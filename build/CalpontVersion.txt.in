@@ -1,0 +1,13 @@
+Name        : calpont                      Relocations: (not relocatable)
+Version     : @@VERSION@@                               Vendor: Calpont Corp.
+Release     : @@RELEASE@@                             Build Date: @@BUILDDATE@@
+Install Date: @@INSTALLDATE@@      Build Host: @@BUILDMACHINE@@.calpont.com
+Group       : Applications
+Size        : 750449506                        License: Copyright (c) 2013 Calpont Corp., all rights reserved
+Signature   : (none)
+Packager    : @@PACKAGER@@
+URL         : http://www.calpont.com/
+Summary     : Calpont InfiniDB software for Windows
+
+Calpont InfiniDB binary files
+

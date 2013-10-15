@@ -1,0 +1,152 @@
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: JLOWE
+Search_columns: 
+Projection: O.O_ORDERDATE
+Object_name: ORDERS
+Alias: O@SEL$2
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$2
+--------------------
+Operation: sort
+Options: AGGREGATE
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  MIN(O.O_ORDERDATE)
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$2
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: JLOWE
+Search_columns: 
+Projection: ORDERS.O_ORDERKEY^ORDERS.O_CUSTKEY^ORDERS.O_ORDERSTATUS^ORDERS.O_TOTALPRICE^O_ORDERDATE^ORDERS.O_ORDERPRIORITY^ORDERS.O_CLERK^ORDERS.O_SHIPPRIORITY^ORDERS.O_COMMENT
+Object_name: ORDERS
+Alias: ORDERS@SEL$1
+Extended_information:    FP:O_ORDERDATE<> (SELECT MIN(O.O_ORDERDATE) FROM ORDERS O)
+Access_predicates: 
+Filter_predicates: O_ORDERDATE<> (SELECT MIN(O.O_ORDERDATE) FROM ORDERS O)
+Select_level: SEL$1
+--------------------
+Operation: select statement
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection: 
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+TOKEN: <O_ORDERDATE<> (SELECT MIN(O.O_ORDERDATE) FROM ORDERS O)>
+TOKEN: <O_ORDERDATE<> (SELECT MIN(O.O_ORDERDATE) FROM ORDERS O)>
+Operator: (
+SimpleFilter
+  SimpleColumn tpch.ORDERS.O_ORDERDATE
+  s/t/c/T/A/RA: tpch/ORDERS/O_ORDERDATE/20/O/0
+  Operator: <>  ArithmeticColumn: >TreeNodeImpl<
+
+Operator: )
+O_CLERK: SimpleColumn tpch.ORDERS.O_CLERK
+  s/t/c/T/A/RA: tpch/ORDERS/O_CLERK/22/ORDERS/0
+
+O_COMMENT: SimpleColumn tpch.ORDERS.O_COMMENT
+  s/t/c/T/A/RA: tpch/ORDERS/O_COMMENT/24/ORDERS/0
+
+O_CUSTKEY: SimpleColumn tpch.ORDERS.O_CUSTKEY
+  s/t/c/T/A/RA: tpch/ORDERS/O_CUSTKEY/17/ORDERS/0
+
+O_ORDERDATE: SimpleColumn tpch.ORDERS.O_ORDERDATE
+  s/t/c/T/A/RA: tpch/ORDERS/O_ORDERDATE/20/O/0
+
+O_ORDERDATE: SimpleColumn tpch.ORDERS.O_ORDERDATE
+  s/t/c/T/A/RA: tpch/ORDERS/O_ORDERDATE/20/ORDERS/0
+
+O_ORDERKEY: SimpleColumn tpch.ORDERS.O_ORDERKEY
+  s/t/c/T/A/RA: tpch/ORDERS/O_ORDERKEY/16/ORDERS/0
+
+O_ORDERPRIORITY: SimpleColumn tpch.ORDERS.O_ORDERPRIORITY
+  s/t/c/T/A/RA: tpch/ORDERS/O_ORDERPRIORITY/21/ORDERS/0
+
+O_ORDERSTATUS: SimpleColumn tpch.ORDERS.O_ORDERSTATUS
+  s/t/c/T/A/RA: tpch/ORDERS/O_ORDERSTATUS/18/ORDERS/0
+
+O_SHIPPRIORITY: SimpleColumn tpch.ORDERS.O_SHIPPRIORITY
+  s/t/c/T/A/RA: tpch/ORDERS/O_SHIPPRIORITY/23/ORDERS/0
+
+O_TOTALPRICE: SimpleColumn tpch.ORDERS.O_TOTALPRICE
+  s/t/c/T/A/RA: tpch/ORDERS/O_TOTALPRICE/19/ORDERS/0
+
+>SELECT MAIN
+>>Returned Columns
+SimpleColumn tpch.ORDERS.O_ORDERKEY
+  s/t/c/T/A/RA: tpch/ORDERS/O_ORDERKEY/16/ORDERS/0
+
+SimpleColumn tpch.ORDERS.O_CUSTKEY
+  s/t/c/T/A/RA: tpch/ORDERS/O_CUSTKEY/17/ORDERS/0
+
+SimpleColumn tpch.ORDERS.O_ORDERSTATUS
+  s/t/c/T/A/RA: tpch/ORDERS/O_ORDERSTATUS/18/ORDERS/0
+
+SimpleColumn tpch.ORDERS.O_TOTALPRICE
+  s/t/c/T/A/RA: tpch/ORDERS/O_TOTALPRICE/19/ORDERS/0
+
+SimpleColumn tpch.ORDERS.O_ORDERDATE
+  s/t/c/T/A/RA: tpch/ORDERS/O_ORDERDATE/20/O/0
+
+SimpleColumn tpch.ORDERS.O_ORDERPRIORITY
+  s/t/c/T/A/RA: tpch/ORDERS/O_ORDERPRIORITY/21/ORDERS/0
+
+SimpleColumn tpch.ORDERS.O_CLERK
+  s/t/c/T/A/RA: tpch/ORDERS/O_CLERK/22/ORDERS/0
+
+SimpleColumn tpch.ORDERS.O_SHIPPRIORITY
+  s/t/c/T/A/RA: tpch/ORDERS/O_SHIPPRIORITY/23/ORDERS/0
+
+SimpleColumn tpch.ORDERS.O_COMMENT
+  s/t/c/T/A/RA: tpch/ORDERS/O_COMMENT/24/ORDERS/0
+
+>>Filters
+SimpleFilter
+  SimpleColumn tpch.ORDERS.O_ORDERDATE
+  s/t/c/T/A/RA: tpch/ORDERS/O_ORDERDATE/20/O/0
+  Operator: <>  ArithmeticColumn: >TreeNodeImpl<
+
+>>Group By Columns
+ArithmeticColumn: AggregateColumn min(O.O_ORDERDATE)
+ArithmeticColumn: SimpleColumn O.O_ORDERDATE
+  s/t/c/T/A/RA: O/O/O_ORDERDATE/20//0
+
+
+
+SessionID: 239
+TxnID: 36
+VerID: 36
+--- Column Map ---
+O_CLERK : 0x8fc5e20
+O_COMMENT : 0x8fc5e80
+O_CUSTKEY : 0x8fc5c78
+O_ORDERDATE : 0x8f90c00
+O_ORDERDATE : 0x8fc5dc0
+O_ORDERKEY : 0x8fc5c48
+O_ORDERPRIORITY : 0x8fc5df0
+O_ORDERSTATUS : 0x8fc5d60
+O_SHIPPRIORITY : 0x8fc5e50
+O_TOTALPRICE : 0x8fc5d90
+

@@ -1,0 +1,38 @@
+#!/bin/sh
+#
+# $Id: clean 1843 2013-03-14 21:43:13Z pleblanc $
+#
+
+for x in \
+dbcon \
+ddlproc \
+decomsvr \
+dmlib \
+dmlproc \
+exemgr \
+mysql \
+net-snmp \
+oam \
+oamapps \
+primitives \
+procmgr \
+procmon \
+snmpd \
+tools \
+utils \
+versioning \
+writeengine \
+; do
+
+# BOOTSTRAP is used to have make ignore sections of make code like:
+# -include $(SRCS:.cpp=.d) tdriver.d. Make will try to generate the .d
+# files if they don't exist since we typically have a rule that says
+# how to do that.  That involves processing header files and we don't
+# want the success of the clean operation to fail because of missing
+# headers.
+
+    make BOOTSTRAP=1 -C $x clean
+done
+
+rm -rf export
+

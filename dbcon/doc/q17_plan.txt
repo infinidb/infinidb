@@ -1,0 +1,164 @@
+Q17
+select
+	sum(l_extendedprice) / 7.0 as avg_yearly
+from
+	lineitem,
+	part
+where
+	p_partkey = l_partkey
+	and p_brand = ':1'
+	and p_container = ':2'
+	and l_quantity < (
+		select
+			0.2 * avg(l_quantity)
+		from
+			lineitem
+		where
+			l_partkey = p_partkey
+	);
+
+Oracle Execution Plan
+
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: P_PARTKEY^P_BRAND^P_CONTAINER
+Object_name: PART
+Alias: PART@SEL$1
+Extended_information:    FP:P_CONTAINER=':2' AND P_BRAND=':1'
+Access_predicates: 
+Filter_predicates: P_CONTAINER=':2'&P_BRAND=':1'
+Select_level: SEL$DD8D4BD4
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: L_PARTKEY^L_QUANTITY^L_EXTENDEDPRICE
+Object_name: LINEITEM
+Alias: LINEITEM@SEL$1
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$DD8D4BD4
+--------------------
+Operation: hash join
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  P_PARTKEY^L_PARTKEY^P_CONTAINER^P_BRAND^L_EXTENDEDPRICE^L_QUANTITY
+Object_name: 
+Alias: 
+Extended_information:    AP:P_PARTKEY=L_PARTKEY
+Access_predicates: P_PARTKEY=L_PARTKEY
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: window
+Options: SORT
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  L_PARTKEY^P_PARTKEY^L_QUANTITY^P_CONTAINER^P_BRAND^L_EXTENDEDPRICE^AVG(L_QUANTITY) OVER ( PARTITION BY L_PARTKEY)
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$DD8D4BD4
+--------------------
+Operation: view
+Options: 
+Object_type: VIEW
+Other: 
+Object_owner: SYS
+Search_columns: 
+Projection: L_EXTENDEDPRICE
+Object_name: 
+Alias: VW_WIF_1@SEL$D99A5D2D
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$DD8D4BD4
+--------------------
+Operation: sort
+Options: AGGREGATE
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  SUM(L_EXTENDEDPRICE)
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$C15DFC48
+--------------------
+Operation: select statement
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection: 
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+
+Calpont Execution Plan
+
+>SELECT MAIN
+>>Returned Columns
+ArithmeticColumn: AggregateColumn sum(L_EXTENDEDPRICE)
+ArithmeticColumn: SimpleColumn L_EXTENDEDPRICE
+  s/t/c/T/A: ///0/
+
+
+>>Filters
+SimpleFilter
+  SimpleColumn tpch.PART.P_CONTAINER
+  s/t/c/T/A: tpch/PART/P_CONTAINER/52/PART
+  Operator: =  ConstantColumn: :2(l)
+SimpleFilter
+  SimpleColumn tpch.PART.P_BRAND
+  s/t/c/T/A: tpch/PART/P_BRAND/49/PART
+  Operator: =  ConstantColumn: :1(l)
+Operator: AND
+SimpleFilter
+  SimpleColumn tpch.PART.P_PARTKEY
+  s/t/c/T/A: tpch/PART/P_PARTKEY/46/PART
+  Operator: =  SimpleColumn tpch.LINEITEM.L_PARTKEY
+  s/t/c/T/A: tpch/LINEITEM/L_PARTKEY/26/LINEITEM
+
+Operator: and
+>>Group By Columns
+ArithmeticColumn: AggregateColumn sum(L_EXTENDEDPRICE)
+ArithmeticColumn: SimpleColumn L_EXTENDEDPRICE
+  s/t/c/T/A: ///0/
+
+
+
+SessionID: 4870
+TxnID: 332
+VerID: 332
+--- Column Map ---
+L_EXTENDEDPRICE : 0x8703a80
+L_PARTKEY : 0x8703948
+L_QUANTITY : 0x8703978
+P_BRAND : 0x86e9728
+P_CONTAINER : 0x86e9758
+P_PARTKEY : 0x86e2df8
+

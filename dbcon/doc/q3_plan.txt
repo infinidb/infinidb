@@ -1,0 +1,243 @@
+Q3
+select
+        l_orderkey,
+        sum(l_extendedprice * (1 - l_discount)) as revenue,
+        o_orderdate,
+        o_shippriority
+from
+        customer,
+        orders,
+        lineitem
+where
+        c_mktsegment = 'BUILDING'
+        and c_custkey = o_custkey
+        and l_orderkey = o_orderkey
+        and o_orderdate < date '1995-03-15'
+        and l_shipdate > date '1995-03-15'
+group by
+        l_orderkey,
+        o_orderdate,
+        o_shippriority
+order by
+        revenue desc,
+        o_orderdate;
+
+Oracle Execution Plan
+
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: L_ORDERKEY^L_EXTENDEDPRICE^L_DISCOUNT
+Object_name: LINEITEM
+Alias: LINEITEM@SEL$1
+Extended_information:    FP:L_SHIPDATE>'1995-03-15'
+Access_predicates: 
+Filter_predicates: L_SHIPDATE>'1995-03-15'
+Select_level: SEL$1
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: C_CUSTKEY
+Object_name: CUSTOMER
+Alias: CUSTOMER@SEL$1
+Extended_information:    FP:C_MKTSEGMENT='BUILDING'
+Access_predicates: 
+Filter_predicates: C_MKTSEGMENT='BUILDING'
+Select_level: SEL$1
+--------------------
+Operation: buffer
+Options: SORT
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  L_ORDERKEY^L_EXTENDEDPRICE^L_DISCOUNT
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: merge join
+Options: CARTESIAN
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  C_CUSTKEY^L_ORDERKEY^L_EXTENDEDPRICE^L_DISCOUNT
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: O_ORDERKEY^O_CUSTKEY^O_ORDERDATE^O_SHIPPRIORITY
+Object_name: ORDERS
+Alias: ORDERS@SEL$1
+Extended_information:    FP:O_ORDERDATE<'1995-03-15'
+Access_predicates: 
+Filter_predicates: O_ORDERDATE<'1995-03-15'
+Select_level: SEL$1
+--------------------
+Operation: hash join
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  L_ORDERKEY^L_DISCOUNT^L_EXTENDEDPRICE^O_ORDERDATE^O_SHIPPRIORITY
+Object_name: 
+Alias: 
+Extended_information:    AP:C_CUSTKEY=O_CUSTKEY AND L_ORDERKEY=O_ORDERKEY
+Access_predicates: C_CUSTKEY=O_CUSTKEY&L_ORDERKEY=O_ORDERKEY
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: hash
+Options: GROUP BY
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  L_ORDERKEY^O_ORDERDATE^O_SHIPPRIORITY^SUM(L_EXTENDEDPRICE*(1-L_DISCOUNT))
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: sort
+Options: ORDER BY
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  SUM(L_EXTENDEDPRICE*(1-L_DISCOUNT))^O_ORDERDATE^L_ORDERKEY^O_SHIPPRIORITY
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$1
+--------------------
+Operation: select statement
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection: 
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+Calpont Execution Plan
+
+>SELECT MAIN
+>>Returned Columns
+1. ArithmeticColumn: AggregateColumn sum(L_EXTENDEDPRICE*(1-L_DISCOUNT))
+ArithmeticColumn: SimpleColumn L_EXTENDEDPRICE
+  s/t/c/T/A: ///0/
+
+ConstantColumn: 1(n)
+SimpleColumn L_DISCOUNT
+  s/t/c/T/A: ///0/
+
+Operator: -
+Operator: *
+
+
+2. SimpleColumn tpch.ORDERS.O_ORDERDATE
+  s/t/c/T/A: tpch/ORDERS/O_ORDERDATE/20/ORDERS
+
+3. SimpleColumn tpch.LINEITEM.L_ORDERKEY
+  s/t/c/T/A: tpch/LINEITEM/L_ORDERKEY/25/LINEITEM
+
+4. SimpleColumn tpch.ORDERS.O_SHIPPRIORITY
+  s/t/c/T/A: tpch/ORDERS/O_SHIPPRIORITY/23/ORDERS
+
+>>Filters
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_SHIPDATE
+  s/t/c/T/A: tpch/LINEITEM/L_SHIPDATE/35/
+  Operator: >  ConstantColumn: 1995-03-15(l)
+SimpleFilter
+  SimpleColumn tpch.CUSTOMER.C_MKTSEGMENT
+  s/t/c/T/A: tpch/CUSTOMER/C_MKTSEGMENT/14/
+  Operator: =  ConstantColumn: BUILDING(l)
+Operator: and
+SimpleFilter
+  SimpleColumn tpch.ORDERS.O_ORDERDATE
+  s/t/c/T/A: tpch/ORDERS/O_ORDERDATE/20/ORDERS
+  Operator: <  ConstantColumn: 1995-03-15(l)
+Operator: and
+SimpleFilter
+  SimpleColumn tpch.CUSTOMER.C_CUSTKEY
+  s/t/c/T/A: tpch/CUSTOMER/C_CUSTKEY/8/CUSTOMER
+  Operator: =  SimpleColumn tpch.ORDERS.O_CUSTKEY
+  s/t/c/T/A: tpch/ORDERS/O_CUSTKEY/17/ORDERS
+
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_ORDERKEY
+  s/t/c/T/A: tpch/LINEITEM/L_ORDERKEY/25/LINEITEM
+  Operator: =  SimpleColumn tpch.ORDERS.O_ORDERKEY
+  s/t/c/T/A: tpch/ORDERS/O_ORDERKEY/16/ORDERS
+
+Operator: AND
+Operator: and
+>>Group By Columns
+ArithmeticColumn: AggregateColumn sum(L_EXTENDEDPRICE*(1-L_DISCOUNT))
+ArithmeticColumn: SimpleColumn L_EXTENDEDPRICE
+  s/t/c/T/A: ///0/
+
+ConstantColumn: 1(n)
+SimpleColumn L_DISCOUNT
+  s/t/c/T/A: ///0/
+
+Operator: -
+Operator: *
+
+
+SimpleColumn tpch.ORDERS.O_ORDERDATE
+  s/t/c/T/A: tpch/ORDERS/O_ORDERDATE/20/ORDERS
+
+SimpleColumn tpch.LINEITEM.L_ORDERKEY
+  s/t/c/T/A: tpch/LINEITEM/L_ORDERKEY/25/LINEITEM
+
+SimpleColumn tpch.ORDERS.O_SHIPPRIORITY
+  s/t/c/T/A: tpch/ORDERS/O_SHIPPRIORITY/23/ORDERS
+
+SessionID: 4794
+TxnID: 294
+VerID: 294
+--- Column Map ---
+C_CUSTKEY : 0x9e39a20
+C_MKTSEGMENT : 0x9e39aa0
+L_DISCOUNT : 0x9e1e758
+L_EXTENDEDPRICE : 0x9e1e728
+L_ORDERKEY : 0x9e17df8
+L_SHIPDATE : 0x9e1e7b8
+O_CUSTKEY : 0x9e39b40
+O_ORDERDATE : 0x9e39b70
+O_ORDERKEY : 0x9e39b10
+O_SHIPPRIORITY : 0x9e39ba0
+

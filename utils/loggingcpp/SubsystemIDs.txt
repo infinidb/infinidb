@@ -1,0 +1,40 @@
+# $Id: SubsystemIDs.txt 3929 2013-06-20 18:27:03Z dhill $
+#
+# This file contains the mapping of numeric Subsystem IDs to actual software and 
+#  hardware subsystems. This file is intended as a simple mechanism to control the
+#  issue of subsystem IDs and is not consulted by the message logging source code.
+#  But it does match SubsystemID[] in messagelog.cpp.
+
+01 - ddljoblist 
+02 - ddlpackage 
+03 - dmlpackage 
+04 - execplan 
+05 - joblist 
+06 - resultset 
+07 - calpontConsole 
+08 - oamcpp 
+09 - servermonitor 
+10 - traphandler 
+11 - snmpmanager 
+12 - configcpp 
+13 - loggingcpp 
+14 - messageqcpp 
+15 - ddlproc 
+16 - exemgr 
+17 - procmgr 
+18 - procmon
+19 - writeengine
+20 - dmlproc
+21 - dmlpackageproc
+22 - threadpool
+23 - ddlpackageproc
+24 - dbcon
+25 - diskmanager
+26 - routemsg
+27 - sqlbuffmgr
+28 - primproc
+29 - masterdbrm
+30 - slavedbrm
+31 - messagequeue
+32 - writeengineserver
+33 - writeenginesplit

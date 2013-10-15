@@ -1,0 +1,22 @@
+#!/bin/sh
+
+# This script is for adding an include statement to Makefiles in order
+# to point them at the toplevel rules.mak.  It was used to add these
+# lines when rules.mak was introduced.
+
+root=${root:-.}
+
+files=$(find $root -name '[mM]akefile' | grep -v ./mysql)
+
+for x in $files; do
+
+    istmt=$(dirname $(echo $x | sed -r -e 's,\./,,' -e 's,[^/]+/,\.\./,g'))/rules.mak
+    tmpfile=/tmp/setmktop.$UID
+    # put new include stmt
+    echo "include $istmt" > $tmpfile
+    # append the old file less any include rules.mak lines
+    grep -v '^include .*rules.mak' $x >> $tmpfile
+    # copy over old
+    mv $tmpfile $x
+    printf "%s %s\n" "$x :" $istmt
+done

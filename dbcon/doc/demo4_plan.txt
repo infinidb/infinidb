@@ -1,0 +1,204 @@
+Demo4
+Select to_char(o_orderdate,'YYYY'),
+      sum(l_quantity) qty_sold
+      from  part,
+            orders,
+            lineitem
+      where p_partkey = l_partkey
+            and l_orderkey = o_orderkey
+            and o_orderdate between TO_DATE('1995-01-01', 'YYYY-MM-DD') 
+            and TO_DATE('1995-01-31', 'YYYY-MM-DD')
+            and p_type = 'ECONOMY ANODIZED STEEL'
+      group by to_char(o_orderdate,'YYYY');
+
+Oracle Execution Plan
+
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: TPCH
+Search_columns: 
+Projection: O_ORDERKEY^O_ORDERDATE
+Object_name: ORDERS
+Alias: ORDERS@SEL$1
+Extended_information:    FP:O_ORDERDATE>='1995-01-01' AND O_ORDERDATE<='1995-01-31'
+Access_predicates: 
+Filter_predicates: O_ORDERDATE>='1995-01-01'&O_ORDERDATE<='1995-01-31'
+Select_level: SEL$1
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: TPCH
+Search_columns: 
+Projection: L_ORDERKEY^L_PARTKEY^L_QUANTITY
+Object_name: LINEITEM
+Alias: LINEITEM@SEL$1
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$1
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: TPCH
+Search_columns: 
+Projection: P_PARTKEY
+Object_name: PART
+Alias: PART@SEL$1
+Extended_information:    FP:P_TYPE='ECONOMY ANODIZED STEEL'
+Access_predicates: 
+Filter_predicates: P_TYPE='ECONOMY ANODIZED STEEL'
+Select_level: SEL$1
+--------------------
+Operation: hash join ( Temp Space:      10,126,000 )
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  O_ORDERDATE^L_QUANTITY^L_PARTKEY
+Object_name: 
+Alias: 
+Extended_information:    AP:L_ORDERKEY=O_ORDERKEY
+Access_predicates: L_ORDERKEY=O_ORDERKEY
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: hash join ( Temp Space:       5,333,000 )
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  O_ORDERDATE^L_QUANTITY
+Object_name: 
+Alias: 
+Extended_information:    AP:P_PARTKEY=L_PARTKEY
+Access_predicates: P_PARTKEY=L_PARTKEY
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: filter
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection: O_ORDERDATE^L_QUANTITY
+Object_name: 
+Alias: 
+Extended_information:    FP:TO_DATE('1995-01-01')<=TO_DATE('1995-01-31')
+Access_predicates: 
+Filter_predicates: TO_DATE('1995-01-01')<=TO_DATE('1995-01-31')
+Select_level: 
+--------------------
+Operation: hash
+Options: GROUP BY
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  TO_CHAR(INTERNAL_FUNCTION(O_ORDERDATE),'YYYY')^SUM(L_QUANTITY)
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$1
+--------------------
+Operation: select statement
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection: 
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+
+Calpont Execution Plan
+
+>SELECT MAIN
+>>Returned Columns
+ArithmeticColumn: FunctionColumn: to_char(INTERNAL_FUNCTION(O_ORDERDATE),'YYYY')
+
+ArithmeticColumn: AggregateColumn sum(L_QUANTITY)
+ArithmeticColumn: SimpleColumn L_QUANTITY
+  s/t/c/T/A/RA: //L_QUANTITY/29//0
+
+
+
+>>Filters
+ConstantFilter
+  Operator: and
+   SimpleColumn tpch.ORDERS.O_ORDERDATE
+  s/t/c/T/A/RA: tpch/ORDERS/O_ORDERDATE/20//0
+
+  SimpleFilter
+  SimpleColumn tpch.ORDERS.O_ORDERDATE
+  s/t/c/T/A/RA: tpch/ORDERS/O_ORDERDATE/20//0
+  Operator: >=  ConstantColumn: 1995-01-01(l)
+  SimpleFilter
+  SimpleColumn tpch.ORDERS.O_ORDERDATE
+  s/t/c/T/A/RA: tpch/ORDERS/O_ORDERDATE/20//0
+  Operator: <=  ConstantColumn: 1995-01-31(l)
+
+ConstantFilter
+   SimpleColumn tpch.PART.P_TYPE
+  s/t/c/T/A/RA: tpch/PART/P_TYPE/50//0
+
+  SimpleFilter
+  SimpleColumn tpch.PART.P_TYPE
+  s/t/c/T/A/RA: tpch/PART/P_TYPE/50//0
+  Operator: =  ConstantColumn: ECONOMY ANODIZED STEEL(l)
+
+Operator: and
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_ORDERKEY
+  s/t/c/T/A/RA: tpch/LINEITEM/L_ORDERKEY/25//0
+  Operator: =  SimpleColumn tpch.ORDERS.O_ORDERKEY
+  s/t/c/T/A/RA: tpch/ORDERS/O_ORDERKEY/16//0
+
+Operator: and
+SimpleFilter
+  SimpleColumn tpch.PART.P_PARTKEY
+  s/t/c/T/A/RA: tpch/PART/P_PARTKEY/46//0
+  Operator: =  SimpleColumn tpch.LINEITEM.L_PARTKEY
+  s/t/c/T/A/RA: tpch/LINEITEM/L_PARTKEY/26//0
+
+Operator: and
+SimpleFilter
+  ArithmeticColumn: FunctionColumn: to_date('1995-01-01')
+  Operator: <=  ArithmeticColumn: FunctionColumn: to_date('1995-01-31')
+
+Operator: and
+>>Group By Columns
+ArithmeticColumn: FunctionColumn: to_char(INTERNAL_FUNCTION(O_ORDERDATE),'YYYY')
+
+ArithmeticColumn: AggregateColumn sum(L_QUANTITY)
+ArithmeticColumn: SimpleColumn L_QUANTITY
+  s/t/c/T/A/RA: //L_QUANTITY/29//0
+
+SessionID: 11846
+TxnID: 165
+VerID: 165
+
+--- Column Map ---
+L_ORDERKEY : 0x6a63d0
+L_PARTKEY : 0x6a6340
+L_QUANTITY : 0x69de80
+O_ORDERDATE : 0x6a6550
+O_ORDERKEY : 0x6a65f0
+P_PARTKEY : 0x6a66d0
+P_TYPE : 0x6a67b0
+

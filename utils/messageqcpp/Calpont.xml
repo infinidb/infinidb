@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Calpont Version="V1.0.0">
+	<Messageq>
+		<Dir>.</Dir>
+	</Messageq>
+	<server1>
+		<IPAddr>127.0.0.1</IPAddr>
+		<Port>7601</Port>
+	</server1>
+	<server2>
+		<IPAddr>127.0.0.1</IPAddr>
+		<Port>7602</Port>
+	</server2>
+	<server3>
+		<IPAddr>127.0.0.1</IPAddr>
+		<Port>7603</Port>
+	</server3>
+	<server4>
+		<IPAddr>127.0.0.1</IPAddr>
+		<Port>7604</Port>
+	</server4>
+	<server5>
+		<IPAddr>127.0.0.1</IPAddr>
+		<Port>7605</Port>
+	</server5>
+	<server6>
+		<IPAddr>127.0.0.1</IPAddr>
+		<Port>7606</Port>
+	</server6>
+</Calpont>

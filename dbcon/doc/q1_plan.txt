@@ -1,0 +1,233 @@
+Q1
+select
+	l_returnflag,
+	l_linestatus,
+	sum(l_quantity) as sum_qty,
+	sum(l_extendedprice) as sum_base_price,
+	sum(l_extendedprice * (1 - l_discount)) as sum_disc_price,
+	sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)) as sum_charge,
+	avg(l_quantity) as avg_qty,
+	avg(l_extendedprice) as avg_price,
+	avg(l_discount) as avg_disc,
+	count(*) as count_order
+from
+	lineitem
+where
+	l_shipdate <= date '1998-12-01' - interval '1' day (3)
+group by
+	l_returnflag,
+	l_linestatus
+order by
+	l_returnflag,
+	l_linestatus;
+
+Oracle Execution Plan
+
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: L_QUANTITY^L_EXTENDEDPRICE^L_DISCOUNT^L_TAX^L_RETURNFLAG^L_LINESTATUS
+Object_name: LINEITEM
+Alias: LINEITEM@SEL$1
+Extended_information:    FP:L_SHIPDATE<=TO_DATE('1998-09-02 00:00:00', 'yyyy-mm-dd hh24:mi:ss')
+Access_predicates: 
+Filter_predicates: L_SHIPDATE<=TO_DATE('1998-09-02 00:00:00', 'yyyy-mm-dd hh24:mi:ss')
+Select_level: SEL$1
+--------------------
+Operation: sort
+Options: GROUP BY
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  L_RETURNFLAG^L_LINESTATUS^COUNT(ALL)^COUNT(L_DISCOUNT)^COUNT(L_EXTENDEDPRICE)^COUNT(L_QUANTITY)^SUM(L_DISCOUNT)^SUM(L_EXTENDEDPRICE*(1-L_DISCOUNT)*(1+L_TAX))^SUM(L_EXTENDEDPRICE*(1-L_DISCOUNT))^SUM(L_EXTENDEDPRICE)^SUM(L_QUANTITY)
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$1
+--------------------
+Operation: select statement
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection: 
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+
+Calpont Execution Plan
+
+>SELECT MAIN
+>>Returned Columns
+1. SimpleColumn tpch.LINEITEM.L_RETURNFLAG
+  s/t/c/T/A: tpch/LINEITEM/L_RETURNFLAG/33/LINEITEM
+
+2. SimpleColumn tpch.LINEITEM.L_LINESTATUS
+  s/t/c/T/A: tpch/LINEITEM/L_LINESTATUS/34/LINEITEM
+
+3. ArithmeticColumn: AggregateColumn count(ALL)
+ArithmeticColumn: SimpleColumn ALL
+  s/t/c/T/A: ///0/
+
+4. ArithmeticColumn: AggregateColumn count(L_DISCOUNT)
+ArithmeticColumn: SimpleColumn L_DISCOUNT
+  s/t/c/T/A: ///0/
+
+5. ArithmeticColumn: AggregateColumn count(L_EXTENDEDPRICE)
+ArithmeticColumn: SimpleColumn L_EXTENDEDPRICE
+  s/t/c/T/A: ///0/
+
+6. ArithmeticColumn: AggregateColumn count(L_QUANTITY)
+ArithmeticColumn: SimpleColumn L_QUANTITY
+  s/t/c/T/A: ///0/
+
+7. ArithmeticColumn: AggregateColumn sum(L_DISCOUNT)
+ArithmeticColumn: SimpleColumn L_DISCOUNT
+  s/t/c/T/A: ///0/
+
+8. ArithmeticColumn: AggregateColumn sum(L_EXTENDEDPRICE*(1-L_DISCOUNT)*(1+L_TAX))
+ArithmeticColumn: SimpleColumn L_EXTENDEDPRICE
+  s/t/c/T/A: ///0/
+
+ConstantColumn: 1(n)
+SimpleColumn L_DISCOUNT
+  s/t/c/T/A: ///0/
+
+Operator: -
+Operator: *
+ConstantColumn: 1(n)
+SimpleColumn L_TAX
+  s/t/c/T/A: ///0/
+
+Operator: +
+Operator: *
+
+
+9. ArithmeticColumn: AggregateColumn sum(L_EXTENDEDPRICE*(1-L_DISCOUNT))
+ArithmeticColumn: SimpleColumn L_EXTENDEDPRICE
+  s/t/c/T/A: ///0/
+
+ConstantColumn: 1(n)
+SimpleColumn L_DISCOUNT
+  s/t/c/T/A: ///0/
+
+Operator: -
+Operator: *
+
+
+10. ArithmeticColumn: AggregateColumn sum(L_EXTENDEDPRICE)
+ArithmeticColumn: SimpleColumn L_EXTENDEDPRICE
+  s/t/c/T/A: ///0/
+
+
+
+11. ArithmeticColumn: AggregateColumn sum(L_QUANTITY)
+ArithmeticColumn: SimpleColumn L_QUANTITY
+  s/t/c/T/A: ///0/
+
+
+
+>>Filters
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_SHIPDATE
+  s/t/c/T/A: tpch/LINEITEM/L_SHIPDATE/35/
+  Operator: <=  ArithmeticColumn: FunctionColumn: to_date('1998-09-02 00:00:00', 'yyyy-mm-dd hh24:mi:ss')
+
+>>Group By Columns
+SimpleColumn tpch.LINEITEM.L_RETURNFLAG
+  s/t/c/T/A: tpch/LINEITEM/L_RETURNFLAG/33/LINEITEM
+
+SimpleColumn tpch.LINEITEM.L_LINESTATUS
+  s/t/c/T/A: tpch/LINEITEM/L_LINESTATUS/34/LINEITEM
+
+ArithmeticColumn: AggregateColumn count(ALL)
+ArithmeticColumn: SimpleColumn ALL
+  s/t/c/T/A: ///0/
+
+
+
+ArithmeticColumn: AggregateColumn count(L_DISCOUNT)
+ArithmeticColumn: SimpleColumn L_DISCOUNT
+  s/t/c/T/A: ///0/
+
+
+
+ArithmeticColumn: AggregateColumn count(L_EXTENDEDPRICE)
+ArithmeticColumn: SimpleColumn L_EXTENDEDPRICE
+  s/t/c/T/A: ///0/
+
+
+
+ArithmeticColumn: AggregateColumn count(L_QUANTITY)
+ArithmeticColumn: SimpleColumn L_QUANTITY
+  s/t/c/T/A: ///0/
+
+
+
+ArithmeticColumn: AggregateColumn sum(L_DISCOUNT)
+ArithmeticColumn: SimpleColumn L_DISCOUNT
+  s/t/c/T/A: ///0/
+
+
+
+ArithmeticColumn: AggregateColumn sum(L_EXTENDEDPRICE*(1-L_DISCOUNT)*(1+L_TAX))
+ArithmeticColumn: SimpleColumn L_EXTENDEDPRICE
+  s/t/c/T/A: ///0/
+
+ConstantColumn: 1(n)
+SimpleColumn L_DISCOUNT
+  s/t/c/T/A: ///0/
+
+Operator: -
+Operator: *
+ConstantColumn: 1(n)
+SimpleColumn L_TAX
+  s/t/c/T/A: ///0/
+
+Operator: +
+Operator: *
+
+
+ArithmeticColumn: AggregateColumn sum(L_EXTENDEDPRICE*(1-L_DISCOUNT))
+ArithmeticColumn: SimpleColumn L_EXTENDEDPRICE
+  s/t/c/T/A: ///0/
+
+ConstantColumn: 1(n)
+SimpleColumn L_DISCOUNT
+  s/t/c/T/A: ///0/
+
+Operator: -
+Operator: *
+
+
+ArithmeticColumn: AggregateColumn sum(L_EXTENDEDPRICE)
+ArithmeticColumn: SimpleColumn L_EXTENDEDPRICE
+  s/t/c/T/A: ///0/
+
+ArithmeticColumn: AggregateColumn sum(L_QUANTITY)
+ArithmeticColumn: SimpleColumn L_QUANTITY
+  s/t/c/T/A: ///0/
+
+SessionID: 4790
+TxnID: 292
+VerID: 292
+--- Column Map ---
+L_DISCOUNT : 0x913f768
+L_EXTENDEDPRICE : 0x913f738
+L_LINESTATUS : 0x9158898
+L_QUANTITY : 0x9158d98
+L_RETURNFLAG : 0x913f7c8
+L_SHIPDATE : 0x91589d0
+L_TAX : 0x913f798
+

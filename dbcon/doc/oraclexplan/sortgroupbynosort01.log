@@ -1,0 +1,42 @@
+Operation: index
+Options: FULL SCAN
+Object_type: INDEX (UNIQUE)
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: O_ORDERKEY
+Object_name: 
+Alias: ORDERS@SEL$1
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$1
+--------------------
+Operation: sort
+Options: GROUP BY NOSORT
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  O_ORDERKEY
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$1
+--------------------
+Operation: select statement
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection: 
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------

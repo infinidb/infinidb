@@ -1,0 +1,8 @@
+# Copy this file to /etc/default and rename it to 'infinidb'.
+
+# Change this line to your InfiniDB installation directory
+INFINIDB_INSTALL_DIR=/usr/local/Calpont
+
+LD_LIBRARY_PATH=$INFINIDB_INSTALL_DIR/lib:$INFINIDB_INSTALL_DIR/mysql/lib/mysql
+declare -x INFINIDB_INSTALL_DIR=$INFINIDB_INSTALL_DIR
+declare -x LD_LIBRARY_PATH=$LD_LIBRARY_PATH

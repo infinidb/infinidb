@@ -1,0 +1,42 @@
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: O_ORDERKEY^O_CUSTKEY^O_TOTALPRICE
+Object_name: ORDERS
+Alias: ORDERS@SEL$1
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$1
+--------------------
+Operation: window
+Options: SORT
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  O_CUSTKEY^O_ORDERKEY^O_TOTALPRICE^SUM(O_TOTALPRICE) OVER ( ORDER BY O_CUSTKEY RANGE  BETWEEN  UNBOUNDED  PRECEDING  AND  CURRENT ROW )
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$1
+--------------------
+Operation: select statement
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection: 
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------

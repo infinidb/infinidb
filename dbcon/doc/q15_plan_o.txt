@@ -1,0 +1,176 @@
+Q15
+create view revenue (supplier_no, total_revenue) as
+	select
+		l_suppkey,
+		sum(l_extendedprice * (1 - l_discount))
+	from
+		lineitem
+	where
+		l_shipdate >= date '1995-01-01'
+		and l_shipdate < date '1995-01-01' + interval '3' month
+	group by
+		l_suppkey;
+
+:o
+select
+	s_suppkey,
+	s_name,
+	s_address,
+	s_phone,
+	total_revenue
+from
+	supplier,
+	revenue
+where
+	s_suppkey = supplier_no
+	and total_revenue = (
+		select
+			max(total_revenue)
+		from
+			revenue
+	)
+order by
+	s_suppkey;
+
+Oracle Execution Plan
+
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: L_SUPPKEY^L_EXTENDEDPRICE^L_DISCOUNT
+Object_name: LINEITEM
+Alias: LINEITEM@SEL$4
+Extended_information:    FP:L_SHIPDATE>=TO_DATE('1995-01-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss') AND L_SHIPDATE<TO_DATE('1995-04-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss')
+Access_predicates: 
+Filter_predicates: L_SHIPDATE>=TO_DATE('1995-01-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss')&L_SHIPDATE<TO_DATE('1995-04-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss')
+Select_level: SEL$4
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: ROWID^S_SUPPKEY^S_NAME^S_ADDRESS^S_PHONE
+Object_name: SUPPLIER
+Alias: SUPPLIER@SEL$1
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$F5BB74E1
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: L_SUPPKEY^L_EXTENDEDPRICE^L_DISCOUNT
+Object_name: LINEITEM
+Alias: LINEITEM@SEL$2
+Extended_information:    FP:L_SHIPDATE>=TO_DATE('1995-01-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss') AND L_SHIPDATE<TO_DATE('1995-04-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss')
+Access_predicates: 
+Filter_predicates: L_SHIPDATE>=TO_DATE('1995-01-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss')&L_SHIPDATE<TO_DATE('1995-04-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss')
+Select_level: SEL$F5BB74E1
+--------------------
+Operation: sort
+Options: GROUP BY
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  L_SUPPKEY^SUM(L_EXTENDEDPRICE*(1-L_DISCOUNT))
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$4
+--------------------
+Operation: hash join
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  S_SUPPKEY^L_SUPPKEY^ROWID^S_PHONE^S_NAME^S_ADDRESS^L_EXTENDEDPRICE^L_DISCOUNT
+Object_name: 
+Alias: 
+Extended_information:    AP:S_SUPPKEY=L_SUPPKEY
+Access_predicates: S_SUPPKEY=L_SUPPKEY
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: view
+Options: 
+Object_type: VIEW
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: TOTAL_REVENUE
+Object_name: 
+Alias: REVENUE@SEL$3
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$4
+--------------------
+Operation: sort
+Options: GROUP BY
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  S_SUPPKEY^ROWID^S_PHONE^S_ADDRESS^S_NAME^L_SUPPKEY^SUM(L_EXTENDEDPRICE*(1-L_DISCOUNT))
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: sort
+Options: AGGREGATE
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  MAX(TOTAL_REVENUE)
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$3
+--------------------
+Operation: filter
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection: S_SUPPKEY^S_PHONE^S_ADDRESS^S_NAME^SUM(L_EXTENDEDPRICE*(1-L_DISCOUNT))
+Object_name: 
+Alias: 
+Extended_information:    FP:SUM(L_EXTENDEDPRICE*(1-L_DISCOUNT))= (SELECT MAX(TOTAL_REVENUE) FROM  (SELECT L_SUPPKEY SUPPLIER_NO,SUM(L_EXTENDEDPRICE*(1-L_DISCOUNT)) TOTAL_REVENUE FROM S_CALUSER01.LINEITEM LINEITEM WHERE L_SHIPDATE>=TO_DATE('1995-01-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss') AND L_SHIPDATE<TO_DATE('1995-04-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss') GROUP BY L_SUPPKEY) REVENUE)
+Access_predicates: 
+Filter_predicates: SUM(L_EXTENDEDPRICE*(1-L_DISCOUNT))= (SELECT MAX(TOTAL_REVENUE) FROM  (SELECT L_SUPPKEY SUPPLIER_NO,SUM(L_EXTENDEDPRICE*(1-L_DISCOUNT)) TOTAL_REVENUE FROM S_CALUSER01.LINEITEM LINEITEM WHERE L_SHIPDATE>=TO_DATE('1995-01-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss')&L_SHIPDATE<TO_DATE('1995-04-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss') GROUP BY L_SUPPKEY) REVENUE)
+Select_level: SEL$F5BB74E1
+--------------------
+Operation: select statement
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection: 
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------

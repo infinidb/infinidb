@@ -1,0 +1,54 @@
+#!/bin/bash
+#
+# $Id: bootstrap 1333 2011-01-18 17:25:26Z rdempsey $
+#
+# This script is responsible for setting up a fresh development tree
+# following a git checkout.  It copies static files and shared include
+# files to the export tree prior to building the software.
+
+mkdir -p export/{include,lib,etc,share,bin,sbin,post}
+if [ ! $$ ]; then
+    exit 1
+fi
+
+cp build/Doxyfile export/etc
+if [ ! $$ ]; then
+    exit 1
+fi
+
+cp -p -r utils/net-snmp export/include
+
+if [ `uname -m` == "x86_64" ]; then
+	cp -p utils/net-snmp-built-libs/lib64/* export/lib
+	cp -p utils/net-snmp-built-libs/bin64/* export/sbin
+else
+	egrep -qs Constantine /etc/redhat-release
+	if [ $? -eq 0 ]; then
+		cp -p utils/net-snmp-built-libs/fc12lib/libnetsnmp*.so.* export/lib
+		cp -p utils/net-snmp-built-libs/fc12bin/* export/sbin
+	else
+		cp -p utils/net-snmp-built-libs/fc6lib/libnetsnmp*.so.* export/lib
+		cp -p utils/net-snmp-built-libs/fc6bin/* export/sbin
+	fi
+fi
+
+pushd export/lib >/dev/null
+for lib in libnetsnmpagent.so libnetsnmphelpers.so libnetsnmpmibs.so libnetsnmp.so libnetsnmptrapd.so; do
+	rm -f ${lib} ${lib}.5
+	ln -s ${lib}.5.2.1 ${lib}.5
+	ln -s ${lib}.5.2.1 ${lib}
+done
+popd >/dev/null
+
+./build/genVersion.sh
+
+for x in \
+$(find . -name '[mM]akefile' \
+    | xargs grep -l ^bootstrap: \
+    | cut -f 2 -d / \
+    | sort -u)
+do
+  echo bootstrapping $x
+  make BOOTSTRAP=1 -C $x bootstrap
+done
+

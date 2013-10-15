@@ -1,0 +1,47 @@
+#!/bin/bash
+
+branch=genii
+
+prefix=/usr/local/Calpont
+extra_ld_flags="-Wl,-rpath -Wl,$prefix/mysql/lib/mysql -Wl,-rpath -Wl,$prefix/lib"
+
+export LD_LIBRARY_PATH=/usr/local/gcc45/lib64:/usr/local/gmp43/lib:/usr/local/mpfr24/lib:/usr/local/mpc08/lib
+export PATH=/usr/local/gcc45/bin:/usr/local/bin:/bin:/usr/bin
+export CC=/usr/local/gcc45/bin/gcc
+export CXX=/usr/local/gcc45/bin/g++
+
+cd $HOME
+updateGenii.pl > updateGenii.log 2>&1
+rm -rf mysql-5.1.39
+tar -zxf mysql-5.1.39.tar.gz
+cd mysql-5.1.39
+cp $HOME/$branch/dbcon/mysql/configure.in .
+cd sql
+cp $HOME/$branch/dbcon/mysql/*.yy .
+cp $HOME/$branch/dbcon/mysql/*.h .
+cp $HOME/$branch/dbcon/mysql/*.cc .
+if [ -f $HOME/$branch/dbcon/mysql/Makefile.am.mysql ]; then
+	cp $HOME/$branch/dbcon/mysql/Makefile.am.mysql Makefile.am
+fi
+if [ -f $HOME/$branch/utils/loggingcpp/errorids.h ]; then
+	cp $HOME/$branch/utils/loggingcpp/errorids.h .
+fi
+cd ..
+
+for extras in include mysys; do
+	if [ -d $HOME/$branch/dbcon/mysql/$extras ]; then
+		cp $HOME/$branch/dbcon/mysql/$extras/*.h $extras
+	fi
+done
+
+autoreconf
+./configure --prefix=$prefix/mysql --without-libedit --with-readline \
+	--with-plugins=csv,heap,myisam,myisammrg,partition --with-mysqld-ldflags="$extra_ld_flags" \
+	--with-client-ldflags="$extra_ld_flags" --with-extra-charsets=all --with-ssl
+(make && make install) > $HOME/make-$branch.log 2>&1
+cd $HOME/$branch/dbcon/mysql
+cp files.lst $prefix/mysql
+cp install_calpont_mysql.sh $prefix/mysql
+cp my.cnf $prefix/mysql
+cp mysql-Calpont $prefix/mysql
+

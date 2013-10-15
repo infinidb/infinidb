@@ -1,0 +1,424 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- $Id: ConsoleCmds.xml 3331 2012-10-24 21:12:27Z dhill $ -->
+<Calpont Version="V1.0.0">
+	<Cmd0>
+		<Name>help</Name>
+		<Desc1>Get help on the Console Commands</Desc1>
+		<Arg1>No Argument or '-a' will display a list of Console commands</Arg1>
+		<Arg2>Optional: '-v' will display a list of Console commands with their descriptions</Arg2>
+		<Arg3>Optional: Command-name will display the command description</Arg3>
+	</Cmd0>
+	<Cmd1>
+		<Name>?</Name>
+		<Desc1>Get help on the Console Commands</Desc1>
+		<Arg1>No Argument, '-a', or '-all' will display a list of Console commands</Arg1>
+		<Arg2>Optional: '-v' or '-verbose' will display a list of Console commands with their descriptions</Arg2>
+		<Arg3>Optional: Command-name will display the command description</Arg3>
+	</Cmd1>
+	<Cmd2>
+		<Name>exit</Name>
+		<Desc1>Exit from the Console tool</Desc1>
+		<Arg1>None</Arg1>
+	</Cmd2>
+	<Cmd3>
+		<Name>quit</Name>
+		<Desc1>Exit from the Console tool</Desc1>
+		<Arg1>None</Arg1>
+	</Cmd3>
+	<Cmd4>
+		<Name>getSystemConfig</Name>
+		<Desc1>Get System Configuration Information</Desc1>
+		<Desc2>Can display all parmeters or a single parameter</Desc2>
+		<Arg1>No Argument or 'all' will display all System Configuration parameters</Arg1>
+		<Arg2>Optional: Parameter-name will display the System Configuration parameter</Arg2>
+	</Cmd4>
+	<Cmd5>
+		<Name>setSystemConfig</Name>
+		<Desc1>Set a System Configuration parameter</Desc1>
+		<Arg1>Required: Parameter-name is the parameter to be updated</Arg1>
+		<Arg2>Required: Parameter-value is the parameter value</Arg2>
+	</Cmd5>
+	<Cmd6>
+		<Name>getModuleTypeConfig</Name>
+		<Desc1>Get Module Type Configuration Information</Desc1>
+		<Desc2>Can display all Module Type parameters, parameters for a single module type , or a single parameter for a specific module type</Desc2>
+		<Arg1>No Argument or 'all' will display all Module Type Configuration parameters</Arg1>
+		<Arg2>Optional: Module-type will display the Module Type Configuration parameters</Arg2>
+		<Arg3>Optional: Module-type and Parameter-name will display the Module Type Configuration parameter</Arg3>
+	</Cmd6>
+	<Cmd7>
+		<Name>setModuleTypeConfig</Name>
+		<Desc1>Set a Module Type Configuration parameter</Desc1>
+		<Arg1>Required: Module-type is the parameter to be updated</Arg1>
+		<Arg2>Required: Parameter-name is the parameter to be updated</Arg2>
+		<Arg3>Required: Parameter-value is the parameter value</Arg3>
+	</Cmd7>
+	<Cmd8>
+		<Name>getProcessConfig</Name>
+		<Desc1>Get Process Configuration Information</Desc1>
+		<Desc2>Can display all Process parameters, parameters for a single process, or a single parameter for a specific process</Desc2>
+		<Arg1>No Argument or 'all' enter will display all Process Configuration parameters</Arg1>
+		<Arg2>Optional: Process-name and Module-type will display the Process Configuration parameters</Arg2>
+		<Arg3>Optional: Process-name, Module-type, and Parameter-name will display the Process Configuration parameter</Arg3>
+	</Cmd8>
+	<Cmd9>
+		<Name>setProcessConfig</Name>
+		<Desc1>Set a Process Configuration parameter</Desc1>
+		<Arg1>Required: Process-name is the Process to be updated</Arg1>
+		<Arg2>Required: Module-type is the Module Type of the Process to be updated</Arg2>
+		<Arg3>Required: Parameter-name is the parameter to be updated</Arg3>
+		<Arg4>Required: Parameter-value is the parameter value</Arg4>
+	</Cmd9>
+	<Cmd10>
+		<Name>getAlarmConfig</Name>
+		<Desc1>Get Alarm Configuration Information</Desc1>
+		<Desc2>Can display all Alarms or a single Alarm</Desc2>
+		<Arg1>No Argument or 'all' enter will display all Alarms Configuration parameters</Arg1>
+		<Arg2>Optional: Alarm-ID will display the Alarm Configuration parameter </Arg2>
+	</Cmd10>
+	<Cmd11>
+		<Name>setAlarmConfig</Name>
+		<Desc1>Set a Alarm Configuration parameter</Desc1>
+		<Arg1>Required: Alarm-ID is the Alarm to be updated</Arg1>
+		<Arg2>Required: Parameter-name is the parameter to be updated</Arg2>
+		<Arg3>Required: Parameter-value is the parameter value</Arg3>
+	</Cmd11>
+	<Cmd12>
+		<Name>getActiveAlarms</Name>
+		<Desc1>Get Active Alarm list</Desc1>
+		<Desc2>Displays all the Alarms that are currently active</Desc2>
+		<Arg1>None</Arg1>
+	</Cmd12>
+	<Cmd13>
+		<Name>getStorageConfig</Name>
+		<Desc1>Get System Storage Configuration Information</Desc1>
+		<Desc2>Displays storage and dbroot assignment Information</Desc2>
+		<Arg1>None</Arg1>
+	</Cmd13>
+	<Cmd14>
+		<Name>addDbroot</Name>
+		<Desc1>Add DBRoot Disk storage to the InfiniDB System</Desc1>
+		<Arg1>Required: Number of DBRoots to be added</Arg1>
+	</Cmd14>
+	<Cmd15>
+		<Name>removeDbroot</Name>
+		<Desc1>Remove DBRoot Disk storage from the InfiniDB System</Desc1>
+		<Arg1>Required: List of Dbroot IDs to be removed</Arg1>
+	</Cmd15>
+	<Cmd16>
+		<Name>stopSystem</Name>
+		<Desc1>Stops the processing of the InfiniDB System</Desc1>
+		<Desc2>It will leave the Modules powered on and the Operating Systems enable </Desc2>
+		<Desc3>This command might be used for Software Maintenance reasons</Desc3>
+		<Arg1>Optional: GRACEFUL/FORCEFUL is the mode the process will be taken down. Default is FORCEFUL</Arg1>
+		<Arg2>Optional: ACK_YES/ACK_NO is Acknowledgment response or not. Default is ACK_YES</Arg2>
+	</Cmd16>
+	<Cmd17>
+		<Name>shutdownSystem</Name>
+		<Desc1>Shuts down the InfiniDB System</Desc1>
+		<Desc2>This command stops the processing of applications on all Modules within the InfiniDB System</Desc2>
+		<Desc3>It should be using when performing an upgrade</Desc3>
+		<Arg1>Optional: GRACEFUL/FORCEFUL is the mode the process will be taken down. Default is FORCEFUL</Arg1>
+		<Arg2>Optional: ACK_YES/ACK_NO is Acknowledgment response or not. Default is ACK_YES</Arg2>
+	</Cmd17>
+	<Cmd18>
+		<Name>startSystem</Name>
+		<Desc1>Starts a stopped or shutdown InfiniDB System</Desc1>
+		<Desc2>If system is shutdown, then a server root password should be entered if a ssh key is not defined</Desc2>
+		<Arg1>Optional: Server-root-password</Arg1>
+	</Cmd18>
+	<Cmd19>
+		<Name>restartSystem</Name>
+		<Desc1>Restarts a stopped or shutdown InfiniDB System</Desc1>
+		<Desc2>If system is shutdown, then a server root password should be entered if a ssh key is not defined</Desc2>
+		<Arg1>Optional: GRACEFUL/FORCEFUL is the mode the process will be taken down. Default is FORCEFUL</Arg1>
+		<Arg2>Optional: ACK_YES/ACK_NO is Acknowledgment response or not. Default is ACK_YES</Arg2>
+		<Arg3>Optional: Server-root-password</Arg3>
+	</Cmd19>
+	<Cmd20>
+		<Name>getSystemStatus</Name>
+		<Desc1>Get System and Modules Status</Desc1>
+		<Desc2>Get Status of the InfiniDB System and the modules within the InfiniDB Appliance</Desc2>
+		<Arg1>None</Arg1>
+	</Cmd20>
+	<Cmd21>
+		<Name>getProcessStatus</Name>
+		<Desc1>Get InfiniDB Process Statuses</Desc1>
+		<Desc2>Get Status of the InfiniDB Processes witin the InfiniDB System</Desc2>
+		<Arg1>None</Arg1>
+	</Cmd21>
+	<Cmd22>
+		<Name>system</Name>
+		<Desc1>Execute a system shell command</Desc1>
+		<Arg1>Required: UNIX command</Arg1>
+	</Cmd22>
+	<Cmd23>
+		<Name>getAlarmHistory</Name>
+		<Desc1>Get system alarms</Desc1>
+		<Desc2>Get all set and clear alarms reported on the system on a daily basis</Desc2>
+		<Arg1>Required: Date to Display in format of MM/DD/YY</Arg1>
+	</Cmd23>
+	<Cmd24>
+		<Name>monitorAlarms</Name>
+		<Desc1>Monitor alarms in realtime mode</Desc1>
+		<Desc2>Enter "control-C" to exit monitorAlarms command</Desc2>
+	</Cmd24>
+	<Cmd25>
+		<Name>resetAlarm</Name>
+		<Desc1>Resets an Active Alarm</Desc1>
+		<Desc2>Resetting the Alarm will remove it from the Active Alarm Log file</Desc2>
+		<Arg1>Required: AlarmID or ALL to reset all active alarms</Arg1>
+		<Arg2>Required: Reporting Module or ALL to reset all active AlarmID alarms</Arg2>
+		<Arg3>Required: Reported Device or ALL to reset all active AlarmID/Reporting Module Alarms</Arg3>
+	</Cmd25>
+	<Cmd26>
+		<Name>enableLog</Name>
+		<Desc1>Enable the levels of process and debug logging</Desc1>
+		<Arg1>Required: 'system' or Module-name where logging is being enabled</Arg1>
+		<Arg2>Required: 'all' or the specific level to enable</Arg2>
+		<Arg3>    Levels: critical, error, warning, info, and debug</Arg3>
+	</Cmd26>
+	<Cmd27>
+		<Name>disableLog</Name>
+		<Desc1>Disable the levels of process and debug logging</Desc1>
+		<Arg1>Required: 'system' or Module-name where logging is being disabled</Arg1>
+		<Arg2>Required: 'all' or the specific level to disable</Arg2>
+		<Arg3>    Levels: critical, error, warning, info, and debug</Arg3>
+	</Cmd27>
+	<Cmd28>
+		<Name>switchParentOAMModule</Name>
+		<Desc1>Switches the Active Parent OAM Module to another Performance Module</Desc1>
+		<Desc2>A System stop and start is performed as part of the process</Desc2>
+		<Desc3>Command is recommended to be done while the system is idle</Desc3>
+		<Arg1>Optional: Performance-Module-name to switch to, default to Standby Parent OAM Module</Arg1>
+	</Cmd28>
+	<Cmd29>
+		<Name>getStorageStatus</Name>
+		<Desc1>Get System Storage Status</Desc1>
+		<Desc2>Get Status of the InfiniDB DBRoot Storages within the InfiniDB Appliance</Desc2>
+		<Desc2>Only Valid for External Configured disk</Desc2>
+		<Arg1>None</Arg1>
+	</Cmd29>
+	<Cmd30>
+		<Name>getLogConfig</Name>
+		<Desc1>Get the System log file configuration</Desc1>
+		<Desc2>Get the process and debug log file configuration on each Module</Desc2>
+	</Cmd30>
+	<Cmd31>
+		<Name>movePmDbrootConfig</Name>
+		<Desc1>Move DBroots from one Performance Module to another</Desc1>
+		<Desc2>This command would be used before a Performance Module is removed or added</Desc2>
+		<Arg1>Required: Performance Module Name where the Dbroot are being moved from</Arg1>
+		<Arg2>Required: List of Dbroot IDs to be moved</Arg2>
+		<Arg3>Required: Performance Module Name where the Dbroot are being moved to</Arg3>
+	</Cmd31>
+	<Cmd32>
+		<Name>suspendDatabaseWrites</Name>
+		<Desc1>Suspend performing writes to the InfiniDB Database</Desc1>
+		<Arg1>None</Arg1>
+	</Cmd32>
+	<Cmd33>
+		<Name>resumeDatabaseWrites</Name>
+		<Desc1>Resume performing writes to the InfiniDB Database</Desc1>
+		<Arg1>None</Arg1>
+	</Cmd33>
+	<Cmd34>
+		<Name>AVAILABLE</Name>
+	</Cmd34>
+	<Cmd35>
+		<Name>assignDbrootPmConfig</Name>
+		<Desc1>Assign unassigned DBroots to Performance Module</Desc1>
+		<Desc2>This command could be used after a Performance Module and/or DBRoot is added</Desc2>
+		<Arg1>Required: List of Dbroot IDs to be assigned</Arg1>
+		<Arg2>Required: Performance Module Name</Arg2>
+	</Cmd35>
+	<Cmd36>
+		<Name>getAlarmSummary</Name>
+		<Desc1>Get Summary counts of Active Alarm</Desc1>
+		<Arg1>None</Arg1>
+	</Cmd36>
+	<Cmd37>
+		<Name>getSystemInfo</Name>
+		<Desc1>Get the Over-all System Statuses</Desc1>
+		<Desc2>Get the System, Module, Process, and Active Alarm Statuses</Desc2>
+		<Arg1>None</Arg1>
+	</Cmd37>
+	<Cmd38>
+		<Name>getModuleConfig</Name>
+		<Desc1>Get Module Name Configuration Information</Desc1>
+		<Desc2>Can display all Module Name parameters, parameters for a single module name, or a single parameter for a specific module name</Desc2>
+		<Arg1>No Argument or 'all' will display all Module Name Configuration parameters</Arg1>
+		<Arg2>Optional: Module-name will display the Module Name Configuration parameters</Arg2>
+		<Arg3>Optional: Module-name and Parameter-name will display the Module Name Configuration parameter</Arg3>
+	</Cmd38>
+	<Cmd39>
+		<Name>addExternalDevice</Name>
+		<Desc1>Add External Device to Configuration file</Desc1>
+		<Desc2>External Devices will be monitored and alarms reported on failures</Desc2>
+		<Arg1>Required: External Device name</Arg1>
+		<Arg2>Required: External Device IP Address</Arg2>
+	</Cmd39>
+	<Cmd40>
+		<Name>getExternalDeviceConfig</Name>
+		<Desc1>Get External Device Configuration Information</Desc1>
+		<Desc2>Can display all External Device parameters or a single External Device</Desc2>
+		<Arg1>No Argument or 'all' will display all External Devices Configuration parameters</Arg1>
+		<Arg2>Optional: External Device name will display the Switch Name Configuration parameters</Arg2>
+	</Cmd40>
+	<Cmd41>
+		<Name>setExternalDeviceConfig</Name>
+		<Desc1>Set a External Device Configuration parameter</Desc1>
+		<Arg1>Required: External-device-name is the parameter to be updated</Arg1>
+		<Arg2>Required: Parameter-name is the parameter to be updated</Arg2>
+		<Arg3>Required: Parameter-value is the parameter value</Arg3>
+	</Cmd41>
+	<Cmd42>
+		<Name>removeExternalDevice</Name>
+		<Desc1>Remove External Device to Configuration file</Desc1>
+		<Arg1>Required: External Device name</Arg1>
+	</Cmd42>
+	<Cmd43>
+		<Name>assignElasticIPAddress</Name>
+		<Desc1>Assign Amazon Elastic IP Address to a module</Desc1>
+		<Arg1>Required: Amazon Elastic IP Address</Arg1>
+		<Arg2>Required: Module Name</Arg2>
+	</Cmd43>
+	<Cmd44>
+		<Name>unassignElasticIPAddress</Name>
+		<Desc1>Unassign Amazon Elastic IP Address</Desc1>
+		<Arg1>Required: Amazon Elastic IP Address</Arg1>
+	</Cmd44>
+	<Cmd45>
+		<Name>getSystemNetworkConfig</Name>
+		<Desc1>Get System Network Configuration Information</Desc1>
+		<Desc2>Displays the Network Host Names and IP Addresses for all Modules, Switches,</Desc2>
+		<Desc3>and Storage Units that make up the system</Desc3>
+		<Arg1>None</Arg1>
+	</Cmd45>
+	<Cmd46>
+		<Name>AVAILABLE</Name>
+	</Cmd46>
+	<Cmd47>
+		<Name>getCalpontSoftwareInfo</Name>
+		<Desc1>Get the InfiniDB RPM detailed information</Desc1>
+		<Arg1>None</Arg1>
+	</Cmd47>
+	<Cmd48>
+		<Name>addModule</Name>
+		<Desc1>Add a Module within the InfiniDB System</Desc1>
+		<Desc2>This command is used to configure a Module to the Configuration</Desc2>
+		<Desc3>Database within the InfiniDB System. It will also install the </Desc3>
+		<Desc4>InfiniDB Packages and setup the module to make it ready to be restored</Desc4>
+		<Arg1>Required: Module-type or Module-name being added</Arg1>
+		<Arg2>Required: Number-of-Modules being added when Module-type is specified</Arg2>
+		<Arg3>Optional: Server-Hostnames/Amazon-Instance-Names seperated by commas</Arg3>
+		<Arg4>Optional: Server-root-password</Arg4>
+	</Cmd48>
+	<Cmd49>
+		<Name>removeModule</Name>
+		<Desc1>Remove a Module within the InfiniDB System</Desc1>
+		<Desc2>This command is used to unconfigure a Module from the Configuration</Desc2>
+		<Desc3>Database within the InfiniDB System</Desc3>
+		<Arg1>Required: Module-type or Module-name being removed</Arg1>
+		<Arg2>Required: Number-of-Modules being remove when Module-type is specified</Arg2>
+	</Cmd49>
+	<Cmd50>
+		<Name>AVAILABLE</Name>
+	</Cmd50>
+	<Cmd51>
+		<Name>AVAILABLE</Name>
+	</Cmd51>
+	<Cmd52>
+		<Name>getModuleCpuUsers</Name>
+		<Desc1>Get a Module Top Processes utilizing CPU</Desc1>
+		<Desc2>The top number of processes using more than 0% will be displayed</Desc2>
+		<Arg1>Required: Module-name being monitored</Arg1>
+		<Arg2>Optional: Top number of Process to Display (1-10, default is 5)</Arg2>
+	</Cmd52>
+	<Cmd53>
+		<Name>getSystemCpuUsers</Name>
+		<Desc1>Get System Top Processes utilizing CPU</Desc1>
+		<Desc2>The top number of processes using more than 0% will be displayed</Desc2>
+		<Arg1>Optional: Top number of Process to Display (1-10, default is 5)</Arg1>
+	</Cmd53>
+	<Cmd54>
+		<Name>getModuleCpu</Name>
+		<Desc1>Get a Module CPU usage</Desc1>
+		<Desc2>The Modules CPU Usage percentage will be displayed</Desc2>
+		<Arg1>Required: Module-name being monitored</Arg1>
+	</Cmd54>
+	<Cmd55>
+		<Name>getSystemCpu</Name>
+		<Desc1>Get System CPU usage on all modules</Desc1>
+		<Desc2>The System Modules CPU Usage percentage will be displayed</Desc2>
+	</Cmd55>
+	<Cmd56>
+		<Name>getModuleMemoryUsers</Name>
+		<Desc1>Get a Module Top Processes utilizing Memory</Desc1>
+		<Desc2>The top number of processes using more than 0% will be displayed</Desc2>
+		<Arg1>Required: Module-name being monitored</Arg1>
+		<Arg2>Optional: Top number of Process to Display (1-10, default is 5)</Arg2>
+	</Cmd56>
+	<Cmd57>
+		<Name>getSystemMemoryUsers</Name>
+		<Desc1>Get System Top Processes utilizing Memory</Desc1>
+		<Desc2>The top number of processes using more than 0% will be displayed</Desc2>
+		<Arg1>Optional: Top number of Process to Display (1-10, default is 5)</Arg1>
+	</Cmd57>
+	<Cmd58>
+		<Name>getModuleMemory</Name>
+		<Desc1>Get a Module Memory usage</Desc1>
+		<Desc2>The Modules Memory Usage percentage will be displayed</Desc2>
+		<Arg1>Required: Module-name being monitored</Arg1>
+	</Cmd58>
+	<Cmd59>
+		<Name>getSystemMemory</Name>
+		<Desc1>Get System Memory usage on all modules</Desc1>
+		<Desc2>The System Modules Memory Usage percentage will be displayed</Desc2>
+	</Cmd59>
+	<Cmd60>
+		<Name>getModuleDisk</Name>
+		<Desc1>Get a Module Disk usage</Desc1>
+		<Desc2>The Modules Disk Usage will be displayed</Desc2>
+		<Arg1>Required: Module-name being monitored</Arg1>
+	</Cmd60>
+	<Cmd61>
+		<Name>getSystemDisk</Name>
+		<Desc1>Get System Disk usage on all modules</Desc1>
+		<Desc2>The System Modules Disk Usage will be displayed</Desc2>
+	</Cmd61>
+	<Cmd62>
+		<Name>getModuleResourceUsage</Name>
+		<Desc1>Get a Module Resource usage</Desc1>
+		<Desc2>The Modules Resource Usage will be displayed</Desc2>
+		<Desc3>Resources consist of CPU, Memory, and Disk usage</Desc3>
+		<Arg1>Required: Module-name being monitored</Arg1>
+	</Cmd62>
+	<Cmd63>
+		<Name>getSystemResourceUsage</Name>
+		<Desc1>Get System Resource usage on all modules</Desc1>
+		<Desc2>The System Modules Resource Usage will be displayed</Desc2>
+		<Desc3>Resources consist of CPU, Memory, and Disk usage</Desc3>
+	</Cmd63>
+	<Cmd64>
+		<Name>getActiveSQLStatements</Name>
+		<Desc1>Get List Active SQL Statements within the System</Desc1>
+	</Cmd64>
+	<Cmd65>
+		<Name>alterSystem-disableModule</Name>
+		<Desc1>Disable a Module and Alter the InfiniDB System</Desc1>
+		<Desc2>This command is used to place a Module in an disable state</Desc2>
+		<Desc3>and restart the associated processes the InfiniDB System. </Desc3>
+		<Arg1>Required: Module-name(s) being placed disable</Arg1>
+	</Cmd65>
+	<Cmd66>
+		<Name>alterSystem-enableModule</Name>
+		<Desc1>Enable a Module and Alter the InfiniDB System</Desc1>
+		<Desc2>This command is used to place a Module in an enable state</Desc2>
+		<Desc3>and restart the associated processes the InfiniDB System. </Desc3>
+		<Arg1>Required: Module-name(s) being placed enable</Arg1>
+	</Cmd66>
+	<Cmd67>
+		<Name>AVAILABLE</Name>
+	</Cmd67>
+</Calpont>

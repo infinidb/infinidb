@@ -1,0 +1,133 @@
+#!/bin/bash
+#
+# $Id: post-uninstall 421 2007-04-05 15:46:55Z dhill $
+#
+# Post-uninstall steps for calpont install
+
+prefix=/usr/local
+installdir=$prefix/Calpont
+rpmmode=install
+user=$USER
+if [ -z "$user" ]; then
+	user=root
+fi
+quiet=0
+
+for arg in "$@"; do
+	if [ `expr -- "$arg" : '--prefix='` -eq 9 ]; then
+		prefix="`echo $arg | awk -F= '{print $2}'`"
+		installdir=$prefix/Calpont
+	elif [ `expr -- "$arg" : '--rpmmode='` -eq 10 ]; then
+		rpmmode="`echo $arg | awk -F= '{print $2}'`"
+	elif [ `expr -- "$arg" : '--installdir='` -eq 13 ]; then
+		installdir="`echo $arg | awk -F= '{print $2}'`"
+		prefix=`dirname $installdir`
+	elif [ `expr -- "$arg" : '--user='` -eq 7 ]; then
+		user="`echo $arg | awk -F= '{print $2}'`"
+	elif [ `expr -- "$arg" : '--quiet'` -eq 7 ]; then
+		quiet=1
+	else
+		echo "post-uninstall: ignoring unknown argument: $arg" 1>&2
+	fi
+done
+
+#stop services
+$installdir/bin/infinidb stop > /dev/null 2>&1
+if test -f /etc/init.d/calpont-Mysql ; then
+	$installdir/myql/calpont-Mysql stop > /dev/null 2>&1
+fi
+
+# uninstall OS scripts updated by postConfigure
+if test -f /root/.bashrc.calpontSave ; then
+	mv -f /root/.bashrc.calpontSave /root/.bashrc > /dev/null 2>&1
+fi
+if test -f /etc/exports.calpontSave ; then
+	mv -f /etc/exports.calpontSave /etc/exports > /dev/null 2>&1
+else
+	rm -f /etc/exports > /dev/null 2>&1
+fi
+if test -f /etc/rc.d/rc.local.calpontSave ; then
+	mv -f /etc/rc.d/rc.local.calpontSave /etc/rc.d/rc.local > /dev/null 2>&1
+fi
+if test -f /etc/rc.local.calpontSave ; then
+	mv -f /etc/rc.local.calpontSave /etc/rc.local > /dev/null 2>&1
+fi
+ 
+#remove log file directories
+#rm -rf /var/log/Calpont > /dev/null 2>&1
+#rm -f $installdir/mysql/db/*.err > /dev/null 2>&1
+rm -f /var/log/Calpont/activeAlarms > /dev/null 2>&1
+rm -f /var/log/Calpont/*.log1 > /dev/null 2>&1
+rm -rf $installdir/mysql/db/infinidb_log_archive > /dev/null 2>&1
+
+# remove Calpont Log Rotate File abd Transaction Log File
+rm -f /etc/logrotate.d/calpont > /dev/null 2>&1
+rm -f /etc/cron.d/transactionLog > /dev/null 2>&1
+
+# delete Calpont shared memory segments
+pkill -9 ProcMon
+$installdir/bin/clearShm  > /dev/null 2>&1
+
+# delete prat files
+rm -f /etc/cron.d/ps > /dev/null 2>&1
+rm -f /etc/pscollect > /dev/null 2>&1
+/etc/init.d/crond reload  > /dev/null 2>&1
+
+# delete tmp files
+rm -f $installdir/local/*.calpont
+rm -rf $installdir/local/etc/
+rm -rf /tmp/bucketreuse
+rm -f /tmp/calpont.txt
+rm -f /tmp/dbbuilder.*
+rm -f /tmp/dbrmfiles
+rm -f /var/lock/subsys/infinidb
+rm -f /tmp/pkgcheck
+rm -f /tmp/upgrade-status.log.*
+rm -f /tmp/mount.log
+rm -f $installdir/data/bulk/tmpjob/* >/dev/null 2>&1
+rm -rf /tmp/infinidb_tmp_files
+rm -f $installdir/local/moveDbrootTransactionLog
+
+# delete core files
+#rm -f /var/log/Calpont/corefiles/* > /dev/null 2>&1
+
+#uninstall InfiniDB system logging
+if [ -x $installdir/bin/syslogSetup.sh ]; then
+	if [ $user = "root" ]; then
+		$installdir/bin/syslogSetup.sh uninstall >/dev/null 2>&1
+		rm -f /etc/init.d/infinidb > /dev/null 2>&1
+	else
+		sudo $installdir/bin/syslogSetup.sh uninstall >/dev/null 2>&1
+	fi
+fi
+
+if [ -x /sbin/chkconfig ]; then
+	/sbin/chkconfig infinidb off > /dev/null 2>&1
+	/sbin/chkconfig --del infinidb > /dev/null 2>&1
+elif [ -x /usr/sbin/update-rc.d ]; then
+	/usr/sbin/update-rc.d -f infinidb remove > /dev/null 2>&1
+fi
+
+if [ $quiet != 1 ]; then
+	#make copy of Calpont.xml
+	/bin/cp -f $installdir/etc/Calpont.xml $installdir/etc/Calpont.xml.rpmsave > /dev/null 2>&1
+	/bin/cp -f $installdir/mysql/my.cnf $installdir/mysql/my.cnf.rpmsave > /dev/null 2>&1
+fi
+
+#umount file systems
+if [ $user = "root" ]; then
+	rm -f $installdir/data*/OAMdbrootCheck > /dev/null 2>&1
+	umount -fl $installdir/data*  > /dev/null 2>&1
+	rm -f $installdir/data*/OAMdbrootCheck > /dev/null 2>&1
+else
+	sudo rm -f $installdir/data*/OAMdbrootCheck > /dev/null 2>&1
+	sudo umount -fl $installdir/data*  > /dev/null 2>&1
+	sudo rm -f $installdir/data*/OAMdbrootCheck > /dev/null 2>&1
+fi
+
+#tell user to run post configure script
+echo " "
+echo "Calpont uninstall completed"
+
+exit 0
+

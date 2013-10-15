@@ -1,0 +1,131 @@
+Q22
+select 
+    substr(c_phone, 1, 2) as cntrycode, 
+    count(*) as numcust, 
+    sum(c_acctbal) as totacctbal 
+from 
+    customer 
+where 
+    substr(c_phone, 1, 2) in ('13', '31', '23', '29', '30', '18', '17') 
+    and c_acctbal > (
+        select 
+            avg(c_acctbal) 
+        from 
+            customer 
+        where 
+            c_acctbal > 0.00 
+            and substr(c_phone, 1, 2) in ('13', '31', '23', '29', '30', '18', '17')) 
+            and not exists (
+                select 
+                    * 
+                from 
+                    orders 
+                where 
+                    o_custkey = c_custkey
+              )
+         group by 
+            substr(c_phone, 1, 2) 
+         order by 
+            cntrycode;
+
+Oracle Execution Plan
+
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: C_ACCTBAL
+Object_name: CUSTOMER
+Alias: CUSTOMER@SEL$2
+Extended_information:    FP:C_ACCTBAL>0.00 AND (SUBSTR(C_PHONE,1,2)='13' OR SUBSTR(C_PHONE,1,2)='31' OR SUBSTR(C_PHONE,1,2)='23' OR SUBSTR(C_PHONE,1,2)='29' OR SUBSTR(C_PHONE,1,2)='30' OR SUBSTR(C_PHONE,1,2)='18' OR SUBSTR(C_PHONE,1,2)='17')
+Access_predicates: 
+Filter_predicates: C_ACCTBAL>0.00&(SUBSTR(C_PHONE,1,2)='13'|SUBSTR(C_PHONE,1,2)='31'|SUBSTR(C_PHONE,1,2)='23'|SUBSTR(C_PHONE,1,2)='29'|SUBSTR(C_PHONE,1,2)='30'|SUBSTR(C_PHONE,1,2)='18'|SUBSTR(C_PHONE,1,2)='17')
+Select_level: SEL$2
+--------------------
+Operation: sort
+Options: AGGREGATE
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  AVG(C_ACCTBAL)
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$2
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: C_CUSTKEY^C_PHONE^C_ACCTBAL
+Object_name: CUSTOMER
+Alias: CUSTOMER@SEL$1
+Extended_information:    FP:(SUBSTR(C_PHONE,1,2)='13' OR SUBSTR(C_PHONE,1,2)='31' OR SUBSTR(C_PHONE,1,2)='23' OR SUBSTR(C_PHONE,1,2)='29' OR SUBSTR(C_PHONE,1,2)='30' OR SUBSTR(C_PHONE,1,2)='18' OR SUBSTR(C_PHONE,1,2)='17') AND C_ACCTBAL> (SELECT AVG(C_ACCTBAL) FROM CUSTOMER CUSTOMER WHERE C_ACCTBAL>0.00 AND (SUBSTR(C_PHONE,1,2)='13' OR SUBSTR(C_PHONE,1,2)='31' OR SUBSTR(C_PHONE,1,2)='23' OR SUBSTR(C_PHONE,1,2)='29' OR SUBSTR(C_PHONE,1,2)='30' OR SUBSTR(C_PHONE,1,2)='18' OR SUBSTR(C_PHONE,1,2)='17'))
+Access_predicates: 
+Filter_predicates: (SUBSTR(C_PHONE,1,2)='13'|SUBSTR(C_PHONE,1,2)='31'|SUBSTR(C_PHONE,1,2)='23'|SUBSTR(C_PHONE,1,2)='29'|SUBSTR(C_PHONE,1,2)='30'|SUBSTR(C_PHONE,1,2)='18'|SUBSTR(C_PHONE,1,2)='17')&C_ACCTBAL> (SELECT AVG(C_ACCTBAL) FROM CUSTOMER CUSTOMER WHERE C_ACCTBAL>0.00&(SUBSTR(C_PHONE,1,2)='13'|SUBSTR(C_PHONE,1,2)='31'|SUBSTR(C_PHONE,1,2)='23'|SUBSTR(C_PHONE,1,2)='29'|SUBSTR(C_PHONE,1,2)='30'|SUBSTR(C_PHONE,1,2)='18'|SUBSTR(C_PHONE,1,2)='17'))
+Select_level: SEL$8771BF6C
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: O_CUSTKEY
+Object_name: ORDERS
+Alias: ORDERS@SEL$3
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$8771BF6C
+--------------------
+Operation: hash join
+Options: ANTI
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  C_ACCTBAL^C_PHONE
+Object_name: 
+Alias: 
+Extended_information:    AP:O_CUSTKEY=C_CUSTKEY
+Access_predicates: O_CUSTKEY=C_CUSTKEY
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: sort
+Options: GROUP BY
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  SUBSTR(C_PHONE,1,2)^SUM(C_ACCTBAL)
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$8771BF6C
+--------------------
+Operation: select statement
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection: 
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+

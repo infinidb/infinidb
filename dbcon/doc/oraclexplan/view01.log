@@ -1,0 +1,85 @@
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: O_CUSTKEY
+Object_name: ORDERS
+Alias: ORDERS@SEL$2
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$2
+--------------------
+Operation: hash ( Temp Space:   1,911,604,000 )
+Options: GROUP BY
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  O_CUSTKEY^COUNT(ALL)
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$2
+--------------------
+Operation: view
+Options: 
+Object_type: 
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: O.O_CUSTKEY^O.TOT_ORDERS
+Object_name: 
+Alias: O@SEL$1
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$2
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: C.C_CUSTKEY^C.C_NAME
+Object_name: CUSTOMER
+Alias: C@SEL$1
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$1
+--------------------
+Operation: hash join ( Temp Space:     332,317,000 )
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  O.TOT_ORDERS^C.C_NAME
+Object_name: 
+Alias: 
+Extended_information:    AP:C.C_CUSTKEY=O.O_CUSTKEY
+Access_predicates: C.C_CUSTKEY=O.O_CUSTKEY
+Filter_predicates: 
+Select_level: SEL$1
+--------------------
+Operation: select statement
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection: 
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+TOKEN: <C.C_CUSTKEY=O.O_CUSTKEY>

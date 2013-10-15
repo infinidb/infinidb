@@ -1,0 +1,38 @@
+systable: 1000
+systable                tablename 1001   65 2001  0
+systable                   schema 1002   65 2004  1
+systable                 objectid 1003    4    0  2
+systable               createdate 1004    4    0  3
+systable               lastupdate 1005    4    0  4
+systable                     init 1006    4    0  5
+systable                     next 1007    4    0  6
+systable                numofrows 1008    4    0  7
+systable                avgrowlen 1009    4    0  8
+systable              numofblocks 1010    4    0  9
+systable            autoincrement 1011    4    0 10
+ 
+syscolumn: 1020
+syscolumn                   schema 1021   65 2061  0
+syscolumn                tablename 1022   65 2064  1
+syscolumn               columnname 1023   65 2067  2
+syscolumn                 objectid 1024    4    0  3
+syscolumn             dictobjectid 1025    4    0  4
+syscolumn             listobjectid 1026    4    0  5
+syscolumn             treeobjectid 1027    4    0  6
+syscolumn                 datatype 1028    4    0  7
+syscolumn             columnlength 1029    4    0  8
+syscolumn           columnposition 1030    4    0  9
+syscolumn               lastupdate 1031    4    0 10
+syscolumn             defaultvalue 1032    9 2070 11
+syscolumn                 nullable 1033    4    0 12
+syscolumn                    scale 1034    4    0 13
+syscolumn                     prec 1035    4    0 14
+syscolumn            autoincrement 1036    1    0 15
+syscolumn                distcount 1037    4    0 16
+syscolumn                nullcount 1038    4    0 17
+syscolumn                 minvalue 1039   65 2073 18
+syscolumn                 maxvalue 1040   65 2076 19
+syscolumn          compressiontype 1041    4    0 20
+syscolumn                nextvalue 1042    8    0 21
+
+

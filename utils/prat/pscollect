@@ -1,0 +1,24 @@
+#! /bin/sh
+#
+#/*******************************************************************************
+#*  Script Name:    pscollect
+#*  Date Created:   2009.01.27
+#*  Author:         Calpont Corp.
+#*  Purpose:        capture system activity every x seconds
+#*
+#******************************************************************************/
+#
+cd /var/log/prat/ps
+    if [ ! -f /var/log/prat/ps/pslog ]
+    then 
+	touch pslog
+	echo Start `date +%R` >> pslog
+	/bin/ps -leaf >> pslog
+	echo End `date +%R` >> pslog
+    else
+	echo Start `date +%R` >> pslog
+	/bin/ps -leaf >> pslog
+	echo End `date +%R` >> pslog
+    fi
+
+# End of script

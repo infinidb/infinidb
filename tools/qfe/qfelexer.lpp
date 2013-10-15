@@ -1,0 +1,65 @@
+%{
+#include <utility>
+#include <string>
+#include "returnedcolumn.h"
+#ifndef _MSC_VER
+#include "qfeparser.h"
+#else
+#include "bison-win.h"
+#endif
+
+extern int qfeerror(const char *s);
+
+extern std::string* newstr(const char* cp);
+
+%}
+
+%option noyywrap
+%option yylineno
+%option nounput
+
+%x CCONST
+
+digit		[0-9]
+int_const	[+-]?{digit}+
+letter		[a-zA-Z_]
+objname		{letter}({letter}|{digit})*
+
+%%
+
+"SELECT"	{ return QFEP_SELECT; }
+"FROM"		{ return QFEP_FROM; }
+"WHERE"		{ return QFEP_WHERE; }
+"GROUP BY"	{ return GROUPBY; }
+"AND"		{ qfelval.cp = newstr(qfetext); return LOGICOP; }
+"OR"		{ qfelval.cp = newstr(qfetext); return LOGICOP; }
+"LIMIT"		{ return LIMIT; }
+"ORDER BY"	{ return ORDERBY; }
+"ASC"		{ return ASC; }
+"DESC"		{ return DESC; }
+"AS"		{ return AS; }
+"SUM"		{ qfelval.cp = newstr(qfetext); return FUNC; }
+"MIN"		{ qfelval.cp = newstr(qfetext); return FUNC; }
+"MAX"		{ qfelval.cp = newstr(qfetext); return FUNC; }
+"AVG"		{ qfelval.cp = newstr(qfetext); return FUNC; }
+
+{objname}	{ qfelval.cp = newstr(qfetext); return OBJNAME; }
+
+"'"		{ BEGIN(CCONST); }
+<CCONST>[^']*	{ qfelval.cp = newstr(qfetext); return CHAR_CONST; }
+<CCONST>"'"	{ BEGIN(INITIAL); }
+
+{int_const}	{ qfelval.cp = newstr(qfetext); return INT_CONST; }
+
+">"		{ qfelval.cp = newstr(qfetext); return RELOP; }
+">="		{ qfelval.cp = newstr(qfetext); return RELOP; }
+"<"		{ qfelval.cp = newstr(qfetext); return RELOP; }
+"<="		{ qfelval.cp = newstr(qfetext); return RELOP; }
+"<>"		{ qfelval.cp = newstr(qfetext); return RELOP; }
+"="		{ qfelval.cp = newstr(qfetext); return RELOP; }
+
+[ \t]*		{}
+[\n]		{ qfelineno++; }
+
+.		{ return qfetext[0]; }
+

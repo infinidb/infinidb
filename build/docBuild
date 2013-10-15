@@ -1,0 +1,9 @@
+#!/bin/sh
+
+git status | grep "On branch"
+
+if [ -f buildFlags ]; then
+	echo "Build Flags: `cat buildFlags`"
+fi
+
+git log -1 | head -3 | egrep "^(commit|Date)"

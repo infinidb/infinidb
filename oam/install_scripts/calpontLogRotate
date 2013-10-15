@@ -1,0 +1,35 @@
+# 
+# Calpont Log Rotate file that gets installed in /etc/logrotate.d
+# as part of the RPM installation
+# 
+
+/var/log/Calpont/*.log {
+    missingok
+    rotate 7
+    daily
+    dateext
+	copytruncate
+    olddir /var/log/Calpont/archive
+}
+/var/log/Calpont/*.log1 {
+    missingok
+    rotate 7
+    daily
+	nocreate
+	compress
+    olddir /var/log/Calpont/archive
+}
+/usr/local/Calpont/etc/Calpont.xml {
+    daily
+    dateext
+	copy
+    olddir /usr/local/Calpont/etc/
+}
+/usr/local/Calpont/mysql/db/*.err {
+    missingok
+    rotate 7
+    daily
+    dateext
+	copytruncate
+    olddir /usr/local/Calpont/mysql/db
+}

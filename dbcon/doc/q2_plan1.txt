@@ -1,0 +1,257 @@
+select
+        s_acctbal,
+        s_name,
+        n_name,
+        p_partkey,
+        p_mfgr,
+        s_address,
+        s_phone,
+        s_comment
+from
+        part,
+        supplier,
+        partsupp,
+        nation,
+        region
+where
+        p_partkey = ps_partkey
+        and s_suppkey = ps_suppkey
+        and p_size = 1
+        and p_type like '%a'
+        and s_nationkey = n_nationkey
+        and n_regionkey = r_regionkey
+        and r_name = 'ASIA'
+        and ps_supplycost = (
+                select
+                        min(ps_supplycost)
+                from
+                        partsupp,
+                        supplier,
+                        nation,
+                        region
+                where
+                        p_partkey = ps_partkey
+                        and s_suppkey = ps_suppkey
+                        and s_nationkey = n_nationkey
+                        and n_regionkey = r_regionkey
+                        and r_name = 'ASIA')
+        order by 
+            s_acctbal desc,
+            n_name,
+            s_name,
+            p_partkey;
+
+-- Q2 Plan Start --
+
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: P_PARTKEY, P_MFGR, P_TYPE, P_SIZE
+Object_name: PART
+Alias: PART@SEL$1
+Extended_information:    FP:P_SIZE=1 AND P_TYPE LIKE '%:2'
+Access_predicates: 
+Filter_predicates: P_SIZE=1&P_TYPE LIKE '%:2'
+Select_level: SEL$DD8D4BD4
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: S_SUPPKEY, S_NAME, S_ADDRESS, S_NATIONKEY, S_PHONE, S_ACCTBAL, S_COMMENT
+Object_name: SUPPLIER
+Alias: SUPPLIER@SEL$1
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$DD8D4BD4
+--------------------
+Operation: buffer
+Options: SORT
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  P_PARTKEY, P_MFGR, P_TYPE, P_SIZE
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: R_REGIONKEY, R_NAME
+Object_name: REGION
+Alias: REGION@SEL$1
+Extended_information:    FP:R_NAME=':3'
+Access_predicates: 
+Filter_predicates: R_NAME=':3'
+Select_level: SEL$DD8D4BD4
+--------------------
+Operation: merge join
+Options: CARTESIAN
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  S_SUPPKEY, S_NAME, S_ADDRESS, S_NATIONKEY, S_PHONE, S_ACCTBAL, S_COMMENT, P_PARTKEY, P_MFGR, P_TYPE, P_SIZE
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: buffer
+Options: SORT
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  R_REGIONKEY, R_NAME
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: merge join
+Options: CARTESIAN
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  S_SUPPKEY, S_NAME, S_ADDRESS, S_NATIONKEY, S_PHONE, S_ACCTBAL, S_COMMENT, P_PARTKEY, P_MFGR, P_TYPE, P_SIZE, R_REGIONKEY, R_NAME
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: N_NATIONKEY, N_NAME, N_REGIONKEY
+Object_name: NATION
+Alias: NATION@SEL$1
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$DD8D4BD4
+--------------------
+Operation: hash join
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  R_REGIONKEY, N_REGIONKEY, S_NATIONKEY, N_NATIONKEY, S_SUPPKEY, S_NAME, S_ADDRESS, R_NAME, S_PHONE, S_ACCTBAL, S_COMMENT, P_PARTKEY, P_MFGR, P_TYPE, P_SIZE, N_NAME
+Object_name: 
+Alias: 
+Extended_information:    AP:N_REGIONKEY=R_REGIONKEY AND S_NATIONKEY=N_NATIONKEY
+Access_predicates: N_REGIONKEY=R_REGIONKEY&S_NATIONKEY=N_NATIONKEY
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: ROWID, PS_PARTKEY, PS_SUPPKEY, PS_SUPPLYCOST
+Object_name: PARTSUPP
+Alias: PARTSUPP@SEL$1
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$DD8D4BD4
+--------------------
+Operation: hash join
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  S_SUPPKEY, PS_SUPPKEY, P_PARTKEY, PS_PARTKEY, R_REGIONKEY, N_REGIONKEY, S_NATIONKEY, N_NATIONKEY, N_NAME, S_NAME, S_ADDRESS, R_NAME, S_PHONE, S_ACCTBAL, S_COMMENT, P_SIZE, P_MFGR, P_TYPE, ROWID, PS_SUPPLYCOST
+Object_name: 
+Alias: 
+Extended_information:    AP:S_SUPPKEY=PS_SUPPKEY AND P_PARTKEY=PS_PARTKEY
+Access_predicates: S_SUPPKEY=PS_SUPPKEY&P_PARTKEY=PS_PARTKEY
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: window
+Options: SORT
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  PS_PARTKEY, S_SUPPKEY, PS_SUPPKEY, P_PARTKEY, PS_SUPPLYCOST, R_REGIONKEY, N_REGIONKEY, S_NATIONKEY, N_NATIONKEY, N_NAME, S_NAME, S_ADDRESS, R_NAME, S_PHONE, S_ACCTBAL, S_COMMENT, P_SIZE, P_MFGR, P_TYPE, ROWID, MIN(PS_SUPPLYCOST) OVER ( PARTITION BY PS_PARTKEY)
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$DD8D4BD4
+--------------------
+Operation: view
+Options: 
+Object_type: VIEW
+Other: 
+Object_owner: SYS
+Search_columns: 
+Projection: S_ACCTBAL, S_NAME, N_NAME, P_PARTKEY, P_MFGR, S_ADDRESS, S_PHONE, S_COMMENT, VW_COL_9
+Object_name: 
+Alias: VW_WIF_1@SEL$76B8F26C
+Extended_information:    FP:VW_COL_9 IS NOT NULL
+Access_predicates: 
+Filter_predicates: VW_COL_9 IS NOT NULL
+Select_level: SEL$DD8D4BD4
+--------------------
+Operation: sort
+Options: ORDER BY
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  INTERNAL_FUNCTION(S_ACCTBAL), N_NAME, S_NAME, P_PARTKEY, S_COMMENT, S_ADDRESS, S_PHONE, P_MFGR
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$599F6CA1
+--------------------
+Operation: select statement
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection: 
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+
+-- END --
+

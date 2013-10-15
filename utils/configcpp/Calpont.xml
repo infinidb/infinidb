@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Calpont Version="V1.0.0">
+	<Message>
+		<Name>Message</Name>
+		<Dir>.</Dir>
+		<Length>875</Length>
+		<Version>V1.0</Version>
+	</Message>
+	<SystemConfig>
+		<SystemVersion>V1.0</SystemVersion>
+	</SystemConfig>
+</Calpont>

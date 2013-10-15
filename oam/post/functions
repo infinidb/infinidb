@@ -1,0 +1,50 @@
+#
+# $Id: functions 2937 2012-05-30 18:17:09Z rdempsey $
+#
+
+if [ -z "$INFINIDB_INSTALL_DIR" ]; then
+	test -f /etc/default/infinidb && . /etc/default/infinidb
+fi
+
+if [ -z "$INFINIDB_INSTALL_DIR" ]; then
+	INFINIDB_INSTALL_DIR=/usr/local/Calpont
+fi
+
+declare -x INFINIDB_INSTALL_DIR=$INFINIDB_INSTALL_DIR
+
+PATH=$INFINIDB_INSTALL_DIR/bin:$PATH
+export PATH
+
+module_type()
+{
+(
+	sed -r 's/[0-9]+$//' $INFINIDB_INSTALL_DIR/local/module
+) 2>/dev/null
+}
+
+firstboot()
+{
+	dbrmroot="`getConfig SystemConfig DBRMRoot`"
+	dbrmdir="`dirname $dbrmroot`"
+	test ! -f $dbrmdir/BRM_saves_current
+}
+
+oidbitmapfile()
+{
+	oidfile="`getConfig OIDManager OIDBitmapFile`"
+	test ! -f $oidfile
+}
+
+module_name()
+{
+(
+	cat $INFINIDB_INSTALL_DIR/local/module
+) 2>/dev/null
+}
+
+module_id()
+{
+(
+	sed -r 's/[a-zA-Z]//g' $INFINIDB_INSTALL_DIR/local/module
+) 2>/dev/null
+}

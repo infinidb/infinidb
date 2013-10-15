@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Calpont Version="V1.0.0">
+	<NetServer>
+		<IPAddr>10.100.5.1</IPAddr>
+		<!-- <IPAddr>127.0.0.1</IPAddr> -->
+		<Port>9601</Port>
+	</NetServer>
+</Calpont>

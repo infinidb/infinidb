@@ -1,0 +1,225 @@
+select
+	supp_nation,
+	cust_nation,
+	l_year,
+	sum(volume) as revenue
+from
+	(
+		select
+			n1.n_name as supp_nation,
+			n2.n_name as cust_nation,
+			extract(year from l_shipdate) as l_year,
+			l_extendedprice * (1 - l_discount) as volume
+		from
+			supplier,
+			lineitem,
+			orders,
+			customer,
+			nation n1,
+			nation n2
+		where
+			s_suppkey = l_suppkey
+			and o_orderkey = l_orderkey
+			and c_custkey = o_custkey
+			and s_nationkey = n1.n_nationkey
+			and c_nationkey = n2.n_nationkey
+			and (
+				(n1.n_name = ':1' and n2.n_name = ':2')
+				or (n1.n_name = ':2' and n2.n_name = ':1')
+			)
+			and l_shipdate between date '1995-01-01' and date '1996-12-31'
+	) shipping
+group by
+	supp_nation,
+	cust_nation,
+	l_year
+order by
+	supp_nation,
+	cust_nation,
+	l_year;
+	
+-- Q7 Plan Start --
+
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: S_SUPPKEY, S_NATIONKEY
+Object_name: SUPPLIER
+Alias: SUPPLIER@SEL$2
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$F5BB74E1
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: L_ORDERKEY, L_SUPPKEY, L_EXTENDEDPRICE, L_DISCOUNT, L_SHIPDATE
+Object_name: LINEITEM
+Alias: LINEITEM@SEL$2
+Extended_information:    FP:L_SHIPDATE>=TO_DATE('1995-01-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss') AND L_SHIPDATE<=TO_DATE('1996-12-31 00:00:00', 'yyyy-mm-dd hh24:mi:ss')
+Access_predicates: 
+Filter_predicates: L_SHIPDATE>=TO_DATE('1995-01-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss')&L_SHIPDATE<=TO_DATE('1996-12-31 00:00:00', 'yyyy-mm-dd hh24:mi:ss')
+Select_level: SEL$F5BB74E1
+--------------------
+Operation: hash join
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  S_NATIONKEY, L_ORDERKEY, L_SHIPDATE, L_EXTENDEDPRICE, L_DISCOUNT
+Object_name: 
+Alias: 
+Extended_information:    AP:S_SUPPKEY=L_SUPPKEY
+Access_predicates: S_SUPPKEY=L_SUPPKEY
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: O_ORDERKEY, O_CUSTKEY
+Object_name: ORDERS
+Alias: ORDERS@SEL$2
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$F5BB74E1
+--------------------
+Operation: hash join
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  S_NATIONKEY, L_DISCOUNT, L_SHIPDATE, L_EXTENDEDPRICE, O_CUSTKEY
+Object_name: 
+Alias: 
+Extended_information:    AP:O_ORDERKEY=L_ORDERKEY
+Access_predicates: O_ORDERKEY=L_ORDERKEY
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: N1.N_NATIONKEY, N1.N_NAME
+Object_name: NATION
+Alias: N1@SEL$2
+Extended_information:    FP:N1.N_NAME=':1' OR N1.N_NAME=':2'
+Access_predicates: 
+Filter_predicates: N1.N_NAME=':1'|N1.N_NAME=':2'
+Select_level: SEL$F5BB74E1
+--------------------
+Operation: hash join
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  O_CUSTKEY, L_DISCOUNT, L_SHIPDATE, L_EXTENDEDPRICE, N1.N_NAME
+Object_name: 
+Alias: 
+Extended_information:    AP:S_NATIONKEY=N1.N_NATIONKEY
+Access_predicates: S_NATIONKEY=N1.N_NATIONKEY
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: N2.N_NATIONKEY, N2.N_NAME
+Object_name: NATION
+Alias: N2@SEL$2
+Extended_information:    FP:(N2.N_NAME=':1' OR N2.N_NAME=':2') AND (N1.N_NAME=':1' AND N2.N_NAME=':2' OR N1.N_NAME=':2' AND N2.N_NAME=':1')
+Access_predicates: 
+Filter_predicates: (N2.N_NAME=':1'|N2.N_NAME=':2')&(N1.N_NAME=':1'&N2.N_NAME=':2'|N1.N_NAME=':2'&N2.N_NAME=':1')
+Select_level: SEL$F5BB74E1
+--------------------
+Operation: nested loops
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  O_CUSTKEY, L_DISCOUNT, L_SHIPDATE, L_EXTENDEDPRICE, N1.N_NAME, N2.N_NATIONKEY, N2.N_NAME
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: C_CUSTKEY, C_NATIONKEY
+Object_name: CUSTOMER
+Alias: CUSTOMER@SEL$2
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$F5BB74E1
+--------------------
+Operation: hash join
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  N2.N_NAME, L_DISCOUNT, L_SHIPDATE, L_EXTENDEDPRICE, N1.N_NAME
+Object_name: 
+Alias: 
+Extended_information:    AP:C_CUSTKEY=O_CUSTKEY AND C_NATIONKEY=N2.N_NATIONKEY
+Access_predicates: C_CUSTKEY=O_CUSTKEY&C_NATIONKEY=N2.N_NATIONKEY
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: sort
+Options: GROUP BY
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  N1.N_NAME, N2.N_NAME, EXTRACT(YEAR FROM INTERNAL_FUNCTION(L_SHIPDATE)), SUM(L_EXTENDEDPRICE*(1-L_DISCOUNT))
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$F5BB74E1
+--------------------
+Operation: select statement
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection: 
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+
+-- End --

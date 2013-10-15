@@ -1,0 +1,8 @@
+# Need to set these before using rpmbuild
+%_topdir <HOME>/rpm
+%_tmppath <HOME>/rpm/tmp
+# Change to 1 if you want to abort on unpackaged files
+%_unpackaged_files_terminate_build 0
+# Don't build debuginfo packages
+%debug_package %{nil}
+

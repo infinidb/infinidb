@@ -1,0 +1,188 @@
+Q12
+select 
+    l_shipmode, 
+    sum(decode(o_orderpriority,'1-URGENT',1,'2-HIGH',1,0)) as high_line_count, 
+    sum(decode(o_orderpriority,'1-URGENT',0,'2-HIGH',0,1)) as low_line_count 
+from 
+    orders, 
+    lineitem 
+where 
+    o_orderkey = l_orderkey 
+    and l_shipmode in ('MAIL','SHIP') 
+    and l_commitdate < l_receiptdate 
+    and l_shipdate < l_commitdate 
+    and l_receiptdate >= '1994-01-01' 
+    and l_receiptdate < date '1994-01-01' + interval '1' year 
+group by 
+    l_shipmode 
+order by 
+    l_shipmode;
+
+	
+Oracle Execution Plan
+	
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: O_ORDERKEY^O_ORDERPRIORITY
+Object_name: ORDERS
+Alias: ORDERS@SEL$1
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$1
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: L_ORDERKEY^L_SHIPMODE
+Object_name: LINEITEM
+Alias: LINEITEM@SEL$1
+Extended_information:    FP:L_RECEIPTDATE>=TO_DATE('1994-01-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss') AND L_RECEIPTDATE<TO_DATE('1995-01-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss') AND L_COMMITDATE<TO_DATE('1995-01-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss') AND L_SHIPDATE<TO_DATE('1995-01-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss') AND (L_SHIPMODE='MAIL' OR L_SHIPMODE='SHIP') AND L_COMMITDATE<L_RECEIPTDATE AND L_SHIPDATE<L_COMMITDATE
+Access_predicates: 
+Filter_predicates: L_RECEIPTDATE>=TO_DATE('1994-01-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss')&L_RECEIPTDATE<TO_DATE('1995-01-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss')&L_COMMITDATE<TO_DATE('1995-01-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss')&L_SHIPDATE<TO_DATE('1995-01-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss')&(L_SHIPMODE='MAIL'|L_SHIPMODE='SHIP')&L_COMMITDATE<L_RECEIPTDATE&L_SHIPDATE<L_COMMITDATE
+Select_level: SEL$1
+--------------------
+Operation: hash join
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  O_ORDERPRIORITY^L_SHIPMODE
+Object_name: 
+Alias: 
+Extended_information:    AP:O_ORDERKEY=L_ORDERKEY
+Access_predicates: O_ORDERKEY=L_ORDERKEY
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: sort
+Options: GROUP BY
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  L_SHIPMODE^SUM(DECODE(O_ORDERPRIORITY,'1-URGENT',0,'2-HIGH',0,1))^SUM(DECODE(O_ORDERPRIORITY,'1-URGENT',1,'2-HIGH',1,0))
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$1
+--------------------
+Operation: select statement
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection: 
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+
+Calpont Execution Plan
+
+>SELECT MAIN
+>>Returned Columns
+SimpleColumn tpch.LINEITEM.L_SHIPMODE
+  s/t/c/T/A: tpch/LINEITEM/L_SHIPMODE/39/LINEITEM
+
+ArithmeticColumn: AggregateColumn sum(DECODE(O_ORDERPRIORITY,'1-URGENT',0,'2-HIGH',0,1))
+ArithmeticColumn: FunctionColumn: decode(O_ORDERPRIORITY,'1-URGENT',0,'2-HIGH',0,1)
+
+
+ArithmeticColumn: AggregateColumn sum(DECODE(O_ORDERPRIORITY,'1-URGENT',1,'2-HIGH',1,0))
+ArithmeticColumn: FunctionColumn: decode(O_ORDERPRIORITY,'1-URGENT',1,'2-HIGH',1,0)
+
+
+>>Filters
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_RECEIPTDATE
+  s/t/c/T/A: tpch/LINEITEM/L_RECEIPTDATE/37/
+  Operator: >=  ArithmeticColumn: FunctionColumn: to_date('1994-01-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss')
+
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_RECEIPTDATE
+  s/t/c/T/A: tpch/LINEITEM/L_RECEIPTDATE/37/
+  Operator: <  ArithmeticColumn: FunctionColumn: to_date('1995-01-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss')
+
+Operator: AND
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_COMMITDATE
+  s/t/c/T/A: tpch/LINEITEM/L_COMMITDATE/36/
+  Operator: <  ArithmeticColumn: FunctionColumn: to_date('1995-01-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss')
+
+Operator: AND
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_SHIPDATE
+  s/t/c/T/A: tpch/LINEITEM/L_SHIPDATE/35/
+  Operator: <  ArithmeticColumn: FunctionColumn: to_date('1995-01-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss')
+
+Operator: AND
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_SHIPMODE
+  s/t/c/T/A: tpch/LINEITEM/L_SHIPMODE/39/LINEITEM
+  Operator: =  ConstantColumn: MAIL(l)
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_SHIPMODE
+  s/t/c/T/A: tpch/LINEITEM/L_SHIPMODE/39/LINEITEM
+  Operator: =  ConstantColumn: SHIP(l)
+Operator: OR
+Operator: AND
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_COMMITDATE
+  s/t/c/T/A: tpch/LINEITEM/L_COMMITDATE/36/
+  Operator: <  SimpleColumn tpch.LINEITEM.L_RECEIPTDATE
+  s/t/c/T/A: tpch/LINEITEM/L_RECEIPTDATE/37/
+
+Operator: AND
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_SHIPDATE
+  s/t/c/T/A: tpch/LINEITEM/L_SHIPDATE/35/
+  Operator: <  SimpleColumn tpch.LINEITEM.L_COMMITDATE
+  s/t/c/T/A: tpch/LINEITEM/L_COMMITDATE/36/
+
+Operator: AND
+SimpleFilter
+  SimpleColumn tpch.ORDERS.O_ORDERKEY
+  s/t/c/T/A: tpch/ORDERS/O_ORDERKEY/16/ORDERS
+  Operator: =  SimpleColumn tpch.LINEITEM.L_ORDERKEY
+  s/t/c/T/A: tpch/LINEITEM/L_ORDERKEY/25/LINEITEM
+
+Operator: and
+>>Group By Columns
+SimpleColumn tpch.LINEITEM.L_SHIPMODE
+  s/t/c/T/A: tpch/LINEITEM/L_SHIPMODE/39/LINEITEM
+
+ArithmeticColumn: AggregateColumn sum(DECODE(O_ORDERPRIORITY,'1-URGENT',0,'2-HIGH',0,1))
+ArithmeticColumn: FunctionColumn: decode(O_ORDERPRIORITY,'1-URGENT',0,'2-HIGH',0,1)
+
+
+ArithmeticColumn: AggregateColumn sum(DECODE(O_ORDERPRIORITY,'1-URGENT',1,'2-HIGH',1,0))
+ArithmeticColumn: FunctionColumn: decode(O_ORDERPRIORITY,'1-URGENT',1,'2-HIGH',1,0)
+
+
+SessionID: 4858
+TxnID: 326
+VerID: 326
+--- Column Map ---
+L_COMMITDATE : 0x9115c48
+L_ORDERKEY : 0x90fb758
+L_RECEIPTDATE : 0x9115b60
+L_SHIPDATE : 0x9114d30
+L_SHIPMODE : 0x90fb788
+O_ORDERKEY : 0x90f4df8
+O_ORDERPRIORITY : 0x90fb728
+

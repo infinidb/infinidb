@@ -1,0 +1,183 @@
+*~
+*.d
+*.d.*
+*.o
+lib*.a
+lib*.so
+lib*.so.*
+export/
+buildFlags
+MyDebugFlags
+*.sql.log
+
+#--------------------
+# Visual studio files 
+*.user
+*.ncb
+*.suo
+*.exe
+
+#--------------------
+# Slickedit Projects 
+*.vpj
+*.vpw*
+*.vtg
+
+#-------------------
+# CodeBlocks Projects
+*.cbp
+
+#--------------------
+# dbcon files
+dbcon/ddlpackage/ddl-gram.cpp
+dbcon/ddlpackage/ddl-gram.h
+dbcon/ddlpackage/ddl-scan.cpp
+dbcon/dmlpackage/dml-gram.cpp
+dbcon/dmlpackage/dml-gram.h
+dbcon/dmlpackage/dml-scan.cpp
+
+#--------------------
+# ddlproc files
+ddlproc/DDLProc
+
+#--------------------
+# decomsvr files
+decomsvr/DecomSvr
+
+#--------------------
+# dmlproc files
+dmlproc/DMLProc
+
+#--------------------
+# exemgr files
+exemgr/ExeMgr
+
+#--------------------
+# oamapps files
+oamapps/calpontConsole/calpontConsole
+oamapps/calpontDB/calpontDBWrite
+oamapps/postConfigure/amazonInstaller
+oamapps/postConfigure/installer
+oamapps/postConfigure/patchInstaller
+oamapps/postConfigure/postConfigure
+oamapps/sendtrap/sendtrap
+oamapps/serverMonitor/ServerMonitor
+oamapps/traphandler/trapHandler
+
+#--------------------
+# primitives files
+primitives/primproc/PrimProc
+
+#--------------------
+# procmgr files
+procmgr/ProcMgr
+
+#--------------------
+# procmon files
+procmon/ProcMon
+
+#--------------------
+# tools files
+tools/SesMgr/SesMgr
+tools/calpontSupport/calpontSupport
+tools/clearShm/clearShm
+tools/cleartablelock/cleartablelock
+tools/configMgt/autoConfigure
+tools/configMgt/autoInstaller
+tools/configMgt/stackReleaseChecker
+tools/configMgt/svnQuery
+tools/cplogger/cplogger
+tools/dbbuilder/dbbuilder
+tools/dbloadxml/colxml
+tools/dbsizereport/databaseSizeReport
+tools/ddlcleanup/ddlcleanup
+tools/dumpVss/dumpVss
+tools/dumpcol/dumpcol
+tools/dumpobm/dumpobm
+tools/editTxn/editTxn
+tools/editem/editem
+tools/evalcol/evalcol
+tools/getConfig/getConfig
+tools/hdfsCheck/hdfsCheck
+tools/healthcheck/healthcheck
+tools/idbmeminfo/idbmeminfo
+tools/oid2file/oid2file
+tools/redistributeDB/redistributeDB
+tools/setConfig/setConfig
+tools/viewtablelock/viewtablelock
+
+#--------------------
+# utils files
+utils/udfsdk/udfsdk.tar.gz
+utils/idbhdfs/hdfs-12/hdfs-12.so
+utils/idbhdfs/hdfs-20/hdfs-20.so
+
+#--------------------
+# versioning (BRM) files
+versioning/BRM/autoinctest
+versioning/BRM/controllernode
+versioning/BRM/copylocktest
+versioning/BRM/dbrmctl
+versioning/BRM/load_brm
+versioning/BRM/load_em
+versioning/BRM/print_journal
+versioning/BRM/reset_locks
+versioning/BRM/rollback
+versioning/BRM/save_brm
+versioning/BRM/tablelocktest
+versioning/BRM/workernode
+
+#--------------------
+# writeengine files
+writeengine/bulk/cpimport.bin
+writeengine/server/WriteEngineServer
+writeengine/splitter/cpimport
+
+#--------------------
+# Eclipse project files
+.metadata/
+dbcon/.project
+ddlproc/.project
+dmlproc/.project
+exemgr/.project
+oam/.project
+primitives/.project
+tools/.project
+utils/.project
+utils/funcexp/tdriver
+writeengine/.cproject
+writeengine/.project
+writeengine/.settings/
+
+
+
+
+#--------------------
+# libraries that are under revision control
+!utils/net-snmp-built-libs/libnetsnmp.so.5.2.1
+!utils/net-snmp-built-libs/fc12lib/libnetsnmp.so.5.2.1
+!utils/net-snmp-built-libs/fc12lib/libnetsnmpmibs.so.5.2.1
+!utils/net-snmp-built-libs/fc12lib/libnetsnmphelpers.so.5.2.1
+!utils/net-snmp-built-libs/fc12lib/libnetsnmpagent.so.5.2.1
+!utils/net-snmp-built-libs/fc12lib/libnetsnmptrapd.so.5.2.1
+!utils/net-snmp-built-libs/libnetsnmpmibs.so.5.2.1
+!utils/net-snmp-built-libs/fc6lib/libnetsnmp.so.5.2.1
+!utils/net-snmp-built-libs/fc6lib/libnetsnmpmibs.so.5.2.1
+!utils/net-snmp-built-libs/fc6lib/libnetsnmphelpers.so.5.2.1
+!utils/net-snmp-built-libs/fc6lib/libnetsnmpagent.so.5.2.1
+!utils/net-snmp-built-libs/fc6lib/libnetsnmptrapd.so.5.2.1
+!utils/net-snmp-built-libs/libnetsnmphelpers.so.5.2.1
+!utils/net-snmp-built-libs/libnetsnmpagent.so.5.2.1
+!utils/net-snmp-built-libs/lib64/libnetsnmp.so.5.2.1
+!utils/net-snmp-built-libs/lib64/libnetsnmpmibs.so.5.2.1
+!utils/net-snmp-built-libs/lib64/libnetsnmphelpers.so.5.2.1
+!utils/net-snmp-built-libs/lib64/libnetsnmpagent.so.5.2.1
+!utils/net-snmp-built-libs/lib64/libnetsnmptrapd.so.5.2.1
+!utils/net-snmp-built-libs/libnetsnmptrapd.so.5.2.1
+!utils/jemalloc/libjemalloc.so.3.3.0
+!utils/unwind/libiberty.a
+!utils/unwind/libunwind.so.8.0.1
+!utils/unwind/libunwind-x86_64.so.8.0.1
+!utils/idbhdfs/hdfs-12/libhdfs.so
+!utils/idbhdfs/hdfs-20/libhdfs.so
+!utils/idbhdfs/jvm/jdk1.6.0_31/libjvm.so

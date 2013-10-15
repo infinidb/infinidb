@@ -1,0 +1,16 @@
+# $Id$
+
+description "Starts the InfiniDB Enterprise Process Monitor"
+
+start on runlevel 2
+start on runlevel 3
+
+stop on runlevel 0
+stop on runlevel 1
+stop on runlevel 4
+stop on runlevel 5
+stop on runlevel 6
+
+respawn
+exec /usr/local/Calpont/bin/ProcMon
+

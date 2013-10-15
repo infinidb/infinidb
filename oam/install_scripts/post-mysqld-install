@@ -1,0 +1,97 @@
+#!/bin/bash
+#
+# $Id: post-mysqld-install 3661 2013-06-25 22:04:33Z dhill $
+#
+# Post-install steps for infinidb-mysql install
+
+prefix=/usr/local
+installdir=$prefix/Calpont
+rpmmode=install
+user=mysql
+if [ $EUID -ne 0 ]; then
+	user=$USER
+fi
+
+for arg in "$@"; do
+	if [ `expr -- "$arg" : '--prefix='` -eq 9 ]; then
+		prefix="`echo $arg | awk -F= '{print $2}'`"
+		installdir=$prefix/Calpont
+	elif [ `expr -- "$arg" : '--rpmmode='` -eq 10 ]; then
+		rpmmode="`echo $arg | awk -F= '{print $2}'`"
+	elif [ `expr -- "$arg" : '--installdir='` -eq 13 ]; then
+		installdir="`echo $arg | awk -F= '{print $2}'`"
+		prefix=`dirname $installdir`
+	elif [ `expr -- "$arg" : '--user='` -eq 7 ]; then
+		user="`echo $arg | awk -F= '{print $2}'`"
+	else
+		echo "post-mysqld-install: ignoring unknown argument: $arg" 1>&2
+	fi
+done
+
+cd $installdir/mysql/lib/mysql
+for file in libmysqlclient libmysqlclient_r; do
+	ln -sf $file.so.16.0.0 $file.so
+	ln -sf $file.so.16.0.0 $file.so.16
+done
+cd $installdir/mysql/lib/mysql/plugin
+for file in ha_archive ha_blackhole ha_federated ha_innodb ha_innodb_plugin; do
+	ln -sf $file.so.0.0.0 $file.so
+	ln -sf $file.so.0.0.0 $file.so.0
+done
+
+### taken from MySQL-server-5.1.30-0.glibc23.i386.rpm
+mysql_datadir=$installdir/mysql/db
+
+# Create data directory if needed
+if test ! -d $mysql_datadir; then mkdir -m 755 $mysql_datadir; fi
+if test ! -d $mysql_datadir/mysql; then mkdir $mysql_datadir/mysql; fi
+if test ! -d $mysql_datadir/test; then mkdir $mysql_datadir/test; fi
+
+# Create a MySQL user and group. Do not report any problems if it already
+# exists.
+groupadd -r $user 2> /dev/null || true
+useradd -m -r -d $mysql_datadir -s /bin/bash -c "MySQL server" -g $user $user 2> /dev/null || true
+# The user may already exist, make sure it has the proper group nevertheless (BUG#12823)
+usermod -g $user $user 2> /dev/null || true
+
+# Change permissions so that the user that will run the MySQL daemon
+# owns all database files.
+chown -R $user:$user $mysql_datadir
+
+# Initiate databases if needed
+if [ $installdir != "/usr/local/Calpont" ]; then
+	sed -i -e s@/usr/local/Calpont@$installdir@g $installdir/mysql/my.cnf
+fi
+### Don't give the user the notes, we'll fix them ourselves...
+$installdir/mysql/bin/mysql_install_db --rpm --user=$user --defaults-file=$installdir/mysql/my.cnf --basedir=$installdir/mysql >/dev/null
+# Change permissions again to fix any new files.
+chown -R $user:$user $mysql_datadir
+
+# Fix permissions for the permission database so that only the user
+# can read them.
+chmod -R og-rw $mysql_datadir/mysql
+
+# Change permissions again to fix any new files.
+chown -R $user.$user $installdir/mysql
+
+test -e /etc/init.d/mysql-Calpont || cp $installdir/mysql/mysql-Calpont /etc/init.d >/dev/null 2>&1
+
+if [ -f $installdir/lib/libcalmysql.so.1.0.0 ]; then
+	libcalmysql=$installdir/lib/libcalmysql.so.1.0.0
+	libudfsdk=$installdir/lib/libudf_mysql.so.1.0.0
+elif [ -f $installdir/lib/libcalmysql.so.1 ]; then
+	libcalmysql=$installdir/lib/libcalmysql.so.1
+	libudfsdk=$installdir/lib/libudf_mysql.so.1
+else
+	libcalmysql=
+fi
+
+if [ -n "$libcalmysql" ]; then
+
+	cd $installdir/mysql/lib/mysql/plugin
+	ln -sf $libcalmysql libcalmysql.so
+        ln -sf $libcalmysql libcalmysqlent.so
+	ln -sf $libudfsdk libudf_mysql.so
+fi
+
+exit 0

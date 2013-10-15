@@ -1,0 +1,1 @@
+CALALARM|13|FaultyDeviceID|1|ec1|reportingProcess|10|8

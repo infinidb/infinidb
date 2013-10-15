@@ -1,0 +1,136 @@
+Q13
+select
+	c_count,
+	count(*) as custdist
+from
+	(
+		select
+			c_custkey,
+			count(o_orderkey)
+		from
+			customer left outer join orders on
+				c_custkey = o_custkey
+				and o_comment not like '%:1%:2%'
+		group by
+			c_custkey
+	) as c_orders (c_custkey, c_count)
+group by
+	c_count
+order by
+	custdist desc,
+	c_count desc;
+	
+Oracle Execution Plan	
+
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: C_CUSTKEY
+Object_name: CUSTOMER
+Alias: CUSTOMER@SEL$3
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$54D64B3C
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: ORDERS.O_ORDERKEY^O_CUSTKEY
+Object_name: ORDERS
+Alias: ORDERS@SEL$2
+Extended_information:    FP:O_COMMENT(+) NOT LIKE '%:1%:2%'
+Access_predicates: 
+Filter_predicates: O_COMMENT(+) NOT LIKE '%:1%:2%'
+Select_level: SEL$54D64B3C
+--------------------
+Operation: hash join
+Options: OUTER
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  C_CUSTKEY^ORDERS.O_ORDERKEY
+Object_name: 
+Alias: 
+Extended_information:    AP:C_CUSTKEY=O_CUSTKEY(+)
+Access_predicates: C_CUSTKEY=O_CUSTKEY(+)
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: hash
+Options: GROUP BY
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  CUSTOMER.C_CUSTKEY^COUNT(ORDERS.O_ORDERKEY)
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$54D64B3C
+--------------------
+Operation: view
+Options: 
+Object_type: 
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: C_COUNT
+Object_name: 
+Alias: C_ORDERS@SEL$1
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$54D64B3C
+--------------------
+Operation: hash
+Options: GROUP BY
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  C_COUNT^COUNT(ALL)
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: sort
+Options: ORDER BY
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  COUNT(ALL)^INTERNAL_FUNCTION(C_COUNT)
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$1
+--------------------
+Operation: select statement
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection: 
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------

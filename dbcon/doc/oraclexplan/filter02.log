@@ -1,0 +1,59 @@
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: JLOWE
+Search_columns: 
+Projection: O_TOTALPRICE
+Object_name: ORDERS
+Alias: ORDERS@SEL$1
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$1
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: JLOWE
+Search_columns: 
+Projection: O_TOTALPRICE
+Object_name: ORDERS
+Alias: ORDERS@SEL$2
+Extended_information:    FP:O_TOTALPRICE<5000 AND LNNVL(O_TOTALPRICE<>:B1)
+Access_predicates: 
+Filter_predicates: O_TOTALPRICE<5000&LNNVL(O_TOTALPRICE<>:B1)
+Select_level: SEL$2
+--------------------
+Operation: filter
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection: O_TOTALPRICE
+Object_name: 
+Alias: 
+Extended_information:    FP: NOT EXISTS (SELECT /*+ */ 0 FROM ORDERS ORDERS WHERE O_TOTALPRICE<5000 AND LNNVL(O_TOTALPRICE<>:B1))
+Access_predicates: 
+Filter_predicates:  NOT EXISTS (SELECT /*+ */ 0 FROM ORDERS ORDERS WHERE O_TOTALPRICE<5000&LNNVL(O_TOTALPRICE<>:B1))
+Select_level: SEL$1
+--------------------
+Operation: select statement
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection: 
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+TOKEN: <O_TOTALPRICE<5000>
+TOKEN: <O_TOTALPRICE<5000>
+TOKEN: <LNNVL(O_TOTALPRICE<>:B1)>

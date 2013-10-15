@@ -1,0 +1,64 @@
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: 
+Object_name: NATION
+Alias: NATION@SEL$1
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$1
+--------------------
+Operation: sort
+Options: AGGREGATE
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  COUNT(ALL)
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$1
+--------------------
+Operation: select statement
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection: 
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+>SELECT MAIN
+>>Returned Columns
+ArithmeticColumn: AggregateColumn count(ALL)
+ArithmeticColumn: SimpleColumn ALL
+  s/t/c/T/A/RA: //ALL/0//0
+
+
+
+>>Filters
+empty filter tree
+>>Group By Columns
+ArithmeticColumn: AggregateColumn count(ALL)
+ArithmeticColumn: SimpleColumn ALL
+  s/t/c/T/A/RA: //ALL/0//0
+
+
+
+SessionID: 383
+TxnID: 108
+VerID: 108
+--- Column Map ---
+

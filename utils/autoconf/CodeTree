@@ -1,0 +1,28 @@
+build - tools to help build InfiniDB
+buildFlags
+dbcon - most of the code for InfiniBD:
+   ddlpackage - classes to parse DDL
+   ddlpackageproc - classes to perform DDL
+   dmlpackage - classes to parse DML
+   dmlpackageproc - classes to perform DML
+   doc - some historical documents
+   execplan - classes to describe an execution plan from a SQL point of view
+   ingres - WIP code to interface w/ Ingres
+   joblist - classes that transform a SQL tree into IDB job instructions
+   mysql - the MySQL Storage Engine API layer, also the patches to MySQL server
+   plsql - WIP code to interface w/ Oracle
+   sm - an abstraction layer for interfacing with ExeMgr
+ddlproc - main service loop for DDL
+dmlproc - main service loop for DML
+exemgr - main service loop for queries
+mysql - mostly header files copied from MySQL
+net-snmp - SNMP library
+oam - OAM service library
+oamapps - some OAM apps
+primitives - most of the code to build PrimProc, the main block processor
+snmpd - snmp utils
+tools - tools to debug IDB
+utils - utility classes
+versioning - classes to help with MVCC
+writeengine - classes that write data to disk
+

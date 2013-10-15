@@ -1,0 +1,179 @@
+Q13
+select
+	c_count,
+	count(*) as custdist
+from
+	(
+		select
+			c_custkey,
+			count(o_orderkey) as c_count
+		from
+			customer left outer join orders on
+				c_custkey = o_custkey
+				and o_comment not like '%:1%:2%'
+		group by
+			c_custkey
+	) c_orders
+group by
+	c_count
+order by
+	custdist desc,
+	c_count desc;
+	
+Oracle Execution Plan
+
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: C_CUSTKEY
+Object_name: CUSTOMER
+Alias: CUSTOMER@SEL$3
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$54D64B3C
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: ORDERS.O_ORDERKEY^O_CUSTKEY
+Object_name: ORDERS
+Alias: ORDERS@SEL$2
+Extended_information:    FP:O_COMMENT(+) NOT LIKE '%:1%:2%'
+Access_predicates: 
+Filter_predicates: O_COMMENT(+) NOT LIKE '%:1%:2%'
+Select_level: SEL$54D64B3C
+--------------------
+Operation: hash join
+Options: OUTER
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  C_CUSTKEY^ORDERS.O_ORDERKEY
+Object_name: 
+Alias: 
+Extended_information:    AP:C_CUSTKEY=O_CUSTKEY(+)
+Access_predicates: C_CUSTKEY=O_CUSTKEY(+)
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: hash
+Options: GROUP BY
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  CUSTOMER.C_CUSTKEY^COUNT(ORDERS.O_ORDERKEY)
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$54D64B3C
+--------------------
+Operation: view
+Options: 
+Object_type: 
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: C_COUNT
+Object_name: 
+Alias: C_ORDERS@SEL$1
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$54D64B3C
+--------------------
+Operation: hash
+Options: GROUP BY
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  C_COUNT^COUNT(ALL)
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: sort
+Options: ORDER BY
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  COUNT(ALL)^INTERNAL_FUNCTION(C_COUNT)
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$1
+--------------------
+Operation: select statement
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection: 
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+
+Calpont Execution Plan
+
+>SELECT MAIN
+>>Returned Columns
+ArithmeticColumn: AggregateColumn count(ALL)
+ArithmeticColumn: SimpleColumn ALL
+  s/t/c/T/A/RA: ///0//184
+
+
+
+ArithmeticColumn: FunctionColumn: internal_function(C_COUNT)
+
+>>Filters
+SimpleFilter
+  SimpleColumn tpch.ORDERS.O_COMMENT
+  s/t/c/T/A/RA: tpch/ORDERS/O_COMMENT/24//0
+  Operator:  NOT LIKE   ConstantColumn: %:1%:2%(l)
+SimpleFilter
+  SimpleColumn tpch.CUSTOMER.C_CUSTKEY
+  s/t/c/T/A/RA: tpch/CUSTOMER/C_CUSTKEY/8/CUSTOMER/1
+  Operator: =  SimpleColumn tpch.ORDERS.O_CUSTKEY
+  s/t/c/T/A/RA: tpch/ORDERS/O_CUSTKEY/17/ORDERS/0
+
+Operator: and
+>>Group By Columns
+ArithmeticColumn: AggregateColumn count(ALL)
+ArithmeticColumn: SimpleColumn ALL
+  s/t/c/T/A/RA: ///0//112
+
+
+
+ArithmeticColumn: FunctionColumn: internal_function(C_COUNT)
+
+SessionID: 4940
+TxnID: 373
+VerID: 373
+--- Column Map ---
+C_CUSTKEY : 0x96d8650
+O_COMMENT : 0x96d37b8
+O_CUSTKEY : 0x96d3758
+O_ORDERKEY : 0x96d3728
+

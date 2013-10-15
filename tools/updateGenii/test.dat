@@ -1,0 +1,14 @@
+A      OID3046.dat
+?      brmtest/brmtest
+?      dumpcol/dumpcol
+?      fixdate/fixdate.cdf
+?      fixdate/f1.cdf
+?      fixdate/fixdate
+?      evalcol/evalcol
+?      editem/editem
+?      dbbuilder/dbbuilder
+?      oid2file/oid2file
+M      Makefile
+G      updateGenii
+C      updateGenii/updateGenii.pl
+G      updateGenii/listRepos.pl

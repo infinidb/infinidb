@@ -1,0 +1,18 @@
+#
+# Calpont version with Daily running at midnight
+#
+
+SHELL=/bin/bash
+PATH=/sbin:/bin:/usr/sbin:/usr/bin
+MAILTO=root
+HOME=/
+
+# run-parts
+01 * * * * root run-parts /etc/cron.hourly
+00 0 * * * root run-parts /etc/cron.daily
+22 4 * * 0 root run-parts /etc/cron.weekly
+42 4 1 * * root run-parts /etc/cron.monthly
+
+# Translation Log Archiver, default to every 10 minutes
+00,10,20,30,40,50 * * * * root /usr/local/Calpont/bin/transactionLogArchiver.sh
+

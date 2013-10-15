@@ -1,0 +1,154 @@
+Q4
+select
+	o_orderpriority,
+	count(*) as order_count
+from
+	orders
+where
+	o_orderdate >= date '1993-07-01'
+	and o_orderdate < date '1993-07-01' + interval '3' month
+	and exists (
+		select
+			*
+		from
+			lineitem
+		where
+			l_orderkey = o_orderkey
+			and l_commitdate < l_receiptdate
+	)
+group by
+	o_orderpriority
+order by
+	o_orderpriority;
+	
+Oracle Execution Plan
+	
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: O_ORDERKEY^O_ORDERPRIORITY
+Object_name: ORDERS
+Alias: ORDERS@SEL$1
+Extended_information:    FP:O_ORDERDATE>=TO_DATE('1993-07-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss') AND O_ORDERDATE<TO_DATE('1993-10-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss')
+Access_predicates: 
+Filter_predicates: O_ORDERDATE>=TO_DATE('1993-07-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss')&O_ORDERDATE<TO_DATE('1993-10-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss')
+Select_level: SEL$5DA710D3
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: L_ORDERKEY
+Object_name: LINEITEM
+Alias: LINEITEM@SEL$2
+Extended_information:    FP:L_COMMITDATE<L_RECEIPTDATE
+Access_predicates: 
+Filter_predicates: L_COMMITDATE<L_RECEIPTDATE
+Select_level: SEL$5DA710D3
+--------------------
+Operation: hash join
+Options: SEMI
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  O_ORDERPRIORITY
+Object_name: 
+Alias: 
+Extended_information:    AP:L_ORDERKEY=O_ORDERKEY
+Access_predicates: L_ORDERKEY=O_ORDERKEY
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: sort
+Options: GROUP BY
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  O_ORDERPRIORITY^COUNT(ALL)
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$5DA710D3
+--------------------
+Operation: select statement
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection: 
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+
+Calpont Execution Plan
+
+>SELECT MAIN
+>>Returned Columns
+1. SimpleColumn tpch.ORDERS.O_ORDERPRIORITY
+  s/t/c/T/A: tpch/ORDERS/O_ORDERPRIORITY/21/ORDERS
+
+2. ArithmeticColumn: AggregateColumn count(ALL)
+ArithmeticColumn: SimpleColumn ALL
+  s/t/c/T/A: ///0/
+
+
+>>Filters
+SimpleFilter
+  SimpleColumn tpch.ORDERS.O_ORDERDATE
+  s/t/c/T/A: tpch/ORDERS/O_ORDERDATE/20/
+  Operator: >=  ArithmeticColumn: FunctionColumn: to_date('1993-07-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss')
+
+SimpleFilter
+  SimpleColumn tpch.ORDERS.O_ORDERDATE
+  s/t/c/T/A: tpch/ORDERS/O_ORDERDATE/20/
+  Operator: <  ArithmeticColumn: FunctionColumn: to_date('1993-10-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss')
+
+Operator: AND
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_COMMITDATE
+  s/t/c/T/A: tpch/LINEITEM/L_COMMITDATE/36/
+  Operator: <  SimpleColumn tpch.LINEITEM.L_RECEIPTDATE
+  s/t/c/T/A: tpch/LINEITEM/L_RECEIPTDATE/37/
+
+Operator: and
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_ORDERKEY
+  s/t/c/T/A: tpch/LINEITEM/L_ORDERKEY/25/LINEITEM
+  Operator: =  SimpleColumn tpch.ORDERS.O_ORDERKEY
+  s/t/c/T/A: tpch/ORDERS/O_ORDERKEY/16/ORDERS
+
+Operator: and
+>>Group By Columns
+SimpleColumn tpch.ORDERS.O_ORDERPRIORITY
+  s/t/c/T/A: tpch/ORDERS/O_ORDERPRIORITY/21/ORDERS
+
+ArithmeticColumn: AggregateColumn count(ALL)
+ArithmeticColumn: SimpleColumn ALL
+  s/t/c/T/A: ///0/
+
+
+SessionID: 4796
+TxnID: 295
+VerID: 295
+--- Column Map ---
+L_COMMITDATE : 0xa113d20
+L_ORDERKEY : 0xa113af0
+L_RECEIPTDATE : 0xa0f9788
+O_ORDERDATE : 0xa113908
+O_ORDERKEY : 0xa0f2df8
+O_ORDERPRIORITY : 0xa0f9728
+

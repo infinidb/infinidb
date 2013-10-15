@@ -1,0 +1,93 @@
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: JLOWE
+Search_columns: 
+Projection: R_NAME
+Object_name: REGION
+Alias: REGION@SEL$1
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$1
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: JLOWE
+Search_columns: 
+Projection: N_NATIONKEY
+Object_name: NATION
+Alias: NATION@SEL$1
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$1
+--------------------
+Operation: buffer
+Options: SORT
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  R_NAME
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: merge join
+Options: CARTESIAN
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  N_NATIONKEY^R_NAME
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$1
+--------------------
+Operation: select statement
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection: 
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+N_NATIONKEY: SimpleColumn tpch.NATION.N_NATIONKEY
+  s/t/c/T/A/RA: tpch/NATION/N_NATIONKEY/4/NATION/0
+
+R_NAME: SimpleColumn tpch.REGION.R_NAME
+  s/t/c/T/A/RA: tpch/REGION/R_NAME/2/REGION/0
+
+>SELECT MAIN
+>>Returned Columns
+SimpleColumn tpch.NATION.N_NATIONKEY
+  s/t/c/T/A/RA: tpch/NATION/N_NATIONKEY/4/NATION/0
+
+SimpleColumn tpch.REGION.R_NAME
+  s/t/c/T/A/RA: tpch/REGION/R_NAME/2/REGION/0
+
+>>Filters
+empty filter tree
+SessionID: 211
+TxnID: 22
+VerID: 22
+--- Column Map ---
+N_NATIONKEY : 0xa108c20
+R_NAME : 0xa0d3c00
+

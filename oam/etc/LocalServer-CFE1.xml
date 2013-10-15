@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- $Id: LocalServer-CFE1.xml 375 2007-02-09 20:26:01Z rdempsey $ -->
+<Calpont Version="V1.0.0">
+	<LocalServerConfig>
+		<ServerName>fep1</ServerName>
+		<OAMMasterServer>0</OAMMasterServer>
+		<RTLinuxServer>0</RTLinuxServer>
+	</LocalServerConfig>
+</Calpont>

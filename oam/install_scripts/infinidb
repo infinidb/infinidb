@@ -1,0 +1,185 @@
+#!/bin/bash
+#
+# $Id: infinidb 3704 2013-08-07 03:33:20Z bwilkinson $
+#
+# infinidb        Starts Calpont InfiniDB database platform
+#
+#
+# chkconfig: 2345 99 99
+# description: Calpont InfiniDB is a database platform that utilizes Mysql
+#
+### BEGIN INIT INFO
+# Provides:          infinidb
+# Required-Start:    $local_fs $remote_fs $network $syslog $all
+# Required-Stop:     $local_fs $remote_fs $network $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Start/stop InfiniDB DW DBMS
+### END INIT INFO
+
+# Source function library.
+if [ -f /etc/init.d/functions ]; then
+	. /etc/init.d/functions
+fi
+
+if [ -z "$INFINIDB_INSTALL_DIR" ]; then
+	test -f /etc/default/infinidb && . /etc/default/infinidb
+fi
+
+if [ -z "$INFINIDB_INSTALL_DIR" ]; then
+	INFINIDB_INSTALL_DIR=/usr/local/Calpont
+fi
+
+declare -x INFINIDB_INSTALL_DIR=$INFINIDB_INSTALL_DIR
+
+InstallDir=$INFINIDB_INSTALL_DIR
+
+if [ $InstallDir != "/usr/local/Calpont" ]; then
+	export PATH=$InstallDir/bin:$InstallDir/mysql/bin:/bin:/usr/bin
+	export LD_LIBRARY_PATH=$InstallDir/lib:$InstallDir/mysql/lib/mysql
+fi
+
+#hadoop
+plugin=`$INFINIDB_INSTALL_DIR/bin/getConfig SystemConfig DataFilePlugin`
+if [ -n "$plugin" ]; then
+	export JAVA_HOME=/usr/java/jdk1.6.0_31
+	export LD_LIBRARY_PATH=/usr/java/jdk1.6.0_31/jre/lib/amd64/server
+
+	setenv=`$InstallDir/bin/getConfig SystemConfig DataFileEnvFile`
+	if [ -z "$setenv" ]; then
+		#default
+		setenv=setenv-hdfs-20
+	fi
+	. /root/$setenv >/dev/null 2>&1
+fi
+
+export LD_PRELOAD=$InstallDir/lib/libjemalloc.so
+
+test -f $InstallDir/post/functions && . $InstallDir/post/functions
+
+mt=`module_type`
+mid=`module_id`
+
+has_um=`$InstallDir/bin/getConfig SystemModuleConfig ModuleCount2`
+if [ "x$has_um" = x ]; then
+	has_um=0
+fi
+
+user=$USER
+if [ -z "$user" ]; then
+        user=root
+fi
+
+checkInstallSetup() {
+	InitialInstallFlag=`$InstallDir/bin/getConfig -c $InstallDir/etc/Calpont.xml Installation InitialInstallFlag`
+	if [ $InitialInstallFlag != "y" ]; then
+		echo "Please run the postConfigure install script, check the Installation Guide"
+		echo "for additional details"
+		rm -f /var/lock/subsys/infinidb
+		exit 1
+	fi
+}
+
+[ -f $InstallDir/bin/ProcMon ] || exit 0
+
+start() {
+	if [ -f /var/lock/subsys/infinidb ]; then
+		echo "InfiniDB Database Platform already running"
+		exit 0
+	fi
+
+	(mkdir -p /var/lock/subsys && touch /var/lock/subsys/infinidb) >/dev/null 2>&1
+
+	if [ -x $InstallDir/bin/infinidb.pre-start ]; then
+		$InstallDir/bin/infinidb.pre-start
+		if [ $? -ne 0 ]; then
+			echo "Error running InfiniDB pre-start script, not starting InfiniDB"
+			rm -f /var/lock/subsys/infinidb
+			exit 1
+		fi
+	fi
+	checkInstallSetup
+
+	CoreFileFlag=`$InstallDir/bin/getConfig -c $InstallDir/etc/Calpont.xml Installation CoreFileFlag`
+	if [ $CoreFileFlag = "y" ]; then
+		SUDO=
+		if [ -z "$NO_NONROOT_SUDO" -a "$user" != "root" ]; then 
+			SUDO="sudo"
+		fi
+
+		#infinidb core files
+		$SUDO ulimit -c unlimited  > /dev/null 2>&1
+		$SUDO sysctl -q -w kernel.core_uses_pid=1  > /dev/null 2>&1
+		$SUDO sysctl -q -w kernel.core_pattern=/var/log/Calpont/corefiles/core.%e.%p  > /dev/null 2>&1
+	fi
+
+	RETVAL=0
+	echo "Starting InfiniDB Database Platform"
+	rm -f /tmp/StopCalpont
+	exec $InstallDir/bin/run.sh $InstallDir/bin/ProcMon  > /dev/null 2>&1 &
+
+	return $RETVAL
+}	
+stop() {
+	echo "Shutting down InfiniDB Database Platform"
+	touch /tmp/StopCalpont
+	pkill -9 ProcMon
+	pkill -9 ProcMgr
+	sleep 1
+	$InstallDir/bin/clearShm
+	RETVAL=$?
+	rm -f /var/lock/subsys/infinidb
+	fuser -k 8604/tcp > /dev/null 2>&1
+	test -f /etc/init.d/mysql-Calpont || return $RETVAL
+	/etc/init.d/mysql-Calpont stop > /dev/null 2>&1
+	if [ -x $InstallDir/bin/infinidb.post-stop ]; then
+		$InstallDir/bin/infinidb.post-stop
+	fi
+	return $RETVAL
+}
+restart() {
+	stop
+	start
+}
+status() {
+	isrunning=0
+	if [ $EUID -eq 0 ]; then
+		if [ -f /var/lock/subsys/infinidb ]; then
+			isrunning=1
+		fi
+	else
+		pgrep ProcMon >/dev/null 2>&1
+		if [ $? -eq 0 ]; then
+			isrunning=1
+		fi
+	fi
+	if [ $isrunning -ne 0 ]; then
+		echo "InfiniDB is running"
+	else
+		echo "InfiniDB is not running"
+	fi
+}
+
+case "$1" in
+start)
+	start
+	;;
+stop)
+	stop
+	;;
+restart)
+	restart
+	;;
+condrestart)
+	[ -f /var/lock/subsys/infinidb ] && restart || :
+	;;
+status)
+	status
+	;;
+*)
+	echo $"Usage: $0 {start|stop|restart|condrestart|status}"
+	exit 1
+esac
+
+exit $?
+

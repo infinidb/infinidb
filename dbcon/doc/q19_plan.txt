@@ -1,0 +1,421 @@
+Q19
+select
+	sum(l_extendedprice* (1 - l_discount)) as revenue
+from
+	lineitem,
+	part
+where
+	(
+		p_partkey = l_partkey
+		and p_brand = 'Brand#12'
+		and p_container in ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG')
+		and l_quantity >= 1 and l_quantity <= 1 + 10
+		and p_size between 1 and 5
+		and l_shipmode in ('AIR', 'AIR REG')
+		and l_shipinstruct = 'DELIVER IN PERSON'
+	)
+	or
+	(
+		p_partkey = l_partkey
+		and p_brand = 'Brand#23'
+		and p_container in ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK')
+		and l_quantity >= 10 and l_quantity <= 10 + 10
+		and p_size between 1 and 10
+		and l_shipmode in ('AIR', 'AIR REG')
+		and l_shipinstruct = 'DELIVER IN PERSON'
+	)
+	or
+	(
+		p_partkey = l_partkey
+		and p_brand = 'Brand#34'
+		and p_container in ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG')
+		and l_quantity >= 20 and l_quantity <= 20 + 10
+		and p_size between 1 and 15
+		and l_shipmode in ('AIR', 'AIR REG')
+		and l_shipinstruct = 'DELIVER IN PERSON'
+	);
+
+Oracle Execution Plan
+
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: L_PARTKEY^L_QUANTITY^L_EXTENDEDPRICE^L_DISCOUNT
+Object_name: LINEITEM
+Alias: LINEITEM@SEL$1
+Extended_information:    FP:L_SHIPINSTRUCT='DELIVER IN PERSON' AND (L_SHIPMODE='AIR' OR L_SHIPMODE='AIR REG') AND (L_QUANTITY>=1 AND L_QUANTITY<=11 OR L_QUANTITY>=10 AND L_QUANTITY<=20 OR L_QUANTITY>=20 AND L_QUANTITY<=30)
+Access_predicates: 
+Filter_predicates: L_SHIPINSTRUCT='DELIVER IN PERSON'&(L_SHIPMODE='AIR'|L_SHIPMODE='AIR REG')&(L_QUANTITY>=1&L_QUANTITY<=11|L_QUANTITY>=10&L_QUANTITY<=20|L_QUANTITY>=20&L_QUANTITY<=30)
+Select_level: SEL$1
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: P_PARTKEY^P_BRAND^P_SIZE^P_CONTAINER
+Object_name: PART
+Alias: PART@SEL$1
+Extended_information:    FP:P_SIZE>=1 AND (P_SIZE<=5 AND P_BRAND='Brand#12' AND (P_CONTAINER='SM BOX' OR P_CONTAINER='SM CASE' OR P_CONTAINER='SM PACK' OR P_CONTAINER='SM PKG') OR P_SIZE<=10 AND P_BRAND='Brand#23' AND (P_CONTAINER='MED BAG' OR P_CONTAINER='MED BOX' OR P_CONTAINER='MED PACK' OR P_CONTAINER='MED PKG') OR P_SIZE<=15 AND P_BRAND='Brand#34' AND (P_CONTAINER='LG BOX' OR P_CONTAINER='LG CASE' OR P_CONTAINER='LG PACK' OR P_CONTAINER='LG PKG'))
+Access_predicates: 
+Filter_predicates: P_SIZE>=1&(P_SIZE<=5&P_BRAND='Brand#12'&(P_CONTAINER='SM BOX'|P_CONTAINER='SM CASE'|P_CONTAINER='SM PACK'|P_CONTAINER='SM PKG')|P_SIZE<=10&P_BRAND='Brand#23'&(P_CONTAINER='MED BAG'|P_CONTAINER='MED BOX'|P_CONTAINER='MED PACK'|P_CONTAINER='MED PKG')|P_SIZE<=15&P_BRAND='Brand#34'&(P_CONTAINER='LG BOX'|P_CONTAINER='LG CASE'|P_CONTAINER='LG PACK'|P_CONTAINER='LG PKG'))
+Select_level: SEL$1
+--------------------
+Operation: hash join
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  L_EXTENDEDPRICE^L_DISCOUNT
+Object_name: 
+Alias: 
+Extended_information:    AP:P_PARTKEY=L_PARTKEY   FP:P_BRAND='Brand#12' AND (P_CONTAINER='SM BOX' OR P_CONTAINER='SM CASE' OR P_CONTAINER='SM PACK' OR P_CONTAINER='SM PKG') AND L_QUANTITY>=1 AND L_QUANTITY<=11 AND P_SIZE<=5 OR P_BRAND='Brand#23' AND (P_CONTAINER='MED BAG' OR P_CONTAINER='MED BOX' OR P_CONTAINER='MED PACK' OR P_CONTAINER='MED PKG') AND L_QUANTITY>=10 AND L_QUANTITY<=20 AND P_SIZE<=10 OR P_BRAND='Brand#34' AND (P_CONTAINER='LG BOX' OR P_CONTAINER='LG CASE' OR P_CONTAINER='LG PACK' OR P_CONTAINER='LG PKG') AND L_QUANTITY>=20 AND L_QUANTITY<=30 AND P_SIZE<=15
+Access_predicates: P_PARTKEY=L_PARTKEY
+Filter_predicates: P_BRAND='Brand#12'&(P_CONTAINER='SM BOX'|P_CONTAINER='SM CASE'|P_CONTAINER='SM PACK'|P_CONTAINER='SM PKG')&L_QUANTITY>=1&L_QUANTITY<=11&P_SIZE<=5|P_BRAND='Brand#23'&(P_CONTAINER='MED BAG'|P_CONTAINER='MED BOX'|P_CONTAINER='MED PACK'|P_CONTAINER='MED PKG')&L_QUANTITY>=10&L_QUANTITY<=20&P_SIZE<=10|P_BRAND='Brand#34'&(P_CONTAINER='LG BOX'|P_CONTAINER='LG CASE'|P_CONTAINER='LG PACK'|P_CONTAINER='LG PKG')&L_QUANTITY>=20&L_QUANTITY<=30&P_SIZE<=15
+Select_level: 
+--------------------
+Operation: sort
+Options: AGGREGATE
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  SUM(L_EXTENDEDPRICE*(1-L_DISCOUNT))
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$1
+--------------------
+Operation: select statement
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection: 
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+
+Calpont Execution Plan
+
+>SELECT MAIN
+>>Returned Columns
+ArithmeticColumn: AggregateColumn sum(L_EXTENDEDPRICE*(1-L_DISCOUNT))
+ArithmeticColumn: SimpleColumn L_EXTENDEDPRICE
+  s/t/c/T/A: ///0/
+
+ConstantColumn: 1(n)
+SimpleColumn L_DISCOUNT
+  s/t/c/T/A: ///0/
+
+Operator: -
+Operator: *
+
+
+>>Filters
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_SHIPINSTRUCT
+  s/t/c/T/A: tpch/LINEITEM/L_SHIPINSTRUCT/38/
+  Operator: =  ConstantColumn: DELIVER IN PERSON(l)
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_SHIPMODE
+  s/t/c/T/A: tpch/LINEITEM/L_SHIPMODE/39/
+  Operator: =  ConstantColumn: AIR(l)
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_SHIPMODE
+  s/t/c/T/A: tpch/LINEITEM/L_SHIPMODE/39/
+  Operator: =  ConstantColumn: AIR REG(l)
+Operator: OR
+Operator: AND
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_QUANTITY
+  s/t/c/T/A: tpch/LINEITEM/L_QUANTITY/29/LINEITEM
+  Operator: >=  ConstantColumn: 1(n)
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_QUANTITY
+  s/t/c/T/A: tpch/LINEITEM/L_QUANTITY/29/LINEITEM
+  Operator: <=  ConstantColumn: 11(n)
+Operator: AND
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_QUANTITY
+  s/t/c/T/A: tpch/LINEITEM/L_QUANTITY/29/LINEITEM
+  Operator: >=  ConstantColumn: 10(n)
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_QUANTITY
+  s/t/c/T/A: tpch/LINEITEM/L_QUANTITY/29/LINEITEM
+  Operator: <=  ConstantColumn: 20(n)
+Operator: AND
+Operator: OR
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_QUANTITY
+  s/t/c/T/A: tpch/LINEITEM/L_QUANTITY/29/LINEITEM
+  Operator: >=  ConstantColumn: 20(n)
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_QUANTITY
+  s/t/c/T/A: tpch/LINEITEM/L_QUANTITY/29/LINEITEM
+  Operator: <=  ConstantColumn: 30(n)
+Operator: AND
+Operator: OR
+Operator: AND
+SimpleFilter
+  SimpleColumn tpch.PART.P_SIZE
+  s/t/c/T/A: tpch/PART/P_SIZE/51/PART
+  Operator: >=  ConstantColumn: 1(n)
+SimpleFilter
+  SimpleColumn tpch.PART.P_SIZE
+  s/t/c/T/A: tpch/PART/P_SIZE/51/PART
+  Operator: <=  ConstantColumn: 5(n)
+SimpleFilter
+  SimpleColumn tpch.PART.P_BRAND
+  s/t/c/T/A: tpch/PART/P_BRAND/49/PART
+  Operator: =  ConstantColumn: Brand#12(l)
+Operator: AND
+SimpleFilter
+  SimpleColumn tpch.PART.P_CONTAINER
+  s/t/c/T/A: tpch/PART/P_CONTAINER/52/PART
+  Operator: =  ConstantColumn: SM BOX(l)
+SimpleFilter
+  SimpleColumn tpch.PART.P_CONTAINER
+  s/t/c/T/A: tpch/PART/P_CONTAINER/52/PART
+  Operator: =  ConstantColumn: SM CASE(l)
+Operator: OR
+SimpleFilter
+  SimpleColumn tpch.PART.P_CONTAINER
+  s/t/c/T/A: tpch/PART/P_CONTAINER/52/PART
+  Operator: =  ConstantColumn: SM PACK(l)
+Operator: OR
+SimpleFilter
+  SimpleColumn tpch.PART.P_CONTAINER
+  s/t/c/T/A: tpch/PART/P_CONTAINER/52/PART
+  Operator: =  ConstantColumn: SM PKG(l)
+Operator: OR
+Operator: AND
+SimpleFilter
+  SimpleColumn tpch.PART.P_SIZE
+  s/t/c/T/A: tpch/PART/P_SIZE/51/PART
+  Operator: <=  ConstantColumn: 10(n)
+SimpleFilter
+  SimpleColumn tpch.PART.P_BRAND
+  s/t/c/T/A: tpch/PART/P_BRAND/49/PART
+  Operator: =  ConstantColumn: Brand#23(l)
+Operator: AND
+SimpleFilter
+  SimpleColumn tpch.PART.P_CONTAINER
+  s/t/c/T/A: tpch/PART/P_CONTAINER/52/PART
+  Operator: =  ConstantColumn: MED BAG(l)
+SimpleFilter
+  SimpleColumn tpch.PART.P_CONTAINER
+  s/t/c/T/A: tpch/PART/P_CONTAINER/52/PART
+  Operator: =  ConstantColumn: MED BOX(l)
+Operator: OR
+SimpleFilter
+  SimpleColumn tpch.PART.P_CONTAINER
+  s/t/c/T/A: tpch/PART/P_CONTAINER/52/PART
+  Operator: =  ConstantColumn: MED PACK(l)
+Operator: OR
+SimpleFilter
+  SimpleColumn tpch.PART.P_CONTAINER
+  s/t/c/T/A: tpch/PART/P_CONTAINER/52/PART
+  Operator: =  ConstantColumn: MED PKG(l)
+Operator: OR
+Operator: AND
+Operator: OR
+SimpleFilter
+  SimpleColumn tpch.PART.P_SIZE
+  s/t/c/T/A: tpch/PART/P_SIZE/51/PART
+  Operator: <=  ConstantColumn: 15(n)
+SimpleFilter
+  SimpleColumn tpch.PART.P_BRAND
+  s/t/c/T/A: tpch/PART/P_BRAND/49/PART
+  Operator: =  ConstantColumn: Brand#34(l)
+Operator: AND
+SimpleFilter
+  SimpleColumn tpch.PART.P_CONTAINER
+  s/t/c/T/A: tpch/PART/P_CONTAINER/52/PART
+  Operator: =  ConstantColumn: LG BOX(l)
+SimpleFilter
+  SimpleColumn tpch.PART.P_CONTAINER
+  s/t/c/T/A: tpch/PART/P_CONTAINER/52/PART
+  Operator: =  ConstantColumn: LG CASE(l)
+Operator: OR
+SimpleFilter
+  SimpleColumn tpch.PART.P_CONTAINER
+  s/t/c/T/A: tpch/PART/P_CONTAINER/52/PART
+  Operator: =  ConstantColumn: LG PACK(l)
+Operator: OR
+SimpleFilter
+  SimpleColumn tpch.PART.P_CONTAINER
+  s/t/c/T/A: tpch/PART/P_CONTAINER/52/PART
+  Operator: =  ConstantColumn: LG PKG(l)
+Operator: OR
+Operator: AND
+Operator: OR
+Operator: AND
+Operator: and
+SimpleFilter
+  SimpleColumn tpch.PART.P_PARTKEY
+  s/t/c/T/A: tpch/PART/P_PARTKEY/46/PART
+  Operator: =  SimpleColumn tpch.LINEITEM.L_PARTKEY
+  s/t/c/T/A: tpch/LINEITEM/L_PARTKEY/26/LINEITEM
+
+Operator: and
+SimpleFilter
+  SimpleColumn tpch.PART.P_BRAND
+  s/t/c/T/A: tpch/PART/P_BRAND/49/PART
+  Operator: =  ConstantColumn: Brand#12(l)
+SimpleFilter
+  SimpleColumn tpch.PART.P_CONTAINER
+  s/t/c/T/A: tpch/PART/P_CONTAINER/52/PART
+  Operator: =  ConstantColumn: SM BOX(l)
+SimpleFilter
+  SimpleColumn tpch.PART.P_CONTAINER
+  s/t/c/T/A: tpch/PART/P_CONTAINER/52/PART
+  Operator: =  ConstantColumn: SM CASE(l)
+Operator: OR
+SimpleFilter
+  SimpleColumn tpch.PART.P_CONTAINER
+  s/t/c/T/A: tpch/PART/P_CONTAINER/52/PART
+  Operator: =  ConstantColumn: SM PACK(l)
+Operator: OR
+SimpleFilter
+  SimpleColumn tpch.PART.P_CONTAINER
+  s/t/c/T/A: tpch/PART/P_CONTAINER/52/PART
+  Operator: =  ConstantColumn: SM PKG(l)
+Operator: OR
+Operator: AND
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_QUANTITY
+  s/t/c/T/A: tpch/LINEITEM/L_QUANTITY/29/LINEITEM
+  Operator: >=  ConstantColumn: 1(n)
+Operator: AND
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_QUANTITY
+  s/t/c/T/A: tpch/LINEITEM/L_QUANTITY/29/LINEITEM
+  Operator: <=  ConstantColumn: 11(n)
+Operator: AND
+SimpleFilter
+  SimpleColumn tpch.PART.P_SIZE
+  s/t/c/T/A: tpch/PART/P_SIZE/51/PART
+  Operator: <=  ConstantColumn: 5(n)
+Operator: AND
+SimpleFilter
+  SimpleColumn tpch.PART.P_BRAND
+  s/t/c/T/A: tpch/PART/P_BRAND/49/PART
+  Operator: =  ConstantColumn: Brand#23(l)
+SimpleFilter
+  SimpleColumn tpch.PART.P_CONTAINER
+  s/t/c/T/A: tpch/PART/P_CONTAINER/52/PART
+  Operator: =  ConstantColumn: MED BAG(l)
+SimpleFilter
+  SimpleColumn tpch.PART.P_CONTAINER
+  s/t/c/T/A: tpch/PART/P_CONTAINER/52/PART
+  Operator: =  ConstantColumn: MED BOX(l)
+Operator: OR
+SimpleFilter
+  SimpleColumn tpch.PART.P_CONTAINER
+  s/t/c/T/A: tpch/PART/P_CONTAINER/52/PART
+  Operator: =  ConstantColumn: MED PACK(l)
+Operator: OR
+SimpleFilter
+  SimpleColumn tpch.PART.P_CONTAINER
+  s/t/c/T/A: tpch/PART/P_CONTAINER/52/PART
+  Operator: =  ConstantColumn: MED PKG(l)
+Operator: OR
+Operator: AND
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_QUANTITY
+  s/t/c/T/A: tpch/LINEITEM/L_QUANTITY/29/LINEITEM
+  Operator: >=  ConstantColumn: 10(n)
+Operator: AND
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_QUANTITY
+  s/t/c/T/A: tpch/LINEITEM/L_QUANTITY/29/LINEITEM
+  Operator: <=  ConstantColumn: 20(n)
+Operator: AND
+SimpleFilter
+  SimpleColumn tpch.PART.P_SIZE
+  s/t/c/T/A: tpch/PART/P_SIZE/51/PART
+  Operator: <=  ConstantColumn: 10(n)
+Operator: AND
+Operator: OR
+SimpleFilter
+  SimpleColumn tpch.PART.P_BRAND
+  s/t/c/T/A: tpch/PART/P_BRAND/49/PART
+  Operator: =  ConstantColumn: Brand#34(l)
+SimpleFilter
+  SimpleColumn tpch.PART.P_CONTAINER
+  s/t/c/T/A: tpch/PART/P_CONTAINER/52/PART
+  Operator: =  ConstantColumn: LG BOX(l)
+SimpleFilter
+  SimpleColumn tpch.PART.P_CONTAINER
+  s/t/c/T/A: tpch/PART/P_CONTAINER/52/PART
+  Operator: =  ConstantColumn: LG CASE(l)
+Operator: OR
+SimpleFilter
+  SimpleColumn tpch.PART.P_CONTAINER
+  s/t/c/T/A: tpch/PART/P_CONTAINER/52/PART
+  Operator: =  ConstantColumn: LG PACK(l)
+Operator: OR
+SimpleFilter
+  SimpleColumn tpch.PART.P_CONTAINER
+  s/t/c/T/A: tpch/PART/P_CONTAINER/52/PART
+  Operator: =  ConstantColumn: LG PKG(l)
+Operator: OR
+Operator: AND
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_QUANTITY
+  s/t/c/T/A: tpch/LINEITEM/L_QUANTITY/29/LINEITEM
+  Operator: >=  ConstantColumn: 20(n)
+Operator: AND
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_QUANTITY
+  s/t/c/T/A: tpch/LINEITEM/L_QUANTITY/29/LINEITEM
+  Operator: <=  ConstantColumn: 30(n)
+Operator: AND
+SimpleFilter
+  SimpleColumn tpch.PART.P_SIZE
+  s/t/c/T/A: tpch/PART/P_SIZE/51/PART
+  Operator: <=  ConstantColumn: 15(n)
+Operator: AND
+Operator: OR
+Operator: and
+>>Group By Columns
+ArithmeticColumn: AggregateColumn sum(L_EXTENDEDPRICE*(1-L_DISCOUNT))
+ArithmeticColumn: SimpleColumn L_EXTENDEDPRICE
+  s/t/c/T/A: ///0/
+
+ConstantColumn: 1(n)
+SimpleColumn L_DISCOUNT
+  s/t/c/T/A: ///0/
+
+Operator: -
+Operator: *
+
+
+SessionID: 4874
+TxnID: 334
+VerID: 334
+--- Column Map ---
+L_DISCOUNT : 0x9f9b788
+L_EXTENDEDPRICE : 0x9f9b758
+L_PARTKEY : 0x9f94df8
+L_QUANTITY : 0x9f9b728
+L_SHIPINSTRUCT : 0x9fb4980
+L_SHIPMODE : 0x9fb4a30
+P_BRAND : 0x9fb3eb8
+P_CONTAINER : 0x9fb3f18
+P_PARTKEY : 0x9fb3e88
+P_SIZE : 0x9fb3ee8
+

@@ -1,0 +1,29 @@
+Operation: index
+Options: UNIQUE SCAN
+Object_type: INDEX (UNIQUE)
+Other: 
+Object_owner: CALUSER01
+Search_columns: 1
+Projection: O_ORDERKEY
+Object_name: 
+Alias: ORDERS@SEL$1
+Extended_information:    AP:O_ORDERKEY=500
+Access_predicates: O_ORDERKEY=500
+Filter_predicates: 
+Select_level: SEL$1
+--------------------
+Operation: select statement
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection: 
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+TOKEN: <O_ORDERKEY=500>

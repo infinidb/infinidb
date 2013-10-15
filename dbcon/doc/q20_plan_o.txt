@@ -1,0 +1,251 @@
+Q20
+select
+	s_name,
+	s_address
+from
+	supplier,
+	nation
+where
+	s_suppkey in (
+		select
+			ps_suppkey
+		from
+			partsupp
+		where
+			ps_partkey in (
+				select
+					p_partkey
+				from
+					part
+				where
+					p_name like 'forest%'
+			)
+			and ps_availqty > (
+				select
+					0.5 * sum(l_quantity)
+				from
+					lineitem
+				where
+					l_partkey = ps_partkey
+					and l_suppkey = ps_suppkey
+					and l_shipdate >= date '1994-01-01'
+					and l_shipdate < date '1994-01-01' + interval '1' year
+			)
+	)
+	and s_nationkey = n_nationkey
+	and n_name = 'CANADA'
+order by
+	s_name;
+
+Oracle Execution Plan
+
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: P_PARTKEY
+Object_name: PART
+Alias: PART@SEL$3
+Extended_information:    FP:P_NAME LIKE 'forest%'
+Access_predicates: 
+Filter_predicates: P_NAME LIKE 'forest%'
+Select_level: SEL$0A417DA5
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: PS_PARTKEY^PS_SUPPKEY^PS_AVAILQTY
+Object_name: PARTSUPP
+Alias: PARTSUPP@SEL$2
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$0A417DA5
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: L_QUANTITY
+Object_name: LINEITEM
+Alias: LINEITEM@SEL$4
+Extended_information:    FP:L_SHIPDATE>=TO_DATE('1994-01-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss') AND L_SHIPDATE<TO_DATE('1995-01-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss') AND L_PARTKEY=:B1 AND L_SUPPKEY=:B2
+Access_predicates: 
+Filter_predicates: L_SHIPDATE>=TO_DATE('1994-01-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss')&L_SHIPDATE<TO_DATE('1995-01-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss')&L_PARTKEY=:B1&L_SUPPKEY=:B2
+Select_level: SEL$4
+--------------------
+Operation: hash join
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  PS_PARTKEY^PS_AVAILQTY^PS_SUPPKEY
+Object_name: 
+Alias: 
+Extended_information:    AP:PS_PARTKEY=P_PARTKEY
+Access_predicates: PS_PARTKEY=P_PARTKEY
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: sort
+Options: AGGREGATE
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  SUM(L_QUANTITY)
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$4
+--------------------
+Operation: filter
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection: PS_SUPPKEY
+Object_name: 
+Alias: 
+Extended_information:    FP:PS_AVAILQTY> (SELECT 0.5*SUM(L_QUANTITY) FROM LINEITEM LINEITEM WHERE L_SHIPDATE>=TO_DATE('1994-01-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss') AND L_SHIPDATE<TO_DATE('1995-01-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss') AND L_PARTKEY=:B1 AND L_SUPPKEY=:B2)
+Access_predicates: 
+Filter_predicates: PS_AVAILQTY> (SELECT 0.5*SUM(L_QUANTITY) FROM LINEITEM LINEITEM WHERE L_SHIPDATE>=TO_DATE('1994-01-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss')&L_SHIPDATE<TO_DATE('1995-01-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss')&L_PARTKEY=:B1&L_SUPPKEY=:B2)
+Select_level: 
+--------------------
+Operation: hash
+Options: UNIQUE
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  PS_SUPPKEY
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$0A417DA5
+--------------------
+Operation: view
+Options: 
+Object_type: VIEW
+Other: 
+Object_owner: SYS
+Search_columns: 
+Projection: $nso_col_1
+Object_name: 
+Alias: VW_NSO_1@SEL$032ACE5F
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$0A417DA5
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: N_NATIONKEY
+Object_name: NATION
+Alias: NATION@SEL$1
+Extended_information:    FP:N_NAME='CANADA'
+Access_predicates: 
+Filter_predicates: N_NAME='CANADA'
+Select_level: SEL$032ACE5F
+--------------------
+Operation: buffer
+Options: SORT
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  $nso_col_1
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: merge join
+Options: CARTESIAN
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  N_NATIONKEY^$nso_col_1
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: S_SUPPKEY^S_NAME^S_ADDRESS^S_NATIONKEY
+Object_name: SUPPLIER
+Alias: SUPPLIER@SEL$1
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$032ACE5F
+--------------------
+Operation: hash join
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  S_ADDRESS^S_NAME
+Object_name: 
+Alias: 
+Extended_information:    AP:S_SUPPKEY=$nso_col_1 AND S_NATIONKEY=N_NATIONKEY
+Access_predicates: S_SUPPKEY=$nso_col_1&S_NATIONKEY=N_NATIONKEY
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: sort
+Options: ORDER BY
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  S_NAME^S_ADDRESS
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$032ACE5F
+--------------------
+Operation: select statement
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection: 
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------

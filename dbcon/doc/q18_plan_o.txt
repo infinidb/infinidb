@@ -1,0 +1,219 @@
+Q18
+select
+	c_name,
+	c_custkey,
+	o_orderkey,
+	o_orderdate,
+	o_totalprice,
+	sum(l_quantity)
+from
+	customer,
+	orders,
+	lineitem
+where
+	o_orderkey in (
+		select
+			l_orderkey
+		from
+			lineitem
+		group by
+			l_orderkey having
+				sum(l_quantity) > 300
+	)
+	and c_custkey = o_custkey
+	and o_orderkey = l_orderkey
+group by
+	c_name,
+	c_custkey,
+	o_orderkey,
+	o_orderdate,
+	o_totalprice
+order by
+	o_totalprice desc,
+	o_orderdate;
+	
+Oracle Execution Plan	
+
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: L_ORDERKEY^L_QUANTITY
+Object_name: LINEITEM
+Alias: LINEITEM@SEL$1
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$5DA710D3
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: L_ORDERKEY^L_QUANTITY
+Object_name: LINEITEM
+Alias: LINEITEM@SEL$2
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$683B0107
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: C_CUSTKEY^C_NAME
+Object_name: CUSTOMER
+Alias: CUSTOMER@SEL$1
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$5DA710D3
+--------------------
+Operation: buffer
+Options: SORT
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  L_ORDERKEY^L_QUANTITY
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: hash
+Options: GROUP BY
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  L_ORDERKEY^SUM(L_QUANTITY)
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: merge join
+Options: CARTESIAN
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  C_CUSTKEY^C_NAME^L_ORDERKEY^L_QUANTITY
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: O_ORDERKEY^O_CUSTKEY^O_TOTALPRICE^O_ORDERDATE
+Object_name: ORDERS
+Alias: ORDERS@SEL$1
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$5DA710D3
+--------------------
+Operation: filter
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection: L_ORDERKEY
+Object_name: 
+Alias: 
+Extended_information:    FP:SUM(L_QUANTITY)>300
+Access_predicates: 
+Filter_predicates: SUM(L_QUANTITY)>300
+Select_level: SEL$683B0107
+--------------------
+Operation: hash join
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  C_CUSTKEY^O_ORDERKEY^L_QUANTITY^C_NAME^O_TOTALPRICE^O_ORDERDATE
+Object_name: 
+Alias: 
+Extended_information:    AP:C_CUSTKEY=O_CUSTKEY AND O_ORDERKEY=L_ORDERKEY
+Access_predicates: C_CUSTKEY=O_CUSTKEY&O_ORDERKEY=L_ORDERKEY
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: view
+Options: 
+Object_type: VIEW
+Other: 
+Object_owner: SYS
+Search_columns: 
+Projection: $nso_col_1
+Object_name: 
+Alias: VW_NSO_1@SEL$5DA710D3
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$683B0107
+--------------------
+Operation: hash join
+Options: SEMI
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  O_ORDERKEY^C_CUSTKEY^O_ORDERDATE^L_QUANTITY^C_NAME^O_TOTALPRICE
+Object_name: 
+Alias: 
+Extended_information:    AP:O_ORDERKEY=$nso_col_1
+Access_predicates: O_ORDERKEY=$nso_col_1
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: sort
+Options: GROUP BY
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  INTERNAL_FUNCTION(O_TOTALPRICE)^O_ORDERDATE^O_ORDERKEY^C_CUSTKEY^C_NAME^SUM(L_QUANTITY)
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$5DA710D3
+--------------------
+Operation: select statement
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection: 
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+

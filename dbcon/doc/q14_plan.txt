@@ -1,0 +1,151 @@
+Q14
+select 
+    100.00 * sum(decode(substr(p_type, 1, 5), 'PROMO',  l_extendedprice * (1 - l_discount), 0) )/ sum(l_extendedprice * (1 - l_discount)) promo_revenue 
+from 
+    lineitem, 
+    part 
+where 
+    l_partkey = p_partkey 
+    and l_shipdate >= date '1995-09-01' 
+    and l_shipdate < date '1995-09-01' + interval '1' month;
+
+Oracle Execution Plan
+
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: L_PARTKEY^L_EXTENDEDPRICE^L_DISCOUNT
+Object_name: LINEITEM
+Alias: LINEITEM@SEL$1
+Extended_information:    FP:L_SHIPDATE>=TO_DATE('1995-09-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss') AND L_SHIPDATE<TO_DATE('1995-10-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss')
+Access_predicates: 
+Filter_predicates: L_SHIPDATE>=TO_DATE('1995-09-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss')&L_SHIPDATE<TO_DATE('1995-10-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss')
+Select_level: SEL$1
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: P_PARTKEY^P_TYPE
+Object_name: PART
+Alias: PART@SEL$1
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$1
+--------------------
+Operation: hash join
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  L_EXTENDEDPRICE^L_DISCOUNT^P_TYPE
+Object_name: 
+Alias: 
+Extended_information:    AP:L_PARTKEY=P_PARTKEY
+Access_predicates: L_PARTKEY=P_PARTKEY
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: sort
+Options: AGGREGATE
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  SUM(L_EXTENDEDPRICE*(1-L_DISCOUNT))^SUM(DECODE(SUBSTR(P_TYPE,1,5),'PROMO',L_EXTENDEDPRICE*(1-L_DISCOUNT),0))
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$1
+--------------------
+Operation: select statement
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection: 
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+
+Calpont Execution Plan
+
+>SELECT MAIN
+>>Returned Columns
+ArithmeticColumn: AggregateColumn sum(L_EXTENDEDPRICE*(1-L_DISCOUNT))
+ArithmeticColumn: SimpleColumn L_EXTENDEDPRICE
+  s/t/c/T/A: ///0/
+
+ConstantColumn: 1(n)
+SimpleColumn L_DISCOUNT
+  s/t/c/T/A: ///0/
+
+Operator: -
+Operator: *
+
+
+ArithmeticColumn: AggregateColumn sum(DECODE(SUBSTR(P_TYPE,1,5),'PROMO',L_EXTENDEDPRICE*(1-L_DISCOUNT),0))
+ArithmeticColumn: FunctionColumn: decode(SUBSTR(P_TYPE,1,5),'PROMO',L_EXTENDEDPRICE*(1-L_DISCOUNT),0)
+
+
+>>Filters
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_SHIPDATE
+  s/t/c/T/A: tpch/LINEITEM/L_SHIPDATE/35/
+  Operator: >=  ArithmeticColumn: FunctionColumn: to_date('1995-09-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss')
+
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_SHIPDATE
+  s/t/c/T/A: tpch/LINEITEM/L_SHIPDATE/35/
+  Operator: <  ArithmeticColumn: FunctionColumn: to_date('1995-10-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss')
+
+Operator: AND
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_PARTKEY
+  s/t/c/T/A: tpch/LINEITEM/L_PARTKEY/26/LINEITEM
+  Operator: =  SimpleColumn tpch.PART.P_PARTKEY
+  s/t/c/T/A: tpch/PART/P_PARTKEY/46/PART
+
+Operator: and
+>>Group By Columns
+ArithmeticColumn: AggregateColumn sum(L_EXTENDEDPRICE*(1-L_DISCOUNT))
+ArithmeticColumn: SimpleColumn L_EXTENDEDPRICE
+  s/t/c/T/A: ///0/
+
+ConstantColumn: 1(n)
+SimpleColumn L_DISCOUNT
+  s/t/c/T/A: ///0/
+
+Operator: -
+Operator: *
+
+
+ArithmeticColumn: AggregateColumn sum(DECODE(SUBSTR(P_TYPE,1,5),'PROMO',L_EXTENDEDPRICE*(1-L_DISCOUNT),0))
+ArithmeticColumn: FunctionColumn: decode(SUBSTR(P_TYPE,1,5),'PROMO',L_EXTENDEDPRICE*(1-L_DISCOUNT),0)
+
+
+SessionID: 4860
+TxnID: 327
+VerID: 327
+--- Column Map ---
+L_DISCOUNT : 0x8926758
+L_EXTENDEDPRICE : 0x8926728
+L_PARTKEY : 0x891fdf8
+L_SHIPDATE : 0x893f960
+P_PARTKEY : 0x893fb30
+P_TYPE : 0x893fc50
+

@@ -1,0 +1,116 @@
+# $Id: MessageFile.txt 3174 2012-07-04 12:09:47Z dcathey $
+#
+# This file maps message ID's to message texts.
+#
+# When you need a new message text, you put it here and you add a detailed description
+#  in the error message descriptions document in the Software docs folder
+#
+# The first token on a line must be the message ID. Everything else up to the the end of
+#  the line is the message text. There must be exactly one tab character
+#  separating the message id from the message text. The message text may
+#  contain any character(s) except tab. The line must end with a single '\n'.
+
+0	%1% %2% %3% %4% %5% %6% %7% %8% %9% %10%
+1	%1% %2% %3% %4%
+2	%1% %2%
+3	%1% %2%
+4	%1% %2%
+5	%1% %2%
+6	%1%
+7	%1% %2% %3% %4%
+8	%1% %2%
+9	%1% %2% %3% %4%
+10	%1%
+11	%1% %2%
+12	%1% %2%
+13	DML statement: >%1%<
+14	Error communicating with DMLProc: %1%
+15	Error processing DML statement: %1% : %2%
+16	Error setting maximum open files: %1%
+17	DML %1%
+18	DDL %1%
+19	CMD %1%
+20	Replay Transaction Log Started:  %1%
+21	Replay Transaction Log Completed:  %1%
+22	Bulk Load Started: %1%
+23	Bulk Load Completed: %1%
+24	Backup Started: %1%
+25	Backup Completed: %1% 
+26	DbProf: Start Transaction
+27	DbProf: End Transaction: %1%
+28	DbProf: Start Statement: Statement-%1% Ver-%2% SQL-%3%
+29	DbProf: End Statement: Statement-%1%
+30	DbProf: Start Step: Statement-%1% StepId-%2% StepName-%3%
+31	DbProf: End Step: Statement-%1% StepId-%2% BlockedFifoIn-%3% BlockedFifoOut-%4% MsgBytesIn-%5% MsgBytesOut-%6%
+32	DbProf: I/O: Statement-%1% StepId-%2% ObjectId-%3% PhysRead-%4% CacheRead-%5% CPBlks-%6%
+33	bad column width of %1%
+34	bad COP of %1% passed to %2%
+35	output buffer is too small (%1%)
+36	SQL trace: %1%
+37	failed to convert a filter string to a regexp
+38	bad offset (%1%) passed to p_Dictionary
+39	bad BOP of %1% passed to %2%
+40	idxList(): bad index list entry
+41	Start SQL statement: %1%
+42	End SQL statement
+43	FATAL ERROR: ExeMgr could not find any PrimProc's to talk to! ExeMgr is restarting.
+44	FATAL ERROR: ExeMgr has allocated too much memory! Percent allocation-%1%, allowed-%2%. ExeMgr is restarting.
+45	FATAL ERROR: PrimProc has allocated too much memory! PrimProc is restarting.
+46	DbProf: Processing Times: Statement-%1% StepId-%2% FirstRead-%3% LastRead-%4% FirstWrite-%5% LastWrite-%6%
+47	DbProf: Summary: Statement-%1% MaxMemPct-%2% TempFileCnt-%3% TempFileSpace-%4% PhysRead-%5% CacheRead-%6% MsgsRcvd-%7% MsgBytesIn-%8% MsgBytesOut-%9% CPBlks-%10%
+48	Startup Tests: %1%: running test %2%
+49	Startup Tests: %1%: %2%
+50	Startup Tests: %1%: FATAL ERROR running test %2%: %3%
+51	Startup Tests: FATAL ERROR running test suite %1%: module will not start
+52	Startup Tests: %1%: test %2% succeeded
+53	PrimProc could not open file for OID %1%; %2%
+54	Startup Tests: all tests passed
+55	ERROR: ExeMgr has caught an exception. %1%
+56	Error communicating with DDLProc: %1%
+57	Error processing DDL statement: %1% : %2%
+58	PrimProc socket destination selection error: %1%
+59	JobListFactory makeJoblist error: %1%
+60	dbbuilder system catalog %1%: %2%
+61	PrimProc error reading file for OID %1%; %2%
+62	ResourceManager: %1% request %2% %3% available, %4% requested
+63	ResourceManager: %1% request %2% WAIT %3% available, %4% requested
+64	ResourceManager: %1% return %2% %3% available, %4% returned
+65	Incompatible column types specified for join condition
+66	ResourceManager change to %1%: new value %2%, default value %3% 
+67	ResourceManager unsuccessful change to %1%: new value %2% cannot be greater than total value %3%  Set to total.
+68	Invalid token value %1% lbid %2% rid %3%.
+69	Error loading UDF ordinal %1% from library
+70	TransportReceiverThread error: %1%
+71	%1%: socket read error: %2%; %3%; Will retry.
+72	ClearTableLock: Rollback extents   for table %1%.
+73	ClearTableLock: Rollback extents   for table %1%, column %2%. %3%
+74	ClearTableLock: Rollback extentMap for table %1%, column %2%. %3%
+75	ClearTableLock: Rollback dbfile    for table %1%, column %2%. %3%
+76	Out of disk space for DB file: %1%
+77	PrimProc: Remount performed to open file-%1%; OID-%2%; tries-%3%; elapsedTime-%4% secs; status-%5%
+78	Error executing VB copy; unable to fseek to DB file for OID %1%, offset %2%; %3%
+79	Error executing VB copy; unable to fseek to VB file for OID %1%, offset %2%; %3%
+80	Compression Handling: %1%
+81	Start BulkLoad: JobId-%1%; db-%2%
+82	End BulkLoad: JobId-%1%; status-%2%
+83	BulkLoad: JobId-%1%; finished loading table %2%; %3% rows inserted
+84	ClearTableLock: Starting bulk rollback for table %1%; lock-%2%; initiated by %3%.
+85	ClearTableLock: Ending bulk rollback for table %1%; lock-%2%; initiated by %3%.
+86	Initiating BulkLoad: %1%
+87	BulkLoad Error: %1%
+88	ClearTableLock: Initiating %1% for table %2%; lock-%3%
+89	ClearTableLock: %1% for table %2%; lock-%3%.  %4%
+90	ClearTableLock: Nothing to rollback for table %1% on DBRoot%2%
+91	BBRM encountered network error, check the controllernode.	
+92	A process crashed while holding the BRM mutex.  The lock state is unreliable.  Please restart InfiniDB
+93	Unrecoverable BRM lock state detected. Diagnostic values: r=%1% rwt=%2% w=%3% wwt=%4%. Please restart InfiniDB.
+94	Attempting to fix the BRM lock state. Diagnostic values: r=%1% rwt=%2% w=%3% wwt=%4%.
+95	BRM lock state appears to be functional again.
+96	Table %s%.%2% (OID-%3%) was NOT successfully loaded. %4%.
+97	%1%.%2% : ERROR : %3%.
+98	Received a Cpimport Pass from PM%1%.
+99	Received ErrReport from PM%1%.
+100	Received BadData Report from PM%1%.
+101	Rollback Failed on PM%1%.
+102	Cleanup Failed on PM%1%. 
+103	Starting FBO for new %1% extent too large for current db file; %2%

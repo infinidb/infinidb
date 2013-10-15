@@ -1,0 +1,185 @@
+# $Id: ErrorMessage.txt 3830 2013-05-23 22:28:07Z xlou $
+#
+# This file maps error ID's to error texts.
+#
+# When you need a new message text, you put it here and you add a detailed description
+# in the error message descriptions document in the Software docs folder
+#
+# There must be three tokens on each line:
+#
+# token 1: error ID
+# token 2: internal error name
+# token 3: error message text to describe the error
+# 
+# The tokens should be separated by one tab character. The error message text may contain
+# any character(s) except tab. The line must end with a single '\n'.
+
+# Non support errors 1000 ~ 2000. 
+# The query will go through the optimizer again with some optimization turned off
+1000	ERR_MISS_JOIN	%1% not joined.
+1001	ERR_NON_SUPPORTED_FUNCTION	Function '%1%' can only be used in the outermost select or order by clause and cannot be used in conjunction with an aggregate function.
+1002	ERR_INCOMPATIBLE_JOIN	%1% incompatible column type specified for join condition.
+1003	ERR_CIRCULAR_JOIN	Circular joins are not supported.
+1004	ERR_MIX_JOIN	Mixed %1% JOIN is not supported.
+1005	ERR_UPDATE_SUB	update with subselect in select clause is currently not supported in InfiniDB.
+1006	ERR_DATATYPE_NOT_SUPPORT	Function called with unsupported datatype.
+1007	ERR_DML_NOT_SUPPORT_FEATURE	This version of InfiniDB does not yet support the use of '%1%' in an update or delete statement.
+1008	ERR_CREATE_DATATYPE_NOT_SUPPORT	The syntax or the data type(s) is not supported by InfiniDB. Please check the InfiniDB syntax guide for supported syntax or data types.
+# 1009 	ERR_CREATE_DATACOMPRESSION_NOT_SUPPORT	The compression type is not supported in InfiniDB Community.
+1009	ERR_ENTERPRISE_ONLY	%1% is only available in InfiniDB Enterprise.
+1010	ERR_AGGREGATE_TYPE_NOT_SUPPORT	'%1%' for column type '%2%' isn't supported.
+1011	ERR_DML_VIEW	%1% on VIEW is currently not supported.
+1012	ERR_UPDATE_NOT_SUPPORT_FEATURE	This version of InfiniDB supports update of only one table at a time.
+1013	ERR_CREATE_AUTOINCREMENT_NOT_SUPPORT	Autoincrement columns are only available in InfiniDB Enterprise.
+1014	ERR_ROLLUP_NOT_SUPPORT	Rollup is currently not supported.
+1015	ERR_OUTER_JOIN_SUBSELECT	Subquery on OUTER JOIN ON clause is currently not supported.
+1016	ERR_PARTITION_BY_RANGE	The column type %1% is currently  not supported in %2% function.
+1017	ERR_SP_FUNCTION_NOT_SUPPORT	Stored function is currently not supported in InfiniDB.
+
+# Other errors ...
+2001	ERR_JOIN_TOO_BIG	Join or subselect exceeds memory limit.
+2002	ERR_UNION_TOO_BIG	Union memory limit exceeded.
+2003	ERR_AGGREGATION_TOO_BIG	Aggregation/Distinct memory limit is exceeded.
+#2004 Connector can not connect to ExeMgr
+2004	ERR_LOST_CONN_EXEMGR	Cannot connect to ExeMgr.
+#2005 Connector can connect to ExeMgr, but ExeMgr fail to respond. possibly PrimProc issue
+2005	ERR_EXEMGR_MALFUNCTION	ExeMgr is not functioning correctly.
+2006	ERR_TABLE_NOT_IN_CATALOG	%1% does not exist in InfiniDB.
+2007	ERR_DICTBUFFER_OVERFLOW	The dictionary buffer is too small for this query; increase <PrimitiveServers><DictBufferSize> and try again.
+2008	ERR_VERSIONBUFFER_OVERFLOW	The version buffer overflowed. Increase VersionBufferFileSize or limit the rows to be processed.
+2009	ERR_TABLE_LOCKED	Unable to perform the operation because %1% with PID %2% is currently holding the table lock for session %3%.
+2010	ERR_ACTIVE_TRANSACTION	Unable to perform DDL/DML because session %1% has an active transaction.
+2011	ERR_VIOLATE_NOT_NULL Column ' %1% ' cannot be null.
+2012	ERR_EXTENT_DISK_SPACE	Not able to add extent; adding extent would exceed max file system disk usage. %1%
+2013	ERR_NON_NUMERIC_DATA	Not able to convert the input data; Data value %1% does not match data type.
+2014	ERR_JOBLIST	Error in making/executing job steps in DML
+2015	ERR_ORDERBY_TOO_BIG	Sorting length exceeded. Session variable max_length_for_sort_data needs to be set higher.
+2016	ERR_NON_SUPPORT_GROUP_BY	Non supported item %1% on the GROUP BY list.
+2017	ERR_IN_DELIVERY	ExeMgr failed to deliver result set to connector.
+2018	ERR_LIMIT_TOO_BIG	Not enough memory to process the LIMIT.  Consider raising TotalUmMemory or reducing memory usage.
+2019	ERR_IN_PROCESS	Caught exception in process: %1%.
+2020	ERR_MUL_ARG_AGG	Multiple arguments in aggregate function is currently not supported.
+2021	ERR_NOT_GROUPBY_EXPRESSION	%1% is not in GROUP BY clause. All non-aggregate columns in the SELECT and ORDER BY clause must be included in the GROUP BY clause.
+2022	ERR_ORDERBY_NOT_IN_DISTINCT	ORDER BY column not in DISTINCT list.
+2023	ERR_NO_PRIMPROC	PrimProc is not running (or connection to PrimProc dropped).
+2024	ERR_FUNC_MULTI_COL	Multiple columns operand is only supported with "IN", "NOT IN", "=" and "<>" operators.
+2025	WARN_DATA_TRUNC	Data truncated for column %1%
+2026	ERR_AGG_IN_WHERE	Group function is not allowed in WHERE clause.
+2027	ERR_NON_SUPPORT_AGG_ARGS	Non supported item in aggregate function %1%.
+2028	ERR_NO_FROM	FROM keyword not found where expected.
+2029	ERR_LOCK_TABLE	Lock table command is currently not supported in InfiniDB.
+2030	ERR_FILTER_COND_EXP	Predicate and Logic operators can not be used where an expression is expected.
+2031	ERR_BRM_LOOKUP	Blocks are missing.  Alter or drop table in progress?
+2032	ERR_INCORRECT_VALUE	Incorrect %1% value: '%2%'.
+2033	ERR_SYSTEM_CATALOG	Error occurred when calling system catalog.
+2034	ERR_DATA_OFFLINE	At least one DBRoot required for that query is offline. 
+2035	ERR_ASSERTION_FAILURE	An internal error occurred.  Check the error log file & contact support.
+2036	ERR_PARTITION_NO_SCHEMA	No schema is specified for this partition function.
+2037	ERR_INVALID_FUNC_ARGUMENT	%1% in function arguments.
+2038	ERR_O_DIRECT	Failed to open file.  The DirectIO setting in Calpont.xml may not be compatible with the file system.
+2039	ERR_ENOENT	Data file does not exist, please contact your system administrator for more information.
+2040	WARN_NO_PARTITION_FOUND	No partition found for the given value range.
+2041	SYSTABLE_PARTITION	Systables' partition cannot be modified.
+2042	WARN_NO_PARTITION_PERFORMED	No partitions are %1%.
+2043	ERR_READ_INPUT_DATALIST	Input datalist read error.
+
+# a couple generic error msgs, for calls converted from the old logging system
+2043	ERR_DICTIONARY_SCAN		An internal error occurred.  Check the error log file & contact support.
+2044	ERR_TUPLE_BPS	An internal error occurred.  Check the error log file & contact support.
+2045	ERR_PRIMPROC_DOWN	At least one PrimProc closed the connection unexpectedly.
+
+
+# Sub-query errors
+3001	ERR_NON_SUPPORT_SUB_QUERY_TYPE	This subquery type is not supported yet.
+3002	ERR_MORE_THAN_1_ROW	Subquery returns more than 1 row.
+3003	ERR_MEMORY_MAX_FOR_LIMIT_TOO_LOW	MAX memory for LIMIT is set too low.
+3004	ERR_CORRELATE_SCOPE_NOT_SUPPORTED	Skipped correlate scope is not supported yet.
+3005	ERR_CORRELATED_DATA_TYPE_INCOMPATIBLE	Correlated data type is not compatible.
+3006	ERR_INVALID_OPERATOR_WITH_LIST	This operator cannot be used with lists.
+3007	ERR_CORRELATE_FAIL	Mapping correlated data failed.
+3008	ERR_AGG_EXISTS	Aggregate function in EXISTS subquery is currently not supported.
+3009	ERR_UNKNOWN_COL	Unknown column '%1%'.
+3010	ERR_AMBIGUOUS_COL	Ambiguous column '%1%'.
+3011	ERR_NON_SUPPORT_ORDER_BY	Non-supported item in Order By clause.
+3012	ERR_NON_SUPPORT_SCALAR	Scalar filter and semi join are not from the same pair of tables.
+3013	ERR_UNION_IN_SUBQUERY	Subquery with union is currently only supported in the FROM clause.
+3014	ERR_ALL_SOME_IN_SUBQUERY	Scalar subquery with ALL/SOME/ANY is currently not supported.
+3015	ERR_NON_SUPPORT_HAVING	Correlated subquery in HAVING clause is currently not supported.
+3016	ERR_NON_SUPPORT_SELECT_SUB	Function or Operator with sub query on the SELECT clause is currently not supported.
+3017	ERR_NON_SUPPORT_DELETE_SUB	Subquery in DELETE statements is currently not supported.
+3018	ERR_MISS_JOIN_IN_SUB	%1% table is not joined in the subquery.
+3019	ERR_NON_SUPPORT_LIMIT_SUB	Limit within a correlated subquery is currently not supported.
+3020	ERR_NON_SUPPORT_INSERT_SUB	Subquery in INSERT statements is currently not supported.
+3021	ERR_SUB_EXPRESSION	Subquery cannot be used within an expression.
+3022	ERR_NON_SUPPORT_FUNC_SUB	Scalar subquery within a function is currently not supported.
+3033	ERR_CORRELATED_SUB_OR	Correlated subquery within OR operator is currently not supported.
+3034	ERR_CORRELATE_COL_MISSING	Query is not supported.  Unknown column '%1%' in subquery.
+3035	ERR_NON_SUPPORT_NEQ_AGG_SUB	Not equal comparison between a column within a subquery with an aggregate result and a column outside of the subquery is not supported.
+
+# DDL & DML Errors
+4001	ERR_INVALID_LAST_PARTITION	Partition(s) %1% %2% in the last "physical" partition for a DBRoot and cannot be disabled or dropped.
+4002	ERR_PARTITION_ALREADY_DISABLED	One or more partitions have already been disabled. The states of those partitions remain unchanged.
+4003	ERR_PARTITION_NOT_EXIST	Partition "%1%" does not exist.
+4004	ERR_PARTITION_ALREADY_ENABLED	One or more partitions have already been enabled. The states of those partitions remain unchanged.
+4005	NO_VALID_TRANSACTION_ID	There is no valid transaction ID for this session.
+4006	ERR_INVALID_START_VALUE	The provided start value is invalid.
+4007	ERR_INVALID_COMPRESSION_TYPE	The provided compression type is not supported.
+4008	ERR_INVALID_AUTOINCREMENT_TYPE	Autoincrement column must be an integral data type.
+4009	ERR_INVALID_NUMBER_AUTOINCREMENT	Only one column in the table may be specified as autoincrement.
+4010	ERR_NEGATIVE_STARTVALUE	The starting autoincrement value must be greater than 0.
+4011	ERR_INVALID_STARTVALUE	The specified starting autoincrement value is too large.
+4012	ERR_EXCEED_LIMIT	The maximum allowed value has been exceeded for the autoincrement column data type.
+4013	ERR_INVALID_VARBINARYVALUE	The value is not varbinary.
+4014	ERR_CONSTRAINTS	Constraints are currently not supported in InfiniDB.
+4015	ERR_NOT_NULL_CONSTRAINTS	Column '%1%' cannot be null.
+
+# UDF
+5001	ERR_FUNC_NON_IMPLEMENT	%1%:%2% is not implemented.
+
+# DBRM Errors
+6001	ERR_NETWORK DBRM encountered a network error, check the controllernode.
+6002	ERR_BRM_MUTEX A process crashed while holding the BRM mutex.  The lock state is unreliable.  Please restart InfiniDB.
+6003	ERR_UNRECOVERABLE_LOCK_STATE Unrecoverable BRM lock state detected.  Diagnostic values: r=%1% rwt=%2 w=%3% wwt=%4%.  Please restart InfiniDB.
+6004	ERR_RECOVERABLE_LOCK_STATE Attempting to fix the BRM lock state.  Diagnostic values: r=%1% rwt=%2 w=%3% wwt=%4%.  
+6005	ERR_SUCCESSFUL_RECOVERY BRM lock state appears to be functional again.
+6006	ERR_HARD_FAILURE DBRM encountered, most likely, a network or disk problem performing that operation.
+
+# MySQL daemon Errors (7001~8000 reserved. Do not change the error numbers)
+7001	ERR_NON_IDB_TABLE	Non Calpont table(s) on the FROM clause.
+
+# Cross Engine Errors
+8001	ERR_CROSS_ENGINE_CONFIG	CrossEngineSupport section in Calpont.xml is not properly configured.
+8002	ERR_CROSS_ENGINE_CONNECT	Error: %1%.
+
+# Window Function Errors
+#9001 is generic unknown error. should not be thrown when feature gets stable.
+9001	ERR_WF_NON_SUPPORT	Non supported item in window function.
+9002	ERR_WF_WINDOW_WITHOUT_ORDER	Missing ORDER BY expression in the window specification.
+9003	ERR_WF_FUNCTION_NOT_EXISTS	Window function '%1%' does not exist.
+9004	ERR_WF_INVALID_WINDOW	Invalid window aggregation group in the window specification.
+9005	ERR_WF_ORDER_BY_DISTINCT	Order By is not allowed when DISTINCT is specified for window function.
+9006	ERR_WF_INVALID_BOUND	Bound is out of range in the Window specification.
+9007	ERR_WF_INVALID_ORDER_KEY	Only one sort key is allowed for the RANGE window specified.
+9008	ERR_WF_BOUND_OUT_OF_RANGE	Bound '%1%' is out of range in the window specification.
+9009	ERR_WF_WINDOW_FUNC_NOT_ALLOWED	Window functions are not allowed here.
+9010	ERR_WF_INVALID_ORDER_TYPE	Invalid datatype for order by column in window function: '%1%'.
+9011	ERR_WF_INVALID_BOUND_TYPE	Invalid datatype for window frame bound: '%1%'.
+9012	ERR_WF_WRONG_ARGS	Incorrect parameter count or type in the call to window function '%1%'
+9013	ERR_WF_ORDER_MISSING	Order By clause is missing for window function '%1%'.
+9014	ERR_WF_WINDOW_CLAUSE	Window clause is not allowed for window function '%1%'.
+9015	ERR_WF_UPDATE	Can not use window function in UPDATE.
+9016	ERR_WF_ORDER_BY	OrderBy is not allowed for window function '%1%'.
+9017	ERR_WF_INVALID_ORDER_KEY_WITHIN	Only one sort key is allowed for WITHIN GROUP clause.
+9018	ERR_WF_NOT_SUPPORT	Window Function '%1%' is currently not supported in InfiniDB.
+9019	ERR_WF_UNKNOWN_COL_TYPE	Unknown column type encountered: '%1%'.
+9020	ERR_EXECUTE_WINDOW_FUNCTION	Exception caught when process window function.
+9021	ERR_WINDOW_FUNCTION_WRAPPER	Exception caught by window function wrapper.
+9022	ERR_WF_INVALID_PARM_TYPE	Invalid datatype for window function: '%1%'.
+9023	ERR_WF_OVERFLOW	'%1%' overflow.
+9024	ERR_WF_COLUMN_MISSING	'%1%' is not in tuple.
+9025	ERR_WF_UNKNOWN_BOUND	Unknown window frame start/bound type: '%1%'.
+9026	ERR_WF_NOT_IN_COL_MAP	Returned column not in intermediate result set. 
+9027	ERR_WF_ARG_OUT_OF_RANGE	Argument '%1%' is out of range.
+9028	ERR_WF_NOT_ALLOWED	Window functions are not allowed in %1%.
+9029	ERR_WF_IDB_ONLY	Window function are only supported for InfiniDB tables.
+9030	ERR_WF_DATA_SET_TOO_BIG	Window function data set exceeds memory limit.

@@ -1,0 +1,9 @@
+# 
+# 
+
+/var/log/prat/ps/pslog {
+    missingok
+    rotate 7
+    daily
+        copytruncate
+}

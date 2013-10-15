@@ -1,0 +1,29 @@
+Operation: index
+Options: RANGE SCAN
+Object_type: INDEX
+Other: 
+Object_owner: CALUSER01
+Search_columns: 1
+Projection: L_ORDERKEY
+Object_name: 
+Alias: LINEITEM@SEL$1
+Extended_information:    AP:L_ORDERKEY<500
+Access_predicates: L_ORDERKEY<500
+Filter_predicates: 
+Select_level: SEL$1
+--------------------
+Operation: select statement
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection: 
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+TOKEN: <L_ORDERKEY<500>

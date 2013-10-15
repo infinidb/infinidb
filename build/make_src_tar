@@ -1,0 +1,138 @@
+#!/bin/bash
+#
+# $Id: make_src_tar 1932 2013-06-20 18:26:27Z dhill $
+#
+
+# basedir is the working dir for all the activity
+basedir=$HOME
+# vname is the name of the top-level dir in the tar file
+vname=
+# ofile is the output tar file name and is relative to a hidden dir, so it should be absolute
+ofile=
+# branch is the branch to checkout (develop by default)
+branch=
+for arg in "$@"; do
+       if [ $(expr -- "$arg" : '--basedir=') -eq 10 ]; then
+               basedir="$(echo $arg | awk -F= '{print $2}')"
+       elif [ $(expr -- "$arg" : '--vname=') -eq 8 ]; then
+               vname="$(echo $arg | awk -F= '{print $2}')"
+       elif [ $(expr -- "$arg" : '--ofile=') -eq 8 ]; then
+               ofile="$(echo $arg | awk -F= '{print $2}')"
+       elif [ $(expr -- "$arg" : '--branch=') -eq 9 ]; then
+               branch="$(echo $arg | awk -F= '{print $2}')"
+       else
+               echo "ignoring unknown argument: $arg" 1>&2
+       fi
+done
+
+if [ -f releasenum ]; then
+	. releasenum
+elif [ -f build/releasenum ]; then
+	. build/releasenum
+else
+	echo "Couldn't locate 'releasenum' file in the build dir, make sure running in top-level dir"
+fi
+
+if [ -z "$version" ]; then
+	echo "Version defaulting to 4.0-develop"
+	version=4.0
+	release=develop
+fi
+
+if [ -z "$release" ]; then
+	release=0
+fi
+
+blddir=bld.$$
+if [ -z "$vname" ]; then
+	       vname=infinidb-${version}
+fi
+if [ -z "$ofile" ]; then
+	       ofile=${basedir}/${vname}-${release}.src.tar.gz
+fi
+co_dir=$blddir/$vname
+
+trap "{ echo; cd ${basedir}; rm -rf $blddir; exit 1; }" TERM INT ERR
+
+cd ${basedir}
+rm -rf $blddir
+mkdir -p $co_dir
+
+cd $co_dir
+
+branch_arg=
+if [ ! -z "$branch" ]; then
+	branch_arg="-b $branch"
+else
+	branch=develop
+fi
+
+echo -n "getting git source from $branch..."
+git clone http://srvengcm1.calpont.com/repos/infinidb.git infinidb
+cd infinidb
+git checkout $branch
+echo "done."
+
+test -d build || exit 1
+
+echo -n "cleaning git source for "
+echo -n "release..."
+rm -rf .git .gitignore
+rm -rf qa export
+rm -f rules.mak
+find . -name Makefile | xargs rm -f
+find . -name \*.xmi | xargs rm -f
+rm -f dbcon/joblist/bandeddl.h.set dbcon/joblist/bandeddl.h.vector primitives/blockcache/iomanager.cpp.single-read \
+	primitives/udf/Makefile.sdk
+rm -rf utils/scenarios
+cd mysql
+rm -rf scripts queries storage/maria
+cd ..
+rm -rf writeengine/test/*
+rm -rf utils/net-snmp-built-libs
+cd utils/multicast
+rm -f config.h impl.h participants.h socklib.h threads.h udpc-protoc.h util.h impl.cpp mc_fifo.h produconsum.h statistics.h udp-sender.h udpcast.h
+cd ../..
+rm -rf utils/openpgm
+rm -rf tools/reserveStacks
+rm -rf dbcon/doc dbcon/ingres dbcon/plsql
+rm -rf dmlib
+cd tools
+rm -rf brmtest dataPump evalidx fixdate nettest pgm pingproc rebuildEM snconvert updateGenii valprint
+rm -rf cfread dbgen dbgen-ssb ddldriver dmldriver idb_comp sendPlan vbgen
+cd ..
+rm -rf utils/libstatgrab utils/libxml utils/testbc utils/configcpp/md5
+echo "done."
+
+cd ..
+
+echo -n "getting MySQL..."
+git clone https://github.com/infinidb/mysql mysql
+cd mysql
+git checkout $branch
+echo "done."
+
+cd ..
+
+echo -n "building tarball..."
+cd infinidb
+cp -r utils/autoconf/* .
+cp INSTALL INSTALL.keep
+cp install-sh install-sh.keep
+rm -rf utils/autoconf
+autoreconf --force --install
+rm -f INSTALL install-sh
+mv INSTALL.keep INSTALL
+mv install-sh.keep install-sh
+cd ..
+ln -s infinidb/INSTALL
+ln -s infinidb/README
+cd ..
+tar -zcf $ofile $vname
+echo "done."
+
+echo "tarball left in $ofile"
+
+cd ${basedir}
+rm -rf $blddir
+

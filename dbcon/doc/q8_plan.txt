@@ -1,0 +1,417 @@
+Q8
+select
+	o_year,
+	sum(case
+		when nation = 'BRAZIL' then volume
+		else 0
+	end) / sum(volume) as mkt_share
+from
+	(
+		select
+			extract(year from o_orderdate) as o_year,
+			l_extendedprice * (1 - l_discount) as volume,
+			n2.n_name as nation
+		from
+			part,
+			supplier,
+			lineitem,
+			orders,
+			customer,
+			nation n1,
+			nation n2,
+			region
+		where
+			p_partkey = l_partkey
+			and s_suppkey = l_suppkey
+			and l_orderkey = o_orderkey
+			and o_custkey = c_custkey
+			and c_nationkey = n1.n_nationkey
+			and n1.n_regionkey = r_regionkey
+			and r_name = 'AMERICA'
+			and s_nationkey = n2.n_nationkey
+			and o_orderdate between date '1995-01-01' and date '1996-12-31'
+			and p_type = 'ECONOMY ANODIZED STEEL'
+	) all_nations
+group by
+	o_year
+order by
+	o_year;
+
+Oracle Execution Plan
+
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: P_PARTKEY
+Object_name: PART
+Alias: PART@SEL$2
+Extended_information:    FP:P_TYPE='ECONOMY ANODIZED STEEL'
+Access_predicates: 
+Filter_predicates: P_TYPE='ECONOMY ANODIZED STEEL'
+Select_level: SEL$F5BB74E1
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: L_ORDERKEY^L_PARTKEY^L_SUPPKEY^L_EXTENDEDPRICE^L_DISCOUNT
+Object_name: LINEITEM
+Alias: LINEITEM@SEL$2
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$F5BB74E1
+--------------------
+Operation: hash join
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  L_ORDERKEY^L_DISCOUNT^L_SUPPKEY^L_EXTENDEDPRICE
+Object_name: 
+Alias: 
+Extended_information:    AP:P_PARTKEY=L_PARTKEY
+Access_predicates: P_PARTKEY=L_PARTKEY
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: S_SUPPKEY^S_NATIONKEY
+Object_name: SUPPLIER
+Alias: SUPPLIER@SEL$2
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$F5BB74E1
+--------------------
+Operation: hash join
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  L_ORDERKEY^L_DISCOUNT^L_EXTENDEDPRICE^S_NATIONKEY
+Object_name: 
+Alias: 
+Extended_information:    AP:S_SUPPKEY=L_SUPPKEY
+Access_predicates: S_SUPPKEY=L_SUPPKEY
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: O_ORDERKEY^O_CUSTKEY^O_ORDERDATE
+Object_name: ORDERS
+Alias: ORDERS@SEL$2
+Extended_information:    FP:O_ORDERDATE>=TO_DATE('1995-01-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss') AND O_ORDERDATE<=TO_DATE('1996-12-31 00:00:00', 'yyyy-mm-dd hh24:mi:ss')
+Access_predicates: 
+Filter_predicates: O_ORDERDATE>=TO_DATE('1995-01-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss')&O_ORDERDATE<=TO_DATE('1996-12-31 00:00:00', 'yyyy-mm-dd hh24:mi:ss')
+Select_level: SEL$F5BB74E1
+--------------------
+Operation: hash join
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  S_NATIONKEY^L_DISCOUNT^L_EXTENDEDPRICE^O_ORDERDATE^O_CUSTKEY
+Object_name: 
+Alias: 
+Extended_information:    AP:L_ORDERKEY=O_ORDERKEY
+Access_predicates: L_ORDERKEY=O_ORDERKEY
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: C_CUSTKEY^C_NATIONKEY
+Object_name: CUSTOMER
+Alias: CUSTOMER@SEL$2
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$F5BB74E1
+--------------------
+Operation: hash join
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  S_NATIONKEY^L_DISCOUNT^L_EXTENDEDPRICE^O_ORDERDATE^C_NATIONKEY
+Object_name: 
+Alias: 
+Extended_information:    AP:O_CUSTKEY=C_CUSTKEY
+Access_predicates: O_CUSTKEY=C_CUSTKEY
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: N1.N_NATIONKEY^N1.N_REGIONKEY
+Object_name: NATION
+Alias: N1@SEL$2
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$F5BB74E1
+--------------------
+Operation: hash join
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  S_NATIONKEY^L_DISCOUNT^L_EXTENDEDPRICE^O_ORDERDATE^N1.N_REGIONKEY
+Object_name: 
+Alias: 
+Extended_information:    AP:C_NATIONKEY=N1.N_NATIONKEY
+Access_predicates: C_NATIONKEY=N1.N_NATIONKEY
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: N2.N_NATIONKEY^N2.N_NAME
+Object_name: NATION
+Alias: N2@SEL$2
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$F5BB74E1
+--------------------
+Operation: hash join
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  N1.N_REGIONKEY^L_DISCOUNT^L_EXTENDEDPRICE^O_ORDERDATE^N2.N_NAME
+Object_name: 
+Alias: 
+Extended_information:    AP:S_NATIONKEY=N2.N_NATIONKEY
+Access_predicates: S_NATIONKEY=N2.N_NATIONKEY
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: R_REGIONKEY
+Object_name: REGION
+Alias: REGION@SEL$2
+Extended_information:    FP:R_NAME='AMERICA'
+Access_predicates: 
+Filter_predicates: R_NAME='AMERICA'
+Select_level: SEL$F5BB74E1
+--------------------
+Operation: hash join
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  N2.N_NAME^L_DISCOUNT^L_EXTENDEDPRICE^O_ORDERDATE
+Object_name: 
+Alias: 
+Extended_information:    AP:N1.N_REGIONKEY=R_REGIONKEY
+Access_predicates: N1.N_REGIONKEY=R_REGIONKEY
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: sort
+Options: GROUP BY
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  EXTRACT(YEAR FROM INTERNAL_FUNCTION(O_ORDERDATE))^SUM(L_EXTENDEDPRICE*(1-L_DISCOUNT))^SUM(DECODE(N2.N_NAME,'BRAZIL',L_EXTENDEDPRICE*(1-L_DISCOUNT),0))
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$F5BB74E1
+--------------------
+Operation: select statement
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection: 
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+
+Calpont Execution Plan
+
+>SELECT MAIN
+>>Returned Columns
+1. ArithmeticColumn: FunctionColumn: extract(YEAR FROM INTERNAL_FUNCTION(O_ORDERDATE))
+
+2. ArithmeticColumn: AggregateColumn sum(L_EXTENDEDPRICE*(1-L_DISCOUNT))
+ArithmeticColumn: SimpleColumn L_EXTENDEDPRICE
+  s/t/c/T/A: ///0/
+
+ConstantColumn: 1(n)
+SimpleColumn L_DISCOUNT
+  s/t/c/T/A: ///0/
+
+Operator: -
+Operator: *
+
+
+3. ArithmeticColumn: AggregateColumn sum(DECODE(N2.N_NAME,'BRAZIL',L_EXTENDEDPRICE*(1-L_DISCOUNT),0))
+ArithmeticColumn: FunctionColumn: decode(N2.N_NAME,'BRAZIL',L_EXTENDEDPRICE*(1-L_DISCOUNT),0)
+
+
+>>Filters
+SimpleFilter
+  SimpleColumn tpch.PART.P_TYPE
+  s/t/c/T/A: tpch/PART/P_TYPE/50/
+  Operator: =  ConstantColumn: ECONOMY ANODIZED STEEL(l)
+SimpleFilter
+  SimpleColumn tpch.PART.P_PARTKEY
+  s/t/c/T/A: tpch/PART/P_PARTKEY/46/PART
+  Operator: =  SimpleColumn tpch.LINEITEM.L_PARTKEY
+  s/t/c/T/A: tpch/LINEITEM/L_PARTKEY/26/LINEITEM
+
+Operator: and
+SimpleFilter
+  SimpleColumn tpch.SUPPLIER.S_SUPPKEY
+  s/t/c/T/A: tpch/SUPPLIER/S_SUPPKEY/55/SUPPLIER
+  Operator: =  SimpleColumn tpch.LINEITEM.L_SUPPKEY
+  s/t/c/T/A: tpch/LINEITEM/L_SUPPKEY/27/LINEITEM
+
+Operator: and
+SimpleFilter
+  SimpleColumn tpch.ORDERS.O_ORDERDATE
+  s/t/c/T/A: tpch/ORDERS/O_ORDERDATE/20/ORDERS
+  Operator: >=  ArithmeticColumn: FunctionColumn: to_date('1995-01-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss')
+
+SimpleFilter
+  SimpleColumn tpch.ORDERS.O_ORDERDATE
+  s/t/c/T/A: tpch/ORDERS/O_ORDERDATE/20/ORDERS
+  Operator: <=  ArithmeticColumn: FunctionColumn: to_date('1996-12-31 00:00:00', 'yyyy-mm-dd hh24:mi:ss')
+
+Operator: AND
+Operator: and
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_ORDERKEY
+  s/t/c/T/A: tpch/LINEITEM/L_ORDERKEY/25/LINEITEM
+  Operator: =  SimpleColumn tpch.ORDERS.O_ORDERKEY
+  s/t/c/T/A: tpch/ORDERS/O_ORDERKEY/16/ORDERS
+
+Operator: and
+SimpleFilter
+  SimpleColumn tpch.ORDERS.O_CUSTKEY
+  s/t/c/T/A: tpch/ORDERS/O_CUSTKEY/17/ORDERS
+  Operator: =  SimpleColumn tpch.CUSTOMER.C_CUSTKEY
+  s/t/c/T/A: tpch/CUSTOMER/C_CUSTKEY/8/CUSTOMER
+
+Operator: and
+SimpleFilter
+  SimpleColumn tpch.CUSTOMER.C_NATIONKEY
+  s/t/c/T/A: tpch/CUSTOMER/C_NATIONKEY/11/CUSTOMER
+  Operator: =  SimpleColumn tpch.NATION.N_NATIONKEY
+  s/t/c/T/A: tpch/NATION/N_NATIONKEY/4/N1
+
+Operator: and
+SimpleFilter
+  SimpleColumn tpch.SUPPLIER.S_NATIONKEY
+  s/t/c/T/A: tpch/SUPPLIER/S_NATIONKEY/58/SUPPLIER
+  Operator: =  SimpleColumn tpch.NATION.N_NATIONKEY
+  s/t/c/T/A: tpch/NATION/N_NATIONKEY/4/N2
+
+Operator: and
+SimpleFilter
+  SimpleColumn tpch.REGION.R_NAME
+  s/t/c/T/A: tpch/REGION/R_NAME/2/
+  Operator: =  ConstantColumn: AMERICA(l)
+Operator: and
+SimpleFilter
+  SimpleColumn tpch.NATION.N_REGIONKEY
+  s/t/c/T/A: tpch/NATION/N_REGIONKEY/6/N1
+  Operator: =  SimpleColumn tpch.REGION.R_REGIONKEY
+  s/t/c/T/A: tpch/REGION/R_REGIONKEY/1/REGION
+
+Operator: and
+>>Group By Columns
+ArithmeticColumn: FunctionColumn: extract(YEAR FROM INTERNAL_FUNCTION(O_ORDERDATE))
+
+ArithmeticColumn: AggregateColumn sum(L_EXTENDEDPRICE*(1-L_DISCOUNT))
+ArithmeticColumn: SimpleColumn L_EXTENDEDPRICE
+  s/t/c/T/A: ///0/
+
+ConstantColumn: 1(n)
+SimpleColumn L_DISCOUNT
+  s/t/c/T/A: ///0/
+
+Operator: -
+Operator: *
+
+
+ArithmeticColumn: AggregateColumn sum(DECODE(N2.N_NAME,'BRAZIL',L_EXTENDEDPRICE*(1-L_DISCOUNT),0))
+ArithmeticColumn: FunctionColumn: decode(N2.N_NAME,'BRAZIL',L_EXTENDEDPRICE*(1-L_DISCOUNT),0)
+
+
+SessionID: 4834
+TxnID: 313
+VerID: 313
+--- Column Map ---
+C_CUSTKEY : 0x9e1eec8
+C_NATIONKEY : 0x9e12238
+L_DISCOUNT : 0x9e122b8
+L_EXTENDEDPRICE : 0x9e121b0
+L_ORDERKEY : 0x9e0d7c8
+L_PARTKEY : 0x9e12150
+L_SUPPKEY : 0x9e12180
+N_NAME : 0x9e1ec38
+N_NATIONKEY : 0x9e119b8
+N_NATIONKEY : 0x9e1ec08
+N_REGIONKEY : 0x9e119e8
+O_CUSTKEY : 0x9e12588
+O_ORDERDATE : 0x9e125b8
+O_ORDERKEY : 0x9e12558
+P_PARTKEY : 0x9e06df8
+P_TYPE : 0x9e0d758
+R_NAME : 0x9e1ea58
+R_REGIONKEY : 0x9e1e9d8
+S_NATIONKEY : 0x9e123b8
+S_SUPPKEY : 0x9e12388
+

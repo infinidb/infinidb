@@ -1,0 +1,68 @@
+#!/bin/bash
+#
+# $Id: post-mysql-install 3661 2013-06-25 22:04:33Z dhill $
+#
+# Post-install steps for calpont-mysql install
+
+prefix=/usr/local
+installdir=$prefix/Calpont
+rpmmode=install
+password=
+
+for arg in "$@"; do
+	if [ $(expr -- "$arg" : '--prefix=') -eq 9 ]; then
+		prefix="$(echo $arg | awk -F= '{print $2}')"
+		installdir=$prefix/Calpont
+	elif [ $(expr -- "$arg" : '--rpmmode=') -eq 10 ]; then
+		rpmmode="$(echo $arg | awk -F= '{print $2}')"
+	elif [ $(expr -- "$arg" : '--password=') -eq 11 ]; then
+		password="$(echo $arg | awk -F= '{print $2}')"
+	elif [ $(expr -- "$arg" : '--installdir=') -eq 13 ]; then
+		installdir="$(echo $arg | awk -F= '{print $2}')"
+		prefix=$(dirname $installdir)
+	else
+		echo "ignoring unknown argument: $arg" 1>&2
+	fi
+done
+
+if [ $installdir != "/usr/local/Calpont" ]; then
+	export INFINIDB_INSTALL_DIR=$installdir
+	export LD_LIBRARY_PATH=$INFINIDB_INSTALL_DIR/lib:$INFINIDB_INSTALL_DIR/mysql/lib/mysql
+fi
+
+if [ -f $installdir/lib/libcalmysql.so.1.0.0 ]; then
+	libcalmysql=$installdir/lib/libcalmysql.so.1.0.0
+	libudfsdk=$installdir/lib/libudf_mysql.so.1.0.0
+elif [ -f $installdir/lib/libcalmysql.so.1 ]; then
+	libcalmysql=$installdir/lib/libcalmysql.so.1
+	libudfsdk=$installdir/lib/libudf_mysql.so.1
+else
+	libcalmysql=
+fi
+
+if [ -d $installdir/mysql/lib/mysql/plugin -a -n "$libcalmysql" ]; then
+	cd $installdir/mysql/lib/mysql/plugin
+	ln -sf $libcalmysql libcalmysql.so
+        ln -sf $libcalmysql libcalmysqlent.so
+	ln -sf $libudfsdk libudf_mysql.so
+fi
+
+if [ $installdir != "/usr/local/Calpont" ]; then
+	sed -i -e s@/usr/local/Calpont@$installdir@g $installdir/mysql/my.cnf
+fi
+
+if [ -x $installdir/mysql/mysql-Calpont ]; then
+
+	# Restart in the same way that mysqld will be started normally.
+	$installdir/mysql/mysql-Calpont start
+
+	sleep 2
+
+	# Install various Calpont stuff...
+	$installdir/mysql/install_calpont_mysql.sh --password=$password --installdir=$installdir
+
+	$installdir/mysql/mysql-Calpont stop
+fi
+
+exit 0
+

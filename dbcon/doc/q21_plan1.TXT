@@ -1,0 +1,487 @@
+select
+	s_name,
+	count(*) as numwait
+from
+	supplier,
+	lineitem l1,
+	orders,
+	nation
+where
+	s_suppkey = l1.l_suppkey
+	and o_orderkey = l1.l_orderkey
+	and o_orderstatus = 'F'
+	and l1.l_receiptdate > l1.l_commitdate
+	and exists (
+		select
+			*
+		from
+			lineitem l2
+		where
+			l2.l_orderkey = l1.l_orderkey
+			and l2.l_suppkey <> l1.l_suppkey
+	)
+	and not exists (
+		select
+			*
+		from
+			lineitem l3
+		where
+			l3.l_orderkey = l1.l_orderkey
+			and l3.l_suppkey <> l1.l_suppkey
+			and l3.l_receiptdate > l3.l_commitdate
+	)
+	and s_nationkey = n_nationkey
+	and n_name = ':1'
+group by
+	s_name
+order by
+	numwait desc,
+	s_name;
+	
+-- Q21 Plan Start --
+
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: S_SUPPKEY, S_NAME, S_NATIONKEY
+Object_name: SUPPLIER
+Alias: SUPPLIER@SEL$1
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$CC7EC59E
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: L1.L_ORDERKEY, L1.L_SUPPKEY
+Object_name: LINEITEM
+Alias: L1@SEL$1
+Extended_information:    FP:L1.L_RECEIPTDATE>L1.L_COMMITDATE
+Access_predicates: 
+Filter_predicates: L1.L_RECEIPTDATE>L1.L_COMMITDATE
+Select_level: SEL$CC7EC59E
+--------------------
+Operation: hash join
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  L1.L_SUPPKEY, S_NATIONKEY, S_NAME, L1.L_ORDERKEY
+Object_name: 
+Alias: 
+Extended_information:    AP:S_SUPPKEY=L1.L_SUPPKEY
+Access_predicates: S_SUPPKEY=L1.L_SUPPKEY
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: O_ORDERKEY
+Object_name: ORDERS
+Alias: ORDERS@SEL$1
+Extended_information:    FP:O_ORDERSTATUS='F'
+Access_predicates: 
+Filter_predicates: O_ORDERSTATUS='F'
+Select_level: SEL$CC7EC59E
+--------------------
+Operation: hash join
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  L1.L_ORDERKEY, L1.L_SUPPKEY, S_NATIONKEY, S_NAME
+Object_name: 
+Alias: 
+Extended_information:    AP:O_ORDERKEY=L1.L_ORDERKEY
+Access_predicates: O_ORDERKEY=L1.L_ORDERKEY
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: N_NATIONKEY
+Object_name: NATION
+Alias: NATION@SEL$1
+Extended_information:    FP:N_NAME=':1'
+Access_predicates: 
+Filter_predicates: N_NAME=':1'
+Select_level: SEL$CC7EC59E
+--------------------
+Operation: hash join
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  L1.L_ORDERKEY, L1.L_SUPPKEY, S_NAME
+Object_name: 
+Alias: 
+Extended_information:    AP:S_NATIONKEY=N_NATIONKEY
+Access_predicates: S_NATIONKEY=N_NATIONKEY
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: L3.L_ORDERKEY, L3.L_SUPPKEY
+Object_name: LINEITEM
+Alias: L3@SEL$3
+Extended_information:    FP:L3.L_RECEIPTDATE>L3.L_COMMITDATE
+Access_predicates: 
+Filter_predicates: L3.L_RECEIPTDATE>L3.L_COMMITDATE
+Select_level: SEL$CC7EC59E
+--------------------
+Operation: hash join
+Options: ANTI
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  L1.L_ORDERKEY, L1.L_SUPPKEY, S_NAME
+Object_name: 
+Alias: 
+Extended_information:    AP:L3.L_ORDERKEY=L1.L_ORDERKEY   FP:L3.L_SUPPKEY<>L1.L_SUPPKEY
+Access_predicates: L3.L_ORDERKEY=L1.L_ORDERKEY
+Filter_predicates: L3.L_SUPPKEY<>L1.L_SUPPKEY
+Select_level: 
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: L2.L_ORDERKEY, L2.L_SUPPKEY
+Object_name: LINEITEM
+Alias: L2@SEL$2
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$CC7EC59E
+--------------------
+Operation: hash join
+Options: SEMI
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  S_NAME
+Object_name: 
+Alias: 
+Extended_information:    AP:L2.L_ORDERKEY=L1.L_ORDERKEY   FP:L2.L_SUPPKEY<>L1.L_SUPPKEY
+Access_predicates: L2.L_ORDERKEY=L1.L_ORDERKEY
+Filter_predicates: L2.L_SUPPKEY<>L1.L_SUPPKEY
+Select_level: 
+--------------------
+Operation: hash
+Options: GROUP BY
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  S_NAME, COUNT(ALL)
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: sort
+Options: ORDER BY
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  COUNT(ALL), S_NAME
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$CC7EC59E
+--------------------
+Operation: select statement
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection: 
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+
+-- End --
+
+TOKEN: <L1.L_RECEIPTDATE>L1.L_COMMITDATE>
+LEFT: L1.L_RECEIPTDATE
+TOKEN: <S_SUPPKEY=L1.L_SUPPKEY>
+LEFT: S_SUPPKEY
+TOKEN: <O_ORDERSTATUS='F'>
+LEFT: O_ORDERSTATUS
+TOKEN: <O_ORDERKEY=L1.L_ORDERKEY>
+LEFT: O_ORDERKEY
+TOKEN: <N_NAME=':1'>
+LEFT: N_NAME
+TOKEN: <S_NATIONKEY=N_NATIONKEY>
+LEFT: S_NATIONKEY
+TOKEN: <L3.L_RECEIPTDATE>L3.L_COMMITDATE>
+LEFT: L3.L_RECEIPTDATE
+TOKEN: <L3.L_ORDERKEY=L1.L_ORDERKEY>
+LEFT: L3.L_ORDERKEY
+TOKEN: <L3.L_SUPPKEY<>L1.L_SUPPKEY>
+LEFT: L3.L_SUPPKEY
+TOKEN: <L2.L_ORDERKEY=L1.L_ORDERKEY>
+LEFT: L2.L_ORDERKEY
+TOKEN: <L2.L_SUPPKEY<>L1.L_SUPPKEY>
+LEFT: L2.L_SUPPKEY
+Operator: (
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_RECEIPTDATE
+  s/t/c/T/A: tpch/LINEITEM/L_RECEIPTDATE/37/L1
+  Operator: >  SimpleColumn tpch.LINEITEM.L_COMMITDATE
+  s/t/c/T/A: tpch/LINEITEM/L_COMMITDATE/36/L1
+
+Operator: )
+Operator: and
+Operator: (
+SimpleFilter
+  SimpleColumn tpch.SUPPLIER.S_SUPPKEY
+  s/t/c/T/A: tpch/SUPPLIER/S_SUPPKEY/55/SUPPLIER
+  Operator: =  SimpleColumn tpch.LINEITEM.L_SUPPKEY
+  s/t/c/T/A: tpch/LINEITEM/L_SUPPKEY/27/L1
+
+Operator: )
+Operator: and
+Operator: (
+SimpleFilter
+  SimpleColumn tpch.ORDERS.O_ORDERSTATUS
+  s/t/c/T/A: tpch/ORDERS/O_ORDERSTATUS/18/
+  Operator: =  ConstantColumn: F(l)
+Operator: )
+Operator: and
+Operator: (
+SimpleFilter
+  SimpleColumn tpch.ORDERS.O_ORDERKEY
+  s/t/c/T/A: tpch/ORDERS/O_ORDERKEY/16/ORDERS
+  Operator: =  SimpleColumn tpch.LINEITEM.L_ORDERKEY
+  s/t/c/T/A: tpch/LINEITEM/L_ORDERKEY/25/L1
+
+Operator: )
+Operator: and
+Operator: (
+SimpleFilter
+  SimpleColumn tpch.NATION.N_NAME
+  s/t/c/T/A: tpch/NATION/N_NAME/5/
+  Operator: =  ConstantColumn: :1(l)
+Operator: )
+Operator: and
+Operator: (
+SimpleFilter
+  SimpleColumn tpch.SUPPLIER.S_NATIONKEY
+  s/t/c/T/A: tpch/SUPPLIER/S_NATIONKEY/58/SUPPLIER
+  Operator: =  SimpleColumn tpch.NATION.N_NATIONKEY
+  s/t/c/T/A: tpch/NATION/N_NATIONKEY/4/NATION
+
+Operator: )
+Operator: and
+Operator: (
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_RECEIPTDATE
+  s/t/c/T/A: tpch/LINEITEM/L_RECEIPTDATE/37/L3
+  Operator: >  SimpleColumn tpch.LINEITEM.L_COMMITDATE
+  s/t/c/T/A: tpch/LINEITEM/L_COMMITDATE/36/L3
+
+Operator: )
+Operator: and
+Operator: (
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_ORDERKEY
+  s/t/c/T/A: tpch/LINEITEM/L_ORDERKEY/25/L3
+  Operator: =  SimpleColumn tpch.LINEITEM.L_ORDERKEY
+  s/t/c/T/A: tpch/LINEITEM/L_ORDERKEY/25/L1
+
+Operator: )
+Operator: and
+Operator: (
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_SUPPKEY
+  s/t/c/T/A: tpch/LINEITEM/L_SUPPKEY/27/L3
+  Operator: <>  SimpleColumn tpch.LINEITEM.L_SUPPKEY
+  s/t/c/T/A: tpch/LINEITEM/L_SUPPKEY/27/L1
+
+Operator: )
+Operator: and
+Operator: (
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_ORDERKEY
+  s/t/c/T/A: tpch/LINEITEM/L_ORDERKEY/25/L2
+  Operator: =  SimpleColumn tpch.LINEITEM.L_ORDERKEY
+  s/t/c/T/A: tpch/LINEITEM/L_ORDERKEY/25/L1
+
+Operator: )
+Operator: and
+Operator: (
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_SUPPKEY
+  s/t/c/T/A: tpch/LINEITEM/L_SUPPKEY/27/L2
+  Operator: <>  SimpleColumn tpch.LINEITEM.L_SUPPKEY
+  s/t/c/T/A: tpch/LINEITEM/L_SUPPKEY/27/L1
+
+Operator: )
+L_ORDERKEY: SimpleColumn tpch.LINEITEM.L_ORDERKEY
+  s/t/c/T/A: tpch/LINEITEM/L_ORDERKEY/25/L1
+
+L_ORDERKEY: SimpleColumn tpch.LINEITEM.L_ORDERKEY
+  s/t/c/T/A: tpch/LINEITEM/L_ORDERKEY/25/L3
+
+L_ORDERKEY: SimpleColumn tpch.LINEITEM.L_ORDERKEY
+  s/t/c/T/A: tpch/LINEITEM/L_ORDERKEY/25/L2
+
+L_SUPPKEY: SimpleColumn tpch.LINEITEM.L_SUPPKEY
+  s/t/c/T/A: tpch/LINEITEM/L_SUPPKEY/27/L1
+
+L_SUPPKEY: SimpleColumn tpch.LINEITEM.L_SUPPKEY
+  s/t/c/T/A: tpch/LINEITEM/L_SUPPKEY/27/L3
+
+L_SUPPKEY: SimpleColumn tpch.LINEITEM.L_SUPPKEY
+  s/t/c/T/A: tpch/LINEITEM/L_SUPPKEY/27/L2
+
+N_NATIONKEY: SimpleColumn tpch.NATION.N_NATIONKEY
+  s/t/c/T/A: tpch/NATION/N_NATIONKEY/4/NATION
+
+O_ORDERKEY: SimpleColumn tpch.ORDERS.O_ORDERKEY
+  s/t/c/T/A: tpch/ORDERS/O_ORDERKEY/16/ORDERS
+
+S_NAME: SimpleColumn tpch.SUPPLIER.S_NAME
+  s/t/c/T/A: tpch/SUPPLIER/S_NAME/56/SUPPLIER
+
+S_NATIONKEY: SimpleColumn tpch.SUPPLIER.S_NATIONKEY
+  s/t/c/T/A: tpch/SUPPLIER/S_NATIONKEY/58/SUPPLIER
+
+S_SUPPKEY: SimpleColumn tpch.SUPPLIER.S_SUPPKEY
+  s/t/c/T/A: tpch/SUPPLIER/S_SUPPKEY/55/SUPPLIER
+
+>SELECT MAIN
+>>Returned Columns
+ArithmeticColumn: AggregateColumn count(ALL)
+ArithmeticColumn: SimpleColumn ALL
+  s/t/c/T/A: ///0/
+
+
+
+SimpleColumn tpch.SUPPLIER.S_NAME
+  s/t/c/T/A: tpch/SUPPLIER/S_NAME/56/SUPPLIER
+
+>>Filters
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_RECEIPTDATE
+  s/t/c/T/A: tpch/LINEITEM/L_RECEIPTDATE/37/L1
+  Operator: >  SimpleColumn tpch.LINEITEM.L_COMMITDATE
+  s/t/c/T/A: tpch/LINEITEM/L_COMMITDATE/36/L1
+
+SimpleFilter
+  SimpleColumn tpch.SUPPLIER.S_SUPPKEY
+  s/t/c/T/A: tpch/SUPPLIER/S_SUPPKEY/55/SUPPLIER
+  Operator: =  SimpleColumn tpch.LINEITEM.L_SUPPKEY
+  s/t/c/T/A: tpch/LINEITEM/L_SUPPKEY/27/L1
+
+Operator: and
+SimpleFilter
+  SimpleColumn tpch.ORDERS.O_ORDERSTATUS
+  s/t/c/T/A: tpch/ORDERS/O_ORDERSTATUS/18/
+  Operator: =  ConstantColumn: F(l)
+Operator: and
+SimpleFilter
+  SimpleColumn tpch.ORDERS.O_ORDERKEY
+  s/t/c/T/A: tpch/ORDERS/O_ORDERKEY/16/ORDERS
+  Operator: =  SimpleColumn tpch.LINEITEM.L_ORDERKEY
+  s/t/c/T/A: tpch/LINEITEM/L_ORDERKEY/25/L1
+
+Operator: and
+SimpleFilter
+  SimpleColumn tpch.NATION.N_NAME
+  s/t/c/T/A: tpch/NATION/N_NAME/5/
+  Operator: =  ConstantColumn: :1(l)
+Operator: and
+SimpleFilter
+  SimpleColumn tpch.SUPPLIER.S_NATIONKEY
+  s/t/c/T/A: tpch/SUPPLIER/S_NATIONKEY/58/SUPPLIER
+  Operator: =  SimpleColumn tpch.NATION.N_NATIONKEY
+  s/t/c/T/A: tpch/NATION/N_NATIONKEY/4/NATION
+
+Operator: and
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_RECEIPTDATE
+  s/t/c/T/A: tpch/LINEITEM/L_RECEIPTDATE/37/L3
+  Operator: >  SimpleColumn tpch.LINEITEM.L_COMMITDATE
+  s/t/c/T/A: tpch/LINEITEM/L_COMMITDATE/36/L3
+
+Operator: and
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_ORDERKEY
+  s/t/c/T/A: tpch/LINEITEM/L_ORDERKEY/25/L3
+  Operator: =  SimpleColumn tpch.LINEITEM.L_ORDERKEY
+  s/t/c/T/A: tpch/LINEITEM/L_ORDERKEY/25/L1
+
+Operator: and
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_SUPPKEY
+  s/t/c/T/A: tpch/LINEITEM/L_SUPPKEY/27/L3
+  Operator: <>  SimpleColumn tpch.LINEITEM.L_SUPPKEY
+  s/t/c/T/A: tpch/LINEITEM/L_SUPPKEY/27/L1
+
+Operator: and
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_ORDERKEY
+  s/t/c/T/A: tpch/LINEITEM/L_ORDERKEY/25/L2
+  Operator: =  SimpleColumn tpch.LINEITEM.L_ORDERKEY
+  s/t/c/T/A: tpch/LINEITEM/L_ORDERKEY/25/L1
+
+Operator: and
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_SUPPKEY
+  s/t/c/T/A: tpch/LINEITEM/L_SUPPKEY/27/L2
+  Operator: <>  SimpleColumn tpch.LINEITEM.L_SUPPKEY
+  s/t/c/T/A: tpch/LINEITEM/L_SUPPKEY/27/L1
+
+Operator: and
+>>Group By Columns
+ArithmeticColumn: AggregateColumn count(ALL)
+ArithmeticColumn: SimpleColumn ALL
+  s/t/c/T/A: ///0/
+
+
+
+SimpleColumn tpch.SUPPLIER.S_NAME
+  s/t/c/T/A: tpch/SUPPLIER/S_NAME/56/SUPPLIER
+
+SessionID: 2935
+TxnID: 104
+VerID: 104
+

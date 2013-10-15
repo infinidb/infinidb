@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Calpont Version="V1.0.0">
+	<ExeMgr>
+		<IPAddr>127.0.0.1</IPAddr>
+	</ExeMgr>
+	<JobProc>
+		<IPAddr>127.0.0.1</IPAddr>
+	</JobProc>
+</Calpont>

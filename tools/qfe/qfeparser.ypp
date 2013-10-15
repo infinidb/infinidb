@@ -1,0 +1,306 @@
+%{
+#include <iostream>
+#include <string>
+#include <utility>
+using namespace std;
+
+namespace qfe
+{
+extern string DefaultSchema;
+}
+
+int qfeerror(const char *s);
+int qfelex(void);
+
+#include "calpontselectexecutionplan.h"
+#include "simplecolumn.h"
+#include "calpontsystemcatalog.h"
+#include "aggregatecolumn.h"
+execplan::CalpontSelectExecutionPlan* ParserCSEP;
+execplan::CalpontSystemCatalog* ParserCSC;
+namespace execplan
+{
+class ReturnedColumn;
+}
+
+#include "cseputils.h"
+
+%}
+
+%union
+{
+	execplan::ReturnedColumn* rcp;
+	std::string* cp;
+	std::pair<int, std::string>* cvp;
+}
+
+//Some of these defines cause conflicts in calpontselectexecutionplan.h, so we prepend QFEP_
+%token CHAR_CONST RELOP LOGICOP QFEP_SELECT QFEP_FROM QFEP_WHERE GROUPBY OBJNAME INT_CONST LIMIT ORDERBY ASC
+%token DESC AS FUNC
+
+%type <cp> select_column_list table_name filter_predicate_list obj_name_aux opt_alias opt_as
+%type <cp> opt_limit_clause
+%type <cp> OBJNAME CHAR_CONST INT_CONST RELOP LOGICOP FUNC AS
+
+%type <rcp> aliased_column_name select_column_name obj_name func_col groupby_item
+
+%type <cvp> constant
+
+%destructor { delete $$; } OBJNAME CHAR_CONST INT_CONST RELOP LOGICOP FUNC AS
+%destructor { delete $$; } aliased_column_name select_column_name obj_name func_col groupby_item
+%destructor { delete $$; } constant
+
+%%
+
+statement:	QFEP_SELECT select_column_list
+			QFEP_FROM table_spec
+			opt_where_clause
+			opt_groupby_clause
+			opt_orderby_clause
+			opt_limit_clause ';'
+		;
+
+select_column_list:	aliased_column_name
+			{
+				execplan::SRCP rcp($1);
+				ParserCSEP->returnedCols().push_back(rcp);
+				$$ = 0;
+			}
+			| select_column_list ',' aliased_column_name
+			{
+				execplan::SRCP rcp($3);
+				ParserCSEP->returnedCols().push_back(rcp);
+				$$ = 0;
+			}
+			;
+
+select_column_name:	obj_name
+			{
+				execplan::SimpleColumn* sc = dynamic_cast<execplan::SimpleColumn*>($1);
+				if (sc->schemaName() == "infinidb_unknown" && !qfe::DefaultSchema.empty())
+					sc->schemaName(qfe::DefaultSchema);
+				sc->setOID();
+				sc->tableAlias(sc->tableName());
+				sc->alias(execplan::make_tcn(sc->schemaName(), sc->tableName(), sc->columnName()).toString());
+				$$ = $1;
+			}
+			| func_col
+			;
+
+func_col:	FUNC '(' select_column_name ')'
+		{
+			execplan::AggregateColumn* ag = new execplan::AggregateColumn(execplan::AggregateColumn::agname2num(*($1)), $3);
+			delete $1;
+			$$ = ag;
+		}
+		;
+
+aliased_column_name:	select_column_name opt_alias
+			;
+
+opt_alias:	/* empty */
+		{ $$ = 0; }
+		| opt_as OBJNAME
+		{
+			delete $2;
+			$$ = $1;
+		}
+		| opt_as CHAR_CONST
+		{
+			delete $2;
+			$$ = $1;
+		}
+		;
+
+opt_as:	/* empty */
+	{ $$ = 0; }
+	| AS
+	;
+
+table_spec:	aliased_table_name
+		;
+
+/* this is too loose for a table name, but it's easier to parse */
+table_name:	obj_name
+		{
+			execplan::SimpleColumn* sc=0;
+			sc = dynamic_cast<execplan::SimpleColumn*>($1);
+			execplan::CalpontSystemCatalog::TableAliasName tan;
+			tan.schema = sc->tableName();
+			if (tan.schema == "infinidb_unknown" && !qfe::DefaultSchema.empty())
+				tan.schema = qfe::DefaultSchema;
+			if (qfe::DefaultSchema.empty())
+				qfe::DefaultSchema = tan.schema;
+			tan.table = sc->columnName();
+			tan.alias = tan.table;
+			execplan::CalpontSelectExecutionPlan::TableList tl;
+			tl.push_back(tan);
+			ParserCSEP->tableList(tl);
+			delete sc;
+			$$ = 0;
+		}
+		;
+
+aliased_table_name:	table_name opt_alias
+			;
+
+opt_where_clause:	/* empty */
+			| QFEP_WHERE filter_predicate_list
+			;
+
+filter_predicate_list:	obj_name RELOP constant
+			{
+				pair<int, string> cval = *($3);
+				delete $3;
+				execplan::SimpleColumn* sc=0;
+				sc = dynamic_cast<execplan::SimpleColumn*>($1);
+				qfe::utils::updateParseTree(ParserCSC, ParserCSEP,
+					sc, *($2), cval);
+				delete sc;
+				delete $2;
+				$$ = 0;
+			}
+			| filter_predicate_list LOGICOP obj_name RELOP constant
+			{
+				//string logicop = *($2);
+				delete $2;
+				pair<int, string> cval = *($5);
+				delete $5;
+				execplan::SimpleColumn* sc=0;
+				sc = dynamic_cast<execplan::SimpleColumn*>($3);
+				qfe::utils::updateParseTree(ParserCSC, ParserCSEP,
+					sc, *($4), cval);
+				delete sc;
+				delete $4;
+				$$ = 0;
+			}
+			;
+
+obj_name:	obj_name_aux
+		{
+			//This is possibly a table name, but we shove it into a SimpleColumn. We'll
+			// fix this in the table_spec production
+			execplan::SimpleColumn* sc = new execplan::SimpleColumn("infinidb_unknown", "infinidb_unknown", *($1));
+			sc->tableAlias("infinidb_unknown");
+			sc->alias(execplan::make_tcn("infinidb_unknown", "infinidb_unknown", *($1)).toString());
+			//cerr << "inside parser: " << *sc << endl;
+			delete $1;
+			$$ = sc;
+		}
+		| obj_name_aux '.' obj_name_aux
+		{
+			//This is possibly a table name, but we shove it into a SimpleColumn. We'll
+			// fix this in the table_spec production
+			execplan::SimpleColumn* sc = new execplan::SimpleColumn("infinidb_unknown", *($1), *($3));
+			sc->tableAlias(*($1));
+			sc->alias(execplan::make_tcn("infinidb_unknown", *($1), *($3)).toString());
+			//cerr << "inside parser: " << *sc << endl;
+			delete $1;
+			delete $3;
+			$$ = sc;
+		}
+		| obj_name_aux '.' obj_name_aux '.' obj_name_aux
+		{
+			if (qfe::DefaultSchema.empty())
+				qfe::DefaultSchema = *($1);
+			execplan::SimpleColumn* sc = new execplan::SimpleColumn(*($1), *($3), *($5));
+			sc->tableAlias(*($3));
+			sc->alias(execplan::make_tcn(*($1), *($3), *($5)).toString());
+			//cerr << "inside parser: " << *sc << endl;
+			delete $1;
+			delete $3;
+			delete $5;
+			$$ = sc;
+		}
+		;
+
+obj_name_aux:	OBJNAME
+		| '`' OBJNAME '`'
+		{
+			$$ = $2;
+		}
+		;
+
+constant:	CHAR_CONST
+		{
+			pair<int, string>* p = new pair<int, string>(1, *($1));
+			delete $1;
+			$$ = p;
+		}
+		| INT_CONST
+		{
+			pair<int, string>* p = new pair<int, string>(0, *($1));
+			delete $1;
+			$$ = p;
+		}
+		;
+
+opt_groupby_clause:	/* empty */
+			| GROUPBY groupby_items_list
+			{ YYERROR; }
+			;
+
+groupby_items_list:	groupby_item
+			| groupby_items_list ',' groupby_item
+			{ delete $3; }
+			;
+
+groupby_item:	obj_name
+		| INT_CONST
+		{
+			delete $1;
+			$$ = 0;
+		}
+		;
+
+opt_orderby_clause:	/* empty */
+			| ORDERBY groupby_items_list opt_direction
+			{ YYERROR; }
+			;
+
+opt_direction:	/* empty */
+		| ASC
+		| DESC
+		;
+
+opt_limit_clause:	/* empty */
+			{ $$ = 0; }
+			| LIMIT INT_CONST
+			{
+				delete $2;
+				YYERROR;
+				$$ = 0;
+			}
+			| LIMIT INT_CONST ',' INT_CONST
+			{
+				delete $2;
+				delete $4;
+				YYERROR;
+				$$ = 0;
+			}
+			;
+
+%%
+
+int qfeerror(const string& s)
+{
+  extern int qfelineno;	// defined and maintained in lex.c
+  extern char *qfetext;	// defined and maintained in lex.c
+  
+  cerr << "ERROR: " << s << " at symbol \"" << qfetext;
+  cerr << "\" on line " << qfelineno << endl;
+  return -1;
+}
+
+int qfeerror(const char *s)
+{
+  return qfeerror(string(s));
+}
+
+string* newstr(const char* cp)
+{
+	string* strp;
+	strp = new string(cp);
+	return strp;
+}
+

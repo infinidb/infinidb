@@ -1,0 +1,49 @@
+# Autodetect JAVA_HOME if not defined
+if [ -e /usr/libexec/bigtop-detect-javahome ]; then
+. /usr/libexec/bigtop-detect-javahome
+elif [ -e /usr/lib/bigtop-utils/bigtop-detect-javahome ]; then
+. /usr/lib/bigtop-utils/bigtop-detect-javahome
+fi
+
+HADOOP_LIBEXEC_DIR=/usr/lib/hadoop/libexec
+. $HADOOP_LIBEXEC_DIR/hadoop-config.sh
+
+# CLASSPATH initially contains $HADOOP_CONF_DIR
+CLASSPATH="${HADOOP_CONF_DIR}"
+CLASSPATH=${CLASSPATH}:$JAVA_HOME/lib/tools.jar
+
+# so that filenames w/ spaces are handled correctly in loops below
+IFS=
+
+# add libs to CLASSPATH
+for f in $HADOOP_COMMON_HOME/lib/*.jar; do
+  CLASSPATH=${CLASSPATH}:$f;
+done
+
+for ff in $HADOOP_COMMON_HOME/*.jar; do 
+  CLASSPATH=${CLASSPATH}:$ff
+done
+
+# add libs to CLASSPATH
+for f2a in $HADOOP_HDFS_HOME/lib/*.jar; do
+  CLASSPATH=${CLASSPATH}:$f2a;
+done
+
+for f2b in $HADOOP_HDFS_HOME/*.jar; do 
+  CLASSPATH=${CLASSPATH}:$f2b
+done
+
+# add libs to CLASSPATH
+for f3a in $HADOOP_MAPRED_HOME/lib/*.jar; do
+  CLASSPATH=${CLASSPATH}:$f3a;
+done
+
+for f3b in $HADOOP_MAPRED_HOME/*.jar; do 
+  CLASSPATH=${CLASSPATH}:$f3b
+done
+
+# restore ordinary behaviour
+unset IFS
+
+export CLASSPATH=$CLASSPATH
+

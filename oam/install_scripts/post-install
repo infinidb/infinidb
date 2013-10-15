@@ -1,0 +1,273 @@
+#!/bin/bash
+#
+# $Id: post-install 3705 2013-08-07 19:47:20Z dhill $
+#
+# Post-install steps for calpont install
+
+prefix=/usr/local
+installdir=$prefix/Calpont
+rpmmode=install
+user=$USER
+if [ -z "$user" ]; then
+	user=root
+fi
+quiet=0
+
+for arg in "$@"; do
+	if [ `expr -- "$arg" : '--prefix='` -eq 9 ]; then
+		prefix="`echo $arg | awk -F= '{print $2}'`"
+		installdir=$prefix/Calpont
+	elif [ `expr -- "$arg" : '--rpmmode='` -eq 10 ]; then
+		rpmmode="`echo $arg | awk -F= '{print $2}'`"
+	elif [ `expr -- "$arg" : '--installdir='` -eq 13 ]; then
+		installdir="`echo $arg | awk -F= '{print $2}'`"
+		prefix=`dirname $installdir`
+	elif [ `expr -- "$arg" : '--user='` -eq 7 ]; then
+		user="`echo $arg | awk -F= '{print $2}'`"
+	elif [ `expr -- "$arg" : '--quiet'` -eq 7 ]; then
+		quiet=1
+	elif [ `expr -- "$arg" : '--plugin='` -eq 9 ]; then
+		plugin="`echo $arg | awk -F= '{print $2}'`"
+	else
+		echo "post-install: ignoring unknown argument: $arg" 1>&2
+	fi
+done
+
+if [ $installdir != "/usr/local/Calpont" ]; then
+	export INFINIDB_INSTALL_DIR=$installdir
+	export LD_LIBRARY_PATH=$INFINIDB_INSTALL_DIR/lib
+fi
+
+#check 64-bit OS compatiable
+arch=`uname -m`
+patcnt=`expr "$arch" : 'i.86'`
+is64bitos=1
+if [ $patcnt -ne 0 ]; then
+	is64bitos=0
+fi
+is64bitpkg=1
+file $installdir/bin/PrimProc | grep '64-bit' >/dev/null 2>&1
+if [ $? -ne 0 ]; then
+	is64bitpkg=0
+fi
+if [ $is64bitpkg -eq 1 -a $is64bitos -ne 1 ]; then
+	echo "ERROR: Incompatiable Version, package is intended for a x86_64 architecture"
+	echo "exiting...."
+	exit 1
+fi
+
+if [ ! -f $installdir/etc/Calpont.xml ]; then
+	echo "$installdir/etc/Calpont.xml not found, exiting"
+	exit 1
+fi
+
+cd $installdir/lib || exit 1
+for lib in *.so.1.0.0; do
+	blib=`basename $lib .1.0.0`
+	ln -sf $lib $blib
+done
+chown -h $user.$user *.so >/dev/null 2>&1
+if [ -f libnetsnmp.so.5.2.1 ]; then
+	for lib in *.so.5.2.1; do
+		blib=`basename $lib .5.2.1`
+		ln -sf $lib $blib
+		ln -sf $lib ${blib}.5
+	done
+	chown -h $user.$user *.so *.so.5 >/dev/null 2>&1
+fi
+if [ -f libstdc++.so.6.0.14 ]; then
+	ln -sf libstdc++.so.6.0.14 libstdc++.so.6
+	chown -h $user.$user libstdc++.so.6 >/dev/null 2>&1
+fi
+
+ln -sf libjemalloc.so.3.3.0 libjemalloc.so
+chown -h $user.$user libjemalloc.so >/dev/null 2>&1
+
+ln -sf libunwind.so.8.0.1 libunwind.so.8
+chown -h $user.$user libunwind.so.8 >/dev/null 2>&1
+
+ln -sf libunwind-x86_64.so.8.0.1 libunwind-x86_64.so.8
+chown -h $user.$user libunwind-x86_64.so.8 >/dev/null 2>&1
+
+# TODO-based on early experience with HDP it doesn't install bigtop
+# so the code below will not correctly detect JAVA_HOME.  Need to 
+# decide how to handle
+# Autodetect JAVA_HOME if not defined
+if [ -e /usr/libexec/bigtop-detect-javahome ]; then
+. /usr/libexec/bigtop-detect-javahome
+elif [ -e /usr/lib/bigtop-utils/bigtop-detect-javahome ]; then
+. /usr/lib/bigtop-utils/bigtop-detect-javahome
+fi
+ln -sf $JAVA_HOME/jre/lib/amd64/server/libjvm.so
+chown -h $user.$user libjvm.so >/dev/null 2>&1
+
+cd /
+
+test -d /var/log/Calpont || mkdir /var/log/Calpont >/dev/null 2>&1
+test -d /var/log/Calpont/archive || mkdir /var/log/Calpont/archive >/dev/null 2>&1
+test -d /var/log/Calpont/corefiles || mkdir /var/log/Calpont/corefiles >/dev/null 2>&1
+test -d /var/log/Calpont/trace || mkdir /var/log/Calpont/trace >/dev/null 2>&1
+# make sure trace dir is world-writable and sticky
+chmod 1777 /var/log/Calpont/trace >/dev/null 2>&1
+test -d $installdir/data || mkdir $installdir/data
+test -d $installdir/data1 || mkdir $installdir/data1
+test -d $installdir/data1/systemFiles || mkdir $installdir/data1/systemFiles
+test -d $installdir/data1/systemFiles/dbrm || mkdir $installdir/data1/systemFiles/dbrm
+test -d $installdir/data1/systemFiles/dataTransaction || mkdir $installdir/data1/systemFiles/dataTransaction
+test -d $installdir/data1/systemFiles/dataTransaction/archive || mkdir $installdir/data1/systemFiles/dataTransaction/archive
+chmod 1777 $installdir/data1 >/dev/null 2>&1
+chmod -R 1777 $installdir/data1/systemFiles >/dev/null 2>&1
+chmod 1777 $installdir/etc > /dev/null 2>&1
+test -d /var/log/Calpont/data || ln -sf $installdir/data1/systemFiles/dataTransaction /var/log/Calpont/data > /dev/null 2>&1
+
+#create the bulk-load dirs
+mkdir -p $installdir/data/bulk/data/import >/dev/null 2>&1
+mkdir -p $installdir/data/bulk/log >/dev/null 2>&1
+mkdir -p $installdir/data/bulk/job >/dev/null 2>&1
+mkdir -p $installdir/data/bulk/rollback >/dev/null 2>&1
+mkdir -p $installdir/data/bulk/tmpjob >/dev/null 2>&1
+rm -f $installdir/data/bulk/tmpjob/* >/dev/null 2>&1
+
+#create infinidb temp file directory
+mkdir -p /tmp/infinidb_tmp_files >/dev/null 2>&1
+
+#setup core file directory and link
+mkdir /var/log/Calpont/corefiles > /dev/null 2>&1
+chmod 777 /var/log/Calpont/corefiles > /dev/null 2>&1
+
+#create mount directories
+mkdir /mnt/tmp > /dev/null 2>&1
+mkdir /var/log/Calpont/data/archive > /dev/null 2>&1
+
+#remove this fstab back file if its left over from 2.x version
+if test -f /etc/fstab.calpontSave ; then
+	rm -f /etc/fstab.calpontSave > /dev/null 2>&1
+fi
+
+
+# install Calpont Log Rotate File
+test -d $installdir/mysql/db || mkdir -p $installdir/mysql/db
+cp $installdir/bin/calpontLogRotate /etc/logrotate.d/calpont > /dev/null 2>&1
+rm -rf $installdir/mysql/db/infinidb_log_archive > /dev/null 2>&1
+
+# delete Calpont shared memory segments
+$installdir/bin/Calpont/bin/clearShm  > /dev/null 2>&1
+
+#setup the infinidb service script
+rm -f /etc/init.d/infinidb >/dev/null 2>&1
+cp $installdir/bin/infinidb /etc/init.d >/dev/null 2>&1
+if [ -x /sbin/chkconfig ]; then
+	/sbin/chkconfig --add infinidb > /dev/null 2>&1
+	/sbin/chkconfig infinidb on > /dev/null 2>&1
+elif [ -x /usr/sbin/update-rc.d ]; then
+	/usr/sbin/update-rc.d infinidb defaults 99 > /dev/null 2>&1
+else
+	echo ""
+	echo "Package 'chkconfig' or 'update-rc.d' not installed, contact your sysadmin if you want to setup to autostart for infinidb"	
+fi
+
+#setup InfiniDB system logging
+if [ $user = "root" ]; then
+	$installdir/bin/syslogSetup.sh install > /tmp/syslog_install.log 2>&1
+elif [ -z "$NO_NONROOT_SUDO" ]; then
+	sudo $installdir/bin/syslogSetup.sh --installdir=$installdir install > /tmp/syslog_install.log 2>&1
+	sudo chown $user:$user $installdir/etc/Calpont.xml
+	sudo chmod 777 /var
+	sudo chmod 777 /var/log
+	sudo chmod -R 777 /var/log/Calpont
+	sudo chmod 777 /dev/shm
+	sudo rm -f /var/lock/subsys/mysql-Calpont
+fi
+
+#check if InfiniDB system logging was setup
+cat /tmp/syslog_install.log | grep 'No System Logging' >/dev/null 2>&1
+if [ $? -eq 0 ]; then
+	cat /tmp/syslog_install.log
+fi
+
+#setup alias commands
+eval userhome=~$user
+bashFile=$userhome/.bashrc
+touch ${bashFile}
+if [ $installdir != "/usr/local/Calpont" ]; then
+	sed -i -e s@/usr/local/Calpont@$installdir@g $installdir/bin/calpontAlias
+fi
+egrep -qs 'Calpont Database Platform Alias Commands' ${bashFile}
+rc1=$?
+egrep -qs 'InfiniDB Alias Commands' ${bashFile}
+rc2=$?
+if [ $rc1 -ne 0 -a $rc2 -ne 0 ]; then
+	rm -f ${bashFile}.calpontSave
+	cp ${bashFile} ${bashFile}.calpontSave >/dev/null 2>&1
+	cat $installdir/bin/calpontAlias >> ${bashFile}
+	echo " " >> ${bashFile}
+fi
+
+#check and get amazon EC2 env variables
+if [ -n "$EC2_HOME" ]; then
+	$installdir/bin/setConfig -d Installation EC2_HOME $EC2_HOME
+
+	$installdir/bin/setConfig -d Installation JAVA_HOME $JAVA_HOME
+
+	$installdir/bin/setConfig -d Installation EC2_PATH $PATH:/home/ec2/bin:/opt/aws/bin
+fi
+
+#log install message
+test -f $installdir/post/functions && . $installdir/post/functions
+LD_LIBRARY_PATH=$installdir/lib $installdir/bin/cplogger -i 100 "***** InfiniDB Installed *****"
+
+#setup non-root
+if [ $installdir != "/usr/local/Calpont" -a $quiet -eq 0 ]; then
+	cat <<EOD
+The next steps are:
+
+export INFINIDB_INSTALL_DIR=$installdir
+export LD_LIBRARY_PATH=$INFINIDB_INSTALL_DIR/lib:$INFINIDB_INSTALL_DIR/mysql/lib/mysql
+$INFINIDB_INSTALL_DIR/bin/postConfigure -i $INFINIDB_INSTALL_DIR
+
+EOD
+fi
+
+#setup hadoop
+hadoop=`which hadoop 2>/dev/null`
+if [ -z $hadoop ]; then 
+        exit 0
+fi
+if [ $hadoop = "/usr/bin/hadoop" ]; then
+	if [ -f $installdir/bin/setenv-hdfs-12 ]; then
+			cp $installdir/bin/setenv-hdfs-12 /root/.
+	fi
+	if [ -f $installdir/bin/setenv-hdfs-20 ]; then
+			cp $installdir/bin/setenv-hdfs-20 /root/.
+	fi
+
+	export JAVA_HOME=/usr/java/jdk1.6.0_31
+	export LD_LIBRARY_PATH=/usr/java/jdk1.6.0_31/jre/lib/amd64/server
+
+	. /root/setenv-hdfs-20
+	$installdir/bin/hdfsCheck $installdir/lib/hdfs-20.so >/dev/null 2>&1
+	if [ $? -ne 0 ]; then
+		cat <<EOD
+The next steps are:
+
+export JAVA_HOME=/usr/java/jdk1.6.0_31
+export LD_LIBRARY_PATH=/usr/java/jdk1.6.0_31/jre/lib/amd64/server
+. /root/setenv-hdfs-12
+$INFINIDB_INSTALL_DIR/bin/postConfigure
+
+EOD
+	else
+		cat <<EOD
+The next steps are:
+
+export JAVA_HOME=/usr/java/jdk1.6.0_31
+export LD_LIBRARY_PATH=/usr/java/jdk1.6.0_31/jre/lib/amd64/server
+. /root/setenv-hdfs-20
+$INFINIDB_INSTALL_DIR/bin/postConfigure
+
+EOD
+	fi
+fi
+
+exit 0
+

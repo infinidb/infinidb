@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- $Id: amazonConfig.xml 2830 2012-04-08 17:38:58Z dhill $ -->
+<!--   Used with the amazonInstaller script-->
+<Calpont Version="V1.0.0">
+	<SystemConfig>
+		<!-- System Name-->
+		<SystemName>calpont-1</SystemName>
+		
+		<!-- System Type: combined (um and pm functionality on same instance)
+					separate (um and pm functionality on separate instances) -->
+		<SystemType>separate</SystemType>
+		
+		<!-- Elastic IP to Module Assignment -->
+		<!--- Example usages: x.x.x.x:um1 -->
+		<!--- Example usages: x.x.x.x:um1,y.y.y.y:pm1 -->
+		<ElasticIPs>unassigned</ElasticIPs>
+		
+		<!-- Number of User Modules: n/a for combination system type -->
+		<UserModuleCount>1</UserModuleCount>
+		
+		<!-- User Modules Instances list, use existing instances instead of Launching new ones -->
+		<!-- This list would start with um1, list is seperated by commands. i.e 'id1,id2,id3' -->
+		<UserModuleInstances>unassigned</UserModuleInstances>
+		
+		<!-- User Modules Instance Type, default to local Instance Type -->
+		<UserModuleInstanceType>unassigned</UserModuleInstanceType>
+		
+		<!-- User Modules Security Group, default to local Security Group -->
+		<UserModuleSecurityGroup>unassigned</UserModuleSecurityGroup>
+		
+		<!-- Use EBS Volumes for User Module data storage? -->
+		<!-- Applicable for system type = 'separate' only -->
+		<UseUMEBSVolumes>y</UseUMEBSVolumes>	
+		
+		<!-- Size of User Module EBS Volumes in gigibytes -->
+		<!-- Applicable for system type = 'separate' only -->
+		<UMEBSVolumeSize>10</UMEBSVolumeSize>
+		
+		<!-- User Module MySQL Database Auto Sync -->
+		<!-- Setting this enables the Automatic syncing of the MySQL Database from the Primary User Module -->
+		<!-- to other User Modules. And will sync the dastabase when a new User Module is Added -->
+		<UserModuleAutoSync>y</UserModuleAutoSync>
+		
+		<!-- User Module MySQL Database Auto Sync Time in Minutes -->
+		<UserModuleSyncTime>10</UserModuleSyncTime>
+		
+		<!-- Number of Performance Modules -->
+		<PerformanceModuleCount>2</PerformanceModuleCount>
+		
+		<!-- Performance Modules Instances list, use existing instances instead of Launching new ones -->
+		<!-- This list would start with pm2, list is seperated by commands. i.e 'id1,id2,id3' -->
+		<PerformanceModuleInstances>unassigned</PerformanceModuleInstances>
+		
+		<!-- Number of DBRoots assigned to each Performance Module -->
+		<DBRootsPerPM>1</DBRootsPerPM>
+		
+		<!-- Use EBS Volumes for (um/pm) data storage (system type = 'combined')? -->
+		<!-- Use EBS Volumes for pm data storage (system type = 'separate')? -->
+		<UsePMEBSVolumes>y</UsePMEBSVolumes>	
+		
+		<!-- Size of Back-End Data EBS Volumes in gigibytes -->
+		<PMEBSVolumeSize>100</PMEBSVolumeSize>
+		
+		<!-- SNMP Trap Receiver IP Address: 0.0.0.0 means no snmptraps will be forwarded -->
+		<SNMPTrapIPAddr>0.0.0.0</SNMPTrapIPAddr>
+		
+		<!-- Total UM Memory Size, default to postConfigure setting -->
+		<!-- Use xxG for Gigibytes, ie. 16G, xxM for megabytes, ie. 256M -->
+		<TotalUmMemory>unassigned</TotalUmMemory>
+		
+		<!-- Blocks Cache Size Percentage, default to postConfigure setting -->
+		<NumBlocksPct>unassigned</NumBlocksPct>
+
+		<!-- Root Password or 'ssh' for ssh-key setup -->
+		<RootPassword>Calpont1</RootPassword>
+		
+		<!-- License Key, default to 30 days -->
+		<LicenseKey>unassigned</LicenseKey>
+		
+		<!-- Enables Automatic Amazon Instance/Volume tagging -->
+		<!-- When set 'y', Instance Name Tags will be set to 'system-name'-'module-name' -->
+		<!--               DBRoot Volume Name Tags will be set to 'system-name'-'dbrootID' -->
+		<!--               User Module Volume Name Tags will be set to 'system-name'-'module-name' -->
+		<AutoTagging>y</AutoTagging>
+		
+		<!-- Amazon EC2 region your running in, run ec2-describe-regions to get valid region names -->
+		<Region>us-east-1</Region>
+		
+		<!-- x.509 Certification File with directory location. i.e. /root/cert-xxxx -->
+		<x509CertificationFile>unassigned</x509CertificationFile>
+		
+		<!-- x.509 Private Key File with directory location. i.e. /root/pk-xxxx -->
+		<x509PrivateFile>unassigned</x509PrivateFile>
+	</SystemConfig>
+</Calpont>

@@ -1,0 +1,23 @@
+#!/bin/bash
+
+# This is a temporary testing device for the ddl parser.
+
+success=
+fail=
+
+files=$(echo sql/at*.sql sql/ct*.sql sql/atdtc*.sql sql/dt*.sql sql/di*.sql sql/ci*.sql \
+    sql/atrc01.sql sql/atmct01.sql)
+echo files is $files
+for x in $files; do
+    if ./gramtest --sql $x; then
+	success="$success $x"
+    else
+	fail="$fail $x"
+    fi
+done
+
+echo;echo
+echo Success: $success
+echo Failure: $fail
+    
+    

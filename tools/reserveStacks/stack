@@ -1,0 +1,82 @@
+#!/bin/bash
+
+# BP 09/16/2011 13:43 
+# This script will give user to 
+#		list all the calpont stacks
+#		reserve a calpont stack
+#		release a calpont stack
+# Help to use a test stack without stepping each other.
+#
+
+DB=stacks
+
+usage()
+{
+	echo "Usage:" >&2
+	echo "	${0##*/} list" >&2
+	echo "	${0##*/} reserve stackname who" >&2
+	echo "	${0##*/} release stackname who" >&2
+}
+
+cmd="$1"
+argc=$#
+
+if [ -z "$cmd" -o "$cmd" = "-h" ]; then
+	usage
+	exit 1
+fi
+
+if [ $(expr 'list' : "$cmd") -gt 0 ]; then
+	cmd=list
+	INST=$2
+elif [ $(expr 'reserve' : "$cmd") -gt 2 ]; then
+	cmd=reserve
+	INST=$4
+elif [ $(expr 'release' : "$cmd") -gt 2 ]; then
+	cmd=release
+	INST=$4
+fi
+if [ -z "$INSTALLDIR" ]; then
+        INSTALLDIR="/usr/local/Calpont"
+        if [ $INST ]; then
+                INSTALLDIR=$INST
+        fi
+        export INSTALLDIR
+fi
+
+if [ -z "$MYSQLCMD" ]; then
+        if [ -d "$INSTALLDIR/mysql" ]; then
+		# Linux.
+                MYSQLCMD="$INSTALLDIR/mysql/bin/mysql -h 10.100.4.51 -u root --database=$DB"
+        else
+		# Windows.
+                MYSQLCMD="$INSTALLDIR/bin/mysql -h 10.100.4.51 -u root --database=$DB"
+        fi
+        export MYSQLCMD
+fi
+
+good=0
+
+if [ "$cmd" = "list" ]; then
+	sql="call list_stacks()"
+	$MYSQLCMD -e "$sql" 
+	good=1
+fi
+
+if [ "$cmd" = "reserve" -a $argc -ge 3 ]; then
+	sql="call reserve_stack('$2', '$3')"
+	$MYSQLCMD -e "$sql"
+	good=1
+fi
+
+if [ "$cmd" = "release" -a $argc -ge 3 ]; then
+	sql="call release_stack('$2', '$3')"
+	$MYSQLCMD -e "$sql" 
+	good=1
+fi
+
+if [ $good -eq 0 ]; then
+	usage
+	exit 1
+fi
+

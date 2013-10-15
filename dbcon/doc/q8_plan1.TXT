@@ -1,0 +1,276 @@
+select
+	o_year,
+	sum(volume) as mkt_share
+from
+	(
+		select
+			extract(year from o_orderdate) as o_year,
+			l_extendedprice * (1 - l_discount) as volume,
+			n2.n_name as nation
+		from
+			part,
+			supplier,
+			lineitem,
+			orders,
+			customer,
+			nation n1,
+			nation n2,
+			region
+		where
+			p_partkey = l_partkey
+			and s_suppkey = l_suppkey
+			and l_orderkey = o_orderkey
+			and o_custkey = c_custkey
+			and c_nationkey = n1.n_nationkey
+			and n1.n_regionkey = r_regionkey
+			and r_name = ':2'
+			and s_nationkey = n2.n_nationkey
+			and o_orderdate between date '1995-01-01' and date '1996-12-31'
+			and p_type = ':3'
+	) as all_nations
+group by
+	o_year
+order by
+	o_year;
+	
+-- Q8 Plan Start --
+
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: P_PARTKEY
+Object_name: PART
+Alias: PART@SEL$2
+Extended_information:    FP:P_TYPE=':3'
+Access_predicates: 
+Filter_predicates: P_TYPE=':3'
+Select_level: SEL$F5BB74E1
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: L_ORDERKEY, L_PARTKEY, L_SUPPKEY, L_EXTENDEDPRICE, L_DISCOUNT
+Object_name: LINEITEM
+Alias: LINEITEM@SEL$2
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$F5BB74E1
+--------------------
+Operation: hash join
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  L_ORDERKEY, L_DISCOUNT, L_SUPPKEY, L_EXTENDEDPRICE
+Object_name: 
+Alias: 
+Extended_information:    AP:P_PARTKEY=L_PARTKEY
+Access_predicates: P_PARTKEY=L_PARTKEY
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: S_SUPPKEY, S_NATIONKEY
+Object_name: SUPPLIER
+Alias: SUPPLIER@SEL$2
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$F5BB74E1
+--------------------
+Operation: hash join
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  L_ORDERKEY, L_DISCOUNT, L_EXTENDEDPRICE, S_NATIONKEY
+Object_name: 
+Alias: 
+Extended_information:    AP:S_SUPPKEY=L_SUPPKEY
+Access_predicates: S_SUPPKEY=L_SUPPKEY
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: O_ORDERKEY, O_CUSTKEY, O_ORDERDATE
+Object_name: ORDERS
+Alias: ORDERS@SEL$2
+Extended_information:    FP:O_ORDERDATE>=TO_DATE('1995-01-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss') AND O_ORDERDATE<=TO_DATE('1996-12-31 00:00:00', 'yyyy-mm-dd hh24:mi:ss')
+Access_predicates: 
+Filter_predicates: O_ORDERDATE>=TO_DATE('1995-01-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss')&O_ORDERDATE<=TO_DATE('1996-12-31 00:00:00', 'yyyy-mm-dd hh24:mi:ss')
+Select_level: SEL$F5BB74E1
+--------------------
+Operation: hash join
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  S_NATIONKEY, L_DISCOUNT, L_EXTENDEDPRICE, O_ORDERDATE, O_CUSTKEY
+Object_name: 
+Alias: 
+Extended_information:    AP:L_ORDERKEY=O_ORDERKEY
+Access_predicates: L_ORDERKEY=O_ORDERKEY
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: C_CUSTKEY, C_NATIONKEY
+Object_name: CUSTOMER
+Alias: CUSTOMER@SEL$2
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$F5BB74E1
+--------------------
+Operation: hash join
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  S_NATIONKEY, L_DISCOUNT, L_EXTENDEDPRICE, O_ORDERDATE, C_NATIONKEY
+Object_name: 
+Alias: 
+Extended_information:    AP:O_CUSTKEY=C_CUSTKEY
+Access_predicates: O_CUSTKEY=C_CUSTKEY
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: N1.N_NATIONKEY, N1.N_REGIONKEY
+Object_name: NATION
+Alias: N1@SEL$2
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$F5BB74E1
+--------------------
+Operation: hash join
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  S_NATIONKEY, L_DISCOUNT, L_EXTENDEDPRICE, O_ORDERDATE, N1.N_REGIONKEY
+Object_name: 
+Alias: 
+Extended_information:    AP:C_NATIONKEY=N1.N_NATIONKEY
+Access_predicates: C_NATIONKEY=N1.N_NATIONKEY
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: N2.N_NATIONKEY
+Object_name: NATION
+Alias: N2@SEL$2
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$F5BB74E1
+--------------------
+Operation: hash join
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  N1.N_REGIONKEY, L_DISCOUNT, L_EXTENDEDPRICE, O_ORDERDATE
+Object_name: 
+Alias: 
+Extended_information:    AP:S_NATIONKEY=N2.N_NATIONKEY
+Access_predicates: S_NATIONKEY=N2.N_NATIONKEY
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: R_REGIONKEY
+Object_name: REGION
+Alias: REGION@SEL$2
+Extended_information:    FP:R_NAME=':2'
+Access_predicates: 
+Filter_predicates: R_NAME=':2'
+Select_level: SEL$F5BB74E1
+--------------------
+Operation: hash join
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  O_ORDERDATE, L_DISCOUNT, L_EXTENDEDPRICE
+Object_name: 
+Alias: 
+Extended_information:    AP:N1.N_REGIONKEY=R_REGIONKEY
+Access_predicates: N1.N_REGIONKEY=R_REGIONKEY
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: sort
+Options: GROUP BY
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  EXTRACT(YEAR FROM INTERNAL_FUNCTION(O_ORDERDATE)), SUM(L_EXTENDEDPRICE*(1-L_DISCOUNT))
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$F5BB74E1
+--------------------
+Operation: select statement
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection: 
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+
+-- End --

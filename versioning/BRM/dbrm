@@ -1,0 +1,50 @@
+#!/bin/bash
+#
+# (Adapted from /etc/rc.d/init.d/gpmi and /etc/init.d/functions)
+
+PIDDIR=$HOME
+
+# Set up a default search path.
+PATH="$HOME/genii/versioning/BRM:../../export/bin:$HOME/genii/export/bin:/sbin:/usr/sbin:/bin:/usr/bin:/usr/X11R6/bin"
+export PATH
+
+. script-fcns
+
+RETVAL=0
+
+start() {
+	echo -n $"Starting DBRM controller process: "
+	daemon controllernode
+	echo
+	echo -n $"Starting DBRM worker process: "
+	daemon workernode DBRM_Worker1
+	echo
+}
+
+stop() {
+	echo -n $"Shutting down DBRM controller process: "
+	killproc controllernode -TERM
+	echo
+	echo -n $"Shutting down DBRM worker process: "
+	killproc workernode -TERM
+	echo
+	sleep 6
+}
+
+case "$1" in
+  start)
+	start
+	;;
+  stop)
+	stop
+	;;
+  restart)
+	stop
+	start
+	;;
+  *)
+	echo $"Usage: $0 {start|stop|restart}"
+	exit 1
+esac
+
+exit $RETVAL

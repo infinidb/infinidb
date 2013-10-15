@@ -1,0 +1,71 @@
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: JLOWE
+Search_columns: 
+Projection: 
+Object_name: CUSTOMER
+Alias: CUSTOMER@SEL$2
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$2
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: JLOWE
+Search_columns: 
+Projection: C_NAME
+Object_name: CUSTOMER
+Alias: C@SEL$1
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$1
+--------------------
+Operation: filter
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection: 
+Object_name: 
+Alias: 
+Extended_information:    FP::B1='KING'
+Access_predicates: 
+Filter_predicates: :B1='KING'
+Select_level: SEL$2
+--------------------
+Operation: filter
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection: C_NAME
+Object_name: 
+Alias: 
+Extended_information:    FP: EXISTS (SELECT /*+ */ 0 FROM CUSTOMER CUSTOMER WHERE :B1='KING')
+Access_predicates: 
+Filter_predicates:  EXISTS (SELECT /*+ */ 0 FROM CUSTOMER CUSTOMER WHERE :B1='KING')
+Select_level: SEL$1
+--------------------
+Operation: select statement
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection: 
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+TOKEN: <:B1='KING'>

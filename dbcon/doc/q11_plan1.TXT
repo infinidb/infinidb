@@ -1,0 +1,241 @@
+--- Q11 Start --
+
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: N_NATIONKEY
+Object_name: NATION
+Alias: NATION@SEL$1
+Extended_information:    FP:N_NAME=':1'
+Access_predicates: 
+Filter_predicates: N_NAME=':1'
+Select_level: SEL$1
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: N_NATIONKEY
+Object_name: NATION
+Alias: NATION@SEL$2
+Extended_information:    FP:N_NAME=':1'
+Access_predicates: 
+Filter_predicates: N_NAME=':1'
+Select_level: SEL$2
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: PS_PARTKEY, PS_SUPPKEY, PS_AVAILQTY, PS_SUPPLYCOST
+Object_name: PARTSUPP
+Alias: PARTSUPP@SEL$1
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$1
+--------------------
+Operation: buffer
+Options: SORT
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  N_NATIONKEY
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: PS_SUPPKEY, PS_AVAILQTY, PS_SUPPLYCOST
+Object_name: PARTSUPP
+Alias: PARTSUPP@SEL$2
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$2
+--------------------
+Operation: buffer
+Options: SORT
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  N_NATIONKEY
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: merge join
+Options: CARTESIAN
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  PS_PARTKEY, PS_SUPPKEY, PS_AVAILQTY, PS_SUPPLYCOST, N_NATIONKEY
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: S_SUPPKEY, S_NATIONKEY
+Object_name: SUPPLIER
+Alias: SUPPLIER@SEL$1
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$1
+--------------------
+Operation: merge join
+Options: CARTESIAN
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  PS_SUPPKEY, PS_AVAILQTY, PS_SUPPLYCOST, N_NATIONKEY
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: S_SUPPKEY, S_NATIONKEY
+Object_name: SUPPLIER
+Alias: SUPPLIER@SEL$2
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$2
+--------------------
+Operation: hash join
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  PS_PARTKEY, PS_AVAILQTY, PS_SUPPLYCOST
+Object_name: 
+Alias: 
+Extended_information:    AP:PS_SUPPKEY=S_SUPPKEY AND S_NATIONKEY=N_NATIONKEY
+Access_predicates: PS_SUPPKEY=S_SUPPKEY&S_NATIONKEY=N_NATIONKEY
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: hash join
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  PS_AVAILQTY, PS_SUPPLYCOST
+Object_name: 
+Alias: 
+Extended_information:    AP:PS_SUPPKEY=S_SUPPKEY AND S_NATIONKEY=N_NATIONKEY
+Access_predicates: PS_SUPPKEY=S_SUPPKEY&S_NATIONKEY=N_NATIONKEY
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: hash
+Options: GROUP BY
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  PS_PARTKEY, SUM(PS_SUPPLYCOST*PS_AVAILQTY)
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: sort
+Options: AGGREGATE
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  SUM(PS_SUPPLYCOST*PS_AVAILQTY)
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$2
+--------------------
+Operation: filter
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection: PS_PARTKEY, SUM(PS_SUPPLYCOST*PS_AVAILQTY)
+Object_name: 
+Alias: 
+Extended_information:    FP:SUM(PS_SUPPLYCOST*PS_AVAILQTY)> (SELECT SUM(PS_SUPPLYCOST*PS_AVAILQTY)*2 FROM NATION NATION,SUPPLIER SUPPLIER,PARTSUPP PARTSUPP WHERE S_NATIONKEY=N_NATIONKEY AND PS_SUPPKEY=S_SUPPKEY AND N_NAME=':1')
+Access_predicates: 
+Filter_predicates: SUM(PS_SUPPLYCOST*PS_AVAILQTY)> (SELECT SUM(PS_SUPPLYCOST*PS_AVAILQTY)*2 FROM NATION NATION,SUPPLIER SUPPLIER,PARTSUPP PARTSUPP WHERE S_NATIONKEY=N_NATIONKEY&PS_SUPPKEY=S_SUPPKEY&N_NAME=':1')
+Select_level: 
+--------------------
+Operation: sort
+Options: ORDER BY
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  SUM(PS_SUPPLYCOST*PS_AVAILQTY), PS_PARTKEY
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$1
+--------------------
+Operation: select statement
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection: 
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+
+---- END ------

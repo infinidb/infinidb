@@ -1,0 +1,117 @@
+Q6
+select
+	sum(l_extendedprice * l_discount) as revenue
+from
+	lineitem
+where
+	l_shipdate >= date ':1'
+	and l_shipdate < date ':1' + interval '1' year
+	and l_discount between :2 - 0.01 and :2 + 0.01
+	and l_quantity < :3;
+	
+Oracle Execution Plan
+	
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: L_EXTENDEDPRICE^L_DISCOUNT
+Object_name: LINEITEM
+Alias: LINEITEM@SEL$1
+Extended_information:    FP:L_SHIPDATE>=TO_DATE('1994-01-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss') AND L_SHIPDATE<TO_DATE('1995-01-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss') AND L_DISCOUNT>=.05 AND L_DISCOUNT<=.07 AND L_QUANTITY<24
+Access_predicates: 
+Filter_predicates: L_SHIPDATE>=TO_DATE('1994-01-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss')&L_SHIPDATE<TO_DATE('1995-01-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss')&L_DISCOUNT>=.05&L_DISCOUNT<=.07&L_QUANTITY<24
+Select_level: SEL$1
+--------------------
+Operation: sort
+Options: AGGREGATE
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  SUM(L_EXTENDEDPRICE*L_DISCOUNT)
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$1
+--------------------
+Operation: select statement
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection: 
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+
+Calpont Execution Plan
+
+>SELECT MAIN
+>>Returned Columns
+1. ArithmeticColumn: AggregateColumn sum(L_EXTENDEDPRICE*L_DISCOUNT)
+ArithmeticColumn: SimpleColumn L_EXTENDEDPRICE
+  s/t/c/T/A: ///0/
+
+SimpleColumn L_DISCOUNT
+  s/t/c/T/A: ///0/
+
+Operator: *
+
+
+>>Filters
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_SHIPDATE
+  s/t/c/T/A: tpch/LINEITEM/L_SHIPDATE/35/
+  Operator: >=  ArithmeticColumn: FunctionColumn: to_date('1994-01-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss')
+
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_SHIPDATE
+  s/t/c/T/A: tpch/LINEITEM/L_SHIPDATE/35/
+  Operator: <  ArithmeticColumn: FunctionColumn: to_date('1995-01-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss')
+
+Operator: AND
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_DISCOUNT
+  s/t/c/T/A: tpch/LINEITEM/L_DISCOUNT/31/LINEITEM
+  Operator: >=  ConstantColumn: .05(n)
+Operator: AND
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_DISCOUNT
+  s/t/c/T/A: tpch/LINEITEM/L_DISCOUNT/31/LINEITEM
+  Operator: <=  ConstantColumn: .07(n)
+Operator: AND
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_QUANTITY
+  s/t/c/T/A: tpch/LINEITEM/L_QUANTITY/29/
+  Operator: <  ConstantColumn: 24(n)
+Operator: AND
+>>Group By Columns
+ArithmeticColumn: AggregateColumn sum(L_EXTENDEDPRICE*L_DISCOUNT)
+ArithmeticColumn: SimpleColumn L_EXTENDEDPRICE
+  s/t/c/T/A: ///0/
+
+SimpleColumn L_DISCOUNT
+  s/t/c/T/A: ///0/
+
+Operator: *
+
+
+SessionID: 4800
+TxnID: 297
+VerID: 297
+--- Column Map ---
+L_DISCOUNT : 0x9bfa728
+L_EXTENDEDPRICE : 0x9bf3df8
+L_QUANTITY : 0x9c13af0
+L_SHIPDATE : 0x9c13990
+

@@ -1,0 +1,328 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- $Id: AlarmConfig.xml 3702 2013-08-06 22:29:48Z bpaul $ -->
+<Calpont Version="V1.0.0">
+	<AlarmConfig1>
+		<AlarmID>1</AlarmID>
+		<BriefDesc>CPU_USAGE_HIGH</BriefDesc>
+		<DetailedDesc>The usage on the indicated CPU has exceeded its high threshold</DetailedDesc>
+		<Severity>1</Severity>
+		<Threshold>100</Threshold>
+		<Occurrences>0</Occurrences>
+		<LastIssueTime>0</LastIssueTime>		
+	</AlarmConfig1>
+	<AlarmConfig2>
+		<AlarmID>2</AlarmID>
+		<BriefDesc>CPU_USAGE_MED</BriefDesc>
+		<DetailedDesc>The usage on the indicated CPU has exceeded its medium threshold</DetailedDesc>
+		<Severity>2</Severity>
+		<Threshold>100</Threshold>
+		<Occurrences>0</Occurrences>
+		<LastIssueTime>0</LastIssueTime>		
+	</AlarmConfig2>
+	<AlarmConfig3>
+		<AlarmID>3</AlarmID>
+		<BriefDesc>CPU_USAGE_LOW</BriefDesc>
+		<DetailedDesc>The usage on the indicated CPU has exceeded its low threshold</DetailedDesc>
+		<Severity>3</Severity>
+		<Threshold>100</Threshold>
+		<Occurrences>0</Occurrences>
+		<LastIssueTime>0</LastIssueTime>		
+	</AlarmConfig3>
+	<AlarmConfig4>
+		<AlarmID>4</AlarmID>
+		<BriefDesc>DISK_USAGE_HIGH</BriefDesc>
+		<DetailedDesc>The usage on the indicated Disk Drive has exceeded its high threshold</DetailedDesc>
+		<Severity>1</Severity>
+		<Threshold>100</Threshold>
+		<Occurrences>0</Occurrences>
+		<LastIssueTime>0</LastIssueTime>		
+	</AlarmConfig4>
+	<AlarmConfig5>
+		<AlarmID>5</AlarmID>
+		<BriefDesc>DISK_USAGE_MED</BriefDesc>
+		<DetailedDesc>The usage on the indicated DISK Drive has exceeded its medium threshold</DetailedDesc>
+		<Severity>2</Severity>
+		<Threshold>100</Threshold>
+		<Occurrences>0</Occurrences>
+		<LastIssueTime>0</LastIssueTime>		
+	</AlarmConfig5>
+	<AlarmConfig6>
+		<AlarmID>6</AlarmID>
+		<BriefDesc>DISK_USAGE_LOW</BriefDesc>
+		<DetailedDesc>The usage on the indicated Disk Drive has exceeded its low threshold</DetailedDesc>
+		<Severity>3</Severity>
+		<Threshold>100</Threshold>
+		<Occurrences>0</Occurrences>
+		<LastIssueTime>0</LastIssueTime>		
+	</AlarmConfig6>
+	<AlarmConfig7>
+		<AlarmID>7</AlarmID>
+		<BriefDesc>MEMORY_USAGE_HIGH</BriefDesc>
+		<DetailedDesc>The usage on the indicated Memory has exceeded its high threshold</DetailedDesc>
+		<Severity>1</Severity>
+		<Threshold>100</Threshold>
+		<Occurrences>0</Occurrences>
+		<LastIssueTime>0</LastIssueTime>		
+	</AlarmConfig7>
+	<AlarmConfig8>
+		<AlarmID>8</AlarmID>
+		<BriefDesc>MEMORY_USAGE_MED</BriefDesc>
+		<DetailedDesc>The usage on the indicated Memory has exceeded its medium threshold</DetailedDesc>
+		<Severity>2</Severity>
+		<Threshold>100</Threshold>
+		<Occurrences>0</Occurrences>
+		<LastIssueTime>0</LastIssueTime>		
+	</AlarmConfig8>
+	<AlarmConfig9>
+		<AlarmID>9</AlarmID>
+		<BriefDesc>MEMORY_USAGE_LOW</BriefDesc>
+		<DetailedDesc>The usage on the indicated Memory has exceeded its low threshold</DetailedDesc>
+		<Severity>3</Severity>
+		<Threshold>100</Threshold>
+		<Occurrences>0</Occurrences>
+		<LastIssueTime>0</LastIssueTime>		
+	</AlarmConfig9>
+	<AlarmConfig10>
+		<AlarmID>10</AlarmID>
+		<BriefDesc>SWAP_USAGE_HIGH</BriefDesc>
+		<DetailedDesc>The usage on the indicated Swap has exceeded its high threshold</DetailedDesc>
+		<Severity>1</Severity>
+		<Threshold>100</Threshold>
+		<Occurrences>0</Occurrences>
+		<LastIssueTime>0</LastIssueTime>		
+	</AlarmConfig10>
+	<AlarmConfig11>
+		<AlarmID>11</AlarmID>
+		<BriefDesc>SWAP_USAGE_MED</BriefDesc>
+		<DetailedDesc>The usage on the indicated Swap has exceeded its medium threshold</DetailedDesc>
+		<Severity>2</Severity>
+		<Threshold>100</Threshold>
+		<Occurrences>0</Occurrences>
+		<LastIssueTime>0</LastIssueTime>		
+	</AlarmConfig11>
+	<AlarmConfig12>
+		<AlarmID>12</AlarmID>
+		<BriefDesc>SWAP_USAGE_LOW</BriefDesc>
+		<DetailedDesc>The usage on the indicated Swap has exceeded its low threshold</DetailedDesc>
+		<Severity>3</Severity>
+		<EmailAddr>NONE</EmailAddr>
+		<Occurrences>0</Occurrences>
+		<LastIssueTime>0</LastIssueTime>		
+	</AlarmConfig12>
+	<AlarmConfig13>
+		<AlarmID>13</AlarmID>
+		<BriefDesc>PROCESS_DOWN_AUTO</BriefDesc>
+		<DetailedDesc>Process is auto out-of-service</DetailedDesc>
+		<Severity>2</Severity>
+		<EmailAddr>NONE</EmailAddr>
+		<Occurrences>0</Occurrences>
+		<LastIssueTime>0</LastIssueTime>		
+	</AlarmConfig13>
+	<AlarmConfig14>
+		<AlarmID>14</AlarmID>
+		<BriefDesc>MODULE_DOWN_AUTO</BriefDesc>
+		<DetailedDesc>Module is auto out-of-service</DetailedDesc>
+		<Severity>1</Severity>
+		<Threshold>100</Threshold>
+		<Occurrences>0</Occurrences>
+		<LastIssueTime>0</LastIssueTime>		
+	</AlarmConfig14>
+	<AlarmConfig15>
+		<AlarmID>15</AlarmID>
+		<BriefDesc>SYSTEM_DOWN_AUTO</BriefDesc>
+		<DetailedDesc>System is auto out-of-service</DetailedDesc>
+		<Severity>1</Severity>
+		<Threshold>100</Threshold>
+		<Occurrences>0</Occurrences>
+		<LastIssueTime>0</LastIssueTime>		
+	</AlarmConfig15>
+	<AlarmConfig16>
+		<AlarmID>16</AlarmID>
+		<BriefDesc>POWERON_TEST_SEVERE</BriefDesc>
+		<DetailedDesc>A Module Power-On Severe Warning error occurred. Test Failures indicate that the system is running in a degraded state</DetailedDesc>
+		<Severity>2</Severity>
+		<Threshold>100</Threshold>
+		<Occurrences>0</Occurrences>
+		<LastIssueTime>0</LastIssueTime>		
+	</AlarmConfig16>
+	<AlarmConfig17>
+		<AlarmID>17</AlarmID>
+		<BriefDesc>POWERON_TEST_WARNING</BriefDesc>
+		<DetailedDesc>A Module Power-On Warning error occurred. Test Failures indicate that the system is running with little or no degradation in performance</DetailedDesc>
+		<Severity>4</Severity>
+		<Threshold>100</Threshold>
+		<Occurrences>0</Occurrences>
+		<LastIssueTime>0</LastIssueTime>		
+	</AlarmConfig17>
+	<AlarmConfig18>
+		<AlarmID>18</AlarmID>
+		<BriefDesc>HARDWARE_HIGH</BriefDesc>
+		<DetailedDesc>A Hardware Device's resource has exceeded its high threshold</DetailedDesc>
+		<Severity>1</Severity>
+		<Threshold>100</Threshold>
+		<Occurrences>0</Occurrences>
+		<LastIssueTime>0</LastIssueTime>		
+	</AlarmConfig18>
+	<AlarmConfig19>
+		<AlarmID>19</AlarmID>
+		<BriefDesc>HARDWARE_MED</BriefDesc>
+		<DetailedDesc>A Hardware Device's resource has exceeded its medium threshold</DetailedDesc>
+		<Severity>2</Severity>
+		<Threshold>100</Threshold>
+		<Occurrences>0</Occurrences>
+		<LastIssueTime>0</LastIssueTime>		
+	</AlarmConfig19>
+	<AlarmConfig20>
+		<AlarmID>20</AlarmID>
+		<BriefDesc>HARDWARE_LOW</BriefDesc>
+		<DetailedDesc>A Hardware Device's resource has exceeded its low threshold</DetailedDesc>
+		<Severity>3</Severity>
+		<Threshold>100</Threshold>
+		<Occurrences>0</Occurrences>
+		<LastIssueTime>0</LastIssueTime>		
+	</AlarmConfig20>
+	<AlarmConfig21>
+		<AlarmID>21</AlarmID>
+		<BriefDesc>PROCESS_DOWN_MANUAL</BriefDesc>
+		<DetailedDesc>Process is manually out-of-service</DetailedDesc>
+		<Severity>3</Severity>
+		<Threshold>100</Threshold>
+		<Occurrences>0</Occurrences>
+		<LastIssueTime>0</LastIssueTime>		
+	</AlarmConfig21>
+	<AlarmConfig22>
+		<AlarmID>22</AlarmID>
+		<BriefDesc>MODULE_DOWN_MANUAL</BriefDesc>
+		<DetailedDesc>Module is manually out-of-service</DetailedDesc>
+		<Severity>2</Severity>
+		<Threshold>100</Threshold>
+		<Occurrences>0</Occurrences>
+		<LastIssueTime>0</LastIssueTime>		
+	</AlarmConfig22>
+	<AlarmConfig23>
+		<AlarmID>23</AlarmID>
+		<BriefDesc>SYSTEM_DOWN_MANUAL</BriefDesc>
+		<DetailedDesc>System is manually out-of-service</DetailedDesc>
+		<Severity>1</Severity>
+		<Threshold>100</Threshold>
+		<Occurrences>0</Occurrences>
+		<LastIssueTime>0</LastIssueTime>		
+	</AlarmConfig23>
+	<AlarmConfig24>
+		<AlarmID>24</AlarmID>
+		<BriefDesc>EXT_DEVICE_DOWN_AUTO</BriefDesc>
+		<DetailedDesc>External Device is auto out-of-service</DetailedDesc>
+		<Severity>2</Severity>
+		<Threshold>100</Threshold>
+		<Occurrences>0</Occurrences>
+		<LastIssueTime>0</LastIssueTime>		
+	</AlarmConfig24>
+	<AlarmConfig25>
+		<AlarmID>25</AlarmID>
+		<BriefDesc>PROCESS_INIT_FAILURE</BriefDesc>
+		<DetailedDesc>Process Initialzation failed or Timed-out</DetailedDesc>
+		<Severity>2</Severity>
+		<Threshold>100</Threshold>
+		<Occurrences>0</Occurrences>
+		<LastIssueTime>0</LastIssueTime>		
+	</AlarmConfig25>
+	<AlarmConfig26>
+		<AlarmID>26</AlarmID>
+		<BriefDesc>NIC_DOWN_AUTO</BriefDesc>
+		<DetailedDesc>NIC Interface is auto out-of-service</DetailedDesc>
+		<Severity>2</Severity>
+		<Threshold>100</Threshold>
+		<Occurrences>0</Occurrences>
+		<LastIssueTime>0</LastIssueTime>		
+	</AlarmConfig26>
+	<AlarmConfig27>
+		<AlarmID>27</AlarmID>
+		<BriefDesc>DBRM_LOAD_DATA_ERROR</BriefDesc>
+		<DetailedDesc>Error occurred loading DBRM data</DetailedDesc>
+		<Severity>1</Severity>
+		<Threshold>100</Threshold>
+		<Occurrences>0</Occurrences>
+		<LastIssueTime>0</LastIssueTime>		
+	</AlarmConfig27>
+	<AlarmConfig28>
+		<AlarmID>28</AlarmID>
+		<BriefDesc>INVALID_SW_VERSION</BriefDesc>
+		<DetailedDesc>Invalid Software Version found on a module. It doesn't match the version running on the Director Module</DetailedDesc>
+		<Severity>1</Severity>
+		<Threshold>100</Threshold>
+		<Occurrences>0</Occurrences>
+		<LastIssueTime>0</LastIssueTime>		
+	</AlarmConfig28>
+	<AlarmConfig29>
+		<AlarmID>29</AlarmID>
+		<BriefDesc>STARTUP_DIAGNOTICS_FAILURE</BriefDesc>
+		<DetailedDesc>A Failure occurred when the System Startup Diagnostics was executed on a Module. The log files can be viewed for details on the failure.</DetailedDesc>
+		<Severity>1</Severity>
+		<Threshold>100</Threshold>
+		<Occurrences>0</Occurrences>
+		<LastIssueTime>0</LastIssueTime>		
+	</AlarmConfig29>
+	<AlarmConfig30>
+		<AlarmID>30</AlarmID>
+		<BriefDesc>CONN_FAILURE</BriefDesc>
+		<DetailedDesc>A Connection Failure occurred that could affect the performance of the system processing.</DetailedDesc>
+		<Severity>1</Severity>
+		<Threshold>100</Threshold>
+		<Occurrences>0</Occurrences>
+		<LastIssueTime>0</LastIssueTime>		
+	</AlarmConfig30>
+	<AlarmConfig31>
+		<AlarmID>31</AlarmID>
+		<BriefDesc>DBRM_READ_ONLY</BriefDesc>
+		<DetailedDesc>The DBRM is now read-only and updates to the database are not possible.</DetailedDesc>
+		<Severity>1</Severity>
+		<Threshold>100</Threshold>
+		<Occurrences>0</Occurrences>
+		<LastIssueTime>0</LastIssueTime>		
+	</AlarmConfig31>
+	<AlarmConfig32>
+		<AlarmID>32</AlarmID>
+		<BriefDesc>Unassigned</BriefDesc>
+		<DetailedDesc>Unassigned</DetailedDesc>
+		<Severity>0</Severity>
+		<Threshold>0</Threshold>
+		<Occurrences>0</Occurrences>
+		<LastIssueTime>0</LastIssueTime>		
+	</AlarmConfig32>
+	<AlarmConfig33>
+		<AlarmID>33</AlarmID>
+		<BriefDesc>MODULE_SWITCH_ACTIVE</BriefDesc>
+		<DetailedDesc>An outage of Parent OAM Module or the execution of the switchParentOAMModule command initiated a change of the Parent OAM Module.</DetailedDesc>
+		<Severity>1</Severity>
+		<Threshold>100</Threshold>
+		<Occurrences>0</Occurrences>
+		<LastIssueTime>0</LastIssueTime>		
+	</AlarmConfig33>
+	<AlarmConfig34>
+		<AlarmID>34</AlarmID>
+		<BriefDesc>ROLLBACK_FAILURE</BriefDesc>
+		<DetailedDesc>A Database Rollback Failure occurred, Contact Calpont Customer Support.</DetailedDesc>
+		<Severity>1</Severity>
+		<Threshold>100</Threshold>
+		<Occurrences>0</Occurrences>
+		<LastIssueTime>0</LastIssueTime>		
+	</AlarmConfig34>
+	<AlarmConfig35>
+		<AlarmID>35</AlarmID>
+		<BriefDesc>GLUSTER_DISK_FAILURE</BriefDesc>
+		<DetailedDesc>An Error was reported on a Gluster disk copy.</DetailedDesc>
+		<Severity>1</Severity>
+		<Threshold>100</Threshold>
+		<Occurrences>0</Occurrences>
+		<LastIssueTime>0</LastIssueTime>		
+	</AlarmConfig35>
+	<AlarmConfig36>
+		<AlarmID>36</AlarmID>
+		<BriefDesc>INVALID_LOCALE</BriefDesc>
+		<DetailedDesc>An Error was reported on setting system locale.</DetailedDesc>
+		<Severity>1</Severity>
+		<Threshold>100</Threshold>
+		<Occurrences>0</Occurrences>
+		<LastIssueTime>0</LastIssueTime>		
+	</AlarmConfig36>
+</Calpont>

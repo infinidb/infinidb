@@ -1,0 +1,12 @@
+delete from lineitem where l_shipdate between '1992-02-01' and '1992-02-29' and l_orderkey <= 500000000 and l_linestatus = 'X';
+delete from lineitem where l_shipdate between '1992-02-01' and '1992-02-29' and l_orderkey <= 1000000000 and l_linestatus = 'X';
+delete from lineitem where l_shipdate between '1992-02-01' and '1992-02-29' and l_orderkey <= 1500000000 and l_linestatus = 'X';
+delete from lineitem where l_shipdate between '1992-02-01' and '1992-02-29' and l_orderkey <= 2000000000 and l_linestatus = 'X';
+delete from lineitem where l_shipdate between '1992-02-01' and '1992-02-29' and l_orderkey <= 2500000000 and l_linestatus = 'X';
+delete from lineitem where l_shipdate between '1992-02-01' and '1992-02-29' and l_orderkey <= 3000000000 and l_linestatus = 'X';
+delete from lineitem where l_shipdate between '1992-02-01' and '1992-02-29' and l_orderkey <= 3500000000 and l_linestatus = 'X';
+delete from lineitem where l_shipdate between '1992-02-01' and '1992-02-29' and l_orderkey <= 4000000000 and l_linestatus = 'X';
+delete from lineitem where l_shipdate between '1992-02-01' and '1992-02-29' and l_orderkey <= 4500000000 and l_linestatus = 'X';
+delete from lineitem where l_shipdate between '1992-02-01' and '1992-02-29' and l_orderkey <= 5000000000 and l_linestatus = 'X';
+delete from lineitem where l_shipdate between '1992-02-01' and '1992-02-29' and l_orderkey <= 5500000000 and l_linestatus = 'X';
+delete from lineitem where l_shipdate between '1992-02-01' and '1992-02-29' and l_orderkey <= 6000000000 and l_linestatus = 'X';

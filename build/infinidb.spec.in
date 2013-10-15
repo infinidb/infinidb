@@ -1,0 +1,619 @@
+#
+# $Id$
+#
+Summary: Calpont InfiniDB software
+Name: infinidb
+@@VERSION@@
+@@RELEASE@@
+Vendor: Calpont Corp.
+URL: http://www.calpont.com/
+@@PACKAGER@@
+Group: Applications
+License: Copyright (c) 2013 Calpont Corp., all rights reserved
+BuildRoot: %{_tmppath}/%{name}-%{release}-buildroot
+
+%description
+Calpont InfiniDB software meta-package
+
+%package platform
+Summary: Calpont InfiniDB software binaries
+Group: Applications
+Obsoletes: calpont
+Requires: expect, infinidb-libs
+
+%description platform
+Calpont InfiniDB binary files
+@@BUILDINFO@@
+
+%package libs
+Summary: Calpont InfiniDB software libraries
+Group: Applications
+Obsoletes: calpont
+
+%description libs
+Calpont InfiniDB libraries
+
+%package enterprise
+Summary: Calpont InfiniDB Enterprise software binaries
+Group: Applications
+Obsoletes: calpont
+Requires: infinidb-libs, infinidb-platform
+
+%description enterprise
+Calpont InfiniDB Enterprise binary files
+
+%package storage-engine
+Summary: Calpont InfiniDB software MySQL connector
+Group: Applications
+Obsoletes: calpont-mysql
+Requires: infinidb-libs
+
+%description storage-engine
+Calpont InfiniDB MySQL connector binary files
+
+%package mysql
+Summary: Calpont InfiniDB software MySQL server
+Group: Applications
+Obsoletes: calpont-mysqld
+
+%description mysql
+Calpont InfiniDB MySQL 5.1.39 server binary files
+
+%prep
+%define _use_internal_dependency_generator 0
+%define __find_requires %{nil}
+%define __os_install_post %{nil}
+%define debug_package %{nil}
+
+%build
+
+%install
+mkdir -p %{buildroot}/usr/local
+tar -C $RPM_BUILD_DIR/%{name}-%{version}-%{release} -cf - . | tar -C %{buildroot}/usr/local -xf -
+
+%clean
+rm -rf $RPM_BUILD_ROOT $RPM_BUILD_DIR/%{name}-%{version}-%{release}
+
+%changelog
+
+%files platform
+%defattr(-, root, root)
+
+/usr/local/Calpont/bin/DDLProc
+/usr/local/Calpont/bin/ExeMgr
+/usr/local/Calpont/bin/ProcMgr
+/usr/local/Calpont/bin/ProcMon
+/usr/local/Calpont/bin/DMLProc
+/usr/local/Calpont/bin/WriteEngineServer
+/usr/local/Calpont/bin/cpimport
+/usr/local/Calpont/bin/post-install
+/usr/local/Calpont/bin/post-mysql-install
+/usr/local/Calpont/bin/post-mysqld-install
+/usr/local/Calpont/bin/pre-uninstall
+/usr/local/Calpont/bin/PrimProc
+/usr/local/Calpont/bin/DecomSvr
+/usr/local/Calpont/bin/upgrade-infinidb.sh
+/usr/local/Calpont/bin/run.sh
+/usr/local/Calpont/bin/infinidb
+/usr/local/Calpont/bin/calpontSyslog 
+/usr/local/Calpont/bin/calpontSyslog-ng 
+/usr/local/Calpont/bin/syslogSetup.sh
+/usr/local/Calpont/bin/cplogger
+/usr/local/Calpont/bin/install-infinidb.sh
+/usr/local/Calpont/bin/infinidb.def
+/usr/local/Calpont/bin/dbbuilder
+/usr/local/Calpont/bin/cpimport.bin
+/usr/local/Calpont/bin/load_brm
+/usr/local/Calpont/bin/save_brm
+/usr/local/Calpont/bin/dbrmctl
+/usr/local/Calpont/bin/controllernode
+/usr/local/Calpont/bin/reset_locks
+/usr/local/Calpont/bin/workernode
+/usr/local/Calpont/bin/colxml
+/usr/local/Calpont/bin/clearShm
+/usr/local/Calpont/bin/viewtablelock
+/usr/local/Calpont/bin/cleartablelock
+/usr/local/Calpont/bin/calpontConsole
+/usr/local/Calpont/bin/trapHandler
+/usr/local/Calpont/bin/remote_command.sh
+/usr/local/Calpont/bin/postConfigure
+/usr/local/Calpont/bin/calpontLogRotate
+/usr/local/Calpont/bin/transactionLog
+/usr/local/Calpont/bin/calpontDBWrite
+/usr/local/Calpont/bin/transactionLogArchiver.sh
+/usr/local/Calpont/bin/system_installer.sh
+/usr/local/Calpont/bin/installer
+/usr/local/Calpont/bin/module_installer.sh
+/usr/local/Calpont/bin/patchInstaller
+/usr/local/Calpont/bin/patch_installer.sh
+/usr/local/Calpont/bin/xm_installer.sh
+/usr/local/Calpont/bin/calpontUninstall.sh
+/usr/local/Calpont/bin/director_installer.sh
+/usr/local/Calpont/bin/user_installer.sh
+/usr/local/Calpont/bin/performance_installer.sh
+/usr/local/Calpont/bin/startupTests.sh
+/usr/local/Calpont/bin/os_check.sh
+/usr/local/Calpont/bin/sendtrap
+/usr/local/Calpont/bin/remote_scp_put.sh
+/usr/local/Calpont/bin/remotessh.exp
+/usr/local/Calpont/bin/ServerMonitor
+
+#
+%config /usr/local/Calpont/etc/Calpont.xml
+%config /usr/local/Calpont/etc/ConsoleCmds.xml
+%config /usr/local/Calpont/etc/ProcessConfig.xml
+%config /usr/local/Calpont/etc/snmpd.conf
+%config /usr/local/Calpont/etc/snmptrapd.conf
+%config /usr/local/Calpont/etc/Calpont.xml.singleserver
+%config /usr/local/Calpont/etc/ProcessConfig.xml.singleserver
+%config /usr/local/Calpont/etc/snmpd.conf.singleserver
+%config /usr/local/Calpont/etc/snmptrapd.conf.singleserver
+#
+/usr/local/Calpont/etc/MessageFile.txt
+/usr/local/Calpont/etc/ErrorMessage.txt
+#
+%attr(0666, root, root) /usr/local/Calpont/local/module
+#
+/usr/local/Calpont/releasenum
+
+# Tools...
+/usr/local/Calpont/bin/rollback
+/usr/local/Calpont/bin/editem
+/usr/local/Calpont/bin/getConfig
+/usr/local/Calpont/bin/setConfig
+/usr/local/Calpont/bin/setenv-hdfs-12
+/usr/local/Calpont/bin/setenv-hdfs-20
+/usr/local/Calpont/bin/hdfsCheck
+/usr/local/Calpont/bin/configxml.sh
+/usr/local/Calpont/bin/remote_scp_get.sh
+/usr/local/Calpont/bin/calpontAlias
+/usr/local/Calpont/bin/autoConfigure
+/usr/local/Calpont/bin/ddlcleanup
+/usr/local/Calpont/bin/idbmeminfo
+/usr/local/Calpont/bin/IDBInstanceCmds.sh
+/usr/local/Calpont/bin/IDBVolumeCmds.sh
+/usr/local/Calpont/bin/binary_installer.sh 
+
+/usr/local/Calpont/sbin/snmpd
+/usr/local/Calpont/sbin/snmptrapd
+%config %attr(0666, root, root) /usr/local/Calpont/etc/AlarmConfig.xml
+#
+%config /usr/local/Calpont/local/snmpdx.conf
+%config /usr/local/Calpont/local/snmpdx.conf.singleserver
+#
+/usr/local/Calpont/share/snmp/mibs/AGENTX-MIB.txt
+/usr/local/Calpont/share/snmp/mibs/CALPONT-MIB.txt
+/usr/local/Calpont/share/snmp/mibs/DISMAN-EVENT-MIB.txt
+/usr/local/Calpont/share/snmp/mibs/DISMAN-SCHEDULE-MIB.txt
+/usr/local/Calpont/share/snmp/mibs/DISMAN-SCRIPT-MIB.txt
+/usr/local/Calpont/share/snmp/mibs/EtherLike-MIB.txt
+/usr/local/Calpont/share/snmp/mibs/HCNUM-TC.txt
+/usr/local/Calpont/share/snmp/mibs/HOST-RESOURCES-MIB.txt
+/usr/local/Calpont/share/snmp/mibs/HOST-RESOURCES-TYPES.txt
+/usr/local/Calpont/share/snmp/mibs/IANA-ADDRESS-FAMILY-NUMBERS-MIB.txt
+/usr/local/Calpont/share/snmp/mibs/IANAifType-MIB.txt
+/usr/local/Calpont/share/snmp/mibs/IANA-LANGUAGE-MIB.txt
+/usr/local/Calpont/share/snmp/mibs/IANA-RTPROTO-MIB.txt
+/usr/local/Calpont/share/snmp/mibs/IF-INVERTED-STACK-MIB.txt
+/usr/local/Calpont/share/snmp/mibs/IF-MIB.txt
+/usr/local/Calpont/share/snmp/mibs/INET-ADDRESS-MIB.txt
+/usr/local/Calpont/share/snmp/mibs/IP-FORWARD-MIB.txt
+/usr/local/Calpont/share/snmp/mibs/IP-MIB.txt
+/usr/local/Calpont/share/snmp/mibs/IPV6-ICMP-MIB.txt
+/usr/local/Calpont/share/snmp/mibs/IPV6-MIB.txt
+/usr/local/Calpont/share/snmp/mibs/IPV6-TCP-MIB.txt
+/usr/local/Calpont/share/snmp/mibs/IPV6-TC.txt
+/usr/local/Calpont/share/snmp/mibs/IPV6-UDP-MIB.txt
+/usr/local/Calpont/share/snmp/mibs/NET-SNMP-AGENT-MIB.txt
+/usr/local/Calpont/share/snmp/mibs/NET-SNMP-EXAMPLES-MIB.txt
+/usr/local/Calpont/share/snmp/mibs/NET-SNMP-EXTEND-MIB.txt
+/usr/local/Calpont/share/snmp/mibs/NET-SNMP-MIB.txt
+/usr/local/Calpont/share/snmp/mibs/NET-SNMP-TC.txt
+/usr/local/Calpont/share/snmp/mibs/NOTIFICATION-LOG-MIB.txt
+/usr/local/Calpont/share/snmp/mibs/RFC1155-SMI.txt
+/usr/local/Calpont/share/snmp/mibs/RFC1213-MIB.txt
+/usr/local/Calpont/share/snmp/mibs/RFC-1215.txt
+/usr/local/Calpont/share/snmp/mibs/RMON-MIB.txt
+/usr/local/Calpont/share/snmp/mibs/SMUX-MIB.txt
+/usr/local/Calpont/share/snmp/mibs/SNMP-COMMUNITY-MIB.txt
+/usr/local/Calpont/share/snmp/mibs/SNMP-FRAMEWORK-MIB.txt
+/usr/local/Calpont/share/snmp/mibs/SNMP-MPD-MIB.txt
+/usr/local/Calpont/share/snmp/mibs/SNMP-NOTIFICATION-MIB.txt
+/usr/local/Calpont/share/snmp/mibs/SNMP-PROXY-MIB.txt
+/usr/local/Calpont/share/snmp/mibs/SNMP-TARGET-MIB.txt
+/usr/local/Calpont/share/snmp/mibs/SNMP-USER-BASED-SM-MIB.txt
+/usr/local/Calpont/share/snmp/mibs/SNMP-USM-AES-MIB.txt
+/usr/local/Calpont/share/snmp/mibs/SNMP-USM-DH-OBJECTS-MIB.txt
+/usr/local/Calpont/share/snmp/mibs/SNMPv2-CONF.txt
+/usr/local/Calpont/share/snmp/mibs/SNMPv2-MIB.txt
+/usr/local/Calpont/share/snmp/mibs/SNMPv2-SMI.txt
+/usr/local/Calpont/share/snmp/mibs/SNMPv2-TC.txt
+/usr/local/Calpont/share/snmp/mibs/SNMPv2-TM.txt
+/usr/local/Calpont/share/snmp/mibs/SNMP-VIEW-BASED-ACM-MIB.txt
+/usr/local/Calpont/share/snmp/mibs/TCP-MIB.txt
+/usr/local/Calpont/share/snmp/mibs/TRANSPORT-ADDRESS-MIB.txt
+/usr/local/Calpont/share/snmp/mibs/UCD-DEMO-MIB.txt
+/usr/local/Calpont/share/snmp/mibs/UCD-DISKIO-MIB.txt
+/usr/local/Calpont/share/snmp/mibs/UCD-DLMOD-MIB.txt
+/usr/local/Calpont/share/snmp/mibs/UCD-IPFWACC-MIB.txt
+/usr/local/Calpont/share/snmp/mibs/UCD-SNMP-MIB.txt
+/usr/local/Calpont/share/snmp/mibs/UDP-MIB.txt
+#
+/usr/local/Calpont/post/functions
+/usr/local/Calpont/post/test-001.sh
+/usr/local/Calpont/post/test-002.sh
+/usr/local/Calpont/post/test-003.sh
+/usr/local/Calpont/post/test-004.sh
+
+%files enterprise
+%defattr(-, root, root)
+/usr/local/Calpont/bin/displayJobGraph.sh
+/usr/local/Calpont/bin/dbhealth.sh 
+/usr/local/Calpont/bin/dbhealth.sql
+
+# Tools...
+/usr/local/Calpont/bin/dumpcol
+/usr/local/Calpont/bin/oid2file
+/usr/local/Calpont/bin/evalcol
+/usr/local/Calpont/bin/SesMgr
+/usr/local/Calpont/bin/dumpVss
+/usr/local/Calpont/bin/editTxn
+/usr/local/Calpont/bin/dbprof.pl
+/usr/local/Calpont/bin/dumpobm
+/usr/local/Calpont/bin/file2oid.pl
+/usr/local/Calpont/bin/calpontSupport
+/usr/local/Calpont/bin/hardwareReport.sh
+/usr/local/Calpont/bin/softwareReport.sh
+/usr/local/Calpont/bin/configReport.sh
+/usr/local/Calpont/bin/logReport.sh
+/usr/local/Calpont/bin/bulklogReport.sh
+/usr/local/Calpont/bin/resourceReport.sh
+/usr/local/Calpont/bin/hadoopReport.sh
+/usr/local/Calpont/bin/alarmReport.sh
+/usr/local/Calpont/bin/print_journal
+/usr/local/Calpont/bin/rsync.sh
+/usr/local/Calpont/bin/healthcheck
+/usr/local/Calpont/bin/glusterctl
+/usr/local/Calpont/bin/glusteradd
+/usr/local/Calpont/bin/glusterconf
+/usr/local/Calpont/bin/redistributeDB
+/usr/local/Calpont/bin/databaseSizeReport
+/usr/local/Calpont/bin/gdb
+#
+/usr/local/Calpont/tools/copy2here.sh
+/usr/local/Calpont/tools/getlogs.sh
+/usr/local/Calpont/tools/getmodules.sh
+/usr/local/Calpont/tools/getps.sh
+/usr/local/Calpont/tools/getsar.sh
+/usr/local/Calpont/tools/getuserinput.sh
+/usr/local/Calpont/tools/prat
+/usr/local/Calpont/tools/prat.sh
+/usr/local/Calpont/tools/ps
+/usr/local/Calpont/tools/pscollect
+/usr/local/Calpont/tools/README
+/usr/local/Calpont/tools/tarfiles.sh
+#
+%files libs
+%defattr(-, root, root)
+
+/usr/local/Calpont/lib/libconfigcpp.so.1.0.0
+/usr/local/Calpont/lib/libddlpackageproc.so.1.0.0
+/usr/local/Calpont/lib/libddlpackage.so.1.0.0
+/usr/local/Calpont/lib/libdmlpackageproc.so.1.0.0
+/usr/local/Calpont/lib/libdmlpackage.so.1.0.0
+/usr/local/Calpont/lib/libexecplan.so.1.0.0
+/usr/local/Calpont/lib/libfuncexp.so.1.0.0
+/usr/local/Calpont/lib/libudfsdk.so.1.0.0
+/usr/local/Calpont/lib/libjoblist.so.1.0.0
+/usr/local/Calpont/lib/libjoiner.so.1.0.0
+/usr/local/Calpont/lib/libloggingcpp.so.1.0.0
+/usr/local/Calpont/lib/libmessageqcpp.so.1.0.0
+/usr/local/Calpont/lib/libnetsnmpagent.so.5.2.1
+/usr/local/Calpont/lib/libnetsnmphelpers.so.5.2.1
+/usr/local/Calpont/lib/libnetsnmpmibs.so.5.2.1
+/usr/local/Calpont/lib/libnetsnmp.so.5.2.1
+/usr/local/Calpont/lib/libnetsnmptrapd.so.5.2.1
+/usr/local/Calpont/lib/liboamcpp.so.1.0.0
+/usr/local/Calpont/lib/libsnmpmanager.so.1.0.0
+/usr/local/Calpont/lib/libthreadpool.so.1.0.0
+/usr/local/Calpont/lib/libwindowfunction.so.1.0.0
+/usr/local/Calpont/lib/libwriteengine.so.1.0.0
+/usr/local/Calpont/lib/libwriteengineclient.so.1.0.0
+/usr/local/Calpont/lib/libbrm.so.1.0.0
+/usr/local/Calpont/lib/librwlock.so.1.0.0
+/usr/local/Calpont/lib/libdataconvert.so.1.0.0
+/usr/local/Calpont/lib/librowgroup.so.1.0.0
+/usr/local/Calpont/lib/libcacheutils.so.1.0.0
+/usr/local/Calpont/lib/libmulticast.so.1.0.0
+/usr/local/Calpont/lib/libcommon.so.1.0.0
+/usr/local/Calpont/lib/libboost_idb.so.1.0.0
+/usr/local/Calpont/lib/libcompress.so.1.0.0
+/usr/local/Calpont/lib/libddlcleanuputil.so.1.0.0
+/usr/local/Calpont/lib/libbatchloader.so.1.0.0
+/usr/local/Calpont/lib/libmysqlcl_idb.so.1.0.0
+/usr/local/Calpont/lib/libquerystats.so.1.0.0
+/usr/local/Calpont/lib/libwriteengineredistribute.so.1.0.0
+/usr/local/Calpont/lib/libjemalloc.so.3.3.0
+/usr/local/Calpont/lib/libidbdatafile.so.1.0.0
+/usr/local/Calpont/lib/hdfs-20.so
+/usr/local/Calpont/lib/hdfs-12.so
+/usr/local/Calpont/lib/libgcc_s.so.1
+/usr/local/Calpont/lib/libstdc++.so.6.0.14
+
+%files storage-engine
+/usr/local/Calpont/lib/libcalmysql.so.1.0.0
+/usr/local/Calpont/lib/libudf_mysql.so.1.0.0
+
+%files mysql
+/usr/local/Calpont/mysql/lib/mysql/libmysqlclient.so.16.0.0
+/usr/local/Calpont/mysql/lib/mysql/libmysqlclient_r.so.16.0.0
+/usr/local/Calpont/mysql/lib/mysql/plugin/ha_federated.so.0.0.0
+/usr/local/Calpont/mysql/lib/mysql/plugin/ha_blackhole.so.0.0.0
+/usr/local/Calpont/mysql/lib/mysql/plugin/ha_archive.so.0.0.0
+/usr/local/Calpont/mysql/lib/mysql/plugin/ha_innodb.so.0.0.0
+/usr/local/Calpont/mysql/lib/mysql/plugin/ha_innodb_plugin.so.0.0.0
+/usr/local/Calpont/mysql/libexec/mysqlmanager
+/usr/local/Calpont/mysql/libexec/mysqld
+/usr/local/Calpont/mysql/bin/mysql_find_rows
+/usr/local/Calpont/mysql/bin/mysqlbug
+/usr/local/Calpont/mysql/bin/innochecksum
+/usr/local/Calpont/mysql/bin/mysql_secure_installation
+/usr/local/Calpont/mysql/bin/resolve_stack_dump
+/usr/local/Calpont/mysql/bin/my_print_defaults
+/usr/local/Calpont/mysql/bin/mysql_waitpid
+/usr/local/Calpont/mysql/bin/resolveip
+/usr/local/Calpont/mysql/bin/perror
+/usr/local/Calpont/mysql/bin/myisamlog
+/usr/local/Calpont/mysql/bin/mysql
+/usr/local/Calpont/mysql/bin/myisamchk
+/usr/local/Calpont/mysql/bin/mysql_fix_privilege_tables
+/usr/local/Calpont/mysql/bin/mysql_upgrade
+/usr/local/Calpont/mysql/bin/mysqlcheck
+/usr/local/Calpont/mysql/bin/myisampack
+/usr/local/Calpont/mysql/bin/mysql_setpermission
+/usr/local/Calpont/mysql/bin/mysqladmin
+/usr/local/Calpont/mysql/bin/mysqlslap
+/usr/local/Calpont/mysql/bin/mysql_zap
+/usr/local/Calpont/mysql/bin/mysqldump
+/usr/local/Calpont/mysql/bin/mysqld_safe
+/usr/local/Calpont/mysql/bin/mysqlshow
+/usr/local/Calpont/mysql/bin/mysqltest
+/usr/local/Calpont/mysql/bin/mysql_config
+/usr/local/Calpont/mysql/bin/mysql_client_test
+/usr/local/Calpont/mysql/bin/mysqlbinlog
+/usr/local/Calpont/mysql/bin/mysqld_multi
+/usr/local/Calpont/mysql/bin/mysqlaccess
+/usr/local/Calpont/mysql/bin/mysql_install_db
+/usr/local/Calpont/mysql/bin/msql2mysql
+/usr/local/Calpont/mysql/bin/mysqlimport
+/usr/local/Calpont/mysql/bin/replace
+/usr/local/Calpont/mysql/bin/mysql_convert_table_format
+/usr/local/Calpont/mysql/bin/myisam_ftdump
+/usr/local/Calpont/mysql/bin/mysql_tzinfo_to_sql
+/usr/local/Calpont/mysql/bin/mysql_fix_extensions
+/usr/local/Calpont/mysql/bin/mysqldumpslow
+/usr/local/Calpont/mysql/bin/mysqlhotcopy
+/usr/local/Calpont/mysql/share/mysql/config.small.ini
+/usr/local/Calpont/mysql/share/mysql/romanian/errmsg.sys
+/usr/local/Calpont/mysql/share/mysql/korean/errmsg.sys
+/usr/local/Calpont/mysql/share/mysql/norwegian-ny/errmsg.sys
+/usr/local/Calpont/mysql/share/mysql/binary-configure
+/usr/local/Calpont/mysql/share/mysql/french/errmsg.sys
+/usr/local/Calpont/mysql/share/mysql/greek/errmsg.sys
+/usr/local/Calpont/mysql/share/mysql/mysql-log-rotate
+/usr/local/Calpont/mysql/share/mysql/mysql_system_tables_data.sql
+/usr/local/Calpont/mysql/share/mysql/russian/errmsg.sys
+/usr/local/Calpont/mysql/share/mysql/mysql.server
+/usr/local/Calpont/mysql/share/mysql/mi_test_all.res
+/usr/local/Calpont/mysql/share/mysql/danish/errmsg.sys
+/usr/local/Calpont/mysql/share/mysql/portuguese/errmsg.sys
+/usr/local/Calpont/mysql/share/mysql/mysql_fix_privilege_tables.sql
+/usr/local/Calpont/mysql/share/mysql/italian/errmsg.sys
+/usr/local/Calpont/mysql/share/mysql/mi_test_all
+/usr/local/Calpont/mysql/share/mysql/mysql_system_tables.sql
+/usr/local/Calpont/mysql/share/mysql/my-innodb-heavy-4G.cnf
+/usr/local/Calpont/mysql/share/mysql/norwegian/errmsg.sys
+/usr/local/Calpont/mysql/share/mysql/fill_help_tables.sql
+/usr/local/Calpont/mysql/share/mysql/spanish/errmsg.sys
+/usr/local/Calpont/mysql/share/mysql/ndb-config-2-node.ini
+/usr/local/Calpont/mysql/share/mysql/slovak/errmsg.sys
+/usr/local/Calpont/mysql/share/mysql/mysql_test_data_timezone.sql
+/usr/local/Calpont/mysql/share/mysql/czech/errmsg.sys
+/usr/local/Calpont/mysql/share/mysql/english/errmsg.sys
+/usr/local/Calpont/mysql/share/mysql/hungarian/errmsg.sys
+/usr/local/Calpont/mysql/share/mysql/mysqld_multi.server
+/usr/local/Calpont/mysql/share/mysql/estonian/errmsg.sys
+/usr/local/Calpont/mysql/share/mysql/german/errmsg.sys
+/usr/local/Calpont/mysql/share/mysql/errmsg.txt
+/usr/local/Calpont/mysql/share/mysql/swedish/errmsg.sys
+/usr/local/Calpont/mysql/share/mysql/dutch/errmsg.sys
+/usr/local/Calpont/mysql/share/mysql/charsets/cp866.xml
+/usr/local/Calpont/mysql/share/mysql/charsets/hebrew.xml
+/usr/local/Calpont/mysql/share/mysql/charsets/latin2.xml
+/usr/local/Calpont/mysql/share/mysql/charsets/armscii8.xml
+/usr/local/Calpont/mysql/share/mysql/charsets/latin7.xml
+/usr/local/Calpont/mysql/share/mysql/charsets/geostd8.xml
+/usr/local/Calpont/mysql/share/mysql/charsets/latin5.xml
+/usr/local/Calpont/mysql/share/mysql/charsets/swe7.xml
+/usr/local/Calpont/mysql/share/mysql/charsets/keybcs2.xml
+/usr/local/Calpont/mysql/share/mysql/charsets/cp1257.xml
+/usr/local/Calpont/mysql/share/mysql/charsets/macroman.xml
+/usr/local/Calpont/mysql/share/mysql/charsets/cp1251.xml
+/usr/local/Calpont/mysql/share/mysql/charsets/cp1256.xml
+/usr/local/Calpont/mysql/share/mysql/charsets/macce.xml
+/usr/local/Calpont/mysql/share/mysql/charsets/dec8.xml
+/usr/local/Calpont/mysql/share/mysql/charsets/latin1.xml
+/usr/local/Calpont/mysql/share/mysql/charsets/greek.xml
+/usr/local/Calpont/mysql/share/mysql/charsets/cp850.xml
+/usr/local/Calpont/mysql/share/mysql/charsets/hp8.xml
+/usr/local/Calpont/mysql/share/mysql/charsets/cp852.xml
+/usr/local/Calpont/mysql/share/mysql/charsets/koi8r.xml
+/usr/local/Calpont/mysql/share/mysql/charsets/README
+/usr/local/Calpont/mysql/share/mysql/charsets/cp1250.xml
+/usr/local/Calpont/mysql/share/mysql/charsets/koi8u.xml
+/usr/local/Calpont/mysql/share/mysql/charsets/Index.xml
+/usr/local/Calpont/mysql/share/mysql/charsets/ascii.xml
+/usr/local/Calpont/mysql/share/mysql/config.medium.ini
+/usr/local/Calpont/mysql/share/mysql/my-huge.cnf
+/usr/local/Calpont/mysql/share/mysql/polish/errmsg.sys
+/usr/local/Calpont/mysql/share/mysql/my-medium.cnf
+/usr/local/Calpont/mysql/share/mysql/my-large.cnf
+/usr/local/Calpont/mysql/share/mysql/config.huge.ini
+/usr/local/Calpont/mysql/share/mysql/ukrainian/errmsg.sys
+/usr/local/Calpont/mysql/share/mysql/serbian/errmsg.sys
+/usr/local/Calpont/mysql/share/mysql/my-small.cnf
+/usr/local/Calpont/mysql/share/mysql/japanese/errmsg.sys
+/usr/local/Calpont/mysql/mysql-Calpont
+/usr/local/Calpont/mysql/install_calpont_mysql.sh
+/usr/local/Calpont/mysql/syscatalog_mysql.sql
+/usr/local/Calpont/mysql/dumpcat_mysql.sql
+/usr/local/Calpont/mysql/dumpcat.pl
+/usr/local/Calpont/mysql/calsetuserpriority.sql
+/usr/local/Calpont/mysql/calremoveuserpriority.sql
+/usr/local/Calpont/mysql/calshowprocesslist.sql
+
+%config /usr/local/Calpont/mysql/my.cnf
+
+#
+# Scriptlets
+# for an install, pre & post run with $1 set to 1
+# for an erase, preun & postun run with $1 set to 0
+# for an upgrade, pre & post run first, with $1 set to 2 then the _old_ preun & postun run with $1 set to 1
+
+%post platform
+rpmmode=install
+if  [ "$1" -eq "$1" 2> /dev/null ]; then
+	if [ $1 -ne 1 ]; then
+		rpmmode=upgrade
+	fi
+fi
+
+prefix=/usr/local
+
+test -x /usr/local/Calpont/bin/post-install && /usr/local/Calpont/bin/post-install --prefix=$prefix --rpmmode=$rpmmode
+
+echo "Calpont RPM install completed"
+
+%post libs
+rpmmode=install
+if  [ "$1" -eq "$1" 2> /dev/null ]; then
+	if [ $1 -ne 1 ]; then
+		rpmmode=upgrade
+	fi
+fi
+
+prefix=/usr/local
+
+echo "Calpont RPM install completed"
+
+%post storage-engine
+rpmmode=install
+if  [ "$1" -eq "$1" 2> /dev/null ]; then
+	if [ $1 -ne 1 ]; then
+		rpmmode=upgrade
+	fi
+fi
+
+prefix=/usr/local
+
+echo "Calpont RPM install completed"
+
+%post mysql
+rpmmode=install
+if  [ "$1" -eq "$1" 2> /dev/null ]; then
+	if [ $1 -ne 1 ]; then
+		rpmmode=upgrade
+	fi
+fi
+
+prefix=/usr/local
+
+echo "Calpont RPM install completed"
+
+%post enterprise
+rpmmode=install
+if  [ "$1" -eq "$1" 2> /dev/null ]; then
+	if [ $1 -ne 1 ]; then
+		rpmmode=upgrade
+	fi
+fi
+
+prefix=/usr/local
+
+echo "Calpont RPM install completed"
+
+%preun platform
+rpmmode=upgrade
+if  [ "$1" -eq "$1" 2> /dev/null ]; then
+	if [ $1 -ne 1 ]; then
+		rpmmode=erase
+	fi
+else
+	rpmmode=erase
+fi
+
+if [ $rpmmode = erase ]; then
+	test -x /usr/local/Calpont/bin/pre-uninstall && /usr/local/Calpont/bin/pre-uninstall
+fi
+
+exit 0
+
+%preun libs
+rpmmode=upgrade
+if  [ "$1" -eq "$1" 2> /dev/null ]; then
+	if [ $1 -ne 1 ]; then
+		rpmmode=erase
+	fi
+else
+	rpmmode=erase
+fi
+
+exit 0
+
+%preun storage-engine
+rpmmode=upgrade
+if  [ "$1" -eq "$1" 2> /dev/null ]; then
+	if [ $1 -ne 1 ]; then
+		rpmmode=erase
+	fi
+else
+	rpmmode=erase
+fi
+
+exit 0
+
+%preun enterprise
+rpmmode=upgrade
+if  [ "$1" -eq "$1" 2> /dev/null ]; then
+	if [ $1 -ne 1 ]; then
+		rpmmode=erase
+	fi
+else
+	rpmmode=erase
+fi
+
+exit 0
+
+%preun mysql
+rpmmode=upgrade
+if  [ "$1" -eq "$1" 2> /dev/null ]; then
+	if [ $1 -ne 1 ]; then
+		rpmmode=erase
+	fi
+else
+	rpmmode=erase
+fi
+
+if [ $rpmmode = erase ]; then
+	/etc/init.d/mysql-Calpont stop > /dev/null 2>&1
+	if [ -x /sbin/chkconfig ]; then
+		/sbin/chkconfig mysql-Calpont off > /dev/null 2>&1
+		/sbin/chkconfig --del mysql-Calpont > /dev/null 2>&1
+	elif [ -x /usr/sbin/update-rc.d ]; then
+		/usr/sbin/update-rc.d -f mysql-Calpont remove > /dev/null 2>&1
+	fi
+	rm -f /etc/init.d/mysql-Calpont
+fi
+
+exit 0
+

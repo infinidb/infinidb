@@ -1,0 +1,42 @@
+PRAT - Platform Run Analysis Tool
+
+
+Overview
+--------
+
+The PRAT utility is a set of shell scripts designed to collect system activity
+and performance data so that it can be made available to Calpont Customer Support.
+Run under the supervision of Calpont support personnel, the utility will prompt the user
+for the start and stop times of a period where the performance of an individual query or
+the overall system is an issue.  PRAT will collect data from each of the hosts in a
+particular Calpont installation and puts it into a format that can easily be 
+transmitted to Calpont.
+
+PRAT is installed with the Calpont InfiniDB application.  Automated processes that collect system activity 
+(i.e. the "ps" command) are also installed with the Calpont InfiniDB application.  Finally,the PRAT utility 
+relies upon the presence of the sysstat rpm package (see the Calpont InfiniDB Installation Guide).
+
+
+Usage Instructions
+------------------
+
+To use the PRAT utility, the user must execute the main PRAT script from the Calpont
+tools directory:
+
+/usr/local/Calpont/tools/prat.sh
+
+The user will then be prompted for the two digit day of the month of the time period in 
+question.  The user will also be prompted for the start and end times of the time period
+under study (in the format of "hh:mm").
+
+Once the time frame data is provided, the user will then be asked for the root password for 
+each host in the Calpont installation.
+
+The utility will then collect all the pertinent data necessary to provide an analysis of
+the overall system state and performance for the query or time period in question.  This
+data is collected in the data directory under the tools directory in the form of tar files.
+There is one tar file for each host in the installation and these files are then in turn
+sent to Calpont support personnel for analysis.
+
+
+

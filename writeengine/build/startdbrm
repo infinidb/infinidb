@@ -1,0 +1,2 @@
+nohup controlernode   &
+nohup workernode DBRM_Worker1  &

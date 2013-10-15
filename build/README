@@ -1,0 +1,74 @@
+How it Works Now
+----------------
+
+There is a new toplevel directory called build.  This contains a
+couple of scripts and a couple of previously (as far as I can tell)
+unmanaged files: Calpont.xml and Doxyfile.  It also contains a
+top-level Makefile and a rules.tmpl, which is a template rules file
+for other makefiles to include.  More on that later.
+
+After doing an updateGenii.pl, you do the following from the top of
+your development tree, which, more or less has to be genii in
+conformance with updateGenii.pl. (I'm not particularly happy with what
+we are doing with updateGenii.pl, but, it is the prevailing custom and
+these changes assume its use).
+
+0. cd $HOME/genii.
+
+1. build/bootstrap
+
+   This does the following:
+
+   a. creates export/bin,lib,share,etc,include
+
+   b. Copies static elements into the export tree.  Static elements
+      are things we use but either don't build or don't build
+      routinely.  This includes Doxyfile, Calpont.xml and
+      net-snmp components.
+
+   c. Generates a rules.mak from build/build/rules.tmpl to pwd (which
+      is supposed to be the top of your development tree).  rules.mak
+      includes shared variables used by many other makefiles, mostly
+      in install rules.  In particular, it defines TOP, which is how
+      build processes find the export tree.  Makefiles that use this
+      have a hard-coded path to rules.mak.  These hard-coded paths can
+      be automatically reset via build/setmktop.
+
+   d. Runs make bootstrap for components that need to export headers.
+      bootstrap rules usually just copy LINCLUDES (headers that need
+      to be shared with other components) to export/include.
+
+2. Now you can type make in the various component areas or use the
+   top-level Makefile installed by bootstrap.
+
+   The order specified in the buildbot configuration is:
+
+   a. utils
+   b. snmpd
+   c. oam
+   d. dbcon
+--------------
+   e. emulator
+   f. mysql
+   g. exemgr
+   h. procmon
+   i. procmgr
+
+3. There is a top-level build/Makefile to support development build
+   activities.  It is not part of the formal nightly build.  The
+   buildbot setup orchestrates component builds via component specific
+   builders.  Developers may want to use this.  cp build/Makefile
+   $HOME/genii or use make -f.
+
+   For example you can try make scratch to build everything including
+   test, coverage, etc., or make compile to just try the build part.
+   It's a simple makefile, you can read it if you want to.
+
+4. Note that while we no longer install files into /usr/local/Calpont,
+   the old install targets are retained as the mechanism for copying
+   programs and libraries into the export tree.  Install targets do
+   not operate on header files.  This is taken care of by the
+   bootstrap target.
+
+5. Following a build, a bunch of output products should be in
+   genii/export.

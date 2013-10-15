@@ -1,0 +1,85 @@
+CALPONT-MIB DEFINITIONS ::= BEGIN
+IMPORTS ucdExperimental, ucdavis FROM UCD-SNMP-MIB;
+--IMPORTS ucdavis FROM UCD-SNMP-MIB;
+
+-- v1 trap
+demotraps OBJECT IDENTIFIER ::= { ucdExperimental 990 }
+
+demo-trap TRAP-TYPE
+	STATUS current
+	ENTERPRISE demotraps
+	VARIABLES { sysLocation }
+	DESCRIPTION "This is just a demo"
+	::= 17
+
+-- v2 trap
+calpont-trap OBJECT IDENTIFIER ::= { ucdavis 991 }
+
+--alarm NOTIFICATION-TYPE
+--	STATUS current
+--	DESCRIPTION "Calpont alarm notification"
+--        ::= { demonotifs 17 }
+
+-- alarmData contains alarm info of all the following
+-- fields, which in the same format of agent trap alarm
+-- data as: CALALARM-alarmID-comID-state-pname-pid-tid
+-- this is to easy the trap handler processing
+-- the individual fields are for the future snmp get/set to work
+
+alarmData OBJECT-TYPE
+	SYNTAX	DisplayString
+    MAX-ACCESS	accessible-for-notify
+	STATUS current
+	DESCRIPTION "Fault component ID"
+        ::= { calpont-trap 17 }
+
+componentID OBJECT-TYPE
+	SYNTAX	DisplayString
+    MAX-ACCESS	accessible-for-notify
+	STATUS current
+	DESCRIPTION "Fault component ID"
+        ::= { calpont-trap 18 }
+        
+alarmID NOTIFICATION-TYPE
+	SYNTAX	Integer32
+    MAX-ACCESS	accessible-for-notify
+	STATUS current
+	DESCRIPTION "alarm ID"
+        ::= { calpont-trap 19 }        
+
+state NOTIFICATION-TYPE
+	SYNTAX	Integer32
+    MAX-ACCESS	accessible-for-notify
+	STATUS current
+	DESCRIPTION "set or clear"
+        ::= { calpont-trap 20 }   
+
+sname NOTIFICATION-TYPE
+	SYNTAX	DisplayString
+    MAX-ACCESS	accessible-for-notify
+	STATUS current
+	DESCRIPTION "Reporting Server Name"
+        ::= { calpont-trap 21 }
+        
+pname NOTIFICATION-TYPE
+	SYNTAX	DisplayString
+    MAX-ACCESS	accessible-for-notify
+	STATUS current
+	DESCRIPTION "Reporting Process Name"
+        ::= { calpont-trap 22 }
+        
+pid NOTIFICATION-TYPE
+	SYNTAX	Integer32
+    MAX-ACCESS	accessible-for-notify
+	STATUS current
+	DESCRIPTION "Process ID"
+        ::= { calpont-trap 23 }
+        
+tid NOTIFICATION-TYPE
+	SYNTAX	Integer32
+    MAX-ACCESS	accessible-for-notify
+	STATUS current
+	DESCRIPTION "Thread ID"
+        ::= { calpont-trap 24 }
+                   
+END

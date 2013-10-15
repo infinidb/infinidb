@@ -1,0 +1,7 @@
+# Calpont Database Platform Logging
+local1.=crit -/var/log/Calpont/crit.log
+local1.=err -/var/log/Calpont/err.log
+local1.=warning -/var/log/Calpont/warning.log
+local1.=info -/var/log/Calpont/info.log
+local1.=debug -/var/log/Calpont/debug.log
+local2.=crit -/var/log/Calpont/data/data_mods.log

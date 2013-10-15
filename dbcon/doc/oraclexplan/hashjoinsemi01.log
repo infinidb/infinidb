@@ -1,0 +1,109 @@
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: JLOWE
+Search_columns: 
+Projection: C.C_CUSTKEY^C_NAME
+Object_name: CUSTOMER
+Alias: C@SEL$1
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$5DA710D3
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: JLOWE
+Search_columns: 
+Projection: C_CUSTKEY
+Object_name: CUSTOMER
+Alias: CUSTOMER@SEL$2
+Extended_information:    FP:C_NAME='KING'
+Access_predicates: 
+Filter_predicates: C_NAME='KING'
+Select_level: SEL$5DA710D3
+--------------------
+Operation: hash join
+Options: SEMI
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  C_NAME
+Object_name: 
+Alias: 
+Extended_information:    AP:C.C_CUSTKEY=C_CUSTKEY
+Access_predicates: C.C_CUSTKEY=C_CUSTKEY
+Filter_predicates: 
+Select_level: SEL$5DA710D3
+--------------------
+Operation: select statement
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection: 
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+TOKEN: <C_NAME='KING'>
+TOKEN: <C_NAME='KING'>
+TOKEN: <C.C_CUSTKEY=C_CUSTKEY>
+TOKEN: <C.C_CUSTKEY=C_CUSTKEY>
+Operator: (
+SimpleFilter
+  SimpleColumn tpch.CUSTOMER.C_NAME
+  s/t/c/T/A/RA: tpch/CUSTOMER/C_NAME/9/C/0
+  Operator: =  ConstantColumn: KING(l)
+Operator: )
+Operator: and
+Operator: (
+SimpleFilter
+  SimpleColumn tpch.CUSTOMER.C_CUSTKEY
+  s/t/c/T/A/RA: tpch/CUSTOMER/C_CUSTKEY/8/C/0
+  Operator: =  SimpleColumn tpch.CUSTOMER.C_CUSTKEY
+  s/t/c/T/A/RA: tpch/CUSTOMER/C_CUSTKEY/8/C/0
+
+Operator: )
+C_CUSTKEY: SimpleColumn tpch.CUSTOMER.C_CUSTKEY
+  s/t/c/T/A/RA: tpch/CUSTOMER/C_CUSTKEY/8/C/0
+
+C_CUSTKEY: SimpleColumn tpch.CUSTOMER.C_CUSTKEY
+  s/t/c/T/A/RA: tpch/CUSTOMER/C_CUSTKEY/8/CUSTOMER/0
+
+C_NAME: SimpleColumn tpch.CUSTOMER.C_NAME
+  s/t/c/T/A/RA: tpch/CUSTOMER/C_NAME/9/C/0
+
+>SELECT MAIN
+>>Returned Columns
+SimpleColumn tpch.CUSTOMER.C_NAME
+  s/t/c/T/A/RA: tpch/CUSTOMER/C_NAME/9/C/0
+
+>>Filters
+SimpleFilter
+  SimpleColumn tpch.CUSTOMER.C_NAME
+  s/t/c/T/A/RA: tpch/CUSTOMER/C_NAME/9/C/0
+  Operator: =  ConstantColumn: KING(l)
+SimpleFilter
+  SimpleColumn tpch.CUSTOMER.C_CUSTKEY
+  s/t/c/T/A/RA: tpch/CUSTOMER/C_CUSTKEY/8/C/0
+  Operator: =  SimpleColumn tpch.CUSTOMER.C_CUSTKEY
+  s/t/c/T/A/RA: tpch/CUSTOMER/C_CUSTKEY/8/C/0
+
+Operator: and
+SessionID: 233
+TxnID: 33
+VerID: 33
+--- Column Map ---
+C_CUSTKEY : 0x8ff5c00
+C_CUSTKEY : 0x902ac50
+C_NAME : 0x902ac20
+

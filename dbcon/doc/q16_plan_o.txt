@@ -1,0 +1,147 @@
+Q16
+select 
+    p_brand, 
+    p_type, 
+    p_size, 
+    count(distinct ps_suppkey) as supplier_cnt 
+from 
+    partsupp, 
+    part 
+where 
+    p_partkey = ps_partkey 
+    and p_brand <> 'Brand#45' 
+    and p_type not like 'MEDIUM POLISHED%' 
+    and p_size in (49, 14, 23, 45, 19, 3, 36, 9) 
+    and ps_suppkey not in (
+        select 
+            s_suppkey 
+        from 
+            supplier 
+        where 
+            s_comment like '%Customer%Complaints%'
+      ) 
+group by 
+    p_brand, 
+    p_type, 
+    p_size 
+order by 
+    supplier_cnt desc, 
+    p_brand, 
+    p_type, 
+    p_size;
+
+Oracle Execution Plan
+
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: PS_PARTKEY^PS_SUPPKEY
+Object_name: PARTSUPP
+Alias: PARTSUPP@SEL$1
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$1
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: P_PARTKEY^P_BRAND^P_TYPE^P_SIZE
+Object_name: PART
+Alias: PART@SEL$1
+Extended_information:    FP:(P_SIZE=3 OR P_SIZE=9 OR P_SIZE=14 OR P_SIZE=19 OR P_SIZE=23 OR P_SIZE=36 OR P_SIZE=45 OR P_SIZE=49) AND P_BRAND<>'Brand#45' AND P_TYPE NOT LIKE 'MEDIUM POLISHED%'
+Access_predicates: 
+Filter_predicates: (P_SIZE=3|P_SIZE=9|P_SIZE=14|P_SIZE=19|P_SIZE=23|P_SIZE=36|P_SIZE=45|P_SIZE=49)&P_BRAND<>'Brand#45'&P_TYPE NOT LIKE 'MEDIUM POLISHED%'
+Select_level: SEL$1
+--------------------
+Operation: hash join
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  PS_SUPPKEY^P_SIZE^P_BRAND^P_TYPE
+Object_name: 
+Alias: 
+Extended_information:    AP:P_PARTKEY=PS_PARTKEY
+Access_predicates: P_PARTKEY=PS_PARTKEY
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: S_SUPPKEY^S_COMMENT
+Object_name: SUPPLIER
+Alias: SUPPLIER@SEL$2
+Extended_information:    FP:S_COMMENT LIKE '%Customer%Complaints%' AND LNNVL(S_SUPPKEY<>:B1)
+Access_predicates: 
+Filter_predicates: S_COMMENT LIKE '%Customer%Complaints%'&LNNVL(S_SUPPKEY<>:B1)
+Select_level: SEL$2
+--------------------
+Operation: filter
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection: PS_SUPPKEY^P_SIZE^P_BRAND^P_TYPE
+Object_name: 
+Alias: 
+Extended_information:    FP: NOT EXISTS (SELECT /*+ */ 0 FROM SUPPLIER SUPPLIER WHERE S_COMMENT LIKE '%Customer%Complaints%' AND LNNVL(S_SUPPKEY<>:B1))
+Access_predicates: 
+Filter_predicates:  NOT EXISTS (SELECT /*+ */ 0 FROM SUPPLIER SUPPLIER WHERE S_COMMENT LIKE '%Customer%Complaints%'&LNNVL(S_SUPPKEY<>:B1))
+Select_level: 
+--------------------
+Operation: sort
+Options: GROUP BY
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  P_BRAND^P_TYPE^P_SIZE^COUNT(DISTINCT PS_SUPPKEY)
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: sort
+Options: ORDER BY
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  COUNT(DISTINCT PS_SUPPKEY)^P_BRAND^P_TYPE^P_SIZE
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$1
+--------------------
+Operation: select statement
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection: 
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+

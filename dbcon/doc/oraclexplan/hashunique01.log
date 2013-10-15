@@ -1,0 +1,58 @@
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: JLOWE
+Search_columns: 
+Projection: O_CUSTKEY
+Object_name: ORDERS
+Alias: ORDERS@SEL$1
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$1
+--------------------
+Operation: hash
+Options: UNIQUE
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  O_CUSTKEY
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$1
+--------------------
+Operation: select statement
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection: 
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+O_CUSTKEY: SimpleColumn tpch.ORDERS.O_CUSTKEY
+  s/t/c/T/A/RA: tpch/ORDERS/O_CUSTKEY/17/ORDERS/0
+
+>SELECT MAIN
+>>Returned Columns
+SimpleColumn tpch.ORDERS.O_CUSTKEY
+  s/t/c/T/A/RA: tpch/ORDERS/O_CUSTKEY/17/ORDERS/0
+
+>>Filters
+empty filter tree
+SessionID: 257
+TxnID: 45
+VerID: 45
+--- Column Map ---
+O_CUSTKEY : 0x88d3c00
+

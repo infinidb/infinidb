@@ -1,0 +1,89 @@
+set PROMPT "(\\$|#) "
+
+proc auto_ssh_command { username password server commandstr } {
+	global PROMPT
+
+	# 
+	# send command
+	#
+	send "ssh -t $username@$server $commandstr\n"
+	expect {
+		-re "Host key verification failed" { send_user "FAILED: Host key verification failed\n" ; exit 1}
+		-re "service not known"    { send_user "           FAILED: Invalid Host\n" ; exit 1}
+		-re "ssh: connect to host" { send_user "           FAILED: Invalid Host\n" ; exit 1 }
+		-re "Connection refused"   { send_user "ERROR: Connection refused\n" ; exit 1 }
+		-re "closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
+		-re "authenticity" { send "yes\n" 
+			expect {
+			 	-re "word: " { send "$password\n" } abort
+				-re "passphrase" { send "$password\n" } abort
+			}
+		}
+		-re "word: " { send "$password\n" } abort
+		-re "passphrase" { send "$password\n" } abort
+	}
+
+	set needsudopwd 0
+	expect {
+		-re $PROMPT { exit 0 }
+		-re "Permission denied, please try again" { send_user "           FAILED: Invalid password\n" ; exit 1 }
+		-re ": Permission denied" { send_user "           FAILED: Privilege error\n" ; exit 1 }
+		-re "(y or n)"  { send "y\n" 
+			expect -re $PROMPT { exit 0 }
+		}
+		-re "sudo\\] password for $username: " { 
+			send "$password\n";
+			set needsudopwd 1
+		} abort
+	}
+
+	if {$needsudopwd} {
+		expect {
+			-re $PROMPT { exit 0 }
+			-re "try again" { send_user "           FAILED: Invalid sudo password\n" ; exit 1 }			
+		}
+	}
+}
+
+proc auto_scp_command { username password server srcpath destpath } {
+	global PROMPT
+	send "scp $srcpath  $username@$server:$destpath\n"
+	expect {
+		-re "Host key verification failed" { send_user "FAILED: Host key verification failed\n" ; exit 1}
+		-re "service not known"    { send_user "           FAILED: Invalid Host\n" ; exit 1}
+		-re "ssh: connect to host" { send_user "           FAILED: Invalid Host\n" ; exit 1 }
+		-re "Connection refused"   { send_user "ERROR: Connection refused\n" ; exit 1 }
+		-re "closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
+		-re "authenticity" { send "yes\n" 
+			expect {
+			 	-re "word: " { send "$password\n" } abort
+				-re "passphrase" { send "$password\n" } abort
+			}
+		}
+		-re "word: " { send "$password\n" } abort
+		-re "passphrase" { send "$password\n" } abort
+	}
+
+	expect {
+		-re $PROMPT { exit 0 }
+		-re "Permission denied, please try again" { send_user "           FAILED: Invalid password\n" ; exit 1 }
+		-re ": Permission denied" { send_user "           FAILED: Privilege error\n" ; exit 1 }
+		-re "(y or n)"  { send "y\n" 
+			expect -re $PROMPT { exit 0 }
+		}
+	}
+
+	set timeout 30
+	expect {
+		-re "100%" 				{ send_user "DONE" } abort
+		-re "directory"  				{ send_user "ERROR\n" ; 
+					 			send_user "\n*** Installation ERROR\n" ; 
+								exit 1 }
+		-re "Permission denied, please try again"         { send_user "ERROR: Invalid password\n" ; exit 1 }
+		-re "No such file or directory" { send_user "ERROR: Invalid package\n" ; exit 1 }
+	}
+
+	send_user "\n"
+	# sleep to make sure it's finished
+	sleep 5
+}

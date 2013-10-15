@@ -1,0 +1,11 @@
+These files are verbatim copies from Boost 1.52.0. Only the files
+pertinent to InfiniDB are included, however. This should be all
+of the thread, filesystem, regex and date_time libraries, as well
+as most of the header-only code.
+
+All of the code here retains its original copyright and is
+included only for the convenience of compiling InfiniDB without
+having to locate and install a Boost 1.52.0 development package.
+
+See http://www.boost.org/ for a complete 1.52.0 source distribution.
+

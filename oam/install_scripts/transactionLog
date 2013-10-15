@@ -1,0 +1,12 @@
+#
+# Calpont version with Daily running at midnight
+#
+
+SHELL=/bin/bash
+PATH=/sbin:/bin:/usr/sbin:/usr/bin
+MAILTO=root
+HOME=/
+
+# Translation Log Archiver, default to every 10 minutes
+*/10 * * * * root /usr/local/Calpont/bin/transactionLogArchiver.sh
+

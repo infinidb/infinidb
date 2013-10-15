@@ -1,0 +1,60 @@
+Demo 1
+select l_shipdate from lineitem where l_quantity = 1 and l_discount = 0;               
+
+Oracle Execution Plan
+
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: L_SHIPDATE
+Object_name: LINEITEM
+Alias: LINEITEM@SEL$1
+Extended_information:    FP:L_QUANTITY=1 AND L_DISCOUNT=0
+Access_predicates: 
+Filter_predicates: L_QUANTITY=1&L_DISCOUNT=0
+Select_level: SEL$1
+--------------------
+Operation: select statement
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection: 
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+
+Calpont Execution Plan
+
+>SELECT MAIN
+>>Returned Columns
+1. SimpleColumn tpch.LINEITEM.L_SHIPDATE
+  s/t/c/T/A: tpch/LINEITEM/L_SHIPDATE/35/LINEITEM
+
+>>Filters
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_QUANTITY
+  s/t/c/T/A: tpch/LINEITEM/L_QUANTITY/29/
+  Operator: =  ConstantColumn: 1(n)
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_DISCOUNT
+  s/t/c/T/A: tpch/LINEITEM/L_DISCOUNT/31/
+  Operator: =  ConstantColumn: 0(n)
+Operator: AND
+SessionID: 5000
+TxnID: 407
+VerID: 407
+
+--- Column Map ---
+L_DISCOUNT : 0x9849140
+L_QUANTITY : 0x9844758
+L_SHIPDATE : 0x9849650
+

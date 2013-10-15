@@ -1,0 +1,54 @@
+# assume these are set in users .bashrc
+# export JAVA_HOME=/usr/lib/jvm/java-6-sun
+# export HADOOP_HOME=/usr/local/hadoop
+export LD_LIBRARY_PATH=/usr/local/lib:/usr/lib64/:$JAVA_HOME/jre/lib/amd64/server:$LD_LIBRARY_PATH
+# export PATH=/usr/local/hadoop/bin:$PATH
+
+# Manipulate HADOOP_CONF_DIR too
+# which is necessary to circumvent bin/hadoop
+# HADOOP_CONF_DIR=$HADOOP_CONF_DIR:$HADOOP_HOME/conf
+HADOOP_LIBEXEC_DIR=/usr/lib/hadoop/libexec
+. $HADOOP_LIBEXEC_DIR/hadoop-config.sh
+
+# CLASSPATH initially contains $HADOOP_CONF_DIR
+CLASSPATH="${HADOOP_CONF_DIR}"
+CLASSPATH=${CLASSPATH}:$JAVA_HOME/lib/tools.jar
+
+# so that filenames w/ spaces are handled correctly in loops below
+IFS=
+
+# tarball layout
+if [ -d "$HADOOP_HOME/webapps" ]; then
+  CLASSPATH=${CLASSPATH}:$HADOOP_HOME
+fi
+
+for f in $HADOOP_HOME/hadoop-core-*.jar; do
+  CLASSPATH=${CLASSPATH}:$f;
+done
+
+for f in $HADOOP_HOME/lib/*.jar; do
+  CLASSPATH=${CLASSPATH}:$f;
+done
+
+if [ -d "$HADOOP_HOME/build/ivy/lib/Hadoop/common" ]; then
+  for f in $HADOOP_HOME/build/ivy/lib/Hadoop/common/*.jar; do
+    CLASSPATH=${CLASSPATH}:$f;
+  done
+fi
+
+for f in $HADOOP_HOME/lib/jsp-2.1/*.jar; do
+  CLASSPATH=${CLASSPATH}:$f;
+done
+
+for f in $HADOOP_HOME/hadoop-tools-*.jar; do
+  TOOL_PATH=${TOOL_PATH}:$f;
+done
+for f in $HADOOP_HOME/build/hadoop-tools-*.jar; do
+  TOOL_PATH=${TOOL_PATH}:$f;
+done
+
+# restore ordinary behaviour
+unset IFS
+
+export CLASSPATH=$CLASSPATH
+

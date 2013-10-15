@@ -1,0 +1,75 @@
+Demo 2
+select l_partkey from lineitem
+where l_quantity = 5 
+      and l_discount = 0
+      and l_linestatus = 'F'
+      and l_returnflag = 'N';
+
+Oracle Execution Plan
+
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: L_PARTKEY
+Object_name: LINEITEM
+Alias: LINEITEM@SEL$1
+Extended_information:    FP:L_QUANTITY=5 AND L_DISCOUNT=0 AND L_LINESTATUS='F' AND L_RETURNFLAG='N'
+Access_predicates: 
+Filter_predicates: L_QUANTITY=5&L_DISCOUNT=0&L_LINESTATUS='F'&L_RETURNFLAG='N'
+Select_level: SEL$1
+--------------------
+Operation: select statement
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection: 
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+
+Calpont Execution Plan
+
+>SELECT MAIN
+>>Returned Columns
+1. SimpleColumn tpch.LINEITEM.L_PARTKEY
+  s/t/c/T/A: tpch/LINEITEM/L_PARTKEY/26/LINEITEM
+
+>>Filters
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_QUANTITY
+  s/t/c/T/A: tpch/LINEITEM/L_QUANTITY/29/
+  Operator: =  ConstantColumn: 5(n)
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_DISCOUNT
+  s/t/c/T/A: tpch/LINEITEM/L_DISCOUNT/31/
+  Operator: =  ConstantColumn: 0(n)
+Operator: AND
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_LINESTATUS
+  s/t/c/T/A: tpch/LINEITEM/L_LINESTATUS/34/
+  Operator: =  ConstantColumn: F(l)
+Operator: AND
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_RETURNFLAG
+  s/t/c/T/A: tpch/LINEITEM/L_RETURNFLAG/33/
+  Operator: =  ConstantColumn: N(l)
+Operator: AND
+SessionID: 5002
+TxnID: 408
+VerID: 408
+--- Column Map ---
+L_DISCOUNT : 0xa171888
+L_LINESTATUS : 0xa171928
+L_PARTKEY : 0xa151de8
+L_QUANTITY : 0xa158748
+L_RETURNFLAG : 0xa1719e0
+

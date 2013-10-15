@@ -1,0 +1,340 @@
+Q1
+select
+	n_name,
+	sum(l_extendedprice * (1 - l_discount)) as revenue
+from
+	customer,
+	orders,
+	lineitem,
+	supplier,
+	nation,
+	region
+where
+	c_custkey = o_custkey
+	and l_orderkey = o_orderkey
+	and l_suppkey = s_suppkey
+	and c_nationkey = s_nationkey
+	and s_nationkey = n_nationkey
+	and n_regionkey = r_regionkey
+	and r_name = 'ASIA'
+	and o_orderdate >= date '1994-01-01'
+	and o_orderdate < date '1994-01-01' + interval '1' year
+group by
+	n_name
+order by
+	revenue desc;
+	
+Oracle Execution Plan
+	
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: C_CUSTKEY^C_NATIONKEY
+Object_name: CUSTOMER
+Alias: CUSTOMER@SEL$1
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$1
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: O_ORDERKEY^O_CUSTKEY
+Object_name: ORDERS
+Alias: ORDERS@SEL$1
+Extended_information:    FP:O_ORDERDATE>=TO_DATE('1994-01-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss') AND O_ORDERDATE<TO_DATE('1995-01-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss')
+Access_predicates: 
+Filter_predicates: O_ORDERDATE>=TO_DATE('1994-01-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss')&O_ORDERDATE<TO_DATE('1995-01-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss')
+Select_level: SEL$1
+--------------------
+Operation: hash join
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  C_NATIONKEY^O_ORDERKEY
+Object_name: 
+Alias: 
+Extended_information:    AP:C_CUSTKEY=O_CUSTKEY
+Access_predicates: C_CUSTKEY=O_CUSTKEY
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: L_ORDERKEY^L_SUPPKEY^L_EXTENDEDPRICE^L_DISCOUNT
+Object_name: LINEITEM
+Alias: LINEITEM@SEL$1
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$1
+--------------------
+Operation: hash join
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  C_NATIONKEY^L_DISCOUNT^L_SUPPKEY^L_EXTENDEDPRICE
+Object_name: 
+Alias: 
+Extended_information:    AP:L_ORDERKEY=O_ORDERKEY
+Access_predicates: L_ORDERKEY=O_ORDERKEY
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: S_SUPPKEY^S_NATIONKEY
+Object_name: SUPPLIER
+Alias: SUPPLIER@SEL$1
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$1
+--------------------
+Operation: hash join
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  S_NATIONKEY^L_EXTENDEDPRICE^L_DISCOUNT
+Object_name: 
+Alias: 
+Extended_information:    AP:L_SUPPKEY=S_SUPPKEY AND C_NATIONKEY=S_NATIONKEY
+Access_predicates: L_SUPPKEY=S_SUPPKEY&C_NATIONKEY=S_NATIONKEY
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: N_NATIONKEY^N_NAME^N_REGIONKEY
+Object_name: NATION
+Alias: NATION@SEL$1
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$1
+--------------------
+Operation: hash join
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  L_DISCOUNT^L_EXTENDEDPRICE^N_REGIONKEY^N_NAME
+Object_name: 
+Alias: 
+Extended_information:    AP:S_NATIONKEY=N_NATIONKEY
+Access_predicates: S_NATIONKEY=N_NATIONKEY
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: R_REGIONKEY
+Object_name: REGION
+Alias: REGION@SEL$1
+Extended_information:    FP:R_NAME='ASIA'
+Access_predicates: 
+Filter_predicates: R_NAME='ASIA'
+Select_level: SEL$1
+--------------------
+Operation: hash join
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  L_DISCOUNT^L_EXTENDEDPRICE^N_NAME
+Object_name: 
+Alias: 
+Extended_information:    AP:N_REGIONKEY=R_REGIONKEY
+Access_predicates: N_REGIONKEY=R_REGIONKEY
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: hash
+Options: GROUP BY
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  N_NAME^SUM(L_EXTENDEDPRICE*(1-L_DISCOUNT))
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+Operation: sort
+Options: ORDER BY
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  SUM(L_EXTENDEDPRICE*(1-L_DISCOUNT))^N_NAME
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: SEL$1
+--------------------
+Operation: select statement
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection: 
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+
+Calpont Execution Plan
+
+>SELECT MAIN
+>>Returned Columns
+1. ArithmeticColumn: AggregateColumn sum(L_EXTENDEDPRICE*(1-L_DISCOUNT))
+ArithmeticColumn: SimpleColumn L_EXTENDEDPRICE
+  s/t/c/T/A: ///0/
+
+ConstantColumn: 1(n)
+SimpleColumn L_DISCOUNT
+  s/t/c/T/A: ///0/
+
+Operator: -
+Operator: *
+
+
+2. SimpleColumn tpch.NATION.N_NAME
+  s/t/c/T/A: tpch/NATION/N_NAME/5/NATION
+
+>>Filters
+SimpleFilter
+  SimpleColumn tpch.ORDERS.O_ORDERDATE
+  s/t/c/T/A: tpch/ORDERS/O_ORDERDATE/20/
+  Operator: >=  ArithmeticColumn: FunctionColumn: to_date('1994-01-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss')
+
+SimpleFilter
+  SimpleColumn tpch.ORDERS.O_ORDERDATE
+  s/t/c/T/A: tpch/ORDERS/O_ORDERDATE/20/
+  Operator: <  ArithmeticColumn: FunctionColumn: to_date('1995-01-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss')
+
+Operator: AND
+SimpleFilter
+  SimpleColumn tpch.CUSTOMER.C_CUSTKEY
+  s/t/c/T/A: tpch/CUSTOMER/C_CUSTKEY/8/CUSTOMER
+  Operator: =  SimpleColumn tpch.ORDERS.O_CUSTKEY
+  s/t/c/T/A: tpch/ORDERS/O_CUSTKEY/17/ORDERS
+
+Operator: and
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_ORDERKEY
+  s/t/c/T/A: tpch/LINEITEM/L_ORDERKEY/25/LINEITEM
+  Operator: =  SimpleColumn tpch.ORDERS.O_ORDERKEY
+  s/t/c/T/A: tpch/ORDERS/O_ORDERKEY/16/ORDERS
+
+Operator: and
+SimpleFilter
+  SimpleColumn tpch.LINEITEM.L_SUPPKEY
+  s/t/c/T/A: tpch/LINEITEM/L_SUPPKEY/27/LINEITEM
+  Operator: =  SimpleColumn tpch.SUPPLIER.S_SUPPKEY
+  s/t/c/T/A: tpch/SUPPLIER/S_SUPPKEY/55/SUPPLIER
+
+SimpleFilter
+  SimpleColumn tpch.CUSTOMER.C_NATIONKEY
+  s/t/c/T/A: tpch/CUSTOMER/C_NATIONKEY/11/CUSTOMER
+  Operator: =  SimpleColumn tpch.SUPPLIER.S_NATIONKEY
+  s/t/c/T/A: tpch/SUPPLIER/S_NATIONKEY/58/SUPPLIER
+
+Operator: AND
+Operator: and
+SimpleFilter
+  SimpleColumn tpch.SUPPLIER.S_NATIONKEY
+  s/t/c/T/A: tpch/SUPPLIER/S_NATIONKEY/58/SUPPLIER
+  Operator: =  SimpleColumn tpch.NATION.N_NATIONKEY
+  s/t/c/T/A: tpch/NATION/N_NATIONKEY/4/NATION
+
+Operator: and
+SimpleFilter
+  SimpleColumn tpch.REGION.R_NAME
+  s/t/c/T/A: tpch/REGION/R_NAME/2/
+  Operator: =  ConstantColumn: ASIA(l)
+Operator: and
+SimpleFilter
+  SimpleColumn tpch.NATION.N_REGIONKEY
+  s/t/c/T/A: tpch/NATION/N_REGIONKEY/6/NATION
+  Operator: =  SimpleColumn tpch.REGION.R_REGIONKEY
+  s/t/c/T/A: tpch/REGION/R_REGIONKEY/1/REGION
+
+Operator: and
+>>Group By Columns
+ArithmeticColumn: AggregateColumn sum(L_EXTENDEDPRICE*(1-L_DISCOUNT))
+ArithmeticColumn: SimpleColumn L_EXTENDEDPRICE
+  s/t/c/T/A: ///0/
+
+ConstantColumn: 1(n)
+SimpleColumn L_DISCOUNT
+  s/t/c/T/A: ///0/
+
+Operator: -
+Operator: *
+
+
+SimpleColumn tpch.NATION.N_NAME
+  s/t/c/T/A: tpch/NATION/N_NAME/5/NATION
+
+SessionID: 4798
+TxnID: 296
+VerID: 296
+--- Column Map ---
+C_CUSTKEY : 0x920bdf8
+C_NATIONKEY : 0x9212728
+L_DISCOUNT : 0x9238fb0
+L_EXTENDEDPRICE : 0x9238f80
+L_ORDERKEY : 0x9238ca0
+L_SUPPKEY : 0x9238f50
+N_NAME : 0x9238270
+N_NATIONKEY : 0x9238240
+N_REGIONKEY : 0x92382a0
+O_CUSTKEY : 0x9212788
+O_ORDERDATE : 0x9238d00
+O_ORDERKEY : 0x9212758
+R_NAME : 0x9237e18
+R_REGIONKEY : 0x9238388
+S_NATIONKEY : 0x9238b88
+S_SUPPKEY : 0x9238b58
+

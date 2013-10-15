@@ -1,0 +1,125 @@
+#!/bin/bash
+#
+# $Id: build_rpms 1734 2012-10-25 18:07:16Z dhill $
+#
+
+usage="build_rpms [-vh]"
+vflg=0
+
+while getopts "vh" flag; do
+	case $flag in
+	v) ((vflg++))
+		;;
+	h) echo $usage
+		exit 0
+		;;
+	\? | *) echo $usage
+		exit 1
+		;;
+	esac
+done
+shift $((OPTIND - 1))
+
+#try to find project root
+while [ ! -d dbcon ]; do
+	cd ..
+	curdir=$(pwd)
+	if [ $curdir = / -o $curdir = $HOME ]; then
+		echo "I could not find the project root directory: I can't continue!"
+		exit 1
+	fi
+done
+
+if [ ! -f ./build/releasenum ]; then
+	echo "I could not find the file 'releasesum' in the build directory: I can't continue!"
+	exit 1
+fi
+
+. ./build/releasenum
+
+# make the install package
+buildroot=$HOME/rpm/BUILD/infinidb-$version-$release
+
+rm -rf $buildroot
+mkdir -p $buildroot
+echo -n "Writing binary files to $buildroot..."
+tar -cf - --exclude 'export/include' --exclude 'export/*.tar' export | tar -C $buildroot -xf -
+mv $buildroot/export $buildroot/Calpont
+
+#get mysql server files
+pushd /usr/local/Calpont/mysql > /dev/null
+mkdir -p $buildroot/Calpont/mysql
+cpio -pdmu --quiet $buildroot/Calpont/mysql < files.lst
+popd >/dev/null
+
+#clean up some files from buildroot
+rm -f $buildroot/Calpont/etc/Doxyfile
+for file in $buildroot/Calpont/lib/*; do
+	if [ -h $file ]; then
+		rm -f $file
+	fi
+done
+
+#temporarily clean up these BRM thingies
+for file in dbrm script-fcns; do
+	rm -f $buildroot/Calpont/bin/$file
+done
+
+#clean up these bulkload scripts
+for file in bulkload.sh cleanup.sh dbbuilder.sh dbload.sh cpimport.sh bulkloadp.sh; do
+	rm -f $buildroot/Calpont/bin/$file
+done
+
+rm -f $buildroot/Calpont/lib/libidbboot.a
+rm -f $buildroot/Calpont/bin/amazonInstaller
+rm -f $buildroot/Calpont/lib/libiberty.a
+
+mkdir -p $HOME/rpm/BUILD $HOME/rpm/RPMS $HOME/rpm/SRPMS $HOME/rpm/SPECS $HOME/rpm/tmp
+
+if [ ! -f $HOME/.rpmmacros ]; then
+	cat > $HOME/.rpmmacros <<EOD
+%_topdir $HOME/rpm
+%_tmppath $HOME/rpm/tmp
+# Change to 1 if you want to abort on unpackaged files
+%_unpackaged_files_terminate_build 0
+EOD
+fi
+
+#twiddle with the spec file
+
+packager="$USER <$USER@calpont.com>"
+tag=poc
+buildinfo=`./build/docBuild $tag | (
+read l
+b="$l"
+while read l; do
+b="$b\\n$l"
+done
+echo $b )`
+
+cp ./build/infinidb.spec.in $HOME/rpm/SPECS/infinidb.spec
+sed -i  -e "s/@@PACKAGER@@/Packager: $packager/" \
+	-e "s/@@VERSION@@/Version: $version/" \
+	-e "s/@@RELEASE@@/Release: $release/" \
+	-e "s?@@BUILDINFO@@?$buildinfo?" $HOME/rpm/SPECS/infinidb.spec
+
+echo done.
+
+if [ -d /usr/local/gcc45/lib64 ]; then
+	cp /usr/local/gcc45/lib64/libgcc_s.so.1 $buildroot/Calpont/lib
+	cp /usr/local/gcc45/lib64/libstdc++.so.6.0.14 $buildroot/Calpont/lib
+	cp /usr/local/gdb71/bin/gdb $buildroot/Calpont/bin
+fi
+
+echo -n "Building rpms..."
+rpmbuild -ba $HOME/rpm/SPECS/infinidb.spec >/tmp/rpmbuild.out.$$ 2>&1
+rc=$?
+echo done.
+if [ $vflg -gt 0 -o $rc -ne 0 ]; then
+	cat /tmp/rpmbuild.out.$$
+fi
+
+rm -f /tmp/*.$$
+
+exit $rc
+

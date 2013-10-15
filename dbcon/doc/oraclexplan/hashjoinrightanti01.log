@@ -1,0 +1,139 @@
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: O_TOTALPRICE
+Object_name: ORDERS
+Alias: ORDERS@SEL$2
+Extended_information:    FP:O_TOTALPRICE<5000 AND O_TOTALPRICE IS NOT NULL
+Access_predicates: 
+Filter_predicates: O_TOTALPRICE<5000&O_TOTALPRICE IS NOT NULL
+Select_level: SEL$5DA710D3
+--------------------
+Operation: table access
+Options: FULL
+Object_type: TABLE
+Other: 
+Object_owner: CALUSER01
+Search_columns: 
+Projection: O_TOTALPRICE
+Object_name: ORDERS
+Alias: ORDERS@SEL$1
+Extended_information:    FP:O_TOTALPRICE IS NOT NULL
+Access_predicates: 
+Filter_predicates: O_TOTALPRICE IS NOT NULL
+Select_level: SEL$5DA710D3
+--------------------
+Operation: hash join ( Temp Space:      22,791,000 )
+Options: RIGHT ANTI
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection:  O_TOTALPRICE
+Object_name: 
+Alias: 
+Extended_information:    AP:O_TOTALPRICE=O_TOTALPRICE
+Access_predicates: O_TOTALPRICE=O_TOTALPRICE
+Filter_predicates: 
+Select_level: SEL$5DA710D3
+--------------------
+Operation: select statement
+Options: 
+Object_type: 
+Other: 
+Object_owner: 
+Search_columns: 
+Projection: 
+Object_name: 
+Alias: 
+Extended_information: 
+Access_predicates: 
+Filter_predicates: 
+Select_level: 
+--------------------
+TOKEN: <O_TOTALPRICE<5000>
+TOKEN: <O_TOTALPRICE<5000>
+TOKEN: <O_TOTALPRICE IS NOT NULL>
+TOKEN: <O_TOTALPRICE IS NOT NULL>
+TOKEN: <O_TOTALPRICE IS NOT NULL>
+TOKEN: <O_TOTALPRICE IS NOT NULL>
+TOKEN: <O_TOTALPRICE=O_TOTALPRICE>
+TOKEN: <O_TOTALPRICE=O_TOTALPRICE>
+Operator: (
+SimpleFilter
+  SimpleColumn tpch.ORDERS.O_TOTALPRICE
+  s/t/c/T/A/RA: tpch/ORDERS/O_TOTALPRICE/19/ORDERS/0
+  Operator: <  ConstantColumn: 5000(n)
+Operator: AND
+SimpleFilter
+  SimpleColumn tpch.ORDERS.O_TOTALPRICE
+  s/t/c/T/A/RA: tpch/ORDERS/O_TOTALPRICE/19/ORDERS/0
+  Operator: is  SimpleColumn NOTNULL
+  s/t/c/T/A/RA: //NOTNULL/0//0
+
+Operator: )
+Operator: and
+Operator: (
+SimpleFilter
+  SimpleColumn tpch.ORDERS.O_TOTALPRICE
+  s/t/c/T/A/RA: tpch/ORDERS/O_TOTALPRICE/19/ORDERS/0
+  Operator: is  SimpleColumn NOTNULL
+  s/t/c/T/A/RA: //NOTNULL/0//0
+
+Operator: )
+Operator: and
+Operator: (
+SimpleFilter
+  SimpleColumn tpch.ORDERS.O_TOTALPRICE
+  s/t/c/T/A/RA: tpch/ORDERS/O_TOTALPRICE/19/ORDERS/0
+  Operator: =  SimpleColumn tpch.ORDERS.O_TOTALPRICE
+  s/t/c/T/A/RA: tpch/ORDERS/O_TOTALPRICE/19/ORDERS/0
+
+Operator: )
+O_TOTALPRICE: SimpleColumn tpch.ORDERS.O_TOTALPRICE
+  s/t/c/T/A/RA: tpch/ORDERS/O_TOTALPRICE/19/ORDERS/0
+
+O_TOTALPRICE: SimpleColumn tpch.ORDERS.O_TOTALPRICE
+  s/t/c/T/A/RA: tpch/ORDERS/O_TOTALPRICE/19/ORDERS/0
+
+>SELECT MAIN
+>>Returned Columns
+SimpleColumn tpch.ORDERS.O_TOTALPRICE
+  s/t/c/T/A/RA: tpch/ORDERS/O_TOTALPRICE/19/ORDERS/0
+
+>>Filters
+SimpleFilter
+  SimpleColumn tpch.ORDERS.O_TOTALPRICE
+  s/t/c/T/A/RA: tpch/ORDERS/O_TOTALPRICE/19/ORDERS/0
+  Operator: <  ConstantColumn: 5000(n)
+SimpleFilter
+  SimpleColumn tpch.ORDERS.O_TOTALPRICE
+  s/t/c/T/A/RA: tpch/ORDERS/O_TOTALPRICE/19/ORDERS/0
+  Operator: is  SimpleColumn NOTNULL
+  s/t/c/T/A/RA: //NOTNULL/0//0
+
+Operator: AND
+SimpleFilter
+  SimpleColumn tpch.ORDERS.O_TOTALPRICE
+  s/t/c/T/A/RA: tpch/ORDERS/O_TOTALPRICE/19/ORDERS/0
+  Operator: is  SimpleColumn NOTNULL
+  s/t/c/T/A/RA: //NOTNULL/0//0
+
+Operator: and
+SimpleFilter
+  SimpleColumn tpch.ORDERS.O_TOTALPRICE
+  s/t/c/T/A/RA: tpch/ORDERS/O_TOTALPRICE/19/ORDERS/0
+  Operator: =  SimpleColumn tpch.ORDERS.O_TOTALPRICE
+  s/t/c/T/A/RA: tpch/ORDERS/O_TOTALPRICE/19/ORDERS/0
+
+Operator: and
+SessionID: 299
+TxnID: 58
+VerID: 58
+--- Column Map ---
+O_TOTALPRICE : 0x9085c98
+O_TOTALPRICE : 0x90baf18
+
