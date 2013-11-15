@@ -42,7 +42,7 @@ TupleJoiner::TupleJoiner(
 	uint largeJoinColumn,
 	JoinType jt) :
 	smallRG(smallInput), largeRG(largeInput), joinAlg(INSERTING), joinType(jt),
-	threadCount(1), typelessJoin(false), uniqueLimit(100)
+	threadCount(1), typelessJoin(false), bSignedUnsignedJoin(false), uniqueLimit(100)
 {
 	if (smallRG.usesStringTable()) {
 		STLPoolAllocator<pair<const int64_t, Row::Pointer> > alloc(64*1024*1024 + 1);
@@ -79,6 +79,8 @@ TupleJoiner::TupleJoiner(
         cpValues[0].push_back(numeric_limits<int64_t>::max());
         cpValues[0].push_back(numeric_limits<int64_t>::min());
     }
+    if (smallRG.isUnsigned(smallJoinColumn) != largeRG.isUnsigned(largeJoinColumn))
+       bSignedUnsignedJoin = true;
 	nullValueForJoinColumn = smallNullRow.getSignedNullValue(smallJoinColumn);
 }
 
@@ -91,7 +93,7 @@ TupleJoiner::TupleJoiner(
 	smallRG(smallInput), largeRG(largeInput), joinAlg(INSERTING),
 	joinType(jt), threadCount(1), typelessJoin(true),
 	smallKeyColumns(smallJoinColumns), largeKeyColumns(largeJoinColumns),
-	uniqueLimit(100)
+	bSignedUnsignedJoin(false), uniqueLimit(100)
 {
 	STLPoolAllocator<pair<const TypelessData, Row::Pointer> > alloc(64*1024*1024 + 1);
 	_pool = alloc.getPoolAllocator();
@@ -105,12 +107,17 @@ TupleJoiner::TupleJoiner(
 		smallNullRow.initToNull();
 	}
 
-	for (uint i = keyLength = 0; i < smallKeyColumns.size(); i++)
+	for (uint i = keyLength = 0; i < smallKeyColumns.size(); i++) {
 		if (smallRG.getColTypes()[smallKeyColumns[i]] == CalpontSystemCatalog::CHAR ||
-		  smallRG.getColTypes()[smallKeyColumns[i]] == CalpontSystemCatalog::VARCHAR)
-			keyLength += smallRG.getColumnWidth(smallKeyColumns[i]) + 1;  // +1 null char
-		else
+          smallRG.getColTypes()[smallKeyColumns[i]] == CalpontSystemCatalog::VARCHAR)
+            keyLength += smallRG.getColumnWidth(smallKeyColumns[i]) + 1;  // +1 null char
+       else
 			keyLength += 8;
+       // Set bSignedUnsignedJoin if one or more join columns are signed to unsigned compares.
+       if (smallRG.isUnsigned(smallKeyColumns[i]) != largeRG.isUnsigned(largeKeyColumns[i])) {
+           bSignedUnsignedJoin = true;
+       }
+    }
 	storedKeyAlloc = FixedAllocator(keyLength);
 	
 	discreteValues.reset(new bool[smallKeyColumns.size()]);
@@ -156,27 +163,34 @@ bool TupleJoiner::operator<(const TupleJoiner &tj) const
 void TupleJoiner::insert(Row &r) {
 	r.zeroRid();
 	updateCPData(r);
-	if (joinAlg == UM)
-		if (typelessJoin)
-			ht->insert(pair<TypelessData, Row::Pointer>
-			  (makeTypelessKey(r, smallKeyColumns, keyLength, &storedKeyAlloc), 
-			  r.getPointer()));
-		else if (!smallRG.usesStringTable()) {
-			int64_t smallKey = r.getIntField(smallKeyColumns[0]);
+	if (joinAlg == UM) {
+		if (typelessJoin) {
+                ht->insert(pair<TypelessData, Row::Pointer>
+                  (makeTypelessKey(r, smallKeyColumns, keyLength, &storedKeyAlloc), 
+                  r.getPointer()));
+        } 
+        else if (!smallRG.usesStringTable()) {
+            int64_t smallKey;
+            if (r.isUnsigned(smallKeyColumns[0]))
+                smallKey = (int64_t)(r.getUintField(smallKeyColumns[0]));
+            else
+                smallKey = r.getIntField(smallKeyColumns[0]);
 			if (UNLIKELY(smallKey == nullValueForJoinColumn))
-				h->insert(pair<int64_t, uint8_t *>(getJoinNullValue(), r.getData()));   // TODO: how do we handle this mixed signed/unsigned
-			else
-				h->insert(pair<int64_t, uint8_t *>(smallKey, r.getData()));
+				h->insert(pair<int64_t, uint8_t *>(getJoinNullValue(), r.getData()));
+            else
+				h->insert(pair<int64_t, uint8_t *>(smallKey, r.getData())); // Normal path for integers
 		}
 		else {
 			int64_t smallKey = r.getIntField(smallKeyColumns[0]);
 			if (UNLIKELY(smallKey == nullValueForJoinColumn))
-				sth->insert(pair<int64_t, Row::Pointer>(getJoinNullValue(), r.getPointer()));   // TODO: how do we handle this mixed signed/unsigned
+				sth->insert(pair<int64_t, Row::Pointer>(getJoinNullValue(), r.getPointer()));
 			else
 				sth->insert(pair<int64_t, Row::Pointer>(smallKey, r.getPointer()));
 		}
-	else
-		rows.push_back(r.getPointer());
+    }
+	else {
+        rows.push_back(r.getPointer());
+    }
 }
 
 void TupleJoiner::match(rowgroup::Row &largeSideRow, uint largeRowIndex, uint threadID,
@@ -215,18 +229,22 @@ void TupleJoiner::match(rowgroup::Row &largeSideRow, uint largeRowIndex, uint th
 			iterator it;
 			pair<iterator, iterator> range;
 			Row r;
-
-			largeKey = largeSideRow.getIntField(largeKeyColumns[0]);
-			it = h->find(largeKey);
-			if (it == end() && !(joinType & (LARGEOUTER | MATCHNULLS)))
-				return;
-			range = h->equal_range(largeKey);
-			//smallRG.initRow(&r);
-			for (; range.first != range.second; ++range.first) {
-				//r.setData(range.first->second);
-				//cerr << "matched small side row: " << r.toString() << endl;
-				matches->push_back(range.first->second);
-			}
+            if (largeSideRow.isUnsigned(largeKeyColumns[0])) {
+                largeKey = (int64_t)largeSideRow.getUintField(largeKeyColumns[0]);
+            }
+            else {
+                largeKey = largeSideRow.getIntField(largeKeyColumns[0]);
+            }
+            it = h->find(largeKey);
+            if (it == end() && !(joinType & (LARGEOUTER | MATCHNULLS)))
+                return;
+            range = h->equal_range(largeKey);
+            //smallRG.initRow(&r);
+            for (; range.first != range.second; ++range.first) {
+                //r.setData(range.first->second);
+                //cerr << "matched small side row: " << r.toString() << endl;
+                matches->push_back(range.first->second);
+            }
 		}
 		else {
 			int64_t largeKey;
@@ -345,8 +363,12 @@ void TupleJoiner::doneInserting()
 				smallRow.setPointer(sthit->second);
 				++sthit;
 			}
-			
-			uniquer.insert(smallRow.getIntField(smallKeyColumns[col]));
+            if (smallRow.isUnsigned(smallKeyColumns[col])) {
+                uniquer.insert((int64_t)smallRow.getUintField(smallKeyColumns[col]));
+            }
+            else {
+                uniquer.insert(smallRow.getIntField(smallKeyColumns[col]));
+            }
 			CHECKSIZE;
 		}
 
@@ -597,7 +619,12 @@ TypelessData makeTypelessKey(const Row &r, const vector<uint> &keyCols,
 		else {
 			if (off + 8 > keylen)
 				goto toolong;
-			*((int64_t *) &ret.data[off]) = r.getIntField(keyCols[i]);
+            if (r.isUnsigned(keyCols[i])) {
+                *((uint64_t *) &ret.data[off]) = r.getUintField(keyCols[i]);
+            }
+            else {
+                *((int64_t *) &ret.data[off]) = r.getIntField(keyCols[i]);
+            }
 			off += 8;
 		}
 	}
@@ -638,7 +665,12 @@ TypelessData makeTypelessKey(const Row &r, const vector<uint> &keyCols, PoolAllo
 			ret.data[off++] = 0;
 		}
 		else {
-			*((int64_t *) &ret.data[off]) = r.getIntField(keyCols[i]);
+            if (r.isUnsigned(keyCols[i])) {
+                *((uint64_t *)&ret.data[off]) = r.getUintField(keyCols[i]);
+            }
+            else {
+                *((int64_t *)&ret.data[off]) = r.getIntField(keyCols[i]);
+            }
 			off += 8;
 		}
 	}
@@ -685,9 +717,25 @@ void TypelessData::deserialize(messageqcpp::ByteStream &b, utils::PoolAllocator 
 
 bool TupleJoiner::hasNullJoinColumn(const Row &r) const
 {
-	for (uint i = 0; i < largeKeyColumns.size(); i++)
+	uint64_t key;
+	for (uint i = 0; i < largeKeyColumns.size(); i++) {
 		if (r.isNullValue(largeKeyColumns[i]))
 			return true;
+		if (UNLIKELY(bSignedUnsignedJoin)) {
+			// BUG 5628 If this is a signed/unsigned join column and the sign bit is set on either
+			// side, then this row should not compare. Treat as NULL to prevent compare, even if 
+			// the bit patterns match.
+			if (smallRG.isUnsigned(smallKeyColumns[i]) != largeRG.isUnsigned(largeKeyColumns[i])) {
+				if (r.isUnsigned(largeKeyColumns[i]))
+					key = r.getUintField(largeKeyColumns[i]); // Does not propogate sign bit
+				else
+					key = r.getIntField(largeKeyColumns[i]);  // Propogates sign bit
+				if (key & 0x8000000000000000ULL) {
+					return true;
+				}
+			}
+		}
+	}
 	return false;
 }
 

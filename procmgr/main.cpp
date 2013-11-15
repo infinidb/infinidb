@@ -23,6 +23,8 @@
 
 #include <clocale>
 
+#include <boost/filesystem.hpp>
+
 #include "processmanager.h"
 #include "installdir.h"
 
@@ -43,6 +45,7 @@ bool runCold = false;
 string systemName = "system";
 string iface_name;
 string cloud;
+bool amazon = false;
 string PMInstanceType;
 string UMInstanceType;
 string GlusterConfig = "n";
@@ -50,6 +53,9 @@ bool rootUser = true;
 string USER = "root";
 bool HDFS = false;
 string localHostName;
+
+// pushing the ACTIVE_ALARMS_FILE to all nodes every 10 seconds.
+const int ACTIVE_ALARMS_PUSHING_INTERVAL = 10;
 
 typedef   map<string, int>	moduleList;
 moduleList	moduleInfoList;
@@ -129,10 +135,11 @@ int main(int argc, char **argv)
 	catch(...) {}
 
 	//get amazon parameters
-	if ( cloud == "amazon" )
+	if ( cloud == "amazon-ec2" || cloud == "amazon-vpc" )
 	{
 		oam.getSystemConfig("PMInstanceType", PMInstanceType);
 		oam.getSystemConfig("UMInstanceType", UMInstanceType);
+		amazon = true;
 	}
 
 	//get gluster config
@@ -1245,8 +1252,8 @@ void pingDeviceThread()
 								int status;
 	
 								// if pm, move dbroots back to pm
-								if ( ( moduleName.find("pm") == 0 && cloud != "amazon" ) ||
-									( moduleName.find("pm") == 0 && cloud == "amazon" && downActiveOAMModule ) ) {
+								if ( ( moduleName.find("pm") == 0 && !amazon ) ||
+									( moduleName.find("pm") == 0 && amazon && downActiveOAMModule ) ) {
 
 									//restart to get the versionbuffer files closed so it can be unmounted
 									processManager.restartProcessType("WriteEngineServer");
@@ -1476,8 +1483,8 @@ void pingDeviceThread()
 									aManager.sendAlarmReport(moduleName.c_str(), MODULE_DOWN_AUTO, SET);
 
 									// if pm, move dbroots back to pm
-									if ( ( moduleName.find("pm") == 0 && cloud != "amazon" ) ||
-										( moduleName.find("pm") == 0 && cloud == "amazon" && downActiveOAMModule ) ) {
+									if ( ( moduleName.find("pm") == 0 && !amazon ) ||
+										( moduleName.find("pm") == 0 && amazon && downActiveOAMModule ) ) {
 										//move dbroots to other modules
 										try {
 											log.writeLog(__LINE__, "Call autoMovePmDbroot", LOG_TYPE_DEBUG);
@@ -1510,7 +1517,7 @@ void pingDeviceThread()
 
 									log.writeLog(__LINE__, "Module failed to auto start: " + moduleName, LOG_TYPE_CRITICAL);
 
-									if ( cloud == "amazon" )
+									if ( amazon )
 										processManager.setSystemState(oam::FAILED);
 									else
 										processManager.setSystemState(oam::ACTIVE);
@@ -1577,7 +1584,7 @@ system(cmd.c_str());
 								// state = running, then instance is rebooting, monitor for recovery
 								// state = stopped, then try starting, if fail, remove/addmodule to launch new instance
 								// state = terminate or nothing, remove/addmodule to launch new instance
-								if ( cloud == "amazon" ) {
+								if ( amazon ) {
 
 									if ( moduleName.find("um") == 0 )
 									{
@@ -1700,7 +1707,11 @@ system(cmd.c_str());
 										HostConfig hostconfig;
 
 										devicenetworkconfig.DeviceName = moduleName;
-										hostconfig.IPAddr = oam::UnassignedName;
+										if (cloud == "amazon-vpc")
+											hostconfig.IPAddr = ipAddr;
+										else
+											hostconfig.IPAddr = oam::UnassignedName;
+
 										hostconfig.HostName = oam::UnassignedName;
 										hostconfig.NicID = 1;
 										devicenetworkconfig.hostConfigList.push_back(hostconfig);
@@ -2216,15 +2227,25 @@ system(cmd.c_str());
 ******************************************************************************************/
 static void hdfsActiveAlarmsPushingThread()
 {
-	std::ostringstream oss;
-	oss << "hadoop fs -rm -skipTrash " << ACTIVE_ALARMS_IMG << " > /dev/null 2>&1; "
-		<< "hadoop fs -copyFromLocal " << ACTIVE_ALARM_FILE << " " << ACTIVE_ALARMS_IMG
-		<< " > /dev/null 2>&1";
-	std::string cmd(oss.str());
+	boost::filesystem::path filePath(ACTIVE_ALARM_FILE);
+	boost::filesystem::path dirPath = filePath.parent_path();
+	string dirName = boost::filesystem::canonical(dirPath).string();
 
-	while(1) {
-		system(cmd.c_str());
-		sleep(ACTIVE_ALARMS_IMG_PUSH_INTERVAL);
+	if (boost::filesystem::exists("/etc/pdsh/machines"))
+	{
+		string cpCmd =  "pdcp -a -x " + localHostName + " " + ACTIVE_ALARM_FILE + " " + dirName +
+						" > /dev/null 2>&1";
+		string rmCmd =  "pdsh -a -x " + localHostName + " rm -f " + ACTIVE_ALARM_FILE +
+						" > /dev/null 2>&1";
+		while(1)
+		{
+			if (boost::filesystem::exists(filePath))
+				system(cpCmd.c_str());
+			else
+				system(rmCmd.c_str());
+
+			sleep(ACTIVE_ALARMS_PUSHING_INTERVAL);
+		}
 	}
 
 	return;

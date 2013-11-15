@@ -4515,6 +4515,40 @@ namespace oam
 		return false;
 	}
 
+
+    /********************************************************************
+     *
+     * incrementIPAddress - Increment IP Address
+     *
+     ********************************************************************/
+	std::string Oam::incrementIPAddress(const std::string ipAddress)
+	{
+		string newipAddress = ipAddress;
+		string::size_type pos = ipAddress.rfind(".",80);
+		if (pos != string::npos) {
+			string last = ipAddress.substr(pos+1,80);
+			int Ilast = atoi(last.c_str());
+			Ilast++;
+
+			if ( Ilast > 255 )
+			{
+				writeLog("incrementIPAddress: new address invalid, larger than 255", LOG_TYPE_ERROR );
+				exceptionControl("incrementIPAddress", API_FAILURE);
+			}
+
+			last = itoa(Ilast);
+			newipAddress = ipAddress.substr(0,pos+1);
+			newipAddress = newipAddress + last;
+		}
+		else
+		{
+			writeLog("incrementIPAddress: passed address invalid: " + ipAddress, LOG_TYPE_ERROR );
+			exceptionControl("incrementIPAddress", API_FAILURE);
+		}
+
+		return newipAddress;
+	}
+
     /********************************************************************
      *
      * checkLogStatus - Check for a phrase in a log file and return status
@@ -4539,6 +4573,58 @@ namespace oam
 		file.close();
 	
 		return false;
+	}
+
+    /********************************************************************
+     *
+     * fixRSAkey - Fix RSA key
+     *
+     ********************************************************************/
+	void Oam::fixRSAkey(std::string logFile)
+	{
+		ifstream file (logFile.c_str());
+	
+		char line[400];
+		string buf;
+	
+		while (file.getline(line, 400))
+		{
+			buf = line;
+	
+			string::size_type pos = buf.find("Offending RSA key",0);
+			if (pos != string::npos) {
+				// line ID
+				pos = buf.find(":",0);
+				string lineID = buf.substr(pos+1,80);
+				//remove non alphanumber characters
+				for (size_t i = 0; i < lineID.length();)
+				{
+					if (!isdigit(lineID[i]))
+						lineID.erase(i, 1);
+					else
+						 i++;
+				}
+
+				//get user
+				string USER = "root";
+				char* p= getenv("USER");
+				if (p && *p)
+					USER = p;
+
+				string userDir = USER;
+				if ( USER != "root")
+					userDir = "home/" + USER;
+
+				string cmd = "sed '" + lineID + "d' /" + userDir + "/.ssh/known_hosts > /" + userDir + "/.ssh/known_hosts";
+				cout << cmd << endl;
+				system(cmd.c_str());
+				return;
+			}
+
+		}
+		file.close();
+
+		return;
 	}
 
     /********************************************************************
@@ -5763,7 +5849,8 @@ namespace oam
 			exceptionControl("addDbroot", API_INVALID_PARAMETER);
 		}
 
-		if (cloud == "amazon" && DBRootStorageType == "external" )
+		if ( (cloud == "amazon-ec2" || cloud == "amazon-vpc") && 
+				DBRootStorageType == "external" )
 		{
 			if ( newSystemDBRootCount > MAX_DBROOT_AMAZON )
 			{
@@ -5826,7 +5913,8 @@ namespace oam
 		}
 
 		//if amazon cloud with external volumes, create AWS volumes
-		if (cloud == "amazon" && DBRootStorageType == "external" )
+		if ( (cloud == "amazon-ec2" || cloud == "amazon-vpc") && 
+				DBRootStorageType == "external" )
 		{
 			//get local instance name (pm1)
 			string localInstance = getEC2LocalInstance();
@@ -7277,10 +7365,10 @@ namespace oam
      *
      ****************************************************************************/
 
-    std::string Oam::launchEC2Instance( const std::string name, const std::string type, const std::string group)
+    std::string Oam::launchEC2Instance( const std::string name, const std::string IPAddress, const std::string type, const std::string group)
 	{
 		// run script to get Instance status and IP Address
-		string cmd = InstallDir + "/bin/IDBInstanceCmds.sh launchInstance " + type + " " + group + " > /tmp/getInstance_" + name;
+		string cmd = InstallDir + "/bin/IDBInstanceCmds.sh launchInstance " + IPAddress + " " + type + " " + group + " > /tmp/getInstance_" + name;
 		int status = system(cmd.c_str());
 		if (WEXITSTATUS(status) != 0 )
 			return "failed";
@@ -7826,7 +7914,6 @@ namespace oam
 #endif
 		return 0;
 	}
-
 
     /***************************************************************************
      * PRIVATE FUNCTIONS
@@ -8689,7 +8776,8 @@ namespace oam
 		}
 		catch(...) {}
 
-		if (cloud == "amazon" && DBRootStorageType == "external" )
+		if ( (cloud == "amazon-ec2" || cloud == "amazon-vpc") && 
+			DBRootStorageType == "external" )
 		{
 			//get Instance Name for to-pm
 			string toInstanceName = oam::UnassignedName;
@@ -8942,53 +9030,46 @@ namespace oam
 	int Oam::readHdfsActiveAlarms(AlarmList& alarmList)
 	{
 		int returnStatus = API_FAILURE;
-
-		string fileName = ACTIVE_ALARMS_IMG;
-		const char tmpActiveAlarms[] = "/tmp/.activeAlarms";
-		ostringstream oss;
-		oss << "hadoop fs -test -e " << ACTIVE_ALARMS_IMG << " > /dev/null 2>&1";
-		string cmd1(oss.str());
-		oss.str("");
-		oss << "rm -rf " << tmpActiveAlarms << "; "
-			<< "hadoop fs -copyToLocal " << ACTIVE_ALARMS_IMG << " " << tmpActiveAlarms
-			<< " > /dev/null 2>&1";
-		string cmd2(oss.str());
-
 		Alarm alarm;
 
-		// the alarm file will be pushed to HDFS fs every ACTIVE_ALARMS_IMG_PUSG_INTERVAL seconds
-		for (int i = 0; i < ACTIVE_ALARMS_IMG_PUSH_INTERVAL/2 && returnStatus != API_SUCCESS; i++)
+		// the alarm file will be pushed to all nodes every 10 seconds, retry 1 second
+		for (int i = 0; i < 10 && returnStatus != API_SUCCESS; i++)
 		{
-			if (system(cmd1.c_str()) != 0)  // file may remove while in sleep()
+			try
 			{
+				ifstream activeAlarm(ACTIVE_ALARM_FILE.c_str(), ios::in);
+				if (!activeAlarm.is_open())
+				{
+					// file may be temporary not available due to dpcp.
+					usleep(10000);
+
+					activeAlarm.open(ACTIVE_ALARM_FILE.c_str(), ios::in);
+					if (!activeAlarm.is_open())
+					{
+						// still cannot open, treat as no activeAlarms file.
+						returnStatus = API_SUCCESS;
+						continue;
+					}
+				}
+
+				// read from opened file.
+				while (!activeAlarm.eof() && activeAlarm.good())
+				{
+					activeAlarm >> alarm;
+					if (alarm.getAlarmID() != INVALID_ALARM_ID)
+						alarmList.insert (AlarmList::value_type(INVALID_ALARM_ID, alarm));
+				}
+				activeAlarm.close();
+
 				returnStatus = API_SUCCESS;
 			}
-
-			// if the img file exists, make a local copy
-			else if (system(cmd2.c_str()) == 0)
+			catch (...)
 			{
-				try
-				{
-					ifstream activeAlarm(tmpActiveAlarms, ios::in);
-					activeAlarm.exceptions(ios::failbit | ios::badbit);
-					while (!activeAlarm.eof())
-					{
-						activeAlarm >> alarm;
-						if (alarm.getAlarmID() != INVALID_ALARM_ID)
-							alarmList.insert (AlarmList::value_type(INVALID_ALARM_ID, alarm));
-					}
-					activeAlarm.close();
-
-					returnStatus = API_SUCCESS;
-				}
-				catch (...)
-				{
-				}
 			}
 
 			// wait a second and try again
 			if (returnStatus != API_SUCCESS)
-				sleep (1);
+				usleep (100000);
 		}
 
 		return returnStatus;

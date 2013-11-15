@@ -1466,6 +1466,10 @@ int processCommand(string* arguments)
 				}
 				catch(...) {}
 
+				string::size_type pos = cloud.find("amazon",0);
+				if (pos != string::npos)
+					cloud = "amazon";
+
 				cout << endl << "System Storage Configuration" << endl << endl;
 
 				cout << "Performance Module (DBRoot) Storage Type = " << boost::get<0>(t) << endl;
@@ -1732,6 +1736,18 @@ int processCommand(string* arguments)
 
         case 15: // removeDbroot parameters: dbroot-list
         {
+			string GlusterConfig = "n";
+			try {
+				oam.getSystemConfig( "GlusterConfig", GlusterConfig);
+			}
+			catch(...)
+			{}
+
+			if (GlusterConfig == "y") {
+				cout << endl << "**** removeDbroot Not Supported on Data Redundancy Configured System" << endl;
+				break;
+			}
+
 			if ( localModule != parentOAMModule ) {
 				// exit out since not on active module
 				cout << endl << "**** removeDbroot Failed : Can only run command on Active OAM Parent Module (" << parentOAMModule << ")." << endl;
@@ -3551,6 +3567,11 @@ int processCommand(string* arguments)
 					break;
 				}
 			}
+			else
+			{
+				cout << endl << "**** assignDbrootPmConfig Failed,  System is shutdown. Needs to be stopped" << endl;
+				break;
+			}
 
            if (arguments[2] == "")
             {
@@ -3593,7 +3614,7 @@ int processCommand(string* arguments)
 
 					if (DBRootStorageType == "external" ){
 						string GlusterConfig = "n";
-						string cloud = "n";
+						string cloud = oam::UnassignedName;
 						try {
 							oam.getSystemConfig("Cloud", cloud);
 							oam.getSystemConfig( "GlusterConfig", GlusterConfig);
@@ -3601,7 +3622,7 @@ int processCommand(string* arguments)
 						catch(...)
 						{}
 
-						if ( GlusterConfig == "n" && cloud != "amazon")
+						if ( GlusterConfig == "n" && cloud == oam::UnassignedName)
 							cout << "   REMINDER: Update the /etc/fstab on " << toPM << " to include these dbroot mounts" << endl << endl;
 						break;
 
@@ -4015,13 +4036,13 @@ int processCommand(string* arguments)
         case 43: // assignElasticIPAddress
 		{
 			//get cloud configuration data
-			string cloud = "n";
+			string cloud = oam::UnassignedName;
 			try{
 				oam.getSystemConfig("Cloud", cloud);
 			}
 			catch(...) {}
 
-			if ( cloud != "amazon" )
+			if ( cloud == oam::UnassignedName )
 			{
 				cout << endl << "**** assignElasticIPAddress Not Supported : For Amazon Systems only" << endl;
 				break;
@@ -4170,13 +4191,13 @@ int processCommand(string* arguments)
         case 44: // unassignElasticIPAddress
 		{
 			//get cloud configuration data
-			string cloud = "n";
+			string cloud = oam::UnassignedName;
 			try{
 				oam.getSystemConfig("Cloud", cloud);
 			}
 			catch(...) {}
 
-			if ( cloud != "amazon" )
+			if ( cloud == oam::UnassignedName )
 			{
 				cout << endl << "**** unassignElasticIPAddress Not Supported : For Amazon Systems only" << endl;
 				break;
@@ -4479,13 +4500,13 @@ int processCommand(string* arguments)
 			}
 
 			//get cloud configuration data
-			string cloud = "n";
+			string cloud = oam::UnassignedName;
 			try{
 				oam.getSystemConfig("Cloud", cloud);
 			}
 			catch(...) {}
 
-			if ( cloud == "amazon" )
+			if ( cloud == "amazon-ec2" ||  cloud == "amazon-vpc" )
 			{
 				cout << endl << "Amazon Instance Configuration" << endl << endl;
 
@@ -4499,6 +4520,17 @@ int processCommand(string* arguments)
 					cout << "UMInstanceType = " << UMInstanceType << endl;
 				}
 				catch(...) {}
+
+				if ( cloud == "amazon-vpc" )
+				{
+					string AmazonSubNetID = oam::UnassignedName;
+					try{
+						oam.getSystemConfig("AmazonSubNetID", AmazonSubNetID);
+	
+						cout << "AmazonSubNetID = " << AmazonSubNetID << endl;
+					}
+					catch(...) {}
+				}
 			}
 
 			cout << endl;
@@ -4625,13 +4657,15 @@ int processCommand(string* arguments)
 
 			string GlusterConfig = "n";
 			int GlusterCopies;
-			string cloud = "n";
+			string cloud = oam::UnassignedName;
 			string GlusterStorageType;
+			string AmazonVPCNextPrivateIP;
 			try {
 				oam.getSystemConfig("GlusterConfig", GlusterConfig);
 				oam.getSystemConfig("GlusterCopies", GlusterCopies);
 				oam.getSystemConfig("Cloud", cloud);
 				oam.getSystemConfig("GlusterStorageType", GlusterStorageType);
+				oam.getSystemConfig("AmazonVPCNextPrivateIP", AmazonVPCNextPrivateIP);
 			}
 			catch(...) {}
 
@@ -4645,8 +4679,8 @@ int processCommand(string* arguments)
 			string moduleName;
 			int moduleCount;
 			string password;
-			typedef std::vector<string> hostNames;
-			hostNames hostnames;
+			typedef std::vector<string> inputNames;
+			inputNames inputnames;
 			typedef std::vector<string> umStorageNames;
 			umStorageNames umstoragenames;
 			int hostArg;
@@ -4655,7 +4689,7 @@ int processCommand(string* arguments)
 			//check if module type or module name was entered
 			if ( arguments[1].size() == 2 ) 
 			{	//Module Type was entered
-				if (arguments[3] == "" && cloud == "n")
+				if (arguments[3] == "" && cloud == oam::UnassignedName)
 				{
 					// need at least  arguments
 					cout << endl << "**** addModule Failed : Missing a required Parameter, enter 'help' for additional information" << endl;
@@ -4677,7 +4711,7 @@ int processCommand(string* arguments)
 			else
 			{
 				//Module Name was entered
-				if (arguments[2] == "" && cloud == "n")
+				if (arguments[2] == "" && cloud == oam::UnassignedName)
 				{
 					// need at least  arguments
 					cout << endl << "**** addModule Failed : Missing a required Parameter, enter 'help' for additional information" << endl;
@@ -4716,7 +4750,7 @@ int processCommand(string* arguments)
 				}
 			}
 
-			//check and parse Server Hostname
+			//check and parse input Hostname/VPC-IP Addresses
 			if (arguments[hostArg] != "") {
 				boost::char_separator<char> sep(", ");
 				boost::tokenizer< boost::char_separator<char> > tokens(arguments[hostArg], sep);
@@ -4724,22 +4758,63 @@ int processCommand(string* arguments)
 						it != tokens.end();
 						++it)
 				{
-					hostnames.push_back(*it);
+					inputnames.push_back(*it);
 				}
 			}
 
-			if ( hostnames.size() < (unsigned) moduleCount ) {
-				if ( cloud != "amazon" )
+			if ( inputnames.size() < (unsigned) moduleCount ) {
+				if ( cloud == oam::UnassignedName )
 				{
 					cout << endl << "**** addModule Failed : Failed to Add Module, number of hostnames is less than Module Count" << endl;
 					break;
 				}
 				else
 				{
-					cout << endl << "number of Instance-IDs (" << hostnames.size() << ") is less than Module Count (" << moduleCount << "), will launch new Instance(s)" << endl;
-					for ( int id = hostnames.size() ; id < moduleCount ; id++ )
+					if ( cloud == "amazon-ec2" )
 					{
-						hostnames.push_back(oam::UnassignedName);
+						cout << endl << "number of Instance-IDs (" << inputnames.size() << ") is less than Module Count (" << moduleCount << "), will launch new Instance(s)" << endl;
+						for ( int id = inputnames.size() ; id < moduleCount ; id++ )
+						{
+							inputnames.push_back(oam::UnassignedName);
+						}
+					}
+					else
+					{	// amazon-vpc
+						if ( inputnames.size() == 0 )
+						{
+							if ( AmazonVPCNextPrivateIP == oam::UnassignedName)
+							{
+								cout << endl << "**** addModule Failed : Failed to Add Module, enter VPC Private IP Address" << endl;
+								break;
+							}
+							else
+							{
+								if ( AmazonVPCNextPrivateIP == "autoassign")
+								{
+									for ( int id = inputnames.size() ; id < moduleCount ; id++ )
+									{
+										inputnames.push_back("autoassign");
+									}
+								}
+								else
+								{
+									for ( int id = inputnames.size() ; id < moduleCount ; id++ )
+									{
+										inputnames.push_back(AmazonVPCNextPrivateIP);
+	
+										try
+										{
+											AmazonVPCNextPrivateIP = oam.incrementIPAddress(AmazonVPCNextPrivateIP);
+										}
+										catch(...)
+										{
+											cout << endl << "ERROR: incrementIPAddress API error, check logs" << endl;
+											exit(1);
+										}
+									}
+								}
+							}
+						}
 					}
 				}
 			}
@@ -4773,13 +4848,13 @@ int processCommand(string* arguments)
 				}
 			}
 
-			if ( ((unsigned) nicNumber * moduleCount) != hostnames.size() && cloud == "n" ) {
+			if ( ((unsigned) nicNumber * moduleCount) != inputnames.size() && cloud == oam::UnassignedName ) {
 				cout << endl << "**** addModule Failed : Failed to Add Module, invalid number of hostNames entered. Enter " + oam.itoa(nicNumber * moduleCount) +  " hostname(s), which is the number of NICs times the number of modules" << endl;
 				break;
 			}
 
 			int moduleID = 1;
-			hostNames::const_iterator listPT1 = hostnames.begin();
+			inputNames::const_iterator listPT1 = inputnames.begin();
 			umStorageNames::const_iterator listPT2 = umstoragenames.begin();
 			for ( int i = 0 ; i < moduleCount ; i++ )
 			{
@@ -4821,11 +4896,11 @@ int processCommand(string* arguments)
 				for ( int j = 0 ; j < nicNumber ; j ++ )
 				{
 					//get/check Server Hostnames IP address
-					string hostName = *listPT1;
-					//get Network IP Address
+					string hostName;
 					string IPAddress;
-					if ( cloud == "amazon")
+					if ( cloud == "amazon-ec2")
 					{
+						hostName = *listPT1;
 						if ( hostName != oam::UnassignedName )
 						{
 							IPAddress = oam.getEC2InstanceIpAddress(hostName);
@@ -4839,13 +4914,42 @@ int processCommand(string* arguments)
 					}
 					else
 					{
-						IPAddress = oam.getIPAddress(hostName);
-						if ( IPAddress.empty() ) {
-							// prompt for IP Address
-							string prompt = "IP Address of " + hostName + " not found, enter IP Address or enter 'abort'";
-							IPAddress = dataPrompt(prompt);
-							if ( IPAddress == "abort" || !oam.isValidIP(IPAddress))
-								return 1;
+						if ( cloud == "amazon-vpc")
+						{
+							if ( *listPT1 != "autoassign" )
+							{
+								if ( oam.isValidIP(*listPT1) ) {
+									//ip address entered
+									hostName = oam::UnassignedName;
+									IPAddress = *listPT1;
+								}
+								else
+								{	//instance id entered
+									hostName = *listPT1;
+									IPAddress = oam.getEC2InstanceIpAddress(hostName);
+									if (IPAddress == "stopped" || IPAddress == "terminated") {
+										cout << "ERROR: Instance " + hostName + " not running, please start and retry" << endl << endl;
+										return 1;
+									}
+								}
+							}
+							else
+							{
+								hostName = oam::UnassignedName;
+								IPAddress = "autoassign";
+							}
+						}
+						else
+						{	// non-amazon
+							hostName = *listPT1;
+							IPAddress = oam.getIPAddress(hostName);
+							if ( IPAddress.empty() ) {
+								// prompt for IP Address
+								string prompt = "IP Address of " + hostName + " not found, enter IP Address or enter 'abort'";
+								IPAddress = dataPrompt(prompt);
+								if ( IPAddress == "abort" || !oam.isValidIP(IPAddress))
+									return 1;
+							}
 						}
 					}
 
@@ -5049,6 +5153,11 @@ int processCommand(string* arguments)
 				{
 					cout << "addModule Command Successfully completed: Modules are Disabled, run alterSystem-enableModule command to enable them" << endl << endl;
 				}
+
+				try {
+					oam.setSystemConfig("AmazonVPCNextPrivateIP", AmazonVPCNextPrivateIP);
+				}
+				catch(...) {}
 
 			}
 			catch (exception& e)

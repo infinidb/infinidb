@@ -2820,10 +2820,6 @@ int WriteEngineWrapper::processBeginVBCopy(const TxnID& txnid, const vector<ColS
 	rangeListTot.insert(rangeListTot.end(), rangeList.begin(), rangeList.end());
    }
 
-for (uint i=0; i < rangeListTot.size(); i++)
-{
-	cout << "lbid:txnid = " << rangeListTot[i].start <<":"<< txnid << endl;
-} 
 	if (rangeListTot.size() > 0)
 		rc = BRMWrapper::getInstance()->getDbrmObject()->beginVBCopy(txnid, colStructList[0].fColDbRoot, rangeListTot, freeList);
 //timer.stop("beginVBCopy");

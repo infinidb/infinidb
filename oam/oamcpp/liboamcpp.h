@@ -2146,10 +2146,21 @@ namespace oam
              */
 			EXPORT bool isValidIP(const std::string ipAddress);
 
+            /** @brief Increment IP Address
+             *
+             * Increment IP Address
+             */
+			EXPORT std::string incrementIPAddress(const std::string ipAddress);
+
 			/**
 			*@brief Check for a phrase in a log file and return status
 			*/
 			EXPORT bool checkLogStatus(std::string filename, std::string phase);
+
+			/**
+			*@brief  Fix RSA key
+			*/
+			EXPORT void fixRSAkey(std::string logFile);
 
 			/**
 			*@brief Get PM with read-write mount
@@ -2291,7 +2302,7 @@ namespace oam
 
             /** @brief launchEC2Instance
              */
-            EXPORT std::string launchEC2Instance(const std::string name = "dummy", const std::string type = oam::UnassignedName, const std::string group = oam::UnassignedName);
+            EXPORT std::string launchEC2Instance(const std::string name = "dummy", const std::string IPAddress = oam::UnassignedName, const std::string type = oam::UnassignedName, const std::string group = oam::UnassignedName);
 
             /** @brief getEC2InstanceIpAddress
              */
@@ -2367,7 +2378,6 @@ namespace oam
 			*@brief  gluster control
 			*/
 			EXPORT int glusterctl(GLUSTER_COMMANDS command, std::string argument1, std::string& argument2, std::string& errmsg);
-
 
         private:
 

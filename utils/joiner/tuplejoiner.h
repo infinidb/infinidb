@@ -164,10 +164,11 @@ public:
 
 	/* Typeless join interface */
 	inline bool isTypelessJoin() { return typelessJoin; }
+    inline bool isSignedUnsignedJoin() { return bSignedUnsignedJoin; }
 	inline const std::vector<uint> & getSmallKeyColumns() { return smallKeyColumns; }
 	inline const std::vector<uint> & getLargeKeyColumns() { return largeKeyColumns; }
 	inline uint getKeyLength() { return keyLength; }
-	
+    
 	/* Runtime casual partitioning support */
 	inline const boost::scoped_array<bool> &discreteCPValues() { return discreteValues; }
 	inline const boost::scoped_array<std::vector<int64_t> > &getCPData() { return cpValues; }
@@ -239,8 +240,9 @@ private:
 	boost::scoped_ptr<typelesshash_t> ht;  // used for UM join on strings
 	uint keyLength;
 	utils::FixedAllocator storedKeyAlloc;
-	boost::scoped_array<utils::FixedAllocator> tmpKeyAlloc;
-	
+    boost::scoped_array<utils::FixedAllocator> tmpKeyAlloc;
+    bool bSignedUnsignedJoin; // Set if we have a signed vs unsigned compare in a join. When not set, we can save checking for the signed bit.
+
 	/* semi-join vars & fcns */
 	boost::shared_ptr<funcexp::FuncExpWrapper> fe;
 	boost::scoped_array<funcexp::FuncExpWrapper> fes;  // holds X copies of fe, one per thread

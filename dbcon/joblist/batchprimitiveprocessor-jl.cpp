@@ -1140,7 +1140,11 @@ bool BatchPrimitiveProcessorJL::nextTupleJoinerMsg(ByteStream &bs)
 	Row r;
 	vector<Row::Pointer> *tSmallSide;
 	joiner::TypelessData tlData;
+    uint smallKeyCol;
+    uint largeKeyCol;
+    uint64_t smallkey;
 	bool isNull;
+	bool bSignedUnsigned;
 
 	memset((void*)&ism, 0, sizeof(ism));
 	tSmallSide = tJoiners[joinerNum]->getSmallSide();
@@ -1183,14 +1187,32 @@ bool BatchPrimitiveProcessorJL::nextTupleJoinerMsg(ByteStream &bs)
 		for (i = pos; i < pos + toSend; i++) {
 			r.setPointer((*tSmallSide)[i]);
 			isNull = false;
-			for (j = 0; j < smallSideKeys[joinerNum].size(); j++)
+			bSignedUnsigned = tJoiners[joinerNum]->isSignedUnsignedJoin();
+			for (j = 0; j < smallSideKeys[joinerNum].size(); j++){
 				isNull |= r.isNullValue(smallSideKeys[joinerNum][j]);
+                if (UNLIKELY(bSignedUnsigned)) {
+                    // BUG 5628 If this is a signed/unsigned join column and the sign bit is set on either side,
+                    // then it should not compare. Send null to PM to prevent compare
+                    smallKeyCol = smallSideKeys[joinerNum][j];
+                    largeKeyCol = tJoiners[joinerNum]->getLargeKeyColumns()[j];
+                    if (r.isUnsigned(smallKeyCol) != largeSideRG.isUnsigned(largeKeyCol)) {
+                        if (r.isUnsigned(smallKeyCol))
+                            smallkey = r.getUintField(smallKeyCol);
+                        else
+                            smallkey = r.getIntField(smallKeyCol);
+                        if (smallkey & 0x8000000000000000ULL) {
+                            isNull = true;
+                            break;
+                        }
+                    }
+                }
+            }
 			bs << (uint8_t) isNull;
 			if (!isNull) {
-				tlData = makeTypelessKey(r, smallSideKeys[joinerNum],
-				  tlKeyLens[joinerNum], &fa);
-				tlData.serialize(bs);
-				bs << i;
+                tlData = makeTypelessKey(r, smallSideKeys[joinerNum],
+                  tlKeyLens[joinerNum], &fa);
+                tlData.serialize(bs);
+                bs << i;
 			}
 		}
 	}
@@ -1204,9 +1226,20 @@ bool BatchPrimitiveProcessorJL::nextTupleJoinerMsg(ByteStream &bs)
 		bs.needAtLeast(toSend * sizeof(JoinerElements));
 		arr = (JoinerElements *) bs.getInputPtr();
 
-		for (i = pos, j = 0; i < pos + toSend; i++, j++) {
+        smallKeyCol = smallSideKeys[joinerNum][0];
+        bSignedUnsigned = r.isUnsigned(smallKeyCol) != largeSideRG.isUnsigned(tJoiners[joinerNum]->getLargeKeyColumns()[0]);
+        j = 0;
+		for (i = pos, j = 0; i < pos + toSend; ++i, ++j) {
 			r.setPointer((*tSmallSide)[i]);
-			arr[j].key = r.getIntField(smallSideKeys[joinerNum][0]);
+			if (r.isUnsigned(smallKeyCol))
+				smallkey = r.getUintField(smallKeyCol);
+			else 
+				smallkey = r.getIntField(smallKeyCol);
+			// If this is a compare signed vs unsigned and the sign bit is on for this value, then all compares
+			// against the large side should fall. UBIGINTEMPTYROW is not a valid value, so nothing will match.
+			if (bSignedUnsigned && (smallkey & 0x8000000000000000ULL)) 
+				smallkey = joblist::UBIGINTEMPTYROW;
+			arr[j].key = (int64_t)smallkey;
 			arr[j].value = i;
 // 			cout << "sending " << arr[j].key << ", " << arr[j].value << endl;
 		}

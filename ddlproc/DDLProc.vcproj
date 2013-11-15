@@ -438,7 +438,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="libbrm.lib libconfigcpp.lib libwriteengine.lib libddlpackage.lib libddlpackageproc.lib liboamcpp.lib libjoblist.lib libcacheutils.lib libloggingcpp.lib libexecplan.lib libfuncexp.lib libdataconvert.lib libmessageqcpp.lib libudfsdk.lib librowgroup.lib libweclient.lib libidbboot.lib librwlock.lib libcompress.lib libwinport.lib libxml2.lib iphlpapi.lib ws2_32.lib psapi.lib"
+				AdditionalDependencies="libbrm.lib libconfigcpp.lib libwriteengine.lib libddlpackage.lib libddlpackageproc.lib liboamcpp.lib libjoblist.lib libcacheutils.lib libloggingcpp.lib libexecplan.lib libfuncexp.lib libdataconvert.lib libmessageqcpp.lib libudfsdk.lib librowgroup.lib libweclient.lib libidbboot.lib librwlock.lib libcompress.lib libwinport.lib libxml2.lib iphlpapi.lib ws2_32.lib psapi.lib libidbdatafile.lib"
 				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_52_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\x64\EnterpriseRelease"
 				GenerateDebugInformation="true"
 				OptimizeReferences="2"

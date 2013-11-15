@@ -342,7 +342,7 @@ void TupleUnion::normalize(const Row &in, Row *out)
                     case CalpontSystemCatalog::UBIGINT:
                         if (in.getScale(i))
                             goto dec1;
-                        out->setUintField(in.getIntField(i), i);
+                        out->setUintField(in.getUintField(i), i);
                         break;
 					case CalpontSystemCatalog::CHAR:
 					case CalpontSystemCatalog::VARCHAR: {

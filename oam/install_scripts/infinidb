@@ -125,6 +125,7 @@ stop() {
 	touch /tmp/StopCalpont
 	pkill -9 ProcMon
 	pkill -9 ProcMgr
+	pkill -9 snmptrapd
 	sleep 1
 	$InstallDir/bin/clearShm
 	RETVAL=$?

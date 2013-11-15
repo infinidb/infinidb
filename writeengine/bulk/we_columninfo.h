@@ -268,7 +268,7 @@ struct ColumnInfo
     int openDctnryStore( bool bMustExist );
 
     /** @brief dictionary blocks that will need to be flushed from cache */
-    BRM::BlockList_t fDictBlocks;
+    std::vector<BRM::LBID_t> fDictBlocks;
 
     /** @brief Set abbreviated extent flag if this is an abbrev extent */
     void setAbbrevExtentCheck( );

@@ -16,6 +16,7 @@ MyDebugFlags
 *.ncb
 *.suo
 *.exe
+x64
 
 #--------------------
 # Slickedit Projects 

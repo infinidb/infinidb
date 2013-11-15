@@ -8,11 +8,11 @@ OutFile InfiniDB64.exe
 
 !define DISPLAY_URL http://www.calpont.com/
 
-!define DISPLAY_VERSION trunk
-VIAddVersionKey "FileVersion" "trunk Alpha"
-VIProductVersion "4.0.0.0"
+!define DISPLAY_VERSION "4.0.0-1"
+VIAddVersionKey "FileVersion" "4.0.0-1"
+VIProductVersion "4.0.0.1"
 
-VIAddVersionKey "ProductVersion" "${DISPLAY_VERSION} Final"
+VIAddVersionKey "ProductVersion" "${DISPLAY_VERSION}"
 VIAddVersionKey "CompanyName" "Calpont Corp."
 VIAddVersionKey "FileDescription" "Calpont InfiniDB Standard Windows 64-bit Installer"
 VIAddVersionKey "LegalCopyright" "Copyright (c) 2010-2013"

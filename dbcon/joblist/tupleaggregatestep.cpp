@@ -180,12 +180,10 @@ TupleAggregateStep::TupleAggregateStep(
 		fRowGroupIn(rgIn),
 		fUmOnly(false),
 		fRm(jobInfo.rm),
-		fBucketMask(0),
 		fBucketNum(0),
 		fInputIter(-1)
 {
 	fRowGroupData.reinit(fRowGroupOut);
-	//fRowGroupData.reset(new uint8_t[fRowGroupOut.getMaxDataSize()]);
 	fRowGroupOut.setData(&fRowGroupData);
 	fAggregator->setInputOutput(fRowGroupIn, &fRowGroupOut);
 
@@ -216,6 +214,8 @@ TupleAggregateStep::~TupleAggregateStep()
 void TupleAggregateStep::initializeMultiThread()
 {
 	RowGroupDL *dlIn = fInputJobStepAssociation.outAt(0)->rowGroupDL();
+    uint i;
+
 	if (dlIn == NULL)
 		throw logic_error("Input is not RowGroup data list in delivery step.");
 
@@ -223,26 +223,6 @@ void TupleAggregateStep::initializeMultiThread()
 		fInputIter = dlIn->getIterator();
 
 	fRowGroupIns.resize(fNumOfThreads);
-	fBucketMask = 0;
-
-	uint64_t mask = 1;
-	uint i;
-	for (i = 1; i <= 64; i++)
-	{
-		mask <<= 1;
-		fBucketMask = (fBucketMask << 1) | 1;
-		if (fNumOfBuckets & mask)
-		break;
-	}
-
-	// Check if the bucket number is a power of 2. If not, force it to be 16.
-	for (i++, mask <<= 1; i <= 64; i++, mask <<= 1)
-		if (fNumOfBuckets & mask)
-		{
-			fNumOfBuckets = 16;
-			fBucketMask = 15;
-		}
-
 	fRowGroupOuts.resize(fNumOfBuckets);
 	fRowGroupDatas.resize(fNumOfBuckets);
 
@@ -278,14 +258,14 @@ void TupleAggregateStep::join()
 }
 
 
-void TupleAggregateStep::doThreadedSecondPhaseAggregate(uint8_t threadID)
+void TupleAggregateStep::doThreadedSecondPhaseAggregate(uint32_t threadID)
 {
-	//RowBucketVec rowBucketVecs[fNumOfBuckets];
+    if (threadID >= fNumOfBuckets)
+        return;
+
 	scoped_array<RowBucketVec> rowBucketVecs(new RowBucketVec[fNumOfBuckets]);
 	scoped_array<bool> bucketDone(new bool[fNumOfBuckets]);
-
 	uint32_t hashlen = fAggregator->aggMapKeyLength();
-	//utils::TupleHasher hash(hashlen);
 
 	try
 	{
@@ -294,9 +274,7 @@ void TupleAggregateStep::doThreadedSecondPhaseAggregate(uint8_t threadID)
 		Row rowIn;
 		RowGroup* rowGroupIn = 0;
 		rowGroupIn = (aggDist->aggregator()->getOutputRowGroup());
-
 		uint bucketID;
-		//bool bucketDone[fNumOfBuckets];
 
 		if (multiDist)
 		{
@@ -325,7 +303,7 @@ void TupleAggregateStep::doThreadedSecondPhaseAggregate(uint8_t threadID)
 						// The key is the groupby columns, which are the leading columns.
 						//uint8_t* hashMapKey = rowIn.getData() + 2;
 						//bucketID = hash.operator()(hashMapKey) & fBucketMask;
-						bucketID = rowIn.hash(hashlen-1) & fBucketMask;
+						bucketID = rowIn.hash(hashlen-1) % fNumOfBuckets;
 						rowBucketVecs[bucketID][j].push_back(rowIn.getPointer());
 						rowIn.nextRow();
 					}
@@ -344,7 +322,7 @@ void TupleAggregateStep::doThreadedSecondPhaseAggregate(uint8_t threadID)
 					// The key is the groupby columns, which are the leading columns.
 					//uint8_t* hashMapKey = rowIn.getData() + 2;
 					//bucketID = hash.operator()(hashMapKey) & fBucketMask;
-					bucketID = rowIn.hash(hashlen-1) & fBucketMask;
+					bucketID = rowIn.hash(hashlen-1) % fNumOfBuckets;
 					rowBucketVecs[bucketID][0].push_back(rowIn.getPointer());
 					rowIn.nextRow();
 				}
@@ -352,7 +330,6 @@ void TupleAggregateStep::doThreadedSecondPhaseAggregate(uint8_t threadID)
 		}
 
 		bool done = false;
-		//uint64_t rgcount = 0; //debug
 
 		// reset bucketDone[] to be false
 		//memset(bucketDone, 0, sizeof(bucketDone));
@@ -364,7 +341,6 @@ void TupleAggregateStep::doThreadedSecondPhaseAggregate(uint8_t threadID)
 			{
 				if (!bucketDone[c] && fAgg_mutex[c]->try_lock())
 				{
-					//rgcount += rowBucketVecs[c][0].size();
 					if (multiDist)
 						dynamic_cast<RowAggregationMultiDistinct*>(fAggregators[c].get())->doDistinctAggregation_rowVec(rowBucketVecs[c]);
 					else
@@ -385,7 +361,6 @@ void TupleAggregateStep::doThreadedSecondPhaseAggregate(uint8_t threadID)
 			fEndOfResult = true;
 		}
 
-		//cout << "2nd phase thread " << (int)threadID << " rcount: " << rgcount << endl;
 	} // try
 	catch (IDBExcept& iex)
 	{
@@ -481,8 +456,6 @@ uint TupleAggregateStep::nextBand_singleThread(messageqcpp::ByteStream &bs)
 				if (fRowGroupOut.getColumnCount() != fRowGroupDelivered.getColumnCount())
 					pruneAuxColumns();
 				fRowGroupDelivered.serializeRGData(bs);
-				//bs << fRowGroupDelivered.getDataSize();
-				//bs.append(fRowGroupDelivered.getData(), fRowGroupDelivered.getDataSize());
 			}
 			else
 			{
@@ -536,8 +509,6 @@ uint TupleAggregateStep::nextBand_singleThread(messageqcpp::ByteStream &bs)
 		fRowGroupOut.resetRowGroup(0);
 		fRowGroupOut.setStatus(status());
 		fRowGroupOut.serializeRGData(bs);
-		//bs << fRowGroupOut.getDataSize();
-		//bs.append(rgData.get(), fRowGroupOut.getDataSize());
 		rowCount = 0;
 
 		if (traceOn())
@@ -634,8 +605,6 @@ void TupleAggregateStep::configDeliveredRowGroup(const JobInfo& jobInfo)
 							vector<uint>(precision0, precision0+retColCount),
 							jobInfo.stringTableThreshold);
 
-	//fRowGroupDelivered.setUseStringTable(false);
-
 	if (jobInfo.trace)
 		cout << "delivered RG: " << fRowGroupDelivered.toString() << endl << endl;
 
@@ -673,9 +642,6 @@ void TupleAggregateStep::savePmHJData(SP_ROWAGG_t& um, SP_ROWAGG_t& pm, RowGroup
 
 void TupleAggregateStep::deliverStringTableRowGroup(bool b)
 {
-	// aggregation not support string table yet.
-	idbassert(!b);
-
 	fRowGroupDelivered.setUseStringTable(b);
 }
 
@@ -1370,7 +1336,6 @@ void TupleAggregateStep::prep1PhaseAggregate(
 		posAgg.push_back(posAgg[i] + widthAgg[i]);
 	RowGroup aggRG(oidsAgg.size(), posAgg, oidsAgg, keysAgg, typeAgg, scaleAgg, precisionAgg,
 		jobInfo.stringTableThreshold);
-	//aggRG.setUseStringTable(false);
 	SP_ROWAGG_UM_t rowAgg(new RowAggregationUM(groupBy, functionVec, &jobInfo.rm));
 	rowgroups.push_back(aggRG);
 	aggregators.push_back(rowAgg);
@@ -2167,7 +2132,6 @@ void TupleAggregateStep::prep1PhaseDistinctAggregate(
 		posAgg.push_back(posAgg[i] + widthAgg[i]);
 	RowGroup aggRG(oidsAgg.size(), posAgg, oidsAgg, keysAgg, typeAgg, scaleAgg, precisionAgg,
 		jobInfo.stringTableThreshold);
-	//aggRG.setUseStringTable(false);
 	SP_ROWAGG_UM_t rowAgg(new RowAggregationUM(groupBy, functionVec1, &jobInfo.rm));
 
 	posAggDist.push_back(2);   // rid
@@ -2175,7 +2139,6 @@ void TupleAggregateStep::prep1PhaseDistinctAggregate(
 		posAggDist.push_back(posAggDist[i] + widthAggDist[i]);
 	RowGroup aggRgDist(oidsAggDist.size(), posAggDist, oidsAggDist, keysAggDist, typeAggDist,
 		scaleAggDist, precisionAggDist, jobInfo.stringTableThreshold);
-	//aggRgDist.setUseStringTable(false);
 	SP_ROWAGG_DIST rowAggDist(new RowAggregationDistinct(groupByNoDist, functionVec2, &jobInfo.rm));
 
 	// mapping the group_concat columns, if any.
@@ -2254,7 +2217,6 @@ void TupleAggregateStep::prep1PhaseDistinctAggregate(
 				posAggSub.push_back(posAggSub[k] + widthAggSub[k]);
 			RowGroup subRg(oidsAggSub.size(), posAggSub, oidsAggSub, keysAggSub, typeAggSub,
 				scaleAggSub, precisionAggSub, jobInfo.stringTableThreshold);
-			//subRg.setUseStringTable(false);
 			subRgVec.push_back(subRg);
 
 			// construct groupby vector
@@ -2982,7 +2944,6 @@ void TupleAggregateStep::prep2PhasesAggregate(
 		posAggUm.push_back(posAggUm[i] + widthAggUm[i]);
 	RowGroup aggRgUm(oidsAggUm.size(), posAggUm, oidsAggUm, keysAggUm, typeAggUm, scaleAggUm,
 		precisionAggUm, jobInfo.stringTableThreshold);
-	//aggRgUm.setUseStringTable(false);
 	SP_ROWAGG_UM_t rowAggUm(new RowAggregationUMP2(groupByUm, functionVecUm, &jobInfo.rm));
 	rowgroups.push_back(aggRgUm);
 	aggregators.push_back(rowAggUm);
@@ -2992,7 +2953,6 @@ void TupleAggregateStep::prep2PhasesAggregate(
 		posAggPm.push_back(posAggPm[i] + widthAggPm[i]);
 	RowGroup aggRgPm(oidsAggPm.size(), posAggPm, oidsAggPm, keysAggPm, typeAggPm, scaleAggPm,
 		precisionAggPm, jobInfo.stringTableThreshold);
-	//aggRgPm.setUseStringTable(false);
 	SP_ROWAGG_PM_t rowAggPm(new RowAggregation(groupByPm, functionVecPm));
 	rowgroups.push_back(aggRgPm);
 	aggregators.push_back(rowAggPm);
@@ -3775,7 +3735,6 @@ void TupleAggregateStep::prep2PhasesDistinctAggregate(
 		posAggUm.push_back(posAggUm[i] + widthAggUm[i]);
 	RowGroup aggRgUm(oidsAggUm.size(), posAggUm, oidsAggUm, keysAggUm, typeAggUm, scaleAggUm,
 		precisionAggUm, jobInfo.stringTableThreshold);
-	//aggRgUm.setUseStringTable(false);
 	SP_ROWAGG_UM_t rowAggUm(new RowAggregationUMP2(groupByUm, functionNoDistVec, &jobInfo.rm));
 
 	posAggDist.push_back(2);   // rid
@@ -3783,7 +3742,6 @@ void TupleAggregateStep::prep2PhasesDistinctAggregate(
 		posAggDist.push_back(posAggDist[i] + widthAggDist[i]);
 	RowGroup aggRgDist(oidsAggDist.size(), posAggDist, oidsAggDist, keysAggDist, typeAggDist,
 		scaleAggDist, precisionAggDist, jobInfo.stringTableThreshold);
-	//aggRgDist.setUseStringTable(false);
 	SP_ROWAGG_DIST rowAggDist(new RowAggregationDistinct(groupByNoDist, functionVecUm, &jobInfo.rm));
 
 	// if distinct key word applied to more than one aggregate column, reset rowAggDist
@@ -3853,7 +3811,6 @@ void TupleAggregateStep::prep2PhasesDistinctAggregate(
 				posAggSub.push_back(posAggSub[k] + widthAggSub[k]);
 			RowGroup subRg(oidsAggSub.size(), posAggSub, oidsAggSub, keysAggSub, typeAggSub,
 				scaleAggSub, precisionAggSub, jobInfo.stringTableThreshold);
-			//subRg.setUseStringTable(false);
 			subRgVec.push_back(subRg);
 
 			// construct groupby vector
@@ -3971,7 +3928,6 @@ void TupleAggregateStep::prep2PhasesDistinctAggregate(
 		posAggPm.push_back(posAggPm[i] + widthAggPm[i]);
 	RowGroup aggRgPm(oidsAggPm.size(), posAggPm, oidsAggPm, keysAggPm, typeAggPm, scaleAggPm,
 		precisionAggPm, jobInfo.stringTableThreshold);
-	//aggRgPm.setUseStringTable(false);
 	SP_ROWAGG_PM_t rowAggPm(new RowAggregation(groupByPm, functionVecPm));
 	rowgroups.push_back(aggRgPm);
 	aggregators.push_back(rowAggPm);
@@ -4225,24 +4181,17 @@ void TupleAggregateStep::aggregateRowGroups()
 }
 
 
-void TupleAggregateStep::threadedAggregateRowGroups(uint8_t threadID)
+void TupleAggregateStep::threadedAggregateRowGroups(uint32_t threadID)
 {
 	RGData rgData;
 	scoped_array<RowBucketVec> rowBucketVecs(new RowBucketVec[fNumOfBuckets]);
 	scoped_array<Row> distRow;
 	scoped_array<shared_array<uint8_t> > distRowData;
 	uint bucketID;
-	//bool bucketDone[fNumOfBuckets];
 	scoped_array<bool> bucketDone(new bool[fNumOfBuckets]);
 	vector<utils::TupleHasher*> hashs;
 	vector<uint> hashLens;
 	bool locked = false;
-
-	// profiling
-	//ostringstream readInput, buildBucket, buildMap;
-	//readInput << "readInput" << (int)threadID;
-	//buildBucket << "buildBucket" << (int)threadID;
-	//buildMap << "buildMap" << (int)threadID;
 
 	RowAggregationMultiDistinct *multiDist = NULL;
 
@@ -4296,8 +4245,6 @@ void TupleAggregateStep::threadedAggregateRowGroups(uint8_t threadID)
 								distRowData[j].reset(new uint8_t[distRow[j].getSize()]);
 								distRow[j].setData(distRowData[j].get());
 								hashLens.push_back(multiDist->subAggregators()[j]->aggMapKeyLength());
-								//assert(hashLens.back() > 0);
-								//hashs.push_back(new utils::TupleHasher(hashlen));
 							}
 						}
 						else
@@ -4309,7 +4256,6 @@ void TupleAggregateStep::threadedAggregateRowGroups(uint8_t threadID)
 								hashLens.push_back(dynamic_cast<RowAggregationDistinct*>(fAggregator.get())->aggregator()->aggMapKeyLength());
 							else
 								hashLens.push_back(fAggregator->aggMapKeyLength());
-							//hashs.push_back(new utils::TupleHasher(hashlen));
 						}
 
 						fRowGroupIns[threadID] = fRowGroupIn;
@@ -4319,8 +4265,21 @@ void TupleAggregateStep::threadedAggregateRowGroups(uint8_t threadID)
 
 					if (more)
 					{
+					    // Trying out a ramp-up strategy for starting the
+                        // first phase threads to cut overhead on big systems
+                        // processing small result
+                        // sets.  On every non-zero read from the input FIFO,
+                        // and if there is more data to read, the
+                        // first thread will start another thread until the
+                        // maximum number is reached.
+                        if (threadID == 0 && fFirstPhaseThreadCount < fNumOfThreads &&
+                          dlIn->more(fInputIter)) {
+                            fFirstPhaseRunners[fFirstPhaseThreadCount].reset
+                                (new boost::thread(ThreadedAggregator(this, fFirstPhaseThreadCount)));
+                            fFirstPhaseThreadCount++;
+                        }
+
 						fRowGroupIns[threadID].setData(&rgData);
-						//cout << "*TAS got: " << fRowGroupIns[threadID].toString() << endl;
 						fMemUsage[threadID] += fRowGroupIns[threadID].getSizeWithStrings();
 						if (!fRm.getMemory(fRowGroupIns[threadID].getSizeWithStrings()))
 						{
@@ -4343,7 +4302,8 @@ void TupleAggregateStep::threadedAggregateRowGroups(uint8_t threadID)
 					}
 				}
 
-				// input rowgroup and aggregator is finalized only right before hashjoin starts if there is.
+				// input rowgroup and aggregator is finalized only right before hashjoin starts
+				// if there is.
 				if (fAggregators.empty())
 				{
 					fAggregators.resize(fNumOfBuckets);
@@ -4375,9 +4335,7 @@ void TupleAggregateStep::threadedAggregateRowGroups(uint8_t threadID)
 								{
 									rowIn.copyField(distRow[j], k, multiDist->subAggregators()[j]->getGroupByCols()[k].get()->fInputColumnIndex);
 								}
-								//uint8_t* hashMapKey = distRow[j].getData() + 2;
-								bucketID = distRow[j].hash(hashLens[j] - 1) & fBucketMask;
-								//bucketID = hashs[j]->operator()(hashMapKey) & fBucketMask;
+								bucketID = distRow[j].hash(hashLens[j] - 1) % fNumOfBuckets;
 								rowBucketVecs[bucketID][j].push_back(rowIn.getPointer());
 								rowIn.nextRow();
 							}
@@ -4389,14 +4347,11 @@ void TupleAggregateStep::threadedAggregateRowGroups(uint8_t threadID)
 					for (uint c = 0; c < rgDatas.size(); c++)
 					{
 						fRowGroupIns[threadID].setData(&rgDatas[c]);
-						//cout << "**TAS got: " << fRowGroupIns[threadID].toString() << endl;
 						fRowGroupIns[threadID].getRow(0, &rowIn);
 						for (uint64_t i = 0; i < fRowGroupIns[threadID].getRowCount(); ++i)
 						{
 							// The key is the groupby columns, which are the leading columns.
-							//uint8_t* hashMapKey = rowIn.getData() + 2;
-							//int bucketID = hashs[0]->operator()(hashMapKey) & fBucketMask;
-							int bucketID = rowIn.hash(hashLens[0] - 1) & fBucketMask;
+							int bucketID = rowIn.hash(hashLens[0] - 1) % fNumOfBuckets;
 							rowBucketVecs[bucketID][0].push_back(rowIn.getPointer());
 							rowIn.nextRow();
 						}
@@ -4405,7 +4360,6 @@ void TupleAggregateStep::threadedAggregateRowGroups(uint8_t threadID)
 
 				// insert to the hashmaps owned by each aggregator
 				bool done = false;
-				//memset(bucketDone, 0, sizeof(bucketDone));
 				fill(&bucketDone[0], &bucketDone[fNumOfBuckets], false);
 				while (!fEndOfResult && !done && !cancelled())
 				{
@@ -4447,8 +4401,6 @@ void TupleAggregateStep::threadedAggregateRowGroups(uint8_t threadID)
 					fMutex.unlock();
 				}
 			}
-			//cout << "thread " << (int)threadID << " rcount: " << rgcount << endl;
-
 		} // try
 		catch (IDBExcept& iex)
 		{
@@ -4579,12 +4531,9 @@ void TupleAggregateStep::doAggregate_singleThread()
 				fAggregator->finalize();
 				fRowsReturned += fRowGroupOut.getRowCount();
 				rgData = fRowGroupOut.duplicate();
-				//rgData.reinit(fRowGroupOut, fRowGroupOut.getRowCount());
-				//memcpy(rgData.get(), fRowGroupOut.getData(), fRowGroupOut.getDataSize());
 				fRowGroupDelivered.setData(&rgData);
 				if (fRowGroupOut.getColumnCount() > fRowGroupDelivered.getColumnCount())
 					pruneAuxColumns();
-				//INSERT_ADAPTER(dlp, rgData);
 				dlp->insert(rgData);
 			}
 		}
@@ -4641,17 +4590,31 @@ uint64_t TupleAggregateStep::doThreadedAggregate(ByteStream& bs, RowGroupDL* dlp
 	try {
 		if (!fDoneAggregate)
 		{
-			vector<shared_ptr<thread> > runners;
-			shared_ptr<thread> runner;
 			initializeMultiThread();
-			for (i = 0; i < fNumOfThreads; i++)
-			{
-				runner.reset(new thread(ThreadedAggregator(this, i)));
-				runners.push_back(runner);
-			}
-			for (i = 0; i < fNumOfThreads; i++)
-				runners[i]->join();
-		}
+/*
+//          This block of code starts all threads at the start
+          fFirstPhaseThreadCount = fNumOfThreads;
+          boost::shared_ptr<boost::thread> runner;
+          for (i = 0; i < fNumOfThreads; i++)
+          {
+              runner.reset(new boost::thread(ThreadedAggregator(this, i)));
+              fFirstPhaseRunners.push_back(runner);
+          }
+*/
+
+//          This block of code starts one thread, relies on doThreadedAggregation()
+//          to start more as needed
+            fFirstPhaseRunners.resize(fNumOfThreads); // to prevent a resize during use
+            fFirstPhaseThreadCount = 1;
+            for (i = 1; i < fNumOfThreads; i++)
+                // fill with valid thread objects to make joining work
+                fFirstPhaseRunners[i].reset(new boost::thread());
+            fFirstPhaseRunners[0].reset(new boost::thread(ThreadedAggregator(this, 0)));
+
+            for (i = 0; i < fNumOfThreads; i++)
+                fFirstPhaseRunners[i]->join();
+            fFirstPhaseRunners.clear();
+        }
 
 		if (dynamic_cast<RowAggregationDistinct*>(fAggregator.get()) && fAggregator->aggMapKeyLength() > 0)
 		{
@@ -4664,20 +4627,20 @@ uint64_t TupleAggregateStep::doThreadedAggregate(ByteStream& bs, RowGroupDL* dlp
 					shared_ptr<thread> runner;
 					fRowGroupsDeliveredData.resize(fNumOfBuckets);
 
-					for (i = 0; i < fNumOfBuckets; i++)
-					{
-						runner.reset(new thread(ThreadedSecondPhaseAggregator(this, i)));
-						runners.push_back(runner);
-					}
-					for (i = 0; i < fNumOfBuckets; i++)
-						runners[i]->join();
-				}
+                    uint bucketsPerThread = fNumOfBuckets/fNumOfThreads;
+                    uint numThreads = ((fNumOfBuckets % fNumOfThreads) == 0 ?
+                        fNumOfThreads : fNumOfThreads + 1);
+                    //uint bucketsPerThread = 1;
+                    //uint numThreads = fNumOfBuckets;
 
-				// profiling debug
-				//for (uint c = 0; c < fNumOfBuckets; c++)
-				//{
-				//	cout << "map[" << c << "] = " << fAggregators[c]->mapPtr()->size() << endl;
-				//}
+                    for (i = 0; i < numThreads; i++)
+                    {
+                        runner.reset(new boost::thread(ThreadedSecondPhaseAggregator(this, i*bucketsPerThread, bucketsPerThread)));
+                        runners.push_back(runner);
+                    }
+                    for (i = 0; i < numThreads; i++)
+                        runners[i]->join();
+                }
 
 				fDoneAggregate = true;
 				bool done = true;
@@ -4693,17 +4656,12 @@ uint64_t TupleAggregateStep::doThreadedAggregate(ByteStream& bs, RowGroupDL* dlp
 						if (dlp)
 						{
 							rgData = fRowGroupDelivered.duplicate();
-							//rgData.reset(new uint8_t[fRowGroupDelivered.getDataSize()]);
-							//memcpy(rgData.get(), fRowGroupDelivered.getData(), fRowGroupDelivered.getDataSize());
-							//INSERT_ADAPTER(dlp, rgData);
 							dlp->insert(rgData);
 						}
 						else
 						{
 							bs.restart();
 							fRowGroupDelivered.serializeRGData(bs);
-							//bs << fRowGroupDelivered.getDataSize();
-							//bs.append(fRowGroupDelivered.getData(), fRowGroupDelivered.getDataSize());
 							break;
 						}
 					}
@@ -4719,7 +4677,6 @@ uint64_t TupleAggregateStep::doThreadedAggregate(ByteStream& bs, RowGroupDL* dlp
 			RowAggregationDistinct* agg = dynamic_cast<RowAggregationDistinct*>(fAggregator.get());
 			if (!fEndOfResult)
 			{
-				////bs.restart();
 				if (!fDoneAggregate)
 				{
 					for (i = 0; i < fNumOfBuckets; i++)
@@ -4773,19 +4730,13 @@ uint64_t TupleAggregateStep::doThreadedAggregate(ByteStream& bs, RowGroupDL* dlp
 
 					if (dlp)
 					{
-						rgData = fRowGroupOut.duplicate();
-						//rgData.reset(new uint8_t[fRowGroupOut.getDataSize()]);
-						//memcpy(rgData.get(), fRowGroupOut.getData(), fRowGroupOut.getDataSize());
-						//INSERT_ADAPTER(dlp, rgData);
+						rgData = fRowGroupDelivered.duplicate();
 						dlp->insert(rgData);
 					}
 					else
 					{
 						bs.restart();
 						fRowGroupDelivered.serializeRGData(bs);
-						//bs.restart();
-						//bs << fRowGroupDelivered.getDataSize();
-						//bs.append(fRowGroupDelivered.getData(), fRowGroupDelivered.getDataSize());
 						break;
 					}
 				}
@@ -4841,13 +4792,10 @@ uint64_t TupleAggregateStep::doThreadedAggregate(ByteStream& bs, RowGroupDL* dlp
 		{
 			// send an empty / error band
 			RGData rgData(fRowGroupOut, 0);
-			//shared_array<uint8_t> rgData(new uint8_t[fRowGroupOut.getEmptySize()]);
 			fRowGroupOut.setData(&rgData);
 			fRowGroupOut.resetRowGroup(0);
 			fRowGroupOut.setStatus(status());
 			fRowGroupOut.serializeRGData(bs);
-			//bs << fRowGroupOut.getDataSize();
-			//bs.append(rgData.get(), fRowGroupOut.getDataSize());
 			rowCount = 0;
 
 			if (traceOn())
@@ -4873,7 +4821,6 @@ void TupleAggregateStep::pruneAuxColumns()
 		row2.nextRow();
 
 		// bug4463, memmove for src, dest overlap
-		//copyRow(row1, &row2);
 		memmove(row2.getData(), row1.getData(), row2.getSize());
 	}
 }

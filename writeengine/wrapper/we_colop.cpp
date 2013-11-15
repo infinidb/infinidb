@@ -182,7 +182,13 @@ int ColumnOp::allocRowId(const TxnID& txnid, bool useStartingExtent,
 					break;
 			}
 		}
+		
+		if ((rowsallocated == 0) && isFirstBatchPm)
+		{
+			TableMetaData::removeTableMetaData(tableOid);
+			TableMetaData* tableMetaData= TableMetaData::makeTableMetaData(tableOid);
 
+		} 
 	    //Check if a new extent is needed  		
         if (rowsallocated < totalRow)
 		 {
@@ -354,12 +360,6 @@ int ColumnOp::allocRowId(const TxnID& txnid, bool useStartingExtent,
 			if (isBatchInsert && newExtent)
 			{
 			  TableMetaData* tableMetaData= TableMetaData::makeTableMetaData(tableOid);	
-			  //@Bug 5429
-			  if (isFirstBatchPm && (totalRow == rowsLeft))
-			  {
-				TableMetaData::removeTableMetaData(tableOid);
-				tableMetaData= TableMetaData::makeTableMetaData(tableOid);	
-			  }
 				
 			  for (i=0; i < newColStructList.size(); i++)
 			  {		
@@ -671,12 +671,12 @@ int ColumnOp::fillColumn(const TxnID& txnid, Column& column, Column& refCol, voi
 							rootList[i], partition, segment, startLbid, newFile);
 						if (rc != NO_ERROR)
 							return rc;
-						
+						//@Bug 5652.
 						std::map<FID,FID> oids1;
 						oids1[dictOid] = dictOid;						
 						dctnry->flushFile(rc, oids1);
-						dctnry->closeDctnry();	
-						
+						dctnry->closeDctnry();
+							
 						//tokenize default value if needed
 						if (defaultValStr.length() > 0)
 						{
@@ -691,15 +691,23 @@ int ColumnOp::fillColumn(const TxnID& txnid, Column& column, Column& refCol, voi
 							DctnryTuple dctnryTuple;
 							memcpy(dctnryTuple.sigValue, defaultValStr.c_str(), defaultValStr.length());
 							dctnryTuple.sigSize = defaultValStr.length();
-							WriteEngineWrapper wrapper;
-							wrapper.setTransId(txnid);
-							wrapper.setIsInsert(true);
-							wrapper.setBulkFlag(true);
-							rc = wrapper.tokenize(txnid, dctnryStruct, dctnryTuple);							
-							wrapper.flushDataFiles(rc, txnid, oids1);
+								
+							rc = dctnry->openDctnry(dctnryStruct.dctnryOid,
+                              dctnryStruct.fColDbRoot, dctnryStruct.fColPartition,
+                              dctnryStruct.fColSegment);
+							rc = dctnry->updateDctnry(dctnryTuple.sigValue, dctnryTuple.sigSize, dctnryTuple.token);
+							if (dctnryStruct.fCompressionType > 0)	
+								dctnry->closeDctnry(false);	
+							else
+								dctnry->closeDctnry(true);	
+							
 							if (rc != NO_ERROR)
 								return rc;
 							memcpy(defaultVal, &dctnryTuple.token, size); 
+							//@Bug 5652.
+							std::map<FID,FID> oids1;
+							oids1[dictOid] = dictOid;						
+							dctnry->flushFile(rc, oids1);
 						}			
 					}
                 }
@@ -731,6 +739,12 @@ int ColumnOp::fillColumn(const TxnID& txnid, Column& column, Column& refCol, voi
 								rootList[i], partition, segment, startLbid, newFile);
 							if (rc != NO_ERROR)
 								return rc;
+								
+							//@Bug 5652.
+							std::map<FID,FID> oids1;
+							oids1[dictOid] = dictOid;						
+							dctnry->flushFile(rc, oids1);
+							dctnry->closeDctnry();
 							//tokenize default value if needed
 							if (defaultValStr.length() > 0)
 							{
@@ -744,13 +758,26 @@ int ColumnOp::fillColumn(const TxnID& txnid, Column& column, Column& refCol, voi
 								dctnryStruct.fCompressionType = column.compressionType;
 								DctnryTuple dctnryTuple;
 								memcpy(dctnryTuple.sigValue, defaultValStr.c_str(), defaultValStr.length());
-								WriteEngineWrapper wrapper;
+								//WriteEngineWrapper wrapper;
 								dctnryTuple.sigSize = defaultValStr.length();
-								rc = wrapper.tokenize(txnid, dctnryStruct, dctnryTuple);
+								//rc = wrapper.tokenize(txnid, dctnryStruct, dctnryTuple);
+								rc = dctnry->openDctnry(dctnryStruct.dctnryOid,
+                              dctnryStruct.fColDbRoot, dctnryStruct.fColPartition,
+                              dctnryStruct.fColSegment);
+								rc = dctnry->updateDctnry(dctnryTuple.sigValue, dctnryTuple.sigSize, dctnryTuple.token);
+								if (dctnryStruct.fCompressionType > 0)	
+									dctnry->closeDctnry(false);	
+								else
+									dctnry->closeDctnry(true);			
 								if (rc != NO_ERROR)
 									return rc;
 								memcpy(defaultVal, &dctnryTuple.token, size); 
-							}	
+								//@Bug 5652.
+								std::map<FID,FID> oids1;
+								oids1[dictOid] = dictOid;						
+								dctnry->flushFile(rc, oids1);
+									
+							}
 						}
 					}
 					else //just add a extent to the file

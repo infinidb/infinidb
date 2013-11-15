@@ -117,11 +117,7 @@ fi
 #umount file systems
 if [ $user = "root" ]; then
 	rm -f $installdir/data*/OAMdbrootCheck > /dev/null 2>&1
-	umount -fl $installdir/data*  > /dev/null 2>&1
-	rm -f $installdir/data*/OAMdbrootCheck > /dev/null 2>&1
 else
-	sudo rm -f $installdir/data*/OAMdbrootCheck > /dev/null 2>&1
-	sudo umount -fl $installdir/data*  > /dev/null 2>&1
 	sudo rm -f $installdir/data*/OAMdbrootCheck > /dev/null 2>&1
 fi
 

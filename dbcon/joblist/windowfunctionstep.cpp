@@ -500,7 +500,9 @@ void WindowFunctionStep::initialize(const RowGroup& rg, JobInfo& jobInfo)
 	if (jobInfo.trace) cout << "Input to WindowFunctionStep: " << rg.toString() << endl;
 
 	// query type decides the output by dbroot or partition
-	fIsSelect = (jobInfo.queryType == "SELECT");
+	// @bug 5631. Insert select should be treated as select
+	fIsSelect = (jobInfo.queryType == "SELECT" || 
+                     jobInfo.queryType == "INSERT_SELECT");
 
 	// input row meta data
 	fRowGroupIn = rg;
@@ -957,7 +959,10 @@ void WindowFunctionStep::doPostProcessForDml()
 		fRowGroupIn.setData(&(*i));
 		RGData rgData = RGData(fRowGroupIn, fRowGroupIn.getRowCount());
 		fRowGroupOut.setData(&rgData);
+		// @bug 5631. reset rowgroup before the data is populated.
+		fRowGroupOut.resetRowGroup(fRowGroupIn.getBaseRid());
 		fRowGroupOut.setDBRoot(fRowGroupIn.getDBRoot());
+                fRowGroupOut.setRowCount(fRowGroupIn.getRowCount());
 
 		fRowGroupIn.getRow(0, &rowIn);
 		fRowGroupOut.getRow(0, &rowOut);
@@ -973,8 +978,8 @@ void WindowFunctionStep::doPostProcessForDml()
 			rowOut.nextRow();
 		}
 
-		fRowGroupOut.resetRowGroup(fRowGroupIn.getBaseRid());
-		fRowGroupOut.setRowCount(fRowGroupIn.getRowCount());
+		//fRowGroupOut.resetRowGroup(fRowGroupIn.getBaseRid());
+		//fRowGroupOut.setRowCount(fRowGroupIn.getRowCount());
 
 		fOutputDL->insert(rgData);
 	}

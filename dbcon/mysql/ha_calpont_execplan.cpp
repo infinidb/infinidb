@@ -206,7 +206,7 @@ uint buildOuterJoin(gp_walk_info& gwi, SELECT_LEX& select_lex)
 #endif
 			expr->traverse_cond(gp_walk, &gwi_outer, Item::POSTFIX);
 		}
-		// this part is ambiguous. Not quite sure how MySQL's lay out the outer join filters in the structur
+		// this part is ambiguous. Not quite sure how MySQL's lay out the outer join filters in the structure
 		else if (table_ptr->embedding && table_ptr->embedding->outer_join && table_ptr->embedding->on_expr)
 		{
 			// all the tables in nested_join are inner tables.
@@ -1456,7 +1456,6 @@ void debug_walk(const Item *item, void *arg)
 	case Item::SUM_FUNC_ITEM:
 	{
 		Item_sum* isp = (Item_sum*)item;
-
 		Item_sum_int*            isip = 0;
 		Item_sum_distinct*       isdp = 0;
 		Item_sum_avg*            isap = 0;
@@ -1464,51 +1463,51 @@ void debug_walk(const Item *item, void *arg)
 		Item_sum_count_distinct* iscdp = 0;
 		Item_sum_min*            isnp = 0;
 		Item_sum_max*            isxp = 0;
-		Item* ip = 0;
-		uint arg_count = 0;
+		//Item*                    ip = 0;
+		//uint                     arg_count = 0;
 
 		switch (isp->sum_func())
 		{
 		case Item_sum::SUM_FUNC:
 			isip = (Item_sum_int*)isp;
-			ip = *isip->args;
-			arg_count = isip->arg_count;
+			//ip = *isip->args;
+			//arg_count = isip->arg_count;
 			cout << "SUM_FUNC: " << isip->name << endl;
 			break;
 		case Item_sum::SUM_DISTINCT_FUNC:
 			isdp = (Item_sum_distinct*)isp;
-			ip = *isdp->args;
-			arg_count = isdp->arg_count;
+			//ip = *isdp->args;
+			//arg_count = isdp->arg_count;
 			cout << "SUM_DISTINCT_FUNC: " << isdp->name << endl;
 			break;
 		case Item_sum::AVG_FUNC:
 			isap = (Item_sum_avg*)isp;
-			ip = *isap->args;
-			arg_count = isap->arg_count;
+			//ip = *isap->args;
+			//arg_count = isap->arg_count;
 			cout << "AVG_FUNC: " << isap->name << endl;
 			break;
 		case Item_sum::COUNT_FUNC:
 			iscp = (Item_sum_count*)isp;
-			ip = *iscp->args;
-			arg_count = iscp->arg_count;
+			//ip = *iscp->args;
+			//arg_count = iscp->arg_count;
 			cout << "COUNT_FUNC: " << iscp->name << endl;
 			break;
 		case Item_sum::COUNT_DISTINCT_FUNC:
 			iscdp = (Item_sum_count_distinct*)isp;
-			ip = *iscdp->args;
-			arg_count = iscdp->arg_count;
+			//ip = *iscdp->args;
+			//arg_count = iscdp->arg_count;
 			cout << "COUNT_DISTINCT_FUNC: " << iscdp->name << endl;
 			break;
 		case Item_sum::MIN_FUNC:
 			isnp = (Item_sum_min*)isp;
-			ip = *isnp->args;
-			arg_count = isnp->arg_count;
+			//ip = *isnp->args;
+			//arg_count = isnp->arg_count;
 			cout << "MIN_FUNC: " << isnp->name << endl;
 			break;
 		case Item_sum::MAX_FUNC:
 			isxp = (Item_sum_max*)isp;
-			ip = *isxp->args;
-			arg_count = isxp->arg_count;
+			//ip = *isxp->args;
+			//arg_count = isxp->arg_count;
 			cout << "MAX_FUNC: " << isxp->name << endl;
 			break;
 		default:
@@ -4985,10 +4984,30 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex, SCSEP& csep, bool i
 				gwi.groupByCols.push_back(srcp);
 				gwi.columnMap.insert(CalpontSelectExecutionPlan::ColumnMap::value_type(string(ifp->field_name), srcp));
 			}
-			else if ((*(groupcol->item))->type() == Item::FUNC_ITEM)
+			// @bug5638. The group by column is constant but not couter, alias has to match a column
+			// on the select list
+			else if (!groupcol->counter_used && 
+			         (groupItem->type() == Item::INT_ITEM ||
+			          groupItem->type() == Item::STRING_ITEM ||
+			          groupItem->type() == Item::REAL_ITEM ||
+			          groupItem->type() == Item::DECIMAL_ITEM))
 			{
-				nonSupportItem = groupItem;
-				break;
+				ReturnedColumn* rc = 0;
+				for (uint j = 0; j < gwi.returnedCols.size(); j++)
+				{
+					if (groupItem->name && string(groupItem->name) == gwi.returnedCols[j].get()->alias())
+					{
+						rc = gwi.returnedCols[j].get()->clone();
+						rc->orderPos(j);
+						break;
+					}					
+				}
+				if (!rc)
+				{
+					nonSupportItem = groupItem;
+					break;
+				}
+				gwi.groupByCols.push_back(SRCP(rc));
 			}
 			else if ((*(groupcol->item))->type() == Item::SUBSELECT_ITEM)
 			{
@@ -5018,19 +5037,20 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex, SCSEP& csep, bool i
 			// @bug 3761.
 			else if (groupcol->counter_used)
 			{
-				gwi.groupByCols.push_back(SRCP(gwi.returnedCols[groupcol->counter-1]->clone()));
-			}
-			else if ((*(groupcol->item))->type() == Item::INT_ITEM)
-			{
-				// when the group by col is from derived table, mysql does not resolve it. int value is the counter
-				uint counter = ((Item_int*)groupItem)->val_int();
-				if (gwi.returnedCols.size() < counter - 1)
+				if (gwi.returnedCols.size() <= (uint)(groupcol->counter-1))
 				{
 					nonSupportItem = groupItem;
-					break;
 				}
-				gwi.groupByCols.push_back(SRCP(gwi.returnedCols[counter-1]->clone()));
+				else
+				{
+					gwi.groupByCols.push_back(SRCP(gwi.returnedCols[groupcol->counter-1]->clone()));
+				}
 			}
+			else
+			{
+				nonSupportItem = groupItem;
+			}
+			
 		}
 		
 		// @bug 4756. Add internal groupby column for correlated join to the groupby list

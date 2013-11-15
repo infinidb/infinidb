@@ -48,7 +48,7 @@ fi
 export INFINIDB_INSTALL_DIR=$installdir
 
 cloud=`$INFINIDB_INSTALL_DIR/bin/getConfig Installation Cloud`
-if [ $cloud = "amazon" ]; then
+if [ $cloud = "amazon-ec2" ] || [ $cloud = "amazon-vpc" ]; then
 	cp $INFINIDB_INSTALL_DIR/local/etc/*.pem /root/. > /dev/null 2>&1
 
 	if test -f $INFINIDB_INSTALL_DIR/local/fstab ; then
@@ -66,7 +66,7 @@ mid=`module_id`
 
 #if um, cloud, separate system type, external um storage, then setup mount
 if [ "$1" = "um" ]; then
-	if [ $cloud = "amazon" ]; then
+	if [ $cloud = "amazon-ec2" ] || [ $cloud = "amazon-vpc" ]; then
 		systemtype=`$INFINIDB_INSTALL_DIR/bin/getConfig Installation ServerTypeInstall`
 		if [ $systemtype = "1" ]; then
 			umstoragetype=`$INFINIDB_INSTALL_DIR/bin/getConfig Installation UMStorageType`

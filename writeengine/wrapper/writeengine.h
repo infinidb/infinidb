@@ -138,7 +138,7 @@ public:
    /**
     * @brief Close a dictionary
     */
-   int closeDctnry(const TxnID& txnid, int i) { return m_dctnry[op(i)]->closeDctnry(); }
+   int closeDctnry(const TxnID& txnid, int i, bool realClose = true) { return m_dctnry[op(i)]->closeDctnry(realClose); }
 
    /**
     * @brief Commit transaction
@@ -368,7 +368,7 @@ public:
    void setIsInsert(bool bIsInsert)
    { 
        m_colOp[COMPRESSED_OP]->chunkManager()->setIsInsert(bIsInsert); 
-       m_dctnry[COMPRESSED_OP]->chunkManager()->setIsInsert(bIsInsert); 
+       m_dctnry[COMPRESSED_OP]->chunkManager()->setIsInsert(true); 
    }
    
    /**

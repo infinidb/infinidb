@@ -5,9 +5,9 @@
 # Remote command execution script to another server
 set USERNAME root
 set PASSWORD Calpont1
-set RELEASE Latest
+set RELEASE ""
 set PKGSERVER srvdeb5
-
+set OLD "n"
 log_user 0
 
 spawn -noecho /bin/bash
@@ -26,19 +26,30 @@ while true {
 		send_user "It will place the packages in //calweb/shared/Iterations/Latest/packages\n"
 		send_user "and in //calweb/shared/Iterations/'release'/packages when specified\n"
 		send_user "\n"
-		send_user "Usage: autoPackage -r 'release'\n"
-		send_user "			release - Calpont release number (defaults to Latest)\n"
+		send_user "Usage: autoPackage -r 'release' -o\n"
+		send_user "			release - Calpont release number\n"
+		send_user "			-o - Build Old Calpont Packages\n"
 		exit
 	}
 	if { $arg($i) == "-r" } {
 		incr i
 		set RELEASE $arg($i)
 	}
+	if { $arg($i) == "-o" } {
+		set OLD "y"
+	}
 	incr i
 }
 
+if { $RELEASE == "" } {
+    send_user "\nError: provide a release number with -r option\n"
+    exit 1
+}
+
 set PKGCOMMAND "'/root/autoOAM/buildCalpontPackages.sh $RELEASE'"
-set DATDUPPKGCOMMAND "'/root/autoOAM/buildDatdupPackages.sh $RELEASE'"
+if { $OLD == "n"} {
+    set PKGCOMMAND "'/root/autoOAM/buildInfiniDBPackages.sh $RELEASE'"
+}
 
 set timeout 3700
 # 

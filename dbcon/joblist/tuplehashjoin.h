@@ -167,8 +167,8 @@ public:
 	bool  deliverStringTableRowGroup() const;
 
 	// joinId
-	void joinId(uint64_t id) { fJoinId = id; }
-	uint64_t joinId() const { return fJoinId; }
+	void joinId(int64_t id) { fJoinId = id; }
+	int64_t joinId() const { return fJoinId; }
 
 	/* semi-join support */
 	void addJoinFilter(boost::shared_ptr<execplan::ParseTree>, uint index);

@@ -100,20 +100,27 @@ void OamCache::checkReload()
     // Restore for Windows when we support multiple PMs
 	while (it != uniquePids.end())
 	{
-		try {
-			int state = 0; bool degraded;
-			char num[80];
+#if  !defined(SKIP_OAM_INIT)
+		{
+			try {
+				int state = 0; bool degraded;
+				char num[80];
 
-			snprintf(num, 80, "%d", *it);
-			oam.getModuleStatus(string("pm") + num, state, degraded);
-			if (state == oam::ACTIVE) {
-				pmToConnectionMap[*it] = i++;
-				moduleIds.push_back(*it);
+				snprintf(num, 80, "%d", *it);
+				oam.getModuleStatus(string("pm") + num, state, degraded);
+				if (state == oam::ACTIVE) {
+					pmToConnectionMap[*it] = i++;
+					moduleIds.push_back(*it);
 				//cout << "pm " << *it << " -> connection " << (i-1) << endl;
+				}
 			}
+			catch (...) { /* doesn't get added to the connection map */ }
 		}
-		catch (...) { /* doesn't get added to the connection map */ }
+#else
+		moduleIds.push_back(*it);
+#endif
 		it++;
+		
 	}
 #endif
 	dbRootConnectionMap.reset(new map<int, int>());

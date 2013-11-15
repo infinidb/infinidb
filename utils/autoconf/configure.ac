@@ -91,6 +91,26 @@ AC_FUNC_STRTOD
 AC_FUNC_UTIME_NULL
 AC_CHECK_FUNCS([alarm dup2 floor ftime ftruncate gethostbyname getpagesize gettimeofday inet_ntoa isascii localtime_r memchr memmove memset mkdir pow regcomp rmdir select setenv setlocale socket strcasecmp strchr strcspn strdup strerror strrchr strspn strstr strtol strtoul strtoull utime])
 
+AM_PATH_XML2([2.6.26])
+if test "x$XML_CPPFLAGS" = "x"; then
+	AC_MSG_ERROR([Could not find a usable libxml2 development environment!])
+fi
+
+AC_CHECK_HEADERS([zlib.h])
+if test "x$ac_cv_header_zlib_h" != "xyes"; then
+	AC_MSG_ERROR([Could not find a usable zlib development environment!])
+fi
+
+AC_CHECK_HEADERS([readline/readline.h])
+if test "x$ac_cv_header_readline_readline_h" != "xyes"; then
+	AC_MSG_ERROR([Could not find a usable readline development environment!])
+fi
+
+AC_CHECK_HEADERS([ncurses.h])
+if test "x$ac_cv_header_ncurses_h" != "xyes"; then
+	AC_MSG_ERROR([Could not find a usable ncurses development environment!])
+fi
+
 AC_MSG_CHECKING(whether to enable debugging)
 AC_SUBST([idb_cppflags], [' '])
 AC_ARG_WITH([debug],

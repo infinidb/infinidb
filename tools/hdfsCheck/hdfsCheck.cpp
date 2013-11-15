@@ -660,7 +660,7 @@ void logFailure(const char* msg)
 	ostringstream oss;
     oss << "hdfsCheck failed: " << msg;
 	::openlog("hdfsCheck", 0|LOG_PID, LOG_LOCAL1);
-	::syslog(LOG_CRIT, oss.str().c_str());
+	::syslog(LOG_WARNING, oss.str().c_str());
 	::closelog();
 }
 
@@ -718,7 +718,7 @@ int main(int argc, char** argv)
 	
 		if( !IDBPolicy::installPlugin(opts.pluginFile) )
 		{
-			cerr << "ERROR: unable to install HDFS plugin " << opts.pluginFile << endl;
+			cerr << "ERROR: HDFS plugin not installed " << opts.pluginFile << endl;
 			return -1;
 		}
 	}

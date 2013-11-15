@@ -78,21 +78,22 @@ typedef struct Volume_struct
 
 typedef std::vector<Volume> VolumeList;
 
-typedef struct ElasticIP_struct
+typedef struct ModuleIP_struct
 {
 	std::string     IPaddress;
 	std::string     moduleName;
-} ElasticIP;
+} ModuleIP;
 
-typedef std::vector<ElasticIP> ElasticIPList;
+typedef std::vector<ModuleIP> ModuleIPList;
 
+typedef std::vector<std::string> PrivateIPList;
 
 string getIPAddress(string instance);
 void cleanupSystem(bool terminate = true);
 void setSystemName();
 void snmpAppCheck();
 void setRootPassword();
-void launchInstanceThread(string module);
+void launchInstanceThread(ModuleIP moduleip);
 int launchInstanceCount = 0;
 void createVolumeThread(string module);
 int createVolumeCount = 0;
@@ -120,7 +121,8 @@ VolumeList PMvolumelist;
 VolumeList UMvolumelist;
 string rootPassword = "Calpont1";
 string AMIrootPassword = "Calpont1";
-ElasticIPList elasticiplist;
+ModuleIPList elasticiplist;
+ModuleIPList moduleiplist;
 
 char* pcommand = 0;
 string prompt;
@@ -138,6 +140,8 @@ string region = "us-east-1";
 string autoTagging = "y";
 string elasticIPs = oam::UnassignedName;
 string systemType = "";
+string subnetID = oam::UnassignedName;
+string VPCStartPrivateIP = oam::UnassignedName;
 
 bool PMEBS = true;
 
@@ -164,6 +168,8 @@ int main(int argc, char *argv[])
 	bool systemStop = false;
 	string existingPMInstances = oam::UnassignedName;
 	string existingUMInstances = oam::UnassignedName;
+	string UMprivateIPS = oam::UnassignedName;
+	string PMprivateIPS = oam::UnassignedName;
 	string UserModuleAutoSync = "n";
 	int UserModuleSyncTime = 10;
 	string instanceType;
@@ -1018,6 +1024,10 @@ int main(int argc, char *argv[])
 			UserModuleSyncTime = atoi(amazonConfig->getConfig("SystemConfig", "UserModuleSyncTime").c_str());
 			autoTagging = amazonConfig->getConfig("SystemConfig", "AutoTagging");
 			region = amazonConfig->getConfig("SystemConfig", "Region");
+			subnetID = amazonConfig->getConfig("SystemConfig", "SubNetID");
+			VPCStartPrivateIP = amazonConfig->getConfig("SystemConfig", "VPCStartPrivateIP");
+			UMprivateIPS = amazonConfig->getConfig("SystemConfig", "UserModulePrivateIP");
+			PMprivateIPS = amazonConfig->getConfig("SystemConfig", "PerformanceModulePrivateIP");
 		}
 		catch(...)
 		{}
@@ -1090,7 +1100,7 @@ int main(int argc, char *argv[])
 				it != tokens.end();
 				++it)
 		{
-			ElasticIP elasticip;
+			ModuleIP elasticip;
 			elasticip.IPaddress = *it;
 			++it;
 			elasticip.moduleName = *it;
@@ -1131,6 +1141,158 @@ int main(int argc, char *argv[])
 		}
 	}
 
+	//get Private IPs if VPC subNet configured
+	vector <string> umprivateip;
+	vector <string> pmprivateip;
+	if ( subnetID != oam::UnassignedName )
+	{
+		//set subnetID
+		try {
+			sysConfig->setConfig(InstallSection, "AmazonSubNetID", subnetID);
+		}
+		catch(...)
+		{}
+
+		if ( VPCStartPrivateIP == "autoassign" )
+		{
+			for ( int um = 0 ; um < umNumber ; um++ )
+			{
+				umprivateip.push_back("autoassign");
+			}
+
+			for ( int pm = 0 ; pm < pmNumber ; pm++ )
+			{
+				pmprivateip.push_back("autoassign");
+			}
+
+			//set VPCNextPrivateIP
+			try {
+				sysConfig->setConfig(InstallSection, "AmazonVPCNextPrivateIP", "autoassign");
+			}
+			catch(...)
+			{}
+		}
+		else
+		{
+			if ( VPCStartPrivateIP == oam::UnassignedName )
+			{
+				if ( UMprivateIPS == oam::UnassignedName )
+				{
+					cout << endl << "ERROR: Invalid UM Private IP Address List / VPCStartPrivateIP" << endl;
+					exit(1);
+				}
+				else
+				{
+					boost::char_separator<char> sep(",");
+					boost::tokenizer< boost::char_separator<char> > tokens(UMprivateIPS, sep);
+					for ( boost::tokenizer< boost::char_separator<char> >::iterator it = tokens.begin();
+							it != tokens.end();
+							++it)
+					{
+						if (!oam.isValidIP(*it))
+						{
+							cout << endl << "ERROR: Invalid UM Private IP Address: " << *it << endl;
+							exit(1);
+						}
+		
+						umprivateip.push_back(*it);
+					}
+	
+					if ( umNumber != (int) umprivateip.size() )
+					{
+						cout << endl << "ERROR: Number of UMs doesn't match number of UM Private IPs Provided" << endl;
+						exit(1);
+					}
+				}
+		
+				if ( PMprivateIPS == oam::UnassignedName )
+				{
+					cout << endl << "ERROR: Invalid PM Private IP Address List / VPCStartPrivateIP" << endl;
+					exit(1);
+				}
+				else
+				{
+					boost::char_separator<char> sep(",");
+					boost::tokenizer< boost::char_separator<char> > tokens1(PMprivateIPS, sep);
+					for ( boost::tokenizer< boost::char_separator<char> >::iterator it = tokens1.begin();
+							it != tokens1.end();
+							++it)
+					{
+						if (!oam.isValidIP(*it))
+						{
+							cout << endl << "ERROR: Invalid PM Private IP Address: " << *it << endl;
+							exit(1);
+						}
+		
+						pmprivateip.push_back(*it);
+					}
+			
+					if ( pmNumber != (int) pmprivateip.size() )
+					{
+						cout << endl << "ERROR: Number of PMs doesn't match number of PM Private IPs Provided" << endl;
+						exit(1);
+					}
+				}
+			}
+			else
+			{
+				if (!oam.isValidIP(VPCStartPrivateIP))
+				{
+					cout << endl << "ERROR: Invalid Starting VPC Private IP Address: " << VPCStartPrivateIP << endl;
+					exit(1);
+				}
+	
+				string VPCNextPrivateIP = VPCStartPrivateIP;
+	
+				for ( int um = 0 ; um < umNumber ; um++ )
+				{
+					umprivateip.push_back(VPCNextPrivateIP);
+	
+					try
+					{
+						VPCNextPrivateIP = oam.incrementIPAddress(VPCNextPrivateIP);
+					}
+					catch(...)
+					{
+						cout << endl << "ERROR: incrementIPAddress API error, check logs" << endl;
+						exit(1);
+					}
+				}
+	
+				for ( int pm = 0 ; pm < pmNumber ; pm++ )
+				{
+					pmprivateip.push_back(VPCNextPrivateIP);
+	
+					try
+					{
+						VPCNextPrivateIP = oam.incrementIPAddress(VPCNextPrivateIP);
+					}
+					catch(...)
+					{
+						cout << endl << "ERROR: incrementIPAddress API error, check logs" << endl;
+						exit(1);
+					}
+				}
+	
+				//set VPCNextPrivateIP
+				try {
+					sysConfig->setConfig(InstallSection, "AmazonVPCNextPrivateIP", VPCNextPrivateIP);
+				}
+				catch(...)
+				{}
+			}
+		}
+	}
+
+	try {
+		sysConfig->write();
+	}
+	catch(...)
+	{
+		cout << "ERROR: Failed trying to update InfiniDB System Configuration file" << endl;
+		exit(1);
+	}
+
 	//get local instance name (pm1)
 	localInstance = oam.getEC2LocalInstance();
 	if ( localInstance == "failed" || localInstance.empty() || localInstance == "") 
@@ -1157,6 +1319,20 @@ int main(int argc, char *argv[])
 
 	cout << "InfiniDB Version = " << systemsoftware.Version << "-" << systemsoftware.Release << endl;
 	cout << "System Type = " << systemType << endl;
+
+	if ( subnetID != oam::UnassignedName ) {
+		cout << "SubNet ID = " << subnetID << endl;
+		if ( VPCStartPrivateIP == oam::UnassignedName )
+		{
+			if ( systemType == "separate" )
+				cout << "User Modules VPC Private IPs = " << UMprivateIPS << endl;
+
+			cout << "Performance Modules VPC Private IPs = " << PMprivateIPS << endl;
+		}
+		else
+			cout << "Starting VPC Private IP = " << VPCStartPrivateIP << endl;
+	}
+
 	if ( systemType == "separate" ) {
 		cout << "Number of User Modules = " << umNumber << " (" + UserModuleInstanceType + ")" << endl;
 		if ( UserModuleSecurityGroup != oam::UnassignedName )
@@ -1189,7 +1365,7 @@ int main(int argc, char *argv[])
 
 	if ( elasticiplist.size() > 0 )
 	{
-		ElasticIPList::iterator list9 = elasticiplist.begin();
+		ModuleIPList::iterator list9 = elasticiplist.begin();
 		for (; list9 != elasticiplist.end() ; list9++)
 		{
 			cout << "Elastic IP Address " << (*list9).IPaddress << " assigned to " << (*list9).moduleName << endl;
@@ -1472,9 +1648,21 @@ int main(int argc, char *argv[])
 		}
 	
 		//launch um Instances
+		std::vector<std::string>::iterator umprivatelist = umprivateip.begin();
 		for ( ; um < umNumber+1 ; um ++ )
 		{
 			string module = "um" + oam.itoa(um);
+
+			ModuleIP moduleip;
+			moduleip.moduleName = module;
+
+			if ( umprivateip.size() == 0 )
+				moduleip.IPaddress = oam::UnassignedName;
+			else
+			{
+				moduleip.IPaddress = *umprivatelist;
+				umprivatelist++;
+			}
 
 			while(true)
 			{
@@ -1482,7 +1670,7 @@ int main(int argc, char *argv[])
 				{
 					launchInstanceCount++;
 					pthread_t launchinstancethread;
-					int status = pthread_create (&launchinstancethread, NULL, (void*(*)(void*)) &launchInstanceThread, &module);
+					int status = pthread_create (&launchinstancethread, NULL, (void*(*)(void*)) &launchInstanceThread, &moduleip);
 					if ( status != 0 )
 					{
 						cout << "launchInstanceThread failed for " + module << endl;
@@ -1530,9 +1718,21 @@ int main(int argc, char *argv[])
 	}
 
 	//launch pm Instances
+	std::vector<std::string>::iterator pmprivatelist = pmprivateip.begin();
 	for ( ; pm < pmNumber+1 ; pm ++ )
 	{
 		string module = "pm" + oam.itoa(pm);
+
+		ModuleIP moduleip;
+		moduleip.moduleName = module;
+
+		if ( pmprivateip.size() == 0 )
+			moduleip.IPaddress = oam::UnassignedName;
+		else
+		{
+			moduleip.IPaddress = *pmprivatelist;
+			pmprivatelist++;
+		}
 
 		while(true)
 		{
@@ -1540,7 +1740,7 @@ int main(int argc, char *argv[])
 			{
 				launchInstanceCount++;
 				pthread_t launchinstancethread;
-				int status = pthread_create (&launchinstancethread, NULL, (void*(*)(void*)) &launchInstanceThread, &module);
+				int status = pthread_create (&launchinstancethread, NULL, (void*(*)(void*)) &launchInstanceThread, &moduleip);
 				if ( status != 0 )
 				{
 					cout << "launchInstanceThread failed for " + module << endl;
@@ -1718,8 +1918,12 @@ int main(int argc, char *argv[])
 	{}
 
 	//set for amazon cloud
+	string cloud = "amazon-ec2";
+	if ( subnetID != oam::UnassignedName )
+		cloud = "amazon-vpc";
+
 	try {
-		 sysConfig->setConfig(InstallSection, "Cloud", "amazon");
+		 sysConfig->setConfig(InstallSection, "Cloud", cloud);
 	}
 	catch(...)
 	{}
@@ -1737,7 +1941,7 @@ int main(int argc, char *argv[])
 		}
 	
 		int id = 1;
-		ElasticIPList::iterator list9 = elasticiplist.begin();
+		ModuleIPList::iterator list9 = elasticiplist.begin();
 		for (; list9 != elasticiplist.end() ; list9++)
 		{
 			string moduleName = (*list9).moduleName;
@@ -2152,12 +2356,13 @@ void setRootPassword()
 	}
 }
 
-void launchInstanceThread(string module)
+void launchInstanceThread(ModuleIP moduleip)
 {
 	Oam oam;
 
-	//local copies
-	string moduleName = module;
+	//get module info
+	string moduleName = moduleip.moduleName;
+	string IPAddress = moduleip.IPaddress;
 
 	//due to bad instances getting launched causing scp failures
 	//have retry login around fail scp command where a instance will be relaunched
@@ -2169,9 +2374,9 @@ void launchInstanceThread(string module)
 
 		string instanceName;
 		if ( moduleName.find("um") == 0 )
-			instanceName = oam.launchEC2Instance(moduleName, UserModuleInstanceType, UserModuleSecurityGroup);
+			instanceName = oam.launchEC2Instance(moduleName, IPAddress, UserModuleInstanceType, UserModuleSecurityGroup);
 		else
-			instanceName = oam.launchEC2Instance(moduleName);
+			instanceName = oam.launchEC2Instance(moduleName, IPAddress);
 	
 		if ( instanceName == "failed" ) {
 			cout << " *** Failed to Launch an Instance for " + moduleName << ", will retry up to 5 times" << endl;
@@ -2266,7 +2471,7 @@ void launchInstanceThread(string module)
 
 		if ( elasticiplist.size() > 0 )
 		{
-			ElasticIPList::iterator list9 = elasticiplist.begin();
+			ModuleIPList::iterator list9 = elasticiplist.begin();
 			for (; list9 != elasticiplist.end() ; list9++)
 			{
 				if ( moduleName == (*list9).moduleName )

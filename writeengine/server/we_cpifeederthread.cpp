@@ -107,15 +107,13 @@ void WECpiFeederThread::add2MsgQueue(ByteStream& Ibs)
 
 void WECpiFeederThread::feedData2Cpi()
 {
-	const boost::posix_time::seconds TIME_OUT(2);
 	while(isContinue())
 	{
 
 		mutex::scoped_lock aLock(fMsgQMutex);
 		if(fMsgQueue.empty())
 		{
-			boost::system_time const abs_time = boost::get_system_time()+ TIME_OUT;
-			bool aTimedOut = fFeederCond.timed_wait(aLock, abs_time);
+			bool aTimedOut = fFeederCond.timed_wait(aLock, boost::posix_time::milliseconds(3000));
 			if(!isContinue()) { aLock.unlock(); break; }
 			// to handle spurious wake ups and timeout wake ups
 			if((fMsgQueue.empty())||(!aTimedOut)) {	aLock.unlock();	continue; }

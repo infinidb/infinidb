@@ -34,8 +34,8 @@ IDB_SNMP_LIBS=-lnetsnmpagent -lnetsnmp -lnetsnmpmibs -lnetsnmphelpers
 
 LDFLAGS=-Wl,--no-as-needed 
 
-#DEBUG_FLAGS=-ggdb3
-DEBUG_FLAGS=-g0 -O3 -fno-strict-aliasing
+DEBUG_FLAGS=-ggdb3
+#DEBUG_FLAGS=-g0 -O3 -fno-strict-aliasing
 
 ifeq (i686,$(shell uname -m))
 	DEBUG_FLAGS+=-march=pentium4

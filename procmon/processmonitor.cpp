@@ -2127,8 +2127,8 @@ pid_t ProcessMonitor::startProcess(string processModuleType, string processName,
 //				DBRMDir = tempDBRMDir;
 
 				// remove all files for temp directory
-				cmd = "rm -f " + DBRMDir + "/*";
-				system(cmd.c_str());
+//				cmd = "rm -f " + DBRMDir + "/*";
+//				system(cmd.c_str());
 
 				// go request files from parent OAM module
 				if ( getDBRMdata() != oam::API_SUCCESS ) {
@@ -2190,11 +2190,11 @@ pid_t ProcessMonitor::startProcess(string processModuleType, string processName,
 
 					//record the process information into processList 
 					config.buildList(processModuleType, processName, processLocation, arg_list, 
-										launchID, newProcessID, FAILED, BootLaunch, RunType,
+										launchID, 0, FAILED, BootLaunch, RunType,
 										DepProcessName, DepModuleName, LogFile);
 			
-					//Update Process Status: Mark Process INIT state 
-					updateProcessInfo(processName, FAILED, newProcessID);
+					//Update Process Status: Mark Process FAILED state 
+					updateProcessInfo(processName, FAILED, 0);
 
 					return oam::API_FAILURE;
 				}
@@ -3402,6 +3402,8 @@ int ProcessMonitor::checkSpecialProcessState( std::string processName, std::stri
 			retStatus = oam::STANDBY;
 		else if ( runType == ACTIVE_STANDBY && processModuleType == "ParentOAMModule" )
 			retStatus = oam::COLD_STANDBY;
+		else if ( runType == SIMPLEX && processModuleType == "ParentOAMModule" && !gOAMParentModuleFlag)
+			retStatus = oam::COLD_STANDBY;
 		else
 		{
 			//simplex on a non um1 or non-parent-pm
@@ -3542,7 +3544,8 @@ int ProcessMonitor::createDataDirs(std::string cloud)
 
 	log.writeLog(__LINE__, "createDataDirs called", LOG_TYPE_DEBUG);
 
-	if ( config.moduleType() == "um" && cloud == "amazon")
+	if ( config.moduleType() == "um" && 
+		( cloud == "amazon-ec2" || cloud == "amazon-vpc") )
 	{
 		string UMStorageType;
 		try {
@@ -3612,8 +3615,9 @@ int ProcessMonitor::createDataDirs(std::string cloud)
 						system(cmd.c_str());
 					}
 
-					if (cloud == "amazon" && DBRootStorageType == "external" && 
-						config.moduleID() == moduleID)
+					if ( (cloud == "amazon-ec2" || cloud == "amazon-vpc") && 
+							DBRootStorageType == "external" && 
+							config.moduleID() == moduleID)
 					{
 						if(!amazonVolumeCheck(id)) {
 							//Set the alarm

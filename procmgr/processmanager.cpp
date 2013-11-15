@@ -42,6 +42,7 @@ pthread_mutex_t STATUS_LOCK;
 pthread_mutex_t THREAD_LOCK;
 
 extern string cloud;
+extern bool amazon;
 extern bool runStandby;
 extern string iface_name;
 extern string PMInstanceType;
@@ -4299,6 +4300,9 @@ int ProcessManager::addModule(oam::DeviceNetworkList devicenetworklist, std::str
 	string calpontPackage;
 	string mysqlPackage;
 	string mysqldPackage;
+	string calpontPackage1;
+	string calpontPackage2;
+
 	string systemID;
 	string packageType = "rpm";
 
@@ -4337,10 +4341,12 @@ int ProcessManager::addModule(oam::DeviceNetworkList devicenetworklist, std::str
 		calpontPackage = homedir + "/infinidb-platform" + separator + systemsoftware.Version + "-" + systemsoftware.Release + "*." + packageType;
 		mysqlPackage = homedir + "/infinidb-storage-engine" + separator + systemsoftware.Version + "-" + systemsoftware.Release + "*." + packageType;
 		mysqldPackage = homedir + "/infinidb-mysql" + separator + systemsoftware.Version + "-" + systemsoftware.Release + "*." + packageType;
+		calpontPackage1 = homedir + "/infinidb-libs" + separator + systemsoftware.Version + "-" + systemsoftware.Release + "*." + packageType;
+		calpontPackage2 = homedir + "/infinidb-ent" + separator + systemsoftware.Version + "-" + systemsoftware.Release + "*." + packageType;
 	}
 	else
 	{
-		calpontPackage = homedir + "/infinidb-ent-" + systemsoftware.Version + "-" + systemsoftware.Release + "*.bin.tar.gz";
+		calpontPackage = homedir + "/infinidb*" + systemsoftware.Version + "-" + systemsoftware.Release + "*.bin.tar.gz";
 		mysqlPackage = calpontPackage;
 		mysqldPackage = calpontPackage;
 	}
@@ -4354,6 +4360,12 @@ int ProcessManager::addModule(oam::DeviceNetworkList devicenetworklist, std::str
 	}
 	log.writeLog(__LINE__, "addModule - Calpont Package found:" + calpontPackage, LOG_TYPE_DEBUG);
 
+	// check if infinidb-ent is there
+	cmd = "ls " + calpontPackage2 + " > /dev/null 2>&1";
+	rtnCode = system(cmd.c_str());
+	if (WEXITSTATUS(rtnCode) != 0)
+		calpontPackage2 = "dummy.rpm";
+
 	//
 	// Verify Host IP and Password
 	//
@@ -4361,7 +4373,7 @@ int ProcessManager::addModule(oam::DeviceNetworkList devicenetworklist, std::str
 	// This is the password that is set in a amazon AMI
 	string amazonDefaultPassword = "Calpont1";
 
-	if ( password == "ssh" && cloud == "amazon" )
+	if ( password == "ssh" && amazon )
 	{	// check if there is a root password stored
 		string rpw = oam::UnassignedName;
 		try
@@ -4381,10 +4393,11 @@ int ProcessManager::addModule(oam::DeviceNetworkList devicenetworklist, std::str
 	for( ; listPT != devicenetworklist.end() ; listPT++)
 	{
 		HostConfigList::iterator pt1 = (*listPT).hostConfigList.begin();
-		string newIPAddr = (*pt1).IPAddr;
-		if ( newIPAddr == oam::UnassignedName )
+		string newHostName = (*pt1).HostName;
+		if ( newHostName == oam::UnassignedName )
 			continue;
 
+		string newIPAddr = (*pt1).IPAddr;
 		string cmd = installDir + "/bin/remote_command.sh " + newIPAddr + " " + password + " ls";
 		log.writeLog(__LINE__, cmd, LOG_TYPE_DEBUG);
 		int rtnCode = system(cmd.c_str());
@@ -4409,6 +4422,7 @@ int ProcessManager::addModule(oam::DeviceNetworkList devicenetworklist, std::str
 		pthread_mutex_unlock(&THREAD_LOCK);
 		return API_FAILURE;
 	}
+
 	setmoduletypeconfig = moduletypeconfig;
 
 	// update Module Type Count
@@ -4431,7 +4445,8 @@ int ProcessManager::addModule(oam::DeviceNetworkList devicenetworklist, std::str
 			string hostName = (*pt1).HostName;
 			string IPAddr = (*pt1).IPAddr;
 			//if cloud and unassigned, launch a new Instance
-			if ( cloud == "amazon" && hostName == oam::UnassignedName )
+			if ( ( cloud == "amazon-ec2" && hostName == oam::UnassignedName ) ||
+				 ( cloud == "amazon-vpc" && hostName == oam::UnassignedName ) )
 			{
 				string UMinstanceType;
 				string UMSecurityGroup;
@@ -4446,11 +4461,10 @@ int ProcessManager::addModule(oam::DeviceNetworkList devicenetworklist, std::str
 
 				log.writeLog(__LINE__, "addModule - Launching a new Instance for: " + moduleName, LOG_TYPE_DEBUG);
 
-
 				if ( moduleType == "um" )
-					hostName = oam.launchEC2Instance(moduleName, UMinstanceType, UMSecurityGroup);
+					hostName = oam.launchEC2Instance(moduleName, IPAddr, UMinstanceType, UMSecurityGroup);
 				else
-					hostName = oam.launchEC2Instance(moduleName);
+					hostName = oam.launchEC2Instance(moduleName, IPAddr);
 
 				if ( hostName == "failed" ) {
 					log.writeLog(__LINE__, "addModule - Launch New Instance Failure", LOG_TYPE_ERROR);
@@ -4474,9 +4488,18 @@ int ProcessManager::addModule(oam::DeviceNetworkList devicenetworklist, std::str
 						sleep(10);
 						continue;
 					}
+
 					string cmd = installDir + "/bin/remote_command.sh " + IPAddr + " " + amazonDefaultPassword + " 'ls' 1  > /tmp/login_test.log";
 					system(cmd.c_str());
 					if (!oam.checkLogStatus("/tmp/login_test.log", "README")) {
+						//check for RSA KEY ISSUE and fix
+						if (oam.checkLogStatus("/tmp/login_test.log", "Offending RSA key")) {
+							log.writeLog(__LINE__, "addModule - login failed, RSA key issue, try fixing: " + moduleName, LOG_TYPE_DEBUG);
+							string file = "/tmp/login_test.log";
+							oam.fixRSAkey(file);
+						}
+
+						log.writeLog(__LINE__, "addModule - login failed, retry login test: " + moduleName, LOG_TYPE_DEBUG);
 						sleep(10);
 						continue;
 					}
@@ -4846,7 +4869,7 @@ int ProcessManager::addModule(oam::DeviceNetworkList devicenetworklist, std::str
 		}
 
 		//set root password
-		if ( cloud == "amazon") {
+		if (amazon) {
 			cmd = startup::StartUp::installDir() + "/bin/remote_command.sh " + remoteModuleIP + " " + amazonDefaultPassword + " '/root/updatePassword.sh " + password + "' > /tmp/password_change.log";
 			//log.writeLog(__LINE__, "addModule - cmd: " + cmd, LOG_TYPE_DEBUG);
 			rtnCode = system(cmd.c_str());
@@ -4865,7 +4888,7 @@ int ProcessManager::addModule(oam::DeviceNetworkList devicenetworklist, std::str
 			//run remote installer script
 			if ( packageType != "binary" ) {
 				log.writeLog(__LINE__, "addModule - user_installer run for " +  remoteModuleName, LOG_TYPE_DEBUG);
-				string cmd = installDir + "/bin/user_installer.sh " + remoteModuleName + " " + remoteModuleIP + " " + password + " " + calpontPackage + " " + mysqlPackage + " " + mysqldPackage + " initial " + packageType +
+				string cmd = installDir + "/bin/user_installer.sh " + remoteModuleName + " " + remoteModuleIP + " " + password + " " + calpontPackage + " " + calpontPackage1 + " " + calpontPackage2 + " " + mysqlPackage + " " + mysqldPackage + " initial " + packageType +
 				" --nodeps none 1 > /tmp/user_installer.log";
 				log.writeLog(__LINE__, "addModule cmd: " + cmd, LOG_TYPE_DEBUG);
 
@@ -4898,7 +4921,7 @@ int ProcessManager::addModule(oam::DeviceNetworkList devicenetworklist, std::str
 			if ( remoteModuleType == "pm" ) {
 				if ( packageType != "binary" ) {
 					log.writeLog(__LINE__, "addModule - performance_installer run for " +  remoteModuleName, LOG_TYPE_DEBUG);
-					string cmd = installDir + "/bin/performance_installer.sh " + remoteModuleName + " " + remoteModuleIP + " " + password + " " + calpontPackage + " " + mysqlPackage + " " + mysqldPackage + " initial " + 	packageType + " --nodeps 1 > /tmp/performance_installer.log";
+					string cmd = installDir + "/bin/performance_installer.sh " + remoteModuleName + " " + remoteModuleIP + " " + password + " " + calpontPackage + " " + calpontPackage1 + " " + calpontPackage2 + " " + mysqlPackage + " " + mysqldPackage + " initial " + 	packageType + " --nodeps 1 > /tmp/performance_installer.log";
 					log.writeLog(__LINE__, "addModule cmd: " + cmd, LOG_TYPE_DEBUG);
 
 					rtnCode = system(cmd.c_str());
@@ -4949,7 +4972,7 @@ int ProcessManager::addModule(oam::DeviceNetworkList devicenetworklist, std::str
 
 		// add to monitor list
 		moduleInfoList.insert(moduleList::value_type(remoteModuleName, 0));
-		if ( cloud == "amazon") {
+		if (amazon) {
 			//check and assign Elastic IP Address
 			int AmazonElasticIPCount = 0;
 			try{
@@ -4991,7 +5014,7 @@ int ProcessManager::addModule(oam::DeviceNetworkList devicenetworklist, std::str
 	}
 
 	//if amazon, delay to give time for ProcMon to start
-	if ( cloud == "amazon") {
+	if (amazon) {
 		log.writeLog(__LINE__, "addModule - sleep 30 - give ProcMon time to start on new Instance", LOG_TYPE_DEBUG);
 		sleep(30);
 	}
@@ -5123,7 +5146,7 @@ int ProcessManager::removeModule(oam::DeviceNetworkList devicenetworklist, bool 
 				for ( ; pt1 != (*pt).hostConfigList.end() ; pt1++ )
 				{
 					//if cloud, delete instance
-					if ( cloud == "amazon" )
+					if (amazon)
 					{
 						log.writeLog(__LINE__, "removeModule - terminate instance: " + (*pt1).HostName, LOG_TYPE_DEBUG);
 						oam.terminateEC2Instance( (*pt1).HostName );
@@ -8527,7 +8550,7 @@ int ProcessManager::OAMParentModuleChange()
 			{}
 
 			//do amazon failover
-			if ( cloud == "amazon" )
+			if (amazon)
 			{
 				log.writeLog(__LINE__, " ", LOG_TYPE_DEBUG);
 				log.writeLog(__LINE__, "*** OAMParentModule outage, recover the Instance ***", LOG_TYPE_DEBUG);
@@ -8879,8 +8902,8 @@ int ProcessManager::OAMParentModuleChange()
 
 	//restart DDLProc/DMLProc to perform any rollbacks, if needed
 	//dont rollback in amazon, wait until down pm recovers
-	if ( config.ServerInstallType() != oam::INSTALL_COMBINE_DM_UM_PM &&
-			cloud != "amazon") {
+	if ( ( config.ServerInstallType() != oam::INSTALL_COMBINE_DM_UM_PM  ) &&
+			!amazon) {
 		processManager.restartProcessType("DDLProc");
 		sleep(1);
 		processManager.restartProcessType("DMLProc");
@@ -8892,7 +8915,7 @@ int ProcessManager::OAMParentModuleChange()
 	// clear alarm
 	aManager.sendAlarmReport(config.moduleName().c_str(), MODULE_SWITCH_ACTIVE, CLEAR);
 
-	if ( cloud == "amazon") {
+	if (amazon) {
 		//Set the down module instance state so it will be auto restarted 
 		processManager.setModuleState(downOAMParentName, oam::AUTO_OFFLINE);
 

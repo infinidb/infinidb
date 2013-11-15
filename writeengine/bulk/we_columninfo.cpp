@@ -1237,7 +1237,7 @@ int ColumnInfo::finishParsing( )
 #ifdef PROFILE
         Stats::startParseEvent(WE_STATS_FLUSH_PRIMPROC_BLOCKS);
 #endif
-        cacheutils::flushPrimProcBlocks ( fDictBlocks );
+        cacheutils::flushPrimProcAllverBlocks ( fDictBlocks );
 #ifdef PROFILE
         Stats::stopParseEvent(WE_STATS_FLUSH_PRIMPROC_BLOCKS);
 #endif
@@ -1655,7 +1655,7 @@ int ColumnInfo::openDctnryStore( bool bMustExist )
         }
 
         if (INVALID_LBID != fStore->getCurLbid())
-            fDictBlocks.push_back(BRM::LVP_t(fStore->getCurLbid(), 0));
+            fDictBlocks.push_back(fStore->getCurLbid());
 
         std::ostringstream oss;
         oss << "Opening existing store file for " << column.colName <<

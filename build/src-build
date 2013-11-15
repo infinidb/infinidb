@@ -1,0 +1,138 @@
+#!/bin/bash
+
+# Copyright (C) 2013 Calpont Corp.
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; version 2 of
+# the License.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+# MA 02110-1301, USA.
+
+prefix=/usr/local
+for arg in "$@"; do
+	if [ `expr -- "$arg" : '--prefix='` -eq 9 ]; then
+		prefix="`echo $arg | awk -F= '{print $2}'`"
+	else
+		echo "ignoring unknown argument: $arg" 1>&2
+	fi
+done
+
+if [ ! -d build ]; then
+	echo "No build directory found, giving up. (maybe you're not in the right directory?)" 1>&2
+	exit 1
+fi
+
+bison --version >/dev/null 2>&1
+if [ $? -ne 0 ]; then
+	echo "No 'bison' program installed, giving up." 1>&2
+	exit 1
+fi
+flex --version >/dev/null 2>&1
+if [ $? -ne 0 ]; then
+	echo "No 'flex' program installed, giving up." 1>&2
+	exit 1
+fi
+autoreconf --version >/dev/null 2>&1
+if [ $? -ne 0 ]; then
+	echo "No 'autoreconf' program installed, giving up." 1>&2
+	exit 1
+fi
+expect -v >/dev/null 2>&1
+if [ $? -ne 0 ]; then
+	echo "No 'expect' program installed, giving up." 1>&2
+	exit 1
+fi
+
+mysqldir=
+for testdir in ./mysql ./mysql-master ../mysql ../mysql-master; do
+	if [ -d $testdir ]; then
+		mysqldir=$testdir
+		break
+	fi
+done
+
+if [ -z "$mysqldir" ]; then
+	echo "Didn't find a MySQL tree, looking for a ZIP file..."
+	for testfile in ./mysql-master.zip ../mysql-master.zip; do
+		if [ -f $testfile ]; then
+			unzip -qq $testfile
+			break
+		fi
+	done
+	for testdir in ./mysql ./mysql-master; do
+		if [ -d $testdir ]; then
+			mysqldir=$testdir
+			break
+		fi
+	done
+fi
+
+if [ -z "$mysqldir" ]; then
+	echo "Didn't find a MySQL tree and didn't find a ZIP file. Going to github..."
+	git --version >/dev/null 2>&1
+	if [ $? -ne 0 ]; then
+		echo "No 'git' program installed, giving up (maybe you could download infinidb-mysql?)." 1>&2
+		exit 1
+	fi
+	git clone https://github.com/infinidb/mysql --branch=master --quiet
+	if [ $? -ne 0 ]; then
+		echo "Cloning from github didn't work, giving up." 1>&2
+		exit 1
+	fi
+	if [ ! -x ./mysql/idbbuild.sh ]; then
+		echo "Didn't find mysql build script, giving up." 1>&2
+		exit 1
+	fi
+	mysqldir=./mysql
+fi
+
+echo "Using MySQL tree in $mysqldir"
+
+echo "Building MySQL..."
+
+( cd $mysqldir;
+	./idbbuild.sh --prefix=$prefix/Calpont && make install ) >./mysql_build.log 2>&1
+
+if [ $? -ne 0 -o ! -x $prefix/Calpont/mysql/libexec/mysqld ]; then
+	echo "Something went wrong building MySQL, giving up. (check ./mysql_build.log)" 1>&2
+	exit 1
+fi
+
+if [ $mysqldir = "./mysql" -o $mysqldir = "./mysql-master" ]; then
+	( bn=$(basename $(pwd)); cd ..; ln -s $bn/$mysqldir mysql ) >/dev/null 2>&1
+fi
+
+if [ ! -f ../mysql/include/mysql_version.h ]; then
+	echo "Couldn't find mysql_version.h in ../mysql/include, giving up." 1>&2
+	exit 1
+fi
+
+echo "Building InfiniDB..."
+
+( cp -r utils/autoconf/* .;
+	autoreconf;
+	libtoolize --force --install;
+	mv -f $mysqldir/Makefile $mysqldir/Makefile.bak;
+	./configure --prefix=$prefix && make && make install ) >./infinidb_build.log 2>&1
+
+if [ $? -ne 0 -o ! -x $prefix/Calpont/bin/PrimProc ]; then
+	echo "Something went wrong building InfiniDB, giving up. (check ./infinidb_build.log)" 1>&2
+	exit 1
+fi
+
+cp dbcon/mysql/my.cnf $prefix/Calpont/mysql
+cp utils/jemalloc/libjemalloc.so.3.3.0 $prefix/Calpont/lib/libjemalloc.so
+
+echo "InfiniDB binaries and libs are in $prefix/Calpont"
+
+exit 0
+

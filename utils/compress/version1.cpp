@@ -310,8 +310,8 @@ void readn(int fd, void* buf, const size_t wanted)
 			oss << "compress::v1::readn: poll() returned " << prc << " (" << strerror(en) << ")";
 			idbassert_s(0, oss.str());
 		}
-		//revents == POLLHUP if DecomSvr dies in the middle of writing
-		if (fds[0].revents != POLLIN)
+		//Check if there's data to be read
+		if ((fds[0].revents & POLLIN) == 0)
 		{
 			oss << "compress::v1::readn: revents for fd " << fds[0].fd << " was " << fds[0].revents;
 			idbassert_s(0, oss.str());

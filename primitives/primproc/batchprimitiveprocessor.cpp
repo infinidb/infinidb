@@ -794,10 +794,13 @@ void BatchPrimitiveProcessor::executeTupleJoin()
 			if (LIKELY(!typelessJoin[j])) {
 				//cout << "not typeless join\n";
 				bool isNull;
-				largeKey = oldRow.getIntField(largeSideKeyColumns[j]);
-				found = (tJoiners[j]->find(largeKey) != tJoiners[j]->end());
-				isNull = oldRow.isNullValue(largeSideKeyColumns[j]);
-
+                uint colIndex = largeSideKeyColumns[j];
+                if (oldRow.isUnsigned(colIndex)) 
+				    largeKey = oldRow.getUintField(colIndex);
+                else 
+                    largeKey = oldRow.getIntField(colIndex);
+                found = (tJoiners[j]->find(largeKey) != tJoiners[j]->end());
+				isNull = oldRow.isNullValue(colIndex);
 				/* These conditions define when the row is NOT in the result set:
 				 *    - if the key is not in the small side, and the join isn't a large-outer or anti join
 				 *    - if the key is NULL, and the join isn't anti- or large-outer
@@ -2075,7 +2078,14 @@ inline void BatchPrimitiveProcessor::getJoinResults(const Row &r, uint jIndex, v
 			else
 				return;
 		}
-		uint64_t largeKey = r.getIntField(largeSideKeyColumns[jIndex]);
+        uint64_t largeKey;
+        uint colIndex = largeSideKeyColumns[jIndex];
+        if (r.isUnsigned(colIndex)) {
+		    largeKey = r.getUintField(colIndex);
+        }
+        else {
+		    largeKey = r.getIntField(colIndex);
+        }
 		pair<TJoiner::iterator, TJoiner::iterator> range = tJoiners[jIndex]->equal_range(largeKey);
 		for (; range.first != range.second; ++range.first)
 			v.push_back(range.first->second);

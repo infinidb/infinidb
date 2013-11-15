@@ -90,8 +90,8 @@ int main(int argc, char *argv[])
 		systemName = oam::UnassignedName;
 
 	try {
-		sysConfigOld = Config::makeConfig("./Calpont.xml");
-		sysConfigNew = Config::makeConfig("./Calpont.xml.new");
+		sysConfigOld = Config::makeConfig("./Calpont.xml");		// system version
+		sysConfigNew = Config::makeConfig("./Calpont.xml.new");	// released version
 	}
 	catch(...)
 	{
@@ -112,17 +112,31 @@ int main(int argc, char *argv[])
 		exit(-1);
 	}
 
-	//read cloud parameter to see if this is a 3.0 or pre-3.0 build
+	//read cloud parameter to see if this is a 3.0+ or pre-3.0 build being installed 
 	string cloud;
 	try {
-		cloud = sysConfigOld->getConfig(InstallSection, "Cloud");
+		cloud = sysConfigNew->getConfig(InstallSection, "Cloud");
 	}
 	catch(...)
-	{ }
+	{}
 
 	bool build3 = false;
 	if ( !cloud.empty() )
 		build3 = true;
+
+	//read subnet parameter to see if this is a 4.0+ or pre-4.0 build build being installed
+	string AmazonSubNetID;
+
+	try {
+		AmazonSubNetID = sysConfigNew->getConfig(InstallSection, "AmazonSubNetID");
+	}
+	catch(...)
+	{}
+
+	bool build4 = false;
+	if ( !AmazonSubNetID.empty() )
+		build4 = true;
+
 	//set install config flag
 	try {
 		sysConfigNew->setConfig(InstallSection, "InitialInstallFlag", "y");
@@ -1186,8 +1200,10 @@ int main(int argc, char *argv[])
 		string UMSyncTime;
 		string AmazonAutoTagging;
 		string AmazonRegion;
+		string AmazonVPCNextPrivateIP;
 
 		try {
+			cloud = sysConfigOld->getConfig(InstallSection, "Cloud");
 			x509Cert = sysConfigOld->getConfig(InstallSection, "AmazonX509Certificate");
 			x509PriKey = sysConfigOld->getConfig(InstallSection, "AmazonX509PrivateKey");
 			UMStorageType = sysConfigOld->getConfig(InstallSection, "UMStorageType");
@@ -1201,12 +1217,27 @@ int main(int argc, char *argv[])
 			UMSyncTime = sysConfigOld->getConfig(InstallSection, "UMSyncTime");
 			AmazonAutoTagging = sysConfigOld->getConfig(InstallSection, "AmazonAutoTagging");
 			AmazonRegion = sysConfigOld->getConfig(InstallSection, "AmazonRegion");
+			AmazonVPCNextPrivateIP = sysConfigOld->getConfig(InstallSection, "AmazonVPCNextPrivateIP");
+			AmazonSubNetID = sysConfigOld->getConfig(InstallSection, "AmazonSubNetID");
 		}
 		catch(...)
 		{ }
-	
-		if ( cloud == "no" )
-			cloud = "n";
+
+		if (build3 && !build4 )
+		{
+			if ( cloud == "no" || cloud == oam::UnassignedName)
+				cloud = "n";
+			if ( cloud == "amazon-ec2" || cloud == "amazon-vpc")
+				cloud = "amazon";
+		}
+
+		if (build4)
+		{
+			if ( cloud == "no" || cloud == "n" )
+				cloud = oam::UnassignedName;
+			if ( cloud == "amazon")
+				cloud = "amazon-ec2";
+		}
 	
 		try {
 			sysConfigNew->setConfig(InstallSection, "Cloud", cloud);
@@ -1228,6 +1259,19 @@ int main(int argc, char *argv[])
 		{
 	//		cout << "ERROR: Problem setting Cloud Parameters from the Calpont System Configuration file" << endl;
 	//		exit(-1);
+		}
+
+		if (build4)
+		{
+			try {
+				sysConfigNew->setConfig(InstallSection, "AmazonSubNetID", AmazonSubNetID);
+				sysConfigNew->setConfig(InstallSection, "AmazonVPCNextPrivateIP", AmazonVPCNextPrivateIP);
+			}
+			catch(...)
+			{
+		//		cout << "ERROR: Problem setting Cloud Parameters from the Calpont System Configuration file" << endl;
+		//		exit(-1);
+			}
 		}
 
 		//setup um storage

@@ -29,6 +29,9 @@
 #include <stdexcept>
 #include "logger.h"
 #endif
+#ifndef _MSC_VER
+#include <sys/resource.h>
+#endif
 using namespace std;
 
 #include "messagequeue.h"
@@ -62,6 +65,29 @@ namespace
 	}
 }
 
+int setupResources()
+{
+#ifndef _MSC_VER
+        struct rlimit rlim;
+
+        if (getrlimit(RLIMIT_NOFILE, &rlim) != 0) {
+                return -1;
+        }
+        rlim.rlim_cur = rlim.rlim_max = 65536;
+        if (setrlimit(RLIMIT_NOFILE, &rlim) != 0) {
+                return -2;
+        }
+
+        if (getrlimit(RLIMIT_NOFILE, &rlim) != 0) {
+                return -3;
+        }
+
+        if (rlim.rlim_cur != 65536) {
+                return -4;
+        }
+#endif
+        return 0;
+}
 
 int main(int argc, char** argv)
 {
@@ -103,6 +129,9 @@ int main(int argc, char** argv)
     idbdatafile::IDBPolicy::configIDBPolicy();
 #endif
 	Config weConfig;
+	int rc;
+	rc = setupResources();
+	
 	ostringstream serverParms;
 	serverParms << "pm" << weConfig.getLocalModuleID() << "_WriteEngineServer";
 

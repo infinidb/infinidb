@@ -258,11 +258,14 @@ void Func_inet_ntoa::convertNtoa(
 {
     struct sockaddr_in sa;
     sa.sin_addr.s_addr = htonl(ipNum);
-    char str[INET_ADDRSTRLEN];
 
     // now get it back and print it
-    inet_ntop(AF_INET, &(sa.sin_addr), str, INET_ADDRSTRLEN);
-    ipString = str;
+#ifdef _MSC_VER
+    ipString = inet_ntoa(sa.sin_addr);
+#else
+    char str[INET_ADDRSTRLEN];
+    ipString = inet_ntop(AF_INET, &(sa.sin_addr), str, INET_ADDRSTRLEN);
+#endif
 }
 
 }

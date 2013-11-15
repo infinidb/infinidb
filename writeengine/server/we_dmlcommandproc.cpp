@@ -1689,6 +1689,7 @@ uint8_t WE_DMLCommandProc::processUpdate(messageqcpp::ByteStream& bs,
 				dctnryStruct.columnOid = colStruct.dataOid;
 				dctnryStruct.fCompressionType = colType.compressionType;
 				dctnryStruct.colWidth = colType.colWidth;
+
 				if (NO_ERROR != (error = fWEWrapper.openDctnry (txnId, dctnryStruct)))
 				{
 					WErrorCodes ec;
@@ -1723,6 +1724,7 @@ uint8_t WE_DMLCommandProc::processUpdate(messageqcpp::ByteStream& bs,
 				{
 					for (unsigned i = 0; i < rowsThisRowgroup; i++)
 					{
+						
 						rowGroups[txnId]->getRow(i, &row);
 						if (row.isNullValue(fetchColPos))
 						{
@@ -1752,6 +1754,7 @@ uint8_t WE_DMLCommandProc::processUpdate(messageqcpp::ByteStream& bs,
 								memcpy(dctTuple.sigValue, value.c_str(), value.length());
 								dctTuple.sigSize = value.length();
 								dctTuple.isNull = false;
+
 								error = fWEWrapper.tokenize(txnId, dctTuple, colType.compressionType);
 								if (error != NO_ERROR)
 								{
@@ -1769,7 +1772,6 @@ uint8_t WE_DMLCommandProc::processUpdate(messageqcpp::ByteStream& bs,
 							}
 							continue;
 						}
-					
 						switch (fetchColTypes[fetchColPos])
 						{
 							case CalpontSystemCatalog::DATE:
@@ -2053,16 +2055,24 @@ uint8_t WE_DMLCommandProc::processUpdate(messageqcpp::ByteStream& bs,
 						memcpy(dctTuple.sigValue, value.c_str(), value.length());
 						dctTuple.sigSize = value.length();
 						dctTuple.isNull = false;
+
 						error = fWEWrapper.tokenize(txnId, dctTuple, colType.compressionType);
 						if (error != NO_ERROR)
 						{
 							fWEWrapper.closeDctnry(txnId, colType.compressionType);
-							return false;
+							rc = error;
+							WErrorCodes ec;
+							err = ec.errorString(error);
+							return rc;
 						}
+
 						colTuple.data = dctTuple.token;
 						colTupleList.push_back (colTuple);
 					}
-					fWEWrapper.closeDctnry(txnId, colType.compressionType);
+					if (colType.compressionType == 0)
+						fWEWrapper.closeDctnry(txnId, colType.compressionType, true);
+					else
+						fWEWrapper.closeDctnry(txnId, colType.compressionType, false);
 					fetchColPos++;
 				}
 				else //constant
@@ -2099,10 +2109,16 @@ uint8_t WE_DMLCommandProc::processUpdate(messageqcpp::ByteStream& bs,
 							if (error != NO_ERROR)
 							{
 								fWEWrapper.closeDctnry(txnId, colType.compressionType);
-								return false;
+								rc = error;
+								WErrorCodes ec;
+								err = ec.errorString(error);
+								return rc;
 							}
 							colTuple.data = dctTuple.token;
-							fWEWrapper.closeDctnry(txnId, colType.compressionType); // Constant only need to tokenize once.
+							if (colType.compressionType == 0)
+								fWEWrapper.closeDctnry(txnId, colType.compressionType, true);
+							else
+								fWEWrapper.closeDctnry(txnId, colType.compressionType, false); // Constant only need to tokenize once.
 						}
 						else
 						{
@@ -2133,10 +2149,17 @@ uint8_t WE_DMLCommandProc::processUpdate(messageqcpp::ByteStream& bs,
 						if (error != NO_ERROR)
 						{
 							fWEWrapper.closeDctnry(txnId, colType.compressionType);
-							return false;
+							rc = error;
+							WErrorCodes ec;
+							err = ec.errorString(error);
+							return rc;
 						}
 						colTuple.data = dctTuple.token;
-						fWEWrapper.closeDctnry(txnId, colType.compressionType); // Constant only need to tokenize once.
+						
+						if(colType.compressionType == 0)
+							fWEWrapper.closeDctnry(txnId, colType.compressionType, true);
+						else
+							fWEWrapper.closeDctnry(txnId, colType.compressionType, false); // Constant only need to tokenize once.
 					}
 
 					for (unsigned row = 0; row < rowsThisRowgroup; row++)
@@ -3346,9 +3369,36 @@ uint8_t WE_DMLCommandProc::processFlushFiles(messageqcpp::ByteStream& bs, std::s
 	bs >> flushCode;
 	bs >> txnId;
 	bs >> tableOid;
-	
-	std::map<uint32_t,uint32_t> oids;
+	std::map<uint32_t,uint32_t> oids;		
+	CalpontSystemCatalog::TableName aTableName;
+	CalpontSystemCatalog::RIDList ridList;
+	CalpontSystemCatalog* systemCatalogPtr =
+    CalpontSystemCatalog::makeCalpontSystemCatalog(txnId);
+   // execplan::CalpontSystemCatalog::ColType colType;
+    CalpontSystemCatalog::DictOIDList dictOids;
+    
+    if (tableOid > 3000) {
+               try {
+                               aTableName =  systemCatalogPtr->tableName(tableOid);
+               }
+               catch ( ... )
+               {
+                       err = "Systemcatalog error for tableoid " + tableOid;
+                       rc = 1;
+                       return rc;
+                       
+               }
+               dictOids = systemCatalogPtr->dictOIDs(aTableName);
+               for (unsigned i=0; i < dictOids.size(); i++)
+               {
+                       oids[dictOids[i].dictOID] = dictOids[i].dictOID;
+               }
+       
+               //if (dictOids.size() > 0)
+                //       colType = systemCatalogPtr->colTypeDct(dictOids[0].dictOID);
+    }
 
+  
 	fWEWrapper.setIsInsert(false);
 	fWEWrapper.setBulkFlag(false);
 	vector<LBID_t> lbidList;
@@ -3374,10 +3424,11 @@ uint8_t WE_DMLCommandProc::processFlushFiles(messageqcpp::ByteStream& bs, std::s
     		catch(...) {}
 	}
        	
-	//timer.start("flushDataFiles");
 	error = fWEWrapper.flushDataFiles(flushCode, txnId, oids);
-	//timer.stop("flushDataFiles");
-
+	
+//No need to close files, flushDataFile will close them.
+	//if (((colType.compressionType > 0 ) && (dictOids.size() > 0)) || (idbdatafile::IDBPolicy::useHdfs()))
+	//	fWEWrapper.closeDctnry(txnId, colType.compressionType, true);
 	if (error != NO_ERROR)
 	{
 			rc = error;
@@ -3430,7 +3481,6 @@ uint8_t WE_DMLCommandProc::processFlushFiles(messageqcpp::ByteStream& bs, std::s
 	//if (idbdatafile::IDBPolicy::useHdfs())
 	//		cacheutils::dropPrimProcFdCache();
 	TableMetaData::removeTableMetaData(tableOid);
-	//timer.finish();
 	return rc;
 }
 

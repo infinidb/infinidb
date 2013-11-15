@@ -300,8 +300,8 @@ void readn(int fd, void* buf, const size_t wanted)
 			oss << "decomsvr::readn: poll() returned " << prc << " (" << strerror(en) << ")";
 			idbassert_s(0, oss.str());
 		}
-		//revents == POLLHUP if PrimProc dies in the middle of writing
-		if (fds[0].revents != POLLIN)
+		//no data on fd
+		if ((fds[0].revents & POLLIN) == 0)
 		{
 			oss << "decomsvr::readn: revents for fd " << fds[0].fd << " was " << fds[0].revents;
 			idbassert_s(0, oss.str());
@@ -653,21 +653,30 @@ void ThreadFunc::operator()()
 	CloseHandle(h);
 	cleaner.handle = INVALID_HANDLE_VALUE;
 #else
-	int fd = open(cfifo.c_str(), O_RDONLY);
-	idbassert_s(fd >= 0, "when opening data fifo for input");
-//	if (fd < 0)
-//		throw runtime_error("when opening data fifo for input");
+	scoped_array<char> in;
+	int fd=-1;
+	try
+	{
+		fd = open(cfifo.c_str(), O_RDONLY);
+		idbassert_s(fd >= 0, "when opening data fifo for input");
 
-	cleaner.fd = fd;
+		cleaner.fd = fd;
 
-	readn(fd, &ccount, 8);
+		readn(fd, &ccount, 8);
 
-	scoped_array<char> in(new char[ccount]);
+		in.reset(new char[ccount]);
 
-	readn(fd, in.get(), ccount);
+		readn(fd, in.get(), ccount);
 
-	close(fd);
-	cleaner.fd = -1;
+		close(fd);
+		cleaner.fd = -1;
+	}
+	catch (std::exception& )
+	{
+		//This is a protocol error and returning here will clean up resources on
+		//the stack unwind.
+		return;
+	}
 #endif
 #ifdef _MSC_VER
 	h = CreateFile(ufifo.c_str(), GENERIC_WRITE, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
@@ -703,39 +712,42 @@ void ThreadFunc::operator()()
 	CloseHandle(h);
 	cleaner.handle = INVALID_HANDLE_VALUE;
 #else
-	fd = open(ufifo.c_str(), O_WRONLY);
-	idbassert_s(fd >= 0, "when opening data fifo for output");
-	//if (fd < 0)
-	//	throw runtime_error("when opening data fifo for output");
+	scoped_array<char> out;
+	try
+	{
+		fd = open(ufifo.c_str(), O_WRONLY);
+		idbassert_s(fd >= 0, "when opening data fifo for output");
+		//if (fd < 0)
+		//	throw runtime_error("when opening data fifo for output");
 
-	cleaner.fd = fd;
+		cleaner.fd = fd;
 
-	uint64_t outlen = 512 * 1024 * 8;
-	unsigned int ol = outlen;
+		uint64_t outlen = 512 * 1024 * 8;
+		unsigned int ol = outlen;
 
-	scoped_array<char> out(new char[outlen]);
+		out.reset(new char[outlen]);
 
-	int crc = uncompressBlock(in.get(), ccount, reinterpret_cast<unsigned char*>(out.get()), ol);
-	if (crc != ERR_OK)
-		outlen = 0;
-	else
-		outlen = ol;
+		int crc = uncompressBlock(in.get(), ccount, reinterpret_cast<unsigned char*>(out.get()), ol);
+		if (crc != ERR_OK)
+			outlen = 0;
+		else
+			outlen = ol;
 
-	rrc = writen(fd, &outlen, 8);
-	idbassert_s(rrc == 8, "when writing len to data fifo");
-	//if (rrc != 8)
-	//{
-	//	throw runtime_error("when writing len to data fifo");
-	//}
-	rrc = writen(fd, out.get(), outlen);
-	idbassert_s(rrc == (ssize_t)outlen, "when writing data to data fifo");
-	//if (rrc != (ssize_t)outlen)
-	//{
-	//	throw runtime_error("when writing data to data fifo");
-	//}
+		rrc = writen(fd, &outlen, 8);
+		idbassert_s(rrc == 8, "when writing len to data fifo");
 
-	close(fd);
-	cleaner.fd = -1;
+		rrc = writen(fd, out.get(), outlen);
+		idbassert_s(rrc == (ssize_t)outlen, "when writing data to data fifo");
+
+		close(fd);
+		cleaner.fd = -1;
+	}
+	catch (std::exception& )
+	{
+		//There was an error writing the uncompressed data back to PrimProc. Cleanup by
+		//unwinding the stack
+		return;
+	}
 #endif
 }
 

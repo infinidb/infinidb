@@ -118,12 +118,12 @@ void diskMonitor()
 		}
 	}
 
-	string cloud = "n";
+	string cloud = oam::UnassignedName;
 	try {
 		oam.getSystemConfig( "Cloud", cloud);
 	}
 	catch(...) {
-		cloud = "n";
+		cloud = oam::UnassignedName;
 	}
 
 	//get Gluster Config setting
@@ -490,7 +490,7 @@ void diskMonitor()
 							fail = true;
 						else
 						{	//second test for amazon, check volume status
-							if ( cloud == "amazon" ) {
+							if ( cloud != oam::UnassignedName ) {
 								string volumeNameID = "PMVolumeName" + dbrootID;
 								string volumeName = oam::UnassignedName;
 								try {

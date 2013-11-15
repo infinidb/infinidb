@@ -90,7 +90,7 @@ public:
 	 */
 	EXPORT virtual ~DistributedEngineComm();
 
-	EXPORT static DistributedEngineComm* instance(ResourceManager& rm);
+	EXPORT static DistributedEngineComm* instance(ResourceManager& rm, bool isExeMgr=false);
 
 	/** @brief delete the static instance
 	 *  This has the effect of causing the connection to be rebuilt
@@ -128,7 +128,8 @@ public:
 	EXPORT void read_all(uint32_t key, std::vector<messageqcpp::SBS> &v);
 
 	/** reads queuesize/divisor msgs */
-	EXPORT void read_some(uint32_t key, uint divisor, std::vector<messageqcpp::SBS> &v);
+	EXPORT void read_some(uint32_t key, uint divisor, std::vector<messageqcpp::SBS> &v,
+                       bool *flowControlOn = NULL);
 
 	/** @brief Write a primitive message
 	 *
@@ -220,7 +221,7 @@ private:
 	//The mapping of session ids to StepMsgQueueLists
 	typedef std::map<unsigned, boost::shared_ptr<MQE> > MessageQueueMap;
 
-	explicit DistributedEngineComm(ResourceManager& rm);
+	explicit DistributedEngineComm(ResourceManager& rm, bool isExeMgr);
 
 	void StartClientListener(boost::shared_ptr<messageqcpp::MessageQueueClient> cl, uint connIndex);
 
@@ -258,6 +259,8 @@ private:
 	bool fMulticast;
 	boost::mutex fMulticastLock;
 	multicast::MulticastSender fMulticastSender;
+
+	bool fIsExeMgr;
 
 	// send-side throttling vars
 	uint64_t throttleThreshold;

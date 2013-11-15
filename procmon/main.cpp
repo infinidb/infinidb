@@ -143,7 +143,7 @@ int main(int argc, char **argv)
 	}
 	catch(...) {}
 
-	if ( cloud == "amazon" ) {
+	if ( cloud == "amazon-ec2" ) {
 		if(!aMonitor.amazonIPCheck()) {
 			string cmd = startup::StartUp::installDir() + "/bin/infinidb stop > /dev/null 2>&1";
 			system(cmd.c_str());

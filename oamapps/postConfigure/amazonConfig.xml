@@ -9,6 +9,30 @@
 		<!-- System Type: combined (um and pm functionality on same instance)
 					separate (um and pm functionality on separate instances) -->
 		<SystemType>separate</SystemType>
+
+		<!--- VPC Configuration Setup -->
+		<!---  						  -->
+		<!--- subnet ID -->
+		<!--- The ID of the Amazon VPC subnet in which to launch the instance(s) -->
+		<SubNetID>unassigned</SubNetID>
+		
+		<!-- VPC Starting Private IP Address -->
+		<!-- Requires the SubNetID to be setup -->
+		<!-- Use this if you want InfiniDB to assigned IP Addresses starting with this one -->
+		<!-- Set value to 'autoassign' if you want Amazon to auto-assign IP Addresses within the subnet range -->
+		<VPCStartPrivateIP>unassigned</VPCStartPrivateIP>
+		
+		<!-- User Modules Private IP Address list, use when running on a Amazon VPC -->
+		<!-- Requires the SubNetID to be setup -->
+		<!-- This list would start with um1, list is seperated by commands. i.e 'ip1,ip2,ip3' -->
+		<!-- IGNORED when VPCStartPrivateIP is set -->
+		<UserModulePrivateIP>unassigned</UserModulePrivateIP>
+		
+		<!-- User Modules Private IP Address list, use when running on a Amazon VPC -->
+		<!-- Requires the SubNetID to be setup -->
+		<!-- This list would start with pm2, list is seperated by commands. i.e 'ip1,ip2,ip3' -->
+		<!-- IGNORED when VPCStartPrivateIP is set -->
+		<PerformanceModulePrivateIP>unassigned</PerformanceModulePrivateIP>
 		
 		<!-- Elastic IP to Module Assignment -->
 		<!--- Example usages: x.x.x.x:um1 -->

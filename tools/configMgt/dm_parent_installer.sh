@@ -32,12 +32,12 @@ set SHARED "//calweb/shared"
 
 log_user $DEBUG
 spawn -noecho /bin/bash
-send "rm -f $CALPONTPACKAGE1 $CALPONTPACKAGE2 $CALPONTPACKAGE3\n"
+#send "rm -f $CALPONTPACKAGE1 $CALPONTPACKAGE2 $CALPONTPACKAGE3\n"
 # 
 # delete and erase all old packages from Director Module
 #
 set timeout 10
-send "ssh $USERNAME@$SERVER 'rm -f $CALPONTPACKAGE1 $CALPONTPACKAGE2 $CALPONTPACKAGE3'\n"
+send "ssh $USERNAME@$SERVER 'rm -f /root/calpont-*.rpm /root/infinidb*.rpm'\n"
 expect {
 	-re "authenticity" { send "yes\n" 
 						expect {

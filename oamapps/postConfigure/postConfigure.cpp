@@ -520,9 +520,6 @@ int main(int argc, char *argv[])
 
 				//check if dbrm data resides in older directory path and inform user if it does
 				dbrmDirCheck();
-				cmd = "umount " + installDir + "/data1  > /dev/null 2>&1";
-
-				system(cmd.c_str());
 
 				//check snmp Apps disable option
 				snmpAppCheck();
@@ -576,19 +573,45 @@ int main(int argc, char *argv[])
 	//
 
 	cout << endl;
-	string cloud;
+	string cloud = oam::UnassignedName;
+	string amazonSubNet = oam::UnassignedName;
+	bool amazonEC2 = false;
+	bool amazonVPC = false;
+
 	try {
 		 cloud = sysConfig->getConfig(InstallSection, "Cloud");
 	}
 	catch(...)
-	{}
+	{
+		cloud  = oam::UnassignedName;
+	}
 
-	string tcloud = cloud;
-	if (cloud.empty())
+	string tcloud = "n";
+	if (cloud == oam::UnassignedName)
 		tcloud = "n";
 	else
-	 	if (cloud == "amazon")
+	{
+	 	if (cloud == "amazon-ec2")
+		{
 			tcloud = "y";
+			amazonEC2 = true;
+		}
+		else
+		{
+			if (cloud == "amazon-vpc")
+			{
+				tcloud = "y";
+				amazonVPC = true;
+
+				//get subnetID
+				try {
+					amazonSubNet = sysConfig->getConfig(InstallSection, "AmazonSubNetID");
+				}
+				catch(...)
+				{}
+			}
+		}
+	}
 
 	//cleanup/create local/etc  directory
 	cmd = "rm -rf " + installDir + "/local/etc > /dev/null 2>&1";
@@ -597,98 +620,169 @@ int main(int argc, char *argv[])
 	system(cmd.c_str());
 
 	while(true) {
-		prompt = "Installing on Non-VPC Amazon EC2 Instances [y,n] (" + tcloud + ") > ";
+		prompt = "Installing on Amazon System (EC2 or VPC services) [y,n] (" + tcloud + ") > ";
 		pcommand = callReadline(prompt.c_str());
 		if (pcommand) {
 			if (strlen(pcommand) > 0) tcloud = pcommand;
 			callFree(pcommand);
 		}
 
-		if (tcloud == "y") {
-			cloud = "amazon";
-			cout << endl << "For Amazon EC2 Instance installs, these files will need to be installed on" << endl;
-			cout << "on the local instance:" << endl << endl;
-			cout << " 1. X.509 Certificate" << endl;
-			cout << " 2. X.509 Private Key" << endl << endl;
+		if (tcloud == "y") 
+		{
+			if (!amazonEC2)
+				tcloud = "n";
 
-			while(true) {
-				string ready = "y";
-				prompt = "Are these files installed and ready to continue [y,n] (y) > ";
+			prompt = "Using EC2 services [y,n] (" + tcloud + ") > ";
+			pcommand = callReadline(prompt.c_str());
+			if (pcommand) {
+				if (strlen(pcommand) > 0) tcloud = pcommand;
+				callFree(pcommand);
+			}
+	
+			if (tcloud == "n")
+			{
+				amazonEC2 = false;
+				cloud = oam::UnassignedName;
+
+				if (amazonVPC)
+					tcloud = "y";
+
+				prompt = "Using VPC services [y,n] (" + tcloud + ") > ";
 				pcommand = callReadline(prompt.c_str());
 				if (pcommand) {
-					if (strlen(pcommand) > 0) ready = pcommand;
+					if (strlen(pcommand) > 0) tcloud = pcommand;
 					callFree(pcommand);
-					if (ready == "n") {
-						cout << endl << "Please Install these files and re-run postConfigure. exiting..." << endl;
-						exit(0);
+				}
+		
+				if (tcloud == "n")
+				{
+					amazonVPC = false;
+					cloud = oam::UnassignedName;
+				}
+				else
+				{
+					amazonVPC = true;
+					cloud = "amazon-vpc";
+
+					prompt = "Enter VPC SubNet ID (" + amazonSubNet + ") > ";
+					pcommand = callReadline(prompt.c_str());
+					if (pcommand) {
+						if (strlen(pcommand) > 0) amazonSubNet = pcommand;
+						callFree(pcommand);
 					}
+
+					//set subnetID
+					try {
+						sysConfig->setConfig(InstallSection, "AmazonSubNetID", amazonSubNet);
+					}
+					catch(...)
+					{}
 				}
-
-				if ( ready == "y" )
-					break;
-
-				cout << "Invalid Entry, please enter 'y' for yes or 'n' for no" << endl;
 			}
-
-			try {
-				x509Cert = sysConfig->getConfig(InstallSection, "AmazonX509Certificate");
-				x509PriKey = sysConfig->getConfig(InstallSection, "AmazonX509PrivateKey");
-			}
-			catch(...)
-			{}
-
-			cout << endl;
-
-			while(true)
+			else
 			{
-				prompt = "Enter Name and directory of the X.509 Certificate (" + x509Cert + ") > ";
-				pcommand = callReadline(prompt.c_str());
-				if (pcommand) {
-					if (strlen(pcommand) > 0) x509Cert = pcommand;
-					callFree(pcommand);
-				}
-				ifstream File (x509Cert.c_str());
-				if (!File)
-					cout << "Error: file not found, please re-enter" << endl;
-				else
-					break;
+				amazonEC2 = true;
+				cloud = "amazon-ec2";
 			}
 
-			while(true)
+			if ( amazonEC2 || amazonVPC )
 			{
-				prompt = "Enter Name and directory of the X.509 Private Key (" + x509PriKey + ") > ";
-				pcommand = callReadline(prompt.c_str());
-				if (pcommand) {
-					if (strlen(pcommand) > 0) x509PriKey = pcommand;
-					callFree(pcommand);
+				cout << endl << "For Amazon EC2/VPC Instance installs, these files will need to be installed on" << endl;
+				cout << "on the local instance:" << endl << endl;
+				cout << " 1. X.509 Certificate" << endl;
+				cout << " 2. X.509 Private Key" << endl << endl;
+	
+				while(true) {
+					string ready = "y";
+					prompt = "Are these files installed and ready to continue [y,n] (y) > ";
+					pcommand = callReadline(prompt.c_str());
+					if (pcommand) {
+						if (strlen(pcommand) > 0) ready = pcommand;
+						callFree(pcommand);
+						if (ready == "n") {
+							cout << endl << "Please Install these files and re-run postConfigure. exiting..." << endl;
+							exit(0);
+						}
+					}
+	
+					if ( ready == "y" )
+						break;
+	
+					cout << "Invalid Entry, please enter 'y' for yes or 'n' for no" << endl;
+					if ( noPrompting )
+						exit(1);
 				}
-				ifstream File (x509PriKey.c_str());
-				if (!File)
-					cout << "Error: file not found, please re-enter" << endl;
-				else
-					break;
+	
+				try {
+					x509Cert = sysConfig->getConfig(InstallSection, "AmazonX509Certificate");
+					x509PriKey = sysConfig->getConfig(InstallSection, "AmazonX509PrivateKey");
+				}
+				catch(...)
+				{}
+	
+				cout << endl;
+	
+				while(true)
+				{
+					prompt = "Enter Name and directory of the X.509 Certificate (" + x509Cert + ") > ";
+					pcommand = callReadline(prompt.c_str());
+					if (pcommand) {
+						if (strlen(pcommand) > 0) x509Cert = pcommand;
+						callFree(pcommand);
+					}
+					ifstream File (x509Cert.c_str());
+					if (!File) {
+						cout << "Error: file not found, please re-enter" << endl;
+						if ( noPrompting )
+							exit(1);
+					}
+					else
+						break;
+				}
+	
+				while(true)
+				{
+					prompt = "Enter Name and directory of the X.509 Private Key (" + x509PriKey + ") > ";
+					pcommand = callReadline(prompt.c_str());
+					if (pcommand) {
+						if (strlen(pcommand) > 0) x509PriKey = pcommand;
+						callFree(pcommand);
+					}
+					ifstream File (x509PriKey.c_str());
+					if (!File)
+					{
+						cout << "Error: file not found, please re-enter" << endl;
+						if ( noPrompting )
+							exit(1);
+					}
+					else
+						break;
+				}
+	
+				try {
+					sysConfig->setConfig(InstallSection, "AmazonX509Certificate", x509Cert);
+					sysConfig->setConfig(InstallSection, "AmazonX509PrivateKey", x509PriKey);
+				}
+				catch(...)
+				{}
+	
+				if( !copyX509files() )
+					cout << "copyX509files error" << endl;
+	
+				break;
 			}
-
-			try {
-				sysConfig->setConfig(InstallSection, "AmazonX509Certificate", x509Cert);
-				sysConfig->setConfig(InstallSection, "AmazonX509PrivateKey", x509PriKey);
-			}
-			catch(...)
-			{}
-
-			if( !copyX509files() )
-				cout << "copyX509files error" << endl;
-
-			break;
 		}
 		else 
 		{
 			if (tcloud == "n" ) {
-				cloud = "n";
+				cloud = oam::UnassignedName;
 				break;
 			}
 		}
+
 		cout << "Invalid Entry, please enter 'y' for yes or 'n' for no" << endl;
+		if ( noPrompting )
+			exit(1);
 	}
 
 	try {
@@ -696,6 +790,9 @@ int main(int argc, char *argv[])
 	}
 	catch(...)
 	{}
+
+	if ( cloud == "amazon-ec2" || cloud == "amazon-vpc" )
+		cloud = "amazon";
 
 	cout << endl << "===== Setup System Module Type Configuration =====" << endl << endl;
 

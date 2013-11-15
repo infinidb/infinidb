@@ -1059,6 +1059,8 @@ void applyMapping(const int *mapping, const Row &in, Row *out)
 				out->setVarBinaryField(in.getVarBinaryField(i), in.getVarBinaryLength(i), mapping[i]);
 			else if (UNLIKELY(in.getColTypes()[i] == execplan::CalpontSystemCatalog::LONGDOUBLE))
 				out->setLongDoubleField(in.getLongDoubleField(i), mapping[i]);
+            else if (in.isUnsigned(i))
+                out->setUintField(in.getUintField(i), mapping[i]);
 			else
 				out->setIntField(in.getIntField(i), mapping[i]);
 		}

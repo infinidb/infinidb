@@ -1032,7 +1032,7 @@ bool combineJobStepsByTable(TableInfoMap::iterator& mit, JobInfo& jobInfo)
 			thjs->schema1(tableInfo.fSchema);
 			thjs->schema2(tableInfo.fSchema);
 			thjs->setLargeSideBPS(tbps);
-			thjs->joinId(0);
+			thjs->joinId(-1); // token join is a filter force it done before other joins
 			thjs->setJoinType(INNER);
 			tbps->incWaitToRunStepCnt();
 			SJSTEP spthjs(thjs);
@@ -2181,20 +2181,15 @@ void joinTablesInOrder(uint largest, JobStepVector& joinSteps, TableInfoMap& tab
 				break;
 			}
 
-			// WORKAROUND limitation on join FE
 			// check if FE needs table in previous smallsides
 			if (jobInfo.joinFeTableMap[joins[ns].fJoinId].size() > 0)
 			{
-				bool workaround = false;
 				set<uint>& tids = jobInfo.joinFeTableMap[joins[ns].fJoinId];
 				for (set<uint>::iterator si = smallSideTid.begin(); si != smallSideTid.end(); si++)
 				{
 					if (tids.find(*si) != tids.end())
 						throw runtime_error("On clause filter involving a table not directly involved in the outer join is currently not supported.");
 				}
-
-				if (workaround)
-					break;
 			}
 
 			updateJoinSides(small, large, joinInfoMap, smallSides, tableInfoMap, jobInfo);
@@ -2220,7 +2215,6 @@ void joinTablesInOrder(uint largest, JobStepVector& joinSteps, TableInfoMap& tab
 		}
 
 		size_t startPos = 0; // start point to add new smallsides
-		if (thjs) startPos = thjs->getLargeKeys().size();
 
 		// get info to config the TupleHashjoin
 		vector<string> traces;
@@ -2339,13 +2333,13 @@ void joinTablesInOrder(uint largest, JobStepVector& joinSteps, TableInfoMap& tab
 			tableInfoMap[large].fQuerySteps.push_back(spjs);
 			tableInfoMap[large].fDl = spdl;
 		}
-		else
+		else // thjs && joinStepMap[large].second >= 1
 		{
 			JobStepAssociation inJsa = thjs->inputAssociation();
 			if (inJsa.outSize() < 2)
 				throw runtime_error("Not enough input to a hashjoin.");
-			size_t last = inJsa.outSize() - 1;
-			inJsa.outAdd(smallSideDLs, last);
+			startPos = inJsa.outSize() - 1;
+			inJsa.outAdd(smallSideDLs, startPos);
 			thjs->inputAssociation(inJsa);
 			thjs->setLargeSideDLIndex(inJsa.outSize() - 1);
 
@@ -2525,7 +2519,7 @@ void joinTablesInOrder(uint largest, JobStepVector& joinSteps, TableInfoMap& tab
 						ParseTree* joinFilter = new ParseTree;
 						joinFilter->copyTree(*(e->expressionFilter()));
 						shared_ptr<ParseTree> sppt(joinFilter);
-						thjs->addJoinFilter(sppt, x->second);
+						thjs->addJoinFilter(sppt, startPos + x->second);
 						thjs->setJoinFilterInputRG(rg);
 						continue;
 					}
@@ -2603,10 +2597,11 @@ void joinTablesInOrder(uint largest, JobStepVector& joinSteps, TableInfoMap& tab
 				joinOrder.push_back(*i);
 		}
 
-		uint64_t n = joinOrder.size();
-		uint64_t h = n/2, e = n - 1;
+		const uint64_t n = joinOrder.size();
+		const uint64_t h = n / 2;
+		const uint64_t e = n - 1;
 		for (uint64_t i = 0; i < h; i++)
-			swap(joinOrder[i], joinOrder[e - i]);
+			std::swap(joinOrder[i], joinOrder[e - i]);
 	}
 }
 

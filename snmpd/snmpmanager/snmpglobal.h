@@ -50,10 +50,6 @@ const std::string ACTIVE_ALARM_FILE = "/var/log/Calpont/activeAlarms";
 const std::string ALARM_FILE = "/var/log/Calpont/alarm.log";
 const std::string ALARM_ARCHIVE_FILE = "/var/log/Calpont/archive";
 
-// image alarm records for none-OAMParentModule to view in HDFS
-const std::string ACTIVE_ALARMS_IMG = "/usr/local/Calpont/data1/systemFiles/activeAlarms";
-const int ACTIVE_ALARMS_IMG_PUSH_INTERVAL = 10;  // seconds
-
 const CALPONT_OID SNMPTRAP_OID [] = { 1, 3, 6, 1, 6, 3, 1, 1, 4, 1, 0 };
 const CALPONT_OID CALPONT_TRAP_OID [] = { 1, 3, 6, 1, 4, 1, 2021, 991 };
 const CALPONT_OID CALALARM_DATA_OID [] =  { 1, 3, 6, 1, 4, 1, 2021, 991, 17 };

@@ -46,7 +46,8 @@ const string IDB_date_format(const DateTime& dt, const string& format)
 	uint32_t weekday = 0;
 	uint32_t dayval = 0;
 	uint32_t weekval = 0;
-	
+	uint32_t weekyear = 0;
+
 	for (uint i = 0; i < format.length(); i++)
 	{
 		if (format[i] != '%')
@@ -54,7 +55,7 @@ const string IDB_date_format(const DateTime& dt, const string& format)
 		else
 		{
 			i++;
-			switch (format[i]) 
+			switch (format[i])
 			{
 			case 'M':
 				sprintf(ptr, "%s", helpers::monthFullNames[dt.month].c_str());
@@ -85,7 +86,7 @@ const string IDB_date_format(const DateTime& dt, const string& format)
 			break;
 			case 'Y':
 				sprintf(ptr, "%04d", dt.year);
-				ptr += 4; 
+				ptr += 4;
 				break;
 			case 'y':
 				sprintf(ptr, "%02d", dt.year % 100);
@@ -143,7 +144,7 @@ const string IDB_date_format(const DateTime& dt, const string& format)
 				ptr += 2;
 				break;
 			case 'r':
-				sprintf(ptr, (dt.hour % 24 < 12 ? "%02d:%02d:%02d AM" : "%02d:%02d:%02d PM"), 
+				sprintf(ptr, (dt.hour % 24 < 12 ? "%02d:%02d:%02d AM" : "%02d:%02d:%02d PM"),
 	             (dt.hour + 11) % 12 + 1, dt.minute, dt.second);
 				ptr += 11;
 				break;
@@ -157,35 +158,38 @@ const string IDB_date_format(const DateTime& dt, const string& format)
 				ptr += 8;
 				break;
 			case 'U':
-				weekval = helpers::calc_mysql_week( dt.year, dt.month, dt.day,
-													helpers::WEEK_GT_THREE_DAYS);
+				weekval = helpers::calc_mysql_week( dt.year, dt.month, dt.day, 0);
 				sprintf(ptr, "%02d", weekval);
 				ptr += 2;
 				break;
 			case 'V':
 				weekval = helpers::calc_mysql_week( dt.year, dt.month, dt.day,
-													helpers::WEEK_NO_ZERO | helpers::WEEK_GT_THREE_DAYS);
+													helpers::WEEK_NO_ZERO );
 				sprintf(ptr, "%02d", weekval);
 				ptr += 2;
 				break;
 			case 'u':
 				weekval = helpers::calc_mysql_week( dt.year, dt.month, dt.day,
-													helpers::WEEK_MONDAY_FIRST);
+													helpers::WEEK_MONDAY_FIRST | helpers::WEEK_GT_THREE_DAYS);
 				sprintf(ptr, "%02d", weekval);
 				ptr += 2;
 				break;
 			case 'v':
 				weekval = helpers::calc_mysql_week( dt.year, dt.month, dt.day,
-												    helpers::WEEK_NO_ZERO | helpers::WEEK_MONDAY_FIRST);
+												    helpers::WEEK_NO_ZERO | helpers::WEEK_MONDAY_FIRST| helpers::WEEK_GT_THREE_DAYS);
 				sprintf(ptr, "%02d", weekval);
 				ptr += 2;
 				break;
 			case 'x':
-				sprintf(ptr, "%04d", dt.year);
-				ptr += 4;
+                helpers::calc_mysql_week( dt.year, dt.month, dt.day,
+                                          helpers::WEEK_NO_ZERO | helpers::WEEK_MONDAY_FIRST | helpers::WEEK_GT_THREE_DAYS, &weekyear);
+				sprintf(ptr, "%04d", weekyear);
+                ptr += 4;
 				break;
 			case 'X':
-				sprintf(ptr, "%04d", dt.year);
+			    helpers::calc_mysql_week( dt.year, dt.month, dt.day,
+                                          helpers::WEEK_NO_ZERO, &weekyear);
+				sprintf(ptr, "%04d", weekyear);
 				ptr += 4;
 				break;
 			default:
@@ -272,7 +276,7 @@ string Func_date_format::getStrVal(rowgroup::Row& row,
 				dt.second = (uint32_t)((val >> 20) & 0x3f);
 				dt.msecond = (uint32_t)((val & 0xfffff));
 			}
-			break;	
+			break;
 		case CalpontSystemCatalog::DECIMAL:
 			if (parm[0]->data()->resultType().scale == 0)
 			{
@@ -298,7 +302,7 @@ string Func_date_format::getStrVal(rowgroup::Row& row,
 			isNull = true;
 			return "";
 	}
-	
+
 	const string& format = parm[1]->data()->getStrVal(row, isNull);
 
 	return helpers::IDB_date_format(dt, format);
@@ -311,7 +315,7 @@ int32_t Func_date_format::getDateIntVal(rowgroup::Row& row,
 							CalpontSystemCatalog::ColType& ct)
 {
 	return dataconvert::DataConvert::dateToInt(getStrVal(row, parm, isNull, ct));
-}		
+}
 
 
 int64_t Func_date_format::getDatetimeIntVal(rowgroup::Row& row,

@@ -439,11 +439,13 @@
 		<EEPackageType>rpm</EEPackageType>
 		<SystemLogConfigFile>unassigned</SystemLogConfigFile>
 		<rpw>unassigned</rpw>
-		<Cloud>n</Cloud>
+		<Cloud>unassigned</Cloud>
 		<AmazonX509Certificate>unassigned</AmazonX509Certificate>
 		<AmazonX509PrivateKey>unassigned</AmazonX509PrivateKey>
 		<AmazonRegion>us-east-1</AmazonRegion>
 		<AmazonZone>unassigned</AmazonZone>
+		<AmazonSubNetID>unassigned</AmazonSubNetID>
+		<AmazonVPCNextPrivateIP>unassigned</AmazonVPCNextPrivateIP>
 		<EnableSNMP>y</EnableSNMP>
 		<UMInstanceType>unassigned</UMInstanceType>
 		<UMSecurityGroup>unassigned</UMSecurityGroup>

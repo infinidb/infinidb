@@ -78,7 +78,7 @@ public:
     /**
      * @brief Close the dictionary file handle.
      */
-    EXPORT int   closeDctnry();
+    EXPORT int   closeDctnry(bool realClose = true);
 
     /**
      * @brief Close the dictionary file handle without flushing the current blk

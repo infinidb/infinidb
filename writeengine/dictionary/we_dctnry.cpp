@@ -345,7 +345,7 @@ int  Dctnry::expandDctnryExtent()
  * RETURN:
  *    none
  ******************************************************************************/
-int Dctnry::closeDctnry()
+int Dctnry::closeDctnry(bool realClose)
 {
     if ( !m_dFile )
         return NO_ERROR;
@@ -368,12 +368,13 @@ int Dctnry::closeDctnry()
     }
 
     // dmc-error handling (should detect/report error in closing file)
-    closeDctnryFile(true, oids);
+    if (realClose)
+		closeDctnryFile(true, oids);
 
     m_hwm = (HWM)m_lastFbo;
     idbassert(m_dctnryOID>=0);
 	
-	if (idbdatafile::IDBPolicy::useHdfs()) 
+	if (idbdatafile::IDBPolicy::useHdfs() && realClose) 
 	{
 		BRM::FileInfo aFile;
 		std::vector<BRM::OID_t>  oidsToFlush;
@@ -394,7 +395,8 @@ int Dctnry::closeDctnry()
         return rc;
 
     //cout <<"Init called! m_dctnryOID ="  << m_dctnryOID << endl;
-    freeStringCache( );
+    if (realClose)
+		freeStringCache( );
 
     return NO_ERROR;
 }
