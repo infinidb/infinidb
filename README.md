@@ -1,19 +1,21 @@
 This is InfiniDB 4.0.
+=====================
 
 To build InfiniDB from source you will need:
-   o a CentOS/RHEL 5/6, debian 5/6 or Ubuntu 10/12 linux host configured for
-     software development or a Windows XP-or-later host with MS VS 2008
-     installed and patched to at least SP1.
 
-Download the InfiniDB version of MySQL 5.1.39 from github.
+  * a CentOS/RHEL 5/6, debian 5/6 or Ubuntu 10/12 linux host configured for software development
 
-Download this repository.
+Along with a working C++ compiler and GNU software development tools you will need the following extra packages:
 
-From your $HOME directory, unzip both archives.
+  * expect
+  * zlib-devel
+  * ncurses-devel
+  * libxml2-devel
+  * readline-devel
 
-Rename mysql-master to mysql and infinidb-master to infinidb.
+Clone or download this repository.
 
-cd infinidb
-make
-make install
+    git clone https://github.com/infinidb/infinidb
+    cd infinidb
+    ./build/src-build --prefix=$HOME
 
