@@ -96,8 +96,8 @@ private:
 	void doAggregate_singleThread();
 	uint64_t doThreadedAggregate(messageqcpp::ByteStream &bs, RowGroupDL* dlp);
 	void aggregateRowGroups();
-	void threadedAggregateRowGroups(uint32_t threadID);
-	void doThreadedSecondPhaseAggregate(uint32_t threadID);
+	void threadedAggregateRowGroups(uint8_t threadID);
+	void doThreadedSecondPhaseAggregate(uint8_t threadID);
 	bool nextDeliveredRowGroup();
 	void pruneAuxColumns();
 	void formatMiniStats();
@@ -138,32 +138,27 @@ private:
 	class ThreadedAggregator
 	{
 		public:
-			ThreadedAggregator(TupleAggregateStep* step, uint32_t threadID) :
+			ThreadedAggregator(TupleAggregateStep* step, uint8_t threadID) :
 				fStep(step),
 				fThreadID(threadID)
 			{}
 			void operator()() { fStep->threadedAggregateRowGroups(fThreadID); }
 
 			TupleAggregateStep* fStep;
-			uint32_t fThreadID;
+			uint8_t fThreadID;
 	};
 
 	class ThreadedSecondPhaseAggregator
 	{
 		public:
-			ThreadedSecondPhaseAggregator(TupleAggregateStep* step, uint32_t threadID, uint32_t bucketsPerThread) :
+			ThreadedSecondPhaseAggregator(TupleAggregateStep* step, uint8_t threadID) :
 				fStep(step),
-				fThreadID(threadID),
-				bucketCount(bucketsPerThread)
+				fThreadID(threadID)
 			{
 			}
-			void operator()() {
-				for (uint i = 0; i < bucketCount; i++)
-					fStep->doThreadedSecondPhaseAggregate(fThreadID+i);
-			}
+			void operator()() {fStep->doThreadedSecondPhaseAggregate(fThreadID);}
 			TupleAggregateStep* fStep;
-			uint32_t fThreadID;
-			uint32_t bucketCount;
+			uint8_t fThreadID;
 	};
 
 	boost::scoped_ptr<boost::thread> fRunner;
@@ -174,6 +169,7 @@ private:
 	uint fNumOfThreads;
 	uint fNumOfBuckets;
 	uint fNumOfRowGroups;
+	uint64_t fBucketMask;
 	uint fBucketNum;
 
 	boost::mutex fMutex;
@@ -186,8 +182,6 @@ private:
 	bool fIsMultiThread;
 	int fInputIter; // iterator
 	boost::scoped_array<uint64_t> fMemUsage;
-	vector<boost::shared_ptr<boost::thread> > fFirstPhaseRunners;
-	uint fFirstPhaseThreadCount;
 };
 
 

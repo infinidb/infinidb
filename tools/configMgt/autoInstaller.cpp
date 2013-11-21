@@ -684,21 +684,6 @@ CONFIGDONE:
 		exit(1);
 	}
 
-	bool HDFS = false;
-	string DBRootStorageType;
-	try {
-		DBRootStorageType = sysConfigOld->getConfig("Installation", "DBRootStorageType");
-	}
-	catch(...)
-	{
-		cout << "ERROR: Problem reading DBRootStorageType from the InfiniDB System Configuration file, exiting" << endl;
-		cerr << "ERROR: Problem reading DBRootStorageType from the InfiniDB System Configuration file, exiting" << endl;
-		exit(1);
-	}
-
-	if ( DBRootStorageType == "hdfs" )
-		HDFS = true;
-
 	if ( serverTypeInstall != oam::INSTALL_COMBINE_DM_UM_PM && CE == "1")
 	{
 		cout << "Community-Edition only work on single-server systems, exiting" << endl;
@@ -824,15 +809,7 @@ CONFIGDONE:
 	}
 	else
 	{
-		if (HDFS)
-		{
-			string DataFileEnvFile = "setenv-hdfs-20";
-			cmd = "./remote_command.sh " + installParentModuleIPAddr + " " + systemUser + " " + password + " 'export JAVA_HOME=/usr/java/jdk1.6.0_31;export LD_LIBRARY_PATH=/usr/java/jdk1.6.0_31/jre/lib/amd64/server;. /root/" + DataFileEnvFile + ";" + installDir + "/Calpont/bin/postConfigure -i " + installDir + "/Calpont -n -mp " + MySQLpassword + " -p " + password + "' 'System is Active' Error 1200 " + debug_flag;
-		}
-		else
-		{
-			cmd = "./remote_command.sh " + installParentModuleIPAddr + " " + systemUser + " " + password + " '" + installDir + "/Calpont/bin/postConfigure -i " + installDir + "/Calpont -n -mp " + MySQLpassword + " -p " + password + "' 'System is Active' Error 1200 " + debug_flag;
-		}
+		cmd = "./remote_command.sh " + installParentModuleIPAddr + " " + systemUser + " " + password + "  '" + installDir + "/Calpont/bin/postConfigure -i " + installDir + "/Calpont -n -mp " + MySQLpassword + " -p " + password + "' 'System is Active' Error 1200 " + debug_flag;
 	}
 
 	rtnCode = system(cmd.c_str());

@@ -172,10 +172,10 @@ namespace joblist
   DistributedEngineComm* DistributedEngineComm::fInstance = 0;
 
   /*static*/
-  DistributedEngineComm* DistributedEngineComm::instance(ResourceManager& rm, bool isExeMgr)
+  DistributedEngineComm* DistributedEngineComm::instance(ResourceManager& rm)
   {
     if (fInstance == 0)
-        fInstance = new DistributedEngineComm(rm, isExeMgr);
+        fInstance = new DistributedEngineComm(rm);
 
     return fInstance;
   }
@@ -187,13 +187,12 @@ namespace joblist
 	fInstance = 0;
   }
 
-  DistributedEngineComm::DistributedEngineComm(ResourceManager& rm, bool isExeMgr) :
+  DistributedEngineComm::DistributedEngineComm(ResourceManager& rm) :
 	fRm(rm),
 	fLBIDShift(fRm.getPsLBID_Shift()),
 	pmCount(0),
 	fMulticast(rm.getPsMulticast()),
-	fMulticastSender(),
-    fIsExeMgr(isExeMgr)
+	fMulticastSender()
   {
     Setup();
   }
@@ -210,7 +209,7 @@ void DistributedEngineComm::Setup()
 
 	throttleThreshold = fRm.getDECThrottleThreshold();
     uint newPmCount = fRm.getPsCount();
-    int cpp = (fIsExeMgr ? fRm.getPsConnectionsPerPrimProc() : 1);
+    int cpp = fRm.getPsConnectionsPerPrimProc();
     tbpsThreadCount = fRm.getJlNumScanReceiveThreads();
     unsigned numConnections = newPmCount * cpp;
     oam::Oam oam;
@@ -506,8 +505,7 @@ void DistributedEngineComm::read(uint32_t key, SBS &bs)
 	}
   }
 
-  void DistributedEngineComm::read_some(uint32_t key, uint divisor, vector<SBS> &v,
-                                        bool *flowControlOn)
+  void DistributedEngineComm::read_some(uint32_t key, uint divisor, vector<SBS> &v)
   {
 	boost::shared_ptr<MQE> mqe;
 
@@ -526,16 +524,11 @@ void DistributedEngineComm::read(uint32_t key, SBS &bs)
 
 	TSQSize_t queueSize = mqe->queue.pop_some(divisor, v, 1);   // need to play with the min #
 
-	if (flowControlOn)
-        *flowControlOn = false;
-
 	if (mqe->sendACKs) {
 		mutex::scoped_lock lk(ackLock);
 		if (mqe->throttled && !mqe->hasBigMsgs && queueSize.size <= disableThreshold)
 			setFlowControl(false, key, mqe);
 		sendAcks(key, v, mqe, queueSize.size);
-        if (flowControlOn)
-            *flowControlOn = mqe->throttled;
 	}
   }
 

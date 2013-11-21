@@ -6,7 +6,7 @@
 
 prefix=/usr/local/Calpont
 for arg in "$@"; do
-	if [ `expr "$arg" : '--prefix='` -eq 9 ]; then
+	if [ `expr -- "$arg" : '--prefix='` -eq 9 ]; then
 		prefix="`echo $arg | awk -F= '{print $2}'`"
 	else
 		echo "ignoring unknown argument: $arg" 1>&2

@@ -441,10 +441,6 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libudfsdk-ent", "..\utils\u
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libudf_mysql", "..\utils\udfsdk\libudf_mysql.vcproj", "{51ACB58A-6581-482E-BEBE-B85D0BB5A1ED}"
-	ProjectSection(ProjectDependencies) = postProject
-		{9AE60D66-99F6-4CCB-902D-3814A12AE0A9} = {9AE60D66-99F6-4CCB-902D-3814A12AE0A9}
-		{C543C9A1-B4E0-4BAD-9FC2-2AFEEA952FC5} = {C543C9A1-B4E0-4BAD-9FC2-2AFEEA952FC5}
-	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

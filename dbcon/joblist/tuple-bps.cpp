@@ -168,7 +168,6 @@ void TupleBPS::initializeConfigParms()
 	fRequestSize = fRm.getJlRequestSize();
 	fMaxOutstandingRequests = fRm.getJlMaxOutstandingRequests();
 	fProcessorThreadsPerScan = fRm.getJlProcessorThreadsPerScan();
-    fNumThreads = 0;
 
 	config::Config* cf = config::Config::makeConfig();
 	string epsf = cf->getConfig("ExtentMap", "ExtentsPerSegmentFile");
@@ -177,15 +176,11 @@ void TupleBPS::initializeConfigParms()
 
 	if (fRequestSize >= fMaxOutstandingRequests)
 		fRequestSize = 1;
-    if ((fSessionId & 0x80000000) == 0)
-        fMaxNumThreads = fRm.getJlNumScanReceiveThreads();
-    else
-        fMaxNumThreads = 1;
+	fNumThreads = fRm.getJlNumScanReceiveThreads();
+	if (fSessionId & 0x80000000)
+		fNumThreads = 1;
 
-	fProducerThread.reset(new SPTHD[fMaxNumThreads]);
-    // Make maxnum thread objects even if they don't get used to make join() safe.
-    for (uint i = 0; i < fMaxNumThreads; i++)
-        fProducerThread[i].reset(new thread());
+	fProducerThread.reset(new SPTHD[fNumThreads]);
 }
 
 TupleBPS::TupleBPS(const pColStep& rhs, const JobInfo& jobInfo) :
@@ -748,19 +743,10 @@ void TupleBPS::startPrimitiveThread()
 	pThread.reset(new boost::thread(TupleBPSPrimitive(this)));
 }
 
-void TupleBPS::startAggregationThread()
+void TupleBPS::startAggregationThreads()
 {
-//  This block of code starts all threads up front
-//     fMaxNumThreads = 1;
-//     fNumThreads = fMaxNumThreads;
-//     for (uint i = 0; i < fMaxNumThreads; i++)
-//             fProducerThread[i].reset(new boost::thread(TupleBPSAggregators(this, i)));
-
-//  This block of code starts one thread at a time
-    if (fNumThreads >= fMaxNumThreads)
-        return;
-    fNumThreads++;
-    fProducerThread[fNumThreads-1].reset(new boost::thread(TupleBPSAggregators(this, fNumThreads-1)));
+	for (uint i = 0; i < fNumThreads; i++)
+		fProducerThread[i].reset(new boost::thread(TupleBPSAggregators(this, i)));
 }
 
 void TupleBPS::serializeJoiner()
@@ -1018,11 +1004,11 @@ void TupleBPS::run()
 		deliveryDL.reset(new RowGroupDL(1, 5));
 		deliveryIt = deliveryDL->getIterator();
 	}
-
-	fBPP->setThreadCount(fMaxNumThreads);
+	
+	fBPP->setThreadCount(fNumThreads);
 	if (doJoin)
 		for (i = 0; i < smallSideCount; i++)
-			tjoiners[i]->setThreadCount(fMaxNumThreads);
+			tjoiners[i]->setThreadCount(fNumThreads);
 
 	if (fe1)
 		fBPP->setFEGroup1(fe1, fe1Input);
@@ -1055,7 +1041,7 @@ void TupleBPS::run()
 		prepCasualPartitioning();
 
 		startPrimitiveThread();
-		startAggregationThread();
+		startAggregationThreads();
 	}
 	catch (const std::exception& e)
 	{
@@ -1089,14 +1075,14 @@ void TupleBPS::join()
 		if (msgsRecvd < msgsSent) {
 			// wake up the sending thread, it should drain the input dl and exit
 			mutex.lock();
-			condvarWakeupProducer.notify_all();
+			condvarWakeupProducer.notify_all(); 
 			mutex.unlock();
 		}
 
 		if (pThread)
 			pThread->join();
 
-		for (uint i = 0; i < fMaxNumThreads; i++)
+		for (uint i = 0; i < fNumThreads; i++)
 			fProducerThread[i]->join();
 		if (BPPIsAllocated) {
 			ByteStream bs;
@@ -1151,7 +1137,7 @@ uint TupleBPS::nextBand(ByteStream &bs)
 	RowGroup &realOutputRG = (fe2 ? fe2Output : primRowGroup);
 	RGData rgData;
 	uint rowCount = 0;
-
+	
 	bs.restart();
 	while (rowCount == 0 && more) {
 		more = deliveryDL->next(deliveryIt, &rgData);
@@ -1164,6 +1150,308 @@ uint TupleBPS::nextBand(ByteStream &bs)
 	}
 	return rowCount;
 }
+
+
+#if 0 
+/* Keeping this around for reference for a couple weeks in case something goes wrong with the
+ * new impl */
+
+/* XXXPAT: This function is ridiculous.  Need to replace it with code that uses
+ * the multithreaded recv fcn & a FIFO once we get tighter control over memory usage.
+ */
+uint TupleBPS::nextBand(messageqcpp::ByteStream &bs)
+{
+	int64_t min;
+	int64_t max;
+	uint64_t lbid;
+	uint32_t cachedIO=0;
+	uint32_t physIO=0;
+	uint32_t touchedBlocks=0;
+	bool validCPData = false;
+	boost::shared_ptr<messageqcpp::ByteStream> bsIn;
+	RGData rgData;
+	//boost::shared_array<uint8_t> rgData;
+	uint rows = 0;
+	RowGroup &realOutputRG = (fe2 ? fe2Output : primRowGroup);
+
+	bs.restart();
+
+again:
+try
+{
+	while (msgsRecvd == msgsSent && !finishedSending && !cancelled())
+		usleep(1000);
+
+	/* "If there are no more messages expected, or if there was an error somewhere else in the joblist..." */
+	if ((msgsRecvd == msgsSent && finishedSending) || cancelled())
+	{
+		bsIn.reset(new ByteStream());
+// 		if (fOid>=3000 && tracOn()) dlTimes.setLastReadTime();
+		if (fOid>=3000 && traceOn()) dlTimes.setEndOfInputTime();
+		/* "If there was an error, make a response with the error code... */
+		if (fBPP->getStatus() || cancelled())
+		{
+			/* Note, doesn't matter which rowgroup is used here */
+			rgData = fBPP->getErrorRowGroupData(status());
+			//cout << "TBPS: returning error status " << status() << endl;
+			rows = 0;
+			if (!status())
+				status(fBPP->getStatus());
+			primRowGroup.setData(&rgData);
+			//primRowGroup.convertToInlineDataInPlace();
+			primRowGroup.serializeRGData(bs);
+			//bs.load(rgData.rowData, primRowGroup.getEmptySize());
+		}
+		else
+		{
+			/* else, send the special, 0-row last message. */
+			bool unused;
+			rgData = fBPP->getRowGroupData(*bsIn, &validCPData, &lbid, &min, &max, &cachedIO, &physIO, &touchedBlocks, &unused, 0);
+
+			primRowGroup.setData(&rgData);
+			if (fe2)
+			{
+				if (!runFEonPM)
+					processFE2_oneRG(primRowGroup, fe2Output, fe2InRow, fe2OutRow, fe2.get());
+				else
+					fe2Output.setData(&rgData);
+			}
+
+			rows = realOutputRG.getRowCount();
+			//realOutputRG.convertToInlineDataInPlace();
+			realOutputRG.serializeRGData(bs);
+			//bs.load(realOutputRG.getData(), realOutputRG.getDataSize());
+
+			/* send the cleanup commands to the PM & DEC */
+			ByteStream dbs;
+			fDec->removeDECEventListener(this);
+			fBPP->destroyBPP(dbs);
+			try {
+				fDec->write(uniqueID, dbs);
+			}
+			catch (...) {
+				// return the result since it's
+				// completed instead of returning an error.
+			}
+			BPPIsAllocated = false;
+
+			Stats stats = fDec->getNetworkStats(uniqueID);
+			fMsgBytesIn = stats.dataRecvd();
+			fMsgBytesOut = stats.dataSent();
+
+			fDec->removeQueue(uniqueID);
+			tjoiners.clear();
+
+			/* A pile of stats gathering */
+			if (fOid>=3000)
+			{
+				struct timeval tvbuf;
+				gettimeofday(&tvbuf, 0);
+				FIFO<boost::shared_array<uint8_t> > *pFifo = 0;
+				uint64_t totalBlockedReadCount  = 0;
+				uint64_t totalBlockedWriteCount = 0;
+
+				//...Sum up the blocked FIFO reads for all input associations
+				size_t inDlCnt  = fInputJobStepAssociation.outSize();
+				for (size_t iDataList=0; iDataList<inDlCnt; iDataList++)
+				{
+					pFifo = dynamic_cast<FIFO<boost::shared_array<uint8_t> > *>(
+						fInputJobStepAssociation.outAt(iDataList)->rowGroupDL());
+					if (pFifo)
+					{
+						totalBlockedReadCount += pFifo->blockedReadCount();
+					}
+				}
+
+				//...Sum up the blocked FIFO writes for all output associations
+				size_t outDlCnt = fOutputJobStepAssociation.outSize();
+				for (size_t iDataList=0; iDataList<outDlCnt; iDataList++)
+				{
+					pFifo = dynamic_cast<FIFO<boost::shared_array<uint8_t> > *>(
+						fOutputJobStepAssociation.outAt(iDataList)->rowGroupDL());
+					if (pFifo)
+					{
+						totalBlockedWriteCount += pFifo->blockedWriteCount();
+					}
+				}
+
+				if (traceOn())
+				{
+					//...Roundoff msg byte counts to nearest KB for display
+					uint64_t msgBytesInKB  = fMsgBytesIn >> 10;
+					uint64_t msgBytesOutKB = fMsgBytesOut >> 10;
+					if (fMsgBytesIn & 512)
+						msgBytesInKB++;
+					if (fMsgBytesOut & 512)
+						msgBytesOutKB++;
+
+					ostringstream logStr;
+					logStr << "ses:" << fSessionId << " st: " << fStepId<<" finished at "<<
+					JSTimeStamp::format(tvbuf) << "; PhyI/O-" << fPhysicalIO << "; CacheI/O-"  <<
+					fCacheIO << "; MsgsSent-" << msgsSent << "; MsgsRvcd-" << msgsRecvd <<
+					"; BlocksTouched-"<< fBlockTouched <<
+					"; BlockedFifoIn/Out-" << totalBlockedReadCount <<
+					"/" << totalBlockedWriteCount <<
+					"; output size-" << rowsReturned << endl <<
+					"\tPartitionBlocksEliminated-" << fNumBlksSkipped <<
+					"; MsgBytesIn-"  << msgBytesInKB  << "KB" <<
+					"; MsgBytesOut-" << msgBytesOutKB << "KB" << endl  <<
+					"\t1st read " << dlTimes.FirstReadTimeString() <<
+					"; EOI " << dlTimes.EndOfInputTimeString() << "; runtime-" <<
+					JSTimeStamp::tsdiffstr(dlTimes.EndOfInputTime(),dlTimes.FirstReadTime())
+					<< "s\n\tJob completion status " << status() << endl;
+					logEnd(logStr.str().c_str());
+					syslogReadBlockCounts(16,                   // exemgr sybsystem
+									fPhysicalIO,                // # blocks read from disk
+									fCacheIO,                   // # blocks read from cache
+									fNumBlksSkipped);           // # casual partition block hits
+					syslogProcessingTimes(16,                   // exemgr subsystem
+									dlTimes.FirstReadTime(),    // first datalist read
+									dlTimes.LastReadTime(),     // last  datalist read
+									dlTimes.FirstInsertTime(),  // first datalist write
+									dlTimes.EndOfInputTime());  // last (endOfInput) datalist write
+					syslogEndStep(16,                           // exemgr subsystem
+									totalBlockedReadCount,      // blocked datalist input
+									totalBlockedWriteCount,     // blocked datalist output
+									fMsgBytesIn,                // incoming msg byte count
+									fMsgBytesOut);              // outgoing msg byte count
+					fExtendedInfo += toString() + logStr.str();
+					formatMiniStats();
+				}
+			}
+
+			if (fOid>=3000 && (ffirstStepType == SCAN) && bop == BOP_AND) {
+				cpMutex.lock(); //pthread_mutex_lock(&cpMutex);
+				lbidList->UpdateAllPartitionInfo();
+				cpMutex.unlock(); //pthread_mutex_unlock(&cpMutex);
+			}
+		}
+	}
+
+	/* .. else, this is the next msg to process from the PM... */
+	else
+	{
+		if (fOid>=3000 && traceOn() && dlTimes.FirstReadTime().tv_sec ==0)
+			dlTimes.setFirstReadTime();
+		fDec->read(uniqueID, bsIn);
+		firstRead = false;
+		if (bsIn->length() != 0 && fBPP->countThisMsg(*bsIn)) {
+			mutex.lock(); //pthread_mutex_lock(&mutex);
+			msgsRecvd++;
+			//@Bug 1424, 1298
+			if ((sendWaiting) && ((msgsSent - msgsRecvd) <=
+			    (fMaxOutstandingRequests << LOGICAL_EXTENT_CONVERTER)))
+			{
+				condvarWakeupProducer.notify_one(); //pthread_cond_signal(&condvarWakeupProducer);
+				THROTTLEDEBUG << "nextBand wakes up sending side .. " << "  msgsSent: " << msgsSent << "  msgsRecvd = " << msgsRecvd << endl;
+			}
+			mutex.unlock(); //pthread_mutex_unlock(&mutex);
+		}
+
+		ISMPacketHeader *hdr = (ISMPacketHeader*)bsIn->buf();
+
+		// Check for errors and abort
+		if (bsIn->length() == 0 || 0 < hdr->Status || 0 < fBPP->getStatus() || cancelled())
+		{
+			if (bsIn->length() == 0)
+				status(ERR_PRIMPROC_DOWN);
+			else if (hdr->Status) {
+				string errmsg;
+				bsIn->advance(sizeof(ISMPacketHeader) + sizeof(PrimitiveHeader));
+				*bsIn >> errmsg;
+				status(hdr->Status);
+				errorMessage(errmsg);
+			}
+			mutex.lock(); //pthread_mutex_lock(&mutex);
+
+			/* What is this supposed to do? */
+			if (!fSwallowRows)
+			{
+				msgsRecvd = msgsSent;
+				finishedSending = true;
+				rows = 0;  //send empty message to indicate finished.
+			}
+			abort_nolock();
+			//cout << "BPS receive signal " << fStepId << endl;
+			mutex.unlock(); //pthread_mutex_unlock(&mutex);
+		}
+		/* " ... no error, process the message */
+		else
+		{
+			bool unused;
+			rgData = fBPP->getRowGroupData(*bsIn, &validCPData, &lbid, &min, &max, &cachedIO, &physIO, &touchedBlocks, &unused, 0);
+
+			primRowGroup.setData(&rgData);
+			if (fe2) {
+				if (!runFEonPM)
+					processFE2_oneRG(primRowGroup, fe2Output, fe2InRow, fe2OutRow, fe2.get());
+				else
+					fe2Output.setData(&rgData);
+			}
+
+			if (dupColumns.size() > 0)
+				dupOutputColumns(realOutputRG);
+
+			if (fOid>=3000 && (ffirstStepType == SCAN) && bop == BOP_AND)
+			{
+				cpMutex.lock(); //pthread_mutex_lock(&cpMutex);
+				lbidList->UpdateMinMax(min, max, lbid, fColType.colDataType, validCPData);
+				cpMutex.unlock(); //pthread_mutex_unlock(&cpMutex);
+			}
+
+			rows = realOutputRG.getRowCount();
+// 			cout << "realOutputRG toString()\n";
+// 			cout << realOutputRG.toString() << endl;
+// 			cout << "  -- realout.. rowcount=" << realOutputRG.getRowCount() << "\n";
+			//realOutputRG.convertToInlineDataInPlace();
+			realOutputRG.serializeRGData(bs);
+			//bs.load(realOutputRG.getData(), realOutputRG.getDataSize());
+// 			cout << "loaded\n";
+
+		}
+
+		fPhysicalIO += physIO;
+		fCacheIO += cachedIO;
+		fBlockTouched += touchedBlocks;
+
+		rowsReturned += rows;
+		if (rows == 0)
+		{
+			bs.restart();
+			goto again;
+		}
+	}
+}//try
+catch(const std::exception& ex)
+{
+	std::string errstr("TupleBPS next band caught exception: ");
+	errstr.append(ex.what());
+	catchHandler(errstr, fSessionId);
+	status(ERR_TUPLE_BPS);
+	bs.restart();
+	rgData = fBPP->getErrorRowGroupData(ERR_TUPLE_BPS);
+	primRowGroup.setData(&rgData);
+	//primRowGroup.convertToInlineDataInPlace();
+	primRowGroup.serializeRGData(bs);
+	//bs.load(primRowGroup.getData(), primRowGroup.getDataSize());
+	return 0;
+}
+catch(...)
+{
+	catchHandler("TupleBPS next band caught an unknown exception", fSessionId);
+	status(ERR_TUPLE_BPS);
+	bs.restart();
+	rgData = fBPP->getErrorRowGroupData(ERR_TUPLE_BPS);
+	primRowGroup.setData(&rgData);
+	//primRowGroup.convertToInlineDataInPlace();
+	primRowGroup.serializeRGData(bs);
+	//bs.load(primRowGroup.getData(), primRowGroup.getDataSize());
+	return 0;
+}
+	return rows;
+}
+
+#endif
 
 /* The current interleaving rotates over PMs, clustering jobs for a single PM
  * by dbroot to keep block accesses adjacent & make best use of prefetching &
@@ -1529,12 +1817,8 @@ try
 		if (msgsSent == msgsRecvd && finishedSending)
 			break;
 
-        bool flowControlOn;
-		fDec->read_some(uniqueID, fMaxNumThreads, bsv, &flowControlOn);
+		fDec->read_some(uniqueID, fNumThreads, bsv);
 		size = bsv.size();
-        if (flowControlOn && fNumThreads < fMaxNumThreads)
-            startAggregationThread();
-
 		for (uint z = 0; z < size; z++) {
 			if (bsv[z]->length() > 0 && fBPP->countThisMsg(*(bsv[z])))
 				++msgsRecvd;
@@ -1557,6 +1841,27 @@ try
 			if (sendWaiting)
 				condvarWakeupProducer.notify_one();
 			break;
+
+#if 0
+			// thread 0 stays, the rest finish & exit to allow a quicker EOF
+			if (threadID != 0 || fNumThreads == 1)
+				break;
+			else if (!didEOF) {
+				didEOF = true;
+				// need a time limit here too?  Better to leak something than to hang?
+				while (recvExited < fNumThreads - 1)
+					usleep(100000);
+				dlp->endOfInput();
+			}
+			if (size != 0) // got something, reset the timer and go again
+				errorTimeout = 0;
+
+			usleep(5000);
+			mutex.lock(); 
+			if (++errorTimeout == 1000)     // 5 sec delay
+				break;
+			continue;
+#endif
 		}
 		if (size == 0) {
 			mutex.unlock();
@@ -1608,7 +1913,7 @@ try
 			while (!fromPrimProc.empty() && !cancelled()) {
 				rgData = fromPrimProc.back();
 				fromPrimProc.pop_back();
-
+			
 				local_primRG.setData(&rgData);
 // 				cout << "rowcount is " << local_primRG.getRowCount() << endl;
 				ridsReturned_Thread += local_primRG.getRowCount();   // TODO need the pre-join count even on PM joins... later
@@ -1841,7 +2146,7 @@ out:
 				else
 					rgDataToDl(joinedData, local_outputRG, dlp);
 			}
-			mutex.unlock();
+			mutex.lock();
 		}
 
 		if (fOid>=3000 && traceOn()) {

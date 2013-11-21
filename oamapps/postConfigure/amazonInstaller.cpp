@@ -162,7 +162,6 @@ int main(int argc, char *argv[])
 	bool postConfigureDebug = false;
 	string TotalUmMemory = oam::UnassignedName;
 	string NumBlocksPct = oam::UnassignedName;
-	string LicenseKey = oam::UnassignedName;
 	bool postConfigureCleanup = false;
 	bool systemCleanup = false;
 	bool systemStop = false;
@@ -928,15 +927,6 @@ int main(int argc, char *argv[])
 		}
 
 		cout << endl;
-		//get LicenseKey
-		prompt = "Enter License Key or hit enter to default to standard 30 days > ";
-		pcommand = readline(prompt.c_str());
-		if (pcommand) {
-			if (strlen(pcommand) > 0) LicenseKey = pcommand;
-			free(pcommand);
-			pcommand = 0;
-		}
-
 		//check snmp Apps disable option
 		snmpAppCheck();
 
@@ -1017,7 +1007,6 @@ int main(int argc, char *argv[])
 			UserModuleSecurityGroup = amazonConfig->getConfig("SystemConfig", "UserModuleSecurityGroup");
 			TotalUmMemory = amazonConfig->getConfig("SystemConfig", "TotalUmMemory");
 			NumBlocksPct = amazonConfig->getConfig("SystemConfig", "NumBlocksPct");
-			LicenseKey = amazonConfig->getConfig("SystemConfig", "LicenseKey");
 			existingPMInstances = amazonConfig->getConfig("SystemConfig", "PerformanceModuleInstances");
 			existingUMInstances = amazonConfig->getConfig("SystemConfig", "UserModuleInstances");
 			UserModuleAutoSync = amazonConfig->getConfig("SystemConfig", "UserModuleAutoSync");
@@ -1404,15 +1393,6 @@ int main(int argc, char *argv[])
 			cout << endl << "ERROR: Problem setting SystemName from the InfiniDB System Configuration file" << endl;
 			exit(1);
 		}
-	}
-
-	if ( LicenseKey != oam::UnassignedName ) {
-		cout << "LicenseKey = " << LicenseKey << endl;
-		try {
-			sysConfig->setConfig(SystemSection, "Flags", LicenseKey);
-		}
-		catch(...)
-		{}
 	}
 
 	if ( systemType == "separate" ) {

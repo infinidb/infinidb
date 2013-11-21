@@ -28,7 +28,7 @@
 		<!-- IGNORED when VPCStartPrivateIP is set -->
 		<UserModulePrivateIP>unassigned</UserModulePrivateIP>
 		
-		<!-- User Modules Private IP Address list, use when running on a Amazon VPC -->
+		<!-- Performance Modules Private IP Address list, use when running on a Amazon VPC -->
 		<!-- Requires the SubNetID to be setup -->
 		<!-- This list would start with pm2, list is seperated by commands. i.e 'ip1,ip2,ip3' -->
 		<!-- IGNORED when VPCStartPrivateIP is set -->
@@ -97,9 +97,6 @@
 
 		<!-- Root Password or 'ssh' for ssh-key setup -->
 		<RootPassword>Calpont1</RootPassword>
-		
-		<!-- License Key, default to 30 days -->
-		<LicenseKey>unassigned</LicenseKey>
 		
 		<!-- Enables Automatic Amazon Instance/Volume tagging -->
 		<!-- When set 'y', Instance Name Tags will be set to 'system-name'-'module-name' -->

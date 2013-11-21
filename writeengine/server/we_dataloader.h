@@ -96,7 +96,6 @@ public:
     void onCpimportFailure();
 
     void sendDataRequest();
-    void sendCpimportFailureNotice();
 
 	void serialize(messageqcpp::ByteStream& b) const;
 	void unserialize(messageqcpp::ByteStream& b);

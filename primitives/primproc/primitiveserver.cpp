@@ -1181,17 +1181,16 @@ struct BPPHandler
 		idbassert(bs.length() == 0);
 		bppv->getSendThread()->sendMore(initMsgsLeft);
 		bppv->add(bpp);
-		if ((bpp->getSessionID() & 0x80000000) == 0) {
-			for (i = 1; i < BPPCount; i++) {
-				SBPP dup = bpp->duplicate();
+		for (i = 1; i < BPPCount; i++) {
+			SBPP dup = bpp->duplicate();
 
-				/* Uncomment these lines to verify duplicate().  == op might need updating */
-//  					if (*bpp != *dup)
-// 	 					cerr << "createBPP: duplicate mismatch at index " << i << endl;
-//  					idbassert(*bpp == *dup);
-				bppv->add(dup);
-			}
+			/* Uncomment these lines to verify duplicate().  == op might need updating */
+//  				if (*bpp != *dup)
+//  					cerr << "createBPP: duplicate mismatch at index " << i << endl;
+//  				idbassert(*bpp == *dup);
+			bppv->add(dup);
 		}
+
 		key = bpp->getUniqueID();
 		//cout << "creating BPP key = " << key << endl;
 		mutex::scoped_lock scoped(bppLock);
@@ -1621,7 +1620,7 @@ struct ReadThread
 					shared_ptr<BPPSeeder> bpps(new BPPSeeder(bs, writeLock, outIos, 
 							fPrimitiveServerPtr->ProcessorThreads(),
 							fPrimitiveServerPtr->PTTrace()));
-					if (bpps->isSysCat()) 
+					if (bpps->isSysCat())
 						boost::thread t(*bpps);
 					else {
 						PriorityThreadPool::Job job;

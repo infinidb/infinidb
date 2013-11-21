@@ -20,6 +20,7 @@
 
 #include <stdexcept>
 #include <boost/utility.hpp>
+#include <boost/thread.hpp>
 
 #include "hdfs.h"
 
@@ -56,9 +57,10 @@ protected:
 private:
 	void reopen() throw (std::exception);
 
-	hdfsFile m_file;
+	volatile hdfsFile m_file;
 	hdfsFS   m_fs;
 	int      m_flags;
+	boost::mutex m_mutex;
 };
 
 }

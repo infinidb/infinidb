@@ -112,12 +112,6 @@ WEDataLoader::WEDataLoader(SplitterReadThread& Srt ):fRef(Srt),
   	setObjId(aObjId);
 
   	setupSignalHandlers();
-
-	if(!fpSysLog)
-	{
-		fpSysLog = SimpleSysLog::instance();
-		fpSysLog->setLoggingID(logging::LoggingID(SUBSYSTEM_ID_WE_SRV));
-	}
 }
 //-----------------------------------------------------------------------------
 /**
@@ -208,29 +202,21 @@ bool WEDataLoader::setupCpimport() // fork the cpimport
 {
 	pid_t aChPid;
 
-	errno = 0;
 	if(pipe(fFIFO)== -1)
 	{
-		int errnum = errno;
-		ostringstream oss;
-		oss << getObjId() <<" : Error in creating pipe (errno-" <<
-			errnum << "); " << strerror(errnum);
-		throw runtime_error( oss.str() );
+		perror("pipe");
+		throw runtime_error("Error in creating pipe!!");
 	}
 
 	setPid(getpid());
 	setPPid(getppid());
 
-	errno = 0;
 	aChPid = fork();
 
 	if(aChPid == -1)	//an error caused
 	{
-		int errnum = errno;
-		ostringstream oss;
-		oss << getObjId() <<" : Error in forking cpimport.bin (errno-" <<
-			errnum << "); " << strerror(errnum);
-		throw runtime_error( oss.str() );
+		perror("fork");	// fork failed
+		throw runtime_error("Error in forking cpimport!!");
 	}
 	else if(aChPid == 0)// we are in child
 	{
@@ -271,21 +257,18 @@ bool WEDataLoader::setupCpimport() // fork the cpimport
 		//BUG 4410 : hacky solution so that CHLD process get EOF on close of pipe
 		for(int i=aStartFD;i< aEndFD;i++) close(i);
 
-		errno = 0;
 		int aRet = execv(Cmds[0], &Cmds[0]);	//NOTE - works with full Path
 		//int aRet = execvp(Cmds[0], &Cmds[0]);	//NOTE - works if $PATH has cpimport
 
-		int execvErrno = errno;
 		cout << "Return status of cpimport is " << aRet <<endl;
 		cout.flush();
 		close(fFIFO[0]);	// will trigger an EOF on stdin
 		ostringstream oss;
-		oss << getObjId() << " : execv error: cpimport.bin invocation failed; "
-			<< "(errno-" << errno << "); " << strerror(execvErrno) <<
-			"; Check file and try invoking locally.";
+		oss << getObjId() <<" :execv error: cpimport.bin invocation failed; Check file and try invoking locally.";
 		logging::Message::Args errMsgArgs;
 		errMsgArgs.add(oss.str());
 		fpSysLog->logMsg(errMsgArgs, logging::LOG_TYPE_ERROR, logging::M0000);
+		//fpSysLog->logMsg(errMsgArgs, logging::LOG_TYPE_INFO, logging::M0000);
 		if(aRet == -1) exit(-1);
 	}
 	else	// parent
@@ -703,11 +686,32 @@ void WEDataLoader::onCpimportSuccess()
  **/
 void WEDataLoader::onCpimportFailure()
 {
-	// Send failure notice back to the parent splitter job
-	sendCpimportFailureNotice();
+
+	ByteStream obs;
+	obs << (ByteStream::byte)WE_CLT_SRV_CPIFAIL;
+	obs << (ByteStream::byte)fPmId;     // PM id
+	mutex::scoped_lock aLock(fClntMsgMutex);
+    updateTxBytes(obs.length());
+	try
+	{
+		fRef.fIos.write(obs);
+	}
+	catch(...)
+	{
+		cout <<"Broken Pipe .." << endl;
+		if(fpSysLog)
+		{
+			ostringstream oss;
+			oss << getObjId() <<" : Broken Pipe : socket write failed ";
+			logging::Message::Args errMsgArgs;
+			errMsgArgs.add(oss.str());
+			fpSysLog->logMsg(errMsgArgs, logging::LOG_TYPE_INFO, logging::M0000);
+		}
+	}
+	aLock.unlock();
 
 	//Even if we failed, we have failure info in BRMRPT
-	ByteStream obs;
+	obs.reset();
 	obs << (ByteStream::byte)WE_CLT_SRV_BRMRPT;
 	obs << (ByteStream::byte)fPmId;     // PM id
 	BrmReportParser aBrmRptParser;
@@ -720,18 +724,16 @@ void WEDataLoader::onCpimportFailure()
 		{
 			fRef.fIos.write(obs);
 		}
-		catch(std::exception& ex)
+		catch(...)
 		{
-			cout <<"Broken Pipe .." << ex.what() << endl;
+			cout <<"Broken Pipe .." << endl;
 			if(fpSysLog)
 			{
 				ostringstream oss;
-				oss << getObjId() <<" : Broken Pipe : socket write failed; " <<
-					ex.what();
+				oss << getObjId() <<" : Broken Pipe : socket write failed ";
 				logging::Message::Args errMsgArgs;
 				errMsgArgs.add(oss.str());
-				fpSysLog->logMsg(errMsgArgs, logging::LOG_TYPE_ERROR,
-					logging::M0000);
+				fpSysLog->logMsg(errMsgArgs, logging::LOG_TYPE_INFO, logging::M0000);
 			}
 		}
 		aLock.unlock();
@@ -752,40 +754,19 @@ void WEDataLoader::onCpimportFailure()
 }
 
 //-----------------------------------------------------------------------------
-// Send msg to front-end splitter to notify it that a cpimport.bin pgm failed.
-//-----------------------------------------------------------------------------
-void WEDataLoader::sendCpimportFailureNotice()
-{
-	ByteStream obs;
-	obs << (ByteStream::byte)WE_CLT_SRV_CPIFAIL;
-	obs << (ByteStream::byte)fPmId;     // PM id
-	mutex::scoped_lock aLock(fClntMsgMutex);
-	updateTxBytes(obs.length());
-	try
-	{
-		fRef.fIos.write(obs);
-	}
-	catch(...)
-	{
-		cout <<"Broken Pipe .." << endl;
-		if(fpSysLog)
-		{
-			ostringstream oss;
-			oss << getObjId() <<" : Broken Pipe : socket write failed ";
-			logging::Message::Args errMsgArgs;
-			errMsgArgs.add(oss.str());
-			fpSysLog->logMsg(errMsgArgs,logging::LOG_TYPE_ERROR,logging::M0000);
-		}
-	}
-}
-
-//-----------------------------------------------------------------------------
 /**
  * @brief 	Event when a KEEPALIVE arrives.
  * @param	Incoming ByteStream, not used currently
  */
 void WEDataLoader::onReceiveKeepAlive(ByteStream& Ibs)
 {
+	// Do what we have to do with the message
+	if(!fpSysLog)
+	{
+		fpSysLog = SimpleSysLog::instance();
+		fpSysLog->setLoggingID(logging::LoggingID(SUBSYSTEM_ID_WE_SRV));
+	}
+
 	/*
 	// TODO comment out when we done with debug
 	if(fpSysLog)
@@ -1213,20 +1194,10 @@ void WEDataLoader::onReceiveStartCpimport()
 			fpCfThread->startFeederThread();
 		}
 	}
-	catch(std::exception& ex)
+	catch(...)
 	{
 		// send an CPI FAIL command back to splitter
-		if(fpSysLog)
-		{
-			logging::Message::Args errMsgArgs;
-			errMsgArgs.add(ex.what());
-			fpSysLog->logMsg(errMsgArgs,logging::LOG_TYPE_ERROR,logging::M0000);
-
-			sendCpimportFailureNotice();
-			return;
-		}
 	}
-
 	if(1 == getMode())	// In mode 2/0 we do not rqst data.
 	{
 		sendDataRequest();

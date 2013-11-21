@@ -94,6 +94,8 @@ void HdfsFile::reopen() throw (std::exception)
 
 ssize_t HdfsFile::pread(void *ptr, off64_t offset, size_t count)
 {
+	boost::mutex::scoped_lock lock(m_mutex);
+
 	tSize ret = hdfsPread(m_fs, m_file, offset, ptr, count);
 	// this is an observed case when trying to read from an open file handle
 	// that is now stale (because of rewrite/whatever).  If we see this,
@@ -105,9 +107,9 @@ ssize_t HdfsFile::pread(void *ptr, off64_t offset, size_t count)
 	{
 		//if (ret != count)
 		//	IDBLogger::logRW("pread_retry", m_fname, this, offset, count, ret);
-		if (retryCount >= 40)
+		if (retryCount >= 50)
 			break;
-		usleep(500);
+		usleep(1000);
 		reopen();
 		ret = hdfsPread(m_fs, m_file, offset, ptr, count);
 		retryCount++;
@@ -244,8 +246,9 @@ int HdfsFile::flush()
 
 time_t HdfsFile::mtime()
 {
-	time_t ret = 0;
+	boost::mutex::scoped_lock lock(m_mutex);
 
+	time_t ret = 0;
 	hdfsFileInfo* fileinfo;
 	fileinfo = hdfsGetPathInfo(m_fs,m_fname.c_str());
 	ret = (fileinfo ? fileinfo->mLastMod : -1);

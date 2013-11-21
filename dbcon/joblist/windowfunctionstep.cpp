@@ -502,7 +502,7 @@ void WindowFunctionStep::initialize(const RowGroup& rg, JobInfo& jobInfo)
 	// query type decides the output by dbroot or partition
 	// @bug 5631. Insert select should be treated as select
 	fIsSelect = (jobInfo.queryType == "SELECT" || 
-                     jobInfo.queryType == "INSERT_SELECT");
+	             jobInfo.queryType == "INSERT_SELECT");
 
 	// input row meta data
 	fRowGroupIn = rg;
@@ -977,9 +977,6 @@ void WindowFunctionStep::doPostProcessForDml()
 			rowIn.nextRow();
 			rowOut.nextRow();
 		}
-
-		//fRowGroupOut.resetRowGroup(fRowGroupIn.getBaseRid());
-		//fRowGroupOut.setRowCount(fRowGroupIn.getRowCount());
 
 		fOutputDL->insert(rgData);
 	}
