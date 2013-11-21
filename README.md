@@ -17,5 +17,5 @@ Clone or download this repository.
 
     git clone https://github.com/infinidb/infinidb
     cd infinidb
-    ./build/src-build --prefix=$HOME
+    ./build/src-build
 
