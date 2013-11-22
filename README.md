@@ -32,9 +32,6 @@ Build the hard way:
     rm -rf infinidb
     git clone http://github.com/infinidb/infinidb
     cd infinidb
-    cp -r utils/autoconf/* .
-    autoreconf
-    libtoolize --force --install
     ./configure --prefix=$HOME
     make
     make install
