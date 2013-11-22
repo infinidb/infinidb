@@ -41,11 +41,6 @@ if [ $? -ne 0 ]; then
 	echo "No 'flex' program installed, giving up." 1>&2
 	exit 1
 fi
-autoreconf --version >/dev/null 2>&1
-if [ $? -ne 0 ]; then
-	echo "No 'autoreconf' program installed, giving up." 1>&2
-	exit 1
-fi
 
 mysqldir=
 for testdir in ./mysql ./mysql-master ../mysql ../mysql-master; do
@@ -113,10 +108,7 @@ fi
 
 echo "Building InfiniDB..."
 
-( cp -r utils/autoconf/* .;
-	autoreconf;
-	libtoolize --force --install;
-	mv -f $mysqldir/Makefile $mysqldir/Makefile.bak;
+( mv -f $mysqldir/Makefile $mysqldir/Makefile.bak;
 	./configure --prefix=$prefix && make && make install ) >./infinidb_build.log 2>&1
 
 if [ $? -ne 0 -o ! -x $prefix/Calpont/bin/PrimProc ]; then
