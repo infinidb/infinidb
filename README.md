@@ -13,9 +13,31 @@ Along with a working C++ compiler and GNU software development tools you will ne
   * libxml2-devel
   * readline-devel
 
-Clone or download this repository.
+Build the easy way:
 
-    git clone https://github.com/infinidb/infinidb
+    git clone http://github.com/infinidb/infinidb
     cd infinidb
     ./build/src-build --prefix=$HOME
 
+Build the hard way:
+
+    cd $HOME
+    rm -rf mysql
+    git clone http://github.com/infinidb/mysql
+    cd mysql
+    ./configure --prefix=$HOME/Calpont/mysql
+    make
+    make install
+    cd $HOME
+    rm -rf infinidb
+    git clone http://github.com/infinidb/infinidb
+    cd infinidb
+    cp -r utils/autoconf/* .
+    autoreconf
+    libtoolize --force --install
+    ./configure --prefix=$HOME
+    make
+    make install
+    
+Either way you will end up with `$HOME/Calpont` as a binary tree. Follow the Binary Download
+instructions in the InfiniDB 4.0 Installation Guide (available on http://www.calpont.com/).
