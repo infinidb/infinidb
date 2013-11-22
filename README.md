@@ -17,7 +17,7 @@ Build the easy way:
 
     git clone http://github.com/infinidb/infinidb
     cd infinidb
-    ./build/src-build
+    ./build/src-build --prefix=$HOME
 
 Build the hard way:
 
