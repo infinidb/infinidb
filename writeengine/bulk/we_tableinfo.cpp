@@ -792,12 +792,21 @@ void TableInfo::reportTotals(double elapsedTime)
             ossSatCnt << "Column " << fTableName << '.' <<
                 fColumns[i].column.colName << "; Number of ";
             if (fColumns[i].column.dataType == CalpontSystemCatalog::DATE)
-                ossSatCnt <<
-                    "invalid dates replaced with null: ";
-            else if (fColumns[i].column.dataType ==
-                     CalpontSystemCatalog::DATETIME)
-                ossSatCnt <<
-                    "invalid date/times replaced with null: ";
+			{
+				//Bug5383
+				if(!fColumns[i].column.fNotNull)
+                	ossSatCnt << "invalid dates replaced with null: ";
+				else
+                	ossSatCnt << "invalid dates replaced with minimum value : ";
+			}
+            else if (fColumns[i].column.dataType == CalpontSystemCatalog::DATETIME)
+			{
+				//Bug5383
+				if(!fColumns[i].column.fNotNull)
+                	ossSatCnt << "invalid date/times replaced with null: ";
+				else
+                	ossSatCnt << "invalid date/times replaced with minimum value : ";
+			}
             else if (fColumns[i].column.dataType == CalpontSystemCatalog::CHAR)
                 ossSatCnt <<
                     "character strings truncated: ";
@@ -1713,6 +1722,35 @@ int TableInfo::validateColumnHWMs(
                 "; segment-"   << segFileInfo[k1].fSegment     <<
                 "; hwm-"       << segFileInfo[k1].fLocalHwm    <<
                 "; width-"     << jobColK1.width << ':'<<std::endl<<
+                " and OID2-"   << jobColK.mapOid               <<
+                "; column-"    << jobColK.colName              <<
+                "; DBRoot-"    << segFileInfo[k].fDbRoot       <<
+                "; partition-" << segFileInfo[k].fPartition    <<
+                "; segment-"   << segFileInfo[k].fSegment      <<
+                "; hwm-"       << segFileInfo[k].fLocalHwm     <<
+                "; width-"     << jobColK.width;
+            fLog->logMsg( oss.str(), ERR_BRM_HWMS_NOT_EQUAL, MSGLVL_ERROR );
+            return ERR_BRM_HWMS_NOT_EQUAL;
+        }
+
+        // HWM DBRoot, partition, and segment number should match for all
+        // columns; so compare DBRoot, part#, and seg# with first column.
+        if ((segFileInfo[0].fDbRoot    != segFileInfo[k].fDbRoot)    ||
+            (segFileInfo[0].fPartition != segFileInfo[k].fPartition) ||
+            (segFileInfo[0].fSegment   != segFileInfo[k].fSegment))
+        {
+            const JobColumn& jobCol0 =
+            ( (jobTable != 0) ? jobTable->colList[0] : fColumns[0].column );
+
+            ostringstream oss;
+            oss << stage << " HWM DBRoot,Part#, or Seg# do not match for"
+                " OID1-"       << jobCol0.mapOid               <<
+                "; column-"    << jobCol0.colName              <<
+                "; DBRoot-"    << segFileInfo[0].fDbRoot       <<
+                "; partition-" << segFileInfo[0].fPartition    <<
+                "; segment-"   << segFileInfo[0].fSegment      <<
+                "; hwm-"       << segFileInfo[0].fLocalHwm     <<
+                "; width-"     << jobCol0.width << ':'<<std::endl<<
                 " and OID2-"   << jobColK.mapOid               <<
                 "; column-"    << jobColK.colName              <<
                 "; DBRoot-"    << segFileInfo[k].fDbRoot       <<

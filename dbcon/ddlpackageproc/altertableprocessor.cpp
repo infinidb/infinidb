@@ -262,7 +262,7 @@ AlterTableProcessor::DDLResult AlterTableProcessor::processPackage(ddlpackage::A
 	try
 	{
 		//check table lock
-		CalpontSystemCatalog *systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(alterTableStmt.fSessionID);
+		boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(alterTableStmt.fSessionID);
 		systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 		systemCatalogPtr->sessionID(alterTableStmt.fSessionID);
 		CalpontSystemCatalog::TableName tableName;
@@ -516,7 +516,7 @@ void AlterTableProcessor::addColumn (u_int32_t sessionID, execplan::CalpontSyste
 	BRM::OID_t sysOid = 1001;
 	bool isDict = false;
 	//@Bug 4111. Check whether the column exists in calpont systable
-	CalpontSystemCatalog* systemCatalogPtr =
+	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr =
 		CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 	systemCatalogPtr->identity(CalpontSystemCatalog::FE);
 	CalpontSystemCatalog::TableColName tableColName;
@@ -1010,7 +1010,7 @@ void AlterTableProcessor::dropColumn (u_int32_t sessionID, execplan::CalpontSyst
 	tableColName.table = fTableName.fName;
 	tableColName.column = ataDropColumn.fColumnName;
 	execplan::CalpontSystemCatalog::DictOIDList dictOIDList;
-	CalpontSystemCatalog* systemCatalogPtr =
+	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr =
 	CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 	//@Bug 1358
 	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
@@ -1535,7 +1535,7 @@ void AlterTableProcessor::dropTableConstraint (u_int32_t sessionID, execplan::Ca
 	ddlpackage::QualifiedName sysCatalogTableName;
 	sysCatalogTableName.fSchema = CALPONT_SCHEMA;
 	sysCatalogTableName.fName  = SYSCONSTRAINT_TABLE;
-	CalpontSystemCatalog* systemCatalogPtr;
+	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr;
 	systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 	//@Bug 1358
 	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
@@ -1612,7 +1612,7 @@ void AlterTableProcessor::renameTable (uint32_t sessionID, execplan::CalpontSyst
 	SUMMARY_INFO("AlterTableProcessor::renameTable");
 	
 	//@Bug 4599. Check whether the new table exists in infinidb
-	CalpontSystemCatalog* systemCatalogPtr =
+	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr =
 		CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 	execplan::CalpontSystemCatalog::TableName tableName;
 	tableName.schema = fTableName.fSchema;
@@ -1708,7 +1708,7 @@ void AlterTableProcessor::renameColumn(uint32_t sessionID, execplan::CalpontSyst
 	2. Update SYSTABLE if column is autoincrement column
 	*/
 	SUMMARY_INFO("AlterTableProcessor::renameColumn");
-	CalpontSystemCatalog* systemCatalogPtr =
+	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr =
 		CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 		
 	ByteStream bs;

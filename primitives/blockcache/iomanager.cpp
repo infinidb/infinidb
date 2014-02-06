@@ -350,16 +350,8 @@ char* alignTo(const char* in, int av)
 
 void waitForRetry(long count)
 {
-	return;  // neutered for 3.0
-
-	timespec ts;
-	ts.tv_sec = 5L*count/10L;
-	ts.tv_nsec = (5L*count%10L)*100000000L;
-#ifdef _MSC_VER
-	Sleep(ts.tv_sec * 1000 + ts.tv_nsec / 1000 / 1000);
-#else
-	nanosleep(&ts, 0);
-#endif
+	usleep(5000 * count); 
+	return;
 }
 
 
@@ -367,6 +359,8 @@ void waitForRetry(long count)
 int updateptrs(char* ptr, FdCacheType_t::iterator fdit, const IDBCompressInterface& decompressor)
 {
 	ssize_t i;
+	uint32_t progress;
+
 
 	// ptr is taken from buffer, already been checked: realbuff.get() == 0
 	if (ptr == 0)
@@ -387,8 +381,14 @@ int updateptrs(char* ptr, FdCacheType_t::iterator fdit, const IDBCompressInterfa
 	//We need to read one extra block because we need the first ptr in the 3rd block
 	// to know if we're done.
 	//FIXME: re-work all of this so we don't have to re-read the 3rd block.
-	i = fp->pread(ptr, 0, 4096 * 3);
-	if (i != 4096 * 3)
+	progress = 0;
+	while (progress < 4096 * 3) {
+		i = fp->pread(&ptr[progress], progress, (4096 * 3) - progress);
+		if (i <= 0)
+			break;
+		progress += i;
+	}
+	if (progress != 4096 * 3)
 		return -4;   // let it retry. Not likely, but ...
 
 	fdit->second->cmpMTime = 0;
@@ -412,7 +412,17 @@ int updateptrs(char* ptr, FdCacheType_t::iterator fdit, const IDBCompressInterfa
 
 		nextHdrBufPtr = alignTo(nextHdrBufsa.get(), 4096);
 
-		i = fp->pread(&nextHdrBufPtr[0], 4096 * 2, numHdrs * 4096);
+		progress = 0;
+		while (progress < numHdrs * 4096) {
+			i = fp->pread(&nextHdrBufPtr[progress], (4096 * 2) + progress,
+				(numHdrs * 4096) - progress);
+			if (i <= 0)
+				break;
+			progress += i;
+		}
+		if (progress != numHdrs * 4096)
+			return -8;
+
 		CompChunkPtrList nextPtrList;
 		gplRc = decompressor.getPtrList(&nextHdrBufPtr[0], numHdrs * 4096, nextPtrList);
 		if (gplRc != 0)

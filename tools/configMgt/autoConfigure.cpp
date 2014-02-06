@@ -120,22 +120,34 @@ int main(int argc, char *argv[])
 	catch(...)
 	{}
 
+	// build3 is for 3 and above 4
 	bool build3 = false;
 	if ( !cloud.empty() )
 		build3 = true;
 
-	//read subnet parameter to see if this is a 4.0+ or pre-4.0 build build being installed
-	string AmazonSubNetID;
+	// build 4.0 flag
+	string CoreFileFlag;
+	try {
+		CoreFileFlag = sysConfigNew->getConfig(InstallSection, "CoreFileFlag");
+	}
+	catch(...)
+	{}
 
+	bool build40 = false;
+	if ( !CoreFileFlag.empty() )
+		build40 = true;
+
+	//build 4.0.1 flag
+	string AmazonSubNetID;
 	try {
 		AmazonSubNetID = sysConfigNew->getConfig(InstallSection, "AmazonSubNetID");
 	}
 	catch(...)
 	{}
 
-	bool build4 = false;
+	bool build401 = false;
 	if ( !AmazonSubNetID.empty() )
-		build4 = true;
+		build401 = true;
 
 	//set install config flag
 	try {
@@ -1135,7 +1147,6 @@ int main(int argc, char *argv[])
 
 	sysConfigNew->write();
 
-
 	//
 	// Configure NMS Addresses
 	//
@@ -1183,7 +1194,7 @@ int main(int argc, char *argv[])
 	}
 
 	//
-	// 3.0 sn configuration items
+	// 3 and above configuration items
 	// 
 	if (build3) {
 		//setup cloud parameters
@@ -1200,6 +1211,7 @@ int main(int argc, char *argv[])
 		string UMSyncTime;
 		string AmazonAutoTagging;
 		string AmazonRegion;
+		string AmazonZone;
 		string AmazonVPCNextPrivateIP;
 
 		try {
@@ -1217,13 +1229,15 @@ int main(int argc, char *argv[])
 			UMSyncTime = sysConfigOld->getConfig(InstallSection, "UMSyncTime");
 			AmazonAutoTagging = sysConfigOld->getConfig(InstallSection, "AmazonAutoTagging");
 			AmazonRegion = sysConfigOld->getConfig(InstallSection, "AmazonRegion");
+			AmazonZone = sysConfigOld->getConfig(InstallSection, "AmazonZone");
 			AmazonVPCNextPrivateIP = sysConfigOld->getConfig(InstallSection, "AmazonVPCNextPrivateIP");
 			AmazonSubNetID = sysConfigOld->getConfig(InstallSection, "AmazonSubNetID");
 		}
 		catch(...)
 		{ }
 
-		if (build3 && !build4 )
+		// 3.x upgrade
+		if (build3 && !build40 && !build401)
 		{
 			if ( cloud == "no" || cloud == oam::UnassignedName)
 				cloud = "n";
@@ -1231,14 +1245,36 @@ int main(int argc, char *argv[])
 				cloud = "amazon";
 		}
 
-		if (build4)
+		// 4.0 upgrade
+		if (build40 && !build401)
+		{
+			if ( cloud == "no" || cloud == "n" )
+				cloud = oam::UnassignedName;
+		}
+
+		// 4.0.1+ upgrade
+		if (build401)
 		{
 			if ( cloud == "no" || cloud == "n" )
 				cloud = oam::UnassignedName;
 			if ( cloud == "amazon")
 				cloud = "amazon-ec2";
+			if ( AmazonSubNetID.empty() )
+				AmazonSubNetID = oam::UnassignedName;
+			if ( AmazonVPCNextPrivateIP.empty() )
+				AmazonVPCNextPrivateIP = oam::UnassignedName;
+
+			try {
+				sysConfigNew->setConfig(InstallSection, "AmazonSubNetID", AmazonSubNetID);
+				sysConfigNew->setConfig(InstallSection, "AmazonVPCNextPrivateIP", AmazonVPCNextPrivateIP);
+			}
+			catch(...)
+			{
+		//		cout << "ERROR: Problem setting Cloud Parameters from the Calpont System Configuration file" << endl;
+		//		exit(-1);
+			}
 		}
-	
+
 		try {
 			sysConfigNew->setConfig(InstallSection, "Cloud", cloud);
 			sysConfigNew->setConfig(InstallSection, "AmazonX509Certificate", x509Cert);
@@ -1254,6 +1290,7 @@ int main(int argc, char *argv[])
 			sysConfigNew->setConfig(InstallSection, "UMSyncTime", UMSyncTime);
 			sysConfigNew->setConfig(InstallSection, "AmazonAutoTagging", AmazonAutoTagging);
 			sysConfigNew->setConfig(InstallSection, "AmazonRegion", AmazonRegion);
+			sysConfigNew->setConfig(InstallSection, "AmazonZone", AmazonZone);
 		}
 		catch(...)
 		{
@@ -1261,23 +1298,15 @@ int main(int argc, char *argv[])
 	//		exit(-1);
 		}
 
-		if (build4)
-		{
-			try {
-				sysConfigNew->setConfig(InstallSection, "AmazonSubNetID", AmazonSubNetID);
-				sysConfigNew->setConfig(InstallSection, "AmazonVPCNextPrivateIP", AmazonVPCNextPrivateIP);
-			}
-			catch(...)
-			{
-		//		cout << "ERROR: Problem setting Cloud Parameters from the Calpont System Configuration file" << endl;
-		//		exit(-1);
-			}
-		}
+
+		if ( cloud == "amazon-ec2" || cloud == "amazon-vpc")
+			cloud = "amazon";
 
 		//setup um storage
 		if ( cloud == "amazon" && UMStorageType == "external") {
-            try
-            {
+
+		try
+            	{
                 systemStorageInfo_t t;
                 t = oam.getStorageConfig();
 
@@ -1408,8 +1437,6 @@ int main(int argc, char *argv[])
 		{
 			cout << endl << "**** getUnassignedDbroot Failed :  " << e.what() << endl;
 		}
-
-		
 	}
 	else
 	{ // pre 3.0 only
@@ -1531,7 +1558,6 @@ int main(int argc, char *argv[])
 	{}
 
 	// CoreFile Flag
-	string CoreFileFlag;
 	try {
 		CoreFileFlag = sysConfigOld->getConfig("Installation", "CoreFileFlag");
 

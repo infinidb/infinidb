@@ -40,9 +40,9 @@ BPPSendThread::BPPSendThread() : die(false), gotException(false), mainThreadWait
 	fcEnabled(false), currentByteSize(0), maxByteSize(25000000)
 {
 	runner = boost::thread(Runner_t(this));
-}	
-	
-BPPSendThread::BPPSendThread(uint initMsgsLeft) : die(false), gotException(false),
+}
+
+BPPSendThread::BPPSendThread(uint32_t initMsgsLeft) : die(false), gotException(false),
 	mainThreadWaiting(false), sizeThreshold(100), msgsLeft(initMsgsLeft), waiting(false),
 	sawAllConnections(false), fcEnabled(false), currentByteSize(0), maxByteSize(25000000)
 {
@@ -149,7 +149,7 @@ void BPPSendThread::mainLoop()
 	SP_UM_MUTEX lock;
 	SP_UM_IOSOCK sock;
 	bool doLoadBalancing = false;
-	
+
 	msg.reset(new Msg_t[msgCap]);
 
 	while (!die) {
@@ -160,7 +160,7 @@ void BPPSendThread::mainLoop()
 			mainThreadWaiting = false;
 			continue;
 		}
-	
+
 		msgCount = (msgQueue.size() > msgCap ? msgCap : msgQueue.size());
 		for (i = 0; i < msgCount; i++) {
 			msg[i] = msgQueue.front();
@@ -174,9 +174,9 @@ void BPPSendThread::mainLoop()
 		msgsSent = 0;
 		while (msgsSent < msgCount && !die) {
 			uint64_t bsSize;
-			if (msgsLeft == 0 && fcEnabled && !die) {
+			if (msgsLeft <= 0 && fcEnabled && !die) {
 				mutex::scoped_lock sl2(ackLock);
-				while (msgsLeft == 0 && fcEnabled && !die) {
+				while (msgsLeft <= 0 && fcEnabled && !die) {
 					waiting = true;
 					okToSend.wait(sl2);
 					waiting = false;

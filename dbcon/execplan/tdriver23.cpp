@@ -43,7 +43,7 @@ private:
 
 public:
 
-CalpontSystemCatalog* syscat;
+boost::shared_ptr<CalpontSystemCatalog> syscat;
 CalpontSystemCatalog::OID o;
 CalpontSystemCatalog::ColType ct;
    

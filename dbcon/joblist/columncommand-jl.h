@@ -56,7 +56,7 @@ public:
 	const uint8_t getBOP() const { return BOP; }
 	const messageqcpp::ByteStream& getFilterString() { return filterString; }
 	const uint16_t getFilterCount() const { return filterCount; }
-	std::vector<struct BRM::EMEntry>& getExtents() { return extents; }
+	const std::vector<struct BRM::EMEntry>& getExtents() { return extents; }
 	const execplan::CalpontSystemCatalog::ColType& getColType() const { return colType; }
 	bool isDict() const { return fIsDict; }
 

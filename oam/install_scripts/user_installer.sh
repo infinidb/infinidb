@@ -90,7 +90,8 @@ expect {
 	"sys" {  }
 }
 send_user "\n"
-sleep 5
+#BUG 5749 - SAS: didn't work on their system until I added the sleep 60
+sleep 60
 
 if { $INSTALLTYPE == "initial" || $INSTALLTYPE == "uninstall" } {
 	# 

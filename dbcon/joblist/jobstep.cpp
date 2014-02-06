@@ -63,7 +63,7 @@ JobStep::JobStep(const JobInfo& j) :
         fDie(false),
         fWaitToRunStepCnt(0),
         fPriority(1),
-        fErrInfo(j.status),
+        fErrorInfo(j.errorInfo),
         fLogger(j.logger)
 {
 }

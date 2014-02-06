@@ -169,7 +169,7 @@ void DMLPackageProcessor::getColumnsForTable(uint32_t sessionID, std::string sch
 	tableName.schema = schema;
 	tableName.table = table;
 
-	CalpontSystemCatalog* systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog( sessionID );
+	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog( sessionID );
 	CalpontSystemCatalog::RIDList ridList = systemCatalogPtr->columnRIDs(tableName, true);
 
 	CalpontSystemCatalog::RIDList::const_iterator rid_iterator = ridList.begin();

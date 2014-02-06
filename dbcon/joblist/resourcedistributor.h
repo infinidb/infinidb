@@ -26,10 +26,11 @@
 #define JOBLIST_RESOURCEMANAGER_H
 
 #include <unistd.h>
-#include "jl_logger.h"
 #include <list>
 #include <limits>
 #include <boost/thread/condition.hpp>
+
+#include "logger.h"
 
 #undef min
 #undef max

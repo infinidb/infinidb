@@ -334,7 +334,7 @@ extern "C" int Process_ddl(OCIExtProcContext* extProcCtx,
     				qualifiedTblName.schema = owner;
     				qualifiedTblName.table = tableName;
     			}
-    			CalpontSystemCatalog *csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
+    			boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
     			csc->identity( CalpontSystemCatalog::FE );
     			constraintName = csc->primaryKeyName( qualifiedTblName );
     			

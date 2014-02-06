@@ -688,10 +688,11 @@ void RedistributeReadThread::operator()()
 //------------------------------------------------------------------------------
 // GetFileSizeThread constructor.
 //------------------------------------------------------------------------------
-GetFileSizeThread::GetFileSizeThread(const messageqcpp::IOSocket& ios, ByteStream& Ibs)
+GetFileSizeThread::GetFileSizeThread(const messageqcpp::IOSocket& ios, ByteStream& Ibs, BRM::DBRM& dbrm)
 : ReadThread(ios), fWeGetFileSizes(new WE_GetFileSizes())
 {
     fIbs = Ibs;
+    key = dbrm.getUnique32();
 }
 
 //------------------------------------------------------------------------------
@@ -719,7 +720,7 @@ void GetFileSizeThread::operator()()
         {
         case WE_SVR_GET_FILESIZES:
             {
-                rc = fWeGetFileSizes->processTable(fIbs, errMsg);
+                rc = fWeGetFileSizes->processTable(fIbs, errMsg, key);
                 break;
             }
         default:
@@ -759,7 +760,7 @@ void GetFileSizeThread::operator()()
 
 //-----------------------------------------------------------------------------
 
-void ReadThreadFactory::CreateReadThread(ThreadPool& Tp, IOSocket& Ios)
+void ReadThreadFactory::CreateReadThread(ThreadPool& Tp, IOSocket& Ios, BRM::DBRM& dbrm)
 {
     struct timespec rm_ts;
     int sleepTime = 20000; // wait for 20 seconds
@@ -835,7 +836,7 @@ void ReadThreadFactory::CreateReadThread(ThreadPool& Tp, IOSocket& Ios)
         break;
 	case WE_SVR_GET_FILESIZES:
         {
-            GetFileSizeThread getFileSizeThread(Ios, aBs);
+            GetFileSizeThread getFileSizeThread(Ios, aBs, dbrm);
             Tp.invoke(getFileSizeThread);
         }
         break;

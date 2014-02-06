@@ -35,7 +35,6 @@ ELIBS+=-lsnmpmanager -lnetsnmpmibs -lnetsnmpagent -lnetsnmp \
 -lnetsnmpmibs -lnetsnmphelpers -loamcpp -lfuncexp -lmysqlcl_idb
 ELIBS+=-lwindowfunction
 
-
 # setup libraries for tdriver
 
 TLIBS=-L. -ljoblist -lfuncexp -L$(EXPORT_ROOT)/lib -lrt -lmysqlcl_idb
@@ -48,7 +47,7 @@ GLIBS=-L$(EXPORT_ROOT)/lib -lrt -lmessageqcpp -lconfigcpp -lxml2 -lcppunit
 GLIBS+=-ldl -liberty -lxml2 -ldmlpackageproc -ldmlpackage -lwriteengine -lloggingcpp -ldataconvert -lfuncexp -lmysqlcl_idb
 GLIBS+=-lwindowfunction
 
-LLIBS=-L$(CALPONT_LIBRARY_PATH) -lexecplan -lrowgroup -loamcpp -lmulticast -ljoiner -lquerystats -lcommon -lrt -lmysqlcl_idb -lwindowfunction
+LLIBS=-L$(CALPONT_LIBRARY_PATH) -lexecplan -lrowgroup -loamcpp -lmulticast -ljoiner -lquerystats -lcommon -lrt -lmysqlcl_idb -lwindowfunction 
 
 SRCS=\
 	anydatalist.cpp \
@@ -106,6 +105,7 @@ LINCLUDES=\
 	bpp-jl.h \
 	distributedenginecomm.h \
 	elementtype.h \
+	errorinfo.h \
 	groupconcat.h \
 	jl_logger.h \
 	joblist.h \

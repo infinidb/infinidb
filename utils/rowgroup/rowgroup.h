@@ -101,7 +101,7 @@ public:
 	inline bool equals(const std::string &str, uint32_t offset, uint32_t length) const;
 
 	void clear();
-	
+
 	void serialize(messageqcpp::ByteStream &) const;
 	uint deserialize(messageqcpp::ByteStream &);
 
@@ -141,7 +141,7 @@ public:
 	virtual ~RGData();
 
 	inline RGData & operator=(const RGData &);
-	
+
 	// amount should be the # returned by RowGroup::getDataSize()
 	void serialize(messageqcpp::ByteStream &, uint amount) const;
 	
@@ -155,7 +155,7 @@ public:
 	void reinit(const RowGroup &rg);
 	void reinit(const RowGroup &rg, uint rowCount);
 	inline void setStringStore(boost::shared_ptr<StringStore> &ss) { strings = ss; }
-	
+
 	// this will use the pre-configured Row to figure out where row # num is, then set the Row
 	// to point to it.  It's a shortcut around using a RowGroup to do the same thing for cases
 	// where it's inconvenient to instantiate one.
@@ -163,7 +163,7 @@ public:
 	
 	boost::shared_array<uint8_t> rowData;
 	boost::shared_ptr<StringStore> strings;
-	
+
 private:
 	//boost::shared_array<uint8_t> rowData;
 	//boost::shared_ptr<StringStore> strings;
@@ -174,13 +174,12 @@ private:
 friend class RowGroup;
 };
 
-
 class Row
 {
 	public:
 		struct Pointer {
 			inline Pointer() : data(NULL), strings(NULL) { }
-			
+
 			// Pointer(uint8_t*) implicitly makes old code compatible with the string table impl;
 			// make it explicit to identify things that still might need to be changed
 			inline Pointer(uint8_t *d) : data(d), strings(NULL) { }
@@ -188,21 +187,21 @@ class Row
 			uint8_t *data;
 			StringStore *strings;
 		};
-		
+
 		Row();
 		Row(const Row &);
 		~Row();
 
 		Row & operator=(const Row &);
 		bool operator==(const Row &) const;
-		
+
 		//void setData(uint8_t *rowData, StringStore *ss);
 		inline void setData(const Pointer &);   // convenience fcn, can go away
 		inline uint8_t * getData() const;
-		
+
 		inline void setPointer(const Pointer &);
 		inline Pointer getPointer() const;
-		
+
 		inline void nextRow();
 		inline uint getColumnWidth(uint colIndex) const;
 		inline uint getColumnCount() const;
@@ -315,7 +314,7 @@ class Row
 		inline uint64_t hash(const std::vector<uint> &keyColumns) const;
 		inline uint64_t hash(uint lastCol) const;  // generates a hash for cols [0-lastCol]
 		inline uint64_t hash() const;  // generates a hash for all cols
-		
+
 		// these are for cases when you already know the type definitions are the same.
 		// a fcn to check the type defs seperately doesn't exist yet.
 		inline bool equals(const Row &, const std::vector<uint> &keyColumns) const;
@@ -341,8 +340,7 @@ class Row
 		bool hasLongStringField;
 		uint sTableThreshold;
 		boost::shared_array<bool> forceInline;
-		
-		inline bool inStringTable(uint col) const;
+		inline bool inStringTable(uint32_t col) const;
 
 		friend class RowGroup;
 };
@@ -350,9 +348,9 @@ class Row
 inline Row::Pointer Row::getPointer() const { return Pointer(data, strings); }
 inline uint8_t * Row::getData() const { return data; }
 
-inline void Row::setPointer(const Pointer &p) 
-{ 
-	data = p.data; 
+inline void Row::setPointer(const Pointer &p)
+{
+	data = p.data;
 	strings = p.strings;
 	bool hasStrings = (strings != 0);
 	if (useStringTable != hasStrings) {
@@ -362,7 +360,7 @@ inline void Row::setPointer(const Pointer &p)
 }
 
 inline void Row::setData(const Pointer &p) { setPointer(p); }
-	
+
 inline void Row::nextRow() { data += offsets[columnCount]; }
 
 inline uint Row::getColumnCount() const { return columnCount; }
@@ -829,15 +827,15 @@ inline uint64_t Row::hash(uint lastCol) const
 {
 	utils::Hasher_r h;
 	uint32_t ret = 0;
-	
+
 	// Sometimes we ask this to hash 0 bytes, and it comes through looking like
 	// lastCol = -1.  Return 0.
 	if (lastCol >= columnCount)
 		return 0;
-	
+
 	// Two rows that store identical values but are in different formats will return different hashes
 	// if this fast path is used.  Also can't use any column offsets in this fcn.
-		
+
 	//if (!useStringTable) {
 	//	ret = h((const char *) &data[offsets[0]], offsets[lastCol+1] - offsets[0], 0);
 	//	return h.finalize(ret, offsets[lastCol+1]);
@@ -874,7 +872,7 @@ inline bool Row::equals(const Row &r2, uint lastCol) const
 {
 	if (lastCol >= columnCount)
 		return true;
-	
+
 	if (!useStringTable && !r2.useStringTable)
 		return !(memcmp(&data[offsets[0]], &r2.data[offsets[0]], offsets[lastCol+1] - offsets[0]));
 	
@@ -979,7 +977,7 @@ public:
 
 	// this returns the size of the row data with the string table
 	inline uint64_t getSizeWithStrings() const;
-	
+
 	// sets the row count to 0 and the baseRid to something
 	// effectively initializing whatever chunk of memory
 	// data points to
@@ -1022,6 +1020,9 @@ public:
 	
 	void append(RGData &);
 	void append(RowGroup &);
+	void append(RGData &, uint pos);   // insert starting at position 'pos'
+	void append(RowGroup &, uint pos);
+
 	RGData duplicate();   // returns a copy of the attached RGData
 
 	std::string toString() const;
@@ -1031,8 +1032,8 @@ public:
 	* append the metadata of another RowGroup to this RowGroup
 	*/
 	RowGroup& operator+=(const RowGroup& rhs);
-	
-	// returns a RowGroup with only the first cols columns.  Useful for generating a 
+
+	// returns a RowGroup with only the first cols columns.  Useful for generating a
 	// RowGroup where the first cols make up a key of some kind, and the rest is irrelevant.
 	RowGroup truncate(uint cols); 
 
@@ -1041,7 +1042,7 @@ public:
 	 * Orders RG's based on baseRid
 	 */
 	inline bool operator<(const RowGroup& rhs) const;
-	
+
 	void addToSysDataList(execplan::CalpontSystemCatalog::NJLSysDataList& sysDataList);
 
 	/* Base RIDs are now a combination of partition#, segment#, extent#, and block#. */
@@ -1380,7 +1381,7 @@ inline void copyRow(const Row &in, Row *out, uint colCount)
 {
 	if (&in == out)
 		return;
-	
+
 	out->setRid(in.getRelRid());
 	if (!in.usesStringTable() && !out->usesStringTable()) {
 		memcpy(out->getData(), in.getData(), std::min(in.getOffset(colCount), out->getOffset(colCount)));
@@ -1447,7 +1448,7 @@ inline bool StringStore::isNullValue(uint32_t off, uint32_t len) const
 {
 	if (off == std::numeric_limits<uint32_t>::max() || len == 0)
 		return true;
-	
+
 	if (len < 8)
 		return false;
 	
@@ -1476,7 +1477,7 @@ inline bool StringStore::equals(const std::string &str, uint32_t off, uint32_t l
 	MemChunk *mc = (MemChunk *) mem[chunk].get();
 	if ((offset + len) > mc->currentSize)
 		return false;
-	
+
 	return (strncmp(str.c_str(), (const char *) &mc->data[offset], len) == 0);
 }
 

@@ -113,6 +113,10 @@ public:
 	void setTotalFileCounts(uint64_t numFiles, uint64_t numBytes);
 	void totalFileCounts(uint64_t& numFiles, uint64_t& numBytes) const;
 
+	// returns true if there might be more data to read,
+	// false if there is no more data.  Similar to next(), but
+	// does not return data.
+	bool more(uint64_t id);
 protected:
 
 private:
@@ -145,6 +149,7 @@ private:
 	void signalPs();
 	bool swapBuffers(bool waitIfBlocked=true);
 	bool waitForSwap(uint64_t id);
+
 };
 
 // #define FIFO_DEBUG
@@ -320,6 +325,13 @@ bool FIFO<element_t>::waitForSwap(uint64_t id)
 		return false;
 	}
 	return true;
+}
+
+template<typename element_t>
+bool FIFO<element_t>::more(uint64_t id)
+{
+	boost::mutex::scoped_lock scoped(base::mutex);
+	return !(cpos[id] == fMaxElements && base::noMoreInput);
 }
 
 template<typename element_t>

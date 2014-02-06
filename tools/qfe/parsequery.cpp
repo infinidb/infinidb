@@ -28,7 +28,7 @@ struct yy_buffer_state;
 extern yy_buffer_state* qfe_scan_string(const char*);
 extern void qfe_delete_buffer(yy_buffer_state*);
 extern CalpontSelectExecutionPlan* ParserCSEP;
-extern CalpontSystemCatalog* ParserCSC;
+extern boost::shared_ptr<CalpontSystemCatalog> ParserCSC;
 
 namespace
 {
@@ -46,7 +46,7 @@ CalpontSelectExecutionPlan* parseQuery(const string& query, const uint32_t sid)
 	// performance (I think)
 	mutex::scoped_lock lk(ParserMutex);
 
-	CalpontSystemCatalog* csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sid);
+	boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sid);
 	CalpontSelectExecutionPlan* csep=0;
 	csep = new CalpontSelectExecutionPlan();
 	//we use an auto_ptr here with some trepidation. We only want auto delete on an execption.

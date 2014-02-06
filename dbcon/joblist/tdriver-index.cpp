@@ -60,7 +60,7 @@ CPPUNIT_TEST_SUITE_END();
 
 
 private:
-     	int getIndexOID(const CalpontSystemCatalog::TableColName&  col, CalpontSystemCatalog *cat)
+     	int getIndexOID(const CalpontSystemCatalog::TableColName&  col, boost::shared_ptr<CalpontSystemCatalog> cat)
 	{	
 		const CalpontSystemCatalog::IndexNameList iNames = cat->colValueSysindexCol(col);
 		if (0 == iNames.size())
@@ -78,7 +78,7 @@ public:
 	{
 		ResourceManager rm;
 		DistributedEngineComm* dec = DistributedEngineComm::instance(rm);
-		CalpontSystemCatalog *cat = CalpontSystemCatalog::makeCalpontSystemCatalog();
+		boost::shared_ptr<CalpontSystemCatalog> cat = CalpontSystemCatalog::makeCalpontSystemCatalog();
 
 		JobStepAssociation inJs;
 		JobStepAssociation walkJs;
@@ -127,7 +127,7 @@ public:
 	{
 		ResourceManager rm;
 		DistributedEngineComm* dec = DistributedEngineComm::instance(rm);
-		CalpontSystemCatalog *cat = CalpontSystemCatalog::makeCalpontSystemCatalog();
+		boost::shared_ptr<CalpontSystemCatalog> cat = CalpontSystemCatalog::makeCalpontSystemCatalog();
 
 		JobStepAssociation inJs;
 		JobStepAssociation walkJs;
@@ -177,7 +177,7 @@ public:
 	{
 		ResourceManager rm;
 		DistributedEngineComm* dec = DistributedEngineComm::instance(rm);
-		CalpontSystemCatalog *cat = CalpontSystemCatalog::makeCalpontSystemCatalog();
+		boost::shared_ptr<CalpontSystemCatalog> cat = CalpontSystemCatalog::makeCalpontSystemCatalog();
 
 // 		dec->addSession(12345);
 // 		dec->addStep(12345, 0);
@@ -236,7 +236,7 @@ public:
 	{
 		ResourceManager rm;
 		DistributedEngineComm* dec = DistributedEngineComm::instance(rm);
-		CalpontSystemCatalog *cat = CalpontSystemCatalog::makeCalpontSystemCatalog();
+		boost::shared_ptr<CalpontSystemCatalog> cat = CalpontSystemCatalog::makeCalpontSystemCatalog();
 
 // 		dec->addSession(12345);
 // 		dec->addStep(12345, 0);
@@ -294,7 +294,7 @@ public:
 	{
 		ResourceManager rm;
 		DistributedEngineComm* dec = DistributedEngineComm::instance(rm);
-		CalpontSystemCatalog *cat = CalpontSystemCatalog::makeCalpontSystemCatalog();
+		boost::shared_ptr<CalpontSystemCatalog> cat = CalpontSystemCatalog::makeCalpontSystemCatalog();
 
 		JobStepAssociation inJs;
 		JobStepAssociation walkJs;

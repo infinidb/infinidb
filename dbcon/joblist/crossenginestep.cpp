@@ -178,6 +178,7 @@ CrossEngineStep::CrossEngineStep(
 		BatchPrimitive(jobInfo),
 		fRowsRetrieved(0),
 		fRowsReturned(0),
+		fRowsPerGroup(256),
 		fOutputDL(NULL),
 		fOutputIterator(0),
 		fEndOfResult(false),
@@ -292,16 +293,14 @@ void CrossEngineStep::setField(int i, const char* value, Row& row)
 
 inline void CrossEngineStep::addRow(RGData &data)
 {
-	fRowDelivered.setRid(fRowsReturned%8192);
+	fRowDelivered.setRid(fRowsReturned%fRowsPerGroup);
 	fRowDelivered.nextRow();
 	fRowGroupDelivered.incRowCount();
 
-	if (++fRowsReturned%8192 == 0)
+	if (++fRowsReturned%fRowsPerGroup == 0)
 	{
-		//INSERT_ADAPTER(fOutputDL, data);
-//		cout << fRowGroupDelivered.toString() << endl;
 		fOutputDL->insert(data);
-		data.reinit(fRowGroupDelivered);
+		data.reinit(fRowGroupDelivered, fRowsPerGroup);
 		fRowGroupDelivered.setData(&data);
 		fRowGroupDelivered.resetRowGroup(fRowsReturned);
 		fRowGroupDelivered.getRow(0, &fRowDelivered);
@@ -498,7 +497,7 @@ void CrossEngineStep::execute()
 		RGData rgDataDelivered;
 		fRowGroupDelivered.initRow(&fRowDelivered);
 		// use getDataSize() i/o getMaxDataSize() to make sure there are 8192 rows.
-		rgDataDelivered.reinit(fRowGroupDelivered);
+		rgDataDelivered.reinit(fRowGroupDelivered, fRowsPerGroup);
 		fRowGroupDelivered.setData(&rgDataDelivered);
 		fRowGroupDelivered.resetRowGroup(0);
 		fRowGroupDelivered.getRow(0, &fRowDelivered);
@@ -618,30 +617,16 @@ void CrossEngineStep::execute()
 	}
 	catch (IDBExcept& iex)
 	{
-		catchHandler(iex.what(), fSessionId);
-		if (status() == 0)
-		{
-			status(iex.errorCode());
-			errorMessage(iex.what());
-		}
+		catchHandler(iex.what(), iex.errorCode(), fErrorInfo, fSessionId);
 	}
 	catch(const std::exception& ex)
 	{
-		catchHandler(ex.what(), fSessionId);
-		if (status() == 0)
-		{
-			status(ERR_CROSS_ENGINE_CONNECT);
-			errorMessage(ex.what());
-		}
+		catchHandler(ex.what(), ERR_CROSS_ENGINE_CONNECT, fErrorInfo, fSessionId);
 	}
 	catch(...)
 	{
-		catchHandler("CrossEngineStep execute caught an unknown exception", fSessionId);
-		if (status() == 0)
-		{
-			status(ERR_CROSS_ENGINE_CONNECT);
-			errorMessage("unknown exception");
-		}
+		catchHandler("CrossEngineStep execute caught an unknown exception",
+						ERR_CROSS_ENGINE_CONNECT, fErrorInfo, fSessionId);
 	}
 
 	fEndOfResult = true;
@@ -808,18 +793,17 @@ uint CrossEngineStep::nextBand(messageqcpp::ByteStream &bs)
 	}
 	catch(const std::exception& ex)
 	{
-		catchHandler(ex.what(), fSessionId);
-		if (status() == 0)
-			status(ERR_IN_DELIVERY);
+		catchHandler(ex.what(), ERR_IN_DELIVERY, fErrorInfo, fSessionId);
+
 		while (more)
 			more = fOutputDL->next(fOutputIterator, &rgDataOut);
 		fEndOfResult = true;
 	}
 	catch(...)
 	{
-		catchHandler("CrossEngineStep next band caught an unknown exception", fSessionId);
-		if (status() == 0)
-			status(ERR_IN_DELIVERY);
+		catchHandler("CrossEngineStep next band caught an unknown exception",
+						ERR_IN_DELIVERY, fErrorInfo, fSessionId);
+
 		while (more)
 			more = fOutputDL->next(fOutputIterator, &rgDataOut);
 		fEndOfResult = true;

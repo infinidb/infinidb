@@ -2385,10 +2385,6 @@ namespace oam
              */
             int checkGlusterLog(std::string logFile, std::string& errmsg);
 
-            /** @brief copy database files from src to dst
-             */
-            void copyDatabaseFiles(std::string src, std::string dst);
-
 		    int sendMsgToProcMgr3(messageqcpp::ByteStream::byte requestType, snmpmanager::AlarmList& alarmlist, const std::string date);
 
             /** @brief build and send request message to Process Manager

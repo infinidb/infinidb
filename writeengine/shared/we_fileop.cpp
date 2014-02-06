@@ -946,9 +946,6 @@ int FileOp::initColumnExtent(
     bool     bExpandExtent,
     bool     bAbbrevExtent )
 {
-    // Create vector of mutexes used to serialize extent access per DBRoot
-    initDbRootExtentMutexes( );
-
     if ((bNewFile) && (m_compressionType))
     {
         char hdrs[IDBCompressInterface::HDR_BUF_LEN*2];
@@ -959,95 +956,114 @@ int FileOp::initColumnExtent(
         RETURN_ON_ERROR(writeHeaders(pFile, hdrs));
     }
 
-    // Determine the number of blocks in each call to fwrite(), and the
-    // number of fwrite() calls to make, based on this.  In other words,
-    // we put a cap on the "writeSize" so that we don't allocate and write
-    // an entire extent at once for the 64M row extents.
-    // If we are expanding an abbreviated 64M extent, we may not have an even
-    // multiple of MAX_NBLOCKS to write; remWriteSize is the number of blocks
-    // above and beyond loopCount*MAX_NBLOCKS.
-    int writeSize = nBlocks * BYTE_PER_BLOCK; // 1M and 8M row extent size
-    int loopCount = 1;
-    int remWriteSize = 0;
-    if (nBlocks > MAX_NBLOCKS)                // 64M row extent size
+    // @bug5769 Don't initialize extents or truncate db files on HDFS
+    if (idbdatafile::IDBPolicy::useHdfs())
     {
-        writeSize = MAX_NBLOCKS * BYTE_PER_BLOCK;
-        loopCount = nBlocks / MAX_NBLOCKS;
-        remWriteSize = nBlocks - (loopCount * MAX_NBLOCKS);
+        //@Bug 3219. update the compression header after the extent is expanded.
+        if ((!bNewFile) && (m_compressionType) && (bExpandExtent))
+        {
+            updateColumnExtent(pFile, nBlocks);
+        }
+
+        // @bug 2378. Synchronize here to avoid write buffer pile up too much,
+        // which could cause controllernode to timeout later when it needs to
+        // save a snapshot.
+        pFile->flush();
     }
-
-    // Allocate a buffer, initialize it, and use it to create the extent
-    idbassert(dbRoot > 0);
-#ifdef PROFILE
-    if (bExpandExtent)
-        Stats::startParseEvent(WE_STATS_WAIT_TO_EXPAND_COL_EXTENT);
     else
-        Stats::startParseEvent(WE_STATS_WAIT_TO_CREATE_COL_EXTENT);
-#endif
-    boost::mutex::scoped_lock lk(*m_DbRootAddExtentMutexes[dbRoot]);
-#ifdef PROFILE
-    if (bExpandExtent)
-        Stats::stopParseEvent(WE_STATS_WAIT_TO_EXPAND_COL_EXTENT);
-    else
-        Stats::stopParseEvent(WE_STATS_WAIT_TO_CREATE_COL_EXTENT);
-    Stats::startParseEvent(WE_STATS_INIT_COL_EXTENT);
-#endif
-
-    // Allocate buffer, and store in scoped_array to insure it's deletion.
-    // Create scope {...} to manage deletion of writeBuf.
     {
-        unsigned char* writeBuf = new unsigned char[writeSize];
-        boost::scoped_array<unsigned char> writeBufPtr( writeBuf );
+        // Create vector of mutexes used to serialize extent access per DBRoot
+        initDbRootExtentMutexes( );
 
-        setEmptyBuf( writeBuf, writeSize, emptyVal, width );
+        // Determine the number of blocks in each call to fwrite(), and the
+        // number of fwrite() calls to make, based on this.  In other words,
+        // we put a cap on the "writeSize" so that we don't allocate and write
+        // an entire extent at once for the 64M row extents.  If we are
+        // expanding an abbreviated 64M extent, we may not have an even
+        // multiple of MAX_NBLOCKS to write; remWriteSize is the number of
+        // blocks above and beyond loopCount*MAX_NBLOCKS.
+        int writeSize = nBlocks * BYTE_PER_BLOCK; // 1M and 8M row extent size
+        int loopCount = 1;
+        int remWriteSize = 0;
+        if (nBlocks > MAX_NBLOCKS)                // 64M row extent size
+        {
+            writeSize = MAX_NBLOCKS * BYTE_PER_BLOCK;
+            loopCount = nBlocks / MAX_NBLOCKS;
+            remWriteSize = nBlocks - (loopCount * MAX_NBLOCKS);
+        }
 
+        // Allocate a buffer, initialize it, and use it to create the extent
+        idbassert(dbRoot > 0);
 #ifdef PROFILE
-        Stats::stopParseEvent(WE_STATS_INIT_COL_EXTENT);
         if (bExpandExtent)
-            Stats::startParseEvent(WE_STATS_EXPAND_COL_EXTENT);
+            Stats::startParseEvent(WE_STATS_WAIT_TO_EXPAND_COL_EXTENT);
         else
-            Stats::startParseEvent(WE_STATS_CREATE_COL_EXTENT);
+            Stats::startParseEvent(WE_STATS_WAIT_TO_CREATE_COL_EXTENT);
+#endif
+        boost::mutex::scoped_lock lk(*m_DbRootAddExtentMutexes[dbRoot]);
+#ifdef PROFILE
+        if (bExpandExtent)
+            Stats::stopParseEvent(WE_STATS_WAIT_TO_EXPAND_COL_EXTENT);
+        else
+            Stats::stopParseEvent(WE_STATS_WAIT_TO_CREATE_COL_EXTENT);
+        Stats::startParseEvent(WE_STATS_INIT_COL_EXTENT);
 #endif
 
-        //std::ostringstream oss;
-        //oss << "initColExtent: width-" << width <<
-        //"; loopCount-" << loopCount <<
-        //"; writeSize-" << writeSize;
-        //std::cout << oss.str() << std::endl;
-        if (remWriteSize > 0)
+        // Allocate buffer, and store in scoped_array to insure it's deletion.
+        // Create scope {...} to manage deletion of writeBuf.
         {
-            if( pFile->write( writeBuf, remWriteSize ) != remWriteSize )
-            {
-                return ERR_FILE_WRITE;
-            }
-        }
-        for (int j=0; j<loopCount; j++)
-        {
-        	if( pFile->write( writeBuf, writeSize ) != writeSize )
-            {
-                return ERR_FILE_WRITE;
-            }
-        }
-    }
+            unsigned char* writeBuf = new unsigned char[writeSize];
+            boost::scoped_array<unsigned char> writeBufPtr( writeBuf );
 
-    //@Bug 3219. update the compression header after the extent is expanded.
-    if ((!bNewFile) && (m_compressionType) && (bExpandExtent))
-    {
-        updateColumnExtent(pFile, nBlocks);
-    } 
-
-
-    // @bug 2378. Synchronize here to avoid write buffer pile up too much,
-    // which could cause controllernode to timeout later when it needs to
-    // save a snapshot.
-    pFile->flush();
+            setEmptyBuf( writeBuf, writeSize, emptyVal, width );
 
 #ifdef PROFILE
-    if (bExpandExtent)
-        Stats::stopParseEvent(WE_STATS_EXPAND_COL_EXTENT);
-    else
-        Stats::stopParseEvent(WE_STATS_CREATE_COL_EXTENT);
+            Stats::stopParseEvent(WE_STATS_INIT_COL_EXTENT);
+            if (bExpandExtent)
+                Stats::startParseEvent(WE_STATS_EXPAND_COL_EXTENT);
+            else
+                Stats::startParseEvent(WE_STATS_CREATE_COL_EXTENT);
 #endif
+
+            //std::ostringstream oss;
+            //oss << "initColExtent: width-" << width <<
+            //"; loopCount-" << loopCount <<
+            //"; writeSize-" << writeSize;
+            //std::cout << oss.str() << std::endl;
+            if (remWriteSize > 0)
+            {
+                if( pFile->write( writeBuf, remWriteSize ) != remWriteSize )
+                {
+                    return ERR_FILE_WRITE;
+                }
+            }
+            for (int j=0; j<loopCount; j++)
+            {
+        	    if( pFile->write( writeBuf, writeSize ) != writeSize )
+                {
+                    return ERR_FILE_WRITE;
+                }
+            }
+        }
+
+        //@Bug 3219. update the compression header after the extent is expanded.
+        if ((!bNewFile) && (m_compressionType) && (bExpandExtent))
+        {
+            updateColumnExtent(pFile, nBlocks);
+        }
+
+        // @bug 2378. Synchronize here to avoid write buffer pile up too much,
+        // which could cause controllernode to timeout later when it needs to
+        // save a snapshot.
+        pFile->flush();
+
+#ifdef PROFILE
+        if (bExpandExtent)
+            Stats::stopParseEvent(WE_STATS_EXPAND_COL_EXTENT);
+        else
+            Stats::stopParseEvent(WE_STATS_CREATE_COL_EXTENT);
+#endif
+    }
 
     return NO_ERROR;
 }
@@ -1641,98 +1657,111 @@ int FileOp::initDctnryExtent(
     int            blockHdrInitSize,
     bool           bExpandExtent )
 {
-    // Create vector of mutexes used to serialize extent access per DBRoot
-    initDbRootExtentMutexes( );
-
-    // Determine the number of blocks in each call to fwrite(), and the
-    // number of fwrite() calls to make, based on this.  In other words,
-    // we put a cap on the "writeSize" so that we don't allocate and write
-    // an entire extent at once for the 64M row extents.
-    // If we are expanding an abbreviated 64M extent, we may not have an even
-    // multiple of MAX_NBLOCKS to write; remWriteSize is the number of blocks
-    // above and beyond loopCount*MAX_NBLOCKS.
-    int writeSize = nBlocks * BYTE_PER_BLOCK; // 1M and 8M row extent size
-    int loopCount = 1;
-    int remWriteSize = 0;
-    if (nBlocks > MAX_NBLOCKS)                // 64M row extent size
+    // @bug5769 Don't initialize extents or truncate db files on HDFS
+    if (idbdatafile::IDBPolicy::useHdfs())
     {
-        writeSize = MAX_NBLOCKS * BYTE_PER_BLOCK;
-        loopCount = nBlocks / MAX_NBLOCKS;
-        remWriteSize = nBlocks - (loopCount * MAX_NBLOCKS);
+        if (m_compressionType)
+            updateDctnryExtent(pFile, nBlocks);
+
+        // Synchronize to avoid write buffer pile up too much, which could cause
+        // controllernode to timeout later when it needs to save a snapshot.
+        pFile->flush();
     }
-
-    // Allocate a buffer, initialize it, and use it to create the extent
-    idbassert(dbRoot > 0);
-#ifdef PROFILE
-    if (bExpandExtent)
-        Stats::startParseEvent(WE_STATS_WAIT_TO_EXPAND_DCT_EXTENT);
     else
-        Stats::startParseEvent(WE_STATS_WAIT_TO_CREATE_DCT_EXTENT);
-#endif
-    boost::mutex::scoped_lock lk(*m_DbRootAddExtentMutexes[dbRoot]);
-#ifdef PROFILE
-    if (bExpandExtent)
-        Stats::stopParseEvent(WE_STATS_WAIT_TO_EXPAND_DCT_EXTENT);
-    else
-        Stats::stopParseEvent(WE_STATS_WAIT_TO_CREATE_DCT_EXTENT);
-    Stats::startParseEvent(WE_STATS_INIT_DCT_EXTENT);
-#endif
-
-    // Allocate buffer, and store in scoped_array to insure it's deletion.
-    // Create scope {...} to manage deletion of writeBuf.
     {
-        unsigned char* writeBuf = new unsigned char[writeSize];
-        boost::scoped_array<unsigned char> writeBufPtr( writeBuf );
+        // Create vector of mutexes used to serialize extent access per DBRoot
+        initDbRootExtentMutexes( );
 
-        memset(writeBuf, 0, writeSize);
-        for (int i=0; i<nBlocks; i++)
+        // Determine the number of blocks in each call to fwrite(), and the
+        // number of fwrite() calls to make, based on this.  In other words,
+        // we put a cap on the "writeSize" so that we don't allocate and write
+        // an entire extent at once for the 64M row extents.  If we are
+        // expanding an abbreviated 64M extent, we may not have an even
+        // multiple of MAX_NBLOCKS to write; remWriteSize is the number of
+        // blocks above and beyond loopCount*MAX_NBLOCKS.
+        int writeSize = nBlocks * BYTE_PER_BLOCK; // 1M and 8M row extent size
+        int loopCount = 1;
+        int remWriteSize = 0;
+        if (nBlocks > MAX_NBLOCKS)                // 64M row extent size
         {
-            memcpy( writeBuf+(i*BYTE_PER_BLOCK),
-                    blockHdrInit,
-                    blockHdrInitSize );
+            writeSize = MAX_NBLOCKS * BYTE_PER_BLOCK;
+            loopCount = nBlocks / MAX_NBLOCKS;
+            remWriteSize = nBlocks - (loopCount * MAX_NBLOCKS);
         }
 
+        // Allocate a buffer, initialize it, and use it to create the extent
+        idbassert(dbRoot > 0);
 #ifdef PROFILE
-        Stats::stopParseEvent(WE_STATS_INIT_DCT_EXTENT);
         if (bExpandExtent)
-            Stats::startParseEvent(WE_STATS_EXPAND_DCT_EXTENT);
+            Stats::startParseEvent(WE_STATS_WAIT_TO_EXPAND_DCT_EXTENT);
         else
-            Stats::startParseEvent(WE_STATS_CREATE_DCT_EXTENT);
+            Stats::startParseEvent(WE_STATS_WAIT_TO_CREATE_DCT_EXTENT);
 #endif
-
-        //std::ostringstream oss;
-        //oss << "initDctnryExtent: width-8(assumed)" <<
-        //"; loopCount-" << loopCount <<
-        //"; writeSize-" << writeSize;
-        //std::cout << oss.str() << std::endl;
-        if (remWriteSize > 0)
-        {
-        	if (pFile->write( writeBuf, remWriteSize ) != remWriteSize)
-            {
-                return ERR_FILE_WRITE;
-            }
-        }
-        for (int j=0; j<loopCount; j++)
-        {
-        	if (pFile->write( writeBuf, writeSize ) != writeSize)
-            {
-                return ERR_FILE_WRITE;
-            }
-        }
-    }
-
-    if (m_compressionType)
-        updateDctnryExtent(pFile, nBlocks);
-
-    // Synchronize here to avoid write buffer pile up too much, which could
-    // cause controllernode to timeout later when it needs to save a snapshot.
-    pFile->flush();
+        boost::mutex::scoped_lock lk(*m_DbRootAddExtentMutexes[dbRoot]);
 #ifdef PROFILE
-    if (bExpandExtent)
-        Stats::stopParseEvent(WE_STATS_EXPAND_DCT_EXTENT);
-    else
-        Stats::stopParseEvent(WE_STATS_CREATE_DCT_EXTENT);
+        if (bExpandExtent)
+            Stats::stopParseEvent(WE_STATS_WAIT_TO_EXPAND_DCT_EXTENT);
+        else
+            Stats::stopParseEvent(WE_STATS_WAIT_TO_CREATE_DCT_EXTENT);
+        Stats::startParseEvent(WE_STATS_INIT_DCT_EXTENT);
 #endif
+
+        // Allocate buffer, and store in scoped_array to insure it's deletion.
+        // Create scope {...} to manage deletion of writeBuf.
+        {
+            unsigned char* writeBuf = new unsigned char[writeSize];
+            boost::scoped_array<unsigned char> writeBufPtr( writeBuf );
+
+            memset(writeBuf, 0, writeSize);
+            for (int i=0; i<nBlocks; i++)
+            {
+                memcpy( writeBuf+(i*BYTE_PER_BLOCK),
+                        blockHdrInit,
+                        blockHdrInitSize );
+            }
+
+#ifdef PROFILE
+            Stats::stopParseEvent(WE_STATS_INIT_DCT_EXTENT);
+            if (bExpandExtent)
+                Stats::startParseEvent(WE_STATS_EXPAND_DCT_EXTENT);
+            else
+                Stats::startParseEvent(WE_STATS_CREATE_DCT_EXTENT);
+#endif
+
+            //std::ostringstream oss;
+            //oss << "initDctnryExtent: width-8(assumed)" <<
+            //"; loopCount-" << loopCount <<
+            //"; writeSize-" << writeSize;
+            //std::cout << oss.str() << std::endl;
+            if (remWriteSize > 0)
+            {
+        	    if (pFile->write( writeBuf, remWriteSize ) != remWriteSize)
+                {
+                    return ERR_FILE_WRITE;
+                }
+            }
+            for (int j=0; j<loopCount; j++)
+            {
+        	    if (pFile->write( writeBuf, writeSize ) != writeSize)
+                {
+                    return ERR_FILE_WRITE;
+                }
+            }
+        }
+
+        if (m_compressionType)
+            updateDctnryExtent(pFile, nBlocks);
+
+        // Synchronize to avoid write buffer pile up too much, which could cause
+        // controllernode to timeout later when it needs to save a snapshot.
+        pFile->flush();
+#ifdef PROFILE
+        if (bExpandExtent)
+            Stats::stopParseEvent(WE_STATS_EXPAND_DCT_EXTENT);
+        else
+            Stats::stopParseEvent(WE_STATS_CREATE_DCT_EXTENT);
+#endif
+    }
 
     return NO_ERROR;
 }

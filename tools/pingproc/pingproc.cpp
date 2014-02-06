@@ -134,7 +134,7 @@ public:
 OidOperation::OidOperation(const OID_t oid, const OpType_t opType, const uint32_t sessionId)
 	:fOid(oid), fFilterList(), fFilterCount(0), fOpType(opType),fSessionId(sessionId), fBOP(BOP_NONE), fCOP1(COMPARE_NIL),fCOP2(COMPARE_NIL), fLbidTrace(false), fPMProfile(false)
 {
- 	CalpontSystemCatalog* cat = execplan::CalpontSystemCatalog::makeCalpontSystemCatalog(getpid());
+ 	boost::shared_ptr<CalpontSystemCatalog> cat = execplan::CalpontSystemCatalog::makeCalpontSystemCatalog(getpid());
  	fColType = cat->colType(oid);
 	fFilterList.reset();
 }
@@ -979,7 +979,7 @@ void doBatchOp_scan(OidOperation &OidOp)
 	ResourceManager rm;
 	DistributedEngineComm* dec = DistributedEngineComm::instance(rm);
 	ThdFcn f1;
-	CalpontSystemCatalog* sysCat = execplan::CalpontSystemCatalog::makeCalpontSystemCatalog(getpid());
+	boost::shared_ptr<CalpontSystemCatalog> sysCat = execplan::CalpontSystemCatalog::makeCalpontSystemCatalog(getpid());
 
 	pColScanStep scan(injs, outjs, dec, sysCat, OidOp.fOid, OidOp.fOid,
 			  OidOp.fSessionId, 0, OidOp.fSessionId, OidOp.fSessionId, OidOp.fSessionId, rm);
@@ -1089,7 +1089,7 @@ void doBatchOp_filt(OidOperation &OidOp)
 	ResourceManager rm;
 	DistributedEngineComm* dec = DistributedEngineComm::instance(rm);
 	ThdFcn f1;
-	CalpontSystemCatalog* sysCat = CalpontSystemCatalog::makeCalpontSystemCatalog(getpid());
+	boost::shared_ptr<CalpontSystemCatalog> sysCat = CalpontSystemCatalog::makeCalpontSystemCatalog(getpid());
 
 	ByteStream bs;
 	DBRM dbrm;
@@ -1235,7 +1235,7 @@ void doBatchQueryOp(OperationList& OidOps)
 
 	f1.fDec = dec;
 	f1.uniqueID = uniqueID;
-//	CalpontSystemCatalog* sysCat = execplan::CalpontSystemCatalog::makeCalpontSystemCatalog(getpid());
+//	boost::shared_ptr<CalpontSystemCatalog> sysCat = execplan::CalpontSystemCatalog::makeCalpontSystemCatalog(getpid());
 
 //first column is made into the first scan filter step including filters
 	OID_t scanOid = (*filterOp)->fOid;
@@ -1399,7 +1399,7 @@ void doBatchOp_step(OidOperation &OidOp)
 	ThdFcn f1;
 	JobStepAssociation injs, outjs;
 
-	CalpontSystemCatalog* sysCat = execplan::CalpontSystemCatalog::makeCalpontSystemCatalog(getpid());
+	boost::shared_ptr<CalpontSystemCatalog> sysCat = execplan::CalpontSystemCatalog::makeCalpontSystemCatalog(getpid());
 
 	pColStep step(injs, outjs, dec, sysCat, OidOp.fOid, OidOp.fOid,
 		      OidOp.fSessionId, 0, OidOp.fSessionId, OidOp.fSessionId, OidOp.fSessionId, rm);

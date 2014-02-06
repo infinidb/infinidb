@@ -66,12 +66,13 @@ namespace execplan
 namespace cal_impl_if
 {
 class SubQuery;
+class View;
 
 struct JoinInfo
 {
 	execplan::CalpontSystemCatalog::TableAliasName tn;
-	uint joinTimes;
-	std::vector<uint> IDs;	
+	uint32_t joinTimes;
+	std::vector<uint32_t> IDs;
 };
 
 enum ClauseType
@@ -113,7 +114,7 @@ struct gp_walk_info
 	std::vector<execplan::FunctionColumn*> no_parm_func_list;
 	std::vector<execplan::ReturnedColumn*> windowFuncList;
 	TableMap tableMap;
-	execplan::CalpontSystemCatalog *csc;
+	boost::shared_ptr<execplan::CalpontSystemCatalog> csc;
 	int8_t internalDecimalScale;
 	THD* thd;
 	uint64_t subSelectType; // the type of sub select filter that owns the gwi
@@ -121,32 +122,30 @@ struct gp_walk_info
 	execplan::CalpontSelectExecutionPlan::SelectList derivedTbList;
 	execplan::CalpontSelectExecutionPlan::TableList tbList;
 	std::vector<execplan::CalpontSystemCatalog::TableAliasName> correlatedTbNameVec;
-	std::vector<execplan::CalpontSystemCatalog::TableAliasName> viewList;
 	ClauseType clauseType;
 	execplan::CalpontSystemCatalog::TableAliasName viewName;
 	bool aggOnSelect;
 	bool hasWindowFunc;
 	bool hasSubSelect;
 	SubQuery* lastSub;
+	std::vector<View*> viewList;
 
-
-	gp_walk_info() : sessionid(0), 
-		               fatalParseError(false), 
-		               condPush(false), 
-		               dropCond(false), 
-		               expressionId(0), 
-		               csc(0), 
-		               internalDecimalScale(4),
-		               thd(0),
-		               subSelectType(uint64_t(-1)),
-		               subQuery(0),
-		               clauseType(INIT),
-		               aggOnSelect(false),
-		               hasWindowFunc(false),
-		               hasSubSelect(false),
-		               lastSub(0)
+	gp_walk_info() : sessionid(0),
+	               fatalParseError(false),
+	               condPush(false),
+	               dropCond(false),
+	               expressionId(0),
+	               internalDecimalScale(4),
+	               thd(0),
+	               subSelectType(uint64_t(-1)),
+	               subQuery(0),
+	               clauseType(INIT),
+	               aggOnSelect(false),
+	               hasWindowFunc(false),
+	               hasSubSelect(false),
+	               lastSub(0)
 	{}
-	
+
 	~gp_walk_info() {}
 };
 
@@ -154,10 +153,10 @@ struct cal_table_info
 {
 	enum RowSources { FROM_ENGINE, FROM_FILE };
 
-	cal_table_info() : tpl_ctx(0), 
-		                 //tpl_scan_ctx(0), 
-		                 c(0), 
-		                 msTablePtr(0), 
+	cal_table_info() : tpl_ctx(0),
+		                 //tpl_scan_ctx(0),
+		                 c(0),
+		                 msTablePtr(0),
 		                 conn_hndl(0),
 		                 condInfo(0),
 		                 moreRows(false)
@@ -165,9 +164,9 @@ struct cal_table_info
 	~cal_table_info() {}
 	sm::cpsm_tplh_t* tpl_ctx;
 	sm::sp_cpsm_tplsch_t tpl_scan_ctx;
-	unsigned c;	// for debug purpose
+	unsigned c; // for debug purpose
 	st_table* msTablePtr; // no ownership
-	sm::cpsm_conhdl_t* conn_hndl; 
+	sm::cpsm_conhdl_t* conn_hndl;
 	gp_walk_info* condInfo;
 	execplan::SCSEP csep;
 	bool moreRows; //are there more rows to consume (b/c of limit)
@@ -180,7 +179,7 @@ typedef std::map<uint32_t, ColValuesList> TableValuesMap;
 struct cal_connection_info
 {
 	enum AlterTableState { NOT_ALTER, ALTER_SECOND_RENAME, ALTER_FIRST_RENAME };
-	cal_connection_info() : cal_conn_hndl(0), queryState(0), currentTable(0), traceFlags(0), alterTableState(NOT_ALTER), isAlter(false), 
+	cal_connection_info() : cal_conn_hndl(0), queryState(0), currentTable(0), traceFlags(0), alterTableState(NOT_ALTER), isAlter(false),
 	bulkInsertRows(0), singleInsert(true), isLoaddataInfile( false ), dmlProc(0), rowsHaveInserted(0), rc(0), tableOid(0)
 	{ }
 

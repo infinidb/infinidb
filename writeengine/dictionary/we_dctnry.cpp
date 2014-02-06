@@ -368,8 +368,12 @@ int Dctnry::closeDctnry(bool realClose)
     }
 
     // dmc-error handling (should detect/report error in closing file)
-    if (realClose)
+    if (realClose) {
+		//@Bug 5689. Need pass oid to write to the right file.
+		oids[m_dctnryOID] = m_dctnryOID;
 		closeDctnryFile(true, oids);
+		
+	}
 
     m_hwm = (HWM)m_lastFbo;
     idbassert(m_dctnryOID>=0);
@@ -836,16 +840,22 @@ int Dctnry::insertDctnry(const char* buf,
                     m_logger->logMsg( oss.str(), MSGLVL_INFO2 );
                 }
                 m_curLbid = startLbid;
-#ifdef PROFILE
-                Stats::startParseEvent(WE_STATS_PARSE_DCT_SEEK_EXTENT_BLK);
-#endif
+
                 // now seek back to the curFbo, after adding an extent
-                long long byteOffset = m_curFbo;
-                byteOffset *= BYTE_PER_BLOCK;
-                RETURN_ON_ERROR( setFileOffset(m_dFile, byteOffset) );
+                // @bug5769 For uncompressed only;
+                // ChunkManager manages the file offset for the compression case
+                if (m_compressionType == 0)
+                {
 #ifdef PROFILE
-                Stats::stopParseEvent(WE_STATS_PARSE_DCT_SEEK_EXTENT_BLK);
+                    Stats::startParseEvent(WE_STATS_PARSE_DCT_SEEK_EXTENT_BLK);
 #endif
+                    long long byteOffset = m_curFbo;
+                    byteOffset *= BYTE_PER_BLOCK;
+                    RETURN_ON_ERROR( setFileOffset(m_dFile, byteOffset) );
+#ifdef PROFILE
+                    Stats::stopParseEvent(WE_STATS_PARSE_DCT_SEEK_EXTENT_BLK);
+#endif
+                }
             }
             else
             {

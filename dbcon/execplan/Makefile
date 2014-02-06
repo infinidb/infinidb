@@ -107,7 +107,8 @@ OBJS=$(SRCS:.cpp=.o)
 LLIBS=-L$(CALPONT_LIBRARY_PATH) -lmessageqcpp -ljoblist -lbrm -loamcpp
 
 $(LIBRARY): $(OBJS)
-	$(LINK.cpp) -shared -o $(LIBRARY) $(OBJS) -L$(EXPORT_ROOT)/lib -loamcpp -lsnmpmanager -lnetsnmpmibs -lnetsnmpagent -lnetsnmp -lnetsnmpmibs -lnetsnmphelpers
+	$(LINK.cpp) -shared -o $(LIBRARY) $(OBJS) -L$(EXPORT_ROOT)/lib -loamcpp 
+#	$(LINK.cpp) -shared -o $(LIBRARY) $(OBJS) -L$(EXPORT_ROOT)/lib -loamcpp -lsnmpmanager -lnetsnmpmibs -lnetsnmpagent -lnetsnmp -lnetsnmpmibs -lnetsnmphelpers
 	rm -f $(PROGRAM)
 	ln -s $(LIBRARY) $(PROGRAM)
 

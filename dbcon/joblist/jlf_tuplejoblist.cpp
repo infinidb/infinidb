@@ -2115,10 +2115,7 @@ void joinTablesInOrder(uint largest, JobStepVector& joinSteps, TableInfoMap& tab
 
 	for (uint64_t js = 0; js < joins.size(); js++)
 	{
-		map<uint64_t, size_t> joinIdIndexMap;
 		set<uint> smallSideTid;
-		size_t index = 0;
-		joinIdIndexMap[joins[js].fJoinId] = index++;
 
 		if (joins[js].fJoinId != 0)
 			isSemijoin = false;
@@ -2156,7 +2153,7 @@ void joinTablesInOrder(uint largest, JobStepVector& joinSteps, TableInfoMap& tab
 		smallSideTid.insert(small);
 
 		// merge in the next step if the large side is the same
-		for (uint64_t ns  = js + 1; ns < joins.size(); ns++)
+		for (uint64_t ns  = js + 1; ns < joins.size(); js++, ns++)
 		{
 			uint tid1 = joins[ns].fTid1;
 			uint tid2 = joins[ns].fTid2;
@@ -2196,9 +2193,6 @@ void joinTablesInOrder(uint largest, JobStepVector& joinSteps, TableInfoMap& tab
 			lastJoinId = joins[ns].fJoinId;
 			if (find(joinedTable.begin(), joinedTable.end(), small) == joinedTable.end())
 				joinedTable.push_back(small);
-
-			joinIdIndexMap[joins[ns].fJoinId] = index++;
-			js++;
 		}
 
 		joinedTable.push_back(large);
@@ -2225,6 +2219,53 @@ void joinTablesInOrder(uint largest, JobStepVector& joinSteps, TableInfoMap& tab
 		vector<bool> typeless;
 		vector<vector<uint> > smallKeyIndices;
 		vector<vector<uint> > largeKeyIndices;
+
+		// bug5764, make sure semi joins acting as filter is after outer join.
+		{
+			// the inner table filters have to be performed after outer join
+			vector<uint64_t> semijoins;
+			vector<uint64_t> smallouts;
+			for (size_t i = 0; i < smallSides.size(); i++)
+			{
+				// find the the small-outer and semi-join joins
+				JoinType jt = smallSides[i]->fJoinData.fTypes[0];
+				if (jt & SMALLOUTER)
+					smallouts.push_back(i);
+				else if (jt & (SEMI | ANTI | SCALAR | CORRELATED))
+					semijoins.push_back(i);
+			}
+
+			// check the join order, re-arrange if necessary
+			if (smallouts.size() > 0 && semijoins.size() > 0)
+			{
+				uint64_t lastSmallOut = smallouts.back();
+				uint64_t lastSemijoin = semijoins.back();
+				if (lastSmallOut > lastSemijoin)
+				{
+					vector<SP_JoinInfo> temp1;
+					vector<SP_JoinInfo> temp2;
+					size_t j = 0;
+					for (size_t i = 0; i < smallSides.size(); i++)
+					{
+						if (j < semijoins.size() && i == semijoins[j])
+						{
+							temp1.push_back(smallSides[i]);
+							j++;
+						}
+						else
+						{
+							temp2.push_back(smallSides[i]);
+						}
+
+						if (i == lastSmallOut)
+							temp2.insert(temp2.end(), temp1.begin(), temp1.end());
+					}
+
+					smallSides = temp2;
+				}
+			}
+		}
+
 		for (vector<SP_JoinInfo>::iterator i = smallSides.begin(); i != smallSides.end(); i++)
 		{
 			JoinInfo* info = i->get();
@@ -2359,6 +2400,14 @@ void joinTablesInOrder(uint largest, JobStepVector& joinSteps, TableInfoMap& tab
 			for (vector<string>::iterator t = traces.begin(); t != traces.end(); ++t)
 				cout << *t;
 			cout << "RowGroup join result: " << endl << rg.toString() << endl << endl;
+		}
+
+		// on clause filter association
+		map<uint64_t, size_t> joinIdIndexMap;
+		for (size_t i = 0; i < smallSides.size(); i++)
+		{
+			if (smallSides[i]->fJoinData.fJoinId > 0)
+				joinIdIndexMap[smallSides[i]->fJoinData.fJoinId] = i;
 		}
 
 		// check if any cross-table expressions can be evaluated after the join

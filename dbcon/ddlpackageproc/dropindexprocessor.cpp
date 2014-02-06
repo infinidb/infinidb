@@ -34,7 +34,7 @@ DropIndexProcessor::DDLResult DropIndexProcessor::processPackage(ddlpackage::Dro
 {
     SUMMARY_INFO("DropIndexProcessor::processPackage");
 
-    CalpontSystemCatalog *sysCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog( dropIndexStmt.fSessionID );
+    boost::shared_ptr<CalpontSystemCatalog> sysCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog( dropIndexStmt.fSessionID );
     CalpontSystemCatalog::IndexName indexName;
     CalpontSystemCatalog::IndexOID indexOID;
 

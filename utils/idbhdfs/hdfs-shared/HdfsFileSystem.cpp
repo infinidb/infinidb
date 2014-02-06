@@ -129,7 +129,7 @@ int HdfsFileSystem::listDirectory(const char* pathname, std::list<std::string>& 
 	{
 		// hdfs returns a fully specified path name but we want to
 		// only return paths relative to the directory passed in.
-	    boost::filesystem::path filepath( fileinfo[0].mName );
+	    boost::filesystem::path filepath( fileinfo[i].mName );
 		contents.push_back( filepath.filename().c_str() );
 	}
 	if( fileinfo )
@@ -151,6 +151,20 @@ bool HdfsFileSystem::isDir(const char* pathname) const
 int HdfsFileSystem::copyFile(const char* srcPath, const char* destPath) const
 {
 	int ret = hdfsCopy(m_fs, srcPath, m_fs, destPath);
+
+	int n = 0; // retry count
+	while (ret != 0 && n++ < 25)
+	{
+		if (n < 10)
+			usleep(10000);
+		else
+			usleep(200000);
+
+		if( IDBLogger::isEnabled() )
+			IDBLogger::logFSop2( HDFS, "copyFile-retry", srcPath, destPath, this, ret);
+
+		ret = hdfsCopy(m_fs, srcPath, m_fs, destPath);
+	}
 
 	if( IDBLogger::isEnabled() )
 		IDBLogger::logFSop2( HDFS, "copyFile", srcPath, destPath, this, ret);

@@ -150,7 +150,7 @@ public:
 	
     /** @brief ctor
      */ 
-    DMLPackageProcessor(BRM::DBRM* aDbrm) : fEC(0), DMLLoggingId(21), fRollbackPending(false), fDebugLevel(NONE)
+    DMLPackageProcessor(BRM::DBRM* aDbrm, uint32_t sid) : fEC(0), DMLLoggingId(21), fRollbackPending(false), fDebugLevel(NONE)
 	{
 		try {
 		fWEClient = new WriteEngine::WEClients(WriteEngine::WEClients::DMLPROC);
@@ -165,7 +165,9 @@ public:
 		oam::OamCache * oamCache = oam::OamCache::makeOamCache();
 		fDbRootPMMap = oamCache->getDBRootToPMMap();
 		fDbrm = aDbrm;
-		fExeMgr =  new execplan::ClientRotator(1, "ExeMgr"); 
+		fSessionID = sid;
+		fExeMgr =  new execplan::ClientRotator(fSessionID, "ExeMgr");
+		//std::cout << " fSessionID is " << fSessionID << std::endl;
 		fExeMgr->connect(0.005);
 	}
 

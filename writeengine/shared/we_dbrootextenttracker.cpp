@@ -44,48 +44,22 @@ namespace WriteEngine
 //------------------------------------------------------------------------------
 // DBRootExtentInfo constructor
 //------------------------------------------------------------------------------
-DBRootExtentInfo::DBRootExtentInfo(int colWidth,
+DBRootExtentInfo::DBRootExtentInfo(
     uint16_t    dbRoot,
     uint32_t    partition,
     uint16_t    segment,
     BRM::LBID_t startLbid,
     HWM         localHwm,
     uint64_t    dbrootTotalBlocks,
-    int16_t     status) :
+    DBRootExtentInfoState state) :
     fPartition(partition),
     fDbRoot(dbRoot),
     fSegment(segment),
     fStartLbid(startLbid),
     fLocalHwm(localHwm),
-    fDBRootTotalBlocks(dbrootTotalBlocks)
+    fDBRootTotalBlocks(dbrootTotalBlocks),
+    fState(state)
 {
-    if (status == BRM::EXTENTOUTOFSERVICE)
-    {
-        fState = DBROOT_EXTENT_OUT_OF_SERVICE;
-    }
-    else
-    {
-        if (fDBRootTotalBlocks == 0)
-        {
-            fState = DBROOT_EXTENT_EMPTY_DBROOT;
-        }
-        else
-        {
-            fState = DBROOT_EXTENT_PARTIAL_EXTENT;
-
-            // See if local hwm is on an extent bndry,in which case the extent
-            // is full and we won't be adding rows to the current HWM extent;
-            // we will instead need to allocate a new extent in order to begin
-            // adding any rows.
-            long long nRows= ((long long)(localHwm+1) *
-                              (long long)BYTE_PER_BLOCK)/ (long long)colWidth;
-            long long nRem = nRows % BRMWrapper::getInstance()->getExtentRows();
-            if (nRem == 0)
-            {
-                fState = DBROOT_EXTENT_EXTENT_BOUNDARY;
-            }
-        }
-    }
 }
 
 //------------------------------------------------------------------------------
@@ -106,9 +80,10 @@ bool DBRootExtentInfo::operator<(
 // before processing threads are spawned.
 //------------------------------------------------------------------------------
 DBRootExtentTracker::DBRootExtentTracker ( OID oid,
-    int  colWidth,
-    Log* logger,
-    const BRM::EmDbRootHWMInfo_v& emDbRootHWMInfo ) :
+    const std::vector<int>& colWidths,
+    const std::vector<BRM::EmDbRootHWMInfo_v>& dbRootHWMInfoColVec,
+    unsigned int columnIdx,
+    Log* logger ) :
     fOID(oid),
     fLog(logger),
     fCurrentDBRootIdx(-1),
@@ -116,20 +91,57 @@ DBRootExtentTracker::DBRootExtentTracker ( OID oid,
     fEmptyPM(true),
     fDisabledHWM(false)
 {
+    const BRM::EmDbRootHWMInfo_v& emDbRootHWMInfo =
+        dbRootHWMInfoColVec[columnIdx];
+    int colWidth = colWidths[columnIdx];
+
     fBlksPerExtent = (long long)BRMWrapper::getInstance()->getExtentRows() *
         (long long)colWidth / (long long)BYTE_PER_BLOCK;
 
+    std::vector<bool> resetState;
     for (unsigned int i=0; i<emDbRootHWMInfo.size(); i++)
     {
+        resetState.push_back(false);
+        DBRootExtentInfoState state = determineState(
+            colWidths[columnIdx],
+            emDbRootHWMInfo[i].localHWM,
+            emDbRootHWMInfo[i].totalBlocks,
+            emDbRootHWMInfo[i].status);
+
+        // For a full extent...
+        // check to see if any of the column HWMs are partially full, in which
+        // case we consider all the columns for that DBRoot to be partially
+        // full.  (This can happen if a table has columns with varying widths,
+        // as the HWM may be at the last extent block for a shorter column, and
+        // still have free blocks for wider columns.)
+        if (state == DBROOT_EXTENT_EXTENT_BOUNDARY)
+        {
+            for (unsigned int kCol=0; kCol<dbRootHWMInfoColVec.size(); kCol++)
+            {
+                const BRM::EmDbRootHWMInfo_v& emDbRootHWMInfo2 =
+                    dbRootHWMInfoColVec[kCol];
+                DBRootExtentInfoState state2 = determineState(
+                    colWidths[kCol],
+                    emDbRootHWMInfo2[i].localHWM,
+                    emDbRootHWMInfo2[i].totalBlocks,
+                    emDbRootHWMInfo2[i].status);
+                if (state2 == DBROOT_EXTENT_PARTIAL_EXTENT)
+                {
+                    state = DBROOT_EXTENT_PARTIAL_EXTENT;
+                    resetState[ resetState.size()-1 ] = true;
+                    break;
+                }
+            }
+        }
+
         DBRootExtentInfo dbRootExtent(
-            colWidth,
             emDbRootHWMInfo[i].dbRoot,
             emDbRootHWMInfo[i].partitionNum,
             emDbRootHWMInfo[i].segmentNum,
             emDbRootHWMInfo[i].startLbid,
             emDbRootHWMInfo[i].localHWM,
             emDbRootHWMInfo[i].totalBlocks,
-            emDbRootHWMInfo[i].status);
+            state);
 
         fDBRootExtentList.push_back( dbRootExtent );
     }
@@ -154,10 +166,54 @@ DBRootExtentTracker::DBRootExtentTracker ( OID oid,
                     "/" << fDBRootExtentList[k].fStartLbid         <<
                     "/" << fDBRootExtentList[k].fDBRootTotalBlocks <<
                     "/" << stateStrings[ fDBRootExtentList[k].fState ];
+                if (resetState[k])
+                    oss << ".";
             }
             fLog->logMsg( oss.str(), MSGLVL_INFO2 );
         }
     }
+}
+
+//------------------------------------------------------------------------------
+// Determines the state of the HWM extent (for a DBRoot); considering the
+// current BRM status, HWM, and total block count for the DBRoot.
+//------------------------------------------------------------------------------
+DBRootExtentInfoState DBRootExtentTracker::determineState(int colWidth,
+    HWM      localHwm,
+    uint64_t dbRootTotalBlocks,
+    int16_t  status)
+{
+    DBRootExtentInfoState extentState;
+
+    if (status == BRM::EXTENTOUTOFSERVICE)
+    {
+        extentState = DBROOT_EXTENT_OUT_OF_SERVICE;
+    }
+    else
+    {
+        if (dbRootTotalBlocks == 0)
+        {
+            extentState = DBROOT_EXTENT_EMPTY_DBROOT;
+        }
+        else
+        {
+            extentState = DBROOT_EXTENT_PARTIAL_EXTENT;
+
+            // See if local hwm is on an extent bndry,in which case the extent
+            // is full and we won't be adding rows to the current HWM extent;
+            // we will instead need to allocate a new extent in order to begin
+            // adding any rows.
+            long long nRows= ((long long)(localHwm+1) *
+                              (long long)BYTE_PER_BLOCK)/ (long long)colWidth;
+            long long nRem = nRows % BRMWrapper::getInstance()->getExtentRows();
+            if (nRem == 0)
+            {
+                extentState = DBROOT_EXTENT_EXTENT_BOUNDARY;
+            }
+        }
+    }
+
+    return extentState;
 }
 
 //------------------------------------------------------------------------------
@@ -368,12 +424,8 @@ void DBRootExtentTracker::initEmptyDBRoots( )
 //------------------------------------------------------------------------------
 void DBRootExtentTracker::assignFirstSegFile(
     const DBRootExtentTracker& refTracker,
-    DBRootExtentInfo& dbRootExtent,
-    bool& bNoStartExtentOnThisPM,
-    bool& bEmptyPM )
+    DBRootExtentInfo& dbRootExtent)
 {
-    bNoStartExtentOnThisPM = false;
-
     // Start with the same DBRoot index as the reference tracker; assumes that
     // DBRoots for each column are listed in same order in fDBRootExtentList.
     // That should be a safe assumption since DBRootExtentTracker constructor
@@ -390,9 +442,6 @@ void DBRootExtentTracker::assignFirstSegFile(
         fDBRootExtentList[startExtentIdx].fPartition = 0;
     }
 
-    if ((fEmptyOrDisabledPM) || (fDisabledHWM))
-        bNoStartExtentOnThisPM = true;
-    bEmptyPM          = fEmptyPM;
     fCurrentDBRootIdx = startExtentIdx;
 
     // Finish Initializing DBRootExtentList for empty DBRoots w/o any extents

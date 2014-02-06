@@ -26,6 +26,7 @@
 #include <sys/time.h>
 using namespace std;
 
+#include "jl_logger.h"
 #include "resourcedistributor.h"
 
 namespace joblist {

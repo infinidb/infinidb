@@ -768,6 +768,9 @@ void WindowFunctionStep::execute()
 			more = fInputDL->next(fInputIterator, &rgData);
 		}
 	} // try
+	catch(const IDBExcept &idb) {
+		handleException(idb.what(), idb.errorCode());
+	}
 	catch(const std::exception& ex)
 	{
 		handleException(ex.what(), ERR_READ_INPUT_DATALIST);
@@ -986,12 +989,7 @@ void WindowFunctionStep::doPostProcessForDml()
 void WindowFunctionStep::handleException(string errStr, int errCode)
 {
 	cerr << "Exception: " << errStr << endl;
-	catchHandler(errStr, fSessionId);
-	if (status() == 0)
-	{
-		status(errCode);
-		errorMessage(errStr);
-	}
+	catchHandler(errStr, errCode, fErrorInfo, fSessionId);
 }
 
 

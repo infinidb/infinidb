@@ -36,6 +36,7 @@
 #include "calpontsystemcatalog.h"
 #include "calpontselectexecutionplan.h"
 #include "elementtype.h"
+#include "errorinfo.h"
 #include "jl_logger.h"
 #include "timestamp.h"
 #include "rowgroup.h"
@@ -82,21 +83,6 @@ private:
     DataListVec fInDataList;
     DataListVec fOutDataList;
 };
-
-
-/** @brief struct ErrorInfo
- *
- * struct ErrorInfo stores the error code and message
- */
-struct ErrorInfo {
-    ErrorInfo() : errCode(0) { }
-    uint32_t errCode;
-    std::string errMsg;
-    // for backward compat
-    ErrorInfo(uint16_t v) : errCode(v) { }
-    ErrorInfo & operator=(uint16_t v) { errCode = v; errMsg.clear(); return *this; }
-};
-typedef boost::shared_ptr<ErrorInfo> SErrorInfo;
 
 
 // forward reference
@@ -223,15 +209,15 @@ public:
     uint priority() { return fPriority; }
     void priority(uint p) { fPriority = p; }
 
-    uint32_t status() const { return fErrInfo->errCode; }
-    void  status(uint32_t s)  { fErrInfo->errCode = s; }
-    std::string errorMessage() { return fErrInfo->errMsg; }
-    void errorMessage(const std::string &s) { fErrInfo->errMsg = s; }
-    const SErrorInfo& statusPtr() const { return fErrInfo; }
-    SErrorInfo& statusPtr() { return fErrInfo; }
-    void statusPtr(SErrorInfo& sp) { fErrInfo = sp; }
+    uint32_t status() const { return fErrorInfo->errCode; }
+    void  status(uint32_t s)  { fErrorInfo->errCode = s; }
+    std::string errorMessage() { return fErrorInfo->errMsg; }
+    void errorMessage(const std::string &s) { fErrorInfo->errMsg = s; }
+    const SErrorInfo& errorInfo() const { return fErrorInfo; }
+    SErrorInfo& errorInfo() { return fErrorInfo; }
+    void errorInfo(SErrorInfo& sp) { fErrorInfo = sp; }
 
-	bool cancelled() { return (fErrInfo->errCode > 0 || fDie); }
+	bool cancelled() { return (fErrorInfo->errCode > 0 || fDie); }
 	
 	virtual bool stringTableFriendly() { return false; }
 
@@ -265,7 +251,7 @@ protected:
 
     uint fPriority;
 
-    SErrorInfo fErrInfo;
+    SErrorInfo fErrorInfo;
     SPJL fLogger;
 
 private:

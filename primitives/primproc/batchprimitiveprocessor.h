@@ -19,7 +19,7 @@
 // $Id: batchprimitiveprocessor.h 2132 2013-07-17 20:06:10Z pleblanc $
 // C++ Interface: batchprimitiveprocessor
 //
-// Description: 
+// Description:
 //
 //
 // Author: Patrick LeBlanc <pleblanc@calpont.com>, (C) 2008
@@ -65,7 +65,7 @@ namespace primitiveprocessor
 
 typedef boost::shared_ptr<BatchPrimitiveProcessor> SBPP;
 
-class scalar_exception : public std::exception { 
+class scalar_exception : public std::exception {
 	const char * what() const throw() { return "Not a scalar subquery."; }
 };
 
@@ -90,7 +90,7 @@ class BatchPrimitiveProcessor
 		void initBPP(messageqcpp::ByteStream &);
 		void resetBPP(messageqcpp::ByteStream &, const SP_UM_MUTEX& wLock, const SP_UM_IOSOCK& outputSock);
 		void addToJoiner(messageqcpp::ByteStream &);
-		void endOfJoiner();
+		int endOfJoiner();
 		int operator()();
 		void setLBIDForScan(uint64_t rid);
 
@@ -119,6 +119,10 @@ class BatchPrimitiveProcessor
 
 		void setError(const std::string& error, logging::ErrorCodeValues errorCode) {}
 
+		// these two functions are used by BPPV to create BPP instances
+		// on demand.  TRY not to use unlock() for anything else.
+		void unlock() { objLock.unlock(); }
+		bool hasJoin() { return doJoin; }
 	private:
 		BatchPrimitiveProcessor();
 		BatchPrimitiveProcessor(const BatchPrimitiveProcessor &);
@@ -221,7 +225,7 @@ class BatchPrimitiveProcessor
 
 		// query density threshold for prefetch & async loading
 		double prefetchThreshold;
-		
+
 		/* RowGroup support */
 		rowgroup::RowGroup outputRG;
 		boost::scoped_ptr<rowgroup::RGData> outRowGroupData;
@@ -233,7 +237,7 @@ class BatchPrimitiveProcessor
 		typedef std::tr1::unordered_multimap<uint64_t, uint32_t,
 				joiner::TupleJoiner::hasher, std::equal_to<uint64_t>,
 				utils::SimpleAllocator<std::pair<const uint64_t, uint32_t> > > TJoiner;
-	
+
 		typedef std::tr1::unordered_multimap<joiner::TypelessData,
 				uint32_t, joiner::TupleJoiner::hasher> TLJoiner;
 
@@ -314,7 +318,7 @@ class BatchPrimitiveProcessor
 		bool hasDictStep;
 
 		primitives::PrimitiveProcessor pp;
-		
+
 		/* VSS cache members */
 		VSSCache vssCache;
 		void buildVSSCache(uint loopCount);
@@ -322,12 +326,12 @@ class BatchPrimitiveProcessor
 		/* To support limited DEC queues on the PM */		
 		boost::shared_ptr<BPPSendThread> sendThread;
 		bool newConnection;   // to support the load balancing code in sendThread
-		
+
 		/* To support reentrancy */
 		uint currentBlockOffset;
 		boost::scoped_array<uint64_t> relLBID;
 		boost::scoped_array<bool> asyncLoaded;
-		
+
 		/* To support a smaller memory footprint when idle */
 		static const uint64_t maxIdleBufferSize = 16*1024*1024;  // arbitrary
 		void allocLargeBuffers();
@@ -338,6 +342,8 @@ class BatchPrimitiveProcessor
 
 		/* Shared nothing vars */
 		uint dbRoot;
+
+		bool endOfJoinerRan;
 
 		friend class Command;
 		friend class ColumnCommand;

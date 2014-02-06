@@ -166,7 +166,6 @@ struct JobInfo
 		sessionId(0),
 		txnId(0),
 		statementId(0),
-		csc(0),
 		maxBuckets(rm.getHjMaxBuckets()),
 		maxElems(rm.getHjMaxElems()),
 		flushInterval(rm.getJLFlushInterval()),
@@ -207,7 +206,7 @@ struct JobInfo
 	BRM::QueryContext  verId;
 	uint32_t  statementId;
 	std::string  queryType;
-	execplan::CalpontSystemCatalog* csc;
+	boost::shared_ptr<execplan::CalpontSystemCatalog> csc;
 	DeliveredTablesSet tables;
 	int       maxBuckets;
 	uint64_t  maxElems;
@@ -226,7 +225,7 @@ struct JobInfo
 	uint32_t  traceFlags;
 	uint64_t  tupleDLMaxSize;
 	uint32_t  tupleMaxBuckets;
-	SErrorInfo status;
+	SErrorInfo errorInfo;
 	execplan::CalpontSystemCatalog::OID* projectingTableOID; // DeliveryWSDLs get a reference to this
 	bool      isExeMgr;
 	bool      trace;
@@ -384,7 +383,7 @@ bool isCharCol(const execplan::CalpontSystemCatalog::ColType& colType);
  *
  */
 execplan::CalpontSystemCatalog::OID tableOid(const execplan::SimpleColumn* sc,
-	execplan::CalpontSystemCatalog* cat);
+	boost::shared_ptr<execplan::CalpontSystemCatalog> cat);
 
 /** @brief Returns the unique ID to be used in tupleInfo
  *

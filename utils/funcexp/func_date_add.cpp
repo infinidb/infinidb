@@ -47,6 +47,7 @@ namespace helpers
 uint64_t dateAdd( uint64_t time, const string& expr, IntervalColumn::interval_type unit, bool dateType, OpType funcType )
 {
 	int array[10];
+	int64_t array2[10];
 
 	int month_length[13] = { 0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
 	
@@ -54,16 +55,18 @@ uint64_t dateAdd( uint64_t time, const string& expr, IntervalColumn::interval_ty
 	         month = 0, 
 	         day = 0, 
 	         hour = 0, 
-	         min = 0, 
-	         sec = 0, 
-	         msec = 0,
 			monthSave = 0;
 	
+	int64_t min = 0, 
+	         sec = 0, 
+	         msec = 0;
+
 	int32_t yearAdd = 0, 
 	         monthAdd = 0, 
 	         dayAdd = 0, 
-	         hourAdd = 0, 
-	         minAdd = 0, 
+	         hourAdd = 0;
+
+	int64_t minAdd = 0, 
 	         secAdd = 0, 
 	         msecAdd = 0;
 	
@@ -86,7 +89,19 @@ uint64_t dateAdd( uint64_t time, const string& expr, IntervalColumn::interval_ty
 
 	monthSave = month;
 
-	int index = getNumbers( expr, array, funcType);
+ 	int index = -1;
+	switch( unit )
+	{
+	case IntervalColumn::INTERVAL_MINUTE:
+	case IntervalColumn::INTERVAL_SECOND:
+	case IntervalColumn::INTERVAL_MICROSECOND:
+		index = getNumbers( expr, array2, funcType);
+		break;
+	default:
+		index = getNumbers( expr, array, funcType);
+		break;
+	};
+
 	if ( index <= 0 )
 		throw runtime_error("expression type is not supported");
 
@@ -123,17 +138,17 @@ uint64_t dateAdd( uint64_t time, const string& expr, IntervalColumn::interval_ty
 			}
 		case IntervalColumn::INTERVAL_MINUTE:
 			{
-				minAdd = array[0];
+				minAdd = array2[0];
 				break;
 			}
 		case IntervalColumn::INTERVAL_SECOND:
 			{
-				secAdd = array[0];
+				secAdd = array2[0];
 				break;
 			}
 		case IntervalColumn::INTERVAL_MICROSECOND:
 			{
-				msecAdd = array[0];
+				msecAdd = array2[0];
 				break;
 			}
 		case IntervalColumn::INTERVAL_YEAR_MONTH:
@@ -414,25 +429,25 @@ uint64_t dateAdd( uint64_t time, const string& expr, IntervalColumn::interval_ty
 	msec += msecAdd;
 
 	if ( msec > 999999 ) {
-		int secs = msec / 1000000;
+		int64_t secs = msec / 1000000;
 		sec += secs;
 		msec = msec - ( secs * 1000000 );
 	}
 
 	if ( msec < 0 ) {
-		int secs = 1 + (-msec / 1000000);
+		int64_t secs = 1 + (-msec / 1000000);
 		sec -= secs;
 		msec = msec + ( secs * 1000000 );
 	}
 
 	if ( sec > 59 ) {
-		int mins = sec / 60;
+		int64_t mins = sec / 60;
 		min += mins;
 		sec = sec - ( mins * 60 );
 	}
 
 	if ( sec < 0 ) {
-		int mins = 0;
+		int64_t mins = 0;
 		if ( ( sec + (-sec / 60) * 60 ) == 0 &&
 			sec != 0)
 			mins = (-sec / 60);

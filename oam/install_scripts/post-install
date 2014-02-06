@@ -35,7 +35,7 @@ done
 
 if [ $installdir != "/usr/local/Calpont" ]; then
 	export INFINIDB_INSTALL_DIR=$installdir
-	export LD_LIBRARY_PATH=$INFINIDB_INSTALL_DIR/lib
+	export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$INFINIDB_INSTALL_DIR/lib
 fi
 
 #check 64-bit OS compatiable
@@ -222,7 +222,7 @@ if [ $installdir != "/usr/local/Calpont" -a $quiet -eq 0 ]; then
 The next steps are:
 
 export INFINIDB_INSTALL_DIR=$installdir
-export LD_LIBRARY_PATH=$INFINIDB_INSTALL_DIR/lib:$INFINIDB_INSTALL_DIR/mysql/lib/mysql
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$INFINIDB_INSTALL_DIR/lib:$INFINIDB_INSTALL_DIR/mysql/lib/mysql
 $INFINIDB_INSTALL_DIR/bin/postConfigure -i $INFINIDB_INSTALL_DIR
 
 EOD
@@ -242,7 +242,7 @@ if [ $hadoop = "/usr/bin/hadoop" ]; then
 	fi
 
 	export JAVA_HOME=/usr/java/jdk1.6.0_31
-	export LD_LIBRARY_PATH=/usr/java/jdk1.6.0_31/jre/lib/amd64/server
+	export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/java/jdk1.6.0_31/jre/lib/amd64/server
 
 	. /root/setenv-hdfs-20
 	$installdir/bin/hdfsCheck $installdir/lib/hdfs-20.so >/dev/null 2>&1
@@ -251,7 +251,7 @@ if [ $hadoop = "/usr/bin/hadoop" ]; then
 The next steps are:
 
 export JAVA_HOME=/usr/java/jdk1.6.0_31
-export LD_LIBRARY_PATH=/usr/java/jdk1.6.0_31/jre/lib/amd64/server
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/java/jdk1.6.0_31/jre/lib/amd64/server
 . /root/setenv-hdfs-12
 $INFINIDB_INSTALL_DIR/bin/postConfigure
 
@@ -261,7 +261,7 @@ EOD
 The next steps are:
 
 export JAVA_HOME=/usr/java/jdk1.6.0_31
-export LD_LIBRARY_PATH=/usr/java/jdk1.6.0_31/jre/lib/amd64/server
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/java/jdk1.6.0_31/jre/lib/amd64/server
 . /root/setenv-hdfs-20
 $INFINIDB_INSTALL_DIR/bin/postConfigure
 

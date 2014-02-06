@@ -22,12 +22,20 @@
 #include <string>
 using namespace std;
 
+#include <boost/thread/mutex.hpp>
+
 #include "messageobj.h"
 #include "messageids.h"
 #include "loggingid.h"
 using namespace logging;
 
 #include "jl_logger.h"
+
+namespace
+{
+boost::mutex logMutex;
+};
+
 
 namespace joblist
 {
@@ -50,8 +58,15 @@ Logger::Logger() : fLogId(5),
 	fImpl->msgMap(msgMap);
 }
 
-void catchHandler(const string& ex, unsigned sid, logging::LOG_TYPE level)
+void catchHandler(const string& ex, int c, SErrorInfo& ei, unsigned sid, logging::LOG_TYPE level)
 {
+	boost::mutex::scoped_lock lk(logMutex);
+	if (ei->errCode == 0)
+	{
+		ei->errMsg = ex;
+		ei->errCode = c;
+	}
+
 	Logger log;
 	log.setLoggingSession(sid);
 	log.logMessage(level, ex);

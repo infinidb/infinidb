@@ -43,7 +43,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_52_0;C:\InfiniDB\src\utils\winport"
+				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_52_0;C:\InfiniDB\genii\utils\winport"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
@@ -55,7 +55,7 @@
 			/>
 			<Tool
 				Name="VCResourceCompilerTool"
-				AdditionalIncludeDirectories="C:\InfiniDB\src\utils\winport"
+				AdditionalIncludeDirectories="C:\InfiniDB\genii\utils\winport"
 			/>
 			<Tool
 				Name="VCPreLinkEventTool"
@@ -115,7 +115,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_52_0;C:\InfiniDB\src\utils\winport"
+				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_52_0;C:\InfiniDB\genii\utils\winport"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
@@ -187,7 +187,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_52_0;C:\InfiniDB\src\utils\winport"
+				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_52_0;C:\InfiniDB\genii\utils\winport"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
 				WarningLevel="3"
@@ -198,7 +198,7 @@
 			/>
 			<Tool
 				Name="VCResourceCompilerTool"
-				AdditionalIncludeDirectories="C:\InfiniDB\src\utils\winport"
+				AdditionalIncludeDirectories="C:\InfiniDB\genii\utils\winport"
 			/>
 			<Tool
 				Name="VCPreLinkEventTool"
@@ -262,7 +262,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_52_0;C:\InfiniDB\src\utils\winport"
+				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_52_0;C:\InfiniDB\genii\utils\winport"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
 				WarningLevel="3"
@@ -336,7 +336,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_52_0;C:\InfiniDB\src\utils\winport"
+				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_52_0;C:\InfiniDB\genii\utils\winport"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
 				WarningLevel="3"
@@ -347,7 +347,7 @@
 			/>
 			<Tool
 				Name="VCResourceCompilerTool"
-				AdditionalIncludeDirectories="C:\InfiniDB\src\utils\winport"
+				AdditionalIncludeDirectories="C:\InfiniDB\genii\utils\winport"
 			/>
 			<Tool
 				Name="VCPreLinkEventTool"
@@ -411,7 +411,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_52_0;C:\InfiniDB\src\utils\winport"
+				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_52_0;C:\InfiniDB\genii\utils\winport"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
 				WarningLevel="3"

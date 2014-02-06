@@ -283,7 +283,7 @@ private:
 	uint64_t getFBO(uint64_t lbid);
 
 	ResourceManager& fRm;
-	execplan::CalpontSystemCatalog *sysCat;
+	boost::shared_ptr<execplan::CalpontSystemCatalog> sysCat;
 	execplan::CalpontSystemCatalog::OID fOid;
 	execplan::CalpontSystemCatalog::OID fTableOid;
 	execplan::CalpontSystemCatalog::ColType fColType;
@@ -629,7 +629,7 @@ private:
     void startPrimitiveThread();
     void startAggregationThread();
 
-	execplan::CalpontSystemCatalog* sysCat;
+	boost::shared_ptr<execplan::CalpontSystemCatalog> sysCat;
 	execplan::CalpontSystemCatalog::OID fOid;
 	execplan::CalpontSystemCatalog::OID fTableOid;
 	uint32_t fBOP;
@@ -758,7 +758,7 @@ private:
 	void formatMiniStats();
 
     DistributedEngineComm* fDec;
-	execplan::CalpontSystemCatalog* sysCat;
+	boost::shared_ptr<execplan::CalpontSystemCatalog> sysCat;
 	execplan::CalpontSystemCatalog::OID fOid;
 	execplan::CalpontSystemCatalog::OID fTableOid;
 	uint32_t fFilterCount;
@@ -1039,7 +1039,7 @@ private:
     typedef boost::shared_ptr<boost::thread> SPTHD;
 	typedef boost::shared_array<SPTHD> SATHD;
     void startPrimitiveThread();
-    void startAggregationThreads();
+    void startAggregationThread();
     void initializeConfigParms();
 	uint64_t getFBO(uint64_t lbid);
 	void checkDupOutputColumns(const rowgroup::RowGroup &rg);
@@ -1057,6 +1057,7 @@ private:
     bool fCPEvaluated;  // @bug 2123
 	uint64_t fEstimatedRows; // @bug 2123
     /// number of threads on the receive side
+    uint fMaxNumThreads;
 	uint fNumThreads;
 	PrimitiveStepType ffirstStepType;
 	bool isFilterFeeder;
@@ -1161,7 +1162,7 @@ private:
 	void processFE2_oneRG(rowgroup::RowGroup &input, rowgroup::RowGroup &output,
 	  rowgroup::Row &inRow, rowgroup::Row &outRow,
 	  funcexp::FuncExpWrapper* localFE2);
-	
+
 	/* Runtime Casual Partitioning adjustments.  The CP code is needlessly complicated;
 	 * to avoid making it worse, decided to designate 'scanFlags' as the static
 	 * component and this new array as the runtime component.  The final CP decision
@@ -1303,7 +1304,7 @@ private:
 	uint64_t getLBID(uint64_t rid, bool& scan);
 	uint64_t getFBO(uint64_t lbid);
 
-	execplan::CalpontSystemCatalog *catalog;
+	boost::shared_ptr<execplan::CalpontSystemCatalog> catalog;
 	execplan::CalpontSystemCatalog::OID fOid;
 	execplan::CalpontSystemCatalog::OID fTableOid;
 	uint8_t colWidth;

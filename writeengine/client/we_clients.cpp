@@ -218,24 +218,6 @@ void WEClients::Setup()
     for (unsigned i = 0; i < pmCountConfig; i++) {
 		//Find the module id
 		moduleID = atoi((moduletypeconfig.ModuleNetworkList[i]).DeviceName.substr(MAX_MODULE_TYPE_SIZE,MAX_MODULE_ID_SIZE).c_str());
-		
-#if !defined(_MSC_VER) && !defined(SKIP_OAM_INIT)
-		//check if wes is ACTIVE
-		ProcessStatus processstatus;
-		processstatus.ProcessOpState = ACTIVE;
-		try {
-			//Get the process information 
-			Oam oam;
-			oam.getProcessStatus("WriteEngineServer", moduletypeconfig.ModuleNetworkList[i].DeviceName, processstatus);
-		}
-		catch(...)
-		{
-			processstatus.ProcessOpState = oam::ACTIVE;
-		}
-
-		if (processstatus.ProcessOpState != oam::ACTIVE)
-			continue;
-#endif
 		//cout << "setting connection to moduleid " << moduleID << endl;
         snprintf(buff, sizeof(buff), "pm%u_WriteEngineServer", moduleID);
         string fServer (buff);

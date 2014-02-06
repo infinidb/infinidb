@@ -130,7 +130,7 @@ public:
      * Fills in the values from the column result and calpont system catalog for
      * the WriteEngine::IdxStruct
      */
-    execplan::CalpontSystemCatalog::ColType makeIdxStruct(const execplan::ColumnResult* cr, size_t cols, execplan::CalpontSystemCatalog* csc );
+    execplan::CalpontSystemCatalog::ColType makeIdxStruct(const execplan::ColumnResult* cr, size_t cols, boost::shared_ptr<execplan::CalpontSystemCatalog> csc );
 	
     /** @brief add the column result data to the value list
      *

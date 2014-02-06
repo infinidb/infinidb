@@ -80,12 +80,7 @@ tdriver: tdriver.o
 	$(LINK.cpp) -o $@ $^ $(TLIBS) -Wl,--rpath -Wl,/usr/local/Calpont/lib
 
 tdriver1: tdriver1.o
-	$(LINK.cpp) -o $@ $^ -Wl,-rpath -Wl,/home/rdempsey/genii/export/lib \
-		-L/home/rdempsey/genii/utils/idbdatafile \
-		-lidbdatafile -lloggingcpp -lconfigcpp \
-		-lmessageqcpp -lboost_idb -lcompress -lidbboot -lbrm -lrwlock -lexecplan -lcacheutils -ljoblist \
-		-loamcpp -lfuncexp -lrowgroup -ljoiner -lcommon -lwindowfunction -ldataconvert -lmysqlcl_idb \
-		-lmulticast -lquerystats -lsnmpmanager -ludfsdk -lxml2
+	$(LINK.cpp) -o $@ $^ $(TLIBS) -Wl,-rpath -Wl,/usr/local/Calpont/lib
 
 test: $(LIBRARY) tdriver
 	LD_LIBRARY_PATH=.:$(EXPORT_ROOT)/lib ./tdriver

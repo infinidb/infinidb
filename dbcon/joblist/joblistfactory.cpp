@@ -708,7 +708,7 @@ void updateAggregateColType(AggregateColumn* ac, const SRCP& srcp, int op, JobIn
 
 const JobStepVector doAggProject(const CalpontSelectExecutionPlan* csep, JobInfo& jobInfo)
 {
-	map<uint, uint> projectColMap;   // projected column map    -- unique
+	vector<uint> projectKeys;        // projected column keys   -- unique
 	RetColsVector pcv;               // projected column vector -- may have duplicates
 
 	// add the groupby cols in the front part of the project column vector (pcv)
@@ -751,8 +751,8 @@ const JobStepVector doAggProject(const CalpontSelectExecutionPlan* csep, JobInfo
 			string view(sc->viewName());
 			TupleInfo ti(setTupleInfo(ct, gbOid, jobInfo, tblOid, sc, alias));
 			uint tupleKey = ti.key;
-			if (projectColMap.find(tupleKey) == projectColMap.end())
-				projectColMap[tupleKey] = i;
+			if (find(projectKeys.begin(), projectKeys.end(), tupleKey) == projectKeys.end())
+				projectKeys.push_back(tupleKey);
 
 			// for dictionary columns, replace the token oid with string oid
 			if (dictOid > 0)
@@ -771,8 +771,8 @@ const JobStepVector doAggProject(const CalpontSelectExecutionPlan* csep, JobInfo
 			TupleInfo ti(setExpTupleInfo(ct, eid, ac->alias(), jobInfo));
 			uint tupleKey = ti.key;
 			jobInfo.groupByColVec.push_back(tupleKey);
-			if (projectColMap.find(tupleKey) == projectColMap.end())
-				projectColMap[tupleKey] = i;
+			if (find(projectKeys.begin(), projectKeys.end(), tupleKey) == projectKeys.end())
+				projectKeys.push_back(tupleKey);
 		}
 		else if ((fc = dynamic_cast<const FunctionColumn*>(groupByCols[i].get())) != NULL)
 		{
@@ -781,15 +781,15 @@ const JobStepVector doAggProject(const CalpontSelectExecutionPlan* csep, JobInfo
 			TupleInfo ti(setExpTupleInfo(ct, eid, fc->alias(), jobInfo));
 			uint tupleKey = ti.key;
 			jobInfo.groupByColVec.push_back(tupleKey);
-			if (projectColMap.find(tupleKey) == projectColMap.end())
-				projectColMap[tupleKey] = i;
+			if (find(projectKeys.begin(), projectKeys.end(), tupleKey) == projectKeys.end())
+				projectKeys.push_back(tupleKey);
 		}
 		else
 		{
 			std::ostringstream errmsg;
-			errmsg << "doAggProject: unsupported group by column: "
-					 << typeid(*groupByCols[i]).name();
-			cerr << boldStart << errmsg.str() << boldStop << endl;
+			errmsg  << "doAggProject: unsupported group by column: "
+					<< typeid(*groupByCols[i]).name();
+			cerr    << boldStart << errmsg.str() << boldStop << endl;
 			throw logic_error(errmsg.str());
 		}
 	}
@@ -960,6 +960,13 @@ const JobStepVector doAggProject(const CalpontSelectExecutionPlan* csep, JobInfo
 				if (fc->aggColumnList().size() > 0)
 					hasAggCols = true;
 			}
+			else if (dynamic_cast<const AggregateColumn*>(srcp.get()) != NULL)
+			{
+				std::ostringstream errmsg;
+				errmsg << "Invalid aggregate function nesting.";
+				cerr << boldStart << errmsg.str() << boldStop << endl;
+				throw logic_error(errmsg.str());
+			}
 			else if ((wc = dynamic_cast<const WindowFunctionColumn*>(srcp.get())) == NULL)
 			{
 				std::ostringstream errmsg;
@@ -977,7 +984,8 @@ const JobStepVector doAggProject(const CalpontSelectExecutionPlan* csep, JobInfo
 		}
 
 		// add to project list
-		if (projectColMap.find(tupleKey) == projectColMap.end())
+		vector<uint>::iterator keyIt = find(projectKeys.begin(), projectKeys.end(), tupleKey);
+		if (keyIt == projectKeys.end())
 		{
 			RetColsVector::iterator it = pcv.end();
 			if (doDistinct)
@@ -985,23 +993,17 @@ const JobStepVector doAggProject(const CalpontSelectExecutionPlan* csep, JobInfo
 			else
 				it = pcv.insert(pcv.end(), srcp);
 
-			projectColMap[tupleKey] = distance(pcv.begin(), it);
+			projectKeys.insert(projectKeys.begin() + distance(pcv.begin(), it), tupleKey);
 		}
 		else if (doDistinct) // @bug4250, move forward distinct column if necessary.
 		{
-			uint pos = projectColMap[tupleKey];
+			uint pos = distance(projectKeys.begin(), keyIt);
 			if (pos >= lastGroupByPos)
 			{
 				pcv[pos] = pcv[lastGroupByPos];
 				pcv[lastGroupByPos] = srcp;
-
-				// @bug4935, update the projectColMap after swapping
-				map<uint, uint>::iterator j = projectColMap.begin();
-				for (; j != projectColMap.end(); j++)
-					if (j->second == lastGroupByPos)
-						j->second = pos;
-
-				projectColMap[tupleKey] = lastGroupByPos;
+				projectKeys[pos] = projectKeys[lastGroupByPos];
+				projectKeys[lastGroupByPos] = tupleKey;
 				lastGroupByPos++;
 			}
 		}
@@ -1581,17 +1583,17 @@ SJLP makeJobList_(
 	unsigned& errCode, string& emsg)
 {
 	CalpontSelectExecutionPlan* csep = dynamic_cast<CalpontSelectExecutionPlan*>(cplan);
-	CalpontSystemCatalog* csc = CalpontSystemCatalog::makeCalpontSystemCatalog(csep->sessionID());
+	boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(csep->sessionID());
 
 	// We have to go ahead and create JobList now so we can store the joblist's
 	// projectTableOID pointer in JobInfo for use during jobstep creation.
-	SErrorInfo status(new ErrorInfo());
-	shared_ptr<TupleKeyInfo> keyInfo(new TupleKeyInfo);
-	shared_ptr<int> subCount(new int);
+	SErrorInfo errorInfo(new ErrorInfo());
+	boost::shared_ptr<TupleKeyInfo> keyInfo(new TupleKeyInfo);
+	boost::shared_ptr<int> subCount(new int);
 	*subCount = 0;
 	JobList* jl = new TupleJobList(isExeMgr);
 	jl->priority(csep->priority());
-	jl->statusPtr(status);
+	jl->errorInfo(errorInfo);
 	rm.setTraceFlags(csep->traceFlags());
 
 	//Stuff a util struct with some stuff we always need
@@ -1608,7 +1610,7 @@ SJLP makeJobList_(
 	jobInfo.isExeMgr = isExeMgr;
 //	jobInfo.tryTuples = tryTuples; // always tuples after release 3.0
 	jobInfo.stringScanThreshold = csep->stringScanThreshold();
-	jobInfo.status = status;
+	jobInfo.errorInfo = errorInfo;
 	jobInfo.keyInfo = keyInfo;
 	jobInfo.subCount = subCount;
 	jobInfo.projectingTableOID = jl->projectingTableOIDPtr();
@@ -1717,7 +1719,7 @@ SJLP makeJobList_(
 	}
 	catch (IDBExcept& iex)
 	{
-		jobInfo.status->errCode = iex.errorCode();
+		jobInfo.errorInfo->errCode = iex.errorCode();
 		errCode = iex.errorCode();
 		exceptionHandler(jl, jobInfo, iex.what(), LOG_TYPE_DEBUG);
 		emsg = iex.what();
@@ -1725,7 +1727,7 @@ SJLP makeJobList_(
 	}
 	catch (QueryDataExcept& uee)
 	{
-		jobInfo.status->errCode = uee.errorCode();
+		jobInfo.errorInfo->errCode = uee.errorCode();
 		errCode = uee.errorCode();
 		exceptionHandler(jl, jobInfo, uee.what(), LOG_TYPE_DEBUG);
 		emsg = uee.what();
@@ -1733,7 +1735,7 @@ SJLP makeJobList_(
 	}
 	catch (const std::exception& ex)
 	{
-		jobInfo.status->errCode = makeJobListErr;
+		jobInfo.errorInfo->errCode = makeJobListErr;
 		errCode = makeJobListErr;
 		exceptionHandler(jl, jobInfo, ex.what());
 		emsg = ex.what();
@@ -1741,7 +1743,7 @@ SJLP makeJobList_(
 	}
 	catch (...)
 	{
-		jobInfo.status->errCode = makeJobListErr;
+		jobInfo.errorInfo->errCode = makeJobListErr;
 		errCode = makeJobListErr;
 		exceptionHandler(jl, jobInfo, "an exception");
 		emsg = "An unknown internal joblist error";
@@ -1781,10 +1783,10 @@ SJLP JobListFactory::makeJobList(
 	if (!ret)
 	{
 		ret.reset(new TupleJobList(isExeMgr));
-		SErrorInfo status(new ErrorInfo);
-		status->errCode = errCode;
-		status->errMsg  = emsg;
-		ret->statusPtr(status);
+		SErrorInfo errorInfo(new ErrorInfo);
+		errorInfo->errCode = errCode;
+		errorInfo->errMsg  = emsg;
+		ret->errorInfo(errorInfo);
 	}
 
 	return ret;

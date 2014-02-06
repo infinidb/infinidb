@@ -49,6 +49,7 @@ using namespace oam;
 #include "distributedenginecomm.h"
 #include "IDBPolicy.h"
 #include "utils_utf8.h"
+#include "dbrm.h"
 
 namespace
 {
@@ -203,13 +204,14 @@ int main(int argc, char** argv)
 		}
 	}
 	cout << "WriteEngineServer is ready" << endl;
+	BRM::DBRM dbrm;
 	for (;;)
 	{
 		try // BUG 4834 -
 		{
 			ios = mqs->accept();
 			//tp.invoke(ReadThread(ios));
-			ReadThreadFactory::CreateReadThread(tp,ios);
+			ReadThreadFactory::CreateReadThread(tp,ios, dbrm);
 			{
 /*				logging::Message::Args args;
 				logging::Message message;

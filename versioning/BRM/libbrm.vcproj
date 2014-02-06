@@ -43,7 +43,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_52_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\src\dbcon\execplan;C:\InfiniDB\src\utils\configcpp;C:\InfiniDB\src\utils\winport;C:\InfiniDB\src\utils\rwlock;C:\InfiniDB\src\utils\messageqcpp;C:\InfiniDB\src\writeengine\shared;C:\InfiniDB\src\utils\loggingcpp;C:\InfiniDB\src\utils\dataconvert;C:\InfiniDB\src\oam\oamcpp;C:\InfiniDB\src\snmpd\snmpmanager;C:\InfiniDB\src\utils\common;C:\InfiniDB\src\dbcon\joblist;C:\InfiniDB\src\utils\cacheutils"
+				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_52_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\genii\dbcon\execplan;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\utils\rwlock;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\writeengine\shared;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\dataconvert;C:\InfiniDB\genii\oam\oamcpp;C:\InfiniDB\genii\snmpd\snmpmanager;C:\InfiniDB\genii\utils\common;C:\InfiniDB\genii\dbcon\joblist;C:\InfiniDB\genii\utils\cacheutils"
 				PreprocessorDefinitions="SKIP_SNMP; COMMUNITY_KEYRANGE"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
@@ -56,7 +56,7 @@
 			/>
 			<Tool
 				Name="VCResourceCompilerTool"
-				AdditionalIncludeDirectories="C:\InfiniDB\src\utils\winport"
+				AdditionalIncludeDirectories="C:\InfiniDB\genii\utils\winport"
 			/>
 			<Tool
 				Name="VCPreLinkEventTool"
@@ -107,7 +107,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_52_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\src\dbcon\execplan;C:\InfiniDB\src\utils\configcpp;C:\InfiniDB\src\utils\winport;C:\InfiniDB\src\utils\rwlock;C:\InfiniDB\src\utils\messageqcpp;C:\InfiniDB\src\writeengine\shared;C:\InfiniDB\src\utils\loggingcpp;C:\InfiniDB\src\utils\dataconvert;C:\InfiniDB\src\oam\oamcpp;C:\InfiniDB\src\snmpd\snmpmanager;C:\InfiniDB\src\utils\common;C:\InfiniDB\src\dbcon\joblist;C:\InfiniDB\src\utils\cacheutils;C:\InfiniDB\src\utils\idbdatafile"
+				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_52_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\genii\dbcon\execplan;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\utils\rwlock;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\writeengine\shared;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\dataconvert;C:\InfiniDB\genii\oam\oamcpp;C:\InfiniDB\genii\snmpd\snmpmanager;C:\InfiniDB\genii\utils\common;C:\InfiniDB\genii\dbcon\joblist;C:\InfiniDB\genii\utils\cacheutils;C:\InfiniDB\genii\utils\idbdatafile"
 				PreprocessorDefinitions="SKIP_SNMP; COMMUNITY_KEYRANGE"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
@@ -173,7 +173,7 @@
 				InlineFunctionExpansion="2"
 				EnableIntrinsicFunctions="true"
 				FavorSizeOrSpeed="1"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_52_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\src\dbcon\execplan;C:\InfiniDB\src\utils\configcpp;C:\InfiniDB\src\utils\winport;C:\InfiniDB\src\utils\rwlock;C:\InfiniDB\src\utils\messageqcpp;C:\InfiniDB\src\writeengine\shared;C:\InfiniDB\src\utils\loggingcpp;C:\InfiniDB\src\utils\dataconvert;C:\InfiniDB\src\oam\oamcpp;C:\InfiniDB\src\snmpd\snmpmanager;C:\InfiniDB\src\utils\common;C:\InfiniDB\src\dbcon\joblist;C:\InfiniDB\src\utils\cacheutils"
+				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_52_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\genii\dbcon\execplan;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\utils\rwlock;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\writeengine\shared;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\dataconvert;C:\InfiniDB\genii\oam\oamcpp;C:\InfiniDB\genii\snmpd\snmpmanager;C:\InfiniDB\genii\utils\common;C:\InfiniDB\genii\dbcon\joblist;C:\InfiniDB\genii\utils\cacheutils"
 				PreprocessorDefinitions="SKIP_SNMP;COMMUNITY_KEYRANGE"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="false"
@@ -186,7 +186,7 @@
 			/>
 			<Tool
 				Name="VCResourceCompilerTool"
-				AdditionalIncludeDirectories="C:\InfiniDB\src\utils\winport"
+				AdditionalIncludeDirectories="C:\InfiniDB\genii\utils\winport"
 			/>
 			<Tool
 				Name="VCPreLinkEventTool"
@@ -241,7 +241,7 @@
 				InlineFunctionExpansion="2"
 				EnableIntrinsicFunctions="true"
 				FavorSizeOrSpeed="1"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_52_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\src\dbcon\execplan;C:\InfiniDB\src\utils\configcpp;C:\InfiniDB\src\utils\winport;C:\InfiniDB\src\utils\rwlock;C:\InfiniDB\src\utils\messageqcpp;C:\InfiniDB\src\writeengine\shared;C:\InfiniDB\src\utils\loggingcpp;C:\InfiniDB\src\utils\dataconvert;C:\InfiniDB\src\oam\oamcpp;C:\InfiniDB\src\snmpd\snmpmanager;C:\InfiniDB\src\utils\common;C:\InfiniDB\src\dbcon\joblist;C:\InfiniDB\src\utils\cacheutils"
+				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_52_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\genii\dbcon\execplan;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\utils\rwlock;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\writeengine\shared;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\dataconvert;C:\InfiniDB\genii\oam\oamcpp;C:\InfiniDB\genii\snmpd\snmpmanager;C:\InfiniDB\genii\utils\common;C:\InfiniDB\genii\dbcon\joblist;C:\InfiniDB\genii\utils\cacheutils"
 				PreprocessorDefinitions="SKIP_SNMP;COMMUNITY_KEYRANGE"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="false"
@@ -307,7 +307,7 @@
 				InlineFunctionExpansion="2"
 				EnableIntrinsicFunctions="true"
 				FavorSizeOrSpeed="1"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_52_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\src\dbcon\execplan;C:\InfiniDB\src\utils\configcpp;C:\InfiniDB\src\utils\winport;C:\InfiniDB\src\utils\rwlock;C:\InfiniDB\src\utils\messageqcpp;C:\InfiniDB\src\writeengine\shared;C:\InfiniDB\src\utils\loggingcpp;C:\InfiniDB\src\utils\dataconvert;C:\InfiniDB\src\oam\oamcpp;C:\InfiniDB\src\snmpd\snmpmanager;C:\InfiniDB\src\utils\common;C:\InfiniDB\src\dbcon\joblist;C:\InfiniDB\src\utils\cacheutils"
+				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_52_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\genii\dbcon\execplan;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\utils\rwlock;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\writeengine\shared;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\dataconvert;C:\InfiniDB\genii\oam\oamcpp;C:\InfiniDB\genii\snmpd\snmpmanager;C:\InfiniDB\genii\utils\common;C:\InfiniDB\genii\dbcon\joblist;C:\InfiniDB\genii\utils\cacheutils"
 				PreprocessorDefinitions="SKIP_SNMP"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="false"
@@ -320,7 +320,7 @@
 			/>
 			<Tool
 				Name="VCResourceCompilerTool"
-				AdditionalIncludeDirectories="C:\InfiniDB\src\utils\winport"
+				AdditionalIncludeDirectories="C:\InfiniDB\genii\utils\winport"
 			/>
 			<Tool
 				Name="VCPreLinkEventTool"
@@ -375,7 +375,7 @@
 				InlineFunctionExpansion="2"
 				EnableIntrinsicFunctions="true"
 				FavorSizeOrSpeed="1"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_52_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\src\dbcon\execplan;C:\InfiniDB\src\utils\configcpp;C:\InfiniDB\src\utils\winport;C:\InfiniDB\src\utils\rwlock;C:\InfiniDB\src\utils\messageqcpp;C:\InfiniDB\src\writeengine\shared;C:\InfiniDB\src\utils\loggingcpp;C:\InfiniDB\src\utils\dataconvert;C:\InfiniDB\src\oam\oamcpp;C:\InfiniDB\src\snmpd\snmpmanager;C:\InfiniDB\src\utils\common;C:\InfiniDB\src\dbcon\joblist;C:\InfiniDB\src\utils\cacheutils;C:\InfiniDB\src\utils\idbdatafile"
+				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_52_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\genii\dbcon\execplan;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\utils\rwlock;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\writeengine\shared;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\dataconvert;C:\InfiniDB\genii\oam\oamcpp;C:\InfiniDB\genii\snmpd\snmpmanager;C:\InfiniDB\genii\utils\common;C:\InfiniDB\genii\dbcon\joblist;C:\InfiniDB\genii\utils\cacheutils;C:\InfiniDB\genii\utils\idbdatafile"
 				PreprocessorDefinitions="SKIP_SNMP"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="false"

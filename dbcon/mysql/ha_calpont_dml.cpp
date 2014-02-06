@@ -507,8 +507,7 @@ int doProcessInsertValues ( TABLE* table, uint32_t size, cal_connection_info& ci
 		if ( b == dmlpackageprocessor::DMLPackageProcessor::IDBRANGE_WARNING )
 		{
 			rc = 0;
-			string errmsg ("Out of range value detected. Please check Calpont Syntax Guide for supported data range." );
-			push_warning(thd, MYSQL_ERROR::WARN_LEVEL_WARN, 9999, errmsg.c_str());
+			push_warning(thd, MYSQL_ERROR::WARN_LEVEL_WARN, 9999, errormsg.c_str());
 		}
 		
 		if ( rc != 0 )
@@ -773,7 +772,7 @@ int ha_calpont_impl_write_row_(uchar *buf, TABLE* table, cal_connection_info& ci
 			return tableLockInfo;
 		}
 
-		execplan::CalpontSystemCatalog* csc =
+		boost::shared_ptr<execplan::CalpontSystemCatalog> csc =
 			execplan::CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 		csc->identity(execplan::CalpontSystemCatalog::FE);
 

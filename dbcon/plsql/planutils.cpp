@@ -529,7 +529,7 @@ ReturnedColumn* getColumn (string& token, bool& outerJoinFlag, bool& indexFlag)
 	          }       
 	        i++;
 	      }
-	      CalpontSystemCatalog *csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionid);
+	      boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionid);
 	      CalpontSystemCatalog::TableName tablename;  
         tablename.schema =  schemaName;
         tablename.table = tableName;
@@ -1346,7 +1346,7 @@ void doConversion(CalpontSelectExecutionPlan &csep)
             {
                 indexName = (*i).object_name;
                 //@bug 357 Need to look up systables find out the real table name for index
-                CalpontSystemCatalog *csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionid);
+                boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionid);
                 CalpontSystemCatalog::TableName tablename = csc->lookupTableForIndex( indexName, schemaName);
                 tableName = tablename.table;
             }
@@ -1477,7 +1477,7 @@ void doConversion(CalpontSelectExecutionPlan &csep)
             {
                 indexName = (*i).object_name;
                 //@bug 357 Need to look up systables find out the real table name for index
-                CalpontSystemCatalog *csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionid);
+                boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionid);
                 CalpontSystemCatalog::TableName tablename = csc->lookupTableForIndex( indexName, schemaName);
                 tableName = tablename.table;
             }
@@ -1662,7 +1662,7 @@ void doConversion(CalpontSelectExecutionPlan &csep)
         if ((*tb_iter).second == 1) continue;
         CalpontSystemCatalog::TableName tn = (*tb_iter).first;
         
-        CalpontSystemCatalog *csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionid);
+        boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionid);
         CalpontSystemCatalog::RIDList oidlist = csc->columnRIDs(tn, true);
         CalpontSystemCatalog::TableColName tcn;
         int minColWidth = 0;

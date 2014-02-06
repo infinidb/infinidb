@@ -224,18 +224,15 @@ uint SubAdapterStep::nextBand(messageqcpp::ByteStream &bs)
 	}
 	catch(const std::exception& ex)
 	{
-		catchHandler(ex.what(), fSessionId);
-		if (status() == 0)
-			status(ERR_IN_DELIVERY);
+		catchHandler(ex.what(), ERR_IN_DELIVERY, fErrorInfo, fSessionId);
 		while (more)
 			more = fOutputDL->next(fOutputIterator, &rgDataOut);
 		fEndOfResult = true;
 	}
 	catch(...)
 	{
-		catchHandler("SubAdapterStep next band caught an unknown exception", fSessionId);
-		if (status() == 0)
-			status(ERR_IN_DELIVERY);
+		catchHandler("SubAdapterStep next band caught an unknown exception",
+						ERR_IN_DELIVERY, fErrorInfo, fSessionId);
 		while (more)
 			more = fOutputDL->next(fOutputIterator, &rgDataOut);
 		fEndOfResult = true;
@@ -413,15 +410,12 @@ void SubAdapterStep::execute()
 	}
 	catch(const std::exception& ex)
 	{
-		catchHandler(ex.what(), fSessionId);
-		if (status() == 0)
-			status(ERR_EXEMGR_MALFUNCTION);
+		catchHandler(ex.what(), ERR_EXEMGR_MALFUNCTION, fErrorInfo, fSessionId);
 	}
 	catch(...)
 	{
-		catchHandler("SubAdapterStep execute caught an unknown exception", fSessionId);
-		if (status() == 0)
-			status(ERR_EXEMGR_MALFUNCTION);
+		catchHandler("SubAdapterStep execute caught an unknown exception",
+						ERR_EXEMGR_MALFUNCTION, fErrorInfo, fSessionId);
 	}
 
 	if (cancelled())

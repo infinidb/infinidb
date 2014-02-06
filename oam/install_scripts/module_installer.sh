@@ -42,7 +42,7 @@ done
 shift $shiftcnt
 
 if [ $installdir != "/usr/local/Calpont" ]; then
-	export LD_LIBRARY_PATH=$INFINIDB_INSTALL_DIR/lib:$INFINIDB_INSTALL_DIR/mysql/lib/mysql
+	export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$INFINIDB_INSTALL_DIR/lib:$INFINIDB_INSTALL_DIR/mysql/lib/mysql
 fi
 
 export INFINIDB_INSTALL_DIR=$installdir
@@ -117,10 +117,8 @@ if [ -n "$plugin" ]; then
 
 	echo " " >> ${bashFile}
 	echo "export JAVA_HOME=/usr/java/jdk1.6.0_31" >> ${bashFile}
-	echo "export LD_LIBRARY_PATH=/usr/java/jdk1.6.0_31/jre/lib/amd64/server" >> ${bashFile}
+	echo "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/java/jdk1.6.0_31/jre/lib/amd64/server" >> ${bashFile}
 	echo ". ./$setenv" >> ${bashFile}
-
-	su - hdfs -c "hadoop fs -mkdir /usr/local/Calpont;hadoop fs -chown root:root /usr/local/Calpont" >/dev/null 2>&1
 fi
 
 echo " "

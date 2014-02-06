@@ -504,6 +504,74 @@ class to_lower
         }
 };
 
+inline int  getNumbers( const std::string& expr, int64_t *array, execplan::OpType funcType)
+{
+	int index = 0;
+
+	int funcNeg = 1;
+	if ( funcType == execplan::OP_SUB )
+		funcNeg = -1;
+
+	if ( expr.size() == 0 )
+		return 0;
+
+	// @bug 4703 reworked this code to avoid use of incrementally
+	//           built string to hold temporary values while
+	//           scanning expr for numbers.  This function is now
+	//           covered by a unit test in tdriver.cpp
+	bool foundNumber = false;
+	int64_t  number = 0;
+	int  neg = 1;
+	for ( unsigned int i=0 ; i < expr.size() ; i++ )
+	{
+		char value = expr[i];
+		if ( (value >= '0' && value <= '9') )
+		{
+			foundNumber = true;
+			number = ( number * 10 ) + ( value - '0' );
+		}
+		else if ( value == '-' && !foundNumber )
+		{
+			neg = -1;
+		}
+		else if ( value == '-')
+		{
+			// this is actually an error condition - it means that
+			// input came in with something like NN-NN (i.e. a dash
+			// between two numbers.  To match prior code we will
+			// return the number up to the dash and just return
+			array[index] = number * funcNeg * neg;
+			index++;
+
+			return index;
+		}
+		else
+		{
+			if ( foundNumber )
+			{
+				array[index] = number * funcNeg * neg;
+				number = 0;
+				neg = 1;
+				index++;
+
+				if ( index > 9 )
+					return index;
+			}
+		}
+	}
+
+	if ( foundNumber )
+	{
+		array[index] = number * funcNeg * neg;
+		index++;
+	}
+
+	return index;
+}
+
+
+
+
 inline int  getNumbers( const std::string& expr, int *array, execplan::OpType funcType)
 {
 	int index = 0;

@@ -99,7 +99,7 @@ void  DDLPackageProcessor::getColumnsForTable(u_int32_t sessionID, std::string s
 	std::string err;
 	try
 	{
-		CalpontSystemCatalog* systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
+		boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 		systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 
 		const CalpontSystemCatalog::RIDList ridList = systemCatalogPtr->columnRIDs(tableName);
@@ -726,7 +726,7 @@ void DDLPackageProcessor::writeSysTableMetaData(u_int32_t sessionID, execplan::C
 	WriteEngine::RIDList ridList;
 	CalpontSystemCatalog::TableName tableName;
 	CalpontSystemCatalog::ROPair sysTableROPair;
-	CalpontSystemCatalog* systemCatalogPtr;
+	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr;
 	ColumnList columns;
 	ColumnList::const_iterator column_iterator;
 	DDLColumn column;
@@ -1256,7 +1256,7 @@ void DDLPackageProcessor::removeSysTableMetaData(u_int32_t sessionID, execplan::
 	userTableName.schema = tableName.fSchema;
 	userTableName.table = tableName.fName;
 
-	CalpontSystemCatalog* systemCatalogPtr;
+	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr;
 	systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 	try
@@ -1299,7 +1299,7 @@ void DDLPackageProcessor::removeSysColMetaData(u_int32_t sessionID, execplan::Ca
 	userTableName.schema = tableName.fSchema;
 	userTableName.table = tableName.fName;
 
-	CalpontSystemCatalog* systemCatalogPtr;
+	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr;
 	systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 	std::string err;
@@ -1340,7 +1340,7 @@ void DDLPackageProcessor::removeColSysColMetaData(u_int32_t sessionID, execplan:
 	userColName.table = columnInfo.fCatalog;
 	userColName.column = columnInfo.fName;
 
-	CalpontSystemCatalog* systemCatalogPtr;
+	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr;
 	systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 	std::string err;
@@ -1693,7 +1693,7 @@ void DDLPackageProcessor::createFiles(CalpontSystemCatalog::TableName aTableName
 	const u_int64_t uniqueId, const u_int32_t numOids)
 {
 	SUMMARY_INFO("DDLPackageProcessor::createFiles");
-	CalpontSystemCatalog* systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(1);
+	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(1);
 	CalpontSystemCatalog::RIDList ridList = systemCatalogPtr->columnRIDs(aTableName);
 	fWEClient->addQueue(uniqueId);
 	CalpontSystemCatalog::ColType colType;

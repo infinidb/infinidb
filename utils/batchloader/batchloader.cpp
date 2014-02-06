@@ -88,7 +88,7 @@ BatchLoader::BatchLoader ( uint32_t tableOid,
 //------------------------------------------------------------------------------
 void BatchLoader::selectFirstPM ( uint& PMId)
 {
-	CalpontSystemCatalog *systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(fSessionId);
+	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(fSessionId);
 	//cout << "calling tableName for oid " << fTableOid << endl;
 	CalpontSystemCatalog::TableName aTableName = systemCatalogPtr->tableName(fTableOid);
 	

@@ -50,7 +50,7 @@ class CommandPackageProcessor : public DMLPackageProcessor
 {
 
 public:
-	CommandPackageProcessor(BRM::DBRM* aDbrm) : DMLPackageProcessor(aDbrm){}
+	CommandPackageProcessor(BRM::DBRM* aDbrm, uint32_t sid) : DMLPackageProcessor(aDbrm, sid){}
     /** @brief process an CommandDMLPackage
       *
       * @param cpackage the CommandDMLPackage to process

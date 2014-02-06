@@ -96,7 +96,7 @@ int qfelex(void);
 #include "calpontsystemcatalog.h"
 #include "aggregatecolumn.h"
 execplan::CalpontSelectExecutionPlan* ParserCSEP;
-execplan::CalpontSystemCatalog* ParserCSC;
+boost::shared_ptr<execplan::CalpontSystemCatalog> ParserCSC;
 namespace execplan
 {
 class ReturnedColumn;

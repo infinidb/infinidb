@@ -78,11 +78,12 @@ struct pDictionaryScanPrimitive
         }
         catch(runtime_error& re)
         {
-			catchHandler(re.what());
+			catchHandler(re.what(), ERR_DICTIONARY_SCAN, fPDictScan->errorInfo(), fPDictScan->sessionId());
 		}
         catch(...)
         {
-			catchHandler("pDictionaryScan send caught an unknown exception");
+			catchHandler("pDictionaryScan send caught an unknown exception",
+							ERR_DICTIONARY_SCAN, fPDictScan->errorInfo(), fPDictScan->sessionId());
 		}
 
     }
@@ -101,11 +102,12 @@ struct pDictionaryScanAggregator
         }
         catch(runtime_error& re)
         {
-			catchHandler(re.what());
+			catchHandler(re.what(), ERR_DICTIONARY_SCAN, fPDictScan->errorInfo(), fPDictScan->sessionId());
 		}
         catch(...)
         {
-			catchHandler("pDictionaryScan receive caught an unknown exception");
+			catchHandler("pDictionaryScan receive caught an unknown exception",
+							ERR_DICTIONARY_SCAN, fPDictScan->errorInfo(), fPDictScan->sessionId());
 		}
 
     }
@@ -372,12 +374,13 @@ void pDictionaryScan::sendPrimitiveMessages()
 	}//try
 	catch(const exception& e)
     {
-      catchHandler(e.what(), fSessionId);
+      catchHandler(e.what(), ERR_DICTIONARY_SCAN, fErrorInfo, fSessionId);
       sendError(ERR_DICTIONARY_SCAN);
     }
 	catch(...)
     {
-      catchHandler("pDictionaryScan caught an unknown exception.", fSessionId);
+      catchHandler("pDictionaryScan caught an unknown exception.",
+					ERR_DICTIONARY_SCAN, fErrorInfo, fSessionId);
       sendError(ERR_DICTIONARY_SCAN);
     }
 
@@ -481,27 +484,23 @@ void pDictionaryScan::sendAPrimitiveMessage(
 	try {
 		fDec->write(uniqueID, primMsg);
 	}
-	catch (const IDBExcept &e) {
+	catch (const IDBExcept& e) {
 		abort();
-		catchHandler(e.what());
-		if (status() == 0)
-			status(e.errorCode());
+		cerr << "pDictionaryScan::send() caught: " << e.what() << endl;
+		catchHandler(e.what(), e.errorCode(), fErrorInfo, fSessionId);
 	}
 	catch (const std::exception& e)
 	{
 		abort();
 		cerr << "pDictionaryScan::send() caught: " << e.what() << endl;
-		catchHandler(e.what());
-		if (status() == 0)
-			status(ERR_DICTIONARY_SCAN);
+		catchHandler(e.what(), ERR_DICTIONARY_SCAN, fErrorInfo, fSessionId);
 	}
 	catch (...)
 	{
 		abort();
 		cerr << "pDictionaryScan::send() caught unknown exception" << endl;
-		catchHandler("pDictionaryScan::send() caught unknown exception");
-		if (status() == 0)
-			status(ERR_DICTIONARY_SCAN);
+		catchHandler("pDictionaryScan::send() caught unknown exception",
+					ERR_DICTIONARY_SCAN, fErrorInfo, fSessionId);
 	}
 	fMsgsToPm++;
 }
@@ -631,26 +630,37 @@ void pDictionaryScan::receivePrimitiveMessages()
 				fStopSending = true;
 				condvarWakeupProducer.notify_one();
 				mutex.unlock();
+				string errMsg;
+				//bs->advance(sizeof(ISMPacketHeader) + sizeof(PrimitiveHeader));
+				//*bs >> errMsg;
+				if (error < 1000)
+				{
+					logging::ErrorCodes errorcodes;
+					errMsg = errorcodes.errorString(error);
+				}
+				else
+				{
+					errMsg = IDBErrorInfo::instance()->errorMsg(error);
+				}
+				errorMessage(errMsg);
 				status(error);
 			}
 		} // end of loop to read LBID responses from primproc
 	}
 	catch(const LargeDataListExcept& ex)
     {
-		catchHandler(ex.what(), fSessionId);
-		status(ERR_DICTIONARY_SCAN);
+		catchHandler(ex.what(), ERR_DICTIONARY_SCAN, fErrorInfo, fSessionId);
 		mutex.unlock();
     }
 	catch(const exception& e)
     {
-		catchHandler(e.what(), fSessionId);
-		status(ERR_DICTIONARY_SCAN);
+		catchHandler(e.what(), ERR_DICTIONARY_SCAN, fErrorInfo, fSessionId);
 		mutex.unlock();
     }
 	catch(...)
     {
-		catchHandler("pDictionaryScan caught an unknown exception.", fSessionId);
-		status(ERR_DICTIONARY_SCAN);
+		catchHandler("pDictionaryScan caught an unknown exception.",
+						ERR_DICTIONARY_SCAN, fErrorInfo, fSessionId);
 		mutex.unlock();
     }
 
@@ -797,25 +807,21 @@ void pDictionaryScan::serializeEqualityFilter()
 	}
 	catch (const IDBExcept &e) {
 		abort();
-		catchHandler(e.what());
-		if (status() == 0)
-			status(e.errorCode());
+		cerr << "pDictionaryScan::serializeEqualityFilter() caught: " << e.what() << endl;
+		catchHandler(e.what(), e.errorCode(), fErrorInfo, fSessionId);
 	}
 	catch (const std::exception& e)
 	{
 		abort();
 		cerr << "pDictionaryScan::serializeEqualityFilter() caught: " << e.what() << endl;
-		catchHandler(e.what());
-		if (status() == 0)
-			status(ERR_DICTIONARY_SCAN);
+		catchHandler(e.what(), ERR_DICTIONARY_SCAN, fErrorInfo, fSessionId);
 	}
 	catch (...)
 	{
 		abort();
 		cerr << "pDictionaryScan::serializeEqualityFilter() caught unknown exception" << endl;
-		catchHandler("pDictionaryScan::serializeEqualityFilter() caught unknown exception");
-		if (status() == 0)
-			status(ERR_DICTIONARY_SCAN);
+		catchHandler("pDictionaryScan::serializeEqualityFilter() caught unknown exception",
+						ERR_DICTIONARY_SCAN, fErrorInfo, fSessionId);
 	}
 	empty.swap(equalityFilter);
 }
@@ -834,25 +840,20 @@ void pDictionaryScan::destroyEqualityFilter()
 	}
 	catch (const IDBExcept &e) {
 		abort();
-		catchHandler(e.what());
-		if (status() == 0)
-			status(e.errorCode());
+		catchHandler(e.what(), e.errorCode(), fErrorInfo, fSessionId);
 	}
 	catch (const std::exception& e)
 	{
 		abort();
 		cerr << "pDictionaryScan::destroyEqualityFilter() caught: " << e.what() << endl;
-		catchHandler(e.what());
-		if (status() == 0)
-			status(ERR_DICTIONARY_SCAN);
+		catchHandler(e.what(), ERR_DICTIONARY_SCAN, fErrorInfo, fSessionId);
 	}
 	catch (...)
 	{
 		abort();
 		cerr << "pDictionaryScan::destroyEqualityFilter() caught unknown exception" << endl;
-		catchHandler("pDictionaryScan::destroyEqualityFilter() caught unknown exception");
-		if (status() == 0)
-			status(ERR_DICTIONARY_SCAN);
+		catchHandler("pDictionaryScan::destroyEqualityFilter() caught unknown exception",
+						ERR_DICTIONARY_SCAN, fErrorInfo, fSessionId);
 	}
 }
 

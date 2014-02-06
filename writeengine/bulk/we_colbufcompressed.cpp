@@ -479,34 +479,49 @@ int ColumnBufferCompressed::finishFile(bool bTruncFile)
         long long truncateFileSize = fChunkPtrs[fChunkPtrs.size()-1].first +
             fChunkPtrs[fChunkPtrs.size()-1].second;
 
-        std::ostringstream oss1;
-        oss1 << "Truncating column file"
-            ": OID-"    << fColInfo->curCol.dataFile.fid        <<
-            "; DBRoot-" << fColInfo->curCol.dataFile.fDbRoot    <<
-            "; part-"   << fColInfo->curCol.dataFile.fPartition <<
-            "; seg-"    << fColInfo->curCol.dataFile.fSegment   <<
-            "; size-"   << truncateFileSize;
-        fLog->logMsg( oss1.str(), MSGLVL_INFO2 );
-
-        int rc = NO_ERROR;
-        if (truncateFileSize > 0)
-            rc = fColInfo->colOp->truncateFile( fFile, truncateFileSize );
-        else
-            rc = ERR_COMP_TRUNCATE_ZERO; //@bug 3913 - Catch truncate to 0 bytes
-        if (rc != NO_ERROR)
+        // @bug5769 Don't initialize extents or truncate db files on HDFS
+        if (idbdatafile::IDBPolicy::useHdfs())
         {
-            WErrorCodes ec;
-            std::ostringstream oss2;
-            oss2 << "finishFile: error truncating file for "        <<
-                "OID "      << fColInfo->curCol.dataFile.fid        <<
+            std::ostringstream oss1;
+            oss1 << "Finished writing column file"
+                ": OID-"    << fColInfo->curCol.dataFile.fid        <<
                 "; DBRoot-" << fColInfo->curCol.dataFile.fDbRoot    <<
                 "; part-"   << fColInfo->curCol.dataFile.fPartition <<
                 "; seg-"    << fColInfo->curCol.dataFile.fSegment   <<
-                "; size-"   << truncateFileSize                     <<
-                "; "        << ec.errorString(rc);
-            fLog->logMsg( oss2.str(), rc, MSGLVL_ERROR );
+                "; size-"   << truncateFileSize;
+            fLog->logMsg( oss1.str(), MSGLVL_INFO2 );
+        }
+        else
+        {
+            std::ostringstream oss1;
+            oss1 << "Truncating column file"
+                ": OID-"    << fColInfo->curCol.dataFile.fid        <<
+                "; DBRoot-" << fColInfo->curCol.dataFile.fDbRoot    <<
+                "; part-"   << fColInfo->curCol.dataFile.fPartition <<
+                "; seg-"    << fColInfo->curCol.dataFile.fSegment   <<
+                "; size-"   << truncateFileSize;
+            fLog->logMsg( oss1.str(), MSGLVL_INFO2 );
 
-            return rc;
+            int rc = NO_ERROR;
+            if (truncateFileSize > 0)
+                rc = fColInfo->colOp->truncateFile( fFile, truncateFileSize );
+            else
+                rc = ERR_COMP_TRUNCATE_ZERO;//@bug3913-Catch truncate to 0 bytes
+            if (rc != NO_ERROR)
+            {
+                WErrorCodes ec;
+                std::ostringstream oss2;
+                oss2 << "finishFile: error truncating file for "        <<
+                    "OID "      << fColInfo->curCol.dataFile.fid        <<
+                    "; DBRoot-" << fColInfo->curCol.dataFile.fDbRoot    <<
+                    "; part-"   << fColInfo->curCol.dataFile.fPartition <<
+                    "; seg-"    << fColInfo->curCol.dataFile.fSegment   <<
+                    "; size-"   << truncateFileSize                     <<
+                    "; "        << ec.errorString(rc);
+                fLog->logMsg( oss2.str(), rc, MSGLVL_ERROR );
+
+                return rc;
+            }
         }
     }
 

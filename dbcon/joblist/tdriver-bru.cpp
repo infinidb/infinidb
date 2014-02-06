@@ -698,7 +698,7 @@ void *BucketReUseDriver::scanThread(void* arg)
 
 	string dummy;
 	bool scan = false;
-	execplan::CalpontSystemCatalog *c =
+	boost::shared_ptr<execplan::CalpontSystemCatalog> c =
 						execplan::CalpontSystemCatalog::makeCalpontSystemCatalog(0x80000000);
 	execplan::CalpontSystemCatalog::TableColName tcn = c->colName(a->oid);
 	BucketReuseControlEntry* entry = BucketReuseManager::instance()->userRegister(
@@ -751,7 +751,7 @@ void *BucketReUseDriver::reuseThread(void* arg)
 
 	string dummy;
 	bool scan = true;
-	execplan::CalpontSystemCatalog *c =
+	boost::shared_ptr<execplan::CalpontSystemCatalog> c =
 						execplan::CalpontSystemCatalog::makeCalpontSystemCatalog(0x80000000);
 	execplan::CalpontSystemCatalog::TableColName tcn = c->colName(a->oid);
 	BucketReuseControlEntry* entry = BucketReuseManager::instance()->userRegister(
@@ -817,7 +817,7 @@ void *BucketReUseDriver::raceThread(void* arg)
 	BucketReuseControlEntry* entry = NULL;
 	{
 		boost::mutex::scoped_lock lock(BucketReuseManager::instance()->getMutex());
-		execplan::CalpontSystemCatalog *c =
+		boost::shared_ptr<execplan::CalpontSystemCatalog> c =
 						execplan::CalpontSystemCatalog::makeCalpontSystemCatalog(0x80000000);
 		execplan::CalpontSystemCatalog::TableColName tcn = c->colName(a->oid);
 		entry = BucketReuseManager::instance()->userRegister(

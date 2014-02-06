@@ -220,7 +220,7 @@ public:
 	std::string tablename;
 	int tboid;
 	short requestType; // 0 -- ID2NAME; 1 -- NAME2ID
-	execplan::CalpontSystemCatalog* csc;
+	boost::shared_ptr<execplan::CalpontSystemCatalog> csc;
 	// @bug 649; @bug 626
 	std::map <int, int> tidMap;     // tableid-tableStartCount map
 	std::map <int, sp_cpsm_tplsch_t> tidScanMap;

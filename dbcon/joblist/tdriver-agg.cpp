@@ -775,7 +775,7 @@ public:
 	    uint32_t verId = 1;
 	    uint16_t stepID = 0;
 	    uint32_t statementID = 1;
-	    CalpontSystemCatalog *csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionid);
+	    boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionid);
 	        
 	    SRCP srcp;
 	    SimpleColumn *l_orderkey = new SimpleColumn(s_l_orderkey, sessionid);
@@ -944,7 +944,7 @@ public:
 	    uint32_t verId = 1;
 	    uint16_t stepID = 0;
 	    uint32_t statementID = 1;
-	    CalpontSystemCatalog *csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionid);
+	    boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionid);
 	    
 	    SRCP srcp;
 	    SimpleColumn *l_orderkey = new SimpleColumn(s_l_orderkey, sessionid);

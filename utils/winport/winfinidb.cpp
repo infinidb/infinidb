@@ -34,6 +34,7 @@
 #include <sstream>
 //#define NDEBUG
 #include <cassert>
+#include <unistd.h>
 using namespace std;
 
 #include <boost/algorithm/string/predicate.hpp>
@@ -166,6 +167,8 @@ int startUp()
 {
 	int rc;
 
+	syslog(LOG_INFO, "System is starting");
+
 	if (runIt("clearShm"))
 		return -1;
 
@@ -202,11 +205,15 @@ int startUp()
 			DWORD fmRes = FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER|FORMAT_MESSAGE_FROM_SYSTEM,
 				0, GetLastError(), 0, (LPSTR)lppBuffer, 0, 0);
 
-			cerr << endl << "Failed to start process runner thread for " << procInfo[pidx].pName << ": ";
+			cerr << endl;
+			ostringstream ostr;
+			ostr << "Failed to start process runner thread for " << procInfo[pidx].pName << ": ";
 			if (fmRes > 0)
-				cerr << lpBuffer << endl;
+				ostr << lpBuffer;
 			else
-				cerr << "Unknown error" << endl;
+				ostr << "Unknown error";
+			cerr << ostr.str() << endl; 
+			syslog(LOG_ERR, ostr.str().c_str());
 			return -1;
 		}
 
@@ -240,15 +247,38 @@ DWORD WINAPI procRunner(LPVOID parms)
 			LPTSTR* lppBuffer = &lpBuffer;
 			DWORD fmRes = FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER|FORMAT_MESSAGE_FROM_SYSTEM,
 				0, GetLastError(), 0, (LPSTR)lppBuffer, 0, 0);
-
-			cerr << endl << "Failed to start process " << pip->pName << ": ";
+			ostringstream ostr;
+			cerr << endl;
+			ostr << "Failed to start process " << pi.pName << ": ";
 			if (fmRes > 0)
-				cerr << lpBuffer << endl;
+				ostr << lpBuffer;
 			else
-				cerr << "Unknown error" << endl;
+				ostr << "Unknown error";
+			cerr << ostr.str() << endl; 
+			syslog(LOG_ERR, ostr.str().c_str());
 			return -1;
 		}
+		else
+		{
+			ostringstream ostr;
+			ostr << pi.pName << " started ";
+			cerr << ostr.str() << endl; 
+			syslog(LOG_INFO, ostr.str().c_str());
+		}
 		WaitForSingleObject(pInfo.hProcess, INFINITE);
+		ostringstream ostr;
+		ostr << pi.pName;
+		if (shuttingDown)
+		{
+			ostr << " shut down";
+			syslog(LOG_INFO, ostr.str().c_str());
+		}
+		else
+		{
+			ostr << " has died unexpectedly";
+			syslog(LOG_ERR, ostr.str().c_str());
+		}
+		cerr << ostr.str() << endl; 
 		CloseHandle(pInfo.hProcess);
 		if (shuttingDown)
 			return 0;
@@ -303,7 +333,6 @@ int killProcByName(const string& pname)
 			HANDLE hProcess = OpenProcess( PROCESS_QUERY_INFORMATION |
 										   PROCESS_VM_READ,
 										   FALSE, pids[i] );
-
 			// Get the process name.
 			if (NULL != hProcess )
 			{
@@ -335,6 +364,7 @@ int killProcByName(const string& pname)
 int shutDown()
 {
 	shuttingDown = true;
+	syslog(LOG_INFO, "System is shutting down");
 
 	vector<string> pList;
 

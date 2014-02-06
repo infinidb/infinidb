@@ -103,7 +103,7 @@ inline void  getColumnsForTable(u_int32_t sessionID, std::string schema,std::str
 	std::string err;
 	try
 	{
-		CalpontSystemCatalog* systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
+		boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 		systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 
 		const CalpontSystemCatalog::RIDList ridList = systemCatalogPtr->columnRIDs(tableName);

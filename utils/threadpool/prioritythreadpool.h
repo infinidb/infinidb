@@ -46,12 +46,15 @@ public:
 	class Functor {
 	public:
 		virtual ~Functor() { };
+		// as of 12/3/13, all implementors return 0 and -1.  -1 will cause
+        // this thread pool to reschedule the job, 0 will throw it away on return.
 		virtual int operator()() = 0;
 	};
 
     //typedef boost::function0<int> Functor;
 
 	struct Job {
+		Job() : weight(1), priority(0), id(0) { }
 		boost::shared_ptr<Functor> functor;
 		uint weight;
 		uint priority;
@@ -67,14 +70,14 @@ public:
 
     /*********************************************
      *  ctor/dtor
-     * 
+     *
      *********************************************/
 
     /** @brief ctor
       */
 
     PriorityThreadPool(uint targetWeightPerRun, uint highThreads, uint midThreads,
-    		uint lowThreads);
+    		uint lowThreads, uint id = 0);
     virtual ~PriorityThreadPool();
 
     void removeJobs(uint id);
@@ -108,7 +111,8 @@ private:
     boost::condition newJob;
     boost::thread_group threads;
     bool _stop;
-    uint weightPerRun;
+    uint32_t weightPerRun;
+    volatile uint id;   // prevent it from being optimized out
 };
 
 } // namespace threadpool

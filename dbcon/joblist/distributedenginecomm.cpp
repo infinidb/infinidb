@@ -172,10 +172,10 @@ namespace joblist
   DistributedEngineComm* DistributedEngineComm::fInstance = 0;
 
   /*static*/
-  DistributedEngineComm* DistributedEngineComm::instance(ResourceManager& rm)
+  DistributedEngineComm* DistributedEngineComm::instance(ResourceManager& rm, bool isExeMgr)
   {
     if (fInstance == 0)
-        fInstance = new DistributedEngineComm(rm);
+        fInstance = new DistributedEngineComm(rm, isExeMgr);
 
     return fInstance;
   }
@@ -187,13 +187,15 @@ namespace joblist
 	fInstance = 0;
   }
 
-  DistributedEngineComm::DistributedEngineComm(ResourceManager& rm) :
+  DistributedEngineComm::DistributedEngineComm(ResourceManager& rm, bool isExeMgr) :
 	fRm(rm),
 	fLBIDShift(fRm.getPsLBID_Shift()),
 	pmCount(0),
 	fMulticast(rm.getPsMulticast()),
-	fMulticastSender()
+	fMulticastSender(),
+    fIsExeMgr(isExeMgr)
   {
+
     Setup();
   }
 
@@ -209,7 +211,7 @@ void DistributedEngineComm::Setup()
 
 	throttleThreshold = fRm.getDECThrottleThreshold();
     uint newPmCount = fRm.getPsCount();
-    int cpp = fRm.getPsConnectionsPerPrimProc();
+    int cpp = (fIsExeMgr ? fRm.getPsConnectionsPerPrimProc() : 1);
     tbpsThreadCount = fRm.getJlNumScanReceiveThreads();
     unsigned numConnections = newPmCount * cpp;
     oam::Oam oam;
@@ -294,7 +296,6 @@ int DistributedEngineComm::Close()
     return 0;
   }
 
-
 void DistributedEngineComm::Listen(boost::shared_ptr<MessageQueueClient> client, uint connIndex)
 {
 	SBS sbs;
@@ -305,8 +306,9 @@ void DistributedEngineComm::Listen(boost::shared_ptr<MessageQueueClient> client,
 			Stats stats;
 			//TODO: This call blocks so setting Busy() in another thread doesn't work here...
 			sbs = client->read(0, NULL, &stats);
-			if (sbs->length() != 0)
+			if (sbs->length() != 0) {
 				addDataToOutput(sbs, connIndex, &stats);
+			}
 			else // got zero bytes on read, nothing more will come
 				goto Error;
 		}
@@ -399,6 +401,7 @@ void DistributedEngineComm::addQueue(uint32_t key, bool sendACKs)
 	MessageQueueMap::iterator map_tok = fSessionMessages.find(key);
 	if (map_tok == fSessionMessages.end())
 		return;
+
 	map_tok->second->queue.shutdown();
 	map_tok->second->queue.clear();
 	fSessionMessages.erase(map_tok);
@@ -505,7 +508,8 @@ void DistributedEngineComm::read(uint32_t key, SBS &bs)
 	}
   }
 
-  void DistributedEngineComm::read_some(uint32_t key, uint divisor, vector<SBS> &v)
+  void DistributedEngineComm::read_some(uint32_t key, uint divisor, vector<SBS> &v,
+                                        bool *flowControlOn)
   {
 	boost::shared_ptr<MQE> mqe;
 
@@ -524,11 +528,16 @@ void DistributedEngineComm::read(uint32_t key, SBS &bs)
 
 	TSQSize_t queueSize = mqe->queue.pop_some(divisor, v, 1);   // need to play with the min #
 
+	if (flowControlOn)
+        *flowControlOn = false;
+
 	if (mqe->sendACKs) {
 		mutex::scoped_lock lk(ackLock);
 		if (mqe->throttled && !mqe->hasBigMsgs && queueSize.size <= disableThreshold)
 			setFlowControl(false, key, mqe);
 		sendAcks(key, v, mqe, queueSize.size);
+        if (flowControlOn)
+            *flowControlOn = mqe->throttled;
 	}
   }
 
@@ -681,6 +690,15 @@ void DistributedEngineComm::setFlowControl(bool enabled, uint32_t uniqueID, boos
 	ism->Interleave = uniqueID;
 	ism->Command = BATCH_PRIMITIVE_ACK;
 	ism->Size = (enabled ? 0 : -1);
+	
+#ifdef VALGRIND
+	/* XXXPAT: For testing in valgrind, init the vars that don't get used */
+	ism->Flags = 0;
+	ism->Type = 0;
+	ism->MsgCount = 0;
+	ism->Status = 0;
+#endif	
+
 	msg.advanceInputPtr(sizeof(ISMPacketHeader));
 
 	for (uint i = 0; i < mqe->pmCount; i++)

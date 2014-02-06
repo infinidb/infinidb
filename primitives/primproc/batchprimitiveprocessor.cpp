@@ -106,7 +106,8 @@ BatchPrimitiveProcessor::BatchPrimitiveProcessor() :
 	filtOnString(false),
 	prefetchThreshold(0),
 	hasDictStep(false),
-	sockIndex(0)
+	sockIndex(0),
+	endOfJoinerRan(false)
 {
 	pp.setLogicalBlockMode(true);
 	pp.setBlockPtr((int *) blockData);
@@ -145,7 +146,8 @@ BatchPrimitiveProcessor::BatchPrimitiveProcessor(ByteStream &b, double prefetch,
 	filtOnString(false),
 	prefetchThreshold(prefetch),
 	hasDictStep(false),
-	sockIndex(0)
+	sockIndex(0),
+	endOfJoinerRan(false)
 {
 	pp.setLogicalBlockMode(true);
 	pp.setBlockPtr((int *) blockData);
@@ -254,7 +256,6 @@ void BatchPrimitiveProcessor::initBPP(ByteStream &bs)
 				bs >> tJoinerSizes[i];
  				//cout << "joiner size = " << tJoinerSizes[i] << endl;
 				bs >> joinTypes[i];
-				bs >> joinNullValues[i];
 				bs >> tmp8;
 				typelessJoin[i] = (bool) tmp8;
 				if (joinTypes[i] & WITHFCNEXP) {
@@ -265,6 +266,7 @@ void BatchPrimitiveProcessor::initBPP(ByteStream &bs)
 				if (joinTypes[i] & SMALLOUTER)
 					hasSmallOuterJoin = true;
 				if (!typelessJoin[i]) {
+					bs >> joinNullValues[i];
 					bs >> largeSideKeyColumns[i];
  					//cout << "large side key is " << largeSideKeyColumns[i] << endl;
 					_pools[i].reset(new utils::SimplePool());
@@ -442,7 +444,7 @@ void BatchPrimitiveProcessor::resetBPP(ByteStream &bs, const SP_UM_MUTEX& w,
 
 void BatchPrimitiveProcessor::addToJoiner(ByteStream &bs)
 {
-	uint32_t count, i, joinerNum, tlIndex;
+	uint32_t count, i, joinerNum, tlIndex, startPos;
 	joblist::ElementType *et;
 	TypelessData tlLargeKey;
 	uint8_t nullFlag;
@@ -459,6 +461,7 @@ void BatchPrimitiveProcessor::addToJoiner(ByteStream &bs)
 	bs.advance(sizeof(ISMPacketHeader) + 3*sizeof(uint32_t));
 
 	bs >> count;
+	bs >> startPos;
 	if (ot == ROW_GROUP) {
 		bs >> joinerNum;
 		idbassert(joinerNum < joinerCount);
@@ -502,9 +505,9 @@ void BatchPrimitiveProcessor::addToJoiner(ByteStream &bs)
 			// the extra copying.
 			offTheWire.deserialize(bs);
 			smallSide.setData(&smallSideRowData[joinerNum]);
-			smallSide.append(offTheWire);
+			smallSide.append(offTheWire, startPos);
 
-			ssrdPos[joinerNum] += count;
+			//ssrdPos[joinerNum] += count;
 
 /*  This prints the row data
 			smallSideRGs[joinerNum].initRow(&r);
@@ -527,11 +530,35 @@ void BatchPrimitiveProcessor::addToJoiner(ByteStream &bs)
 	addToJoinerLock.unlock();
 }
 
-void BatchPrimitiveProcessor::endOfJoiner()
+int BatchPrimitiveProcessor::endOfJoiner()
 {
 	/* Wait for all joiner elements to be added */
 	uint i;
 
+    boost::mutex::scoped_lock scoped(addToJoinerLock);
+
+    if (endOfJoinerRan)
+        return 0;
+
+	if (ot == ROW_GROUP)
+		for (i = 0; i < joinerCount; i++) {
+			if (!typelessJoin[i]) {
+				if ((tJoiners[i].get() == NULL || tJoiners[i]->size() !=
+				  tJoinerSizes[i]))
+					return -1;
+			}
+			else
+				if ((tlJoiners[i].get() == NULL || tlJoiners[i]->size() !=
+				  tJoinerSizes[i]))
+					return -1;
+		}
+	else
+		if (joiner.get() == NULL || joiner->size() != joinerSize)
+			return -1;
+
+    endOfJoinerRan = true;
+
+#ifdef old_version
 	addToJoinerLock.lock();
 	if (ot == ROW_GROUP)
 		for (i = 0; i < joinerCount; i++) {
@@ -557,9 +584,12 @@ void BatchPrimitiveProcessor::endOfJoiner()
 			addToJoinerLock.lock();
 		}
 	addToJoinerLock.unlock();
+#endif
+
 #ifndef __FreeBSD__
 	objLock.unlock();
 #endif
+    return 0;
 }
 
 void BatchPrimitiveProcessor::initProcessor()
@@ -797,7 +827,7 @@ void BatchPrimitiveProcessor::executeTupleJoin()
                 uint colIndex = largeSideKeyColumns[j];
                 if (oldRow.isUnsigned(colIndex)) 
 				    largeKey = oldRow.getUintField(colIndex);
-                else 
+                else
                     largeKey = oldRow.getIntField(colIndex);
                 found = (tJoiners[j]->find(largeKey) != tJoiners[j]->end());
 				isNull = oldRow.isNullValue(colIndex);

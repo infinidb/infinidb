@@ -2944,7 +2944,7 @@ int main(int argc, char *argv[])
 								exit (1);
 							}
 					
-							usleep(10000);
+							sleep(1);
 
 						}
 						else
@@ -2981,7 +2981,7 @@ int main(int argc, char *argv[])
 									exit (1);
 								}
 						
-								usleep(10000);
+								sleep(1);
 							}
 							else
 							{
@@ -3010,7 +3010,7 @@ int main(int argc, char *argv[])
 									exit (1);
 								}
 						
-								usleep(10000);
+								sleep(1);
 							}
 							else
 							{
@@ -3043,10 +3043,10 @@ int main(int argc, char *argv[])
 			cout.flush();
 			sleep(10);
 			wait++;
-			// give it 5 minutes to complete
-			if ( wait >= 60 )
+			// give it 10 minutes to complete
+			if ( wait >= 120 )
 			{
-				cout << "Timed out (5 minutes) waiting for Remote Nodes to be Installed, check logs" << endl;
+				cout << "Timed out (10 minutes) waiting for Remote Nodes to be Installed, check logs" << endl;
 				exit (1);
 			}
 		}
@@ -4755,7 +4755,7 @@ bool updateBash()
 	cmd = "echo . ./" + DataFileEnvFile + " >> " + fileName;
 	system(cmd.c_str());
 
-	cmd = "su - hdfs -c 'hadoop fs -mkdir /usr/local/Calpont;hadoop fs -chown root:root /usr/local/Calpont' >/dev/null 2>&1";
+	cmd = "su - hdfs -c 'hadoop fs -mkdir -p /usr/local/Calpont;hadoop fs -chown root:root /usr/local/Calpont' >/dev/null 2>&1";
 	system(cmd.c_str());
 
 	newFile.close();

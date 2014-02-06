@@ -111,7 +111,7 @@ void ThreadPool::wait()
     while (waitingFunctorsSize > 0)
     {
         fThreadAvailable.wait(lock1);
-		cerr << "woke!" << endl;
+		//cerr << "woke!" << endl;
     }
 }
 
@@ -200,19 +200,18 @@ void ThreadPool::beginThread() throw()
 				/* Need to tune these magic #s */
 
 				vector<Container_T::iterator> todoList;
-				int i, num = (waitingFunctorsSize - issued)/2;
+				int i, num;
 				Container_T::const_iterator iter;
 
-				/* If one thread gets fewer than 10 jobs, just do them all */
-				if (num < 1)	//BP 01/17/2012 15:26 -changed from 10 to 1 for WES 
-					num = waitingFunctorsSize - issued;
+				/* Use this to control how many jobs are issued to a single thread */
+                num = (waitingFunctorsSize - issued >= 1 ? 1 : 0);
 
 				for (i = 0; i < num; i++)
                 	todoList.push_back(fNextFunctor++);
 
 				issued += num;
 // 				cerr << "got " << num << " jobs." << endl;
-//   				cerr << "got " << num << " jobs. waitingFunctorsSize=" << 
+//   				cerr << "got " << num << " jobs. waitingFunctorsSize=" <<
 //   					waitingFunctorsSize << " issued=" << issued << " fThreadCount=" <<
 //   					fThreadCount << endl;
                 lock1.unlock();
@@ -230,15 +229,15 @@ void ThreadPool::beginThread() throw()
 
 				issued -= num;
 				waitingFunctorsSize -= num;
-				for (i = 0; i < num; i++) 
+				for (i = 0; i < num; i++)
 					fWaitingFunctors.erase(todoList[i]);
 /*
-				if (waitingFunctorsSize != fWaitingFunctors.size()) 
-					cerr << "size mismatch!  fake size=" << waitingFunctorsSize << 
+				if (waitingFunctorsSize != fWaitingFunctors.size())
+					cerr << "size mismatch!  fake size=" << waitingFunctorsSize <<
 						" real size=" << fWaitingFunctors.size() << endl;
 */
                 fThreadAvailable.notify_all();
-				
+
             }
         }
     }

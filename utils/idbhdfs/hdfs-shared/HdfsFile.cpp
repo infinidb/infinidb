@@ -43,7 +43,7 @@ HdfsFile::HdfsFile(const char* fname, const char* mode, unsigned /* opts */) :
 	{
 		ostringstream oss;
 		oss << "Error opening file - unsupported mode " << mode;
-    	throw std::runtime_error(oss.str());
+		throw std::runtime_error(oss.str());
 	}
 
 	m_fs = HdfsFsCache::fs();
@@ -53,12 +53,12 @@ HdfsFile::HdfsFile(const char* fname, const char* mode, unsigned /* opts */) :
 	if ((m_flags & O_APPEND) && (hdfsExists(m_fs, fname) != 0))
 		m_flags &= ~O_APPEND;
 
-    m_file = hdfsOpenFile(m_fs, fname, m_flags, 0, 0, 0);
+	m_file = hdfsOpenFile(m_fs, fname, m_flags, 0, 0, 0);
 
-    if(!m_file)
-    {
-    	throw std::runtime_error("unable to open HDFS file ");
-    }
+	if(!m_file)
+	{
+		throw std::runtime_error("unable to open HDFS file ");
+	}
 }
 
 HdfsFile::~HdfsFile()
@@ -107,9 +107,14 @@ ssize_t HdfsFile::pread(void *ptr, off64_t offset, size_t count)
 	{
 		//if (ret != count)
 		//	IDBLogger::logRW("pread_retry", m_fname, this, offset, count, ret);
-		if (retryCount >= 50)
+		if (retryCount >= 25)
 			break;
-		usleep(1000);
+
+		if (retryCount < 10)
+			usleep(1000);
+		else
+			usleep(200000);
+
 		reopen();
 		ret = hdfsPread(m_fs, m_file, offset, ptr, count);
 		retryCount++;
@@ -123,6 +128,8 @@ ssize_t HdfsFile::pread(void *ptr, off64_t offset, size_t count)
 
 ssize_t HdfsFile::read(void *ptr, size_t count)
 {
+	boost::mutex::scoped_lock lock(m_mutex);
+
 	size_t offset = tell();
 	tSize ret = hdfsRead(m_fs, m_file, ptr, count);
 	// see comment in pread
@@ -136,8 +143,13 @@ ssize_t HdfsFile::read(void *ptr, size_t count)
 	{
 		// retry
 		int retryCount = 0;
-		while (ret >= 0 && ret != (tSize) count && ++retryCount < 40)
+		while (ret >= 0 && ret != (tSize) count && ++retryCount < 25)
 		{
+			if (retryCount < 10)
+				usleep(1000);
+			else
+				usleep(200000);
+
 			ssize_t n = hdfsRead(m_fs, m_file, (char*)ptr+ret, count-ret);
 			if (n >= 0)
 				ret += n;
@@ -167,8 +179,21 @@ ssize_t HdfsFile::write(const void *ptr, size_t count)
 	}
 	else if ((size_t) ret < count)  // ret >= 0
 	{
-		// retry once for now
-		ret += hdfsWrite(m_fs, m_file, (const char*)ptr+ret, count-ret);
+		// retry
+		int retryCount = 0;
+		while (ret >= 0 && ret != (tSize) count && ++retryCount < 25)
+		{
+			if (retryCount < 10)
+				usleep(1000);
+			else
+				usleep(200000);
+
+			ssize_t n = hdfsWrite(m_fs, m_file, (const char*)ptr+ret, count-ret);
+			if (n >= 0)
+				ret += n;
+			else
+				ret = n;
+		}
 	}
 
 	if( IDBLogger::isEnabled() )
@@ -179,6 +204,8 @@ ssize_t HdfsFile::write(const void *ptr, size_t count)
 
 int HdfsFile::seek(off64_t offset, int whence)
 {
+	boost::mutex::scoped_lock lock(m_mutex);
+
 	off_t mod_offset = offset;
 	if( whence == SEEK_CUR )
 	{
@@ -226,7 +253,7 @@ off64_t HdfsFile::size()
 	if( IDBLogger::isEnabled() )
 		IDBLogger::logSize(m_fname, this, ret);
 
-    return ret;
+	return ret;
 }
 
 off64_t HdfsFile::tell()

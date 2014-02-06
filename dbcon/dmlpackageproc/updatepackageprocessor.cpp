@@ -109,7 +109,7 @@ UpdatePackageProcessor::processPackage(dmlpackage::CalpontDMLPackage& cpackage)
 	}
 	
 	uint64_t tableLockId = 0;
-	CalpontSystemCatalog *systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(fSessionID);
+	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(fSessionID);
 	CalpontSystemCatalog::TableName tableName;		
 	// get the table object from the package
     DMLTable* tablePtr =  cpackage.get_Table();

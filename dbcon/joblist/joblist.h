@@ -79,8 +79,8 @@ public:
 	virtual void querySummary(bool extendedStats);
 	virtual void graph(uint32_t sessionID);
 
-	virtual const SErrorInfo& statusPtr() const { return errInfo; }
-	virtual void statusPtr(SErrorInfo sp) { errInfo = sp; }
+	virtual const SErrorInfo& errorInfo() const { return errInfo; }
+	virtual void errorInfo(SErrorInfo sp) { errInfo = sp; }
 
 	virtual const uint32_t status() const { return errInfo->errCode; }
 	virtual void status(uint32_t ec) { errInfo->errCode = ec; }

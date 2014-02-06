@@ -612,7 +612,7 @@ void JobList::graph(uint32_t sessionID)
 	JobStepVector::iterator qsi;
 	JobStepVector::iterator psi;
 	DeliveredTableMap::iterator dsi;
-	CalpontSystemCatalog *csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
+	boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 	CalpontSystemCatalog::TableColName tcn;
 	uint64_t outSize = 0;
 	uint64_t msgs = 0;
@@ -1139,13 +1139,13 @@ void JobList::validate() const
 //
 //	/* Check that all JobSteps use the right status pointer */
 //	for (i = 0; i < fQuery.size(); i++) {
-//		idbassert(fQuery[i]->statusPtr().get() == statusPtr().get());
+//		idbassert(fQuery[i]->errorInfo().get() == errorInfo().get());
 //	}
 //	for (i = 0; i < fProject.size(); i++) {
-//		idbassert(fProject[i]->statusPtr().get() == statusPtr().get());
+//		idbassert(fProject[i]->errorInfo().get() == errorInfo().get());
 //	}
 //	for (it = fDeliveredTables.begin(); it != fDeliveredTables.end(); ++it) {
-//		idbassert(it->second->statusPtr().get() == statusPtr().get());
+//		idbassert(it->second->errorInfo().get() == errorInfo().get());
 //	}
 }
 
@@ -1179,13 +1179,13 @@ void TupleJobList::validate() const
 
 	/* Check that all JobSteps use the right status pointer */
 	for (i = 0; i < fQuery.size(); i++)
-		idbassert(fQuery[i]->statusPtr().get() == statusPtr().get());
+		idbassert(fQuery[i]->errorInfo().get() == errorInfo().get());
 
 	for (i = 0; i < fProject.size(); i++)
-		idbassert(fProject[i]->statusPtr().get() == statusPtr().get());
+		idbassert(fProject[i]->errorInfo().get() == errorInfo().get());
 
 	for (it = fDeliveredTables.begin(); it != fDeliveredTables.end(); ++it)
-		idbassert(it->second->statusPtr().get() == statusPtr().get());
+		idbassert(it->second->errorInfo().get() == errorInfo().get());
 }
 
 void JobList::abort()

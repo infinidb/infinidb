@@ -180,7 +180,7 @@ class MasterSegmentTable {
 		MasterSegmentTable& operator=(const MasterSegmentTable& mst);
 
 		int shmid;
-		mutable rwlock::RWLock *rwlock[nTables];
+		mutable boost::scoped_ptr<rwlock::RWLock> rwlock[nTables];
 		
 		static const int MSTshmsize = nTables * sizeof(MSTEntry);
 		int RWLockKeys[nTables];

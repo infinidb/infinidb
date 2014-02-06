@@ -45,7 +45,7 @@ class UpdatePackageProcessor : public DMLPackageProcessor
 {
 
 public:
-	UpdatePackageProcessor(BRM::DBRM* aDbrm) : DMLPackageProcessor(aDbrm) {
+	UpdatePackageProcessor(BRM::DBRM* aDbrm, uint32_t sid) : DMLPackageProcessor(aDbrm, sid) {
 	}
     /** @brief process an UpdateDMLPackage
      *

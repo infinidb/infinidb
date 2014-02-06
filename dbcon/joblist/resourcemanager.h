@@ -33,7 +33,6 @@
 
 #include "configcpp.h"
 #include "calpontselectexecutionplan.h"
-#include "jl_logger.h"
 #include "resourcedistributor.h"
 
 #include "atomicops.h"

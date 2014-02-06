@@ -43,7 +43,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\boost_1_52_0;C:\InfiniDB\src\utils\messageqcpp;C:\InfiniDB\src\utils\winport;C:\InfiniDB\src\utils\loggingcpp;C:\InfiniDB\src\utils\startup"
+				AdditionalIncludeDirectories="&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\boost_1_52_0;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\startup"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
@@ -55,7 +55,7 @@
 			/>
 			<Tool
 				Name="VCResourceCompilerTool"
-				AdditionalIncludeDirectories="C:\InfiniDB\src\utils\winport"
+				AdditionalIncludeDirectories="C:\InfiniDB\genii\utils\winport"
 			/>
 			<Tool
 				Name="VCPreLinkEventTool"
@@ -115,7 +115,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\boost_1_52_0;C:\InfiniDB\src\utils\messageqcpp;C:\InfiniDB\src\utils\winport;C:\InfiniDB\src\utils\loggingcpp;C:\InfiniDB\src\utils\startup"
+				AdditionalIncludeDirectories="&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\boost_1_52_0;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\startup"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
@@ -185,7 +185,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\boost_1_52_0;C:\InfiniDB\src\utils\messageqcpp;C:\InfiniDB\src\utils\winport;C:\InfiniDB\src\utils\loggingcpp;C:\InfiniDB\src\utils\startup"
+				AdditionalIncludeDirectories="&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\boost_1_52_0;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\startup"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
 				WarningLevel="3"
@@ -197,7 +197,7 @@
 			/>
 			<Tool
 				Name="VCResourceCompilerTool"
-				AdditionalIncludeDirectories="C:\InfiniDB\src\utils\winport"
+				AdditionalIncludeDirectories="C:\InfiniDB\genii\utils\winport"
 			/>
 			<Tool
 				Name="VCPreLinkEventTool"
@@ -261,7 +261,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\boost_1_52_0;C:\InfiniDB\src\utils\messageqcpp;C:\InfiniDB\src\utils\winport;C:\InfiniDB\src\utils\loggingcpp;C:\InfiniDB\src\utils\startup"
+				AdditionalIncludeDirectories="&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\boost_1_52_0;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\startup"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
 				WarningLevel="3"
@@ -332,7 +332,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\boost_1_52_0;C:\InfiniDB\src\utils\messageqcpp;C:\InfiniDB\src\utils\winport;C:\InfiniDB\src\utils\loggingcpp;C:\InfiniDB\src\utils\startup"
+				AdditionalIncludeDirectories="&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\boost_1_52_0;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\startup"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
 				WarningLevel="3"
@@ -344,7 +344,7 @@
 			/>
 			<Tool
 				Name="VCResourceCompilerTool"
-				AdditionalIncludeDirectories="C:\InfiniDB\src\utils\winport"
+				AdditionalIncludeDirectories="C:\InfiniDB\genii\utils\winport"
 			/>
 			<Tool
 				Name="VCPreLinkEventTool"
@@ -408,7 +408,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\boost_1_52_0;C:\InfiniDB\src\utils\messageqcpp;C:\InfiniDB\src\utils\winport;C:\InfiniDB\src\utils\loggingcpp;C:\InfiniDB\src\utils\startup"
+				AdditionalIncludeDirectories="&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\boost_1_52_0;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\startup"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
 				WarningLevel="3"

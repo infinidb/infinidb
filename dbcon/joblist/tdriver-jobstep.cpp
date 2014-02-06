@@ -72,7 +72,7 @@ public:
     void pColScan_1() 
 	{
 		DistributedEngineComm* dec;
-		CalpontSystemCatalog *cat;
+		boost::shared_ptr<CalpontSystemCatalog> cat;
 
 		dec = DistributedEngineComm::instance(fRm);
 	// 	dec = DistributedEngineComm::instance("./config-dec.xml");
@@ -113,7 +113,7 @@ public:
 	void pColStep_1()
 	{
 		DistributedEngineComm* dec;
-		CalpontSystemCatalog *cat;
+		boost::shared_ptr<CalpontSystemCatalog> cat;
 		ElementType e;
 		int i, it;
 		bool more;
@@ -161,7 +161,7 @@ public:
 	void pColStep_2() 
 	{
 		DistributedEngineComm* dec;
-		CalpontSystemCatalog *cat;
+		boost::shared_ptr<CalpontSystemCatalog> cat;
 		ElementType e;
 		int i, it;
 		bool more;
@@ -210,7 +210,7 @@ public:
 	void pColStep_as_ProjectionStep_1()
 	{
 		DistributedEngineComm* dec;
-		CalpontSystemCatalog *cat;
+		boost::shared_ptr<CalpontSystemCatalog> cat;
 		ElementType e;
 		int i, it;
 		bool more;
@@ -551,7 +551,7 @@ void reduceStep_4()
 	void pnljoin_1()
 	{
 		DistributedEngineComm* dec;
-		CalpontSystemCatalog *cat;
+		boost::shared_ptr<CalpontSystemCatalog> cat;
 		ElementType e;
 		int it;
 		bool more;
@@ -603,7 +603,7 @@ void reduceStep_4()
 	void pnljoin_2()
 	{
 		DistributedEngineComm* dec;
-		CalpontSystemCatalog *cat;
+		boost::shared_ptr<CalpontSystemCatalog> cat;
 		ElementType e;
 		int i, it;
 		bool more;
@@ -667,7 +667,7 @@ void reduceStep_4()
 	void pnljoin_3()
 	{
 		DistributedEngineComm* dec;
-		CalpontSystemCatalog *cat;
+		boost::shared_ptr<CalpontSystemCatalog> cat;
 		ElementType e;
 		int i, it;
 		bool more;

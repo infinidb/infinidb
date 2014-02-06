@@ -384,8 +384,8 @@ void GroupConcator::initialize(const rowgroup::SP_GroupConcat& gcc)
 	fGroupConcatLen = gcc->fSize;
 	fCurrentLength -= strlen(gcc->fSeparator.c_str());
 
-	fOutputString.reset(new uint8_t[fGroupConcatLen]);
-	memset(fOutputString.get(), 0, fGroupConcatLen);
+	fOutputString.reset(new uint8_t[fGroupConcatLen+2]);
+	memset(fOutputString.get(), 0, fGroupConcatLen+2);
 	
 	fConstCols = gcc->fConstCols;
 	fConstantLen = strlen(gcc->fSeparator.c_str());

@@ -232,7 +232,10 @@ int ColumnOp::allocRowId(const TxnID& txnid, bool useStartingExtent,
 						BLKS_PER_EXTENT =(BRMWrapper::getInstance()->getExtentRows() * newColStructList[i].colWidth)/BYTE_PER_BLOCK;
 						nBlks = newHwm + 1;
 						nRem  = nBlks % BLKS_PER_EXTENT;
-						newHwm = nBlks - nRem + BLKS_PER_EXTENT - 1;
+						if (nRem > 0)
+							newHwm = nBlks - nRem + BLKS_PER_EXTENT - 1;
+						else
+							newHwm = nBlks - 1;
 						//save it to set in the end
 						ColExtsInfo aColExtsInfo = tableMetaData->getColExtsInfo(newColStructList[i].dataOid);
 						ColExtInfo aExt;

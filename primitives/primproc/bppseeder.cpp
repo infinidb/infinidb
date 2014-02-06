@@ -19,7 +19,7 @@
 // $Id: bppseeder.cpp 2035 2013-01-21 14:12:19Z rdempsey $
 // C++ Implementation: bppseeder
 //
-// Description: 
+// Description:
 //
 //
 // Author: Patrick <pleblanc@localhost.localdomain>, (C) 2008
@@ -77,7 +77,7 @@ extern int fCacheCount;
 
 void timespec_sub(const struct timespec &tv1,
 				const struct timespec &tv2,
-				double &tm) 
+				double &tm)
 {
 	tm = (double)(tv2.tv_sec - tv1.tv_sec) + 1.e-9*(tv2.tv_nsec - tv1.tv_nsec);
 }
@@ -98,6 +98,9 @@ BPPSeeder::BPPSeeder(const SBS &b,
 	stepID = *((uint32_t *) &buf[pos]); pos += 4;
 	uniqueID = *((uint32_t *) &buf[pos]); pos +=4;
 	_priority = *((uint32_t *) &buf[pos]);
+
+	dieTime = boost::posix_time::second_clock::universal_time() +
+                boost::posix_time::seconds(100);
 }
 
 BPPSeeder::BPPSeeder(const BPPSeeder &b)
@@ -123,7 +126,6 @@ int BPPSeeder::operator()()
 	double tm3=0;
 	bool ptLock=false;
 	bool gotBPP = false;
-	const uint maxFailCount = 20000;   // current 1ms pause in W-threadpool, this is 20s
 	PTLogs_t* logFD=NULL;
 	int ret = 0;
 	pthread_t tid=0;
@@ -147,52 +149,53 @@ int BPPSeeder::operator()()
 
 		//if (!(sessionID & 0x80000000))
 		//cout << "got request for <" << sessionID <<", " << stepID << ">\n";
-retry:
 		scoped.lock();
 		if (!bppv) {
 			it = bppMap.find(uniqueID);
 			if (it == bppMap.end()) {
 				/* mitigate a small race between creation and use */
 				scoped.unlock();
-				if (++failCount > maxFailCount) {
+				if (boost::posix_time::second_clock::universal_time() > dieTime) {
 #if 0   // for debugging
 #ifndef _MSC_VER
 					boost::posix_time::ptime pt = boost::posix_time::microsec_clock::local_time();
 					if (sessionID & 0x80000000)
-						cout << "BPPSeeder couldn't find the sessionID/stepID pair.  sessionID=" 
+						cout << "BPPSeeder couldn't find the sessionID/stepID pair.  sessionID="
 							<< (int) (sessionID ^ 0x80000000) << " stepID=" << stepID << " (syscat)" << pt << endl;
-					else 
-						cout << "BPPSeeder couldn't find the sessionID/stepID pair.  sessionID=" 
+					else
+						cout << "BPPSeeder couldn't find the sessionID/stepID pair.  sessionID="
 							<< sessionID << " stepID=" << stepID << pt << endl;
 #endif
 					throw logic_error("BPPSeeder couldn't find the sessionID/stepID pair");
 #endif
 					return 0;
 				}
-				if (!isSysCat()) 
+//				if (!isSysCat())
 					return -1;
-				else {   // syscat queries aren't run by a threadpool, can't reschedule those jobs
-					usleep(1000);
-					goto retry;
-				}
+//				else {   // syscat queries aren't run by a threadpool, can't reschedule those jobs
+//					usleep(1000);
+//					goto retry;
+//				}
 			}
 			bppv = it->second;
 		}
+		if (bppv->aborted())
+			return 0;
 		bpp = bppv->next();
 		scoped.unlock();
 		if (!bpp) {
-			if (isSysCat()) {
-				usleep(1000);
-				goto retry;
-			}
+//			if (isSysCat()) {
+//				usleep(1000);
+//				goto retry;
+//			}
 			return -1;    // all BPP instances are busy, make threadpool reschedule
 		}
 		gotBPP = true;
 		bpp->resetBPP(*bs, writelock, sock);
 		firstRun = false;
 	}   // firstRun
-	
-	
+
+
 	if (fTrace)
 	{
 		PTLogsMap_t::iterator it;
@@ -229,7 +232,7 @@ retry:
 			}
 		} else
 			logFD =(*it).second.get();
-		
+
 		if (ptLock) {
 			gFDMutex.unlock();
 			ptLock=false;
@@ -245,7 +248,7 @@ restart:
 	catch (NeedToRestartJob &e) {
 		ostringstream os;
 		// experimentally the race can exist longer than 10s.  "No way" should
-		// it take 10 minutes.  If it does, the user will have to resubmit their 
+		// it take 10 minutes.  If it does, the user will have to resubmit their
 		// query.
 
 		// 9/27/12 - changed the timeout to 2 mins b/c people report the system
@@ -273,12 +276,12 @@ restart:
 				<< left << setw(3) << logFD->thdId
 				<< right << fixed << ((double)(tm.tv_sec+(1.e-9*tm.tv_nsec))) << " "
 				<< right << fixed << tm3 << " "
-				<< right << setw(6) << bpp->getSessionID() << " " 
-				<< right << setw(4) << bpp->getStepID() << " " 
-				<< right << setw(2) << bpp->FilterCount() << " " 
-				<< right << setw(2) << bpp->ProjectCount() << " " 
-				<< right << setw(9) << bpp->PhysIOCount() << " " 
-				<< right << setw(9) << bpp->CachedIOCount() << " " 
+				<< right << setw(6) << bpp->getSessionID() << " "
+				<< right << setw(4) << bpp->getStepID() << " "
+				<< right << setw(2) << bpp->FilterCount() << " "
+				<< right << setw(2) << bpp->ProjectCount() << " "
+				<< right << setw(9) << bpp->PhysIOCount() << " "
+				<< right << setw(9) << bpp->CachedIOCount() << " "
 				<< right << setw(9) << bpp->BlocksTouchedCount()
 				<< endl;
 		} // if (logFD...
@@ -332,8 +335,8 @@ void BPPSeeder::sendErrorMsg(uint32_t id, uint16_t status, uint32_t step)
 
 	ISMPacketHeader ism;
 	PrimitiveHeader ph = {0};
-	
-	ism.Status =  status;	
+
+	ism.Status =  status;
 	ph.UniqueID = id;
 	ph.StepID = step;
 	ByteStream msg(sizeof(ISMPacketHeader) + sizeof(PrimitiveHeader));

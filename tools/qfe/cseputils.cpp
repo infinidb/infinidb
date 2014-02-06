@@ -37,7 +37,7 @@ ConstantColumn* createConstCol(const string& valstr, T val)
 
 SimpleFilter* createSimpleFilter
 				(
-				CalpontSystemCatalog*& csc,
+				boost::shared_ptr<CalpontSystemCatalog>& csc,
 				const CalpontSystemCatalog::TableColName& tcn,
 				const string& opstr,
 				ConstantColumn* cc
@@ -117,7 +117,7 @@ void appendSimpleFilter
 	}
 }
 
-void updateParseTree(execplan::CalpontSystemCatalog*& csc,
+void updateParseTree(boost::shared_ptr<execplan::CalpontSystemCatalog>& csc,
 	execplan::CalpontSelectExecutionPlan*& csep,
 	execplan::SimpleColumn* sc,
 	const std::string& relop, pair<int, string> cval)

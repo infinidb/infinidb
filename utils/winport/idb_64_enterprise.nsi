@@ -47,10 +47,10 @@ PreInstStopped2:
 SetOutPath $INSTDIR
 WriteUninstaller $INSTDIR\uninstall.exe
 IfFileExists $INSTDIR\my.ini 0 MyIniNotExists
-File /oname=$INSTDIR\my_dist.ini C:\InfiniDB\src\utils\winport\my.ini
+File /oname=$INSTDIR\my_dist.ini C:\InfiniDB\genii\\utils\winport\my.ini
 Goto MyIniExists
 MyIniNotExists:
-File C:\InfiniDB\src\utils\winport\my.ini
+File C:\InfiniDB\genii\\utils\winport\my.ini
 MyIniExists:
 SetOutPath $INSTDIR\bin
 
@@ -119,10 +119,10 @@ File C:\InfiniDB\libxml2-2.7.6\libxml2.dll
 File C:\InfiniDB\vcredist_x64.exe
 
 File C:\InfiniDB\x64\EnterpriseRelease\bootstrap.exe
-File C:\InfiniDB\src\utils\winport\svcwait.bat
-File C:\InfiniDB\src\utils\winport\idbsvsta.bat
-File C:\InfiniDB\src\utils\winport\idbsvsto.bat
-File C:\InfiniDB\src\utils\winport\idbmysql.bat
+File C:\InfiniDB\genii\\utils\winport\svcwait.bat
+File C:\InfiniDB\genii\\utils\winport\idbsvsta.bat
+File C:\InfiniDB\genii\\utils\winport\idbsvsto.bat
+File C:\InfiniDB\genii\\utils\winport\idbmysql.bat
 
 SetOutPath $INSTDIR\bulk\data\import
 SetOutPath $INSTDIR\bulk\job
@@ -130,21 +130,21 @@ SetOutPath $INSTDIR\bulk\log
 SetOutPath $INSTDIR\data1
 SetOutPath $INSTDIR\dbrm
 SetOutPath $INSTDIR\etc
-File C:\InfiniDB\src\utils\winport\win_setup_mysql_part1.sql
-File C:\InfiniDB\src\utils\winport\win_setup_mysql_part2.sql
-File C:\InfiniDB\src\utils\winport\win_setup_mysql_part3.sql
-File C:\InfiniDB\src\utils\winport\win_setup_mysql_part3.1.sql
-File C:\InfiniDB\src\utils\winport\win_setup_mysql_part4.sql
-File C:\InfiniDB\src\utils\winport\win_setup_mysql_part5.sql
-File C:\InfiniDB\src\utils\winport\CalpontVersion.txt
+File C:\InfiniDB\genii\\utils\winport\win_setup_mysql_part1.sql
+File C:\InfiniDB\genii\\utils\winport\win_setup_mysql_part2.sql
+File C:\InfiniDB\genii\\utils\winport\win_setup_mysql_part3.sql
+File C:\InfiniDB\genii\\utils\winport\win_setup_mysql_part3.1.sql
+File C:\InfiniDB\genii\\utils\winport\win_setup_mysql_part4.sql
+File C:\InfiniDB\genii\\utils\winport\win_setup_mysql_part5.sql
+File C:\InfiniDB\genii\\utils\winport\CalpontVersion.txt
 IfFileExists $INSTDIR\etc\Calpont.xml 0 CfgNotExists
-File /oname=$INSTDIR\etc\Calpont_dist.xml C:\InfiniDB\src\utils\winport\Calpont.xml
+File /oname=$INSTDIR\etc\Calpont_dist.xml C:\InfiniDB\genii\\utils\winport\Calpont.xml
 Goto CfgExists
 CfgNotExists:
-File C:\InfiniDB\src\utils\winport\Calpont.xml
+File C:\InfiniDB\genii\\utils\winport\Calpont.xml
 CfgExists:
-File C:\InfiniDB\src\utils\loggingcpp\ErrorMessage.txt
-File C:\InfiniDB\src\utils\loggingcpp\MessageFile.txt
+File C:\InfiniDB\genii\\utils\loggingcpp\ErrorMessage.txt
+File C:\InfiniDB\genii\\utils\loggingcpp\MessageFile.txt
 SetOutPath $INSTDIR\log
 SetOutPath $INSTDIR\local
 SetOutPath $INSTDIR\mysqldb
@@ -176,10 +176,10 @@ File /r C:\InfiniDB\mysql\sql\share\swedish
 File /r C:\InfiniDB\mysql\sql\share\ukrainian
 SetOutPath $INSTDIR\tmp
 SetOutPath $INSTDIR\sql
-File C:\InfiniDB\src\dbcon\mysql\dumpcat_mysql.sql
-File C:\InfiniDB\src\dbcon\mysql\calsetuserpriority.sql
-File C:\InfiniDB\src\dbcon\mysql\calremoveuserpriority.sql
-File C:\InfiniDB\src\dbcon\mysql\calshowprocesslist.sql
+File C:\InfiniDB\genii\\dbcon\mysql\dumpcat_mysql.sql
+File C:\InfiniDB\genii\\dbcon\mysql\calsetuserpriority.sql
+File C:\InfiniDB\genii\\dbcon\mysql\calremoveuserpriority.sql
+File C:\InfiniDB\genii\\dbcon\mysql\calshowprocesslist.sql
 
 WriteRegStr HKLM Software\Calpont\InfiniDB "" $INSTDIR
 WriteRegStr HKLM Software\Calpont\InfiniDB "CalpontHome" $INSTDIR\etc

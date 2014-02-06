@@ -1012,7 +1012,7 @@ extern "C" EXECPROC_API void CalLogon(OCIExtProcContext* extProcCtx,
 	if (moduleType != "xm" )
 	{
 		// @bug 682. get all system catalog info for this schema and store them in cache
-		CalpontSystemCatalog *csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
+		boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 		if (csc)
 		{
 			// Make getSchemaInfo cover getTables. related to bug 1021.
@@ -1438,7 +1438,7 @@ extern "C" EXECPROC_API int ODCITableStart(OCIExtProcContext* extProcCtx,
 
 			// get calpont system catalog instance here when we have access to
 			// sessionid and txnID
-			CalpontSystemCatalog *csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
+			boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 			csc->sessionID(sessionID);
 			csc->identity(CalpontSystemCatalog::FE);
 
@@ -2231,7 +2231,7 @@ extern "C" EXECPROC_API int ODCITableFetch(OCIExtProcContext* extProcCtx, Calpon
 	storedCtx=GetStoredCtx(&handles,self,self_ind);
 	if (!storedCtx) return ODCI_ERROR;
 
-	CalpontSystemCatalog *csc = CalpontSystemCatalog::makeCalpontSystemCatalog(storedCtx->sessionID);
+	boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(storedCtx->sessionID);
 	csc->sessionID(storedCtx->sessionID);
 	csc->identity(CalpontSystemCatalog::FE);
 
@@ -3247,7 +3247,7 @@ extern "C" int Process_dml(OCIExtProcContext* extProcCtx,
 	CalpontSystemCatalog::TableName tableName;
 	tableName.schema = pDMLPackage->get_SchemaName();
 	tableName.table = pDMLPackage->get_TableName();
-	CalpontSystemCatalog *csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
+	boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 	csc->sessionID(sessionID);
 	csc->identity(CalpontSystemCatalog::FE);
 	execplan::CalpontSystemCatalog::RIDList ridList;

@@ -252,7 +252,7 @@ int ColumnAutoInc::getNextValueFromSysCat( uint64_t& nextValue )
     uint64_t nextAuto = 0;
     try
     {
-        execplan::CalpontSystemCatalog* systemCatPtr =
+        boost::shared_ptr<execplan::CalpontSystemCatalog> systemCatPtr =
             execplan::CalpontSystemCatalog::makeCalpontSystemCatalog(
                 BULK_SYSCAT_SESSION_ID);
         systemCatPtr->identity(execplan::CalpontSystemCatalog::EC);

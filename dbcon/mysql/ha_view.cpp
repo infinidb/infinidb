@@ -58,15 +58,15 @@ void View::viewName(execplan::CalpontSystemCatalog::TableAliasName& viewName)
 void View::transform()
 {
 	CalpontSelectExecutionPlan* csep = new CalpontSelectExecutionPlan();
-	csep->sessionID(fParentGwip->sessionid);	
-	
+	csep->sessionID(fParentGwip->sessionid);
+
 	// gwi for the sub query
 	gp_walk_info gwi;
-	gwi.thd = fParentGwip->thd;	
-	
+	gwi.thd = fParentGwip->thd;
+
 	uint32_t sessionID = csep->sessionID();
 	gwi.sessionid = sessionID;
-	CalpontSystemCatalog *csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
+	boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 	csc->identity(CalpontSystemCatalog::FE);
 	gwi.csc = csc;
 
@@ -82,7 +82,7 @@ void View::transform()
 			// mysql put vtable here for from sub. we ignore it
 			if (string(table_ptr->table_name).find("$vtable") != string::npos)
 				continue;
-				
+
 			string viewName = getViewName(table_ptr);
 
 			if (table_ptr->derived)
@@ -95,7 +95,6 @@ void View::transform()
 				fromSub->alias(alias);
 				gwi.derivedTbList.push_back(SCSEP(fromSub->transform()));
 				// set alias to both table name and alias name of the derived table
-				//z//CalpontSystemCatalog::TableAliasName tn = make_aliasview("", "", alias, fViewName.alias);
 				CalpontSystemCatalog::TableAliasName tn = make_aliasview("", "", alias, viewName);
 				gwi.tbList.push_back(tn);
 				gwi.tableMap[tn] = make_pair(0, table_ptr);
@@ -104,20 +103,18 @@ void View::transform()
 			else if (table_ptr->view)
 			{
 				// for nested view, the view name is vout.vin... format
-				//z//string viewName = fViewName.alias + string(".") + table_ptr->alias; 
-				//view->viewName(fViewName);
 				CalpontSystemCatalog::TableAliasName tn = make_aliasview(table_ptr->db, table_ptr->table_name, table_ptr->alias, viewName);
-				gwi.viewList.push_back(tn);
 				gwi.viewName = make_aliastable(table_ptr->db, table_ptr->table_name, viewName);
 				View *view = new View(table_ptr->view->select_lex, &gwi);
 				view->viewName(gwi.viewName);
+				gwi.viewList.push_back(view);
 				view->transform();
 			}
 			else
 			{
 				// check foreign engine tables
 				bool infiniDB = (table_ptr->table ? isInfiniDB(table_ptr->table) : true);
-				
+
 				// trigger system catalog cache
 				if (infiniDB)
 					csc->columnRIDs(make_table(table_ptr->db, table_ptr->table_name), true);
@@ -131,7 +128,6 @@ void View::transform()
 		if (gwi.fatalParseError)
 		{
 			setError(gwi.thd, HA_ERR_UNSUPPORTED, gwi.parseErrorText);
-			//return HA_ERR_UNSUPPORTED;
 			return;
 		}
 	}
@@ -139,24 +135,24 @@ void View::transform()
 	{
 		setError(gwi.thd, HA_ERR_INTERNAL_ERROR, ie.what());
 		CalpontSystemCatalog::removeCalpontSystemCatalog(sessionID);
-		return /*HA_ERR_INTERNAL_ERROR*/;
+		return;
 	}
 	catch (...)
 	{
-		string emsg = IDBErrorInfo::instance()->errorMsg(ERR_LOST_CONN_EXEMGR);		
+		string emsg = IDBErrorInfo::instance()->errorMsg(ERR_LOST_CONN_EXEMGR);
 		setError(gwi.thd, HA_ERR_INTERNAL_ERROR, emsg);
 		CalpontSystemCatalog::removeCalpontSystemCatalog(sessionID);
-		return /*HA_ERR_INTERNAL_ERROR*/;
+		return;
 	}
-	
-	// No need to check return status?
-	buildOuterJoin(gwi, fSelect);
 
 	// merge table list to parent select
 	fParentGwip->tbList.insert(fParentGwip->tbList.end(), gwi.tbList.begin(), gwi.tbList.end());
 	fParentGwip->derivedTbList.insert(fParentGwip->derivedTbList.end(), gwi.derivedTbList.begin(), gwi.derivedTbList.end());
 	fParentGwip->correlatedTbNameVec.insert(fParentGwip->correlatedTbNameVec.end(), gwi.correlatedTbNameVec.begin(), gwi.correlatedTbNameVec.end());
-	
+
+	// merge view list to parent
+	fParentGwip->viewList.insert(fParentGwip->viewList.end(), gwi.viewList.begin(), gwi.viewList.end());
+
 	// merge non-collapsed outer join to parent select
 	stack<ParseTree*> tmpstack;
 	while (!gwi.ptWorkStack.empty())
@@ -164,12 +160,17 @@ void View::transform()
 		tmpstack.push(gwi.ptWorkStack.top());
 		gwi.ptWorkStack.pop();
 	}
-	
+
 	while (!tmpstack.empty())
 	{
 		fParentGwip->ptWorkStack.push(tmpstack.top());
 		tmpstack.pop();
 	}
+}
+
+uint32_t View::processOuterJoin(gp_walk_info& gwi)
+{
+	return buildOuterJoin(gwi, fSelect);
 }
 
 }

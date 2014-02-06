@@ -317,26 +317,6 @@ public:
                             long long& fileSize ) const;
 
    /**
-    * @brief Initialize an extent in a column segment file
-    * @param pFile (in) IDBDataFile* of column segment file to be written to
-    * @param dbRoot (in) - DBRoot of pFile
-    * @param nBlocks (in) - number of blocks to be written for an extent
-    * @param emptyVal(in) - empty value to be used for column data values
-    * @param width (in) - width of the applicable column
-    * @param bNewFile (in)      -  Adding extent to new file
-    * @param bExpandExtent (in) -  Expand existing extent, or initialize new one
-    * @param bAbbrevExtent (in) -  If adding new extent, is it abbreviated
-    */
-    EXPORT int          initColumnExtent( IDBDataFile*    pFile,
-                            uint16_t dbRoot,
-                            int      nBlocks,
-                            uint64_t      emptyVal,
-                            int      width,
-                            bool     bNewFile,
-                            bool     bExpandExtent,
-                            bool     bAbbrevExtent );
-
-   /**
     * @brief Initialize an extent in a dictionary store file
     * @param pFile (in) IDBDataFile* of dictionary store file to be written to
     * @param dbRoot (in) - DBRoot of pFile
@@ -485,13 +465,6 @@ protected:
     EXPORT virtual int         updateColumnExtent(IDBDataFile* pFile, int nBlocks);
     EXPORT virtual int         updateDctnryExtent(IDBDataFile* pFile, int nBlocks);
 
-    int                 writeInitialCompColumnChunk( IDBDataFile* pFile,
-                            int      nBlocksAllocated,
-                            int      nRows,
-                            uint64_t emptyVal,
-                            int      width,
-                            char*    hdrs);
-
     int                 m_compressionType;  // compresssion type
 
 private:
@@ -515,8 +488,33 @@ private:
                             uint64_t      emptyVal,
                             int      width);
 
+    // Initialize an extent in a column segment file
+    // pFile (in) IDBDataFile* of column segment file to be written to
+    // dbRoot (in) - DBRoot of pFile
+    // nBlocks (in) - number of blocks to be written for an extent
+    // emptyVal(in) - empty value to be used for column data values
+    // width (in) - width of the applicable column
+    // bNewFile (in)      -  Adding extent to new file
+    // bExpandExtent (in) -  Expand existing extent, or initialize new one
+    // bAbbrevExtent (in) -  If adding new extent, is it abbreviated
+    int                 initColumnExtent( IDBDataFile*    pFile,
+                            uint16_t dbRoot,
+                            int      nBlocks,
+                            uint64_t emptyVal,
+                            int      width,
+                            bool     bNewFile,
+                            bool     bExpandExtent,
+                            bool     bAbbrevExtent );
+
     static void         initDbRootExtentMutexes();
     static void         removeDbRootExtentMutexes();
+
+    int                 writeInitialCompColumnChunk( IDBDataFile* pFile,
+                            int      nBlocksAllocated,
+                            int      nRows,
+                            uint64_t emptyVal,
+                            int      width,
+                            char*    hdrs);
 
     TxnID       m_transId;
 	bool 		m_isBulk;

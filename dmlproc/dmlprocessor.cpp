@@ -400,6 +400,13 @@ void PackageHandler::run()
 								logging::Logger logger(logid.fSubsysID);
 								logger.logMessage(LOG_TYPE_DEBUG, msg, logid); 
 								logging::logDML(insertPkg.get_SessionID(), fTxnid, insertPkg.get_SQLStatement()+ ";", insertPkg.get_SchemaName());
+								logging::Message::Args args;
+								logging::Message message(1);
+								args.add(errMsg);
+								args.add("");
+								args.add("");
+								message.format(args);
+								result.message = message;
 							}
 							else if ( rc != 0)
 							{
@@ -477,6 +484,13 @@ void PackageHandler::run()
 									logging::Logger logger(logid.fSubsysID);
 									logger.logMessage(LOG_TYPE_DEBUG, msg, logid); 
 									logging::logDML(insertPkg.get_SessionID(), fTxnid, insertPkg.get_SQLStatement()+ ";", insertPkg.get_SchemaName());
+									logging::Message::Args args;
+									logging::Message message(1);
+									args.add(errMsg);
+									args.add("");
+									args.add("");
+									message.format(args);
+									result.message = message;
 								}
 								else if ( rc != 0)
 								{
@@ -603,7 +617,7 @@ void PackageHandler::run()
 					{
 						//insertPkg.readTable(*(fByteStream.get()));
 						insertPkg.set_TxnID(fTxnid);
-						fProcessor.reset(new dmlpackageprocessor::InsertPackageProcessor(fDbrm));
+						fProcessor.reset(new dmlpackageprocessor::InsertPackageProcessor(fDbrm, insertPkg.get_SessionID()));
 						result = fProcessor->processPackage(insertPkg);
 					}
 				}
@@ -619,7 +633,7 @@ void PackageHandler::run()
 					// process it
 					//@Bug 1341. Don't remove calpontsystemcatalog from this 
 					//session to take advantage of cache. 
-					fProcessor.reset(new dmlpackageprocessor::UpdatePackageProcessor(fDbrm));
+					fProcessor.reset(new dmlpackageprocessor::UpdatePackageProcessor(fDbrm, updatePkg->get_SessionID()));
 					fProcessor->setEngineComm(fEC);
 					fProcessor->setRM( &frm);
 					idbassert( fTxnid != 0);
@@ -634,7 +648,7 @@ void PackageHandler::run()
 					deletePkg->set_TxnID(fTxnid);
 					// process it
 					//@Bug 1341. Don't remove calpontsystemcatalog from this session to take advantage of cache.
-					fProcessor.reset(new dmlpackageprocessor::DeletePackageProcessor(fDbrm));
+					fProcessor.reset(new dmlpackageprocessor::DeletePackageProcessor(fDbrm, deletePkg->get_SessionID()));
 					fProcessor->setEngineComm(fEC);
 					fProcessor->setRM( &frm);
 					idbassert( fTxnid != 0);
@@ -659,7 +673,7 @@ void PackageHandler::run()
 					{
 						// process it
 						//@Bug 1341. Don't remove calpontsystemcatalog from this session to take advantage of cache.
-						fProcessor.reset(new dmlpackageprocessor::CommandPackageProcessor(fDbrm));
+						fProcessor.reset(new dmlpackageprocessor::CommandPackageProcessor(fDbrm, commandPkg.get_SessionID()));
 					
 						//cout << "got command " << stmt << " for session " << commandPkg.get_SessionID() << endl;
 						result = fProcessor->processPackage(commandPkg);

@@ -155,7 +155,7 @@ private:
 
 	boost::scoped_ptr<boost::thread> fRunner;
 
-	execplan::CalpontSystemCatalog*  fCatalog;
+	boost::shared_ptr<execplan::CalpontSystemCatalog>  fCatalog;
 	uint64_t                         fRowsReturned;
 	bool                             fEndOfResult;
 	bool                             fIsSelect;

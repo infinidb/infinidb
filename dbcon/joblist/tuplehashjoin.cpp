@@ -247,8 +247,8 @@ void TupleHashJoinStep::smallRunnerFcn(uint index)
 		if (UNLIKELY(!gotMem)) {
 			/* bail out until we get an LHJ impl */
 			fLogger->logMessage(logging::LOG_TYPE_INFO, logging::ERR_JOIN_TOO_BIG);
-			status(logging::ERR_JOIN_TOO_BIG);
 			errorMessage(logging::IDBErrorInfo::instance()->errorMsg(logging::ERR_JOIN_TOO_BIG));
+			status(logging::ERR_JOIN_TOO_BIG);
 			fDie = true;
 			joinIsTooBig = true;
 			oss << "join too big ";
@@ -351,9 +351,9 @@ void TupleHashJoinStep::hjRunner()
 	}
 	catch (thread_resource_error&) {
 		string emsg = "TupleHashJoin caught a thread resource error, aborting...\n";
-		status(logging::threadResourceErr);
 		errorMessage("too many threads");
-		errorLogging(emsg);
+		status(logging::threadResourceErr);
+		errorLogging(emsg, logging::threadResourceErr);
 		fDie = true;
 	}
 
@@ -570,12 +570,13 @@ const string TupleHashJoinStep::toString() const
 //------------------------------------------------------------------------------
 // Log specified error to stderr and the critical log
 //------------------------------------------------------------------------------
-void TupleHashJoinStep::errorLogging(const string& msg) const
+void TupleHashJoinStep::errorLogging(const string& msg, int err) const
 {
 	ostringstream errMsg;
 	errMsg << "Step " << stepId() << "; " << msg;
 	cerr   << errMsg.str() << endl;
-	catchHandler( errMsg.str(), sessionId() );
+	SErrorInfo errorInfo(new ErrorInfo); // dummy, error info already set by caller.
+	catchHandler(msg, err, errorInfo, fSessionId);
 }
 
 void TupleHashJoinStep::addSmallSideRG(const vector<rowgroup::RowGroup>& rgs,
@@ -1121,8 +1122,8 @@ void TupleHashJoinStep::joinOneRG(uint threadID, vector<RGData> *out,
 				break;
 
 			if (joiners[j]->scalar() && matchCount > 1) {
-				status(logging::ERR_MORE_THAN_1_ROW);
 				errorMessage(logging::IDBErrorInfo::instance()->errorMsg(logging::ERR_MORE_THAN_1_ROW));
+				status(logging::ERR_MORE_THAN_1_ROW);
 				abort();
 			}
 			if (joiners[j]->smallOuterJoin())

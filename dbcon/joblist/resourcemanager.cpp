@@ -36,7 +36,7 @@ using namespace boost;
 #include "resourcemanager.h"
 #undef RESOURCEMANAGER_DLLEXPORT
 
-#include "logger.h"
+#include "jl_logger.h"
 #include "cgroupconfigurator.h"
 
 using namespace config;

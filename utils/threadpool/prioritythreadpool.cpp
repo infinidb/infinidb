@@ -37,8 +37,8 @@ namespace threadpool
 {
 
 PriorityThreadPool::PriorityThreadPool(uint targetWeightPerRun, uint highThreads,
-		uint midThreads, uint lowThreads) :
-		_stop(false), weightPerRun(targetWeightPerRun)
+		uint midThreads, uint lowThreads, uint ID) :
+		_stop(false), weightPerRun(targetWeightPerRun), id(ID)
 {
 	for (uint i = 0; i < highThreads; i++)
 		threads.create_thread(ThreadHelper(this, HIGH));

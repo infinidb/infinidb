@@ -133,6 +133,7 @@ protected:
 
 	uint64_t fRowsRetrieved;
 	uint64_t fRowsReturned;
+	uint64_t fRowsPerGroup;
 
 	// output rowgroup and row
 	rowgroup::RowGroup fRowGroupOut;

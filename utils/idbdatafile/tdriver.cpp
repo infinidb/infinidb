@@ -71,7 +71,7 @@ void usage()
 	cerr << "         -d use O_DIRECT" << endl;
 	cerr << "         -p flush before read" << endl;
 	cerr << "         -s sync on write" << endl;
-	cerr << "         -r repoen file for read" << endl;
+	cerr << "         -r reopen file for read" << endl;
 	cerr << "         -b <BLK_SIZE> block size in bytes" << endl;
 	cerr << "         -d <milliseconds> delay before read" << endl;
 	cerr << "         -c close file after each write" << endl;
@@ -156,6 +156,7 @@ private:
 	bool openRF();
 	bool flushTest(IDBDataFile::Types);
 	bool seekTest(IDBDataFile::Types);
+	bool listDirTest(IDBDataFile::Types, const string&);
 
 	void reset();
 
@@ -386,23 +387,10 @@ bool TestRunner::runTest( IDBDataFile::Types filetype, unsigned open_opts )
 		returnval = seekTest( filetype );
 	}
 
-	list<string> dircontents;
-	assert( fs.listDirectory( dir.c_str(), dircontents ) == 0 );
-	ostringstream ldstr;
-	ldstr << "Listed directory " << dir << ":";
-	list<string>::iterator iend = dircontents.end();
-	for( list<string>::iterator i = dircontents.begin(); i != iend; ++i )
+	if( returnval )
 	{
-		ldstr << (*i) << ",";
+		returnval = listDirTest( filetype, dir );
 	}
-	logMsg( INFO, ldstr.str() );
-	assert( dircontents.size() == 1 );
-
-	// now check a bogus path and make sure it returns -1
-	assert( fs.listDirectory( "/this-is-a-bogus-directory", dircontents ) == -1 );
-	assert( fs.remove( "/this-is-a-bogus-directory" ) == 0 );
-	assert( !fs.isDir( "/this-is-a-bogus-directory" ));
-	assert( !fs.isDir( m_fname.c_str() ));
 
 	if( returnval )
 		logMsg( INFO, typeString + " tests passed!", true );
@@ -1245,6 +1233,76 @@ bool TestRunner::seekTest( IDBDataFile::Types filetype )
 
 	delete file;
 	file = NULL;
+
+	return true;
+}
+
+bool TestRunner::listDirTest( IDBDataFile::Types filetype, const string& dir )
+{
+	logMsg( INFO, "listDirTest" );
+
+	IDBFileSystem& fs = IDBFileSystem::getFs( filetype );
+	ostringstream errstr;
+	string fname2 = m_fname + "2";
+	string fname3 = m_fname + "3";
+
+	IDBDataFile* file2 = IDBDataFile::open(filetype, fname2.c_str(), "w", m_open_opts);
+	if (file2)
+		delete file2;
+
+	IDBDataFile* file3 = IDBDataFile::open(filetype, fname3.c_str(), "w", m_open_opts);
+	if (file3)
+		delete file3;
+
+	list<string> dircontents;
+	if (fs.listDirectory( dir.c_str(), dircontents ) != 0)
+	{
+		errstr << "Error calling listDirectory";
+		logMsg( ERROR, errstr.str() );
+		return false;
+	}
+	ostringstream ldstr;
+	ldstr << "Listed directory " << dir << ":";
+	list<string>::iterator iend = dircontents.end();
+	bool foobarFound  = false;
+	bool foobar2Found = false;
+	bool foobar3Found = false;
+	for( list<string>::iterator i = dircontents.begin(); i != iend; ++i )
+	{
+		ldstr << (*i) << ",";
+		if ((*i) == "foobar")
+			foobarFound = true;
+		else if ((*i) == "foobar2")
+			foobar2Found = true;
+		else if ((*i) == "foobar3")
+			foobar3Found = true;
+	}
+	logMsg( INFO, ldstr.str() );
+
+	if (dircontents.size() != 3)
+	{
+		errstr << "listDirectory not returning 3 file names";
+		logMsg( ERROR, errstr.str() );
+		return false;
+	}
+	if ((!foobarFound || !foobar2Found || !foobar3Found))
+	{
+		errstr << "listDirectory returning incorrect file names";
+		logMsg( ERROR, errstr.str() );
+		return false;
+	}
+
+	// now check a bogus path and make sure it returns -1
+	if (fs.listDirectory( "/this-is-a-bogus-directory", dircontents ) != -1)
+	{
+		errstr << "listDirectory not failing a call for a bogus directory";
+		logMsg( ERROR, errstr.str() );
+		return false;
+	}
+
+	assert( fs.remove( "/this-is-a-bogus-directory" ) == 0 );
+	assert( !fs.isDir( "/this-is-a-bogus-directory" ));
+	assert( !fs.isDir( m_fname.c_str() ));
 
 	return true;
 }

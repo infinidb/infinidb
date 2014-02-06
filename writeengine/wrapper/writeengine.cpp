@@ -2562,8 +2562,8 @@ timer.stop("flushVMCache");
 #ifdef PROFILE
 timer.finish();
 #endif
-	//flush PrimProc FD cache
-	ColsExtsInfoMap colsExtsInfoMap = aTableMetaData->getColsExtsInfoMap();
+	//flush PrimProc FD cache moved to we_dmlcommandproc.cpp
+/*	ColsExtsInfoMap colsExtsInfoMap = aTableMetaData->getColsExtsInfoMap();
 	ColsExtsInfoMap::iterator it = colsExtsInfoMap.begin();
 	ColExtsInfo::iterator aIt;
 	std::vector<BRM::FileInfo> files;
@@ -2588,7 +2588,7 @@ timer.finish();
 	}
 	if ((idbdatafile::IDBPolicy::useHdfs()) && (files.size() > 0))
 		cacheutils::purgePrimProcFdCache(files, Config::getLocalModuleID());
-	TableMetaData::removeTableMetaData(tableOid);	
+	TableMetaData::removeTableMetaData(tableOid);	*/
 	return rc;
 }
 
@@ -4160,7 +4160,8 @@ int WriteEngineWrapper::tokenize(const TxnID& txnid,
     return rc;
 
   rc = tokenize(txnid, dctnryTuple, dctnryStruct.fCompressionType);
-  int rc2 = dctnry->closeDctnry(); // close file, even if tokenize() fails
+					
+  int rc2 = dctnry->closeDctnry(true); // close file, even if tokenize() fails
   if ((rc == NO_ERROR) && (rc2 != NO_ERROR))
     rc = rc2;
   return rc;
@@ -4518,7 +4519,7 @@ int WriteEngineWrapper::rollbackVersion(const TxnID& txnid, int sessionId)
 int WriteEngineWrapper::updateNextValue(const TxnID txnId, const OID& columnoid, const uint64_t nextVal, const uint32_t sessionID, const uint16_t dbRoot)
 {
 	int rc = NO_ERROR;
-	CalpontSystemCatalog* systemCatalogPtr;
+	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr;
 	RIDList ridList;
 	ColValueList colValueList;
 	WriteEngine::ColTupleList colTuples;

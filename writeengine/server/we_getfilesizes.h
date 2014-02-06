@@ -37,7 +37,7 @@ class WE_GetFileSizes
 {
 public:
 	
-	static int processTable(messageqcpp::ByteStream& bs, std::string& errMsg);
+	static int processTable(messageqcpp::ByteStream& bs, std::string& errMsg, int key);
 
 };
 

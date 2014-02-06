@@ -34,7 +34,7 @@ using namespace threadpool;
 #include "we_cleartablelockcmd.h"
 #include "we_dataloader.h"
 #include "we_getfilesizes.h"
-
+#include "dbrm.h"
 
 namespace WriteEngine
 {
@@ -132,13 +132,14 @@ private:
 class GetFileSizeThread : public ReadThread
 {
 public:
-	GetFileSizeThread(const messageqcpp::IOSocket& ios, ByteStream& ibs);
+	GetFileSizeThread(const messageqcpp::IOSocket& ios, ByteStream& ibs, BRM::DBRM &dbrm);
 	virtual ~GetFileSizeThread();
 
 	virtual void operator()();
 
 private:
 	boost::shared_ptr<WE_GetFileSizes> fWeGetFileSizes;
+	int key;
 };
 
 class ReadThreadFactory
@@ -148,7 +149,7 @@ public:
 	virtual ~ReadThreadFactory(){}
 
 public:
-	static void CreateReadThread(ThreadPool& Tp, IOSocket& ios);
+	static void CreateReadThread(ThreadPool& Tp, IOSocket& ios, BRM::DBRM &dbrm);
 
 
 };

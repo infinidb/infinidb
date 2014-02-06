@@ -91,14 +91,14 @@ struct DBRootExtentInfo
         fDBRootTotalBlocks(0),
         fState(DBROOT_EXTENT_PARTIAL_EXTENT) { }
 
-    DBRootExtentInfo(int colWidth,
+    DBRootExtentInfo(
         uint16_t    dbRoot,
         uint32_t    partition,
         uint16_t    segment,
         BRM::LBID_t startLbid,
         HWM         localHwm,
         uint64_t    dbrootTotalBlocks,
-        int16_t     status);
+        DBRootExtentInfoState state);
 
     bool operator<(const DBRootExtentInfo& entry) const;
 };
@@ -114,14 +114,17 @@ public:
 
     /** @brief DBRootExtentTracker constructor
      * @param oid Column OID of interest.
-     * @param colWidth Width (in bytes) of the relevant column.
+     * @param colWidths Widths (in bytes) of all the columns in the table.
+     * @param dbRootHWMInfoColVec Column HWM, DBRoots, etc for this table.
+     * @param columnIdx Index (into colWidths and dbRootHWMInfoColVec)
+     *        referencing the column that applies to this ExtentTracker.
      * @param logger Logger to be used for logging messages.
-     * @param vector Collection of DBRoots to be tracked or rotated through.
      */
     EXPORT DBRootExtentTracker ( OID oid,
-        int  colWidth,
-        Log* logger,
-        const BRM::EmDbRootHWMInfo_v& emDbRootHWMInfo );
+        const std::vector<int>& colWidths,
+        const std::vector<BRM::EmDbRootHWMInfo_v>& dbRootHWMInfoColVec,
+        unsigned int columnIdx,
+        Log* logger );
 
     /** @brief Select the first DBRoot/segment file to add rows to, for this PM.
      * @param dbRootExtent Dbroot/segment file selected for first set of rows.
@@ -144,13 +147,9 @@ public:
      * and assignFirstSegFile for all other columns in the same table.
      * @param refTracker Tracker object used to assign first DBRoot/segment.
      * @param dbRootExtent Dbroot/segment file selected for first set of rows.
-     * @param bNoStartExtentOnThisPM Is starting HWM extent missing or disabled
-     * @param bEmptyPM  Does this have any available or disabled extents
      */
     EXPORT void assignFirstSegFile( const DBRootExtentTracker& refTracker,
-                             DBRootExtentInfo& dbRootExtent,
-                             bool& bNoStartExtentOnThisPM,
-                             bool& bEmptyPM );
+                             DBRootExtentInfo& dbRootExtent );
 
     /** @brief Iterate/return next DBRoot to be used for the next extent.
      *
@@ -208,6 +207,10 @@ public:
     }
 
 private:
+    DBRootExtentInfoState determineState(int colWidth,
+        HWM      localHwm,
+        uint64_t dbRootTotalBlocks,
+        int16_t  status);
     // Select First DBRoot/segment file on a PM having no extents for fOID
     int  selectFirstSegFileForEmptyPM ( std::string& errMsg );
     void initEmptyDBRoots();                // init ExtentList for empty DBRoots

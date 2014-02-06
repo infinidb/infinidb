@@ -111,7 +111,7 @@ public:
     /** static calpontsystemcatalog instance map. one instance per session 
      *  TODO: should be one per transaction
      */
-    typedef std::map <uint32_t, CalpontSystemCatalog*> CatalogMap;
+    typedef std::map <uint32_t, boost::shared_ptr<CalpontSystemCatalog> > CatalogMap;
     
     /** Server Identity
      *
@@ -737,7 +737,7 @@ public:
      *  TODO: may need to change to one instance per transaction
      *  @parm sessionID to map the key of catalog map
      */
-    static CalpontSystemCatalog* makeCalpontSystemCatalog(uint32_t sessionID = 0);
+    static boost::shared_ptr<CalpontSystemCatalog> makeCalpontSystemCatalog(uint32_t sessionID = 0);
     
     /** remove and delete the instance map to the sessionid
      *  @param sessionID
@@ -790,13 +790,14 @@ public:
 
 	friend class ::ExecPlanTest;
 
+    /** Destructor */
+    ~CalpontSystemCatalog();
+
 private:
     /** Constuctors */
     explicit CalpontSystemCatalog();
     explicit CalpontSystemCatalog(const CalpontSystemCatalog& rhs);
     
-    /** Destructor */
-    ~CalpontSystemCatalog();
     
     CalpontSystemCatalog& operator=(const CalpontSystemCatalog& rhs);
 

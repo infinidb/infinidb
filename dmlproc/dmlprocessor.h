@@ -146,7 +146,7 @@ private:
 	messageqcpp::IOSocket fIos;
 	
 	execplan::SessionManager sessionManager;
-	execplan::CalpontSystemCatalog* csc;
+	boost::shared_ptr<execplan::CalpontSystemCatalog> csc;
 	BRM::DBRM* fDbrm;
 
 	// A map to hold pointers to all active PackageProcessors
@@ -166,7 +166,7 @@ class RollbackTransactionProcessor : public dmlpackageprocessor::DMLPackageProce
 {
 
 public:
-	RollbackTransactionProcessor(BRM::DBRM* aDbrm) : DMLPackageProcessor(aDbrm) {}
+	RollbackTransactionProcessor(BRM::DBRM* aDbrm) : DMLPackageProcessor(aDbrm, 1) {}
     /** @brief process an Rollback transactions
      *
      * @param cpackage the UpdateDMLPackage to process

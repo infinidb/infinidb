@@ -180,6 +180,7 @@ public:
 
 	virtual bool hasAggregate() {return false;}
 	virtual bool hasWindowFunc();
+	void adjustResultType();
 
 private:
 	/**

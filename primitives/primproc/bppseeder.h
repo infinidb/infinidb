@@ -19,7 +19,7 @@
 // $Id: bppseeder.h 2035 2013-01-21 14:12:19Z rdempsey $
 // C++ Interface: bppseeder
 //
-// Description: 
+// Description:
 //
 //
 // Author: Patrick <pleblanc@localhost.localdomain>, (C) 2008
@@ -53,7 +53,7 @@ class BPPSeeder : public threadpool::PriorityThreadPool::Functor
 {
 	public:
 		BPPSeeder(const messageqcpp::SBS &,
-				const SP_UM_MUTEX& wLock, 
+				const SP_UM_MUTEX& wLock,
 				const SP_UM_IOSOCK& ios,
 				const int pmThreads,
 				const bool trace=false);
@@ -82,12 +82,13 @@ class BPPSeeder : public threadpool::PriorityThreadPool::Functor
 		SP_UM_IOSOCK sock;
 		int fPMThreads;
 		bool fTrace;
-		
+
 		/* To support reentrancy */
 		uint32_t uniqueID, sessionID, stepID, failCount;
 		boost::shared_ptr<BatchPrimitiveProcessor> bpp;
 		SBPPV bppv;
 		bool firstRun;
+		boost::posix_time::ptime dieTime;
 
 		uint _priority;
 };

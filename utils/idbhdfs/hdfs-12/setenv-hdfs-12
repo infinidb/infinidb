@@ -7,7 +7,21 @@ export LD_LIBRARY_PATH=/usr/local/lib:/usr/lib64/:$JAVA_HOME/jre/lib/amd64/serve
 # Manipulate HADOOP_CONF_DIR too
 # which is necessary to circumvent bin/hadoop
 # HADOOP_CONF_DIR=$HADOOP_CONF_DIR:$HADOOP_HOME/conf
-HADOOP_LIBEXEC_DIR=/usr/lib/hadoop/libexec
+
+if [ -e /etc/alternatives/hadoop ]; then
+  find // -name hadoop-config.sh > /tmp/hadoop-config.txt
+  libfile=`grep libexec /tmp/hadoop-config.txt`
+  libpath=`echo $libfile | rev | cut -c 18- | rev`
+  HADOOP_LIBEXEC_DIR=$libpath
+
+  find // -name libhdfs.so.0.0.0 > /tmp/libhds.txt
+  libfile=`grep lib64 /tmp/libhds.txt`
+  libpath=`echo $libfile | rev | cut -c 18- | rev`
+  export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$libpath
+else
+  HADOOP_LIBEXEC_DIR=/usr/lib/hadoop/libexec
+fi
+
 . $HADOOP_LIBEXEC_DIR/hadoop-config.sh
 
 # CLASSPATH initially contains $HADOOP_CONF_DIR

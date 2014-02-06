@@ -313,6 +313,33 @@ bool WindowFunctionColumn::hasWindowFunc()
 	return true;
 }
 
+void WindowFunctionColumn::adjustResultType()
+{
+	if (fResultType.colDataType == CalpontSystemCatalog::DECIMAL &&
+	    !boost::iequals(fFunctionName,"COUNT") &&
+	    !boost::iequals(fFunctionName,"COUNT(*)") &&
+	    !boost::iequals(fFunctionName,"ROW_NUMBER") &&
+	    !boost::iequals(fFunctionName,"RANK") &&
+	    !boost::iequals(fFunctionName,"PERCENT_RANK") &&
+	    !boost::iequals(fFunctionName,"DENSE_RANK") &&
+	    !boost::iequals(fFunctionName,"CUME_DIST") &&
+	    !boost::iequals(fFunctionName,"NTILE") &&
+	    !boost::iequals(fFunctionName,"PERCENTILE") &&
+	    !fFunctionParms.empty() &&
+	    fFunctionParms[0]->resultType().colDataType == CalpontSystemCatalog::DOUBLE)
+	    fResultType = fFunctionParms[0]->resultType();
+	    
+	if ((boost::iequals(fFunctionName, "LEAD") ||
+	     boost::iequals(fFunctionName, "LAG") ||
+	     boost::iequals(fFunctionName, "MIN") ||
+	     boost::iequals(fFunctionName, "MAX") ||
+	     boost::iequals(fFunctionName, "FIRST_VALUE") ||
+	     boost::iequals(fFunctionName, "LAST_VALUE") ||
+	     boost::iequals(fFunctionName, "NTH_VALUE")) &&
+	    !fFunctionParms.empty())
+	    fResultType = fFunctionParms[0]->resultType();
+}
+
 void WindowFunctionColumn::evaluate(Row& row, bool& isNull)
 {
 	switch (fResultType.colDataType)
@@ -534,6 +561,7 @@ void WindowFunctionColumn::evaluate(Row& row, bool& isNull)
 		}
 	}
 }
+
 
 ostream& operator<<(ostream& output, const WindowFunctionColumn& rhs)
 {

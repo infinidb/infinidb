@@ -146,9 +146,9 @@ inline const std::string& SimpleColumn_UINT<len>:: getStrVal(rowgroup::Row& row,
 	else
 	{
 #ifndef __LP64__
-		snprintf(tmp, 20, "%lld", (int64_t)row.getIntField<len>(fInputIndex));
+		snprintf(tmp, 21, "%llu", row.getUintField<len>(fInputIndex));
 #else
-		snprintf(tmp, 20, "%ld", (int64_t)row.getIntField<len>(fInputIndex));
+		snprintf(tmp, 21, "%lu", row.getUintField<len>(fInputIndex));
 #endif
 	}
 	fResult.strVal = std::string(tmp);

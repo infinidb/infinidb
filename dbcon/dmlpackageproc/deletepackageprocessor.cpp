@@ -106,7 +106,7 @@ namespace dmlpackageprocessor
     DMLTable* tablePtr =  cpackage.get_Table();
 	std::string schemaName = tablePtr->get_SchemaName();
     std::string tableName = tablePtr->get_TableName();
-	CalpontSystemCatalog * csc = CalpontSystemCatalog::makeCalpontSystemCatalog( fSessionID );
+	boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog( fSessionID );
 	CalpontSystemCatalog::TableName aTableName;
 	aTableName.table = tableName;
 	aTableName.schema = schemaName;

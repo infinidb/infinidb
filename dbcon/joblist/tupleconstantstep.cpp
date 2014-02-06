@@ -333,18 +333,15 @@ uint TupleConstantStep::nextBand(messageqcpp::ByteStream &bs)
 	}
 	catch(const std::exception& ex)
 	{
-		catchHandler(ex.what(), fSessionId);
-		if (status() == 0)
-			status(tupleConstantStepErr);
+		catchHandler(ex.what(), tupleConstantStepErr, fErrorInfo, fSessionId);
 		while (more)
 			more = fInputDL->next(fInputIterator, &rgDataIn);
 		fEndOfResult = true;
 	}
 	catch(...)
 	{
-		catchHandler("TupleConstantStep next band caught an unknown exception", fSessionId);
-		if (status() == 0)
-			status(tupleConstantStepErr);
+		catchHandler("TupleConstantStep next band caught an unknown exception",
+					 tupleConstantStepErr, fErrorInfo, fSessionId);
 		while (more)
 			more = fInputDL->next(fInputIterator, &rgDataIn);
 		fEndOfResult = true;
@@ -408,18 +405,15 @@ void TupleConstantStep::execute()
 	}
 	catch(const std::exception& ex)
 	{
-		catchHandler(ex.what(), fSessionId);
-		if (status() == 0)
-			status(tupleConstantStepErr);
+		catchHandler(ex.what(), tupleConstantStepErr, fErrorInfo, fSessionId);
 	}
 	catch(...)
 	{
-		catchHandler("TupleConstantStep execute caught an unknown exception", fSessionId);
-		if (status() == 0)
-			status(tupleConstantStepErr);
+		catchHandler("TupleConstantStep execute caught an unknown exception",
+					 tupleConstantStepErr, fErrorInfo, fSessionId);
 	}
 
-	if (!fEndOfResult)
+//	if (!fEndOfResult)
 		while (more)
 			more = fInputDL->next(fInputIterator, &rgDataIn);
 
@@ -659,9 +653,8 @@ void TupleConstantOnlyStep::run()
 		}
 		catch(...)
 		{
-			catchHandler("TupleConstantOnlyStep run caught an unknown exception", fSessionId);
-			if (status() == 0)
-				status(tupleConstantStepErr);
+			catchHandler("TupleConstantOnlyStep run caught an unknown exception",
+						 tupleConstantStepErr, fErrorInfo, fSessionId);
 		}
 
 		if (traceOn())
@@ -701,15 +694,12 @@ uint TupleConstantOnlyStep::nextBand(messageqcpp::ByteStream &bs)
 		}
 		catch(const std::exception& ex)
 		{
-			catchHandler(ex.what(), fSessionId);
-			if (status() == 0)
-				status(tupleConstantStepErr);
+			catchHandler(ex.what(), tupleConstantStepErr, fErrorInfo, fSessionId);
 		}
 		catch(...)
 		{
-			catchHandler("TupleConstantStep next band caught an unknown exception", fSessionId);
-			if (status() == 0)
-				status(tupleConstantStepErr);
+			catchHandler("TupleConstantStep next band caught an unknown exception",
+						 tupleConstantStepErr, fErrorInfo, fSessionId);
 		}
 
 		fEndOfResult = true;

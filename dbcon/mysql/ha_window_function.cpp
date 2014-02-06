@@ -401,8 +401,13 @@ ReturnedColumn* buildWindowFunctionColumn(Item* item, gp_walk_info& gwi, bool& n
 		setError(gwi.thd, HA_ERR_UNSUPPORTED, gwi.parseErrorText);
 		return NULL;
 	}
-
+    
 	ac->resultType(colType_MysqlToIDB(wf));
+	
+	// bug5736. Make the result type double for some window functions when
+    // infinidb_double_for_decimal_math is set.
+    ac->adjustResultType();
+	    
 	ac->expressionId(gwi.expressionId++);
 	if (item->name)
 		ac->alias(item->name);

@@ -49,7 +49,7 @@ class DeletePackageProcessor : public DMLPackageProcessor
 
 public:
 
-    DeletePackageProcessor(BRM::DBRM* aDbrm) : DMLPackageProcessor(aDbrm){}
+    DeletePackageProcessor(BRM::DBRM* aDbrm, uint32_t sid) : DMLPackageProcessor(aDbrm, sid){}
     /** @brief process a DeleteDMLPackage
       *
       * @param cpackage the delete dml package to process

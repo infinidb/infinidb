@@ -186,7 +186,7 @@ private:
 	TupleHashJoinStep(const TupleHashJoinStep &);
 	TupleHashJoinStep & operator=(const TupleHashJoinStep &);
 
-	void errorLogging(const std::string& msg) const;
+	void errorLogging(const std::string& msg, int err) const;
 	void startAdjoiningSteps();
 
 	void formatMiniStats(uint index);

@@ -379,7 +379,7 @@ void TpchSchema::buildTable(string createText)
 
             ddlpackage::SqlStatement &stmt = *ptree.fList[0];
             ddlpackageprocessor::CreateTableProcessor::DDLResult result;
-			CalpontSystemCatalog* systemCatalogPtr =
+			boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr =
         		CalpontSystemCatalog::makeCalpontSystemCatalog( 1 );
             result  = processor.processPackage(dynamic_cast<ddlpackage::CreateTableStatement&>(stmt));
             systemCatalogPtr->removeCalpontSystemCatalog(1);
@@ -413,7 +413,7 @@ void TpchSchema::createindex(string createText)
 
                 SqlStatement &stmt = *ptree.fList[0];
                 CreateIndexProcessor::DDLResult result;
-				CalpontSystemCatalog* systemCatalogPtr =
+				boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr =
         		CalpontSystemCatalog::makeCalpontSystemCatalog( 1 );
                 result = processor.processPackage(dynamic_cast<CreateIndexStatement&>(stmt));
                 systemCatalogPtr->removeCalpontSystemCatalog(1);

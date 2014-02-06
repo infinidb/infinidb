@@ -31,7 +31,7 @@ done
 
 if [ $installdir != "/usr/local/Calpont" ]; then
 	export INFINIDB_INSTALL_DIR=$installdir
-	export LD_LIBRARY_PATH=$INFINIDB_INSTALL_DIR/lib
+	export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$INFINIDB_INSTALL_DIR/lib
 fi
 
 calpontSyslogFile=$installdir/bin/calpontSyslog

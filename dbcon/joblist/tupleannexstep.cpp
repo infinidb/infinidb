@@ -233,25 +233,22 @@ uint TupleAnnexStep::nextBand(messageqcpp::ByteStream &bs)
 		}
 		else
 		{
-			if (more)
+			while (more)
 				more = fOutputDL->next(fOutputIterator, &rgDataOut);
 			fEndOfResult = true;
 		}
 	}
 	catch(const std::exception& ex)
 	{
-		catchHandler(ex.what(), fSessionId);
-		if (status() == 0)
-			status(ERR_IN_DELIVERY);
+		catchHandler(ex.what(), ERR_IN_DELIVERY, fErrorInfo, fSessionId);
 		while (more)
 			more = fOutputDL->next(fOutputIterator, &rgDataOut);
 		fEndOfResult = true;
 	}
 	catch(...)
 	{
-		catchHandler("TupleAnnexStep next band caught an unknown exception", fSessionId);
-		if (status() == 0)
-			status(ERR_IN_DELIVERY);
+		catchHandler("TupleAnnexStep next band caught an unknown exception",
+					 ERR_IN_DELIVERY, fErrorInfo, fSessionId);
 		while (more)
 			more = fOutputDL->next(fOutputIterator, &rgDataOut);
 		fEndOfResult = true;
@@ -351,22 +348,18 @@ void TupleAnnexStep::executeNoOrderBy()
 	}
 	catch(const std::exception& ex)
 	{
-		catchHandler(ex.what(), fSessionId);
-		if (status() == 0)
-			status(ERR_IN_PROCESS);
+		catchHandler(ex.what(), ERR_IN_PROCESS, fErrorInfo, fSessionId);
 	}
 	catch(...)
 	{
-		catchHandler("TupleAnnexStep execute caught an unknown exception", fSessionId);
-		if (status() == 0)
-			status(ERR_IN_PROCESS);
+		catchHandler("TupleAnnexStep execute caught an unknown exception",
+					 ERR_IN_PROCESS, fErrorInfo, fSessionId);
 	}
 
 	while (more)
 		more = fInputDL->next(fInputIterator, &rgDataIn);
 
-
-	if (traceOn() && !fDelivery)
+	if (traceOn())
 	{
 		dlTimes.setLastReadTime();
 		dlTimes.setEndOfInputTime();
@@ -451,17 +444,13 @@ void TupleAnnexStep::executeNoOrderByWithDistinct()
 	}
 	catch(const std::exception& ex)
 	{
-		catchHandler(ex.what(), fSessionId);
-		if (status() == 0)
-			status(ERR_IN_PROCESS);
+		catchHandler(ex.what(), ERR_IN_PROCESS, fErrorInfo, fSessionId);
 	}
 	catch(...)
 	{
-		catchHandler("TupleAnnexStep execute caught an unknown exception", fSessionId);
-		if (status() == 0)
-			status(ERR_IN_PROCESS);
+		catchHandler("TupleAnnexStep execute caught an unknown exception",
+					 ERR_IN_PROCESS, fErrorInfo, fSessionId);
 	}
-
 
 	while (more)
 		more = fInputDL->next(fInputIterator, &rgDataIn);
@@ -549,15 +538,12 @@ void TupleAnnexStep::executeWithOrderBy()
 	}
 	catch(const std::exception& ex)
 	{
-		catchHandler(ex.what(), fSessionId);
-		if (status() == 0)
-			status(ERR_IN_PROCESS);
+		catchHandler(ex.what(), ERR_IN_PROCESS, fErrorInfo, fSessionId);
 	}
 	catch(...)
 	{
-		catchHandler("TupleAnnexStep execute caught an unknown exception", fSessionId);
-		if (status() == 0)
-			status(ERR_IN_PROCESS);
+		catchHandler("TupleAnnexStep execute caught an unknown exception",
+					 ERR_IN_PROCESS, fErrorInfo, fSessionId);
 	}
 
 	while (more)

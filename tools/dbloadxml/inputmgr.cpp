@@ -203,7 +203,7 @@ bool InputMgr::input(int argc, char **argv)
 //------------------------------------------------------------------------------
 bool  InputMgr::loadCatalogTables()
 {
-    execplan::CalpontSystemCatalog* systemCatPtr =
+    boost::shared_ptr<execplan::CalpontSystemCatalog> systemCatPtr =
         execplan::CalpontSystemCatalog::makeCalpontSystemCatalog(
         BULK_SYSCAT_SESSION_ID);
     systemCatPtr->identity(execplan::CalpontSystemCatalog::EC);

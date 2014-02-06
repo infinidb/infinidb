@@ -36,14 +36,14 @@ InstallDir=$INFINIDB_INSTALL_DIR
 
 if [ $InstallDir != "/usr/local/Calpont" ]; then
 	export PATH=$InstallDir/bin:$InstallDir/mysql/bin:/bin:/usr/bin
-	export LD_LIBRARY_PATH=$InstallDir/lib:$InstallDir/mysql/lib/mysql
+	export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$InstallDir/lib:$InstallDir/mysql/lib/mysql
 fi
 
 #hadoop
 plugin=`$INFINIDB_INSTALL_DIR/bin/getConfig SystemConfig DataFilePlugin`
 if [ -n "$plugin" ]; then
 	export JAVA_HOME=/usr/java/jdk1.6.0_31
-	export LD_LIBRARY_PATH=/usr/java/jdk1.6.0_31/jre/lib/amd64/server
+	export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/java/jdk1.6.0_31/jre/lib/amd64/server
 
 	setenv=`$InstallDir/bin/getConfig SystemConfig DataFileEnvFile`
 	if [ -z "$setenv" ]; then
@@ -53,7 +53,11 @@ if [ -n "$plugin" ]; then
 	. /root/$setenv >/dev/null 2>&1
 fi
 
-export LD_PRELOAD=$InstallDir/lib/libjemalloc.so
+if [ -e $InstallDir/lib/libjemalloc.so ]; then
+	export LD_PRELOAD=$InstallDir/lib/libjemalloc.so
+elif [ -e $InstallDir/lib/libjemalloc.so.1 ]; then
+	export LD_PRELOAD=$InstallDir/lib/libjemalloc.so.1
+fi
 
 test -f $InstallDir/post/functions && . $InstallDir/post/functions
 

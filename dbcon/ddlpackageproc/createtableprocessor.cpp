@@ -87,7 +87,7 @@ CreateTableProcessor::DDLResult CreateTableProcessor::processPackage(
 	VERBOSE_INFO("Getting current txnID");
 
 	//Check whether the table is existed already
-	CalpontSystemCatalog* systemCatalogPtr =
+	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr =
 		CalpontSystemCatalog::makeCalpontSystemCatalog(createTableStmt.fSessionID);
 	execplan::CalpontSystemCatalog::TableName tableName;
 	tableName.schema = tableDef.fQualifiedName->fSchema;

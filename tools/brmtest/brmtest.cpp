@@ -28,7 +28,7 @@ extern int reset_locks();
 
 namespace {
 
-CalpontSystemCatalog* Cat;
+boost::shared_ptr<CalpontSystemCatalog> Cat;
 
 void LBIDList(CalpontSystemCatalog::OID OID, ostringstream& cout_str)
 {

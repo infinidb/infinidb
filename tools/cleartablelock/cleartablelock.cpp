@@ -219,7 +219,6 @@ int createMsgQueClts(
 		// Send bulk rollback request to each specified PM.
 		for (unsigned k=0; k<pmList.size(); k++)
 		{
-			std::ostringstream weServerName;
 			weServerName << "pm" << pmList[k] << "_WriteEngineServer";
 //			std::cout << "Connecting to " << weServerName.str() << " on " <<
 //				devName << std::endl;
@@ -543,7 +542,7 @@ int main(int argc, char** argv)
 
 		uint32_t sessionID = 1;
 		task = taskSysCat;
-		execplan::CalpontSystemCatalog* systemCatalogPtr =
+		boost::shared_ptr<execplan::CalpontSystemCatalog> systemCatalogPtr =
 			execplan::CalpontSystemCatalog::makeCalpontSystemCatalog(
 				sessionID );
 		systemCatalogPtr->identity(execplan::CalpontSystemCatalog::EC);

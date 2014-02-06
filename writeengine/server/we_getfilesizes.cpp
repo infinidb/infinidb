@@ -35,6 +35,9 @@ using namespace threadpool;
 using namespace messageqcpp;
 #include "we_fileop.h"
 
+#include "idbcompress.h"
+using namespace compress;
+
 #include "IDBFileSystem.h"
 #include "IDBPolicy.h"
 using namespace idbdatafile;
@@ -58,13 +61,104 @@ struct FileInfo
 		}
 };
 typedef std::vector<FileInfo> Files;
-typedef std::map<u_int32_t, Files> columnMap;
-columnMap columnsMap;
+typedef std::map<uint32_t, Files> columnMap;
+typedef std::map<int, columnMap*> allColumnMap;
+allColumnMap wholeMap;
 boost::mutex columnMapLock;	
 ActiveThreadCounter *activeThreadCounter;
+
+size_t readFillBuffer(
+	idbdatafile::IDBDataFile* pFile,
+	char*   buffer,
+	size_t  bytesReq)
+{
+	char*   pBuf = buffer;
+	ssize_t nBytes;
+	size_t  bytesToRead = bytesReq;
+	size_t  totalBytesRead = 0;
+
+	while (1)
+	{
+		nBytes = pFile->read(pBuf, bytesToRead);
+		if (nBytes > 0)
+			totalBytesRead += nBytes;
+		else
+			break;
+
+		if ((size_t)nBytes == bytesToRead)
+			break;
+
+		pBuf        += nBytes;
+		bytesToRead  =  bytesToRead - (size_t)nBytes;
+	}
+
+	return totalBytesRead;
+}
+
+off64_t getCompressedDataSize(string& fileName)
+{
+		off64_t dataSize = 0;
+		IDBDataFile* pFile = 0;
+		size_t nBytes;
+		// Some IDBPolicy functions can throw exceptions, caller will catch it
+		IDBPolicy::configIDBPolicy();
+		bool bHdfsFile = IDBPolicy::useHdfs();
+		if (bHdfsFile)
+			pFile = IDBDataFile::open(IDBDataFile::HDFS,
+				fileName.c_str(), "r", 0);
+		else
+			pFile = IDBDataFile::open(IDBDataFile::BUFFERED,
+				fileName.c_str(), "r", 0);
+		if (!pFile)
+		{
+			std::ostringstream oss;
+			oss << "Cannot open file " << fileName << " for read.";
+			throw std::runtime_error(oss.str());
+		}
+		
+		IDBCompressInterface decompressor;
+		//--------------------------------------------------------------------------
+		// Read headers and extract compression pointers
+		//--------------------------------------------------------------------------
+		char hdr1[IDBCompressInterface::HDR_BUF_LEN];
+		nBytes = readFillBuffer( pFile,hdr1,IDBCompressInterface::HDR_BUF_LEN);
+		if ( nBytes != IDBCompressInterface::HDR_BUF_LEN )
+		{
+			std::ostringstream oss;
+			oss << "Error reading first header from file " << fileName;
+			throw std::runtime_error(oss.str());
+		}
+
+		int64_t ptrSecSize = decompressor.getHdrSize(hdr1) - IDBCompressInterface::HDR_BUF_LEN;
+		char* hdr2 = new char[ptrSecSize];
+		nBytes = readFillBuffer( pFile,hdr2,ptrSecSize);
+		if ( (int64_t)nBytes != ptrSecSize )
+		{
+			std::ostringstream oss;
+			oss << "Error reading second header from file " << fileName;
+			throw std::runtime_error(oss.str());
+		}
+
+		CompChunkPtrList chunkPtrs;
+		int rc = decompressor.getPtrList(hdr2, ptrSecSize, chunkPtrs);
+		delete[] hdr2;
+		if (rc != 0)
+		{
+			std::ostringstream oss;
+			oss << "Error decompressing second header from file " << fileName;
+			throw std::runtime_error(oss.str());
+		}
+
+		unsigned k = chunkPtrs.size();
+		// last header's offset + length will be the data bytes
+		dataSize = chunkPtrs[k-1].first + chunkPtrs[k-1].second;
+		delete pFile;
+		return dataSize;
+}
 struct ColumnThread
 {
-    ColumnThread(u_int32_t oid) : fOid(oid)
+    ColumnThread(uint32_t oid, int32_t compressionType, bool reportRealUse, int key) 
+    : fOid(oid), fCompressionType(compressionType), fReportRealUse(reportRealUse), fKey(key) 
     {}
     void operator()()
     {
@@ -97,7 +191,20 @@ struct ColumnThread
 				char fileName[200];
 				(void)fileOp.getFileName( fOid, fileName, rootList[i], entries[0].partitionNum, entries[0].segmentNum);
 				string aFile(fileName); //convert between char* and string
-				off64_t fileSize = fs.size( fileName );
+				off64_t fileSize = 0;
+				if (fReportRealUse && (fCompressionType > 0))
+				{
+					try {
+						fileSize = getCompressedDataSize(aFile);
+					}
+					catch (std::exception& ex)
+					{
+						cerr << ex.what();
+					}
+				}
+				else
+					fileSize = fs.size( fileName );
+					
 				if (fileSize > 0) // File exists, add to list
 				{
 					FileInfo aFileInfo;
@@ -125,11 +232,19 @@ struct ColumnThread
 		
 		boost::mutex::scoped_lock lk(columnMapLock);
 		//cout << "Current size of columnsMap is " << columnsMap.size() << endl;
-		columnsMap[fOid] = aFiles;	
-		activeThreadCounter->decr();
+		allColumnMap::iterator colMapiter = wholeMap.find(fKey);
+		if (colMapiter != wholeMap.end())
+		{
+			(colMapiter->second)->insert(make_pair(fOid,aFiles));	
+			activeThreadCounter->decr();
 		//cout << "Added to columnsMap aFiles with size " << aFiles.size() << " for oid " << fOid << endl;		
+		}
 	}
-	u_int32_t fOid;
+	
+	uint32_t fOid;
+	int32_t fCompressionType;
+	bool fReportRealUse;
+	int fKey;
 };
 //------------------------------------------------------------------------------
 // Process a table size based on input from the
@@ -137,7 +252,7 @@ struct ColumnThread
 //------------------------------------------------------------------------------
 int WE_GetFileSizes::processTable(
 	messageqcpp::ByteStream& bs,
-	std::string& errMsg)
+	std::string& errMsg, int key)
 {
 	uint8_t rc = 0;
 	errMsg.clear();
@@ -145,33 +260,42 @@ int WE_GetFileSizes::processTable(
 	try {
 		std::string aTableName;
 		std::string schemaName;
-
+		bool reportRealUse = false;
+		ByteStream::byte tmp8;
 		bs >> schemaName;
 		//cout << "schema: "<< schemaName << endl;
 
 		bs >> aTableName;
 		//cout << "tableName: " << aTableName << endl;
+		bs >> tmp8;
+		reportRealUse = tmp8;
+		
 		//get column oids
-		CalpontSystemCatalog *systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(0);
+		boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(0);
 		CalpontSystemCatalog::TableName tableName;
 		tableName.schema = schemaName;
 		tableName.table = aTableName;
 		CalpontSystemCatalog::RIDList columnList = systemCatalogPtr->columnRIDs(tableName);
+		CalpontSystemCatalog::ColType colType;
 		CalpontSystemCatalog::DictOIDList dictOidList = systemCatalogPtr->dictOIDs(tableName);
 		int serverThreads = 20;
 		int serverQueueSize = serverThreads * 100;
 		threadpool::ThreadPool tp(serverThreads,serverQueueSize);
 		int totalSize = columnList.size() + dictOidList.size();
 		activeThreadCounter = new ActiveThreadCounter(totalSize);
-		
-		for (uint i=0; i < columnList.size(); i++)
-		{
-			tp.invoke(ColumnThread(columnList[i].objnum));		
+		columnMap *columnsMap = new columnMap();
+		{	
+			boost::mutex::scoped_lock lk(columnMapLock);
+			wholeMap[key] = columnsMap;
 		}
-		for (uint i=0; i < dictOidList.size(); i++)
+		for (uint32_t i=0; i < columnList.size(); i++)
 		{
-			tp.invoke(ColumnThread(dictOidList[i].dictOID));		
+			colType = systemCatalogPtr->colType(columnList[i].objnum);
+			tp.invoke(ColumnThread(columnList[i].objnum, colType.compressionType, reportRealUse, key));	
+			if (colType.ddn.dictOID > 0)
+				tp.invoke(ColumnThread(colType.ddn.dictOID, colType.compressionType, reportRealUse, key));	
 		}
+
 		//check whether all threads finish
 		int sleepTime = 100; // sleep 100 milliseconds between checks
 		struct timespec rm_ts;
@@ -205,22 +329,26 @@ int WE_GetFileSizes::processTable(
 	//Build the message to send to the caller
 	bs.reset();
 	boost::mutex::scoped_lock lk(columnMapLock);
-	columnMap::iterator iter = columnsMap.begin();
-	uint64_t size;
-	Files::iterator it;
-	while ( iter != columnsMap.end())
+	allColumnMap::iterator colMapiter = wholeMap.find(key);
+	if (colMapiter != wholeMap.end())
 	{
-		bs << iter->first;
-		//cout << "processTable::coloid = " << iter->first << endl;
+		columnMap::iterator iter = colMapiter->second->begin();
+		uint64_t size;
+		Files::iterator it;
+		while ( iter != colMapiter->second->end())
+		{
+			bs << iter->first;
+			//cout << "processTable::coloid = " << iter->first << endl;
 
-		size = iter->second.size();
-		bs << size;
-		for (it = iter->second.begin(); it != iter->second.end(); it++)
-			it->serialize(bs);
-		//cout << "length now is " << bs.length() << endl;
-		iter++;
+			size = iter->second.size();
+			bs << size;
+			for (it = iter->second.begin(); it != iter->second.end(); it++)
+				it->serialize(bs);
+			//cout << "length now is " << bs.length() << endl;
+			iter++;
+		}
+		wholeMap.erase(colMapiter);
 	}
-	columnsMap.clear();
 	return rc;
 }
 

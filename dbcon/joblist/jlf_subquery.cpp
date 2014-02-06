@@ -156,25 +156,24 @@ bool simpleScalarFilterToParseTree(SimpleScalarFilter* sf, ParseTree*& pt, JobIn
 		lop = "or";
 
 	// Transformer sub to a scalar result.
-	SErrorInfo status(jobInfo.status);
-	SimpleScalarTransformer transformer(&jobInfo, status, false);
+	SErrorInfo errorInfo(jobInfo.errorInfo);
+	SimpleScalarTransformer transformer(&jobInfo, errorInfo, false);
 	transformer.makeSubQueryStep(csep);
 
 	// Do not catch exceptions here, let caller handle them.
 	transformer.run();
 
 	// if subquery errored out
-	if (status->errCode)
+	if (errorInfo->errCode)
 	{
 		ostringstream oss;
 		oss << "Sub-query failed: ";
-		if (status->errMsg.empty())
-			oss << "error code " << status->errCode;
-		else
-			oss << status->errMsg;
-
-		status->errMsg = oss.str();
-		throw runtime_error(status->errMsg);
+		if (errorInfo->errMsg.empty())
+		{
+			oss << "error code " << errorInfo->errCode;
+			errorInfo->errMsg = oss.str();
+		}
+		throw runtime_error(errorInfo->errMsg);
 	}
 
 	// Construct simple filters based on the scalar result.
@@ -410,8 +409,8 @@ void alterCsepInExistsFilter(CalpontSelectExecutionPlan* csep, JobInfo& jobInfo)
 void doCorrelatedExists(const ExistsFilter* ef, JobInfo& jobInfo)
 {
 	// Transformer sub to a subquery step.
-	SErrorInfo status(jobInfo.status);
-	SubQueryTransformer transformer(&jobInfo, status);
+	SErrorInfo errorInfo(jobInfo.errorInfo);
+	SubQueryTransformer transformer(&jobInfo, errorInfo);
 	CalpontSelectExecutionPlan* csep = ef->sub().get();
 	alterCsepInExistsFilter(csep, jobInfo);
 	SJSTEP subQueryStep = transformer.makeSubQueryStep(csep);
@@ -437,8 +436,8 @@ void doNonCorrelatedExists(const ExistsFilter* ef, JobInfo& jobInfo)
 	if (!noFrom)
 	{
 		// Transformer sub to a scalar result set.
-		SErrorInfo status(new ErrorInfo());
-		SimpleScalarTransformer transformer(&jobInfo, status, true);
+		SErrorInfo errorInfo(new ErrorInfo());
+		SimpleScalarTransformer transformer(&jobInfo, errorInfo, true);
 		transformer.makeSubQueryStep(ef->sub().get());
 
 		// @bug 2839. error out in-relelvant correlated column case
@@ -498,9 +497,9 @@ const SRCP doSelectSubquery(CalpontExecutionPlan* ep, SRCP& sc, JobInfo& jobInfo
 {
 	CalpontSelectExecutionPlan* csep = dynamic_cast<CalpontSelectExecutionPlan*>(ep);
 	SRCP rc;
-	SErrorInfo status(jobInfo.status);
+	SErrorInfo errorInfo(jobInfo.errorInfo);
 	jobInfo.subView = dynamic_cast<SimpleColumn*>(sc.get())->viewName();
-	SubQueryTransformer transformer(&jobInfo, status);
+	SubQueryTransformer transformer(&jobInfo, errorInfo);
 	transformer.setVarbinaryOK();
 	SJSTEP subQueryStep = transformer.makeSubQueryStep(csep);
 	if (transformer.correlatedSteps().size() > 0)
@@ -606,8 +605,8 @@ void doSelectFilter(const ParseTree* p, JobInfo& jobInfo)
 	const SelectFilter* sf = dynamic_cast<const SelectFilter*>(p->data());
 	idbassert(sf != NULL);
 
-	SErrorInfo status(jobInfo.status);
-	SubQueryTransformer transformer(&jobInfo, status);
+	SErrorInfo errorInfo(jobInfo.errorInfo);
+	SubQueryTransformer transformer(&jobInfo, errorInfo);
 	SJSTEP subQueryStep = transformer.makeSubQueryStep(sf->sub().get());
 	transformer.updateCorrelateInfo();
 	JobStepVector jsv = transformer.correlatedSteps();
@@ -693,9 +692,9 @@ void preprocessHavingClause(CalpontSelectExecutionPlan* csep, JobInfo& jobInfo)
 int doFromSubquery(CalpontExecutionPlan* ep, const string& alias, const string& view, JobInfo& jobInfo)
 {
 	CalpontSelectExecutionPlan* csep = dynamic_cast<CalpontSelectExecutionPlan*>(ep);
-	SErrorInfo status(jobInfo.status);
+	SErrorInfo errorInfo(jobInfo.errorInfo);
 	jobInfo.subView = view;
-	SubQueryTransformer transformer(&jobInfo, status, alias);
+	SubQueryTransformer transformer(&jobInfo, errorInfo, alias);
 	transformer.setVarbinaryOK();
 	SJSTEP subQueryStep = transformer.makeSubQueryStep(csep, true);
 	subQueryStep->view(view);
@@ -796,8 +795,8 @@ void preprocessSelectSubquery(CalpontSelectExecutionPlan* csep, JobInfo& jobInfo
 SJSTEP doUnionSub(CalpontExecutionPlan* ep, JobInfo& jobInfo)
 {
 	CalpontSelectExecutionPlan* csep = dynamic_cast<CalpontSelectExecutionPlan*>(ep);
-	SErrorInfo status(jobInfo.status);
-	SubQueryTransformer transformer(&jobInfo, status);
+	SErrorInfo errorInfo(jobInfo.errorInfo);
+	SubQueryTransformer transformer(&jobInfo, errorInfo);
 	transformer.setVarbinaryOK();
 	SJSTEP subQueryStep = transformer.makeSubQueryStep(csep, false);
 	SJSTEP subAd(new SubAdapterStep(subQueryStep, jobInfo));

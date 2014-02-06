@@ -209,7 +209,12 @@ void TupleUnion::readInput(uint which)
 				}
 				if (!rm.getMemory(memDiff)) {
 					fLogger->logMessage(logging::LOG_TYPE_INFO, logging::ERR_UNION_TOO_BIG);
-					status(logging::ERR_UNION_TOO_BIG);
+					if (status() == 0) // preserve existing error code
+					{
+						errorMessage(logging::IDBErrorInfo::instance()->errorMsg(
+							logging::ERR_UNION_TOO_BIG));
+						status(logging::ERR_UNION_TOO_BIG);
+					}
 					abort();
 				}
 			}
@@ -226,6 +231,7 @@ void TupleUnion::readInput(uint which)
 	{
 		if (status() == 0)
 		{
+			errorMessage("Union step caught an unknown exception.");
 			status(logging::unionStepErr);
 			fLogger->logMessage(logging::LOG_TYPE_CRITICAL, "Union step caught an unknown exception.");
 		}

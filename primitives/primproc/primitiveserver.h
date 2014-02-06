@@ -47,6 +47,7 @@
 
 namespace primitiveprocessor
 {
+    extern boost::shared_ptr<threadpool::PriorityThreadPool> OOBPool;
 	extern dbbc::BlockRequestProcessor **BRPp;
 	extern BRM::DBRM *brm;
 	extern boost::mutex bppLock;
@@ -56,7 +57,7 @@ namespace primitiveprocessor
 	extern map<pthread_t, logging::StopWatch*> stopwatchMap;
 	extern pthread_mutex_t stopwatchMapMutex;
 	extern bool stopwatchThreadCreated;
-	
+
 	extern void pause_(int seconds);
 	extern void *autoFinishStopwatchThread(void *arg);
 #endif
@@ -70,9 +71,18 @@ namespace primitiveprocessor
 			const std::vector<boost::shared_ptr<BatchPrimitiveProcessor> > & get();
 			inline boost::shared_ptr<BPPSendThread> getSendThread() { return sendThread; }
 			void abort();
+			bool aborted();
+			volatile bool joinDataReceived;
 		private:
 			std::vector<boost::shared_ptr<BatchPrimitiveProcessor> > v;
 			boost::shared_ptr<BPPSendThread> sendThread;
+
+			// the instance other instances are created from
+			boost::shared_ptr<BatchPrimitiveProcessor> unusedInstance;
+
+			// pos keeps the position of the last BPP returned by next(),
+			// next() will start searching at this pos on the next call.
+			uint pos;
 	};
 
 	typedef boost::shared_ptr<BPPV> SBPPV;
@@ -105,8 +115,8 @@ namespace primitiveprocessor
 						int processorWeight,
 						int processorQueueSize,
 						bool rotatingDestination,
-                		uint32_t BRPBlocks=(1024 * 1024 * 2), 
-						int BRPThreads=64, 
+                		uint32_t BRPBlocks=(1024 * 1024 * 2),
+						int BRPThreads=64,
 						int cacheCount = 8,
 						int maxBlocksPerRead = 128,
 						int readAheadBlocks=256,

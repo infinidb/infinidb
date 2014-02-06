@@ -2010,7 +2010,7 @@ int WESDHandler::leastDataSendPm() {
 int WESDHandler::getTableOID(std::string Schema, std::string Table) {
 	execplan::CalpontSystemCatalog::ROPair roPair;
 	CalpontSystemCatalog::TableName tableName(Schema, Table);
-	CalpontSystemCatalog *systemCatalogPtr =
+	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr =
 			CalpontSystemCatalog::makeCalpontSystemCatalog();
 	roPair = systemCatalogPtr->tableRID(tableName);
 
@@ -2025,7 +2025,7 @@ unsigned int WESDHandler::calcTableRecLen(
 	unsigned int recLen = 0;
 
 	CalpontSystemCatalog::TableName tableName(schema, table);
-	CalpontSystemCatalog *systemCatalogPtr =
+	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr =
 		CalpontSystemCatalog::makeCalpontSystemCatalog();
 	CalpontSystemCatalog::RIDList colRidList =
 		systemCatalogPtr->columnRIDs(tableName, true);

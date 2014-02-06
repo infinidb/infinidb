@@ -123,7 +123,7 @@ namespace dmlpackageprocessor
 			
 			//cout << "single insert get transaction id " << txnid.id << endl;
 			// get the table object from the package
-			CalpontSystemCatalog *systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(fSessionID);
+			boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(fSessionID);
 			//cout << "DMLProc using syscatptr:sessionid = " << systemCatalogPtr <<":" << fSessionID<< endl;
 			CalpontSystemCatalog::TableName tableName;
 			execplan::CalpontSystemCatalog::ROPair roPair;
@@ -333,7 +333,6 @@ cout << "Single insert got exception" << ex.what() << endl;
 cout << "Single insert got unknown exception" << endl;
 #endif
 				}
-				
 				// Log the insert statement.
 				LoggingID logid( DMLLoggingId, fSessionID, txnid.id);
 				logging::Message::Args args1;
@@ -391,7 +390,18 @@ cout << "Single insert got unknown exception" << endl;
 			result.result = INSERT_ERROR;
 			result.message = message;
 		}
-
+		else if (rc == IDBRANGE_WARNING)
+		{
+			logging::Message::Args args;
+			logging::Message message(1);
+			args.add(errorMsg);
+			args.add("");
+			args.add("");
+			message.format(args);
+			result.result = IDBRANGE_WARNING;
+			result.message = message;
+		}
+		
 		fWEClient->removeQueue(uniqueId);
 		VERBOSE_INFO("Finished Processing Insert DML Package");
 		return result;

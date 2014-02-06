@@ -445,7 +445,7 @@ private:
 		}
 	}
 	
-	void buildSysCache(const CalpontSelectExecutionPlan& csep, CalpontSystemCatalog* csc)
+	void buildSysCache(const CalpontSelectExecutionPlan& csep, boost::shared_ptr<CalpontSystemCatalog> csc)
 	{
 		const CalpontSelectExecutionPlan::ColumnMap& colMap = csep.columnMap();
 		CalpontSelectExecutionPlan::ColumnMap::const_iterator it;
@@ -543,7 +543,7 @@ new_plan:
 				// skip system catalog queries.
 				if ((csep.sessionID()&0x80000000)==0)
 				{
-					CalpontSystemCatalog* csc =
+					boost::shared_ptr<CalpontSystemCatalog> csc =
 						CalpontSystemCatalog::makeCalpontSystemCatalog(csep.sessionID());
 					buildSysCache(csep, csc);
 				}
@@ -1324,7 +1324,7 @@ int main(int argc, char* argv[])
 	msgMap[logExeMgrExcpt]          = Message(logExeMgrExcpt);
 	msgLog.msgMap(msgMap);
 
-	ec = DistributedEngineComm::instance(rm);
+	ec = DistributedEngineComm::instance(rm, true);
 	ec->Open();
 
 	bool tellUser = true;

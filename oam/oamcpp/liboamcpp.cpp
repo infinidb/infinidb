@@ -3532,7 +3532,7 @@ namespace oam
 		unsigned int stateColumnWidth     = 9;  // "State"
 
         // Initialize System Catalog object used to get table name
-        execplan::CalpontSystemCatalog* systemCatalogPtr =
+        boost::shared_ptr<execplan::CalpontSystemCatalog> systemCatalogPtr =
             execplan::CalpontSystemCatalog::makeCalpontSystemCatalog(0);
 
         std::string fullTblName;
@@ -7992,74 +7992,6 @@ namespace oam
 
 		return 1;
 	}
-
-
-    /***************************************************************************
-     *
-     * Function:  copyDatabaseFiles
-     *
-     * Purpose:   copy database files from src to dst
-     *
-     ****************************************************************************/
-    void Oam::copyDatabaseFiles(std::string src, std::string dst)
-    {
-        std::vector<std::string> dbFileNames;
-        std::string file_name;
-        fs::path sourceDir(src);
-        fs::directory_iterator iter(sourceDir);
-        fs::directory_iterator end_iter;
-        double total_bytes = 0;
-        for( ; iter != end_iter ; ++iter)
-        {
-            fs::path source = *iter;
-            if (!fs::is_directory(source) )
-            {
-#if BOOST_VERSION >= 105200
-                file_name = source.filename().generic_string();
-#else
-                file_name = iter->leaf();
-#endif
-                if (file_name.find(".dat", file_name.length() - 4) != string::npos)
-                {
-                    dbFileNames.push_back(file_name);
-                    total_bytes += fs::file_size(source);
-                }
-            }
-        }
-
-        // make sure there is enough disk space
-        double avail_bytes = getFreeSpace(dst);
-        if (avail_bytes < total_bytes)
-        {
-            char error[256];
-            sprintf(error, "Insufficient Disk Space. Avail: %8.0f kb, Needed: %8.0f kb\n", avail_bytes/1024, total_bytes/1024);
-            throw std::runtime_error(error);
-        }
-
-        boost::progress_display show_progress(dbFileNames.size());
-        std::vector<std::string>::iterator dbfiles_iter = dbFileNames.begin();
-        for( ; dbfiles_iter != dbFileNames.end() ; ++dbfiles_iter)
-        {
-            file_name = *dbfiles_iter;
-            std::string sourceFile = src;
-            std::string destFile = dst;
-
-            sourceFile += "/";
-            sourceFile += file_name;
-
-            destFile += "/";
-            destFile += file_name;
-
-            fs::path source = sourceFile;
-            fs::path destination  = destFile;
-            if (fs::exists(destination))
-                fs::remove(destination);
-            fs::copy_file( source, destination );
-
-            ++show_progress;
-        }
-
-    }
 
     /***************************************************************************
      *

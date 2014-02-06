@@ -121,6 +121,8 @@ dbbc::Stats pmstats(statsName);
 //FIXME: there is an anon ns burried later in between 2 named namespaces...
 namespace primitiveprocessor
 {
+    boost::shared_ptr<threadpool::PriorityThreadPool> OOBPool;
+
 	BlockRequestProcessor **BRPp;
 #ifndef _MSC_VER
 	dbbc::Stats stats;
@@ -355,7 +357,7 @@ namespace primitiveprocessor
 #ifndef _MSC_VER
 		if (LBIDTrace) {
 			for (i = 0; i < blockCount; i++) {
-		
+
 				stats.touchedLBID(lbids[i], pthread_self(), sessionID);
 			}
 		}
@@ -397,7 +399,7 @@ namespace primitiveprocessor
 		*/
 
 		ret = bc.getCachedBlocks(lbids, vers, bufferPtrs, wasCached, blockCount);
-		
+
 		// Do we want to check any VB flags here?  Initial thought: no, because we have
 		// no idea whether any other blocks in the prefetch range are versioned,
 		// what's the difference if one in the visible range is?
@@ -409,7 +411,7 @@ namespace primitiveprocessor
 				pmstats.markEvent(lbids[0], (pthread_t)-1, sessionID, 'M');
 #endif
 			/* After the prefetch they're all cached if they are in the same range, so
-			 * prune the block list and try getCachedBlocks again first, then fall back 
+			 * prune the block list and try getCachedBlocks again first, then fall back
 			 * to single-block IO requests if for some reason they aren't. */
 			uint l_blockCount = 0;
 			for (i = 0; i < blockCount; i++) {
@@ -423,7 +425,7 @@ namespace primitiveprocessor
 				}
 			}
 			ret += bc.getCachedBlocks(lbids, vers, bufferPtrs, wasCached, l_blockCount);
-			
+
 			if (ret != blockCount) {
 				for (i = 0; i < l_blockCount; i++)
 					if (!wasCached[i]) {
@@ -581,7 +583,7 @@ namespace primitiveprocessor
 				int i = -1;
 
 
-				if (compType == 0) 
+				if (compType == 0)
                 {
 					newBufferSa.reset(new uint8_t[DATA_BLOCK_SIZE + pageSize]);
 					alignedBuffer = (ptrdiff_t) newBufferSa.get();
@@ -713,7 +715,7 @@ blockReadRetry:
 				if ( rc < 0 ) {
 					string msg("pread failed");
 					ostringstream infoMsg;
-					infoMsg << " rc:" << rc << ")"; 
+					infoMsg << " rc:" << rc << ")";
 					msg = msg + ", error:" + strerror(errno) + infoMsg.str();
 					SUMMARY_INFO(msg);
 					//FIXME: free-up allocated memory!
@@ -744,7 +746,7 @@ blockReadRetry:
 
 		FileBuffer* fbPtr=0;
 		bool wasBlockInCache=false;
-		
+
 		fbPtr = bc.getBlockPtr(lbid, ver, flg);
 		if (fbPtr) {
 			memcpy(bufferPtr, fbPtr->getData(), BLOCK_SIZE);
@@ -776,26 +778,26 @@ blockReadRetry:
 	}
 
 	struct AsynchLoader {
-		AsynchLoader(uint64_t l, 
+		AsynchLoader(uint64_t l,
 					const QueryContext &v,
-					uint32_t t, 
-					int ct, 
+					uint32_t t,
+					int ct,
 					uint32_t *cCount,
-					uint32_t *rCount, 
-					bool trace, 
-					uint32_t sesID, 
+					uint32_t *rCount,
+					bool trace,
+					uint32_t sesID,
 					boost::mutex *m,
 					uint *loaderCount,
 					VSSCache *vCache) :
-								lbid(l), 
-								ver(v), 
-								txn(t), 
-								compType(ct), 
-								LBIDTrace(trace), 
+								lbid(l),
+								ver(v),
+								txn(t),
+								compType(ct),
+								LBIDTrace(trace),
 								sessionID(sesID),
-								cacheCount(cCount), 
-								readCount(rCount), 
-								busyLoaders(loaderCount), 
+								cacheCount(cCount),
+								readCount(rCount),
+								busyLoaders(loaderCount),
 								mutex(m),
 								vssCache(vCache)
 		{ }
@@ -862,13 +864,13 @@ blockReadRetry:
 			VSSCache *vssCache;
 	};
 
-	void loadBlockAsync(uint64_t lbid, 
+	void loadBlockAsync(uint64_t lbid,
 						const QueryContext &c,
 						uint32_t txn,
 						int compType,
-						uint32_t *cCount, 
-						uint32_t *rCount, 
-						bool LBIDTrace, 
+						uint32_t *cCount,
+						uint32_t *rCount,
+						bool LBIDTrace,
 						uint32_t sessionID,
 						boost::mutex *m,
 						uint *busyLoaders,
@@ -878,7 +880,7 @@ blockReadRetry:
 		bool vbFlag;
 		BRM::VER_t ver;
 		VSSCache::iterator it;
-	
+
 		if (vssCache) {
 			it = vssCache->find(lbid);
 			if (it != vssCache->end()) {
@@ -890,7 +892,7 @@ blockReadRetry:
 		}
 		if (!vssCache || it == vssCache->end())
 			brm->vssLookup((BRM::LBID_t) lbid, c, txn, &ver, &vbFlag);
-		
+
 		if (bc.exists(lbid, ver))
 			return;
 
@@ -982,21 +984,23 @@ class DictScanJob : public threadpool::PriorityThreadPool::Functor
 public:
 	DictScanJob(SP_UM_IOSOCK ios, SBS bs, SP_UM_MUTEX writeLock);
 	virtual ~DictScanJob();
-	
+
 	void write(const ByteStream &);
 	int operator()();
 	void catchHandler(const std::string& ex, uint32_t id, uint16_t code = logging::primitiveServerErr);
 	void sendErrorMsg(uint32_t id, uint16_t code);
-	
+
 private:
 	SP_UM_IOSOCK fIos;
 	SBS fByteStream;
 	SP_UM_MUTEX fWriteLock;
+	posix_time::ptime dieTime;
 };
 
 DictScanJob::DictScanJob(SP_UM_IOSOCK ios, SBS bs, SP_UM_MUTEX writeLock) :
 		fIos(ios), fByteStream(bs), fWriteLock(writeLock)
 {
+	dieTime = posix_time::second_clock::universal_time() + posix_time::seconds(100);
 }
 
 DictScanJob::~DictScanJob()
@@ -1019,13 +1023,13 @@ int DictScanJob::operator()()
 	uint32_t blocksRead = 0;
 	uint16_t runCount;
 
-	map<uint32_t, shared_ptr<DictEqualityFilter> >::iterator eqFilter;
+	boost::shared_ptr<DictEqualityFilter> eqFilter;
 	ByteStream results(output_buf_size);
 	TokenByScanRequestHeader *cmd;
 	PrimitiveProcessor pproc(gDebugLevel);
 	TokenByScanResultHeader *output;
 	QueryContext verInfo;
-	
+
 	try {
 #ifdef DCT_DEBUG
 		DebugLevel oldDebugLevel = gDebugLevel;
@@ -1039,35 +1043,37 @@ int DictScanJob::operator()()
 		uniqueId = cmd->Hdr.UniqueID;
 		runCount = cmd->Count;
 		output = (TokenByScanResultHeader *) results.getInputPtr();
-		eqFilter = dictEqualityFilters.end();
 
 		/* Grab the equality filter if one is specified */
 		if (cmd->flags & HAS_EQ_FILTER) {
-			while (eqFilter == dictEqualityFilters.end()) {
-				mutex::scoped_lock sl(eqFilterMutex);
-				eqFilter = dictEqualityFilters.find(uniqueId);
-				sl.unlock();
-				if (eqFilter == dictEqualityFilters.end())
-					usleep(10000);    // it's still being built, wait for it
+			mutex::scoped_lock sl(eqFilterMutex);
+			map<uint32_t, boost::shared_ptr<DictEqualityFilter> >::iterator it;
+			it = dictEqualityFilters.find(uniqueId);
+			if (it != dictEqualityFilters.end())
+				eqFilter = it->second;
+			sl.unlock();
+			if (!eqFilter) {
+				if (posix_time::second_clock::universal_time() < dieTime) {
+					fByteStream->rewind();
+					return -1;    // it's still being built, wait for it
+				}
+				else
+					return 0;   // was probably aborted, go away...
 			}
 		}
-		
+
 		for (uint16_t i = 0; i < runCount; ++i) {
 			loadBlock(cmd->LBID,
 				verInfo,
 				cmd->Hdr.TransactionID,
 				cmd->CompType,
-				data, 
-				&wasBlockInCache, 
-				&blocksRead, 
+				data,
+				&wasBlockInCache,
+				&blocksRead,
 				fLBIDTraceOn,
 				session);
 			pproc.setBlockPtr((int*) data);
-
-			boost::shared_ptr<DictEqualityFilter> defp;
-			if (eqFilter != dictEqualityFilters.end())
-				defp = eqFilter->second;  // doing this assignment is more portable
-			pproc.p_TokenByScan(cmd, output, output_buf_size, utf8, defp);
+			pproc.p_TokenByScan(cmd, output, output_buf_size, utf8, eqFilter);
 
 			if (wasBlockInCache)
 				output->CacheIO++;
@@ -1089,7 +1095,7 @@ int DictScanJob::operator()()
 		catchHandler(re.what(), uniqueId);
 	} catch(...) {
 		string msg("Unknown exception caught in DictScanJob.");
-		cerr << msg << endl;			
+		cerr << msg << endl;
 		catchHandler(msg, uniqueId);
 	}
 	return 0;
@@ -1118,16 +1124,45 @@ void DictScanJob::sendErrorMsg(uint32_t id, uint16_t code)
 
 struct BPPHandler
 {
-	BPPHandler(PrimitiveServer* ps) : fPrimitiveServerPtr(ps){ }
+	BPPHandler(PrimitiveServer* ps) : fPrimitiveServerPtr(ps) { }
 
-	struct LastJoinerRunner {
-		BPPHandler *rt;
-		SBS bs;
-		LastJoinerRunner(BPPHandler *r, SBS b) : rt(r), bs(b) { };
-		void operator()() { rt->lastJoinerMsg(*bs); };
+    struct BPPHandlerFunctor : public PriorityThreadPool::Functor {
+        BPPHandlerFunctor(BPPHandler *r, SBS b) : rt(r), bs(b)
+        {
+            dieTime = posix_time::second_clock::universal_time() + posix_time::seconds(100);
+        }
+
+        BPPHandler *rt;
+        SBS bs;
+        posix_time::ptime dieTime;
+    };
+
+	struct LastJoiner : public BPPHandlerFunctor {
+        LastJoiner(BPPHandler *r, SBS b) : BPPHandlerFunctor(r, b) { }
+        int operator()() { return rt->lastJoinerMsg(*bs, dieTime); }
+	};
+    
+	struct Create : public BPPHandlerFunctor {
+        Create(BPPHandler *r, SBS b) : BPPHandlerFunctor(r, b) { }
+        int operator()() { rt->createBPP(*bs); return 0; }
 	};
 
-	void doAbort(ByteStream &bs)
+    struct Destroy : public BPPHandlerFunctor {
+        Destroy(BPPHandler *r, SBS b) : BPPHandlerFunctor(r, b) { }
+        int operator()() { return rt->destroyBPP(*bs, dieTime); }
+	};
+
+    struct AddJoiner : public BPPHandlerFunctor {
+        AddJoiner(BPPHandler *r, SBS b) : BPPHandlerFunctor(r, b) { }
+        int operator()() { return rt->addJoinerToBPP(*bs, dieTime); }
+	};
+
+    struct Abort : public BPPHandlerFunctor {
+        Abort(BPPHandler *r, SBS b) : BPPHandlerFunctor(r, b) { }
+        int operator()() { return rt->doAbort(*bs, dieTime); }
+	};
+
+	int doAbort(ByteStream &bs, const posix_time::ptime &dieTime)
 	{
 		uint32_t key;
 		BPPMap::iterator it;
@@ -1136,30 +1171,43 @@ struct BPPHandler
 		bs >> key;
 		mutex::scoped_lock scoped(bppLock);
 		it = bppMap.find(key);
-		scoped.unlock();
-		if (it != bppMap.end())
+		if (it != bppMap.end()) {
 			it->second->abort();
+			bppMap.erase(it);
+		}
+        else {
+            bs.rewind();
+            if (posix_time::second_clock::universal_time() > dieTime)
+                return 0;
+            else
+                return -1;
+        }
+		scoped.unlock();
 		fPrimitiveServerPtr->getProcessorThreadPool()->removeJobs(key);
+		OOBPool->removeJobs(key);
+		return 0;
 	}
 
-	void doAck(ByteStream &bs)
+	int doAck(ByteStream &bs)
 	{
-		 uint32_t key;
-		 int16_t msgCount;
-		 BPPMap::iterator it;
-		 const ISMPacketHeader *ism = (const ISMPacketHeader *) bs.buf();
-		 
-		 key = ism->Interleave;
-		 msgCount = (int16_t) ism->Size;
-		 bs.advance(sizeof(ISMPacketHeader));
-		 
-		 mutex::scoped_lock scoped(bppLock);
-		 it = bppMap.find(key);
-		 scoped.unlock();
-		 if (it != bppMap.end())
-			it->second->getSendThread()->sendMore(msgCount);
+		uint32_t key;
+		int16_t msgCount;
+		SBPPV bpps;
+		const ISMPacketHeader *ism = (const ISMPacketHeader *) bs.buf();
+
+		key = ism->Interleave;
+		msgCount = (int16_t) ism->Size;
+		bs.advance(sizeof(ISMPacketHeader));
+
+		bpps = grabBPPs(key);
+		if (bpps) {
+            bpps->getSendThread()->sendMore(msgCount);
+            return 0;
+        }
+		else 
+            return -1;
 	}
-		
+
 	void createBPP(ByteStream &bs)
 	{
 		uint i;
@@ -1169,11 +1217,10 @@ struct BPPHandler
 
 		// make the new BPP object
 		bppv.reset(new BPPV());
-		bpp.reset(new BatchPrimitiveProcessor(bs, fPrimitiveServerPtr->prefetchThreshold(), 
+		bpp.reset(new BatchPrimitiveProcessor(bs, fPrimitiveServerPtr->prefetchThreshold(),
 			bppv->getSendThread()));
-		if (bs.length() > 0) {
+		if (bs.length() > 0)
 			bs >> initMsgsLeft;
-		}
 		else{
 			initMsgsLeft = -1;
 		}
@@ -1181,25 +1228,28 @@ struct BPPHandler
 		idbassert(bs.length() == 0);
 		bppv->getSendThread()->sendMore(initMsgsLeft);
 		bppv->add(bpp);
-		for (i = 1; i < BPPCount; i++) {
-			SBPP dup = bpp->duplicate();
+		// this block of code creates some BPP instances up front for user queries,
+		// seems to get us slightly better query times
+		if ((bpp->getSessionID() & 0x80000000) == 0) {
+			for (i = 1; i < BPPCount/8; i++) {
+				SBPP dup = bpp->duplicate();
 
-			/* Uncomment these lines to verify duplicate().  == op might need updating */
-//  				if (*bpp != *dup)
-//  					cerr << "createBPP: duplicate mismatch at index " << i << endl;
-//  				idbassert(*bpp == *dup);
-			bppv->add(dup);
+				/* Uncomment these lines to verify duplicate().  == op might need updating */
+//  					if (*bpp != *dup)
+// 	 					cerr << "createBPP: duplicate mismatch at index " << i << endl;
+//  					idbassert(*bpp == *dup);
+				bppv->add(dup);
+			}
 		}
-
 		key = bpp->getUniqueID();
-		//cout << "creating BPP key = " << key << endl;
 		mutex::scoped_lock scoped(bppLock);
 		bool newInsert;
 		newInsert = bppMap.insert(pair<uint32_t, SBPPV>(key, bppv)).second;
+		//cout << "creating BPP # " << key << endl;
 		scoped.unlock();
 		if (!newInsert) {
 			if (bpp->getSessionID() & 0x80000000)
-				cerr << "warning: createBPP() tried to clobber a BPP with duplicate sessionID & stepID. sessionID=" << 
+				cerr << "warning: createBPP() tried to clobber a BPP with duplicate sessionID & stepID. sessionID=" <<
 					(int) (bpp->getSessionID() ^ 0x80000000) << " stepID=" <<
 					bpp->getStepID()<< " (syscat)" << endl;
 			else
@@ -1208,21 +1258,22 @@ struct BPPHandler
 		}
 	}
 
-	SBPPV grabBPPs(uint32_t uniqueID, bool fatal=true)
+	SBPPV grabBPPs(uint32_t uniqueID)
 	{
 		BPPMap::iterator it;
-		uint failCount = 0;
-		uint maxFailCount = (fatal ? 500 : 5000);
+/*
+		uint32_t failCount = 0;
+		uint32_t maxFailCount = (fatal ? 500 : 5000);
+*/
 		SBPPV ret;
 
 		mutex::scoped_lock scoped(bppLock);
 		it = bppMap.find(uniqueID);
 		if (it != bppMap.end())
-		{
-			ret = it->second;
-			return ret;
-		}
-
+			return it->second;
+		else
+            return SBPPV();
+/*
 		do
 		{
 			if (++failCount == maxFailCount) {
@@ -1238,16 +1289,17 @@ struct BPPHandler
 
 		ret = it->second;
 		return ret;
+*/
 	}
 
-	void addJoinerToBPP(ByteStream &bs)
+	int addJoinerToBPP(ByteStream &bs, const posix_time::ptime &dieTime)
 	{
 		SBPPV bppv;
 		uint32_t uniqueID;
 		const uint8_t *buf;
 
 		/* call addToJoiner() on the first BPP */
-		
+
 		buf = bs.buf();
 		/* the uniqueID is after the ISMPacketHeader, sessionID, and stepID */
 		uniqueID = *((const uint32_t *) &buf[sizeof(ISMPacketHeader) + 2*sizeof(uint32_t)]);
@@ -1255,30 +1307,59 @@ struct BPPHandler
 		if (bppv) {
 			mutex::scoped_lock lk(djLock);
 			bppv->get()[0]->addToJoiner(bs);
+			return 0;
+		}
+		else {
+            if (posix_time::second_clock::universal_time() > dieTime)
+                return 0;
+            else
+                return -1;
 		}
 	}
 
-	void lastJoinerMsg(ByteStream &bs)
+	int lastJoinerMsg(ByteStream &bs, const posix_time::ptime &dieTime)
 	{
 		SBPPV bppv;
 		uint32_t uniqueID, i;
 		const uint8_t *buf;
+        int err;
 
 		/* call endOfJoiner() on the every BPP */
 
 		buf = bs.buf();
 		/* the uniqueID is after the ISMPacketHeader, sessionID, and stepID */
 		uniqueID = *((const uint32_t *) &buf[sizeof(ISMPacketHeader) + 2*sizeof(uint32_t)]);
-		
-		bppv = grabBPPs(uniqueID, false);
-		if (!bppv)   // they've already been destroyed
-			return;
+
+		bppv = grabBPPs(uniqueID);
+        if (!bppv) {
+            //cout << "got a lastJoiner msg for an unknown obj " << uniqueID << endl;
+            if (posix_time::second_clock::universal_time() > dieTime)
+                return 0;
+            else
+                return -1;
+        }
+
 		mutex::scoped_lock lk(djLock);
-		for (i = 0; i < bppv->get().size(); i++)
-			bppv->get()[i]->endOfJoiner();
+		for (i = 0; i < bppv->get().size(); i++) {
+			err = bppv->get()[i]->endOfJoiner();
+			if (err == -1) {
+                if (posix_time::second_clock::universal_time() > dieTime)
+                    return 0;
+                else
+                    return -1;
+			}
+        }
+
+		/* Note: some of the duplicate/run/join sync was moved to the BPPV class to do
+		more intelligent scheduling.  Once the join data is received, BPPV will
+		start letting jobs run and create more BPP instances on demand. */
+
+		atomicops::atomicMb();  // make sure the joinDataReceived assignment doesn't migrate upward...
+		bppv->joinDataReceived = true;
+		return 0;
 	}
 
-	void destroyBPP(ByteStream &bs)
+	int destroyBPP(ByteStream &bs, const posix_time::ptime &dieTime)
 	{
 		uint32_t uniqueID, sessionID, stepID;
 		BPPMap::iterator it;
@@ -1287,25 +1368,35 @@ struct BPPHandler
 		bs >> sessionID;
 		bs >> stepID;
 		bs >> uniqueID;
-		mutex::scoped_lock lk(djLock);
-		mutex::scoped_lock scoped(bppLock);
-		//cout << "destroying BPP # " << uniqueID << endl;
-		it = bppMap.find(uniqueID);
-		if (it != bppMap.end()) {
-			it->second->abort();
-			bppMap.erase(it);
-		}
-		scoped.unlock();
+
+        mutex::scoped_lock lk(djLock);
+        mutex::scoped_lock scoped(bppLock);
+
+        it = bppMap.find(uniqueID);
+        if (it != bppMap.end()) {
+            it->second->abort();
+            bppMap.erase(it);
+        }
+        else {
+            //cout << "got a destroy for an unknown obj " << uniqueID << endl;
+            bs.rewind();
+            if (posix_time::second_clock::universal_time() > dieTime)
+                return 0;
+            else
+                return -1;
+        }
 // 			cout << "  destroy: new size is " << bppMap.size() << endl;
 /*
 		if (sessionID & 0x80000000)
 			cerr << "destroyed BPP instances for sessionID " << (int)
 			(sessionID ^ 0x80000000) << " stepID "<< stepID << " (syscat)\n";
 		else
-			cerr << "destroyed BPP instances for sessionID " << sessionID << 
+			cerr << "destroyed BPP instances for sessionID " << sessionID <<
 			" stepID "<< stepID << endl;
 */
 		fPrimitiveServerPtr->getProcessorThreadPool()->removeJobs(uniqueID);
+		OOBPool->removeJobs(uniqueID);
+		return 0;
 	}
 
 	void setBPPToError(uint32_t uniqueID, const string& error, logging::ErrorCodeValues errorCode)
@@ -1321,7 +1412,108 @@ struct BPPHandler
 			bppMap.begin()->second.get()->get()[0]->setError(error, errorCode);
 	}
 
+    // Would be good to define the structure of these msgs somewhere...
+    inline uint32_t getUniqueID(SBS bs, uint8_t command)
+    {
+        uint8_t *buf;
+
+        buf = bs->buf();
+        switch (command) {
+            case BATCH_PRIMITIVE_ABORT:
+                return *((uint32_t *) &buf[sizeof(ISMPacketHeader)]);
+            case BATCH_PRIMITIVE_ACK: {
+                ISMPacketHeader *ism = (ISMPacketHeader *) buf;
+                return ism->Interleave;
+            }
+            case BATCH_PRIMITIVE_ADD_JOINER:
+            case BATCH_PRIMITIVE_END_JOINER:
+            case BATCH_PRIMITIVE_DESTROY:
+                return *((uint32_t *) &buf[sizeof(ISMPacketHeader) + 2*sizeof(uint32_t)]);
+            default:
+                return 0;
+        }
+    }
+
 	PrimitiveServer* fPrimitiveServerPtr;
+};
+
+class DictionaryOp : public PriorityThreadPool::Functor
+{
+public:
+	DictionaryOp(SBS cmd) : bs(cmd) {
+		dieTime = posix_time::second_clock::universal_time() + posix_time::seconds(100);
+	}
+	virtual int execute() = 0;
+	int operator()() {
+		int ret;
+		ret = execute();
+		if (ret != 0) {
+			bs->rewind();
+			if (posix_time::second_clock::universal_time() > dieTime)
+				return 0;
+		}
+		return ret;
+	}
+protected:
+	SBS bs;
+private:
+	posix_time::ptime dieTime;
+};
+
+class CreateEqualityFilter : public DictionaryOp
+{
+public:
+	CreateEqualityFilter(SBS cmd) : DictionaryOp(cmd) { }
+	int execute() {
+		createEqualityFilter();
+		return 0;
+	}
+
+private:
+	void createEqualityFilter()
+	{
+		uint32_t uniqueID, count, i;
+		string str;
+		boost::shared_ptr<DictEqualityFilter> filter(new DictEqualityFilter());
+
+		bs->advance(sizeof(ISMPacketHeader));
+		*bs >> uniqueID;
+		*bs >> count;
+		for (i = 0; i < count; i++) {
+			*bs >> str;
+			filter->insert(str);
+		}
+
+		mutex::scoped_lock sl(eqFilterMutex);
+		dictEqualityFilters[uniqueID] = filter;
+	}
+};
+
+class DestroyEqualityFilter : public DictionaryOp
+{
+public:
+	DestroyEqualityFilter(SBS cmd) : DictionaryOp(cmd) { }
+	int execute() {
+		return destroyEqualityFilter();
+	}
+
+	int destroyEqualityFilter()
+	{
+		uint32_t uniqueID;
+		map<uint32_t, boost::shared_ptr<DictEqualityFilter> >::iterator it;			
+
+		bs->advance(sizeof(ISMPacketHeader));
+		*bs >> uniqueID;
+
+		mutex::scoped_lock sl(eqFilterMutex);
+		it = dictEqualityFilters.find(uniqueID);
+		if (it != dictEqualityFilters.end()) {	
+			dictEqualityFilters.erase(it);
+			return 0;
+		}
+		else
+			return -1;
+	}
 };
 
 struct ReadThread
@@ -1330,13 +1522,6 @@ struct ReadThread
 		fServerName(serverName), fIos(ios), fPrimitiveServerPtr(ps), fBPPHandler(ps)
 	{
 	}
-
-	struct LastJoinerRunner {
-		BPPHandler* rt;
-		SBS bs;
-		LastJoinerRunner(BPPHandler *r, SBS b) : rt(r), bs(b) { };
-		void operator()() { rt->lastJoinerMsg(*bs); };
-	};
 
 	const ByteStream buildCacheOpResp(int32_t result)
 	{
@@ -1423,7 +1608,7 @@ struct ReadThread
 		purgeFDCache(files);
 		ios->write(buildCacheOpResp(0));
 	}
-	
+
 	//N.B. this fcn doesn't actually clean the VSS, but rather instructs PP to flush its
 	//   cache of specific LBID's
 	void doCacheCleanVSSCmd(SP_UM_IOSOCK ios, const ByteStream& bs)
@@ -1453,7 +1638,8 @@ struct ReadThread
 		}
 		ios->write(buildCacheOpResp(0));
 	}
-	
+
+/*
 	void createEqualityFilter(SBS bs)
 	{
 		uint32_t uniqueID, count, i;
@@ -1481,6 +1667,7 @@ struct ReadThread
 		*bs >> uniqueID;
 		dictEqualityFilters.erase(uniqueID);
 	}
+*/
 
 	void operator()()
 	{
@@ -1562,11 +1749,15 @@ struct ReadThread
 
 				switch(ismHdr->Command) {
 				case DICT_CREATE_EQUALITY_FILTER: {
-					createEqualityFilter(bs);
+				    PriorityThreadPool::Job job;
+				    job.functor = boost::shared_ptr<PriorityThreadPool::Functor>(new CreateEqualityFilter(bs));
+				    OOBPool->addJob(job);
 					break;
 				}
 				case DICT_DESTROY_EQUALITY_FILTER: {
-					destroyEqualityFilter(bs);
+				    PriorityThreadPool::Job job;
+				    job.functor = boost::shared_ptr<PriorityThreadPool::Functor>(new DestroyEqualityFilter(bs));
+				    OOBPool->addJob(job);
 					break;
 				}
 				case DICT_TOKEN_BY_SCAN_COMPARE: {
@@ -1586,15 +1777,20 @@ struct ReadThread
 							bRotateDest = false;
 						}
 					}
-					if (hdr->flags & IS_SYSCAT)
-						boost::thread t(DictScanJob(outIos, bs, writeLock));
+                    PriorityThreadPool::Job job;
+                    job.functor = shared_ptr<DictScanJob>(new DictScanJob(outIos,
+                      bs, writeLock));
+                    job.id = hdr->Hdr.UniqueID;
+                    job.weight = LOGICAL_BLOCK_RIDS;
+                    job.priority = hdr->Hdr.Priority;
+					if (hdr->flags & IS_SYSCAT) {
+						//boost::thread t(DictScanJob(outIos, bs, writeLock));
+						// using already-existing threads may cut latency
+                        // if it's changed back to running in an independent thread
+						// change the issyscat() checks in BPPSeeder as well
+						OOBPool->addJob(job);
+					}
 					else {
-						PriorityThreadPool::Job job;
-						job.functor = shared_ptr<DictScanJob>(new DictScanJob(outIos,
-						  bs, writeLock));
-						job.id = hdr->Hdr.UniqueID;;
-						job.weight = LOGICAL_BLOCK_RIDS;
-						job.priority = hdr->Hdr.Priority;
 						procPoolPtr->addJob(job);
 					}
 					break;
@@ -1617,36 +1813,59 @@ struct ReadThread
 					}
 					/* Decide whether this is a syscat call and run
 					right away instead of queueing */
-					shared_ptr<BPPSeeder> bpps(new BPPSeeder(bs, writeLock, outIos, 
+					boost::shared_ptr<BPPSeeder> bpps(new BPPSeeder(bs, writeLock, outIos,
 							fPrimitiveServerPtr->ProcessorThreads(),
 							fPrimitiveServerPtr->PTTrace()));
-					if (bpps->isSysCat())
-						boost::thread t(*bpps);
-					else {
-						PriorityThreadPool::Job job;
-						job.functor = bpps;
-						job.id = bpps->getID();
-						job.weight = ismHdr->Size;
-						job.priority = bpps->priority();
+                    PriorityThreadPool::Job job;
+                    job.functor = bpps;
+                    job.id = bpps->getID();
+                    job.weight = ismHdr->Size;
+                    job.priority = bpps->priority();
+					if (bpps->isSysCat()) {
+						//boost::thread t(*bpps);
+						// using already-existing threads may cut latency
+						// if it's changed back to running in an independent thread
+						// change the issyscat() checks in BPPSeeder as well
+						OOBPool->addJob(job);
+					}
+                    else {
 						procPoolPtr->addJob(job);
 					}
 					break;
 				}
 				case BATCH_PRIMITIVE_CREATE: {
-					fBPPHandler.createBPP(*bs);
+				    PriorityThreadPool::Job job;
+				    job.functor = boost::shared_ptr<PriorityThreadPool::Functor>(new BPPHandler::Create(&fBPPHandler, bs));
+				    OOBPool->addJob(job);
+					//fBPPHandler.createBPP(*bs);
 					break;
 				}
 				case BATCH_PRIMITIVE_ADD_JOINER: {
-					fBPPHandler.addJoinerToBPP(*bs);
+                    PriorityThreadPool::Job job;
+				    job.functor = boost::shared_ptr<PriorityThreadPool::Functor>(new BPPHandler::AddJoiner(&fBPPHandler, bs));
+				    job.id = fBPPHandler.getUniqueID(bs, ismHdr->Command);
+				    OOBPool->addJob(job);
+					//fBPPHandler.addJoinerToBPP(*bs);
 					break;
 				}
 				case BATCH_PRIMITIVE_END_JOINER: {
 					// lastJoinerMsg can block; must do this in a different thread
-					boost::thread t(BPPHandler::LastJoinerRunner(&fBPPHandler, bs));
+					//OOBPool->invoke(BPPHandler::LastJoiner(&fBPPHandler, bs));  // needs a threadpool that can resched
+					//boost::thread tmp(BPPHandler::LastJoiner(&fBPPHandler, bs));
+                    PriorityThreadPool::Job job;
+				    job.functor = boost::shared_ptr<PriorityThreadPool::Functor>(new BPPHandler::LastJoiner(&fBPPHandler, bs));
+				    job.id = fBPPHandler.getUniqueID(bs, ismHdr->Command);
+				    OOBPool->addJob(job);
 					break;
 				}
 				case BATCH_PRIMITIVE_DESTROY: {
-					fBPPHandler.destroyBPP(*bs);
+				    //OOBPool->invoke(BPPHandler::Destroy(&fBPPHandler, bs));  // needs a threadpool that can resched
+				    //boost::thread tmp(BPPHandler::Destroy(&fBPPHandler, bs));
+                    PriorityThreadPool::Job job;
+				    job.functor = boost::shared_ptr<PriorityThreadPool::Functor>(new BPPHandler::Destroy(&fBPPHandler, bs));
+				    job.id = fBPPHandler.getUniqueID(bs, ismHdr->Command);
+				    OOBPool->addJob(job);
+					//fBPPHandler.destroyBPP(*bs);
 					break;
 				}
 				case BATCH_PRIMITIVE_ACK: {
@@ -1654,7 +1873,12 @@ struct ReadThread
 					break;
 				}
 				case BATCH_PRIMITIVE_ABORT: {
-					fBPPHandler.doAbort(*bs);
+				    //OBPool->invoke(BPPHandler::Abort(&fBPPHandler, bs));
+					//fBPPHandler.doAbort(*bs);
+                    PriorityThreadPool::Job job;
+				    job.functor = boost::shared_ptr<PriorityThreadPool::Functor>(new BPPHandler::Abort(&fBPPHandler, bs));
+				    job.id = fBPPHandler.getUniqueID(bs, ismHdr->Command);
+				    OOBPool->addJob(job);
 					break;
 				}
 				default: {
@@ -1785,12 +2009,12 @@ struct TransportReceiverThread
 	void operator()()
 	{
 		MulticastReceiver fmcReceiver;
-		do 
+		do
 		{
 			try
 			{
 				SBS byteStream = fmcReceiver.receive();  //blocks
-				processMessage(byteStream);	
+				processMessage(byteStream);
 			}
 			catch(const logging::MulticastException& ex)
 			{
@@ -1811,10 +2035,10 @@ struct TransportReceiverThread
 				return;
 			}
 
-		} 
+		}
 		while (true);
 	}
-	
+
 	void processMessage(const SBS& bs)
 	{
 		idbassert(bs->length() >= sizeof(ISMPacketHeader));
@@ -1822,7 +2046,9 @@ struct TransportReceiverThread
 		const ByteStream::byte* bytePtr = bs->buf();
 		const ISMPacketHeader* ismHdr = reinterpret_cast<const ISMPacketHeader*>(bytePtr);
 		fLastCommand = ismHdr->Command;
-		switch (ismHdr->Command) 
+		posix_time::ptime dieTime = posix_time::second_clock::universal_time() +
+            posix_time::seconds(10);
+		switch (ismHdr->Command)
 		{
 			case BATCH_PRIMITIVE_CREATE:
 				fLastUniqueId = *((const uint32_t *) &bytePtr[sizeof(ISMPacketHeader) + sizeof(uint8_t) + 4*sizeof(uint32_t)]);
@@ -1830,19 +2056,19 @@ struct TransportReceiverThread
 				fBPPHandler.createBPP(*bs);
 				break;
 			case BATCH_PRIMITIVE_DESTROY:
-				fBPPHandler.destroyBPP(*bs);
+				fBPPHandler.destroyBPP(*bs, dieTime);
 				break;
 			case BATCH_PRIMITIVE_ADD_JOINER:
 				fLastUniqueId = *((const uint32_t *) &bytePtr[sizeof(ISMPacketHeader) + 2*sizeof(uint32_t)]);
-				fBPPHandler.addJoinerToBPP(*bs);
+				fBPPHandler.addJoinerToBPP(*bs, dieTime);
 				break;
-			case BATCH_PRIMITIVE_END_JOINER: 
+			case BATCH_PRIMITIVE_END_JOINER:
 			{
 				// lastJoinerMsg blocks, this thread won't wait.
-				boost::thread t(BPPHandler::LastJoinerRunner(&fBPPHandler, bs));
+				boost::thread t(BPPHandler::LastJoiner(&fBPPHandler, bs));
 				break;
 			}
-			default: 
+			default:
 			 	ostringstream oss;
 				oss << "Incorrect message type for Multicast ";
 				oss <<  ismHdr->Command;
@@ -1873,8 +2099,8 @@ PrimitiveServer::PrimitiveServer(int serverThreads,
 								int processorWeight,
 								int processorQueueSize,
 								bool rotatingDestination,
-								uint32_t BRPBlocks, 
-								int BRPThreads, 
+								uint32_t BRPBlocks,
+								int BRPThreads,
 								int cacheCount,
 								int maxBlocksPerRead,
 								int readAheadBlocks,
@@ -1887,7 +2113,7 @@ PrimitiveServer::PrimitiveServer(int serverThreads,
 								):
 				fServerThreads(serverThreads),
 				fServerQueueSize(serverQueueSize),
-				fProcessorWeight(processorWeight), 
+				fProcessorWeight(processorWeight),
 				fProcessorQueueSize(processorQueueSize),
 				fMaxBlocksPerRead(maxBlocksPerRead),
 				fReadAheadBlocks(readAheadBlocks),
@@ -1903,7 +2129,11 @@ PrimitiveServer::PrimitiveServer(int serverThreads,
 	fServerpool.setQueueSize(fServerQueueSize);
 
 	fProcessorPool.reset(new threadpool::PriorityThreadPool(fProcessorWeight, highPriorityThreads,
-			medPriorityThreads, lowPriorityThreads));
+			medPriorityThreads, lowPriorityThreads, 0));
+
+    // We're not using either the priority or the job-clustering features, just need a threadpool
+    // that can reschedule jobs, and an unlimited non-blocking queue
+    OOBPool.reset(new threadpool::PriorityThreadPool(1, 5, 0, 0, 1));
 
 	asyncCounter = 0;
 
@@ -1976,6 +2206,9 @@ void PrimitiveServer::start()
 BPPV::BPPV()
 {
 	sendThread.reset(new BPPSendThread());
+	v.reserve(BPPCount);
+	pos = 0;
+	joinDataReceived = false;
 }
 
 BPPV::~BPPV()
@@ -1984,6 +2217,21 @@ BPPV::~BPPV()
 
 void BPPV::add(boost::shared_ptr<BatchPrimitiveProcessor> a)
 {
+	/* Right now BPP initialization locks the object if there is a join to
+	prevent the instance from being used before the join data is received.
+	The init/join/run sync code is quite old and confusing at this point,
+	and this makes it a little worse by circumventing the original design.
+	Due for a rewrite. */
+
+	if (!unusedInstance) {
+		unusedInstance = a->duplicate();
+		if (a->hasJoin()) {
+			joinDataReceived = false;
+			unusedInstance->unlock();
+		}
+		else
+			joinDataReceived = true;
+	}
 	v.push_back(a);
 }
 const vector<boost::shared_ptr<BatchPrimitiveProcessor> > & BPPV::get()
@@ -1994,21 +2242,60 @@ const vector<boost::shared_ptr<BatchPrimitiveProcessor> > & BPPV::get()
 
 boost::shared_ptr<BatchPrimitiveProcessor> BPPV::next()
 {
-	std::vector<boost::shared_ptr<BatchPrimitiveProcessor> >::iterator bpp = v.begin();
+	uint size = v.size();
+	uint i;
 
-	for (bpp = v.begin(); bpp != v.end(); bpp++)
-		if (!(*bpp)->busy()) {
-			(*bpp)->busy(true);
-			return *bpp;
+#if 0
+	// This block of code scans for the first available BPP instance,
+	// makes BPPSeeder reschedule it if none are available. Relies on BPP instance
+	// being preallocated.
+	for (i = 0; i < size; i++) {
+		uint index = (i + pos) % size;
+		if (!(v[index]->busy())) {
+			pos = (index + 1) % size;
+			v[index]->busy(true);
+			return v[index];
 		}
-		
+	}
 	// They're all busy, make threadpool reschedule the job
-	return boost::shared_ptr<BatchPrimitiveProcessor>();
+ 	return boost::shared_ptr<BatchPrimitiveProcessor>();
+#endif
+
+	//This block of code creates BPP instances if/when they are needed
+
+	// don't use a processor thread when it will just block, reschedule it instead
+	if (!joinDataReceived)
+		return boost::shared_ptr<BatchPrimitiveProcessor>();
+
+	for (i = 0; i < size; i++) {
+		uint index = (i+pos) % size;
+		if (!(v[index]->busy())) {
+			pos = (index + 1) % size;
+			v[index]->busy(true);
+			return v[index];
+		}
+	}
+
+	// honor the BPPCount limit, mostly for debugging purposes.
+	if (size >= BPPCount)
+		return boost::shared_ptr<BatchPrimitiveProcessor>();
+
+	SBPP newone = unusedInstance->duplicate();
+	if (newone->hasJoin())
+		newone->unlock();
+	newone->busy(true);
+	v.push_back(newone);
+ 	return newone;
 }
 
 void BPPV::abort()
 {
 	sendThread->abort();
+}
+
+bool BPPV::aborted()
+{
+	return sendThread->aborted();
 }
 
 #ifdef PRIMPROC_STOPWATCH

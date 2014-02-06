@@ -347,7 +347,8 @@ bool validateNextValue( int type, int64_t value )
 bool anyRowInTable(string& schema, string& tableName, int sessionID)
 {
 	//find a column in the table
-	CalpontSystemCatalog* csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
+	boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
+	csc->identity(execplan::CalpontSystemCatalog::FE);
 	CalpontSystemCatalog::TableName aTableName;
 	algorithm::to_lower(schema);
 	algorithm::to_lower(tableName);
@@ -637,6 +638,18 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
     if ( typeid ( stmt ) == typeid ( CreateTableStatement ) )
     {
     	CreateTableStatement * createTable = dynamic_cast <CreateTableStatement *> ( &stmt );
+    	//@Bug 5767. To handle key words inside `` for a tablename.
+    	if (!(boost::iequals(schema, createTable->fTableDef->fQualifiedName->fSchema)) || !(boost::iequals(table,createTable->fTableDef->fQualifiedName->fName)))
+    	{
+			rc = 1;
+			thd->main_da.can_overwrite_status = true;
+
+			thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_CREATE_DATATYPE_NOT_SUPPORT)).c_str());
+			ci->alterTableState = cal_connection_info::NOT_ALTER;
+			ci->isAlter = false;
+			return rc;	
+		}
+		
     	bool matchedCol = false;
     	for ( unsigned i=0; i < createTable->fTableDef->fColumns.size(); i++ )
     	{
@@ -1166,7 +1179,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 					if (autoIncre)
 					{
 						//Check if the table already has autoincrement column
-						CalpontSystemCatalog* csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
+						boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
+						csc->identity(execplan::CalpontSystemCatalog::FE);
 						CalpontSystemCatalog::TableName tableName;
 						tableName.schema = alterTable->fTableName->fSchema;
 						tableName.table = alterTable->fTableName->fName;
@@ -1490,7 +1504,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 					if (autoIncre)
 					{
 						//Check if the table already has autoincrement column
-						CalpontSystemCatalog* csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
+						boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
+						csc->identity(execplan::CalpontSystemCatalog::FE);
 						CalpontSystemCatalog::TableName tableName;
 						tableName.schema = alterTable->fTableName->fSchema;
 						tableName.table = alterTable->fTableName->fName;
@@ -1634,7 +1649,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 					if (autoIncre)
 					{
 						//Check if the table already has autoincrement column
-						CalpontSystemCatalog* csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
+						boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
+						csc->identity(execplan::CalpontSystemCatalog::FE);
 						CalpontSystemCatalog::TableName tableName;
 						tableName.schema = alterTable->fTableName->fSchema;
 						tableName.table = alterTable->fTableName->fName;

@@ -162,7 +162,7 @@ uint8_t WE_DDLCommandProc::writeSystable(ByteStream& bs, std::string &err)
 	WriteEngine::RIDList ridList;
 	CalpontSystemCatalog::TableName tableName;
 	CalpontSystemCatalog::ROPair sysTableROPair;
-	CalpontSystemCatalog* systemCatalogPtr;
+	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr;
 	ColumnList columns;
 	ColumnList::const_iterator column_iterator;
 	DDLColumn column;
@@ -394,7 +394,13 @@ uint8_t WE_DDLCommandProc::writeSystable(ByteStream& bs, std::string &err)
 			if (dataType == CalpontSystemCatalog::DECIMAL ||
 				dataType == CalpontSystemCatalog::UDECIMAL)
 			{
-				if	 (colDefPtr->fType->fPrecision < colDefPtr->fType->fScale)
+				if (colDefPtr->fType->fPrecision > 18) //@Bug 5717 precision cannot be over 18.
+				{
+					ostringstream os;
+					os << "Syntax error: The maximum precision (total number of digits) that can be specified is 18";
+					throw std::runtime_error(os.str());
+				}
+				else if	 (colDefPtr->fType->fPrecision < colDefPtr->fType->fScale)
 				{
 					ostringstream os;
 					os << "Syntax error: scale should be less than precision, precision: " << colDefPtr->fType->fPrecision << " scale: " << colDefPtr->fType->fScale;
@@ -760,7 +766,13 @@ uint8_t WE_DDLCommandProc::writeSyscolumn(ByteStream& bs, std::string & err)
 		if (dataType == CalpontSystemCatalog::DECIMAL ||
 			dataType == CalpontSystemCatalog::UDECIMAL)
 		{
-			if	 (colDefPtr->fType->fPrecision < colDefPtr->fType->fScale)
+			if (colDefPtr->fType->fPrecision > 18) //@Bug 5717 precision cannot be over 18.
+			{
+					ostringstream os;
+					os << "Syntax error: The maximum precision (total number of digits) that can be specified is 18";
+					throw std::runtime_error(os.str());
+			}
+			else if	 (colDefPtr->fType->fPrecision < colDefPtr->fType->fScale)
 			{
 				ostringstream os;
 				os << "Syntax error: scale should be less than precision, precision: " << colDefPtr->fType->fPrecision << " scale: " << colDefPtr->fType->fScale;
@@ -1203,7 +1215,7 @@ uint8_t WE_DDLCommandProc::deleteSyscolumn(ByteStream& bs, std::string & err)
 	userTableName.schema = schema;
 	userTableName.table = tablename;
 
-	CalpontSystemCatalog* systemCatalogPtr;
+	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr;
 	systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 	u_int16_t  dbRoot;
@@ -1330,7 +1342,7 @@ uint8_t WE_DDLCommandProc::deleteSyscolumnRow(ByteStream& bs, std::string & err)
 	tableColName.table = tablename;
 	tableColName.column = columnname;
 
-	CalpontSystemCatalog* systemCatalogPtr;
+	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr;
 	systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 	u_int16_t  dbRoot;
@@ -1454,7 +1466,7 @@ uint8_t WE_DDLCommandProc::deleteSystable(ByteStream& bs, std::string & err)
 	userTableName.schema = schema;
 	userTableName.table = tablename;
 
-	CalpontSystemCatalog* systemCatalogPtr;
+	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr;
 	systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 	u_int16_t  dbRoot;
@@ -1578,7 +1590,7 @@ uint8_t WE_DDLCommandProc::deleteSystables(ByteStream& bs, std::string & err)
 	userTableName.schema = schema;
 	userTableName.table = tablename;
 
-	CalpontSystemCatalog* systemCatalogPtr;
+	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr;
 	systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 	WriteEngine::ColStruct colStruct;
@@ -1821,7 +1833,7 @@ uint8_t WE_DDLCommandProc::updateSyscolumnAuto(ByteStream& bs, std::string & err
 	uint16_t segment;
 	uint32_t partition;
 	CalpontSystemCatalog::RIDList roList;
-	CalpontSystemCatalog* systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
+	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 	try {
 		roList = systemCatalogPtr->columnRIDs(tableName);
@@ -1989,7 +2001,7 @@ uint8_t WE_DDLCommandProc::updateSyscolumnNextvalCol(ByteStream& bs, std::string
 	uint32_t partition;
 
 	CalpontSystemCatalog::RIDList roList;
-	CalpontSystemCatalog* systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
+	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 	try {
 		roList = systemCatalogPtr->columnRIDs(tableName);
@@ -2152,7 +2164,7 @@ uint8_t WE_DDLCommandProc::updateSyscolumnTablename(ByteStream& bs, std::string 
 	uint32_t partition;
 
 	CalpontSystemCatalog::RIDList roList;
-	CalpontSystemCatalog* systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
+	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 
 	try {
@@ -2368,7 +2380,7 @@ uint8_t WE_DDLCommandProc::updateSystableAuto(ByteStream& bs, std::string & err)
 	uint32_t partition;
 
 	CalpontSystemCatalog::ROPair ropair;
-	CalpontSystemCatalog* systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
+	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 
 	try {
@@ -2539,7 +2551,7 @@ uint8_t WE_DDLCommandProc::updateSystableTablename(ByteStream& bs, std::string &
 	uint32_t partition;
 
 	CalpontSystemCatalog::ROPair ropair;
-	CalpontSystemCatalog* systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
+	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 
 	try {
@@ -2738,7 +2750,7 @@ uint8_t WE_DDLCommandProc::updateSystablesTablename(ByteStream& bs, std::string 
 	uint32_t partition;
 
 	CalpontSystemCatalog::ROPair ropair;
-	CalpontSystemCatalog* systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
+	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 
 	//@bug 4592 Error handling for syscat call
@@ -3115,7 +3127,7 @@ uint8_t WE_DDLCommandProc::updateSyscolumnColumnposCol(messageqcpp::ByteStream& 
 	CalpontSystemCatalog::TableName tableName;
 	tableName.table = atableName;
 	tableName.schema = schema;
-	CalpontSystemCatalog* systemCatalogPtr =
+	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr =
 	CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 	CalpontSystemCatalog::RIDList rids;
@@ -3748,7 +3760,7 @@ uint8_t WE_DDLCommandProc::updateSyscolumnSetDefault(messageqcpp::ByteStream& bs
 	bs >> colName;
 	bs >> defaultvalue;
 
-	CalpontSystemCatalog* systemCatalogPtr;
+	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr;
 	systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 
@@ -4005,7 +4017,7 @@ uint8_t WE_DDLCommandProc::updateSyscolumnRenameColumn(messageqcpp::ByteStream& 
 	bs >> nullable;
 	bs >> defaultvalue;
 
-	CalpontSystemCatalog* systemCatalogPtr;
+	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr;
 	systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 

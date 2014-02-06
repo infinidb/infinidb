@@ -128,7 +128,7 @@ DropTableProcessor::DDLResult DropTableProcessor::processPackage(ddlpackage::Dro
 	try 
 	{	
 		//check table lock
-		CalpontSystemCatalog *systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(dropTableStmt.fSessionID);
+		boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(dropTableStmt.fSessionID);
 		systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 		systemCatalogPtr->sessionID(dropTableStmt.fSessionID);
 		CalpontSystemCatalog::TableName tableName;
@@ -576,7 +576,9 @@ TruncTableProcessor::DDLResult TruncTableProcessor::processPackage(ddlpackage::T
 		return result;
 	}
 
-	SQLLogger logger(truncTableStmt.fSql, fDDLLoggingId, truncTableStmt.fSessionID, txnID.id);
+	//@Bug 5765 log the schema.
+	string stmt = truncTableStmt.fSql + "|" + truncTableStmt.fTableName->fSchema +"|";
+	SQLLogger logger(stmt, fDDLLoggingId, truncTableStmt.fSessionID, txnID.id);
 	
 	std::vector <CalpontSystemCatalog::OID> columnOidList;
 	std::vector <CalpontSystemCatalog::OID> allOidList;
@@ -586,7 +588,7 @@ TruncTableProcessor::DDLResult TruncTableProcessor::processPackage(ddlpackage::T
 	std::string  processName("DDLProc");
 	u_int32_t  processID = ::getpid();;
 	int32_t   txnid = txnID.id;
-	CalpontSystemCatalog *systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(truncTableStmt.fSessionID);
+	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(truncTableStmt.fSessionID);
 	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 	systemCatalogPtr->sessionID(truncTableStmt.fSessionID);
 	CalpontSystemCatalog::TableInfo tableInfo;

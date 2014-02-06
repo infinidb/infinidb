@@ -565,6 +565,13 @@ int fetchNextRow(uchar *buf, cal_table_info& ti, cal_connection_info* ci)
 					(*f)->field_length = 310;
 					//double double_val = *(double*)(&value);
 					//f2->store(double_val);
+
+					// @bug5736, double type with precision -1 indicates a double for decimal math,
+					//           restore the original decimal scale.
+					// This work around is only for mysqld 5.1.39, newer version 5.1.72 is OK.
+					if (colType.precision == -1)
+						((Field_new_decimal*)(*f))->dec = colType.scale;
+
 					f2->store(dl);
 					if ((*f)->null_ptr)
 						*(*f)->null_ptr &= ~(*f)->null_bit;	
@@ -1057,7 +1064,8 @@ uint doUpdateDelete(THD *thd)
 	}
 	//save table oid for commit/rollback to use
 	uint32_t sessionID = tid2sid(thd->thread_id);
-	CalpontSystemCatalog* csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
+	boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
+	csc->identity(execplan::CalpontSystemCatalog::FE);
 	CalpontSystemCatalog::TableName aTableName;
 	TABLE_LIST *first_table = 0;
 	if (( (thd->lex)->sql_command == SQLCOM_UPDATE ) || ( (thd->lex)->sql_command == SQLCOM_UPDATE_MULTI ) )
@@ -1982,7 +1990,8 @@ long long callastinsertid(UDF_INIT* initid, UDF_ARGS* args,
 		}
 	}
 
-	CalpontSystemCatalog* csc = CalpontSystemCatalog::makeCalpontSystemCatalog(tid2sid(thd->thread_id));
+	boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(tid2sid(thd->thread_id));
+	csc->identity(execplan::CalpontSystemCatalog::FE);
 	
     try
     {
@@ -2235,8 +2244,9 @@ int ha_calpont_impl_rnd_init(TABLE* table)
 		return doUpdateDelete(thd);
 	
 	uint32_t sessionID = tid2sid(thd->thread_id);
-	CalpontSystemCatalog* csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);	
+	boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);	
 	csc->identity(CalpontSystemCatalog::FE);
+	
 	if (!thd->infinidb_vtable.cal_conn_info)
 		thd->infinidb_vtable.cal_conn_info = (void*)(new cal_connection_info());
 	cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(thd->infinidb_vtable.cal_conn_info);	
@@ -2928,7 +2938,7 @@ int ha_calpont_impl_create(const char *name, TABLE *table_arg, HA_CREATE_INFO *c
 int ha_calpont_impl_delete_table(const char *name)
 {	
 	//if this is an InfiniDB tmp table ('#sql*.frm') just leave...
-	if (!bcmp((uchar*)name, tmp_file_prefix, tmp_file_prefix_length)) return 0;
+	if (!memcmp((uchar*)name, tmp_file_prefix, tmp_file_prefix_length)) return 0;
 
 	THD *thd = current_thd;
 
@@ -3153,7 +3163,8 @@ void ha_calpont_impl_start_bulk_insert(ha_rows rows, TABLE* table)
 			return;
 		}
 			
-		CalpontSystemCatalog* csc = CalpontSystemCatalog::makeCalpontSystemCatalog(tid2sid(thd->thread_id));
+		boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(tid2sid(thd->thread_id));
+		csc->identity(execplan::CalpontSystemCatalog::FE);
 		CalpontSystemCatalog::TableName tableName;
 		tableName.schema = table->s->db.str;
 		tableName.table = table->s->table_name.str;

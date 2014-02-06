@@ -610,12 +610,12 @@ bool BatchPrimitiveProcessorJL::countThisMsg(messageqcpp::ByteStream &in) const
 	return (data[offset] != 0);
 }
 
-void BatchPrimitiveProcessorJL::deserializeAggregateResult(ByteStream *in, 
+void BatchPrimitiveProcessorJL::deserializeAggregateResult(ByteStream *in,
 	vector<RGData> *out) const
 {
 	RGData rgData;
 	uint32_t count, i;
-	
+
 	*in >> count;
 	for (i = 0; i < count; i++) {
 		rgData.deserialize(*in, true);
@@ -635,7 +635,7 @@ void BatchPrimitiveProcessorJL::getRowGroupData(ByteStream &in, vector<RGData> *
 	RowGroup &org = primprocRG[threadID];
 
 	out->clear();
-	
+
 	if (in.length() == 0) {
 		// done, return an empty RG
 		rgData = RGData(org, 0);
@@ -667,7 +667,7 @@ void BatchPrimitiveProcessorJL::getRowGroupData(ByteStream &in, vector<RGData> *
 
 	in >> tmp8;
 	*countThis = (tmp8 != 0);
-	
+
 	/* Would be cleaner to make the PM BPP's send a msg count to unify the msg formats.
 	 * For later... */
 	if (aggregatorPM) {
@@ -723,7 +723,7 @@ void BatchPrimitiveProcessorJL::getRowGroupData(ByteStream &in, vector<RGData> *
 		*physIO = 0;
 		*touchedBlocks = 0;
 	}
-	
+
 	idbassert(in.length() == 0);
 }
 
@@ -826,10 +826,9 @@ void BatchPrimitiveProcessorJL::createBPP(ByteStream &bs) const
 	uint i;
 	uint8_t flags = 0;
 
-	memset((void*)&ism, 0, sizeof(ism));
 	ism.Command = BATCH_PRIMITIVE_CREATE;
 
-	bs.append((uint8_t *) &ism, sizeof(ism));
+	bs.load((uint8_t *) &ism, sizeof(ism));
 	bs << (uint8_t) ot;
 	bs << (messageqcpp::ByteStream::quadbyte)txnID;
 	bs << (messageqcpp::ByteStream::quadbyte)sessionID;
@@ -898,7 +897,9 @@ void BatchPrimitiveProcessorJL::createBPP(ByteStream &bs) const
 			for (i = 0; i < PMJoinerCount; i++) {
 				bs << (uint32_t) tJoiners[i]->size();
 				bs << tJoiners[i]->getJoinType();
-				bs << (uint64_t) tJoiners[i]->smallNullValue();
+				
+				//bs << (uint64_t) tJoiners[i]->smallNullValue();
+				
 				bs << (uint8_t) tJoiners[i]->isTypelessJoin();
 				if (tJoiners[i]->hasFEFilter()) {
 					atLeastOneFE = true;
@@ -908,6 +909,7 @@ void BatchPrimitiveProcessorJL::createBPP(ByteStream &bs) const
 					bs << *tJoiners[i]->getFcnExpFilter();
 				}
 				if (!tJoiners[i]->isTypelessJoin()) {
+					bs << (uint64_t) tJoiners[i]->smallNullValue();
 					bs << (messageqcpp::ByteStream::quadbyte)tJoiners[i]->getLargeKeyColumn();
  					//cout << "large key column is " << (uint) tJoiners[i]->getLargeKeyColumn() << endl;
 				}
@@ -1180,6 +1182,7 @@ bool BatchPrimitiveProcessorJL::nextTupleJoinerMsg(ByteStream &bs)
 	unsigned rowunits = fJoinerChunkSize / (r.getSize() + metasize);
 	toSend = std::min<unsigned int>(size - pos, rowunits);
 	bs << toSend;
+	bs << pos;
 	bs << joinerNum;
 
 	if (tJoiners[joinerNum]->isTypelessJoin()) {
@@ -1233,11 +1236,11 @@ bool BatchPrimitiveProcessorJL::nextTupleJoinerMsg(ByteStream &bs)
 			r.setPointer((*tSmallSide)[i]);
 			if (r.isUnsigned(smallKeyCol))
 				smallkey = r.getUintField(smallKeyCol);
-			else 
+			else
 				smallkey = r.getIntField(smallKeyCol);
 			// If this is a compare signed vs unsigned and the sign bit is on for this value, then all compares
 			// against the large side should fall. UBIGINTEMPTYROW is not a valid value, so nothing will match.
-			if (bSignedUnsigned && (smallkey & 0x8000000000000000ULL)) 
+			if (bSignedUnsigned && (smallkey & 0x8000000000000000ULL))
 				smallkey = joblist::UBIGINTEMPTYROW;
 			arr[j].key = (int64_t)smallkey;
 			arr[j].value = i;
@@ -1314,6 +1317,7 @@ bool BatchPrimitiveProcessorJL::nextJoinerMsg(ByteStream &bs)
 
 	toSend = (size - pos > 1000000 ? 1000000 : size - pos);
 	bs << toSend;
+	bs << pos;
 	bs.append((uint8_t *) (&(*smallSide)[pos]), sizeof(ElementType) * toSend);
 	pos += toSend;
 

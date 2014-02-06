@@ -3811,7 +3811,7 @@ void DBRM::invalidateUncommittedExtentLBIDs(execplan::CalpontSystemCatalog::SCN 
 
 	vector<LBID_t> localLBIDList;
 
-    execplan::CalpontSystemCatalog* csc;
+    boost::shared_ptr<execplan::CalpontSystemCatalog> csc;
     CPInfoList_t cpInfos;
     CPInfo aInfo;
     int oid;

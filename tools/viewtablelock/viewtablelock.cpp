@@ -50,7 +50,7 @@ void usage()
 // Print table locks.
 // This function closely resembles CommandPackageProcessor::viewTableLock().
 //------------------------------------------------------------------------------
-int printTableLocks( CalpontSystemCatalog* systemCatalogPtr,
+int printTableLocks( boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr,
 	const std::string& tableNameIn,
 	const std::vector<BRM::TableLockInfo> tableLocks )
 {
@@ -291,7 +291,7 @@ int main(int argc, char** argv)
 		std::string table( argv[optind++]);
 
 		// Get table oid
-		CalpontSystemCatalog *systemCatalogPtr =
+		boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr =
 			CalpontSystemCatalog::makeCalpontSystemCatalog(1);
 		systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 		CalpontSystemCatalog::TableName tableName;
@@ -355,7 +355,7 @@ int main(int argc, char** argv)
 		}
 		else
 		{
-			CalpontSystemCatalog *systemCatalogPtr =
+			boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr =
 				CalpontSystemCatalog::makeCalpontSystemCatalog();
 			systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 

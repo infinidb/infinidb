@@ -187,7 +187,7 @@ int ddl_cleanup()
 					rc = cacheutils::flushOIDsFromCache(aLogInfo.oids);	
 					ddlpackageprocessor.removeExtents( aLogInfo.oids );
 					//create a new sets of files. Just find a dbroot according th the number of tables in syscat-1.
-					CalpontSystemCatalog* systemCatalogPtr =
+					boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr =
 						CalpontSystemCatalog::makeCalpontSystemCatalog(1);
 					int tableCount = systemCatalogPtr->getTableCount();
 					int dbRootCnt = 1;

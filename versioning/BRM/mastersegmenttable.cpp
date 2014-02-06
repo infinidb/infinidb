@@ -137,11 +137,10 @@ MasterSegmentTable::MasterSegmentTable()
 	RWLockKeys[3] = fShmKeys.KEYRANGE_VSS_BASE;
 	RWLockKeys[4] = fShmKeys.KEYRANGE_CL_BASE;
 		
-	rwlock[0] = NULL;
     try
     {
         // if initializer is returned false, then this is not the first time for this key.
-        rwlock[0] = new RWLock(RWLockKeys[0], &initializer);
+        rwlock[0].reset(new RWLock(RWLockKeys[0], &initializer));
 	}
 	catch (exception &e) 
     {
@@ -154,7 +153,7 @@ MasterSegmentTable::MasterSegmentTable()
 	}
 	
 	for (i = 1; i < nTables; i++)
-		rwlock[i] = new RWLock(RWLockKeys[i]);
+		rwlock[i].reset(new RWLock(RWLockKeys[i]));
 	
 	makeMSTSegment();
 	if (initializer) {
@@ -169,10 +168,10 @@ MasterSegmentTable::MasterSegmentTable()
 
 MasterSegmentTable::~MasterSegmentTable()
 {
-	int i;
+//	int i;
 	
-	for (i = 0; i < nTables; i++)
-		delete rwlock[i];
+//	for (i = 0; i < nTables; i++)
+//		delete rwlock[i];
 }
 	
 void MasterSegmentTable::makeMSTSegment()

@@ -963,10 +963,19 @@ void BulkLoadBuffer::convert(char *field, int fieldLength,
                         bufStats.maxBufferVal = llDate;
                 }
                 else {
-                    // @bug 3375: reset invalid date/time to NULL,
-                    //            and track as a saturated value.
-                    llDate = joblist::DATETIMENULL;
-                    bufStats.satCount++;
+					if(!column.fNotNull)
+					{
+                    	// @bug 3375: reset invalid date/time to NULL,
+                    	//            and track as a saturated value.
+                    	llDate = joblist::DATETIMENULL;
+                    	bufStats.satCount++;
+					}
+					else
+					{
+						//Bug5383 - 4.0@1400-01-01 00:00:00 Below 4.0 is 0000-01-01 00:00:00
+						llDate = 0x578104000000000; 	//394082834458869760
+						bufStats.satCount++;
+					}
                 }
 
                 pVal = &llDate;
@@ -1250,11 +1259,21 @@ void BulkLoadBuffer::convert(char *field, int fieldLength,
                     if (iDate > bufStats.maxBufferVal)
                         bufStats.maxBufferVal = iDate;
                 }
-                else {
-                    // @bug 3375: reset invalid date to NULL,
-                    //            and track as a saturated value.
-                    iDate = joblist::DATENULL;
-                    bufStats.satCount++;
+                else 
+				{
+					if(!column.fNotNull)
+					{
+						// @bug 3375: reset invalid date to NULL,
+						//            and track as a saturated value.
+						iDate = joblist::DATENULL;
+						bufStats.satCount++;
+					}
+					else
+					{
+						// Bug5383 - 1400-01-01 
+						iDate = 0x5781068;  	//ver below 4.0 it is 0x1068
+						bufStats.satCount++;
+					}
                 }
 
                 pVal = &iDate;

@@ -436,7 +436,7 @@ void BulkLoad::spawnWorkers()
 int BulkLoad::preProcess( Job& job, int tableNo,
                           TableInfo* tableInfo )
 {
-    int         rc=NO_ERROR, maxWidth=0, minWidth=9999; // give a big number
+    int         rc=NO_ERROR, minWidth=9999; // give a big number
     HWM         minHWM = 999999;  // rp 9/25/07 Bug 473
     ColStruct   curColStruct;
     CalpontSystemCatalog::ColDataType colDataType;
@@ -475,10 +475,9 @@ int BulkLoad::preProcess( Job& job, int tableNo,
 
     //------------------------------------------------------------------------
     // First loop thru the columns for the "tableNo" table in jobTableList[].
-    // and determine the HWM for the smallest width column(s), and save that
-    // as minHWM.  We save additional HWM information acquired from BRM, in
-    // segFileInfo, for later use.
+    // Get the HWM information for each column.
     //------------------------------------------------------------------------
+    std::vector<int>                    colWidths;
     std::vector<DBRootExtentInfo>       segFileInfo;
     std::vector<DBRootExtentTracker*>   dbRootExtTrackerVec;
     std::vector<BRM::EmDbRootHWMInfo_v> dbRootHWMInfoColVec(
@@ -488,7 +487,7 @@ int BulkLoad::preProcess( Job& job, int tableNo,
     bool bEmptyPM               = false;
     for( size_t i = 0; i < job.jobTableList[tableNo].colList.size(); i++ ) 
     {
-        JobColumn curJobCol = job.jobTableList[tableNo].colList[i];
+        const JobColumn& curJobCol = job.jobTableList[tableNo].colList[i];
 
         // convert column data type
         if( curJobCol.typeName.length() >0 &&
@@ -513,8 +512,6 @@ int BulkLoad::preProcess( Job& job, int tableNo,
         job.jobTableList[tableNo].colList[i].emptyVal = getEmptyRowValue(
             job.jobTableList[tableNo].colList[i].dataType,
             job.jobTableList[tableNo].colList[i].width );
-        if( job.jobTableList[tableNo].colList[i].width > maxWidth )
-            maxWidth = job.jobTableList[tableNo].colList[i].width;
 
         // check HWM for column file
         rc = BRMWrapper::getInstance()->getDbRootHWMInfo( curJobCol.mapOid,
@@ -529,17 +526,31 @@ int BulkLoad::preProcess( Job& job, int tableNo,
             return rc;
         }
 
+        colWidths.push_back( job.jobTableList[tableNo].colList[i].width );
+    } // end of 1st for-loop through the list of columns (get starting HWM)
+
+    //--------------------------------------------------------------------------
+    // Second loop thru the columns for the "tableNo" table in jobTableList[].
+    // Create DBRootExtentTracker, and select starting DBRoot.
+    // Determine the smallest width column(s), and save that as minHWM.
+    // We save additional HWM information acquired from BRM, in segFileInfo,
+    // for later use.
+    //--------------------------------------------------------------------------
+    for( size_t i = 0; i < job.jobTableList[tableNo].colList.size(); i++ )
+    {
+        const JobColumn& curJobCol = job.jobTableList[tableNo].colList[i];
+
         // Find DBRoot/segment file where we want to start adding rows
-        BRM::EmDbRootHWMInfo_v& dbRootHWMInfo = dbRootHWMInfoColVec[i];
         DBRootExtentTracker* pDBRootExtentTracker = new DBRootExtentTracker(
             curJobCol.mapOid,
-            job.jobTableList[tableNo].colList[i].width,
-            &fLog,
-            dbRootHWMInfo );
+            colWidths,
+            dbRootHWMInfoColVec,
+            i,
+            &fLog );
         if (i == 0)
             pRefDBRootExtentTracker = pDBRootExtentTracker;
         dbRootExtTrackerVec.push_back( pDBRootExtentTracker );
-                
+
         // Start adding rows to DBRoot/segment file that is selected
         DBRootExtentInfo dbRootExtent;
         if (i == 0) // select starting DBRoot/segment for column[0]
@@ -555,12 +566,9 @@ int BulkLoad::preProcess( Job& job, int tableNo,
         }
         else // select starting DBRoot/segment based on column[0] selection
         {    // to ensure all columns start with the same DBRoot/segment
-            bool bNoStartExtentOnThisPM2; // not used in this case
-            bool bEmptyPM2;               // no usedd in this case
             pDBRootExtentTracker->assignFirstSegFile(
                 *pRefDBRootExtentTracker, // reference column[0] tracker
-                dbRootExtent,
-                bNoStartExtentOnThisPM2, bEmptyPM2);
+                dbRootExtent);
         }
 
         if( job.jobTableList[tableNo].colList[i].width < minWidth )
@@ -572,7 +580,7 @@ int BulkLoad::preProcess( Job& job, int tableNo,
 
         // Save column segment file info for use in subsequent loop
         segFileInfo.push_back( dbRootExtent );
-    } // end of 1st for-loop through the list of columns (get starting HWM)
+    }
 
     //--------------------------------------------------------------------------
     // Validate that the starting HWMs for all the columns are in sync
@@ -600,7 +608,7 @@ int BulkLoad::preProcess( Job& job, int tableNo,
     }
 
     //--------------------------------------------------------------------------
-    // Second loop thru the columns for the "tableNo" table in jobTableList[].
+    // Third loop thru the columns for the "tableNo" table in jobTableList[].
     // In this pass through the columns we create the ColumnInfo object,
     // open the applicable column and dictionary store files, and seek to
     // the block where we will begin adding data.

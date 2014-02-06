@@ -236,7 +236,7 @@ void SimpleColumn::parse(const string& token)
 
 void SimpleColumn::setOID()
 {
-    CalpontSystemCatalog* csc = CalpontSystemCatalog::makeCalpontSystemCatalog(fSessionID);
+    boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(fSessionID);
     CalpontSystemCatalog::TableColName tcn;
     tcn = make_tcn(fSchemaName, fTableName, fColumnName);
 

@@ -3,15 +3,15 @@
 echo ======================================
 echo updating mysql source
 cd \InfiniDB\mysql
-git checkout develop
+git checkout 4.0
 git pull
 IF %ERRORLEVEL% NEQ 0 GOTO ERROR_HANDLER
 
 echo ======================================
 echo updating InfiniDB source
-cd \InfiniDB\src
-git checkout develop
-git pull origin_http develop
+cd \InfiniDB\genii
+git checkout 4.0
+git pull origin_http 4.0
 IF %ERRORLEVEL% NEQ 0 GOTO ERROR_HANDLER
 
 echo ======================================
@@ -22,9 +22,16 @@ IF %ERRORLEVEL% NEQ 0 GOTO ERROR_HANDLER
 
 echo ======================================
 echo Building InfiniDB
-cd \InfiniDB\src\build
+cd \InfiniDB\genii\build
 VCBUILD /M8 /rebuild InfiniDB.sln "EnterpriseRelease|x64"
 IF %ERRORLEVEL% NEQ 0 GOTO ERROR_HANDLER
+
+echo ======================================
+echo Building infindb-ent
+cd \InfiniDB\infinidb-ent\build
+call Build.bat
+IF %ERRORLEVEL% NEQ 0 GOTO ERROR_HANDLER
+cd \InfiniDB\genii\build
 
 echo ======================================
 echo Building CalpontVersion.txt

@@ -32,6 +32,7 @@
 #include "errorids.h"
 #include "logger.h"
 #include "errorcodes.h"
+#include "errorinfo.h"
 #include "exceptclasses.h"
 
 namespace joblist
@@ -81,7 +82,7 @@ private:
 };
 
 typedef boost::shared_ptr<Logger> SPJL;
-void catchHandler(const std::string& s, unsigned sid = 0,
+void catchHandler(const std::string& s, int c, SErrorInfo& errorInfo, unsigned sid = 0,
 	logging::LOG_TYPE = logging::LOG_TYPE_CRITICAL);
 
 }

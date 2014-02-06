@@ -214,7 +214,7 @@ int RedistributeControlThread::makeRedistributePlan()
 		}
 
 		// get all user table oids
-		CalpontSystemCatalog *csc = CalpontSystemCatalog::makeCalpontSystemCatalog(0);
+		boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(0);
 		vector<pair<CalpontSystemCatalog::OID, CalpontSystemCatalog::TableName> >
 			tables = csc->getTables();
 		vector<pair<CalpontSystemCatalog::OID, CalpontSystemCatalog::TableName> >::iterator i;
