@@ -14,9 +14,13 @@ set SERVER [lindex $argv 0]
 set PASSWORD [lindex $argv 1]
 set COMMAND [lindex $argv 2]
 set DEBUG [lindex $argv 3]
-if {[catch {myeval $env($USER)} USERNAME]} {
-    set USERNAME "root"  
+
+if {[info exists env(USER)]} {
+    set USERNAME $env(USER)
+} else {
+    set USERNAME "root"
 }
+
 set UNM [lindex $argv 4]
 if { $UNM != "" && $UNM != "-" } {
 	set USERNAME "$UNM"
