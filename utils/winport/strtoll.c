@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -21,27 +21,7 @@
 
 #include "unistd.h"
 
-long long llabs(const long long in)
-{
-	if (in < 0) return -in;
-	return in;
-}
-
 long long atoll(const char* nptr)
 {
-	return idb_strtoll(nptr, 0, 0);
-}
-
-unsigned long long idb_strtoull(const char *nptr, char **endptr, int base)
-{
-	long long out;
-	out = (long long)_strtoui64(nptr, endptr, base);
-	return out;
-}
-
-long long idb_strtoll(const char *nptr, char **endptr, int base)
-{
-	long long out;
-	out = (long long)_strtoi64(nptr, endptr, base);
-	return out;
+	return strtoll(nptr, 0, 0);
 }

@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -234,7 +234,7 @@ int ProcessCommandStatement(THD *thd, string& dmlStatement, cal_connection_info&
 	//@Bug 2721 and 2722. Log the statement before issuing commit/rollback
 	if ( dmlStatement == "LOGGING" )
 	{	
-		VendorDMLStatement cmdStmt(thd->query, DML_COMMAND, sessionID);
+		VendorDMLStatement cmdStmt(idb_mysql_query_str(thd), DML_COMMAND, sessionID);
 		cmdStmt.set_Logging( false );
 		pDMLPackage = CalpontDMLFactory::makeCalpontDMLPackageFromMysqlBuffer(cmdStmt);
 		pDMLPackage->set_Logging( false );
@@ -259,7 +259,7 @@ int ProcessCommandStatement(THD *thd, string& dmlStatement, cal_connection_info&
 		pDMLPackage->set_isAutocommitOn(true);
 			
     ByteStream bytestream;
-    bytestream << static_cast<u_int32_t>(sessionID);
+    bytestream << static_cast<uint32_t>(sessionID);
     
     pDMLPackage->write(bytestream);
     delete pDMLPackage;
@@ -322,7 +322,7 @@ int doProcessInsertValues ( TABLE* table, uint32_t size, cal_connection_info& ci
 		
 		int rc = 0;
 		
-		VendorDMLStatement dmlStmts(thd->query, DML_INSERT, table->s->table_name.str,
+		VendorDMLStatement dmlStmts(idb_mysql_query_str(thd), DML_INSERT, table->s->table_name.str,
                 table->s->db.str, size, ci.colNameList.size(), ci.colNameList,
                 ci.tableValuesMap, sessionID);
 
@@ -692,7 +692,7 @@ int ha_calpont_impl_write_row_(uchar *buf, TABLE* table, cal_connection_info& ci
 	pDMLPackage->set_TableName (tablename.table);
     	
     ByteStream bytestream;
-    bytestream << static_cast<u_int32_t>(sessionID);
+    bytestream << static_cast<uint32_t>(sessionID);
     pDMLPackage->write(bytestream);
     delete pDMLPackage;
 	
@@ -814,7 +814,7 @@ int ha_calpont_impl_write_row_(uchar *buf, TABLE* table, cal_connection_info& ci
 	pDMLPackage->set_SQLStatement( lockIDString.str() );
 
     ByteStream bytestream;
-    bytestream << static_cast<u_int32_t>(sessionID);
+    bytestream << static_cast<uint32_t>(sessionID);
     pDMLPackage->write(bytestream);
     delete pDMLPackage;
 	
@@ -871,6 +871,7 @@ int ha_calpont_impl_commit_ (handlerton *hton, THD *thd, bool all, cal_connectio
 	if (thd->infinidb_vtable.vtable_state == THD::INFINIDB_ALTER_VTABLE ||
 		  thd->infinidb_vtable.vtable_state == THD::INFINIDB_SELECT_VTABLE )
 		return rc;
+	if (thd->slave_thread) return 0;
 	std::string command("COMMIT");
 #ifdef INFINIDB_DEBUG
 	cout << "COMMIT" << endl;

@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -20,9 +20,7 @@
  *
  *
  ***********************************************************************/
-#define DMLPKGPROC_DLLEXPORT
 #include "dmlpackageprocessor.h"
-#undef DMLPKGPROC_DLLEXPORT
 
 #include <math.h>
 using namespace std;
@@ -224,7 +222,7 @@ void DMLPackageProcessor::convertRidToColumn(uint64_t& rid, unsigned& dbRoot, un
 }
 
 
-string DMLPackageProcessor::projectTableErrCodeToMsg(uint ec)
+string DMLPackageProcessor::projectTableErrCodeToMsg(uint32_t ec)
 {
 	if (ec < 1000) // pre IDB error code
 	{
@@ -285,7 +283,7 @@ int DMLPackageProcessor::rollBackTransaction(uint64_t uniqueId, BRM::TxnID txnID
 	bytestream << uniqueId;
 	bytestream << sessionID;
 	bytestream << (uint32_t)txnID.id;
-	uint msgRecived = 0;
+	uint32_t msgRecived = 0;
 	try {
 		fWEClient->write_to_all(bytestream);
 		boost::shared_ptr<messageqcpp::ByteStream> bsIn;
@@ -394,7 +392,7 @@ int DMLPackageProcessor::commitBatchAutoOnTransaction(uint64_t uniqueId, BRM::Tx
 	bytestream << tableOid;
 	bytestream << fSessionID;
 	
-	uint msgRecived = 0;
+	uint32_t msgRecived = 0;
 	fWEClient->write_to_all(bytestream);
 	boost::shared_ptr<messageqcpp::ByteStream> bsIn;
 	bsIn.reset(new ByteStream());
@@ -568,7 +566,7 @@ int DMLPackageProcessor::rollBackBatchAutoOnTransaction(uint64_t uniqueId, BRM::
 	bytestream << sessionID;
 	bytestream << tableLockId;
 	bytestream << tableOid;
-	uint msgRecived = 0;
+	uint32_t msgRecived = 0;
 	fWEClient->write_to_all(bytestream);
 	boost::shared_ptr<messageqcpp::ByteStream> bsIn;
 	bsIn.reset(new ByteStream());
@@ -696,7 +694,7 @@ int DMLPackageProcessor::commitBatchAutoOffTransaction(uint64_t uniqueId, BRM::T
 	bytestream << (ByteStream::byte)WE_SVR_BATCH_AUTOON_REMOVE_META;
 	bytestream << uniqueId;
 	bytestream << tableOid;
-	uint msgRecived = 0;
+	uint32_t msgRecived = 0;
 	fWEClient->write_to_all(bytestream);
 	while (1)
 	{
@@ -727,7 +725,7 @@ int DMLPackageProcessor::rollBackBatchAutoOffTransaction(uint64_t uniqueId, BRM:
 	bytestream << sessionID;
 	bytestream << (uint32_t)txnID.id;
 	bytestream << tableOid;
-	uint msgRecived = 0;
+	uint32_t msgRecived = 0;
 	fWEClient->write_to_all(bytestream);
 	boost::shared_ptr<messageqcpp::ByteStream> bsIn;
 	bsIn.reset(new ByteStream());
@@ -770,7 +768,7 @@ int DMLPackageProcessor::flushDataFiles (int rcIn, std::map<FID,FID> & columnOid
 	bytestream << (uint32_t) rcIn;
 	bytestream << (uint32_t)txnID.id;
 	bytestream << tableOid;
-	uint msgRecived = 0;
+	uint32_t msgRecived = 0;
 	fWEClient->write_to_all(bytestream);
 	boost::shared_ptr<messageqcpp::ByteStream> bsIn;
 	bsIn.reset(new ByteStream());
@@ -814,7 +812,7 @@ int DMLPackageProcessor::endTransaction (uint64_t uniqueId, BRM::TxnID txnID, bo
 	bytestream << uniqueId;
 	bytestream << (uint32_t)txnID.id;
 	bytestream << (ByteStream::byte)success;
-	uint msgRecived = 0;
+	uint32_t msgRecived = 0;
 	fWEClient->write_to_all(bytestream);
 	boost::shared_ptr<messageqcpp::ByteStream> bsIn;
 	bsIn.reset(new ByteStream());

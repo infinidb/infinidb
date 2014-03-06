@@ -49,7 +49,7 @@ extern          "C" {
 
 void                 netsnmp_baby_steps_init(void);
 
-netsnmp_mib_handler *netsnmp_baby_steps_handler_get(u_long modes);
+netsnmp_mib_handler *netsnmp_baby_steps_handler_get(uint32_t modes);
 
 /** @} */
 

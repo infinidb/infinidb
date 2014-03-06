@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -39,10 +39,6 @@
 
 namespace primitiveprocessor
 {
-
-typedef int64_t (*UDFFcnPtr_t)(int64_t);
-typedef std::map<unsigned, UDFFcnPtr_t> UDFFcnMap_t;
-extern UDFFcnMap_t UDFFcnMap;
 
 #define SUMMARY_INFO( message ) \
         if ( isDebug(SUMMARY) ) \

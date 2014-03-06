@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -61,8 +61,8 @@ class BucketDL : public DataList<element_t>
          * @param hash The function object that calculates which bucket an elements goes into on insertion.
          */
 
-        BucketDL(uint numBuckets, uint numConsumers, uint maxElementsPerBucket, ResourceManager& rm,
-            boost::function<uint32_t (const char *data, uint len)> hash = utils::Hasher());
+        BucketDL(uint32_t numBuckets, uint32_t numConsumers, uint32_t maxElementsPerBucket, ResourceManager& rm,
+            boost::function<uint32_t (const char *data, uint32_t len)> hash = utils::Hasher());
 
         virtual ~BucketDL();
 
@@ -153,7 +153,7 @@ class BucketDL : public DataList<element_t>
         uint64_t numBuckets;
         uint64_t numConsumers;
         uint64_t maxElements;
-        boost::function<uint32_t (const char *data, uint len)> hashFcn;
+        boost::function<uint32_t (const char *data, uint32_t len)> hashFcn;
         uint64_t hashMode;
         uint64_t bucketMask;
         bool multiProducer;
@@ -169,12 +169,12 @@ class BucketDL : public DataList<element_t>
 };
 
 template<typename element_t>
-BucketDL<element_t>::BucketDL(uint nb, uint nc, uint me, ResourceManager& rm,
-    boost::function<uint32_t (const char *data, uint len)> hash)
+BucketDL<element_t>::BucketDL(uint32_t nb, uint32_t nc, uint32_t me, ResourceManager& rm,
+    boost::function<uint32_t (const char *data, uint32_t len)> hash)
     : base(), fRm(rm), buckets(0), rbuckets(0), fTraceOn(false), fHashLen(0), fElementLen(0),
       bucketDoneCount(0), fReuseControl(NULL)
 {
-    uint i;
+    uint32_t i;
     uint64_t mask;
 
     numBuckets = nb;
@@ -382,7 +382,7 @@ void BucketDL<element_t>::insert(const element_t* array, uint64_t arrayCount)
 template<typename element_t>
 uint64_t BucketDL<element_t>::getIterator()
 {
-    throw std::logic_error("don't call BucketDL::getIterator(), call getIterator(uint)");
+    throw std::logic_error("don't call BucketDL::getIterator(), call getIterator(uint32_t)");
 }
 
 template<typename element_t>
@@ -417,7 +417,7 @@ void BucketDL<element_t>::endOfInput()
 template<typename element_t>
 bool BucketDL<element_t>::next(uint64_t it, element_t *e)
 {
-    throw std::logic_error("don't call BucketDL::next(uint, element_t), call next(uint, uint, element_t");
+    throw std::logic_error("don't call BucketDL::next(uint32_t, element_t), call next(uint32_t, uint32_t, element_t");
 }
 
 template<typename element_t>

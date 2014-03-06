@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -37,6 +37,9 @@ using namespace oam;
 
 string mysqlpw = " ";
 string pwprompt = " ";
+
+string masterLogFile = oam::UnassignedName;
+string masterLogPos = oam::UnassignedName;
 
 extern string installDir;
 
@@ -267,7 +270,7 @@ void mysqlSetup()
 *
 *
 ******************************************************************************************/
-int sendUpgradeRequest(int IserverTypeInstall)
+int sendUpgradeRequest(int IserverTypeInstall, bool pmwithum)
 {
 	Oam oam;
 
@@ -307,7 +310,8 @@ int sendUpgradeRequest(int IserverTypeInstall)
 
 		string moduleType = systemmoduletypeconfig.moduletypeconfig[i].ModuleType;
 		if ( moduleType == "um" ||
-			( moduleType == "pm" && IserverTypeInstall == oam::INSTALL_COMBINE_DM_UM_PM ) ) {
+			( moduleType == "pm" && IserverTypeInstall == oam::INSTALL_COMBINE_DM_UM_PM ) || 
+			( moduleType == "pm" && pmwithum ) ) {
 
 			DeviceNetworkList::iterator pt = systemmoduletypeconfig.moduletypeconfig[i].ModuleNetworkList.begin();
 			for ( ; pt != systemmoduletypeconfig.moduletypeconfig[i].ModuleNetworkList.end(); pt++)
@@ -317,11 +321,14 @@ int sendUpgradeRequest(int IserverTypeInstall)
 				try {
 					oam.getModuleStatus((*pt).DeviceName, opState, degraded);
 
-					if (opState == oam::ACTIVE) {
+					if (opState == oam::ACTIVE ||
+						opState == oam::DEGRADED) {
 						returnStatus = sendMsgProcMon( (*pt).DeviceName, msg, requestID, 30 );
 		
-						if ( returnStatus != API_SUCCESS)
+						if ( returnStatus != API_SUCCESS) {
+							cout << "ERROR: Error return in running the InfiniDB Upgrade, check /tmp/upgrade*.logs on " << (*pt).DeviceName << endl;
 							return returnStatus;
+						}
 					}
 				}
 				catch (exception& ex)
@@ -331,6 +338,126 @@ int sendUpgradeRequest(int IserverTypeInstall)
 	}
 	return returnStatus;
 }
+
+/******************************************************************************************
+* @brief	sendReplicationRequest
+*
+* purpose:	send Upgrade Request Msg to all ACTIVE UMs
+*
+*
+******************************************************************************************/
+int sendReplicationRequest(int IserverTypeInstall)
+{
+	Oam oam;
+
+	SystemModuleTypeConfig systemmoduletypeconfig;
+
+	try{
+		oam.getSystemConfig(systemmoduletypeconfig);
+	}
+	catch (exception& ex)
+	{}
+
+	//get Primary (Master) UM
+	string masterModule = oam::UnassignedName;
+	try {
+		oam.getSystemConfig("PrimaryUMModuleName", masterModule);
+	}
+	catch(...) {
+		masterModule = oam::UnassignedName;
+	}
+
+	if ( masterModule == oam::UnassignedName )
+	{
+		// use default setting
+		masterModule = "um1";
+		if ( IserverTypeInstall == oam::INSTALL_COMBINE_DM_UM_PM )
+			masterModule = "pm1";
+	}
+
+	int returnStatus = oam::API_SUCCESS;
+
+	bool masterDone = false;
+	for( unsigned int i = 0; i < systemmoduletypeconfig.moduletypeconfig.size(); i++)
+	{
+		int moduleCount = systemmoduletypeconfig.moduletypeconfig[i].ModuleCount;
+		if( moduleCount == 0)
+			continue;
+
+		string moduleType = systemmoduletypeconfig.moduletypeconfig[i].ModuleType;
+
+		DeviceNetworkList::iterator pt = systemmoduletypeconfig.moduletypeconfig[i].ModuleNetworkList.begin();
+		for ( ; pt != systemmoduletypeconfig.moduletypeconfig[i].ModuleNetworkList.end(); )
+		{
+			// we want to do master first
+			if ( ( (*pt).DeviceName == masterModule && !masterDone ) || 
+				( (*pt).DeviceName != masterModule && masterDone ) )
+			{
+				int opState;
+				bool degraded;
+				try {
+					oam.getModuleStatus((*pt).DeviceName, opState, degraded);
+	
+					if (opState == oam::ACTIVE ||
+						opState == oam::DEGRADED) {
+						if ( (*pt).DeviceName == masterModule )
+						{	
+							// set for master repl request
+							ByteStream msg;
+							ByteStream::byte requestID = oam::MASTERREP;
+							msg << requestID;
+							msg << mysqlpw;
+	
+							returnStatus = sendMsgProcMon( (*pt).DeviceName, msg, requestID, 30 );
+			
+							if ( returnStatus != API_SUCCESS) {
+								cout << "ERROR: Error return in running the MySQL Master replication, check /tmp/master-rep*.logs on " << masterModule << endl;
+								return returnStatus;
+							}
+
+							masterDone = true;
+							pt = systemmoduletypeconfig.moduletypeconfig[i].ModuleNetworkList.begin();
+						}
+						else
+						{ // set for slave repl request
+							ByteStream msg;
+							ByteStream::byte requestID = oam::SLAVEREP;
+							msg << requestID;
+							msg << mysqlpw;
+	
+							if ( masterLogFile == oam::UnassignedName || 
+								masterLogPos == oam::UnassignedName )
+								return API_FAILURE;
+	
+							msg << masterLogFile;
+							msg << masterLogPos;
+	
+							returnStatus = sendMsgProcMon( (*pt).DeviceName, msg, requestID, 30 );
+			
+							if ( returnStatus != API_SUCCESS) {
+								cout << "ERROR: Error return in running the MySQL Slave replication, check /tmp/slave-rep*.logs on " << (*pt).DeviceName << endl;
+								return returnStatus;
+							}
+
+							pt++;
+						}
+					}
+					else
+					{
+						cout << "ERROR: Module not Active, replication not done on " << (*pt).DeviceName << endl;
+						pt++;
+					}
+				}
+				catch (exception& ex)
+				{}
+			}
+			else
+				pt++;
+		}
+	}
+	return returnStatus;
+}
+
 
 /******************************************************************************************
 * @brief	sendMsgProcMon
@@ -392,11 +519,17 @@ int sendMsgProcMon( std::string module, ByteStream msg, int requestID, int timeo
 					receivedMSG >> returnACK;
 					receivedMSG >> returnRequestID;
 					receivedMSG >> requestStatus;
+
+					if ( requestID == oam::MASTERREP )
+					{
+						receivedMSG >> masterLogFile;
+						receivedMSG >> masterLogPos;
+					}
 		
 					if ( returnACK == oam::ACK &&  returnRequestID == requestID) {
 						// ACK for this request
 						returnStatus = requestStatus;
-					break;	
+						break;	
 					}	
 				}
 				else
@@ -420,7 +553,6 @@ int sendMsgProcMon( std::string module, ByteStream msg, int requestID, int timeo
 
 	return returnStatus;
 }
-
 
 void checkFilesPerPartion(int DBRootCount, Config* sysConfig)
 {

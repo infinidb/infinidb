@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -232,7 +232,7 @@ inline uint64_t KeyStorage::getMemUsage()
 }
 
 
-ExternalKeyHasher::ExternalKeyHasher(const RowGroup &r, KeyStorage *k, uint keyColCount, Row **tRow) : 
+ExternalKeyHasher::ExternalKeyHasher(const RowGroup &r, KeyStorage *k, uint32_t keyColCount, Row **tRow) : 
 	tmpRow(tRow), lastKeyCol(keyColCount-1), ks(k)
 {
 	r.initRow(&row);
@@ -249,7 +249,7 @@ inline uint64_t ExternalKeyHasher::operator()(const RowPosition &pos) const
 }
 
 
-ExternalKeyEq::ExternalKeyEq(const RowGroup &r, KeyStorage *k, uint keyColCount, Row **tRow) : 
+ExternalKeyEq::ExternalKeyEq(const RowGroup &r, KeyStorage *k, uint32_t keyColCount, Row **tRow) : 
 	tmpRow(tRow), lastKeyCol(keyColCount-1), ks(k)
 {
 	r.initRow(&row1);
@@ -690,7 +690,7 @@ void RowAggregation::addRowGroup(const RowGroup* pRows, vector<Row::Pointer>& in
 
 	Row rowIn;
 	pRows->initRow(&rowIn);
-	for (uint i = 0; i < inRows.size(); i++)
+	for (uint32_t i = 0; i < inRows.size(); i++)
 	{
 		rowIn.setData(inRows[i]);
 		aggregateRow(rowIn);
@@ -708,13 +708,13 @@ void RowAggregation::setJoinRowGroups(vector<RowGroup> *pSmallSideRG, RowGroup *
 	fSmallSideCount = fSmallSideRGs->size();
 	fSmallMappings.reset(new shared_array<int>[fSmallSideCount]);
 
-	for (uint i = 0; i < fSmallSideCount; i++)
+	for (uint32_t i = 0; i < fSmallSideCount; i++)
 		fSmallMappings[i] = makeMapping((*fSmallSideRGs)[i], fRowGroupIn);
 
 	fLargeMapping = makeMapping(*fLargeSideRG, fRowGroupIn);
 
 	rowSmalls.reset(new Row[fSmallSideCount]);
-	for (uint i = 0; i < fSmallSideCount; i++)
+	for (uint32_t i = 0; i < fSmallSideCount; i++)
 		(*fSmallSideRGs)[i].initRow(&rowSmalls[i]);
 }
 
@@ -1731,7 +1731,7 @@ bool RowAggregation::newRowGroup()
 {
 	// For now, n*n relation is not supported, no memory limit.
 	// May apply a restriction when more resarch is done -- bug 1604
-	shared_ptr<RGData> data(new RGData(*fRowGroupOut, AGG_ROWGROUP_SIZE));
+	boost::shared_ptr<RGData> data(new RGData(*fRowGroupOut, AGG_ROWGROUP_SIZE));
 
 	if (data.get() != NULL)
 	{
@@ -1757,7 +1757,7 @@ void RowAggregation::loadResult(messageqcpp::ByteStream& bs)
 {
 	uint32_t size = fResultDataVec.size();
 	bs << size;
-	for (uint i = 0; i < size; i++)
+	for (uint32_t i = 0; i < size; i++)
 	{
 		fRowGroupOut->setData(fResultDataVec[i]);
 		fRowGroupOut->serializeRGData(bs);
@@ -2424,7 +2424,7 @@ void RowAggregationUM::doNotNullConstantAggregate(const ConstantAggData& aggData
 				}
 				break;
 
-				// AVG should not be uint result type.
+				// AVG should not be uint32_t result type.
 				case execplan::CalpontSystemCatalog::UTINYINT:
 				case execplan::CalpontSystemCatalog::USMALLINT:
 				case execplan::CalpontSystemCatalog::UMEDINT:
@@ -2718,7 +2718,7 @@ bool RowAggregationUM::newRowGroup()
 	fTotalMemUsage += allocSize + memDiff;
 	if (fRm->getMemory(allocSize + memDiff))
 	{
-		shared_ptr<RGData> data(new RGData(*fRowGroupOut, AGG_ROWGROUP_SIZE));
+		boost::shared_ptr<RGData> data(new RGData(*fRowGroupOut, AGG_ROWGROUP_SIZE));
 
 		if (data.get() != NULL)
 		{
@@ -3282,7 +3282,7 @@ void RowAggregationSubDistinct::addRowGroup(const RowGroup *pRows)
 {
 	Row rowIn;
 	pair<RowAggMap_t::iterator, bool> inserted;
-	uint i, j;
+	uint32_t i, j;
 
 	pRows->initRow(&rowIn);
 	pRows->getRow(0, &rowIn);
@@ -3322,7 +3322,7 @@ void RowAggregationSubDistinct::addRowGroup(const RowGroup* pRows, std::vector<R
 {
 	Row rowIn;
 	pair<RowAggMap_t::iterator, bool> inserted;
-	uint i, j;
+	uint32_t i, j;
 
 	pRows->initRow(&rowIn);
 
@@ -3393,7 +3393,7 @@ RowAggregationMultiDistinct::RowAggregationMultiDistinct(const RowAggregationMul
 	fSubRowData.clear();
 
 	boost::shared_ptr<RowAggregationUM> agg;
-	for (uint i = 0; i < rhs.fSubAggregators.size(); i++)
+	for (uint32_t i = 0; i < rhs.fSubAggregators.size(); i++)
 	{
 #if 0
 		fTotalMemUsage += fSubRowGroups[i].getDataSize(AGG_ROWGROUP_SIZE);
@@ -3553,7 +3553,7 @@ GroupConcatAg::~GroupConcatAg()
 
 
 
-AggHasher::AggHasher(const Row &row, Row **tRow, uint keyCount, RowAggregation *ra)
+AggHasher::AggHasher(const Row &row, Row **tRow, uint32_t keyCount, RowAggregation *ra)
 	: agg(ra), tmpRow(tRow), r(row), lastKeyCol(keyCount-1)
 {
 }
@@ -3576,7 +3576,7 @@ inline uint64_t AggHasher::operator()(const RowPosition &data) const
 }
 
 
-AggComparator::AggComparator(const Row &row, Row **tRow, uint keyCount, RowAggregation *ra)
+AggComparator::AggComparator(const Row &row, Row **tRow, uint32_t keyCount, RowAggregation *ra)
 	: agg(ra), tmpRow(tRow), r1(row), r2(row), lastKeyCol(keyCount-1)
 {
 }

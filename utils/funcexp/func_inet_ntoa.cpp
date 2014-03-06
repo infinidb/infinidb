@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -258,11 +258,14 @@ void Func_inet_ntoa::convertNtoa(
 {
     struct sockaddr_in sa;
     sa.sin_addr.s_addr = htonl(ipNum);
-    char str[INET_ADDRSTRLEN];
 
     // now get it back and print it
-    inet_ntop(AF_INET, &(sa.sin_addr), str, INET_ADDRSTRLEN);
-    ipString = str;
+#ifdef _MSC_VER
+    ipString = inet_ntoa(sa.sin_addr);
+#else
+    char str[INET_ADDRSTRLEN];
+    ipString = inet_ntop(AF_INET, &(sa.sin_addr), str, INET_ADDRSTRLEN);
+#endif
 }
 
 }

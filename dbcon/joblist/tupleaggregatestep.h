@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -63,8 +63,8 @@ public:
 	const rowgroup::RowGroup& getDeliveredRowGroup() const;
 	void  deliverStringTableRowGroup(bool b);
 	bool  deliverStringTableRowGroup() const;
-	uint nextBand(messageqcpp::ByteStream &bs);
-	uint nextBand_singleThread(messageqcpp::ByteStream &bs);
+	uint32_t nextBand(messageqcpp::ByteStream &bs);
+	uint32_t nextBand_singleThread(messageqcpp::ByteStream &bs);
 	bool setPmHJAggregation(JobStep* step);
 	void savePmHJData(rowgroup::SP_ROWAGG_t&, rowgroup::SP_ROWAGG_t&, rowgroup::RowGroup&);
 
@@ -158,7 +158,7 @@ private:
 			{
 			}
 			void operator()() {
-				for (uint i = 0; i < bucketCount; i++)
+				for (uint32_t i = 0; i < bucketCount; i++)
 					fStep->doThreadedSecondPhaseAggregate(fThreadID+i);
 			}
 			TupleAggregateStep* fStep;
@@ -171,10 +171,10 @@ private:
 	ResourceManager& fRm;
 
 	// multi-threaded
-	uint fNumOfThreads;
-	uint fNumOfBuckets;
-	uint fNumOfRowGroups;
-	uint fBucketNum;
+	uint32_t fNumOfThreads;
+	uint32_t fNumOfBuckets;
+	uint32_t fNumOfRowGroups;
+	uint32_t fBucketNum;
 
 	boost::mutex fMutex;
 	std::vector<boost::mutex*> fAgg_mutex;
@@ -187,7 +187,7 @@ private:
 	int fInputIter; // iterator
 	boost::scoped_array<uint64_t> fMemUsage;
 	vector<boost::shared_ptr<boost::thread> > fFirstPhaseRunners;
-	uint fFirstPhaseThreadCount;
+	uint32_t fFirstPhaseThreadCount;
 };
 
 

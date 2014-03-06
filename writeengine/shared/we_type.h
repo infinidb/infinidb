@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -193,9 +193,9 @@ namespace WriteEngine
         FID            fid;                 /** @brief File id */
         HWM            hwm;                 /** @brief High water mark */
         IDBDataFile*   pFile;               /** @brief File handle */
-        u_int32_t      fPartition;          /** @brief Partition for pFile*/
-        u_int16_t      fSegment;            /** @brief Segment for pFile */
-        u_int16_t      fDbRoot;             /** @brief DbRoot for pFile */
+        uint32_t      fPartition;          /** @brief Partition for pFile*/
+        uint16_t      fSegment;            /** @brief Segment for pFile */
+        uint16_t      fDbRoot;             /** @brief DbRoot for pFile */
         std::string    fSegFileName;        /** @brief Current seg file path */
         File()         { clear(); } /** @brief constructor */
         void clear()   { pFile = NULL; oid = fid = hwm = 0;
@@ -255,9 +255,9 @@ namespace WriteEngine
         bool           tokenFlag;           /** @brief column token flag, must be set to true if it is a token column */
         execplan::CalpontSystemCatalog::ColDataType    colDataType;         /** @brief column data type (for interface)*/
         ColType        colType;             /** @brief column type (internal use for write engine)*/
-        u_int32_t      fColPartition;       /** @brief Partition for column file */
-        u_int16_t      fColSegment;         /** @brief Segment for column file*/
-        u_int16_t      fColDbRoot;          /** @brief DBRoot for column file */
+        uint32_t      fColPartition;       /** @brief Partition for column file */
+        uint16_t      fColSegment;         /** @brief Segment for column file*/
+        uint16_t      fColDbRoot;          /** @brief DBRoot for column file */
         int            fCompressionType;    /** @brief Compression tpye for column file */
         ColStruct() : dataOid(0), colWidth(0),  /** @brief constructor */
                     tokenFlag(false), colDataType(execplan::CalpontSystemCatalog::INT), colType(WR_INT),
@@ -278,9 +278,9 @@ namespace WriteEngine
         OID            dctnryOid;           /** @brief dictionary signature file */
         OID            columnOid;           /** @brief corresponding column file */
         int            colWidth;            /** @brief string width for the dictionary column*/
-        u_int32_t      fColPartition;       /** @brief Partition for column file */
-        u_int16_t      fColSegment;         /** @brief Segment for column file */
-        u_int16_t      fColDbRoot;          /** @brief DBRoot for column file */
+        uint32_t      fColPartition;       /** @brief Partition for column file */
+        uint16_t      fColSegment;         /** @brief Segment for column file */
+        uint16_t      fColDbRoot;          /** @brief DBRoot for column file */
         int            fCompressionType;    /** @brief Compression tpye for column file */
         DctnryStruct() : dctnryOid(0), columnOid(0),   /** @brief constructor */
                        colWidth(0),

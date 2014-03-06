@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -19,8 +19,8 @@
 #include <string>
 #include <sys/types.h>
 #include <map>
-#include "boost/filesystem/operations.hpp"
-#include "boost/filesystem/path.hpp"
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
 namespace fs = boost::filesystem;
 
 using namespace std;
@@ -154,6 +154,7 @@ long clock_gettime(clockid_t, struct timespec* tp)
 	return 0;
 }
 
+#if _MSC_VER < 1600
 lldiv_t lldiv(const long long numer, const long long denom)
 {
 	lldiv_t ret;
@@ -161,6 +162,7 @@ lldiv_t lldiv(const long long numer, const long long denom)
 	ret.rem = numer % denom;
 	return ret;
 }
+#endif
 
 unsigned int sleep(unsigned int secs)
 {

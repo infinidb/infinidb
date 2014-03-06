@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -92,11 +92,11 @@ private:
     std::vector< std::pair<RID,std::string> > fRowStatus;//Status of bad rows
     std::vector<std::string> fErrRows; // Rejected rows to write to .bad file
 
-    uint fTotalReadRows;                // Total valid rows read into buffer;
+    uint32_t fTotalReadRows;                // Total valid rows read into buffer;
                                         //   this count excludes rejected rows
-    uint fTotalReadRowsParser;          // for temporary use by parser
+    uint32_t fTotalReadRowsParser;          // for temporary use by parser
 
-    uint fTotalReadRowsForLog;          // Total rows read into this buffer
+    uint32_t fTotalReadRowsForLog;          // Total rows read into this buffer
                                         //   including invalid rows
 
     RID fStartRow;                      // Starting row id for rows in buffer,
@@ -109,9 +109,9 @@ private:
                                         //   file.  All rows are counted.
     RID fStartRowForLoggingParser;      // for temporary use by parser
 
-    uint fAutoIncGenCount;              // How many auto-increment values are
+    uint32_t fAutoIncGenCount;              // How many auto-increment values are
                                         //   to be generated for current buffer
-    uint fAutoIncGenCountParser;        // for temporary use by parser
+    uint32_t fAutoIncGenCountParser;        // for temporary use by parser
 
     uint64_t fAutoIncNextValue;         // Next auto-increment value assign to
                                         //   a row in this buffer
@@ -192,8 +192,8 @@ private:
      * @param nRowsParsed   Number of buffer rows that were parsed
      */
     int parseDictSection(ColumnInfo &columnInfo, int tokenPos,
-                         RID startRow, uint totalReadRows,
-                         uint& nRowsParsed);
+                         RID startRow, uint32_t totalReadRows,
+                         uint32_t& nRowsParsed);
 
     /** @brief Expand the size of the fTokens array
      */

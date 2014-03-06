@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -29,7 +29,7 @@
 #ifdef NEED_CALPONT_EXTERNS
 extern int ha_calpont_impl_create(const char *name, TABLE *table_arg, HA_CREATE_INFO *create_info);
 extern int ha_calpont_impl_delete_table(const char *name);
-extern int ha_calpont_impl_open(const char *name, int mode, uint test_if_locked);
+extern int ha_calpont_impl_open(const char *name, int mode, uint32_t test_if_locked);
 extern int ha_calpont_impl_close(void);
 extern int ha_calpont_impl_rnd_init(TABLE* table);
 extern int ha_calpont_impl_rnd_next(uchar *buf, TABLE* table);
@@ -46,7 +46,7 @@ extern int ha_calpont_impl_external_lock(THD *thd, TABLE* table, int lock_type);
 extern int ha_calpont_impl_update_row();
 extern int ha_calpont_impl_delete_row();
 extern int ha_calpont_impl_rnd_pos(uchar *buf, uchar *pos);
-extern void ha_calpont_impl_set_error(THD* thd, uint64_t errCode, LEX_STRING* args, uint argCount);
+extern void ha_calpont_impl_set_error(THD* thd, uint64_t errCode, LEX_STRING* args, uint32_t argCount);
 #endif
 
 #ifdef NEED_CALPONT_INTERFACE

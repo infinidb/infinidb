@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -46,9 +46,9 @@ namespace WriteEngine
 {
 struct FileInfo                             
 {
-        u_int32_t      partition;          /** @brief Partition for a file*/
-        u_int16_t      segment;            /** @brief Segment for a file */
-        u_int16_t      dbRoot;             /** @brief DbRoot for a file */
+        uint32_t      partition;          /** @brief Partition for a file*/
+        uint16_t      segment;            /** @brief Segment for a file */
+        uint16_t      dbRoot;             /** @brief DbRoot for a file */
         std::string    segFileName;        /** @brief seg file path */
 		double  	   fileSize;		   /** @brief seg file size in giga bytes */
 		void serialize(messageqcpp::ByteStream& bs)
@@ -164,7 +164,7 @@ struct ColumnThread
     {
 		Config config;
 		config.initConfigCache();
-		std::vector<u_int16_t> rootList;
+		std::vector<uint16_t> rootList;
 		config.getRootIdList( rootList );
 		FileOp fileOp;
 		Files aFiles;
@@ -179,7 +179,7 @@ struct ColumnThread
 		else
 			fileType = IDBDataFile::UNBUFFERED;
 		IDBFileSystem& fs = IDBFileSystem::getFs( fileType );
-		for (uint i=0; i < rootList.size(); i++)
+		for (uint32_t i=0; i < rootList.size(); i++)
 		{
 			std::vector<struct BRM::EMEntry> entries;
 			(void)BRMWrapper::getInstance()->getExtents_dbroot(fOid, entries, rootList[i]);
@@ -220,7 +220,7 @@ struct ColumnThread
 				
 				//erase the entries from this dbroot.
 				std::vector<struct BRM::EMEntry> entriesTrimed;
-				for (uint m=0; m<entries.size(); m++)
+				for (uint32_t m=0; m<entries.size(); m++)
 				{
 					if ((entries[0].partitionNum != entries[m].partitionNum) || (entries[0].segmentNum != entries[m].segmentNum))
 					entriesTrimed.push_back(entries[m]);
@@ -240,7 +240,6 @@ struct ColumnThread
 		//cout << "Added to columnsMap aFiles with size " << aFiles.size() << " for oid " << fOid << endl;		
 		}
 	}
-	
 	uint32_t fOid;
 	int32_t fCompressionType;
 	bool fReportRealUse;
@@ -268,7 +267,7 @@ int WE_GetFileSizes::processTable(
 		bs >> aTableName;
 		//cout << "tableName: " << aTableName << endl;
 		bs >> tmp8;
-		reportRealUse = tmp8;
+		reportRealUse = (tmp8 != 0);
 		
 		//get column oids
 		boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(0);
@@ -283,6 +282,7 @@ int WE_GetFileSizes::processTable(
 		threadpool::ThreadPool tp(serverThreads,serverQueueSize);
 		int totalSize = columnList.size() + dictOidList.size();
 		activeThreadCounter = new ActiveThreadCounter(totalSize);
+		
 		columnMap *columnsMap = new columnMap();
 		{	
 			boost::mutex::scoped_lock lk(columnMapLock);
@@ -295,7 +295,10 @@ int WE_GetFileSizes::processTable(
 			if (colType.ddn.dictOID > 0)
 				tp.invoke(ColumnThread(colType.ddn.dictOID, colType.compressionType, reportRealUse, key));	
 		}
-
+	/*	for (uint32_t i=0; i < dictOidList.size(); i++)
+		{
+			tp.invoke(ColumnThread(dictOidList[i].dictOID));		
+		} */
 		//check whether all threads finish
 		int sleepTime = 100; // sleep 100 milliseconds between checks
 		struct timespec rm_ts;

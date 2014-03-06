@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -50,7 +50,7 @@ public:
 	~BatchInsertProc();
 	uint64_t grabTableLock(int32_t sessionId);
 	SP_PKG  getInsertQueue ();
-	uint getNumDBRoots();
+	uint32_t getNumDBRoots();
 	void setLastPkg (bool lastPkg);
 	void addPkg(messageqcpp::ByteStream & insertBs);
 	messageqcpp::ByteStream getPkg();
@@ -79,10 +79,10 @@ private:
 	BRM::DBRM* fDbrm;
 	WriteEngine::WEClients* fWEClient;
 	oam::OamCache *fOamcache;
-	std::vector<uint> fPMs; //active PMs
+	std::vector<uint32_t> fPMs; //active PMs
 	batchloader::BatchLoader* fBatchLoader;
 	std::map<unsigned, bool> fPmState;
-	uint fCurrentPMid;
+	uint32_t fCurrentPMid;
 	boost::shared_ptr<messageqcpp::ByteStream> bsIn;
 	messageqcpp::ByteStream::byte tmp8;
 	messageqcpp::ByteStream::quadbyte tmp32;

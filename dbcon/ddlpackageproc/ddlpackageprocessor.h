@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -46,11 +46,13 @@
 #include "columnresult.h"
 #include "we_clients.h"
 #include "liboamcpp.h"
+
 #if defined(_MSC_VER) && defined(DDLPKGPROC_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
 #endif
+
 //#define IDB_DDL_DEBUG
 namespace ddlpackageprocessor
 {
@@ -220,7 +222,7 @@ public:
         unsigned int size() {return static_cast<unsigned int>(sysDataVec.size());}
 		int findColumn(const execplan::CalpontSystemCatalog::OID& columnOID) 
 	{
-		for(uint i = 0; i < sysDataVec.size(); i++) {
+		for(uint32_t i = 0; i < sysDataVec.size(); i++) {
 			if(sysDataVec[i]->ColumnOID() == columnOID) {
 				return i;
 			}
@@ -449,7 +451,7 @@ protected:
      * @param constraintList the table constrain list
      * @param qualifiedName the name of catalog, schema, object names
      */
- //   void writeTableSysConstraintMetaData(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result,
+ //   void writeTableSysConstraintMetaData(uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result,
  //                                       ddlpackage::TableConstraintDefList& constraintList, ddlpackage::QualifiedName&
  //                                        qualifiedName, bool alterFlag=false );
     /** @brief write the table constraint meta data to the SYSCONSTRAINTCOL table
@@ -459,7 +461,7 @@ protected:
       * @param constraintList the table constrain list
       * @param qualifiedName the name of catalog, schema, object names
       */
- //   void writeTableSysConstraintColMetaData(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID,
+ //   void writeTableSysConstraintColMetaData(uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID,
  //                                           const DDLResult& result, ddlpackage::TableConstraintDefList& constraintList,
  //                                           ddlpackage::QualifiedName& qualifiedName, bool alterFlag=false );
 
@@ -470,7 +472,7 @@ protected:
       * @param constraintList the table constrain list
       * @param qualifiedName the name of catalog, schema, object names
       */
-//    void writeColumnSysConstraintMetaData(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, const DDLResult& result,
+//    void writeColumnSysConstraintMetaData(uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, const DDLResult& result,
 //                                          ddlpackage::ColumnDefList& tableDefCols,
 //                                          ddlpackage::QualifiedName& qualifiedName );
 
@@ -480,7 +482,7 @@ protected:
       * @param result the result of the operation
       * @param tableDef the table definition
       */
-//    void writeColumnSysConstraintColMetaData(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID,
+//    void writeColumnSysConstraintColMetaData(uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID,
 //            const DDLResult& result, ddlpackage::ColumnDefList& tableDefCols,
  //           ddlpackage::QualifiedName& qualifiedName);
 
@@ -758,7 +760,7 @@ protected:
 	BRM::DBRM* fDbrm;
    
     execplan::SessionManager fSessionManager;
-	uint fPMCount;
+	uint32_t fPMCount;
 	WriteEngine::WEClients* fWEClient;
 
 

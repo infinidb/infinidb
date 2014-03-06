@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -67,7 +67,7 @@ int buckets = 16;  // # of buckets to use in bucketDL tests.
 class BandGrouper
 {
 	public:
-		uint32_t operator()(const char *data, uint len) const
+		uint32_t operator()(const char *data, uint32_t len) const
 		{
 			stringstream ss(string(data, len));
 			ElementType dle;
@@ -101,7 +101,7 @@ void *MP_FIFO_stress_producer(void *arg)
 	uint64_t id = ::pCount++;
 
 // 	cout << "producer " << id << " started" << endl;
-	for (i = 0; i < (uint) ::count/10; i++) {
+	for (i = 0; i < (uint32_t) ::count/10; i++) {
 		val.first = (id << 60) | i;
 		val.second = val.first;
 		f->insert(val);
@@ -202,7 +202,7 @@ void *FIFO_2_helper(void *arg)
 void *WSDL_2_helper(void *arg)
 {
 	WSDL<ElementType> *w = reinterpret_cast<WSDL<ElementType> *>(arg);
-	uint i, id;
+	uint32_t i, id;
 	bool nextRet;
 	ElementType dle;
 
@@ -220,7 +220,7 @@ void *WSDL_2_helper(void *arg)
 void *BandedDL_1_helper(void *arg)
 {
 	BandedDL<ElementType> *w = reinterpret_cast<BandedDL<ElementType> *>(arg);
-	uint i, id;
+	uint32_t i, id;
 	bool nextRet;
 	ElementType dle;
 
@@ -238,7 +238,7 @@ void *BandedDL_1_helper(void *arg)
 void *BandedDL_2_helper(void *arg)
 {
 	BandedDL<StringElementType> *w = reinterpret_cast<BandedDL<StringElementType> *>(arg);
-	uint i, id;
+	uint32_t i, id;
 	bool nextRet;
 	StringElementType dle;
 
@@ -558,7 +558,7 @@ public:
 	{
 		WSDL<ElementType> w(1, ::count/100);
 		ElementType dle;
-		uint i, id;
+		uint32_t i, id;
 		bool nextRet;
 
  		for (i = 0; i < ::count; i++) {
@@ -581,7 +581,7 @@ public:
 	{
 		WSDL<ElementType> w(2, ::count/10);
 		ElementType dle;
-		uint i, id, size;
+		uint32_t i, id, size;
 		bool nextRet;
 		pthread_t consumer1;
 		
@@ -616,7 +616,7 @@ public:
 	{
 		WSDL<StringElementType> w(1, ::count/10);
 		StringElementType dle;
-		uint i, id;
+		uint32_t i, id;
 		bool nextRet;
 
  		for (i = 0; i < ::count; i++) {
@@ -731,7 +731,7 @@ public:
 		int i, id;
 		ElementType e;
 		bool nextRet;
-		uint numOfThreads = 8;
+		uint32_t numOfThreads = 8;
 		pthread_t producer[numOfThreads];
 		struct timespec ts1, ts2, diff;
 
@@ -767,10 +767,10 @@ public:
 	    SWSDL<ElementType> sw(4);
         sw.setMultipleProducers(true);
 		ElementType dle;
-		uint i, id;
+		uint32_t i, id;
 		bool nextRet;
-		uint numOfProducers = 8;
-		uint numOfConsumers = 4;
+		uint32_t numOfProducers = 8;
+		uint32_t numOfConsumers = 4;
 		pthread_t producer[numOfProducers];
 		pthread_t consumer[numOfConsumers];
 		struct timespec ts1, ts2, diff;
@@ -802,9 +802,9 @@ public:
         BandedDL<ElementType> w(2);
         w.setMultipleProducers(true);
 		ElementType dle;
-		uint i, id;
+		uint32_t i, id;
 		bool nextRet;
-		uint numOfThreads = 8;
+		uint32_t numOfThreads = 8;
 		pthread_t producer[numOfThreads];
 		struct timespec ts1, ts2, diff;
 
@@ -861,9 +861,9 @@ public:
         BandedDL<ElementType> w(2);
         w.setMultipleProducers(true);
 		ElementType dle;
-		uint i, id;
+		uint32_t i, id;
 		bool nextRet;
-		uint numOfThreads = 8;
+		uint32_t numOfThreads = 8;
 		pthread_t producer[numOfThreads];
 		pthread_t consumer;
 		struct timespec ts1, ts2, diff;
@@ -981,7 +981,7 @@ public:
 	{
 		BucketDL<ElementType> bdl(16, 1, ::count/100);
 		ElementType dle;
-		uint i, it, eCount = 0, buckets;
+		uint32_t i, it, eCount = 0, buckets;
 		bool nextRet;
 
 		for (i = 0; i < ::count; i++) {
@@ -1010,7 +1010,7 @@ public:
 	{
 		BandedDL<ElementType> w(2);
 		ElementType dle;
-		uint i, id, size;
+		uint32_t i, id, size;
 		bool nextRet;
 		pthread_t consumer1;
 		
@@ -1049,7 +1049,7 @@ public:
 	{
 		BandedDL<StringElementType> w(2);
 		StringElementType dle;
-		uint i, id, size;
+		uint32_t i, id, size;
 		bool nextRet;
 		pthread_t consumer1;
 		
@@ -1098,7 +1098,7 @@ public:
 	{
 		BandedDL<ElementType> bdl(1);
 		ElementType e;
-		uint i, it;
+		uint32_t i, it;
 		bool more;
 
 		for (i = 1; i <= ::count; i++) {
@@ -1135,7 +1135,7 @@ public:
 	void BandedDL_as_WSDL_2()
 	{
 		BucketDL<ElementType> bucketDL(::buckets, 1, 1000, BandGrouper());
-		uint last, i, it;
+		uint32_t last, i, it;
 		ElementType dle;	
 		bool more;
 
@@ -1176,10 +1176,10 @@ public:
 	    ZDL<ElementType> zdl(4);
         zdl.setMultipleProducers(true);
 		ElementType dle;
-		uint i, id;
+		uint32_t i, id;
 		bool nextRet;
-		uint numOfProducers = 8;
-		uint numOfConsumers = 4;
+		uint32_t numOfProducers = 8;
+		uint32_t numOfConsumers = 4;
 		pthread_t producer[numOfProducers];
 		pthread_t consumer[numOfConsumers];
 		struct timespec ts1, ts2, diff;

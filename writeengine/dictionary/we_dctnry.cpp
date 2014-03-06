@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -30,9 +30,7 @@
 #include <cstring>
 #include <vector>
 #include <sstream>
-#ifndef _MSC_VER
 #include <inttypes.h>
-#endif
 #include <iostream>
 using namespace std;
 
@@ -41,9 +39,7 @@ using namespace std;
 #include "extentmap.h"    // for DICT_COL_WIDTH
 #include "we_stats.h"
 #include "we_log.h"
-#define WRITEENGINEDCTNRY_DLLEXPORT
 #include "we_dctnry.h"
-#undef WRITEENGINEDCTNRY_DLLEXPORT
 using namespace messageqcpp;
 using namespace WriteEngine;
 using namespace BRM;
@@ -367,10 +363,14 @@ int Dctnry::closeDctnry(bool realClose)
         // m_curBlock.state== BLK_INIT;
     }
 
-    // dmc-error handling (should detect/report error in closing file)
+	//@Bug 5572. always close file for uncompressed file.
+    if (FileOp::compressionType() == 0)
+		realClose = true;
+		
     if (realClose) {
 		//@Bug 5689. Need pass oid to write to the right file.
 		oids[m_dctnryOID] = m_dctnryOID;
+		// dmc-error handling (should detect/report error in closing file)
 		closeDctnryFile(true, oids);
 		
 	}
@@ -459,15 +459,18 @@ int  Dctnry::dropDctnry( const OID& dctnryOID)
  *    dbRoot   -- DBRoot for dictionary store segment file
  *    partition-- partition for dictionary store segment file
  *    segment  -- segment for dictionary store segment file
+ *    useTmpSuffix - for Bulk HDFS usage: use or not use *.tmp file suffix
  *
  * RETURN:
  *    successful- NO_ERROR
  *    Fail      - Error Code
  ******************************************************************************/
+// @bug 5572 - HDFS usage: add *.tmp file backup flag
 int Dctnry::openDctnry(const OID& dctnryOID,
     const uint16_t dbRoot,
     const uint32_t partition,
-    const uint16_t segment)
+    const uint16_t segment,
+    const bool     useTmpSuffix)
 {
 #ifdef PROFILE
     Stats::startParseEvent(WE_STATS_OPEN_DCT_FILE);
@@ -478,7 +481,7 @@ int Dctnry::openDctnry(const OID& dctnryOID,
     m_partition = partition;
     m_segment   = segment;
 
-    m_dFile = openDctnryFile();
+    m_dFile = openDctnryFile(useTmpSuffix);
     if( m_dFile == NULL )
     {
         ostringstream oss;
@@ -1291,16 +1294,18 @@ int  Dctnry::updateDctnry(unsigned char* sigValue, int& sigSize,
 IDBDataFile* Dctnry::createDctnryFile(
     const char *name, int, const char *mode, int ioBuffSize)
 {
-    return openFile(name, mode, ioBuffSize);
+    return openFile(name, mode, ioBuffSize, false);
 }
 
 /*******************************************************************************
  * open dictionary file
  ******************************************************************************/
-IDBDataFile* Dctnry::openDctnryFile()
+// @bug 5572 - HDFS usage: add *.tmp file backup flag
+IDBDataFile* Dctnry::openDctnryFile(bool useTmpSuffix)
 {
     return openFile(
-        m_dctnryOID, m_dbRoot, m_partition, m_segment, m_segFileName);
+        m_dctnryOID, m_dbRoot, m_partition, m_segment, m_segFileName,
+            "r+b", DEFAULT_COLSIZ, useTmpSuffix);
 }
 
 /*******************************************************************************

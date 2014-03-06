@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -27,9 +27,7 @@
 
 using namespace std;
 
-#define WRITEENGINECOLUMNOP_DLLEXPORT
 #include "we_colop.h"
-#undef WRITEENGINECOLUMNOP_DLLEXPORT
 #include "we_log.h"
 #include "we_dbfileop.h"
 #include "we_dctnrycompress.h"
@@ -119,7 +117,7 @@ int ColumnOp::allocRowId(const TxnID& txnid, bool useStartingExtent,
 	}
 
 	newExtent = false;
-	uint j = 0, i=0, rowsallocated = 0;
+	uint32_t j = 0, i=0, rowsallocated = 0;
 	int rc = 0;
 	newFile = false;
 	Column newCol;
@@ -186,16 +184,16 @@ int ColumnOp::allocRowId(const TxnID& txnid, bool useStartingExtent,
 		if ((rowsallocated == 0) && isFirstBatchPm)
 		{
 			TableMetaData::removeTableMetaData(tableOid);
-			TableMetaData* tableMetaData= TableMetaData::makeTableMetaData(tableOid);
+			//TableMetaData* tableMetaData= TableMetaData::makeTableMetaData(tableOid);
 
 		} 
 	    //Check if a new extent is needed  		
         if (rowsallocated < totalRow)
 		 {
 			 //Create another extent
-			 u_int16_t  dbRoot;
-			 u_int32_t  partition = 0;
-			 u_int16_t  segment;
+			 uint16_t  dbRoot;
+			 uint32_t  partition = 0;
+			 uint16_t  segment;
 			 IDBDataFile* pFile = NULL;
 			 std::string segFile;
 			 rowsLeft = 0;
@@ -416,7 +414,7 @@ int ColumnOp::allocRowId(const TxnID& txnid, bool useStartingExtent,
 			
 			 setColParam(newCol, 0, column.colWidth,column.colDataType, column.colType, 
 					 column.dataFile.fid, column.compressionType, dbRoot, partition, segment);
-			 rc = openColumnFile(newCol, segFile);
+			 rc = openColumnFile(newCol, segFile, false); // @bug 5572 HDFS tmp file
 			 if (rc != NO_ERROR)
 				 return rc;
 			//@Bug 3164 update compressed extent
@@ -609,7 +607,7 @@ int ColumnOp::fillColumn(const TxnID& txnid, Column& column, Column& refCol, voi
 	//get dbroots from config
 	Config config;
 	config.initConfigCache();
-	std::vector<u_int16_t> rootList;
+	std::vector<uint16_t> rootList;
 	config.getRootIdList( rootList );
 	emptyVal = getEmptyRowValue(column.colDataType, column.colWidth);
     refEmptyVal = getEmptyRowValue(refCol.colDataType, refCol.colWidth);
@@ -697,7 +695,8 @@ int ColumnOp::fillColumn(const TxnID& txnid, Column& column, Column& refCol, voi
 								
 							rc = dctnry->openDctnry(dctnryStruct.dctnryOid,
                               dctnryStruct.fColDbRoot, dctnryStruct.fColPartition,
-                              dctnryStruct.fColSegment);
+                              dctnryStruct.fColSegment,
+                              false); // @bug 5572 HDFS tmp file
 							rc = dctnry->updateDctnry(dctnryTuple.sigValue, dctnryTuple.sigSize, dctnryTuple.token);
 							if (dctnryStruct.fCompressionType > 0)	
 								dctnry->closeDctnry(false);	
@@ -766,7 +765,8 @@ int ColumnOp::fillColumn(const TxnID& txnid, Column& column, Column& refCol, voi
 								//rc = wrapper.tokenize(txnid, dctnryStruct, dctnryTuple);
 								rc = dctnry->openDctnry(dctnryStruct.dctnryOid,
                               dctnryStruct.fColDbRoot, dctnryStruct.fColPartition,
-                              dctnryStruct.fColSegment);
+                              dctnryStruct.fColSegment,
+                              false); // @bug 5572 HDFS tmp file
 								rc = dctnry->updateDctnry(dctnryTuple.sigValue, dctnryTuple.sigSize, dctnryTuple.token);
 								if (dctnryStruct.fCompressionType > 0)	
 									dctnry->closeDctnry(false);	
@@ -797,13 +797,13 @@ int ColumnOp::fillColumn(const TxnID& txnid, Column& column, Column& refCol, voi
 			column.dataFile.fDbRoot = rootList[i];
             column.dataFile.fPartition = newEntries[0].partitionNum;
             column.dataFile.fSegment = newEntries[0].segmentNum;
-            RETURN_ON_ERROR(openColumnFile(column, segFile));
+            RETURN_ON_ERROR(openColumnFile(column, segFile, false)); // @bug 5572 HDFS tmp file
 			//cout << "Processing new col file " << segFile << endl;
 			refCol.dataFile.fDbRoot = rootList[i];
 			refCol.dataFile.fPartition = newEntries[0].partitionNum;
             refCol.dataFile.fSegment = newEntries[0].segmentNum;
             std::string segFileRef;
-            RETURN_ON_ERROR(refColOp->openColumnFile(refCol, segFileRef));
+            RETURN_ON_ERROR(refColOp->openColumnFile(refCol, segFileRef, false)); // @bug 5572 HDFS tmp file
 			//cout << "Processing ref file " << segFileRef << " and hwm is " << lastRefHwm << endl;
 			RETURN_ON_ERROR(refColOp->readBlock(refCol.dataFile.pFile, refColBuf, lastRefHwm));
 			
@@ -1022,7 +1022,7 @@ int ColumnOp::fillColumn(const TxnID& txnid, Column& column, Column& refCol, voi
 				return rc;
 			//erase the entries from this dbroot.
 			std::vector<struct BRM::EMEntry> refEntriesTrimed;
-			for (uint m=0; m<refEntries.size(); m++)
+			for (uint32_t m=0; m<refEntries.size(); m++)
 			{
 				if ((refEntries[0].partitionNum != refEntries[m].partitionNum) || (refEntries[0].segmentNum != refEntries[m].segmentNum))
 					refEntriesTrimed.push_back(refEntries[m]);
@@ -1295,8 +1295,10 @@ int ColumnOp::addExtent(
     *    NO_ERROR if success
     *    ERR_FILE_READ if something wrong in reading the file
     ***********************************************************/
+// @bug 5572 - HDFS usage: add *.tmp file backup flag
    int ColumnOp::openColumnFile(Column& column,
       std::string& segFile,
+      bool useTmpSuffix,
       int ioBuffSize) const
    {
       if (!isValid(column))
@@ -1308,6 +1310,7 @@ int ColumnOp::addExtent(
          column.dataFile.fPartition,
          column.dataFile.fSegment,
          column.dataFile.fSegFileName,
+         useTmpSuffix,
          "r+b", ioBuffSize);
       segFile = column.dataFile.fSegFileName;
       if (column.dataFile.pFile == NULL)
@@ -1373,9 +1376,9 @@ int ColumnOp::addExtent(
       ColType   colType,
       FID       dataFid,
       int       compressionType,
-      u_int16_t dbRoot,
-      u_int32_t partition,
-      u_int16_t segment) const
+      uint16_t dbRoot,
+      uint32_t partition,
+      uint16_t segment) const
    {
       column.colNo = colNo;
       column.colWidth = colWidth;
@@ -1403,7 +1406,7 @@ int ColumnOp::addExtent(
     * RETURN:
     *    NO_ERROR if success, other number otherwise
     ***********************************************************/
-   int ColumnOp::writeRow(Column& curCol, uint64_t totalRow, const RID* rowIdArray, const void* valArray, const void* oldValArray, bool bDelete )
+   int ColumnOp::writeRow(Column& curCol, uint64_t totalRow, const RID* rowIdArray, const void* valArray, bool bDelete )
    {
       uint64_t i = 0, curRowId;
       int      dataFbo, dataBio, curDataFbo = -1;

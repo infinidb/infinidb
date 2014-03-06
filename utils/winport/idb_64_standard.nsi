@@ -6,16 +6,16 @@ InstallDir c:\Calpont
 InstallDirRegKey HKLM SOFTWARE\Calpont\InfiniDB ""
 OutFile InfiniDB64.exe
 
-!define DISPLAY_URL http://www.calpont.com/
+!define DISPLAY_URL http://www.infinidb.co/
 
 !define DISPLAY_VERSION "4.0.0-1"
 VIAddVersionKey "FileVersion" "4.0.0-1"
 VIProductVersion "4.0.0.1"
 
 VIAddVersionKey "ProductVersion" "${DISPLAY_VERSION}"
-VIAddVersionKey "CompanyName" "Calpont Corp."
-VIAddVersionKey "FileDescription" "Calpont InfiniDB Standard Windows 64-bit Installer"
-VIAddVersionKey "LegalCopyright" "Copyright (c) 2010-2013"
+VIAddVersionKey "CompanyName" "InfiniDB, Inc."
+VIAddVersionKey "FileDescription" "InfiniDB Standard Windows 64-bit Installer"
+VIAddVersionKey "LegalCopyright" "Copyright (c) 2014"
 VIAddVersionKey "ProductName" "InfiniDB"
 
 XPStyle on
@@ -47,10 +47,10 @@ PreInstStopped2:
 SetOutPath $INSTDIR
 WriteUninstaller $INSTDIR\uninstall.exe
 IfFileExists $INSTDIR\my.ini 0 MyIniNotExists
-File /oname=$INSTDIR\my_dist.ini C:\InfiniDB\genii\\utils\winport\my.ini
+File /oname=$INSTDIR\my_dist.ini my.ini
 Goto MyIniExists
 MyIniNotExists:
-File C:\InfiniDB\genii\\utils\winport\my.ini
+File my.ini
 MyIniExists:
 SetOutPath $INSTDIR\bin
 # Enterprise Release files that need to be removed for standard release
@@ -60,67 +60,68 @@ Delete $INSTDIR\bin\oid2file.exe
 Delete $INSTDIR\bin\dumpVss.exe
 Delete $INSTDIR\bin\calpontSupport.bat
 
-File C:\InfiniDB\x64\EnterpriseRelease\clearShm.exe
-File C:\InfiniDB\x64\EnterpriseRelease\colxml.exe
-File C:\InfiniDB\x64\EnterpriseRelease\controllernode.exe
-File C:\InfiniDB\x64\EnterpriseRelease\cpimport.exe
-File C:\InfiniDB\x64\EnterpriseRelease\dbbuilder.exe
-File C:\InfiniDB\x64\EnterpriseRelease\DDLProc.exe
-File C:\InfiniDB\x64\EnterpriseRelease\DMLProc.exe
-File C:\InfiniDB\x64\EnterpriseRelease\editem.exe
-File C:\InfiniDB\x64\EnterpriseRelease\ExeMgr.exe
-File C:\InfiniDB\x64\EnterpriseRelease\load_brm.exe
-File C:\InfiniDB\x64\EnterpriseRelease\WriteEngineServer.exe
-File C:\InfiniDB\x64\EnterpriseRelease\DecomSvr.exe
-File C:\InfiniDB\x64\EnterpriseRelease\PrimProc.exe
-File C:\InfiniDB\x64\EnterpriseRelease\save_brm.exe
-File C:\InfiniDB\x64\EnterpriseRelease\viewtablelock.exe
-File C:\InfiniDB\x64\EnterpriseRelease\winfinidb.exe
-File C:\InfiniDB\x64\EnterpriseRelease\workernode.exe
-File C:\InfiniDB\x64\EnterpriseRelease\cleartablelock.exe
-File C:\InfiniDB\x64\EnterpriseRelease\ddlcleanup.exe
-File C:\InfiniDB\x64\EnterpriseRelease\getConfig.exe
-File C:\InfiniDB\x64\EnterpriseRelease\setConfig.exe
-File C:\InfiniDB\x64\EnterpriseRelease\dbrmctl.exe
-File C:\InfiniDB\x64\EnterpriseRelease\reset_locks.exe
-File C:\InfiniDB\mysql\sql\Release\mysqld.exe
-File C:\InfiniDB\mysql\storage\myisam\Release\myisam_ftdump.exe
-File C:\InfiniDB\mysql\storage\myisam\Release\myisamchk.exe
-File C:\InfiniDB\mysql\storage\myisam\Release\myisamlog.exe
-File C:\InfiniDB\mysql\storage\myisam\Release\myisampack.exe
-File C:\InfiniDB\mysql\client\Release\mysql.exe
-File C:\InfiniDB\mysql\client\Release\mysql_upgrade.exe
-File C:\InfiniDB\mysql\client\Release\mysqladmin.exe
-File C:\InfiniDB\mysql\client\Release\mysqlbinlog.exe
-File C:\InfiniDB\mysql\client\Release\mysqlcheck.exe
-File C:\InfiniDB\mysql\client\Release\mysqldump.exe
-File C:\InfiniDB\mysql\client\Release\mysqlimport.exe
-File C:\InfiniDB\mysql\server-tools\instance-manager\Release\mysqlmanager.exe
-File C:\InfiniDB\mysql\client\Release\mysqlshow.exe
-File C:\InfiniDB\mysql\client\Release\mysqlslap.exe
-File C:\InfiniDB\mysql\client\Release\mysqltest.exe
-File C:\InfiniDB\mysql\storage\archive\Release\ha_archive.dll
-File C:\InfiniDB\mysql\storage\federated\Release\ha_federated.dll
-File C:\InfiniDB\mysql\storage\innodb_plugin\Release\ha_innodb_plugin.dll
-File C:\InfiniDB\mysql\libmysql\Release\libmysql.dll
+File ..\..\..\x64\EnterpriseRelease\clearShm.exe
+File ..\..\..\x64\EnterpriseRelease\colxml.exe
+File ..\..\..\x64\EnterpriseRelease\controllernode.exe
+File ..\..\..\x64\EnterpriseRelease\cpimport.exe
+File ..\..\..\x64\EnterpriseRelease\dbbuilder.exe
+File ..\..\..\x64\EnterpriseRelease\DDLProc.exe
+File ..\..\..\x64\EnterpriseRelease\DMLProc.exe
+File ..\..\..\x64\EnterpriseRelease\editem.exe
+File ..\..\..\x64\EnterpriseRelease\ExeMgr.exe
+File ..\..\..\x64\EnterpriseRelease\load_brm.exe
+File ..\..\..\x64\EnterpriseRelease\WriteEngineServer.exe
+File ..\..\..\x64\EnterpriseRelease\DecomSvr.exe
+File ..\..\..\x64\EnterpriseRelease\PrimProc.exe
+File ..\..\..\x64\EnterpriseRelease\save_brm.exe
+File ..\..\..\x64\EnterpriseRelease\viewtablelock.exe
+File ..\..\..\x64\EnterpriseRelease\winfinidb.exe
+File ..\..\..\x64\EnterpriseRelease\workernode.exe
+File ..\..\..\x64\EnterpriseRelease\cleartablelock.exe
+File ..\..\..\x64\EnterpriseRelease\ddlcleanup.exe
+File ..\..\..\x64\EnterpriseRelease\getConfig.exe
+File ..\..\..\x64\EnterpriseRelease\setConfig.exe
+File ..\..\..\x64\EnterpriseRelease\dbrmctl.exe
+File ..\..\..\x64\EnterpriseRelease\reset_locks.exe
+File ..\..\..\mysql\sql\Release\mysqld.exe
+File ..\..\..\mysql\storage\myisam\Release\myisam_ftdump.exe
+File ..\..\..\mysql\storage\myisam\Release\myisamchk.exe
+File ..\..\..\mysql\storage\myisam\Release\myisamlog.exe
+File ..\..\..\mysql\storage\myisam\Release\myisampack.exe
+File ..\..\..\mysql\client\Release\mysql.exe
+File ..\..\..\mysql\client\Release\mysql_upgrade.exe
+File ..\..\..\mysql\client\Release\mysqladmin.exe
+File ..\..\..\mysql\client\Release\mysqlbinlog.exe
+File ..\..\..\mysql\client\Release\mysqlcheck.exe
+File ..\..\..\mysql\client\Release\mysqldump.exe
+File ..\..\..\mysql\client\Release\mysqlimport.exe
+File ..\..\..\mysql\server-tools\instance-manager\Release\mysqlmanager.exe
+File ..\..\..\mysql\client\Release\mysqlshow.exe
+File ..\..\..\mysql\client\Release\mysqlslap.exe
+File ..\..\..\mysql\client\Release\mysqltest.exe
+File ..\..\..\mysql\storage\archive\Release\ha_archive.dll
+File ..\..\..\mysql\storage\federated\Release\ha_federated.dll
+File ..\..\..\mysql\storage\innodb_plugin\Release\ha_innodb_plugin.dll
+File ..\..\..\mysql\libmysql\Release\libmysql.dll
 
-File C:\InfiniDB\x64\EnterpriseRelease\libcalmysql.dll
-File C:\InfiniDB\x64\EnterpriseRelease\libconfigcpp.dll
-File C:\InfiniDB\x64\EnterpriseRelease\libddlpackageproc.dll
-File C:\InfiniDB\x64\EnterpriseRelease\libdmlpackageproc.dll
-File C:\InfiniDB\x64\EnterpriseRelease\libjoblist.dll
-File C:\InfiniDB\x64\EnterpriseRelease\libwriteengine.dll
-File C:\InfiniDB\x64\EnterpriseRelease\libudfsdk.dll
-File C:\InfiniDB\x64\EnterpriseRelease\libudf_mysql.dll
-File C:\InfiniDB\libxml2-2.7.6\libxml2.dll
+File ..\..\..\x64\EnterpriseRelease\libcalmysql.dll
+File ..\..\..\x64\EnterpriseRelease\libconfigcpp.dll
+File ..\..\..\x64\EnterpriseRelease\libddlpackageproc.dll
+File ..\..\..\x64\EnterpriseRelease\libdmlpackageproc.dll
+File ..\..\..\x64\EnterpriseRelease\libjoblist.dll
+File ..\..\..\x64\EnterpriseRelease\libwriteengine.dll
+File ..\..\..\x64\EnterpriseRelease\libudfsdk.dll
+File ..\..\..\x64\EnterpriseRelease\libudf_mysql.dll
+File ..\..\..\libxml2-2.7.8\libxml2\win32\Release\libxml2.dll
+File ..\..\..\libiconv-1.14\libiconv\Release\libiconv.dll
 
-File C:\InfiniDB\vcredist_x64.exe
+File ..\..\..\vcredist_x64.exe
 
-File C:\InfiniDB\x64\EnterpriseRelease\bootstrap.exe
-File C:\InfiniDB\genii\\utils\winport\svcwait.bat
-File C:\InfiniDB\genii\\utils\winport\idbsvsta.bat
-File C:\InfiniDB\genii\\utils\winport\idbsvsto.bat
-File C:\InfiniDB\genii\\utils\winport\idbmysql.bat
+File ..\..\..\x64\EnterpriseRelease\bootstrap.exe
+File svcwait.bat
+File idbsvsta.bat
+File idbsvsto.bat
+File idbmysql.bat
 
 SetOutPath $INSTDIR\bulk\data\import
 SetOutPath $INSTDIR\bulk\job
@@ -128,56 +129,56 @@ SetOutPath $INSTDIR\bulk\log
 SetOutPath $INSTDIR\data1
 SetOutPath $INSTDIR\dbrm
 SetOutPath $INSTDIR\etc
-File C:\InfiniDB\genii\\utils\winport\win_setup_mysql_part1.sql
-File C:\InfiniDB\genii\\utils\winport\win_setup_mysql_part2.sql
-File C:\InfiniDB\genii\\utils\winport\win_setup_mysql_part3.sql
-File C:\InfiniDB\genii\\utils\winport\win_setup_mysql_part3.1.sql
-File C:\InfiniDB\genii\\utils\winport\win_setup_mysql_part4.sql
-File C:\InfiniDB\genii\\utils\winport\win_setup_mysql_part5.sql
-File C:\InfiniDB\genii\\utils\winport\CalpontVersion.txt
+File win_setup_mysql_part1.sql
+File win_setup_mysql_part2.sql
+File win_setup_mysql_part3.sql
+File win_setup_mysql_part3.1.sql
+File win_setup_mysql_part4.sql
+File win_setup_mysql_part5.sql
+File CalpontVersion.txt
 IfFileExists $INSTDIR\etc\Calpont.xml 0 CfgNotExists
-File /oname=$INSTDIR\etc\Calpont_dist.xml C:\InfiniDB\genii\\utils\winport\Calpont.xml
+File /oname=$INSTDIR\etc\Calpont_dist.xml Calpont.xml
 Goto CfgExists
 CfgNotExists:
-File C:\InfiniDB\genii\\utils\winport\Calpont.xml
+File Calpont.xml
 CfgExists:
-File C:\InfiniDB\genii\\utils\loggingcpp\ErrorMessage.txt
-File C:\InfiniDB\genii\\utils\loggingcpp\MessageFile.txt
+File ..\..\utils\loggingcpp\ErrorMessage.txt
+File ..\..\utils\loggingcpp\MessageFile.txt
 SetOutPath $INSTDIR\log
 SetOutPath $INSTDIR\local
 SetOutPath $INSTDIR\mysqldb
 SetOutPath $INSTDIR\share
-File /r C:\InfiniDB\mysql\sql\share\charsets
-File /r C:\InfiniDB\mysql\sql\share\czech
-File /r C:\InfiniDB\mysql\sql\share\danish
-File /r C:\InfiniDB\mysql\sql\share\dutch
-File /r C:\InfiniDB\mysql\sql\share\english
-File /r C:\InfiniDB\mysql\sql\share\estonian
-File /r C:\InfiniDB\mysql\sql\share\french
-File /r C:\InfiniDB\mysql\sql\share\german
-File /r C:\InfiniDB\mysql\sql\share\greek
-File /r C:\InfiniDB\mysql\sql\share\hungarian
-File /r C:\InfiniDB\mysql\sql\share\italian
-File /r C:\InfiniDB\mysql\sql\share\japanese
-File /r C:\InfiniDB\mysql\sql\share\japanese-sjis
-File /r C:\InfiniDB\mysql\sql\share\korean
-File /r C:\InfiniDB\mysql\sql\share\norwegian
-File /r C:\InfiniDB\mysql\sql\share\norwegian-ny
-File /r C:\InfiniDB\mysql\sql\share\polish
-File /r C:\InfiniDB\mysql\sql\share\portuguese
-File /r C:\InfiniDB\mysql\sql\share\romanian
-File /r C:\InfiniDB\mysql\sql\share\russian
-File /r C:\InfiniDB\mysql\sql\share\serbian
-File /r C:\InfiniDB\mysql\sql\share\slovak
-File /r C:\InfiniDB\mysql\sql\share\spanish
-File /r C:\InfiniDB\mysql\sql\share\swedish
-File /r C:\InfiniDB\mysql\sql\share\ukrainian
+File /r ..\..\..\mysql\sql\share\charsets
+File /r ..\..\..\mysql\sql\share\czech
+File /r ..\..\..\mysql\sql\share\danish
+File /r ..\..\..\mysql\sql\share\dutch
+File /r ..\..\..\mysql\sql\share\english
+File /r ..\..\..\mysql\sql\share\estonian
+File /r ..\..\..\mysql\sql\share\french
+File /r ..\..\..\mysql\sql\share\german
+File /r ..\..\..\mysql\sql\share\greek
+File /r ..\..\..\mysql\sql\share\hungarian
+File /r ..\..\..\mysql\sql\share\italian
+File /r ..\..\..\mysql\sql\share\japanese
+File /r ..\..\..\mysql\sql\share\japanese-sjis
+File /r ..\..\..\mysql\sql\share\korean
+File /r ..\..\..\mysql\sql\share\norwegian
+File /r ..\..\..\mysql\sql\share\norwegian-ny
+File /r ..\..\..\mysql\sql\share\polish
+File /r ..\..\..\mysql\sql\share\portuguese
+File /r ..\..\..\mysql\sql\share\romanian
+File /r ..\..\..\mysql\sql\share\russian
+File /r ..\..\..\mysql\sql\share\serbian
+File /r ..\..\..\mysql\sql\share\slovak
+File /r ..\..\..\mysql\sql\share\spanish
+File /r ..\..\..\mysql\sql\share\swedish
+File /r ..\..\..\mysql\sql\share\ukrainian
 SetOutPath $INSTDIR\tmp
 SetOutPath $INSTDIR\sql
-File C:\InfiniDB\genii\\dbcon\mysql\dumpcat_mysql.sql
-File C:\InfiniDB\genii\\dbcon\mysql\calsetuserpriority.sql
-File C:\InfiniDB\genii\\dbcon\mysql\calremoveuserpriority.sql
-File C:\InfiniDB\genii\\dbcon\mysql\calshowprocesslist.sql
+File ..\..\dbcon\mysql\dumpcat_mysql.sql
+File ..\..\dbcon\mysql\calsetuserpriority.sql
+File ..\..\dbcon\mysql\calremoveuserpriority.sql
+File ..\..\dbcon\mysql\calshowprocesslist.sql
 
 WriteRegStr HKLM Software\Calpont\InfiniDB "" $INSTDIR
 WriteRegStr HKLM Software\Calpont\InfiniDB "CalpontHome" $INSTDIR\etc
@@ -195,7 +196,7 @@ DontAppendSysPath:
 WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\InfiniDB" "DisplayName" "InfiniDB"
 WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\InfiniDB" "UninstallString" "$INSTDIR\uninstall.exe"
 WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\InfiniDB" "InstallLocation" "$INSTDIR"
-WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\InfiniDB" "Publisher" "Calpont Corp."
+WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\InfiniDB" "Publisher" "InfiniDB, Inc."
 WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\InfiniDB" "HelpLink" "${DISPLAY_URL}"
 WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\InfiniDB" "URLUpdateInfo" "${DISPLAY_URL}"
 WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\InfiniDB" "URLInfoAbout" "${DISPLAY_URL}"
@@ -274,6 +275,7 @@ Delete $INSTDIR\bin\libwriteengine.dll
 Delete $INSTDIR\bin\libudfsdk.dll
 Delete $INSTDIR\bin\libudf_mysql.dll
 Delete $INSTDIR\bin\libxml2.dll
+Delete $INSTDIR\bin\libiconv.dll
 Delete $INSTDIR\bin\load_brm.exe
 Delete $INSTDIR\bin\myisam_ftdump.exe
 Delete $INSTDIR\bin\myisamchk.exe

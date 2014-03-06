@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -35,10 +35,10 @@ class ByteStream;
 /**
  * Namespace
  */
-namespace execplan { 
+namespace execplan {
 /**
  * @brief A class to represent a constant return column
- * 
+ *
  * This class is a specialization of class ReturnedColumn that
  * handles a constant column such as number and literal string.
  */
@@ -74,7 +74,7 @@ public:
 	 * dtor
 	 */
 	virtual ~ConstantColumn();
-	
+
 	/*
 	 * Accessor Methods
 	 */
@@ -106,13 +106,13 @@ public:
 	 * accessor
 	 */
 	virtual const std::string toString() const;
-	
+
 	/** return a copy of this pointer
 	 *
 	 * deep copy of this pointer and return the copy
-	 */	
+	 */
 	inline virtual ConstantColumn* clone() const {return new ConstantColumn (*this);}
-		
+
 	/*
 	 * The serialization interface
 	 */
@@ -124,47 +124,50 @@ public:
 	 * unserialize
 	 */
 	virtual void unserialize(messageqcpp::ByteStream&);
-	
+
 	/** @brief Do a deep, strict (as opposed to semantic) equivalence test
 	 *
 	 * Do a deep, strict (as opposed to semantic) equivalence test.
 	 * @return true iff every member of t is a duplicate copy of every member of this; false otherwise
 	 */
 	virtual bool operator==(const TreeNode* t) const;
-	
+
 	/** @brief Do a deep, strict (as opposed to semantic) equivalence test
 	 *
 	 * Do a deep, strict (as opposed to semantic) equivalence test.
 	 * @return true iff every member of t is a duplicate copy of every member of this; false otherwise
 	 */
 	bool operator==(const ConstantColumn& t) const;
-	
+
 	/** @brief Do a deep, strict (as opposed to semantic) equivalence test
 	 *
 	 * Do a deep, strict (as opposed to semantic) equivalence test.
 	 * @return false iff every member of t is a duplicate copy of every member of this; true otherwise
 	 */
 	virtual bool operator!=(const TreeNode* t) const;
-	 
+
 	/** @brief Do a deep, strict (as opposed to semantic) equivalence test
 	 *
 	 * Do a deep, strict (as opposed to semantic) equivalence test.
 	 * @return false iff every member of t is a duplicate copy of every member of this; true otherwise
 	 */
 	bool operator!=(const ConstantColumn& t) const;
-	
+
 	virtual bool hasAggregate() {return false;}
 	virtual bool hasWindowFunc() {return false;}
-	
+
+	/** Constant column on the filte can always be moved into derived table */
+	virtual void setDerivedTable() { fDerivedTable = "*"; }
+
 private:
 	std::string fConstval;
-	int fType; 
-	std::string fData;		
-	
+	int fType;
+	std::string fData;
+
 	/***********************************************************
 	 *                  F&E framework                          *
 	 ***********************************************************/
-public:	
+public:
 	/**
 	 * ctor
 	 */
@@ -199,29 +202,29 @@ public:
 	virtual bool getBoolVal(rowgroup::Row& row, bool& isNull)
 	{
 		isNull = isNull || (fType == NULLDATA);
-		return TreeNode::getBoolVal();		
+		return TreeNode::getBoolVal();
 	}
 	/**
 	 * F&E
 	 */
-	virtual const std::string& getStrVal(rowgroup::Row& row, bool& isNull) 
-	{ 
+	virtual const std::string& getStrVal(rowgroup::Row& row, bool& isNull)
+	{
 		isNull = isNull || (fType == NULLDATA);
-		return fResult.strVal; 
+		return fResult.strVal;
 	}
 	/**
 	 * F&E
 	 */
-	virtual int64_t getIntVal(rowgroup::Row& row, bool& isNull) 
-	{ 
+	virtual int64_t getIntVal(rowgroup::Row& row, bool& isNull)
+	{
 		isNull = isNull || (fType == NULLDATA);
 		return fResult.intVal;
 	}
 	/**
 	 * F&E
 	 */
-	virtual uint64_t getUintVal(rowgroup::Row& row, bool& isNull) 
-	{ 
+	virtual uint64_t getUintVal(rowgroup::Row& row, bool& isNull)
+	{
     		isNull = isNull || (fType == NULLDATA);
 		return fResult.uintVal;
 	}
@@ -236,10 +239,10 @@ public:
 	/**
 	 * F&E
 	 */
-	virtual double getDoubleVal(rowgroup::Row& row, bool& isNull) 
+	virtual double getDoubleVal(rowgroup::Row& row, bool& isNull)
 	{
 		isNull = isNull || (fType == NULLDATA);
-		return fResult.doubleVal; 
+		return fResult.doubleVal;
 	}
 	/**
 	 * F&E
@@ -291,6 +294,6 @@ public:
  */
 std::ostream& operator<<(std::ostream& output, const ConstantColumn& rhs);
 
-} 
+}
 #endif //CONSTANTCOLUMN_H
 

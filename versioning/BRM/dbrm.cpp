@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -596,7 +596,7 @@ int DBRM::vssLookup(LBID_t lbid, const QueryContext &verInfo, VER_t txnID, VER_t
 int DBRM::bulkVSSLookup(const std::vector<LBID_t> &lbids, const QueryContext_vss &verInfo,
 	VER_t txnID, std::vector<VSSData> *out) 
 {
-	uint i;
+	uint32_t i;
 	bool locked = false;
 	try {
 		out->resize(lbids.size());
@@ -665,13 +665,13 @@ int DBRM::bulkGetCurrentVersion(const vector<LBID_t> &lbids, vector<VER_t> *vers
 		locked = true;
 		if (isLocked != NULL) {
 			bool tmp=false;
-			for (uint i = 0; i < lbids.size(); i++) {
+			for (uint32_t i = 0; i < lbids.size(); i++) {
 				(*versions)[i] = vss->getCurrentVersion(lbids[i], &tmp);
 				(*isLocked)[i] = tmp;
 			}
 		}
 		else
-			for (uint i = 0; i < lbids.size(); i++)
+			for (uint32_t i = 0; i < lbids.size(); i++)
 				(*versions)[i] = vss->getCurrentVersion(lbids[i], NULL);
 		vss->release(VSS::READ);
 		locked = false;
@@ -793,9 +793,9 @@ reconnect:
 //------------------------------------------------------------------------------
 int DBRM::createStripeColumnExtents(
 	const std::vector<CreateStripeColumnExtentsArgIn>& cols,
-	u_int16_t  dbRoot,
-	u_int32_t& partitionNum,
-	u_int16_t& segmentNum,
+	uint16_t  dbRoot,
+	uint32_t& partitionNum,
+	uint16_t& segmentNum,
 	std::vector<CreateStripeColumnExtentsArgOut>& extents) DBRM_THROW
 {
 #ifdef BRM_INFO
@@ -846,14 +846,14 @@ int DBRM::createStripeColumnExtents(
 // Send a request to create a column extent for the specified OID and DBRoot.
 //------------------------------------------------------------------------------
 int DBRM::createColumnExtent_DBroot(OID_t oid,
-	u_int32_t  colWidth,
-	u_int16_t  dbRoot,
-	u_int32_t& partitionNum,
-	u_int16_t& segmentNum,
+	uint32_t  colWidth,
+	uint16_t  dbRoot,
+	uint32_t& partitionNum,
+	uint16_t& segmentNum,
     execplan::CalpontSystemCatalog::ColDataType colDataType,
 	LBID_t&    lbid,
 	int&       allocdSize,
-	u_int32_t& startBlockOffset) DBRM_THROW
+	uint32_t& startBlockOffset) DBRM_THROW
 {
 #ifdef BRM_INFO
 	if (fDebug)
@@ -873,7 +873,7 @@ int DBRM::createColumnExtent_DBroot(OID_t oid,
 
 	ByteStream command, response;
 	uint8_t  err;
-    uint tmp8 = (uint8_t)colDataType;
+    uint32_t tmp8 = (uint8_t)colDataType;
 	uint16_t tmp16;
 	uint32_t tmp32;
 	uint64_t tmp64;
@@ -917,14 +917,14 @@ int DBRM::createColumnExtent_DBroot(OID_t oid,
 // specified by the requested OID, DBRoot, partition, and segment.
 //------------------------------------------------------------------------------
 int DBRM::createColumnExtentExactFile(OID_t oid,
-	u_int32_t  colWidth,
-	u_int16_t  dbRoot,
-	u_int32_t partitionNum,
-	u_int16_t segmentNum,
+	uint32_t  colWidth,
+	uint16_t  dbRoot,
+	uint32_t partitionNum,
+	uint16_t segmentNum,
     execplan::CalpontSystemCatalog::ColDataType colDataType,
     LBID_t&    lbid,
 	int&       allocdSize,
-	u_int32_t& startBlockOffset) DBRM_THROW
+	uint32_t& startBlockOffset) DBRM_THROW
 {
 #ifdef BRM_INFO
 	if (fDebug)
@@ -988,9 +988,9 @@ int DBRM::createColumnExtentExactFile(OID_t oid,
 // Send a request to create a dictionary store extent.
 //------------------------------------------------------------------------------
 int DBRM::createDictStoreExtent(OID_t oid,
-	u_int16_t  dbRoot,
-	u_int32_t  partitionNum,
-	u_int16_t  segmentNum,
+	uint16_t  dbRoot,
+	uint32_t  partitionNum,
+	uint16_t  segmentNum,
 	LBID_t&    lbid,
 	int&       allocdSize) DBRM_THROW
 {
@@ -1048,9 +1048,9 @@ int DBRM::createDictStoreExtent(OID_t oid,
 //------------------------------------------------------------------------------
 int DBRM::rollbackColumnExtents_DBroot(OID_t oid,
 	bool       bDeleteAll,
-	u_int16_t  dbRoot,
-	u_int32_t  partitionNum,
-	u_int16_t  segmentNum,
+	uint16_t  dbRoot,
+	uint32_t  partitionNum,
+	uint16_t  segmentNum,
 	HWM_t      hwm) DBRM_THROW
 {
 #ifdef BRM_INFO
@@ -1091,9 +1091,9 @@ int DBRM::rollbackColumnExtents_DBroot(OID_t oid,
 // last stripe of extents are updated accordingly.
 //------------------------------------------------------------------------------
 int DBRM::rollbackDictStoreExtents_DBroot(OID_t oid,
-	u_int16_t            dbRoot,
-	u_int32_t            partitionNum,
-	const vector<u_int16_t>& segNums,
+	uint16_t            dbRoot,
+	uint32_t            partitionNum,
+	const vector<uint16_t>& segNums,
 	const vector<HWM_t>& hwms) DBRM_THROW
 {
 #ifdef BRM_INFO
@@ -1263,7 +1263,7 @@ int DBRM::deleteOIDs(const std::vector<OID_t>& oids) DBRM_THROW
 	CHECK_EMPTY(response);
 
 	try {
-		for (uint i = 0; i < oids.size(); i++)
+		for (uint32_t i = 0; i < oids.size(); i++)
 			deleteAISequence(oids[i]);
 	}
 	catch (...) { }   // an error here means a network problem, will be caught elsewhere
@@ -1911,7 +1911,7 @@ int DBRM::isDBRootEmpty(uint16_t dbroot,
 }
 
 int DBRM::writeVBEntry(VER_t transID, LBID_t lbid, OID_t vbOID,
-	u_int32_t vbFBO) DBRM_THROW
+	uint32_t vbFBO) DBRM_THROW
 {
 
 #ifdef BRM_INFO
@@ -1964,7 +1964,7 @@ int DBRM::getDBRootsForRollback(VER_t transID, vector<uint16_t> *dbroots) throw(
 	set<OID_t> vbOIDs;
 	set<OID_t>::iterator vbIt;
 	vector<LBID_t> lbidList;
-	uint i, size;
+	uint32_t i, size;
 	uint32_t tmp32;
 	OID_t vbOID;
 	int err;
@@ -3221,13 +3221,13 @@ bool DBRM::isDBRMReady() throw()
  * bad happened, and this will fix the lock state so that primproc can keep
  * running.  These prevent a non-critical problem anyway.
  */
-void DBRM::lockLBIDRange(LBID_t start, uint count)
+void DBRM::lockLBIDRange(LBID_t start, uint32_t count)
 {
 	bool locked = false, lockedRange = false;
 	LBIDRange range;
-	const uint waitInterval = 50000;  // in usec
-	const uint maxRetries = 30000000/waitInterval;  // 30 secs
-	uint retries = 0;
+	const uint32_t waitInterval = 50000;  // in usec
+	const uint32_t maxRetries = 30000000/waitInterval;  // 30 secs
+	uint32_t retries = 0;
 
 	range.start = start;
 	range.size = count;
@@ -3263,7 +3263,7 @@ void DBRM::lockLBIDRange(LBID_t start, uint count)
 	}
 }
 
-void DBRM::releaseLBIDRange(LBID_t start, uint count)
+void DBRM::releaseLBIDRange(LBID_t start, uint32_t count)
 {
 	bool locked = false;
 	LBIDRange range;
@@ -3380,13 +3380,13 @@ int DBRM::oidm_size()
 	}
 }
 
-int DBRM::allocVBOID(uint dbroot)
+int DBRM::allocVBOID(uint32_t dbroot)
 {
 	ByteStream command, response;
 	uint8_t err;
 	uint32_t ret;
 
-	command << ALLOC_VBOID << (uint) dbroot;
+	command << ALLOC_VBOID << (uint32_t) dbroot;
 	err = send_recv(command, response);
 	if (err != ERR_OK) {
 		cerr << "DBRM: OIDManager::allocVBOID(): network error" << endl;
@@ -3410,13 +3410,13 @@ int DBRM::allocVBOID(uint dbroot)
 	}
 }
 
-int DBRM::getDBRootOfVBOID(uint vbOID)
+int DBRM::getDBRootOfVBOID(uint32_t vbOID)
 {
 	ByteStream command, response;
 	uint8_t err;
 	uint32_t ret;
 
-	command << GETDBROOTOFVBOID << (uint) vbOID;
+	command << GETDBROOTOFVBOID << (uint32_t) vbOID;
 	err = send_recv(command, response);
 	if (err != ERR_OK) {
 		cerr << "DBRM: OIDManager::getDBRootOfVBOID(): network error" << endl;
@@ -3469,7 +3469,7 @@ vector<uint16_t> DBRM::getVBOIDToDBRootMap()
 	}
 }
 
-uint64_t DBRM::getTableLock(const vector<uint> &pmList, uint32_t tableOID,
+uint64_t DBRM::getTableLock(const vector<uint32_t> &pmList, uint32_t tableOID,
 		string *ownerName, uint32_t *ownerPID, int32_t *ownerSessionID, int32_t *ownerTxnID, LockState state)
 {
 	ByteStream command, response;
@@ -3481,11 +3481,11 @@ uint64_t DBRM::getTableLock(const vector<uint> &pmList, uint32_t tableOID,
 	OamCache * oamcache = OamCache::makeOamCache();
 	OamCache::PMDbrootsMap_t pmDbroots = oamcache->getPMToDbrootsMap();
 	int moduleId = 0;
-	for (uint i = 0; i < pmList.size(); i++)
+	for (uint32_t i = 0; i < pmList.size(); i++)
 	{
 		moduleId = pmList[i];
 		vector<int> dbroots = (*pmDbroots)[moduleId];
-		for (uint j = 0; j < dbroots.size(); j++)
+		for (uint32_t j = 0; j < dbroots.size(); j++)
 			dbRootsList.push_back((uint32_t)dbroots[j]);
 	}
 	tli.id = 0;
@@ -3563,7 +3563,7 @@ bool DBRM::changeState(uint64_t id, LockState state)
 	return (bool) err;
 }
 
-bool DBRM::changeOwner(uint64_t id, const string &ownerName, uint ownerPID, int32_t ownerSessionID,
+bool DBRM::changeOwner(uint64_t id, const string &ownerName, uint32_t ownerPID, int32_t ownerSessionID,
 		int32_t ownerTxnID)
 {
 	ByteStream command, response;
@@ -3664,7 +3664,7 @@ bool DBRM::getTableLockInfo(uint64_t id, TableLockInfo *tli)
 	return (bool) err;
 }
 
-void DBRM::startAISequence(uint32_t OID, uint64_t firstNum, uint colWidth,
+void DBRM::startAISequence(uint32_t OID, uint64_t firstNum, uint32_t colWidth,
                            execplan::CalpontSystemCatalog::ColDataType colDataType)
 {
 	ByteStream command, response;
@@ -3818,7 +3818,7 @@ void DBRM::invalidateUncommittedExtentLBIDs(execplan::CalpontSystemCatalog::SCN 
     uint16_t dbRoot;
     uint32_t partitionNum;
     uint16_t segmentNum;
-    u_int32_t fileBlockOffset;
+    uint32_t fileBlockOffset;
 
     // 2) Get the list of uncommitted lbids for the transaction, if we weren't given one.
     if (plbidList == NULL)

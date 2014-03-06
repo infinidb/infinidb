@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -32,12 +32,11 @@ using namespace std;
 #include <boost/regex.hpp>
 using namespace boost;
 
-#define RESOURCEMANAGER_DLLEXPORT
 #include "resourcemanager.h"
-#undef RESOURCEMANAGER_DLLEXPORT
 
 #include "jl_logger.h"
 #include "cgroupconfigurator.h"
+#include "liboamcpp.h"
 
 using namespace config;
 
@@ -120,11 +119,26 @@ namespace joblist {
 
 	pmJoinMemLimit = getIntVal(fHashJoinStr, "PmMaxMemorySmallSide",
 	  defaultHJPmMaxMemorySmallSide);
-	// Need to use different limits if this instance isn't running on the UM
+	// Need to use different limits if this instance isn't running on the UM,
+	// or if it's an ExeMgr running on a PM node
 	if (!isExeMgr)
 		totalUmMemLimit = pmJoinMemLimit;
 	else {
-        string umtxt = fConfig->getConfig(fHashJoinStr, "TotalUmMemory");
+        string whichLimit = "TotalUmMemory";
+        string pmWithUM = fConfig->getConfig("Installation", "PMwithUM");
+        if (pmWithUM == "y" || pmWithUM == "Y") {
+            oam::Oam OAM;
+            oam::oamModuleInfo_t moduleInfo = OAM.getModuleInfo();
+            string &moduleType = boost::get<1>(moduleInfo);
+
+            if (moduleType == "pm" || moduleType == "PM") {
+                string doesItExist = fConfig->getConfig(fHashJoinStr, "TotalPmUmMemory");
+                if (!doesItExist.empty())
+                    whichLimit = "TotalPmUmMemory";
+            }
+        }
+
+        string umtxt = fConfig->getConfig(fHashJoinStr, whichLimit);
         if (umtxt.empty())
             totalUmMemLimit = defaultTotalUmMemory;
         else {
@@ -139,7 +153,7 @@ namespace joblist {
                     totalUmMemLimit = defaultTotalUmMemory;
             }
             else {  // an absolute; use the existing converter
-                totalUmMemLimit = getIntVal(fHashJoinStr, "TotalUmMemory",
+                totalUmMemLimit = getIntVal(fHashJoinStr, whichLimit,
                     defaultTotalUmMemory);
             }
         }
@@ -172,12 +186,12 @@ namespace joblist {
 		fWindowFunctionThreads = numCores();
 	else
 		fWindowFunctionThreads = fConfig->uFromText(wt);
-	
+
 	// hdfs info
 	string hdfs = fConfig->getConfig("SystemConfig", "DataFilePlugin");
-	
+
 	if ( hdfs.find("hdfs") != string::npos)
-		fUseHdfs = true;	
+		fUseHdfs = true;
 	else
 		fUseHdfs = false;
   }

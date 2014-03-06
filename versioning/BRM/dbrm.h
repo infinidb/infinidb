@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -224,9 +224,9 @@ public:
 	 */
 	 EXPORT int createStripeColumnExtents(
 					const std::vector<CreateStripeColumnExtentsArgIn>& cols,
-					u_int16_t  dbRoot,
-					u_int32_t& partitionNum,
-					u_int16_t& segmentNum,
+					uint16_t  dbRoot,
+					uint32_t& partitionNum,
+					uint16_t& segmentNum,
 			std::vector<CreateStripeColumnExtentsArgOut>& extents) DBRM_THROW;
 
 	/** @brief Allocate an extent for a column file
@@ -247,14 +247,14 @@ public:
 	 */
 	 // @bug 4091: To be deprecated.  Replaced by createStripeColumnExtents().
 	 EXPORT int createColumnExtent_DBroot(OID_t oid,
-					u_int32_t  colWidth,
-					u_int16_t  dbRoot,
-					u_int32_t& partitionNum,
-					u_int16_t& segmentNum,
+					uint32_t  colWidth,
+					uint16_t  dbRoot,
+					uint32_t& partitionNum,
+					uint16_t& segmentNum,
 					execplan::CalpontSystemCatalog::ColDataType colDataType,
 					LBID_t&    lbid,
 					int&       allocdSize,
-					u_int32_t& startBlockOffset) DBRM_THROW;
+					uint32_t& startBlockOffset) DBRM_THROW;
 
 	/** @brief Allocate extent for specified segment file
 	 *
@@ -271,14 +271,14 @@ public:
 	 * @return 0 on success, -1 on error
 	 */
 	 EXPORT int createColumnExtentExactFile(OID_t oid,
-					u_int32_t  colWidth,
-					u_int16_t  dbRoot,
-					u_int32_t  partitionNum,
-					u_int16_t  segmentNum,
+					uint32_t  colWidth,
+					uint16_t  dbRoot,
+					uint32_t  partitionNum,
+					uint16_t  segmentNum,
 					execplan::CalpontSystemCatalog::ColDataType colDataType,
 					LBID_t&    lbid,
 					int&       allocdSize,
-					u_int32_t& startBlockOffset) DBRM_THROW;
+					uint32_t& startBlockOffset) DBRM_THROW;
 					
 	/** @brief Allocate an extent for a dictionary store file
 	 *
@@ -294,9 +294,9 @@ public:
 	 * @return 0 on success, -1 on error
 	 */
 	 EXPORT int createDictStoreExtent(OID_t oid,
-					 u_int16_t  dbRoot,
-					 u_int32_t  partitionNum,
-					 u_int16_t  segmentNum,
+					 uint16_t  dbRoot,
+					 uint32_t  partitionNum,
+					 uint16_t  segmentNum,
 					 LBID_t&    lbid,
 					 int&       allocdSize) DBRM_THROW;
 
@@ -315,9 +315,9 @@ public:
 	 */
 	EXPORT int rollbackColumnExtents_DBroot(OID_t oid,
 					bool      bDeleteAll,
-					u_int16_t dbRoot,
-					u_int32_t partitionNum,
-					u_int16_t segmentNum,
+					uint16_t dbRoot,
+					uint32_t partitionNum,
+					uint16_t segmentNum,
 					HWM_t     hwm) DBRM_THROW;
 
 	/** @brief Rollback (delete) a set of dict store extents for an OID & DBRoot
@@ -336,9 +336,9 @@ public:
 	 * @return 0 on success
 	 */
 	EXPORT int rollbackDictStoreExtents_DBroot(OID_t oid,
-					 u_int16_t dbRoot,
-					 u_int32_t partitionNum,
-					 const std::vector<u_int16_t>& segNums,
+					 uint16_t dbRoot,
+					 uint32_t partitionNum,
+					 const std::vector<uint16_t>& segNums,
 					 const std::vector<HWM_t>& hwms) DBRM_THROW;
 					 
 	/** @brief delete of column extents for the specified extents.
@@ -603,7 +603,7 @@ public:
 	 * @return 0 on success, non-0 on error (see brmtypes.h)
 	 */
 	EXPORT int writeVBEntry(VER_t transID, LBID_t lbid, OID_t vbOID, 
-					 u_int32_t vbFBO) DBRM_THROW;
+					 uint32_t vbFBO) DBRM_THROW;
 	
 	/** @brief Retrieves a list of uncommitted LBIDs.
 	 * 
@@ -781,12 +781,12 @@ public:
 	/* returns a unique ID (> 0) for the lock on success, 0 on failure.
 	 * Also, on failure, the ownerName, pid, and session ID parameters will be set
 	 * to the owner of one of the overlapping locks. */
-	EXPORT uint64_t getTableLock(const std::vector<uint> &pmList, uint32_t tableOID,
+	EXPORT uint64_t getTableLock(const std::vector<uint32_t> &pmList, uint32_t tableOID,
 			std::string *ownerName, uint32_t *ownerPID, int32_t *ownerSessionID,
 			int32_t *ownerTxnID, LockState state);
 	EXPORT bool releaseTableLock(uint64_t id);
 	EXPORT bool changeState(uint64_t id, LockState state);
-	EXPORT bool changeOwner(uint64_t id, const std::string &ownerName, uint ownerPID,
+	EXPORT bool changeOwner(uint64_t id, const std::string &ownerName, uint32_t ownerPID,
 			int32_t ownerSessionID, int32_t ownerTxnID);
 	EXPORT bool checkOwner(uint64_t id);
 	EXPORT std::vector<TableLockInfo> getAllTableLocks();
@@ -821,8 +821,8 @@ public:
 	EXPORT int mergeExtentsMaxMin(const CPInfoMergeList_t &cpInfos) DBRM_THROW;
 
 	/* read-side interface for locking LBID ranges (used by PrimProc) */
-	EXPORT void lockLBIDRange(LBID_t start, uint count);
-	EXPORT void releaseLBIDRange(LBID_t start, uint count);
+	EXPORT void lockLBIDRange(LBID_t start, uint32_t count);
+	EXPORT void releaseLBIDRange(LBID_t start, uint32_t count);
 
 	/* write-side interface for locking LBID ranges (used by DML) */
 	EXPORT int dmlLockLBIDRanges(const std::vector<LBIDRange> &ranges, int txnID);
@@ -953,12 +953,12 @@ public:
 	EXPORT int allocOIDs(int num);
 	EXPORT void returnOIDs(int start, int end);
 	EXPORT int oidm_size();
-	EXPORT int allocVBOID(uint dbroot);
-	EXPORT int getDBRootOfVBOID(uint vbOID);
+	EXPORT int allocVBOID(uint32_t dbroot);
+	EXPORT int getDBRootOfVBOID(uint32_t vbOID);
 	EXPORT std::vector<uint16_t> getVBOIDToDBRootMap();
 
 	/* Autoincrement interface */
-	EXPORT void startAISequence(uint32_t OID, uint64_t firstNum, uint colWidth,
+	EXPORT void startAISequence(uint32_t OID, uint64_t firstNum, uint32_t colWidth,
 								execplan::CalpontSystemCatalog::ColDataType colDataType);
 	EXPORT bool getAIRange(uint32_t OID, uint32_t count, uint64_t *firstNum);
 	EXPORT bool getAIValue(uint32_t OID, uint64_t *value);

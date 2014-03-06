@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -43,7 +43,7 @@ public:
 	EXPORT AutoincrementManager();
 	EXPORT virtual ~AutoincrementManager();
 
-	EXPORT void startSequence(uint32_t OID, uint64_t firstNum, uint colWidth,
+	EXPORT void startSequence(uint32_t OID, uint64_t firstNum, uint32_t colWidth,
                               execplan::CalpontSystemCatalog::ColDataType colDataType);
 	EXPORT bool getAIRange(uint32_t OID, uint64_t count, uint64_t *firstNum);
 	EXPORT void resetSequence(uint32_t OID, uint64_t value);
@@ -52,7 +52,7 @@ public:
 	EXPORT void deleteSequence(uint32_t OID);
 
 private:
-	static const uint lockTime = 30;   // 30 seconds
+	static const uint32_t lockTime = 30;   // 30 seconds
 	struct sequence {
 		sequence() : value(0), overflow(0) { }
 		sequence(const sequence &s) : value(s.value), overflow(s.overflow) { }

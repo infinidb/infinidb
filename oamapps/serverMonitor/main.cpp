@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -14,14 +14,6 @@
    along with this program; if not, write to the Free Software
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
-
-/***************************************************************************
- * $Id: main.cpp 34 2006-09-29 21:13:54Z dhill $
- *
- *   Copyright (C) 2009-2013 Calpont Corporationoration
- *   All rights reserved
- *   Author: David Hill
- ***************************************************************************/
 
 #include "IDBPolicy.h"
 #include "serverMonitor.h"

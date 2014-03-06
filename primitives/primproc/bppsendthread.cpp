@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -33,7 +33,7 @@ using namespace boost;
 namespace primitiveprocessor
 {
 	
-extern uint connectionsPerUM;
+extern uint32_t connectionsPerUM;
 	
 BPPSendThread::BPPSendThread() : die(false), gotException(false), mainThreadWaiting(false),
 	sizeThreshold(100), msgsLeft(-1), waiting(false), sawAllConnections(false),
@@ -112,7 +112,7 @@ void BPPSendThread::sendResults(const vector<Msg_t> &msgs, bool newConnection)
 			}
 		}
 	}
-	for (uint i = 0; i < msgs.size(); i++) {
+	for (uint32_t i = 0; i < msgs.size(); i++) {
 		(void)atomicops::atomicAdd<uint64_t>(&currentByteSize, msgs[i].msg->lengthWithHdrOverhead());
 		msgQueue.push(msgs[i]);
 	}
@@ -143,9 +143,9 @@ bool BPPSendThread::flowControlEnabled()
 
 void BPPSendThread::mainLoop()
 {
-	const uint msgCap = 20;
+	const uint32_t msgCap = 20;
 	boost::scoped_array<Msg_t> msg;
-	uint msgCount = 0, i, msgsSent;
+	uint32_t msgCount = 0, i, msgsSent;
 	SP_UM_MUTEX lock;
 	SP_UM_IOSOCK sock;
 	bool doLoadBalancing = false;

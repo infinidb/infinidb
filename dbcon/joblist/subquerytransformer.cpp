@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -100,6 +100,8 @@ SJSTEP& SubQueryTransformer::makeSubQueryStep(execplan::CalpontSelectExecutionPl
 	fSubJobInfo->projectingTableOID = fSubJobList->projectingTableOIDPtr();
 	fSubJobInfo->jobListPtr = fSubJobList.get();
 	fSubJobInfo->stringTableThreshold = fOutJobInfo->stringTableThreshold;
+	fSubJobInfo->localQuery = fOutJobInfo->localQuery;
+	fSubJobInfo->uuid = fOutJobInfo->uuid;
 	fOutJobInfo->jobListPtr->addSubqueryJobList(fSubJobList);
 
 	// Update v-table's alias.
@@ -164,11 +166,11 @@ SJSTEP& SubQueryTransformer::makeSubQueryStep(execplan::CalpontSelectExecutionPl
 	fSubQueryStep.reset(sqs);
 
 	// Update the v-table columns and rowgroup
-	vector<uint> pos;
-	vector<uint> oids;
-	vector<uint> keys;
-	vector<uint> scale;
-	vector<uint> precision;
+	vector<uint32_t> pos;
+	vector<uint32_t> oids;
+	vector<uint32_t> keys;
+	vector<uint32_t> scale;
+	vector<uint32_t> precision;
 	vector<CalpontSystemCatalog::ColDataType> types;
 	pos.push_back(2);
 
@@ -276,7 +278,7 @@ void SubQueryTransformer::updateCorrelateInfo()
 		subTables.insert(fSubJobInfo->tableList[i]);
 
 	// Update correlated steps
-	const map<UniqId, uint>& subMap = fVtable.columnMap();
+	const map<UniqId, uint32_t>& subMap = fVtable.columnMap();
 	for (JobStepVector::iterator i = fCorrelatedSteps.begin(); i != fCorrelatedSteps.end(); i++)
 	{
 		TupleHashJoinStep* thjs = dynamic_cast<TupleHashJoinStep*>(i->get());
@@ -341,8 +343,8 @@ void SubQueryTransformer::updateCorrelateInfo()
 			vector<string>& aliases = es->aliases();
 			vector<string>& views = es->views();
 			vector<string>& schemas = es->schemas();
-			vector<uint>& tableKeys = es->tableKeys();
-			vector<uint>& columnKeys = es->columnKeys();
+			vector<uint32_t>& tableKeys = es->tableKeys();
+			vector<uint32_t>& columnKeys = es->columnKeys();
 			for (uint64_t j = 0; j < scList.size(); j++)
 			{
 				SimpleColumn* sc = dynamic_cast<SimpleColumn*>(scList[j]);
@@ -350,7 +352,7 @@ void SubQueryTransformer::updateCorrelateInfo()
 				{
 					if (subTables.find(tableKeys[j]) != subTables.end())
 					{
-						const map<UniqId, uint>::const_iterator k =
+						const map<UniqId, uint32_t>::const_iterator k =
 							subMap.find(UniqId(oids[j], aliases[j], schemas[j], views[j]));
 						if (k == subMap.end())
 							//throw CorrelateFailExcept();
@@ -393,7 +395,7 @@ void SubQueryTransformer::updateCorrelateInfo()
 				else if (dynamic_cast<WindowFunctionColumn*>(scList[j]) != NULL)
 				{
 					// workaround for window function IN/EXISTS subquery
-					const map<UniqId, uint>::const_iterator k =
+					const map<UniqId, uint32_t>::const_iterator k =
 						subMap.find(UniqId(scList[j]->expressionId(), "", "", ""));
 					if (k == subMap.end())
 							throw IDBExcept(logging::ERR_NON_SUPPORT_SUB_QUERY_TYPE);

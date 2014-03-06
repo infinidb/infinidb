@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -68,7 +68,7 @@ public:
 	virtual int doQuery();
 
 	/* returns row count */
-	virtual uint projectTable(execplan::CalpontSystemCatalog::OID, messageqcpp::ByteStream&) = 0;
+	virtual uint32_t projectTable(execplan::CalpontSystemCatalog::OID, messageqcpp::ByteStream&) = 0;
 	virtual int  putEngineComm(DistributedEngineComm*);
 
 	virtual void addQuery(const JobStepVector& query) { fQuery = query; }
@@ -117,8 +117,8 @@ public:
 
 	std::string toString() const;
 
-	void priority(uint p) { fPriority = p; }
-	uint priority() { return fPriority; }
+	void priority(uint32_t p) { fPriority = p; }
+	uint32_t priority() { return fPriority; }
 
 	// @bug4848, enhance and unify limit handling.
 	EXPORT virtual void abortOnLimit(JobStep* js);
@@ -145,7 +145,7 @@ protected:
 
 	volatile uint32_t fAborted;
 
-	uint fPriority;   //higher #s = higher priority
+	uint32_t fPriority;   //higher #s = higher priority
 };
 
 class TupleJobList : public JobList
@@ -154,7 +154,7 @@ public:
 	TupleJobList(bool isEM=false);
 	virtual ~TupleJobList();
 
-	EXPORT uint projectTable(execplan::CalpontSystemCatalog::OID, messageqcpp::ByteStream&);
+	EXPORT uint32_t projectTable(execplan::CalpontSystemCatalog::OID, messageqcpp::ByteStream&);
 	EXPORT const rowgroup::RowGroup& getOutputRowGroup() const;
 	TupleDeliveryStep* getDeliveryStep() { return ds; }
 	const JobStepVector& querySteps() const { return fQuery; }

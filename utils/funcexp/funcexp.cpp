@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -41,11 +41,13 @@ using namespace joblist;
 #include "udfsdk.h"
 #endif
 
-bool cPo = false;		// extern-ed in utils_utf8.h
-
-
 namespace funcexp
 {
+namespace utf8
+{
+bool JPcodePoint = false;		// extern-ed in utils_utf8.h
+}
+
 /* static */
 FuncExp* FuncExp::fInstance = 0;
 
@@ -118,6 +120,7 @@ FuncExp::FuncExp()
 	fFuncMap["greatest"] = new Func_greatest();	//dlh
 	fFuncMap["hex"] = new Func_hex();
 	fFuncMap["hour"] = new Func_hour();	//dlh
+	fFuncMap["idbpartition"] = new Func_idbpartition(); // pseudo column
 	fFuncMap["if"] = new Func_if();
 	fFuncMap["ifnull"] = new Func_ifnull();
 	fFuncMap["in"] = new Func_in();
@@ -235,7 +238,7 @@ Func* FuncExp::getFunctor(std::string& funcName)
 void FuncExp::evaluate(rowgroup::Row& row, std::vector<execplan::SRCP>& expression)
 {
 	bool isNull;
-	for (uint i = 0; i < expression.size(); i++)
+	for (uint32_t i = 0; i < expression.size(); i++)
 	{
 		isNull = false;
 		switch (expression[i]->resultType().colDataType)

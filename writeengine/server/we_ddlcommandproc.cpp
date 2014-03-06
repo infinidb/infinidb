@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -112,8 +112,8 @@ namespace WriteEngine
 uint8_t WE_DDLCommandProc::writeSystable(ByteStream& bs, std::string &err)
 {
 		int rc = 0;
-	u_int32_t sessionID, tmp32, columnSize, dictSize, i;
-	u_int8_t tmp8;
+	uint32_t sessionID, tmp32, columnSize, dictSize, i;
+	uint8_t tmp8;
 	int txnID, tableOID, colpos;
 	uint32_t tableWithAutoi;
 	bs >> sessionID;
@@ -127,8 +127,8 @@ uint8_t WE_DDLCommandProc::writeSystable(ByteStream& bs, std::string &err)
 	bs >> columnSize;
 
 	//deserialize column Oid and dictionary oid
-	vector<u_int32_t> coloids;
-	vector<u_int32_t> dictoids;
+	vector<uint32_t> coloids;
+	vector<uint32_t> dictoids;
 
 	for (i = 0; i < columnSize; ++i) {
 		bs >> tmp32;
@@ -146,7 +146,7 @@ uint8_t WE_DDLCommandProc::writeSystable(ByteStream& bs, std::string &err)
 	bs >> tmp32;
 	colpos = tmp32;
 	bs >> tmp32;
-	u_int16_t dbroot = tmp32;
+	uint16_t dbroot = tmp32;
 	ddlpackage::TableDef tableDef;
 	tableDef.unserialize(bs);
 
@@ -699,10 +699,10 @@ uint8_t WE_DDLCommandProc::writeSystable(ByteStream& bs, std::string &err)
 uint8_t WE_DDLCommandProc::writeSyscolumn(ByteStream& bs, std::string & err)
 {
 	int rc = 0;
-	u_int32_t sessionID, tmp32, coloid, dictoid;
+	uint32_t sessionID, tmp32, coloid, dictoid;
 	int txnID, startPos;
 	string schema, tablename;
-	u_int8_t tmp8;
+	uint8_t tmp8;
 	bool isAlter = false;
 	bs >> sessionID;
 	bs >> tmp32;
@@ -714,7 +714,7 @@ uint8_t WE_DDLCommandProc::writeSyscolumn(ByteStream& bs, std::string & err)
 	bs >> tmp8; //alterFlag
 	bs >> tmp32;
 	startPos = tmp32;
-	isAlter = tmp32;
+	isAlter = (tmp8 != 0);
 	boost::scoped_ptr<ddlpackage::ColumnDef>  colDefPtr(new ddlpackage::ColumnDef());
 	colDefPtr->unserialize(bs);
 
@@ -803,7 +803,7 @@ uint8_t WE_DDLCommandProc::writeSyscolumn(ByteStream& bs, std::string & err)
 		}
 
 		unsigned int i = 0;
-		u_int16_t  dbRoot;
+		uint16_t  dbRoot;
 		BRM::OID_t sysOid = 1021;
 		//Find out where syscolumn is
 		rc = fDbrm.getSysCatDBRoot(sysOid, dbRoot);
@@ -1077,7 +1077,7 @@ uint8_t WE_DDLCommandProc::createtablefiles(ByteStream& bs, std::string & err)
 	bool tokenFlag;
 	int txnID;
 	CalpontSystemCatalog::ColDataType colDataType;
-	u_int16_t colDbRoot;
+	uint16_t colDbRoot;
 	int compressionType;
 	bs >> tmp32;
 	txnID = tmp32;
@@ -1129,7 +1129,7 @@ uint8_t WE_DDLCommandProc::createtablefiles(ByteStream& bs, std::string & err)
 uint8_t WE_DDLCommandProc::commitVersion(ByteStream& bs, std::string & err)
 {
 	int rc = 0;
-	u_int32_t tmp32;
+	uint32_t tmp32;
 	int txnID;
 
 	bs >> tmp32;
@@ -1149,7 +1149,7 @@ uint8_t WE_DDLCommandProc::commitVersion(ByteStream& bs, std::string & err)
 uint8_t WE_DDLCommandProc::rollbackBlocks(ByteStream& bs, std::string & err)
 {
 	int rc = 0;
-	u_int32_t sessionID, tmp32;;
+	uint32_t sessionID, tmp32;;
 	int txnID;
 	bs >> sessionID;
 	bs >> tmp32;
@@ -1177,7 +1177,7 @@ uint8_t WE_DDLCommandProc::rollbackBlocks(ByteStream& bs, std::string & err)
 uint8_t WE_DDLCommandProc::rollbackVersion(ByteStream& bs, std::string & err)
 {
 	int rc = 0;
-	u_int32_t sessionID, tmp32;
+	uint32_t sessionID, tmp32;
 	int txnID;
 	bs >> sessionID;
 	bs >> tmp32;
@@ -1198,7 +1198,7 @@ uint8_t WE_DDLCommandProc::rollbackVersion(ByteStream& bs, std::string & err)
 uint8_t WE_DDLCommandProc::deleteSyscolumn(ByteStream& bs, std::string & err)
 {
 	int rc = 0;
-	u_int32_t sessionID, tmp32;;
+	uint32_t sessionID, tmp32;;
 	int txnID;
 	string schema, tablename;
 	bs >> sessionID;
@@ -1218,7 +1218,7 @@ uint8_t WE_DDLCommandProc::deleteSyscolumn(ByteStream& bs, std::string & err)
 	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr;
 	systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
-	u_int16_t  dbRoot;
+	uint16_t  dbRoot;
 	BRM::OID_t sysOid = 1021;
 	//Find out where syscolumn is
 	rc = fDbrm.getSysCatDBRoot(sysOid, dbRoot);
@@ -1323,7 +1323,7 @@ uint8_t WE_DDLCommandProc::deleteSyscolumn(ByteStream& bs, std::string & err)
 uint8_t WE_DDLCommandProc::deleteSyscolumnRow(ByteStream& bs, std::string & err)
 {
 	int rc = 0;
-	u_int32_t sessionID, tmp32;;
+	uint32_t sessionID, tmp32;;
 	int txnID;
 	string schema, tablename, columnname;
 	bs >> sessionID;
@@ -1345,7 +1345,7 @@ uint8_t WE_DDLCommandProc::deleteSyscolumnRow(ByteStream& bs, std::string & err)
 	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr;
 	systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
-	u_int16_t  dbRoot;
+	uint16_t  dbRoot;
 	BRM::OID_t sysOid = 1021;
 	//Find out where syscolumn is
 	rc = fDbrm.getSysCatDBRoot(sysOid, dbRoot);
@@ -1448,7 +1448,7 @@ uint8_t WE_DDLCommandProc::deleteSyscolumnRow(ByteStream& bs, std::string & err)
 uint8_t WE_DDLCommandProc::deleteSystable(ByteStream& bs, std::string & err)
 {
 	int rc = 0;
-	u_int32_t sessionID, tmp32;;
+	uint32_t sessionID, tmp32;;
 	int txnID;
 	string schema, tablename;
 	bs >> sessionID;
@@ -1469,7 +1469,7 @@ uint8_t WE_DDLCommandProc::deleteSystable(ByteStream& bs, std::string & err)
 	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr;
 	systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
-	u_int16_t  dbRoot;
+	uint16_t  dbRoot;
 	BRM::OID_t sysOid = 1021;
 	//Find out where systcolumn is
 	rc = fDbrm.getSysCatDBRoot(sysOid, dbRoot);
@@ -1572,7 +1572,7 @@ uint8_t WE_DDLCommandProc::deleteSystable(ByteStream& bs, std::string & err)
 uint8_t WE_DDLCommandProc::deleteSystables(ByteStream& bs, std::string & err)
 {
 	int rc = 0;
-	u_int32_t sessionID, tmp32;;
+	uint32_t sessionID, tmp32;;
 	int txnID;
 	string schema, tablename;
 	bs >> sessionID;
@@ -1600,7 +1600,7 @@ uint8_t WE_DDLCommandProc::deleteSystables(ByteStream& bs, std::string & err)
 	WriteEngine::RIDList ridList;
 	std::vector<WriteEngine::RIDList> ridLists;
 	DDLColumn column;
-	u_int16_t  dbRoot;
+	uint16_t  dbRoot;
 	BRM::OID_t sysOid = 1003;
 	//Find out where systable is
 	rc = fDbrm.getSysCatDBRoot(sysOid, dbRoot);
@@ -1807,10 +1807,10 @@ uint8_t WE_DDLCommandProc::dropFiles(ByteStream& bs, std::string & err)
 uint8_t WE_DDLCommandProc::updateSyscolumnAuto(ByteStream& bs, std::string & err)
 {
 	int rc = 0;
-	u_int32_t sessionID, tmp32;
+	uint32_t sessionID, tmp32;
 	std::string schema, tablename;
 	int txnID;
-	u_int8_t tmp8;
+	uint8_t tmp8;
 	bool autoIncrement = false;
 
 	bs >> sessionID;
@@ -1974,10 +1974,10 @@ uint8_t WE_DDLCommandProc::updateSyscolumnAuto(ByteStream& bs, std::string & err
 uint8_t WE_DDLCommandProc::updateSyscolumnNextvalCol(ByteStream& bs, std::string & err)
 {
 	int rc = 0;
-	u_int32_t sessionID, tmp32;
+	uint32_t sessionID, tmp32;
 	std::string schema, tablename;
 	int txnID;
-	u_int8_t tmp8;
+	uint8_t tmp8;
 	bool autoIncrement = false;
 
 	bs >> sessionID;
@@ -2137,7 +2137,7 @@ uint8_t WE_DDLCommandProc::updateSyscolumnNextvalCol(ByteStream& bs, std::string
 uint8_t WE_DDLCommandProc::updateSyscolumnTablename(ByteStream& bs, std::string & err)
 {
 	int rc = 0;
-	u_int32_t sessionID, tmp32;
+	uint32_t sessionID, tmp32;
 	std::string schema, oldTablename, newTablename;
 	int txnID;
 
@@ -2224,7 +2224,7 @@ uint8_t WE_DDLCommandProc::updateSyscolumnTablename(ByteStream& bs, std::string 
 	fWEWrapper.setIsInsert(false);
 	fWEWrapper.setBulkFlag(false);
 	fWEWrapper.startTransaction(txnID);
-	if (NO_ERROR != (error = fWEWrapper.tokenize(txnID, dictStruct, dictTuple)))
+	if (NO_ERROR != (error = fWEWrapper.tokenize(txnID, dictStruct, dictTuple, false))) // @bug 5572 HDFS tmp file
 	{
 		WErrorCodes ec;
 		throw std::runtime_error("WE: Tokenization failed " + ec.errorString(error));
@@ -2356,7 +2356,7 @@ uint8_t WE_DDLCommandProc::updateSyscolumnTablename(ByteStream& bs, std::string 
 uint8_t WE_DDLCommandProc::updateSystableAuto(ByteStream& bs, std::string & err)
 {
 	int rc = 0;
-	u_int32_t sessionID, tmp32, autoVal;
+	uint32_t sessionID, tmp32, autoVal;
 	std::string schema, tablename;
 	int txnID;
 
@@ -2527,7 +2527,7 @@ uint8_t WE_DDLCommandProc::updateSystableAuto(ByteStream& bs, std::string & err)
 uint8_t WE_DDLCommandProc::updateSystableTablename(ByteStream& bs, std::string & err)
 {
 	int rc = 0;
-	u_int32_t sessionID, tmp32;
+	uint32_t sessionID, tmp32;
 	std::string schema, oldTablename, newTablename;
 	int txnID;
 
@@ -2607,7 +2607,7 @@ uint8_t WE_DDLCommandProc::updateSystableTablename(ByteStream& bs, std::string &
 	fWEWrapper.setBulkFlag(false);
 	fWEWrapper.startTransaction(txnID);
 	
-	if (NO_ERROR != (error = fWEWrapper.tokenize(txnID, dictStruct, dictTuple)))
+	if (NO_ERROR != (error = fWEWrapper.tokenize(txnID, dictStruct, dictTuple, false))) // @bug 5572 HDFS tmp file
 	{
 		WErrorCodes ec;
 		throw std::runtime_error("WE: Tokenization failed " + ec.errorString(error));
@@ -2726,7 +2726,7 @@ uint8_t WE_DDLCommandProc::updateSystableTablename(ByteStream& bs, std::string &
 uint8_t WE_DDLCommandProc::updateSystablesTablename(ByteStream& bs, std::string & err)
 {
 	int rc = 0;
-	u_int32_t sessionID, tmp32;
+	uint32_t sessionID, tmp32;
 	std::string schema, oldTablename, newTablename;
 	int txnID;
 
@@ -2813,7 +2813,7 @@ uint8_t WE_DDLCommandProc::updateSystablesTablename(ByteStream& bs, std::string 
 	//WriteEngine::Token aToken = dictTuple.token;
 
 	//colTuple.data = aToken;
-	//cout << "token value for new table name is op:fbo = " << aToken.op <<":" << aToken.fbo << " null flag = " << (uint)dictTuple.isNull<< endl;
+	//cout << "token value for new table name is op:fbo = " << aToken.op <<":" << aToken.fbo << " null flag = " << (uint32_t)dictTuple.isNull<< endl;
 	if (idbdatafile::IDBPolicy::useHdfs())
 	{
 		colStruct.fCompressionType = 2;
@@ -3110,7 +3110,7 @@ uint8_t WE_DDLCommandProc::updateSyscolumnColumnposCol(messageqcpp::ByteStream& 
 	int rc = 0;
 	int colPos;
 	string schema, atableName;
-	u_int32_t sessionID, tmp32;
+	uint32_t sessionID, tmp32;
 	int txnID;
 
 	bs >> sessionID;
@@ -3172,7 +3172,7 @@ uint8_t WE_DDLCommandProc::updateSyscolumnColumnposCol(messageqcpp::ByteStream& 
 		return rc;
 	}
 	colValuesList.push_back(colTuples);
-	u_int16_t  dbRoot;
+	uint16_t  dbRoot;
 	BRM::OID_t sysOid = 1021;
 	//Find out where systable is
 	rc = fDbrm.getSysCatDBRoot(sysOid, dbRoot);
@@ -3236,8 +3236,8 @@ uint8_t WE_DDLCommandProc::updateSyscolumnColumnposCol(messageqcpp::ByteStream& 
 uint8_t WE_DDLCommandProc::fillNewColumn(ByteStream& bs, std::string& err)
 {
 	int rc = 0;
-	u_int32_t tmp32;
-	u_int8_t tmp8;
+	uint32_t tmp32;
+	uint8_t tmp8;
 	int txnID;
 	OID dataOid, dictOid, refColOID;
 	CalpontSystemCatalog::ColDataType dataType, refColDataType;
@@ -3305,12 +3305,12 @@ uint8_t WE_DDLCommandProc::fillNewColumn(ByteStream& bs, std::string& err)
 uint8_t WE_DDLCommandProc::writeTruncateLog(ByteStream& bs, std::string& err)
 {
 	int rc = 0;
-	u_int32_t tableOid, numOid, tmp32;
+	uint32_t tableOid, numOid, tmp32;
 	bs >> tableOid;
 	bs >> numOid;
-	std::vector<u_int32_t> oids;
+	std::vector<uint32_t> oids;
 
-	for (u_int32_t i=0; i < numOid; i++)
+	for (uint32_t i=0; i < numOid; i++)
 	{
 		bs >> tmp32;
 		oids.push_back(tmp32);
@@ -3366,21 +3366,21 @@ uint8_t WE_DDLCommandProc::writeTruncateLog(ByteStream& bs, std::string& err)
 uint8_t WE_DDLCommandProc::writeDropPartitionLog(ByteStream& bs, std::string& err)
 {
 	int rc = 0;
-	u_int32_t tableOid, numParts, numOid, tmp32;
+	uint32_t tableOid, numParts, numOid, tmp32;
 	bs >> tableOid;
 	std::set<BRM::LogicalPartition> partitionNums;
 	bs >> numParts;
 	BRM::LogicalPartition lp;
-	for (u_int32_t i=0; i < numParts; i++)
+	for (uint32_t i=0; i < numParts; i++)
 	{
 		lp.unserialize(bs);
 		partitionNums.insert(lp);
 	}
 
 	bs >> numOid;
-	std::vector<u_int32_t> oids;
+	std::vector<uint32_t> oids;
 
-	for (u_int32_t i=0; i < numOid; i++)
+	for (uint32_t i=0; i < numOid; i++)
 	{
 		bs >> tmp32;
 		oids.push_back(tmp32);
@@ -3443,13 +3443,13 @@ uint8_t WE_DDLCommandProc::writeDropPartitionLog(ByteStream& bs, std::string& er
 uint8_t WE_DDLCommandProc::writeDropTableLog(ByteStream& bs, std::string& err)
 {
 	int rc = 0;
-	u_int32_t tableOid, numOid, tmp32;
+	uint32_t tableOid, numOid, tmp32;
 	bs >> tableOid;
 
 	bs >> numOid;
-	std::vector<u_int32_t> oids;
+	std::vector<uint32_t> oids;
 
-	for (u_int32_t i=0; i < numOid; i++)
+	for (uint32_t i=0; i < numOid; i++)
 	{
 		bs >> tmp32;
 		oids.push_back(tmp32);
@@ -3502,7 +3502,7 @@ uint8_t WE_DDLCommandProc::writeDropTableLog(ByteStream& bs, std::string& err)
 uint8_t WE_DDLCommandProc::deleteDDLLog(ByteStream& bs, std::string& err)
 {
 	int rc = 0;
-	u_int32_t tableOid, fileType;
+	uint32_t tableOid, fileType;
 	bs >> fileType;
 	bs >> tableOid;
 	string prefix;
@@ -3751,7 +3751,7 @@ uint8_t WE_DDLCommandProc::updateSyscolumnSetDefault(messageqcpp::ByteStream& bs
 	uint32_t tmp32;
 	string schema, tableName, colName, defaultvalue;
 	int txnID;
-	u_int32_t sessionID;
+	uint32_t sessionID;
 	bs >> sessionID;
 	bs >> tmp32;
 	txnID = tmp32;
@@ -3868,7 +3868,7 @@ uint8_t WE_DDLCommandProc::updateSyscolumnSetDefault(messageqcpp::ByteStream& bs
 			dictTuple.sigSize = defaultvalue.length();
 			dictTuple.isNull = false;
 			int error = NO_ERROR;
-			if (NO_ERROR != (error = fWEWrapper.tokenize(txnID, dictStruct, dictTuple)))
+			if (NO_ERROR != (error = fWEWrapper.tokenize(txnID, dictStruct, dictTuple, false))) // @bug 5572 HDFS tmp file
 			{
 				WErrorCodes ec;
 				throw std::runtime_error("WE: Tokenization failed " + ec.errorString(error));
@@ -4004,7 +4004,7 @@ uint8_t WE_DDLCommandProc::updateSyscolumnRenameColumn(messageqcpp::ByteStream& 
 	uint32_t tmp32, nullable;
 	string schema, tableName, colOldname, autoinc, colNewName, defaultvalue;
 	int txnID;
-	u_int32_t sessionID;
+	uint32_t sessionID;
 	bs >> sessionID;
 	bs >> tmp32;
 	txnID = tmp32;
@@ -4133,7 +4133,7 @@ uint8_t WE_DDLCommandProc::updateSyscolumnRenameColumn(messageqcpp::ByteStream& 
 		dictTuple.isNull = false;
 		int error = NO_ERROR;
 
-		if (NO_ERROR != (error = fWEWrapper.tokenize(txnID, dictStruct, dictTuple)))
+		if (NO_ERROR != (error = fWEWrapper.tokenize(txnID, dictStruct, dictTuple, false))) // @bug 5572 HDFS tmp file
 		{
 			WErrorCodes ec;
 			err = ec.errorString(error);
@@ -4331,7 +4331,7 @@ uint8_t WE_DDLCommandProc::updateSyscolumnRenameColumn(messageqcpp::ByteStream& 
 			dictTuple.sigSize = defaultvalue.length();
 			dictTuple.isNull = false;
 			int error = NO_ERROR;
-			if (NO_ERROR != (error = fWEWrapper.tokenize(txnID, dictStruct, dictTuple)))
+			if (NO_ERROR != (error = fWEWrapper.tokenize(txnID, dictStruct, dictTuple, false))) // @bug 5572 HDFS tmp file
 			{
 				WErrorCodes ec;
 				throw std::runtime_error("WE: Tokenization failed " + ec.errorString(error));

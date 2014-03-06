@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -87,7 +87,7 @@ private:
 	uint64_t adjustValue(const execplan::CalpontSystemCatalog::ColType& ct,
         	             const uint64_t& value);
 
-	uint daysThroughMonth(uint mth);
+	uint32_t daysThroughMonth(uint32_t mth);
 
 	uint32_t estimateDistinctValues(const execplan::CalpontSystemCatalog::ColType& ct,
                                         const uint64_t& min,
@@ -129,13 +129,13 @@ private:
 				   const uint32_t& rowsInExtent);
 
 	// Configurables read from Calpont.xml - future.
-	uint fExtentsToSample;
-	uint fIntDistinctAdjust;
-	uint fDecDistinctAdjust;
-	uint fChar1DistinctAdjust;
-	uint fChar2Thru7DistinctAdjust;
-	uint fDictDistinctAdjust;
-	uint fDateDistinctAdjust;
+	uint32_t fExtentsToSample;
+	uint32_t fIntDistinctAdjust;
+	uint32_t fDecDistinctAdjust;
+	uint32_t fChar1DistinctAdjust;
+	uint32_t fChar2Thru7DistinctAdjust;
+	uint32_t fDictDistinctAdjust;
+	uint32_t fDateDistinctAdjust;
 
 	static const uint32_t fRowsPerExtent = 8192 * 1024;
 	static const uint32_t fBlockSize = 8192; // Block size in bytes.

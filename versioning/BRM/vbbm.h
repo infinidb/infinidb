@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -76,7 +76,7 @@ struct VBBMEntry {
 	LBID_t lbid;
 	VER_t verID;
 	OID_t vbOID;
-	u_int32_t vbFBO;
+	uint32_t vbFBO;
 	int next;
 	EXPORT VBBMEntry();
 };
@@ -166,8 +166,8 @@ class VBBM : public Undoable {
 		
 		EXPORT void lock(OPS op);
 		EXPORT void release(OPS op);
-		EXPORT int lookup(LBID_t lbid, VER_t ver, OID_t &oid, u_int32_t &fbo) const;
-		EXPORT void insert(LBID_t lbid, VER_t ver, OID_t oid, u_int32_t fbo);
+		EXPORT int lookup(LBID_t lbid, VER_t ver, OID_t &oid, uint32_t &fbo) const;
+		EXPORT void insert(LBID_t lbid, VER_t ver, OID_t oid, uint32_t fbo);
 		EXPORT void getBlocks(int num, OID_t vbOID, std::vector<VBRange> &vbRanges, VSS& vss,
 				bool flushPMCache);
 		EXPORT void removeEntry(LBID_t, VER_t ver);
@@ -218,7 +218,7 @@ class VBBM : public Undoable {
 		/* Shared nothing mods */
 		uint64_t currentFileSize;
 		void setCurrentFileSize();
-		uint addVBFileIfNotExists(OID_t vbOID);
+		uint32_t addVBFileIfNotExists(OID_t vbOID);
 };
 
 }

@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -748,7 +748,7 @@ void dc8()
 {
 	data = "2007-05-11";
 	int status = 0;
-	u_int32_t anyval;
+	uint32_t anyval;
 	anyval = converter.convertColumnDate( data.c_str(), CALPONTDATE_ENUM, status, data.length());
 	CPPUNIT_ASSERT(anyval == 131551998);
 	std::string backToString = converter.dateToString(anyval);
@@ -906,7 +906,7 @@ void dc_datetest()
 
 	for (unsigned i = 0; i < sizeof(date_tests)/sizeof(DateCheck); i++)
 	{
-		u_int32_t val = converter.stringToDate(date_tests[i].str);
+		uint32_t val = converter.stringToDate(date_tests[i].str);
 		bool check = (((uint32_t)(val & 0xFFFFFFC0)) == ((*(reinterpret_cast<uint32_t *> (&date_tests[i].date))) & 0xFFFFFFC0));
 		if (!check)
 		{

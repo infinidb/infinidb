@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -138,10 +138,10 @@ map<string, int> WindowFunctionType::windowFunctionId = assign::map_list_of
 	(string("REGR_SYY"),        WF__REGR_SYY)
 ;
 
-shared_ptr<WindowFunctionType>
+boost::shared_ptr<WindowFunctionType>
 	WindowFunctionType::makeWindowFunction(const string& name, int ct)
 {
-	shared_ptr<WindowFunctionType> af;
+	boost::shared_ptr<WindowFunctionType> af;
 	int functionId = windowFunctionId[algorithm::to_upper_copy(name)];
 	switch (functionId)
 	{

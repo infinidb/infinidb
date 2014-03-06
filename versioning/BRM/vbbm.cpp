@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -359,7 +359,7 @@ key_t VBBM::chooseShmkey() const
 }
 
 //write lock
-void VBBM::insert(LBID_t lbid, VER_t verID, OID_t vbOID, u_int32_t vbFBO)
+void VBBM::insert(LBID_t lbid, VER_t verID, OID_t vbOID, uint32_t vbFBO)
 {
 	VBBMEntry entry;
 
@@ -440,7 +440,7 @@ void VBBM::_insert(VBBMEntry& e, VBShmsegHeader *dest, int *destHash,
 }
 
 //assumes read lock is held
-int VBBM::lookup(LBID_t lbid, VER_t verID, OID_t &oid, u_int32_t &fbo) const
+int VBBM::lookup(LBID_t lbid, VER_t verID, OID_t &oid, uint32_t &fbo) const
 {
 	int index, prev, bucket;
 
@@ -468,7 +468,7 @@ int VBBM::lookup(LBID_t lbid, VER_t verID, OID_t &oid, u_int32_t &fbo) const
 void VBBM::getBlocks(int num, OID_t vbOID, vector<VBRange>& freeRanges, VSS& vss, bool flushPMCache)
 {
 	int blocksLeftInFile, blocksGathered = 0, i;
-	uint fileIndex;
+	uint32_t fileIndex;
 	uint32_t firstFBO, lastFBO;
 	VBRange range;
 	vector<VBRange>::iterator it;
@@ -485,7 +485,7 @@ void VBBM::getBlocks(int num, OID_t vbOID, vector<VBRange>& freeRanges, VSS& vss
 	}
 	*/
 
-	if ((uint) num > files[fileIndex].fileSize/BLOCK_SIZE) {
+	if ((uint32_t) num > files[fileIndex].fileSize/BLOCK_SIZE) {
 		cout << "num = " << num << " filesize = " << files[fileIndex].fileSize << endl;
 		log("VBBM::getBlocks(): num is larger than the size of the version buffer",
 				logging::LOG_TYPE_DEBUG);
@@ -506,7 +506,7 @@ void VBBM::getBlocks(int num, OID_t vbOID, vector<VBRange>& freeRanges, VSS& vss
 		range.vbFBO = files[fileIndex].nextOffset/BLOCK_SIZE;
 		range.size = (blocksLeftInFile >= blocksLeft ? blocksLeft : blocksLeftInFile);
 		makeUndoRecord(&files[fileIndex], sizeof(VBFileMetadata));
-		if (range.size == (uint) blocksLeftInFile)
+		if (range.size == (uint32_t) blocksLeftInFile)
 			files[fileIndex].nextOffset = 0;
 		else
 			files[fileIndex].nextOffset += range.size * BLOCK_SIZE;
@@ -516,7 +516,7 @@ void VBBM::getBlocks(int num, OID_t vbOID, vector<VBRange>& freeRanges, VSS& vss
 
 	//age the returned blocks out of the VB
 	for (it = freeRanges.begin(); it != freeRanges.end(); it++) {
-		uint firstChunk, lastChunk;
+		uint32_t firstChunk, lastChunk;
 
 		vbOID = it->vbOID;
 		firstFBO = it->vbFBO;
@@ -993,7 +993,7 @@ void VBBM::save(string filename)
 #endif
 }
 
-uint VBBM::addVBFileIfNotExists(OID_t vbOID)
+uint32_t VBBM::addVBFileIfNotExists(OID_t vbOID)
 {
 	int i;
 

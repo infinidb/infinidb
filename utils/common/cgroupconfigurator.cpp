@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -84,14 +84,14 @@ CGroupConfigurator::~CGroupConfigurator()
 {
 }
 
-uint CGroupConfigurator::getNumCoresFromCGroup()
+uint32_t CGroupConfigurator::getNumCoresFromCGroup()
 {
     ostringstream filename;
     filename << "/sys/fs/cgroup/cpuset/" << cGroupName << "/cpus";
 
     ifstream in(filename.str().c_str());
     string cpusString;
-    uint cpus = 0;
+    uint32_t cpus = 0;
 
     if (!in)
         RETURN_NO_GROUP(0);
@@ -123,8 +123,8 @@ uint CGroupConfigurator::getNumCoresFromCGroup()
             cpus++;
         else {
             const char *data = oneRange.c_str();
-            uint firstCPU = strtol(data, NULL, 10);
-            uint lastCPU = strtol(&data[dash+1], NULL, 10);
+            uint32_t firstCPU = strtol(data, NULL, 10);
+            uint32_t lastCPU = strtol(&data[dash+1], NULL, 10);
             cpus += lastCPU - firstCPU + 1;
         }
         first = last + 1;
@@ -133,7 +133,7 @@ uint CGroupConfigurator::getNumCoresFromCGroup()
     return cpus;
 }
 
-uint CGroupConfigurator::getNumCoresFromProc()
+uint32_t CGroupConfigurator::getNumCoresFromProc()
 {
 #ifdef _MSC_VER
 	SYSTEM_INFO siSysInfo;
@@ -170,14 +170,14 @@ uint CGroupConfigurator::getNumCoresFromProc()
 
 
 
-uint CGroupConfigurator::getNumCores()
+uint32_t CGroupConfigurator::getNumCores()
 {
     /*
         Detect if InfiniDB is in a C-Group
             - get the group ID
         If not, get the number of cores from /proc
     */
-    uint ret;
+    uint32_t ret;
 
     if (!cGroupDefined)
         ret = getNumCoresFromProc();

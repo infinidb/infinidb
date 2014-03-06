@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -23,9 +23,7 @@ using namespace std;
 
 #include <boost/algorithm/string/case_conv.hpp>
 
-#define DDLPKGCREATETABLEPROC_DLLEXPORT
 #include "createtableprocessor.h"
-#undef DDLPKGCREATETABLEPROC_DLLEXPORT
 
 #include "ddlpkg.h"
 using namespace ddlpackage;
@@ -237,8 +235,8 @@ keepGoing:
 		VERBOSE_INFO("Allocating object ID for table");	
 		// Allocate a object ID for each column we are about to create
 		VERBOSE_INFO("Allocating object IDs for columns");
-		u_int32_t numColumns = tableDef.fColumns.size();
-		u_int32_t numDictCols = 0;
+		uint32_t numColumns = tableDef.fColumns.size();
+		uint32_t numDictCols = 0;
 		for (unsigned i=0; i < numColumns; i++)
 		{
 			int dataType;
@@ -271,26 +269,26 @@ cout << "Create table allocOIDs got the stating oid " << fStartingColOID << endl
 		ByteStream bytestream;
 		bytestream << (ByteStream::byte)WE_SVR_WRITE_SYSTABLE;
 		bytestream << uniqueId;
-		bytestream << (u_int32_t) createTableStmt.fSessionID;
-		bytestream << (u_int32_t)txnID.id;
-		bytestream << (u_int32_t)fStartingColOID;
-		bytestream << (u_int32_t)createTableStmt.fTableWithAutoi;
+		bytestream << (uint32_t) createTableStmt.fSessionID;
+		bytestream << (uint32_t)txnID.id;
+		bytestream << (uint32_t)fStartingColOID;
+		bytestream << (uint32_t)createTableStmt.fTableWithAutoi;
 		
 		bytestream << numColumns;
 		for (unsigned i = 0; i <numColumns; ++i) {
-			bytestream << (u_int32_t)(fStartingColOID+i+1);
+			bytestream << (uint32_t)(fStartingColOID+i+1);
 		}	
 		bytestream << numDictCols;
 		for (unsigned i = 0; i <numDictCols; ++i) {
-			bytestream << (u_int32_t)(fStartingColOID+numColumns+i+1);
+			bytestream << (uint32_t)(fStartingColOID+numColumns+i+1);
 		}	
 		
-		u_int8_t alterFlag = 0;
+		uint8_t alterFlag = 0;
 		int colPos = 0;
 		bytestream << (ByteStream::byte)alterFlag;
-		bytestream << (u_int32_t)colPos;
+		bytestream << (uint32_t)colPos;
 		
-		u_int16_t  dbRoot;
+		uint16_t  dbRoot;
 		BRM::OID_t sysOid = 1001;
 		//Find out where systable is
 		rc = fDbrm->getSysCatDBRoot(sysOid, dbRoot); 
@@ -308,14 +306,14 @@ cout << "Create table allocOIDs got the stating oid " << fStartingColOID << endl
 			return result;
 		}
 		int pmNum = 1;
-		bytestream << (u_int32_t)dbRoot; 
+		bytestream << (uint32_t)dbRoot; 
 		tableDef.serialize(bytestream);
 		boost::shared_ptr<messageqcpp::ByteStream> bsIn;
 		boost::shared_ptr<std::map<int, int> > dbRootPMMap = oamcache->getDBRootToPMMap();
 		pmNum = (*dbRootPMMap)[dbRoot];
 		try
 		{			
-			fWEClient->write(bytestream, (uint)pmNum);
+			fWEClient->write(bytestream, (uint32_t)pmNum);
 #ifdef IDB_DDL_DEBUG
 cout << "create table sending We_SVR_WRITE_SYSTABLE to pm " << pmNum << endl;
 #endif	
@@ -394,7 +392,7 @@ cout << "create table got unknown exception" << endl;
 		bytestream.restart();
 		bytestream << (ByteStream::byte)WE_SVR_WRITE_CREATETABLEFILES;
 		bytestream << uniqueId;
-		bytestream << (u_int32_t)txnID.id;
+		bytestream << (uint32_t)txnID.id;
 		bytestream << (numColumns + numDictCols);
 		unsigned colNum = 0;
 		unsigned dictNum = 0;
@@ -429,21 +427,21 @@ cout << "create table got unknown exception" << endl;
 				}	
 			}
 			bytestream << (fStartingColOID + (colNum++) + 1);
-			bytestream << (u_int8_t) dataType;
-			bytestream << (u_int8_t) false;
+			bytestream << (uint8_t) dataType;
+			bytestream << (uint8_t) false;
 
 			bytestream << (uint32_t) colDefPtr->fType->fLength;
-			bytestream << (u_int16_t) useDBRoot;
+			bytestream << (uint16_t) useDBRoot;
 			bytestream << (uint32_t) colDefPtr->fType->fCompressiontype;
 			if ( (dataType == CalpontSystemCatalog::CHAR && colDefPtr->fType->fLength > 8) ||
 				 (dataType == CalpontSystemCatalog::VARCHAR && colDefPtr->fType->fLength > 7) ||
 				 (dataType == CalpontSystemCatalog::VARBINARY && colDefPtr->fType->fLength > 7) )
 			{
 				bytestream << (uint32_t) (fStartingColOID+numColumns+(dictNum++)+1);
-				bytestream << (u_int8_t) dataType;
-				bytestream << (u_int8_t) true;
+				bytestream << (uint8_t) dataType;
+				bytestream << (uint8_t) true;
 				bytestream << (uint32_t) colDefPtr->fType->fLength;
-				bytestream << (u_int16_t) useDBRoot;
+				bytestream << (uint16_t) useDBRoot;
 				bytestream << (uint32_t) colDefPtr->fType->fCompressiontype;
 			}
 			++iter;

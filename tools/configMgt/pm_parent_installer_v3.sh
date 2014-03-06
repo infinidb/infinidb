@@ -67,9 +67,7 @@ expect -re "word: "
 send "$PASSWORD\n"
 expect {
 	-re "#" 						{ send_user "DONE" } abort
-	-re "scp"  						{ send_user "FAILED\n" ; 
-				 			send_user "\n*** Installation Failed\n" ; 
-							exit -1 }
+	-re "scp"  						{ send_user "FAILED: SCP failure\n" ; exit -1 }
 	-re "Permission denied, please try again"         { send_user "FAILED: Invalid password\n" ; exit -1 }
 	-re "No such file or directory" { send_user "FAILED: Invalid package\n" ; exit -1 }
 }
@@ -123,7 +121,7 @@ expect {
 	-re "Permission denied, please try again"   { send_user "FAILED: Invalid password\n" ; exit -1 }
 }
 send_user "\n"
-set timeout 30
+set timeout 120
 expect -re "# "
 send "rm -f $PACKAGE\n"
 #
@@ -138,9 +136,7 @@ if { $CONFIGFILE != "NULL"} {
 	send "$PASSWORD\n"
 	expect {
 		-re "100%" 				  		{ } abort
-		-re "scp"  						{ send_user "FAILED\n" ; 
-								send_user "\n*** Installation Failed\n" ; 
-								exit -1 }
+		-re "scp"  						{ send_user "FAILED: SCP failure\n" ; exit -1 }
 		-re "Permission denied, please try again"         { send_user "FAILED: Invalid password\n" ; exit -1 }
 		-re "No such file or directory" { send_user "FAILED: Invalid package\n" ; exit -1 }
 	}
@@ -150,11 +146,16 @@ if { $CONFIGFILE != "NULL"} {
 	send "$PASSWORD\n"
 	expect {
 		-re "100%" 				  		{ send_user "DONE" } abort
-		-re "scp"  						{ send_user "FAILED\n" ; 
-								send_user "\n*** Installation Failed\n" ; 
-								exit -1 }
+		-re "scp"  						{ send_user "FAILED: SCP failure\n" ; exit -1 }
 		-re "Permission denied, please try again"         { send_user "FAILED: Invalid password\n" ; exit -1 }
 		-re "No such file or directory" { send_user "FAILED: Invalid package\n" ; exit -1 }
+	}
+	send "scp $CONFIGFILE $USERNAME@$SERVER:/tmp/Calpont.xml\n"
+	expect -re "word: "
+	# send the password
+	send "$PASSWORD\n"
+	expect {
+		-re "100%" 				  		{ send_user " " } abort
 	}
 } else {
 	#

@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -535,29 +535,31 @@ namespace oam
         PROCUPDATELOG,
         PROCGETCONFIGLOG,
         CHECKPOWERON,
-		PROCUPDATECONFIG,
+	PROCUPDATECONFIG,
         HEARTBEAT_REGISTER,
         HEARTBEAT_DEREGISTER,
         HEARTBEAT_SEND,
-		PROCBUILDSYSTEMTABLES,
-		LOCALHEARTBEAT,
-		RECONFIGURE,
-		PROCESSRESTART,
-		GETSOFTWAREINFO,
-		UPDATEEXPORTS,
-		UPDATEPARENTNFS,
-		OAMPARENTACTIVE,
-		UPDATECONFIGFILE,
-		GETDBRMDATA,
-		GETPARENTOAMMODULE,
-		OAMPARENTCOLD,
-		UPDATESNMPD,
-		GETALARMDATA,
-		GETACTIVEALARMDATA,
-		RUNUPGRADE,
-		PROCUNMOUNT,
-		PROCMOUNT,
-		PROCFSTABUPDATE
+	PROCBUILDSYSTEMTABLES,
+	LOCALHEARTBEAT,
+	RECONFIGURE,
+	PROCESSRESTART,
+	GETSOFTWAREINFO,
+	UPDATEEXPORTS,
+	UPDATEPARENTNFS,
+	OAMPARENTACTIVE,
+	UPDATECONFIGFILE,
+	GETDBRMDATA,
+	GETPARENTOAMMODULE,
+	OAMPARENTCOLD,
+	UPDATESNMPD,
+	GETALARMDATA,
+	GETACTIVEALARMDATA,
+	RUNUPGRADE,
+	PROCUNMOUNT,
+	PROCMOUNT,
+	PROCFSTABUPDATE,
+	MASTERREP,
+	SLAVEREP
     };
 
 
@@ -2150,131 +2152,131 @@ namespace oam
              *
              * Increment IP Address
              */
-			EXPORT std::string incrementIPAddress(const std::string ipAddress);
+		EXPORT std::string incrementIPAddress(const std::string ipAddress);
 
-			/**
-			*@brief Check for a phrase in a log file and return status
-			*/
-			EXPORT bool checkLogStatus(std::string filename, std::string phase);
+		/**
+		*@brief Check for a phrase in a log file and return status
+		*/
+		EXPORT bool checkLogStatus(std::string filename, std::string phase);
 
-			/**
-			*@brief  Fix RSA key
-			*/
-			EXPORT void fixRSAkey(std::string logFile);
+		/**
+		*@brief  Fix RSA key
+		*/
+		EXPORT void fixRSAkey(std::string logFile);
 
-			/**
-			*@brief Get PM with read-write mount
-			*/
-			EXPORT std::string getWritablePM();
+		/**
+		*@brief Get PM with read-write mount
+		*/
+		EXPORT std::string getWritablePM();
 
-			/**
-			*@brief Get PM with read-write mount
-			*/
-			EXPORT std::string getHotStandbyPM();
+		/**
+		*@brief Get PM with read-write mount
+		*/
+		EXPORT std::string getHotStandbyPM();
 
-			/**
-			*@brief Get PM with read-write mount
-			*/
-			EXPORT void setHotStandbyPM(std::string moduleName);
+		/**
+		*@brief Get PM with read-write mount
+		*/
+		EXPORT void setHotStandbyPM(std::string moduleName);
 
-			/**
-			*@brief Distribute Calpont Configure File
-			*/
-			EXPORT void distributeConfigFile(std::string name = "system", std::string file = "Calpont.xml");
+		/**
+		*@brief Distribute Calpont Configure File
+		*/
+		EXPORT void distributeConfigFile(std::string name = "system", std::string file = "Calpont.xml");
 
-			/**
-			*@brief Switch Parent OAM Module 
-			*  Return true if we need to wait for systme restart 
-			*/
-			EXPORT bool switchParentOAMModule(std::string moduleName, GRACEFUL_FLAG gracefulflag);
+		/**
+		*@brief Switch Parent OAM Module 
+		*  Return true if we need to wait for systme restart 
+		*/
+		EXPORT bool switchParentOAMModule(std::string moduleName, GRACEFUL_FLAG gracefulflag);
 
-			/**
-			*@brief Get Storage Config Data
-			*/
-			EXPORT systemStorageInfo_t getStorageConfig();
+		/**
+		*@brief Get Storage Config Data
+		*/
+		EXPORT systemStorageInfo_t getStorageConfig();
 
-			/**
-			*@brief Get PM - DBRoot Config data
-			*/
-			EXPORT void getPmDbrootConfig(const int pmid, DBRootConfigList& dbrootconfiglist);
+		/**
+		*@brief Get PM - DBRoot Config data
+		*/
+		EXPORT void getPmDbrootConfig(const int pmid, DBRootConfigList& dbrootconfiglist);
 
-			/**
-			*@brief Get DBRoot - PM Config data
-			*/
-			EXPORT void getDbrootPmConfig(const int dbrootid, int& pmid);
+		/**
+		*@brief Get DBRoot - PM Config data
+		*/
+		EXPORT void getDbrootPmConfig(const int dbrootid, int& pmid);
 
-			EXPORT void getDbrootPmConfig(const int dbrootid, std::string& pmid);
+		EXPORT void getDbrootPmConfig(const int dbrootid, std::string& pmid);
 
-			/**
-			*@brief Get System DBRoot Config data
-			*/
-			EXPORT void getSystemDbrootConfig(DBRootConfigList& dbrootconfiglist);
+		/**
+		*@brief Get System DBRoot Config data
+		*/
+		EXPORT void getSystemDbrootConfig(DBRootConfigList& dbrootconfiglist);
 
-			/**
-			*@brief Set PM - DBRoot Config data
-			*/
-			EXPORT void setPmDbrootConfig(const int pmid, DBRootConfigList& dbrootconfiglist);
+		/**
+		*@brief Set PM - DBRoot Config data
+		*/
+		EXPORT void setPmDbrootConfig(const int pmid, DBRootConfigList& dbrootconfiglist);
 
-			/**
-			*@brief Manual Move PM - DBRoot data
-			*/
-			EXPORT void manualMovePmDbroot(std::string residePM, std::string dbrootIDs, std::string toPM);
+		/**
+		*@brief Manual Move PM - DBRoot data
+		*/
+		EXPORT void manualMovePmDbroot(std::string residePM, std::string dbrootIDs, std::string toPM);
 
-			/**
-			*@brief Auto Move PM - DBRoot data
-			*/
-			EXPORT bool autoMovePmDbroot(std::string residePM);
+		/**
+		*@brief Auto Move PM - DBRoot data
+		*/
+		EXPORT bool autoMovePmDbroot(std::string residePM);
 
-			/**
-			*@brief Auto Un-Move PM - DBRoot data
-			*/
-			EXPORT bool autoUnMovePmDbroot(std::string toPM);
+		/**
+		*@brief Auto Un-Move PM - DBRoot data
+		*/
+		EXPORT bool autoUnMovePmDbroot(std::string toPM);
 
-			/**
-			*@brief add DBRoot
-			*/
-			EXPORT void addDbroot(const int dbrootNumber, DBRootConfigList& dbrootlist);
+		/**
+		*@brief add DBRoot
+		*/
+		EXPORT void addDbroot(const int dbrootNumber, DBRootConfigList& dbrootlist);
 
-			/**
-			*@brief distribute Fstab Updates
-			*/
-			EXPORT void distributeFstabUpdates(std::string entry, std::string toPM = "system" );
+		/**
+		*@brief distribute Fstab Updates
+		*/
+		EXPORT void distributeFstabUpdates(std::string entry, std::string toPM = "system" );
 
-			/**
-			*@brief assign DBRoot
-			*/
-			EXPORT void assignDbroot(std::string toPM, DBRootConfigList& dbrootlist);
+		/**
+		*@brief assign DBRoot
+		*/
+		EXPORT void assignDbroot(std::string toPM, DBRootConfigList& dbrootlist);
 
-			/**
-			*@brief unassign DBRoot
-			*/
-			EXPORT void unassignDbroot(std::string residePM, DBRootConfigList& dbrootlist);
+		/**
+		*@brief unassign DBRoot
+		*/
+		EXPORT void unassignDbroot(std::string residePM, DBRootConfigList& dbrootlist);
 
-			/**
-			*@brief get unassigned DBRoot list
-			*/
-			EXPORT void getUnassignedDbroot(DBRootConfigList& dbrootlist);
+		/**
+		*@brief get unassigned DBRoot list
+		*/
+		EXPORT void getUnassignedDbroot(DBRootConfigList& dbrootlist);
 
-			/**
-			*@brief remove DBRoot
-			*/
-			EXPORT void removeDbroot(DBRootConfigList& dbrootlist);
+		/**
+		*@brief remove DBRoot
+		*/
+		EXPORT void removeDbroot(DBRootConfigList& dbrootlist);
 
-			/**
-			*@brief get AWS Device Name for DBRoot ID
-			*/
-			EXPORT std::string getAWSdeviceName( const int dbrootid);
+		/**
+		*@brief get AWS Device Name for DBRoot ID
+		*/
+		EXPORT std::string getAWSdeviceName( const int dbrootid);
 
-			/**
-			*@brief set System DBRoot Count
-			*/
-			EXPORT void setSystemDBrootCount();
+		/**
+		*@brief set System DBRoot Count
+		*/
+		EXPORT void setSystemDBrootCount();
 
-			/**
-			*@brief set FilesPerColumnPartition based on value of old
-			* FilePerColumnPartition and old DbRootCount that is given
-			*/
-			EXPORT void setFilesPerColumnPartition( int oldDbRootCount );
+		/**
+		*@brief set FilesPerColumnPartition based on value of old
+		* FilePerColumnPartition and old DbRootCount that is given
+		*/
+		EXPORT void setFilesPerColumnPartition( int oldDbRootCount );
 
             /** @brief send Device Notification Msg
              */
@@ -2352,15 +2354,15 @@ namespace oam
              */
             EXPORT bool createEC2tag(std::string resourceName, std::string tagName, std::string tagValue);
 
-			/**
-			*@brief  take action on Syslog process
-			*/
-			EXPORT void syslogAction( std::string action);
+		/**
+		*@brief  take action on Syslog process
+		*/
+		EXPORT void syslogAction( std::string action);
 
-			/**
-			*@brief  call dbrm control
-			*/
-			EXPORT void dbrmctl(std::string command);
+		/**
+		*@brief  call dbrm control
+		*/
+		EXPORT void dbrmctl(std::string command);
 
             /** @brief Wait for system to close transactions
              *  
@@ -2374,10 +2376,10 @@ namespace oam
     		void amazonReattach(std::string toPM, dbrootList dbrootConfigList, bool attach = false);
             void mountDBRoot(dbrootList dbrootConfigList, bool mount = true);
 
-			/**
-			*@brief  gluster control
-			*/
-			EXPORT int glusterctl(GLUSTER_COMMANDS command, std::string argument1, std::string& argument2, std::string& errmsg);
+		/**
+		*@brief  gluster control
+		*/
+		EXPORT int glusterctl(GLUSTER_COMMANDS command, std::string argument1, std::string& argument2, std::string& errmsg);
 
         private:
 
@@ -2385,7 +2387,8 @@ namespace oam
              */
             int checkGlusterLog(std::string logFile, std::string& errmsg);
 
-		    int sendMsgToProcMgr3(messageqcpp::ByteStream::byte requestType, snmpmanager::AlarmList& alarmlist, const std::string date);
+
+	    int sendMsgToProcMgr3(messageqcpp::ByteStream::byte requestType, snmpmanager::AlarmList& alarmlist, const std::string date);
 
             /** @brief build and send request message to Process Manager
              */

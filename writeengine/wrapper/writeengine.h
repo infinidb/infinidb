@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -45,13 +45,11 @@
 #include "we_dbrootextenttracker.h"
 #include "we_rbmetawriter.h"
 #include "brmtypes.h"
-#define WRITEENGINECHUNKMGR_DLLEXPORT
 #include "we_chunkmanager.h"
-#undef WRITEENGINECHUNKMGR_DLLEXPORT
 
 #define IO_BUFF_SIZE 81920
 
-#if defined(_MSC_VER) && defined(WRITEENGINEWRAPPER_DLLEXPORT)
+#if defined(_MSC_VER) && defined(WRITEENGINE_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
@@ -213,6 +211,16 @@ public:
     */
    EXPORT int deleteRow(const TxnID& txnid, std::vector<ColStructList>& colExtentsStruct,
                          std::vector<void *>& colOldValueList, std::vector<RIDList>& ridLists, const int32_t tableOid);
+                         
+   /**
+    * @brief Delete a list of rows from a table
+    * @param colStructList column struct list
+    * @param rowIdList row id list
+    */
+    
+   EXPORT int deleteBadRows(const TxnID& txnid, ColStructList& colStructs,
+                         RIDList& ridList, DctnryStructList& dctnryStructList);
+
 
    /**
     * @brief delete a dictionary signature and its token
@@ -324,21 +332,21 @@ public:
 							   const int32_t tableOid);
    /**
     * @brief Open dictionary
-    * @param dctnryOid dictionary signature file object id
-    * @param treeOid dictionary tree file object id
-    * @param listOid index list file object id
+    * @param txnid relevant transaction
+    * @param dctnryStruct dictionary column to open
+    * @param useTmpSuffix Bulk HDFS usage: use *.tmp file suffix
     */
-   int openDctnry(const TxnID& txnid, DctnryStruct dctnryStruct)
+   // @bug 5572 - HDFS usage: add *.tmp file backup flag
+   int openDctnry(const TxnID& txnid, DctnryStruct dctnryStruct, bool useTmpSuffix)
    {
       int compress_op = op(dctnryStruct.fCompressionType);
       m_dctnry[compress_op]->setTransId(txnid);
       return m_dctnry[compress_op]->openDctnry(
                                 dctnryStruct.dctnryOid,
-//                                dctnryStruct.treeOid,
-//                                dctnryStruct.listOid,
                                 dctnryStruct.fColDbRoot,
                                 dctnryStruct.fColPartition,
-                                dctnryStruct.fColSegment);
+                                dctnryStruct.fColSegment,
+                                useTmpSuffix);
    }
 
    /**
@@ -421,6 +429,19 @@ public:
            m_dctnry[i]->setBulkFlag(isBulk);
        }
    }
+   
+   	/**
+   * @brief Set the fIsFix  into all fileops
+   */
+   void setFixFlag(bool isFix = false)
+   { 
+       for (int i = 0; i < TOTAL_COMPRESS_OP; i++) 
+       {
+           m_colOp[i]->setFixFlag(isFix);
+           m_dctnry[i]->setFixFlag(isFix);
+       }
+   }
+   
 	/**
    * @brief let chunkmanager start transaction. 
    * 
@@ -463,9 +484,11 @@ public:
     * @brief Tokenize a dictionary signature into a token
     * @param dctnryStruct dictionary structure
     * @param dctnryTuple dictionary tuple
+    * @param useTmpSuffix Bulk HDFS usage: use *.tmp file suffix
     */
    EXPORT int tokenize(const TxnID& txnid, DctnryTuple&, int compType ); // Files need open first
-   EXPORT int tokenize(const TxnID& txnid, DctnryStruct& dctnryStruct, DctnryTuple& dctnryTuple);
+   EXPORT int tokenize(const TxnID& txnid, DctnryStruct& dctnryStruct, DctnryTuple& dctnryTuple,
+                       bool useTmpSuffix);
 
    /**
     * @brief Update values into a column (New one)
@@ -619,10 +642,12 @@ private:
     * @brief Common methods to write values to a column
     */
     int writeColumnRec(const TxnID& txnid, const ColStructList& colStructList,
-                       const ColValueList& colValueList,
+                       ColValueList& colValueList,
                        RID* rowIdArray, const ColStructList& newColStructList,
-                       const ColValueList& newColValueList, const int32_t tableOid,
-					   bool versioning = true);
+                       ColValueList& newColValueList, const int32_t tableOid,
+					   bool useTmpSuffix, bool versioning = true);
+
+
 
     //@Bug 1886,2870 pass the address of ridList vector
     int writeColumnRec(const TxnID& txnid, const ColStructList& colStructList,

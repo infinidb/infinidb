@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -86,7 +86,7 @@ namespace BRM {
 
 /* these types should be defined in the system catalog header */
 typedef int64_t LBID_t; /// The LBID space is currently 36 bits.  We use 64 here.
-typedef u_int32_t HWM_t;
+typedef uint32_t HWM_t;
 typedef int32_t VER_t;
 /// Object ID type.  Currently a 32-bit number.  24 for Object number, 8 for partition number.
 typedef execplan::CalpontSystemCatalog::OID OID_t;  
@@ -110,7 +110,7 @@ struct InlineLBIDRange {
 #define MAX_PROCNAME 16
 
 		/** @brief SID = Session ID */
-		typedef u_int32_t SID;
+		typedef uint32_t SID;
 		/** @brief A type describing a single transaction ID */
 		struct _TxnID {
 			/// The TransactionID number
@@ -233,7 +233,7 @@ class LBIDRange : public messageqcpp::Serializeable {
 
 	public:
 		LBID_t start;
-		u_int32_t size;
+		uint32_t size;
 
 		EXPORT LBIDRange();
 		EXPORT LBIDRange(const LBIDRange& l);
@@ -295,8 +295,8 @@ class VBRange : public messageqcpp::Serializeable {
 
 	public:
 		OID_t vbOID;
-		u_int32_t vbFBO;
-		u_int32_t size;
+		uint32_t vbFBO;
+		uint32_t size;
 
 		EXPORT VBRange();
 		EXPORT VBRange(const VBRange& v);

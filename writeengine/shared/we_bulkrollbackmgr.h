@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -33,6 +33,7 @@
 #include <windows.h>
 #include <boost/thread/mutex.hpp>
 #endif
+#include <set>
 #include <string>
 #include <sstream>
 #include <vector>
@@ -41,7 +42,7 @@
 #include "messagelog.h"
 #include "messageobj.h"
 
-#if defined(_MSC_VER) && defined(WRITEENGINEBULKROLLMGR_DLLEXPORT)
+#if defined(_MSC_VER) && defined(WRITEENGINE_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
@@ -78,7 +79,7 @@ public:
      *        Currently used for logging only.
      */
     EXPORT BulkRollbackMgr(OID tableOID,
-                           u_int64_t lockID,
+                           uint64_t lockID,
                            const std::string& tableName,
                            const std::string& applName,
                            Log* logger=0);
@@ -132,11 +133,13 @@ public:
     /*
      * @brief Get list of segment file numbers found in dirName directory
      * @param dirName Directory path to be searched
+     * @param bIncludeAlternateSegFileNames Include *.orig and *.tmp in search
      * @param segList List of segment files found in dirName
      * @param errMsg Error msg if return code is not NO_ERROR
      */
     EXPORT static int getSegFileList( const std::string& dirName,
-                                std::vector<u_int32_t>& segList,
+                                bool bIncludeAlternateSegFileNames,
+                                std::vector<uint32_t>& segList,
                                 std::string& errMsg );
 
 private:
@@ -148,18 +151,18 @@ private:
     // segment files in the last partition.
     struct RollbackData
     {
-        u_int32_t    fDbRoot;
-        u_int32_t    fPartNum;
-        u_int32_t    fSegNum;
+        uint32_t    fDbRoot;
+        uint32_t    fPartNum;
+        uint32_t    fSegNum;
         HWM          fHwm;
         bool         fWithHwm;
     };
 
     void createFileDeletionEntry( OID     columnOID,
                                 bool      fileTypeFlag,
-                                u_int32_t dbRoot,
-                                u_int32_t partNum,
-                                u_int32_t segNum,
+                                uint32_t dbRoot,
+                                uint32_t partNum,
+                                uint32_t segNum,
                                 const std::string& segFileName );
     void deleteColumn1Extents ( const char* inBuf ); // delete col extents
     void deleteColumn1ExtentsV3(const char* inBuf );
@@ -181,15 +184,15 @@ private:
     void deleteMetaDataFiles  ( ); // delete metafiles
     int  metaDataFileExists   ( bool& exists ); // does meta-data file exists
     BulkRollbackFile* makeFileRestorer(int compressionType);
-    bool openMetaDataFile     ( u_int16_t dbRoot,    //  open a metadata file
+    bool openMetaDataFile     ( uint16_t dbRoot,    //  open a metadata file
                                 std::istringstream& metaDataStream );
-    void validateAllMetaFilesExist(const std::vector<u_int16_t>& dbRoots) const;
+    void validateAllMetaFilesExist(const std::vector<uint16_t>& dbRoots) const;
 
     // Data members
     OID           fTableOID;    // table to be rolled back
-    u_int64_t     fLockID;      // unique lock ID associated with table lock
+    uint64_t     fLockID;      // unique lock ID associated with table lock
     std::string   fTableName;   // name of table associated with fTableOID
-    u_int32_t     fProcessId;   // pid associated with current table lock
+    uint32_t     fProcessId;   // pid associated with current table lock
     std::string   fProcessName; // processName associated with fProcessId
     IDBDataFile*  fMetaFile;    // current meta data file we are reading
     std::string   fMetaFileName;// name of current meta data file
@@ -200,11 +203,12 @@ private:
     // Dictionary store extents for an OID are read in and managed as a
     // group.  The following data members are used to collect this info.
     OID           fPendingDctnryStoreOID;// Dctnry OID of pending dctnry extents
-    u_int32_t     fPendingDctnryStoreDbRoot; // DbRoot of pending dctnry extents
+    uint32_t     fPendingDctnryStoreDbRoot; // DbRoot of pending dctnry extents
     int           fPendingDctnryStoreCompressionType; // Dctnry compression type
     std::vector<RollbackData> fPendingDctnryExtents;
+    std::set<OID> fAllColDctOIDs;   // List of all affected col and dctnry OIDS
 
-	// List of DB Files to be deleted.  Files are deleted in reverse order.
+    // List of DB Files to be deleted.  Files are deleted in reverse order.
     std::vector<File>         fPendingFilesToDelete;
 
     logging::MessageLog fSysLogger; // Used for syslogging

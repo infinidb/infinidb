@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -48,9 +48,7 @@ using namespace rowgroup;
 #include "dataconvert.h"
 using namespace dataconvert;
 
-#define GROUPCONCAT_DLLEXPORT
 #include "groupconcat.h"
-#undef GROUPCONCAT_DLLEXPORT
 
 #include "idborderby.h"
 using namespace ordering;
@@ -147,7 +145,7 @@ void GroupConcatInfo::prepGroupConcat(JobInfo& jobInfo)
 }
 
 
-uint GroupConcatInfo::getColumnKey(const SRCP& srcp, JobInfo& jobInfo)
+uint32_t GroupConcatInfo::getColumnKey(const SRCP& srcp, JobInfo& jobInfo)
 {
 	int colKey = -1;
 	const SimpleColumn* sc = dynamic_cast<const SimpleColumn*>(srcp.get());
@@ -190,25 +188,25 @@ uint GroupConcatInfo::getColumnKey(const SRCP& srcp, JobInfo& jobInfo)
 
 void GroupConcatInfo::mapColumns(const RowGroup& projRG)
 {
-	map<uint, uint> projColumnMap;
-	const vector<uint>& keysProj = projRG.getKeys();
+	map<uint32_t, uint32_t> projColumnMap;
+	const vector<uint32_t>& keysProj = projRG.getKeys();
 	for (uint64_t i = 0; i < projRG.getColumnCount(); i++)
 		projColumnMap[keysProj[i]] = i;
 
 	for (vector<SP_GroupConcat>::iterator k = fGroupConcat.begin(); k!= fGroupConcat.end(); k++)
 	{
-		vector<uint> pos;
-		vector<uint> oids;
-		vector<uint> keys;
-		vector<uint> scale;
-		vector<uint> precision;
+		vector<uint32_t> pos;
+		vector<uint32_t> oids;
+		vector<uint32_t> keys;
+		vector<uint32_t> scale;
+		vector<uint32_t> precision;
 		vector<CalpontSystemCatalog::ColDataType> types;
 		pos.push_back(2);
 
-		vector<pair<uint, uint> >::iterator i1 = (*k)->fGroupCols.begin();
+		vector<pair<uint32_t, uint32_t> >::iterator i1 = (*k)->fGroupCols.begin();
 		while (i1 != (*k)->fGroupCols.end())
 		{
-			map<uint, uint>::iterator j = projColumnMap.find(i1->first);
+			map<uint32_t, uint32_t>::iterator j = projColumnMap.find(i1->first);
 			if(j == projColumnMap.end())
 			{
 				cerr << "Concat Key:" << i1->first << " is not projected." << endl;
@@ -225,17 +223,17 @@ void GroupConcatInfo::mapColumns(const RowGroup& projRG)
 			i1++;
 		}
 
-		vector<pair<uint, bool> >::iterator i2 = (*k)->fOrderCols.begin();
+		vector<pair<uint32_t, bool> >::iterator i2 = (*k)->fOrderCols.begin();
 		while (i2 != (*k)->fOrderCols.end())
 		{
-			map<uint, uint>::iterator j = projColumnMap.find(i2->first);
+			map<uint32_t, uint32_t>::iterator j = projColumnMap.find(i2->first);
 			if(j == projColumnMap.end())
 			{
 				cerr << "Order Key:" << i2->first << " is not projected." << endl;
 				throw runtime_error("Project error.");
 			}
 
-			vector<uint>::iterator i3 = find(keys.begin(), keys.end(), j->first);
+			vector<uint32_t>::iterator i3 = find(keys.begin(), keys.end(), j->first);
 			int idx = 0;
 			if (i3 == keys.end())
 			{
@@ -398,7 +396,7 @@ void GroupConcator::outputRow(std::ostringstream& oss, const rowgroup::Row& row)
 {
 	const CalpontSystemCatalog::ColDataType* types = row.getColTypes();
 	vector<uint32_t>::iterator i = fConcatColumns.begin();
-	vector<pair<string, uint> >::iterator j = fConstCols.begin();
+	vector<pair<string, uint32_t> >::iterator j = fConstCols.begin();
 
 	uint64_t groupColCount = fConcatColumns.size() + fConstCols.size();
 
@@ -616,7 +614,7 @@ const string GroupConcator::toString() const
 	oss << "GroupConcat size-" << fGroupConcatLen;
 	oss << "Concat   cols: ";
 	vector<uint32_t>::const_iterator i = fConcatColumns.begin();
-	vector<pair<string, uint> >::const_iterator j = fConstCols.begin();
+	vector<pair<string, uint32_t> >::const_iterator j = fConstCols.begin();
 	uint64_t groupColCount = fConcatColumns.size() + fConstCols.size();
 	for (uint64_t k = 0; k < groupColCount; k++)
 	{
@@ -662,7 +660,7 @@ void GroupConcatOrderBy::initialize(const rowgroup::SP_GroupConcat& gcc)
 	fErrorCode = ERR_AGGREGATION_TOO_BIG;
 	fRm = gcc->fRm;
 
-	vector<std::pair<uint, uint> >::iterator i = gcc->fGroupCols.begin();
+	vector<std::pair<uint32_t, uint32_t> >::iterator i = gcc->fGroupCols.begin();
 	while (i != gcc->fGroupCols.end())
 		fConcatColumns.push_back((*(i++)).second);
 
@@ -906,7 +904,7 @@ void GroupConcatNoOrder::initialize(const rowgroup::SP_GroupConcat& gcc)
 	fErrorCode = ERR_AGGREGATION_TOO_BIG;
 	fRm = gcc->fRm;
 
-	vector<std::pair<uint, uint> >::iterator i = gcc->fGroupCols.begin();
+	vector<std::pair<uint32_t, uint32_t> >::iterator i = gcc->fGroupCols.begin();
 	while (i != gcc->fGroupCols.end())
 		fConcatColumns.push_back((*(i++)).second);
 

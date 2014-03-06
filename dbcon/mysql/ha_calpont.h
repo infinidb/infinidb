@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -44,7 +44,7 @@
 */
 typedef struct st_calpont_share {
   char *table_name;
-  uint table_name_length,use_count;
+  uint32_t table_name_length,use_count;
   pthread_mutex_t mutex;
   THR_LOCK lock;
 } INFINIDB_SHARE;
@@ -72,7 +72,7 @@ public:
     The name of the index type that will be used for display.
     Don't implement this method unless you really have indexes.
    */
-  //const char *index_type(uint inx) { return "HASH"; }
+  //const char *index_type(uint32_t inx) { return "HASH"; }
 
   /** @brief
     The file extensions.
@@ -103,19 +103,19 @@ public:
     If all_parts is set, MySQL wants to know the flags for the combined
     index, up to and including 'part'.
   */
-  ulong index_flags(uint inx, uint part, bool all_parts) const
+  ulong index_flags(uint32_t inx, uint32_t part, bool all_parts) const
   {
     return 0;
   }
 
   /** @brief
     unireg.cc will call max_supported_record_length(), max_supported_keys(),
-    max_supported_key_parts(), uint max_supported_key_length()
+    max_supported_key_parts(), uint32_t max_supported_key_length()
     to make sure that the storage engine can handle the data it is about to
     send. Return *real* limits of your storage engine here; MySQL will do
     min(your_limits, MySQL_limits) automatically.
    */
-  uint max_supported_record_length() const { return HA_MAX_REC_LENGTH; }
+  uint32_t max_supported_record_length() const { return HA_MAX_REC_LENGTH; }
 
   /** @brief
     unireg.cc will call this to make sure that the storage engine can handle
@@ -126,7 +126,7 @@ public:
     There is no need to implement ..._key_... methods if your engine doesn't
     support indexes.
    */
-  uint max_supported_keys()          const { return 1; }
+  uint32_t max_supported_keys()          const { return 1; }
 
   /** @brief
     unireg.cc will call this to make sure that the storage engine can handle
@@ -137,7 +137,7 @@ public:
     There is no need to implement ..._key_... methods if your engine doesn't
     support indexes.
    */
-  uint max_supported_key_parts()     const { return 1; }
+  uint32_t max_supported_key_parts()     const { return 1; }
 
   /** @brief
     unireg.cc will call this to make sure that the storage engine can handle
@@ -148,7 +148,7 @@ public:
     There is no need to implement ..._key_... methods if your engine doesn't
     support indexes.
    */
-  uint max_supported_key_length()    const { return 8; }
+  uint32_t max_supported_key_length()    const { return 8; }
 
   /** @brief
     Called in test_quick_select to determine if indexes should be used.
@@ -169,7 +169,7 @@ public:
   /** @brief
     We implement this in ha_example.cc; it's a required method.
   */
-  int open(const char *name, int mode, uint test_if_locked);    // required
+  int open(const char *name, int mode, uint32_t test_if_locked);    // required
 
   /** @brief
     We implement this in ha_example.cc; it's a required method.
@@ -253,11 +253,11 @@ public:
   int rnd_next(uchar *buf);                                     ///< required
   int rnd_pos(uchar *buf, uchar *pos);                          ///< required
   void position(const uchar *record);                           ///< required
-  int info(uint);                                               ///< required
+  int info(uint32_t);                                               ///< required
   int extra(enum ha_extra_function operation);
   int external_lock(THD *thd, int lock_type);                   ///< required
   int delete_all_rows(void);
-  ha_rows records_in_range(uint inx, key_range *min_key,
+  ha_rows records_in_range(uint32_t inx, key_range *min_key,
                            key_range *max_key);
   int delete_table(const char *from);
   int rename_table(const char * from, const char * to);

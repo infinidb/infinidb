@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -413,9 +413,9 @@ void MasterDBRMNode::msgProcessor()
 		}
 
 retrycmd:
-		uint haltloops = 0;
+		uint32_t haltloops = 0;
 
-		while (halting && ++haltloops < static_cast<uint>(FIVE_MIN_TIMEOUT.tv_sec))
+		while (halting && ++haltloops < static_cast<uint32_t>(FIVE_MIN_TIMEOUT.tv_sec))
 			sleep(1);
 
 		slaveLock.lock();
@@ -514,7 +514,7 @@ retrycmd:
 
 		/* Need to atomically do the safety check and the clear. */
 		if (cmd == BRM_CLEAR) {
-			uint txnCount = sm.getTxnCount();
+			uint32_t txnCount = sm.getTxnCount();
 			// do nothing if there's an active transaction
             if (txnCount != 0) {
 				ByteStream *reply = new ByteStream();
@@ -629,7 +629,7 @@ out:
 
 void MasterDBRMNode::distribute(ByteStream *msg)
 {
-	uint i;
+	uint32_t i;
 
 	for (i = 0, iSlave = slaves.begin(); iSlave != slaves.end() && !halting; iSlave++, i++)
 		try {
@@ -667,8 +667,8 @@ int MasterDBRMNode::gatherResponses(uint8_t cmd,
 		try {
 			// can't just block for 5 mins
 			timespec newtimeout = {10, 0};
-			uint ntRetries = FIVE_MIN_TIMEOUT.tv_sec/newtimeout.tv_sec;
-			uint retries = 0;
+			uint32_t ntRetries = FIVE_MIN_TIMEOUT.tv_sec/newtimeout.tv_sec;
+			uint32_t retries = 0;
 
 			while (++retries < ntRetries && tmp->length() == 0 && !halting)
 				*tmp = (*iSlave)->read(&newtimeout);
@@ -896,7 +896,7 @@ void MasterDBRMNode::finalCleanup()
 	if (activeSessions.size() > 0)
 		cerr << "There are still live sessions\n";
 #endif
-	for (uint i = 0; i < activeSessions.size(); ++i) {
+	for (uint32_t i = 0; i < activeSessions.size(); ++i) {
 		activeSessions[i]->close();
 		delete activeSessions[i];
 	}
@@ -1711,7 +1711,7 @@ void MasterDBRMNode::doChangeTableLockOwner(ByteStream &msg, ThreadParams *p)
 	uint8_t cmd;
 	uint64_t id;
 	string name;
-	uint pid;
+	uint32_t pid;
 	ByteStream reply;
 	ByteStream workerNodeCmd;
 	uint32_t tmp32;
@@ -1764,7 +1764,7 @@ void MasterDBRMNode::doChangeTableLockOwner(ByteStream &msg, ThreadParams *p)
 		}
 
 		exists = false;
-		for (uint i = 0; i < responses.size(); i++) {
+		for (uint32_t i = 0; i < responses.size(); i++) {
 			/* Parse msg from worker node */
 			uint8_t ret;
 			idbassert(responses[i]->length() == 1);
@@ -1917,7 +1917,7 @@ void MasterDBRMNode::doOwnerCheck(ByteStream &msg, ThreadParams *p)
 		}
 
 		exists = false;
-		for (uint i = 0; i < responses.size(); i++) {
+		for (uint32_t i = 0; i < responses.size(); i++) {
 			/* Parse msg from worker node */
 			uint8_t ret;
 			idbassert(responses[i]->length() == 1);

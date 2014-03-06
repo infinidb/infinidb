@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -39,9 +39,7 @@
 #include <boost/scoped_array.hpp>
 using namespace std;
 
-#define WRITEENGINEFILEOP_DLLEXPORT
 #include "we_fileop.h"
-#undef WRITEENGINEFILEOP_DLLEXPORT
 #include "we_convertor.h"
 #include "we_log.h"
 #include "we_config.h"
@@ -251,9 +249,9 @@ int FileOp::createFile(FID fid,
 //timer.start( "allocateColExtent" );
 
     BRM::LBID_t startLbid;
-    u_int32_t startBlock;
+    uint32_t startBlock;
     RETURN_ON_ERROR( BRMWrapper::getInstance()->allocateColExtentExactFile(
-        (const OID)fid, (u_int32_t)width, dbRootx, partitionx, segment, colDataType,
+        (const OID)fid, (uint32_t)width, dbRootx, partitionx, segment, colDataType,
         startLbid, allocSize, startBlock) );
 
     // We allocate a full extent from BRM, but only write an abbreviated 256K
@@ -404,7 +402,7 @@ int FileOp::deletePartitions( const std::vector<OID>& fids,
     char rootOidDirName[FILE_NAME_SIZE];
     char partitionDirName[FILE_NAME_SIZE];
 
-    for (uint i = 0; i < partitions.size(); i++)
+    for (uint32_t i = 0; i < partitions.size(); i++)
     {
         RETURN_ON_ERROR((Convertor::oid2FileName(
             partitions[i].oid, tempFileName, dbDir,
@@ -456,8 +454,8 @@ int FileOp::deletePartitions( const std::vector<OID>& fids,
  * RETURN:
  *    NO_ERROR if success
  ***********************************************************/
-int FileOp::deleteFile( FID fid, u_int16_t dbRoot,
-    u_int32_t partition, u_int16_t segment ) const
+int FileOp::deleteFile( FID fid, uint16_t dbRoot,
+    uint32_t partition, uint16_t segment ) const
 {
     char fileName[FILE_NAME_SIZE];
 
@@ -491,8 +489,8 @@ bool FileOp::exists( const char* fileName ) const
  * RETURN:
  *    true if exists, false otherwise
  ***********************************************************/
-bool FileOp::exists( FID fid, u_int16_t dbRoot,
-    u_int32_t partition, u_int16_t segment ) const
+bool FileOp::exists( FID fid, uint16_t dbRoot,
+    uint32_t partition, uint16_t segment ) const
 {
     char fileName[FILE_NAME_SIZE];
 
@@ -1236,7 +1234,9 @@ int FileOp::fillCompColumnExtentEmptyChunks(OID oid,
     failedTask.clear();
 
     // Open the file and read the headers with the compression chunk pointers
-    IDBDataFile* pFile = openFile( oid, dbRoot, partition, segment, segFile );
+    // @bug 5572 - HDFS usage: incorporate *.tmp file backup flag
+    IDBDataFile* pFile = openFile( oid, dbRoot, partition, segment, segFile,
+        "r+b", DEFAULT_COLSIZ, true );
     if (!pFile)
     {
         failedTask = "Opening file";
@@ -1778,7 +1778,7 @@ void FileOp::initDbRootExtentMutexes( )
     boost::mutex::scoped_lock lk(m_createDbRootMutexes);
     if ( m_DbRootAddExtentMutexes.size() == 0 )
     {
-        std::vector<u_int16_t> rootIds;
+        std::vector<uint16_t> rootIds;
         Config::getRootIdList( rootIds );
 
         for (size_t i=0; i<rootIds.size(); i++)
@@ -2004,8 +2004,8 @@ int FileOp::getFileSize( IDBDataFile* pFile, long long& fileSize ) const
  * RETURN:
  *    NO_ERROR if okay, else an error return code.
  ***********************************************************/
-int FileOp::getFileSize( FID fid, u_int16_t dbRoot,
-    u_int32_t partition, u_int16_t segment,
+int FileOp::getFileSize( FID fid, uint16_t dbRoot,
+    uint32_t partition, uint16_t segment,
     long long& fileSize ) const
 {
     fileSize = 0;
@@ -2275,18 +2275,27 @@ int FileOp::getDirName( FID fid, uint16_t dbRoot,
  * RETURN:
  *    true if exists, false otherwise
  ***********************************************************/
+// @bug 5572 - HDFS usage: add *.tmp file backup flag
 IDBDataFile* FileOp::openFile( const char* fileName,
     const char* mode,
-    const int ioColSize ) const
+    const int ioColSize,
+    bool useTmpSuffix ) const
 {
     IDBDataFile* pFile;
     errno = 0;
 
+    unsigned opts;
+    if (ioColSize > 0)
+        opts = IDBDataFile::USE_VBUF;
+    else
+        opts = IDBDataFile::USE_NOVBUF;
+    if ((useTmpSuffix) && idbdatafile::IDBPolicy::useHdfs())
+        opts |= IDBDataFile::USE_TMPFILE;
     pFile = IDBDataFile::open(
     						IDBPolicy::getType( fileName, IDBPolicy::WRITEENG ),
     						fileName,
     						mode,
-    						(ioColSize > 0) ? IDBDataFile::USE_VBUF : IDBDataFile::USE_NOVBUF,
+    						opts,
                             ioColSize );
     if (pFile == NULL)
     {
@@ -2310,12 +2319,14 @@ IDBDataFile* FileOp::openFile( const char* fileName,
     return pFile;
 }
 
+// @bug 5572 - HDFS usage: add *.tmp file backup flag
  IDBDataFile* FileOp::openFile( FID fid,
     uint16_t dbRoot,
     uint32_t partition,
     uint16_t segment,
     std::string&   segFile,
-    const char* mode, int ioColSize ) const
+    const char* mode, int ioColSize,
+    bool useTmpSuffix ) const
 {
     char fileName[FILE_NAME_SIZE];
     int  rc;
@@ -2328,7 +2339,7 @@ IDBDataFile* FileOp::openFile( const char* fileName,
     if (fid < 1000)
         ioColSize = 0;
 
-    IDBDataFile* pF = openFile( fileName, mode, ioColSize );
+    IDBDataFile* pF = openFile( fileName, mode, ioColSize, useTmpSuffix );
 
     segFile = fileName;
 
@@ -2441,9 +2452,9 @@ int FileOp::setFileOffsetBlock( IDBDataFile* pFile, uint64_t lbid, int origin) c
     int fbo = 0;
 
     // only when fboFlag is false, we get in here
-    u_int16_t  dbRoot;
-    u_int32_t  partition;
-    u_int16_t  segment;
+    uint16_t  dbRoot;
+    uint32_t  partition;
+    uint16_t  segment;
     RETURN_ON_ERROR( BRMWrapper::getInstance()->getFboOffset(
         lbid, dbRoot, partition, segment, fbo ) );
     fboOffset = ((long long)fbo) * (long)BYTE_PER_BLOCK;
@@ -2620,5 +2631,9 @@ int FileOp::updateDctnryExtent(IDBDataFile* pFile, int nBlocks)
     return NO_ERROR;
 }
 
+void FileOp::setFixFlag(bool isFix)
+{
+    m_isFix = isFix;
+}
 } //end of namespace
 

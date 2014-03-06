@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -105,7 +105,7 @@ const uint8_t CHUNK_MAGIC1 = 0xff;
 const int SIG_OFFSET = 0;
 const int CHECKSUM_OFFSET = 1;
 const int LEN_OFFSET = 5;
-const uint HEADER_SIZE = 9;
+const uint32_t HEADER_SIZE = 9;
 
 const int ERR_OK = 0;
 const int ERR_CHECKSUM = -1;

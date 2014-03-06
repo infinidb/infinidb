@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -35,6 +35,7 @@
 #include <boost/scoped_array.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/scoped_ptr.hpp>
+#include <boost/uuid/uuid.hpp>
 
 #include "primitivemsg.h"
 #include "serializeable.h"
@@ -46,7 +47,7 @@
 
 namespace joblist
 {
-const uint LOGICAL_BLOCKS_CONVERTER = 23;  		// 10 + 13.  13 to convert to logical blocks,
+const uint32_t LOGICAL_BLOCKS_CONVERTER = 23;  		// 10 + 13.  13 to convert to logical blocks,
 												// 10 to convert to groups of 1024 logical blocks
 
 // forward reference
@@ -65,24 +66,26 @@ public:
 	inline bool hasScan() { return _hasScan; }
 
 	/* For initializing the object */
-	inline void setSessionID(uint num) { sessionID = num; }
-	inline void setStepID(uint num) { stepID = num; }
+	inline void setSessionID(uint32_t num) { sessionID = num; }
+	inline void setStepID(uint32_t num) { stepID = num; }
 	inline void setUniqueID(uint32_t id) { uniqueID = id; }
 	inline void setQueryContext(const BRM::QueryContext &qc) { versionInfo = qc; }
-	inline void setTxnID(uint num) { txnID = num; }
+	inline void setTxnID(uint32_t num) { txnID = num; }
 	inline void setOutputType(BPSOutputType o) { ot = o;
 		if (ot == TUPLE || ot == ROW_GROUP) needRidsAtDelivery = true; }
 	inline void setNeedRidsAtDelivery(bool b) { needRidsAtDelivery = b; }
 	inline void setTraceFlags(uint32_t flags) {
 		LBIDTrace = ((flags & execplan::CalpontSelectExecutionPlan::TRACE_LBIDS) != 0);
 	}
-	inline uint getRidCount() { return ridCount; }
-	inline void setThreadCount(uint tc) { threadCount = tc; }
+	inline uint32_t getRidCount() { return ridCount; }
+	inline void setThreadCount(uint32_t tc) { threadCount = tc; }
 
 	void addFilterStep(const pColScanStep &, std::vector<BRM::LBID_t> lastScannedLBID);
+	void addFilterStep(const PseudoColStep &);
 	void addFilterStep(const pColStep &);
 	void addFilterStep(const pDictionaryStep &);
 	void addFilterStep(const FilterStep &);
+    void addProjectStep(const PseudoColStep &);
 	void addProjectStep(const pColStep &);
 	void addProjectStep(const PassThruStep &);
 	void addProjectStep(const pColStep &, const pDictionaryStep &);
@@ -98,8 +101,8 @@ public:
 	// void addDeliveryStep(const DeliveryStep &);
 
 	/* At runtime, feed input here */
-	void addElementType(const ElementType &, uint dbroot);
-	void addElementType(const StringElementType &, uint dbroot);
+	void addElementType(const ElementType &, uint32_t dbroot);
+	void addElementType(const StringElementType &, uint32_t dbroot);
 	//void setRowGroupData(const rowgroup::RowGroup &);
 
 	void runBPP(messageqcpp::ByteStream &, uint32_t pmNum);
@@ -122,7 +125,7 @@ public:
 		int64_t *min, int64_t *max, uint32_t *cachedIO, uint32_t *physIO,
 		uint32_t *touchedBlocks) const;
 	/* (returns the row count) */
-//	uint getTableBand(messageqcpp::ByteStream &in, messageqcpp::ByteStream *out,
+//	uint32_t getTableBand(messageqcpp::ByteStream &in, messageqcpp::ByteStream *out,
 //		bool *validCPData, uint64_t *lbid, int64_t *min, int64_t *max,
 //		uint32_t *cachedIO, uint32_t *physIO, uint32_t *touchedBlocks) const;
 	void getTuples(messageqcpp::ByteStream &in, std::vector<TupleType> *out,
@@ -133,15 +136,15 @@ public:
 	void getRowGroupData(messageqcpp::ByteStream &in, std::vector<rowgroup::RGData> *out,
 		bool *validCPData, uint64_t *lbid, int64_t *min, int64_t *max,
 		uint32_t *cachedIO,	uint32_t *physIO, uint32_t *touchedBlocks, bool *countThis,
-		uint threadID) const;
-	void deserializeAggregateResult(messageqcpp::ByteStream *in, 
+		uint32_t threadID) const;
+	void deserializeAggregateResult(messageqcpp::ByteStream *in,
 		std::vector<rowgroup::RGData> *out) const;
 	bool countThisMsg(messageqcpp::ByteStream &in) const;
 
 	void setStatus(uint16_t s) {  status = s; }
 	uint16_t  getStatus() const { return status; }
 	void runErrorBPP(messageqcpp::ByteStream &);
-//	uint getErrorTableBand(uint16_t error, messageqcpp::ByteStream *out);
+//	uint32_t getErrorTableBand(uint16_t error, messageqcpp::ByteStream *out);
 //	boost::shared_array<uint8_t> getErrorRowGroupData(uint16_t error) const;
 	rowgroup::RGData getErrorRowGroupData(uint16_t error) const;
 
@@ -162,10 +165,10 @@ public:
 	/* Tuple hashjoin */
 	void useJoiners(const std::vector<boost::shared_ptr<joiner::TupleJoiner> > &);
 	bool nextTupleJoinerMsg(messageqcpp::ByteStream &);
-// 	void setSmallSideKeyColumn(uint col);
+// 	void setSmallSideKeyColumn(uint32_t col);
 
 	/* OR hacks */
-	void setBOP(uint op);   // BOP_AND or BOP_OR, default is BOP_AND
+	void setBOP(uint32_t op);   // BOP_AND or BOP_OR, default is BOP_AND
 	void setForHJ(bool b);  // default is false
 
 	/* self-join */
@@ -182,26 +185,29 @@ public:
 	from a join or put the RG data right in the output datalist. */
 	bool pmSendsFinalResult() const
 	{
-		return ((sendTupleJoinRowGroupData && tJoiners.size() > 0 && PMJoinerCount > 0) || tJoiners.size() == 0);
+		//isn't aware of UM-only joins.  Function name is a bit misleading.
+		return (tJoiners.size() == 0 || (PMJoinerCount > 0 && (fe2 || aggregatorPM)));
 	}
 	const std::string toMiniString() const;
 
-	void priority(uint p) { _priority = p; };
-	uint priority() { return _priority; }
+	void priority(uint32_t p) { _priority = p; };
+	uint32_t priority() { return _priority; }
 
 	void deliverStringTableRowGroup(bool b);
 
+	void setUuid(const boost::uuids::uuid& u) { uuid = u; }
+
 private:
-	//void setLBIDForScan(uint64_t rid, uint dbroot);
+	//void setLBIDForScan(uint64_t rid, uint32_t dbroot);
 
 	BPSOutputType ot;
 
 	bool needToSetLBID;
 
 	BRM::QueryContext versionInfo;
-	uint txnID;
-	uint sessionID;
-	uint stepID;
+	uint32_t txnID;
+	uint32_t sessionID;
+	uint32_t stepID;
 	uint32_t uniqueID;
 
 	// # of times to loop over the command arrays
@@ -232,7 +238,7 @@ private:
 //	TableBand templateTB;
 	uint32_t tableOID;
 	boost::scoped_array<int> tablePositions;
-	uint tableColumnCount;
+	uint32_t tableColumnCount;
 	bool sendValues;
 	bool sendAbsRids;
 	bool _hasScan;
@@ -240,9 +246,9 @@ private:
 
 	/* for tuple return type */
 	std::vector<uint16_t> colWidths;
-	uint tupleLength;
-// 		uint rowCounter;    // for debugging
-// 		uint rowsProcessed;
+	uint32_t tupleLength;
+// 		uint32_t rowCounter;    // for debugging
+// 		uint32_t rowsProcessed;
 	uint16_t status;
 
 	/* for Joiner serialization */
@@ -264,10 +270,10 @@ private:
 	std::vector<boost::shared_ptr<joiner::TupleJoiner> > tJoiners;
 	std::vector<rowgroup::RowGroup> smallSideRGs;
 	rowgroup::RowGroup largeSideRG;
-	std::vector<std::vector<uint> > smallSideKeys;
-	boost::scoped_array<uint> tlKeyLens;
+	std::vector<std::vector<uint32_t> > smallSideKeys;
+	boost::scoped_array<uint32_t> tlKeyLens;
 	bool sendTupleJoinRowGroupData;
-	uint PMJoinerCount;
+	uint32_t PMJoinerCount;
 
 	/* OR hack */
 	uint8_t bop;   // BOP_AND or BOP_OR
@@ -282,13 +288,15 @@ private:
 	rowgroup::RowGroup joinFERG;
 
 	mutable boost::scoped_array<rowgroup::RowGroup> primprocRG;   // the format of the data received from PrimProc
-	uint threadCount;
+	uint32_t threadCount;
 
 	unsigned fJoinerChunkSize;
-	uint dbRoot;
+	uint32_t dbRoot;
 	bool hasSmallOuterJoin;
 
-	uint _priority;
+	uint32_t _priority;
+
+	boost::uuids::uuid uuid;
 
 	friend class CommandJL;
 	friend class ColumnCommandJL;

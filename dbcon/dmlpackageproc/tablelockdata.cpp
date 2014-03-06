@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -28,9 +28,10 @@ using namespace std;
 #include <boost/scoped_array.hpp>
 using namespace boost;
 
-#define DMLTBLLCKDAT_DLLEXPORT
 #include "tablelockdata.h"
-#undef DMLTBLLCKDAT_DLLEXPORT
+
+namespace dmlpackageprocessor
+{
 
 /*static*/
 boost::mutex TablelockData::map_mutex;
@@ -45,16 +46,16 @@ TablelockData* TablelockData::makeTablelockData(uint32_t sessionID)
 
     if (it == fTablelockDataMap.end())
     {
-        instance = new TablelockData();	 
+        instance = new TablelockData();
         fTablelockDataMap[sessionID] = instance;
         return instance;
     }
 
-    return it->second;    
+    return it->second;
 }
 
 /* static */
-void TablelockData::removeTablelockData(u_int32_t sessionID)
+void TablelockData::removeTablelockData(uint32_t sessionID)
 {
     boost::mutex::scoped_lock lock(map_mutex);
     TablelockDataMap::iterator it = fTablelockDataMap.find(sessionID);
@@ -62,8 +63,8 @@ void TablelockData::removeTablelockData(u_int32_t sessionID)
     {
         delete (*it).second;
         fTablelockDataMap.erase(it);
-    }    
-}	
+    }
+}
 
 TablelockData::TablelockData()
 {
@@ -74,13 +75,13 @@ TablelockData::~TablelockData()
 
 void TablelockData::setTablelock(uint32_t tableOid, uint64_t tablelockId)
 {
-	boost::mutex::scoped_lock lk(fOIDTablelock);	
-	fOIDTablelockMap[tableOid] = tablelockId;	
+	boost::mutex::scoped_lock lk(fOIDTablelock);
+	fOIDTablelockMap[tableOid] = tablelockId;
 }
 
 uint64_t TablelockData::getTablelockId(uint32_t tableOid)
 {
-	boost::mutex::scoped_lock lk(fOIDTablelock);	
+	boost::mutex::scoped_lock lk(fOIDTablelock);
 	uint64_t tablelockId = 0;
 	OIDTablelock::iterator it = fOIDTablelockMap.find(tableOid);
 	if (it != fOIDTablelockMap.end())
@@ -92,8 +93,10 @@ uint64_t TablelockData::getTablelockId(uint32_t tableOid)
 
 TablelockData::OIDTablelock & TablelockData::getOidTablelockMap()
 {
-	boost::mutex::scoped_lock lk(fOIDTablelock);	
-		
+	boost::mutex::scoped_lock lk(fOIDTablelock);
+
 	return fOIDTablelockMap;
+}
+
 }
 // vim:ts=4 sw=4:

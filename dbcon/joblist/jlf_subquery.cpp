@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -34,6 +34,7 @@ using namespace boost;
 #include "constantcolumn.h"
 #include "existsfilter.h"
 #include "predicateoperator.h"
+#include "pseudocolumn.h"
 #include "selectfilter.h"
 #include "simplefilter.h"
 #include "simplescalarfilter.h"
@@ -721,7 +722,7 @@ void addOrderByAndLimit(CalpontSelectExecutionPlan* csep, JobInfo& jobInfo)
 		if (dynamic_cast<ConstantColumn*>(orderByCols[i].get()) != NULL)
 			continue;
 
-		uint tupleKey = -1;
+		uint32_t tupleKey = -1;
 		SimpleColumn* sc = dynamic_cast<SimpleColumn*>(orderByCols[i].get());
 		if (sc != NULL)
 		{
@@ -737,7 +738,8 @@ void addOrderByAndLimit(CalpontSelectExecutionPlan* csep, JobInfo& jobInfo)
 			{
 				ct = sc->colType();
 //XXX use this before connector sets colType in sc correctly.
-				if (sc->isInfiniDB())
+//    type of pseudo column is set by connector
+				if (sc->isInfiniDB() && !(dynamic_cast<PseudoColumn*>(sc)))
 					ct = jobInfo.csc->colType(sc->oid());
 //X
 				dictOid = isDictCol(ct);

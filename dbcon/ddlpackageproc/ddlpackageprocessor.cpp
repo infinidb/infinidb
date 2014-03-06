@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -24,9 +24,7 @@
 #include <cassert>
 using namespace std;
 
-#define DDLPKGPROC_DLLEXPORT
 #include "ddlpackageprocessor.h"
-#undef DDLPKGPROC_DLLEXPORT
 
 #include "dataconvert.h"
 using namespace dataconvert;
@@ -89,7 +87,7 @@ DDLPackageProcessor::~DDLPackageProcessor()
 	delete fWEClient;
 }
 
-void  DDLPackageProcessor::getColumnsForTable(u_int32_t sessionID, std::string schema,std::string table,
+void  DDLPackageProcessor::getColumnsForTable(uint32_t sessionID, std::string schema,std::string table,
 		ColumnList& colList)
 {
 
@@ -679,7 +677,7 @@ boost::any DDLPackageProcessor::tokenizeData(execplan::CalpontSystemCatalog::SCN
 			memcpy(dictTuple.sigValue, str.c_str(), str.length());
 			dictTuple.sigSize = str.length();
 			int error = NO_ERROR;
-			if (NO_ERROR != (error = fWriteEngine.tokenize(txnID, dictStruct, dictTuple)))
+			if (NO_ERROR != (error = fWriteEngine.tokenize(txnID, dictStruct, dictTuple, false))) // @bug 5572 HDFS tmp file
 			{
 		WErrorCodes ec;
 				throw std::runtime_error("WE: Tokenization failed " + ec.errorString(error));
@@ -705,7 +703,7 @@ boost::any DDLPackageProcessor::tokenizeData(execplan::CalpontSystemCatalog::SCN
 }
 
 #if 0
-void DDLPackageProcessor::writeSysTableMetaData(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, const DDLResult& result,
+void DDLPackageProcessor::writeSysTableMetaData(uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, const DDLResult& result,
 		ddlpackage::TableDef& tableDef, uint32_t tableWithAutoi)
 {
 	std::string err("DDLPackageProcessor::writeSysTableMetaData ");
@@ -893,7 +891,7 @@ void DDLPackageProcessor::writeSysTableMetaData(u_int32_t sessionID, execplan::C
 	}
 }
 
-void  DDLPackageProcessor::writeSysColumnMetaData(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, const DDLResult& result,
+void  DDLPackageProcessor::writeSysColumnMetaData(uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, const DDLResult& result,
 		ColumnDefList& tableDefCols, ddlpackage::QualifiedName& qualifiedName,
 		int colpos, bool alterFlag)
 {
@@ -1238,7 +1236,7 @@ void  DDLPackageProcessor::writeSysColumnMetaData(u_int32_t sessionID, execplan:
 	}
 }
 
-void DDLPackageProcessor::removeSysTableMetaData(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID,
+void DDLPackageProcessor::removeSysTableMetaData(uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID,
 		DDLResult& result,
 		ddlpackage::QualifiedName& tableName)
 {
@@ -1282,7 +1280,7 @@ void DDLPackageProcessor::removeSysTableMetaData(u_int32_t sessionID, execplan::
 	}
 }
 
-void DDLPackageProcessor::removeSysColMetaData(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID,
+void DDLPackageProcessor::removeSysColMetaData(uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID,
 		DDLResult& result,
 		ddlpackage::QualifiedName& tableName)
 {
@@ -1322,7 +1320,7 @@ void DDLPackageProcessor::removeSysColMetaData(u_int32_t sessionID, execplan::Ca
 
 }
 
-void DDLPackageProcessor::removeColSysColMetaData(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID,
+void DDLPackageProcessor::removeColSysColMetaData(uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID,
 		DDLResult& result,
 		ddlpackage::QualifiedName& columnInfo)
 {
@@ -1363,7 +1361,7 @@ void DDLPackageProcessor::removeColSysColMetaData(u_int32_t sessionID, execplan:
 	}
 }
 
-void DDLPackageProcessor::removeRowFromSysCatalog(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID,
+void DDLPackageProcessor::removeRowFromSysCatalog(uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID,
 		const DDLResult& result,
 		ddlpackage::QualifiedName& sysCatalogTableName,
 		WriteEngine::RID& rid)
@@ -1397,7 +1395,7 @@ void DDLPackageProcessor::removeRowFromSysCatalog(u_int32_t sessionID, execplan:
 
 }
 
-void DDLPackageProcessor::removeRowsFromSysCatalog(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID,
+void DDLPackageProcessor::removeRowsFromSysCatalog(uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID,
 		const DDLResult& result,
 		ddlpackage::QualifiedName& sysCatalogTableName,
 		execplan::CalpontSystemCatalog::RIDList& colRidList)
@@ -1638,7 +1636,7 @@ void DDLPackageProcessor::removeFiles(const uint64_t uniqueId, std::vector<execp
 		bytestream << (uint32_t) oidList[i];
 	}
 		
-	uint msgRecived = 0;
+	uint32_t msgRecived = 0;
 	ByteStream::byte rc = 0;
 	ByteStream::byte tmp8;
 	string errorMsg;
@@ -1690,7 +1688,7 @@ void DDLPackageProcessor::removeFiles(const uint64_t uniqueId, std::vector<execp
 }
 
 void DDLPackageProcessor::createFiles(CalpontSystemCatalog::TableName aTableName, const int useDBRoot, 
-	const u_int64_t uniqueId, const u_int32_t numOids)
+	const uint64_t uniqueId, const uint32_t numOids)
 {
 	SUMMARY_INFO("DDLPackageProcessor::createFiles");
 	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(1);
@@ -1700,25 +1698,25 @@ void DDLPackageProcessor::createFiles(CalpontSystemCatalog::TableName aTableName
 	ByteStream bytestream;
 	boost::shared_ptr<messageqcpp::ByteStream> bsIn;
 	bytestream << (ByteStream::byte)WE_SVR_WRITE_CREATETABLEFILES;
-	bytestream << (u_int32_t)1;
+	bytestream << (uint32_t)1;
 	bytestream << uniqueId;
 	bytestream << numOids;
 	for (unsigned col  = 0; col < ridList.size(); col++)
 	{						
 		colType = systemCatalogPtr->colType(ridList[col].objnum);
 		bytestream << (uint32_t) ridList[col].objnum;
-		bytestream << (u_int8_t) colType.colDataType;
-		bytestream << (u_int8_t) false;
+		bytestream << (uint8_t) colType.colDataType;
+		bytestream << (uint8_t) false;
 		bytestream << (uint32_t) colType.colWidth;
-		bytestream << (u_int16_t) useDBRoot;
+		bytestream << (uint16_t) useDBRoot;
 		bytestream << (uint32_t) colType.compressionType;
 		if (colType.ddn.dictOID > 3000)
 		{
 			bytestream << (uint32_t) colType.ddn.dictOID;
-			bytestream << (u_int8_t) colType.colDataType;
-			bytestream << (u_int8_t) true;
+			bytestream << (uint8_t) colType.colDataType;
+			bytestream << (uint8_t) true;
 			bytestream << (uint32_t) colType.colWidth;
-			bytestream << (u_int16_t) useDBRoot;
+			bytestream << (uint16_t) useDBRoot;
 			bytestream << (uint32_t) colType.compressionType;
 		}
 	}
@@ -1730,7 +1728,7 @@ void DDLPackageProcessor::createFiles(CalpontSystemCatalog::TableName aTableName
 		boost::shared_ptr<std::map<int, int> > dbRootPMMap = oamcache->getDBRootToPMMap();
 		int pmNum = (*dbRootPMMap)[useDBRoot];
 			
-		fWEClient->write(bytestream, (uint)pmNum);
+		fWEClient->write(bytestream, (uint32_t)pmNum);
 		bsIn.reset(new ByteStream());
 				
 		while (1)
@@ -1788,7 +1786,7 @@ void DDLPackageProcessor::removePartitionFiles(std::vector<execplan::CalpontSyst
 	PartitionNums::const_iterator partIt;
 	vector<BRM::PartitionInfo> partInfos;
 
-	for (uint i = 0; i <  oidList.size(); i++)
+	for (uint32_t i = 0; i <  oidList.size(); i++)
 	{
 		bs << (uint32_t)oidList[i];
 		// add oid to LogicalPartition to form PartitionInfo
@@ -1802,11 +1800,11 @@ void DDLPackageProcessor::removePartitionFiles(std::vector<execplan::CalpontSyst
 	}
 
 	bs << (uint32_t)partInfos.size();
-	for (uint i = 0; i < partInfos.size(); i++)
+	for (uint32_t i = 0; i < partInfos.size(); i++)
 		partInfos[i].serialize(bs);
 
 	fWEClient->write_to_all(bs);
-	uint pmCount = fWEClient->getPmCount();
+	uint32_t pmCount = fWEClient->getPmCount();
 	boost::shared_ptr<messageqcpp::ByteStream> bsIn;
 	bsIn.reset(new ByteStream());
 
@@ -1860,7 +1858,7 @@ void DDLPackageProcessor::removeExtents(std::vector<execplan::CalpontSystemCatal
 }
 
 void DDLPackageProcessor::createWriteDropLogFile(execplan::CalpontSystemCatalog::OID tableOid,  
-	u_int64_t uniqueId, std::vector<execplan::CalpontSystemCatalog::OID>& oidList)
+	uint64_t uniqueId, std::vector<execplan::CalpontSystemCatalog::OID>& oidList)
 {
 	SUMMARY_INFO("DDLPackageProcessor::createWriteDropLogFile");
 	//For shared nothing, the meta files are created under data1 with controllernode.
@@ -1869,19 +1867,19 @@ void DDLPackageProcessor::createWriteDropLogFile(execplan::CalpontSystemCatalog:
 	OAMParentModuleName = OAMParentModuleName.substr(2, OAMParentModuleName.length());
 	int parentId = atoi(OAMParentModuleName.c_str());
 	ByteStream bytestream;
-	u_int8_t rc = 0;
+	uint8_t rc = 0;
 	std::string errorMsg;
 	boost::shared_ptr<messageqcpp::ByteStream> bsIn;
 	bytestream << (ByteStream::byte)WE_SVR_WRITE_DROPTABLE;
 	bytestream << uniqueId;
-	bytestream << (u_int32_t)tableOid;
-	bytestream << (u_int32_t) oidList.size();
-	for (u_int32_t i=0; i < oidList.size(); i++)
+	bytestream << (uint32_t)tableOid;
+	bytestream << (uint32_t) oidList.size();
+	for (uint32_t i=0; i < oidList.size(); i++)
 	{
-		bytestream << (u_int32_t)oidList[i];
+		bytestream << (uint32_t)oidList[i];
 	}
 	try {
-		fWEClient->write(bytestream, (uint)parentId);
+		fWEClient->write(bytestream, (uint32_t)parentId);
 		while (1)
 		{
 			bsIn.reset(new ByteStream());
@@ -1916,7 +1914,7 @@ void DDLPackageProcessor::createWriteDropLogFile(execplan::CalpontSystemCatalog:
 		throw std::runtime_error(errorMsg);
 }
 
-void DDLPackageProcessor::deleteLogFile(LogFileType fileType, execplan::CalpontSystemCatalog::OID tableOid, u_int64_t uniqueId)
+void DDLPackageProcessor::deleteLogFile(LogFileType fileType, execplan::CalpontSystemCatalog::OID tableOid, uint64_t uniqueId)
 {
 	SUMMARY_INFO("DDLPackageProcessor::deleteLogFile");
 	OamCache * oamcache = OamCache::makeOamCache();
@@ -1924,16 +1922,16 @@ void DDLPackageProcessor::deleteLogFile(LogFileType fileType, execplan::CalpontS
 	OAMParentModuleName = OAMParentModuleName.substr(2, OAMParentModuleName.length());
 	int parentId = atoi(OAMParentModuleName.c_str());
 	ByteStream bytestream;
-	u_int8_t rc = 0;
+	uint8_t rc = 0;
 	std::string errorMsg;
 	fWEClient->addQueue(uniqueId);
 	boost::shared_ptr<messageqcpp::ByteStream> bsIn;
 	bytestream << (ByteStream::byte)WE_SVR_DELETE_DDLLOG;
 	bytestream << uniqueId;
-	bytestream << (u_int32_t) fileType;
-	bytestream << (u_int32_t)tableOid;
+	bytestream << (uint32_t) fileType;
+	bytestream << (uint32_t)tableOid;
 	try {
-		fWEClient->write(bytestream, (uint)parentId);
+		fWEClient->write(bytestream, (uint32_t)parentId);
 		while (1)
 		{
 			bsIn.reset(new ByteStream());
@@ -1970,7 +1968,7 @@ void DDLPackageProcessor::deleteLogFile(LogFileType fileType, execplan::CalpontS
 	}
 }
 
-void DDLPackageProcessor::fetchLogFile(TableLogInfo & tableLogInfos, u_int64_t uniqueId)
+void DDLPackageProcessor::fetchLogFile(TableLogInfo & tableLogInfos, uint64_t uniqueId)
 {
 	SUMMARY_INFO("DDLPackageProcessor::fetchLogFile");
 	OamCache * oamcache = OamCache::makeOamCache();
@@ -1980,8 +1978,8 @@ void DDLPackageProcessor::fetchLogFile(TableLogInfo & tableLogInfos, u_int64_t u
 		OAMParentModuleName = "pm1";
 	int parentId = atoi(OAMParentModuleName.substr(2, OAMParentModuleName.length()).c_str());
 	ByteStream bytestream;
-	u_int8_t rc = 0;
-	u_int32_t tmp32, tableOid, numOids, numPartitions;
+	uint8_t rc = 0;
+	uint32_t tmp32, tableOid, numOids, numPartitions;
 	LogFileType logFileType;
 	std::string errorMsg;
 	fWEClient->addQueue(uniqueId);
@@ -1989,7 +1987,7 @@ void DDLPackageProcessor::fetchLogFile(TableLogInfo & tableLogInfos, u_int64_t u
 	bytestream << (ByteStream::byte)WE_SVR_FETCH_DDL_LOGS;
 	bytestream << uniqueId;
 	try {
-		fWEClient->write(bytestream, (uint)parentId);
+		fWEClient->write(bytestream, (uint32_t)parentId);
 		while (1)
 		{
 			bsIn.reset(new ByteStream());
@@ -2055,7 +2053,7 @@ void DDLPackageProcessor::fetchLogFile(TableLogInfo & tableLogInfos, u_int64_t u
 
 void DDLPackageProcessor::createWritePartitionLogFile(execplan::CalpontSystemCatalog::OID tableOid,  
 	                                                   const PartitionNums& partitionNums,
-	                                                   std::vector<execplan::CalpontSystemCatalog::OID>& oidList, u_int64_t uniqueId)
+	                                                   std::vector<execplan::CalpontSystemCatalog::OID>& oidList, uint64_t uniqueId)
 {
 	SUMMARY_INFO("DDLPackageProcessor::createWritePartitionLogFile");
 	fWEClient->addQueue(uniqueId);
@@ -2066,23 +2064,23 @@ void DDLPackageProcessor::createWritePartitionLogFile(execplan::CalpontSystemCat
 	boost::shared_ptr<messageqcpp::ByteStream> bsIn;
 	ByteStream bytestream;
 	std::string errorMsg;
-	u_int8_t rc = 0;
+	uint8_t rc = 0;
 	bytestream << (ByteStream::byte)WE_SVR_WRITE_DROPPARTITION;
 	bytestream << uniqueId;
-	bytestream << (u_int32_t)tableOid;
+	bytestream << (uint32_t)tableOid;
 	bytestream << (uint32_t) partitionNums.size();
 	PartitionNums::const_iterator it;
 	
 	for (it = partitionNums.begin(); it != partitionNums.end(); ++it)
 		(*it).serialize(bytestream);
 		
-	bytestream << (u_int32_t) oidList.size();
-	for (u_int32_t i=0; i < oidList.size(); i++)
+	bytestream << (uint32_t) oidList.size();
+	for (uint32_t i=0; i < oidList.size(); i++)
 	{
-		bytestream << (u_int32_t)oidList[i];
+		bytestream << (uint32_t)oidList[i];
 	}
 	try {
-		fWEClient->write(bytestream, (uint)parentId);
+		fWEClient->write(bytestream, (uint32_t)parentId);
 		while (1)
 		{
 			bsIn.reset(new ByteStream());
@@ -2117,7 +2115,7 @@ void DDLPackageProcessor::createWritePartitionLogFile(execplan::CalpontSystemCat
 		throw std::runtime_error(errorMsg);
 }
 
-void DDLPackageProcessor::createWriteTruncateTableLogFile(execplan::CalpontSystemCatalog::OID tableOid,  u_int64_t uniqueId, std::vector<execplan::CalpontSystemCatalog::OID>& oidList)
+void DDLPackageProcessor::createWriteTruncateTableLogFile(execplan::CalpontSystemCatalog::OID tableOid,  uint64_t uniqueId, std::vector<execplan::CalpontSystemCatalog::OID>& oidList)
 {
 	SUMMARY_INFO("DDLPackageProcessor::createWriteTruncateTableLogFile");
 	//For shared nothing, the meta files are created under data1 with controllernode.
@@ -2126,19 +2124,19 @@ void DDLPackageProcessor::createWriteTruncateTableLogFile(execplan::CalpontSyste
 	OAMParentModuleName = OAMParentModuleName.substr(2, OAMParentModuleName.length());
 	int parentId = atoi(OAMParentModuleName.c_str());
 	ByteStream bytestream;
-	u_int8_t rc = 0;
+	uint8_t rc = 0;
 	std::string errorMsg;
 	boost::shared_ptr<messageqcpp::ByteStream> bsIn;
 	bytestream << (ByteStream::byte)WE_SVR_WRITE_TRUNCATE;
 	bytestream << uniqueId;
-	bytestream << (u_int32_t)tableOid;
-	bytestream << (u_int32_t) oidList.size();
-	for (u_int32_t i=0; i < oidList.size(); i++)
+	bytestream << (uint32_t)tableOid;
+	bytestream << (uint32_t) oidList.size();
+	for (uint32_t i=0; i < oidList.size(); i++)
 	{
-		bytestream << (u_int32_t)oidList[i];
+		bytestream << (uint32_t)oidList[i];
 	}
 	try {
-		fWEClient->write(bytestream, (uint)parentId);
+		fWEClient->write(bytestream, (uint32_t)parentId);
 		while (1)
 		{
 			bsIn.reset(new ByteStream());
@@ -2356,7 +2354,7 @@ void DDLPackageProcessor::returnOIDs(execplan::CalpontSystemCatalog::RIDList& ri
 	}
 }
 
-void DDLPackageProcessor::findColumnData(u_int32_t sessionID, execplan::CalpontSystemCatalog::TableName& systableName,
+void DDLPackageProcessor::findColumnData(uint32_t sessionID, execplan::CalpontSystemCatalog::TableName& systableName,
 		const std::string& colName,
 		DDLColumn& sysCol)
 {
@@ -2432,14 +2430,14 @@ void DDLPackageProcessor::convertRidToColumn(uint64_t& rid, unsigned& dbRoot, un
 	rid = relRidInThisExtent +  numExtentsInThisSegPart * extentRows;
 }
 
-int DDLPackageProcessor::rollBackTransaction(u_int64_t uniqueId, BRM::TxnID txnID, u_int32_t sessionID)
+int DDLPackageProcessor::rollBackTransaction(uint64_t uniqueId, BRM::TxnID txnID, uint32_t sessionID)
 {
 	ByteStream bytestream;
 	bytestream << (ByteStream::byte) WE_SVR_ROLLBACK_BLOCKS;
 	bytestream << uniqueId;
 	bytestream << sessionID;
-	bytestream << (u_int32_t)txnID.id;
-	uint msgRecived = 0;
+	bytestream << (uint32_t)txnID.id;
+	uint32_t msgRecived = 0;
 	fWEClient->write_to_all(bytestream);
 	boost::shared_ptr<messageqcpp::ByteStream> bsIn;
 	bsIn.reset(new ByteStream());
@@ -2476,7 +2474,7 @@ int DDLPackageProcessor::rollBackTransaction(u_int64_t uniqueId, BRM::TxnID txnI
 		bytestream << (ByteStream::byte) WE_SVR_ROLLBACK_VERSION;
 		bytestream << uniqueId;
 		bytestream << sessionID;
-		bytestream << (u_int32_t) txnID.id;
+		bytestream << (uint32_t) txnID.id;
 		fWEClient->write_to_all(bytestream);
 		bsIn.reset(new ByteStream());
 		msgRecived = 0;
@@ -2507,7 +2505,7 @@ int DDLPackageProcessor::rollBackTransaction(u_int64_t uniqueId, BRM::TxnID txnI
 	return rc;
 }
 
-int DDLPackageProcessor::commitTransaction(u_int64_t uniqueId, BRM::TxnID txnID)
+int DDLPackageProcessor::commitTransaction(uint64_t uniqueId, BRM::TxnID txnID)
 {
 	int rc = fDbrm->vbCommit(txnID.id);
 	return rc;	

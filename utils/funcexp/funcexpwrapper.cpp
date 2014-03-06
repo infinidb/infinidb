@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -46,7 +46,7 @@ FuncExpWrapper::FuncExpWrapper()
 
 FuncExpWrapper::FuncExpWrapper(const FuncExpWrapper &f)
 {
-	uint i;
+	uint32_t i;
 
 	fe = FuncExp::instance();
 
@@ -64,7 +64,7 @@ FuncExpWrapper::~FuncExpWrapper()
 
 void FuncExpWrapper::operator=(const FuncExpWrapper &f)
 {
-	uint i;
+	uint32_t i;
 
 	filters.resize(f.filters.size());
 	for (i = 0; i < f.filters.size(); i++)
@@ -78,7 +78,7 @@ void FuncExpWrapper::operator=(const FuncExpWrapper &f)
 
 void FuncExpWrapper::serialize(ByteStream &bs) const
 {
-	uint i;
+	uint32_t i;
 
 	bs << (uint32_t) filters.size();
 	bs << (uint32_t) rcs.size();
@@ -104,7 +104,7 @@ void FuncExpWrapper::deserialize(ByteStream &bs)
 
 bool FuncExpWrapper::evaluate(Row *r)
 {
-	uint i;
+	uint32_t i;
 
 	for (i = 0; i < filters.size(); i++)
 		if (!fe->evaluate(*r, filters[i].get()))

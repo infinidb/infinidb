@@ -1,0 +1,246 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="EnterpriseRelease|Win32">
+      <Configuration>EnterpriseRelease</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="EnterpriseRelease|x64">
+      <Configuration>EnterpriseRelease</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{0DD34627-B046-4415-80CF-D0FBA4E069CB}</ProjectGuid>
+    <RootNamespace>libwindowfunction</RootNamespace>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='EnterpriseRelease|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <PlatformToolset>v110</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <PlatformToolset>v110</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <PlatformToolset>v110</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='EnterpriseRelease|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <PlatformToolset>v110</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <PlatformToolset>v110</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <PlatformToolset>v110</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='EnterpriseRelease|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='EnterpriseRelease|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <_ProjectFileVersion>11.0.50727.1</_ProjectFileVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <OutDir>$(SolutionDir)..\..\$(PlatformName)\$(ConfigurationName)\</OutDir>
+    <IntDir>$(SolutionDir)..\..\obj\$(ProjectName)\$(PlatformName)\$(ConfigurationName)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <OutDir>$(SolutionDir)..\..\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)..\..\obj\$(ProjectName)\$(Platform)\$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <OutDir>$(SolutionDir)..\..\$(PlatformName)\$(ConfigurationName)\</OutDir>
+    <IntDir>$(SolutionDir)..\..\obj\$(ProjectName)\$(PlatformName)\$(ConfigurationName)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <OutDir>$(SolutionDir)$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(Platform)\$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='EnterpriseRelease|Win32'">
+    <OutDir>$(SolutionDir)..\..\$(PlatformName)\$(ConfigurationName)\</OutDir>
+    <IntDir>$(SolutionDir)..\..\obj\$(ProjectName)\$(PlatformName)\$(ConfigurationName)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='EnterpriseRelease|x64'">
+    <OutDir>$(SolutionDir)..\..\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)..\..\obj\$(ProjectName)\$(Platform)\$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <Optimization>Disabled</Optimization>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\libxml2-2.7.8\libxml2\include;$(SolutionDir)..\..\libiconv-1.14\libiconv\include;$(SolutionDir)..\dbcon\execplan;$(SolutionDir)..\utils\winport;$(SolutionDir)..\writeengine\shared;$(SolutionDir)..\utils\messageqcpp;$(SolutionDir)..\utils\loggingcpp;$(SolutionDir)..\utils\configcpp;$(SolutionDir)..\utils\dataconvert;$(SolutionDir)..\versioning\BRM;$(SolutionDir)..\utils\rwlock;$(SolutionDir)..\utils\funcexp;$(SolutionDir)..\dbcon\joblist;$(SolutionDir)..\utils\rowgroup;$(SolutionDir)..\dbcon\ddlpackage;$(SolutionDir)..\utils\common;$(SolutionDir)..\utils\joiner;$(SolutionDir)..\oam\oamcpp;$(SolutionDir)..\snmpd\snmpmanager;$(SolutionDir)..\utils\querystats;$(SolutionDir)..\utils\querytele;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>SKIP_SNMP;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <MinimalRebuild>true</MinimalRebuild>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <WarningLevel>Level3</WarningLevel>
+      <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Midl>
+      <TargetEnvironment>X64</TargetEnvironment>
+    </Midl>
+    <ClCompile>
+      <Optimization>Disabled</Optimization>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\libxml2-2.7.8\libxml2\include;$(SolutionDir)..\..\libiconv-1.14\libiconv\include;$(SolutionDir)..\dbcon\execplan;$(SolutionDir)..\utils\winport;$(SolutionDir)..\writeengine\shared;$(SolutionDir)..\utils\messageqcpp;$(SolutionDir)..\utils\loggingcpp;$(SolutionDir)..\utils\configcpp;$(SolutionDir)..\utils\dataconvert;$(SolutionDir)..\versioning\BRM;$(SolutionDir)..\utils\rwlock;$(SolutionDir)..\utils\funcexp;$(SolutionDir)..\dbcon\joblist;$(SolutionDir)..\utils\rowgroup;$(SolutionDir)..\dbcon\ddlpackage;$(SolutionDir)..\utils\common;$(SolutionDir)..\utils\joiner;$(SolutionDir)..\oam\oamcpp;$(SolutionDir)..\snmpd\snmpmanager;$(SolutionDir)..\utils\querystats;$(SolutionDir)..\utils\querytele;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>SKIP_SNMP;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <MinimalRebuild>true</MinimalRebuild>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <WarningLevel>Level3</WarningLevel>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <Optimization>MaxSpeed</Optimization>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\libxml2-2.7.8\libxml2\include;$(SolutionDir)..\..\libiconv-1.14\libiconv\include;$(SolutionDir)..\dbcon\execplan;$(SolutionDir)..\utils\winport;$(SolutionDir)..\writeengine\shared;$(SolutionDir)..\utils\messageqcpp;$(SolutionDir)..\utils\loggingcpp;$(SolutionDir)..\utils\configcpp;$(SolutionDir)..\utils\dataconvert;$(SolutionDir)..\versioning\BRM;$(SolutionDir)..\utils\rwlock;$(SolutionDir)..\utils\funcexp;$(SolutionDir)..\dbcon\joblist;$(SolutionDir)..\utils\rowgroup;$(SolutionDir)..\dbcon\ddlpackage;$(SolutionDir)..\utils\common;$(SolutionDir)..\utils\joiner;$(SolutionDir)..\oam\oamcpp;$(SolutionDir)..\snmpd\snmpmanager;$(SolutionDir)..\utils\querystats;$(SolutionDir)..\utils\querytele;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>SKIP_SNMP; _CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <WarningLevel>Level3</WarningLevel>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <DisableSpecificWarnings>4244;4267;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Midl>
+      <TargetEnvironment>X64</TargetEnvironment>
+    </Midl>
+    <ClCompile>
+      <Optimization>MaxSpeed</Optimization>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\libxml2-2.7.8\libxml2\include;$(SolutionDir)..\..\libiconv-1.14\libiconv\include;$(SolutionDir)..\dbcon\execplan;$(SolutionDir)..\utils\winport;$(SolutionDir)..\writeengine\shared;$(SolutionDir)..\utils\messageqcpp;$(SolutionDir)..\utils\loggingcpp;$(SolutionDir)..\utils\configcpp;$(SolutionDir)..\utils\dataconvert;$(SolutionDir)..\versioning\BRM;$(SolutionDir)..\utils\rwlock;$(SolutionDir)..\utils\funcexp;$(SolutionDir)..\dbcon\joblist;$(SolutionDir)..\utils\rowgroup;$(SolutionDir)..\dbcon\ddlpackage;$(SolutionDir)..\utils\common;$(SolutionDir)..\utils\joiner;$(SolutionDir)..\oam\oamcpp;$(SolutionDir)..\snmpd\snmpmanager;$(SolutionDir)..\utils\querystats;$(SolutionDir)..\utils\querytele;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>SKIP_SNMP; _CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <WarningLevel>Level3</WarningLevel>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <DisableSpecificWarnings>4244;4267;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='EnterpriseRelease|Win32'">
+    <ClCompile>
+      <Optimization>MaxSpeed</Optimization>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\libxml2-2.7.8\libxml2\include;$(SolutionDir)..\..\libiconv-1.14\libiconv\include;$(SolutionDir)..\dbcon\execplan;$(SolutionDir)..\utils\winport;$(SolutionDir)..\writeengine\shared;$(SolutionDir)..\utils\messageqcpp;$(SolutionDir)..\utils\loggingcpp;$(SolutionDir)..\utils\configcpp;$(SolutionDir)..\utils\dataconvert;$(SolutionDir)..\versioning\BRM;$(SolutionDir)..\utils\rwlock;$(SolutionDir)..\utils\funcexp;$(SolutionDir)..\dbcon\joblist;$(SolutionDir)..\utils\rowgroup;$(SolutionDir)..\dbcon\ddlpackage;$(SolutionDir)..\utils\common;$(SolutionDir)..\utils\joiner;$(SolutionDir)..\oam\oamcpp;$(SolutionDir)..\snmpd\snmpmanager;$(SolutionDir)..\utils\querystats;$(SolutionDir)..\utils\querytele;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>SKIP_SNMP; _CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <WarningLevel>Level3</WarningLevel>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <DisableSpecificWarnings>4244;4267;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='EnterpriseRelease|x64'">
+    <Midl>
+      <TargetEnvironment>X64</TargetEnvironment>
+    </Midl>
+    <ClCompile>
+      <Optimization>MaxSpeed</Optimization>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\libxml2-2.7.8\libxml2\include;$(SolutionDir)..\..\libiconv-1.14\libiconv\include;$(SolutionDir)..\dbcon\execplan;$(SolutionDir)..\utils\winport;$(SolutionDir)..\writeengine\shared;$(SolutionDir)..\utils\messageqcpp;$(SolutionDir)..\utils\loggingcpp;$(SolutionDir)..\utils\configcpp;$(SolutionDir)..\utils\dataconvert;$(SolutionDir)..\versioning\BRM;$(SolutionDir)..\utils\rwlock;$(SolutionDir)..\utils\funcexp;$(SolutionDir)..\dbcon\joblist;$(SolutionDir)..\utils\rowgroup;$(SolutionDir)..\dbcon\ddlpackage;$(SolutionDir)..\utils\common;$(SolutionDir)..\utils\joiner;$(SolutionDir)..\oam\oamcpp;$(SolutionDir)..\snmpd\snmpmanager;$(SolutionDir)..\utils\querystats;$(SolutionDir)..\utils\querytele;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>SKIP_SNMP; _CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <WarningLevel>Level3</WarningLevel>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <DisableSpecificWarnings>4244;4267;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+      <BufferSecurityCheck>false</BufferSecurityCheck>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="framebound.cpp" />
+    <ClCompile Include="frameboundrange.cpp" />
+    <ClCompile Include="frameboundrow.cpp" />
+    <ClCompile Include="idborderby.cpp" />
+    <ClCompile Include="wf_count.cpp" />
+    <ClCompile Include="wf_lead_lag.cpp" />
+    <ClCompile Include="wf_min_max.cpp" />
+    <ClCompile Include="wf_nth_value.cpp" />
+    <ClCompile Include="wf_ntile.cpp" />
+    <ClCompile Include="wf_percentile.cpp" />
+    <ClCompile Include="wf_ranking.cpp" />
+    <ClCompile Include="wf_row_number.cpp" />
+    <ClCompile Include="wf_stats.cpp" />
+    <ClCompile Include="wf_sum_avg.cpp" />
+    <ClCompile Include="windowframe.cpp" />
+    <ClCompile Include="windowfunction.cpp" />
+    <ClCompile Include="windowfunctiontype.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="framebound.h" />
+    <ClInclude Include="frameboundrange.h" />
+    <ClInclude Include="frameboundrow.h" />
+    <ClInclude Include="idborderby.h" />
+    <ClInclude Include="wf_avg.h" />
+    <ClInclude Include="wf_count.h" />
+    <ClInclude Include="wf_leadlag.h" />
+    <ClInclude Include="wf_max.h" />
+    <ClInclude Include="wf_min.h" />
+    <ClInclude Include="wf_nth_value.h" />
+    <ClInclude Include="wf_ntile.h" />
+    <ClInclude Include="wf_percentile.h" />
+    <ClInclude Include="wf_ranking.h" />
+    <ClInclude Include="wf_row_number.h" />
+    <ClInclude Include="wf_stats.h" />
+    <ClInclude Include="wf_sum.h" />
+    <ClInclude Include="windowframe.h" />
+    <ClInclude Include="windowfunction.h" />
+    <ClInclude Include="windowfunctiontype.h" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -1350,7 +1350,7 @@ int createTxns(const int& start, const int& end) {
 	verifyLen=manager->verifySize();
 	for (int idx = first; idx<last && verifyLen<maxNewTxns; idx++)
 	{
-		managerTxns[idx] = manager->newTxnID((u_int32_t)idx+1000);
+		managerTxns[idx] = manager->newTxnID((uint32_t)idx+1000);
 		CPPUNIT_ASSERT(managerTxns[idx].id>0);
 		CPPUNIT_ASSERT(managerTxns[idx].valid==true);
 		verifyLen=manager->verifySize();
@@ -1426,7 +1426,7 @@ void MonitorTestPlan_1() {
 			monitor = new SessionMonitor(); // read Monitor data
     		toTxns.clear();
 			toTxns = monitor->timedOutTxns(); // get timed out txns
-			CPPUNIT_ASSERT(toTxns.size()==(uint)txnCntIncr*idx);
+			CPPUNIT_ASSERT(toTxns.size()==(uint32_t)txnCntIncr*idx);
 
 			delete monitor;
 		}

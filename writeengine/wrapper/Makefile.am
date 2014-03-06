@@ -1,4 +1,4 @@
-# Copyright (C) 2013 Calpont Corp.
+# Copyright (C) 2014 InfiniDB, Inc.
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -46,6 +46,7 @@ libwriteengine_la_SOURCES = writeengine.cpp \
 	../shared/we_bulkrollbackfile.cpp \
 	../shared/we_rbmetawriter.cpp \
 	../shared/we_dbrootextenttracker.cpp \
+	../shared/we_confirmhdfsdbfile.cpp \
 	../dictionary/we_dctnry.cpp \
 	../xml/we_xmlop.cpp \
 	../xml/we_xmljob.cpp \

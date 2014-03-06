@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -35,6 +35,7 @@
 #include <boost/thread/condition.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/function.hpp>
+#include "winport.h"
 
 namespace threadpool
 {
@@ -56,9 +57,9 @@ public:
 	struct Job {
 		Job() : weight(1), priority(0), id(0) { }
 		boost::shared_ptr<Functor> functor;
-		uint weight;
-		uint priority;
-		uint id;
+		uint32_t weight;
+		uint32_t priority;
+		uint32_t id;
 	};
 
 	enum Priority {
@@ -80,7 +81,7 @@ public:
     		uint lowThreads, uint id = 0);
     virtual ~PriorityThreadPool();
 
-    void removeJobs(uint id);
+    void removeJobs(uint32_t id);
     void addJob(const Job &job, bool useLock = true);
     void stop();
 
@@ -106,7 +107,7 @@ private:
     void threadFcn(const Priority preferredQueue) throw();
 
     std::list<Job> jobQueues[3];  // higher indexes = higher priority
-    uint threadCounts[3];
+    uint32_t threadCounts[3];
     boost::mutex mutex;
     boost::condition newJob;
     boost::thread_group threads;

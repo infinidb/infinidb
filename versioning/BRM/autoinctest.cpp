@@ -8,7 +8,7 @@ using namespace std;
 using namespace BRM;
 
 /*
-EXPORT void startAISequence(uint32_t OID, uint64_t firstNum, uint colWidth);
+EXPORT void startAISequence(uint32_t OID, uint64_t firstNum, uint32_t colWidth);
 EXPORT bool getAIRange(uint32_t OID, uint32_t count, uint64_t *firstNum);
 EXPORT bool getAIValue(uint32_t OID, uint64_t *value);
 EXPORT void resetAISequence(uint32_t OID, uint64_t value);

@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -121,7 +121,7 @@ void TupleUnion::setDistinctFlags(const vector<bool> &v)
 	distinctFlags = v;
 }
 
-void TupleUnion::readInput(uint which)
+void TupleUnion::readInput(uint32_t which)
 {
 	/* The handling of the output got a little kludgey with the string table enhancement.
 	 * When there is no distinct check, the outputs are all generated independently of
@@ -134,7 +134,7 @@ void TupleUnion::readInput(uint which)
 	RowGroupDL *dl = NULL;
 	bool more = true;
 	RGData inRGData, outRGData, *tmpRGData;
-	uint it = numeric_limits<uint>::max();
+	uint32_t it = numeric_limits<uint32_t>::max();
 	RowGroup l_inputRG, l_outputRG, l_tmpRG;
 	Row inRow, outRow, tmpRow;
 	bool distinct;
@@ -184,7 +184,7 @@ void TupleUnion::readInput(uint which)
 				l_tmpRG.resetRowGroup(0);
 				l_tmpRG.getRow(0, &tmpRow);
 				l_tmpRG.setRowCount(l_inputRG.getRowCount());
-				for (uint i = 0; i < l_inputRG.getRowCount(); i++, inRow.nextRow(),
+				for (uint32_t i = 0; i < l_inputRG.getRowCount(); i++, inRow.nextRow(),
 				  tmpRow.nextRow())
 					normalize(inRow, &tmpRow);
 
@@ -193,7 +193,7 @@ void TupleUnion::readInput(uint which)
 					mutex::scoped_lock lk(uniquerMutex);
 					getOutput(&l_outputRG, &outRow, &outRGData);
 					memUsageBefore = allocator.getMemUsage();
-					for (uint i = 0; i < l_tmpRG.getRowCount(); i++, tmpRow.nextRow()) {
+					for (uint32_t i = 0; i < l_tmpRG.getRowCount(); i++, tmpRow.nextRow()) {
 						pair<Uniquer_t::iterator, bool> inserted;
 						inserted = uniquer->insert(RowPosition(which | RowPosition::normalizedFlag, i));
 						if (inserted.second) {
@@ -219,7 +219,7 @@ void TupleUnion::readInput(uint which)
 				}
 			}
 			else {
-				for (uint i = 0; i < l_inputRG.getRowCount(); i++, inRow.nextRow()) {
+				for (uint32_t i = 0; i < l_inputRG.getRowCount(); i++, inRow.nextRow()) {
 					normalize(inRow, &outRow);
 					addToOutput(&outRow, &l_outputRG, false, outRGData);
 				}
@@ -240,7 +240,7 @@ void TupleUnion::readInput(uint which)
 
 	/* make sure that the input was drained before exiting.  This can happen if the
 	query was aborted */
-	if (dl && it != numeric_limits<uint>::max())
+	if (dl && it != numeric_limits<uint32_t>::max())
 		while (more)
 			more = dl->next(it, &inRGData);
 
@@ -259,11 +259,11 @@ void TupleUnion::readInput(uint which)
 	}
 }
 
-uint TupleUnion::nextBand(messageqcpp::ByteStream &bs)
+uint32_t TupleUnion::nextBand(messageqcpp::ByteStream &bs)
 {
 	RGData mem;
 	bool more;
-	uint ret = 0;
+	uint32_t ret = 0;
 
 	bs.restart();
 	more = output->next(outputIt, &mem);
@@ -317,7 +317,7 @@ void TupleUnion::addToOutput(Row *r, RowGroup *rg, bool keepit,
 
 void TupleUnion::normalize(const Row &in, Row *out)
 {
-	uint i;
+	uint32_t i;
 
 	out->setRid(0);
 	for (i = 0; i < out->getColumnCount(); i++) {
@@ -599,7 +599,7 @@ dec2:					uint64_t val = in.getIntField(i);
 					case CalpontSystemCatalog::DECIMAL:
                     case CalpontSystemCatalog::UDECIMAL: {
 dec3:					/* have to pick a scale to use for the double. using 5... */
-						uint scale = 5;
+						uint32_t scale = 5;
 						uint64_t ival = (uint64_t) (double) (val * pow((double) 10, (double) scale));
 						int diff = out->getScale(i) - scale;
 						if (diff < 0)
@@ -620,7 +620,7 @@ dec3:					/* have to pick a scale to use for the double. using 5... */
             case CalpontSystemCatalog::DECIMAL:
 			case CalpontSystemCatalog::UDECIMAL: {
 				int64_t val = in.getIntField(i);
-				uint    scale = in.getScale(i);
+				uint32_t    scale = in.getScale(i);
 
 				switch (out->getColTypes()[i]) {
 					case CalpontSystemCatalog::TINYINT:
@@ -690,7 +690,7 @@ dec3:					/* have to pick a scale to use for the double. using 5... */
 
 void TupleUnion::run()
 {
-	uint i;
+	uint32_t i;
 
 	mutex::scoped_lock lk(jlLock);
 	if (runRan)
@@ -725,7 +725,7 @@ void TupleUnion::run()
 
 void TupleUnion::join()
 {
-	uint i;
+	uint32_t i;
 	mutex::scoped_lock lk(jlLock);
 	Uniquer_t::iterator it;
 
@@ -760,7 +760,7 @@ const string TupleUnion::toString() const
 
 }
 
-void TupleUnion::writeNull(Row *out, uint col)
+void TupleUnion::writeNull(Row *out, uint32_t col)
 {
 	switch (out->getColTypes()[col]) {
 		case CalpontSystemCatalog::TINYINT:
@@ -774,7 +774,7 @@ void TupleUnion::writeNull(Row *out, uint col)
 		case CalpontSystemCatalog::DECIMAL:
         case CalpontSystemCatalog::UDECIMAL:
 		{
-			uint len = out->getColumnWidth(col);
+			uint32_t len = out->getColumnWidth(col);
 			switch (len)
 			{
 				case 1:
@@ -810,7 +810,7 @@ void TupleUnion::writeNull(Row *out, uint col)
 			out->setUintField<8>(joblist::DATETIMENULL, col); break;
 		case CalpontSystemCatalog::CHAR:
 		case CalpontSystemCatalog::VARCHAR: {
-			uint len = out->getColumnWidth(col);
+			uint32_t len = out->getColumnWidth(col);
 			switch (len) {
 				case 1: out->setUintField<1>(joblist::CHAR1NULL, col); break;
 				case 2: out->setUintField<2>(joblist::CHAR2NULL, col); break;

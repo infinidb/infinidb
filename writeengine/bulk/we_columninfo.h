@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -310,9 +310,9 @@ struct ColumnInfo
      *  @param bSkippedtoNewExtent Did block skipping advance to next extent
      *  @param bIsNewExtent Treat as new extent when updating CP min/max
      */
-    int setupInitialColumnExtent( u_int16_t dbRoot,
-                       u_int32_t partition,
-                       u_int16_t segment,
+    int setupInitialColumnExtent( uint16_t dbRoot,
+                       uint32_t partition,
+                       uint16_t segment,
                        const std::string& tblName,
                        BRM::LBID_t lbid,
                        HWM     oldHwm,
@@ -329,9 +329,9 @@ struct ColumnInfo
     *                    has no extents (or is the HWM extent just disabled)
     */
     void setupDelayedFileCreation(
-                       u_int16_t dbRoot,
-                       u_int32_t partition,
-                       u_int16_t segment,
+                       uint16_t dbRoot,
+                       uint32_t partition,
+                       uint16_t segment,
                        HWM       hwm,
                        bool      bEmptyPM );
 
@@ -358,7 +358,7 @@ struct ColumnInfo
      *  @param autoIncCount The number of autoincrement numbers to be reserved.
      *  @param nextValue    Value of the first reserved auto inc number.
      */
-    int reserveAutoIncNums(uint autoIncCount, uint64_t& nextValue );
+    int reserveAutoIncNums(uint32_t autoIncCount, uint64_t& nextValue );
 
     /** @brief Truncate specified dictionary file.  Only applies if compressed.
      * @param dctnryOid Dictionary store OID
@@ -423,7 +423,7 @@ struct ColumnInfo
     virtual int setupInitialColumnFile( HWM oldHWM,   // original HWM 
                                         HWM newHWM ); // new HWM to start from
 
-    virtual int saveDctnryStoreHWMChunk();  // Backup dctnry HWM chunk
+    virtual int saveDctnryStoreHWMChunk(bool& needBackup);//Backup Dct HWM Chunk
     int extendColumnNewExtent(              // extend column; new extent
         bool saveLBIDForCP,
         uint16_t dbRootNew,

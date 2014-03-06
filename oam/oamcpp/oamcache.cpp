@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -32,6 +32,7 @@ using namespace boost;
 #include "liboamcpp.h"
 #include "exceptclasses.h"
 #include "configcpp.h"
+#include "installdir.h"
 
 namespace
 {
@@ -50,7 +51,7 @@ OamCache * OamCache::makeOamCache()
 	return oamCache;
 }
 
-OamCache::OamCache() : mtime(0)
+OamCache::OamCache() : mtime(0), mLocalPMId(0)
 {}
 
 OamCache::~OamCache()
@@ -76,7 +77,7 @@ void OamCache::checkReload()
 	dbRootPMMap.reset(new map<int, int>());
 
 	//cout << "reloading oamcache\n";	
-	for (uint i = 0; i < dbroots.size(); i++) {
+	for (uint32_t i = 0; i < dbroots.size(); i++) {
 		oam.getDbrootPmConfig(dbroots[i], temp);
 		//cout << "  dbroot " << dbroots[i] << " -> PM " << temp << endl;
 		(*dbRootPMMap)[dbroots[i]] = temp;
@@ -92,7 +93,7 @@ void OamCache::checkReload()
 	}
 	std::set<int>::const_iterator it = uniquePids.begin();
 	moduleIds.clear();
-	uint i = 0;
+	uint32_t i = 0;
 	map<int, int> pmToConnectionMap;
 #ifdef _MSC_VER
 	moduleIds.push_back(*it);
@@ -171,7 +172,7 @@ OamCache::PMDbrootsMap_t OamCache::getPMToDbrootsMap()
 	return pmDbrootsMap;
 }
 
-uint OamCache::getDBRootCount()
+uint32_t OamCache::getDBRootCount()
 {
 	mutex::scoped_lock lk(cacheLock);
 
@@ -202,5 +203,43 @@ std::string OamCache::getOAMParentModuleName()
 	checkReload();
 	return OAMParentModuleName; 
 }
+
+int OamCache::getLocalPMId()
+{
+	// This comes from the file $INSTALL/local/module, not from the xml.
+	// Thus, it's not refreshed during checkReload().
+	if (mLocalPMId > 0)
+	{
+		return mLocalPMId;
+	}
+
+	string localModule;
+    string moduleType;
+	string fileName = startup::StartUp::installDir() + "/local/module";
+	ifstream moduleFile (fileName.c_str());
+	char line[400];
+	while (moduleFile.getline(line, 400))
+	{
+		localModule = line;
+		break;
+	}
+	moduleFile.close();
+
+	if (localModule.empty() ) 
+	{
+		mLocalPMId = 0;
+		return mLocalPMId;
+	}
+
+	moduleType = localModule.substr(0,MAX_MODULE_TYPE_SIZE);
+	mLocalPMId = atoi(localModule.substr(MAX_MODULE_TYPE_SIZE,MAX_MODULE_ID_SIZE).c_str());
+	if (moduleType != "pm")
+	{
+		mLocalPMId = 0;
+	}
+
+	return mLocalPMId;
+}
+
 } /* namespace oam */
 

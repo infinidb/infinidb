@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -140,7 +140,7 @@ class MultiTimer {
 			total.fStartCount = 1;
 			fProcessStats.push_back(total);
 
-			for(uint i = 0; i < fProcessStats.size(); i++) {
+			for(uint32_t i = 0; i < fProcessStats.size(); i++) {
 
 				if(i == (fProcessStats.size() - 1)) {
 					cout << endl;
@@ -216,8 +216,8 @@ class MultiTimer {
 
 void MultiTimer::stop(const string& message) {
 	bool found = false;
-	uint idx = 0;
-	for(uint i = 0; i < fProcessStats.size(); i++) {
+	uint32_t idx = 0;
+	for(uint32_t i = 0; i < fProcessStats.size(); i++) {
 		if(fProcessStats[i].fProcess == message) {
 			idx = i;
 			found = true;
@@ -232,13 +232,13 @@ void MultiTimer::stop(const string& message) {
 
 void MultiTimer::start(const string& message) {
 	bool found = false;
-	uint idx = 0;
+	uint32_t idx = 0;
 	ProcessStats processStats;
 	if(!fStarted) {
 		fStarted = true;
 		gettimeofday(&fTvStart, 0);
 	}
-	for(uint i = 0; i < fProcessStats.size(); i++) {
+	for(uint32_t i = 0; i < fProcessStats.size(); i++) {
 		if(fProcessStats[i].fProcess == message) {
 			idx = i;
 			found = true;
@@ -541,7 +541,7 @@ private:
         // double list
         WSDL<DoubleElementType>* wsdlInD1 = new WSDL<DoubleElementType>(20, numRows, fRm);
         WSDL<DoubleElementType>* wsdlInD2 = new WSDL<DoubleElementType>(20, numRows, fRm);
-        // uint list
+        // uint32_t list
         WSDL<ElementType>* wsdlInU1 = new WSDL<ElementType>(20, numRows, fRm);
         WSDL<ElementType>* wsdlInU2 = new WSDL<ElementType>(20, numRows, fRm);
         // string list
@@ -602,7 +602,7 @@ private:
             }
         }
 
-		// double add(double, uint)
+		// double add(double, uint32_t)
         {
             DoubleElementType el0, el1;
             ElementType       el2;
@@ -666,7 +666,7 @@ private:
             }
         }
 
-		// double add(uint, double)
+		// double add(uint32_t, double)
         {
             DoubleElementType el0, el2;
             ElementType       el1;
@@ -698,7 +698,7 @@ private:
             }
         }
 
-		// double add(uint, uint)
+		// double add(uint32_t, uint32_t)
         {
             DoubleElementType el0;
             ElementType       el1, el2;
@@ -730,7 +730,7 @@ private:
             }
         }
 
-		// double add(uint, string)
+		// double add(uint32_t, string)
         {
             DoubleElementType el0;
             ElementType       el1;
@@ -795,7 +795,7 @@ private:
             }
         }
 
-		// double add(string, uint)
+		// double add(string, uint32_t)
         {
             DoubleElementType el0;
             StringElementType el1;

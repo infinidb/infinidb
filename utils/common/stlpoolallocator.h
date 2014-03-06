@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -59,7 +59,7 @@ class STLPoolAllocator
 
 		STLPoolAllocator() throw();
 		STLPoolAllocator(const STLPoolAllocator &) throw();
-		STLPoolAllocator(uint capacity) throw();
+		STLPoolAllocator(uint32_t capacity) throw();
 		template<class U> STLPoolAllocator(const STLPoolAllocator<U> &) throw();
 		~STLPoolAllocator();
 
@@ -76,7 +76,7 @@ class STLPoolAllocator
 		void construct(pointer p, const T& val);
 		void destroy(pointer p);
 
-		static const uint DEFAULT_SIZE = 4096*sizeof(T);
+		static const uint32_t DEFAULT_SIZE = 4096*sizeof(T);
 
 		boost::shared_ptr<utils::PoolAllocator> pa;
 };
@@ -94,7 +94,7 @@ STLPoolAllocator<T>::STLPoolAllocator(const STLPoolAllocator<T> &s) throw()
 }
 
 template<class T>
-STLPoolAllocator<T>::STLPoolAllocator(uint capacity) throw()
+STLPoolAllocator<T>::STLPoolAllocator(uint32_t capacity) throw()
 {
 	pa.reset(new PoolAllocator(capacity));
 }
@@ -140,7 +140,7 @@ void STLPoolAllocator<T>::deallocate(typename STLPoolAllocator<T>::pointer p,
 template<class T>
 typename STLPoolAllocator<T>::size_type STLPoolAllocator<T>::max_size() const throw()
 {
-	return std::numeric_limits<uint>::max()/sizeof(T);
+	return std::numeric_limits<uint32_t>::max()/sizeof(T);
 }
 
 template<class T>

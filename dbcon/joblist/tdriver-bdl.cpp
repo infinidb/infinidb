@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -225,11 +225,11 @@ public:
 		eofInputTag += testDesc;
 		consumeTag  += testDesc;
 
-		uint i;
-		uint numOfProducers = NUM_PRODUCERS;
-		uint numOfConsumers = NUM_CONSUMERS;
-		uint numBuckets     = NUM_BUCKETS;
-		uint maxElements    = MAX_ELEMENTS;
+		uint32_t i;
+		uint32_t numOfProducers = NUM_PRODUCERS;
+		uint32_t numOfConsumers = NUM_CONSUMERS;
+		uint32_t numBuckets     = NUM_BUCKETS;
+		uint32_t maxElements    = MAX_ELEMENTS;
 		BucketDL<Element> bdl(numBuckets, 1, maxElements); 
 	    bdl.setMultipleProducers(true);		
 		bdl.setElementMode(1); // RID_VALUE
@@ -323,11 +323,11 @@ public:
 		eofInputTag += testDesc;
 		consumeTag  += testDesc;
 
-		uint i;
-		uint numOfProducers = NUM_PRODUCERS;
-		uint numOfConsumers = NUM_CONSUMERS;
-		uint numBuckets     = NUM_BUCKETS;
-		uint maxElements    = MAX_ELEMENTS;
+		uint32_t i;
+		uint32_t numOfProducers = NUM_PRODUCERS;
+		uint32_t numOfConsumers = NUM_CONSUMERS;
+		uint32_t numBuckets     = NUM_BUCKETS;
+		uint32_t maxElements    = MAX_ELEMENTS;
 		BucketDL<Element> bdl(numBuckets, 1, maxElements); 
 	    bdl.setMultipleProducers(true);		
 		if ( compress )
@@ -405,7 +405,7 @@ public:
 	    typedef ElementType Element;
 
     	vector <Element> v;
-    	for (uint i = 0; i < ::count; i++)
+    	for (uint32_t i = 0; i < ::count; i++)
     	    v.push_back(Element(i,i));
     	
     	vector<Element> v1;

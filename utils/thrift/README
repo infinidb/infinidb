@@ -1,0 +1,6 @@
+This is Apache Thrift 0.9.1
+
+Actually, this is just the bits and pieces of the API necessary to work
+with InfiniDB. It is provided as a convenience to source builders so
+that they don't have to find and install Thrift
+

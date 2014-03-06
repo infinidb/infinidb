@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -66,7 +66,7 @@ RowColumn::RowColumn (const RowColumn& rhs, const uint32_t sessionID):
 	fColumnVec.clear();
 	//fColumnVec = rhs.fColumnVec;
 	SRCP srcp;
-	for (uint i = 0; i < rhs.fColumnVec.size(); i++)
+	for (uint32_t i = 0; i < rhs.fColumnVec.size(); i++)
 	{
 		srcp.reset(rhs.fColumnVec[i]->clone());
 		fColumnVec.push_back(srcp);
@@ -102,7 +102,7 @@ const string RowColumn::toString() const
 {
 	ostringstream output;
 	output << "RowColumn" << endl;
-	for (uint i = 0; i < fColumnVec.size(); i++)
+	for (uint32_t i = 0; i < fColumnVec.size(); i++)
 		output << fColumnVec[i]->toString();
 
 	return output.str();
@@ -113,7 +113,7 @@ void RowColumn::serialize(messageqcpp::ByteStream& b) const
 	b << (ObjectReader::id_t) ObjectReader::ROWCOLUMN;
 	ReturnedColumn::serialize(b);
 	b << (uint32_t)fColumnVec.size();
-	for (uint i = 0; i < fColumnVec.size(); i++)
+	for (uint32_t i = 0; i < fColumnVec.size(); i++)
 		fColumnVec[i]->serialize(b);
 }
 
@@ -125,7 +125,7 @@ void RowColumn::unserialize(messageqcpp::ByteStream& b)
 	uint32_t size;
 	SRCP srcp;
 	b >> (uint32_t&)size;
-	for (uint i = 0; i < size; i++)
+	for (uint32_t i = 0; i < size; i++)
 	{
 		srcp.reset(dynamic_cast<ReturnedColumn*>((ObjectReader::createTreeNode(b))));
 		fColumnVec.push_back(srcp);
@@ -136,7 +136,7 @@ bool RowColumn::operator==(const RowColumn& t) const
 {
 	if (fColumnVec.size() != t.columnVec().size())
 		return false;
-	for (uint i = 0; i < fColumnVec.size(); i++)
+	for (uint32_t i = 0; i < fColumnVec.size(); i++)
 	{
 		if (fColumnVec[i].get() != NULL)
 		{
@@ -170,6 +170,17 @@ bool RowColumn::operator!=(const RowColumn& t) const
 bool RowColumn::operator!=(const TreeNode* t) const
 {
 	return !(*this == t);
+}
+
+ostream& operator<<(ostream &output, const SubSelect& ss)
+{
+	output << ss.toString() << endl;
+	return output;
+}
+
+const string SubSelect::toString() const
+{
+	return string(">SubSelect<");
 }
 
 } // namespace execplan

@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -31,6 +31,7 @@
 #include <vector>
 
 #include <boost/shared_ptr.hpp>
+#include <boost/uuid/uuid.hpp>
 
 #include "calpontexecutionplan.h"
 #include "calpontselectexecutionplan.h"
@@ -67,17 +68,17 @@ const int8_t CONST_COL_ONLY  = 2;
 
 struct TupleInfo
 {
-	TupleInfo(uint w=0, uint o=0, uint k=-1, uint t=-1, uint s=0, uint p=0,
+	TupleInfo(uint32_t w=0, uint32_t o=0, uint32_t k=-1, uint32_t t=-1, uint32_t s=0, uint32_t p=0,
 		execplan::CalpontSystemCatalog::ColDataType dt=execplan::CalpontSystemCatalog::BIGINT) :
 		width(w), oid(o), key(k), tkey(t), scale(s), precision(p), dtype(dt) { }
 	~TupleInfo() { }
 
-	uint width;
-	uint oid;
-	uint key;
-	uint tkey;
-	uint scale;
-	uint precision;
+	uint32_t width;
+	uint32_t oid;
+	uint32_t key;
+	uint32_t tkey;
+	uint32_t scale;
+	uint32_t precision;
 	execplan::CalpontSystemCatalog::ColDataType dtype;
 };
 
@@ -85,8 +86,8 @@ struct TupleInfo
 struct JoinData
 {
 	int64_t fJoinId;
-	std::vector<uint> fLeftKeys;
-	std::vector<uint> fRightKeys;
+	std::vector<uint32_t> fLeftKeys;
+	std::vector<uint32_t> fRightKeys;
 	std::vector<JoinType> fTypes; // joblisttypes.h: INNER, LEFTOUTER, RIGHTOUTER
 	bool fTypeless;
 
@@ -97,7 +98,7 @@ typedef std::stack<JobStepVector> JobStepVectorStack;
 typedef std::set<execplan::CalpontSystemCatalog::TableName> DeliveredTablesSet;
 typedef std::map<execplan::CalpontSystemCatalog::OID, execplan::CalpontSystemCatalog::OID> DictOidToColOidMap;
 typedef std::vector<TupleInfo> TupleInfoVector;
-typedef std::map<uint, TupleInfoVector> TupleInfoMap;
+typedef std::map<uint32_t, TupleInfoVector> TupleInfoMap;
 
 //@bug 598 & 1632 self-join
 //typedef std::pair<execplan::CalpontSystemCatalog::OID, std::string> OIDAliasPair;  //self-join
@@ -110,27 +111,29 @@ struct UniqId
 	std::string fTable;  // table name (table alias)
 	std::string fSchema; // schema name
 	std::string fView;   // view name
+	uint32_t    fPseudo; // pseudo type
 //	uint64_t	fEngine; // InfiniDB == 0
 	uint64_t    fSubId;  // subquery ID
 
 	UniqId() : fId(-1), fSubId(-1) {}
-	UniqId(int i, const std::string& t, const std::string& s, const std::string& v, uint64_t l=-1) :
-		fId(i), fTable(t), fSchema(s), fView(v), fSubId(l) {}
+	UniqId(int i, const std::string& t, const std::string& s, const std::string& v,
+	       uint32_t pi = 0, uint64_t l=-1) :
+	       fId(i), fTable(t), fSchema(s), fView(v), fPseudo(pi), fSubId(l) {}
 	UniqId(const execplan::SimpleColumn* sc);
 	UniqId(int o, const execplan::SimpleColumn* sc);
 };
 bool operator < (const struct UniqId& x, const struct UniqId& y);
 bool operator == (const struct UniqId& x, const struct UniqId& y);
-typedef std::map<UniqId, uint> TupleKeyMap;
+typedef std::map<UniqId, uint32_t> TupleKeyMap;
 
 //typedef vector<SRCP> RetColsVector;
 typedef execplan::CalpontSelectExecutionPlan::ReturnedColumnList RetColsVector;
 
 //join data between table pairs
-typedef std::map<std::pair<uint, uint>, JoinData> TableJoinMap;
+typedef std::map<std::pair<uint32_t, uint32_t>, JoinData> TableJoinMap;
 // map<table<table A id, table B id>, pair<table A joinKey, table B joinKey> >
-//typedef std::map<std::pair<uint, uint>, std::pair<uint, uint> > TableJoinKeyMap;
-//typedef std::map<std::pair<uint, uint>, JoinType> JoinTypeMap;
+//typedef std::map<std::pair<uint32_t, uint32_t>, std::pair<uint32_t, uint32_t> > TableJoinKeyMap;
+//typedef std::map<std::pair<uint32_t, uint32_t>, JoinType> JoinTypeMap;
 
 struct TupleKeyInfo
 {
@@ -141,13 +144,15 @@ struct TupleKeyInfo
 	std::vector<bool>  crossEngine;
 
 	// TODO: better orgineze this structs
-	std::map<uint, execplan::CalpontSystemCatalog::OID> tupleKeyToTableOid;
-	std::map<uint, execplan::CalpontSystemCatalog::ColType> colType;
-	std::map<uint, execplan::CalpontSystemCatalog::ColType> token2DictTypeMap; // i/c token only
-	std::map<uint, std::string> keyName;
-	std::map<uint, uint> colKeyToTblKey;
-	std::map<uint, uint> dictKeyMap;    // map token key to dictionary key
-	DictOidToColOidMap dictOidToColOid; // map dictionary OID to column OID
+	std::map<uint32_t, execplan::CalpontSystemCatalog::OID> tupleKeyToTableOid;
+	std::map<uint32_t, execplan::CalpontSystemCatalog::ColType> colType;
+	std::map<uint32_t, execplan::CalpontSystemCatalog::ColType> token2DictTypeMap; // i/c token only
+	std::map<uint32_t, std::string> keyName;
+	std::map<uint32_t, uint32_t> colKeyToTblKey;
+	std::map<uint32_t, uint32_t> dictKeyMap;    // map token key to dictionary key
+	DictOidToColOidMap dictOidToColOid;         // map dictionary OID to column OID
+	std::map<uint32_t, uint32_t> pseudoType;    // key to pseudo column type
+
 	TupleInfoMap tupleInfoMap;
 
 	TupleKeyInfo() : nextKey(0) {}
@@ -178,7 +183,6 @@ struct JobInfo
 		traceFlags(0),
 		tupleDLMaxSize(rm.getTwMaxSize()),
 		tupleMaxBuckets(rm.getTwMaxBuckets()),
-//		status(new uint16_t(0)),
 		projectingTableOID(0),
 		isExeMgr(false),
 		trace(false),
@@ -254,7 +258,7 @@ struct JobInfo
 	// In most case, the string is used for return or comparison, so default is false.
 	//     when setting to false, no need to check: false overwrites true;
 	//     When setting to true, need check: true cannot overwrite false.
-	std::map<uint, bool> tokenOnly;
+	std::map<uint32_t, bool> tokenOnly;
 
 	// unique ID list of the tables in from clause
 	std::vector<uint32_t> tableList;
@@ -271,24 +275,23 @@ struct JobInfo
 	RetColsVector nonConstCols;     // none constant columns
 	RetColsVector nonConstDelCols;  // delivered none constant columns
 	RetColsVector projectionCols;   // columns for projection
-//	std::set<uint64_t> returnColSet;// columns returned
 	std::multimap<execplan::ReturnedColumn*, execplan::ReturnedColumn*> cloneAggregateColMap;
 	std::vector<std::pair<int, int> > aggEidIndexList;
 
 	// for AVG to support CNX_USE_DECIMAL_SCALE
 	//   map<key, column scale << 8 + avg scale>
-	std::map<uint, int> scaleOfAvg;
+	std::map<uint32_t, int> scaleOfAvg;
 
 	// table pairs with incompatible join which is treated as expression
-	std::map<uint, uint> incompatibleJoinMap;
+	std::map<uint32_t, uint32_t> incompatibleJoinMap;
 
 	// bug 1573 & 3391, having
 	SJSTEP         havingStep;
 	JobStepVector  havingStepVec;
 
 	// bug 2634, 5311 and 5374, outjoin and predicates
-	std::set<uint> outerOnTable;
-	std::set<uint> tableHasIsNull;
+	std::set<uint32_t> outerOnTable;
+	std::set<uint32_t> tableHasIsNull;
 	JobStepVector  outerJoinExpressions;
 	std::vector<boost::shared_ptr<const execplan::ParseTree> > onClauseFilter;
 
@@ -327,15 +330,15 @@ struct JobInfo
 	GroupConcatInfo groupConcatInfo;
 
 	// @bug3736, column map
-	std::map<uint, std::vector<uint> > columnMap;
+	std::map<uint32_t, std::vector<uint32_t> > columnMap;
 
 	// @bug3438, joblist for trace/stats
 	JobList* jobListPtr;  // just reference, NOT delete by JobInfo
 
 	// WORKAROUND for join FE limitation (join Id to expression tables map)
-	std::map<uint, std::set<uint> > joinFeTableMap;
+	std::map<uint32_t, std::set<uint32_t> > joinFeTableMap;
 
-	uint stringTableThreshold;
+	uint32_t stringTableThreshold;
 
 	// @bug4531, Window Function support
 	RetColsVector windowCols;
@@ -346,7 +349,16 @@ struct JobInfo
 	uint64_t      wfqLimitStart;
 	uint64_t      wfqLimitCount;
 	// workaround for expression of windowfunction in IN/EXISTS sub-query
-	//std::map<uint, RetColsVector>  exprWinfuncListMap;
+	//std::map<uint32_t, RetColsVector>  exprWinfuncListMap;
+
+	// Flag to tell us we are in local PM only query mode
+	uint32_t localQuery;
+
+	boost::uuids::uuid uuid;
+
+	// @bug4021, column map for all pseudo column queries
+	std::map<uint64_t, execplan::SRCP> tableColMap;
+	std::set<uint64_t> pseudoColTable;
 
 private:
 	//defaults okay
@@ -388,27 +400,27 @@ execplan::CalpontSystemCatalog::OID tableOid(const execplan::SimpleColumn* sc,
 /** @brief Returns the unique ID to be used in tupleInfo
  *
  */
-uint getTupleKey(const JobInfo& jobInfo,
+uint32_t getTupleKey(const JobInfo& jobInfo,
 	const execplan::SimpleColumn* sc);
-uint getTableKey(const JobInfo& jobInfo,
+uint32_t getTableKey(const JobInfo& jobInfo,
 	execplan::CalpontSystemCatalog::OID tableOid,
 	const std::string& alias,
 	const std::string& schema,
 	const std::string& view);
-uint getTupleKey(JobInfo& jobInfo,
+uint32_t getTupleKey(JobInfo& jobInfo,
 	const execplan::SRCP& srcp,
 	bool add = false);
-uint getTableKey(const JobInfo& jobInfo,
-	uint cid);
-uint getTableKey(JobInfo& jobInfo,
+uint32_t getTableKey(const JobInfo& jobInfo,
+	uint32_t cid);
+uint32_t getTableKey(JobInfo& jobInfo,
 	JobStep* js);
 
-uint getExpTupleKey(const JobInfo& jobInfo,
+uint32_t getExpTupleKey(const JobInfo& jobInfo,
 	uint64_t eid);
 
-uint makeTableKey(JobInfo& jobInfo,
+uint32_t makeTableKey(JobInfo& jobInfo,
 	const execplan::SimpleColumn* sc);
-uint makeTableKey(JobInfo& jobInfo,
+uint32_t makeTableKey(JobInfo& jobInfo,
 	execplan::CalpontSystemCatalog::OID tableOid,
 	const std::string& tbl_name,
 	const std::string& tbl_alias,
@@ -419,12 +431,12 @@ uint makeTableKey(JobInfo& jobInfo,
 /** @brief Returns the tupleInfo associate with the (table, column) key pair
  *
  */
-TupleInfo getTupleInfo(uint tableKey, uint columnKey, const JobInfo& jobInfo);
+TupleInfo getTupleInfo(uint32_t tableKey, uint32_t columnKey, const JobInfo& jobInfo);
 
 /** @brief Returns the tupleInfo associate with the expression
  *
  */
-TupleInfo getExpTupleInfo(uint expKey, const JobInfo& jobInfo);
+TupleInfo getExpTupleInfo(uint32_t expKey, const JobInfo& jobInfo);
 
 /** @brief set tuple info for simple column
  *

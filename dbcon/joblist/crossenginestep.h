@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -73,12 +73,12 @@ public:
 
 	// from BatchPrimitive
 	bool getFeederFlag() const { return false; }
-	execplan::CalpontSystemCatalog::OID getLastOid() const { return 0; }
-	uint getStepCount () const { return 1; }
+	uint64_t getLastTupleId() const { return 0; }
+	uint32_t getStepCount () const { return 1; }
 	void setBPP(JobStep* jobStep);
 	void setFirstStepType(PrimitiveStepType firstStepType) {}
 	void setIsProjectionOnly() {}
-	void setLastOid(execplan::CalpontSystemCatalog::OID colOid) {}
+	void setLastTupleId(uint64_t id) {}
 	void setOutputType(BPSOutputType outputType) {}
 	void setProjectBPP(JobStep* jobStep1, JobStep* jobStep2);
 	void setStepCount() {}
@@ -99,12 +99,12 @@ public:
 	const rowgroup::RowGroup& getOutputRowGroup() const;
 
 	// from DECEventListener
-	void newPMOnline(uint) {}
+	void newPMOnline(uint32_t) {}
 
 	const rowgroup::RowGroup& getDeliveredRowGroup() const;
 	void  deliverStringTableRowGroup(bool b);
 	bool  deliverStringTableRowGroup() const;
-	uint nextBand(messageqcpp::ByteStream &bs);
+	uint32_t nextBand(messageqcpp::ByteStream &bs);
 
 	void addFcnExpGroup1(const boost::shared_ptr<execplan::ParseTree>&);
 	void setFE1Input(const rowgroup::RowGroup&);
@@ -174,7 +174,7 @@ protected:
 	// Function & Expression columns
 	boost::shared_ptr<execplan::ParseTree> fFeFilters;
 	std::vector<boost::shared_ptr<execplan::ReturnedColumn> > fFeSelects;
-	std::map<uint, uint> fColumnMap;   // projected key position (k->p)
+	std::map<uint32_t, uint32_t> fColumnMap;   // projected key position (k->p)
 	uint64_t fColumnCount;
 	boost::scoped_array<int> fFe1Column;
 	boost::shared_array<int> fFeMapping1;

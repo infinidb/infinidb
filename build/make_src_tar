@@ -90,9 +90,7 @@ rm -rf scripts queries storage/maria
 cd ..
 rm -rf writeengine/test/*
 rm -rf utils/net-snmp-built-libs
-cd utils/multicast
-rm -f config.h impl.h participants.h socklib.h threads.h udpc-protoc.h util.h impl.cpp mc_fifo.h produconsum.h statistics.h udp-sender.h udpcast.h
-cd ../..
+rm -rf utils/multicast
 rm -rf utils/openpgm
 rm -rf tools/reserveStacks
 rm -rf dbcon/doc dbcon/ingres dbcon/plsql

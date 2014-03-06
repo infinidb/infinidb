@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -136,7 +136,7 @@ pColStep::pColStep(
 		return;
 
 	int err, i;
-	uint mask;
+	uint32_t mask;
 
 	if (fFlushInterval == 0 || !isEM)
 		fOutputType = OT_BOTH;
@@ -273,11 +273,10 @@ pColStep::pColStep(const pColScanStep& rhs) :
 	fNumBlksSkipped(0),
 	fMsgBytesIn(0),
 	fMsgBytesOut(0),
-	fUdfName(rhs.udfName()),
 	fFilters(rhs.getFilters())
 {
 	int err, i;
-	uint mask;
+	uint32_t mask;
 	if (fTableOid == 0)  // cross engine support
 		return;
 
@@ -368,7 +367,7 @@ pColStep::pColStep(const PassThruStep& rhs) :
 	fMsgBytesOut(0)
 {
 	int err, i;
-	uint mask;
+	uint32_t mask;
 
 	if (fTableOid == 0)  // cross engine support
 		return;
@@ -467,7 +466,7 @@ void pColStep::initializeConfigParms()
 // 		errno  = 0;
 // 		numVal = Config::uFromText(strVal);
 // 		if ( errno == 0 )
-// 			fProjectBlockReqLimit     = (u_int32_t)numVal;
+// 			fProjectBlockReqLimit     = (uint32_t)numVal;
 // 	}
 //
 // 	strVal = cf->getConfig(section, sendThresholdName);
@@ -476,7 +475,7 @@ void pColStep::initializeConfigParms()
 // 		errno  = 0;
 // 		numVal = Config::uFromText(strVal);
 // 		if ( errno == 0 )
-// 			fProjectBlockReqThreshold = (u_int32_t)numVal;
+// 			fProjectBlockReqThreshold = (uint32_t)numVal;
 // 	}
 }
 
@@ -611,8 +610,8 @@ void pColStep::sendPrimitiveMessages()
 //	int64_t msgLargeBlock = -1;
 //	int64_t nextLargeBlock = -1;
 //	uint16_t blockRelativeRID;
-//	uint msgCount = 0;
-//	uint sentBlockCount = 0;
+//	uint32_t msgCount = 0;
+//	uint32_t sentBlockCount = 0;
 //	int msgsSkip=0;
 //	bool scan=false;
 //	bool scanThisBlock=false;
@@ -658,7 +657,7 @@ void pColStep::sendPrimitiveMessages()
 //
 //	scanFlags.resize(numExtents);
 //
-//	for (uint idx=0; idx <numExtents; idx++)
+//	for (uint32_t idx=0; idx <numExtents; idx++)
 //	{
 //		if (extents[idx].partition.cprange.isValid != BRM::CP_VALID) {
 //			scanFlags[idx]=1;
@@ -958,7 +957,7 @@ void pColStep::receivePrimitiveMessages()
 //	UintRowGroup rw;
 //	uint64_t ridBase;
 //	boost::shared_ptr<ByteStream> bs;
-//	uint i = 0, length;
+//	uint32_t i = 0, length;
 //
 //	while (1) {
 //		// sync with the send side
@@ -1008,7 +1007,7 @@ void pColStep::receivePrimitiveMessages()
 //		length = bs->length();
 //
 //		i = 0;
-//		uint msgCount = 0;
+//		uint32_t msgCount = 0;
 //		while (i < length) {
 //			++msgCount;
 //
@@ -1059,7 +1058,7 @@ void pColStep::receivePrimitiveMessages()
 //				ridResults += crh->NVALS;
 //
 //				/* memcpy the bytestream into the output set */
-//				uint toCopy, bsPos = 0;
+//				uint32_t toCopy, bsPos = 0;
 //				uint8_t *pos;
 //				while (bsPos < crh->NVALS) {
 //					toCopy = (crh->NVALS - bsPos > rw.ElementsPerGroup - rw.count ?
@@ -1378,7 +1377,7 @@ void pColStep::addFilters()
 /* This exists to avoid a DBRM lookup for every rid. */
 inline uint64_t pColStep::getLBID(uint64_t rid, bool& scan)
 {
-	uint extentIndex, extentOffset;
+	uint32_t extentIndex, extentOffset;
 	uint64_t fbo;
 	fbo = rid >> rpbShift;
 	extentIndex = fbo >> divShift;
@@ -1389,7 +1388,7 @@ inline uint64_t pColStep::getLBID(uint64_t rid, bool& scan)
 
 inline uint64_t pColStep::getFBO(uint64_t lbid)
 {
-	uint i;
+	uint32_t i;
 	uint64_t lastLBID;
 
 	for (i = 0; i < numExtents; i++) {

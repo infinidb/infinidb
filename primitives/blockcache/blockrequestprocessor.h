@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -98,7 +98,7 @@ public:
 		bool readFromCache);
 
 	int getCachedBlocks(const BRM::LBID_t *lbids, const BRM::VER_t *vers, uint8_t **ptrs,
-		bool *wasCached, uint count);
+		bool *wasCached, uint32_t count);
 
 	inline bool exists(BRM::LBID_t lbid, BRM::VER_t ver) {
 		return fbMgr.exists(HashObject_t(lbid, ver, 0)); }

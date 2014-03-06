@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -218,7 +218,7 @@ class RowAggregation;
 class AggHasher
 {
 public:
-	AggHasher(const Row &row, Row **tRow, uint keyCount, RowAggregation *ra);
+	AggHasher(const Row &row, Row **tRow, uint32_t keyCount, RowAggregation *ra);
 	inline uint64_t operator()(const RowPosition &p) const;
 
 private:
@@ -226,13 +226,13 @@ private:
 	RowAggregation *agg;
 	Row **tmpRow;
 	mutable Row r;
-	uint lastKeyCol;
+	uint32_t lastKeyCol;
 };
 
 class AggComparator
 {
 public:
-	AggComparator(const Row &row, Row **tRow, uint keyCount, RowAggregation *ra);
+	AggComparator(const Row &row, Row **tRow, uint32_t keyCount, RowAggregation *ra);
 	inline bool operator()(const RowPosition &, const RowPosition &) const;
 
 private:
@@ -240,7 +240,7 @@ private:
 	RowAggregation *agg;
 	Row **tmpRow;
 	mutable Row r1, r2;
-	uint lastKeyCol;
+	uint32_t lastKeyCol;
 };
 
 class KeyStorage
@@ -265,26 +265,26 @@ private:
 class ExternalKeyHasher
 {
 public:
-	ExternalKeyHasher(const RowGroup &keyRG, KeyStorage *ks, uint keyColCount, Row **tRow);
+	ExternalKeyHasher(const RowGroup &keyRG, KeyStorage *ks, uint32_t keyColCount, Row **tRow);
 	inline uint64_t operator()(const RowPosition &pos) const;
 
 private:
 	mutable Row row;
 	mutable Row **tmpRow;
-	uint lastKeyCol;
+	uint32_t lastKeyCol;
 	KeyStorage *ks;
 };
 
 class ExternalKeyEq
 {
 public:
-	ExternalKeyEq(const RowGroup &keyRG, KeyStorage *ks, uint keyColCount, Row **tRow);
+	ExternalKeyEq(const RowGroup &keyRG, KeyStorage *ks, uint32_t keyColCount, Row **tRow);
 	inline bool operator()(const RowPosition &pos1, const RowPosition &pos2) const;
 
 private:
 	mutable Row row1, row2;
 	mutable Row **tmpRow;
-	uint lastKeyCol;
+	uint32_t lastKeyCol;
 	KeyStorage *ks;
 };
 
@@ -302,10 +302,10 @@ typedef std::tr1::unordered_map<RowPosition, RowPosition, ExternalKeyHasher, Ext
 struct GroupConcat
 {
 	// GROUP_CONCAT(DISTINCT col1, 'const', col2 ORDER BY col3 desc SEPARATOR 'sep')
-	std::vector<std::pair<uint, uint> > fGroupCols;    // columns to concatenate, and position
-	std::vector<std::pair<uint, bool> > fOrderCols;    // columns to order by [asc/desc]
+	std::vector<std::pair<uint32_t, uint32_t> > fGroupCols;    // columns to concatenate, and position
+	std::vector<std::pair<uint32_t, bool> > fOrderCols;    // columns to order by [asc/desc]
 	std::string                         fSeparator;
-	std::vector<std::pair<std::string, uint> >  fConstCols; // constant columns in group
+	std::vector<std::pair<std::string, uint32_t> >  fConstCols; // constant columns in group
 	bool                                fDistinct;
 	uint64_t                            fSize;
 
@@ -519,7 +519,7 @@ class RowAggregation : public messageqcpp::Serializeable
 		RowGroup*                                       fLargeSideRG;
 		boost::shared_array<boost::shared_array<int> >  fSmallMappings;
 		boost::shared_array<int>                        fLargeMapping;
-		uint                                            fSmallSideCount;
+		uint32_t                                            fSmallSideCount;
 		boost::scoped_array<Row> rowSmalls;
 
 		// for hashmap

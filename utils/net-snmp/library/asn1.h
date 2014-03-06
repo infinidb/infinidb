@@ -39,7 +39,7 @@ SOFTWARE.
 
 #ifndef MAX_SUBID               /* temporary - duplicate definition protection */
 #ifndef EIGHTBIT_SUBIDS
-    typedef u_long  oid;
+    typedef uint32_t  oid;
 #define MAX_SUBID   0xFFFFFFFF
 #else
     typedef u_char  oid;
@@ -81,8 +81,8 @@ SOFTWARE.
 #define IS_EXTENSION_ID(byte)	(((byte) & ASN_EXTENSION_ID) == ASN_EXTENSION_ID)
 
     struct counter64 {
-        u_long          high;
-        u_long          low;
+        uint32_t          high;
+        uint32_t          low;
     };
 
 #ifdef OPAQUE_SPECIAL_TYPES
@@ -191,9 +191,9 @@ SOFTWARE.
     u_char         *asn_build_int(u_char *, size_t *, u_char, const long *,
                                   size_t);
     u_char         *asn_parse_unsigned_int(u_char *, size_t *, u_char *,
-                                           u_long *, size_t);
+                                           uint32_t *, size_t);
     u_char         *asn_build_unsigned_int(u_char *, size_t *, u_char,
-                                           const u_long *, size_t);
+                                           const uint32_t *, size_t);
     u_char         *asn_parse_string(u_char *, size_t *, u_char *,
                                      u_char *, size_t *);
     u_char         *asn_build_string(u_char *, size_t *, u_char,
@@ -203,7 +203,7 @@ SOFTWARE.
                                        const char *estr);       /* error message prefix */
     u_char         *asn_build_header(u_char *, size_t *, u_char, size_t);
     u_char         *asn_build_sequence(u_char *, size_t *, u_char, size_t);
-    u_char         *asn_parse_length(u_char *, u_long *);
+    u_char         *asn_parse_length(u_char *, uint32_t *);
     u_char         *asn_build_length(u_char *, size_t *, size_t);
     u_char         *asn_parse_objid(u_char *, size_t *, u_char *, oid *,
                                     size_t *);
@@ -363,7 +363,7 @@ SOFTWARE.
                                                     size_t * offset,
                                                     int allow_realloc,
                                                     u_char type,
-                                                    const u_long * data,
+                                                    const uint32_t * data,
                                                     size_t data_size);
 
     int             asn_realloc_rbuild_header(u_char ** pkt,

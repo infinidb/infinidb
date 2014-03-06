@@ -150,7 +150,7 @@
 		<DepProcessName2>DBRMWorkerNode</DepProcessName2>
 		<DepModuleName2>*</DepModuleName2>
 		<DepProcessName3>ExeMgr</DepProcessName3>
-		<DepModuleName3>um*</DepModuleName3>
+		<DepModuleName3>*</DepModuleName3>
 		<RunType>SIMPLEX</RunType>
 		<LogFile>off</LogFile>
 	</PROCESSCONFIG12>

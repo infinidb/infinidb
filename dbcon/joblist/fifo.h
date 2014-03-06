@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -55,7 +55,7 @@ public:
 		RID_VALUE
 	};
 
-	FIFO(uint numConsumers, uint maxElements);
+	FIFO(uint32_t numConsumers, uint32_t maxElements);
 	virtual ~FIFO();
 
 	/* DataList<element_t> interface */
@@ -78,14 +78,14 @@ public:
 	execplan::CalpontSystemCatalog::OID OID() const { return base::OID(); }
 
 	inline void dropToken() { };
-	inline void dropToken(uint) { };
+	inline void dropToken(uint32_t) { };
 
 	// Counters that reflect how many many times this FIFO blocked on reads/writes
 	uint64_t blockedWriteCount() const;
 	uint64_t blockedReadCount()  const;
 
 	// @bug 653 set number of consumers when it is empty.
-	void setNumConsumers( uint nc );
+	void setNumConsumers( uint32_t nc );
 
 	void inOrder(bool order) { fInOrder = order; }
 	bool inOrder() const { return fInOrder; }
@@ -106,8 +106,8 @@ public:
 	// a FIFO is converted to another datalist, this enum should be copied
 	// over to the datalist, as a ZDL for example can use the element mode
 	// for other reasons.
-	void setElementMode(uint mode)     { fElementMode = mode; }
-	uint getElementMode() const        { return fElementMode; }
+	void setElementMode(uint32_t mode)     { fElementMode = mode; }
+	uint32_t getElementMode() const        { return fElementMode; }
 
 	// Total number of files and filespace used for temp files
 	void setTotalFileCounts(uint64_t numFiles, uint64_t numBytes);
@@ -133,7 +133,7 @@ private:
 	bool     fInOrder;
 	uint64_t fConsumerFinishedCount;
 	volatile bool fConsumptionStarted;
-	uint     fElementMode;
+	uint32_t     fElementMode;
 	uint64_t fNumFiles;
 	uint64_t fNumBytes;
 
@@ -159,7 +159,7 @@ private:
 // #define ONE_CS
 
 template<typename element_t>
-FIFO<element_t>::FIFO(uint con, uint max) : DataListImpl<std::vector<element_t>, element_t>(con)
+FIFO<element_t>::FIFO(uint32_t con, uint32_t max) : DataListImpl<std::vector<element_t>, element_t>(con)
 {
 	fMaxElements = max;
 	pBuffer = 0;
@@ -411,7 +411,7 @@ void FIFO<element_t>::setMultipleProducers(bool b)
 
 //@bug 653
 template<typename element_t>
-void FIFO<element_t>::setNumConsumers( uint nc )
+void FIFO<element_t>::setNumConsumers( uint32_t nc )
 {
 	delete [] cpos;
 	base::setNumConsumers(nc);

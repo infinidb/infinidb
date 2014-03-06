@@ -7,4 +7,14 @@ CREATE FUNCTION caldroppartitionsbyvalue RETURNS STRING SONAME 'libcalmysql.dll'
 CREATE FUNCTION caldisablepartitionsbyvalue RETURNS STRING SONAME 'libcalmysql.dll';
 CREATE FUNCTION calenablepartitionsbyvalue RETURNS STRING SONAME 'libcalmysql.dll';
 CREATE FUNCTION calshowpartitionsbyvalue RETURNS STRING SONAME 'libcalmysql.dll';
+CREATE FUNCTION idbpm RETURNS INTEGER soname 'libcalmysql.dll';
+CREATE FUNCTION idbdbroot RETURNS INTEGER soname 'libcalmysql.dll';
+CREATE FUNCTION idbsegment RETURNS INTEGER soname 'libcalmysql.dll';
+CREATE FUNCTION idbsegmentdir RETURNS INTEGER soname 'libcalmysql.dll';
+CREATE FUNCTION idbextentrelativerid RETURNS INTEGER soname 'libcalmysql.dll';
+CREATE FUNCTION idbblockid RETURNS INTEGER soname 'libcalmysql.dll';
+CREATE FUNCTION idbextentid RETURNS INTEGER soname 'libcalmysql.dll';
+CREATE FUNCTION idbextentmin RETURNS STRING soname 'libcalmysql.dll';
+CREATE FUNCTION idbextentmax RETURNS STRING soname 'libcalmysql.dll';
+CREATE FUNCTION idbpartition RETURNS STRING soname 'libcalmysql.dll';
 

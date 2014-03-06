@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -1253,7 +1253,7 @@ void WESDHandler::onBrmReport(int PmId, messageqcpp::SBS& Sbs) {
 				{
 					if (getDebugLvl())
 						cout << "\tSuccessfully changed TableLock State" << endl;
-					doCleanup();
+					doCleanup(true);
 				}
 				else
 				{
@@ -1546,7 +1546,10 @@ void WESDHandler::onRollbackResult(int PmId, messageqcpp::SBS& Sbs) {
 		fLog.logMsg( aStrStr.str(), MSGLVL_INFO2 );
 		if (getDebugLvl()) cout << aStrStr.str() << endl;
 
-		doCleanup();
+		// false flag sent to doCleanup says to not delete HDFS temp db files,
+		// because the bulk rollback will have already deleted them.  We still
+		// call doCleanup for other file cleanup (like deleting meta file).
+		doCleanup(false);
 	}
 
 }
@@ -1708,13 +1711,14 @@ void WESDHandler::doRollback()
 
 //------------------------------------------------------------------------------
 
-void WESDHandler::doCleanup() {
+void WESDHandler::doCleanup(bool deleteHdfsTempDbFiles) {
 	if (getDebugLvl())
 		cout << "A cleanup is called!!" << endl;
 
 	messageqcpp::ByteStream aBs;
 	aBs << (ByteStream::byte) WE_CLT_SRV_CLEANUP;
 	aBs << (ByteStream::quadbyte) fTableOId;
+	aBs << (ByteStream::byte) deleteHdfsTempDbFiles;
 	mutex::scoped_lock aLock(fSendMutex);
 	send2Pm(aBs);
 	aLock.unlock();
@@ -2276,14 +2280,14 @@ std::string WESDHandler::getTime2Str() const
 {
 	char aBuff[64];
 	time_t aTime;
-	struct tm * pTm;
+	struct tm pTm;
 	time(&aTime);
-	pTm = localtime(&aTime);
+	localtime_r(&aTime, &pTm);
 
 	//				  M   D   H   M   S
 	snprintf(aBuff, sizeof(aBuff), "%02d%02d%02d%02d%02d",
-			pTm->tm_mon+1, pTm->tm_mday, pTm->tm_hour,
-			pTm->tm_min, pTm->tm_sec);
+			pTm.tm_mon+1, pTm.tm_mday, pTm.tm_hour,
+			pTm.tm_min, pTm.tm_sec);
 
 	return aBuff;
 }
@@ -2424,7 +2428,7 @@ void WESDHandler::onDisconnectFailure()
 					{
 						fWeSplClients[PmId]->setup();
 					}
-					catch(runtime_error& re)
+					catch(runtime_error&)
 					{
 						cout << "Unable to connect to PM" <<
 								PmId <<"; Trying again..."<< endl;

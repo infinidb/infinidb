@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -15,13 +15,6 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-/***********************************************************************
-*   $Id: groupconcatcolumn.cpp 9381 2013-04-04 19:19:32Z rdempsey $
-*
-*   Copyright (C) 2009-2013 Calpont Corporation
-*   All Rights Reserved
-*
-***********************************************************************/
 #include <sstream>
 #include <cstring>
 
@@ -53,12 +46,12 @@ GroupConcatColumn::GroupConcatColumn():
 {
 }
 
-GroupConcatColumn::GroupConcatColumn(const u_int32_t sessionID):
+GroupConcatColumn::GroupConcatColumn(const uint32_t sessionID):
 		AggregateColumn(sessionID)
 {
 }
 
-GroupConcatColumn::GroupConcatColumn(const GroupConcatColumn& rhs, const u_int32_t sessionID):
+GroupConcatColumn::GroupConcatColumn(const GroupConcatColumn& rhs, const uint32_t sessionID):
 		AggregateColumn(dynamic_cast<const AggregateColumn&>(rhs)),
 		fOrderCols(rhs.fOrderCols),
 		fSeparator(rhs.fSeparator)
@@ -79,7 +72,7 @@ const string GroupConcatColumn::toString() const
 	output << "GroupConcatColumn " << data() << endl;
 	output << AggregateColumn::toString() << endl;
 	output << "Group Concat Order Columns: " << endl;
-	for (uint i = 0; i < fOrderCols.size(); i++)
+	for (uint32_t i = 0; i < fOrderCols.size(); i++)
 	{
 		output << *fOrderCols[i];
 	}
@@ -95,7 +88,7 @@ ostream& operator<<(ostream& output, const GroupConcatColumn& rhs)
 
 void GroupConcatColumn::serialize(messageqcpp::ByteStream& b) const
 {
-	b << (u_int8_t) ObjectReader::GROUPCONCATCOLUMN;
+	b << (uint8_t) ObjectReader::GROUPCONCATCOLUMN;
 	AggregateColumn::serialize(b);
 
 	CalpontSelectExecutionPlan::ReturnedColumnList::const_iterator rcit;
@@ -130,7 +123,7 @@ bool GroupConcatColumn::operator==(const GroupConcatColumn& t) const
 	rc2 = static_cast<const AggregateColumn*>(&t);
 	if (*rc1 != *rc2)
 		return false;
-	for (uint i = 0; i < fOrderCols.size(); i++)
+	for (uint32_t i = 0; i < fOrderCols.size(); i++)
 	{
 		if (fOrderCols[i].get() != NULL)
 		{

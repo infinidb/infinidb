@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -57,10 +57,10 @@ namespace dbbc {
 
 struct FileBufferIndex
 {
-	FileBufferIndex(BRM::LBID_t l, BRM::VER_t v, u_int32_t p) : lbid(l), ver(v), poolIdx(p) {}
+	FileBufferIndex(BRM::LBID_t l, BRM::VER_t v, uint32_t p) : lbid(l), ver(v), poolIdx(p) {}
 	BRM::LBID_t lbid;
 	BRM::VER_t ver;
-	u_int32_t poolIdx;	
+	uint32_t poolIdx;	
 };
 
 struct CacheInsert_t {
@@ -176,8 +176,8 @@ public:
 	 **/
 
 	bool find(const HashObject_t& keyFb, void* bufferPtr);
-	uint bulkFind(const BRM::LBID_t *lbids, const BRM::VER_t *vers, uint8_t **buffers,
-		bool *wasCached, uint blockCount);
+	uint32_t bulkFind(const BRM::LBID_t *lbids, const BRM::VER_t *vers, uint8_t **buffers,
+		bool *wasCached, uint32_t blockCount);
 	
 	uint32_t maxCacheSize() const {return fMaxNumBlocks;}
 

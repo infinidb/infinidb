@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -26,6 +26,7 @@ using namespace std;
 
 #include <boost/shared_ptr.hpp>
 #include <boost/shared_array.hpp>
+#include <boost/uuid/uuid_io.hpp>
 using namespace boost;
 
 #include "messagequeue.h"
@@ -229,7 +230,7 @@ void CrossEngineStep::setFE1Input(const rowgroup::RowGroup& rg)
 }
 
 
-void CrossEngineStep::setFcnExpGroup3(const vector<shared_ptr<ReturnedColumn> >& fe)
+void CrossEngineStep::setFcnExpGroup3(const vector<boost::shared_ptr<ReturnedColumn> >& fe)
 {
 	fFeSelects = fe;
 }
@@ -249,10 +250,10 @@ void CrossEngineStep::makeMappings()
 
 	if (fFeFilters != NULL)
 	{
-		const std::vector<uint>& colInFe1 = fRowGroupFe1.getKeys();
+		const std::vector<uint32_t>& colInFe1 = fRowGroupFe1.getKeys();
 		for (uint64_t i = 0; i < colInFe1.size(); i++)
 		{
-			map<uint, uint>::iterator it = fColumnMap.find(colInFe1[i]);
+			map<uint32_t, uint32_t>::iterator it = fColumnMap.find(colInFe1[i]);
 			if (it != fColumnMap.end())
 				fFe1Column[it->second] = i;
 			else
@@ -652,29 +653,32 @@ void CrossEngineStep::setBPP(JobStep* jobStep)
 	string bop = " AND ";
 	if (pcs != 0)
 	{
+		if (dynamic_cast<PseudoColStep*>(pcs) != NULL)
+			throw logic_error("No Psedo Column for foreign engine.");
+
 		if (pcs->BOP() == BOP_OR)
 			bop = " OR ";
 		addFilterStr(pcs->getFilters(), bop);
 	}
-	else if ((pcss = dynamic_cast<pColScanStep*>(jobStep)) != 0)
+	else if ((pcss = dynamic_cast<pColScanStep*>(jobStep)) != NULL)
 	{
 		if (pcss->BOP() == BOP_OR)
 			bop = " OR ";
 		addFilterStr(pcss->getFilters(), bop);
 	}
-	else if ((pds = dynamic_cast<pDictionaryStep*>(jobStep)) != 0)
+	else if ((pds = dynamic_cast<pDictionaryStep*>(jobStep)) != NULL)
 	{
 		if (pds->BOP() == BOP_OR)
 			bop = " OR ";
 		addFilterStr(pds->getFilters(), bop);
 	}
-	else if ((pdss = dynamic_cast<pDictionaryScan*>(jobStep)) != 0)
+	else if ((pdss = dynamic_cast<pDictionaryScan*>(jobStep)) != NULL)
 	{
 		if (pds->BOP() == BOP_OR)
 			bop = " OR ";
 		addFilterStr(pdss->getFilters(), bop);
 	}
-	else if ((fs = dynamic_cast<FilterStep*>(jobStep)) != 0)
+	else if ((fs = dynamic_cast<FilterStep*>(jobStep)) != NULL)
 	{
 		addFilterStr(fs->getFilters(), bop);
 	}
@@ -763,12 +767,12 @@ const RowGroup& CrossEngineStep::getDeliveredRowGroup() const
 }
 
 
-uint CrossEngineStep::nextBand(messageqcpp::ByteStream &bs)
+uint32_t CrossEngineStep::nextBand(messageqcpp::ByteStream &bs)
 {
 	//shared_array<uint8_t> rgDataOut;
 	RGData rgDataOut;
 	bool more = false;
-	uint rowCount = 0;
+	uint32_t rowCount = 0;
 
 	try
 	{
@@ -864,7 +868,8 @@ void CrossEngineStep::printCalTrace()
 			<< "\t1st read " << dlTimes.FirstReadTimeString()
 			<< "; EOI " << dlTimes.EndOfInputTimeString() << "; runtime-"
 			<< JSTimeStamp::tsdiffstr(dlTimes.EndOfInputTime(), dlTimes.FirstReadTime())
-			<< "s;\n\tJob completion status " << status() << endl;
+			<< "s;\n\tUUID " << uuids::to_string(fStepUuid) << endl
+			<< "\tJob completion status " << status() << endl;
 	logEnd(logStr.str().c_str());
 	fExtendedInfo += logStr.str();
 	formatMiniStats();

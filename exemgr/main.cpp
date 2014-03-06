@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -54,10 +54,12 @@
 //#define NDEBUG
 #include <cassert>
 #include <clocale>
+#include <ctime>
 using namespace std;
 
 #include <boost/thread.hpp>
 #include <boost/tokenizer.hpp>
+#include <boost/scoped_ptr.hpp>
 using namespace boost;
 
 #include "configcpp.h"
@@ -66,8 +68,6 @@ using namespace config;
 #include "iosocket.h"
 #include "bytestream.h"
 using namespace messageqcpp;
-#include "threadpool.h"
-using namespace threadpool;
 #include "calpontselectexecutionplan.h"
 #include "calpontsystemcatalog.h"
 #include "simplecolumn.h"
@@ -86,8 +86,8 @@ using namespace logging;
 #include "querystats.h"
 using namespace querystats;
 #include "MonitorProcMem.h"
-
-#include <boost/scoped_ptr.hpp>
+#include "querytele.h"
+using namespace querytele;
 
 #include "activestatementcounter.h"
 #include "femsghandler.h"
@@ -120,8 +120,8 @@ mutex sessionMemMapMutex;
 
 //...The FrontEnd may establish more than 1 connection (which results in
 //   more than 1 ExeMgr thread) per session.  These threads will share
-//   the same CalpontSystemCatalog object for that session.  Here, we de-
-//   fine a map to track how many threads are sharing each session, so
+//   the same CalpontSystemCatalog object for that session.  Here, we
+//   define a map to track how many threads are sharing each session, so
 //   that we know when we can safely delete a CalpontSystemCatalog object
 //   shared by multiple threads per session.
 typedef map<uint32_t, uint32_t> ThreadCntPerSessionMap_t;
@@ -214,13 +214,38 @@ const string prettyPrintMiniInfo(const string& in)
 	return oss.str();
 }
 
-struct SessionThread
+const string timeNow()
 {
+	time_t outputTime = time(0);
+	struct tm ltm;
+	char buf[32];	//ctime(3) says at least 26
+	size_t len = 0;
+#ifdef _MSC_VER
+	asctime_s(buf, 32, localtime_r(&outputTime, &ltm));
+#else
+	asctime_r(localtime_r(&outputTime, &ltm), buf);
+#endif
+	len = strlen(buf);
+	if (len > 0) --len;
+	if (buf[len] == '\n') buf[len] = 0;
+	return buf;
+}
+
+QueryTeleServerParms gTeleServerParms;
+
+class SessionThread
+{
+public:
+
 	SessionThread(const IOSocket& ios, DistributedEngineComm* ec, ResourceManager& rm) :
 		fIos(ios), fEc(ec),
 		fRm(rm),
-		fStatsRetrieved(false)
-	{ }
+		fStatsRetrieved(false),
+		fTeleClient(gTeleServerParms)
+	{
+	}
+
+private:
 
 	IOSocket fIos;
 	DistributedEngineComm *fEc;
@@ -230,6 +255,8 @@ struct SessionThread
 	// Variables used to store return stats
 	bool       fStatsRetrieved;
 
+	QueryTeleClient fTeleClient;
+
 	//...Reinitialize stats for start of a new query
 	void initStats ( uint32_t sessionId, string& sqlText )
 	{
@@ -237,7 +264,6 @@ struct SessionThread
 
 		fStats.reset();
 		fStats.setStartTime();
-		//fStats.rm(&fRm);
 		fStats.fSessionID = sessionId;
 		fStats.fQuery = sqlText;
 		fStatsRetrieved  = false;
@@ -269,7 +295,6 @@ struct SessionThread
 	{
 		if ( sessionId < 0x80000000 )
 		{
-			// cout << "Deleting pct for session " << sessionId << endl;
 			mutex::scoped_lock lk(sessionMemMapMutex);
 			SessionMemMap_t::iterator mapIter =
 				sessionMemMap.find( sessionId );
@@ -281,15 +306,16 @@ struct SessionThread
 	}
 
 	//...Get and log query stats to specified output stream
-	void getAndLogQueryStats (
+	const string formatQueryStats (
 		SJLP&    jl,			// joblist associated with query
-		ostream& os,		    // output stream to log output to
 		const    string& label, // header label to print in front of log output
 		bool     includeNewLine,//include line breaks in query stats string
 		bool     vtableModeOn,
 		bool     wantExtendedStats,
 		uint64_t rowsReturned)
 	{
+		ostringstream os;
+
 		// Get stats if not already acquired for current query
 		if ( !fStatsRetrieved )
 		{
@@ -330,6 +356,8 @@ struct SessionThread
 			"; MsgBytesIn-"    << roundBytes(fStats.fMsgBytesIn) <<
 			"; MsgBytesOut-"   << roundBytes(fStats.fMsgBytesOut) <<
 			"; Mode-"          << queryMode;
+
+		return os.str();
 	}
 
 	//...Increment the number of threads using the specified sessionId
@@ -369,8 +397,6 @@ struct SessionThread
 			}
 		}
 	}
-
-private:
 
 	//...Init sessionMemMap entry for specified session to 0 memory %.
 	//...SessionId >= 0x80000000 is system catalog query we can ignore.
@@ -524,6 +550,17 @@ public:
 						// now wait for the CSEP...
 						bs = fIos.read();
 					}
+					else if (qb == 5) //somebody wants stats
+					{
+						bs.restart();
+						qb = statementsRunningCount->cur();
+						bs << qb;
+						qb = statementsRunningCount->waiting();
+						bs << qb;
+						fIos.write(bs);
+						fIos.close();
+						break;
+					}
 					else
 					{
 						if (gDebug)
@@ -534,7 +571,16 @@ public:
 				}
 new_plan:
 				csep.unserialize(bs);
-				
+
+				QueryTeleStats qts;
+				qts.query_uuid = csep.uuid();
+				qts.msg_type = QueryTeleStats::QT_START;
+				qts.start_time = QueryTeleClient::timeNowms();
+				qts.query = csep.data();
+				qts.session_id = csep.sessionID();
+				qts.query_type = csep.queryType();
+				fTeleClient.postQueryTele(qts);
+
 				if (gDebug > 1 || (gDebug && (csep.sessionID()&0x80000000)==0))
 					cout << "### For session id " << csep.sessionID() << ", got a CSEP" << endl;
 
@@ -557,7 +603,6 @@ new_plan:
 					incSessionThreadCnt = false;
 				}
 
-// 				bool needEndMsg = false;
 				bool needDbProfEndStatementMsg = false;
 				Message::Args args;
 				string sqlText = csep.data();
@@ -571,17 +616,6 @@ new_plan:
 				initStats( csep.sessionID(), sqlText );
 				fStats.fQueryType = csep.queryType();
 
-//				@bug 1775 Use SQLLogger instead
-// 				if (!sqlText.empty())
-// 				{
-// 					if (!selfJoin)
-// 					{
-// 						args.add(sqlText);
-// 						msgLog.logMessage(LOG_TYPE_DEBUG, logStartSql, args, li);
-// 					}
-// 					needEndMsg = true;
-// 				}
-				
 				// Log start and end statement if tracing is enabled.  Keep in
 				// mind the trace flag won't be set for system catalog queries.
 				if (csep.traceOn())
@@ -605,14 +639,6 @@ new_plan:
 				oss << sqlText << "; |" << csep.schemaName() <<"|";
 				SQLLogger sqlLog(oss.str(), li);
 
-				// Initialize stats for this query, including
-				// init sessionMemMap entry for this session to 0 memory %.
-				// We will need this later for traceOn() or if we receive a
-				// table request with qb=3 (see below). This is also recorded
-				// as query start time.
-//				initStats( csep.sessionID() );
-
-				// Run the query, get the minimum RID list for each table
 				statementsRunningCount->incr(stmtCounted);
 
 				if (tryTuples)
@@ -634,7 +660,6 @@ new_plan:
 							usingTuples = true;
 
 							//Tell the FE that we're sending tuples back, not TableBands
-//							tflg = 4;
 							tbs << tflg;
 							fIos.write(tbs);
 							emsgBs.reset();
@@ -703,7 +728,7 @@ new_plan:
 				}
 
 
-				jl->doQuery(); // throw runtime_error("ExeMgr: Query failed to run!");
+				jl->doQuery();
 
 				CalpontSystemCatalog::OID tableOID;
 				bool swallowRows = false;
@@ -774,12 +799,11 @@ new_plan:
 						}
 						else if (qb == 3) //special option-UM wants job stats string
 						{
-							ostringstream statsString;
+							string statsString;
 
 							//Log stats string to be sent back to front end
-							getAndLogQueryStats(
+							statsString = formatQueryStats(
 								jl,
-								statsString,
 								"Query Stats",
 								false,
 								!(csep.traceFlags() & CalpontSelectExecutionPlan::TRACE_TUPLE_OFF),
@@ -788,7 +812,7 @@ new_plan:
 								);
 
 							bs.restart();
-							bs << statsString.str();
+							bs << statsString;
 							if ((csep.traceFlags() & CalpontSelectExecutionPlan::TRACE_LOG) != 0)
 							{
 								bs << jl->extendedInfo();
@@ -837,8 +861,6 @@ new_plan:
 
 					if (swallowRows) tm.erase(tableOID);
 
-				//	uint64_t totalRowCount = 0;
-
 					FEMsgHandler msgHandler(jl, &fIos);
 					if (tableOID == 100)
 						msgHandler.start();
@@ -846,23 +868,10 @@ new_plan:
 					//...Loop serializing table bands projected for the tableOID
 					for (;;)
 					{
-						uint rowCount;
+						uint32_t rowCount;
 
 						rowCount = jl->projectTable(tableOID, bs);
 
-#if 0
-						if (csep.sessionID() < 0x80000000)
-						{
-							ByteStream bs2(bs);
-							TupleJobList *tjl = dynamic_cast<TupleJobList *>(jl.get());
-							rowgroup::RowGroup rg = tjl->getOutputRowGroup();
-							rowgroup::RGData blah;
-							blah.deserialize(bs2);
-							rg.setData(&blah);
-							cout << "exemgr got " << rg.toString() << endl;
-						}
-#endif
-						
 						msgHandler.stop();
 						if (jl->status()) {
 							IDBErrorInfo* errInfo = IDBErrorInfo::instance();
@@ -902,8 +911,7 @@ new_plan:
 							if (tableOID == 100 && msgHandler.aborted()) {
 								/* TODO: modularize the cleanup code, as well as
 								 * the rest of this fcn */
-								//cout << "saw the abort signal\n";
-								
+
 								decThreadCntPerSession( csep.sessionID() | 0x80000000 );
 								statementsRunningCount->decr(stmtCounted);
 								fIos.close();
@@ -951,23 +959,20 @@ new_plan:
 
 				if (needDbProfEndStatementMsg)
 				{
-					time_t outputTime;
-					outputTime = time(NULL);
+					string ss;
 					ostringstream prefix;
 					prefix << "ses:" << csep.sessionID() << " Query Totals";
 
 					//Log stats string to standard out
-					getAndLogQueryStats(
+					ss = formatQueryStats(
 						jl,
-						cout,
 						prefix.str(),
 						true,
 						!(csep.traceFlags() & CalpontSelectExecutionPlan::TRACE_TUPLE_OFF),
 						(csep.traceFlags() & CalpontSelectExecutionPlan::TRACE_LOG),
 						totalRowCount);
 					//@Bug 1306. Added timing info for real time tracking.
-					struct tm ltm;
-					cout << " at " << asctime(localtime_r(&outputTime, &ltm)) << endl;
+					cout << ss << " at " << timeNow() << endl;
 
 					// log query status to debug log file
 					args.reset();
@@ -1004,18 +1009,12 @@ new_plan:
 					// delete sessionMemMap entry for this session's memory % use
 					deleteMaxMemPct( csep.sessionID() );
 
-// 				if (needEndMsg)
-// 					msgLog.logMessage(LOG_TYPE_DEBUG, logEndSql, Message::Args(), li);
-
+				string endtime(timeNow());
 				if ((csep.traceFlags() & flagsWantOutput) && (csep.sessionID() < 0x80000000))
 				{
-					//@Bug 1306. Added timing info for real time tracking.
-					time_t outputTime;
-					outputTime = time(NULL);
-					struct tm ltm;
 					cout << "For session " << csep.sessionID() << ": " <<
 						totalBytesSent <<
-						" bytes sent back at " << asctime(localtime_r(&outputTime, &ltm)) << endl;
+						" bytes sent back at " << endtime << endl;
 
 					// @bug 663 - Implemented caltraceon(16) to replace the
 					// $FIFO_SINK compiler definition in pColStep.
@@ -1040,11 +1039,39 @@ new_plan:
 				}
 
 				statementsRunningCount->decr(stmtCounted);
+
+				{
+					//QueryTeleStats qts;
+					//qts.query_uuid = csep.uuid();
+					qts.msg_type = QueryTeleStats::QT_SUMMARY;
+					qts.max_mem_pct = fStats.fMaxMemPct;
+					qts.num_files = fStats.fNumFiles;
+					qts.phy_io = fStats.fPhyIO;
+					qts.cache_io = fStats.fCacheIO;
+					qts.msg_rcv_cnt = fStats.fMsgRcvCnt;
+					qts.cp_blocks_skipped = fStats.fCPBlocksSkipped;
+					qts.msg_bytes_in = fStats.fMsgBytesIn;
+					qts.msg_bytes_out = fStats.fMsgBytesOut;
+					qts.rows = totalRowCount;
+					//qts.start_time = 
+					qts.end_time = QueryTeleClient::timeNowms();
+					//qts.error_no = 
+					//qts.blocks_changed = 
+					qts.session_id = csep.sessionID();
+					qts.query_type = csep.queryType();
+					qts.query = csep.data();
+					//qts.user =
+					//qts.host =
+					//qts.priority =
+					fTeleClient.postQueryTele(qts);
+				}
+
 			}
 			jl.reset();
 			// Release CSC object (for sessionID) that was added by makeJobList()
 			// Mask 0x80000000 is for associate user query and csc query
 			decThreadCntPerSession( csep.sessionID() | 0x80000000 );
+
 		}
 		catch (std::exception& ex)
 		{
@@ -1117,8 +1144,6 @@ public:
             {
                 if ( pct > mapIter->second )
                 {
-                    //cout << "Updating session " << mapIter->first
-                    //  << " percentage to " << pct << endl;
                     mapIter->second = pct;
                 }
             }
@@ -1131,7 +1156,6 @@ public:
 
 void exit_(int)
 {
-    ec->destroyMulticastSender();
     exit(0);
 }
 
@@ -1186,17 +1210,6 @@ void setupSignalHandlers()
     ign.sa_handler = SIG_IGN;
 
     sigaction(SIGPIPE, &ign, 0);
-
-    // @bug5030 comment out the following signal hanlder to avoid
-            // deadlock when thread being interrupted by signal.
-
-    //memset(&ign, 0, sizeof(ign));
-    //ign.sa_handler = exit_;
-
-    //sigaction(SIGUSR1, &ign, 0);
-    //signal(SIGSEGV, exit_);
-    //signal(SIGINT, exit_);
-    //signal(SIGTERM, exit_);
 
     memset(&ign, 0, sizeof(ign));
     ign.sa_handler = added_a_pm;
@@ -1297,22 +1310,7 @@ int main(int argc, char* argv[])
 	setupResources();
 	
 	setupCwd(rm);
-#ifndef _MSC_VER
-	//TODO: huge kludge to get Q/A going
-	{
-		string tdp = rm.getScTempDiskPath();
-		ostringstream rmcmd;
-		rmcmd << "/usr/bin/find " << tdp << " -name LDL-\\* 2>/dev/null | /usr/bin/xargs /bin/rm -f >/dev/null 2>&1";
-		(void)::system(rmcmd.str().c_str());
-		// @bug 1041. remove stranded tuple dl.
-		rmcmd.str("");
-		rmcmd << "/usr/bin/find " << tdp << " -name Tuple-\\* 2>/dev/null | /usr/bin/xargs /bin/rm -f >/dev/null 2>&1";
-		(void)::system(rmcmd.str().c_str());
-		rmcmd.str("");
-		rmcmd << "/usr/bin/find " << tdp << " -name FIFO-\\* 2>/dev/null | /usr/bin/xargs /bin/rm -f >/dev/null 2>&1";
-		(void)::system(rmcmd.str().c_str());
-	}
-#endif
+
 	MsgMap msgMap;
 	msgMap[logDefaultMsg]           = Message(logDefaultMsg);
 	msgMap[logDbProfStartStatement] = Message(logDbProfStartStatement);
@@ -1369,16 +1367,16 @@ int main(int argc, char* argv[])
 	setpriority(PRIO_PROCESS, 0, priority);
 #endif
 
-	ThreadPool tp(serverThreads, serverQueueSize);
-
-//	// bug 934. Let ExeMgr continue, even if BucketReuseManger cannot startup successfully
-//	try
-//	{
-//		BucketReuseManager::instance()->startup(rm);
-//	}
-//	catch (...)
-//	{
-//	}
+	string teleServerHost(rm.getConfig()->getConfig("QueryTele", "Host"));
+	if (!teleServerHost.empty())
+	{
+		int teleServerPort = toInt(rm.getConfig()->getConfig("QueryTele", "Port"));
+		if (teleServerPort > 0)
+		{
+			gTeleServerParms.host = teleServerHost;
+			gTeleServerParms.port = teleServerPort;
+		}
+	}
 
 	cout << "Starting ExeMgr: st = " << serverThreads << ", sq = " <<
 		serverQueueSize << ", qs = " << rm.getEmExecQueueSize() << ", mx = " << maxPct << ", cf = " <<
@@ -1405,14 +1403,11 @@ int main(int argc, char* argv[])
 	{
 	}
 
-// 	exQueueCount = 0;
-
 	for (;;)
 	{
 		IOSocket ios;
 		ios = mqs->accept();
 		boost::thread thd(SessionThread(ios, ec, rm));
-// 		tp.invoke(SessionThread(ios, ec, rm));
 	}
 
 	return 0;

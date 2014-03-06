@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -45,7 +45,7 @@ namespace
 // we will convert at most 8 characters and then add the null
 inline bool getChar( uint64_t value, char* buf )
 {
-    uint cur_offset = 0; // current index into buf
+    uint32_t cur_offset = 0; // current index into buf
     int  cur_bitpos = 56; // 8th octet in input val
 
     while( cur_bitpos >= 0 )

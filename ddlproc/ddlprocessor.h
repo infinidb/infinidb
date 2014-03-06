@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -81,7 +81,7 @@ private:
     messageqcpp::MessageQueueServer fMqServer;
     boost::shared_ptr<execplan::CalpontSystemCatalog> csc;
 	WriteEngine::WEClients* fWEClient;
-	uint fPMCount;
+	uint32_t fPMCount;
 };
 
 

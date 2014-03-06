@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -24,6 +24,10 @@
 /*
  * Implements ObjectReader
  */
+
+#include <unistd.h>
+#include <string>
+#include <sstream>
 
 #include "treenode.h"
 #include "returnedcolumn.h"
@@ -47,6 +51,7 @@
 #include "windowfunctioncolumn.h"
 #include "logicoperator.h"
 #include "predicateoperator.h"
+#include "pseudocolumn.h"
 #include "treenodeimpl.h"
 #include "calpontexecutionplan.h"
 #include "calpontselectexecutionplan.h"
@@ -71,9 +76,6 @@ TreeNode* ObjectReader::createTreeNode(messageqcpp::ByteStream& b) {
 		case TREENODEIMPL:
 			ret = new TreeNodeImpl();
 			break;
-//		case RETURNEDCOLUMN:
-//			ret = new ReturnedColumn();
-//			break;
 		case SIMPLECOLUMN:
 			ret = new SimpleColumn();
 			break;
@@ -89,18 +91,18 @@ TreeNode* ObjectReader::createTreeNode(messageqcpp::ByteStream& b) {
 		case SIMPLECOLUMN_INT1:
 			ret = new SimpleColumn_INT<1>();
 			break;
-        case SIMPLECOLUMN_UINT2:
-            ret = new SimpleColumn_UINT<2>();
-            break;
-        case SIMPLECOLUMN_UINT4:
-            ret = new SimpleColumn_UINT<4>();
-            break;
-        case SIMPLECOLUMN_UINT8:
-            ret = new SimpleColumn_UINT<8>();
-            break;
-        case SIMPLECOLUMN_UINT1:
-            ret = new SimpleColumn_UINT<1>();
-            break;
+		case SIMPLECOLUMN_UINT2:
+			ret = new SimpleColumn_UINT<2>();
+			break;
+		case SIMPLECOLUMN_UINT4:
+			ret = new SimpleColumn_UINT<4>();
+			break;
+		case SIMPLECOLUMN_UINT8:
+			ret = new SimpleColumn_UINT<8>();
+			break;
+		case SIMPLECOLUMN_UINT1:
+			ret = new SimpleColumn_UINT<1>();
+			break;
 		case SIMPLECOLUMN_DECIMAL2:
 			ret = new SimpleColumn_Decimal<2>();
 			break;
@@ -133,6 +135,9 @@ TreeNode* ObjectReader::createTreeNode(messageqcpp::ByteStream& b) {
 			break;
 		case WINDOWFUNCTIONCOLUMN:
 			ret = new WindowFunctionColumn();
+			break;
+		case PSEUDOCOLUMN:
+			ret = new PseudoColumn();
 			break;
 		case FILTER:
 			ret = new Filter();
@@ -171,8 +176,13 @@ TreeNode* ObjectReader::createTreeNode(messageqcpp::ByteStream& b) {
 			b >> (id_t&) id;   //eat the ID
 			return NULL;
 		default:
-			throw UnserializeException("Bad type.  Stream out of sync?");
-	};
+		{
+			ostringstream oss;
+			oss << "Bad type: " << (int)id << ". Stream out of sync? (1)";
+			throw UnserializeException(oss.str());
+			break;
+		}
+	}
 
 	ret->unserialize(b);
 	return ret;
@@ -192,7 +202,12 @@ CalpontExecutionPlan* ObjectReader::createExecutionPlan(messageqcpp::ByteStream&
 			b >> reinterpret_cast<id_t&>(id);
 			return NULL;
 		default:
-			throw UnserializeException("Bad type.  Stream out of sync?");
+		{
+			ostringstream oss;
+			oss << "Bad type: " << (int)id << ". Stream out of sync? (2)";
+			throw UnserializeException(oss.str());
+			break;
+		}
 	}
 	ret->unserialize(b);
 	return ret;
@@ -254,6 +269,10 @@ void ObjectReader::checkType(messageqcpp::ByteStream& b, const CLASSID id)
 				throw UnserializeException("Not a FunctionColumn");
 			case ROWCOLUMN:
 				throw UnserializeException("Not a RowColumn");
+			case WINDOWFUNCTIONCOLUMN:
+				throw UnserializeException("Not a WindowFunctionColumn");
+			case PSEUDOCOLUMN:
+				throw UnserializeException("Not a PseudoColumn");
 			case FILTER:
 				throw UnserializeException("Not a Filter");
 			case CONDITIONFILTER:
@@ -280,7 +299,7 @@ void ObjectReader::checkType(messageqcpp::ByteStream& b, const CLASSID id)
 	return;
 }
 	
-ObjectReader::UnserializeException::UnserializeException(std::string msg)
+ObjectReader::UnserializeException::UnserializeException(string msg)
     throw() : fWhat(msg)
 {
 }

@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -58,11 +58,13 @@ inline uint64_t htonll(uint64_t n);
 // don't know 34127856 or 78563412, hope never be required to support this byte order.
 #endif
 #else //!__linux__
+#if _MSC_VER < 1600
 //Assume we're on little-endian
 inline uint64_t htonll(uint64_t n)
 {
 return ((((uint64_t) htonl(n & 0xFFFFFFFFULL)) << 32) | (htonl((n & 0xFFFFFFFF00000000ULL) >> 32)));
 }
+#endif //_MSC_VER
 #endif //__linux__
 
 // this method evalutes the uint64 that stores a char[] to expected value
@@ -98,9 +100,9 @@ struct Date
     	spare(0x3E), day(0x3F), month(0xF), year(0xFFFF) {}
     // Construct a Date from a 64 bit integer Calpont date.
     Date(uint64_t val) :
-    	spare(0), day((val >> 6) & 077), month((val >> 12) & 0xF), year((val >> 16)) {}
+    	spare(0x3E), day((val >> 6) & 077), month((val >> 12) & 0xF), year((val >> 16)) {}
     // Construct using passed in parameters, no value checking
-    Date(unsigned y, unsigned m, unsigned d) : spare(0), day(d), month(m), year(y) {}
+    Date(unsigned y, unsigned m, unsigned d) : spare(0x3E), day(d), month(m), year(y) {}
 
     int32_t convertToMySQLint() const;
 };
@@ -184,9 +186,9 @@ struct Time
 		{}
 };
 
-static uint daysInMonth[13] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 0};
+static uint32_t daysInMonth[13] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 0};
 
-inline uint getDaysInMonth(uint month)
+inline uint32_t getDaysInMonth(uint32_t month)
 { return ( (month < 1 || month > 12) ? 0 : daysInMonth[month-1]);}
 
 inline bool isLeapYear ( int year)
@@ -504,7 +506,7 @@ inline std::string DataConvert::constructRegexp(const std::string& str)
 	//In the worst case, every char is quadrupled, plus some leading/trailing cruft...
 	char* cBuf = (char*)alloca(((4 * str.length()) + 3) * sizeof(char));
 	char c;
-	uint i, cBufIdx = 0;
+	uint32_t i, cBufIdx = 0;
 	// translate to regexp symbols
 	cBuf[cBufIdx++] = '^';  // implicit leading anchor
 	for (i = 0; i < str.length(); i++) {

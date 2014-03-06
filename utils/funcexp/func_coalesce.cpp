@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -49,7 +49,7 @@ int64_t Func_coalesce::getIntVal(rowgroup::Row& row,
 						CalpontSystemCatalog::ColType& op_ct)
 {
 	int64_t val = 0;
-	for (uint i = 0; i < parm.size(); i++)
+	for (uint32_t i = 0; i < parm.size(); i++)
 	{
 		val = parm[i]->data()->getIntVal(row, isNull);
 		if (isNull)
@@ -69,7 +69,7 @@ string Func_coalesce::getStrVal(rowgroup::Row& row,
 							CalpontSystemCatalog::ColType& ct)
 {
 	string val;
-	for (uint i = 0; i < parm.size(); i++)
+	for (uint32_t i = 0; i < parm.size(); i++)
 	{
 		val = parm[i]->data()->getStrVal(row, isNull);
 		if (isNull)
@@ -89,7 +89,7 @@ int32_t Func_coalesce::getDateIntVal(rowgroup::Row& row,
 							CalpontSystemCatalog::ColType& ct)
 {
 	int64_t val = 0;
-	for (uint i = 0; i < parm.size(); i++)
+	for (uint32_t i = 0; i < parm.size(); i++)
 	{
 		val = parm[i]->data()->getDateIntVal(row, isNull);
 		if (isNull)
@@ -109,7 +109,7 @@ int64_t Func_coalesce::getDatetimeIntVal(rowgroup::Row& row,
 							CalpontSystemCatalog::ColType& ct)
 {
 	int64_t val = 0;
-	for (uint i = 0; i < parm.size(); i++)
+	for (uint32_t i = 0; i < parm.size(); i++)
 	{
 		val = parm[i]->data()->getDatetimeIntVal(row, isNull);
 		if (isNull)
@@ -129,7 +129,7 @@ double Func_coalesce::getDoubleVal(rowgroup::Row& row,
 						execplan::CalpontSystemCatalog::ColType& ct)
 {
 	double d = 0.0;
-	for (uint i = 0; i < parm.size(); i++)
+	for (uint32_t i = 0; i < parm.size(); i++)
 	{
 		d = parm[i]->data()->getDoubleVal(row, isNull);
 		if (isNull)
@@ -150,7 +150,7 @@ execplan::IDB_Decimal Func_coalesce::getDecimalVal(rowgroup::Row& row,
 						execplan::CalpontSystemCatalog::ColType& ct)
 {
 	IDB_Decimal d;
-	for (uint i = 0; i < parm.size(); i++)
+	for (uint32_t i = 0; i < parm.size(); i++)
 	{
 		d = parm[i]->data()->getDecimalVal(row, isNull);
 		if (isNull)

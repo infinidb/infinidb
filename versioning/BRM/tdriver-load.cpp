@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -134,11 +134,11 @@ public:
 		ExtentMap em;
 		int i, err, oid, iterations = 1300;  // (EM_INITIAL_SIZE + 3*EM_INCREMENT)
 		int caughtException = 0, allocdSize;
-		u_int32_t fbo, hwm;
+		uint32_t fbo, hwm;
 		BRM::HWM_t hwm2;
 		BRM::VER_t txnID;
 		vector<LBID_t> lbids;
-		const uint extentSize = em.getExtentSize();
+		const uint32_t extentSize = em.getExtentSize();
 
 		em.load(string("EMImage"));
 		em.checkConsistency();
@@ -188,7 +188,7 @@ public:
 			em.setHWM(i, (i > (extentSize - 1) ? extentSize - 1 : i));
 			em.confirmChanges();
 			hwm = em.getHWM(i);
-			CPPUNIT_ASSERT(hwm == static_cast<u_int32_t>(i > extentSize-1 ? extentSize-1 : i));
+			CPPUNIT_ASSERT(hwm == static_cast<uint32_t>(i > extentSize-1 ? extentSize-1 : i));
 		}
 
 		em.checkConsistency();
@@ -346,11 +346,11 @@ public:
 		BlockResolutionManager brm;
 		int i, err, oid, allocdSize, 
 			iterations = 1300;  // (EM_INITIAL_SIZE + 3*EM_INCREMENT)
-		u_int32_t fbo, hwm;
+		uint32_t fbo, hwm;
 		vector<LBID_t> lbids;
 		HWM_t hwm2;
 		VER_t txnID;
-		const uint extentSize = brm.getExtentSize();
+		const uint32_t extentSize = brm.getExtentSize();
 		
 		for (i = 0; i < iterations; i++) {
 			brm.createExtent(extentSize, i, lbids, allocdSize);
@@ -408,7 +408,7 @@ public:
 			CPPUNIT_ASSERT(err == 0);
 			err = brm.getHWM(i, hwm);
 			CPPUNIT_ASSERT(err == 0);
-			CPPUNIT_ASSERT(hwm == static_cast<u_int32_t>(i > extentSize - 1 ? extentSize - 1 : i));
+			CPPUNIT_ASSERT(hwm == static_cast<uint32_t>(i > extentSize - 1 ? extentSize - 1 : i));
 		}
 		
  		CPPUNIT_ASSERT(brm.checkConsistency() == 0);
@@ -445,7 +445,7 @@ public:
 		VBRange_v::iterator vbRangesIT;
 		EMEntry em;
 		OID_t oid;
-		u_int32_t fbo;
+		uint32_t fbo;
 		LBIDRange range;
 		VBRange vbRange;
 		VER_t verID;
@@ -477,7 +477,7 @@ public:
 		
 		em = *(extents.begin());
 // 		CPPUNIT_ASSERT(em.range.start == 0);
- 		CPPUNIT_ASSERT(em.range.size*1024 == static_cast<u_int32_t>(brm.getExtentSize()));
+ 		CPPUNIT_ASSERT(em.range.size*1024 == static_cast<uint32_t>(brm.getExtentSize()));
 		CPPUNIT_ASSERT(em.HWM == 0);
 		CPPUNIT_ASSERT(em.blockOffset == 0);
 		
@@ -573,7 +573,7 @@ public:
 			err = brm.lookup(i, verID, vbFlag, oid, fbo);
 			CPPUNIT_ASSERT(err == 0);
 			CPPUNIT_ASSERT(oid == vbRange.vbOID);
-			CPPUNIT_ASSERT(fbo == static_cast<u_int32_t>(i + vbRange.vbFBO));
+			CPPUNIT_ASSERT(fbo == static_cast<uint32_t>(i + vbRange.vbFBO));
 			
 			vbbm.lock(VBBM::WRITE);
 			vss.lock(VSS::WRITE);
@@ -619,7 +619,7 @@ public:
 		LBIDRange_v tmp;
 		EMEntry em;
 		OID_t oid;
-		u_int32_t fbo;
+		uint32_t fbo;
 		LBIDRange range;
 		VBRange vbRange;
 		VER_t verID;
@@ -650,7 +650,7 @@ public:
 		
 		em = *(extents.begin());
  		CPPUNIT_ASSERT(em.range.start == 0);
-		CPPUNIT_ASSERT(em.range.size*1024 == static_cast<u_int32_t>(brm.getExtentSize()));
+		CPPUNIT_ASSERT(em.range.size*1024 == static_cast<uint32_t>(brm.getExtentSize()));
 		CPPUNIT_ASSERT(em.HWM == 0);
 		CPPUNIT_ASSERT(em.blockOffset == 0);
 		
@@ -755,7 +755,7 @@ public:
 			err = brm.lookup(i, verID, vbFlag, oid, fbo);
 			CPPUNIT_ASSERT(err == 0);
 			CPPUNIT_ASSERT(oid == 0);
-			CPPUNIT_ASSERT(fbo == static_cast<u_int32_t>(i));
+			CPPUNIT_ASSERT(fbo == static_cast<uint32_t>(i));
 			
 			vbbm.lock(VBBM::WRITE);
 			vss.lock(VSS::WRITE);
@@ -854,7 +854,7 @@ public:
 		ExtentMap **ems;
 		int i, allocdSize, iterations = 1400;  // (EM_INITIAL_SIZE + 4*EM_INCREMENT)
 		vector<LBID_t> lbids;
-		uint extentSize;
+		uint32_t extentSize;
 		
 // 		cerr << endl << "Extent Map instance test" << endl;
 		

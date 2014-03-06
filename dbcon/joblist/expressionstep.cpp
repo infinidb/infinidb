@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -40,6 +40,7 @@ using namespace logging;
 #include "arithmeticcolumn.h"
 #include "constantcolumn.h"
 #include "functioncolumn.h"
+#include "pseudocolumn.h"
 #include "simplecolumn.h"
 #include "windowfunctioncolumn.h"
 #include "constantfilter.h"
@@ -145,7 +146,7 @@ void ExpressionStep::expressionFilter(const Filter* filter, JobInfo& jobInfo)
 	else if ((cf = dynamic_cast<ConstantFilter*>(f)) != NULL)
 	{
 		//addColumn(cf->col().get(), jobInfo);
-		for (uint i = 0; i < cf->simpleColumnList().size(); i++)
+		for (uint32_t i = 0; i < cf->simpleColumnList().size(); i++)
 			addColumn(cf->simpleColumnList()[i], jobInfo);
 	}
 }
@@ -286,7 +287,9 @@ void ExpressionStep::populateColumnInfo(SimpleColumn* sc, JobInfo& jobInfo)
 	{
 		ct = sc->colType();
 //XXX use this before connector sets colType in sc correctly.
-		ct = jobInfo.csc->colType(sc->oid());
+//    type of pseudo column is set by connector
+		if (dynamic_cast<PseudoColumn*>(sc) == NULL)
+			ct = jobInfo.csc->colType(sc->oid());
 //X
 		if (ct.scale == 0)       // keep passed original ct for decimal type
 			sc->resultType(ct);  // update from mysql type to calpont type
@@ -316,7 +319,7 @@ void ExpressionStep::populateColumnInfo(SimpleColumn* sc, JobInfo& jobInfo)
 	CalpontSystemCatalog::OID dictOid = joblist::isDictCol(ct);
 	if (dictOid > 0)
 	{
-		uint tupleKey = ti.key;
+		uint32_t tupleKey = ti.key;
 		jobInfo.tokenOnly[tupleKey] = false;
 		jobInfo.keyInfo->dictOidToColOid[dictOid] = sc->oid();
 		ti = setTupleInfo(ct, dictOid, jobInfo, tblOid, sc, alias);
@@ -351,7 +354,7 @@ void ExpressionStep::populateColumnInfo(WindowFunctionColumn* wc, JobInfo& jobIn
 }
 
 
-void ExpressionStep::updateInputIndex(map<uint, uint>& indexMap, const JobInfo& jobInfo)
+void ExpressionStep::updateInputIndex(map<uint32_t, uint32_t>& indexMap, const JobInfo& jobInfo)
 {
 	if (jobInfo.trace)
 		cout << "Input indices of Expression:" << (int64_t) fExpressionId << endl;
@@ -365,7 +368,7 @@ void ExpressionStep::updateInputIndex(map<uint, uint>& indexMap, const JobInfo& 
 			CalpontSystemCatalog::OID oid = sc->oid();
 			CalpontSystemCatalog::OID dictOid = 0;
 			CalpontSystemCatalog::ColType ct;
-			uint key = fColumnKeys[distance(fColumns.begin(), it)];
+			uint32_t key = fColumnKeys[distance(fColumns.begin(), it)];
 			if (sc->schemaName().empty())
 			{
 				ct = sc->resultType();
@@ -376,7 +379,12 @@ void ExpressionStep::updateInputIndex(map<uint, uint>& indexMap, const JobInfo& 
 			}
 			else
 			{
-				ct = jobInfo.csc->colType(oid);
+				ct = sc->colType();
+//XXX use this before connector sets colType in sc correctly.
+//    type of pseudo column is set by connector
+				if (dynamic_cast<PseudoColumn*>(sc) == NULL)
+					ct = jobInfo.csc->colType(oid);
+//X
 				dictOid = joblist::isDictCol(ct);
 				if (dictOid > 0)
 					key = jobInfo.keyInfo->dictKeyMap[key];
@@ -384,7 +392,7 @@ void ExpressionStep::updateInputIndex(map<uint, uint>& indexMap, const JobInfo& 
 			sc->inputIndex(indexMap[key]);
 
 			if (jobInfo.trace)
-				cout << "OID:" << (dictOid ? dictOid : oid) << "(" << sc->tableAlias() << "):";
+				cout <<"OID/key:"<<(dictOid?dictOid:oid)<<"/"<<key<<"("<<sc->tableAlias()<<"):";
 		}
 		else
 		{
@@ -424,7 +432,7 @@ void ExpressionStep::updateInputIndex(map<uint, uint>& indexMap, const JobInfo& 
 }
 
 
-void ExpressionStep::updateOutputIndex(map<uint, uint>& indexMap, const JobInfo& jobInfo)
+void ExpressionStep::updateOutputIndex(map<uint32_t, uint32_t>& indexMap, const JobInfo& jobInfo)
 {
 	fExpression->outputIndex(indexMap[getExpTupleKey(jobInfo, fExpressionId)]);
 

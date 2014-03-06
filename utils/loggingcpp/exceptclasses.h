@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -140,25 +140,6 @@ public:
 		QueryDataExcept(msg, hwmRangeSizeErr){ }
 };
 
-
-/** @brief specific error exception class for Multicast exceptions
-*   @bug 2065
-*  
-*/
-class MulticastException : public std::runtime_error 
-{
-public:
-	/** Takes a character string describing the error.  */
-	MulticastException(const std::string& msg, int err = 0) :
-		std::runtime_error(std::string("MulticastException: ") + msg), fErrorCode(err)  { }
-
-	void errorCode(int code) { fErrorCode = code; }
-	int errorCode() const    { return fErrorCode; }
-
-private:
-	int fErrorCode;
-
-};
 
 /** @brief Exception for F&E framework to throw
  *  Invalid Operation Exception

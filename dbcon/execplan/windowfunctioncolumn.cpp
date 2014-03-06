@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -173,7 +173,7 @@ const string WF_OrderBy::toString() const
 {
 	ostringstream output;
 	output << "order by: " << endl;
-	for (uint i = 0; i < fOrders.size(); i++)
+	for (uint32_t i = 0; i < fOrders.size(); i++)
 		output << fOrders[i]->toString() << endl;
 	output << fFrame.toString();
 	return output.str();
@@ -182,17 +182,17 @@ const string WF_OrderBy::toString() const
 void WF_OrderBy::serialize(messageqcpp::ByteStream& b) const
 {
 	b << (uint32_t)fOrders.size();
-	for (uint i = 0; i < fOrders.size(); i++)
+	for (uint32_t i = 0; i < fOrders.size(); i++)
 		fOrders[i]->serialize(b);
 	fFrame.serialize(b);
 }
 
 void WF_OrderBy::unserialize(messageqcpp::ByteStream& b)
 {
-	uint size;
+	uint32_t size;
 	b >> (uint32_t&)size;
 	SRCP srcp;
-	for (uint i = 0; i < size; i++)
+	for (uint32_t i = 0; i < size; i++)
 	{
 		srcp.reset(dynamic_cast<ReturnedColumn*>(ObjectReader::createTreeNode(b)));
 		fOrders.push_back(srcp);
@@ -207,12 +207,12 @@ void WF_OrderBy::unserialize(messageqcpp::ByteStream& b)
 WindowFunctionColumn::WindowFunctionColumn()
 {}
 
-WindowFunctionColumn::WindowFunctionColumn(const string& functionName, const u_int32_t sessionID):
+WindowFunctionColumn::WindowFunctionColumn(const string& functionName, const uint32_t sessionID):
     ReturnedColumn(sessionID),
     fFunctionName(functionName)
 {}
 
-WindowFunctionColumn::WindowFunctionColumn( const WindowFunctionColumn& rhs, const u_int32_t sessionID):
+WindowFunctionColumn::WindowFunctionColumn( const WindowFunctionColumn& rhs, const uint32_t sessionID):
     ReturnedColumn(rhs, sessionID),
     fFunctionName(rhs.functionName()),
     fFunctionParms(rhs.functionParms()),
@@ -231,15 +231,15 @@ const string WindowFunctionColumn::toString() const
 	output << "resultType=" << colDataTypeToString(fResultType.colDataType) << "|" << fResultType.colWidth << endl;
 	output << "operationType=" << colDataTypeToString(fOperationType.colDataType) << endl;
 	output << "function parm: " << endl;
-	for (uint i = 0; i < fFunctionParms.size(); i++)
+	for (uint32_t i = 0; i < fFunctionParms.size(); i++)
 		output << fFunctionParms[i]->toString() << endl;
 	output << "partition by: " << endl;
-	for (uint i = 0; i < fPartitions.size(); i++)
+	for (uint32_t i = 0; i < fPartitions.size(); i++)
 		output << fPartitions[i]->toString() << endl;
 	output << fOrderBy.toString() << endl;
 	output << "getColumnList():" << endl;
 	vector<SRCP> colList = getColumnList();
-	for (uint i = 0; i < colList.size(); i++)
+	for (uint32_t i = 0; i < colList.size(); i++)
 		output << colList[i]->toString() << endl;
 	return output.str();
 }
@@ -251,10 +251,10 @@ void WindowFunctionColumn::serialize(messageqcpp::ByteStream& b) const
 	b << fFunctionName;
 
 	b << (uint32_t)fFunctionParms.size();
-	for (uint i = 0; i < fFunctionParms.size(); i++)
+	for (uint32_t i = 0; i < fFunctionParms.size(); i++)
 		fFunctionParms[i]->serialize(b);
 	b << (uint32_t)fPartitions.size();
-	for (uint i = 0; i < fPartitions.size(); i++)
+	for (uint32_t i = 0; i < fPartitions.size(); i++)
 		fPartitions[i]->serialize(b);
 	fOrderBy.serialize(b);
 }
@@ -271,13 +271,13 @@ void WindowFunctionColumn::unserialize(messageqcpp::ByteStream& b)
 
 	b >> fFunctionName;
 	b >> (uint32_t&)size;
-	for (uint i = 0; i < size; i++)
+	for (uint32_t i = 0; i < size; i++)
 	{
 		srcp.reset(dynamic_cast<ReturnedColumn*>(ObjectReader::createTreeNode(b)));
 		fFunctionParms.push_back(srcp);
 	}
 	b >> (uint32_t&)size;
-	for (uint i = 0; i < size; i++) 
+	for (uint32_t i = 0; i < size; i++) 
 	{
 		srcp.reset(dynamic_cast<ReturnedColumn*>(ObjectReader::createTreeNode(b)));
 		fPartitions.push_back(srcp);

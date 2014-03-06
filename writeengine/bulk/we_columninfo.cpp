@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -260,9 +260,9 @@ void ColumnInfo::clearMemory( )
 // to be processed.
 //------------------------------------------------------------------------------
 void ColumnInfo::setupDelayedFileCreation(
-    u_int16_t dbRoot,
-    u_int32_t partition,
-    u_int16_t segment,
+    uint16_t dbRoot,
+    uint32_t partition,
+    uint16_t segment,
     HWM       hwm,
     bool      bEmptyPM )
 {
@@ -838,8 +838,9 @@ int ColumnInfo::extendColumnOldExtent(
     {
         std::string segFile;
 
+        // @bug 5572 - HDFS usage: incorporate *.tmp file backup flag 
         IDBDataFile* pFile = colOp->openFile( curCol,
-            dbRootNext, partitionNext, segmentNext, segFile );
+            dbRootNext, partitionNext, segmentNext, segFile, true );
         if ( !pFile )
         {
             std::ostringstream oss;
@@ -1041,7 +1042,7 @@ int ColumnInfo::expandAbbrevExtent( bool bRetainFilePos )
         off64_t oldOffset = 0;
         if (bRetainFilePos)
         {
-        	oldOffset = curCol.dataFile.pFile->tell();
+            oldOffset = curCol.dataFile.pFile->tell();
         }
         colOp->setFileOffset( curCol.dataFile.pFile, 0, SEEK_END );
 
@@ -1113,7 +1114,7 @@ int ColumnInfo::closeColumnFile(bool /*bCompletingExtent*/, bool /*bAbort*/)
         colOp->closeFile( curCol.dataFile.pFile );
         curCol.dataFile.pFile = 0;
     }
-	
+
     return NO_ERROR;
 }
 
@@ -1231,16 +1232,22 @@ int ColumnInfo::finishParsing( )
     }
 
     // After closing the column and dictionary store files,
-    // flush any updated dictionary blocks in PrimProc
-    if (fDictBlocks.size() > 0)
+    // flush any updated dictionary blocks in PrimProc.
+    // We only do this for non-HDFS.  For HDFS we don't want to flush till
+    // "after" we have "confirmed" all the file changes, which flushes the
+    // changes to disk.
+    if (!idbdatafile::IDBPolicy::useHdfs())
     {
+        if (fDictBlocks.size() > 0)
+        {
 #ifdef PROFILE
-        Stats::startParseEvent(WE_STATS_FLUSH_PRIMPROC_BLOCKS);
+            Stats::startParseEvent(WE_STATS_FLUSH_PRIMPROC_BLOCKS);
 #endif
-        cacheutils::flushPrimProcAllverBlocks ( fDictBlocks );
+            cacheutils::flushPrimProcAllverBlocks ( fDictBlocks );
 #ifdef PROFILE
-        Stats::stopParseEvent(WE_STATS_FLUSH_PRIMPROC_BLOCKS);
+            Stats::stopParseEvent(WE_STATS_FLUSH_PRIMPROC_BLOCKS);
 #endif
+        }
     }
 
     clearMemory();
@@ -1325,14 +1332,28 @@ int ColumnInfo::getHWMInfoForBRM( BRMReporter& brmReporter )
         hwmArg.segNum  = fSegFileUpdateList[iseg].fSegment;
         hwmArg.hwm     = fSegFileUpdateList[iseg].hwm;
         brmReporter.addToHWMInfo( hwmArg );
-		
-		BRM::FileInfo aFile;
-        aFile.oid     = fSegFileUpdateList[iseg].fid;
+
+        // Save list of modified db column files
+        BRM::FileInfo aFile;
+        aFile.oid          = fSegFileUpdateList[iseg].fid;
         aFile.partitionNum = fSegFileUpdateList[iseg].fPartition;
-        aFile.segmentNum  = fSegFileUpdateList[iseg].fSegment;
-        aFile.dbRoot     = fSegFileUpdateList[iseg].fDbRoot;
-		aFile.compType = curCol.compressionType;
+        aFile.segmentNum   = fSegFileUpdateList[iseg].fSegment;
+        aFile.dbRoot       = fSegFileUpdateList[iseg].fDbRoot;
+        aFile.compType     = curCol.compressionType;
         brmReporter.addToFileInfo( aFile );
+
+        // Save list of corresponding modified db dictionary store files
+        if (column.colType == COL_TYPE_DICT)
+        {
+            BRM::FileInfo dFile;
+            dFile.oid          = column.dctnry.dctnryOid;
+            dFile.partitionNum = fSegFileUpdateList[iseg].fPartition;
+            dFile.segmentNum   = fSegFileUpdateList[iseg].fSegment;
+            dFile.dbRoot       = fSegFileUpdateList[iseg].fDbRoot;
+            dFile.compType     = curCol.compressionType;
+            brmReporter.addToDctnryFileInfo( dFile );
+        }
+
         entriesAdded++;
     }
     fSegFileUpdateList.clear(); // don't need vector anymore, so release memory
@@ -1348,9 +1369,9 @@ int ColumnInfo::getHWMInfoForBRM( BRMReporter& brmReporter )
 // start adding rows, we will automatically advance to the next extent.
 //------------------------------------------------------------------------------
 int ColumnInfo::setupInitialColumnExtent(
-    u_int16_t   dbRoot,               // dbroot of starting extent
-    u_int32_t   partition,            // partition number of starting extent
-    u_int16_t   segment,              // segment number of starting extent
+    uint16_t   dbRoot,               // dbroot of starting extent
+    uint32_t   partition,            // partition number of starting extent
+    uint16_t   segment,              // segment number of starting extent
     const std::string& tblName,       // name of table containing this column
     BRM::LBID_t lbid,                 // starting LBID for starting extent
     HWM         oldHwm,               // original HWM
@@ -1381,7 +1402,12 @@ int ColumnInfo::setupInitialColumnExtent(
     }
 
     std::string segFile;
-    int rc = colOp->openColumnFile( curCol, segFile );
+    bool useTmpSuffix = false;
+    if (!bIsNewExtent)
+        useTmpSuffix = true;
+
+    // @bug 5572 - HDFS usage: incorporate *.tmp file backup flag
+    int rc = colOp->openColumnFile( curCol, segFile, useTmpSuffix );
     if(rc != NO_ERROR)
     {
         WErrorCodes ec;
@@ -1552,7 +1578,7 @@ int ColumnInfo::initAutoInc( const std::string& fullTableName )
 // Reserves the requested number of auto-increment numbers (autoIncCount).
 // The starting value of the reserved block of numbers is returned in nextValue.
 //------------------------------------------------------------------------------
-int ColumnInfo::reserveAutoIncNums(uint autoIncCount, uint64_t& nextValue )
+int ColumnInfo::reserveAutoIncNums(uint32_t autoIncCount, uint64_t& nextValue )
 {
     int rc = fAutoIncMgr->reserveNextRange( autoIncCount, nextValue );
 
@@ -1630,13 +1656,17 @@ int ColumnInfo::openDctnryStore( bool bMustExist )
         curCol.dataFile.fSegment)) )
     {
         // Save HWM chunk (for compressed files) if this seg file calls for it
-        RETURN_ON_ERROR( saveDctnryStoreHWMChunk() );
+        // @bug 5572 - HDFS usage: incorporate *.tmp file backup flag
+        bool useTmpSuffixDctnry = false;
+        RETURN_ON_ERROR( saveDctnryStoreHWMChunk( useTmpSuffixDctnry ) );
 
+        // @bug 5572 - HDFS usage: incorporate *.tmp file backup flag
         rc = fStore->openDctnry(
             column.dctnry.dctnryOid,
             curCol.dataFile.fDbRoot,
             curCol.dataFile.fPartition,
-            curCol.dataFile.fSegment);
+            curCol.dataFile.fSegment,
+            useTmpSuffixDctnry );
         if (rc != NO_ERROR)
         {
             WErrorCodes ec;
@@ -1646,6 +1676,7 @@ int ColumnInfo::openDctnryStore( bool bMustExist )
                    "; DBRoot-" << curCol.dataFile.fDbRoot    <<
                    "; part-"   << curCol.dataFile.fPartition <<
                    "; seg-"    << curCol.dataFile.fSegment   <<
+                   "; tmpFlag-"<< useTmpSuffixDctnry         <<
                    "; " << ec.errorString(rc);
             fLog->logMsg( oss.str(), rc, MSGLVL_ERROR );
 
@@ -1699,7 +1730,8 @@ int ColumnInfo::openDctnryStore( bool bMustExist )
             column.dctnry.dctnryOid,
             curCol.dataFile.fDbRoot,
             curCol.dataFile.fPartition,
-            curCol.dataFile.fSegment);
+            curCol.dataFile.fSegment,
+            false );
         if (rc != NO_ERROR)
         {
             WErrorCodes ec;
@@ -1827,8 +1859,10 @@ int ColumnInfo::updateDctnryStore(char* buf,
 //------------------------------------------------------------------------------
 // No action necessary for uncompressed dictionary files
 //------------------------------------------------------------------------------
-int ColumnInfo::saveDctnryStoreHWMChunk()
+// @bug 5572 - HDFS usage: add flag used to control *.tmp file usage
+int ColumnInfo::saveDctnryStoreHWMChunk(bool& needBackup)
 {
+    needBackup = false;
     return NO_ERROR;
 }
 

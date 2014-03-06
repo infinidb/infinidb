@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -19,7 +19,7 @@
 // $Id: bpp.h 2035 2013-01-21 14:12:19Z rdempsey $
 // C++ Interface: bpp
 //
-// Description: 
+// Description:
 //
 //
 // Author: Patrick LeBlanc <pleblanc@calpont.com>, (C) 2008
@@ -41,3 +41,5 @@
 #include "filtercommand.h"
 #include "passthrucommand.h"
 #include "rtscommand.h"
+#include "pseudocc.h"
+

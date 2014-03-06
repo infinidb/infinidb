@@ -58,7 +58,6 @@ typedef unsigned int in_port_t;
 //typedef long ssize_t;
 
 # define snprintf _snprintf
-# define inline __inline
 
 struct sockaddr_un
 {

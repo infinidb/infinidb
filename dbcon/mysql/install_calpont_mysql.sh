@@ -27,7 +27,7 @@ done
 
 df=$installdir/mysql/my.cnf
 
-$installdir/mysql/bin/mysql --defaults-file=$df --force --user=root $pwprompt mysql 2>/dev/null <<EOD
+$installdir/mysql/bin/mysql --defaults-file=$df --force --user=root $pwprompt mysql 2>/tmp/mysql_install.log <<EOD
 INSTALL PLUGIN infinidb SONAME 'libcalmysql.so';
 -- these are deprecated names
 DELETE FROM mysql.func WHERE name='caldisablepartition';
@@ -68,6 +68,18 @@ CREATE FUNCTION caldroppartitionsbyvalue RETURNS STRING SONAME 'libcalmysql.so';
 CREATE FUNCTION caldisablepartitionsbyvalue RETURNS STRING SONAME 'libcalmysql.so';
 CREATE FUNCTION calenablepartitionsbyvalue RETURNS STRING SONAME 'libcalmysql.so';
 CREATE FUNCTION calshowpartitionsbyvalue RETURNS STRING SONAME 'libcalmysql.so';
+CREATE FUNCTION idbpm RETURNS INTEGER soname 'libcalmysql.so';
+CREATE FUNCTION idbdbroot RETURNS INTEGER soname 'libcalmysql.so';
+CREATE FUNCTION idbsegment RETURNS INTEGER soname 'libcalmysql.so';
+CREATE FUNCTION idbsegmentdir RETURNS INTEGER soname 'libcalmysql.so';
+CREATE FUNCTION idbextentrelativerid RETURNS INTEGER soname 'libcalmysql.so';
+CREATE FUNCTION idbblockid RETURNS INTEGER soname 'libcalmysql.so';
+CREATE FUNCTION idbextentid RETURNS INTEGER soname 'libcalmysql.so';
+CREATE FUNCTION idbextentmin RETURNS STRING soname 'libcalmysql.so';
+CREATE FUNCTION idbextentmax RETURNS STRING soname 'libcalmysql.so';
+CREATE FUNCTION idbpartition RETURNS STRING soname 'libcalmysql.so';
+CREATE FUNCTION idblocalpm RETURNS INTEGER soname 'libcalmysql.so';
+
 CREATE DATABASE IF NOT EXISTS infinidb_vtable;
 CREATE DATABASE IF NOT EXISTS infinidb_querystats;
 CREATE TABLE IF NOT EXISTS infinidb_querystats.querystats

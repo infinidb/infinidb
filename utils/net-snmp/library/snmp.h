@@ -318,7 +318,7 @@ SOFTWARE.
 #define SNMPADMINLENGTH 255
 
 
-    char           *uptime_string(u_long, char *);
+    char           *uptime_string(uint32_t, char *);
     void            xdump(const u_char *, size_t, const char *);
     u_char         *snmp_parse_var_op(u_char *, oid *, size_t *, u_char *,
                                       size_t *, u_char **, size_t *);

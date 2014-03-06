@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -40,10 +40,14 @@
 #include "blockrequestprocessor.h"
 #include "batchprimitiveprocessor.h"
 
+#include "winport.h"
 //#define PRIMPROC_STOPWATCH
 #ifdef PRIMPROC_STOPWATCH
 #include "stopwatch.h"
 #endif
+
+#include "oamcache.h"
+extern oam::OamCache *oamCache;
 
 namespace primitiveprocessor
 {
@@ -51,7 +55,7 @@ namespace primitiveprocessor
 	extern dbbc::BlockRequestProcessor **BRPp;
 	extern BRM::DBRM *brm;
 	extern boost::mutex bppLock;
-	extern uint highPriorityThreads, medPriorityThreads, lowPriorityThreads;
+	extern uint32_t highPriorityThreads, medPriorityThreads, lowPriorityThreads;
 
 #ifdef PRIMPROC_STOPWATCH
 	extern map<pthread_t, logging::StopWatch*> stopwatchMap;
@@ -82,7 +86,7 @@ namespace primitiveprocessor
 
 			// pos keeps the position of the last BPP returned by next(),
 			// next() will start searching at this pos on the next call.
-			uint pos;
+			uint32_t pos;
 	};
 
 	typedef boost::shared_ptr<BPPV> SBPPV;
@@ -91,16 +95,16 @@ namespace primitiveprocessor
 
 	void prefetchBlocks(uint64_t lbid, uint32_t* rCount);
 	void prefetchExtent(uint64_t lbid, uint32_t ver, uint32_t txn, uint32_t* rCount);
-	void loadBlock(u_int64_t lbid, BRM::QueryContext q, u_int32_t txn, int compType, void* bufferPtr,
+	void loadBlock(uint64_t lbid, BRM::QueryContext q, uint32_t txn, int compType, void* bufferPtr,
 		bool* pWasBlockInCache, uint32_t* rCount=NULL, bool LBIDTrace = false,
 		uint32_t sessionID = 0, bool doPrefetch=true, VSSCache *vssCache = NULL);
 	void loadBlockAsync(uint64_t lbid, const BRM::QueryContext &q, uint32_t txn, int CompType,
 		uint32_t *cCount, uint32_t *rCount, bool LBIDTrace, uint32_t sessionID,
-		boost::mutex *m, uint *busyLoaders, VSSCache* vssCache=0);
-	uint loadBlocks(BRM::LBID_t *lbids, BRM::QueryContext q, BRM::VER_t txn, int compType,
+		boost::mutex *m, uint32_t *busyLoaders, VSSCache* vssCache=0);
+	uint32_t loadBlocks(BRM::LBID_t *lbids, BRM::QueryContext q, BRM::VER_t txn, int compType,
 		uint8_t **bufferPtrs, uint32_t *rCount, bool LBIDTrace, uint32_t sessionID,
-		uint blockCount, bool *wasVersioned, bool doPrefetch = true, VSSCache *vssCache = NULL);
-	uint cacheNum(uint64_t lbid);
+		uint32_t blockCount, bool *wasVersioned, bool doPrefetch = true, VSSCache *vssCache = NULL);
+	uint32_t cacheNum(uint64_t lbid);
 	void buildFileName(BRM::OID_t oid, char* fileName);
 
     /** @brief process primitives as they arrive
@@ -123,8 +127,6 @@ namespace primitiveprocessor
 						uint32_t deleteBlocks = 0,
 						bool ptTrace=false,
 						double prefetchThreshold = 0,
-						bool multicast = false,
-						bool multicastloop = false,
 						uint64_t pmSmallSide = 0);
 
             /** @brief dtor
@@ -145,7 +147,7 @@ namespace primitiveprocessor
 			bool  rotatingDestination() const {return fRotatingDestination;}
 			bool PTTrace() const {return fPTTrace;}
 			double prefetchThreshold() const { return fPrefetchThreshold; }
-			uint ProcessorThreads() const { return highPriorityThreads + medPriorityThreads + lowPriorityThreads; }
+			uint32_t ProcessorThreads() const { return highPriorityThreads + medPriorityThreads + lowPriorityThreads; }
         protected:
 
         private:
@@ -168,8 +170,6 @@ namespace primitiveprocessor
 			bool fRotatingDestination;
 			bool fPTTrace;
 			double fPrefetchThreshold;
-			bool fMulticast;
-			bool fMulticastloop;
 			uint64_t fPMSmallSide;
     };
 

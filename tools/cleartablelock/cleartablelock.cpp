@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -347,7 +347,7 @@ int execBulkRollbackReq(
 		{
 			// Take over ownership of stale lock.
 			std::string processName("clearTableLock");
-			u_int32_t processID    = ::getpid();
+			uint32_t processID    = ::getpid();
 			int32_t   sessionID    = -1;
 			int32_t   transID      = -1;
 			bool      ownerChanged = brm->changeOwner(

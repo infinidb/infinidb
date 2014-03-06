@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -265,7 +265,7 @@ public:
 	 * with LBID
 	 * @return 0 on success, -1 on error
 	 */
-	EXPORT int lookupLocal(LBID_t LBID, int& OID, uint16_t& dbRoot, uint32_t& partitionNum, uint16_t& segmentNum, u_int32_t& fileBlockOffset);
+	EXPORT int lookupLocal(LBID_t LBID, int& OID, uint16_t& dbRoot, uint32_t& partitionNum, uint16_t& segmentNum, uint32_t& fileBlockOffset);
 
 	/** @brief Look up the LBID associated with a given OID, offset, partition, and segment.
 	 *
@@ -340,9 +340,9 @@ public:
 	 */
 	EXPORT void createStripeColumnExtents(
 					const std::vector<CreateStripeColumnExtentsArgIn>& cols,
-					u_int16_t  dbRoot,
-					u_int32_t& partitionNum,
-					u_int16_t& segmentNum,
+					uint16_t  dbRoot,
+					uint32_t& partitionNum,
+					uint16_t& segmentNum,
                     std::vector<CreateStripeColumnExtentsArgOut>& extents);
 
 	/** @brief Allocates an extent for a column file
@@ -371,14 +371,14 @@ public:
 	// @bug 4091: To be deprecated as public function.  Should just be a
 	// private function used by createStripeColumnExtents().
 	EXPORT void createColumnExtent_DBroot(int OID,
-					u_int32_t  colWidth,
-					u_int16_t  dbRoot,
+					uint32_t  colWidth,
+					uint16_t  dbRoot,
                     execplan::CalpontSystemCatalog::ColDataType colDataType,
-					u_int32_t& partitionNum,
-					u_int16_t& segmentNum,
+					uint32_t& partitionNum,
+					uint16_t& segmentNum,
 					LBID_t&    lbid,
 					int&       allocdsize,
-					u_int32_t& startBlockOffset,
+					uint32_t& startBlockOffset,
 					bool       useLock = true);
 
 	/** @brief Allocates extent for exact file that is specified
@@ -406,14 +406,14 @@ public:
 	 * @param startBlockOffset (out) The first block of the extent created.
 	 */
 	EXPORT void createColumnExtentExactFile(int OID,
-					u_int32_t  colWidth,
-					u_int16_t  dbRoot,
-					u_int32_t  partitionNum,
-					u_int16_t  segmentNum,
+					uint32_t  colWidth,
+					uint16_t  dbRoot,
+					uint32_t  partitionNum,
+					uint16_t  segmentNum,
                     execplan::CalpontSystemCatalog::ColDataType colDataType,
 					LBID_t&    lbid,
 					int&       allocdsize,
-					u_int32_t& startBlockOffset);
+					uint32_t& startBlockOffset);
 
 	/** @brief Allocates an extent for a dictionary store file
 	 * 
@@ -433,9 +433,9 @@ public:
 	 * @param allocdsize (out) The total number of LBIDs allocated.
 	 */
 	EXPORT void createDictStoreExtent(int OID,
-					u_int16_t  dbRoot,
-					u_int32_t  partitionNum,
-					u_int16_t  segmentNum,
+					uint16_t   dbRoot,
+					uint32_t   partitionNum,
+					uint16_t   segmentNum,
                     LBID_t&    lbid,
 					int&       allocdsize);
 
@@ -449,8 +449,8 @@ public:
 	 * @param hwm HWM to be assigned to the last extent that is kept.
 	 */
 	EXPORT void rollbackColumnExtents(int oid,
-					u_int32_t partitionNum,
-					u_int16_t segmentNum,
+					uint32_t partitionNum,
+					uint16_t segmentNum,
 					HWM_t     hwm);
 
 	/** @brief Rollback (delete) set of extents for specified OID & DBRoot.
@@ -467,9 +467,9 @@ public:
 	 */
 	EXPORT void rollbackColumnExtents_DBroot(int oid,
 					bool      bDeleteAll,
-					u_int16_t dbRoot,
-					u_int32_t partitionNum,
-					u_int16_t segmentNum,
+					uint16_t dbRoot,
+					uint32_t partitionNum,
+					uint16_t segmentNum,
 					HWM_t     hwm);
 
 	/** @brief delete of column extents for the specified extents.
@@ -503,7 +503,7 @@ public:
 	 * @param hwms Vector of hwms for the last partition to be kept.
 	 */
 	EXPORT void rollbackDictStoreExtents(int oid,
-					 u_int32_t        partitionNum,
+					 uint32_t        partitionNum,
 					 const std::vector<HWM_t>& hwms);
 
 	/** @brief Rollback (delete) a set of dict store extents for an OID & DBRoot
@@ -521,9 +521,9 @@ public:
 	 * @param hwms Vector of hwms for the last partition to be kept.
 	 */
 	EXPORT void rollbackDictStoreExtents_DBroot(int oid,
-					 u_int16_t  dbRoot,
-					 u_int32_t  partitionNum,
-					 const std::vector<u_int16_t>& segNums,
+					 uint16_t  dbRoot,
+					 uint32_t  partitionNum,
+					 const std::vector<uint16_t>& segNums,
 					 const std::vector<HWM_t>& hwms);
 
 	/** @brief Deallocates all extents associated with OID
@@ -842,27 +842,27 @@ private:
 
 	OPS EMLock, FLLock;
 
-	LBID_t _createColumnExtent_DBroot(u_int32_t size, int OID,
-					u_int32_t colWidth,
-					u_int16_t  dbRoot,
+	LBID_t _createColumnExtent_DBroot(uint32_t size, int OID,
+					uint32_t colWidth,
+					uint16_t  dbRoot,
                     execplan::CalpontSystemCatalog::ColDataType colDataType,
-                    u_int32_t& partitionNum,
-					u_int16_t& segmentNum,
-					u_int32_t& startBlockOffset);
-	LBID_t _createColumnExtentExactFile(u_int32_t size, int OID,
-					u_int32_t  colWidth,
-					u_int16_t  dbRoot,
-					u_int32_t  partitionNum,
-					u_int16_t  segmentNum,
+                    uint32_t& partitionNum,
+					uint16_t& segmentNum,
+					uint32_t& startBlockOffset);
+	LBID_t _createColumnExtentExactFile(uint32_t size, int OID,
+					uint32_t  colWidth,
+					uint16_t  dbRoot,
+					uint32_t  partitionNum,
+					uint16_t  segmentNum,
                     execplan::CalpontSystemCatalog::ColDataType colDataType,
-					u_int32_t& startBlockOffset);
-	LBID_t _createDictStoreExtent(u_int32_t size, int OID,
-					u_int16_t  dbRoot,
-					u_int32_t  partitionNum,
-					u_int16_t  segmentNum);
+					uint32_t& startBlockOffset);
+	LBID_t _createDictStoreExtent(uint32_t size, int OID,
+					uint16_t  dbRoot,
+					uint32_t  partitionNum,
+					uint16_t  segmentNum);
 	bool isValidCPRange(int64_t max, int64_t min, execplan::CalpontSystemCatalog::ColDataType type) const;
 	void deleteExtent(int emIndex);
-	LBID_t getLBIDsFromFreeList(u_int32_t size);
+	LBID_t getLBIDsFromFreeList(uint32_t size);
 	void reserveLBIDRange(LBID_t start, uint8_t size);    // used by load() to allocate pre-existing LBIDs
 
 	key_t chooseEMShmkey();  //see the code for how keys are segmented
@@ -873,7 +873,6 @@ private:
 	void releaseFreeList(OPS op);
 	void growEMShmseg(size_t nrows=0);
 	void growFLShmseg();
-	virtual void makeUndoRecord(void *start, int size);
 	void finishChanges();
 
 	EXPORT unsigned getFilesPerColumnPartition();

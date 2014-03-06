@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -28,9 +28,9 @@
 #ifndef __STDC_FORMAT_MACROS
 #define __STDC_FORMAT_MACROS
 #endif
-#include <inttypes.h>
 #endif
 
+#include <inttypes.h>
 #include <boost/algorithm/string/case_conv.hpp>
 #include <boost/regex.hpp>
 #include <boost/tokenizer.hpp>
@@ -94,8 +94,8 @@ const int64_t maxNumber_c[] = {
 	999999999999999999ll };
 
 
-const uint TIMESTAMP_MAX_YEAR = 2038;
-const uint TIMESTAMP_MIN_YEAR = (1970 - 1);
+const uint32_t TIMESTAMP_MAX_YEAR = 2038;
+const uint32_t TIMESTAMP_MIN_YEAR = (1970 - 1);
 const int TIMESTAMP_MIN_VALUE = 1;
 const int64_t TIMESTAMP_MAX_VALUE = 0x7FFFFFFFL;
 const unsigned long long MAX_NEGATIVE_NUMBER	= 0x8000000000000000ULL;
@@ -223,9 +223,9 @@ inline uint32_t calc_mysql_weekday( uint32_t year, uint32_t month, uint32_t day,
 }
 
 // Flags for calc_mysql_week
-const uint WEEK_MONDAY_FIRST  = 1;
-const uint WEEK_NO_ZERO       = 2;
-const uint WEEK_GT_THREE_DAYS = 4;
+const uint32_t WEEK_MONDAY_FIRST  = 1;
+const uint32_t WEEK_NO_ZERO       = 2;
+const uint32_t WEEK_GT_THREE_DAYS = 4;
 
 // Takes a MySQL WEEK() function mode setting and converts to a bitmask
 // used by calc_mysql_week()
@@ -504,6 +504,7 @@ class to_lower
         }
 };
 
+
 inline int  getNumbers( const std::string& expr, int64_t *array, execplan::OpType funcType)
 {
 	int index = 0;
@@ -568,8 +569,6 @@ inline int  getNumbers( const std::string& expr, int64_t *array, execplan::OpTyp
 
 	return index;
 }
-
-
 
 
 inline int  getNumbers( const std::string& expr, int *array, execplan::OpType funcType)
@@ -637,36 +636,36 @@ inline int  getNumbers( const std::string& expr, int *array, execplan::OpType fu
 	return index;
 }
 
-inline int convertWeek (std::string week) //Sunday = 0
+inline int dayOfWeek(std::string day) //Sunday = 0
 {
 	int value = -1;
-	boost::to_lower(week);
+	boost::to_lower(day);
 
-	if ( week == "sunday" || week == "sun" )
+	if ( day == "sunday" || day == "sun" )
 	{
 		value = 0;
 	}
-	else if ( week == "monday" || week == "mon" )
+	else if ( day == "monday" || day == "mon" )
 	{
 		value = 1;
 	}
-	else if ( week == "tuesday" || week == "tue" )
+	else if ( day == "tuesday" || day == "tue" )
 	{
 		value = 2;
 	}
-	else if ( week == "wednesday" || week == "wed" )
+	else if ( day == "wednesday" || day == "wed" )
 	{
 		value = 3;
 	}
-	else if ( week == "thursday" || week == "thu" )
+	else if ( day == "thursday" || day == "thu" )
 	{
 		value = 4;
 	}
-	else if ( week == "friday" || week == "fri" )
+	else if ( day == "friday" || day == "fri" )
 	{
 		value = 5;
 	}
-	else if ( week == "saturday" || week == "sat" )
+	else if ( day == "saturday" || day == "sat" )
 	{
 		value = 6;
 	}	

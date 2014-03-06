@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -44,7 +44,8 @@
 #include "columnresult.h"
 #include "brmtypes.h"
 #include "joblist.h"
-#if defined(_MSC_VER) && defined(DDLPKGPROC_DLLEXPORT)
+
+#if defined(_MSC_VER) && defined(xxxDDLPKGPROC_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
@@ -93,7 +94,7 @@ namespace WriteEngine
 		bool operator==(const extentInfo& rhs) const { return (dbRoot == rhs.dbRoot && partition == rhs.partition && segment == rhs.segment); }
 		bool operator!=(const extentInfo& rhs) const { return !(*this == rhs); }
 	};
-inline void  getColumnsForTable(u_int32_t sessionID, std::string schema,std::string table,
+inline void  getColumnsForTable(uint32_t sessionID, std::string schema,std::string table,
 		ColumnList& colList)
 {
 
@@ -460,7 +461,7 @@ inline int convertDataType(int dataType)
 	return calpontDataType;
 }
 
-inline void findColumnData(u_int32_t sessionID, execplan::CalpontSystemCatalog::TableName& systableName,
+inline void findColumnData(uint32_t sessionID, execplan::CalpontSystemCatalog::TableName& systableName,
 		const std::string& colName, DDLColumn& sysCol)
 {
 	ColumnList columns;

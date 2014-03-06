@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -137,7 +137,7 @@ private:
 	//Compiler defaults okay
 	//TraceFile(const TraceFile& rhs);
 	//TraceFile operator=(const TraceFile& rhs);
-	shared_ptr<ofstream> oFile;
+	boost::shared_ptr<ofstream> oFile;
 
 };
 

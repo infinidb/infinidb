@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -25,9 +25,7 @@
 #include <cassert>
 using namespace std;
 
-#define JOBLIST_DLLEXPORT
 #include "joblist.h"
-#undef JOBLIST_DLLEXPORT
 
 #include "calpontsystemcatalog.h"
 using namespace execplan;
@@ -102,7 +100,7 @@ JobList::~JobList()
 				++iter;
 			}
 
-			for (uint i = 0; i < joiners.size(); i++) {
+			for (uint32_t i = 0; i < joiners.size(); i++) {
 				joiners[i]->join();
 				delete joiners[i];
 			}
@@ -127,9 +125,9 @@ int JobList::doQuery()
 	JobStep *js;
 
 	// Set the priority on the jobsteps
-	for (uint i = 0; i < fQuery.size(); i++)
+	for (uint32_t i = 0; i < fQuery.size(); i++)
 		fQuery[i]->priority(fPriority);
-	for (uint i = 0; i < fProject.size(); i++)
+	for (uint32_t i = 0; i < fProject.size(); i++)
 		fProject[i]->priority(fPriority);
 
 	// I put this logging in a separate loop rather than including it in the
@@ -317,9 +315,9 @@ int JobList::putEngineComm(DistributedEngineComm* dec)
 
 // -- TupleJobList
 /* returns row count */
-uint TupleJobList::projectTable(CalpontSystemCatalog::OID, messageqcpp::ByteStream& bs)
+uint32_t TupleJobList::projectTable(CalpontSystemCatalog::OID, messageqcpp::ByteStream& bs)
 {
-	uint ret = ds->nextBand(bs);
+	uint32_t ret = ds->nextBand(bs);
 	moreData = (ret != 0);
 	return ret;
 }
@@ -1116,7 +1114,7 @@ void JobList::graph(uint32_t sessionID)
 
 void JobList::validate() const
 {
-//	uint i;
+//	uint32_t i;
 //	DeliveredTableMap::const_iterator it;
 
 	/* Make sure there's at least one query step and that they're the right type */
@@ -1151,7 +1149,7 @@ void JobList::validate() const
 
 void TupleJobList::validate() const
 {
-	uint i, j;
+	uint32_t i, j;
 	DeliveredTableMap::const_iterator it;
 
 	idbassert(fQuery.size() > 0);
@@ -1190,7 +1188,7 @@ void TupleJobList::validate() const
 
 void JobList::abort()
 {
-	uint i;
+	uint32_t i;
 	//If we're not currently aborting, then start aborting...
 	if (atomicops::atomicCAS<uint32_t>(&fAborted, 0, 1)) {
 		for (i = 0; i < fQuery.size(); i++)
@@ -1205,7 +1203,7 @@ void JobList::abortOnLimit(JobStep* js)
 	//If we're not currently aborting, then start aborting...
 	if (atomicops::atomicCAS<uint32_t>(&fAborted, 0, 1)) {
 		// @bug4848, enhance and unify limit handling.
-		for (uint i = 0; i < fQuery.size(); i++) {
+		for (uint32_t i = 0; i < fQuery.size(); i++) {
 			if (fQuery[i].get() == js)
 				break;
 
@@ -1216,7 +1214,7 @@ void JobList::abortOnLimit(JobStep* js)
 
 string JobList::toString() const
 {
-	uint i;
+	uint32_t i;
 	string ret;
 
 	ret = "Filter Steps:\n";

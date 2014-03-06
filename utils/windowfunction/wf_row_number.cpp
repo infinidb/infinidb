@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -53,9 +53,9 @@ namespace windowfunction
 {
 
 
-shared_ptr<WindowFunctionType> WF_row_number::makeFunction(int id, const string& name, int ct)
+boost::shared_ptr<WindowFunctionType> WF_row_number::makeFunction(int id, const string& name, int ct)
 {
-	shared_ptr<WindowFunctionType> func(new WF_row_number(id, name));
+	boost::shared_ptr<WindowFunctionType> func(new WF_row_number(id, name));
 	return func;
 }
 

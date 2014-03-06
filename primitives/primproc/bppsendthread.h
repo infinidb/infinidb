@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -39,7 +39,7 @@ class BPPSendThread {
 
 	public:
 		BPPSendThread();   // starts unthrottled
-		BPPSendThread(uint initMsgsLeft);   // starts throttled
+		BPPSendThread(uint32_t initMsgsLeft);   // starts throttled
 		virtual ~BPPSendThread();
 
 		struct Msg_t {
@@ -83,7 +83,7 @@ class BPPSendThread {
 		boost::condition queueNotEmpty;
 		volatile bool die, gotException, mainThreadWaiting;
 		std::string exceptionString;
-		uint sizeThreshold;
+		uint32_t sizeThreshold;
 		volatile int32_t msgsLeft;
 		bool waiting;
 		boost::mutex ackLock;

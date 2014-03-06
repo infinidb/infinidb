@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -68,7 +68,7 @@ int64_t Func_greatest::getIntVal(rowgroup::Row& row,
 	double str = fp[0]->data()->getDoubleVal(row, isNull);
 
 	double greatestStr = str;
-	for (uint i = 1; i < fp.size(); i++)
+	for (uint32_t i = 1; i < fp.size(); i++)
 	{
 		double str1 = fp[i]->data()->getDoubleVal(row, isNull);
 
@@ -87,7 +87,7 @@ uint64_t Func_greatest::getUintVal(rowgroup::Row& row,
 	double str = fp[0]->data()->getDoubleVal(row, isNull);
 
 	double greatestStr = str;
-	for (uint i = 1; i < fp.size(); i++)
+	for (uint32_t i = 1; i < fp.size(); i++)
 	{
 		double str1 = fp[i]->data()->getDoubleVal(row, isNull);
 
@@ -106,7 +106,7 @@ double Func_greatest::getDoubleVal(rowgroup::Row& row,
 	double str = fp[0]->data()->getDoubleVal(row, isNull);
 
 	double greatestStr = str;
-	for (uint i = 1; i < fp.size(); i++)
+	for (uint32_t i = 1; i < fp.size(); i++)
 	{
 		double str1 = fp[i]->data()->getDoubleVal(row, isNull);
 
@@ -125,7 +125,7 @@ std::string Func_greatest::getStrVal(rowgroup::Row& row,
 	const string& str = fp[0]->data()->getStrVal(row, isNull);
 
 	string greatestStr = str;
-	for (uint i = 1; i < fp.size(); i++)
+	for (uint32_t i = 1; i < fp.size(); i++)
 	{
 		const string& str1 = fp[i]->data()->getStrVal(row, isNull);
 
@@ -148,7 +148,7 @@ IDB_Decimal Func_greatest::getDecimalVal(Row& row,
 	IDB_Decimal str = fp[0]->data()->getDecimalVal(row, isNull);
 
 	IDB_Decimal greatestStr = str;
-	for (uint i = 1; i < fp.size(); i++)
+	for (uint32_t i = 1; i < fp.size(); i++)
 	{
 		IDB_Decimal str1 = fp[i]->data()->getDecimalVal(row, isNull);
 

@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -24,9 +24,7 @@
 #include <iostream>
 #include <boost/scoped_ptr.hpp>
 using namespace std;
-#define DELETEPKGPROC_DLLEXPORT
 #include "deletepackageprocessor.h"
-#undef DELETEPKGPROC_DLLEXPORT
 #include "writeengine.h"
 #include "joblistfactory.h"
 #include "messagelog.h"
@@ -126,17 +124,17 @@ namespace dmlpackageprocessor
 		if (tableLockId == 0)
 		{
 			//cout << "tablelock is not found in cache " << endl;
-			u_int32_t  processID = ::getpid();
+			uint32_t  processID = ::getpid();
 			int32_t   txnId = txnid.id;
 			std::string  processName("DMLProc");
 			int32_t sessionId = fSessionID;
 			int i = 0;
 			OamCache * oamcache = OamCache::makeOamCache();
 			std::vector<int> pmList = oamcache->getModuleIds();
-			std::vector<uint> pms;
+			std::vector<uint32_t> pms;
 			for (unsigned i=0; i < pmList.size(); i++)
 			{
-				pms.push_back((uint)pmList[i]);
+				pms.push_back((uint32_t)pmList[i]);
 			}
 				
 			try {
@@ -276,7 +274,7 @@ namespace dmlpackageprocessor
     }
 	//timer.finish();
 	//@Bug 1886,2870 Flush VM cache only once per statement. 
-	std::map<u_int32_t,u_int32_t> oids;
+	std::map<uint32_t,uint32_t> oids;
 	int rc = 0;
     if (result.result == NO_ERROR)
 	{
@@ -353,7 +351,7 @@ namespace dmlpackageprocessor
 	msg << qb;
 	boost::scoped_ptr<rowgroup::RowGroup> rowGroup;
 	uint64_t  rowsProcessed = 0;
-	uint dbroot = 1;
+	uint32_t dbroot = 1;
 	bool metaData = false;
 	oam::OamCache * oamCache = oam::OamCache::makeOamCache();
 	std::vector<int> fPMs = oamCache->getModuleIds();
@@ -457,7 +455,7 @@ namespace dmlpackageprocessor
 				}
 
 				// XXXST: take out the 'true' when all jobsteps have been made st-compatible
-				uint amount = rgData.deserialize(msg, true);
+				uint32_t amount = rgData.deserialize(msg, true);
 				rowGroup->setData(&rgData);
 				//rowGroup->setData(const_cast<uint8_t*>(msg.buf())); 
 				err = (rowGroup->getStatus() != 0);
@@ -595,7 +593,7 @@ namespace dmlpackageprocessor
   }
   
 bool DeletePackageProcessor::processRowgroup(ByteStream & aRowGroup, DMLResult& result, const uint64_t uniqueId, 
-			dmlpackage::CalpontDMLPackage& cpackage, std::map<unsigned, bool>& pmStateDel, bool isMeta, uint dbroot)
+			dmlpackage::CalpontDMLPackage& cpackage, std::map<unsigned, bool>& pmStateDel, bool isMeta, uint32_t dbroot)
 {
 	bool rc = false;
 	//cout << "Get dbroot " << dbroot << endl;
@@ -605,13 +603,13 @@ bool DeletePackageProcessor::processRowgroup(ByteStream & aRowGroup, DMLResult& 
 	bytestream << (ByteStream::byte)WE_SVR_DELETE;
 	bytestream << uniqueId;
 	bytestream << (ByteStream::quadbyte) pmNum;
-	bytestream << u_int32_t(cpackage.get_SessionID());
+	bytestream << uint32_t(cpackage.get_SessionID());
 	bytestream << (ByteStream::quadbyte) cpackage.get_TxnID();
 	bytestream << tablePtr->get_SchemaName();
 	bytestream << tablePtr->get_TableName();
 	bytestream += aRowGroup;
 	//cout << "sending rows to pm " << pmNum << " with msg length " << bytestream.length() << endl;
-	uint msgRecived = 0;
+	uint32_t msgRecived = 0;
 	boost::shared_ptr<messageqcpp::ByteStream> bsIn;
 	bsIn.reset(new ByteStream());
 	ByteStream::byte tmp8;
@@ -649,7 +647,7 @@ bool DeletePackageProcessor::processRowgroup(ByteStream & aRowGroup, DMLResult& 
 	if (pmStateDel[pmNum])
 	{ 	
 		try {
-			fWEClient->write(bytestream, (uint)pmNum);
+			fWEClient->write(bytestream, (uint32_t)pmNum);
 			//cout << "sent tp pm " << pmNum<<endl;
 			pmStateDel[pmNum] = false;
 		}
@@ -698,14 +696,14 @@ bool DeletePackageProcessor::processRowgroup(ByteStream & aRowGroup, DMLResult& 
 					result.stats.fBlocksChanged += blocksChanged;
 					result.stats.fErrorNo = tmp8;
 					
-					//cout << "received from pm " << (uint)tmp32 << " and rc = " << rc << endl;
+					//cout << "received from pm " << (uint32_t)tmp32 << " and rc = " << rc << endl;
 					pmStateDel[tmp32] = true;
 					if (rc != 0) {
 						throw std::runtime_error(errorMsg); 
 					}
-					if ( tmp32 == (uint)pmNum )
+					if ( tmp32 == (uint32_t)pmNum )
 					{
-						fWEClient->write(bytestream, (uint)pmNum);
+						fWEClient->write(bytestream, (uint32_t)pmNum);
 						pmStateDel[pmNum] = false;
 						break;
 					}		
@@ -744,7 +742,7 @@ bool DeletePackageProcessor::receiveAll(DMLResult& result, const uint64_t unique
 										std::map<unsigned, bool>& pmStateDel, const uint32_t tableOid)
 {
 	//check how many message we need to receive
-	uint messagesNotReceived = 0;
+	uint32_t messagesNotReceived = 0;
 	bool err = false;
 	for (unsigned i=0; i<fPMs.size(); i++)
 	{
@@ -753,7 +751,7 @@ bool DeletePackageProcessor::receiveAll(DMLResult& result, const uint64_t unique
 	}
 	
 	boost::shared_ptr<messageqcpp::ByteStream> bsIn;
-	uint msgReceived = 0;
+	uint32_t msgReceived = 0;
 	ByteStream::byte tmp8;
 	string errorMsg;
 	if (messagesNotReceived > 0)

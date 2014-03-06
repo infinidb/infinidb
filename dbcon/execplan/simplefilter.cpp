@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -56,7 +56,7 @@ SimpleFilter::SimpleFilter():
 SimpleFilter::SimpleFilter(const string& sql):
 		Filter(sql)
 {
-    parse(sql);    
+	parse(sql);
 }
 
 SimpleFilter::SimpleFilter(const SOP& op, ReturnedColumn* lhs, ReturnedColumn* rhs) :
@@ -72,15 +72,15 @@ SimpleFilter::SimpleFilter(const SimpleFilter& rhs) :
 {
 	fLhs = rhs.lhs()->clone();
 	fRhs = rhs.rhs()->clone();
-	
+
 	fSimpleColumnList.clear();
 	fAggColumnList.clear();
 	fWindowFunctionColumnList.clear();
-	
+
 	SimpleColumn *lsc = dynamic_cast<SimpleColumn*>(fLhs);
 	FunctionColumn *lfc = dynamic_cast<FunctionColumn*>(fLhs);
 	ArithmeticColumn *lac = dynamic_cast<ArithmeticColumn*>(fLhs);
-	WindowFunctionColumn *laf = dynamic_cast<WindowFunctionColumn*>(fLhs);	
+	WindowFunctionColumn *laf = dynamic_cast<WindowFunctionColumn*>(fLhs);
 	AggregateColumn *lagc = dynamic_cast<AggregateColumn*>(fLhs);
 	SimpleColumn *rsc = dynamic_cast<SimpleColumn*>(fRhs);
 	FunctionColumn *rfc = dynamic_cast<FunctionColumn*>(fRhs);
@@ -114,7 +114,7 @@ SimpleFilter::SimpleFilter(const SimpleFilter& rhs) :
 	{
 		fWindowFunctionColumnList.push_back(laf);
 	}
-	
+
 	if (rsc)
 	{
 		fSimpleColumnList.push_back(rsc);
@@ -128,7 +128,7 @@ SimpleFilter::SimpleFilter(const SimpleFilter& rhs) :
 		fSimpleColumnList.insert
 		  (fSimpleColumnList.end(), rfc->simpleColumnList().begin(), rfc->simpleColumnList().end());
 		fAggColumnList.insert
-		  (fAggColumnList.end(), rfc->aggColumnList().begin(), rfc->aggColumnList().end());		
+		  (fAggColumnList.end(), rfc->aggColumnList().begin(), rfc->aggColumnList().end());
 		fWindowFunctionColumnList.insert
 		  (fWindowFunctionColumnList.end(), rfc->windowfunctionColumnList().begin(), rfc->windowfunctionColumnList().end());
 	}
@@ -155,7 +155,7 @@ SimpleFilter::~SimpleFilter()
 /**
  * Methods
  */
- 
+
 void SimpleFilter::lhs(ReturnedColumn* lhs)
 {
 	fLhs = lhs;
@@ -208,34 +208,34 @@ const string SimpleFilter::toString() const
 
 void SimpleFilter::parse(string sql)
 {
-    fLhs = 0;
-    fRhs = 0;
-    string delimiter[7] = {">=", "<=", "<>", "!=", "=", "<", ">"};
-    string::size_type pos;
-    for (int i = 0; i < 7; i++)
-    {
-        pos = sql.find(delimiter[i], 0);
-        if (pos == string::npos)
-            continue;
-        fOp.reset(new Operator (delimiter[i]));
-        string lhs = sql.substr(0, pos);
-        if (lhs.at(0) == ' ')
-            lhs = lhs.substr(1, pos);
-        if (lhs.at(lhs.length()-1) == ' ')
-            lhs = lhs.substr(0, pos-1);
-        fLhs = new SimpleColumn(lhs);
-        
-        pos = pos + delimiter[i].length();
-        string rhs = sql.substr(pos,sql.length());
-        if (rhs.at(0) == ' ')
-            rhs = rhs.substr(1, pos);
-        if (rhs.at(rhs.length()-1) == ' ')
-            rhs = rhs.substr(0, pos-1);
-        fRhs = new SimpleColumn (rhs); 
-        break;
-    }
-    if (fLhs == NULL || fRhs == NULL)
-        throw runtime_error ("invalid sql for simple filter\n" );
+	fLhs = 0;
+	fRhs = 0;
+	string delimiter[7] = {">=", "<=", "<>", "!=", "=", "<", ">"};
+	string::size_type pos;
+	for (int i = 0; i < 7; i++)
+	{
+		pos = sql.find(delimiter[i], 0);
+		if (pos == string::npos)
+			continue;
+		fOp.reset(new Operator (delimiter[i]));
+		string lhs = sql.substr(0, pos);
+		if (lhs.at(0) == ' ')
+			lhs = lhs.substr(1, pos);
+		if (lhs.at(lhs.length()-1) == ' ')
+			lhs = lhs.substr(0, pos-1);
+		fLhs = new SimpleColumn(lhs);
+
+		pos = pos + delimiter[i].length();
+		string rhs = sql.substr(pos,sql.length());
+		if (rhs.at(0) == ' ')
+			rhs = rhs.substr(1, pos);
+		if (rhs.at(rhs.length()-1) == ' ')
+			rhs = rhs.substr(0, pos-1);
+		fRhs = new SimpleColumn (rhs);
+		break;
+	}
+	if (fLhs == NULL || fRhs == NULL)
+		throw runtime_error ("invalid sql for simple filter\n" );
 }
 
 ostream& operator<<(ostream& output, const SimpleFilter& rhs)
@@ -260,14 +260,14 @@ void SimpleFilter::serialize(messageqcpp::ByteStream& b) const
 		fRhs->serialize(b);
 	else
 		b << static_cast<ObjectReader::id_t>(ObjectReader::NULL_CLASS);
-    b << static_cast<u_int32_t>(fIndexFlag);
-    b << static_cast<u_int32_t>(fJoinFlag);
+	b << static_cast<uint32_t>(fIndexFlag);
+	b << static_cast<uint32_t>(fJoinFlag);
 }
-	
+
 void SimpleFilter::unserialize(messageqcpp::ByteStream& b)
 {
 	ObjectReader::checkType(b, ObjectReader::SIMPLEFILTER);
-	
+
 	//delete fOp;
 	delete fLhs;
 	delete fRhs;
@@ -275,17 +275,17 @@ void SimpleFilter::unserialize(messageqcpp::ByteStream& b)
 	fOp.reset(dynamic_cast<Operator*>(ObjectReader::createTreeNode(b)));
 	fLhs = dynamic_cast<ReturnedColumn*>(ObjectReader::createTreeNode(b));
 	fRhs = dynamic_cast<ReturnedColumn*>(ObjectReader::createTreeNode(b));
-	b >> reinterpret_cast<u_int32_t&>(fIndexFlag);
-	b >> reinterpret_cast<u_int32_t&>(fJoinFlag);
-	
+	b >> reinterpret_cast<uint32_t&>(fIndexFlag);
+	b >> reinterpret_cast<uint32_t&>(fJoinFlag);
+
 	fSimpleColumnList.clear();
 	fAggColumnList.clear();
 	fWindowFunctionColumnList.clear();
-	
+
 	SimpleColumn *lsc = dynamic_cast<SimpleColumn*>(fLhs);
 	FunctionColumn *lfc = dynamic_cast<FunctionColumn*>(fLhs);
 	ArithmeticColumn *lac = dynamic_cast<ArithmeticColumn*>(fLhs);
-	WindowFunctionColumn *laf = dynamic_cast<WindowFunctionColumn*>(fLhs);	
+	WindowFunctionColumn *laf = dynamic_cast<WindowFunctionColumn*>(fLhs);
 	AggregateColumn *lagc = dynamic_cast<AggregateColumn*>(fLhs);
 	SimpleColumn *rsc = dynamic_cast<SimpleColumn*>(fRhs);
 	FunctionColumn *rfc = dynamic_cast<FunctionColumn*>(fRhs);
@@ -319,7 +319,7 @@ void SimpleFilter::unserialize(messageqcpp::ByteStream& b)
 	{
 		fWindowFunctionColumnList.push_back(laf);
 	}
-	
+
 	if (rsc)
 	{
 		fSimpleColumnList.push_back(rsc);
@@ -333,7 +333,7 @@ void SimpleFilter::unserialize(messageqcpp::ByteStream& b)
 		fSimpleColumnList.insert
 		  (fSimpleColumnList.end(), rfc->simpleColumnList().begin(), rfc->simpleColumnList().end());
 		fAggColumnList.insert
-		  (fAggColumnList.end(), rfc->aggColumnList().begin(), rfc->aggColumnList().end());		
+		  (fAggColumnList.end(), rfc->aggColumnList().begin(), rfc->aggColumnList().end());
 		fWindowFunctionColumnList.insert
 		  (fWindowFunctionColumnList.end(), rfc->windowfunctionColumnList().begin(), rfc->windowfunctionColumnList().end());
 	}
@@ -347,8 +347,8 @@ void SimpleFilter::unserialize(messageqcpp::ByteStream& b)
 	else if (raf)
 	{
 		fWindowFunctionColumnList.push_back(raf);
-	}	
-		
+	}
+
 	// construct regex constant for like operator
 	if (fOp->op() == OP_LIKE || fOp->op() == OP_NOTLIKE)
 	{
@@ -369,34 +369,34 @@ bool SimpleFilter::operator==(const SimpleFilter& t) const
 	f2 = static_cast<const Filter*>(&t);
 	if (*f1 != *f2)
 		return false;
-	
+
 	if (fOp != NULL) {
 		if (*fOp != *t.fOp)
 			return false;
 	}
 	else if (t.fOp != NULL)
 		return false;
-	
+
 	if (fLhs != NULL) {
 		if (*fLhs != t.fLhs)
 			return false;
 	}
 	else if (t.fLhs != NULL)
 		return false;
-	
+
 	if (fRhs != NULL) {
 		if (*fRhs != t.fRhs)
 			return false;
 	}
 	else if (t.fRhs != NULL)
 		return false;
-	
+
 	else if (fIndexFlag != t.fIndexFlag)
-	    return false;
-	    
+		return false;
+
 	else if (fJoinFlag != t.fJoinFlag)
-	    return false;
-	
+		return false;
+
 	return true;
 }
 
@@ -422,66 +422,29 @@ bool SimpleFilter::operator!=(const TreeNode* t) const
 
 bool SimpleFilter::pureFilter()
 {
-    if (typeid (*fLhs) == typeid(ConstantColumn) && 
-        typeid (*fRhs) != typeid(ConstantColumn))
-    {
-        // make sure constantCol sit on right hand side
-        ReturnedColumn* temp = fLhs;
-        fLhs = fRhs;
-        fRhs = temp;
-        // also switch indexFlag
-        if (fIndexFlag == SimpleFilter::LEFT) fIndexFlag = SimpleFilter::RIGHT;
-        else if (fIndexFlag == SimpleFilter::RIGHT) fIndexFlag = SimpleFilter::LEFT;
-        return true;
-    }    
-    if (typeid (*fRhs) == typeid(ConstantColumn) && 
-             typeid (*fLhs) != typeid(ConstantColumn)) 
-        return true;
-    return false;
-}
-
-Filter* SimpleFilter::combinable(Filter* f, Operator *op)
-{
-    if (!pureFilter()) return NULL;
-    if (typeid(*f) == typeid(SimpleFilter))
-    {
-        SimpleFilter *sf = dynamic_cast<SimpleFilter*>(f);
-        if (sf->pureFilter() && fLhs->sameColumn(sf->lhs()))
-        {
-            ConstantFilter *cf = new ConstantFilter(this);
-            cf->pushFilter(sf);
-            SOP sop(op);
-            cf->op(sop);
-            return cf;
-        }   
-    }
-    if (typeid(*f) == typeid(ConstantFilter))
-    {
-        ConstantFilter *cf = dynamic_cast<ConstantFilter*>(f);
-        if (fLhs->sameColumn(cf->col().get()) && ( !cf->op() || cf->op()->data().compare(op->data())==0))
-        {
-            cf->pushFilter(this);
-            if (!cf->op()) 
-            {
-                SOP sop(op);
-                cf->op(sop);                
-            }
-            else
-            {
-                delete op;
-            }
-            return cf;
-        }
-    }
-    
-    return NULL;        
+	if (typeid (*fLhs) == typeid(ConstantColumn) &&
+		typeid (*fRhs) != typeid(ConstantColumn))
+	{
+		// make sure constantCol sit on right hand side
+		ReturnedColumn* temp = fLhs;
+		fLhs = fRhs;
+		fRhs = temp;
+		// also switch indexFlag
+		if (fIndexFlag == SimpleFilter::LEFT) fIndexFlag = SimpleFilter::RIGHT;
+		else if (fIndexFlag == SimpleFilter::RIGHT) fIndexFlag = SimpleFilter::LEFT;
+		return true;
+	}
+	if (typeid (*fRhs) == typeid(ConstantColumn) &&
+			 typeid (*fLhs) != typeid(ConstantColumn))
+		return true;
+	return false;
 }
 
 void SimpleFilter::convertConstant()
 {
 	if (fOp->op() == OP_ISNULL || fOp->op() == OP_ISNOTNULL)
 		return;
-	
+
 	ConstantColumn *lcc = dynamic_cast<ConstantColumn*>(fLhs);
 	ConstantColumn *rcc = dynamic_cast<ConstantColumn*>(fRhs);
 	if (lcc)
@@ -517,7 +480,7 @@ void SimpleFilter::convertConstant()
 	}
 	if (rcc)
 	{
-		Result result = rcc->result();		
+		Result result = rcc->result();
 		if (fLhs->resultType().colDataType == CalpontSystemCatalog::DATE)
 		{
 			if (rcc->constval().empty())
@@ -547,5 +510,82 @@ void SimpleFilter::convertConstant()
 		rcc->result(result);
 	}
 }
+
+void SimpleFilter::setDerivedTable()
+{
+	string lDerivedTable = "";
+	string rDerivedTable = "";
+
+	if (fLhs)
+	{
+		fLhs->setDerivedTable();
+		lDerivedTable = fLhs->derivedTable();
+	}
+	else
+	{
+		lDerivedTable = "*";
+	}
+
+	if (fRhs)
+	{
+		fRhs->setDerivedTable();
+		rDerivedTable = fRhs->derivedTable();
+	}
+	else
+	{
+		rDerivedTable = "*";
+	}
+
+	if (lDerivedTable == "*")
+	{
+		fDerivedTable = rDerivedTable;
+	}
+	else if (rDerivedTable == "*")
+	{
+		fDerivedTable = lDerivedTable;
+	}
+	else if (lDerivedTable == rDerivedTable)
+	{
+		fDerivedTable = lDerivedTable; // should be the same as rhs
+	}
+	else
+	{
+		fDerivedTable = "";
+	}
+}
+
+void SimpleFilter::replaceRealCol(CalpontSelectExecutionPlan::ReturnedColumnList& derivedColList)
+{
+	SimpleColumn *sc = NULL;
+	if (fLhs)
+	{
+		sc = dynamic_cast<SimpleColumn*>(fLhs);
+		if (sc)
+		{
+			ReturnedColumn* tmp = derivedColList[sc->colPosition()]->clone();
+			delete fLhs;
+			fLhs = tmp;
+		}
+		else
+		{
+			fLhs->replaceRealCol(derivedColList);
+		}
+	}
+	if (fRhs)
+	{
+		sc = dynamic_cast<SimpleColumn*>(fRhs);
+		if (sc)
+		{
+			ReturnedColumn* tmp = derivedColList[sc->colPosition()]->clone();
+			delete fRhs;
+			fRhs = tmp;
+		}
+		else
+		{
+			fRhs->replaceRealCol(derivedColList);
+		}
+	}
+}
+
 
 } // namespace execplan

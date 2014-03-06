@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -185,7 +185,7 @@ public:
      * @brief Get debug level
      */
     inline const DebugLevel getDebugLevel() const { return fDebugLevel; }
-    //int rollBackTransaction(u_int64_t uniqueId, u_int32_t txnID, u_int32_t sessionID, std::string & errorMsg);
+    //int rollBackTransaction(uint64_t uniqueId, uint32_t txnID, uint32_t sessionID, std::string & errorMsg);
     /**
      * @brief Set debug level
      */
@@ -206,7 +206,7 @@ public:
 
 	EXPORT int rollBackTransaction(uint64_t uniqueId, BRM::TxnID txnID, uint32_t sessionID, std::string & errorMsg);
 	
-	EXPORT int rollBackBatchAutoOnTransaction(u_int64_t uniqueId, BRM::TxnID txnID, u_int32_t sessionID, const u_int32_t tableOid, std::string & errorMsg);
+	EXPORT int rollBackBatchAutoOnTransaction(uint64_t uniqueId, BRM::TxnID txnID, uint32_t sessionID, const uint32_t tableOid, std::string & errorMsg);
     /**
      * @brief convert a columns data, represnted as a string, to it's native
      * data type
@@ -278,7 +278,7 @@ protected:
      * @param updateFlag 0: delete, 1: update, 2 insert
      * @param colNameList the updated column names, only valid for update SQL statement
      */
-    bool updateIndexes( u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, const std::string& schema,
+    bool updateIndexes( uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, const std::string& schema,
                         const std::string& table,const dmlpackage::RowList& rows, DMLResult& result,
                         std::vector<WriteEngine::RID> ridList,
                         WriteEngine::ColValueList& colValuesList, std::vector<std::string>& colNameList, const char updateFlag,
@@ -302,7 +302,7 @@ protected:
      * @param rows the lists of rows to check column constraints on
      * @param result the result structure
      */
-    bool violatesConstraints( u_int32_t sessionID, const std::string& schema, const std::string& table,
+    bool violatesConstraints( uint32_t sessionID, const std::string& schema, const std::string& table,
                               const dmlpackage::RowList& rows, DMLResult& result );
 
     /**	@brief validate that the column does not violate a unique constraint
@@ -354,14 +354,14 @@ protected:
      * @param rows the lists of rows to check column constraints on
      * @param result the result structure
      */   
-	 bool violatesPKRefConnstraint ( u_int32_t sessionID,
+	 bool violatesPKRefConnstraint ( uint32_t sessionID,
                                      const std::string& schema,
                                      const std::string& table,
                                      const dmlpackage::RowList& rows,
                                      const WriteEngine::ColValueList& oldValueList,
                                      DMLResult& result );
                                  
-    bool violatesPKRefConnstraint ( u_int32_t sessionID, 
+    bool violatesPKRefConnstraint ( uint32_t sessionID, 
                                      const std::string& schema, 
                                      const std::string& table,
                                      std::vector<WriteEngine::RID>& rowIDList, 
@@ -396,7 +396,7 @@ protected:
      * @param rows the lists of rows to check column constraints on
      * @param result the result structure
      */
-    bool violatesUpdtRefConstraints( u_int32_t sessionID, 
+    bool violatesUpdtRefConstraints( uint32_t sessionID, 
                                      const std::string& schema, 
                                      const std::string& table,
                                      const dmlpackage::RowList& rows, 
@@ -422,7 +422,7 @@ protected:
      * @param table the table name
      * @param colList ColumnList to fill with the columns for the supplied table
      */
-    void getColumnsForTable( u_int32_t sessionID, std::string schema, std::string table, dmlpackage::ColumnList& colList );
+    void getColumnsForTable( uint32_t sessionID, std::string schema, std::string table, dmlpackage::ColumnList& colList );
 	
 	/** @brief convert absolute rid to relative rid in a segement file
      *
@@ -432,7 +432,7 @@ protected:
      * @param startDBRoot the dbroot this table starts
      * @param dbrootCnt the number of dbroot in db
      */
-    void convertRidToColumn(u_int64_t& rid, unsigned& dbRoot, unsigned& partition, 
+    void convertRidToColumn(uint64_t& rid, unsigned& dbRoot, unsigned& partition, 
                                                     unsigned& segment, unsigned filesPerColumnPartition, 
                                                     unsigned  extentsPerSegmentFile, unsigned extentRows, 
                                                     unsigned startDBRoot, unsigned dbrootCnt,
@@ -457,16 +457,16 @@ protected:
      * @param   ec in:the error code received
      * @returns error string
      */
-    std::string projectTableErrCodeToMsg(uint ec);
+    std::string projectTableErrCodeToMsg(uint32_t ec);
     
 //    bool validateNextValue(execplan::CalpontSystemCatalog::ColType colType, int64_t value, bool & offByOne);
     
     bool validateVarbinaryVal( std::string & inStr);
-    int commitTransaction(u_int64_t uniqueId, BRM::TxnID txnID);
-    int commitBatchAutoOnTransaction(u_int64_t uniqueId, BRM::TxnID txnID, const u_int32_t tableOid, std::string & errorMsg);
-    int commitBatchAutoOffTransaction(u_int64_t uniqueId, BRM::TxnID txnID, const u_int32_t tableOid, std::string & errorMsg);
-    int rollBackBatchAutoOffTransaction(u_int64_t uniqueId, BRM::TxnID txnID, u_int32_t sessionID, const u_int32_t tableOid, std::string & errorMsg);
-    int flushDataFiles (int rc, std::map<u_int32_t,u_int32_t> & columnOids, u_int64_t uniqueId, BRM::TxnID txnID, u_int32_t tableOid);
+    int commitTransaction(uint64_t uniqueId, BRM::TxnID txnID);
+    int commitBatchAutoOnTransaction(uint64_t uniqueId, BRM::TxnID txnID, const uint32_t tableOid, std::string & errorMsg);
+    int commitBatchAutoOffTransaction(uint64_t uniqueId, BRM::TxnID txnID, const uint32_t tableOid, std::string & errorMsg);
+    int rollBackBatchAutoOffTransaction(uint64_t uniqueId, BRM::TxnID txnID, uint32_t sessionID, const uint32_t tableOid, std::string & errorMsg);
+    int flushDataFiles (int rc, std::map<uint32_t,uint32_t> & columnOids, uint64_t uniqueId, BRM::TxnID txnID, uint32_t tableOid);
 	int endTransaction (uint64_t uniqueId, BRM::TxnID txnID, bool success);
     
     /** @brief the Session Manager interface
@@ -475,9 +475,9 @@ protected:
     joblist::DistributedEngineComm *fEC;
     joblist::ResourceManager* fRM;
     char* strlower(char* in);
-    u_int32_t fSessionID;
+    uint32_t fSessionID;
     const unsigned DMLLoggingId;
-    uint fPMCount;
+    uint32_t fPMCount;
     WriteEngine::WEClients* fWEClient;
     BRM::DBRM* fDbrm;
     boost::shared_ptr<std::map<int, int> > fDbRootPMMap;

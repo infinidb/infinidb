@@ -32,12 +32,12 @@ set SHARED "//calweb/shared"
 
 log_user $DEBUG
 spawn -noecho /bin/bash
-send "rm -f $CALPONTPACKAGE1 $CALPONTPACKAGE2 $CALPONTPACKAGE3\n"
+#send "rm -f $CALPONTPACKAGE1 $CALPONTPACKAGE2 $CALPONTPACKAGE3\n"
 # 
 # delete and erase all old packages from Director Module
 #
 set timeout 10
-send "ssh $USERNAME@$SERVER 'rm -f $CALPONTPACKAGE1 $CALPONTPACKAGE2 $CALPONTPACKAGE3'\n"
+send "ssh $USERNAME@$SERVER 'rm -f /root/calpont-*.rpm /root/infinidb*.rpm'\n"
 expect {
 	-re "authenticity" { send "yes\n" 
 						expect {
@@ -111,9 +111,7 @@ expect -re "word: "
 send "$PASSWORD\n"
 expect {
 	-re {[$#] } 						{ send_user "DONE" }
-	-re "scp"  						{ send_user "FAILED\n" ; 
-				 			send_user "\n*** Installation Failed\n" ; 
-							exit -1 }
+	-re "scp"  						{ send_user "FAILED: SCP failure\n" ; exit -1 }
 	-re "Permission denied, please try again"         { send_user "FAILED: Invalid password\n" ; exit -1 }
 	-re "No such file or directory" { send_user "FAILED: Invalid package\n" ; exit -1 }
 }
@@ -142,37 +140,41 @@ expect {
 	-re "Permission denied, please try again"   { send_user "FAILED: Invalid password\n" ; exit -1 }
 }
 send_user "\n"
-set timeout 60
+set timeout 120
 expect -re {[$#] }
 #
 if { $CONFIGFILE != "NULL"} {
 	#
 	# copy over Calpont.xml file
 	#
+	send "scp $CONFIGFILE $USERNAME@$SERVER:/usr/local/Calpont/etc/Calpont.xml\n"
+	expect -re "word: "
+	# send the password
+	send "$PASSWORD\n"
+	expect {
+		-re "100%" 				  		{  }
+		-re "scp"  						{ send_user "FAILED: SCP failure\n" ; exit -1 }
+		-re "Permission denied, please try again"         { send_user "FAILED: Invalid password\n" ; exit -1 }
+		-re "No such file or directory" { send_user "FAILED: Invalid package\n" ; exit -1 }
+	}
 	send_user "Copy InfiniDB Configuration File              "
 	send "scp $CONFIGFILE $USERNAME@$SERVER:/usr/local/Calpont/etc/Calpont.xml.rpmsave\n"
 	expect -re "word: "
 	# send the password
 	send "$PASSWORD\n"
 	expect {
-		-re "100%" 				  		{ }
-		-re "scp"  						{ send_user "FAILED\n" ; 
-								send_user "\n*** Installation Failed\n" ; 
-								exit -1 }
+		-re "100%" 				  		{ send_user "DONE"}
+		-re "scp"  						{ send_user "FAILED: SCP failure\n" ; exit -1 }
 		-re "Permission denied, please try again"         { send_user "FAILED: Invalid password\n" ; exit -1 }
 		-re "No such file or directory" { send_user "FAILED: Invalid package\n" ; exit -1 }
 	}
-	send "scp $CONFIGFILE $USERNAME@$SERVER:/usr/local/Calpont/etc/Calpont.xml\n"
+	#do a dummy scp command
+	send "scp $CONFIGFILE $USERNAME@$SERVER:/tmp/Calpont.xml\n"
 	expect -re "word: "
 	# send the password
 	send "$PASSWORD\n"
 	expect {
-		-re "100%" 				  		{ send_user "DONE" }
-		-re "scp"  						{ send_user "FAILED\n" ; 
-								send_user "\n*** Installation Failed\n" ; 
-								exit -1 }
-		-re "Permission denied, please try again"         { send_user "FAILED: Invalid password\n" ; exit -1 }
-		-re "No such file or directory" { send_user "FAILED: Invalid package\n" ; exit -1 }
+		-re "100%" 				  		{ send_user " " }
 	}
 } else {
 	#

@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -149,11 +149,11 @@ const string AggregateColumn::toString() const
 	output << "expressionId=" << fExpressionId << endl;
 	if (fAlias.length() > 0) output << "/Alias: " << fAlias << endl;
 	if (fFunctionParms == 0)
-	    output << "No arguments" << endl;
+		output << "No arguments" << endl;
 	else
-	    output << *fFunctionParms << endl;
+		output << *fFunctionParms << endl;
 	if (fConstCol)
-	    output << *fConstCol;
+		output << *fConstCol;
 	return output.str();
 }
 
@@ -209,13 +209,13 @@ void AggregateColumn::unserialize(messageqcpp::ByteStream& b)
 	b >> size;
 	for (i = 0; i < size; i++) {
 		rc = dynamic_cast<ReturnedColumn*>(ObjectReader::createTreeNode(b));
-        SRCP srcp(rc);
+		SRCP srcp(rc);
 		fGroupByColList.push_back(srcp);
 	}
 	b >> size;
 	for (i = 0; i < size; i++) {
 		rc = dynamic_cast<ReturnedColumn*>(ObjectReader::createTreeNode(b));
-        SRCP srcp(rc);
+		SRCP srcp(rc);
 		fProjectColList.push_back(srcp);
 	}
 	b >> fData;
@@ -249,7 +249,7 @@ bool AggregateColumn::operator==(const AggregateColumn& t) const
 	//if (fAlias != t.fAlias)
 	//	return false;
 	if (fTableAlias != t.fTableAlias)
-	    return false;
+		return false;
 	if (fData != t.fData)
 		return false;
 	if (fAsc != t.fAsc)

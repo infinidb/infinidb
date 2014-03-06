@@ -400,8 +400,6 @@ if { $INSTALLTYPE == "initial"} {
 	}
 	set timeout 20
 	expect {
-		"ERROR" { send_user "ERROR: Daemon failed to run";
-		exit 1 }
 		"closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
 	}
 	set timeout 30

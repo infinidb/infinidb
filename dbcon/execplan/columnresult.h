@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -46,13 +46,13 @@ public:
 	ColumnResult() : oid(0), dcount(0) { }
 	// the other defaults are OK.
 
-	int64_t GetData(uint index) const
+	int64_t GetData(uint32_t index) const
 		{ return intData[index]; }
 
 	void PutData(int64_t d)
 		{ intData.push_back(d); dcount++; }
 
-	const std::string& GetStringData(uint index) const
+	const std::string& GetStringData(uint32_t index) const
 		{ return stringData[index]; }
 
 	void PutStringData(const std::string& s)
@@ -64,7 +64,7 @@ public:
 	void SetColumnOID(int o)
 		{ oid = o; }
 
-	uint64_t GetRid(uint index) const
+	uint64_t GetRid(uint32_t index) const
 		{ return rids[index]; }
 
 	void PutRid(uint64_t rid)

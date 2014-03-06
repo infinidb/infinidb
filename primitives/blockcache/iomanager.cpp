@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -305,7 +305,7 @@ const vector<pair<string, string> > getDBRootList()
 {
 	vector<pair<string, string> > ret;
 	Config *config;
-	uint dbrootCount, i;
+	uint32_t dbrootCount, i;
 	string stmp, devname, mountpoint;
 	char devkey[80], mountkey[80];
 
@@ -460,7 +460,7 @@ void* thr_popper(ioManager *arg) {
 	char* fileNamePtr=fileName;
 	uint64_t longSeekOffset=0;
 	int err;
-	uint dlen = 0, acc, readSize, blocksThisRead, j;
+	uint32_t dlen = 0, acc, readSize, blocksThisRead, j;
 	uint32_t blocksRequested=0;
 	ssize_t i;
 	char* alignedbuff=0;
@@ -710,7 +710,7 @@ if (compType != 0) cout << boldStop;
 
 			int opts = primitiveprocessor::directIOFlag ? IDBDataFile::USE_ODIRECT : 0;
 			fp = NULL;
-			uint openRetries = 0;
+			uint32_t openRetries = 0;
 			int saveErrno;
             while (fp == NULL && openRetries++ < 5) {
                 fp = IDBDataFile::open(
@@ -782,7 +782,7 @@ if (compType != 0) cout << boldStop;
 		uint32_t readCount=0;
 		uint32_t bytesRead=0;
 		uint32_t compressedBytesRead=0; // @Bug 3149.  IOMTrace was not reporting bytesRead correctly for compressed columns.
-		uint jend = blocksRequested/iom->blocksPerRead;
+		uint32_t jend = blocksRequested/iom->blocksPerRead;
 		if (iom->IOTrace())
 			clock_gettime(CLOCK_REALTIME, &tm);
 		ostringstream errMsg;
@@ -1002,7 +1002,7 @@ cout << "pread1.2(" << fp << ", 0x" << hex << (ptrdiff_t)&alignedbuff[acc] << de
 				vector<BRM::LBID_t> lbids;
 				vector<BRM::VER_t> versions;
 				vector<bool> isLocked;
-				for (i = 0; (uint) i < blocksThisRead; i++)
+				for (i = 0; (uint32_t) i < blocksThisRead; i++)
 					lbids.push_back((BRM::LBID_t) (lbid + i) + (j * iom->blocksPerRead));
 
 				if (blocksRequested > 1 || !flg)  // prefetch, or an unversioned single-block read
@@ -1089,7 +1089,7 @@ cout << "pread1.2(" << fp << ", 0x" << hex << (ptrdiff_t)&alignedbuff[acc] << de
 						primitiveprocessor::mlp->logInfoMessage(logging::M0006, args);
 					}
 				}
-				for (i = 0; useCache && (uint) i < lbids.size(); i++) {
+				for (i = 0; useCache && (uint32_t) i < lbids.size(); i++) {
 					if (!isLocked[i]) {
 #ifdef IDB_COMP_POC_DEBUG
 {
@@ -1225,7 +1225,7 @@ void purgeFDCache(std::vector<BRM::FileInfo>& files)
 	localLock.write_lock();
 
 	FdCacheType_t::iterator fdit;
-	for ( uint i=0; i < files.size(); i++)
+	for ( uint32_t i=0; i < files.size(); i++)
 	{
 		FdEntry fdKey(files[i].oid, files[i].dbRoot, files[i].partitionNum, files[i].segmentNum, files[i].compType, NULL);
 		fdit = fdcache.find(fdKey);

@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -3786,16 +3786,16 @@ namespace oam
      ******************************************************************************************/
 	string Oam::getIPAddress(string hostName)
 	{
-		static u_long my_bind_addr;
+		static uint32_t my_bind_addr;
 		struct hostent *ent;
 		string IPAddr = "";
 	
 		ent=gethostbyname(hostName.c_str());
 		if (ent != 0) {
-			my_bind_addr = (u_long) ((in_addr*)ent->h_addr_list[0])->s_addr;
+			my_bind_addr = (uint32_t) ((in_addr*)ent->h_addr_list[0])->s_addr;
 	
-			u_int8_t split[4];
-			u_int32_t ip = my_bind_addr;
+			uint8_t split[4];
+			uint32_t ip = my_bind_addr;
 			split[0] = (ip & 0xff000000) >> 24;
 			split[1] = (ip & 0x00ff0000) >> 16;
 			split[2] = (ip & 0x0000ff00) >> 8;
@@ -6908,12 +6908,12 @@ namespace oam
         {
  			case MYSQL_START:
 			{
-				command = "start > /dev/null 2>&1";
+				command = "start > /tmp/actionMysqlCalpont.log 2>&1";
 				break;
 			}
 			case MYSQL_STOP:
 			{
-				command = "stop > /dev/null 2>&1";
+				command = "stop > /tmp/actionMysqlCalpont.log 2>&1";
 
 				//set process status
 				try
@@ -6927,17 +6927,17 @@ namespace oam
 			}
 			case MYSQL_RESTART:
 			{
-				command = "restart > /dev/null 2>&1";
+				command = "restart > /tmp/actionMysqlCalpont.logl 2>&1";
 				break;
 			}
 			case MYSQL_RELOAD:
 			{
-				command = "reload > /dev/null 2>&1";
+				command = "reload > /tmp/actionMysqlCalpont.log 2>&1";
 				break;
 			}
 			case MYSQL_FORCE_RELOAD:
 			{
-				command = "force-reload > /dev/null 2>&1";
+				command = "force-reload > /tmp/actionMysqlCalpont.logl 2>&1";
 				break;
 			}
 			case MYSQL_STATUS:

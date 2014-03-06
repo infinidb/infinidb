@@ -69,9 +69,7 @@ expect -re "word: "
 send "$PASSWORD\n"
 expect {
 	-re {[$#] } 						{ send_user "DONE" }
-	-re "scp"  						{ send_user "FAILED\n" ; 
-				 			send_user "\n*** Installation Failed\n" ; 
-							exit -1 }
+	-re "scp"  						{ send_user "FAILED: SCP failure\n" ; exit -1 }
 	-re "Permission denied, please try again"         { send_user "FAILED: Invalid password\n" ; exit -1 }
 	-re "No such file or directory" { send_user "FAILED: Invalid package\n" ; exit -1 }
 }
@@ -127,11 +125,21 @@ expect {
 	-re "File not found"   { send_user "FAILED: File not found\n" ; exit -1 }
 }
 send_user "\n"
-set timeout 30
+set timeout 120
 expect -re {[$#] }
 send "rm -f $PACKAGE\n"
 #
 if { $CONFIGFILE != "NULL"} {
+	send "scp $CONFIGFILE $USERNAME@$SERVER:/usr/local/Calpont/etc/Calpont.xml\n"
+	expect -re "word: "
+	# send the password
+	send "$PASSWORD\n"
+	expect {
+		-re "100%" 				  		{  }
+		-re "scp"  						{ send_user "FAILED: SCP failure\n" ; exit -1 }
+		-re "Permission denied, please try again"         { send_user "FAILED: Invalid password\n" ; exit -1 }
+		-re "No such file or directory" { send_user "FAILED: Invalid package\n" ; exit -1 }
+	}
 	#
 	# copy over Calpont.xml file
 	#
@@ -141,24 +149,18 @@ if { $CONFIGFILE != "NULL"} {
 	# send the password
 	send "$PASSWORD\n"
 	expect {
-		-re "100%" 				  		{ }
-		-re "scp"  						{ send_user "FAILED\n" ; 
-								send_user "\n*** Installation Failed\n" ; 
-								exit -1 }
+		-re "100%" 				  		{ send_user "DONE" }
+		-re "scp"  						{ send_user "FAILED: SCP failure\n" ; exit -1 }
 		-re "Permission denied, please try again"         { send_user "FAILED: Invalid password\n" ; exit -1 }
 		-re "No such file or directory" { send_user "FAILED: Invalid package\n" ; exit -1 }
 	}
-	send "scp $CONFIGFILE $USERNAME@$SERVER:/usr/local/Calpont/etc/Calpont.xml\n"
+	#do a dummy scp command
+	send "scp $CONFIGFILE $USERNAME@$SERVER:/tmp/Calpont.xml\n"
 	expect -re "word: "
 	# send the password
 	send "$PASSWORD\n"
 	expect {
-		-re "100%" 				  		{ send_user "DONE" }
-		-re "scp"  						{ send_user "FAILED\n" ; 
-								send_user "\n*** Installation Failed\n" ; 
-								exit -1 }
-		-re "Permission denied, please try again"         { send_user "FAILED: Invalid password\n" ; exit -1 }
-		-re "No such file or directory" { send_user "FAILED: Invalid package\n" ; exit -1 }
+		-re "100%" 				  		{ send_user " " }
 	}
 } else {
 	#

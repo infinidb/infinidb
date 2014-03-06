@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -33,7 +33,7 @@
 
 //#define SHARED_NOTHING_DEMO_2
 
-#if defined(_MSC_VER) && defined(WRITEENGINECONFIG_DLLEXPORT)
+#if defined(_MSC_VER) && defined(WRITEENGINE_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
@@ -79,7 +79,7 @@ public:
     /**
      * @brief Get list of applicable DBRoot ids for this job.
      */
-    EXPORT static void getRootIdList( std::vector<u_int16_t>& dbRootIds );
+    EXPORT static void getRootIdList( std::vector<uint16_t>& dbRootIds );
 
 #ifdef SHARED_NOTHING_DEMO_2
     EXPORT static void getSharedNothingRoot(char *);  // pass in an char[FILE_NAME_SIZE]
@@ -144,7 +144,7 @@ public:
     /**
      * @brief Local Module ID   (ex: 1   )
      */
-    EXPORT static u_int16_t getLocalModuleID();
+    EXPORT static uint16_t getLocalModuleID();
 
     /**
      * @brief Version Buffer root
@@ -166,7 +166,7 @@ public:
 private:
     typedef std::vector<std::string>  strvec_t;
     typedef std::map<int,std::string> intstrmap_t;
-    typedef std::vector<u_int16_t>    uint16vec_t;
+    typedef std::vector<uint16_t>    uint16vec_t;
 
     static void         checkReload();
 

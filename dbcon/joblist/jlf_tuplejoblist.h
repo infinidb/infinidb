@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -52,7 +52,7 @@ typedef boost::shared_ptr<JoinInfo> SP_JoinInfo;
 // data to construct and config a token hashjoin for string access predicates
 struct DictionaryScanInfo
 {
-	uint                      fTokenId;  // token unique id
+	uint32_t                      fTokenId;  // token unique id
 	AnyDataListSPtr           fDl;       // data list
 	rowgroup::RowGroup        fRowGroup; // rowgroup meta data for the data list
 
@@ -72,19 +72,19 @@ struct TableInfo
 	JobStepVector             fQuerySteps;
 	JobStepVector             fProjectSteps;
 	JobStepVector             fOneTableExpSteps;
-	std::vector<uint>         fProjectCols;
-	std::vector<uint>         fColsInExp1;    // 1 table expression
-	std::vector<uint>         fColsInExp2;    // 2 or more tables in expression
-	std::vector<uint>         fColsInRetExp;  // expression in selection/group by clause
-	std::vector<uint>         fColsInOuter;   // delayed outer join filter
-	std::vector<uint>         fColsInColMap;  // columns in column map
-	std::vector<uint>         fJoinKeys;
-	std::vector<uint>         fAdjacentList;  // tables joined with
+	std::vector<uint32_t>         fProjectCols;
+	std::vector<uint32_t>         fColsInExp1;    // 1 table expression
+	std::vector<uint32_t>         fColsInExp2;    // 2 or more tables in expression
+	std::vector<uint32_t>         fColsInRetExp;  // expression in selection/group by clause
+	std::vector<uint32_t>         fColsInOuter;   // delayed outer join filter
+	std::vector<uint32_t>         fColsInColMap;  // columns in column map
+	std::vector<uint32_t>         fJoinKeys;
+	std::vector<uint32_t>         fAdjacentList;  // tables joined with
 	bool                      fVisited;
 
 	AnyDataListSPtr           fDl;            // output data list
 	rowgroup::RowGroup        fRowGroup;      // output rowgroup meta data
-	std::set<uint>            fJoinedTables;  // tables directly/indirectly joined to this table
+	std::set<uint32_t>            fJoinedTables;  // tables directly/indirectly joined to this table
 
 	TableInfo() : fTableOid(-1), fVisited(false) {}
 };

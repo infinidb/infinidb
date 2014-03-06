@@ -247,7 +247,7 @@ int main(int argc, char **argv)
 	} // while...
 
 
-	uint idx=0;
+	uint32_t idx=0;
 	std::vector<boost::thread*> thrList;
 
 	while(idx < oidList.size()) {

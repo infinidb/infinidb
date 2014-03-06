@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -26,7 +26,8 @@
 #include <winsock2.h>
 #include <inaddr.h>
 #include <stdint.h>
-
+#include <time.h>
+#include "inttypes.h"
 #ifdef __cplusplus
 #include <string>
 extern "C" {
@@ -34,8 +35,9 @@ extern "C" {
 
 extern unsigned long long strtoull(const char*, char**, int);
 extern long long atoll(const char*);
-extern long long llabs(const long long);
+#if _MSC_VER < 1600
 extern lldiv_t lldiv(const long long, const long long);
+#endif
 extern unsigned int sleep(unsigned int);
 
 #define strerror_r(e, b, l) strerror_s((b), (l), (e))
@@ -92,10 +94,8 @@ extern int gettimeofday(struct timeval*, struct timezone*);
 #ifndef _my_pthread_h
 #define localtime_r idb_localtime_r
 extern struct tm* idb_localtime_r(const time_t*, struct tm*);
-#define strtoll idb_strtoll
-extern long long idb_strtoll(const char*, char**, int);
-#define strtoull idb_strtoull
-extern unsigned long long idb_strtoull(const char*, char**, int);
+#define strtoll _strtoi64
+#define strtoull _strtoui64
 #define crc32 idb_crc32
 extern unsigned int idb_crc32(const unsigned int, const unsigned char*, const size_t);
 #endif

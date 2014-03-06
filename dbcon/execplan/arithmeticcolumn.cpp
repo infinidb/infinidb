@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -63,7 +63,7 @@ ArithmeticColumn::ArithmeticColumn():
     fExpression (0)
 {}
 
-ArithmeticColumn::ArithmeticColumn(const string& sql, const u_int32_t sessionID):
+ArithmeticColumn::ArithmeticColumn(const string& sql, const uint32_t sessionID):
     ReturnedColumn(sessionID),
     fData(sql),
     fExpression(0)
@@ -71,7 +71,7 @@ ArithmeticColumn::ArithmeticColumn(const string& sql, const u_int32_t sessionID)
 	buildTree();
 }
 
-ArithmeticColumn::ArithmeticColumn(const ArithmeticColumn& rhs, const u_int32_t sessionID):
+ArithmeticColumn::ArithmeticColumn(const ArithmeticColumn& rhs, const uint32_t sessionID):
     ReturnedColumn(rhs, sessionID),
     fTableAlias (rhs.fTableAlias),
     fAsc (rhs.fAsc),
@@ -390,6 +390,21 @@ bool ArithmeticColumn::hasWindowFunc()
 	if (fWindowFunctionColumnList.empty())
 		return false;
 	return true;
+}
+
+void ArithmeticColumn::setDerivedTable()
+{
+	if (fExpression)
+	{
+		fExpression->setDerivedTable();
+		fDerivedTable = fExpression->derivedTable();
+	}
+}
+
+void ArithmeticColumn::replaceRealCol(std::vector<SRCP>& derivedColList)
+{
+	if (fExpression)
+		replaceRefCol(fExpression, derivedColList);
 }
 
 } // namespace

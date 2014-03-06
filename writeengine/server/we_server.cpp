@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -130,8 +130,7 @@ int main(int argc, char** argv)
     idbdatafile::IDBPolicy::configIDBPolicy();
 #endif
 	Config weConfig;
-	int rc;
-	rc = setupResources();
+	setupResources();
 	
 	ostringstream serverParms;
 	serverParms << "pm" << weConfig.getLocalModuleID() << "_WriteEngineServer";

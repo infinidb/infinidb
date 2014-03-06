@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -49,14 +49,14 @@ public:
 	const std::string& alias() const { return fAlias; }
 
 	const std::vector<execplan::SSC>& columns() const { return fColumns; }
-	const execplan::CalpontSystemCatalog::OID& columnOid(uint i) const;
+	const execplan::CalpontSystemCatalog::OID& columnOid(uint32_t i) const;
 
 	const std::vector<execplan::CalpontSystemCatalog::ColType>& columnTypes() const
 		{ return fColumnTypes; }
-	void columnType(execplan::CalpontSystemCatalog::ColType& type, uint i);
-	const execplan::CalpontSystemCatalog::ColType& columnType(uint i) const;
+	void columnType(execplan::CalpontSystemCatalog::ColType& type, uint32_t i);
+	const execplan::CalpontSystemCatalog::ColType& columnType(uint32_t i) const;
 
-	const std::map<UniqId, uint>& columnMap() const { return fColumnMap; }
+	const std::map<UniqId, uint32_t>& columnMap() const { return fColumnMap; }
 
 	void varbinaryOK(bool b) { fVarBinOK = b; }
 	bool varbinaryOK() const { return fVarBinOK; }
@@ -68,7 +68,7 @@ protected:
 
 	std::vector<execplan::SSC>          fColumns;
 	std::vector<execplan::CalpontSystemCatalog::ColType> fColumnTypes;
-	std::map<UniqId, uint>              fColumnMap;
+	std::map<UniqId, uint32_t>              fColumnMap;
 
 	bool                                fVarBinOK;
 };

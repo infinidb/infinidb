@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -52,9 +52,9 @@ namespace windowfunction
 
 
 template<typename T>
-shared_ptr<WindowFunctionType> WF_lead_lag<T>::makeFunction(int id, const string& name, int ct)
+boost::shared_ptr<WindowFunctionType> WF_lead_lag<T>::makeFunction(int id, const string& name, int ct)
 {
-	shared_ptr<WindowFunctionType> func;
+	boost::shared_ptr<WindowFunctionType> func;
 	switch (ct)
 	{
 		case CalpontSystemCatalog::TINYINT:
@@ -260,7 +260,7 @@ void WF_lead_lag<T>::operator()(int64_t b, int64_t e, int64_t c)
 
 
 template
-shared_ptr<WindowFunctionType> WF_lead_lag<int64_t>::makeFunction(int, const string&, int);
+boost::shared_ptr<WindowFunctionType> WF_lead_lag<int64_t>::makeFunction(int, const string&, int);
 
 template void WF_lead_lag<int64_t>::parseParms(const std::vector<execplan::SRCP>&);
 template void WF_lead_lag<uint64_t>::parseParms(const std::vector<execplan::SRCP>&);

@@ -1,4 +1,4 @@
-# Copyright (C) 2013 Calpont Corp.
+# Copyright (C) 2014 InfiniDB, Inc.
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -18,7 +18,7 @@
 # $Id: Makefile.am 3720 2012-04-04 18:18:49Z rdempsey $
 ## Process this file with automake to produce Makefile.in
 
-include_HEADERS = we_index.h we_define.h we_type.h we_fileop.h we_blockop.h we_dbfileop.h we_obj.h we_log.h we_simplesyslog.h we_convertor.h we_brm.h we_macro.h we_config.h we_cache.h we_stats.h we_bulkrollbackmgr.h we_typeext.h we_chunkmanager.h we_bulkrollbackfilecompressed.h we_bulkrollbackfilecompressedhdfs.h we_bulkrollbackfile.h we_rbmetawriter.h we_dbrootextenttracker.h
+include_HEADERS = we_index.h we_define.h we_type.h we_fileop.h we_blockop.h we_dbfileop.h we_obj.h we_log.h we_simplesyslog.h we_convertor.h we_brm.h we_macro.h we_config.h we_cache.h we_stats.h we_bulkrollbackmgr.h we_typeext.h we_chunkmanager.h we_bulkrollbackfilecompressed.h we_bulkrollbackfilecompressedhdfs.h we_bulkrollbackfile.h we_rbmetawriter.h we_dbrootextenttracker.h we_confirmhdfsdbfile.h
 
 test:
 

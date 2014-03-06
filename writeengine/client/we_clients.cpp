@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -105,11 +105,11 @@ namespace {
 struct WEClientRunner
 {
     WEClientRunner(WriteEngine::WEClients *jl,
-		boost::shared_ptr<MessageQueueClient> cl, uint connectionIndex) : jbl(jl), client(cl),
+		boost::shared_ptr<MessageQueueClient> cl, uint32_t connectionIndex) : jbl(jl), client(cl),
 		connIndex(connectionIndex) {}
     WriteEngine::WEClients *jbl;
     boost::shared_ptr<MessageQueueClient> client;
-	uint connIndex;
+	uint32_t connIndex;
     void operator()()
     {
       //cout << "Listening on client at 0x" << hex << (ptrdiff_t)client << dec << endl;
@@ -189,7 +189,7 @@ void WEClients::Setup()
 		throw runtime_error("Setup failed");
 	}
 
-	uint pmCountConfig =  moduletypeconfig.ModuleCount;
+	uint32_t pmCountConfig =  moduletypeconfig.ModuleCount;
 	pmCount = 0;
 	int moduleID = 1;
 	
@@ -281,7 +281,7 @@ int WEClients::Close()
 	bs << (ByteStream::byte) WE_SVR_CLOSE_CONNECTION;
 	write_to_all(bs);
 //cout << "connection is closed. this = " << this << " and closingConnection = " << closingConnection << endl;
-	for (uint i=0; i < fWESReader.size(); i++)
+	for (uint32_t i=0; i < fWESReader.size(); i++)
 	{
 		fWESReader[i]->join();
 	}
@@ -294,7 +294,7 @@ int WEClients::Close()
     return 0;
 }
 
-void WEClients::Listen ( boost::shared_ptr<MessageQueueClient> client, uint connIndex)
+void WEClients::Listen ( boost::shared_ptr<MessageQueueClient> client, uint32_t connIndex)
 {
 	SBS sbs;
 
@@ -438,7 +438,7 @@ void WEClients::read(uint32_t key, SBS &bs)
 		bs.reset(new ByteStream());
 }
 
-void WEClients::write(const messageqcpp::ByteStream &msg, uint connection)
+void WEClients::write(const messageqcpp::ByteStream &msg, uint32_t connection)
 {
 	if (pmCount == 0)
 	{
@@ -477,14 +477,14 @@ void WEClients::write_to_all(const messageqcpp::ByteStream &msg)
 	}
 }
 
-void WEClients::StartClientListener(boost::shared_ptr<MessageQueueClient> cl, uint connIndex)
+void WEClients::StartClientListener(boost::shared_ptr<MessageQueueClient> cl, uint32_t connIndex)
 {
     boost::thread *thrd = new boost::thread(WEClientRunner(this, cl, connIndex));
     fWESReader.push_back(thrd);
 }
 
 
-void WEClients::addDataToOutput(SBS sbs, uint connIndex)
+void WEClients::addDataToOutput(SBS sbs, uint32_t connIndex)
   {
    // ISMPacketHeader *hdr = (ISMPacketHeader*)(sbs->buf());
    // PrimitiveHeader *p = (PrimitiveHeader *)(hdr+1);

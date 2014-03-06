@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -19,7 +19,7 @@
 // $Id: passthrucommand.cpp 2093 2013-05-08 19:23:58Z pleblanc $
 // C++ Implementation: passthrucommand
 //
-// Description: 
+// Description:
 //
 //
 // Author: Patrick <pleblanc@localhost.localdomain>, (C) 2008
@@ -62,7 +62,7 @@ void PassThruCommand::execute()
 
 void PassThruCommand::project()
 {
-	uint i;
+	uint32_t i;
 
 	*bpp->serialized << (uint32_t) (bpp->ridCount * colWidth);
 #if 0
@@ -92,13 +92,13 @@ void PassThruCommand::project()
 	}
 }
 
-void PassThruCommand::projectIntoRowGroup(RowGroup &rg, uint col)
+void PassThruCommand::projectIntoRowGroup(RowGroup &rg, uint32_t col)
 {
-	uint i;
+	uint32_t i;
 
 	rg.initRow(&r);
 	rg.getRow(0, &r);
-	uint offset = r.getOffset(col);
+	uint32_t offset = r.getOffset(col);
 	rowSize = r.getSize();
 
 	switch (colWidth) {
@@ -143,7 +143,7 @@ void PassThruCommand::nextLBID()
 
 void PassThruCommand::createCommand(ByteStream &bs)
 {
-	bs.advance(1);
+    bs.advance(1);
 	bs >> colWidth;
 	Command::createCommand(bs);
 }

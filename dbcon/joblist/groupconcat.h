@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -34,7 +34,7 @@
 #include "rowaggregation.h" // SP_GroupConcat
 #include "limitedorderby.h" // IdbOrderBy
 
-#if defined(_MSC_VER) && defined(GROUPCONCAT_DLLEXPORT)
+#if defined(_MSC_VER) && defined(JOBLIST_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
@@ -58,16 +58,16 @@ public:
 	void prepGroupConcat(JobInfo&);
 	void mapColumns(const rowgroup::RowGroup&);
 
-	std::set<uint>& columns() { return fColumns; }
+	std::set<uint32_t>& columns() { return fColumns; }
 	std::vector<rowgroup::SP_GroupConcat>& groupConcat() { return fGroupConcat; }
 
 	const std::string toString() const;
 
 protected:
-	uint getColumnKey(const execplan::SRCP& srcp, JobInfo& jobInfo);
+	uint32_t getColumnKey(const execplan::SRCP& srcp, JobInfo& jobInfo);
 	boost::shared_array<int> makeMapping(const rowgroup::RowGroup&, const rowgroup::RowGroup&);
 
-	std::set<uint>                        fColumns;
+	std::set<uint32_t>                        fColumns;
 	std::vector<rowgroup::SP_GroupConcat> fGroupConcat;
 };
 
@@ -118,7 +118,7 @@ protected:
 	virtual int64_t lengthEstimate(const rowgroup::Row&);
 
 	std::vector<uint32_t>                 fConcatColumns;
-	std::vector<std::pair<std::string, uint> >  fConstCols;
+	std::vector<std::pair<std::string, uint32_t> >  fConstCols;
 	int64_t                               fCurrentLength;
 	int64_t                               fGroupConcatLen;
 	int64_t                               fConstantLen;

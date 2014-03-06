@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -45,11 +45,11 @@ public:
 	ColumnCommandJL(const pColStep &);
 	virtual ~ColumnCommandJL();
 
-	void createCommand(messageqcpp::ByteStream &bs) const;
-	void runCommand(messageqcpp::ByteStream &bs) const;
-	void setLBID(uint64_t rid, uint dbroot);
+	virtual void createCommand(messageqcpp::ByteStream &bs) const;
+	virtual void runCommand(messageqcpp::ByteStream &bs) const;
+	void setLBID(uint64_t rid, uint32_t dbroot);
 	uint8_t getTableColumnType();
-	std::string toString();
+	virtual std::string toString();
 	uint16_t getWidth();
 	CommandType getCommandType() { return COLUMN_COMMAND; }
 	// @bug 1098
@@ -62,9 +62,14 @@ public:
 
 	void  scan(bool b) { isScan = b; }
 	bool  scan() { return isScan; }
-	uint8_t fcnOrd() { return fFcnOrd; }
 
 	void reloadExtents();
+
+protected:
+    uint32_t currentExtentIndex;
+	messageqcpp::ByteStream filterString;
+	std::vector<struct BRM::EMEntry> extents;
+	execplan::CalpontSystemCatalog::ColType colType;
 
 private:
 	ColumnCommandJL();
@@ -77,13 +82,9 @@ private:
 	uint32_t traceFlags;  // probably move this to Command
 	uint8_t BOP;
 	uint32_t rpbShift, divShift, modMask;
-	std::vector<struct BRM::EMEntry> extents;
-	messageqcpp::ByteStream filterString;
 	uint16_t filterCount;
-	uint8_t fFcnOrd;
 	std::vector<BRM::LBID_t> fLastLbid;
 
-	execplan::CalpontSystemCatalog::ColType colType;
 	bool fIsDict;
 
 	// @Bug 2889.  Added two members below for drop partition enhancement.
@@ -91,8 +92,8 @@ private:
 	uint64_t fFilesPerColumnPartition;
 	uint64_t fExtentsPerSegmentFile;
 
-	uint numDBRoots;
-	uint dbroot;
+	uint32_t numDBRoots;
+	uint32_t dbroot;
 
 	static const unsigned DEFAULT_FILES_PER_COLUMN_PARTITION = 32;
 	static const unsigned DEFAULT_EXTENTS_PER_SEGMENT_FILE   =  4;

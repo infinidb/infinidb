@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -60,40 +60,6 @@ double cotangent(double in)
 	return (1.0 / tan(in));
 }
 
-inline UDFFcnPtr_t ord2Fptr(uint8_t ord)
-{
-#ifndef _MSC_VER
-	if (ord == 0)
-		return 0;
-
-	if (ord == 255) return reinterpret_cast<UDFFcnPtr_t>(::llabs);
-	if (ord == 254) return reinterpret_cast<UDFFcnPtr_t>(::acos);
-	if (ord == 253) return reinterpret_cast<UDFFcnPtr_t>(::asin);
-	if (ord == 252) return reinterpret_cast<UDFFcnPtr_t>(::atan);
-	if (ord == 251) return reinterpret_cast<UDFFcnPtr_t>(::cos);
-	if (ord == 250) return reinterpret_cast<UDFFcnPtr_t>(cotangent);
-	if (ord == 249) return reinterpret_cast<UDFFcnPtr_t>(::exp);
-	if (ord == 248) return reinterpret_cast<UDFFcnPtr_t>(::log);
-#ifdef __linux__
-	if (ord == 247) return reinterpret_cast<UDFFcnPtr_t>(::log2);
-#else
-	if (ord == 247) return reinterpret_cast<UDFFcnPtr_t>(::log);
-#endif
-	if (ord == 246) return reinterpret_cast<UDFFcnPtr_t>(::log10);
-	if (ord == 245) return reinterpret_cast<UDFFcnPtr_t>(::sin);
-	if (ord == 244) return reinterpret_cast<UDFFcnPtr_t>(::sqrt);
-	if (ord == 243) return reinterpret_cast<UDFFcnPtr_t>(::tan);
-
-	//we'd like to avoid having to lock the map, so we need to use const methods only
-	UDFFcnMap_t::const_iterator it = UDFFcnMap.find(ord);
-	if (it == UDFFcnMap.end())
-		return 0;
-
-	return it->second;
-#else
-	return 0;
-#endif
-}
 }
 
 namespace primitiveprocessor
@@ -105,8 +71,7 @@ ColumnCommand::ColumnCommand() :
 	Command(COLUMN_COMMAND),
 	blockCount(0),
 	loadCount(0),
-	suppressFilter(false),
-	fUdfFuncPtr(0)
+	suppressFilter(false)
 	{
 	}
 
@@ -176,21 +141,19 @@ void ColumnCommand::makeStepMsg()
 // 	cout << "lbid is " << lbid << endl;
 }
 
-void ColumnCommand::issuePrimitive()
+void ColumnCommand::loadData()
 {
-	int i;
-
-	bool wasVersioned;
-	uint wasCached;
+	uint32_t wasCached;
 	uint32_t blocksRead;
-	uint32_t resultSize;
 	uint8_t _mask;
 	uint64_t oidLastLbid=0;
 	bool lastBlockReached=false;
 	oidLastLbid = getLastLbid();
-	uint blocksToLoad = 0;
+	uint32_t blocksToLoad = 0;
 	BRM::LBID_t *lbids = (BRM::LBID_t *) alloca(8 * sizeof(BRM::LBID_t));
 	uint8_t **blockPtrs = (uint8_t **) alloca(8 * sizeof(uint8_t *));
+	int i;
+
 
 	_mask = mask;
 // 	primMsg->RidFlags = 0xff;   // disables selective block loading
@@ -265,15 +228,23 @@ void ColumnCommand::issuePrimitive()
 	bpp->cachedIO += wasCached;
 	bpp->physIO += blocksRead;
 	bpp->touchedBlocks += blocksToLoad;
+}
+
+void ColumnCommand::issuePrimitive()
+{
+	uint32_t resultSize;
+
+    loadData();
 
 // 	cout << "issuing primitive for LBID " << primMsg->LBID << endl;
 	if (!suppressFilter)
 		bpp->pp.setParsedColumnFilter(parsedColumnFilter);
 	else
 		bpp->pp.setParsedColumnFilter(emptyFilter);
-	bpp->pp.p_Col(primMsg, outMsg, bpp->outMsgSize, (unsigned int*)&resultSize, fUdfFuncPtr);
+	bpp->pp.p_Col(primMsg, outMsg, bpp->outMsgSize, (unsigned int*)&resultSize);
 
-	/* Update CP data */
+	/* Update CP data, the PseudoColumn code should always be !_isScan.  Should be safe
+        to leave this here for now. */
 	if (_isScan) {
 		bpp->validCPData = (outMsg->ValidMinMax && !wasVersioned);
 		//if (wasVersioned && outMsg->ValidMinMax)
@@ -415,14 +386,14 @@ void ColumnCommand::createCommand(ByteStream &bs)
 {
 	uint8_t tmp8;
 
-	bs >> tmp8;  // eat the Command
+    bs.advance(1);
 	bs >> tmp8;
 	_isScan = tmp8;
 	bs >> traceFlags;
 	bs >> filterString;
 #if 0
 	cout << "filter string: ";
-	for (uint i = 0; i < filterString.length(); ++i)
+	for (uint32_t i = 0; i < filterString.length(); ++i)
 		cout << (int) filterString.buf()[i] << " ";
 	cout << endl;
 #endif
@@ -436,16 +407,9 @@ void ColumnCommand::createCommand(ByteStream &bs)
 	colType.compressionType = tmp8;
 	bs >> BOP;
 	bs >> filterCount;
-	bs >> tmp8;  // UDF ordinal number
-	fUdfFuncPtr = ord2Fptr(tmp8);
-	if (tmp8 != 0 && fUdfFuncPtr == 0) {
-		Message::Args args;
-		args.add(tmp8);
-		mlp->logMessage(logging::M0069, args);
-	}
 	deserializeInlineVector(bs, lastLbid);
 //	cout << "lastLbid count=" << lastLbid.size() << endl;
-//	for (uint i = 0; i < lastLbid.size(); i++)
+//	for (uint32_t i = 0; i < lastLbid.size(); i++)
 //		cout << "  " << lastLbid[i];
 
 
@@ -505,7 +469,7 @@ void ColumnCommand::prep(int8_t outputType, bool absRids)
  	cout << "filter length is " << filterString.length() << endl;
 
 	cout << "appending filter string: ";
-	for (uint i = 0; i < filterString.length(); ++i)
+	for (uint32_t i = 0; i < filterString.length(); ++i)
 		cout << (int) filterString.buf()[i] << " ";
 	cout << endl;
 #endif
@@ -567,11 +531,11 @@ void ColumnCommand::projectResult()
 
 void ColumnCommand::removeRowsFromRowGroup(RowGroup &rg)
 {
-    uint gapSize = colType.colWidth + 2;
+    uint32_t gapSize = colType.colWidth + 2;
     uint8_t *msg8;
     uint16_t rid;
     Row oldRow, newRow;
-    uint oldIdx, newIdx;
+    uint32_t oldIdx, newIdx;
 
     rg.initRow(&oldRow);
     rg.initRow(&newRow);
@@ -599,9 +563,9 @@ void ColumnCommand::removeRowsFromRowGroup(RowGroup &rg)
     primMsg->NVALS = outMsg->NVALS;
 }
 
-void ColumnCommand::projectResultRG(RowGroup &rg, uint pos)
+void ColumnCommand::projectResultRG(RowGroup &rg, uint32_t pos)
 {
-	uint i, offset, gapSize;
+	uint32_t i, offset, gapSize;
     uint8_t *msg8 = (uint8_t *) (outMsg + 1);
     if (noVB) {
         // outMsg has rids in this case
@@ -698,7 +662,7 @@ void ColumnCommand::project()
 	projectResult();
 }
 
-void ColumnCommand::projectIntoRowGroup(RowGroup &rg, uint pos)
+void ColumnCommand::projectIntoRowGroup(RowGroup &rg, uint32_t pos)
 {
 	if (bpp->ridCount == 0) {
 		blockCount += colType.colWidth;
@@ -714,28 +678,31 @@ void ColumnCommand::nextLBID()
 	lbid += colType.colWidth;
 }
 
+void ColumnCommand::duplicate(ColumnCommand *cc)
+{
+    cc->_isScan = _isScan;
+    cc->traceFlags = traceFlags;
+    cc->filterString = filterString;
+    cc->colType.colDataType = colType.colDataType;
+    cc->colType.compressionType = colType.compressionType;
+    cc->colType.colWidth = colType.colWidth;
+    cc->BOP = BOP;
+    cc->filterCount = filterCount;
+    cc->fFilterFeeder = fFilterFeeder;
+    cc->parsedColumnFilter = parsedColumnFilter;
+    cc->suppressFilter = suppressFilter;
+    cc->lastLbid = lastLbid;
+    cc->r = r;
+    cc->rowSize = rowSize;
+    cc->Command::duplicate(this);
+}
+
 SCommand ColumnCommand::duplicate()
 {
 	SCommand ret;
-	ColumnCommand *cc;
 
 	ret.reset(new ColumnCommand());
-	cc = (ColumnCommand *) ret.get();
-	cc->_isScan = _isScan;
-	cc->traceFlags = traceFlags;
-	cc->filterString = filterString;
-	cc->colType.colDataType = colType.colDataType;
-	cc->colType.compressionType = colType.compressionType;
-	cc->colType.colWidth = colType.colWidth;
-	cc->BOP = BOP;
-	cc->filterCount = filterCount;
-	cc->fFilterFeeder = fFilterFeeder;
-	cc->parsedColumnFilter = parsedColumnFilter;
-	cc->suppressFilter = suppressFilter;
-	cc->lastLbid = lastLbid;
-	cc->r = r;
-	cc->rowSize = rowSize;
-	cc->Command::duplicate(this);
+	duplicate((ColumnCommand *) ret.get());
 	return ret;
 }
 
@@ -874,7 +841,7 @@ const uint64_t ColumnCommand::getEmptyRowValue( const execplan::CalpontSystemCat
     return emptyVal;
 }
 
-void ColumnCommand::getLBIDList(uint loopCount, vector<int64_t> *lbids)
+void ColumnCommand::getLBIDList(uint32_t loopCount, vector<int64_t> *lbids)
 {
 	int64_t firstLBID = lbid, lastLBID = firstLBID + (loopCount * colType.colWidth) - 1, i;
 

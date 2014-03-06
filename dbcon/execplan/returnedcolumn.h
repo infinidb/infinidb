@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -68,6 +68,7 @@ class SimpleColumn;
 class AggregateColumn;
 class WindowFunctionColumn;
 class ReturnedColumn;
+class CalpontSelectExecutionPlan;
 
 typedef boost::shared_ptr<ReturnedColumn> SRCP;
 
@@ -83,8 +84,8 @@ public:
 	 */
 	ReturnedColumn();
 	ReturnedColumn(const std::string& sql);
-	ReturnedColumn(const u_int32_t sessionID, const bool returnAll = false);
-	ReturnedColumn(const ReturnedColumn& rhs, const u_int32_t sessionID = 0);
+	ReturnedColumn(const uint32_t sessionID, const bool returnAll = false);
+	ReturnedColumn(const ReturnedColumn& rhs, const uint32_t sessionID = 0);
 
 	/**
 	 * Destructors
@@ -100,8 +101,8 @@ public:
 	virtual const bool returnAll() const {return fReturnAll;}
 	virtual void returnAll(const bool returnAll) { fReturnAll = returnAll; }
 
-	const u_int32_t sessionID() const {return fSessionID;}
-	void sessionID(const u_int32_t sessionID) { fSessionID = sessionID; }
+	const uint32_t sessionID() const {return fSessionID;}
+	void sessionID(const uint32_t sessionID) { fSessionID = sessionID; }
 
 	inline const uint32_t sequence() const {return fSequence;}
 	inline void sequence(const uint32_t sequence) {fSequence = sequence;}
@@ -115,8 +116,8 @@ public:
 	virtual bool distinct() const { return fDistinct;}
 	virtual void distinct(const bool distinct) { fDistinct=distinct; }
 
-	const uint expressionId() const { return fExpressionId; }
-	void expressionId(const uint expressionId) { fExpressionId = expressionId; }
+	const uint32_t expressionId() const { return fExpressionId; }
+	void expressionId(const uint32_t expressionId) { fExpressionId = expressionId; }
 
 	virtual uint64_t joinInfo() const { return fJoinInfo; }
 	virtual void joinInfo(const uint64_t joinInfo) { fJoinInfo = joinInfo; }
@@ -132,7 +133,7 @@ public:
 
 	virtual uint64_t colSource() const { return fColSource; }
 	virtual void colSource(const uint64_t colSource) { fColSource = colSource; }
-	
+
 	virtual uint64_t colPosition() const { return fColPosition; }
 	virtual void colPosition(const uint64_t colPosition) { fColPosition = colPosition; }
 
@@ -186,29 +187,31 @@ public:
 	virtual bool sameColumn(const ReturnedColumn* rc) const
 	{return (fData.compare(rc->data()) == 0);}
 
-	// get all simple columns involved in this expression                                           
+	// get all simple columns involved in this expression
 	const std::vector<SimpleColumn*>& simpleColumnList() const
 	{ return fSimpleColumnList; }
 
 	// get all aggregate column list in this expression
 	const std::vector<AggregateColumn*>& aggColumnList() const
 	{ return fAggColumnList; }
-	
+
 	// get all window function column list in this expression
 	const std::vector<WindowFunctionColumn*>& windowfunctionColumnList() const
 	{ return fWindowFunctionColumnList; }
-	
+
 	/* @brief if this column is or contains aggregate column
 	 *
 	 * @note after this function call fAggColumnList is populated
 	 */
 	virtual bool hasAggregate() = 0;
-	
+
 	/* @brief if this column is or contains window function column
 	 *
 	 * @note after this function call fWindowFunctionColumnList is populated
 	 */
 	virtual bool hasWindowFunc() = 0;
+
+	virtual void replaceRealCol(std::vector<SRCP>&){}
 
 protected:
 	// return all flag set if the other column is outer join column (+)
@@ -223,7 +226,7 @@ protected:
 	bool fNullsFirst;                   /// for window function
 	uint64_t fOrderPos;                 /// for order by and group by column
 	uint64_t fColSource;                /// from which subquery
-	uint64_t fColPosition;              /// the column position in the source subquery 
+	uint64_t fColPosition;              /// the column position in the source subquery
 	std::vector<SimpleColumn*> fSimpleColumnList;
 	std::vector<AggregateColumn*> fAggColumnList;
 	std::vector<WindowFunctionColumn*> fWindowFunctionColumnList;
@@ -235,16 +238,16 @@ private:
  *                   F&E framework                                *
  ******************************************************************/
 public:
-	const uint inputIndex() const { return fInputIndex; }
-	void inputIndex ( const uint inputIndex ) { fInputIndex = inputIndex; }
-	const uint outputIndex() const { return fOutputIndex; }
-	void outputIndex ( const uint outputIndex ) { fOutputIndex = outputIndex; }
+	const uint32_t inputIndex() const { return fInputIndex; }
+	void inputIndex ( const uint32_t inputIndex ) { fInputIndex = inputIndex; }
+	const uint32_t outputIndex() const { return fOutputIndex; }
+	void outputIndex ( const uint32_t outputIndex ) { fOutputIndex = outputIndex; }
 
 protected:
 	std::string fErrMsg;   /// error occured in evaluation
 	uint32_t fInputIndex;  /// index to the input rowgroup
 	uint32_t fOutputIndex; /// index to the output rowgroup
-	uint fExpressionId;    /// unique id for this expression
+	uint32_t fExpressionId;    /// unique id for this expression
 };
 
 std::ostream& operator<<(std::ostream& os, const ReturnedColumn& rhs);

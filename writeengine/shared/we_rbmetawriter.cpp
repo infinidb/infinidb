@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -19,9 +19,7 @@
 * $Id: we_rbmetawriter.cpp 4737 2013-08-14 20:45:46Z bwilkinson $
 */
 
-#define WRITEENGINERBMETAWRITER_DLLEXPORT
 #include "we_rbmetawriter.h"
-#undef WRITEENGINERBMETAWRITER_DLLEXPORT
 
 #include <cerrno>
 #include <iostream>
@@ -46,8 +44,20 @@ using namespace idbdatafile;
 namespace
 {
     const char* DATA_DIR_SUFFIX = "_data";
-    const char* DBROOT_BULK_ROLLBACK_SUBDIR = "bulkRollback";
     const char* TMP_FILE_SUFFIX = ".tmp";
+
+    const char* VERSION3_REC    = "# VERSION: 3";
+    const int   VERSION3_REC_LEN= 12;
+    const char* VERSION4_REC    = "# VERSION: 4";
+    const int   VERSION4_REC_LEN= 12;
+    const char* COLUMN1_REC     = "COLUM1"; // HWM extent for a DBRoot
+    const int   COLUMN1_REC_LEN = 6;
+    const char* COLUMN2_REC     = "COLUM2"; // Placeholder for empty DBRoot
+    const int   COLUMN2_REC_LEN = 6;
+    const char* DSTORE1_REC     = "DSTOR1"; // HWM extent for a DBRoot
+    const int   DSTORE1_REC_LEN = 6;
+    const char* DSTORE2_REC     = "DSTOR2"; // Placeholder for empty DBRoot
+    const int   DSTORE2_REC_LEN = 6;
 
     //--------------------------------------------------------------------------
     // Local Function that prints contents of an RBChunkInfo object
@@ -107,7 +117,7 @@ void RBMetaWriter::init (
     fTableOID  = tableOID;
     fTableName = tableName;
 
-    std::vector<u_int16_t> dbRoots;
+    std::vector<uint16_t> dbRoots;
     Config::getRootIdList( dbRoots );
 
     std::string metaFileName;
@@ -160,7 +170,7 @@ void RBMetaWriter::saveBulkRollbackMetaData(
 
     try
     {
-        std::vector<u_int16_t> dbRoots;
+        std::vector<uint16_t> dbRoots;
         Config::getRootIdList( dbRoots );
 
         // Loop through DBRoot HWMs for this PM
@@ -192,9 +202,9 @@ void RBMetaWriter::saveBulkRollbackMetaData(
                     throw WeException( oss.str(), ERR_INVALID_PARAM );
                 }
                     
-                u_int16_t dbRoot    = dbRootHWMInfo[k].dbRoot;
-                u_int32_t partition = 0;
-                u_int16_t segment   = 0;
+                uint16_t dbRoot    = dbRootHWMInfo[k].dbRoot;
+                uint32_t partition = 0;
+                uint16_t segment   = 0;
                 HWM       localHWM  = 0;
                 bool      bExtentWithData = false;
 
@@ -226,7 +236,7 @@ void RBMetaWriter::saveBulkRollbackMetaData(
                 // Save dctnry store meta-data info to support bulk rollback
                 if ( dctnryStoreOids[i] > 0 ) 
                 {
-                    std::vector<u_int32_t> segList;
+                    std::vector<uint32_t> segList;
                     std::string segFileListErrMsg;
 
                     if (bExtentWithData)
@@ -248,7 +258,8 @@ void RBMetaWriter::saveBulkRollbackMetaData(
                             throw WeException( oss.str(), rc );
                         }
 
-                        rc = BulkRollbackMgr::getSegFileList(dirName, segList,
+                        rc = BulkRollbackMgr::getSegFileList(dirName, false,
+                            segList,
                             segFileListErrMsg);       
                         if (rc != NO_ERROR)
                         {
@@ -389,7 +400,7 @@ void RBMetaWriter::saveBulkRollbackMetaData(
 //------------------------------------------------------------------------------
 // Open a meta data file to save info about the specified table OID.
 //------------------------------------------------------------------------------
-std::string RBMetaWriter::openMetaFile ( u_int16_t dbRoot )
+std::string RBMetaWriter::openMetaFile ( uint16_t dbRoot )
 {
     std::string bulkRollbackPath( Config::getDBRootByNum( dbRoot ) );
     bulkRollbackPath += '/';
@@ -574,7 +585,10 @@ void RBMetaWriter::writeColumnMetaData (
     {
         if (!fCreatedSubDir)
         {
-            createSubDir( metaFileName );
+            // @bug 5572 - Don't need db backup files for HDFS;
+            //             use hdfs buffer file
+            if (!IDBPolicy::useHdfs())
+                createSubDir( metaFileName );
         }
     }
 }
@@ -684,12 +698,8 @@ void RBMetaWriter::backupColumnHWMChunk(
     uint16_t  segment,
     HWM       startingHWM)
 {
-    if (IDBPolicy::useHdfs())
-    {
-        backupHWMFile( true,
-            columnOID, dbRoot, partition, segment, startingHWM );
-    }
-    else
+    // @bug 5572 - Don't need db backup file for HDFS; we use hdfs buffer file
+    if (!IDBPolicy::useHdfs())
     {
         backupHWMChunk( true,
             columnOID, dbRoot, partition, segment, startingHWM );
@@ -702,17 +712,22 @@ void RBMetaWriter::backupColumnHWMChunk(
 // This operation is only performed for compressed columns.  Once the chunk is
 // saved, we remove that OID, partition, and segment from the internal list
 // (fRBChunkDctnrySet) that is maintained.
+// Return value indicates whether the specified file needs to be backed up or
+// not.
 //
 // This function MUST be maintained to be thread-safe so that multiple threads
 // can concurrently call this function, with each thread managing a different
 // dictionary column.
 //------------------------------------------------------------------------------
-void RBMetaWriter::backupDctnryHWMChunk(
+// @bug 5572 - HDFS usage: add return flag to indicate backup status
+bool RBMetaWriter::backupDctnryHWMChunk(
     OID       dctnryOID,
     uint16_t  dbRoot,
     uint32_t  partition,
     uint16_t  segment)
 {
+    bool bBackupApplies = false;
+
     if (fRBChunkDctnrySet.size() > 0)
     {
         RBChunkInfo chunkInfo(
@@ -736,12 +751,11 @@ void RBMetaWriter::backupDctnryHWMChunk(
         {
             if (chunkInfoFound.fPartition == partition)
             {
-                if (IDBPolicy::useHdfs())
-                {
-                    backupHWMFile(false, dctnryOID,
-                        dbRoot, partition, segment, chunkInfoFound.fHwm);
-                }
-                else
+                // @bug 5572 - Don't need db backup file for HDFS;
+                //             we use hdfs buffer file.  Set backup flag
+                //             so application knows to use tmp buffer file.
+                bBackupApplies = true;
+                if (!IDBPolicy::useHdfs())
                 {
                     backupHWMChunk(false, dctnryOID,
                         dbRoot, partition, segment, chunkInfoFound.fHwm);
@@ -767,6 +781,8 @@ void RBMetaWriter::backupDctnryHWMChunk(
             }
         }
     }
+
+    return bBackupApplies;
 }
 
 //------------------------------------------------------------------------------
@@ -779,6 +795,8 @@ void RBMetaWriter::backupDctnryHWMChunk(
 // backupHWMChunk() has to have a local FileOp object.  We can't share/reuse
 // a FileOp data member variable unless we want to employ a mutex.
 //------------------------------------------------------------------------------
+// @bug 5572 - Stopped using backupHWMFile().
+// Don't need db backup file for HDFS; we use hdfs buffer file
 void RBMetaWriter::backupHWMFile(
     bool      bColumnFile, // is this a column (vs dictionary) file
     OID       columnOID,   // OID of column or dictionary store
@@ -1318,6 +1336,78 @@ void RBMetaWriter::printDctnryChunkList(
         }
         fLog->logMsg( oss.str(), MSGLVL_INFO2 );
     }
+}
+
+//------------------------------------------------------------------------------
+// Verify that specified string represents Version 3 file format
+//------------------------------------------------------------------------------
+/* static */
+bool RBMetaWriter::verifyVersion3(const char* versionRec)
+{
+    if (strncmp(versionRec, VERSION3_REC, VERSION3_REC_LEN) == 0)
+        return true;
+    else
+        return false;
+}
+
+//------------------------------------------------------------------------------
+// Verify that specified string represents Version 4 file format
+//------------------------------------------------------------------------------
+/* static */
+bool RBMetaWriter::verifyVersion4(const char* versionRec)
+{
+    if (strncmp(versionRec, VERSION4_REC, VERSION4_REC_LEN) == 0)
+        return true;
+    else
+        return false;
+}
+
+//------------------------------------------------------------------------------
+// Verify that specified record type is a Column1 record
+//------------------------------------------------------------------------------
+/* static */
+ bool RBMetaWriter::verifyColumn1Rec(const char* recType)
+{
+    if (strncmp(recType, COLUMN1_REC, COLUMN1_REC_LEN) == 0)
+        return true;
+    else
+        return false;
+}
+
+//------------------------------------------------------------------------------
+// Verify that specified record type is a Column2 record
+//------------------------------------------------------------------------------
+/* static */
+bool RBMetaWriter::verifyColumn2Rec(const char* recType)
+{
+    if (strncmp(recType, COLUMN2_REC, COLUMN2_REC_LEN) == 0)
+        return true;
+    else
+        return false;
+}
+
+//------------------------------------------------------------------------------
+// Verify that specified record type is a DStore1 record
+//------------------------------------------------------------------------------
+/* static */
+bool RBMetaWriter::verifyDStore1Rec(const char* recType)
+{
+    if (strncmp(recType, DSTORE1_REC, DSTORE1_REC_LEN) == 0)
+        return true;
+    else
+        return false;
+}
+
+//------------------------------------------------------------------------------
+// Verify that specified record type is a DStore2 record
+//------------------------------------------------------------------------------
+/* static */
+bool RBMetaWriter::verifyDStore2Rec(const char* recType)
+{
+    if (strncmp(recType, DSTORE2_REC, DSTORE2_REC_LEN) == 0)
+        return true;
+    else
+        return false;
 }
 
 } // end of namespace

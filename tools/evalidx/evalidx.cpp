@@ -51,9 +51,9 @@ namespace {
 const streamsize entrysize = sizeof(IdxBitTestEntry);
 const streamsize subbloacksize = SUBBLOCK_TOTAL_BYTES;
 const streamsize listHdrSize = sizeof(IdxRidListHdr);
-u_int32_t treeOID, listOID;
-u_int32_t colOID = 0;
-u_int32_t columnSize = 0;
+uint32_t treeOID, listOID;
+uint32_t colOID = 0;
+uint32_t columnSize = 0;
 ifstream indexTreeFile, indexListFile, columnFile;
 bool vFlag = false;
 bool nFlag = false;
@@ -76,7 +76,7 @@ void usage()
     cout << "\t-n read RID from tree design" << endl;
 }
 
-int oid2file(u_int32_t oid, string& filename)
+int oid2file(uint32_t oid, string& filename)
 {
 //ITER17_Obsolete
 // This code and this program is obsolete at this point since we are not
@@ -158,9 +158,9 @@ void walkBlock (streamsize byteoffset)
             continue; 
         
         // convert lbid to real fob number
-        u_int16_t dbRoot;
-        u_int32_t partition;
-        u_int16_t segment;
+        uint16_t dbRoot;
+        uint32_t partition;
+        uint16_t segment;
         BRMWrapper::getInstance()->getFboOffset(entry->fbo, dbRoot, partition, segment, fbo);
         newByteoffset = ((int64_t)fbo)*BLOCK_SIZE+entry->sbid*subbloacksize+entry->entry*entrysize;
         

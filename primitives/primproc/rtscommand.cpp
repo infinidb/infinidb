@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -19,7 +19,7 @@
 // $Id: rtscommand.cpp 2035 2013-01-21 14:12:19Z rdempsey $
 // C++ Implementation: rtscommand
 //
-// Description: 
+// Description:
 //
 //
 // Author: Patrick <pleblanc@localhost.localdomain>, (C) 2008
@@ -56,7 +56,7 @@ void RTSCommand::execute()
 
 void RTSCommand::project()
 {
-	uint i;
+	uint32_t i;
 
 	if (passThru) {
 // 		if (bpp->absRids.get() == NULL)
@@ -72,19 +72,19 @@ void RTSCommand::project()
 	}
 	else {
 		int64_t tmpValues[LOGICAL_BLOCK_RIDS];
-		uint old_rc = bpp->ridCount;
+		uint32_t old_rc = bpp->ridCount;
 		if (bpp->absRids.get() == NULL)
 			bpp->absRids.reset(new uint64_t[LOGICAL_BLOCK_RIDS]);
 
 		col.execute(tmpValues);
-		
+
 		if (old_rc != bpp->ridCount) {
 			ostringstream os;
 
 			os << __FILE__ << " (token column) error on projection for oid " << col.getOID() << " lbid " << col.getLBID();
 			os << ": input rids " << old_rc;
 			os << ", output rids " << bpp->ridCount << endl;
-			if (bpp->sessionID & 0x80000000) 
+			if (bpp->sessionID & 0x80000000)
 				throw NeedToRestartJob(os.str());
 			else {
 				throw PrimitiveColumnProjectResultExcept(os.str());
@@ -95,9 +95,9 @@ void RTSCommand::project()
 	}
 }
 
-void RTSCommand::projectIntoRowGroup(RowGroup &rg, uint colNum)
+void RTSCommand::projectIntoRowGroup(RowGroup &rg, uint32_t colNum)
 {
-	uint i;
+	uint32_t i;
 
 	if (passThru) {
 		if (absNull)   //@bug 1003. Always need to remake absRids
@@ -110,7 +110,7 @@ void RTSCommand::projectIntoRowGroup(RowGroup &rg, uint colNum)
 	}
 	else {
 		int64_t tmpValues[LOGICAL_BLOCK_RIDS];
-		uint old_rc = bpp->ridCount;
+		uint32_t old_rc = bpp->ridCount;
 		if (bpp->absRids.get() == NULL)
 			bpp->absRids.reset(new uint64_t[LOGICAL_BLOCK_RIDS]);
 
@@ -125,7 +125,7 @@ void RTSCommand::projectIntoRowGroup(RowGroup &rg, uint colNum)
 			os << ", output rids " << bpp->ridCount << endl;
 			if (bpp->sessionID & 0x80000000)
 				throw NeedToRestartJob(os.str());
-			else 
+			else
 				throw PrimitiveColumnProjectResultExcept(os.str());
 		}
 
@@ -156,7 +156,7 @@ void RTSCommand::prep(int8_t outputType, bool makeAbsRids)
 
 void RTSCommand::createCommand(ByteStream &bs)
 {
-	bs.advance(1);
+    bs.advance(1);
 	bs >> passThru;
 	if (!passThru) {
 		col.createCommand(bs);
@@ -206,7 +206,7 @@ bool RTSCommand::operator!=(const RTSCommand &r) const
 	return !(*this == r);
 }
 
-void RTSCommand::getLBIDList(uint loopCount, vector<int64_t> *lbids)
+void RTSCommand::getLBIDList(uint32_t loopCount, vector<int64_t> *lbids)
 {
 	dict.getLBIDList(loopCount, lbids);
 	if (!passThru)

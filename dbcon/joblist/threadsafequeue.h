@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -42,7 +42,7 @@ namespace joblist
 
 struct TSQSize_t {
 	size_t size;
-	uint count;
+	uint32_t count;
 };
 
 /** @brief A thread-safe queue class
@@ -144,7 +144,7 @@ public:
 		bytes += v->lengthWithHdrOverhead();
 		fPimplCond->notify_one();
 		ret.size = bytes;
-		ret.count = static_cast<uint>(fImpl.size());
+		ret.count = static_cast<uint32_t>(fImpl.size());
 		return ret;
 	}
 	/** @brief remove the front item in the queue
@@ -182,7 +182,7 @@ public:
 		}
 		fImpl.pop();
 		ret.size = bytes;
-		ret.count = static_cast<uint>(fImpl.size());
+		ret.count = static_cast<uint32_t>(fImpl.size());
 		return ret;
 	}
 
@@ -190,9 +190,9 @@ public:
 	 * for up to 10 consecutive calls (poor man's timer).  On the 11th, it will return
 	 * the entire queue.  Note, the zeroCount var is non-critical.  Not a big deal if
 	 * it gets fudged now and then. */
-	TSQSize_t pop_some(uint divisor, std::vector<T> &t, uint min = 1)
+	TSQSize_t pop_some(uint32_t divisor, std::vector<T> &t, uint32_t min = 1)
 	{
-		uint curSize, workSize;
+		uint32_t curSize, workSize;
 		TSQSize_t ret = {0, 0};
 
 		if (fPimplLock == 0)
@@ -218,7 +218,7 @@ public:
 			workSize = curSize;
 			zeroCount = 0;
 		}
-		for (uint i = 0; i < workSize; ++i) {
+		for (uint32_t i = 0; i < workSize; ++i) {
 			t.push_back(fImpl.front());
 			bytes -= fImpl.front()->lengthWithHdrOverhead();
 			fImpl.pop();
@@ -296,7 +296,7 @@ private:
 #else
 	size_t bytes;
 #endif
-	uint zeroCount;   // counts the # of times read_some returned 0
+	uint32_t zeroCount;   // counts the # of times read_some returned 0
 };
 
 }

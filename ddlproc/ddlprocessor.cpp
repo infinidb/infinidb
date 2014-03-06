@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -308,7 +308,7 @@ void DDLProcessor::process()
         {
             ios = fMqServer.accept();
             bs = ios.read();
-            u_int32_t sessionID;
+            uint32_t sessionID;
             bs >> sessionID;
             bs >> packageType;
 
@@ -658,7 +658,7 @@ int DDLProcessor::commitTransaction(uint32_t txnID, std::string & errorMsg)
 	bytestream << (ByteStream::byte)WE_SVR_COMMIT_VERSION;
 	bytestream << uniqueId;
 	bytestream << txnID;
-	uint msgRecived = 0;
+	uint32_t msgRecived = 0;
 	fWEClient->write_to_all(bytestream);
 	boost::shared_ptr<messageqcpp::ByteStream> bsIn;
 	bsIn.reset(new ByteStream());

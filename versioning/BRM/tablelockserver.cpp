@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -57,7 +57,7 @@ TableLockServer::~TableLockServer()
 void TableLockServer::save()
 {
 	lit_t it;
-	uint count = locks.size();
+	uint32_t count = locks.size();
 
 	const char* filename_p = filename.c_str();
 	if (IDBPolicy::useHdfs()) {
@@ -91,7 +91,7 @@ void TableLockServer::save()
 void TableLockServer::load()
 {
 	uint32_t size;
-	uint i = 0;
+	uint32_t i = 0;
 	TableLockInfo tli;
 
 	/* Need to standardize the file error handling */
@@ -161,7 +161,7 @@ uint64_t TableLockServer::lock(TableLockInfo *tli)
 {
 	set<uint32_t> dbroots;
 	lit_t it;
-	uint i;
+	uint32_t i;
 	mutex::scoped_lock lk(mutex);
 
 	for (i = 0; i < tli->dbrootList.size(); i++)
@@ -233,7 +233,7 @@ bool TableLockServer::changeState(uint64_t id, LockState state)
 	return true;
 }
 
-bool TableLockServer::changeOwner(uint64_t id, const string &ownerName, uint pid, int32_t session,
+bool TableLockServer::changeOwner(uint64_t id, const string &ownerName, uint32_t pid, int32_t session,
 		int32_t txnID)
 {
 	lit_t it;

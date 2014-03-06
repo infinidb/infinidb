@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -54,7 +54,7 @@ public:
 	void execute(int64_t *vals);	//used by RTSCommand to redirect values
 	void prep(int8_t outputType, bool makeAbsRids);
 	void project();
-	void projectIntoRowGroup(rowgroup::RowGroup &rg, uint pos);
+	void projectIntoRowGroup(rowgroup::RowGroup &rg, uint32_t pos);
 	void nextLBID();
 	bool isScan() { return _isScan; }
 	void createCommand(messageqcpp::ByteStream &);
@@ -63,9 +63,9 @@ public:
 	bool willPrefetch();
 	const uint64_t getEmptyRowValue( const execplan::CalpontSystemCatalog::ColDataType dataType, const int width ) const;
 	const int64_t getLastLbid();
-	void getLBIDList(uint loopCount, std::vector<int64_t> *lbids);
+	void getLBIDList(uint32_t loopCount, std::vector<int64_t> *lbids);
 
-	SCommand duplicate();
+	virtual SCommand duplicate();
 	bool operator==(const ColumnCommand &) const;
 	bool operator!=(const ColumnCommand &) const;
 
@@ -75,6 +75,14 @@ public:
 	void enableFilters();
 
 	int getCompType() const { return colType.compressionType; }
+
+protected:
+    virtual void loadData();
+	void duplicate(ColumnCommand *);
+
+   	// we only care about the width and type fields.
+	//On the PM the rest is uninitialized
+	execplan::CalpontSystemCatalog::ColType colType;
 
 private:
 	ColumnCommand(const ColumnCommand &);
@@ -88,7 +96,7 @@ private:
 	void process_OT_DATAVALUE();
 	void process_OT_ROWGROUP();
 	void projectResult();
-	void projectResultRG(rowgroup::RowGroup &rg, uint pos);
+	void projectResultRG(rowgroup::RowGroup &rg, uint32_t pos);
 	void removeRowsFromRowGroup(rowgroup::RowGroup &);
 	void makeScanMsg();
 	void makeStepMsg();
@@ -102,7 +110,7 @@ private:
 
 	// the length of base prim msg, which is everything up to the
 	// rid array for the pCol message
-	uint baseMsgLength;
+	uint32_t baseMsgLength;
 
 	uint64_t lbid;
 	uint32_t traceFlags;  // probably move this to Command
@@ -115,11 +123,7 @@ private:
 	uint8_t mask, shift;  // vars for the selective block loader
 
 	// counters to decide whether to prefetch or not
-	uint blockCount, loadCount;
-
-	// we only care about the width and type fields.
-	//On the PM the rest is uninitialized
-	execplan::CalpontSystemCatalog::ColType colType;
+	uint32_t blockCount, loadCount;
 
 	boost::shared_ptr<primitives::ParsedColumnFilter> parsedColumnFilter;
 
@@ -127,13 +131,13 @@ private:
 	boost::shared_ptr<primitives::ParsedColumnFilter> emptyFilter;
 	bool suppressFilter;
 
-	UDFFcnPtr_t fUdfFuncPtr;
 	std::vector<uint64_t> lastLbid;
 
 	/* speculative optimizations for projectintorowgroup() */
 	rowgroup::Row r;
-	uint rowSize;
+	uint32_t rowSize;
 
+    bool wasVersioned;
 
 	friend class RTSCommand;
 };

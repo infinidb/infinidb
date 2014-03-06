@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -85,8 +85,8 @@ bool StopWatch::stop(const string& message, const int limit) {
 	gettimeofday(&fTvLast, 0);
 	fOpenCalls--;
 	bool found = false;
-	uint idx = 0;
-	for(uint i = 0; i < fProcessStats.size(); i++) {
+	uint32_t idx = 0;
+	for(uint32_t i = 0; i < fProcessStats.size(); i++) {
 		if(fProcessStats[i].fProcess == message) {
 			idx = i;
 			found = true;
@@ -108,13 +108,13 @@ void StopWatch::start(const string& message) {
 	fOpenCalls++;
 	gettimeofday(&fTvLast, 0);
 	bool found = false;
-	uint idx = 0;
+	uint32_t idx = 0;
 	ProcessStats processStats;
 	if(!fStarted) {
 		fStarted = true;
 		gettimeofday(&fTvStart, 0);
 	}
-	for(uint i = 0; i < fProcessStats.size(); i++) {
+	for(uint32_t i = 0; i < fProcessStats.size(); i++) {
 		if(fProcessStats[i].fProcess == message) {
 			idx = i;
 			found = true;
@@ -157,7 +157,7 @@ void StopWatch::finish() {
 	}
 	fProcessStats.push_back(total);
 
-	for(uint i = 0; i < fProcessStats.size(); i++) {
+	for(uint32_t i = 0; i < fProcessStats.size(); i++) {
 
 		if(i == (fProcessStats.size() - 1)) {
 			oss << endl;

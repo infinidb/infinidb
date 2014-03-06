@@ -1,34 +1,20 @@
-/*
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-Copyright (C) 2009-2013 Calpont Corporation.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-Use of and access to the Calpont InfiniDB Community software is subject to the
-terms and conditions of the Calpont Open Source License Agreement. Use of and
-access to the Calpont InfiniDB Enterprise software is subject to the terms and
-conditions of the Calpont End User License Agreement.
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
 
-This program is distributed in the hope that it will be useful, and unless
-otherwise noted on your license agreement, WITHOUT ANY WARRANTY; without even
-the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-Please refer to the Calpont Open Source License Agreement and the Calpont End
-User License Agreement for more details.
+   You should have received a copy of the GNU General Public License
+   along with this program; if not, write to the Free Software
+   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+   MA 02110-1301, USA. */
 
-You should have received a copy of either the Calpont Open Source License
-Agreement or the Calpont End User License Agreement along with this program; if
-not, it is your responsibility to review the terms and conditions of the proper
-Calpont license agreement by visiting http://www.calpont.com for the Calpont
-InfiniDB Enterprise End User License Agreement or http://www.infinidb.org for
-the Calpont InfiniDB Community Calpont Open Source License Agreement.
-
-Calpont may make changes to these license agreements from time to time. When
-these changes are made, Calpont will make a new copy of the Calpont End User
-License Agreement available at http://www.calpont.com and a new copy of the
-Calpont Open Source License Agreement available at http:///www.infinidb.org.
-You understand and agree that if you use the Program after the date on which
-the license agreement authorizing your use has changed, Calpont will treat your
-use as acceptance of the updated License.
-
-*/
 
 /******************************************************************************************
  * $Id: calpontConsole.cpp 3110 2013-06-20 18:09:12Z dhill $
@@ -36,6 +22,8 @@ use as acceptance of the updated License.
  ******************************************************************************************/
 
 #include <clocale>
+#include <netdb.h>
+extern int h_errno;
 
 #include "calpontConsole.h"
 #include "boost/filesystem/operations.hpp"
@@ -2136,7 +2124,7 @@ int processCommand(string* arguments)
 				}
 				catch (exception& e)
 				{
-					cout << endl << "**** getModuleConfig Failed =  " << e.what() << endl;
+					cout << endl << "**** startSystem Failed =  " << e.what() << endl;
 					break;
 				}
 
@@ -2346,7 +2334,7 @@ int processCommand(string* arguments)
 				}
 				catch (exception& e)
 				{
-					cout << endl << "**** getModuleConfig Failed =  " << e.what() << endl;
+					cout << endl << "**** restartSystem Failed =  " << e.what() << endl;
 					break;
 				}
 
@@ -2881,7 +2869,7 @@ int processCommand(string* arguments)
 			if (DBRootStorageType == "internal" && GlusterConfig == "n")
 			{
 				cout << endl << "**** switchParentOAMModule Failed : DBRoot Storage type =  internal/non-data-replication" << endl;
-//				break;
+				break;
 			}
 
 			if (bUseHotStandby)
@@ -3529,8 +3517,86 @@ int processCommand(string* arguments)
 			break;
 		}
 
-        case 34: // AVAILABLE
+        case 34: // unassignDbrootPmConfig parameters: dbroot-list
         {
+			if ( localModule != parentOAMModule ) {
+				// exit out since not on active module
+				cout << endl << "**** unassignDbrootPmConfig Failed : Can only run command on Active OAM Parent Module (" << parentOAMModule << ")." << endl;
+				break;
+			}
+
+			//check the system status / service status and only allow command when System is MAN_OFFLINE
+			string cmd = startup::StartUp::installDir() + "/bin/infinidb status > /tmp/status.log";
+			system(cmd.c_str());
+			if (oam.checkLogStatus("/tmp/status.log", "InfiniDB is running") ) 
+			{
+				SystemStatus systemstatus;
+				try {
+					oam.getSystemStatus(systemstatus);
+		
+					if (systemstatus.SystemOpState != oam::MAN_OFFLINE ) {
+					cout << endl << "**** unassignDbrootPmConfig Failed,  System has to be in a MAN_OFFLINE state, stop system first" << endl;
+						break;
+					}
+				}
+				catch (exception& e)
+				{
+					cout << endl << "**** unassignDbrootPmConfig Failed : " << e.what() << endl;
+					break;
+				}
+				catch(...)
+				{
+					cout << endl << "**** unassignDbrootPmConfig Failed,  Failed return from getSystemStatus API" << endl;
+					break;
+				}
+			}
+			else
+			{
+				cout << endl << "**** unassignDbrootPmConfig Failed,  System is shutdown. Needs to be stopped" << endl;
+				break;
+			}
+
+           if (arguments[2] == "")
+            {
+                // need atleast 2 arguments
+                cout << endl << "**** unassignDbrootPmConfig Failed : Missing a required Parameter, enter 'help' for additional information" << endl;
+                break;
+            }
+
+			string dbrootIDs = arguments[1];
+			string residePM = arguments[2];
+
+			if (arguments[2].find("pm") == string::npos ) {
+				cout << endl << "**** unassignDbrootPmConfig Failed : Parmameter 2 is not a Performance Module name, enter 'help' for additional information" << endl;
+				break;
+			}
+
+			DBRootConfigList dbrootlist;
+
+			boost::char_separator<char> sep(", ");
+			boost::tokenizer< boost::char_separator<char> > tokens(dbrootIDs, sep);
+			for ( boost::tokenizer< boost::char_separator<char> >::iterator it = tokens.begin();
+					it != tokens.end();
+					++it)
+			{
+				dbrootlist.push_back(atoi((*it).c_str()));
+			}
+
+			cout << endl;
+
+			//get dbroots ids for reside PM
+            try
+            {
+                oam.unassignDbroot(residePM, dbrootlist);
+
+                cout << endl << "   Successfully Unassigned DBRoots " << endl << endl;
+		
+            }
+            catch (exception& e)
+            {
+                cout << endl << "**** Failed Unassign of DBRoots: " << e.what() << endl;
+		break;
+            }
         }
         break;
 
@@ -5398,12 +5464,68 @@ int processCommand(string* arguments)
 			break;
 		}
 
-        case 50: // AVAILABLE
+        case 50: // getModuleHostNames
         {
+			SystemModuleTypeConfig systemmoduletypeconfig;
+			ModuleTypeConfig moduletypeconfig;
+			ModuleConfig moduleconfig;
+			systemmoduletypeconfig.moduletypeconfig.clear();
+			string returnValue;
+			string Argument;
+
+			// get and all display Module HostNames (NIC 1)
+			// No other data will be displayed, only the hostnames.
+			// This feature is designed for use by other processes. 
+			// It was specifically installed for the sqoop import feature (version 4.5)
+			// If arguments[1] == PM, display only PMs, UM, display only UMs, else all.
+			try
+			{
+				oam.getSystemConfig(systemmoduletypeconfig);
+
+				for( unsigned int i = 0 ; i < systemmoduletypeconfig.moduletypeconfig.size(); i++)
+				{
+					if( systemmoduletypeconfig.moduletypeconfig[i].ModuleType.empty() )
+						// end of list
+						break;
+
+					int moduleCount = systemmoduletypeconfig.moduletypeconfig[i].ModuleCount;
+					if ( moduleCount == 0 )
+						// skip if no modules
+						continue;
+
+					string moduletype = systemmoduletypeconfig.moduletypeconfig[i].ModuleType;
+					if (arguments[1] == "pm" && moduletype != "pm")
+						continue;
+					if (arguments[1] == "um" && moduletype != "um")
+						continue;
+
+					DeviceNetworkList::iterator pt = systemmoduletypeconfig.moduletypeconfig[i].ModuleNetworkList.begin();
+					for( ; pt != systemmoduletypeconfig.moduletypeconfig[i].ModuleNetworkList.end() ; pt++)
+					{
+						HostConfigList::iterator pt1 = (*pt).hostConfigList.begin();
+						for( ; pt1 != (*pt).hostConfigList.end() ; pt1++)
+						{
+							// Only print for NIC 1
+							if ((*pt1).NicID == 1) 
+							{
+								// We need the name with domain and everything.
+								struct hostent* hentName = gethostbyname((*pt1).HostName.c_str());
+								cout << hentName->h_name << endl;
+							}
+						}
+					}
+				}
+			}
+			catch (exception& e)
+			{
+				cout << endl << "**** getModuleHostNames Failed =  " << e.what() << endl;
+			}
+            break;
 		}
 
         case 51: // AVAILABLE
         {
+            break;
 		}
 
         case 52: // getModuleCpuUsers
@@ -6116,84 +6238,103 @@ int processCommand(string* arguments)
                 break;
             }
 
-			parentOAMModule = getParentOAMModule();
-			if ( arguments[1] == parentOAMModule ) {
-				// exit out since you can't manually remove OAM Parent Module
-                cout << endl << "**** alterSystem-disableModule Failed : can't manually disable the Active OAM Parent Module." << endl;
-                break;
-			}
+		parentOAMModule = getParentOAMModule();
+		if ( arguments[1] == parentOAMModule ) {
+		// exit out since you can't manually remove OAM Parent Module
+                	cout << endl << "**** alterSystem-disableModule Failed : can't manually disable the Active OAM Parent Module." << endl;
+                	break;
+		}
 
-			string moduleType = arguments[1].substr(0,MAX_MODULE_TYPE_SIZE);
+		string moduleType = arguments[1].substr(0,MAX_MODULE_TYPE_SIZE);
 
-            gracefulTemp = INSTALL;
+            	gracefulTemp = INSTALL;
 
-            // confirm request
+		//display Primary UM Module
+		string PrimaryUMModuleName;
+		try {
+			oam.getSystemConfig("PrimaryUMModuleName", PrimaryUMModuleName);
+		}
+		catch(...) {}
+
+		bool primUM = false;
+		if ( PrimaryUMModuleName == arguments[1] )
+		{
+			cout << endl << "This command stops the processing of applications on the Primary User Module, which is where DDL/DML are performed";
+			if (confirmPrompt("If there is another module that can be changed to a new Primary User Module, this will be done"))
+				break;
+			primUM = true;
+		}
+		else
+		{
+			// confirm request
 			if ( arguments[2] != "y" ) {
 				if (confirmPrompt("This command stops the processing of applications on a Module within the Calpont System"))
 					break;
 			}
+		}
 
-			//parse module names
-			DeviceNetworkConfig devicenetworkconfig;
-			DeviceNetworkList devicenetworklist;
+		//parse module names
+		DeviceNetworkConfig devicenetworkconfig;
+		DeviceNetworkList devicenetworklist;
 
-			boost::char_separator<char> sep(", ");
-			boost::tokenizer< boost::char_separator<char> > tokens(arguments[1], sep);
-			for ( boost::tokenizer< boost::char_separator<char> >::iterator it = tokens.begin();
-					it != tokens.end();
-					++it)
+		boost::char_separator<char> sep(", ");
+		boost::tokenizer< boost::char_separator<char> > tokens(arguments[1], sep);
+		for ( boost::tokenizer< boost::char_separator<char> >::iterator it = tokens.begin();
+				it != tokens.end();
+				++it)
+		{
+			devicenetworkconfig.DeviceName = *it;
+			devicenetworklist.push_back(devicenetworkconfig);
+		}
+
+		DeviceNetworkList::iterator pt = devicenetworklist.begin();
+		DeviceNetworkList::iterator endpt = devicenetworklist.end();
+
+		bool quit = false;
+
+		// check for module status and if any dbroots still assigned
+		if ( moduleType == "pm" ) {
+			for( ; pt != endpt ; pt++)
 			{
-				devicenetworkconfig.DeviceName = *it;
-				devicenetworklist.push_back(devicenetworkconfig);
-			}
-
-			DeviceNetworkList::iterator pt = devicenetworklist.begin();
-			DeviceNetworkList::iterator endpt = devicenetworklist.end();
-
-			bool quit = false;
-
-			// check for module status and if any dbroots still assigned
-			if ( moduleType == "pm" ) {
-				for( ; pt != endpt ; pt++)
-				{
-					// check for dbroots assigned
-					DBRootConfigList dbrootConfigList;
-					string moduleID = (*pt).DeviceName.substr(MAX_MODULE_TYPE_SIZE,MAX_MODULE_ID_SIZE);
-					try {
-						oam.getPmDbrootConfig(atoi(moduleID.c_str()), dbrootConfigList);
-					}
-					catch(...) 
-					{}
-	
-					if ( !dbrootConfigList.empty() ) {
-						cout << endl << "**** alterSystem-disableModule Failed : " << (*pt).DeviceName << " has dbroots still assigned and will not be disabled. Please run movePmDbrootConfig.";
-						quit = true;
-						cout << endl;
-						break;
-					}
+				// check for dbroots assigned
+				DBRootConfigList dbrootConfigList;
+				string moduleID = (*pt).DeviceName.substr(MAX_MODULE_TYPE_SIZE,MAX_MODULE_ID_SIZE);
+				try {
+					oam.getPmDbrootConfig(atoi(moduleID.c_str()), dbrootConfigList);
 				}
+				catch(...) 
+				{}
 
-				if (quit) {
+				if ( !dbrootConfigList.empty() ) {
+					cout << endl << "**** alterSystem-disableModule Failed : " << (*pt).DeviceName << " has dbroots still assigned and will not be disabled. Please run movePmDbrootConfig.";
+					quit = true;
 					cout << endl;
 					break;
 				}
 			}
 
-			if ( devicenetworklist.empty() ) {
-				cout << endl << "quiting, no modules to remove." << endl << endl;
+			if (quit) {
+				cout << endl;
 				break;
 			}
+		}
 
-			// stop module
-			try
-			{
-				cout << endl << "   Stopping Modules" << endl;
-				oam.stopModule(devicenetworklist, gracefulTemp, ackTemp);
-				cout << "   Successful stop of Modules " << endl;
-			}
-			catch (exception& e)
-			{
-                string Failed = e.what();
+		if ( devicenetworklist.empty() ) {
+			cout << endl << "quiting, no modules to remove." << endl << endl;
+			break;
+		}
+
+		// stop module
+		try
+		{
+			cout << endl << "   Stopping Modules" << endl;
+			oam.stopModule(devicenetworklist, gracefulTemp, ackTemp);
+			cout << "   Successful stop of Modules " << endl;
+		}
+		catch (exception& e)
+		{
+
+		string Failed = e.what();
                 if (Failed.find("Disabled") != string::npos)
 					cout << endl << "   Successful stop of Modules " << endl;
 				else {
@@ -6208,6 +6349,18 @@ int processCommand(string* arguments)
 				cout << endl << "   Disabling Modules" << endl;
 				oam.disableModule(devicenetworklist);
 				cout << "   Successful disable of Modules " << endl;
+
+				//display Primary UM Module
+				string PrimaryUMModuleName;
+				try {
+					oam.getSystemConfig("PrimaryUMModuleName", PrimaryUMModuleName);
+				}
+				catch(...) {}
+		
+				if ( primUM && 
+					PrimaryUMModuleName != arguments[1] )
+					cout << endl << "   New Primary User Module = " << PrimaryUMModuleName << endl;
+
 			}
 			catch (exception& e)
 			{
@@ -7338,7 +7491,7 @@ void printSystemStatus()
 		printState(state, extraInfo);
 		cout.width(24);
 		string stime = systemstatus.StateChangeDate;
-        stime = stime.substr (0,24);
+        	stime = stime.substr (0,24);
 		cout << stime << endl << endl;
 
 		for( unsigned int i = 0 ; i < systemstatus.systemmodulestatus.modulestatus.size(); i++)
@@ -7376,9 +7529,32 @@ void printSystemStatus()
 		}
 		cout << endl;
 
-		if ( systemstatus.systemmodulestatus.modulestatus.size() > 1)
+		if ( systemstatus.systemmodulestatus.modulestatus.size() > 1) {
 			// get and display Parent OAM Module
-			cout << "Active Parent OAM Performance Module is '" << getParentOAMModule() << "'" << endl << endl;
+			cout << "Active Parent OAM Performance Module is '" << getParentOAMModule() << "'" << endl;
+
+			//display Primary UM Module
+			string PrimaryUMModuleName;
+			try {
+				oam.getSystemConfig("PrimaryUMModuleName", PrimaryUMModuleName);
+			}
+			catch(...) {}
+	
+			if ( PrimaryUMModuleName != oam::UnassignedName )
+				cout << "Primary Front-End MySQL Module is '" << PrimaryUMModuleName << "'" << endl;
+		}
+
+		//display PMwithUM feature, if enabled
+		string PMwithUM;
+		try {
+			oam.getSystemConfig("PMwithUM", PMwithUM);
+		}
+		catch(...) {}
+
+		if ( PMwithUM == "y" )
+			cout << "Performance-Module with User-Module Functionality is enabled" << endl << endl;
+		else
+			cout << endl;
 
 	}
 	catch (exception& e)

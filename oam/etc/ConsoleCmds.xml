@@ -223,7 +223,11 @@
 		<Arg1>None</Arg1>
 	</Cmd33>
 	<Cmd34>
-		<Name>AVAILABLE</Name>
+		<Name>unassignDbrootPmConfig</Name>
+		<Desc1>Unassign DBroots from a Performance Module</Desc1>
+		<Desc2>This command could be used before a DBRoot is removed</Desc2>
+		<Arg1>Required: List of Dbroot IDs to be unassigned</Arg1>
+		<Arg2>Required: Performance Module Name</Arg2>
 	</Cmd34>
 	<Cmd35>
 		<Name>assignDbrootPmConfig</Name>
@@ -323,7 +327,9 @@
 		<Arg2>Required: Number-of-Modules being remove when Module-type is specified</Arg2>
 	</Cmd49>
 	<Cmd50>
-		<Name>AVAILABLE</Name>
+		<Name>getModuleHostNames</Name>
+		<Desc1>Get a list of Module host names (NIC 1 only)</Desc1>
+		<Arg1>Optional: um or pm</Arg1>
 	</Cmd50>
 	<Cmd51>
 		<Name>AVAILABLE</Name>

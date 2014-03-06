@@ -1,4 +1,4 @@
-# Copyright (C) 2013 Calpont Corp.
+# Copyright (C) 2014 InfiniDB, Inc.
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -34,9 +34,9 @@ PrimProc_SOURCES = primproc.cpp \
         logger.cpp \
         passthrucommand.cpp \
         primitiveserver.cpp \
+	pseudocc.cpp \
         rtscommand.cpp \
-        umsocketselector.cpp \
-        udf.cpp
+        umsocketselector.cpp
 PrimProc_CPPFLAGS = -I../blockcache -I../linux-port $(AM_CPPFLAGS)
 PrimProc_CXXFLAGS = $(march_flags) $(AM_CXXFLAGS)
 PrimProc_LDFLAGS = $(idb_common_ldflags) $(idb_write_libs) $(idb_common_libs) -lthreadpool -lcacheutils $(netsnmp_libs) $(AM_LDFLAGS)

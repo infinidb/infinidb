@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -54,9 +54,9 @@ static void *RWRunner(void *arg)
 	rwlock = new RWLock(reinterpret_cast<int64_t>(arg));
 	
 	while (!threadStop) {
-		op = rand_r(reinterpret_cast<uint *>(&tv.tv_usec)) % 10;
+		op = rand_r(reinterpret_cast<uint32_t *>(&tv.tv_usec)) % 10;
 		if (op < 8) {   // read
-				interval = rand_r(reinterpret_cast<uint *>(&tv.tv_usec)) % 100000;
+				interval = rand_r(reinterpret_cast<uint32_t *>(&tv.tv_usec)) % 100000;
 				rwlock->read_lock();
 				rwlock->lock();
 				CPPUNIT_ASSERT(rwlock->getReading() > 0);
@@ -64,7 +64,7 @@ static void *RWRunner(void *arg)
 				rwlock->unlock();
 				usleep(interval);
 
-				op2 = rand_r(reinterpret_cast<uint *>(&tv.tv_usec)) % 2;
+				op2 = rand_r(reinterpret_cast<uint32_t *>(&tv.tv_usec)) % 2;
 				if (op2) {
 					rwlock->upgrade_to_write();
 					rwlock->lock();
@@ -77,14 +77,14 @@ static void *RWRunner(void *arg)
 				else {
 					/* For testing the lock recovery code in the BRM workernodes */
 					/*
-					int crash = rand_r((uint *) &tv.tv_usec) % 100;
+					int crash = rand_r((uint32_t *) &tv.tv_usec) % 100;
 					if (crash > 0)   // 1% chance of crashing
 						rwlock->read_unlock();
 					*/
 				}
 		}
 		else if (op < 9) {    // write
-				interval = rand_r(reinterpret_cast<uint *>(&tv.tv_usec)) % 100000;
+				interval = rand_r(reinterpret_cast<uint32_t *>(&tv.tv_usec)) % 100000;
 				rwlock->write_lock();
 				rwlock->lock();
 				CPPUNIT_ASSERT(rwlock->getReading() == 0);
@@ -92,7 +92,7 @@ static void *RWRunner(void *arg)
 				rwlock->unlock();
 				usleep(interval);
 
-				op2 = rand_r(reinterpret_cast<uint *>(&tv.tv_usec)) % 2;
+				op2 = rand_r(reinterpret_cast<uint32_t *>(&tv.tv_usec)) % 2;
 				if (op2) {
 					rwlock->downgrade_to_read();
 					rwlock->lock();
@@ -124,7 +124,7 @@ static void *RWRunner_local(void *arg)
 	gettimeofday(&tv, NULL);
 	
 	while (!threadStop) {
-		op = rand_r(reinterpret_cast<uint *>(&tv.tv_usec)) % 10;
+		op = rand_r(reinterpret_cast<uint32_t *>(&tv.tv_usec)) % 10;
 //    		cout << "doing op " << op << endl;
 		switch(op) {
 			case 0:    //read
@@ -137,14 +137,14 @@ static void *RWRunner_local(void *arg)
 			case 7:
 			case 8:
 			{
-				interval = rand_r(reinterpret_cast<uint *>(&tv.tv_usec)) % 100000;
+				interval = rand_r(reinterpret_cast<uint32_t *>(&tv.tv_usec)) % 100000;
 				rwlock->read_lock();
 				rwlock->lock();
 				CPPUNIT_ASSERT(rwlock->getReading() > 0);
 				CPPUNIT_ASSERT(rwlock->getWriting() == 0);
 				rwlock->unlock();
  				usleep(interval);
-				op2 = rand_r(reinterpret_cast<uint *>(&tv.tv_usec)) % 2;
+				op2 = rand_r(reinterpret_cast<uint32_t *>(&tv.tv_usec)) % 2;
 				if (op2) {
 					rwlock->upgrade_to_write();
 // 					rwlock->lock();
@@ -158,14 +158,14 @@ static void *RWRunner_local(void *arg)
 			}
 			case 9:		//write
 			{
-				interval = rand_r(reinterpret_cast<uint *>(&tv.tv_usec)) % 100000;
+				interval = rand_r(reinterpret_cast<uint32_t *>(&tv.tv_usec)) % 100000;
 				rwlock->write_lock();
 // 				rwlock->lock();
 				CPPUNIT_ASSERT(rwlock->getReading() == 0);
 				CPPUNIT_ASSERT(rwlock->getWriting() == 1);
 // 				rwlock->unlock();
  				usleep(interval);
-				op2 = rand_r(reinterpret_cast<uint *>(&tv.tv_usec)) % 2;
+				op2 = rand_r(reinterpret_cast<uint32_t *>(&tv.tv_usec)) % 2;
 				if (op2) {
 					rwlock->downgrade_to_read();
 					rwlock->lock();

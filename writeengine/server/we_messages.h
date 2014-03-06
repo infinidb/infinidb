@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -78,6 +78,7 @@ enum ServerMessages
 	WE_SVR_GET_FILESIZES,
 	WE_SVR_PURGEFD,
 	WE_END_TRANSACTION,
+	WE_SRV_FIX_ROWS,
 
 	WE_CLT_SRV_DATA=100,
 	WE_CLT_SRV_EOD,

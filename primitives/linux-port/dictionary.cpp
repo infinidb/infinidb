@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -91,27 +91,27 @@ void PrimitiveProcessor::p_TokenByScan(const TokenByScanRequestHeader *h,
 	boost::shared_ptr<DictEqualityFilter> eqFilter)
 {
 	const DataValue *args;
-	const u_int8_t *niceBlock;		// block cast to a byte-indexed type
-	const u_int8_t *niceInput;		// h cast to a byte-indexed type
-	const u_int16_t *offsets;
+	const uint8_t *niceBlock;		// block cast to a byte-indexed type
+	const uint8_t *niceInput;		// h cast to a byte-indexed type
+	const uint16_t *offsets;
 	int offsetIndex, argIndex, argsOffset;	
 	bool cmpResult=false;
 	int tmp, i, err;
 
 	const char *sig;
-	u_int16_t siglen;
+	uint16_t siglen;
 
 	PrimToken *retTokens;
 	DataValue *retDataValues;
 	int rdvOffset;
-	u_int8_t *niceRet;			// ret cast to a byte-indexed type
+	uint8_t *niceRet;			// ret cast to a byte-indexed type
 
 	boost::scoped_array<idb_regex_t> regex;
 
 	// set up pointers to fields within each structure
 
 	// either retTokens or retDataValues will be used but not both.
-	niceRet = reinterpret_cast<u_int8_t *>(ret);
+	niceRet = reinterpret_cast<uint8_t *>(ret);
 	rdvOffset = sizeof(TokenByScanResultHeader);
 
 	retTokens = reinterpret_cast<PrimToken *>(&niceRet[rdvOffset]);
@@ -125,9 +125,9 @@ void PrimitiveProcessor::p_TokenByScan(const TokenByScanRequestHeader *h,
 	ret->CacheIO    = 0;
 	ret->PhysicalIO = 0;
 
-	niceBlock = reinterpret_cast<const u_int8_t *>(block);
-	offsets = reinterpret_cast<const u_int16_t *>(&niceBlock[10]);
-	niceInput = reinterpret_cast<const u_int8_t *>(h);
+	niceBlock = reinterpret_cast<const uint8_t *>(block);
+	offsets = reinterpret_cast<const uint16_t *>(&niceBlock[10]);
+	niceInput = reinterpret_cast<const uint8_t *>(h);
 
 	// if LIKE is an operator, compile regexp's in advance.
 	if ((h->NVALS > 0 && h->COP1 & COMPARE_LIKE) || 
@@ -380,9 +380,9 @@ void PrimitiveProcessor::nextSig(int NVALS,
 				uint8_t outputFlags,
 				bool oldGetSigBehavior, bool skipNulls) throw()
 {
-	const u_int8_t* niceBlock = reinterpret_cast<const u_int8_t *>(block);
-	const u_int16_t *offsets
-		= reinterpret_cast<const u_int16_t *>(&niceBlock[10]);
+	const uint8_t* niceBlock = reinterpret_cast<const uint8_t *>(block);
+	const uint16_t *offsets
+		= reinterpret_cast<const uint16_t *>(&niceBlock[10]);
 
 	if (NVALS == 0) {		
 		if (offsets[dict_OffsetIndex + 1] == 0xffff) {
@@ -427,7 +427,7 @@ again:
 				//@Bug 2534. Change the length check to 8000
 				if (ret->len < 0 || ret->len > 8001)
 				{
-					ret->data = reinterpret_cast<const u_int8_t*>(signatureNotFound);
+					ret->data = reinterpret_cast<const uint8_t*>(signatureNotFound);
 					ret->len = strlen(reinterpret_cast<const char*>(ret->data));
 				}
 				else
@@ -444,7 +444,7 @@ again:
 		ret->data = &niceBlock[tokens[dict_OffsetIndex].offset];
 
 		if (outputFlags & OT_TOKEN) {
-			//offsets = reinterpret_cast<const u_int16_t *>(&niceBlock[10]);
+			//offsets = reinterpret_cast<const uint16_t *>(&niceBlock[10]);
 			for (currentOffsetIndex = 1; offsets[currentOffsetIndex] != 0xffff; currentOffsetIndex++)
 				if (tokens[dict_OffsetIndex].offset == offsets[currentOffsetIndex])
 					break;
@@ -471,7 +471,7 @@ void PrimitiveProcessor::p_AggregateSignature(const AggregateSignatureRequestHea
 	AggregateSignatureResultHeader *out, unsigned outSize, unsigned *written, bool utf8)
 {	
 
-	u_int8_t *niceOutput;		// h cast to a byte-indexed type
+	uint8_t *niceOutput;		// h cast to a byte-indexed type
 	int cmp;	
 	char cMin[BLOCK_SIZE], cMax[BLOCK_SIZE];
 	int cMinLen, cMaxLen;
@@ -482,7 +482,7 @@ void PrimitiveProcessor::p_AggregateSignature(const AggregateSignatureRequestHea
 
 	memcpy(out, in, sizeof(ISMPacketHeader) + sizeof(PrimitiveHeader));
 	out->ism.Command = DICT_AGGREGATE_RESULTS;
-	niceOutput = reinterpret_cast<u_int8_t *>(out);
+	niceOutput = reinterpret_cast<uint8_t *>(out);
 
 	// The first sig is the min and the max.
 	out->Count = 0;
@@ -652,10 +652,10 @@ bool PrimitiveProcessor::isLike(const p_DataValue *dict, const idb_regex_t *rege
 }
 
 boost::shared_array<idb_regex_t>
-PrimitiveProcessor::makeLikeFilter (const DictFilterElement *filterString, uint count)
+PrimitiveProcessor::makeLikeFilter (const DictFilterElement *filterString, uint32_t count)
 {
 	boost::shared_array<idb_regex_t> ret;
-	uint filterIndex, filterOffset;
+	uint32_t filterIndex, filterOffset;
 	uint8_t *in8 = (uint8_t *) filterString;
 	const DictFilterElement *filter;
 	p_DataValue filterptr = {0, NULL};
@@ -696,7 +696,7 @@ void PrimitiveProcessor::p_Dictionary(const DictInput *in, vector<uint8_t> *out,
 	const int SCALE_FACTOR = 2;
 	out->resize(DEF_OUTSIZE);
 
-	in8 = reinterpret_cast<const u_int8_t *>(in);
+	in8 = reinterpret_cast<const uint8_t *>(in);
 
 	memcpy(&header, in, sizeof(ISMPacketHeader) + sizeof(PrimitiveHeader));
 	header.ism.Command = DICT_RESULTS;
@@ -810,7 +810,7 @@ store:
 			header.NVALS++;
 			if (in->OutputType & OT_RID && in->InputFlags == 1) {			// hack that indicates old GetSignature behavior
 				const OldGetSigParams *oldParams;
-				u_int64_t *outRid;
+				uint64_t *outRid;
 				oldParams = reinterpret_cast<const OldGetSigParams *>(in->tokens);
 				uint32_t newlen = header.NBYTES + 8;
 				if( newlen > out->size() )

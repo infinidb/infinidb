@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -56,16 +56,16 @@ using namespace sm;
 void cleanup(cpsm_conhdl_t* hndl)
 {
 		// remove system catalog instance for this statement.
-		CalpontSystemCatalog::removeCalpontSystemCatalog(hndl->sessionID);		
+		CalpontSystemCatalog::removeCalpontSystemCatalog(hndl->sessionID);
 		hndl->queryState = NO_QUERY;
-		hndl->resultSet.erase(hndl->resultSet.begin(), hndl->resultSet.end());	
+		hndl->resultSet.erase(hndl->resultSet.begin(), hndl->resultSet.end());
 }
 
 status_t tpl_scan_fetch_getband(cpsm_conhdl_t* hndl, sp_cpsm_tplsch_t& ntplsch, int* killed)
-{	 
+{
 		// @bug 649 check keybandmap first
 		map<int, int>::iterator keyBandMapIter = hndl->keyBandMap.find(ntplsch->key);
-		
+
 		try {
 		if (keyBandMapIter != hndl->keyBandMap.end())
 		{
@@ -75,11 +75,11 @@ status_t tpl_scan_fetch_getband(cpsm_conhdl_t* hndl, sp_cpsm_tplsch_t& ntplsch, 
 				ifstream bandFile (oss.str().c_str(), ios::in);
 				bandFile >> bs;
 				unlink (oss.str().c_str());
-			
+
 				// not possible for vtable
 				ntplsch->deserializeTable(bs);
 				ntplsch->bandID++;
-				
+
 				// end of result set
 				if (ntplsch->bandID == keyBandMapIter->second)
 				{
@@ -88,15 +88,15 @@ status_t tpl_scan_fetch_getband(cpsm_conhdl_t* hndl, sp_cpsm_tplsch_t& ntplsch, 
 				}
 		}
 		else
-		{		 
-				ByteStream bs;							 
+		{
+				ByteStream bs;
 				// @bug 626. check saveFlag. If SAVING, read band from socket and save to disk
 				if (ntplsch->saveFlag == SAVING)
 				{
 						ByteStream bs;
 						// @bug 2244. Bypass ClientRotator::read() because if I/O error occurs, it tries
-						//            to reestablish a connection with ExeMgr which ends up causing mysql
-						//            session to hang.
+						//			to reestablish a connection with ExeMgr which ends up causing mysql
+						//			session to hang.
 						bs = hndl->exeMgr->read();
 						ostringstream oss;
 						oss << DEFAULT_SAVE_PATH << '/' << hndl->sessionID << '/' << ntplsch->tableid << '_' << ntplsch->bandsReturned << ".band";
@@ -105,7 +105,7 @@ status_t tpl_scan_fetch_getband(cpsm_conhdl_t* hndl, sp_cpsm_tplsch_t& ntplsch, 
 						saveFile.close();
 						ntplsch->bandsReturned++;
 						// not possible for vtable
-						ntplsch->deserializeTable(bs);						
+						ntplsch->deserializeTable(bs);
 				}
 				// if SAVED, read from saved file. not possible for vtable
 				else if (ntplsch->saveFlag == SAVED)
@@ -116,15 +116,15 @@ status_t tpl_scan_fetch_getband(cpsm_conhdl_t* hndl, sp_cpsm_tplsch_t& ntplsch, 
 						saveFile >> bs;
 						saveFile.close();
 						ntplsch->bandsReturned++;
-						ntplsch->deserializeTable(bs);	 			
+						ntplsch->deserializeTable(bs);
 				}
 				// most normal path. also the path for vtable
 				else
 				{
 					ntplsch->bs.restart();
 					// @bug 2244. Bypass ClientRotator::read() because if I/O error occurs, it tries
-					//            to reestablish a connection with ExeMgr which ends up causing mysql
-					//            session to hang.
+					//			to reestablish a connection with ExeMgr which ends up causing mysql
+					//			session to hang.
 					// @bug 3386. need to abort the query when user does ctrl+c
 					timespec t;
 					t.tv_sec = 5L;
@@ -140,14 +140,14 @@ status_t tpl_scan_fetch_getband(cpsm_conhdl_t* hndl, sp_cpsm_tplsch_t& ntplsch, 
 						{
 							ntplsch->bs.restart();
 							// @bug 2244. Bypass ClientRotator::read() because if I/O error occurs, it tries
-							//            to reestablish a connection with ExeMgr which ends up causing mysql
-							//            session to hang.
+							//			to reestablish a connection with ExeMgr which ends up causing mysql
+							//			session to hang.
 							bool timeout = true;
 							while (timeout)
 							{
 								timeout = false;
 								ntplsch->bs = hndl->exeMgr->getClient()->read(&t, &timeout);
-								
+
 								if (killed && *killed)
 									return SQL_KILLED;
 							}
@@ -159,9 +159,9 @@ status_t tpl_scan_fetch_getband(cpsm_conhdl_t* hndl, sp_cpsm_tplsch_t& ntplsch, 
 							}
 							ntplsch->deserializeTable(ntplsch->bs);
 						}
-					
+
 						uint16_t error = ntplsch->getStatus();
-						if (0 != error)	
+						if (0 != error)
 						{
 							ntplsch->setErrMsg();
 							return error;
@@ -206,7 +206,7 @@ void end_query(cpsm_conhdl_t* hndl)
 	hndl->queryState = NO_QUERY;
 	// reset at the end of query
 	hndl->curFetchTb = 0;
-	// @bug 626 clear up 
+	// @bug 626 clear up
 	hndl->tidMap.clear();
 	hndl->tidScanMap.clear();
 	hndl->keyBandMap.clear();
@@ -227,8 +227,8 @@ void end_query(cpsm_conhdl_t* hndl)
 bool sigFlag = false;
 void sighandler(int sig_num)
 {
-    FILE* p;
-    char buf[1024];
+	FILE* p;
+	char buf[1024];
 
 	if ((p = fopen("/tmp/f1.dat", "a")) != NULL)
 	{
@@ -250,20 +250,20 @@ namespace sm
 	const std::string DEFAULT_SAVE_PATH = "/var/tmp";
 #endif
 
-status_t 
+status_t
 tpl_open ( tableid_t tableid,
 		cpsm_tplh_t*	ntplh,
 		cpsm_conhdl_t*	conn_hdl)
 {
 		SMDEBUGLOG << "tpl_open: " << conn_hdl << " tableid: " << tableid << endl;
-		
+
 		// if first time enter this function for a statement, set
 		// queryState to QUERY_IN_PRCOESS and get execution plan.
 		if (conn_hdl->queryState == NO_QUERY)
 		{
 				conn_hdl->queryState = QUERY_IN_PROCESS;
 		}
-	
+
 		try {
 				// @bug 626. check saveFlag, if SAVED, do not project
 				if (ntplh->saveFlag != SAVED)
@@ -288,13 +288,13 @@ tpl_open ( tableid_t tableid,
 		return STATUS_OK;
 }
 
-status_t 
+status_t
 tpl_scan_open ( tableid_t	tableid,
 		sp_cpsm_tplsch_t& ntplsch,
-		cpsm_conhdl_t* conn_hdl ) 
+		cpsm_conhdl_t* conn_hdl )
 {
 		SMDEBUGLOG << "tpl_scan_open: " << conn_hdl << " tableid: " << tableid << endl;
-		
+
 		// @bug 649. No initialization here. take passed in reference
 		ntplsch->tableid = tableid;
 
@@ -302,7 +302,7 @@ tpl_scan_open ( tableid_t	tableid,
 		return STATUS_OK;
 }
 
-status_t 
+status_t
 tpl_scan_fetch ( sp_cpsm_tplsch_t& ntplsch,
 		cpsm_conhdl_t* conn_hdl,
 		int* killed )
@@ -320,12 +320,12 @@ tpl_scan_fetch ( sp_cpsm_tplsch_t& ntplsch,
 		return status;
 }
 
-status_t 
+status_t
 tpl_scan_close ( sp_cpsm_tplsch_t& ntplsch )
 {
 #if IDB_SM_DEBUG
 	SMDEBUGLOG << "tpl_scan_close: ";
-	if (ntplsch) 
+	if (ntplsch)
 		SMDEBUGLOG << " tableid: " << ntplsch->tableid << endl;
 #endif
 	ntplsch.reset();
@@ -336,7 +336,7 @@ tpl_scan_close ( sp_cpsm_tplsch_t& ntplsch )
 status_t
 tpl_close ( cpsm_tplh_t* ntplh,
 		cpsm_conhdl_t** conn_hdl,
-		QueryStats& stats ) 
+		QueryStats& stats )
 {
 		cpsm_conhdl_t* hndl = *conn_hdl;
 #if IDB_SM_DEBUG
@@ -346,10 +346,10 @@ tpl_close ( cpsm_tplh_t* ntplh,
 		SMDEBUGLOG << endl;
 #endif
 		delete ntplh;
-		
-		// determine end of result set and end of statement execution	
+
+		// determine end of result set and end of statement execution
 		if (hndl->queryState == QUERY_IN_PROCESS)
-		{ 
+		{
 				// Get the query stats
 				ByteStream bs;
 				ByteStream::quadbyte qb = 3;
@@ -374,7 +374,7 @@ tpl_close ( cpsm_tplh_t* ntplh,
 						// @bug4732
 						end_query(hndl);
 						throw;
-					} 
+					}
 					catch (...) {
 						// querystats messed up. close connection.
 						// no need to throw for querystats protocol error, like for tablemode.
@@ -392,49 +392,68 @@ tpl_close ( cpsm_tplh_t* ntplh,
 
 status_t
 sm_init ( uint32_t sid,
-    cpsm_conhdl_t **conn_hdl ) 
+		  cpsm_conhdl_t **conn_hdl,
+		  uint32_t infinidb_local_query)
 {
-    // clear file content
+	// clear file content
 #if IDB_SM_DEBUG
-    smlog.close();
-    smlog.open("/tmp/sm.log");
-    SMDEBUGLOG << "sm_init: " << dboptions << endl;
-#endif    
-
-    cpsm_conhdl_t* hndl = new cpsm_conhdl_t(time(0), sid);
-    *conn_hdl = hndl;
-    hndl->sessionID = sid;
-
-    // profiling statistics
-    GET_PF_TIME(hndl->pf.login);
-
-    return STATUS_OK;
-}
-
-status_t 
-sm_cleanup ( cpsm_conhdl_t* conn_hdl )
-{
-#if IDB_SM_DEBUG    
-    SMDEBUGLOG << "sm_cleanup: " << conn_hdl << endl;
-    SMDEBUGLOG.close();
+	smlog.close();
+	smlog.open("/tmp/sm.log");
+	SMDEBUGLOG << "sm_init: " << dboptions << endl;
 #endif
 
-    delete conn_hdl;
+	// @bug5660 Connection changes related to the local pm setting
+	/**
+	 * when local PM is detected, or infinidb_local_query is set:
+	 * 1. SELECT query connect to local ExeMgr 127.0.0.1:8601;
+	 * 2. DML/DDL is disallowed.
+	 * once local connection is determined, no need to check
+	 * again because it will not switch back.
+	 **/
+	if (*conn_hdl)
+	{
+		// existing connection is local, ok.
+		if ((*conn_hdl)->exeMgr->localQuery() || ! infinidb_local_query)
+			return STATUS_OK;
+		// if session variable changes to local, re-establish the connection to loopback.
+		else
+			sm_cleanup(*conn_hdl);
+	}
+	
+	cpsm_conhdl_t* hndl = new cpsm_conhdl_t(time(0), sid, infinidb_local_query);
+	*conn_hdl = hndl;
+	hndl->sessionID = sid;
 
-    return STATUS_OK;
+	// profiling statistics
+	GET_PF_TIME(hndl->pf.login);
+
+	return STATUS_OK;
+}
+
+status_t
+sm_cleanup ( cpsm_conhdl_t* conn_hdl )
+{
+#if IDB_SM_DEBUG
+	SMDEBUGLOG << "sm_cleanup: " << conn_hdl << endl;
+	SMDEBUGLOG.close();
+#endif
+
+	delete conn_hdl;
+
+	return STATUS_OK;
 }
 
 void cpsm_conhdl_t::write(ByteStream bs)
 {
 #ifdef _MSC_VER
-    exeMgr->write(bs);
+	exeMgr->write(bs);
 #else
-    sighandler_t old_handler = signal(SIGPIPE, sighandler);
-    sigFlag = false;
-    exeMgr->write(bs);
+	sighandler_t old_handler = signal(SIGPIPE, sighandler);
+	sigFlag = false;
+	exeMgr->write(bs);
 	signal(SIGPIPE, old_handler);
-    if (sigFlag)
-	    throw runtime_error("Broken Pipe Error");
+	if (sigFlag)
+		throw runtime_error("Broken Pipe Error");
 #endif
 }
 

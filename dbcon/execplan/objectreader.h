@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -68,7 +68,7 @@ public:
 	enum CLASSID {
 		ZERO,      // an appropriate initializer
 		NULL_CLASS,		// to denote that some member is NULL
-		
+
 		/**** TreeNodes */
 		TREENODE,
 		TREENODEIMPL,
@@ -80,7 +80,8 @@ public:
 		FUNCTIONCOLUMN,
 		ROWCOLUMN,
 		WINDOWFUNCTIONCOLUMN,
-		
+		PSEUDOCOLUMN,
+
 		SIMPLECOLUMN,
 		SIMPLECOLUMN_INT1,
 		SIMPLECOLUMN_INT2,
@@ -108,14 +109,14 @@ public:
 		LOGICOPERATOR,
 
 		/**** /TreeNodes */
-		
+
 		PARSETREE,
 		CALPONTSELECTEXECUTIONPLAN,
 		CONSTANTFILTER,
 		OUTERJOINONFILTER,
 	};
 
-	typedef u_int8_t id_t;    //expand as necessary
+	typedef uint8_t id_t;    //expand as necessary
 
 	/** @brief Creates a new TreeNode object from the ByteStream
 	 *
@@ -123,30 +124,30 @@ public:
 	 * @return A newly allocated TreeNode
 	 */
 	static TreeNode* createTreeNode(messageqcpp::ByteStream& b);
-	
+
 	/** @brief Creates a new ParseTree from the ByteStream
 	 *
 	 * @param b The ByteStream to create it from
 	 * @return A newly allocated ParseTree
 	 */
 	static ParseTree* createParseTree(messageqcpp::ByteStream& b);
-	
+
 	/** @brief Creates a new CalpontExecutionPlan from the ByteStream
 	 *
 	 * @param b The ByteStream to create it from
 	 * @return A newly allocated CalpontExecutionPlan
 	 */
 	static CalpontExecutionPlan* createExecutionPlan(messageqcpp::ByteStream& b);
-	
+
 	/** @brief Serialize() for ParseTrees
 	 *
 	 * This function effectively serializes a ParseTree.
 	 * @param tree The ParseTree to write out
 	 * @param b The ByteStream to write tree to
 	 */
-	static void writeParseTree(const ParseTree* tree, 
-							   messageqcpp::ByteStream& b);
-	
+	static void writeParseTree(const ParseTree* tree,
+				   messageqcpp::ByteStream& b);
+
 	/** @brief Verify the type of the next object in the ByteStream
 	 *
 	 * @param b The ByteStream to read from

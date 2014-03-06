@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -55,9 +55,9 @@ namespace windowfunction
 {
 
 template<typename T>
-shared_ptr<WindowFunctionType> WF_percentile<T>::makeFunction(int id, const string& name, int ct)
+boost::shared_ptr<WindowFunctionType> WF_percentile<T>::makeFunction(int id, const string& name, int ct)
 {
-	shared_ptr<WindowFunctionType> func;
+	boost::shared_ptr<WindowFunctionType> func;
 	if (id == WF__PERCENTILE_DISC)
 	{
 		switch (ct)
@@ -273,21 +273,23 @@ void WF_percentile<T>::operator()(int64_t b, int64_t e, int64_t c)
 		double cnt = (e1 - b1 + 1);
 		if (fFunctionId == WF__PERCENTILE_CONT)
 		{
-			double rn = b1 + fNve * (cnt - 1);
+			// @bug5820, this "rn" is the normalized row number, not the real row number.
+			// Using real row number here will introduce a small calculation error in double result.
+			double rn = fNve * (cnt - 1);
 			double crn = ceil(rn);
 			double frn = floor(rn);
 			double vd = 0;
 			if (crn == rn && rn == frn)
 			{
-				fRow.setData(getPointer(fRowData->at((size_t) rn)));
+				fRow.setData(getPointer(fRowData->at((size_t) rn + (size_t) b1)));
 				implicit2T(idx, vd, 0);
 			}
 			else
 			{
 				double cv = 0.0, fv = 0.0;
-				fRow.setData(getPointer(fRowData->at((size_t) frn)));
+				fRow.setData(getPointer(fRowData->at((size_t) frn + (size_t) b1)));
 				implicit2T(idx, fv, 0);
-				fRow.setData(getPointer(fRowData->at((size_t) crn)));
+				fRow.setData(getPointer(fRowData->at((size_t) crn + (size_t) b1)));
 				implicit2T(idx, cv, 0);
 				vd = (crn - rn) * fv + (rn - frn) * cv;
 			}
@@ -334,7 +336,7 @@ void WF_percentile<T>::operator()(int64_t b, int64_t e, int64_t c)
 
 
 template
-shared_ptr<WindowFunctionType> WF_percentile<int64_t>::makeFunction(int, const string&, int);
+boost::shared_ptr<WindowFunctionType> WF_percentile<int64_t>::makeFunction(int, const string&, int);
 
 
 }   //namespace

@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -84,7 +84,7 @@ public:
 	 * ctor
 	 */
 	AggregateColumn();
-	
+
 	/**
 	 * ctor
 	 */
@@ -94,7 +94,7 @@ public:
 	 * ctor
 	 */
 	AggregateColumn(const AggOp aggop, ReturnedColumn* parm, const uint32_t sessionID=0);
-	
+
 	/**
 	 * ctor
 	 */
@@ -104,17 +104,17 @@ public:
 	 * ctor
 	 */
 	AggregateColumn(const std::string& functionName, ReturnedColumn* parm, const uint32_t sessionID=0);
-	
+
 	/**
 	 * ctor
 	 */
 	AggregateColumn(const std::string& functionName, const std::string& content, const uint32_t sessionID=0);
-	
+
 	/**
 	 * ctor
 	 */
 	AggregateColumn( const AggregateColumn& rhs, const uint32_t sessionID=0 );
-	
+
 	/**
 	 * Destructors
 	 */
@@ -127,7 +127,7 @@ public:
 	{
 		return fFunctionName;
 	}
-	
+
 	/**
 	 * accessor
 	 */
@@ -135,7 +135,7 @@ public:
 	{
 		fFunctionName = functionName;
 	}
-		
+
 	/**
 	 * accessor
 	 */
@@ -144,7 +144,7 @@ public:
 	 * accessor
 	 */
 	virtual void aggOp(const uint8_t aggOp) {fAggOp = aggOp;}
-	
+
 	/** get function parms
 	 *
 	 * set the function parms from this object
@@ -153,7 +153,7 @@ public:
 	{
 		return fFunctionParms;
 	}
-	
+
 	/** set function parms
 	 *
 	 * set the function parms for this object
@@ -166,7 +166,7 @@ public:
 	/** return a copy of this pointer
 	 *
 	 * deep copy of this pointer and return the copy
-	 */	
+	 */
 	inline virtual AggregateColumn* clone() const
 	{
 	    return new AggregateColumn (*this);
@@ -188,7 +188,7 @@ public:
 	/**
 	* ASC flag
 	*/
-	inline virtual void asc(const bool asc) { fAsc = asc; }	
+	inline virtual void asc(const bool asc) { fAsc = asc; }
 
 	/**
 	 * fData: SQL representation of this object
@@ -198,7 +198,7 @@ public:
 	 * fData: SQL representation of this object
 	 */
 	virtual void data(const std::string& data) { fData = data; }
-		
+
 	/**
 	 * Overloaded stream operator
 	 */
@@ -212,21 +212,21 @@ public:
 	 * Serialize interface
 	 */
 	virtual void unserialize(messageqcpp::ByteStream&);
-	
+
 	/** @brief Do a deep, strict (as opposed to semantic) equivalence test
 	 *
 	 * Do a deep, strict (as opposed to semantic) equivalence test.
 	 * @return true iff every member of t is a duplicate copy of every member of this; false otherwise
 	*/
 	virtual bool operator==(const TreeNode* t) const;
-	
+
 	/** @brief Do a deep, strict (as opposed to semantic) equivalence test
 	 *
 	 * Do a deep, strict (as opposed to semantic) equivalence test.
 	 * @return true iff every member of t is a duplicate copy of every member of this; false otherwise
 	 */
 	virtual bool operator==(const AggregateColumn& t) const;
-	
+
 	/** @brief Do a deep, strict (as opposed to semantic) equivalence test
 	 *
 	 * Do a deep, strict (as opposed to semantic) equivalence test.
@@ -240,10 +240,10 @@ public:
 	 * @return false iff every member of t is a duplicate copy of every member of this; true otherwise
 	 */
 	virtual bool operator!=(const AggregateColumn& t) const;
-	
+
 	/** @brief push back arg to group by column list*/
 	virtual void addGroupByCol(SRCP ac) {fGroupByColList.push_back(ac);}
-	
+
 	/** @brief push back arg to project by column list*/
 	virtual void addProjectCol(SRCP ac) {fProjectColList.push_back(ac);}
 
@@ -255,19 +255,19 @@ public:
 	* accessor
 	*/
 	virtual const ColumnList& projectColList() const { return fProjectColList;}
-	
+
 	/** @brief constant argument for aggregate with constant */
 	inline const SRCP constCol() const { return fConstCol; }
 	/**
 	* accessor
 	*/
-	inline void constCol(const SRCP& constCol) { fConstCol = constCol; }	
+	inline void constCol(const SRCP& constCol) { fConstCol = constCol; }
 
 	/**
 	* convert an aggregate name to an AggOp enum
 	*/
 	static AggOp agname2num(const std::string&);
-	
+
 	virtual bool hasAggregate();
 	virtual bool hasWindowFunc() {return false;}
 
@@ -279,21 +279,21 @@ protected:
 	 * A ReturnedColumn objects that are the arguments to this function
 	 */
 	SRCP fFunctionParms;
-	
+
 	/** table alias
 	 * A string to represent table alias name which contains this column
 	 */
 	std:: string fTableAlias;
-	
+
 	/**
 	 * Flag to indicate asc or desc order for order by column
 	 */
-	bool fAsc;    	
+	bool fAsc;
 	std::string fData;
 	ColumnList fGroupByColList;
 	ColumnList fProjectColList;
 	SRCP fConstCol;
-	
+
 public:
 	/***********************************************************
 	 *                 F&E framework                           *
@@ -306,7 +306,7 @@ public:
 		evaluate(row, isNull);
 		return TreeNode::getStrVal();
 	}
-	
+
 	/**
 	* F&E
 	*/
@@ -333,7 +333,7 @@ public:
 		evaluate(row, isNull);
 		return TreeNode::getFloatVal();
 	}
-	
+
 	/**
 	* F&E
 	*/
@@ -342,7 +342,7 @@ public:
 		evaluate(row, isNull);
 		return TreeNode::getDoubleVal();
 	}
-	
+
 	/**
 	* F&E
 	*/
@@ -367,7 +367,7 @@ public:
 		evaluate(row, isNull);
 		return TreeNode::getDatetimeIntVal();
 	}
-	
+
 private:
 	void evaluate(rowgroup::Row& row, bool& isNull);
 };

@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -49,7 +49,7 @@ namespace joblist
 // This is used for converting a Calpont date to an integer representing the day number since the year 0 for use in
 // calculating the number of distinct days in a range.  It doesn't account for leap years as these are rough estimates
 // and only need to be accurate within an order of magnitude.
-uint RowEstimator::daysThroughMonth(uint mth)
+uint32_t RowEstimator::daysThroughMonth(uint32_t mth)
 {
 	switch(mth)
 	{
@@ -455,7 +455,7 @@ uint64_t RowEstimator::estimateRows(const vector<ColumnCommandJL*>& cpColVec,
 			cout << "Ext-" << idx << ", rowsToScan-" << extentRows << endl;
 #endif
 			factor = 1.0;
-			for (uint j = 0; j < cpColVec.size(); j++)
+			for (uint32_t j = 0; j < cpColVec.size(); j++)
 			{
 				colCmd = cpColVec[j];
 				//RowEstimator rowEstimator;

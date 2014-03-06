@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -41,7 +41,7 @@ namespace BRM {
 class RWLockMonitor {
 public:
 	// d = die, ls = lock status, k = key
-	EXPORT RWLockMonitor(const bool *d, const bool *ls, const uint k);
+	EXPORT RWLockMonitor(const bool *d, const bool *ls, const uint32_t k);
 
 	EXPORT virtual ~RWLockMonitor();
 
@@ -55,11 +55,11 @@ private:
 	/* Some of these vars are only useful once we implement write_lock checking. */
 	const bool *die;
 	const bool *lockStatus;
-	uint key;
+	uint32_t key;
 	boost::shared_ptr<rwlock::RWLock> lock;
 
 	struct timespec ts;   // 3:30 timer
-	uint secsBetweenAttempts;  // :30
+	uint32_t secsBetweenAttempts;  // :30
 };
 
 } /* namespace BRM */

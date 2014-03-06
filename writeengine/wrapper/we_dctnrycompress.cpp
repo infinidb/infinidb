@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -29,9 +29,7 @@ using namespace std;
 #include "we_brm.h"
 #include "we_chunkmanager.h"
 
-#define WRITEENGINEDCTNRYCOMPRESS_DLLEXPORT
 #include "we_dctnrycompress.h"
-#undef WRITEENGINEDCTNRYCOMPRESS_DLLEXPORT
 
 
 namespace WriteEngine
@@ -104,10 +102,11 @@ IDBDataFile* DctnryCompress1::createDctnryFile(const char *name,int width,const 
 }
 
 
-IDBDataFile* DctnryCompress1::openDctnryFile()
+// @bug 5572 - HDFS usage: add *.tmp file backup flag
+IDBDataFile* DctnryCompress1::openDctnryFile(bool useTmpSuffix)
 {
    return m_chunkManager->getFilePtr(
-       m_dctnryOID, m_dbRoot, m_partition, m_segment, m_segFileName, "r+b", DEFAULT_BUFSIZ);
+       m_dctnryOID, m_dbRoot, m_partition, m_segment, m_segFileName, "r+b", DEFAULT_BUFSIZ, useTmpSuffix);
 }
 
 
@@ -171,9 +170,9 @@ int DctnryCompress1::flushFile(int rc, std::map<FID,FID> & columnOids)
 
 int DctnryCompress1::lbidToFbo(const uint64_t lbid, int& fbo)
 {
-    u_int16_t dbRoot;
-    u_int16_t segment;
-    u_int32_t partition;
+    uint16_t dbRoot;
+    uint16_t segment;
+    uint32_t partition;
     return BRMWrapper::getInstance()->getFboOffset(lbid, dbRoot, partition, segment, fbo);
 }
 

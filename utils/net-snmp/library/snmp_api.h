@@ -94,8 +94,8 @@ typedef struct snmp_pdu {
     /** Error index (max_repetitions in GetBulk) */
     long            errindex;       
     /** Uptime */
-    u_long          time;   
-    u_long          flags;
+    uint32_t          time;   
+    uint32_t          flags;
 
     int             securityModel;
     /** noAuthNoPriv, authNoPriv, authPriv */
@@ -194,7 +194,7 @@ struct snmp_session {
     int             retries;
     /** Number of uS until first timeout, then exponential backoff */
     long            timeout;        
-    u_long          flags;
+    uint32_t          flags;
     struct snmp_session *subsession;
     struct snmp_session *next;
 
@@ -314,7 +314,7 @@ typedef struct request_list {
     netsnmp_callback callback;      /* user callback per request (NULL if unused) */
     void           *cb_data;        /* user callback data per request (NULL if unused) */
     int             retries;        /* Number of retries */
-    u_long          timeout;        /* length to wait for timeout */
+    uint32_t          timeout;        /* length to wait for timeout */
     struct timeval  time;   /* Time this request was made */
     struct timeval  expire; /* time this request is due to expire */
     struct snmp_session *session;

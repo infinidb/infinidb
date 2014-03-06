@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -79,7 +79,7 @@ public:
 
 	const uint32_t getExtentRows() { return fdbrm.getExtentRows(); }
 
-	uint blocksPerRead;
+	uint32_t blocksPerRead;
 
 	bool IOTrace() const { return fIOTrace;}
 
@@ -98,7 +98,7 @@ public:
 	
 	
 #ifdef SHARED_NOTHING_DEMO_2
-	uint pmCount;
+	uint32_t pmCount;
 #endif
 
 private:

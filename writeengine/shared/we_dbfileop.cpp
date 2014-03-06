@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -26,9 +26,7 @@ using namespace std;
 
 #include "we_chunkmanager.h"
 
-#define WRITEENGINEDBFILEOP_DLLEXPORT
 #include "we_dbfileop.h"
-#undef WRITEENGINEDBFILEOP_DLLEXPORT
 
 #include "we_stats.h"
 #include "IDBDataFile.h"
@@ -166,9 +164,9 @@ int DbFileOp::readDBFile( CommBlock& cb,
     {
         int  fbo = lbid;
 
-        u_int16_t  dbRoot;
-        u_int32_t  partition;
-        u_int16_t  segment;
+        uint16_t  dbRoot;
+        uint32_t  partition;
+        uint16_t  segment;
         RETURN_ON_ERROR( BRMWrapper::getInstance()->getFboOffset(
             lbid, dbRoot, partition, segment, fbo ) );
       
@@ -491,7 +489,8 @@ int DbFileOp::restoreBlock(IDBDataFile* pFile, const unsigned char* writeBuf, ui
     return pFile->write(writeBuf, BYTE_PER_BLOCK);
 }
 
-IDBDataFile* DbFileOp::getFilePtr(const Column& column)
+// @bug 5572 - HDFS usage: add *.tmp file backup flag
+IDBDataFile* DbFileOp::getFilePtr(const Column& column, bool useTmpSuffix)
 {
     string filename;
     return m_chunkManager->getFilePtr(column,
@@ -500,7 +499,8 @@ IDBDataFile* DbFileOp::getFilePtr(const Column& column)
                                       column.dataFile.fSegment,
                                       filename,
                                       "r+b",
-                                      column.colWidth);
+                                      column.colWidth,
+                                      useTmpSuffix);
 }
 
 } //end of namespace

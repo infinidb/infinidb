@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -27,12 +27,14 @@
 #include "we_brmreporter.h"
 
 #include <cerrno>
+#include <set>
 
 #include "we_brm.h"
 #include "we_convertor.h"
 #include "we_log.h"
 #include "cacheutils.h"
 #include "IDBPolicy.h"
+
 namespace WriteEngine {
 
 //------------------------------------------------------------------------------
@@ -68,18 +70,27 @@ void BRMReporter::addToHWMInfo(const BRM::BulkSetHWMArg& hwmEntry)
 }
 
 //------------------------------------------------------------------------------
-// Add an File infomation to "this" BRMReporter's collection
+// Add Column File infomation to "this" BRMReporter's collection
 //------------------------------------------------------------------------------
 void BRMReporter::addToFileInfo(const BRM::FileInfo& fileEntry)
 {
-	fFileInfo.push_back( fileEntry );
+    fFileInfo.push_back( fileEntry );
 }
+
+//------------------------------------------------------------------------------
+// Add Dictionary File infomation to "this" BRMReporter's collection
+//------------------------------------------------------------------------------
+void BRMReporter::addToDctnryFileInfo(const BRM::FileInfo& fileEntry)
+{
+    fDctnryFileInfo.push_back( fileEntry );
+}
+
 //------------------------------------------------------------------------------
 // Add Critical Error Message
 //------------------------------------------------------------------------------
 void BRMReporter::addToErrMsgEntry(const std::string& errCritMsg)
 {
-	fCritErrMsgs.push_back(errCritMsg);	
+    fCritErrMsgs.push_back(errCritMsg);
 }
 
 //------------------------------------------------------------------------------
@@ -87,36 +98,87 @@ void BRMReporter::addToErrMsgEntry(const std::string& errCritMsg)
 //------------------------------------------------------------------------------
 void BRMReporter::sendErrMsgToFile(const std::string& rptFileName)
 {
-	if((!rptFileName.empty())&&(fRptFileName.empty())) fRptFileName=rptFileName;
-	if ((!fRptFileName.empty())&&(fCritErrMsgs.size()))
-	{
-		fRptFile.open( fRptFileName.c_str(), std::ios_base::app);
-		if ( fRptFile.good() )
+    if((!rptFileName.empty())&&(fRptFileName.empty()))
+        fRptFileName=rptFileName;
+    if ((!fRptFileName.empty())&&(fCritErrMsgs.size()))
+    {
+        fRptFile.open( fRptFileName.c_str(), std::ios_base::app);
+        if ( fRptFile.good() )
         {
-			for (unsigned int i=0; i<fCritErrMsgs.size(); i++)
-			{
-				fRptFile << "MERR: " << fCritErrMsgs[i] << std::endl;
-				//std::cout <<"**********" << fCritErrMsgs[i] << std::endl;
-			}
+            for (unsigned int i=0; i<fCritErrMsgs.size(); i++)
+            {
+                fRptFile << "MERR: " << fCritErrMsgs[i] << std::endl;
+                //std::cout <<"**********" << fCritErrMsgs[i] << std::endl;
+            }
         }
-	}
+    }
 }
 
 //------------------------------------------------------------------------------
 // Send collection information (Casual Partition and HWM) to applicable
 // destination.  If file name given, then data is saved to the file, else
 // the data is sent directly to BRM.
+//
+// On HDFS system, this function also notifies PrimProc to flush certain file
+// descriptors (for columns and dictionary store), and blocks (for dictionary
+// store).  Any DB file changes should have been "confirmed" prior to calling
+// sendBRMInfo().  Once PrimProc cache is flushed, we can send the BRM updates.
 //------------------------------------------------------------------------------
 int BRMReporter::sendBRMInfo(const std::string& rptFileName,
     const std::vector<std::string>& errFiles,
     const std::vector<std::string>& badFiles)
 {
     int rc = NO_ERROR;
-	//Purge PrimProc FD cache
-	if (( fFileInfo.size() > 0 ) && idbdatafile::IDBPolicy::useHdfs()) {	
-		cacheutils::purgePrimProcFdCache(fFileInfo, Config::getLocalModuleID());
-	}
-	
+
+    // For HDFS, we need to flush PrimProc cache since we modify HDFS files
+    // by rewriting the files.
+    if (idbdatafile::IDBPolicy::useHdfs())
+    {
+        std::vector<BRM::FileInfo> allFileInfo;
+
+        if ( fFileInfo.size() > 0 )
+        {
+            for (unsigned k=0; k<fFileInfo.size(); k++)
+            {
+                allFileInfo.push_back( fFileInfo[k] );
+            }
+        }
+
+        std::vector<BRM::OID_t> oidsToFlush;
+        std::set<BRM::OID_t>    oidSet;
+        if (fDctnryFileInfo.size() > 0)
+        {
+            for (unsigned k=0; k<fDctnryFileInfo.size(); k++)
+            {
+                allFileInfo.push_back( fDctnryFileInfo[k] );
+                oidSet.insert( fDctnryFileInfo[k].oid );
+            }
+
+            // Store dictionary oids in std::set first, to eliminate duplicates
+            if (oidSet.size() > 0)
+            {
+                for (std::set<BRM::OID_t>::const_iterator iter=oidSet.begin();
+                    iter != oidSet.end();
+                    ++iter)
+                {
+                    oidsToFlush.push_back( *iter );
+                }
+            }
+        }
+
+        // Flush PrimProc FD cache
+        if (allFileInfo.size() > 0)
+        {
+            cacheutils::purgePrimProcFdCache(allFileInfo,
+                Config::getLocalModuleID());
+        }
+
+        // Flush PrimProc block cache
+        if (oidsToFlush.size() > 0)
+            cacheutils::flushOIDsFromCache(oidsToFlush);
+    }
+
+    // After flushing cache (for HDFS), now we can update BRM
     if (rptFileName.empty())
     {
         // Set Casual Partition (CP) info for BRM for this column.  Be sure to
@@ -157,7 +219,7 @@ int BRMReporter::sendBRMInfo(const std::string& rptFileName,
         }
 
     }
-	
+
     return rc;
 }
 
@@ -252,9 +314,9 @@ void BRMReporter::sendCPToFile( )
 // Report Summary totals; only applicable if we are generating a report file.
 //------------------------------------------------------------------------------
 void BRMReporter::reportTotals(
-    u_int64_t totalReadRows,
-    u_int64_t totalInsertedRows,
-    const std::vector<boost::tuple<CalpontSystemCatalog::ColDataType, std::string, u_int64_t> >& satCounts)
+    uint64_t totalReadRows,
+    uint64_t totalInsertedRows,
+    const std::vector<boost::tuple<CalpontSystemCatalog::ColDataType, std::string, uint64_t> >& satCounts)
 {
     if (fRptFile.is_open())
     {

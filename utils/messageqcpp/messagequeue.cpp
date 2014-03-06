@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -195,6 +195,24 @@ MessageQueueClient::MessageQueueClient(const string& otherEnd, Config* config, b
 		fConfig = Config::makeConfig();
 
 	setup(syncProto);
+}
+
+MessageQueueClient::MessageQueueClient(const string& ip, uint16_t port, bool syncProto) :
+	fLogger(31), fIsAvailable(true)
+{
+	memset(&fServ_addr, 0, sizeof(fServ_addr));
+	sockaddr_in* sinp = reinterpret_cast<sockaddr_in*>(&fServ_addr);
+	sinp->sin_family = AF_INET;
+	sinp->sin_port = htons(port);
+	sinp->sin_addr.s_addr = inet_addr(ip.c_str());
+
+#ifdef SKIP_IDB_COMPRESSION
+	fClientSock.setSocketImpl(new InetStreamSocket());
+#else
+	fClientSock.setSocketImpl(new CompressedInetStreamSocket());
+#endif
+	fClientSock.syncProto(syncProto);
+	fClientSock.sa(&fServ_addr);
 }
 
 const SBS MessageQueueClient::read(const struct timespec* timeout, bool* isTimeOut, Stats *stats) const

@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -27,9 +27,7 @@ using namespace std;
 
 #include <boost/shared_ptr.hpp>
 
-#define ALTERTABLEPROC_DLLEXPORT
 #include "altertableprocessor.h"
-#undef ALTERTABLEPROC_DLLEXPORT
 
 #include "brm.h"
 using namespace BRM;
@@ -84,9 +82,10 @@ bool typesAreSame(const CalpontSystemCatalog::ColType& colType, const ColumnType
 	case (CalpontSystemCatalog::TINYINT):
 		if (newType.fType == DDL_TINYINT && colType.precision == newType.fPrecision &&
 			colType.scale == newType.fScale) return true;
+		//@Bug 5443 Not allow user change data type.
 		//Not sure this is possible...
-		if (newType.fType == DDL_DECIMAL && colType.precision == newType.fPrecision &&
-			colType.scale == newType.fScale) return true;
+		//if (newType.fType == DDL_DECIMAL && colType.precision == newType.fPrecision &&
+		//	colType.scale == newType.fScale) return true;
 		break;
 	case (CalpontSystemCatalog::UTINYINT):
 		if (newType.fType == DDL_UNSIGNED_TINYINT && colType.precision == newType.fPrecision &&
@@ -98,8 +97,8 @@ bool typesAreSame(const CalpontSystemCatalog::ColType& colType, const ColumnType
 	case (CalpontSystemCatalog::SMALLINT):
 		if (newType.fType == DDL_SMALLINT && colType.precision == newType.fPrecision &&
 			colType.scale == newType.fScale) return true;
-		if (newType.fType == DDL_DECIMAL && colType.precision == newType.fPrecision &&
-			colType.scale == newType.fScale) return true;
+		//if (newType.fType == DDL_DECIMAL && colType.precision == newType.fPrecision &&
+		//	colType.scale == newType.fScale) return true;
 		break;
 	case (CalpontSystemCatalog::USMALLINT):
 		if (newType.fType == DDL_UNSIGNED_SMALLINT && colType.precision == newType.fPrecision &&
@@ -119,14 +118,15 @@ bool typesAreSame(const CalpontSystemCatalog::ColType& colType, const ColumnType
 	case (CalpontSystemCatalog::MEDINT):
 		if (newType.fType == DDL_MEDINT && colType.precision == newType.fPrecision &&
 			colType.scale == newType.fScale) return true;
-		if (newType.fType == DDL_DECIMAL && colType.precision == newType.fPrecision &&
-			colType.scale == newType.fScale) return true;
+		//@Bug 5443 Not allow user change data type.	
+		//if (newType.fType == DDL_DECIMAL && colType.precision == newType.fPrecision &&
+		//	colType.scale == newType.fScale) return true;
 		break;
 	case (CalpontSystemCatalog::INT):
 		if (newType.fType == DDL_INT && colType.precision == newType.fPrecision &&
 			colType.scale == newType.fScale) return true;
-		if (newType.fType == DDL_DECIMAL && colType.precision == newType.fPrecision &&
-			colType.scale == newType.fScale) return true;
+		//if (newType.fType == DDL_DECIMAL && colType.precision == newType.fPrecision &&
+		//	colType.scale == newType.fScale) return true;
 		break;
 	case (CalpontSystemCatalog::UINT):
 		if (newType.fType == DDL_UNSIGNED_INT && colType.precision == newType.fPrecision &&
@@ -144,9 +144,10 @@ bool typesAreSame(const CalpontSystemCatalog::ColType& colType, const ColumnType
 	case (CalpontSystemCatalog::BIGINT):
 		if (newType.fType == DDL_BIGINT && colType.precision == newType.fPrecision &&
 			colType.scale == newType.fScale) return true;
+		//@Bug 5443 Not allow user change data type.
 		//decimal is mapped to bigint in syscat
-		if (newType.fType == DDL_DECIMAL && colType.precision == newType.fPrecision &&
-			colType.scale == newType.fScale) return true;
+		//if (newType.fType == DDL_DECIMAL && colType.precision == newType.fPrecision &&
+		//	colType.scale == newType.fScale) return true;
 		break;
 	case (CalpontSystemCatalog::UBIGINT):
 		if (newType.fType == DDL_UNSIGNED_BIGINT && colType.precision == newType.fPrecision &&
@@ -271,16 +272,16 @@ AlterTableProcessor::DDLResult AlterTableProcessor::processPackage(ddlpackage::A
 		execplan::CalpontSystemCatalog::ROPair roPair;
 		roPair = systemCatalogPtr->tableRID(tableName);
 
-		u_int32_t  processID = ::getpid();
+		uint32_t  processID = ::getpid();
 		int32_t   txnid = txnID.id;
 		int32_t sessionId = alterTableStmt.fSessionID;
 		std::string  processName("DDLProc");
 		int i = 0;
 				
-		std::vector<uint> pms;
+		std::vector<uint32_t> pms;
 		for (unsigned i=0; i < moduleIds.size(); i++)
 		{
-			pms.push_back((uint)moduleIds[i]);
+			pms.push_back((uint32_t)moduleIds[i]);
 		}
 				
 		try {
@@ -482,7 +483,7 @@ AlterTableProcessor::DDLResult AlterTableProcessor::processPackage(ddlpackage::A
 }
 
 void AlterTableProcessor::rollBackAlter(const string& error, BRM::TxnID txnID,
-										int sessionId, DDLResult& result, u_int64_t uniqueId)
+										int sessionId, DDLResult& result, uint64_t uniqueId)
 {
 	DETAIL_INFO("Rolling back transaction");
 	cerr << "AltertableProcessor::processPackage: " << error << endl;
@@ -501,7 +502,7 @@ void AlterTableProcessor::rollBackAlter(const string& error, BRM::TxnID txnID,
 	result.message = message;
 }
 
-void AlterTableProcessor::addColumn (u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result, 
+void AlterTableProcessor::addColumn (uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result, 
 		ddlpackage::ColumnDef* columnDefPtr, ddlpackage::QualifiedName& inTableName, const uint64_t uniqueId)
 {
 	std::string err("AlterTableProcessor::addColumn ");
@@ -512,7 +513,7 @@ void AlterTableProcessor::addColumn (u_int32_t sessionID, execplan::CalpontSyste
 	ByteStream::byte tmp8;
 	int rc = 0;
 	std::string errorMsg;
-	u_int16_t  dbRoot;
+	uint16_t  dbRoot;
 	BRM::OID_t sysOid = 1001;
 	bool isDict = false;
 	//@Bug 4111. Check whether the column exists in calpont systable
@@ -659,12 +660,12 @@ void AlterTableProcessor::addColumn (u_int32_t sessionID, execplan::CalpontSyste
 			else
 				bs << (uint32_t) 0;
 				
-			bs << (u_int8_t) alterFlag;
+			bs << (uint8_t) alterFlag;
 			bs << (uint32_t) totalColumns;
 			columnDefPtr->serialize(bs);
 			//send to WES to process
 			try {
-				fWEClient->write(bs, (uint)pmNum);
+				fWEClient->write(bs, (uint32_t)pmNum);
 				while (1)
 				{
 					bsIn.reset(new ByteStream());
@@ -715,7 +716,7 @@ void AlterTableProcessor::addColumn (u_int32_t sessionID, execplan::CalpontSyste
 			
 			//send to WES to process
 			try {
-				fWEClient->write(bs, (uint)pmNum);
+				fWEClient->write(bs, (uint32_t)pmNum);
 				while (1)
 				{
 					bsIn.reset(new ByteStream());
@@ -844,7 +845,7 @@ void AlterTableProcessor::addColumn (u_int32_t sessionID, execplan::CalpontSyste
 				bs << (uint32_t) column_iterator->colType.colWidth;
 				bs << (ByteStream::byte) column_iterator->colType.compressionType;
 				//cout << "sending command fillcolumn " << endl;	 
-                uint msgRecived = 0;
+                uint32_t msgRecived = 0;
                 fWEClient->write_to_all(bs);
                 bsIn.reset(new ByteStream());
                 while (1)
@@ -874,12 +875,12 @@ void AlterTableProcessor::addColumn (u_int32_t sessionID, execplan::CalpontSyste
                     bs << (ByteStream::byte)WE_SVR_WRITE_DROPFILES;
                     bs << uniqueId;
                     bs << (uint32_t) oidList.size();
-                    for (uint i=0; i < oidList.size(); i++)
+                    for (uint32_t i=0; i < oidList.size(); i++)
                     {
                         bs << (uint32_t) oidList[i];
                     }
                     
-                    uint msgRecived = 0;
+                    uint32_t msgRecived = 0;
                     try {
                         fWEClient->write_to_all(bs);
                         bsIn.reset(new ByteStream());
@@ -990,7 +991,7 @@ void AlterTableProcessor::addColumn (u_int32_t sessionID, execplan::CalpontSyste
 	fWEClient->addQueue(uniqueId);
 }
 
-void AlterTableProcessor::dropColumn (u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result, 
+void AlterTableProcessor::dropColumn (uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result, 
 			ddlpackage::AtaDropColumn& ataDropColumn, ddlpackage::QualifiedName& fTableName, const uint64_t uniqueId)
 {
 	// 1. Get the OIDs for the column
@@ -1033,13 +1034,13 @@ void AlterTableProcessor::dropColumn (u_int32_t sessionID, execplan::CalpontSyst
 	bytestream << (ByteStream::byte)WE_SVR_DELETE_SYSCOLUMN_ROW;
 	bytestream << uniqueId;
 	bytestream << sessionID;
-	bytestream << (u_int32_t)txnID;
+	bytestream << (uint32_t)txnID;
 	bytestream << fTableName.fSchema;
 	bytestream << fTableName.fName;
 	bytestream << ataDropColumn.fColumnName;
 	
 	std::string errorMsg;
-	u_int16_t  dbRoot;
+	uint16_t  dbRoot;
 	BRM::OID_t sysOid = 1001;
 	ByteStream::byte rc = 0;
 	//Find out where systable is
@@ -1055,7 +1056,7 @@ void AlterTableProcessor::dropColumn (u_int32_t sessionID, execplan::CalpontSyst
 	pmNum = (*dbRootPMMap)[dbRoot];
 	try
 	{			
-		fWEClient->write(bytestream, (uint)pmNum);
+		fWEClient->write(bytestream, (uint32_t)pmNum);
 #ifdef IDB_DDL_DEBUG
 cout << "Alter table drop column sending WE_SVR_DELETE_SYSCOLUMN_ROW to pm " << pmNum << endl;
 #endif	
@@ -1103,13 +1104,13 @@ cout << "Alter table drop column got unknown exception" << endl;
 		bytestream << (ByteStream::byte)WE_SVR_UPDATE_SYSTABLE_AUTO;
 		bytestream << uniqueId;
 		bytestream << sessionID;
-		bytestream << (u_int32_t)txnID;
+		bytestream << (uint32_t)txnID;
 		bytestream << fTableName.fSchema;
 		bytestream << fTableName.fName;
-		bytestream << (u_int32_t) 0; //autoincrement off
+		bytestream << (uint32_t) 0; //autoincrement off
 		
 		try {		
-			fWEClient->write(bytestream, (uint)pmNum);
+			fWEClient->write(bytestream, (uint32_t)pmNum);
 #ifdef IDB_DDL_DEBUG
 cout << "Alter table drop column sending WE_SVR_UPDATE_SYSTABLE_AUTO to pm " << pmNum << endl;
 #endif	
@@ -1156,12 +1157,12 @@ cout << "Alter table drop column got unknown exception" << endl;
 	bytestream << (ByteStream::byte)WE_SVR_UPDATE_SYSCOLUMN_COLPOS;
 	bytestream << uniqueId;
 	bytestream << sessionID;
-	bytestream << (u_int32_t)txnID;
+	bytestream << (uint32_t)txnID;
 	bytestream << fTableName.fSchema;
 	bytestream << fTableName.fName;
-	bytestream << (u_int32_t) colPos;
+	bytestream << (uint32_t) colPos;
 	try {		
-		fWEClient->write(bytestream, (uint)pmNum);
+		fWEClient->write(bytestream, (uint32_t)pmNum);
 #ifdef IDB_DDL_DEBUG
 cout << "Alter table drop column sending WE_SVR_UPDATE_SYSTABLE_AUTO to pm " << pmNum << endl;
 #endif	
@@ -1234,7 +1235,7 @@ cout << "Alter table drop column got unknown exception" << endl;
 		oidList.push_back(oid);
 	}
 	//Save the oids to a file
-	uint msgRecived = 0;
+	uint32_t msgRecived = 0;
 	bool fileDropped = true;
 	try {
 		createWriteDropLogFile( roPair.objnum, uniqueId, oidList );
@@ -1300,7 +1301,7 @@ cout << "create table got unknown exception" << endl;
 }
 
 
-void AlterTableProcessor::dropColumns (u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result, 
+void AlterTableProcessor::dropColumns (uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result, 
 		ddlpackage::AtaDropColumns& ataDropColumns, ddlpackage::QualifiedName& fTableName, const uint64_t uniqueId)
 {
 	SUMMARY_INFO("AlterTableProcessor::dropColumns");
@@ -1338,7 +1339,7 @@ void AlterTableProcessor::dropColumns (u_int32_t sessionID, execplan::CalpontSys
 	}
 }
 
-void AlterTableProcessor::addTableConstraint (u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result, ddlpackage::AtaAddTableConstraint& ataAddTableConstraint, ddlpackage::QualifiedName& fTableName)
+void AlterTableProcessor::addTableConstraint (uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result, ddlpackage::AtaAddTableConstraint& ataAddTableConstraint, ddlpackage::QualifiedName& fTableName)
 {
 	/*TODO: Check if existing row satisfy the constraint.
 	If not, the constraint will not be added. */
@@ -1366,7 +1367,7 @@ void AlterTableProcessor::addTableConstraint (u_int32_t sessionID, execplan::Cal
 	}
 }
 
-void AlterTableProcessor::setColumnDefault (u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result, 
+void AlterTableProcessor::setColumnDefault (uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result, 
 		ddlpackage::AtaSetColumnDefault& ataSetColumnDefault, ddlpackage::QualifiedName& fTableName, const uint64_t uniqueId)
 {
 	SUMMARY_INFO("AlterTableProcessor::setColumnDefault");
@@ -1376,7 +1377,7 @@ void AlterTableProcessor::setColumnDefault (u_int32_t sessionID, execplan::Calpo
 	SUMMARY_INFO("AlterTableProcessor::setColumnDefault");
 	ByteStream bs;
 	std::string errorMsg;
-	u_int16_t  dbRoot;
+	uint16_t  dbRoot;
 	BRM::OID_t sysOid = 1001;
 	ByteStream::byte rc = 0;
 	//Find out where systable is
@@ -1411,7 +1412,7 @@ void AlterTableProcessor::setColumnDefault (u_int32_t sessionID, execplan::Calpo
 		
 	//send to WES to process
 	try {
-		fWEClient->write(bs, (uint)pmNum);
+		fWEClient->write(bs, (uint32_t)pmNum);
 		while (1)
 		{
 			bsIn.reset(new ByteStream());
@@ -1445,7 +1446,7 @@ void AlterTableProcessor::setColumnDefault (u_int32_t sessionID, execplan::Calpo
 	if (rc != 0)
 		throw std::runtime_error(errorMsg);	
 }
-void AlterTableProcessor::dropColumnDefault (u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result, 
+void AlterTableProcessor::dropColumnDefault (uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result, 
 		ddlpackage::AtaDropColumnDefault& ataDropColumnDefault, ddlpackage::QualifiedName& fTableName, const uint64_t uniqueId)
 {
 		SUMMARY_INFO("AlterTableProcessor::setColumnDefault");
@@ -1455,7 +1456,7 @@ void AlterTableProcessor::dropColumnDefault (u_int32_t sessionID, execplan::Calp
 	SUMMARY_INFO("AlterTableProcessor::setColumnDefault");
 	ByteStream bs;
 	std::string errorMsg;
-	u_int16_t  dbRoot;
+	uint16_t  dbRoot;
 	BRM::OID_t sysOid = 1001;
 	ByteStream::byte rc = 0;
 	//Find out where systable is
@@ -1487,7 +1488,7 @@ void AlterTableProcessor::dropColumnDefault (u_int32_t sessionID, execplan::Calp
 		
 	//send to WES to process
 	try {
-		fWEClient->write(bs, (uint)pmNum);
+		fWEClient->write(bs, (uint32_t)pmNum);
 		while (1)
 		{
 			bsIn.reset(new ByteStream());
@@ -1523,7 +1524,7 @@ void AlterTableProcessor::dropColumnDefault (u_int32_t sessionID, execplan::Calp
 }
 
 #if 0
-void AlterTableProcessor::dropTableConstraint (u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result, ddlpackage::AtaDropTableConstraint& ataDropTableConstraint, ddlpackage::QualifiedName& fTableName)
+void AlterTableProcessor::dropTableConstraint (uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result, ddlpackage::AtaDropTableConstraint& ataDropTableConstraint, ddlpackage::QualifiedName& fTableName)
 {
 	/*Steps tp drop table constraint
 	 1. Delete the ConstraintName from SYSCONSTRAINT
@@ -1635,13 +1636,13 @@ void AlterTableProcessor::renameTable (uint32_t sessionID, execplan::CalpontSyst
 	bytestream << (ByteStream::byte)WE_SVR_UPDATE_SYSTABLES_TABLENAME;
 	bytestream << uniqueId;
 	bytestream << sessionID;
-	bytestream << (u_int32_t)txnID;
+	bytestream << (uint32_t)txnID;
 	bytestream << fTableName.fSchema;
 	bytestream << fTableName.fName;
 	bytestream << ataRenameTable.fQualifiedName->fName;
 	
 	std::string errorMsg;
-	u_int16_t  dbRoot;
+	uint16_t  dbRoot;
 	BRM::OID_t sysOid = 1001;
 	ByteStream::byte rc = 0;
 	//Find out where systable is
@@ -1657,7 +1658,7 @@ void AlterTableProcessor::renameTable (uint32_t sessionID, execplan::CalpontSyst
 	pmNum = (*dbRootPMMap)[dbRoot];
 	try
 	{		
-		fWEClient->write(bytestream, (uint)pmNum);
+		fWEClient->write(bytestream, (uint32_t)pmNum);
 #ifdef IDB_DDL_DEBUG
 cout << "Rename table sending WE_SVR_UPDATE_SYSTABLE_TABLENAME to pm " << pmNum << endl;
 #endif	
@@ -1713,7 +1714,7 @@ void AlterTableProcessor::renameColumn(uint32_t sessionID, execplan::CalpontSyst
 		
 	ByteStream bs;
 	std::string errorMsg;
-	u_int16_t  dbRoot;
+	uint16_t  dbRoot;
 	BRM::OID_t sysOid = 1001;
 	ByteStream::byte rc = 0;
 	//Find out where systable is
@@ -1793,7 +1794,7 @@ void AlterTableProcessor::renameColumn(uint32_t sessionID, execplan::CalpontSyst
 			
 			//send to WES to process
 			try {
-				fWEClient->write(bs, (uint)pmNum);
+				fWEClient->write(bs, (uint32_t)pmNum);
 				while (1)
 				{
 					bsIn.reset(new ByteStream());
@@ -1858,7 +1859,7 @@ void AlterTableProcessor::renameColumn(uint32_t sessionID, execplan::CalpontSyst
 		string defaultValue("");
 		if (ataRenameColumn.fConstraints.size() > 0)
 		{
-			for (uint j=0; j < ataRenameColumn.fConstraints.size(); j++)
+			for (uint32_t j=0; j < ataRenameColumn.fConstraints.size(); j++)
 			{
 				if (ataRenameColumn.fConstraints[j]->fConstraintType == DDL_NOT_NULL)
 				{
@@ -1875,7 +1876,7 @@ void AlterTableProcessor::renameColumn(uint32_t sessionID, execplan::CalpontSyst
 		
 		//send to WES to process
 		try {
-			fWEClient->write(bs, (uint)pmNum);
+			fWEClient->write(bs, (uint32_t)pmNum);
 			while (1)
 			{
 				bsIn.reset(new ByteStream());

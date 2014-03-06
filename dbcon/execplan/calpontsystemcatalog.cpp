@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -167,7 +167,7 @@ const string colDataTypeToString(CalpontSystemCatalog::ColDataType cdt)
         return "umedint";
         break;
     case CalpontSystemCatalog::UINT:
-        return "uint";
+        return "uint32_t";
         break;
     case CalpontSystemCatalog::UFLOAT:
         return "ufloat";
@@ -700,7 +700,7 @@ void CalpontSystemCatalog::getSysData_EC(CalpontSelectExecutionPlan& csep,
 
 	uint32_t tableOID = IDB_VTABLE_ID;
 	ByteStream bs;
-	uint status;
+	uint32_t status;
 
 	ResourceManager rm(true);
 	DistributedEngineComm* fEc = DistributedEngineComm::instance(rm);
@@ -737,7 +737,7 @@ void CalpontSystemCatalog::getSysData_EC(CalpontSelectExecutionPlan& csep,
 	while (true)
 	{
 		bs.restart();
-		uint rowCount = jl->projectTable(tableOID, bs);
+		uint32_t rowCount = jl->projectTable(tableOID, bs);
 		
 		// XXXST: take out the 'true' when all jobsteps have been made st-compatible.
 		rgData.deserialize(bs, true);
@@ -1630,7 +1630,7 @@ const CalpontSystemCatalog::SCN CalpontSystemCatalog::scn(void) const
 #endif
 
 /* static */
-boost::shared_ptr<CalpontSystemCatalog> CalpontSystemCatalog::makeCalpontSystemCatalog(u_int32_t sessionID) 
+boost::shared_ptr<CalpontSystemCatalog> CalpontSystemCatalog::makeCalpontSystemCatalog(uint32_t sessionID) 
 {
     boost::mutex::scoped_lock lock(map_mutex);
     boost::shared_ptr<CalpontSystemCatalog> instance;
@@ -1672,7 +1672,7 @@ boost::shared_ptr<CalpontSystemCatalog> CalpontSystemCatalog::makeCalpontSystemC
 }
 
 /* static */
-void CalpontSystemCatalog::removeCalpontSystemCatalog(u_int32_t sessionID)
+void CalpontSystemCatalog::removeCalpontSystemCatalog(uint32_t sessionID)
 {
     boost::mutex::scoped_lock lock(map_mutex);
     DEBUG << "remove calpont system catalog for session " << sessionID << endl;
@@ -5148,7 +5148,7 @@ void CalpontSystemCatalog::getSchemaInfo(const string& in_schema)
 
 	// populate colinfo cache
 	//boost::mutex::scoped_lock lk3(fColinfomapLock);
-	for (uint i = 0; i < ctList.size(); i++)
+	for (uint32_t i = 0; i < ctList.size(); i++)
 		fColinfomap[ctList[i].columnOID] = ctList[i];
 	//lk3.unlock();
 	// populate tbinfomap

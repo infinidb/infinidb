@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -102,8 +102,8 @@ public:
 						const std::vector<std::string> &tableNames);
 	void addJoinKeyIndex(const std::vector<JoinType>& jt,
 						 const std::vector<bool>& typeless,
-						 const std::vector<std::vector<uint> >& smallkeys,
-						 const std::vector<std::vector<uint> >& largekeys);
+						 const std::vector<std::vector<uint32_t> >& smallkeys,
+						 const std::vector<std::vector<uint32_t> >& largekeys);
 
 	void configSmallSideRG(const std::vector<rowgroup::RowGroup>& rgs,
 						   const std::vector<std::string> &tableNames);
@@ -111,20 +111,20 @@ public:
 
 	void configJoinKeyIndex(const std::vector<JoinType>& jt,
 							const std::vector<bool>& typeless,
-							const std::vector<std::vector<uint> >& smallkeys,
-							const std::vector<std::vector<uint> >& largekeys);
+							const std::vector<std::vector<uint32_t> >& smallkeys,
+							const std::vector<std::vector<uint32_t> >& largekeys);
 
 	void setOutputRowGroup(const rowgroup::RowGroup &rg);
 
-	uint nextBand(messageqcpp::ByteStream &bs);
+	uint32_t nextBand(messageqcpp::ByteStream &bs);
 
 	const rowgroup::RowGroup& getOutputRowGroup() const { return outputRG; }
 	const rowgroup::RowGroup &getSmallRowGroup() const { return smallRGs[0]; }
 	const std::vector<rowgroup::RowGroup> &getSmallRowGroups() const { return smallRGs; }
 	const rowgroup::RowGroup& getLargeRowGroup() const { return largeRG; }
-	const uint getSmallKey() const { return smallSideKeys[0][0]; }
-	const std::vector<std::vector<uint> >& getSmallKeys() const { return smallSideKeys; }
-	const std::vector<std::vector<uint> >& getLargeKeys() const { return largeSideKeys; }
+	const uint32_t getSmallKey() const { return smallSideKeys[0][0]; }
+	const std::vector<std::vector<uint32_t> >& getSmallKeys() const { return smallSideKeys; }
+	const std::vector<std::vector<uint32_t> >& getLargeKeys() const { return largeSideKeys; }
 
 	/* Some compat fcns to get rid of later */
 	void oid1(execplan::CalpontSystemCatalog::OID oid) { fOid1 = oid; }
@@ -139,13 +139,13 @@ public:
 	/* The replacements.  I don't think there's a need for setters or vars.
 		OIDs are already in the rowgroups. */
 	// s - sth table pair; k - kth key in compound join, 0 for non-compand join
-	execplan::CalpontSystemCatalog::OID smallSideKeyOID(uint s, uint k) const;
-	execplan::CalpontSystemCatalog::OID largeSideKeyOID(uint s, uint k) const;
+	execplan::CalpontSystemCatalog::OID smallSideKeyOID(uint32_t s, uint32_t k) const;
+	execplan::CalpontSystemCatalog::OID largeSideKeyOID(uint32_t s, uint32_t k) const;
 
 	void deliveryStep(const SJSTEP& ds) { fDeliveryStep = ds; }
 
 	/* Iteration 18 mods */
-	void setLargeSideDLIndex(uint i) { largeSideIndex = i; }
+	void setLargeSideDLIndex(uint32_t i) { largeSideIndex = i; }
 
 	/* obsolete, need to update JLF */
 	void setJoinType(JoinType jt) { joinType = jt; }
@@ -171,9 +171,9 @@ public:
 	int64_t joinId() const { return fJoinId; }
 
 	/* semi-join support */
-	void addJoinFilter(boost::shared_ptr<execplan::ParseTree>, uint index);
+	void addJoinFilter(boost::shared_ptr<execplan::ParseTree>, uint32_t index);
 	bool hasJoinFilter() const { return (fe.size() > 0); }
-	bool hasJoinFilter(uint index) const;
+	bool hasJoinFilter(uint32_t index) const;
 	void setJoinFilterInputRG(const rowgroup::RowGroup &rg);
 
 	/* UM Join logic */
@@ -189,12 +189,12 @@ private:
 	void errorLogging(const std::string& msg, int err) const;
 	void startAdjoiningSteps();
 
-	void formatMiniStats(uint index);
+	void formatMiniStats(uint32_t index);
 
 	RowGroupDL *largeDL, *outputDL;
 	std::vector<RowGroupDL *> smallDLs;
-	std::vector<uint> smallIts;
-	uint largeIt;
+	std::vector<uint32_t> smallIts;
+	uint32_t largeIt;
 
 	JoinType joinType;   // deprecated
 	std::vector<JoinType> joinTypes;
@@ -233,8 +233,8 @@ private:
 	int fCorrelatedSide;
 
 	std::vector<bool> typelessJoin;     // the size of the vector is # of small side
-	std::vector<std::vector<uint> > largeSideKeys;
-	std::vector<std::vector<uint> > smallSideKeys;
+	std::vector<std::vector<uint32_t> > largeSideKeys;
+	std::vector<std::vector<uint32_t> > smallSideKeys;
 
 	ResourceManager& resourceManager;
 	volatile uint64_t totalUMMemoryUsage;
@@ -254,7 +254,7 @@ private:
 	uint64_t rgDataSize;
 
 	void hjRunner();
-	void smallRunnerFcn(uint index);
+	void smallRunnerFcn(uint32_t index);
 
 	struct HJRunner {
 		HJRunner(TupleHashJoinStep *hj) : HJ(hj) { }
@@ -262,10 +262,10 @@ private:
 		TupleHashJoinStep *HJ;
 	};
 	struct SmallRunner {
-		SmallRunner(TupleHashJoinStep *hj, uint i) :HJ(hj), index(i) { }
+		SmallRunner(TupleHashJoinStep *hj, uint32_t i) :HJ(hj), index(i) { }
 		void operator()() { HJ->smallRunnerFcn(index); }
 		TupleHashJoinStep *HJ;
-		uint index;
+		uint32_t index;
 	};
 
 	boost::shared_ptr<boost::thread> mainRunner;
@@ -283,12 +283,12 @@ private:
 	bool runRan, joinRan;
 
 	/* Iteration 18 mods */
-	uint largeSideIndex;
+	uint32_t largeSideIndex;
 	bool joinIsTooBig;
 
 	/* Functions & Expressions support */
 	boost::shared_ptr<funcexp::FuncExpWrapper> fe2;
-	std::vector<uint> fe2TableDeps;
+	std::vector<uint32_t> fe2TableDeps;
 	rowgroup::RowGroup fe2Output;
 	bool runFE2onPM;
 
@@ -302,21 +302,21 @@ private:
 
 	/* Casual Partitioning forwarding */
 	void forwardCPData();
-	uint uniqueLimit;
+	uint32_t uniqueLimit;
 
 	/* UM Join support.  Most of this code is ported from the UM join code in tuple-bps.cpp.
 	 * They should be kept in sync as much as possible. */
 	struct JoinRunner {
-		JoinRunner(TupleHashJoinStep *hj, uint i) : HJ(hj), index(i) { }
+		JoinRunner(TupleHashJoinStep *hj, uint32_t i) : HJ(hj), index(i) { }
 		void operator()() { HJ->joinRunnerFcn(index); }
 		TupleHashJoinStep *HJ;
-		uint index;
+		uint32_t index;
 	};
-	void joinRunnerFcn(uint index);
+	void joinRunnerFcn(uint32_t index);
 	void startJoinThreads();
 	void generateJoinResultSet(const std::vector<std::vector<rowgroup::Row::Pointer> > &joinerOutput,
 	  rowgroup::Row &baseRow, const boost::shared_array<boost::shared_array<int> > &mappings,
-	  const uint depth, rowgroup::RowGroup &outputRG, rowgroup::RGData &rgData,
+	  const uint32_t depth, rowgroup::RowGroup &outputRG, rowgroup::RGData &rgData,
 	  std::vector<rowgroup::RGData> *outputData,
 	  const boost::shared_array<rowgroup::Row> &smallRows, rowgroup::Row &joinedRow);
 	void grabSomeWork(std::vector<rowgroup::RGData> *work);
@@ -324,29 +324,29 @@ private:
 	void processFE2(rowgroup::RowGroup &input, rowgroup::RowGroup &output, rowgroup::Row &inRow,
 	  rowgroup::Row &outRow, std::vector<rowgroup::RGData> *rgData,
 	  funcexp::FuncExpWrapper* local_fe);
-	void joinOneRG(uint threadID, std::vector<rowgroup::RGData> *out,
+	void joinOneRG(uint32_t threadID, std::vector<rowgroup::RGData> *out,
 	  rowgroup::RowGroup &inputRG, rowgroup::RowGroup &joinOutput, rowgroup::Row &largeSideRow,
 	  rowgroup::Row &joinFERow, rowgroup::Row &joinedRow, rowgroup::Row &baseRow,
 	  std::vector<std::vector<rowgroup::Row::Pointer> > &joinMatches,
 	  boost::shared_array<rowgroup::Row> &smallRowTemplates);
 	void finishSmallOuterJoin();
 	void makeDupList(const rowgroup::RowGroup &rg);
-	void processDupList(uint threadID, rowgroup::RowGroup &ingrp,
+	void processDupList(uint32_t threadID, rowgroup::RowGroup &ingrp,
 		std::vector<rowgroup::RGData> *rowData);
 
 	boost::scoped_array<boost::shared_ptr<boost::thread> > joinRunners;
 	boost::mutex inputDLLock, outputDLLock;
 	boost::shared_array<boost::shared_array<int> > columnMappings, fergMappings;
 	boost::shared_array<int> fe2Mapping;
-	uint joinThreadCount;
+	uint32_t joinThreadCount;
 	boost::scoped_array<boost::scoped_array<uint8_t> > smallNullMemory;
 	uint64_t outputIt;
 	bool moreInput;
-	std::vector<std::pair<uint, uint> > dupList;
+	std::vector<std::pair<uint32_t, uint32_t> > dupList;
 	boost::scoped_array<rowgroup::Row> dupRows;
 	std::vector<std::string> smallTableNames;
 	bool isExeMgr;
-	uint lastSmallOuterJoiner;
+	uint32_t lastSmallOuterJoiner;
 
 	// moved from base class JobStep
 	boost::mutex* fStatsMutexPtr;

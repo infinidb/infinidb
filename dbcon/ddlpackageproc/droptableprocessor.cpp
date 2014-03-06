@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -25,9 +25,7 @@
 #include <vector>
 using namespace std;
 
-#define DROPTABLEPROC_DLLEXPORT
 #include "droptableprocessor.h"
-#undef DROPTABLEPROC_DLLEXPORT
 
 #include "we_messages.h"
 #include "we_ddlcommandclient.h"
@@ -136,16 +134,16 @@ DropTableProcessor::DDLResult DropTableProcessor::processPackage(ddlpackage::Dro
 		tableName.table = dropTableStmt.fTableName->fName;
 		roPair = systemCatalogPtr->tableRID( tableName );
 
-		u_int32_t  processID = ::getpid();
+		uint32_t  processID = ::getpid();
 		int32_t   txnid = txnID.id;
 		int32_t sessionId = dropTableStmt.fSessionID;
 		std::string  processName("DDLProc");
 		int i = 0;
 			
-		std::vector<uint> pms;
+		std::vector<uint32_t> pms;
 		for (unsigned i=0; i < moduleIds.size(); i++)
 		{
-			pms.push_back((uint)moduleIds[i]);
+			pms.push_back((uint32_t)moduleIds[i]);
 		}
 			
 		try {
@@ -245,8 +243,8 @@ cout << "Removing the SYSTABLEs meta data" << endl;
 #endif
 		bytestream << (ByteStream::byte)WE_SVR_DELETE_SYSTABLES;
 		bytestream << uniqueId;
-		bytestream << (u_int32_t) dropTableStmt.fSessionID;
-		bytestream << (u_int32_t)txnID.id;
+		bytestream << (uint32_t) dropTableStmt.fSessionID;
+		bytestream << (uint32_t)txnID.id;
 		bytestream << dropTableStmt.fTableName->fSchema;
 		bytestream << dropTableStmt.fTableName->fName;
 		
@@ -254,7 +252,7 @@ cout << "Removing the SYSTABLEs meta data" << endl;
 		BRM::OID_t sysOid = 1001;
 		ByteStream::byte rc = 0;
 		
-		u_int16_t  dbRoot;
+		uint16_t  dbRoot;
 		rc = fDbrm->getSysCatDBRoot(sysOid, dbRoot);  
 		if (rc != 0)
 		{
@@ -274,7 +272,7 @@ cout << "Removing the SYSTABLEs meta data" << endl;
 		try
 		{
 			//cout << "deleting systable entries with txnid " << txnID.id << endl;
-			fWEClient->write(bytestream, (uint)pmNum);
+			fWEClient->write(bytestream, (uint32_t)pmNum);
 #ifdef IDB_DDL_DEBUG
 cout << "Drop table sending WE_SVR_DELETE_SYSTABLES to pm " << pmNum << endl;
 #endif				
@@ -448,7 +446,7 @@ cout << "Drop table got unknown exception" << endl;
 #ifdef IDB_DDL_DEBUG
 cout << "Drop table removing column files" << endl;
 #endif		
-	uint msgRecived = 0;
+	uint32_t msgRecived = 0;
 	try {
 		fWEClient->write_to_all(bytestream);
 
@@ -586,7 +584,7 @@ TruncTableProcessor::DDLResult TruncTableProcessor::processPackage(ddlpackage::T
 	CalpontSystemCatalog::DictOIDList dictOIDList;
 	execplan::CalpontSystemCatalog::ROPair roPair;
 	std::string  processName("DDLProc");
-	u_int32_t  processID = ::getpid();;
+	uint32_t  processID = ::getpid();;
 	int32_t   txnid = txnID.id;
 	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(truncTableStmt.fSessionID);
 	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
@@ -639,10 +637,10 @@ TruncTableProcessor::DDLResult TruncTableProcessor::processPackage(ddlpackage::T
 		std::string  processName("DDLProc");
 		int i = 0;
 			
-		std::vector<uint> pms;
+		std::vector<uint32_t> pms;
 		for (unsigned i=0; i < moduleIds.size(); i++)
 		{
-			pms.push_back((uint)moduleIds[i]);
+			pms.push_back((uint32_t)moduleIds[i]);
 		}
 		try {
 			tableLockId = fDbrm->getTableLock(pms, roPair.objnum, &processName, &processID, &sessionId, &txnid, BRM::LOADING );
@@ -821,7 +819,7 @@ TruncTableProcessor::DDLResult TruncTableProcessor::processPackage(ddlpackage::T
 			bytestream << (uint32_t) allOidList[i];
 		}
 	
-		uint msgRecived = 0;
+		uint32_t msgRecived = 0;
 		try {
 			fWEClient->write_to_all(bytestream);
 
@@ -920,7 +918,7 @@ TruncTableProcessor::DDLResult TruncTableProcessor::processPackage(ddlpackage::T
 		bytestream.restart();
 		bytestream << (ByteStream::byte) WE_SVR_WRITE_CREATETABLEFILES;
 		bytestream << uniqueId;
-		bytestream << (u_int32_t)txnID.id;
+		bytestream << (uint32_t)txnID.id;
 		uint32_t numOids = columnOidList.size() + dictOIDList.size();
 		bytestream << numOids;
 		CalpontSystemCatalog::ColType colType;
@@ -931,10 +929,10 @@ TruncTableProcessor::DDLResult TruncTableProcessor::processPackage(ddlpackage::T
 			if (colType.autoincrement)
 				autoIncColOid = colType.columnOID;
 			bytestream << (uint32_t)columnOidList[col];
-			bytestream << (u_int8_t) colType.colDataType;
-			bytestream << (u_int8_t) false;
+			bytestream << (uint8_t) colType.colDataType;
+			bytestream << (uint8_t) false;
 			bytestream << (uint32_t) colType.colWidth;
-			bytestream << (u_int16_t) useDBRoot;
+			bytestream << (uint16_t) useDBRoot;
 			bytestream << (uint32_t) colType.compressionType;			
 		}
 		
@@ -942,10 +940,10 @@ TruncTableProcessor::DDLResult TruncTableProcessor::processPackage(ddlpackage::T
 		{
 			colType = systemCatalogPtr->colTypeDct(dictOIDList[col].dictOID);
 			bytestream << (uint32_t) dictOIDList[col].dictOID;
-			bytestream << (u_int8_t) colType.colDataType;
-			bytestream << (u_int8_t) true;
+			bytestream << (uint8_t) colType.colDataType;
+			bytestream << (uint8_t) true;
 			bytestream << (uint32_t) colType.colWidth;
-			bytestream << (u_int16_t) useDBRoot;
+			bytestream << (uint16_t) useDBRoot;
 			bytestream << (uint32_t) colType.compressionType;
 		}
 		

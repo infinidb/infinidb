@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -20,33 +20,23 @@
  *
  *****************************************************************************/
 
-/** @file 
+/** @file
  * Put LogicalPartition define here to avoid header file include confilct.
  * This struct will be used in connector, brm and writeengine
  */
 
+#include <cstdio>
 #include <sstream>
 #include "bytestream.h"
 #include "logicalpartition.h"
 
-namespace BRM 
+namespace BRM
 {
 std::string LogicalPartition::toString() const
 {
-	std::ostringstream oss;
-	if (pp != (uint32_t)-1)
-	{
-		oss << pp;
-	}
-	if (seg != (uint16_t)-1)
-	{
-		oss << "." << seg;
-	}
-	if (dbroot != (uint16_t)-1)
-	{
-		oss << "." << dbroot;
-	}
-	return oss.str();
+	char buf[256] = {0};
+	std::sprintf(buf, "%d.%d.%d", pp, seg, dbroot);
+	return std::string(buf);
 }
 
 /**

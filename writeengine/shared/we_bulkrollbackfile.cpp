@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -64,27 +64,23 @@ BulkRollbackFile::~BulkRollbackFile()
 }
 
 //------------------------------------------------------------------------------
-// Find the specified database segment file.
+// Build the specified database segment file name.
 //
 // columnOID      - OID of segment file to be found
 // fileTypeFlag   - true -> column file; false -> dictionary store file
 // dbRoot         - DBRoot of segment file to be found
 // partNum        - Partition number of segment file to be found
 // segNum         - Segment number of segment file to be found
-// segFileExisted (out) - indicates whether segment file was found or not
 // segFileName (out)    - Name of segment file
 //------------------------------------------------------------------------------
-void BulkRollbackFile::findSegmentFile(
+void BulkRollbackFile::buildSegmentFileName(
     OID          columnOID,
     bool         fileTypeFlag,
-    u_int32_t    dbRoot,
-    u_int32_t    partNum,
-    u_int32_t    segNum,
-    bool&        segFileExists,
+    uint32_t    dbRoot,
+    uint32_t    partNum,
+    uint32_t    segNum,
     std::string& segFileName )
 {
-    segFileExists = false;
-
     char fileName[FILE_NAME_SIZE];
     int rc = fDbFile.getFileName( columnOID, fileName,
         dbRoot, partNum, segNum );
@@ -104,9 +100,7 @@ void BulkRollbackFile::findSegmentFile(
         throw WeException( oss.str(), rc );
     }
 
-    segFileName   = fileName;
-
-    segFileExists = fDbFile.exists( fileName );
+    segFileName = fileName;
 }
 
 //------------------------------------------------------------------------------
@@ -122,9 +116,9 @@ void BulkRollbackFile::findSegmentFile(
 void BulkRollbackFile::deleteSegmentFile(
     OID       columnOID, 
     bool      fileTypeFlag,
-    u_int32_t dbRoot,
-    u_int32_t partNum, 
-    u_int32_t segNum,
+    uint32_t dbRoot,
+    uint32_t partNum, 
+    uint32_t segNum,
     const std::string& segFileName )
 {
     std::ostringstream msgText; 
@@ -167,9 +161,9 @@ void BulkRollbackFile::deleteSegmentFile(
 //------------------------------------------------------------------------------
 void BulkRollbackFile::truncateSegmentFile(
     OID       columnOID,
-    u_int32_t dbRoot,
-    u_int32_t partNum,
-    u_int32_t segNum,
+    uint32_t dbRoot,
+    uint32_t partNum,
+    uint32_t segNum,
     long long fileSizeBlocks )
 {
     long long fileSizeBytes = fileSizeBlocks * BYTE_PER_BLOCK;
@@ -365,9 +359,9 @@ void BulkRollbackFile::reInitTruncColumnExtent(
 //------------------------------------------------------------------------------
 void BulkRollbackFile::reInitTruncDctnryExtent(
     OID         dStoreOID,
-    u_int32_t   dbRoot,
-    u_int32_t   partNum,
-    u_int32_t   segNum,
+    uint32_t   dbRoot,
+    uint32_t   partNum,
+    uint32_t   segNum,
     long long   startOffsetBlk,
     int         nBlocks )
 {
@@ -402,7 +396,7 @@ void BulkRollbackFile::reInitTruncDctnryExtent(
     // abbreviated extent, then we reset nBlocks to reflect the size of the file
     // (Unlike column files which only employ an abbreviated extent for the
     // 1st extent in part0, seg0, all new store files start with abbrev extent)
-    const u_int32_t PSEUDO_COL_WIDTH = 8; // simulated col width for dictionary
+    const uint32_t PSEUDO_COL_WIDTH = 8; // simulated col width for dictionary
     long long nBytesInAbbrevExtent = INITIAL_EXTENT_ROWS_TO_DISK *
                                      PSEUDO_COL_WIDTH;
     if (startOffset <= nBytesInAbbrevExtent)
@@ -481,9 +475,9 @@ void BulkRollbackFile::reInitTruncDctnryExtent(
 // on whether the HWM chunk was modified and backed up to disk.
 //------------------------------------------------------------------------------
 bool BulkRollbackFile::doWeReInitExtent( OID columnOID,
-    u_int32_t dbRoot,
-    u_int32_t partNum,
-    u_int32_t segNum) const
+    uint32_t dbRoot,
+    uint32_t partNum,
+    uint32_t segNum) const
 {
     return true;
 }

@@ -1,63 +1,63 @@
 #
 # $Id$
 #
-Summary: Calpont InfiniDB software
+Summary: InfiniDB software
 Name: infinidb
 @@VERSION@@
 @@RELEASE@@
-Vendor: Calpont Corp.
+Vendor: InfiniDB, Inc.
 URL: http://www.calpont.com/
 @@PACKAGER@@
 Group: Applications
-License: Copyright (c) 2013 Calpont Corp., all rights reserved
+License: Copyright (c) 2014 InfiniDB, Inc., all rights reserved
 BuildRoot: %{_tmppath}/%{name}-%{release}-buildroot
 
 %description
-Calpont InfiniDB software meta-package
+InfiniDB software meta-package
 
 %package platform
-Summary: Calpont InfiniDB software binaries
+Summary: InfiniDB software binaries
 Group: Applications
 Obsoletes: calpont
 Requires: expect, infinidb-libs
 
 %description platform
-Calpont InfiniDB binary files
+InfiniDB binary files
 @@BUILDINFO@@
 
 %package libs
-Summary: Calpont InfiniDB software libraries
+Summary: InfiniDB software libraries
 Group: Applications
 Obsoletes: calpont
 
 %description libs
-Calpont InfiniDB libraries
+InfiniDB libraries
 
 %package enterprise
-Summary: Calpont InfiniDB Enterprise software binaries
+Summary: InfiniDB Enterprise software binaries
 Group: Applications
 Obsoletes: calpont
 Requires: infinidb-libs, infinidb-platform
 
 %description enterprise
-Calpont InfiniDB Enterprise binary files
+InfiniDB Enterprise binary files
 
 %package storage-engine
-Summary: Calpont InfiniDB software MySQL connector
+Summary: InfiniDB software MySQL connector
 Group: Applications
 Obsoletes: calpont-mysql
 Requires: infinidb-libs
 
 %description storage-engine
-Calpont InfiniDB MySQL connector binary files
+InfiniDB MySQL connector binary files
 
 %package mysql
-Summary: Calpont InfiniDB software MySQL server
+Summary: InfiniDB software MySQL server
 Group: Applications
 Obsoletes: calpont-mysqld
 
 %description mysql
-Calpont InfiniDB MySQL 5.1.39 server binary files
+InfiniDB/MySQL 5.1.73 server binary files
 
 %prep
 %define _use_internal_dependency_generator 0
@@ -137,6 +137,8 @@ rm -rf $RPM_BUILD_ROOT $RPM_BUILD_DIR/%{name}-%{version}-%{release}
 /usr/local/Calpont/bin/remote_scp_put.sh
 /usr/local/Calpont/bin/remotessh.exp
 /usr/local/Calpont/bin/ServerMonitor
+/usr/local/Calpont/bin/master-rep-infinidb.sh 
+/usr/local/Calpont/bin/slave-rep-infinidb.sh
 
 #
 %config /usr/local/Calpont/etc/Calpont.xml
@@ -324,7 +326,6 @@ rm -rf $RPM_BUILD_ROOT $RPM_BUILD_DIR/%{name}-%{version}-%{release}
 /usr/local/Calpont/lib/libdataconvert.so.1.0.0
 /usr/local/Calpont/lib/librowgroup.so.1.0.0
 /usr/local/Calpont/lib/libcacheutils.so.1.0.0
-/usr/local/Calpont/lib/libmulticast.so.1.0.0
 /usr/local/Calpont/lib/libcommon.so.1.0.0
 /usr/local/Calpont/lib/libboost_idb.so.1.0.0
 /usr/local/Calpont/lib/libcompress.so.1.0.0
@@ -339,6 +340,8 @@ rm -rf $RPM_BUILD_ROOT $RPM_BUILD_DIR/%{name}-%{version}-%{release}
 /usr/local/Calpont/lib/hdfs-12.so
 /usr/local/Calpont/lib/libgcc_s.so.1
 /usr/local/Calpont/lib/libstdc++.so.6.0.14
+/usr/local/Calpont/lib/libthrift.so.1.0.0
+/usr/local/Calpont/lib/libquerytele.so.1.0.0
 
 %files storage-engine
 /usr/local/Calpont/lib/libcalmysql.so.1.0.0
@@ -492,7 +495,7 @@ prefix=/usr/local
 
 test -x /usr/local/Calpont/bin/post-install && /usr/local/Calpont/bin/post-install --prefix=$prefix --rpmmode=$rpmmode
 
-echo "Calpont RPM install completed"
+echo "InfinIDB RPM install completed"
 
 %post libs
 rpmmode=install
@@ -504,7 +507,7 @@ fi
 
 prefix=/usr/local
 
-echo "Calpont RPM install completed"
+echo "InfinIDB RPM install completed"
 
 %post storage-engine
 rpmmode=install
@@ -516,7 +519,7 @@ fi
 
 prefix=/usr/local
 
-echo "Calpont RPM install completed"
+echo "InfinIDB RPM install completed"
 
 %post mysql
 rpmmode=install
@@ -528,7 +531,7 @@ fi
 
 prefix=/usr/local
 
-echo "Calpont RPM install completed"
+echo "InfinIDB RPM install completed"
 
 %post enterprise
 rpmmode=install
@@ -540,7 +543,7 @@ fi
 
 prefix=/usr/local
 
-echo "Calpont RPM install completed"
+echo "InfinIDB RPM install completed"
 
 %preun platform
 rpmmode=upgrade

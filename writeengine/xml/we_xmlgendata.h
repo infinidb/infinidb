@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -29,7 +29,7 @@
 #include <map>
 #include "calpontsystemcatalog.h"
 
-#if defined(_MSC_VER) && defined(WRITEENGINEXMLGENDATA_DLLEXPORT)
+#if defined(_MSC_VER) && defined(WRITEENGINE_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
@@ -54,22 +54,22 @@ class XMLGenData
     // Valid parms that can be stored and retrieved from XMLGenData
     EXPORT const static std::string DELIMITER;
     EXPORT const static std::string DESCRIPTION;
-#if defined(_MSC_VER) && !defined(WRITEENGINEXMLGENDATA_DLLEXPORT)
+#if defined(_MSC_VER) && !defined(WRITEENGINE_DLLEXPORT)
     __declspec(dllimport)
 #endif
     EXPORT const static std::string ENCLOSED_BY_CHAR;
-#if defined(_MSC_VER) && !defined(WRITEENGINEXMLGENDATA_DLLEXPORT)
+#if defined(_MSC_VER) && !defined(WRITEENGINE_DLLEXPORT)
     __declspec(dllimport)
 #endif
     EXPORT const static std::string ESCAPE_CHAR;
-#if defined(_MSC_VER) && !defined(WRITEENGINEXMLGENDATA_DLLEXPORT)
+#if defined(_MSC_VER) && !defined(WRITEENGINE_DLLEXPORT)
     __declspec(dllimport)
 #endif
     EXPORT const static std::string JOBID;
     EXPORT const static std::string MAXERROR;
     EXPORT const static std::string NAME;
     EXPORT const static std::string PATH;
-#if defined(_MSC_VER) && !defined(WRITEENGINEXMLGENDATA_DLLEXPORT)
+#if defined(_MSC_VER) && !defined(WRITEENGINE_DLLEXPORT)
     __declspec(dllimport)
 #endif
     EXPORT const static std::string RPT_DEBUG;

@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -33,9 +33,7 @@ using namespace std;
 #include <boost/scoped_ptr.hpp>
 using namespace boost;
 
-#define WRITEENGINEBRM_DLLEXPORT
 #include "we_brm.h"
-#undef WRITEENGINEBRM_DLLEXPORT
 
 #include "calpontsystemcatalog.h"
 #include "we_dbfileop.h"
@@ -99,8 +97,8 @@ typedef std::map< File, IDBDataFile*, fileInfoCompare > FileOpenMap;
 //------------------------------------------------------------------------------
 int BRMWrapper::startAutoIncrementSequence(
     OID          colOID,
-    u_int64_t    startNextValue,
-    u_int32_t    colWidth,
+    uint64_t    startNextValue,
+    uint32_t    colWidth,
     execplan::CalpontSystemCatalog::ColDataType colDataType,
     std::string& errMsg)
 {
@@ -124,15 +122,15 @@ int BRMWrapper::startAutoIncrementSequence(
 //------------------------------------------------------------------------------
 int BRMWrapper::getAutoIncrementRange(
     OID          colOID,
-    u_int64_t    count,
-    u_int64_t&   firstNum,
+    uint64_t    count,
+    uint64_t&   firstNum,
     std::string& errMsg)
 {
     int rc = NO_ERROR;
 
     try
     {
-        u_int64_t firstNumArg = 0;
+        uint64_t firstNumArg = 0;
         bool gotFullRange = blockRsltnMgrPtr->getAIRange(
             colOID, count, &firstNumArg );
         if (gotFullRange)
@@ -160,9 +158,9 @@ int BRMWrapper::getAutoIncrementRange(
 //------------------------------------------------------------------------------
 int   BRMWrapper::allocateStripeColExtents(
     const std::vector<BRM::CreateStripeColumnExtentsArgIn>& cols,
-    u_int16_t    dbRoot,
-    u_int32_t&   partition,
-    u_int16_t&   segmentNum,
+    uint16_t    dbRoot,
+    uint32_t&   partition,
+    uint16_t&   segmentNum,
     std::vector<BRM::CreateStripeColumnExtentsArgOut>& extents)
 {
     int rc = blockRsltnMgrPtr->createStripeColumnExtents(
@@ -183,14 +181,14 @@ int   BRMWrapper::allocateStripeColExtents(
 //------------------------------------------------------------------------------
 int   BRMWrapper::allocateColExtentExactFile(
     const OID   oid,
-    const u_int32_t colWidth,
-    u_int16_t   dbRoot,
-    u_int32_t   partition,
-    u_int16_t   segment,
+    const uint32_t colWidth,
+    uint16_t   dbRoot,
+    uint32_t   partition,
+    uint16_t   segment,
     execplan::CalpontSystemCatalog::ColDataType colDataType,
     LBID_t&     startLbid,
     int&        allocSize,
-    u_int32_t&  startBlock)
+    uint32_t&  startBlock)
 {
     int rc = blockRsltnMgrPtr->createColumnExtentExactFile(
             (int)oid, colWidth, dbRoot, partition, segment, colDataType,
@@ -218,9 +216,9 @@ int   BRMWrapper::allocateColExtentExactFile(
 //------------------------------------------------------------------------------
 int   BRMWrapper::allocateDictStoreExtent(
     const OID   oid,
-    u_int16_t   dbRoot,
-    u_int32_t   partition,
-    u_int16_t   segment,
+    uint16_t   dbRoot,
+    uint32_t   partition,
+    uint16_t   segment,
     LBID_t&     startLbid,
     int&        allocSize)
 {
@@ -261,8 +259,8 @@ int BRMWrapper::deleteOIDsFromExtentMap(const std::vector<int32_t>& oids)
 // Get BRM information based on a specfic OID, DBRoot, partition, and segment.
 //------------------------------------------------------------------------------
 int   BRMWrapper::getBrmInfo(const OID oid,
-    const u_int32_t partition,
-    const u_int16_t segment,
+    const uint32_t partition,
+    const uint16_t segment,
     const int       fbo,
     LBID_t&         lbid)
 {
@@ -271,7 +269,7 @@ int   BRMWrapper::getBrmInfo(const OID oid,
     // need to pass DBRoot to lookupLocal().
     int rc = blockRsltnMgrPtr->lookupLocal((int)oid ,
         partition, segment,
-        (u_int32_t)fbo,lbid);
+        (uint32_t)fbo,lbid);
      return getRC(rc, ERR_BRM_LOOKUP_LBID);
 };
 
@@ -280,8 +278,8 @@ int   BRMWrapper::getBrmInfo(const OID oid,
 // block offset.
 //------------------------------------------------------------------------------
 int   BRMWrapper::getStartLbid(const OID oid,
-    const u_int32_t partition,
-    const u_int16_t segment,
+    const uint32_t partition,
+    const uint16_t segment,
     const int       fbo,
     LBID_t&         lbid)
 {
@@ -290,7 +288,7 @@ int   BRMWrapper::getStartLbid(const OID oid,
     // need to pass DBRoot to lookupLocalStartLbid().
     int rc = blockRsltnMgrPtr->lookupLocalStartLbid((int)oid ,
             partition, segment,
-            (u_int32_t)fbo,lbid);
+            (uint32_t)fbo,lbid);
 
     return getRC(rc, ERR_BRM_LOOKUP_START_LBID);
 }
@@ -306,7 +304,7 @@ int  BRMWrapper::getFboOffset(const uint64_t lbid,
 {
     int oid;
     // according to Patric, extendmap don't need vbflag, thus verid =0
-//  int rc = blockRsltnMgrPtr->lookup((u_int64_t)lbid, 0, false, oid, (u_int32_t&)fbo);
+//  int rc = blockRsltnMgrPtr->lookup((uint64_t)lbid, 0, false, oid, (uint32_t&)fbo);
 //  return getRC(rc, ERR_BRM_LOOKUP_FBO);
     return getFboOffset(lbid, oid, dbRoot, partition, segment, fbo);
 }
@@ -321,9 +319,9 @@ int  BRMWrapper::getFboOffset(const uint64_t lbid, int& oid,
     int&       fbo)
 {
     // according to Patric, extendmap don't need vbflag, thus verid =0
-    int rc = blockRsltnMgrPtr->lookupLocal((u_int64_t)lbid, 0, false, (BRM::OID_t&)oid,
+    int rc = blockRsltnMgrPtr->lookupLocal((uint64_t)lbid, 0, false, (BRM::OID_t&)oid,
         dbRoot, partition, segment,
-        (u_int32_t&)fbo);
+        (uint32_t&)fbo);
     return getRC(rc, ERR_BRM_LOOKUP_FBO);
 }
 
@@ -355,7 +353,7 @@ int BRMWrapper::getDbRootHWMInfo( const OID oid,
     BRM::EmDbRootHWMInfo_v& emDbRootHwmInfos)
 {
     int rc = NO_ERROR;
-    u_int16_t localModuleID = Config::getLocalModuleID();
+    uint16_t localModuleID = Config::getLocalModuleID();
     rc = blockRsltnMgrPtr->getDbRootHWMInfo(
         oid, localModuleID, emDbRootHwmInfos);
 
@@ -498,7 +496,7 @@ int BRMWrapper::getTableLock( OID tableOid,
     int rc = NO_ERROR;
     lockID = 0;
 
-    std::vector<uint> pmList;
+    std::vector<uint32_t> pmList;
     pmList.push_back( Config::getLocalModuleID() );
 
     try
@@ -519,7 +517,7 @@ int BRMWrapper::getTableLock( OID tableOid,
 //------------------------------------------------------------------------------
 // Change the state of the specified lock to the indicated lock state.
 //------------------------------------------------------------------------------
-int BRMWrapper::changeTableLockState( u_int64_t lockID,
+int BRMWrapper::changeTableLockState( uint64_t lockID,
     BRM::LockState lockState,
     bool& bChanged,
     std::string& errMsg )
@@ -544,7 +542,7 @@ int BRMWrapper::changeTableLockState( u_int64_t lockID,
 // Release the table lock associated with the specified lockID.
 // bReleased will indicate whether the lock was released or not.
 //------------------------------------------------------------------------------
-int BRMWrapper::releaseTableLock( u_int64_t lockID,
+int BRMWrapper::releaseTableLock( uint64_t lockID,
     bool& bReleased,
     std::string& errMsg )
 {
@@ -567,7 +565,7 @@ int BRMWrapper::releaseTableLock( u_int64_t lockID,
 //------------------------------------------------------------------------------
 // Get information about the specified table lock.
 //------------------------------------------------------------------------------
-int BRMWrapper::getTableLockInfo( u_int64_t lockID,
+int BRMWrapper::getTableLockInfo( uint64_t lockID,
     BRM::TableLockInfo* lockInfo,
     bool& bLockExists,
     std::string& errMsg )
@@ -800,7 +798,7 @@ int BRMWrapper::rollBack(const VER_t transID, int sessionId)
     std::vector<LBIDRange> lbidRangeList;
     LBIDRange   range;
     OID_t       vbOid, weOid, currentVbOid;
-    u_int32_t   vbFbo, weFbo;
+    uint32_t   vbFbo, weFbo;
     size_t      i;
     bool        vbFlag;
     uint16_t   vbDbRoot, weDbRoot, vbSegmentNum, weSegmentNum;
@@ -950,7 +948,7 @@ int BRMWrapper::rollBack(const VER_t transID, int sessionId)
 //      printf("\n\ttarget file info - oid =%d fPartition=%d fSegment=%d, fDbRoot=%d", weOid, wePartitionNum, weSegmentNum, weDbRoot);
         if (column.compressionType != 0)
         {
-            pTargetFile = fileOp.getFilePtr(column);
+            pTargetFile = fileOp.getFilePtr(column, false); // @bug 5572 HDFS tmp file
         }
         else if (fileOpenList.find(targetFileInfo) != fileOpenList.end())
         {
@@ -1041,7 +1039,7 @@ int BRMWrapper::rollBackBlocks(const VER_t transID, int sessionId)
     OID_t       vbOid;
     OID_t       weOid;
     OID_t       currentVbOid = static_cast<OID_t>(-1);
-    u_int32_t   vbFbo, weFbo;
+    uint32_t   vbFbo, weFbo;
     size_t      i;
     VER_t       verID = (VER_t) transID;
 
@@ -1051,7 +1049,7 @@ int BRMWrapper::rollBackBlocks(const VER_t transID, int sessionId)
     File  targetFileInfo;
 	Config config;
 	config.initConfigCache();
-	std::vector<u_int16_t> rootList;
+	std::vector<uint16_t> rootList;
 	config.getRootIdList( rootList );
 	std::map<uint16_t, uint16_t> dbrootPmMap;
 	
@@ -1132,7 +1130,7 @@ int BRMWrapper::rollBackBlocks(const VER_t transID, int sessionId)
 			std::ostringstream oss;
 			BRM::errString(rc, errorMsg);
 			oss << "lookupLocal from extent map error encountered while looking up lbid:verID " << lbidList[i] << ":"
-				<<(uint)verID << " and error code is " << rc << " with message " << errorMsg;
+				<<(uint32_t)verID << " and error code is " << rc << " with message " << errorMsg;
 			throw std::runtime_error(oss.str());	
 		}
 		
@@ -1198,7 +1196,7 @@ int BRMWrapper::rollBackBlocks(const VER_t transID, int sessionId)
 			std::ostringstream oss;
 			BRM::errString(rc, errorMsg);
 			oss << "lookupLocal from version buffer error encountered while looking up lbid:verID " << lbidList[i] << ":"
-				<<(uint)verID << " and error code is " << rc << " with message " << errorMsg;
+				<<(uint32_t)verID << " and error code is " << rc << " with message " << errorMsg;
 			throw std::runtime_error(oss.str());	
 		}
        
@@ -1263,7 +1261,7 @@ int BRMWrapper::rollBackBlocks(const VER_t transID, int sessionId)
 			
         if (column.compressionType != 0)
         {
-            pTargetFile = fileOp.getFilePtr(column);
+            pTargetFile = fileOp.getFilePtr(column, false); // @bug 5572 HDFS tmp file
         }
         else if (fileOpenList.find(targetFileInfo) != fileOpenList.end())
         {
@@ -1410,9 +1408,9 @@ int BRMWrapper::writeVB(IDBDataFile* pFile, const VER_t transID, const OID oid, 
     lbidRange.size  = 1;
     rangeList.push_back(lbidRange);
 
-    u_int16_t  dbRoot;
-    u_int32_t  partition;
-    u_int16_t  segment;
+    uint16_t  dbRoot;
+    uint32_t  partition;
+    uint16_t  segment;
     RETURN_ON_ERROR(getFboOffset(lbid, dbRoot, partition, segment, fbo));
 
     fboList.push_back(fbo);
@@ -1429,7 +1427,7 @@ void BRMWrapper::pruneLBIDList(VER_t transID, vector<LBIDRange> *rangeList,
 	vector<LBID_t> lbids;
     vector<BRM::VSSData> vssData;
     BRM::QueryContext verID(transID);
-    uint i;
+    uint32_t i;
     int rc;
 	vector<LBIDRange> newrangeList;
 	vector<uint32_t> newfboList;
@@ -1452,7 +1450,7 @@ void BRMWrapper::pruneLBIDList(VER_t transID, vector<LBIDRange> *rangeList,
 	
 /*	if (newrangeList.size() != rangeList->size()) {
 		cout << "Lbidlist is pruned, and the original list is: " << endl;
-		for (uint i = 0; i < rangeList->size(); i++)
+		for (uint32_t i = 0; i < rangeList->size(); i++)
 		{
            cout << "lbid : " << (*rangeList)[i].start << endl;
 		}

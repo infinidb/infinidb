@@ -1,29 +1,29 @@
-::@echo off
+@echo off
 
 echo ======================================
 echo updating mysql source
 cd \InfiniDB\mysql
-git checkout 4.0
+git checkout develop
 git pull
 IF %ERRORLEVEL% NEQ 0 GOTO ERROR_HANDLER
 
 echo ======================================
 echo updating InfiniDB source
 cd \InfiniDB\genii
-git checkout 4.0
-git pull origin_http 4.0
+git checkout develop
+git pull origin_http develop
 IF %ERRORLEVEL% NEQ 0 GOTO ERROR_HANDLER
 
 echo ======================================
 echo Building mysql
 cd \InfiniDB\mysql
-VCBUILD /M8 /rebuild mysql.sln "Release|x64"
+MSBuild /M:8 /t:rebuild /p:Configuration="Release" /p:Platform="x64" mysql.sln
 IF %ERRORLEVEL% NEQ 0 GOTO ERROR_HANDLER
 
 echo ======================================
 echo Building InfiniDB
 cd \InfiniDB\genii\build
-VCBUILD /M8 /rebuild InfiniDB.sln "EnterpriseRelease|x64"
+MSBuild /M:8 /t:rebuild /p:Configuration="EnterpriseRelease" /p:Platform="x64" InfiniDB.sln
 IF %ERRORLEVEL% NEQ 0 GOTO ERROR_HANDLER
 
 echo ======================================
@@ -55,10 +55,13 @@ GOTO QUIT
 echo.
 echo ======================================
 echo Error occured. InfiniDB not built
+
+cd \InfiniDB\genii\build
 exit /B 1
 
 :QUIT
 echo ======================================
+cd \InfiniDB\genii\build
 echo    compiled at %date% %time%
 echo nightly build complete
 

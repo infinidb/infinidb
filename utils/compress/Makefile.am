@@ -1,4 +1,4 @@
-# Copyright (C) 2013 Calpont Corp.
+# Copyright (C) 2014 InfiniDB, Inc.
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -24,7 +24,7 @@ AM_CFLAGS = $(idb_cflags)
 AM_CXXFLAGS = $(idb_cxxflags)
 AM_LDFLAGS = -version-info 1:0:0 $(idb_ldflags)
 lib_LTLIBRARIES = libcompress.la
-libcompress_la_SOURCES = idbcompress.cpp snappy.cpp snappy-sinksource.cpp version1.cpp
+libcompress_la_SOURCES = idbcompress.cpp snappy.cpp snappy-sinksource.cpp version1.cpp snappy-stubs-internal.cpp
 include_HEADERS = idbcompress.h
 
 test:

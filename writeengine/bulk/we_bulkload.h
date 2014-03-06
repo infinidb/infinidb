@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -227,8 +227,8 @@ private:
 
     // Map specified DBRoot to it's first segment file number
     int mapDBRootToFirstSegment(OID columnOid,
-                            u_int16_t  dbRoot,
-                            u_int16_t& segment);
+                            uint16_t  dbRoot,
+                            uint16_t& segment);
 
     // The thread method for the read thread.
     void read(int id);
@@ -247,8 +247,8 @@ private:
     // Determine starting HWM and LBID after block skipping added to HWM
     int preProcessHwmLbid( const ColumnInfo* info,
                                int          minWidth,
-                               u_int32_t    partition,
-                               u_int16_t    segment,
+                               uint32_t    partition,
+                               uint16_t    segment,
                                HWM&         hwm,
                                BRM::LBID_t& lbid,
                                bool&        bSkippedToNewExtent);

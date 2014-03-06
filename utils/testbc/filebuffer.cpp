@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -45,7 +45,7 @@ FileBuffer::FileBuffer(const FileBuffer& rhs) {
 }
 
 
-FileBuffer::FileBuffer(const BRM::LBID_t lbid, const BRM::VER_t ver, const u_int8_t* data, const uint32_t len) {
+FileBuffer::FileBuffer(const BRM::LBID_t lbid, const BRM::VER_t ver, const uint8_t* data, const uint32_t len) {
 	fLbid = lbid;
 	fVerid = ver;
 	fDataLen=len;
@@ -69,7 +69,7 @@ FileBuffer& FileBuffer::operator= (const FileBuffer& rhs) {
 	return *this;
 }
 
-void FileBuffer::setData(const u_int8_t* d, const int len)
+void FileBuffer::setData(const uint8_t* d, const int len)
 {
 	if (d==NULL || len <=0)
 		return;

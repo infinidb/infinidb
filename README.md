@@ -1,4 +1,4 @@
-This is InfiniDB 4.0.
+This is InfiniDB 4.5.
 =====================
 
 To build InfiniDB from source you will need:
@@ -37,4 +37,4 @@ Build the hard way:
     make install
     
 Either way you will end up with `$HOME/Calpont` as a binary tree. Follow the Binary Download
-instructions in the InfiniDB 4.0 Installation Guide (available on http://www.calpont.com/).
+instructions in the InfiniDB 4.5 Installation Guide (available on http://www.infinidb.co/).

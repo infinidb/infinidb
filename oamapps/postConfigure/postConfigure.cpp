@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -124,8 +124,7 @@ bool singleServerDBrootSetup();
 bool copyFstab(string moduleName);
 bool copyX509files();
 
-void remoteInstallThread(string command);
-int remoteInstallCount = 0;
+void remoteInstallThread(void *);
 
 string calpontPackage1;
 string calpontPackage2;
@@ -137,6 +136,7 @@ const char* pcommand = 0;
 
 string parentOAMModuleName;
 int pmNumber = 0;
+int umNumber = 0;
 
 string DBRootStorageLoc;
 string DBRootStorageType;
@@ -172,6 +172,8 @@ bool rootUser = true;
 string USER = "root";
 bool hdfs = false;
 bool gluster = false;
+bool pmwithum = false;
+bool mysqlrep = false;
 
 string DataFileEnvFile;
 
@@ -194,6 +196,11 @@ void callFree(const char* )
 	pcommand = 0;
 }
 
+/* create thread argument struct for thr_func() */
+typedef struct _thread_data_t {
+  	std::string command;
+} thread_data_t;
+
 int main(int argc, char *argv[])
 {
     Oam oam;
@@ -211,7 +218,7 @@ int main(int argc, char *argv[])
 	string password;
 	string mysqlpw = " ";
 
-  	struct sysinfo myinfo; 
+//  	struct sysinfo myinfo; 
 
 	// hidden options
 	// -f for force use nodeps on rpm install
@@ -473,7 +480,7 @@ int main(int argc, char *argv[])
 					// within the same second which means the changes that are about to happen
 					// when Calpont.xml gets overwritten will be ignored because of the Config
 					// instance won't know to reload
-                    sleep(2);
+                    			sleep(2);
 
 					cmd = "rm -f " + installDir + "/etc/Calpont.xml.installSave  > /dev/null 2>&1";
 					system(cmd.c_str());
@@ -496,8 +503,8 @@ int main(int argc, char *argv[])
 				}
 
 				if (hdfs)
-                	if( !updateBash() )
-	                    cout << "updateBash error" << endl;
+                			if( !updateBash() )
+	                    		cout << "updateBash error" << endl;
 
 				// setup storage
 				if (!singleServerDBrootSetup())
@@ -847,6 +854,20 @@ int main(int argc, char *argv[])
 				cout << "The Server will be configured as a Performance Module." << endl;
 				cout << "All InfiniDB Processes will run on the Performance Modules." << endl;
 	
+				try {
+					 sysConfig->setConfig(InstallSection, "PMwithUM", "n");
+				}
+				catch(...)
+				{}
+
+				mysqlrep = true;
+
+				try {
+					 sysConfig->setConfig(InstallSection, "MySQLRep", "y");
+				}
+				catch(...)
+				{}
+
 				//module ProcessConfig.xml to setup all apps on the dm
 				if( !updateProcessConfig(IserverTypeInstall) )
 					cout << "Update ProcessConfig.xml error" << endl;
@@ -855,6 +876,50 @@ int main(int argc, char *argv[])
 			}
 			default:	// normal, separate UM and PM
 			{
+				// Get PM with UM functionality flag
+				string PMwithUM = "n";
+				try {
+					PMwithUM = sysConfig->getConfig(InstallSection, "PMwithUM");
+				}
+				catch(...)
+				{
+					PMwithUM = "n";
+				}
+
+				while(true) {
+					prompt = "Would you like have User Module Functionality on the Performance Modules? [y,n] (" + PMwithUM + ") > ";
+					pcommand = callReadline(prompt.c_str());
+					if (pcommand)
+					{
+						if (strlen(pcommand) > 0) PMwithUM = pcommand;
+						callFree(pcommand);
+					}
+
+					if ( PMwithUM == "y" || PMwithUM == "n" )
+						break;
+					cout << "Invalid Entry, please enter 'y' for yes or 'n' for no" << endl;
+					PMwithUM = "n";
+					if ( noPrompting )
+						exit(1);
+				}
+
+				if ( PMwithUM == "y" )
+					pmwithum = true;
+
+				try {
+					 sysConfig->setConfig(InstallSection, "PMwithUM", PMwithUM);
+				}
+				catch(...)
+				{}
+
+				mysqlrep = true;
+
+				try {
+					 sysConfig->setConfig(InstallSection, "MySQLRep", "y");
+				}
+				catch(...)
+				{}
+
 				break;
 			}
 		}
@@ -875,7 +940,8 @@ int main(int argc, char *argv[])
 		cout << "ERROR: Failed trying to update InfiniDB System Configuration file" << endl; 
 		exit(1);
 	}
-	
+
+	cout << endl;
 	setSystemName();
 
 	cout << endl;
@@ -1012,42 +1078,24 @@ int main(int argc, char *argv[])
 					exit(1);
 				}
 
-				try{
-					sysinfo(&myinfo);
-				}
-				catch (...) {}
+//				try{
+//					sysinfo(&myinfo);
+//				}
+//				catch (...) {}
 		
 				//get memory stats
-				long long total = myinfo.totalram / 1024 / 1000;
+//				long long total = myinfo.totalram / 1024 / 1000;
 
-				string percent = "25";
+				string percent = "25%";
+
 				if (hdfs) {
-					total = total / 2;
-					percent = "12";
+					percent = "12%";
 				}
 
-				// adjust max memory, 25% of total memory
-				string value;
-
-				if ( total <= 2000 )
-					value = "256M";
-				else if ( total <= 4000 )
-					value = "512M";
-				else if ( total <= 8000 )
-					value = "1G";
-				else if ( total <= 16000 )
-					value = "2G";
-				else if ( total <= 32000 )
-					value = "4G";
-				else if ( total <= 64000 )
-					value = "8G";
-				else
-					value = "16G";
-
-				cout << "      Setting 'TotalUmMemory' to " << percent << "% of total memory (Combined Server Install maximum value is 16G). Value set to " << value << endl;
+				cout << "      Setting 'TotalUmMemory' to " << percent << " of total memory" << endl;
 
 				try {
-					sysConfig->setConfig("HashJoin", "TotalUmMemory", value);
+					sysConfig->setConfig("HashJoin", "TotalUmMemory", percent);
 				}
 				catch(...)
 				{
@@ -1073,7 +1121,7 @@ int main(int argc, char *argv[])
 					
 					string totalUmMemory = sysConfig->getConfig("HashJoin", "TotalUmMemory");
 
-					cout << "      Using previous configuration setting for 'TotalUmMemory' = " << totalUmMemory << endl;
+					cout << "      Using previous configuration setting for 'TotalUmMemory' = " << totalUmMemory <<  endl;
 				}
 				catch(...)
 				{
@@ -1106,42 +1154,23 @@ int main(int argc, char *argv[])
 				else
 					cout << "NOTE: Using the default setting for 'NumBlocksPct' at " << numBlocksPct << "%" << endl;
 
-				try{
-					sysinfo(&myinfo);
-				}
-				catch (...) {}
+//				try{
+//					sysinfo(&myinfo);
+//				}
+//				catch (...) {}
 		
 				//get memory stats
-				long long total = myinfo.totalram / 1024 / 1000;
+//				long long total = myinfo.totalram / 1024 / 1000;
 
-				string percent = "50";
-                if (hdfs) {
-                    total = total / 2;
-                    percent = "12";
-                }	
+				string percent = "50%";
+				if (hdfs) {
+					percent = "12%";
+				}	
 
-				// adjust max memory, 50% of total memory
-				string value;
-			
-				if ( total <= 2000 )
-					value = "512M";
-				else if ( total <= 4000 )
-					value = "1G";
-				else if ( total <= 8000 )
-					value = "2G";
-				else if ( total <= 16000 )
-					value = "4G";
-				else if ( total <= 32000 )
-					value = "8G";
-				else if ( total <= 64000 )
-					value = "16G";
-				else
-					value = "32G";
-			
-				cout << "      Setting 'TotalUmMemory' to " << percent << "% of total memory (Combined Server Install maximum value is 32G). Value set to " << value << endl;
+				cout << "      Setting 'TotalUmMemory' to " << percent << " of total memory" << endl;
 
 				try {
-					sysConfig->setConfig("HashJoin", "TotalUmMemory", value);
+					sysConfig->setConfig("HashJoin", "TotalUmMemory", percent);
 				}
 				catch(...)
 				{
@@ -1166,7 +1195,7 @@ int main(int argc, char *argv[])
 
 					string totalUmMemory = sysConfig->getConfig("HashJoin", "TotalUmMemory");
 
-					cout << "      Using previous configuration setting for 'TotalUmMemory' = " << totalUmMemory << endl;
+					cout << "      Using previous configuration setting for 'TotalUmMemory' = " << totalUmMemory  << endl;
 				}
 				catch(...)
 				{
@@ -1303,6 +1332,9 @@ int main(int argc, char *argv[])
 
 		if ( moduleType == "pm" )
 			pmNumber = moduleCount;
+
+		if ( moduleType == "um" )
+			umNumber = moduleCount;
 
 		int moduleID = 1;
 		while(true) {
@@ -1766,12 +1798,23 @@ int main(int argc, char *argv[])
 			
 							sysConfig->setConfig(Section, "IPAddr", newModuleIPAddr);
 							sysConfig->setConfig(Section, "Port", "8601");
-			
+							sysConfig->setConfig(Section, "Module", parentOAMModuleName);
+
 							//set Performance Module's IP's to first NIC IP entered
 							sysConfig->setConfig("DDLProc", "IPAddr", newModuleIPAddr);
 							sysConfig->setConfig("DMLProc", "IPAddr", newModuleIPAddr);
 						}
 
+						//set User Module's IP Addresses
+						if ( pmwithum ) {
+							string Section = "ExeMgr" + oam.itoa(moduleID+umNumber);
+		
+							sysConfig->setConfig(Section, "IPAddr", newModuleIPAddr);
+							sysConfig->setConfig(Section, "Port", "8601");
+							sysConfig->setConfig(Section, "Module", parentOAMModuleName);
+
+						}
+		
 						//setup rc.local file in module tmp dir
 						if( !makeRClocal(moduleType , newModuleName, IserverTypeInstall) )
 							cout << "makeRClocal error" << endl;
@@ -1800,12 +1843,16 @@ int main(int argc, char *argv[])
 						if ( moduleType == "um" ||
 							( moduleType == "pm" && IserverTypeInstall == oam::INSTALL_COMBINE_DM_UM_PM ) ||
 							( moduleType == "um" && IserverTypeInstall == oam::INSTALL_COMBINE_DM_UM ) ||
-							( moduleType == "pm" && IserverTypeInstall == oam::INSTALL_COMBINE_PM_UM ) ) {
-	
+							( moduleType == "pm" && IserverTypeInstall == oam::INSTALL_COMBINE_PM_UM ) ||
+							( moduleType == "pm" && pmwithum ) ) {
+
 							string Section = "ExeMgr" + oam.itoa(moduleID);
+							if ( moduleType == "pm" && pmwithum )
+								Section = "ExeMgr" + oam.itoa(moduleID+umNumber);
 		
 							sysConfig->setConfig(Section, "IPAddr", newModuleIPAddr);
 							sysConfig->setConfig(Section, "Port", "8601");
+							sysConfig->setConfig(Section, "Module", newModuleName);
 						}
 		
 						//set Performance Module's IP's to first NIC IP entered
@@ -2611,6 +2658,13 @@ int main(int argc, char *argv[])
 		sleep(5);
 	}
 
+	int thread_id = 0;
+
+	pthread_t thr[childmodulelist.size()];
+	
+	/* create a thread_data_t argument array */
+	thread_data_t thr_data[childmodulelist.size()];
+
 	if ( IserverTypeInstall != oam::INSTALL_COMBINE_DM_UM_PM || 
 			pmNumber > 1 ) {
 
@@ -2760,6 +2814,69 @@ int main(int argc, char *argv[])
 				globfree(&gt);
 			}
 
+			//if PM is running with UM functionality
+			// install UM packages and run mysql setup scripts
+			if ( pmwithum ) {
+				//run the mysql / mysqld setup scripts
+				cout << endl << "===== Installing InfiniDB UM Packages and Running the InfiniDB MySQL setup scripts =====" << endl << endl;
+		
+				if ( EEPackageType != "binary") {
+					string cmd = "rpm -Uv --force " + mysqlPackage + " " + mysqldPackage;
+					if ( EEPackageType == "deb" )
+						cmd = "dpkg -i " + mysqlPackage + " " + mysqldPackage;
+					system(cmd.c_str());
+					cout << endl;
+				}
+
+				system("netstat -na | grep '3306 ' | grep LISTEN > /tmp/mysqlport");
+				string fileName = "/tmp/mysqlport";
+				ifstream oldFile (fileName.c_str());
+				if (oldFile) {
+					oldFile.seekg(0, std::ios::end);
+					int size = oldFile.tellg();
+					if ( size != 0 ) {
+						cout << "The mysqld default port of 3306 is already in-use by another mysqld" << endl;
+						cout << "Either change the port number of 3306 in " + installDir + "/mysql/my.cnf" << endl;
+						cout << "Or stop current mysqld version that is running" << endl;
+		
+						while(true)
+						{
+							string answer = "n";
+							pcommand = callReadline("Enter 'y' when a change has been made and you are ready to continue > ");
+							if (pcommand)
+							{
+								if (strlen(pcommand) > 0) answer = pcommand;
+								callFree(pcommand);
+							}
+							if ( answer == "y" )
+								break;
+							else
+								cout << "Invalid Entry, please enter 'y' for yes" << endl;
+							if ( noPrompting )
+								exit(1);
+						}
+					}
+				}
+
+				// rename my.cnf if upgrade
+/*				if ( reuseConfig == "y" ) 
+				{
+					string fileName = installDir + "/mysql/my.cnf.rpmsave";
+					ifstream file (fileName.c_str());
+					if (file) {
+						cout << endl;
+						cout << "Renaming my.cnf.rpmsave to my.cnf" << endl;
+						cout << endl;
+						string cmd = "rm -f " + installDir + "/mysql/my.cnf.idbbackup; mv " + installDir + "/mysql/my.cnf " + installDir + "/mysql/my.cnf.idbbackup; cp " + installDir + "/mysql/my.cnf.rpmsave " + installDir + "/mysql/my.cnf; chown mysql:mysql " + installDir + "/mysql/my.cnf.*";
+						//cout << cmd << endl;
+						system(cmd.c_str());
+					}
+				}
+*/				// call the mysql setup scripts
+				mysqlSetup();
+				sleep(5);
+			}
+
 			cout << endl;
 			cout << "Next step is to enter the password to access the other Servers." << endl;
 			cout << "This is either your password or you can default to using a ssh key" << endl;
@@ -2822,7 +2939,8 @@ int main(int argc, char *argv[])
 				}
 
 				if ( remoteModuleType == "um" ||
-					(remoteModuleType == "pm" && IserverTypeInstall == oam::INSTALL_COMBINE_DM_UM_PM) )
+					(remoteModuleType == "pm" && IserverTypeInstall == oam::INSTALL_COMBINE_DM_UM_PM) ||
+					(remoteModuleType == "pm" && pmwithum) )
 				{
 					cout << endl << "----- Performing Install on '" + remoteModuleName + " / " + remoteHostName + "' -----" << endl << endl;
 
@@ -2836,19 +2954,17 @@ int main(int argc, char *argv[])
 						
 						//run remote installer script
 						string cmd = installDir + "/bin/user_installer.sh " + remoteModuleName + " " + remoteModuleIP + " " + password + " " + calpontPackage1 + " " + calpontPackage2 + " " + calpontPackage3 + " " + mysqlPackage + " " + mysqldPackage + " initial " + EEPackageType + " " + nodeps + " " + temppwprompt + " " + remote_installer_debug + " " + debug_logfile;
-
 						if ( thread_remote_installer == "1" ) {
-							remoteInstallCount++;
-							pthread_t remoteinstallthread;
-							int status = pthread_create (&remoteinstallthread, NULL, (void*(*)(void*)) &remoteInstallThread, &cmd);
+							thr_data[thread_id].command = cmd;
+
+							int status = pthread_create (&thr[thread_id], NULL, (void*(*)(void*)) &remoteInstallThread, &thr_data[thread_id]);
 					
 							if ( status != 0 )
 							{
 								cout << "remoteInstallThread failed for " << remoteModuleName << ", exiting" << endl;
 								exit (1);
 							}
-					
-							sleep(1);
+							thread_id++;
 						}
 						else
 						{
@@ -2934,9 +3050,9 @@ int main(int argc, char *argv[])
 							" " + installDir + " " + debug_logfile;
 
 						if ( thread_remote_installer == "1" ) {
-							remoteInstallCount++;
-							pthread_t remoteinstallthread;
-							int status = pthread_create (&remoteinstallthread, NULL, (void*(*)(void*)) &remoteInstallThread, &cmd);
+							thr_data[thread_id].command = cmd;
+
+							int status = pthread_create (&thr[thread_id], NULL, (void*(*)(void*)) &remoteInstallThread, &thr_data[thread_id]);
 					
 							if ( status != 0 )
 							{
@@ -2944,8 +3060,7 @@ int main(int argc, char *argv[])
 								exit (1);
 							}
 					
-							sleep(1);
-
+							thread_id++;
 						}
 						else
 						{
@@ -2959,7 +3074,8 @@ int main(int argc, char *argv[])
 				}
 				else
 				{
-					if (remoteModuleType == "pm" && IserverTypeInstall != oam::INSTALL_COMBINE_DM_UM_PM)
+					if ( (remoteModuleType == "pm" && IserverTypeInstall != oam::INSTALL_COMBINE_DM_UM_PM) ||
+						(remoteModuleType == "pm" && !pmwithum ) )
 					{
 						cout << endl << "----- Performing Install on '" + remoteModuleName + " / " + remoteHostName + "' -----" << endl << endl;
 
@@ -2971,9 +3087,9 @@ int main(int argc, char *argv[])
 							cmd = installDir + "/bin/performance_installer.sh " + remoteModuleName + " " + remoteModuleIP + " " + password + " " + calpontPackage1 + " " + calpontPackage2 + " " + calpontPackage3 + " " + mysqlPackage + " " + mysqldPackage + " initial " + EEPackageType + " " + nodeps + " " + remote_installer_debug + " " + debug_logfile;
 
 							if ( thread_remote_installer == "1" ) {
-								remoteInstallCount++;
-								pthread_t remoteinstallthread;
-								int status = pthread_create (&remoteinstallthread, NULL, (void*(*)(void*)) &remoteInstallThread, &cmd);
+								thr_data[thread_id].command = cmd;
+
+								int status = pthread_create (&thr[thread_id], NULL, (void*(*)(void*)) &remoteInstallThread, &thr_data[thread_id]);
 						
 								if ( status != 0 )
 								{
@@ -2981,7 +3097,7 @@ int main(int argc, char *argv[])
 									exit (1);
 								}
 						
-								sleep(1);
+								thread_id++;
 							}
 							else
 							{
@@ -3000,9 +3116,9 @@ int main(int argc, char *argv[])
 								debug_logfile;
 
 							if ( thread_remote_installer == "1" ) {
-								remoteInstallCount++;
-								pthread_t remoteinstallthread;
-								int status = pthread_create (&remoteinstallthread, NULL, (void*(*)(void*)) &remoteInstallThread, &cmd);
+								thr_data[thread_id].command = cmd;
+
+								int status = pthread_create (&thr[thread_id], NULL, (void*(*)(void*)) &remoteInstallThread, &thr_data[thread_id]);
 						
 								if ( status != 0 )
 								{
@@ -3010,7 +3126,7 @@ int main(int argc, char *argv[])
 									exit (1);
 								}
 						
-								sleep(1);
+								thread_id++;
 							}
 							else
 							{
@@ -3024,34 +3140,22 @@ int main(int argc, char *argv[])
 					}
 				}
 			}
-		}
-	}
 
-	if ( thread_remote_installer == "1" ) {
-
-		//wait until remove install Thread Count is at zero or hit timeout
-		cout << endl << "InfiniDB Package being installed, please wait .";
-		cout.flush();
-	
-		int wait = 0;
-		while (true)
-		{
-			if ( remoteInstallCount == 0 )
-				break;
-	
-			cout << ".";
-			cout.flush();
-			sleep(10);
-			wait++;
-			// give it 10 minutes to complete
-			if ( wait >= 120 )
-			{
-				cout << "Timed out (10 minutes) waiting for Remote Nodes to be Installed, check logs" << endl;
-				exit (1);
+			if ( thread_remote_installer == "1" ) {
+		
+				//wait until remove install Thread Count is at zero or hit timeout
+				cout << endl << "InfiniDB Package being installed, please wait ...";
+				cout.flush();
+			
+				/* block until all threads complete */
+				for (thread_id = 0; thread_id < (int) childmodulelist.size(); ++thread_id) {
+					pthread_join(thr[thread_id], NULL);
+				}
+		
+				cout << "  DONE" << endl;
 			}
-		}
 
-		cout << " DONE" << endl;
+		}
 	}
 
 	//configure data redundancy
@@ -3220,7 +3324,7 @@ int main(int argc, char *argv[])
 					//run remote command script
 					cout << endl << "----- Starting InfiniDB on '" + remoteModuleName + "' -----" << endl << endl;
 					cmd = installDir + "/bin/remote_command.sh " + remoteModuleIP + " " + password +
-						" '" + installDir + "/bin/infinidb restart' " +  remote_installer_debug;
+						" '" + installDir + "/bin/infinidb restart' 0";
 					int rtnCode = system(cmd.c_str());
 					if (WEXITSTATUS(rtnCode) != 0)
 						cout << "Error with running remote_command.sh" << endl;
@@ -3230,7 +3334,7 @@ int main(int argc, char *argv[])
 		
 				//start InfiniDB on local server
 				cout << endl << "----- Starting InfiniDB on local server -----" << endl << endl;
-				cmd = installDir + "/bin/infinidb restart";
+				cmd = installDir + "/bin/infinidb restart > /dev/null 2>&1";
 				int rtnCode = system(cmd.c_str());
 				if (WEXITSTATUS(rtnCode) != 0) {
 					cout << "Error Starting InfiniDB local module" << endl;
@@ -3275,7 +3379,7 @@ int main(int argc, char *argv[])
 		if ( start == "y" ) {
 			//start InfiniDB on local server
 			cout << endl << "----- Starting InfiniDB on local Server '" + parentOAMModuleName + "' -----" << endl << endl;
-			string cmd = installDir + "/bin/infinidb restart";
+			string cmd = installDir + "/bin/infinidb restart > /dev/null 2>&1";
 			int rtnCode = system(cmd.c_str());
 			if (WEXITSTATUS(rtnCode) != 0) {
 				cout << "Error Starting InfiniDB local module" << endl;
@@ -3308,14 +3412,13 @@ int main(int argc, char *argv[])
 		{
 			if ( oam.checkLogStatus("/tmp/dbbuilder.log", "System catalog appears to exist") ) {
 
-				cout << endl << "Run Upgrade Script..";
+				cout << endl << "Run MySQL Upgrade.. ";
 				cout.flush();
 
 				//send message to procmon's to run upgrade script
-				int status = sendUpgradeRequest(IserverTypeInstall);
+				int status = sendUpgradeRequest(IserverTypeInstall, pmwithum);
 	
 				if ( status != 0 ) {
-					cout << "ERROR: Error return in running the upgrade script, check um's tmp/upgrade.log" << endl;
 					cout << endl << "InfiniDB Install Failed" << endl << endl;
 					exit(1);
 				}
@@ -3328,6 +3431,25 @@ int main(int argc, char *argv[])
 				cout << "Check latest log file in /tmp/dbbuilder.log.*" << endl;
 				exit (1);
 			}
+		}
+
+		//set mysql replication, if needed
+		if ( ( mysqlrep && pmwithum ) || 
+			( mysqlrep && umNumber > 1 ) ||
+			( mysqlrep && pmNumber > 1 && IserverTypeInstall == oam::INSTALL_COMBINE_DM_UM_PM ) ) 
+		{
+			cout << endl << "Run MySQL Replication.. ";
+			cout.flush();
+
+			//send message to procmon's to run upgrade script
+			int status = sendReplicationRequest(IserverTypeInstall);
+
+			if ( status != 0 ) {
+				cout << endl << " InfiniDB Install Failed" << endl << endl;
+				exit(1);
+			}
+			else
+				cout << " DONE" << endl;
 		}
 
 		cout << endl << "InfiniDB Install Successfully Completed, System is Active" << endl << endl;
@@ -5030,19 +5152,17 @@ bool singleServerDBrootSetup()
 
 	return true;
 }
+ 
 
-
-void remoteInstallThread(string cmd)
+void remoteInstallThread(void *arg)
 {
-	string command = cmd;
+  	thread_data_t *data = (thread_data_t *)arg;
 
-	int rtnCode = system(command.c_str());
+	int rtnCode = system((data->command).c_str());
 	if (WEXITSTATUS(rtnCode) != 0) {
 		cout << endl << "Failure with a remote module install, check install log files in /tmp" << endl;
 		exit(1);
 	}
-
-	remoteInstallCount--;
 
 	// exit thread
 	pthread_exit(0);

@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -61,16 +61,18 @@ ColumnOpBulk::~ColumnOpBulk()
 //------------------------------------------------------------------------------
 // Open specified column file
 //------------------------------------------------------------------------------
+// @bug 5572 - HDFS usage: add *.tmp file backup flag
 IDBDataFile* ColumnOpBulk::openFile(const WriteEngine::Column& column,
     uint16_t     dbRoot,
     uint32_t     partition,
     uint16_t     segment,
     std::string& segFile,
+    bool         useTmpSuffix,
     const char*  mode,
     int          ioBuffSize) const
 {
     return FileOp::openFile(column.dataFile.fid, dbRoot, partition, segment,
-        segFile, mode, column.colWidth);
+        segFile, mode, column.colWidth, useTmpSuffix);
 }
 
 //------------------------------------------------------------------------------

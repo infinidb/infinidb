@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -75,7 +75,7 @@ namespace
 
 
 // construct a pcolstep from column key
-void tupleKeyToProjectStep(uint key, JobStepVector& jsv, JobInfo& jobInfo)
+void tupleKeyToProjectStep(uint32_t key, JobStepVector& jsv, JobInfo& jobInfo)
 {
 	// this JSA is for pcolstep construct, is not taking input/output
 	// because the pcolstep is to be added into TBPS
@@ -86,7 +86,7 @@ void tupleKeyToProjectStep(uint key, JobStepVector& jsv, JobInfo& jobInfo)
 	if (mit != jobInfo.keyInfo->dictOidToColOid.end())
 	{
 		oid = mit->second;
-		for (map<uint, uint>::iterator i = jobInfo.keyInfo->dictKeyMap.begin();
+		for (map<uint32_t, uint32_t>::iterator i = jobInfo.keyInfo->dictKeyMap.begin();
 				i != jobInfo.keyInfo->dictKeyMap.end();
 				i++)
 		{
@@ -111,8 +111,13 @@ void tupleKeyToProjectStep(uint key, JobStepVector& jsv, JobInfo& jobInfo)
 	CalpontSystemCatalog::ColType ct = jobInfo.keyInfo->colType[key];
 	if (jobInfo.keyInfo->token2DictTypeMap.find(key) != jobInfo.keyInfo->token2DictTypeMap.end())
 		ct = jobInfo.keyInfo->token2DictTypeMap[key];
+	uint32_t pt = jobInfo.keyInfo->pseudoType[key];
 
-	SJSTEP sjs(new pColStep(oid, tableOid, ct, jobInfo));
+	SJSTEP sjs;
+	if (pt == 0)
+		sjs.reset(new pColStep(oid, tableOid, ct, jobInfo));
+	else
+		sjs.reset(new PseudoColStep(oid, tableOid, pt, ct, jobInfo));
 	sjs->alias(jobInfo.keyInfo->tupleKeyVec[key].fTable);
 	sjs->view(jobInfo.keyInfo->tupleKeyVec[key].fView);
 	sjs->schema(jobInfo.keyInfo->tupleKeyVec[key].fSchema);
@@ -122,14 +127,14 @@ void tupleKeyToProjectStep(uint key, JobStepVector& jsv, JobInfo& jobInfo)
 	jsv.push_back(sjs);
 
 	bool tokenOnly = false;
-	map<uint, bool>::iterator toIt = jobInfo.tokenOnly.find(key);
+	map<uint32_t, bool>::iterator toIt = jobInfo.tokenOnly.find(key);
 	if (toIt != jobInfo.tokenOnly.end())
 		tokenOnly = toIt->second;
 
 	if (sjs.get()->isDictCol() && !tokenOnly)
 	{
 		// Need a dictionary step
-		uint dictKey = jobInfo.keyInfo->dictKeyMap[key];
+		uint32_t dictKey = jobInfo.keyInfo->dictKeyMap[key];
 		CalpontSystemCatalog::OID dictOid = jobInfo.keyInfo->tupleKeyVec[dictKey].fId;
 		sjs.reset(new pDictionaryStep(dictOid, tableOid, ct, jobInfo));
 		sjs->alias(jobInfo.keyInfo->tupleKeyVec[dictKey].fTable);
@@ -145,8 +150,8 @@ void tupleKeyToProjectStep(uint key, JobStepVector& jsv, JobInfo& jobInfo)
 }
 
 
-inline void addColumnToRG(uint tid, uint cid, vector<uint>& pos, vector<uint>& oids,
-	vector<uint>& keys, vector<uint>& scale, vector<uint>& precision,
+inline void addColumnToRG(uint32_t tid, uint32_t cid, vector<uint32_t>& pos, vector<uint32_t>& oids,
+	vector<uint32_t>& keys, vector<uint32_t>& scale, vector<uint32_t>& precision,
 	vector<CalpontSystemCatalog::ColDataType>& types, JobInfo& jobInfo)
 {
 	TupleInfo ti(getTupleInfo(tid, cid, jobInfo));
@@ -159,8 +164,8 @@ inline void addColumnToRG(uint tid, uint cid, vector<uint>& pos, vector<uint>& o
 }
 
 
-inline void addColumnInExpToRG(uint tid, uint cid, vector<uint>& pos, vector<uint>& oids,
-	vector<uint>& keys, vector<uint>& scale, vector<uint>& precision,
+inline void addColumnInExpToRG(uint32_t tid, uint32_t cid, vector<uint32_t>& pos, vector<uint32_t>& oids,
+	vector<uint32_t>& keys, vector<uint32_t>& scale, vector<uint32_t>& precision,
 	vector<CalpontSystemCatalog::ColDataType>& types, JobInfo& jobInfo)
 {
 	if (jobInfo.keyInfo->dictKeyMap.find(cid) != jobInfo.keyInfo->dictKeyMap.end())
@@ -171,34 +176,34 @@ inline void addColumnInExpToRG(uint tid, uint cid, vector<uint>& pos, vector<uin
 }
 
 
-inline void addColumnsToRG(uint tid, vector<uint>& pos, vector<uint>& oids,
-	vector<uint>& keys, vector<uint>& scale, vector<uint>& precision,
+inline void addColumnsToRG(uint32_t tid, vector<uint32_t>& pos, vector<uint32_t>& oids,
+	vector<uint32_t>& keys, vector<uint32_t>& scale, vector<uint32_t>& precision,
 	vector<CalpontSystemCatalog::ColDataType>& types,
 	TableInfoMap& tableInfoMap, JobInfo& jobInfo)
 {
 	// -- the selected columns
-	vector<uint>& pjCol = tableInfoMap[tid].fProjectCols;
+	vector<uint32_t>& pjCol = tableInfoMap[tid].fProjectCols;
 	for (unsigned i = 0; i < pjCol.size(); i++)
 	{
 		addColumnToRG(tid, pjCol[i], pos, oids, keys, scale, precision, types, jobInfo);
 	}
 
 	// -- any columns will be used in cross-table exps
-	vector<uint>& exp2 = tableInfoMap[tid].fColsInExp2;
+	vector<uint32_t>& exp2 = tableInfoMap[tid].fColsInExp2;
 	for (unsigned i = 0; i < exp2.size(); i++)
 	{
 		addColumnInExpToRG(tid, exp2[i], pos, oids, keys, scale, precision, types, jobInfo);
 	}
 
 	// -- any columns will be used in returned exps
-	vector<uint>& expr = tableInfoMap[tid].fColsInRetExp;
+	vector<uint32_t>& expr = tableInfoMap[tid].fColsInRetExp;
 	for (unsigned i = 0; i < expr.size(); i++)
 	{
 		addColumnInExpToRG(tid, expr[i], pos, oids, keys, scale, precision, types, jobInfo);
 	}
 
 	// -- any columns will be used in final outer join expression
-	vector<uint>& expo = tableInfoMap[tid].fColsInOuter;
+	vector<uint32_t>& expo = tableInfoMap[tid].fColsInOuter;
 	for (unsigned i = 0; i < expo.size(); i++)
 	{
 		addColumnInExpToRG(tid, expo[i], pos, oids, keys, scale, precision, types, jobInfo);
@@ -206,15 +211,15 @@ inline void addColumnsToRG(uint tid, vector<uint>& pos, vector<uint>& oids,
 }
 
 
-void constructJoinedRowGroup(RowGroup& rg, uint large, uint prev, bool root,
-	set<uint>& tableSet, TableInfoMap& tableInfoMap, JobInfo& jobInfo)
+void constructJoinedRowGroup(RowGroup& rg, uint32_t large, uint32_t prev, bool root,
+	set<uint32_t>& tableSet, TableInfoMap& tableInfoMap, JobInfo& jobInfo)
 {
 	// Construct the output rowgroup for the join.
-	vector<uint> pos;
-	vector<uint> oids;
-	vector<uint> keys;
-	vector<uint> scale;
-	vector<uint> precision;
+	vector<uint32_t> pos;
+	vector<uint32_t> oids;
+	vector<uint32_t> keys;
+	vector<uint32_t> scale;
+	vector<uint32_t> precision;
 	vector<CalpontSystemCatalog::ColDataType> types;
 	pos.push_back(2);
 
@@ -223,13 +228,13 @@ void constructJoinedRowGroup(RowGroup& rg, uint large, uint prev, bool root,
 	//    [loop throuh the key list to support compound join]
 	if (root == false)  // not root
 	{
-		vector<uint>& joinKeys = jobInfo.tableJoinMap[make_pair(large, prev)].fLeftKeys;
-		for (vector<uint>::iterator i = joinKeys.begin(); i != joinKeys.end(); i++)
+		vector<uint32_t>& joinKeys = jobInfo.tableJoinMap[make_pair(large, prev)].fLeftKeys;
+		for (vector<uint32_t>::iterator i = joinKeys.begin(); i != joinKeys.end(); i++)
 			addColumnToRG(large, *i, pos, oids, keys, scale, precision, types, jobInfo);
 	}
 
 	// -- followed by the columns in select or expression
-	for (set<uint>::iterator i = tableSet.begin(); i != tableSet.end(); i++)
+	for (set<uint32_t>::iterator i = tableSet.begin(); i != tableSet.end(); i++)
 		addColumnsToRG(*i, pos, oids, keys, scale, precision, types, tableInfoMap, jobInfo);
 
 	RowGroup tmpRg(oids.size(), pos, oids, keys, types, scale, precision, jobInfo.stringTableThreshold);
@@ -237,32 +242,32 @@ void constructJoinedRowGroup(RowGroup& rg, uint large, uint prev, bool root,
 }
 
 
-void constructJoinedRowGroup(RowGroup& rg, set<uint>& tableSet, TableInfoMap& tableInfoMap,
+void constructJoinedRowGroup(RowGroup& rg, set<uint32_t>& tableSet, TableInfoMap& tableInfoMap,
 	JobInfo& jobInfo)
 {
 	// Construct the output rowgroup for the join.
-	vector<uint> pos;
-	vector<uint> oids;
-	vector<uint> keys;
-	vector<uint> scale;
-	vector<uint> precision;
+	vector<uint32_t> pos;
+	vector<uint32_t> oids;
+	vector<uint32_t> keys;
+	vector<uint32_t> scale;
+	vector<uint32_t> precision;
 	vector<CalpontSystemCatalog::ColDataType> types;
 	pos.push_back(2);
 
-	for (set<uint>::iterator i = tableSet.begin(); i != tableSet.end(); i++)
+	for (set<uint32_t>::iterator i = tableSet.begin(); i != tableSet.end(); i++)
 	{
 		// columns in select or expression
 		addColumnsToRG(*i, pos, oids, keys, scale, precision, types, tableInfoMap, jobInfo);
 
 		// keys to be joined if not already in the rowgroup
-		vector<uint>& adjList = tableInfoMap[*i].fAdjacentList;
-		for (vector<uint>::iterator j = adjList.begin(); j != adjList.end(); j++)
+		vector<uint32_t>& adjList = tableInfoMap[*i].fAdjacentList;
+		for (vector<uint32_t>::iterator j = adjList.begin(); j != adjList.end(); j++)
 		{
 			if (find(tableSet.begin(), tableSet.end(), *j) == tableSet.end())
 			{
 				// not joined
-				vector<uint>& joinKeys = jobInfo.tableJoinMap[make_pair(*i, *j)].fLeftKeys;
-				for (vector<uint>::iterator k = joinKeys.begin(); k != joinKeys.end(); k++)
+				vector<uint32_t>& joinKeys = jobInfo.tableJoinMap[make_pair(*i, *j)].fLeftKeys;
+				for (vector<uint32_t>::iterator k = joinKeys.begin(); k != joinKeys.end(); k++)
 				{
 					if (find(keys.begin(), keys.end(), *k) == keys.end())
 						addColumnToRG(*i, *k, pos, oids, keys, scale, precision, types, jobInfo);
@@ -281,12 +286,12 @@ void updateExp2Cols(JobStepVector& expSteps, TableInfoMap& tableInfoMap, JobInfo
 	for (JobStepVector::iterator it = expSteps.begin(); it != expSteps.end(); it++)
 	{
 		ExpressionStep* exps = dynamic_cast<ExpressionStep*>(it->get());
-		const vector<uint>& tables = exps->tableKeys();
-		const vector<uint>& columns = exps->columnKeys();
+		const vector<uint32_t>& tables = exps->tableKeys();
+		const vector<uint32_t>& columns = exps->columnKeys();
 		for (uint64_t i = 0; i < tables.size(); ++i)
 		{
-			vector<uint>& exp2 = tableInfoMap[tables[i]].fColsInExp2;
-			vector<uint>::iterator cit = find(exp2.begin(), exp2.end(), columns[i]);
+			vector<uint32_t>& exp2 = tableInfoMap[tables[i]].fColsInExp2;
+			vector<uint32_t>::iterator cit = find(exp2.begin(), exp2.end(), columns[i]);
 			if (cit != exp2.end())
 				exp2.erase(cit);
 		}
@@ -310,11 +315,11 @@ void adjustLastStep(JobStepVector& querySteps, DeliveredTableMap& deliverySteps,
 
 	// Construct a rowgroup that matches the select columns
 	TupleInfoVector v = jobInfo.pjColList;
-	vector<uint> pos;
-	vector<uint> oids;
-	vector<uint> keys;
-	vector<uint> scale;
-	vector<uint> precision;
+	vector<uint32_t> pos;
+	vector<uint32_t> oids;
+	vector<uint32_t> keys;
+	vector<uint32_t> scale;
+	vector<uint32_t> precision;
 	vector<CalpontSystemCatalog::ColDataType> types;
 	pos.push_back(2);
 
@@ -342,7 +347,7 @@ void adjustLastStep(JobStepVector& querySteps, DeliveredTableMap& deliverySteps,
 		types.clear();
 		pos.push_back(2);
 
-		const vector<uint>& keys0 = rg0->getKeys();
+		const vector<uint32_t>& keys0 = rg0->getKeys();
 		for (unsigned i = 0; i < v.size(); i++)
 		{
 			if (find(keys0.begin(), keys0.end(), v[i].key) == keys0.end())
@@ -361,7 +366,7 @@ void adjustLastStep(JobStepVector& querySteps, DeliveredTableMap& deliverySteps,
 		RowGroup rg01 = *rg0 + RowGroup(oids.size(), pos, oids, keys, types, scale, precision, jobInfo.stringTableThreshold);
 		if (jobInfo.trace) cout << "Output RowGroup 01: " << rg01.toString() << endl;
 
-		map<uint, uint> keyToIndexMap0;  // maps key to the index in the input RG
+		map<uint32_t, uint32_t> keyToIndexMap0;  // maps key to the index in the input RG
 		for (uint64_t i = 0; i < rg01.getKeys().size(); ++i)
 			keyToIndexMap0.insert(make_pair(rg01.getKeys()[i], i));
 
@@ -552,32 +557,32 @@ void addProjectStepsToBps(TableInfoMap::iterator& mit, BatchPrimitive* bps, JobI
 		throw runtime_error("BPS is null");
 
 	// construct a pcolstep for each joinkey to be projected
-	vector<uint>& joinKeys = mit->second.fJoinKeys;
+	vector<uint32_t>& joinKeys = mit->second.fJoinKeys;
 	JobStepVector keySteps;
-	for (vector<uint>::iterator kit = joinKeys.begin(); kit != joinKeys.end(); kit++)
+	for (vector<uint32_t>::iterator kit = joinKeys.begin(); kit != joinKeys.end(); kit++)
 		tupleKeyToProjectStep(*kit, keySteps, jobInfo);
 
 	// construct pcolstep for columns in expresssions
 	JobStepVector expSteps;
-	vector<uint>& exp1 = mit->second.fColsInExp1;
-	for (vector<uint>::iterator kit = exp1.begin(); kit != exp1.end(); kit++)
+	vector<uint32_t>& exp1 = mit->second.fColsInExp1;
+	for (vector<uint32_t>::iterator kit = exp1.begin(); kit != exp1.end(); kit++)
 		tupleKeyToProjectStep(*kit, expSteps, jobInfo);
-	vector<uint>& exp2 = mit->second.fColsInExp2;
-	for (vector<uint>::iterator kit = exp2.begin(); kit != exp2.end(); kit++)
+	vector<uint32_t>& exp2 = mit->second.fColsInExp2;
+	for (vector<uint32_t>::iterator kit = exp2.begin(); kit != exp2.end(); kit++)
 		tupleKeyToProjectStep(*kit, expSteps, jobInfo);
-	vector<uint>& expRet = mit->second.fColsInRetExp;
-	for (vector<uint>::iterator kit = expRet.begin(); kit != expRet.end(); kit++)
+	vector<uint32_t>& expRet = mit->second.fColsInRetExp;
+	for (vector<uint32_t>::iterator kit = expRet.begin(); kit != expRet.end(); kit++)
 		tupleKeyToProjectStep(*kit, expSteps, jobInfo);
-	vector<uint>& expOut = mit->second.fColsInOuter;
-	for (vector<uint>::iterator kit = expOut.begin(); kit != expOut.end(); kit++)
+	vector<uint32_t>& expOut = mit->second.fColsInOuter;
+	for (vector<uint32_t>::iterator kit = expOut.begin(); kit != expOut.end(); kit++)
 		tupleKeyToProjectStep(*kit, expSteps, jobInfo);
 
 	// for output rowgroup
-	vector<uint> pos;
-	vector<uint> oids;
-	vector<uint> keys;
-	vector<uint> scale;
-	vector<uint> precision;
+	vector<uint32_t> pos;
+	vector<uint32_t> oids;
+	vector<uint32_t> keys;
+	vector<uint32_t> scale;
+	vector<uint32_t> precision;
 	vector<CalpontSystemCatalog::ColDataType> types;
 	pos.push_back(2);
 
@@ -585,19 +590,19 @@ void addProjectStepsToBps(TableInfoMap::iterator& mit, BatchPrimitive* bps, JobI
 	JobStepVector psv = mit->second.fProjectSteps;             // columns being selected
 	psv.insert(psv.begin(), keySteps.begin(), keySteps.end()); // add joinkeys to project
 	psv.insert(psv.end(), expSteps.begin(), expSteps.end());   // add expressions to project
-	set<uint> seenCols;                                        // columns already processed
+	set<uint32_t> seenCols;                                        // columns already processed
 
 	// for passthru conversion
-	// passthru is disabled (default lastOid to -1) unless the TupleBPS::bop is BOP_AND.
-	CalpontSystemCatalog::OID lastOid = -1;
+	// passthru is disabled (default lastTupleId to -1) unless the TupleBPS::bop is BOP_AND.
+	uint64_t lastTupleId = -1;
 	TupleBPS* tbps = dynamic_cast<TupleBPS*>(bps);
 	if (tbps != NULL && tbps->getBOP() == BOP_AND && exp1.size() == 0)
-		lastOid = tbps->getLastOid();
+		lastTupleId = tbps->getLastTupleId();
 
 	for (JobStepVector::iterator it = psv.begin(); it != psv.end(); it++)
 	{
 		JobStep* js = it->get();
-		uint tupleKey = js->tupleId();
+		uint32_t tupleKey = js->tupleId();
 		if (seenCols.find(tupleKey) != seenCols.end())
 			continue;
 
@@ -606,9 +611,11 @@ void addProjectStepsToBps(TableInfoMap::iterator& mit, BatchPrimitive* bps, JobI
 
 		// if the projected column is the last accessed predicate
 		pColStep* pcol = dynamic_cast<pColStep*>(js);
-		if (pcol != NULL && js->oid() == lastOid)
+		if (pcol != NULL && js->tupleId() == lastTupleId)
 		{
 			PassThruStep* pts = new PassThruStep(*pcol);
+			if (dynamic_cast<PseudoColStep*>(pcol))
+				pts->pseudoType(dynamic_cast<PseudoColStep*>(pcol)->pseudoColumnId());
 			pts->alias(pcol->alias());
 			pts->view(pcol->view());
 			pts->name(pcol->name());
@@ -618,7 +625,7 @@ void addProjectStepsToBps(TableInfoMap::iterator& mit, BatchPrimitive* bps, JobI
 
 		// add projected column to TBPS
 		bool tokenOnly = false;
-		map<uint, bool>::iterator toIt = jobInfo.tokenOnly.find(js->tupleId());
+		map<uint32_t, bool>::iterator toIt = jobInfo.tokenOnly.find(js->tupleId());
 		if (toIt != jobInfo.tokenOnly.end())
 			tokenOnly = toIt->second;
 		if (it->get()->isDictCol() && !tokenOnly)
@@ -629,9 +636,9 @@ void addProjectStepsToBps(TableInfoMap::iterator& mit, BatchPrimitive* bps, JobI
 			bps->setProjectBPP(it->get(),(it+1)->get());
 
 			// this is a two-step project step, remove the token step from id vector
-			vector<uint>& pjv = mit->second.fProjectCols;
-			uint tokenKey = js->tupleId();
-			for (vector<uint>::iterator i = pjv.begin(); i != pjv.end(); ++i)
+			vector<uint32_t>& pjv = mit->second.fProjectCols;
+			uint32_t tokenKey = js->tupleId();
+			for (vector<uint32_t>::iterator i = pjv.begin(); i != pjv.end(); ++i)
 			{
 				if (*i == tokenKey)
 				{
@@ -690,9 +697,9 @@ void addExpresssionStepsToBps(TableInfoMap::iterator& mit, SJSTEP& sjsp, JobInfo
 	{
 		if (tableOid > 0)
 		{
-			uint key0 = exp0->columnKey();
+			uint32_t key0 = exp0->columnKey();
 			CalpontSystemCatalog::ColType ct = jobInfo.keyInfo->colType[key0];
-			map<uint, CalpontSystemCatalog::ColType>::iterator dkMit;
+			map<uint32_t, CalpontSystemCatalog::ColType>::iterator dkMit;
 			if (jobInfo.keyInfo->token2DictTypeMap.find(key0) !=
 				jobInfo.keyInfo->token2DictTypeMap.end())
 				ct = jobInfo.keyInfo->token2DictTypeMap[key0];
@@ -722,20 +729,20 @@ void addExpresssionStepsToBps(TableInfoMap::iterator& mit, SJSTEP& sjsp, JobInfo
 	}
 
 	// rowgroup for evaluating the expression
-	vector<uint> pos;
-	vector<uint> oids;
-	vector<uint> keys;
-	vector<uint> scale;
-	vector<uint> precision;
+	vector<uint32_t> pos;
+	vector<uint32_t> oids;
+	vector<uint32_t> keys;
+	vector<uint32_t> scale;
+	vector<uint32_t> precision;
 	vector<CalpontSystemCatalog::ColDataType> types;
 	pos.push_back(2);
 
-	vector<uint>& cols = mit->second.fColsInExp1;
-	uint index = 0;                 // index in the rowgroup
-	map<uint, uint> keyToIndexMap;  // maps key to the index in the RG
-	for (vector<uint>::iterator kit = cols.begin(); kit != cols.end(); kit++)
+	vector<uint32_t>& cols = mit->second.fColsInExp1;
+	uint32_t index = 0;                 // index in the rowgroup
+	map<uint32_t, uint32_t> keyToIndexMap;  // maps key to the index in the RG
+	for (vector<uint32_t>::iterator kit = cols.begin(); kit != cols.end(); kit++)
 	{
-		uint key = *kit;
+		uint32_t key = *kit;
 		if (jobInfo.keyInfo->dictKeyMap.find(key) != jobInfo.keyInfo->dictKeyMap.end())
 			key = jobInfo.keyInfo->dictKeyMap[key];
 
@@ -767,7 +774,7 @@ void addExpresssionStepsToBps(TableInfoMap::iterator& mit, SJSTEP& sjsp, JobInfo
 	{
 		ExpressionStep* e = dynamic_cast<ExpressionStep*>(it->get());
 		e->updateInputIndex(keyToIndexMap, jobInfo);
-		shared_ptr<ParseTree> sppt(new ParseTree);
+		boost::shared_ptr<ParseTree> sppt(new ParseTree);
 		sppt->copyTree(*(e->expressionFilter()));
 		bps->addFcnExpGroup1(sppt);
 	}
@@ -788,7 +795,7 @@ bool combineJobStepsByTable(TableInfoMap::iterator& mit, JobInfo& jobInfo)
 		if (qsv.size() == 0)
 		{
 			// find a column in FE1, FE2, or FE3
-			uint key = -1;
+			uint32_t key = -1;
 			if (tableInfo.fColsInExp1.size() > 0)
 				key = tableInfo.fColsInExp1[0];
 			else if (tableInfo.fColsInExp2.size() > 0)
@@ -804,14 +811,8 @@ bool combineJobStepsByTable(TableInfoMap::iterator& mit, JobInfo& jobInfo)
 
 			// construct a pcolscanstep to initialize the tbps
 			CalpontSystemCatalog::OID oid = jobInfo.keyInfo->tupleKeyVec[key].fId;
-			JobStepAssociation dummyJsa;
-			AnyDataListSPtr adl(new AnyDataList());
-			RowGroupDL* dl = new RowGroupDL(1, jobInfo.fifoSize);
-			dl->OID(oid);
-			adl->rowGroupDL(dl);
-			dummyJsa.outAdd(adl);
 			CalpontSystemCatalog::ColType ct = jobInfo.keyInfo->colType[key];
-			map<uint, CalpontSystemCatalog::ColType>::iterator dkMit;
+			map<uint32_t, CalpontSystemCatalog::ColType>::iterator dkMit;
 			if (jobInfo.keyInfo->token2DictTypeMap.find(key) !=
 				jobInfo.keyInfo->token2DictTypeMap.end())
 				ct = jobInfo.keyInfo->token2DictTypeMap[key];
@@ -867,29 +868,29 @@ bool combineJobStepsByTable(TableInfoMap::iterator& mit, JobInfo& jobInfo)
 			unsigned itInc = 1;               // iterator increase number
 			unsigned numOfStepsAddToBps = 0;  // # steps to be added into TBPS
 			if ((distance(it, end) > 2 &&
-				 typeid(*(it->get())) == typeid(pDictionaryScan) &&
-				 (typeid(*((it + 1)->get())) == typeid(pColScanStep) ||
-				 typeid(*((it + 1)->get())) == typeid(pColStep)) &&
-				 typeid(*((it + 2)->get())) == typeid(TupleHashJoinStep)) ||
+				 dynamic_cast<pDictionaryScan*>(it->get()) != NULL &&
+				 (dynamic_cast<pColScanStep*>((it + 1)->get()) != NULL ||
+				  dynamic_cast<pColStep*>((it + 1)->get()) != NULL) &&
+				 dynamic_cast<TupleHashJoinStep*>((it + 2)->get()) != NULL) ||
 				(distance(it, end) > 1 &&
-				 typeid(*(it->get())) == typeid(pDictionaryScan) &&
-				 typeid(*((it + 1)->get())) == typeid(TupleHashJoinStep)))
+				 dynamic_cast<pDictionaryScan*>(it->get()) != NULL &&
+				 dynamic_cast<TupleHashJoinStep*>((it + 1)->get()) != NULL))
 			{
 				// string access predicate
 				// setup pDictionaryScan
 				pDictionaryScan* pds = dynamic_cast<pDictionaryScan*>(it->get());
-				vector<uint> pos;
-				vector<uint> oids;
-				vector<uint> keys;
-				vector<uint> scale;
-				vector<uint> precision;
+				vector<uint32_t> pos;
+				vector<uint32_t> oids;
+				vector<uint32_t> keys;
+				vector<uint32_t> scale;
+				vector<uint32_t> precision;
 				vector<CalpontSystemCatalog::ColDataType> types;
 				pos.push_back(2);
 
 				pos.push_back(2 + 8);
 				CalpontSystemCatalog::OID coid = jobInfo.keyInfo->dictOidToColOid[pds->oid()];
 				oids.push_back(coid);
-				uint keyId = pds->tupleId();
+				uint32_t keyId = pds->tupleId();
 				keys.push_back(keyId);
 				types.push_back(CalpontSystemCatalog::BIGINT);
 				scale.push_back(0);
@@ -911,55 +912,55 @@ bool combineJobStepsByTable(TableInfoMap::iterator& mit, JobInfo& jobInfo)
 				numOfStepsAddToBps = 0;
 			}
 			else if (distance(begin, it) > 1 &&
-				(typeid(*((it-1)->get())) == typeid(pDictionaryScan) ||
-				 typeid(*((it-2)->get())) == typeid(pDictionaryScan)) &&
-				typeid(*(it->get())) == typeid(TupleHashJoinStep))
+				(dynamic_cast<pDictionaryScan*>((it-1)->get()) != NULL ||
+				 dynamic_cast<pDictionaryScan*>((it-2)->get()) != NULL) &&
+				dynamic_cast<TupleHashJoinStep*>(it->get()) != NULL)
 			{
 				// save the token join to the last, by pdsInfo
 				itInc = 1;
 				numOfStepsAddToBps = 0;
 			}
 			else if (distance(it, end) > 2 &&
-				typeid(*((it + 1)->get())) == typeid(pColStep) &&
-				typeid(*((it + 2)->get())) == typeid(FilterStep))
+				dynamic_cast<pColStep*>((it + 1)->get()) != NULL &&
+				dynamic_cast<FilterStep*>((it + 2)->get()) != NULL)
 			{
 				itInc = 3;
 				numOfStepsAddToBps = 3;
 			}
 			else if (distance(it, end) > 3 &&
-				typeid(*((it + 1)->get())) == typeid(pColStep) &&
-				typeid(*((it + 2)->get())) == typeid(pDictionaryStep) &&
-				typeid(*((it + 3)->get())) == typeid(FilterStep))
+				dynamic_cast<pColStep*>((it + 1)->get()) != NULL &&
+				dynamic_cast<pDictionaryStep*>((it + 2)->get()) != NULL &&
+				dynamic_cast<FilterStep*>((it + 3)->get()) != NULL)
 			{
 				itInc = 4;
 				numOfStepsAddToBps = 4;
 			}
 			else if (distance(it, end) > 3 &&
-				typeid(*((it + 1)->get())) == typeid(pDictionaryStep) &&
-				typeid(*((it + 2)->get())) == typeid(pColStep) &&
-				typeid(*((it + 3)->get())) == typeid(FilterStep))
+				dynamic_cast<pDictionaryStep*>((it + 1)->get()) != NULL &&
+				dynamic_cast<pColStep*>((it + 2)->get()) != NULL &&
+				dynamic_cast<FilterStep*>((it + 3)->get()) != NULL)
 			{
 				itInc = 4;
 				numOfStepsAddToBps = 4;
 			}
 			else if (distance(it, end) > 4 &&
-				typeid(*((it + 1)->get())) == typeid(pDictionaryStep) &&
-				typeid(*((it + 2)->get())) == typeid(pColStep) &&
-				typeid(*((it + 3)->get())) == typeid(pDictionaryStep) &&
-				typeid(*((it + 4)->get())) == typeid(FilterStep))
+				dynamic_cast<pDictionaryStep*>((it + 1)->get()) != NULL &&
+				dynamic_cast<pColStep*>((it + 2)->get()) != NULL &&
+				dynamic_cast<pDictionaryStep*>((it + 3)->get()) != NULL &&
+				dynamic_cast<FilterStep*>((it + 4)->get()) != NULL)
 			{
 				itInc = 5;
 				numOfStepsAddToBps = 5;
 			}
 			else if (distance(it, end) > 1 &&
-				(typeid(*(it->get())) == typeid(pColStep) ||
-				 typeid(*(it->get())) == typeid(pColScanStep)) &&
-				typeid(*((it + 1)->get())) == typeid(pDictionaryStep))
+				(dynamic_cast<pColStep*>(it->get()) != NULL ||
+				 dynamic_cast<pColScanStep*>(it->get()) != NULL) &&
+				dynamic_cast<pDictionaryStep*>((it + 1)->get()) != NULL)
 			{
 				itInc = 2;
 				numOfStepsAddToBps = 2;
 			}
-			else if (typeid(*(it->get())) == typeid(pColStep))
+			else if (dynamic_cast<pColStep*>(it->get()) != NULL)
 			{
 				pColStep* pcol = dynamic_cast<pColStep*>(it->get());
 				if (pcol->getFilters().size() == 0)
@@ -974,7 +975,7 @@ bool combineJobStepsByTable(TableInfoMap::iterator& mit, JobInfo& jobInfo)
 
 				itInc = 1;
 			}
-			else if (typeid(*(it->get())) == typeid(pColScanStep))
+			else if (dynamic_cast<pColScanStep*>(it->get()) != NULL)
 			{
 				numOfStepsAddToBps = 1;
 				itInc = 1;
@@ -995,7 +996,7 @@ bool combineJobStepsByTable(TableInfoMap::iterator& mit, JobInfo& jobInfo)
 			{
 				bps->setBPP((it+i)->get());
 				bps->setStepCount();
-				bps->setLastOid((it+i)->get()->oid());
+				bps->setLastTupleId((it+i)->get()->tupleId());
 			}
 
 			it += itInc;
@@ -1044,18 +1045,18 @@ bool combineJobStepsByTable(TableInfoMap::iterator& mit, JobInfo& jobInfo)
 			// input jobstepassociation
 			// 1.  small sides -- pdictionaryscan steps
 			vector<RowGroup> rgPdsVec;
-			map<uint, uint> addedCol;
+			map<uint32_t, uint32_t> addedCol;
 			vector<JoinType> jointypes;
 			vector<bool> typeless;
-			vector<vector<uint> > smallKeyIndices;
-			vector<vector<uint> > largeKeyIndices;
+			vector<vector<uint32_t> > smallKeyIndices;
+			vector<vector<uint32_t> > largeKeyIndices;
 			vector<string> tableNames;
 			JobStepAssociation inJsa;
 			for (vector<DictionaryScanInfo>::iterator i = pdsVec.begin(); i != pdsVec.end(); i++)
 			{
 				// add the token steps to the TBPS
-				uint tupleKey = i->fTokenId;
-				map<uint, uint>::iterator k = addedCol.find(tupleKey);
+				uint32_t tupleKey = i->fTokenId;
+				map<uint32_t, uint32_t>::iterator k = addedCol.find(tupleKey);
 				unsigned largeSideIndex = rgTbps.getColumnCount();
 				if (k == addedCol.end())
 				{
@@ -1084,8 +1085,8 @@ bool combineJobStepsByTable(TableInfoMap::iterator& mit, JobInfo& jobInfo)
 				rgPdsVec.push_back(i->fRowGroup);
 				jointypes.push_back(INNER);
 				typeless.push_back(false);
-				smallKeyIndices.push_back(vector<uint>(1, 0));
-				largeKeyIndices.push_back(vector<uint>(1, largeSideIndex));
+				smallKeyIndices.push_back(vector<uint32_t>(1, 0));
+				largeKeyIndices.push_back(vector<uint32_t>(1, largeSideIndex));
 			}
 
 			// 2. large side
@@ -1167,7 +1168,7 @@ void spanningTreeCheck(TableInfoMap& tableInfoMap, JobInfo& jobInfo)
 		for (TableInfoMap::iterator i = tableInfoMap.begin(); i != tableInfoMap.end(); i++)
 		{
 			cout << i->first << " :";
-			vector<uint>::iterator j = i->second.fAdjacentList.begin();
+			vector<uint32_t>::iterator j = i->second.fAdjacentList.begin();
 			while (j != i->second.fAdjacentList.end())
 				cout << " " << *j++;
 			cout << endl;
@@ -1184,13 +1185,13 @@ void spanningTreeCheck(TableInfoMap& tableInfoMap, JobInfo& jobInfo)
 	else if (tableInfoMap.size() > 1)
 	{
 		// make sure all tables are joined if not a single table query
-		set<pair<uint, uint> > joinPaths;
-		vector<uint> joinedTables;
+		set<pair<uint32_t, uint32_t> > joinPaths;
+		vector<uint32_t> joinedTables;
 		joinedTables.push_back((tableInfoMap.begin())->first);
 		for (size_t i = 0; i < joinedTables.size(); i++)
 		{
-			vector<uint>& v = tableInfoMap[joinedTables[i]].fAdjacentList;
-			for (vector<uint>::iterator j = v.begin(); j != v.end(); j++)
+			vector<uint32_t>& v = tableInfoMap[joinedTables[i]].fAdjacentList;
+			for (vector<uint32_t>::iterator j = v.begin(); j != v.end(); j++)
 			{
 				if (find(joinedTables.begin(), joinedTables.end(), *j) == joinedTables.end())
 					joinedTables.push_back(*j);
@@ -1202,14 +1203,14 @@ void spanningTreeCheck(TableInfoMap& tableInfoMap, JobInfo& jobInfo)
 		// 1. connected
 		if (joinedTables.size() < tableInfoMap.size())
 		{
-			vector<uint> notJoinedTables;
+			vector<uint32_t> notJoinedTables;
 			for (TableInfoMap::iterator i = tableInfoMap.begin(); i != tableInfoMap.end(); i++)
 			{
 				if (find(joinedTables.begin(), joinedTables.end(), i->first) == joinedTables.end())
 					notJoinedTables.push_back(i->first);
 			}
 
-			vector<uint>::iterator k = joinedTables.begin();
+			vector<uint32_t>::iterator k = joinedTables.begin();
 			set<string> views1;
 			set<string> tables1;
 			for (; k != joinedTables.end(); k++)
@@ -1235,7 +1236,7 @@ void spanningTreeCheck(TableInfoMap& tableInfoMap, JobInfo& jobInfo)
 				{
 					errcode = ERR_INCOMPATIBLE_JOIN;
 
-					uint key2 = jobInfo.incompatibleJoinMap[*k];
+					uint32_t key2 = jobInfo.incompatibleJoinMap[*k];
 					if (jobInfo.keyInfo->tupleKeyVec[*k].fView.length() > 0)
 					{
 						string view2 = jobInfo.keyInfo->tupleKeyVec[key2].fView;
@@ -1363,7 +1364,7 @@ void spanningTreeCheck(TableInfoMap& tableInfoMap, JobInfo& jobInfo)
 
 void outjoinPredicateAdjust(TableInfoMap& tableInfoMap, JobInfo& jobInfo)
 {
-	set<uint>::iterator i = jobInfo.outerOnTable.begin();
+	set<uint32_t>::iterator i = jobInfo.outerOnTable.begin();
 	for (; i != jobInfo.outerOnTable.end(); i++)
 	{
 		// resetTableFilters(tableInfoMap[*i], jobInfo)
@@ -1374,7 +1375,7 @@ void outjoinPredicateAdjust(TableInfoMap& tableInfoMap, JobInfo& jobInfo)
 			bool isOnClauseFilter = false;  // bug5311
 			for (; k != tblInfo.fQuerySteps.end(); k++)
 			{
-				uint colKey = -1;
+				uint32_t colKey = -1;
 				pColStep* pcs = dynamic_cast<pColStep*>(k->get());
 				pColScanStep* pcss = dynamic_cast<pColScanStep*>(k->get());
 				pDictionaryScan* pdss = dynamic_cast<pDictionaryScan*>(k->get());
@@ -1468,7 +1469,7 @@ void outjoinPredicateAdjust(TableInfoMap& tableInfoMap, JobInfo& jobInfo)
 }
 
 
-uint getLargestTable(JobInfo& jobInfo, TableInfoMap& tableInfoMap, bool overrideLargeSideEstimate)
+uint32_t getLargestTable(JobInfo& jobInfo, TableInfoMap& tableInfoMap, bool overrideLargeSideEstimate)
 {
 	// Subquery in FROM clause assumptions:
 	//   hint will be ignored, if the 1st table in FROM clause is a derived table.
@@ -1482,7 +1483,7 @@ uint getLargestTable(JobInfo& jobInfo, TableInfoMap& tableInfoMap, bool override
 	// Default to the first table in the from clause if:
 	//   the user set the hint; or
 	//   there is only one table in the query.
-	uint ret = jobInfo.tableList.front();
+	uint32_t ret = jobInfo.tableList.front();
 
 	if(jobInfo.tableList.size() <= 1)
 	{
@@ -1494,7 +1495,7 @@ uint getLargestTable(JobInfo& jobInfo, TableInfoMap& tableInfoMap, bool override
 	uint64_t estimatedRowCount = 0;
 
 	// Loop through the tables and find the one with the largest estimated cardinality.
-	for (uint i = 0; i < jobInfo.tableList.size(); i++)
+	for (uint32_t i = 0; i < jobInfo.tableList.size(); i++)
 	{
 		jobInfo.tableSize[jobInfo.tableList[i]] = 0;
 		TableInfoMap::iterator it = tableInfoMap.find(jobInfo.tableList[i]);
@@ -1533,13 +1534,13 @@ uint getLargestTable(JobInfo& jobInfo, TableInfoMap& tableInfoMap, bool override
 }
 
 
-uint getPrevLarge(uint n, TableInfoMap& tableInfoMap)
+uint32_t getPrevLarge(uint32_t n, TableInfoMap& tableInfoMap)
 {
 	// root node : no previous node;
 	// other node: only one immediate previous node;
 	int prev = -1;
-	vector<uint>& adjList = tableInfoMap[n].fAdjacentList;
-	for (vector<uint>::iterator i = adjList.begin(); i != adjList.end() && prev < 0; i++)
+	vector<uint32_t>& adjList = tableInfoMap[n].fAdjacentList;
+	for (vector<uint32_t>::iterator i = adjList.begin(); i != adjList.end() && prev < 0; i++)
 	{
 		if (tableInfoMap[*i].fVisited == true)
 			prev = *i;
@@ -1549,9 +1550,9 @@ uint getPrevLarge(uint n, TableInfoMap& tableInfoMap)
 }
 
 
-uint getKeyIndex(uint key, const RowGroup& rg)
+uint32_t getKeyIndex(uint32_t key, const RowGroup& rg)
 {
-	vector<uint>::const_iterator i = rg.getKeys().begin();
+	vector<uint32_t>::const_iterator i = rg.getKeys().begin();
 	for (; i != rg.getKeys().end(); ++i)
 		if (key == *i)
 			break;
@@ -1596,19 +1597,19 @@ string joinTypeToString(const JoinType& joinType)
 }
 
 
-SP_JoinInfo joinToLargeTable(uint large, TableInfoMap& tableInfoMap,
-							 JobInfo& jobInfo, vector<uint>& joinOrder)
+SP_JoinInfo joinToLargeTable(uint32_t large, TableInfoMap& tableInfoMap,
+							 JobInfo& jobInfo, vector<uint32_t>& joinOrder)
 {
 	vector<SP_JoinInfo> smallSides;
 	tableInfoMap[large].fVisited = true;
 	tableInfoMap[large].fJoinedTables.insert(large);
-	set<uint>& tableSet = tableInfoMap[large].fJoinedTables;
-	vector<uint>& adjList = tableInfoMap[large].fAdjacentList;
-	uint prevLarge = (uint) getPrevLarge(large, tableInfoMap);
-	bool root = (prevLarge == (uint) -1) ? true : false;
+	set<uint32_t>& tableSet = tableInfoMap[large].fJoinedTables;
+	vector<uint32_t>& adjList = tableInfoMap[large].fAdjacentList;
+	uint32_t prevLarge = (uint32_t) getPrevLarge(large, tableInfoMap);
+	bool root = (prevLarge == (uint32_t) -1) ? true : false;
 
 	// Get small sides ready.
-	for (vector<uint>::iterator i = adjList.begin(); i != adjList.end(); i++)
+	for (vector<uint32_t>::iterator i = adjList.begin(); i != adjList.end(); i++)
 	{
 		if (tableInfoMap[*i].fVisited == false)
 		{
@@ -1650,8 +1651,8 @@ SP_JoinInfo joinToLargeTable(uint large, TableInfoMap& tableInfoMap,
 		vector<RowGroup> smallSideRGs;
 		vector<JoinType> jointypes;
 		vector<bool> typeless;
-		vector<vector<uint> > smallKeyIndices;
-		vector<vector<uint> > largeKeyIndices;
+		vector<vector<uint32_t> > smallKeyIndices;
+		vector<vector<uint32_t> > largeKeyIndices;
 		for (vector<SP_JoinInfo>::iterator i = smallSides.begin(); i != smallSides.end(); i++)
 		{
 			JoinInfo* info = i->get();
@@ -1660,12 +1661,12 @@ SP_JoinInfo joinToLargeTable(uint large, TableInfoMap& tableInfoMap,
 			jointypes.push_back(info->fJoinData.fTypes[0]);
 			typeless.push_back(info->fJoinData.fTypeless);
 
-			vector<uint> smallIndices;
-			vector<uint> largeIndices;
-			const vector<uint>& keys1 = info->fJoinData.fLeftKeys;
-			const vector<uint>& keys2 = info->fJoinData.fRightKeys;
-			vector<uint>::const_iterator k1 = keys1.begin();
-			vector<uint>::const_iterator k2 = keys2.begin();
+			vector<uint32_t> smallIndices;
+			vector<uint32_t> largeIndices;
+			const vector<uint32_t>& keys1 = info->fJoinData.fLeftKeys;
+			const vector<uint32_t>& keys2 = info->fJoinData.fRightKeys;
+			vector<uint32_t>::const_iterator k1 = keys1.begin();
+			vector<uint32_t>::const_iterator k2 = keys2.begin();
 			tableNames.push_back(jobInfo.keyInfo->tupleKeyVec[*k1].fTable);
 			for (; k1 != keys1.end(); ++k1, ++k2)
 			{
@@ -1795,7 +1796,7 @@ SP_JoinInfo joinToLargeTable(uint large, TableInfoMap& tableInfoMap,
 			ExpressionStep* exp = dynamic_cast<ExpressionStep*>(eit->get());
 			if (exp == NULL)
 				throw runtime_error("Not an expression.");
-			const vector<uint>& tables = exp->tableKeys();
+			const vector<uint32_t>& tables = exp->tableKeys();
 			uint64_t i = 0;
 			for (; i < tables.size(); i++)
 			{
@@ -1825,7 +1826,7 @@ SP_JoinInfo joinToLargeTable(uint large, TableInfoMap& tableInfoMap,
 		// check additional compares for semi-join
 		if (readyExpSteps.size() > 0)
 		{
-			map<uint, uint> keyToIndexMap; // map keys to the indices in the RG
+			map<uint32_t, uint32_t> keyToIndexMap; // map keys to the indices in the RG
 			for (uint64_t i = 0; i < rg.getKeys().size(); ++i)
 				keyToIndexMap.insert(make_pair(rg.getKeys()[i], i));
 
@@ -1860,7 +1861,7 @@ SP_JoinInfo joinToLargeTable(uint large, TableInfoMap& tableInfoMap,
 						continue;
 					}
 
-					const vector<uint>& tables = e->tableKeys();
+					const vector<uint32_t>& tables = e->tableKeys();
 					map<uint32_t, int>::iterator j = correlateTables.end();
 
 					for (size_t i = 0; i < tables.size(); i++)
@@ -1906,7 +1907,7 @@ SP_JoinInfo joinToLargeTable(uint large, TableInfoMap& tableInfoMap,
 					ParseTree* pt = correlateCompare[k->first];
 					if (pt != NULL)
 					{
-						shared_ptr<ParseTree> sppt(pt);
+						boost::shared_ptr<ParseTree> sppt(pt);
 						thjs->addJoinFilter(sppt, dcf + k->second);
 					}
 
@@ -1946,7 +1947,7 @@ SP_JoinInfo joinToLargeTable(uint large, TableInfoMap& tableInfoMap,
 					}
 				}
 
-				shared_ptr<ParseTree> sppt(pt);
+				boost::shared_ptr<ParseTree> sppt(pt);
 				thjs->addFcnExpGroup2(sppt);
 			}
 
@@ -2001,9 +2002,9 @@ bool joinStepCompare(const SJSTEP& a, const SJSTEP& b)
 
 struct JoinOrderData
 {
-	uint fTid1;
-	uint fTid2;
-	uint fJoinId;
+	uint32_t fTid1;
+	uint32_t fTid2;
+	uint32_t fJoinId;
 };
 
 
@@ -2036,7 +2037,7 @@ void getJoinOrder(vector<JoinOrderData>& joins, JobStepVector& joinSteps, JobInf
 	}
 }
 
-inline void updateJoinSides(uint small, uint large, map<uint, SP_JoinInfo>& joinInfoMap,
+inline void updateJoinSides(uint32_t small, uint32_t large, map<uint32_t, SP_JoinInfo>& joinInfoMap,
 		vector<SP_JoinInfo>& smallSides, TableInfoMap& tableInfoMap, JobInfo& jobInfo)
 {
 	TableJoinMap::iterator mit = jobInfo.tableJoinMap.find(make_pair(small, large));
@@ -2054,11 +2055,11 @@ inline void updateJoinSides(uint small, uint large, map<uint, SP_JoinInfo>& join
 
 // For OUTER JOIN bug @2422/2633/3437/3759, join table based on join order.
 // The largest table will be always the streaming table, other tables are always on small side.
-void joinTablesInOrder(uint largest, JobStepVector& joinSteps, TableInfoMap& tableInfoMap,
-						JobInfo& jobInfo, vector<uint>& joinOrder)
+void joinTablesInOrder(uint32_t largest, JobStepVector& joinSteps, TableInfoMap& tableInfoMap,
+						JobInfo& jobInfo, vector<uint32_t>& joinOrder)
 {
 	// populate the tableInfo for join
-	map<uint, SP_JoinInfo> joinInfoMap;          // <table, JoinInfo>
+	map<uint32_t, SP_JoinInfo> joinInfoMap;          // <table, JoinInfo>
 
 	// <table,  <last step involved, large priority> >
 	// large priority:
@@ -2066,7 +2067,7 @@ void joinTablesInOrder(uint largest, JobStepVector& joinSteps, TableInfoMap& tab
 	//      0 - prefer to be on small side, like FROM subquery;
 	//      1 - can be on either large or small side;
 	//      2 - must be on large side.
-	map<uint, pair<SJSTEP, int> > joinStepMap;
+	map<uint32_t, pair<SJSTEP, int> > joinStepMap;
 
 	BatchPrimitive* bps = NULL;
 	SubAdapterStep* tsas = NULL;
@@ -2105,24 +2106,24 @@ void joinTablesInOrder(uint largest, JobStepVector& joinSteps, TableInfoMap& tab
 
 	// join the steps
 	int64_t lastJoinId = -1;
-	uint large = (uint) -1;
-	uint small = (uint) -1;
-	uint prevLarge = (uint) -1;
+	uint32_t large = (uint32_t) -1;
+	uint32_t small = (uint32_t) -1;
+	uint32_t prevLarge = (uint32_t) -1;
 	bool umstream = false;
-	vector<uint> joinedTable;
-	uint lastJoin = joins.size() - 1;
+	vector<uint32_t> joinedTable;
+	uint32_t lastJoin = joins.size() - 1;
 	bool isSemijoin = true;
 
 	for (uint64_t js = 0; js < joins.size(); js++)
 	{
-		set<uint> smallSideTid;
+		set<uint32_t> smallSideTid;
 
 		if (joins[js].fJoinId != 0)
 			isSemijoin = false;
 
 		vector<SP_JoinInfo> smallSides;
-		uint tid1 = joins[js].fTid1;
-		uint tid2 = joins[js].fTid2;
+		uint32_t tid1 = joins[js].fTid1;
+		uint32_t tid2 = joins[js].fTid2;
 		lastJoinId = joins[js].fJoinId;
 
 		// largest has already joined, and this join cannot be merged.
@@ -2155,9 +2156,9 @@ void joinTablesInOrder(uint largest, JobStepVector& joinSteps, TableInfoMap& tab
 		// merge in the next step if the large side is the same
 		for (uint64_t ns  = js + 1; ns < joins.size(); js++, ns++)
 		{
-			uint tid1 = joins[ns].fTid1;
-			uint tid2 = joins[ns].fTid2;
-			uint small = (uint) -1;
+			uint32_t tid1 = joins[ns].fTid1;
+			uint32_t tid2 = joins[ns].fTid2;
+			uint32_t small = (uint32_t) -1;
 
 			if ((tid1 == large) &&
 				((joinStepMap[tid1].second > joinStepMap[tid2].second) ||
@@ -2181,8 +2182,8 @@ void joinTablesInOrder(uint largest, JobStepVector& joinSteps, TableInfoMap& tab
 			// check if FE needs table in previous smallsides
 			if (jobInfo.joinFeTableMap[joins[ns].fJoinId].size() > 0)
 			{
-				set<uint>& tids = jobInfo.joinFeTableMap[joins[ns].fJoinId];
-				for (set<uint>::iterator si = smallSideTid.begin(); si != smallSideTid.end(); si++)
+				set<uint32_t>& tids = jobInfo.joinFeTableMap[joins[ns].fJoinId];
+				for (set<uint32_t>::iterator si = smallSideTid.begin(); si != smallSideTid.end(); si++)
 				{
 					if (tids.find(*si) != tids.end())
 						throw runtime_error("On clause filter involving a table not directly involved in the outer join is currently not supported.");
@@ -2217,8 +2218,8 @@ void joinTablesInOrder(uint largest, JobStepVector& joinSteps, TableInfoMap& tab
 		vector<RowGroup> smallSideRGs;
 		vector<JoinType> jointypes;
 		vector<bool> typeless;
-		vector<vector<uint> > smallKeyIndices;
-		vector<vector<uint> > largeKeyIndices;
+		vector<vector<uint32_t> > smallKeyIndices;
+		vector<vector<uint32_t> > largeKeyIndices;
 
 		// bug5764, make sure semi joins acting as filter is after outer join.
 		{
@@ -2274,12 +2275,12 @@ void joinTablesInOrder(uint largest, JobStepVector& joinSteps, TableInfoMap& tab
 			jointypes.push_back(info->fJoinData.fTypes[0]);
 			typeless.push_back(info->fJoinData.fTypeless);
 
-			vector<uint> smallIndices;
-			vector<uint> largeIndices;
-			const vector<uint>& keys1 = info->fJoinData.fLeftKeys;
-			const vector<uint>& keys2 = info->fJoinData.fRightKeys;
-			vector<uint>::const_iterator k1 = keys1.begin();
-			vector<uint>::const_iterator k2 = keys2.begin();
+			vector<uint32_t> smallIndices;
+			vector<uint32_t> largeIndices;
+			const vector<uint32_t>& keys1 = info->fJoinData.fLeftKeys;
+			const vector<uint32_t>& keys2 = info->fJoinData.fRightKeys;
+			vector<uint32_t>::const_iterator k1 = keys1.begin();
+			vector<uint32_t>::const_iterator k2 = keys2.begin();
 			tableNames.push_back(jobInfo.keyInfo->tupleKeyVec[*k1].fTable);
 			for (; k1 != keys1.end(); ++k1, ++k2)
 			{
@@ -2389,7 +2390,7 @@ void joinTablesInOrder(uint largest, JobStepVector& joinSteps, TableInfoMap& tab
 		}
 
 		RowGroup rg;
-		set<uint>& tableSet = tableInfoMap[large].fJoinedTables;
+		set<uint32_t>& tableSet = tableInfoMap[large].fJoinedTables;
 		constructJoinedRowGroup(rg, tableSet, tableInfoMap, jobInfo);
 		thjs->setOutputRowGroup(rg);
 		tableInfoMap[large].fRowGroup = rg;
@@ -2419,7 +2420,7 @@ void joinTablesInOrder(uint largest, JobStepVector& joinSteps, TableInfoMap& tab
 			ExpressionStep* exp = dynamic_cast<ExpressionStep*>(eit->get());
 			if (exp == NULL)
 				throw runtime_error("Not an expression.");
-			const vector<uint>& tables = exp->tableKeys();
+			const vector<uint32_t>& tables = exp->tableKeys();
 			uint64_t i = 0;
 			for (; i < tables.size(); i++)
 			{
@@ -2458,7 +2459,7 @@ void joinTablesInOrder(uint largest, JobStepVector& joinSteps, TableInfoMap& tab
 		// check additional compares for semi-join
 		if (readyExpSteps.size() > 0)
 		{
-			map<uint, uint> keyToIndexMap; // map keys to the indices in the RG
+			map<uint32_t, uint32_t> keyToIndexMap; // map keys to the indices in the RG
 			for (uint64_t i = 0; i < rg.getKeys().size(); ++i)
 				keyToIndexMap.insert(make_pair(rg.getKeys()[i], i));
 
@@ -2493,7 +2494,7 @@ void joinTablesInOrder(uint largest, JobStepVector& joinSteps, TableInfoMap& tab
 						continue;
 					}
 
-					const vector<uint>& tables = e->tableKeys();
+					const vector<uint32_t>& tables = e->tableKeys();
 					map<uint32_t, int>::iterator j = correlateTables.end();
 
 					for (size_t i = 0; i < tables.size(); i++)
@@ -2539,7 +2540,7 @@ void joinTablesInOrder(uint largest, JobStepVector& joinSteps, TableInfoMap& tab
 					ParseTree* pt = correlateCompare[k->first];
 					if (pt != NULL)
 					{
-						shared_ptr<ParseTree> sppt(pt);
+						boost::shared_ptr<ParseTree> sppt(pt);
 						thjs->addJoinFilter(sppt, startPos + k->second);
 					}
 
@@ -2567,7 +2568,7 @@ void joinTablesInOrder(uint largest, JobStepVector& joinSteps, TableInfoMap& tab
 					{
 						ParseTree* joinFilter = new ParseTree;
 						joinFilter->copyTree(*(e->expressionFilter()));
-						shared_ptr<ParseTree> sppt(joinFilter);
+						boost::shared_ptr<ParseTree> sppt(joinFilter);
 						thjs->addJoinFilter(sppt, startPos + x->second);
 						thjs->setJoinFilterInputRG(rg);
 						continue;
@@ -2593,7 +2594,7 @@ void joinTablesInOrder(uint largest, JobStepVector& joinSteps, TableInfoMap& tab
 
 				if (pt != NULL)
 				{
-					shared_ptr<ParseTree> sppt(pt);
+					boost::shared_ptr<ParseTree> sppt(pt);
 					thjs->addFcnExpGroup2(sppt);
 				}
 			}
@@ -2620,7 +2621,7 @@ void joinTablesInOrder(uint largest, JobStepVector& joinSteps, TableInfoMap& tab
 		else
 			joinStepMap[large] = make_pair(spjs, l);
 
-		for (set<uint>::iterator i = tableSet.begin(); i != tableSet.end(); i++)
+		for (set<uint32_t>::iterator i = tableSet.begin(); i != tableSet.end(); i++)
 		{
 			joinInfoMap[*i]->fDl = tableInfoMap[large].fDl;
 			joinInfoMap[*i]->fRowGroup = tableInfoMap[large].fRowGroup;
@@ -2640,7 +2641,7 @@ void joinTablesInOrder(uint largest, JobStepVector& joinSteps, TableInfoMap& tab
 
 	// Keep join order by the table last used for picking the right delivery step.
 	{
-		for (vector<uint>::reverse_iterator i = joinedTable.rbegin(); i < joinedTable.rend(); i++)
+		for (vector<uint32_t>::reverse_iterator i = joinedTable.rbegin(); i < joinedTable.rend(); i++)
 		{
 			if (find(joinOrder.begin(), joinOrder.end(), *i) == joinOrder.end())
 				joinOrder.push_back(*i);
@@ -2656,9 +2657,9 @@ void joinTablesInOrder(uint largest, JobStepVector& joinSteps, TableInfoMap& tab
 
 
 inline void joinTables(JobStepVector& joinSteps, TableInfoMap& tableInfoMap, JobInfo& jobInfo,
-						vector<uint>& joinOrder, const bool overrideLargeSideEstimate)
+						vector<uint32_t>& joinOrder, const bool overrideLargeSideEstimate)
 {
-	uint largestTable = getLargestTable(jobInfo, tableInfoMap, overrideLargeSideEstimate);
+	uint32_t largestTable = getLargestTable(jobInfo, tableInfoMap, overrideLargeSideEstimate);
 	if (jobInfo.outerOnTable.size() == 0)
 		joinToLargeTable(largestTable, tableInfoMap, jobInfo, joinOrder);
 	else
@@ -2688,7 +2689,7 @@ void associateTupleJobSteps(JobStepVector& querySteps, JobStepVector& projectSte
 {
 	if (jobInfo.trace)
 	{
-		const shared_ptr<TupleKeyInfo>& keyInfo = jobInfo.keyInfo;
+		const boost::shared_ptr<TupleKeyInfo>& keyInfo = jobInfo.keyInfo;
 		cout << "query steps:" << endl;
 		for (JobStepVector::iterator i = querySteps.begin(); i != querySteps.end(); ++i)
 		{
@@ -2734,7 +2735,7 @@ void associateTupleJobSteps(JobStepVector& querySteps, JobStepVector& projectSte
 		}
 
 		cout << "\nTupleKey vector:  (tupleKey  oid  name  alias view sub)" << endl;
-		for (uint i = 0; i < keyInfo->tupleKeyVec.size(); ++i)
+		for (uint32_t i = 0; i < keyInfo->tupleKeyVec.size(); ++i)
 		{
 			CalpontSystemCatalog::OID oid = keyInfo->tupleKeyVec[i].fId;
 			string alias = keyInfo->tupleKeyVec[i].fTable;
@@ -2744,6 +2745,10 @@ void associateTupleJobSteps(JobStepVector& querySteps, JobStepVector& projectSte
 			if (keyInfo->dictOidToColOid.find(oid) != keyInfo->dictOidToColOid.end())
 			{
 				name += "[d]";  // indicate this is a dictionary column
+			}
+			if (jobInfo.keyInfo->pseudoType[i] > 0)
+			{
+				name += "[p]";  // indicate this is a pseudo column
 			}
 			if (name.empty())
 			{
@@ -2770,7 +2775,7 @@ void associateTupleJobSteps(JobStepVector& querySteps, JobStepVector& projectSte
 	TableInfoMap tableInfoMap;
 	for (uint64_t i = 0; i < jobInfo.tableList.size(); i++)
 	{
-		uint tableUid = jobInfo.tableList[i];
+		uint32_t tableUid = jobInfo.tableList[i];
 		tableInfoMap[tableUid] = TableInfo();
 		tableInfoMap[tableUid].fTableOid = jobInfo.keyInfo->tupleKeyVec[tableUid].fId;
 		tableInfoMap[tableUid].fName = jobInfo.keyInfo->keyName[tableUid];
@@ -2885,7 +2890,7 @@ void associateTupleJobSteps(JobStepVector& querySteps, JobStepVector& projectSte
 			tableInfoMap[tid2].fJoinKeys.push_back(key2);
 
 			// keep a join map
-			pair<uint, uint> tablePair(tid1, tid2);
+			pair<uint32_t, uint32_t> tablePair(tid1, tid2);
 			TableJoinMap::iterator m1 = jobInfo.tableJoinMap.find(tablePair);
 			TableJoinMap::iterator m2 = jobInfo.tableJoinMap.end();
 			if (m1 == jobInfo.tableJoinMap.end())
@@ -2966,8 +2971,8 @@ void associateTupleJobSteps(JobStepVector& querySteps, JobStepVector& projectSte
 		else if (exps != NULL && subs == NULL)
 		{
 			const vector<CalpontSystemCatalog::OID>& oids = exps->oids();
-			const vector<uint>& tables = exps->tableKeys();
-			const vector<uint>& columns = exps->columnKeys();
+			const vector<uint32_t>& tables = exps->tableKeys();
+			const vector<uint32_t>& columns = exps->columnKeys();
 			bool  tableInOuterQuery = false;
 			set<uint32_t> tableSet;	           // involved unique tables
 			for (uint64_t i = 0; i < tables.size(); ++i)
@@ -3060,6 +3065,51 @@ void associateTupleJobSteps(JobStepVector& querySteps, JobStepVector& projectSte
 		it++;
 	}
 
+	// @bug4021, make sure there is real column to scan
+	for (TableInfoMap::iterator it = tableInfoMap.begin(); it != tableInfoMap.end(); it++)
+	{
+		uint32_t tableUid = it->first;
+		if (jobInfo.pseudoColTable.find(tableUid) == jobInfo.pseudoColTable.end())
+			continue;
+
+		JobStepVector& steps = tableInfoMap[tableUid].fQuerySteps;
+		JobStepVector::iterator s = steps.begin();
+		for (; s != steps.end(); s++)
+		{
+			if (typeid(*(s->get())) == typeid(pColScanStep) ||
+				typeid(*(s->get())) == typeid(pColStep))
+				break;
+		}
+
+		if (s == steps.end())
+		{
+			map<uint64_t, SRCP>::iterator t = jobInfo.tableColMap.find(tableUid);
+			if (t == jobInfo.tableColMap.end())
+			{
+				string msg = jobInfo.keyInfo->tupleKeyToName[tableUid];
+				msg += " has no column in column map.";
+				throw runtime_error(msg);
+			}
+
+			SimpleColumn* sc = dynamic_cast<SimpleColumn*>(t->second.get());
+			CalpontSystemCatalog::OID oid = sc->oid();
+			CalpontSystemCatalog::OID tblOid = tableOid(sc, jobInfo.csc);
+			CalpontSystemCatalog::ColType ct = sc->colType();
+			string alias(extractTableAlias(sc));
+			SJSTEP sjs(new pColScanStep(oid, tblOid, ct, jobInfo));
+			sjs->alias(alias);
+			sjs->view(sc->viewName());
+			sjs->schema(sc->schemaName());
+			sjs->name(sc->columnName());
+			TupleInfo ti(setTupleInfo(ct, oid, jobInfo, tblOid, sc, alias));
+			sjs->tupleId(ti.key);
+			steps.insert(steps.begin(), sjs);
+
+			if (isDictCol(ct) && jobInfo.tokenOnly.find(ti.key) == jobInfo.tokenOnly.end())
+				jobInfo.tokenOnly[ti.key] = true;
+		}
+	}
+
 	// @bug3767, error out scalar subquery with aggregation and correlated additional comparison.
 	if (jobInfo.hasAggregation && (jobInfo.correlateSteps.size() > 0))
 	{
@@ -3094,7 +3144,7 @@ void associateTupleJobSteps(JobStepVector& querySteps, JobStepVector& projectSte
 	end = projectSteps.end();
 	while (it != end)
 	{
-		uint tid = getTableKey(jobInfo, (*it)->tupleId());
+		uint32_t tid = getTableKey(jobInfo, (*it)->tupleId());
 		tableInfoMap[tid].fProjectSteps.push_back(*it);
 		tableInfoMap[tid].fProjectCols.push_back((*it)->tupleId());
 		it++;
@@ -3105,7 +3155,7 @@ void associateTupleJobSteps(JobStepVector& querySteps, JobStepVector& projectSte
 		if (jobInfo.keyInfo->tupleKeyVec[j->tkey].fId == 3000)
 			continue;
 
-		vector<uint>& projectCols = tableInfoMap[j->tkey].fProjectCols;
+		vector<uint32_t>& projectCols = tableInfoMap[j->tkey].fProjectCols;
 		if (find(projectCols.begin(), projectCols.end(), j->key) == projectCols.end())
 			projectCols.push_back(j->key);
 	}
@@ -3137,11 +3187,11 @@ void associateTupleJobSteps(JobStepVector& querySteps, JobStepVector& projectSte
 			throw runtime_error("combineJobStepsByTable failed.");
 
 	// 2. join the combined steps together to form the spanning tree
-	vector<uint> joinOrder;
+	vector<uint32_t> joinOrder;
 	joinTables(joinSteps, tableInfoMap, jobInfo, joinOrder, overrideLargeSideEstimate);
 
 	// 3. put the steps together
-	for (vector<uint>::iterator i = joinOrder.begin(); i != joinOrder.end(); ++i)
+	for (vector<uint32_t>::iterator i = joinOrder.begin(); i != joinOrder.end(); ++i)
 		querySteps.insert(querySteps.end(),
 							tableInfoMap[*i].fQuerySteps.begin(),
 								tableInfoMap[*i].fQuerySteps.end());
@@ -3156,11 +3206,11 @@ SJSTEP unionQueries(JobStepVector& queries, uint64_t distinctUnionNum, JobInfo& 
 	vector<bool> distinct;
 	uint64_t colCount = jobInfo.deliveredCols.size();
 
-	vector<uint> oids;
-	vector<uint> keys;
-	vector<uint> scale;
-	vector<uint> precision;
-	vector<uint> width;
+	vector<uint32_t> oids;
+	vector<uint32_t> keys;
+	vector<uint32_t> scale;
+	vector<uint32_t> precision;
+	vector<uint32_t> width;
 	vector<CalpontSystemCatalog::ColDataType> types;
 	JobStepAssociation jsaToUnion;
 
@@ -3181,8 +3231,8 @@ SJSTEP unionQueries(JobStepVector& queries, uint64_t distinctUnionNum, JobInfo& 
 		const RowGroup& rg = tds->getDeliveredRowGroup();
 		inputRGs.push_back(rg);
 
-		const vector<uint>& scaleIn = rg.getScale();
-		const vector<uint>& precisionIn = rg.getPrecision();
+		const vector<uint32_t>& scaleIn = rg.getScale();
+		const vector<uint32_t>& precisionIn = rg.getPrecision();
 		const vector<CalpontSystemCatalog::ColDataType>& typesIn = rg.getColTypes();
 
 		for (uint64_t j = 0; j < colCount; ++j)
@@ -3195,8 +3245,8 @@ SJSTEP unionQueries(JobStepVector& queries, uint64_t distinctUnionNum, JobInfo& 
 
 		if (i == 0)
 		{
-			const vector<uint>& oidsIn = rg.getOIDs();
-			const vector<uint>& keysIn = rg.getKeys();
+			const vector<uint32_t>& oidsIn = rg.getOIDs();
+			const vector<uint32_t>& keysIn = rg.getKeys();
 			oids.insert(oids.end(), oidsIn.begin(), oidsIn.begin() + colCount);
 			keys.insert(keys.end(), keysIn.begin(), keysIn.begin() + colCount);
 		}
@@ -3234,7 +3284,7 @@ SJSTEP unionQueries(JobStepVector& queries, uint64_t distinctUnionNum, JobInfo& 
 		width.push_back(colType.colWidth);
 	}
 
-	vector<uint> pos;
+	vector<uint32_t> pos;
 	pos.push_back(2);
 	for (uint64_t i = 0; i < oids.size(); ++i)
 		pos.push_back(pos[i] + width[i]);

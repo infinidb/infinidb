@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -243,10 +243,10 @@ public:
 	 * @note See PrimitiveMsg.h for the type definitions.
 	 */
 	void p_Col(NewColRequestHeader *in, NewColResultHeader *out, unsigned outSize, 
-		unsigned *written, primitiveprocessor::UDFFcnPtr_t fp=0);
+		unsigned *written);
 
 	boost::shared_ptr<ParsedColumnFilter> parseColumnFilter(const uint8_t *filterString,
-		uint colWidth, uint colType, uint filterCount, uint BOP);
+		uint32_t colWidth, uint32_t colType, uint32_t filterCount, uint32_t BOP);
 	void setParsedColumnFilter(boost::shared_ptr<ParsedColumnFilter>);
 
 	/** @brief The p_ColAggregate primitive processor.
@@ -272,12 +272,12 @@ public:
 //@bug 1828 These need to be public so that column operations can use it for 'like'
 	struct p_DataValue {
 		int len;
-		const u_int8_t *data;
+		const uint8_t *data;
 	};
 
 	static int convertToRegexp(idb_regex_t *regex, const p_DataValue *str);
 	inline static bool isEscapedChar(char c);
-	boost::shared_array<idb_regex_t> makeLikeFilter(const DictFilterElement *inputMsg, uint count);
+	boost::shared_array<idb_regex_t> makeLikeFilter(const DictFilterElement *inputMsg, uint32_t count);
 	void setLikeFilter(boost::shared_array<idb_regex_t> filter) { parsedLikeFilter = filter; }
 
 private:

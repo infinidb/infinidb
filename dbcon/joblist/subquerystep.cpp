@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -28,6 +28,7 @@ using namespace std;
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/thread.hpp>
+#include <boost/uuid/uuid_io.hpp>
 using namespace boost;
 
 #include "parsetree.h"
@@ -196,11 +197,11 @@ void SubAdapterStep::join()
 }
 
 
-uint SubAdapterStep::nextBand(messageqcpp::ByteStream &bs)
+uint32_t SubAdapterStep::nextBand(messageqcpp::ByteStream &bs)
 {
 	RGData rgDataOut;
 	bool more = false;
-	uint rowCount = 0;
+	uint32_t rowCount = 0;
 
 	try
 	{
@@ -261,7 +262,7 @@ void SubAdapterStep::setFeRowGroup(const rowgroup::RowGroup& rg)
 void SubAdapterStep::setOutputRowGroup(const rowgroup::RowGroup& rg)
 {
 	fRowGroupOut = fRowGroupDeliver = rg;
-	if (fRowGroupFe.getColumnCount() == (uint) -1)
+	if (fRowGroupFe.getColumnCount() == (uint32_t) -1)
 		fIndexMap = makeMapping(fRowGroupIn, fRowGroupOut);
 	else
 		fIndexMap = makeMapping(fRowGroupFe, fRowGroupOut);
@@ -272,12 +273,12 @@ void SubAdapterStep::setOutputRowGroup(const rowgroup::RowGroup& rg)
 
 void SubAdapterStep::checkDupOutputColumns()
 {
-	map<uint, uint> keymap; // map<unique col key, col index in the row group>
+	map<uint32_t, uint32_t> keymap; // map<unique col key, col index in the row group>
 	fDupColumns.clear();
-	const vector<uint>& keys = fRowGroupDeliver.getKeys();
-	for (uint i = 0; i < keys.size(); i++)
+	const vector<uint32_t>& keys = fRowGroupDeliver.getKeys();
+	for (uint32_t i = 0; i < keys.size(); i++)
 	{
-		map<uint, uint>::iterator j = keymap.find(keys[i]);
+		map<uint32_t, uint32_t>::iterator j = keymap.find(keys[i]);
 		if (j == keymap.end())
 			keymap.insert(make_pair(keys[i], i));           // map key to col index
 		else
@@ -346,7 +347,7 @@ void SubAdapterStep::execute()
 
 	RGData rowFeData;
 	bool usesFE = false;
-	if (fRowGroupFe.getColumnCount() != (uint) -1)
+	if (fRowGroupFe.getColumnCount() != (uint32_t) -1)
 	{
 		usesFE = true;
 		fRowGroupFe.initRow(&rowFe, true);
@@ -437,8 +438,8 @@ void SubAdapterStep::execute()
 void SubAdapterStep::addExpression(const JobStepVector& exps, JobInfo& jobInfo)
 {
 	// maps key to the index in the RG
-	map<uint, uint> keyToIndexMap;
-	const vector<uint>& keys = fRowGroupIn.getKeys();
+	map<uint32_t, uint32_t> keyToIndexMap;
+	const vector<uint32_t>& keys = fRowGroupIn.getKeys();
 	for (size_t i = 0; i < keys.size(); i++)
 		keyToIndexMap[keys[i]] = i;
 
@@ -469,7 +470,7 @@ void SubAdapterStep::addExpression(const JobStepVector& exps, JobInfo& jobInfo)
 	// add to the expression wrapper
 	if (fExpression.get() == NULL)
 		fExpression.reset(new funcexp::FuncExpWrapper());
-	fExpression->addFilter(shared_ptr<execplan::ParseTree>(filter));
+	fExpression->addFilter(boost::shared_ptr<execplan::ParseTree>(filter));
 }
 
 
@@ -496,7 +497,8 @@ void SubAdapterStep::printCalTrace()
 			<< "\t1st read " << dlTimes.FirstReadTimeString()
 			<< "; EOI " << dlTimes.EndOfInputTimeString() << "; runtime-"
 			<< JSTimeStamp::tsdiffstr(dlTimes.EndOfInputTime(), dlTimes.FirstReadTime())
-			<< "s;\n\tJob completion status " << status() << endl;
+			<< "s;\n\tUUID " << uuids::to_string(fStepUuid) << endl
+			<< "\tJob completion status " << status() << endl;
 	logEnd(logStr.str().c_str());
 	fExtendedInfo += logStr.str();
 	formatMiniStats();

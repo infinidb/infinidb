@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -41,9 +41,9 @@ void usage()
 
 int main(int argc, char **argv)
 {
-	uint which_lock;  // 1-5
-	uint which_side;  // 0 or 1
-	uint lock_unlock;  // 0 or 1
+	uint32_t which_lock;  // 1-5
+	uint32_t which_side;  // 0 or 1
+	uint32_t lock_unlock;  // 0 or 1
 	RWLock *rwlock;
 
 	name = argv[0];

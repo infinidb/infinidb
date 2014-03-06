@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -449,7 +449,7 @@ void OIDServer::loadVBOIDs()
 	readData((uint8_t *) &vbOidDBRootMap[0], StartOfVBOidSection + 2, size * 2);
 
 	//cout << "loaded " << size << " vboids: ";
-	//for (uint i = 0; i < size; i++)
+	//for (uint32_t i = 0; i < size; i++)
 	//	cout << (int) vbOidDBRootMap[i] << " ";
 	//cout << endl;
 }
@@ -660,7 +660,7 @@ void OIDServer::patchFreelist(struct FEntry* freelist, int start, int num) const
 int OIDServer::allocVBOID(uint16_t dbroot)
 {
 	int ret;
-	uint offset;
+	uint32_t offset;
 
 	ret = vbOidDBRootMap.size();
 
@@ -699,7 +699,7 @@ const vector<uint16_t> & OIDServer::getVBOIDToDBRootMap()
 
 int OIDServer::getVBOIDOfDBRoot(uint32_t dbRoot)
 {
-	uint i;
+	uint32_t i;
 
 	for (i = 0; i < vbOidDBRootMap.size(); i++)
 		if (vbOidDBRootMap[i] == dbRoot)

@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -28,6 +28,7 @@ using namespace std;
 #include <boost/shared_ptr.hpp>
 #include <boost/shared_array.hpp>
 #include <boost/thread.hpp>
+#include <boost/uuid/uuid_io.hpp>
 using namespace boost;
 
 #include "atomicops.h"
@@ -44,11 +45,12 @@ using namespace config;
 #include "calpontselectexecutionplan.h"
 #include "calpontsystemcatalog.h"
 #include "aggregatecolumn.h"
-#include "windowfunctioncolumn.h"
 #include "arithmeticcolumn.h"
-#include "functioncolumn.h"
 #include "constantcolumn.h"
+#include "functioncolumn.h"
+#include "pseudocolumn.h"
 #include "simplefilter.h"
+#include "windowfunctioncolumn.h"
 using namespace execplan;
 
 #include "windowfunction.h"
@@ -77,7 +79,7 @@ using namespace joblist;
 namespace
 {
 
-string keyName(uint64_t i, uint key, const joblist::JobInfo& jobInfo)
+string keyName(uint64_t i, uint32_t key, const joblist::JobInfo& jobInfo)
 {
 	string name = jobInfo.projectionCols[i]->alias();
 	if (name.empty())
@@ -98,7 +100,12 @@ uint64_t getColumnIndex(const SRCP& c, const map<uint64_t, uint64_t>& m, JobInfo
 	if (sc != NULL && !sc->schemaName().empty())
 	{
 		// special handling for dictionary
-		CalpontSystemCatalog::ColType ct = jobInfo.csc->colType(sc->oid());
+		CalpontSystemCatalog::ColType ct = sc->colType();
+//XXX use this before connector sets colType in sc correctly.
+//    type of pseudo column is set by connector
+		if (!(dynamic_cast<const PseudoColumn*>(sc)))
+			ct = jobInfo.csc->colType(sc->oid());
+//X
 		CalpontSystemCatalog::OID dictOid = isDictCol(ct);
 		string alias(extractTableAlias(sc));
 		if (dictOid > 0)
@@ -191,11 +198,11 @@ void WindowFunctionStep::join()
 }
 
 
-uint WindowFunctionStep::nextBand(messageqcpp::ByteStream &bs)
+uint32_t WindowFunctionStep::nextBand(messageqcpp::ByteStream &bs)
 {
 	RGData rgDataOut;
 	bool more = false;
-	uint rowCount = 0;
+	uint32_t rowCount = 0;
 
 	try
 	{
@@ -502,7 +509,7 @@ void WindowFunctionStep::initialize(const RowGroup& rg, JobInfo& jobInfo)
 	// query type decides the output by dbroot or partition
 	// @bug 5631. Insert select should be treated as select
 	fIsSelect = (jobInfo.queryType == "SELECT" || 
-	             jobInfo.queryType == "INSERT_SELECT");
+                     jobInfo.queryType == "INSERT_SELECT");
 
 	// input row meta data
 	fRowGroupIn = rg;
@@ -511,12 +518,12 @@ void WindowFunctionStep::initialize(const RowGroup& rg, JobInfo& jobInfo)
 	// make an input map(id, index)
 	map<uint64_t, uint64_t> colIndexMap;
 	uint64_t colCntIn = rg.getColumnCount();
-	const vector<uint>& pos = rg.getOffsets();
-	const vector<uint>& oids = rg.getOIDs();
-	const vector<uint>& keys = rg.getKeys();
+	const vector<uint32_t>& pos = rg.getOffsets();
+	const vector<uint32_t>& oids = rg.getOIDs();
+	const vector<uint32_t>& keys = rg.getKeys();
 	const vector<CalpontSystemCatalog::ColDataType>& types = rg.getColTypes();
-	const vector<uint>& scales = rg.getScale();
-	const vector<uint>& precisions = rg.getPrecision();
+	const vector<uint32_t>& scales = rg.getScale();
+	const vector<uint32_t>& precisions = rg.getPrecision();
 	for (uint64_t i = 0; i < colCntIn; i++)
 		colIndexMap.insert(make_pair(keys[i], i));
 
@@ -567,9 +574,9 @@ void WindowFunctionStep::initialize(const RowGroup& rg, JobInfo& jobInfo)
 		}
 
 		// functors for sorting
-		shared_ptr<EqualCompData> parts(new EqualCompData(eqIdx, rg));
-		shared_ptr<OrderByData> orderbys(new OrderByData(sorts, rg));
-		shared_ptr<EqualCompData> peers(new EqualCompData(peerIdx, rg));
+		boost::shared_ptr<EqualCompData> parts(new EqualCompData(eqIdx, rg));
+		boost::shared_ptr<OrderByData> orderbys(new OrderByData(sorts, rg));
+		boost::shared_ptr<EqualCompData> peers(new EqualCompData(peerIdx, rg));
 
 		// column type for functor templates
 		int ct = 0;
@@ -584,7 +591,7 @@ void WindowFunctionStep::initialize(const RowGroup& rg, JobInfo& jobInfo)
 			ct = types[peerIdx[0]];
 
 		// create the functor based on function name
-		shared_ptr<WindowFunctionType> func =
+		boost::shared_ptr<WindowFunctionType> func =
 			WindowFunctionType::makeWindowFunction(fn, ct);
 
 		// parse parms after peer and fields are set
@@ -599,15 +606,15 @@ void WindowFunctionStep::initialize(const RowGroup& rg, JobInfo& jobInfo)
 		if (frame.fStart.fFrame == WF_UNBOUNDED_PRECEDING &&
 			frame.fEnd.fFrame == WF_UNBOUNDED_FOLLOWING)
 				frameUnit = WF__FRAME_ROWS;
-		shared_ptr<FrameBound> upper = parseFrameBound(
+		boost::shared_ptr<FrameBound> upper = parseFrameBound(
 			frame.fStart, colIndexMap, orders, peers, jobInfo, !frame.fIsRange, true);
-		shared_ptr<FrameBound> lower = parseFrameBound(
+		boost::shared_ptr<FrameBound> lower = parseFrameBound(
 			frame.fEnd, colIndexMap, orders, peers, jobInfo, !frame.fIsRange, false);
-		shared_ptr<WindowFrame> windows(new WindowFrame(frameUnit, upper, lower));
+		boost::shared_ptr<WindowFrame> windows(new WindowFrame(frameUnit, upper, lower));
 		func->frameUnit(frameUnit);
 
 		// add to the function list
-		fFunctions.push_back(shared_ptr<WindowFunction>(
+		fFunctions.push_back(boost::shared_ptr<WindowFunction>(
 			new WindowFunction(func, parts, orderbys, windows, rg, fRowIn)));
 		fFunctionCount++;
 	}
@@ -700,11 +707,11 @@ void WindowFunctionStep::initialize(const RowGroup& rg, JobInfo& jobInfo)
 	}
 
 	size_t retColCount = delColIdx.size();
-	vector<uint> pos1;
-	vector<uint> oids1;
-	vector<uint> keys1;
-	vector<uint> scales1;
-	vector<uint> precisions1;
+	vector<uint32_t> pos1;
+	vector<uint32_t> oids1;
+	vector<uint32_t> keys1;
+	vector<uint32_t> scales1;
+	vector<uint32_t> precisions1;
 	vector<CalpontSystemCatalog::ColDataType> types1;
 	pos1.push_back(2);
 
@@ -814,7 +821,7 @@ void WindowFunctionStep::execute()
 
 			for (uint64_t i = 0; i < fTotalThreads && !cancelled(); i++)
 				fFunctionThreads.push_back(
-					shared_ptr<boost::thread>(new boost::thread(WFunction(this))));
+					boost::shared_ptr<boost::thread>(new boost::thread(WFunction(this))));
 
 			// If cancelled, not all thread is started.
 			for (uint64_t i = 0; i < fFunctionThreads.size(); i++)
@@ -981,6 +988,9 @@ void WindowFunctionStep::doPostProcessForDml()
 			rowOut.nextRow();
 		}
 
+		//fRowGroupOut.resetRowGroup(fRowGroupIn.getBaseRid());
+		//fRowGroupOut.setRowCount(fRowGroupIn.getRowCount());
+
 		fOutputDL->insert(rgData);
 	}
 }
@@ -993,11 +1003,12 @@ void WindowFunctionStep::handleException(string errStr, int errCode)
 }
 
 
-shared_ptr<FrameBound> WindowFunctionStep::parseFrameBoundRows(const execplan::WF_Boundary& b,
+boost::shared_ptr<FrameBound> WindowFunctionStep::parseFrameBoundRows(
+                                                         const execplan::WF_Boundary& b,
                                                          const map<uint64_t, uint64_t>& m,
                                                          JobInfo& jobInfo)
 {
-	shared_ptr<FrameBound> fb;
+	boost::shared_ptr<FrameBound> fb;
 	if (b.fFrame == WF_CURRENT_ROW)
 	{
 		fb.reset(new FrameBoundRow(WF__CURRENT_ROW));
@@ -1089,12 +1100,12 @@ shared_ptr<FrameBound> WindowFunctionStep::parseFrameBoundRows(const execplan::W
 }
 
 
-shared_ptr<FrameBound> WindowFunctionStep::parseFrameBoundRange(const execplan::WF_Boundary& b,
+boost::shared_ptr<FrameBound> WindowFunctionStep::parseFrameBoundRange(const execplan::WF_Boundary& b,
                                                           const map<uint64_t, uint64_t>& m,
                                                           const vector<SRCP>& o,
                                                           JobInfo& jobInfo)
 {
-	shared_ptr<FrameBound> fb;
+	boost::shared_ptr<FrameBound> fb;
 	if (b.fFrame == WF_CURRENT_ROW)
 	{
 		fb.reset(new FrameBoundRange(WF__CURRENT_ROW));
@@ -1241,15 +1252,15 @@ shared_ptr<FrameBound> WindowFunctionStep::parseFrameBoundRange(const execplan::
 }
 
 
-shared_ptr<FrameBound> WindowFunctionStep::parseFrameBound(const execplan::WF_Boundary& b,
+boost::shared_ptr<FrameBound> WindowFunctionStep::parseFrameBound(const execplan::WF_Boundary& b,
                                                      const map<uint64_t, uint64_t>& m,
                                                      const vector<SRCP>& o,
-                                                     const shared_ptr<EqualCompData>& p,
+                                                     const boost::shared_ptr<EqualCompData>& p,
                                                      JobInfo& j,
                                                      bool rows,
                                                      bool s)
 {
-	shared_ptr<FrameBound> fb;
+	boost::shared_ptr<FrameBound> fb;
 
 	switch(b.fFrame)
 	{
@@ -1432,7 +1443,8 @@ void WindowFunctionStep::printCalTrace()
 			<< "\t1st read " << dlTimes.FirstReadTimeString()
 			<< "; EOI " << dlTimes.EndOfInputTimeString() << "; runtime-"
 			<< JSTimeStamp::tsdiffstr(dlTimes.EndOfInputTime(), dlTimes.FirstReadTime())
-			<< "s;\n\tJob completion status " << status() << endl;
+			<< "s;\n\tUUID " << uuids::to_string(fStepUuid) << endl
+			<< "\tJob completion status " << status() << endl;
 	logEnd(logStr.str().c_str());
 	fExtendedInfo += logStr.str();
 	formatMiniStats();

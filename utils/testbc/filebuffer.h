@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -70,7 +70,7 @@ public:
 	/**
 	 * @brief the disk block from lbid@ver, and a data block len bytes long
 	 **/
-	FileBuffer(const BRM::LBID_t lbid, const BRM::VER_t ver, const u_int8_t* data, const uint32_t len);
+	FileBuffer(const BRM::LBID_t lbid, const BRM::VER_t ver, const uint8_t* data, const uint32_t len);
 
 	/**
 	 * @brief disk block lbid@ver and empty data
@@ -85,13 +85,13 @@ public:
 	/**
 	 * @brief set the data value of this block to d have len bytestream
 	 **/
-	void setData(const u_int8_t* d, const int len=8192);
+	void setData(const uint8_t* d, const int len=8192);
 
 	/**
 	 * @brief retrieve the data in byte* format from this data block
 	 **/
-	const u_int8_t* getData() const {return fByteData;}
-	u_int8_t* getData() {return fByteData;}
+	const uint8_t* getData() const {return fByteData;}
+	uint8_t* getData() {return fByteData;}
 
 	const uint32_t datLen() const {return fDataLen;}
 
@@ -137,7 +137,7 @@ public:
 
 private:
 
-	u_int8_t fByteData[WriteEngine::BYTE_PER_BLOCK];
+	uint8_t fByteData[WriteEngine::BYTE_PER_BLOCK];
 	uint32_t fDataLen;
 
 	BRM::LBID_t fLbid;

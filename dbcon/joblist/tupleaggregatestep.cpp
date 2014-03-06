@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -28,6 +28,7 @@ using namespace std;
 #include <boost/shared_ptr.hpp>
 #include <boost/shared_array.hpp>
 #include <boost/scoped_array.hpp>
+#include <boost/uuid/uuid_io.hpp>
 using namespace boost;
 
 #include "messagequeue.h"
@@ -144,7 +145,7 @@ inline string colTypeIdString(CalpontSystemCatalog::ColDataType type)
 }
 
 
-string keyName(uint64_t i, uint key, const joblist::JobInfo& jobInfo)
+string keyName(uint64_t i, uint32_t key, const joblist::JobInfo& jobInfo)
 {
 	string name = jobInfo.projectionCols[i]->alias();
 	if (name.empty())
@@ -204,9 +205,9 @@ TupleAggregateStep::TupleAggregateStep(
 
 TupleAggregateStep::~TupleAggregateStep()
 {
-	for (uint i = 0; i < fNumOfThreads; i++)
+	for (uint32_t i = 0; i < fNumOfThreads; i++)
 		fRm.returnMemory(fMemUsage[i]);
-	for (uint i = 0; i < fAgg_mutex.size(); i++)
+	for (uint32_t i = 0; i < fAgg_mutex.size(); i++)
 		delete fAgg_mutex[i];
 }
 
@@ -214,7 +215,7 @@ TupleAggregateStep::~TupleAggregateStep()
 void TupleAggregateStep::initializeMultiThread()
 {
 	RowGroupDL *dlIn = fInputJobStepAssociation.outAt(0)->rowGroupDL();
-    uint i;
+    uint32_t i;
 
 	if (dlIn == NULL)
 		throw logic_error("Input is not RowGroup data list in delivery step.");
@@ -275,23 +276,23 @@ void TupleAggregateStep::doThreadedSecondPhaseAggregate(uint32_t threadID)
 		Row rowIn;
 		RowGroup* rowGroupIn = 0;
 		rowGroupIn = (aggDist->aggregator()->getOutputRowGroup());
-		uint bucketID;
+		uint32_t bucketID;
 
 		if (multiDist)
 		{
-			for (uint i = 0; i < fNumOfBuckets; i++)
+			for (uint32_t i = 0; i < fNumOfBuckets; i++)
 				rowBucketVecs[i].resize(multiDist->subAggregators().size());
 		}
 		else
 		{
-			for (uint i = 0; i < fNumOfBuckets; i++)
+			for (uint32_t i = 0; i < fNumOfBuckets; i++)
 				rowBucketVecs[i].resize(1);
 		}
 
 		// dispatch rows to bucket
 		if (multiDist)
 		{
-			for (uint j = 0; j < multiDist->subAggregators().size(); j++)
+			for (uint32_t j = 0; j < multiDist->subAggregators().size(); j++)
 			{
 				rowGroupIn = (multiDist->subAggregators()[j]->getOutputRowGroup());
 				rowGroupIn->initRow(&rowIn);
@@ -338,7 +339,7 @@ void TupleAggregateStep::doThreadedSecondPhaseAggregate(uint32_t threadID)
 		while (!done && !cancelled())
 		{
 			done = true;
-			for (uint c = 0; c < fNumOfBuckets && !cancelled(); c++)
+			for (uint32_t c = 0; c < fNumOfBuckets && !cancelled(); c++)
 			{
 				if (!bucketDone[c] && fAgg_mutex[c]->try_lock())
 				{
@@ -399,9 +400,9 @@ void TupleAggregateStep::doThreadedSecondPhaseAggregate(uint32_t threadID)
 }
 
 
-uint TupleAggregateStep::nextBand_singleThread(messageqcpp::ByteStream &bs)
+uint32_t TupleAggregateStep::nextBand_singleThread(messageqcpp::ByteStream &bs)
 {
-	uint rowCount = 0;
+	uint32_t rowCount = 0;
 
 	try
 	{
@@ -496,7 +497,7 @@ bool TupleAggregateStep::nextDeliveredRowGroup()
 }
 
 
-uint TupleAggregateStep::nextBand(messageqcpp::ByteStream &bs)
+uint32_t TupleAggregateStep::nextBand(messageqcpp::ByteStream &bs)
 {
 	// use the orignal single thread model when no group by and distnct.
 	// @bug4314. DO NOT access fAggregtor before the first read of input,
@@ -528,8 +529,8 @@ bool TupleAggregateStep::setPmHJAggregation(JobStep* step)
 void TupleAggregateStep::configDeliveredRowGroup(const JobInfo& jobInfo)
 {
 	// configure the oids and keys
-	vector<uint> oids = fRowGroupOut.getOIDs();
-	vector<uint> keys = fRowGroupOut.getKeys();
+	vector<uint32_t> oids = fRowGroupOut.getOIDs();
+	vector<uint32_t> keys = fRowGroupOut.getKeys();
 	vector<pair<int, int> >::const_iterator begin = jobInfo.aggEidIndexList.begin();
 	vector<pair<int, int> >::const_iterator end   = jobInfo.aggEidIndexList.end();
 	for (vector<pair<int, int> >::const_iterator i = begin; i != end; i++)
@@ -539,7 +540,7 @@ void TupleAggregateStep::configDeliveredRowGroup(const JobInfo& jobInfo)
 	}
 
 	// correct the scale
-	vector<uint> scale = fRowGroupOut.getScale();
+	vector<uint32_t> scale = fRowGroupOut.getScale();
 	for (uint64_t i = 0; i < scale.size(); i++)
 	{
 		// to support CNX_DECIMAL_SCALE the avg column's scale is coded with two scales:
@@ -551,18 +552,18 @@ void TupleAggregateStep::configDeliveredRowGroup(const JobInfo& jobInfo)
 	size_t retColCount = jobInfo.nonConstDelCols.size();
 	if (jobInfo.havingStep)
 		retColCount = jobInfo.returnedColVec.size();
-	vector<uint>::const_iterator offsets0 = fRowGroupOut.getOffsets().begin();
+	vector<uint32_t>::const_iterator offsets0 = fRowGroupOut.getOffsets().begin();
 	vector<CalpontSystemCatalog::ColDataType>::const_iterator types0 =
 																fRowGroupOut.getColTypes().begin();
 
-	vector<uint>::const_iterator precision0 = fRowGroupOut.getPrecision().begin();
+	vector<uint32_t>::const_iterator precision0 = fRowGroupOut.getPrecision().begin();
 	fRowGroupDelivered = RowGroup(retColCount,
-							vector<uint>(offsets0, offsets0+retColCount+1),
-							vector<uint>(oids.begin(), oids.begin()+retColCount),
-							vector<uint>(keys.begin(), keys.begin()+retColCount),
+							vector<uint32_t>(offsets0, offsets0+retColCount+1),
+							vector<uint32_t>(oids.begin(), oids.begin()+retColCount),
+							vector<uint32_t>(keys.begin(), keys.begin()+retColCount),
 							vector<CalpontSystemCatalog::ColDataType>(types0, types0+retColCount),
-							vector<uint>(scale.begin(), scale.begin()+retColCount),
-							vector<uint>(precision0, precision0+retColCount),
+							vector<uint32_t>(scale.begin(), scale.begin()+retColCount),
+							vector<uint32_t>(precision0, precision0+retColCount),
 							jobInfo.stringTableThreshold);
 
 	if (jobInfo.trace)
@@ -647,7 +648,7 @@ SJSTEP TupleAggregateStep::prepAggregate(SJSTEP& step, JobInfo& jobInfo)
 	vector<ConstantAggData> constAggDataVec;
 
 	vector<std::pair<uint32_t, int> > returnedColVecOrig = jobInfo.returnedColVec;
-	for(uint idx = 0; idx < jobInfo.returnedColVec.size(); idx++)
+	for(uint32_t idx = 0; idx < jobInfo.returnedColVec.size(); idx++)
 	{
 		if (jobInfo.returnedColVec[idx].second == AggregateColumn::DISTINCT_COUNT ||
 			jobInfo.returnedColVec[idx].second == AggregateColumn::DISTINCT_AVG ||
@@ -891,29 +892,29 @@ void TupleAggregateStep::prep1PhaseAggregate(
 	// 1. get projected rowgroup (done by doAggProject) -- passed in
 	// 2. construct aggregate rowgroup  -- output of UM
 	const RowGroup projRG = rowgroups[0];
-	const vector<uint>& oidsProj = projRG.getOIDs();
-	const vector<uint>& keysProj = projRG.getKeys();
-	const vector<uint>& scaleProj = projRG.getScale();
-	const vector<uint>& precisionProj = projRG.getPrecision();
+	const vector<uint32_t>& oidsProj = projRG.getOIDs();
+	const vector<uint32_t>& keysProj = projRG.getKeys();
+	const vector<uint32_t>& scaleProj = projRG.getScale();
+	const vector<uint32_t>& precisionProj = projRG.getPrecision();
 	const vector<CalpontSystemCatalog::ColDataType>& typeProj = projRG.getColTypes();
 
-	vector<uint> posAgg;
-	vector<uint> oidsAgg;
-	vector<uint> keysAgg;
-	vector<uint> scaleAgg;
-	vector<uint> precisionAgg;
+	vector<uint32_t> posAgg;
+	vector<uint32_t> oidsAgg;
+	vector<uint32_t> keysAgg;
+	vector<uint32_t> scaleAgg;
+	vector<uint32_t> precisionAgg;
 	vector<CalpontSystemCatalog::ColDataType> typeAgg;
-	vector<uint> widthAgg;
+	vector<uint32_t> widthAgg;
 	vector<SP_ROWAGG_GRPBY_t> groupBy;
 	vector<SP_ROWAGG_FUNC_t> functionVec;
-	uint bigIntWidth = sizeof(int64_t);
-	uint bigUintWidth = sizeof(uint64_t);
+	uint32_t bigIntWidth = sizeof(int64_t);
+	uint32_t bigUintWidth = sizeof(uint64_t);
 
 	// for count column of average function
 	map<uint32_t, SP_ROWAGG_FUNC_t> avgFuncMap;
 
 	// collect the projected column info, prepare for aggregation
-	vector<uint> width;
+	vector<uint32_t> width;
 	map<uint32_t, int> projColPosMap;
 	for (uint64_t i = 0; i < keysProj.size(); i++)
 	{
@@ -946,7 +947,7 @@ void TupleAggregateStep::prep1PhaseAggregate(
 	{
 		RowAggFunctionType aggOp = functionIdMap(returnedColVec[i].second);
 		RowAggFunctionType stats = statsFuncIdMap(returnedColVec[i].second);
-		uint key = returnedColVec[i].first;
+		uint32_t key = returnedColVec[i].first;
 
 		if (aggOp == ROWAGG_CONSTANT)
 		{
@@ -966,8 +967,8 @@ void TupleAggregateStep::prep1PhaseAggregate(
 		if (aggOp == ROWAGG_GROUP_CONCAT)
 		{
 			TupleInfo ti = getExpTupleInfo(key, jobInfo);
-			uint ptrSize = sizeof(GroupConcatAg*);
-			uint width = (ti.width >= ptrSize) ? ti.width : ptrSize;
+			uint32_t ptrSize = sizeof(GroupConcatAg*);
+			uint32_t width = (ti.width >= ptrSize) ? ti.width : ptrSize;
 			oidsAgg.push_back(ti.oid);
 			keysAgg.push_back(key);
 			scaleAgg.push_back(ti.scale);
@@ -1128,7 +1129,7 @@ void TupleAggregateStep::prep1PhaseAggregate(
 				else if (isUnsigned(typeProj[colProj]))
 				{
 					typeAgg.push_back(CalpontSystemCatalog::UBIGINT);
-					uint scale = scaleProj[colProj];
+					uint32_t scale = scaleProj[colProj];
 					// for int average, FE expects a decimal
 					if (aggOp == ROWAGG_AVG)
 						scale = jobInfo.scaleOfAvg[key]; // scale += 4;
@@ -1139,7 +1140,7 @@ void TupleAggregateStep::prep1PhaseAggregate(
 				else
 				{
 					typeAgg.push_back(CalpontSystemCatalog::BIGINT);
-					uint scale = scaleProj[colProj];
+					uint32_t scale = scaleProj[colProj];
 					// for int average, FE expects a decimal
 					if (aggOp == ROWAGG_AVG)
 						scale = jobInfo.scaleOfAvg[key]; // scale += 4;
@@ -1334,22 +1335,22 @@ void TupleAggregateStep::prep1PhaseDistinctAggregate(
 	// 1. get projected rowgroup (done by doAggProject) -- passed in
 	// 2. construct aggregate rowgroup  -- output of UM
 	const RowGroup projRG = rowgroups[0];
-	const vector<uint>& oidsProj = projRG.getOIDs();
-	const vector<uint>& keysProj = projRG.getKeys();
-	const vector<uint>& scaleProj = projRG.getScale();
-	const vector<uint>& precisionProj = projRG.getPrecision();
+	const vector<uint32_t>& oidsProj = projRG.getOIDs();
+	const vector<uint32_t>& keysProj = projRG.getKeys();
+	const vector<uint32_t>& scaleProj = projRG.getScale();
+	const vector<uint32_t>& precisionProj = projRG.getPrecision();
 	const vector<CalpontSystemCatalog::ColDataType>& typeProj = projRG.getColTypes();
 
-	vector<uint> posAgg, posAggDist;
-	vector<uint> oidsAgg, oidsAggDist;
-	vector<uint> keysAgg, keysAggDist;
-	vector<uint> scaleAgg, scaleAggDist;
-	vector<uint> precisionAgg, precisionAggDist;
+	vector<uint32_t> posAgg, posAggDist;
+	vector<uint32_t> oidsAgg, oidsAggDist;
+	vector<uint32_t> keysAgg, keysAggDist;
+	vector<uint32_t> scaleAgg, scaleAggDist;
+	vector<uint32_t> precisionAgg, precisionAggDist;
 	vector<CalpontSystemCatalog::ColDataType> typeAgg, typeAggDist;
-	vector<uint> widthProj, widthAgg, widthAggDist;
+	vector<uint32_t> widthProj, widthAgg, widthAggDist;
 	vector<SP_ROWAGG_GRPBY_t> groupBy, groupByNoDist;
 	vector<SP_ROWAGG_FUNC_t> functionVec1, functionVec2, functionNoDistVec;
-	uint bigIntWidth = sizeof(int64_t);
+	uint32_t bigIntWidth = sizeof(int64_t);
 	map<pair<uint32_t, int>, uint64_t> aggFuncMap;
 	set<uint32_t> avgSet;
 
@@ -1456,7 +1457,7 @@ void TupleAggregateStep::prep1PhaseDistinctAggregate(
 			if (aggOp == ROWAGG_GROUP_CONCAT)
 			{
 				TupleInfo ti = getExpTupleInfo(aggKey, jobInfo);
-				uint width = sizeof(GroupConcatAg*);
+				uint32_t width = sizeof(GroupConcatAg*);
 				oidsAgg.push_back(ti.oid);
 				keysAgg.push_back(aggKey);
 				scaleAgg.push_back(ti.scale);
@@ -1543,7 +1544,7 @@ void TupleAggregateStep::prep1PhaseDistinctAggregate(
 						typeProj[colProj] != CalpontSystemCatalog::FLOAT)
 					{
 						typeAgg.push_back(CalpontSystemCatalog::BIGINT);
-						uint scale = scaleProj[colProj];
+						uint32_t scale = scaleProj[colProj];
 						// for int average, FE expects a decimal
 						if (aggOp == ROWAGG_AVG)
 							scale = jobInfo.scaleOfAvg[aggKey]; // scale += 4;
@@ -1653,7 +1654,7 @@ void TupleAggregateStep::prep1PhaseDistinctAggregate(
 
 	// populated the functionNoDistVec
 	{
-//		for (uint idx = 0; idx < functionVec1.size(); idx++)
+//		for (uint32_t idx = 0; idx < functionVec1.size(); idx++)
 //		{
 //			SP_ROWAGG_FUNC_t func1 = functionVec1[idx];
 //			SP_ROWAGG_FUNC_t funct(
@@ -1740,7 +1741,7 @@ void TupleAggregateStep::prep1PhaseDistinctAggregate(
 						typeAgg[colAgg] != CalpontSystemCatalog::FLOAT)
 					{
 						typeAggDist.push_back(CalpontSystemCatalog::BIGINT);
-						uint scale = scaleProj[colAgg];
+						uint32_t scale = scaleProj[colAgg];
 						// for int average, FE expects a decimal
 						if (aggOp == ROWAGG_DISTINCT_AVG)
 							scale = jobInfo.scaleOfAvg[retKey]; // scale += 4;
@@ -1792,7 +1793,7 @@ void TupleAggregateStep::prep1PhaseDistinctAggregate(
 						scaleAggDist.push_back(scaleAgg[colAgg]);
 						precisionAggDist.push_back(precisionAgg[colAgg]);
 						typeAggDist.push_back(typeAgg[colAgg]);
-						uint width = widthAgg[colAgg];
+						uint32_t width = widthAgg[colAgg];
 						if (aggOp == ROWAGG_GROUP_CONCAT)
 						{
 							TupleInfo ti = getExpTupleInfo(retKey, jobInfo);
@@ -2119,13 +2120,13 @@ void TupleAggregateStep::prep1PhaseDistinctAggregate(
 		rowAggDist->groupConcat(jobInfo.groupConcatInfo.groupConcat());
 
 		// construct and add sub-aggregators to rowAggDist
-		vector<uint> posAggGb, posAggSub;
-		vector<uint> oidsAggGb, oidsAggSub;
-		vector<uint> keysAggGb, keysAggSub;
-		vector<uint> scaleAggGb, scaleAggSub;
-		vector<uint> precisionAggGb, precisionAggSub;
+		vector<uint32_t> posAggGb, posAggSub;
+		vector<uint32_t> oidsAggGb, oidsAggSub;
+		vector<uint32_t> keysAggGb, keysAggSub;
+		vector<uint32_t> scaleAggGb, scaleAggSub;
+		vector<uint32_t> precisionAggGb, precisionAggSub;
 		vector<CalpontSystemCatalog::ColDataType> typeAggGb, typeAggSub;
-		vector<uint> widthAggGb, widthAggSub;
+		vector<uint32_t> widthAggGb, widthAggSub;
 
 		// populate groupby column info
 		for (uint64_t i = 0; i < jobInfo.groupByColVec.size(); i++)
@@ -2142,7 +2143,7 @@ void TupleAggregateStep::prep1PhaseDistinctAggregate(
 		vector<SP_ROWAGG_DIST> rowAggSubDistVec;
 		for (uint64_t i = 0; i < jobInfo.distinctColVec.size(); i++)
 		{
-			uint distinctColKey = jobInfo.distinctColVec[i];
+			uint32_t distinctColKey = jobInfo.distinctColVec[i];
 			uint64_t j = -1;
 
 			// locate the distinct key in the row group
@@ -2337,23 +2338,23 @@ void TupleAggregateStep::prep2PhasesAggregate(
 	// 2. construct aggregate rowgroup  -- output of PM, input of UM
 	// 3. construct aggregate rowgroup  -- output of UM
 	const RowGroup projRG = rowgroups[0];
-	const vector<uint>& oidsProj = projRG.getOIDs();
-	const vector<uint>& keysProj = projRG.getKeys();
-	const vector<uint>& scaleProj = projRG.getScale();
-	const vector<uint>& precisionProj = projRG.getPrecision();
+	const vector<uint32_t>& oidsProj = projRG.getOIDs();
+	const vector<uint32_t>& keysProj = projRG.getKeys();
+	const vector<uint32_t>& scaleProj = projRG.getScale();
+	const vector<uint32_t>& precisionProj = projRG.getPrecision();
 	const vector<CalpontSystemCatalog::ColDataType>& typeProj = projRG.getColTypes();
 
-	vector<uint> posAggPm, posAggUm;
-	vector<uint> oidsAggPm, oidsAggUm;
-	vector<uint> keysAggPm, keysAggUm;
-	vector<uint> scaleAggPm, scaleAggUm;
-	vector<uint> precisionAggPm, precisionAggUm;
+	vector<uint32_t> posAggPm, posAggUm;
+	vector<uint32_t> oidsAggPm, oidsAggUm;
+	vector<uint32_t> keysAggPm, keysAggUm;
+	vector<uint32_t> scaleAggPm, scaleAggUm;
+	vector<uint32_t> precisionAggPm, precisionAggUm;
 	vector<CalpontSystemCatalog::ColDataType> typeAggPm, typeAggUm;
-	vector<uint> widthAggPm, widthAggUm;
+	vector<uint32_t> widthAggPm, widthAggUm;
 	vector<SP_ROWAGG_GRPBY_t> groupByPm, groupByUm;
 	vector<SP_ROWAGG_FUNC_t> functionVecPm, functionVecUm;
-	uint bigIntWidth = sizeof(int64_t);
-	uint bigUintWidth = sizeof(uint64_t);
+	uint32_t bigIntWidth = sizeof(int64_t);
+	uint32_t bigUintWidth = sizeof(uint64_t);
 	map<pair<uint32_t, int>, uint64_t> aggFuncMap;
 
 	// associate the columns between projected RG and aggregate RG on PM
@@ -2363,7 +2364,7 @@ void TupleAggregateStep::prep2PhasesAggregate(
 	{
 		// project only uniq oids, but they may be repeated in aggregation
 		// collect the projected column info, prepare for aggregation
-		vector<uint> width;
+		vector<uint32_t> width;
 		map<uint32_t, int> projColPosMap;
 		for (uint64_t i = 0; i < keysProj.size(); i++)
 		{
@@ -2528,7 +2529,7 @@ void TupleAggregateStep::prep2PhasesAggregate(
 					else if (isUnsigned(typeProj[colProj]))
 					{
 						typeAggPm.push_back(CalpontSystemCatalog::UBIGINT);
-						uint scale = scaleProj[colProj];
+						uint32_t scale = scaleProj[colProj];
 						// for int average, FE expects a decimal
 						if (aggOp == ROWAGG_AVG)
 							scale = jobInfo.scaleOfAvg[aggKey]; // scale += 4;
@@ -2539,7 +2540,7 @@ void TupleAggregateStep::prep2PhasesAggregate(
 					else
 					{
 						typeAggPm.push_back(CalpontSystemCatalog::BIGINT);
-						uint scale = scaleProj[colProj];
+						uint32_t scale = scaleProj[colProj];
 						// for int average, FE expects a decimal
 						if (aggOp == ROWAGG_AVG)
 							scale = jobInfo.scaleOfAvg[aggKey]; // scale += 4;
@@ -2734,7 +2735,7 @@ void TupleAggregateStep::prep2PhasesAggregate(
 				else if (jobInfo.windowSet.find(retKey) != jobInfo.windowSet.end())
 				{
 					// an window function
-					uint tblKey = jobInfo.keyInfo->colKeyToTblKey[retKey];
+					uint32_t tblKey = jobInfo.keyInfo->colKeyToTblKey[retKey];
 					TupleInfo ti = getTupleInfo(tblKey, retKey, jobInfo);
 					oidsAggUm.push_back(ti.oid);
 					keysAggUm.push_back(retKey);
@@ -2982,24 +2983,24 @@ void TupleAggregateStep::prep2PhasesDistinctAggregate(
 	// 4. construct aggregate rowgroup  -- output of distinct aggregates
 
 	const RowGroup projRG = rowgroups[0];
-	const vector<uint>& oidsProj = projRG.getOIDs();
-	const vector<uint>& keysProj = projRG.getKeys();
-	const vector<uint>& scaleProj = projRG.getScale();
-	const vector<uint>& precisionProj = projRG.getPrecision();
+	const vector<uint32_t>& oidsProj = projRG.getOIDs();
+	const vector<uint32_t>& keysProj = projRG.getKeys();
+	const vector<uint32_t>& scaleProj = projRG.getScale();
+	const vector<uint32_t>& precisionProj = projRG.getPrecision();
 	const vector<CalpontSystemCatalog::ColDataType>& typeProj = projRG.getColTypes();
 
-	vector<uint> posAggPm, posAggUm, posAggDist;
-	vector<uint> oidsAggPm, oidsAggUm, oidsAggDist;
-	vector<uint> keysAggPm, keysAggUm, keysAggDist;
-	vector<uint> scaleAggPm, scaleAggUm, scaleAggDist;
-	vector<uint> precisionAggPm, precisionAggUm, precisionAggDist;
+	vector<uint32_t> posAggPm, posAggUm, posAggDist;
+	vector<uint32_t> oidsAggPm, oidsAggUm, oidsAggDist;
+	vector<uint32_t> keysAggPm, keysAggUm, keysAggDist;
+	vector<uint32_t> scaleAggPm, scaleAggUm, scaleAggDist;
+	vector<uint32_t> precisionAggPm, precisionAggUm, precisionAggDist;
 	vector<CalpontSystemCatalog::ColDataType> typeAggPm, typeAggUm, typeAggDist;
-	vector<uint> widthAggPm, widthAggUm, widthAggDist;
+	vector<uint32_t> widthAggPm, widthAggUm, widthAggDist;
 
 	vector<SP_ROWAGG_GRPBY_t> groupByPm, groupByUm, groupByNoDist;
 	vector<SP_ROWAGG_FUNC_t> functionVecPm, functionNoDistVec, functionVecUm;
 
-	uint bigIntWidth = sizeof(int64_t);
+	uint32_t bigIntWidth = sizeof(int64_t);
 	map<pair<uint32_t, int>, uint64_t> aggFuncMap, avgFuncDistMap;
 
 	// associate the columns between projected RG and aggregate RG on PM
@@ -3009,7 +3010,7 @@ void TupleAggregateStep::prep2PhasesDistinctAggregate(
 	{
 		// project only uniq oids, but they may be repeated in aggregation
 		// collect the projected column info, prepare for aggregation
-		vector<uint> width;
+		vector<uint32_t> width;
 		map<uint32_t, int> projColPosMap;
 		for (uint64_t i = 0; i < keysProj.size(); i++)
 		{
@@ -3173,7 +3174,7 @@ void TupleAggregateStep::prep2PhasesDistinctAggregate(
 						typeProj[colProj] != CalpontSystemCatalog::FLOAT)
 					{
 						typeAggPm.push_back(CalpontSystemCatalog::BIGINT);
-						uint scale = scaleProj[colProj];
+						uint32_t scale = scaleProj[colProj];
 						// for int average, FE expects a decimal
 						if (aggOp == ROWAGG_AVG)
 							scale = jobInfo.scaleOfAvg[aggKey]; // scale += 4;
@@ -3285,13 +3286,13 @@ void TupleAggregateStep::prep2PhasesDistinctAggregate(
 	// associate the columns between the aggregate RGs on PM and UM without distinct aggregator
 	// populated the returned columns
 	{
-		for (uint idx = 0; idx < groupByPm.size(); idx++)
+		for (uint32_t idx = 0; idx < groupByPm.size(); idx++)
 		{
 			SP_ROWAGG_GRPBY_t groupby(new RowAggGroupByCol(idx, idx));
 			groupByUm.push_back(groupby);
 		}
 
-		for (uint idx = 0; idx < functionVecPm.size(); idx++)
+		for (uint32_t idx = 0; idx < functionVecPm.size(); idx++)
 		{
 			SP_ROWAGG_FUNC_t funcPm = functionVecPm[idx];
 			SP_ROWAGG_FUNC_t funct(new RowAggFunctionCol(
@@ -3387,7 +3388,7 @@ void TupleAggregateStep::prep2PhasesDistinctAggregate(
 						typeAggUm[colUm] != CalpontSystemCatalog::FLOAT)
 					{
 						typeAggDist.push_back(CalpontSystemCatalog::BIGINT);
-						uint scale = scaleAggUm[colUm];
+						uint32_t scale = scaleAggUm[colUm];
 						// for int average, FE expects a decimal
 						if (aggOp == ROWAGG_DISTINCT_AVG)
 							scale = jobInfo.scaleOfAvg[retKey]; // scale += 4;
@@ -3501,7 +3502,7 @@ void TupleAggregateStep::prep2PhasesDistinctAggregate(
 						else if (jobInfo.windowSet.find(retKey) != jobInfo.windowSet.end())
 						{
 							// a window function
-							uint tblKey = jobInfo.keyInfo->colKeyToTblKey[retKey];
+							uint32_t tblKey = jobInfo.keyInfo->colKeyToTblKey[retKey];
 							TupleInfo ti = getTupleInfo(tblKey, retKey, jobInfo);
 							oidsAggDist.push_back(ti.oid);
 							keysAggDist.push_back(retKey);
@@ -3713,13 +3714,13 @@ void TupleAggregateStep::prep2PhasesDistinctAggregate(
 		rowAggDist.reset(multiDistinctAggregator);
 
 		// construct and add sub-aggregators to rowAggDist
-		vector<uint> posAggGb, posAggSub;
-		vector<uint> oidsAggGb, oidsAggSub;
-		vector<uint> keysAggGb, keysAggSub;
-		vector<uint> scaleAggGb, scaleAggSub;
-		vector<uint> precisionAggGb, precisionAggSub;
+		vector<uint32_t> posAggGb, posAggSub;
+		vector<uint32_t> oidsAggGb, oidsAggSub;
+		vector<uint32_t> keysAggGb, keysAggSub;
+		vector<uint32_t> scaleAggGb, scaleAggSub;
+		vector<uint32_t> precisionAggGb, precisionAggSub;
 		vector<CalpontSystemCatalog::ColDataType> typeAggGb, typeAggSub;
-		vector<uint> widthAggGb, widthAggSub;
+		vector<uint32_t> widthAggGb, widthAggSub;
 
 		// populate groupby column info
 		for (uint64_t i = 0; i < jobInfo.groupByColVec.size(); i++)
@@ -3736,7 +3737,7 @@ void TupleAggregateStep::prep2PhasesDistinctAggregate(
 		vector<SP_ROWAGG_DIST> rowAggSubDistVec;
 		for (uint64_t i = 0; i < jobInfo.distinctColVec.size(); i++)
 		{
-			uint distinctColKey = jobInfo.distinctColVec[i];
+			uint32_t distinctColKey = jobInfo.distinctColVec[i];
 			uint64_t j = -1;
 
 			// locate the distinct key in the row group
@@ -3907,7 +3908,7 @@ void TupleAggregateStep::prep2PhasesDistinctAggregate(
 
 void TupleAggregateStep::prepExpressionOnAggregate(SP_ROWAGG_UM_t& aggUM, JobInfo& jobInfo)
 {
-	map<uint, uint> keyToIndexMap;
+	map<uint32_t, uint32_t> keyToIndexMap;
 	for (uint64_t i = 0; i < fRowGroupOut.getKeys().size(); ++i)
 	{
 		if (keyToIndexMap.find(fRowGroupOut.getKeys()[i]) == keyToIndexMap.end())
@@ -3944,7 +3945,7 @@ void TupleAggregateStep::prepExpressionOnAggregate(SP_ROWAGG_UM_t& aggUM, JobInf
 		// update the output index
 		if (eid != (uint64_t) -1)
 		{
-			map<uint, uint>::iterator mit = keyToIndexMap.find(getExpTupleKey(jobInfo, eid));
+			map<uint32_t, uint32_t>::iterator mit = keyToIndexMap.find(getExpTupleKey(jobInfo, eid));
 
 			if (mit != keyToIndexMap.end())
 			{
@@ -3964,7 +3965,7 @@ void TupleAggregateStep::prepExpressionOnAggregate(SP_ROWAGG_UM_t& aggUM, JobInf
 	for (vector<SimpleColumn*>::iterator i = simpleColumns.begin(); i != simpleColumns.end(); i++)
 	{
 		CalpontSystemCatalog::OID oid = (*i)->oid();
-		uint key = getTupleKey(jobInfo, *i);
+		uint32_t key = getTupleKey(jobInfo, *i);
 		CalpontSystemCatalog::OID dictOid = joblist::isDictCol((*i)->colType());
 		if (dictOid > 0)
 		{
@@ -3972,7 +3973,7 @@ void TupleAggregateStep::prepExpressionOnAggregate(SP_ROWAGG_UM_t& aggUM, JobInf
 			key = jobInfo.keyInfo->dictKeyMap[key];
 		}
 
-		map<uint, uint>::iterator mit = keyToIndexMap.find(key);
+		map<uint32_t, uint32_t>::iterator mit = keyToIndexMap.find(key);
 
 		if (mit != keyToIndexMap.end())
 		{
@@ -4087,10 +4088,10 @@ void TupleAggregateStep::threadedAggregateRowGroups(uint32_t threadID)
 	scoped_array<RowBucketVec> rowBucketVecs(new RowBucketVec[fNumOfBuckets]);
 	scoped_array<Row> distRow;
 	scoped_array<shared_array<uint8_t> > distRowData;
-	uint bucketID;
+	uint32_t bucketID;
 	scoped_array<bool> bucketDone(new bool[fNumOfBuckets]);
 	vector<utils::TupleHasher*> hashs;
-	vector<uint> hashLens;
+	vector<uint32_t> hashLens;
 	bool locked = false;
 	bool more = true;
 	RowGroupDL *dlIn = NULL;
@@ -4124,7 +4125,7 @@ void TupleAggregateStep::threadedAggregateRowGroups(uint32_t threadID)
 			{
 				fMutex.lock();
 				locked = true;
-				for (uint c = 0; c < fNumOfRowGroups && !cancelled(); c++)
+				for (uint32_t c = 0; c < fNumOfRowGroups && !cancelled(); c++)
 				{
 					more = dlIn->next(fInputIter, &rgData);
 					if (firstRead)
@@ -4134,13 +4135,13 @@ void TupleAggregateStep::threadedAggregateRowGroups(uint32_t threadID)
 						multiDist = dynamic_cast<RowAggregationMultiDistinct*>(fAggregator.get());
 						if (multiDist)
 						{
-							for (uint i = 0; i < fNumOfBuckets; i++)
+							for (uint32_t i = 0; i < fNumOfBuckets; i++)
 								rowBucketVecs[i].resize(multiDist->subAggregators().size());
 
 							distRow.reset(new Row[multiDist->subAggregators().size()]);
 							distRowData.reset(new shared_array<uint8_t>[
 													multiDist->subAggregators().size()]);
-							for (uint j = 0; j < multiDist->subAggregators().size(); j++)
+							for (uint32_t j = 0; j < multiDist->subAggregators().size(); j++)
 							{
 								multiDist->subAggregators()[j]->getOutputRowGroup()->initRow(
 																	&distRow[j], true);
@@ -4151,7 +4152,7 @@ void TupleAggregateStep::threadedAggregateRowGroups(uint32_t threadID)
 						}
 						else
 						{
-							for (uint i = 0; i < fNumOfBuckets; i++)
+							for (uint32_t i = 0; i < fNumOfBuckets; i++)
 								rowBucketVecs[i].resize(1);
 
 							if (dynamic_cast<RowAggregationDistinct*>(fAggregator.get()))
@@ -4213,7 +4214,7 @@ void TupleAggregateStep::threadedAggregateRowGroups(uint32_t threadID)
 				if (fAggregators.empty())
 				{
 					fAggregators.resize(fNumOfBuckets);
-					for (uint i = 0; i < fNumOfBuckets; i++)
+					for (uint32_t i = 0; i < fNumOfBuckets; i++)
 					{
 						fAggregators[i].reset(fAggregator->clone());
 						fAggregators[i]->setInputOutput(fRowGroupIn, &fRowGroupOuts[i]);
@@ -4227,10 +4228,10 @@ void TupleAggregateStep::threadedAggregateRowGroups(uint32_t threadID)
 				// dispatch rows to row buckets
 				if (multiDist)
 				{
-					for (uint c = 0; c < rgDatas.size(); c++)
+					for (uint32_t c = 0; c < rgDatas.size(); c++)
 					{
 						fRowGroupIns[threadID].setData(&rgDatas[c]);
-						for (uint j = 0; j < multiDist->subAggregators().size(); j++)
+						for (uint32_t j = 0; j < multiDist->subAggregators().size(); j++)
 						{
 							fRowGroupIns[threadID].getRow(0, &rowIn);
 							for (uint64_t i = 0; i < fRowGroupIns[threadID].getRowCount(); ++i)
@@ -4250,7 +4251,7 @@ void TupleAggregateStep::threadedAggregateRowGroups(uint32_t threadID)
 				}
 				else
 				{
-					for (uint c = 0; c < rgDatas.size(); c++)
+					for (uint32_t c = 0; c < rgDatas.size(); c++)
 					{
 						fRowGroupIns[threadID].setData(&rgDatas[c]);
 						fRowGroupIns[threadID].getRow(0, &rowIn);
@@ -4271,7 +4272,7 @@ void TupleAggregateStep::threadedAggregateRowGroups(uint32_t threadID)
 				{
 					bool didWork = false;
 					done = true;
-					for (uint c = 0; c < fNumOfBuckets && !cancelled(); c++)
+					for (uint32_t c = 0; c < fNumOfBuckets && !cancelled(); c++)
 					{
 						if (!fEndOfResult && !bucketDone[c] && fAgg_mutex[c]->try_lock())
 						{
@@ -4468,15 +4469,15 @@ uint64_t TupleAggregateStep::doThreadedAggregate(ByteStream& bs, RowGroupDL* dlp
 			{
 				if (!fDoneAggregate)
 				{
-					vector<shared_ptr<thread> > runners;
-					shared_ptr<thread> runner;
+					vector<boost::shared_ptr<thread> > runners;
+					boost::shared_ptr<thread> runner;
 					fRowGroupsDeliveredData.resize(fNumOfBuckets);
 
-                    uint bucketsPerThread = fNumOfBuckets/fNumOfThreads;
-                    uint numThreads = ((fNumOfBuckets % fNumOfThreads) == 0 ?
+                    uint32_t bucketsPerThread = fNumOfBuckets/fNumOfThreads;
+                    uint32_t numThreads = ((fNumOfBuckets % fNumOfThreads) == 0 ?
                         fNumOfThreads : fNumOfThreads + 1);
-                    //uint bucketsPerThread = 1;
-                    //uint numThreads = fNumOfBuckets;
+                    //uint32_t bucketsPerThread = 1;
+                    //uint32_t numThreads = fNumOfBuckets;
 
                     for (i = 0; i < numThreads; i++)
                     {
@@ -4668,7 +4669,8 @@ void TupleAggregateStep::printCalTrace()
 			<< "\t1st read " << dlTimes.FirstReadTimeString()
 			<< "; EOI " << dlTimes.EndOfInputTimeString() << "; runtime-"
 			<< JSTimeStamp::tsdiffstr(dlTimes.EndOfInputTime(), dlTimes.FirstReadTime())
-			<< "s;\n\tJob completion status " << status() << endl;
+			<< "s;\n\tUUID " << uuids::to_string(fStepUuid) << endl
+			<< "\tJob completion status " << status() << endl;
 	logEnd(logStr.str().c_str());
 	fExtendedInfo += logStr.str();
 	formatMiniStats();

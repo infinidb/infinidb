@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -138,7 +138,7 @@ public:
 	*
 	* return the name of this config file.
 	*/
-	inline const std::string& configFile() const { return fConfigFile; }
+	EXPORT inline const std::string& configFile() const { return fConfigFile; }
 
 	/** @brief delete all config file instances
 	*
@@ -160,7 +160,7 @@ public:
 	*
 	* Return an unsigned numeric value.
 	*/
-	static inline uint64_t uFromText(const std::string& text) { return static_cast<uint64_t>(fromText(text)); }
+	EXPORT static inline uint64_t uFromText(const std::string& text) { return static_cast<uint64_t>(fromText(text)); }
 
 	/** @brief Used externally to check whether there has been a config change without loading everything
 	 *
@@ -181,7 +181,7 @@ protected:
 	/** @brief write the XML tree to disk
 	*
 	*/
-	void writeConfig(const std::string& fileName) const;
+	EXPORT void writeConfig(const std::string& fileName) const;
 
 	/** @brief stop processing this XML file
 	*

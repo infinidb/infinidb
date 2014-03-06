@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -62,7 +62,7 @@ public:
    */
   DDLIndexPopulator(WriteEngine::WriteEngineWrapper* writeEngine, 
 		    execplan::SessionManager* sessionManager, 
-		    u_int32_t sessionID, 
+		    uint32_t sessionID, 
 		    execplan::CalpontSystemCatalog::SCN txnID, 
 		    DDLPackageProcessor::DDLResult& result, 
 		    const DDLPackageProcessor::IndexOID& idxOID, 
@@ -245,7 +245,7 @@ public:
 
     WriteEngine::WriteEngineWrapper*	fWriteEngine;
     execplan::SessionManager*        	fSessionManager;
-    u_int32_t 				fSessionID;
+    uint32_t 				fSessionID;
     execplan::CalpontSystemCatalog::SCN fTxnID;
     DDLPackageProcessor::DDLResult	fResult;
     DDLPackageProcessor::IndexOID    	fIdxOID;

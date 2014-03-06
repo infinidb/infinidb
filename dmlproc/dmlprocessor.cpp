@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -23,6 +23,7 @@
 /** @file */
 #include "configcpp.h"
 #include <signal.h>
+#include <ctime>
 
 //#define      SERIALIZE_DDL_DML_CPIMPORT    1
 #include <boost/thread/mutex.hpp>
@@ -55,6 +56,9 @@ using namespace joblist;
 using namespace logging;
 using namespace oam;
 using namespace WriteEngine;
+
+#include "querytele.h"
+using namespace querytele;
 
 extern boost::mutex mute;
 extern boost::condition_variable cond;
@@ -275,10 +279,18 @@ PackageHandler::PackageHandler(const messageqcpp::IOSocket& ios,
 							   uint64_t maxDeleteRows,
 							   uint32_t sessionID, 
 							   execplan::CalpontSystemCatalog::SCN txnId,
-							   DBRM * aDbrm) : 
-		fIos(ios), fPackageType(packageType), fEC(ec), fMaxDeleteRows(maxDeleteRows), fSessionID(sessionID), fTxnid(txnId), fDbrm(aDbrm)
+							   DBRM * aDbrm,
+							   const QueryTeleClient& qtc) : 
+		fIos(ios),
+		fByteStream(bs),
+		fPackageType(packageType),
+		fEC(ec),
+		fMaxDeleteRows(maxDeleteRows),
+		fSessionID(sessionID),
+		fTxnid(txnId),
+		fDbrm(aDbrm),
+		fQtc(qtc)
 {
-	fByteStream = bs;
 }
 
 PackageHandler::~PackageHandler()
@@ -307,6 +319,13 @@ void PackageHandler::run()
 					//boost::shared_ptr<messageqcpp::ByteStream> insertBs (new messageqcpp::ByteStream);
 					messageqcpp::ByteStream bsSave = *(fByteStream.get());
 					insertPkg.read(*(fByteStream.get()));
+					QueryTeleStats qts;
+					qts.query_uuid = QueryTeleClient::genUUID();
+					qts.msg_type = QueryTeleStats::QT_START;
+					qts.start_time = QueryTeleClient::timeNowms();
+					qts.query_type = "INSERT";
+					qts.query = insertPkg.get_SQLStatement();
+					fQtc.postQueryTele(qts);
 					//cout << "This is batch insert " << insertPkg->get_isBatchInsert() << endl;
 					if (insertPkg.get_isBatchInsert())
 					{
@@ -620,6 +639,19 @@ void PackageHandler::run()
 						fProcessor.reset(new dmlpackageprocessor::InsertPackageProcessor(fDbrm, insertPkg.get_SessionID()));
 						result = fProcessor->processPackage(insertPkg);
 					}
+					qts.msg_type = QueryTeleStats::QT_SUMMARY;
+					qts.max_mem_pct = result.stats.fMaxMemPct;
+					qts.num_files = result.stats.fNumFiles;
+					qts.phy_io = result.stats.fPhyIO;
+					qts.cache_io = result.stats.fCacheIO;
+					qts.msg_rcv_cnt = result.stats.fMsgRcvCnt;
+					qts.cp_blocks_skipped = result.stats.fCPBlocksSkipped;
+					qts.msg_bytes_in = result.stats.fMsgBytesIn;
+					qts.msg_bytes_out = result.stats.fMsgBytesOut;
+					qts.rows = result.stats.fRows;
+					qts.end_time = QueryTeleClient::timeNowms();
+					qts.blocks_changed = result.stats.fBlocksChanged;
+					fQtc.postQueryTele(qts);
 				}
 				break;
 
@@ -630,6 +662,13 @@ void PackageHandler::run()
 					boost::scoped_ptr<dmlpackage::UpdateDMLPackage> updatePkg(new dmlpackage::UpdateDMLPackage());
 					updatePkg->read(*(fByteStream.get()));
 					updatePkg->set_TxnID(fTxnid);
+					QueryTeleStats qts;
+					qts.query_uuid = QueryTeleClient::genUUID();
+					qts.msg_type = QueryTeleStats::QT_START;
+					qts.start_time = QueryTeleClient::timeNowms();
+					qts.query_type = "UPDATE";
+					qts.query = updatePkg->get_SQLStatement();
+					fQtc.postQueryTele(qts);
 					// process it
 					//@Bug 1341. Don't remove calpontsystemcatalog from this 
 					//session to take advantage of cache. 
@@ -638,6 +677,19 @@ void PackageHandler::run()
 					fProcessor->setRM( &frm);
 					idbassert( fTxnid != 0);
 					result = fProcessor->processPackage(*(updatePkg.get())) ;
+					qts.msg_type = QueryTeleStats::QT_SUMMARY;
+					qts.max_mem_pct = result.stats.fMaxMemPct;
+					qts.num_files = result.stats.fNumFiles;
+					qts.phy_io = result.stats.fPhyIO;
+					qts.cache_io = result.stats.fCacheIO;
+					qts.msg_rcv_cnt = result.stats.fMsgRcvCnt;
+					qts.cp_blocks_skipped = result.stats.fCPBlocksSkipped;
+					qts.msg_bytes_in = result.stats.fMsgBytesIn;
+					qts.msg_bytes_out = result.stats.fMsgBytesOut;
+					qts.rows = result.stats.fRows;
+					qts.end_time = QueryTeleClient::timeNowms();
+					qts.blocks_changed = result.stats.fBlocksChanged;
+					fQtc.postQueryTele(qts);
 				}
 				break;
 
@@ -788,6 +840,15 @@ DMLProcessor::DMLProcessor(messageqcpp::IOSocket ios, BRM::DBRM* aDbrm) :
 {
 	csc = CalpontSystemCatalog::makeCalpontSystemCatalog();
 	csc->identity(CalpontSystemCatalog::EC);
+	string teleServerHost(config::Config::makeConfig()->getConfig("QueryTele", "Host"));
+	if (!teleServerHost.empty())
+	{
+		int teleServerPort = config::Config::fromText(config::Config::makeConfig()->getConfig("QueryTele", "Port"));
+		if (teleServerPort > 0)
+		{
+			fQtc.serverParms(QueryTeleServerParms(teleServerHost, teleServerPort));
+		}
+	}
 }
 
 void DMLProcessor::operator()()
@@ -1172,7 +1233,8 @@ void DMLProcessor::operator()()
 				else
 				{
 					//cout << "starting processing package type " << (int) packageType << " for session " << sessionID << " with id " << txnid.id << endl;
-					shared_ptr<PackageHandler> php(new PackageHandler(fIos, bs1, packageType, fEC, maxDeleteRows, sessionID, txnid.id, fDbrm));
+					boost::shared_ptr<PackageHandler> php(new PackageHandler(fIos, bs1, packageType, fEC,
+						maxDeleteRows, sessionID, txnid.id, fDbrm, fQtc));
 					// We put the packageHandler into a map so that if we receive a
 					// message to affect the previous command, we can find it.
 					boost::mutex::scoped_lock lk2(DMLProcessor::packageHandlerMapLock, defer_lock);
@@ -1206,7 +1268,8 @@ void DMLProcessor::operator()()
 					txnid = sessionManager.getTxnID(sessionID);
 				}
 
-				shared_ptr<PackageHandler> php(new PackageHandler(fIos, bs1, packageType, fEC, maxDeleteRows, sessionID, txnid.id, fDbrm));
+				boost::shared_ptr<PackageHandler> php(new PackageHandler(fIos, bs1, packageType, fEC,
+					maxDeleteRows, sessionID, txnid.id, fDbrm, fQtc));
 				// We put the packageHandler into a map so that if we receive a
 				// message to affect the previous command, we can find it.
 				boost::mutex::scoped_lock lk2(DMLProcessor::packageHandlerMapLock, defer_lock);
@@ -1274,7 +1337,7 @@ void RollbackTransactionProcessor::processBulkRollback (BRM::TableLockInfo lockI
 	//find the PMs need to send the message to
 	std::set<int> pmSet;
 	int pmId;
-	for (uint i=0; i<lockInfo.dbrootList.size(); i++)
+	for (uint32_t i=0; i<lockInfo.dbrootList.size(); i++)
 	{	
 		pmId = (*dbRootPMMap)[lockInfo.dbrootList[i]]; 
 		pmSet.insert(pmId);
@@ -1347,7 +1410,7 @@ void RollbackTransactionProcessor::processBulkRollback (BRM::TableLockInfo lockI
 	// Wait for "all" the responses, and accumulate any/all errors
 	unsigned int pmMsgCnt = 0;
 	//@Bug 4517 Release tablelock when it is in CLEANUP state
-	uint rcCleanup = 0;
+	uint32_t rcCleanup = 0;
 	std::string fileDeleteErrMsg;
 	while (pmMsgCnt < pmSet.size())
 	{
@@ -1413,5 +1476,4 @@ void DMLProcessor::log(const std::string& msg, logging::LOG_TYPE level)
 
 } //namespace dmlprocessor
 // vim:ts=4 sw=4:
-
 

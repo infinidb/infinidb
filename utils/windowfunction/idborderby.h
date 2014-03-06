@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -232,14 +232,14 @@ protected:
 	struct Hasher {
 		IdbOrderBy *ts;
 		utils::Hasher_r h;
-		uint colCount;
-		Hasher(IdbOrderBy *t, uint c) : ts(t), colCount(c) { }
+		uint32_t colCount;
+		Hasher(IdbOrderBy *t, uint32_t c) : ts(t), colCount(c) { }
 		uint64_t operator()(const rowgroup::Row::Pointer &) const;
 	};
 	struct Eq {
 		IdbOrderBy *ts;
-		uint colCount;
-		Eq(IdbOrderBy *t, uint c) : ts(t), colCount(c) { }
+		uint32_t colCount;
+		Eq(IdbOrderBy *t, uint32_t c) : ts(t), colCount(c) { }
 		bool operator()(const rowgroup::Row::Pointer &, const rowgroup::Row::Pointer &) const;
 	};
 

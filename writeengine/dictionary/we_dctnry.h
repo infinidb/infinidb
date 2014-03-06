@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -37,7 +37,7 @@
 #include "we_brm.h"
 #include "bytestream.h"
 
-#if defined(_MSC_VER) && defined(WRITEENGINEDCTNRY_DLLEXPORT)
+#if defined(_MSC_VER) && defined(WRITEENGINE_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
@@ -169,9 +169,11 @@ public:
      * @param dbRoot    - DBRoot for store file
      * @param partition - partition number for store file
      * @param segment   - column segment number for store file
+     * @param useTmpSuffix - for Bulk HDFS usage: use or not use *.tmp file suffix
      */
     EXPORT int   openDctnry(const OID& dctnryOID, const uint16_t dbRoot,
-                    const uint32_t partition, const uint16_t segment);
+                    const uint32_t partition, const uint16_t segment,
+                    const bool useTmpSuffix);
 
     /**
      * @brief copy the dictionary header to buffer
@@ -195,6 +197,8 @@ public:
 
     void         setImportDataMode( ImportDataMode importMode )
                  { m_importDataMode = importMode; }
+                 
+    virtual int checkFixLastDictChunk() {return NO_ERROR;}
 
 //------------------------------------------------------------------------------
 // Protected members
@@ -250,7 +254,7 @@ protected:
     // (width argument in createDctnryFile() is string width, not token width)
     virtual IDBDataFile* createDctnryFile(const char *name, int width,
                                    const char *mode, int ioBuffSize);
-    virtual IDBDataFile* openDctnryFile();
+    virtual IDBDataFile* openDctnryFile(bool useTmpSuffix);
     virtual void  closeDctnryFile(bool doFlush, std::map<FID,FID> & oids);
     virtual int   numOfBlocksInFile();
 

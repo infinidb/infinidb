@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -73,9 +73,9 @@ BulkRollbackFileCompressed::~BulkRollbackFileCompressed()
 //------------------------------------------------------------------------------
 void BulkRollbackFileCompressed::truncateSegmentFile(
     OID       columnOID,
-    u_int32_t dbRoot,
-    u_int32_t partNum,
-    u_int32_t segNum,
+    uint32_t dbRoot,
+    uint32_t partNum,
+    uint32_t segNum,
     long long fileSizeBlocks )
 {
     std::ostringstream msgText1;
@@ -208,13 +208,13 @@ void BulkRollbackFileCompressed::truncateSegmentFile(
 //------------------------------------------------------------------------------
 void BulkRollbackFileCompressed::reInitTruncColumnExtent(
     OID         columnOID,
-    u_int32_t   dbRoot,
-    u_int32_t   partNum,
-    u_int32_t   segNum,
+    uint32_t   dbRoot,
+    uint32_t   partNum,
+    uint32_t   segNum,
     long long   startOffsetBlk,
     int         nBlocks,
     CalpontSystemCatalog::ColDataType colType,
-    u_int32_t   colWidth,
+    uint32_t   colWidth,
     bool        restoreHwmChk )
 {
     long long startOffset = startOffsetBlk * BYTE_PER_BLOCK;
@@ -489,9 +489,9 @@ int BulkRollbackFileCompressed::loadColumnHdrPtrs(
 //------------------------------------------------------------------------------
 void BulkRollbackFileCompressed::reInitTruncDctnryExtent(
     OID         dStoreOID,
-    u_int32_t   dbRoot,
-    u_int32_t   partNum,
-    u_int32_t   segNum,
+    uint32_t   dbRoot,
+    uint32_t   partNum,
+    uint32_t   segNum,
     long long   startOffsetBlk,
     int         nBlocks )
 {
@@ -589,7 +589,7 @@ void BulkRollbackFileCompressed::reInitTruncDctnryExtent(
         // (Unlike column files which only employ an abbreviated extent for the
         // 1st extent in part0, seg0, all store files start with abbrev extent)
         bool bAbbreviatedExtent          = false;
-        const u_int32_t PSEUDO_COL_WIDTH = 8; // simulated col width for dctnry
+        const uint32_t PSEUDO_COL_WIDTH = 8; // simulated col width for dctnry
         long long nBytesInAbbrevExtent   = INITIAL_EXTENT_ROWS_TO_DISK *
                                      PSEUDO_COL_WIDTH;
         if (startOffset <= nBytesInAbbrevExtent)
@@ -797,8 +797,8 @@ int BulkRollbackFileCompressed::loadDctnryHdrPtrs(
 int BulkRollbackFileCompressed::restoreHWMChunk(
     IDBDataFile* pFile,
     OID          columnOID,
-    u_int32_t    partNum,
-    u_int32_t    segNum,
+    uint32_t    partNum,
+    uint32_t    segNum,
     uint64_t     fileOffsetByteForRestoredChunk,
     uint64_t&    restoredChunkLen,
     uint64_t&    restoredFileSize,
@@ -934,9 +934,9 @@ int BulkRollbackFileCompressed::restoreHWMChunk(
 // and thus not needed.
 //------------------------------------------------------------------------------
 bool BulkRollbackFileCompressed::doWeReInitExtent( OID columnOID,
-    u_int32_t dbRoot,
-    u_int32_t partNum,
-    u_int32_t segNum) const
+    uint32_t dbRoot,
+    uint32_t partNum,
+    uint32_t segNum) const
 {
     std::ostringstream oss;
     oss << "/" << columnOID << ".p" << partNum << ".s" << segNum;

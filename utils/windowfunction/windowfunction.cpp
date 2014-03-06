@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -50,12 +50,12 @@ using namespace joblist;
 namespace windowfunction
 {
 
-WindowFunction::WindowFunction(shared_ptr<WindowFunctionType>& f,
-                                   shared_ptr<ordering::EqualCompData>& p,
-                                   shared_ptr<OrderByData>& o,
-                                   shared_ptr<WindowFrame>& w,
-                                   const RowGroup& g,
-                                   const Row& r) :
+WindowFunction::WindowFunction(boost::shared_ptr<WindowFunctionType>& f,
+                               boost::shared_ptr<ordering::EqualCompData>& p,
+                               boost::shared_ptr<OrderByData>& o,
+                               boost::shared_ptr<WindowFrame>& w,
+                               const RowGroup& g,
+                               const Row& r) :
 	fFunctionType(f), fPartitionBy(p), fOrderBy(o), fFrame(w), fRowGroup(g), fRow(r)
 {
 }

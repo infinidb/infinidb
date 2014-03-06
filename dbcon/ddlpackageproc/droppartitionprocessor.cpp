@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -20,9 +20,7 @@
  *
  *
  ***********************************************************************/
-#define DROPPARTITIONPROC_DLLEXPORT
 #include "droppartitionprocessor.h"
-#undef DROPPARTITIONPROC_DLLEXPORT
 
 #include "messagelog.h"
 #include "sqllogger.h"
@@ -75,10 +73,10 @@ namespace ddlpackageprocessor
 		CalpontSystemCatalog::DictOIDList dictOIDList;
 		execplan::CalpontSystemCatalog::ROPair roPair;
 		uint32_t processID = 0;
-		u_int64_t uniqueID = 0;
+		uint64_t uniqueID = 0;
 		uint32_t sessionID = dropPartitionStmt.fSessionID;
 		std::string  processName("DDLProc");
-		u_int64_t uniqueId = 0;
+		uint64_t uniqueId = 0;
 		
 		//Bug 5070. Added exception handling
 		try {
@@ -129,10 +127,10 @@ namespace ddlpackageprocessor
 			processID = ::getpid();
 			oam::OamCache * oamcache = OamCache::makeOamCache();
 			std::vector<int> pmList = oamcache->getModuleIds();
-			std::vector<uint> pms;
+			std::vector<uint32_t> pms;
 			for (unsigned i=0; i < pmList.size(); i++)
 			{
-				pms.push_back((uint)pmList[i]);
+				pms.push_back((uint32_t)pmList[i]);
 			}
 				
 			try {

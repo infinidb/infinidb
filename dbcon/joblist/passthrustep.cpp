@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -224,6 +224,7 @@ PassThruStep::PassThruStep(
 	isDictColumn = ((colType.colDataType == CalpontSystemCatalog::VARCHAR && colType.colWidth > 7)
 					|| (colType.colDataType == CalpontSystemCatalog::CHAR && colType.colWidth > 8));
 	fColType = colType;
+	fPseudoType = 0;
 
 }
 
@@ -237,8 +238,27 @@ PassThruStep::PassThruStep(const pColStep& rhs) : JobStep(rhs), fRm(rhs.fRm)
 	fTableOid = rhs.tableOid();
 	fSwallowRows = rhs.getSwallowRows();
 	isDictColumn = rhs.isDictCol();
-//	fDec = rhs.dec();
 	fColType = rhs.colType();
+	isEM = rhs.isExeMgr();
+
+	const PseudoColStep* pcs = dynamic_cast<const PseudoColStep*>(&rhs);
+	if (pcs)
+		fPseudoType = pcs->pseudoColumnId();
+		
+}
+
+PassThruStep::PassThruStep(const PseudoColStep& rhs) : JobStep(rhs), fRm(rhs.fRm)
+{
+	fInputJobStepAssociation = rhs.inputAssociation();
+	fOutputJobStepAssociation = rhs.outputAssociation();
+	colWidth = rhs.fColType.colWidth;
+	realWidth = rhs.realWidth;
+	fOid = rhs.oid();
+	fTableOid = rhs.tableOid();
+	fSwallowRows = rhs.getSwallowRows();
+	isDictColumn = rhs.isDictCol();
+	fColType = rhs.colType();
+	fPseudoType = rhs.pseudoColumnId();
 	isEM = rhs.isExeMgr();
 }
 

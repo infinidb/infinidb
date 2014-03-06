@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -35,7 +35,7 @@
 #include "idbcompress.h"
 #include "IDBFileSystem.h"
 
-#if defined(_MSC_VER) && defined(WRITEENGINECHUNKMGR_DLLEXPORT)
+#if defined(_MSC_VER) && defined(WRITEENGINE_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
@@ -169,7 +169,8 @@ public:
                     uint16_t segment,
                     std::string& filename,
                     const char* mode,
-                    int size) const;
+                    int size,
+                    bool useTmpSuffix) const;
 
     // @brief Retrieve a file pointer in the chunk manager.
     //        for dictionary file
@@ -179,7 +180,8 @@ public:
                     uint16_t segment,
                     std::string& filename,
                     const char* mode,
-                    int size) const;
+                    int size,
+                    bool useTmpSuffix) const;
 
     // @brief Create a compressed dictionary file with an appropriate header.
     IDBDataFile* createDctnryFile(const FID& fid,
@@ -246,7 +248,14 @@ public:
     EXPORT int startTransaction(const TxnID& transId) const;
     EXPORT int confirmTransaction(const TxnID& transId) const;
     EXPORT int endTransaction(const TxnID& transId, bool success) const;
+	// @brief Use this flag to fix bad chunk.
+    void setFixFlag(bool isFix)
+    { fIsFix = isFix; }
 
+	EXPORT int checkFixLastDictChunk(const FID& fid,
+                    uint16_t root,
+                    uint32_t partition,
+                    uint16_t segment);
 
 protected:
     // @brief Retrieve pointer to a compressed DB file.
@@ -259,6 +268,7 @@ protected:
                     int size,
                     const execplan::CalpontSystemCatalog::ColDataType colDataType,
                     int colWidth,
+                    bool useTmpSuffix,
                     bool dictnry = false) const;
 
     // @brief Retrieve a chunk of pFile from disk.
@@ -277,7 +287,8 @@ protected:
     inline int writeHeader_(CompFileData* fileData, int ptrSecSize);
 
     // @brief open a compressed DB file.
-    int openFile(CompFileData* fileData, const char* mode, int colWidth, int ln) const;
+    int openFile(CompFileData* fileData, const char* mode, int colWidth,
+        bool useTmpSuffix, int ln) const;
 
     // @brief set offset in a compressed DB file from beginning.
     int setFileOffset(IDBDataFile* pFile, const std::string& fileName, off64_t offset, int ln) const;
@@ -339,7 +350,8 @@ protected:
     TxnID                                       fTransId;
     int                                         fLocalModuleId;
     idbdatafile::IDBFileSystem&                 fFs;
-
+	bool 										fIsFix;
+	
 private:
 };
 

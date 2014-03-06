@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -18,8 +18,15 @@
 // $Id: jobstep.cpp 9414 2013-04-22 22:18:30Z xlou $
 #include <iostream>
 #include <string>
-#include <boost/thread.hpp>
 using namespace std;
+
+#include <boost/thread.hpp>
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_generators.hpp>
+namespace bu=boost::uuids;
+
+#include "configcpp.h"
+using namespace config;
 
 #include "calpontsystemcatalog.h"
 #include "calpontselectexecutionplan.h"
@@ -31,20 +38,28 @@ using namespace std;
 #include "jlf_common.h"
 using namespace logging;
 
+#include "querytele.h"
+using namespace querytele;
+
+namespace
+{
+
+int toInt(const string& val)
+{
+	if (val.length() == 0) return -1;
+	return static_cast<int>(config::Config::fromText(val));
+}
+}
+
 namespace joblist
 {
 boost::mutex JobStep::fLogMutex; //=PTHREAD_MUTEX_INITIALIZER;
-
 
 ostream& operator<<(ostream& os, const JobStep* rhs)
 {
     os << rhs->toString();
     return os;
 }
-
-}
-
-using namespace joblist;
 
 //------------------------------------------------------------------------------
 // constructor
@@ -64,8 +79,24 @@ JobStep::JobStep(const JobInfo& j) :
         fWaitToRunStepCnt(0),
         fPriority(1),
         fErrorInfo(j.errorInfo),
-        fLogger(j.logger)
+        fLogger(j.logger),
+        fLocalQuery(j.localQuery),
+        fQueryUuid(j.uuid)
 {
+	QueryTeleServerParms tsp;
+	string teleServerHost(Config::makeConfig()->getConfig("QueryTele", "Host"));
+	if (!teleServerHost.empty())
+	{
+		int teleServerPort = toInt(Config::makeConfig()->getConfig("QueryTele", "Port"));
+		if (teleServerPort > 0)
+		{
+			tsp.host = teleServerHost;
+			tsp.port = teleServerPort;
+		}
+	}
+	fQtc.serverParms(tsp);
+	//fStepUuid = bu::random_generator()();
+	fStepUuid = QueryTeleClient::genUUID();
 }
 
 //------------------------------------------------------------------------------
@@ -166,4 +197,7 @@ bool JobStep::traceOn() const
 {
     return fTraceFlags & execplan::CalpontSelectExecutionPlan::TRACE_LOG;
 }
+
+} //namespace joblist
+// vim:ts=4 sw=4:
 

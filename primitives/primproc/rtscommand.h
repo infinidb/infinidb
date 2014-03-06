@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -45,7 +45,7 @@ class RTSCommand : public Command
 
 		void execute();
 		void project();
-		void projectIntoRowGroup(rowgroup::RowGroup &rg, uint col);
+		void projectIntoRowGroup(rowgroup::RowGroup &rg, uint32_t col);
 		uint64_t getLBID();
 		void nextLBID();
 		void createCommand(messageqcpp::ByteStream &);
@@ -60,7 +60,7 @@ class RTSCommand : public Command
 		void prep(int8_t outputType, bool makeAbsRids);
 		uint8_t isPassThru() { return passThru; }
 		void setAbsNull(bool a = true) { absNull = a; }
-		void getLBIDList(uint loopCount, std::vector<int64_t> *lbids);
+		void getLBIDList(uint32_t loopCount, std::vector<int64_t> *lbids);
 
 		//TODO: do we need to reference either col or dict?
 		int getCompType() const { return dict.getCompType(); }

@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -74,7 +74,7 @@ namespace
 				int64_t val = pm[0]->data()->getIntVal(row, isNull);
 				if (isNull)
 					return false;
-				for (uint i = 1; i < pm.size(); i++)
+				for (uint32_t i = 1; i < pm.size(); i++)
 				{
 					isNull = false;
 					if (val == pm[i]->data()->getIntVal(row, isNull) && !isNull )
@@ -93,7 +93,7 @@ namespace
                 uint64_t val = pm[0]->data()->getUintVal(row, isNull);
                 if (isNull)
                     return false;
-                for (uint i = 1; i < pm.size(); i++)
+                for (uint32_t i = 1; i < pm.size(); i++)
                 {
                     isNull = false;
                     if (val == pm[i]->data()->getUintVal(row, isNull) && !isNull )
@@ -108,7 +108,7 @@ namespace
 				int32_t val = pm[0]->data()->getDateIntVal(row, isNull);
 				if (isNull)
 					return false;
-				for (uint i = 1; i < pm.size(); i++)
+				for (uint32_t i = 1; i < pm.size(); i++)
 				{
 					isNull = false;
 					if ( val == pm[i]->data()->getDateIntVal(row, isNull) && !isNull )
@@ -123,7 +123,7 @@ namespace
 				int64_t val = pm[0]->data()->getDatetimeIntVal(row, isNull);
 				if (isNull)
 					return false;
-				for (uint i = 1; i < pm.size(); i++)
+				for (uint32_t i = 1; i < pm.size(); i++)
 				{
 					isNull = false;
 					if ( val == pm[i]->data()->getDatetimeIntVal(row, isNull) && !isNull )
@@ -141,7 +141,7 @@ namespace
 				double val = pm[0]->data()->getDoubleVal(row, isNull);
 				if (isNull)
 					return false;
-				for (uint i = 1; i < pm.size(); i++)
+				for (uint32_t i = 1; i < pm.size(); i++)
 				{
 					isNull = false;
 					if ( val == pm[i]->data()->getDoubleVal(row, isNull) && !isNull )
@@ -157,7 +157,7 @@ namespace
 				IDB_Decimal val = pm[0]->data()->getDecimalVal(row, isNull);
 				if (isNull)
 					return false;
-				for (uint i = 1; i < pm.size(); i++)
+				for (uint32_t i = 1; i < pm.size(); i++)
 				{
 					isNull = false;
 					if ( val == pm[i]->data()->getDecimalVal(row, isNull) && !isNull )
@@ -173,7 +173,7 @@ namespace
 				const string& val = pm[0]->data()->getStrVal(row, isNull);
 				if (isNull)
 					return false;
-				for (uint i = 1; i < pm.size(); i++)
+				for (uint32_t i = 1; i < pm.size(); i++)
 				{
 					isNull = false;
 					if ( utf8::idb_strcoll(val.c_str(), pm[i]->data()->getStrVal(row, isNull).c_str()) == 0 && !isNull)
@@ -207,7 +207,7 @@ CalpontSystemCatalog::ColType Func_in::operationType( FunctionParm& fp, CalpontS
 	bool allString = true;
 	bool allNonToken = true;
 	
-	for (uint i = 0; i < fp.size(); i++)
+	for (uint32_t i = 0; i < fp.size(); i++)
 	{
 		//op.setOpType(op.operationType(), fp[i]->data()->resultType());
 		if (fp[i]->data()->resultType().colDataType != CalpontSystemCatalog::CHAR &&
@@ -244,7 +244,7 @@ CalpontSystemCatalog::ColType Func_in::operationType( FunctionParm& fp, CalpontS
 	if (op.operationType().colDataType == CalpontSystemCatalog::DATE)
 	{
 		ConstantColumn *cc = NULL;
-		for (uint i = 1; i < fp.size(); i++)
+		for (uint32_t i = 1; i < fp.size(); i++)
 		{
 			cc = dynamic_cast<ConstantColumn*>(fp[i]->data());
 			if (cc)
@@ -258,7 +258,7 @@ CalpontSystemCatalog::ColType Func_in::operationType( FunctionParm& fp, CalpontS
 	else if (op.operationType().colDataType == CalpontSystemCatalog::DATETIME)
 	{
 		ConstantColumn *cc = NULL;
-		for (uint i = 1; i < fp.size(); i++)
+		for (uint32_t i = 1; i < fp.size(); i++)
 		{
 			cc = dynamic_cast<ConstantColumn*>(fp[i]->data());
 			if (cc)

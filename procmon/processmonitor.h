@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -488,6 +488,21 @@ public:
      *@brief run upgrade script
      */
 	int runUpgrade(std::string mysqlpw);
+
+    /**
+     *@brief change my.cnf
+     */
+	int changeMyCnf(std::string type);
+
+    /**
+     *@brief run Master Replication script
+     */
+	int runMasterRep(std::string& mysqlpw, std::string& masterLogFile, std::string& masterLogPos);
+
+    /**
+     *@brief run Slave Replication script
+     */
+	int runSlaveRep(std::string& mysqlpw, std::string& masterLogFile, std::string& masterLogPos);
 
     /**
      *@brief Amazon Instance and IP check

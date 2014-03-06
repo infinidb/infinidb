@@ -900,7 +900,7 @@
 /* Define to 1 if you have the <uvm/uvm_param.h> header file. */
 /* #undef HAVE_UVM_UVM_PARAM_H */
 
-/* Define to 1 if the system has the type `u_int32_t'. */
+/* Define to 1 if the system has the type `uint32_t'. */
 #define HAVE_U_INT32_T 1
 
 /* Define to 1 if the system has the type `u_int64_t'. */
@@ -1003,7 +1003,7 @@
 /* define if you have type uint32_t */
 #define HAVE_UINT32_T 1
 
-/* define if you have type u_int32_t */
+/* define if you have type uint32_t */
 #define HAVE_U_INT32_T 1
 
 /* define if you have type int64_t */

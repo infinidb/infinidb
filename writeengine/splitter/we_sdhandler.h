@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -97,7 +97,7 @@ public:
     bool updateCPAndHWMInBRM();
     void cancelOutstandingCpimports();
     void doRollback();
-    void doCleanup();
+    void doCleanup(bool deleteHdfsTempDbFiles);
     void getErrorLog(int PmId, const std::string& ErrFileName);
     void getBadLog(int PmId, const std::string& BadFileName);
     int check4RollbackRslts();

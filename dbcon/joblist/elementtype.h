@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -143,7 +143,7 @@ struct RowWrapper
 
 	inline RowWrapper(const RowWrapper &rg) : count(rg.count)
 	{
-		for (uint i = 0; i < count; ++i)
+		for (uint32_t i = 0; i < count; ++i)
 			et[i] = rg.et[i];
 	}
 
@@ -154,7 +154,7 @@ struct RowWrapper
 	inline RowWrapper & operator=(const RowWrapper &rg)
 	{
 		count = rg.count;
-		for (uint i = 0; i < count; ++i)
+		for (uint32_t i = 0; i < count; ++i)
 			et[i] = rg.et[i];
 		return *this;
 	}
@@ -490,7 +490,7 @@ public:
 	static DataListTypes dlType(const DataList_t* dl);
 	static DataListTypes strDlType(const StrDataList* dl);
 //	static DataListTypes tupleDlType(const TupleDataList* dl);
-	uint getNumConsumers()
+	uint32_t getNumConsumers()
 	{
 //	    if (fDl1 != NULL) return fDl1->getNumConsumers();
 //		else if (fDl2 != NULL) return fDl2->getNumConsumers();

@@ -10,7 +10,7 @@ void grabLock()
 {
 	DBRM dbrm;
 	uint64_t id;
-	vector<uint> pmlist;
+	vector<uint32_t> pmlist;
 
 	string name = "init";
 	uint32_t pid = 1;
@@ -99,7 +99,7 @@ void printAllLocks()
 {
 	DBRM dbrm;
 	vector<TableLockInfo> locks;
-	uint i;
+	uint32_t i;
 
 	try {
 		locks = dbrm.getAllTableLocks();

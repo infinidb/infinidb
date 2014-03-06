@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -45,12 +45,11 @@ using namespace oam;
 
 /** @file */
 
-extern bool cPo;		// code point ordering (Japanese UTF) flag, used in idb_strcoll
-
 namespace funcexp
 {
 namespace utf8
 {
+extern bool JPcodePoint;		// code point ordering (Japanese UTF) flag, used in idb_strcoll
 
 const int MAX_UTF8_BYTES_PER_CHAR=4;
 
@@ -110,7 +109,7 @@ std::string idb_setlocale()
 	//BUG 2991
 	setlocale(LC_NUMERIC, "C");
 	if(systemLang.find("ja_JP") != std::string::npos)
-		cPo = true;
+		JPcodePoint = true;
 	return systemLang;	
 }
 
@@ -120,7 +119,7 @@ std::string idb_setlocale()
 inline
 int idb_strcoll(const char* str1, const char* str2)
 {
-	if(cPo)
+	if (JPcodePoint)
 		return strcmp(str1, str2);
 	else
 		return strcoll(str1, str2);

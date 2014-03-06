@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -47,8 +47,8 @@ class BandedDL : public LargeDataList<std::vector<element_t>, element_t>
 	typedef LargeDataList<std::vector<element_t>, element_t> base;
 
 	public:
-		BandedDL(uint numConsumers, const ResourceManager& rm);
-//		BandedDL(BucketDL<element_t> &, uint numConsumers, const ResourceManager& rm);
+		BandedDL(uint32_t numConsumers, const ResourceManager& rm);
+//		BandedDL(BucketDL<element_t> &, uint32_t numConsumers, const ResourceManager& rm);
 		virtual ~BandedDL();
 
 		int64_t saveBand();
@@ -80,7 +80,7 @@ class BandedDL : public LargeDataList<std::vector<element_t>, element_t>
 };
 
 template<typename element_t>
-  BandedDL<element_t>::BandedDL(uint nc, const ResourceManager& rm) : base(nc,  sizeof(uint64_t), sizeof(uint64_t), rm)
+  BandedDL<element_t>::BandedDL(uint32_t nc, const ResourceManager& rm) : base(nc,  sizeof(uint64_t), sizeof(uint64_t), rm)
 {
 	//pthread_cond_init(&nextSetLoaded, NULL);
 	waitingConsumers = 0;
@@ -88,7 +88,7 @@ template<typename element_t>
 
 #if 0
 template<typename element_t>
-  BandedDL<element_t>::BandedDL(BucketDL<element_t> &b, uint nc, const ResourceManager& rm) : base(nc, sizeof(uint64_t), sizeof(uint64_t), rm)
+  BandedDL<element_t>::BandedDL(BucketDL<element_t> &b, uint32_t nc, const ResourceManager& rm) : base(nc, sizeof(uint64_t), sizeof(uint64_t), rm)
 {
 	uint64_t i, it;
 	element_t e;

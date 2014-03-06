@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -61,7 +61,8 @@ int main(int argc, char *argv[])
 	string XMpassword = "dummypw";
 	string configFile = "NULL";
 	string release = "Latest";
-	string SHARED = "//calweb/shared";
+//	string SHARED = "//calweb/shared";
+	string SHARED = "//srvfrisco2/public";
 	string installDir = "/usr/local";
 	string MySQLpassword = "dummymysqlpw";
 	string installPackageType = "";
@@ -80,7 +81,7 @@ int main(int argc, char *argv[])
 		if( string("-h") == argv[i] ) {
 			cout << endl;
 			cout << "'autoInstaller' installs the RPMs located in" << endl;
-			cout << "//calweb/shared/Iterations on the specified" << endl;
+			cout << "///srvfrisco2/public/Iterations on the specified" << endl;
 			cout << "system. It will either install the latest rpm located in" << endl;
 			cout << "in the /Latest directory or the rpm associated with the" << endl;
 			cout << "release-number entered." << endl;
@@ -414,7 +415,7 @@ int main(int argc, char *argv[])
 
 		calpontPackage = calpontPackagename + "-" + currentPrefix + systemPackage;
 
-		cout << endl << "Using the InfiniDB Packages '" + systemPackage + "' from //calweb/shared/Iterations/" + release + "/" << endl;
+		cout << endl << "Using the InfiniDB Packages '" + systemPackage + "' from //srvfrisco2/public/Iterations/" + release + "/" << endl;
 	}
 	else	//binary package
 	{
@@ -494,7 +495,7 @@ int main(int argc, char *argv[])
 		}
 		file.close();
 
-		cout << endl << "Using the InfiniDB Package '" + systemPackage + "' from //calweb/shared/Iterations/" + release + "/packages" << endl;
+		cout << endl << "Using the InfiniDB Package '" + systemPackage + "' from //srvfrisco2/public/Iterations/" + release + "/packages" << endl;
 
 	}
 
@@ -579,8 +580,20 @@ exit(0);
 	
 							//try to parse it
 							Config* sysConfigOld;
+
+						    ofstream file("/dev/null");
+
+						    //save cout stream buffer
+						    streambuf* strm_buffer = cerr.rdbuf();
+
 							try {
+							    // redirect cout to /dev/null
+								cerr.rdbuf(file.rdbuf());
+
 								sysConfigOld = Config::makeConfig( systemDir + "/Calpont.xml");
+
+							   // restore cout stream buffer
+								cerr.rdbuf (strm_buffer);
 
 								//update release Calpont.xml with System Configuration info from system Calpont.xml
 								cout << "Run Calpont.xml autoConfigure                 " << flush;
@@ -598,7 +611,9 @@ exit(0);
 							}
 							catch(...)
 							{
-								cout << "  FAILED to parse, try re-reading again" << endl;
+//								cout << "  FAILED to parse, try re-reading again" << endl;
+							   // restore cout stream buffer
+								cerr.rdbuf (strm_buffer);
 								continue;
 							}
 						}
@@ -683,6 +698,21 @@ CONFIGDONE:
 		cerr << "ERROR: Problem reading serverTypeInstall from the InfiniDB System Configuration file, exiting" << endl;
 		exit(1);
 	}
+
+	bool HDFS = false;
+	string DBRootStorageType;
+	try {
+		DBRootStorageType = sysConfigOld->getConfig("Installation", "DBRootStorageType");
+	}
+	catch(...)
+	{
+		cout << "ERROR: Problem reading DBRootStorageType from the InfiniDB System Configuration file, exiting" << endl;
+		cerr << "ERROR: Problem reading DBRootStorageType from the InfiniDB System Configuration file, exiting" << endl;
+		exit(1);
+	}
+
+	if ( DBRootStorageType == "hdfs" )
+		HDFS = true;
 
 	if ( serverTypeInstall != oam::INSTALL_COMBINE_DM_UM_PM && CE == "1")
 	{
@@ -809,7 +839,15 @@ CONFIGDONE:
 	}
 	else
 	{
-		cmd = "./remote_command.sh " + installParentModuleIPAddr + " " + systemUser + " " + password + "  '" + installDir + "/Calpont/bin/postConfigure -i " + installDir + "/Calpont -n -mp " + MySQLpassword + " -p " + password + "' 'System is Active' Error 1200 " + debug_flag;
+		if (HDFS)
+		{
+			string DataFileEnvFile = "setenv-hdfs-20";
+			cmd = "./remote_command.sh " + installParentModuleIPAddr + " " + systemUser + " " + password + " 'export JAVA_HOME=/usr/java/jdk1.6.0_31;export LD_LIBRARY_PATH=/usr/java/jdk1.6.0_31/jre/lib/amd64/server;. /root/" + DataFileEnvFile + ";" + installDir + "/Calpont/bin/postConfigure -i " + installDir + "/Calpont -n -mp " + MySQLpassword + " -p " + password + "' 'System is Active' Error 1200 " + debug_flag;
+		}
+		else
+		{
+			cmd = "./remote_command.sh " + installParentModuleIPAddr + " " + systemUser + " " + password + " '" + installDir + "/Calpont/bin/postConfigure -i " + installDir + "/Calpont -n -mp " + MySQLpassword + " -p " + password + "' 'System is Active' Error 1200 " + debug_flag;
+		}
 	}
 
 	rtnCode = system(cmd.c_str());

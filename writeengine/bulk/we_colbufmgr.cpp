@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -114,8 +114,8 @@ ColumnBufferManager::~ColumnBufferManager() {
 //------------------------------------------------------------------------------
 int ColumnBufferManager::reserveSection(
     RID startRowId,
-    uint  nRowsIn,
-    uint& secRowCnt,
+    uint32_t  nRowsIn,
+    uint32_t& secRowCnt,
     ColumnBufferSection** cbs,
     RID&  lastInputRowInExtent) {
 #ifdef PROFILE
@@ -482,7 +482,7 @@ int ColumnBufferManager::writeToFile(int endOffset) {
 //          internal buffer, or if an abbreviated extent is expanded.
 //------------------------------------------------------------------------------
 int ColumnBufferManager::writeToFileExtentCheck(
-    uint startOffset, uint writeSize) {
+    uint32_t startOffset, uint32_t writeSize) {
 
     if (fLog->isDebug( DEBUG_3 )) {
         std::ostringstream oss;

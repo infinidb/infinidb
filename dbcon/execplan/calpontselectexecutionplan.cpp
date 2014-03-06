@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -24,6 +24,8 @@
 #include <algorithm>
 using namespace std;
 
+#include <boost/uuid/uuid_io.hpp>
+
 #include "bytestream.h"
 using namespace messageqcpp;
 
@@ -33,6 +35,9 @@ using namespace messageqcpp;
 #include "returnedcolumn.h"
 #include "simplecolumn.h"
 #include "querystats.h"
+
+#include "querytele.h"
+using namespace querytele;
 
 namespace {
 
@@ -45,7 +50,7 @@ template<class T> struct deleter : public unary_function<T&, void>
 
 namespace execplan
 {
-    
+
 /** Static */
 CalpontSelectExecutionPlan::ColumnMap CalpontSelectExecutionPlan::fColMap;
 
@@ -53,123 +58,134 @@ CalpontSelectExecutionPlan::ColumnMap CalpontSelectExecutionPlan::fColMap;
  * Constructors/Destructors
  */
 CalpontSelectExecutionPlan::CalpontSelectExecutionPlan(const int location):
-                            fFilters (0),
-                            fHaving (0),
-                            fLocation (location),
-                            fDependent (false),
-                            fTraceFlags(TRACE_NONE),
-                            fStatementID(0),
-                            fDistinct(false),
-                            fOverrideLargeSideEstimate(false),
-                            fDistinctUnionNum(0),
-                            fSubType(MAIN_SELECT),
-                            fLimitStart(0),
-                            fLimitNum(-1),
-                            fHasOrderBy(false),
-                            fStringScanThreshold(ULONG_MAX),
-                            fQueryType(SELECT),
-                            fPriority(querystats::DEFAULT_USER_PRIORITY_LEVEL),
+							fLocalQuery (GLOBAL_QUERY),
+							fFilters (0),
+							fHaving (0),
+							fLocation (location),
+							fDependent (false),
+							fTxnID(-1),
+							fTraceFlags(TRACE_NONE),
+							fStatementID(0),
+							fDistinct(false),
+							fOverrideLargeSideEstimate(false),
+							fDistinctUnionNum(0),
+							fSubType(MAIN_SELECT),
+							fLimitStart(0),
+							fLimitNum(-1),
+							fHasOrderBy(false),
+							fStringScanThreshold(ULONG_MAX),
+							fQueryType(SELECT),
+							fPriority(querystats::DEFAULT_USER_PRIORITY_LEVEL),
 							fStringTableThreshold(20)
-{}
+{
+	fUuid = QueryTeleClient::genUUID();
+}
 
 CalpontSelectExecutionPlan::CalpontSelectExecutionPlan(
 							   const ReturnedColumnList& returnedCols,
-	                           ParseTree* filters,
-	                           const SelectList& subSelects,
-	                           const GroupByColumnList& groupByCols,
-	                           ParseTree* having,
-	                           const OrderByColumnList& orderByCols,
-	                           const string alias,
-	                           const int location,
-	                           const bool dependent) :
-	                         fReturnedCols (returnedCols),
-	                         fFilters (filters),
-	                         fSubSelects (subSelects),
-	                         fGroupByCols (groupByCols),
-	                         fHaving (having),
-	                         fOrderByCols (orderByCols),
-	                         fTableAlias (alias),
-	                         fLocation (location),
-	                         fDependent (dependent),
-	                         fTraceFlags(TRACE_NONE),
-	                         fStatementID(0),
-	                         fDistinct(false),
-	                         fOverrideLargeSideEstimate(false),
-	                         fDistinctUnionNum(0),
-	                         fSubType(MAIN_SELECT),
-	                         fLimitStart(0),
-	                         fLimitNum(-1),
-	                         fHasOrderBy(false),
-	                         fStringScanThreshold(ULONG_MAX),
-	                         fQueryType(SELECT),
-	                         fPriority(querystats::DEFAULT_USER_PRIORITY_LEVEL),
-	                         fStringTableThreshold(20)
-{}
-
-CalpontSelectExecutionPlan::CalpontSelectExecutionPlan (string data) :
-                             fData(data),
-                             fTraceFlags(TRACE_NONE),
-                             fStatementID(0),
-                             fDistinct(false),
-                             fOverrideLargeSideEstimate(false),
-                             fDistinctUnionNum(0),
-                             fSubType(MAIN_SELECT),
-                             fLimitStart(0),
-                             fLimitNum(-1),
-                             fHasOrderBy(false),
-	                         fStringScanThreshold(ULONG_MAX),
-	                         fQueryType(SELECT),
+							   ParseTree* filters,
+							   const SelectList& subSelects,
+							   const GroupByColumnList& groupByCols,
+							   ParseTree* having,
+							   const OrderByColumnList& orderByCols,
+							   const string alias,
+							   const int location,
+							   const bool dependent) :
+							 fLocalQuery (GLOBAL_QUERY),
+							 fReturnedCols (returnedCols),
+							 fFilters (filters),
+							 fSubSelects (subSelects),
+							 fGroupByCols (groupByCols),
+							 fHaving (having),
+							 fOrderByCols (orderByCols),
+							 fTableAlias (alias),
+							 fLocation (location),
+							 fDependent (dependent),
+							 fTxnID(-1),
+							 fTraceFlags(TRACE_NONE),
+							 fStatementID(0),
+							 fDistinct(false),
+							 fOverrideLargeSideEstimate(false),
+							 fDistinctUnionNum(0),
+							 fSubType(MAIN_SELECT),
+							 fLimitStart(0),
+							 fLimitNum(-1),
+							 fHasOrderBy(false),
+							 fStringScanThreshold(ULONG_MAX),
+							 fQueryType(SELECT),
 							 fPriority(querystats::DEFAULT_USER_PRIORITY_LEVEL),
 							 fStringTableThreshold(20)
-{ // TODO: big parsing 
-}                             
+{
+	fUuid = QueryTeleClient::genUUID();
+}
+
+CalpontSelectExecutionPlan::CalpontSelectExecutionPlan (string data) :
+							 fLocalQuery (GLOBAL_QUERY),
+							 fData(data),
+							 fTxnID(-1),
+							 fTraceFlags(TRACE_NONE),
+							 fStatementID(0),
+							 fDistinct(false),
+							 fOverrideLargeSideEstimate(false),
+							 fDistinctUnionNum(0),
+							 fSubType(MAIN_SELECT),
+							 fLimitStart(0),
+							 fLimitNum(-1),
+							 fHasOrderBy(false),
+							 fStringScanThreshold(ULONG_MAX),
+							 fQueryType(SELECT),
+							 fPriority(querystats::DEFAULT_USER_PRIORITY_LEVEL),
+							 fStringTableThreshold(20)
+{
+	fUuid = QueryTeleClient::genUUID();
+}
 
 CalpontSelectExecutionPlan::~CalpontSelectExecutionPlan()
 {
 	if (fFilters != NULL)
-        delete fFilters;
-    if (fHaving != NULL)
-        delete fHaving;
+		delete fFilters;
+	if (fHaving != NULL)
+		delete fHaving;
 	fFilters = NULL;
 	fHaving = NULL;
 }
- 
+
 /**
  * Methods
  */
 
 void CalpontSelectExecutionPlan::filterTokenList( FilterTokenList& filterTokenList)
 {
-    fFilterTokenList = filterTokenList;
-    
-    Parser parser;
-    std::vector<Token> tokens;
-    Token t;
-    
-    for (unsigned int i = 0; i < filterTokenList.size(); i++)
-    {
-        t.value = filterTokenList[i];
-        tokens.push_back(t);
-    }
-    if (tokens.size() > 0)
-        filters(parser.parse(tokens.begin(), tokens.end()));
+	fFilterTokenList = filterTokenList;
+
+	Parser parser;
+	std::vector<Token> tokens;
+	Token t;
+
+	for (unsigned int i = 0; i < filterTokenList.size(); i++)
+	{
+		t.value = filterTokenList[i];
+		tokens.push_back(t);
+	}
+	if (tokens.size() > 0)
+		filters(parser.parse(tokens.begin(), tokens.end()));
 }
 
 void CalpontSelectExecutionPlan::havingTokenList( const FilterTokenList& havingTokenList)
 {
-    fHavingTokenList = havingTokenList;
-    
-    Parser parser;
-    std::vector<Token> tokens;
-    Token t;
-    
-    for (unsigned int i = 0; i < havingTokenList.size(); i++)
-    {
-        t.value = havingTokenList[i];
-        tokens.push_back(t);
-    }
-    if (tokens.size() > 0)
-        having(parser.parse(tokens.begin(), tokens.end()));
+	fHavingTokenList = havingTokenList;
+
+	Parser parser;
+	std::vector<Token> tokens;
+	Token t;
+
+	for (unsigned int i = 0; i < havingTokenList.size(); i++)
+	{
+		t.value = havingTokenList[i];
+		tokens.push_back(t);
+	}
+	if (tokens.size() > 0)
+		having(parser.parse(tokens.begin(), tokens.end()));
 }
 
 ostream &operator<< (ostream &output, const CalpontSelectExecutionPlan &cep)
@@ -177,28 +193,28 @@ ostream &operator<< (ostream &output, const CalpontSelectExecutionPlan &cep)
 	output << ">SELECT " ;
 	if (cep.distinct())
 		output << "DISTINCT ";
-	output << "limit: " << cep.limitStart() << " - " << cep.limitNum() << endl; 
-	
+	output << "limit: " << cep.limitStart() << " - " << cep.limitNum() << endl;
+
 	switch (cep.location())
 	{
 		case CalpontSelectExecutionPlan::MAIN:
-	    output << "MAIN" << endl;
-	    break;
-    case CalpontSelectExecutionPlan::FROM:
-        output << "FROM" << endl;
-        break;
-    case CalpontSelectExecutionPlan::WHERE:
-        output << "WHERE" << endl;
-        break;
-    case CalpontSelectExecutionPlan::HAVING:
-        output << "HAVING" << endl;
-        break;
-   }	    
-	
+		output << "MAIN" << endl;
+		break;
+	case CalpontSelectExecutionPlan::FROM:
+		output << "FROM" << endl;
+		break;
+	case CalpontSelectExecutionPlan::WHERE:
+		output << "WHERE" << endl;
+		break;
+	case CalpontSelectExecutionPlan::HAVING:
+		output << "HAVING" << endl;
+		break;
+	}
+
 	// Returned Column
-	CalpontSelectExecutionPlan::ReturnedColumnList retCols = cep.returnedCols();	
+	CalpontSelectExecutionPlan::ReturnedColumnList retCols = cep.returnedCols();
 	output << ">>Returned Columns" << endl;
-	uint seq = 0;
+	uint32_t seq = 0;
 	for (unsigned int i = 0; i < retCols.size(); i++)
 	{
 		output << *retCols[i] << endl;
@@ -207,12 +223,12 @@ ostream &operator<< (ostream &output, const CalpontSelectExecutionPlan &cep)
 			output << "select sub -- " << endl;
 			CalpontSelectExecutionPlan *plan = dynamic_cast<CalpontSelectExecutionPlan*>(cep.fSelectSubList[seq++].get());
 			if (plan)
-				output << "{" << *plan << "}" << endl; 
+				output << "{" << *plan << "}" << endl;
 		}
 	}
-	
+
 	// From Clause
-	CalpontSelectExecutionPlan::TableList tables = cep.tableList();	
+	CalpontSelectExecutionPlan::TableList tables = cep.tableList();
 	output << ">>From Tables" << endl;
 	seq = 0;
 	for (unsigned int i = 0; i < tables.size(); i++)
@@ -223,37 +239,37 @@ ostream &operator<< (ostream &output, const CalpontSelectExecutionPlan &cep)
 			output << "derived table - " << tables[i].alias << endl;
 			CalpontSelectExecutionPlan *plan = dynamic_cast<CalpontSelectExecutionPlan*>(cep.fDerivedTableList[seq++].get());
 			if (plan)
-				output << "{" << *plan << "}" << endl; 
+				output << "{" << *plan << "}" << endl;
 		}
 		else
 		{
 			output << tables[i] << endl;
 		}
 	}
-	
+
 	// Filters
 	output << ">>Filters" << endl;
-  if (cep.filters() != 0)
-  	cep.filters()->walk (ParseTree::print, output);
-  else
-  	output << "empty filter tree" << endl;
-    
+	if (cep.filters() != 0)
+		cep.filters()->walk (ParseTree::print, output);
+	else
+		output << "empty filter tree" << endl;
+
 	// Group by columns
 	CalpontSelectExecutionPlan::GroupByColumnList groupByCols = cep.groupByCols();
 	if (groupByCols.size() > 0)
 	{
-  	output << ">>Group By Columns" << endl;
-  	for (unsigned int i = 0; i < groupByCols.size(); i++)
-    	output << *groupByCols[i] << endl;
+	output << ">>Group By Columns" << endl;
+	for (unsigned int i = 0; i < groupByCols.size(); i++)
+		output << *groupByCols[i] << endl;
 	}
-    
+
 	// Having
 	if (cep.having() != 0)
 	{
 		output << ">>Having" << endl;
 		cep.having()->walk (ParseTree::print, output);
 	}
-    
+
 	// Order by columns
 	CalpontSelectExecutionPlan::OrderByColumnList orderByCols = cep.orderByCols();
 	if (orderByCols.size() > 0)
@@ -261,7 +277,7 @@ ostream &operator<< (ostream &output, const CalpontSelectExecutionPlan &cep)
 		output << ">>Order By Columns" << endl;
 		for (unsigned int i = 0; i < orderByCols.size(); i++)
 			output << *orderByCols[i] << endl;
-	}   
+	}
 	output << "SessionID: " << cep.fSessionID << endl;
 	output << "TxnID: " << cep.fTxnID << endl;
 	output << "VerID: " << cep.fVerID << endl;
@@ -270,12 +286,23 @@ ostream &operator<< (ostream &output, const CalpontSelectExecutionPlan &cep)
 	output << "DistUnionNum: " << (int)cep.fDistinctUnionNum << endl;
 	output << "Limit: " << cep.fLimitStart << " - " << cep.fLimitNum << endl;
 	output << "String table threshold: " << cep.fStringTableThreshold << endl;
-	  
+
 	output << "--- Column Map ---" << endl;
 	CalpontSelectExecutionPlan::ColumnMap::const_iterator iter;
 	for (iter = cep.columnMap().begin(); iter != cep.columnMap().end(); iter++)
 		output << (*iter).first << " : " << (*iter).second << endl;
-	
+	output << "UUID: " << cep.fUuid << endl;
+
+	if (!cep.unionVec().empty())
+		output << "\n--- Union Unit ---" << endl;
+	for (unsigned i = 0; i < cep.unionVec().size(); i++)
+	{
+		CalpontSelectExecutionPlan *plan =
+			 dynamic_cast<CalpontSelectExecutionPlan*>(cep.unionVec()[i].get());
+		if (plan)
+			output << "{" << *plan << "}\n" << endl;
+	}
+
 	return output;
 }
 
@@ -284,7 +311,7 @@ const std::string CalpontSelectExecutionPlan::queryType() const
 	return queryTypeToString(fQueryType);
 }
 
-std::string CalpontSelectExecutionPlan::queryTypeToString(const uint queryType)
+std::string CalpontSelectExecutionPlan::queryTypeToString(const uint32_t queryType)
 {
 	switch (queryType)
 	{
@@ -316,55 +343,55 @@ void CalpontSelectExecutionPlan::serialize(messageqcpp::ByteStream& b) const
 	vector<ReturnedColumn*>::const_iterator it;
 	ColumnMap::const_iterator mapiter;
 	TableList::const_iterator tit;
-	
+
 	b << static_cast<ObjectReader::id_t>(ObjectReader::CALPONTSELECTEXECUTIONPLAN);
-	
-	b << static_cast<u_int32_t>(fReturnedCols.size());
+
+	b << static_cast<uint32_t>(fReturnedCols.size());
 	for (rcit = fReturnedCols.begin(); rcit != fReturnedCols.end(); ++rcit)
 		(*rcit)->serialize(b);
-		
-	b << static_cast<u_int32_t>(fTableList.size());
+
+	b << static_cast<uint32_t>(fTableList.size());
 	for (tit = fTableList.begin(); tit != fTableList.end(); ++tit)
 	{
 		(*tit).serialize(b);
 	}
 
 	ObjectReader::writeParseTree(fFilters, b);
-	
-	b << static_cast<u_int32_t>(fSubSelects.size());
-	for (uint i = 0; i < fSubSelects.size(); i++)
+
+	b << static_cast<uint32_t>(fSubSelects.size());
+	for (uint32_t i = 0; i < fSubSelects.size(); i++)
 		fSubSelects[i]->serialize(b);
-	
-	b << static_cast<u_int32_t>(fGroupByCols.size());
+
+	b << static_cast<uint32_t>(fGroupByCols.size());
 	for (rcit = fGroupByCols.begin(); rcit != fGroupByCols.end(); ++rcit)
 		(*rcit)->serialize(b);
 
-	ObjectReader::writeParseTree(fHaving, b);		
-	
-	b << static_cast<u_int32_t>(fOrderByCols.size());
+	ObjectReader::writeParseTree(fHaving, b);
+
+	b << static_cast<uint32_t>(fOrderByCols.size());
 	for (rcit = fOrderByCols.begin(); rcit != fOrderByCols.end(); ++rcit)
 		(*rcit)->serialize(b);
-		
-    b << static_cast<u_int32_t>(fColumnMap.size());
-    for (mapiter = fColumnMap.begin(); mapiter != fColumnMap.end(); ++mapiter)
-    {
-        b << (*mapiter).first;
-        (*mapiter).second->serialize(b);
-    }
 
-    b << static_cast<u_int32_t>(frmParms.size());
-    for (RMParmVec::const_iterator it = frmParms.begin(); it != frmParms.end(); ++it)
-    {
-    	b << it->sessionId;
-    	b << it->id;
+	b << static_cast<uint32_t>(fColumnMap.size());
+	for (mapiter = fColumnMap.begin(); mapiter != fColumnMap.end(); ++mapiter)
+	{
+		b << (*mapiter).first;
+		(*mapiter).second->serialize(b);
+	}
+
+	b << static_cast<uint32_t>(frmParms.size());
+	for (RMParmVec::const_iterator it = frmParms.begin(); it != frmParms.end(); ++it)
+	{
+		b << it->sessionId;
+		b << it->id;
 			b << it->value;
-    }
-	
+	}
+
 	b << fTableAlias;
-	b << static_cast<u_int32_t>(fLocation);
-	
-	b << static_cast< ByteStream::byte>(fDependent);		
-	
+	b << static_cast<uint32_t>(fLocation);
+
+	b << static_cast< ByteStream::byte>(fDependent);
+
 	// ? not sure if this needs to be added
 	b << fData;
 	b << static_cast<uint32_t>(fSessionID);
@@ -372,28 +399,28 @@ void CalpontSelectExecutionPlan::serialize(messageqcpp::ByteStream& b) const
 	b << fVerID;
 	b << fTraceFlags;
 	b << fStatementID;
-	b << static_cast<const ByteStream::byte>(fDistinct);		
+	b << static_cast<const ByteStream::byte>(fDistinct);
 	b << static_cast<uint8_t>(fOverrideLargeSideEstimate);
-	
+
 	// for union
 	b << (uint8_t)fDistinctUnionNum;
 	b << (uint32_t)fUnionVec.size();
-	for (uint i = 0; i < fUnionVec.size(); i++)
+	for (uint32_t i = 0; i < fUnionVec.size(); i++)
 		fUnionVec[i]->serialize(b);
-		
+
 	b << (uint64_t)fSubType;
-	
+
 	// for FROM subquery
 	b << static_cast<uint32_t>(fDerivedTableList.size());
-	for (uint i = 0; i < fDerivedTableList.size(); i++)
+	for (uint32_t i = 0; i < fDerivedTableList.size(); i++)
 		fDerivedTableList[i]->serialize(b);
-	
+
 	b << (uint64_t)fLimitStart;
 	b << (uint64_t)fLimitNum;
 	b << static_cast<const ByteStream::byte>(fHasOrderBy);
-	
+
 	b << static_cast<uint32_t>(fSelectSubList.size());
-	for (uint i = 0; i < fSelectSubList.size(); i++)
+	for (uint32_t i = 0; i < fSelectSubList.size(); i++)
 		fSelectSubList[i]->serialize(b);
 
 	b << (uint64_t)fStringScanThreshold;
@@ -401,6 +428,8 @@ void CalpontSelectExecutionPlan::serialize(messageqcpp::ByteStream& b) const
 	b << fPriority;
 	b << fStringTableThreshold;
 	b << fSchemaName;
+	b << fLocalQuery;		
+	b << fUuid;
 }
 
 void CalpontSelectExecutionPlan::unserialize(messageqcpp::ByteStream& b)
@@ -408,21 +437,21 @@ void CalpontSelectExecutionPlan::unserialize(messageqcpp::ByteStream& b)
 	ReturnedColumn *rc;
 	CalpontExecutionPlan *cep;
 	string colName;
-	
+
 	ObjectReader::checkType(b, ObjectReader::CALPONTSELECTEXECUTIONPLAN);
-	
+
 	// erase elements, otherwise vectors contain null pointers
 	fReturnedCols.clear();
 	fSubSelects.clear();
 	fGroupByCols.clear();
 	fOrderByCols.clear();
 	fTableList.clear();
-	fColumnMap.clear(); 
-	fUnionVec.clear();	
+	fColumnMap.clear();
+	fUnionVec.clear();
 	frmParms.clear();
 	fDerivedTableList.clear();
 	fSelectSubList.clear();
-	
+
 	if (fFilters != 0) {
 		delete fFilters;
 		fFilters = 0;
@@ -441,7 +470,7 @@ void CalpontSelectExecutionPlan::unserialize(messageqcpp::ByteStream& b)
 			SRCP srcp(rc);
 		fReturnedCols.push_back(srcp);
 	}
-	
+
 	b >> size;
 	CalpontSystemCatalog::TableAliasName tan;
 	for (i = 0; i < size; i++)
@@ -449,31 +478,31 @@ void CalpontSelectExecutionPlan::unserialize(messageqcpp::ByteStream& b)
 		tan.unserialize(b);
 		fTableList.push_back(tan);
 	}
-	
+
 	fFilters = ObjectReader::createParseTree(b);
-	
+
 	b >> size;
 	for (i = 0; i < size; i++) {
 		cep = ObjectReader::createExecutionPlan(b);
 		fSubSelects.push_back(SCEP(cep));
 	}
-	
+
 	b >> size;
 	for (i = 0; i < size; i++) {
 		rc = dynamic_cast<ReturnedColumn*>(ObjectReader::createTreeNode(b));
 		SRCP srcp(rc);
 		fGroupByCols.push_back(srcp);
 	}
-	
-	fHaving = ObjectReader::createParseTree(b);	
-	
+
+	fHaving = ObjectReader::createParseTree(b);
+
 	b >> size;
 	for (i = 0; i < size; i++) {
 		rc = dynamic_cast<ReturnedColumn*>(ObjectReader::createTreeNode(b));
 		SRCP srcp(rc);
 		fOrderByCols.push_back(srcp);
 	}
-	
+
 	b >> size;
 	for (i = 0; i < size; i++) {
 		b >> colName;
@@ -492,11 +521,11 @@ void CalpontSelectExecutionPlan::unserialize(messageqcpp::ByteStream& b)
 		b >> memory;
 		frmParms.push_back(RMParam(sessionId, id, memory));
 	}
-	
+
 	b >> fTableAlias;
-	b >> reinterpret_cast<u_int32_t&>(fLocation);
-	b >> reinterpret_cast< ByteStream::byte&>(fDependent);		
-	
+	b >> reinterpret_cast<uint32_t&>(fLocation);
+	b >> reinterpret_cast< ByteStream::byte&>(fDependent);
+
 	// ? not sure if this needs to be added
 	b >> fData;
 	b >> reinterpret_cast<uint32_t&>(fSessionID);
@@ -504,11 +533,11 @@ void CalpontSelectExecutionPlan::unserialize(messageqcpp::ByteStream& b)
 	b >> fVerID;
 	b >> fTraceFlags;
 	b >> fStatementID;
-	b >> reinterpret_cast< ByteStream::byte&>(fDistinct);	
+	b >> reinterpret_cast< ByteStream::byte&>(fDistinct);
 	uint8_t val;
 	b >> reinterpret_cast<uint8_t&>(val);
 	fOverrideLargeSideEstimate = (val != 0);
-	
+
 	// for union
 	b >> (uint8_t&)(fDistinctUnionNum);
 	b >> size;
@@ -518,7 +547,7 @@ void CalpontSelectExecutionPlan::unserialize(messageqcpp::ByteStream& b)
 		fUnionVec.push_back(SCEP(cep));
 	}
 	b >> (uint64_t&)fSubType;
-	
+
 	// for FROM subquery
 	b >> size;
 	for (i = 0; i < size; i++)
@@ -526,10 +555,10 @@ void CalpontSelectExecutionPlan::unserialize(messageqcpp::ByteStream& b)
 		cep = ObjectReader::createExecutionPlan(b);
 		fDerivedTableList.push_back(SCEP(cep));
 	}
-	
+
 	b >> (uint64_t&)fLimitStart;
 	b >> (uint64_t&)fLimitNum;
-	b >> reinterpret_cast< ByteStream::byte&>(fHasOrderBy);	
+	b >> reinterpret_cast< ByteStream::byte&>(fHasOrderBy);
 
 	// for SELECT subquery
 	b >> size;
@@ -544,6 +573,8 @@ void CalpontSelectExecutionPlan::unserialize(messageqcpp::ByteStream& b)
 	b >> fPriority;
 	b >> fStringTableThreshold;
 	b >> fSchemaName;
+	b >> fLocalQuery;		
+	b >> fUuid;
 }
 
 bool CalpontSelectExecutionPlan::operator==(const CalpontSelectExecutionPlan& t) const
@@ -551,13 +582,13 @@ bool CalpontSelectExecutionPlan::operator==(const CalpontSelectExecutionPlan& t)
 
 	// If we use this outside the serialization tests, we should
 	// reorder these comparisons to speed up the common case
-	
+
 	ReturnedColumnList::const_iterator rcit;
 	ReturnedColumnList::const_iterator rcit2;
 	vector<ReturnedColumn*>::const_iterator it, it2;
 	SelectList::const_iterator sit, sit2;
 	ColumnMap::const_iterator map_it, map_it2;
-	
+
 	//fReturnedCols
 	if (fReturnedCols.size() != t.fReturnedCols.size())
 		return false;
@@ -565,7 +596,7 @@ bool CalpontSelectExecutionPlan::operator==(const CalpontSelectExecutionPlan& t)
 		rcit != fReturnedCols.end(); ++rcit, ++rcit2)
 			if (**rcit != **rcit2)
 				return false;
-	
+
 	//fFilters
 	if (fFilters != NULL && t.fFilters != NULL) {
 		if (*fFilters != *t.fFilters)
@@ -573,7 +604,7 @@ bool CalpontSelectExecutionPlan::operator==(const CalpontSelectExecutionPlan& t)
 	}
 	else if (fFilters != NULL || t.fFilters != NULL)
 		return false;
-	
+
 	//fSubSelects
 	if (fSubSelects.size() != t.fSubSelects.size())
 		return false;
@@ -581,7 +612,7 @@ bool CalpontSelectExecutionPlan::operator==(const CalpontSelectExecutionPlan& t)
 			sit != fSubSelects.end(); ++sit, ++sit2)
 		if (*((*sit).get()) != (*sit2).get())
 			return false;
-	
+
 	//fGroupByCols
 	if (fGroupByCols.size() != t.fGroupByCols.size())
 		return false;
@@ -589,15 +620,15 @@ bool CalpontSelectExecutionPlan::operator==(const CalpontSelectExecutionPlan& t)
 			rcit != fGroupByCols.end(); ++rcit, ++rcit2)
 		if (**rcit != **rcit2)
 			return false;
-			
+
 	//fHaving
 	if (fHaving != NULL && t.fHaving != NULL) {
 		if (*fHaving != *t.fHaving)
 			return false;
 	}
 	else if (fHaving != NULL || t.fHaving != NULL)
-		return false;			
-	
+		return false;
+
 	//fOrderByCols
 	if (fOrderByCols.size() != t.fOrderByCols.size())
 		return false;
@@ -605,7 +636,7 @@ bool CalpontSelectExecutionPlan::operator==(const CalpontSelectExecutionPlan& t)
 			rcit != fOrderByCols.end(); ++rcit, ++rcit2)
 		if (**rcit != **rcit2)
 			return false;
-			
+
 	//fColumnMap
 	if (fColumnMap.size() != t.fColumnMap.size())
 		return false;
@@ -613,7 +644,7 @@ bool CalpontSelectExecutionPlan::operator==(const CalpontSelectExecutionPlan& t)
 			map_it != fColumnMap.end(); ++map_it, ++map_it2)
 		if (*(map_it->second) != *(map_it2->second))
 			return false;
-	
+
 	if (fTableAlias != t.fTableAlias)
 		return false;
 	if (fLocation != t.fLocation)
@@ -630,14 +661,14 @@ bool CalpontSelectExecutionPlan::operator==(const CalpontSelectExecutionPlan& t)
 		return false;
 	if (fStringTableThreshold != t.fStringTableThreshold)
 		return false;
-	
+
 	return true;
 }
 
 bool CalpontSelectExecutionPlan::operator==(const CalpontExecutionPlan* t) const
 {
 	const CalpontSelectExecutionPlan *ac;
-	
+
 	ac = dynamic_cast<const CalpontSelectExecutionPlan*>(t);
 	if (ac == NULL)
 		return false;
@@ -672,7 +703,7 @@ void CalpontSelectExecutionPlan::rmParms (const RMParmVec& parms)
 
 	frmParms.clear();
 	frmParms.assign(parms.begin(), parms.end());
-} 
+}
 
 
 } // namespace execplan

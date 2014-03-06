@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -76,7 +76,7 @@ public:
 	std::string view2() const { return fView2; }
 	void view2(const std::string& vw) { fView2 = vw; }
 
-	uint nextBand(messageqcpp::ByteStream &bs);
+	uint32_t nextBand(messageqcpp::ByteStream &bs);
 
 
 private:
@@ -94,8 +94,8 @@ private:
 	void addToOutput(rowgroup::Row *r, rowgroup::RowGroup *rg, bool keepit,
 		rowgroup::RGData &data);
 	void normalize(const rowgroup::Row &in, rowgroup::Row *out);
-	void writeNull(rowgroup::Row *out, uint col);
-	void readInput(uint);
+	void writeNull(rowgroup::Row *out, uint32_t col);
+	void readInput(uint32_t);
 
 	execplan::CalpontSystemCatalog::OID fTableOID;
 	// @bug 598 for self-join
@@ -109,12 +109,12 @@ private:
 	std::vector<rowgroup::RowGroup> inputRGs;
 	std::vector<RowGroupDL *> inputs;
 	RowGroupDL *output;
-	uint outputIt;
+	uint32_t outputIt;
 
 	struct Runner {
 		TupleUnion *tu;
-		uint index;
-		Runner(TupleUnion *t, uint in) : tu(t), index(in) { }
+		uint32_t index;
+		Runner(TupleUnion *t, uint32_t in) : tu(t), index(in) { }
 		void operator()() { tu->readInput(index); }
 	};
 	std::vector<boost::shared_ptr<boost::thread> > runners;
@@ -138,16 +138,16 @@ private:
 	std::vector<rowgroup::RGData> rowMemory;
 	boost::mutex sMutex, uniquerMutex;
 	uint64_t memUsage;
-	uint rowLength;
+	uint32_t rowLength;
 	rowgroup::Row row, row2;
 	std::vector<bool> distinctFlags;
 	ResourceManager& rm;
 	utils::STLPoolAllocator<RowPosition> allocator;
 	boost::scoped_array<rowgroup::RGData> normalizedData;
 
-	uint runnersDone;
-	uint distinctCount;
-	uint distinctDone;
+	uint32_t runnersDone;
+	uint32_t distinctCount;
+	uint32_t distinctDone;
 
 	// temporary hack to make sure JobList only calls run, join once
 	boost::mutex jlLock;

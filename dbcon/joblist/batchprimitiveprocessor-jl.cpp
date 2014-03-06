@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -35,6 +35,10 @@
 #include <iostream>
 #include <set>
 using namespace std;
+
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_generators.hpp>
+namespace bu=boost::uuids;
 
 #include "calpontsystemcatalog.h"
 using namespace execplan;
@@ -75,6 +79,8 @@ BatchPrimitiveProcessorJL::BatchPrimitiveProcessorJL(const ResourceManager& rm) 
 	hasSmallOuterJoin(false),
 	_priority(1)
 {
+    PMJoinerCount = 0;
+	uuid = bu::nil_generator()();
 }
 
 BatchPrimitiveProcessorJL::~BatchPrimitiveProcessorJL()
@@ -88,10 +94,26 @@ void BatchPrimitiveProcessorJL::addFilterStep(const pColScanStep &scan, vector<B
 	tableOID = scan.tableOid();
 	cc.reset(new ColumnCommandJL(scan, lastScannedLBID));
 	cc->setBatchPrimitiveProcessor(this);
+	cc->setQueryUuid(scan.queryUuid());
+	cc->setStepUuid(uuid);
 	filterSteps.push_back(cc);
 	filterCount++;
 	_hasScan = true;
 	idbassert(sessionID == scan.sessionId());
+}
+
+void BatchPrimitiveProcessorJL::addFilterStep(const PseudoColStep &pcs)
+{
+    SCommand cc;
+
+    tableOID = pcs.tableOid();
+	cc.reset(new PseudoCCJL(pcs));
+	cc->setBatchPrimitiveProcessor(this);
+	cc->setQueryUuid(pcs.queryUuid());
+	cc->setStepUuid(uuid);
+	filterSteps.push_back(cc);
+	filterCount++;
+	idbassert(sessionID == pcs.sessionId());
 }
 
 void BatchPrimitiveProcessorJL::addFilterStep(const pColStep &step)
@@ -101,6 +123,8 @@ void BatchPrimitiveProcessorJL::addFilterStep(const pColStep &step)
 	tableOID = step.tableOid();
 	cc.reset(new ColumnCommandJL(step));
 	cc->setBatchPrimitiveProcessor(this);
+	cc->setQueryUuid(step.queryUuid());
+	cc->setStepUuid(uuid);
 	filterSteps.push_back(cc);
 	filterCount++;
 	idbassert(sessionID == step.sessionId());
@@ -118,6 +142,8 @@ void BatchPrimitiveProcessorJL::addFilterStep(const pDictionaryStep &step)
 	}
 	cc.reset(new DictStepJL(step));
 	cc->setBatchPrimitiveProcessor(this);
+	cc->setQueryUuid(step.queryUuid());
+	cc->setStepUuid(uuid);
 	filterSteps.push_back(cc);
 	filterCount++;
 	needStrValues = true;
@@ -132,8 +158,26 @@ void BatchPrimitiveProcessorJL::addFilterStep(const FilterStep& step)
 	tableOID = step.tableOid();
 	cc.reset(new FilterCommandJL(step));
 	cc->setBatchPrimitiveProcessor(this);
+	cc->setQueryUuid(step.queryUuid());
+	cc->setStepUuid(uuid);
 	filterSteps.push_back(cc);
 	filterCount++;
+	idbassert(sessionID == step.sessionId());
+}
+
+void BatchPrimitiveProcessorJL::addProjectStep(const PseudoColStep &step)
+{
+	SCommand cc;
+
+	cc.reset(new PseudoCCJL(step));
+	cc->setBatchPrimitiveProcessor(this);
+	cc->setTupleKey(step.tupleId());
+	cc->setQueryUuid(step.queryUuid());
+	cc->setStepUuid(uuid);
+	projectSteps.push_back(cc);
+	colWidths.push_back(cc->getWidth());
+	tupleLength += cc->getWidth();
+	projectCount++;
 	idbassert(sessionID == step.sessionId());
 }
 
@@ -144,6 +188,8 @@ void BatchPrimitiveProcessorJL::addProjectStep(const pColStep &step)
 	cc.reset(new ColumnCommandJL(step));
 	cc->setBatchPrimitiveProcessor(this);
 	cc->setTupleKey(step.tupleId());
+	cc->setQueryUuid(step.queryUuid());
+	cc->setStepUuid(uuid);
 	projectSteps.push_back(cc);
 	colWidths.push_back(cc->getWidth());
 	tupleLength += cc->getWidth();
@@ -158,6 +204,8 @@ void BatchPrimitiveProcessorJL::addProjectStep(const PassThruStep &step)
 	cc.reset(new PassThruCommandJL(step));
 	cc->setBatchPrimitiveProcessor(this);
 	cc->setTupleKey(step.tupleId());
+	cc->setQueryUuid(step.queryUuid());
+	cc->setStepUuid(uuid);
 	projectSteps.push_back(cc);
 	colWidths.push_back(cc->getWidth());
 	tupleLength += cc->getWidth();
@@ -175,6 +223,8 @@ void BatchPrimitiveProcessorJL::addProjectStep(const pColStep &col,
 	cc.reset(new RTSCommandJL(col, dict));
 	cc->setBatchPrimitiveProcessor(this);
 	cc->setTupleKey(dict.tupleId());
+	cc->setQueryUuid(col.queryUuid());
+	cc->setStepUuid(uuid);
 	projectSteps.push_back(cc);
 	colWidths.push_back(cc->getWidth());
 	tupleLength += cc->getWidth();
@@ -192,6 +242,8 @@ void BatchPrimitiveProcessorJL::addProjectStep(const PassThruStep &p,
 	cc.reset(new RTSCommandJL(p, dict));
 	cc->setBatchPrimitiveProcessor(this);
 	cc->setTupleKey(dict.tupleId());
+	cc->setQueryUuid(p.queryUuid());
+	cc->setStepUuid(uuid);
 	projectSteps.push_back(cc);
 	colWidths.push_back(cc->getWidth());
 	tupleLength += cc->getWidth();
@@ -211,7 +263,7 @@ void BatchPrimitiveProcessorJL::addDeliveryStep(const DeliveryStep &ds)
 {
 	idbassert(sessionID == ds.sessionId());
 
-	uint i;
+	uint32_t i;
 
 	templateTB = ds.fEmptyTableBand;
 	tableOID = ds.fTableOID;
@@ -253,9 +305,9 @@ void BatchPrimitiveProcessorJL::addDeliveryStep(const DeliveryStep &ds)
 }
 #endif
 
-void BatchPrimitiveProcessorJL::addElementType(const ElementType &et, uint dbroot)
+void BatchPrimitiveProcessorJL::addElementType(const ElementType &et, uint32_t dbroot)
 {
-	uint i;
+	uint32_t i;
 // 	rowCounter++;
 
 	if (needToSetLBID) {
@@ -286,7 +338,7 @@ void BatchPrimitiveProcessorJL::addElementType(const ElementType &et, uint dbroo
 #if 0
 void BatchPrimitiveProcessorJL::setRowGroupData(const rowgroup::RowGroup &rg)
 {
-	uint i;
+	uint32_t i;
 	rowgroup::Row r;
 
 	inputRG.setData(rg.getData());
@@ -307,7 +359,7 @@ void BatchPrimitiveProcessorJL::setRowGroupData(const rowgroup::RowGroup &rg)
 
 #endif
 
-void BatchPrimitiveProcessorJL::addElementType(const StringElementType &et, uint dbroot)
+void BatchPrimitiveProcessorJL::addElementType(const StringElementType &et, uint32_t dbroot)
 {
 	if (filterCount == 0)
 		throw logic_error("BPPJL::addElementType(StringElementType): doesn't work without filter steps yet");
@@ -341,7 +393,7 @@ void BatchPrimitiveProcessorJL::getElementTypes(ByteStream &in,
 	int64_t *max, uint32_t *cachedIO, uint32_t *physIO, uint32_t *touchedBlocks,
 	uint16_t *preJoinRidCount) const
 {
-	uint i;
+	uint32_t i;
 	uint16_t l_count;
 	uint64_t l_baseRid;
 	uint16_t *rids;
@@ -383,7 +435,7 @@ void BatchPrimitiveProcessorJL::getElementTypes(ByteStream &in,
 
 	rids = (uint16_t *) buf;
 	vals = (uint64_t *) (buf + (l_count << 1));
-	idbassert(in.length() > (uint) ((l_count << 1) + (l_count << 3)) );
+	idbassert(in.length() > (uint32_t) ((l_count << 1) + (l_count << 3)) );
 	in.advance((l_count << 1) + (l_count << 3));
 
 	for (i = 0; i < l_count; ++i) {
@@ -433,7 +485,7 @@ void BatchPrimitiveProcessorJL::getStringElementTypes(ByteStream &in,
 	vector<StringElementType> *out, bool *validCPData, uint64_t *lbid, int64_t *min,
 	int64_t *max, uint32_t *cachedIO, uint32_t *physIO, uint32_t *touchedBlocks) const
 {
-	uint i;
+	uint32_t i;
 	uint16_t l_count;
 	uint64_t *l_absRids;
 	uint64_t tmp64;
@@ -483,7 +535,7 @@ void BatchPrimitiveProcessorJL::getTuples(messageqcpp::ByteStream &in,
 	std::vector<TupleType> *out, bool *validCPData, uint64_t *lbid, int64_t *min,
 	int64_t *max, uint32_t *cachedIO, uint32_t *physIO, uint32_t *touchedBlocks) const
 {
-	uint i, j, pos, len;
+	uint32_t i, j, pos, len;
 	uint16_t l_rowCount;
 	uint64_t l_baseRid;
 	uint16_t *l_relRids;
@@ -596,7 +648,7 @@ void BatchPrimitiveProcessorJL::getTuples(messageqcpp::ByteStream &in,
 bool BatchPrimitiveProcessorJL::countThisMsg(messageqcpp::ByteStream &in) const
 {
 	const uint8_t *data = in.buf();
-	uint offset = sizeof(ISMPacketHeader) + sizeof(PrimitiveHeader); // skip the headers
+	uint32_t offset = sizeof(ISMPacketHeader) + sizeof(PrimitiveHeader); // skip the headers
 
 	if (_hasScan)
 	{
@@ -626,7 +678,7 @@ void BatchPrimitiveProcessorJL::deserializeAggregateResult(ByteStream *in,
 void BatchPrimitiveProcessorJL::getRowGroupData(ByteStream &in, vector<RGData> *out,
 	bool *validCPData, uint64_t *lbid, int64_t *min, int64_t *max,
 	uint32_t *cachedIO, uint32_t *physIO, uint32_t *touchedBlocks, bool *countThis,
-	uint threadID) const
+	uint32_t threadID) const
 {
 	uint64_t tmp64;
 	uint8_t tmp8;
@@ -672,7 +724,7 @@ void BatchPrimitiveProcessorJL::getRowGroupData(ByteStream &in, vector<RGData> *
 	 * For later... */
 	if (aggregatorPM) {
 		deserializeAggregateResult(&in, out);
-		//for (uint z = 0; z < out->size(); z++) {
+		//for (uint32_t z = 0; z < out->size(); z++) {
 		//	org.setData(&(*out)[z]);
 		//	cout << "BPPJL: " << org.toString() << endl;
 		//}
@@ -685,11 +737,11 @@ void BatchPrimitiveProcessorJL::getRowGroupData(ByteStream &in, vector<RGData> *
 		rowCount = org.getRowCount();
 
 		bool pmSendsMatchesAnyway = (hasSmallOuterJoin && *countThis && PMJoinerCount > 0 &&
-			sendTupleJoinRowGroupData);
+            (fe2 || aggregatorPM));
 
-		if (!pmSendsFinalResult() || pmSendsMatchesAnyway) {
+        if (!pmSendsFinalResult() || pmSendsMatchesAnyway) {
 			boost::shared_array<vector<uint32_t> > joinResults;
-			uint i, j;
+			uint32_t i, j;
 
 			if (pmSendsMatchesAnyway) {
 				uint16_t joinRowCount;
@@ -752,7 +804,7 @@ void BatchPrimitiveProcessorJL::reset()
 
 void BatchPrimitiveProcessorJL::setLBID(uint64_t l, const BRM::EMEntry &scannedExtent)
 {
-	uint i;
+	uint32_t i;
 
 	dbRoot = scannedExtent.dbRoot;
 	baseRid = rowgroup::convertToRid(scannedExtent.partitionNum,
@@ -777,7 +829,7 @@ void BatchPrimitiveProcessorJL::setLBID(uint64_t l, const BRM::EMEntry &scannedE
 string BatchPrimitiveProcessorJL::toString() const
 {
 	ostringstream ret;
-	uint i;
+	uint32_t i;
 
 	ret << "BatchPrimitiveProcessorJL:" << endl;
 	if (!_hasScan) {
@@ -823,7 +875,7 @@ string BatchPrimitiveProcessorJL::toString() const
 void BatchPrimitiveProcessorJL::createBPP(ByteStream &bs) const
 {
 	ISMPacketHeader ism;
-	uint i;
+	uint32_t i;
 	uint8_t flags = 0;
 
 	ism.Command = BATCH_PRIMITIVE_CREATE;
@@ -897,9 +949,9 @@ void BatchPrimitiveProcessorJL::createBPP(ByteStream &bs) const
 			for (i = 0; i < PMJoinerCount; i++) {
 				bs << (uint32_t) tJoiners[i]->size();
 				bs << tJoiners[i]->getJoinType();
-				
+
 				//bs << (uint64_t) tJoiners[i]->smallNullValue();
-				
+
 				bs << (uint8_t) tJoiners[i]->isTypelessJoin();
 				if (tJoiners[i]->hasFEFilter()) {
 					atLeastOneFE = true;
@@ -911,10 +963,10 @@ void BatchPrimitiveProcessorJL::createBPP(ByteStream &bs) const
 				if (!tJoiners[i]->isTypelessJoin()) {
 					bs << (uint64_t) tJoiners[i]->smallNullValue();
 					bs << (messageqcpp::ByteStream::quadbyte)tJoiners[i]->getLargeKeyColumn();
- 					//cout << "large key column is " << (uint) tJoiners[i]->getLargeKeyColumn() << endl;
+ 					//cout << "large key column is " << (uint32_t) tJoiners[i]->getLargeKeyColumn() << endl;
 				}
 				else {
-					serializeVector<uint>(bs, tJoiners[i]->getLargeKeyColumns());
+					serializeVector<uint32_t>(bs, tJoiners[i]->getLargeKeyColumns());
 					bs << (uint32_t) tJoiners[i]->getKeyLength();
 				}
 			}
@@ -926,7 +978,7 @@ void BatchPrimitiveProcessorJL::createBPP(ByteStream &bs) const
 #endif
 				serializeVector<RowGroup>(bs, smallSideRGs);
 				bs << largeSideRG;
-				bs << joinedRG;
+				bs << joinedRG;    // TODO: I think we can omit joinedRG if (!(fe2 || aggregatorPM))
 // 				cout << "joined RG: " << joinedRG.toString() << endl;
 			}
 		}
@@ -962,14 +1014,17 @@ void BatchPrimitiveProcessorJL::createBPP(ByteStream &bs) const
 	// decide which rowgroup is received by PrimProc
 	if (ot == ROW_GROUP) {
 		primprocRG.reset(new RowGroup[threadCount]);
-		for (uint i = 0; i < threadCount; i++)
-			if (aggregatorPM)
+		for (uint32_t i = 0; i < threadCount; i++)
+			if (aggregatorPM) 
 				primprocRG[i] = aggregateRGPM;
-			else if (fe2)
+			else if (fe2) 
 				primprocRG[i] = fe2Output;
-			else if ((flags & HAS_JOINER) && sendTupleJoinRowGroupData)
-				primprocRG[i] = joinedRG;
-			else
+			//This shouldn't be necessary. As of 2-17-14, PrimProc
+			//will only send joined results if fe2 || aggregatorPM,
+			//so it will never send back data for joinedRG.
+			//else if ((flags & HAS_JOINER) && sendTupleJoinRowGroupData)
+			//	primprocRG[i] = joinedRG;
+			else 
 				primprocRG[i] = projectionRG;
 	}
 
@@ -1003,7 +1058,7 @@ void BatchPrimitiveProcessorJL::createBPP(ByteStream &bs) const
 void BatchPrimitiveProcessorJL::runBPP(ByteStream &bs, uint32_t pmNum)
 {
 	ISMPacketHeader ism;
-	uint i;
+	uint32_t i;
 
 /* XXXPAT: BPPJL currently reuses the ism Size fields for other things to
 save bandwidth.  They're completely unused otherwise.  We need to throw out all unused
@@ -1110,8 +1165,8 @@ void BatchPrimitiveProcessorJL::useJoiners(const vector<boost::shared_ptr<joiner
 	tJoiners = j;
 
 	PMJoinerCount = 0;
-	tlKeyLens.reset(new uint[tJoiners.size()]);
-	for (uint i = 0; i < tJoiners.size(); i++) {
+	tlKeyLens.reset(new uint32_t[tJoiners.size()]);
+	for (uint32_t i = 0; i < tJoiners.size(); i++) {
 		if (tJoiners[i]->inPM()) {
 			PMJoinerCount++;
 			smallSideKeys.push_back(tJoiners[i]->getSmallKeyColumns());
@@ -1142,8 +1197,8 @@ bool BatchPrimitiveProcessorJL::nextTupleJoinerMsg(ByteStream &bs)
 	Row r;
 	vector<Row::Pointer> *tSmallSide;
 	joiner::TypelessData tlData;
-    uint smallKeyCol;
-    uint largeKeyCol;
+    uint32_t smallKeyCol;
+    uint32_t largeKeyCol;
     uint64_t smallkey;
 	bool isNull;
 	bool bSignedUnsigned;
@@ -1353,7 +1408,7 @@ void BatchPrimitiveProcessorJL::addAggregateStep(const rowgroup::SP_ROWAGG_PM_t&
 }
 
 /* OR hacks */
-void BatchPrimitiveProcessorJL::setBOP(uint op)
+void BatchPrimitiveProcessorJL::setBOP(uint32_t op)
 {
 	bop = op;
 
@@ -1445,13 +1500,15 @@ void BatchPrimitiveProcessorJL::abortProcessing(ByteStream *bs)
 
 void BatchPrimitiveProcessorJL::deliverStringTableRowGroup(bool b)
 {
-	if (fe2)
+    if (aggregatorPM)
+        aggregateRGPM.setUseStringTable(b);
+	else if (fe2)
 		fe2Output.setUseStringTable(b);
-	else if ((joiner.get() != NULL || tJoiners.size() > 0) && sendTupleJoinRowGroupData)
-		joinedRG.setUseStringTable(b);
+//	else if ((joiner.get() != NULL || tJoiners.size() > 0) && sendTupleJoinRowGroupData)
+//		joinedRG.setUseStringTable(b);
 	else
 		projectionRG.setUseStringTable(b);
 }
 
 
-};
+}

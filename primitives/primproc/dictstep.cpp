@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -19,7 +19,7 @@
 // $Id: dictstep.cpp 2110 2013-06-19 15:51:38Z bwilkinson $
 // C++ Implementation: dictstep
 //
-// Description: 
+// Description:
 //
 //
 // Author: Patrick LeBlanc <pleblanc@calpont.com>, (C) 2008
@@ -42,7 +42,7 @@ using namespace rowgroup;
 
 namespace primitiveprocessor {
 
-extern uint dictBufferSize;
+extern uint32_t dictBufferSize;
 extern bool utf8;
 
 DictStep::DictStep() : Command(DICT_STEP), strValues(NULL), filterCount(0),
@@ -73,7 +73,7 @@ void DictStep::createCommand(ByteStream &bs)
 {
 	uint8_t tmp8;
 
-	bs >> tmp8;  // eat the command
+    bs.advance(1);
 	bs >> BOP;
 	bs >> tmp8;
 	compressionType = tmp8;
@@ -86,7 +86,7 @@ void DictStep::createCommand(ByteStream &bs)
 		eqFilter.reset(new primitives::DictEqualityFilter());
 		bs >> eqOp;
 		//cout << "saw the eqfilter count=" << filterCount << endl;
-		for (uint i = 0; i < filterCount; i++) {
+		for (uint32_t i = 0; i < filterCount; i++) {
 			bs >> strTmp;
 			//cout << "  " << strTmp << endl;
 			eqFilter->insert(strTmp);
@@ -98,7 +98,7 @@ void DictStep::createCommand(ByteStream &bs)
 #if 0
 	cout << "see " << filterCount << " filters\n";
 	DictFilterElement *filters = (DictFilterElement *) filterString.buf();
-	for (uint i = 0; i < filterCount; i++) {
+	for (uint32_t i = 0; i < filterCount; i++) {
 		cout << "  COP=" << (int) filters->COP << endl;
 		cout << "  len=" << filters->len << endl;
 		cout << "  string=" << filters->data << endl;
@@ -121,7 +121,7 @@ void DictStep::prep(int8_t outputType, bool makeAbsRids)
 
 	primMsg->ism.Interleave = 0;
 	primMsg->ism.Flags = 0;
-// 	primMsg->ism.Flags = PrimitiveMsg::planFlagsToPrimFlags(traceFlags);	
+// 	primMsg->ism.Flags = PrimitiveMsg::planFlagsToPrimFlags(traceFlags);
 	primMsg->ism.Command=DICT_SIGNATURE;
 	primMsg->ism.Size = bufferSize;
 	primMsg->ism.Type = 2;
@@ -149,12 +149,12 @@ void DictStep::issuePrimitive(bool isFilter)
  		//cout << "DS issuePrimitive lbid: " << (uint64_t)primMsg->LBID << endl;
 		primitiveprocessor::loadBlock(primMsg->LBID,
 									bpp->versionInfo,
-									bpp->txnID, 
+									bpp->txnID,
 									compressionType,
-									bpp->blockData, 
-									&wasCached, 
-									&blocksRead, 
-									bpp->LBIDTrace, 
+									bpp->blockData,
+									&wasCached,
+									&blocksRead,
+									bpp->LBIDTrace,
 									bpp->sessionID);
 		if (wasCached)
 			bpp->cachedIO++;
@@ -167,7 +167,7 @@ void DictStep::issuePrimitive(bool isFilter)
 
 void DictStep::copyResultToTmpSpace(OrderedToken *ot)
 {
-	uint i;
+	uint32_t i;
 	uint8_t *pos;
 	uint16_t len;
 	uint64_t rid64;
@@ -196,7 +196,7 @@ void DictStep::copyResultToTmpSpace(OrderedToken *ot)
 
 void DictStep::copyResultToFinalPosition(OrderedToken *ot)
 {
-	uint i, resultPos = 0;
+	uint32_t i, resultPos = 0;
 
 	for (i = 0; i < inputRidCount; i++) {
 		if (ot[i].inResult) {
@@ -211,7 +211,7 @@ void DictStep::copyResultToFinalPosition(OrderedToken *ot)
 
 void DictStep::processResult()
 {
-	uint i;
+	uint32_t i;
 	uint8_t *pos;
 	uint16_t len;
 	DictOutput *header = (DictOutput *) &result[0];
@@ -243,28 +243,28 @@ void DictStep::processResult()
 
 void DictStep::projectResult(string* strings)
 {
-    uint i;
+    uint32_t i;
     uint8_t *pos;
     uint16_t len;
     DictOutput *header = (DictOutput *) &result[0];
-        
+
     if (header->NVALS == 0) return;
-        
+
     pos = &result[sizeof(DictOutput)];
     //cout << "projectResult() l: " << primMsg->LBID << " NVALS: " << header->NVALS << endl;
     for (i = 0; i < header->NVALS; i++) {
         len = *((uint16_t *) pos); pos += 2;
         strings[tmpResultCounter++] = string((char *) pos, len);
-        //cout << "serialized length is " << len << " string is " << strings[tmpResultCounter-1] << " string length = " << 
+        //cout << "serialized length is " << len << " string is " << strings[tmpResultCounter-1] << " string length = " <<
         //  strings[tmpResultCounter-1].length() << endl;
         pos += len;
         totalResultLength += len + 4;
     }
-}               
+}
 
 // bug4901 -
-// This version of projectResult needs to stay in sync with 
-// the above.  They are separate methods because the 
+// This version of projectResult needs to stay in sync with
+// the above.  They are separate methods because the
 // _projectToRG() method can deal with this optimized version
 // where we only need to return the pointer and length.  This
 // is desirable because it avoids an unnecessary temporary
@@ -273,7 +273,7 @@ void DictStep::projectResult(string* strings)
 // before starting to serialize strings.
 void DictStep::projectResult(StringPtr *strings)
 {
-	uint i;
+	uint32_t i;
 	uint8_t *pos;
 	uint16_t len;
 	DictOutput *header = (DictOutput *) &result[0];
@@ -285,7 +285,7 @@ void DictStep::projectResult(StringPtr *strings)
 	for (i = 0; i < header->NVALS; i++) {
 		len = *((uint16_t *) pos); pos += 2;
 		strings[tmpResultCounter++] = StringPtr(pos, len);
- 		//cout << "serialized length is " << len << " string is " << strings[tmpResultCounter-1] << " string length = " << 
+ 		//cout << "serialized length is " << len << " string is " << strings[tmpResultCounter-1] << " string length = " <<
 		//	strings[tmpResultCounter-1].length() << endl;
 		pos += len;
 		totalResultLength += len + 4;
@@ -371,7 +371,7 @@ void DictStep::_execute()
 void DictStep::_project()
 {
 	/* Need to loop over bpp->values, issuing a primitive for each LBID */
-	uint i;
+	uint32_t i;
 	int64_t l_lbid=0;
 	OldGetSigParams *pt;
 	string tmpStrings[LOGICAL_BLOCK_RIDS];
@@ -420,10 +420,10 @@ void DictStep::_project()
  	//cout << "DS: /_project() l: " << l_lbid << endl;
 }
 
-void DictStep::_projectToRG(RowGroup &rg, uint col)
+void DictStep::_projectToRG(RowGroup &rg, uint32_t col)
 {
 	/* Need to loop over bpp->values, issuing a primitive for each LBID */
-	uint i;
+	uint32_t i;
 	int64_t l_lbid=0;
 	int64_t o_lbid=0;
 	OldGetSigParams *pt;
@@ -441,7 +441,7 @@ void DictStep::_projectToRG(RowGroup &rg, uint col)
 	sort(&newRidList[0], &newRidList[bpp->ridCount], TokenSorter());
 
 	rg.initRow(&r);
-    uint curResultCounter = 0;
+    uint32_t curResultCounter = 0;
 	tmpResultCounter = 0;
 	totalResultLength = 0;
 	i = 0;
@@ -489,7 +489,7 @@ void DictStep::_projectToRG(RowGroup &rg, uint col)
 // 			pt++;
 			i++;
 		}
-		
+
 		if (((int64_t)primMsg->LBID)<0 && o_lbid>0)
 			primMsg->LBID = o_lbid;
 
@@ -513,13 +513,13 @@ void DictStep::_projectToRG(RowGroup &rg, uint col)
             	rg.getRow(newRidList[i].pos, &r);
             	r.setVarBinaryField(tmpStrings[i].ptr, tmpStrings[i].len, col);
         	}
-    	}   
+    	}
         curResultCounter = tmpResultCounter;
 	}
 
  	//cout << "_projectToRG() total length = " << totalResultLength << endl;
 	idbassert(tmpResultCounter == bpp->ridCount);
- 	
+
     //cout << "DS: /projectingToRG l: " << (int64_t)primMsg->LBID
 	//	<< " len: " << tmpResultCounter
 	//	<<  endl;
@@ -537,13 +537,13 @@ void DictStep::project(int64_t *vals)
 	_project();
 }
 
-void DictStep::projectIntoRowGroup(RowGroup &rg, uint col)
+void DictStep::projectIntoRowGroup(RowGroup &rg, uint32_t col)
 {
 	values = bpp->values;
 	_projectToRG(rg, col);
 }
 
-void DictStep::projectIntoRowGroup(RowGroup &rg, int64_t *vals, uint col)
+void DictStep::projectIntoRowGroup(RowGroup &rg, int64_t *vals, uint32_t col)
 {
 	values = vals;
 	_projectToRG(rg, col);

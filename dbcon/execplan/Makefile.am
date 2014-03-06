@@ -1,4 +1,4 @@
-#  Copyright (C) 2013 Calpont Corp.
+#  Copyright (C) 2014 InfiniDB, Inc.
 #
 #  This program is free software; you can redistribute it and/or
 #  modify it under the terms of the GNU General Public License
@@ -43,6 +43,7 @@ operator.cpp \
 oracleexecutionplan.cpp \
 outerjoinonfilter.cpp \
 predicateoperator.cpp \
+pseudocolumn.cpp \
 range.cpp \
 returnedcolumn.cpp \
 rowcolumn.cpp \
@@ -85,6 +86,7 @@ oracleexecutionplan.h \
 outerjoinonfilter.h \
 parsetree.h \
 predicateoperator.h \
+pseudocolumn.h \
 range.h \
 returnedcolumn.h \
 rowcolumn.h \

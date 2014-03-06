@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -32,6 +32,7 @@
 
 #include <boost/shared_ptr.hpp>
 #include <boost/shared_array.hpp>
+#include <boost/uuid/uuid.hpp>
 
 #include "calpontsystemcatalog.h"
 #include "calpontselectexecutionplan.h"
@@ -40,6 +41,7 @@
 #include "jl_logger.h"
 #include "timestamp.h"
 #include "rowgroup.h"
+#include "querytele.h"
 
 #include "atomicops.h"
 
@@ -206,8 +208,8 @@ public:
     const std::string& extendedInfo() const { return fExtendedInfo; }
     const std::string& miniInfo() const { return fMiniInfo; }
 
-    uint priority() { return fPriority; }
-    void priority(uint p) { fPriority = p; }
+    uint32_t priority() { return fPriority; }
+    void priority(uint32_t p) { fPriority = p; }
 
     uint32_t status() const { return fErrorInfo->errCode; }
     void  status(uint32_t s)  { fErrorInfo->errCode = s; }
@@ -223,6 +225,7 @@ public:
 
 	bool delivery()        { return fDelivery; }
 	void delivery(bool b)  { fDelivery = b; }
+	const boost::uuids::uuid& queryUuid() const { return fQueryUuid; }
 
 protected:
     JobStepAssociation fInputJobStepAssociation;
@@ -249,13 +252,20 @@ protected:
     std::string fExtendedInfo;
     std::string fMiniInfo;
 
-    uint fPriority;
+    uint32_t fPriority;
 
     SErrorInfo fErrorInfo;
     SPJL fLogger;
 
+	uint32_t fLocalQuery;
+
+	boost::uuids::uuid fQueryUuid;
+	boost::uuids::uuid fStepUuid;
+	querytele::QueryTeleClient fQtc;
+
 private:
     static boost::mutex fLogMutex;
+
     friend class CommandJL;
 };
 
@@ -263,8 +273,8 @@ private:
 class TupleJobStep
 {
 public:
-    TupleJobStep() {}
-    virtual ~TupleJobStep() {}
+    TupleJobStep() { }
+    virtual ~TupleJobStep() { }
     virtual void  setOutputRowGroup(const rowgroup::RowGroup&) = 0;
     virtual void  setFcnExpGroup3(const std::vector<execplan::SRCP>&) {}
     virtual void  setFE23Output(const rowgroup::RowGroup&) {}
@@ -276,7 +286,7 @@ class TupleDeliveryStep : public TupleJobStep
 {
 public:
     virtual ~TupleDeliveryStep() { }
-    virtual uint  nextBand(messageqcpp::ByteStream &bs) = 0;
+    virtual uint32_t  nextBand(messageqcpp::ByteStream &bs) = 0;
     virtual const rowgroup::RowGroup& getDeliveredRowGroup() const = 0;
 	virtual void  deliverStringTableRowGroup(bool b) = 0;
 	virtual bool  deliverStringTableRowGroup() const = 0;
@@ -285,17 +295,13 @@ public:
 // calls rhs->toString()
 std::ostream& operator<<(std::ostream& os, const JobStep* rhs);
 
-
 typedef boost::shared_ptr<JobStepAssociation> SJSA;
 typedef boost::shared_ptr<JobStepAssociation> JobStepAssociationSPtr;
 
 typedef boost::shared_ptr<JobStep> SJSTEP;
 
-
 }
 
 #endif  // JOBLIST_JOBSTEP_H_
 // vim:ts=4 sw=4:
-
-
 

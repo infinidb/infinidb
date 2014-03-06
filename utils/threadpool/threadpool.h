@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -16,13 +16,15 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: threadpool.h 3495 2013-01-21 14:09:51Z rdempsey $
 *
 *   Work dervied from Devguy.com's Open Source C++ thread pool implementation 
-*	released under public domain.
+*	released under public domain:
+*	http://web.archive.org/liveweb/http://dgpctk.cvs.sourceforge.net/viewvc/dgpctk/dgc%2B%2B/include/dg/thread/threadpool.h?revision=1.22&content-type=text%2Fplain 
 *
+*	http://web.archive.org/web/20100104101109/http://devguy.com/bb/viewtopic.php?t=460 
 *
 ***********************************************************************/
+
 /** @file */
 
 #ifndef THREADPOOL_H
@@ -115,7 +117,7 @@ public:
     /** @brief queue size accessor
       *
       */
-    inline uint getWaiting() const { return waitingFunctorsSize; }
+    inline uint32_t getWaiting() const { return waitingFunctorsSize; }
 
 
     /*********************************************
@@ -203,7 +205,7 @@ private:
     bool 	fStop;
     long 	fGeneralErrors;
     long	fFunctorErrors;
-	uint 	waitingFunctorsSize;
+	uint32_t 	waitingFunctorsSize;
 
 };
 

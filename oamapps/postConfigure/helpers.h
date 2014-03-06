@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -27,7 +27,8 @@ extern bool waitForActive();
 extern void dbrmDirCheck();
 extern void mysqlSetup();
 extern int sendMsgProcMon( std::string module, ByteStream msg, int requestID, int timeout );
-extern int sendUpgradeRequest(int IserverTypeInstall);
+extern int sendUpgradeRequest(int IserverTypeInstall, bool pmwithum);
+extern int sendReplicationRequest(int IserverTypeInstall);
 extern void checkFilesPerPartion(int DBRootCount, Config* sysConfig);
 }
 

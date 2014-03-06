@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -19,9 +19,7 @@
 #define CGROUPCONFIGURATOR_H
 
 #include <stdlib.h>
-#ifndef _MSC_VER
 #include <inttypes.h>
-#endif
 #include <string>
 
 #include "configcpp.h"
@@ -36,7 +34,7 @@ public:
     CGroupConfigurator();
     virtual ~CGroupConfigurator();
 
-    uint getNumCores();
+    uint32_t getNumCores();
     uint64_t getTotalMemory();
     uint64_t getFreeMemory();
     uint64_t getTotalSwapSpace();
@@ -45,8 +43,8 @@ public:
     bool usingCGroup() { return cGroupDefined; }
 
 private:
-    uint getNumCoresFromProc();
-    uint getNumCoresFromCGroup();
+    uint32_t getNumCoresFromProc();
+    uint32_t getNumCoresFromCGroup();
     uint64_t getTotalMemoryFromProc();
     uint64_t getTotalMemoryFromCGroup();
     uint64_t getFreeMemoryFromProc();

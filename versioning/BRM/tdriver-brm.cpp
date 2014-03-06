@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -64,13 +64,13 @@ static void *BRMRunner_2(void *arg)
 	
 	pthread_mutex_t listMutex;
 	int op;
-	uint randstate;
+	uint32_t randstate;
 	BlockResolutionManager *brm;
 	struct timeval tv;
 	
 	pthread_mutex_init(&listMutex, NULL);
 	gettimeofday(&tv, NULL);
-	randstate = static_cast<uint>(tv.tv_usec);
+	randstate = static_cast<uint32_t>(tv.tv_usec);
 	brm = new BlockResolutionManager();
 	
 	while (!threadStop) {
@@ -148,12 +148,12 @@ static void* BRMRunner_1(void *arg)
 	
 	struct EMEntries {
 		u_int64_t LBIDstart;
-		u_int32_t size;
+		uint32_t size;
 		int OID;
-		u_int32_t FBO;
-		u_int32_t HWM;
-		u_int32_t secondHWM;
-		u_int32_t txnID;
+		uint32_t FBO;
+		uint32_t HWM;
+		uint32_t secondHWM;
+		uint32_t txnID;
 		struct EMEntries *next;
 		EMEntries() { next = NULL; HWM = 0; secondHWM = 0; txnID = 0; }
 	};
@@ -162,7 +162,7 @@ static void* BRMRunner_1(void *arg)
 	int threadNum = reinterpret_cast<int>(arg);
 #endif
 	int op, listSize = 0, i;
-	uint randstate;
+	uint32_t randstate;
 	struct EMEntries *head = NULL, *tmp;
 	struct timeval tv;
 	BlockResolutionManager *brm;
@@ -174,7 +174,7 @@ static void* BRMRunner_1(void *arg)
 #endif
 	
 	gettimeofday(&tv, NULL);
-	randstate = static_cast<uint>(tv.tv_usec);
+	randstate = static_cast<uint32_t>(tv.tv_usec);
 	brm = new BlockResolutionManager();
 	
 	while (!threadStop) {
@@ -201,7 +201,7 @@ static void* BRMRunner_1(void *arg)
 		if ((size % brm->getExtentSize()) != 0)
 			entries++;
 				
-		CPPUNIT_ASSERT((uint)entries == lbids.size());
+		CPPUNIT_ASSERT((uint32_t)entries == lbids.size());
 				
 		for (i = 0 ; i < entries; i++) {
 				
@@ -258,7 +258,7 @@ static void* BRMRunner_1(void *arg)
 		if ((size % brm->getExtentSize()) != 0)
 			entries++;
 				
-		CPPUNIT_ASSERT((uint)entries == lbids.size());
+		CPPUNIT_ASSERT((uint32_t)entries == lbids.size());
 		for (i = 0; i < entries; i++) {
 				
 			newEm = new EMEntries();
@@ -334,7 +334,7 @@ static void* BRMRunner_1(void *arg)
 		int i, err, offset, oid;
 		struct EMEntries *tmp;
 		LBID_t target;
-		u_int32_t fbo;
+		uint32_t fbo;
 				
 		for (i = 0, tmp = head; i < entryRand; i++)
 			tmp = tmp->next;
@@ -392,7 +392,7 @@ static void* BRMRunner_1(void *arg)
 		int entryRand = rand_r(&randstate) % listSize;
 		int i, err;
 		struct EMEntries *tmp;
-		u_int32_t hwm;
+		uint32_t hwm;
 				
 		for (i = 0, tmp = head; i < entryRand; i++)
 			tmp = tmp->next;
@@ -529,12 +529,12 @@ static void* BRMRunner_si(void *arg)
 	
 	struct EMEntries {
 		u_int64_t LBIDstart;
-		u_int32_t size;
+		uint32_t size;
 		int OID;
-		u_int32_t FBO;
-		u_int32_t HWM;
-		u_int32_t secondHWM;
-		u_int32_t txnID;
+		uint32_t FBO;
+		uint32_t HWM;
+		uint32_t secondHWM;
+		uint32_t txnID;
 		struct EMEntries *next;
 		EMEntries() { next = NULL; HWM = 0; secondHWM = 0; txnID = 0; }
 	};
@@ -543,7 +543,7 @@ static void* BRMRunner_si(void *arg)
 	int threadNum = reinterpret_cast<int>(arg);
 #endif
 	int op, listSize = 0, i;
-	uint randstate;
+	uint32_t randstate;
 	struct EMEntries *head = NULL, *tmp;
 	struct timeval tv;
 	ExtentMap em;
@@ -554,7 +554,7 @@ static void* BRMRunner_si(void *arg)
 #endif
 	
 	gettimeofday(&tv, NULL);
-	randstate = static_cast<uint>(tv.tv_usec);
+	randstate = static_cast<uint32_t>(tv.tv_usec);
 	
 	while (!threadStop) {
 		op = rand_r(&randstate) % 10;
@@ -580,7 +580,7 @@ static void* BRMRunner_si(void *arg)
 		if ((size % brm_si.getExtentSize()) != 0)
 			entries++;
 				
-		CPPUNIT_ASSERT((uint)entries == lbids.size());
+		CPPUNIT_ASSERT((uint32_t)entries == lbids.size());
 				
 		for (i = 0 ; i < entries; i++) {
 				
@@ -637,7 +637,7 @@ static void* BRMRunner_si(void *arg)
 		if ((size % brm_si.getExtentSize()) != 0)
 			entries++;
 				
-		CPPUNIT_ASSERT((uint)entries == lbids.size());
+		CPPUNIT_ASSERT((uint32_t)entries == lbids.size());
 		for (i = 0; i < entries; i++) {
 				
 			newEm = new EMEntries();
@@ -713,7 +713,7 @@ static void* BRMRunner_si(void *arg)
 		int i, err, offset, oid;
 		struct EMEntries *tmp;
 		LBID_t target;
-		u_int32_t fbo;
+		uint32_t fbo;
 				
 		for (i = 0, tmp = head; i < entryRand; i++)
 			tmp = tmp->next;
@@ -771,7 +771,7 @@ static void* BRMRunner_si(void *arg)
 		int entryRand = rand_r(&randstate) % listSize;
 		int i, err;
 		struct EMEntries *tmp;
-		u_int32_t hwm;
+		uint32_t hwm;
 				
 		for (i = 0, tmp = head; i < entryRand; i++)
 			tmp = tmp->next;
@@ -892,12 +892,12 @@ static void* EMRunner(void *arg)
 	
 	struct EMEntries {
 		u_int64_t LBIDstart;
-		u_int32_t size;
+		uint32_t size;
 		int OID;
-		u_int32_t FBO;
-		u_int32_t HWM;
-		u_int32_t secondHWM;
-		u_int32_t txnID;
+		uint32_t FBO;
+		uint32_t HWM;
+		uint32_t secondHWM;
+		uint32_t txnID;
 		struct EMEntries *next;
 		EMEntries() { next = NULL; HWM = 0; secondHWM = 0; txnID = 0; }
 	};
@@ -906,7 +906,7 @@ static void* EMRunner(void *arg)
 	int threadNum = reinterpret_cast<int>(arg);
 #endif
 	int op, listSize = 0, i;
-	uint randstate;
+	uint32_t randstate;
 	struct EMEntries *head = NULL, *tmp;
 	struct timeval tv;
 	ExtentMap *em;
@@ -917,7 +917,7 @@ static void* EMRunner(void *arg)
 #endif
 	
 	gettimeofday(&tv, NULL);
-	randstate = static_cast<uint>(tv.tv_usec);
+	randstate = static_cast<uint32_t>(tv.tv_usec);
 	em = new ExtentMap();
 	
 	while (!threadStop) {
@@ -943,7 +943,7 @@ static void* EMRunner(void *arg)
 				if ((size % em->getExtentSize()) != 0)
 					entries++;
 				
-				CPPUNIT_ASSERT((uint)entries == lbids.size());
+				CPPUNIT_ASSERT((uint32_t)entries == lbids.size());
 				
 				for (i = 0 ; i < entries; i++) {
 				
@@ -997,7 +997,7 @@ static void* EMRunner(void *arg)
 				if ((size % em->getExtentSize()) != 0)
 					entries++;
 				
-				CPPUNIT_ASSERT((uint)entries == lbids.size());
+				CPPUNIT_ASSERT((uint32_t)entries == lbids.size());
 				for (i = 0; i < entries; i++) {
 				
 					newEm = new EMEntries();
@@ -1070,7 +1070,7 @@ static void* EMRunner(void *arg)
 				int i, err, offset, oid;
 				struct EMEntries *tmp;
 				LBID_t target;
-				u_int32_t fbo;
+				uint32_t fbo;
 				
 				for (i = 0, tmp = head; i < entryRand; i++)
 					tmp = tmp->next;
@@ -1122,7 +1122,7 @@ static void* EMRunner(void *arg)
 				int entryRand = rand_r(&randstate) % listSize;
 				int i;
 				struct EMEntries *tmp;
-				u_int32_t hwm;
+				uint32_t hwm;
 				
 				for (i = 0, tmp = head; i < entryRand; i++)
 					tmp = tmp->next;
@@ -1243,12 +1243,12 @@ static void* EMRunner_si(void *arg)
 	
 	struct EMEntries {
 		u_int64_t LBIDstart;
-		u_int32_t size;
+		uint32_t size;
 		int OID;
-		u_int32_t FBO;
-		u_int32_t HWM;
-		u_int32_t secondHWM;
-		u_int32_t txnID;
+		uint32_t FBO;
+		uint32_t HWM;
+		uint32_t secondHWM;
+		uint32_t txnID;
 		struct EMEntries *next;
 		EMEntries() { next = NULL; HWM = 0; secondHWM = 0; txnID = 0; }
 	};
@@ -1257,7 +1257,7 @@ static void* EMRunner_si(void *arg)
 	int threadNum = reinterpret_cast<int>(arg);
 #endif
 	int op, listSize = 0, i;
-	uint randstate;
+	uint32_t randstate;
 	struct EMEntries *head = NULL, *tmp;
 	struct timeval tv;
 	vector<LBID_t> lbids;
@@ -1267,7 +1267,7 @@ static void* EMRunner_si(void *arg)
 #endif
 	
 	gettimeofday(&tv, NULL);
-	randstate = static_cast<uint>(tv.tv_usec);
+	randstate = static_cast<uint32_t>(tv.tv_usec);
 	
 	while (!threadStop) {
 		op = rand_r(&randstate) % 9;
@@ -1292,7 +1292,7 @@ static void* EMRunner_si(void *arg)
 				if ((size % em_si.getExtentSize()) != 0)
 					entries++;
 				
-				CPPUNIT_ASSERT((uint)entries == lbids.size());
+				CPPUNIT_ASSERT((uint32_t)entries == lbids.size());
 				
 				for (i = 0 ; i < entries; i++) {
 				
@@ -1346,7 +1346,7 @@ static void* EMRunner_si(void *arg)
 				if ((size % em_si.getExtentSize()) != 0)
 					entries++;
 				
-				CPPUNIT_ASSERT((uint)entries == lbids.size());
+				CPPUNIT_ASSERT((uint32_t)entries == lbids.size());
 				for (i = 0; i < entries; i++) {
 				
 					newEm = new EMEntries();
@@ -1419,7 +1419,7 @@ static void* EMRunner_si(void *arg)
 				int i, err, offset, oid;
 				struct EMEntries *tmp;
 				LBID_t target;
-				u_int32_t fbo;
+				uint32_t fbo;
 				
 				for (i = 0, tmp = head; i < entryRand; i++)
 					tmp = tmp->next;
@@ -1471,7 +1471,7 @@ static void* EMRunner_si(void *arg)
 				int entryRand = rand_r(&randstate) % listSize;
 				int i;
 				struct EMEntries *tmp;
-				u_int32_t hwm;
+				uint32_t hwm;
 				
 				for (i = 0, tmp = head; i < entryRand; i++)
 					tmp = tmp->next;
@@ -1582,15 +1582,15 @@ static void* EMRangeRunner_si(void *arg)
 	
 	struct EMEntries {
 		u_int64_t LBIDstart;
-		u_int32_t size;
+		uint32_t size;
 		int OID;
 		int64_t lo_val;		// low value for this partition
 		int64_t hi_val;		// hi value for this partition
-		u_int32_t extCnt;	// number of extents in this partition
-		u_int32_t FBO;
-		u_int32_t HWM;
-		u_int32_t secondHWM;
-		u_int32_t txnID;
+		uint32_t extCnt;	// number of extents in this partition
+		uint32_t FBO;
+		uint32_t HWM;
+		uint32_t secondHWM;
+		uint32_t txnID;
 		struct EMEntries *next;
 		EMEntries() { next = NULL; HWM = 0; secondHWM = 0; txnID = 0; }
 	};
@@ -1601,7 +1601,7 @@ static void* EMRangeRunner_si(void *arg)
 	int op, listSize = 0, i;
 	const int numOps=11;
 	int opRuns[numOps]={0};
-	uint randstate;
+	uint32_t randstate;
 	struct EMEntries *head = NULL, *tmp;
 	struct timeval tv;
 	vector<LBID_t> lbids;
@@ -1611,7 +1611,7 @@ static void* EMRangeRunner_si(void *arg)
 #endif
 	
 	gettimeofday(&tv, NULL);
-	randstate = static_cast<uint>(tv.tv_usec);
+	randstate = static_cast<uint32_t>(tv.tv_usec);
 	const int MaxPart=16;	
 	static int64_t pLowValue=0;
 
@@ -1648,7 +1648,7 @@ static void* EMRangeRunner_si(void *arg)
 					entries++;
 
 				int partLen=entries;
-				CPPUNIT_ASSERT((uint)entries == lbids.size());
+				CPPUNIT_ASSERT((uint32_t)entries == lbids.size());
 
 				int j=0;
 				for (i = 0 ; i < entries && j < partSize; i++) {
@@ -1714,7 +1714,7 @@ static void* EMRangeRunner_si(void *arg)
 					entries++;
 
 				int partLen=entries;
-				CPPUNIT_ASSERT((uint)entries == lbids.size());
+				CPPUNIT_ASSERT((uint32_t)entries == lbids.size());
 
 				int j=0;
 				for (i = 0; i < entries && j < partSize; i++) {
@@ -1793,7 +1793,7 @@ static void* EMRangeRunner_si(void *arg)
 				int i, err, offset, oid;
 				struct EMEntries *tmp;
 				LBID_t target;
-				u_int32_t fbo;
+				uint32_t fbo;
 				
 				for (i = 0, tmp = head; i < entryRand; i++)
 					tmp = tmp->next;
@@ -1833,7 +1833,7 @@ static void* EMRangeRunner_si(void *arg)
 				cerr << "  lbid should be " << tmp->LBIDstart + offset << endl;
 #endif
 				CPPUNIT_ASSERT(err == 0);
-				CPPUNIT_ASSERT((uint)lbid == tmp->LBIDstart + offset);
+				CPPUNIT_ASSERT((uint32_t)lbid == tmp->LBIDstart + offset);
 				emrange_si.checkConsistency();
 				break;
 			}
@@ -1845,7 +1845,7 @@ static void* EMRangeRunner_si(void *arg)
 				int entryRand = rand_r(&randstate) % listSize;
 				int i;
 				struct EMEntries *tmp;
-				u_int32_t hwm;
+				uint32_t hwm;
 				
 				for (i = 0, tmp = head; i < entryRand; i++)
 					tmp = tmp->next;
@@ -1905,7 +1905,7 @@ static void* EMRangeRunner_si(void *arg)
 				err = emrange_si.getBulkInsertVars(lbid, hwm, txnID);
 				CPPUNIT_ASSERT(err == 0);
 				CPPUNIT_ASSERT(hwm == tmp->secondHWM);
-				CPPUNIT_ASSERT((uint)txnID == tmp->txnID);
+				CPPUNIT_ASSERT((uint32_t)txnID == tmp->txnID);
 				break;
 			}
 			case 8:			//setBulkInsertVars
@@ -1983,8 +1983,8 @@ static void* EMRangeRunner_si(void *arg)
 			" partHi " << tmp->hi_val << endl;
 #endif
 
-				CPPUNIT_ASSERT((uint)err == lbids.size() );
-				CPPUNIT_ASSERT((uint)tmp->extCnt == lbids.size() );
+				CPPUNIT_ASSERT((uint32_t)err == lbids.size() );
+				CPPUNIT_ASSERT((uint32_t)tmp->extCnt == lbids.size() );
 				CPPUNIT_ASSERT(tmp->lo_val < target && tmp->hi_val >= target);
 
 				emrange_si.checkConsistency();

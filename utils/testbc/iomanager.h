@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -62,12 +62,12 @@ public:
 						   BRM::VER_t verid,
 						   bool vbFlag,
 						   BRM::OID_t& oid,
-						   u_int32_t& offset);
+						   uint32_t& offset);
 	void buildOidFileName(const BRM::OID_t oid, char* file_name);
 
-	uint getExtentSize() { return fdbrm.getExtentSize(); }
+	uint32_t getExtentSize() { return fdbrm.getExtentSize(); }
 
-	uint blocksPerRead;
+	uint32_t blocksPerRead;
 
 	bool IOTrace() const { return fIOTrace;}
 

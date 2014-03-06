@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -142,7 +142,7 @@ public:
 		DBRM brm;
 		vector<LBID_t> lbids;
 		int allocdSize, err;
-		const uint extentSize = brm.getExtentSize();
+		const uint32_t extentSize = brm.getExtentSize();
 
  		err = brm.createExtent(extentSize, 1, lbids, allocdSize);
 		CPPUNIT_ASSERT(err == 0);
@@ -171,11 +171,11 @@ public:
 		DBRM brm;
 		int i, err, oid, allocdSize, 
 			iterations = 100;  // (EM_INITIAL_SIZE + 3*EM_INCREMENT)
-		u_int32_t fbo, hwm;
+		uint32_t fbo, hwm;
 		vector<LBID_t> lbids;
 		HWM_t hwm2;
 		VER_t txnID;
-		const uint extentSize = brm.getExtentSize();
+		const uint32_t extentSize = brm.getExtentSize();
 		
  		cerr << "brm_extentmap_good_1" << endl;
 
@@ -262,11 +262,11 @@ public:
 			err = brm.getHWM(i, hwm);
 			CPPUNIT_ASSERT(err == 0);
 			CPPUNIT_ASSERT(hwm == 0);
-			err = brm.setHWM(i, ((uint)i > extentSize - 1 ? extentSize - 1 : i));
+			err = brm.setHWM(i, ((uint32_t)i > extentSize - 1 ? extentSize - 1 : i));
 			CPPUNIT_ASSERT(err == 0);
 			err = brm.getHWM(i, hwm);
 			CPPUNIT_ASSERT(err == 0);
-			CPPUNIT_ASSERT(hwm == static_cast<u_int32_t>((uint)i > extentSize - 1 ? extentSize - 1 : i));
+			CPPUNIT_ASSERT(hwm == static_cast<uint32_t>((uint32_t)i > extentSize - 1 ? extentSize - 1 : i));
 		}
 		
  		CPPUNIT_ASSERT(brm.checkConsistency() == 0);
@@ -306,7 +306,7 @@ public:
 		vector<VBRange>::iterator vbRangesIT;
 		EMEntry em;
 		OID_t oid;
-		u_int32_t fbo;
+		uint32_t fbo;
 		LBIDRange range;
 		VBRange vbRange;
 		VER_t verID;
@@ -340,7 +340,7 @@ public:
 		
 		em = *(extents.begin());
 // 		CPPUNIT_ASSERT(em.range.start == 0);
- 		CPPUNIT_ASSERT(em.range.size*1024 == static_cast<u_int32_t>(brm.getExtentSize()));
+ 		CPPUNIT_ASSERT(em.range.size*1024 == static_cast<uint32_t>(brm.getExtentSize()));
 		CPPUNIT_ASSERT(em.HWM == 0);
 		CPPUNIT_ASSERT(em.blockOffset == 0);
 		
@@ -436,7 +436,7 @@ public:
 			err = brm.lookup(i, verID, vbFlag, oid, fbo);
 			CPPUNIT_ASSERT(err == 0);
 			CPPUNIT_ASSERT(oid == vbRange.vbOID);
-			CPPUNIT_ASSERT(fbo == static_cast<u_int32_t>(i + vbRange.vbFBO));
+			CPPUNIT_ASSERT(fbo == static_cast<uint32_t>(i + vbRange.vbFBO));
 			
 			vbbm.lock(VBBM::WRITE);
 			vss.lock(VSS::WRITE);
@@ -486,7 +486,7 @@ public:
 		LBIDRange_v tmp;
 		EMEntry em;
 		OID_t oid;
-		u_int32_t fbo;
+		uint32_t fbo;
 		LBIDRange range;
 		VBRange vbRange;
 		VER_t verID;
@@ -519,7 +519,7 @@ public:
 		
 		em = *(extents.begin());
  		CPPUNIT_ASSERT(em.range.start == 0);
-		CPPUNIT_ASSERT(em.range.size*1024 == static_cast<u_int32_t>(brm.getExtentSize()));
+		CPPUNIT_ASSERT(em.range.size*1024 == static_cast<uint32_t>(brm.getExtentSize()));
 		CPPUNIT_ASSERT(em.HWM == 0);
 		CPPUNIT_ASSERT(em.blockOffset == 0);
 		
@@ -624,7 +624,7 @@ public:
 			err = brm.lookup(i, verID, vbFlag, oid, fbo);
 			CPPUNIT_ASSERT(err == 0);
  			CPPUNIT_ASSERT(oid == 1);
-			CPPUNIT_ASSERT(fbo == static_cast<u_int32_t>(i));
+			CPPUNIT_ASSERT(fbo == static_cast<uint32_t>(i));
 			
 			vbbm.lock(VBBM::WRITE);
 			vss.lock(VSS::WRITE);
@@ -854,7 +854,7 @@ void dbrm_clear()
 	err = dbrm.beginVBCopy(txnID, ranges, freelist);
 	CPPUNIT_ASSERT(err == 0);
 
-	for (i = range.start; (uint) i < range.size; i++) {
+	for (i = range.start; (uint32_t) i < range.size; i++) {
 		if (i % 50000 == 0)
 			cerr << " ... " << i;
 		err = dbrm.writeVBEntry(txnID, i, 1, i);
@@ -1059,7 +1059,7 @@ void sessionmanager_8()
 		vector<LBID_t> lbids;
 		int64_t min, max;
 		int32_t seqNum;
-		const uint extentSize = brm.getExtentSize();
+		const uint32_t extentSize = brm.getExtentSize();
 		
 		cerr << "brm_markExtentsInvalid" << endl;
 

@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -101,7 +101,7 @@ void timespec_sub(const struct timespec &tv1, const struct timespec &tv2,
     	int threadNumber = parms->threadNumber;
     	int64_t i;
     	ElementType val;
-    	uint it;
+    	uint32_t it;
     	int bucketIndex;
     	
         int cnt = 0;
@@ -126,7 +126,7 @@ void timespec_sub(const struct timespec &tv1, const struct timespec &tv2,
     	int i;
     	//ElementType val;
     	TupleType val;
-    	uint it;
+    	uint32_t it;
     	int bucketIndex;
     	
         int cnt = 0;
@@ -187,13 +187,13 @@ public:
    
     void *aggregator(void *arg)
     {
-        uint fHashLen = 4;
+        uint32_t fHashLen = 4;
         TupleType tt;
         tt.second = new char[fHashLen];
         ThreadParms *parms = reinterpret_cast<ThreadParms*>(arg);
         int threadNumber = parms->threadNumber;
         struct timespec ts1, ts2, diff;
-        uint size = 585938;
+        uint32_t size = 585938;
 #if 0        
         //typedef std::vector<uint64_t> RIDVec;
         typedef std::pair<int64_t, Elem> Results;
@@ -214,13 +214,13 @@ public:
         Hasher hasher;
         bool flag = true;
 
-        for (uint k = 0; k < NUM_BUCKETS/4; k++)
+        for (uint32_t k = 0; k < NUM_BUCKETS/4; k++)
         {
           clock_gettime(CLOCK_REALTIME, &ts1);
 
-          for (uint j = 0; j < 4; j++) 
+          for (uint32_t j = 0; j < 4; j++) 
 	  {
-            for (uint i = 0; i < size/10; i++)
+            for (uint32_t i = 0; i < size/10; i++)
             {                                         	
                 flag = true;
             	memcpy(tt.second, &i, 4);
@@ -282,12 +282,12 @@ public:
 		Results rr;
     
         uint32_t val = 0;
-        for (uint k = 0; k < NUM_BUCKETS/4; k++)
+        for (uint32_t k = 0; k < NUM_BUCKETS/4; k++)
         {
           clock_gettime(CLOCK_REALTIME, &ts1);
-          for (uint j = 0; j < 4; j++)
+          for (uint32_t j = 0; j < 4; j++)
           {
-          for (uint i = 0; i < size/10; i++)
+          for (uint32_t i = 0; i < size/10; i++)
           {          	
         	memcpy(tt.second, &i, 4);
             iter = shmp->find(tt.second);
@@ -339,12 +339,12 @@ public:
 		int64_t rr;
     
         uint32_t val = 0;
-        for (uint k = 0; k < NUM_BUCKETS/4; k++)
+        for (uint32_t k = 0; k < NUM_BUCKETS/4; k++)
         {
           clock_gettime(CLOCK_REALTIME, &ts1);
-          for (uint j = 0; j < 4; j++)
+          for (uint32_t j = 0; j < 4; j++)
           {
-          for (uint i = 0; i < size/10; i++)
+          for (uint32_t i = 0; i < size/10; i++)
           {          	
         	memcpy(tt.second, &i, 4);
         	vt.push_back(tt);
@@ -400,7 +400,7 @@ public:
         TupleBucketDataList *tbdl = parms->tbdl;
         TupleType t;
         vector<TupleType> vt;
-        for (uint i = 0; i < 150000000; i++)
+        for (uint32_t i = 0; i < 150000000; i++)
         {            
             t.first = i;
             t.second = new char[4];
@@ -423,7 +423,7 @@ public:
         TupleType t;
         ElementType e;
         vector<ElementType> vt;
-        for (uint i = 0; i < 150000000; i++)
+        for (uint32_t i = 0; i < 150000000; i++)
         {            
             e.first = i;
             e.second = i;
@@ -534,7 +534,7 @@ public:
         if (v.size() > 0)
         {
             tbdl->insert(v); 
-            //for (uint i = 0; i < v.size(); i++)
+            //for (uint32_t i = 0; i < v.size(); i++)
             //    delete [] (v[i].second);
             v.clear();
         }
@@ -621,7 +621,7 @@ public:
 		ThreadParms producerThreadParms[4];
         
         timer1.start("insert-tbdl");
-		for (uint i = 0; i < 4; i++)
+		for (uint32_t i = 0; i < 4; i++)
 		{
 			producerThreadParms[i].tbdl          = tbdl;
 			producerThreadParms[i].threadNumber = i;
@@ -629,7 +629,7 @@ public:
 		    pthread_create(&producer[i], NULL,
 			TBDL_producer, &producerThreadParms[i]);
 		}
-		for (uint i = 0; i < 4; i++)
+		for (uint32_t i = 0; i < 4; i++)
 		    pthread_join(producer[i], NULL);
 		tbdl->endOfInput();
 		timer1.stop("insert-tbdl");
@@ -647,7 +647,7 @@ public:
 		ThreadParms producerThreadParms[4];
         
         timer1.start("insert-bdl");
-		for (uint i = 0; i < 4; i++)
+		for (uint32_t i = 0; i < 4; i++)
 		{
 			producerThreadParms[i].bdl          = bdl;
 			producerThreadParms[i].threadNumber = i;
@@ -655,7 +655,7 @@ public:
 		    pthread_create(&producer[i], NULL,
 			BDL_producer, &producerThreadParms[i]);
 		}
-		for (uint i = 0; i < 4; i++)
+		for (uint32_t i = 0; i < 4; i++)
 		    pthread_join(producer[i], NULL);
 		bdl->endOfInput();
 		timer1.stop("insert-bdl");
@@ -708,7 +708,7 @@ public:
                 if (v.size() == 2048)
                 {
                     tbdl->insert(v); 
-                    for (uint i = 0; i < v.size(); i++)
+                    for (uint32_t i = 0; i < v.size(); i++)
                         v[i].deleter();
                     v.clear();
                 }
@@ -721,7 +721,7 @@ public:
         if (v.size() > 0)
         {
             tbdl->insert(v); 
-            for (uint i = 0; i < v.size(); i++)
+            for (uint32_t i = 0; i < v.size(); i++)
                 delete [] (v[i].second);
             v.clear();
         }
@@ -1043,7 +1043,7 @@ public:
 	    memset(a,0,5*1024*1024);
 	    memcpy(&tm, a, 4);
 	  }
-	  uint fHashLen = 4;
+	  uint32_t fHashLen = 4;
           TupleType tt;
           tt.second = new char[fHashLen]; 
           uint64_t size = 585937;     
@@ -1193,7 +1193,7 @@ public:
 #if 0	
 	void hashmap_tuple_multi()
 	{
-		uint fHashLen = 4;
+		uint32_t fHashLen = 4;
 		TupleHasher tupleHash(fHashLen);
         TupleComparator tupleComp(fHashLen);  
         TupleType tt;     
@@ -1212,7 +1212,7 @@ public:
 		Hasher fHasher;
     
         timer1.start("multi_insert");
-        uint i = 0, j = 0;
+        uint32_t i = 0, j = 0;
         uint32_t val = 0;
 
         for ( j = 0; j < 4; j++)
@@ -1234,7 +1234,7 @@ public:
         char* key;
         if (iter != shmp->end())
             key = iter->first;
-        uint ct = 0;
+        uint32_t ct = 0;
         for (iter = ++iter; iter != shmp->end(); iter++)
         {
             if (memcmp(iter->first, key, 4) == 0)

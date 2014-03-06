@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -30,7 +30,7 @@
 #include "we_dbrootextenttracker.h"
 #include "we_tablemetadata.h"
 #include "we_dctnry.h"
-#if defined(_MSC_VER) && defined(WRITEENGINECOLUMNOP_DLLEXPORT)
+#if defined(_MSC_VER) && defined(WRITEENGINE_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
@@ -230,6 +230,7 @@ public:
     */
    EXPORT virtual int openColumnFile(Column& column,
                               std::string& segFile,
+                              bool useTmpSuffix,
                               int ioBuffSize=DEFAULT_BUFSIZ) const;
 
    /**
@@ -246,9 +247,9 @@ public:
                                   ColType colType = WR_INT,
                                   FID dataFid = 0,
                                   int comppre = 0,
-                                  u_int16_t dbRoot = 0,
-                                  u_int32_t partition = 0,
-                                  u_int16_t segment = 0) const;
+                                  uint16_t dbRoot = 0,
+                                  uint32_t partition = 0,
+                                  uint16_t segment = 0) const;
 
    /**
     * @brief Write row(s)
@@ -257,7 +258,6 @@ public:
                               uint64_t totalRow,
                               const RID* rowIdArray,
                               const void* valArray,
-                              const void* oldValArray,
                               bool bDelete = false);
 
    /**
@@ -297,7 +297,7 @@ public:
     * @brief open a data file of column
     */
    virtual IDBDataFile*  openFile(const Column& column, uint16_t dbRoot, uint32_t partition,
-      uint16_t segment, std::string& segFile, const char* mode = "r+b",
+      uint16_t segment, std::string& segFile, bool useTmpSuffix, const char* mode = "r+b",
       int ioBuffSize = DEFAULT_BUFSIZ) const = 0;
 
 

@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -121,7 +121,7 @@ static int calpont_commit(handlerton *hton, THD* thd, bool all);
 
 static int calpont_rollback(handlerton *hton, THD* thd, bool all);                                      
 static int calpont_close_connection ( handlerton *hton, THD* thd );
-static void calpont_set_error( THD*, uint64_t, LEX_STRING*, uint);
+static void calpont_set_error( THD*, uint64_t, LEX_STRING*, uint32_t);
 handlerton *calpont_hton;
 
 /* Variables for example share methods */
@@ -218,12 +218,12 @@ static int calpont_done_func(void *p)
 static CALPONT_SHARE *get_share(const char *table_name, TABLE *table)
 {
   CALPONT_SHARE *share;
-  uint length;
+  uint32_t length;
   char *tmp_name;
 #ifndef _MSC_VER
   pthread_mutex_lock(&calpont_mutex);
 #endif
-  length=(uint) strlen(table_name);
+  length=(uint32_t) strlen(table_name);
 
   if (!(share=(CALPONT_SHARE*) hash_search(&calpont_open_tables,
                                            (uchar*) table_name,
@@ -307,7 +307,7 @@ static int calpont_close_connection ( handlerton *hton, THD* thd )
 	return rc;
 }
 
-static void calpont_set_error(THD* thd, uint64_t errCode, LEX_STRING* args, uint argCount)
+static void calpont_set_error(THD* thd, uint64_t errCode, LEX_STRING* args, uint32_t argCount)
 {
 	return ha_calpont_impl_set_error(thd, errCode, args, argCount);
 }
@@ -361,7 +361,7 @@ const char **ha_calpont::bas_ext() const
   handler::ha_open() in handler.cc
 */
 
-int ha_calpont::open(const char *name, int mode, uint test_if_locked)
+int ha_calpont::open(const char *name, int mode, uint32_t test_if_locked)
 {
   DBUG_ENTER("ha_calpont::open");
 
@@ -738,7 +738,7 @@ int ha_calpont::rnd_pos(uchar *buf, uchar *pos)
   sql_select.cc, sql_show.cc, sql_show.cc, sql_show.cc, sql_show.cc, sql_table.cc,
   sql_union.cc and sql_update.cc
 */
-int ha_calpont::info(uint flag)
+int ha_calpont::info(uint32_t flag)
 {
   DBUG_ENTER("ha_calpont::info");
   // @bug 1635. Raise this number magically fix the filesort crash issue. May need to twist 
@@ -965,7 +965,7 @@ int ha_calpont::rename_table(const char * from, const char * to)
   @see
   check_quick_keys() in opt_range.cc
 */
-ha_rows ha_calpont::records_in_range(uint inx, key_range *min_key,
+ha_rows ha_calpont::records_in_range(uint32_t inx, key_range *min_key,
                                      key_range *max_key)
 {
   DBUG_ENTER("ha_calpont::records_in_range");
@@ -1065,8 +1065,8 @@ mysql_declare_plugin(calpont)
   MYSQL_STORAGE_ENGINE_PLUGIN,
   &infinidb_storage_engine,
   "InfiniDB",
-  "Calpont Corp.",
-  "Calpont InfiniDB storage engine",
+  "InfiniDB, Inc.",
+  "InfiniDB storage engine",
   PLUGIN_LICENSE_PROPRIETARY,
   calpont_init_func,                            /* Plugin Init */
   calpont_done_func,                            /* Plugin Deinit */

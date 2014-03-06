@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -41,9 +41,7 @@ using namespace std;
 #include <boost/thread.hpp>
 using namespace boost;
 
-#define DISTRIBUTEDENGINECOMM_DLLEXPORT
 #include "distributedenginecomm.h"
-#undef DISTRIBUTEDENGINECOMM_DLLEXPORT
 
 #include "messagequeue.h"
 #include "bytestream.h"
@@ -116,11 +114,11 @@ namespace
   struct EngineCommRunner
   {
     EngineCommRunner(joblist::DistributedEngineComm *jl,
-		boost::shared_ptr<MessageQueueClient> cl, uint connectionIndex) : jbl(jl), client(cl),
+		boost::shared_ptr<MessageQueueClient> cl, uint32_t connectionIndex) : jbl(jl), client(cl),
 		connIndex(connectionIndex) {}
     joblist::DistributedEngineComm *jbl;
     boost::shared_ptr<MessageQueueClient> client;
-	uint connIndex;
+	uint32_t connIndex;
     void operator()()
     {
       //cout << "Listening on client at 0x" << hex << (ptrdiff_t)client << dec << endl;
@@ -191,8 +189,6 @@ namespace joblist
 	fRm(rm),
 	fLBIDShift(fRm.getPsLBID_Shift()),
 	pmCount(0),
-	fMulticast(rm.getPsMulticast()),
-	fMulticastSender(),
     fIsExeMgr(isExeMgr)
   {
 
@@ -210,7 +206,7 @@ void DistributedEngineComm::Setup()
     makeBusy(true);
 
 	throttleThreshold = fRm.getDECThrottleThreshold();
-    uint newPmCount = fRm.getPsCount();
+    uint32_t newPmCount = fRm.getPsCount();
     int cpp = (fIsExeMgr ? fRm.getPsConnectionsPerPrimProc() : 1);
     tbpsThreadCount = fRm.getJlNumScanReceiveThreads();
     unsigned numConnections = newPmCount * cpp;
@@ -263,14 +259,14 @@ void DistributedEngineComm::Setup()
     // first pmCount.  If there is no match, it's a new node,
     //    call the event listeners' newPMOnline() callbacks.
     mutex::scoped_lock lock(eventListenerLock);
-    for (uint i = 0; i < newPmCount; i++) {
+    for (uint32_t i = 0; i < newPmCount; i++) {
         uint32_t j;
         for (j = 0; j < pmCount; j++) {
             if (newClients[i]->isSameAddr(*fPmConnections[j]))
                 break;
         }
         if (j == pmCount)
-            for (uint k = 0; k < eventListeners.size(); k++)
+            for (uint32_t k = 0; k < eventListeners.size(); k++)
                 eventListeners[k]->newPMOnline(i);
     }
     lock.unlock();
@@ -296,7 +292,7 @@ int DistributedEngineComm::Close()
     return 0;
   }
 
-void DistributedEngineComm::Listen(boost::shared_ptr<MessageQueueClient> client, uint connIndex)
+void DistributedEngineComm::Listen(boost::shared_ptr<MessageQueueClient> client, uint32_t connIndex)
 {
 	SBS sbs;
 
@@ -347,7 +343,7 @@ Error:
 		mutex::scoped_lock onErrLock(fOnErrMutex);
 		string moduleName = client->moduleName();
 		//cout << "moduleName=" << moduleName << endl;
-		for ( uint i = 0; i < fPmConnections.size(); i++)
+		for ( uint32_t i = 0; i < fPmConnections.size(); i++)
 		{
 			if (moduleName != fPmConnections[i]->moduleName())
 				tempConns.push_back(fPmConnections[i]);
@@ -508,7 +504,7 @@ void DistributedEngineComm::read(uint32_t key, SBS &bs)
 	}
   }
 
-  void DistributedEngineComm::read_some(uint32_t key, uint divisor, vector<SBS> &v,
+  void DistributedEngineComm::read_some(uint32_t key, uint32_t divisor, vector<SBS> &v,
                                         bool *flowControlOn)
   {
 	boost::shared_ptr<MQE> mqe;
@@ -563,7 +559,7 @@ void DistributedEngineComm::sendAcks(uint32_t uniqueID, const vector<SBS> &msgs,
 	}
 
 	size_t totalMsgSize = 0;
-	for (uint i = 0; i < msgs.size(); i++)
+	for (uint32_t i = 0; i < msgs.size(); i++)
 		totalMsgSize += msgs[i]->lengthWithHdrOverhead();
 
 	if (queueSize + totalMsgSize > mqe->targetQueueSize) {
@@ -701,15 +697,15 @@ void DistributedEngineComm::setFlowControl(bool enabled, uint32_t uniqueID, boos
 
 	msg.advanceInputPtr(sizeof(ISMPacketHeader));
 
-	for (uint i = 0; i < mqe->pmCount; i++)
+	for (uint32_t i = 0; i < mqe->pmCount; i++)
 		writeToClient(i, msg);
 }
 
   void DistributedEngineComm::write(uint32_t senderID, ByteStream& msg)
   {
 	ISMPacketHeader *ism = (ISMPacketHeader *) msg.buf();
-	uint dest;
-	uint numConn = fPmConnections.size();
+	uint32_t dest;
+	uint32_t numConn = fPmConnections.size();
 
     if (numConn > 0) {
 		switch (ism->Command) {
@@ -722,29 +718,12 @@ void DistributedEngineComm::setFlowControl(bool enabled, uint32_t uniqueID, boos
 			case BATCH_PRIMITIVE_ABORT:
 			case DICT_CREATE_EQUALITY_FILTER:
 			case DICT_DESTROY_EQUALITY_FILTER:
-				if (fMulticast)
-				try
-				{
-					mutex::scoped_lock lk(fMulticastLock);
-					fMulticastSender.send(msg);
-				}
-				catch (const MulticastException&)
-				{
-					writeToLog(__FILE__, __LINE__, " Error in setting up Multicast. Turning Multicast send off.", LOG_TYPE_WARNING);
-					fMulticast = false;
-					uint32_t i;
-					for (i = 0; i < pmCount; i++)
-						writeToClient(i, msg, senderID);
-					return;
-				}
-				else {
-					/* XXXPAT: This relies on the assumption that the first pmCount "PMS*"
-					entries in the config file point to unique PMs */
-					uint32_t i;
-					for (i = 0; i < pmCount; i++)
-						writeToClient(i, msg, senderID);
-					return;
-				}
+				/* XXXPAT: This relies on the assumption that the first pmCount "PMS*"
+				entries in the config file point to unique PMs */
+				uint32_t i;
+				for (i = 0; i < pmCount; i++)
+					writeToClient(i, msg, senderID);
+				return;
 			case BATCH_PRIMITIVE_RUN:
 			case DICT_TOKEN_BY_SCAN_COMPARE:
 				// for efficiency, writeToClient() grabs the interleaving factor for the caller,
@@ -764,7 +743,7 @@ void DistributedEngineComm::setFlowControl(bool enabled, uint32_t uniqueID, boos
 	}
   }
 
-void DistributedEngineComm::write(messageqcpp::ByteStream &msg, uint connection)
+void DistributedEngineComm::write(messageqcpp::ByteStream &msg, uint32_t connection)
 {
 	ISMPacketHeader *ism = (ISMPacketHeader *) msg.buf();
 	PrimitiveHeader *pm = (PrimitiveHeader *) (ism + 1);
@@ -783,13 +762,13 @@ void DistributedEngineComm::write(messageqcpp::ByteStream &msg, uint connection)
 	newClients[connection]->write(msg, NULL, senderStats);
 }
 
-  void DistributedEngineComm::StartClientListener(boost::shared_ptr<MessageQueueClient> cl, uint connIndex)
+  void DistributedEngineComm::StartClientListener(boost::shared_ptr<MessageQueueClient> cl, uint32_t connIndex)
   {
     boost::thread *thrd = new boost::thread(EngineCommRunner(this, cl, connIndex));
     fPmReader.push_back(thrd);
   }
 
-  void DistributedEngineComm::addDataToOutput(SBS sbs, uint connIndex, Stats *stats)
+  void DistributedEngineComm::addDataToOutput(SBS sbs, uint32_t connIndex, Stats *stats)
   {
     ISMPacketHeader *hdr = (ISMPacketHeader*)(sbs->buf());
     PrimitiveHeader *p = (PrimitiveHeader *)(hdr+1);
@@ -837,7 +816,7 @@ int DistributedEngineComm::writeToClient(size_t index, const ByteStream& bs, uin
 	mutex::scoped_lock lk(fMlock, defer_lock_t());
 	MessageQueueMap::iterator it;
 	Stats *senderStats = NULL;
-	uint interleaver = 0;
+	uint32_t interleaver = 0;
 
 	if (fPmConnections.size() == 0)
 		return 0;
@@ -892,7 +871,7 @@ int DistributedEngineComm::writeToClient(size_t index, const ByteStream& bs, uin
 			//cout << "module name = " << moduleName << endl;
 			if (index >= fPmConnections.size()) return 0;
 
-			for (uint i = 0; i < fPmConnections.size(); i++)
+			for (uint32_t i = 0; i < fPmConnections.size(); i++)
 			{
 				if (moduleName != fPmConnections[i]->moduleName())
 					tempConns.push_back(fPmConnections[i]);
@@ -915,7 +894,7 @@ int DistributedEngineComm::writeToClient(size_t index, const ByteStream& bs, uin
 	}
 }
 
-uint DistributedEngineComm::size(uint32_t key)
+uint32_t DistributedEngineComm::size(uint32_t key)
 {
 	mutex::scoped_lock lk(fMlock);
 	MessageQueueMap::iterator map_tok = fSessionMessages.find(key);
@@ -937,9 +916,9 @@ void DistributedEngineComm::removeDECEventListener(DECEventListener *l)
 {
 	mutex::scoped_lock lk(eventListenerLock);
 	std::vector<DECEventListener *> newListeners;
-	uint s = eventListeners.size();
+	uint32_t s = eventListeners.size();
 
-	for (uint i = 0; i < s; i++)
+	for (uint32_t i = 0; i < s; i++)
 		if (eventListeners[i] != l)
 			newListeners.push_back(eventListeners[i]);
 	eventListeners.swap(newListeners);
@@ -957,7 +936,7 @@ Stats DistributedEngineComm::getNetworkStats(uint32_t uniqueID)
 	return empty;
 }
 
-DistributedEngineComm::MQE::MQE(uint pCount) : ackSocketIndex(0), pmCount(pCount), hasBigMsgs(false),
+DistributedEngineComm::MQE::MQE(uint32_t pCount) : ackSocketIndex(0), pmCount(pCount), hasBigMsgs(false),
 				targetQueueSize(targetRecvQueueSize)
 {
 	unackedWork.reset(new volatile uint32_t[pmCount]);

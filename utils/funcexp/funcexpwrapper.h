@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -56,8 +56,8 @@ class FuncExpWrapper : public messageqcpp::Serializeable
 		void deserialize(messageqcpp::ByteStream &);
 
 		bool evaluate(rowgroup::Row *);
-		inline bool evaluateFilter(uint num, rowgroup::Row *r);
-		inline uint getFilterCount() const;
+		inline bool evaluateFilter(uint32_t num, rowgroup::Row *r);
+		inline uint32_t getFilterCount() const;
 
 		void addFilter(const boost::shared_ptr<execplan::ParseTree>&);
 		void addReturnedColumn(const boost::shared_ptr<execplan::ReturnedColumn>&);
@@ -68,12 +68,12 @@ class FuncExpWrapper : public messageqcpp::Serializeable
 		FuncExp *fe;
 };
 
-inline bool FuncExpWrapper::evaluateFilter(uint num, rowgroup::Row *r)
+inline bool FuncExpWrapper::evaluateFilter(uint32_t num, rowgroup::Row *r)
 {
 	return fe->evaluate(*r, filters[num].get());
 }
 
-inline uint FuncExpWrapper::getFilterCount() const
+inline uint32_t FuncExpWrapper::getFilterCount() const
 {
 	return filters.size();
 }

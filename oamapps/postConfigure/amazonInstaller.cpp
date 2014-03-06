@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -659,7 +659,6 @@ int main(int argc, char *argv[])
 				//get UserModuleInstanceType
 				while(true)
 				{
-					UserModuleInstanceType = instanceType;
 					prompt = "Enter User Module Instance Type or hit enter to default to current type (" + instanceType + ") > ";
 					pcommand = readline(prompt.c_str());
 					if (pcommand) {
@@ -1298,9 +1297,6 @@ int main(int argc, char *argv[])
 		exit (1);
 	}
 	
-	if ( UserModuleInstanceType == oam::UnassignedName )
-		UserModuleInstanceType = instanceType;
-
 	cout << "===== Setting up system '" + systemName + "' based on these settings ===== " << endl << endl;
 
 	SystemSoftware systemsoftware;
@@ -1323,7 +1319,10 @@ int main(int argc, char *argv[])
 	}
 
 	if ( systemType == "separate" ) {
-		cout << "Number of User Modules = " << umNumber << " (" + UserModuleInstanceType + ")" << endl;
+		if ( UserModuleInstanceType == oam::UnassignedName )
+			cout << "Number of User Modules = " << umNumber << " (" + instanceType + ")" << endl;
+		else
+			cout << "Number of User Modules = " << umNumber << " (" + UserModuleInstanceType + ")" << endl;
 		if ( UserModuleSecurityGroup != oam::UnassignedName )
 			cout << "User Modules Instances Security Group = " << UserModuleSecurityGroup << endl;
 		if ( existingUMInstances != oam::UnassignedName )

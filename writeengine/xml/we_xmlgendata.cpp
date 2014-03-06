@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -20,9 +20,7 @@
 *
 *******************************************************************************/
 
-#define WRITEENGINEXMLGENDATA_DLLEXPORT
 #include "we_xmlgendata.h"
-#undef WRITEENGINEXMLGENDATA_DLLEXPORT
 
 #include <iostream>
 #include <boost/filesystem/path.hpp>

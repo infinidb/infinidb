@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -640,6 +640,116 @@ int WriteEngineWrapper::fillColumn(const TxnID& txnid, const OID& dataOid,
    return rc;
 }
 
+int WriteEngineWrapper::deleteBadRows(const TxnID& txnid, ColStructList& colStructs,
+                         RIDList& ridList, DctnryStructList& dctnryStructList)
+{
+	/*  Need to scan all files including dictionary store files to check whether there is any bad chunks
+	 * 
+	 */ 
+	int rc = 0;
+	Column         curCol;
+	void*          valArray = NULL;
+	for (unsigned i = 0; i < colStructs.size(); i++)
+	{
+		ColumnOp* colOp = m_colOp[op(colStructs[i].fCompressionType)];
+		unsigned needFixFiles = colStructs[i].tokenFlag? 2:1;
+		colOp->initColumn(curCol);
+		for (unsigned j=0; j < needFixFiles; j++)
+		{
+			if (j == 0)
+			{
+				colOp->setColParam(curCol, 0, colStructs[i].colWidth,
+					colStructs[i].colDataType, colStructs[i].colType, colStructs[i].dataOid,
+					colStructs[i].fCompressionType, colStructs[i].fColDbRoot,
+					colStructs[i].fColPartition, colStructs[i].fColSegment);
+		
+				string segFile;
+				rc = colOp->openColumnFile(curCol, segFile, true, IO_BUFF_SIZE); // @bug 5572 HDFS tmp file
+				if (rc != NO_ERROR) //If openFile fails, disk error or header error is assumed.
+				{
+					//report error and return.
+					std::ostringstream oss;
+					WErrorCodes ec;
+					string err = ec.errorString(rc);
+					oss << "Error opening file oid:dbroot:partition:segment = " << colStructs[i].dataOid << ":" <<colStructs[i].fColDbRoot
+						<<":"<<colStructs[i].fColPartition<<":"<<colStructs[i].fColSegment << " and error code is " << rc << " with message " << err;
+					throw std::runtime_error(oss.str());	
+				}
+
+				switch (colStructs[i].colType)
+				{
+				case WriteEngine::WR_INT:
+					valArray = (int*) calloc(sizeof(int), 1);
+					break;
+				case WriteEngine::WR_UINT:
+					valArray = (uint32_t*) calloc(sizeof(uint32_t), 1);
+					break;
+				case WriteEngine::WR_VARBINARY : // treat same as char for now
+				case WriteEngine::WR_CHAR:
+				case WriteEngine::WR_BLOB:
+					valArray = (char*) calloc(sizeof(char), 1 * MAX_COLUMN_BOUNDARY);
+					break;
+				case WriteEngine::WR_FLOAT:
+					valArray = (float*) calloc(sizeof(float), 1);
+					break;
+				case WriteEngine::WR_DOUBLE:
+					valArray = (double*) calloc(sizeof(double), 1);
+					break;
+				case WriteEngine::WR_BYTE:
+				valArray = (char*) calloc(sizeof(char), 1);
+				break;
+				case WriteEngine::WR_UBYTE:
+					valArray = (uint8_t*) calloc(sizeof(uint8_t), 1);
+					break;
+				case WriteEngine::WR_SHORT:
+					valArray = (short*) calloc(sizeof(short), 1);
+					break;
+				case WriteEngine::WR_USHORT:
+					valArray = (uint16_t*) calloc(sizeof(uint16_t), 1);
+					break;
+				case WriteEngine::WR_LONGLONG:
+					valArray = (long long*) calloc(sizeof(long long), 1);
+					break;
+				case WriteEngine::WR_ULONGLONG:
+					valArray = (uint64_t*) calloc(sizeof(uint64_t), 1);
+					break;
+				case WriteEngine::WR_TOKEN:
+					valArray = (Token*) calloc(sizeof(Token), 1);
+					break;
+				}
+				rc = colOp->writeRows(curCol, ridList.size(), ridList, valArray, 0, true);
+				if ( rc != NO_ERROR)
+				{
+					//read error is fixed in place
+					if (rc == ERR_COMP_COMPRESS) //write error
+					{
+				
+					}
+			
+				}
+				//flush files will be done in the end of fix.
+				colOp->clearColumn(curCol);
+
+				if (valArray != NULL)
+					free(valArray);
+			}
+			else //dictionary file. How to fix
+			{
+				//read headers out, uncompress the last chunk, if error, replace it with empty chunk.
+				Dctnry* dctnry = m_dctnry[op(dctnryStructList[i].fCompressionType)];
+				rc = dctnry->openDctnry(dctnryStructList[i].dctnryOid,
+                     dctnryStructList[i].fColDbRoot, dctnryStructList[i].fColPartition,
+                     dctnryStructList[i].fColSegment,
+                     false);
+               
+                rc =  dctnry->checkFixLastDictChunk();
+                rc = dctnry->closeDctnry(true);
+                
+			}
+		}
+	}
+	return rc;
+}
 
  /*@flushVMCache - Flush VM cache
  */
@@ -703,6 +813,14 @@ int WriteEngineWrapper::insertColumnRecs(const TxnID& txnid,
    bool newExtent = false;
    RIDList ridList;
    ColumnOp* colOp = NULL;
+
+   // Set tmp file suffix to modify HDFS db file
+   bool           useTmpSuffix = false;
+   if (idbdatafile::IDBPolicy::useHdfs())
+   {
+      if (!bFirstExtentOnThisPM)
+         useTmpSuffix = true;
+   }
 
    unsigned i=0;
 #ifdef PROFILE
@@ -975,8 +1093,7 @@ int WriteEngineWrapper::insertColumnRecs(const TxnID& txnid,
    colOp->setColParam(curCol, 0, curColStruct.colWidth, curColStruct.colDataType,
        curColStruct.colType, curColStruct.dataOid, curColStruct.fCompressionType,
        curColStruct.fColDbRoot, curColStruct.fColPartition, curColStruct.fColSegment);
-
-   rc = colOp->openColumnFile(curCol, segFile);
+   rc = colOp->openColumnFile(curCol, segFile, useTmpSuffix); // @bug 5572 HDFS tmp file
    if (rc != NO_ERROR) {
       return rc;
    }
@@ -1012,6 +1129,7 @@ timer.stop("allocRowId");
 	// Expand initial abbreviated extent if any RID in 1st extent is > 256K.
 	// if totalRow == rowsLeft, then not adding rows to 1st extent, so skip it.
 	//--------------------------------------------------------------------------
+// DMC-SHARED_NOTHING_NOTE: Is it safe to assume only part0 seg0 is abbreviated?
     if ((curCol.dataFile.fPartition == 0) &&
        (curCol.dataFile.fSegment   == 0) &&
        ((totalRow-rowsLeft) > 0) &&
@@ -1030,7 +1148,7 @@ timer.stop("allocRowId");
                colStructList[k].fColDbRoot,
                colStructList[k].fColPartition,
                colStructList[k].fColSegment);
-           rc = colOp->openColumnFile(expandCol, segFile);
+           rc = colOp->openColumnFile(expandCol, segFile, true); // @bug 5572 HDFS tmp file
            if (rc == NO_ERROR)
            {
                if (colOp->abbreviatedExtent(expandCol.dataFile.pFile, colStructList[k].colWidth))
@@ -1042,7 +1160,7 @@ timer.stop("allocRowId");
            {
 				return rc;
            }
-           colOp->clearColumn(expandCol); // closes the file
+           colOp->clearColumn(expandCol); // closes the file (if uncompressed)
        }
     }
 	
@@ -1061,7 +1179,8 @@ timer.stop("allocRowId");
          Dctnry* dctnry = m_dctnry[op(dctnryStructList[i].fCompressionType)];
          rc = dctnry->openDctnry(dctnryStructList[i].dctnryOid,
                      dctnryStructList[i].fColDbRoot, dctnryStructList[i].fColPartition,
-                     dctnryStructList[i].fColSegment);
+                     dctnryStructList[i].fColSegment,
+                     useTmpSuffix); // @bug 5572 HDFS tmp file
          if (rc !=NO_ERROR)
 		 {
 			cout << "Error opening dctnry file " << dctnryStructList[i].dctnryOid<< endl;
@@ -1100,7 +1219,7 @@ timer.stop("tokenize");
 
          }
          //close dictionary files
-         rc = dctnry->closeDctnry();
+         rc = dctnry->closeDctnry(false);
          if (rc != NO_ERROR)
              return rc;
 
@@ -1110,9 +1229,9 @@ timer.stop("tokenize");
 			if (fRBMetaWriter)
 				fRBMetaWriter->backupDctnryHWMChunk(newDctnryStructList[i].dctnryOid, newDctnryStructList[i].fColDbRoot, newDctnryStructList[i].fColPartition, newDctnryStructList[i].fColSegment);
              rc = dctnry->openDctnry(newDctnryStructList[i].dctnryOid,
-             //            dctnryStructList[i].treeOid, dctnryStructList[i].listOid,
                            newDctnryStructList[i].fColDbRoot, newDctnryStructList[i].fColPartition,
-                           newDctnryStructList[i].fColSegment);
+                           newDctnryStructList[i].fColSegment,
+                           false); // @bug 5572 HDFS tmp file
              if (rc !=NO_ERROR)
                  return rc;
 
@@ -1147,7 +1266,7 @@ timer.stop("tokenize");
                  col_iter++;
              }
              //close dictionary files
-             rc = dctnry->closeDctnry();
+             rc = dctnry->closeDctnry(false);
              if (rc != NO_ERROR)
                  return rc;
          }
@@ -1176,7 +1295,7 @@ timer.stop("tokenize");
    //if a new extent is created, all the columns in this table should have their own new extent
    //First column already processed
 
-   //@Bug 1701. Close the file
+   //@Bug 1701. Close the file (if uncompressed)
    m_colOp[op(curCol.compressionType)]->clearColumn(curCol);
    //cout << "Saving hwm info for new ext batch" << endl;
    //Update hwm to set them in the end
@@ -1317,7 +1436,7 @@ timer.start("writeColumnRec");
 		//----------------------------------------------------------------------
 		// Write row(s) to database file(s)
 		//----------------------------------------------------------------------
-		rc = writeColumnRec(txnid, colStructList, colOldValueList, rowIdArray, newColStructList, colNewValueList, tableOid);
+		rc = writeColumnRec(txnid, colStructList, colOldValueList, rowIdArray, newColStructList, colNewValueList, tableOid, useTmpSuffix); // @bug 5572 HDFS tmp file
 	}
    return rc;
 }
@@ -1347,7 +1466,7 @@ int WriteEngineWrapper::insertColumnRec_SYS(const TxnID& txnid,
    bool newExtent = false;
    RIDList ridList;
    ColumnOp* colOp = NULL;
-   uint i = 0;
+   uint32_t i = 0;
 #ifdef PROFILE
  StopWatch timer;
 #endif
@@ -1410,7 +1529,7 @@ int WriteEngineWrapper::insertColumnRec_SYS(const TxnID& txnid,
        dbRoot, partitionNum, segmentNum);
 
    string segFile;
-   rc = colOp->openColumnFile(curCol, segFile);
+   rc = colOp->openColumnFile(curCol, segFile, false); // @bug 5572 HDFS tmp file
    if (rc != NO_ERROR) {
       return rc;
    }
@@ -1507,7 +1626,7 @@ timer.start("allocRowId");
                dbRoot,
                partitionNum,
                segmentNum);
-           rc = colOp->openColumnFile(expandCol, segFile);
+           rc = colOp->openColumnFile(expandCol, segFile, false); // @bug 5572 HDFS tmp file
            if (rc == NO_ERROR)
            {
                if (colOp->abbreviatedExtent(expandCol.dataFile.pFile, colStructList[k].colWidth))
@@ -1552,9 +1671,9 @@ timer.start("allocRowId");
          dctnryStructList[i].fColSegment = segmentNum;
          dctnryStructList[i].fColDbRoot = dbRoot;
          rc = dctnry->openDctnry(dctnryStructList[i].dctnryOid,
-         //          dctnryStructList[i].treeOid, dctnryStructList[i].listOid,
                      dctnryStructList[i].fColDbRoot, dctnryStructList[i].fColPartition,
-                     dctnryStructList[i].fColSegment);
+                     dctnryStructList[i].fColSegment,
+                     false); // @bug 5572 HDFS tmp file
          if (rc !=NO_ERROR)
              return rc;
 
@@ -1617,9 +1736,9 @@ timer.stop("tokenize");
          if (newExtent)
          {
              rc = dctnry->openDctnry(newDctnryStructList[i].dctnryOid,
-             //            dctnryStructList[i].treeOid, dctnryStructList[i].listOid,
                            newDctnryStructList[i].fColDbRoot, newDctnryStructList[i].fColPartition,
-                           newDctnryStructList[i].fColSegment);
+                           newDctnryStructList[i].fColSegment,
+                           false); // @bug 5572 HDFS tmp file
              if (rc !=NO_ERROR)
                  return rc;
 
@@ -1839,11 +1958,11 @@ timer.stop("tokenize");
    {
       if (newExtent)
       {
-         rc = writeColumnRec(txnid, colStructList, colOldValueList, rowIdArray, newColStructList, colNewValueList, tableOid);
+         rc = writeColumnRec(txnid, colStructList, colOldValueList, rowIdArray, newColStructList, colNewValueList, tableOid, false); // @bug 5572 HDFS tmp file
       }
       else
       {
-         rc = writeColumnRec(txnid, colStructList, colValueList, rowIdArray, newColStructList, colNewValueList, tableOid);
+         rc = writeColumnRec(txnid, colStructList, colValueList, rowIdArray, newColStructList, colNewValueList, tableOid, false); // @bug 5572 HDFS tmp file
       }
    }
 #ifdef PROFILE
@@ -1939,7 +2058,7 @@ int WriteEngineWrapper::insertColumnRec_Single(const TxnID& txnid,
 	bool newExtent = false;
 	RIDList ridList;
 	ColumnOp* colOp = NULL;
-	uint i = 0;
+	uint32_t i = 0;
 
 #ifdef PROFILE
 StopWatch timer;
@@ -2014,7 +2133,7 @@ StopWatch timer;
 	string segFile;
 	if (bUseStartExtent)
 	{
-		rc = colOp->openColumnFile(curCol, segFile);
+		rc = colOp->openColumnFile(curCol, segFile, true); // @bug 5572 HDFS tmp file
 		if (rc != NO_ERROR) {
 			return rc;
 		}
@@ -2135,7 +2254,7 @@ timer.stop("allocRowId");
 				colStructList[k].fColDbRoot,
 				colStructList[k].fColPartition,
 				colStructList[k].fColSegment);
-			rc = colOp->openColumnFile(expandCol, segFile);
+			rc = colOp->openColumnFile(expandCol, segFile, true); // @bug 5572 HDFS tmp file
 			if (rc == NO_ERROR)
 			{
 				if (colOp->abbreviatedExtent(
@@ -2173,7 +2292,8 @@ timer.stop("allocRowId");
 				rc = dctnry->openDctnry(dctnryStructList[i].dctnryOid,
 					dctnryStructList[i].fColDbRoot,
 					dctnryStructList[i].fColPartition,
-					dctnryStructList[i].fColSegment);
+					dctnryStructList[i].fColSegment,
+					true); // @bug 5572 HDFS tmp file
 				if (rc !=NO_ERROR)
 					return rc;
 
@@ -2241,7 +2361,8 @@ timer.stop("tokenize");
 				rc = dctnry->openDctnry(newDctnryStructList[i].dctnryOid,
 					newDctnryStructList[i].fColDbRoot,
 					newDctnryStructList[i].fColPartition,
-					newDctnryStructList[i].fColSegment);
+					newDctnryStructList[i].fColSegment,
+					false); // @bug 5572 HDFS tmp file
 				if (rc !=NO_ERROR)
 					return rc;
 
@@ -2475,12 +2596,14 @@ timer.start("writeColumnRec");
 		if (newExtent)
 		{
 			rc = writeColumnRec(txnid, colStructList, colOldValueList,
-				rowIdArray, newColStructList, colNewValueList, tableOid);
+				rowIdArray, newColStructList, colNewValueList, tableOid,
+				false); // @bug 5572 HDFS tmp file
 		}
 		else
 		{
 			rc = writeColumnRec(txnid, colStructList, colValueList,
-				rowIdArray, newColStructList, colNewValueList, tableOid);
+				rowIdArray, newColStructList, colNewValueList, tableOid,
+				true); // @bug 5572 HDFS tmp file
 		}
 	}
 #ifdef PROFILE
@@ -2788,13 +2911,13 @@ int WriteEngineWrapper::processBeginVBCopy(const TxnID& txnid, const vector<ColS
   
  //StopWatch timer;
 // timer.start("calculation");
-   for (uint j=0; j < colStructList.size(); j++)
+   for (uint32_t j=0; j < colStructList.size(); j++)
    {
 	vector<uint32_t> fboList;
    vector<LBIDRange>    rangeList;
    lastFbo = -1;
 	ColumnOp* colOp = m_colOp[op(colStructList[j].fCompressionType)];
-	for (uint i = 0; i < ridList.size(); i++) {
+	for (uint32_t i = 0; i < ridList.size(); i++) {
       curRowId = ridList[i];
       //cout << "processVersionBuffer got rid " << curRowId << endl;
       successFlag = colOp->calculateRowId(curRowId, BYTE_PER_BLOCK/colStructList[j].colWidth, colStructList[j].colWidth, curFbo, curBio);
@@ -2948,7 +3071,7 @@ int WriteEngineWrapper::processBeginVBCopy(const TxnID& txnid, const vector<ColS
                if (!dctCol_iter->isNull)
                {
                   RETURN_ON_ERROR(tokenize(
-                     txnid, dctnryStructList[i], *dctCol_iter));
+                     txnid, dctnryStructList[i], *dctCol_iter, true)); // @bug 5572 HDFS tmp file
                   token = dctCol_iter->token;
 
 #ifdef PROFILE
@@ -3155,7 +3278,7 @@ int WriteEngineWrapper::writeColumnRecords(const TxnID& txnid,
 	  }
 	
       string segFile;
-      rc = colOp->openColumnFile(curCol, segFile);
+      rc = colOp->openColumnFile(curCol, segFile, true); // @bug 5572 HDFS tmp file
       if (rc != NO_ERROR)
          break;
 	  vector<LBIDRange>   rangeList;
@@ -3271,27 +3394,27 @@ timer.stop("writeRow ");
  *    colNewStructList - the new extent struct list
  *    colNewValueList - column value list for the new extent
  *    rowIdArray -  row id list
+ *    useTmpSuffix - use temp suffix for db output file
  * RETURN:
  *    NO_ERROR if success
  *    others if something wrong in inserting the value
  ***********************************************************/
 int WriteEngineWrapper::writeColumnRec(const TxnID& txnid,
                                        const ColStructList& colStructList,
-                                       const ColValueList& colValueList,
+                                       ColValueList& colValueList,
                                        RID* rowIdArray,
                                        const ColStructList& newColStructList,
-                                       const ColValueList& newColValueList,
+                                       ColValueList& newColValueList,
 									   const int32_t tableOid,
+									   bool useTmpSuffix,
 									   bool versioning)
 {
    bool           bExcp;
    int            rc = 0;
    void*          valArray;
-   void*          oldValArray = NULL;
    string         segFile;
    Column         curCol;
-   ColStruct      curColStruct;
-   ColTupleList   curTupleList, oldTupleList;
+   ColTupleList   oldTupleList;
    ColStructList::size_type  totalColumn;
    ColStructList::size_type  i;
    ColTupleList::size_type   totalRow1, totalRow2;
@@ -3303,16 +3426,13 @@ int WriteEngineWrapper::writeColumnRec(const TxnID& txnid,
 StopWatch timer;
 #endif
    if (newColValueList.size() > 0)
-   {
-       curTupleList = static_cast<ColTupleList>(colValueList[0]);
-       totalRow1 = curTupleList.size();
-       curTupleList = static_cast<ColTupleList>(newColValueList[0]);
-       totalRow2 = curTupleList.size();
+   { 
+       totalRow1 = colValueList[0].size();
+       totalRow2 = newColValueList[0].size();
    }
    else
    {
-       curTupleList = static_cast<ColTupleList>(colValueList[0]);
-       totalRow1 = curTupleList.size();
+       totalRow1 = colValueList[0].size();
        totalRow2 = 0;
    }
 
@@ -3327,23 +3447,21 @@ StopWatch timer;
             //Write the first batch
             valArray = NULL;
             RID * firstPart = rowIdArray;
-            curColStruct = colStructList[i];
-            curTupleList = colValueList[i];
-            ColumnOp* colOp = m_colOp[op(curColStruct.fCompressionType)];
+            ColumnOp* colOp = m_colOp[op(colStructList[i].fCompressionType)];
 
             // set params
             colOp->initColumn(curCol);
             // need to pass real dbRoot, partition, and segment to setColParam
-            colOp->setColParam(curCol, 0, curColStruct.colWidth,
-            curColStruct.colDataType, curColStruct.colType, curColStruct.dataOid,
-            curColStruct.fCompressionType, curColStruct.fColDbRoot,
-            curColStruct.fColPartition, curColStruct.fColSegment);
+            colOp->setColParam(curCol, 0, colStructList[i].colWidth,
+            colStructList[i].colDataType, colStructList[i].colType, colStructList[i].dataOid,
+            colStructList[i].fCompressionType, colStructList[i].fColDbRoot,
+            colStructList[i].fColPartition, colStructList[i].fColSegment);
 			
-			ColExtsInfo aColExtsInfo = aTbaleMetaData->getColExtsInfo(curColStruct.dataOid);
+			ColExtsInfo aColExtsInfo = aTbaleMetaData->getColExtsInfo(colStructList[i].dataOid);
 			ColExtsInfo::iterator it = aColExtsInfo.begin();
 			while (it != aColExtsInfo.end())
 			{
-				if ((it->dbRoot == curColStruct.fColDbRoot) && (it->partNum == curColStruct.fColPartition) && (it->segNum == curColStruct.fColSegment))
+				if ((it->dbRoot == colStructList[i].fColDbRoot) && (it->partNum == colStructList[i].fColPartition) && (it->segNum == colStructList[i].fColSegment))
 					break;
 				it++;
 			}
@@ -3351,15 +3469,15 @@ StopWatch timer;
 			if (it == aColExtsInfo.end()) //add this one to the list
 			{
 				ColExtInfo aExt;
-				aExt.dbRoot =curColStruct.fColDbRoot;
-				aExt.partNum = curColStruct.fColPartition;
-				aExt.segNum = curColStruct.fColSegment;
-				aExt.compType = curColStruct.fCompressionType;		
+				aExt.dbRoot =colStructList[i].fColDbRoot;
+				aExt.partNum = colStructList[i].fColPartition;
+				aExt.segNum = colStructList[i].fColSegment;
+				aExt.compType = colStructList[i].fCompressionType;		
 				aColExtsInfo.push_back(aExt);
 				aTbaleMetaData->setColExtsInfo(colStructList[i].dataOid, aColExtsInfo);
 			}
 
-            rc = colOp->openColumnFile(curCol, segFile, IO_BUFF_SIZE);
+            rc = colOp->openColumnFile(curCol, segFile, useTmpSuffix, IO_BUFF_SIZE); // @bug 5572 HDFS tmp file
             if (rc != NO_ERROR)
                break;
 
@@ -3367,10 +3485,10 @@ StopWatch timer;
 			vector<LBIDRange>   rangeList;
 			if (versioning)
 			{
-					rc = processVersionBuffer(curCol.dataFile.pFile, txnid, curColStruct,
-                                      curColStruct.colWidth, totalRow1, firstPart, rangeList);
+					rc = processVersionBuffer(curCol.dataFile.pFile, txnid, colStructList[i],
+                                      colStructList[i].colWidth, totalRow1, firstPart, rangeList);
 				if (rc != NO_ERROR) {
-					if (curColStruct.fCompressionType == 0)
+					if (colStructList[i].fCompressionType == 0)
 					{
 						curCol.dataFile.pFile->flush();
 					}
@@ -3383,63 +3501,45 @@ StopWatch timer;
             //totalRow1 -= totalRow2;
             // have to init the size here
             // nullArray = (bool*) malloc(sizeof(bool) * totalRow);
-            switch (curColStruct.colType)
+            switch (colStructList[i].colType)
             {
                case WriteEngine::WR_INT:
                   valArray = (int*) calloc(sizeof(int), totalRow1);
-                  oldValArray = (int*) calloc(sizeof(int), totalRow1);
                   break;
                case WriteEngine::WR_UINT:
                   valArray = (uint32_t*) calloc(sizeof(uint32_t), totalRow1);
-                  oldValArray = (uint32_t*) calloc(sizeof(uint32_t), totalRow1);
                   break;
                case WriteEngine::WR_VARBINARY : // treat same as char for now
                case WriteEngine::WR_CHAR:
                case WriteEngine::WR_BLOB:
                   valArray = (char*) calloc(sizeof(char), totalRow1 * MAX_COLUMN_BOUNDARY);
-                  oldValArray = (char*) calloc(sizeof(char), totalRow1 * MAX_COLUMN_BOUNDARY);
                   break;
-//             case WriteEngine::WR_LONG:
-//                valArray = (long*) calloc(sizeof(long), totalRow1);
-//                break;
                case WriteEngine::WR_FLOAT:
                   valArray = (float*) calloc(sizeof(float), totalRow1);
-                  oldValArray = (float*) calloc(sizeof(float), totalRow1);
                   break;
                case WriteEngine::WR_DOUBLE:
                   valArray = (double*) calloc(sizeof(double), totalRow1);
-                  oldValArray = (double*) calloc(sizeof(double), totalRow1);
                   break;
-//             case WriteEngine::WR_BIT:
-//                valArray = (bool*) calloc(sizeof(bool), totalRow1);
-//                break;
                case WriteEngine::WR_BYTE:
                   valArray = (char*) calloc(sizeof(char), totalRow1);
-                  oldValArray = (char*) calloc(sizeof(char), totalRow1);
                   break;
                case WriteEngine::WR_UBYTE:
                   valArray = (uint8_t*) calloc(sizeof(uint8_t), totalRow1);
-                  oldValArray = (uint8_t*) calloc(sizeof(uint8_t), totalRow1);
                   break;
                case WriteEngine::WR_SHORT:
                   valArray = (short*) calloc(sizeof(short), totalRow1);
-                  oldValArray = (short*) calloc(sizeof(short), totalRow1);
                   break;
                case WriteEngine::WR_USHORT:
                   valArray = (uint16_t*) calloc(sizeof(uint16_t), totalRow1);
-                  oldValArray = (uint16_t*) calloc(sizeof(uint16_t), totalRow1);
                   break;
                case WriteEngine::WR_LONGLONG:
                   valArray = (long long*) calloc(sizeof(long long), totalRow1);
-                  oldValArray = (long long*) calloc(sizeof(long long), totalRow1);
                   break;
                case WriteEngine::WR_ULONGLONG:
                   valArray = (uint64_t*) calloc(sizeof(uint64_t), totalRow1);
-                  oldValArray = (uint64_t*) calloc(sizeof(uint64_t), totalRow1);
                   break;
                case WriteEngine::WR_TOKEN:
                   valArray = (Token*) calloc(sizeof(Token), totalRow1);
-                  oldValArray = (Token*) calloc(sizeof(Token), totalRow1);
                   break;
             }
 
@@ -3447,7 +3547,7 @@ StopWatch timer;
             if (m_opType != DELETE) {
                bExcp = false;
                try {
-                  convertValArray(totalRow1, curColStruct.colType, curTupleList, valArray);
+                 convertValArray(totalRow1, colStructList[i].colType, colValueList[i], valArray);
                }
                catch(...) {
                   bExcp = true;
@@ -3460,7 +3560,7 @@ StopWatch timer;
 #ifdef PROFILE
 timer.start("writeRow ");
 #endif
-               rc = colOp->writeRow(curCol, totalRow1, firstPart, valArray, oldValArray);
+               rc = colOp->writeRow(curCol, totalRow1, firstPart, valArray);
 #ifdef PROFILE
 timer.stop("writeRow ");
 #endif
@@ -3470,14 +3570,11 @@ timer.stop("writeRow ");
 #ifdef PROFILE
 timer.start("writeRow ");
 #endif
-               rc = colOp->writeRow(curCol, totalRow1, rowIdArray, valArray, oldValArray, true);
+               rc = colOp->writeRow(curCol, totalRow1, rowIdArray, valArray, true);
 #ifdef PROFILE
 timer.stop("writeRow ");
 #endif
             }
-
-            // clean
-            curTupleList.clear();
 
             colOp->clearColumn(curCol);
 			
@@ -3487,9 +3584,6 @@ timer.stop("writeRow ");
             if (valArray != NULL)
                free(valArray);
 
-            if (oldValArray != NULL)
-               free(oldValArray);
-
             // check error
             if (rc != NO_ERROR)
                break;
@@ -3497,22 +3591,20 @@ timer.stop("writeRow ");
          //Process the second batch
          valArray = NULL;
 
-         curColStruct = newColStructList[i];
-         curTupleList = newColValueList[i];
-         ColumnOp* colOp = m_colOp[op(curColStruct.fCompressionType)];
+         ColumnOp* colOp = m_colOp[op(newColStructList[i].fCompressionType)];
 
          // set params
          colOp->initColumn(curCol);
-         colOp->setColParam(curCol, 0, curColStruct.colWidth,
-            curColStruct.colDataType, curColStruct.colType, curColStruct.dataOid,
-            curColStruct.fCompressionType, curColStruct.fColDbRoot,
-            curColStruct.fColPartition, curColStruct.fColSegment);
+         colOp->setColParam(curCol, 0, newColStructList[i].colWidth,
+            newColStructList[i].colDataType, newColStructList[i].colType, newColStructList[i].dataOid,
+            newColStructList[i].fCompressionType, newColStructList[i].fColDbRoot,
+            newColStructList[i].fColPartition, newColStructList[i].fColSegment);
 
-		ColExtsInfo aColExtsInfo = aTbaleMetaData->getColExtsInfo(curColStruct.dataOid);
+		ColExtsInfo aColExtsInfo = aTbaleMetaData->getColExtsInfo(newColStructList[i].dataOid);
 		ColExtsInfo::iterator it = aColExtsInfo.begin();
 		while (it != aColExtsInfo.end())
 		{
-			if ((it->dbRoot == curColStruct.fColDbRoot) && (it->partNum == curColStruct.fColPartition) && (it->segNum == curColStruct.fColSegment))
+			if ((it->dbRoot == newColStructList[i].fColDbRoot) && (it->partNum == newColStructList[i].fColPartition) && (it->segNum == newColStructList[i].fColSegment))
 				break;
 			it++;
 		}
@@ -3520,14 +3612,18 @@ timer.stop("writeRow ");
 		if (it == aColExtsInfo.end()) //add this one to the list
 		{
 			ColExtInfo aExt;
-			aExt.dbRoot =curColStruct.fColDbRoot;
-			aExt.partNum = curColStruct.fColPartition;
-			aExt.segNum = curColStruct.fColSegment;
-			aExt.compType = curColStruct.fCompressionType;		
+			aExt.dbRoot =newColStructList[i].fColDbRoot;
+			aExt.partNum = newColStructList[i].fColPartition;
+			aExt.segNum = newColStructList[i].fColSegment;
+			aExt.compType = newColStructList[i].fCompressionType;		
 			aColExtsInfo.push_back(aExt);
-			aTbaleMetaData->setColExtsInfo(colStructList[i].dataOid, aColExtsInfo);
+			aTbaleMetaData->setColExtsInfo(newColStructList[i].dataOid, aColExtsInfo);
 		}
-         rc = colOp->openColumnFile(curCol, segFile, IO_BUFF_SIZE);
+
+         // Pass "false" for hdfs tmp file flag.  Since we only allow 1
+         // extent per segment file (with HDFS), we can assume a second
+         // extent is going to a new file (and won't need tmp file).
+         rc = colOp->openColumnFile(curCol, segFile, false, IO_BUFF_SIZE); // @bug 5572 HDFS tmp file
          if (rc != NO_ERROR)
              break;
 
@@ -3535,10 +3631,10 @@ timer.stop("writeRow ");
 		 vector<LBIDRange>   rangeList;
 		 if (versioning)
 		 {
-			rc = processVersionBuffer(curCol.dataFile.pFile, txnid, curColStruct,
-                                   curColStruct.colWidth, totalRow2, secondPart, rangeList);
+			rc = processVersionBuffer(curCol.dataFile.pFile, txnid, newColStructList[i],
+                                   newColStructList[i].colWidth, totalRow2, secondPart, rangeList);
 			if (rc != NO_ERROR) {
-				if (curColStruct.fCompressionType == 0)
+				if (newColStructList[i].fCompressionType == 0)
 				{
 					curCol.dataFile.pFile->flush();
 				}
@@ -3550,63 +3646,45 @@ timer.stop("writeRow ");
          //totalRow1 -= totalRow2;
          // have to init the size here
 //       nullArray = (bool*) malloc(sizeof(bool) * totalRow);
-         switch (curColStruct.colType)
+         switch (newColStructList[i].colType)
          {
             case WriteEngine::WR_INT:
                valArray = (int*) calloc(sizeof(int), totalRow2);
-               oldValArray = (int*) calloc(sizeof(int), totalRow2);
                break;
             case WriteEngine::WR_UINT:
                valArray = (uint32_t*) calloc(sizeof(uint32_t), totalRow2);
-               oldValArray = (uint32_t*) calloc(sizeof(uint32_t), totalRow2);
                break;
             case WriteEngine::WR_VARBINARY : // treat same as char for now
             case WriteEngine::WR_CHAR:
             case WriteEngine::WR_BLOB:
                valArray = (char*) calloc(sizeof(char), totalRow2 * MAX_COLUMN_BOUNDARY);
-               oldValArray = (char*) calloc(sizeof(char), totalRow2 * MAX_COLUMN_BOUNDARY);
                break;
-//          case WriteEngine::WR_LONG:
-//             valArray = (long*) calloc(sizeof(long), totalRow);
-//             break;
             case WriteEngine::WR_FLOAT:
                valArray = (float*) calloc(sizeof(float), totalRow2);
-               oldValArray = (float*) calloc(sizeof(float), totalRow2);
                break;
             case WriteEngine::WR_DOUBLE:
                valArray = (double*) calloc(sizeof(double), totalRow2);
-               oldValArray = (double*) calloc(sizeof(double), totalRow2);
                break;
-//          case WriteEngine::WR_BIT:
-//             valArray = (bool*) calloc(sizeof(bool), totalRow);
-//             break;
             case WriteEngine::WR_BYTE:
                valArray = (char*) calloc(sizeof(char), totalRow2);
-               oldValArray = (char*) calloc(sizeof(char), totalRow2);
                break;
             case WriteEngine::WR_UBYTE:
                valArray = (uint8_t*) calloc(sizeof(uint8_t), totalRow2);
-               oldValArray = (uint8_t*) calloc(sizeof(uint8_t), totalRow2);
                break;
             case WriteEngine::WR_SHORT:
                valArray = (short*) calloc(sizeof(short), totalRow2);
-               oldValArray = (short*) calloc(sizeof(short), totalRow2);
                break;
             case WriteEngine::WR_USHORT:
                valArray = (uint16_t*) calloc(sizeof(uint16_t), totalRow2);
-               oldValArray = (uint16_t*) calloc(sizeof(uint16_t), totalRow2);
                break;
             case WriteEngine::WR_LONGLONG:
                valArray = (long long*) calloc(sizeof(long long), totalRow2);
-               oldValArray = (long long*) calloc(sizeof(long long), totalRow2);
                break;
             case WriteEngine::WR_ULONGLONG:
                valArray = (uint64_t*) calloc(sizeof(uint64_t), totalRow2);
-               oldValArray = (uint64_t*) calloc(sizeof(uint64_t), totalRow2);
                break;
             case WriteEngine::WR_TOKEN:
                valArray = (Token*) calloc(sizeof(Token), totalRow2);
-               oldValArray = (Token*) calloc(sizeof(Token), totalRow2);
                break;
          }
 
@@ -3614,7 +3692,7 @@ timer.stop("writeRow ");
          if (m_opType != DELETE) {
             bExcp = false;
             try {
-               convertValArray(totalRow2, curColStruct.colType, curTupleList, valArray);
+               convertValArray(totalRow2, newColStructList[i].colType, newColValueList[i], valArray);
             }
             catch(...) {
                bExcp = true;
@@ -3627,7 +3705,7 @@ timer.stop("writeRow ");
 #ifdef PROFILE
 timer.start("writeRow ");
 #endif
-            rc = colOp->writeRow(curCol, totalRow2, secondPart, valArray, oldValArray);
+            rc = colOp->writeRow(curCol, totalRow2, secondPart, valArray);
 #ifdef PROFILE
 timer.stop("writeRow ");
 #endif
@@ -3637,14 +3715,12 @@ timer.stop("writeRow ");
 #ifdef PROFILE
 timer.start("writeRow ");
 #endif
-            rc = colOp->writeRow(curCol, totalRow2, rowIdArray, valArray, oldValArray, true);
+            rc = colOp->writeRow(curCol, totalRow2, rowIdArray, valArray, true);
 #ifdef PROFILE
 timer.stop("writeRow ");
 #endif
          }
 
-         // clean
-         curTupleList.clear();
 
          colOp->clearColumn(curCol);
 		 if (versioning)
@@ -3652,9 +3728,6 @@ timer.stop("writeRow ");
 			
          if (valArray != NULL)
             free(valArray);
-
-         if (oldValArray != NULL)
-            free(oldValArray);
 
          // check error
          if (rc != NO_ERROR)
@@ -3664,27 +3737,25 @@ timer.stop("writeRow ");
       {
          valArray = NULL;
 
-         curColStruct = colStructList[i];
-         curTupleList = colValueList[i];
-         ColumnOp* colOp = m_colOp[op(curColStruct.fCompressionType)];
+         ColumnOp* colOp = m_colOp[op(colStructList[i].fCompressionType)];
 
          // set params
          colOp->initColumn(curCol);
-         colOp->setColParam(curCol, 0, curColStruct.colWidth,
-            curColStruct.colDataType, curColStruct.colType, curColStruct.dataOid,
-            curColStruct.fCompressionType, curColStruct.fColDbRoot,
-            curColStruct.fColPartition, curColStruct.fColSegment);
+         colOp->setColParam(curCol, 0, colStructList[i].colWidth,
+            colStructList[i].colDataType, colStructList[i].colType, colStructList[i].dataOid,
+            colStructList[i].fCompressionType, colStructList[i].fColDbRoot,
+            colStructList[i].fColPartition, colStructList[i].fColSegment);
 
-         rc = colOp->openColumnFile(curCol, segFile, IO_BUFF_SIZE);
+         rc = colOp->openColumnFile(curCol, segFile, useTmpSuffix, IO_BUFF_SIZE); // @bug 5572 HDFS tmp file
 		  //cout << " Opened file oid " << curCol.dataFile.pFile << endl;
          if (rc != NO_ERROR)
             break;
 
-		ColExtsInfo aColExtsInfo = aTbaleMetaData->getColExtsInfo(curColStruct.dataOid);
+		ColExtsInfo aColExtsInfo = aTbaleMetaData->getColExtsInfo(colStructList[i].dataOid);
 			ColExtsInfo::iterator it = aColExtsInfo.begin();
 			while (it != aColExtsInfo.end())
 			{
-				if ((it->dbRoot == curColStruct.fColDbRoot) && (it->partNum == curColStruct.fColPartition) && (it->segNum == curColStruct.fColSegment))
+				if ((it->dbRoot == colStructList[i].fColDbRoot) && (it->partNum == colStructList[i].fColPartition) && (it->segNum == colStructList[i].fColSegment))
 					break;
 				it++;
 			}
@@ -3692,10 +3763,10 @@ timer.stop("writeRow ");
 			if (it == aColExtsInfo.end()) //add this one to the list
 			{
 				ColExtInfo aExt;
-				aExt.dbRoot =curColStruct.fColDbRoot;
-				aExt.partNum = curColStruct.fColPartition;
-				aExt.segNum = curColStruct.fColSegment;
-				aExt.compType = curColStruct.fCompressionType;		
+				aExt.dbRoot =colStructList[i].fColDbRoot;
+				aExt.partNum = colStructList[i].fColPartition;
+				aExt.segNum = colStructList[i].fColSegment;
+				aExt.compType = colStructList[i].fCompressionType;		
 				aColExtsInfo.push_back(aExt);
 				aTbaleMetaData->setColExtsInfo(colStructList[i].dataOid, aColExtsInfo);
 			}
@@ -3703,10 +3774,10 @@ timer.stop("writeRow ");
 		 vector<LBIDRange>   rangeList;
 		 if (versioning)
 		 {
-			rc = processVersionBuffer(curCol.dataFile.pFile, txnid, curColStruct,
-                                   curColStruct.colWidth, totalRow1, rowIdArray, rangeList);
+			rc = processVersionBuffer(curCol.dataFile.pFile, txnid, colStructList[i],
+                                   colStructList[i].colWidth, totalRow1, rowIdArray, rangeList);
 				if (rc != NO_ERROR) {
-					if (curColStruct.fCompressionType == 0)
+					if (colStructList[i].fCompressionType == 0)
 					{
 						curCol.dataFile.pFile->flush();
 					}
@@ -3717,63 +3788,45 @@ timer.stop("writeRow ");
 
          // have to init the size here
 //       nullArray = (bool*) malloc(sizeof(bool) * totalRow);
-         switch (curColStruct.colType)
+         switch (colStructList[i].colType)
          {
             case WriteEngine::WR_INT:
                valArray = (int*) calloc(sizeof(int), totalRow1);
-               oldValArray = (int*) calloc(sizeof(int), totalRow1);
                break;
             case WriteEngine::WR_UINT:
                valArray = (uint32_t*) calloc(sizeof(uint32_t), totalRow1);
-               oldValArray = (uint32_t*) calloc(sizeof(uint32_t), totalRow1);
                break;
             case WriteEngine::WR_VARBINARY : // treat same as char for now
             case WriteEngine::WR_CHAR:
             case WriteEngine::WR_BLOB:
                valArray = (char*) calloc(sizeof(char), totalRow1 * MAX_COLUMN_BOUNDARY);
-               oldValArray = (char*) calloc(sizeof(char), totalRow1 * MAX_COLUMN_BOUNDARY);
                break;
-//          case WriteEngine::WR_LONG:
-//             valArray = (long*) calloc(sizeof(long), totalRow1);
-//             break;
             case WriteEngine::WR_FLOAT:
                valArray = (float*) calloc(sizeof(float), totalRow1);
-               oldValArray = (float*) calloc(sizeof(float), totalRow1);
                break;
             case WriteEngine::WR_DOUBLE:
                valArray = (double*) calloc(sizeof(double), totalRow1);
-               oldValArray = (double*) calloc(sizeof(double), totalRow1);
                break;
-//          case WriteEngine::WR_BIT:
-//             valArray = (bool*) calloc(sizeof(bool), totalRow1);
-//             break;
             case WriteEngine::WR_BYTE:
                valArray = (char*) calloc(sizeof(char), totalRow1);
-               oldValArray = (char*) calloc(sizeof(char), totalRow1);
                break;
             case WriteEngine::WR_UBYTE:
                valArray = (uint8_t*) calloc(sizeof(uint8_t), totalRow1);
-               oldValArray = (uint8_t*) calloc(sizeof(uint8_t), totalRow1);
                break;
             case WriteEngine::WR_SHORT:
                valArray = (short*) calloc(sizeof(short), totalRow1);
-               oldValArray = (short*) calloc(sizeof(short), totalRow1);
                break;
             case WriteEngine::WR_USHORT:
                valArray = (uint16_t*) calloc(sizeof(uint16_t), totalRow1);
-               oldValArray = (uint16_t*) calloc(sizeof(uint16_t), totalRow1);
                break;
             case WriteEngine::WR_LONGLONG:
                valArray = (long long*) calloc(sizeof(long long), totalRow1);
-               oldValArray = (long long*) calloc(sizeof(long long), totalRow1);
                break;
             case WriteEngine::WR_ULONGLONG:
                valArray = (uint64_t*) calloc(sizeof(uint64_t), totalRow1);
-               oldValArray = (uint64_t*) calloc(sizeof(uint64_t), totalRow1);
                break;
             case WriteEngine::WR_TOKEN:
                valArray = (Token*) calloc(sizeof(Token), totalRow1);
-               oldValArray = (Token*) calloc(sizeof(Token), totalRow1);
                break;
          }
 
@@ -3781,7 +3834,7 @@ timer.stop("writeRow ");
          if (m_opType != DELETE) {
             bExcp = false;
             try {
-              convertValArray(totalRow1, curColStruct.colType, curTupleList, valArray);
+              convertValArray(totalRow1, colStructList[i].colType, colValueList[i], valArray);
             }
             catch(...) {
                bExcp = true;
@@ -3794,7 +3847,7 @@ timer.stop("writeRow ");
 #ifdef PROFILE
 timer.start("writeRow ");
 #endif
-            rc = colOp->writeRow(curCol, totalRow1, rowIdArray, valArray, oldValArray);
+            rc = colOp->writeRow(curCol, totalRow1, rowIdArray, valArray);
 #ifdef PROFILE
 timer.stop("writeRow ");
 #endif
@@ -3804,24 +3857,18 @@ timer.stop("writeRow ");
 #ifdef PROFILE
 timer.start("writeRow ");
 #endif
-         rc = colOp->writeRow(curCol, totalRow1, rowIdArray, valArray, oldValArray, true);
+         rc = colOp->writeRow(curCol, totalRow1, rowIdArray, valArray, true);
 #ifdef PROFILE
 timer.stop("writeRow ");
 #endif
          }
 
-         // clean
-         curTupleList.clear();
-		//cout << " close file oid " << curCol.dataFile.pFile << endl;
          colOp->clearColumn(curCol);
 		 
 		 if (versioning)
 			BRMWrapper::getInstance()->writeVBEnd(txnid, rangeList);
          if (valArray != NULL)
             free(valArray);
-
-         if (oldValArray != NULL)
-            free(oldValArray);
 
          // check error
          if (rc != NO_ERROR)
@@ -3873,12 +3920,19 @@ StopWatch timer;
 	{
 		if (rangeListTot.size() > 0)
 			BRMWrapper::getInstance()->writeVBEnd(txnid, rangeListTot);
-		return rc;
+		switch (rc)
+		{
+			case BRM::ERR_DEADLOCK: return ERR_BRM_DEAD_LOCK;
+			case BRM::ERR_VBBM_OVERFLOW: return ERR_BRM_VB_OVERFLOW;
+			case BRM::ERR_NETWORK: return ERR_BRM_NETWORK;
+			case BRM::ERR_READONLY: return ERR_BRM_READONLY;
+			default: return ERR_BRM_BEGIN_COPY;
+		}
 	}
 	
 	VBRange aRange;
-	uint blocksProcessedThisOid = 0;
-	uint blocksProcessed = 0;
+	uint32_t blocksProcessedThisOid = 0;
+	uint32_t blocksProcessed = 0;
 	std::vector<BRM::FileInfo> files;
 	TableMetaData* aTbaleMetaData = TableMetaData::makeTableMetaData(tableOid);
    for (i = 0; i < totalColumn; i++)
@@ -3920,7 +3974,7 @@ StopWatch timer;
 		}
 	 
       string segFile;
-      rc = colOp->openColumnFile(curCol, segFile, IO_BUFF_SIZE);
+      rc = colOp->openColumnFile(curCol, segFile, true, IO_BUFF_SIZE); // @bug 5572 HDFS tmp file
       if (rc != NO_ERROR)
          break;
 	  if (curColStruct.fCompressionType == 0)
@@ -3940,7 +3994,7 @@ StopWatch timer;
 	  //vector<LBIDRange>   rangeList;
      // rc = processVersionBuffers(curCol.dataFile.pFile, txnid, curColStruct, curColStruct.colWidth, totalRow, ridList, rangeList);
 	 std::vector<VBRange> curFreeList;
-	 uint blockUsed = 0;
+	 uint32_t blockUsed = 0;
 	 if (!idbdatafile::IDBPolicy::useHdfs()) {
 	if (rangeListTot.size() > 0) {	
 		if (freeList[0].size >= (blocksProcessed + rangeLists[i].size()))
@@ -4147,15 +4201,16 @@ int WriteEngineWrapper::tokenize(const TxnID& txnid, DctnryTuple& dctnryTuple, i
  ***********************************************************/
 int WriteEngineWrapper::tokenize(const TxnID& txnid,
                                  DctnryStruct& dctnryStruct,
-                                 DctnryTuple& dctnryTuple)
+                                 DctnryTuple& dctnryTuple,
+                                 bool useTmpSuffix) // @bug 5572 HDFS tmp file
 {
   //find the corresponding column segment file the token is going to be inserted.
 
   Dctnry* dctnry = m_dctnry[op(dctnryStruct.fCompressionType)];
   int rc = dctnry->openDctnry(dctnryStruct.dctnryOid,
-  //                          dctnryStruct.treeOid, dctnryStruct.listOid,
                               dctnryStruct.fColDbRoot, dctnryStruct.fColPartition,
-                              dctnryStruct.fColSegment);
+                              dctnryStruct.fColSegment,
+                              useTmpSuffix); // @bug 5572 TBD
   if (rc !=NO_ERROR)
     return rc;
 

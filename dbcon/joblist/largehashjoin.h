@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -118,7 +118,7 @@ private:
 public:
 	uint32_t operator()(const std::string& v) const
 	{
-		return hasher(v.c_str(), (uint) v.length());
+		return hasher(v.c_str(), (uint32_t) v.length());
 	}
 };
 
@@ -174,7 +174,7 @@ public:
 	HashJoin(const HashJoin& hj);
 	JoinType getJoinType() { return fJoinType; }
     virtual ~HashJoin();
-	virtual int performJoin(const uint thrCount=1);
+	virtual int performJoin(const uint32_t thrCount=1);
 	virtual int performThreadedJoin(const uint32_t numThreads);
 
 	joblist::BDLWrapper<element_t>* Set1() { return & fSet1;}
@@ -287,8 +287,8 @@ int HashJoin<element_t>::performThreadedJoin(const uint32_t numThreads)
 	boost::scoped_array<typename HashJoin<element_t>::thrParams_t> params(new typename HashJoin<element_t>::thrParams_t[numThreads]);
 	uint32_t maxThreads=numThreads;
 	int realCnt=0;
-	uint bucketsPerThr=0;
-	uint totalBuckets=0;
+	uint32_t bucketsPerThr=0;
+	uint32_t totalBuckets=0;
 
 	// TODO: maybe this should throw an exception
 	if (maxThreads<=0 || maxThreads >32) {
@@ -302,8 +302,8 @@ int HashJoin<element_t>::performThreadedJoin(const uint32_t numThreads)
 		maxThreads=Set1()->bucketCount();
 	}
 
-	bucketsPerThr=(uint)(Set1()->bucketCount()/maxThreads);
-	uint idx=0;
+	bucketsPerThr=(uint32_t)(Set1()->bucketCount()/maxThreads);
+	uint32_t idx=0;
 	for(idx=0; idx<maxThreads && totalBuckets<Set1()->bucketCount(); idx++)
 	{
 		params[idx].hjptr = this;
@@ -413,7 +413,7 @@ int HashJoin<element_t>::performThreadedJoin(const uint32_t numThreads)
 
 // defaults to 1 thread
 template <typename element_t>
-int HashJoin<element_t>::performJoin(const uint thrCount)
+int HashJoin<element_t>::performJoin(const uint32_t thrCount)
 {
 	return performThreadedJoin(thrCount);
 }
@@ -438,7 +438,7 @@ void HashJoin<element_t>::createHash(BucketDL<element_t> *srcBucketDL,
 	timespec ts1, ts2, diff;
 	clock_gettime(CLOCK_REALTIME, &ts1);
 #endif
-	uint bucketIter = srcBucketDL->getIterator((int)bucketNum);
+	uint32_t bucketIter = srcBucketDL->getIterator((int)bucketNum);
     // @bug 828. catch hashjoin starting time
 	more = srcBucketDL->next(bucketNum, bucketIter, &e);
 	if (thrDlTimes.FirstReadTime().tv_sec == 0) {

@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -253,7 +253,7 @@ int dumpone(OID_t oid, unsigned int sortOrder)
 		end = entries.end();
 		while (iter != end)
 		{
-			u_int32_t lbidRangeSize = iter->range.size * 1024;
+			uint32_t lbidRangeSize = iter->range.size * 1024;
 			max       = iter->partition.cprange.hi_val;
 			min       = iter->partition.cprange.lo_val;
 			seqNum    = iter->partition.cprange.sequenceNum;
@@ -387,7 +387,7 @@ int clearAllCPData()
 			cpInfo.min = numeric_limits<int64_t>::max();
 			cpInfo.seqNum = -1;
 
-			for (uint i=0; i< ranges.size(); i++) {
+			for (uint32_t i=0; i< ranges.size(); i++) {
 				BRM::LBIDRange r=ranges.at(i); 
 				cpInfo.firstLbid = r.start;
 				vCpInfo.push_back(cpInfo);
@@ -434,7 +434,7 @@ int extendOids( )
 	uint32_t  partNum;
 	uint16_t  segNum;
 	OID_t     oid;
-	u_int32_t colWidth;
+	uint32_t colWidth;
 	char      DictStoreOIDFlag;
 
 	vector<CreateStripeColumnExtentsArgIn> cols;

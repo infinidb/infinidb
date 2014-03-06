@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -103,7 +103,7 @@ WEDataLoader::WEDataLoader(SplitterReadThread& Srt ):fRef(Srt),
 	fpSysLog(0)
 {
  	Config weConfig;
-  	u_int16_t localModuleId = weConfig.getLocalModuleID();
+  	uint16_t localModuleId = weConfig.getLocalModuleID();
   	fPmId = static_cast<char>(localModuleId); 
 
   	srand ( time(NULL) );				// initialize random seed
@@ -1016,17 +1016,7 @@ void WEDataLoader::onReceiveEod(ByteStream& Ibs)
 void WEDataLoader::onReceiveCmd(ByteStream& bs) {
 	//TODO - can be cpimport cmd or server cmd, for now write to a file
     ByteStream::byte aCmdId;
-	//(*bs) >> aCmdId;
     bs >> aCmdId;
-
-	// switch
-	switch(aCmdId)
-	{
-	default:
-		//cout << "Cmd received .. check where did it come from " << endl;
-		break;
-	}
-
 }
 //-----------------------------------------------------------------------------
 /**
@@ -1638,10 +1628,10 @@ void WEDataLoader::serialize(messageqcpp::ByteStream& b) const {
 	/*
 	b << (ObjectReader::id_t) ObjectReader::SIMPLECOLUMN;
 	ReturnedColumn::serialize(b); // parent class serialize
-	b << (u_int32_t) fOid;
+	b << (uint32_t) fOid;
 	b << fData;
 	b << static_cast<const ByteStream::doublebyte>(fReturnAll);
-	b << (u_int32_t) fSequence;
+	b << (uint32_t) fSequence;
 	*/
 }
 
@@ -1653,10 +1643,10 @@ void WEDataLoader::unserialize(messageqcpp::ByteStream& b)
 	/*
 	ObjectReader::checkType(b, ObjectReader::SIMPLECOLUMN);
 	ReturnedColumn::unserialize(b); // parent class unserialize
-	b >> (u_int32_t&) fOid;
+	b >> (uint32_t&) fOid;
 	b >> fData;
 	b >> reinterpret_cast<ByteStream::doublebyte&>(fReturnAll);
-	b >> (u_int32_t&) fSequence;
+	b >> (uint32_t&) fSequence;
 	*/
 }
 

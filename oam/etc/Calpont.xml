@@ -9,6 +9,7 @@
 	<ExeMgr1>
 		<IPAddr>0.0.0.0</IPAddr>
 		<Port>8601</Port>
+		<Module>unassigned</Module>
 	</ExeMgr1>
 	<JobProc>
 		<IPAddr>0.0.0.0</IPAddr>
@@ -289,7 +290,7 @@
 		<ModuleDBRootID1-1-1>unassigned</ModuleDBRootID1-1-1>
 		<ModuleType2>um</ModuleType2>
 		<ModuleDesc2>User Module</ModuleDesc2>
-		<RunType2>LOADSHARE</RunType2>
+		<RunType2>SIMPLEX</RunType2>
 		<ModuleCount2>1</ModuleCount2>
 		<ModuleIPAddr1-1-2>0.0.0.0</ModuleIPAddr1-1-2>
 		<ModuleHostName1-1-2>unassigned</ModuleHostName1-1-2>
@@ -434,6 +435,8 @@
 		<InitialInstallFlag>n</InitialInstallFlag>
 		<SingleServerInstall>n</SingleServerInstall>
 		<ServerTypeInstall>2</ServerTypeInstall>
+		<PMwithUM>n</PMwithUM>
+		<MySQLRep>n</MySQLRep>
 		<DBRootStorageType>internal</DBRootStorageType>
 		<UMStorageType>internal</UMStorageType>
 		<EEPackageType>rpm</EEPackageType>
@@ -477,7 +480,8 @@
 		<MaxElems>128K</MaxElems>  <!-- 128 buckets * 128K * 16 = 256 MB -->
 		<FifoSizeLargeSide>128</FifoSizeLargeSide>
 		<PmMaxMemorySmallSide>64M</PmMaxMemorySmallSide><!-- divide by 48 to getapproximate row count -->
-		<TotalUmMemory>8G</TotalUmMemory>
+		<TotalUmMemory>50%</TotalUmMemory>
+		<TotalPmUmMemory>10%</TotalPmUmMemory>
 		<CPUniqueLimit>100</CPUniqueLimit>
 	</HashJoin>
 	<JobList>
@@ -519,5 +523,9 @@
 	<NetworkCompression>
 		<Enabled>Y</Enabled>
 	</NetworkCompression>
+	<QueryTele>
+		<Host>127.0.0.1</Host>
+		<Port>0</Port>
+	</QueryTele>
 </Calpont>
 

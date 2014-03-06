@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -63,7 +63,7 @@ void LimitedOrderBy::initialize(const RowGroup& rg, const JobInfo& jobInfo)
 	fErrorCode = ERR_LIMIT_TOO_BIG;
 
 	// locate column position in the rowgroup
-	map<uint, uint> keyToIndexMap;
+	map<uint32_t, uint32_t> keyToIndexMap;
 	for (uint64_t i = 0; i < rg.getKeys().size(); ++i)
 	{
 		if (keyToIndexMap.find(rg.getKeys()[i]) == keyToIndexMap.end())
@@ -73,7 +73,7 @@ void LimitedOrderBy::initialize(const RowGroup& rg, const JobInfo& jobInfo)
 	vector<pair<uint32_t, bool> >::const_iterator i = jobInfo.orderByColVec.begin();
 	for ( ; i != jobInfo.orderByColVec.end(); i++)
 	{
-		map<uint, uint>::iterator j = keyToIndexMap.find(i->first);
+		map<uint32_t, uint32_t>::iterator j = keyToIndexMap.find(i->first);
 		idbassert(j != keyToIndexMap.end());
 		fOrderByCond.push_back(IdbSortSpec(j->second, i->second));
 	}

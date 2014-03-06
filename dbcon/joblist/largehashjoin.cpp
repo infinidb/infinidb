@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -180,7 +180,7 @@ void* HashJoinByBucket_thr(void* arg)
 	bool sendAllSearchSet = false;
 try
 {
-	for (uint idx=0, bucketIdx=params->startBucket;
+	for (uint32_t idx=0, bucketIdx=params->startBucket;
 		idx<params->numBuckets;
 		idx++, bucketIdx++) {
 
@@ -233,10 +233,10 @@ try
 #ifdef DEBUG
 	long hashSetTotal = 0;
 	long searchSetTotal = 0;
-	for (uint j=0;j<hjPtr->HashSet(thrIdx)->bucketCount();j++)
+	for (uint32_t j=0;j<hjPtr->HashSet(thrIdx)->bucketCount();j++)
 		hashSetTotal+=hjPtr->HashSet(thrIdx)->bucketCount(); // are bucketDL
 
-	for (uint j=0;j<hjPtr->HashSet(thrIdx)->bucketCount();j++)
+	for (uint32_t j=0;j<hjPtr->HashSet(thrIdx)->bucketCount();j++)
 		searchSetTotal+=hjPtr->SearchSet(thrIdx)->size(j); // can be any datalist
 
 	cout << "\t\tJoinByBucket() thr " << dec << thrIdx
@@ -294,7 +294,7 @@ try
 			if(hjPtr->SearchResult(thrIdx)->OID() >= 3000)
 			cout << "JoinByBucket() SearchResult add " << bucketIdx
 				<< " [" << e.first << "][" << e.second << "]" << endl;
-			uint a=0;
+			uint32_t a=0;
 			e_t b=e_t();
 #endif
 

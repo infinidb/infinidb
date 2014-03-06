@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -21,10 +21,8 @@
  *
  ***********************************************************************/
 #include <iostream>
-#define INSERTPKGPROC_DLLEXPORT
 #include "insertpackageprocessor.h"
 #include "autoincrementdata.h"
-#undef INSERTPKGPROC_DLLEXPORT
 #include <vector>
 #include <algorithm>
 #include <sstream>
@@ -78,7 +76,7 @@ namespace dmlpackageprocessor
 		logger.logMessage(LOG_TYPE_DEBUG, msg, logid);
 		//WriteEngine::ChunkManager* cm = cpackage.get_ChunkManager();
 		//fWriteEngine.setChunkManager(cm);
-		//std::map<u_int32_t,u_int32_t> oids;
+		//std::map<uint32_t,uint32_t> oids;
 		VERBOSE_INFO("Processing Insert DML Package...");
 		uint64_t uniqueId = 0;
 		//Bug 5070. Added exception handling
@@ -112,13 +110,13 @@ namespace dmlpackageprocessor
 		std::string errorMsg;
 		OamCache * oamcache = OamCache::makeOamCache();
 		std::vector<int> moduleIds = oamcache->getModuleIds();
-		std::vector<uint> pms;		
+		std::vector<uint32_t> pms;		
 			
 		try
 		{
 			for (unsigned int i=0; i <moduleIds.size(); i++)
 			{			
-				pms.push_back((uint)moduleIds[i]);
+				pms.push_back((uint32_t)moduleIds[i]);
 			}
 			
 			//cout << "single insert get transaction id " << txnid.id << endl;
@@ -141,7 +139,7 @@ namespace dmlpackageprocessor
 				if (tableLockId == 0)
 				{
 					//cout << "tablelock is not found in cache, getting from dbrm" << endl;
-					u_int32_t  processID = ::getpid();
+					uint32_t  processID = ::getpid();
 					int32_t   txnId = txnid.id;
 					int32_t sessionId = fSessionID;
 					std::string  processName("DMLProc");
@@ -296,7 +294,7 @@ namespace dmlpackageprocessor
 				ByteStream::byte rc1;
 				try
 				{
-					fWEClient->write(bytestream, (uint)pmNum);
+					fWEClient->write(bytestream, (uint32_t)pmNum);
 #ifdef IDB_DML_DEBUG
 cout << "Single insert sending WE_SVR_SINGLE_INSERT to pm " << pmNum << endl;
 #endif	

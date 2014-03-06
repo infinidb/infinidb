@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -89,8 +89,8 @@ class ColumnBufferManager {
      * @param lastRIDInExtent (out) last RID in relevant extent.
      * @return success or fail status
      */
-    int reserveSection(RID startRowId, uint nRows,
-                       uint& secRowCnt,
+    int reserveSection(RID startRowId, uint32_t nRows,
+                       uint32_t& secRowCnt,
                        ColumnBufferSection** cbs,
                        RID&  lastRIDInExtent);
 
@@ -186,7 +186,7 @@ class ColumnBufferManager {
      * @param writeSize   The number of bytes to be written to the file
      * @return success or fail status
      */
-    virtual int writeToFileExtentCheck(uint startOffset, uint writeSize);
+    virtual int writeToFileExtentCheck(uint32_t startOffset, uint32_t writeSize);
 
     //-------------------------------------------------------------------------
     // Protected Data Members
@@ -259,7 +259,7 @@ class ColumnBufferManagerDctnry : public ColumnBufferManager {
     virtual ~ColumnBufferManagerDctnry();
 
     virtual int rowsExtentCheck( int nRows, int& nRows2 );
-    virtual int writeToFileExtentCheck(uint startOffset, uint writeSize);
+    virtual int writeToFileExtentCheck(uint32_t startOffset, uint32_t writeSize);
 };
 
 }

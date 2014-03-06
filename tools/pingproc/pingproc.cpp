@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -1470,7 +1470,7 @@ void doBatchOp_step(OidOperation &OidOp)
 		for (unsigned i = 0; i < rangeSize; i++)
 		{
 			/* insert all rids for this LBID */
-			for (uint j = 0; j < BLOCK_SIZE/OidOp.fColType.colWidth; ++j) {
+			for (uint32_t j = 0; j < BLOCK_SIZE/OidOp.fColType.colWidth; ++j) {
 				et.first = ((fbo+i) * BLOCK_SIZE/OidOp.fColType.colWidth) + j;
 				et.second = j;
 				bpp.addElementType(et);
@@ -2036,7 +2036,7 @@ if (list) {
 	doListOp();
 } else {
 
-	for (uint i=0; i<OpList.size(); i++) {
+	for (uint32_t i=0; i<OpList.size(); i++) {
 
 		if (OpList[i]->OpType()==OidOperation::LOOPBACK) {
 			doLoopBack(loopback_count);
@@ -2116,43 +2116,43 @@ if (list) {
 
 
 // join threads to main
-for (uint i=0; i<thrArray.size(); i++)
+for (uint32_t i=0; i<thrArray.size(); i++)
 	thrArray[i]->join();
 
 // clean up
-for(uint i=0; i < OpList.size(); i++)
+for(uint32_t i=0; i < OpList.size(); i++)
 	delete OpList[i];
 OpList.clear();
 
-for(uint i=0; i < BatchScanThreads.size(); i++)
+for(uint32_t i=0; i < BatchScanThreads.size(); i++)
 	delete BatchScanThreads[i];
 BatchScanThreads.clear();
 
-for(uint i=0; i < BatchStepThreads.size(); i++)
+for(uint32_t i=0; i < BatchStepThreads.size(); i++)
 	delete BatchStepThreads[i];
 BatchStepThreads.clear();
 
-for(uint i=0; i < BatchFiltThreads.size(); i++)
+for(uint32_t i=0; i < BatchFiltThreads.size(); i++)
 	delete BatchFiltThreads[i];
 BatchFiltThreads.clear();
 
-for(uint i=0; i < ColScanThreads.size(); i++)
+for(uint32_t i=0; i < ColScanThreads.size(); i++)
 	delete ColScanThreads[i];
 ColScanThreads.clear();
 
-for(uint i=0; i < ColStepThreads.size(); i++)
+for(uint32_t i=0; i < ColStepThreads.size(); i++)
 	delete ColStepThreads[i];
 ColStepThreads.clear();
 
-for(uint i=0; i < DictScanThreads.size(); i++)
+for(uint32_t i=0; i < DictScanThreads.size(); i++)
 	delete DictScanThreads[i];
 DictScanThreads.clear();
 
-for(uint i=0; i < DictSigThreads.size(); i++)
+for(uint32_t i=0; i < DictSigThreads.size(); i++)
 	delete DictSigThreads[i];
 DictSigThreads.clear();
 
-for (uint i=0; i < thrArray.size(); i++)
+for (uint32_t i=0; i < thrArray.size(); i++)
 	delete thrArray[i];
 thrArray.clear();
 

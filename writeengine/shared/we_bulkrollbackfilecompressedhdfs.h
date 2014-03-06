@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -64,9 +64,9 @@ public:
      * @param segNum Segment number for the segment file in question
      */
     virtual bool doWeReInitExtent(OID columnOID,
-        u_int32_t  dbRoot,
-        u_int32_t  partNum,
-        u_int32_t  segNum) const;
+        uint32_t  dbRoot,
+        uint32_t  partNum,
+        uint32_t  segNum) const;
 
     /** @brief Reinitialize the specified column segment file starting at
      * startOffsetBlk, and truncate trailing extents.
@@ -82,13 +82,13 @@ public:
      * @param restoreHwmChk Restore HWM chunk
      */
     virtual void reInitTruncColumnExtent(OID columnOID,
-        u_int32_t  dbRoot,
-        u_int32_t  partNum,
-        u_int32_t  segNum,
+        uint32_t  dbRoot,
+        uint32_t  partNum,
+        uint32_t  segNum,
         long long  startOffsetBlk,
         int        nBlocks,
         execplan::CalpontSystemCatalog::ColDataType colType,
-        u_int32_t  colWidth,
+        uint32_t  colWidth,
         bool       restoreHwmChk );
 
     /** @brief Reinitialize the specified dictionary store segment file starting
@@ -102,9 +102,9 @@ public:
      * @param nBlocks Number of blocks to be reinitialized
      */
     virtual void reInitTruncDctnryExtent(OID columnOID,
-        u_int32_t  dbRoot,
-        u_int32_t  partNum,
-        u_int32_t  segNum,
+        uint32_t  dbRoot,
+        uint32_t  partNum,
+        uint32_t  segNum,
         long long  startOffsetBlk,
         int        nBlocks );
 
@@ -116,9 +116,9 @@ public:
      * @param fileSizeBlocks Number of blocks to retain in the file
      */
     virtual void truncateSegmentFile(OID columnOID,
-        u_int32_t  dbRoot,
-        u_int32_t  partNum,
-        u_int32_t  segNum,
+        uint32_t  dbRoot,
+        uint32_t  partNum,
+        uint32_t  segNum,
         long long  filesSizeBlocks );
 
 private:
@@ -129,9 +129,9 @@ private:
 
     void restoreFromBackup(const char* colType,
         OID        columnOID,
-        u_int32_t  dbRoot,
-        u_int32_t  partNum,
-        u_int32_t  segNum );
+        uint32_t  dbRoot,
+        uint32_t  partNum,
+        uint32_t  segNum );
 };
 
 } //end of namespace

@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -64,7 +64,7 @@ public:
      * @param autoIncCount Number of auto-increment numbers to reserve
      * @param nextValue Starting number of reserved range
      */
-    virtual int reserveNextRange(uint autoIncCount,
+    virtual int reserveNextRange(uint32_t autoIncCount,
                         uint64_t& nextValue) = 0;
 
     /** @brief Finished with auto-incrementing; perform any applicable updates.
@@ -102,7 +102,7 @@ public:
     explicit ColumnAutoIncJob(Log* logger);
     virtual ~ColumnAutoIncJob();
 
-    virtual int reserveNextRange(uint autoIncCount,
+    virtual int reserveNextRange(uint32_t autoIncCount,
                         uint64_t& nextValue);
 };
 
@@ -121,7 +121,7 @@ public:
     explicit ColumnAutoIncIncremental(Log* logger);
     virtual ~ColumnAutoIncIncremental();
 
-    virtual int reserveNextRange(uint autoIncCount,
+    virtual int reserveNextRange(uint32_t autoIncCount,
                         uint64_t& nextValue);
 };
 

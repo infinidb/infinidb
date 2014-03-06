@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -29,9 +29,7 @@ using namespace messageqcpp;
 
 #include "columnresult.h"
 
-#define TABLECOLUMN_DLLEXPORT
 #include "tablecolumn.h"
-#undef TABLECOLUMN_DLLEXPORT
 
 namespace joblist
 {
@@ -78,7 +76,7 @@ void TableColumn::serialize()
 		else if(fColumnType == STRING) {
 			rowCount = fStrValues->size();
 			*preserialized << rowCount;
-			for(uint i = 0; i < rowCount; i++)
+			for(uint32_t i = 0; i < rowCount; i++)
 				*preserialized << (*fStrValues)[i];
 		}
 	}
@@ -121,7 +119,7 @@ void TableColumn::serialize(messageqcpp::ByteStream& b)
 		else if(fColumnType == STRING) {
 			rowCount = fStrValues->size();
 			b << rowCount;
-			for(uint i = 0; i < rowCount; i++)
+			for(uint32_t i = 0; i < rowCount; i++)
 				b << (*fStrValues)[i];
 		}
 	}
@@ -168,7 +166,7 @@ void TableColumn::unserialize(messageqcpp::ByteStream& b) {
 		if (columnType == UINT8) {
 // 			cout << "UN (" << oid << "): is an 8\n";
 			fIntValues->reserve(rowCount);
-			for (uint i = 0; i < rowCount; ++i) {
+			for (uint32_t i = 0; i < rowCount; ++i) {
 				b >> val8;
 // 				cout << "UN (" << oid << "): " << (int) val8 << " at " << i << endl;
 				fIntValues->push_back(val8);
@@ -177,7 +175,7 @@ void TableColumn::unserialize(messageqcpp::ByteStream& b) {
 		else if (columnType == UINT16) {
 // 			cout << "UN (" << oid << "): is a 16\n";
 			fIntValues->reserve(rowCount);
-			for (uint i = 0; i < rowCount; ++i) {
+			for (uint32_t i = 0; i < rowCount; ++i) {
 				b >> val16;
 // 				cout << "UN (" << oid << "): " << val16 << " at " << i << endl;
 				fIntValues->push_back(val16);
@@ -186,7 +184,7 @@ void TableColumn::unserialize(messageqcpp::ByteStream& b) {
 		else if (columnType == UINT32) {
 // 			cout << "UN (" << oid << "): is a 32\n";
 			fIntValues->reserve(rowCount);
-			for (uint i = 0; i < rowCount; ++i) {
+			for (uint32_t i = 0; i < rowCount; ++i) {
 				b >> val32;
 // 				cout << "UN (" << oid << "): " << val32 << " at " << i << endl;
 				fIntValues->push_back(val32);
@@ -201,7 +199,7 @@ void TableColumn::unserialize(messageqcpp::ByteStream& b) {
 			fStrValues.reset(new std::vector<std::string>());
 			fStrValues->reserve(rowCount);
 			std::string value;
-			for(uint i = 0; i < rowCount; i++) {
+			for(uint32_t i = 0; i < rowCount; i++) {
 				b >> value;
 // 				cout << "UN: " << value << endl;
 				fStrValues->push_back(value);
@@ -225,9 +223,9 @@ void TableColumn::addToSysDataList(execplan::CalpontSystemCatalog::NJLSysDataLis
 		sysDataList.push_back(cr);
 	}
 	if(fColumnType == UINT64) {
-		uint vsize = fIntValues->size();
+		uint32_t vsize = fIntValues->size();
 		bool putRids = (rids.size() == vsize);
- 		for(uint i = 0; i < vsize; i++) {
+ 		for(uint32_t i = 0; i < vsize; i++) {
 			cr->PutData((*fIntValues)[i]);
 			if(putRids) {
 				cr->PutRid(rids[i]);
@@ -238,9 +236,9 @@ void TableColumn::addToSysDataList(execplan::CalpontSystemCatalog::NJLSysDataLis
 		}
 	}
 	else {
-		uint vsize = fStrValues->size();
+		uint32_t vsize = fStrValues->size();
 		bool putRids = (rids.size() == vsize);
-		for(uint i = 0; i < vsize; i++) {
+		for(uint32_t i = 0; i < vsize; i++) {
 			cr->PutStringData((*fStrValues)[i]);
 			if(putRids) {
 				cr->PutRid(rids[i]);
@@ -266,10 +264,10 @@ void TableColumn::addToSysDataRids(execplan::CalpontSystemCatalog::NJLSysDataLis
 		sysDataList.push_back(cr);
 	}
 
-	uint vsize = (fIntValues) ? fIntValues->size() : fStrValues->size();
+	uint32_t vsize = (fIntValues) ? fIntValues->size() : fStrValues->size();
 
 	bool putRids = (rids.size() == vsize);
-	for(uint i = 0; i < vsize; i++) {
+	for(uint32_t i = 0; i < vsize; i++) {
 		if(putRids) {
 			cr->PutRidOnly(rids[i]);
 		}

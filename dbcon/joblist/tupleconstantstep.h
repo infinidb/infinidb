@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -57,7 +57,7 @@ public:
 	const rowgroup::RowGroup& getDeliveredRowGroup() const;
 	void  deliverStringTableRowGroup(bool b);
 	bool  deliverStringTableRowGroup() const;
-	uint nextBand(messageqcpp::ByteStream &bs);
+	uint32_t nextBand(messageqcpp::ByteStream &bs);
 
 	virtual void initialize(const JobInfo& jobInfo, const rowgroup::RowGroup* rgIn);
 	virtual void fillInConstants(const rowgroup::Row& rowIn, rowgroup::Row& rowOut);
@@ -126,7 +126,7 @@ public:
 	void initialize(const rowgroup::RowGroup& rgIn, const JobInfo& jobInfo);
 
     const std::string toString() const;
-	uint nextBand(messageqcpp::ByteStream &bs);
+	uint32_t nextBand(messageqcpp::ByteStream &bs);
 
 protected:
 	void fillInConstants();
@@ -154,7 +154,7 @@ public:
 	void initialize(const rowgroup::RowGroup& rgIn, const JobInfo& jobInfo);
 
     const std::string toString() const;
-	uint nextBand(messageqcpp::ByteStream &bs);
+	uint32_t nextBand(messageqcpp::ByteStream &bs);
 
 	virtual void boolValue(bool b) { fValue = b; }
 	virtual bool boolValue() const { return fValue; }

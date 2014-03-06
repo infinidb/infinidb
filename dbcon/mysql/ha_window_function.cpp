@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -178,7 +178,7 @@ ReturnedColumn* buildWindowFunctionColumn(Item* item, gp_walk_info& gwi, bool& n
 
 	// arguments
 	vector<SRCP> funcParms;
-	for (uint i = 0; i < wf->arg_count; i++)
+	for (uint32_t i = 0; i < wf->arg_count; i++)
 	{
 		srcp.reset(buildReturnedColumn(wf->arguments()[i], gwi, nonSupport));
 		if (!srcp)
@@ -193,7 +193,7 @@ ReturnedColumn* buildWindowFunctionColumn(Item* item, gp_walk_info& gwi, bool& n
 	if (wf_ctx)
 	{
 		vector<SRCP> partitions;
-		for (uint i = 0; i < wf_ctx->partition_count; i++)
+		for (uint32_t i = 0; i < wf_ctx->partition_count; i++)
 		{
 			srcp.reset(buildReturnedColumn(wf_ctx->partitions[i], gwi, nonSupport));
 			if (!srcp)

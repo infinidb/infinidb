@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -106,7 +106,7 @@ const SBS CompressedInetStreamSocket::read(const struct timespec* timeout, bool*
 void CompressedInetStreamSocket::write(const ByteStream &msg, Stats *stats)
 {
 	size_t outLen=0;
-	uint len = msg.length();
+	uint32_t len = msg.length();
 	
 	if (useCompression && (len > 512)) {
 		ByteStream smsg(alg.maxCompressedSize(len));

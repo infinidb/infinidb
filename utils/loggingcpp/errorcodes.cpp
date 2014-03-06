@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -69,7 +69,6 @@ namespace logging {
     fErrorCodes[projectResultErr] = "error in BatchPrimitiveProcessor projectResult.  Please check crit.log for more details.";
     fErrorCodes[hwmRangeSizeErr] = "error in PrimitiveServer load block with HWM.  Please check crit.log for more details.";
     fErrorCodes[formatErr] = "format mismatch.";
-    fErrorCodes[multicastErr] = "error in Multicast transport.  Please check crit.log for more details.";
     fErrorCodes[dataTypeErr] = "data type unknown.";
     fErrorCodes[incompatJoinCols] = "incompatible column types specified for join condition.";
     fErrorCodes[incompatFilterCols] = "incompatible column types specified for filter condition.";

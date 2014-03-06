@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -25,6 +25,7 @@
 #include "we_define.h"
 #include "we_fileop.h"
 #include "we_bulkrollbackmgr.h"
+#include "we_confirmhdfsdbfile.h"
 #include "we_convertor.h"
 #include "messageids.h"
 #include "IDBDataFile.h"
@@ -71,9 +72,9 @@ BulkRollbackFileCompressedHdfs::~BulkRollbackFileCompressedHdfs()
 //------------------------------------------------------------------------------
 void BulkRollbackFileCompressedHdfs::truncateSegmentFile(
     OID       columnOID,
-    u_int32_t dbRoot,
-    u_int32_t partNum,
-    u_int32_t segNum,
+    uint32_t dbRoot,
+    uint32_t partNum,
+    uint32_t segNum,
     long long fileSizeBlocks )
 {
     std::ostringstream msgText;
@@ -106,13 +107,13 @@ void BulkRollbackFileCompressedHdfs::truncateSegmentFile(
 //------------------------------------------------------------------------------
 void BulkRollbackFileCompressedHdfs::reInitTruncColumnExtent(
     OID         columnOID,
-    u_int32_t   dbRoot,
-    u_int32_t   partNum,
-    u_int32_t   segNum,
+    uint32_t   dbRoot,
+    uint32_t   partNum,
+    uint32_t   segNum,
     long long   startOffsetBlk,
     int         nBlocks,
     CalpontSystemCatalog::ColDataType colType,
-    u_int32_t   colWidth,
+    uint32_t   colWidth,
     bool        restoreHwmChk )
 {
     long long startOffset = startOffsetBlk * BYTE_PER_BLOCK;
@@ -145,9 +146,9 @@ void BulkRollbackFileCompressedHdfs::reInitTruncColumnExtent(
 //------------------------------------------------------------------------------
 void BulkRollbackFileCompressedHdfs::reInitTruncDctnryExtent(
     OID         dStoreOID,
-    u_int32_t   dbRoot,
-    u_int32_t   partNum,
-    u_int32_t   segNum,
+    uint32_t   dbRoot,
+    uint32_t   partNum,
+    uint32_t   segNum,
     long long   startOffsetBlk,
     int         nBlocks )
 {
@@ -167,39 +168,36 @@ void BulkRollbackFileCompressedHdfs::reInitTruncDctnryExtent(
 }
 
 //------------------------------------------------------------------------------
-// Return true/false depending on whether the applicable backup chunk file can
-// be found to restore a backed up compressed chunk back into a db file.  If
-// the backup file is not found, we assume that it's because one was not created
-// and thus not needed.
+// For HDFS system, just always return true.
+// Let ConfirmHdfsDbFile later determine when/if/how to restore from any
+// existing backup file.
 //------------------------------------------------------------------------------
 bool BulkRollbackFileCompressedHdfs::doWeReInitExtent( OID columnOID,
-    u_int32_t dbRoot,
-    u_int32_t partNum,
-    u_int32_t segNum) const
+    uint32_t dbRoot,
+    uint32_t partNum,
+    uint32_t segNum) const
 {
-    std::ostringstream oss;
-    oss << "/" << columnOID << ".p" << partNum << ".s" << segNum;
-    std::string bulkRollbackSubPath( fMgr->getMetaFileName() );
-    bulkRollbackSubPath += DATA_DIR_SUFFIX;
-    bulkRollbackSubPath += oss.str();
-
-    if ( !IDBPolicy::exists( bulkRollbackSubPath.c_str() ) )
-    {
-        return false;
-    }
-
     return true;
 }
 
 //------------------------------------------------------------------------------
 // Replace the currently specified db file with it's corresponding backup file.
 // The backup file is a complete backup, not just a backup of a single chunk.
+//
+// The initial implementation for this function restored from a NNN.pNNN.sNNN
+// file stored under the meta file directory.
+// The latest  implementation for this function restores from a FILENNN.cdf.tmp
+// or FILENNN.cdf.orig file stored in the same OID directory as the FILENNN.cdf
+// file.
+// However, this function still looks for the first backup file (NNN.pNNN.sNNN)
+// in case the user did not upgrade cleanly, and we have to restore using an
+// old leftover backup file.
 //------------------------------------------------------------------------------
 void BulkRollbackFileCompressedHdfs::restoreFromBackup(const char* colType,
     OID       columnOID,
-    u_int32_t dbRoot,
-    u_int32_t partNum,
-    u_int32_t segNum)
+    uint32_t dbRoot,
+    uint32_t partNum,
+    uint32_t segNum)
 {
     // Construct file name for db file to be restored
     char dbFileName[FILE_NAME_SIZE];
@@ -226,48 +224,61 @@ void BulkRollbackFileCompressedHdfs::restoreFromBackup(const char* colType,
     std::string dbFileNameTmp = dbFileName;
     dbFileNameTmp += OLD_FILE_SUFFIX;
 
-    // Log msg but don't abort if backup file does not exist
-    if ( !IDBPolicy::exists(backupFileName.c_str()) )
+    // For backwards compatibility...
+    // Restore from backup file used in initial HDFS release, in case the user
+    // upgraded without going down cleanly.  In that case we might need to
+    // rollback using an old backup file left from previous release.
+    if ( IDBPolicy::exists(backupFileName.c_str()) )
     {
-        std::ostringstream msgText;
-        msgText << "No restore needed for " << colType << " HDFS file" <<
-        ": dbRoot-" << dbRoot  <<
-        "; part#-"  << partNum <<
-        "; seg#-"   << segNum  <<
-        " (no backup exists)";
-        fMgr->logAMessage( logging::LOG_TYPE_INFO,
-            logging::M0075, columnOID, msgText.str() );
-        return;
-    }
-    
-    // Rename current db file to make room for restored file
-    rc = IDBPolicy::rename( dbFileName, dbFileNameTmp.c_str() );
-    if (rc != 0)
-    {
-        std::ostringstream oss;
-        oss << "Error restoring " << colType <<
-            " HDFS file for OID " << columnOID <<
-            "; Can't move old file for DBRoot"  << dbRoot <<
-            "; partition-"   << partNum <<
-            "; segment-"     << segNum;
-        throw WeException( oss.str(), ERR_COMP_RENAME_FILE );
-    }
+        // Rename current db file to make room for restored file
+        rc = IDBPolicy::rename( dbFileName, dbFileNameTmp.c_str() );
+        if (rc != 0)
+        {
+            std::ostringstream oss;
+            oss << "Error restoring " << colType <<
+                " HDFS file for OID " << columnOID <<
+                "; Can't move old file for DBRoot"  << dbRoot <<
+                "; partition-"        << partNum <<
+                "; segment-"          << segNum;
+            throw WeException( oss.str(), ERR_COMP_RENAME_FILE );
+        }
 
-    // Rename backup file to replace current db file
-    rc = IDBPolicy::rename( backupFileName.c_str(), dbFileName );
-    if (rc != 0)
-    {
-        std::ostringstream oss;
-        oss << "Error restoring " << colType <<
-            " HDFS file for OID " << columnOID <<
-            "; Can't rename backup file for DBRoot"  << dbRoot <<
-            "; partition-"   << partNum <<
-            "; segment-"     << segNum;
-        throw WeException( oss.str(), ERR_METADATABKUP_COMP_RENAME );
-    }
+        // Rename backup file to replace current db file
+        rc = IDBPolicy::rename( backupFileName.c_str(), dbFileName );
+        if (rc != 0)
+        {
+            std::ostringstream oss;
+            oss << "Error restoring " << colType <<
+                " HDFS file for OID " << columnOID <<
+                "; Can't rename backup file for DBRoot"  << dbRoot <<
+                "; partition-"        << partNum <<
+                "; segment-"          << segNum;
+            throw WeException( oss.str(), ERR_METADATABKUP_COMP_RENAME );
+        }
 
-    // Delete db file we just replaced with backup
-    IDBPolicy::remove( dbFileNameTmp.c_str() );
+        // Delete db file we just replaced with backup
+        IDBPolicy::remove( dbFileNameTmp.c_str() );
+    }
+    else // Restore from HDFS temp swap backup file; This is the normal case
+    {
+        std::string errMsg;
+        ConfirmHdfsDbFile confirmHdfs;
+        rc = confirmHdfs.endDbFileChange( std::string("tmp"),
+            dbFileName,
+            false,
+            errMsg);
+        if (rc != 0)
+        {
+            std::ostringstream oss;
+            oss << "Error restoring " << colType   <<
+                " HDFS file for OID " << columnOID <<
+                "; DBRoot"            << dbRoot    <<
+                "; partition-"        << partNum   <<
+                "; segment-"          << segNum    <<
+                "; "                  << errMsg;
+            throw WeException( oss.str(), rc );
+        }
+    }
 }
 
 } //end of namespace

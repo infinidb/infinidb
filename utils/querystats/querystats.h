@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -24,7 +24,7 @@
 #ifndef QUERYSTATS_H_
 #define QUERYSTATS_H_
 
-#include <sys/time.h>
+#include <ctime>
 #include <string>
 #include <vector>
 #include <map>
@@ -35,7 +35,7 @@
 
 namespace querystats
 {
-const uint DEFAULT_USER_PRIORITY_LEVEL = 33; //Low
+const uint32_t DEFAULT_USER_PRIORITY_LEVEL = 33; //Low
 const std::string DEFAULT_USER_PRIORITY = "LOW";
 
 struct QueryStats
@@ -62,7 +62,7 @@ struct QueryStats
 	std::string fUser;             // user
 	std::string fHost;             // host
 	std::string fPriority;         // priority
-	uint fPriorityLevel;           // priority level
+	uint32_t fPriorityLevel;           // priority level
 	
 	
 	QueryStats();
@@ -93,9 +93,9 @@ struct QueryStats
 	{ 
 		time(&fStartTime);
 		char buffer [80];
-		struct tm * timeinfo;
-		timeinfo = localtime ( &fStartTime );  
-		strftime (buffer,80,"%Y-%m-%d %H:%M:%S",timeinfo);
+		struct tm timeinfo;
+		localtime_r(&fStartTime, &timeinfo);
+		strftime(buffer,80,"%Y-%m-%d %H:%M:%S", &timeinfo);
 		fStartTimeStr = buffer;
 	}
 	
@@ -103,9 +103,9 @@ struct QueryStats
 	{ 
 		time(&fEndTime);
 		char buffer [80];
-		struct tm * timeinfo;
-		timeinfo = localtime ( &fEndTime );  
-		strftime (buffer,80,"%Y-%m-%d %H:%M:%S",timeinfo);
+		struct tm timeinfo;
+		localtime_r(&fEndTime, &timeinfo);
+		strftime(buffer,80,"%Y-%m-%d %H:%M:%S", &timeinfo);
 		fEndTimeStr = buffer;
 	}
 	
@@ -130,7 +130,7 @@ struct QueryStats
 	void handleMySqlError(const char*, unsigned int);
 	
 	/* User mysql API to query priority table and get this user's assigned priority */
-	uint userPriority(std::string host, const std::string user);
+	uint32_t userPriority(std::string host, const std::string user);
 
 private:
 //	default okay

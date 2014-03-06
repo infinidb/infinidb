@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -157,6 +157,47 @@ int main(int argc, char *argv[])
 	{
 		cout << "ERROR: Problem setting InitialInstallFlag from the Calpont System Configuration file" << endl;
 		exit(-1);
+	}
+
+
+	//check and update PMwithUM
+	try {
+		string PMwithUM = sysConfigOld->getConfig(InstallSection, "PMwithUM");
+
+		if ( !PMwithUM.empty() )
+		{
+			try {
+				sysConfigNew->setConfig(InstallSection, "PMwithUM", PMwithUM);
+			}
+			catch(...)
+			{
+				cout << "ERROR: Problem setting PMwithUM in the Calpont System Configuration file" << endl;
+				exit(-1);
+			}
+		}
+	}
+	catch(...)
+	{
+	}
+
+	//check and update PMwithUM
+	try {
+		string MySQLRep = sysConfigOld->getConfig(InstallSection, "MySQLRep");
+
+		if ( !MySQLRep.empty() )
+		{
+			try {
+				sysConfigNew->setConfig(InstallSection, "MySQLRep", MySQLRep);
+			}
+			catch(...)
+			{
+				cout << "ERROR: Problem setting MySQLRep in the Calpont System Configuration file" << endl;
+				exit(-1);
+			}
+		}
+	}
+	catch(...)
+	{
 	}
 
 	//set gluster flag if it exists
@@ -652,22 +693,35 @@ int main(int argc, char *argv[])
 	catch(...)
 	{}
 
+	string TotalPmUmMemory;
+	try {
+		TotalPmUmMemory = sysConfigOld->getConfig("HashJoin", "TotalPmUmMemory");
+	}
+	catch(...)
+	{ }
+
+	try {
+		 sysConfigNew->setConfig("HashJoin", "TotalPmUmMemory", TotalPmUmMemory);
+	}
+	catch(...)
+	{}
+
 	string strNumThreads;
-    try {
-        strNumThreads = sysConfigOld->getConfig("DBBC", "NumThreads");
-    }
-    catch(...)
-    { }
-
-    if ( !( strNumThreads.empty() || strNumThreads == "" ) ) {
-        try {
-            sysConfigNew->setConfig("DBBC", "NumThreads", strNumThreads);
-        }
-        catch(...)
-        {}
-    }
-
-    sysConfigNew->write();
+	try {
+		strNumThreads = sysConfigOld->getConfig("DBBC", "NumThreads");
+	}
+	catch(...)
+	{ }
+	
+	if ( !( strNumThreads.empty() || strNumThreads == "" ) ) {
+		try {
+		sysConfigNew->setConfig("DBBC", "NumThreads", strNumThreads);
+		}
+		catch(...)
+		{}
+	}
+	
+	sysConfigNew->write();
 
 	//Get list of configured system modules
 	SystemModuleTypeConfig sysModuleTypeConfig;

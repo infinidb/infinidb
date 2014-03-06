@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -22,9 +22,11 @@
 ***********************************************************************/
 /** @file */
 
+#include <unistd.h>
 #include <string>
 #include <exception>
 #include <typeinfo>
+#include <cstring>
 
 #include "bytestream.h"
 #include "treenode.h"
@@ -36,23 +38,30 @@ namespace execplan{
 /**
  * Constructors/Destructors
  */
-TreeNode::TreeNode() {}
+TreeNode::TreeNode(): fDerivedTable(""),
+                      fRefCount(0),
+                      fDerivedRefCol(NULL)
+{ memset(tmp, 0, 312); }
 
 TreeNode::TreeNode(const TreeNode& rhs):
-	        fResult(rhs.fResult),
-	        fResultType(rhs.resultType()),
-	        fOperationType(rhs.operationType()),
-	        fRegex (rhs.regex()) {}
+           fResult(rhs.fResult),
+           fResultType(rhs.resultType()),
+           fOperationType(rhs.operationType()),
+           fRegex (rhs.regex()),
+           fDerivedTable (rhs.derivedTable()),
+           fRefCount(rhs.refCount()),
+           fDerivedRefCol(rhs.derivedRefCol())
+{ memcpy(tmp, rhs.tmp, 312); }
 
 TreeNode::~TreeNode() {}
 
-void TreeNode::resultType ( const execplan::CalpontSystemCatalog::ColType& resultType) 
-{ 
-	fResultType = resultType; 
-		
+void TreeNode::resultType ( const execplan::CalpontSystemCatalog::ColType& resultType)
+{
+	fResultType = resultType;
+
 	// set scale/precision for the result
 	if (fResultType.colDataType == execplan::CalpontSystemCatalog::DECIMAL ||
-        fResultType.colDataType == execplan::CalpontSystemCatalog::UDECIMAL)
+	    fResultType.colDataType == execplan::CalpontSystemCatalog::UDECIMAL)
 	{
 		fResult.decimalVal.scale = fResultType.scale;
 		fResult.decimalVal.precision = fResultType.precision;

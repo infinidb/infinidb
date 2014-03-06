@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -529,6 +529,10 @@ public:
 	/** @brief distribute fstab update message
 		*/
 	int updateFstab(std::string moduleName, std::string entry);
+
+	/** @brief Set MySQL Replication
+		*/
+	int setMySQLReplication(oam::DeviceNetworkList devicenetworklist, std::string masterModule = oam::UnassignedName, bool failover = false);
 
 
 private:

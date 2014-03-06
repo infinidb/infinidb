@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -66,8 +66,8 @@ fTxnid(txnId), fIsAutocommitOn(isAutocommitOn), fTableOid(tableOid), fDbrm(aDbrm
 	//cout << "moduleIds size is " << moduleIds.size() << endl;
 	for (unsigned i=0; i < moduleIds.size(); i++)
 	{	
-		fPMs.push_back((uint)moduleIds[i]);
-		//cout << "got module id " << (uint)moduleIds[i] << endl;
+		fPMs.push_back((uint32_t)moduleIds[i]);
+		//cout << "got module id " << (uint32_t)moduleIds[i] << endl;
 		//cout << "fPMs[0] is " << fPMs[0] << endl;
 	}
 	fBatchLoader = new BatchLoader(fTableOid, fTxnid, fPMs);
@@ -211,7 +211,7 @@ void BatchInsertProc::buildLastPkg(messageqcpp::ByteStream& bs)
 
 void BatchInsertProc::sendFirstBatch()
 {
-	uint firstPmId = 0;
+	uint32_t firstPmId = 0;
 	int rc = 0;
 	try {
 		firstPmId = fBatchLoader->selectNextPM();
@@ -266,7 +266,7 @@ void BatchInsertProc::sendNextBatch()
 		//cout << "current pm state for pm is false for pm " << fCurrentPMid<< endl;
 		while (1) 
 		{
-		//cout << "Read from WES for pm id " << (uint) tmp32 << endl;
+		//cout << "Read from WES for pm id " << (uint32_t) tmp32 << endl;
 		bsIn.reset(new ByteStream());	
 		fWEClient->read(fUniqueId, bsIn);
 		if ( bsIn->length() == 0 ) //read error
@@ -280,16 +280,16 @@ void BatchInsertProc::sendNextBatch()
 			rc = tmp8;
 			*bsIn >> errorMsg;
 			*bsIn >> tmp32;
-			//cout << "got response from WES for pm id " << (uint) tmp32 << endl;
+			//cout << "got response from WES for pm id " << (uint32_t) tmp32 << endl;
 			if (rc != 0) {
-				//cout << "Batch insert got error code:errormsg = " << (uint)tmp8<<":"<<errorMsg<<endl;
+				//cout << "Batch insert got error code:errormsg = " << (uint32_t)tmp8<<":"<<errorMsg<<endl;
 				setError(rc, errorMsg);
 				fPmState[tmp32] = true;
 				break;
 			}
 		}
 		fPmState[tmp32] = true;
-		//cout << "set pm state to true for pm " << (uint) tmp32 << " and current PM id is " << fCurrentPMid<< " this = " << this << endl;
+		//cout << "set pm state to true for pm " << (uint32_t) tmp32 << " and current PM id is " << fCurrentPMid<< " this = " << this << endl;
 		if (tmp32 == fCurrentPMid)
 			break;
 		}
@@ -323,7 +323,7 @@ void BatchInsertProc::sendlastBatch()
 void BatchInsertProc::receiveOutstandingMsg()
 {
 	//check how many message we need to receive
-	uint messagesNotReceived = 0;
+	uint32_t messagesNotReceived = 0;
 	int rc = 0;
 	for (unsigned i=0; i<fPMs.size(); i++)
 	{
@@ -334,7 +334,7 @@ void BatchInsertProc::receiveOutstandingMsg()
 	if ((messagesNotReceived > 0) && (messagesNotReceived <= fWEClient->getPmCount()))
 	{
 		string errorMsg;
-		uint msgReceived = 0;
+		uint32_t msgReceived = 0;
 
 		while (1)
 		{
@@ -379,7 +379,7 @@ void BatchInsertProc::receiveOutstandingMsg()
 
 void BatchInsertProc::receiveAllMsg()
 {
-	uint msgRevd = 0;
+	uint32_t msgRevd = 0;
 	int rc = 0;
 	string errorMsg;
 	try {
@@ -418,7 +418,7 @@ void BatchInsertProc::receiveAllMsg()
 					setError(rc, errorMsg);
 				}
 				else if (rc != 0) {
-				//cout << "Batch insert lastpkg got error code:errormsg = " << (uint)tmp8<<":"<<errorMsg<<endl;
+				//cout << "Batch insert lastpkg got error code:errormsg = " << (uint32_t)tmp8<<":"<<errorMsg<<endl;
 					setError(rc, errorMsg);
 				}
 			}

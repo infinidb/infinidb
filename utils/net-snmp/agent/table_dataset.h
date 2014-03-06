@@ -58,7 +58,7 @@ extern          "C" {
             double         *doubleVal;
 #endif                          /* OPAQUE_SPECIAL_TYPES */
         } data;
-        u_long          data_len;
+        uint32_t          data_len;
 
         struct netsnmp_table_data_set_storage_s *next;
     } netsnmp_table_data_set_storage;

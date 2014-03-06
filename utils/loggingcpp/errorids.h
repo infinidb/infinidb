@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -86,10 +86,11 @@ const unsigned ERR_ENOENT = 2039;
 const unsigned WARN_NO_PARTITION_FOUND = 2040;
 const unsigned SYSTABLE_PARTITION = 2041;
 const unsigned WARN_NO_PARTITION_PERFORMED = 2042;
-const unsigned ERR_READ_INPUT_DATALIST = 2043;
 const unsigned ERR_DICTIONARY_SCAN = 2043;
 const unsigned ERR_TUPLE_BPS = 2044;
 const unsigned ERR_PRIMPROC_DOWN = 2045;
+const unsigned ERR_READ_INPUT_DATALIST = 2046;
+const unsigned ERR_LOCAL_QUERY_UM = 2047;
 const unsigned ERR_NON_SUPPORT_SUB_QUERY_TYPE = 3001;
 const unsigned ERR_MORE_THAN_1_ROW = 3002;
 const unsigned ERR_MEMORY_MAX_FOR_LIMIT_TOO_LOW = 3003;
@@ -130,7 +131,11 @@ const unsigned ERR_EXCEED_LIMIT = 4012;
 const unsigned ERR_INVALID_VARBINARYVALUE = 4013;
 const unsigned ERR_CONSTRAINTS = 4014;
 const unsigned ERR_NOT_NULL_CONSTRAINTS = 4015;
+const unsigned ERR_DML_DDL_SLAVE = 4016;
+const unsigned ERR_DML_DDL_LOCAL = 4017;
 const unsigned ERR_FUNC_NON_IMPLEMENT = 5001;
+const unsigned ERR_PSEUDOCOL_IDB_ONLY = 5002;
+const unsigned ERR_PSEUDOCOL_WRONG_ARG = 5003;
 const unsigned ERR_NETWORK = 6001;
 const unsigned ERR_BRM_MUTEX = 6002;
 const unsigned ERR_UNRECOVERABLE_LOCK_STATE = 6003;

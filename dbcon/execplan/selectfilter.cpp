@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -65,7 +65,7 @@ const string SelectFilter::toString() const
 {
     ostringstream oss;
     oss << "SelectFilter " << "returnedColPos=" << fReturnedColPos << endl;
-    for (uint i = 0; i < fCols.size(); i++)
+    for (uint32_t i = 0; i < fCols.size(); i++)
     	oss << fCols[i]->toString();
     oss << fOp->toString() << endl;
     oss << *(fSub.get());
@@ -83,7 +83,7 @@ void SelectFilter::serialize(messageqcpp::ByteStream& b) const
 	b << static_cast<ObjectReader::id_t>(ObjectReader::SELECTFILTER);
 	Filter::serialize(b);
 	b << static_cast<uint32_t>(fCols.size());
-	for (uint i = 0; i < fCols.size(); i++)
+	for (uint32_t i = 0; i < fCols.size(); i++)
 	{
 		if (fCols[i] != NULL)
 			fCols[i]->serialize(b);
@@ -110,7 +110,7 @@ void SelectFilter::unserialize(messageqcpp::ByteStream& b)
 	uint32_t size;
 	SRCP srcp;
 	b >> size;
-	for (uint i = 0; i < size; i++)
+	for (uint32_t i = 0; i < size; i++)
 	{
 		srcp.reset(dynamic_cast<ReturnedColumn*>(ObjectReader::createTreeNode(b)));
 		fCols.push_back(srcp);
@@ -130,7 +130,7 @@ bool SelectFilter::operator==(const SelectFilter& t) const
 		return false;
 	if (fCols.size() != t.fCols.size())
 		return false;
-	for (uint i = 0; i < fCols.size(); i++)
+	for (uint32_t i = 0; i < fCols.size(); i++)
 	{
 		if (fCols[i] != NULL) {
 			if (*(fCols[i]) != *(t.fCols[i]))

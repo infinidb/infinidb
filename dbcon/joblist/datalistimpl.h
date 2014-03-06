@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -46,7 +46,7 @@ class DataListImpl : public DataList<element_t>
 {
 
 	public:
-		DataListImpl(uint numConsumers);
+		DataListImpl(uint32_t numConsumers);
 		DataListImpl(const DataListImpl &dl);
 		virtual ~DataListImpl();
 
@@ -58,9 +58,9 @@ class DataListImpl : public DataList<element_t>
 		virtual uint64_t getIterator();
 		virtual bool next(uint64_t it, element_t *e);
 
-		virtual void setNumConsumers(uint);
-		virtual uint getNumConsumers() const;
-		void resetNumConsumers(uint numConsumers);
+		virtual void setNumConsumers(uint32_t);
+		virtual uint32_t getNumConsumers() const;
+		void resetNumConsumers(uint32_t numConsumers);
 
 	protected:
 		bool endOfData(uint64_t id) const;
@@ -84,25 +84,25 @@ DataListImpl<container_t, element_t>::DataListImpl() : DataList<element_t>(), c(
 { }
 
 template<typename container_t, typename element_t>
-void DataListImpl<container_t, element_t>::setNumConsumers(uint nc)
+void DataListImpl<container_t, element_t>::setNumConsumers(uint32_t nc)
 {
 	resetNumConsumers(nc);
 }
 
 template<typename container_t, typename element_t>
-uint DataListImpl<container_t, element_t>::getNumConsumers() const
+uint32_t DataListImpl<container_t, element_t>::getNumConsumers() const
 {
 	return numConsumers;
 }
 
 template<typename container_t, typename element_t>
-void DataListImpl<container_t, element_t>::resetNumConsumers(uint nc)
+void DataListImpl<container_t, element_t>::resetNumConsumers(uint32_t nc)
 {
 	if (itIndex != 0)
 		throw std::logic_error("DataListImpl::resetNumConsumers(): attempt to change numConsumers "
 			"after iterators have been issued");
 
-	uint i;
+	uint32_t i;
 
 	numConsumers = nc;
 	delete [] cIterators;
@@ -112,9 +112,9 @@ void DataListImpl<container_t, element_t>::resetNumConsumers(uint nc)
 }
 
 template<typename container_t, typename element_t>
-DataListImpl<container_t, element_t>::DataListImpl(uint nc) : DataList<element_t>()
+DataListImpl<container_t, element_t>::DataListImpl(uint32_t nc) : DataList<element_t>()
 {
-	uint i;
+	uint32_t i;
 
 	numConsumers = nc;
 	itIndex = 0;

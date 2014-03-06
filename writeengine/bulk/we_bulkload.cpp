@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -616,9 +616,9 @@ int BulkLoad::preProcess( Job& job, int tableNo,
     unsigned int fixedBinaryRecLen = 0;
     for( size_t i = 0; i < job.jobTableList[tableNo].colList.size(); i++ ) 
     {
-        u_int16_t dbRoot    = segFileInfo[i].fDbRoot;
-        u_int32_t partition = segFileInfo[i].fPartition;
-        u_int16_t segment   = segFileInfo[i].fSegment;
+        uint16_t dbRoot    = segFileInfo[i].fDbRoot;
+        uint32_t partition = segFileInfo[i].fPartition;
+        uint16_t segment   = segFileInfo[i].fSegment;
         HWM       oldHwm    = segFileInfo[i].fLocalHwm;
 
         DBRootExtentTracker* pDBRootExtentTracker = 0;
@@ -813,8 +813,8 @@ int BulkLoad::preProcessAutoInc( const std::string& fullTableName,
 int BulkLoad::preProcessHwmLbid(
     const ColumnInfo* info,
     int          minWidth,
-    u_int32_t    partition,
-    u_int16_t    segment,
+    uint32_t    partition,
+    uint16_t    segment,
     HWM&         hwm,                  // input/output
     BRM::LBID_t& lbid,                 // output
     bool&        bSkippedToNewExtent)  // output
@@ -843,7 +843,7 @@ int BulkLoad::preProcessHwmLbid(
             info->column.width) / BYTE_PER_BLOCK;
 
         // Look for LBID associated with block at end of current extent
-        u_int32_t numBlocks = (((hwm+1) / blocksPerExtent) * blocksPerExtent);
+        uint32_t numBlocks = (((hwm+1) / blocksPerExtent) * blocksPerExtent);
 
         hwm = numBlocks - 1;
         rc = BRMWrapper::getInstance()->getStartLbid(

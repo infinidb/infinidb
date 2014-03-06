@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -54,7 +54,7 @@ class MonitorProcMem
          */
         explicit MonitorProcMem(size_t   maxPct,
                                 size_t   memChk,
-                                uint     subsystemID,
+                                uint32_t     subsystemID,
                                 unsigned sec=1) :
                  fPid           ( getpid() ),
                  fMaxPct        ( maxPct ),
@@ -108,7 +108,7 @@ protected:
         pid_t    fPid;       // process pid
         size_t   fMaxPct;    // max allowable % memory use
         unsigned fSleepSec;  // sleep interval in seconds
-        uint     fSubsystemID; // Subsystem ID  for Logger
+        uint32_t     fSubsystemID; // Subsystem ID  for Logger
         int      fPageSize;  // page size for this host (in bytes)
 
 		// @bug4507, monitor % of total used system memory

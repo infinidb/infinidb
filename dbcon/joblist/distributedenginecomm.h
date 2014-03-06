@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -47,12 +47,11 @@
 #include "threadsafequeue.h"
 #include "rwlock_local.h"
 #include "resourcemanager.h"
-
-#include "multicast.h"
+#include "messagequeue.h"
 
 class TestDistributedEngineComm;
 
-#if defined(_MSC_VER) && defined(DISTRIBUTEDENGINECOMM_DLLEXPORT)
+#if defined(_MSC_VER) && defined(JOBLIST_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
@@ -76,7 +75,7 @@ class DECEventListener
 		virtual ~DECEventListener() { };
 
 		/* Do whatever needs to be done to init the new PM */
-		virtual void newPMOnline(uint newConnectionNumber) = 0;
+		virtual void newPMOnline(uint32_t newConnectionNumber) = 0;
 };
 
 /**
@@ -117,7 +116,7 @@ public:
 	 *
 	 * Returns the next message in the inbound queue for session sessionId and step stepId.
 	 * @param bs A pointer to the ByteStream to fill in.
-	 * @note: saves a copy vs read(uint, uint).
+	 * @note: saves a copy vs read(uint32_t, uint32_t).
 	 */
 	EXPORT void read(uint32_t key, messageqcpp::SBS &);
 
@@ -128,7 +127,7 @@ public:
 	EXPORT void read_all(uint32_t key, std::vector<messageqcpp::SBS> &v);
 
 	/** reads queuesize/divisor msgs */
-	EXPORT void read_some(uint32_t key, uint divisor, std::vector<messageqcpp::SBS> &v,
+	EXPORT void read_some(uint32_t key, uint32_t divisor, std::vector<messageqcpp::SBS> &v,
                        bool *flowControlOn = NULL);
 
 	/** @brief Write a primitive message
@@ -142,7 +141,7 @@ public:
 
 	/** @brief Special write function for use only by newPMOnline event handlers
 	*/
-	EXPORT void write(messageqcpp::ByteStream &msg, uint connection);
+	EXPORT void write(messageqcpp::ByteStream &msg, uint32_t connection);
 
 	/** @brief Shutdown this object
 	 *
@@ -155,7 +154,7 @@ public:
 	 * Starts the current thread listening on the client socket for primitive response messages. Will not return
 	 * until busy() returns false or a zero-length response is received.
 	 */
-	EXPORT void Listen(boost::shared_ptr<messageqcpp::MessageQueueClient> client, uint connIndex);
+	EXPORT void Listen(boost::shared_ptr<messageqcpp::MessageQueueClient> client, uint32_t connIndex);
 
 	/** @brief set/unset busy flag
 	 *
@@ -170,18 +169,15 @@ public:
 
 	/** @brief Returns the size of the queue for the specified jobstep
 	*/
-	EXPORT uint size(uint32_t key);
+	EXPORT uint32_t size(uint32_t key);
 
 	EXPORT void Setup();
 
 	EXPORT void addDECEventListener(DECEventListener *);
 	EXPORT void removeDECEventListener(DECEventListener *);
 
-	EXPORT void setMulticast(bool mc) { fMulticast = mc; }
-	EXPORT void destroyMulticastSender() { fMulticastSender.destroy(); }
-
 	uint64_t connectedPmServers() const { return fPmConnections.size(); }
-	uint getPmCount() const { return pmCount; }
+	uint32_t getPmCount() const { return pmCount; }
 
 	messageqcpp::Stats getNetworkStats(uint32_t uniqueID);
 
@@ -196,13 +192,13 @@ private:
 
 	/* To keep some state associated with the connection.  These aren't copyable. */
 	struct MQE : public boost::noncopyable {
-		MQE(uint pmCount);
+		MQE(uint32_t pmCount);
 		messageqcpp::Stats stats;
 		StepMsgQueue queue;
-		uint ackSocketIndex;
+		uint32_t ackSocketIndex;
 		boost::scoped_array<volatile uint32_t> unackedWork;
 		boost::scoped_array<uint32_t> interleaver;
-		uint pmCount;
+		uint32_t pmCount;
 		// non-BPP primitives don't do ACKs
 		bool sendACKs;
 
@@ -223,12 +219,12 @@ private:
 
 	explicit DistributedEngineComm(ResourceManager& rm, bool isExeMgr);
 
-	void StartClientListener(boost::shared_ptr<messageqcpp::MessageQueueClient> cl, uint connIndex);
+	void StartClientListener(boost::shared_ptr<messageqcpp::MessageQueueClient> cl, uint32_t connIndex);
 
 	/** @brief Add a message to the queue
 	 *
 	 */
-	void addDataToOutput(messageqcpp::SBS, uint connIndex, messageqcpp::Stats *statsToAdd);
+	void addDataToOutput(messageqcpp::SBS, uint32_t connIndex, messageqcpp::Stats *statsToAdd);
 
 	/** @brief Writes data to the client at the index
  	*
@@ -256,17 +252,14 @@ private:
 
 	ClientList newClients;
 	std::vector<boost::shared_ptr<boost::mutex> > newLocks;
-	bool fMulticast;
-	boost::mutex fMulticastLock;
-	multicast::MulticastSender fMulticastSender;
 
 	bool fIsExeMgr;
 
 	// send-side throttling vars
 	uint64_t throttleThreshold;
-	static const uint targetRecvQueueSize = 50000000;
-	static const uint disableThreshold = 10000000;
-	uint tbpsThreadCount;
+	static const uint32_t targetRecvQueueSize = 50000000;
+	static const uint32_t disableThreshold = 10000000;
+	uint32_t tbpsThreadCount;
 
 	void sendAcks(uint32_t uniqueID, const std::vector<messageqcpp::SBS> &msgs,
 		boost::shared_ptr<MQE> mqe, size_t qSize);

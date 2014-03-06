@@ -4,18 +4,18 @@ Installation Instructions
 Copyright (C) 1994, 1995, 1996, 1999, 2000, 2001, 2002, 2004, 2005 Free
 Software Foundation, Inc.
 
-Copyright (C) 2009-2012 Calpont Corp.
+Copyright (C) 2014 InfiniDB, Inc.
 
 This file is free documentation; the Free Software Foundation gives
 unlimited permission to copy, distribute and modify it.
 
-Calpont Corp. also gives unlimited permission to copy, distribute and
+InfiniDB, Inc. also gives unlimited permission to copy, distribute and
 modify it.
 
 Basic Installation from source
 ==============================
 
-**** Calpont infinidb source build instructions ****
+**** InfiniDB source build instructions ****
 
 Consult the generic installation instructions
 that follow for detailed information. The short version is:
@@ -37,7 +37,7 @@ make install
 This will create a directory called Calpont in $HOME which conatins
 all the software you need.
 
-Install the Calpont software into /usr/local (for example) by copying
+Install the InfiniDB software into /usr/local (for example) by copying
 the entire Calpont directory tree there.
 
 After untaring the sofware or installing the RPM's, setup the software

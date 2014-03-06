@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -41,7 +41,7 @@ namespace
 {
 char digit_upper[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
-void octet2hex(char *to, const char *str, uint len)
+void octet2hex(char *to, const char *str, uint32_t len)
 {
   const char *str_end= str + len;
   for (; str != str_end; ++str)
@@ -107,7 +107,7 @@ string Func_hex::getStrVal(rowgroup::Row& row,
 		{
 			dec= (uint64_t)parm[0]->data()->getIntVal(row, isNull);
 			retval = helpers::convNumToStr(dec, ans, 16);
-			if (retval.length() > (uint)ct.colWidth)
+			if (retval.length() > (uint32_t)ct.colWidth)
 				retval = retval.substr(retval.length()-ct.colWidth, ct.colWidth);
 		}
 	}

@@ -1,4 +1,4 @@
-# Copyright (C) 2013 Calpont Corp.
+# Copyright (C) 2014 InfiniDB, Inc.
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -17,7 +17,11 @@
 
 # $Id: Makefile.am 4038 2013-08-07 14:02:48Z rdempsey $
 
-SUBDIRS = boost_idb startup common configcpp loggingcpp messageqcpp threadpool rwlock dataconvert joiner rowgroup cacheutils multicast funcexp udfsdk compress batchloader ddlcleanup mysqlcl_idb querystats jemalloc windowfunction idbdatafile idbhdfs
+SUBDIRS = boost_idb startup common configcpp loggingcpp messageqcpp \
+	threadpool rwlock dataconvert joiner rowgroup cacheutils \
+	funcexp udfsdk compress batchloader ddlcleanup \
+	mysqlcl_idb querystats jemalloc windowfunction idbdatafile \
+	idbhdfs winport thrift querytele
 
 test:
 

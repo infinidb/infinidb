@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright (C) 2013 Calpont Corp.
+# Copyright (C) 2014 InfiniDB, Inc.
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -44,6 +44,11 @@ fi
 autoreconf --version >/dev/null 2>&1
 if [ $? -ne 0 ]; then
 	echo "No 'autoreconf' program installed, giving up." 1>&2
+	exit 1
+fi
+expect -v >/dev/null 2>&1
+if [ $? -ne 0 ]; then
+	echo "No 'expect' program installed, giving up." 1>&2
 	exit 1
 fi
 

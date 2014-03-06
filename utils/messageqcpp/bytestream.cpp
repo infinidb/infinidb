@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -28,6 +28,7 @@
 #include <cassert>
 #include <algorithm>
 #include <cctype>
+#include <inttypes.h>
 using namespace std;
 
 #include <boost/scoped_ptr.hpp>
@@ -46,7 +47,7 @@ namespace messageqcpp {
 /* Copies only the data left to be read */
 void ByteStream::doCopy(const ByteStream &rhs)
 {
-	uint rlen = rhs.length();
+	uint32_t rlen = rhs.length();
 
 	if (fMaxLen < rlen) {
 		delete [] fBuf;
@@ -354,7 +355,7 @@ void ByteStream::peek(int32_t& q) const
 {
 	if (length() < 4)
 		throw underflow_error("ByteStream>int32_t: not enough data in stream to fill datatype");
-	
+
 	q = *((int32_t *) fCurOutPtr);
 }
 
@@ -362,7 +363,7 @@ void ByteStream::peek(uint32_t& q) const
 {
 	if (length() < 4)
 		throw underflow_error("ByteStream>uint32_t: not enough data in stream to fill datatype");
-	
+
 	q = *((uint32_t *) fCurOutPtr);
 }
 
@@ -370,7 +371,7 @@ void ByteStream::peek(int64_t& o) const
 {
 
 	if (length() < 8)
-		throw underflow_error("ByteStream>uint64_t: not enough data in stream to fill datatype");
+		throw underflow_error("ByteStream>int64_t: not enough data in stream to fill datatype");
 
 	o = *((int64_t *) fCurOutPtr);
 }
@@ -404,7 +405,7 @@ void ByteStream::peek(string& s) const
 #endif
 	if (len < 0)
 		throw logging::ProtocolError("expected a string");
-	
+
 	//we know len >= 0 by now...
 	if (length() < static_cast<uint32_t>(len + 4))
 	{
@@ -473,7 +474,7 @@ ifstream& operator>>(ifstream& ifs, ByteStream& bs)
 	return ifs;
 }
 
-bool ByteStream::operator==(const ByteStream& b) const 
+bool ByteStream::operator==(const ByteStream& b) const
 {
 	if (b.length() != length())
 		return false;
@@ -481,7 +482,7 @@ bool ByteStream::operator==(const ByteStream& b) const
 	return (memcmp(fCurOutPtr, b.fCurOutPtr, length()) == 0);
 }
 
-bool ByteStream::operator!=(const ByteStream& b) const 
+bool ByteStream::operator!=(const ByteStream& b) const
 {
 	return !(*this == b);
 }
@@ -514,7 +515,7 @@ void ByteStream::needAtLeast(size_t amount)
 
 #ifdef _MSC_VER
 #if BOOST_VERSION < 104500
-ByteStream& ByteStream::operator<<(const uint ui)
+ByteStream& ByteStream::operator<<(const uint32_t ui)
 {
 	if (fBuf == 0 || (fCurInPtr - fBuf + 4U > fMaxLen + ISSOverhead))
 		growBuf(fMaxLen + BlockSize);
@@ -525,7 +526,7 @@ ByteStream& ByteStream::operator<<(const uint ui)
 	return *this;
 }
 
-ByteStream& ByteStream::operator>>(uint& ui)
+ByteStream& ByteStream::operator>>(uint32_t& ui)
 {
 	uint32_t q;
 	peek(q);
@@ -564,6 +565,27 @@ void ByteStream::peek(ByteStream& bs) const
 		throw underflow_error("ByteStream>ByteStream: not enough data in stream to fill datatype");
 
 	bs.load(&fCurOutPtr[4], len);
+}
+
+ByteStream& ByteStream::operator<<(const uuid& u)
+{
+	append(reinterpret_cast<const uint8_t*>(&u.data[0]), uuids::uuid::static_size());
+	return *this;
+}
+
+ByteStream& ByteStream::operator>>(uuid& u)
+{
+	peek(u);
+	fCurOutPtr += uuids::uuid::static_size();
+	return *this;
+}
+
+void ByteStream::peek(uuid& u) const
+{
+	if (length() < uuids::uuid::static_size())
+		throw underflow_error("ByteStream>uuid: not enough data in stream to fill datatype");
+
+	memcpy(&u.data[0], fCurOutPtr, uuids::uuid::static_size());
 }
 
 }//namespace messageqcpp

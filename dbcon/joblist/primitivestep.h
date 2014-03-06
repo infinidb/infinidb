@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -78,6 +78,7 @@ class BatchPrimitiveProcessorJL;
 class pColStep;
 class pColScanStep;
 class PassThruStep;
+class PseudoColStep;
 
 
 typedef boost::shared_ptr<LBIDList> SP_LBIDList;
@@ -234,11 +235,11 @@ public:
 	virtual execplan::CalpontSystemCatalog::OID tableOid() const { return fTableOid; }
 
 	uint32_t filterCount() const { return fFilterCount; }
-	messageqcpp::ByteStream filterString() const { return fFilterString; }
+	const messageqcpp::ByteStream &filterString() const { return fFilterString; }
 	int8_t BOP() const { return fBOP; }
 	const execplan::CalpontSystemCatalog::ColType& colType() const { return fColType; }
 	void appendFilter(const messageqcpp::ByteStream& filter, unsigned count);
-	uint flushInterval() const { return fFlushInterval; }
+	uint32_t flushInterval() const { return fFlushInterval; }
 	bool getFeederFlag() const { return isFilterFeeder; }
 
 	void setFeederFlag (bool filterFeeder) { isFilterFeeder = filterFeeder; }
@@ -254,8 +255,6 @@ public:
 	uint64_t blksSkipped           () const { return fNumBlksSkipped; }
 	ResourceManager& resourceManager() const { return fRm; }
 
-	std::string udfName() const { return fUdfName; };
-	void udfName(const std::string& name) { fUdfName = name; }
 	SP_LBIDList getlbidList() const { return lbidList;}
 
 	void addFilter(const execplan::Filter* f);
@@ -295,20 +294,20 @@ private:
 	StrDataList* strRidList;
 	messageqcpp::ByteStream fFilterString;
 	std::vector<struct BRM::EMEntry> extents;
-	uint extentSize, divShift, modMask, ridsPerBlock, rpbShift, blockSizeShift, numExtents;
+	uint32_t extentSize, divShift, modMask, ridsPerBlock, rpbShift, blockSizeShift, numExtents;
 	uint64_t rpbMask;
 	uint64_t msgsSent, msgsRecvd;
 	bool finishedSending, recvWaiting, fIsDict;
 	bool isEM;
 	int64_t ridCount;
-	uint fFlushInterval;
+	uint32_t fFlushInterval;
 
 	// @bug 663 - Added fSwallowRows for calpont.caltrace(16) which is TRACE_FLAGS::TRACE_NO_ROWS4.
 	// 	      Running with this one will swallow rows at projection.
 	bool fSwallowRows;
-	u_int32_t fProjectBlockReqLimit;     // max number of rids to send in a scan
+	uint32_t fProjectBlockReqLimit;     // max number of rids to send in a scan
                                      // request to primproc
-    u_int32_t fProjectBlockReqThreshold; // min level of rids backlog before
+    uint32_t fProjectBlockReqThreshold; // min level of rids backlog before
                                      // consumer will tell producer to send
                                      // more rids scan requests to primproc
 
@@ -330,7 +329,6 @@ private:
 	SP_LBIDList lbidList;
 	std::vector<int> scanFlags; // use to keep track of which extents to eliminate from this step
 	uint32_t uniqueID;
-	std::string fUdfName;
 
 	//@bug 2634
     //@bug 3128 change ParseTree* to vector<Filter*>
@@ -449,7 +447,7 @@ public:
 	virtual uint64_t msgsRcvdCount () const { return recvCount;   }
 	virtual uint64_t msgBytesIn    () const { return fMsgBytesIn; }
 	virtual uint64_t msgBytesOut   () const { return fMsgBytesOut;}
-    uint getRidsPerBlock() const {return ridsPerBlock;}
+    uint32_t getRidsPerBlock() const {return ridsPerBlock;}
 
 	//...Currently only supported by pColStep and pColScanStep, so didn't bother
 	//...to define abstract method in base class, but if start adding to other
@@ -481,7 +479,7 @@ private:
     void sendAPrimitiveMessage (
 		ISMPacketHeader& ism,
 		BRM::LBID_t msgLbidStart,
-		u_int32_t msgLbidCount);
+		uint32_t msgLbidCount);
 	uint64_t getFBO(uint64_t lbid);
 	bool isEmptyVal(const uint8_t *val8) const;
 
@@ -489,11 +487,11 @@ private:
     ColByScanRangeRequestHeader fMsgHeader;
     SPTHD fConsumerThread;
     /// number of threads on the receive side
-	uint fNumThreads;
+	uint32_t fNumThreads;
 
     SPTHD * fProducerThread;
 	messageqcpp::ByteStream fFilterString;
-	uint fFilterCount;
+	uint32_t fFilterCount;
 	execplan::CalpontSystemCatalog::OID fOid;
 	execplan::CalpontSystemCatalog::OID fTableOid;
 	execplan::CalpontSystemCatalog::ColType fColType;
@@ -511,16 +509,16 @@ private:
 	boost::condition condvar;
 	boost::condition condvarWakeupProducer;
 	bool finishedSending, sendWaiting, rDoNothing, fIsDict;
-	uint recvWaiting, recvExited;
+	uint32_t recvWaiting, recvExited;
 	uint64_t ridsReturned;
 
 	std::vector<struct BRM::EMEntry> extents;
-	uint extentSize, divShift, ridsPerBlock, rpbShift, numExtents;
+	uint32_t extentSize, divShift, ridsPerBlock, rpbShift, numExtents;
 // 	config::Config *fConfig;
 
-	u_int32_t fScanLbidReqLimit;     // max number of LBIDs to send in a scan
+	uint32_t fScanLbidReqLimit;     // max number of LBIDs to send in a scan
                                      // request to primproc
-	u_int32_t fScanLbidReqThreshold; // min level of scan LBID backlog before
+	uint32_t fScanLbidReqThreshold; // min level of scan LBID backlog before
                                      // consumer will tell producer to send
                                      // more LBID scan requests to primproc
 
@@ -643,7 +641,7 @@ private:
 	boost::shared_ptr<boost::thread> cThread;  //producer thread
 
 	messageqcpp::ByteStream fFilterString;
-	uint fFilterCount;
+	uint32_t fFilterCount;
 
 	DataList_t* requestList;
 	//StringDataList* stringList;
@@ -771,7 +769,7 @@ private:
 	uint32_t recvWaiting;
 	uint32_t sendWaiting;
 	int64_t  ridCount;
-	u_int32_t fLogicalBlocksPerScan;
+	uint32_t fLogicalBlocksPerScan;
 	DataList<ElementType> *ridList;
 	messageqcpp::ByteStream fFilterString;
 	execplan::CalpontSystemCatalog::ColType colType;
@@ -787,9 +785,9 @@ private:
 	uint64_t extentSize;
 	uint64_t divShift;
 	uint64_t numExtents;
-	u_int32_t fScanLbidReqLimit;     // max number of LBIDs to send in a scan
+	uint32_t fScanLbidReqLimit;     // max number of LBIDs to send in a scan
                                      // request to primproc
-	u_int32_t fScanLbidReqThreshold; // min level of scan LBID backlog before
+	uint32_t fScanLbidReqThreshold; // min level of scan LBID backlog before
                                      // consumer will tell producer to send
 	bool fStopSending;
 	bool fSingleThread;
@@ -821,12 +819,12 @@ public:
 
 	BatchPrimitive(const JobInfo& jobInfo) : JobStep(jobInfo) {}
 	virtual bool getFeederFlag() const = 0;
-	virtual execplan::CalpontSystemCatalog::OID getLastOid() const = 0;
-	virtual uint getStepCount () const = 0;
+	virtual uint64_t getLastTupleId() const = 0;
+	virtual uint32_t getStepCount () const = 0;
 	virtual void setBPP(JobStep* jobStep) = 0;
 	virtual void setFirstStepType(PrimitiveStepType firstStepType) = 0;
 	virtual void setIsProjectionOnly() = 0;
-	virtual void setLastOid(execplan::CalpontSystemCatalog::OID colOid) = 0;
+	virtual void setLastTupleId(uint64_t) = 0;
 	virtual void setOutputType(BPSOutputType outputType) = 0;
 	virtual void setProjectBPP(JobStep* jobStep1, JobStep* jobStep2) = 0;
 	virtual void setStepCount() = 0;
@@ -886,7 +884,7 @@ public:
 	 *
 	 * The main loop for the receive-side thread.  Don't call it directly.
 	 */
-    void receiveMultiPrimitiveMessages(uint threadID);
+    void receiveMultiPrimitiveMessages(uint32_t threadID);
 
 /** @brief Add a filter when the column is anything but a 4-byte float type.
  *
@@ -912,9 +910,9 @@ public:
 	void setFirstStepType(PrimitiveStepType firstStepType) { ffirstStepType = firstStepType;}
 	PrimitiveStepType getPrimitiveStepType () { return ffirstStepType; }
 	void setStepCount() { fStepCount++; }
-	uint getStepCount () const { return fStepCount; }
-	void setLastOid(execplan::CalpontSystemCatalog::OID colOid) { fLastOid = colOid; }
-	execplan::CalpontSystemCatalog::OID getLastOid() const { return fLastOid; }
+	uint32_t getStepCount () const { return fStepCount; }
+	void setLastTupleId(uint64_t id) { fLastTupleId = id; }
+	uint64_t getLastTupleId() const { return fLastTupleId; }
 
 	/** @brief Set the DistributedEngineComm object this instance should use
 	 *
@@ -936,7 +934,7 @@ public:
 	virtual uint64_t msgBytesIn    () const { return fMsgBytesIn; }
 	virtual uint64_t msgBytesOut   () const { return fMsgBytesOut;}
 	virtual uint64_t blockTouched  () const { return fBlockTouched;}
-	uint nextBand(messageqcpp::ByteStream &bs);
+	uint32_t nextBand(messageqcpp::ByteStream &bs);
 
 	//...Currently only supported by pColStep and pColScanStep, so didn't bother
 	//...to define abstract method in base class, but if start adding to other
@@ -950,7 +948,7 @@ public:
 	bool wasStepRun() const { return fRunExecuted; }
 
 	// DEC event listener interface
-	void newPMOnline(uint connectionNumber);
+	void newPMOnline(uint32_t connectionNumber);
 
 	void setInputRowGroup(const rowgroup::RowGroup &rg);
 	void setOutputRowGroup(const rowgroup::RowGroup &rg);
@@ -1050,45 +1048,48 @@ private:
 
     DistributedEngineComm* fDec;
     boost::shared_ptr<BatchPrimitiveProcessorJL> fBPP;
-	uint rowCount;
+	uint32_t rowCount;
 	uint16_t fNumSteps;
 	int fColWidth;
-	uint fStepCount;
+	uint32_t fStepCount;
     bool fCPEvaluated;  // @bug 2123
 	uint64_t fEstimatedRows; // @bug 2123
     /// number of threads on the receive side
-    uint fMaxNumThreads;
-	uint fNumThreads;
+    uint32_t fMaxNumThreads;
+	uint32_t fNumThreads;
 	PrimitiveStepType ffirstStepType;
 	bool isFilterFeeder;
     SATHD fProducerThread;
 	messageqcpp::ByteStream fFilterString;
-	uint fFilterCount;
+	uint32_t fFilterCount;
 	execplan::CalpontSystemCatalog::ColType fColType;
 	execplan::CalpontSystemCatalog::OID fOid;
 	execplan::CalpontSystemCatalog::OID fTableOid;
-	execplan::CalpontSystemCatalog::OID fLastOid;
+	uint64_t fLastTupleId;
 	BRM::LBIDRange_v lbidRanges;
 	std::vector<int32_t> lastExtent;
 	std::vector<BRM::LBID_t> lastScannedLBID;
 	BRM::DBRM dbrm;
     SP_LBIDList lbidList;
 	uint64_t ridsRequested;
-	volatile uint64_t msgsSent, msgsRecvd;
+	uint64_t totalMsgs;
+	volatile uint64_t msgsSent;
+	volatile uint64_t msgsRecvd;
 	volatile bool finishedSending;
-	bool firstRead, sendWaiting;
+	bool firstRead;
+	bool sendWaiting;
 	uint32_t recvWaiting;
-	uint recvExited;
+	uint32_t recvExited;
 	uint64_t ridsReturned;
 	uint64_t rowsReturned;
 	std::map<execplan::CalpontSystemCatalog::OID, std::tr1::unordered_map<int64_t, struct BRM::EMEntry> > extentsMap;
 	std::vector<BRM::EMEntry> scannedExtents;
 	OIDVector projectOids;
-	uint extentSize, divShift, rpbShift, numExtents, modMask;
-	u_int32_t fRequestSize; // the number of logical extents per batch of requests sent to PrimProc.
-	u_int32_t fProcessorThreadsPerScan; // The number of messages sent per logical extent.
+	uint32_t extentSize, divShift, rpbShift, numExtents, modMask;
+	uint32_t fRequestSize; // the number of logical extents per batch of requests sent to PrimProc.
+	uint32_t fProcessorThreadsPerScan; // The number of messages sent per logical extent.
 	bool fSwallowRows;
-    u_int32_t fMaxOutstandingRequests; // The number of logical extents have not processed by PrimProc
+    uint32_t fMaxOutstandingRequests; // The number of logical extents have not processed by PrimProc
 	uint64_t fPhysicalIO;	// total physical I/O count
 	uint64_t fCacheIO;		// total cache I/O count
 	uint64_t fNumBlksSkipped;//total number of block scans skipped due to CP
@@ -1111,11 +1112,11 @@ private:
 	/* HashJoin support */
 
 	void serializeJoiner();
-	void serializeJoiner(uint connectionNumber);
+	void serializeJoiner(uint32_t connectionNumber);
 
 	void generateJoinResultSet(const std::vector<std::vector<rowgroup::Row::Pointer> > &joinerOutput,
 	  rowgroup::Row &baseRow, const std::vector<boost::shared_array<int> > &mappings,
-	  const uint depth, rowgroup::RowGroup &outputRG, rowgroup::RGData &rgData,
+	  const uint32_t depth, rowgroup::RowGroup &outputRG, rowgroup::RGData &rgData,
 	  std::vector<rowgroup::RGData> *outputData,
 	  const boost::scoped_array<rowgroup::Row> &smallRows, rowgroup::Row &joinedRow);
 
@@ -1123,7 +1124,7 @@ private:
 	bool doJoin, hasPMJoin, hasUMJoin;
 	std::vector<rowgroup::RowGroup> joinerMatchesRGs;   // parses the small-side matches from joiner
 
-	uint smallSideCount;
+	uint32_t smallSideCount;
 	int  smallOuterJoiner;
 
 	bool fRunExecuted; // was the run method executed for this step
@@ -1140,10 +1141,11 @@ private:
 
 	// temporary hack to make sure JobList only calls run and join once
 	boost::mutex jlLock;
-	bool runRan, joinRan;
+	bool runRan;
+	bool joinRan;
 
 	// bug 1965, trace duplicat columns in delivery list <dest, src>
-	std::vector<std::pair<uint, uint> > dupColumns;
+	std::vector<std::pair<uint32_t, uint32_t> > dupColumns;
 
 	/* Functions & Expressions vars */
 	boost::shared_ptr<funcexp::FuncExpWrapper> fe1, fe2;
@@ -1172,18 +1174,17 @@ private:
 
 	/* semijoin vars */
 	rowgroup::RowGroup joinFERG;
-	
-	boost::shared_ptr<RowGroupDL> deliveryDL;
-	uint deliveryIt;
 
+	boost::shared_ptr<RowGroupDL> deliveryDL;
+	uint32_t deliveryIt;
 
 	/* shared nothing support */
 	struct Job {
-		Job(uint d, uint n, uint b, boost::shared_ptr<messageqcpp::ByteStream> &bs) :
+		Job(uint32_t d, uint32_t n, uint32_t b, boost::shared_ptr<messageqcpp::ByteStream> &bs) :
 			dbroot(d), connectionNum(n), expectedResponses(b), msg(bs) { }
-		uint dbroot;
-		uint connectionNum;
-		uint expectedResponses;
+		uint32_t dbroot;
+		uint32_t connectionNum;
+		uint32_t expectedResponses;
 		boost::shared_ptr<messageqcpp::ByteStream> msg;
 	};
 
@@ -1191,7 +1192,20 @@ private:
 	void makeJobs(std::vector<Job> *jobs);
 	void interleaveJobs(std::vector<Job> *jobs) const;
 	void sendJobs(const std::vector<Job> &jobs);
-	uint numDBRoots;
+	uint32_t numDBRoots;
+
+    /* Pseudo column filter processing.  Think about refactoring into a separate class. */
+    bool processPseudoColFilters(uint32_t extentIndex, boost::shared_ptr<std::map<int, int> > dbRootPMMap) const;
+    bool processOneFilterType(int8_t colWidth, int64_t value, uint32_t type) const;
+    bool processSingleFilterString(int8_t BOP, int8_t colWidth, int64_t val, const uint8_t *filterString,
+      uint32_t filterCount) const;
+    bool processSingleFilterString_ranged(int8_t BOP, int8_t colWidth, int64_t min, int64_t max,
+        const uint8_t *filterString, uint32_t filterCount) const;
+    bool processLBIDFilter(const BRM::EMEntry &emEntry) const;
+    bool compareSingleValue(uint8_t COP, int64_t val1, int64_t val2) const;
+    bool compareRange(uint8_t COP, int64_t min, int64_t max, int64_t val) const;
+    bool hasPCFilter, hasPMFilter, hasRIDFilter, hasSegmentFilter, hasDBRootFilter, hasSegmentDirFilter,
+        hasPartitionFilter, hasMaxFilter, hasMinFilter, hasLBIDFilter, hasExtentIDFilter;
 
 };
 
@@ -1266,6 +1280,7 @@ public:
 		const JobInfo& jobInfo);
 
 	PassThruStep(const pColStep& rhs);
+	PassThruStep(const PseudoColStep& rhs);
 
 	virtual ~PassThruStep();
 
@@ -1293,6 +1308,9 @@ public:
 	const execplan::CalpontSystemCatalog::ColType& colType() const { return fColType; }
 	ResourceManager& resourceManager() const { return fRm; }
 
+	void pseudoType(uint32_t p) { fPseudoType = p; }
+	uint32_t pseudoType() const { return fPseudoType; }
+
 protected:
 
 private:
@@ -1309,6 +1327,7 @@ private:
 	execplan::CalpontSystemCatalog::OID fTableOid;
 	uint8_t colWidth;
 	uint16_t realWidth;
+	uint32_t fPseudoType;
 	execplan::CalpontSystemCatalog::ColType fColType;
 	bool isDictColumn;
 	bool isEM;
@@ -1323,6 +1342,41 @@ private:
 	friend class RTSCommandJL;
 	friend class BatchPrimitiveStep;
 	friend class TupleBPS;
+};
+
+class PseudoColStep : public pColStep
+{
+public:
+    /** @brief PseudoColStep constructor
+     */
+    PseudoColStep(
+		execplan::CalpontSystemCatalog::OID oid,
+		execplan::CalpontSystemCatalog::OID tableOid,
+		uint32_t pId,
+		const execplan::CalpontSystemCatalog::ColType& ct,
+		const JobInfo& jobInfo) :
+		pColStep(oid, tableOid, ct, jobInfo),
+		fPseudoColumnId(pId)
+    {}
+
+    PseudoColStep(const PassThruStep& rhs) :
+		pColStep(rhs),
+		fPseudoColumnId(rhs.pseudoType())
+	{}
+
+	virtual ~PseudoColStep() {}
+
+	uint32_t pseudoColumnId() const   { return fPseudoColumnId; }
+	void pseudoColumnId(uint32_t pId) { fPseudoColumnId = pId;  }
+
+protected:
+	uint32_t fPseudoColumnId;
+
+private:
+	/** @brief disabled constuctor
+	 */
+    PseudoColStep(const pColScanStep&);
+    PseudoColStep(const pColStep&);
 };
 
 

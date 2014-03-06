@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -84,7 +84,7 @@ class ColumnInfoCompressed : public ColumnInfo
     // newHWM - Starting point for adding data after initial blockskipping
     virtual int setupInitialColumnFile( HWM oldHWM, HWM newHWM );
 
-    virtual int saveDctnryStoreHWMChunk();
+    virtual int saveDctnryStoreHWMChunk(bool& needBackup);
     virtual int extendColumnOldExtent(
         uint16_t dbRootNext,
         uint32_t partitionNext,

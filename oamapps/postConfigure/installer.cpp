@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -857,7 +857,8 @@ int main(int argc, char *argv[])
 				cout.flush();
 
 				//send message to procmon's to run upgrade script
-				int status = sendUpgradeRequest(IserverTypeInstall);
+				bool pmwithum = false;
+				int status = sendUpgradeRequest(IserverTypeInstall, pmwithum);
 	
 				if ( status != 0 ) {
 					cout << "ERROR: Error return in running the upgrade script, check /tmp/upgrade.log" << endl;

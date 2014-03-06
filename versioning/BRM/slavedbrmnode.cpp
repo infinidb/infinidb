@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -90,9 +90,9 @@ int SlaveDBRMNode::lookup(OID_t oid, LBIDRange_v& lbidList) throw()
 //------------------------------------------------------------------------------
 int SlaveDBRMNode::createStripeColumnExtents(
 	const std::vector<CreateStripeColumnExtentsArgIn>& cols,
-	u_int16_t  dbRoot,
-	u_int32_t& partitionNum,
-	u_int16_t& segmentNum,
+	uint16_t  dbRoot,
+	uint32_t& partitionNum,
+	uint16_t& segmentNum,
     std::vector<CreateStripeColumnExtentsArgOut>& extents) throw()
 {
 	try {
@@ -111,14 +111,14 @@ int SlaveDBRMNode::createStripeColumnExtents(
 // Create an extent for the specified OID and DBRoot.
 //------------------------------------------------------------------------------
 int SlaveDBRMNode::createColumnExtent_DBroot(OID_t oid,
-	u_int32_t  colWidth,
-	u_int16_t  dbRoot,
+	uint32_t  colWidth,
+	uint16_t  dbRoot,
     execplan::CalpontSystemCatalog::ColDataType colDataType,
-    u_int32_t& partitionNum,
-	u_int16_t& segmentNum,
+    uint32_t& partitionNum,
+	uint16_t& segmentNum,
 	LBID_t&    lbid,
 	int&       allocdSize,
-	u_int32_t& startBlockOffset) throw()
+	uint32_t& startBlockOffset) throw()
 {
 	try {
 		em.createColumnExtent_DBroot(oid, colWidth, dbRoot, colDataType,
@@ -137,14 +137,14 @@ int SlaveDBRMNode::createColumnExtent_DBroot(OID_t oid,
 // OID, DBRoot, partition, and segment.
 //------------------------------------------------------------------------------
 int SlaveDBRMNode::createColumnExtentExactFile(OID_t oid,
-	u_int32_t  colWidth,
-	u_int16_t  dbRoot,
-	u_int32_t  partitionNum,
-	u_int16_t  segmentNum,
+	uint32_t  colWidth,
+	uint16_t  dbRoot,
+	uint32_t  partitionNum,
+	uint16_t  segmentNum,
     execplan::CalpontSystemCatalog::ColDataType colDataType,
 	LBID_t&    lbid,
 	int&       allocdSize,
-	u_int32_t& startBlockOffset) throw()
+	uint32_t& startBlockOffset) throw()
 {
 	try {
 		em.createColumnExtentExactFile(oid, colWidth, dbRoot, partitionNum,
@@ -163,9 +163,9 @@ int SlaveDBRMNode::createColumnExtentExactFile(OID_t oid,
 // number and segment number.
 //------------------------------------------------------------------------------
 int SlaveDBRMNode::createDictStoreExtent(OID_t oid,
-	u_int16_t  dbRoot,
-	u_int32_t  partitionNum,
-	u_int16_t  segmentNum,
+	uint16_t  dbRoot,
+	uint32_t  partitionNum,
+	uint16_t  segmentNum,
 	LBID_t&    lbid,
 	int&       allocdSize) throw()
 {
@@ -355,7 +355,7 @@ int SlaveDBRMNode::bulkSetHWMAndCP(const vector<BulkSetHWMArg> &hwmArgs,
 		const std::vector<CPInfoMerge> & mergeCPDataArgs,
 		VER_t transID, bool firstNode) throw()
 {
-	uint i;
+	uint32_t i;
 	bool firstCall = true;
 	CPMaxMin setCPEntry;
 	CPMaxMinMap_t bulkSetCPMap;
@@ -416,7 +416,7 @@ int SlaveDBRMNode::bulkUpdateDBRoot(const vector<BulkUpdateDBRootArg> &args) thr
 
 
 int SlaveDBRMNode::writeVBEntry(VER_t transID, LBID_t lbid, OID_t vbOID,
-										 u_int32_t vbFBO) throw()
+										 uint32_t vbFBO) throw()
 {
 	VER_t oldVerID;
 	
@@ -479,7 +479,7 @@ int SlaveDBRMNode::beginVBCopy(VER_t transID, uint16_t vbOID,
 	uint64_t retries;
 	bool* lockedRanges = (bool*)alloca(ranges.size() * sizeof(bool));
 	bool allLocked;
-	uint i;
+	uint32_t i;
 
 
 #ifdef BRM_DEBUG
@@ -1172,7 +1172,7 @@ int SlaveDBRMNode::dmlLockLBIDRanges(const vector<LBIDRange> &ranges, int txnID)
 	uint64_t retries;
 	bool* lockedRanges = (bool*)alloca(ranges.size() * sizeof(bool));
 	bool allLocked;
-	uint i;
+	uint32_t i;
 
 	/* XXXPAT: The controller node will wait up to 5 mins for the response.
 	 * For now, this alg will try for 1 min to grab all of the locks.
@@ -1246,7 +1246,7 @@ int SlaveDBRMNode::dmlReleaseLBIDRanges(const vector<LBIDRange> &ranges)
 		copylocks.lock(CopyLocks::WRITE);
 		locked[2] = true;
 
-		for (uint i = 0; i < ranges.size(); ++i)
+		for (uint32_t i = 0; i < ranges.size(); ++i)
 			copylocks.releaseRange(ranges[i]);
 
 		return 0;

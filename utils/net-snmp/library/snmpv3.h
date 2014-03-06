@@ -39,12 +39,12 @@ extern          "C" {
     void            shutdown_snmpv3(const char *type);
     int             snmpv3_store(int majorID, int minorID, void *serverarg,
                                  void *clientarg);
-    u_long          snmpv3_local_snmpEngineBoots(void);
+    uint32_t          snmpv3_local_snmpEngineBoots(void);
     int             snmpv3_clone_engineID(u_char **, size_t *, u_char *,
                                           size_t);
     size_t          snmpv3_get_engineID(u_char * buf, size_t buflen);
     u_char         *snmpv3_generate_engineID(size_t *);
-    u_long          snmpv3_local_snmpEngineTime(void);
+    uint32_t          snmpv3_local_snmpEngineTime(void);
     int             get_default_secLevel(void);
     const oid      *get_default_authtype(size_t *);
     const oid      *get_default_privtype(size_t *);

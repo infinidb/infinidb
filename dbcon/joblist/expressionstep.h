@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -64,8 +64,8 @@ class ExpressionStep : public JobStep
 	std::string alias() const { return fAliases.empty() ? "" : fAliases.front(); }
 	std::string view() const { return fViews.empty() ? "" : fViews.front(); }
 	std::string schema() const { return fSchemas.empty() ? "" : fSchemas.front(); }
-	uint tableKey() const { return fTableKeys.empty() ? -1 : fTableKeys.front(); }
-	uint columnKey() const { return fColumnKeys.empty() ? -1 : fColumnKeys.front(); }
+	uint32_t tableKey() const { return fTableKeys.empty() ? -1 : fTableKeys.front(); }
+	uint32_t columnKey() const { return fColumnKeys.empty() ? -1 : fColumnKeys.front(); }
 
 	void expression(const execplan::SRCP exp, JobInfo& jobInfo);
 	execplan::SRCP expression() const { return fExpression; }
@@ -82,19 +82,19 @@ class ExpressionStep : public JobStep
 	const std::vector<std::string>& aliases() const { return fAliases; }
 	const std::vector<std::string>& views() const { return fViews; }
 	const std::vector<std::string>& schemas() const { return fSchemas; }
-	const std::vector<uint>& tableKeys() const { return fTableKeys; }
-	const std::vector<uint>& columnKeys() const { return fColumnKeys; }
+	const std::vector<uint32_t>& tableKeys() const { return fTableKeys; }
+	const std::vector<uint32_t>& columnKeys() const { return fColumnKeys; }
 
 	std::vector<execplan::CalpontSystemCatalog::OID>& tableOids() { return fTableOids; }
 	std::vector<execplan::CalpontSystemCatalog::OID>& oids() { return fOids; }
 	std::vector<std::string>& aliases() { return fAliases; }
 	std::vector<std::string>& views() { return fViews; }
 	std::vector<std::string>& schemas() { return fSchemas; }
-	std::vector<uint>& tableKeys() { return fTableKeys; }
-	std::vector<uint>& columnKeys() { return fColumnKeys; }
+	std::vector<uint32_t>& tableKeys() { return fTableKeys; }
+	std::vector<uint32_t>& columnKeys() { return fColumnKeys; }
 
-	virtual void updateInputIndex(std::map<uint, uint>& indexMap, const JobInfo& jobInfo);
-	virtual void updateOutputIndex(std::map<uint, uint>& indexMap, const JobInfo& jobInfo);
+	virtual void updateInputIndex(std::map<uint32_t, uint32_t>& indexMap, const JobInfo& jobInfo);
+	virtual void updateOutputIndex(std::map<uint32_t, uint32_t>& indexMap, const JobInfo& jobInfo);
 	virtual void updateColumnOidAlias(JobInfo& jobInfo);
 
 	std::vector<execplan::ReturnedColumn*>& columns() { return fColumns; }
@@ -124,8 +124,8 @@ class ExpressionStep : public JobStep
 	std::vector<std::string>                         fAliases;
 	std::vector<std::string>                         fViews;
 	std::vector<std::string>                         fSchemas;
-	std::vector<uint>                                fTableKeys;
-	std::vector<uint>                                fColumnKeys;
+	std::vector<uint32_t>                                fTableKeys;
+	std::vector<uint32_t>                                fColumnKeys;
 	std::vector<execplan::ReturnedColumn*>           fColumns;
 
   private:

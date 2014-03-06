@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -98,7 +98,7 @@ void DmlReadThread::operator()()
             ibs >> msgId;
 			if (msgId != WE_SVR_CLOSE_CONNECTION)
 				ibs >> uniqueID;
-            //cout << "DmlReadThread " << pthread_self () << " received message id " << (uint)msgId << " and bytestream length " << ibs.length() << endl;
+            //cout << "DmlReadThread " << pthread_self () << " received message id " << (uint32_t)msgId << " and bytestream length " << ibs.length() << endl;
             switch (msgId)
             {
             case WE_SVR_SINGLE_INSERT:
@@ -151,7 +151,7 @@ void DmlReadThread::operator()()
                 }
             case WE_SVR_BATCH_INSERT_END:
                 {
-                    fWeDMLprocessor->processBatchInsertHwm(ibs, errMsg);
+                    rc = fWeDMLprocessor->processBatchInsertHwm(ibs, errMsg);
 					//timer.finish();
                     break;
                 }
@@ -320,6 +320,11 @@ void DmlReadThread::operator()()
 					rc = fWeDMLprocessor->processEndTransaction(ibs, errMsg);
 					break;
 				}
+			case WE_SRV_FIX_ROWS:
+				{
+					rc = fWeDMLprocessor->processFixRows(ibs, errMsg, PMId);
+					break;
+				}
 			case WE_SVR_CLOSE_CONNECTION:
 				{
 					break;
@@ -391,8 +396,8 @@ void DmlReadThread::operator()()
 			try
 			{
 				fIos.write(obs);
-            //cout << "dmlthread sent back response for msgid " << (uint)msgId << " with uniqueID:rc= "
-            //<< (uint)uniqueID<<":"<< (uint)rc<<" and error message is " << errMsg <<endl;
+            //cout << "dmlthread sent back response for msgid " << (uint32_t)msgId << " with uniqueID:rc= "
+            //<< (uint32_t)uniqueID<<":"<< (uint32_t)rc<<" and error message is " << errMsg <<endl;
             //get next message
 				ibs = fIos.read();
 			}

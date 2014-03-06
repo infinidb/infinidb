@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -38,7 +38,7 @@
 #include <ws2tcpip.h>
 #include <stdio.h>
 #include <stdint.h>
-typedef boost::uint32_t in_addr_t;
+typedef uint32_t in_addr_t;
 #else
 #include <netinet/in.h>
 #endif

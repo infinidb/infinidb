@@ -1,4 +1,4 @@
-#  Copyright (C) 2013 Calpont Corp.
+#  Copyright (C) 2014 InfiniDB, Inc.
 #
 #  This program is free software; you can redistribute it and/or
 #  modify it under the terms of the GNU General Public License
@@ -53,6 +53,7 @@ libjoblist_la_SOURCES = \
         pdictionary.cpp \
         pdictionaryscan.cpp \
         primitivemsg.cpp \
+	pseudocc-jl.cpp \
         resourcedistributor.cpp \
         resourcemanager.cpp \
         rowestimator.cpp \

@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -155,7 +155,7 @@ int BCTest::LoadOid(const OidRanges_t& o, uint32_t& loadCount)
 	blockCacheClient bc(BRP);
 	uint32_t rCount=0;
 
-	for (uint i =0; i<o.ranges.size() ; i++)
+	for (uint32_t i =0; i<o.ranges.size() ; i++)
 	{
 		const InlineLBIDRange r={o.ranges[i].start, o.ranges[i].size};
 		if (r.size>0) {
@@ -181,7 +181,7 @@ int BCTest::ReadOidRanges(const OidRanges_t& v, uint32_t* hits, uint32_t* miss)
 	uint8_t inBuff[8192];
 	int ret;
 
-	for(uint i=0; i<v.ranges.size() && i < lastRangeListIdx; i++)
+	for(uint32_t i=0; i<v.ranges.size() && i < lastRangeListIdx; i++)
 	{
 		FileBuffer fb(-1, -1);
 		const InlineLBIDRange r={v.ranges[i].start, v.ranges[i].size};
@@ -219,7 +219,7 @@ void BCTest::LoadLbid(const BRM::LBID_t lbid, const BRM::VER_t ver)
 //
 void BCTest::ReadOidLbids(const BRM::LBID_t lbid, const BRM::VER_t ver)
 {
-	u_int8_t d[8192]={'\0'};
+	uint8_t d[8192]={'\0'};
 	blockCacheClient bc(BRP);
 	bc.read(lbid, ver, d);
 } // ReadLbid
@@ -295,7 +295,7 @@ struct readThr
 		tm2.tv_nsec=0;
 		double tm3=0;
 		clock_gettime(CLOCK_REALTIME, &tm1);
-		for (uint k=0; k<fReps; k++) {
+		for (uint32_t k=0; k<fReps; k++) {
 			for(uint32_t i=0; i<lastRangeListIdx && i<fBC.OidRangesList.size() ; i++)
 			{
 				rc = fBC.ReadOidRanges(fBC.OidRangesList[i], &hits, &miss);

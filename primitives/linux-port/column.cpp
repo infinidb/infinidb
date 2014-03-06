@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -423,7 +423,7 @@ inline bool isNullVal<1>(uint8_t type, const uint8_t* ival)
 }
 
 /* A generic isNullVal */
-inline bool isNullVal(uint length, uint8_t type, const uint8_t *val8)
+inline bool isNullVal(uint32_t length, uint8_t type, const uint8_t *val8)
 {
 	switch (length) {
 		case 8: return isNullVal<8>(type, val8);
@@ -531,14 +531,6 @@ inline bool colCompareUnsigned(uint64_t val1, uint64_t val2, uint8_t COP, uint8_
         return colCompare_(val1, val2, COP, rf);
     else
         return false;
-}
-
-template<int N>
-inline void udf(UDFFcnPtr_t fp, void* out, const uint8_t* in)
-{
-	int64_t* invp = (int64_t*)in;
-	int64_t outv = fp(*invp);
-	memcpy(out, &outv, N);
 }
 
 inline void store(const NewColRequestHeader *in,
@@ -926,8 +918,7 @@ inline void p_Col_ridArray(NewColRequestHeader *in,
                            NewColResultHeader *out,
                            unsigned outSize,
                            unsigned *written, int* block, Stats* fStatsPtr, unsigned itemsPerBlk,
-                           boost::shared_ptr<ParsedColumnFilter> parsedColumnFilter,
-                           UDFFcnPtr_t fp)
+                           boost::shared_ptr<ParsedColumnFilter> parsedColumnFilter)
 {
     uint16_t *ridArray=0;
     uint8_t *in8 = reinterpret_cast<uint8_t *>(in);
@@ -1093,94 +1084,6 @@ inline void p_Col_ridArray(NewColRequestHeader *in,
                               &isEmpty, &rid, in->OutputType, reinterpret_cast<uint8_t *>(block), itemsPerBlk);
     }
 
-    if (fp)
-    {
-#ifndef _MSC_VER
-        if ((void*)fp == (void*)::acos ||
-            (void*)fp == (void*)::asin ||
-            (void*)fp == (void*)::atan ||
-            (void*)fp == (void*)::cos ||
-            //(void*)fp == (void*):cotangent ||
-            (void*)fp == (void*)::exp ||
-            (void*)fp == (void*)::log ||
-#ifdef __linux__
-            (void*)fp == (void*)::log2 ||
-#else
-            (void*)fp == (void*)::log ||
-#endif
-            (void*)fp == (void*)::log10 ||
-            (void*)fp == (void*)::sin ||
-            (void*)fp == (void*)::sqrt ||
-            (void*)fp == (void*)::tan)
-        {
-            double (*dfp)(double) = (double (*)(double))fp;
-            if (isUnsigned((CalpontSystemCatalog::ColDataType)in->DataType))
-            {
-                switch (W)
-                {
-                    case 4:
-                    {
-                        float fout;
-                        float* finp = (float*)&uval;
-                        uint32_t* valp = (uint32_t*)&fout;
-                        fout = (float)dfp((double)(*finp));
-                        uval = *valp;
-                    }
-                    break;
-                    default:
-                    {
-                        double dout;
-                        double* dinp = (double*)&uval;
-                        uint64_t* valp = (uint64_t*)&dout;
-                        dout = dfp(*dinp);
-                        uval = *valp;
-                    }
-                    break;
-                }
-            }
-            else
-            {
-                switch (W)
-                {
-                    case 4:
-                    {
-                        float fout;
-                        float* finp = (float*)&val;
-                        int32_t* valp = (int32_t*)&fout;
-                        fout = (float)dfp((double)(*finp));
-                        val = *valp;
-                    }
-                    break;
-                    default:
-                    {
-                        double dout;
-                        double* dinp = (double*)&val;
-                        int64_t* valp = (int64_t*)&dout;
-                        dout = dfp(*dinp);
-                        val = *valp;
-                    }
-                    break;
-                }
-            }
-        }
-        else
-        {
-            if (isUnsigned((CalpontSystemCatalog::ColDataType)in->DataType))
-            {
-                uval = fp(uval);
-            }
-            else
-            {
-                val = fp(val);
-            }
-        }
-#else
-        //FIXME: ???
-        val = 0;
-        uval = 0;
-#endif
-    }
-
     while (!done)
     {
         if (cops == NULL)    // implies parsedColumnFilter && columnFilterMode == SET
@@ -1294,94 +1197,6 @@ inline void p_Col_ridArray(NewColRequestHeader *in,
                                   &isNull, &isEmpty, &rid, in->OutputType, reinterpret_cast<uint8_t *>(block),
                                   itemsPerBlk);
         }
-
-        if (fp)
-        {
-#ifndef _MSC_VER
-            if ((void*)fp == (void*)::acos ||
-                (void*)fp == (void*)::asin ||
-                (void*)fp == (void*)::atan ||
-                (void*)fp == (void*)::cos ||
-                //(void*)fp == (void*):cotangent ||
-                (void*)fp == (void*)::exp ||
-                (void*)fp == (void*)::log ||
-#ifdef __linux__
-                (void*)fp == (void*)::log2 ||
-#else
-                (void*)fp == (void*)::log ||
-#endif
-                (void*)fp == (void*)::log10 ||
-                (void*)fp == (void*)::sin ||
-                (void*)fp == (void*)::sqrt ||
-                (void*)fp == (void*)::tan)
-            {
-                double (*dfp)(double) = (double (*)(double))fp;
-                if (isUnsigned((CalpontSystemCatalog::ColDataType)in->DataType))
-                {
-                    switch (W)
-                    {
-                        case 4:
-                        {
-                            float fout;
-                            float* finp = (float*)&uval;
-                            uint32_t* valp = (uint32_t*)&fout;
-                            fout = (float)dfp((double)(*finp));
-                            uval = *valp;
-                        }
-                        break;
-                        default:
-                        {
-                            double dout;
-                            double* dinp = (double*)&uval;
-                            uint64_t* valp = (uint64_t*)&dout;
-                            dout = dfp(*dinp);
-                            uval = *valp;
-                        }
-                        break;
-                    }
-                }
-                else
-                {
-                    switch (W)
-                    {
-                        case 4:
-                        {
-                            float fout;
-                            float* finp = (float*)&val;
-                            int32_t* valp = (int32_t*)&fout;
-                            fout = (float)dfp((double)(*finp));
-                            val = *valp;
-                        }
-                        break;
-                        default:
-                        {
-                            double dout;
-                            double* dinp = (double*)&val;
-                            int64_t* valp = (int64_t*)&dout;
-                            dout = dfp(*dinp);
-                            val = *valp;
-                        }
-                        break;
-                    }
-                }
-            }
-            else
-            {
-                if (isUnsigned((CalpontSystemCatalog::ColDataType)in->DataType))
-                {
-                    uval = fp(val);
-                }
-                else
-                {
-                    val = fp(val);
-                }
-            }
-#else
-            val = 0;
-            uval = 0;
-#endif
-        }
-
     }
 
     if (fStatsPtr)
@@ -1398,7 +1213,7 @@ namespace primitives
 {
 
 void PrimitiveProcessor::p_Col(NewColRequestHeader *in, NewColResultHeader *out,
-	unsigned outSize, unsigned *written, UDFFcnPtr_t fp)
+	unsigned outSize, unsigned *written)
 {
 	memcpy(out, in, sizeof(ISMPacketHeader) + sizeof(PrimitiveHeader));
 	out->NVALS = 0;
@@ -1438,16 +1253,16 @@ void PrimitiveProcessor::p_Col(NewColRequestHeader *in, NewColResultHeader *out,
 	switch (in->DataSize)
 	{
 	case 8:
-		p_Col_ridArray<8>(in, out, outSize, written, block, fStatsPtr, itemsPerBlk, parsedColumnFilter, fp);
+		p_Col_ridArray<8>(in, out, outSize, written, block, fStatsPtr, itemsPerBlk, parsedColumnFilter);
 		break;
 	case 4:
-		p_Col_ridArray<4>(in, out, outSize, written, block, fStatsPtr, itemsPerBlk, parsedColumnFilter, fp);
+		p_Col_ridArray<4>(in, out, outSize, written, block, fStatsPtr, itemsPerBlk, parsedColumnFilter);
 		break;
 	case 2:
-		p_Col_ridArray<2>(in, out, outSize, written, block, fStatsPtr, itemsPerBlk, parsedColumnFilter, fp);
+		p_Col_ridArray<2>(in, out, outSize, written, block, fStatsPtr, itemsPerBlk, parsedColumnFilter);
 		break;
 	case 1:
-		p_Col_ridArray<1>(in, out, outSize, written, block, fStatsPtr, itemsPerBlk, parsedColumnFilter, fp);
+		p_Col_ridArray<1>(in, out, outSize, written, block, fStatsPtr, itemsPerBlk, parsedColumnFilter);
 		break;
 	default:
 		idbassert(0);
@@ -1462,11 +1277,11 @@ void PrimitiveProcessor::p_Col(NewColRequestHeader *in, NewColResultHeader *out,
 }
 
 boost::shared_ptr<ParsedColumnFilter> PrimitiveProcessor::parseColumnFilter
-	(const uint8_t *filterString, uint colWidth, uint colType, uint filterCount, 
-	uint BOP)
+	(const uint8_t *filterString, uint32_t colWidth, uint32_t colType, uint32_t filterCount, 
+	uint32_t BOP)
 {
 	boost::shared_ptr<ParsedColumnFilter> ret;
-	uint argIndex;
+	uint32_t argIndex;
 	const ColArgs *args;
 	bool convertToSet = true;
 

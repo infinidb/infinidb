@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -46,8 +46,8 @@ class DictStep : public Command
 		void execute();
 		void project();
 		void project(int64_t *vals);		//used by RTSCommand to redirect input
-		void projectIntoRowGroup(rowgroup::RowGroup &rg, uint row);
-		void projectIntoRowGroup(rowgroup::RowGroup &rg, int64_t *vals, uint col);
+		void projectIntoRowGroup(rowgroup::RowGroup &rg, uint32_t row);
+		void projectIntoRowGroup(rowgroup::RowGroup &rg, int64_t *vals, uint32_t col);
 		uint64_t getLBID();
 
 		/* This doesn't do anything for this class...  make it column-specific or not? */
@@ -83,7 +83,7 @@ class DictStep : public Command
 		void projectResult(std::string* tmpStrings);
 		void projectResult(StringPtr *tmpStrings);
 		void _project();
-		void _projectToRG(rowgroup::RowGroup &rg, uint col);
+		void _projectToRG(rowgroup::RowGroup &rg, uint32_t col);
 
 		// struct used for scratch space
 		struct OrderedToken {
@@ -111,8 +111,8 @@ class DictStep : public Command
 
 		// Worst case, 8192 tokens in the msg.  Each is 10 bytes. */
 		boost::scoped_array<uint8_t> inputMsg;
-		uint tmpResultCounter;
-		uint totalResultLength;
+		uint32_t tmpResultCounter;
+		uint32_t totalResultLength;
 		DictInput *primMsg;
 		std::vector<uint8_t> result;
 

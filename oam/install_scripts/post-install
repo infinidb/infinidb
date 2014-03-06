@@ -83,12 +83,6 @@ fi
 ln -sf libjemalloc.so.3.3.0 libjemalloc.so
 chown -h $user.$user libjemalloc.so >/dev/null 2>&1
 
-ln -sf libunwind.so.8.0.1 libunwind.so.8
-chown -h $user.$user libunwind.so.8 >/dev/null 2>&1
-
-ln -sf libunwind-x86_64.so.8.0.1 libunwind-x86_64.so.8
-chown -h $user.$user libunwind-x86_64.so.8 >/dev/null 2>&1
-
 # TODO-based on early experience with HDP it doesn't install bigtop
 # so the code below will not correctly detect JAVA_HOME.  Need to 
 # decide how to handle
@@ -214,7 +208,7 @@ fi
 
 #log install message
 test -f $installdir/post/functions && . $installdir/post/functions
-LD_LIBRARY_PATH=$installdir/lib $installdir/bin/cplogger -i 100 "***** InfiniDB Installed *****"
+LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$installdir/lib $installdir/bin/cplogger -i 19 "***** InfiniDB Installed *****"
 
 #setup non-root
 if [ $installdir != "/usr/local/Calpont" -a $quiet -eq 0 ]; then
@@ -248,7 +242,7 @@ if [ $hadoop = "/usr/bin/hadoop" ]; then
 	$installdir/bin/hdfsCheck $installdir/lib/hdfs-20.so >/dev/null 2>&1
 	if [ $? -ne 0 ]; then
 		cat <<EOD
-The next steps are:
+If you are intending to install InfiniDB over Hadoop, the next steps are:
 
 export JAVA_HOME=/usr/java/jdk1.6.0_31
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/java/jdk1.6.0_31/jre/lib/amd64/server
@@ -258,7 +252,7 @@ $INFINIDB_INSTALL_DIR/bin/postConfigure
 EOD
 	else
 		cat <<EOD
-The next steps are:
+If you are intending to install InfiniDB over Hadoop, the next steps are:
 
 export JAVA_HOME=/usr/java/jdk1.6.0_31
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/java/jdk1.6.0_31/jre/lib/amd64/server

@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -171,7 +171,7 @@ VBRange& VBRange::operator= (const VBRange& v)
 
 void VBRange::deserialize(ByteStream& bs)
 {
-	u_int32_t tmp;
+	uint32_t tmp;
 
 	bs >> tmp;
 	vbOID = tmp;
@@ -181,7 +181,7 @@ void VBRange::deserialize(ByteStream& bs)
 
 void VBRange::serialize(ByteStream& bs) const
 {
-	bs << (u_int32_t) vbOID;
+	bs << (uint32_t) vbOID;
 	bs << vbFBO;
 	bs << size;
 }
@@ -354,7 +354,7 @@ bool TableLockInfo::overlaps(const TableLockInfo &t, const std::set<uint32_t> &s
 {
 	if (tableOID != t.tableOID)
 		return false;
-	for (uint i = 0; i < dbrootList.size(); i++)
+	for (uint32_t i = 0; i < dbrootList.size(); i++)
 		if (sDbrootList.find(dbrootList[i]) != sDbrootList.end())
 			return true;
 	return false;
@@ -396,7 +396,7 @@ void TableLockInfo::serialize(ostream &o) const
 	o.write((char *) &nameLen, 2);
 	o.write((char *) ownerName.c_str(), nameLen);
 	o.write((char *) &dbrootListSize, 2);
-	for (uint j = 0; j < dbrootListSize; j++)
+	for (uint32_t j = 0; j < dbrootListSize; j++)
 		o.write((char *) &dbrootList[j], 4);
 }
 
@@ -419,7 +419,7 @@ void TableLockInfo::deserialize(istream &i)
 	ownerName = string(buf.get(), nameLen);
 	i.read((char *) &dbrootListSize, 2);
 	dbrootList.resize(dbrootListSize);
-	for (uint j = 0; j < dbrootListSize; j++)
+	for (uint32_t j = 0; j < dbrootListSize; j++)
 		i.read((char *) &dbrootList[j], 4);
 }
 
@@ -438,7 +438,7 @@ void TableLockInfo::serialize(IDBDataFile* o) const
 	o->write((char *) &nameLen, 2);
 	o->write((char *) ownerName.c_str(), nameLen);
 	o->write((char *) &dbrootListSize, 2);
-	for (uint j = 0; j < dbrootListSize; j++)
+	for (uint32_t j = 0; j < dbrootListSize; j++)
 		o->write((char *) &dbrootList[j], 4);
 }
 
@@ -461,7 +461,7 @@ void TableLockInfo::deserialize(IDBDataFile* i)
 	ownerName = string(buf.get(), nameLen);
 	i->read((char *) &dbrootListSize, 2);
 	dbrootList.resize(dbrootListSize);
-	for (uint j = 0; j < dbrootListSize; j++)
+	for (uint32_t j = 0; j < dbrootListSize; j++)
 		i->read((char *) &dbrootList[j], 4);
 }
 
@@ -474,7 +474,7 @@ ostream & operator<<(ostream &os, const QueryContext &qc)
 {
 	os << "  SCN: " << qc.currentScn << endl;
 	os << "  Txns: ";
-	for (uint i = 0; i < qc.currentTxns->size(); i++)
+	for (uint32_t i = 0; i < qc.currentTxns->size(); i++)
 		os << (*qc.currentTxns)[i] << " ";
 	return os;
 }

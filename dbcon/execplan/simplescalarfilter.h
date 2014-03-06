@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -36,11 +36,11 @@
 /**
  * Namespace
  */
-namespace execplan { 
+namespace execplan {
 /**
  * @brief A class to represent a non-correlated scalar sub select filter
  *
- * the sub select can always be resolved first and this scalar filter can be 
+ * the sub select can always be resolved first and this scalar filter can be
  * treated as a constant filter
  */
 class SimpleScalarFilter : public Filter {
@@ -48,7 +48,7 @@ class SimpleScalarFilter : public Filter {
  * Public stuff
  */
 public:
-		  
+
 	/**
 	 * Constructors
 	 */
@@ -56,17 +56,17 @@ public:
 	SimpleScalarFilter(const SimpleScalarFilter& rhs);
 
 	/** Constructors
-	 * 
+	 *
 	 * pass all parts in ctor
 	 * @note SimpleFilter takes ownership of all these pointers
 	 */
 	SimpleScalarFilter(const std::vector<SRCP>& cols, const SOP& op, SCSEP& sub);
-	
+
 	/**
 	 * Destructors
 	 */
 	virtual ~SimpleScalarFilter();
-	
+
 	/**
 	 * Accessor Methods
 	 */
@@ -74,48 +74,48 @@ public:
 	{
 		return fCols;
 	}
-	
+
 	void cols(const std::vector<SRCP>& cols) { fCols = cols; }
-	
+
 	inline const SOP& op() const
 	{
 		return fOp;
 	}
-	
+
 	inline void op (const SOP& op)
 	{
 		fOp = op;
 	}
-	
+
 	inline const SCSEP& sub() const
 	{
 		return fSub;
 	}
-	
+
 	inline void sub(SCSEP& sub)
 	{
 		fSub = sub;
 	}
 
 	virtual const std::string toString() const;
-	
+
 	virtual inline const std::string data() const {return fData;}
 	virtual inline void data( const std::string data ) {fData = data;}
-	
+
 	/**
 	 * The serialization interface
 	 */
 	virtual void serialize(messageqcpp::ByteStream&) const;
 	virtual void unserialize(messageqcpp::ByteStream&);
-		
+
 	/** return a copy of this pointer
 	 *
 	 * deep copy of this pointer and return the copy
-	 */	
+	 */
 	inline virtual SimpleScalarFilter* clone() const
 	{
 	    return new SimpleScalarFilter (*this);
-	}	
+	}
 
 	/** @brief Do a deep, strict (as opposed to semantic) equivalence test
 	 *
@@ -123,28 +123,28 @@ public:
 	 * @return true iff every member of t is a duplicate copy of every member of this; false otherwise
 	 */
 	virtual bool operator==(const TreeNode* t) const;
-	
+
 	/** @brief Do a deep, strict (as opposed to semantic) equivalence test
 	 *
 	 * Do a deep, strict (as opposed to semantic) equivalence test.
 	 * @return true iff every member of t is a duplicate copy of every member of this; false otherwise
 	 */
 	bool operator==(const SimpleScalarFilter& t) const;
-	
+
 	/** @brief Do a deep, strict (as opposed to semantic) equivalence test
 	 *
 	 * Do a deep, strict (as opposed to semantic) equivalence test.
 	 * @return false iff every member of t is a duplicate copy of every member of this; true otherwise
 	 */
 	virtual bool operator!=(const TreeNode* t) const;
-	 
+
 	/** @brief Do a deep, strict (as opposed to semantic) equivalence test
 	 *
 	 * Do a deep, strict (as opposed to semantic) equivalence test.
 	 * @return false iff every member of t is a duplicate copy of every member of this; true otherwise
 	 */
 	bool operator!=(const SimpleScalarFilter& t) const;
-	
+
 private:
 	//default okay?
 	//SelectFilter& operator=(const SelectFilter& rhs);
@@ -157,6 +157,6 @@ private:
 
 std::ostream& operator<<(std::ostream& output, const SimpleScalarFilter& rhs);
 
-} 
+}
 #endif //SELECTFILTER_H
 

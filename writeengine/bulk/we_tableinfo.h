@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -24,9 +24,9 @@
 
 #include <sys/time.h>
 #include <fstream>
-
 #include <utility>
 #include <vector>
+
 #include <boost/thread/mutex.hpp>
 #include <boost/ptr_container/ptr_vector.hpp>
 
@@ -44,6 +44,7 @@
 #include "we_extentstripealloc.h"
 #include "messagelog.h"
 #include "brmtypes.h"
+#include "querytele.h"
 
 namespace WriteEngine
 {
@@ -138,7 +139,7 @@ private:
     std::string fBRMRptFileName;        // Name of distributed mode rpt file
     BRMReporter fBRMReporter;           // Object used to report BRM updates
     uint64_t fTableLockID;              // Unique table lock ID
-    std::vector<u_int16_t> fOrigDbRootIds; // List of DBRoots at start of job
+    std::vector<uint16_t> fOrigDbRootIds; // List of DBRoots at start of job
 
     std::vector<std::string> fErrFiles; // List of *.err files for this table
     std::vector<std::string> fBadFiles; // List of *.bad files for this table
@@ -150,6 +151,7 @@ private:
     unsigned int  fRejectErrCnt;        // Running count in current err msg file
 
     ExtentStripeAlloc fExtentStrAlloc;  // Extent stripe allocator for this tbl
+    querytele::QueryTeleClient fQtc;    // Query Tele client
 
     //--------------------------------------------------------------------------
     // Private Functions
@@ -158,6 +160,8 @@ private:
     int  changeTableLockState();        // Change state of table lock to cleanup
     void closeTableFile();              // Close current tbl file; free buffer
     void closeOpenDbFiles();            // Close DB files left open at job's end
+    int  confirmDBFileChanges();        // Confirm DB file changes (on HDFS)
+    void deleteTempDBFileChanges();     // Delete DB temp swap files (on HDFS)
     int  finishBRM();                   // Finish reporting updates for BRM
     void freeProcessingBuffers();       // Free up Processing Buffers
     bool isBufferAvailable(bool report);// Is tbl buffer available for reading

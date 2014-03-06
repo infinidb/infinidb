@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -77,8 +77,6 @@ using namespace config;
 #include "pp_logger.h"
 using namespace primitives;
 
-#include "multicast.h"
-using namespace multicast;
 #include "errorcodes.h"
 #include "exceptclasses.h"
 
@@ -118,6 +116,8 @@ uint32_t gSession=0;
 dbbc::Stats pmstats(statsName);
 #endif
 
+oam::OamCache *oamCache = oam::OamCache::makeOamCache();
+
 //FIXME: there is an anon ns burried later in between 2 named namespaces...
 namespace primitiveprocessor
 {
@@ -134,13 +134,13 @@ namespace primitiveprocessor
 	bool fLBIDTraceOn;
 
 	/* params from the config file */
-	uint BPPCount;
-	uint blocksReadAhead;
-	uint defaultBufferSize;
-	uint connectionsPerUM;
-	uint highPriorityThreads;
-	uint medPriorityThreads;
-	uint lowPriorityThreads;
+	uint32_t BPPCount;
+	uint32_t blocksReadAhead;
+	uint32_t defaultBufferSize;
+	uint32_t connectionsPerUM;
+	uint32_t highPriorityThreads;
+	uint32_t medPriorityThreads;
+	uint32_t lowPriorityThreads;
 	int  directIOFlag = O_DIRECT;
 	int  noVB = 0;
 
@@ -175,10 +175,10 @@ namespace primitiveprocessor
 	pfBlockMap_t pfExtentMap;
 	boost::mutex pfMutex; // = PTHREAD_MUTEX_INITIALIZER;
 
-	map<uint32_t, shared_ptr<DictEqualityFilter> > dictEqualityFilters;
+	map<uint32_t, boost::shared_ptr<DictEqualityFilter> > dictEqualityFilters;
 	mutex eqFilterMutex;
 
-	uint cacheNum(uint64_t lbid)
+	uint32_t cacheNum(uint64_t lbid)
 	{
 		return ( lbid / brm->getExtentSize() ) % fCacheCount;
 	}
@@ -329,7 +329,7 @@ namespace primitiveprocessor
 	} // prefetchBlocks()
 
 	// returns the # that were cached.
-	uint loadBlocks (
+	uint32_t loadBlocks (
 		LBID_t *lbids,
 		QueryContext qc,
 		VER_t txn,
@@ -338,7 +338,7 @@ namespace primitiveprocessor
 		uint32_t *rCount,
 		bool LBIDTrace,
 		uint32_t sessionID,
-		uint blockCount,
+		uint32_t blockCount,
 		bool *blocksWereVersioned,
 		bool doPrefetch,
 		VSSCache *vssCache)
@@ -346,7 +346,7 @@ namespace primitiveprocessor
 		blockCacheClient bc(*BRPp[cacheNum(lbids[0])]);
 		uint32_t blksRead=0;
 		VSSCache::iterator it;
-		uint i, ret;
+		uint32_t i, ret;
 		bool *vbFlags;
 		int *vssRCs;
 		bool *cacheThisBlock;
@@ -392,7 +392,7 @@ namespace primitiveprocessor
 
 		/*
 		cout << "  resolved ver #s: ";
-		for (uint i = 0; i < blockCount; i++)
+		for (uint32_t i = 0; i < blockCount; i++)
 			cout << " <" << vers[i] << ", " << (int) vbFlags[i] << ", " << (int)
 				cacheThisBlock[i] << ">";
 		cout << endl;
@@ -413,7 +413,7 @@ namespace primitiveprocessor
 			/* After the prefetch they're all cached if they are in the same range, so
 			 * prune the block list and try getCachedBlocks again first, then fall back
 			 * to single-block IO requests if for some reason they aren't. */
-			uint l_blockCount = 0;
+			uint32_t l_blockCount = 0;
 			for (i = 0; i < blockCount; i++) {
 				if (!wasCached[i]) {
 					lbids[l_blockCount] = lbids[i];
@@ -463,9 +463,9 @@ namespace primitiveprocessor
 	}
 
 	void loadBlock (
-		u_int64_t lbid,
+		uint64_t lbid,
 		QueryContext v,
-		u_int32_t t,
+		uint32_t t,
 		int compType,
 		void* bufferPtr,
 		bool* pWasBlockInCache,
@@ -517,6 +517,9 @@ namespace primitiveprocessor
 			boost::scoped_array<char> cmpHdrBufSa;
 			boost::scoped_array<char> cmpBufSa;
 			boost::scoped_array<unsigned char> uCmpBufSa;
+
+
+
 			ptrdiff_t alignedBuffer = 0;
 			void* readBufferPtr = NULL;
 			char* cmpHdrBuf = NULL;
@@ -741,6 +744,11 @@ blockReadRetry:
 				mlp->logInfoMessage(logging::M0006, args);
 			}
 
+			if (pWasBlockInCache)
+				*pWasBlockInCache = false;
+			if (rCount)
+				*rCount = 1;
+
 			return;
 		}
 
@@ -787,7 +795,7 @@ blockReadRetry:
 					bool trace,
 					uint32_t sesID,
 					boost::mutex *m,
-					uint *loaderCount,
+					uint32_t *loaderCount,
 					VSSCache *vCache) :
 								lbid(l),
 								ver(v),
@@ -859,7 +867,7 @@ blockReadRetry:
 			uint32_t sessionID;
 			uint32_t *cacheCount;
 			uint32_t *readCount;
-			uint *busyLoaders;
+			uint32_t *busyLoaders;
 			boost::mutex *mutex;
 			VSSCache *vssCache;
 	};
@@ -873,7 +881,7 @@ blockReadRetry:
 						bool LBIDTrace,
 						uint32_t sessionID,
 						boost::mutex *m,
-						uint *busyLoaders,
+						uint32_t *busyLoaders,
 						VSSCache *vssCache)
 	{
 		blockCacheClient bc(*BRPp[cacheNum(lbid)]);
@@ -1016,12 +1024,13 @@ void DictScanJob::write(const ByteStream& bs)
 int DictScanJob::operator()()
 {
 	uint8_t data[DATA_BLOCK_SIZE];
-	uint output_buf_size = MAX_BUFFER_SIZE;
+	uint32_t output_buf_size = MAX_BUFFER_SIZE;
 	uint32_t session;
 	uint32_t uniqueId = 0;
 	bool wasBlockInCache=false;
 	uint32_t blocksRead = 0;
 	uint16_t runCount;
+
 
 	boost::shared_ptr<DictEqualityFilter> eqFilter;
 	ByteStream results(output_buf_size);
@@ -1043,6 +1052,9 @@ int DictScanJob::operator()()
 		uniqueId = cmd->Hdr.UniqueID;
 		runCount = cmd->Count;
 		output = (TokenByScanResultHeader *) results.getInputPtr();
+#ifdef VALGRIND
+		memset(output, 0, sizeof(TokenByScanResultHeader));
+#endif
 
 		/* Grab the equality filter if one is specified */
 		if (cmd->flags & HAS_EQ_FILTER) {
@@ -1141,7 +1153,7 @@ struct BPPHandler
         LastJoiner(BPPHandler *r, SBS b) : BPPHandlerFunctor(r, b) { }
         int operator()() { return rt->lastJoinerMsg(*bs, dieTime); }
 	};
-    
+
 	struct Create : public BPPHandlerFunctor {
         Create(BPPHandler *r, SBS b) : BPPHandlerFunctor(r, b) { }
         int operator()() { rt->createBPP(*bs); return 0; }
@@ -1204,13 +1216,13 @@ struct BPPHandler
             bpps->getSendThread()->sendMore(msgCount);
             return 0;
         }
-		else 
+		else
             return -1;
 	}
 
 	void createBPP(ByteStream &bs)
 	{
-		uint i;
+		uint32_t i;
 		uint32_t key, initMsgsLeft;
 		SBPP bpp;
 		SBPPV bppv;
@@ -1406,7 +1418,7 @@ struct BPPHandler
 		bppv = grabBPPs(uniqueID);
 		if (!bppv)
 			return;
-		for (uint i = 0; i < bppv->get().size(); i++)
+		for (uint32_t i = 0; i < bppv->get().size(); i++)
 			bppv->get()[i]->setError(error, errorCode);
 		if (bppv->get().empty() && !bppMap.empty() )
 			bppMap.begin()->second.get()->get()[0]->setError(error, errorCode);
@@ -1500,14 +1512,14 @@ public:
 	int destroyEqualityFilter()
 	{
 		uint32_t uniqueID;
-		map<uint32_t, boost::shared_ptr<DictEqualityFilter> >::iterator it;			
+		map<uint32_t, boost::shared_ptr<DictEqualityFilter> >::iterator it;
 
 		bs->advance(sizeof(ISMPacketHeader));
 		*bs >> uniqueID;
 
 		mutex::scoped_lock sl(eqFilterMutex);
 		it = dictEqualityFilters.find(uniqueID);
-		if (it != dictEqualityFilters.end()) {	
+		if (it != dictEqualityFilters.end()) {
 			dictEqualityFilters.erase(it);
 			return 0;
 		}
@@ -1639,36 +1651,6 @@ struct ReadThread
 		ios->write(buildCacheOpResp(0));
 	}
 
-/*
-	void createEqualityFilter(SBS bs)
-	{
-		uint32_t uniqueID, count, i;
-		string str;
-		boost::shared_ptr<DictEqualityFilter> filter(new DictEqualityFilter());
-
-		bs->advance(sizeof(ISMPacketHeader));
-		*bs >> uniqueID;
-		*bs >> count;
-		for (i = 0; i < count; i++) {
-			*bs >> str;
-			filter->insert(str);
-		}
-
-		mutex::scoped_lock sl(eqFilterMutex);
-		dictEqualityFilters[uniqueID] = filter;
-	}
-
-	void destroyEqualityFilter(SBS bs)
-	{
-		mutex::scoped_lock sl(eqFilterMutex);
-		uint32_t uniqueID;
-
-		bs->advance(sizeof(ISMPacketHeader));
-		*bs >> uniqueID;
-		dictEqualityFilters.erase(uniqueID);
-	}
-*/
-
 	void operator()()
 	{
 		boost::shared_ptr<threadpool::PriorityThreadPool> procPoolPtr =
@@ -1778,7 +1760,7 @@ struct ReadThread
 						}
 					}
                     PriorityThreadPool::Job job;
-                    job.functor = shared_ptr<DictScanJob>(new DictScanJob(outIos,
+                    job.functor = boost::shared_ptr<DictScanJob>(new DictScanJob(outIos,
                       bs, writeLock));
                     job.id = hdr->Hdr.UniqueID;
                     job.weight = LOGICAL_BLOCK_RIDS;
@@ -1985,111 +1967,6 @@ struct ServerThread
 	MessageQueueServer* mqServerPtr;
 };
 
-
-
-// Receives messages from Multicast PGM protocol
-struct TransportReceiverThread
-{
-	PrimitiveServer* 	fPrimServer;
-// 	MulticastReceiver 	fmcReceiver;
-	uint64_t			fMaxBytes;
-	bool				fMultiloop;
-	string				fServerName;
-	BPPHandler			fBPPHandler;
-	uint8_t				fLastCommand;
-	uint32_t			fLastUniqueId;
-
-	TransportReceiverThread(uint64_t maxBytes, bool loop, const string& name, PrimitiveServer* ps) :
-		fPrimServer(ps), fMaxBytes(maxBytes), /*fmcReceiver*/fMultiloop(loop), fServerName(name),
-		fBPPHandler(ps), fLastCommand(0), fLastUniqueId(0)
-	{
-		SUMMARY_INFO("Starting multicast receiver");
-	}
-
-	void operator()()
-	{
-		MulticastReceiver fmcReceiver;
-		do
-		{
-			try
-			{
-				SBS byteStream = fmcReceiver.receive();  //blocks
-				processMessage(byteStream);
-			}
-			catch(const logging::MulticastException& ex)
-			{
-				logAndSendErrorMessage(ex.what());
-#ifdef ECONNRESET
-				if (ECONNRESET != ex.errorCode())
-#endif
-					return;
-			}
-			catch(const std::exception& ex)
-			{
-				logAndSendErrorMessage(ex.what());
-				return;
-			}
-			catch(...)
-			{
-				logAndSendErrorMessage("Multicast caught unknown exception");
-				return;
-			}
-
-		}
-		while (true);
-	}
-
-	void processMessage(const SBS& bs)
-	{
-		idbassert(bs->length() >= sizeof(ISMPacketHeader));
-
-		const ByteStream::byte* bytePtr = bs->buf();
-		const ISMPacketHeader* ismHdr = reinterpret_cast<const ISMPacketHeader*>(bytePtr);
-		fLastCommand = ismHdr->Command;
-		posix_time::ptime dieTime = posix_time::second_clock::universal_time() +
-            posix_time::seconds(10);
-		switch (ismHdr->Command)
-		{
-			case BATCH_PRIMITIVE_CREATE:
-				fLastUniqueId = *((const uint32_t *) &bytePtr[sizeof(ISMPacketHeader) + sizeof(uint8_t) + 4*sizeof(uint32_t)]);
-
-				fBPPHandler.createBPP(*bs);
-				break;
-			case BATCH_PRIMITIVE_DESTROY:
-				fBPPHandler.destroyBPP(*bs, dieTime);
-				break;
-			case BATCH_PRIMITIVE_ADD_JOINER:
-				fLastUniqueId = *((const uint32_t *) &bytePtr[sizeof(ISMPacketHeader) + 2*sizeof(uint32_t)]);
-				fBPPHandler.addJoinerToBPP(*bs, dieTime);
-				break;
-			case BATCH_PRIMITIVE_END_JOINER:
-			{
-				// lastJoinerMsg blocks, this thread won't wait.
-				boost::thread t(BPPHandler::LastJoiner(&fBPPHandler, bs));
-				break;
-			}
-			default:
-			 	ostringstream oss;
-				oss << "Incorrect message type for Multicast ";
-				oss <<  ismHdr->Command;
-				logging::Message::Args args;
-				args.add(oss.str());
-				mlp->logMessage(logging::M0070,args);
-		}
-	}
-
-	void logAndSendErrorMessage(const string& msg)
-	{
-		logging::Message::Args args;
-		args.add(msg);
-		mlp->logMessage(logging::M0070,args, true);
-		if (BATCH_PRIMITIVE_ADD_JOINER == fLastCommand || BATCH_PRIMITIVE_CREATE == fLastCommand)
-		{
-			fBPPHandler.setBPPToError(fLastUniqueId, msg, logging::multicastErr);
-		}
-	}
-};
-
 } // namespace anon
 
 namespace primitiveprocessor
@@ -2107,8 +1984,6 @@ PrimitiveServer::PrimitiveServer(int serverThreads,
 								uint32_t deleteBlocks,
 								bool ptTrace,
 								double prefetch,
-								bool multicast,
-								bool multicastloop,
 								uint64_t smallSide
 								):
 				fServerThreads(serverThreads),
@@ -2120,12 +1995,10 @@ PrimitiveServer::PrimitiveServer(int serverThreads,
 				fRotatingDestination(rotatingDestination),
 				fPTTrace(ptTrace),
 				fPrefetchThreshold(prefetch),
-				fMulticast(multicast),
-				fMulticastloop(multicastloop),
 				fPMSmallSide(smallSide)
 {
 	fCacheCount=cacheCount;
-	fServerpool.setMaxThreads(fServerThreads + multicast);
+	fServerpool.setMaxThreads(fServerThreads);
 	fServerpool.setQueueSize(fServerQueueSize);
 
 	fProcessorPool.reset(new threadpool::PriorityThreadPool(fProcessorWeight, highPriorityThreads,
@@ -2169,27 +2042,6 @@ void PrimitiveServer::start()
 
 		fServerpool.invoke(ServerThread(oss.str(), this));
 	}
-
-	if (fMulticast)
-	{
-		pause_(5);
-		try
-		{
-		  fServerpool.invoke(TransportReceiverThread(fPMSmallSide, fMulticastloop, "PMS1", this));
-		}
-		catch (const logging::MulticastException& mce)
-		{
-			string errormsg("  Error starting Multicast Receiver Thread. Turning Multicast off");
-			cout << mce.what() << errormsg << endl;
-			logging::Message::Args args;
-			args.add(mce.what());
-			args.add(errormsg);
-			mlp->logMessage(logging::M0070,args);
-			fMulticast = false;
-		}
-	}
-	// wait for things to settle down...
-//	pause_(5);
 
 	{
 		Oam oam;
@@ -2242,15 +2094,15 @@ const vector<boost::shared_ptr<BatchPrimitiveProcessor> > & BPPV::get()
 
 boost::shared_ptr<BatchPrimitiveProcessor> BPPV::next()
 {
-	uint size = v.size();
-	uint i;
+	uint32_t size = v.size();
+	uint32_t i;
 
 #if 0
 	// This block of code scans for the first available BPP instance,
 	// makes BPPSeeder reschedule it if none are available. Relies on BPP instance
 	// being preallocated.
 	for (i = 0; i < size; i++) {
-		uint index = (i + pos) % size;
+		uint32_t index = (i + pos) % size;
 		if (!(v[index]->busy())) {
 			pos = (index + 1) % size;
 			v[index]->busy(true);
@@ -2268,7 +2120,7 @@ boost::shared_ptr<BatchPrimitiveProcessor> BPPV::next()
 		return boost::shared_ptr<BatchPrimitiveProcessor>();
 
 	for (i = 0; i < size; i++) {
-		uint index = (i+pos) % size;
+		uint32_t index = (i+pos) % size;
 		if (!(v[index]->busy())) {
 			pos = (index + 1) % size;
 			v[index]->busy(true);

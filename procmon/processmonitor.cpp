@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -49,6 +49,7 @@ extern string GlusterConfig;
 extern bool rootUser;
 extern string USER;
 extern bool HDFS;
+extern string PMwithUM;
 
 //std::string gOAMParentModuleName;
 bool gOAMParentModuleFlag;
@@ -573,17 +574,17 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 						}
 
 						pid_t processID = startProcess(processconfig.ModuleType,
-														processconfig.ProcessName,
-														processconfig.ProcessLocation, 
-														processconfig.ProcessArgs, 
-														processconfig.LaunchID,
-														processconfig.BootLaunch,
-														processconfig.RunType,
-														processconfig.DepProcessName, 
-														processconfig.DepModuleName,
-														processconfig.LogFile,
-														initType,
-														actIndicator);
+										processconfig.ProcessName,
+										processconfig.ProcessLocation, 
+										processconfig.ProcessArgs, 
+										processconfig.LaunchID,
+										processconfig.BootLaunch,
+										processconfig.RunType,
+										processconfig.DepProcessName, 
+										processconfig.DepModuleName,
+										processconfig.LogFile,
+										initType,
+										actIndicator);
 						if ( processID > oam::API_MAX )
 							processID = oam::API_SUCCESS;
 						requestStatus = processID;
@@ -1729,6 +1730,85 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 			break;
 		}
 
+		case MASTERREP:
+		{
+			log.writeLog(__LINE__,  "MSG RECEIVED: Run Master Replication script ");
+
+			string mysqlpw;
+			msg >> mysqlpw;
+
+			string masterLogFile = oam::UnassignedName;
+			string masterLogPos = oam::UnassignedName;
+
+			//change local my.cnf file
+			int ret = changeMyCnf("master");
+
+			if ( ret == oam::API_FAILURE )
+			{
+				ackMsg << (ByteStream::byte) ACK;
+				ackMsg << (ByteStream::byte) MASTERREP;
+				ackMsg << (ByteStream::byte) ret;
+				ackMsg <<  masterLogFile;
+				ackMsg <<  masterLogPos;
+				mq.write(ackMsg);
+	
+				log.writeLog(__LINE__, "MASTERREP: ACK back to ProcMgr return status = " + oam.itoa((int) ret));
+				break;
+			}
+
+			// run Master Rep script
+			ret = runMasterRep(mysqlpw, masterLogFile, masterLogPos);
+
+			ackMsg << (ByteStream::byte) ACK;
+			ackMsg << (ByteStream::byte) MASTERREP;
+			ackMsg << (ByteStream::byte) ret;
+			ackMsg <<  masterLogFile;
+			ackMsg <<  masterLogPos;
+			mq.write(ackMsg);
+
+			log.writeLog(__LINE__, "MASTERREP: ACK back to ProcMgr return status = " + oam.itoa((int) ret));
+
+			break;
+		}
+
+		case SLAVEREP:
+		{
+			log.writeLog(__LINE__,  "MSG RECEIVED: Run Slave Replication script ");
+
+			string mysqlpw;
+			msg >> mysqlpw;
+			string masterLogFile;
+			msg >> masterLogFile;
+			string masterLogPos;
+			msg >> masterLogPos;
+
+			//change local my.cnf file
+			int ret = changeMyCnf("slave");
+
+			if ( ret == oam::API_FAILURE )
+			{
+				ackMsg << (ByteStream::byte) ACK;
+				ackMsg << (ByteStream::byte) SLAVEREP;
+				ackMsg << (ByteStream::byte) ret;
+				mq.write(ackMsg);
+	
+				log.writeLog(__LINE__, "SLAVEREP: ACK back to ProcMgr return status = " + oam.itoa((int) ret));
+				break;
+			}
+
+			// run Slave Rep script
+			ret = runSlaveRep(mysqlpw, masterLogFile, masterLogPos);
+
+			ackMsg << (ByteStream::byte) ACK;
+			ackMsg << (ByteStream::byte) SLAVEREP;
+			ackMsg << (ByteStream::byte) ret;
+			mq.write(ackMsg);
+
+			log.writeLog(__LINE__, "SLAVEREP: ACK back to ProcMgr return status = " + oam.itoa((int) ret));
+
+			break;
+		}
+
 		default:
 			break;
 	} //end of switch
@@ -2127,8 +2207,8 @@ pid_t ProcessMonitor::startProcess(string processModuleType, string processName,
 //				DBRMDir = tempDBRMDir;
 
 				// remove all files for temp directory
-//				cmd = "rm -f " + DBRMDir + "/*";
-//				system(cmd.c_str());
+				cmd = "rm -f " + DBRMDir + "/*";
+				system(cmd.c_str());
 
 				// go request files from parent OAM module
 				if ( getDBRMdata() != oam::API_SUCCESS ) {
@@ -2200,11 +2280,11 @@ pid_t ProcessMonitor::startProcess(string processModuleType, string processName,
 				}
 	
 				// now delete the dbrm data from local disk
-//				if ( !gOAMParentModuleFlag) {
-//					string cmd = "rm -f " + tempDBRMDir + "/*";
-//					system(cmd.c_str());
-//					log.writeLog(__LINE__, "removed DBRM file with command: " + cmd, LOG_TYPE_DEBUG);
-//				}
+				if ( !gOAMParentModuleFlag && !HDFS ) {
+					string cmd = "rm -f " + DBRMDir + "/*";
+					system(cmd.c_str());
+					log.writeLog(__LINE__, "removed DBRM file with command: " + cmd, LOG_TYPE_DEBUG);
+				}
 			}
 			else
 				log.writeLog(__LINE__, "No DBRM files exist, must be a initial startup", LOG_TYPE_DEBUG);
@@ -3245,11 +3325,24 @@ int ProcessMonitor::updateConfig()
 	for( unsigned int i = 0 ; i < systemprocessconfig.processconfig.size(); i++)
 	{
 		if (systemprocessconfig.processconfig[i].ModuleType == systemModuleType
+			|| ( systemprocessconfig.processconfig[i].ModuleType == "um" &&
+				systemModuleType == "pm" && PMwithUM == "y" )
 			|| systemprocessconfig.processconfig[i].ModuleType == "ChildExtOAMModule"
 			|| ( systemprocessconfig.processconfig[i].ModuleType == "ChildOAMModule" )
 			|| (systemprocessconfig.processconfig[i].ModuleType == "ParentOAMModule" &&
 				systemModuleType == OAMParentModuleType) )
 		{
+			if ( systemprocessconfig.processconfig[i].ModuleType == "um" && 
+				systemModuleType == "pm" && PMwithUM == "y" &&
+				systemprocessconfig.processconfig[i].ProcessName == "DMLProc" )
+				continue;
+
+
+			if ( systemprocessconfig.processconfig[i].ModuleType == "um" && 
+				systemModuleType == "pm" && PMwithUM == "y" &&
+				systemprocessconfig.processconfig[i].ProcessName == "DDLProc" )
+				continue;
+
 			ProcessStatus processstatus;
 			try {
 				//Get the process information 
@@ -3268,17 +3361,17 @@ int ProcessMonitor::updateConfig()
 			}
 
 			config.buildList(systemprocessconfig.processconfig[i].ModuleType,
-								systemprocessconfig.processconfig[i].ProcessName,
-								systemprocessconfig.processconfig[i].ProcessLocation,
-								systemprocessconfig.processconfig[i].ProcessArgs,
-								systemprocessconfig.processconfig[i].LaunchID,
-								processstatus.ProcessID,
-								processstatus.ProcessOpState,
-								systemprocessconfig.processconfig[i].BootLaunch,
-								systemprocessconfig.processconfig[i].RunType,
-								systemprocessconfig.processconfig[i].DepProcessName, 
-								systemprocessconfig.processconfig[i].DepModuleName,
-								systemprocessconfig.processconfig[i].LogFile);
+					systemprocessconfig.processconfig[i].ProcessName,
+					systemprocessconfig.processconfig[i].ProcessLocation,
+					systemprocessconfig.processconfig[i].ProcessArgs,
+					systemprocessconfig.processconfig[i].LaunchID,
+					processstatus.ProcessID,
+					processstatus.ProcessOpState,
+					systemprocessconfig.processconfig[i].BootLaunch,
+					systemprocessconfig.processconfig[i].RunType,
+					systemprocessconfig.processconfig[i].DepProcessName, 
+					systemprocessconfig.processconfig[i].DepModuleName,
+					systemprocessconfig.processconfig[i].LogFile);
 		}
 	}
 	return API_SUCCESS;
@@ -3393,7 +3486,9 @@ int ProcessMonitor::checkSpecialProcessState( std::string processName, std::stri
 
 		log.writeLog(__LINE__, "checkSpecialProcessState on : " + processName, LOG_TYPE_DEBUG);
 
-		if ( runType == SIMPLEX && gOAMParentModuleFlag )
+		if ( runType == SIMPLEX && PMwithUM == "y" && processModuleType == "um" && gOAMParentModuleFlag)
+			retStatus = oam::COLD_STANDBY;
+		else if ( runType == SIMPLEX && gOAMParentModuleFlag )
 			retStatus = oam::MAN_INIT;
 		else if ( runType == ACTIVE_STANDBY && processModuleType == "ParentOAMModule" && 
 				( gOAMParentModuleFlag || !runStandby ) )
@@ -4335,6 +4430,10 @@ void ProcessMonitor::checkProcessFailover( std::string processName)
 			{
 				if ( systemprocessstatus.processstatus[i].ProcessName == processName  &&
 						systemprocessstatus.processstatus[i].Module != config.moduleName() ) {
+					//make sure it matches module type
+					string procModuleType = systemprocessstatus.processstatus[i].Module.substr(0,MAX_MODULE_TYPE_SIZE);
+					if ( config.moduleType() != procModuleType )
+						continue;
 					if ( systemprocessstatus.processstatus[i].ProcessOpState == oam::COLD_STANDBY || 
 						systemprocessstatus.processstatus[i].ProcessOpState == oam::AUTO_OFFLINE ||
 						systemprocessstatus.processstatus[i].ProcessOpState == oam::FAILED ) {
@@ -4392,13 +4491,11 @@ int ProcessMonitor::runUpgrade(std::string mysqlpw)
 	for ( int i = 0 ; i < 10 ; i++ )
 	{
 		//run upgrade script
-		string logdir("/var/log/Calpont");
-		if (access(logdir.c_str(), W_OK) != 0) logdir = "/tmp";
 		string cmd = startup::StartUp::installDir() + "/bin/upgrade-infinidb.sh doupgrade --password=" +
-			mysqlpw + " --installdir=" +  startup::StartUp::installDir() + "  > " + logdir + "/upgrade-infinidb.log1 2>&1";
+			mysqlpw + " --installdir=" +  startup::StartUp::installDir() + "  > " + "/tmp/upgrade-infinidb.log 2>&1";
 		system(cmd.c_str());
 
-		cmd = logdir + "/upgrade-infinidb.log1";
+		cmd = "/tmp/upgrade-infinidb.log";
 		if (oam.checkLogStatus(cmd, "OK")) {
 			log.writeLog(__LINE__, "upgrade-infinidb.sh: Successful return", LOG_TYPE_DEBUG);
 			return oam::API_SUCCESS;
@@ -4422,6 +4519,357 @@ int ProcessMonitor::runUpgrade(std::string mysqlpw)
 	return oam::API_FAILURE;
 }
 
+
+/******************************************************************************************
+* @brief	changeMyCnf
+*
+* purpose:	Change my.cnf
+*
+******************************************************************************************/
+int ProcessMonitor::changeMyCnf(std::string type)
+{
+	Oam oam;
+
+	log.writeLog(__LINE__, "changeMyCnf function called for " + type, LOG_TYPE_DEBUG);
+
+	string mycnfFile = startup::StartUp::installDir() + "/mysql/my.cnf";
+	ifstream file (mycnfFile.c_str());
+	if (!file) {
+		log.writeLog(__LINE__, "changeMyCnf - my.cnf file not found: " + mycnfFile, LOG_TYPE_CRITICAL);
+		return oam::API_FAILURE;
+	}
+
+	if ( type == "master" )
+	{
+		// set master replication entries
+		vector <string> lines;
+		char line[200];
+		string buf;
+		while (file.getline(line, 200))
+		{
+			buf = line;
+			string::size_type pos = buf.find("server-id =",0);
+			if ( pos != string::npos ) {
+				buf = "server-id = 1";
+			}
+
+			pos = buf.find("# log-bin=mysql-bin",0);
+			if ( pos != string::npos ) {
+				buf = "log-bin=mysql-bin";
+			}
+
+			pos = buf.find("infinidb_local_query=1",0);
+			if ( pos != string::npos && pos == 0) {
+				buf = "# infinidb_local_query=1";
+			}
+
+			//output to temp file
+			lines.push_back(buf);
+		}
+
+		file.close();
+		unlink (mycnfFile.c_str());
+		ofstream newFile (mycnfFile.c_str());	
+		
+		//create new file
+		int fd = open(mycnfFile.c_str(), O_RDWR|O_CREAT, 0666);
+		
+		copy(lines.begin(), lines.end(), ostream_iterator<string>(newFile, "\n"));
+		newFile.close();
+		
+		close(fd);
+	}
+
+	if ( type == "slave" )
+	{
+		//get slave id based on ExeMgrx setup
+		string slaveID = "0";
+		string hostIPAdd = oam::UnassignedName;
+		string slaveModuleName = config.moduleName();
+		for ( int id = 1 ; ; id++ )
+		{
+			string Section = "ExeMgr" + oam.itoa(id);
+
+			string moduleName;
+
+			try {
+				Config* sysConfig = Config::makeConfig();
+				moduleName = sysConfig->getConfig(Section, "Module");
+
+				if ( moduleName == slaveModuleName )
+				{
+					slaveID = oam.itoa(id);
+
+					// if slave ID from above is 1, then it means this is a former Original master and use the ID of the current Master
+					if ( slaveID == "1" ) {
+						string PrimaryUMModuleName;
+						oam.getSystemConfig("PrimaryUMModuleName", PrimaryUMModuleName);
+
+						for ( int mid = 1 ; ; mid++ )
+						{
+							string Section = "ExeMgr" + oam.itoa(mid);
+				
+							string moduleName;
+				
+							try {
+								Config* sysConfig = Config::makeConfig();
+								moduleName = sysConfig->getConfig(Section, "Module");
+				
+								if ( moduleName == PrimaryUMModuleName )
+								{
+									slaveID = oam.itoa(mid);
+									break;
+								}
+							}
+							catch (...) {}
+						}
+					}
+
+					hostIPAdd = sysConfig->getConfig(Section, "IPAddr");
+					break;
+				}
+			}
+			catch (...) {}
+		}
+
+		if ( slaveID == "0" )
+		{
+			log.writeLog(__LINE__, "changeMyCnf: ExeMgr for local module doesn't exist", LOG_TYPE_ERROR);
+			return oam::API_FAILURE;
+		}
+
+		if ( hostIPAdd == oam::UnassignedName )
+		{
+			log.writeLog(__LINE__, "changeMyCnf: ExeMgr for IpAddress doesn't exist", LOG_TYPE_ERROR);
+			return oam::API_FAILURE;
+		}
+
+		// set slave replication entries
+		vector <string> lines;
+		char line[200];
+		string buf;
+		while (file.getline(line, 200))
+		{
+			buf = line;
+			string::size_type pos = buf.find("server-id =",0);
+			if ( pos != string::npos ) {
+				buf = "server-id = " + slaveID;
+			}
+
+			pos = buf.find("#relay-log=HOSTNAME-relay-bin",0);
+			if ( pos != string::npos ) {
+				buf = "relay-log=" + hostIPAdd + "-relay-bin";
+			}
+
+			// set local query flag if on pm
+			if ( config.moduleType() == "pm" )
+			{
+				pos = buf.find("# infinidb_local_query=1",0);
+				if ( pos != string::npos ) {
+					buf = "infinidb_local_query=1";
+				}
+			}
+
+			pos = buf.find("log-bin=mysql-bin",0);
+			if ( pos != string::npos && pos == 0 ) {
+				buf = "# log-bin=mysql-bin";
+			}
+
+			//output to temp file
+			lines.push_back(buf);
+		}
+
+		file.close();
+		unlink (mycnfFile.c_str());
+		ofstream newFile (mycnfFile.c_str());	
+		
+		//create new file
+		int fd = open(mycnfFile.c_str(), O_RDWR|O_CREAT, 0666);
+		
+		copy(lines.begin(), lines.end(), ostream_iterator<string>(newFile, "\n"));
+		newFile.close();
+		
+		close(fd);
+	}
+
+	// restart mysql
+	try {
+		oam.actionMysqlCalpont(MYSQL_RESTART);
+	}
+	catch(...)
+	{}
+
+	return oam::API_SUCCESS;
+}
+
+/******************************************************************************************
+* @brief	runMasterRep
+*
+* purpose:	run Master Replication script
+*
+******************************************************************************************/
+int ProcessMonitor::runMasterRep(std::string& mysqlpw, std::string& masterLogFile, std::string& masterLogPos)
+{
+	Oam oam;
+
+	log.writeLog(__LINE__, "runMasterRep function called", LOG_TYPE_DEBUG);
+
+	SystemModuleTypeConfig systemModuleTypeConfig;
+	try {
+		oam.getSystemConfig(systemModuleTypeConfig);
+	}
+	catch (exception& ex)
+	{
+		string error = ex.what();
+		log.writeLog(__LINE__, "EXCEPTION ERROR on getSystemConfig: " + error, LOG_TYPE_ERROR);
+	}
+	catch(...)
+	{
+		log.writeLog(__LINE__, "EXCEPTION ERROR on getSystemConfig: Caught unknown exception!", LOG_TYPE_ERROR);
+	}
+
+	// create user for each module by ip address
+	for ( unsigned int i = 0 ; i < systemModuleTypeConfig.moduletypeconfig.size(); i++)
+	{
+		int moduleCount = systemModuleTypeConfig.moduletypeconfig[i].ModuleCount;
+		if( moduleCount == 0)
+			continue;
+
+		DeviceNetworkList::iterator pt = systemModuleTypeConfig.moduletypeconfig[i].ModuleNetworkList.begin();
+		for( ; pt != systemModuleTypeConfig.moduletypeconfig[i].ModuleNetworkList.end() ; pt++)
+		{
+			HostConfigList::iterator pt1 = (*pt).hostConfigList.begin();
+			for ( ; pt1 != (*pt).hostConfigList.end() ; pt1++ )
+			{
+				string ipAddr = (*pt1).IPAddr;
+
+				string logFile = "/tmp/master-rep-infinidb-" + ipAddr + ".log";
+				string cmd = startup::StartUp::installDir() + "/bin/master-rep-infinidb.sh --password=" +
+					mysqlpw + " --installdir=" + startup::StartUp::installDir() + " --hostIP=" + ipAddr + "  > " + logFile + " 2>&1";
+				system(cmd.c_str());
+		
+				if (oam.checkLogStatus(logFile, "OK"))
+					log.writeLog(__LINE__, "master-rep-infinidb.sh: Successful return for node " + ipAddr, LOG_TYPE_DEBUG);
+				else 
+				{
+					if (oam.checkLogStatus(logFile, "ERROR 1045") ) {
+						log.writeLog(__LINE__, "master-rep-infinidb.sh: Missing Password error, return success", LOG_TYPE_DEBUG);
+						return oam::API_SUCCESS;
+					}
+					else
+					{
+						log.writeLog(__LINE__, "master-rep-infinidb.sh: Error return, check log " + logFile, LOG_TYPE_ERROR);
+						return oam::API_FAILURE;
+					}
+				}
+			}
+		}
+	}
+
+	// go parse out the MASTER_LOG_FILE and MASTER_LOG_POS
+	// this is what the output will look like
+	//
+	//	SHOW MASTER STATUS
+	//	File	Position	Binlog_Do_DB	Binlog_Ignore_DB
+	//	mysql-bin.000006	2921
+	// 
+	// in log - /tmp/show-master-status.log
+
+	ifstream file ("/tmp/show-master-status.log");
+	if (!file) {
+		log.writeLog(__LINE__, "runMasterRep - show master status log file doesn't exist - /tmp/show-master-status.log", LOG_TYPE_CRITICAL);
+		return oam::API_FAILURE;
+	}
+	else
+	{
+		char line[200];
+		string buf;
+		while (file.getline(line, 200))
+		{
+			buf = line;
+			string::size_type pos = buf.find("mysql-bin",0);
+			if ( pos != string::npos ) {
+				string::size_type pos1 = buf.find("\t",pos);
+				if ( pos1 != string::npos ) {
+					string masterlogfile = buf.substr(pos,pos1-pos);
+
+					//strip trailing spaces
+					string::size_type lead = masterlogfile.find_first_of(" ");
+					masterLogFile = masterlogfile.substr( 0, lead);
+
+					string masterlogpos = buf.substr(pos1,80);
+
+					//strip off leading tab masterlogpos
+					lead=masterlogpos.find_first_not_of("\t");
+					masterlogpos = masterlogpos.substr( lead, masterlogpos.length()-lead);
+
+					//string trailing spaces
+					lead = masterlogpos.find_first_of(" ");
+					masterLogPos = masterlogpos.substr( 0, lead);
+
+					log.writeLog(__LINE__, "runMasterRep: masterlogfile=" + masterLogFile + ", masterlogpos=" + masterLogPos, LOG_TYPE_DEBUG);
+					file.close();
+					return oam::API_SUCCESS;
+				}
+			}
+		}
+
+		file.close();
+	}
+
+	log.writeLog(__LINE__, "runMasterRep - 'mysql-bin not found in log file - /tmp/show-master-status.log", LOG_TYPE_CRITICAL);
+	return oam::API_FAILURE;
+}
+
+/******************************************************************************************
+* @brief	runSlaveRep
+*
+* purpose:	run Slave Replication script
+*
+******************************************************************************************/
+int ProcessMonitor::runSlaveRep(std::string& mysqlpw, std::string& masterLogFile, std::string& masterLogPos)
+{
+	Oam oam;
+
+	log.writeLog(__LINE__, "runSlaveRep function called", LOG_TYPE_DEBUG);
+
+	// get master replicaion module IP Address
+	string PrimaryUMModuleName;
+	oam.getSystemConfig("PrimaryUMModuleName", PrimaryUMModuleName);
+
+	string masterIPAddress;;
+	try
+	{
+		ModuleConfig moduleconfig;
+		oam.getSystemConfig(PrimaryUMModuleName, moduleconfig);
+		HostConfigList::iterator pt1 = moduleconfig.hostConfigList.begin();
+		masterIPAddress = (*pt1).IPAddr;
+	}
+	catch(...)
+	{}
+
+	string cmd = startup::StartUp::installDir() + "/bin/slave-rep-infinidb.sh --password=" +
+		mysqlpw + " --installdir=" + startup::StartUp::installDir() + " --masteripaddr=" + masterIPAddress + " --masterlogfile=" + masterLogFile  + " --masterlogpos=" + masterLogPos + "  >   /tmp/slave-rep-infinidb.log 2>&1";
+	system(cmd.c_str());
+
+	cmd = "/tmp/slave-rep-infinidb.log";
+	if (oam.checkLogStatus(cmd, "OK")) {
+		log.writeLog(__LINE__, "slave-rep-infinidb.sh: Successful return", LOG_TYPE_DEBUG);
+		return oam::API_SUCCESS;
+	}
+	else {
+		if (oam.checkLogStatus(cmd, "ERROR 1045") ) {
+			log.writeLog(__LINE__, "slave-rep-infinidb.sh: Missing Password error, return success", LOG_TYPE_DEBUG);
+			return oam::API_SUCCESS;
+		}
+
+		log.writeLog(__LINE__, "slave-rep-infinidb.sh: Error return, check log /tmp/slave-rep-infinidb.log", LOG_TYPE_ERROR);
+		return oam::API_FAILURE;
+	}
+
+	return oam::API_FAILURE;
+}
+
 /******************************************************************************************
 * @brief	amazonIPCheck
 *
@@ -4434,6 +4882,9 @@ bool ProcessMonitor::amazonIPCheck()
 	Oam oam;
 
 	log.writeLog(__LINE__, "amazonIPCheck function called", LOG_TYPE_DEBUG);
+
+	// delete description file so it will create a new one
+	unlink("/tmp/describeInstance.txt");
 
 	//
 	// Get Module Info
@@ -4749,7 +5200,7 @@ void ProcessMonitor::unmountExtraDBroots()
 	ModuleConfig moduleconfig;
 	Oam oam;
 
-	string DBRootStorageType = "local";
+	string DBRootStorageType = "internal";
 
 	try{
 		oam.getSystemConfig("DBRootStorageType", DBRootStorageType);
@@ -4839,45 +5290,52 @@ int ProcessMonitor::checkDataMount()
 
 	log.writeLog(__LINE__, "checkDataMount called ", LOG_TYPE_DEBUG);
 
-	string DBRootStorageType = "local";
+	string DBRootStorageType = "internal";
 	vector <string> dbrootList;
 	string installDir(startup::StartUp::installDir());
 
-	try
+	for ( int retry = 0 ; retry < 10 ; retry++)
 	{
-		systemStorageInfo_t t;
-		t = oam.getStorageConfig();
-
-		if ( boost::get<1>(t) == 0 ) {
-			log.writeLog(__LINE__, "No dbroots are configured in Calpont.xml file", LOG_TYPE_WARNING);
-			return API_INVALID_PARAMETER;
-		}
-
-		DeviceDBRootList moduledbrootlist = boost::get<2>(t);
-
-		DeviceDBRootList::iterator pt = moduledbrootlist.begin();
-		for( ; pt != moduledbrootlist.end() ; pt++)
+		try
 		{
-			int moduleID = (*pt).DeviceID;
-
-			DBRootConfigList::iterator pt1 = (*pt).dbrootConfigList.begin();
-			for( ; pt1 != (*pt).dbrootConfigList.end() ;pt1++)
+			systemStorageInfo_t t;
+			t = oam.getStorageConfig();
+	
+			if ( boost::get<1>(t) == 0 ) {
+				log.writeLog(__LINE__, "getStorageConfig return: No dbroots are configured in Calpont.xml file", LOG_TYPE_WARNING);
+				return API_INVALID_PARAMETER;
+			}
+	
+			DeviceDBRootList moduledbrootlist = boost::get<2>(t);
+	
+			DeviceDBRootList::iterator pt = moduledbrootlist.begin();
+			for( ; pt != moduledbrootlist.end() ; pt++)
 			{
-				if (config.moduleID() == moduleID)
+				int moduleID = (*pt).DeviceID;
+	
+				DBRootConfigList::iterator pt1 = (*pt).dbrootConfigList.begin();
+				for( ; pt1 != (*pt).dbrootConfigList.end() ;pt1++)
 				{
-					dbrootList.push_back(oam.itoa(*pt1));
+					if (config.moduleID() == moduleID)
+					{
+						dbrootList.push_back(oam.itoa(*pt1));
+					}
 				}
 			}
+
+			break;
 		}
-	}
-	catch (exception& ex)
-	{
-		string error = ex.what();
-		log.writeLog(__LINE__, "EXCEPTION ERROR on getStorageConfig: " + error, LOG_TYPE_ERROR);
-	}
-	catch(...)
-	{
-		log.writeLog(__LINE__, "EXCEPTION ERROR on getStorageConfig: Caught unknown exception!", LOG_TYPE_ERROR);
+		catch (exception& ex)
+		{
+			string error = ex.what();
+			log.writeLog(__LINE__, "EXCEPTION ERROR on getStorageConfig: " + error, LOG_TYPE_ERROR);
+			sleep (1);
+		}
+		catch(...)
+		{
+			log.writeLog(__LINE__, "EXCEPTION ERROR on getStorageConfig: Caught unknown exception!", LOG_TYPE_ERROR);
+			sleep (1);
+		}
 	}
 
 	if ( dbrootList.size() == 0 ) {

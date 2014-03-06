@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -68,8 +68,8 @@ class BPPSeeder : public threadpool::PriorityThreadPool::Functor
 
 		uint32_t getID();
 
-		void priority(uint p) { _priority = p; }
-		uint priority() { return _priority; }
+		void priority(uint32_t p) { _priority = p; }
+		uint32_t priority() { return _priority; }
 
 	private:
 		BPPSeeder();
@@ -90,7 +90,7 @@ class BPPSeeder : public threadpool::PriorityThreadPool::Functor
 		bool firstRun;
 		boost::posix_time::ptime dieTime;
 
-		uint _priority;
+		uint32_t _priority;
 };
 
 };

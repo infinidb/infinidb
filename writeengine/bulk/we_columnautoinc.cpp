@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -312,7 +312,7 @@ ColumnAutoIncJob::~ColumnAutoIncJob( )
 //------------------------------------------------------------------------------
 /* virtual */
 int ColumnAutoIncJob::reserveNextRange(
-    uint autoIncCount,
+    uint32_t autoIncCount,
     uint64_t& nextValue )
 {
     boost::mutex::scoped_lock lock(fAutoIncMutex);
@@ -350,11 +350,11 @@ ColumnAutoIncIncremental::~ColumnAutoIncIncremental( )
 //------------------------------------------------------------------------------
 /* virtual */
 int ColumnAutoIncIncremental::reserveNextRange(
-    uint autoIncCount,
+    uint32_t autoIncCount,
     uint64_t& nextValue )
 {
-    u_int64_t countArg   = autoIncCount;
-    u_int64_t nextValArg = 0;
+    uint64_t countArg   = autoIncCount;
+    uint64_t nextValArg = 0;
     std::string errMsg;
     int rc = BRMWrapper::getInstance()->getAutoIncrementRange(
         fColumnOID, countArg, nextValArg, errMsg );

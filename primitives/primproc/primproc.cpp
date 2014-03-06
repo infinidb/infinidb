@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -73,20 +73,19 @@ using namespace idbdatafile;
 namespace primitiveprocessor
 {
 
-extern uint BPPCount;
-extern uint blocksReadAhead;
-extern uint defaultBufferSize;
-extern uint connectionsPerUM;
-extern uint highPriorityThreads;
-extern uint medPriorityThreads;
-extern uint lowPriorityThreads;
+extern uint32_t BPPCount;
+extern uint32_t blocksReadAhead;
+extern uint32_t defaultBufferSize;
+extern uint32_t connectionsPerUM;
+extern uint32_t highPriorityThreads;
+extern uint32_t medPriorityThreads;
+extern uint32_t lowPriorityThreads;
 extern int  directIOFlag;
 extern int  noVB;
 
 
 DebugLevel gDebugLevel;
 Logger* mlp;
-UDFFcnMap_t UDFFcnMap;
 string systemLang;
 bool utf8 = false;
 
@@ -94,8 +93,6 @@ bool isDebug( const DebugLevel level )
 {
         return level <= gDebugLevel;
 }
-
-extern void loadUDFs();
 
 }
 
@@ -188,7 +185,7 @@ public:
 	{
 		for (;;)
 		{
-			uint qd = fPsp->getProcessorThreadPool()->getWaiting();
+			uint32_t qd = fPsp->getProcessorThreadPool()->getWaiting();
 			if (fQszLog)
 			{
 				// Get a timestamp for output.
@@ -329,13 +326,11 @@ int main(int argc, char* argv[])
 	uint64_t extentRows = 8*1024*1024;
 	uint64_t MaxExtentSize = 0;
 	double prefetchThreshold;
-	bool multicast = false;
-	bool multicastloop = false;
 	uint64_t PMSmallSide = 67108864;
 	BPPCount = 16;
 	int numCores = -1;
 	int configNumCores = -1;
-	uint highPriorityPercentage, medPriorityPercentage, lowPriorityPercentage;
+	uint32_t highPriorityPercentage, medPriorityPercentage, lowPriorityPercentage;
 	utils::CGroupConfigurator cg;
 
 	gDebugLevel = primitiveprocessor::NONE;
@@ -448,8 +443,8 @@ int main(int argc, char* argv[])
 	if (temp > 0)
 		deleteBlocks = temp;
 
-	if ((uint)(.01 * BRPBlocks) < deleteBlocks)
-		deleteBlocks = (uint)(.01 * BRPBlocks);
+	if ((uint32_t)(.01 * BRPBlocks) < deleteBlocks)
+		deleteBlocks = (uint32_t)(.01 * BRPBlocks);
 
 	temp = toInt(cf->getConfig(primitiveServers, "ColScanBufferSizeBlocks"));
 	if (temp > (int) MaxReadAheadSz || temp < 1)
@@ -520,19 +515,6 @@ int main(int argc, char* argv[])
 			rotatingDestination = false;
 	}
 
-	strVal = cf->getConfig(primitiveServers, "Multicast");
-	if ((strVal == "y") || (strVal == "Y"))
-		multicast = true;
-	if (multicast)
-	{
-		strVal = cf->getConfig(primitiveServers, "MulticastLoop");
-		if ((strVal == "y") || (strVal == "Y"))
-			multicastloop = true;
-		uint64_t tmp = cf->uFromText(cf->getConfig("HashJoin", "PmMaxMemorySmallSide"));
-		if (tmp)
-			PMSmallSide = tmp;
-	}
-
 	//See if we want to override the calculated #cores
 	temp = toInt(cf->getConfig(primitiveServers, "NumCores"));
 	if (temp > 0)
@@ -566,14 +548,14 @@ int main(int argc, char* argv[])
 		highPriorityThreads = (2 * numCores) - lowPriorityThreads - medPriorityThreads;
 	}
 	else {
-		uint totalThreads = (uint) ((lowPriorityPercentage + medPriorityPercentage +
+		uint32_t totalThreads = (uint32_t) ((lowPriorityPercentage + medPriorityPercentage +
 		  highPriorityPercentage) / 100.0 * (2*numCores));
 
 		if (totalThreads == 0)
 			totalThreads = 1;
 
-		lowPriorityThreads = (uint) (lowPriorityPercentage/100.0 * (2*numCores));
-		medPriorityThreads = (uint) (medPriorityPercentage/100.0 * (2*numCores));
+		lowPriorityThreads = (uint32_t) (lowPriorityPercentage/100.0 * (2*numCores));
+		medPriorityThreads = (uint32_t) (medPriorityPercentage/100.0 * (2*numCores));
 		highPriorityThreads = totalThreads - lowPriorityThreads - medPriorityThreads;
 	}
 
@@ -598,8 +580,6 @@ int main(int argc, char* argv[])
 
 	IDBPolicy::configIDBPolicy();
 
-	loadUDFs();
-
 	// no versionbuffer if using HDFS for performance reason
 	if (IDBPolicy::useHdfs())
 		noVB = 1;
@@ -608,12 +588,12 @@ int main(int argc, char* argv[])
 		", pw = " << processorWeight << ", pq = " << processorQueueSize <<
 		", nb = " << BRPBlocks << ", nt = " << BRPThreads << ", nc = " << cacheCount <<
 		", ra = " << blocksReadAhead <<  ", db = " << deleteBlocks << ", mb = " << maxBlocksPerRead <<
-		", rd = " << rotatingDestination << ", tr = " << PTTrace << ", mc = " << boolalpha << multicast <<
-		", ml = " << multicastloop << ", ss = " << PMSmallSide << ", bp = " << BPPCount << endl;
+		", rd = " << rotatingDestination << ", tr = " << PTTrace <<
+		", ss = " << PMSmallSide << ", bp = " << BPPCount << endl;
 
 	PrimitiveServer server(serverThreads, serverQueueSize, processorWeight, processorQueueSize,
 		rotatingDestination, BRPBlocks, BRPThreads, cacheCount, maxBlocksPerRead, blocksReadAhead,
-		deleteBlocks, PTTrace, prefetchThreshold, multicast, multicastloop, PMSmallSide);
+		deleteBlocks, PTTrace, prefetchThreshold, PMSmallSide);
 
 #ifdef QSIZE_DEBUG
 	thread* qszMonThd;

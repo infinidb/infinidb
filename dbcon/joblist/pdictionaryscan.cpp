@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -26,9 +26,11 @@
 #include <sstream>
 //#define NDEBUG
 #include <cassert>
+#include <ctime>
+using namespace std;
+
 #include <boost/thread.hpp>
 #include <boost/thread/condition.hpp>
-using namespace std;
 
 #include "distributedenginecomm.h"
 #include "elementtype.h"
@@ -58,9 +60,8 @@ using namespace BRM;
 #include "rowgroup.h"
 using namespace rowgroup;
 
-//#define DEBUG 1
-//#define DEBUG2 1
-
+#include "querytele.h"
+using namespace querytele;
 
 namespace joblist
 {
@@ -190,6 +191,7 @@ pDictionaryScan::pDictionaryScan(
 	uniqueID = UniqueNumberGenerator::instance()->getUnique32();
  	initializeConfigParms();
 	fExtendedInfo = "DSS: ";
+	fQtc.stepParms().stepType = StepTeleStats::T_DSS;
 }
 
 pDictionaryScan::~pDictionaryScan()
@@ -311,12 +313,15 @@ void pDictionaryScan::sendPrimitiveMessages()
 	uint32_t partNum;
 	uint16_t segNum;
 	BRM::OID_t oid;
+	boost::shared_ptr<map<int, int> > dbRootConnectionMap;
 	boost::shared_ptr<map<int, int> > dbRootPMMap;
 	oam::OamCache *oamCache = oam::OamCache::makeOamCache();
+	int localPMId = oamCache->getLocalPMId();
 
 	try
 	{
-		dbRootPMMap = oamCache->getDBRootToConnectionMap();
+		dbRootConnectionMap = oamCache->getDBRootToConnectionMap();
+		dbRootPMMap = oamCache->getDBRootToPMMap();
 
 		it = fDictlbids.begin();
 		for (; it != fDictlbids.end() && !cancelled(); it++)
@@ -331,6 +336,15 @@ void pDictionaryScan::sendPrimitiveMessages()
 						segNum,
 						fbo);
 
+			// Bug5741 If we are local only and this doesn't belongs to us, skip it
+			if (fLocalQuery == execplan::CalpontSelectExecutionPlan::LOCAL_QUERY)
+			{
+				if (localPMId == 0)
+					throw IDBExcept(ERR_LOCAL_QUERY_UM);
+				if (dbRootPMMap->find(dbroot)->second != localPMId)
+					continue;
+			}
+
 			// Retrieve the HWM blk for the segment file specified by the oid,
 			// partition, and segment number.  The extState arg indicates
 			// whether the hwm block is outOfService or not, but we already
@@ -339,19 +353,19 @@ void pDictionaryScan::sendPrimitiveMessages()
 			int extState;
 			dbrm.getLocalHWM(oid, partNum, segNum, hwm, extState);
 
-			u_int32_t remainingLbids =
+			uint32_t remainingLbids =
 				( (hwm > (fbo + it->size - 1)) ? (it->size) : (hwm - fbo + 1) );
 
-			u_int32_t msgLbidCount   =  fLogicalBlocksPerScan;
+			uint32_t msgLbidCount   =  fLogicalBlocksPerScan;
 
 			while ( remainingLbids && !cancelled())
 			{
 				if ( remainingLbids < msgLbidCount)
 					msgLbidCount = remainingLbids;
 
-				if (dbRootPMMap->find(dbroot) == dbRootPMMap->end())
+				if (dbRootConnectionMap->find(dbroot) == dbRootConnectionMap->end())
 					throw IDBExcept(ERR_DATA_OFFLINE);
-				sendAPrimitiveMessage(primMsg, msgLbidStart, msgLbidCount, (*dbRootPMMap)[dbroot]);
+				sendAPrimitiveMessage(primMsg, msgLbidStart, msgLbidCount, (*dbRootConnectionMap)[dbroot]);
 				primMsg.restart();
 
 				mutex.lock();
@@ -520,6 +534,13 @@ void pDictionaryScan::receivePrimitiveMessages()
 	fOutputRowGroup.setData(&rgData);
 	fOutputRowGroup.resetRowGroup(0);
 
+	StepTeleStats sts;
+	sts.query_uuid = fQueryUuid;
+	sts.step_uuid = fStepUuid;
+	sts.msg_type = StepTeleStats::ST_START;
+	sts.start_time = QueryTeleClient::timeNowms();
+	sts.total_units_of_work = msgsSent;
+	fQtc.postStepTele(sts);
 
 	uint16_t error = status();
 	//...Be careful here.  Mutex is locked prior to entering the loop, so
@@ -606,6 +627,11 @@ void pDictionaryScan::receivePrimitiveMessages()
 
 				mutex.lock();
 				msgsRecvd++;
+
+				sts.msg_type = StepTeleStats::ST_PROGRESS;
+				sts.total_units_of_work = msgsSent;
+				sts.units_of_work_completed = msgsRecvd;
+				fQtc.postStepTele(sts);
 
 				//...If producer is waiting, and we have gone below our threshold value,
 				//...then we signal the producer to request more data from primproc
@@ -731,6 +757,17 @@ void pDictionaryScan::receivePrimitiveMessages()
 			formatMiniStats();
 		}
 	}
+	sts.query_uuid = fQueryUuid;
+	sts.step_uuid = fStepUuid;
+	sts.msg_type = StepTeleStats::ST_SUMMARY;
+	sts.phy_io = fPhysicalIO;
+	sts.cache_io = fCacheIO;
+	sts.msg_rcv_cnt = sts.total_units_of_work = sts.units_of_work_completed = msgsRecvd;
+	sts.msg_bytes_in = fMsgBytesIn;
+	sts.msg_bytes_out = fMsgBytesOut;
+	sts.rows = fRidResults;
+	sts.end_time = QueryTeleClient::timeNowms();
+	fQtc.postStepTele(sts);
 
 	rgFifo->endOfInput();
 }
@@ -792,7 +829,7 @@ void pDictionaryScan::serializeEqualityFilter()
 {
 	ByteStream msg;
 	ISMPacketHeader ism;
-	uint i;
+	uint32_t i;
 	vector<string> empty;
 
 	memset(&ism, 0, sizeof(ISMPacketHeader));

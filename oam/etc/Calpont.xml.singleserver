@@ -4,6 +4,7 @@
 	<ExeMgr1>
 		<IPAddr>127.0.0.1</IPAddr>
 		<Port>8601</Port>
+		<Module>pm1</Module>
 	</ExeMgr1>
 	<JobProc>
 		<IPAddr>0.0.0.0</IPAddr>
@@ -276,7 +277,7 @@
 		<ModuleDBRootID1-1-1>unassigned</ModuleDBRootID1-1-1>
 		<ModuleType2>um</ModuleType2>
 		<ModuleDesc2>User Module</ModuleDesc2>
-		<RunType2>LOADSHARE</RunType2>
+		<RunType2>SIMPLEX</RunType2>
 		<ModuleCount2>0</ModuleCount2>
 		<ModuleIPAddr1-1-2>0.0.0.0</ModuleIPAddr1-1-2>
 		<ModuleHostName1-1-2>unassigned</ModuleHostName1-1-2>
@@ -429,17 +430,21 @@
 		<InitialInstallFlag>y</InitialInstallFlag>
 		<SingleServerInstall>y</SingleServerInstall>
 		<ServerTypeInstall>2</ServerTypeInstall>
+		<PMwithUM>n</PMwithUM>
+		<MySQLRep>n</MySQLRep>
 		<DBRootStorageType>internal</DBRootStorageType>
 		<UMStorageType>internal</UMStorageType>
 		<SystemLogConfigFile>unassigned</SystemLogConfigFile>	
 		<rpw>unassigned</rpw>
-		<Cloud>n</Cloud>
+		<Cloud>unassigned</Cloud>
 		<EEPackageType>rpm</EEPackageType>
 		<EnableSNMP>y</EnableSNMP>
 		<AmazonX509Certificate>unassigned</AmazonX509Certificate>
 		<AmazonX509PrivateKey>unassigned</AmazonX509PrivateKey>
 		<AmazonRegion>us-east-1</AmazonRegion>
 		<AmazonZone>unassigned</AmazonZone>
+		<AmazonSubNetID>unassigned</AmazonSubNetID>
+		<AmazonVPCNextPrivateIP>unassigned</AmazonVPCNextPrivateIP>
 		<PMInstanceType>unassigned</PMInstanceType>
 		<UMInstanceType>unassigned</UMInstanceType>
 		<UMSecurityGroup>unassigned</UMSecurityGroup>
@@ -447,6 +452,9 @@
 		<PMVolumeSize>unassigned</PMVolumeSize>
 		<UMAutoSync>n</UMAutoSync>
 		<AmazonAutoTagging>n</AmazonAutoTagging>
+		<AmazonElasticIPCount>0</AmazonElasticIPCount>
+		<AmazonElasticIPAddr1>unassigned</AmazonElasticIPAddr1>
+		<AmazonElasticModule1>unassigned</AmazonElasticModule1>
 		<CoreFileFlag>n</CoreFileFlag>
 	</Installation>
 	<ExtentMap>
@@ -463,7 +471,8 @@
 		<MaxElems>128K</MaxElems>  <!-- 128 buckets * 128K * 16 = 256 MB -->
 		<FifoSizeLargeSide>128</FifoSizeLargeSide>
 		<PmMaxMemorySmallSide>64M</PmMaxMemorySmallSide><!-- divide by 48 to get element count -->
-		<TotalUmMemory>8G</TotalUmMemory>
+		<TotalUmMemory>25%</TotalUmMemory>
+		<TotalPmUmMemory>10%</TotalPmUmMemory>
 		<CPUniqueLimit>100</CPUniqueLimit>
 	</HashJoin>
 	<JobList>
@@ -496,7 +505,17 @@
 		<User>unassigned</User>
 		<Password></Password>
 	</CrossEngineSupport>
+	<QueryStats>
+		<Enabled>N</Enabled>
+	</QueryStats>
+	<UserPriority>
+		<Enabled>N</Enabled>
+	</UserPriority>
 	<NetworkCompression>
 		<Enabled>Y</Enabled>
 	</NetworkCompression>
+	<QueryTele>
+		<Host>127.0.0.1</Host>
+		<Port>0</Port>
+	</QueryTele>
 </Calpont>

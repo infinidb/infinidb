@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -203,7 +203,7 @@ void rollbackAll(DBRM* dbrm)
 			message2.format( args1 );
 			ml.logInfoMessage( message2 );
 			dbrm->invalidateUncommittedExtentLBIDs(tableLocks[i].ownerTxnID);
-			u_int32_t sessionid = 0;
+			uint32_t sessionid = 0;
 			txnId.id = tableLocks[i].ownerTxnID;
 			txnId.valid = true;
 			rc = rollbackProcessor.rollBackTransaction(uniqueId, txnId, sessionid, errorMsg);
@@ -362,7 +362,7 @@ void rollbackAll(DBRM* dbrm)
             dbrm->invalidateUncommittedExtentLBIDs(*curTxnID);
 			txnId.id = *curTxnID;
 			txnId.valid = true;
-			u_int32_t sessionid = 0;
+			uint32_t sessionid = 0;
 			ostringstream oss;
 			oss << "DMLProc will roll back transaction " <<*curTxnID;
 			logging::Message::Args args2;

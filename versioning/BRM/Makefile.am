@@ -1,4 +1,4 @@
-# Copyright (C) 2013 Calpont Corp.
+# Copyright (C) 2014 InfiniDB, Inc.
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -68,31 +68,31 @@ vss.h
 bin_PROGRAMS = controllernode workernode dbrmctl reset_locks rollback save_brm load_brm
 
 controllernode_SOURCES = masternode.cpp masterdbrmnode.cpp
-controllernode_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_brm_libs) $(netsnmp_libs) $(idb_exec_libs) $(AM_LDFLAGS)
+controllernode_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_exec_libs) $(netsnmp_libs) $(AM_LDFLAGS)
 controllernode_LDADD = libbrm.la
 
 workernode_SOURCES = slavenode.cpp
-workernode_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_brm_libs) $(netsnmp_libs) $(idb_exec_libs) $(AM_LDFLAGS)
+workernode_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_exec_libs) $(netsnmp_libs) $(AM_LDFLAGS)
 workernode_LDADD = libbrm.la
 
 dbrmctl_SOURCES = dbrmctl.cpp
-dbrmctl_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_brm_libs) $(netsnmp_libs) $(idb_exec_libs) $(AM_LDFLAGS)
+dbrmctl_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_exec_libs) $(netsnmp_libs) $(AM_LDFLAGS)
 dbrmctl_LDADD = libbrm.la
 
 reset_locks_SOURCES = reset_locks.cpp
-reset_locks_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_brm_libs) $(netsnmp_libs) $(idb_exec_libs) $(AM_LDFLAGS)
+reset_locks_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_exec_libs) $(netsnmp_libs) $(AM_LDFLAGS)
 reset_locks_LDADD = libbrm.la
 
 rollback_SOURCES = rollback.cpp
-rollback_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_brm_libs) $(netsnmp_libs) $(idb_exec_libs) $(AM_LDFLAGS)
+rollback_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_exec_libs) $(netsnmp_libs) $(AM_LDFLAGS)
 rollback_LDADD = libbrm.la
 
 save_brm_SOURCES = save_brm.cpp
-save_brm_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_brm_libs) $(netsnmp_libs) $(idb_exec_libs) $(AM_LDFLAGS)
+save_brm_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_exec_libs) $(netsnmp_libs) $(AM_LDFLAGS)
 save_brm_LDADD = libbrm.la
 
 load_brm_SOURCES = load_brm.cpp
-load_brm_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_brm_libs) $(netsnmp_libs) $(idb_exec_libs) $(AM_LDFLAGS)
+load_brm_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_exec_libs) $(netsnmp_libs) $(AM_LDFLAGS)
 load_brm_LDADD = libbrm.la
 
 .PHONY: dbrm

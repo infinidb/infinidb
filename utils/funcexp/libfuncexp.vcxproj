@@ -1,0 +1,332 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="EnterpriseRelease|Win32">
+      <Configuration>EnterpriseRelease</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="EnterpriseRelease|x64">
+      <Configuration>EnterpriseRelease</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{9AE60D66-99F6-4CCB-902D-3814A12AE0A9}</ProjectGuid>
+    <RootNamespace>libfuncexp</RootNamespace>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='EnterpriseRelease|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <PlatformToolset>v110</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <PlatformToolset>v110</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <PlatformToolset>v110</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='EnterpriseRelease|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <PlatformToolset>v110</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <PlatformToolset>v110</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <PlatformToolset>v110</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='EnterpriseRelease|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='EnterpriseRelease|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <_ProjectFileVersion>11.0.50727.1</_ProjectFileVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <OutDir>$(SolutionDir)..\..\$(PlatformName)\$(ConfigurationName)\</OutDir>
+    <IntDir>$(SolutionDir)..\..\obj\$(ProjectName)\$(PlatformName)\$(ConfigurationName)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <OutDir>$(SolutionDir)..\..\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)..\..\obj\$(ProjectName)\$(Platform)\$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <OutDir>$(SolutionDir)..\..\$(PlatformName)\$(ConfigurationName)\</OutDir>
+    <IntDir>$(SolutionDir)..\..\obj\$(ProjectName)\$(PlatformName)\$(ConfigurationName)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <OutDir>$(SolutionDir)..\..\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)..\..\obj\$(ProjectName)\$(Platform)\$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='EnterpriseRelease|Win32'">
+    <OutDir>$(SolutionDir)..\..\$(PlatformName)\$(ConfigurationName)\</OutDir>
+    <IntDir>$(SolutionDir)..\..\obj\$(ProjectName)\$(PlatformName)\$(ConfigurationName)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='EnterpriseRelease|x64'">
+    <OutDir>$(SolutionDir)..\..\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)..\..\obj\$(ProjectName)\$(Platform)\$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <Optimization>Disabled</Optimization>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\libxml2-2.7.8\libxml2\include;$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\utils\winport;$(SolutionDir)..\dbcon\execplan;$(SolutionDir)..\utils\rowgroup;$(SolutionDir)..\writeengine\shared;$(SolutionDir)..\utils\messageqcpp;$(SolutionDir)..\utils\loggingcpp;$(SolutionDir)..\utils\configcpp;$(SolutionDir)..\utils\dataconvert;$(SolutionDir)..\dbcon\joblist;$(SolutionDir)..\utils\udfsdk;$(SolutionDir)..\utils\common;$(SolutionDir)..\oam\oamcpp;$(SolutionDir)..\snmpd\snmpmanager;$(SolutionDir)..\versioning\BRM;$(SolutionDir)..\utils\rwlock;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>SKIP_SNMP;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <MinimalRebuild>true</MinimalRebuild>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <WarningLevel>Level3</WarningLevel>
+      <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Midl>
+      <TargetEnvironment>X64</TargetEnvironment>
+    </Midl>
+    <ClCompile>
+      <Optimization>Disabled</Optimization>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\libxml2-2.7.8\libxml2\include;$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\utils\winport;$(SolutionDir)..\dbcon\execplan;$(SolutionDir)..\utils\rowgroup;$(SolutionDir)..\writeengine\shared;$(SolutionDir)..\utils\messageqcpp;$(SolutionDir)..\utils\loggingcpp;$(SolutionDir)..\utils\configcpp;$(SolutionDir)..\utils\dataconvert;$(SolutionDir)..\dbcon\joblist;$(SolutionDir)..\utils\udfsdk;$(SolutionDir)..\utils\common;$(SolutionDir)..\utils\windowfunction;$(SolutionDir)..\oam\oamcpp;$(SolutionDir)..\snmpd\snmpmanager;$(SolutionDir)..\versioning\BRM;$(SolutionDir)..\utils\rwlock;$(SolutionDir)..\..\libiconv-1.14\libiconv\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS; SKIP_SNMP;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <MinimalRebuild>true</MinimalRebuild>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <WarningLevel>Level3</WarningLevel>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <Optimization>MaxSpeed</Optimization>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\libxml2-2.7.8\libxml2\include;$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\utils\winport;$(SolutionDir)..\dbcon\execplan;$(SolutionDir)..\utils\rowgroup;$(SolutionDir)..\writeengine\shared;$(SolutionDir)..\utils\messageqcpp;$(SolutionDir)..\utils\loggingcpp;$(SolutionDir)..\utils\configcpp;$(SolutionDir)..\utils\dataconvert;$(SolutionDir)..\dbcon\joblist;$(SolutionDir)..\utils\udfsdk;$(SolutionDir)..\utils\common;$(SolutionDir)..\oam\oamcpp;$(SolutionDir)..\snmpd\snmpmanager;$(SolutionDir)..\versioning\BRM;$(SolutionDir)..\utils\rwlock;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;SKIP_UDF;SKIP_SNMP;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <WarningLevel>Level3</WarningLevel>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <DisableSpecificWarnings>4267;4244;4996;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Midl>
+      <TargetEnvironment>X64</TargetEnvironment>
+    </Midl>
+    <ClCompile>
+      <Optimization>MaxSpeed</Optimization>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\libxml2-2.7.8\libxml2\include;$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\utils\winport;$(SolutionDir)..\dbcon\execplan;$(SolutionDir)..\utils\rowgroup;$(SolutionDir)..\writeengine\shared;$(SolutionDir)..\utils\messageqcpp;$(SolutionDir)..\utils\loggingcpp;$(SolutionDir)..\utils\configcpp;$(SolutionDir)..\utils\dataconvert;$(SolutionDir)..\dbcon\joblist;$(SolutionDir)..\utils\udfsdk;$(SolutionDir)..\utils\common;$(SolutionDir)..\oam\oamcpp;$(SolutionDir)..\snmpd\snmpmanager;$(SolutionDir)..\versioning\BRM;$(SolutionDir)..\utils\rwlock;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;SKIP_UDF;SKIP_SNMP;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <WarningLevel>Level3</WarningLevel>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <DisableSpecificWarnings>4267;4244;4996;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='EnterpriseRelease|Win32'">
+    <ClCompile>
+      <Optimization>MaxSpeed</Optimization>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\libxml2-2.7.8\libxml2\include;$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\utils\winport;$(SolutionDir)..\dbcon\execplan;$(SolutionDir)..\utils\rowgroup;$(SolutionDir)..\writeengine\shared;$(SolutionDir)..\utils\messageqcpp;$(SolutionDir)..\utils\loggingcpp;$(SolutionDir)..\utils\configcpp;$(SolutionDir)..\utils\dataconvert;$(SolutionDir)..\dbcon\joblist;$(SolutionDir)..\utils\udfsdk;$(SolutionDir)..\utils\common;$(SolutionDir)..\oam\oamcpp;$(SolutionDir)..\snmpd\snmpmanager;$(SolutionDir)..\versioning\BRM;$(SolutionDir)..\utils\rwlock;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;SKIP_SNMP;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <WarningLevel>Level3</WarningLevel>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <DisableSpecificWarnings>4267;4244;4996;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='EnterpriseRelease|x64'">
+    <Midl>
+      <TargetEnvironment>X64</TargetEnvironment>
+    </Midl>
+    <ClCompile>
+      <Optimization>MaxSpeed</Optimization>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\libxml2-2.7.8\libxml2\include;$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\utils\winport;$(SolutionDir)..\dbcon\execplan;$(SolutionDir)..\utils\rowgroup;$(SolutionDir)..\writeengine\shared;$(SolutionDir)..\utils\messageqcpp;$(SolutionDir)..\utils\loggingcpp;$(SolutionDir)..\utils\configcpp;$(SolutionDir)..\utils\dataconvert;$(SolutionDir)..\dbcon\joblist;$(SolutionDir)..\utils\udfsdk;$(SolutionDir)..\utils\common;$(SolutionDir)..\utils\windowfunction;$(SolutionDir)..\oam\oamcpp;$(SolutionDir)..\snmpd\snmpmanager;$(SolutionDir)..\versioning\BRM;$(SolutionDir)..\utils\rwlock;$(SolutionDir)..\..\libiconv-1.14\libiconv\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS; SKIP_SNMP;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <WarningLevel>Level3</WarningLevel>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <DisableSpecificWarnings>4267;4244;4996;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+      <BufferSecurityCheck>false</BufferSecurityCheck>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="func_abs.cpp" />
+    <ClCompile Include="func_add_time.cpp" />
+    <ClCompile Include="func_ascii.cpp" />
+    <ClCompile Include="func_between.cpp" />
+    <ClCompile Include="func_bitwise.cpp" />
+    <ClCompile Include="func_case.cpp" />
+    <ClCompile Include="func_cast.cpp" />
+    <ClCompile Include="func_ceil.cpp" />
+    <ClCompile Include="func_char.cpp" />
+    <ClCompile Include="func_char_length.cpp" />
+    <ClCompile Include="func_coalesce.cpp" />
+    <ClCompile Include="func_concat.cpp" />
+    <ClCompile Include="func_concat_ws.cpp" />
+    <ClCompile Include="func_conv.cpp" />
+    <ClCompile Include="func_crc32.cpp" />
+    <ClCompile Include="func_date.cpp" />
+    <ClCompile Include="func_date_add.cpp" />
+    <ClCompile Include="func_date_format.cpp" />
+    <ClCompile Include="func_day.cpp" />
+    <ClCompile Include="func_dayname.cpp" />
+    <ClCompile Include="func_dayofweek.cpp" />
+    <ClCompile Include="func_dayofyear.cpp" />
+    <ClCompile Include="func_div.cpp" />
+    <ClCompile Include="func_elt.cpp" />
+    <ClCompile Include="func_exp.cpp" />
+    <ClCompile Include="func_extract.cpp" />
+    <ClCompile Include="func_find_in_set.cpp" />
+    <ClCompile Include="func_floor.cpp" />
+    <ClCompile Include="func_from_days.cpp" />
+    <ClCompile Include="func_from_unixtime.cpp" />
+    <ClCompile Include="func_get_format.cpp" />
+    <ClCompile Include="func_greatest.cpp" />
+    <ClCompile Include="func_hex.cpp" />
+    <ClCompile Include="func_hour.cpp" />
+    <ClCompile Include="func_idbpartition.cpp" />
+    <ClCompile Include="func_if.cpp" />
+    <ClCompile Include="func_ifnull.cpp" />
+    <ClCompile Include="func_in.cpp" />
+    <ClCompile Include="func_inet_aton.cpp" />
+    <ClCompile Include="func_inet_ntoa.cpp" />
+    <ClCompile Include="func_insert.cpp" />
+    <ClCompile Include="func_instr.cpp" />
+    <ClCompile Include="func_isnull.cpp" />
+    <ClCompile Include="func_last_day.cpp" />
+    <ClCompile Include="func_lcase.cpp" />
+    <ClCompile Include="func_least.cpp" />
+    <ClCompile Include="func_left.cpp" />
+    <ClCompile Include="func_length.cpp" />
+    <ClCompile Include="func_lpad.cpp" />
+    <ClCompile Include="func_ltrim.cpp" />
+    <ClCompile Include="func_makedate.cpp" />
+    <ClCompile Include="func_maketime.cpp" />
+    <ClCompile Include="func_math.cpp" />
+    <ClCompile Include="func_md5.cpp" />
+    <ClCompile Include="func_microsecond.cpp" />
+    <ClCompile Include="func_minute.cpp" />
+    <ClCompile Include="func_mod.cpp" />
+    <ClCompile Include="func_month.cpp" />
+    <ClCompile Include="func_monthname.cpp" />
+    <ClCompile Include="func_nullif.cpp" />
+    <ClCompile Include="func_period_add.cpp" />
+    <ClCompile Include="func_period_diff.cpp" />
+    <ClCompile Include="func_pow.cpp" />
+    <ClCompile Include="func_quarter.cpp" />
+    <ClCompile Include="func_rand.cpp" />
+    <ClCompile Include="func_regexp.cpp" />
+    <ClCompile Include="func_repeat.cpp" />
+    <ClCompile Include="func_replace.cpp" />
+    <ClCompile Include="func_reverse.cpp" />
+    <ClCompile Include="func_right.cpp" />
+    <ClCompile Include="func_round.cpp" />
+    <ClCompile Include="func_rpad.cpp" />
+    <ClCompile Include="func_rtrim.cpp" />
+    <ClCompile Include="func_sec_to_time.cpp" />
+    <ClCompile Include="func_second.cpp" />
+    <ClCompile Include="func_sha.cpp" />
+    <ClCompile Include="func_sign.cpp" />
+    <ClCompile Include="func_str_to_date.cpp" />
+    <ClCompile Include="func_strcmp.cpp" />
+    <ClCompile Include="func_substr.cpp" />
+    <ClCompile Include="func_substring_index.cpp" />
+    <ClCompile Include="func_sysdate.cpp" />
+    <ClCompile Include="func_time.cpp" />
+    <ClCompile Include="func_time_format.cpp" />
+    <ClCompile Include="func_time_to_sec.cpp" />
+    <ClCompile Include="func_timediff.cpp" />
+    <ClCompile Include="func_timestampdiff.cpp" />
+    <ClCompile Include="func_to_days.cpp" />
+    <ClCompile Include="func_trim.cpp" />
+    <ClCompile Include="func_truncate.cpp" />
+    <ClCompile Include="func_ucase.cpp" />
+    <ClCompile Include="func_unhex.cpp" />
+    <ClCompile Include="func_unix_timestamp.cpp" />
+    <ClCompile Include="func_week.cpp" />
+    <ClCompile Include="func_weekday.cpp" />
+    <ClCompile Include="func_year.cpp" />
+    <ClCompile Include="func_yearweek.cpp" />
+    <ClCompile Include="funcexp.cpp" />
+    <ClCompile Include="funcexpwrapper.cpp" />
+    <ClCompile Include="functor.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="utf8\checked.h" />
+    <ClInclude Include="utf8\core.h" />
+    <ClInclude Include="funcexp.h" />
+    <ClInclude Include="funcexpwrapper.h" />
+    <ClInclude Include="funchelpers.h" />
+    <ClInclude Include="functor.h" />
+    <ClInclude Include="functor_all.h" />
+    <ClInclude Include="functor_bool.h" />
+    <ClInclude Include="functor_dtm.h" />
+    <ClInclude Include="functor_export.h" />
+    <ClInclude Include="functor_int.h" />
+    <ClInclude Include="functor_real.h" />
+    <ClInclude Include="functor_str.h" />
+    <ClInclude Include="sha.h" />
+    <ClInclude Include="utf8\unchecked.h" />
+    <ClInclude Include="utf8.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\configcpp\libconfigcpp.vcxproj">
+      <Project>{c543c9a1-b4e0-4bad-9fc2-2afeea952fc5}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

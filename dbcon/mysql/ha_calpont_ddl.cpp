@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -108,9 +108,9 @@ inline uint32_t tid2sid(const uint32_t tid)
 }
 
 
-uint convertDataType(int dataType)
+uint32_t convertDataType(int dataType)
 {
-	uint calpontDataType;
+	uint32_t calpontDataType;
 
 	switch (dataType)
 	{
@@ -509,7 +509,7 @@ bool anyNullInTheColumn (string& schema, string& table, string& columnName, int 
     csep.returnedCols(returnedColumnList);
 	
 	SimpleFilter *sf = new SimpleFilter();
-	shared_ptr<Operator> sop(new PredicateOperator("isnull"));
+	boost::shared_ptr<Operator> sop(new PredicateOperator("isnull"));
 	sf->op(sop);
 	ConstantColumn *rhs = new ConstantColumn("", ConstantColumn::NULLDATA);
 	sf->lhs(col[0]->clone());
@@ -660,7 +660,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
     		if (createTable->fTableDef->fColumns[i]->fConstraints.size() > 0 )
     		{
 				//support default value and NOT NULL constraint			
-				for (uint j=0; j < createTable->fTableDef->fColumns[i]->fConstraints.size(); j++)
+				for (uint32_t j=0; j < createTable->fTableDef->fColumns[i]->fConstraints.size(); j++)
 				{
 					if (createTable->fTableDef->fColumns[i]->fConstraints[j]->fConstraintType != DDL_NOT_NULL)
 					{
@@ -715,7 +715,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 				if (!createTable->fTableDef->fColumns[i]->fDefaultValue->fNull)
 				{
 					//validate the default value, if out of range, just error out
-					uint dataType;
+					uint32_t dataType;
 					dataType = convertDataType(createTable->fTableDef->fColumns[i]->fType->fType);
 					CalpontSystemCatalog::ColType colType;
 					colType.colDataType = (CalpontSystemCatalog::ColDataType) dataType;
@@ -984,7 +984,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 				if ( (addColumnPtr->fColumnDef->fConstraints.size() > 0 ) || addColumnPtr->fColumnDef->fDefaultValue )
 				{
 					//support default value and NOT NULL constraint	
-					for (uint j=0; j < addColumnPtr->fColumnDef->fConstraints.size(); j++)
+					for (uint32_t j=0; j < addColumnPtr->fColumnDef->fConstraints.size(); j++)
 					{
 						if (addColumnPtr->fColumnDef->fConstraints[j]->fConstraintType != DDL_NOT_NULL)
 						{
@@ -1059,7 +1059,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 						}
 					
 						//validate the default value, if out of range, just error out
-						uint dataType;
+						uint32_t dataType;
 						dataType = convertDataType(addColumnPtr->fColumnDef->fType->fType);
 						CalpontSystemCatalog::ColType colType;
 						colType.colDataType = (CalpontSystemCatalog::ColDataType) dataType;
@@ -1315,7 +1315,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
     			if ( (addColumnsPtr->fColumns[0]->fConstraints.size() > 0 ) || addColumnsPtr->fColumns[0]->fDefaultValue )
     			{
 					//@Bug 5274. support default value and NOT NULL constraint	
-					for (uint j=0; j < addColumnsPtr->fColumns[0]->fConstraints.size(); j++)
+					for (uint32_t j=0; j < addColumnsPtr->fColumns[0]->fConstraints.size(); j++)
 					{
 						if (addColumnsPtr->fColumns[0]->fConstraints[j]->fConstraintType != DDL_NOT_NULL)
 						{
@@ -1390,7 +1390,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 						}
 					
 						//validate the default value, if out of range, just error out
-						uint dataType;
+						uint32_t dataType;
 						dataType = convertDataType(addColumnsPtr->fColumns[0]->fType->fType);
 						CalpontSystemCatalog::ColType colType;
 						colType.colDataType = (CalpontSystemCatalog::ColDataType) dataType;
@@ -1654,16 +1654,18 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 						CalpontSystemCatalog::TableName tableName;
 						tableName.schema = alterTable->fTableName->fSchema;
 						tableName.table = alterTable->fTableName->fName;
-						CalpontSystemCatalog::TableInfo tblInfo = csc->tableInfo(tableName);	
+						//CalpontSystemCatalog::TableInfo tblInfo = csc->tableInfo(tableName);	
 						
-						if (tblInfo.tablewithautoincr == 1)
+						//@Bug 5444. rename column doen't need to check this.
+					/*	if (tblInfo.tablewithautoincr == 1)
 						{
 							rc = 1;
 							thd->main_da.can_overwrite_status = true;
 							thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_INVALID_NUMBER_AUTOINCREMENT)).c_str());
-							ci->alterTableState = cal_connection_info::NOT_ALTER;ci->isAlter = false;
+							ci->alterTableState = cal_connection_info::NOT_ALTER;
+							ci->isAlter = false;
 							return rc;
-						}
+						} */
 						
 						if (!validateAutoincrementDatatype(renameColumnsPtr->fNewType->fType))
 						{
@@ -1697,7 +1699,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 				
 				if (renameColumnsPtr->fConstraints.size() > 0)
 				{
-					for (uint j=0; j < renameColumnsPtr->fConstraints.size(); j++)
+					for (uint32_t j=0; j < renameColumnsPtr->fConstraints.size(); j++)
 					{
 						if (renameColumnsPtr->fConstraints[j]->fConstraintType == DDL_NOT_NULL)
 						{
@@ -1887,7 +1889,7 @@ int ha_calpont_impl_create_(const char *name, TABLE *table_arg, HA_CREATE_INFO *
 #endif
     THD *thd = current_thd;
 
-    string stmt = thd->query;
+    string stmt = idb_mysql_query_str(thd);
     stmt += ";";
     algorithm::to_upper(stmt);	
 
@@ -1989,12 +1991,16 @@ int ha_calpont_impl_create_(const char *name, TABLE *table_arg, HA_CREATE_INFO *
 
 
     string emsg;
-	stmt = thd->query;
+	stmt = idb_mysql_query_str(thd);
     stmt += ";";
     int rc = 0;
 
 	// Don't do the DDL (only for create table if this is SSO. Should only get here on ATAC w/SSO.
 	if ( schemaSyncOnly && isCreate)
+		return rc;
+
+	//this is replcated DDL, treat it just like SSO
+	if (thd->slave_thread)
 		return rc;
 		
 	// @bug 3908. error out primary key for now.
@@ -2077,7 +2083,7 @@ int ha_calpont_impl_delete_table_(const char *name, cal_connection_info& ci)
 #endif
     THD *thd = current_thd;
     std::string tbl(name);
-    std::string stmt(thd->query);
+    std::string stmt(idb_mysql_query_str(thd));
     algorithm::to_upper(stmt);
 	// @bug 4158 allow table name with 'restrict' in it (but not by itself)
 	std::string::size_type fpos;
@@ -2087,10 +2093,14 @@ int ha_calpont_impl_delete_table_(const char *name, cal_connection_info& ci)
         return 0;
     }
 
+	//this is replcated DDL, treat it just like SSO
+	if (thd->slave_thread)
+		return 0;
+		
     TABLE_LIST *first_table= (TABLE_LIST*) thd->lex->select_lex.table_list.first;
 		string db = first_table->table->s->db.str;
     string emsg;
-	stmt = thd->query;
+	stmt = idb_mysql_query_str(thd);
     stmt += ";";
     int rc = ProcessDDLStatement(stmt, db, tbl, tid2sid(thd->thread_id), emsg);
     if (rc != 0)
@@ -2108,6 +2118,10 @@ int ha_calpont_impl_rename_table_(const char* from, const char* to, cal_connecti
 	pair<string, string> toPair;
 	string stmt;
 
+	//this is replcated DDL, treat it just like SSO
+	if (thd->slave_thread)
+		return 0;
+		
 	fromPair = parseTableName(from);
 	toPair = parseTableName(to);
 

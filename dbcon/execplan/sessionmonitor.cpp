@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -273,7 +273,7 @@ void SessionMonitor::copyPreviousSegment()
 bool SessionMonitor::readMonitorDataFromFile(const std::string filename)
 {
 	int err = 0;
-	uint headerSize = 2*sizeof(int);
+	uint32_t headerSize = 2*sizeof(int);
 	char* data = reinterpret_cast<char *>(&fPrevSegment);
 	int fd = open(filename.c_str(), O_RDONLY);
 	

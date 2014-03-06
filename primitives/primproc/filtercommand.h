@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -49,7 +49,7 @@ class FilterCommand : public Command
 		// virtuals from base class -- Command
 		void execute();
 		void project();
-		void projectIntoRowGroup(rowgroup::RowGroup &rg, uint col);
+		void projectIntoRowGroup(rowgroup::RowGroup &rg, uint32_t col);
 		uint64_t getLBID();
 		void nextLBID();
 		void createCommand(messageqcpp::ByteStream&);

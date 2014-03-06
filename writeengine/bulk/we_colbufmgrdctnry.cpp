@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -56,7 +56,7 @@ ColumnBufferManagerDctnry::~ColumnBufferManagerDctnry()
 // is "writeSize" bytes long.
 //------------------------------------------------------------------------------
 int ColumnBufferManagerDctnry::writeToFileExtentCheck(
-    uint startOffset, uint writeSize)
+    uint32_t startOffset, uint32_t writeSize)
 {
     if (fLog->isDebug( DEBUG_3 ))
     {

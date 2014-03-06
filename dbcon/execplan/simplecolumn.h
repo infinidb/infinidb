@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -31,6 +31,7 @@
 #include "treenode.h"
 #include "calpontsystemcatalog.h"
 #include "dataconvert.h"
+#include "calpontselectexecutionplan.h"
 
 namespace messageqcpp {
 class ByteStream;
@@ -67,8 +68,7 @@ public:
 				 const std::string& col,
 				 const bool isInfiniDB,
 				 const uint32_t sessionID = 0);
-	SimpleColumn(const SimpleColumn& rhs,
-				 const uint32_t sessionID = 0);
+	SimpleColumn(const SimpleColumn& rhs, const uint32_t sessionID = 0);
 
 	/**
 	 * Destructor
@@ -191,13 +191,15 @@ public:
 	virtual bool hasAggregate() {return false;}
 	virtual bool hasWindowFunc() {return false;}
 
-private:
+	void setDerivedTable();
+
+protected:
 	/**
 	 * Fields
 	 */
 	std::string fSchemaName;           /// schema name
-	std::string fTableName;	           /// table name
-	std::string fColumnName;	       /// column name
+	std::string fTableName;            /// table name
+	std::string fColumnName;           /// column name
 	CalpontSystemCatalog::OID fOid;    /// column TCN number
 	std::string fTableAlias;           /// table alias
 	std::string fData;
@@ -279,11 +281,11 @@ public:
 		return TreeNode::getDateIntVal();
 	}
 
-  inline int64_t getDatetimeIntVal(rowgroup::Row& row, bool& isNull)
-  {
-  	evaluate(row, isNull);
-  	return TreeNode::getDatetimeIntVal();
-  }
+	inline int64_t getDatetimeIntVal(rowgroup::Row& row, bool& isNull)
+	{
+		evaluate(row, isNull);
+		return TreeNode::getDatetimeIntVal();
+	}
 
 };
 
@@ -298,6 +300,7 @@ std::ostream& operator<<(std::ostream& output, const SimpleColumn& rhs);
  * utility function to extract all simple columns from a parse tree
  */
 void getSimpleCols(ParseTree* n, void* obj);
+ParseTree* replaceRefCol(ParseTree*& n, CalpontSelectExecutionPlan::ReturnedColumnList&);
 
 }
 #endif //SIMPLECOLUMN_H

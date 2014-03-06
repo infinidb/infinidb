@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -55,8 +55,8 @@ uint64_t dateAdd( uint64_t time, const string& expr, IntervalColumn::interval_ty
 	         month = 0, 
 	         day = 0, 
 	         hour = 0, 
-			monthSave = 0;
-	
+			 monthSave = 0;
+
 	int64_t min = 0, 
 	         sec = 0, 
 	         msec = 0;
@@ -69,7 +69,8 @@ uint64_t dateAdd( uint64_t time, const string& expr, IntervalColumn::interval_ty
 	int64_t minAdd = 0, 
 	         secAdd = 0, 
 	         msecAdd = 0;
-	
+
+
 	if (dateType)
 	{
 		year = (uint32_t)((time >> 16) & 0xffff);
@@ -89,19 +90,21 @@ uint64_t dateAdd( uint64_t time, const string& expr, IntervalColumn::interval_ty
 
 	monthSave = month;
 
- 	int index = -1;
+	int index = -1;
+	
 	switch( unit )
 	{
-	case IntervalColumn::INTERVAL_MINUTE:
-	case IntervalColumn::INTERVAL_SECOND:
-	case IntervalColumn::INTERVAL_MICROSECOND:
-		index = getNumbers( expr, array2, funcType);
-		break;
-	default:
-		index = getNumbers( expr, array, funcType);
-		break;
+		case IntervalColumn::INTERVAL_MINUTE:
+		case IntervalColumn::INTERVAL_SECOND:
+		case IntervalColumn::INTERVAL_MICROSECOND:
+			index = getNumbers( expr, array2, funcType);
+			break;
+		default:
+			index = getNumbers( expr, array, funcType);
+			break;
 	};
-
+	
+	
 	if ( index <= 0 )
 		throw runtime_error("expression type is not supported");
 

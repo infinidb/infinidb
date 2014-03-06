@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -40,11 +40,13 @@
 #include "we_dbrootextenttracker.h"
 #include "we_rbmetawriter.h"
 #include "rowgroup.h"
-#if defined(_MSC_VER) && defined(DDLPKGPROC_DLLEXPORT)
+
+#if defined(_MSC_VER) && defined(xxxDDLPKGPROC_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
 #endif
+
 namespace WriteEngine
 {
 
@@ -67,7 +69,7 @@ class WE_DMLCommandProc
 		}
 		
 		//Convert rid from logical block rid to file relative rid
-		inline void convertToRelativeRid (u_int64_t& rid, const uint8_t extentNum, const uint16_t blockNum)
+		inline void convertToRelativeRid (uint64_t& rid, const uint8_t extentNum, const uint16_t blockNum)
 		{
 			rid = rid + extentNum*extentRows + blockNum * 8192;
 		}
@@ -92,6 +94,7 @@ class WE_DMLCommandProc
 		EXPORT uint8_t updateSyscolumnNextval(ByteStream& bs, std::string & err);
 		EXPORT uint8_t processPurgeFDCache(ByteStream& bs, std::string & err);
 		EXPORT uint8_t processEndTransaction(ByteStream& bs, std::string & err);
+		EXPORT uint8_t processFixRows(ByteStream& bs, std::string & err, ByteStream::quadbyte & PMId);
 	private:	
 		WriteEngineWrapper fWEWrapper;
 		boost::scoped_ptr<RBMetaWriter> fRBMetaWriter;
@@ -109,6 +112,10 @@ class WE_DMLCommandProc
 			else
 				return false;
 		}
+		uint8_t processBatchInsertHwmFlushChunks(uint32_t tableOID, int txnID,
+			const std::vector<BRM::FileInfo>& files,
+			const std::vector<BRM::OID_t>& oidsToFlush,
+			std::string& err);
 
 		bool fIsFirstBatchPm;
 		std::map<uint32_t,rowgroup::RowGroup *> rowGroups;

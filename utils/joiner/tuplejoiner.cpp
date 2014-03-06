@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -38,8 +38,8 @@ namespace joiner {
 TupleJoiner::TupleJoiner(
 	const rowgroup::RowGroup &smallInput,
 	const rowgroup::RowGroup &largeInput,
-	uint smallJoinColumn,
-	uint largeJoinColumn,
+	uint32_t smallJoinColumn,
+	uint32_t largeJoinColumn,
 	JoinType jt) :
 	smallRG(smallInput), largeRG(largeInput), joinAlg(INSERTING), joinType(jt),
 	threadCount(1), typelessJoin(false), bSignedUnsignedJoin(false), uniqueLimit(100)
@@ -87,8 +87,8 @@ TupleJoiner::TupleJoiner(
 TupleJoiner::TupleJoiner(
 	const rowgroup::RowGroup &smallInput,
 	const rowgroup::RowGroup &largeInput,
-	const vector<uint> &smallJoinColumns,
-	const vector<uint> &largeJoinColumns,
+	const vector<uint32_t> &smallJoinColumns,
+	const vector<uint32_t> &largeJoinColumns,
 	JoinType jt) :
 	smallRG(smallInput), largeRG(largeInput), joinAlg(INSERTING),
 	joinType(jt), threadCount(1), typelessJoin(true),
@@ -107,7 +107,7 @@ TupleJoiner::TupleJoiner(
 		smallNullRow.initToNull();
 	}
 
-	for (uint i = keyLength = 0; i < smallKeyColumns.size(); i++) {
+	for (uint32_t i = keyLength = 0; i < smallKeyColumns.size(); i++) {
 		if (smallRG.getColTypes()[smallKeyColumns[i]] == CalpontSystemCatalog::CHAR ||
           smallRG.getColTypes()[smallKeyColumns[i]] == CalpontSystemCatalog::VARCHAR)
             keyLength += smallRG.getColumnWidth(smallKeyColumns[i]) + 1;  // +1 null char
@@ -122,7 +122,7 @@ TupleJoiner::TupleJoiner(
 	
 	discreteValues.reset(new bool[smallKeyColumns.size()]);
 	cpValues.reset(new vector<int64_t>[smallKeyColumns.size()]);
-	for (uint i = 0; i < smallKeyColumns.size(); i++) {
+	for (uint32_t i = 0; i < smallKeyColumns.size(); i++) {
 		discreteValues[i] = false;
         if (isUnsigned(smallRG.getColType(i)))
         {
@@ -193,16 +193,16 @@ void TupleJoiner::insert(Row &r) {
     }
 }
 
-void TupleJoiner::match(rowgroup::Row &largeSideRow, uint largeRowIndex, uint threadID,
+void TupleJoiner::match(rowgroup::Row &largeSideRow, uint32_t largeRowIndex, uint32_t threadID,
 	vector<Row::Pointer> *matches)
 {
-	uint i;
+	uint32_t i;
 	bool isNull = hasNullJoinColumn(largeSideRow);
 
 	matches->clear();
 	if (inPM()) { 
 		vector<uint32_t> &v = pmJoinResults[threadID][largeRowIndex];
-		uint size = v.size();
+		uint32_t size = v.size();
 		for (i = 0; i < size; i++)
 			if (v[i] < rows.size())
 				matches->push_back(rows[v[i]]);
@@ -321,7 +321,7 @@ void TupleJoiner::doneInserting()
 			return;
 #endif
 	
-	uint col;
+	uint32_t col;
 
 	/* Put together the discrete values for the runtime casual partitioning restriction */
 
@@ -331,7 +331,7 @@ void TupleJoiner::doneInserting()
 		sthash_t::iterator sthit;
 		hash_t::iterator hit;
 		typelesshash_t::iterator thit;
-		uint i, pmpos = 0, rowCount;
+		uint32_t i, pmpos = 0, rowCount;
 		Row smallRow;
 	
 		smallRG.initRow(&smallRow);
@@ -391,7 +391,7 @@ void TupleJoiner::setInUM()
 {
 	vector<Row::Pointer> empty;
 	Row smallRow;
-	uint i, size;
+	uint32_t i, size;
 
 	joinAlg = UM;
 	size = rows.size();
@@ -415,15 +415,15 @@ void TupleJoiner::setInUM()
 }
 
 void TupleJoiner::setPMJoinResults(boost::shared_array<vector<uint32_t> > jr,
-	uint threadID)
+	uint32_t threadID)
 {
 	pmJoinResults[threadID] = jr;
 }
 
-void TupleJoiner::markMatches(uint threadID, uint rowCount)
+void TupleJoiner::markMatches(uint32_t threadID, uint32_t rowCount)
 {
 	boost::shared_array<vector<uint32_t> > matches = pmJoinResults[threadID];
-	uint i, j;
+	uint32_t i, j;
 
 	for (i = 0; i < rowCount; i++)
 		for (j = 0; j < matches[i].size(); j++) {
@@ -434,10 +434,10 @@ void TupleJoiner::markMatches(uint threadID, uint rowCount)
 		}
 }
 
-void TupleJoiner::markMatches(uint threadID, const vector<Row::Pointer> &matches)
+void TupleJoiner::markMatches(uint32_t threadID, const vector<Row::Pointer> &matches)
 {
-	uint rowCount = matches.size();
-	uint i;
+	uint32_t rowCount = matches.size();
+	uint32_t i;
 
 	for (i = 0; i < rowCount; i++) {
 			smallRow[threadID].setPointer(matches[i]);
@@ -445,26 +445,26 @@ void TupleJoiner::markMatches(uint threadID, const vector<Row::Pointer> &matches
 	}
 }
 
-boost::shared_array<std::vector<uint32_t> > TupleJoiner::getPMJoinArrays(uint threadID)
+boost::shared_array<std::vector<uint32_t> > TupleJoiner::getPMJoinArrays(uint32_t threadID)
 {
 	return pmJoinResults[threadID];
 }
 
-void TupleJoiner::setThreadCount(uint cnt)
+void TupleJoiner::setThreadCount(uint32_t cnt)
 {
 	threadCount = cnt;
 	pmJoinResults.reset(new boost::shared_array<vector<uint32_t> >[cnt]);
 	smallRow.reset(new Row[cnt]);
-	for (uint i = 0; i < cnt; i++)
+	for (uint32_t i = 0; i < cnt; i++)
 		smallRG.initRow(&smallRow[i]);
 	if (typelessJoin) {
 		tmpKeyAlloc.reset(new FixedAllocator[threadCount]);
-		for (uint i = 0; i < threadCount; i++)
+		for (uint32_t i = 0; i < threadCount; i++)
 			tmpKeyAlloc[i] = FixedAllocator(keyLength, true);
 	}
 	if (fe) {
 		fes.reset(new funcexp::FuncExpWrapper[cnt]);
-		for (uint i = 0; i < cnt; i++)
+		for (uint32_t i = 0; i < cnt; i++)
 			fes[i] = *fe;
 	}
 }
@@ -476,7 +476,7 @@ void TupleJoiner::getUnmarkedRows(vector<Row::Pointer> *out)
 	smallRG.initRow(&smallR);
 	out->clear();
 	if (inPM()) {
-		uint i, size;
+		uint32_t i, size;
 
 		size = rows.size();
 		for (i = 0; i < size; i++) {
@@ -537,7 +537,7 @@ void TupleJoiner::setFcnExpFilter(boost::shared_ptr<funcexp::FuncExpWrapper> pt)
 
 void TupleJoiner::updateCPData(const Row &r)
 {
-	uint col;
+	uint32_t col;
 
 	if (antiJoin() || largeOuterJoin())
 		return;
@@ -593,11 +593,11 @@ size_t TupleJoiner::size() const
 	return rows.size();
 }
 
-TypelessData makeTypelessKey(const Row &r, const vector<uint> &keyCols,
-	uint keylen, FixedAllocator *fa)
+TypelessData makeTypelessKey(const Row &r, const vector<uint32_t> &keyCols,
+	uint32_t keylen, FixedAllocator *fa)
 {
 	TypelessData ret;
-	uint off = 0, i, j;
+	uint32_t off = 0, i, j;
 	execplan::CalpontSystemCatalog::ColDataType type;
 
 	ret.data = (uint8_t *) fa->allocate();
@@ -606,7 +606,7 @@ TypelessData makeTypelessKey(const Row &r, const vector<uint> &keyCols,
 		if (type == CalpontSystemCatalog::VARCHAR || type == CalpontSystemCatalog::CHAR) {
 			// this is a string, copy a normalized version
 			const uint8_t *str = r.getStringPointer(keyCols[i]);
-			uint width = r.getStringLength(keyCols[i]);
+			uint32_t width = r.getStringLength(keyCols[i]);
 			for (j = 0; j < width && str[j] != 0; j++) {
                 if (off >= keylen)
                     goto toolong;
@@ -637,13 +637,13 @@ toolong:
 	return ret;
 }
 
-TypelessData makeTypelessKey(const Row &r, const vector<uint> &keyCols, PoolAllocator *fa)
+TypelessData makeTypelessKey(const Row &r, const vector<uint32_t> &keyCols, PoolAllocator *fa)
 {
 	TypelessData ret;
-	uint off = 0, i, j;
+	uint32_t off = 0, i, j;
 	execplan::CalpontSystemCatalog::ColDataType type;
 
-	uint keylen = 0;
+	uint32_t keylen = 0;
 	/* get the length of the normalized key... */
 	for (i = 0; i < keyCols.size(); i++) {
 		type = r.getColTypes()[keyCols[i]];
@@ -659,7 +659,7 @@ TypelessData makeTypelessKey(const Row &r, const vector<uint> &keyCols, PoolAllo
 		if (type == CalpontSystemCatalog::VARCHAR || type == CalpontSystemCatalog::CHAR) {
 			// this is a string, copy a normalized version
 			const uint8_t *str = r.getStringPointer(keyCols[i]);
-			uint width = r.getStringLength(keyCols[i]);
+			uint32_t width = r.getStringLength(keyCols[i]);
 			for (j = 0; j < width && str[j] != 0; j++)
 				ret.data[off++] = str[j];
 			ret.data[off++] = 0;
@@ -682,12 +682,12 @@ TypelessData makeTypelessKey(const Row &r, const vector<uint> &keyCols, PoolAllo
 
 string TypelessData::toString() const
 {
-	uint i;
+	uint32_t i;
 	ostringstream os;
 	
 	os << hex;
 	for (i = 0; i < len; i++) {
-		os << (uint) data[i] << " ";
+		os << (uint32_t) data[i] << " ";
 	}
 	os << dec;
 	return os.str();
@@ -718,7 +718,7 @@ void TypelessData::deserialize(messageqcpp::ByteStream &b, utils::PoolAllocator 
 bool TupleJoiner::hasNullJoinColumn(const Row &r) const
 {
 	uint64_t key;
-	for (uint i = 0; i < largeKeyColumns.size(); i++) {
+	for (uint32_t i = 0; i < largeKeyColumns.size(); i++) {
 		if (r.isNullValue(largeKeyColumns[i]))
 			return true;
 		if (UNLIKELY(bSignedUnsignedJoin)) {

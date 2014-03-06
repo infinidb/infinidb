@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -36,11 +36,11 @@
 /**
  * Namespace
  */
-namespace execplan { 
+namespace execplan {
 
 class ReturnedColumn;
 class AggregateColumn;
-    
+
 /**
  * @brief A class to represent a simple column op constant predicate
  *
@@ -50,7 +50,7 @@ class AggregateColumn;
  * same column. All the simple filters are connected by the same
  * operator (either "and" or "or"). This class is introduced for
  * easy operation combine for primitive processor.
- */ 
+ */
 class ConstantFilter : public Filter {
 
 public:
@@ -68,12 +68,12 @@ public:
 
 	//not needed yet
 	//ConstantFilter(const ConstantFilter& rhs);
-	
+
 	/**
 	 * Destructors
 	 */
 	virtual ~ConstantFilter();
-	
+
 	/**
 	 * Accessor Methods
 	 */
@@ -81,14 +81,14 @@ public:
     void filterList( const FilterList& filterList) {fFilterList = filterList; }
     const SOP& op() const {return fOp;}
     void op(const SOP& op){fOp = op;}
-    const SSC& col() const {return fCol;}
-    void col(const SSC& col) {fCol = col;}
-    
+    const SRCP& col() const {return fCol;}
+    void col(const SRCP& col) {fCol = col;}
+
 	/**
 	 * Operations
 	 */
-    void pushFilter (SimpleFilter* sf) {SSFP ssfp(sf); fFilterList.push_back(ssfp);} 
-	
+    void pushFilter (SimpleFilter* sf) {SSFP ssfp(sf); fFilterList.push_back(ssfp);}
+
 	//virtual const std::string data() const;
 	virtual const std::string toString() const;
 
@@ -97,35 +97,35 @@ public:
 	 */
 	virtual void serialize(messageqcpp::ByteStream&) const;
 	virtual void unserialize(messageqcpp::ByteStream&);
-	
+
 	/** @brief Do a deep, strict (as opposed to semantic) equivalence test
 	 *
 	 * Do a deep, strict (as opposed to semantic) equivalence test.
 	 * @return true iff every member of t is a duplicate copy of every member of this; false otherwise
 	 */
 	virtual bool operator==(const TreeNode* t) const;
-	
+
 	/** @brief Do a deep, strict (as opposed to semantic) equivalence test
 	 *
 	 * Do a deep, strict (as opposed to semantic) equivalence test.
 	 * @return true iff every member of t is a duplicate copy of every member of this; false otherwise
 	 */
 	bool operator==(const ConstantFilter& t) const;
-	
+
 	/** @brief Do a deep, strict (as opposed to semantic) equivalence test
 	 *
 	 * Do a deep, strict (as opposed to semantic) equivalence test.
 	 * @return false iff every member of t is a duplicate copy of every member of this; true otherwise
 	 */
 	virtual bool operator!=(const TreeNode* t) const;
-	 
+
 	/** @brief Do a deep, strict (as opposed to semantic) equivalence test
 	 *
 	 * Do a deep, strict (as opposed to semantic) equivalence test.
 	 * @return false iff every member of t is a duplicate copy of every member of this; true otherwise
 	 */
 	bool operator!=(const ConstantFilter& t) const;
-	
+
 	/** @brief test if this filter can be combined with the argument filter
 	  *  This is for operation combine optimization
 	  *  @param f the filter that this fiter tries to combine with
@@ -134,7 +134,8 @@ public:
 	  *  @return a filter(constantfilter) if successfully combined. otherwise
 	  *     	 return NULL
 	  */
-	 virtual Filter* combinable(Filter* f, Operator* op);
+	// Used by Oracle frontend, deprecated now. 
+	//virtual Filter* combinable(Filter* f, Operator* op);
 
 	/** get function name
 	 *
@@ -148,12 +149,15 @@ public:
 	 */
 	void functionName(const std::string& functionName) { fFunctionName = functionName; }
 
+	void setDerivedTable();
+	virtual void replaceRealCol(std::vector<SRCP>&);
+
 private:
-	SOP fOp;			/// connect operator (and or)
+	SOP fOp;       /// connect operator (and or)
 	FilterList fFilterList; /// vector of simple filters
-	SSC fCol;     /// the common column
+	SRCP fCol;     /// the common column
 	std::string fFunctionName;  /// function name
-		
+
 	/***********************************************************
 	 *                  F&E framework                          *
 	 ***********************************************************/
@@ -163,18 +167,18 @@ public:
 	{
 	    return new ConstantFilter (*this);
 	}
-	
-	inline virtual bool getBoolVal(rowgroup::Row& row, bool& isNull);		
-	
+
+	inline virtual bool getBoolVal(rowgroup::Row& row, bool& isNull);
+
 	// get all simple columns involved in this column
 	const std::vector<SimpleColumn*>& simpleColumnList() const { return fSimpleColumnList; }
-		
+
 	// get all aggregate columns involved in this column
 	const std::vector<AggregateColumn*>& aggColumnList() const { return fAggColumnList; }
 
 private:
-		std::vector<SimpleColumn*> fSimpleColumnList;
-		std::vector<AggregateColumn*> fAggColumnList;
+	std::vector<SimpleColumn*> fSimpleColumnList;
+	std::vector<AggregateColumn*> fAggColumnList;
 };
 
 inline bool ConstantFilter::getBoolVal(rowgroup::Row& row, bool& isNull)
@@ -182,12 +186,12 @@ inline bool ConstantFilter::getBoolVal(rowgroup::Row& row, bool& isNull)
 	switch(fOp->op())
 	{
 		case OP_AND:
-			for (uint i = 0; i < fFilterList.size(); i++)
+			for (uint32_t i = 0; i < fFilterList.size(); i++)
 				if (!fFilterList[i]->getBoolVal(row, isNull))
 					return false;
 			return true;
 		case OP_OR:
-			for (uint i = 0; i < fFilterList.size(); i++)
+			for (uint32_t i = 0; i < fFilterList.size(); i++)
 				if (fFilterList[i]->getBoolVal(row, isNull))
 					return true;
 			return false;
@@ -199,9 +203,9 @@ inline bool ConstantFilter::getBoolVal(rowgroup::Row& row, bool& isNull)
 		}
 	}
 }
-		
+
 std::ostream& operator<<(std::ostream& output, const ConstantFilter& rhs);
 
-} 
+}
 #endif //CONSTANTFILTER_H
 

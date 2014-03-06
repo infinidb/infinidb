@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -26,7 +26,7 @@
 
 #include "ddlpackageprocessor.h"
 
-#if defined(_MSC_VER) && defined(ALTERTABLEPROC_DLLEXPORT)
+#if defined(_MSC_VER) && defined(DDLPKGPROC_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
@@ -53,7 +53,7 @@ namespace ddlpackageprocessor
              * @param addColumn the AtaAddColumn object
              * @param fTableName the QualifiedName of the table
              */
-            EXPORT void addColumn(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result,
+            EXPORT void addColumn(uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result,
                 ddlpackage::ColumnDef* columnDefPtr,
                 ddlpackage::QualifiedName& fTableName, const uint64_t uniqueId);
 
@@ -63,7 +63,7 @@ namespace ddlpackageprocessor
              * @param ataDropColumn the AtaDropColumn object
              * @param fTableName the QualifiedName for the table
              */
-            EXPORT void dropColumn(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result,
+            EXPORT void dropColumn(uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result,
                 ddlpackage::AtaDropColumn& ataDropColumn,
                 ddlpackage::QualifiedName& fTableName, const uint64_t uniqueId);
 
@@ -73,7 +73,7 @@ namespace ddlpackageprocessor
              * @param ataDropColumns the AtaDropColumn object
              * @param fTableName the QualifiedName for the table
              */
-            EXPORT void dropColumns(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result,
+            EXPORT void dropColumns(uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result,
                 ddlpackage::AtaDropColumns& ataDropColumns,
                 ddlpackage::QualifiedName& fTableName, const uint64_t uniqueId );
 
@@ -83,7 +83,7 @@ namespace ddlpackageprocessor
              * @param ataAddTableConstraint the AtaDropColumn object
              * @param fTableName the QualifiedName for the table
              */
-            EXPORT void addTableConstraint(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result,
+            EXPORT void addTableConstraint(uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result,
                 ddlpackage::AtaAddTableConstraint& ataAddTableConstraint,
                 ddlpackage::QualifiedName& fTableName );
 
@@ -93,7 +93,7 @@ namespace ddlpackageprocessor
              * @param ataSetColumnDefault the AtaSetColumnDefault object
              * @param fTableName the QualifiedName for the table
              */
-            EXPORT void setColumnDefault(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result,
+            EXPORT void setColumnDefault(uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result,
                 ddlpackage::AtaSetColumnDefault& ataSetColumnDefault,
                 ddlpackage::QualifiedName& fTableName, const uint64_t uniqueId );
 
@@ -103,7 +103,7 @@ namespace ddlpackageprocessor
              * @param ataDropColumnDefault the AtaDropColumnDefault object
              * @param fTableName the QualifiedName for the table
              */
-            EXPORT void dropColumnDefault(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result,
+            EXPORT void dropColumnDefault(uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result,
                 ddlpackage::AtaDropColumnDefault& ataDropColumnDefault,
                 ddlpackage::QualifiedName& fTableName, const uint64_t uniqueId );
 
@@ -113,7 +113,7 @@ namespace ddlpackageprocessor
              * @param ataDropTableConstraint the AtaDropTableConstraint object
              * @param fTableName the QualifiedName for the table
              */
-            EXPORT void dropTableConstraint(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result,
+            EXPORT void dropTableConstraint(uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result,
                 ddlpackage::AtaDropTableConstraint& ataDropTableConstraint,
                 ddlpackage::QualifiedName& fTableName );
             /** @brief rename a table
@@ -122,7 +122,7 @@ namespace ddlpackageprocessor
              * @param ataRenameTable the AtaRenameTable object
              * @param fTableName the QualifiedName for the table
              */
-            EXPORT void renameTable(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID,
+            EXPORT void renameTable(uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID,
                 DDLResult& result, ddlpackage::AtaRenameTable& ataRenameTable,
                 ddlpackage::QualifiedName& fTableName, const uint64_t uniqueId);
 
@@ -132,12 +132,12 @@ namespace ddlpackageprocessor
              * @param ataRenameColumn the AtaRenameColumn object
              * @param fTableName the QualifiedName for the table
              */
-            EXPORT void renameColumn(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result,
+            EXPORT void renameColumn(uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result,
                 ddlpackage::AtaRenameColumn& ataRenameColumn,
                 ddlpackage::QualifiedName& fTableName, const uint64_t uniqueId);
 
         protected:
-	    void rollBackAlter(const std::string& error, BRM::TxnID txnID, int sessionId, DDLResult& result, u_int64_t uniqueId);
+	    void rollBackAlter(const std::string& error, BRM::TxnID txnID, int sessionId, DDLResult& result, uint64_t uniqueId);
 
         private:
 

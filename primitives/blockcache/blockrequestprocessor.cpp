@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -234,7 +234,7 @@ const int BlockRequestProcessor::getBlock(const BRM::LBID_t& lbid, const BRM::Qu
 }
 
 int BlockRequestProcessor::getCachedBlocks(const BRM::LBID_t *lbids, const BRM::VER_t *vers,
-	uint8_t **ptrs, bool *wasCached, uint count)
+	uint8_t **ptrs, bool *wasCached, uint32_t count)
 {
 	return fbMgr.bulkFind(lbids, vers, ptrs, wasCached, count);
 }

@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -95,17 +95,6 @@ bool Filter::operator!=(const Filter& t) const
 bool Filter::operator!=(const TreeNode* t) const
 {
 	return (!(*this == t));
-}
-
-Filter* Filter::combinable(Filter* f, Operator* op)
-{
-    SimpleFilter *sf = dynamic_cast<SimpleFilter*>(f);
-    if (sf) 
-        return sf->combinable(this, op);
-    ConstantFilter *cf = dynamic_cast<ConstantFilter*>(f);
-    if (cf)
-        return cf->combinable(this, op);
-    return NULL;
 }
 
 /**

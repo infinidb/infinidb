@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -493,7 +493,7 @@ void WECmdArgs::usage()
 			<<"\t-l\tName of import file to be loaded, relative to -f path,\n"
 			<<"\t-h\tPrint this message.\n"
 			<<"\t-q\tBatch Quantity, Number of rows distributed per batch in Mode 1\n"
-			<<"\t-i\tPrint extended info to console.\n"
+			<<"\t-i\tPrint extended info to console in Mode 3.\n"
 			<<"\t-j\tJob ID. In simple usage, default is the table OID.\n"
 			<<"\t\t\tunless a fully qualified input file name is given.\n"
 			<<"\t-n\tNullOption (0-treat the string NULL as data (default);\n"
@@ -1097,15 +1097,15 @@ std::string WECmdArgs::getBrmRptFileName()
 		fTmpFileDir = brmRptFileName;
 		char aBuff[64];
 		time_t aTime;
-		struct tm * pTm;
+		struct tm pTm;
 		time(&aTime);
-		pTm = localtime(&aTime);
+		localtime_r(&aTime, &pTm);
 
 		// BUG 4424
 		//			M   D   H   M   S
 		snprintf(aBuff, sizeof(aBuff), "/BrmRpt%02d%02d%02d%02d%02d%d.rpt",
-				pTm->tm_mon, pTm->tm_mday, pTm->tm_hour,
-				pTm->tm_min, pTm->tm_sec, getpid());
+				pTm.tm_mon, pTm.tm_mday, pTm.tm_hour,
+				pTm.tm_min, pTm.tm_sec, getpid());
 		brmRptFileName += aBuff;
 	}
 	else
@@ -1325,7 +1325,7 @@ void WECmdArgs::setEnclByAndEscCharFromJobFile(std::string& JobName)
 				fEnclosedChar = aEnclosedBy.at(0);
 			}
 		}
-		catch(std::runtime_error& err)
+		catch(std::runtime_error&)
 		{
 			// do not do anything
 		}
@@ -1348,7 +1348,7 @@ void WECmdArgs::setEnclByAndEscCharFromJobFile(std::string& JobName)
 				fEscChar = aEscChar.at(0);
 			}
 		}
-		catch(std::runtime_error& err)
+		catch(std::runtime_error&)
 		{
 			// do not do anything
 		}

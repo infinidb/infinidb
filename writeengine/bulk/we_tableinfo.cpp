@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -24,11 +24,10 @@
 #include "we_tableinfo.h"
 #include "we_bulkstatus.h"
 #include "we_bulkload.h"
+
 #include <sstream>
-using namespace std;
-using namespace boost;
 #include <sys/time.h>
-#include <time.h>
+#include <ctime>
 #include <unistd.h>
 #include <sys/types.h>
 #include <cstdio>
@@ -37,12 +36,19 @@ using namespace boost;
 #include <utility>
 // @bug 2099+
 #include <iostream>
+using namespace std;
+
 // @bug 2099-
 #include <boost/filesystem/path.hpp>
+using namespace boost;
 
 #include "we_config.h"
 #include "we_simplesyslog.h"
 #include "we_bulkrollbackmgr.h"
+#include "we_confirmhdfsdbfile.h"
+
+#include "querytele.h"
+using namespace querytele;
 
 namespace
 {
@@ -115,6 +121,15 @@ TableInfo::TableInfo(Log* logger, const BRM::TxnID txnID,
     fColumns.clear();
     fStartTime.tv_sec  = 0;
     fStartTime.tv_usec = 0;
+    string teleServerHost(config::Config::makeConfig()->getConfig("QueryTele", "Host"));
+    if (!teleServerHost.empty())
+    {
+        int teleServerPort = config::Config::fromText(config::Config::makeConfig()->getConfig("QueryTele", "Port"));
+        if (teleServerPort > 0)
+        {
+		fQtc.serverParms(QueryTeleServerParms(teleServerHost, teleServerPort));
+        }
+    }
 }
 
 //------------------------------------------------------------------------------
@@ -235,10 +250,17 @@ int  TableInfo::readTableData( )
     fLog->logMsg( ossStartMsg.str(), MSGLVL_INFO2 );
     fProcessingBegun = true;
 
+    ImportTeleStats its;
+    its.import_uuid = QueryTeleClient::genUUID();
+    its.msg_type = ImportTeleStats::IT_START;
+    its.start_time = QueryTeleClient::timeNowms();
+    its.table_list.push_back(fTableName);
+    its.rows_so_far.push_back(0);
+    fQtc.postImportTele(its);
+
     //
     // LOOP to read all the import data for this table
     //
-    //int bufferCount=0;
     while(true)
     {
         // See if JobStatus has been set to terminate by another thread
@@ -363,6 +385,10 @@ int  TableInfo::readTableData( )
 #ifdef PROFILE
         Stats::stopReadEvent(WE_STATS_READ_INTO_BUF);
 #endif
+        its.msg_type = ImportTeleStats::IT_PROGRESS;
+        its.rows_so_far.pop_back();
+        its.rows_so_far.push_back(totalRowsPerInputFile);
+        fQtc.postImportTele(its);
 
         // Check if there were any errors in the read data.
         // if yes, copy it to the error list.
@@ -476,7 +502,13 @@ int  TableInfo::readTableData( )
 #endif
         } // mark buffer status as read-complete within scope of a mutex
     }     // loop to read all data for this table
-           
+
+    its.msg_type = ImportTeleStats::IT_SUMMARY;
+    its.end_time = QueryTeleClient::timeNowms();
+    its.rows_so_far.pop_back();
+    its.rows_so_far.push_back(fTotalReadRows);
+    fQtc.postImportTele(its);
+
     return NO_ERROR;    
 }
 
@@ -648,6 +680,35 @@ int TableInfo::setParseComplete(const int &columnId,
                         "; " << ec.errorString(rc);
                     fLog->logMsg(oss.str(), rc, MSGLVL_ERROR);
                     fStatusTI = WriteEngine::ERR;
+
+                    ostringstream oss2;
+                    oss2 << "Ending HWMs for table " << fTableName << ": ";
+                    for (unsigned int n=0; n<fColumns.size(); n++)
+                    {
+                        oss2 << std::endl;
+                        oss2 << "  " << fColumns[n].column.colName <<
+                            "; DBRoot/part/seg/hwm: "        <<
+                            segFileInfo[n].fDbRoot           <<
+                            "/" << segFileInfo[n].fPartition <<
+                            "/" << segFileInfo[n].fSegment   <<
+                            "/" << segFileInfo[n].fLocalHwm;
+                    }
+                    fLog->logMsg(oss2.str(), MSGLVL_INFO1);
+
+                    return rc;
+                }
+
+                //..Confirm changes to DB files (necessary for HDFS)
+                rc = confirmDBFileChanges( );
+                if (rc != NO_ERROR)
+                {
+                    WErrorCodes ec;
+                    ostringstream oss;
+                    oss << "setParseComplete: Error confirming DB changes; "
+                        "Failed to load table: " << fTableName <<
+                        "; " << ec.errorString(rc);
+                    fLog->logMsg(oss.str(), rc, MSGLVL_ERROR);
+                    fStatusTI = WriteEngine::ERR;
                     return rc;
                 }
 
@@ -681,6 +742,7 @@ int TableInfo::setParseComplete(const int &columnId,
 
                 // Finished with this table, so delete bulk rollback
                 // meta data file and release the table lock.
+                deleteTempDBFileChanges();
                 deleteMetaDataRollbackFile();
 
                 rc = releaseTableLock( );
@@ -774,7 +836,7 @@ void TableInfo::reportTotals(double elapsedTime)
     fLog->logMsg(oss2.str(), MSGLVL_INFO2);
 
     // @bug 3504: Loop through columns to print saturation counts
-    std::vector<boost::tuple<CalpontSystemCatalog::ColDataType,std::string,u_int64_t> > satCounts;
+    std::vector<boost::tuple<CalpontSystemCatalog::ColDataType,std::string,uint64_t> > satCounts;
     for (unsigned i=0; i < fColumns.size(); ++i)
     {
         std::string colName(fTableName);
@@ -793,19 +855,24 @@ void TableInfo::reportTotals(double elapsedTime)
                 fColumns[i].column.colName << "; Number of ";
             if (fColumns[i].column.dataType == CalpontSystemCatalog::DATE)
 			{
-				//Bug5383
+				//bug5383
 				if(!fColumns[i].column.fNotNull)
-                	ossSatCnt << "invalid dates replaced with null: ";
+                	ossSatCnt <<
+                    	"invalid dates replaced with null: ";
 				else
-                	ossSatCnt << "invalid dates replaced with minimum value : ";
+					ossSatCnt <<
+						"invalid dates replaced with minimum value : ";
 			}
-            else if (fColumns[i].column.dataType == CalpontSystemCatalog::DATETIME)
+            else if (fColumns[i].column.dataType ==
+                     CalpontSystemCatalog::DATETIME)
 			{
-				//Bug5383
+				//bug5383
 				if(!fColumns[i].column.fNotNull)
-                	ossSatCnt << "invalid date/times replaced with null: ";
+                	ossSatCnt <<
+                    	"invalid date/times replaced with null: ";
 				else
-                	ossSatCnt << "invalid date/times replaced with minimum value : ";
+					ossSatCnt <<
+						"invalid date/times replaced with minimum value : ";
 			}
             else if (fColumns[i].column.dataType == CalpontSystemCatalog::CHAR)
                 ossSatCnt <<
@@ -1395,7 +1462,7 @@ int TableInfo::acquireTableLock( bool disableTimeOut )
 
     // Retry loop to lock the db table associated with this TableInfo object
     std::string processName;
-    u_int32_t   processId;
+    uint32_t   processId;
     int32_t     sessionId;
     int32_t     transId;
     ostringstream pmModOss;
@@ -1620,6 +1687,77 @@ void TableInfo::deleteMetaDataRollbackFile( )
             ostringstream oss;
             oss << "Error deleting meta file; " << ex.what();
             fLog->logMsg(oss.str(), ex.errorCode(), MSGLVL_ERROR);
+        }
+    }
+}
+
+//------------------------------------------------------------------------------
+// Changes to "existing" DB files must be confirmed on HDFS system.
+// This function triggers this action.
+//------------------------------------------------------------------------------
+// @bug 5572 - Add db file confirmation for HDFS
+int TableInfo::confirmDBFileChanges( )
+{
+    // Unlike deleteTempDBFileChanges(), note that confirmDBFileChanges()
+    // executes regardless of the import mode.  We go ahead and confirm
+    // the file changes at the end of a successful cpimport.bin.
+    if (idbdatafile::IDBPolicy::useHdfs())
+    {
+        ostringstream oss;
+        oss << "Confirming DB file changes for " << fTableName;
+        fLog->logMsg( oss.str(), MSGLVL_INFO2 );
+
+        std::string errMsg;
+        ConfirmHdfsDbFile confirmHdfs;
+        int rc = confirmHdfs.confirmDbFileListFromMetaFile( fTableOID, errMsg );
+        if (rc != NO_ERROR)
+        {
+            ostringstream ossErrMsg;
+            ossErrMsg << "Unable to confirm changes to table " << fTableName <<
+                "; " << errMsg;
+            fLog->logMsg( ossErrMsg.str(), rc, MSGLVL_ERROR );
+
+            return rc;
+        }
+    }
+
+    return NO_ERROR;
+}
+
+//------------------------------------------------------------------------------
+// Temporary swap files must be deleted on HDFS system.
+// This function triggers this action.
+//------------------------------------------------------------------------------
+// @bug 5572 - Add db file confirmation for HDFS
+void TableInfo::deleteTempDBFileChanges( )
+{
+    // If executing distributed (mode1) or central command (mode2) then
+    // no action necessary.  The client front-end will initiate the deletion
+    // of the temp files, only after all the distributed imports have
+    // successfully completed.
+    if ((fBulkMode == BULK_MODE_REMOTE_SINGLE_SRC) ||
+        (fBulkMode == BULK_MODE_REMOTE_MULTIPLE_SRC))
+    {
+        return;
+    }
+
+    if (idbdatafile::IDBPolicy::useHdfs())
+    {
+        ostringstream oss;
+        oss << "Deleting DB temp swap files for " << fTableName;
+        fLog->logMsg( oss.str(), MSGLVL_INFO2 );
+
+        std::string errMsg;
+        ConfirmHdfsDbFile confirmHdfs;
+        int rc = confirmHdfs.endDbFileListFromMetaFile(fTableOID, true, errMsg);
+
+        // Treat any error as non-fatal, though we log it.
+        if (rc != NO_ERROR)
+        {
+            ostringstream ossErrMsg;
+            ossErrMsg << "Unable to delete temp swap files for table " <<
+                fTableName << "; " << errMsg;
+            fLog->logMsg( ossErrMsg.str(), rc, MSGLVL_ERROR );
         }
     }
 }
@@ -2055,7 +2193,7 @@ int TableInfo::rollbackWork( )
     // Abort "local" bulk rollback if a DBRoot from the start of the job, is
     // now missing.  User should run cleartablelock to execute a rollback on
     // this PM "and" the PM where the DBRoot was moved to.
-    std::vector<u_int16_t> dbRootIds;
+    std::vector<uint16_t> dbRootIds;
     Config::getRootIdList( dbRootIds );
     for (unsigned int j=0; j<fOrigDbRootIds.size(); j++)
     {

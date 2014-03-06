@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -159,7 +159,7 @@ public:
 	/** @brief TupleDeliveryStep's pure virtual methods nextBand
      *  @returns row count
 	 */
-	uint nextBand(messageqcpp::ByteStream &bs);
+	uint32_t nextBand(messageqcpp::ByteStream &bs);
 
 	/** @brief Delivered Row Group
      *  @returns RowGroup
@@ -205,7 +205,7 @@ protected:
 	uint64_t                                         fRowsReturned;
 	bool                                             fEndOfResult;
 	boost::shared_array<int>                         fIndexMap;
-	std::vector<std::pair<uint, uint> >              fDupColumns;
+	std::vector<std::pair<uint32_t, uint32_t> >              fDupColumns;
 
 	RowGroupDL*                                      fInputDL;
 	RowGroupDL*                                      fOutputDL;

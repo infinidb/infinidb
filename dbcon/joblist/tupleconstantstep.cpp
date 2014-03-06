@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -26,6 +26,7 @@ using namespace std;
 
 #include <boost/shared_ptr.hpp>
 #include <boost/shared_array.hpp>
+#include <boost/uuid/uuid_io.hpp>
 using namespace boost;
 
 #include "messagequeue.h"
@@ -96,12 +97,12 @@ void TupleConstantStep::setOutputRowGroup(const rowgroup::RowGroup& rg)
 
 void TupleConstantStep::initialize(const JobInfo& jobInfo, const RowGroup* rgIn)
 {
-	vector<uint> oids, oidsIn = fRowGroupIn.getOIDs();
-	vector<uint> keys, keysIn = fRowGroupIn.getKeys();
-	vector<uint> scale, scaleIn = fRowGroupIn.getScale();
-	vector<uint> precision, precisionIn = fRowGroupIn.getPrecision();
+	vector<uint32_t> oids, oidsIn = fRowGroupIn.getOIDs();
+	vector<uint32_t> keys, keysIn = fRowGroupIn.getKeys();
+	vector<uint32_t> scale, scaleIn = fRowGroupIn.getScale();
+	vector<uint32_t> precision, precisionIn = fRowGroupIn.getPrecision();
 	vector<CalpontSystemCatalog::ColDataType> types, typesIn = fRowGroupIn.getColTypes();
-	vector<uint> pos;
+	vector<uint32_t> pos;
 	pos.push_back(2);
 
 	if (rgIn)
@@ -296,12 +297,12 @@ void TupleConstantStep::join()
 }
 
 
-uint TupleConstantStep::nextBand(messageqcpp::ByteStream &bs)
+uint32_t TupleConstantStep::nextBand(messageqcpp::ByteStream &bs)
 {
 	RGData rgDataIn;
 	RGData rgDataOut;
 	bool more = false;
-	uint rowCount = 0;
+	uint32_t rowCount = 0;
 
 	try
 	{
@@ -456,7 +457,7 @@ void TupleConstantStep::fillInConstants()
 		{
 			fRowOut.setRid(fRowIn.getRelRid());
 			fRowConst.copyField(fRowOut, 0, 0);
-			for (uint i = 1; i < fRowOut.getColumnCount(); i++)
+			for (uint32_t i = 1; i < fRowOut.getColumnCount(); i++)
 				fRowIn.copyField(fRowOut, i, i-1);
 
 			fRowIn.nextRow();
@@ -487,7 +488,7 @@ void TupleConstantStep::fillInConstants(const rowgroup::Row& rowIn, rowgroup::Ro
 		rowOut.setRid(rowIn.getRelRid());
 		fRowConst.copyField(rowOut, 0, 0);
 		//fRowConst.copyField(rowOut.getData()+2, 0); // hardcoded 2 for rid length
-		for (uint i = 1; i < rowOut.getColumnCount(); i++)
+		for (uint32_t i = 1; i < rowOut.getColumnCount(); i++)
 			rowIn.copyField(rowOut, i, i-1);
 		//memcpy(rowOut.getData()+rowOut.getOffset(1), rowIn.getData()+2, n);
 	}
@@ -549,7 +550,8 @@ void TupleConstantStep::printCalTrace()
 			<< "\t1st read " << dlTimes.FirstReadTimeString()
 			<< "; EOI " << dlTimes.EndOfInputTimeString() << "; runtime-"
 			<< JSTimeStamp::tsdiffstr(dlTimes.EndOfInputTime(), dlTimes.FirstReadTime())
-			<< "s;\n\tJob completion status " << status() << endl;
+			<< "s;\n\tUUID " << uuids::to_string(fStepUuid) << endl
+			<< "\tJob completion status " << status() << endl;
 	logEnd(logStr.str().c_str());
 	fExtendedInfo += logStr.str();
 	formatMiniStats();
@@ -587,12 +589,12 @@ TupleConstantOnlyStep::~TupleConstantOnlyStep()
 
 void TupleConstantOnlyStep::initialize(const RowGroup& rgIn, const JobInfo& jobInfo)
 {
-	vector<uint> oids;
-	vector<uint> keys;
-	vector<uint> scale;
-	vector<uint> precision;
+	vector<uint32_t> oids;
+	vector<uint32_t> keys;
+	vector<uint32_t> scale;
+	vector<uint32_t> precision;
 	vector<CalpontSystemCatalog::ColDataType> types;
-	vector<uint> pos;
+	vector<uint32_t> pos;
 	pos.push_back(2);
 
 	for (uint64_t i = 0; i < jobInfo.deliveredCols.size(); i++)
@@ -671,10 +673,10 @@ void TupleConstantOnlyStep::run()
 }
 
 
-uint TupleConstantOnlyStep::nextBand(messageqcpp::ByteStream &bs)
+uint32_t TupleConstantOnlyStep::nextBand(messageqcpp::ByteStream &bs)
 {
 	RGData rgDataOut;
-	uint rowCount = 0;
+	uint32_t rowCount = 0;
 
 	if (!fEndOfResult)
 	{
@@ -798,7 +800,7 @@ void TupleConstantBooleanStep::run()
 }
 
 
-uint TupleConstantBooleanStep::nextBand(messageqcpp::ByteStream &bs)
+uint32_t TupleConstantBooleanStep::nextBand(messageqcpp::ByteStream &bs)
 {
 	// send an empty band
 	RGData rgData(fRowGroupOut, 0);

@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -116,7 +116,7 @@ SlaveComm::SlaveComm(string hostname, SlaveDBRMNode *s) :
 		firstSlave = true;
 		journalName = savefile + "_journal";
 		const char* filename = journalName.c_str();
-		uint utmp = ::umask(0);
+		uint32_t utmp = ::umask(0);
 		if (IDBPolicy::useHdfs())
 		{
 			journalh = IDBDataFile::open(
@@ -357,7 +357,7 @@ void SlaveComm::do_createStripeColumnExtents(ByteStream &msg)
 	if (printOnly) {
 		cout << "createStripeColumnExtents().  " <<
 			"DBRoot=" << dbRoot << "; Part#=" << partitionNum << endl;
-		for (uint i = 0; i < cols.size(); i++)
+		for (uint32_t i = 0; i < cols.size(); i++)
 			cout << "StripeColExt arg "    << i + 1 <<
 				": oid="  << cols[i].oid   <<
 				" width=" << cols[i].width << endl;
@@ -661,7 +661,7 @@ void SlaveComm::do_rollbackDictStoreExtents_DBroot(ByteStream &msg)
 			" dbRoot=" << dbRoot <<
 			" partitionNum=" << partitionNum <<
 			" hwms..." << endl;
-		for (uint i = 0; i < hwms.size(); i++)
+		for (uint32_t i = 0; i < hwms.size(); i++)
 			cout << "   " << i << ": " << hwms[i] << endl;
 		return;
 	}
@@ -922,7 +922,7 @@ void SlaveComm::do_bulkSetHWM(ByteStream &msg)
 
 	if (printOnly) {
 		cout << "bulkSetHWM().  TransID = " << transID << endl;
-		for (uint i = 0; i < args.size(); i++)
+		for (uint32_t i = 0; i < args.size(); i++)
 			cout << "bulkSetHWM arg " << i + 1 << ": oid=" << args[i].oid << " partitionNum=" << args[i].partNum <<
 					" segmentNum=" << args[i].segNum << " hwm=" << args[i].hwm << endl;
 		return;
@@ -961,7 +961,7 @@ void SlaveComm::do_bulkSetHWMAndCP(ByteStream &msg)
 #if 0
 	if (printOnly) {
 		cout << "bulkSetHWM().  TransID = " << transID << endl;
-		for (uint i = 0; i < args.size(); i++)
+		for (uint32_t i = 0; i < args.size(); i++)
 			cout << "bulkSetHWM arg " << i + 1 << ": oid=" << args[i].oid << " partitionNum=" << args[i].partNum <<
 					" segmentNum=" << args[i].segNum << " hwm=" << args[i].hwm << endl;
 		return;
@@ -1532,7 +1532,7 @@ void SlaveComm::do_beginVBCopy(ByteStream &msg)
 	if (printOnly) {
 		cout << "beginVBCopy: transID=" << transID << " dbRoot=" << dbRoot << " size="
 				<< ranges.size() <<	" ranges..." << endl;
-		for (uint i = 0; i < ranges.size(); i++)
+		for (uint32_t i = 0; i < ranges.size(); i++)
 			cout << "   start=" << ranges[i].start << " size=" << ranges[i].size << endl;
 		return;
 	}
@@ -1568,7 +1568,7 @@ void SlaveComm::do_endVBCopy(ByteStream &msg)
 	if (printOnly) {
 		cout << "endVBCopy: transID=" << transID << " size=" << ranges.size() << 
 			" ranges..." << endl;
-		for (uint i = 0; i < ranges.size(); i++)
+		for (uint32_t i = 0; i < ranges.size(); i++)
 			cout << "   start=" << ranges[i].start << " size=" << ranges[i].size << endl;
 		return;
 	}
@@ -1602,7 +1602,7 @@ void SlaveComm::do_vbRollback1(ByteStream &msg)
 	if (printOnly) {
 		cout << "vbRollback1: transID=" << transID << " size=" << lbidList.size() <<
 			" lbids..." << endl;
-		for (uint i = 0; i < lbidList.size(); i++)
+		for (uint32_t i = 0; i < lbidList.size(); i++)
 			cout << "   start=" << lbidList[i].start << " size=" << lbidList[i].size << endl;
 		return;
 	}
@@ -1636,7 +1636,7 @@ void SlaveComm::do_vbRollback2(ByteStream &msg)
 	if (printOnly) {
 		cout << "vbRollback2: transID=" << transID << " size=" << lbidList.size() <<
 			" lbids..." << endl;
-		for (uint i = 0; i < lbidList.size(); i++)
+		for (uint32_t i = 0; i < lbidList.size(); i++)
 			cout << "   " << lbidList[i] << endl;
 		return;
 	}
@@ -1759,7 +1759,7 @@ void SlaveComm::do_confirm()
 			saveFileToggle = !saveFileToggle;
 
 			const char* filename = journalName.c_str();
-			uint utmp = ::umask(0);
+			uint32_t utmp = ::umask(0);
 			delete journalh;
 			journalh = IDBDataFile::open(
 						IDBPolicy::getType(filename, IDBPolicy::WRITEENG), filename, "w+b", 0);
@@ -1790,7 +1790,7 @@ void SlaveComm::do_confirm()
 
 			/* Is there a nicer way to truncate the file using an ofstream? */
 			journal.close();
-			uint utmp = ::umask(0);
+			uint32_t utmp = ::umask(0);
 			journal.open(journalName.c_str(), ios_base::binary | ios_base::out | ios_base::trunc);
 			::umask(utmp);
 		}
@@ -2158,7 +2158,7 @@ void SlaveComm::do_dmlLockLBIDRanges(ByteStream &msg)
 	if (printOnly) {
 		cout << "dmlLockLBIDRanges: transID=" << txnID << " size="
 				<< ranges.size() <<	" ranges..." << endl;
-		for (uint i = 0; i < ranges.size(); i++)
+		for (uint32_t i = 0; i < ranges.size(); i++)
 			cout << "   start=" << ranges[i].start << " size=" << ranges[i].size << endl;
 		return;
 	}
@@ -2184,7 +2184,7 @@ void SlaveComm::do_dmlReleaseLBIDRanges(ByteStream &msg)
 
 	if (printOnly) {
 		cout << "dmlLockLBIDRanges: size=" << ranges.size() << " ranges..." << endl;
-		for (uint i = 0; i < ranges.size(); i++)
+		for (uint32_t i = 0; i < ranges.size(); i++)
 			cout << "   start=" << ranges[i].start << " size=" << ranges[i].size << endl;
 		return;
 	}

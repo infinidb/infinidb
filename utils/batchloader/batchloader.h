@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -48,14 +48,14 @@ public:
      * @param sessionId cpimport use 0 as session id.
      * @param PMs vector Collection of PM ids.
      */
-    BatchLoader ( uint32_t tableOid, execplan::CalpontSystemCatalog::SCN sessionId, std::vector<uint>& PMs);
+    BatchLoader ( uint32_t tableOid, execplan::CalpontSystemCatalog::SCN sessionId, std::vector<uint32_t>& PMs);
 
     /**
      * 	@brief select the Next PM where batch data to be distributed.
      * 	return the PM where next batch to be send.
      * 	if an error occurs, 0 will be returned
      */
-    uint selectNextPM();
+    uint32_t selectNextPM();
 
     /**
 	 * 	@brief Move to previous Sequence in the array.
@@ -77,7 +77,7 @@ public:
     {
         /** @brief the dbroot
          */
-        uint DBRoot;
+        uint32_t DBRoot;
         /** @brief the number of extents
          */
         uint64_t numExtents;
@@ -90,7 +90,7 @@ public:
 	{
 		/** @brief the module id
          */
-        uint PMId;
+        uint32_t PMId;
 		/** @brief the dbroot info
 		*/
 		std::vector<RootExtentsBlocks> rootInfo;
@@ -102,7 +102,7 @@ private:
      * @param PMId - The PM id to send the first batch of rows if startFromNextPM is false.
      * @return Returns 0 if success, else returns error code.
      */
-    void selectFirstPM ( uint& PMId);
+    void selectFirstPM ( uint32_t& PMId);
 
    /** @brief build the batch distribution sequence in a vector
      * return void
@@ -112,14 +112,14 @@ private:
     /** @brief build the batch distribution sequence in a vector
       * return void
       */
-    void buildBatchDistSeqVector(uint StartPm);
+    void buildBatchDistSeqVector(uint32_t StartPm);
 
-    typedef std::vector<uint> BlIntVec;
+    typedef std::vector<uint32_t> BlIntVec;
 	BlIntVec fPMs;
 	BlIntVec fDbRoots;
 	BlIntVec fPmDistSeq;
-	uint fNextIdx;
-	uint fFirstPm;
+	uint32_t fNextIdx;
+	uint32_t fFirstPm;
 	execplan::CalpontSystemCatalog::SCN fSessionId;
 	uint32_t fTableOid;
 	oam::OamCache::PMDbrootsMap_t fPmDbrootMap;

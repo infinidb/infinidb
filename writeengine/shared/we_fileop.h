@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -44,7 +44,7 @@
 #include "we_stats.h"
 #include "idbcompress.h"
 
-#if defined(_MSC_VER) && defined(WRITEENGINEFILEOP_DLLEXPORT)
+#if defined(_MSC_VER) && defined(WRITEENGINE_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
@@ -116,9 +116,9 @@ public:
    /**
     * @brief Delete a specific database segment file.
     */
-    EXPORT int          deleteFile( FID fid, u_int16_t dbRoot,
-                            u_int32_t partition,
-                            u_int16_t segment ) const;
+    EXPORT int          deleteFile( FID fid, uint16_t dbRoot,
+                            uint32_t partition,
+                            uint16_t segment ) const;
 
    /**
     * @brief Check whether a file exists or not
@@ -129,8 +129,8 @@ public:
     * @brief @brief Check whether file exists or not by using file id, DBRoot,
     * partition, and segment number.
     */
-    EXPORT bool         exists( FID fid, u_int16_t dbRoot,
-                            u_int32_t partition, u_int16_t segment ) const;
+    EXPORT bool         exists( FID fid, uint16_t dbRoot,
+                            uint32_t partition, uint16_t segment ) const;
 
    /**
     * @brief Check whether a column exists or not by using file id.  Since this
@@ -363,7 +363,8 @@ public:
     */
     EXPORT IDBDataFile*     openFile( const char* fileName,
                             const char* mode = "r+b",
-                            int ioColSize = DEFAULT_COLSIZ) const;
+                            int ioColSize = DEFAULT_COLSIZ,
+                            bool useTmpSuffix = false) const;
 
    /**
     * @brief Open a file using an OID, dbroot, partition, and segment number.
@@ -382,7 +383,8 @@ public:
                             uint16_t       segment,
                             std::string&   segFile,
                             const char*    mode = "r+b",
-                            int ioColSize = DEFAULT_COLSIZ) const;
+                            int ioColSize = DEFAULT_COLSIZ,
+                            bool useTmpSuffix = false) const;
 
    /**
     * @brief Read to a buffer from a file at current location
@@ -454,6 +456,7 @@ public:
     */ 
     EXPORT virtual void        setTransId( const TxnID& transId);
 	EXPORT virtual void        setBulkFlag(bool isBulkLoad);
+	EXPORT virtual void 	   setFixFlag(bool isFix);
     TxnID               getTransId() const;
 
     void                compressionType(int t);
@@ -518,6 +521,7 @@ private:
 
     TxnID       m_transId;
 	bool 		m_isBulk;
+	bool 		m_isFix;
 
     // protect creation of m_DbRootAddExtentMutexes
     static boost::mutex               m_createDbRootMutexes;

@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -154,10 +154,10 @@ void BrmReportParser::unserialize(messageqcpp::ByteStream& Bs)
 	/*
 	ObjectReader::checkType(b, ObjectReader::SIMPLECOLUMN);
 	ReturnedColumn::unserialize(b); // parent class unserialize
-	b >> (u_int32_t&) fOid;
+	b >> (uint32_t&) fOid;
 	b >> fData;
 	b >> reinterpret_cast<ByteStream::doublebyte&>(fReturnAll);
-	b >> (u_int32_t&) fSequence;
+	b >> (uint32_t&) fSequence;
 	*/
 
 	std::string aStrLine;

@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -37,7 +37,7 @@
 
 #include "atomicops.h"
 
-#if defined(_MSC_VER) && defined(RESOURCEMANAGER_DLLEXPORT)
+#if defined(_MSC_VER) && defined(JOBLIST_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
@@ -104,7 +104,7 @@ namespace joblist
   const int  defaultTWMaxBuckets = 256;
   const int  defaultPSCount = 0;
   const int  defaultConnectionsPerPrimProc = 1;
-  const uint defaultLBID_Shift = 13;
+  const uint32_t defaultLBID_Shift = 13;
   const uint64_t defaultExtentRows = 8 * 1024 * 1024;
 
   // DMLProc
@@ -116,7 +116,7 @@ namespace joblist
   const uint64_t defaultRowsPerBatch  = 10000;
 
   /* HJ CP feedback, see bug #1465 */
-  const uint defaultHjCPUniqueLimit = 100;
+  const uint32_t defaultHjCPUniqueLimit = 100;
 
   // Order By and Limit
   const uint64_t defaultOrderByLimitMaxMemory = 1 * 1024 * 1024 * 1024ULL;
@@ -159,7 +159,7 @@ namespace joblist
     unsigned  	getHjNumThreads() const { return  fHjNumThreads; } //getUintVal(fHashJoinStr, "NumThreads", defaultNumThreads); }
     uint64_t  	getHjMaxElems()  const { return  getUintVal(fHashJoinStr, "MaxElems", defaultHJMaxElems); }
     uint32_t  	getHjFifoSizeLargeSide() const { return  getUintVal(fHashJoinStr, "FifoSizeLargeSide", defaultHJFifoSizeLargeSide); }
-	uint 		getHjCPUniqueLimit() const { return getUintVal(fHashJoinStr, "CPUniqueLimit", defaultHjCPUniqueLimit); }
+	uint32_t 		getHjCPUniqueLimit() const { return getUintVal(fHashJoinStr, "CPUniqueLimit", defaultHjCPUniqueLimit); }
 	uint64_t	getPMJoinMemLimit() const { return pmJoinMemLimit; }
 
     uint32_t  	getJLFlushInterval() const { return  getUintVal(fJobListStr, "FlushInterval", defaultFlushInterval); }
@@ -181,19 +181,7 @@ namespace joblist
 
     int	      	getPsCount() const { return  getUintVal(fPrimitiveServersStr, "Count", defaultPSCount ); }
     int	      	getPsConnectionsPerPrimProc() const { return getUintVal(fPrimitiveServersStr, "ConnectionsPerPrimProc", defaultConnectionsPerPrimProc); }
-    uint      	getPsLBID_Shift() const { return  getUintVal(fPrimitiveServersStr, "LBID_Shift", defaultLBID_Shift ); }
-    bool      	getPsMulticast() const
-    {
-      std::string val(getStringVal(fPrimitiveServersStr, "Multicast", "N" ));
-	boost::to_upper(val);
-	return "Y" == val;
-    }
-    bool      	getPsMulticastLoop() const
-    {
-      std::string val(getStringVal(fPrimitiveServersStr, "MulticastLoop", "N" ));
-	boost::to_upper(val);
-	return "Y" == val;
-    }
+    uint32_t      	getPsLBID_Shift() const { return  getUintVal(fPrimitiveServersStr, "LBID_Shift", defaultLBID_Shift ); }
 
     std::string getScTempDiskPath() const { return  getStringVal(fSystemConfigStr, "TempDiskPath", defaultTempDiskPath  ); }
     uint64_t  	getScTempSaveSize() const { return  getUintVal(fSystemConfigStr, "TempSaveSize", defaultTempSaveSize); }
@@ -317,17 +305,17 @@ namespace joblist
     void numCores(unsigned numCores) { fNumCores = numCores; }
     unsigned numCores() const { return fNumCores; }
 
-    void aggNumThreads(uint numThreads) { fAggNumThreads = numThreads; }
-    uint aggNumThreads() const { return fAggNumThreads; }
+    void aggNumThreads(uint32_t numThreads) { fAggNumThreads = numThreads; }
+    uint32_t aggNumThreads() const { return fAggNumThreads; }
 
-    void aggNumBuckets(uint numBuckets) { fAggNumBuckets = numBuckets; }
-    uint aggNumBuckets() const { return fAggNumBuckets; }
+    void aggNumBuckets(uint32_t numBuckets) { fAggNumBuckets = numBuckets; }
+    uint32_t aggNumBuckets() const { return fAggNumBuckets; }
 
-    void aggNumRowGroups(uint numRowGroups) { fAggNumRowGroups = numRowGroups; }
-    uint aggNumRowGroups() const { return fAggNumRowGroups; }
+    void aggNumRowGroups(uint32_t numRowGroups) { fAggNumRowGroups = numRowGroups; }
+    uint32_t aggNumRowGroups() const { return fAggNumRowGroups; }
 
-    void windowFunctionThreads(uint n) { fWindowFunctionThreads = n; }
-    uint windowFunctionThreads() const { return fWindowFunctionThreads; }
+    void windowFunctionThreads(uint32_t n) { fWindowFunctionThreads = n; }
+    uint32_t windowFunctionThreads() const { return fWindowFunctionThreads; }
 	
 	bool useHdfs() const { return fUseHdfs; }
 
@@ -386,12 +374,12 @@ namespace joblist
 	uint64_t pmJoinMemLimit;	// mem limit on individual PM joins
 
 	/* multi-thread aggregate */
-	uint fAggNumThreads;
-	uint fAggNumBuckets;
-	uint fAggNumRowGroups;
+	uint32_t fAggNumThreads;
+	uint32_t fAggNumBuckets;
+	uint32_t fAggNumRowGroups;
 
 	// window function
-	uint fWindowFunctionThreads;
+	uint32_t fWindowFunctionThreads;
 
 
 	bool isExeMgr;

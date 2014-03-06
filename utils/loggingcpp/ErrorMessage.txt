@@ -81,12 +81,14 @@
 2040	WARN_NO_PARTITION_FOUND	No partition found for the given value range.
 2041	SYSTABLE_PARTITION	Systables' partition cannot be modified.
 2042	WARN_NO_PARTITION_PERFORMED	No partitions are %1%.
-2043	ERR_READ_INPUT_DATALIST	Input datalist read error.
 
 # a couple generic error msgs, for calls converted from the old logging system
 2043	ERR_DICTIONARY_SCAN		An internal error occurred.  Check the error log file & contact support.
 2044	ERR_TUPLE_BPS	An internal error occurred.  Check the error log file & contact support.
 2045	ERR_PRIMPROC_DOWN	At least one PrimProc closed the connection unexpectedly.
+
+2046	ERR_READ_INPUT_DATALIST	Input datalist read error.
+2047	ERR_LOCAL_QUERY_UM	Query attempted on UM (no PM) with infinidb_local_query set.
 
 
 # Sub-query errors
@@ -132,9 +134,13 @@
 4013	ERR_INVALID_VARBINARYVALUE	The value is not varbinary.
 4014	ERR_CONSTRAINTS	Constraints are currently not supported in InfiniDB.
 4015	ERR_NOT_NULL_CONSTRAINTS	Column '%1%' cannot be null.
+4016	ERR_DML_DDL_SLAVE	DML and DDL statements for InfiniDB tables can only be run from the replication master.
+4017	ERR_DML_DDL_LOCAL	DML and DDL statements are not allowed when infinidb_local_query is greater than 0.
 
 # UDF
 5001	ERR_FUNC_NON_IMPLEMENT	%1%:%2% is not implemented.
+5002	ERR_PSEUDOCOL_IDB_ONLY	Pseudo column function '%1%' is only supported in InfiniDB.
+5003	ERR_PSEUDOCOL_WRONG_ARG	Argument of pseudo column function '%1%' is invalid.
 
 # DBRM Errors
 6001	ERR_NETWORK DBRM encountered a network error, check the controllernode.

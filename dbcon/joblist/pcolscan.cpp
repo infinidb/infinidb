@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -288,7 +288,7 @@ void pColScanStep::startPrimitiveThread()
 
 void pColScanStep::startAggregationThread()
 {
-//	for (uint i = 0; i < fNumThreads; i++)
+//	for (uint32_t i = 0; i < fNumThreads; i++)
 //    	fProducerThread[i].reset(new boost::thread(pColScanStepAggregater(this, i)));
 }
 
@@ -311,7 +311,7 @@ void pColScanStep::join()
 {
 //	fConsumerThread->join();
 //	if ( !fSingleThread ) {
-//	for (uint i = 0; i < fNumThreads; i++)
+//	for (uint32_t i = 0; i < fNumThreads; i++)
 //		fProducerThread[i]->join();
 //	}
 }
@@ -581,7 +581,7 @@ void pColScanStep::receivePrimitiveMessages(uint64_t tid)
 //	vector<ElementType> v;
 //	UintRowGroup rw;
 //	vector<boost::shared_ptr<ByteStream> > bsv;
-//	uint i, k, size, bsLength;
+//	uint32_t i, k, size, bsLength;
 //	bool lastThread = false;
 //	vector<CPInfo> cpv;
 //
@@ -634,7 +634,7 @@ void pColScanStep::receivePrimitiveMessages(uint64_t tid)
 //
 //		mutex.unlock(); //pthread_mutex_unlock(&mutex);
 //
-//		uint msgCount = 0;
+//		uint32_t msgCount = 0;
 //		for (i = 0; i < size; i++) {
 //			const ByteStream::byte* bsp = bsv[i]->buf();
 //
@@ -965,7 +965,7 @@ const string pColScanStep::toString() const
 
 uint64_t pColScanStep::getFBO(uint64_t lbid)
 {
-	uint i;
+	uint32_t i;
 	uint64_t lastLBID;
 
 	for (i = 0; i < numExtents; i++) {
@@ -982,8 +982,7 @@ uint64_t pColScanStep::getFBO(uint64_t lbid)
 
 pColScanStep::pColScanStep(const pColStep& rhs) :
 	JobStep(rhs),
-	fRm(rhs.resourceManager()),
-	fUdfName(rhs.udfName())
+	fRm(rhs.resourceManager())
 {
 	fNumThreads = fRm.getJlNumScanReceiveThreads();
 	fFilterCount = rhs.filterCount();

@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -48,9 +48,7 @@ namespace primitiveprocessor
 
 Command* FilterCommand::makeFilterCommand(ByteStream& bs, vector<SCommand>& cmds)
 {
-	// skip the command type byte -- filtercommand
-	bs.advance(1);
-
+    bs.advance(1);
 	// find out the # of commands in the cmds vector,
 	// vector::size() will not work, because cmds is resize() to filterCount
 	uint64_t nc = 0;
@@ -137,7 +135,7 @@ Command* FilterCommand::makeFilterCommand(ByteStream& bs, vector<SCommand>& cmds
 		cmds[nc-1]->filterFeeder(RIGHT_FEEDER);
 		ColumnCommand* cmd0 = dynamic_cast<ColumnCommand*>(cmds[nc-3].get());
 		ColumnCommand* cmd1 = dynamic_cast<ColumnCommand*>(cmds[nc-2].get());
-		size_t cl = cmd0->getWidth(); // char[] column 
+		size_t cl = cmd0->getWidth(); // char[] column
 		sc->setCharLength(cl);
 		sc->setCompareFunc(DCC);
 		fc = sc;
@@ -205,7 +203,7 @@ void FilterCommand::project()
 {
 }
 
-void FilterCommand::projectIntoRowGroup(rowgroup::RowGroup &rg, uint col)
+void FilterCommand::projectIntoRowGroup(rowgroup::RowGroup &rg, uint32_t col)
 {
 }
 
@@ -250,7 +248,7 @@ void FilterCommand::doFilter()
 	bpp->ridCount = 0;
 
 	// rids in [0] is used for scan [1], so [1] is a subset of [0], and same order.
-	// -- see makeFilterCommand() above. 
+	// -- see makeFilterCommand() above.
 	for (uint64_t i = 0, j = 0; j < bpp->fFiltRidCount[1];  )
 	{
 		if (bpp->fFiltCmdRids[0][i] != bpp->fFiltCmdRids[1][j])

@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -32,19 +32,26 @@
 class ActiveStatementCounter
 {
 public:
-	ActiveStatementCounter(uint limit) : fStatementCount(0), upperLimit(limit) {}
+	ActiveStatementCounter(uint32_t limit) :
+		fStatementCount(0),
+		upperLimit(limit),
+		fStatementsWaiting(0)
+		{}
+
 	virtual ~ActiveStatementCounter() {}
 
 	void incr(bool& counted);
 	void decr(bool& counted);
 	uint32_t cur() const { return fStatementCount; }
+	uint32_t waiting() const { return fStatementsWaiting; }
 
 private:
 	ActiveStatementCounter(const ActiveStatementCounter& rhs);
 	ActiveStatementCounter& operator=(const ActiveStatementCounter& rhs);
 
 	uint32_t fStatementCount;
-	uint upperLimit;
+	uint32_t upperLimit;
+	uint32_t fStatementsWaiting;
 	boost::mutex fMutex;
 	boost::condition condvar;
 	BRM::VSS fVss;

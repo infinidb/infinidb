@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -53,6 +53,7 @@ bool rootUser = true;
 string USER = "root";
 bool HDFS = false;
 string localHostName;
+string PMwithUM = "n";
 
 // pushing the ACTIVE_ALARMS_FILE to all nodes every 10 seconds.
 const int ACTIVE_ALARMS_PUSHING_INTERVAL = 10;
@@ -160,6 +161,14 @@ int main(int argc, char **argv)
 
 	if ( DBRootStorageType == "hdfs" )
 		HDFS = true;
+
+	//PMwithUM config 
+	try {
+		oam.getSystemConfig( "PMwithUM", PMwithUM);
+	}
+	catch(...) {
+		PMwithUM = "n";
+	}
 
 	// get system uptime and alarm if this is a restart after module outage
 	if ( gOAMParentModuleFlag ) {
@@ -941,8 +950,8 @@ void pingDeviceThread()
 		}
 
 		// Module Heartbeat period and failure count
-	    int ModuleHeartbeatPeriod;
-    	int ModuleHeartbeatCount;
+	    	int ModuleHeartbeatPeriod;
+    		int ModuleHeartbeatCount;
 	
 		try {
 			oam.getSystemConfig("ModuleHeartbeatPeriod", ModuleHeartbeatPeriod);
@@ -1209,26 +1218,31 @@ void pingDeviceThread()
 							{
 								log.writeLog(__LINE__, "Module alive, bring it back online: " + moduleName, LOG_TYPE_DEBUG);
 
-								// skip module check if DMLProc is BUSY_INIT (rollback)
-								SystemProcessStatus systemprocessstatus;
-								ProcessStatus processstatus;
+								string PrimaryUMModuleName = config.moduleName();
+								try {
+									oam.getSystemConfig("PrimaryUMModuleName", PrimaryUMModuleName);
+								}
+								catch(...) {}
 
 								bool busy = false;
-								try {
-									oam.getProcessStatus(systemprocessstatus);
-								
-									for( unsigned int i = 0 ; i < systemprocessstatus.processstatus.size(); i++)
-									{
-										if ( systemprocessstatus.processstatus[i].ProcessName == "DMLProc" &&
-											systemprocessstatus.processstatus[i].ProcessOpState == oam::BUSY_INIT) {
+								for ( int retry = 0 ; retry < 20 ; retry++ )
+								{
+									busy = false;
+									ProcessStatus DMLprocessstatus;
+									try {
+										oam.getProcessStatus("DMLProc", PrimaryUMModuleName, DMLprocessstatus);
+									
+										if ( DMLprocessstatus.ProcessOpState == oam::BUSY_INIT) {
 											log.writeLog(__LINE__, "DMLProc in BUSY_INIT, skip bringing module online " + moduleName, LOG_TYPE_DEBUG);
 											busy = true;
-											break;
+											sleep (5);
 										}
+										else
+											break;
 									}
+									catch(...)
+									{}
 								}
-								catch(...)
-								{}
 
 								if (busy)
 									break;
@@ -1430,6 +1444,14 @@ void pingDeviceThread()
 										continue;
 									}
 
+									//call dbrm control, need to resume before start so the getdbrmfiles halt doesn't hang
+									oam.dbrmctl("reload");
+									log.writeLog(__LINE__, "'dbrmctl reload' done", LOG_TYPE_DEBUG);
+	
+									// resume the dbrm
+									oam.dbrmctl("resume");
+									log.writeLog(__LINE__, "'dbrmctl resume' done", LOG_TYPE_DEBUG);
+
 									// next, startmodule
 									status = processManager.startModule(moduleName, oam::FORCEFUL, oam::AUTO_OFFLINE);
 									if ( status == oam::API_SUCCESS )
@@ -1454,14 +1476,6 @@ void pingDeviceThread()
 										processManager.restartProcessType("mysql");
 									}
 
-									//call dbrm control
-									oam.dbrmctl("reload");
-									log.writeLog(__LINE__, "'dbrmctl reload' done", LOG_TYPE_DEBUG);
-	
-									// resume the dbrm
-									oam.dbrmctl("resume");
-									log.writeLog(__LINE__, "'dbrmctl resume' done", LOG_TYPE_DEBUG);
-
 									// if a PM module was started successfully, DMLProc/DDLProc
 									if( moduleName.find("pm") == 0 ) {
 										processManager.restartProcessType("DDLProc");
@@ -1473,6 +1487,14 @@ void pingDeviceThread()
 
 									//clear count
 									moduleInfoList[moduleName] = 0;
+
+									//setup MySQL Replication for started modules
+									log.writeLog(__LINE__, "Setup MySQL Replication for module recovering from outage", LOG_TYPE_DEBUG);
+									DeviceNetworkList devicenetworklist;
+									DeviceNetworkConfig devicenetworkconfig;
+									devicenetworkconfig.DeviceName = moduleName;
+									devicenetworklist.push_back(devicenetworkconfig);
+									processManager.setMySQLReplication(devicenetworklist);
 								}
 								else
 								{	// module failed to restart, place back in disabled state
@@ -1560,9 +1582,9 @@ void pingDeviceThread()
 								log.writeLog(__LINE__, "'dbrmctl halt' done", LOG_TYPE_DEBUG);
 
 								processManager.setSystemState(oam::BUSY_INIT);
-// TEST CODE
-string cmd = "/etc/init.d/glusterd restart > /dev/null 2>&1";
-system(cmd.c_str());
+
+								string cmd = "/etc/init.d/glusterd restart > /dev/null 2>&1";
+								system(cmd.c_str());
 
 								//send notification
 								oam.sendDeviceNotification(moduleName, MODULE_DOWN);
@@ -2138,7 +2160,8 @@ system(cmd.c_str());
                         {
                             bool degraded;
                             oam.getModuleStatus(moduleName, opState, degraded);
-                            if (opState == oam::ACTIVE || 
+                            if (opState == oam::ACTIVE ||
+				opState == oam::DEGRADED || 
                                 opState == oam::MAN_DISABLED || 
                                 opState == oam::AUTO_DISABLED )
                                 continue;

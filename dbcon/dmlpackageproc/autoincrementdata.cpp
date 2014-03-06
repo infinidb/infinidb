@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -52,7 +52,7 @@ AutoincrementData* AutoincrementData::makeAutoincrementData(uint32_t sessionID)
 }
 
 /* static */
-void AutoincrementData::removeAutoincrementData(u_int32_t sessionID)
+void AutoincrementData::removeAutoincrementData(uint32_t sessionID)
 {
     boost::mutex::scoped_lock lock(map_mutex);
     AutoincDataMap::iterator it = fAutoincDataMap.find(sessionID);

@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -40,11 +40,11 @@ PriorityThreadPool::PriorityThreadPool(uint targetWeightPerRun, uint highThreads
 		uint midThreads, uint lowThreads, uint ID) :
 		_stop(false), weightPerRun(targetWeightPerRun), id(ID)
 {
-	for (uint i = 0; i < highThreads; i++)
+	for (uint32_t i = 0; i < highThreads; i++)
 		threads.create_thread(ThreadHelper(this, HIGH));
-	for (uint i = 0; i < midThreads; i++)
+	for (uint32_t i = 0; i < midThreads; i++)
 		threads.create_thread(ThreadHelper(this, MEDIUM));
-	for (uint i = 0; i < lowThreads; i++)
+	for (uint32_t i = 0; i < lowThreads; i++)
 		threads.create_thread(ThreadHelper(this, LOW));
 	cout << "started " << highThreads << " high, " << midThreads << " med, " << lowThreads
 			<< " low.\n";
@@ -76,13 +76,13 @@ void PriorityThreadPool::addJob(const Job &job, bool useLock)
 		newJob.notify_one();
 }
 
-void PriorityThreadPool::removeJobs(uint id)
+void PriorityThreadPool::removeJobs(uint32_t id)
 {
 	list<Job>::iterator it;
 
 	mutex::scoped_lock lk(mutex);
 
-	for (uint i = 0; i < _COUNT; i++)
+	for (uint32_t i = 0; i < _COUNT; i++)
 		for (it = jobQueues[i].begin(); it != jobQueues[i].end();)
 			if (it->id == id)
 				it = jobQueues[i].erase(it);
@@ -105,11 +105,11 @@ PriorityThreadPool::Priority PriorityThreadPool::pickAQueue(Priority preference)
 void PriorityThreadPool::threadFcn(const Priority preferredQueue) throw()
 {
 	Priority queue;
-	uint weight, i;
+	uint32_t weight, i;
 	vector<Job> runList;
 	vector<bool> reschedule;
-	uint rescheduleCount;
-	uint queueSize;
+	uint32_t rescheduleCount;
+	uint32_t queueSize;
 
 	while (!_stop) {
 

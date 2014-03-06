@@ -131,9 +131,7 @@ void idb_add_deinit(UDF_INIT* initid)
 #ifdef _MSC_VER
 __declspec(dllexport)
 #endif
-double idb_add(UDF_INIT* initid, UDF_ARGS* args,
-					char* result, unsigned long* length,
-					char* is_null, char* error)
+double idb_add(UDF_INIT *initid, UDF_ARGS *args, char *is_null, char *error)
 {
 	double op1, op2;
 
@@ -171,9 +169,7 @@ void idb_isnull_deinit(UDF_INIT* initid)
 #ifdef _MSC_VER
 __declspec(dllexport)
 #endif
-long long idb_isnull(UDF_INIT* initid, UDF_ARGS* args,
-					char* result, unsigned long* length,
-					char* is_null, char* error)
+long long idb_isnull(UDF_INIT *initid, UDF_ARGS *args, char *is_null, char *error)
 {
 	return 0;
 }

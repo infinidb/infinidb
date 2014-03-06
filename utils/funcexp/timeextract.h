@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -25,17 +25,17 @@ namespace funcexp
 class TimeExtractor
 {
 private:
-	int32_t m_dayOfWeek;
-	int32_t m_dayOfYear;
-	int32_t m_weekOfYear;
-	bool    m_sundayFirst;
+	int32_t dayOfWeek;
+	int32_t dayOfYear;
+	int32_t weekOfYear;
+	bool    sundayFirst;
 
 public:
 	TimeExtractor() :
-		m_dayOfWeek( -1 ),
-		m_dayOfYear( -1 ),
-		m_weekOfYear( -1 ),
-		m_sundayFirst( false ) {;}
+		dayOfWeek( -1 ),
+		dayOfYear( -1 ),
+		weekOfYear( -1 ),
+		sundayFirst( false ) {;}
 
 	/**
 	 * extractTime is an implementation that matches MySQL behavior for the
@@ -54,28 +54,28 @@ public:
 				return returnError( dateTime );
 		}
 
-		if( m_dayOfYear > 0 )
+		if( dayOfYear > 0 )
 		{
 			// they set day of year - we also need to make sure there is a year to work with
 			if( !dataconvert::isDateValid( 1, 1, dateTime.year ) )
 				return returnError( dateTime );
 
-			helpers::get_date_from_mysql_daynr( helpers::calc_mysql_daynr( dateTime.year, 1, 1 ) + m_dayOfYear - 1, dateTime );
+			helpers::get_date_from_mysql_daynr( helpers::calc_mysql_daynr( dateTime.year, 1, 1 ) + dayOfYear - 1, dateTime );
 		}
-		else if( m_weekOfYear > 0 )
+		else if( weekOfYear > 0 )
 		{
-			if( m_dayOfWeek < 0 || !dataconvert::isDateValid( 1, 1, dateTime.year ) )
+			if( dayOfWeek < 0 || !dataconvert::isDateValid( 1, 1, dateTime.year ) )
 				return returnError( dateTime );
 
 			boost::gregorian::date yearfirst( dateTime.year, 1, 1 );
 
 			// figure out which day of week Jan-01 is
-			uint32_t firstweekday = helpers::calc_mysql_weekday( dateTime.year, 1, 1, m_sundayFirst );
+			uint32_t firstweekday = helpers::calc_mysql_weekday( dateTime.year, 1, 1, sundayFirst );
 
 			// calculate the offset to the first week starting day
 			uint32_t firstoffset = firstweekday ? ( 7 - firstweekday ) : 0;
 
-			firstoffset += ( ( m_weekOfYear - 1) * 7 ) + m_dayOfWeek - ( m_sundayFirst ? 0 : 1 );
+			firstoffset += ( ( weekOfYear - 1) * 7 ) + dayOfWeek - ( sundayFirst ? 0 : 1 );
 			yearfirst += boost::gregorian::date_duration( firstoffset );
 			dateTime.year = yearfirst.year();
 			dateTime.month = yearfirst.month();
@@ -174,8 +174,8 @@ private:
 				// weekday abbreviations are always exactly 3 characters
 				std::string weekday_str( valStr, vptr, 3 );
 				vptr += 3;
-				m_dayOfWeek = helpers::convertWeek(weekday_str);
-				if( m_dayOfWeek < 0 )
+				dayOfWeek = helpers::dayOfWeek(weekday_str);
+				if( dayOfWeek < 0 )
 				{
 					return false;
 				}
@@ -289,7 +289,7 @@ private:
 				vptr += (vend - valptr);
 				if( value < 1 || value > 366 )
 					return false;
-				m_dayOfYear = value;
+				dayOfYear = value;
 				break;
 			}
 			case 'M':
@@ -376,12 +376,12 @@ private:
 				// %u - Week (00..53), where Monday is the first day of the week
 				// %V - Week (01..53), where Sunday is the first day of the week; used with %X
 				// %v - Week (01..53), where Monday is the first day of the week; used with %x
-				m_sundayFirst = isupper( field );
+				sundayFirst = (isupper(field) != 0);
 				const char* vend = valptr + min(2, (int)(valStr.length() - vptr));
 				if( !scanDecimalVal( valptr, &vend, value ) )
 					return false;
 				vptr += (vend - valptr);
-				m_weekOfYear = value;
+				weekOfYear = value;
 				break;
 			}
 			case 'X':
@@ -393,7 +393,7 @@ private:
 				// %x - Year for the week, where Monday is the first day of the week, numeric, four digits; used with %v
 				// %Y - Year, numeric, four digits
 				// %y - Year, numeric (two digits)
-				m_sundayFirst = ( field == 'X' );
+				sundayFirst = ( field == 'X' );
 				int minFieldWidth = ( field == 'y' ? 2 : 4 );
 				const char* vend = valptr + min( minFieldWidth, (int)(valStr.length() - vptr) );
 				if( !scanDecimalVal( valptr, &vend, value ) )
@@ -419,14 +419,14 @@ private:
 					++endpos;
 				std::string weekday_str( valStr, vptr, endpos );
 				vptr += weekday_str.length();
-				value = helpers::convertWeek(weekday_str);
+				value = helpers::dayOfWeek(weekday_str);
 				if( value < 0 )
 				{
 					return false;
 				}
 				else
 				{
-					m_dayOfWeek = value;
+					dayOfWeek = value;
 				}
 				break;
 			}
@@ -437,7 +437,7 @@ private:
 				if( !scanDecimalVal( valptr, &vend, value ) )
 					return false;
 				vptr += (vend - valptr);
-				m_dayOfWeek = value;
+				dayOfWeek = value;
 				break;
 			}
 			default:

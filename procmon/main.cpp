@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -14,14 +14,6 @@
    along with this program; if not, write to the Free Software
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
-
-/******************************************************************************************
-* $Id: main.cpp 2022 2013-06-21 18:35:22Z dhill $
-*
-* Copyright (C) 2009-2012 Calpont Corporation
-*
-* All rights reserved
-******************************************************************************************/
 
 #include <boost/interprocess/shared_memory_object.hpp>
 #include <boost/interprocess/mapped_region.hpp>
@@ -63,6 +55,7 @@ bool runStandby = false;
 bool processInitComplete = false;
 bool rootUser = true;
 string USER = "root";
+string PMwithUM = "n";
 
 //extern std::string gOAMParentModuleName;
 extern bool gOAMParentModuleFlag;
@@ -128,14 +121,14 @@ int main(int argc, char **argv)
 	string systemLang = "C";
 
 	try{
-        oam.getSystemConfig("SystemLang", systemLang);
-    }
-    catch(...)
-    {
+        	oam.getSystemConfig("SystemLang", systemLang);
+	}
+	catch(...)
+	{
 		systemLang = "C";
 	}
 
-    setlocale(LC_ALL, systemLang.c_str());
+    	setlocale(LC_ALL, systemLang.c_str());
 
 	// if amazon cloud, check and update Instance IP Addresses and volumes
 	try {
@@ -173,6 +166,14 @@ int main(int argc, char **argv)
 
 	if ( DBRootStorageType == "hdfs" )
 		HDFS = true;
+
+	//PMwithUM config 
+	try {
+		oam.getSystemConfig( "PMwithUM", PMwithUM);
+	}
+	catch(...) {
+		PMwithUM = "n";
+	}
 
 	//define entry if missing
 	Config* sysConfig = Config::makeConfig();
@@ -571,11 +572,13 @@ int main(int argc, char **argv)
 				systemprocessconfig.processconfig[i].LaunchID == 0 )
 			continue;
 
-		if (systemprocessconfig.processconfig[i].ModuleType == config.moduleType() ||
-			systemprocessconfig.processconfig[i].ModuleType == "ChildExtOAMModule" ||
-			(systemprocessconfig.processconfig[i].ModuleType == "ChildOAMModule" ) ||
-			(systemprocessconfig.processconfig[i].ModuleType == "ParentOAMModule" &&
-			config.moduleType() == OAMParentModuleType ) )
+		if ( (systemprocessconfig.processconfig[i].ModuleType == config.moduleType() ) ||
+			( systemprocessconfig.processconfig[i].ModuleType == "um" && 
+				config.moduleType() == "pm" && PMwithUM == "y") ||
+			( systemprocessconfig.processconfig[i].ModuleType == "ChildExtOAMModule") ||
+			( systemprocessconfig.processconfig[i].ModuleType == "ChildOAMModule" ) ||
+			( systemprocessconfig.processconfig[i].ModuleType == "ParentOAMModule" &&
+			  	config.moduleType() == OAMParentModuleType ) )
 		{
 			// If Process Monitor, update local state
 			if ( systemprocessconfig.processconfig[i].ProcessName == "ProcessMonitor")
@@ -595,6 +598,17 @@ int main(int argc, char **argv)
 			}	
 			else
 			{
+				if ( systemprocessconfig.processconfig[i].ModuleType == "um" && 
+					config.moduleType() == "pm" && PMwithUM == "y" &&
+					systemprocessconfig.processconfig[i].ProcessName == "DMLProc" )
+					continue;
+
+
+				if ( systemprocessconfig.processconfig[i].ModuleType == "um" && 
+					config.moduleType() == "pm" && PMwithUM == "y" &&
+					systemprocessconfig.processconfig[i].ProcessName == "DDLProc" )
+					continue;
+
 				// Get Last Known Process Status and PID
 				int state = oam::AUTO_OFFLINE;
 				int PID = 0;
@@ -1461,10 +1475,23 @@ static void statusControlThread()
 				string processModuleType = systemprocessconfig.processconfig[j].ModuleType;
 
 				if (processModuleType == systemModuleType
+					|| ( processModuleType == "um" && 
+						systemModuleType == "pm" && PMwithUM == "y")
 					|| processModuleType == "ChildExtOAMModule"
 					|| (processModuleType == "ChildOAMModule" )
 					|| (processModuleType == "ParentOAMModule" && systemModuleType == OAMParentModuleType) )
 				{
+					if ( processModuleType == "um" && 
+						systemModuleType == "pm" && PMwithUM == "y" &&
+						systemprocessconfig.processconfig[j].ProcessName == "DMLProc" )
+						continue;
+	
+	
+					if ( processModuleType == "um" && 
+						systemModuleType == "pm" && PMwithUM == "y" &&
+						systemprocessconfig.processconfig[j].ProcessName == "DDLProc" )
+						continue;
+	
 					processstatus procstat;
 					procstat.ProcessName = systemprocessconfig.processconfig[j].ProcessName;
 					procstat.ModuleName = (*pt).DeviceName;
@@ -2685,10 +2712,23 @@ static void statusControlThread()
 										string processModuleType = systemprocessconfig.processconfig[j].ModuleType;
 
 										if (processModuleType == moduleType
+										|| ( processModuleType == "um" && 
+											moduleType == "pm" && PMwithUM == "y")
 											|| processModuleType == "ChildExtOAMModule"
 											|| (processModuleType == "ChildOAMModule" )
 											|| (processModuleType == "ParentOAMModule" && moduleType == OAMParentModuleType) )
 										{
+											if ( processModuleType == "um" && 
+												moduleType == "pm" && PMwithUM == "y" &&
+												systemprocessconfig.processconfig[j].ProcessName == "DMLProc" )
+												continue;
+							
+							
+											if ( processModuleType == "um" && 
+												moduleType == "pm" && PMwithUM == "y" &&
+												systemprocessconfig.processconfig[j].ProcessName == "DDLProc" )
+												continue;
+
 											processstatus procstat;
 											procstat.ProcessName = systemprocessconfig.processconfig[j].ProcessName;
 											procstat.ModuleName = (*pt).DeviceName;

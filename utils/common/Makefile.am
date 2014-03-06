@@ -1,4 +1,4 @@
-# Copyright (C) 2013 Calpont Corp.
+# Copyright (C) 2014 InfiniDB, Inc.
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -24,9 +24,9 @@ AM_CFLAGS = $(idb_cflags)
 AM_CXXFLAGS = $(idb_cxxflags)
 AM_LDFLAGS = -version-info 1:0:0 $(idb_ldflags)
 lib_LTLIBRARIES = libcommon.la
-libcommon_la_SOURCES = fixedallocator.cpp poolallocator.cpp cgroupconfigurator.cpp MonitorProcMem.cpp
+libcommon_la_SOURCES = fixedallocator.cpp poolallocator.cpp cgroupconfigurator.cpp MonitorProcMem.cpp nullvaluemanip.cpp
 include_HEADERS = hasher.h simpleallocator.h fixedallocator.h poolallocator.h \
-stlpoolallocator.h syncstream.h atomicops.h branchpred.h cgroupconfigurator.h MonitorProcMem.h
+stlpoolallocator.h syncstream.h atomicops.h branchpred.h cgroupconfigurator.h MonitorProcMem.h nullvaluemanip.h
 
 test:
 

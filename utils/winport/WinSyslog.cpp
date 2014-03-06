@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -32,7 +32,7 @@ using namespace std;
 #include "idbregistry.h"
 #include "WinSysLog.h"
 
-// WinSyslog class encapsulates what supstitutes for the syslog in the 
+// WinSyslog class encapsulates what substitutes for the syslog in the 
 // InfiniDB Windows version.
 
 // Singleton instance
@@ -114,7 +114,6 @@ WinSyslog::WinSyslog() :
     {
         fbGoodIPMutex = true;
     }
-
 }
 
 WinSyslog::~WinSyslog()
@@ -251,11 +250,11 @@ void WinSyslog::Archive(const tm& nowtm)
         }
         fLastArchiveDay = nowtm.tm_yday;
 
-        // Find any files older than a week.
+        // Get the dates of all archive files.
         fs::path sourceDir(fLogDirName); 
         fs::directory_iterator iter(sourceDir);
         fs::directory_iterator end_iter;
-        std::multimap<std::time_t, fs::path> fileSet;
+        std::multimap<std::time_t, fs::path> fileSet;  // Stays sorted
         while (iter != end_iter)
         {
             fs::path archiveFile = *iter;

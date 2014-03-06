@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -56,7 +56,7 @@ int fifoSize = 128;
 int startingOid = 3416;  // Oid for lineitem.l_orderkey on your database.
 // uint32_t flushInterval = 16384; // interval used in flushing table bands
 uint32_t flushInterval = 16384; // interval used in flushing table bands
-uint columns;
+uint32_t columns;
 
 Stopwatch timer;
 
@@ -101,7 +101,7 @@ class BSQueueMgr
          *
          * @return Next projected table band. Row count of 0 marks end of data
          */
-        messageqcpp::ByteStream* getNextByteStream(uint &rowCount);
+        messageqcpp::ByteStream* getNextByteStream(uint32_t &rowCount);
 
     private:
         //Disable these by declaring but not defining
@@ -110,7 +110,7 @@ class BSQueueMgr
 
 		struct QueueElement {
 			messageqcpp::ByteStream *bs;
-			uint rowCount;
+			uint32_t rowCount;
 		};
 
         DeliveryStep *ds;
@@ -164,7 +164,7 @@ void BSQueueMgr::project ( )
 
 	while ( moreData )
 	{
-		uint rowCount;
+		uint32_t rowCount;
 		QueueElement qe;
 		
 		qe.bs = new ByteStream;
@@ -196,7 +196,7 @@ void BSQueueMgr::project ( )
 // Returns next projected table band.  A row count of 0, marks the table
 // band as being the last.
 //------------------------------------------------------------------------------
-ByteStream * BSQueueMgr::getNextByteStream(uint &rowCount)
+ByteStream * BSQueueMgr::getNextByteStream(uint32_t &rowCount)
 {
 	QueueElement qe;
 
@@ -717,7 +717,7 @@ void *nextBandBenchProducer(void *arg)
 	FIFO<UintRowGroup>* dl1 = (FIFO<UintRowGroup>*) arg;
 	UintRowGroup rg;
 	uint64_t *arr;
-	uint i;
+	uint32_t i;
 
 	arr = (uint64_t*) rg.et;
 	for (i = 0; i < 8192; ++i)
@@ -737,7 +737,7 @@ void nextBandBenchmark()
 {
 	ByteStream bs;
 	pthread_t threads[columns];
-	uint i, rowCount = 1;
+	uint32_t i, rowCount = 1;
 	JobStepAssociation inJs;
 
 	for (i = 0; i < columns; ++i) {
@@ -774,7 +774,7 @@ void queuedBSBenchmark(int queueLength)
 {
     ByteStream *bs;
     pthread_t threads[columns];
-    uint i, rowCount = 1;
+    uint32_t i, rowCount = 1;
     JobStepAssociation inJs;
 
     for (i = 0; i < columns; ++i) {

@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -62,13 +62,13 @@ public:
 	 *
 	 * Returns the next message in the inbound queue for unique ids.
 	 * @param bs A pointer to the ByteStream to fill in.
-	 * @note: saves a copy vs read(uint, uint).
+	 * @note: saves a copy vs read(uint32_t, uint32_t).
 	 */
 	EXPORT void read(uint32_t key, messageqcpp::SBS &);
 
 	/** @brief write function to write to specified PM
 	*/
-	EXPORT void write(const messageqcpp::ByteStream &msg, uint connection);
+	EXPORT void write(const messageqcpp::ByteStream &msg, uint32_t connection);
 	
 	/** @brief write function to write to all PMs
 	*/
@@ -85,7 +85,7 @@ public:
 	 * Starts the current thread listening on the client socket for Write Engine Server response messages. Will not return
 	 * until busy() returns false or a zero-length response is received.
 	 */
-	EXPORT void Listen(boost::shared_ptr<messageqcpp::MessageQueueClient> client, uint connIndex);
+	EXPORT void Listen(boost::shared_ptr<messageqcpp::MessageQueueClient> client, uint32_t connIndex);
 
 	/** @brief set/unset busy flag
 	 *
@@ -104,7 +104,7 @@ public:
 	
 	/** @brief accessor
 	 */
-	uint getPmCount() { return pmCount; }
+	uint32_t getPmCount() { return pmCount; }
 private:
 	WEClients(const WEClients& weClient);
 	WEClients& operator=(const WEClients& weClient);
@@ -116,25 +116,25 @@ private:
 	
 	/* To keep some state associated with the connection */
 	struct MQE {
-		MQE(uint pCount) : ackSocketIndex(0), pmCount(pCount){
+		MQE(uint32_t pCount) : ackSocketIndex(0), pmCount(pCount){
 			unackedWork.reset(new volatile uint32_t[pmCount]);
 			memset((void *) unackedWork.get(), 0, pmCount * sizeof(uint32_t));
 		}
 		WESMsgQueue queue;
-		uint ackSocketIndex;
+		uint32_t ackSocketIndex;
 		boost::scoped_array<volatile uint32_t> unackedWork;
-		uint pmCount;
+		uint32_t pmCount;
 	};
 	
 	//The mapping of session ids to StepMsgQueueLists
 	typedef std::map<unsigned, boost::shared_ptr<MQE> > MessageQueueMap;
 
-	void StartClientListener(boost::shared_ptr<messageqcpp::MessageQueueClient> cl, uint connIndex);
+	void StartClientListener(boost::shared_ptr<messageqcpp::MessageQueueClient> cl, uint32_t connIndex);
 
 	/** @brief Add a message to the queue
 	 *
 	 */
-	void addDataToOutput(messageqcpp::SBS, uint connIndex);
+	void addDataToOutput(messageqcpp::SBS, uint32_t connIndex);
 
 	int fPrgmID;
 	
@@ -144,8 +144,8 @@ private:
   	boost::mutex fMlock; //sessionMessages mutex
  	std::vector<boost::shared_ptr<boost::mutex> > fWlock; //WES socket write mutexes
 	bool fBusy;
-	volatile uint closingConnection;
-	uint pmCount;
+	volatile uint32_t closingConnection;
+	uint32_t pmCount;
 	boost::mutex fOnErrMutex;   // to lock function scope to reset pmconnections under error condition
 	
 	boost::mutex ackLock;

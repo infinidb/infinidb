@@ -91,6 +91,26 @@ AC_FUNC_STRTOD
 AC_FUNC_UTIME_NULL
 AC_CHECK_FUNCS([alarm dup2 floor ftime ftruncate gethostbyname getpagesize gettimeofday inet_ntoa isascii localtime_r memchr memmove memset mkdir pow regcomp rmdir select setenv setlocale socket strcasecmp strchr strcspn strdup strerror strrchr strspn strstr strtol strtoul strtoull utime])
 
+AM_PATH_XML2([2.6.26])
+if test "x$XML_CPPFLAGS" = "x"; then
+	AC_MSG_ERROR([Could not find a usable libxml2 development environment!])
+fi
+
+AC_CHECK_HEADERS([zlib.h])
+if test "x$ac_cv_header_zlib_h" != "xyes"; then
+	AC_MSG_ERROR([Could not find a usable zlib development environment!])
+fi
+
+AC_CHECK_HEADERS([readline/readline.h])
+if test "x$ac_cv_header_readline_readline_h" != "xyes"; then
+	AC_MSG_ERROR([Could not find a usable readline development environment!])
+fi
+
+AC_CHECK_HEADERS([ncurses.h])
+if test "x$ac_cv_header_ncurses_h" != "xyes"; then
+	AC_MSG_ERROR([Could not find a usable ncurses development environment!])
+fi
+
 AC_MSG_CHECKING(whether to enable debugging)
 AC_SUBST([idb_cppflags], [' '])
 AC_ARG_WITH([debug],
@@ -137,7 +157,7 @@ AC_SUBST([netsnmp_libs], ['-lnetsnmpmibs -lnetsnmpagent -lnetsnmp -lnetsnmpmibs 
 AC_SUBST([idb_common_libs], ['-lmessageqcpp -lloggingcpp -lconfigcpp -lidbboot -lboost_idb -lxml2 -lpthread -lrt'])
 AC_SUBST([idb_oam_libs], ['-loamcpp -lsnmpmanager ${netsnmp_libs}'])
 AC_SUBST([idb_brm_libs], ['-lbrm -lidbdatafile -lcacheutils -lrwlock ${idb_oam_libs} ${idb_common_libs}'])
-AC_SUBST([idb_exec_libs], ['-ljoblist -lexecplan -lwindowfunction -ljoiner -lrowgroup -lmulticast -lfuncexp -ludfsdk -ldataconvert -lcommon -lcompress -lmysqlcl_idb -lquerystats ${idb_brm_libs}'])
+AC_SUBST([idb_exec_libs], ['-ljoblist -lexecplan -lwindowfunction -ljoiner -lrowgroup -lfuncexp -ludfsdk -ldataconvert -lcommon -lcompress -lmysqlcl_idb -lquerystats -lquerytele -lthrift -lthreadpool ${idb_brm_libs}'])
 AC_SUBST([idb_write_libs], ['-lddlpackageproc -lddlpackage -ldmlpackageproc -ldmlpackage -lwriteengine -lwriteengineclient -lidbdatafile -lcacheutils ${idb_exec_libs}'])
 AC_SUBST([idb_common_includes], ['-I${prefix}/Calpont/include -I/usr/local/include -I/usr/local/include/libxml2 -I/usr/include/libxml2'])
 AC_SUBST([idb_common_ldflags], ['-L${prefix}/Calpont/lib -L/usr/local/lib'])
@@ -158,7 +178,6 @@ AC_CONFIG_FILES([
 	utils/rowgroup/Makefile
 	utils/cacheutils/Makefile
 	utils/net-snmp/Makefile
-	utils/multicast/Makefile
 	utils/funcexp/Makefile
 	utils/udfsdk/Makefile
 	utils/compress/Makefile
@@ -172,6 +191,9 @@ AC_CONFIG_FILES([
 	utils/idbhdfs/Makefile
 	utils/idbhdfs/hdfs-12/Makefile
 	utils/idbhdfs/hdfs-20/Makefile
+	utils/winport/Makefile
+	utils/thrift/Makefile
+	utils/querytele/Makefile
 	exemgr/Makefile
 	ddlproc/Makefile
 	dbcon/Makefile

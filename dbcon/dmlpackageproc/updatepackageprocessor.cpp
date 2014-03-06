@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -26,9 +26,7 @@
 #include <map>
 #include <boost/scoped_ptr.hpp>
 using namespace std;
-#define UPDATEPKGPROC_DLLEXPORT
 #include "updatepackageprocessor.h"
-#undef UPDATEPKGPROC_DLLEXPORT
 #include "writeengine.h"
 #include "joblistfactory.h"
 #include "messagelog.h"
@@ -151,17 +149,17 @@ UpdatePackageProcessor::processPackage(dmlpackage::CalpontDMLPackage& cpackage)
 			if (tableLockId == 0)
 			{
 				//cout << "tablelock is not found in cache, getting from dbrm" << endl;
-				u_int32_t  processID = ::getpid();
+				uint32_t  processID = ::getpid();
 				int32_t   txnId = txnid.id;
 				int32_t sessionId = fSessionID;
 				std::string  processName("DMLProc");
 				int i = 0;
 				OamCache * oamcache = OamCache::makeOamCache();
 				std::vector<int> pmList = oamcache->getModuleIds();
-				std::vector<uint> pms;
+				std::vector<uint32_t> pms;
 				for (unsigned i=0; i < pmList.size(); i++)
 				{
-					pms.push_back((uint)pmList[i]);
+					pms.push_back((uint32_t)pmList[i]);
 				}
 				
 				try {
@@ -325,7 +323,7 @@ UpdatePackageProcessor::processPackage(dmlpackage::CalpontDMLPackage& cpackage)
   // timer.finish();
 	//@Bug 1886,2870 Flush VM cache only once per statement. send to all PMs.
 	//WriteEngineWrapper writeEngine;
-	std::map<u_int32_t,u_int32_t> oids;
+	std::map<uint32_t,uint32_t> oids;
 	int rc = 0;
     if (result.result == NO_ERROR || result.result == IDBRANGE_WARNING)
     {
@@ -512,7 +510,7 @@ uint64_t UpdatePackageProcessor::fixUpRows(dmlpackage::CalpontDMLPackage& cpacka
 					//timer.stop("Meta");
 					continue;
 				}
-				uint amount = rgData.deserialize(msg, true);
+				uint32_t amount = rgData.deserialize(msg, true);
 				rowGroup->setData(&rgData);
 				//rowGroup->setData(const_cast<uint8_t*>(msg.buf())); 
 				err = (rowGroup->getStatus() != 0);
@@ -672,7 +670,7 @@ uint64_t UpdatePackageProcessor::fixUpRows(dmlpackage::CalpontDMLPackage& cpacka
 }
 
 bool UpdatePackageProcessor::processRowgroup(ByteStream & aRowGroup, DMLResult& result, const uint64_t uniqueId, 
-			dmlpackage::CalpontDMLPackage& cpackage, std::map<unsigned, bool>& pmState,  bool isMeta, uint dbroot)
+			dmlpackage::CalpontDMLPackage& cpackage, std::map<unsigned, bool>& pmState,  bool isMeta, uint32_t dbroot)
 {
 	bool rc = false;
 	//cout << "Get dbroot " << dbroot << endl;
@@ -685,7 +683,7 @@ bool UpdatePackageProcessor::processRowgroup(ByteStream & aRowGroup, DMLResult& 
 	bytestream << (uint32_t)cpackage.get_TxnID();
 	bytestream += aRowGroup;
 	//cout << "sending rows to pm " << pmNum << " with msg length " << bytestream.length() << endl;
-	uint msgRecived = 0;
+	uint32_t msgRecived = 0;
 	boost::shared_ptr<messageqcpp::ByteStream> bsIn;
 	bsIn.reset(new ByteStream());
 	ByteStream::byte tmp8;
@@ -733,7 +731,7 @@ bool UpdatePackageProcessor::processRowgroup(ByteStream & aRowGroup, DMLResult& 
 	{ 	
 		try {
 			//cout << "sending rows to pm " << pmNum << " with msg length " << bytestream.length() << endl;
-			fWEClient->write(bytestream, (uint)pmNum);
+			fWEClient->write(bytestream, (uint32_t)pmNum);
 			pmState[pmNum] = false;
 		}
 		catch (runtime_error& ex) //write error
@@ -802,7 +800,7 @@ bool UpdatePackageProcessor::processRowgroup(ByteStream & aRowGroup, DMLResult& 
 					if (tmp32 == (uint32_t)pmNum)
 					{
 						//cout << "sending rows to pm " << pmNum << " with msg length " << bytestream.length() << endl;
-						fWEClient->write(bytestream, (uint)pmNum);
+						fWEClient->write(bytestream, (uint32_t)pmNum);
 						pmState[pmNum] = false;
 						break;
 					}
@@ -841,7 +839,7 @@ bool UpdatePackageProcessor::receiveAll(DMLResult& result, const uint64_t unique
 										std::map<unsigned, bool>& pmState, const uint32_t tableOid)
 {
 	//check how many message we need to receive
-	uint messagesNotReceived = 0;
+	uint32_t messagesNotReceived = 0;
 	bool err = false;
 	for (unsigned i=0; i<fPMs.size(); i++)
 	{
@@ -852,7 +850,7 @@ bool UpdatePackageProcessor::receiveAll(DMLResult& result, const uint64_t unique
 	boost::shared_ptr<messageqcpp::ByteStream> bsIn;
 	ByteStream::byte tmp8;
 	string errorMsg;
-	uint msgReceived = 0;
+	uint32_t msgReceived = 0;
 	if (messagesNotReceived > 0)
 	{
 		LoggingID logid( DMLLoggingId, fSessionID, fSessionID);

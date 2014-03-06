@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -53,13 +53,13 @@ public:
  
 	/** Constructors */ 
 	SimpleColumn_Decimal();
-	SimpleColumn_Decimal(const std::string& token, const u_int32_t sessionID = 0);
+	SimpleColumn_Decimal(const std::string& token, const uint32_t sessionID = 0);
 	SimpleColumn_Decimal(const std::string& schema, 
 		               const std::string& table, 
 		               const std::string& col, 
 		               const bool isInfiniDB,
-		               const u_int32_t sessionID = 0);
-	SimpleColumn_Decimal(const SimpleColumn& rhs, const u_int32_t sessionID = 0);
+		               const uint32_t sessionID = 0);
+	SimpleColumn_Decimal(const SimpleColumn& rhs, const uint32_t sessionID = 0);
 	
 	/** Destructor */
 	virtual ~SimpleColumn_Decimal(){}
@@ -93,7 +93,7 @@ SimpleColumn_Decimal<len>::SimpleColumn_Decimal():SimpleColumn()
 }
 
 template<int len>
-SimpleColumn_Decimal<len>::SimpleColumn_Decimal(const std::string& token, const u_int32_t sessionID):
+SimpleColumn_Decimal<len>::SimpleColumn_Decimal(const std::string& token, const uint32_t sessionID):
 		SimpleColumn(token, sessionID) 
 {
 	setNullVal();
@@ -104,14 +104,14 @@ SimpleColumn_Decimal<len>::SimpleColumn_Decimal(const std::string& schema,
 		           const std::string& table, 
 		           const std::string& col, 
 		           const bool isInfiniDB,
-		           const u_int32_t sessionID) :
+		           const uint32_t sessionID) :
 		           SimpleColumn(schema, table, col, isInfiniDB, sessionID) 
 {
 	setNullVal();
 }
 
 template<int len>
-SimpleColumn_Decimal<len>::SimpleColumn_Decimal(const SimpleColumn& rhs, const u_int32_t sessionID):
+SimpleColumn_Decimal<len>::SimpleColumn_Decimal(const SimpleColumn& rhs, const uint32_t sessionID):
 		SimpleColumn(rhs,sessionID) 
 {
 	setNullVal();

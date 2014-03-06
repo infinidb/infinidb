@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -92,7 +92,7 @@ BPPSeeder::BPPSeeder(const SBS &b,
 					firstRun(true)
 {
 	uint8_t *buf = b->buf();
-	uint pos = sizeof(ISMPacketHeader);
+	uint32_t pos = sizeof(ISMPacketHeader);
 
 	sessionID = *((uint32_t *) &buf[pos]); pos += 4;
 	stepID = *((uint32_t *) &buf[pos]); pos += 4;
@@ -208,7 +208,7 @@ int BPPSeeder::operator()()
 		// only lock map while inserted objects
 		// once there is an object for each thread
 		// there is not need to lock
-		if (gFDList.size()<(uint)fPMThreads) {
+		if (gFDList.size()<(uint32_t)fPMThreads) {
 			gFDMutex.lock();
 			ptLock=true;
 		}
@@ -240,7 +240,7 @@ int BPPSeeder::operator()()
 		clock_gettime(CLOCK_MONOTONIC, &tm);
   	} // if (fTrace)
 
-	uint retries = 0;
+	uint32_t retries = 0;
 restart:
 	try {
 		ret = (*bpp)();
@@ -350,7 +350,7 @@ void BPPSeeder::sendErrorMsg(uint32_t id, uint16_t status, uint32_t step)
 bool BPPSeeder::isSysCat()
 {
 	const uint8_t *buf;
-	uint sessionIDOffset = sizeof(ISMPacketHeader);
+	uint32_t sessionIDOffset = sizeof(ISMPacketHeader);
 	uint32_t sessionID;
 
 	buf = bs->buf();

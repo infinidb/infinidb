@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -32,6 +32,7 @@
 #include <set>
 #include <boost/shared_ptr.hpp>
 #include <boost/version.hpp>
+#include <boost/uuid/uuid.hpp>
 #include <stdint.h>
 #include <cstring>
 
@@ -74,6 +75,7 @@ public:
 	typedef uint16_t doublebyte;
 	typedef uint32_t quadbyte;
 	typedef uint64_t octbyte;
+	typedef boost::uuids::uuid uuid;
 
 	/**
 	 *	default ctor
@@ -129,9 +131,9 @@ public:
 #if BOOST_VERSION < 104500
 	//These 2 are to make MS VC++ w/ boost < 1.45 happy
     // TODO: Do we still need these?
-	EXPORT ByteStream& operator<<(const uint ui);
+	EXPORT ByteStream& operator<<(const uint32_t ui);
 
-	EXPORT ByteStream& operator>>(uint& ui);
+	EXPORT ByteStream& operator>>(uint32_t& ui);
 #endif
 #endif
 	/**
@@ -154,6 +156,10 @@ public:
 	 * push a ByteStream onto the end of the stream.
 	 */
 	EXPORT ByteStream& operator<<(const ByteStream& bs);
+	/**
+	 * push a UUID onto the end of the stream.
+	 */
+	EXPORT ByteStream& operator<<(const uuid& u);
 
 	/**
 	 *	extract a int8_t from the front of the stream.
@@ -205,6 +211,10 @@ public:
 	 * extract a ByteStream from the front of the stream.
 	 */
 	EXPORT ByteStream& operator>>(ByteStream& bs);
+	/**
+	 * extract a UUID from the front of the stream.
+	 */
+	EXPORT ByteStream& operator>>(uuid& u);
 
 	/**
 	 *	Peek at a int8_t from the front of the stream.
@@ -252,6 +262,10 @@ public:
 	 * Peek at a ByteStream from the front of the stream.
 	 */
 	EXPORT void peek(ByteStream& bs) const;
+	/**
+	 * Peek at a UUID from the front of the stream.
+	 */
+	EXPORT void peek(uuid& u) const;
 
 	/**
 	 *	load the stream from an array. Clears out any previous data.
@@ -392,6 +406,7 @@ static const uint8_t BS_INT64 = 7;
 static const uint8_t BS_STRING = 8;
 static const uint8_t BS_BLOB = 9;
 static const uint8_t BS_SERIALIZABLE = 10;
+static const uint8_t BS_UUID = 11;
 
 inline ByteStream::ByteStream(const uint8_t* bp, const uint32_t len) : fBuf(0), fMaxLen(0) { load(bp, len); }
 inline ByteStream::~ByteStream() { delete [] fBuf; }
@@ -455,7 +470,7 @@ void serializeVector(ByteStream& bs, const std::vector<T>& v)
 template<typename T>
 void deserializeVector(ByteStream& bs, std::vector<T>& v)
 {
-	uint i;
+	uint32_t i;
 	T tmp;
 	uint64_t size;
 	
@@ -522,7 +537,7 @@ void serializeSet(ByteStream &bs, const std::set<T> &s)
 template<typename T>
 void deserializeSet(ByteStream& bs, std::set<T>& s)
 {
-	uint i;
+	uint32_t i;
 	T tmp;
 	uint64_t size;
 	

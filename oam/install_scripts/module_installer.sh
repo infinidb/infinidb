@@ -105,6 +105,19 @@ if [ $EUID -eq 0 -a -f $INFINIDB_INSTALL_DIR/local/rc.local.calpont ]; then
 	fi
 fi
 
+#if um install and PMwithUM flag is set, rename my.cnf.rpmsave if it exist
+if [ "$1" = "um" ]; then
+	PMwithUM=`$INFINIDB_INSTALL_DIR/bin/getConfig Installation PMwithUM`
+	if [ $PMwithUM = "y" ]; then
+		if test -f $INFINIDB_INSTALL_DIR/mysql/my.cnf.rpmsave ; then
+			echo "Rename my.cnf.rpmsave my.cnf"
+			rm -f $INFINIDB_INSTALL_DIR/mysql/my.cnf.idbbackup
+			mv $INFINIDB_INSTALL_DIR/mysql/my.cnf $INFINIDB_INSTALL_DIR/mysql/my.cnf.idbbackup
+			cp $INFINIDB_INSTALL_DIR/mysql/my.cnf.rpmsave $INFINIDB_INSTALL_DIR/mysql/my.cnf
+		fi
+	fi
+fi
+
 plugin=`$INFINIDB_INSTALL_DIR/bin/getConfig SystemConfig DataFilePlugin`
 if [ -n "$plugin" ]; then
 	echo "Setup .bashrc on Module"

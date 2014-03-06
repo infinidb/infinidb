@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -972,9 +972,9 @@ void BulkLoadBuffer::convert(char *field, int fieldLength,
 					}
 					else
 					{
-						//Bug5383 - 4.0@1400-01-01 00:00:00 Below 4.0 is 0000-01-01 00:00:00
-						llDate = 0x578104000000000; 	//394082834458869760
-						bufStats.satCount++;
+						//Bug5383 - 4.0@1400-01-01 00:00:00 Below it is 0000-01-01 00:00:00
+						llDate = 0x578104000000000;	//394082834458869760
+                    	bufStats.satCount++;
 					}
                 }
 
@@ -1259,20 +1259,21 @@ void BulkLoadBuffer::convert(char *field, int fieldLength,
                     if (iDate > bufStats.maxBufferVal)
                         bufStats.maxBufferVal = iDate;
                 }
-                else 
-				{
-					if(!column.fNotNull)
+                else {
+
+
+                	if (!column.fNotNull)
 					{
-						// @bug 3375: reset invalid date to NULL,
-						//            and track as a saturated value.
-						iDate = joblist::DATENULL;
-						bufStats.satCount++;
+                    	// @bug 3375: reset invalid date to NULL,
+                    	//            and track as a saturated value.
+                    	iDate = joblist::DATENULL;
+                    	bufStats.satCount++;
 					}
 					else
 					{
 						// Bug5383 - 1400-01-01 
-						iDate = 0x5781068;  	//ver below 4.0 it is 0x1068
-						bufStats.satCount++;
+                        iDate = 0x5781068;		// for versions below 4.0 it is 0x1068
+						bufStats.satCount++; 	
 					}
                 }
 
@@ -1334,7 +1335,7 @@ int  BulkLoadBuffer::parseCol(ColumnInfo &columnInfo)
     int     rc = NO_ERROR;
 
     // Parse the data and fill up a buffer; which is written to output file
-    uint nRowsParsed;
+    uint32_t nRowsParsed;
 
     if (fLog->isDebug( DEBUG_2 ))
     {
@@ -1390,7 +1391,7 @@ int  BulkLoadBuffer::parseCol(ColumnInfo &columnInfo)
 
         int  tokenLength   = 0;
         bool tokenNullFlag = false;
-        for(uint i=0; i<fTotalReadRowsParser; ++i)
+        for(uint32_t i=0; i<fTotalReadRowsParser; ++i)
         {
             char *p = fDataParser + fTokensParser[i][columnInfo.id].start;
 
@@ -1566,7 +1567,7 @@ int  BulkLoadBuffer::parseDict(ColumnInfo &columnInfo)
 {
     int rc = NO_ERROR;
 
-    uint nRowsParsed1;
+    uint32_t nRowsParsed1;
     rc = parseDictSection( columnInfo,
                            0,
                            fStartRowParser,
@@ -1680,7 +1681,7 @@ int  BulkLoadBuffer::parseDict(ColumnInfo &columnInfo)
 
         //..Now we can add the remaining rows in the current Read buffer to
         //  to the output buffer destined for the next extent we just added.
-        uint nRowsParsed2;
+        uint32_t nRowsParsed2;
         rc = parseDictSection( columnInfo,
                                nRowsParsed1,
                               (fStartRowParser+nRowsParsed1),
@@ -1723,8 +1724,8 @@ int  BulkLoadBuffer::parseDict(ColumnInfo &columnInfo)
 int  BulkLoadBuffer::parseDictSection(ColumnInfo& columnInfo,
                                       int         tokenPos,
                                       RID         startRow,
-                                      uint        totalReadRows,
-                                      uint&       nRowsParsed)
+                                      uint32_t        totalReadRows,
+                                      uint32_t&       nRowsParsed)
 {
     int rc = NO_ERROR;
 

@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -43,8 +43,7 @@
 #include "calpontsystemcatalog.h"
 #include "dmlpackageprocessor.h"
 #include "batchinsertprocessor.h"
-
-//#include "iosocket.h"
+#include "querytele.h"
 
 namespace dmlprocessor
 {
@@ -103,8 +102,10 @@ private:
 class PackageHandler
 {
 public:
-    PackageHandler(const messageqcpp::IOSocket& ios, boost::shared_ptr<messageqcpp::ByteStream> bs, uint8_t packageType,
-		joblist::DistributedEngineComm *ec, uint64_t maxDeleteRows, uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnId, BRM::DBRM * aDbrm);
+    PackageHandler(const messageqcpp::IOSocket& ios, boost::shared_ptr<messageqcpp::ByteStream> bs,
+		uint8_t packageType, joblist::DistributedEngineComm *ec, uint64_t maxDeleteRows,
+		uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnId, BRM::DBRM * aDbrm,
+		const querytele::QueryTeleClient& qtc);
 	~PackageHandler();
 
     void run();
@@ -123,6 +124,7 @@ private:
 	execplan::CalpontSystemCatalog::SCN fTxnid;
 	execplan::SessionManager sessionManager;
 	BRM::DBRM *fDbrm;
+	querytele::QueryTeleClient fQtc;
 };
 
 /** @brief processes dml packages as they arrive
@@ -148,9 +150,10 @@ private:
 	execplan::SessionManager sessionManager;
 	boost::shared_ptr<execplan::CalpontSystemCatalog> csc;
 	BRM::DBRM* fDbrm;
+	querytele::QueryTeleClient fQtc;
 
 	// A map to hold pointers to all active PackageProcessors
-	typedef std::map<uint32_t, shared_ptr<PackageHandler> > PackageHandlerMap_t;
+	typedef std::map<uint32_t, boost::shared_ptr<PackageHandler> > PackageHandlerMap_t;
 	static PackageHandlerMap_t packageHandlerMap;
 	static boost::mutex packageHandlerMapLock;
 

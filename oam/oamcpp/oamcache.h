@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -46,11 +46,12 @@ public:
 	EXPORT dbRootPMMap_t getDBRootToPMMap();
 	EXPORT dbRootPMMap_t getDBRootToConnectionMap();
 	EXPORT PMDbrootsMap_t getPMToDbrootsMap();
-	EXPORT uint getDBRootCount();
+	EXPORT uint32_t getDBRootCount();
 	EXPORT DBRootConfigList& getDBRootNums();
 	EXPORT std::vector<int> & getModuleIds();
 	EXPORT static OamCache * makeOamCache();
 	EXPORT std::string getOAMParentModuleName();
+	EXPORT int getLocalPMId();	// return the PM id of this machine.
 
 private:
 	OamCache();
@@ -60,11 +61,12 @@ private:
 	dbRootPMMap_t dbRootPMMap;
 	dbRootPMMap_t dbRootConnectionMap;
 	PMDbrootsMap_t pmDbrootsMap;
-	uint numDBRoots;
+	uint32_t numDBRoots;
 	time_t mtime;
 	DBRootConfigList dbroots;
 	std::vector<int> moduleIds;
 	std::string OAMParentModuleName;
+	int mLocalPMId;	// The PM id running on this machine
 };
 
 } /* namespace */

@@ -1,11 +1,11 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -48,6 +48,9 @@ using namespace joiner;
 using namespace rowgroup;
 using namespace boost;
 using namespace funcexp;
+
+#include "querytele.h"
+using namespace querytele;
 
 #include "atomicops.h"
 
@@ -92,6 +95,7 @@ TupleHashJoinStep::TupleHashJoinStep(const JobInfo& jobInfo) :
 	joinThreadCount = resourceManager.getJlNumScanReceiveThreads();
 	largeBPS = NULL;
 	moreInput = true;
+	fQtc.stepParms().stepType = StepTeleStats::T_HJS;
 }
 
 TupleHashJoinStep::~TupleHashJoinStep()
@@ -106,7 +110,7 @@ TupleHashJoinStep::~TupleHashJoinStep()
 
 void TupleHashJoinStep::run()
 {
-	uint i;
+	uint32_t i;
 
 	mutex::scoped_lock lk(jlLock);
 	if (runRan)
@@ -144,13 +148,13 @@ void TupleHashJoinStep::join()
 		return;
 	joinRan = true;
 	mainRunner->join();
-	for (uint i = 0; i < smallRunners.size(); i++)
+	for (uint32_t i = 0; i < smallRunners.size(); i++)
 		smallRunners[i]->join();
 	smallRunners.clear();
 }
 
 /* Index is which small input to read. */
-void TupleHashJoinStep::smallRunnerFcn(uint index)
+void TupleHashJoinStep::smallRunnerFcn(uint32_t index)
 {
 	uint64_t i;
 	bool more, flippedUMSwitch = false, gotMem;
@@ -159,9 +163,9 @@ void TupleHashJoinStep::smallRunnerFcn(uint index)
 	Row r;
 	JoinType jt;
 	RowGroupDL *smallDL;
-	uint smallIt;
+	uint32_t smallIt;
 	RowGroup smallRG;
-	shared_ptr<TupleJoiner> joiner;
+	boost::shared_ptr<TupleJoiner> joiner;
 
 	string extendedInfo;
 	extendedInfo += toString();
@@ -291,7 +295,7 @@ next:
 
 void TupleHashJoinStep::forwardCPData()
 {
-	uint i, col;
+	uint32_t i, col;
 
 	if (largeBPS == NULL)
 		return;
@@ -311,7 +315,7 @@ void TupleHashJoinStep::forwardCPData()
 
 void TupleHashJoinStep::hjRunner()
 {
-	uint i;
+	uint32_t i;
 
 	if (cancelled()) {
 		if (fOutputJobStepAssociation.outSize() > 0)
@@ -319,6 +323,13 @@ void TupleHashJoinStep::hjRunner()
 		startAdjoiningSteps();
 		return;
 	}
+
+	StepTeleStats sts;
+	sts.query_uuid = fQueryUuid;
+	sts.step_uuid = fStepUuid;
+	sts.msg_type = StepTeleStats::ST_START;
+	sts.start_time = QueryTeleClient::timeNowms();
+	fQtc.postStepTele(sts);
 
 	idbassert(joinTypes.size() == smallDLs.size());
 
@@ -346,7 +357,7 @@ void TupleHashJoinStep::hjRunner()
 		}
 
 		for (i = 0; i < smallDLs.size(); i++)
-			smallRunners.push_back(shared_ptr<boost::thread>
+			smallRunners.push_back(boost::shared_ptr<boost::thread>
 			  (new boost::thread(SmallRunner(this, i))));
 	}
 	catch (thread_resource_error&) {
@@ -366,7 +377,7 @@ void TupleHashJoinStep::hjRunner()
 	forwardCPData(); 	// this fcn has its own exclusion list
 
 	if (cancelled()) {
-		vector<shared_ptr<joiner::TupleJoiner> > empty_joiners;
+		vector<boost::shared_ptr<joiner::TupleJoiner> > empty_joiners;
 		if (joinIsTooBig)
 			cout << "Join is too big, raise the UM join limit for now\n";
 		//minor optimization: clear out mem as soon as it's not necessary
@@ -376,7 +387,7 @@ void TupleHashJoinStep::hjRunner()
 		totalUMMemoryUsage = 0;
 	}
 
-	for (uint i = 0; i < feIndexes.size() && joiners.size() > 0; i++)
+	for (uint32_t i = 0; i < feIndexes.size() && joiners.size() > 0; i++)
 		joiners[feIndexes[i]]->setFcnExpFilter(fe[i]);
 
 	// decide if perform aggregation on PM
@@ -457,13 +468,18 @@ void TupleHashJoinStep::hjRunner()
 	}
 	else
 		startJoinThreads();
+
+	sts.msg_type = StepTeleStats::ST_SUMMARY;
+	sts.end_time = QueryTeleClient::timeNowms();
+	fQtc.postStepTele(sts);
+
 }
 
-uint TupleHashJoinStep::nextBand(messageqcpp::ByteStream &bs)
+uint32_t TupleHashJoinStep::nextBand(messageqcpp::ByteStream &bs)
 {
 	RGData oneRG;
 	bool more;
-	uint ret = 0;
+	uint32_t ret = 0;
 	RowGroupDL *dl;
 	uint64_t it;
 
@@ -588,15 +604,15 @@ void TupleHashJoinStep::addSmallSideRG(const vector<rowgroup::RowGroup>& rgs,
 
 void TupleHashJoinStep::addJoinKeyIndex(const vector<JoinType>& jt,
 										const vector<bool>& typeless,
-										const vector<vector<uint> >& smallkey,
-										const vector<vector<uint> >& largekey)
+										const vector<vector<uint32_t> >& smallkey,
+										const vector<vector<uint32_t> >& largekey)
 {
 	joinTypes.insert(joinTypes.end(), jt.begin(), jt.end());
 	typelessJoin.insert(typelessJoin.end(), typeless.begin(), typeless.end());
 	smallSideKeys.insert(smallSideKeys.end(), smallkey.begin(), smallkey.end());
 	largeSideKeys.insert(largeSideKeys.end(), largekey.begin(), largekey.end());
 #ifdef JLF_DEBUG
-	for (uint i = 0; i < joinTypes.size(); i++)
+	for (uint32_t i = 0; i < joinTypes.size(); i++)
 		cout << "jointype[" << i << "] = 0x" << hex << joinTypes[i] << dec << endl;
 #endif
 }
@@ -614,15 +630,15 @@ void TupleHashJoinStep::configLargeSideRG(const RowGroup &rg)
 
 void TupleHashJoinStep::configJoinKeyIndex(const vector<JoinType>& jt,
 											const vector<bool>& typeless,
-											const vector<vector<uint> >& smallkey,
-											const vector<vector<uint> >& largekey)
+											const vector<vector<uint32_t> >& smallkey,
+											const vector<vector<uint32_t> >& largekey)
 {
 	joinTypes.insert(joinTypes.begin(), jt.begin(), jt.end());
 	typelessJoin.insert(typelessJoin.begin(), typeless.begin(), typeless.end());
 	smallSideKeys.insert(smallSideKeys.begin(), smallkey.begin(), smallkey.end());
 	largeSideKeys.insert(largeSideKeys.begin(), largekey.begin(), largekey.end());
 #ifdef JLF_DEBUG
-	for (uint i = 0; i < joinTypes.size(); i++)
+	for (uint32_t i = 0; i < joinTypes.size(); i++)
 		cout << "jointype[" << i << "] = 0x" << hex << joinTypes[i] << dec << endl;
 #endif
 }
@@ -632,29 +648,29 @@ void TupleHashJoinStep::setOutputRowGroup(const RowGroup &rg)
 	outputRG = rg;
 }
 
-execplan::CalpontSystemCatalog::OID TupleHashJoinStep::smallSideKeyOID(uint s, uint k) const
+execplan::CalpontSystemCatalog::OID TupleHashJoinStep::smallSideKeyOID(uint32_t s, uint32_t k) const
 {
 	return smallRGs[s].getOIDs()[smallSideKeys[s][k]];
 }
 
-execplan::CalpontSystemCatalog::OID TupleHashJoinStep::largeSideKeyOID(uint s, uint k) const
+execplan::CalpontSystemCatalog::OID TupleHashJoinStep::largeSideKeyOID(uint32_t s, uint32_t k) const
 {
 	return largeRG.getOIDs()[largeSideKeys[s][k]];
 }
 
-void TupleHashJoinStep::addFcnExpGroup2(const shared_ptr<execplan::ParseTree>& fe)
+void TupleHashJoinStep::addFcnExpGroup2(const boost::shared_ptr<execplan::ParseTree>& fe)
 {
 	if (!fe2)
 		fe2.reset(new funcexp::FuncExpWrapper());
 	fe2->addFilter(fe);
 }
 
-void TupleHashJoinStep::setFcnExpGroup3(const vector<shared_ptr<execplan::ReturnedColumn> >& v)
+void TupleHashJoinStep::setFcnExpGroup3(const vector<boost::shared_ptr<execplan::ReturnedColumn> >& v)
 {
 	if (!fe2)
 		fe2.reset(new funcexp::FuncExpWrapper());
 
-	for (uint i = 0; i < v.size(); i++)
+	for (uint32_t i = 0; i < v.size(); i++)
 		fe2->addReturnedColumn(v[i]);
 }
 
@@ -688,7 +704,7 @@ bool TupleHashJoinStep::deliverStringTableRowGroup() const
 }
 
 //Must hold the stats lock when calling this!
-void TupleHashJoinStep::formatMiniStats(uint index)
+void TupleHashJoinStep::formatMiniStats(uint32_t index)
 {
 	ostringstream oss;
 	oss << "HJS ";
@@ -713,19 +729,19 @@ void TupleHashJoinStep::formatMiniStats(uint index)
 	fMiniInfo += oss.str();
 }
 
-void TupleHashJoinStep::addJoinFilter(boost::shared_ptr<execplan::ParseTree> pt, uint index)
+void TupleHashJoinStep::addJoinFilter(boost::shared_ptr<execplan::ParseTree> pt, uint32_t index)
 {
-	shared_ptr<funcexp::FuncExpWrapper> newfe(new funcexp::FuncExpWrapper());
+	boost::shared_ptr<funcexp::FuncExpWrapper> newfe(new funcexp::FuncExpWrapper());
 
 	newfe->addFilter(pt);
 	fe.push_back(newfe);
 	feIndexes.push_back(index);
 }
 
-bool TupleHashJoinStep::hasJoinFilter(uint index) const
+bool TupleHashJoinStep::hasJoinFilter(uint32_t index) const
 {
 	//FIXME: this assumes that index fits into signed space...
-	for (uint i = 0; i < feIndexes.size(); i++)
+	for (uint32_t i = 0; i < feIndexes.size(); i++)
 		if (feIndexes[i] == static_cast<int>(index))
 			return true;
 	return false;
@@ -738,12 +754,17 @@ void TupleHashJoinStep::setJoinFilterInputRG(const rowgroup::RowGroup &rg)
 
 void TupleHashJoinStep::startJoinThreads()
 {
-	uint i;
-	uint smallSideCount = smallDLs.size();
+	uint32_t i;
+	uint32_t smallSideCount = smallDLs.size();
+	bool more = true;
+	RGData oneRG;
 
 	//@bug4836, in error case, stop process, and unblock the next step.
 	if (cancelled()) {
 		outputDL->endOfInput();
+		//@bug5785, memory leak on canceling complex queries
+		while (more)
+			more = largeDL->next(largeIt, &oneRG);
 		return;
 	}
 
@@ -786,7 +807,7 @@ void TupleHashJoinStep::startJoinThreads()
 	makeDupList(fe2 ? fe2Output : outputRG);
 
 	/* Start join runners */
-	joinRunners.reset(new shared_ptr<boost::thread>[joinThreadCount]);
+	joinRunners.reset(new boost::shared_ptr<boost::thread>[joinThreadCount]);
 	for (i = 0; i < joinThreadCount; i++)
 		joinRunners[i].reset(new boost::thread(JoinRunner(this, i)));
 
@@ -794,7 +815,7 @@ void TupleHashJoinStep::startJoinThreads()
 	for (i = 0; i < joinThreadCount; i++)
 		joinRunners[i]->join();
 
-	if (lastSmallOuterJoiner != (uint) -1)
+	if (lastSmallOuterJoiner != (uint32_t) -1)
 		finishSmallOuterJoin();
 
 	outputDL->endOfInput();
@@ -803,8 +824,8 @@ void TupleHashJoinStep::startJoinThreads()
 void TupleHashJoinStep::finishSmallOuterJoin()
 {
 	vector<Row::Pointer> unmatched;
-	uint smallSideCount = smallDLs.size();
-	uint i, j, k;
+	uint32_t smallSideCount = smallDLs.size();
+	uint32_t i, j, k;
 	shared_array<uint8_t> largeNullMemory;
 	RGData joinedData;
 	Row joinedBaseRow, fe2InRow, fe2OutRow;
@@ -880,13 +901,13 @@ void TupleHashJoinStep::finishSmallOuterJoin()
 	}
 }
 
-void TupleHashJoinStep::joinRunnerFcn(uint threadID)
+void TupleHashJoinStep::joinRunnerFcn(uint32_t threadID)
 {
 	RowGroup local_inputRG, local_outputRG, local_joinFERG;
-	uint smallSideCount = smallDLs.size();
+	uint32_t smallSideCount = smallDLs.size();
 	vector<RGData> inputData, joinedRowData;
 	bool hasJoinFE = !fe.empty();
-	uint i;
+	uint32_t i;
 
 	/* thread-local scratch space for join processing */
 	shared_array<uint8_t> joinFERowData;
@@ -948,7 +969,7 @@ void TupleHashJoinStep::joinRunnerFcn(uint threadID)
 
 void TupleHashJoinStep::makeDupList(const RowGroup &rg)
 {
-	uint i, j, cols = rg.getColumnCount();
+	uint32_t i, j, cols = rg.getColumnCount();
 
 	for (i = 0; i < cols; i++)
 		for (j = i + 1; j < cols; j++)
@@ -960,10 +981,10 @@ void TupleHashJoinStep::makeDupList(const RowGroup &rg)
 		rg.initRow(&dupRows[i]);
 }
 
-void TupleHashJoinStep::processDupList(uint threadID, RowGroup &rg,
+void TupleHashJoinStep::processDupList(uint32_t threadID, RowGroup &rg,
 	vector<RGData> *rowData)
 {
-	uint i, j, k;
+	uint32_t i, j, k;
 
 	if (dupList.empty())
 		return;
@@ -982,7 +1003,7 @@ void TupleHashJoinStep::processFE2(RowGroup &input, RowGroup &output, Row &inRow
 {
 	vector<RGData> results;
 	RGData result;
-	uint i, j;
+	uint32_t i, j;
 	bool ret;
 
 	result.reinit(output);
@@ -1023,7 +1044,7 @@ void TupleHashJoinStep::processFE2(RowGroup &input, RowGroup &output, Row &inRow
 void TupleHashJoinStep::sendResult(const vector<RGData> &res)
 {
 	boost::mutex::scoped_lock lock(outputDLLock);
-	for (uint i = 0; i < res.size(); i++)
+	for (uint32_t i = 0; i < res.size(); i++)
 		//INSERT_ADAPTER(outputDL, res[i]);
 		outputDL->insert(res[i]);
 }
@@ -1038,7 +1059,7 @@ void TupleHashJoinStep::grabSomeWork(vector<RGData> *work)
 	RGData e;
 	moreInput = largeDL->next(largeIt, &e);
 	/* Tunable number here, but it probably won't change things much */
-	for (uint i = 0; i < 10 && moreInput; i++) {
+	for (uint32_t i = 0; i < 10 && moreInput; i++) {
 		work->push_back(e);
 		moreInput = largeDL->next(largeIt, &e);
 	}
@@ -1048,14 +1069,14 @@ void TupleHashJoinStep::grabSomeWork(vector<RGData> *work)
 
 /* This function is a port of the main join loop in TupleBPS::receiveMultiPrimitiveMessages().  Any
  * changes made here should also be made there and vice versa. */
-void TupleHashJoinStep::joinOneRG(uint threadID, vector<RGData> *out,
+void TupleHashJoinStep::joinOneRG(uint32_t threadID, vector<RGData> *out,
 	RowGroup &inputRG, RowGroup &joinOutput, Row &largeSideRow, Row &joinFERow,
 	Row &joinedRow, Row &baseRow, vector<vector<Row::Pointer> > &joinMatches,
 	shared_array<Row> &smallRowTemplates)
 {
 	RGData joinedData;
-	uint matchCount, smallSideCount = smallDLs.size();
-	uint j, k;
+	uint32_t matchCount, smallSideCount = smallDLs.size();
+	uint32_t j, k;
 
 	joinedData.reinit(joinOutput);
 	joinOutput.setData(&joinedData);
@@ -1071,7 +1092,7 @@ void TupleHashJoinStep::joinOneRG(uint threadID, vector<RGData> *out,
 				Row r;
 				smallRGs[j].initRow(&r);
 				cout << joinMatches[j].size() << " matches: \n";
-				for (uint z = 0; z < joinMatches[j].size(); z++) {
+				for (uint32_t z = 0; z < joinMatches[j].size(); z++) {
 					r.setData(joinMatches[j][z]);
 					cout << "  " << r.toString() << endl;
 				}
@@ -1080,7 +1101,7 @@ void TupleHashJoinStep::joinOneRG(uint threadID, vector<RGData> *out,
 			if (joiners[j]->hasFEFilter() && matchCount > 0) {
 				vector<Row::Pointer> newJoinMatches;
 				applyMapping(fergMappings[smallSideCount], largeSideRow, &joinFERow);
-				for (uint z = 0; z < joinMatches[j].size(); z++) {
+				for (uint32_t z = 0; z < joinMatches[j].size(); z++) {
 					smallRowTemplates[j].setPointer(joinMatches[j][z]);
 					applyMapping(fergMappings[j], smallRowTemplates[j], &joinFERow);
 					if (!joiners[j]->evaluateFilter(joinFERow, threadID))
@@ -1144,13 +1165,13 @@ void TupleHashJoinStep::joinOneRG(uint threadID, vector<RGData> *out,
 
 void TupleHashJoinStep::generateJoinResultSet(const vector<vector<Row::Pointer> > &joinerOutput,
 	Row &baseRow, const shared_array<shared_array<int> > &mappings,
-	const uint depth, RowGroup &l_outputRG, RGData &rgData,
+	const uint32_t depth, RowGroup &l_outputRG, RGData &rgData,
 	vector<RGData> *outputData,	const shared_array<Row> &smallRows,
 	Row &joinedRow)
 {
-	uint i;
+	uint32_t i;
 	Row &smallRow = smallRows[depth];
-	uint smallSideCount = smallDLs.size();
+	uint32_t smallSideCount = smallDLs.size();
 
 	if (depth < smallSideCount - 1) {
 		for (i = 0; i < joinerOutput[depth].size(); i++) {
@@ -1167,7 +1188,7 @@ void TupleHashJoinStep::generateJoinResultSet(const vector<vector<Row::Pointer> 
 		  l_outputRG.incRowCount()) {
 			smallRow.setPointer(joinerOutput[depth][i]);
 			if (UNLIKELY(l_outputRG.getRowCount() == 8192)) {
-				uint dbRoot = l_outputRG.getDBRoot();
+				uint32_t dbRoot = l_outputRG.getDBRoot();
 				uint64_t baseRid = l_outputRG.getBaseRid();
 				outputData->push_back(rgData);
 				rgData.reinit(l_outputRG);

@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -70,7 +70,7 @@ class FileBuffer {
 	/**
 	 * @brief the disk block from lbid@ver, and a data block len bytes long
 	 **/
-	FileBuffer(const BRM::LBID_t lbid, const BRM::VER_t ver, const u_int8_t* data, const uint32_t len);
+	FileBuffer(const BRM::LBID_t lbid, const BRM::VER_t ver, const uint8_t* data, const uint32_t len);
 
 	/**
 	 * @brief disk block lbid@ver and empty data
@@ -85,14 +85,14 @@ class FileBuffer {
 	/**
 	 * @brief set the data value of this block to d have len bytestream
 	 **/
-	void setData(const u_int8_t* d, const int len);
+	void setData(const uint8_t* d, const int len);
 	void setData(const uint8_t *d);  // assumes len = 8192
 
 	/**
 	 * @brief retrieve the data in byte* format from this data block
 	 **/
-	inline const u_int8_t* getData() const {return fByteData;}
-	inline u_int8_t* getData() {return fByteData;}
+	inline const uint8_t* getData() const {return fByteData;}
+	inline uint8_t* getData() {return fByteData;}
 
 	inline const uint32_t datLen() const {return fDataLen;}
 

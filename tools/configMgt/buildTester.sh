@@ -413,8 +413,19 @@ if { $TEST(0) != " " } {
 							set REPORT perf
 							exec ./remote_scp_get.sh $SERVER $PASSWORD "/root/$SVN/mysql/queries/nightly/$REPORT/go.log"
 							exec cat go.log >> $RUN_LOG_FILE} abort;
-						-re "FAILED"  { exec echo "\nFailed to run timings\n" >> $RUN_LOG_FILE} abort;
+ 				    	-re "FAILED"  { echo "\nFailed to run timings\n" >> $RUN_LOG_FILE} abort;
 						-re "TIMEOUT"  { exec echo "\nTimeout on run timings\n" >> $RUN_LOG_FILE} abort;
+					}
+				} elseif { $TESTCOMMAND == "dataWarehouse" } {
+					set timeout 5000000 
+					exec ./remote_command_test.sh $SERVER $PASSWORD "/root/nightly/startDataWarehouseTests $SVN" "startDataWarehouseTests completed" "error" 5000000 1
+					expect {
+						-re " "  {
+							set REPORT dataWarehouse
+							exec ./remote_scp_get.sh $SERVER $PASSWORD "/root/$SVN/mysql/queries/nightly/$REPORT/go.log"
+							exec cat go.log >> $RUN_LOG_FILE} abort;
+ 				    	-re "FAILED"  { echo "\nFailed to run dataWarehouse\n" >> $RUN_LOG_FILE} abort;
+						-re "TIMEOUT"  { exec echo "\nTimeout on dataWarehouse\n" >> $RUN_LOG_FILE} abort;
 					}
 				} elseif { $TESTCOMMAND == "calbench" } {
 					set timeout 22000
