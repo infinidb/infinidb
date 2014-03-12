@@ -219,6 +219,7 @@ AC_CONFIG_FILES([
 	oamapps/sessionWalker/Makefile
 	oamapps/traphandler/Makefile
 	oamapps/sendtrap/Makefile
+	oamapps/calpontSupport/Makefile
 	primitives/Makefile
 	primitives/blockcache/Makefile
 	primitives/linux-port/Makefile

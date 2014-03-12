@@ -33,6 +33,7 @@
 
 # $Id: Makefile.am 333 2009-04-03 20:35:04Z rdempsey $
 
+
 srcdir = @srcdir@
 top_srcdir = @top_srcdir@
 VPATH = @srcdir@
@@ -55,9 +56,10 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-bin_PROGRAMS = calpontConsole$(EXEEXT)
-subdir = oamapps/calpontConsole
-DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
+bin_PROGRAMS = calpontSupport$(EXEEXT)
+subdir = oamapps/calpontSupport
+DIST_COMMON = $(dist_bin_SCRIPTS) $(srcdir)/Makefile.am \
+	$(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/functions.m4 \
 	$(top_srcdir)/m4/install.m4 $(top_srcdir)/configure.ac
@@ -66,12 +68,14 @@ am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES =
-am__installdirs = "$(DESTDIR)$(bindir)"
+am__installdirs = "$(DESTDIR)$(bindir)" "$(DESTDIR)$(bindir)"
 binPROGRAMS_INSTALL = $(INSTALL_PROGRAM)
 PROGRAMS = $(bin_PROGRAMS)
-am_calpontConsole_OBJECTS = calpontConsole-calpontConsole.$(OBJEXT)
-calpontConsole_OBJECTS = $(am_calpontConsole_OBJECTS)
-calpontConsole_LDADD = $(LDADD)
+am_calpontSupport_OBJECTS = calpontSupport-calpontSupport.$(OBJEXT)
+calpontSupport_OBJECTS = $(am_calpontSupport_OBJECTS)
+calpontSupport_LDADD = $(LDADD)
+dist_binSCRIPT_INSTALL = $(INSTALL_SCRIPT)
+SCRIPTS = $(dist_bin_SCRIPTS)
 DEFAULT_INCLUDES = -I. -I$(srcdir) -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__depfiles_maybe = depfiles
@@ -83,8 +87,8 @@ LTCXXCOMPILE = $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) \
 CXXLD = $(CXX)
 CXXLINK = $(LIBTOOL) --tag=CXX --mode=link $(CXXLD) $(AM_CXXFLAGS) \
 	$(CXXFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
-SOURCES = $(calpontConsole_SOURCES)
-DIST_SOURCES = $(calpontConsole_SOURCES)
+SOURCES = $(calpontSupport_SOURCES)
+DIST_SOURCES = $(calpontSupport_SOURCES)
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -223,9 +227,19 @@ AM_CPPFLAGS = $(idb_cppflags)
 AM_CFLAGS = $(idb_cflags)
 AM_CXXFLAGS = $(idb_cxxflags)
 AM_LDFLAGS = $(idb_ldflags)
-calpontConsole_SOURCES = calpontConsole.cpp
-calpontConsole_CPPFLAGS = $(idb_common_includes) $(AM_CPPFLAGS)
-calpontConsole_LDFLAGS = $(idb_common_ldflags) $(idb_common_libs) $(idb_oam_libs) $(idb_exec_libs) -lreadline -lncurses $(AM_LDFLAGS)
+calpontSupport_SOURCES = calpontSupport.cpp
+calpontSupport_CPPFLAGS = $(idb_common_includes) $(AM_CPPFLAGS)
+calpontSupport_LDFLAGS = $(idb_common_ldflags) $(idb_brm_libs) $(idb_oam_libs) $(idb_exec_libs) -lreadline -lncurses $(AM_LDFLAGS)
+dist_bin_SCRIPTS = \
+	alarmReport.sh \
+	bulklogReport.sh \
+	configReport.sh \
+	hadoopReport.sh \
+	hardwareReport.sh \
+	logReport.sh \
+	resourceReport.sh \
+	softwareReport.sh
+
 all: all-am
 
 .SUFFIXES:
@@ -239,9 +253,9 @@ $(srcdir)/Makefile.in:  $(srcdir)/Makefile.am  $(am__configure_deps)
 	      exit 1;; \
 	  esac; \
 	done; \
-	echo ' cd $(top_srcdir) && $(AUTOMAKE) --gnu  oamapps/calpontConsole/Makefile'; \
+	echo ' cd $(top_srcdir) && $(AUTOMAKE) --gnu  oamapps/calpontSupport/Makefile'; \
 	cd $(top_srcdir) && \
-	  $(AUTOMAKE) --gnu  oamapps/calpontConsole/Makefile
+	  $(AUTOMAKE) --gnu  oamapps/calpontSupport/Makefile
 .PRECIOUS: Makefile
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	@case '$?' in \
@@ -287,9 +301,28 @@ clean-binPROGRAMS:
 	  echo " rm -f $$p $$f"; \
 	  rm -f $$p $$f ; \
 	done
-calpontConsole$(EXEEXT): $(calpontConsole_OBJECTS) $(calpontConsole_DEPENDENCIES) 
-	@rm -f calpontConsole$(EXEEXT)
-	$(CXXLINK) $(calpontConsole_LDFLAGS) $(calpontConsole_OBJECTS) $(calpontConsole_LDADD) $(LIBS)
+calpontSupport$(EXEEXT): $(calpontSupport_OBJECTS) $(calpontSupport_DEPENDENCIES) 
+	@rm -f calpontSupport$(EXEEXT)
+	$(CXXLINK) $(calpontSupport_LDFLAGS) $(calpontSupport_OBJECTS) $(calpontSupport_LDADD) $(LIBS)
+install-dist_binSCRIPTS: $(dist_bin_SCRIPTS)
+	@$(NORMAL_INSTALL)
+	test -z "$(bindir)" || $(mkdir_p) "$(DESTDIR)$(bindir)"
+	@list='$(dist_bin_SCRIPTS)'; for p in $$list; do \
+	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
+	  if test -f $$d$$p; then \
+	    f=`echo "$$p" | sed 's|^.*/||;$(transform)'`; \
+	    echo " $(dist_binSCRIPT_INSTALL) '$$d$$p' '$(DESTDIR)$(bindir)/$$f'"; \
+	    $(dist_binSCRIPT_INSTALL) "$$d$$p" "$(DESTDIR)$(bindir)/$$f"; \
+	  else :; fi; \
+	done
+
+uninstall-dist_binSCRIPTS:
+	@$(NORMAL_UNINSTALL)
+	@list='$(dist_bin_SCRIPTS)'; for p in $$list; do \
+	  f=`echo "$$p" | sed 's|^.*/||;$(transform)'`; \
+	  echo " rm -f '$(DESTDIR)$(bindir)/$$f'"; \
+	  rm -f "$(DESTDIR)$(bindir)/$$f"; \
+	done
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -297,7 +330,7 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/calpontConsole-calpontConsole.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/calpontSupport-calpontSupport.Po@am__quote@
 
 .cpp.o:
 @am__fastdepCXX_TRUE@	if $(CXXCOMPILE) -MT $@ -MD -MP -MF "$(DEPDIR)/$*.Tpo" -c -o $@ $<; \
@@ -320,19 +353,19 @@ distclean-compile:
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(LTCXXCOMPILE) -c -o $@ $<
 
-calpontConsole-calpontConsole.o: calpontConsole.cpp
-@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(calpontConsole_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT calpontConsole-calpontConsole.o -MD -MP -MF "$(DEPDIR)/calpontConsole-calpontConsole.Tpo" -c -o calpontConsole-calpontConsole.o `test -f 'calpontConsole.cpp' || echo '$(srcdir)/'`calpontConsole.cpp; \
-@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/calpontConsole-calpontConsole.Tpo" "$(DEPDIR)/calpontConsole-calpontConsole.Po"; else rm -f "$(DEPDIR)/calpontConsole-calpontConsole.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='calpontConsole.cpp' object='calpontConsole-calpontConsole.o' libtool=no @AMDEPBACKSLASH@
+calpontSupport-calpontSupport.o: calpontSupport.cpp
+@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(calpontSupport_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT calpontSupport-calpontSupport.o -MD -MP -MF "$(DEPDIR)/calpontSupport-calpontSupport.Tpo" -c -o calpontSupport-calpontSupport.o `test -f 'calpontSupport.cpp' || echo '$(srcdir)/'`calpontSupport.cpp; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/calpontSupport-calpontSupport.Tpo" "$(DEPDIR)/calpontSupport-calpontSupport.Po"; else rm -f "$(DEPDIR)/calpontSupport-calpontSupport.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='calpontSupport.cpp' object='calpontSupport-calpontSupport.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(calpontConsole_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o calpontConsole-calpontConsole.o `test -f 'calpontConsole.cpp' || echo '$(srcdir)/'`calpontConsole.cpp
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(calpontSupport_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o calpontSupport-calpontSupport.o `test -f 'calpontSupport.cpp' || echo '$(srcdir)/'`calpontSupport.cpp
 
-calpontConsole-calpontConsole.obj: calpontConsole.cpp
-@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(calpontConsole_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT calpontConsole-calpontConsole.obj -MD -MP -MF "$(DEPDIR)/calpontConsole-calpontConsole.Tpo" -c -o calpontConsole-calpontConsole.obj `if test -f 'calpontConsole.cpp'; then $(CYGPATH_W) 'calpontConsole.cpp'; else $(CYGPATH_W) '$(srcdir)/calpontConsole.cpp'; fi`; \
-@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/calpontConsole-calpontConsole.Tpo" "$(DEPDIR)/calpontConsole-calpontConsole.Po"; else rm -f "$(DEPDIR)/calpontConsole-calpontConsole.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='calpontConsole.cpp' object='calpontConsole-calpontConsole.obj' libtool=no @AMDEPBACKSLASH@
+calpontSupport-calpontSupport.obj: calpontSupport.cpp
+@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(calpontSupport_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT calpontSupport-calpontSupport.obj -MD -MP -MF "$(DEPDIR)/calpontSupport-calpontSupport.Tpo" -c -o calpontSupport-calpontSupport.obj `if test -f 'calpontSupport.cpp'; then $(CYGPATH_W) 'calpontSupport.cpp'; else $(CYGPATH_W) '$(srcdir)/calpontSupport.cpp'; fi`; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/calpontSupport-calpontSupport.Tpo" "$(DEPDIR)/calpontSupport-calpontSupport.Po"; else rm -f "$(DEPDIR)/calpontSupport-calpontSupport.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='calpontSupport.cpp' object='calpontSupport-calpontSupport.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(calpontConsole_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o calpontConsole-calpontConsole.obj `if test -f 'calpontConsole.cpp'; then $(CYGPATH_W) 'calpontConsole.cpp'; else $(CYGPATH_W) '$(srcdir)/calpontConsole.cpp'; fi`
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(calpontSupport_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o calpontSupport-calpontSupport.obj `if test -f 'calpontSupport.cpp'; then $(CYGPATH_W) 'calpontSupport.cpp'; else $(CYGPATH_W) '$(srcdir)/calpontSupport.cpp'; fi`
 
 mostlyclean-libtool:
 	-rm -f *.lo
@@ -421,9 +454,9 @@ distdir: $(DISTFILES)
 	done
 check-am: all-am
 check: check-am
-all-am: Makefile $(PROGRAMS)
+all-am: Makefile $(PROGRAMS) $(SCRIPTS)
 installdirs:
-	for dir in "$(DESTDIR)$(bindir)"; do \
+	for dir in "$(DESTDIR)$(bindir)" "$(DESTDIR)$(bindir)"; do \
 	  test -z "$$dir" || $(mkdir_p) "$$dir"; \
 	done
 install: install-am
@@ -472,7 +505,7 @@ info-am:
 
 install-data-am:
 
-install-exec-am: install-binPROGRAMS
+install-exec-am: install-binPROGRAMS install-dist_binSCRIPTS
 
 install-info: install-info-am
 
@@ -498,19 +531,21 @@ ps: ps-am
 
 ps-am:
 
-uninstall-am: uninstall-binPROGRAMS uninstall-info-am
+uninstall-am: uninstall-binPROGRAMS uninstall-dist_binSCRIPTS \
+	uninstall-info-am
 
 .PHONY: CTAGS GTAGS all all-am check check-am clean clean-binPROGRAMS \
 	clean-generic clean-libtool ctags distclean distclean-compile \
 	distclean-generic distclean-libtool distclean-tags distdir dvi \
 	dvi-am html html-am info info-am install install-am \
-	install-binPROGRAMS install-data install-data-am install-exec \
-	install-exec-am install-info install-info-am install-man \
-	install-strip installcheck installcheck-am installdirs \
-	maintainer-clean maintainer-clean-generic mostlyclean \
-	mostlyclean-compile mostlyclean-generic mostlyclean-libtool \
-	pdf pdf-am ps ps-am tags uninstall uninstall-am \
-	uninstall-binPROGRAMS uninstall-info-am
+	install-binPROGRAMS install-data install-data-am \
+	install-dist_binSCRIPTS install-exec install-exec-am \
+	install-info install-info-am install-man install-strip \
+	installcheck installcheck-am installdirs maintainer-clean \
+	maintainer-clean-generic mostlyclean mostlyclean-compile \
+	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
+	tags uninstall uninstall-am uninstall-binPROGRAMS \
+	uninstall-dist_binSCRIPTS uninstall-info-am
 
 
 test:

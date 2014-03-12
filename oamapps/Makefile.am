@@ -18,7 +18,7 @@
 # $Id: Makefile.am 878 2009-04-03 20:34:32Z rdempsey $
 
 SUBDIRS = calpontConsole calpontDB postConfigure serverMonitor traphandler \
-sendtrap
+sendtrap calpontSupport
 
 test:
 

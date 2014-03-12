@@ -15,17 +15,26 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA 02110-1301, USA.
 
-# $Id$
+# $Id: Makefile.am 333 2009-04-03 20:35:04Z rdempsey $
 ## Process this file with automake to produce Makefile.in
 
 AM_CPPFLAGS = $(idb_cppflags)
 AM_CFLAGS = $(idb_cflags)
 AM_CXXFLAGS = $(idb_cxxflags)
 AM_LDFLAGS = $(idb_ldflags)
-bin_PROGRAMS = sendtrap
-sendtrap_SOURCES = sendtrap.cpp
-sendtrap_CPPFLAGS = @idb_common_includes@ $(AM_CPPFLAGS)
-sendtrap_LDFLAGS = @idb_common_ldflags@ @idb_common_libs@ @idb_write_libs@ @netsnmp_libs@ $(AM_LDFLAGS)
+bin_PROGRAMS = calpontSupport
+calpontSupport_SOURCES = calpontSupport.cpp
+calpontSupport_CPPFLAGS = $(idb_common_includes) $(AM_CPPFLAGS)
+calpontSupport_LDFLAGS = $(idb_common_ldflags) $(idb_brm_libs) $(idb_oam_libs) $(idb_exec_libs) -lreadline -lncurses $(AM_LDFLAGS)
+dist_bin_SCRIPTS=\
+	alarmReport.sh \
+	bulklogReport.sh \
+	configReport.sh \
+	hadoopReport.sh \
+	hardwareReport.sh \
+	logReport.sh \
+	resourceReport.sh \
+	softwareReport.sh
 
 test:
 

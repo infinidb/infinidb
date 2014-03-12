@@ -208,7 +208,7 @@ sysconfdir = @sysconfdir@
 target_alias = @target_alias@
 toolsdir = @toolsdir@
 SUBDIRS = calpontConsole calpontDB postConfigure serverMonitor traphandler \
-sendtrap
+sendtrap calpontSupport
 
 all: all-recursive
 
