@@ -64,10 +64,11 @@ public:
 	/* virtual */ time_t mtime();
 
 protected:
-	/* virtual */ void close();
+	/* virtual */ int close();
 
 private:
-	void reopen() throw (std::exception);
+	int reopen();  // 0 is success, < 0 is failure, errno is set.
+	ssize_t real_pread(void *ptr, off64_t offset, size_t count);
 
 	volatile hdfsFile m_file;
 	hdfsFS   m_fs;

@@ -252,7 +252,7 @@ void projectSimpleColumn(const SimpleColumn* sc, JobStepVector& jsv, JobInfo& jo
 	else // must be vtable mode
 	{
 		oid = (tbl_oid+1) + sc->colPosition();
-		ct = jobInfo.vtableColTypes[UniqId(oid, sc)];
+		ct = jobInfo.vtableColTypes[UniqId(oid, alias, "", "")];
 		ti = setTupleInfo(ct, oid, jobInfo, tbl_oid, sc, alias);
 	}
 
@@ -737,6 +737,8 @@ const JobStepVector doAggProject(const CalpontSelectExecutionPlan* csep, JobInfo
 			CalpontSystemCatalog::OID tblOid = tableOid(sc, jobInfo.csc);
 			CalpontSystemCatalog::OID dictOid = 0;
 			CalpontSystemCatalog::ColType ct;
+			string alias(extractTableAlias(sc));
+			string view(sc->viewName());
 			if (!sc->schemaName().empty())
 			{
 				ct = sc->colType();
@@ -749,15 +751,13 @@ const JobStepVector doAggProject(const CalpontSelectExecutionPlan* csep, JobInfo
 			else
 			{
 				gbOid = (tblOid+1) + sc->colPosition();
-				ct = jobInfo.vtableColTypes[UniqId(gbOid, sc)];
+				ct = jobInfo.vtableColTypes[UniqId(gbOid, alias, "", "")];
 			}
 
 			// As of bug3695, make sure varbinary is not used in group by.
 			if (ct.colDataType == CalpontSystemCatalog::VARBINARY)
 				throw runtime_error ("VARBINARY in group by is not supported.");
 
-			string alias(extractTableAlias(sc));
-			string view(sc->viewName());
 			TupleInfo ti(setTupleInfo(ct, gbOid, jobInfo, tblOid, sc, alias));
 			uint32_t tupleKey = ti.key;
 			if (find(projectKeys.begin(), projectKeys.end(), tupleKey) == projectKeys.end())
@@ -921,7 +921,7 @@ const JobStepVector doAggProject(const CalpontSelectExecutionPlan* csep, JobInfo
 			else
 			{
 				retOid = (tblOid+1) + sc->colPosition();
-				ct = jobInfo.vtableColTypes[UniqId(retOid, sc)];
+				ct = jobInfo.vtableColTypes[UniqId(retOid, alias, "", "")];
 			}
 
 			TupleInfo ti(setTupleInfo(ct, retOid, jobInfo, tblOid, sc, alias));

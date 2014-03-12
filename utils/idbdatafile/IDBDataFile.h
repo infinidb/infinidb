@@ -198,7 +198,7 @@ protected:
 	 * because the preference is for close() to happen automatically during
 	 * deletion of the object
 	 */
-	virtual void close() = 0;
+	virtual int close() = 0;
 
 	/**
 	 * file name

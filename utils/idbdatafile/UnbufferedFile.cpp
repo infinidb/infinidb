@@ -74,6 +74,8 @@ UnbufferedFile::~UnbufferedFile()
 ssize_t UnbufferedFile::pread(void *ptr, off64_t offset, size_t count)
 {
 	ssize_t ret;
+	int savedErrno;
+
 	if (m_fd == INVALID_HANDLE_VALUE)
 		return -1;
 #ifdef _MSC_VER
@@ -87,16 +89,15 @@ ssize_t UnbufferedFile::pread(void *ptr, off64_t offset, size_t count)
 		ret = bytesRead;
 	else
 		ret = -1;
+	savedErrno = errno;
 #else
 	ret = ::pread(m_fd, ptr, count, offset);
-	// pread doesn't update the file offset but we want to for
-	// consistency with other file types so position after last
-	// byte read
-	lseek(m_fd,offset+ret,SEEK_SET);
+	savedErrno = errno;
 #endif
 	if( IDBLogger::isEnabled() )
 		IDBLogger::logRW("pread", m_fname, this, offset, count, ret);
 
+	errno = savedErrno;
 	return ret;
 }
 
@@ -104,6 +105,7 @@ ssize_t UnbufferedFile::read(void *ptr, size_t count)
 {
 	ssize_t ret = 0;
 	ssize_t offset = tell();
+	int savedErrno;
 
 #ifdef _MSC_VER
 	DWORD bytesRead;
@@ -114,9 +116,12 @@ ssize_t UnbufferedFile::read(void *ptr, size_t count)
 #else
 	ret = ::read(m_fd,ptr,count);
 #endif
+	savedErrno = errno;
+
 	if( IDBLogger::isEnabled() )
 		IDBLogger::logRW("read", m_fname, this, offset, count, ret);
 
+	errno = savedErrno;
 	return ret;
 }
 
@@ -124,6 +129,8 @@ ssize_t UnbufferedFile::write(const void *ptr, size_t count)
 {
 	ssize_t ret = 0;
 	ssize_t offset = tell();
+	int savedErrno;
+
 #ifdef _MSC_VER
 	DWORD bytesWritten;
 	if (WriteFile(m_fd, ptr, (DWORD)count, &bytesWritten, NULL))
@@ -133,15 +140,20 @@ ssize_t UnbufferedFile::write(const void *ptr, size_t count)
 #else
 	ret = ::write(m_fd, ptr, count);
 #endif
+	savedErrno = errno;
+
 	if( IDBLogger::isEnabled() )
 		IDBLogger::logRW("write", m_fname, this, offset, count, ret);
 
+	errno = savedErrno;
 	return ret;
 }
 
 int UnbufferedFile::seek(off64_t offset, int whence)
 {
 	int ret;
+	int savedErrno;
+
 #ifdef _MSC_VER
 	LONG lDistanceToMove = LONG(offset & 0x00000000FFFFFFFF);
 	LONG lDistanceToMoveHigh = LONG(offset >> 32);
@@ -149,15 +161,20 @@ int UnbufferedFile::seek(off64_t offset, int whence)
 #else
 	ret = (lseek(m_fd, offset, whence) >= 0) ? 0 : -1;
 #endif
+	savedErrno = errno;
+
 	if( IDBLogger::isEnabled() )
 		IDBLogger::logSeek(m_fname, this, offset, whence, ret);
 
+	errno = savedErrno;
 	return ret;
 }
 
 int UnbufferedFile::truncate(off64_t length)
 {
 	int ret;
+	int savedErrno;
+
 #ifdef _MSC_VER
 	LONG lDistanceToMove = LONG(length & 0x00000000FFFFFFFF);
 	LONG lDistanceToMoveHigh = LONG(length >> 32);
@@ -167,15 +184,20 @@ int UnbufferedFile::truncate(off64_t length)
 #else
 	ret = ftruncate(m_fd,length);
 #endif
+	savedErrno = errno;
+
 	if( IDBLogger::isEnabled() )
 		IDBLogger::logTruncate(m_fname, this, length, ret);
 
+	errno = savedErrno;
 	return ret;
 }
 
 off64_t UnbufferedFile::size()
 {
 	off64_t ret = 0;
+	int savedErrno;
+
 #ifdef _MSC_VER
 	DWORD hi = 0;
 	DWORD lo = GetFileSize(m_fd, &hi);
@@ -185,9 +207,12 @@ off64_t UnbufferedFile::size()
 	int rc = ::fstat( m_fd, &statBuf );
 	ret = ((rc == 0) ? statBuf.st_size : -1);
 #endif
+	savedErrno = errno;
+
 	if( IDBLogger::isEnabled() )
 		IDBLogger::logSize(m_fname, this, ret);
 
+	errno = savedErrno;
 	return ret;
 }
 
@@ -209,6 +234,8 @@ off64_t UnbufferedFile::tell()
 int UnbufferedFile::flush()
 {
 	int ret;
+	int savedErrno;
+
 #ifdef _MSC_VER
 	ret = FlushFileBuffers(m_fd);
 	// In this case for Windows, ret is the reverse of Linux
@@ -219,10 +246,12 @@ int UnbufferedFile::flush()
 #else
 	ret = fsync( m_fd );
 #endif
+	savedErrno = errno;
 
 	if( IDBLogger::isEnabled() )
 		IDBLogger::logNoArg(m_fname, this, "flush", ret);
 
+	errno = savedErrno;
 	return ret;
 }
 
@@ -249,9 +278,11 @@ time_t UnbufferedFile::mtime()
 	return ret;
 }
 
-void UnbufferedFile::close()
+int UnbufferedFile::close()
 {
 	int ret = -1;
+	int savedErrno = EINVAL;  // corresponds to INVALID_HANDLE_VALUE
+
 	if (m_fd != INVALID_HANDLE_VALUE)
 	{
 #ifdef _MSC_VER
@@ -264,9 +295,12 @@ void UnbufferedFile::close()
 #else
 		ret = ::close(m_fd);
 #endif
+		savedErrno = errno;
 	}
 	if( IDBLogger::isEnabled() )
 		IDBLogger::logNoArg(m_fname, this, "close", ret);
+	errno = savedErrno;
+	return ret;
 }
 
 }

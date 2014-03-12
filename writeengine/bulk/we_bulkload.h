@@ -149,6 +149,8 @@ public:
     void                disableTimeOut       ( const bool disableTimeOut);
     bool                disableTimeOut       ( ) const;
 
+	// Add error message into appropriate BRM updater 
+	static bool 		addErrorMsg2BrmUpdater(const std::string& tablename, const std::ostringstream& oss);
 private:
 
     //--------------------------------------------------------------------------
@@ -172,7 +174,7 @@ private:
     long long   fMaxErrors;                // Max allowable errors per job
     std::string fAlternateImportDir;       // Alternate bulk import directory
     std::string fProcessName;              // Application process name
-    boost::ptr_vector<TableInfo> fTableInfo;// Vector of Table information
+    static boost::ptr_vector<TableInfo> fTableInfo;// Vector of Table information
     int         fNoOfParseThreads;         // Number of parse threads
     int         fNoOfReadThreads;          // Number of read threads
     boost::thread_group fReadThreads;      // Read thread group

@@ -58,7 +58,7 @@ void VirtualTable::initialize()
 }
 
 
-void VirtualTable::addColumn(const SRCP& column, const string& view)
+void VirtualTable::addColumn(const SRCP& column)
 {
 	// As of bug3695, make sure varbinary is not used in subquery.
 	if (column->resultType().colDataType == CalpontSystemCatalog::VARBINARY && !fVarBinOK)
@@ -72,7 +72,6 @@ void VirtualTable::addColumn(const SRCP& column, const string& view)
 	WindowFunctionColumn* wc  = NULL;
 
 	string columnName;
-	string viewName(view);
 	ostringstream oss;
 	UniqId colId;
 	if ((sc = dynamic_cast<SimpleColumn*>(column.get())) != NULL)
@@ -110,7 +109,7 @@ void VirtualTable::addColumn(const SRCP& column, const string& view)
 	{
 //		oss << "Constant_" << cc->expressionId();
 		columnName = cc->data();
-		colId = UniqId(cc->expressionId(), cc->alias(), "", viewName);
+		colId = UniqId(cc->expressionId(), cc->alias(), "", fView);
 	}
 	else // new column type has added, but this code is not updated.
 	{
@@ -126,7 +125,7 @@ void VirtualTable::addColumn(const SRCP& column, const string& view)
 	vc->tableAlias(fAlias);
 	vc->columnName(columnName);
 	vc->alias(column->alias());
-	vc->viewName(viewName);
+	vc->viewName(fView);
 
 	uint32_t index = fColumns.size();
 	vc->colPosition(index);

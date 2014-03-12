@@ -182,34 +182,34 @@ uint32_t convertDataType(int dataType)
 			calpontDataType = CalpontSystemCatalog::BLOB;
 			break;
 
-        case ddlpackage::DDL_UNSIGNED_TINYINT:
-            calpontDataType = CalpontSystemCatalog::UTINYINT;
-            break;
+		case ddlpackage::DDL_UNSIGNED_TINYINT:
+			calpontDataType = CalpontSystemCatalog::UTINYINT;
+			break;
 
-        case ddlpackage::DDL_UNSIGNED_SMALLINT:
-            calpontDataType = CalpontSystemCatalog::USMALLINT;
-            break;
+		case ddlpackage::DDL_UNSIGNED_SMALLINT:
+			calpontDataType = CalpontSystemCatalog::USMALLINT;
+			break;
 
-        case ddlpackage::DDL_UNSIGNED_INT:
-            calpontDataType = CalpontSystemCatalog::UINT;
-            break;
+		case ddlpackage::DDL_UNSIGNED_INT:
+			calpontDataType = CalpontSystemCatalog::UINT;
+			break;
 
-        case ddlpackage::DDL_UNSIGNED_BIGINT:
-            calpontDataType = CalpontSystemCatalog::UBIGINT;
-            break;
+		case ddlpackage::DDL_UNSIGNED_BIGINT:
+			calpontDataType = CalpontSystemCatalog::UBIGINT;
+			break;
 
-        case ddlpackage::DDL_UNSIGNED_DECIMAL:
-        case ddlpackage::DDL_UNSIGNED_NUMERIC:
-            calpontDataType = CalpontSystemCatalog::UDECIMAL;
-            break;
+		case ddlpackage::DDL_UNSIGNED_DECIMAL:
+		case ddlpackage::DDL_UNSIGNED_NUMERIC:
+			calpontDataType = CalpontSystemCatalog::UDECIMAL;
+			break;
 
-        case ddlpackage::DDL_UNSIGNED_FLOAT:
-            calpontDataType = CalpontSystemCatalog::UFLOAT;
-            break;
+		case ddlpackage::DDL_UNSIGNED_FLOAT:
+			calpontDataType = CalpontSystemCatalog::UFLOAT;
+			break;
 
-        case ddlpackage::DDL_UNSIGNED_DOUBLE:
-            calpontDataType = CalpontSystemCatalog::UDOUBLE;
-            break;
+		case ddlpackage::DDL_UNSIGNED_DOUBLE:
+			calpontDataType = CalpontSystemCatalog::UDOUBLE;
+			break;
 		default:
 			throw runtime_error("Unsupported datatype!");
 
@@ -227,9 +227,9 @@ int parseCompressionComment ( std::string comment )
 	boost::match_results<std::string::const_iterator> what;
 	std::string::const_iterator start, end;
 	start = comment.begin();
-	end = comment.end();   
+	end = comment.end();
 	boost::match_flag_type flags = boost::match_default;
-	if (boost::regex_search(start, end, what, compat, flags)) 
+	if (boost::regex_search(start, end, what, compat, flags))
 	{
 		//Find the pattern, now get the compression type
 		string compType (&(*(what[0].second)));
@@ -254,7 +254,7 @@ int parseCompressionComment ( std::string comment )
 		{
 			compressiontype = -1;
 		}
-		
+
 	}
 	else
 		compressiontype = MAX_INT;
@@ -273,11 +273,11 @@ bool validateAutoincrementDatatype ( int type )
 		case ddlpackage::DDL_MEDINT:
 		case ddlpackage::DDL_SMALLINT:
 		case ddlpackage::DDL_TINYINT:
-        case ddlpackage::DDL_UNSIGNED_INT:
-        case ddlpackage::DDL_UNSIGNED_BIGINT:
-        case ddlpackage::DDL_UNSIGNED_MEDINT:
-        case ddlpackage::DDL_UNSIGNED_SMALLINT:
-        case ddlpackage::DDL_UNSIGNED_TINYINT:
+		case ddlpackage::DDL_UNSIGNED_INT:
+		case ddlpackage::DDL_UNSIGNED_BIGINT:
+		case ddlpackage::DDL_UNSIGNED_MEDINT:
+		case ddlpackage::DDL_UNSIGNED_SMALLINT:
+		case ddlpackage::DDL_UNSIGNED_TINYINT:
 			validAutoType = true;
 			break;
 	}
@@ -295,12 +295,12 @@ bool validateNextValue( int type, int64_t value )
 					validValue = false;
 			}
 			break;
-        case ddlpackage::DDL_UNSIGNED_BIGINT:
-            {
-                if (static_cast<uint64_t>(value) > MAX_UBIGINT)
-                    validValue = false;
-            }
-            break;
+		case ddlpackage::DDL_UNSIGNED_BIGINT:
+			{
+				if (static_cast<uint64_t>(value) > MAX_UBIGINT)
+					validValue = false;
+			}
+			break;
 		case ddlpackage::DDL_INT:
 		case ddlpackage::DDL_INTEGER:
 		case ddlpackage::DDL_MEDINT:
@@ -309,37 +309,37 @@ bool validateNextValue( int type, int64_t value )
 					validValue = false;
 			}
 			break;
-        case ddlpackage::DDL_UNSIGNED_INT:
-        case ddlpackage::DDL_UNSIGNED_MEDINT:
-            {
-                if (static_cast<uint64_t>(value) > MAX_UINT)
-                    validValue = false;
-            }
-            break;
+		case ddlpackage::DDL_UNSIGNED_INT:
+		case ddlpackage::DDL_UNSIGNED_MEDINT:
+			{
+				if (static_cast<uint64_t>(value) > MAX_UINT)
+					validValue = false;
+			}
+			break;
 		case ddlpackage::DDL_SMALLINT:
 			{
 				if (value > MAX_SMALLINT)
 					validValue = false;
 			}
 			break;
-        case ddlpackage::DDL_UNSIGNED_SMALLINT:
-            {
-                if (static_cast<uint64_t>(value) > MAX_USMALLINT)
-                    validValue = false;
-            }
-            break;
+		case ddlpackage::DDL_UNSIGNED_SMALLINT:
+			{
+				if (static_cast<uint64_t>(value) > MAX_USMALLINT)
+					validValue = false;
+			}
+			break;
 		case ddlpackage::DDL_TINYINT:
 			{
 				if (value > MAX_TINYINT)
 					validValue = false;
 			}
 			break;
-        case ddlpackage::DDL_UNSIGNED_TINYINT:
-            {
-                if (static_cast<uint64_t>(value) > MAX_UTINYINT)
-                    validValue = false;
-            }
-            break;
+		case ddlpackage::DDL_UNSIGNED_TINYINT:
+			{
+				if (static_cast<uint64_t>(value) > MAX_UTINYINT)
+					validValue = false;
+			}
+			break;
 	}
 	return validValue;
 }
@@ -356,11 +356,11 @@ bool anyRowInTable(string& schema, string& tableName, int sessionID)
 	aTableName.table = tableName;
 	CalpontSystemCatalog::RIDList ridList = csc->columnRIDs(aTableName, true);
 	CalpontSystemCatalog::TableColName tableColName =  csc->colName(ridList[0].objnum);
-	
-	CalpontSelectExecutionPlan csep;          
-    CalpontSelectExecutionPlan::ReturnedColumnList returnedColumnList;
-    CalpontSelectExecutionPlan::ColumnMap colMap;  
-	
+
+	CalpontSelectExecutionPlan csep;
+	CalpontSelectExecutionPlan::ReturnedColumnList returnedColumnList;
+	CalpontSelectExecutionPlan::ColumnMap colMap;
+
 	SessionManager sm;
 	BRM::TxnID txnID;
 	txnID = sm.getTxnID(sessionID);
@@ -374,21 +374,21 @@ bool anyRowInTable(string& schema, string& tableName, int sessionID)
 	csep.txnID(txnID.id);
 	csep.verID(verID);
 	csep.sessionID(sessionID);
-	
+
 	string firstCol = tableColName.schema+"."+tableColName.table+"."+tableColName.column;
 	SimpleColumn* col[1];
-    col[0] = new SimpleColumn(firstCol, sessionID); 
+	col[0] = new SimpleColumn(firstCol, sessionID);
 	SRCP srcp;
-    srcp.reset(col[0]);
-    colMap.insert(CMVT_(firstCol, srcp));
+	srcp.reset(col[0]);
+	colMap.insert(CMVT_(firstCol, srcp));
 	csep.columnMapNonStatic(colMap);
 	returnedColumnList.push_back(srcp);
-    csep.returnedCols(returnedColumnList);
-	
+	csep.returnedCols(returnedColumnList);
+
 	CalpontSelectExecutionPlan::TableList tablelist;
 	tablelist.push_back(make_aliastable(schema, tableName, ""));
 	csep.tableList(tablelist);
-	
+
 	boost::shared_ptr<messageqcpp::MessageQueueClient> exemgrClient (new messageqcpp::MessageQueueClient("ExeMgr1"));
 	ByteStream msg, emsgBs;
 	rowgroup::RGData rgData;
@@ -396,16 +396,16 @@ bool anyRowInTable(string& schema, string& tableName, int sessionID)
 	msg << qb;
 	rowgroup::RowGroup *rowGroup = 0;
 	bool anyRow = false;
-	
+
 	exemgrClient->write(msg);
 	ByteStream msgPlan;
 	csep.serialize(msgPlan);
-	exemgrClient->write(msgPlan);	
+	exemgrClient->write(msgPlan);
 	msg.restart();
 	msg = exemgrClient->read(); //error handling
-	emsgBs = exemgrClient->read();	
+	emsgBs = exemgrClient->read();
 	ByteStream::quadbyte qb1;
-							
+
 	if (emsgBs.length() == 0)
 	{
 		//exemgrClient->shutdown();
@@ -414,11 +414,11 @@ bool anyRowInTable(string& schema, string& tableName, int sessionID)
 		throw runtime_error("Lost conection to ExeMgr.");
 	}
 	string emsgStr;
-	emsgBs >> emsgStr;			
+	emsgBs >> emsgStr;
 	if (msg.length() == 4)
 	{
 		msg >> qb1;
-		if (qb1 != 0) 
+		if (qb1 != 0)
 		{
 			//exemgrClient->shutdown();
 			//delete exemgrClient;
@@ -426,7 +426,7 @@ bool anyRowInTable(string& schema, string& tableName, int sessionID)
 			throw runtime_error(emsgStr);
 		}
 	}
-		
+
 	while (true)
 	{
 		msg.restart();
@@ -452,8 +452,8 @@ bool anyRowInTable(string& schema, string& tableName, int sessionID)
 				continue;
 			}
 			rgData.deserialize(msg);
-			rowGroup->setData(&rgData); 
-				
+			rowGroup->setData(&rgData);
+
 			if (rowGroup->getStatus() != 0)
 			{
 				//msg.advance(rowGroup->getDataSize());
@@ -471,19 +471,19 @@ bool anyRowInTable(string& schema, string& tableName, int sessionID)
 			//exemgrClient = 0;
 			return anyRow;
 		}
-	}		
+	}
 }
 
 bool anyNullInTheColumn (string& schema, string& table, string& columnName, int sessionID)
 {
-	CalpontSelectExecutionPlan csep;          
-    CalpontSelectExecutionPlan::ReturnedColumnList returnedColumnList;
-    CalpontSelectExecutionPlan::FilterTokenList filterTokenList;
-    CalpontSelectExecutionPlan::ColumnMap colMap;  
+	CalpontSelectExecutionPlan csep;
+	CalpontSelectExecutionPlan::ReturnedColumnList returnedColumnList;
+	CalpontSelectExecutionPlan::FilterTokenList filterTokenList;
+	CalpontSelectExecutionPlan::ColumnMap colMap;
 	algorithm::to_lower(schema);
 	algorithm::to_lower(table);
 	algorithm::to_lower(columnName);
-	
+
 	SessionManager sm;
 	BRM::TxnID txnID;
 	txnID = sm.getTxnID(sessionID);
@@ -497,31 +497,31 @@ bool anyNullInTheColumn (string& schema, string& table, string& columnName, int 
 	csep.txnID(txnID.id);
 	csep.verID(verID);
 	csep.sessionID(sessionID);
-	
+
 	string firstCol = schema+"."+table+"."+columnName;
 	SimpleColumn* col[1];
-    col[0] = new SimpleColumn(firstCol, sessionID); 
+	col[0] = new SimpleColumn(firstCol, sessionID);
 	SRCP srcp;
-    srcp.reset(col[0]);
-    colMap.insert(CMVT_(firstCol, srcp));
+	srcp.reset(col[0]);
+	colMap.insert(CMVT_(firstCol, srcp));
 	csep.columnMapNonStatic(colMap);
 	returnedColumnList.push_back(srcp);
-    csep.returnedCols(returnedColumnList);
-	
+	csep.returnedCols(returnedColumnList);
+
 	SimpleFilter *sf = new SimpleFilter();
 	boost::shared_ptr<Operator> sop(new PredicateOperator("isnull"));
 	sf->op(sop);
 	ConstantColumn *rhs = new ConstantColumn("", ConstantColumn::NULLDATA);
 	sf->lhs(col[0]->clone());
 	sf->rhs(rhs);
-	
+
 	filterTokenList.push_back(sf);
-	csep.filterTokenList(filterTokenList); 
-	
+	csep.filterTokenList(filterTokenList);
+
 	CalpontSelectExecutionPlan::TableList tablelist;
 	tablelist.push_back(make_aliastable(schema, table, ""));
 	csep.tableList(tablelist);
-	
+
 	boost::shared_ptr<messageqcpp::MessageQueueClient> exemgrClient (new messageqcpp::MessageQueueClient("ExeMgr1"));
 	ByteStream msg, emsgBs;
 	rowgroup::RGData rgData;
@@ -529,16 +529,16 @@ bool anyNullInTheColumn (string& schema, string& table, string& columnName, int 
 	msg << qb;
 	rowgroup::RowGroup *rowGroup = 0;
 	bool anyRow = false;
-	
+
 	exemgrClient->write(msg);
 	ByteStream msgPlan;
 	csep.serialize(msgPlan);
-	exemgrClient->write(msgPlan);	
+	exemgrClient->write(msgPlan);
 	msg.restart();
 	msg = exemgrClient->read(); //error handling
-	emsgBs = exemgrClient->read();	
+	emsgBs = exemgrClient->read();
 	ByteStream::quadbyte qb1;
-							
+
 	if (emsgBs.length() == 0)
 	{
 		//exemgrClient->shutdown();
@@ -547,11 +547,11 @@ bool anyNullInTheColumn (string& schema, string& table, string& columnName, int 
 		throw runtime_error("Lost conection to ExeMgr.");
 	}
 	string emsgStr;
-	emsgBs >> emsgStr;			
+	emsgBs >> emsgStr;
 	if (msg.length() == 4)
 	{
 		msg >> qb1;
-		if (qb1 != 0) 
+		if (qb1 != 0)
 		{
 			//exemgrClient->shutdown();
 			//delete exemgrClient;
@@ -559,7 +559,7 @@ bool anyNullInTheColumn (string& schema, string& table, string& columnName, int 
 			throw runtime_error(emsgStr);
 		}
 	}
-		
+
 	while (true)
 	{
 		msg.restart();
@@ -585,8 +585,8 @@ bool anyNullInTheColumn (string& schema, string& table, string& columnName, int 
 				continue;
 			}
 			rgData.deserialize(msg);
-			rowGroup->setData(&rgData); 
-				
+			rowGroup->setData(&rgData);
+
 			if (rowGroup->getStatus() != 0)
 			{
 				//msg.advance(amount);
@@ -604,7 +604,7 @@ bool anyNullInTheColumn (string& schema, string& table, string& columnName, int 
 			//exemgrClient = 0;
 			return anyRow;
 		}
-	}	
+	}
 }
 
 int ProcessDDLStatement(string& ddlStatement, string& schema, const string& table, int sessionID,
@@ -613,9 +613,9 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
   SqlParser parser;
   THD *thd = current_thd;
 #ifdef INFINIDB_DEBUG
-    cout << "ProcessDDLStatement: " << schema << "." << table << ":" << ddlStatement << endl;
+	cout << "ProcessDDLStatement: " << schema << "." << table << ":" << ddlStatement << endl;
 #endif
-  
+
   parser.setDefaultSchema(schema);
   int rc = 0;
   IDBCompressInterface idbCompress;
@@ -625,8 +625,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
   cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(thd->infinidb_vtable.cal_conn_info);
   if(parser.Good())
   {
-    const ddlpackage::ParseTree &ptree = parser.GetParseTree();
-    SqlStatement &stmt = *ptree.fList[0];
+	const ddlpackage::ParseTree &ptree = parser.GetParseTree();
+	SqlStatement &stmt = *ptree.fList[0];
 	bool isVarbinaryAllowed = false;
 	std::string valConfig = config::Config::makeConfig()->getConfig(
 			"WriteEngine", "AllowVarbinary" );
@@ -634,32 +634,32 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 	if (valConfig.compare("YES") == 0)
 		isVarbinaryAllowed = true;
 
-    //@Bug 1771. error out for not supported feature.
-    if ( typeid ( stmt ) == typeid ( CreateTableStatement ) )
-    {
-    	CreateTableStatement * createTable = dynamic_cast <CreateTableStatement *> ( &stmt );
-    	//@Bug 5767. To handle key words inside `` for a tablename.
-    	if (!(boost::iequals(schema, createTable->fTableDef->fQualifiedName->fSchema)) || !(boost::iequals(table,createTable->fTableDef->fQualifiedName->fName)))
-    	{
+	//@Bug 1771. error out for not supported feature.
+	if ( typeid ( stmt ) == typeid ( CreateTableStatement ) )
+	{
+		CreateTableStatement * createTable = dynamic_cast <CreateTableStatement *> ( &stmt );
+		//@Bug 5767. To handle key words inside `` for a tablename.
+		if (!(boost::iequals(schema, createTable->fTableDef->fQualifiedName->fSchema)) || !(boost::iequals(table,createTable->fTableDef->fQualifiedName->fName)))
+		{
 			rc = 1;
 			thd->main_da.can_overwrite_status = true;
 
 			thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_CREATE_DATATYPE_NOT_SUPPORT)).c_str());
 			ci->alterTableState = cal_connection_info::NOT_ALTER;
 			ci->isAlter = false;
-			return rc;	
+			return rc;
 		}
-		
-    	bool matchedCol = false;
-    	for ( unsigned i=0; i < createTable->fTableDef->fColumns.size(); i++ )
-    	{
+
+		bool matchedCol = false;
+		for ( unsigned i=0; i < createTable->fTableDef->fColumns.size(); i++ )
+		{
 			// if there are any constraints other than 'DEFAULT NULL' (which is the default in IDB), kill
 			//  the statement
 			bool autoIncre = false;
 			uint64_t startValue = 1;
-    		if (createTable->fTableDef->fColumns[i]->fConstraints.size() > 0 )
-    		{
-				//support default value and NOT NULL constraint			
+			if (createTable->fTableDef->fColumns[i]->fConstraints.size() > 0 )
+			{
+				//support default value and NOT NULL constraint
 				for (uint32_t j=0; j < createTable->fTableDef->fColumns[i]->fConstraints.size(); j++)
 				{
 					if (createTable->fTableDef->fColumns[i]->fConstraints[j]->fConstraintType != DDL_NOT_NULL)
@@ -670,11 +670,11 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 						thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_CONSTRAINTS)).c_str());
 						ci->alterTableState = cal_connection_info::NOT_ALTER;
 						ci->isAlter = false;
-						return rc;	
+						return rc;
 					}
-				}				
-    		}
-			
+				}
+			}
+
 			//check varbinary data type
 			if ((createTable->fTableDef->fColumns[i]->fType->fType == ddlpackage::DDL_VARBINARY) && !isVarbinaryAllowed)
 			{
@@ -684,10 +684,10 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 	 			thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Varbinary is currently not supported by InfiniDB.");
 				ci->alterTableState = cal_connection_info::NOT_ALTER;
 				ci->isAlter = false;
-	 			return rc;	
+	 			return rc;
 			}
-			
-			if ((createTable->fTableDef->fColumns[i]->fType->fType == ddlpackage::DDL_VARBINARY) && 
+
+			if ((createTable->fTableDef->fColumns[i]->fType->fType == ddlpackage::DDL_VARBINARY) &&
 			((createTable->fTableDef->fColumns[i]->fType->fLength > 8000) || (createTable->fTableDef->fColumns[i]->fType->fLength < 8)))
 			{
 				rc = 1;
@@ -696,9 +696,9 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 	 			thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Varbinary length has to be between 8 and 8000.");
 				ci->alterTableState = cal_connection_info::NOT_ALTER;
 				ci->isAlter = false;
-	 			return rc;	
+	 			return rc;
 			}
-			
+
 			if (createTable->fTableDef->fColumns[i]->fDefaultValue)
 			{
 				if ((!createTable->fTableDef->fColumns[i]->fDefaultValue->fNull) && (createTable->fTableDef->fColumns[i]->fType->fType == ddlpackage::DDL_VARBINARY))
@@ -709,9 +709,9 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 					thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Varbinary column cannot have default value.");
 					ci->alterTableState = cal_connection_info::NOT_ALTER;
 					ci->isAlter = false;
-					return rc;	
+					return rc;
 				}
-			
+
 				if (!createTable->fTableDef->fColumns[i]->fDefaultValue->fNull)
 				{
 					//validate the default value, if out of range, just error out
@@ -734,8 +734,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 						thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "The default value is out of range for the specified data type.");
 						ci->alterTableState = cal_connection_info::NOT_ALTER;
 						ci->isAlter = false;
-						return rc;	
-					}	
+						return rc;
+					}
 					if (pushWarning)
 					{
 						rc = 1;
@@ -743,9 +743,9 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 						thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "The default value is out of range for the specified data type.");
 						ci->alterTableState = cal_connection_info::NOT_ALTER;
 						ci->isAlter = false;
-						return rc;	
+						return rc;
 					}
-					if (((colType.colDataType == execplan::CalpontSystemCatalog::DATE) && (createTable->fTableDef->fColumns[i]->fDefaultValue->fValue =="0000-00-00")) || 
+					if (((colType.colDataType == execplan::CalpontSystemCatalog::DATE) && (createTable->fTableDef->fColumns[i]->fDefaultValue->fValue =="0000-00-00")) ||
 									((colType.colDataType == execplan::CalpontSystemCatalog::DATETIME) && (createTable->fTableDef->fColumns[i]->fDefaultValue->fValue =="0000-00-00 00:00:00")))
 					{
 						rc = 1;
@@ -753,11 +753,11 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 						thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "The default value is out of range for the specified data type.");
 						ci->alterTableState = cal_connection_info::NOT_ALTER;
 						ci->isAlter = false;
-						return rc;	
+						return rc;
 					}
 				}
 			}
-			
+
 			//Parse the column comment
 			string comment = createTable->fTableDef->fColumns[i]->fComment;
 			int compressionType = compressionTypeIn;
@@ -792,7 +792,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 #endif
 					return rc;
 				}
-				
+
 				try {
 #ifndef SKIP_AUTOI
 	autoIncre = parseAutoincrementColumnComment(comment, startValue);
@@ -808,7 +808,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 		return rc;
 	}
 #endif
-	
+
 					if (autoIncre)
 					{
 						//Check whether there is a column with autoincrement already
@@ -827,7 +827,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 							autoiColName = createTable->fTableDef->fColumns[i]->fName;
 							matchedCol = true;
 						}
-						
+
 						//Check whether the column has default value. If there is, error out
 						if (createTable->fTableDef->fColumns[i]->fDefaultValue)
 						{
@@ -852,7 +852,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 					ci->isAlter = false;
 					return rc;
 				}
-				
+
 			}
 			if (!autoIncre &&  isAnyAutoincreCol && (boost::iequals(autoiColName, createTable->fTableDef->fColumns[i]->fName)))
 			{
@@ -860,7 +860,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 				matchedCol = true;
 				startValue = nextvalue;
 			}
-			
+
 			if (startValue <= 0)
 			{
 				rc = 1;
@@ -870,20 +870,20 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 				ci->isAlter = false;
 				return rc;
 			}
-		
+
 			if(autoIncre)
-            {
-                    if (!validateAutoincrementDatatype(createTable->fTableDef->fColumns[i]->fType->fType))
-                    {
-                        rc = 1;
-                        thd->main_da.can_overwrite_status = true;
-                        thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_INVALID_AUTOINCREMENT_TYPE)).c_str());
+			{
+					if (!validateAutoincrementDatatype(createTable->fTableDef->fColumns[i]->fType->fType))
+					{
+						rc = 1;
+						thd->main_da.can_overwrite_status = true;
+						thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_INVALID_AUTOINCREMENT_TYPE)).c_str());
 						ci->alterTableState = cal_connection_info::NOT_ALTER;
 						ci->isAlter = false;
-                        return rc;
-                    }
-             }
-	
+						return rc;
+					}
+			 }
+
 			if (!validateNextValue(createTable->fTableDef->fColumns[i]->fType->fType, startValue))
 			{
 				rc = 1;
@@ -893,7 +893,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 				ci->isAlter = false;
 				return rc;
 			}
-			
+
 			//hdfs
 			if ((compressionType ==0) && (useHdfs))
 			{
@@ -901,15 +901,15 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 				string errmsg ("The table is created with infinidb compression type 2 under HDFS." );
 				push_warning(thd, MYSQL_ERROR::WARN_LEVEL_WARN, 9999, errmsg.c_str());
 			}
-				
+
 			(createTable->fTableDef->fColumns[i]->fType)->fCompressiontype = compressionType;
 			if (autoIncre)
 				(createTable->fTableDef->fColumns[i]->fType)->fAutoincrement = "y";
 			else
 				(createTable->fTableDef->fColumns[i]->fType)->fAutoincrement = "n";
-				
+
 			(createTable->fTableDef->fColumns[i]->fType)->fNextvalue = startValue;
-		} 
+		}
 
 		if (isAnyAutoincreCol && !matchedCol) //@Bug 3555 error out on invalid column
 		{
@@ -922,10 +922,10 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 			ci->isAlter = false;
 			return rc;
 		}
-    }
-    else if ( typeid ( stmt ) == typeid ( AlterTableStatement ) )
-    {
-    	AlterTableStatement * alterTable = dynamic_cast <AlterTableStatement *> ( &stmt );	
+	}
+	else if ( typeid ( stmt ) == typeid ( AlterTableStatement ) )
+	{
+		AlterTableStatement * alterTable = dynamic_cast <AlterTableStatement *> ( &stmt );
 		if ( schema.length() == 0 )
 		{
 			schema = alterTable->fTableName->fSchema;
@@ -937,27 +937,27 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 	 			thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "No database selected.");
 				ci->alterTableState = cal_connection_info::NOT_ALTER;
 				ci->isAlter = false;
-	 			return rc;	
+	 			return rc;
 			}
 		}
 
-    	ddlpackage::AlterTableActionList actionList = alterTable->fActions;
+		ddlpackage::AlterTableActionList actionList = alterTable->fActions;
 		if (actionList.size() > 1) //@bug 3753 we don't support multiple actions in alter table statement
 		{
 			rc = 1;
 			thd->main_da.can_overwrite_status = true;
 
 			thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Multiple actions in alter table statement is currently not supported by InfiniDB.");
-	 		
+
 			ci->alterTableState = cal_connection_info::NOT_ALTER;
 			ci->isAlter = false;
-			return rc;	
+			return rc;
 		}
 
-    	for ( unsigned i=0; i < actionList.size(); i++ )
-    	{
-    		if ( ddlpackage::AtaAddColumn *addColumnPtr = dynamic_cast<AtaAddColumn*> (actionList[i]) )
-    		{
+		for ( unsigned i=0; i < actionList.size(); i++ )
+		{
+			if ( ddlpackage::AtaAddColumn *addColumnPtr = dynamic_cast<AtaAddColumn*> (actionList[i]) )
+			{
 				//check varbinary data type
 				if ((addColumnPtr->fColumnDef->fType->fType == ddlpackage::DDL_VARBINARY) && !isVarbinaryAllowed)
 				{
@@ -966,24 +966,24 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 					thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Varbinary is currently not supported by InfiniDB.");
 					ci->alterTableState = cal_connection_info::NOT_ALTER;
 					ci->isAlter = false;
-					return rc;	
+					return rc;
 				}
-				
-				if ((addColumnPtr->fColumnDef->fType->fType == ddlpackage::DDL_VARBINARY) && 
+
+				if ((addColumnPtr->fColumnDef->fType->fType == ddlpackage::DDL_VARBINARY) &&
 				((addColumnPtr->fColumnDef->fType->fLength > 8000) || (addColumnPtr->fColumnDef->fType->fLength < 8)))
 				{
 					rc = 1;
 					thd->main_da.can_overwrite_status = true;
 					thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Varbinary length has to be between 8 and 8000.");
-					ci->alterTableState = cal_connection_info::NOT_ALTER; 	
-					ci->isAlter = false;					
-					return rc;	
+					ci->alterTableState = cal_connection_info::NOT_ALTER;
+					ci->isAlter = false;
+					return rc;
 				}
 				uint64_t startValue = 1;
 				bool autoIncre  = false;
 				if ( (addColumnPtr->fColumnDef->fConstraints.size() > 0 ) || addColumnPtr->fColumnDef->fDefaultValue )
 				{
-					//support default value and NOT NULL constraint	
+					//support default value and NOT NULL constraint
 					for (uint32_t j=0; j < addColumnPtr->fColumnDef->fConstraints.size(); j++)
 					{
 						if (addColumnPtr->fColumnDef->fConstraints[j]->fConstraintType != DDL_NOT_NULL)
@@ -993,12 +993,12 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 							thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_CONSTRAINTS)).c_str());
 							ci->alterTableState = cal_connection_info::NOT_ALTER;
 							ci->isAlter = false;
-							return rc;	
+							return rc;
 						}
 						//if not null constraint, user has to provide a default value
 						if ((addColumnPtr->fColumnDef->fConstraints[j]->fConstraintType == DDL_NOT_NULL) && (!addColumnPtr->fColumnDef->fDefaultValue))
 						{
-	
+
 							//do select count(*) from the table to check whether there are existing rows. if there is, error out.
 							bool anyRow  = false;
 							try {
@@ -1011,7 +1011,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 								thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, ex.what());
 								ci->alterTableState = cal_connection_info::NOT_ALTER;
 								ci->isAlter = false;
-								return rc;							
+								return rc;
 							}
 							catch (...)
 							{
@@ -1020,7 +1020,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 								thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Unknown exception caught when checking any rows in the table.");
 								ci->alterTableState = cal_connection_info::NOT_ALTER;
 								ci->isAlter = false;
-								return rc;	
+								return rc;
 							}
 							if (anyRow)
 							{
@@ -1029,7 +1029,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 								thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Table is not empty. New column has to have a default value if NOT NULL required.");
 								ci->alterTableState = cal_connection_info::NOT_ALTER;
 								ci->isAlter = false;
-								return rc;	
+								return rc;
 							}
 						}
 						else if ((addColumnPtr->fColumnDef->fConstraints[j]->fConstraintType == DDL_NOT_NULL) &&(addColumnPtr->fColumnDef->fDefaultValue))
@@ -1041,11 +1041,11 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 								thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "New column has to have a default value if NOT NULL required.");
 								ci->alterTableState = cal_connection_info::NOT_ALTER;
 								ci->isAlter = false;
-								return rc;	
+								return rc;
 							}
 						}
 					}
-					
+
 					if (addColumnPtr->fColumnDef->fDefaultValue)
 					{
 						if ((!addColumnPtr->fColumnDef->fDefaultValue->fNull) && (addColumnPtr->fColumnDef->fType->fType == ddlpackage::DDL_VARBINARY))
@@ -1055,9 +1055,9 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 							thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Varbinary column cannot have default value.");
 							ci->alterTableState = cal_connection_info::NOT_ALTER;
 							ci->isAlter = false;
-							return rc;	
+							return rc;
 						}
-					
+
 						//validate the default value, if out of range, just error out
 						uint32_t dataType;
 						dataType = convertDataType(addColumnPtr->fColumnDef->fType->fType);
@@ -1078,8 +1078,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 							thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "The default value is out of range for the specified data type.");
 							ci->alterTableState = cal_connection_info::NOT_ALTER;
 							ci->isAlter = false;
-							return rc;	
-						}	
+							return rc;
+						}
 						if (pushWarning)
 						{
 							rc = 1;
@@ -1087,9 +1087,9 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 							thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "The default value is out of range for the specified data type.");
 							ci->alterTableState = cal_connection_info::NOT_ALTER;
 							ci->isAlter = false;
-							return rc;	
+							return rc;
 						}
-						if (((colType.colDataType == execplan::CalpontSystemCatalog::DATE) && (addColumnPtr->fColumnDef->fDefaultValue->fValue =="0000-00-00")) || 
+						if (((colType.colDataType == execplan::CalpontSystemCatalog::DATE) && (addColumnPtr->fColumnDef->fDefaultValue->fValue =="0000-00-00")) ||
 									((colType.colDataType == execplan::CalpontSystemCatalog::DATETIME) && (addColumnPtr->fColumnDef->fDefaultValue->fValue =="0000-00-00 00:00:00")))
 						{
 							rc = 1;
@@ -1097,7 +1097,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 							thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "The default value is out of range for the specified data type.");
 							ci->alterTableState = cal_connection_info::NOT_ALTER;
 							ci->isAlter = false;
-							return rc;	
+							return rc;
 						}
 					}
 				}
@@ -1106,7 +1106,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 				int compressionType = compressionTypeIn;
 				if ( comment.length() > 0 )
 				{
-					//@Bug 3782 This is for synchronization after calonlinealter to use 
+					//@Bug 3782 This is for synchronization after calonlinealter to use
 					algorithm::to_upper(comment);
 					regex pat("[[:space:]]*SCHEMA[[:space:]]+SYNC[[:space:]]+ONLY", regex_constants::extended);
 					if (regex_search(comment, pat))
@@ -1126,7 +1126,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 						ci->isAlter = false;
 						return rc;
 					}
-					
+
 					if (( compressionType > 0 ) && !(idbCompress.isCompressionAvail( compressionType )))
 					{
 						rc = 1;
@@ -1142,14 +1142,14 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 						ci->isAlter = false;
 						return rc;
 					}
-					
+
 					if ((compressionType ==0) && (useHdfs))
 					{
 						compressionType = 2;
 						string errmsg ("The column is created with infinidb compression type 2 under HDFS." );
 						push_warning(thd, MYSQL_ERROR::WARN_LEVEL_WARN, 9999, errmsg.c_str());
 					}
-				
+
 					try {
 #ifndef SKIP_AUTOI
 	autoIncre = parseAutoincrementColumnComment(comment, startValue);
@@ -1186,7 +1186,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 						tableName.table = alterTable->fTableName->fName;
 						CalpontSystemCatalog::TableInfo tblInfo;
 						try {
-							tblInfo = csc->tableInfo(tableName);	
+							tblInfo = csc->tableInfo(tableName);
 						}
 						catch (runtime_error& ex)
 						{
@@ -1197,7 +1197,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 							ci->isAlter = false;
 							return rc;
 						}
-						
+
 						if (tblInfo.tablewithautoincr == 1)
 						{
 							rc = 1;
@@ -1207,7 +1207,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 							ci->isAlter = false;
 							return rc;
 						}
-						
+
 						if (!validateAutoincrementDatatype(addColumnPtr->fColumnDef->fType->fType))
 						{
 							rc = 1;
@@ -1226,7 +1226,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 							ci->isAlter = false;
 							return rc;
 						}
-						
+
 						if (startValue <= 0)
 						{
 							rc = 1;
@@ -1235,7 +1235,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 							ci->alterTableState = cal_connection_info::NOT_ALTER;
 							ci->isAlter = false;
 							return rc;
-						}		
+						}
 					}
 				}
 				addColumnPtr->fColumnDef->fType->fCompressiontype = compressionType;
@@ -1243,38 +1243,38 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 					addColumnPtr->fColumnDef->fType->fAutoincrement = "y";
 				else
 					addColumnPtr->fColumnDef->fType->fAutoincrement = "n";
-				
+
 				addColumnPtr->fColumnDef->fType->fNextvalue = startValue;
-				
-    		}
-    		else if ( dynamic_cast<AtaAddTableConstraint*> (actionList[i]))
-    		{
-    			rc = 1;
+
+			}
+			else if ( dynamic_cast<AtaAddTableConstraint*> (actionList[i]))
+			{
+				rc = 1;
   	 			thd->main_da.can_overwrite_status = true;
 
 	 			thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_CONSTRAINTS)).c_str());
 				ci->alterTableState = cal_connection_info::NOT_ALTER;
 				ci->isAlter = false;
 	 			return rc;
-    		}
-/*    		else if ( dynamic_cast<AtaSetColumnDefault*> (actionList[i]) )
-    		{
-    			rc = 1;
+			}
+/*			else if ( dynamic_cast<AtaSetColumnDefault*> (actionList[i]) )
+			{
+				rc = 1;
   	 			thd->main_da.can_overwrite_status = true;
 	 			thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_CONSTRAINTS)).c_str());
 				ci->alterTableState = cal_connection_info::NOT_ALTER;
 				ci->isAlter = false;
 	 			return rc;
-    		}  
+			}
 			else if ( dynamic_cast<AtaDropColumnDefault*> (actionList[i]) )
-    		{
-    			rc = 1;
+			{
+				rc = 1;
   	 			thd->main_da.can_overwrite_status = true;
 	 			thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_CONSTRAINTS)).c_str());
 				ci->alterTableState = cal_connection_info::NOT_ALTER;
 				ci->isAlter = false;
 	 			return rc;
-    		}  
+			}
 */
 			else if ( ddlpackage::AtaAddColumns *addColumnsPtr = dynamic_cast<AtaAddColumns*>(actionList[i]))
 			{
@@ -1287,7 +1287,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 					ci->isAlter = false;
 					return rc;
 				}
-				
+
 				//check varbinary data type
 				if ((addColumnsPtr->fColumns[0]->fType->fType == ddlpackage::DDL_VARBINARY) && !isVarbinaryAllowed)
 				{
@@ -1296,11 +1296,11 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 					thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Varbinary is currently not supported by InfiniDB.");
 					ci->alterTableState = cal_connection_info::NOT_ALTER;
 					ci->isAlter = false;
-					return rc;	
+					return rc;
 				}
-				
-				
-				if ((addColumnsPtr->fColumns[0]->fType->fType == ddlpackage::DDL_VARBINARY) && 
+
+
+				if ((addColumnsPtr->fColumns[0]->fType->fType == ddlpackage::DDL_VARBINARY) &&
 				((addColumnsPtr->fColumns[0]->fType->fLength > 8000) || (addColumnsPtr->fColumns[0]->fType->fLength < 8)))
 				{
 					rc = 1;
@@ -1308,13 +1308,13 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 					thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Varbinary length has to be between 8 and 8000.");
 					ci->alterTableState = cal_connection_info::NOT_ALTER;
 					ci->isAlter = false;
-					return rc;	
+					return rc;
 				}
 				uint64_t startValue = 1;
 				bool autoIncre  = false;
-    			if ( (addColumnsPtr->fColumns[0]->fConstraints.size() > 0 ) || addColumnsPtr->fColumns[0]->fDefaultValue )
-    			{
-					//@Bug 5274. support default value and NOT NULL constraint	
+				if ( (addColumnsPtr->fColumns[0]->fConstraints.size() > 0 ) || addColumnsPtr->fColumns[0]->fDefaultValue )
+				{
+					//@Bug 5274. support default value and NOT NULL constraint
 					for (uint32_t j=0; j < addColumnsPtr->fColumns[0]->fConstraints.size(); j++)
 					{
 						if (addColumnsPtr->fColumns[0]->fConstraints[j]->fConstraintType != DDL_NOT_NULL)
@@ -1324,12 +1324,12 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 							thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_CONSTRAINTS)).c_str());
 							ci->alterTableState = cal_connection_info::NOT_ALTER;
 							ci->isAlter = false;
-							return rc;	
+							return rc;
 						}
 						//if not null constraint, user has to provide a default value
 						if ((addColumnsPtr->fColumns[0]->fConstraints[j]->fConstraintType == DDL_NOT_NULL) && (!addColumnsPtr->fColumns[0]->fDefaultValue))
 						{
-	
+
 							//do select count(*) from the table to check whether there are existing rows. if there is, error out.
 							bool anyRow  = false;
 							try {
@@ -1342,7 +1342,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 								thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, ex.what());
 								ci->alterTableState = cal_connection_info::NOT_ALTER;
 								ci->isAlter = false;
-								return rc;							
+								return rc;
 							}
 							catch (...)
 							{
@@ -1351,7 +1351,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 								thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Unknown exception caught when checking any rows in the table.");
 								ci->alterTableState = cal_connection_info::NOT_ALTER;
 								ci->isAlter = false;
-								return rc;	
+								return rc;
 							}
 							if (anyRow)
 							{
@@ -1360,7 +1360,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 								thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Table is not empty. New column has to have a default value if NOT NULL required.");
 								ci->alterTableState = cal_connection_info::NOT_ALTER;
 								ci->isAlter = false;
-								return rc;	
+								return rc;
 							}
 						}
 						else if ((addColumnsPtr->fColumns[0]->fConstraints[j]->fConstraintType == DDL_NOT_NULL) &&(addColumnsPtr->fColumns[0]->fDefaultValue))
@@ -1372,11 +1372,11 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 								thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "New column has to have a default value if NOT NULL required.");
 								ci->alterTableState = cal_connection_info::NOT_ALTER;
 								ci->isAlter = false;
-								return rc;	
+								return rc;
 							}
 						}
 					}
-					
+
 					if (addColumnsPtr->fColumns[0]->fDefaultValue)
 					{
 						if ((!addColumnsPtr->fColumns[0]->fDefaultValue->fNull) && (addColumnsPtr->fColumns[0]->fType->fType == ddlpackage::DDL_VARBINARY))
@@ -1386,9 +1386,9 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 							thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Varbinary column cannot have default value.");
 							ci->alterTableState = cal_connection_info::NOT_ALTER;
 							ci->isAlter = false;
-							return rc;	
+							return rc;
 						}
-					
+
 						//validate the default value, if out of range, just error out
 						uint32_t dataType;
 						dataType = convertDataType(addColumnsPtr->fColumns[0]->fType->fType);
@@ -1409,8 +1409,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 							thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "The default value is out of range for the specified data type.");
 							ci->alterTableState = cal_connection_info::NOT_ALTER;
 							ci->isAlter = false;
-							return rc;	
-						}	
+							return rc;
+						}
 						if (pushWarning)
 						{
 							rc = 1;
@@ -1418,9 +1418,9 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 							thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "The default value is out of range for the specified data type.");
 							ci->alterTableState = cal_connection_info::NOT_ALTER;
 							ci->isAlter = false;
-							return rc;	
+							return rc;
 						}
-						if (((colType.colDataType == execplan::CalpontSystemCatalog::DATE) && (addColumnsPtr->fColumns[0]->fDefaultValue->fValue =="0000-00-00")) || 
+						if (((colType.colDataType == execplan::CalpontSystemCatalog::DATE) && (addColumnsPtr->fColumns[0]->fDefaultValue->fValue =="0000-00-00")) ||
 									((colType.colDataType == execplan::CalpontSystemCatalog::DATETIME) && (addColumnsPtr->fColumns[0]->fDefaultValue->fValue =="0000-00-00 00:00:00")))
 						{
 							rc = 1;
@@ -1428,10 +1428,10 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 							thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "The default value is out of range for the specified data type.");
 							ci->alterTableState = cal_connection_info::NOT_ALTER;
 							ci->isAlter = false;
-							return rc;	
+							return rc;
 						}
 					}
-    			}
+				}
 				//Handle compression type
 				string comment = addColumnsPtr->fColumns[0]->fComment;
 				int compressionType = compressionTypeIn;
@@ -1450,7 +1450,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 						ci->isAlter = false;
 						return rc;
 					}
-					
+
 					if (( compressionType > 0 ) && !(idbCompress.isCompressionAvail( compressionType )))
 					{
 						rc = 1;
@@ -1466,15 +1466,15 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 						ci->isAlter = false;
 						return rc;
 					}
-					
+
 					if ((compressionType ==0) && (useHdfs))
 					{
 						compressionType = 2;
 						string errmsg ("The column is created with infinidb compression type 2 under HDFS." );
 						push_warning(thd, MYSQL_ERROR::WARN_LEVEL_WARN, 9999, errmsg.c_str());
 					}
-				
-					
+
+
 					try {
 #ifndef SKIP_AUTOI
 	autoIncre = parseAutoincrementColumnComment(comment, startValue);
@@ -1511,7 +1511,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 						tableName.table = alterTable->fTableName->fName;
 						CalpontSystemCatalog::TableInfo tblInfo;
 						try {
-							tblInfo = csc->tableInfo(tableName);	
+							tblInfo = csc->tableInfo(tableName);
 						}
 						catch (runtime_error& ex)
 						{
@@ -1522,7 +1522,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 							ci->isAlter = false;
 							return rc;
 						}
-						
+
 						if (tblInfo.tablewithautoincr == 1)
 						{
 							rc = 1;
@@ -1532,7 +1532,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 							ci->isAlter = false;
 							return rc;
 						}
-						
+
 						if (!validateAutoincrementDatatype(addColumnsPtr->fColumns[0]->fType->fType))
 						{
 							rc = 1;
@@ -1557,7 +1557,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 							thd->main_da.can_overwrite_status = true;
 							thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_NEGATIVE_STARTVALUE)).c_str());
 							return rc;
-						}					
+						}
 					}
 				}
 				addColumnsPtr->fColumns[0]->fType->fCompressiontype = compressionType;
@@ -1565,7 +1565,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 					addColumnsPtr->fColumns[0]->fType->fAutoincrement = "y";
 				else
 					addColumnsPtr->fColumns[0]->fType->fAutoincrement = "n";
-				
+
 				addColumnsPtr->fColumns[0]->fType->fNextvalue = startValue;
 			}
 			else if (ddlpackage::AtaRenameColumn* renameColumnsPtr = dynamic_cast<AtaRenameColumn*>(actionList[i]))
@@ -1573,7 +1573,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 				//cout << "Rename a column" << endl;
 				uint64_t startValue = 1;
 				bool autoIncre  = false;
-    			//@Bug 3746 Handle compression type
+				//@Bug 3746 Handle compression type
 				string comment = renameColumnsPtr->fComment;
 				int compressionType = compressionTypeIn;
 				if ( comment.length() > 0 )
@@ -1591,7 +1591,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 						ci->isAlter = false;
 						return rc;
 					}
-					
+
 					if (( compressionType > 0 ) && !(idbCompress.isCompressionAvail( compressionType )))
 					{
 						rc = 1;
@@ -1607,19 +1607,19 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 						ci->isAlter = false;
 						return rc;
 					}
-					
+
 					if ((compressionType ==0) && (useHdfs))
 					{
 						compressionType = 2;
 						string errmsg ("The column is created with infinidb compression type 2 under HDFS." );
 						push_warning(thd, MYSQL_ERROR::WARN_LEVEL_WARN, 9999, errmsg.c_str());
 					}
-				
+
 				}
-				
+
 				//Handle autoincrement
 				if ( comment.length() > 0 )
-				{					
+				{
 					try {
 #ifndef SKIP_AUTOI
 	autoIncre = parseAutoincrementColumnComment(comment, startValue);
@@ -1635,7 +1635,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 		return rc;
 	}
 #endif
-						
+
 					}
 					catch (runtime_error& ex)
 					{
@@ -1654,8 +1654,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 						CalpontSystemCatalog::TableName tableName;
 						tableName.schema = alterTable->fTableName->fSchema;
 						tableName.table = alterTable->fTableName->fName;
-						//CalpontSystemCatalog::TableInfo tblInfo = csc->tableInfo(tableName);	
-						
+						//CalpontSystemCatalog::TableInfo tblInfo = csc->tableInfo(tableName);
+
 						//@Bug 5444. rename column doen't need to check this.
 					/*	if (tblInfo.tablewithautoincr == 1)
 						{
@@ -1666,7 +1666,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 							ci->isAlter = false;
 							return rc;
 						} */
-						
+
 						if (!validateAutoincrementDatatype(renameColumnsPtr->fNewType->fType))
 						{
 							rc = 1;
@@ -1685,18 +1685,18 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 							ci->isAlter = false;
 							return rc;
 						}
-						
+
 					}
 				}
-		
+
 				if (autoIncre)
 					renameColumnsPtr->fNewType->fAutoincrement = "y";
 				else
 					renameColumnsPtr->fNewType->fAutoincrement = "n";
-				
+
 				renameColumnsPtr->fNewType->fNextvalue = startValue;
 				renameColumnsPtr->fNewType->fCompressiontype = compressionType;
-				
+
 				if (renameColumnsPtr->fConstraints.size() > 0)
 				{
 					for (uint32_t j=0; j < renameColumnsPtr->fConstraints.size(); j++)
@@ -1715,7 +1715,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 								thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, ex.what());
 								ci->alterTableState = cal_connection_info::NOT_ALTER;
 								ci->isAlter = false;
-								return rc;							
+								return rc;
 							}
 							catch (...)
 							{
@@ -1724,7 +1724,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 								thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Unknown exception caught when checking any existing null values in the column.");
 								ci->alterTableState = cal_connection_info::NOT_ALTER;
 								ci->isAlter = false;
-								return rc;	
+								return rc;
 							}
 							if (anyNullVal)
 							{
@@ -1733,7 +1733,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 								thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "The existing rows in this column has null value already.");
 								ci->alterTableState = cal_connection_info::NOT_ALTER;
 								ci->isAlter = false;
-								return rc;								
+								return rc;
 							}
 						}
 						else
@@ -1743,7 +1743,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 							thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_CONSTRAINTS)).c_str());
 							ci->alterTableState = cal_connection_info::NOT_ALTER;
 							ci->isAlter = false;
-							return rc;	
+							return rc;
 						}
 					}
 				}
@@ -1751,9 +1751,9 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 			else
 			{
 			}
-    	}
-    }
-    else
+		}
+	}
+	else
 	{
 	}
 	//@Bug 4387
@@ -1766,64 +1766,64 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 		thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Cannot execute the statement. DBRM is read only!");
 		ci->alterTableState = cal_connection_info::NOT_ALTER;
 		ci->isAlter = false;
-		return rc;	
+		return rc;
 	}
 
-    stmt.fSessionID = sessionID;
-    stmt.fSql = ddlStatement;
+	stmt.fSessionID = sessionID;
+	stmt.fSql = ddlStatement;
 	stmt.fOwner = schema;
 	stmt.fTableWithAutoi = isAnyAutoincreCol;
 	//cout << "Sending to DDLProc" << endl;
-    ByteStream bytestream;
-    bytestream << stmt.fSessionID;
-    stmt.serialize(bytestream);
-    MessageQueueClient mq("DDLProc");
-    ByteStream::byte b=0;
-    try
-    {
-      mq.write(bytestream);
-      bytestream = mq.read();
+	ByteStream bytestream;
+	bytestream << stmt.fSessionID;
+	stmt.serialize(bytestream);
+	MessageQueueClient mq("DDLProc");
+	ByteStream::byte b=0;
+	try
+	{
+	  mq.write(bytestream);
+	  bytestream = mq.read();
 	  if ( bytestream.length() == 0 )
 	  {
 		rc = 1;
-      	thd->main_da.can_overwrite_status = true;
+	  	thd->main_da.can_overwrite_status = true;
 
-      	thd->main_da.set_error_status(thd, HA_ERR_INTERNAL_ERROR, "Lost connection to DDLProc");	
+	  	thd->main_da.set_error_status(thd, HA_ERR_INTERNAL_ERROR, "Lost connection to DDLProc");
 		ci->alterTableState = cal_connection_info::NOT_ALTER;
 		ci->isAlter = false;
 	  }
 	  else
 	  {
-      	bytestream >> b;
-      	bytestream >> emsg;
-      	rc = b;
+	  	bytestream >> b;
+	  	bytestream >> emsg;
+	  	rc = b;
 	  }
-    }
-    catch (runtime_error&)
-    {
-      rc =1;
-      thd->main_da.can_overwrite_status = true;
+	}
+	catch (runtime_error&)
+	{
+	  rc =1;
+	  thd->main_da.can_overwrite_status = true;
 
 	  thd->main_da.set_error_status(thd, HA_ERR_INTERNAL_ERROR, "Lost connection to DDLProc");
 	  ci->alterTableState = cal_connection_info::NOT_ALTER;
 	  ci->isAlter = false;
-    }
-    catch (...)
-    {
-      rc = 1;
-      thd->main_da.can_overwrite_status = true;
+	}
+	catch (...)
+	{
+	  rc = 1;
+	  thd->main_da.can_overwrite_status = true;
 
 	  thd->main_da.set_error_status(thd, HA_ERR_INTERNAL_ERROR, "Unknown error caught");
 	  ci->alterTableState = cal_connection_info::NOT_ALTER;
 	  ci->isAlter = false;
-    }
+	}
 
-    if ((b != 0) && (b!=ddlpackageprocessor::DDLPackageProcessor::WARNING))
-    {
-      thd->main_da.can_overwrite_status = true;
+	if ((b != 0) && (b!=ddlpackageprocessor::DDLPackageProcessor::WARNING))
+	{
+	  thd->main_da.can_overwrite_status = true;
 
 	  thd->main_da.set_error_status(thd, HA_ERR_INTERNAL_ERROR, emsg.c_str());
-    }
+	}
 
 	if (b ==ddlpackageprocessor::DDLPackageProcessor::WARNING)
 	{
@@ -1831,7 +1831,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 		string errmsg ("Error occured during file deletion. Restart DMLProc or use command tool ddlcleanup to clean up. " );
 		push_warning(thd, MYSQL_ERROR::WARN_LEVEL_WARN, 9999, errmsg.c_str());
 	}
-    return rc;
+	return rc;
 
   }
   else
@@ -1885,16 +1885,16 @@ pair<string, string> parseTableName(const string& tn)
 int ha_calpont_impl_create_(const char *name, TABLE *table_arg, HA_CREATE_INFO *create_info, cal_connection_info& ci)
 {
 #ifdef INFINIDB_DEBUG
-    cout << "ha_calpont_impl_create_: " << name << endl;
+	cout << "ha_calpont_impl_create_: " << name << endl;
 #endif
-    THD *thd = current_thd;
+	THD *thd = current_thd;
 
-    string stmt = idb_mysql_query_str(thd);
-    stmt += ";";
-    algorithm::to_upper(stmt);	
+	string stmt = idb_mysql_query_str(thd);
+	stmt += ";";
+	algorithm::to_upper(stmt);
 
-    string db = table_arg->s->db.str;
-    string tbl = table_arg->s->table_name.str;
+	string db = table_arg->s->db.str;
+	string tbl = table_arg->s->table_name.str;
 	string tablecomment;
 	bool isAnyAutoincreCol = false;
 	std::string columnName("");
@@ -1904,18 +1904,17 @@ int ha_calpont_impl_create_(const char *name, TABLE *table_arg, HA_CREATE_INFO *
 		tablecomment = table_arg->s->comment.str;
 		try {
 #ifndef SKIP_AUTOI
-	isAnyAutoincreCol = parseAutoincrementTableComment(tablecomment, startValue, columnName);
+			isAnyAutoincreCol = parseAutoincrementTableComment(tablecomment, startValue, columnName);
 #else
-	algorithm::to_upper(tablecomment);
-	if ( tablecomment.find("AUTOINCREMENT") != string::npos )
-	{
-		int rc = 1;
-		thd->main_da.can_overwrite_status = true;
-		thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_CREATE_AUTOINCREMENT_NOT_SUPPORT)).c_str());
-		return rc;
-	}
+			algorithm::to_upper(tablecomment);
+			if ( tablecomment.find("AUTOINCREMENT") != string::npos )
+			{
+				int rc = 1;
+				thd->main_da.can_overwrite_status = true;
+				thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_CREATE_AUTOINCREMENT_NOT_SUPPORT)).c_str());
+				return rc;
+			}
 #endif
-			
 		}
 		catch (runtime_error& ex)
 		{
@@ -1931,69 +1930,68 @@ int ha_calpont_impl_create_(const char *name, TABLE *table_arg, HA_CREATE_INFO *
 	bool schemaSyncOnly = false;
 	bool isCreate = true;
 
-    // relate to bug 1793. Make sure this is not for a select statement because 
-    if (db == "calpontsys" && thd->infinidb_vtable.vtable_state == THD::INFINIDB_INIT
-    	  && tbl != "systable" 
-    	  && tbl != "syscolumn" && tbl != "sysindex"
-    	  && tbl != "sysconstraint" && tbl != "sysindexcol"
-    	  && tbl != "sysconstraintcol" )
-    {
-			thd->main_da.can_overwrite_status = true;
-			thd->main_da.set_error_status(thd, HA_ERR_INTERNAL_ERROR, "Can not create non-system Calpont tables in calpontsys database");
-			return 1;
-    }
+	// relate to bug 1793. Make sure this is not for a select statement because
+	if (db == "calpontsys" && thd->infinidb_vtable.vtable_state == THD::INFINIDB_INIT
+	    && tbl != "systable"
+	    && tbl != "syscolumn" && tbl != "sysindex"
+	    && tbl != "sysconstraint" && tbl != "sysindexcol"
+	    && tbl != "sysconstraintcol" )
+	{
+		thd->main_da.can_overwrite_status = true;
+		thd->main_da.set_error_status(thd, HA_ERR_INTERNAL_ERROR, "Can not create non-system Calpont tables in calpontsys database");
+		return 1;
+	}
 
-    regex pat("[[:space:]]*SCHEMA[[:space:]]+SYNC[[:space:]]+ONLY", regex_constants::extended);
-    if (regex_search(tablecomment, pat))
-    {
+	regex pat("[[:space:]]*SCHEMA[[:space:]]+SYNC[[:space:]]+ONLY", regex_constants::extended);
+	if (regex_search(tablecomment, pat))
+	{
 		schemaSyncOnly = true;
 		pat = createpatstr;
 		if (!regex_search(stmt, pat)) {
 			isCreate = false;
-		}
-	
-		if (isCreate)
-		{
+	}
+
+	if (isCreate)
+	{
 #ifdef INFINIDB_DEBUG
-			cout << "ha_calpont_impl_create_: SCHEMA SYNC ONLY found, returning" << endl;
+		cout << "ha_calpont_impl_create_: SCHEMA SYNC ONLY found, returning" << endl;
 #endif
-		  return 0;
+		return 0;
 		}
 		else if (thd->infinidb_vtable.vtable_state == THD::INFINIDB_ALTER_VTABLE) //check if it is select
 		{
 			return 0;
 		}
-    }
-    else
-    {
-    	if (db == "calpontsys")
-	    {
+	}
+	else
+	{
+		if (db == "calpontsys")
+		{
 				thd->main_da.can_overwrite_status = true;
 				thd->main_da.set_error_status(thd, HA_ERR_INTERNAL_ERROR, "Calpont system tables can only be created with 'SCHEMA SYNC ONLY'");
 				return 1;
-	    }
+		}
 		else if ( db == "infinidb_vtable") //@bug 3540. table created in infinidb_vtable schema could be dropped when select statement happen to have same tablename.
 		{
 			thd->main_da.can_overwrite_status = true;
 			thd->main_da.set_error_status(thd, HA_ERR_INTERNAL_ERROR, "Table creation is not allowed in infinidb_vtable schema.");
 			return 1;
 		}
-    }
-    
-    pat = alterpatstr;
-    if (regex_search(stmt, pat)) {
+	}
+
+	pat = alterpatstr;
+	if (regex_search(stmt, pat)) {
 		ci.isAlter = true;
-        ci.alterTableState = cal_connection_info::ALTER_FIRST_RENAME;
+		ci.alterTableState = cal_connection_info::ALTER_FIRST_RENAME;
 #ifdef INFINIDB_DEBUG
 		cout << "ha_calpont_impl_create_: now in state ALTER_FIRST_RENAME" << endl;
 #endif
 	}
 
-
-    string emsg;
+	string emsg;
 	stmt = idb_mysql_query_str(thd);
-    stmt += ";";
-    int rc = 0;
+	stmt += ";";
+	int rc = 0;
 
 	// Don't do the DDL (only for create table if this is SSO. Should only get here on ATAC w/SSO.
 	if ( schemaSyncOnly && isCreate)
@@ -2002,7 +2000,16 @@ int ha_calpont_impl_create_(const char *name, TABLE *table_arg, HA_CREATE_INFO *
 	//this is replcated DDL, treat it just like SSO
 	if (thd->slave_thread)
 		return rc;
-		
+
+	//@bug 5660. Error out REAL DDL/DML on slave node.
+	// When the statement gets here, it's NOT SSO or RESTRICT
+	if (ci.isSlaveNode)
+	{
+		string emsg = logging::IDBErrorInfo::instance()->errorMsg(ERR_DML_DDL_SLAVE);
+		setError(current_thd, HA_ERR_UNSUPPORTED, emsg);
+		return 1;
+	}
+
 	// @bug 3908. error out primary key for now.
 	if (table_arg->key_info && table_arg->key_info->name && string(table_arg->key_info->name) == "PRIMARY")
 	{
@@ -2016,7 +2023,7 @@ int ha_calpont_impl_create_(const char *name, TABLE *table_arg, HA_CREATE_INFO *
 	}
 
 	int compressiontype = thd->variables.infinidb_compression_type;
-	
+
 	if (compressiontype == 1) compressiontype = 2;
 	//string tablecomment;
 	if (table_arg->s->comment.length > 0 )
@@ -2033,8 +2040,8 @@ int ha_calpont_impl_create_(const char *name, TABLE *table_arg, HA_CREATE_INFO *
 		ci.alterTableState = cal_connection_info::NOT_ALTER;
 		ci.isAlter = false;
 		return rc;
-	}	
-	
+	}
+
 	//hdfs
 	if ((compressiontype ==0) && (useHdfs))
 	{
@@ -2042,9 +2049,9 @@ int ha_calpont_impl_create_(const char *name, TABLE *table_arg, HA_CREATE_INFO *
 		string errmsg ("The table is created with infinidb compression type 2 under HDFS." );
 		push_warning(thd, MYSQL_ERROR::WARN_LEVEL_WARN, 9999, errmsg.c_str());
 	}
-	
+
 	if (compressiontype == 1) compressiontype = 2;
-	
+
 	IDBCompressInterface idbCompress;
 	if ( ( compressiontype > 0 ) && !(idbCompress.isCompressionAvail( compressiontype )) )
 	{
@@ -2060,57 +2067,66 @@ int ha_calpont_impl_create_(const char *name, TABLE *table_arg, HA_CREATE_INFO *
 		ci.alterTableState = cal_connection_info::NOT_ALTER;
 		ci.isAlter = false;
 		return rc;
-	}	
-			
+	}
+
 	rc = ProcessDDLStatement(stmt, db, tbl, tid2sid(thd->thread_id), emsg, compressiontype, isAnyAutoincreCol, startValue, columnName);
-	
-    if (rc != 0) {
-      push_warning(thd, MYSQL_ERROR::WARN_LEVEL_NOTE, 9999, emsg.c_str());
-      //Bug 1705 reset the flag if error occurs
-      ci.alterTableState = cal_connection_info::NOT_ALTER;
+
+	if (rc != 0) {
+	  push_warning(thd, MYSQL_ERROR::WARN_LEVEL_NOTE, 9999, emsg.c_str());
+	  //Bug 1705 reset the flag if error occurs
+	  ci.alterTableState = cal_connection_info::NOT_ALTER;
 	  ci.isAlter = false;
 #ifdef INFINIDB_DEBUG
 		cout << "ha_calpont_impl_create_: ProcessDDL error, now in state NOT_ALTER" << endl;
 #endif
-    }
-    return rc;
+	}
+	return rc;
 }
 
 int ha_calpont_impl_delete_table_(const char *name, cal_connection_info& ci)
 {
 #ifdef INFINIDB_DEBUG
-		cout << "ha_calpont_impl_delete_table: " << name << endl;
+	cout << "ha_calpont_impl_delete_table: " << name << endl;
 #endif
-    THD *thd = current_thd;
-    std::string tbl(name);
-    std::string stmt(idb_mysql_query_str(thd));
-    algorithm::to_upper(stmt);
+	THD *thd = current_thd;
+	std::string tbl(name);
+	std::string stmt(idb_mysql_query_str(thd));
+	algorithm::to_upper(stmt);
 	// @bug 4158 allow table name with 'restrict' in it (but not by itself)
 	std::string::size_type fpos;
 	fpos = stmt.rfind(" RESTRICT");
 	if ((fpos != std::string::npos) && ((stmt.size() - fpos) == 9)) //last 9 chars of stmt are " RESTRICT"
-    {
-        return 0;
-    }
+	{
+		return 0;
+	}
 
 	//this is replcated DDL, treat it just like SSO
 	if (thd->slave_thread)
 		return 0;
-		
-    TABLE_LIST *first_table= (TABLE_LIST*) thd->lex->select_lex.table_list.first;
+
+	//@bug 5660. Error out REAL DDL/DML on slave node.
+	// When the statement gets here, it's NOT SSO or RESTRICT
+	if (ci.isSlaveNode)
+	{
+		string emsg = logging::IDBErrorInfo::instance()->errorMsg(ERR_DML_DDL_SLAVE);
+		setError(current_thd, HA_ERR_UNSUPPORTED, emsg);
+		return 1;
+	}
+
+	TABLE_LIST *first_table= (TABLE_LIST*) thd->lex->select_lex.table_list.first;
 		string db = first_table->table->s->db.str;
-    string emsg;
+	string emsg;
 	stmt = idb_mysql_query_str(thd);
-    stmt += ";";
-    int rc = ProcessDDLStatement(stmt, db, tbl, tid2sid(thd->thread_id), emsg);
-    if (rc != 0)
-      push_warning(thd, MYSQL_ERROR::WARN_LEVEL_NOTE, 9999, emsg.c_str());
-    return rc;
+	stmt += ";";
+	int rc = ProcessDDLStatement(stmt, db, tbl, tid2sid(thd->thread_id), emsg);
+	if (rc != 0)
+		push_warning(thd, MYSQL_ERROR::WARN_LEVEL_NOTE, 9999, emsg.c_str());
+	return rc;
 }
 
 int ha_calpont_impl_rename_table_(const char* from, const char* to, cal_connection_info& ci)
 {
-    THD *thd = current_thd;
+	THD *thd = current_thd;
 	string emsg;
 
 	ostringstream stmt1;
@@ -2121,15 +2137,23 @@ int ha_calpont_impl_rename_table_(const char* from, const char* to, cal_connecti
 	//this is replcated DDL, treat it just like SSO
 	if (thd->slave_thread)
 		return 0;
-		
+
+	//@bug 5660. Error out REAL DDL/DML on slave node.
+	// When the statement gets here, it's NOT SSO or RESTRICT
+	if (ci.isSlaveNode)
+	{
+		string emsg = logging::IDBErrorInfo::instance()->errorMsg(ERR_DML_DDL_SLAVE);
+		setError(current_thd, HA_ERR_UNSUPPORTED, emsg);
+		return 1;
+	}
+
 	fromPair = parseTableName(from);
 	toPair = parseTableName(to);
 
 	if (fromPair.first != toPair.first)
 	{
 		thd->main_da.can_overwrite_status = true;
-
-	 	thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Both tables must be in the same database to use RENAME TABLE");
+		thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Both tables must be in the same database to use RENAME TABLE");
 		return -1;
 	}
 
@@ -2142,8 +2166,8 @@ int ha_calpont_impl_rename_table_(const char* from, const char* to, cal_connecti
 	else if ( fromPair.first.length() !=0 )
 		db = fromPair.first;
 	else
-		db = toPair.first; 
-		
+		db = toPair.first;
+
 	int rc = ProcessDDLStatement(stmt, db, "", tid2sid(thd->thread_id), emsg);
 	if (rc != 0)
 		push_warning(thd, MYSQL_ERROR::WARN_LEVEL_ERROR, 9999, emsg.c_str());
@@ -2164,11 +2188,11 @@ long long calonlinealter(UDF_INIT* initid, UDF_ARGS* args,
 	string stmt(args->args[0], args->lengths[0]);
 
 	string emsg;
-    THD *thd = current_thd;
+	THD *thd = current_thd;
 	string db("");
 	if ( thd->db )
 		db = thd->db;
-		
+
 	int rc = ProcessDDLStatement(stmt, db, "", tid2sid(thd->thread_id), emsg);
 	if (rc != 0)
 		push_warning(thd, MYSQL_ERROR::WARN_LEVEL_ERROR, 9999, emsg.c_str());

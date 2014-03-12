@@ -450,7 +450,6 @@
 		<UMSecurityGroup>unassigned</UMSecurityGroup>
 		<UMVolumeSize>unassigned</UMVolumeSize>
 		<PMVolumeSize>unassigned</PMVolumeSize>
-		<UMAutoSync>n</UMAutoSync>
 		<AmazonAutoTagging>n</AmazonAutoTagging>
 		<AmazonElasticIPCount>0</AmazonElasticIPCount>
 		<AmazonElasticIPAddr1>unassigned</AmazonElasticIPAddr1>

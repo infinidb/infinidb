@@ -477,10 +477,10 @@ bool TestRunner::rdwrTest( IDBDataFile::Types filetype )
 
     	readbuf = touched[i];
 
-    	if( m_file->seek(-1, SEEK_CUR) )
+		if (m_file->seek(touched[i] * BLK_SIZE, SEEK_SET))
     	{
     		ostringstream errstr;
-    		errstr << "failed to seek -1";
+    		errstr << "failed to seek to " << touched[i] * BLK_SIZE;
     		logMsg( ERROR, errstr.str() );
     		return false;
     	}

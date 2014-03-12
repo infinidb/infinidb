@@ -453,8 +453,6 @@
 		<UMInstanceType>unassigned</UMInstanceType>
 		<UMSecurityGroup>unassigned</UMSecurityGroup>
 		<UMVolumeSize>unassigned</UMVolumeSize>
-		<UMAutoSync>n</UMAutoSync>
-		<UMSyncTime>10</UMSyncTime>
 		<PMInstanceType>unassigned</PMInstanceType>
 		<PMVolumeSize>unassigned</PMVolumeSize>
 		<AmazonAutoTagging>n</AmazonAutoTagging>

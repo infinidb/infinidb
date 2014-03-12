@@ -756,10 +756,11 @@ void buildPredicateItem(Item_func* ifp, gp_walk_info* gwip)
 		}
 		cf->pushFilter(new SimpleFilter(sop, gwip->scsp->clone(), lhs));
 		cf->functionName(gwip->funcName);
-		//debug
-		string fullname;
+
 		String str;
-		ifp->print(&str, QT_INFINIDB_NO_QUOTE);
+		// @bug5811. This filter string is for cross engine to use.
+		// Use real table name.
+		ifp->print(&str, QT_INFINIDB_DERIVED);
 		IDEBUG(cout << str.c_ptr() << endl);
 		if (str.c_ptr())
 			cf->data(str.c_ptr());
@@ -835,10 +836,10 @@ void buildPredicateItem(Item_func* ifp, gp_walk_info* gwip)
 			return;
 		}
 		cf->functionName(gwip->funcName);
-		//debug
-		string fullname;
 		String str;
-		ifp->print(&str, QT_INFINIDB_NO_QUOTE);
+		// @bug5811. This filter string is for cross engine to use.
+		// Use real table name.
+		ifp->print(&str, QT_INFINIDB_DERIVED);
 		IDEBUG(cout << str.c_ptr() << endl);
 		if (str.c_ptr())
 			cf->data(str.c_ptr());
@@ -5201,7 +5202,7 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex, SCSEP& csep, bool i
 					rc->orderPos(ordercol->counter-1);
 					// can not be optimized off if used in order by with counter.
 					// set with self derived table alias if it's derived table
-					gwi.returnedCols[ordercol->counter-1]->derivedTable(csep->derivedTbAlias());
+					gwi.returnedCols[ordercol->counter-1]->incRefCount();
 				}
 				else
 				{

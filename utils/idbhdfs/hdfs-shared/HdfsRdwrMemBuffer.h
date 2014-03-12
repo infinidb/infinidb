@@ -66,15 +66,18 @@ public:
     // Returns the total size of all currently allocated HdfsRdwrMemBuffers
     static size_t getTotalBuff() {return t_totalbuff;}
 
-    // This is used by HdfsRdwrFileBuffer constructor to dump our buffer 
+    // This is used by HdfsRdwrFileBuffer constructor to dump our buffer
     // contents to a file when we run out of memory
     const unsigned char* getbuffer() const {return m_buffer;}
     off64_t getSize() {return m_size;} // TODO: remove after debug
 protected:
-	/* virtual */ void close();
+	/* virtual */ int close();
 
 private:
 	void allocBuffer(size_t size);
+
+	// the size parm should be understood as 'needs at least size more bytes from the current position'
+	void checkRealloc(size_t size); 
 	void releaseBuffer();
 	int flushImpl();
 

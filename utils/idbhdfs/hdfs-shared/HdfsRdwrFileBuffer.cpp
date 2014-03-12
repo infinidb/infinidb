@@ -111,8 +111,23 @@ HdfsRdwrFileBuffer::HdfsRdwrFileBuffer(const char* fname, const char* mode, unsi
 		ssize_t bytesProcessed = 0;
 		while(bytesProcessed < (ssize_t) size)
 		{
-			ssize_t bytesRead = tryread.read( buffer.get(), BUFSIZE );
-			m_buffer->write( buffer.get(), bytesRead );
+			ssize_t tryToRead = ((ssize_t) BUFSIZE > size - bytesProcessed ? size - bytesProcessed : BUFSIZE);
+			ssize_t bytesRead = tryread.read( buffer.get(), tryToRead );
+			if (bytesRead < 0) {
+				ostringstream oss;
+				oss << "Unable to read file: " << input;
+				throw std::runtime_error(oss.str());
+			}
+			else if (bytesRead == 0)   // the size changed since it was checked
+				size = bytesProcessed;
+
+			ssize_t err = m_buffer->write( buffer.get(), bytesRead );
+			// write() will do the retrying
+			if (err < 0) {
+				ostringstream oss;
+				oss << "Unable to write file: " << bufname;
+				throw std::runtime_error(oss.str());
+			}
 			bytesProcessed += bytesRead;
 		}
 		m_buffer->seek(0,SEEK_SET);
@@ -131,7 +146,7 @@ HdfsRdwrFileBuffer::HdfsRdwrFileBuffer(HdfsRdwrMemBuffer* pMemBuffer) throw (std
 	m_buffer(NULL),
 	m_dirty(false)
 {
-	// we have been asked to replace memory buffered rw operations with file buffered 
+	// we have been asked to replace memory buffered rw operations with file buffered
     // operations on a file that currently exists in HDFS.
 
 	// Set up the local directory that we need to write to
@@ -155,14 +170,16 @@ HdfsRdwrFileBuffer::HdfsRdwrFileBuffer(HdfsRdwrMemBuffer* pMemBuffer) throw (std
     while (bytesToProcess > 0)
     {
         bytesProcessed = m_buffer->write( membuffer, bytesToProcess );
-        if (bytesProcessed < 0 && errno != EINTR)
+        if ((bytesProcessed < 0 && errno != EINTR) || bytesProcessed == 0)  // write() does a lot of retrying
         {
             ostringstream oss;
             oss << "MemBuffer overflow. Error while writing: " << pathDir << " " << strerror(errno);
             throw std::runtime_error(oss.str());
         }
-        membuffer += bytesProcessed;
-        bytesToProcess -= bytesProcessed;
+		if (bytesProcessed > 0) {
+	        membuffer += bytesProcessed;
+	        bytesToProcess -= bytesProcessed;
+		}
     }
 }
 
@@ -211,6 +228,7 @@ off64_t HdfsRdwrFileBuffer::tell()
 int HdfsRdwrFileBuffer::flush()
 {
 	int ret = 0;
+    int err;
 
 	if (m_dirty || m_new)
 	{
@@ -226,14 +244,24 @@ int HdfsRdwrFileBuffer::flush()
 		boost::scoped_array<unsigned char> buffer(new unsigned char[BUFSIZE]);
 
 		ssize_t bytesProcessed = 0;
-		assert( m_buffer->seek(0, SEEK_SET) == 0 );
-		assert( m_buffer->tell() == 0 );
+        err = m_buffer->seek(0, SEEK_SET);
+        if (err)
+            return err;
+
+        /* If this operation doesn't complete successfully, something bad happened.
+            Is there anything we can do about cleanup in this case?
+         */
 		while(bytesProcessed < (ssize_t) size)
 		{
 			ssize_t bytesToRead = min( BUFSIZE, size - bytesProcessed );
 			ssize_t bytesRead = m_buffer->read( buffer.get(), bytesToRead );
-			assert( bytesRead > 0 );
-			writer.write( buffer.get(), bytesRead );
+			if (bytesRead < 0)
+                return -1;
+			else if (bytesRead == 0)  // early EOF.  File must have changed size.
+                size = bytesProcessed;
+			ssize_t bytesWritten = writer.write( buffer.get(), bytesRead );
+			if (bytesWritten < bytesRead)   // a fatal error happened during the write
+                return -1;
 			bytesProcessed += bytesRead;
 		}
 
@@ -249,7 +277,7 @@ time_t HdfsRdwrFileBuffer::mtime()
 	return m_buffer->mtime();
 }
 
-void HdfsRdwrFileBuffer::close()
+int HdfsRdwrFileBuffer::close()
 {
 	// on close, flush data from tmp file back to hdfs
 	flush();
@@ -266,6 +294,7 @@ void HdfsRdwrFileBuffer::close()
 	// delete will close the BufferedFile
 	delete m_buffer;
 	m_buffer = 0;
+	return 0;
 }
 
 }

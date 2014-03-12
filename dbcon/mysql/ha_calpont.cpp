@@ -1067,7 +1067,7 @@ mysql_declare_plugin(calpont)
   "InfiniDB",
   "InfiniDB, Inc.",
   "InfiniDB storage engine",
-  PLUGIN_LICENSE_PROPRIETARY,
+  PLUGIN_LICENSE_GPL,
   calpont_init_func,                            /* Plugin Init */
   calpont_done_func,                            /* Plugin Deinit */
   0x0001 /* 0.1 */,

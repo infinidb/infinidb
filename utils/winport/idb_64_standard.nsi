@@ -58,7 +58,6 @@ Delete $INSTDIR\bin\databaseSizeReport.exe
 Delete $INSTDIR\bin\dumpcol.exe
 Delete $INSTDIR\bin\oid2file.exe
 Delete $INSTDIR\bin\dumpVss.exe
-Delete $INSTDIR\bin\calpontSupport.bat
 
 File ..\..\..\x64\EnterpriseRelease\clearShm.exe
 File ..\..\..\x64\EnterpriseRelease\colxml.exe
@@ -103,6 +102,7 @@ File ..\..\..\mysql\storage\archive\Release\ha_archive.dll
 File ..\..\..\mysql\storage\federated\Release\ha_federated.dll
 File ..\..\..\mysql\storage\innodb_plugin\Release\ha_innodb_plugin.dll
 File ..\..\..\mysql\libmysql\Release\libmysql.dll
+File ..\..\oamapps\calpontSupport\calpontSupport.bat
 
 File ..\..\..\x64\EnterpriseRelease\libcalmysql.dll
 File ..\..\..\x64\EnterpriseRelease\libconfigcpp.dll
@@ -315,6 +315,7 @@ Delete $INSTDIR\bin\ha_archive.dll
 Delete $INSTDIR\bin\ha_federated.dll
 Delete $INSTDIR\bin\ha_innodb_plugin.dll
 Delete $INSTDIR\bin\libmysql.dll
+Delete $INSTDIR\bin\calpontSupport.bat
 
 Delete $INSTDIR\etc\ErrorMessage.txt
 Delete $INSTDIR\etc\MessageFile.txt

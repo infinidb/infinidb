@@ -500,6 +500,11 @@ public:
 	int runMasterRep(std::string& mysqlpw, std::string& masterLogFile, std::string& masterLogPos);
 
     /**
+     *@brief run Master Distribution
+     */
+	int runMasterDist(std::string& password, std::string& slaveModule);
+
+    /**
      *@brief run Slave Replication script
      */
 	int runSlaveRep(std::string& mysqlpw, std::string& masterLogFile, std::string& masterLogPos);

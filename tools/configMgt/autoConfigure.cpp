@@ -112,8 +112,20 @@ int main(int argc, char *argv[])
 		exit(-1);
 	}
 
-	//read cloud parameter to see if this is a 3.0+ or pre-3.0 build being installed 
+	//read cloud parameter to see if OLD is a 3.0+ or pre-3.0 build being installed 
 	string cloud;
+	try {
+		cloud = sysConfigOld->getConfig(InstallSection, "Cloud");
+	}
+	catch(...)
+	{}
+
+	// build3 is for 3 and above 4
+	bool OLDbuild3 = false;
+	if ( !cloud.empty() )
+		OLDbuild3 = true;
+
+	//read cloud parameter to see if NEW is a 3.0+ or pre-3.0 build being installed 
 	try {
 		cloud = sysConfigNew->getConfig(InstallSection, "Cloud");
 	}
@@ -802,6 +814,20 @@ int main(int argc, char *argv[])
 		if ( moduleType == "pm" )
 			pmNumber = moduleCount;
 
+		//for 2.x to 3.x upgrade dbroot assignments
+		int dbrootNum = 0;
+		int systemDBRootCount = 0;
+		int dbrootCountPerModule = 0;
+		if ( moduleType == "pm" && OLDbuild3)
+		{
+			dbrootNum = 1;
+			systemDBRootCount = DBRootCount;
+			if ( pmNumber > 1 )
+				dbrootCountPerModule = DBRootCount / pmNumber;
+			if ( dbrootCountPerModule == 0 )
+				dbrootCountPerModule = 1;
+		}
+
 		//get Module Name IP addresses and Host Names
 		DeviceNetworkList::iterator listPT = sysModuleTypeConfig.moduletypeconfig[i].ModuleNetworkList.begin();
 		for( ; listPT != sysModuleTypeConfig.moduletypeconfig[i].ModuleNetworkList.end() ; listPT++)
@@ -992,15 +1018,13 @@ int main(int argc, char *argv[])
 
 			//set dbroot assigments
 			DeviceDBRootList::iterator pt3 = sysModuleTypeConfig.moduletypeconfig[i].ModuleDBRootList.begin();
-			for( ; pt3 != sysModuleTypeConfig.moduletypeconfig[i].ModuleDBRootList.end() ; pt3++)
+
+			//this will be empty if upgrading from 2.2
+			if ( sysModuleTypeConfig.moduletypeconfig[i].ModuleDBRootList.size() == 0 )
 			{
-				if ( (*pt3).dbrootConfigList.size() > 0 )
+				if ( !OLDbuild3 && moduleType == "pm")
 				{
-					int moduleID = (*pt3).DeviceID;
-
-					DBRootConfigList::iterator pt4 = (*pt3).dbrootConfigList.begin();
-
-					int dbrootCount = (*pt3).dbrootConfigList.size();
+					int dbrootCount = dbrootCountPerModule;
 					string moduleCountParm = "ModuleDBRootCount" + oam.itoa(moduleID) + "-" + oam.itoa(i+1);
 					try {
 						sysConfigNew->setConfig(ModuleSection, moduleCountParm, oam.itoa(dbrootCount));
@@ -1012,10 +1036,14 @@ int main(int argc, char *argv[])
 					}
 
 					int entry = 1;
-					for( ; pt4 != (*pt3).dbrootConfigList.end() ; pt4++, entry++)
+					for( ; entry < dbrootCountPerModule+1 ; entry++)
 					{
-						int dbrootid = *pt4;
-		
+						int dbrootid = dbrootNum;
+						if ( dbrootNum > systemDBRootCount )
+							dbrootid = 0;
+						else
+							dbrootNum++;
+
 						string moduleDBRootIDParm = "ModuleDBRootID" + oam.itoa(moduleID) + "-" + oam.itoa(entry) + "-" + oam.itoa(i+1);
 						try {
 							sysConfigNew->setConfig(ModuleSection, moduleDBRootIDParm, oam.itoa(dbrootid));
@@ -1028,7 +1056,46 @@ int main(int argc, char *argv[])
 					}
 				}
 			}
-
+			else
+			{
+				for( ; pt3 != sysModuleTypeConfig.moduletypeconfig[i].ModuleDBRootList.end() ; pt3++)
+				{
+					if ( (*pt3).dbrootConfigList.size() > 0 )
+					{
+						int moduleID = (*pt3).DeviceID;
+		
+						DBRootConfigList::iterator pt4 = (*pt3).dbrootConfigList.begin();
+		
+						int dbrootCount = (*pt3).dbrootConfigList.size();
+						string moduleCountParm = "ModuleDBRootCount" + oam.itoa(moduleID) + "-" + oam.itoa(i+1);
+						try {
+							sysConfigNew->setConfig(ModuleSection, moduleCountParm, oam.itoa(dbrootCount));
+						}
+						catch(...)
+						{
+							cout << "ERROR: Problem setting Host Name in the Calpont System Configuration file" << endl;
+							exit(-1);
+						}
+		
+						int entry = 1;
+						for( ; pt4 != (*pt3).dbrootConfigList.end() ; pt4++, entry++)
+						{
+							int dbrootid = *pt4;
+			
+							string moduleDBRootIDParm = "ModuleDBRootID" + oam.itoa(moduleID) + "-" + oam.itoa(entry) + "-" + oam.itoa(i+1);
+							try {
+								sysConfigNew->setConfig(ModuleSection, moduleDBRootIDParm, oam.itoa(dbrootid));
+							}
+							catch(...)
+							{
+								cout << "ERROR: Problem setting Host Name in the Calpont System Configuration file" << endl;
+								exit(-1);
+							}
+						}
+					}
+				}
+			}
+	
 			//assign any unassigned dbroots to pm1 on pre build3 upgrades
 			if (!build3) {
 				//get any unassigned DBRoots
@@ -1037,11 +1104,11 @@ int main(int argc, char *argv[])
 					oam.getUnassignedDbroot(undbrootlist);
 				}
 				catch(...) {}
-
+	
 				if ( !undbrootlist.empty() )
 				{
 					string dbrootCount;
-
+	
 					int entry = 1;
 					DBRootConfigList::iterator pt1 = undbrootlist.begin();
 					for( ; pt1 != undbrootlist.end() ; pt1++ )
@@ -1049,9 +1116,9 @@ int main(int argc, char *argv[])
 						//skip dbroot #1, already setup
 						if ( *pt1 == 1 )
 							continue;
-
+	
 						entry++;
-
+	
 						string moduleDBRootIDParm = "ModuleDBRootID1-" + oam.itoa(entry) + "-3";
 						try {
 							sysConfigNew->setConfig(ModuleSection, moduleDBRootIDParm, oam.itoa(*pt1));
@@ -1062,7 +1129,7 @@ int main(int argc, char *argv[])
 							exit(-1);
 						}
 					}
-
+	
 					string moduleCountParm = "ModuleDBRootCount1-3";
 					try {
 						sysConfigNew->setConfig(ModuleSection, moduleCountParm, oam.itoa(entry));
@@ -1073,11 +1140,13 @@ int main(int argc, char *argv[])
 						exit(-1);
 					}
 				}
+
 			}
 
 			if ( ( moduleType == "pm" && moduleDisableState == oam::ENABLEDSTATE ) ||
 				( IserverTypeInstall == oam::INSTALL_COMBINE_DM_UM_PM ) )
 				performancemodulelist.push_back(performancemodule);
+
 		} //end of module loop
 
 		sysConfigNew->write();
@@ -1261,8 +1330,6 @@ int main(int argc, char *argv[])
 		string UMSecurityGroup;
 		string UMVolumeSize;
 		string PMVolumeSize;
-		string UMAutoSync;
-		string UMSyncTime;
 		string AmazonAutoTagging;
 		string AmazonRegion;
 		string AmazonZone;
@@ -1279,8 +1346,6 @@ int main(int argc, char *argv[])
 			UMSecurityGroup = sysConfigOld->getConfig(InstallSection, "UMSecurityGroup");
 			UMVolumeSize = sysConfigOld->getConfig(InstallSection, "UMVolumeSize");
 			PMVolumeSize = sysConfigOld->getConfig(InstallSection, "PMVolumeSize");
-			UMAutoSync = sysConfigOld->getConfig(InstallSection, "UMAutoSync");
-			UMSyncTime = sysConfigOld->getConfig(InstallSection, "UMSyncTime");
 			AmazonAutoTagging = sysConfigOld->getConfig(InstallSection, "AmazonAutoTagging");
 			AmazonRegion = sysConfigOld->getConfig(InstallSection, "AmazonRegion");
 			AmazonZone = sysConfigOld->getConfig(InstallSection, "AmazonZone");
@@ -1289,6 +1354,10 @@ int main(int argc, char *argv[])
 		}
 		catch(...)
 		{ }
+
+		//this is for 2.2 to 4.x builds
+		if ( UMStorageType.empty() || UMStorageType == "" )
+			UMStorageType = "internal";
 
 		// 3.x upgrade
 		if (build3 && !build40 && !build401)
@@ -1340,8 +1409,6 @@ int main(int argc, char *argv[])
 			sysConfigNew->setConfig(InstallSection, "UMSecurityGroup", UMSecurityGroup);
 			sysConfigNew->setConfig(InstallSection, "UMVolumeSize", UMVolumeSize);
 			sysConfigNew->setConfig(InstallSection, "PMVolumeSize", PMVolumeSize);
-			sysConfigNew->setConfig(InstallSection, "UMAutoSync", UMAutoSync);
-			sysConfigNew->setConfig(InstallSection, "UMSyncTime", UMSyncTime);
 			sysConfigNew->setConfig(InstallSection, "AmazonAutoTagging", AmazonAutoTagging);
 			sysConfigNew->setConfig(InstallSection, "AmazonRegion", AmazonRegion);
 			sysConfigNew->setConfig(InstallSection, "AmazonZone", AmazonZone);

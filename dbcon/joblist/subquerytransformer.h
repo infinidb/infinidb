@@ -57,9 +57,18 @@ public:
     /** @brief SubQueryTransformer constructor
      *  @param jobInfo
      *  @param errorInfo
-     *  @param alias
+     *  @param view
      */
     SubQueryTransformer(JobInfo*, SErrorInfo&, const std::string&);
+
+    /** @brief SubQueryTransformer constructor
+     *  @param jobInfo
+     *  @param errorInfo
+     *  @param alias
+     *  @param view
+     */
+    SubQueryTransformer(
+		JobInfo*, SErrorInfo&, const std::string&, const std::string&);
 
     /** @brief SubQueryTransformer destructor
      */

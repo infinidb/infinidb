@@ -37,7 +37,7 @@ public:
 	virtual ~VirtualTable() {}
 
 	virtual void initialize();
-	void addColumn(const execplan::SRCP& column, const std::string& view);
+	void addColumn(const execplan::SRCP& column);
 
 	void tableOid(const execplan::CalpontSystemCatalog::OID& oid) { fTableOid = oid; }
 	const execplan::CalpontSystemCatalog::OID& tableOid() const   { return fTableOid; }
@@ -47,6 +47,9 @@ public:
 
 	void alias(const std::string& s) { fAlias = s; }
 	const std::string& alias() const { return fAlias; }
+
+	void view(const std::string& v) { fView = v; }
+	const std::string& view() const { return fView; }
 
 	const std::vector<execplan::SSC>& columns() const { return fColumns; }
 	const execplan::CalpontSystemCatalog::OID& columnOid(uint32_t i) const;
@@ -64,11 +67,12 @@ public:
 protected:
 	execplan::CalpontSystemCatalog::OID fTableOid;
 	std::string                         fName;
-	std::string							fAlias;
+	std::string                         fAlias;
+	std::string                         fView;
 
 	std::vector<execplan::SSC>          fColumns;
 	std::vector<execplan::CalpontSystemCatalog::ColType> fColumnTypes;
-	std::map<UniqId, uint32_t>              fColumnMap;
+	std::map<UniqId, uint32_t>          fColumnMap;
 
 	bool                                fVarBinOK;
 };

@@ -683,43 +683,6 @@ int main(int argc, char *argv[])
 				}
 
 				cout << endl;
-				//get UM auto sync info
-				while(true) {
-					prompt = "We recommend enabling User Module Auto Syncing if using multiple User Modules, you want to enable? [y,n] (y) > ";
-					pcommand = readline(prompt.c_str());
-					if (pcommand) {
-						if (strlen(pcommand) > 0) UserModuleAutoSync = pcommand;
-						free(pcommand);
-						pcommand = 0;
-					}
-			
-					if ( UserModuleAutoSync == "n" ) {
-						break;
-					}
-			
-					if ( UserModuleAutoSync == "y") {
-						while (true)
-						{
-							prompt = "Default sync time is 10 minutes, change if you like [1,1440] (10) > ";
-							pcommand = readline(prompt.c_str());
-							if (pcommand) {
-								if (strlen(pcommand) > 0) UserModuleSyncTime = atoi(pcommand);
-								free(pcommand);
-								pcommand = 0;
-							}
-				
-							if ( UserModuleSyncTime < 1 || UserModuleSyncTime > 1441 ) {
-								cout << endl << "ERROR: Invalid Sync Time '" + oam.itoa(UserModuleSyncTime) + "', please re-enter" << endl << endl;
-								continue;
-							}
-							break;
-						}
-			
-						break;
-					}
-			
-					cout << "Invalid Entry, please enter 'y' for yes or 'n' for no" << endl;
-				}
 
 				cout << endl;
 				//get UMEBS volume info
@@ -1473,26 +1436,6 @@ int main(int argc, char *argv[])
 	// set root password
 	try {
 		sysConfig->setConfig(InstallSection, "rpw", rootPassword);
-	}
-	catch(...)
-	{}
-
-	// set rsync paramaters
-	if ( UserModuleAutoSync == "y" || UserModuleAutoSync == "n" ) {
-		if ( UserModuleSyncTime < 1 ) {
-			cout << "Error: UserModuleSyncTime is invalid (enter a value greater than 0), exiting" << endl;
-			exit (1);
-		}
-	}
-	else
-	{
-		cout << "Error: UserModuleAutoSync is invalid (enter 'y' or 'n'), exiting" << endl;
-		exit (1);
-	}
-
-	try {
-		sysConfig->setConfig(InstallSection, "UMAutoSync", UserModuleAutoSync);
-		sysConfig->setConfig(InstallSection, "UMSyncTime", oam.itoa(UserModuleSyncTime));
 	}
 	catch(...)
 	{}

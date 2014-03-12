@@ -28,7 +28,7 @@ extern void dbrmDirCheck();
 extern void mysqlSetup();
 extern int sendMsgProcMon( std::string module, ByteStream msg, int requestID, int timeout );
 extern int sendUpgradeRequest(int IserverTypeInstall, bool pmwithum);
-extern int sendReplicationRequest(int IserverTypeInstall);
+extern int sendReplicationRequest(int IserverTypeInstall, std::string password);
 extern void checkFilesPerPartion(int DBRootCount, Config* sysConfig);
 }
 

@@ -226,8 +226,7 @@ fi
 hadoop=`which hadoop 2>/dev/null`
 if [ -z $hadoop ]; then 
         exit 0
-fi
-if [ $hadoop = "/usr/bin/hadoop" ]; then
+else
 	if [ -f $installdir/bin/setenv-hdfs-12 ]; then
 			cp $installdir/bin/setenv-hdfs-12 /root/.
 	fi
@@ -235,13 +234,26 @@ if [ $hadoop = "/usr/bin/hadoop" ]; then
 			cp $installdir/bin/setenv-hdfs-20 /root/.
 	fi
 
-	export JAVA_HOME=/usr/java/jdk1.6.0_31
-	export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/java/jdk1.6.0_31/jre/lib/amd64/server
+	if [ -d /usr/java/jdk1.6.0_31 ]; then
+		export JAVA_HOME=/usr/java/jdk1.6.0_31
+		export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/java/jdk1.6.0_31/jre/lib/amd64/server
+		. /root/setenv-hdfs-20
+		$installdir/bin/hdfsCheck $installdir/lib/hdfs-20.so > /tmp/hdfs-20-test.log 2>&1
+		if [ $? -eq 0 ]; then
+			cat <<EOD
+If you are intending to install InfiniDB over Hadoop, the next steps are:
 
-	. /root/setenv-hdfs-20
-	$installdir/bin/hdfsCheck $installdir/lib/hdfs-20.so >/dev/null 2>&1
-	if [ $? -ne 0 ]; then
-		cat <<EOD
+export JAVA_HOME=/usr/java/jdk1.6.0_31
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/java/jdk1.6.0_31/jre/lib/amd64/server
+. /root/setenv-hdfs-20
+$INFINIDB_INSTALL_DIR/bin/postConfigure
+
+EOD
+		else
+			. /root/setenv-hdfs-12
+			$installdir/bin/hdfsCheck $installdir/lib/hdfs-12.so > /tmp/hdfs-12-test.log 2>&1
+			if [ $? -eq 0 ]; then
+cat <<EOD
 If you are intending to install InfiniDB over Hadoop, the next steps are:
 
 export JAVA_HOME=/usr/java/jdk1.6.0_31
@@ -250,15 +262,18 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/java/jdk1.6.0_31/jre/lib/amd64/serv
 $INFINIDB_INSTALL_DIR/bin/postConfigure
 
 EOD
+			else
+cat <<EOD
+If you are intending to install InfiniDB over Hadoop, the Hadoop sanity check did not pass.  
+Most likely there is an environment setup conflict.
+Please Contact InfiniDB Customer Support.
+EOD
+			fi
+		fi
 	else
-		cat <<EOD
-If you are intending to install InfiniDB over Hadoop, the next steps are:
-
-export JAVA_HOME=/usr/java/jdk1.6.0_31
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/java/jdk1.6.0_31/jre/lib/amd64/server
-. /root/setenv-hdfs-20
-$INFINIDB_INSTALL_DIR/bin/postConfigure
-
+cat <<EOD
+If you are intending to install InfiniDB over Hadoop, the required jdk was not found at '/usr/java/jdk1.6.0_31'.
+Please install the required version of Java and try again.
 EOD
 	fi
 fi

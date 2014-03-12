@@ -7540,8 +7540,26 @@ void printSystemStatus()
 			}
 			catch(...) {}
 	
-			if ( PrimaryUMModuleName != oam::UnassignedName )
-				cout << "Primary Front-End MySQL Module is '" << PrimaryUMModuleName << "'" << endl;
+			if ( serverInstallType != oam::INSTALL_COMBINE_DM_UM_PM )
+			{
+				ModuleTypeConfig moduletypeconfig;
+				try{
+					oam.getSystemConfig("um", moduletypeconfig);
+				}
+				catch(...)
+				{}
+			
+				if ( moduletypeconfig.ModuleCount > 1 )
+				{
+					if ( PrimaryUMModuleName != oam::UnassignedName )
+						cout << "Primary Front-End MySQL Module is '" << PrimaryUMModuleName << "'" << endl;
+				}
+			}
+			else
+			{
+				if ( PrimaryUMModuleName != oam::UnassignedName )
+					cout << "Primary Front-End MySQL Module is '" << PrimaryUMModuleName << "'" << endl;
+			}
 		}
 
 		//display PMwithUM feature, if enabled

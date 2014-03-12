@@ -30,6 +30,7 @@
 #include <cmath>
 #include <ctype.h>
 #include <cfloat>
+#include "we_bulkload.h"
 #include "we_bulkloadbuffer.h"
 #include "we_brm.h"
 #include "we_convertor.h"
@@ -1373,6 +1374,7 @@ int  BulkLoadBuffer::parseCol(ColumnInfo &columnInfo)
                     "; OID-" << columnInfo.column.mapOid <<
                     "; " << ec.errorString(rc);
                 fLog->logMsg( oss.str(), rc, MSGLVL_ERROR );
+				BulkLoad::addErrorMsg2BrmUpdater(fTableName, oss);
                 return rc;
             }
         }

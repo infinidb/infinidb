@@ -532,7 +532,7 @@ public:
 
 	/** @brief Set MySQL Replication
 		*/
-	int setMySQLReplication(oam::DeviceNetworkList devicenetworklist, std::string masterModule = oam::UnassignedName, bool failover = false);
+	int setMySQLReplication(oam::DeviceNetworkList devicenetworklist, std::string masterModule = oam::UnassignedName, bool failover = false, bool distributeDB = false, std::string password = oam::UnassignedName);
 
 
 private:

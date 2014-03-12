@@ -315,9 +315,6 @@ struct JobInfo
 	// step to process orderby, limit and fill in constants
 	SJSTEP annexStep;
 
-	// view ?? workaround
-	std::string subView;
-
 	// @bug3475, aggregate constant column <position, aggregate column>
 	std::map<uint64_t, execplan::SRCP> constAggregate;
 	int64_t cntStarPos;  // position of count(*)

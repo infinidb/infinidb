@@ -64,7 +64,7 @@ public:
 	/* virtual */ time_t mtime();
 
 protected:
-	/* virtual */ void close();
+	/* virtual */ int close();
 
 private:
 	BufferedFile* m_buffer;

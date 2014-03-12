@@ -59,7 +59,6 @@ File ..\..\..\x64\Debug\databaseSizeReport.exe
 File ..\..\..\x64\Debug\dumpcol.exe
 File ..\..\..\x64\Debug\oid2file.exe
 File ..\..\..\x64\Debug\dumpVss.exe
-File ..\..\..\infinidb-ent\tools\calpontSupport\calpontSupport.bat
 
 # Standard Release Files
 File ..\..\..\x64\Debug\clearShm.exe
@@ -116,6 +115,7 @@ File ..\..\..\x64\Debug\libudfsdk.dll
 File ..\..\..\x64\Debug\libudf_mysql.dll
 File ..\..\..\libxml2-2.7.8\libxml2\win32\Debug\libxml2.dll
 File ..\..\..\libiconv-1.14\libiconv\Debug\libiconv.dll
+File ..\..\oamapps\calpontSupport\calpontSupport.bat
 
 File ..\..\..\vcredist_x64.exe
 
@@ -263,7 +263,6 @@ Delete $INSTDIR\bin\databaseSizeReport.exe
 Delete $INSTDIR\bin\dumpcol.exe
 Delete $INSTDIR\bin\oid2file.exe
 Delete $INSTDIR\bin\dumpVss.exe
-Delete $INSTDIR\bin\calpontSupport.bat
 
 # Standard Release Files
 Delete $INSTDIR\bin\bootstrap.exe
@@ -325,6 +324,7 @@ Delete $INSTDIR\bin\ha_archive.dll
 Delete $INSTDIR\bin\ha_federated.dll
 Delete $INSTDIR\bin\ha_innodb_plugin.dll
 Delete $INSTDIR\bin\libmysql.dll
+Delete $INSTDIR\bin\calpontSupport.bat
 
 Delete $INSTDIR\etc\ErrorMessage.txt
 Delete $INSTDIR\etc\MessageFile.txt

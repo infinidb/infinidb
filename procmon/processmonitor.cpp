@@ -1752,7 +1752,7 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 				ackMsg <<  masterLogPos;
 				mq.write(ackMsg);
 	
-				log.writeLog(__LINE__, "MASTERREP: ACK back to ProcMgr return status = " + oam.itoa((int) ret));
+				log.writeLog(__LINE__, "MASTERREP: Error in changeMyCnf - ACK back to ProcMgr return status = " + oam.itoa((int) ret));
 				break;
 			}
 
@@ -1792,7 +1792,7 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 				ackMsg << (ByteStream::byte) ret;
 				mq.write(ackMsg);
 	
-				log.writeLog(__LINE__, "SLAVEREP: ACK back to ProcMgr return status = " + oam.itoa((int) ret));
+				log.writeLog(__LINE__, "SLAVEREP: Error in changeMyCnf - ACK back to ProcMgr return status = " + oam.itoa((int) ret));
 				break;
 			}
 
@@ -1805,6 +1805,28 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 			mq.write(ackMsg);
 
 			log.writeLog(__LINE__, "SLAVEREP: ACK back to ProcMgr return status = " + oam.itoa((int) ret));
+
+			break;
+		}
+
+		case MASTERDIST:
+		{
+			log.writeLog(__LINE__,  "MSG RECEIVED: Run Master DB Distribute command ");
+
+			string password;
+			msg >> password;
+			string module;
+			msg >> module;
+
+			// run Master Dist 
+			int ret = runMasterDist(password, module);
+
+			ackMsg << (ByteStream::byte) ACK;
+			ackMsg << (ByteStream::byte) MASTERDIST;
+			ackMsg << (ByteStream::byte) ret;
+			mq.write(ackMsg);
+
+			log.writeLog(__LINE__, "MASTERDIST: Error in runMasterRep - ACK back to ProcMgr return status = " + oam.itoa((int) ret));
 
 			break;
 		}
@@ -4584,7 +4606,6 @@ int ProcessMonitor::changeMyCnf(std::string type)
 	{
 		//get slave id based on ExeMgrx setup
 		string slaveID = "0";
-		string hostIPAdd = oam::UnassignedName;
 		string slaveModuleName = config.moduleName();
 		for ( int id = 1 ; ; id++ )
 		{
@@ -4624,8 +4645,6 @@ int ProcessMonitor::changeMyCnf(std::string type)
 							catch (...) {}
 						}
 					}
-
-					hostIPAdd = sysConfig->getConfig(Section, "IPAddr");
 					break;
 				}
 			}
@@ -4638,11 +4657,21 @@ int ProcessMonitor::changeMyCnf(std::string type)
 			return oam::API_FAILURE;
 		}
 
-		if ( hostIPAdd == oam::UnassignedName )
+		// get local host name
+		string HOSTNAME = "localhost";
+		try
 		{
-			log.writeLog(__LINE__, "changeMyCnf: ExeMgr for IpAddress doesn't exist", LOG_TYPE_ERROR);
-			return oam::API_FAILURE;
+			ModuleConfig moduleconfig;
+			oam.getSystemConfig(config.moduleName(), moduleconfig);
+			HostConfigList::iterator pt1 = moduleconfig.hostConfigList.begin();
+			HOSTNAME = (*pt1).HostName;
 		}
+		catch(...)
+		{}
+
+		char* p= getenv("HOSTNAME");
+		if (p && *p)
+			HOSTNAME = p;
 
 		// set slave replication entries
 		vector <string> lines;
@@ -4658,7 +4687,7 @@ int ProcessMonitor::changeMyCnf(std::string type)
 
 			pos = buf.find("#relay-log=HOSTNAME-relay-bin",0);
 			if ( pos != string::npos ) {
-				buf = "relay-log=" + hostIPAdd + "-relay-bin";
+				buf = "relay-log=" + HOSTNAME + "-relay-bin";
 			}
 
 			// set local query flag if on pm
@@ -4738,18 +4767,20 @@ int ProcessMonitor::runMasterRep(std::string& mysqlpw, std::string& masterLogFil
 		DeviceNetworkList::iterator pt = systemModuleTypeConfig.moduletypeconfig[i].ModuleNetworkList.begin();
 		for( ; pt != systemModuleTypeConfig.moduletypeconfig[i].ModuleNetworkList.end() ; pt++)
 		{
+			string moduleName =  (*pt).DeviceName;
+
 			HostConfigList::iterator pt1 = (*pt).hostConfigList.begin();
 			for ( ; pt1 != (*pt).hostConfigList.end() ; pt1++ )
 			{
 				string ipAddr = (*pt1).IPAddr;
 
-				string logFile = "/tmp/master-rep-infinidb-" + ipAddr + ".log";
+				string logFile = "/tmp/master-rep-infinidb-" + moduleName + ".log";
 				string cmd = startup::StartUp::installDir() + "/bin/master-rep-infinidb.sh --password=" +
 					mysqlpw + " --installdir=" + startup::StartUp::installDir() + " --hostIP=" + ipAddr + "  > " + logFile + " 2>&1";
 				system(cmd.c_str());
 		
 				if (oam.checkLogStatus(logFile, "OK"))
-					log.writeLog(__LINE__, "master-rep-infinidb.sh: Successful return for node " + ipAddr, LOG_TYPE_DEBUG);
+					log.writeLog(__LINE__, "master-rep-infinidb.sh: Successful return for node " + moduleName, LOG_TYPE_DEBUG);
 				else 
 				{
 					if (oam.checkLogStatus(logFile, "ERROR 1045") ) {
@@ -4837,7 +4868,7 @@ int ProcessMonitor::runSlaveRep(std::string& mysqlpw, std::string& masterLogFile
 	string PrimaryUMModuleName;
 	oam.getSystemConfig("PrimaryUMModuleName", PrimaryUMModuleName);
 
-	string masterIPAddress;;
+	string masterIPAddress;
 	try
 	{
 		ModuleConfig moduleconfig;
@@ -4869,6 +4900,92 @@ int ProcessMonitor::runSlaveRep(std::string& mysqlpw, std::string& masterLogFile
 
 	return oam::API_FAILURE;
 }
+
+/******************************************************************************************
+* @brief	runMasterDist
+*
+* purpose:	run Master DB Distribution
+*
+******************************************************************************************/
+int ProcessMonitor::runMasterDist(std::string& password, std::string& slaveModule)
+{
+	Oam oam;
+
+	log.writeLog(__LINE__, "runMasterDist function called", LOG_TYPE_DEBUG);
+
+	SystemModuleTypeConfig systemModuleTypeConfig;
+	try {
+		oam.getSystemConfig(systemModuleTypeConfig);
+	}
+	catch (exception& ex)
+	{
+		string error = ex.what();
+		log.writeLog(__LINE__, "EXCEPTION ERROR on getSystemConfig: " + error, LOG_TYPE_ERROR);
+	}
+	catch(...)
+	{
+		log.writeLog(__LINE__, "EXCEPTION ERROR on getSystemConfig: Caught unknown exception!", LOG_TYPE_ERROR);
+	}
+
+	if ( slaveModule == "all" )
+	{
+		// Distrubuted MySQL Front-end DB to Slave Modules
+		for ( unsigned int i = 0 ; i < systemModuleTypeConfig.moduletypeconfig.size(); i++)
+		{
+			int moduleCount = systemModuleTypeConfig.moduletypeconfig[i].ModuleCount;
+			if( moduleCount == 0)
+				continue;
+	
+			string moduleType = systemModuleTypeConfig.moduletypeconfig[i].ModuleType;
+	
+			if ( (PMwithUM == "n") && (moduleType == "pm") && ( config.ServerInstallType() != oam::INSTALL_COMBINE_DM_UM_PM) )
+				continue;
+	
+			DeviceNetworkList::iterator pt = systemModuleTypeConfig.moduletypeconfig[i].ModuleNetworkList.begin();
+			for( ; pt != systemModuleTypeConfig.moduletypeconfig[i].ModuleNetworkList.end() ; pt++)
+			{
+				string moduleName =  (*pt).DeviceName;
+	
+				//skip if local master mode
+				if ( moduleName == config.moduleName() )
+					continue;
+	
+				HostConfigList::iterator pt1 = (*pt).hostConfigList.begin();
+				for ( ; pt1 != (*pt).hostConfigList.end() ; pt1++ )
+				{
+					string ipAddr = (*pt1).IPAddr;
+	
+					string cmd = startup::StartUp::installDir() + "/bin/rsync.sh " + ipAddr + " " + password + " 1 > /tmp/master-dist_" + moduleName + ".log";
+					int ret = system(cmd.c_str());
+				
+					if ( WEXITSTATUS(ret) == 0 )
+						log.writeLog(__LINE__, "runMasterDist: Success rsync to module: " + moduleName, LOG_TYPE_DEBUG);
+					else
+						log.writeLog(__LINE__, "runMasterDist: Failure rsync to module: " + moduleName, LOG_TYPE_ERROR);
+				}
+			}
+		}
+	}
+	else
+	{
+		// get slave IP address
+		ModuleConfig moduleconfig;
+		oam.getSystemConfig(slaveModule, moduleconfig);
+		HostConfigList::iterator pt1 = moduleconfig.hostConfigList.begin();
+		string ipAddr = (*pt1).IPAddr;
+
+		string cmd = startup::StartUp::installDir() + "/bin/rsync.sh " + ipAddr + " " + password + " 1 > /tmp/master-dist_" + slaveModule + ".log";
+		int ret = system(cmd.c_str());
+	
+		if ( WEXITSTATUS(ret) == 0 )
+			log.writeLog(__LINE__, "runMasterDist: Success rsync to module: " + slaveModule, LOG_TYPE_DEBUG);
+		else
+			log.writeLog(__LINE__, "runMasterDist: Failure rsync to module: " + slaveModule, LOG_TYPE_ERROR);
+	}
+
+	return oam::API_SUCCESS;
+}
+
 
 /******************************************************************************************
 * @brief	amazonIPCheck

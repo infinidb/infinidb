@@ -499,8 +499,8 @@ const SRCP doSelectSubquery(CalpontExecutionPlan* ep, SRCP& sc, JobInfo& jobInfo
 	CalpontSelectExecutionPlan* csep = dynamic_cast<CalpontSelectExecutionPlan*>(ep);
 	SRCP rc;
 	SErrorInfo errorInfo(jobInfo.errorInfo);
-	jobInfo.subView = dynamic_cast<SimpleColumn*>(sc.get())->viewName();
-	SubQueryTransformer transformer(&jobInfo, errorInfo);
+	string subView = dynamic_cast<SimpleColumn*>(sc.get())->viewName();
+	SubQueryTransformer transformer(&jobInfo, errorInfo, subView);
 	transformer.setVarbinaryOK();
 	SJSTEP subQueryStep = transformer.makeSubQueryStep(csep);
 	if (transformer.correlatedSteps().size() > 0)
@@ -694,8 +694,7 @@ int doFromSubquery(CalpontExecutionPlan* ep, const string& alias, const string& 
 {
 	CalpontSelectExecutionPlan* csep = dynamic_cast<CalpontSelectExecutionPlan*>(ep);
 	SErrorInfo errorInfo(jobInfo.errorInfo);
-	jobInfo.subView = view;
-	SubQueryTransformer transformer(&jobInfo, errorInfo, alias);
+	SubQueryTransformer transformer(&jobInfo, errorInfo, alias, view);
 	transformer.setVarbinaryOK();
 	SJSTEP subQueryStep = transformer.makeSubQueryStep(csep, true);
 	subQueryStep->view(view);
@@ -755,7 +754,7 @@ void addOrderByAndLimit(CalpontSelectExecutionPlan* csep, JobInfo& jobInfo)
 					sc->oid((tblOid+1) + sc->colPosition());
 				}
 				oid = sc->oid();
-				ct = jobInfo.vtableColTypes[UniqId(oid, alias, schema, view)];
+				ct = jobInfo.vtableColTypes[UniqId(oid, alias, "", "")];
 			}
 
 			tupleKey = getTupleKey(jobInfo, sc);

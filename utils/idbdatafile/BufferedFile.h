@@ -52,7 +52,7 @@ public:
 	/* virtual */ time_t mtime();
 
 protected:
-	/* virtual */ void close();
+	/* virtual */ int close();
 
 private:
 	void	applyOptions( unsigned opts );

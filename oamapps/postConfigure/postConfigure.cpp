@@ -3438,11 +3438,11 @@ int main(int argc, char *argv[])
 			( mysqlrep && umNumber > 1 ) ||
 			( mysqlrep && pmNumber > 1 && IserverTypeInstall == oam::INSTALL_COMBINE_DM_UM_PM ) ) 
 		{
-			cout << endl << "Run MySQL Replication.. ";
+			cout << endl << "Run MySQL Replication Setup.. ";
 			cout.flush();
 
 			//send message to procmon's to run upgrade script
-			int status = sendReplicationRequest(IserverTypeInstall);
+			int status = sendReplicationRequest(IserverTypeInstall, password);
 
 			if ( status != 0 ) {
 				cout << endl << " InfiniDB Install Failed" << endl << endl;

@@ -332,6 +332,7 @@ void TupleHashJoinStep::hjRunner()
 	fQtc.postStepTele(sts);
 
 	idbassert(joinTypes.size() == smallDLs.size());
+	idbassert(joinTypes.size() == joiners.size());
 
 	/* Start the small-side runners */
 	rgData.reset(new vector<RGData>[smallDLs.size()]);

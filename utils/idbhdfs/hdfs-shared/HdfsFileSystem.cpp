@@ -132,12 +132,14 @@ int HdfsFileSystem::listDirectory(const char* pathname, std::list<std::string>& 
 
 	int numEntries;
 	hdfsFileInfo* fileinfo;
-	if( !exists( pathname ) )
+	if( !exists( pathname ) ) {
+		errno = ENOENT;
 		return -1;
+	}
 
 	// hdfs not happy if you call list directory on a path that does not exist
 	fileinfo = hdfsListDirectory(m_fs,pathname, &numEntries);
-	for( int i = 0; i < numEntries; ++i )
+	for( int i = 0; i < numEntries && fileinfo; ++i )
 	{
 		// hdfs returns a fully specified path name but we want to
 		// only return paths relative to the directory passed in.

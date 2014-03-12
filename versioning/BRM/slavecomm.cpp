@@ -1929,6 +1929,8 @@ int SlaveComm::replayJournal(string prefix)
 			cout << "Error opening journal file " << fName << endl;
 			return -1;
 		}
+		if (journalf->size() == 0)  // empty file, nothing to replay
+			return 0;
 
 		ssize_t readIn = 0;
 		do {

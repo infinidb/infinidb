@@ -5104,7 +5104,7 @@ int ProcessManager::addModule(oam::DeviceNetworkList devicenetworklist, std::str
 
 	//add MySQL Replication slave
 	log.writeLog(__LINE__, "Setup MySQL Replication for new Modules being Added", LOG_TYPE_DEBUG);
-	processManager.setMySQLReplication(devicenetworklist);
+	processManager.setMySQLReplication(devicenetworklist, oam::UnassignedName, false, true, password );
 
 	return API_SUCCESS;
 }
@@ -9693,7 +9693,7 @@ void ProcessManager::flushInodeCache()
 *
 *
 ******************************************************************************************/
-int ProcessManager::setMySQLReplication(oam::DeviceNetworkList devicenetworklist, std::string masterModule, bool failover)
+int ProcessManager::setMySQLReplication(oam::DeviceNetworkList devicenetworklist, std::string masterModule, bool failover, bool distributeDB, std::string password)
 {
 	Oam oam;
 
@@ -9769,6 +9769,58 @@ int ProcessManager::setMySQLReplication(oam::DeviceNetworkList devicenetworklist
 		}
 	}
 
+	//send distubute DB
+	if ( distributeDB )
+	{
+		if ( devicenetworklist.size() == 0 )
+		{ //dist to all slaves
+			ByteStream msg;
+			ByteStream::byte requestID = oam::MASTERDIST;
+			msg << requestID;
+			msg << password;
+			msg << "all";
+		
+			log.writeLog(__LINE__, "Distribute Msater DB, master module=" + masterModule, LOG_TYPE_DEBUG);
+		
+			int returnStatus = sendMsgProcMon( masterModule, msg, requestID, 60 );
+		
+			if ( returnStatus != API_SUCCESS) {
+				log.writeLog(__LINE__, "setMySQLReplication: ERROR: Error getting MySQL Replication Master Information", LOG_TYPE_ERROR);
+				pthread_mutex_unlock(&THREAD_LOCK);
+				return API_FAILURE;
+			}
+		}
+		else
+		{
+			DeviceNetworkList::iterator listPT = devicenetworklist.begin();
+			for( ; listPT != devicenetworklist.end() ; listPT++)
+			{
+				string remoteModuleName = (*listPT).DeviceName;
+		
+				//skip master
+				if ( remoteModuleName == masterModule )
+					continue;
+
+				ByteStream msg;
+				ByteStream::byte requestID = oam::MASTERDIST;
+				msg << requestID;
+				msg << password;
+				msg << remoteModuleName;
+			
+				log.writeLog(__LINE__, "Distribute Msater DB, master module=" + masterModule, LOG_TYPE_DEBUG);
+			
+				int returnStatus = sendMsgProcMon( masterModule, msg, requestID, 60 );
+			
+				if ( returnStatus != API_SUCCESS) {
+					log.writeLog(__LINE__, "setMySQLReplication: ERROR: Error getting MySQL Replication Master Information", LOG_TYPE_ERROR);
+					pthread_mutex_unlock(&THREAD_LOCK);
+					return API_FAILURE;
+				}
+			}
+		}
+	}
+
+	//send setup master
 	ByteStream msg;
 	ByteStream::byte requestID = oam::MASTERREP;
 	msg << requestID;
@@ -9824,39 +9876,25 @@ int ProcessManager::setMySQLReplication(oam::DeviceNetworkList devicenetworklist
 						continue;
 				}
 		
-//				int opState;
-//				bool degraded;
-//				try {
-//					oam.getModuleStatus(remoteModuleName, opState, degraded);
+				ByteStream msg1;
+				ByteStream::byte requestID = oam::SLAVEREP;
+				msg1 << requestID;
+				msg1 << mysqlpw;
+			
+				if ( masterLogFile == oam::UnassignedName || 
+					masterLogPos == oam::UnassignedName )
+					return API_FAILURE;
+			
+				msg1 << masterLogFile;
+				msg1 << masterLogPos;
+			
+				log.writeLog(__LINE__, "Setup MySQL Replication, slave module=" + remoteModuleName, LOG_TYPE_DEBUG);
 
-//					if (opState == oam::ACTIVE ||
-//						opState == oam::DEGRADED) {
-
-						ByteStream msg1;
-						ByteStream::byte requestID = oam::SLAVEREP;
-						msg1 << requestID;
-						msg1 << mysqlpw;
-					
-						if ( masterLogFile == oam::UnassignedName || 
-							masterLogPos == oam::UnassignedName )
-							return API_FAILURE;
-					
-						msg1 << masterLogFile;
-						msg1 << masterLogPos;
-					
-						log.writeLog(__LINE__, "Setup MySQL Replication, slave module=" + remoteModuleName, LOG_TYPE_DEBUG);
-		
-						returnStatus = sendMsgProcMon( remoteModuleName, msg1, requestID, 30 );
-					
-						if ( returnStatus != API_SUCCESS) {
-							log.writeLog(__LINE__, "setMySQLReplication: ERROR: Error setting MySQL Replication Slave", LOG_TYPE_ERROR);
-//							pthread_mutex_unlock(&THREAD_LOCK);
-//							return API_FAILURE;
-						}
-//					}
-//				}
-//				catch (exception& ex)
-//				{}
+				returnStatus = sendMsgProcMon( remoteModuleName, msg1, requestID, 30 );
+			
+				if ( returnStatus != API_SUCCESS) {
+					log.writeLog(__LINE__, "setMySQLReplication: ERROR: Error setting MySQL Replication Slave", LOG_TYPE_ERROR);
+				}
 			}
 		}
 	}
@@ -9871,39 +9909,26 @@ int ProcessManager::setMySQLReplication(oam::DeviceNetworkList devicenetworklist
 			if ( remoteModuleName == masterModule )
 				continue;
 
-//			int opState;
-//			bool degraded;
-//			try {
-//				oam.getModuleStatus(remoteModuleName, opState, degraded);
-
-//				if (opState == oam::ACTIVE ||
-//						opState == oam::DEGRADED) {
-					ByteStream msg1;
-					ByteStream::byte requestID = oam::SLAVEREP;
-					msg1 << requestID;
-					msg1 << mysqlpw;
-				
-					if ( masterLogFile == oam::UnassignedName || 
-						masterLogPos == oam::UnassignedName )
-					{
-						log.writeLog(__LINE__, "setMySQLReplication: ERROR: Unassigned masterLogFile or masterLogPos", LOG_TYPE_ERROR);
-						return API_FAILURE;
-					}
+			ByteStream msg1;
+			ByteStream::byte requestID = oam::SLAVEREP;
+			msg1 << requestID;
+			msg1 << mysqlpw;
 		
-					msg1 << masterLogFile;
-					msg1 << masterLogPos;
-				
-					returnStatus = sendMsgProcMon( remoteModuleName, msg1, requestID, 30 );
-				
-					if ( returnStatus != API_SUCCESS) {
-						log.writeLog(__LINE__, "setMySQLReplication: ERROR: Error setting MySQL Replication Slave", LOG_TYPE_ERROR);
-//						pthread_mutex_unlock(&THREAD_LOCK);
-//						return API_FAILURE;
-					}
-//				}
-//			}
-//			catch (exception& ex)
-//			{}
+			if ( masterLogFile == oam::UnassignedName || 
+				masterLogPos == oam::UnassignedName )
+			{
+				log.writeLog(__LINE__, "setMySQLReplication: ERROR: Unassigned masterLogFile or masterLogPos", LOG_TYPE_ERROR);
+				return API_FAILURE;
+			}
+
+			msg1 << masterLogFile;
+			msg1 << masterLogPos;
+		
+			returnStatus = sendMsgProcMon( remoteModuleName, msg1, requestID, 30 );
+		
+			if ( returnStatus != API_SUCCESS) {
+				log.writeLog(__LINE__, "setMySQLReplication: ERROR: Error setting MySQL Replication Slave", LOG_TYPE_ERROR);
+			}
 		}
 	}
 

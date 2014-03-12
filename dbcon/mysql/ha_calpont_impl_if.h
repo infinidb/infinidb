@@ -36,6 +36,7 @@
 struct st_table;
 struct st_ha_create_information;
 
+#include "configcpp.h"
 #include "idberrorinfo.h"
 #include "calpontselectexecutionplan.h"
 #include "windowfunctioncolumn.h"
@@ -135,20 +136,20 @@ struct gp_walk_info
 	std::vector<execplan::SCSEP> subselectList;
 
 	gp_walk_info() : sessionid(0),
-	               fatalParseError(false),
-	               condPush(false),
-	               dropCond(false),
-	               expressionId(0),
-	               internalDecimalScale(4),
-	               thd(0),
-	               subSelectType(uint64_t(-1)),
-	               subQuery(0),
-	               clauseType(INIT),
-	               aggOnSelect(false),
-	               hasWindowFunc(false),
-	               hasSubSelect(false),
-	               lastSub(0),
-	               derivedTbCnt(0)
+				   fatalParseError(false),
+				   condPush(false),
+				   dropCond(false),
+				   expressionId(0),
+				   internalDecimalScale(4),
+				   thd(0),
+				   subSelectType(uint64_t(-1)),
+				   subQuery(0),
+				   clauseType(INIT),
+				   aggOnSelect(false),
+				   hasWindowFunc(false),
+				   hasSubSelect(false),
+				   lastSub(0),
+				   derivedTbCnt(0)
 	{}
 
 	~gp_walk_info() {}
@@ -159,12 +160,12 @@ struct cal_table_info
 	enum RowSources { FROM_ENGINE, FROM_FILE };
 
 	cal_table_info() : tpl_ctx(0),
-		                 //tpl_scan_ctx(0),
-		                 c(0),
-		                 msTablePtr(0),
-		                 conn_hndl(0),
-		                 condInfo(0),
-		                 moreRows(false)
+						 //tpl_scan_ctx(0),
+						 c(0),
+						 msTablePtr(0),
+						 conn_hndl(0),
+						 condInfo(0),
+						 moreRows(false)
 	{ }
 	~cal_table_info() {}
 	sm::cpsm_tplh_t* tpl_ctx;
@@ -184,9 +185,38 @@ typedef std::map<uint32_t, ColValuesList> TableValuesMap;
 struct cal_connection_info
 {
 	enum AlterTableState { NOT_ALTER, ALTER_SECOND_RENAME, ALTER_FIRST_RENAME };
-	cal_connection_info() : cal_conn_hndl(0), queryState(0), currentTable(0), traceFlags(0), alterTableState(NOT_ALTER), isAlter(false),
-	bulkInsertRows(0), singleInsert(true), isLoaddataInfile( false ), dmlProc(0), rowsHaveInserted(0), rc(0), tableOid(0), localPm(-1)
-	{ }
+	cal_connection_info() : cal_conn_hndl(0), 
+	                        queryState(0),
+	                        currentTable(0),
+	                        traceFlags(0),
+	                        alterTableState(NOT_ALTER),
+	                        isAlter(false),
+	                        bulkInsertRows(0),
+	                        singleInsert(true),
+	                        isLoaddataInfile( false ),
+	                        dmlProc(0),
+	                        rowsHaveInserted(0),
+	                        rc(0),
+	                        tableOid(0), 
+	                        localPm(-1),
+	                        isSlaveNode(false)
+	{
+		// check if this is a slave mysql daemon
+		isSlaveNode = checkSlave();
+	}
+
+	static bool checkSlave()
+	{
+		config::Config* cf = config::Config::makeConfig();
+		std::string configVal = cf->getConfig("Installation", "MySQLRep");
+		bool isMysqlRep = (configVal == "y" || configVal == "Y");
+		if (!isMysqlRep) return false;
+		configVal = cf->getConfig("SystemConfig", "PrimaryUMModuleName");
+		std::string module = execplan::ClientRotator::getModule();
+		if (boost::iequals(configVal, module))
+			return false;
+		return true;
+	}
 
 	sm::cpsm_conhdl_t* cal_conn_hndl;
 	int queryState;
@@ -210,6 +240,7 @@ struct cal_connection_info
 	querystats::QueryStats stats;
 	std::string warningMsg;
 	int64_t localPm;
+	bool isSlaveNode;
 };
 
 typedef std::tr1::unordered_map<int, cal_connection_info> CalConnMap;
@@ -257,8 +288,8 @@ execplan::SPTP getIntervalType(int interval_type);
 uint32_t isPseudoColumn(std::string funcName);
 void setDerivedTable(execplan::ParseTree* n);
 execplan::ParseTree* setDerivedFilter(execplan::ParseTree*& n, 
-                                      std::map<std::string, execplan::ParseTree*>& obj,
-                                      execplan::CalpontSelectExecutionPlan::SelectList& derivedTbList);
+									  std::map<std::string, execplan::ParseTree*>& obj,
+									  execplan::CalpontSelectExecutionPlan::SelectList& derivedTbList);
 void derivedTableOptimization(execplan::SCSEP& csep);
 
 #ifdef DEBUG_WALK_COND

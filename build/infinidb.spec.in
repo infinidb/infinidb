@@ -139,6 +139,16 @@ rm -rf $RPM_BUILD_ROOT $RPM_BUILD_DIR/%{name}-%{version}-%{release}
 /usr/local/Calpont/bin/ServerMonitor
 /usr/local/Calpont/bin/master-rep-infinidb.sh 
 /usr/local/Calpont/bin/slave-rep-infinidb.sh
+/usr/local/Calpont/bin/rsync.sh
+/usr/local/Calpont/bin/calpontSupport
+/usr/local/Calpont/bin/hardwareReport.sh
+/usr/local/Calpont/bin/softwareReport.sh
+/usr/local/Calpont/bin/configReport.sh
+/usr/local/Calpont/bin/logReport.sh
+/usr/local/Calpont/bin/bulklogReport.sh
+/usr/local/Calpont/bin/resourceReport.sh
+/usr/local/Calpont/bin/hadoopReport.sh
+/usr/local/Calpont/bin/alarmReport.sh
 
 #
 %config /usr/local/Calpont/etc/Calpont.xml
@@ -263,17 +273,7 @@ rm -rf $RPM_BUILD_ROOT $RPM_BUILD_DIR/%{name}-%{version}-%{release}
 /usr/local/Calpont/bin/dbprof.pl
 /usr/local/Calpont/bin/dumpobm
 /usr/local/Calpont/bin/file2oid.pl
-/usr/local/Calpont/bin/calpontSupport
-/usr/local/Calpont/bin/hardwareReport.sh
-/usr/local/Calpont/bin/softwareReport.sh
-/usr/local/Calpont/bin/configReport.sh
-/usr/local/Calpont/bin/logReport.sh
-/usr/local/Calpont/bin/bulklogReport.sh
-/usr/local/Calpont/bin/resourceReport.sh
-/usr/local/Calpont/bin/hadoopReport.sh
-/usr/local/Calpont/bin/alarmReport.sh
 /usr/local/Calpont/bin/print_journal
-/usr/local/Calpont/bin/rsync.sh
 /usr/local/Calpont/bin/healthcheck
 /usr/local/Calpont/bin/glusterctl
 /usr/local/Calpont/bin/glusteradd

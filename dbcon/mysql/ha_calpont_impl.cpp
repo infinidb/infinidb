@@ -731,16 +731,14 @@ void makeUpdateSemiJoin(const ParseTree* n, void* obj)
 
 uint32_t doUpdateDelete(THD *thd)
 {
+	if (!thd->infinidb_vtable.cal_conn_info)
+		thd->infinidb_vtable.cal_conn_info = (void*)(new cal_connection_info());
+	cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(thd->infinidb_vtable.cal_conn_info);
+
 	//@bug 5660. Error out DDL/DML on slave node, or on local query node
-	if (thd->slave_thread)
+	if (ci->isSlaveNode && !thd->slave_thread)
 	{
 		string emsg = logging::IDBErrorInfo::instance()->errorMsg(ERR_DML_DDL_SLAVE);
-		setError(current_thd, HA_ERR_UNSUPPORTED, emsg);
-		return HA_ERR_UNSUPPORTED;
-	}
-	if (thd->variables.infinidb_local_query)
-	{
-		string emsg = logging::IDBErrorInfo::instance()->errorMsg(ERR_DML_DDL_LOCAL);
 		setError(current_thd, HA_ERR_UNSUPPORTED, emsg);
 		return HA_ERR_UNSUPPORTED;
 	}
@@ -756,9 +754,6 @@ uint32_t doUpdateDelete(THD *thd)
 		return HA_ERR_UNSUPPORTED;
 	}
 
-	if (!thd->infinidb_vtable.cal_conn_info)
-		thd->infinidb_vtable.cal_conn_info = (void*)(new cal_connection_info());
-	cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(thd->infinidb_vtable.cal_conn_info);
 	// stats start
 	ci->stats.reset();
 	ci->stats.setStartTime();
@@ -2935,21 +2930,6 @@ int ha_calpont_impl_rnd_end(TABLE* table)
 int ha_calpont_impl_create(const char *name, TABLE *table_arg, HA_CREATE_INFO *create_info)
 {
 	THD *thd = current_thd;
-
-	//@bug 5660. Error out DDL/DML on slave node, or on local query node
-	if (thd->slave_thread)
-	{
-		string emsg = logging::IDBErrorInfo::instance()->errorMsg(ERR_DML_DDL_SLAVE);
-		setError(current_thd, HA_ERR_UNSUPPORTED, emsg);
-		return HA_ERR_UNSUPPORTED;
-	}
-	if (thd->variables.infinidb_local_query)
-	{
-		string emsg = logging::IDBErrorInfo::instance()->errorMsg(ERR_DML_DDL_LOCAL);
-		setError(current_thd, HA_ERR_UNSUPPORTED, emsg);
-		return HA_ERR_UNSUPPORTED;
-	}
-
 	if (!thd->infinidb_vtable.cal_conn_info)
 		thd->infinidb_vtable.cal_conn_info = (void*)(new cal_connection_info());
 	cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(thd->infinidb_vtable.cal_conn_info);
@@ -2968,20 +2948,9 @@ int ha_calpont_impl_delete_table(const char *name)
 	if (!memcmp((uchar*)name, tmp_file_prefix, tmp_file_prefix_length)) return 0;
 
 	THD *thd = current_thd;
-
-	//@bug 5660. Error out DDL/DML on slave node, or on local query node
-	if (thd->slave_thread)
-	{
-		string emsg = logging::IDBErrorInfo::instance()->errorMsg(ERR_DML_DDL_SLAVE);
-		setError(current_thd, HA_ERR_UNSUPPORTED, emsg);
-		return HA_ERR_UNSUPPORTED;
-	}
-	if (thd->variables.infinidb_local_query)
-	{
-		string emsg = logging::IDBErrorInfo::instance()->errorMsg(ERR_DML_DDL_LOCAL);
-		setError(current_thd, HA_ERR_UNSUPPORTED, emsg);
-		return HA_ERR_UNSUPPORTED;
-	}
+	if (!thd->infinidb_vtable.cal_conn_info)
+		thd->infinidb_vtable.cal_conn_info = (void*)(new cal_connection_info());
+	cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(thd->infinidb_vtable.cal_conn_info);
 
 	if (!thd) return 0;
 	if (!thd->lex) return 0;
@@ -2990,9 +2959,9 @@ int ha_calpont_impl_delete_table(const char *name)
 	// @bug 1700.
 	if (thd->lex->sql_command == SQLCOM_DROP_DB)
 	{
-  	 thd->main_da.can_overwrite_status = true;
-	 	 thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Non-empty database can not be dropped. ");
-	 	 return 1;
+		thd->main_da.can_overwrite_status = true;
+		thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Non-empty database can not be dropped. ");
+		return 1;
 	}
 
 	TABLE_LIST *first_table= (TABLE_LIST*) thd->lex->select_lex.table_list.first;
@@ -3007,10 +2976,6 @@ int ha_calpont_impl_delete_table(const char *name)
 		return 0;
 
 	string db = first_table->table->s->db.str;
-
-	if (!thd->infinidb_vtable.cal_conn_info)
-		thd->infinidb_vtable.cal_conn_info = (void*)(new cal_connection_info());
-	cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(thd->infinidb_vtable.cal_conn_info);
 
 	if (!ci) return 0;
 
@@ -3118,26 +3083,20 @@ void ha_calpont_impl_start_bulk_insert(ha_rows rows, TABLE* table)
 		thd->infinidb_vtable.cal_conn_info = (void*)(new cal_connection_info());
 	cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(thd->infinidb_vtable.cal_conn_info);
 
-	//@bug 5660. Error out DDL/DML on slave node, or on local query node
-	if (thd->slave_thread)
-	{
-		string emsg = logging::IDBErrorInfo::instance()->errorMsg(ERR_DML_DDL_SLAVE);
-		setError(current_thd, HA_ERR_UNSUPPORTED, emsg);
-		return;
-	}
-	if (thd->variables.infinidb_local_query)
-	{
-		string emsg = logging::IDBErrorInfo::instance()->errorMsg(ERR_DML_DDL_LOCAL);
-		setError(current_thd, HA_ERR_UNSUPPORTED, emsg);
-		return;
-	}
-
 	// clear rows variable
 	ci->rowsHaveInserted = 0; //reset this variable
 
 	if (ci->alterTableState > 0) return;
 
 	if (thd->slave_thread) return;
+
+	//@bug 5660. Error out DDL/DML on slave node, or on local query node
+	if (ci->isSlaveNode && thd->infinidb_vtable.vtable_state != THD::INFINIDB_ALTER_VTABLE)
+	{
+		string emsg = logging::IDBErrorInfo::instance()->errorMsg(ERR_DML_DDL_SLAVE);
+		setError(current_thd, HA_ERR_UNSUPPORTED, emsg);
+		return;
+	}
 
 	//@bug 4771. reject REPLACE key wordd
 	if ((thd->lex)->sql_command == SQLCOM_REPLACE_SELECT)

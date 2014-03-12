@@ -346,7 +346,7 @@ int sendUpgradeRequest(int IserverTypeInstall, bool pmwithum)
 *
 *
 ******************************************************************************************/
-int sendReplicationRequest(int IserverTypeInstall)
+int sendReplicationRequest(int IserverTypeInstall, std::string password)
 {
 	Oam oam;
 
@@ -402,9 +402,23 @@ int sendReplicationRequest(int IserverTypeInstall)
 						opState == oam::DEGRADED) {
 						if ( (*pt).DeviceName == masterModule )
 						{	
+							// set for Master MySQL DB distrubution to slaves
+							ByteStream msg1;
+							ByteStream::byte requestID = oam::MASTERDIST;
+							msg1 << requestID;
+							msg1 << password;
+							msg1 << "all";	// dist to all slave modules
+
+							returnStatus = sendMsgProcMon( (*pt).DeviceName, msg1, requestID, 600 );
+			
+							if ( returnStatus != API_SUCCESS) {
+								cout << "ERROR: Error return in running the MySQL Master DB Distribute, check /tmp/master-dist.logs on " << masterModule << endl;
+								return returnStatus;
+							}
+
 							// set for master repl request
 							ByteStream msg;
-							ByteStream::byte requestID = oam::MASTERREP;
+							requestID = oam::MASTERREP;
 							msg << requestID;
 							msg << mysqlpw;
 	

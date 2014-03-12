@@ -49,7 +49,7 @@ public:
 	/* virtual */ time_t mtime();
 
 protected:
-	/* virtual */ void close();
+	/* virtual */ int close();
 
 private:
 #ifdef _MSC_VER

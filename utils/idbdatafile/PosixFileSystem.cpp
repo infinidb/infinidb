@@ -104,10 +104,12 @@ int PosixFileSystem::rename(const char *oldpath, const char *newpath)
 {
 	// should this use Boost??
 	int ret = ::rename(oldpath, newpath);
+	int savedErrno = errno;
 
 	if( IDBLogger::isEnabled() )
 		IDBLogger::logFSop2( POSIX, "rename", oldpath, newpath, this, ret);
 
+	errno = savedErrno;
 	return ret;
 }
 
@@ -116,11 +118,13 @@ off64_t PosixFileSystem::size(const char* path) const
 	// should this use Boost??
     struct stat statBuf;
     int rc = ::stat( path, &statBuf );
+	int savedErrno = errno;
     off64_t ret = ((rc == 0) ? statBuf.st_size : -1);
 
 	if( IDBLogger::isEnabled() )
 		IDBLogger::logFSop( POSIX, "fs:size", path, this, ret);
 
+	errno = savedErrno;
 	return ret;
 }
 
