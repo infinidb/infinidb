@@ -121,6 +121,16 @@ if [ -n "$plugin" ]; then
 	echo ". ./$setenv" >> ${bashFile}
 fi
 
+# if mysqlrep is on and module has a my.cnf file, upgrade it
+
+MySQLRep=`$INFINIDB_INSTALL_DIR/bin/getConfig Installation MySQLRep`
+if [ $MySQLRep = "y" ]; then
+	if test -f $INFINIDB_INSTALL_DIR/mysql/my.cnf ; then
+		echo "Run Upgrade on my.cnf on Module"
+		$INFINIDB_INSTALL_DIR/bin/mycnfUpgrade > /tmp/mycnfUpgrade.log 2>&1
+	fi
+fi
+
 echo " "
 echo "!!!Module Installation Successfully Completed!!!"
 

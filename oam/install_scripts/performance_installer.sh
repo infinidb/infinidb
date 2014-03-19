@@ -203,7 +203,7 @@ if { $INSTALLTYPE == "initial"} {
 			"passphrase" { send "$PASSWORD\n" }
 		}
 	}
-	set timeout 120
+	set timeout 180
 	expect {
 		"package dummy" 		  { send_user "DONE" }
 		"error: Failed dependencies" { send_user "ERROR: Failed dependencies\n" ; 
@@ -213,6 +213,7 @@ if { $INSTALLTYPE == "initial"} {
 		"closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
 		"No such file or directory"   { send_user "ERROR: file not found\n" ; exit 1 }
 		"needs"    { send_user "ERROR: disk space issue\n" ; exit 1 }
+		"conflicts"	   { send_user "ERROR: File Conflict issue\n" ; exit 1 }
 	}
 
 	if { $CALPONTRPM3 != "dummy.rpm" } {
@@ -237,6 +238,7 @@ if { $INSTALLTYPE == "initial"} {
 			"Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit 1 }
 			"closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
 			"No such file or directory"   { send_user "ERROR: file not found\n" ; exit 1 }
+			"conflicts"	   { send_user "ERROR: File Conflict issue\n" ; exit 1 }
 		}
 	}
 

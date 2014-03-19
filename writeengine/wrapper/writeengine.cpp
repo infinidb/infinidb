@@ -2917,13 +2917,17 @@ int WriteEngineWrapper::processBeginVBCopy(const TxnID& txnid, const vector<ColS
    vector<LBIDRange>    rangeList;
    lastFbo = -1;
 	ColumnOp* colOp = m_colOp[op(colStructList[j].fCompressionType)];
+	
+	ColStruct curColStruct = colStructList[j];	
+	Convertor::convertColType(&curColStruct);
+	
 	for (uint32_t i = 0; i < ridList.size(); i++) {
       curRowId = ridList[i];
       //cout << "processVersionBuffer got rid " << curRowId << endl;
-      successFlag = colOp->calculateRowId(curRowId, BYTE_PER_BLOCK/colStructList[j].colWidth, colStructList[j].colWidth, curFbo, curBio);
+      successFlag = colOp->calculateRowId(curRowId, BYTE_PER_BLOCK/curColStruct.colWidth, curColStruct.colWidth, curFbo, curBio);
       if (successFlag) {
          if (curFbo != lastFbo) {
-            //cout << "processVersionBuffer is processing lbid  " << lbid << endl;
+            //cout << "processVersionBuffer is processing curFbo  " << curFbo << endl;
             RETURN_ON_ERROR(BRMWrapper::getInstance()->getBrmInfo(
                colStructList[j].dataOid, colStructList[j].fColPartition, colStructList[j].fColSegment, curFbo, lbid));
              //cout << "beginVBCopy is processing lbid:transaction  " << lbid <<":"<<txnid<< endl;
@@ -3914,7 +3918,6 @@ StopWatch timer;
 	std::vector<VBRange> freeList;
 	vector<vector<uint32_t> > fboLists;
 	vector<vector<LBIDRange> > rangeLists;
-		
 	rc = processBeginVBCopy(txnid, colStructList, ridList, freeList, fboLists, rangeLists, rangeListTot);
 	if (rc != NO_ERROR) 
 	{

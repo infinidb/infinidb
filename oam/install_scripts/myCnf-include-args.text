@@ -1,0 +1,6 @@
+# List of my.cnf arguments that should be checked and saved during upgrade install
+#
+infinidb_local_query
+log-bin=mysql-bin
+server-id
+relay-log

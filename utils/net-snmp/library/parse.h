@@ -75,7 +75,7 @@ SOFTWARE.
     struct node {
         struct node    *next;
         char           *label;  /* This node's (unique) textual name */
-        uint32_t          subid;  /* This node's integer subidentifier */
+        u_long          subid;  /* This node's integer subidentifier */
         int             modid;  /* The module containing this node */
         char           *parent; /* The parent's textual name */
         int             tc_index;       /* index into tclist (-1 if NA) */
@@ -105,7 +105,7 @@ SOFTWARE.
         struct tree    *next;   /* Next node in hashed list of names */
         struct tree    *parent;
         char           *label;  /* This node's textual name */
-        uint32_t          subid;  /* This node's integer subidentifier */
+        u_long          subid;  /* This node's integer subidentifier */
         int             modid;  /* The module containing this node */
         int             number_modules;
         int            *module_list;    /* To handle multiple modules */

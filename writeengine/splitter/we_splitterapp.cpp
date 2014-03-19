@@ -203,7 +203,7 @@ void WESplitterApp::processMessages()
 			fDh.send2Pm(aBs);
 
 			std::string aJobId = fCmdArgs.getJobId();
-			if(aJobId.length()>0) // Export jobFile NOW
+			if((aJobId.length()>0)&&(!fCmdArgs.isJobLogOnly())) // Export jobFile NOW
 			{
 				std::string aJobFileName = fCmdArgs.getJobFileName();
 				fDh.exportJobFile(aJobId, aJobFileName );
@@ -247,7 +247,7 @@ void WESplitterApp::processMessages()
 
 			std::string aJobId = fCmdArgs.getJobId();
 			if(fDh.getDebugLvl()) cout<<"ProcessMsgs aJobId "<<aJobId<<endl;
-			if(aJobId.length()>0)				// Export jobFile NOW
+			if((aJobId.length()>0)&&(!fCmdArgs.isJobLogOnly())) // Export jobFile NOW
 			{
 				std::string aJobFileName = fCmdArgs.getJobFileName();
 				if(fDh.getDebugLvl()) cout<<"ProcessMsgs Calling exportJobFile "<<endl;

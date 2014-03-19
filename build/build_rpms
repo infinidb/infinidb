@@ -3,22 +3,29 @@
 # $Id: build_rpms 1734 2012-10-25 18:07:16Z dhill $
 #
 
-usage="build_rpms [-vh]"
-vflg=0
+verbose=0
+mysqldir=/usr/local/Calpont/mysql
 
-while getopts "vh" flag; do
-	case $flag in
-	v) ((vflg++))
-		;;
-	h) echo $usage
+usage()
+{
+cat <<EOD
+usage: build_rpms [--verbose] [--local-mysql] [--help]
+   --local-mysql use local (relative) mysql binary tree
+EOD
+}
+
+for arg in "$@"; do
+	if [ `expr -- "$arg" : '--verbose'` -eq 9 ]; then
+		((verbose++))
+	elif [ `expr -- "$arg" : '--local-mysql'` -eq 13 ]; then
+		mysqldir=../Calpont/mysql
+	elif [ `expr -- "$arg" : '--help'` -eq 6 ]; then
+		usage
 		exit 0
-		;;
-	\? | *) echo $usage
-		exit 1
-		;;
-	esac
+	else
+		echo "ignoring unknown argument: $arg" 1>&2
+	fi
 done
-shift $((OPTIND - 1))
 
 #try to find project root
 while [ ! -d dbcon ]; do
@@ -47,7 +54,7 @@ tar -cf - --exclude 'export/include' --exclude 'export/*.tar' export | tar -C $b
 mv $buildroot/export $buildroot/Calpont
 
 #get mysql server files
-pushd /usr/local/Calpont/mysql > /dev/null
+pushd $mysqldir > /dev/null
 mkdir -p $buildroot/Calpont/mysql
 cpio -pdmu --quiet $buildroot/Calpont/mysql < files.lst
 popd >/dev/null
@@ -71,7 +78,6 @@ for file in bulkload.sh cleanup.sh dbbuilder.sh dbload.sh cpimport.sh bulkloadp.
 done
 
 rm -f $buildroot/Calpont/lib/libidbboot.a
-rm -f $buildroot/Calpont/bin/amazonInstaller
 rm -f $buildroot/Calpont/lib/libiberty.a
 
 mkdir -p $HOME/rpm/BUILD $HOME/rpm/RPMS $HOME/rpm/SRPMS $HOME/rpm/SPECS $HOME/rpm/tmp
@@ -115,7 +121,7 @@ echo -n "Building rpms..."
 rpmbuild -ba $HOME/rpm/SPECS/infinidb.spec >/tmp/rpmbuild.out.$$ 2>&1
 rc=$?
 echo done.
-if [ $vflg -gt 0 -o $rc -ne 0 ]; then
+if [ $verbose -gt 0 -o $rc -ne 0 ]; then
 	cat /tmp/rpmbuild.out.$$
 fi
 

@@ -30,7 +30,7 @@
 #include "net-snmp/net-snmp-includes.h"
 #include "net-snmp/agent/net-snmp-agent-includes.h"
 #else
-typedef uint32_t oid;
+typedef uint64_t oid;
 #endif
 
 namespace snmpmanager {

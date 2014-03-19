@@ -163,6 +163,7 @@ fi
 #setup InfiniDB system logging
 if [ $user = "root" ]; then
 	$installdir/bin/syslogSetup.sh install > /tmp/syslog_install.log 2>&1
+	chmod 777 /dev/shm
 elif [ -z "$NO_NONROOT_SUDO" ]; then
 	sudo $installdir/bin/syslogSetup.sh --installdir=$installdir install > /tmp/syslog_install.log 2>&1
 	sudo chown $user:$user $installdir/etc/Calpont.xml

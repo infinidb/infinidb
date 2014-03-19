@@ -734,7 +734,7 @@ uint32_t doUpdateDelete(THD *thd)
 	if (!thd->infinidb_vtable.cal_conn_info)
 		thd->infinidb_vtable.cal_conn_info = (void*)(new cal_connection_info());
 	cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(thd->infinidb_vtable.cal_conn_info);
-
+	
 	//@bug 5660. Error out DDL/DML on slave node, or on local query node
 	if (ci->isSlaveNode && !thd->slave_thread)
 	{
@@ -2211,6 +2211,18 @@ int ha_calpont_impl_rnd_init(TABLE* table)
 	IDEBUG( cout << "rnd_init for table " << table->s->table_name.str << endl );
 	THD* thd = current_thd;
 
+	/* If this node is the slave, ignore DML to IDB tables */
+	if (thd->slave_thread && (
+	  thd->lex->sql_command == SQLCOM_INSERT ||
+      thd->lex->sql_command == SQLCOM_INSERT_SELECT ||
+      thd->lex->sql_command == SQLCOM_UPDATE ||
+      thd->lex->sql_command == SQLCOM_UPDATE_MULTI ||
+      thd->lex->sql_command == SQLCOM_DELETE ||
+      thd->lex->sql_command == SQLCOM_DELETE_MULTI ||
+      thd->lex->sql_command == SQLCOM_TRUNCATE ||
+      thd->lex->sql_command == SQLCOM_LOAD))
+		return 0;
+
 	// @bug 3005. if the table is not $vtable, then this could be a UDF defined on the connector.
 	// watch this for other complications
 	if (thd->infinidb_vtable.vtable_state == THD::INFINIDB_SELECT_VTABLE &&
@@ -2294,16 +2306,23 @@ int ha_calpont_impl_rnd_init(TABLE* table)
 	SCSEP csep;
 
 	// update traceFlags according to the autoswitch state
-	if (thd->infinidb_vtable.vtable_state == THD::INFINIDB_DISABLE_VTABLE)
+	if (thd->infinidb_vtable.vtable_state == THD::INFINIDB_DISABLE_VTABLE ||
+	    (thd->slave_thread && thd->infinidb_vtable.vtable_state == THD::INFINIDB_INIT))
+	{
 		ci->traceFlags |= CalpontSelectExecutionPlan::TRACE_TUPLE_OFF;
+		thd->infinidb_vtable.vtable_state = THD::INFINIDB_DISABLE_VTABLE;
+	}
 	else
+	{
 		ci->traceFlags = (ci->traceFlags | CalpontSelectExecutionPlan::TRACE_TUPLE_OFF)^
 		                  CalpontSelectExecutionPlan::TRACE_TUPLE_OFF;
+	}
 
 	bool localQuery = (thd->variables.infinidb_local_query>0 ? true : false);
 
 	// table mode
-	if (thd->infinidb_vtable.vtable_state == THD::INFINIDB_DISABLE_VTABLE)
+	if (thd->infinidb_vtable.vtable_state == THD::INFINIDB_DISABLE_VTABLE ||
+	    (thd->slave_thread && thd->infinidb_vtable.vtable_state == THD::INFINIDB_INIT))
 	{
 		ti = ci->tableMap[table];
 
@@ -2549,7 +2568,8 @@ int ha_calpont_impl_rnd_init(TABLE* table)
 					}
 
 					rmParms.clear();
-					if (thd->infinidb_vtable.vtable_state == THD::INFINIDB_DISABLE_VTABLE)
+					if (thd->infinidb_vtable.vtable_state == THD::INFINIDB_DISABLE_VTABLE ||
+					    (thd->infinidb_vtable.vtable_state == THD::INFINIDB_INIT && thd->slave_thread))
 					{
 						ci->tableMap[table] = ti;
 					}
@@ -2678,6 +2698,19 @@ int ha_calpont_impl_rnd_next(uchar *buf, TABLE* table)
 {
 	THD* thd = current_thd;
 
+	/* If this node is the slave, ignore DML to IDB tables */
+	if (thd->slave_thread && (
+	  thd->lex->sql_command == SQLCOM_INSERT ||
+	  thd->lex->sql_command == SQLCOM_INSERT_SELECT ||
+	  thd->lex->sql_command == SQLCOM_UPDATE ||
+	  thd->lex->sql_command == SQLCOM_UPDATE_MULTI ||
+	  thd->lex->sql_command == SQLCOM_DELETE ||
+	  thd->lex->sql_command == SQLCOM_DELETE_MULTI ||
+	  thd->lex->sql_command == SQLCOM_TRUNCATE ||
+	  thd->lex->sql_command == SQLCOM_LOAD))
+		return 0;
+
+
 	if (thd->infinidb_vtable.vtable_state == THD::INFINIDB_ERROR)
 		return HA_ERR_INTERNAL_ERROR;
 	// @bug 3005
@@ -2781,6 +2814,18 @@ int ha_calpont_impl_rnd_end(TABLE* table)
 	int rc = 0;
 	THD* thd = current_thd;
 	cal_connection_info* ci = NULL;
+
+	if (thd->slave_thread && (
+	  thd->lex->sql_command == SQLCOM_INSERT ||
+	  thd->lex->sql_command == SQLCOM_INSERT_SELECT ||
+	  thd->lex->sql_command == SQLCOM_UPDATE ||
+	  thd->lex->sql_command == SQLCOM_UPDATE_MULTI ||
+	  thd->lex->sql_command == SQLCOM_DELETE ||
+	  thd->lex->sql_command == SQLCOM_DELETE_MULTI ||
+	  thd->lex->sql_command == SQLCOM_TRUNCATE ||
+	  thd->lex->sql_command == SQLCOM_LOAD))
+        return 0;
+
 
 	if (thd->infinidb_vtable.cal_conn_info)
 		ci = reinterpret_cast<cal_connection_info*>(thd->infinidb_vtable.cal_conn_info);

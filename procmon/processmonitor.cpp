@@ -2458,9 +2458,18 @@ pid_t ProcessMonitor::startProcess(string processModuleType, string processName,
 		if ( processName == "DBRMWorkerNode" || processName == "ExeMgr" || processName == "DDLProc")
 			sleep(3);
 		else
+		{
 			if ( config.ServerInstallType() == oam::INSTALL_COMBINE_DM_UM_PM )
+			{
 				if ( processName == "PrimProc" || processName == "WriteEngineServer")
 					sleep(3);
+			}
+			else
+			{
+				if ( (PMwithUM == "y") && processName == "PrimProc" )
+					sleep(3);
+			}
+		}
 
 		for (i=0; i < numAugs; i++)
 		{
@@ -4680,7 +4689,7 @@ int ProcessMonitor::changeMyCnf(std::string type)
 		while (file.getline(line, 200))
 		{
 			buf = line;
-			string::size_type pos = buf.find("server-id =",0);
+			string::size_type pos = buf.find("server-id",0);
 			if ( pos != string::npos ) {
 				buf = "server-id = " + slaveID;
 			}
@@ -4691,12 +4700,20 @@ int ProcessMonitor::changeMyCnf(std::string type)
 			}
 
 			// set local query flag if on pm
-			if ( config.moduleType() == "pm" )
+			if ( (PMwithUM == "y") && config.moduleType() == "pm" )
 			{
 				pos = buf.find("# infinidb_local_query=1",0);
 				if ( pos != string::npos ) {
 					buf = "infinidb_local_query=1";
 				}
+			}
+			else
+			{ // disable, if needed
+				pos = buf.find("infinidb_local_query=1",0);
+				if ( pos != string::npos ) {
+					buf = "# infinidb_local_query=1";
+				}
+
 			}
 
 			pos = buf.find("log-bin=mysql-bin",0);

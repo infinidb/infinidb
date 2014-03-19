@@ -134,7 +134,8 @@ void clearStacks(gp_walk_info& gwi)
 bool nonConstFunc(Item_func* ifp)
 {
 	if (strcasecmp(ifp->func_name(), "rand") == 0 ||
-	    strcasecmp(ifp->func_name(), "sysdate") == 0)
+	    strcasecmp(ifp->func_name(), "sysdate") == 0 ||
+	    strcasecmp(ifp->func_name(), "idblocalpm") == 0)
 		return true;
 	for (uint32_t i = 0; i < ifp->arg_count; i++)
 	{
@@ -756,7 +757,6 @@ void buildPredicateItem(Item_func* ifp, gp_walk_info* gwip)
 		}
 		cf->pushFilter(new SimpleFilter(sop, gwip->scsp->clone(), lhs));
 		cf->functionName(gwip->funcName);
-
 		String str;
 		// @bug5811. This filter string is for cross engine to use.
 		// Use real table name.
@@ -2147,9 +2147,6 @@ ReturnedColumn* buildFunctionColumn(Item_func* ifp, gp_walk_info& gwi, bool& non
 	uint32_t pseudoType = PSEUDO_UNKNOWN;
 	if (ifp->functype() == Item_func::UDF_FUNC)
 		pseudoType = PseudoColumn::pseudoNameToType(funcName);
-
-	if (pseudoType == PSEUDO_LOCALPM)
-		return NULL;
 
 	if (pseudoType != PSEUDO_UNKNOWN)
 	{

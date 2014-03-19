@@ -6927,7 +6927,7 @@ namespace oam
 			}
 			case MYSQL_RESTART:
 			{
-				command = "restart > /tmp/actionMysqlCalpont.logl 2>&1";
+				command = "restart > /tmp/actionMysqlCalpont.log 2>&1";
 				break;
 			}
 			case MYSQL_RELOAD:
@@ -6937,7 +6937,7 @@ namespace oam
 			}
 			case MYSQL_FORCE_RELOAD:
 			{
-				command = "force-reload > /tmp/actionMysqlCalpont.logl 2>&1";
+				command = "force-reload > /tmp/actionMysqlCalpont.log 2>&1";
 				break;
 			}
 			case MYSQL_STATUS:

@@ -173,7 +173,11 @@ string USER = "root";
 bool hdfs = false;
 bool gluster = false;
 bool pmwithum = false;
-bool mysqlrep = false;
+bool mysqlRep = false;
+string MySQLRep = "n";
+string oldMySQLRep = "n";
+string PMwithUM = "n";
+string oldPMwithUM = "n";
 
 string DataFileEnvFile;
 
@@ -286,9 +290,11 @@ int main(int argc, char *argv[])
 			cout << "   -p  Password, used with no-prompting option" << endl;
 			cout << "   -mp MySQL Password, can be used with no-prompting option" << endl;
 			cout << "   -s  Single Threaded Remote Install" << endl;
+//			cout << "   -lq Enable Local Query Feature" << endl;
+//			cout << "   -rep Enable MySQL Replication" << endl;
 			exit (0);
 		}
-      	else if( string("-s") == argv[i] )
+      		else if( string("-s") == argv[i] )
 			thread_remote_installer = "0";
 		else if( string("-f") == argv[i] )
 			nodeps = "--nodeps";
@@ -343,6 +349,14 @@ int main(int argc, char *argv[])
 				cout << "   ERROR: Valid install dir not provided" << endl;
 				exit (1);
 			}			
+		}
+		else if( string("-lq") == argv[i] ) {
+			pmwithum = true;
+			PMwithUM = "y";
+		}
+		else if( string("-rep") == argv[i] ) {
+			mysqlRep = true;
+			MySQLRep = "y";
 		}
 	}
 
@@ -853,17 +867,16 @@ int main(int argc, char *argv[])
 				cout << "Combined Server Installation will be performed." << endl;
 				cout << "The Server will be configured as a Performance Module." << endl;
 				cout << "All InfiniDB Processes will run on the Performance Modules." << endl;
-	
+
+				if ( pmwithum )
+				{
+					cout << endl << "NOTE: Local Query Feature is not valid on a 'combined' system, feature turned off" << endl << endl;
+					pmwithum = false;
+					PMwithUM = "n";
+				}
+
 				try {
 					 sysConfig->setConfig(InstallSection, "PMwithUM", "n");
-				}
-				catch(...)
-				{}
-
-				mysqlrep = true;
-
-				try {
-					 sysConfig->setConfig(InstallSection, "MySQLRep", "y");
 				}
 				catch(...)
 				{}
@@ -876,55 +889,33 @@ int main(int argc, char *argv[])
 			}
 			default:	// normal, separate UM and PM
 			{
-				// Get PM with UM functionality flag
-				string PMwithUM = "n";
-				try {
-					PMwithUM = sysConfig->getConfig(InstallSection, "PMwithUM");
-				}
-				catch(...)
-				{
-					PMwithUM = "n";
-				}
-
-				while(true) {
-					prompt = "Would you like have User Module Functionality on the Performance Modules? [y,n] (" + PMwithUM + ") > ";
-					pcommand = callReadline(prompt.c_str());
-					if (pcommand)
-					{
-						if (strlen(pcommand) > 0) PMwithUM = pcommand;
-						callFree(pcommand);
-					}
-
-					if ( PMwithUM == "y" || PMwithUM == "n" )
-						break;
-					cout << "Invalid Entry, please enter 'y' for yes or 'n' for no" << endl;
-					PMwithUM = "n";
-					if ( noPrompting )
-						exit(1);
-				}
-
-				if ( PMwithUM == "y" )
-					pmwithum = true;
-
-				try {
-					 sysConfig->setConfig(InstallSection, "PMwithUM", PMwithUM);
-				}
-				catch(...)
-				{}
-
-				mysqlrep = true;
-
-				try {
-					 sysConfig->setConfig(InstallSection, "MySQLRep", "y");
-				}
-				catch(...)
-				{}
-
 				break;
 			}
 		}
 		break;
 	}
+
+	//store local query flag
+	try {
+		sysConfig->setConfig(InstallSection, "PMwithUM", PMwithUM);
+	}
+	catch(...)
+	{}
+
+	//local query needs mysql replication, make sure its enabled
+	if ( pmwithum )
+	{
+		mysqlRep = true;
+		MySQLRep = "y";
+	}
+
+	cout << endl;
+
+	if ( pmwithum )
+		cout << "NOTE: Local Query Feature is enabled" << endl;
+
+	if ( mysqlRep )
+		cout << "NOTE: MySQL Replication Feature is enabled" << endl;
 
 	//Write out Updated System Configuration File
 	try {
@@ -2858,23 +2849,30 @@ int main(int argc, char *argv[])
 					}
 				}
 
-				// rename my.cnf if upgrade
-/*				if ( reuseConfig == "y" ) 
+				// run my.cnf upgrade script
+				if ( reuseConfig == "y" && oldMySQLRep == "y" )
 				{
-					string fileName = installDir + "/mysql/my.cnf.rpmsave";
-					ifstream file (fileName.c_str());
-					if (file) {
-						cout << endl;
-						cout << "Renaming my.cnf.rpmsave to my.cnf" << endl;
-						cout << endl;
-						string cmd = "rm -f " + installDir + "/mysql/my.cnf.idbbackup; mv " + installDir + "/mysql/my.cnf " + installDir + "/mysql/my.cnf.idbbackup; cp " + installDir + "/mysql/my.cnf.rpmsave " + installDir + "/mysql/my.cnf; chown mysql:mysql " + installDir + "/mysql/my.cnf.*";
-						//cout << cmd << endl;
-						system(cmd.c_str());
-					}
+					cmd = installDir + "/bin/mycnfUpgrade  > /tmp/mycnfUpgrade.log 2>&1";
+					int rtnCode = system(cmd.c_str());
+					if (WEXITSTATUS(rtnCode) != 0)
+						cout << "Error: Problem upgrade my.cnf, check /tmp/mycnfUpgrade.log" << endl;
 				}
-*/				// call the mysql setup scripts
+
+				// call the mysql setup scripts
 				mysqlSetup();
 				sleep(5);
+			}
+			else
+			{
+				// run my.cnf upgrade script
+				if ( reuseConfig == "y" && oldMySQLRep == "y" && 
+					IserverTypeInstall == oam::INSTALL_COMBINE_DM_UM_PM )
+				{
+					cmd = installDir + "/bin/mycnfUpgrade  > /tmp/mycnfUpgrade.log 2>&1";
+					int rtnCode = system(cmd.c_str());
+					if (WEXITSTATUS(rtnCode) != 0)
+						cout << "Error: Problem upgrade my.cnf, check /tmp/mycnfUpgrade.log" << endl;
+				}
 			}
 
 			cout << endl;
@@ -3202,6 +3200,13 @@ int main(int argc, char *argv[])
 		}
 	}
 
+	//store mysql rep enable flag
+	try {
+		sysConfig->setConfig(InstallSection, "MySQLRep", MySQLRep);
+	}
+	catch(...)
+	{}
+
 	if ( !writeConfig(sysConfig) ) {
 		cout << "ERROR: Failed trying to update InfiniDB System Configuration file" << endl;
 		exit(1);
@@ -3433,10 +3438,10 @@ int main(int argc, char *argv[])
 			}
 		}
 
-		//set mysql replication, if needed
-		if ( ( mysqlrep && pmwithum ) || 
-			( mysqlrep && umNumber > 1 ) ||
-			( mysqlrep && pmNumber > 1 && IserverTypeInstall == oam::INSTALL_COMBINE_DM_UM_PM ) ) 
+		//set mysql replication, if wasn't setup before on system
+		if ( ( mysqlRep && ( oldMySQLRep == "n") && pmwithum ) || 
+			( mysqlRep && ( oldMySQLRep == "n") && (umNumber > 1) ) ||
+			( mysqlRep && ( oldMySQLRep == "n") && (pmNumber > 1) && (IserverTypeInstall == oam::INSTALL_COMBINE_DM_UM_PM) ) ) 
 		{
 			cout << endl << "Run MySQL Replication Setup.. ";
 			cout.flush();
@@ -3620,8 +3625,37 @@ bool checkSaveConfigFile()
 		}
 
 		//check to see if updates were made	
-		if ( sysConfig->getConfig("ExeMgr1", "IPAddr") != "0.0.0.0")
+		if ( sysConfig->getConfig("ExeMgr1", "IPAddr") != "0.0.0.0") {
+			if ( reuseConfig == "y" ) {
+				//Calpont.xml is ready to go, do mycnf if mysqlrep feature is enabled
+	
+				try {
+					oldMySQLRep = sysConfig->getConfig(InstallSection, "MySQLRep");
+				}
+				catch(...)
+				{}
+	
+				if ( oldMySQLRep == "y" )
+				{
+					MySQLRep = "y";
+					mysqlRep = true;
+				}
+	
+				//get local query / PMwithUM feature flag
+				try {
+					oldPMwithUM = sysConfig->getConfig(InstallSection, "PMwithUM");
+				}
+				catch(...)
+				{}
+	
+				if ( oldPMwithUM == "y" ) {
+					pmwithum = true;
+					PMwithUM  = "y";
+				}
+			}
+
 			return true;
+		}
 
 		sleep(1);
 	}

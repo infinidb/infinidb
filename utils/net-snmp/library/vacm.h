@@ -54,7 +54,7 @@ extern          "C" {
         int             storageType;
         int             status;
 
-        uint32_t          bitMask;
+        u_long          bitMask;
         struct vacm_groupEntry *reserved;
         struct vacm_groupEntry *next;
     };
@@ -73,7 +73,7 @@ extern          "C" {
         int             storageType;
         int             status;
 
-        uint32_t          bitMask;
+        u_long          bitMask;
         struct vacm_accessEntry *reserved;
         struct vacm_accessEntry *next;
     };
@@ -88,7 +88,7 @@ extern          "C" {
         int             viewStorageType;
         int             viewStatus;
 
-        uint32_t          bitMask;
+        u_long          bitMask;
 
         struct vacm_viewEntry *reserved;
         struct vacm_viewEntry *next;

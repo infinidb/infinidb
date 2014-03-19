@@ -200,11 +200,6 @@ void DmlReadThread::operator()()
                     rc = fWeDDLprocessor->writeSyscolumn(ibs, errMsg);
                     break;
                 }
-            case WE_SVR_WRITE_CREATE_SYSCOLUMN:
-                {
-                    rc = fWeDDLprocessor->writeCreateSyscolumn(ibs, errMsg);
-                    break;
-                }
             case WE_SVR_WRITE_CREATETABLEFILES:
                 {
                     rc = fWeDDLprocessor->createtablefiles(ibs, errMsg);

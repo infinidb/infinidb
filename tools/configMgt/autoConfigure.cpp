@@ -1063,9 +1063,9 @@ int main(int argc, char *argv[])
 					if ( (*pt3).dbrootConfigList.size() > 0 )
 					{
 						int moduleID = (*pt3).DeviceID;
-	
+		
 						DBRootConfigList::iterator pt4 = (*pt3).dbrootConfigList.begin();
-	
+		
 						int dbrootCount = (*pt3).dbrootConfigList.size();
 						string moduleCountParm = "ModuleDBRootCount" + oam.itoa(moduleID) + "-" + oam.itoa(i+1);
 						try {
@@ -1076,7 +1076,7 @@ int main(int argc, char *argv[])
 							cout << "ERROR: Problem setting Host Name in the Calpont System Configuration file" << endl;
 							exit(-1);
 						}
-	
+		
 						int entry = 1;
 						for( ; pt4 != (*pt3).dbrootConfigList.end() ; pt4++, entry++)
 						{
@@ -1094,9 +1094,8 @@ int main(int argc, char *argv[])
 						}
 					}
 				}
-
 			}
-
+	
 			if ( ( moduleType == "pm" && moduleDisableState == oam::ENABLEDSTATE ) ||
 				( IserverTypeInstall == oam::INSTALL_COMBINE_DM_UM_PM ) )
 				performancemodulelist.push_back(performancemodule);

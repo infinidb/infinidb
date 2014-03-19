@@ -3833,6 +3833,17 @@ void ProcessManager::setProcessStates(std::string moduleName, uint16_t state, st
 	SystemProcessConfig systemprocessconfig;
 	vector<ProcessConfig>::iterator itor;
 
+	//PMwithUM config
+	string PMwithUM = "n";
+	try {
+		oam.getSystemConfig( "PMwithUM", PMwithUM);
+	}
+	catch(...) {
+		PMwithUM = "n";
+	}
+
+	string moduleType = moduleName.substr(0,MAX_MODULE_TYPE_SIZE);
+
 	try{
 		oam.getProcessConfig(systemprocessconfig);
 	}
@@ -3846,7 +3857,7 @@ void ProcessManager::setProcessStates(std::string moduleName, uint16_t state, st
 		log.writeLog(__LINE__, "EXCEPTION ERROR on getProcessConfig: Caught unknown exception!", LOG_TYPE_ERROR);
 	}
 
-	string moduleType = moduleName.substr(0,MAX_MODULE_TYPE_SIZE);
+	string moduleTypeSet = moduleName.substr(0,MAX_MODULE_TYPE_SIZE);
 	
 	for (itor=systemprocessconfig.processconfig.begin();
 		itor != systemprocessconfig.processconfig.end(); ++itor)
@@ -3878,6 +3889,32 @@ void ProcessManager::setProcessStates(std::string moduleName, uint16_t state, st
 
 				if ( (*itor).ProcessName == "ExeMgr" || state == oam::AUTO_OFFLINE ) 
 					setProcessState(moduleName, "mysqld", state, 0);
+			}
+		}
+		else
+		{	//for for umwithpm apps, which is ExeMgr now
+			if ( moduleTypeSet == "pm" && PMwithUM == "y" )
+			{
+				ProcessStatus processstatus;
+				try {
+					oam.getProcessStatus("ExeMgr", moduleName, processstatus);
+				}
+				catch (exception& ex)
+				{
+					string error = ex.what();
+					log.writeLog(__LINE__, "EXCEPTION ERROR on getProcessStatus: " + error, LOG_TYPE_ERROR);
+				}
+				catch(...)
+				{
+					log.writeLog(__LINE__, "EXCEPTION ERROR on getProcessStatus: Caught unknown exception!", LOG_TYPE_ERROR);
+				}
+	
+				if (processstatus.ProcessOpState != oam::MAN_OFFLINE) {
+					setProcessState(moduleName, "ExeMgr", state, 0);
+	
+					if ( state == oam::AUTO_OFFLINE ) 
+						setProcessState(moduleName, "mysqld", state, 0);
+				}
 			}
 		}
 	}

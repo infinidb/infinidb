@@ -12,6 +12,7 @@ using namespace logging;
 
 #include "pseudocolumn.h"
 #include "functioncolumn.h"
+#include "constantcolumn.h"
 using namespace execplan;
 
 #include "functor.h"
@@ -45,6 +46,24 @@ void bailout(char* error, const string& funcName)
 	current_thd->main_da.can_overwrite_status = true;
 	current_thd->main_da.set_error_status(current_thd, HA_ERR_INTERNAL_ERROR, errMsg.c_str());
 	*error = 1;
+}
+
+int64_t idblocalpm()
+{
+	THD* thd = current_thd;
+	if (!thd->infinidb_vtable.cal_conn_info)
+		thd->infinidb_vtable.cal_conn_info = (void*)(new cal_connection_info());
+	cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(thd->infinidb_vtable.cal_conn_info);
+
+	if (ci->localPm == -1)
+	{
+		string module = ClientRotator::getModule();
+		if (module.size() >= 3 && (module[0] == 'p' || module[0] == 'P'))
+			ci->localPm = atol(module.c_str()+2);
+		else
+			ci->localPm = 0;
+	}
+	return ci->localPm;
 }
 
 extern "C"
@@ -336,7 +355,7 @@ my_bool idbextentmin_init(UDF_INIT* initid, UDF_ARGS* args, char* message)
 		strcpy(message,"idbpm() requires one argument");
 		return 1;
 	}
-
+	initid->maybe_null = 1;
 	return 0;
 }
 
@@ -372,7 +391,7 @@ my_bool idbextentmax_init(UDF_INIT* initid, UDF_ARGS* args, char* message)
 		strcpy(message,"idbextentmax() requires one argument");
 		return 1;
 	}
-
+	initid->maybe_null = 1;
 	return 0;
 }
 
@@ -408,7 +427,7 @@ my_bool idblocalpm_init(UDF_INIT* initid, UDF_ARGS* args, char* message)
 		strcpy(message,"idblocalpm() should take no argument");
 		return 1;
 	}
-
+	initid->maybe_null = 1;
 	return 0;
 }
 
@@ -424,22 +443,10 @@ __declspec(dllexport)
 #endif
 long long idblocalpm(UDF_INIT *initid, UDF_ARGS *args, char *is_null, char *error)
 {
-	THD* thd = current_thd;
-	if (!thd->infinidb_vtable.cal_conn_info)
-		thd->infinidb_vtable.cal_conn_info = (void*)(new cal_connection_info());
-	cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(thd->infinidb_vtable.cal_conn_info);
-
-	if (ci->localPm == -1)
-	{
-		string module = ClientRotator::getModule();
-		if (module.size() >= 3 && (module[0] == 'p' || module[0] == 'P'))
-			ci->localPm = atol(module.c_str()+2);
-		else
-			ci->localPm = 0;
-	}
-	if (ci->localPm == 0)
+	longlong localpm = idblocalpm();
+	if (localpm == 0)
 		*is_null = 1;
-	return ci->localPm;
+	return localpm;
 }
 
 }
@@ -456,7 +463,6 @@ ReturnedColumn* nullOnError(gp_walk_info& gwi, string& funcName)
 	return NULL;
 }
 
-
 uint32_t isPseudoColumn(string funcName)
 {
 	return execplan::PseudoColumn::pseudoNameToType(funcName);
@@ -467,10 +473,24 @@ execplan::ReturnedColumn* buildPseudoColumn(Item* item,
                                             bool& nonSupport,
                                             uint32_t pseudoType)
 {
+	Item_func* ifp = (Item_func*)item;
+
+	// idblocalpm is replaced by constant
+	if (pseudoType == PSEUDO_LOCALPM)
+	{
+		int64_t localPm = idblocalpm();
+		ConstantColumn* cc;
+		if (localPm)
+			cc = new ConstantColumn(localPm);
+		else
+			cc = new ConstantColumn("", ConstantColumn::NULLDATA);
+		cc->alias(ifp->name? ifp->name : "");
+		return cc;
+	}
+
 	// convert udf item to pseudocolumn item.
 	// adjust result type
 	// put arg col to column map
-	Item_func* ifp = (Item_func*)item;
 	string funcName = ifp->func_name();
 	if (ifp->arg_count != 1 ||
 	    !(ifp->arguments()) ||
@@ -534,11 +554,14 @@ execplan::ReturnedColumn* buildPseudoColumn(Item* item,
 		// operation type integer
 		funcexp::Func_idbpartition* idbpartition = new funcexp::Func_idbpartition();
 		fc->operationType(idbpartition->operationType(parms, fc->resultType()));
+		fc->alias(ifp->name? ifp->name : "");
 		return fc;
 	}
 
 	PseudoColumn *pc = new PseudoColumn(*sc, pseudoType);
 
+	// @bug5892. set alias for derived table column matching.
+	pc->alias(ifp->name? ifp->name : "");
 	return pc;
 }
 

@@ -255,9 +255,9 @@ extern          "C" {
                                                    *request,
                                                    int error_value);
 
-    uint32_t          netsnmp_marker_uptime(marker_t pm);
-    uint32_t          netsnmp_timeval_uptime(struct timeval *tv);
-    uint32_t          netsnmp_get_agent_uptime(void);
+    u_long          netsnmp_marker_uptime(marker_t pm);
+    u_long          netsnmp_timeval_uptime(struct timeval *tv);
+    u_long          netsnmp_get_agent_uptime(void);
     int             netsnmp_check_transaction_id(int transaction_id);
     int             netsnmp_agent_check_packet(netsnmp_session *,
                                                struct netsnmp_transport_s

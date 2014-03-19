@@ -5509,8 +5509,17 @@ int processCommand(string* arguments)
 							if ((*pt1).NicID == 1) 
 							{
 								// We need the name with domain and everything.
-								struct hostent* hentName = gethostbyname((*pt1).HostName.c_str());
-								cout << hentName->h_name << endl;
+								if ((*pt1).HostName == "localhost")
+								{
+									char hostName[128] = {0};
+									gethostname(hostName, 128);
+									cout << hostName << endl;
+								}
+								else
+								{
+									struct hostent* hentName = gethostbyname((*pt1).HostName.c_str());
+									cout << hentName->h_name << endl;
+								}
 							}
 						}
 					}
@@ -7562,7 +7571,7 @@ void printSystemStatus()
 			}
 		}
 
-		//display PMwithUM feature, if enabled
+		//display local Query / PMwithUM feature, if enabled
 		string PMwithUM;
 		try {
 			oam.getSystemConfig("PMwithUM", PMwithUM);
@@ -7570,10 +7579,21 @@ void printSystemStatus()
 		catch(...) {}
 
 		if ( PMwithUM == "y" )
-			cout << "Performance-Module with User-Module Functionality is enabled" << endl << endl;
+			cout << "Local Query Feature is enabled" << endl;
 		else
 			cout << endl;
 
+		//display MySQL replication feature, if enabled
+		string MySQLRep;
+		try {
+			oam.getSystemConfig("MySQLRep", MySQLRep);
+		}
+		catch(...) {}
+
+		if ( MySQLRep == "y" )
+			cout << "MySQL Replication Feature is enabled" << endl << endl;
+		else
+			cout << endl;
 	}
 	catch (exception& e)
 	{
@@ -8031,6 +8051,8 @@ bool checkForDisabledModules()
 		if( moduleCount == 0)
 			continue;
 
+		string moduleType = systemmoduletypeconfig.moduletypeconfig[i].ModuleType;
+
 		DeviceNetworkList::iterator pt = systemmoduletypeconfig.moduletypeconfig[i].ModuleNetworkList.begin();
 		for ( ; pt != systemmoduletypeconfig.moduletypeconfig[i].ModuleNetworkList.end(); pt++)
 		{
@@ -8048,6 +8070,9 @@ bool checkForDisabledModules()
 						found = true;
 					}
 					cout << moduleName << " ";
+
+					if ( moduleType == "um" )
+						continue;
 
 					//check if module has any dbroots assigned to it
 					string PMID = moduleName.substr(MAX_MODULE_TYPE_SIZE,MAX_MODULE_ID_SIZE);;

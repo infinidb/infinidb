@@ -33,13 +33,13 @@ int             netsnmp_register_read_only_ulong_instance(const char *name,
                                                           oid * reg_oid,
                                                           size_t
                                                           reg_oid_len,
-                                                          uint32_t * it,
+                                                          u_long * it,
                                                           Netsnmp_Node_Handler
                                                           * subhandler);
 int             netsnmp_register_ulong_instance(const char *name,
                                                 oid * reg_oid,
                                                 size_t reg_oid_len,
-                                                uint32_t * it,
+                                                u_long * it,
                                                 Netsnmp_Node_Handler *
                                                 subhandler);
 int             netsnmp_register_read_only_counter32_instance(const char
@@ -48,7 +48,7 @@ int             netsnmp_register_read_only_counter32_instance(const char
                                                               reg_oid,
                                                               size_t
                                                               reg_oid_len,
-                                                              uint32_t * it,
+                                                              u_long * it,
                                                               Netsnmp_Node_Handler
                                                               *
                                                               subhandler);
@@ -83,14 +83,14 @@ int  netsnmp_register_read_only_ulong_instance_context(const char *name,
                                                        oid * reg_oid,
                                                        size_t
                                                        reg_oid_len,
-                                                       uint32_t * it,
+                                                       u_long * it,
                                                        Netsnmp_Node_Handler
                                                        * subhandler,
                                                        const char *contextName);
 int  netsnmp_register_ulong_instance_context(const char *name,
                                              oid * reg_oid,
                                              size_t reg_oid_len,
-                                             uint32_t * it,
+                                             u_long * it,
                                              Netsnmp_Node_Handler *
                                              subhandler,
                                              const char *contextName);
@@ -100,7 +100,7 @@ int  netsnmp_register_read_only_counter32_instance_context(const char
                                                            reg_oid,
                                                            size_t
                                                            reg_oid_len,
-                                                           uint32_t * it,
+                                                           u_long * it,
                                                            Netsnmp_Node_Handler
                                                            *
                                                            subhandler,

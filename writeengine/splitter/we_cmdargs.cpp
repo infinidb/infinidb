@@ -57,6 +57,7 @@ WECmdArgs::WECmdArgs(int argc, char** argv) :
 		MAXARG(25)
 {
 	fMultiTableCount = 0;
+	fJobLogOnly = false;
 	fHelp = false;
 	fMode = 1; 				//default Mode
 	fArgMode = -1;
@@ -205,13 +206,13 @@ std::string WECmdArgs::getCpImportCmdLine()
 	if(fbTruncationAsError)
 		aSS << " -S ";
 
-	if((fJobId.length()>0)&&(fMode==1))
+	if((fJobId.length()>0)&&(fMode==1)&&(!fJobLogOnly))
 	{
 		// if JobPath provided, make it w.r.t WES
 		aSS << " -p " << fTmpFileDir;
 		aSS << " -fSTDIN";
 	}
-	else if((fJobId.length()>0)&&(fMode==2))
+	else if((fJobId.length()>0)&&(fMode==2)&&(!fJobLogOnly))
 	{
 		// if JobPath provided, make it w.r.t WES
 		aSS << " -p " << fTmpFileDir;
@@ -834,6 +835,9 @@ void WECmdArgs::parseCmdLineArgs(int argc, char** argv)
 					fLocFile = "STDIN";
 				// else take it from the jobxml file
 			}
+
+			if((fSchema.length()>0)&&(fTable.length()>0)&&(fLocFile.length()>0))
+				fJobLogOnly = true;
 		}
 		else
 		{
@@ -1235,7 +1239,7 @@ void WECmdArgs::setSchemaAndTableFromJobFile(std::string& JobName)
 //------------------------------------------------------------------------------
 void WECmdArgs::checkJobIdCase()
 {
-	if((fJobId.empty())||(fMode==3)||(fMode==0)) return;
+	if((fJobId.empty())||(fJobLogOnly)||(fMode==3)||(fMode==0)) return;
 	if(fJobPath.empty())
 	{
 		string bulkRootPath = config::Config::makeConfig()->getConfig(

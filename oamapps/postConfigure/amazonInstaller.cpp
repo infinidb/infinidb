@@ -142,6 +142,8 @@ string elasticIPs = oam::UnassignedName;
 string systemType = "";
 string subnetID = oam::UnassignedName;
 string VPCStartPrivateIP = oam::UnassignedName;
+string localQuery = "n";
+string MySQLRep = "n";
 
 bool PMEBS = true;
 
@@ -169,8 +171,6 @@ int main(int argc, char *argv[])
 	string existingUMInstances = oam::UnassignedName;
 	string UMprivateIPS = oam::UnassignedName;
 	string PMprivateIPS = oam::UnassignedName;
-	string UserModuleAutoSync = "n";
-	int UserModuleSyncTime = 10;
 	string instanceType;
 
 	string amazonConfigFile = "/root/amazonConfig.xml";
@@ -951,7 +951,8 @@ int main(int argc, char *argv[])
 			cout << "Error: x509PrivateFile and x509CertificationFile are the same file name in the config file, exiting" << endl;
 			exit (1);
 		}
-	
+
+		//standard config parmeters
 		try {
 			systemName = amazonConfig->getConfig("SystemConfig", "SystemName");
 			systemType = amazonConfig->getConfig("SystemConfig", "SystemType");
@@ -971,8 +972,6 @@ int main(int argc, char *argv[])
 			NumBlocksPct = amazonConfig->getConfig("SystemConfig", "NumBlocksPct");
 			existingPMInstances = amazonConfig->getConfig("SystemConfig", "PerformanceModuleInstances");
 			existingUMInstances = amazonConfig->getConfig("SystemConfig", "UserModuleInstances");
-			UserModuleAutoSync = amazonConfig->getConfig("SystemConfig", "UserModuleAutoSync");
-			UserModuleSyncTime = atoi(amazonConfig->getConfig("SystemConfig", "UserModuleSyncTime").c_str());
 			autoTagging = amazonConfig->getConfig("SystemConfig", "AutoTagging");
 			region = amazonConfig->getConfig("SystemConfig", "Region");
 			subnetID = amazonConfig->getConfig("SystemConfig", "SubNetID");
@@ -982,6 +981,25 @@ int main(int argc, char *argv[])
 		}
 		catch(...)
 		{}
+
+		//hidden config paremeters
+		try {
+			localQuery = amazonConfig->getConfig("SystemConfig", "LocalQuery");
+		}
+		catch(...)
+		{}
+
+		if ( localQuery.empty() )
+			localQuery = "n";
+
+		try {
+			MySQLRep = amazonConfig->getConfig("SystemConfig", "MySQLRep");
+		}
+		catch(...)
+		{}
+
+		if ( MySQLRep.empty() )
+			MySQLRep = "n";
 	}
 
 	// validate config paramaters
@@ -1299,6 +1317,25 @@ int main(int argc, char *argv[])
 
 	if ( existingPMInstances != oam::UnassignedName )
 		cout << "Using Performance Modules Instances = " << existingPMInstances << endl;
+
+	if ( localQuery == "y" ) {
+		cout << "Local Query Feature = enabled"  << endl;
+		if ( systemType == "combined" && localQuery == "y" ) {
+			cout << "NOTE: Local Query Feature is not valid on a 'combined' system, turning off feature" << endl;
+			localQuery == "n";
+		}
+		else
+		{
+			if ( MySQLRep == "n" ) 
+			{
+				cout << "NOTE: Local Query Feature is enabled and requires MySQL Replication, enabling MySQL Replication Feature" << endl;
+				MySQLRep = "y";
+			}
+		}
+	}
+
+	if ( MySQLRep == "y" )
+		cout << "MySQL Replication Feature = enabled" <<  endl;
 
 	cout << "Number of DBRoots per Performance Modules = " << dbrootPer << endl;
 
@@ -2130,6 +2167,10 @@ int main(int argc, char *argv[])
 	string postConfigureCMD = installDir + "/bin/postConfigure -n -p " + rootPassword;
 	if ( postConfigureDebug )
 		postConfigureCMD = postConfigureCMD + " -d";
+	if ( localQuery == "y" )
+		postConfigureCMD = postConfigureCMD + " -lq";
+	if ( MySQLRep == "y" )
+		postConfigureCMD = postConfigureCMD + " -rep";
 
 	cout << endl << " Running command: " << postConfigureCMD << endl;
 

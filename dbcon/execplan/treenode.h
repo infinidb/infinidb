@@ -345,7 +345,7 @@ public:
 	{ fRefCount++; }
 
 	/***********************************************************************
-	 *					 F&E framework								   *
+     *                     F&E framework                                   *
 	 ***********************************************************************/
 	virtual const std::string& getStrVal(rowgroup::Row& row, bool& isNull) {return fResult.strVal;}
 	virtual int64_t getIntVal(rowgroup::Row& row, bool& isNull) {return fResult.intVal;}
@@ -496,15 +496,33 @@ inline const std::string& TreeNode::getStrVal()
 		case CalpontSystemCatalog::FLOAT:
 		case CalpontSystemCatalog::UFLOAT:
 		{
-			snprintf(tmp, 312, "%f", fResult.floatVal);
-			fResult.strVal = removeTrailing0(tmp, 312);
+			if ((fabs(fResult.floatVal) > (1.0 / IDB_pow[4])) &&
+				(fabs(fResult.floatVal) < (float) IDB_pow[6]))
+			{
+				snprintf(tmp, 312, "%f", fResult.floatVal);
+				fResult.strVal = removeTrailing0(tmp, 312);
+			}
+			else
+			{
+				snprintf(tmp, 312, "%e", fResult.floatVal);
+				fResult.strVal = tmp;
+			}
 			break;
 		}
 		case CalpontSystemCatalog::DOUBLE:
 		case CalpontSystemCatalog::UDOUBLE:
 		{
-			snprintf(tmp, 312, "%f", fResult.doubleVal);
-			fResult.strVal = removeTrailing0(tmp, 312);
+			if ((fabs(fResult.doubleVal) > (1.0 / IDB_pow[13])) &&
+				(fabs(fResult.doubleVal) < (float) IDB_pow[15]))
+			{
+				snprintf(tmp, 312, "%f", fResult.doubleVal);
+				fResult.strVal = removeTrailing0(tmp, 312);
+			}
+			else
+			{
+				snprintf(tmp, 312, "%e", fResult.doubleVal);
+				fResult.strVal = tmp;
+			}
 			break;
 		}
 		case CalpontSystemCatalog::DECIMAL:

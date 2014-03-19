@@ -149,6 +149,8 @@ rm -rf $RPM_BUILD_ROOT $RPM_BUILD_DIR/%{name}-%{version}-%{release}
 /usr/local/Calpont/bin/resourceReport.sh
 /usr/local/Calpont/bin/hadoopReport.sh
 /usr/local/Calpont/bin/alarmReport.sh
+/usr/local/Calpont/bin/amazonInstaller
+
 
 #
 %config /usr/local/Calpont/etc/Calpont.xml
@@ -185,6 +187,9 @@ rm -rf $RPM_BUILD_ROOT $RPM_BUILD_DIR/%{name}-%{version}-%{release}
 /usr/local/Calpont/bin/IDBInstanceCmds.sh
 /usr/local/Calpont/bin/IDBVolumeCmds.sh
 /usr/local/Calpont/bin/binary_installer.sh 
+/usr/local/Calpont/bin/myCnf-include-args.text 
+/usr/local/Calpont/bin/myCnf-exclude-args.text
+/usr/local/Calpont/bin/mycnfUpgrade
 
 /usr/local/Calpont/sbin/snmpd
 /usr/local/Calpont/sbin/snmptrapd

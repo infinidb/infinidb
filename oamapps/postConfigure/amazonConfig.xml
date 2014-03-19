@@ -60,14 +60,6 @@
 		<!-- Applicable for system type = 'separate' only -->
 		<UMEBSVolumeSize>10</UMEBSVolumeSize>
 		
-		<!-- User Module MySQL Database Auto Sync -->
-		<!-- Setting this enables the Automatic syncing of the MySQL Database from the Primary User Module -->
-		<!-- to other User Modules. And will sync the dastabase when a new User Module is Added -->
-		<UserModuleAutoSync>y</UserModuleAutoSync>
-		
-		<!-- User Module MySQL Database Auto Sync Time in Minutes -->
-		<UserModuleSyncTime>10</UserModuleSyncTime>
-		
 		<!-- Number of Performance Modules -->
 		<PerformanceModuleCount>2</PerformanceModuleCount>
 		
@@ -88,8 +80,7 @@
 		<!-- SNMP Trap Receiver IP Address: 0.0.0.0 means no snmptraps will be forwarded -->
 		<SNMPTrapIPAddr>0.0.0.0</SNMPTrapIPAddr>
 		
-		<!-- Total UM Memory Size, default to postConfigure setting -->
-		<!-- Use xxG for Gigibytes, ie. 16G, xxM for megabytes, ie. 256M -->
+		<!-- Total UM Memory Size Percentage, default to postConfigure setting -->
 		<TotalUmMemory>unassigned</TotalUmMemory>
 		
 		<!-- Blocks Cache Size Percentage, default to postConfigure setting -->

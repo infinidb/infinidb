@@ -92,6 +92,7 @@ class WECmdArgs
 		void setBlockMode3(bool Block) { this->fBlockMode3 = Block; }
 		void setTruncationAsError(bool bTruncationAsError)
 		{ fbTruncationAsError = bTruncationAsError;	}
+		bool isJobLogOnly() const { return fJobLogOnly; }
 
     private:	// variables for SplitterApp
         typedef std::vector<std::string> VecArgs;
@@ -125,8 +126,9 @@ class WECmdArgs
 		void getColumnList( std::set<std::string>& columnList ) const;
 
     private:	// variables for SplitterApp
-        std::string fJobId;				// JobID
+        std::string fJobId;		// JobID
         std::string fOrigJobId;	// Original JobID, in case we have to split it
+		bool fJobLogOnly;		// Job number is only for log filename only
         bool fHelp;				// Help mode
         int fMode;				// splitter Mode
         int fArgMode;			// Argument mode, dep. on this fMode is decided.
