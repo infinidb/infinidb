@@ -818,11 +818,11 @@ int main(int argc, char *argv[])
 		int dbrootNum = 0;
 		int systemDBRootCount = 0;
 		int dbrootCountPerModule = 0;
-		if ( moduleType == "pm" && OLDbuild3)
+		if ( moduleType == "pm" && !OLDbuild3)
 		{
 			dbrootNum = 1;
 			systemDBRootCount = DBRootCount;
-			if ( pmNumber > 1 )
+			if ( pmNumber > 0 )
 				dbrootCountPerModule = DBRootCount / pmNumber;
 			if ( dbrootCountPerModule == 0 )
 				dbrootCountPerModule = 1;
@@ -1063,9 +1063,9 @@ int main(int argc, char *argv[])
 					if ( (*pt3).dbrootConfigList.size() > 0 )
 					{
 						int moduleID = (*pt3).DeviceID;
-		
+	
 						DBRootConfigList::iterator pt4 = (*pt3).dbrootConfigList.begin();
-		
+	
 						int dbrootCount = (*pt3).dbrootConfigList.size();
 						string moduleCountParm = "ModuleDBRootCount" + oam.itoa(moduleID) + "-" + oam.itoa(i+1);
 						try {
@@ -1076,7 +1076,7 @@ int main(int argc, char *argv[])
 							cout << "ERROR: Problem setting Host Name in the Calpont System Configuration file" << endl;
 							exit(-1);
 						}
-		
+	
 						int entry = 1;
 						for( ; pt4 != (*pt3).dbrootConfigList.end() ; pt4++, entry++)
 						{
@@ -1092,52 +1092,6 @@ int main(int argc, char *argv[])
 								exit(-1);
 							}
 						}
-					}
-				}
-			}
-	
-			//assign any unassigned dbroots to pm1 on pre build3 upgrades
-			if (!build3) {
-				//get any unassigned DBRoots
-				DBRootConfigList undbrootlist;
-				try {
-					oam.getUnassignedDbroot(undbrootlist);
-				}
-				catch(...) {}
-	
-				if ( !undbrootlist.empty() )
-				{
-					string dbrootCount;
-	
-					int entry = 1;
-					DBRootConfigList::iterator pt1 = undbrootlist.begin();
-					for( ; pt1 != undbrootlist.end() ; pt1++ )
-					{
-						//skip dbroot #1, already setup
-						if ( *pt1 == 1 )
-							continue;
-	
-						entry++;
-	
-						string moduleDBRootIDParm = "ModuleDBRootID1-" + oam.itoa(entry) + "-3";
-						try {
-							sysConfigNew->setConfig(ModuleSection, moduleDBRootIDParm, oam.itoa(*pt1));
-						}
-						catch(...)
-						{
-							cout << "ERROR: Problem setting Host Name in the Calpont System Configuration file" << endl;
-							exit(-1);
-						}
-					}
-	
-					string moduleCountParm = "ModuleDBRootCount1-3";
-					try {
-						sysConfigNew->setConfig(ModuleSection, moduleCountParm, oam.itoa(entry));
-					}
-					catch(...)
-					{
-						cout << "ERROR: Problem setting Host Name in the Calpont System Configuration file" << endl;
-						exit(-1);
 					}
 				}
 

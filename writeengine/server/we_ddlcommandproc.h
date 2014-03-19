@@ -58,6 +58,7 @@ class WE_DDLCommandProc
 		EXPORT uint8_t updateSyscolumnNextval(messageqcpp::ByteStream& bs, std::string & err);
 		EXPORT uint8_t writeSystable(messageqcpp::ByteStream& bs, std::string & err);
 		EXPORT uint8_t writeSyscolumn(messageqcpp::ByteStream& bs, std::string & err);
+		EXPORT uint8_t writeCreateSyscolumn(messageqcpp::ByteStream& bs, std::string & err);
 		EXPORT uint8_t createtablefiles(messageqcpp::ByteStream& bs, std::string & err);
 		EXPORT uint8_t commitVersion(messageqcpp::ByteStream& bs, std::string & err);
 		EXPORT uint8_t rollbackBlocks(messageqcpp::ByteStream& bs, std::string & err);
