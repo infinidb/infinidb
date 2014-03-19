@@ -56,7 +56,8 @@ POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
 bin_PROGRAMS = postConfigure$(EXEEXT) installer$(EXEEXT) \
-	patchInstaller$(EXEEXT)
+	patchInstaller$(EXEEXT) amazonInstaller$(EXEEXT) \
+	mycnfUpgrade$(EXEEXT)
 subdir = oamapps/postConfigure
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -70,10 +71,18 @@ CONFIG_CLEAN_FILES =
 am__installdirs = "$(DESTDIR)$(bindir)"
 binPROGRAMS_INSTALL = $(INSTALL_PROGRAM)
 PROGRAMS = $(bin_PROGRAMS)
+am_amazonInstaller_OBJECTS =  \
+	amazonInstaller-amazonInstaller.$(OBJEXT) \
+	amazonInstaller-helpers.$(OBJEXT)
+amazonInstaller_OBJECTS = $(am_amazonInstaller_OBJECTS)
+amazonInstaller_LDADD = $(LDADD)
 am_installer_OBJECTS = installer-installer.$(OBJEXT) \
 	installer-helpers.$(OBJEXT)
 installer_OBJECTS = $(am_installer_OBJECTS)
 installer_LDADD = $(LDADD)
+am_mycnfUpgrade_OBJECTS = mycnfUpgrade-mycnfUpgrade.$(OBJEXT)
+mycnfUpgrade_OBJECTS = $(am_mycnfUpgrade_OBJECTS)
+mycnfUpgrade_LDADD = $(LDADD)
 am_patchInstaller_OBJECTS = patchInstaller-patchInstaller.$(OBJEXT)
 patchInstaller_OBJECTS = $(am_patchInstaller_OBJECTS)
 patchInstaller_LDADD = $(LDADD)
@@ -92,9 +101,11 @@ LTCXXCOMPILE = $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) \
 CXXLD = $(CXX)
 CXXLINK = $(LIBTOOL) --tag=CXX --mode=link $(CXXLD) $(AM_CXXFLAGS) \
 	$(CXXFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
-SOURCES = $(installer_SOURCES) $(patchInstaller_SOURCES) \
+SOURCES = $(amazonInstaller_SOURCES) $(installer_SOURCES) \
+	$(mycnfUpgrade_SOURCES) $(patchInstaller_SOURCES) \
 	$(postConfigure_SOURCES)
-DIST_SOURCES = $(installer_SOURCES) $(patchInstaller_SOURCES) \
+DIST_SOURCES = $(amazonInstaller_SOURCES) $(installer_SOURCES) \
+	$(mycnfUpgrade_SOURCES) $(patchInstaller_SOURCES) \
 	$(postConfigure_SOURCES)
 ETAGS = etags
 CTAGS = ctags
@@ -243,6 +254,12 @@ installer_LDFLAGS = $(idb_common_ldflags) $(idb_common_libs) $(idb_oam_libs) $(i
 patchInstaller_SOURCES = patchInstaller.cpp
 patchInstaller_CPPFLAGS = $(idb_common_includes) $(AM_CPPFLAGS)
 patchInstaller_LDFLAGS = $(idb_common_ldflags) $(idb_common_libs) $(idb_oam_libs) $(idb_exec_libs) $(AM_LDFLAGS)
+amazonInstaller_SOURCES = amazonInstaller.cpp helpers.cpp
+amazonInstaller_CPPFLAGS = $(idb_common_includes) $(AM_CPPFLAGS)
+amazonInstaller_LDFLAGS = $(idb_common_ldflags) $(idb_common_libs) $(idb_oam_libs) $(idb_exec_libs) $(AM_LDFLAGS)
+mycnfUpgrade_SOURCES = mycnfUpgrade.cpp
+mycnfUpgrade_CPPFLAGS = $(idb_common_includes) $(AM_CPPFLAGS)
+mycnfUpgrade_LDFLAGS = $(idb_common_ldflags) $(idb_common_libs) $(idb_oam_libs) $(idb_exec_libs) $(AM_LDFLAGS)
 all: all-am
 
 .SUFFIXES:
@@ -304,9 +321,15 @@ clean-binPROGRAMS:
 	  echo " rm -f $$p $$f"; \
 	  rm -f $$p $$f ; \
 	done
+amazonInstaller$(EXEEXT): $(amazonInstaller_OBJECTS) $(amazonInstaller_DEPENDENCIES) 
+	@rm -f amazonInstaller$(EXEEXT)
+	$(CXXLINK) $(amazonInstaller_LDFLAGS) $(amazonInstaller_OBJECTS) $(amazonInstaller_LDADD) $(LIBS)
 installer$(EXEEXT): $(installer_OBJECTS) $(installer_DEPENDENCIES) 
 	@rm -f installer$(EXEEXT)
 	$(CXXLINK) $(installer_LDFLAGS) $(installer_OBJECTS) $(installer_LDADD) $(LIBS)
+mycnfUpgrade$(EXEEXT): $(mycnfUpgrade_OBJECTS) $(mycnfUpgrade_DEPENDENCIES) 
+	@rm -f mycnfUpgrade$(EXEEXT)
+	$(CXXLINK) $(mycnfUpgrade_LDFLAGS) $(mycnfUpgrade_OBJECTS) $(mycnfUpgrade_LDADD) $(LIBS)
 patchInstaller$(EXEEXT): $(patchInstaller_OBJECTS) $(patchInstaller_DEPENDENCIES) 
 	@rm -f patchInstaller$(EXEEXT)
 	$(CXXLINK) $(patchInstaller_LDFLAGS) $(patchInstaller_OBJECTS) $(patchInstaller_LDADD) $(LIBS)
@@ -320,8 +343,11 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/amazonInstaller-amazonInstaller.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/amazonInstaller-helpers.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/installer-helpers.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/installer-installer.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mycnfUpgrade-mycnfUpgrade.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/patchInstaller-patchInstaller.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/postConfigure-helpers.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/postConfigure-postConfigure.Po@am__quote@
@@ -346,6 +372,34 @@ distclean-compile:
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(LTCXXCOMPILE) -c -o $@ $<
+
+amazonInstaller-amazonInstaller.o: amazonInstaller.cpp
+@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(amazonInstaller_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT amazonInstaller-amazonInstaller.o -MD -MP -MF "$(DEPDIR)/amazonInstaller-amazonInstaller.Tpo" -c -o amazonInstaller-amazonInstaller.o `test -f 'amazonInstaller.cpp' || echo '$(srcdir)/'`amazonInstaller.cpp; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/amazonInstaller-amazonInstaller.Tpo" "$(DEPDIR)/amazonInstaller-amazonInstaller.Po"; else rm -f "$(DEPDIR)/amazonInstaller-amazonInstaller.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='amazonInstaller.cpp' object='amazonInstaller-amazonInstaller.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(amazonInstaller_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o amazonInstaller-amazonInstaller.o `test -f 'amazonInstaller.cpp' || echo '$(srcdir)/'`amazonInstaller.cpp
+
+amazonInstaller-amazonInstaller.obj: amazonInstaller.cpp
+@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(amazonInstaller_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT amazonInstaller-amazonInstaller.obj -MD -MP -MF "$(DEPDIR)/amazonInstaller-amazonInstaller.Tpo" -c -o amazonInstaller-amazonInstaller.obj `if test -f 'amazonInstaller.cpp'; then $(CYGPATH_W) 'amazonInstaller.cpp'; else $(CYGPATH_W) '$(srcdir)/amazonInstaller.cpp'; fi`; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/amazonInstaller-amazonInstaller.Tpo" "$(DEPDIR)/amazonInstaller-amazonInstaller.Po"; else rm -f "$(DEPDIR)/amazonInstaller-amazonInstaller.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='amazonInstaller.cpp' object='amazonInstaller-amazonInstaller.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(amazonInstaller_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o amazonInstaller-amazonInstaller.obj `if test -f 'amazonInstaller.cpp'; then $(CYGPATH_W) 'amazonInstaller.cpp'; else $(CYGPATH_W) '$(srcdir)/amazonInstaller.cpp'; fi`
+
+amazonInstaller-helpers.o: helpers.cpp
+@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(amazonInstaller_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT amazonInstaller-helpers.o -MD -MP -MF "$(DEPDIR)/amazonInstaller-helpers.Tpo" -c -o amazonInstaller-helpers.o `test -f 'helpers.cpp' || echo '$(srcdir)/'`helpers.cpp; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/amazonInstaller-helpers.Tpo" "$(DEPDIR)/amazonInstaller-helpers.Po"; else rm -f "$(DEPDIR)/amazonInstaller-helpers.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='helpers.cpp' object='amazonInstaller-helpers.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(amazonInstaller_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o amazonInstaller-helpers.o `test -f 'helpers.cpp' || echo '$(srcdir)/'`helpers.cpp
+
+amazonInstaller-helpers.obj: helpers.cpp
+@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(amazonInstaller_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT amazonInstaller-helpers.obj -MD -MP -MF "$(DEPDIR)/amazonInstaller-helpers.Tpo" -c -o amazonInstaller-helpers.obj `if test -f 'helpers.cpp'; then $(CYGPATH_W) 'helpers.cpp'; else $(CYGPATH_W) '$(srcdir)/helpers.cpp'; fi`; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/amazonInstaller-helpers.Tpo" "$(DEPDIR)/amazonInstaller-helpers.Po"; else rm -f "$(DEPDIR)/amazonInstaller-helpers.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='helpers.cpp' object='amazonInstaller-helpers.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(amazonInstaller_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o amazonInstaller-helpers.obj `if test -f 'helpers.cpp'; then $(CYGPATH_W) 'helpers.cpp'; else $(CYGPATH_W) '$(srcdir)/helpers.cpp'; fi`
 
 installer-installer.o: installer.cpp
 @am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(installer_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT installer-installer.o -MD -MP -MF "$(DEPDIR)/installer-installer.Tpo" -c -o installer-installer.o `test -f 'installer.cpp' || echo '$(srcdir)/'`installer.cpp; \
@@ -374,6 +428,20 @@ installer-helpers.obj: helpers.cpp
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='helpers.cpp' object='installer-helpers.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(installer_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o installer-helpers.obj `if test -f 'helpers.cpp'; then $(CYGPATH_W) 'helpers.cpp'; else $(CYGPATH_W) '$(srcdir)/helpers.cpp'; fi`
+
+mycnfUpgrade-mycnfUpgrade.o: mycnfUpgrade.cpp
+@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mycnfUpgrade_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT mycnfUpgrade-mycnfUpgrade.o -MD -MP -MF "$(DEPDIR)/mycnfUpgrade-mycnfUpgrade.Tpo" -c -o mycnfUpgrade-mycnfUpgrade.o `test -f 'mycnfUpgrade.cpp' || echo '$(srcdir)/'`mycnfUpgrade.cpp; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/mycnfUpgrade-mycnfUpgrade.Tpo" "$(DEPDIR)/mycnfUpgrade-mycnfUpgrade.Po"; else rm -f "$(DEPDIR)/mycnfUpgrade-mycnfUpgrade.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='mycnfUpgrade.cpp' object='mycnfUpgrade-mycnfUpgrade.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mycnfUpgrade_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o mycnfUpgrade-mycnfUpgrade.o `test -f 'mycnfUpgrade.cpp' || echo '$(srcdir)/'`mycnfUpgrade.cpp
+
+mycnfUpgrade-mycnfUpgrade.obj: mycnfUpgrade.cpp
+@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mycnfUpgrade_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT mycnfUpgrade-mycnfUpgrade.obj -MD -MP -MF "$(DEPDIR)/mycnfUpgrade-mycnfUpgrade.Tpo" -c -o mycnfUpgrade-mycnfUpgrade.obj `if test -f 'mycnfUpgrade.cpp'; then $(CYGPATH_W) 'mycnfUpgrade.cpp'; else $(CYGPATH_W) '$(srcdir)/mycnfUpgrade.cpp'; fi`; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/mycnfUpgrade-mycnfUpgrade.Tpo" "$(DEPDIR)/mycnfUpgrade-mycnfUpgrade.Po"; else rm -f "$(DEPDIR)/mycnfUpgrade-mycnfUpgrade.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='mycnfUpgrade.cpp' object='mycnfUpgrade-mycnfUpgrade.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mycnfUpgrade_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o mycnfUpgrade-mycnfUpgrade.obj `if test -f 'mycnfUpgrade.cpp'; then $(CYGPATH_W) 'mycnfUpgrade.cpp'; else $(CYGPATH_W) '$(srcdir)/mycnfUpgrade.cpp'; fi`
 
 patchInstaller-patchInstaller.o: patchInstaller.cpp
 @am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(patchInstaller_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT patchInstaller-patchInstaller.o -MD -MP -MF "$(DEPDIR)/patchInstaller-patchInstaller.Tpo" -c -o patchInstaller-patchInstaller.o `test -f 'patchInstaller.cpp' || echo '$(srcdir)/'`patchInstaller.cpp; \
