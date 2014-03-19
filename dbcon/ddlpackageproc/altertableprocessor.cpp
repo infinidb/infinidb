@@ -513,7 +513,7 @@ void AlterTableProcessor::addColumn (u_int32_t sessionID, execplan::CalpontSyste
 	int rc = 0;
 	std::string errorMsg;
 	u_int16_t  dbRoot;
-	BRM::OID_t sysOid = 1001;
+	BRM::OID_t sysOid = 1021;
 	bool isDict = false;
 	//@Bug 4111. Check whether the column exists in calpont systable
 	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr =
@@ -554,7 +554,7 @@ void AlterTableProcessor::addColumn (u_int32_t sessionID, execplan::CalpontSyste
 	{
 		isDict = true;
 	}
-	//Find out where systables are
+	//Find out where syscolumn are
 	rc = fDbrm->getSysCatDBRoot(sysOid, dbRoot);
 	if (rc != 0)
 		throw std::runtime_error("Error while calling getSysCatDBRoot ");
@@ -704,6 +704,13 @@ void AlterTableProcessor::addColumn (u_int32_t sessionID, execplan::CalpontSyste
 		if ((columnDefPtr->fType->fAutoincrement).compare("y") == 0)
 		{
 			//update systable autoincrement column
+			sysOid = 1001;
+			//Find out where systable is
+			rc = fDbrm->getSysCatDBRoot(sysOid, dbRoot);
+			if (rc != 0)
+				throw std::runtime_error("Error while calling getSysCatDBRoot ");
+			
+			pmNum = (*dbRootPMMap)[dbRoot];
 			bs.restart();
 			bs << (ByteStream::byte) WE_SVR_UPDATE_SYSTABLE_AUTO;
 			bs << uniqueId;
@@ -1040,9 +1047,9 @@ void AlterTableProcessor::dropColumn (u_int32_t sessionID, execplan::CalpontSyst
 	
 	std::string errorMsg;
 	u_int16_t  dbRoot;
-	BRM::OID_t sysOid = 1001;
+	BRM::OID_t sysOid = 1021;
 	ByteStream::byte rc = 0;
-	//Find out where systable is
+	//Find out where syscolumn is
 	rc = fDbrm->getSysCatDBRoot(sysOid, dbRoot);  
 	if (rc != 0)
 		throw std::runtime_error("Error while calling getSysCatDBRoot ");
@@ -1099,6 +1106,13 @@ cout << "Alter table drop column got unknown exception" << endl;
 	//Update SYSTABLE 
 	if (colType.autoincrement)
 	{
+		sysOid = 1001;
+		//Find out where systable is
+		rc = fDbrm->getSysCatDBRoot(sysOid, dbRoot);  
+		if (rc != 0)
+			throw std::runtime_error("Error while calling getSysCatDBRoot ");
+	
+		pmNum = (*dbRootPMMap)[dbRoot];
 		bytestream.restart();
 		bytestream << (ByteStream::byte)WE_SVR_UPDATE_SYSTABLE_AUTO;
 		bytestream << uniqueId;
@@ -1160,6 +1174,14 @@ cout << "Alter table drop column got unknown exception" << endl;
 	bytestream << fTableName.fSchema;
 	bytestream << fTableName.fName;
 	bytestream << (u_int32_t) colPos;
+	sysOid = 1021;
+	//Find out where syscolumn is
+	rc = fDbrm->getSysCatDBRoot(sysOid, dbRoot);  
+	if (rc != 0)
+		throw std::runtime_error("Error while calling getSysCatDBRoot ");
+	
+	pmNum = (*dbRootPMMap)[dbRoot];
+	
 	try {		
 		fWEClient->write(bytestream, (uint)pmNum);
 #ifdef IDB_DDL_DEBUG
@@ -1377,9 +1399,9 @@ void AlterTableProcessor::setColumnDefault (u_int32_t sessionID, execplan::Calpo
 	ByteStream bs;
 	std::string errorMsg;
 	u_int16_t  dbRoot;
-	BRM::OID_t sysOid = 1001;
+	BRM::OID_t sysOid = 1021;
 	ByteStream::byte rc = 0;
-	//Find out where systable is
+	//Find out where syscolumns
 	rc = fDbrm->getSysCatDBRoot(sysOid, dbRoot);  
 	if (rc != 0)
 		throw std::runtime_error("Error while calling getSysCatDBRoot");
@@ -1456,9 +1478,9 @@ void AlterTableProcessor::dropColumnDefault (u_int32_t sessionID, execplan::Calp
 	ByteStream bs;
 	std::string errorMsg;
 	u_int16_t  dbRoot;
-	BRM::OID_t sysOid = 1001;
+	BRM::OID_t sysOid = 1021;
 	ByteStream::byte rc = 0;
-	//Find out where systable is
+	//Find out where syscolumn is
 	rc = fDbrm->getSysCatDBRoot(sysOid, dbRoot);  
 	if (rc != 0)
 		throw std::runtime_error("Error while calling getSysCatDBRoot");
@@ -1632,7 +1654,7 @@ void AlterTableProcessor::renameTable (uint32_t sessionID, execplan::CalpontSyst
 		throw std::runtime_error("The new tablename is already in use.");
 	
 	ByteStream bytestream;
-	bytestream << (ByteStream::byte)WE_SVR_UPDATE_SYSTABLES_TABLENAME;
+	bytestream << (ByteStream::byte)WE_SVR_UPDATE_SYSTABLE_TABLENAME;
 	bytestream << uniqueId;
 	bytestream << sessionID;
 	bytestream << (u_int32_t)txnID;
@@ -1660,6 +1682,65 @@ void AlterTableProcessor::renameTable (uint32_t sessionID, execplan::CalpontSyst
 		fWEClient->write(bytestream, (uint)pmNum);
 #ifdef IDB_DDL_DEBUG
 cout << "Rename table sending WE_SVR_UPDATE_SYSTABLE_TABLENAME to pm " << pmNum << endl;
+#endif	
+		while (1)
+		{
+			bsIn.reset(new ByteStream());
+			fWEClient->read(uniqueId, bsIn);
+			if ( bsIn->length() == 0 ) //read error
+			{
+				rc = NETWORK_ERROR;
+				errorMsg = "Lost connection to Write Engine Server while updating SYSTABLES";
+				break;
+			}			
+			else {
+				*bsIn >> rc;
+				*bsIn >> errorMsg;
+				break;
+			}
+		}
+	}
+	catch (runtime_error& ex) //write error
+	{
+#ifdef IDB_DDL_DEBUG
+cout << "create table got exception" << ex.what() << endl;
+#endif			
+		rc = NETWORK_ERROR;
+		errorMsg = ex.what();
+	}
+	catch (...)
+	{
+		rc = NETWORK_ERROR;
+		errorMsg = " Unknown exception caught while updating SYSTABLE.";
+#ifdef IDB_DDL_DEBUG
+cout << "create table got unknown exception" << endl;
+#endif
+	}
+		
+	if (rc != 0)
+		throw std::runtime_error(errorMsg);
+		
+	//update SYSCOLUMN
+	bytestream.restart();
+	bytestream << (ByteStream::byte)WE_SVR_UPDATE_SYSCOLUMN_TABLENAME;
+	bytestream << uniqueId;
+	bytestream << sessionID;
+	bytestream << (u_int32_t)txnID;
+	bytestream << fTableName.fSchema;
+	bytestream << fTableName.fName;
+	bytestream << ataRenameTable.fQualifiedName->fName;
+	sysOid = 1021;
+	//Find out where syscolumn is
+	rc = fDbrm->getSysCatDBRoot(sysOid, dbRoot);   
+	if (rc != 0)
+		throw std::runtime_error("Error while calling getSysCatDBRoot");
+	
+	pmNum = (*dbRootPMMap)[dbRoot];
+	try
+	{		
+		fWEClient->write(bytestream, (uint)pmNum);
+#ifdef IDB_DDL_DEBUG
+cout << "Rename table sending WE_SVR_UPDATE_SYSCOLUMN_TABLENAME to pm " << pmNum << endl;
 #endif	
 		while (1)
 		{
@@ -1872,7 +1953,13 @@ void AlterTableProcessor::renameColumn(uint32_t sessionID, execplan::CalpontSyst
 			defaultValue = ataRenameColumn.fDefaultValue->fValue;
 			 
 		bs << defaultValue;
-		
+		sysOid = 1021;
+		//Find out where syscolumn is
+		rc = fDbrm->getSysCatDBRoot(sysOid, dbRoot);  
+		if (rc != 0)
+			throw std::runtime_error("Error while calling getSysCatDBRoot");
+	
+		pmNum = (*dbRootPMMap)[dbRoot];
 		//send to WES to process
 		try {
 			fWEClient->write(bs, (uint)pmNum);
