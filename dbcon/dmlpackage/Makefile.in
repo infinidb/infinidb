@@ -186,6 +186,7 @@ idb_exec_libs = @idb_exec_libs@
 idb_ldflags = @idb_ldflags@
 idb_oam_libs = @idb_oam_libs@
 idb_write_libs = @idb_write_libs@
+idbinstall = @idbinstall@
 includedir = @includedir@
 infodir = @infodir@
 install_sh = @install_sh@

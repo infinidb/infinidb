@@ -68,7 +68,7 @@ leakcheck:
 docs:
 
 bootstrap:
-	./build/genVersion.sh --prefix=@prefix@/Calpont
+	./build/genVersion.sh --prefix=$(prefix)
 	for subdir in dbcon ddlproc dmlproc exemgr mysql net-snmp oam \
 		oamapps decomsvr primitives procmgr procmon qa snmpd tools utils versioning \
 		writeengine ; do \

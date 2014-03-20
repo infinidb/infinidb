@@ -153,6 +153,7 @@ idb_exec_libs = @idb_exec_libs@
 idb_ldflags = @idb_ldflags@
 idb_oam_libs = @idb_oam_libs@
 idb_write_libs = @idb_write_libs@
+idbinstall = @idbinstall@
 includedir = @includedir@
 infodir = @infodir@
 install_sh = @install_sh@
@@ -353,7 +354,7 @@ docs:
 
 bootstrap:
 	cd net-snmp-5.2.1.2; \
-	./CalpontConfigure.sh --prefix=@prefix@/Calpont
+	./CalpontConfigure.sh --prefix=$(prefix)
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
 .NOEXPORT:
