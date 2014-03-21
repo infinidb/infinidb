@@ -373,7 +373,15 @@ void Config::writeConfig(const string& configFile) const
 
 			//good read, save copy, copy temp file tp tmp then to Calpont.xml
 			//move to /tmp to get around a 'same file error' in mv command
+			try {
+				if (exists(scft)) fs::remove(scft);
+			} catch (fs::filesystem_error&) { }
 			fs::copy_file(dcf, scft, fs::copy_option::overwrite_if_exists);
+			try {
+				fs::permissions(scft, fs::add_perms | fs::owner_read | fs::owner_write |
+													  fs::group_read | fs::group_write |
+													  fs::others_read | fs::others_write);
+			} catch (fs::filesystem_error&) { }
 
 			if (exists(tcft)) fs::remove(tcft);
 			fs::rename(dcft, tcft);
@@ -545,4 +553,5 @@ time_t Config::getCurrentMTime()
 }
 
 } //namespace config
+// vim:ts=4 sw=4:
 

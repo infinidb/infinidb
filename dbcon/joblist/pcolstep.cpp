@@ -333,6 +333,9 @@ pColStep::pColStep(const pColScanStep& rhs) :
 
 	sort(extents.begin(), extents.end(), ExtentSorter());
 	numExtents = extents.size();
+
+	fOnClauseFilter = rhs.onClauseFilter();
+
 //	uniqueID = UniqueNumberGenerator::instance()->getUnique32();
 //	if (fDec)
 //		fDec->addQueue(uniqueID);

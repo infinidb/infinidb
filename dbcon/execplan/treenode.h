@@ -345,7 +345,7 @@ public:
 	{ fRefCount++; }
 
 	/***********************************************************************
-     *                     F&E framework                                   *
+	 *                     F&E framework                                   *
 	 ***********************************************************************/
 	virtual const std::string& getStrVal(rowgroup::Row& row, bool& isNull) {return fResult.strVal;}
 	virtual int64_t getIntVal(rowgroup::Row& row, bool& isNull) {return fResult.intVal;}

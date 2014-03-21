@@ -75,6 +75,7 @@ JobStep::JobStep(const JobInfo& j) :
         fCardinality(0),
         fDelayedRunFlag(false),
         fDelivery(false),
+        fOnClauseFilter(false),
         fDie(false),
         fWaitToRunStepCnt(0),
         fPriority(1),

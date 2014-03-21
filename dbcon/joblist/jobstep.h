@@ -223,9 +223,14 @@ public:
 	
 	virtual bool stringTableFriendly() { return false; }
 
-	bool delivery()        { return fDelivery; }
-	void delivery(bool b)  { fDelivery = b; }
+	bool delivery() const  { return fDelivery; }
+	void delivery(bool b)  { fDelivery = b;    }
+
 	const boost::uuids::uuid& queryUuid() const { return fQueryUuid; }
+
+	//@bug5887, distinguish on clause filter and where clause filter
+	bool onClauseFilter() const { return fOnClauseFilter; }
+	void onClauseFilter(bool b) { fOnClauseFilter = b;    }
 
 protected:
     JobStepAssociation fInputJobStepAssociation;
@@ -247,6 +252,7 @@ protected:
     uint64_t    fCardinality;
     bool        fDelayedRunFlag;
 	bool        fDelivery;
+	bool        fOnClauseFilter;
     volatile bool fDie;
     volatile uint32_t fWaitToRunStepCnt;
     std::string fExtendedInfo;

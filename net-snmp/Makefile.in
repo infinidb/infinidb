@@ -354,7 +354,7 @@ docs:
 
 bootstrap:
 	cd net-snmp-5.2.1.2; \
-	./CalpontConfigure.sh --prefix=$(prefix)
+	./CalpontConfigure.sh --prefix=@prefix@/Calpont
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
 .NOEXPORT:
