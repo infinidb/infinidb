@@ -293,7 +293,6 @@ struct JobInfo
 	std::set<uint32_t> outerOnTable;
 	std::set<uint32_t> tableHasIsNull;
 	JobStepVector  outerJoinExpressions;
-	std::vector<boost::shared_ptr<const execplan::ParseTree> > onClauseFilter;
 
 	// bug 3759, join in order
 	// mixed outer join

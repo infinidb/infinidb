@@ -241,7 +241,7 @@ DropTableProcessor::DDLResult DropTableProcessor::processPackage(ddlpackage::Dro
 #ifdef IDB_DDL_DEBUG
 cout << "Removing the SYSTABLEs meta data" << endl;
 #endif
-		bytestream << (ByteStream::byte)WE_SVR_DELETE_SYSTABLES;
+		bytestream << (ByteStream::byte)WE_SVR_DELETE_SYSTABLE;
 		bytestream << uniqueId;
 		bytestream << (uint32_t) dropTableStmt.fSessionID;
 		bytestream << (uint32_t)txnID.id;
@@ -326,7 +326,91 @@ cout << "Drop table got unknown exception" << endl;
 			fWEClient->removeQueue(uniqueId);
 			return result;				
 		}
+
+		//remove from syscolumn
+		bytestream.restart();
+		bytestream << (ByteStream::byte)WE_SVR_DELETE_SYSCOLUMN;
+		bytestream << uniqueId;
+		bytestream << (uint32_t) dropTableStmt.fSessionID;
+		bytestream << (uint32_t)txnID.id;
+		bytestream << dropTableStmt.fTableName->fSchema;
+		bytestream << dropTableStmt.fTableName->fName;
 		
+		//Find out where syscolumn is
+		sysOid = 1021;
+		rc = fDbrm->getSysCatDBRoot(sysOid, dbRoot);  
+		if (rc != 0)
+		{
+			result.result =(ResultCode) rc;
+			Message::Args args;
+			Message message(9);
+			args.add("Error while calling getSysCatDBRoot");
+			args.add(errorMsg);
+			result.message = message;
+			//release transaction
+			fSessionManager.rolledback(txnID);
+			return result;
+		}
+		
+		pmNum = (*dbRootPMMap)[dbRoot];
+		try
+		{
+			//cout << "deleting systable entries with txnid " << txnID.id << endl;
+			fWEClient->write(bytestream, (unsigned)pmNum);
+#ifdef IDB_DDL_DEBUG
+cout << "Drop table sending WE_SVR_DELETE_SYSTABLES to pm " << pmNum << endl;
+#endif				
+			while (1)
+			{
+				bsIn.reset(new ByteStream());
+				fWEClient->read(uniqueId, bsIn);
+				if ( bsIn->length() == 0 ) //read error
+				{
+					rc = NETWORK_ERROR;
+					errorMsg = "Lost connection to Write Engine Server while updating SYSTABLES";
+					break;
+				}			
+				else {
+					*bsIn >> rc;
+					if (rc != 0) {
+						*bsIn >> errorMsg;
+					}
+					break;
+				}
+			}
+		}
+		catch (runtime_error& ex) //write error
+		{
+#ifdef IDB_DDL_DEBUG
+cout << "Drop table got exception" << endl;
+#endif
+			rc = NETWORK_ERROR;
+			errorMsg = ex.what();
+		}
+		catch (...)
+		{
+			rc = NETWORK_ERROR;
+#ifdef IDB_DDL_DEBUG
+cout << "Drop table got unknown exception" << endl;
+#endif
+		}
+	
+		if (rc != 0)
+		{
+			Message::Args args;
+			Message message(9);
+			args.add("Error in dropping table from systables.");
+			args.add(errorMsg);
+			message.format(args);
+			result.result = (ResultCode)rc;
+			result.message = message;
+			//release table lock and session
+			fSessionManager.rolledback(txnID);
+			(void)fDbrm->releaseTableLock(tableLockId);
+			fWEClient->removeQueue(uniqueId);
+			return result;				
+		}
+				
 		rc = commitTransaction(uniqueId, txnID);
 		//cout << "commiting transaction " << txnID.id << " and valid is " << txnID.valid << endl;
 		if (rc != 0)

@@ -3,7 +3,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.59)
-AC_INIT(Calpont, 1.0.0, support@calpont.com)
+AC_INIT(infinidb, 4.5.0, support@infinidb.co)
 ### we don't want the deault CXXFLAGS set by AC_INIT, but we do want to allow the user to set them
 SAVE_CXXFLAGS=
 if test -n "$CXXFLAGS"; then
@@ -124,7 +124,8 @@ else
 	AC_SUBST([idb_cflags],['-g0 -O3 -fno-strict-aliasing -Wall'])
 	AC_MSG_RESULT(no)
 fi
-AC_SUBST([idb_ldflags],['-Wl,--rpath -Wl,/usr/local/Calpont/lib -Wl,--no-as-needed -Wl,--add-needed'])
+AC_SUBST([idbinstall], ['${prefix}'])
+AC_SUBST([idb_ldflags],['-Wl,--rpath -Wl,${idbinstall}/lib -Wl,--no-as-needed -Wl,--add-needed'])
 
 AC_MSG_CHECKING(for CPU architecture)
 uname=`uname -m`
@@ -133,24 +134,24 @@ AS_IF(
    [AC_SUBST([march_flags], [' '])] [AC_MSG_RESULT(x86_64)]
 )
 
-AC_SUBST([libdir], ['${prefix}/Calpont/lib'])
-AC_SUBST([bindir], ['${prefix}/Calpont/bin'])
-AC_SUBST([includedir], ['${prefix}/Calpont/include'])
-AC_SUBST([etcdir], ['${prefix}/Calpont/etc'])
-AC_SUBST([sysconfdir], ['${prefix}/Calpont/etc'])
-AC_SUBST([mandir], ['${prefix}/Calpont/man'])
-AC_SUBST([sbindir], ['${prefix}/Calpont/sbin'])
-AC_SUBST([sharedir], ['${prefix}/Calpont/share'])
-AC_SUBST([postdir], ['${prefix}/Calpont/post'])
-AC_SUBST([localdir], ['${prefix}/Calpont/local'])
-AC_SUBST([mysqldir], ['${prefix}/Calpont/mysql'])
-AC_SUBST([mibdir], ['${prefix}/Calpont/share/snmp/mibs'])
-AC_SUBST([netsnmpdir], ['${prefix}/Calpont/include/net-snmp'])
-AC_SUBST([netsnmpsysdir], ['${prefix}/Calpont/include/net-snmp/system'])
-AC_SUBST([netsnmpmachdir], ['${prefix}/Calpont/include/net-snmp/machine'])
-AC_SUBST([netsnmplibrdir], ['${prefix}/Calpont/include/net-snmp/library'])
-AC_SUBST([netsnmpagntdir], ['${prefix}/Calpont/include/net-snmp/agent'])
-AC_SUBST([toolsdir], ['${prefix}/Calpont/tools'])
+AC_SUBST([libdir], ['${idbinstall}/lib'])
+AC_SUBST([bindir], ['${idbinstall}/bin'])
+AC_SUBST([includedir], ['${idbinstall}/include'])
+AC_SUBST([etcdir], ['${idbinstall}/etc'])
+AC_SUBST([sysconfdir], ['${idbinstall}/etc'])
+AC_SUBST([mandir], ['${idbinstall}/man'])
+AC_SUBST([sbindir], ['${idbinstall}/sbin'])
+AC_SUBST([sharedir], ['${idbinstall}/share'])
+AC_SUBST([postdir], ['${idbinstall}/post'])
+AC_SUBST([localdir], ['${idbinstall}/local'])
+AC_SUBST([mysqldir], ['${idbinstall}/mysql'])
+AC_SUBST([mibdir], ['${idbinstall}/share/snmp/mibs'])
+AC_SUBST([netsnmpdir], ['${idbinstall}/include/net-snmp'])
+AC_SUBST([netsnmpsysdir], ['${idbinstall}/include/net-snmp/system'])
+AC_SUBST([netsnmpmachdir], ['${idbinstall}/include/net-snmp/machine'])
+AC_SUBST([netsnmplibrdir], ['${idbinstall}/include/net-snmp/library'])
+AC_SUBST([netsnmpagntdir], ['${idbinstall}/include/net-snmp/agent'])
+AC_SUBST([toolsdir], ['${idbinstall}/tools'])
 
 AC_SUBST([netsnmp_libs], ['-lnetsnmpmibs -lnetsnmpagent -lnetsnmp -lnetsnmpmibs -lnetsnmphelpers'])
 
@@ -159,8 +160,8 @@ AC_SUBST([idb_oam_libs], ['-loamcpp -lsnmpmanager ${netsnmp_libs}'])
 AC_SUBST([idb_brm_libs], ['-lbrm -lidbdatafile -lcacheutils -lrwlock ${idb_oam_libs} ${idb_common_libs}'])
 AC_SUBST([idb_exec_libs], ['-ljoblist -lexecplan -lwindowfunction -ljoiner -lrowgroup -lfuncexp -ludfsdk -ldataconvert -lcommon -lcompress -lmysqlcl_idb -lquerystats -lquerytele -lthrift -lthreadpool ${idb_brm_libs}'])
 AC_SUBST([idb_write_libs], ['-lddlpackageproc -lddlpackage -ldmlpackageproc -ldmlpackage -lwriteengine -lwriteengineclient -lidbdatafile -lcacheutils ${idb_exec_libs}'])
-AC_SUBST([idb_common_includes], ['-I${prefix}/Calpont/include -I/usr/local/include -I/usr/local/include/libxml2 -I/usr/include/libxml2'])
-AC_SUBST([idb_common_ldflags], ['-L${prefix}/Calpont/lib -L/usr/local/lib'])
+AC_SUBST([idb_common_includes], ['-I${idbinstall}/include -I/usr/local/include -I/usr/local/include/libxml2 -I/usr/include/libxml2'])
+AC_SUBST([idb_common_ldflags], ['-L${idbinstall}/lib -L/usr/local/lib'])
 
 AC_CONFIG_FILES([
 	Makefile

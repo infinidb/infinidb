@@ -2273,8 +2273,14 @@ const JobStepVector doOuterJoinOnFilter(OuterJoinOnFilter* oj, JobInfo& jobInfo)
 						continue;
 
 					JobStepVector sfv = doSimpleFilter(sf, jobInfo);
+					ExpressionStep* es = NULL;
 					for (JobStepVector::iterator k = sfv.begin(); k != sfv.end(); k++)
+					{
 						k->get()->onClauseFilter(true);
+						if ((es = dynamic_cast<ExpressionStep*>(k->get())) != NULL)
+			            	es->associatedJoinId(thjs->joinId());
+					}
+
 					jsv.insert(jsv.end(), sfv.begin(), sfv.end());
 
 					doneNodes.push_back(cn);
@@ -2358,13 +2364,6 @@ const JobStepVector doOuterJoinOnFilter(OuterJoinOnFilter* oj, JobInfo& jobInfo)
 				nodesToRemove.insert(p);
 				nodesToRemove.insert(c);
 			}
-		}
-
-		for (set<ParseTree*>::iterator i = nodesToRemove.begin(); i != nodesToRemove.end(); i++)
-		{
-			// Bug5374, keep the pointers, to bypass the outerJoin check.
-			boost::shared_ptr<const ParseTree> p(*i);
-			jobInfo.onClauseFilter.push_back(p);
 		}
 
 		// construct an expression step, if additional comparison exists.

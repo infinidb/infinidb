@@ -264,8 +264,8 @@ cout << "Create table allocOIDs got the stating oid " << fStartingColOID << endl
 			return result;
 		}
 
-		// Write the tables metadata to the system catalog
-		VERBOSE_INFO("Writing meta data to SYSTABLES");
+		// Write the table metadata to the systemtable
+		VERBOSE_INFO("Writing meta data to SYSTABLE");
 		ByteStream bytestream;
 		bytestream << (ByteStream::byte)WE_SVR_WRITE_SYSTABLE;
 		bytestream << uniqueId;
@@ -273,21 +273,6 @@ cout << "Create table allocOIDs got the stating oid " << fStartingColOID << endl
 		bytestream << (uint32_t)txnID.id;
 		bytestream << (uint32_t)fStartingColOID;
 		bytestream << (uint32_t)createTableStmt.fTableWithAutoi;
-		
-		bytestream << numColumns;
-		for (unsigned i = 0; i <numColumns; ++i) {
-			bytestream << (uint32_t)(fStartingColOID+i+1);
-		}	
-		bytestream << numDictCols;
-		for (unsigned i = 0; i <numDictCols; ++i) {
-			bytestream << (uint32_t)(fStartingColOID+numColumns+i+1);
-		}	
-		
-		uint8_t alterFlag = 0;
-		int colPos = 0;
-		bytestream << (ByteStream::byte)alterFlag;
-		bytestream << (uint32_t)colPos;
-		
 		uint16_t  dbRoot;
 		BRM::OID_t sysOid = 1001;
 		//Find out where systable is
@@ -305,11 +290,115 @@ cout << "Create table allocOIDs got the stating oid " << fStartingColOID << endl
 			fSessionManager.rolledback(txnID);
 			return result;
 		}
+
 		int pmNum = 1;
 		bytestream << (uint32_t)dbRoot; 
 		tableDef.serialize(bytestream);
 		boost::shared_ptr<messageqcpp::ByteStream> bsIn;
 		boost::shared_ptr<std::map<int, int> > dbRootPMMap = oamcache->getDBRootToPMMap();
+		pmNum = (*dbRootPMMap)[dbRoot];
+		try
+		{			
+			fWEClient->write(bytestream, (unsigned)pmNum);
+#ifdef IDB_DDL_DEBUG
+cout << "create table sending We_SVR_WRITE_SYSTABLE to pm " << pmNum << endl;
+#endif	
+			while (1)
+			{
+				bsIn.reset(new ByteStream());
+				fWEClient->read(uniqueId, bsIn);
+				if ( bsIn->length() == 0 ) //read error
+				{
+					rc = NETWORK_ERROR;
+					errorMsg = "Lost connection to Write Engine Server while updating SYSTABLES";
+					break;
+				}			
+				else {
+					*bsIn >> rc;
+					if (rc != 0) {
+                        errorMsg.clear();
+						*bsIn >> errorMsg;
+#ifdef IDB_DDL_DEBUG
+cout << "Create table We_SVR_WRITE_CREATETABLEFILES: " << errorMsg << endl;
+#endif
+					}
+					break;
+				}
+			}
+		}
+		catch (runtime_error& ex) //write error
+		{
+#ifdef IDB_DDL_DEBUG
+cout << "create table got exception" << ex.what() << endl;
+#endif			
+			rc = NETWORK_ERROR;
+			errorMsg = ex.what();
+		}
+		catch (...)
+		{
+			rc = NETWORK_ERROR;
+#ifdef IDB_DDL_DEBUG
+cout << "create table got unknown exception" << endl;
+#endif
+		}
+		
+		if (rc != 0)
+		{
+			result.result =(ResultCode) rc;
+			Message::Args args;
+			Message message(9);
+			args.add("Create table failed due to ");
+			args.add(errorMsg);
+			message.format( args );
+			result.message = message;
+			if (rc != NETWORK_ERROR)
+			{
+				rollBackTransaction( uniqueId, txnID, createTableStmt.fSessionID );	//What to do with the error code			
+			}
+			//release transaction
+			fSessionManager.rolledback(txnID);
+			return result;
+		}
+			
+		VERBOSE_INFO("Writing meta data to SYSCOLUMN");
+		bytestream.restart();
+		bytestream << (ByteStream::byte)WE_SVR_WRITE_CREATE_SYSCOLUMN;
+		bytestream << uniqueId;
+		bytestream << (uint32_t) createTableStmt.fSessionID;
+		bytestream << (uint32_t)txnID.id;			
+		bytestream << numColumns;
+		for (unsigned i = 0; i <numColumns; ++i) {
+			bytestream << (uint32_t)(fStartingColOID+i+1);
+		}	
+		bytestream << numDictCols;
+		for (unsigned i = 0; i <numDictCols; ++i) {
+			bytestream << (uint32_t)(fStartingColOID+numColumns+i+1);
+		}	
+		
+		uint8_t alterFlag = 0;
+		int colPos = 0;
+		bytestream << (ByteStream::byte)alterFlag;
+		bytestream << (uint32_t)colPos;
+				
+		sysOid = 1021;
+		//Find out where syscolumn is
+		rc = fDbrm->getSysCatDBRoot(sysOid, dbRoot); 
+		if (rc != 0)
+		{
+			result.result =(ResultCode) rc;
+			Message::Args args;
+			Message message(9);
+			args.add("Error while calling getSysCatDBRoot ");
+			args.add(errorMsg);
+			message.format(args);
+			result.message = message;
+			//release transaction
+			fSessionManager.rolledback(txnID);
+			return result;
+		}
+
+		bytestream << (uint32_t)dbRoot; 
+		tableDef.serialize(bytestream);
 		pmNum = (*dbRootPMMap)[dbRoot];
 		try
 		{			

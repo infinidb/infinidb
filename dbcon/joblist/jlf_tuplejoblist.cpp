@@ -3084,11 +3084,16 @@ void associateTupleJobSteps(JobStepVector& querySteps, JobStepVector& projectSte
 
 		JobStepVector& steps = tableInfoMap[tableUid].fQuerySteps;
 		JobStepVector::iterator s = steps.begin();
+		JobStepVector::iterator p = steps.end();
 		for (; s != steps.end(); s++)
 		{
 			if (typeid(*(s->get())) == typeid(pColScanStep) ||
 				typeid(*(s->get())) == typeid(pColStep))
 				break;
+
+			// @bug5893, iterator to the first pseudocolumn
+			if (typeid(*(s->get())) == typeid(PseudoColStep) && p == steps.end())
+				p = s;
 		}
 
 		if (s == steps.end())
@@ -3117,6 +3122,13 @@ void associateTupleJobSteps(JobStepVector& querySteps, JobStepVector& projectSte
 
 			if (isDictCol(ct) && jobInfo.tokenOnly.find(ti.key) == jobInfo.tokenOnly.end())
 				jobInfo.tokenOnly[ti.key] = true;
+		}
+		else if (s > p)
+		{
+			// @bug5893, make sure a pcol is in front of any pseudo step.
+			SJSTEP t = *s;
+			*s = *p;
+			*p = t;
 		}
 	}
 
