@@ -411,7 +411,8 @@ int main(int argc, char* argv[])
 			rotatingDestination = false;
 	}
 
-	temp = toInt(cf->getConfig(dbbc, "NumBlocksPct"));
+	string strBlockPct = cf->getConfig(dbbc, "NumBlocksPct");
+	temp = atoi(strBlockPct.c_str());
 	if (temp > 0)
 		BRPBlocksPct = temp;
 

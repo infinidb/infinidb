@@ -4213,7 +4213,10 @@ bool storageSetup(string cloud)
 	}
 
 	//check if gluster is installed
-	system("which gluster > /tmp/gluster.log 2>&1");
+	if (rootUser)
+		system("which gluster > /tmp/gluster.log 2>&1");
+	else
+		system("sudo which gluster > /tmp/gluster.log 2>&1");
 
 	ifstream in("/tmp/gluster.log");
 
@@ -4226,7 +4229,10 @@ bool storageSetup(string cloud)
 		glusterInstalled = "y";
 
 	//check if hadoop is installed
-	system("which hadoop > /tmp/hadoop.log 2>&1");
+	if (rootUser)
+		system("which hadoop > /tmp/hadoop.log 2>&1");
+	else
+		system("sudo which hadoop > /tmp/hadoop.log 2>&1");
 
 	ifstream in1("/tmp/hadoop.log");
 

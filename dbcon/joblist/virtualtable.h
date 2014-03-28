@@ -1,11 +1,11 @@
 /* Copyright (C) 2013 Calpont Corp.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -37,7 +37,7 @@ public:
 	virtual ~VirtualTable() {}
 
 	virtual void initialize();
-	void addColumn(const execplan::SRCP& column, const std::string& view);
+	void addColumn(const execplan::SRCP& column);
 
 	void tableOid(const execplan::CalpontSystemCatalog::OID& oid) { fTableOid = oid; }
 	const execplan::CalpontSystemCatalog::OID& tableOid() const   { return fTableOid; }
@@ -47,6 +47,9 @@ public:
 
 	void alias(const std::string& s) { fAlias = s; }
 	const std::string& alias() const { return fAlias; }
+
+	void view(const std::string& v) { fView = v; }
+	const std::string& view() const { return fView; }
 
 	const std::vector<execplan::SSC>& columns() const { return fColumns; }
 	const execplan::CalpontSystemCatalog::OID& columnOid(uint i) const;
@@ -64,7 +67,8 @@ public:
 protected:
 	execplan::CalpontSystemCatalog::OID fTableOid;
 	std::string                         fName;
-	std::string							fAlias;
+	std::string                         fAlias;
+	std::string                         fView;
 
 	std::vector<execplan::SSC>          fColumns;
 	std::vector<execplan::CalpontSystemCatalog::ColType> fColumnTypes;

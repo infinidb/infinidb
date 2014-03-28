@@ -98,7 +98,7 @@ if { $INSTALLTYPE == "initial" || $INSTALLTYPE == "uninstall" } {
 	# erase InfiniDB packages
 	#
 	send_user "Erase InfiniDB Packages on Module           "
-	send "ssh $USERNAME@$SERVER '$PKGERASE calpont calpont-mysql calpont-mysqld >/dev/null 2>&1; $PKGERASE infinidb-enterprise >/dev/null 2>&1; $PKGERASE infinidb-libs infinidb-platform;$PKGERASE infinidb-storage-engine infinidb-mysql;$PKGERASE dummy'\n"
+	send "ssh $USERNAME@$SERVER '$PKGERASE calpont >/dev/null 2>&1; $PKGERASE calpont-mysql >/dev/null 2>&1; $PKGERASE calpont-mysqld >/dev/null 2>&1; $PKGERASE infinidb-enterprise >/dev/null 2>&1; $PKGERASE infinidb-libs infinidb-platform;$PKGERASE infinidb-storage-engine infinidb-mysql;$PKGERASE dummy'\n"
 	if { $PASSWORD != "ssh" } {
 		set timeout 30
 		expect {
@@ -204,7 +204,7 @@ if { $INSTALLTYPE == "initial"} {
 			"passphrase" { send "$PASSWORD\n" }
 		}
 	}
-	set timeout 120
+	set timeout 180
 	expect {
 		"package dummy" 	  { send_user "DONE" }
 		"error: Failed dependencies" { send_user "ERROR: Failed dependencies\n" ; 
@@ -212,6 +212,7 @@ if { $INSTALLTYPE == "initial"} {
 							exit 1 }
 		"closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
 		"needs"	   { send_user "ERROR: disk space issue\n" ; exit 1 }
+		"conflicts"	   { send_user "ERROR: File Conflict issue\n" ; exit 1 }
 	}
 	send_user "\n"
 
@@ -234,6 +235,7 @@ if { $INSTALLTYPE == "initial"} {
 								send_user "\n*** Installation ERROR\n" ; 
 								exit 1 }
 			"closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
+			"conflicts"	   { send_user "ERROR: File Conflict issue\n" ; exit 1 }
 		}
 		send_user "\n"
 	}

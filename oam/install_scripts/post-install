@@ -83,12 +83,6 @@ fi
 ln -sf libjemalloc.so.3.3.0 libjemalloc.so
 chown -h $user.$user libjemalloc.so >/dev/null 2>&1
 
-ln -sf libunwind.so.8.0.1 libunwind.so.8
-chown -h $user.$user libunwind.so.8 >/dev/null 2>&1
-
-ln -sf libunwind-x86_64.so.8.0.1 libunwind-x86_64.so.8
-chown -h $user.$user libunwind-x86_64.so.8 >/dev/null 2>&1
-
 # TODO-based on early experience with HDP it doesn't install bigtop
 # so the code below will not correctly detect JAVA_HOME.  Need to 
 # decide how to handle

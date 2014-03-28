@@ -423,7 +423,7 @@ struct ColumnInfo
     virtual int setupInitialColumnFile( HWM oldHWM,   // original HWM 
                                         HWM newHWM ); // new HWM to start from
 
-    virtual int saveDctnryStoreHWMChunk();  // Backup dctnry HWM chunk
+    virtual int saveDctnryStoreHWMChunk(bool& needBackup);//Backup Dct HWM Chunk
     int extendColumnNewExtent(              // extend column; new extent
         bool saveLBIDForCP,
         uint16_t dbRootNew,

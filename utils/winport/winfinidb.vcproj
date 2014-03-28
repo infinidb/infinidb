@@ -43,7 +43,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_52_0;C:\InfiniDB\genii\utils\winport"
+				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;C:\InfiniDB\genii\utils\winport"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
@@ -115,7 +115,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_52_0;C:\InfiniDB\genii\utils\winport"
+				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;C:\InfiniDB\genii\utils\winport"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
@@ -133,8 +133,8 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="libwinport.lib psapi.lib"
-				AdditionalLibraryDirectories="C:\InfiniDB\x64\Debug"
+				AdditionalDependencies="libwinport.lib psapi.lib ws2_32.lib"
+				AdditionalLibraryDirectories="C:\InfiniDB\x64\Debug;C:\InfiniDB\boost_1_54_0"
 				GenerateDebugInformation="true"
 				TargetMachine="17"
 			/>
@@ -187,7 +187,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_52_0;C:\InfiniDB\genii\utils\winport"
+				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;C:\InfiniDB\genii\utils\winport"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
 				WarningLevel="3"
@@ -206,7 +206,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="libwinport.lib psapi.lib"
-				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_52_0\lib32;&quot;C:\InfiniDB\libxml2-2.7.6\lib32&quot;;C:\InfiniDB\Release"
+				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_54_0\lib32;&quot;C:\InfiniDB\libxml2-2.7.6\lib32&quot;;C:\InfiniDB\Release"
 				GenerateDebugInformation="true"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
@@ -262,7 +262,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_52_0;C:\InfiniDB\genii\utils\winport"
+				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;C:\InfiniDB\genii\utils\winport"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
 				WarningLevel="3"
@@ -336,7 +336,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_52_0;C:\InfiniDB\genii\utils\winport"
+				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;C:\InfiniDB\genii\utils\winport"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
 				WarningLevel="3"
@@ -355,7 +355,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="libwinport.lib psapi.lib"
-				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_52_0\lib32;&quot;C:\InfiniDB\libxml2-2.7.6\lib32&quot;;C:\InfiniDB\Release"
+				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_54_0\lib32;&quot;C:\InfiniDB\libxml2-2.7.6\lib32&quot;;C:\InfiniDB\Release"
 				GenerateDebugInformation="true"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
@@ -411,7 +411,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_52_0;C:\InfiniDB\genii\utils\winport"
+				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;C:\InfiniDB\genii\utils\winport"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
 				WarningLevel="3"
@@ -428,8 +428,8 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="libwinport.lib psapi.lib"
-				AdditionalLibraryDirectories="C:\InfiniDB\x64\EnterpriseRelease"
+				AdditionalDependencies="libwinport.lib psapi.lib ws2_32.lib"
+				AdditionalLibraryDirectories="C:\InfiniDB\x64\EnterpriseRelease;C:\InfiniDB\boost_1_54_0"
 				GenerateDebugInformation="true"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"

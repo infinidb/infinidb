@@ -84,7 +84,7 @@ int main(int argc, char** argv)
 		cout << "Using config file: " << cf->configFile() << endl;
 	}
 
-	cout << cf->getConfig(argv[optind + 0], argv[optind + 1]);
+	cout << cf->getConfig(argv[optind + 0], argv[optind + 1]) << endl;
 
 	return 0;
 }

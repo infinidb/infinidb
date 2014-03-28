@@ -1,11 +1,11 @@
 /* Copyright (C) 2013 Calpont Corp.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -290,7 +290,6 @@ struct JobInfo
 	std::set<uint> outerOnTable;
 	std::set<uint> tableHasIsNull;
 	JobStepVector  outerJoinExpressions;
-	std::vector<boost::shared_ptr<const execplan::ParseTree> > onClauseFilter;
 
 	// bug 3759, join in order
 	// mixed outer join
@@ -311,9 +310,6 @@ struct JobInfo
 
 	// step to process orderby, limit and fill in constants
 	SJSTEP annexStep;
-
-	// view ?? workaround
-	std::string subView;
 
 	// @bug3475, aggregate constant column <position, aggregate column>
 	std::map<uint64_t, execplan::SRCP> constAggregate;

@@ -1249,7 +1249,7 @@ stopwatch->start("BatchPrimitiveProcessor::execute fourth part");
 		Add additional RowGroup processing here.
 		TODO:  Try to clean up all of the switching */
 
-		if (doJoin && getTupleJoinRowGroupData) {
+        if (doJoin && (fe2 || fAggregator)) {
 			bool moreRGs = true;
 			ByteStream preamble = *serialized;
 			initGJRG();
@@ -1283,7 +1283,6 @@ stopwatch->start("BatchPrimitiveProcessor::execute fourth part");
 				RowGroup &nextRG = (fe2 ? fe2Output : joinedRG);
 				nextRG.setDBRoot(dbRoot);
 				if (fAggregator) {
-
 					fAggregator->addRowGroup(&nextRG);
 
 					if ((currentBlockOffset+1) == count && moreRGs == false) {  // @bug4507, 8k
@@ -1300,8 +1299,6 @@ stopwatch->start("BatchPrimitiveProcessor::execute fourth part");
 				else {
 					//cerr <<" * serialzing " << nextRG.toString() << endl;
 					nextRG.serializeRGData(*serialized);
-					//*serialized << nextRG.getDataSize();
-					//serialized->append(nextRG.getData(), nextRG.getDataSize());
 				}
 				/* send the msg & reinit the BS */
 				if (moreRGs) {
@@ -1367,7 +1364,7 @@ stopwatch->start("BatchPrimitiveProcessor::execute fourth part");
 			}                                                         // @bug4507, 8k
 		}
 
-		if (!getTupleJoinRowGroupData && !fAggregator && !fe2) {
+		if (!fAggregator && !fe2) {
 			*serialized << (uint8_t) 1;  // the "count this msg" var
 			outputRG.setDBRoot(dbRoot);
 			//cerr << "serializing " << outputRG.toString() << endl;

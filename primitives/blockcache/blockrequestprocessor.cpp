@@ -37,11 +37,11 @@ using namespace std;
 namespace dbbc {
 
 BlockRequestProcessor::BlockRequestProcessor(uint32_t numBlcks,
-										int thrCount, 
-										int blocksPerRead,  
-										uint32_t deleteBlocks, 
+										int thrCount,
+										int blocksPerRead,
+										uint32_t deleteBlocks,
 										uint32_t blckSz) :
-									fbMgr(numBlcks, blckSz, deleteBlocks), 
+									fbMgr(numBlcks, blckSz, deleteBlocks),
 									fIOMgr(fbMgr, fBRPRequestQueue, thrCount, blocksPerRead)
 {
 	//pthread_mutex_init(&check_mutex, NULL);
@@ -55,7 +55,7 @@ BlockRequestProcessor::BlockRequestProcessor(uint32_t numBlcks,
 #endif
 
     if (val.length()>0) temp=static_cast<int>(config::Config::fromText(val));
-        
+
     if (temp > 0)
 		fTrace=true;
 	else
@@ -83,7 +83,7 @@ BlockRequestProcessor::~BlockRequestProcessor()
 
 void BlockRequestProcessor::stop() {
 	fBRPRequestQueue.stop();
-	fIOMgr.stop();	
+	fIOMgr.stop();
 }
 
 int BlockRequestProcessor::check(const BRM::InlineLBIDRange& range, const BRM::QueryContext &ver, const BRM::VER_t txn, const int compType, uint32_t& lbidCount) {
@@ -110,13 +110,13 @@ int BlockRequestProcessor::check(const BRM::InlineLBIDRange& range, const BRM::Q
 			BRM::OID_t oid;
 			fdbrm.lookupLocal(maxLbid, ver.currentScn, false, oid, dbroot, partNum, segNum, fbo);
 			fLogFile
-					<< oid << " " 
+					<< oid << " "
 					<< maxLbid << " "
 					<< fbo << " "
-					<< rangeLen << " " 
-					<< 0 << " " 
-					<< 0 << " " 
-					<< 0 << " " 
+					<< rangeLen << " "
+					<< 0 << " "
+					<< 0 << " "
+					<< 0 << " "
 					<< right << fixed << ((double)(start_tm.tv_sec + (1.e-9 * start_tm.tv_nsec)))
 					<< endl;
 		}
@@ -130,6 +130,8 @@ int BlockRequestProcessor::check(const BRM::InlineLBIDRange& range, const BRM::Q
 	fileRequest rqstBlk(adjRange, ver, txn, compType);
 	check(rqstBlk);
 	if (rqstBlk.RequestStatus() != fileRequest::SUCCESSFUL) {
+		if (rqstBlk.RequestStatus() == fileRequest::BRM_LOOKUP_ERROR)
+			throw logging::IDBExcept(logging::IDBErrorInfo::instance()->errorMsg(logging::ERR_BRM_LOOKUP), logging::ERR_BRM_LOOKUP);
 		if (rqstBlk.RequestStatus() == fileRequest::FS_EINVAL)
 			throw logging::IDBExcept(logging::IDBErrorInfo::instance()->
 					errorMsg(logging::ERR_O_DIRECT), logging::ERR_O_DIRECT);
@@ -149,13 +151,13 @@ int BlockRequestProcessor::check(const BRM::InlineLBIDRange& range, const BRM::Q
 		BRM::OID_t oid;
 		fdbrm.lookupLocal(maxLbid, ver.currentScn, false, oid, dbroot, partNum, segNum, fbo);
 		fLogFile
-				<< oid << " " 
+				<< oid << " "
 				<< maxLbid << " "
 				<< fbo << " "
-				<< rangeLen << " " 
-				<< adjSz << " " 
-				<< rqstBlk.BlocksRead() << " " 
-				<< rqstBlk.BlocksLoaded() << " " 
+				<< rangeLen << " "
+				<< adjSz << " "
+				<< rqstBlk.BlocksRead() << " "
+				<< rqstBlk.BlocksLoaded() << " "
 				<< right << fixed << ((double)(start_tm.tv_sec+(1.e-9*start_tm.tv_nsec)))
 				<< endl;
 	}
@@ -238,6 +240,6 @@ int BlockRequestProcessor::getCachedBlocks(const BRM::LBID_t *lbids, const BRM::
 {
 	return fbMgr.bulkFind(lbids, vers, ptrs, wasCached, count);
 }
-	
+
 
 } // namespace dbbc

@@ -1,11 +1,11 @@
 /* Copyright (C) 2013 Calpont Corp.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -491,7 +491,8 @@ int DbFileOp::restoreBlock(IDBDataFile* pFile, const unsigned char* writeBuf, ui
     return pFile->write(writeBuf, BYTE_PER_BLOCK);
 }
 
-IDBDataFile* DbFileOp::getFilePtr(const Column& column)
+// @bug 5572 - HDFS usage: add *.tmp file backup flag
+IDBDataFile* DbFileOp::getFilePtr(const Column& column, bool useTmpSuffix)
 {
     string filename;
     return m_chunkManager->getFilePtr(column,
@@ -500,7 +501,8 @@ IDBDataFile* DbFileOp::getFilePtr(const Column& column)
                                       column.dataFile.fSegment,
                                       filename,
                                       "r+b",
-                                      column.colWidth);
+                                      column.colWidth,
+                                      useTmpSuffix);
 }
 
 } //end of namespace

@@ -158,6 +158,8 @@ private:
     int  changeTableLockState();        // Change state of table lock to cleanup
     void closeTableFile();              // Close current tbl file; free buffer
     void closeOpenDbFiles();            // Close DB files left open at job's end
+    int  confirmDBFileChanges();        // Confirm DB file changes (on HDFS)
+    void deleteTempDBFileChanges();     // Delete DB temp swap files (on HDFS)
     int  finishBRM();                   // Finish reporting updates for BRM
     void freeProcessingBuffers();       // Free up Processing Buffers
     bool isBufferAvailable(bool report);// Is tbl buffer available for reading

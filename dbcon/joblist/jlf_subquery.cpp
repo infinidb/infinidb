@@ -1,11 +1,11 @@
 /* Copyright (C) 2013 Calpont Corp.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -498,8 +498,8 @@ const SRCP doSelectSubquery(CalpontExecutionPlan* ep, SRCP& sc, JobInfo& jobInfo
 	CalpontSelectExecutionPlan* csep = dynamic_cast<CalpontSelectExecutionPlan*>(ep);
 	SRCP rc;
 	SErrorInfo errorInfo(jobInfo.errorInfo);
-	jobInfo.subView = dynamic_cast<SimpleColumn*>(sc.get())->viewName();
-	SubQueryTransformer transformer(&jobInfo, errorInfo);
+	string subView = dynamic_cast<SimpleColumn*>(sc.get())->viewName();
+	SubQueryTransformer transformer(&jobInfo, errorInfo, subView);
 	transformer.setVarbinaryOK();
 	SJSTEP subQueryStep = transformer.makeSubQueryStep(csep);
 	if (transformer.correlatedSteps().size() > 0)
@@ -693,8 +693,7 @@ int doFromSubquery(CalpontExecutionPlan* ep, const string& alias, const string& 
 {
 	CalpontSelectExecutionPlan* csep = dynamic_cast<CalpontSelectExecutionPlan*>(ep);
 	SErrorInfo errorInfo(jobInfo.errorInfo);
-	jobInfo.subView = view;
-	SubQueryTransformer transformer(&jobInfo, errorInfo, alias);
+	SubQueryTransformer transformer(&jobInfo, errorInfo, alias, view);
 	transformer.setVarbinaryOK();
 	SJSTEP subQueryStep = transformer.makeSubQueryStep(csep, true);
 	subQueryStep->view(view);
@@ -753,7 +752,7 @@ void addOrderByAndLimit(CalpontSelectExecutionPlan* csep, JobInfo& jobInfo)
 					sc->oid((tblOid+1) + sc->colPosition());
 				}
 				oid = sc->oid();
-				ct = jobInfo.vtableColTypes[UniqId(oid, alias, schema, view)];
+				ct = jobInfo.vtableColTypes[UniqId(oid, alias, "", "")];
 			}
 
 			tupleKey = getTupleKey(jobInfo, sc);

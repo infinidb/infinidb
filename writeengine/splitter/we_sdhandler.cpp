@@ -1253,7 +1253,7 @@ void WESDHandler::onBrmReport(int PmId, messageqcpp::SBS& Sbs) {
 				{
 					if (getDebugLvl())
 						cout << "\tSuccessfully changed TableLock State" << endl;
-					doCleanup();
+					doCleanup(true);
 				}
 				else
 				{
@@ -1546,7 +1546,10 @@ void WESDHandler::onRollbackResult(int PmId, messageqcpp::SBS& Sbs) {
 		fLog.logMsg( aStrStr.str(), MSGLVL_INFO2 );
 		if (getDebugLvl()) cout << aStrStr.str() << endl;
 
-		doCleanup();
+		// false flag sent to doCleanup says to not delete HDFS temp db files,
+		// because the bulk rollback will have already deleted them.  We still
+		// call doCleanup for other file cleanup (like deleting meta file).
+		doCleanup(false);
 	}
 
 }
@@ -1708,13 +1711,14 @@ void WESDHandler::doRollback()
 
 //------------------------------------------------------------------------------
 
-void WESDHandler::doCleanup() {
+void WESDHandler::doCleanup(bool deleteHdfsTempDbFiles) {
 	if (getDebugLvl())
 		cout << "A cleanup is called!!" << endl;
 
 	messageqcpp::ByteStream aBs;
 	aBs << (ByteStream::byte) WE_CLT_SRV_CLEANUP;
 	aBs << (ByteStream::quadbyte) fTableOId;
+	aBs << (ByteStream::byte) deleteHdfsTempDbFiles;
 	mutex::scoped_lock aLock(fSendMutex);
 	send2Pm(aBs);
 	aLock.unlock();

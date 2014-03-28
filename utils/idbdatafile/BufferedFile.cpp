@@ -1,11 +1,11 @@
 /* Copyright (C) 2013 Calpont Corp.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -72,15 +72,18 @@ BufferedFile::~BufferedFile()
 ssize_t BufferedFile::pread(void *ptr, off64_t offset, size_t count)
 {
 	ssize_t ret = 0;
-	if (tell() != offset)
-	{
-		seek(offset, SEEK_SET);
-	}
+	int savedErrno;
+	ssize_t curpos = tell();
+
+    seek(offset, SEEK_SET);
 	ret = read(ptr, count);
+	savedErrno = errno;
+	seek(curpos, SEEK_SET);
 
 	if( IDBLogger::isEnabled() )
 		IDBLogger::logRW("pread", m_fname, this, offset, count, ret);
 
+	errno = savedErrno;
 	return ret;
 }
 
@@ -88,51 +91,92 @@ ssize_t BufferedFile::read(void *ptr, size_t count)
 {
 	ssize_t ret = 0;
 	ssize_t offset = tell();
-	ret = fread(ptr, count, 1, m_fp) * count;
+	int savedErrno = -1;
+	size_t progress = 0;
+	uint8_t *ptr8 = (uint8_t *) ptr;
+
+	while (progress < count) {
+		ret = fread(ptr8 + progress, 1, count - progress, m_fp);
+		savedErrno = errno;
+		if (ret <= 0) {
+			if (ferror(m_fp)) {
+				errno = savedErrno;
+				return -1;
+			}
+			else if (feof(m_fp))
+				return progress;
+		}
+		progress += ret;
+	}
 
 	if( IDBLogger::isEnabled() )
-		IDBLogger::logRW("read", m_fname, this, offset, count, ret);
+		IDBLogger::logRW("read", m_fname, this, offset, count, progress);
 
-	return ret;
+	errno = savedErrno;
+	return progress;
 }
 
 ssize_t BufferedFile::write(const void *ptr, size_t count)
 {
 	ssize_t ret = 0;
 	off64_t offset = tell();
-	ret = fwrite(ptr, count, 1, m_fp) * count;
+	int savedErrno = 0;
+	size_t progress = 0;
+	uint8_t *ptr8 = (uint8_t *) ptr;
+
+	while (progress < count) {
+		ret = fwrite(ptr8 + progress, 1, count - progress, m_fp);
+		savedErrno = errno;
+		if (ret <= 0 && ferror(m_fp)) {
+			errno = savedErrno;
+			return -1;
+		}
+		else if (ret > 0)
+            progress += ret;
+        // can fwrite() continually return 0 with no error?
+	}
 
 	if( IDBLogger::isEnabled() )
-		IDBLogger::logRW("write", m_fname, this, offset, count, ret);
+		IDBLogger::logRW("write", m_fname, this, offset, count, progress);
 
-	return ret;
+	errno = savedErrno;
+	return progress;
 }
 
 int BufferedFile::seek(off64_t offset, int whence)
 {
 	int ret = 0;
+	int savedErrno;
 #ifdef _MSC_VER
 	ret = _fseeki64(m_fp, offset, whence);
 #else
 	ret = fseek(m_fp, offset, whence);
 #endif
+	savedErrno = errno;
+
 	if( IDBLogger::isEnabled() )
 		IDBLogger::logSeek(m_fname, this, offset, whence, ret);
 
+	errno = savedErrno;
 	return ret;
 }
 
 int BufferedFile::truncate(off64_t length)
 {
 	int ret = 0;
+	int savedErrno;
+
 #ifdef _MSC_VER
 	ret = _chsize_s(_fileno(m_fp), length);
 #else
 	ret = ftruncate(fileno(m_fp),length);
 #endif
+	savedErrno = errno;
+
 	if( IDBLogger::isEnabled() )
 		IDBLogger::logTruncate(m_fname, this, length, ret);
 
+	errno = savedErrno;
 	return ret;
 }
 
@@ -178,15 +222,21 @@ off64_t BufferedFile::tell()
 int BufferedFile::flush()
 {
 	int rc = fflush(m_fp);
-	if( rc == 0 )
+	int savedErrno = errno;
+
+	if( rc == 0 ) {
 #ifdef _MSC_VER
 		rc = _commit(_fileno(m_fp));
 #else
 		rc = fsync( fileno( m_fp ) );
 #endif
+		savedErrno = errno;
+	}
+
 	if( IDBLogger::isEnabled() )
 		IDBLogger::logNoArg(m_fname, this, "flush", rc);
 
+	errno = savedErrno;
 	return rc;
 }
 
@@ -201,12 +251,16 @@ time_t BufferedFile::mtime()
 	return ret;
 }
 
-void BufferedFile::close()
+int BufferedFile::close()
 {
 	int ret = fclose(m_fp);
+	int savedErrno = errno;
 
 	if( IDBLogger::isEnabled() )
 		IDBLogger::logNoArg(m_fname, this, "close", ret);
+
+	errno = savedErrno;
+	return ret;
 }
 
 }

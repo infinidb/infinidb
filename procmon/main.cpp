@@ -396,33 +396,7 @@ int main(int argc, char **argv)
 
 		sleep(5);	// give the Status thread time to fully initialize
 
-/*		if ( config.ServerInstallType() == oam::INSTALL_COMBINE_DM_UM_PM ) {
-			// start mysqld to make sure it's running
-			// need for addmodule command
-			try {
-				oam.actionMysqlCalpont(MYSQL_START);
-			}
-			catch(...)
-			{}
-		}
-*/	}
-/*	else
-	{	// um, start mysqld to make sure it's running
-		// need for reconfiguremodule command
-		try {
-			oam.actionMysqlCalpont(MYSQL_START);
-		}
-		catch(...)
-		{}
 	}
-*/
-
-	// stop mysqld to make sure it's not running after reboot
-	try {
-		oam.actionMysqlCalpont(MYSQL_STOP);
-	}
-	catch(...)
-	{}
 
 	SystemStatus systemstatus;
 

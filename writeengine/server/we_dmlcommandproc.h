@@ -109,6 +109,10 @@ class WE_DMLCommandProc
 			else
 				return false;
 		}
+		uint8_t processBatchInsertHwmFlushChunks(uint32_t tableOID, int txnID,
+			const std::vector<BRM::FileInfo>& files,
+			const std::vector<BRM::OID_t>& oidsToFlush,
+			std::string& err);
 
 		bool fIsFirstBatchPm;
 		std::map<uint32_t,rowgroup::RowGroup *> rowGroups;

@@ -65,6 +65,7 @@ namespace
 //extern WriteEngine::BRMWrapper* brmWrapperPtr;
 namespace WriteEngine
 {
+	/* static */ boost::ptr_vector<TableInfo> BulkLoad::fTableInfo;
     /* static */ boost::mutex*       BulkLoad::fDDLMutex = 0;
 
     /* static */ const std::string   BulkLoad::DIR_BULK_JOB("job");
@@ -1495,6 +1496,25 @@ int BulkLoad::updateNextValue(OID columnOid, uint64_t nextAutoIncVal)
 
     return (int)rc;
 }
+
+//------------------------------------------------------------------------------
+
+bool BulkLoad::addErrorMsg2BrmUpdater(const std::string& tablename, const ostringstream& oss)
+{
+	int size = fTableInfo.size();
+	if(size == 0) return false;
+	
+	for(int tableId = 0; tableId < size; tableId++)
+	{
+		if(fTableInfo[tableId].getTableName() == tablename)
+		{
+			fTableInfo[tableId].fBRMReporter.addToErrMsgEntry(oss.str());	
+			return true;
+		}
+	}
+	return false;
+}
+
 
 } //end of namespace
 

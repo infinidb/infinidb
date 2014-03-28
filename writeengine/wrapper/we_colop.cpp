@@ -1,11 +1,11 @@
 /* Copyright (C) 2013 Calpont Corp.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -416,7 +416,7 @@ int ColumnOp::allocRowId(const TxnID& txnid, bool useStartingExtent,
 			
 			 setColParam(newCol, 0, column.colWidth,column.colDataType, column.colType, 
 					 column.dataFile.fid, column.compressionType, dbRoot, partition, segment);
-			 rc = openColumnFile(newCol, segFile);
+			 rc = openColumnFile(newCol, segFile, false); // @bug 5572 HDFS tmp file
 			 if (rc != NO_ERROR)
 				 return rc;
 			//@Bug 3164 update compressed extent
@@ -697,7 +697,8 @@ int ColumnOp::fillColumn(const TxnID& txnid, Column& column, Column& refCol, voi
 								
 							rc = dctnry->openDctnry(dctnryStruct.dctnryOid,
                               dctnryStruct.fColDbRoot, dctnryStruct.fColPartition,
-                              dctnryStruct.fColSegment);
+                              dctnryStruct.fColSegment,
+                              false); // @bug 5572 HDFS tmp file
 							rc = dctnry->updateDctnry(dctnryTuple.sigValue, dctnryTuple.sigSize, dctnryTuple.token);
 							if (dctnryStruct.fCompressionType > 0)	
 								dctnry->closeDctnry(false);	
@@ -766,7 +767,8 @@ int ColumnOp::fillColumn(const TxnID& txnid, Column& column, Column& refCol, voi
 								//rc = wrapper.tokenize(txnid, dctnryStruct, dctnryTuple);
 								rc = dctnry->openDctnry(dctnryStruct.dctnryOid,
                               dctnryStruct.fColDbRoot, dctnryStruct.fColPartition,
-                              dctnryStruct.fColSegment);
+                              dctnryStruct.fColSegment,
+                              false); // @bug 5572 HDFS tmp file
 								rc = dctnry->updateDctnry(dctnryTuple.sigValue, dctnryTuple.sigSize, dctnryTuple.token);
 								if (dctnryStruct.fCompressionType > 0)	
 									dctnry->closeDctnry(false);	
@@ -797,13 +799,13 @@ int ColumnOp::fillColumn(const TxnID& txnid, Column& column, Column& refCol, voi
 			column.dataFile.fDbRoot = rootList[i];
             column.dataFile.fPartition = newEntries[0].partitionNum;
             column.dataFile.fSegment = newEntries[0].segmentNum;
-            RETURN_ON_ERROR(openColumnFile(column, segFile));
+            RETURN_ON_ERROR(openColumnFile(column, segFile, false)); // @bug 5572 HDFS tmp file
 			//cout << "Processing new col file " << segFile << endl;
 			refCol.dataFile.fDbRoot = rootList[i];
 			refCol.dataFile.fPartition = newEntries[0].partitionNum;
             refCol.dataFile.fSegment = newEntries[0].segmentNum;
             std::string segFileRef;
-            RETURN_ON_ERROR(refColOp->openColumnFile(refCol, segFileRef));
+            RETURN_ON_ERROR(refColOp->openColumnFile(refCol, segFileRef, false)); // @bug 5572 HDFS tmp file
 			//cout << "Processing ref file " << segFileRef << " and hwm is " << lastRefHwm << endl;
 			RETURN_ON_ERROR(refColOp->readBlock(refCol.dataFile.pFile, refColBuf, lastRefHwm));
 			
@@ -1295,8 +1297,10 @@ int ColumnOp::addExtent(
     *    NO_ERROR if success
     *    ERR_FILE_READ if something wrong in reading the file
     ***********************************************************/
+// @bug 5572 - HDFS usage: add *.tmp file backup flag
    int ColumnOp::openColumnFile(Column& column,
       std::string& segFile,
+      bool useTmpSuffix,
       int ioBuffSize) const
    {
       if (!isValid(column))
@@ -1308,6 +1312,7 @@ int ColumnOp::addExtent(
          column.dataFile.fPartition,
          column.dataFile.fSegment,
          column.dataFile.fSegFileName,
+         useTmpSuffix,
          "r+b", ioBuffSize);
       segFile = column.dataFile.fSegFileName;
       if (column.dataFile.pFile == NULL)

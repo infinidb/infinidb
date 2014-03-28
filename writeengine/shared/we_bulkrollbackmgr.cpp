@@ -1,11 +1,11 @@
 /* Copyright (C) 2013 Calpont Corp.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -44,6 +44,7 @@
 #include "we_bulkrollbackfile.h"
 #include "we_bulkrollbackfilecompressed.h"
 #include "we_bulkrollbackfilecompressedhdfs.h"
+#include "we_rbmetawriter.h"
 #include "messageids.h"
 #include "cacheutils.h"
 
@@ -56,26 +57,15 @@ using namespace std;
 
 namespace
 {
-    const char* VERSION3_REC    = "# VERSION: 3";
-    const int   VERSION3_REC_LEN= 12;
-    const char* VERSION4_REC    = "# VERSION: 4";
-    const int   VERSION4_REC_LEN= 12;
-    const char* COLUMN1_REC     = "COLUM1"; // HWM extent for a DBRoot
-    const int   COLUMN1_REC_LEN = 6;
-    const char* COLUMN2_REC     = "COLUM2"; // Placeholder for empty DBRoot
-    const int   COLUMN2_REC_LEN = 6;
-    const char* DSTORE1_REC     = "DSTOR1"; // HWM extent for a DBRoot
-    const int   DSTORE1_REC_LEN = 6;
-    const char* DSTORE2_REC     = "DSTOR2"; // Placeholder for empty DBRoot
-    const int   DSTORE2_REC_LEN = 6;
     const char* DATA_DIR_SUFFIX = "_data";
-    const char* DBROOT_BULK_ROLLBACK_SUBDIR = "bulkRollback";
     const char* TMP_FILE_SUFFIX = ".tmp";
 
     const int BUF_SIZE = 1024;  // size of buffer used to read meta data records
 
     const std::string DB_FILE_PREFIX   ("FILE");
     const std::string DB_FILE_EXTENSION(".cdf");
+    const std::string DB_FILE_EXTENSION_ORIG(".orig");
+    const std::string DB_FILE_EXTENSION_TMP (".tmp" );
 }
 
 namespace WriteEngine
@@ -175,9 +165,47 @@ int BulkRollbackMgr::rollback ( bool keepMetaFile )
 
         if (dbRootRollbackCount > 0)
         {
-            // Notify PrimProc to flush it's cache.  If error occurs, we tell
-            // the user but keep going but warn the user.
-            int cache_rc = cacheutils::flushPrimProcCache();
+            // Notify PrimProc to flush FD cache.  If error occurs, we tell
+            // the user but keep going.
+            int flushFd_rc = cacheutils::dropPrimProcFdCache();
+            if (flushFd_rc != 0)
+            {
+                std::ostringstream oss;
+                oss << "ClearTableLock: Error flushing PrimProc "
+                    "FD cache after rolling back data for table " <<
+                    fTableName <<
+                    " (OID-" << fTableOID << ");  rc-" << flushFd_rc;
+
+                // If we have a logger, then use it to log to syslog, etc
+                if (fLog)
+                {
+                    fLog->logMsg( oss.str(), MSGLVL_ERROR );
+                }
+                else // log message ourselves
+                {
+                    std::cout << oss.str() << std::endl;
+
+                    logging::Message m( logging::M0010 );
+                    logging::Message::Args args;
+                    args.add( oss.str() );
+                    m.format( args );
+                    fSysLogger.logErrorMessage( m );
+                }
+            }
+
+            // Notify PrimProc to flush block cache.  If error occurs, we tell
+            // the user but keep going.
+            std::vector<BRM::OID_t> allOIDs;
+            std::set<OID>::const_iterator iter=fAllColDctOIDs.begin();
+            while (iter != fAllColDctOIDs.end())
+            {
+                //std::cout << "Flushing OID from PrimProc cache " << *iter <<
+                //  std::endl;
+                allOIDs.push_back(*iter);
+                ++iter;
+            }
+
+            int cache_rc = cacheutils::flushOIDsFromCache( allOIDs );
             if (cache_rc != 0)
             {
                 std::ostringstream oss;
@@ -304,7 +332,8 @@ bool BulkRollbackMgr::openMetaDataFile ( u_int16_t dbRoot,
     }
 
     // Open the file
-    fMetaFile = IDBDataFile::open( IDBPolicy::getType(fMetaFileName.c_str(), IDBPolicy::WRITEENG),
+    fMetaFile = IDBDataFile::open( IDBPolicy::getType(fMetaFileName.c_str(),
+                                   IDBPolicy::WRITEENG),
                                    fMetaFileName.c_str(), "rb", 0);
 
     if ( !fMetaFile )
@@ -353,11 +382,11 @@ bool BulkRollbackMgr::openMetaDataFile ( u_int16_t dbRoot,
 
     // read data
     metaDataStream.getline( inBuf, BUF_SIZE );
-    if (strncmp(inBuf, VERSION3_REC, VERSION3_REC_LEN) == 0)
+    if (RBMetaWriter::verifyVersion3(inBuf))
     {
         fVersion = 3;
     }
-    else if (strncmp(inBuf, VERSION4_REC, VERSION4_REC_LEN) == 0)
+    else if (RBMetaWriter::verifyVersion4(inBuf))
     {
         fVersion = 4;
     }
@@ -435,7 +464,7 @@ void BulkRollbackMgr::deleteExtents ( std::istringstream& metaDataStream )
     while (metaDataStream.getline( inBuf, BUF_SIZE ))
     {
         // Restore extents for a DBRoot
-        if (strncmp(inBuf, COLUMN1_REC, COLUMN1_REC_LEN) == 0)
+        if (RBMetaWriter::verifyColumn1Rec(inBuf))
         {
             // Process any pending dictionary deletes
             if (fPendingDctnryExtents.size() > 0)
@@ -448,7 +477,7 @@ void BulkRollbackMgr::deleteExtents ( std::istringstream& metaDataStream )
             deleteDbFiles( );
         }
         // Delete all extents from a formerly empty DBRoot
-        else if (strncmp(inBuf, COLUMN2_REC, COLUMN2_REC_LEN) == 0)
+        else if (RBMetaWriter::verifyColumn2Rec(inBuf))
         {
             // Process any pending dictionary deletes
             if (fPendingDctnryExtents.size() > 0)
@@ -460,8 +489,8 @@ void BulkRollbackMgr::deleteExtents ( std::istringstream& metaDataStream )
             deleteColumn2Extents ( inBuf );
             deleteDbFiles( );
         }
-        else if ((strncmp(inBuf, DSTORE1_REC, DSTORE1_REC_LEN) == 0) ||
-                 (strncmp(inBuf, DSTORE2_REC, DSTORE2_REC_LEN) == 0))
+        else if (RBMetaWriter::verifyDStore1Rec(inBuf) ||
+                 RBMetaWriter::verifyDStore2Rec(inBuf))
         {
             if (fPendingDctnryExtents.size() > 0)
             {
@@ -525,7 +554,7 @@ void BulkRollbackMgr::readMetaDataRecDctnry ( const char* inBuf )
     RollbackData rbData;
 
     // Process DSTORE1 records representing segment files with an HWM
-    if ((strncmp(recType, DSTORE1_REC, DSTORE1_REC_LEN) == 0))
+    if (RBMetaWriter::verifyDStore1Rec(recType))
     {
         int numFields = sscanf(inBuf, "%s %u %u %u %u %u %u %d",
             recType, &dColumnOID, &dStoreOID,
@@ -736,18 +765,22 @@ void BulkRollbackMgr::deleteColumn1ExtentsV4 ( const char* inBuf )
 
     // Delete extents from the extentmap
     std::ostringstream msg0074Text;
-    msg0074Text << "Restoring HWM column extent: "
+    msg0074Text << "Restoring HWM column extent: " <<
         "dbRoot-"  << dbRootHwm  <<
         "; part#-" << partNumHwm <<
         "; seg#-"  << segNumHwm  <<
         "; hwm-"   << lastLocalHwm;
     logAMessage( logging::LOG_TYPE_INFO,
         logging::M0074, columnOID, msg0074Text.str() );
+    fAllColDctOIDs.insert( columnOID );
 
     // Create the object responsible for restoring the extents in the db files.
     BulkRollbackFile* fileRestorer = makeFileRestorer(compressionType);
     boost::scoped_ptr<BulkRollbackFile> refBulkRollbackFile(fileRestorer);
 
+    // DMC-We should probably change this to build up a list of BRM changes,
+    //     and wait to make the call(s) to rollback the BRM changes "after" we
+    //     have restored the db files, and purged PrimProc FD and block cache.
     int rc = BRMWrapper::getInstance()->rollbackColumnExtents_DBroot (
         columnOID,
         false,                  // false -> Don't delete all extents (rollback
@@ -788,13 +821,13 @@ void BulkRollbackMgr::deleteColumn1ExtentsV4 ( const char* inBuf )
 
     u_int32_t dbRoot  = dbRootHwm;
     u_int32_t partNum = partNumHwm;
-    bool existsFlag   = true;
     std::string segFileListErrMsg;
 
     // Delete extents from the database files.
     // Loop through all partitions (starting with the HWM partition partNumHwm),
     // deleting or restoring applicable extents.  We stay in loop till we 
     // reach a partition that has no column segment files to roll back.
+    bool useHdfs = IDBPolicy::useHdfs();
     while ( 1 )
     {
         std::vector<u_int32_t> segList;
@@ -813,7 +846,7 @@ void BulkRollbackMgr::deleteColumn1ExtentsV4 ( const char* inBuf )
             throw WeException( oss.str(), rc );
         }
 
-        rc = getSegFileList( dirName, segList, segFileListErrMsg );
+        rc = getSegFileList( dirName, useHdfs, segList, segFileListErrMsg );
         if (rc != NO_ERROR)
         {
             WErrorCodes ec;
@@ -880,19 +913,16 @@ void BulkRollbackMgr::deleteColumn1ExtentsV4 ( const char* inBuf )
                     else
                     {
                         std::string segFileName;
-                        fileRestorer->findSegmentFile ( columnOID,
+                        fileRestorer->buildSegmentFileName ( columnOID,
                             true,    // column segment file
                             dbRoot,
                             partNum,
                             segNum,
-                            existsFlag,
                             segFileName );
-                        if (existsFlag)
-                        {
-                            createFileDeletionEntry( columnOID,
-                                true, // column segment file
-                                dbRoot, partNum, segNum, segFileName );
-                        }
+
+                        createFileDeletionEntry( columnOID,
+                            true, // column segment file
+                            dbRoot, partNum, segNum, segFileName );
                     }
                 } // end of (segNum > segNumHwm)
 
@@ -941,19 +971,16 @@ void BulkRollbackMgr::deleteColumn1ExtentsV4 ( const char* inBuf )
             {
                 // Delete any files added to subsequent partitions
                 std::string segFileName;
-                fileRestorer->findSegmentFile ( columnOID,
+                fileRestorer->buildSegmentFileName ( columnOID,
                     true,    // column segment file
                     dbRoot,
                     partNum,
                     segNum,
-                    existsFlag,
                     segFileName );
-                if (existsFlag)
-                {
-                    createFileDeletionEntry( columnOID,
-                        true, // column segment file
-                        dbRoot, partNum, segNum, segFileName );
-                }
+
+                createFileDeletionEntry( columnOID,
+                    true, // column segment file
+                    dbRoot, partNum, segNum, segFileName );
             }
         } // loop thru all the potential segment files in a partition
 
@@ -1012,11 +1039,15 @@ void BulkRollbackMgr::deleteColumn2ExtentsV4 ( const char* inBuf )
         "; hwm-"   << lastLocalHwm;
     logAMessage( logging::LOG_TYPE_INFO,
         logging::M0074, columnOID, msg0074Text.str() );
+    fAllColDctOIDs.insert( columnOID );
 
     // Create the object responsible for restoring the extents in the db files.
     BulkRollbackFile* fileRestorer = makeFileRestorer(compressionType);
     boost::scoped_ptr<BulkRollbackFile> refBulkRollbackFile(fileRestorer);
 
+    // DMC-We should probably change this to build up a list of BRM changes,
+    //     and wait to make the call(s) to rollback the BRM changes "after" we
+    //     have restored the db files, and purged PrimProc FD and block cache.
     int rc = BRMWrapper::getInstance()->rollbackColumnExtents_DBroot (
         columnOID,
         true,           // true -> delete all extents (restore to empty DBRoot)
@@ -1041,13 +1072,13 @@ void BulkRollbackMgr::deleteColumn2ExtentsV4 ( const char* inBuf )
 
     u_int32_t dbRoot  = dbRootHwm;
     u_int32_t partNum = partNumHwm;
-    bool existsFlag   = true;
     std::string segFileListErrMsg;
 
     // Delete extents from the database files.
     // Loop through all partitions (starting with the HWM partition partNumHwm),
     // deleting or restoring applicable extents.  We stay in loop till we 
     // reach a partition that has no column segment files to roll back.
+    bool useHdfs = IDBPolicy::useHdfs();
     while ( 1 )
     {
         std::vector<u_int32_t> segList;
@@ -1066,7 +1097,7 @@ void BulkRollbackMgr::deleteColumn2ExtentsV4 ( const char* inBuf )
             throw WeException( oss.str(), rc );
         }
 
-        rc = getSegFileList( dirName, segList, segFileListErrMsg );
+        rc = getSegFileList( dirName, useHdfs, segList, segFileListErrMsg );
         if (rc != NO_ERROR)
         {
             WErrorCodes ec;
@@ -1088,20 +1119,16 @@ void BulkRollbackMgr::deleteColumn2ExtentsV4 ( const char* inBuf )
 
             // Delete any files added to subsequent partitions
             std::string segFileName;
-            fileRestorer->findSegmentFile ( columnOID,
+            fileRestorer->buildSegmentFileName ( columnOID,
                 true,    // column segment file
                 dbRoot,
                 partNum,
                 segNum,                
-                existsFlag,
                 segFileName );
 
-            if (existsFlag)
-            {
-                createFileDeletionEntry( columnOID,
-                    true, // column segment file
-                    dbRoot, partNum, segNum, segFileName );
-            }
+            createFileDeletionEntry( columnOID,
+                true, // column segment file
+                dbRoot, partNum, segNum, segFileName );
         } // loop thru all the potential segment files in a partition
 
         partNum++;
@@ -1214,12 +1241,16 @@ void BulkRollbackMgr::deleteDctnryExtentsV4 ( )
 
     logAMessage( logging::LOG_TYPE_INFO,
         logging::M0074, fPendingDctnryStoreOID, msg0074Text.str() );
+    fAllColDctOIDs.insert( fPendingDctnryStoreOID );
 
     // Create the object responsible for restoring the extents in the db files.
     BulkRollbackFile* fileRestorer = makeFileRestorer(
         fPendingDctnryStoreCompressionType);
     boost::scoped_ptr<BulkRollbackFile> refBulkRollbackFile(fileRestorer);
 
+    // DMC-We should probably change this to build up a list of BRM changes,
+    //     and wait to make the call(s) to rollback the BRM changes "after" we
+    //     have restored the db files, and purged PrimProc FD and block cache.
     int rc = BRMWrapper::getInstance()->rollbackDictStoreExtents_DBroot (
         fPendingDctnryStoreOID,
         (u_int16_t)fPendingDctnryStoreDbRoot,
@@ -1246,13 +1277,13 @@ void BulkRollbackMgr::deleteDctnryExtentsV4 ( )
 
     u_int32_t dbRoot  = fPendingDctnryStoreDbRoot;
     u_int32_t partNum = fPendingDctnryExtents[0].fPartNum;
-    bool existsFlag   = true;
     std::string segFileListErrMsg;
 
     // Delete extents from the database files.
     // Loop through all partitions (starting with the HWM partition fPartNum),
     // deleting or restoring applicable extents.  We stay in loop till we 
     // reach a partition that has no dctnry store segment files to roll back.
+    bool useHdfs = IDBPolicy::useHdfs();
     while ( 1 )
     {
         std::vector<u_int32_t> segList;
@@ -1272,7 +1303,7 @@ void BulkRollbackMgr::deleteDctnryExtentsV4 ( )
             throw WeException( oss.str(), rc );
         }
 
-        rc = getSegFileList( dirName, segList, segFileListErrMsg );
+        rc = getSegFileList( dirName, useHdfs, segList, segFileListErrMsg );
         if (rc != NO_ERROR)
         {
             WErrorCodes ec;
@@ -1354,20 +1385,17 @@ void BulkRollbackMgr::deleteDctnryExtentsV4 ( )
             else // don't keep this segment file
             {
                 std::string segFileName;
-                fileRestorer->findSegmentFile ( fPendingDctnryStoreOID,
+                fileRestorer->buildSegmentFileName ( fPendingDctnryStoreOID,
                     false,    // not a column segment file
                     dbRoot,
                     partNum,
                     segNum,                
-                    existsFlag,
                     segFileName );
-                if (existsFlag)
-                {
-                    createFileDeletionEntry( fPendingDctnryStoreOID,
-                        false, // not a column segment file
-                        dbRoot, partNum, segNum,
-                        segFileName );
-                }
+
+                createFileDeletionEntry( fPendingDctnryStoreOID,
+                    false, // not a column segment file
+                    dbRoot, partNum, segNum,
+                    segFileName );
             }
         } // loop thru all the potential segment files in a partition
 
@@ -1433,15 +1461,22 @@ void BulkRollbackMgr::deleteDbFiles( )
 
 //------------------------------------------------------------------------------
 // Get list of segment files found in the specified db directory path.
+// If bIncludeAlternateSegFileNames is false, then only "FILENNN.cdf" files
+// will be considered.
+// If bIncludeAlternateSegFileNames is true, then in addition to "FILENNN.cdf"
+// files, "FILENNN.cdf.orig" and "FILENNN.cdf.tmp" files will be considered.
+// The latter case (flag set to true) is used on connection with HDFS.
 //------------------------------------------------------------------------------
 /* static */
 int BulkRollbackMgr::getSegFileList(
     const std::string& dirName,
+    bool bIncludeAlternateSegFileNames,
     std::vector<u_int32_t>& segList,
     std::string& errMsg )
 {
     const unsigned int DB_FILE_PREFIX_LEN = DB_FILE_PREFIX.length();
     segList.clear();
+    std::set<u_int32_t> segSet;
 
     // Return no segment files if partition directory path does not exist
     if( !IDBPolicy::isDir( dirName.c_str() ) )
@@ -1450,9 +1485,9 @@ int BulkRollbackMgr::getSegFileList(
     list<string> dircontents;
     if( IDBPolicy::listDirectory( dirName.c_str(), dircontents ) == 0 )
     {
-    	list<string>::iterator iend = dircontents.end();
-    	for( list<string>::iterator i = dircontents.begin(); i != iend; ++i )
-    	{
+        list<string>::iterator iend = dircontents.end();
+        for( list<string>::iterator i = dircontents.begin(); i != iend; ++i )
+        {
             boost::filesystem::path filepath( *i );
 
 #if BOOST_VERSION >= 105200
@@ -1464,12 +1499,51 @@ int BulkRollbackMgr::getSegFileList(
             const std::string& fileBase = filepath.stem();
             const std::string& fileExt  = filepath.extension();
 #endif
+            //std::cout << "getSegFileList: " << fileBase << " / " <<
+            //  fileExt << std::endl;
+
             // Select files of interest ("FILE*.cdf")
-            if ((fileBase.compare(0, DB_FILE_PREFIX_LEN, DB_FILE_PREFIX) == 0)&&
-                (fileExt == DB_FILE_EXTENSION) )
+            bool bMatchFound = false;
+            unsigned int segNumStrLen = 0;
+
+            if (fileBase.compare(0, DB_FILE_PREFIX_LEN, DB_FILE_PREFIX) == 0)
+            {
+                segNumStrLen = fileBase.length() - DB_FILE_PREFIX_LEN;
+
+                // Select primary "FILE*.cdf" files
+                if (fileExt == DB_FILE_EXTENSION)
+                {
+                    bMatchFound  = true;
+                    //std::cout << "getSegFileList: match *.cdf" << std::endl;
+                }
+                // Select alternate files of interest ("FILE*.cdf.orig" and
+                // "FILE*.cdf.tmp") used for HDFS backup and rollback.
+                else if (bIncludeAlternateSegFileNames)
+                {
+                    if ((fileExt == DB_FILE_EXTENSION_ORIG) ||
+                        (fileExt == DB_FILE_EXTENSION_TMP))
+                    {
+                        //std::cout << "getSegFileList: match *.tmp or *.orig"<<
+                        //    std::endl;
+                        unsigned int extLen = DB_FILE_EXTENSION.length();
+                        if ((fileBase.length() >= extLen) &&
+                            (fileBase.compare((fileBase.length()-extLen),
+                                extLen,
+                                DB_FILE_EXTENSION) == 0))
+                        {
+                            //std::cout << "getSegFileList: match *cdf.tmp or "
+                            //  "*cdf.orig" << std::endl;
+                            bMatchFound   = true;
+                            segNumStrLen -= extLen;
+                        }
+                    }
+                }
+            } // if fileBase.compare() shows filename starting with "FILE"
+
+            if (bMatchFound)
             {
                 const std::string& fileSeg = fileBase.substr(
-                    DB_FILE_PREFIX_LEN, (fileBase.length()-DB_FILE_PREFIX_LEN));
+                    DB_FILE_PREFIX_LEN, segNumStrLen);
                 bool bDbFile = true;
 
                 const unsigned fileSegLen = fileSeg.length();
@@ -1487,16 +1561,25 @@ int BulkRollbackMgr::getSegFileList(
                     if (bDbFile)
                     {
                         u_int32_t segNum = atoi( fileSeg.c_str() );
-                        segList.push_back( segNum );
+                        segSet.insert( segNum );
                     }
                 } // filename must have 3 or more digits representing seg number
-            }     // look for filenames matching "FILE*.cdf"
-    	} // for each file in directory
+            } // found "FILE*.cdf", "FILE*.cdf.orig", or "FILE*.cdf.tmp" file
+        } // for each file in directory
 
-    	if (segList.size() > 1)
-            std::sort( segList.begin(), segList.end() );
+        if (segSet.size() > 0)
+        {
+            std::set<u_int32_t>::const_iterator iter=segSet.begin();
+            while (iter != segSet.end())
+            {
+                //std::cout << "getSegFileList: Adding segnum " << *iter <<
+                //    " to the segment list" << std::endl;
+                segList.push_back(*iter);
+                ++iter;
+            }
+        }
 
-    	return NO_ERROR;
+        return NO_ERROR;
 
     } // if listDirectory() success
     else

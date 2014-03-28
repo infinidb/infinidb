@@ -151,7 +151,7 @@ void DmlReadThread::operator()()
                 }
             case WE_SVR_BATCH_INSERT_END:
                 {
-                    fWeDMLprocessor->processBatchInsertHwm(ibs, errMsg);
+                    rc = fWeDMLprocessor->processBatchInsertHwm(ibs, errMsg);
 					//timer.finish();
                     break;
                 }

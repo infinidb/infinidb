@@ -1,11 +1,11 @@
 /* Copyright (C) 2013 Calpont Corp.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -57,10 +57,21 @@ SubQueryTransformer::SubQueryTransformer(JobInfo* jobInfo, SErrorInfo& err) :
 }
 
 
-SubQueryTransformer::SubQueryTransformer(JobInfo* jobInfo, SErrorInfo& err, const string& alias) :
+SubQueryTransformer::SubQueryTransformer(JobInfo* jobInfo, SErrorInfo& err,
+                                         const string& view) :
+	fOutJobInfo(jobInfo), fSubJobInfo(NULL), fErrorInfo(err)
+{
+	fVtable.view(algorithm::to_lower_copy(view));
+}
+
+
+SubQueryTransformer::SubQueryTransformer(JobInfo* jobInfo, SErrorInfo& err,
+                                         const string& alias,
+                                         const string& view) :
 	fOutJobInfo(jobInfo), fSubJobInfo(NULL), fErrorInfo(err)
 {
 	fVtable.alias(algorithm::to_lower_copy(alias));
+	fVtable.view(algorithm::to_lower_copy(view));
 }
 
 
@@ -180,7 +191,7 @@ SJSTEP& SubQueryTransformer::makeSubQueryStep(execplan::CalpontSelectExecutionPl
 	rg.initRow(&row);
 	for (uint64_t i = 0; i < fSubReturnedCols.size(); i++)
 	{
-		fVtable.addColumn(fSubReturnedCols[i], fOutJobInfo->subView);
+		fVtable.addColumn(fSubReturnedCols[i]);
 
 		// make sure the column type is the same as rowgroup
 		CalpontSystemCatalog::ColType ct = fVtable.columnType(i);
@@ -263,7 +274,7 @@ void SubQueryTransformer::updateCorrelateInfo()
 	// Temp fix for @bug3932 until outer join has no dependency on table order.
 	// Insert at [1], not to mess with OUTER join and hint(INFINIDB_ORDERED -- bug2317).
 	fOutJobInfo->tableList.insert(fOutJobInfo->tableList.begin()+1, makeTableKey(
-		*fOutJobInfo, fVtable.tableOid(), fVtable.name(), fVtable.alias(), "", ""));
+		*fOutJobInfo, fVtable.tableOid(), fVtable.name(), fVtable.alias(), "", fVtable.view()));
 
 	// tables in outer level
 	set<uint32_t> outTables;

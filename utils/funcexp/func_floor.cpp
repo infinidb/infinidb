@@ -1,11 +1,11 @@
 /* Copyright (C) 2013 Calpont Corp.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -272,23 +272,40 @@ string Func_floor::getStrVal(Row& row,
 							bool& isNull,
 							CalpontSystemCatalog::ColType& op_ct)
 {
-	string ret;
+	char tmp[512] = {'\0'};
 	if (op_ct.colDataType == CalpontSystemCatalog::DOUBLE ||
+		op_ct.colDataType == CalpontSystemCatalog::UDOUBLE ||
 		op_ct.colDataType == CalpontSystemCatalog::FLOAT ||
+		op_ct.colDataType == CalpontSystemCatalog::UFLOAT ||
 		op_ct.colDataType == CalpontSystemCatalog::VARCHAR ||
 		op_ct.colDataType == CalpontSystemCatalog::CHAR)
 	{
+		snprintf(tmp, 511, "%f", getDoubleVal(row, parm, isNull, op_ct));
+
 		// remove the decimals in the oss string.
-		ret = doubleToString(getDoubleVal(row, parm, isNull, op_ct));
-		size_t d = ret.find('.');
-		ret = ret.substr(0, d);
+		char *d = tmp;
+		while ((*d != '.') && (*d != '\0'))
+			d++;
+		*d = '\0';
 	}
+	else if (isUnsigned(op_ct.colDataType))
+	{
+#ifndef __LP64__
+        snprintf(tmp, 511, "%llu", getUintVal(row, parm, isNull, op_ct));
+#else
+        snprintf(tmp, 511, "%lu", getUintVal(row, parm, isNull, op_ct));
+#endif
+    }
 	else
 	{
-		ret = intToString(getIntVal(row, parm, isNull, op_ct));
+#ifndef __LP64__
+        snprintf(tmp, 511, "%lld", getIntVal(row, parm, isNull, op_ct));
+#else
+        snprintf(tmp, 511, "%ld", getIntVal(row, parm, isNull, op_ct));
+#endif
 	}
 
-	return ret;
+	return string(tmp);
 }
 
 

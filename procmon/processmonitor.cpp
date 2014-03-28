@@ -4913,9 +4913,6 @@ int ProcessMonitor::checkDataMount()
 				log.writeLog(__LINE__, "Exception assigning gluster dbroot# " + dbrootID, LOG_TYPE_ERROR);
 			}
 		}
-
-		//go unmount disk NOT assigned to this pm
-		unmountExtraDBroots();
 	}
 
 	if ( DBRootStorageType == "hdfs" ||
@@ -4938,6 +4935,9 @@ int ProcessMonitor::checkDataMount()
 
 		return API_SUCCESS;
 	}
+
+	//go unmount disk NOT assigned to this pm
+	unmountExtraDBroots();
 
 	//Flush the cache
 	cacheutils::flushPrimProcCache();

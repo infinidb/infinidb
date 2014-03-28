@@ -84,7 +84,7 @@ class ColumnInfoCompressed : public ColumnInfo
     // newHWM - Starting point for adding data after initial blockskipping
     virtual int setupInitialColumnFile( HWM oldHWM, HWM newHWM );
 
-    virtual int saveDctnryStoreHWMChunk();
+    virtual int saveDctnryStoreHWMChunk(bool& needBackup);
     virtual int extendColumnOldExtent(
         uint16_t dbRootNext,
         uint32_t partitionNext,

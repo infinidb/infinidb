@@ -1,11 +1,11 @@
 /* Copyright (C) 2013 Calpont Corp.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -75,6 +75,7 @@ BatchPrimitiveProcessorJL::BatchPrimitiveProcessorJL(const ResourceManager& rm) 
 	hasSmallOuterJoin(false),
 	_priority(1)
 {
+    PMJoinerCount = 0;
 }
 
 BatchPrimitiveProcessorJL::~BatchPrimitiveProcessorJL()
@@ -685,9 +686,9 @@ void BatchPrimitiveProcessorJL::getRowGroupData(ByteStream &in, vector<RGData> *
 		rowCount = org.getRowCount();
 
 		bool pmSendsMatchesAnyway = (hasSmallOuterJoin && *countThis && PMJoinerCount > 0 &&
-			sendTupleJoinRowGroupData);
+            (fe2 || aggregatorPM));
 
-		if (!pmSendsFinalResult() || pmSendsMatchesAnyway) {
+        if (!pmSendsFinalResult() || pmSendsMatchesAnyway) {
 			boost::shared_array<vector<uint32_t> > joinResults;
 			uint i, j;
 
@@ -926,7 +927,7 @@ void BatchPrimitiveProcessorJL::createBPP(ByteStream &bs) const
 #endif
 				serializeVector<RowGroup>(bs, smallSideRGs);
 				bs << largeSideRG;
-				bs << joinedRG;
+				bs << joinedRG;    // TODO: I think we can omit joinedRG if (!(fe2 || aggregatorPM))
 // 				cout << "joined RG: " << joinedRG.toString() << endl;
 			}
 		}
@@ -965,11 +966,14 @@ void BatchPrimitiveProcessorJL::createBPP(ByteStream &bs) const
 		for (uint i = 0; i < threadCount; i++)
 			if (aggregatorPM)
 				primprocRG[i] = aggregateRGPM;
-			else if (fe2)
+			else if (fe2) 
 				primprocRG[i] = fe2Output;
-			else if ((flags & HAS_JOINER) && sendTupleJoinRowGroupData)
-				primprocRG[i] = joinedRG;
-			else
+			//This shouldn't be necessary. As of 2-17-14, PrimProc
+			//will only send joined results if fe2 || aggregatorPM,
+			//so it will never send back data for joinedRG.
+			//else if ((flags & HAS_JOINER) && sendTupleJoinRowGroupData)
+			//	primprocRG[i] = joinedRG;
+			else 
 				primprocRG[i] = projectionRG;
 	}
 
@@ -1445,10 +1449,12 @@ void BatchPrimitiveProcessorJL::abortProcessing(ByteStream *bs)
 
 void BatchPrimitiveProcessorJL::deliverStringTableRowGroup(bool b)
 {
-	if (fe2)
+    if (aggregatorPM)
+        aggregateRGPM.setUseStringTable(b);
+	else if (fe2)
 		fe2Output.setUseStringTable(b);
-	else if ((joiner.get() != NULL || tJoiners.size() > 0) && sendTupleJoinRowGroupData)
-		joinedRG.setUseStringTable(b);
+//	else if ((joiner.get() != NULL || tJoiners.size() > 0) && sendTupleJoinRowGroupData)
+//		joinedRG.setUseStringTable(b);
 	else
 		projectionRG.setUseStringTable(b);
 }

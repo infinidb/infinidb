@@ -493,7 +493,7 @@ void WECmdArgs::usage()
 			<<"\t-l\tName of import file to be loaded, relative to -f path,\n"
 			<<"\t-h\tPrint this message.\n"
 			<<"\t-q\tBatch Quantity, Number of rows distributed per batch in Mode 1\n"
-			<<"\t-i\tPrint extended info to console.\n"
+			<<"\t-i\tPrint extended info to console in mode 3.\n"
 			<<"\t-j\tJob ID. In simple usage, default is the table OID.\n"
 			<<"\t\t\tunless a fully qualified input file name is given.\n"
 			<<"\t-n\tNullOption (0-treat the string NULL as data (default);\n"

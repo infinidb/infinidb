@@ -1,11 +1,11 @@
 /* Copyright (C) 2013 Calpont Corp.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -2234,6 +2234,14 @@ const JobStepVector doOuterJoinOnFilter(OuterJoinOnFilter* oj, JobInfo& jobInfo)
 						continue;
 
 					JobStepVector sfv = doSimpleFilter(sf, jobInfo);
+					ExpressionStep* es = NULL;
+					for (JobStepVector::iterator k = sfv.begin(); k != sfv.end(); k++)
+					{
+						k->get()->onClauseFilter(true);
+						if ((es = dynamic_cast<ExpressionStep*>(k->get())) != NULL)
+			            	es->associatedJoinId(thjs->joinId());
+					}
+
 					jsv.insert(jsv.end(), sfv.begin(), sfv.end());
 
 					doneNodes.push_back(cn);
@@ -2319,13 +2327,6 @@ const JobStepVector doOuterJoinOnFilter(OuterJoinOnFilter* oj, JobInfo& jobInfo)
 			}
 		}
 
-		for (set<ParseTree*>::iterator i = nodesToRemove.begin(); i != nodesToRemove.end(); i++)
-		{
-			// Bug5374, keep the pointers, to bypass the outerJoin check.
-			boost::shared_ptr<const ParseTree> p(*i);
-			jobInfo.onClauseFilter.push_back(p);
-		}
-
 		// construct an expression step, if additional comparison exists.
 		if (isOk && filters != NULL && filters->data() != NULL)
 		{
@@ -2358,7 +2359,6 @@ const JobStepVector doOuterJoinOnFilter(OuterJoinOnFilter* oj, JobInfo& jobInfo)
 		throw runtime_error("Failed to parse join condition.");
 	}
 
-
 	if (jobInfo.trace)
 	{
 		ostringstream oss;
@@ -2375,8 +2375,11 @@ bool tryCombineDictionary(JobStepVector& jsv1, JobStepVector& jsv2, int8_t bop)
 {
 	JobStepVector::iterator it2 = jsv2.end() - 1;
 	// already checked: (typeid(*(it2->get()) != typeid(pDictionaryStep))
-	if (typeid(*((it2-1)->get())) != typeid(pColStep)) return false;
+	if (typeid(*((it2-1)->get())) != typeid(pColStep))
+		return false;
+
 	pDictionaryStep* ipdsp = dynamic_cast<pDictionaryStep*>(it2->get());
+	bool onClauseFilter = ipdsp->onClauseFilter();
 
 	JobStepVector::iterator iter = jsv1.begin();
 	JobStepVector::iterator end = jsv1.end();
@@ -2388,10 +2391,9 @@ bool tryCombineDictionary(JobStepVector& jsv1, JobStepVector& jsv2, int8_t bop)
 
 	while (iter != end)
 	{
-		if (typeid(*(iter->get())) == typeid(pDictionaryStep))
+		pDictionaryStep* pdsp = dynamic_cast<pDictionaryStep*>(iter->get());
+		if (pdsp != NULL && pdsp->onClauseFilter() == onClauseFilter)
 		{
-			pDictionaryStep* pdsp = dynamic_cast<pDictionaryStep*>((*iter).get());
-
 			// If the OID's match and the BOP's match and the previous step is pcolstep,
 			// then append the filters.
 			if ((ipdsp->tupleId() == pdsp->tupleId()) &&
@@ -2437,6 +2439,7 @@ bool tryCombineDictionaryScan(JobStepVector& jsv1, JobStepVector& jsv2, int8_t b
 		return false;
 
 	pDictionaryScan* ipdsp = dynamic_cast<pDictionaryScan*>(it2->get());
+	bool onClauseFilter = ipdsp->onClauseFilter();
 
 	JobStepVector::iterator iter = jsv1.begin();
 	JobStepVector::iterator end = jsv1.end();
@@ -2451,10 +2454,9 @@ bool tryCombineDictionaryScan(JobStepVector& jsv1, JobStepVector& jsv2, int8_t b
 
 	while (iter != end)
 	{
-		if (typeid(*(iter->get())) == typeid(pDictionaryScan))
+		pDictionaryScan* pdsp = dynamic_cast<pDictionaryScan*>((*iter).get());
+		if (pdsp != NULL && pdsp->onClauseFilter() == onClauseFilter)
 		{
-			pDictionaryScan* pdsp = dynamic_cast<pDictionaryScan*>((*iter).get());
-
 			// If the OID's match and the BOP's match and the previous step is pcolstep,
 			// then append the filters.
 			if ((ipdsp->tupleId() == pdsp->tupleId()) &&
@@ -2508,7 +2510,10 @@ bool tryCombineFilters(JobStepVector& jsv1, JobStepVector& jsv2, int8_t bop)
 	if (typeid(*jsv2.back().get()) != typeid(pColStep)) return false;
 
 	pColStep* ipcsp = dynamic_cast<pColStep*>(jsv2.back().get());
-	idbassert(ipcsp);
+	if (ipcsp == NULL)
+		return false;
+
+	bool onClauseFilter = ipcsp->onClauseFilter();
 
 	JobStepVector::iterator iter = jsv1.begin();
 	JobStepVector::iterator end = jsv1.end();
@@ -2521,7 +2526,8 @@ bool tryCombineFilters(JobStepVector& jsv1, JobStepVector& jsv2, int8_t bop)
 
 	while (iter != end)
 	{
-		if (typeid(*(iter->get())) == typeid(pColStep))
+		pColStep* pcsp = dynamic_cast<pColStep*>(iter->get());
+		if (pcsp != NULL && pcsp->onClauseFilter() == onClauseFilter)
 		{
 			pColStep* pcsp = dynamic_cast<pColStep*>((*iter).get());
 			idbassert(pcsp);

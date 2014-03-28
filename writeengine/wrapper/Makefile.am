@@ -46,6 +46,7 @@ libwriteengine_la_SOURCES = writeengine.cpp \
 	../shared/we_bulkrollbackfile.cpp \
 	../shared/we_rbmetawriter.cpp \
 	../shared/we_dbrootextenttracker.cpp \
+	../shared/we_confirmhdfsdbfile.cpp \
 	../dictionary/we_dctnry.cpp \
 	../xml/we_xmlop.cpp \
 	../xml/we_xmljob.cpp \

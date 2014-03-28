@@ -1,11 +1,11 @@
 /* Copyright (C) 2013 Calpont Corp.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -98,9 +98,9 @@ struct Date
     	spare(0x3E), day(0x3F), month(0xF), year(0xFFFF) {}
     // Construct a Date from a 64 bit integer Calpont date.
     Date(uint64_t val) :
-    	spare(0), day((val >> 6) & 077), month((val >> 12) & 0xF), year((val >> 16)) {}
+    	spare(0x3E), day((val >> 6) & 077), month((val >> 12) & 0xF), year((val >> 16)) {}
     // Construct using passed in parameters, no value checking
-    Date(unsigned y, unsigned m, unsigned d) : spare(0), day(d), month(m), year(y) {}
+    Date(unsigned y, unsigned m, unsigned d) : spare(0x3E), day(d), month(m), year(y) {}
 
     int32_t convertToMySQLint() const;
 };

@@ -43,6 +43,7 @@ using namespace boost;
 #include "we_config.h"
 #include "we_simplesyslog.h"
 #include "we_bulkrollbackmgr.h"
+#include "we_confirmhdfsdbfile.h"
 
 namespace
 {
@@ -648,6 +649,35 @@ int TableInfo::setParseComplete(const int &columnId,
                         "; " << ec.errorString(rc);
                     fLog->logMsg(oss.str(), rc, MSGLVL_ERROR);
                     fStatusTI = WriteEngine::ERR;
+
+                    ostringstream oss2;
+                    oss2 << "Ending HWMs for table " << fTableName << ": ";
+                    for (unsigned int n=0; n<fColumns.size(); n++)
+                    {
+                        oss2 << std::endl;
+                        oss2 << "  " << fColumns[n].column.colName <<
+                            "; DBRoot/part/seg/hwm: "        <<
+                            segFileInfo[n].fDbRoot           <<
+                            "/" << segFileInfo[n].fPartition <<
+                            "/" << segFileInfo[n].fSegment   <<
+                            "/" << segFileInfo[n].fLocalHwm;
+                    }
+                    fLog->logMsg(oss2.str(), MSGLVL_INFO1);
+
+                    return rc;
+                }
+
+                //..Confirm changes to DB files (necessary for HDFS)
+                rc = confirmDBFileChanges( );
+                if (rc != NO_ERROR)
+                {
+                    WErrorCodes ec;
+                    ostringstream oss;
+                    oss << "setParseComplete: Error confirming DB changes; "
+                        "Failed to load table: " << fTableName <<
+                        "; " << ec.errorString(rc);
+                    fLog->logMsg(oss.str(), rc, MSGLVL_ERROR);
+                    fStatusTI = WriteEngine::ERR;
                     return rc;
                 }
 
@@ -681,6 +711,7 @@ int TableInfo::setParseComplete(const int &columnId,
 
                 // Finished with this table, so delete bulk rollback
                 // meta data file and release the table lock.
+                deleteTempDBFileChanges();
                 deleteMetaDataRollbackFile();
 
                 rc = releaseTableLock( );
@@ -1620,6 +1651,77 @@ void TableInfo::deleteMetaDataRollbackFile( )
             ostringstream oss;
             oss << "Error deleting meta file; " << ex.what();
             fLog->logMsg(oss.str(), ex.errorCode(), MSGLVL_ERROR);
+        }
+    }
+}
+
+//------------------------------------------------------------------------------
+// Changes to "existing" DB files must be confirmed on HDFS system.
+// This function triggers this action.
+//------------------------------------------------------------------------------
+// @bug 5572 - Add db file confirmation for HDFS
+int TableInfo::confirmDBFileChanges( )
+{
+    // Unlike deleteTempDBFileChanges(), note that confirmDBFileChanges()
+    // executes regardless of the import mode.  We go ahead and confirm
+    // the file changes at the end of a successful cpimport.bin.
+    if (idbdatafile::IDBPolicy::useHdfs())
+    {
+        ostringstream oss;
+        oss << "Confirming DB file changes for " << fTableName;
+        fLog->logMsg( oss.str(), MSGLVL_INFO2 );
+
+        std::string errMsg;
+        ConfirmHdfsDbFile confirmHdfs;
+        int rc = confirmHdfs.confirmDbFileListFromMetaFile( fTableOID, errMsg );
+        if (rc != NO_ERROR)
+        {
+            ostringstream ossErrMsg;
+            ossErrMsg << "Unable to confirm changes to table " << fTableName <<
+                "; " << errMsg;
+            fLog->logMsg( ossErrMsg.str(), rc, MSGLVL_ERROR );
+
+            return rc;
+        }
+    }
+
+    return NO_ERROR;
+}
+
+//------------------------------------------------------------------------------
+// Temporary swap files must be deleted on HDFS system.
+// This function triggers this action.
+//------------------------------------------------------------------------------
+// @bug 5572 - Add db file confirmation for HDFS
+void TableInfo::deleteTempDBFileChanges( )
+{
+    // If executing distributed (mode1) or central command (mode2) then
+    // no action necessary.  The client front-end will initiate the deletion
+    // of the temp files, only after all the distributed imports have
+    // successfully completed.
+    if ((fBulkMode == BULK_MODE_REMOTE_SINGLE_SRC) ||
+        (fBulkMode == BULK_MODE_REMOTE_MULTIPLE_SRC))
+    {
+        return;
+    }
+
+    if (idbdatafile::IDBPolicy::useHdfs())
+    {
+        ostringstream oss;
+        oss << "Deleting DB temp swap files for " << fTableName;
+        fLog->logMsg( oss.str(), MSGLVL_INFO2 );
+
+        std::string errMsg;
+        ConfirmHdfsDbFile confirmHdfs;
+        int rc = confirmHdfs.endDbFileListFromMetaFile(fTableOID, true, errMsg);
+
+        // Treat any error as non-fatal, though we log it.
+        if (rc != NO_ERROR)
+        {
+            ostringstream ossErrMsg;
+            ossErrMsg << "Unable to delete temp swap files for table " <<
+                fTableName << "; " << errMsg;
+            fLog->logMsg( ossErrMsg.str(), rc, MSGLVL_ERROR );
         }
     }
 }

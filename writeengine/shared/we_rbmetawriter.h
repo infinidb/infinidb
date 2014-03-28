@@ -1,11 +1,11 @@
 /* Copyright (C) 2013 Calpont Corp.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -46,6 +46,8 @@
 #else
 #define EXPORT
 #endif
+
+#define DBROOT_BULK_ROLLBACK_SUBDIR "bulkRollback"
 
 namespace WriteEngine
 {
@@ -159,7 +161,9 @@ public:
         const std::string& tableName );
 
     /** @brief Make a backup copy of the specified HWM dictionary store chunk.
-     * This operation only applies to compressed columns.
+     * This operation only applies to compressed columns.  Backup may not be
+     * necessary.  Return value indicates whether the specified file needs to
+     * be backed up or not.
      * Warning: This function may throw a WeException.
      *
      * This function is thread-safe since concurrent calls could be made by
@@ -169,8 +173,9 @@ public:
      * @param dbRoot current dbRoot of last local HWM for columnOID
      * @param partition current partition of last local HWM for columnOID
      * @param segment current segment of last local HWM for columnOID
+     * @return Indicates whether it is necessary to perform backup
      */
-    EXPORT void backupDctnryHWMChunk (
+    EXPORT bool backupDctnryHWMChunk (
         OID                dctnryOID,
         uint16_t           dbRoot,
         uint32_t           partition,
@@ -203,6 +208,24 @@ public:
         const std::vector<Column>& columns,
         const std::vector<OID>&    dctnryStoreOids,
         const std::vector<BRM::EmDbRootHWMInfo_v>& dbRootHWMInfoVecCol );
+
+    /** @brief Verify that specified version record is for Version 3 */
+    static bool verifyVersion3(const char* versionRec);
+
+    /** @brief Verify that specified version record is for Version 4 */
+    static bool verifyVersion4(const char* versionRec);
+
+    /** @brief Verify that specified record type is a Column1 record */
+    static bool verifyColumn1Rec(const char* recType);
+
+    /** @brief Verify that specified record type is a Column2 record */
+    static bool verifyColumn2Rec(const char* recType);
+
+    /** @brief Verify that specified record type is a DStore1 record */
+    static bool verifyDStore1Rec(const char* recType);
+
+    /** @brief Verify that specified record type is a DStore2 record */
+    static bool verifyDStore2Rec(const char* recType);
 
 private:
     // disable copy constructor and assignment operator

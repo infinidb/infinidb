@@ -1,11 +1,11 @@
 /* Copyright (C) 2013 Calpont Corp.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -64,27 +64,23 @@ BulkRollbackFile::~BulkRollbackFile()
 }
 
 //------------------------------------------------------------------------------
-// Find the specified database segment file.
+// Build the specified database segment file name.
 //
 // columnOID      - OID of segment file to be found
 // fileTypeFlag   - true -> column file; false -> dictionary store file
 // dbRoot         - DBRoot of segment file to be found
 // partNum        - Partition number of segment file to be found
 // segNum         - Segment number of segment file to be found
-// segFileExisted (out) - indicates whether segment file was found or not
 // segFileName (out)    - Name of segment file
 //------------------------------------------------------------------------------
-void BulkRollbackFile::findSegmentFile(
+void BulkRollbackFile::buildSegmentFileName(
     OID          columnOID,
     bool         fileTypeFlag,
     u_int32_t    dbRoot,
     u_int32_t    partNum,
     u_int32_t    segNum,
-    bool&        segFileExists,
     std::string& segFileName )
 {
-    segFileExists = false;
-
     char fileName[FILE_NAME_SIZE];
     int rc = fDbFile.getFileName( columnOID, fileName,
         dbRoot, partNum, segNum );
@@ -104,9 +100,7 @@ void BulkRollbackFile::findSegmentFile(
         throw WeException( oss.str(), rc );
     }
 
-    segFileName   = fileName;
-
-    segFileExists = fDbFile.exists( fileName );
+    segFileName = fileName;
 }
 
 //------------------------------------------------------------------------------

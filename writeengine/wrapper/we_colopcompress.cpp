@@ -1,11 +1,11 @@
 /* Copyright (C) 2013 Calpont Corp.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -65,12 +65,13 @@ ColumnOpCompress0::~ColumnOpCompress0()
 {}
 
 
+// @bug 5572 - HDFS usage: add *.tmp file backup flag
 IDBDataFile* ColumnOpCompress0::openFile(
    const Column& column, const uint16_t dbRoot, const uint32_t partition, const uint16_t segment,
-   std::string& segFile, const char* mode, const int ioBuffSize) const
+   std::string& segFile, bool useTmpSuffix, const char* mode, const int ioBuffSize) const
 {
    return FileOp::openFile(column.dataFile.fid, dbRoot, partition, segment, segFile,
-                     mode, column.colWidth);
+       mode, column.colWidth, useTmpSuffix);
 }
 
 
@@ -142,11 +143,13 @@ ColumnOpCompress1::~ColumnOpCompress1()
 	}
 }
 
+// @bug 5572 - HDFS usage: add *.tmp file backup flag
 IDBDataFile* ColumnOpCompress1::openFile(
    const Column& column, const uint16_t dbRoot, const uint32_t partition, const uint16_t segment,
-   std::string& segFile, const char* mode, const int ioBuffSize) const
+   std::string& segFile, bool useTmpSuffix, const char* mode, const int ioBuffSize) const
 {
-   return m_chunkManager->getFilePtr(column, dbRoot, partition, segment, segFile, mode, ioBuffSize);
+    return m_chunkManager->getFilePtr(column, dbRoot, partition, segment, segFile,
+        mode, ioBuffSize, useTmpSuffix);
 }
 
 

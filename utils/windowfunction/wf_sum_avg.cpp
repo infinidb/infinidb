@@ -1,11 +1,11 @@
 /* Copyright (C) 2013 Calpont Corp.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -110,9 +110,7 @@ T calculateAvg(T sum, uint64_t count, int s)
 
 long double avgWithLimit(long double sum, uint64_t count, int scale, long double u, long double l)
 {
-	int scale1 = scale >> 8;
-	int scale2 = scale & 0x000000FF;
-	long double factor = pow(10.0, scale2 - scale1);
+	long double factor = pow(10.0, scale);
 	long double avg = sum / count;
 	avg *= factor;
 	avg += (avg < 0) ? (-0.5) : (0.5);
@@ -242,6 +240,7 @@ void WF_sum_avg<T>::operator()(int64_t b, int64_t e, int64_t c)
 			e = c;
 
 		uint64_t colIn = fFieldIndex[1];
+		int scale = fRow.getScale(colOut) - fRow.getScale(colIn);
 		for (int64_t i = b; i <= e; i++)
 		{
 			if (i % 1000 == 0 && fStep->cancelled())
@@ -266,7 +265,7 @@ void WF_sum_avg<T>::operator()(int64_t b, int64_t e, int64_t c)
 		}
 
 		if ((fCount > 0) && (fFunctionId == WF__AVG || fFunctionId == WF__AVG_DISTINCT))
-			 fAvg = (T) calculateAvg(fSum, fCount, fRow.getScale(colOut));
+			 fAvg = (T) calculateAvg(fSum, fCount, scale);
 	}
 
 	T* v = NULL;

@@ -1,11 +1,11 @@
 /* Copyright (C) 2013 Calpont Corp.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -950,7 +950,7 @@ int BRMWrapper::rollBack(const VER_t transID, int sessionId)
 //      printf("\n\ttarget file info - oid =%d fPartition=%d fSegment=%d, fDbRoot=%d", weOid, wePartitionNum, weSegmentNum, weDbRoot);
         if (column.compressionType != 0)
         {
-            pTargetFile = fileOp.getFilePtr(column);
+            pTargetFile = fileOp.getFilePtr(column, false); // @bug 5572 HDFS tmp file
         }
         else if (fileOpenList.find(targetFileInfo) != fileOpenList.end())
         {
@@ -1263,7 +1263,7 @@ int BRMWrapper::rollBackBlocks(const VER_t transID, int sessionId)
 			
         if (column.compressionType != 0)
         {
-            pTargetFile = fileOp.getFilePtr(column);
+            pTargetFile = fileOp.getFilePtr(column, false); // @bug 5572 HDFS tmp file
         }
         else if (fileOpenList.find(targetFileInfo) != fileOpenList.end())
         {

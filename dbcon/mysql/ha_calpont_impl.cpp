@@ -1,11 +1,11 @@
 /* Copyright (C) 2013 Calpont Corp.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -3262,6 +3262,13 @@ int ha_calpont_impl_commit (handlerton *hton, THD *thd, bool all)
 	
 	if (ci->isAlter)
 		return 0;
+		
+	//@Bug 5823 check if any active transaction for this session
+    scoped_ptr<DBRM> dbrmp(new DBRM());
+    BRM::TxnID txnId = dbrmp->getTxnID(tid2sid(thd->thread_id));
+    if (!txnId.valid)
+       return 0;
+
 	if ( !ci->dmlProc )
 	{
 		ci->dmlProc = new MessageQueueClient("DMLProc");

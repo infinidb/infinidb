@@ -1,11 +1,11 @@
 /* Copyright (C) 2013 Calpont Corp.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -58,7 +58,7 @@ void VirtualTable::initialize()
 }
 
 
-void VirtualTable::addColumn(const SRCP& column, const string& view)
+void VirtualTable::addColumn(const SRCP& column)
 {
 	// As of bug3695, make sure varbinary is not used in subquery.
 	if (column->resultType().colDataType == CalpontSystemCatalog::VARBINARY && !fVarBinOK)
@@ -72,7 +72,6 @@ void VirtualTable::addColumn(const SRCP& column, const string& view)
 	WindowFunctionColumn* wc  = NULL;
 
 	string columnName;
-	string viewName(view);
 	ostringstream oss;
 	UniqId colId;
 	if ((sc = dynamic_cast<SimpleColumn*>(column.get())) != NULL)
@@ -110,7 +109,7 @@ void VirtualTable::addColumn(const SRCP& column, const string& view)
 	{
 //		oss << "Constant_" << cc->expressionId();
 		columnName = cc->data();
-		colId = UniqId(cc->expressionId(), cc->alias(), "", viewName);
+		colId = UniqId(cc->expressionId(), cc->alias(), "", fView);
 	}
 	else // new column type has added, but this code is not updated.
 	{
@@ -126,7 +125,7 @@ void VirtualTable::addColumn(const SRCP& column, const string& view)
 	vc->tableAlias(fAlias);
 	vc->columnName(columnName);
 	vc->alias(column->alias());
-	vc->viewName(viewName);
+	vc->viewName(fView);
 
 	uint index = fColumns.size();
 	vc->colPosition(index);

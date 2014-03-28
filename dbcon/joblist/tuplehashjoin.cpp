@@ -1,11 +1,11 @@
 /* Copyright (C) 2013 Calpont Corp.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -321,6 +321,7 @@ void TupleHashJoinStep::hjRunner()
 	}
 
 	idbassert(joinTypes.size() == smallDLs.size());
+	idbassert(joinTypes.size() == joiners.size());
 
 	/* Start the small-side runners */
 	rgData.reset(new vector<RGData>[smallDLs.size()]);
@@ -740,10 +741,15 @@ void TupleHashJoinStep::startJoinThreads()
 {
 	uint i;
 	uint smallSideCount = smallDLs.size();
+	bool more = true;
+	RGData oneRG;
 
 	//@bug4836, in error case, stop process, and unblock the next step.
 	if (cancelled()) {
 		outputDL->endOfInput();
+		//@bug5785, memory leak on canceling complex queries
+		while (more)
+			more = largeDL->next(largeIt, &oneRG);
 		return;
 	}
 

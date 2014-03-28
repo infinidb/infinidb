@@ -1,11 +1,11 @@
 /* Copyright (C) 2013 Calpont Corp.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -33,6 +33,7 @@
 #include <windows.h>
 #include <boost/thread/mutex.hpp>
 #endif
+#include <set>
 #include <string>
 #include <sstream>
 #include <vector>
@@ -132,10 +133,12 @@ public:
     /*
      * @brief Get list of segment file numbers found in dirName directory
      * @param dirName Directory path to be searched
+     * @param bIncludeAlternateSegFileNames Include *.orig and *.tmp in search
      * @param segList List of segment files found in dirName
      * @param errMsg Error msg if return code is not NO_ERROR
      */
     EXPORT static int getSegFileList( const std::string& dirName,
+                                bool bIncludeAlternateSegFileNames,
                                 std::vector<u_int32_t>& segList,
                                 std::string& errMsg );
 
@@ -203,8 +206,9 @@ private:
     u_int32_t     fPendingDctnryStoreDbRoot; // DbRoot of pending dctnry extents
     int           fPendingDctnryStoreCompressionType; // Dctnry compression type
     std::vector<RollbackData> fPendingDctnryExtents;
+    std::set<OID> fAllColDctOIDs;   // List of all affected col and dctnry OIDS
 
-	// List of DB Files to be deleted.  Files are deleted in reverse order.
+    // List of DB Files to be deleted.  Files are deleted in reverse order.
     std::vector<File>         fPendingFilesToDelete;
 
     logging::MessageLog fSysLogger; // Used for syslogging

@@ -1,11 +1,11 @@
 /* Copyright (C) 2013 Calpont Corp.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -182,7 +182,8 @@ public:
 	from a join or put the RG data right in the output datalist. */
 	bool pmSendsFinalResult() const
 	{
-		return ((sendTupleJoinRowGroupData && tJoiners.size() > 0 && PMJoinerCount > 0) || tJoiners.size() == 0);
+		//isn't aware of UM-only joins.  Function name is a bit misleading.
+		return (tJoiners.size() == 0 || (PMJoinerCount > 0 && (fe2 || aggregatorPM)));
 	}
 	const std::string toMiniString() const;
 

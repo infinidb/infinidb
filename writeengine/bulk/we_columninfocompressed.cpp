@@ -216,15 +216,18 @@ int ColumnInfoCompressed::resetFileOffsetsNewExtent(const char* hdr)
 // Save HWM chunk for compressed dictionary store files, so that the HWM chunk
 // can be restored by bulk rollback if an error should occur.
 //------------------------------------------------------------------------------
-int ColumnInfoCompressed::saveDctnryStoreHWMChunk()
+// @bug 5572 - HDFS usage: add flag used to control *.tmp file usage
+int ColumnInfoCompressed::saveDctnryStoreHWMChunk(bool& needBackup)
 {
 #ifdef PROFILE
     Stats::startParseEvent(WE_STATS_COMPRESS_DCT_BACKUP_CHUNK);
 #endif
+    needBackup = false;
     int rc = NO_ERROR;
     try
     {
-        fRBMetaWriter->backupDctnryHWMChunk( column.dctnry.dctnryOid,
+        needBackup = fRBMetaWriter->backupDctnryHWMChunk(
+            column.dctnry.dctnryOid,
             curCol.dataFile.fDbRoot,
             curCol.dataFile.fPartition,
             curCol.dataFile.fSegment );

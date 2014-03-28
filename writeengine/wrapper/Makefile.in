@@ -97,6 +97,7 @@ am_libwriteengine_la_OBJECTS = libwriteengine_la-writeengine.lo \
 	libwriteengine_la-we_bulkrollbackfile.lo \
 	libwriteengine_la-we_rbmetawriter.lo \
 	libwriteengine_la-we_dbrootextenttracker.lo \
+	libwriteengine_la-we_confirmhdfsdbfile.lo \
 	libwriteengine_la-we_dctnry.lo libwriteengine_la-we_xmlop.lo \
 	libwriteengine_la-we_xmljob.lo \
 	libwriteengine_la-we_xmlgendata.lo \
@@ -276,6 +277,7 @@ libwriteengine_la_SOURCES = writeengine.cpp \
 	../shared/we_bulkrollbackfile.cpp \
 	../shared/we_rbmetawriter.cpp \
 	../shared/we_dbrootextenttracker.cpp \
+	../shared/we_confirmhdfsdbfile.cpp \
 	../dictionary/we_dctnry.cpp \
 	../xml/we_xmlop.cpp \
 	../xml/we_xmljob.cpp \
@@ -366,6 +368,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwriteengine_la-we_colop.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwriteengine_la-we_colopcompress.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwriteengine_la-we_config.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwriteengine_la-we_confirmhdfsdbfile.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwriteengine_la-we_convertor.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwriteengine_la-we_dbfileop.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwriteengine_la-we_dbrootextenttracker.Plo@am__quote@
@@ -565,6 +568,13 @@ libwriteengine_la-we_dbrootextenttracker.lo: ../shared/we_dbrootextenttracker.cp
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='../shared/we_dbrootextenttracker.cpp' object='libwriteengine_la-we_dbrootextenttracker.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwriteengine_la_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o libwriteengine_la-we_dbrootextenttracker.lo `test -f '../shared/we_dbrootextenttracker.cpp' || echo '$(srcdir)/'`../shared/we_dbrootextenttracker.cpp
+
+libwriteengine_la-we_confirmhdfsdbfile.lo: ../shared/we_confirmhdfsdbfile.cpp
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwriteengine_la_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT libwriteengine_la-we_confirmhdfsdbfile.lo -MD -MP -MF "$(DEPDIR)/libwriteengine_la-we_confirmhdfsdbfile.Tpo" -c -o libwriteengine_la-we_confirmhdfsdbfile.lo `test -f '../shared/we_confirmhdfsdbfile.cpp' || echo '$(srcdir)/'`../shared/we_confirmhdfsdbfile.cpp; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libwriteengine_la-we_confirmhdfsdbfile.Tpo" "$(DEPDIR)/libwriteengine_la-we_confirmhdfsdbfile.Plo"; else rm -f "$(DEPDIR)/libwriteengine_la-we_confirmhdfsdbfile.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='../shared/we_confirmhdfsdbfile.cpp' object='libwriteengine_la-we_confirmhdfsdbfile.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwriteengine_la_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o libwriteengine_la-we_confirmhdfsdbfile.lo `test -f '../shared/we_confirmhdfsdbfile.cpp' || echo '$(srcdir)/'`../shared/we_confirmhdfsdbfile.cpp
 
 libwriteengine_la-we_dctnry.lo: ../dictionary/we_dctnry.cpp
 @am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwriteengine_la_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT libwriteengine_la-we_dctnry.lo -MD -MP -MF "$(DEPDIR)/libwriteengine_la-we_dctnry.Tpo" -c -o libwriteengine_la-we_dctnry.lo `test -f '../dictionary/we_dctnry.cpp' || echo '$(srcdir)/'`../dictionary/we_dctnry.cpp; \

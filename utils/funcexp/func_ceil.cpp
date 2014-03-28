@@ -1,11 +1,11 @@
 /* Copyright (C) 2013 Calpont Corp.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -274,7 +274,7 @@ string Func_ceil::getStrVal(Row& row,
 							bool& isNull,
 							CalpontSystemCatalog::ColType& op_ct)
 {
-	string ret;
+	char tmp[512] = {'\0'};
 	if (op_ct.colDataType == CalpontSystemCatalog::DOUBLE ||
         op_ct.colDataType == CalpontSystemCatalog::UDOUBLE ||
 		op_ct.colDataType == CalpontSystemCatalog::FLOAT ||
@@ -282,29 +282,32 @@ string Func_ceil::getStrVal(Row& row,
 		op_ct.colDataType == CalpontSystemCatalog::VARCHAR ||
 		op_ct.colDataType == CalpontSystemCatalog::CHAR)
 	{
-		ostringstream oss;
-		oss << fixed << getDoubleVal(row, parm, isNull, op_ct);
+		snprintf(tmp, 511, "%f", getDoubleVal(row, parm, isNull, op_ct));
 
 		// remove the decimals in the oss string.
-		ret = oss.str();
-		size_t d = ret.find('.');
-		ret = ret.substr(0, d);
+		char *d = tmp;
+		while ((*d != '.') && (*d != '\0'))
+			d++;
+		*d = '\0';
 	}
     else if (isUnsigned(op_ct.colDataType))
     {
-        ostringstream oss;
-        oss << getUintVal(row, parm, isNull, op_ct);
-        ret = oss.str();
+#ifndef __LP64__
+        snprintf(tmp, 511, "%llu", getUintVal(row, parm, isNull, op_ct));
+#else
+        snprintf(tmp, 511, "%lu", getUintVal(row, parm, isNull, op_ct));
+#endif
     }
 	else
 	{
-
-		ostringstream oss;
-		oss << getIntVal(row, parm, isNull, op_ct);
-		ret = oss.str();
+#ifndef __LP64__
+        snprintf(tmp, 511, "%lld", getIntVal(row, parm, isNull, op_ct));
+#else
+        snprintf(tmp, 511, "%ld", getIntVal(row, parm, isNull, op_ct));
+#endif
 	}
 
-	return ret;
+	return string(tmp);
 }
 
 

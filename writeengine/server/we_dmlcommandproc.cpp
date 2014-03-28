@@ -48,6 +48,7 @@ using namespace BRM;
 #include "we_dbrootextenttracker.h"
 #include "we_bulkrollbackmgr.h"
 #include "we_define.h"
+#include "we_confirmhdfsdbfile.h"
 #include "cacheutils.h"
 #include "IDBDataFile.h"
 #include "IDBPolicy.h"
@@ -87,6 +88,7 @@ WE_DMLCommandProc::~WE_DMLCommandProc()
 uint8_t WE_DMLCommandProc::processSingleInsert(messageqcpp::ByteStream& bs, std::string & err)
 {
 	uint8_t rc = 0;
+	err.clear();
 	InsertDMLPackage insertPkg;
 	ByteStream::quadbyte tmp32;
 	bs >> tmp32;
@@ -464,7 +466,9 @@ uint8_t WE_DMLCommandProc::processSingleInsert(messageqcpp::ByteStream& bs, std:
 				//cout << "Backing up hwm chunks" << endl;
 		  for (unsigned i=0; i < dctnryList.size(); i++) //back up chunks for compressed dictionary
 		  {
-			fRBMetaWriter->backupDctnryHWMChunk(dctnryList[i].dctnryOid, dctnryList[i].fColDbRoot, dctnryList[i].fColPartition, dctnryList[i].fColSegment);
+			// @bug 5572 HDFS tmp file - Ignoring return flag, don't need in this context
+			fRBMetaWriter->backupDctnryHWMChunk(
+				dctnryList[i].dctnryOid, dctnryList[i].fColDbRoot, dctnryList[i].fColPartition, dctnryList[i].fColSegment);
 		  }
 		}
 		catch (std::exception& ex)
@@ -539,70 +543,101 @@ uint8_t WE_DMLCommandProc::processSingleInsert(messageqcpp::ByteStream& bs, std:
 
 	//flush files
 	// @bug5333, up to here, rc may have an error code already, don't overwrite it.
-	error = fWEWrapper.flushChunks(0, oids);  // why not pass rc to flushChunks?
-
-	if (idbdatafile::IDBPolicy::useHdfs())  {
-		//flush PrimProc FD cache
-		TableMetaData* aTableMetaData = TableMetaData::makeTableMetaData(tblOid);
-		ColsExtsInfoMap colsExtsInfoMap = aTableMetaData->getColsExtsInfoMap();
-		ColsExtsInfoMap::iterator it = colsExtsInfoMap.begin();
-		ColExtsInfo::iterator aIt;
-		std::vector<BRM::FileInfo> files;
-		BRM::FileInfo aFile;
-		while (it != colsExtsInfoMap.end())
-		{
-			aIt = (it->second).begin();
-			aFile.oid = it->first;
-
-			while (aIt != (it->second).end())
-			{
-				aFile.partitionNum = aIt->partNum;
-				aFile.dbRoot =aIt->dbRoot;
-				aFile.segmentNum = aIt->segNum;
-				aFile.compType = aIt->compType;
-				files.push_back(aFile);
-				aIt++;
-			}
-			it++;
-		}
-		if (files.size() > 0)
-			cacheutils::purgePrimProcFdCache(files, Config::getLocalModuleID());
-
-		cacheutils::flushOIDsFromCache(oidsToFlush);
-		fDbrm.invalidateUncommittedExtentLBIDs(0, &lbidList);
+	int flushChunksRc = fWEWrapper.flushChunks(0, oids);  // why not pass rc to flushChunks?
+	if (flushChunksRc != NO_ERROR)
+	{
+		WErrorCodes ec;
+		std::ostringstream ossErr;
+		ossErr << "Error flushing chunks for table " << tableName <<
+			"; " << ec.errorString(flushChunksRc);
+		// Append to errmsg in case we already have an error
+		if (err.length() > 0)
+			err += "; ";
+		err += ossErr.str();
+		if (error == NO_ERROR)
+			error = flushChunksRc;
+		if ((rc == NO_ERROR) || (rc == dmlpackageprocessor::DMLPackageProcessor::IDBRANGE_WARNING))
+			rc = 1;  // return hardcoded 1 as the above
+	}
+	
+	// Confirm HDFS DB file changes "only" if no error up to this point
+	if (idbdatafile::IDBPolicy::useHdfs())
+	{
 		if (error == NO_ERROR)
 		{
-			try
+			std::string eMsg;
+			ConfirmHdfsDbFile confirmHdfs;
+			error = confirmHdfs.confirmDbFileListFromMetaFile(tblOid,eMsg);
+			if (error != NO_ERROR)
 			{
-				BulkRollbackMgr::deleteMetaFile( tblOid );
+				ostringstream ossErr;
+				ossErr << "Error confirming changes to table " <<
+					tableName << "; " << eMsg;
+				err = ossErr.str();
+				rc  = 1;
 			}
-			catch(exception & ex)
+			else // Perform extra cleanup that is necessary for HDFS
 			{
-				err = ex.what();
-				rc = 1;
+				std::string eMsg;
+				ConfirmHdfsDbFile confirmHdfs;
+				int confirmRc2 = confirmHdfs.endDbFileListFromMetaFile(
+					tblOid, true, eMsg);
+				if (confirmRc2 != NO_ERROR)
+				{
+					// Might want to log this error, but don't think we need
+					// to report as fatal, since all changes were confirmed.
+				}
+
+				//flush PrimProc FD cache
+				TableMetaData* aTableMetaData = TableMetaData::makeTableMetaData(tblOid);
+				ColsExtsInfoMap colsExtsInfoMap = aTableMetaData->getColsExtsInfoMap();
+				ColsExtsInfoMap::iterator it = colsExtsInfoMap.begin();
+				ColExtsInfo::iterator aIt;
+				std::vector<BRM::FileInfo> files;
+				BRM::FileInfo aFile;
+				while (it != colsExtsInfoMap.end())
+				{
+					aIt = (it->second).begin();
+					aFile.oid = it->first;
+
+					while (aIt != (it->second).end())
+					{
+						aFile.partitionNum = aIt->partNum;
+						aFile.dbRoot =aIt->dbRoot;
+						aFile.segmentNum = aIt->segNum;
+						aFile.compType = aIt->compType;
+						files.push_back(aFile);
+						aIt++;
+					}
+					it++;
+				}
+				if (files.size() > 0)
+					cacheutils::purgePrimProcFdCache(files, Config::getLocalModuleID());
+
+				cacheutils::flushOIDsFromCache(oidsToFlush);
+				fDbrm.invalidateUncommittedExtentLBIDs(0, &lbidList);		
+
+				try 
+				{
+					BulkRollbackMgr::deleteMetaFile( tblOid );
+				}
+				catch(exception & ex)
+				{
+					err = ex.what();
+					rc = 1;
+				}
 			}
-		}
-		else //rollback
+		} // (error == NO_ERROR) through call to flushChunks()
+
+		if (error != NO_ERROR) // rollback
 		{
-
-			CalpontSystemCatalog::TableName aTableName;
-			try {
-				aTableName = systemCatalogPtr->tableName(tblOid);
-			}
-			catch ( ... )
-			{
-				err = "No such table for oid " + tblOid;
-			}
-			string table = aTableName.schema + "." + aTableName.table;
 			string applName ("SingleInsert");
-			fWEWrapper.bulkRollback(tblOid,txnid.id,table,applName, false, err);
-			BulkRollbackMgr::deleteMetaFile( tblOid );
+			fWEWrapper.bulkRollback(tblOid,txnid.id,tableName.toString(),
+				applName, false, err);	
+			BulkRollbackMgr::deleteMetaFile( tblOid );	
 		}
-	}
-
-	if ((rc == NO_ERROR || rc == dmlpackageprocessor::DMLPackageProcessor::IDBRANGE_WARNING) && error != NO_ERROR)
-		rc = 1;  // return hardcoded 1 as the above
-
+	} // extra hdfs steps
+	
 	fWEWrapper.setIsInsert(false);
 	fWEWrapper.setBulkFlag(false);
 	TableMetaData::removeTableMetaData(tblOid);
@@ -836,7 +871,9 @@ uint8_t WE_DMLCommandProc::processBatchInsert(messageqcpp::ByteStream& bs, std::
 				//cout << "Backing up hwm chunks" << endl;
 				for (unsigned i=0; i < dctnryList.size(); i++) //back up chunks for compressed dictionary
 				{
-					fRBMetaWriter->backupDctnryHWMChunk(dctnryList[i].dctnryOid, dctnryList[i].fColDbRoot, dctnryList[i].fColPartition, dctnryList[i].fColSegment);
+					// @bug 5572 HDFS tmp file - Ignoring return flag, don't need in this context
+					fRBMetaWriter->backupDctnryHWMChunk(
+						dctnryList[i].dctnryOid, dctnryList[i].fColDbRoot, dctnryList[i].fColPartition, dctnryList[i].fColSegment);
 				}
 			}
 		}
@@ -1309,10 +1346,6 @@ uint8_t WE_DMLCommandProc::commitBatchAutoOn(messageqcpp::ByteStream& bs, std::s
 
 	fWEWrapper.setTransId(txnID);
 
-	// @bug5333, up to here, rc == 0, but flushchunk may fail.
-	if (fWEWrapper.flushChunks(0, oids) != NO_ERROR)
-		rc = 1;  // return hardcoded 1 as the above
-
 	fWEWrapper.setIsInsert(false);
 	fWEWrapper.setBulkFlag(false);
 
@@ -1326,6 +1359,7 @@ uint8_t WE_DMLCommandProc::commitBatchAutoOn(messageqcpp::ByteStream& bs, std::s
 uint8_t WE_DMLCommandProc::processBatchInsertHwm(messageqcpp::ByteStream& bs, std::string & err)
 {
 	uint8_t tmp8, rc = 0;
+	err.clear();
 	//set hwm for autocommit off
 	uint32_t tmp32, tableOid;
 	int txnID;
@@ -1338,8 +1372,6 @@ uint8_t WE_DMLCommandProc::processBatchInsertHwm(messageqcpp::ByteStream& bs, st
 	bs >> tmp32;
 	tableOid = tmp32;
 	bs >> tmp8;
-	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr =
-    CalpontSystemCatalog::makeCalpontSystemCatalog(txnID);
 	//cout << "processBatchInsertHwm: tranid:isAutoCommitOn = " <<txnID <<":"<< (int)isAutoCommitOn << endl;
 	std::vector<BRM::FileInfo> files;
 	std::vector<BRM::OID_t>  oidsToFlush;
@@ -1373,43 +1405,9 @@ uint8_t WE_DMLCommandProc::processBatchInsertHwm(messageqcpp::ByteStream& bs, st
 		bs.restart();
 		if (fWEWrapper.getIsInsert())
 		{
-			std::map<uint32_t,uint32_t> oids;
-			CalpontSystemCatalog::TableName aTableName;
-			CalpontSystemCatalog::RIDList ridList;
-			try {
-				aTableName =  systemCatalogPtr->tableName(tableOid);
-				ridList = systemCatalogPtr->columnRIDs(aTableName, true);
-			}
-			catch ( ... )
-			{
-				err = "Systemcatalog error for tableoid " + tableOid;
-				rc = 1;
-				return rc;
-
-			}
-			for (unsigned i=0; i < ridList.size(); i++)
-			{
-				oids[ridList[i].objnum] = ridList[i].objnum;
-			}
-			CalpontSystemCatalog::DictOIDList dictOids = systemCatalogPtr->dictOIDs(aTableName);
-			for (unsigned i=0; i < dictOids.size(); i++)
-			{
-				oids[dictOids[i].dictOID] = dictOids[i].dictOID;
-			}
-
-			fWEWrapper.setTransId(txnID);
 			// @bug5333, up to here, rc == 0, but flushchunk may fail.
-			rc = fWEWrapper.flushChunks(0, oids);
-			fWEWrapper.setIsInsert(false);
-			fWEWrapper.setBulkFlag(false);
-			if ((idbdatafile::IDBPolicy::useHdfs()) && (files.size()>0) )
-				cacheutils::purgePrimProcFdCache(files, Config::getLocalModuleID());
-			if (idbdatafile::IDBPolicy::useHdfs())
-				cacheutils::flushOIDsFromCache(oidsToFlush);
-			fIsFirstBatchPm = true;
-
-			if (rc != NO_ERROR)
-				return 1;  // return hardcoded 1 as the above
+			rc = processBatchInsertHwmFlushChunks(tableOid, txnID,
+				files, oidsToFlush, err);
 		}
 		if ( tmp8 != 0)
 			TableMetaData::removeTableMetaData(tableOid);
@@ -1421,10 +1419,9 @@ uint8_t WE_DMLCommandProc::processBatchInsertHwm(messageqcpp::ByteStream& bs, st
 		err = ex.what();
 		rc = 1;
 		return rc;
-
 	}
-
-
+	
+	// Handle case where isAutoCommitOn is false
         BRM::DBRM dbrm;
         //cout << " In processBatchInsertHwm setting hwm" << endl;
         std::vector<BRM::BulkSetHWMArg> setHWMArgs;
@@ -1447,27 +1444,80 @@ uint8_t WE_DMLCommandProc::processBatchInsertHwm(messageqcpp::ByteStream& bs, st
                 it++;
         }
 
-        if ((idbdatafile::IDBPolicy::useHdfs()) && (files.size()>0) )
-                cacheutils::purgePrimProcFdCache(files, Config::getLocalModuleID());
-		if (idbdatafile::IDBPolicy::useHdfs()) {
-			cacheutils::flushOIDsFromCache(oidsToFlush);
-		}
-
 	TableMetaData::removeTableMetaData(tableOid);
 
 	fIsFirstBatchPm = true;
 	//cout << "flush files when autocommit off" << endl;
 	fWEWrapper.setIsInsert(true);
 	fWEWrapper.setBulkFlag(true);
-	std::map<uint32_t,uint32_t> oids;
 
-	CalpontSystemCatalog::TableName aTableName =  systemCatalogPtr->tableName(tableOid);
-	CalpontSystemCatalog::RIDList ridList = systemCatalogPtr->columnRIDs(aTableName, true);
+	rc = processBatchInsertHwmFlushChunks(tableOid, txnID,
+		files, oidsToFlush, err);
+	bs.restart();
+	try {
+		serializeInlineVector (bs, setHWMArgs);
+	} 
+	catch (exception& ex)
+	{
+		// Append to errmsg in case we already have an error
+		if (err.length() > 0)
+			err += "; ";
+		err += ex.what();
+		rc = 1;
+		return rc;
+	}
+	//cout << "flush is called for transaction " << txnID << endl;
+
+	return rc;
+}
+
+//------------------------------------------------------------------------------
+// Flush chunks for the specified table and transaction.
+// Also confirms changes to DB files (for hdfs).
+// files vector represents list of files to be purged from PrimProc cache.
+// oid2ToFlush  represents list of oids  to be flushed from PrimProc cache.
+// Afterwords, the following attributes are reset as follows:
+//   fWEWrapper.setIsInsert(false);
+//   fWEWrapper.setBulkFlag(false);
+//   fIsFirstBatchPm = true;
+// returns 0 for success; returns 1 if error occurs
+//------------------------------------------------------------------------------
+uint8_t WE_DMLCommandProc::processBatchInsertHwmFlushChunks(
+	uint32_t tblOid, int txnID,
+	const std::vector<BRM::FileInfo>& files,
+	const std::vector<BRM::OID_t>& oidsToFlush,
+	std::string& err)
+{
+	uint8_t rc = 0;
+	std::map<uint32_t,uint32_t>       oids;
+	CalpontSystemCatalog::TableName   aTableName;
+	CalpontSystemCatalog::RIDList     ridList;
+	CalpontSystemCatalog::DictOIDList dictOids;
+
+	try {
+		boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr =
+			CalpontSystemCatalog::makeCalpontSystemCatalog(txnID);
+		aTableName = systemCatalogPtr->tableName(tblOid);
+		ridList    = systemCatalogPtr->columnRIDs(aTableName, true);
+		dictOids   = systemCatalogPtr->dictOIDs(aTableName);
+	}
+	catch (exception& ex)
+	{
+		std::ostringstream ossErr;
+		ossErr << "System Catalog error for table OID " << tblOid;
+		// Include tbl name in msg unless exception occurred before we got it
+		if (aTableName.table.length() > 0)
+			ossErr << '(' << aTableName << ')';
+		ossErr << "; " << ex.what();
+		err = ossErr.str();
+		rc = 1;
+		return rc;
+	}
+
 	for (unsigned i=0; i < ridList.size(); i++)
 	{
 		oids[ridList[i].objnum] = ridList[i].objnum;
 	}
-	CalpontSystemCatalog::DictOIDList dictOids = systemCatalogPtr->dictOIDs(aTableName);
 	for (unsigned i=0; i < dictOids.size(); i++)
 	{
 		oids[dictOids[i].dictOID] = dictOids[i].dictOID;
@@ -1476,34 +1526,58 @@ uint8_t WE_DMLCommandProc::processBatchInsertHwm(messageqcpp::ByteStream& bs, st
 	fWEWrapper.setTransId(txnID);
 
 	// @bug5333, up to here, rc == 0, but flushchunk may fail.
-	if (fWEWrapper.flushChunks(0, oids) != NO_ERROR)
-		rc = 1;  // return hardcoded 1 as the above
-	fWEWrapper.setIsInsert(false);
-	fWEWrapper.setBulkFlag(false);
-	if ((idbdatafile::IDBPolicy::useHdfs()) && (files.size()>0) )
-		cacheutils::purgePrimProcFdCache(files, Config::getLocalModuleID());
-	if (idbdatafile::IDBPolicy::useHdfs())
-		cacheutils::flushOIDsFromCache(oidsToFlush);
-	bs.restart();
-	rc = 0;
-	try {
-		serializeInlineVector (bs, setHWMArgs);
-	}
-	catch (exception& ex)
+	rc = fWEWrapper.flushChunks(0, oids);
+	if (rc == NO_ERROR)
 	{
-		err = ex.what();
-		rc = 1;
-		return rc;
+		// Confirm changes to db files "only" if no error up to this point
+		if (idbdatafile::IDBPolicy::useHdfs())
+		{
+			std::string eMsg;
+			ConfirmHdfsDbFile confirmHdfs;
+			int confirmDbRc = confirmHdfs.confirmDbFileListFromMetaFile(
+				tblOid,eMsg);
+			if (confirmDbRc == NO_ERROR)
+			{
+				int endDbRc = confirmHdfs.endDbFileListFromMetaFile(
+					tblOid, true, eMsg);
+				if (endDbRc != NO_ERROR)
+				{
+					// Might want to log this error, but don't think we
+					// need to report as fatal, as all changes were confirmed.
+				}
 
+				if (files.size()>0)
+					cacheutils::purgePrimProcFdCache(files,
+						Config::getLocalModuleID());
+				cacheutils::flushOIDsFromCache(oidsToFlush);
+			}
+			else
+			{
+				ostringstream ossErr;
+				ossErr << "Error confirming changes to table " <<
+					aTableName << "; " << eMsg;
+				err = ossErr.str();
+				rc = 1; // reset to 1
+			}
+		}
 	}
-	//cout << "flush is called for transaction " << txnID << endl;
+	else // flushChunks error
+	{
+		WErrorCodes ec;
+		std::ostringstream ossErr;
+		ossErr << "Error flushing chunks for table " << aTableName <<
+			"; " << ec.errorString(rc);
+		err = ossErr.str();
+		rc = 1; // reset to 1
+	}
+
 	fWEWrapper.setIsInsert(false);
 	fWEWrapper.setBulkFlag(false);
 	fIsFirstBatchPm = true;
 
-
 	return rc;
 }
+
 uint8_t WE_DMLCommandProc::commitBatchAutoOff(messageqcpp::ByteStream& bs, std::string & err)
 {
 	uint8_t rc = 0;
@@ -1801,7 +1875,7 @@ uint8_t WE_DMLCommandProc::processUpdate(messageqcpp::ByteStream& bs,
 				dctnryStruct.fCompressionType = colType.compressionType;
 				dctnryStruct.colWidth = colType.colWidth;
 
-				if (NO_ERROR != (error = fWEWrapper.openDctnry (txnId, dctnryStruct)))
+				if (NO_ERROR != (error = fWEWrapper.openDctnry (txnId, dctnryStruct, false))) // @bug 5572 HDFS tmp file
 				{
 					WErrorCodes ec;
 					err = ec.errorString(error);
@@ -2594,7 +2668,7 @@ uint8_t WE_DMLCommandProc::processFlushFiles(messageqcpp::ByteStream& bs, std::s
    // execplan::CalpontSystemCatalog::ColType colType;
     CalpontSystemCatalog::DictOIDList dictOids;
 
-    if (tableOid > 3000) {
+    if (tableOid >= 3000) {
                try {
                                aTableName =  systemCatalogPtr->tableName(tableOid);
                }

@@ -1,11 +1,11 @@
 /* Copyright (C) 2013 Calpont Corp.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -14,6 +14,18 @@
    along with this program; if not, write to the Free Software
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
+
+/*
+ * InfiniDB FOSS License Exception
+ * We want free and open source software applications under certain
+ * licenses to be able to use the GPL-licensed InfiniDB idbhdfs
+ * libraries despite the fact that not all such FOSS licenses are
+ * compatible with version 2 of the GNU General Public License.  
+ * Therefore there are special exceptions to the terms and conditions 
+ * of the GPLv2 as applied to idbhdfs libraries, which are 
+ * identified and described in more detail in the FOSS License 
+ * Exception in the file utils/idbhdfs/FOSS-EXCEPTION.txt
+ */
 
 #ifndef HDFSRDWRMEMBUFFER_H_
 #define HDFSRDWRMEMBUFFER_H_
@@ -54,15 +66,18 @@ public:
     // Returns the total size of all currently allocated HdfsRdwrMemBuffers
     static size_t getTotalBuff() {return t_totalbuff;}
 
-    // This is used by HdfsRdwrFileBuffer constructor to dump our buffer 
+    // This is used by HdfsRdwrFileBuffer constructor to dump our buffer
     // contents to a file when we run out of memory
     const unsigned char* getbuffer() const {return m_buffer;}
     off64_t getSize() {return m_size;} // TODO: remove after debug
 protected:
-	/* virtual */ void close();
+	/* virtual */ int close();
 
 private:
 	void allocBuffer(size_t size);
+
+	// the size parm should be understood as 'needs at least size more bytes from the current position'
+	void checkRealloc(size_t size); 
 	void releaseBuffer();
 	int flushImpl();
 

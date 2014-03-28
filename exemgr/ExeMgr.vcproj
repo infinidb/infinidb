@@ -43,7 +43,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_52_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\dbcon\joblist;C:\InfiniDB\genii\dbcon\execplan;C:\InfiniDB\genii\utils\threadpool;C:\InfiniDB\genii\writeengine\shared;C:\InfiniDB\genii\utils\dataconvert;C:\InfiniDB\genii\versioning\BRM;C:\InfiniDB\genii\utils\common;C:\InfiniDB\genii\utils\rwlock;C:\InfiniDB\genii\utils\multicast;C:\InfiniDB\genii\utils\joiner;C:\InfiniDB\genii\utils\rowgroup;C:\InfiniDB\genii\utils\funcexp;C:\InfiniDB\genii\oam\oamcpp;C:\InfiniDB\genii\snmpd\snmpmanager;C:\InfiniDB\genii\utils\cacheutils;C:\InfiniDB\genii\utils\querystats"
+				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\dbcon\joblist;C:\InfiniDB\genii\dbcon\execplan;C:\InfiniDB\genii\utils\threadpool;C:\InfiniDB\genii\writeengine\shared;C:\InfiniDB\genii\utils\dataconvert;C:\InfiniDB\genii\versioning\BRM;C:\InfiniDB\genii\utils\common;C:\InfiniDB\genii\utils\rwlock;C:\InfiniDB\genii\utils\multicast;C:\InfiniDB\genii\utils\joiner;C:\InfiniDB\genii\utils\rowgroup;C:\InfiniDB\genii\utils\funcexp;C:\InfiniDB\genii\oam\oamcpp;C:\InfiniDB\genii\snmpd\snmpmanager;C:\InfiniDB\genii\utils\cacheutils;C:\InfiniDB\genii\utils\querystats"
 				PreprocessorDefinitions="SKIP_SNMP"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
@@ -116,7 +116,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_52_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\dbcon\joblist;C:\InfiniDB\genii\dbcon\execplan;C:\InfiniDB\genii\utils\threadpool;C:\InfiniDB\genii\writeengine\shared;C:\InfiniDB\genii\utils\dataconvert;C:\InfiniDB\genii\versioning\BRM;C:\InfiniDB\genii\utils\common;C:\InfiniDB\genii\utils\rwlock;C:\InfiniDB\genii\utils\multicast;C:\InfiniDB\genii\utils\joiner;C:\InfiniDB\genii\utils\rowgroup;C:\InfiniDB\genii\utils\funcexp;C:\InfiniDB\genii\oam\oamcpp;C:\InfiniDB\genii\snmpd\snmpmanager;C:\InfiniDB\genii\utils\cacheutils;C:\InfiniDB\genii\utils\querystats"
+				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\dbcon\joblist;C:\InfiniDB\genii\dbcon\execplan;C:\InfiniDB\genii\utils\threadpool;C:\InfiniDB\genii\writeengine\shared;C:\InfiniDB\genii\utils\dataconvert;C:\InfiniDB\genii\versioning\BRM;C:\InfiniDB\genii\utils\common;C:\InfiniDB\genii\utils\rwlock;C:\InfiniDB\genii\utils\multicast;C:\InfiniDB\genii\utils\joiner;C:\InfiniDB\genii\utils\rowgroup;C:\InfiniDB\genii\utils\funcexp;C:\InfiniDB\genii\oam\oamcpp;C:\InfiniDB\genii\snmpd\snmpmanager;C:\InfiniDB\genii\utils\cacheutils;C:\InfiniDB\genii\utils\querystats"
 				PreprocessorDefinitions="SKIP_SNMP"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
@@ -136,7 +136,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="libmessageqcpp.lib libconfigcpp.lib libloggingcpp.lib libbrm.lib liboamcpp.lib librwlock.lib libexecplan.lib libjoblist.lib libfuncexp.lib libdataconvert.lib libthreadpool.lib libcacheutils.lib libudfsdk.lib librowgroup.lib libquerystats.lib libcompress.lib libmysqlcl_idb.lib libidbboot.lib libwinport.lib libxml2.lib iphlpapi.lib ws2_32.lib psapi.lib"
-				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_52_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\x64\Debug;&quot;C:\InfiniDB\mysql\libmysql\Debug&quot;"
+				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_54_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\x64\Debug;&quot;C:\InfiniDB\mysql\libmysql\Debug&quot;"
 				GenerateDebugInformation="true"
 				TargetMachine="17"
 			/>
@@ -189,7 +189,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_52_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\dbcon\joblist;C:\InfiniDB\genii\dbcon\execplan;C:\InfiniDB\genii\utils\threadpool;C:\InfiniDB\genii\writeengine\shared;C:\InfiniDB\genii\utils\dataconvert;C:\InfiniDB\genii\versioning\BRM;C:\InfiniDB\genii\utils\common;C:\InfiniDB\genii\utils\rwlock;C:\InfiniDB\genii\utils\multicast;C:\InfiniDB\genii\utils\joiner;C:\InfiniDB\genii\utils\rowgroup;C:\InfiniDB\genii\utils\funcexp;C:\InfiniDB\genii\oam\oamcpp;C:\InfiniDB\genii\snmpd\snmpmanager;C:\InfiniDB\genii\utils\cacheutils;C:\InfiniDB\genii\utils\querystats"
+				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\dbcon\joblist;C:\InfiniDB\genii\dbcon\execplan;C:\InfiniDB\genii\utils\threadpool;C:\InfiniDB\genii\writeengine\shared;C:\InfiniDB\genii\utils\dataconvert;C:\InfiniDB\genii\versioning\BRM;C:\InfiniDB\genii\utils\common;C:\InfiniDB\genii\utils\rwlock;C:\InfiniDB\genii\utils\multicast;C:\InfiniDB\genii\utils\joiner;C:\InfiniDB\genii\utils\rowgroup;C:\InfiniDB\genii\utils\funcexp;C:\InfiniDB\genii\oam\oamcpp;C:\InfiniDB\genii\snmpd\snmpmanager;C:\InfiniDB\genii\utils\cacheutils;C:\InfiniDB\genii\utils\querystats"
 				PreprocessorDefinitions="_CRT_SECURE_NO_WARNINGS;SKIP_SNMP"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
@@ -210,7 +210,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="libmessageqcpp.lib libconfigcpp.lib libloggingcpp.lib libbrm.lib liboamcpp.lib librwlock.lib libexecplan.lib libjoblist.lib libfuncexp.lib libdataconvert.lib libthreadpool.lib libcacheutils.lib librowgroup.lib libquerystats.lib libmysqlcl_idb.lib libidbboot.lib libwinport.lib libxml2.lib iphlpapi.lib ws2_32.lib psapi.lib"
-				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_52_0\lib32;&quot;C:\InfiniDB\libxml2-2.7.6\lib32&quot;;C:\InfiniDB\Release;&quot;C:\InfiniDB\mysql\libmysql\Release&quot;"
+				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_54_0\lib32;&quot;C:\InfiniDB\libxml2-2.7.6\lib32&quot;;C:\InfiniDB\Release;&quot;C:\InfiniDB\mysql\libmysql\Release&quot;"
 				GenerateDebugInformation="true"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
@@ -267,7 +267,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_52_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\dbcon\joblist;C:\InfiniDB\genii\dbcon\execplan;C:\InfiniDB\genii\utils\threadpool;C:\InfiniDB\genii\writeengine\shared;C:\InfiniDB\genii\utils\dataconvert;C:\InfiniDB\genii\versioning\BRM;C:\InfiniDB\genii\utils\common;C:\InfiniDB\genii\utils\rwlock;C:\InfiniDB\genii\utils\multicast;C:\InfiniDB\genii\utils\joiner;C:\InfiniDB\genii\utils\rowgroup;C:\InfiniDB\genii\utils\funcexp;C:\InfiniDB\genii\oam\oamcpp;C:\InfiniDB\genii\snmpd\snmpmanager;C:\InfiniDB\genii\utils\cacheutils;C:\InfiniDB\genii\utils\querystats"
+				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\dbcon\joblist;C:\InfiniDB\genii\dbcon\execplan;C:\InfiniDB\genii\utils\threadpool;C:\InfiniDB\genii\writeengine\shared;C:\InfiniDB\genii\utils\dataconvert;C:\InfiniDB\genii\versioning\BRM;C:\InfiniDB\genii\utils\common;C:\InfiniDB\genii\utils\rwlock;C:\InfiniDB\genii\utils\multicast;C:\InfiniDB\genii\utils\joiner;C:\InfiniDB\genii\utils\rowgroup;C:\InfiniDB\genii\utils\funcexp;C:\InfiniDB\genii\oam\oamcpp;C:\InfiniDB\genii\snmpd\snmpmanager;C:\InfiniDB\genii\utils\cacheutils;C:\InfiniDB\genii\utils\querystats"
 				PreprocessorDefinitions="_CRT_SECURE_NO_WARNINGS;SKIP_SNMP"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
@@ -287,7 +287,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="libmessageqcpp.lib libconfigcpp.lib libloggingcpp.lib libbrm.lib liboamcpp.lib librwlock.lib libexecplan.lib libjoblist.lib libfuncexp.lib libdataconvert.lib libthreadpool.lib libcacheutils.lib librowgroup.lib libquerystats.lib libmysqlcl_idb.lib libidbboot.lib libwinport.lib libxml2.lib iphlpapi.lib ws2_32.lib psapi.lib"
-				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_52_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\x64\Release;&quot;C:\InfiniDB\mysql\libmysql\Release&quot;"
+				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_54_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\x64\Release;&quot;C:\InfiniDB\mysql\libmysql\Release&quot;"
 				GenerateDebugInformation="true"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
@@ -343,7 +343,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_52_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\dbcon\joblist;C:\InfiniDB\genii\dbcon\execplan;C:\InfiniDB\genii\utils\threadpool;C:\InfiniDB\genii\writeengine\shared;C:\InfiniDB\genii\utils\dataconvert;C:\InfiniDB\genii\versioning\BRM;C:\InfiniDB\genii\utils\common;C:\InfiniDB\genii\utils\rwlock;C:\InfiniDB\genii\utils\multicast;C:\InfiniDB\genii\utils\joiner;C:\InfiniDB\genii\utils\rowgroup;C:\InfiniDB\genii\utils\funcexp;C:\InfiniDB\genii\oam\oamcpp;C:\InfiniDB\genii\snmpd\snmpmanager;C:\InfiniDB\genii\utils\cacheutils;C:\InfiniDB\genii\utils\querystats"
+				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\dbcon\joblist;C:\InfiniDB\genii\dbcon\execplan;C:\InfiniDB\genii\utils\threadpool;C:\InfiniDB\genii\writeengine\shared;C:\InfiniDB\genii\utils\dataconvert;C:\InfiniDB\genii\versioning\BRM;C:\InfiniDB\genii\utils\common;C:\InfiniDB\genii\utils\rwlock;C:\InfiniDB\genii\utils\multicast;C:\InfiniDB\genii\utils\joiner;C:\InfiniDB\genii\utils\rowgroup;C:\InfiniDB\genii\utils\funcexp;C:\InfiniDB\genii\oam\oamcpp;C:\InfiniDB\genii\snmpd\snmpmanager;C:\InfiniDB\genii\utils\cacheutils;C:\InfiniDB\genii\utils\querystats"
 				PreprocessorDefinitions="_CRT_SECURE_NO_WARNINGS;SKIP_SNMP"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
@@ -364,7 +364,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="libmessageqcpp.lib libconfigcpp.lib libloggingcpp.lib libbrm.lib liboamcpp.lib librwlock.lib libexecplan.lib libjoblist.lib libfuncexp.lib libdataconvert.lib libthreadpool.lib libcacheutils.lib libudfsdk.lib librowgroup.lib libquerystats.lib libcompress.lib libmysqlcl_idb.lib libidbboot.lib libwinport.lib libxml2.lib iphlpapi.lib ws2_32.lib psapi.lib"
-				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_52_0\lib32;&quot;C:\InfiniDB\libxml2-2.7.6\lib32&quot;;C:\InfiniDB\Release;&quot;C:\InfiniDB\mysql\libmysql\Release&quot;"
+				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_54_0\lib32;&quot;C:\InfiniDB\libxml2-2.7.6\lib32&quot;;C:\InfiniDB\Release;&quot;C:\InfiniDB\mysql\libmysql\Release&quot;"
 				GenerateDebugInformation="true"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
@@ -421,7 +421,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_52_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\dbcon\joblist;C:\InfiniDB\genii\dbcon\execplan;C:\InfiniDB\genii\utils\threadpool;C:\InfiniDB\genii\writeengine\shared;C:\InfiniDB\genii\utils\dataconvert;C:\InfiniDB\genii\versioning\BRM;C:\InfiniDB\genii\utils\common;C:\InfiniDB\genii\utils\rwlock;C:\InfiniDB\genii\utils\multicast;C:\InfiniDB\genii\utils\joiner;C:\InfiniDB\genii\utils\rowgroup;C:\InfiniDB\genii\utils\funcexp;C:\InfiniDB\genii\oam\oamcpp;C:\InfiniDB\genii\snmpd\snmpmanager;C:\InfiniDB\genii\utils\cacheutils;C:\InfiniDB\genii\utils\querystats"
+				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\dbcon\joblist;C:\InfiniDB\genii\dbcon\execplan;C:\InfiniDB\genii\utils\threadpool;C:\InfiniDB\genii\writeengine\shared;C:\InfiniDB\genii\utils\dataconvert;C:\InfiniDB\genii\versioning\BRM;C:\InfiniDB\genii\utils\common;C:\InfiniDB\genii\utils\rwlock;C:\InfiniDB\genii\utils\multicast;C:\InfiniDB\genii\utils\joiner;C:\InfiniDB\genii\utils\rowgroup;C:\InfiniDB\genii\utils\funcexp;C:\InfiniDB\genii\oam\oamcpp;C:\InfiniDB\genii\snmpd\snmpmanager;C:\InfiniDB\genii\utils\cacheutils;C:\InfiniDB\genii\utils\querystats"
 				PreprocessorDefinitions="_CRT_SECURE_NO_WARNINGS;SKIP_SNMP"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
@@ -441,7 +441,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="libmessageqcpp.lib libconfigcpp.lib libloggingcpp.lib libbrm.lib liboamcpp.lib librwlock.lib libexecplan.lib libjoblist.lib libfuncexp.lib libdataconvert.lib libthreadpool.lib libcacheutils.lib libudfsdk.lib librowgroup.lib libquerystats.lib libcompress.lib libmysqlcl_idb.lib libidbboot.lib libwinport.lib libxml2.lib iphlpapi.lib ws2_32.lib psapi.lib libcommon.lib libidbdatafile.lib"
-				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_52_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\x64\EnterpriseRelease;&quot;C:\InfiniDB\mysql\libmysql\Release&quot;"
+				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_54_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\x64\EnterpriseRelease;&quot;C:\InfiniDB\mysql\libmysql\Release&quot;"
 				GenerateDebugInformation="true"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"

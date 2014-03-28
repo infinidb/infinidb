@@ -606,18 +606,27 @@ int ColumnBufferCompressed::initToBeCompressedBuffer(long long& startFileOffset)
     // case we start a new empty chunk.
     unsigned int chunkIndex             = 0;
     unsigned int blockOffsetWithinChunk = 0;
-    if (fPreLoadHWMChunk && (fChunkPtrs.size() > 0))
+    bool         bSkipStartingBlks      = false;
+    if (fPreLoadHWMChunk)
     {
-        fCompressor->locateBlock(fStartingHwm,
-            chunkIndex, blockOffsetWithinChunk);
-        if (chunkIndex < fChunkPtrs.size())
-            startFileOffset  = fChunkPtrs[chunkIndex].first;
+        if (fChunkPtrs.size() > 0)
+        {
+            fCompressor->locateBlock(fStartingHwm,
+                chunkIndex, blockOffsetWithinChunk);
+            if (chunkIndex < fChunkPtrs.size())
+                startFileOffset  = fChunkPtrs[chunkIndex].first;
+            else
+                fPreLoadHWMChunk = false;
+        }
+        // If we are at the start of the job, fPreLoadHWMChunk will be true,
+        // to preload the old HWM chunk.  But if we have no chunk ptrs, then
+        // we are starting on an empty PM.  In this case, we skip starting
+        // blks if fStartingHwm has been set.
         else
-            fPreLoadHWMChunk = false;
-    }
-    else
-    {
-        fPreLoadHWMChunk = false;
+        {
+            fPreLoadHWMChunk  = false;
+            bSkipStartingBlks = true;
+        }
     }
 
     // Preload (read and uncompress) the chunk for the starting HWM extent only
@@ -721,8 +730,14 @@ int ColumnBufferCompressed::initToBeCompressedBuffer(long long& startFileOffset)
             startFileOffset = fChunkPtrs[ fChunkPtrs.size()-1 ].first +
                               fChunkPtrs[ fChunkPtrs.size()-1 ].second;
 
-        // Positition ourselves to start of empty to-be-compressed buffer
-        fNumBytes           = 0;
+        // Position ourselves to start of empty to-be-compressed buffer.
+        // If we are starting the first extent on a PM, we may employ blk
+        // skipping at start of import; adjust fNumBytes accordingly.
+        // (see ColumnInfo::createDelayedFileIfNeeded() for discussion)
+        if (bSkipStartingBlks)
+            fNumBytes = fStartingHwm * BYTE_PER_BLOCK;
+        else
+            fNumBytes = 0;
     }
 
     return NO_ERROR;

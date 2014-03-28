@@ -214,17 +214,18 @@ int createMsgQueClts(
 {
 	errMsg.clear();
 
-	std::ostringstream weServerName;
+	std::string srvName;
 	try {
 		// Send bulk rollback request to each specified PM.
 		for (unsigned k=0; k<pmList.size(); k++)
 		{
+			std::ostringstream weServerName;
 			weServerName << "pm" << pmList[k] << "_WriteEngineServer";
-//			std::cout << "Connecting to " << weServerName.str() << " on " <<
-//				devName << std::endl;
+			srvName = weServerName.str();
+			//std::cout << "Connecting to " << srvName << std::endl;
 
 			messageqcpp::MessageQueueClient* cl =
-				new messageqcpp::MessageQueueClient( weServerName.str() );
+				new messageqcpp::MessageQueueClient( srvName );
 			msgQueClts.push_back(
 				boost::shared_ptr<messageqcpp::MessageQueueClient>(cl) );
 		}
@@ -233,14 +234,14 @@ int createMsgQueClts(
 	{
 		std::ostringstream ossStatus;
 		ossStatus << "Error creating connection to " <<
-			weServerName.str() << ex.what();
+			srvName << ": " << ex.what();
 		errMsg = ossStatus.str();
 		return 3;
 	}
 	catch (...)
 	{
 		std::ostringstream ossStatus;
-		ossStatus << "Error creating connection to " << weServerName.str();
+		ossStatus << "Error creating connection to " << srvName;
 		errMsg = ossStatus.str();
 		return 3;
 	}

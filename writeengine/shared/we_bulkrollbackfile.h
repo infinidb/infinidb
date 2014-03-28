@@ -1,11 +1,11 @@
 /* Copyright (C) 2013 Calpont Corp.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -57,7 +57,7 @@ public:
      */
     virtual     ~BulkRollbackFile();
 
-    /** @brief Construct the relevant db filename and determine its existence
+    /** @brief Construct the relevant db filename.
      * Warning: This function may throw a WeException.
      *
      * @param columnOID OID of the segment file to be deleted
@@ -65,15 +65,13 @@ public:
      * @param dbRoot DBRoot of the segment file to be deleted
      * @param partNum Partition number of the segment file to be deleted
      * @param segNum Segment number of the segment file to be deleted
-     * @param segFileExists (out) Does specified segment file exist
      * @param segFileName (out) Name of segment file
      */
-    void findSegmentFile(OID      columnOID,
+    void buildSegmentFileName(OID columnOID,
                         bool      fileTypeFlag,
                         u_int32_t dbRoot,
                         u_int32_t partNum,
                         u_int32_t segNum,
-                        bool&     segFileExists,
                         std::string& segFileName);
 
     /** @brief Delete a segment file.

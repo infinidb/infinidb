@@ -1,11 +1,11 @@
 /* Copyright (C) 2013 Calpont Corp.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -704,6 +704,14 @@ int WriteEngineWrapper::insertColumnRecs(const TxnID& txnid,
    RIDList ridList;
    ColumnOp* colOp = NULL;
 
+   // Set tmp file suffix to modify HDFS db file
+   bool           useTmpSuffix = false;
+   if (idbdatafile::IDBPolicy::useHdfs())
+   {
+      if (!bFirstExtentOnThisPM)
+         useTmpSuffix = true;
+   }
+
    unsigned i=0;
 #ifdef PROFILE
  StopWatch timer;
@@ -975,8 +983,7 @@ int WriteEngineWrapper::insertColumnRecs(const TxnID& txnid,
    colOp->setColParam(curCol, 0, curColStruct.colWidth, curColStruct.colDataType,
        curColStruct.colType, curColStruct.dataOid, curColStruct.fCompressionType,
        curColStruct.fColDbRoot, curColStruct.fColPartition, curColStruct.fColSegment);
-
-   rc = colOp->openColumnFile(curCol, segFile);
+   rc = colOp->openColumnFile(curCol, segFile, useTmpSuffix); // @bug 5572 HDFS tmp file
    if (rc != NO_ERROR) {
       return rc;
    }
@@ -1012,6 +1019,7 @@ timer.stop("allocRowId");
 	// Expand initial abbreviated extent if any RID in 1st extent is > 256K.
 	// if totalRow == rowsLeft, then not adding rows to 1st extent, so skip it.
 	//--------------------------------------------------------------------------
+// DMC-SHARED_NOTHING_NOTE: Is it safe to assume only part0 seg0 is abbreviated?
     if ((curCol.dataFile.fPartition == 0) &&
        (curCol.dataFile.fSegment   == 0) &&
        ((totalRow-rowsLeft) > 0) &&
@@ -1030,7 +1038,7 @@ timer.stop("allocRowId");
                colStructList[k].fColDbRoot,
                colStructList[k].fColPartition,
                colStructList[k].fColSegment);
-           rc = colOp->openColumnFile(expandCol, segFile);
+           rc = colOp->openColumnFile(expandCol, segFile, true); // @bug 5572 HDFS tmp file
            if (rc == NO_ERROR)
            {
                if (colOp->abbreviatedExtent(expandCol.dataFile.pFile, colStructList[k].colWidth))
@@ -1042,7 +1050,7 @@ timer.stop("allocRowId");
            {
 				return rc;
            }
-           colOp->clearColumn(expandCol); // closes the file
+           colOp->clearColumn(expandCol); // closes the file (if uncompressed)
        }
     }
 	
@@ -1061,7 +1069,8 @@ timer.stop("allocRowId");
          Dctnry* dctnry = m_dctnry[op(dctnryStructList[i].fCompressionType)];
          rc = dctnry->openDctnry(dctnryStructList[i].dctnryOid,
                      dctnryStructList[i].fColDbRoot, dctnryStructList[i].fColPartition,
-                     dctnryStructList[i].fColSegment);
+                     dctnryStructList[i].fColSegment,
+                     useTmpSuffix); // @bug 5572 HDFS tmp file
          if (rc !=NO_ERROR)
 		 {
 			cout << "Error opening dctnry file " << dctnryStructList[i].dctnryOid<< endl;
@@ -1100,7 +1109,7 @@ timer.stop("tokenize");
 
          }
          //close dictionary files
-         rc = dctnry->closeDctnry();
+         rc = dctnry->closeDctnry(false);
          if (rc != NO_ERROR)
              return rc;
 
@@ -1110,9 +1119,9 @@ timer.stop("tokenize");
 			if (fRBMetaWriter)
 				fRBMetaWriter->backupDctnryHWMChunk(newDctnryStructList[i].dctnryOid, newDctnryStructList[i].fColDbRoot, newDctnryStructList[i].fColPartition, newDctnryStructList[i].fColSegment);
              rc = dctnry->openDctnry(newDctnryStructList[i].dctnryOid,
-             //            dctnryStructList[i].treeOid, dctnryStructList[i].listOid,
                            newDctnryStructList[i].fColDbRoot, newDctnryStructList[i].fColPartition,
-                           newDctnryStructList[i].fColSegment);
+                           newDctnryStructList[i].fColSegment,
+                           false); // @bug 5572 HDFS tmp file
              if (rc !=NO_ERROR)
                  return rc;
 
@@ -1147,7 +1156,7 @@ timer.stop("tokenize");
                  col_iter++;
              }
              //close dictionary files
-             rc = dctnry->closeDctnry();
+             rc = dctnry->closeDctnry(false);
              if (rc != NO_ERROR)
                  return rc;
          }
@@ -1176,7 +1185,7 @@ timer.stop("tokenize");
    //if a new extent is created, all the columns in this table should have their own new extent
    //First column already processed
 
-   //@Bug 1701. Close the file
+   //@Bug 1701. Close the file (if uncompressed)
    m_colOp[op(curCol.compressionType)]->clearColumn(curCol);
    //cout << "Saving hwm info for new ext batch" << endl;
    //Update hwm to set them in the end
@@ -1317,7 +1326,7 @@ timer.start("writeColumnRec");
 		//----------------------------------------------------------------------
 		// Write row(s) to database file(s)
 		//----------------------------------------------------------------------
-		rc = writeColumnRec(txnid, colStructList, colOldValueList, rowIdArray, newColStructList, colNewValueList, tableOid);
+		rc = writeColumnRec(txnid, colStructList, colOldValueList, rowIdArray, newColStructList, colNewValueList, tableOid, useTmpSuffix); // @bug 5572 HDFS tmp file
 	}
    return rc;
 }
@@ -1410,7 +1419,7 @@ int WriteEngineWrapper::insertColumnRec_SYS(const TxnID& txnid,
        dbRoot, partitionNum, segmentNum);
 
    string segFile;
-   rc = colOp->openColumnFile(curCol, segFile);
+   rc = colOp->openColumnFile(curCol, segFile, false); // @bug 5572 HDFS tmp file
    if (rc != NO_ERROR) {
       return rc;
    }
@@ -1507,7 +1516,7 @@ timer.start("allocRowId");
                dbRoot,
                partitionNum,
                segmentNum);
-           rc = colOp->openColumnFile(expandCol, segFile);
+           rc = colOp->openColumnFile(expandCol, segFile, false); // @bug 5572 HDFS tmp file
            if (rc == NO_ERROR)
            {
                if (colOp->abbreviatedExtent(expandCol.dataFile.pFile, colStructList[k].colWidth))
@@ -1552,9 +1561,9 @@ timer.start("allocRowId");
          dctnryStructList[i].fColSegment = segmentNum;
          dctnryStructList[i].fColDbRoot = dbRoot;
          rc = dctnry->openDctnry(dctnryStructList[i].dctnryOid,
-         //          dctnryStructList[i].treeOid, dctnryStructList[i].listOid,
                      dctnryStructList[i].fColDbRoot, dctnryStructList[i].fColPartition,
-                     dctnryStructList[i].fColSegment);
+                     dctnryStructList[i].fColSegment,
+                     false); // @bug 5572 HDFS tmp file
          if (rc !=NO_ERROR)
              return rc;
 
@@ -1617,9 +1626,9 @@ timer.stop("tokenize");
          if (newExtent)
          {
              rc = dctnry->openDctnry(newDctnryStructList[i].dctnryOid,
-             //            dctnryStructList[i].treeOid, dctnryStructList[i].listOid,
                            newDctnryStructList[i].fColDbRoot, newDctnryStructList[i].fColPartition,
-                           newDctnryStructList[i].fColSegment);
+                           newDctnryStructList[i].fColSegment,
+                           false); // @bug 5572 HDFS tmp file
              if (rc !=NO_ERROR)
                  return rc;
 
@@ -1839,11 +1848,11 @@ timer.stop("tokenize");
    {
       if (newExtent)
       {
-         rc = writeColumnRec(txnid, colStructList, colOldValueList, rowIdArray, newColStructList, colNewValueList, tableOid);
+         rc = writeColumnRec(txnid, colStructList, colOldValueList, rowIdArray, newColStructList, colNewValueList, tableOid, false); // @bug 5572 HDFS tmp file
       }
       else
       {
-         rc = writeColumnRec(txnid, colStructList, colValueList, rowIdArray, newColStructList, colNewValueList, tableOid);
+         rc = writeColumnRec(txnid, colStructList, colValueList, rowIdArray, newColStructList, colNewValueList, tableOid, false); // @bug 5572 HDFS tmp file
       }
    }
 #ifdef PROFILE
@@ -2014,7 +2023,7 @@ StopWatch timer;
 	string segFile;
 	if (bUseStartExtent)
 	{
-		rc = colOp->openColumnFile(curCol, segFile);
+		rc = colOp->openColumnFile(curCol, segFile, true); // @bug 5572 HDFS tmp file
 		if (rc != NO_ERROR) {
 			return rc;
 		}
@@ -2135,7 +2144,7 @@ timer.stop("allocRowId");
 				colStructList[k].fColDbRoot,
 				colStructList[k].fColPartition,
 				colStructList[k].fColSegment);
-			rc = colOp->openColumnFile(expandCol, segFile);
+			rc = colOp->openColumnFile(expandCol, segFile, true); // @bug 5572 HDFS tmp file
 			if (rc == NO_ERROR)
 			{
 				if (colOp->abbreviatedExtent(
@@ -2173,7 +2182,8 @@ timer.stop("allocRowId");
 				rc = dctnry->openDctnry(dctnryStructList[i].dctnryOid,
 					dctnryStructList[i].fColDbRoot,
 					dctnryStructList[i].fColPartition,
-					dctnryStructList[i].fColSegment);
+					dctnryStructList[i].fColSegment,
+					true); // @bug 5572 HDFS tmp file
 				if (rc !=NO_ERROR)
 					return rc;
 
@@ -2241,7 +2251,8 @@ timer.stop("tokenize");
 				rc = dctnry->openDctnry(newDctnryStructList[i].dctnryOid,
 					newDctnryStructList[i].fColDbRoot,
 					newDctnryStructList[i].fColPartition,
-					newDctnryStructList[i].fColSegment);
+					newDctnryStructList[i].fColSegment,
+					false); // @bug 5572 HDFS tmp file
 				if (rc !=NO_ERROR)
 					return rc;
 
@@ -2475,12 +2486,14 @@ timer.start("writeColumnRec");
 		if (newExtent)
 		{
 			rc = writeColumnRec(txnid, colStructList, colOldValueList,
-				rowIdArray, newColStructList, colNewValueList, tableOid);
+				rowIdArray, newColStructList, colNewValueList, tableOid,
+				false); // @bug 5572 HDFS tmp file
 		}
 		else
 		{
 			rc = writeColumnRec(txnid, colStructList, colValueList,
-				rowIdArray, newColStructList, colNewValueList, tableOid);
+				rowIdArray, newColStructList, colNewValueList, tableOid,
+				true); // @bug 5572 HDFS tmp file
 		}
 	}
 #ifdef PROFILE
@@ -2794,13 +2807,17 @@ int WriteEngineWrapper::processBeginVBCopy(const TxnID& txnid, const vector<ColS
    vector<LBIDRange>    rangeList;
    lastFbo = -1;
 	ColumnOp* colOp = m_colOp[op(colStructList[j].fCompressionType)];
-	for (uint i = 0; i < ridList.size(); i++) {
+	
+	ColStruct curColStruct = colStructList[j];	
+	Convertor::convertColType(&curColStruct);
+	
+	for (uint32_t i = 0; i < ridList.size(); i++) {
       curRowId = ridList[i];
       //cout << "processVersionBuffer got rid " << curRowId << endl;
-      successFlag = colOp->calculateRowId(curRowId, BYTE_PER_BLOCK/colStructList[j].colWidth, colStructList[j].colWidth, curFbo, curBio);
+      successFlag = colOp->calculateRowId(curRowId, BYTE_PER_BLOCK/curColStruct.colWidth, curColStruct.colWidth, curFbo, curBio);
       if (successFlag) {
          if (curFbo != lastFbo) {
-            //cout << "processVersionBuffer is processing lbid  " << lbid << endl;
+            //cout << "processVersionBuffer is processing curFbo  " << curFbo << endl;
             RETURN_ON_ERROR(BRMWrapper::getInstance()->getBrmInfo(
                colStructList[j].dataOid, colStructList[j].fColPartition, colStructList[j].fColSegment, curFbo, lbid));
              //cout << "beginVBCopy is processing lbid:transaction  " << lbid <<":"<<txnid<< endl;
@@ -2948,7 +2965,7 @@ int WriteEngineWrapper::processBeginVBCopy(const TxnID& txnid, const vector<ColS
                if (!dctCol_iter->isNull)
                {
                   RETURN_ON_ERROR(tokenize(
-                     txnid, dctnryStructList[i], *dctCol_iter));
+                     txnid, dctnryStructList[i], *dctCol_iter, true)); // @bug 5572 HDFS tmp file
                   token = dctCol_iter->token;
 
 #ifdef PROFILE
@@ -3155,7 +3172,7 @@ int WriteEngineWrapper::writeColumnRecords(const TxnID& txnid,
 	  }
 	
       string segFile;
-      rc = colOp->openColumnFile(curCol, segFile);
+      rc = colOp->openColumnFile(curCol, segFile, true); // @bug 5572 HDFS tmp file
       if (rc != NO_ERROR)
          break;
 	  vector<LBIDRange>   rangeList;
@@ -3271,6 +3288,7 @@ timer.stop("writeRow ");
  *    colNewStructList - the new extent struct list
  *    colNewValueList - column value list for the new extent
  *    rowIdArray -  row id list
+ *    useTmpSuffix - use temp suffix for db output file
  * RETURN:
  *    NO_ERROR if success
  *    others if something wrong in inserting the value
@@ -3282,6 +3300,7 @@ int WriteEngineWrapper::writeColumnRec(const TxnID& txnid,
                                        const ColStructList& newColStructList,
                                        const ColValueList& newColValueList,
 									   const int32_t tableOid,
+									   bool useTmpSuffix,
 									   bool versioning)
 {
    bool           bExcp;
@@ -3359,7 +3378,7 @@ StopWatch timer;
 				aTbaleMetaData->setColExtsInfo(colStructList[i].dataOid, aColExtsInfo);
 			}
 
-            rc = colOp->openColumnFile(curCol, segFile, IO_BUFF_SIZE);
+            rc = colOp->openColumnFile(curCol, segFile, useTmpSuffix, IO_BUFF_SIZE); // @bug 5572 HDFS tmp file
             if (rc != NO_ERROR)
                break;
 
@@ -3527,7 +3546,11 @@ timer.stop("writeRow ");
 			aColExtsInfo.push_back(aExt);
 			aTbaleMetaData->setColExtsInfo(colStructList[i].dataOid, aColExtsInfo);
 		}
-         rc = colOp->openColumnFile(curCol, segFile, IO_BUFF_SIZE);
+
+         // Pass "false" for hdfs tmp file flag.  Since we only allow 1
+         // extent per segment file (with HDFS), we can assume a second
+         // extent is going to a new file (and won't need tmp file).
+         rc = colOp->openColumnFile(curCol, segFile, false, IO_BUFF_SIZE); // @bug 5572 HDFS tmp file
          if (rc != NO_ERROR)
              break;
 
@@ -3675,7 +3698,7 @@ timer.stop("writeRow ");
             curColStruct.fCompressionType, curColStruct.fColDbRoot,
             curColStruct.fColPartition, curColStruct.fColSegment);
 
-         rc = colOp->openColumnFile(curCol, segFile, IO_BUFF_SIZE);
+         rc = colOp->openColumnFile(curCol, segFile, useTmpSuffix, IO_BUFF_SIZE); // @bug 5572 HDFS tmp file
 		  //cout << " Opened file oid " << curCol.dataFile.pFile << endl;
          if (rc != NO_ERROR)
             break;
@@ -3867,13 +3890,19 @@ StopWatch timer;
 	std::vector<VBRange> freeList;
 	vector<vector<uint32_t> > fboLists;
 	vector<vector<LBIDRange> > rangeLists;
-		
 	rc = processBeginVBCopy(txnid, colStructList, ridList, freeList, fboLists, rangeLists, rangeListTot);
 	if (rc != NO_ERROR) 
 	{
 		if (rangeListTot.size() > 0)
 			BRMWrapper::getInstance()->writeVBEnd(txnid, rangeListTot);
-		return rc;
+		switch (rc)
+		{
+			case BRM::ERR_DEADLOCK: return ERR_BRM_DEAD_LOCK;
+			case BRM::ERR_VBBM_OVERFLOW: return ERR_BRM_VB_OVERFLOW;
+			case BRM::ERR_NETWORK: return ERR_BRM_NETWORK;
+			case BRM::ERR_READONLY: return ERR_BRM_READONLY;
+			default: return ERR_BRM_BEGIN_COPY;
+		}
 	}
 	
 	VBRange aRange;
@@ -3920,7 +3949,7 @@ StopWatch timer;
 		}
 	 
       string segFile;
-      rc = colOp->openColumnFile(curCol, segFile, IO_BUFF_SIZE);
+      rc = colOp->openColumnFile(curCol, segFile, true, IO_BUFF_SIZE); // @bug 5572 HDFS tmp file
       if (rc != NO_ERROR)
          break;
 	  if (curColStruct.fCompressionType == 0)
@@ -4147,15 +4176,16 @@ int WriteEngineWrapper::tokenize(const TxnID& txnid, DctnryTuple& dctnryTuple, i
  ***********************************************************/
 int WriteEngineWrapper::tokenize(const TxnID& txnid,
                                  DctnryStruct& dctnryStruct,
-                                 DctnryTuple& dctnryTuple)
+                                 DctnryTuple& dctnryTuple,
+                                 bool useTmpSuffix) // @bug 5572 HDFS tmp file
 {
   //find the corresponding column segment file the token is going to be inserted.
 
   Dctnry* dctnry = m_dctnry[op(dctnryStruct.fCompressionType)];
   int rc = dctnry->openDctnry(dctnryStruct.dctnryOid,
-  //                          dctnryStruct.treeOid, dctnryStruct.listOid,
                               dctnryStruct.fColDbRoot, dctnryStruct.fColPartition,
-                              dctnryStruct.fColSegment);
+                              dctnryStruct.fColSegment,
+                              useTmpSuffix); // @bug 5572 TBD
   if (rc !=NO_ERROR)
     return rc;
 

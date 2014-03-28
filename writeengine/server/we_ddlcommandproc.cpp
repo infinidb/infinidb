@@ -300,8 +300,24 @@ uint8_t WE_DDLCommandProc::writeSystable(ByteStream& bs, std::string &err)
 				throw std::runtime_error("WE: Error updating calpont.systable:" + ec.errorString(error));
 			}
 			}
-			//if (idbdatafile::IDBPolicy::useHdfs())
-			//	fWEWrapper.flushDataFiles(error, txnID, oids);
+			if (idbdatafile::IDBPolicy::useHdfs())
+			{		
+				int rc1 = fWEWrapper.flushDataFiles(error, txnID, oids);
+				if ((error == 0) && ( rc1 == 0))
+				{
+				
+					rc1 = fWEWrapper.confirmTransaction(txnID);
+				
+					if ( rc1 == NO_ERROR)
+						rc1 = fWEWrapper.endTransaction(txnID, true);
+					else
+						fWEWrapper.endTransaction(txnID, false);
+				}
+				else
+				{
+					fWEWrapper.endTransaction(txnID, false);	
+				}
+			}
 		 }
 	 }
 	catch (exception& ex)
@@ -2246,23 +2262,6 @@ uint8_t WE_DDLCommandProc::updateSyscolumnTablename(ByteStream& bs, std::string 
 	}
 	colStruct.colDataType = column.colType.colDataType;
 
-	//Tokenize the data value
-	//dictStruct.dctnryOid = column.colType.ddn.dictOID;
-	//dictStruct.columnOid = column.colType.columnOID;
-	//memcpy(dictTuple.sigValue, newTablename.c_str(), newTablename.length());
-	//dictTuple.sigSize = newTablename.length();
-	//dictTuple.isNull = false;
-	/*
-	if (NO_ERROR != (error = fWEWrapper.tokenize(txnID, dictStruct, dictTuple)))
-	{
-		WErrorCodes ec;
-		throw std::runtime_error("WE: Tokenization failed " + ec.errorString(error));
-	}
-	aToken = dictTuple.token;
-	colTuple.data = aToken; */
-
-	colStruct.colDataType = column.colType.colDataType;
-
 	if (idbdatafile::IDBPolicy::useHdfs())
 	{
 		colStruct.fCompressionType = 2;
@@ -2637,16 +2636,7 @@ uint8_t WE_DDLCommandProc::updateSystableTablename(ByteStream& bs, std::string &
 	dictTuple.isNull = false;
 	memcpy(dictTuple.sigValue, newTablename.c_str(), newTablename.length());
 	dictTuple.sigSize = newTablename.length();
-	//int error = NO_ERROR;
-	//if (NO_ERROR != (error = fWEWrapper.tokenize(txnID, dictStruct, dictTuple)))
-	//{
-	//	WErrorCodes ec;
-	//	throw std::runtime_error("WE: Tokenization failed " + ec.errorString(error));
-	//}
-	//WriteEngine::Token aToken = dictTuple.token;
 
-	//colTuple.data = aToken;
-	//cout << "token value for new table name is op:fbo = " << aToken.op <<":" << aToken.fbo << " null flag = " << (uint)dictTuple.isNull<< endl;
 	if (idbdatafile::IDBPolicy::useHdfs())
 	{
 		colStruct.fCompressionType = 2;
@@ -3926,7 +3916,7 @@ uint8_t WE_DDLCommandProc::updateSyscolumnSetDefault(messageqcpp::ByteStream& bs
 			dictTuple.sigSize = defaultvalue.length();
 			dictTuple.isNull = false;
 			int error = NO_ERROR;
-			if (NO_ERROR != (error = fWEWrapper.tokenize(txnID, dictStruct, dictTuple)))
+			if (NO_ERROR != (error = fWEWrapper.tokenize(txnID, dictStruct, dictTuple, false))) // @bug 5572 HDFS tmp file
 			{
 				WErrorCodes ec;
 				throw std::runtime_error("WE: Tokenization failed " + ec.errorString(error));
@@ -4191,7 +4181,7 @@ uint8_t WE_DDLCommandProc::updateSyscolumnRenameColumn(messageqcpp::ByteStream& 
 		dictTuple.isNull = false;
 		int error = NO_ERROR;
 
-		if (NO_ERROR != (error = fWEWrapper.tokenize(txnID, dictStruct, dictTuple)))
+		if (NO_ERROR != (error = fWEWrapper.tokenize(txnID, dictStruct, dictTuple, false))) // @bug 5572 HDFS tmp file
 		{
 			WErrorCodes ec;
 			err = ec.errorString(error);
@@ -4389,7 +4379,7 @@ uint8_t WE_DDLCommandProc::updateSyscolumnRenameColumn(messageqcpp::ByteStream& 
 			dictTuple.sigSize = defaultvalue.length();
 			dictTuple.isNull = false;
 			int error = NO_ERROR;
-			if (NO_ERROR != (error = fWEWrapper.tokenize(txnID, dictStruct, dictTuple)))
+			if (NO_ERROR != (error = fWEWrapper.tokenize(txnID, dictStruct, dictTuple, false))) // @bug 5572 HDFS tmp file
 			{
 				WErrorCodes ec;
 				throw std::runtime_error("WE: Tokenization failed " + ec.errorString(error));

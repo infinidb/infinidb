@@ -1,11 +1,11 @@
 /* Copyright (C) 2013 Calpont Corp.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -104,10 +104,11 @@ IDBDataFile* DctnryCompress1::createDctnryFile(const char *name,int width,const 
 }
 
 
-IDBDataFile* DctnryCompress1::openDctnryFile()
+// @bug 5572 - HDFS usage: add *.tmp file backup flag
+IDBDataFile* DctnryCompress1::openDctnryFile(bool useTmpSuffix)
 {
    return m_chunkManager->getFilePtr(
-       m_dctnryOID, m_dbRoot, m_partition, m_segment, m_segFileName, "r+b", DEFAULT_BUFSIZ);
+       m_dctnryOID, m_dbRoot, m_partition, m_segment, m_segFileName, "r+b", DEFAULT_BUFSIZ, useTmpSuffix);
 }
 
 

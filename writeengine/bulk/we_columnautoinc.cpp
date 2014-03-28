@@ -78,6 +78,7 @@ int ColumnAutoInc::init( const std::string& fullTableName,
         oss << "Error parsing full table name to get auto-increment value for "
             << fTableName;
         fLog->logMsg( oss.str(), ERR_AUTOINC_TABLE_NAME, MSGLVL_ERROR );
+		BulkLoad::addErrorMsg2BrmUpdater(fTableName, oss);
         return ERR_AUTOINC_TABLE_NAME;
     }
 
@@ -97,6 +98,7 @@ int ColumnAutoInc::init( const std::string& fullTableName,
         oss << "Unable to initialize auto-increment sequence for " <<
             fTableName << "; " << errMsg;
         fLog->logMsg( oss.str(), rc, MSGLVL_ERROR );
+		BulkLoad::addErrorMsg2BrmUpdater(fTableName, oss);
         return rc;
     }
 
@@ -156,6 +158,7 @@ int ColumnAutoInc::finish( )
         oss << "Error locking auto-increment nextValue lock for table " <<
             fTableName << "; column " << fColumnName << "; " << ex.what();
         fLog->logMsg( oss.str(), ERR_AUTOINC_GET_LOCK, MSGLVL_ERROR );
+		BulkLoad::addErrorMsg2BrmUpdater(fTableName, oss);
         return ERR_AUTOINC_GET_LOCK;
     }
 
@@ -185,7 +188,7 @@ int ColumnAutoInc::finish( )
                     fTableName << "; column " << fColumnName << "; rc=" << rc <<
                     "; " << ec.errorString(ERR_AUTOINC_UPDATE);
                 fLog->logMsg( oss.str(), ERR_AUTOINC_UPDATE, MSGLVL_ERROR );
-
+				BulkLoad::addErrorMsg2BrmUpdater(fTableName, oss);
                 // Don't exit this function yet.  We set return code and fall
                 // through to bottom of the function to release the AI lock.
                 rc = ERR_AUTOINC_UPDATE;
@@ -277,6 +280,7 @@ int ColumnAutoInc::getNextValueFromSysCat( uint64_t& nextValue )
         oss << "Unable to get current auto-increment value for " <<
             sName << "." << tName << "; " << ex.what();
         fLog->logMsg( oss.str(), ERR_AUTOINC_INIT1, MSGLVL_ERROR );
+		BulkLoad::addErrorMsg2BrmUpdater(tName, oss);
         return ERR_AUTOINC_INIT1;
     }
     catch (...)
@@ -285,6 +289,7 @@ int ColumnAutoInc::getNextValueFromSysCat( uint64_t& nextValue )
         oss << "Unable to get current auto-increment value for " <<
             sName << "." << tName << "; unknown exception";
         fLog->logMsg( oss.str(), ERR_AUTOINC_INIT2, MSGLVL_ERROR );
+		BulkLoad::addErrorMsg2BrmUpdater(tName, oss);
         return ERR_AUTOINC_INIT2;
     }
 
@@ -367,6 +372,7 @@ int ColumnAutoIncIncremental::reserveNextRange(
         if (rc == ERR_AUTOINC_GEN_EXCEED_MAX)
             oss << " Max allowed value is " << fMaxIntSat << ".";
         fLog->logMsg( oss.str(), rc, MSGLVL_ERROR );
+		BulkLoad::addErrorMsg2BrmUpdater(fTableName, oss);
         return rc;
     }
 

@@ -1,11 +1,11 @@
 /* Copyright (C) 2013 Calpont Corp.
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation;
-   version 2.1 of the License.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
-   This library is distributed in the hope that it will be useful,
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -1236,7 +1236,9 @@ int FileOp::fillCompColumnExtentEmptyChunks(OID oid,
     failedTask.clear();
 
     // Open the file and read the headers with the compression chunk pointers
-    IDBDataFile* pFile = openFile( oid, dbRoot, partition, segment, segFile );
+    // @bug 5572 - HDFS usage: incorporate *.tmp file backup flag
+    IDBDataFile* pFile = openFile( oid, dbRoot, partition, segment, segFile,
+        "r+b", DEFAULT_COLSIZ, true );
     if (!pFile)
     {
         failedTask = "Opening file";
@@ -2275,18 +2277,27 @@ int FileOp::getDirName( FID fid, uint16_t dbRoot,
  * RETURN:
  *    true if exists, false otherwise
  ***********************************************************/
+// @bug 5572 - HDFS usage: add *.tmp file backup flag
 IDBDataFile* FileOp::openFile( const char* fileName,
     const char* mode,
-    const int ioColSize ) const
+    const int ioColSize,
+    bool useTmpSuffix ) const
 {
     IDBDataFile* pFile;
     errno = 0;
 
+    unsigned opts;
+    if (ioColSize > 0)
+        opts = IDBDataFile::USE_VBUF;
+    else
+        opts = IDBDataFile::USE_NOVBUF;
+    if ((useTmpSuffix) && idbdatafile::IDBPolicy::useHdfs())
+        opts |= IDBDataFile::USE_TMPFILE;
     pFile = IDBDataFile::open(
     						IDBPolicy::getType( fileName, IDBPolicy::WRITEENG ),
     						fileName,
     						mode,
-    						(ioColSize > 0) ? IDBDataFile::USE_VBUF : IDBDataFile::USE_NOVBUF,
+    						opts,
                             ioColSize );
     if (pFile == NULL)
     {
@@ -2310,12 +2321,14 @@ IDBDataFile* FileOp::openFile( const char* fileName,
     return pFile;
 }
 
+// @bug 5572 - HDFS usage: add *.tmp file backup flag
  IDBDataFile* FileOp::openFile( FID fid,
     uint16_t dbRoot,
     uint32_t partition,
     uint16_t segment,
     std::string&   segFile,
-    const char* mode, int ioColSize ) const
+    const char* mode, int ioColSize,
+    bool useTmpSuffix ) const
 {
     char fileName[FILE_NAME_SIZE];
     int  rc;
@@ -2328,7 +2341,7 @@ IDBDataFile* FileOp::openFile( const char* fileName,
     if (fid < 1000)
         ioColSize = 0;
 
-    IDBDataFile* pF = openFile( fileName, mode, ioColSize );
+    IDBDataFile* pF = openFile( fileName, mode, ioColSize, useTmpSuffix );
 
     segFile = fileName;
 
