@@ -35,10 +35,15 @@ using namespace oam;
 
 #include "helpers.h"
 
-string mysqlpw = " ";
+extern string mysqlpw;
 string pwprompt = " ";
 
+string masterLogFile = oam::UnassignedName;
+string masterLogPos = oam::UnassignedName;
+
 extern string installDir;
+extern bool noPrompting;
+
 
 namespace installer
 {
@@ -227,7 +232,15 @@ void mysqlSetup()
 		system(cmd.c_str());
 
 		if (oam.checkLogStatus("/tmp/idbmysql.log", "ERROR 1045") ) {
-			mysqlpw = getpass(prompt.c_str());
+			if ( mysqlpw == " " ) {
+				if ( noPrompting ) {
+					cout << " *** MySQL password required, enter on command line, exiting..." << endl;
+					exit(1);
+				}
+
+				mysqlpw = getpass(prompt.c_str());
+			}
+
 			mysqlpw = "'" + mysqlpw + "'";
 			pwprompt = "--password=" + mysqlpw;
 			prompt = " *** Password incorrect, please re-enter MySQL password > ";

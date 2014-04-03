@@ -166,7 +166,6 @@ string glusterInstalled = "n";
 string hadoopInstalled = "n";
 string home;
 
-extern string pwprompt;
 bool noPrompting;
 bool rootUser = true;
 string USER = "root";
@@ -176,6 +175,9 @@ bool gluster = false;
 string DataFileEnvFile;
 
 string installDir;
+
+extern string pwprompt;
+string mysqlpw = " ";
 
 const char* callReadline(string prompt)
 {
@@ -209,7 +211,6 @@ int main(int argc, char *argv[])
 	bool startOfflinePrompt = false;
 	noPrompting = false;
 	string password;
-	string mysqlpw = " ";
 
   	struct sysinfo myinfo; 
 
@@ -2882,12 +2883,14 @@ int main(int argc, char *argv[])
 										if ( prompt == " *** Enter MySQL password > " )
 											cout << endl << " MySQL password set on Module '" + remoteModuleName + "', Additional MySQL Install steps being performed" << endl << endl;
 
-										if ( prompt == " *** Password incorrect, please re-enter MySQL password > " )
-											if ( noPrompting )
+										if ( mysqlpw == " " ) {
+											if ( noPrompting ) {
+												cout << " *** MySQL password required, enter on command line, exiting..." << endl;
 												exit(1);
-
-										if ( mysqlpw == " " )
+											}
+							
 											mysqlpw = getpass(prompt.c_str());
+										}
 
 										mysqlpw = "'" + mysqlpw + "'";
 										pwprompt = "--password=" + mysqlpw;

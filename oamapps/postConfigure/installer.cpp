@@ -75,7 +75,9 @@ bool uncommentCalpontXml( string entry);
 bool writeConfig(Config* sysConfig);
 
 extern string pwprompt;
-extern string mysqlpw;
+
+bool noPrompting;
+string mysqlpw = " ";
 
 string installDir;
 

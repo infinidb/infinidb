@@ -143,6 +143,9 @@ string systemType = "";
 string subnetID = oam::UnassignedName;
 string VPCStartPrivateIP = oam::UnassignedName;
 
+bool noPrompting;
+string mysqlpw = " ";
+
 bool PMEBS = true;
 
 int main(int argc, char *argv[])

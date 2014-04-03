@@ -1971,7 +1971,7 @@ out:
 			formatMiniStats();
 		}
 
-		if (ffirstStepType == SCAN && bop == BOP_AND)
+		if (ffirstStepType == SCAN && bop == BOP_AND && !cancelled())
 		{
 			cpMutex.lock();
  			lbidList->UpdateAllPartitionInfo();
