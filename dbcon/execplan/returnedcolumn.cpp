@@ -135,10 +135,10 @@ void ReturnedColumn::serialize(messageqcpp::ByteStream& b) const
 	b << (uint8_t)fNullsFirst;
 	b << (uint64_t)fOrderPos;
 	b << (uint64_t)fColSource;
-	b << (uint64_t)fColPosition;
+	b << (int64_t)fColPosition;
 	b << (uint32_t)fInputIndex;
 	b << (uint32_t)fOutputIndex;
-	b << (uint32_t)fSequence;
+	b << (int32_t)fSequence;
 	fResultType.serialize(b);
 	fOperationType.serialize(b);
 	b << (uint32_t)fExpressionId;
@@ -156,10 +156,10 @@ void ReturnedColumn::unserialize(messageqcpp::ByteStream& b)
 	b >> (uint8_t&)fNullsFirst;
 	b >> (uint64_t&)fOrderPos;
 	b >> (uint64_t&)fColSource;
-	b >> (uint64_t&)fColPosition;
+	b >> (int64_t&)fColPosition;
 	b >> (uint32_t&)fInputIndex;
 	b >> (uint32_t&)fOutputIndex;
-	b >> (uint32_t&)fSequence;
+	b >> (int32_t&)fSequence;
 	fResultType.unserialize(b);
 	fOperationType.unserialize(b);
 	b >> (uint32_t&)fExpressionId;

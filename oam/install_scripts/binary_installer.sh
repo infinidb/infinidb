@@ -250,7 +250,7 @@ if { $INSTALLTYPE == "initial"} {
 	}
 	send_user "\n"
 	sleep 10
-	if { $MODULETYPE == "um" || $SERVERTYPE == "2" } { 
+	if { $MODULETYPE == "um" || $SERVERTYPE == "2" || $SERVERTYPE == "pmwithum" } { 
 		#
 		# run mysql setup scripts
 		#

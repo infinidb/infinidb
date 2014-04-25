@@ -1217,8 +1217,7 @@ void  DDLPackageProcessor::writeSysColumnMetaData(uint32_t sessionID, execplan::
 				{
 					WErrorCodes ec;
 					throw std::runtime_error(
-						"WE: Error updating calpont.syscolumn. " + ec.errorString(error));
-//					 err = "Error updating calpont.syscolumn. error number = " + error;
+						"WE: Error updating calpontsys.syscolumn. " + ec.errorString(error));
 				}
 			}
 		}

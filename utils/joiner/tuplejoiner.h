@@ -52,7 +52,7 @@ inline uint64_t order_swap(uint64_t x)
         ((x>>40) & 0x000000000000FF00ULL) |
         (x<<56);
 }
-	
+
 class TypelessData
 {
 public:
@@ -91,9 +91,12 @@ class TupleJoiner
 public:
 	struct hasher {
 		inline size_t operator()(int64_t val) const
-		{ return static_cast<std::size_t>(val); }
+		{ return hasher((char *) &val, 8); }
 		inline size_t operator()(const TypelessData &e) const
-		{ return utils::Hasher()((char *) e.data, e.len); }
+		{ return hasher((char *) e.data, e.len); }
+
+		private:
+			utils::Hasher hasher;
 	};
 
 	/* ctor to use for numeric join */
@@ -168,7 +171,7 @@ public:
 	inline const std::vector<uint32_t> & getSmallKeyColumns() { return smallKeyColumns; }
 	inline const std::vector<uint32_t> & getLargeKeyColumns() { return largeKeyColumns; }
 	inline uint32_t getKeyLength() { return keyLength; }
-    
+
 	/* Runtime casual partitioning support */
 	inline const boost::scoped_array<bool> &discreteCPValues() { return discreteValues; }
 	inline const boost::scoped_array<std::vector<int64_t> > &getCPData() { return cpValues; }
@@ -203,11 +206,11 @@ private:
 
 	iterator begin() { return h->begin(); }
 	iterator end() { return h->end(); }
-	
-	
+
+
 	rowgroup::RGData smallNullMemory;
 
-	
+
 	boost::scoped_ptr<hash_t> h;  // used for UM joins on ints
 	boost::scoped_ptr<sthash_t> sth;  // used for UM join on ints where the backing table uses a string table
 	std::vector<rowgroup::Row::Pointer> rows;   // used for PM join
@@ -249,7 +252,7 @@ private:
 	// this var is only used to normalize the NULL values for single-column joins,
 	// will have to change when/if we need to support that for compound or string joins
 	int64_t nullValueForJoinColumn;
-	
+
 	/* Runtime casual partitioning support */
 	void updateCPData(const rowgroup::Row &r);
 	boost::scoped_array<bool> discreteValues;

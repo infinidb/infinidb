@@ -942,12 +942,37 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 					int requestStatus = oam::API_SUCCESS;
 					log.writeLog(__LINE__,  "MSG RECEIVED: Start All process request...");
 
+					// change permissions on /dev/shm
+					string cmd = "chmod 777 /dev/shm >/dev/null 2>&1";
+					if ( !rootUser)
+						cmd = "sudo chmod 777 /dev/shm >/dev/null 2>&1";
+				
+					system(cmd.c_str());
+
 					//start the mysql daemon 
 					try {
 						oam.actionMysqlCalpont(MYSQL_START);
 					}
 					catch(...)
-					{}
+					{	// mysql didn't start, return with error
+						log.writeLog(__LINE__, "STARTALL: MySQL failed to start, start-module failure", LOG_TYPE_CRITICAL);
+						
+						ackMsg << (ByteStream::byte) ACK;
+						ackMsg << (ByteStream::byte) STARTALL;
+						ackMsg << (ByteStream::byte) oam::API_FAILURE;
+						mq.write(ackMsg);
+	
+						try {
+							oam.setProcessStatus("mysqld", config.moduleName(), oam::FAILED, 0);
+						}
+						catch(...)
+						{}
+
+						log.writeLog(__LINE__, "STARTALL: ACK back to ProcMgr, return status = " + oam.itoa((int) oam::API_FAILURE));
+		
+						break;
+
+					}
 
 					if( config.moduleType() == "pm" )
 					{
@@ -1371,7 +1396,8 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 				system(cmd.c_str());
 				cmd = startup::StartUp::installDir() + "/bin/post-mysql-install >> /tmp/rpminstall";
 				system(cmd.c_str());
-				system("/etc/init.d/mysql-Calpont start > /tmp/mysqldstart");
+				cmd = startup::StartUp::installDir() + "/mysql/mysql-Calpont start > /tmp/mysqldstart";
+				system(cmd.c_str());
 
 				ifstream file ("/tmp/mysqldstart");
 				if (!file) {
@@ -1826,7 +1852,7 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 			ackMsg << (ByteStream::byte) ret;
 			mq.write(ackMsg);
 
-			log.writeLog(__LINE__, "MASTERDIST: Error in runMasterRep - ACK back to ProcMgr return status = " + oam.itoa((int) ret));
+			log.writeLog(__LINE__, "MASTERDIST: runMasterRep - ACK back to ProcMgr return status = " + oam.itoa((int) ret));
 
 			break;
 		}
@@ -4973,9 +4999,10 @@ int ProcessMonitor::runMasterDist(std::string& password, std::string& slaveModul
 					string ipAddr = (*pt1).IPAddr;
 	
 					string cmd = startup::StartUp::installDir() + "/bin/rsync.sh " + ipAddr + " " + password + " 1 > /tmp/master-dist_" + moduleName + ".log";
-					int ret = system(cmd.c_str());
+					system(cmd.c_str());
 				
-					if ( WEXITSTATUS(ret) == 0 )
+					string logFile = "/tmp/master-dist_" + moduleName + ".log";
+					if (!oam.checkLogStatus(logFile, "FAILED"))
 						log.writeLog(__LINE__, "runMasterDist: Success rsync to module: " + moduleName, LOG_TYPE_DEBUG);
 					else
 						log.writeLog(__LINE__, "runMasterDist: Failure rsync to module: " + moduleName, LOG_TYPE_ERROR);
@@ -4992,9 +5019,10 @@ int ProcessMonitor::runMasterDist(std::string& password, std::string& slaveModul
 		string ipAddr = (*pt1).IPAddr;
 
 		string cmd = startup::StartUp::installDir() + "/bin/rsync.sh " + ipAddr + " " + password + " 1 > /tmp/master-dist_" + slaveModule + ".log";
-		int ret = system(cmd.c_str());
+		system(cmd.c_str());
 	
-		if ( WEXITSTATUS(ret) == 0 )
+		string logFile = "/tmp/master-dist_" + slaveModule + ".log";
+		if (!oam.checkLogStatus(logFile, "FAILED"))
 			log.writeLog(__LINE__, "runMasterDist: Success rsync to module: " + slaveModule, LOG_TYPE_DEBUG);
 		else
 			log.writeLog(__LINE__, "runMasterDist: Failure rsync to module: " + slaveModule, LOG_TYPE_ERROR);

@@ -117,7 +117,14 @@ int main(int argc, char **argv)
 	if (p && *p)
    		USER = p;
 
-  // get and set locale language    
+	// change permissions on /dev/shm
+	string cmd = "chmod 777 /dev/shm >/dev/null 2>&1";
+	if ( !rootUser)
+		cmd = "sudo chmod 777 /dev/shm >/dev/null 2>&1";
+
+	system(cmd.c_str());
+
+  	// get and set locale language    
 	string systemLang = "C";
 
 	try{

@@ -306,6 +306,8 @@ void PackageHandler::run()
 	//cout << "PackageHandler handling ";
 	std::string stmt;
 	unsigned DMLLoggingId = 21;
+	oam::OamCache* oamCache = oam::OamCache::makeOamCache();
+
 	try
 	{
 
@@ -325,6 +327,8 @@ void PackageHandler::run()
 					qts.start_time = QueryTeleClient::timeNowms();
 					qts.query_type = "INSERT";
 					qts.query = insertPkg.get_SQLStatement();
+					qts.system_name = oamCache->getSystemName();
+					qts.module_name = oamCache->getModuleName();
 					fQtc.postQueryTele(qts);
 					//cout << "This is batch insert " << insertPkg->get_isBatchInsert() << endl;
 					if (insertPkg.get_isBatchInsert())
@@ -651,6 +655,8 @@ void PackageHandler::run()
 					qts.rows = result.stats.fRows;
 					qts.end_time = QueryTeleClient::timeNowms();
 					qts.blocks_changed = result.stats.fBlocksChanged;
+					qts.system_name = oamCache->getSystemName();
+					qts.module_name = oamCache->getModuleName();
 					fQtc.postQueryTele(qts);
 				}
 				break;
@@ -668,6 +674,8 @@ void PackageHandler::run()
 					qts.start_time = QueryTeleClient::timeNowms();
 					qts.query_type = "UPDATE";
 					qts.query = updatePkg->get_SQLStatement();
+					qts.system_name = oamCache->getSystemName();
+					qts.module_name = oamCache->getModuleName();
 					fQtc.postQueryTele(qts);
 					// process it
 					//@Bug 1341. Don't remove calpontsystemcatalog from this 
@@ -689,6 +697,8 @@ void PackageHandler::run()
 					qts.rows = result.stats.fRows;
 					qts.end_time = QueryTeleClient::timeNowms();
 					qts.blocks_changed = result.stats.fBlocksChanged;
+					qts.system_name = oamCache->getSystemName();
+					qts.module_name = oamCache->getModuleName();
 					fQtc.postQueryTele(qts);
 				}
 				break;
@@ -698,6 +708,15 @@ void PackageHandler::run()
 					boost::scoped_ptr<dmlpackage::DeleteDMLPackage> deletePkg(new dmlpackage::DeleteDMLPackage());
 					deletePkg->read(*(fByteStream.get()));
 					deletePkg->set_TxnID(fTxnid);
+					QueryTeleStats qts;
+					qts.query_uuid = QueryTeleClient::genUUID();
+					qts.msg_type = QueryTeleStats::QT_START;
+					qts.start_time = QueryTeleClient::timeNowms();
+					qts.query_type = "DELETE";
+					qts.query = deletePkg->get_SQLStatement();
+					qts.system_name = oamCache->getSystemName();
+					qts.module_name = oamCache->getModuleName();
+					fQtc.postQueryTele(qts);
 					// process it
 					//@Bug 1341. Don't remove calpontsystemcatalog from this session to take advantage of cache.
 					fProcessor.reset(new dmlpackageprocessor::DeletePackageProcessor(fDbrm, deletePkg->get_SessionID()));
@@ -705,6 +724,21 @@ void PackageHandler::run()
 					fProcessor->setRM( &frm);
 					idbassert( fTxnid != 0);
 					result = fProcessor->processPackage(*(deletePkg.get())) ;
+					qts.msg_type = QueryTeleStats::QT_SUMMARY;
+					qts.max_mem_pct = result.stats.fMaxMemPct;
+					qts.num_files = result.stats.fNumFiles;
+					qts.phy_io = result.stats.fPhyIO;
+					qts.cache_io = result.stats.fCacheIO;
+					qts.msg_rcv_cnt = result.stats.fMsgRcvCnt;
+					qts.cp_blocks_skipped = result.stats.fCPBlocksSkipped;
+					qts.msg_bytes_in = result.stats.fMsgBytesIn;
+					qts.msg_bytes_out = result.stats.fMsgBytesOut;
+					qts.rows = result.stats.fRows;
+					qts.end_time = QueryTeleClient::timeNowms();
+					qts.blocks_changed = result.stats.fBlocksChanged;
+					qts.system_name = oamCache->getSystemName();
+					qts.module_name = oamCache->getModuleName();
+					fQtc.postQueryTele(qts);
 				}
 				break;
 			case dmlpackage::DML_COMMAND:

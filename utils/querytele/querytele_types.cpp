@@ -84,8 +84,8 @@ const char* _kITTypeNames[] = {
 };
 const std::map<int, const char*> _ITType_VALUES_TO_NAMES(::apache::thrift::TEnumIterator(4, _kITTypeValues, _kITTypeNames), ::apache::thrift::TEnumIterator(-1, NULL, NULL));
 
-const char* QueryTele::ascii_fingerprint = "AD878680A338DFD18C67AFC88A25AB7D";
-const uint8_t QueryTele::binary_fingerprint[16] = {0xAD,0x87,0x86,0x80,0xA3,0x38,0xDF,0xD1,0x8C,0x67,0xAF,0xC8,0x8A,0x25,0xAB,0x7D};
+const char* QueryTele::ascii_fingerprint = "86103BBE8AA8950640758E78693FD7D8";
+const uint8_t QueryTele::binary_fingerprint[16] = {0x86,0x10,0x3B,0xBE,0x8A,0xA8,0x95,0x06,0x40,0x75,0x8E,0x78,0x69,0x3F,0xD7,0xD8};
 
 uint32_t QueryTele::read(::apache::thrift::protocol::TProtocol* iprot) {
 
@@ -285,6 +285,30 @@ uint32_t QueryTele::read(::apache::thrift::protocol::TProtocol* iprot) {
           xfer += iprot->skip(ftype);
         }
         break;
+      case 23:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->system_name);
+          this->__isset.system_name = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 24:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->module_name);
+          this->__isset.module_name = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 25:
+        if (ftype == ::apache::thrift::protocol::T_I32) {
+          xfer += iprot->readI32(this->local_query);
+          this->__isset.local_query = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
       default:
         xfer += iprot->skip(ftype);
         break;
@@ -409,6 +433,21 @@ uint32_t QueryTele::write(::apache::thrift::protocol::TProtocol* oprot) const {
     xfer += oprot->writeI32(this->priority_level);
     xfer += oprot->writeFieldEnd();
   }
+  if (this->__isset.system_name) {
+    xfer += oprot->writeFieldBegin("system_name", ::apache::thrift::protocol::T_STRING, 23);
+    xfer += oprot->writeString(this->system_name);
+    xfer += oprot->writeFieldEnd();
+  }
+  if (this->__isset.module_name) {
+    xfer += oprot->writeFieldBegin("module_name", ::apache::thrift::protocol::T_STRING, 24);
+    xfer += oprot->writeString(this->module_name);
+    xfer += oprot->writeFieldEnd();
+  }
+  if (this->__isset.local_query) {
+    xfer += oprot->writeFieldBegin("local_query", ::apache::thrift::protocol::T_I32, 25);
+    xfer += oprot->writeI32(this->local_query);
+    xfer += oprot->writeFieldEnd();
+  }
   xfer += oprot->writeFieldStop();
   xfer += oprot->writeStructEnd();
   return xfer;
@@ -438,6 +477,9 @@ void swap(QueryTele &a, QueryTele &b) {
   swap(a.host, b.host);
   swap(a.priority, b.priority);
   swap(a.priority_level, b.priority_level);
+  swap(a.system_name, b.system_name);
+  swap(a.module_name, b.module_name);
+  swap(a.local_query, b.local_query);
   swap(a.__isset, b.__isset);
 }
 
@@ -700,8 +742,8 @@ void swap(StepTele &a, StepTele &b) {
   swap(a.__isset, b.__isset);
 }
 
-const char* ImportTele::ascii_fingerprint = "065A17EBE281132834FDAD0C149AF603";
-const uint8_t ImportTele::binary_fingerprint[16] = {0x06,0x5A,0x17,0xEB,0xE2,0x81,0x13,0x28,0x34,0xFD,0xAD,0x0C,0x14,0x9A,0xF6,0x03};
+const char* ImportTele::ascii_fingerprint = "86D618381836FE2CFA00EEB2945577FC";
+const uint8_t ImportTele::binary_fingerprint[16] = {0x86,0xD6,0x18,0x38,0x18,0x36,0xFE,0x2C,0xFA,0x00,0xEE,0xB2,0x94,0x55,0x77,0xFC};
 
 uint32_t ImportTele::read(::apache::thrift::protocol::TProtocol* iprot) {
 
@@ -725,13 +767,21 @@ uint32_t ImportTele::read(::apache::thrift::protocol::TProtocol* iprot) {
     {
       case 1:
         if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->job_uuid);
+          this->__isset.job_uuid = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 2:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
           xfer += iprot->readString(this->import_uuid);
           this->__isset.import_uuid = true;
         } else {
           xfer += iprot->skip(ftype);
         }
         break;
-      case 2:
+      case 3:
         if (ftype == ::apache::thrift::protocol::T_I32) {
           int32_t ecast3;
           xfer += iprot->readI32(ecast3);
@@ -741,7 +791,7 @@ uint32_t ImportTele::read(::apache::thrift::protocol::TProtocol* iprot) {
           xfer += iprot->skip(ftype);
         }
         break;
-      case 3:
+      case 4:
         if (ftype == ::apache::thrift::protocol::T_I64) {
           xfer += iprot->readI64(this->start_time);
           this->__isset.start_time = true;
@@ -749,7 +799,7 @@ uint32_t ImportTele::read(::apache::thrift::protocol::TProtocol* iprot) {
           xfer += iprot->skip(ftype);
         }
         break;
-      case 4:
+      case 5:
         if (ftype == ::apache::thrift::protocol::T_I64) {
           xfer += iprot->readI64(this->end_time);
           this->__isset.end_time = true;
@@ -757,7 +807,7 @@ uint32_t ImportTele::read(::apache::thrift::protocol::TProtocol* iprot) {
           xfer += iprot->skip(ftype);
         }
         break;
-      case 5:
+      case 6:
         if (ftype == ::apache::thrift::protocol::T_LIST) {
           {
             this->table_list.clear();
@@ -777,7 +827,7 @@ uint32_t ImportTele::read(::apache::thrift::protocol::TProtocol* iprot) {
           xfer += iprot->skip(ftype);
         }
         break;
-      case 6:
+      case 7:
         if (ftype == ::apache::thrift::protocol::T_LIST) {
           {
             this->rows_so_far.clear();
@@ -793,6 +843,22 @@ uint32_t ImportTele::read(::apache::thrift::protocol::TProtocol* iprot) {
             xfer += iprot->readListEnd();
           }
           this->__isset.rows_so_far = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 8:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->system_name);
+          this->__isset.system_name = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 9:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->module_name);
+          this->__isset.module_name = true;
         } else {
           xfer += iprot->skip(ftype);
         }
@@ -813,48 +879,64 @@ uint32_t ImportTele::write(::apache::thrift::protocol::TProtocol* oprot) const {
   uint32_t xfer = 0;
   xfer += oprot->writeStructBegin("ImportTele");
 
-  xfer += oprot->writeFieldBegin("import_uuid", ::apache::thrift::protocol::T_STRING, 1);
+  xfer += oprot->writeFieldBegin("job_uuid", ::apache::thrift::protocol::T_STRING, 1);
+  xfer += oprot->writeString(this->job_uuid);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("import_uuid", ::apache::thrift::protocol::T_STRING, 2);
   xfer += oprot->writeString(this->import_uuid);
   xfer += oprot->writeFieldEnd();
 
-  xfer += oprot->writeFieldBegin("msg_type", ::apache::thrift::protocol::T_I32, 2);
+  xfer += oprot->writeFieldBegin("msg_type", ::apache::thrift::protocol::T_I32, 3);
   xfer += oprot->writeI32((int32_t)this->msg_type);
   xfer += oprot->writeFieldEnd();
 
   if (this->__isset.start_time) {
-    xfer += oprot->writeFieldBegin("start_time", ::apache::thrift::protocol::T_I64, 3);
+    xfer += oprot->writeFieldBegin("start_time", ::apache::thrift::protocol::T_I64, 4);
     xfer += oprot->writeI64(this->start_time);
     xfer += oprot->writeFieldEnd();
   }
   if (this->__isset.end_time) {
-    xfer += oprot->writeFieldBegin("end_time", ::apache::thrift::protocol::T_I64, 4);
+    xfer += oprot->writeFieldBegin("end_time", ::apache::thrift::protocol::T_I64, 5);
     xfer += oprot->writeI64(this->end_time);
     xfer += oprot->writeFieldEnd();
   }
-  xfer += oprot->writeFieldBegin("table_list", ::apache::thrift::protocol::T_LIST, 5);
-  {
-    xfer += oprot->writeListBegin(::apache::thrift::protocol::T_STRING, static_cast<uint32_t>(this->table_list.size()));
-    std::vector<std::string> ::const_iterator _iter14;
-    for (_iter14 = this->table_list.begin(); _iter14 != this->table_list.end(); ++_iter14)
+  if (this->__isset.table_list) {
+    xfer += oprot->writeFieldBegin("table_list", ::apache::thrift::protocol::T_LIST, 6);
     {
-      xfer += oprot->writeString((*_iter14));
+      xfer += oprot->writeListBegin(::apache::thrift::protocol::T_STRING, static_cast<uint32_t>(this->table_list.size()));
+      std::vector<std::string> ::const_iterator _iter14;
+      for (_iter14 = this->table_list.begin(); _iter14 != this->table_list.end(); ++_iter14)
+      {
+        xfer += oprot->writeString((*_iter14));
+      }
+      xfer += oprot->writeListEnd();
     }
-    xfer += oprot->writeListEnd();
+    xfer += oprot->writeFieldEnd();
   }
-  xfer += oprot->writeFieldEnd();
-
-  xfer += oprot->writeFieldBegin("rows_so_far", ::apache::thrift::protocol::T_LIST, 6);
-  {
-    xfer += oprot->writeListBegin(::apache::thrift::protocol::T_I64, static_cast<uint32_t>(this->rows_so_far.size()));
-    std::vector<int64_t> ::const_iterator _iter15;
-    for (_iter15 = this->rows_so_far.begin(); _iter15 != this->rows_so_far.end(); ++_iter15)
+  if (this->__isset.rows_so_far) {
+    xfer += oprot->writeFieldBegin("rows_so_far", ::apache::thrift::protocol::T_LIST, 7);
     {
-      xfer += oprot->writeI64((*_iter15));
+      xfer += oprot->writeListBegin(::apache::thrift::protocol::T_I64, static_cast<uint32_t>(this->rows_so_far.size()));
+      std::vector<int64_t> ::const_iterator _iter15;
+      for (_iter15 = this->rows_so_far.begin(); _iter15 != this->rows_so_far.end(); ++_iter15)
+      {
+        xfer += oprot->writeI64((*_iter15));
+      }
+      xfer += oprot->writeListEnd();
     }
-    xfer += oprot->writeListEnd();
+    xfer += oprot->writeFieldEnd();
   }
-  xfer += oprot->writeFieldEnd();
-
+  if (this->__isset.system_name) {
+    xfer += oprot->writeFieldBegin("system_name", ::apache::thrift::protocol::T_STRING, 8);
+    xfer += oprot->writeString(this->system_name);
+    xfer += oprot->writeFieldEnd();
+  }
+  if (this->__isset.module_name) {
+    xfer += oprot->writeFieldBegin("module_name", ::apache::thrift::protocol::T_STRING, 9);
+    xfer += oprot->writeString(this->module_name);
+    xfer += oprot->writeFieldEnd();
+  }
   xfer += oprot->writeFieldStop();
   xfer += oprot->writeStructEnd();
   return xfer;
@@ -862,12 +944,15 @@ uint32_t ImportTele::write(::apache::thrift::protocol::TProtocol* oprot) const {
 
 void swap(ImportTele &a, ImportTele &b) {
   using ::std::swap;
+  swap(a.job_uuid, b.job_uuid);
   swap(a.import_uuid, b.import_uuid);
   swap(a.msg_type, b.msg_type);
   swap(a.start_time, b.start_time);
   swap(a.end_time, b.end_time);
   swap(a.table_list, b.table_list);
   swap(a.rows_so_far, b.rows_so_far);
+  swap(a.system_name, b.system_name);
+  swap(a.module_name, b.module_name);
   swap(a.__isset, b.__isset);
 }
 

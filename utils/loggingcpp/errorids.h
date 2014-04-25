@@ -133,6 +133,7 @@ const unsigned ERR_CONSTRAINTS = 4014;
 const unsigned ERR_NOT_NULL_CONSTRAINTS = 4015;
 const unsigned ERR_DML_DDL_SLAVE = 4016;
 const unsigned ERR_DML_DDL_LOCAL = 4017;
+const unsigned ERR_NON_SUPPORT_SYNTAX = 4018;
 const unsigned ERR_FUNC_NON_IMPLEMENT = 5001;
 const unsigned ERR_PSEUDOCOL_IDB_ONLY = 5002;
 const unsigned ERR_PSEUDOCOL_WRONG_ARG = 5003;

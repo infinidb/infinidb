@@ -181,6 +181,9 @@ public:
 
 	virtual bool stringTableFriendly() { return true; }
 
+	bool tokenJoin() const { return fTokenJoin; }
+	void tokenJoin(bool b) { fTokenJoin = b;    }
+
 private:
 	TupleHashJoinStep();
 	TupleHashJoinStep(const TupleHashJoinStep &);
@@ -347,6 +350,9 @@ private:
 	std::vector<std::string> smallTableNames;
 	bool isExeMgr;
 	uint32_t lastSmallOuterJoiner;
+
+	//@bug5958, for identify token join
+	bool fTokenJoin;
 
 	// moved from base class JobStep
 	boost::mutex* fStatsMutexPtr;

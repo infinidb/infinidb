@@ -256,7 +256,6 @@ AC_CONFIG_FILES([
 	writeengine/client/Makefile
 	writeengine/splitter/Makefile
 	writeengine/server/Makefile
-	writeengine/cpimport/Makefile
 	writeengine/redistribute/Makefile
 	net-snmp/Makefile
 ])

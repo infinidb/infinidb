@@ -297,7 +297,7 @@ uint8_t WE_DDLCommandProc::writeSystable(ByteStream& bs, std::string &err)
 			else
 			{
 				WErrorCodes ec;
-				throw std::runtime_error("WE: Error updating calpont.systable:" + ec.errorString(error));
+				throw std::runtime_error("WE: Error updating calpontsys.systable:" + ec.errorString(error));
 			}
 			}
 			if (idbdatafile::IDBPolicy::useHdfs())
@@ -716,8 +716,7 @@ uint8_t WE_DDLCommandProc::writeCreateSyscolumn(ByteStream& bs, std::string &err
 				{
 					WErrorCodes ec;
 					throw std::runtime_error(
-						"WE: Error updating calpont.syscolumn. " + ec.errorString(error));
-//					 err = "Error updating calpont.syscolumn. error number = " + error;
+						"WE: Error updating calpontsys.syscolumn. " + ec.errorString(error));
 				}
 			}
 			else
@@ -1083,8 +1082,7 @@ uint8_t WE_DDLCommandProc::writeSyscolumn(ByteStream& bs, std::string & err)
 				{
 					WErrorCodes ec;
 					throw std::runtime_error(
-						"WE: Error updating calpont.syscolumn. " + ec.errorString(error));
-//					 err = "Error updating calpont.syscolumn. error number = " + error;
+						"WE: Error updating calpontsys.syscolumn. " + ec.errorString(error));
 				}
 			}
 			else

@@ -35,6 +35,8 @@ void usage(const string& pname)
 	cout << "usage: " << pname << " [-vh] [-c config_file] section param" << endl <<
 		"   Displays configuration variable param from section section." << endl <<
 		"   -c config_file use config file config_file" << endl <<
+		"   -a display all configuration values" << endl <<
+		"   -i display all configuration values in .ini-file format (implies -a)" << endl <<
 		"   -v display verbose information" << endl <<
 		"   -h display this help text" << endl;
 }
@@ -47,10 +49,12 @@ int main(int argc, char** argv)
 	string pname(argv[0]);
 	bool vflg = false;
 	string configFile;
+	bool aflg = false;
+	bool iflg = false;
 
 	opterr = 0;
 
-	while ((c = getopt(argc, argv, "c:vh")) != EOF)
+	while ((c = getopt(argc, argv, "c:vaih")) != EOF)
 		switch (c)
 		{
 		case 'v':
@@ -58,6 +62,12 @@ int main(int argc, char** argv)
 			break;
 		case 'c':
 			configFile = optarg;
+			break;
+		case 'a':
+			aflg = true;
+			break;
+		case 'i':
+			iflg = aflg = true;
 			break;
 		case 'h':
 		case '?':
@@ -67,7 +77,7 @@ int main(int argc, char** argv)
 			break;
 		}
 
-	if ((argc - optind) < 2)
+	if (!aflg && ( (argc - optind) < 2 ))
 	{
 		usage(pname);
 		return 1;
@@ -84,7 +94,41 @@ int main(int argc, char** argv)
 		cout << "Using config file: " << cf->configFile() << endl;
 	}
 
-	cout << cf->getConfig(argv[optind + 0], argv[optind + 1]);
+	if (aflg)
+	{
+		vector<string> secs;
+		vector<string> parms;
+		secs = cf->enumConfig();
+		vector<string>::iterator siter;
+		vector<string>::iterator send;
+		vector<string>::iterator piter;
+		vector<string>::iterator pend;
+		siter = secs.begin();
+		send = secs.end();
+		while (siter != send)
+		{
+			if (iflg)
+				cout << '[' << *siter << ']' << endl;
+			parms = cf->enumSection(*siter);
+			piter = parms.begin();
+			pend = parms.end();
+			while (piter != pend)
+			{
+				if (iflg)
+					cout << *piter << " = " << cf->getConfig(*siter, *piter) << endl;
+				else
+					cout << *siter << '.' << *piter << " = " <<
+						cf->getConfig(*siter, *piter) << endl;
+				++piter;
+			}
+			++siter;
+			if (iflg)
+				cout << endl;
+		}
+		return 0;
+	}
+
+	cout << cf->getConfig(argv[optind + 0], argv[optind + 1]) << endl;
 
 	return 0;
 }

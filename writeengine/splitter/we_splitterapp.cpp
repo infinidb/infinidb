@@ -27,12 +27,16 @@
  *      Author: bpaul
  */
 
+#include <unistd.h>
 #include <cstdlib>
 #include <csignal>
 
 #include <string>
-#include <stdexcept>
 using namespace std;
+
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_generators.hpp>
+#include <boost/uuid/uuid_io.hpp>
 
 #include "batchloader.h"
 using namespace batchloader;
@@ -186,6 +190,9 @@ void WESplitterApp::onSigHup(int aInt)
 //------------------------------------------------------------------------------
 void WESplitterApp::processMessages()
 {
+    boost::uuids::uuid u=boost::uuids::random_generator()();
+    fCmdArgs.setJobUUID(u);
+
 	messageqcpp::ByteStream aBs;
 	unsigned int aRollCount = 0;
 
@@ -392,10 +399,13 @@ void WESplitterApp::processMessages()
 
 void WESplitterApp::invokeCpimport()
 {
+    boost::uuids::uuid u=boost::uuids::random_generator()();
+    fCmdArgs.setJobUUID(u);
+
 	//BUG 4361 - check cpimport.bin is available or not
 	std::string aCpiBinFile = getCalpontHome() + "/cpimport.bin";			//BUG 4361
-	ifstream iGoodFile(aCpiBinFile.c_str());										//BUG 4361
-	if(!iGoodFile.good()) throw runtime_error("Error : Missing File "+ aCpiBinFile);//BUG 4361
+	if (access(aCpiBinFile.c_str(), X_OK) != 0)
+		throw runtime_error("Error: Missing File " + aCpiBinFile);
 
 	fCmdArgs.setMode(3);
 	std::string aCmdLineStr = fCmdArgs.getCpImportCmdLine();

@@ -72,7 +72,6 @@ ExpressionStep::ExpressionStep(const ExpressionStep& rhs) :
 	fExpressionFilter(NULL),
 	fExpressionId(rhs.expressionId()),
 	fTableOids(tableOids()),
-	fOids(rhs.oids()),
 	fAliases(rhs.aliases()),
 	fViews(rhs.views()),
 	fSchemas(rhs.schemas()),
@@ -294,7 +293,6 @@ void ExpressionStep::populateColumnInfo(SimpleColumn* sc, JobInfo& jobInfo)
 		if (ct.scale == 0)       // keep passed original ct for decimal type
 			sc->resultType(ct);  // update from mysql type to calpont type
 	}
-	fOids.push_back(sc->oid());
 	fAliases.push_back(alias);
 	fViews.push_back(view);
 	fSchemas.push_back(schema);
@@ -344,7 +342,6 @@ void ExpressionStep::populateColumnInfo(WindowFunctionColumn* wc, JobInfo& jobIn
 	string view("");
 	string schema("");
 	fTableOids.push_back(jobInfo.keyInfo->tupleKeyToTableOid[wcKey]);
-	fOids.push_back(wc->expressionId());
 	fAliases.push_back(alias);
 	fViews.push_back(view);
 	fSchemas.push_back(schema);
@@ -452,7 +449,6 @@ void ExpressionStep::updateColumnOidAlias(JobInfo& jobInfo)
 		if (sc != NULL && sc->schemaName().empty())
 		{
 			fTableOids[i] = joblist::tableOid(sc, jobInfo.csc);
-			fOids[i] = sc->oid();
 			fAliases[i] = extractTableAlias(sc);
 		}
 	}

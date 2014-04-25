@@ -50,6 +50,9 @@ struct QueryTele
   20: optional string host,
   21: optional string priority,
   22: optional i32 priority_level,
+  23: optional string system_name,
+  24: optional string module_name,
+  25: optional i32 local_query,
 
 }
 
@@ -113,12 +116,15 @@ typedef list<i64> I64List
 
 struct ImportTele
 {
-  1: string import_uuid,
-  2: ITType msg_type,
-  3: optional i64 start_time,
-  4: optional i64 end_time,
-  5: StringList table_list,
-  6: I64List rows_so_far,
+  1: string job_uuid,
+  2: string import_uuid,
+  3: ITType msg_type,
+  4: optional i64 start_time,
+  5: optional i64 end_time,
+  6: optional StringList table_list,
+  7: optional I64List rows_so_far,
+  8: optional string system_name,
+  9: optional string module_name,
 }
 
 service QueryTeleService

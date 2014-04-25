@@ -57,8 +57,7 @@ class ExpressionStep : public JobStep
 	void join();
 	const std::string toString() const;
 
-	execplan::CalpontSystemCatalog::OID oid() const
-	{ return fOids.empty() ? 0 : fOids.front(); }
+	execplan::CalpontSystemCatalog::OID oid() const { return 0; }
 	execplan::CalpontSystemCatalog::OID tableOid() const
 	{ return fTableOids.empty() ? 0 : fTableOids.front(); }
 	std::string alias() const { return fAliases.empty() ? "" : fAliases.front(); }
@@ -78,7 +77,6 @@ class ExpressionStep : public JobStep
 	uint64_t expressionId() const { return fExpressionId; }
 
 	const std::vector<execplan::CalpontSystemCatalog::OID>& tableOids() const { return fTableOids; }
-	const std::vector<execplan::CalpontSystemCatalog::OID>& oids() const { return fOids; }
 	const std::vector<std::string>& aliases() const { return fAliases; }
 	const std::vector<std::string>& views() const { return fViews; }
 	const std::vector<std::string>& schemas() const { return fSchemas; }
@@ -86,7 +84,6 @@ class ExpressionStep : public JobStep
 	const std::vector<uint32_t>& columnKeys() const { return fColumnKeys; }
 
 	std::vector<execplan::CalpontSystemCatalog::OID>& tableOids() { return fTableOids; }
-	std::vector<execplan::CalpontSystemCatalog::OID>& oids() { return fOids; }
 	std::vector<std::string>& aliases() { return fAliases; }
 	std::vector<std::string>& views() { return fViews; }
 	std::vector<std::string>& schemas() { return fSchemas; }
@@ -120,7 +117,6 @@ class ExpressionStep : public JobStep
 
 	// columns accessed
 	std::vector<execplan::CalpontSystemCatalog::OID> fTableOids;
-	std::vector<execplan::CalpontSystemCatalog::OID> fOids;
 	std::vector<std::string>                         fAliases;
 	std::vector<std::string>                         fViews;
 	std::vector<std::string>                         fSchemas;

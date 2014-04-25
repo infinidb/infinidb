@@ -85,7 +85,7 @@ void OamCache::checkReload()
 
 	ModuleTypeConfig moduletypeconfig; 
 	std::set<int> uniquePids;
-    oam.getSystemConfig("pm", moduletypeconfig);
+	oam.getSystemConfig("pm", moduletypeconfig);
 	int moduleID = 0;
 	for (unsigned i = 0; i < moduletypeconfig.ModuleCount; i++) {
 		moduleID = atoi((moduletypeconfig.ModuleNetworkList[i]).DeviceName.substr(MAX_MODULE_TYPE_SIZE,MAX_MODULE_ID_SIZE).c_str());
@@ -146,6 +146,7 @@ void OamCache::checkReload()
 	oamModuleInfo_t tm;
 	tm = oam.getModuleInfo();
 	OAMParentModuleName = boost::get<3>(tm);
+	systemName = config->getConfig("SystemConfig", "SystemName");
 }
 
 OamCache::dbRootPMMap_t OamCache::getDBRootToPMMap()
@@ -206,6 +207,7 @@ std::string OamCache::getOAMParentModuleName()
 
 int OamCache::getLocalPMId()
 {
+	mutex::scoped_lock lk(cacheLock);
 	// This comes from the file $INSTALL/local/module, not from the xml.
 	// Thus, it's not refreshed during checkReload().
 	if (mLocalPMId > 0)
@@ -214,7 +216,7 @@ int OamCache::getLocalPMId()
 	}
 
 	string localModule;
-    string moduleType;
+	string moduleType;
 	string fileName = startup::StartUp::installDir() + "/local/module";
 	ifstream moduleFile (fileName.c_str());
 	char line[400];
@@ -239,6 +241,29 @@ int OamCache::getLocalPMId()
 	}
 
 	return mLocalPMId;
+}
+
+string OamCache::getSystemName()
+{
+	mutex::scoped_lock lk(cacheLock);
+
+	checkReload();
+	return systemName; 
+}
+
+string OamCache::getModuleName()
+{
+	mutex::scoped_lock lk(cacheLock);
+
+	if (!moduleName.empty())
+		return moduleName;
+
+	string fileName = startup::StartUp::installDir() + "/local/module";
+	ifstream moduleFile(fileName.c_str());
+	getline(moduleFile, moduleName);
+	moduleFile.close();
+
+	return moduleName; 
 }
 
 } /* namespace oam */

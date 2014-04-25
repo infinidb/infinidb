@@ -6885,27 +6885,46 @@ namespace oam
      *
      ****************************************************************************/
 
-    void Oam::actionMysqlCalpont(MYSQLCALPONT_ACTION action)
+    	void Oam::actionMysqlCalpont(MYSQLCALPONT_ACTION action)
 	{
-		// check if mysql-Capont is installed
-		string mysqlscript = InstallDir + "/mysql/mysql-Calpont";
-        if (access(mysqlscript.c_str(), X_OK) != 0)
-            exceptionControl("actionMysqlCalpont", API_FILE_OPEN_ERROR);
-
-		string command;
-
-		// get current Module name
+		// check system type to see if mysqld should be accessed on this module
+		int serverTypeInstall = oam::INSTALL_NORMAL;
+		string moduleType;
 		string moduleName;
 		oamModuleInfo_t st;
 		try {
 			st = getModuleInfo();
+			moduleType = boost::get<1>(st);
+			serverTypeInstall = boost::get<5>(st);
 			moduleName = boost::get<0>(st);
 		}
-		catch (...) 
-		{}
+		catch (...) {}
 
-        switch(action)
-        {
+		//PMwithUM config 
+		string PMwithUM = "n";
+		try {
+			getSystemConfig( "PMwithUM", PMwithUM);
+		}
+		catch(...) {
+			PMwithUM = "n";
+		}
+
+		if ( ( serverTypeInstall == oam::INSTALL_NORMAL && moduleType == "um" ) ||
+			( serverTypeInstall == oam::INSTALL_NORMAL && moduleType == "pm" && PMwithUM == "y") ||
+		     	( serverTypeInstall == oam::INSTALL_COMBINE_DM_UM_PM ) )
+			PMwithUM = PMwithUM;
+		else
+			return;
+
+		// check if mysql-Capont is installed
+		string mysqlscript = InstallDir + "/mysql/mysql-Calpont";
+		if (access(mysqlscript.c_str(), X_OK) != 0)
+			return;
+
+		string command;
+
+		switch(action)
+		{
  			case MYSQL_START:
 			{
 				command = "start > /tmp/actionMysqlCalpont.log 2>&1";
@@ -6948,33 +6967,50 @@ namespace oam
 
 			default:
 			{
-            	exceptionControl("actionMysqlCalpont", API_INVALID_PARAMETER);
+				writeLog("***DEFAULT OPTION", LOG_TYPE_ERROR);
+            			exceptionControl("actionMysqlCalpont", API_INVALID_PARAMETER);
 			}
 		}
 
 		string cmd = mysqlscript + " " + command;
-		int status = system(cmd.c_str());
-		if (WEXITSTATUS(status) != 0 && action != MYSQL_STATUS)
-			exceptionControl("actionMysqlCalpont", API_FAILURE);
+		system(cmd.c_str());
 
 		if (action == MYSQL_START || action == MYSQL_RESTART) {
 			//get pid
 			cmd = "cat " + InstallDir + "/mysql/db/*.pid > /tmp/mysql.pid";
 			system(cmd.c_str());
 			ifstream oldFile ("/tmp/mysql.pid");
+
+			//fail if file size 0
+			oldFile.seekg(0, std::ios::end);
+			int size = oldFile.tellg();
+			if ( size == 0 ) {
+				// mysql not started
+				writeLog("***FILE SIZE EQUALS ZERO", LOG_TYPE_ERROR);
+				exceptionControl("actionMysqlCalpont", API_FAILURE);
+			}
+
 			char line[400];
 			string pid;
 			while (oldFile.getline(line, 400))
 			{
 				pid = line;
+				string::size_type pos = pid.find("cat",0);
+				if (pos != string::npos) {
+					// mysql not started
+					writeLog("***FILE HAS CAT", LOG_TYPE_ERROR);
+					exceptionControl("actionMysqlCalpont", API_FAILURE);
+				}
 				break;
 			}
 			oldFile.close();
 
+			int PID = atoi(pid.c_str());
+
 			//set process status
 			try
 			{
-				setProcessStatus("mysqld", moduleName, ACTIVE, atoi(pid.c_str()));
+				setProcessStatus("mysqld", moduleName, ACTIVE, PID);
 			}
 			catch(...)
 			{}
@@ -7053,15 +7089,12 @@ namespace oam
 						setModuleStatus(moduleName, ACTIVE);
 					}
 					catch(...)
-					{
-						exceptionControl("processInitFailure", API_FAILURE);
-					}
+					{}
 				}
-
 			}
 			else
 			{
-				if ( state != MAN_OFFLINE )
+				if ( state == ACTIVE )
 				{
 					//set process status
 					try
@@ -7087,9 +7120,7 @@ namespace oam
 						setModuleStatus(moduleName, DEGRADED);
 					}
 					catch(...)
-					{
-						exceptionControl("processInitFailure", API_FAILURE);
-					}
+					{}
 				}
 				return;
 			}

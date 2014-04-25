@@ -50,7 +50,7 @@ if [ -n "$plugin" ]; then
 		#default
 		setenv=setenv-hdfs-20
 	fi
-	. /root/$setenv >/dev/null 2>&1
+	. ~/$setenv >/dev/null 2>&1
 fi
 
 if [ -e $InstallDir/lib/libjemalloc.so ]; then
@@ -135,8 +135,8 @@ stop() {
 	RETVAL=$?
 	rm -f /var/lock/subsys/infinidb
 	fuser -k 8604/tcp > /dev/null 2>&1
-	test -f /etc/init.d/mysql-Calpont || return $RETVAL
-	/etc/init.d/mysql-Calpont stop > /dev/null 2>&1
+	test -f $InstallDir/mysql/mysql-Calpont || return $RETVAL
+	$InstallDir/mysql/mysql-Calpont stop > /dev/null 2>&1
 	if [ -x $InstallDir/bin/infinidb.post-stop ]; then
 		$InstallDir/bin/infinidb.post-stop
 	fi

@@ -241,7 +241,7 @@ protected:
     BRM::QueryContext fVerId;
     uint32_t fStatementId;
 
-    uint16_t fStepId;
+    uint32_t fStepId;
     uint64_t fTupleId;
 
     std::string fAlias;

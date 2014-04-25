@@ -88,6 +88,7 @@ using namespace querystats;
 #include "MonitorProcMem.h"
 #include "querytele.h"
 using namespace querytele;
+#include "oamcache.h"
 
 #include "activestatementcounter.h"
 #include "femsghandler.h"
@@ -241,7 +242,8 @@ public:
 		fIos(ios), fEc(ec),
 		fRm(rm),
 		fStatsRetrieved(false),
-		fTeleClient(gTeleServerParms)
+		fTeleClient(gTeleServerParms),
+		fOamCachePtr(oam::OamCache::makeOamCache())
 	{
 	}
 
@@ -256,6 +258,8 @@ private:
 	bool       fStatsRetrieved;
 
 	QueryTeleClient fTeleClient;
+
+	oam::OamCache* fOamCachePtr;	//this ptr is copyable...
 
 	//...Reinitialize stats for start of a new query
 	void initStats ( uint32_t sessionId, string& sqlText )
@@ -579,7 +583,11 @@ new_plan:
 				qts.query = csep.data();
 				qts.session_id = csep.sessionID();
 				qts.query_type = csep.queryType();
-				fTeleClient.postQueryTele(qts);
+				qts.system_name = fOamCachePtr->getSystemName();
+				qts.module_name = fOamCachePtr->getModuleName();
+				qts.local_query = csep.localQuery();
+				if ((csep.sessionID()&0x80000000) == 0)
+					fTeleClient.postQueryTele(qts);
 
 				if (gDebug > 1 || (gDebug && (csep.sessionID()&0x80000000)==0))
 					cout << "### For session id " << csep.sessionID() << ", got a CSEP" << endl;
@@ -1060,10 +1068,14 @@ new_plan:
 					qts.session_id = csep.sessionID();
 					qts.query_type = csep.queryType();
 					qts.query = csep.data();
+					qts.system_name = fOamCachePtr->getSystemName();
+					qts.module_name = fOamCachePtr->getModuleName();
+					qts.local_query = csep.localQuery();
 					//qts.user =
 					//qts.host =
 					//qts.priority =
-					fTeleClient.postQueryTele(qts);
+					if ((csep.sessionID()&0x80000000) == 0)
+						fTeleClient.postQueryTele(qts);
 				}
 
 			}

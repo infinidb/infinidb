@@ -26,6 +26,8 @@
 #include <iostream>
 #include <sstream>
 #include <fstream>
+#include <vector>
+#include <string>
 using namespace std;
 
 #include <boost/thread.hpp>
@@ -550,6 +552,50 @@ time_t Config::getCurrentMTime()
 		return statbuf.st_mtime;
 	else
 		return 0;
+}
+
+const vector<string> Config::enumConfig()
+{
+	mutex::scoped_lock lk(fLock);
+
+	if (fDoc == 0){
+		throw runtime_error("Config::getConfig: no XML document!");
+	}
+
+	struct stat statbuf;
+	if (stat(fConfigFile.c_str(), &statbuf) == 0)
+	{
+		if (statbuf.st_mtime != fMtime)
+		{
+			closeConfig();
+			fMtime = statbuf.st_mtime;
+			parseDoc();
+		}
+	}
+
+	return fParser.enumConfig(fDoc);
+}
+
+const vector<string> Config::enumSection(const string& section)
+{
+	mutex::scoped_lock lk(fLock);
+
+	if (fDoc == 0){
+		throw runtime_error("Config::getConfig: no XML document!");
+	}
+
+	struct stat statbuf;
+	if (stat(fConfigFile.c_str(), &statbuf) == 0)
+	{
+		if (statbuf.st_mtime != fMtime)
+		{
+			closeConfig();
+			fMtime = statbuf.st_mtime;
+			parseDoc();
+		}
+	}
+
+	return fParser.enumSection(fDoc, section);
 }
 
 } //namespace config

@@ -4071,7 +4071,7 @@ void TupleAggregateStep::aggregateRowGroups()
 
 	fDoneAggregate = true;
 
-	while (more) 
+	while (more)
 		more = dlIn->next(fInputIter, &rgData);
 
 	if (traceOn())
@@ -4090,13 +4090,12 @@ void TupleAggregateStep::threadedAggregateRowGroups(uint32_t threadID)
 	scoped_array<shared_array<uint8_t> > distRowData;
 	uint32_t bucketID;
 	scoped_array<bool> bucketDone(new bool[fNumOfBuckets]);
-	vector<utils::TupleHasher*> hashs;
 	vector<uint32_t> hashLens;
 	bool locked = false;
 	bool more = true;
 	RowGroupDL *dlIn = NULL;
 	bool caughtException = false;
-	
+
 	RowAggregationMultiDistinct *multiDist = NULL;
 
 	if (!fDoneAggregate)

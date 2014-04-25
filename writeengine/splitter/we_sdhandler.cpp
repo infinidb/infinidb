@@ -422,11 +422,26 @@ void WESDHandler::setup()
 	bool bForce;
 	aPid << getpid();
 	std::string aTimeStamp = getTime2Str();
-	std::string aLogName = fRef.fCmdArgs.getBulkRootDir()+"/log/"+
+	std::string aLogName;	
+	std::string aErrLogName;
+	if(fRef.fCmdArgs.isJobLogOnly())
+        aLogName = fRef.fCmdArgs.getBulkRootDir()+"/log/"+
+							"cpimport_Job_"+fRef.fCmdArgs.getJobId()+".log";
+	else
+        aLogName = fRef.fCmdArgs.getBulkRootDir()+"/log/"+
 							"cpimport_"+aTimeStamp+"_"+aPid.str()+".log";
+
+
 	if(getDebugLvl()>1) cout <<"LogName : " << aLogName << endl;
-	std::string aErrLogName = fRef.fCmdArgs.getBulkRootDir()+"/log/"+
+
+	if(fRef.fCmdArgs.isJobLogOnly())
+        aErrLogName = fRef.fCmdArgs.getBulkRootDir()+"/log/"+
+							"cpimport_Job_"+fRef.fCmdArgs.getJobId()+".err";
+    else
+        aErrLogName = fRef.fCmdArgs.getBulkRootDir()+"/log/"+
 							"cpimport_"+aTimeStamp+"_"+aPid.str()+".err";
+
+
 	if(getDebugLvl()>1) cout <<"ErrLogName : " << aErrLogName << endl;
 	// consoleFlag false will only output only MSGLOG_LVL1 to console
 	// and MSGLOG_LVL2 to log file without writing to console.
@@ -1171,9 +1186,15 @@ void WESDHandler::onBrmReport(int PmId, messageqcpp::SBS& Sbs) {
 	std::string aBadFileName;
 	std::string aErrFileName;
 	std::string aColName;
+
+    if (getDebugLvl()>2)
+        cout <<"BRM Report length : "<< (*Sbs).length() << endl;
 	while ((*Sbs).length() > 0)
 	{
 		(*Sbs) >> aStr;
+
+        if (getDebugLvl() > 2)
+            cout <<"BRM Report value : "<< aStr << endl;
 
 		bool aRet = WEBrmUpdater::prepareRowsInsertedInfo(aStr, aTotRows, aInsRows);
 		if (aRet)

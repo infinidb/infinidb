@@ -590,7 +590,7 @@ void addProjectStepsToBps(TableInfoMap::iterator& mit, BatchPrimitive* bps, JobI
 	JobStepVector psv = mit->second.fProjectSteps;             // columns being selected
 	psv.insert(psv.begin(), keySteps.begin(), keySteps.end()); // add joinkeys to project
 	psv.insert(psv.end(), expSteps.begin(), expSteps.end());   // add expressions to project
-	set<uint32_t> seenCols;                                        // columns already processed
+	set<uint32_t> seenCols;                                    // columns already processed
 
 	// for passthru conversion
 	// passthru is disabled (default lastTupleId to -1) unless the TupleBPS::bop is BOP_AND.
@@ -1052,6 +1052,7 @@ bool combineJobStepsByTable(TableInfoMap::iterator& mit, JobInfo& jobInfo)
 			thjs->setLargeSideBPS(tbps);
 			thjs->joinId(-1); // token join is a filter force it done before other joins
 			thjs->setJoinType(INNER);
+			thjs->tokenJoin(true);
 			tbps->incWaitToRunStepCnt();
 			SJSTEP spthjs(thjs);
 
@@ -1579,7 +1580,7 @@ bool joinInfoCompare(const SP_JoinInfo& a, const SP_JoinInfo& b)
 string joinTypeToString(const JoinType& joinType)
 {
 	string ret;
-    if (joinType & INNER)
+	if (joinType & INNER)
 		ret = "inner";
 	else if (joinType & LARGEOUTER)
 		ret = "largeOuter";
@@ -1642,7 +1643,12 @@ SP_JoinInfo joinToLargeTable(uint32_t large, TableInfoMap& tableInfoMap,
 		}
 
 		size_t dcf = 0; // for dictionary column filters, 0 if thjs is null.
-		if (thjs) dcf = thjs->getLargeKeys().size();
+		RowGroup largeSideRG = tableInfoMap[large].fRowGroup;
+		if (thjs && thjs->tokenJoin())
+		{
+			dcf = thjs->getLargeKeys().size();
+			largeSideRG = thjs->getLargeRowGroup();
+		}
 
 		// info for debug trace
 		vector<string> tableNames;
@@ -1677,7 +1683,7 @@ SP_JoinInfo joinToLargeTable(uint32_t large, TableInfoMap& tableInfoMap,
 			for (; k1 != keys1.end(); ++k1, ++k2)
 			{
 				smallIndices.push_back(getKeyIndex(*k1, info->fRowGroup));
-				largeIndices.push_back(getKeyIndex(*k2, tableInfoMap[large].fRowGroup));
+				largeIndices.push_back(getKeyIndex(*k2, largeSideRG));
 			}
 
 			smallKeyIndices.push_back(smallIndices);
@@ -1705,7 +1711,7 @@ SP_JoinInfo joinToLargeTable(uint32_t large, TableInfoMap& tableInfoMap,
 					CalpontSystemCatalog::OID oid2 = jobInfo.keyInfo->tupleKeyVec[*k2].fId;
 					CalpontSystemCatalog::TableColName tcn2 = jobInfo.csc->colName(oid2);
 					largeKey << "(" << tcn2.column << ":" << oid2 << ":" << *k2 << ")";
-					largeIndex << " " << getKeyIndex(*k2, tableInfoMap[large].fRowGroup);
+					largeIndex << " " << getKeyIndex(*k2, largeSideRG);
 				}
 
 				ostringstream oss;
@@ -1723,7 +1729,7 @@ SP_JoinInfo joinToLargeTable(uint32_t large, TableInfoMap& tableInfoMap,
 		if (jobInfo.trace)
 		{
 			ostringstream oss;
-			oss << "large side RG" << endl << tableInfoMap[large].fRowGroup.toString() << endl;
+			oss << "large side RG" << endl << largeSideRG.toString() << endl;
 			traces.push_back(oss.str());
 		}
 
@@ -2200,6 +2206,7 @@ void joinTablesInOrder(uint32_t largest, JobStepVector& joinSteps, TableInfoMap&
 			lastJoinId = joins[ns].fJoinId;
 			if (find(joinedTable.begin(), joinedTable.end(), small) == joinedTable.end())
 				joinedTable.push_back(small);
+			smallSideTid.insert(small);
 		}
 
 		joinedTable.push_back(large);
@@ -2216,6 +2223,9 @@ void joinTablesInOrder(uint32_t largest, JobStepVector& joinSteps, TableInfoMap&
 		}
 
 		size_t startPos = 0; // start point to add new smallsides
+		RowGroup largeSideRG = joinInfoMap[large]->fRowGroup;
+		if (thjs && thjs->tokenJoin())
+			largeSideRG = thjs->getLargeRowGroup();
 
 		// get info to config the TupleHashjoin
 		vector<string> traces;
@@ -2291,7 +2301,7 @@ void joinTablesInOrder(uint32_t largest, JobStepVector& joinSteps, TableInfoMap&
 			for (; k1 != keys1.end(); ++k1, ++k2)
 			{
 				smallIndices.push_back(getKeyIndex(*k1, info->fRowGroup));
-				largeIndices.push_back(getKeyIndex(*k2, joinInfoMap[large]->fRowGroup));
+				largeIndices.push_back(getKeyIndex(*k2, largeSideRG));
 			}
 
 			smallKeyIndices.push_back(smallIndices);
@@ -2319,7 +2329,7 @@ void joinTablesInOrder(uint32_t largest, JobStepVector& joinSteps, TableInfoMap&
 					CalpontSystemCatalog::OID oid2 = jobInfo.keyInfo->tupleKeyVec[*k2].fId;
 					CalpontSystemCatalog::TableColName tcn2 = jobInfo.csc->colName(oid2);
 					largeKey << "(" << tcn2.column << ":" << oid2 << ":" << *k2 << ")";
-					largeIndex << " " << getKeyIndex(*k2, joinInfoMap[large]->fRowGroup);
+					largeIndex << " " << getKeyIndex(*k2, largeSideRG);
 				}
 
 				ostringstream oss;
@@ -2337,7 +2347,7 @@ void joinTablesInOrder(uint32_t largest, JobStepVector& joinSteps, TableInfoMap&
 		if (jobInfo.trace)
 		{
 			ostringstream oss;
-			oss << "large side RG" << endl << joinInfoMap[large]->fRowGroup.toString() << endl;
+			oss << "large side RG" << endl << largeSideRG.toString() << endl;
 			traces.push_back(oss.str());
 		}
 
@@ -2976,7 +2986,6 @@ void associateTupleJobSteps(JobStepVector& querySteps, JobStepVector& projectSte
 		// Separate the expressions
 		else if (exps != NULL && subs == NULL)
 		{
-			const vector<CalpontSystemCatalog::OID>& oids = exps->oids();
 			const vector<uint32_t>& tables = exps->tableKeys();
 			const vector<uint32_t>& columns = exps->columnKeys();
 			bool  tableInOuterQuery = false;
@@ -3022,7 +3031,7 @@ void associateTupleJobSteps(JobStepVector& querySteps, JobStepVector& projectSte
 			{
 				// single table and not in join on clause
 				uint32_t tid = tables[0];
-				for (uint64_t i = 0; i < oids.size(); ++i)
+				for (uint64_t i = 0; i < columns.size(); ++i)
 					tableInfoMap[tid].fColsInExp1.push_back(columns[i]);
 
 				tableInfoMap[tid].fOneTableExpSteps.push_back(*it);
@@ -3032,14 +3041,14 @@ void associateTupleJobSteps(JobStepVector& querySteps, JobStepVector& projectSte
 				// WORKAROUND for limitation on join with filter
 				if (exps->associatedJoinId() != 0)
 				{
-					for (uint64_t i = 0; i < exps->oids().size(); ++i)
+					for (uint64_t i = 0; i < exps->columns().size(); ++i)
 					{
 						jobInfo.joinFeTableMap[exps->associatedJoinId()].insert(tables[i]);
 					}
 				}
 
 				// resolve after join: cross table or on clause conditions
-				for (uint64_t i = 0; i < oids.size(); ++i)
+				for (uint64_t i = 0; i < columns.size(); ++i)
 				{
 					uint32_t cid = columns[i];
 					uint32_t tid = getTableKey(jobInfo, cid);

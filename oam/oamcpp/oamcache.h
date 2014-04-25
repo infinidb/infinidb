@@ -52,6 +52,8 @@ public:
 	EXPORT static OamCache * makeOamCache();
 	EXPORT std::string getOAMParentModuleName();
 	EXPORT int getLocalPMId();	// return the PM id of this machine.
+	EXPORT std::string getSystemName();
+	EXPORT std::string getModuleName();
 
 private:
 	OamCache();
@@ -67,6 +69,8 @@ private:
 	std::vector<int> moduleIds;
 	std::string OAMParentModuleName;
 	int mLocalPMId;	// The PM id running on this machine
+	std::string systemName;
+	std::string moduleName;
 };
 
 } /* namespace */

@@ -29,6 +29,7 @@
 
 #include <boost/thread/mutex.hpp>
 #include <boost/ptr_container/ptr_vector.hpp>
+#include <boost/uuid/uuid.hpp>
 
 #include "we_type.h"
 #include "we_colop.h"
@@ -45,6 +46,7 @@
 #include "messagelog.h"
 #include "brmtypes.h"
 #include "querytele.h"
+#include "oamcache.h"
 
 namespace WriteEngine
 {
@@ -152,6 +154,9 @@ private:
 
     ExtentStripeAlloc fExtentStrAlloc;  // Extent stripe allocator for this tbl
     querytele::QueryTeleClient fQtc;    // Query Tele client
+
+    oam::OamCache* fOamCachePtr;	// OamCache: ptr is copyable
+    boost::uuids::uuid fJobUUID;        // Job UUID
 
     //--------------------------------------------------------------------------
     // Private Functions
@@ -442,6 +447,8 @@ public:
      */
     void markTableComplete( );
 
+    void setJobUUID(const boost::uuids::uuid& jobUUID);
+
 public:
     friend class BulkLoad;
     friend struct ColumnInfo;
@@ -544,6 +551,9 @@ inline void TableInfo::setTableId(const int & id) {
 
 inline void TableInfo::setTruncationAsError(bool bTruncationAsError) {
     fbTruncationAsError = bTruncationAsError; }
+
+inline void TableInfo::setJobUUID(const boost::uuids::uuid& jobUUID) {
+    fJobUUID = jobUUID; }
 }
 #endif
 

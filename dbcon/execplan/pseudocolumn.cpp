@@ -23,8 +23,6 @@
 
 #include <iostream>
 #include <string>
-#include <exception>
-#include <stdexcept>
 #include <sstream>
 using namespace std;
 
@@ -34,16 +32,6 @@ using namespace std;
 using namespace messageqcpp;
 
 #include "objectreader.h"
-#include "calpontselectexecutionplan.h"
-
-#include "rowgroup.h"
-using namespace rowgroup;
-
-#include "joblisttypes.h"
-using namespace joblist;
-
-#include "dataconvert.h"
-
 #include "pseudocolumn.h"
 
 namespace execplan
@@ -155,19 +143,19 @@ const string PseudoColumn::toString() const
 
 	output << "SimpleColumn " << data() << endl;
 	output << "  s/t/c/v/o/ct/TA/CA/RA/#/card/join/source/engine: " << schemaName() << '/'
-							  << tableName() << '/'
-							  << columnName() << '/'
-							  << viewName() << '/'
-							  << oid() << '/'
-							  << colDataTypeToString(fResultType.colDataType) << '/'
-							  << tableAlias() << '/'
-							  << alias() << '/'
-							  << returnAll() << '/'
-							  << (int32_t)sequence() << '/'
-							  << cardinality() << '/'
-							  << joinInfo() << '/'
-							  << colSource() << '/'
-							  << (isInfiniDB()? "InfiniDB" : "ForeignEngine") << endl;
+	       << tableName() << '/'
+	       << columnName() << '/'
+	       << viewName() << '/'
+	       << oid() << '/'
+	       << colDataTypeToString(fResultType.colDataType) << '/'
+	       << tableAlias() << '/'
+	       << alias() << '/'
+	       << returnAll() << '/'
+	       << sequence() << '/'
+	       << cardinality() << '/'
+	       << joinInfo() << '/'
+	       << colSource() << '/'
+	       << (isInfiniDB()? "InfiniDB" : "ForeignEngine") << endl;
 
 	output << "Pseudotype=" << fPseudoType << endl;
 	return output.str();
@@ -246,185 +234,6 @@ uint32_t PseudoColumn::pseudoNameToType (string& name)
 		return PSEUDO_LOCALPM;
 	return PSEUDO_UNKNOWN;
 }
-
-/*bool SimpleColumn::sameColumn(const ReturnedColumn* rc) const
-{
-    // NOTE: Operations can still be merged on different table alias
-    const SimpleColumn *sc = dynamic_cast<const SimpleColumn*>(rc);
-    if (!sc) return false;
-    return (fSchemaName.compare(sc->schemaName()) == 0 &&
-            fTableName.compare(sc->tableName()) == 0 &&
-            fColumnName.compare(sc->columnName()) == 0 &&
-            fTableAlias.compare(sc->tableAlias()) == 0 &&
-            fViewName.compare(sc->viewName()) == 0 &&
-            fIsInfiniDB == sc->isInfiniDB());
-}*/
-
-// @todo move to inline
-/*
-void SimpleColumn::evaluate(Row& row, bool& isNull)
-{
-	bool isNull2 = row.isNullValue(fInputIndex);
-	if (isNull2) {
-		isNull = true;
-		return;
-	}
-
-	switch (fResultType.colDataType)
-	{
-		case CalpontSystemCatalog::DATE:
-		{
-			fResult.intVal = row.getUintField<4>(fInputIndex);
-			break;
-		}
-		case CalpontSystemCatalog::DATETIME:
-		{
-			fResult.intVal = row.getUintField<8>(fInputIndex);
-			break;
-		}
-		case CalpontSystemCatalog::CHAR:
-		case CalpontSystemCatalog::VARCHAR:
-		case CalpontSystemCatalog::STRINT:
-		{
-			switch (row.getColumnWidth(fInputIndex))
-			{
-				case 1:
-				{
-					fResult.origIntVal = row.getUintField<1>(fInputIndex);
-					break;
-				}
-				case 2:
-				{
-					fResult.origIntVal = row.getUintField<2>(fInputIndex);
-					break;
-				}
-				case 3:
-				case 4:
-				{
-					fResult.origIntVal = row.getUintField<4>(fInputIndex);
-					break;
-				}
-				case 5:
-				case 6:
-				case 7:
-				case 8:
-				{
-					fResult.origIntVal = row.getUintField<8>(fInputIndex);
-					break;
-				}
-				default:
-				{
-					fResult.strVal = row.getStringField(fInputIndex);
-					break;
-				}
-			}
-			if (fResultType.colDataType == CalpontSystemCatalog::STRINT)
-				fResult.intVal = uint64ToStr(fResult.origIntVal);
-			else
-				fResult.intVal = atoll((char*)&fResult.origIntVal);
-			break;
-		}
-		case CalpontSystemCatalog::BIGINT:
-		{
-			fResult.intVal = row.getIntField<8>(fInputIndex);
-			break;
-		}
-		case CalpontSystemCatalog::INT:
-		case CalpontSystemCatalog::MEDINT:
-		{
-			fResult.intVal = row.getIntField<4>(fInputIndex);
-			break;
-		}
-		case CalpontSystemCatalog::SMALLINT:
-		{
-			fResult.intVal = row.getIntField<2>(fInputIndex);
-			break;
-		}
-		case CalpontSystemCatalog::TINYINT:
-		{
-			fResult.intVal = row.getIntField<1>(fInputIndex);
-			break;
-		}
-		//In this case, we're trying to load a double output column with float data. This is the
-		// case when you do sum(floatcol), e.g.
-		case CalpontSystemCatalog::FLOAT:
-        case CalpontSystemCatalog::UFLOAT:
-		{
-			fResult.floatVal = row.getFloatField(fInputIndex);
-			break;
-		}
-		case CalpontSystemCatalog::DOUBLE:
-        case CalpontSystemCatalog::UDOUBLE:
-		{
-			fResult.doubleVal = row.getDoubleField(fInputIndex);
-			break;
-		}
-		case CalpontSystemCatalog::DECIMAL:
-        case CalpontSystemCatalog::UDECIMAL:
-		{
-            switch (fResultType.colWidth)
-            {
-                case 1:
-                {
-                    fResult.decimalVal.value = row.getIntField<1>(fInputIndex);
-                    fResult.decimalVal.scale = (unsigned)fResultType.scale;
-                    break;
-                }
-                case 2:
-                {
-                    fResult.decimalVal.value = row.getIntField<2>(fInputIndex);
-                    fResult.decimalVal.scale = (unsigned)fResultType.scale;
-                    break;
-                }
-                case 4:
-                {
-                    fResult.decimalVal.value = row.getIntField<4>(fInputIndex);
-                    fResult.decimalVal.scale = (unsigned)fResultType.scale;
-                    break;
-                }
-                default:
-                {
-                    fResult.decimalVal.value = (int64_t)row.getUintField<8>(fInputIndex);
-                    fResult.decimalVal.scale = (unsigned)fResultType.scale;
-                    break;
-                }
-            }
-			break;
-		}
-		case CalpontSystemCatalog::VARBINARY:
-		{
-			fResult.strVal = row.getVarBinaryStringField(fInputIndex);
-			break;
-		}
-        case CalpontSystemCatalog::UBIGINT:
-        {
-            fResult.uintVal = row.getUintField<8>(fInputIndex);
-            break;
-        }
-        case CalpontSystemCatalog::UINT:
-        case CalpontSystemCatalog::UMEDINT:
-        {
-            fResult.uintVal = row.getUintField<4>(fInputIndex);
-            break;
-        }
-        case CalpontSystemCatalog::USMALLINT:
-        {
-            fResult.uintVal = row.getUintField<2>(fInputIndex);
-            break;
-        }
-        case CalpontSystemCatalog::UTINYINT:
-        {
-            fResult.uintVal = row.getUintField<1>(fInputIndex);
-            break;
-        }
-		default:	// treat as int64
-		{
-			fResult.intVal = row.getUintField<8>(fInputIndex);
-			break;
-		}
-	}
-}
-*/
 
 void PseudoColumn::adjustResultType()
 {

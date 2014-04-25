@@ -1868,7 +1868,7 @@ try
         bool flowControlOn;
 		fDec->read_some(uniqueID, fNumThreads, bsv, &flowControlOn);
 		size = bsv.size();
-        if ((flowControlOn) && fNumThreads < fMaxNumThreads)
+        if ((size > 5 || flowControlOn) && fNumThreads < fMaxNumThreads)
             startAggregationThread();
 
 		for (uint32_t z = 0; z < size; z++) {
@@ -2104,7 +2104,7 @@ try
 				sts.units_of_work_completed = msgsRecvd;
 				if (sts.total_units_of_work > 0)
 				{
-					if ((sts.units_of_work_completed*100/sts.total_units_of_work) % 10 == 0)
+					if ((fOid >= 3000) && ((sts.units_of_work_completed*100/sts.total_units_of_work) % 10 == 0))
 						fQtc.postStepTele(sts);
 				}
 			}
@@ -2336,9 +2336,10 @@ out:
 		sts.msg_bytes_out = fMsgBytesOut;
 		sts.rows = ridsReturned;
 		sts.end_time = QueryTeleClient::timeNowms();;
-		fQtc.postStepTele(sts);
+		if (fOid >= 3000)
+			fQtc.postStepTele(sts);
 
-		if (ffirstStepType == SCAN && bop == BOP_AND)
+		if (ffirstStepType == SCAN && bop == BOP_AND && !cancelled())
 		{
 			cpMutex.lock();
  			lbidList->UpdateAllPartitionInfo();

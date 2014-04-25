@@ -50,6 +50,8 @@ using namespace boost;
 #include "querytele.h"
 using namespace querytele;
 
+#include "oamcache.h"
+
 namespace
 {
     const std::string  BAD_FILE_SUFFIX = ".bad"; // Reject data file suffix
@@ -115,7 +117,8 @@ TableInfo::TableInfo(Log* logger, const BRM::TxnID txnID,
     fTableLockID(0),
     fRejectDataCnt(0),
     fRejectErrCnt(0),
-    fExtentStrAlloc(tableOID, logger)
+    fExtentStrAlloc(tableOID, logger),
+    fOamCachePtr(oam::OamCache::makeOamCache())
 {
     fBuffers.clear();
     fColumns.clear();
@@ -229,6 +232,8 @@ int  TableInfo::readTableData( )
     RID totalRowsPerInputFile = 0;
     int filesTBProcessed = fLoadFileList.size();
     int fileCounter = 0;
+    unsigned long long qtSentAt = 0;
+
     if(fHandle == NULL) {
 
         fFileName = fLoadFileList[fileCounter]; 
@@ -251,11 +256,14 @@ int  TableInfo::readTableData( )
     fProcessingBegun = true;
 
     ImportTeleStats its;
+    its.job_uuid = fJobUUID;
     its.import_uuid = QueryTeleClient::genUUID();
     its.msg_type = ImportTeleStats::IT_START;
     its.start_time = QueryTeleClient::timeNowms();
     its.table_list.push_back(fTableName);
     its.rows_so_far.push_back(0);
+    its.system_name = fOamCachePtr->getSystemName();
+    its.module_name = fOamCachePtr->getModuleName();
     fQtc.postImportTele(its);
 
     //
@@ -388,7 +396,13 @@ int  TableInfo::readTableData( )
         its.msg_type = ImportTeleStats::IT_PROGRESS;
         its.rows_so_far.pop_back();
         its.rows_so_far.push_back(totalRowsPerInputFile);
-        fQtc.postImportTele(its);
+	unsigned long long thisRows = static_cast<unsigned long long>(totalRowsPerInputFile);
+	thisRows /= 1000000;
+	if (thisRows > qtSentAt)
+	{
+		fQtc.postImportTele(its);
+		qtSentAt = thisRows;
+	}
 
         // Check if there were any errors in the read data.
         // if yes, copy it to the error list.

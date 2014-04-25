@@ -69,9 +69,6 @@ struct RowPosition
 	inline RowPosition() { }
 };
 
-//typedef std::tr1::unordered_map<uint8_t*, uint8_t*, utils::TupleHasher, utils::TupleComparator,
-//            utils::STLPoolAllocator<std::pair<uint8_t* const, uint8_t*> > > RowAggMap_t;
-
 /** @brief Enumerates aggregate functions supported by RowAggregation
  */
 enum RowAggFunctionType
@@ -532,7 +529,7 @@ class RowAggregation : public messageqcpp::Serializeable
 
 		boost::scoped_ptr<AggHasher> fHasher;
 		boost::scoped_ptr<AggComparator> fEq;
-		
+
 		//TODO: try to get rid of these friend decl's.  AggHasher & Comparator
 		//need access to rowgroup storage holding the rows to hash & ==.
 		friend class AggHasher;

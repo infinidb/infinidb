@@ -540,7 +540,8 @@ void pDictionaryScan::receivePrimitiveMessages()
 	sts.msg_type = StepTeleStats::ST_START;
 	sts.start_time = QueryTeleClient::timeNowms();
 	sts.total_units_of_work = msgsSent;
-	fQtc.postStepTele(sts);
+	if (fOid >= 3000)
+		fQtc.postStepTele(sts);
 
 	uint16_t error = status();
 	//...Be careful here.  Mutex is locked prior to entering the loop, so
@@ -631,7 +632,8 @@ void pDictionaryScan::receivePrimitiveMessages()
 				sts.msg_type = StepTeleStats::ST_PROGRESS;
 				sts.total_units_of_work = msgsSent;
 				sts.units_of_work_completed = msgsRecvd;
-				fQtc.postStepTele(sts);
+				if (fOid >= 3000)
+					fQtc.postStepTele(sts);
 
 				//...If producer is waiting, and we have gone below our threshold value,
 				//...then we signal the producer to request more data from primproc
@@ -767,7 +769,8 @@ void pDictionaryScan::receivePrimitiveMessages()
 	sts.msg_bytes_out = fMsgBytesOut;
 	sts.rows = fRidResults;
 	sts.end_time = QueryTeleClient::timeNowms();
-	fQtc.postStepTele(sts);
+	if (fOid >= 3000)
+		fQtc.postStepTele(sts);
 
 	rgFifo->endOfInput();
 }

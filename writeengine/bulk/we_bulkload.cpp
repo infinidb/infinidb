@@ -36,6 +36,9 @@
 #include <sstream>
 #include <boost/filesystem/path.hpp>
 #include <boost/filesystem/convenience.hpp>
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_generators.hpp>
+
 #include "we_bulkstatus.h"
 #include "we_rbmetawriter.h"
 #include "we_colopbulk.h"
@@ -146,7 +149,8 @@ BulkLoad::BulkLoad() :
     fbTruncationAsError(false),
     fImportDataMode(IMPORT_DATA_TEXT),
     fbContinue(false),
-    fDisableTimeOut(false)
+    fDisableTimeOut(false),
+    fUUID(boost::uuids::nil_generator()())
 {
     fTableInfo.clear();
     setDebugLevel( DEBUG_0 );
@@ -454,6 +458,7 @@ int BulkLoad::preProcess( Job& job, int tableNo,
     tableInfo->setEnclosedByChar(fEnclosedByChar);
     tableInfo->setEscapeChar(fEscapeChar);
     tableInfo->setImportDataMode(fImportDataMode);
+    tableInfo->setJobUUID(fUUID);
 
     if (fMaxErrors != -1)
         tableInfo->setMaxErrorRows(fMaxErrors);
@@ -1516,6 +1521,25 @@ bool BulkLoad::addErrorMsg2BrmUpdater(const std::string& tablename, const ostrin
 	return false;
 }
 
+//------------------------------------------------------------------------------
+// DESCRIPTION:
+//    Set job UUID. Used by Query Telemetry to identify a unique import
+//    job across PMs
+// PARAMETERS:
+//    jobUUID - the job UUID
+// RETURN:
+//    void
+//------------------------------------------------------------------------------
+void BulkLoad::setJobUUID(const std::string& jobUUID)
+{
+	fUUID = boost::uuids::string_generator()(jobUUID);
+}
+
+void BulkLoad::setDefaultJobUUID()
+{
+	if (fUUID.is_nil())
+		fUUID = boost::uuids::random_generator()();
+}
 
 } //end of namespace
 

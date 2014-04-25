@@ -211,7 +211,6 @@ if { $INSTALLTYPE == "initial"} {
 										exit 1 }
 		"Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit 1 }
 		"closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
-		"No such file or directory"   { send_user "ERROR: file not found\n" ; exit 1 }
 		"needs"    { send_user "ERROR: disk space issue\n" ; exit 1 }
 		"conflicts"	   { send_user "ERROR: File Conflict issue\n" ; exit 1 }
 	}
@@ -237,7 +236,6 @@ if { $INSTALLTYPE == "initial"} {
 											exit 1 }
 			"Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit 1 }
 			"closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
-			"No such file or directory"   { send_user "ERROR: file not found\n" ; exit 1 }
 			"conflicts"	   { send_user "ERROR: File Conflict issue\n" ; exit 1 }
 		}
 	}
@@ -381,7 +379,6 @@ if { $INSTALLTYPE == "initial"} {
 		"Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit 1 }
 		"FAILED"   								{ send_user "ERROR: missing OS file\n" ; exit 1 }
 		"closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
-		"No such file or directory"   { send_user "ERROR: file not found\n" ; exit 1 }
 	}
 	send_user "\n"
 }
@@ -409,7 +406,6 @@ expect {
 	timeout { send_user "DONE" } 
 	"not working" { send_user "WARNING: InfiniDB system logging functionality not working" }
 	"closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
-	"No such file or directory"   { send_user "ERROR: file not found\n" ; exit 1 }
 }
 send_user "\n"
 

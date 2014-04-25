@@ -284,9 +284,10 @@ void parseCmdLineArgs(
     int         option;
     bool        bImportFileArg   = false;
     BulkModeType bulkMode = BULK_MODE_LOCAL;
+    std::string jobUUID;
 
     while( (option=getopt(
-        argc,argv,"b:c:d:e:f:hij:kl:m:n:p:r:w:s:B:C:E:I:P:R:SX:D")) != EOF )
+        argc,argv,"b:c:d:e:f:hij:kl:m:n:p:r:s:u:w:B:C:DE:I:P:R:SX:")) != EOF )
     {
         switch(option)
         {
@@ -488,6 +489,13 @@ void parseCmdLineArgs(
                 break;
             }
 
+            case 'u':                                // -u: import job UUID
+            {
+                jobUUID = optarg;
+                curJob.setJobUUID(jobUUID);
+                break;
+            }
+
             case 'w':                                // -w: num parse threads
             {
                 errno = 0;
@@ -596,6 +604,8 @@ void parseCmdLineArgs(
             }
         }
     }
+
+    curJob.setDefaultJobUUID();
 
     // Inconsistent to specify -f STDIN with -l importFile
     if ((bImportFileArg) && (importPath == "STDIN"))

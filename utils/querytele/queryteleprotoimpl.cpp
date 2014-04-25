@@ -69,89 +69,84 @@ void TeleConsumer()
 	boost::mutex::scoped_lock stlk(stQueue.queueMtx, boost::defer_lock);
 	querytele::QueryTeleServiceClient client(fProtocol);
 
-	for (;;)
-	{
-		didSomeWork=false;
-
-		itlk.lock();
-		// Empty the import queue first...
-		while (!itQueue.queue.empty())
+	try {
+		for (;;)
 		{
-			querytele::ImportTele itdata = itQueue.queue.front();
-			itQueue.queue.pop();
-			itlk.unlock();
-			try {
-				fTransport->open();
+			didSomeWork=false;
 
-				try {
-					client.postImport(itdata);
-				} catch (...) {
-					fTransport->close();
-				}
-
-				fTransport->close();
-
-			} catch (...) {
-			}
-			didSomeWork = true;
 			itlk.lock();
-		}
-		itlk.unlock();
-
-		qtlk.lock();
-		// Now empty the query queue...
-		while (!qtQueue.queue.empty())
-		{
-			querytele::QueryTele qtdata = qtQueue.queue.front();
-			qtQueue.queue.pop();
-			qtlk.unlock();
-			try {
-				fTransport->open();
-
+			// Empty the import queue first...
+			while (!itQueue.queue.empty())
+			{
+				querytele::ImportTele itdata = itQueue.queue.front();
+				itQueue.queue.pop();
+				itlk.unlock();
 				try {
-					client.postQuery(qtdata);
-				} catch (...) {
+					fTransport->open();
+					client.postImport(itdata);
 					fTransport->close();
+				} catch (...) {
+					try {
+						fTransport->close();
+					} catch (...) {
+					}
 				}
-
-				fTransport->close();
-
-			} catch (...) {
+				didSomeWork = true;
+				itlk.lock();
 			}
-			didSomeWork = true;
+			itlk.unlock();
+
 			qtlk.lock();
-		}
-		qtlk.unlock();
-
-		stlk.lock();
-		// Finally empty the step queue...
-		while (!stQueue.queue.empty())
-		{
-			querytele::StepTele stdata = stQueue.queue.front();
-			stQueue.queue.pop();
-			stlk.unlock();
-			try {
-				fTransport->open();
-
+			// Now empty the query queue...
+			while (!qtQueue.queue.empty())
+			{
+				querytele::QueryTele qtdata = qtQueue.queue.front();
+				qtQueue.queue.pop();
+				qtlk.unlock();
 				try {
-					client.postStep(stdata);
-				} catch (...) {
+					fTransport->open();
+					client.postQuery(qtdata);
 					fTransport->close();
+				} catch (...) {
+					try {
+						fTransport->close();
+					} catch (...) {
+					}
 				}
-
-				fTransport->close();
-
-			} catch (...) {
+				didSomeWork = true;
+				qtlk.lock();
 			}
-			didSomeWork = true;
-			stlk.lock();
-		}
-		stlk.unlock();
+			qtlk.unlock();
 
-		if (!didSomeWork)
-		{
-			usleep(100000);
+			stlk.lock();
+			// Finally empty the step queue...
+			while (!stQueue.queue.empty())
+			{
+				querytele::StepTele stdata = stQueue.queue.front();
+				stQueue.queue.pop();
+				stlk.unlock();
+				try {
+					fTransport->open();
+					client.postStep(stdata);
+					fTransport->close();
+				} catch (...) {
+					try {
+						fTransport->close();
+					} catch (...) {
+					}
+				}
+				didSomeWork = true;
+				stlk.lock();
+			}
+			stlk.unlock();
+
+			if (!didSomeWork)
+			{
+				usleep(100000);
+			}
 		}
+	} catch (...) {
+		//we're probably shutting down, just let this thread die quietly...
 	}
 }
 

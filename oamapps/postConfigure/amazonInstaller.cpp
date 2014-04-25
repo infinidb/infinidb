@@ -145,6 +145,9 @@ string VPCStartPrivateIP = oam::UnassignedName;
 string localQuery = "n";
 string MySQLRep = "n";
 
+bool noPrompting;
+string mysqlpw = " ";
+
 bool PMEBS = true;
 
 int main(int argc, char *argv[])

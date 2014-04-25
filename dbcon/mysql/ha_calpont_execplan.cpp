@@ -2694,9 +2694,9 @@ ConstantColumn* buildDecimalColumn(Item *item, gp_walk_info &gwi)
 	infinidb_decimal.value = strtoll(infinidb_decimal_val.str().c_str(), 0, 10);
 
 	if (gwi.internalDecimalScale >= 0 && idp->decimals > gwi.internalDecimalScale)
-  {
-  	infinidb_decimal.scale = gwi.internalDecimalScale;
-  	double val = (double)(infinidb_decimal.value / pow((double)10, idp->decimals - gwi.internalDecimalScale));
+	{
+		infinidb_decimal.scale = gwi.internalDecimalScale;
+		double val = (double)(infinidb_decimal.value / pow((double)10, idp->decimals - gwi.internalDecimalScale));
 		infinidb_decimal.value = (int64_t)(val > 0 ? val + 0.5 : val - 0.5);
 	}
 	else
@@ -2713,8 +2713,14 @@ SimpleColumn* buildSimpleColumn(Item_field* ifp, gp_walk_info& gwi)
 		gwi.csc->identity(CalpontSystemCatalog::FE);
 	}
 
+	bool isInformationSchema = false;
+
+	// @bug5523
+	if (ifp->cached_table && strcmp(ifp->cached_table->db, "information_schema") == 0)
+		isInformationSchema = true;
+
 	// support FRPM subquery. columns from the derived table has no definition
-	if (!ifp->field || !ifp->db_name || strlen(ifp->db_name) == 0)
+	if ((!ifp->field || !ifp->db_name || strlen(ifp->db_name) == 0) && !isInformationSchema)
 		return buildSimpleColFromDerivedTable(gwi, ifp);
 
 	CalpontSystemCatalog::ColType ct;
@@ -2804,6 +2810,12 @@ SimpleColumn* buildSimpleColumn(Item_field* ifp, gp_walk_info& gwi)
 	}
 	sc->resultType(ct);
 	string tbname(ifp->table_name);
+	if (isInformationSchema)
+	{
+		sc->schemaName("information_schema");
+		sc->tableName(tbname);
+	}
+
 	sc->tableAlias(lower(tbname));
 
 	// view name
@@ -2811,10 +2823,7 @@ SimpleColumn* buildSimpleColumn(Item_field* ifp, gp_walk_info& gwi)
 
 	sc->alias(ifp->name);
 	sc->isInfiniDB(infiniDB);
-	//SRCP srcp(sc);
-	//gwi.columnMap.insert(CalpontSelectExecutionPlan::ColumnMap::value_type(string(ifp->field_name), srcp));
-//	TABLE_LIST* tmp = (ifp->cached_table ? ifp->cached_table : 0);
-	//gwi.tableMap[make_aliastable(sc->schemaName(), sc->tableName(), sc->tableAlias(), sc->isInfiniDB())] = make_pair(1, tmp);
+
 	if (!infiniDB && ifp->field)
 		sc->oid(ifp->field->field_index + 1); // ExeMgr requires offset started from 1
 	return sc;
@@ -4077,9 +4086,15 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex, SCSEP& csep, bool i
 				if (infiniDB)
 					csc->columnRIDs(make_table(table_ptr->db, table_ptr->table_name), true);
 
-				CalpontSystemCatalog::TableAliasName tn = make_aliasview(table_ptr->db, table_ptr->table_name, table_ptr->alias, viewName, infiniDB);
+				string table_name = table_ptr->table_name;
+
+				// @bug5523
+				if (table_ptr->db && strcmp(table_ptr->db, "information_schema") == 0)
+					table_name = (table_ptr->schema_table_name ? table_ptr->schema_table_name : table_ptr->alias);
+
+				CalpontSystemCatalog::TableAliasName tn = make_aliasview(table_ptr->db, table_name, table_ptr->alias, viewName, infiniDB);
 				gwi.tbList.push_back(tn);
-				CalpontSystemCatalog::TableAliasName tan = make_aliastable(table_ptr->db, table_ptr->table_name, table_ptr->alias, infiniDB);
+				CalpontSystemCatalog::TableAliasName tan = make_aliastable(table_ptr->db, table_name, table_ptr->alias, infiniDB);
 				gwi.tableMap[tan] = make_pair(0,table_ptr);
 			}
 		}
@@ -4346,12 +4361,12 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex, SCSEP& csep, bool i
 
 	while ((item= it++))
 	{
-		string itemAlias;
-		if (item->type() == Item::REF_ITEM)
+		string itemAlias = (item->name? item->name : "");
+
+		// @bug 5916. Need to keep checking until getting concrete item in case
+		// of nested view.
+		while (item->type() == Item::REF_ITEM)
 		{
-			// MySQL is inconsistent on ref item alias. item->ref->->alias could be different from item->alias
-			if (item->name)
-				itemAlias = item->name;
 			Item_ref* ref = (Item_ref*)item;
 			item = (*(ref->ref));
 		}
@@ -5210,7 +5225,21 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex, SCSEP& csep, bool i
 						gwi.fatalParseError = true;
 					else
 						rc = buildReturnedColumn(ord_item, gwi, gwi.fatalParseError);
+
+					// @bug5501 try item_ptr if item can not be fixed. For some 
+					// weird dml statement state, item can not be fixed but the
+					// infomation is available in item_ptr.
 					if (!rc || gwi.fatalParseError)
+					{
+						Item* item_ptr = ordercol->item_ptr;
+						while (item_ptr->type() == Item::REF_ITEM)
+						{
+							item_ptr = *(((Item_ref*)item_ptr)->ref);
+						}
+						rc = buildReturnedColumn(item_ptr, gwi, gwi.fatalParseError);
+					}
+
+					if (!rc)
 					{
 						string emsg = IDBErrorInfo::instance()->errorMsg(ERR_NON_SUPPORT_ORDER_BY);
 						gwi.parseErrorText = emsg;

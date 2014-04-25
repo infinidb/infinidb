@@ -1371,7 +1371,7 @@ void processMSG(messageqcpp::IOSocket* cfIos)
 						//run save.brm script
 						processManager.saveBRM();
 
-						string cmd = "pdsh -a -x " + localHostName + " '/etc/init.d/infinidb stop' > /dev/null 2>&1";
+						string cmd = "pdsh -a -x " + localHostName + " '" + startup::StartUp::installDir() + "/infinidb stop' > /dev/null 2>&1";
 						system(cmd.c_str());
 
 						break;
@@ -5014,6 +5014,7 @@ int ProcessManager::addModule(oam::DeviceNetworkList devicenetworklist, std::str
 					log.writeLog(__LINE__, "addModule - ERROR: user_installer.sh failed", LOG_TYPE_ERROR);
 					pthread_mutex_unlock(&THREAD_LOCK);
 					system(" cp /tmp/user_installer.log /tmp/user_installer.log.failed");
+					processManager.setModuleState(remoteModuleName, oam::FAILED);
 					return API_FAILURE;
 				}
 			}
@@ -5021,7 +5022,10 @@ int ProcessManager::addModule(oam::DeviceNetworkList devicenetworklist, std::str
 			{	// do a binary package install
 				log.writeLog(__LINE__, "addModule - binary_installer run for " +  remoteModuleName, LOG_TYPE_DEBUG);
 
-				string cmd = installDir + "/bin/binary_installer.sh " + remoteModuleName + " " + remoteModuleIP + " " + password + " " + calpontPackage + " " + remoteModuleType + " initial " + oam.itoa(config.ServerInstallType()) + " 1 " + binaryInstallDir + " > /tmp/binary_installer.log";
+				string binservertype = oam.itoa(config.ServerInstallType());
+				if ( PMwithUM == "y" )
+					binservertype = "pmwithum";
+				string cmd = installDir + "/bin/binary_installer.sh " + remoteModuleName + " " + remoteModuleIP + " " + password + " " + calpontPackage + " " + remoteModuleType + " initial " +  binservertype + " 1 " + binaryInstallDir + " > /tmp/binary_installer.log";
 
 				log.writeLog(__LINE__, "addModule - " + cmd, LOG_TYPE_DEBUG);
 				rtnCode = system(cmd.c_str());
@@ -5029,6 +5033,7 @@ int ProcessManager::addModule(oam::DeviceNetworkList devicenetworklist, std::str
 					log.writeLog(__LINE__, "addModule - ERROR: binary_installer.sh failed", LOG_TYPE_ERROR);
 					system(" cp /tmp/binary_installer.log /tmp/binary_installer.log.failed");
 					pthread_mutex_unlock(&THREAD_LOCK);
+					processManager.setModuleState(remoteModuleName, oam::FAILED);
 					return API_FAILURE;
 				}
 			}
@@ -5046,6 +5051,7 @@ int ProcessManager::addModule(oam::DeviceNetworkList devicenetworklist, std::str
 						log.writeLog(__LINE__, "addModule - ERROR: performance_installer.sh failed", LOG_TYPE_ERROR);
 						system(" cp /tmp/performance_installer.log /tmp/performance_installer.log.failed");
 						pthread_mutex_unlock(&THREAD_LOCK);
+						processManager.setModuleState(remoteModuleName, oam::FAILED);
 						return API_FAILURE;
 					}
 				}
@@ -5053,7 +5059,11 @@ int ProcessManager::addModule(oam::DeviceNetworkList devicenetworklist, std::str
 				{	// do a binary package install
 					log.writeLog(__LINE__, "addModule - binary_installer run for " +  remoteModuleName, LOG_TYPE_DEBUG);
 
-					string cmd = installDir + "/bin/binary_installer.sh " + remoteModuleName + " " + remoteModuleIP + " " + password + " " + calpontPackage + " " + remoteModuleType + " initial " + oam.itoa(config.ServerInstallType()) + " 1 " + binaryInstallDir + " > /tmp/binary_installer.log";
+					string binservertype = oam.itoa(config.ServerInstallType());
+					if ( PMwithUM == "y" )
+						binservertype = "pmwithum";
+
+					string cmd = installDir + "/bin/binary_installer.sh " + remoteModuleName + " " + remoteModuleIP + " " + password + " " + calpontPackage + " " + remoteModuleType + " initial " + binservertype + " 1 " + binaryInstallDir + " > /tmp/binary_installer.log";
 					log.writeLog(__LINE__, "addModule - " + cmd, LOG_TYPE_DEBUG);
 
 					rtnCode = system(cmd.c_str());
@@ -5061,6 +5071,7 @@ int ProcessManager::addModule(oam::DeviceNetworkList devicenetworklist, std::str
 						log.writeLog(__LINE__, "addModule - ERROR: binary_installer.sh failed", LOG_TYPE_ERROR);
 						system(" cp /tmp/binary_installer.log /tmp/binary_installer.log.failed");
 						pthread_mutex_unlock(&THREAD_LOCK);
+						processManager.setModuleState(remoteModuleName, oam::FAILED);
 						return API_FAILURE;
 					}
 				}
@@ -5277,6 +5288,52 @@ int ProcessManager::removeModule(oam::DeviceNetworkList devicenetworklist, bool 
 						{
 							string tagValue = systemName + "-" + moduleName + "-terminated";
 							oam.createEC2tag( (*pt1).HostName, "Name", tagValue );
+						}
+
+						//check if any volumes need to be deleted
+						if ( moduleType == "um" )
+						{
+							string UMStorageType = "internal";
+							{
+								try{
+									oam.getSystemConfig("UMStorageType", UMStorageType);
+								}
+								catch(...) {}
+							}
+		
+							if ( UMStorageType == "external" )
+							{	//check if volume already assigned or need to create a new one
+								int moduleID = atoi(moduleName.substr(MAX_MODULE_TYPE_SIZE,MAX_MODULE_ID_SIZE).c_str());
+		
+								string volumeNameID = "UMVolumeName" + oam.itoa(moduleID);
+								string volumeName = oam::UnassignedName;
+								string deviceNameID = "UMVolumeDeviceName" + oam.itoa(moduleID);
+								string deviceName = oam::UnassignedName;
+								try {
+									oam.getSystemConfig( volumeNameID, volumeName);
+									oam.getSystemConfig( deviceNameID, deviceName);
+								}
+								catch(...)
+								{}
+							
+								if ( !volumeName.empty() || volumeName != oam::UnassignedName ) {
+									log.writeLog(__LINE__, "removeModule - detach / remove volume: " + volumeName + "/" + deviceName, LOG_TYPE_DEBUG);
+									oam.detachEC2Volume( volumeName );
+
+									oam.deleteEC2Volume( volumeName );
+							
+									try {
+										Config* sysConfig = Config::makeConfig();
+		
+										sysConfig->setConfig("Installation", volumeNameID, oam::UnassignedName);
+										sysConfig->setConfig("Installation", deviceNameID, oam::UnassignedName);
+		
+										sysConfig->write();
+									}
+									catch(...)
+									{}
+								}
+							}
 						}
 					}
 
@@ -7939,7 +7996,7 @@ int ProcessManager::getDBRMData(messageqcpp::IOSocket fIos, std::string moduleNa
 	}
 	else
 	{
-		log.writeLog(__LINE__, "getDBRMData: no DBRM current file found, must be initial install", LOG_TYPE_ERROR);
+		log.writeLog(__LINE__, "getDBRMData: no DBRM current file found, must be initial install", LOG_TYPE_DEBUG);
 
 		msg << "initial";
 		try {
@@ -7968,7 +8025,7 @@ int ProcessManager::getDBRMData(messageqcpp::IOSocket fIos, std::string moduleNa
 
 	ifstream file (fileName.c_str());
 	if (!file) {
-		log.writeLog(__LINE__, "getDBRMData: no DBRM files found, must be initial install", LOG_TYPE_ERROR);
+		log.writeLog(__LINE__, "getDBRMData: no DBRM files found, must be initial install", LOG_TYPE_DEBUG);
 
 		msg << "initial";
 		try {
@@ -8002,7 +8059,7 @@ int ProcessManager::getDBRMData(messageqcpp::IOSocket fIos, std::string moduleNa
 	file.close();
 
 	if ( dbrmFiles.size() < 1 ) {
-		log.writeLog(__LINE__, "getDBRMData: dbrmFiles size = 0, must be initial install", LOG_TYPE_ERROR);
+		log.writeLog(__LINE__, "getDBRMData: dbrmFiles size = 0, must be initial install", LOG_TYPE_DEBUG);
 
 		msg << "initial";
 		try {

@@ -1683,7 +1683,8 @@ int main(int argc, char *argv[])
 				}
 				else
 				{
-					if ( DataFilePlugin == "/usr/local/Calpont/lib/hdfs-20.so" )
+					string::size_type pos = DataFilePlugin.find("hdfs-20.so",0);
+					if (pos != string::npos)
 						DataFileEnvFile = "setenv-hdfs-20";
 					else
 						DataFileEnvFile = "setenv-hdfs-12";

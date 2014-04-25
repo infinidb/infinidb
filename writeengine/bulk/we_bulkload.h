@@ -46,6 +46,7 @@
 #include <boost/thread/mutex.hpp>
 #include <boost/bind.hpp>
 #include <boost/scoped_ptr.hpp>
+#include <boost/uuid/uuid.hpp>
 
 #if 0 //defined(_MSC_VER) && defined(WE_BULKLOAD_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
@@ -119,6 +120,7 @@ public:
     bool                getTruncationAsError ( ) const;
     BulkModeType        getBulkLoadMode      ( ) const;
     bool                getContinue          ( ) const;
+    boost::uuids::uuid  getJobUUID           ( ) const { return fUUID; }
 
     EXPORT int          setAlternateImportDir( const std::string& loadDir,
                                                std::string& errMsg);
@@ -141,6 +143,7 @@ public:
     void                setTxnID             ( BRM::TxnID txnID );
     void                setVbufReadSize      ( int vbufReadSize );
     void                setTruncationAsError ( bool bTruncationAsError );
+    void                setJobUUID           ( const std::string& jobUUID );
     // Timer functions
     void                startTimer           ( );
     void                stopTimer            ( );
@@ -150,7 +153,9 @@ public:
     bool                disableTimeOut       ( ) const;
 
 	// Add error message into appropriate BRM updater 
-	static bool 		addErrorMsg2BrmUpdater(const std::string& tablename, const std::ostringstream& oss);
+    static bool         addErrorMsg2BrmUpdater(const std::string& tablename, const std::ostringstream& oss);
+    void                setDefaultJobUUID     ( );
+
 private:
 
     //--------------------------------------------------------------------------
@@ -205,6 +210,7 @@ private:
     static const std::string   DIR_BULK_IMPORT;  // Bulk job import dir
     static const std::string   DIR_BULK_LOG;     // Bulk job log directory
     bool        fDisableTimeOut;           // disable timeout when waiting for table lock
+    boost::uuids::uuid fUUID;               // job UUID
 
     //--------------------------------------------------------------------------
     // Private Functions

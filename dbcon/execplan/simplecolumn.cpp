@@ -236,7 +236,7 @@ const string SimpleColumn::toString() const
 	       << tableAlias() << '/'
 	       << alias() << '/'
 	       << returnAll() << '/'
-	       << (int32_t)sequence() << '/'
+	       << sequence() << '/'
 	       << cardinality() << '/'
 	       << joinInfo() << '/'
 	       << colSource() << '/'

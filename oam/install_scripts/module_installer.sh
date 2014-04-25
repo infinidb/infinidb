@@ -107,7 +107,7 @@ fi
 
 plugin=`$INFINIDB_INSTALL_DIR/bin/getConfig SystemConfig DataFilePlugin`
 if [ -n "$plugin" ]; then
-	echo "Setup .bashrc on Module"
+	echo "Setup .bashrc on Module for local-query"
 
 	setenv=`$INFINIDB_INSTALL_DIR/bin/getConfig SystemConfig DataFileEnvFile`
 
@@ -118,7 +118,19 @@ if [ -n "$plugin" ]; then
 	echo " " >> ${bashFile}
 	echo "export JAVA_HOME=/usr/java/jdk1.6.0_31" >> ${bashFile}
 	echo "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/java/jdk1.6.0_31/jre/lib/amd64/server" >> ${bashFile}
-	echo ". ./$setenv" >> ${bashFile}
+	echo ". ~/$setenv" >> ${bashFile}
+fi
+
+if [ $user != "root" ]; then
+	echo "Setup .bashrc on Module for non-root"
+
+	eval userhome=~$user
+	bashFile=$userhome/.bashrc
+	touch ${bashFile}
+
+	echo " " >> ${bashFile}
+	echo "export INFINIDB_INSTALL_DIR=$INFINIDB_INSTALL_DIR" >> ${bashFile}
+	echo "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$INFINIDB_INSTALL_DIR/lib:$INFINIDB_INSTALL_DIR/mysql/lib/mysql" >> ${bashFile}
 fi
 
 # if mysqlrep is on and module has a my.cnf file, upgrade it

@@ -56,7 +56,8 @@ struct QueryTeleStats
 		error_no(0),
 		blocks_changed(0),
 		session_id(0),
-		priority_level(0)
+		priority_level(0),
+		local_query(0)
 	{ query_uuid = boost::uuids::nil_generator()(); }
 
 	~QueryTeleStats() { }
@@ -83,6 +84,9 @@ struct QueryTeleStats
 	std::string host;
 	std::string priority;
 	int32_t priority_level;
+	std::string system_name;
+	std::string module_name;
+	int32_t local_query;
 };
 
 struct StepTeleStats
@@ -165,14 +169,18 @@ struct ImportTeleStats
 		msg_type(IT_INVALID),
 		start_time(-1),
 		end_time(-1)
-	{ import_uuid = boost::uuids::nil_generator()(); }
+	{ job_uuid = boost::uuids::nil_generator()();
+	import_uuid = boost::uuids::nil_generator()(); }
 
+	boost::uuids::uuid job_uuid;
 	boost::uuids::uuid import_uuid;
 	ITType msg_type;
 	int64_t start_time;
 	int64_t end_time;
 	StringList table_list;
 	I64List rows_so_far;
+	std::string system_name;
+	std::string module_name;
 };
 
 }

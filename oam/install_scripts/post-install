@@ -167,11 +167,14 @@ if [ $user = "root" ]; then
 elif [ -z "$NO_NONROOT_SUDO" ]; then
 	sudo $installdir/bin/syslogSetup.sh --installdir=$installdir install > /tmp/syslog_install.log 2>&1
 	sudo chown $user:$user $installdir/etc/Calpont.xml
-	sudo chmod 777 /var
 	sudo chmod 777 /var/log
 	sudo chmod -R 777 /var/log/Calpont
 	sudo chmod 777 /dev/shm
 	sudo rm -f /var/lock/subsys/mysql-Calpont
+	sudo rm -f /tmp/StopCalpont
+
+	sed -i -e s@/usr/local/Calpont@$installdir@g $installdir/bin/infinidb.def
+	sudo $installdir/bin/infinidb.def /etc/default/infinidb
 fi
 
 #check if InfiniDB system logging was setup
@@ -211,9 +214,12 @@ fi
 test -f $installdir/post/functions && . $installdir/post/functions
 LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$installdir/lib $installdir/bin/cplogger -i 19 "***** InfiniDB Installed *****"
 
-#setup non-root
-if [ $installdir != "/usr/local/Calpont" -a $quiet -eq 0 ]; then
-	cat <<EOD
+#setup hadoop
+hadoop=`which hadoop 2>/dev/null`
+if [ -z $hadoop ]; then
+	#check for non-root user
+	if [ $installdir != "/usr/local/Calpont" -a $quiet -eq 0 ]; then
+cat <<EOD
 The next steps are:
 
 export INFINIDB_INSTALL_DIR=$installdir
@@ -221,50 +227,115 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$INFINIDB_INSTALL_DIR/lib:$INFINIDB_INST
 $INFINIDB_INSTALL_DIR/bin/postConfigure -i $INFINIDB_INSTALL_DIR
 
 EOD
-fi
+	else
+cat <<EOD
+The next step is:
 
-#setup hadoop
-hadoop=`which hadoop 2>/dev/null`
-if [ -z $hadoop ]; then 
+$INFINIDB_INSTALL_DIR/bin/postConfigure
+
+EOD
+	fi
         exit 0
 else
 	if [ -f $installdir/bin/setenv-hdfs-12 ]; then
-			cp $installdir/bin/setenv-hdfs-12 /root/.
+			cp $installdir/bin/setenv-hdfs-12 $userhome/.
+			chmod 777 $userhome/setenv-hdfs-12
 	fi
 	if [ -f $installdir/bin/setenv-hdfs-20 ]; then
-			cp $installdir/bin/setenv-hdfs-20 /root/.
+			cp $installdir/bin/setenv-hdfs-20 $userhome/.
+			chmod 777 $userhome/setenv-hdfs-20
 	fi
 
 	if [ -d /usr/java/jdk1.6.0_31 ]; then
 		export JAVA_HOME=/usr/java/jdk1.6.0_31
 		export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/java/jdk1.6.0_31/jre/lib/amd64/server
-		. /root/setenv-hdfs-20
+		. $userhome/setenv-hdfs-20
 		$installdir/bin/hdfsCheck $installdir/lib/hdfs-20.so > /tmp/hdfs-20-test.log 2>&1
 		if [ $? -eq 0 ]; then
-			cat <<EOD
-If you are intending to install InfiniDB over Hadoop, the next steps are:
+			#set in config file
+			$installdir/bin/setConfig -d SystemConfig DataFilePlugin $installdir/lib/hdfs-20.so
+			$installdir/bin/setConfig -d SystemConfig DataFileEnvFile setenv-hdfs-20
 
-export JAVA_HOME=/usr/java/jdk1.6.0_31
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/java/jdk1.6.0_31/jre/lib/amd64/server
-. /root/setenv-hdfs-20
-$INFINIDB_INSTALL_DIR/bin/postConfigure
-
-EOD
-		else
-			. /root/setenv-hdfs-12
-			$installdir/bin/hdfsCheck $installdir/lib/hdfs-12.so > /tmp/hdfs-12-test.log 2>&1
-			if [ $? -eq 0 ]; then
+			#check for non-root user
+			if [ $installdir != "/usr/local/Calpont" -a $quiet -eq 0 ]; then
 cat <<EOD
+
 If you are intending to install InfiniDB over Hadoop, the next steps are:
 
+export INFINIDB_INSTALL_DIR=$installdir
 export JAVA_HOME=/usr/java/jdk1.6.0_31
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/java/jdk1.6.0_31/jre/lib/amd64/server
-. /root/setenv-hdfs-12
-$INFINIDB_INSTALL_DIR/bin/postConfigure
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$INFINIDB_INSTALL_DIR/lib:$INFINIDB_INSTALL_DIR/mysql/lib/mysql:/usr/java/jdk1.6.0_31/jre/lib/amd64/server
+. $userhome/setenv-hdfs-20
+$INFINIDB_INSTALL_DIR/bin/postConfigure -i $INFINIDB_INSTALL_DIR
+
+If you are intending to install InfiniDB without Hadoop, the next steps are:
+
+export INFINIDB_INSTALL_DIR=$installdir
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$INFINIDB_INSTALL_DIR/lib:$INFINIDB_INSTALL_DIR/mysql/lib/mysql
+$INFINIDB_INSTALL_DIR/bin/postConfigure -i $INFINIDB_INSTALL_DIR
 
 EOD
 			else
 cat <<EOD
+
+If you are intending to install InfiniDB over Hadoop, the next steps are:
+
+export JAVA_HOME=/usr/java/jdk1.6.0_31
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/java/jdk1.6.0_31/jre/lib/amd64/server
+. $userhome/setenv-hdfs-20
+$INFINIDB_INSTALL_DIR/bin/postConfigure
+
+If you are intending to install InfiniDB without Hadoop, the next step is:
+
+$INFINIDB_INSTALL_DIR/bin/postConfigure
+
+EOD
+			fi
+		else
+			. $userhome/setenv-hdfs-12
+			$installdir/bin/hdfsCheck $installdir/lib/hdfs-12.so > /tmp/hdfs-12-test.log 2>&1
+			if [ $? -eq 0 ]; then
+				#set in config file
+				$installdir/bin/setConfig -d SystemConfig DataFilePlugin $installdir/lib/hdfs-12.so
+				$installdir/bin/setConfig -d SystemConfig DataFileEnvFile setenv-hdfs-12
+
+				if [ $installdir != "/usr/local/Calpont" -a $quiet -eq 0 ]; then
+cat <<EOD
+
+If you are intending to install InfiniDB over Hadoop, the next steps are:
+
+export INFINIDB_INSTALL_DIR=$installdir
+export JAVA_HOME=/usr/java/jdk1.6.0_31
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$INFINIDB_INSTALL_DIR/lib:$INFINIDB_INSTALL_DIR/mysql/lib/mysql:/usr/java/jdk1.6.0_31/jre/lib/amd64/server
+. $userhome/setenv-hdfs-12
+$INFINIDB_INSTALL_DIR/bin/postConfigure -i $INFINIDB_INSTALL_DIR
+
+If you are intending to install InfiniDB without Hadoop, the next steps are:
+
+export INFINIDB_INSTALL_DIR=$installdir
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$INFINIDB_INSTALL_DIR/lib:$INFINIDB_INSTALL_DIR/mysql/lib/mysql
+$INFINIDB_INSTALL_DIR/bin/postConfigure -i $INFINIDB_INSTALL_DIR
+
+EOD
+				else
+cat <<EOD
+
+If you are intending to install InfiniDB over Hadoop, the next steps are:
+
+export JAVA_HOME=/usr/java/jdk1.6.0_31
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/java/jdk1.6.0_31/jre/lib/amd64/server
+. $userhome/setenv-hdfs-12
+$INFINIDB_INSTALL_DIR/bin/postConfigure
+
+If you are intending to install InfiniDB without Hadoop, the next step is:
+
+$INFINIDB_INSTALL_DIR/bin/postConfigure
+
+EOD
+				fi
+			else
+cat <<EOD
+
 If you are intending to install InfiniDB over Hadoop, the Hadoop sanity check did not pass.  
 Most likely there is an environment setup conflict.
 Please Contact InfiniDB Customer Support.
@@ -273,6 +344,7 @@ EOD
 		fi
 	else
 cat <<EOD
+
 If you are intending to install InfiniDB over Hadoop, the required jdk was not found at '/usr/java/jdk1.6.0_31'.
 Please install the required version of Java and try again.
 EOD

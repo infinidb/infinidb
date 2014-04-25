@@ -80,6 +80,7 @@ TupleHashJoinStep::TupleHashJoinStep(const JobInfo& jobInfo) :
 	joinIsTooBig(false),
 	isExeMgr(jobInfo.isExeMgr),
 	lastSmallOuterJoiner(-1),
+	fTokenJoin(false),
 	fStatsMutexPtr(new boost::mutex())
 {
 	/* Need to figure out how much memory these use...
@@ -329,7 +330,8 @@ void TupleHashJoinStep::hjRunner()
 	sts.step_uuid = fStepUuid;
 	sts.msg_type = StepTeleStats::ST_START;
 	sts.start_time = QueryTeleClient::timeNowms();
-	fQtc.postStepTele(sts);
+	if (fTableOID1 >= 3000)
+		fQtc.postStepTele(sts);
 
 	idbassert(joinTypes.size() == smallDLs.size());
 	idbassert(joinTypes.size() == joiners.size());
@@ -472,7 +474,8 @@ void TupleHashJoinStep::hjRunner()
 
 	sts.msg_type = StepTeleStats::ST_SUMMARY;
 	sts.end_time = QueryTeleClient::timeNowms();
-	fQtc.postStepTele(sts);
+	if (fTableOID1 >= 3000)
+		fQtc.postStepTele(sts);
 
 }
 
@@ -966,6 +969,8 @@ void TupleHashJoinStep::joinRunnerFcn(uint32_t threadID)
 		joinedRowData.clear();
 		grabSomeWork(&inputData);
 	}
+	while (!inputData.empty())
+		grabSomeWork(&inputData);
 }
 
 void TupleHashJoinStep::makeDupList(const RowGroup &rg)

@@ -136,6 +136,7 @@
 4015	ERR_NOT_NULL_CONSTRAINTS	Column '%1%' cannot be null.
 4016	ERR_DML_DDL_SLAVE	DML and DDL statements for InfiniDB tables can only be run from the replication master.
 4017	ERR_DML_DDL_LOCAL	DML and DDL statements are not allowed when infinidb_local_query is greater than 0.
+4018	ERR_NON_SUPPORT_SYNTAX	The statement is not supported in InfiniDB.
 
 # UDF
 5001	ERR_FUNC_NON_IMPLEMENT	%1%:%2% is not implemented.

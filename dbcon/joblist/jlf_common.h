@@ -121,6 +121,8 @@ struct UniqId
 	       fId(i), fTable(t), fSchema(s), fView(v), fPseudo(pi), fSubId(l) {}
 	UniqId(const execplan::SimpleColumn* sc);
 	UniqId(int o, const execplan::SimpleColumn* sc);
+
+	std::string toString() const;
 };
 bool operator < (const struct UniqId& x, const struct UniqId& y);
 bool operator == (const struct UniqId& x, const struct UniqId& y);
@@ -306,6 +308,7 @@ struct JobInfo
 	int                    subId;         // id of current subquery
 	int                    pSubId;        // id of outer query
 	bool                   constantFalse; // has constant false filter
+	std::string            subAlias;      // unique alias to identify the subquery
 	JobStepVector          correlateSteps;
 	JobStepVector          selectAndFromSubs;
 	std::set<uint64_t>     returnColSet;

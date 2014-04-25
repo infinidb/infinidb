@@ -608,7 +608,7 @@ bool anyNullInTheColumn (string& schema, string& table, string& columnName, int 
 }
 
 int ProcessDDLStatement(string& ddlStatement, string& schema, const string& table, int sessionID,
-	 string& emsg, int compressionTypeIn = 0, bool isAnyAutoincreCol = false, int64_t nextvalue = 1, std::string autoiColName = "")
+	 string& emsg, int compressionTypeIn = 2, bool isAnyAutoincreCol = false, int64_t nextvalue = 1, std::string autoiColName = "")
 {
   SqlParser parser;
   THD *thd = current_thd;
@@ -1753,9 +1753,19 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 			}
 		}
 	}
-	else
+	//@Bug 5923 error out on unsupported statements.
+	else if (( typeid ( stmt ) != typeid ( DropTableStatement )) && ( typeid ( stmt ) != typeid ( TruncTableStatement ))
+		&& ( typeid ( stmt ) != typeid ( MarkPartitionStatement )) && ( typeid ( stmt ) != typeid ( RestorePartitionStatement )) 
+		&& ( typeid ( stmt ) != typeid ( DropPartitionStatement )))
 	{
+		rc = 1;
+		thd->main_da.can_overwrite_status = true;
+		thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_NON_SUPPORT_SYNTAX)).c_str());
+		ci->alterTableState = cal_connection_info::NOT_ALTER;
+		ci->isAlter = false;
+		return rc;	
 	}
+	
 	//@Bug 4387
 	scoped_ptr<DBRM> dbrmp(new DBRM());
 	int rc = dbrmp->isReadWrite();
@@ -2193,7 +2203,22 @@ long long calonlinealter(UDF_INIT* initid, UDF_ARGS* args,
 	if ( thd->db )
 		db = thd->db;
 
-	int rc = ProcessDDLStatement(stmt, db, "", tid2sid(thd->thread_id), emsg);
+	int compressiontype = thd->variables.infinidb_compression_type;
+
+	if (compressiontype == 1) compressiontype = 2;
+	
+	if ( compressiontype == MAX_INT )
+		compressiontype = thd->variables.infinidb_compression_type;
+
+	//hdfs
+	if ((compressiontype ==0) && (useHdfs))
+	{
+		compressiontype = 2;
+	}
+
+	if (compressiontype == 1) compressiontype = 2;
+	
+	int rc = ProcessDDLStatement(stmt, db, "", tid2sid(thd->thread_id), emsg, compressiontype);
 	if (rc != 0)
 		push_warning(thd, MYSQL_ERROR::WARN_LEVEL_ERROR, 9999, emsg.c_str());
 

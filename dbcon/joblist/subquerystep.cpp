@@ -141,6 +141,7 @@ SubAdapterStep::SubAdapterStep(SJSTEP& s, const JobInfo& jobInfo)
 	: JobStep(jobInfo)
 	, fTableOid(s->tableOid())
 	, fSubStep(s)
+	, fRowsInput(0)
 	, fRowsReturned(0)
 	, fEndOfResult(false)
 	, fInputIterator(0)
@@ -374,6 +375,8 @@ void SubAdapterStep::execute()
 			fRowGroupIn.getRow(0, &rowIn);
 			fRowGroupOut.getRow(0, &rowOut);
 
+			fRowsInput += fRowGroupIn.getRowCount();
+
 			for (uint64_t i = 0; i < fRowGroupIn.getRowCount(); ++i)
 			{
 				if(fExpression.get() == NULL)
@@ -493,6 +496,7 @@ void SubAdapterStep::printCalTrace()
 	timeString[strlen (timeString )-1] = '\0';
 	ostringstream logStr;
 	logStr  << "ses:" << fSessionId << " st: " << fStepId << " finished at "<< timeString
+			<< "; total rows input-" << fRowsInput
 			<< "; total rows returned-" << fRowsReturned << endl
 			<< "\t1st read " << dlTimes.FirstReadTimeString()
 			<< "; EOI " << dlTimes.EndOfInputTimeString() << "; runtime-"

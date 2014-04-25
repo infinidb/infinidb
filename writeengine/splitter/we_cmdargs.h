@@ -22,10 +22,12 @@
 #ifndef WE_CMDARGS_H_
 #define WE_CMDARGS_H_
 
+#include <set>
+
+#include <boost/uuid/uuid.hpp>
 
 #include "we_xmlgetter.h"
 #include "we_type.h"
-#include <set>
 
 namespace WriteEngine
 {
@@ -93,11 +95,11 @@ class WECmdArgs
 		void setTruncationAsError(bool bTruncationAsError)
 		{ fbTruncationAsError = bTruncationAsError;	}
 		bool isJobLogOnly() const { return fJobLogOnly; }
+		void setJobUUID(const boost::uuids::uuid& jobUUID) { fUUID = jobUUID; }
 
     private:	// variables for SplitterApp
         typedef std::vector<std::string> VecArgs;
         VecArgs fVecArgs;
-        const int MAXARG;
         typedef std::vector<unsigned int> VecInts;
         VecInts fPmVec;
 
@@ -165,6 +167,7 @@ class WECmdArgs
         bool fCpiInvoke;		// invoke cpimport in mode 3
         bool fBlockMode3;		// Do not allow Mode 3
         bool fbTruncationAsError; // Treat string truncation as error
+	boost::uuids::uuid fUUID;
 };
 //----------------------------------------------------------------------
 

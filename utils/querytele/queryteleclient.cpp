@@ -77,6 +77,9 @@ QueryTele qts2qt(const QueryTeleStats& qts)
 	QT_ASSIGN_(host);
 	QT_ASSIGN_(priority);
 	QT_ASSIGN_(priority_level);
+	QT_ASSIGN_(system_name);
+	QT_ASSIGN_(module_name);
+	QT_ASSIGN_(local_query);
 
 	return out;
 }
@@ -125,6 +128,7 @@ ImportTele its2it(const ImportTeleStats& its)
 {
 	ImportTele out;
 
+	out.job_uuid = bu::to_string(its.job_uuid);
 	out.import_uuid = bu::to_string(its.import_uuid);
 	switch (its.msg_type)
 	{
@@ -145,6 +149,8 @@ ImportTele its2it(const ImportTeleStats& its)
 	QT_ASSIGN_(end_time);
 	QT_ASSIGN_(table_list);
 	QT_ASSIGN_(rows_so_far);
+	QT_ASSIGN_(system_name);
+	QT_ASSIGN_(module_name);
 
 	return out;
 }

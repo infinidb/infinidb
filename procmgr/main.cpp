@@ -766,7 +766,8 @@ static void startMgrProcessThread()
 		processManager.setSystemState(oam::FAILED);
 		// exit thread
 		log.writeLog(__LINE__, "startMgrProcessThread Exit with a failure, not all ProcMons ACTIVE", LOG_TYPE_CRITICAL);
-		system("/etc/init.d/infinidb stop");
+		string cmd = startup::StartUp::installDir() + "/etc/init.d/infinidb stop";
+		system(cmd.c_str());
 		exit(1);
 	}
 	else

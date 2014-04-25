@@ -100,6 +100,9 @@ void QueryTeleServiceHandler::postQuery(const QueryTele& qt)
 	cout << "  et: (" << tt << ") ";
 	tt /= 1000;
 	cout << ctime(&tt);
+	cout << "  sn: " << qt.system_name << endl;
+	cout << "  mn: " << qt.module_name << endl;
+	cout << "  lq: " << qt.local_query << endl;
 	cout << endl;
 }
 
@@ -136,7 +139,8 @@ void QueryTeleServiceHandler::postStep(const StepTele& qt)
 void QueryTeleServiceHandler::postImport(const ImportTele& qt)
 {
 	cout << "importStep: " << endl;
-	cout << "  uuid: " << qt.import_uuid << endl;
+	cout << "  juuid: " << qt.job_uuid << endl;
+	cout << "  iuuid: " << qt.import_uuid << endl;
 	if (qt.msg_type == ITType::IT_SUMMARY)
 		cout << "  mt: SUMMARY" << endl;
 	else if (qt.msg_type == ITType::IT_START)
@@ -159,6 +163,8 @@ void QueryTeleServiceHandler::postImport(const ImportTele& qt)
 	cout << "  et: (" << tt << ") ";
 	tt /= 1000;
 	cout << ctime(&tt);
+	cout << "  sn: " << qt.system_name << endl;
+	cout << "  mn: " << qt.module_name << endl;
 	cout << endl;
 }
 

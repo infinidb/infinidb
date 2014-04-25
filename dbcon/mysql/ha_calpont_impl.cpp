@@ -2211,6 +2211,9 @@ int ha_calpont_impl_rnd_init(TABLE* table)
 	IDEBUG( cout << "rnd_init for table " << table->s->table_name.str << endl );
 	THD* thd = current_thd;
 
+	// prevent "create table as select" from running on slave
+	thd->infinidb_vtable.hasInfiniDBTable = true;
+
 	/* If this node is the slave, ignore DML to IDB tables */
 	if (thd->slave_thread && (
 	  thd->lex->sql_command == SQLCOM_INSERT ||
@@ -3132,6 +3135,9 @@ void ha_calpont_impl_start_bulk_insert(ha_rows rows, TABLE* table)
 	ci->rowsHaveInserted = 0; //reset this variable
 
 	if (ci->alterTableState > 0) return;
+
+	if (thd->infinidb_vtable.vtable_state != THD::INFINIDB_ALTER_VTABLE)
+		thd->infinidb_vtable.isInfiniDBDML = true;
 
 	if (thd->slave_thread) return;
 

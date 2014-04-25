@@ -15,17 +15,6 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-/*******************************************************************************
-* $Id$ 
-*
-*******************************************************************************/
-/*
-* we_dataloader.h
-*
-*  Created on: Oct 3, 2011
-*      Author: bpaul@calpont.com
-*/
-
 #include <unistd.h>
 #include <cstdlib>
 #include <cstdio>
@@ -41,6 +30,10 @@
 #include <cerrno>
 using namespace std;
 
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_generators.hpp>
+#include <boost/uuid/uuid_io.hpp>
+
 #include "liboamcpp.h"
 using namespace oam;
 
@@ -54,34 +47,34 @@ namespace WriteEngine
 //----------------------------------------------------------------------
 //----------------------------------------------------------------------
 WECmdArgs::WECmdArgs(int argc, char** argv) :
-		MAXARG(25)
+	fMultiTableCount(0),
+	fJobLogOnly(false),
+	fHelp(false),
+	fMode(1),
+	fArgMode(-1),
+	fQuiteMode(true),
+	fConsoleLog(false),
+	fVerbose(0),
+	fBatchQty(10000),
+	fNoOfReadThrds(0),
+	fDebugLvl(0),
+	fMaxErrors(-1),
+	fReadBufSize(0),
+	fIOReadBufSize(0),
+	fSetBufSize(0),
+	fColDelim('|'),
+	fEnclosedChar(0),
+	fEscChar(0),
+	fNoOfWriteThrds(0),
+	fNullStrMode(false),
+	fImportDataMode(IMPORT_DATA_TEXT),
+	fCpiInvoke(false),
+	fBlockMode3(false),
+	fbTruncationAsError(false),
+	fUUID(boost::uuids::nil_generator()())
 {
-	fMultiTableCount = 0;
-	fJobLogOnly = false;
-	fHelp = false;
-	fMode = 1; 				//default Mode
-	fArgMode = -1;
-	fQuiteMode = true;
-	fNoOfReadThrds = 0;
-	fNoOfWriteThrds = 0;
-	fMaxErrors = -1;
-	fReadBufSize = 0;
-	fBatchQty = 10000;		// default value
-	fIOReadBufSize = 0;
-	fConsoleLog = false;
-	fVerbose = 0;
-	fSetBufSize = 0;
-    fColDelim = '|';		// col delimiter
-    fEnclosedChar=0;		// enclosed by char
-    fEscChar = 0;			// esc char
-    fNullStrMode = false;
-	fImportDataMode = IMPORT_DATA_TEXT;
-    fDebugLvl = 0;
-    fCpiInvoke = false;		// by default don't invoke CPI
-    fBlockMode3 = false;	// to prevent blocking mode 3
-    fbTruncationAsError = false;
 
-	try
+    try
     {
 		appTestFunction();
 	    parseCmdLineArgs(argc, argv);
@@ -224,6 +217,9 @@ std::string WECmdArgs::getCpImportCmdLine()
 	else	// do not provide schema & table with JobId
 	{
 
+    if (!fUUID.is_nil())
+	    aSS << " -u" << boost::uuids::to_string(fUUID);
+
     if(fSchema.length()>0)
         aSS << " " << fSchema;
     //else if((fMode != 0)||(fMode==3))	//TODO make it mode3 + jobID
@@ -264,7 +260,6 @@ std::string WECmdArgs::getCpImportCmdLine()
     		aSS << " " << aLocFiles;
     	}
     }
-
 
     try
     {

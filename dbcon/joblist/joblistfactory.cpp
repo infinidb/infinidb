@@ -366,7 +366,7 @@ void checkHavingClause(CalpontSelectExecutionPlan* csep, JobInfo& jobInfo)
 		{
 			if (sc->schemaName().empty() && sc->oid() == 0)
 			{
-				if (sc->colPosition() == (uint64_t) -1)
+				if (sc->colPosition() == -1)
 				{
 					// from select subquery
 					SRCP ss = csep->returnedCols()[sc->orderPos()];
@@ -584,7 +584,7 @@ void checkGroupByCols(CalpontSelectExecutionPlan* csep, JobInfo& jobInfo)
 			bool selectSubquery = false;
 			if (sc && sc->schemaName().empty() && sc->oid() == 0)
 			{
-				if (sc->colPosition() == (uint64_t) -1)
+				if (sc->colPosition() == -1)
 				{
 					// from select subquery
 					// sc->orderPos() should NOT be -1 because it is a SELECT sub-query.

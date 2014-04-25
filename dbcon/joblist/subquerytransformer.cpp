@@ -126,6 +126,7 @@ SJSTEP& SubQueryTransformer::makeSubQueryStep(execplan::CalpontSelectExecutionPl
 			<< "_" << fOutJobInfo->subNum;
 		fVtable.alias(oss.str());
 	}
+	fSubJobInfo->subAlias = fVtable.alias(); //@bug5844, unique alias for sub 
 
 	// Make the jobsteps out of the execution plan.
 	JobStepVector querySteps;
@@ -350,7 +351,6 @@ void SubQueryTransformer::updateCorrelateInfo()
 		{
 			vector<ReturnedColumn*>& scList = es->columns();
 			vector<CalpontSystemCatalog::OID>& tableOids = es->tableOids();
-			vector<CalpontSystemCatalog::OID>& oids = es->oids();
 			vector<string>& aliases = es->aliases();
 			vector<string>& views = es->views();
 			vector<string>& schemas = es->schemas();
@@ -364,9 +364,8 @@ void SubQueryTransformer::updateCorrelateInfo()
 					if (subTables.find(tableKeys[j]) != subTables.end())
 					{
 						const map<UniqId, uint32_t>::const_iterator k =
-							subMap.find(UniqId(oids[j], aliases[j], schemas[j], views[j]));
+							subMap.find(UniqId(sc->oid(), aliases[j], schemas[j], views[j]));
 						if (k == subMap.end())
-							//throw CorrelateFailExcept();
 							throw IDBExcept(logging::ERR_NON_SUPPORT_SUB_QUERY_TYPE);
 
 						sc->schemaName("");
@@ -379,7 +378,6 @@ void SubQueryTransformer::updateCorrelateInfo()
 							ct, sc->oid(), *fOutJobInfo, fVtable.tableOid(), sc, fVtable.alias());
 
 						tableOids[j] = execplan::CNX_VTABLE_ID;
-						oids[j] = sc->oid();
 						aliases[j] = sc->tableAlias();
 						views[j] = sc->viewName();
 						schemas[j] = sc->schemaName();

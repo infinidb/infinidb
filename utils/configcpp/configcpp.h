@@ -172,6 +172,16 @@ public:
 	 */
 	EXPORT time_t getCurrentMTime();
 
+	/** @brief Enumerate all the sections in the config file
+	 *
+	 */
+	EXPORT const std::vector<std::string> enumConfig();
+
+	/** @brief Enumerate all the names in a section in the config file
+	 *
+	 */
+	EXPORT const std::vector<std::string> enumSection(const std::string& section);
+
 protected:
 	/** @brief parse the XML file
 	*
