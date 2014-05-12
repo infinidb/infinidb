@@ -43,6 +43,8 @@ libhdfs_12_la_SOURCES = \
 
 include_HEADERS = 
 
+bin_SCRIPTS = setenv-hdfs-12
+
 test:
 
 coverage:

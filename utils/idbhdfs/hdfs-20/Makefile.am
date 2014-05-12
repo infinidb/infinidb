@@ -28,10 +28,22 @@
 
 ## Process this file with automake to produce Makefile.in
 
-AM_CPPFLAGS = $(idb_common_includes) $(idb_cppflags)
+AM_CPPFLAGS = $(idb_common_includes) $(idb_cppflags) -DCDH4
 AM_CFLAGS = $(idb_cflags)
 AM_CXXFLAGS = $(idb_cxxflags)
 AM_LDFLAGS = -version-info 1:0:0 $(idb_ldflags)
+lib_LTLIBRARIES = libhdfs-20.la
+libhdfs_20_la_SOURCES = \
+../hdfs-shared/HdfsFile.cpp \
+../hdfs-shared/HdfsFileSystem.cpp \
+../hdfs-shared/HdfsFsCache.cpp	\
+../hdfs-shared/HdfsRdwrFileBuffer.cpp \
+../hdfs-shared/HdfsRdwrMemBuffer.cpp \
+../hdfs-shared/HdfsPlugin.cpp
+
+include_HEADERS = 
+
+bin_SCRIPTS = setenv-hdfs-20
 
 test:
 
