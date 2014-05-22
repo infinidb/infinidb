@@ -98,8 +98,6 @@ typedef struct Performance_Module_struct
 
 typedef std::vector<PerformanceModule> PerformanceModuleList;
 
-
-
 void snmpAppCheck();
 void offLineAppCheck();
 bool setOSFiles(string parentOAMModuleName, int serverTypeInstall);
@@ -112,7 +110,6 @@ bool makeModuleFile(string moduleName, string parentOAMModuleName);
 bool updateProcessConfig(int serverTypeInstall);
 bool uncommentCalpontXml( string entry);
 bool makeRClocal(string moduleType, string moduleName, int IserverTypeInstall);
-bool writeConfig(Config* sysConfig);
 bool createDbrootDirs(string DBRootStorageType);
 bool pkgCheck();
 bool storageSetup(string cloud);
@@ -165,8 +162,9 @@ string glusterCopies;
 string glusterInstalled = "n";
 string hadoopInstalled = "n";
 string home;
+string mysqlPort = oam::UnassignedName;
 
-bool noPrompting;
+bool noPrompting = false;
 bool rootUser = true;
 string USER = "root";
 bool hdfs = false;
@@ -207,7 +205,7 @@ typedef struct _thread_data_t {
 
 int main(int argc, char *argv[])
 {
-    Oam oam;
+    	Oam oam;
 	string parentOAMModuleHostName;
 	ChildModuleList childmodulelist;
 	ChildModuleList niclist;
@@ -265,8 +263,8 @@ int main(int argc, char *argv[])
 	if (p && *p)
    		USER = p;
 
-   for( int i = 1; i < argc; i++ )
-   {
+	for( int i = 1; i < argc; i++ )
+	{
 		if( string("-h") == argv[i] ) {
 			cout << endl;
 			cout << "This is the Calpont InfiniDB System Configuration and Installation tool." << endl;
@@ -282,7 +280,7 @@ int main(int argc, char *argv[])
 			cout << "	Enter one of the options within [], if available, or" << endl;
 			cout << "	Enter a new value" << endl << endl;
 			cout << endl;
-   			cout << "Usage: postConfigure [-h][-c][-n][-p][-mp][-s][-lq][-rep]" << endl;
+   			cout << "Usage: postConfigure [-h][-c][-n][-p][-mp][-s][-lq][-rep][-port]" << endl;
 			cout << "   -h  Help" << endl;
 			cout << "   -c  Config File to use to extract configuration data, default is Calpont.xml.rpmsave" << endl;
 			cout << "   -n  Install with no prompting" << endl;
@@ -291,6 +289,7 @@ int main(int argc, char *argv[])
 			cout << "   -s  Single Threaded Remote Install" << endl;
 			cout << "   -lq Enable Local Query Feature" << endl;
 			cout << "   -rep Enable MySQL Replication" << endl;
+			cout << "   -port MySQL Port Address" << endl;
 			exit (0);
 		}
       		else if( string("-s") == argv[i] )
@@ -358,6 +357,20 @@ int main(int argc, char *argv[])
 		else if( string("-rep") == argv[i] ) {
 			mysqlRep = true;
 			MySQLRep = "y";
+		}
+		else if( string("-port") == argv[i] ) {
+			i++;
+			if (i >= argc ) {
+				cout << "   ERROR: MySQL Port ID not supplied" << endl;
+				exit (1);
+			}
+			mysqlPort = argv[i];
+		}
+		else
+		{
+			cout << "   ERROR: Invalid Argument = " << argv[i] << endl;
+   			cout << "   Usage: postConfigure [-h][-c][-n][-p][-mp][-s][-lq][-rep][-port]" << endl;
+			exit (1);
 		}
 	}
 
@@ -910,12 +923,41 @@ int main(int argc, char *argv[])
 		MySQLRep = "y";
 	}
 
-
 	if ( pmwithum )
 		cout << "NOTE: Local Query Feature is enabled" << endl;
 
 	if ( mysqlRep )
 		cout << "NOTE: MySQL Replication Feature is enabled" << endl;
+
+	//check mysql port changes
+	string MySQLPort;
+	try {
+		MySQLPort = sysConfig->getConfig(InstallSection, "MySQLPort");
+	}
+	catch(...)
+	{}
+
+	if ( mysqlPort == oam::UnassignedName )
+	{
+		if ( MySQLPort.empty() || MySQLPort == "" ) {
+			mysqlPort = "3306";
+			try {
+				sysConfig->setConfig(InstallSection, "MySQLPort", "3306");
+			}
+			catch(...)
+			{}
+		}
+		else
+			mysqlPort = MySQLPort;
+	}
+	else
+	{	// mysql port was providing on command line
+		try {
+			sysConfig->setConfig(InstallSection, "MySQLPort", mysqlPort);
+		}
+		catch(...)
+		{}
+	}
 
 	//Write out Updated System Configuration File
 	try {
@@ -2614,35 +2656,7 @@ int main(int argc, char *argv[])
 		//run the mysql / mysqld setup scripts
 		cout << endl << "===== Running the InfiniDB MySQL setup scripts =====" << endl << endl;
 
-		system("netstat -na | grep '3306 ' | grep LISTEN > /tmp/mysqlport");
-		string fileName = "/tmp/mysqlport";
-		ifstream oldFile (fileName.c_str());
-		if (oldFile) {
-			oldFile.seekg(0, std::ios::end);
-			int size = oldFile.tellg();
-			if ( size != 0 ) {
-				cout << "The mysqld default port of 3306 is already in-use by another mysqld" << endl;
-				cout << "Either change the port number of 3306 in " + installDir + "/mysql/my.cnf" << endl;
-				cout << "Or stop current mysqld version that is running" << endl;
-
-				while(true)
-				{
-					string answer = "n";
-					pcommand = callReadline("Enter 'y' when a change has been made and you are ready to continue > ");
-					if (pcommand)
-					{
-						if (strlen(pcommand) > 0) answer = pcommand;
-						callFree(pcommand);
-					}
-					if ( answer == "y" )
-						break;
-					else
-						cout << "Invalid Entry, please enter 'y' for yes" << endl;
-					if ( noPrompting )
-						exit(1);
-				}
-			}
-		}
+		checkMysqlPort(mysqlPort, sysConfig);
 
 		// call the mysql setup scripts
 		mysqlSetup();
@@ -2821,35 +2835,7 @@ int main(int argc, char *argv[])
 				else
 					cout << endl << "===== Running the InfiniDB MySQL setup scripts =====" << endl << endl;
 
-				system("netstat -na | grep '3306 ' | grep LISTEN > /tmp/mysqlport");
-				string fileName = "/tmp/mysqlport";
-				ifstream oldFile (fileName.c_str());
-				if (oldFile) {
-					oldFile.seekg(0, std::ios::end);
-					int size = oldFile.tellg();
-					if ( size != 0 ) {
-						cout << "The mysqld default port of 3306 is already in-use by another mysqld" << endl;
-						cout << "Either change the port number of 3306 in " + installDir + "/mysql/my.cnf" << endl;
-						cout << "Or stop current mysqld version that is running" << endl;
-		
-						while(true)
-						{
-							string answer = "n";
-							pcommand = callReadline("Enter 'y' when a change has been made and you are ready to continue > ");
-							if (pcommand)
-							{
-								if (strlen(pcommand) > 0) answer = pcommand;
-								callFree(pcommand);
-							}
-							if ( answer == "y" )
-								break;
-							else
-								cout << "Invalid Entry, please enter 'y' for yes" << endl;
-							if ( noPrompting )
-								exit(1);
-						}
-					}
-				}
+				checkMysqlPort(mysqlPort, sysConfig);
 
 				// run my.cnf upgrade script
 				if ( reuseConfig == "y" && MySQLRep == "y" )
@@ -2951,9 +2937,13 @@ int main(int argc, char *argv[])
 						string temppwprompt = pwprompt;
 						if ( pwprompt == " " )
 							temppwprompt = "none";
-						
+
+						//check my.cnf port in-user on remote node
+						checkRemoteMysqlPort(remoteModuleIP, remoteModuleName, USER, password, mysqlPort, sysConfig);
+
 						//run remote installer script
-						string cmd = installDir + "/bin/user_installer.sh " + remoteModuleName + " " + remoteModuleIP + " " + password + " " + calpontPackage1 + " " + calpontPackage2 + " " + calpontPackage3 + " " + mysqlPackage + " " + mysqldPackage + " initial " + EEPackageType + " " + nodeps + " " + temppwprompt + " " + remote_installer_debug + " " + debug_logfile;
+						cmd = installDir + "/bin/user_installer.sh " + remoteModuleName + " " + remoteModuleIP + " " + password + " " + calpontPackage1 + " " + calpontPackage2 + " " + calpontPackage3 + " " + mysqlPackage + " " + mysqldPackage + " initial " + EEPackageType + " " + nodeps + " " + temppwprompt + " " + mysqlPort + " " + remote_installer_debug + " " + debug_logfile;
+
 						if ( thread_remote_installer == "1" ) {
 							thr_data[thread_id].command = cmd;
 
@@ -3049,9 +3039,13 @@ int main(int argc, char *argv[])
 						string binservertype = serverTypeInstall;
 						if ( pmwithum )
 							binservertype = "pmwithum";
+
+						//check my.cnf port in-user on remote node
+						checkRemoteMysqlPort(remoteModuleIP, remoteModuleName, USER, password, mysqlPort, sysConfig);
+
 						cmd = installDir + "/bin/binary_installer.sh " + remoteModuleName + " " +
 							remoteModuleIP + " " + password + " " + calpontPackage1 + " " + remoteModuleType +
-							" initial " + binservertype + " " + remote_installer_debug +
+							" initial " + binservertype + " " + mysqlPort + " " + remote_installer_debug +
 							" " + installDir + " " + debug_logfile;
 
 						if ( thread_remote_installer == "1" ) {
@@ -3120,7 +3114,7 @@ int main(int argc, char *argv[])
 								binservertype = "pmwithum";
 							cmd = installDir + "/bin/binary_installer.sh " + remoteModuleName + " " + remoteModuleIP +
 								" " + password + " " + calpontPackage1 + " " + remoteModuleType + " initial " +
-								binservertype + " " + remote_installer_debug + " " + installDir + " " +
+								binservertype + " " + mysqlPort + " " + remote_installer_debug + " " + installDir + " " +
 								debug_logfile;
 
 							if ( thread_remote_installer == "1" ) {
@@ -3642,26 +3636,30 @@ bool checkSaveConfigFile()
 		if ( sysConfig->getConfig("ExeMgr1", "IPAddr") != "0.0.0.0") {
 			//Calpont.xml is ready to go, get feature options
 
-			try {
-				MySQLRep = sysConfig->getConfig(InstallSection, "MySQLRep");
-			}
-			catch(...)
-			{}
-
-			if ( MySQLRep == "y" )
-				mysqlRep = true;
-
-			//get local query / PMwithUM feature flag
-			try {
-				PMwithUM = sysConfig->getConfig(InstallSection, "PMwithUM");
-			}
-			catch(...)
-			{}
-
-			if ( PMwithUM == "y" ) {
-				pmwithum = true;
+			if ( MySQLRep == "n" )
+			{
+				try {
+					MySQLRep = sysConfig->getConfig(InstallSection, "MySQLRep");
+				}
+				catch(...)
+				{}
+	
+				if ( MySQLRep == "y" )
+					mysqlRep = true;
 			}
 
+			if ( PMwithUM == "n" ) {
+				//get local query / PMwithUM feature flag
+				try {
+					PMwithUM = sysConfig->getConfig(InstallSection, "PMwithUM");
+				}
+				catch(...)
+				{}
+	
+				if ( PMwithUM == "y" ) {
+					pmwithum = true;
+				}
+			}
 			return true;
 		}
 
@@ -4083,25 +4081,6 @@ bool createDbrootDirs(string DBRootStorageType)
 	return true;
 }
 
-
-/*
- * writeConfig 
- */
-bool writeConfig( Config* sysConfig ) 
-{
-	for ( int i = 0 ; i < 3 ; i++ )
-	{
-		try {
-			sysConfig->write();
-			return true;
-		}
-		catch(...)
-		{}
-	}
-
-	return false;
-}
-	
 /*
  * pkgCheck 
  */
@@ -4943,10 +4922,22 @@ bool updateBash()
 
 	if ( hdfs ) 
 	{
-		string cmd = "echo export JAVA_HOME=/usr/java/jdk1.6.0_31 >> " + fileName;
+		string JavaHome;
+		string JavaPath;
+		try {
+			JavaHome = sysConfig->getConfig(InstallSection, "JavaHome");
+			JavaPath = sysConfig->getConfig(InstallSection, "JavaPath");
+		}
+		catch(...)
+		{
+			cout << "ERROR: Problem getting JavaPath from the InfiniDB System Configuration file" << endl;
+			exit(1);
+		}
+
+		string cmd = "echo export JAVA_HOME=" + JavaHome + " >> " + fileName;
 		system(cmd.c_str());
 	
-		cmd = "echo export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/java/jdk1.6.0_31/jre/lib/amd64/server >> " + fileName;
+		cmd = "echo export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:" + JavaPath + " >> " + fileName;
 		system(cmd.c_str());
 	
 		cmd = "echo . ./" + DataFileEnvFile + " >> " + fileName;
@@ -5242,6 +5233,7 @@ bool singleServerDBrootSetup()
 	return true;
 }
  
+pthread_mutex_t THREAD_LOCK;
 
 void remoteInstallThread(void *arg)
 {
@@ -5249,6 +5241,7 @@ void remoteInstallThread(void *arg)
 
 	int rtnCode = system((data->command).c_str());
 	if (WEXITSTATUS(rtnCode) != 0) {
+		pthread_mutex_lock(&THREAD_LOCK);
 		cout << endl << "Failure with a remote module install, check install log files in /tmp" << endl;
 		exit(1);
 	}

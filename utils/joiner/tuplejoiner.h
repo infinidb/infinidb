@@ -91,12 +91,12 @@ class TupleJoiner
 public:
 	struct hasher {
 		inline size_t operator()(int64_t val) const
-		{ return hasher((char *) &val, 8); }
+		{ return fHasher((char *) &val, 8); }
 		inline size_t operator()(const TypelessData &e) const
-		{ return hasher((char *) e.data, e.len); }
+		{ return fHasher((char *) e.data, e.len); }
 
 		private:
-			utils::Hasher hasher;
+			utils::Hasher fHasher;
 	};
 
 	/* ctor to use for numeric join */

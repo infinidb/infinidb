@@ -7946,6 +7946,58 @@ namespace oam
 		return 0;
 	}
 
+	/******************************************************************************************
+	* @brief	changeMyCnf
+	*
+	* purpose:	change my.cnf
+	*
+	******************************************************************************************/
+	bool Oam::changeMyCnf( std::string paramater, std::string value )
+	{
+		string mycnfFile = startup::StartUp::installDir() + "/mysql/my.cnf";
+		ifstream file (mycnfFile.c_str());
+		if (!file) {
+			cout << "File not found: " << mycnfFile << endl;
+			return false;
+		}
+	
+		vector <string> lines;
+		char line[200];
+		string buf;
+		while (file.getline(line, 200))
+		{
+			buf = line;
+			// change port
+			if ( paramater == "port" )
+			{
+				string::size_type pos = buf.find(paramater,0);
+				if ( pos == 0 ) {
+					string::size_type pos = buf.find("=",0);
+					if ( pos != string::npos )
+						buf = "port = " + value;
+				}
+			}
+	
+			//output to temp file
+			lines.push_back(buf);
+		}
+	
+		file.close();
+		unlink (mycnfFile.c_str());
+		ofstream newFile (mycnfFile.c_str());	
+		
+		//create new file
+		int fd = open(mycnfFile.c_str(), O_RDWR|O_CREAT, 0666);
+		
+		copy(lines.begin(), lines.end(), ostream_iterator<string>(newFile, "\n"));
+		newFile.close();
+		
+		close(fd);
+	
+		return true;
+	}
+
+
     /***************************************************************************
      * PRIVATE FUNCTIONS
      ***************************************************************************/

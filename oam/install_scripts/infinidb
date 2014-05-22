@@ -42,8 +42,10 @@ fi
 #hadoop
 plugin=`$INFINIDB_INSTALL_DIR/bin/getConfig SystemConfig DataFilePlugin`
 if [ -n "$plugin" ]; then
-	export JAVA_HOME=/usr/java/jdk1.6.0_31
-	export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/java/jdk1.6.0_31/jre/lib/amd64/server
+	JavaHome=`$INFINIDB_INSTALL_DIR/bin/getConfig Installation JavaHome`
+	JavaPath=`$INFINIDB_INSTALL_DIR/bin/getConfig Installation JavaPath`
+	export JAVA_HOME=$JavaHome
+	export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$JavaPath
 
 	setenv=`$InstallDir/bin/getConfig SystemConfig DataFileEnvFile`
 	if [ -z "$setenv" ]; then

@@ -329,6 +329,7 @@ void PackageHandler::run()
 					qts.query = insertPkg.get_SQLStatement();
 					qts.system_name = oamCache->getSystemName();
 					qts.module_name = oamCache->getModuleName();
+					qts.schema_name = insertPkg.get_SchemaName();
 					fQtc.postQueryTele(qts);
 					//cout << "This is batch insert " << insertPkg->get_isBatchInsert() << endl;
 					if (insertPkg.get_isBatchInsert())
@@ -655,8 +656,6 @@ void PackageHandler::run()
 					qts.rows = result.stats.fRows;
 					qts.end_time = QueryTeleClient::timeNowms();
 					qts.blocks_changed = result.stats.fBlocksChanged;
-					qts.system_name = oamCache->getSystemName();
-					qts.module_name = oamCache->getModuleName();
 					fQtc.postQueryTele(qts);
 				}
 				break;
@@ -676,6 +675,7 @@ void PackageHandler::run()
 					qts.query = updatePkg->get_SQLStatement();
 					qts.system_name = oamCache->getSystemName();
 					qts.module_name = oamCache->getModuleName();
+					qts.schema_name = updatePkg->get_SchemaName();
 					fQtc.postQueryTele(qts);
 					// process it
 					//@Bug 1341. Don't remove calpontsystemcatalog from this 
@@ -697,8 +697,6 @@ void PackageHandler::run()
 					qts.rows = result.stats.fRows;
 					qts.end_time = QueryTeleClient::timeNowms();
 					qts.blocks_changed = result.stats.fBlocksChanged;
-					qts.system_name = oamCache->getSystemName();
-					qts.module_name = oamCache->getModuleName();
 					fQtc.postQueryTele(qts);
 				}
 				break;
@@ -716,6 +714,7 @@ void PackageHandler::run()
 					qts.query = deletePkg->get_SQLStatement();
 					qts.system_name = oamCache->getSystemName();
 					qts.module_name = oamCache->getModuleName();
+					qts.schema_name = deletePkg->get_SchemaName();
 					fQtc.postQueryTele(qts);
 					// process it
 					//@Bug 1341. Don't remove calpontsystemcatalog from this session to take advantage of cache.
@@ -736,8 +735,6 @@ void PackageHandler::run()
 					qts.rows = result.stats.fRows;
 					qts.end_time = QueryTeleClient::timeNowms();
 					qts.blocks_changed = result.stats.fBlocksChanged;
-					qts.system_name = oamCache->getSystemName();
-					qts.module_name = oamCache->getModuleName();
 					fQtc.postQueryTele(qts);
 				}
 				break;

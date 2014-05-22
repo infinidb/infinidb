@@ -264,6 +264,8 @@ int  TableInfo::readTableData( )
     its.rows_so_far.push_back(0);
     its.system_name = fOamCachePtr->getSystemName();
     its.module_name = fOamCachePtr->getModuleName();
+    string tn = getTableName();
+    its.schema_name = string(tn, 0, tn.find('.'));
     fQtc.postImportTele(its);
 
     //
@@ -277,6 +279,10 @@ int  TableInfo::readTableData( )
             boost::mutex::scoped_lock lock(fSyncUpdatesTI);
             fStartTime = readStart;
             fStatusTI  = WriteEngine::ERR;
+            its.msg_type = ImportTeleStats::IT_TERM;
+            its.rows_so_far.pop_back();
+            its.rows_so_far.push_back(0);
+            fQtc.postImportTele(its);
             throw SecondaryShutdownException( "TableInfo::"
                 "readTableData(1) responding to job termination");
         }
@@ -307,6 +313,10 @@ int  TableInfo::readTableData( )
                 boost::mutex::scoped_lock lock(fSyncUpdatesTI);
                 fStartTime = readStart;
                 fStatusTI  = WriteEngine::ERR;
+                its.msg_type = ImportTeleStats::IT_TERM;
+                its.rows_so_far.pop_back();
+                its.rows_so_far.push_back(0);
+                fQtc.postImportTele(its);
                 throw SecondaryShutdownException( "TableInfo::"
                     "readTableData(2) responding to job termination");
             }
@@ -388,6 +398,11 @@ int  TableInfo::readTableData( )
                 ec.errorString(readRc);
             fLog->logMsg( oss.str(), readRc, MSGLVL_ERROR);
 
+            its.msg_type = ImportTeleStats::IT_TERM;
+            its.rows_so_far.pop_back();
+            its.rows_so_far.push_back(0);
+            fQtc.postImportTele(its);
+
             return readRc;
         }
 #ifdef PROFILE
@@ -435,6 +450,11 @@ int  TableInfo::readTableData( )
 
             // List Err and Bad files to report file (if applicable)
             fBRMReporter.rptMaxErrJob( fBRMRptFileName, fErrFiles, fBadFiles );
+
+            its.msg_type = ImportTeleStats::IT_TERM;
+            its.rows_so_far.pop_back();
+            its.rows_so_far.push_back(0);
+            fQtc.postImportTele(its);
 
             return ERR_BULK_MAX_ERR_NUM;
         }

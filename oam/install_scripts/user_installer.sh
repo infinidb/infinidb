@@ -23,14 +23,15 @@ set INSTALLTYPE [lindex $argv 8]
 set PKGTYPE [lindex $argv 9]
 set NODEPS [lindex $argv 10]
 set MYSQLPW [lindex $argv 11]
-set DEBUG [lindex $argv 12]
+set MYSQLPORT [lindex $argv 12]
+set DEBUG [lindex $argv 13]
 set INSTALLDIR "/usr/local/Calpont"
-set IDIR [lindex $argv 13]
+set IDIR [lindex $argv 14]
 if { $IDIR != "" } {
 	set INSTALLDIR $IDIR
 }
 set USERNAME "root"
-set UNM [lindex $argv 14]
+set UNM [lindex $argv 15]
 if { $UNM != "" } {
 	set USERNAME $UNM
 }
@@ -370,7 +371,7 @@ if { $INSTALLTYPE == "initial"} {
 	# Start module installer to setup Custom OS files
 	#
 	send_user "Run Module Installer                            "
-	send "ssh $USERNAME@$SERVER '$BASH $INSTALLDIR/bin/module_installer.sh um'\n"
+	send "ssh $USERNAME@$SERVER '$BASH $INSTALLDIR/bin/module_installer.sh --module=um --port=$MYSQLPORT'\n"
 	if { $PASSWORD != "ssh" } {
 		set timeout 30
 		expect {

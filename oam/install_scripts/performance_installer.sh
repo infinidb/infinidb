@@ -365,7 +365,7 @@ if { $INSTALLTYPE == "initial"} {
 	# Start module installer to setup Custom OS files
 	#
 	send_user "Run Module Installer                            "
-	send "ssh $USERNAME@$SERVER '$BASH $INSTALLDIR/bin/module_installer.sh pm'\n"
+	send "ssh $USERNAME@$SERVER '$BASH $INSTALLDIR/bin/module_installer.sh --module=pm'\n"
 	if { $PASSWORD != "ssh" } {
 		set timeout 30
 		expect {

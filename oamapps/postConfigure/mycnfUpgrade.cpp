@@ -57,6 +57,16 @@ int main(int argc, char *argv[])
 {
 	Oam oam;
 
+	//check for port argument
+	string mysqlPort;
+	if (argc > 1) {
+		mysqlPort = argv[1];
+
+		// set mysql password
+		oam.changeMyCnf( "port", mysqlPort );
+		exit (0);
+	}
+
 	//my.cnf file
 	string mycnfFile = startup::StartUp::installDir() + "/mysql/my.cnf";
 	ifstream mycnffile (mycnfFile.c_str());

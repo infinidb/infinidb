@@ -53,6 +53,7 @@ struct QueryTele
   23: optional string system_name,
   24: optional string module_name,
   25: optional i32 local_query,
+  26: optional string schema_name,
 
 }
 
@@ -83,10 +84,10 @@ enum StepType
 
 struct StepTele
 {
-  1: string query_uuid,	// UUID of the query this step is part of
+  1: string query_uuid,		// UUID of the query this step is part of
   2: STType msg_type,		// What kind of tele msg this is
   3: StepType step_type,	// What kind of query step this is
-  4: string step_uuid,	// UUID for this step
+  4: string step_uuid,		// UUID for this step
 
   5: optional i64 phy_io,
   6: optional i64 cache_io,
@@ -106,9 +107,10 @@ struct StepTele
 enum ITType
 {
   IT_INVALID,
-  IT_SUMMARY,
-  IT_PROGRESS,
-  IT_START,
+  IT_SUMMARY,	// import job summary (good completion)
+  IT_PROGRESS,	// import progress
+  IT_START,	// import job start
+  IT_TERM,	// import job terminiated (too many errs, ctrl-c, etc)
 }
 
 typedef list<string> StringList
@@ -125,6 +127,7 @@ struct ImportTele
   7: optional I64List rows_so_far,
   8: optional string system_name,
   9: optional string module_name,
+  10: optional string schema_name,
 }
 
 service QueryTeleService

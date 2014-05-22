@@ -22,16 +22,17 @@ set MODULETYPE [lindex $argv 4]
 set INSTALLTYPE [lindex $argv 5]
 set PKGTYPE "binary"
 set SERVERTYPE [lindex $argv 6]
-set DEBUG [lindex $argv 7]
+set MYSQLPORT [lindex $argv 7]
+set DEBUG [lindex $argv 8]
 set INSTALLDIR "/usr/local/Calpont"
-set IDIR [lindex $argv 8]
+set IDIR [lindex $argv 9]
 if { $IDIR != "" } {
 	set INSTALLDIR $IDIR
 }
 set env(INFINIDB_INSTALL_DIR) $INSTALLDIR
 set PREFIX [file dirname $INSTALLDIR]
 set USERNAME $env(USER)
-set UNM [lindex $argv 9]
+set UNM [lindex $argv 10]
 if { $UNM != "" } {
 	set USERNAME $UNM
 }
@@ -232,7 +233,7 @@ if { $INSTALLTYPE == "initial"} {
 	send_user "Run Module Installer                            "
 	send " \n"
 	send date\n
-	send "ssh $USERNAME@$SERVER '$INSTALLDIR/bin/module_installer.sh --installdir=$INSTALLDIR $MODULETYPE'\n"
+	send "ssh $USERNAME@$SERVER '$INSTALLDIR/bin/module_installer.sh --module=$MODULETYPE --port=$MYSQLPORT --installdir=$INSTALLDIR $MODULETYPE'\n"
 	set timeout 10
 	expect {
 		"word: " { send "$PASSWORD\n" }

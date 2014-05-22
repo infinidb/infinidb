@@ -23,7 +23,7 @@ remote_scp_get.sh calpontAlias run.sh upgrade-infinidb.sh \
 post-mysql-install post-mysqld-install binary_installer.sh \
 os_check.sh infinidb calpontSyslog calpontSyslog-ng syslogSetup.sh \
 remote_scp_put.sh calpontUninstall.sh infinidb.def \
-remotessh.exp rsync.sh
+remotessh.exp rsync.sh remote_command_verify.sh
 
 dist_local_DATA = module
 

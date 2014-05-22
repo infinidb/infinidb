@@ -292,9 +292,11 @@ inline ParseTree::ParseTree() :
 inline ParseTree::ParseTree(TreeNode* data) :
 	   fData(data),
 	   fLeft(0),
-	   fRight(0),
-	   fDerivedTable(data->derivedTable())
+	   fRight(0)
 {
+	// bug5984. Need to validate data to be not null
+	if (data)
+		fDerivedTable = data->derivedTable();
 }
 
 inline ParseTree::ParseTree(const ParseTree& rhs):

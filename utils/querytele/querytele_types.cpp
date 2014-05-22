@@ -74,18 +74,20 @@ int _kITTypeValues[] = {
   ITType::IT_INVALID,
   ITType::IT_SUMMARY,
   ITType::IT_PROGRESS,
-  ITType::IT_START
+  ITType::IT_START,
+  ITType::IT_TERM
 };
 const char* _kITTypeNames[] = {
   "IT_INVALID",
   "IT_SUMMARY",
   "IT_PROGRESS",
-  "IT_START"
+  "IT_START",
+  "IT_TERM"
 };
-const std::map<int, const char*> _ITType_VALUES_TO_NAMES(::apache::thrift::TEnumIterator(4, _kITTypeValues, _kITTypeNames), ::apache::thrift::TEnumIterator(-1, NULL, NULL));
+const std::map<int, const char*> _ITType_VALUES_TO_NAMES(::apache::thrift::TEnumIterator(5, _kITTypeValues, _kITTypeNames), ::apache::thrift::TEnumIterator(-1, NULL, NULL));
 
-const char* QueryTele::ascii_fingerprint = "86103BBE8AA8950640758E78693FD7D8";
-const uint8_t QueryTele::binary_fingerprint[16] = {0x86,0x10,0x3B,0xBE,0x8A,0xA8,0x95,0x06,0x40,0x75,0x8E,0x78,0x69,0x3F,0xD7,0xD8};
+const char* QueryTele::ascii_fingerprint = "E179941E2BE9C920811D86261E5AAE67";
+const uint8_t QueryTele::binary_fingerprint[16] = {0xE1,0x79,0x94,0x1E,0x2B,0xE9,0xC9,0x20,0x81,0x1D,0x86,0x26,0x1E,0x5A,0xAE,0x67};
 
 uint32_t QueryTele::read(::apache::thrift::protocol::TProtocol* iprot) {
 
@@ -309,6 +311,14 @@ uint32_t QueryTele::read(::apache::thrift::protocol::TProtocol* iprot) {
           xfer += iprot->skip(ftype);
         }
         break;
+      case 26:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->schema_name);
+          this->__isset.schema_name = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
       default:
         xfer += iprot->skip(ftype);
         break;
@@ -448,6 +458,11 @@ uint32_t QueryTele::write(::apache::thrift::protocol::TProtocol* oprot) const {
     xfer += oprot->writeI32(this->local_query);
     xfer += oprot->writeFieldEnd();
   }
+  if (this->__isset.schema_name) {
+    xfer += oprot->writeFieldBegin("schema_name", ::apache::thrift::protocol::T_STRING, 26);
+    xfer += oprot->writeString(this->schema_name);
+    xfer += oprot->writeFieldEnd();
+  }
   xfer += oprot->writeFieldStop();
   xfer += oprot->writeStructEnd();
   return xfer;
@@ -480,6 +495,7 @@ void swap(QueryTele &a, QueryTele &b) {
   swap(a.system_name, b.system_name);
   swap(a.module_name, b.module_name);
   swap(a.local_query, b.local_query);
+  swap(a.schema_name, b.schema_name);
   swap(a.__isset, b.__isset);
 }
 
@@ -742,8 +758,8 @@ void swap(StepTele &a, StepTele &b) {
   swap(a.__isset, b.__isset);
 }
 
-const char* ImportTele::ascii_fingerprint = "86D618381836FE2CFA00EEB2945577FC";
-const uint8_t ImportTele::binary_fingerprint[16] = {0x86,0xD6,0x18,0x38,0x18,0x36,0xFE,0x2C,0xFA,0x00,0xEE,0xB2,0x94,0x55,0x77,0xFC};
+const char* ImportTele::ascii_fingerprint = "9C47642F47F2AFBEA98238934EB1A211";
+const uint8_t ImportTele::binary_fingerprint[16] = {0x9C,0x47,0x64,0x2F,0x47,0xF2,0xAF,0xBE,0xA9,0x82,0x38,0x93,0x4E,0xB1,0xA2,0x11};
 
 uint32_t ImportTele::read(::apache::thrift::protocol::TProtocol* iprot) {
 
@@ -863,6 +879,14 @@ uint32_t ImportTele::read(::apache::thrift::protocol::TProtocol* iprot) {
           xfer += iprot->skip(ftype);
         }
         break;
+      case 10:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->schema_name);
+          this->__isset.schema_name = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
       default:
         xfer += iprot->skip(ftype);
         break;
@@ -937,6 +961,11 @@ uint32_t ImportTele::write(::apache::thrift::protocol::TProtocol* oprot) const {
     xfer += oprot->writeString(this->module_name);
     xfer += oprot->writeFieldEnd();
   }
+  if (this->__isset.schema_name) {
+    xfer += oprot->writeFieldBegin("schema_name", ::apache::thrift::protocol::T_STRING, 10);
+    xfer += oprot->writeString(this->schema_name);
+    xfer += oprot->writeFieldEnd();
+  }
   xfer += oprot->writeFieldStop();
   xfer += oprot->writeStructEnd();
   return xfer;
@@ -953,6 +982,7 @@ void swap(ImportTele &a, ImportTele &b) {
   swap(a.rows_so_far, b.rows_so_far);
   swap(a.system_name, b.system_name);
   swap(a.module_name, b.module_name);
+  swap(a.schema_name, b.schema_name);
   swap(a.__isset, b.__isset);
 }
 

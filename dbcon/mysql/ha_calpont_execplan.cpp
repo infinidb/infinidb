@@ -2005,19 +2005,6 @@ ArithmeticColumn* buildArithmeticColumn(Item_func* item, gp_walk_info& gwi, bool
 		{
 			lhs = new ParseTree(buildReturnedColumn(sfitempp[0], gwi, nonSupport));
 			rhs = new ParseTree(buildReturnedColumn(sfitempp[1], gwi, nonSupport));
-			if (!lhs->data() || !rhs->data())
-			{
-				gwi.fatalParseError = true;
-				if (gwi.parseErrorText.empty())
-				{
-					gwi.parseErrorText = "Un-recognized Arithmetic Operand";
-				}
-				return NULL;
-			}
-			else if (nonSupport)
-			{
-				return NULL;
-			}
 		}
 		else // where clause
 		{
@@ -2071,6 +2058,16 @@ ArithmeticColumn* buildArithmeticColumn(Item_func* item, gp_walk_info& gwi, bool
 			}
 		}
 
+		if (!lhs->data() || !rhs->data() || nonSupport)
+		{
+			gwi.fatalParseError = true;
+			if (gwi.parseErrorText.empty())
+				gwi.parseErrorText = "Un-recognized Arithmetic Operand";
+			delete lhs;
+			delete rhs;
+			return NULL;
+		}
+
 		//aop->operationType(lhs->resultType(), rhs->resultType());
 		pt->left(lhs);
 		pt->right(rhs);
@@ -2093,6 +2090,14 @@ ArithmeticColumn* buildArithmeticColumn(Item_func* item, gp_walk_info& gwi, bool
 				rhs = new ParseTree(gwi.rcWorkStack.top());
 				gwi.rcWorkStack.pop();
 			}
+		}
+		if (!rhs->data() || nonSupport)
+		{
+			gwi.fatalParseError = true;
+			if (gwi.parseErrorText.empty())
+				gwi.parseErrorText = "Un-recognized Arithmetic Operand";
+			delete rhs;
+			return NULL;
 		}
 		pt->left(cc);
 		pt->right(rhs);
@@ -2333,6 +2338,13 @@ ReturnedColumn* buildFunctionColumn(Item_func* ifp, gp_walk_info& gwi, bool& non
 					{
 						if (gwi.rcWorkStack.empty())
 						{
+							ReturnedColumn *rc = buildReturnedColumn(ifp->arguments()[i], gwi, nonSupport);
+							if (!rc || nonSupport)
+							{
+								nonSupport = true;
+								gwi.fatalParseError = true;
+								return NULL;
+							}
 							sptp.reset(new ParseTree(buildReturnedColumn(ifp->arguments()[i], gwi, nonSupport)));
 						}
 						else
@@ -2620,7 +2632,7 @@ FunctionColumn* buildCaseFunction(Item_func* item, gp_walk_info& gwi, bool& nonS
 					ReturnedColumn* parm = buildReturnedColumn(item->arguments()[i], gwi, nonSupport);
 					if (parm)
 					{
-						sptp.reset(new ParseTree(buildReturnedColumn(item->arguments()[i], gwi, nonSupport)));
+						sptp.reset(new ParseTree(parm));
 						if (!gwi.rcWorkStack.empty())
 							gwi.rcWorkStack.pop();
 					}
@@ -4959,7 +4971,8 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex, SCSEP& csep, bool i
 		for (; groupcol; groupcol= groupcol->next)
 		{
 			Item* groupItem = *(groupcol->item);
-			if (groupItem->type() == Item::REF_ITEM)
+			// @bug5993. Could be nested ref.
+			while (groupItem->type() == Item::REF_ITEM)
 				groupItem = (*((Item_ref*)groupItem)->ref);
 
 			if (groupItem->type() == Item::FUNC_ITEM)
@@ -5233,9 +5246,7 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex, SCSEP& csep, bool i
 					{
 						Item* item_ptr = ordercol->item_ptr;
 						while (item_ptr->type() == Item::REF_ITEM)
-						{
 							item_ptr = *(((Item_ref*)item_ptr)->ref);
-						}
 						rc = buildReturnedColumn(item_ptr, gwi, gwi.fatalParseError);
 					}
 
@@ -5265,7 +5276,8 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex, SCSEP& csep, bool i
 				for (; ordercol; ordercol= ordercol->next)
 				{
 					Item* ord_item = *(ordercol->item);
-					if (ord_item->type() == Item::REF_ITEM)
+					// @bug5993. Could be nested ref.
+					while (ord_item->type() == Item::REF_ITEM)
 						ord_item = (*((Item_ref*)ord_item)->ref);
 					// @bug 1706. re-construct the order by item one by one
 					//Item* ord_item = *(ordercol->item);

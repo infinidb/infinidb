@@ -87,6 +87,7 @@ struct QueryTeleStats
 	std::string system_name;
 	std::string module_name;
 	int32_t local_query;
+	std::string schema_name;
 };
 
 struct StepTeleStats
@@ -163,6 +164,7 @@ struct ImportTeleStats
 		IT_SUMMARY,
 		IT_PROGRESS,
 		IT_START,
+		IT_TERM,
 	};
 
 	ImportTeleStats() :
@@ -181,6 +183,7 @@ struct ImportTeleStats
 	I64List rows_so_far;
 	std::string system_name;
 	std::string module_name;
+	std::string schema_name;
 };
 
 }

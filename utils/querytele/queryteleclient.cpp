@@ -80,6 +80,7 @@ QueryTele qts2qt(const QueryTeleStats& qts)
 	QT_ASSIGN_(system_name);
 	QT_ASSIGN_(module_name);
 	QT_ASSIGN_(local_query);
+	QT_ASSIGN_(schema_name);
 
 	return out;
 }
@@ -141,6 +142,9 @@ ImportTele its2it(const ImportTeleStats& its)
 	case ImportTeleStats::IT_START:
 		out.msg_type = ITType::IT_START;
 		break;
+	case ImportTeleStats::IT_TERM:
+		out.msg_type = ITType::IT_TERM;
+		break;
 	default:
 		out.msg_type = ITType::IT_INVALID;
 		break;
@@ -151,6 +155,7 @@ ImportTele its2it(const ImportTeleStats& its)
 	QT_ASSIGN_(rows_so_far);
 	QT_ASSIGN_(system_name);
 	QT_ASSIGN_(module_name);
+	QT_ASSIGN_(schema_name);
 
 	return out;
 }

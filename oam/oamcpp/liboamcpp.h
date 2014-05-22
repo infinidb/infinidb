@@ -2382,6 +2382,14 @@ namespace oam
 		*/
 		EXPORT int glusterctl(GLUSTER_COMMANDS command, std::string argument1, std::string& argument2, std::string& errmsg);
 
+	/**
+	* @brief	changeMyCnf
+	*
+	* purpose:	change my.cnf
+	*
+	**/
+	EXPORT bool changeMyCnf( std::string paramater, std::string value );
+
         private:
 
             /** @brief check Gluster Log after a Gluster control call

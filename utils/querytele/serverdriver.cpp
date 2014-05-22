@@ -103,6 +103,7 @@ void QueryTeleServiceHandler::postQuery(const QueryTele& qt)
 	cout << "  sn: " << qt.system_name << endl;
 	cout << "  mn: " << qt.module_name << endl;
 	cout << "  lq: " << qt.local_query << endl;
+	cout << "  dn: " << qt.schema_name << endl;
 	cout << endl;
 }
 
@@ -145,6 +146,8 @@ void QueryTeleServiceHandler::postImport(const ImportTele& qt)
 		cout << "  mt: SUMMARY" << endl;
 	else if (qt.msg_type == ITType::IT_START)
 		cout << "  mt: START" << endl;
+	else if (qt.msg_type == ITType::IT_TERM)
+		cout << "  mt: TERM" << endl;
 	else
 		cout << "  mt: PROGRESS" << endl;
 	if (qt.table_list.empty())
@@ -165,6 +168,7 @@ void QueryTeleServiceHandler::postImport(const ImportTele& qt)
 	cout << ctime(&tt);
 	cout << "  sn: " << qt.system_name << endl;
 	cout << "  mn: " << qt.module_name << endl;
+	cout << "  dn: " << qt.schema_name << endl;
 	cout << endl;
 }
 

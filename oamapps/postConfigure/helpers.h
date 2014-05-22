@@ -30,6 +30,10 @@ extern int sendMsgProcMon( std::string module, ByteStream msg, int requestID, in
 extern int sendUpgradeRequest(int IserverTypeInstall, bool pmwithum);
 extern int sendReplicationRequest(int IserverTypeInstall, std::string password);
 extern void checkFilesPerPartion(int DBRootCount, Config* sysConfig);
+extern void checkMysqlPort( string& mysqlPort, Config* sysConfig );
+extern void checkRemoteMysqlPort(std::string remoteModuleIP, std::string remoteModuleName, std::string USER, std::string password, std::string& mysqlPort, Config* sysConfig);
+extern bool writeConfig(Config* sysConfig);
+
 }
 
 #endif

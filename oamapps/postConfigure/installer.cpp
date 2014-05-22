@@ -72,14 +72,12 @@ bool makeModuleFile(string moduleName, string parentOAMModuleName);
 bool updateProcessConfig(int serverTypeInstall);
 bool makeRClocal(string moduleName, int IserverTypeInstall);
 bool uncommentCalpontXml( string entry);
-bool writeConfig(Config* sysConfig);
 
 extern string pwprompt;
 
+string installDir;
 bool noPrompting;
 string mysqlpw = " ";
-
-string installDir;
 
 int main(int argc, char *argv[])
 {
@@ -1278,22 +1276,5 @@ bool uncommentCalpontXml( string entry)
 	return true;
 }
 
-/*
- * writeConfig 
- */
-bool writeConfig( Config* sysConfig ) 
-{
-	for ( int i = 0 ; i < 3 ; i++ )
-	{
-		try {
-			sysConfig->write();
-			return true;
-		}
-		catch(...)
-		{}
-	}
-
-	return false;
-}
 // vim:ts=4 sw=4:
 

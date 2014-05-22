@@ -732,6 +732,21 @@ int main(int argc, char *argv[])
 		catch(...)
 		{}
 	}
+
+	string MySQLPort = "3306";
+	try {
+		MySQLPort = sysConfigOld->getConfig("Installation", "MySQLPort");
+	}
+	catch(...)
+	{ 
+		MySQLPort = "3306";
+	}
+	
+	try {
+		sysConfigNew->setConfig("Installation", "MySQLPort", MySQLPort);
+	}
+	catch(...)
+	{}
 	
 	sysConfigNew->write();
 

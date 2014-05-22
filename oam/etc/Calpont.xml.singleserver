@@ -455,6 +455,8 @@
 		<AmazonElasticIPAddr1>unassigned</AmazonElasticIPAddr1>
 		<AmazonElasticModule1>unassigned</AmazonElasticModule1>
 		<CoreFileFlag>n</CoreFileFlag>
+		<JavaHome>unassigned</JavaHome>
+		<JavaPath>unassigned</JavaPath>
 	</Installation>
 	<ExtentMap>
 		<!--

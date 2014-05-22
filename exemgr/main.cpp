@@ -586,6 +586,7 @@ new_plan:
 				qts.system_name = fOamCachePtr->getSystemName();
 				qts.module_name = fOamCachePtr->getModuleName();
 				qts.local_query = csep.localQuery();
+				qts.schema_name = csep.schemaName();
 				if ((csep.sessionID()&0x80000000) == 0)
 					fTeleClient.postQueryTele(qts);
 

@@ -627,9 +627,131 @@ void checkFilesPerPartion(int DBRootCount, Config* sysConfig)
 		}
 	}
 
+	return;
+}
+
+void checkMysqlPort( std::string& mysqlPort, Config* sysConfig )
+{
+	Oam oam;
+	char* pcommand = 0;
+
+	while(true)
+	{
+		string cmd = "netstat -na | grep '" + mysqlPort + "' | grep LISTEN > /tmp/mysqlport";
+
+		system(cmd.c_str());
+		string fileName = "/tmp/mysqlport";
+		ifstream oldFile (fileName.c_str());
+		if (oldFile) {
+			oldFile.seekg(0, std::ios::end);
+			int size = oldFile.tellg();
+			if ( size != 0 ) {
+				if ( noPrompting ) {
+					cout << "The mysqld port of '" + mysqlPort + "' is already in-use" << endl;
+					cout << "For No-prompt install, use the command line argument of 'port' to enter a different number" << endl;
+					exit(1);
+				}
+
+				cout << "The mysqld port of '" + mysqlPort + "' is already in-use" << endl;
+				cout << "enter a different port ID" << endl;
+
+				pcommand = readline("Enter a port number > ");
+				if (pcommand)
+				{
+					if (strlen(pcommand) > 0) mysqlPort = pcommand;
+					free(pcommand);
+					pcommand = 0;
+				}
+			}
+			else
+			{
+				try {
+					sysConfig->setConfig("Installation", "MySQLPort", mysqlPort);
+				}
+				catch(...)
+				{}
+		
+				if ( !writeConfig(sysConfig) ) {
+					cout << "ERROR: Failed trying to update InfiniDB System Configuration file" << endl;
+					exit(1);
+				}
+
+				break;	
+			}
+		}
+		else
+			break;
+	}
+
+	// set mysql password
+	oam.changeMyCnf( "port", mysqlPort );
+}
+
+void checkRemoteMysqlPort(std::string remoteModuleIP, std::string remoteModuleName, std::string USER, std::string password, std::string& mysqlPort, Config* sysConfig)
+{
+	Oam oam;
+	char* pcommand = 0;
+
+	while (true)
+	{
+		string cmd = installDir + "/bin/remote_command_verify.sh " + remoteModuleIP + " " + " " + USER + " " + password + " 'netstat -na | grep " + mysqlPort + " | grep LISTEN' tcp error 2 0 > /dev/null 2>&1";
+		int rtnCode = system(cmd.c_str());
+		if (WEXITSTATUS(rtnCode) == 0) {
+			if ( noPrompting ) {
+				cout << "The mysqld port of '" + mysqlPort + "' is already in-use on " << remoteModuleName << endl;
+				cout << "For No-prompt install, use the command line argument of 'port' to enter a different number" << endl;
+				cout << "exiting..." << endl;
+				exit(1);
+			}
+
+			cout << "The mysqld port of '" + mysqlPort + "' is already in-use on " << remoteModuleName << endl;
+
+			pcommand = readline("Enter a port number > ");
+			if (pcommand)
+			{
+				if (strlen(pcommand) > 0) mysqlPort = pcommand;
+				free(pcommand);
+				pcommand = 0;
+			}
+		}
+		else
+		{
+			try {
+				sysConfig->setConfig("Installation", "MySQLPort", mysqlPort);
+			}
+			catch(...)
+			{}
+	
+			if ( !writeConfig(sysConfig) ) {
+				cout << "ERROR: Failed trying to update InfiniDB System Configuration file" << endl;
+				exit(1);
+			}
+
+			break;
+		}
+	}
 
 	return;
 }
+
+/*
+ * writeConfig 
+ */
+bool writeConfig( Config* sysConfig ) 
+{
+	for ( int i = 0 ; i < 3 ; i++ )
+	{
+		try {
+			sysConfig->write();
+			return true;
+		}
+		catch(...)
+		{}
+	}
+
+	return false;
+}
+	
 
 
 }

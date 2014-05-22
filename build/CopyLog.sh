@@ -1,6 +1,6 @@
 #!/usr/bin/expect -f
 #@echo off
-spawn scp /InfiniDB/genii/mysql/queries/nightly/srvswdev11/go.log root@srvnightly:/tmp/srvbldwin1-genii-queryTester.log
+spawn scp %basedir%/genii/mysql/queries/nightly/srvswdev11/go.log root@srvnightly:/tmp/srvbldwin1-genii-queryTester.log
 
 expect {
 	-re "authenticity" { send "yes\r" 

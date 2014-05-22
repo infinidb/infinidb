@@ -1269,7 +1269,7 @@ int main(int argc, char *argv[])
 	localInstance = oam.getEC2LocalInstance();
 	if ( localInstance == "failed" || localInstance.empty() || localInstance == "") 
 	{
-		cout << endl << "ERROR: Failed to get Instance ID, double check configuration setting. exiting..." << endl;
+		cout << endl << "ERROR: Failed to get Instance ID, check configuration settings like region. exiting..." << endl;
 		exit (1);
 	}
 
@@ -1277,7 +1277,7 @@ int main(int argc, char *argv[])
 
 	if (instanceType.empty() || instanceType == "" || instanceType == "failed")
 	{
-		cout << endl << "ERROR: Failed to get Instance Type, double check configuration setting. exiting..." << endl;
+		cout << endl << "ERROR: Failed to get Instance ID, check configuration settings like region. exiting..." << endl;
 		exit (1);
 	}
 	

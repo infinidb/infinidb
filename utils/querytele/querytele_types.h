@@ -64,7 +64,8 @@ struct ITType {
     IT_INVALID = 0,
     IT_SUMMARY = 1,
     IT_PROGRESS = 2,
-    IT_START = 3
+    IT_START = 3,
+    IT_TERM = 4
   };
 };
 
@@ -75,7 +76,7 @@ typedef std::vector<std::string>  StringList;
 typedef std::vector<int64_t>  I64List;
 
 typedef struct _QueryTele__isset {
-  _QueryTele__isset() : query_uuid(false), msg_type(false), max_mem_pct(false), num_files(false), phy_io(false), cache_io(false), msg_rcv_cnt(false), cp_blocks_skipped(false), msg_bytes_in(false), msg_bytes_out(false), rows(false), start_time(false), end_time(false), error_no(false), blocks_changed(false), session_id(false), query_type(false), query(false), user(false), host(false), priority(false), priority_level(false), system_name(false), module_name(false), local_query(false) {}
+  _QueryTele__isset() : query_uuid(false), msg_type(false), max_mem_pct(false), num_files(false), phy_io(false), cache_io(false), msg_rcv_cnt(false), cp_blocks_skipped(false), msg_bytes_in(false), msg_bytes_out(false), rows(false), start_time(false), end_time(false), error_no(false), blocks_changed(false), session_id(false), query_type(false), query(false), user(false), host(false), priority(false), priority_level(false), system_name(false), module_name(false), local_query(false), schema_name(false) {}
   bool query_uuid;
   bool msg_type;
   bool max_mem_pct;
@@ -101,15 +102,16 @@ typedef struct _QueryTele__isset {
   bool system_name;
   bool module_name;
   bool local_query;
+  bool schema_name;
 } _QueryTele__isset;
 
 class QueryTele {
  public:
 
-  static const char* ascii_fingerprint; // = "86103BBE8AA8950640758E78693FD7D8";
-  static const uint8_t binary_fingerprint[16]; // = {0x86,0x10,0x3B,0xBE,0x8A,0xA8,0x95,0x06,0x40,0x75,0x8E,0x78,0x69,0x3F,0xD7,0xD8};
+  static const char* ascii_fingerprint; // = "E179941E2BE9C920811D86261E5AAE67";
+  static const uint8_t binary_fingerprint[16]; // = {0xE1,0x79,0x94,0x1E,0x2B,0xE9,0xC9,0x20,0x81,0x1D,0x86,0x26,0x1E,0x5A,0xAE,0x67};
 
-  QueryTele() : query_uuid(), msg_type((QTType::type)0), max_mem_pct(0), num_files(0), phy_io(0), cache_io(0), msg_rcv_cnt(0), cp_blocks_skipped(0), msg_bytes_in(0), msg_bytes_out(0), rows(0), start_time(0), end_time(0), error_no(0), blocks_changed(0), session_id(0), query_type(), query(), user(), host(), priority(), priority_level(0), system_name(), module_name(), local_query(0) {
+  QueryTele() : query_uuid(), msg_type((QTType::type)0), max_mem_pct(0), num_files(0), phy_io(0), cache_io(0), msg_rcv_cnt(0), cp_blocks_skipped(0), msg_bytes_in(0), msg_bytes_out(0), rows(0), start_time(0), end_time(0), error_no(0), blocks_changed(0), session_id(0), query_type(), query(), user(), host(), priority(), priority_level(0), system_name(), module_name(), local_query(0), schema_name() {
   }
 
   virtual ~QueryTele() throw() {}
@@ -139,6 +141,7 @@ class QueryTele {
   std::string system_name;
   std::string module_name;
   int32_t local_query;
+  std::string schema_name;
 
   _QueryTele__isset __isset;
 
@@ -265,6 +268,11 @@ class QueryTele {
     __isset.local_query = true;
   }
 
+  void __set_schema_name(const std::string& val) {
+    schema_name = val;
+    __isset.schema_name = true;
+  }
+
   bool operator == (const QueryTele & rhs) const
   {
     if (!(query_uuid == rhs.query_uuid))
@@ -362,6 +370,10 @@ class QueryTele {
     if (__isset.local_query != rhs.__isset.local_query)
       return false;
     else if (__isset.local_query && !(local_query == rhs.local_query))
+      return false;
+    if (__isset.schema_name != rhs.__isset.schema_name)
+      return false;
+    else if (__isset.schema_name && !(schema_name == rhs.schema_name))
       return false;
     return true;
   }
@@ -567,7 +579,7 @@ class StepTele {
 void swap(StepTele &a, StepTele &b);
 
 typedef struct _ImportTele__isset {
-  _ImportTele__isset() : job_uuid(false), import_uuid(false), msg_type(false), start_time(false), end_time(false), table_list(false), rows_so_far(false), system_name(false), module_name(false) {}
+  _ImportTele__isset() : job_uuid(false), import_uuid(false), msg_type(false), start_time(false), end_time(false), table_list(false), rows_so_far(false), system_name(false), module_name(false), schema_name(false) {}
   bool job_uuid;
   bool import_uuid;
   bool msg_type;
@@ -577,15 +589,16 @@ typedef struct _ImportTele__isset {
   bool rows_so_far;
   bool system_name;
   bool module_name;
+  bool schema_name;
 } _ImportTele__isset;
 
 class ImportTele {
  public:
 
-  static const char* ascii_fingerprint; // = "86D618381836FE2CFA00EEB2945577FC";
-  static const uint8_t binary_fingerprint[16]; // = {0x86,0xD6,0x18,0x38,0x18,0x36,0xFE,0x2C,0xFA,0x00,0xEE,0xB2,0x94,0x55,0x77,0xFC};
+  static const char* ascii_fingerprint; // = "9C47642F47F2AFBEA98238934EB1A211";
+  static const uint8_t binary_fingerprint[16]; // = {0x9C,0x47,0x64,0x2F,0x47,0xF2,0xAF,0xBE,0xA9,0x82,0x38,0x93,0x4E,0xB1,0xA2,0x11};
 
-  ImportTele() : job_uuid(), import_uuid(), msg_type((ITType::type)0), start_time(0), end_time(0), system_name(), module_name() {
+  ImportTele() : job_uuid(), import_uuid(), msg_type((ITType::type)0), start_time(0), end_time(0), system_name(), module_name(), schema_name() {
   }
 
   virtual ~ImportTele() throw() {}
@@ -599,6 +612,7 @@ class ImportTele {
   I64List rows_so_far;
   std::string system_name;
   std::string module_name;
+  std::string schema_name;
 
   _ImportTele__isset __isset;
 
@@ -644,6 +658,11 @@ class ImportTele {
     __isset.module_name = true;
   }
 
+  void __set_schema_name(const std::string& val) {
+    schema_name = val;
+    __isset.schema_name = true;
+  }
+
   bool operator == (const ImportTele & rhs) const
   {
     if (!(job_uuid == rhs.job_uuid))
@@ -675,6 +694,10 @@ class ImportTele {
     if (__isset.module_name != rhs.__isset.module_name)
       return false;
     else if (__isset.module_name && !(module_name == rhs.module_name))
+      return false;
+    if (__isset.schema_name != rhs.__isset.schema_name)
+      return false;
+    else if (__isset.schema_name && !(schema_name == rhs.schema_name))
       return false;
     return true;
   }

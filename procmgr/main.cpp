@@ -724,10 +724,8 @@ static void startMgrProcessThread()
 				msg << requestID;
 
 				string moduleSoftwareInfo = processManager.sendMsgProcMon1( moduleName, msg, requestID );
-				if ( moduleSoftwareInfo == "FAILED" ) {
-					status = API_FAILURE;
-					break;
-				}
+				if ( moduleSoftwareInfo == "FAILED" )
+					continue;
 
 				if ( localSoftwareInfo != moduleSoftwareInfo ) {
 					// module not running on same Calpont Software build as this local Director
@@ -766,9 +764,8 @@ static void startMgrProcessThread()
 		processManager.setSystemState(oam::FAILED);
 		// exit thread
 		log.writeLog(__LINE__, "startMgrProcessThread Exit with a failure, not all ProcMons ACTIVE", LOG_TYPE_CRITICAL);
-		string cmd = startup::StartUp::installDir() + "/etc/init.d/infinidb stop";
-		system(cmd.c_str());
-		exit(1);
+		log.writeLog(__LINE__, "startMgrProcessThread Exit - failure", LOG_TYPE_DEBUG);
+		pthread_exit(0);
 	}
 	else
 	{

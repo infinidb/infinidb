@@ -37,6 +37,12 @@ for arg in "$@"; do
 	elif [ $(expr -- "$arg" : '--quiet') -eq 7 ]; then
 		quiet=1
 		((shiftcnt++))
+	elif [ $(expr -- "$arg" : '--port') -eq 6 ]; then
+		mysqlPort="$(echo $arg | awk -F= '{print $2}')"
+		((shiftcnt++))
+	elif [ $(expr -- "$arg" : '--module') -eq 8 ]; then
+		module="$(echo $arg | awk -F= '{print $2}')"
+		((shiftcnt++))
 	fi
 done
 shift $shiftcnt
@@ -65,7 +71,7 @@ test -f $INFINIDB_INSTALL_DIR/post/functions && . $INFINIDB_INSTALL_DIR/post/fun
 mid=`module_id`
 
 #if um, cloud, separate system type, external um storage, then setup mount
-if [ "$1" = "um" ]; then
+if [ $module = "um" ]; then
 	if [ $cloud = "amazon-ec2" ] || [ $cloud = "amazon-vpc" ]; then
 		systemtype=`$INFINIDB_INSTALL_DIR/bin/getConfig Installation ServerTypeInstall`
 		if [ $systemtype = "1" ]; then
@@ -82,7 +88,7 @@ if [ "$1" = "um" ]; then
 fi
 
 #if pm, create dbroot directories
-if [ "$1" = "pm" ]; then
+if [ $module = "pm" ]; then
 	numdbroots=`$INFINIDB_INSTALL_DIR/bin/getConfig SystemConfig DBRootCount`
 	for (( id=1; id<$numdbroots+1; id++ )); do
 		mkdir -p $INFINIDB_INSTALL_DIR/data$id > /dev/null 2>&1
@@ -110,14 +116,16 @@ if [ -n "$plugin" ]; then
 	echo "Setup .bashrc on Module for local-query"
 
 	setenv=`$INFINIDB_INSTALL_DIR/bin/getConfig SystemConfig DataFileEnvFile`
+	JavaHome=`$INFINIDB_INSTALL_DIR/bin/getConfig Installation JavaHome`
+	JavaPath=`$INFINIDB_INSTALL_DIR/bin/getConfig Installation JavaPath`
 
 	eval userhome=~$user
 	bashFile=$userhome/.bashrc
 	touch ${bashFile}
 
 	echo " " >> ${bashFile}
-	echo "export JAVA_HOME=/usr/java/jdk1.6.0_31" >> ${bashFile}
-	echo "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/java/jdk1.6.0_31/jre/lib/amd64/server" >> ${bashFile}
+	echo "export JAVA_HOME=$JavaHome" >> ${bashFile}
+	echo "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$JavaPath" >> ${bashFile}
 	echo ". ~/$setenv" >> ${bashFile}
 fi
 
@@ -142,6 +150,12 @@ if [ $MySQLRep = "y" ]; then
 		$INFINIDB_INSTALL_DIR/bin/mycnfUpgrade > /tmp/mycnfUpgrade.log 2>&1
 	fi
 fi
+
+if test -f $INFINIDB_INSTALL_DIR/mysql/my.cnf ; then
+	echo "Run Mysql Port update on my.cnf on Module"
+	$INFINIDB_INSTALL_DIR/bin/mycnfUpgrade $mysqlPort > /tmp/mycnfUpgrade_port.log 2>&1
+fi
+
 
 echo " "
 echo "!!!Module Installation Successfully Completed!!!"
