@@ -87,13 +87,13 @@ chown -h $user.$user libjemalloc.so >/dev/null 2>&1
 # so the code below will not correctly detect JAVA_HOME.  Need to 
 # decide how to handle
 # Autodetect JAVA_HOME if not defined
-#if [ -e /usr/libexec/bigtop-detect-javahome ]; then
-#. /usr/libexec/bigtop-detect-javahome
-#elif [ -e /usr/lib/bigtop-utils/bigtop-detect-javahome ]; then
-#. /usr/lib/bigtop-utils/bigtop-detect-javahome
-#fi
-#ln -sf $JAVA_HOME/jre/lib/amd64/server/libjvm.so
-#chown -h $user.$user libjvm.so >/dev/null 2>&1
+if [ -e /usr/libexec/bigtop-detect-javahome ]; then
+. /usr/libexec/bigtop-detect-javahome
+elif [ -e /usr/lib/bigtop-utils/bigtop-detect-javahome ]; then
+. /usr/lib/bigtop-utils/bigtop-detect-javahome
+fi
+ln -sf $JAVA_HOME/jre/lib/amd64/server/libjvm.so
+chown -h $user.$user libjvm.so >/dev/null 2>&1
 
 cd /
 
@@ -252,7 +252,7 @@ EOD
 		[ -r /etc/default/bigtop-utils ] && . /etc/default/bigtop-utils
 		
 		# attempt to find java
-		if [ -z $JAVA_HOME ]; then
+#		if [ -z $JAVA_HOME ]; then
 			for candidate in \
 				/usr/lib/j2sdk1.6-sun \
 				/usr/lib/jvm/java-6-sun \
@@ -260,10 +260,10 @@ EOD
 				/usr/lib/jvm/java-1.6.0-sun-1.6.0.*/jre/ \
 				/usr/lib/jvm/j2sdk1.6-oracle \
 				/usr/lib/jvm/j2sdk1.6-oracle/jre \
-				/usr/java/jdk1.6* \
-				/usr/java/jre1.6* \
 				/usr/java/jdk1.7* \
 				/usr/java/jre1.7* \
+				/usr/java/jdk1.6* \
+				/usr/java/jre1.6* \
 				/usr/lib/jvm/j2sdk1.7-oracle \
 				/usr/lib/jvm/j2sdk1.7-oracle/jre \
 				/Library/Java/Home \
@@ -282,17 +282,21 @@ EOD
 					break
 				fi
 			done
-		fi
+#		fi
 
 		libfile=`find $JAVA_HOME -name libjava.so`
 		libpath=`echo $libfile | rev | cut -c 12- | rev`
 		export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$libpath
+		export JAVA_HOME=$JAVA_HOME
 
-		echo " "
-		echo "Installing using the following Java Home and Library Path"
-		echo "JAVA_HOME = " $JAVA_HOME
-		echo "JAVA_LIBRARY_PATH = " $libpath
-		echo " "
+		if [ -z "$libpath" ]; then
+cat <<EOD
+
+If you are intending to install InfiniDB over Hadoop, the JAVA library was not found.
+Please Contact InfiniDB Customer Support.
+EOD
+			exit 1
+		fi
 
 		#set in config file
 		$installdir/bin/setConfig -d Installation JavaHome $JAVA_HOME

@@ -747,13 +747,6 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 					msg >> manualFlag;
 					log.writeLog(__LINE__,  "MSG RECEIVED: Stop All process request...");
 
-					//stop the mysql daemon
-					try {
-						oam.actionMysqlCalpont(MYSQL_STOP);
-					}
-					catch(...)
-					{}
-
 					if ( actIndicator == STATUS_UPDATE ) {
 						//check and send notification
 						MonitorConfig config;
@@ -835,6 +828,13 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 						string cmd = startup::StartUp::installDir() + "/bin/reset_locks > " + logdir + "/reset_locks.log1 2>&1";
 						system(cmd.c_str());
 						log.writeLog(__LINE__, "BRM reset_locks script run", LOG_TYPE_DEBUG);
+
+						//stop the mysql daemon
+						try {
+							oam.actionMysqlCalpont(MYSQL_STOP);
+						}
+						catch(...)
+						{}
 
 						//send down notification
 						oam.sendDeviceNotification(config.moduleName(), MODULE_DOWN);
@@ -948,6 +948,31 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 						cmd = "sudo chmod 777 /dev/shm >/dev/null 2>&1";
 				
 					system(cmd.c_str());
+
+					//start the mysql daemon 
+					try {
+						oam.actionMysqlCalpont(MYSQL_START);
+					}
+					catch(...)
+					{	// mysql didn't start, return with error
+						log.writeLog(__LINE__, "STARTALL: MySQL failed to start, start-module failure", LOG_TYPE_CRITICAL);
+						
+						ackMsg << (ByteStream::byte) ACK;
+						ackMsg << (ByteStream::byte) STARTALL;
+						ackMsg << (ByteStream::byte) oam::API_FAILURE;
+						mq.write(ackMsg);
+	
+						try {
+							oam.setProcessStatus("mysqld", config.moduleName(), oam::FAILED, 0);
+						}
+						catch(...)
+						{}
+
+						log.writeLog(__LINE__, "STARTALL: ACK back to ProcMgr, return status = " + oam.itoa((int) oam::API_FAILURE));
+		
+						break;
+
+					}
 
 					if( config.moduleType() == "pm" )
 					{
@@ -1137,31 +1162,6 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 
 					if ( requestStatus == oam::API_SUCCESS ) {
 
-						//start the mysql daemon 
-						try {
-							oam.actionMysqlCalpont(MYSQL_START);
-						}
-						catch(...)
-						{	// mysql didn't start, return with error
-							log.writeLog(__LINE__, "STARTALL: MySQL failed to start, start-module failure", LOG_TYPE_CRITICAL);
-							
-							ackMsg << (ByteStream::byte) ACK;
-							ackMsg << (ByteStream::byte) STARTALL;
-							ackMsg << (ByteStream::byte) oam::API_FAILURE;
-							mq.write(ackMsg);
-		
-							try {
-								oam.setProcessStatus("mysqld", config.moduleName(), oam::FAILED, 0);
-							}
-							catch(...)
-							{}
-	
-							log.writeLog(__LINE__, "STARTALL: ACK back to ProcMgr, return status = " + oam.itoa((int) oam::API_FAILURE));
-			
-							break;
-	
-						}
-
 						//check and send noitification
 						MonitorConfig config;
 						if ( config.moduleType() == "um" )
@@ -1192,6 +1192,39 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 
 					//Loop reversely thorugh the process list
 			
+/*					processList* aPtr = config.monitoredListPtr();
+					processList::reverse_iterator rPtr;
+					uint16_t rtnCode;
+		
+					for (rPtr = aPtr->rbegin(); rPtr != aPtr->rend(); ++rPtr)
+					{
+						// don't shut yourself or ProcessManager down"
+						if ((*rPtr).ProcessName == "ProcessMonitor" || (*rPtr).ProcessName == "ProcessManager")
+							continue;
+	
+						// update local process state 
+						if ( manualFlag )
+							(*rPtr).state = oam::MAN_OFFLINE;
+						else
+							(*rPtr).state = oam::AUTO_OFFLINE;
+		
+						rtnCode = stopProcess((*rPtr).processID, (*rPtr).ProcessName, (*rPtr).ProcessLocation, actIndicator, manualFlag);
+						if (rtnCode)
+							log.writeLog(__LINE__,  "Process cannot be stopped:" + (*rPtr).ProcessName, LOG_TYPE_DEBUG);
+						else
+							(*rPtr).processID = 0;
+					}
+	
+					//send down notification
+					oam.sendDeviceNotification(config.moduleName(), MODULE_DOWN);
+
+					//stop the mysql daemon and then infinidb
+					try {
+						oam.actionMysqlCalpont(MYSQL_STOP);
+					}
+					catch(...)
+					{}
+*/
 					ackMsg << (ByteStream::byte) ACK;
 					ackMsg << (ByteStream::byte) SHUTDOWNMODULE;
 					ackMsg << (ByteStream::byte) API_SUCCESS;

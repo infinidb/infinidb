@@ -157,6 +157,7 @@ private:
 
     oam::OamCache* fOamCachePtr;	// OamCache: ptr is copyable
     boost::uuids::uuid fJobUUID;        // Job UUID
+    std::vector<BRM::LBID_t> fDictFlushBlks;//dict blks to be flushed from cache
 
     //--------------------------------------------------------------------------
     // Private Functions
