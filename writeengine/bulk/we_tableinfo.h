@@ -143,6 +143,7 @@ private:
     uint64_t fTableLockID;              // Unique table lock ID
     std::vector<uint16_t> fOrigDbRootIds; // List of DBRoots at start of job
 
+	std::string  fErrorDir;             // Opt dir for *.err and *.bad files
     std::vector<std::string> fErrFiles; // List of *.err files for this table
     std::vector<std::string> fBadFiles; // List of *.bad files for this table
     std::ofstream fRejectDataFile;      // File containing rejected rows
@@ -337,7 +338,12 @@ public:
      */
     OID getTableOID( );
 
-    /** @brief get the bulk rollback meta data writer object for this table
+	/** @brief Set the directory for *.err and *.bad files. May be
+	 *  	   empty string, in which case we use current dir.
+     */
+    void setErrorDir(const std::string& errorDir);
+
+	/** @brief get the bulk rollback meta data writer object for this table
      */
     RBMetaWriter* rbMetaWriter();
 
@@ -555,6 +561,16 @@ inline void TableInfo::setTruncationAsError(bool bTruncationAsError) {
 
 inline void TableInfo::setJobUUID(const boost::uuids::uuid& jobUUID) {
     fJobUUID = jobUUID; }
+
+inline void TableInfo::setErrorDir( const std::string& errorDir ) {
+    fErrorDir = errorDir; 
+#ifdef _MSC_VER
+	if (fErrorDir.length() > 0 && *(--(fErrorDir.end())) != '/' && *(--(fErrorDir.end())) != '\\')
+		fErrorDir.push_back('\\'); }
+#else
+    if (fErrorDir.length() > 0 && *(--(fErrorDir.end())) != '/')
+        fErrorDir.push_back('/'); }
+#endif
 }
 #endif
 

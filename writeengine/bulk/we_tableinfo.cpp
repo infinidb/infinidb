@@ -36,6 +36,11 @@
 #include <utility>
 // @bug 2099+
 #include <iostream>
+#ifdef _MSC_VER
+	#include <stdlib.h>
+#else
+    #include <string.h>
+#endif
 using namespace std;
 
 // @bug 2099-
@@ -1323,7 +1328,23 @@ void TableInfo::writeBadRows( const std::vector<std::string>* errorDatRows,
         if (!fRejectDataFile.is_open())
         {
             ostringstream rejectFileName;
-            rejectFileName << getFileName() << ".Job_" << fJobId <<
+			if (fErrorDir.size() > 0)
+			{
+#ifdef _MSC_VER
+                char filename[_MAX_FNAME];
+                char ext[_MAX_EXT];
+				_splitpath(const_cast<char*>(getFileName().c_str()), 
+						   NULL, NULL, filename, ext);
+				rejectFileName << fErrorDir << "\\" << filename << ext;
+#else
+				rejectFileName << fErrorDir << basename(getFileName().c_str()); 
+#endif
+			}
+			else
+			{
+				rejectFileName << getFileName();
+			}
+            rejectFileName << ".Job_" << fJobId <<
                 '_' << ::getpid() << BAD_FILE_SUFFIX;
             fRejectDataFileName = rejectFileName.str();
             fRejectDataFile.open( rejectFileName.str().c_str(),
@@ -1405,7 +1426,23 @@ void  TableInfo::writeErrReason( const std::vector< std::pair<RID,
         if (!fRejectErrFile.is_open())
         {
             ostringstream errFileName;
-            errFileName << getFileName() << ".Job_" << fJobId <<
+			if (fErrorDir.size() > 0)
+			{
+#ifdef _MSC_VER
+				char filename[_MAX_FNAME];
+				char ext[_MAX_EXT];
+				_splitpath(const_cast<char*>(getFileName().c_str()), 
+						   NULL, NULL, filename, ext);
+				errFileName << fErrorDir << "\\" << filename << ext;
+#else
+				errFileName << fErrorDir << basename(getFileName().c_str()); 
+#endif
+			}
+			else
+			{
+				errFileName << getFileName();
+			}
+            errFileName << ".Job_" << fJobId <<
                 '_' << ::getpid() << ERR_FILE_SUFFIX;
             fRejectErrFileName = errFileName.str();
             fRejectErrFile.open( errFileName.str().c_str(),

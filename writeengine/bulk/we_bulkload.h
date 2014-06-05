@@ -114,6 +114,7 @@ public:
     // Accessors and mutators
     void                addToCmdLineImportFileList(const std::string& importFile);
     const std::string&  getAlternateImportDir( ) const;
+    const std::string&  getErrorDir          ( ) const;
     const std::string&  getJobDir            ( ) const;
     const std::string&  getSchema            ( ) const;
     const std::string&  getTempJobDir        ( ) const;
@@ -144,6 +145,7 @@ public:
     void                setVbufReadSize      ( int vbufReadSize );
     void                setTruncationAsError ( bool bTruncationAsError );
     void                setJobUUID           ( const std::string& jobUUID );
+	void                setErrorDir          ( const std::string& errorDir );
     // Timer functions
     void                startTimer           ( );
     void                stopTimer            ( );
@@ -178,6 +180,7 @@ private:
     int         fFileVbufSize;             // Internal file system buffer size
     long long   fMaxErrors;                // Max allowable errors per job
     std::string fAlternateImportDir;       // Alternate bulk import directory
+	std::string fErrorDir;                 // Opt. where error records record
     std::string fProcessName;              // Application process name
     static boost::ptr_vector<TableInfo> fTableInfo;// Vector of Table information
     int         fNoOfParseThreads;         // Number of parse threads
@@ -294,6 +297,9 @@ inline void BulkLoad::addToCmdLineImportFileList(const std::string& importFile){
 inline const std::string& BulkLoad::getAlternateImportDir( ) const {
     return fAlternateImportDir; }
 
+inline const std::string& BulkLoad::getErrorDir( ) const {
+    return fErrorDir; }
+
 inline const std::string& BulkLoad::getJobDir( ) const {
     return DIR_BULK_JOB; }
 
@@ -378,6 +384,9 @@ inline void BulkLoad::setVbufReadSize( int vbufReadSize ) {
 
 inline void BulkLoad::setTruncationAsError(bool bTruncationAsError) {
     fbTruncationAsError = bTruncationAsError; }
+
+inline void BulkLoad::setErrorDir( const std::string& errorDir ) {
+    fErrorDir = errorDir; }
 
 inline void BulkLoad::startTimer( ) {
     gettimeofday( &fStartTime, 0 ); }

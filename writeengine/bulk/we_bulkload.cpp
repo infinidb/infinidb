@@ -979,6 +979,7 @@ int BulkLoad::processJob( )
             (fBulkMode == BULK_MODE_REMOTE_MULTIPLE_SRC))
             tableInfo->setBulkLoadMode( fBulkMode, fBRMRptFileName );
 
+        tableInfo->setErrorDir(getErrorDir());
         tableInfo->setTruncationAsError(getTruncationAsError());
         rc = manageImportDataFileList( curJob, i, tableInfo );
         if (rc != NO_ERROR)

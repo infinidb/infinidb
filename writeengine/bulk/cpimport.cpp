@@ -103,7 +103,8 @@ void printUsage()
   "    [-h] [-r readers] [-w parsers] [-s c] [-f path] [-b readBufs] " << endl<<
   "    [-c readBufSize] [-e maxErrs] [-B libBufSize] [-n NullOption] " << endl<<
   "    [-E encloseChar] [-C escapeChar] [-I binaryOpt] [-S] "
-  "[-d debugLevel] [-i] " << endl;
+  "[-d debugLevel] [-i] " << endl<<
+  "    [-D] [-L rejectDir]" << endl;
 
     cout << endl << "Traditional usage without positional parameters "
       "(XML job file required):" << endl <<
@@ -112,7 +113,7 @@ void printUsage()
   "    [-c readBufSize] [-e maxErrs] [-B libBufSize] [-n NullOption] " << endl<<
   "    [-E encloseChar] [-C escapeChar] [-I binaryOpt] [-S] "
   "[-d debugLevel] [-i] "                                              << endl<<
-  "    [-p path] [-l loadFile]" << endl << endl;
+  "    [-p path] [-l loadFile] [-D] [-L rejectDir]" << endl << endl;
 
     cout << "    Positional parameters:" << endl <<
         "        dbName    Name of database to load" << endl <<
@@ -158,7 +159,7 @@ void printUsage()
         "        -I Binary import; binaryOpt 1-import NULL values"   << endl <<
         "                                    2-saturate NULL values" << endl <<
         "        -S Treat string truncations as errors" << endl << 
-        "        -D Disable timeout when waiting for table lock" << endl << endl;
+        "        -L send *.err and *.bad (reject) files here" << endl << endl;
 
     cout << "    Example1:" << endl <<
         "        cpimport.bin -j 1234" << endl <<
@@ -566,7 +567,13 @@ void parseCmdLineArgs(
                 break;
             }
 
-            case 'P':                                // -P: Calling moduleid
+			case 'L':                                // -L: Error log directory
+			{
+				curJob.setErrorDir( optarg );
+				break;
+			}
+
+			case 'P':                                // -P: Calling moduleid
             {                                        //     and PID
                 sModuleIDandPID = optarg;
                 break;
