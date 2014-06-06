@@ -349,6 +349,9 @@ case "$mode" in
     find . -name '@0024vtable*' | xargs /bin/rm -f
     cd ..
 
+    # hook for InfiniDB automated testing
+    test -x /usr/local/bin/idb-testing-mysql-pre-start && /usr/local/bin/idb-testing-mysql-pre-start $basedir
+
     echo $echo_n "Starting MySQL"
     if test -x $manager -a "$use_mysqld_safe" = "0"
     then
@@ -410,28 +413,26 @@ case "$mode" in
       echo $echo_n "Shutting down MySQL"
       $SUDO kill $mysqlmanager_pid
       # mysqlmanager should remove the pid_file when it exits, so wait for it.
-      wait_for_pid removed "$mysqlmanager_pid"; return_value=$?
+      wait_for_pid removed "$mysqlmanager_pid"
 			
       # @bug2639. force kill mysqld and mysqld_safe after timeout
-#      if test $return_value -ne 0
-#      then 
         $SUDO kill -9 $(ps -efl|awk "{if (\$4==$mysqlmanager_pid) print \$5}") &>/dev/null 
         $SUDO kill -9 $mysqlmanager_pid &>/dev/null
-#        echo $echo_n "Force shutting down" 
         log_success_msg
-        return_value=0
-#      fi
-			
+
       # delete lock for RedHat / SuSE
       if test -f $lock_dir
       then
         rm -f $lock_dir
       fi
-      exit $return_value
     else
       kill_by_pid
       log_failure_msg "MySQL manager or server PID file could not be found!"
     fi
+
+    # hook for InfiniDB automated testing
+    test -x /usr/local/bin/idb-testing-mysql-post-stop && /usr/local/bin/idb-testing-mysql-post-stop $basedir
+
     ;;
 
   'restart')

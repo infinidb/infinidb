@@ -3415,7 +3415,7 @@ int main(int argc, char *argv[])
 	if ( waitForActive() ) {
 		cout << " DONE" << endl;
 
-		cmd = installDir + "/bin/dbbuilder 7 > /tmp/dbbuilder.log";		
+		cmd = ". " + installDir + "/bin/" + DataFileEnvFile + ";" + installDir + "/bin/dbbuilder 7 > /tmp/dbbuilder.log";		
 
 		system(cmd.c_str());
 
@@ -4221,7 +4221,7 @@ bool storageSetup(string cloud)
 				if (access(logdir.c_str(), W_OK) != 0) logdir = "/tmp";
 				string hdfslog = logdir + "/hdfsCheck.log1";
 
-				string cmd = "export JAVA_HOME=/usr/java/jdk1.6.0_31;export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/java/jdk1.6.0_3/jre/lib/amd64/server;. ~/" + DataFileEnvFile + ";" + installDir + "/bin/hdfsCheck " + DataFilePlugin +  " > " + hdfslog + " 2>&1";
+				string cmd = ". " + installDir + "/bin/" + DataFileEnvFile + ";" + installDir + "/bin/hdfsCheck " + DataFilePlugin +  " > " + hdfslog + " 2>&1";
 				system(cmd.c_str());
 				if (oam.checkLogStatus(hdfslog, "All HDFS checks passed!")) 
 				{
@@ -4921,26 +4921,8 @@ bool updateBash()
    	ifstream newFile (fileName.c_str());
 
 	if ( hdfs ) 
-	{
-		string JavaHome;
-		string JavaPath;
-		try {
-			JavaHome = sysConfig->getConfig(InstallSection, "JavaHome");
-			JavaPath = sysConfig->getConfig(InstallSection, "JavaPath");
-		}
-		catch(...)
-		{
-			cout << "ERROR: Problem getting JavaPath from the InfiniDB System Configuration file" << endl;
-			exit(1);
-		}
-
-		string cmd = "echo export JAVA_HOME=" + JavaHome + " >> " + fileName;
-		system(cmd.c_str());
-	
-		cmd = "echo export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:" + JavaPath + " >> " + fileName;
-		system(cmd.c_str());
-	
-		cmd = "echo . ./" + DataFileEnvFile + " >> " + fileName;
+	{	
+		string cmd = "echo . " + installDir + "/bin/" + DataFileEnvFile + " >> " + fileName;
 		system(cmd.c_str());
 	
 		if ( rootUser)

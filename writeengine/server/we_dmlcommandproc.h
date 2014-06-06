@@ -40,6 +40,7 @@
 #include "we_dbrootextenttracker.h"
 #include "we_rbmetawriter.h"
 #include "rowgroup.h"
+#include "we_log.h"
 
 #if defined(_MSC_VER) && defined(xxxDDLPKGPROC_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
@@ -95,6 +96,11 @@ class WE_DMLCommandProc
 		EXPORT uint8_t processPurgeFDCache(ByteStream& bs, std::string & err);
 		EXPORT uint8_t processEndTransaction(ByteStream& bs, std::string & err);
 		EXPORT uint8_t processFixRows(ByteStream& bs, std::string & err, ByteStream::quadbyte & PMId);
+		int validateColumnHWMs(
+				execplan::CalpontSystemCatalog::RIDList& ridList,
+				boost::shared_ptr<execplan::CalpontSystemCatalog> systemCatalogPtr,
+				const std::vector<DBRootExtentInfo>& segFileInfo,
+				const char* stage );
 	private:	
 		WriteEngineWrapper fWEWrapper;
 		boost::scoped_ptr<RBMetaWriter> fRBMetaWriter;
@@ -122,6 +128,7 @@ class WE_DMLCommandProc
 		std::map<uint32_t, dmlpackage::UpdateDMLPackage> cpackages;
 		BRM::DBRM fDbrm;
 		unsigned  extentsPerSegmentFile, extentRows, filesPerColumnPartition, dbrootCnt;
+		Log fLog;
 };
 
 }

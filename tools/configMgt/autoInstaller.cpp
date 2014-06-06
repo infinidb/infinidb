@@ -61,8 +61,8 @@ int main(int argc, char *argv[])
 	string XMpassword = "dummypw";
 	string configFile = "NULL";
 	string release = "Latest";
-//	string SHARED = "//calweb/shared";
-	string SHARED = "//srvfrisco2/public";
+	string SHARED = "//calweb/shared";
+//	string SHARED = "//srvfrisco2/public";
 	string installDir = "/usr/local";
 	string MySQLpassword = "dummymysqlpw";
 	string installPackageType = "";
@@ -81,7 +81,7 @@ int main(int argc, char *argv[])
 		if( string("-h") == argv[i] ) {
 			cout << endl;
 			cout << "'autoInstaller' installs the RPMs located in" << endl;
-			cout << "///srvfrisco2/public/Iterations on the specified" << endl;
+			cout << SHARED << "/Iterations on the specified" << endl;
 			cout << "system. It will either install the latest rpm located in" << endl;
 			cout << "in the /Latest directory or the rpm associated with the" << endl;
 			cout << "release-number entered." << endl;
@@ -415,7 +415,7 @@ int main(int argc, char *argv[])
 
 		calpontPackage = calpontPackagename + "-" + currentPrefix + systemPackage;
 
-		cout << endl << "Using the InfiniDB Packages '" + systemPackage + "' from //srvfrisco2/public/Iterations/" + release + "/" << endl;
+		cout << endl << "Using the InfiniDB Packages '" + systemPackage + "' from " + SHARED + "/Iterations/" + release + "/" << endl;
 	}
 	else	//binary package
 	{
@@ -495,7 +495,7 @@ int main(int argc, char *argv[])
 		}
 		file.close();
 
-		cout << endl << "Using the InfiniDB Package '" + systemPackage + "' from //srvfrisco2/public/Iterations/" + release + "/packages" << endl;
+		cout << endl << "Using the InfiniDB Package '" + systemPackage + "' from " + SHARED + "/Iterations/" + release + "/packages" << endl;
 
 	}
 
@@ -774,7 +774,7 @@ CONFIGDONE:
 
 	cout << "Shutdown System                               " << flush;
 
-	cmd = "./remote_command.sh " + installParentModuleIPAddr + " " + systemUser + " " + password + " '" + installDir + "/Calpont/bin/calpontConsole shutdownsystem y' 'Successful shutdown' Error 60 " + debug_flag;
+	cmd = "./remote_command.sh " + installParentModuleIPAddr + " " + systemUser + " " + password + " '" + installDir + "/Calpont/bin/calpontConsole shutdownsystem Force y' 'Successful shutdown' Error 60 " + debug_flag;
 	rtnCode = system(cmd.c_str());
 	if (rtnCode == 0)
 		cout << "DONE" << endl;
@@ -842,7 +842,7 @@ CONFIGDONE:
 		if (HDFS)
 		{
 			string DataFileEnvFile = "setenv-hdfs-20";
-			cmd = "./remote_command.sh " + installParentModuleIPAddr + " " + systemUser + " " + password + " 'export JAVA_HOME=/usr/java/jdk1.6.0_31;export LD_LIBRARY_PATH=/usr/java/jdk1.6.0_31/jre/lib/amd64/server;. /root/" + DataFileEnvFile + ";" + installDir + "/Calpont/bin/postConfigure -i " + installDir + "/Calpont -n -mp " + MySQLpassword + " -p " + password + "' 'System is Active' Error 1200 " + debug_flag;
+			cmd = "./remote_command.sh " + installParentModuleIPAddr + " " + systemUser + " " + password + " '. " + installDir + "/Calpont/bin/" + DataFileEnvFile + ";" + installDir + "/Calpont/bin/postConfigure -i " + installDir + "/Calpont -n -mp " + MySQLpassword + " -p " + password + "' 'System is Active' Error 1200 " + debug_flag;
 		}
 		else
 		{

@@ -35,7 +35,7 @@ done
 
 if [ $installdir != "/usr/local/Calpont" ]; then
 	export INFINIDB_INSTALL_DIR=$installdir
-	export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$INFINIDB_INSTALL_DIR/lib
+	export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$installdir/lib
 fi
 
 #check 64-bit OS compatiable
@@ -87,13 +87,13 @@ chown -h $user.$user libjemalloc.so >/dev/null 2>&1
 # so the code below will not correctly detect JAVA_HOME.  Need to 
 # decide how to handle
 # Autodetect JAVA_HOME if not defined
-if [ -e /usr/libexec/bigtop-detect-javahome ]; then
-. /usr/libexec/bigtop-detect-javahome
-elif [ -e /usr/lib/bigtop-utils/bigtop-detect-javahome ]; then
-. /usr/lib/bigtop-utils/bigtop-detect-javahome
-fi
-ln -sf $JAVA_HOME/jre/lib/amd64/server/libjvm.so
-chown -h $user.$user libjvm.so >/dev/null 2>&1
+#if [ -e /usr/libexec/bigtop-detect-javahome ]; then
+#. /usr/libexec/bigtop-detect-javahome
+#elif [ -e /usr/lib/bigtop-utils/bigtop-detect-javahome ]; then
+#. /usr/lib/bigtop-utils/bigtop-detect-javahome
+#fi
+#ln -sf $JAVA_HOME/jre/lib/amd64/server/libjvm.so
+#chown -h $user.$user libjvm.so >/dev/null 2>&1
 
 cd /
 
@@ -205,7 +205,9 @@ fi
 if [ -n "$EC2_HOME" ]; then
 	$installdir/bin/setConfig -d Installation EC2_HOME $EC2_HOME
 
-	$installdir/bin/setConfig -d Installation JAVA_HOME $JAVA_HOME
+	if [ -n "$EC2_HOME" ]; then
+		$installdir/bin/setConfig -d Installation JAVA_HOME $JAVA_HOME
+	fi
 
 	$installdir/bin/setConfig -d Installation EC2_PATH $PATH:/home/ec2/bin:/opt/aws/bin
 fi
@@ -223,118 +225,85 @@ cat <<EOD
 The next steps are:
 
 export INFINIDB_INSTALL_DIR=$installdir
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$INFINIDB_INSTALL_DIR/lib:$INFINIDB_INSTALL_DIR/mysql/lib/mysql
-$INFINIDB_INSTALL_DIR/bin/postConfigure -i $INFINIDB_INSTALL_DIR
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$installdir/lib:$installdir/mysql/lib/mysql
+$installdir/bin/postConfigure -i $installdir
 
 EOD
 	else
 cat <<EOD
 The next step is:
 
-$INFINIDB_INSTALL_DIR/bin/postConfigure
+$installdir/bin/postConfigure
 
 EOD
 	fi
         exit 0
 else
-	# check if java is install
-	java=`which java 2>/dev/null`
-	if [ -z $java ]; then
+	chmod 777 $installdir/bin/setenv-hdfs-12
+	chmod 777 $installdir/bin/setenv-hdfs-20
+
+	. $installdir/bin/setenv-hdfs-20
+	$installdir/bin/hdfsCheck $installdir/lib/hdfs-20.so > /tmp/hdfs-20-test.log 2>&1
+	if [ $? -eq 0 ]; then
+		#Passed set in config file
+		$installdir/bin/setConfig -d SystemConfig DataFilePlugin $installdir/lib/hdfs-20.so
+		$installdir/bin/setConfig -d SystemConfig DataFileEnvFile setenv-hdfs-20
+	
+		#check for non-root user
+		if [ $installdir != "/usr/local/Calpont" -a $quiet -eq 0 ]; then
 cat <<EOD
 
-If you are intending to install InfiniDB over Hadoop, java is needed.
-Please install the Oracle JDK Java Package and try again.
+If you are intending to install InfiniDB over Hadoop, the next steps are:
+
+export INFINIDB_INSTALL_DIR=$installdir
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$installdir/lib:$installdir/mysql/lib/mysql
+. $installdir/bin/setenv-hdfs-20
+$installdir/bin/postConfigure -i $installdir
+
+If you are intending to install InfiniDB without Hadoop, the next steps are:
+
+export INFINIDB_INSTALL_DIR=$installdir/bin
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$installdir/lib:$installdir/mysql/lib/mysql
+$installdir/bin/postConfigure -i $installdir
+
 EOD
-		exit 1
+		else
+cat <<EOD
+
+If you are intending to install InfiniDB over Hadoop, the next steps are:
+
+. $installdir/bin/setenv-hdfs-20
+$installdir/bin/postConfigure
+
+If you are intending to install InfiniDB without Hadoop, the next step is:
+
+$installdir/bin/postConfigure
+
+EOD
+		fi
 	else
-		# Override JAVA_HOME in the file below if you want to disable
-		# automatic JAVA_HOME detection
-		[ -r /etc/default/bigtop-utils ] && . /etc/default/bigtop-utils
-		
-		# attempt to find java
-#		if [ -z $JAVA_HOME ]; then
-			for candidate in \
-				/usr/lib/j2sdk1.6-sun \
-				/usr/lib/jvm/java-6-sun \
-				/usr/lib/jvm/java-1.6.0-sun-1.6.0.* \
-				/usr/lib/jvm/java-1.6.0-sun-1.6.0.*/jre/ \
-				/usr/lib/jvm/j2sdk1.6-oracle \
-				/usr/lib/jvm/j2sdk1.6-oracle/jre \
-				/usr/java/jdk1.7* \
-				/usr/java/jre1.7* \
-				/usr/java/jdk1.6* \
-				/usr/java/jre1.6* \
-				/usr/lib/jvm/j2sdk1.7-oracle \
-				/usr/lib/jvm/j2sdk1.7-oracle/jre \
-				/Library/Java/Home \
-				/usr/java/default \
-				/usr/lib/jvm/default-java \
-				/usr/lib/jvm/java-openjdk \
-				/usr/lib/jvm/jre-openjdk \
-				/usr/lib/jvm/java-1.7.0-openjdk* \
-				/usr/lib/jvm/java-7-openjdk* \
-				/usr/lib/jvm/java-7-oracle* \
-				/usr/lib/jvm/java-1.6.0-openjdk \
-				/usr/lib/jvm/java-1.6.0-openjdk-* \
-				/usr/lib/jvm/jre-1.6.0-openjdk* ; do
-				if [ -e $candidate/bin/java ]; then
-					export JAVA_HOME=$candidate
-					break
-				fi
-			done
-#		fi
-
-		libfile=`find $JAVA_HOME -name libjava.so`
-		libpath=`echo $libfile | rev | cut -c 12- | rev`
-		export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$libpath
-		export JAVA_HOME=$JAVA_HOME
-
-		if [ -z "$libpath" ]; then
-cat <<EOD
-
-If you are intending to install InfiniDB over Hadoop, the JAVA library was not found.
-Please Contact InfiniDB Customer Support.
-EOD
-			exit 1
-		fi
-
-		#set in config file
-		$installdir/bin/setConfig -d Installation JavaHome $JAVA_HOME
-		$installdir/bin/setConfig -d Installation JavaPath $libpath
-
-		if [ -f $installdir/bin/setenv-hdfs-12 ]; then
-				cp $installdir/bin/setenv-hdfs-12 $userhome/.
-				chmod 777 $userhome/setenv-hdfs-12
-		fi
-		if [ -f $installdir/bin/setenv-hdfs-20 ]; then
-				cp $installdir/bin/setenv-hdfs-20 $userhome/.
-				chmod 777 $userhome/setenv-hdfs-20
-		fi
-
-		. $userhome/setenv-hdfs-20
-		$installdir/bin/hdfsCheck $installdir/lib/hdfs-20.so > /tmp/hdfs-20-test.log 2>&1
+		. $installdir/bin/setenv-hdfs-12
+		$installdir/bin/hdfsCheck $installdir/lib/hdfs-12.so > /tmp/hdfs-12-test.log 2>&1
 		if [ $? -eq 0 ]; then
-			#set in config file
-			$installdir/bin/setConfig -d SystemConfig DataFilePlugin $installdir/lib/hdfs-20.so
-			$installdir/bin/setConfig -d SystemConfig DataFileEnvFile setenv-hdfs-20
+			#Passed set in config file
+			$installdir/bin/setConfig -d SystemConfig DataFilePlugin $installdir/lib/hdfs-12.so
+			$installdir/bin/setConfig -d SystemConfig DataFileEnvFile setenv-hdfs-12
 
-			#check for non-root user
 			if [ $installdir != "/usr/local/Calpont" -a $quiet -eq 0 ]; then
 cat <<EOD
 
 If you are intending to install InfiniDB over Hadoop, the next steps are:
 
 export INFINIDB_INSTALL_DIR=$installdir
-export JAVA_HOME=$JAVA_HOME
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$INFINIDB_INSTALL_DIR/lib:$INFINIDB_INSTALL_DIR/mysql/lib/mysql:$libpath
-. $userhome/setenv-hdfs-20
-$INFINIDB_INSTALL_DIR/bin/postConfigure -i $INFINIDB_INSTALL_DIR
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$installdir/lib:$installdir/mysql/lib/mysql:$libpath
+. $installdir/bin/setenv-hdfs-12
+$installdir/bin/postConfigure -i $installdir
 
 If you are intending to install InfiniDB without Hadoop, the next steps are:
 
-export INFINIDB_INSTALL_DIR=$installdir
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$INFINIDB_INSTALL_DIR/lib:$INFINIDB_INSTALL_DIR/mysql/lib/mysql
-$INFINIDB_INSTALL_DIR/bin/postConfigure -i $INFINIDB_INSTALL_DIR
+export INFINIDB_INSTALL_DIR=$installdir/bin
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$installdir/lib:$installdir/mysql/lib/mysql
+$installdir/bin/postConfigure -i $installdir
 
 EOD
 			else
@@ -342,67 +311,22 @@ cat <<EOD
 
 If you are intending to install InfiniDB over Hadoop, the next steps are:
 
-export JAVA_HOME=$JAVA_HOME
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$libpath
-. $userhome/setenv-hdfs-20
-$INFINIDB_INSTALL_DIR/bin/postConfigure
+. $installdir/bin/setenv-hdfs-12
+$installdir/bin/postConfigure
 
 If you are intending to install InfiniDB without Hadoop, the next step is:
 
-$INFINIDB_INSTALL_DIR/bin/postConfigure
+$installdir/bin/postConfigure
 
 EOD
 			fi
 		else
-			. $userhome/setenv-hdfs-12
-			$installdir/bin/hdfsCheck $installdir/lib/hdfs-12.so > /tmp/hdfs-12-test.log 2>&1
-			if [ $? -eq 0 ]; then
-				#set in config file
-				$installdir/bin/setConfig -d SystemConfig DataFilePlugin $installdir/lib/hdfs-12.so
-				$installdir/bin/setConfig -d SystemConfig DataFileEnvFile setenv-hdfs-12
-
-				if [ $installdir != "/usr/local/Calpont" -a $quiet -eq 0 ]; then
-cat <<EOD
-
-If you are intending to install InfiniDB over Hadoop, the next steps are:
-
-export INFINIDB_INSTALL_DIR=$installdir
-export JAVA_HOME=$JAVA_HOME
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$INFINIDB_INSTALL_DIR/lib:$INFINIDB_INSTALL_DIR/mysql/lib/mysql:$libpath
-. $userhome/setenv-hdfs-12
-$INFINIDB_INSTALL_DIR/bin/postConfigure -i $INFINIDB_INSTALL_DIR
-
-If you are intending to install InfiniDB without Hadoop, the next steps are:
-
-export INFINIDB_INSTALL_DIR=$installdir
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$INFINIDB_INSTALL_DIR/lib:$INFINIDB_INSTALL_DIR/mysql/lib/mysql
-$INFINIDB_INSTALL_DIR/bin/postConfigure -i $INFINIDB_INSTALL_DIR
-
-EOD
-				else
-cat <<EOD
-
-If you are intending to install InfiniDB over Hadoop, the next steps are:
-
-export JAVA_HOME=$JAVA_HOME
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$libpath
-. $userhome/setenv-hdfs-12
-$INFINIDB_INSTALL_DIR/bin/postConfigure
-
-If you are intending to install InfiniDB without Hadoop, the next step is:
-
-$INFINIDB_INSTALL_DIR/bin/postConfigure
-
-EOD
-				fi
-			else
 cat <<EOD
 
 If you are intending to install InfiniDB over Hadoop, the Hadoop sanity check did not pass.  
 Most likely there is an environment setup conflict or the hdfs services are down.
 Please Contact InfiniDB Customer Support.
 EOD
-			fi
 		fi
 	fi
 fi

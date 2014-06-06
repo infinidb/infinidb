@@ -312,9 +312,9 @@ void msgProcessor()
 								while(p != sdl.end())
 								{
 									ackmsg << (*p).deviceName;
-									ackmsg << (ByteStream::quadbyte) ((*p).totalBlocks / 1024) ;
-									ackmsg << (ByteStream::quadbyte) ((*p).usedBlocks / 1024);
-									ackmsg << (ByteStream::byte) (*p).usedPercent;
+									ackmsg << (uint64_t) ((*p).totalBlocks / 1024) ;
+									ackmsg << (uint64_t) ((*p).usedBlocks / 1024);
+									ackmsg << (uint8_t) (*p).usedPercent;
 									p++;
 								}
 

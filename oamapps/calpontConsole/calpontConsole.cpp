@@ -5558,7 +5558,14 @@ int processCommand(string* arguments)
 								else
 								{
 									struct hostent* hentName = gethostbyname((*pt1).HostName.c_str());
-									cout << hentName->h_name << endl;
+									if (hentName)
+									{
+										cout << hentName->h_name << endl;
+									}
+									else
+									{
+										cout << (*pt1).HostName.c_str() << endl;
+									}
 								}
 							}
 						}
@@ -7874,7 +7881,7 @@ void printModuleDisk(ModuleDisk moduledisk)
 			cout.width(31);
 			cout << moduledisk.diskusage[i].DeviceName;
 			cout.width(14);
-			cout << oam.itoa(moduledisk.diskusage[i].TotalBlocks);
+			cout << moduledisk.diskusage[i].TotalBlocks;
 			cout.width(17);
 			cout << moduledisk.diskusage[i].UsedBlocks;
 			cout.width(2);

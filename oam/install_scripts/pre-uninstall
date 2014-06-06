@@ -88,6 +88,13 @@ rm -f $installdir/data/bulk/tmpjob/* >/dev/null 2>&1
 rm -rf /tmp/infinidb_tmp_files
 rm -f $installdir/local/moveDbrootTransactionLog
 
+#delete any old setenv files under home directory
+if [ $user = "root" ]; then
+	rm -f /root/setenv-hdfs*
+else
+	rm -f /home/$user/setenv-hdfs*
+fi
+
 # delete core files
 #rm -f /var/log/Calpont/corefiles/* > /dev/null 2>&1
 

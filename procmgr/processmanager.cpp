@@ -4940,6 +4940,17 @@ int ProcessManager::addModule(oam::DeviceNetworkList devicenetworklist, std::str
 		PMwithUM = "n";
 	}
 
+	//check mysql port changes
+	string MySQLPort;
+	try {
+		oam.getSystemConfig( "MySQLPort", MySQLPort);
+	}
+	catch(...)
+	{}
+
+	if ( MySQLPort.empty() || MySQLPort == "" || MySQLPort == oam::UnassignedName )
+		MySQLPort = "3306";
+
 	//setup and push custom OS files
 	listPT = devicenetworklist.begin();
 	for( ; listPT != devicenetworklist.end() ; listPT++)
@@ -5005,8 +5016,9 @@ int ProcessManager::addModule(oam::DeviceNetworkList devicenetworklist, std::str
 			//run remote installer script
 			if ( packageType != "binary" ) {
 				log.writeLog(__LINE__, "addModule - user_installer run for " +  remoteModuleName, LOG_TYPE_DEBUG);
-				string cmd = installDir + "/bin/user_installer.sh " + remoteModuleName + " " + remoteModuleIP + " " + password + " " + calpontPackage + " " + calpontPackage1 + " " + calpontPackage2 + " " + mysqlPackage + " " + mysqldPackage + " initial " + packageType +
-				" --nodeps none 1 > /tmp/user_installer.log";
+
+				string cmd = installDir + "/bin/user_installer.sh " + remoteModuleName + " " + remoteModuleIP + " " + password + " " + calpontPackage + " " + calpontPackage1 + " " + calpontPackage2 + " " + mysqlPackage + " " + mysqldPackage + " initial " + packageType + " --nodeps none " + MySQLPort + " 1 > /tmp/user_installer.log";
+
 				log.writeLog(__LINE__, "addModule cmd: " + cmd, LOG_TYPE_DEBUG);
 
 				rtnCode = system(cmd.c_str());
@@ -5025,7 +5037,7 @@ int ProcessManager::addModule(oam::DeviceNetworkList devicenetworklist, std::str
 				string binservertype = oam.itoa(config.ServerInstallType());
 				if ( PMwithUM == "y" )
 					binservertype = "pmwithum";
-				string cmd = installDir + "/bin/binary_installer.sh " + remoteModuleName + " " + remoteModuleIP + " " + password + " " + calpontPackage + " " + remoteModuleType + " initial " +  binservertype + " 1 " + binaryInstallDir + " > /tmp/binary_installer.log";
+				string cmd = installDir + "/bin/binary_installer.sh " + remoteModuleName + " " + remoteModuleIP + " " + password + " " + calpontPackage + " " + remoteModuleType + " initial " +  binservertype + " " + MySQLPort + " 1 " + binaryInstallDir + " > /tmp/binary_installer.log";
 
 				log.writeLog(__LINE__, "addModule - " + cmd, LOG_TYPE_DEBUG);
 				rtnCode = system(cmd.c_str());
@@ -9874,7 +9886,7 @@ int ProcessManager::setMySQLReplication(oam::DeviceNetworkList devicenetworklist
 			msg << password;
 			msg << "all";
 		
-			log.writeLog(__LINE__, "Distribute Msater DB, master module=" + masterModule, LOG_TYPE_DEBUG);
+			log.writeLog(__LINE__, "Distribute Master DB, master module=" + masterModule, LOG_TYPE_DEBUG);
 		
 			int returnStatus = sendMsgProcMon( masterModule, msg, requestID, 60 );
 		
@@ -9901,7 +9913,7 @@ int ProcessManager::setMySQLReplication(oam::DeviceNetworkList devicenetworklist
 				msg << password;
 				msg << remoteModuleName;
 			
-				log.writeLog(__LINE__, "Distribute Msater DB, master module=" + masterModule, LOG_TYPE_DEBUG);
+				log.writeLog(__LINE__, "Distribute Master DB, master module=" + masterModule, LOG_TYPE_DEBUG);
 			
 				int returnStatus = sendMsgProcMon( masterModule, msg, requestID, 60 );
 			

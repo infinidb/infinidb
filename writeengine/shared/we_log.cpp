@@ -204,7 +204,11 @@ void Log::logSyslog( const std::string& msg,
             msgId = logging::M0076;
             break;
         }
-
+		case ERR_UNKNOWN:
+		{
+			msgId = logging::M0017;
+            break;
+		}
         default:
         {
             msgId = logging::M0087;

@@ -42,17 +42,8 @@ fi
 #hadoop
 plugin=`$INFINIDB_INSTALL_DIR/bin/getConfig SystemConfig DataFilePlugin`
 if [ -n "$plugin" ]; then
-	JavaHome=`$INFINIDB_INSTALL_DIR/bin/getConfig Installation JavaHome`
-	JavaPath=`$INFINIDB_INSTALL_DIR/bin/getConfig Installation JavaPath`
-	export JAVA_HOME=$JavaHome
-	export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$JavaPath
-
 	setenv=`$InstallDir/bin/getConfig SystemConfig DataFileEnvFile`
-	if [ -z "$setenv" ]; then
-		#default
-		setenv=setenv-hdfs-20
-	fi
-	. ~/$setenv >/dev/null 2>&1
+	. $InstallDir/bin/$setenv >/dev/null 2>&1
 fi
 
 if [ -e $InstallDir/lib/libjemalloc.so ]; then

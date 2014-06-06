@@ -62,6 +62,10 @@ chown -R $user:$user $mysql_datadir
 if [ $installdir != "/usr/local/Calpont" ]; then
 	sed -i -e s@/usr/local/Calpont@$installdir@g $installdir/mysql/my.cnf
 fi
+
+# InfiniDB testing hook...
+test -x /usr/local/bin/idb-testing-mysql-pre-start && /usr/local/bin/idb-testing-mysql-pre-start $installdir/mysql
+
 ### Don't give the user the notes, we'll fix them ourselves...
 $installdir/mysql/bin/mysql_install_db --rpm --user=$user --defaults-file=$installdir/mysql/my.cnf --basedir=$installdir/mysql >/dev/null
 # Change permissions again to fix any new files.

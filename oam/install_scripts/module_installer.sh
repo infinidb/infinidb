@@ -116,17 +116,13 @@ if [ -n "$plugin" ]; then
 	echo "Setup .bashrc on Module for local-query"
 
 	setenv=`$INFINIDB_INSTALL_DIR/bin/getConfig SystemConfig DataFileEnvFile`
-	JavaHome=`$INFINIDB_INSTALL_DIR/bin/getConfig Installation JavaHome`
-	JavaPath=`$INFINIDB_INSTALL_DIR/bin/getConfig Installation JavaPath`
 
 	eval userhome=~$user
 	bashFile=$userhome/.bashrc
 	touch ${bashFile}
 
 	echo " " >> ${bashFile}
-	echo "export JAVA_HOME=$JavaHome" >> ${bashFile}
-	echo "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$JavaPath" >> ${bashFile}
-	echo ". ~/$setenv" >> ${bashFile}
+	echo ". $INFINIDB_INSTALL_DIR/bin/$setenv" >> ${bashFile}
 fi
 
 if [ $user != "root" ]; then
