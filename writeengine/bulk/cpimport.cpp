@@ -159,6 +159,7 @@ void printUsage()
         "        -I Binary import; binaryOpt 1-import NULL values"   << endl <<
         "                                    2-saturate NULL values" << endl <<
         "        -S Treat string truncations as errors" << endl << 
+		"        -D Disable timeout when waiting for table lock" << endl <<
         "        -L send *.err and *.bad (reject) files here" << endl << endl;
 
     cout << "    Example1:" << endl <<
@@ -288,7 +289,7 @@ void parseCmdLineArgs(
     std::string jobUUID;
 
     while( (option=getopt(
-        argc,argv,"b:c:d:e:f:hij:kl:m:n:p:r:s:u:w:B:C:DE:I:P:R:SX:")) != EOF )
+        argc,argv,"b:c:d:e:f:hij:kl:m:n:p:r:s:u:w:B:C:DE:I:P:R:SX:L:")) != EOF )
     {
         switch(option)
         {

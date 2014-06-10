@@ -1807,6 +1807,8 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 			msg >> masterLogFile;
 			string masterLogPos;
 			msg >> masterLogPos;
+			string port;
+			msg >> port;
 
 			//change local my.cnf file
 			int ret = changeMyCnf("slave");
@@ -1823,7 +1825,7 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 			}
 
 			// run Slave Rep script
-			ret = runSlaveRep(mysqlpw, masterLogFile, masterLogPos);
+			ret = runSlaveRep(mysqlpw, masterLogFile, masterLogPos, port);
 
 			ackMsg << (ByteStream::byte) ACK;
 			ackMsg << (ByteStream::byte) SLAVEREP;
@@ -4901,7 +4903,7 @@ int ProcessMonitor::runMasterRep(std::string& mysqlpw, std::string& masterLogFil
 * purpose:	run Slave Replication script
 *
 ******************************************************************************************/
-int ProcessMonitor::runSlaveRep(std::string& mysqlpw, std::string& masterLogFile, std::string& masterLogPos)
+int ProcessMonitor::runSlaveRep(std::string& mysqlpw, std::string& masterLogFile, std::string& masterLogPos, std::string& port)
 {
 	Oam oam;
 
@@ -4923,7 +4925,7 @@ int ProcessMonitor::runSlaveRep(std::string& mysqlpw, std::string& masterLogFile
 	{}
 
 	string cmd = startup::StartUp::installDir() + "/bin/slave-rep-infinidb.sh --password=" +
-		mysqlpw + " --installdir=" + startup::StartUp::installDir() + " --masteripaddr=" + masterIPAddress + " --masterlogfile=" + masterLogFile  + " --masterlogpos=" + masterLogPos + "  >   /tmp/slave-rep-infinidb.log 2>&1";
+		mysqlpw + " --installdir=" + startup::StartUp::installDir() + " --masteripaddr=" + masterIPAddress + " --masterlogfile=" + masterLogFile  + " --masterlogpos=" + masterLogPos + + " --port=" + port + "  >   /tmp/slave-rep-infinidb.log 2>&1";
 	system(cmd.c_str());
 
 	cmd = "/tmp/slave-rep-infinidb.log";

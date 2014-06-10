@@ -507,7 +507,7 @@ public:
     /**
      *@brief run Slave Replication script
      */
-	int runSlaveRep(std::string& mysqlpw, std::string& masterLogFile, std::string& masterLogPos);
+	int runSlaveRep(std::string& mysqlpw, std::string& masterLogFile, std::string& masterLogPos, std::string& port);
 
     /**
      *@brief Amazon Instance and IP check

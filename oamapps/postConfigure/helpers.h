@@ -23,16 +23,28 @@
 using namespace messageqcpp;
 namespace installer
 {
+
+typedef struct Child_Module_struct
+{
+	std::string     moduleName;
+	std::string     moduleIP;
+	std::string     hostName;
+} ChildModule;
+
+typedef std::vector<ChildModule> ChildModuleList;
+
 extern bool waitForActive();
 extern void dbrmDirCheck();
 extern void mysqlSetup();
 extern int sendMsgProcMon( std::string module, ByteStream msg, int requestID, int timeout );
 extern int sendUpgradeRequest(int IserverTypeInstall, bool pmwithum);
-extern int sendReplicationRequest(int IserverTypeInstall, std::string password);
+extern int sendReplicationRequest(int IserverTypeInstall, std::string password, std::string mysqlPort);
 extern void checkFilesPerPartion(int DBRootCount, Config* sysConfig);
 extern void checkMysqlPort( string& mysqlPort, Config* sysConfig );
-extern void checkRemoteMysqlPort(std::string remoteModuleIP, std::string remoteModuleName, std::string USER, std::string password, std::string& mysqlPort, Config* sysConfig);
 extern bool writeConfig(Config* sysConfig);
+extern void checkSystemMySQLPort(std::string& mysqlPort, Config* sysConfig, std::string USER, std::string password, ChildModuleList childmodulelist, int IserverTypeInstall, bool pmwithum);
+
+
 
 }
 

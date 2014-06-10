@@ -3441,13 +3441,14 @@ int WE_DMLCommandProc::validateColumnHWMs(
     // Make sure the HWMs for all 1-byte columns match; same for all 2-byte,
     // 4-byte, and 8-byte columns as well.
     CalpontSystemCatalog::ColType colType;
+    Convertor convertor;
     for (unsigned k=0; k<segFileInfo.size(); k++)
     {
         int k1 = 0;
 
         // Find out column width
         colType = systemCatalogPtr->colType(ridList[k].objnum);
-     
+		colType.colWidth = convertor.getCorrectRowWidth(colType.colDataType, colType.colWidth);
         // Find the first 1-byte, 2-byte, 4-byte, and 8-byte columns.
         // Use those as our reference HWM for the respective column widths.
         switch ( colType.colWidth )

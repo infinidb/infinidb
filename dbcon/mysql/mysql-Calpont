@@ -225,22 +225,17 @@ wait_for_pid () {
 
 kill_by_pid() {
   # let's see if we can kill the 2 mysql procs by hand
-  # get the port # mysqld is listening on (we can't just kill every mysql on the host
-  # we can only kill ours...)
-  port=$(awk '-F[ =]' '/^port/ {print $NF}' $basedir/my.cnf | head -1)
-  if [ -n "$port" ]; then
-    if [ -x /usr/sbin/lsof ]; then
-      eval $(/usr/sbin/lsof -P -i:$port | tail -1 | awk '{printf "pname=%s\npid=%d\n", $1, $2}')
-      if [ x$pname = xmysqld ]; then
-        ppid=$(ps -o ppid= -p $pid)
+  # get the our mysql from ps
+  eval $(ps -ef | grep "$INFINIDB_INSTALL_DIR/mysql/libexec/mysqld" | grep -v grep | head -1 | awk '{printf "pname=%s\npid=%d\n", $1, $2}')
+
+  if [ x$pname = xmysql ]; then
+	ppid=$(ps -o ppid= -p $pid)
         $SUDO kill -9 $ppid
         sleep 1
         $SUDO kill -9 $pid
         echo $echo_n "Force shutting down (no/bad pid file)" 
         log_success_msg
         exit 0
-      fi
-    fi
   fi
   return
 }

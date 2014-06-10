@@ -22,9 +22,9 @@ Along with a working C++ compiler and GNU software development tools you will ne
 
 ### InfiniDB MySQL
 
-    wget -Omysql-4.5.1-2.tar.gz https://github.com/infinidb/mysql/archive/4.5.1-2.tar.gz
-    tar -zxf mysql-4.5.1-2.tar.gz
-    ln -s mysql-4.5.1-2 mysql
+    wget -Omysql-4.5.1-3.tar.gz https://github.com/infinidb/mysql/archive/4.5.1-3.tar.gz
+    tar -zxf mysql-4.5.1-3.tar.gz
+    ln -s mysql-4.5.1-3 mysql
     cd mysql
     ./configure --prefix=$HOME/infinidb/mysql
     make
@@ -33,9 +33,9 @@ Along with a working C++ compiler and GNU software development tools you will ne
 ### InfiniDB
 
     cd ..
-    wget -Oinfinidb-4.5.1-2.tar.gz https://github.com/infinidb/infinidb/archive/4.5.1-2.tar.gz
-    tar -zxf infinidb-4.5.1-2.tar.gz
-    ln -s infinidb-4.5.1-2 infinidb
+    wget -Oinfinidb-4.5.1-3.tar.gz https://github.com/infinidb/infinidb/archive/4.5.1-3.tar.gz
+    tar -zxf infinidb-4.5.1-3.tar.gz
+    ln -s infinidb-4.5.1-3 infinidb
     cd infinidb
     ./configure --prefix=$HOME/infinidb
     make

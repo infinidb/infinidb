@@ -71,14 +71,6 @@ using namespace snmpmanager;
 #include "helpers.h"
 using namespace installer;
 
-typedef struct Child_Module_struct
-{
-	std::string     moduleName;
-	std::string     moduleIP;
-	std::string     hostName;
-} ChildModule;
-
-typedef std::vector<ChildModule> ChildModuleList;
 
 typedef struct DBRoot_Module_struct
 {
@@ -183,12 +175,18 @@ string mysqlpw = " ";
 
 const char* callReadline(string prompt)
 {
-	if ( !noPrompting )
-		return readline(prompt.c_str());
-	else {
-		cout << prompt << endl;
-		return "";
+    	if ( !noPrompting )
+	{
+	        const char* ret = readline(prompt.c_str());
+	        if( ret == 0 )
+	            exit(1);
+        	return ret;
 	}
+    	else 
+	{
+        	cout << prompt << endl;
+        	return "";
+    	}
 }
 
 void callFree(const char* )
@@ -450,15 +448,41 @@ int main(int argc, char *argv[])
 	catch(...)
 	{}
 
-	//run post install for coverage of possible binary package install
-	cmd = installDir + "/bin/post-install --installdir=" + installDir + " > /dev/null 2>&1";
-	system(cmd.c_str());
-
 	//check Config saved files
 	if ( !checkSaveConfigFile())
 	{
 		cout << "ERROR: Configuration File not setup" << endl;
 		exit(1);
+	}
+
+	//check mysql port changes
+	string MySQLPort;
+	try {
+		MySQLPort = sysConfig->getConfig(InstallSection, "MySQLPort");
+	}
+	catch(...)
+	{}
+
+	if ( mysqlPort == oam::UnassignedName )
+	{
+		if ( MySQLPort.empty() || MySQLPort == "" ) {
+			mysqlPort = "3306";
+			try {
+				sysConfig->setConfig(InstallSection, "MySQLPort", "3306");
+			}
+			catch(...)
+			{}
+		}
+		else
+			mysqlPort = MySQLPort;
+	}
+	else
+	{	// mysql port was providing on command line
+		try {
+			sysConfig->setConfig(InstallSection, "MySQLPort", mysqlPort);
+		}
+		catch(...)
+		{}
 	}
 
 	cout << endl;
@@ -561,6 +585,8 @@ int main(int argc, char *argv[])
 			
 				if (startOfflinePrompt)
 					offLineAppCheck();
+
+				checkMysqlPort(mysqlPort, sysConfig);
 
 				if ( !writeConfig(sysConfig) ) {
 					cout << "ERROR: Failed trying to update InfiniDB System Configuration file" << endl;
@@ -928,36 +954,6 @@ int main(int argc, char *argv[])
 
 	if ( mysqlRep )
 		cout << "NOTE: MySQL Replication Feature is enabled" << endl;
-
-	//check mysql port changes
-	string MySQLPort;
-	try {
-		MySQLPort = sysConfig->getConfig(InstallSection, "MySQLPort");
-	}
-	catch(...)
-	{}
-
-	if ( mysqlPort == oam::UnassignedName )
-	{
-		if ( MySQLPort.empty() || MySQLPort == "" ) {
-			mysqlPort = "3306";
-			try {
-				sysConfig->setConfig(InstallSection, "MySQLPort", "3306");
-			}
-			catch(...)
-			{}
-		}
-		else
-			mysqlPort = MySQLPort;
-	}
-	else
-	{	// mysql port was providing on command line
-		try {
-			sysConfig->setConfig(InstallSection, "MySQLPort", mysqlPort);
-		}
-		catch(...)
-		{}
-	}
 
 	//Write out Updated System Configuration File
 	try {
@@ -2652,7 +2648,7 @@ int main(int argc, char *argv[])
 	//check if dbrm data resides in older directory path and inform user if it does
 	dbrmDirCheck();
 
-	if ( IserverTypeInstall == oam::INSTALL_COMBINE_DM_UM_PM ) {
+	if ( IserverTypeInstall == oam::INSTALL_COMBINE_DM_UM_PM && pmNumber == 1) {
 		//run the mysql / mysqld setup scripts
 		cout << endl << "===== Running the InfiniDB MySQL setup scripts =====" << endl << endl;
 
@@ -2672,7 +2668,6 @@ int main(int argc, char *argv[])
 
 	if ( IserverTypeInstall != oam::INSTALL_COMBINE_DM_UM_PM || 
 			pmNumber > 1 ) {
-
 		//
 		// perform remote install of other servers in the system
 		//
@@ -2832,23 +2827,6 @@ int main(int argc, char *argv[])
 					system(cmd.c_str());
 					cout << endl;
 				}
-				else
-					cout << endl << "===== Running the InfiniDB MySQL setup scripts =====" << endl << endl;
-
-				checkMysqlPort(mysqlPort, sysConfig);
-
-				// run my.cnf upgrade script
-				if ( reuseConfig == "y" && MySQLRep == "y" )
-				{
-					cmd = installDir + "/bin/mycnfUpgrade  > /tmp/mycnfUpgrade.log 2>&1";
-					int rtnCode = system(cmd.c_str());
-					if (WEXITSTATUS(rtnCode) != 0)
-						cout << "Error: Problem upgrade my.cnf, check /tmp/mycnfUpgrade.log" << endl;
-				}
-
-				// call the mysql setup scripts
-				mysqlSetup();
-				sleep(5);
 			}
 			else
 			{
@@ -2908,6 +2886,27 @@ int main(int argc, char *argv[])
 				password = "'" + password + "'";
 			}
 
+			checkSystemMySQLPort(mysqlPort, sysConfig, USER, password, childmodulelist, IserverTypeInstall, pmwithum);
+
+			if ( ( IserverTypeInstall == oam::INSTALL_COMBINE_DM_UM_PM ) ||
+				( (IserverTypeInstall != oam::INSTALL_COMBINE_DM_UM_PM) && pmwithum ) )
+			{
+				cout << endl << "===== Running the InfiniDB MySQL setup scripts =====" << endl << endl;
+
+				// run my.cnf upgrade script
+				if ( reuseConfig == "y" && MySQLRep == "y" )
+				{
+					cmd = installDir + "/bin/mycnfUpgrade  > /tmp/mycnfUpgrade.log 2>&1";
+					int rtnCode = system(cmd.c_str());
+					if (WEXITSTATUS(rtnCode) != 0)
+						cout << "Error: Problem upgrade my.cnf, check /tmp/mycnfUpgrade.log" << endl;
+				}
+
+				// call the mysql setup scripts
+				mysqlSetup();
+				sleep(5);
+			}
+
 			ChildModuleList::iterator list1 = childmodulelist.begin();
 			for (; list1 != childmodulelist.end() ; list1++)
 			{
@@ -2939,7 +2938,7 @@ int main(int argc, char *argv[])
 							temppwprompt = "none";
 
 						//check my.cnf port in-user on remote node
-						checkRemoteMysqlPort(remoteModuleIP, remoteModuleName, USER, password, mysqlPort, sysConfig);
+//						checkRemoteMysqlPort(remoteModuleIP, remoteModuleName, USER, password, mysqlPort, sysConfig);
 
 						//run remote installer script
 						cmd = installDir + "/bin/user_installer.sh " + remoteModuleName + " " + remoteModuleIP + " " + password + " " + calpontPackage1 + " " + calpontPackage2 + " " + calpontPackage3 + " " + mysqlPackage + " " + mysqldPackage + " initial " + EEPackageType + " " + nodeps + " " + temppwprompt + " " + mysqlPort + " " + remote_installer_debug + " " + debug_logfile;
@@ -3041,7 +3040,7 @@ int main(int argc, char *argv[])
 							binservertype = "pmwithum";
 
 						//check my.cnf port in-user on remote node
-						checkRemoteMysqlPort(remoteModuleIP, remoteModuleName, USER, password, mysqlPort, sysConfig);
+//						checkRemoteMysqlPort(remoteModuleIP, remoteModuleName, USER, password, mysqlPort, sysConfig);
 
 						cmd = installDir + "/bin/binary_installer.sh " + remoteModuleName + " " +
 							remoteModuleIP + " " + password + " " + calpontPackage1 + " " + remoteModuleType +
@@ -3415,7 +3414,10 @@ int main(int argc, char *argv[])
 	if ( waitForActive() ) {
 		cout << " DONE" << endl;
 
-		cmd = ". " + installDir + "/bin/" + DataFileEnvFile + ";" + installDir + "/bin/dbbuilder 7 > /tmp/dbbuilder.log";		
+		if (hdfs)
+			cmd = ". " + installDir + "/bin/" + DataFileEnvFile + ";" + installDir + "/bin/dbbuilder 7 > /tmp/dbbuilder.log";
+		else
+			cmd = installDir + "/bin/dbbuilder 7 > /tmp/dbbuilder.log";
 
 		system(cmd.c_str());
 
@@ -3455,7 +3457,7 @@ int main(int argc, char *argv[])
 			cout.flush();
 
 			//send message to procmon's to run upgrade script
-			int status = sendReplicationRequest(IserverTypeInstall, password);
+			int status = sendReplicationRequest(IserverTypeInstall, password, mysqlPort);
 
 			if ( status != 0 ) {
 				cout << endl << " InfiniDB Install Failed" << endl << endl;
@@ -4215,7 +4217,7 @@ bool storageSetup(string cloud)
 
 			while(true)
 			{
-				cout << " Running HDFS Sanity Test:    ";
+				cout << " Running HDFS Sanity Test (please wait):    ";
 				cout.flush();
 				string logdir("/var/log/Calpont");
 				if (access(logdir.c_str(), W_OK) != 0) logdir = "/tmp";
@@ -4372,10 +4374,7 @@ bool storageSetup(string cloud)
 		glusterInstalled = "y";
 
 	//check if hadoop is installed
-	if (rootUser)
-		system("which hadoop > /tmp/hadoop.log 2>&1");
-	else
-		system("sudo which hadoop > /tmp/hadoop.log 2>&1");
+	system("which hadoop > /tmp/hadoop.log 2>&1");
 
 	ifstream in1("/tmp/hadoop.log");
 
@@ -4600,7 +4599,7 @@ bool storageSetup(string cloud)
 				cout << "Error: Hadoop Datafile Plugin File (" + DataFilePlugin + ") doesn't exist, please re-enter" << endl;
 			else
 			{
-				cout << endl << " Running HDFS Sanity Test:    ";
+				cout << endl << " Running HDFS Sanity Test (please wait):    ";
 				cout.flush();
 				string logdir("/var/log/Calpont");
 				if (access(logdir.c_str(), W_OK) != 0) logdir = "/tmp";
@@ -4920,6 +4919,15 @@ bool updateBash()
 
    	ifstream newFile (fileName.c_str());
 
+	if (!rootUser)
+	{
+		string cmd = "echo export INFINIDB_INSTALL_DIR=" + installDir + " >> " + fileName;
+		system(cmd.c_str());
+	
+		cmd = "echo export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$INFINIDB_INSTALL_DIR/lib:$INFINIDB_INSTALL_DIR/mysql/lib/mysql >> " + fileName;
+		system(cmd.c_str());
+	}
+
 	if ( hdfs ) 
 	{	
 		string cmd = "echo . " + installDir + "/bin/" + DataFileEnvFile + " >> " + fileName;
@@ -4930,15 +4938,6 @@ bool updateBash()
 		else
 			cmd = "sudo su - hdfs -c 'hadoop fs -mkdir -p " + installDir + ";hadoop fs -chown " + USER + ":" + USER + " + installDir + ' >/dev/null 2>&1";
 	
-		system(cmd.c_str());
-	}
-
-	if (!rootUser)
-	{
-		string cmd = "echo export INFINIDB_INSTALL_DIR=" + installDir + " >> " + fileName;
-		system(cmd.c_str());
-	
-		cmd = "echo export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$INFINIDB_INSTALL_DIR/lib:$INFINIDB_INSTALL_DIR/mysql/lib/mysql >> " + fileName;
 		system(cmd.c_str());
 	}
 

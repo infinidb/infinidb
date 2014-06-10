@@ -36,6 +36,8 @@ for arg in "$@"; do
 		masterlogfile="`echo $arg | awk -F= '{print $2}'`"
 	elif [ `expr -- "$arg" : '--masterlogpos='` -eq 15 ]; then
 		masterlogpos="`echo $arg | awk -F= '{print $2}'`"
+	elif [ `expr -- "$arg" : '--port='` -eq 7 ]; then
+		port="`echo $arg | awk -F= '{print $2}'`"
 	fi
 done
 
@@ -71,6 +73,7 @@ CHANGE MASTER TO
     	MASTER_HOST='$masteripaddr',
     	MASTER_USER='$repUser',
     	MASTER_PASSWORD='$password',
+    	MASTER_PORT=$port,
    	MASTER_LOG_FILE='$masterlogfile',
     	MASTER_LOG_POS=$masterlogpos;
 

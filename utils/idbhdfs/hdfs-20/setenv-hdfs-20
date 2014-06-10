@@ -136,12 +136,7 @@ if [ -z $javalibfile ]; then
 	return 1
 fi
 
-ln -sf $javalibfile $INFINIDB_INSTALL_DIR/lib/
-chown -h $user.$user $INFINIDB_INSTALL_DIR/lib/libjvm.so >/dev/null 2>&1
-
 javalibpath=$(dirname $javalibfile)
-javalibpath=$(dirname $javalibpath)
-javalibpath=$(dirname $javalibpath)
 
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$javalibpath
 export JAVA_HOME=$JAVA_HOME

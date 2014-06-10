@@ -111,6 +111,18 @@ if [ $EUID -eq 0 -a -f $INFINIDB_INSTALL_DIR/local/rc.local.calpont ]; then
 	fi
 fi
 
+if [ $user != "root" ]; then
+	echo "Setup .bashrc on Module for non-root"
+
+	eval userhome=~$user
+	bashFile=$userhome/.bashrc
+	touch ${bashFile}
+
+	echo " " >> ${bashFile}
+	echo "export INFINIDB_INSTALL_DIR=$INFINIDB_INSTALL_DIR" >> ${bashFile}
+	echo "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$INFINIDB_INSTALL_DIR/lib:$INFINIDB_INSTALL_DIR/mysql/lib/mysql" >> ${bashFile}
+fi
+
 plugin=`$INFINIDB_INSTALL_DIR/bin/getConfig SystemConfig DataFilePlugin`
 if [ -n "$plugin" ]; then
 	echo "Setup .bashrc on Module for local-query"
@@ -123,18 +135,6 @@ if [ -n "$plugin" ]; then
 
 	echo " " >> ${bashFile}
 	echo ". $INFINIDB_INSTALL_DIR/bin/$setenv" >> ${bashFile}
-fi
-
-if [ $user != "root" ]; then
-	echo "Setup .bashrc on Module for non-root"
-
-	eval userhome=~$user
-	bashFile=$userhome/.bashrc
-	touch ${bashFile}
-
-	echo " " >> ${bashFile}
-	echo "export INFINIDB_INSTALL_DIR=$INFINIDB_INSTALL_DIR" >> ${bashFile}
-	echo "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$INFINIDB_INSTALL_DIR/lib:$INFINIDB_INSTALL_DIR/mysql/lib/mysql" >> ${bashFile}
 fi
 
 # if mysqlrep is on and module has a my.cnf file, upgrade it

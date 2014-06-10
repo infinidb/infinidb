@@ -355,7 +355,7 @@ int sendUpgradeRequest(int IserverTypeInstall, bool pmwithum)
 *
 *
 ******************************************************************************************/
-int sendReplicationRequest(int IserverTypeInstall, std::string password)
+int sendReplicationRequest(int IserverTypeInstall, std::string password, std::string port)
 {
 	Oam oam;
 
@@ -454,7 +454,8 @@ int sendReplicationRequest(int IserverTypeInstall, std::string password)
 	
 							msg << masterLogFile;
 							msg << masterLogPos;
-	
+							msg << port;
+
 							returnStatus = sendMsgProcMon( (*pt).DeviceName, msg, requestID, 30 );
 			
 							if ( returnStatus != API_SUCCESS) {
@@ -647,15 +648,14 @@ void checkMysqlPort( std::string& mysqlPort, Config* sysConfig )
 			int size = oldFile.tellg();
 			if ( size != 0 ) {
 				if ( noPrompting ) {
-					cout << "The mysqld port of '" + mysqlPort + "' is already in-use" << endl;
+					cout << endl << "The mysqld port of '" + mysqlPort + "' is already in-use" << endl;
 					cout << "For No-prompt install, use the command line argument of 'port' to enter a different number" << endl;
 					exit(1);
 				}
 
 				cout << "The mysqld port of '" + mysqlPort + "' is already in-use" << endl;
-				cout << "enter a different port ID" << endl;
 
-				pcommand = readline("Enter a port number > ");
+				pcommand = readline("Enter a different port number > ");
 				if (pcommand)
 				{
 					if (strlen(pcommand) > 0) mysqlPort = pcommand;
@@ -665,6 +665,8 @@ void checkMysqlPort( std::string& mysqlPort, Config* sysConfig )
 			}
 			else
 			{
+				cout << endl;
+
 				try {
 					sysConfig->setConfig("Installation", "MySQLPort", mysqlPort);
 				}
@@ -687,35 +689,94 @@ void checkMysqlPort( std::string& mysqlPort, Config* sysConfig )
 	oam.changeMyCnf( "port", mysqlPort );
 }
 
-void checkRemoteMysqlPort(std::string remoteModuleIP, std::string remoteModuleName, std::string USER, std::string password, std::string& mysqlPort, Config* sysConfig)
+void checkSystemMySQLPort(std::string& mysqlPort, Config* sysConfig, std::string USER, std::string password, ChildModuleList childmodulelist, int IserverTypeInstall, bool pmwithum)
 {
 	Oam oam;
 	char* pcommand = 0;
 
-	while (true)
+	bool inUse = false;
+
+	while(true)
 	{
-		string cmd = installDir + "/bin/remote_command_verify.sh " + remoteModuleIP + " " + " " + USER + " " + password + " 'netstat -na | grep " + mysqlPort + " | grep LISTEN' tcp error 2 0 > /dev/null 2>&1";
-		int rtnCode = system(cmd.c_str());
-		if (WEXITSTATUS(rtnCode) == 0) {
-			if ( noPrompting ) {
-				cout << "The mysqld port of '" + mysqlPort + "' is already in-use on " << remoteModuleName << endl;
-				cout << "For No-prompt install, use the command line argument of 'port' to enter a different number" << endl;
-				cout << "exiting..." << endl;
-				exit(1);
+		string localnetstat = "netstat -na | grep :" + mysqlPort + " | grep LISTEN > /tmp/mysqlport";
+		string remotenetstat = "netstat -na | grep :" + mysqlPort + " | grep LISTEN";
+
+		//first check local mysql, if needed
+		if ( ( IserverTypeInstall == oam::INSTALL_COMBINE_DM_UM_PM ) ||
+			( ( IserverTypeInstall != oam::INSTALL_COMBINE_DM_UM_PM ) && pmwithum ) )
+		{
+			system(localnetstat.c_str());
+			string fileName = "/tmp/mysqlport";
+			ifstream oldFile (fileName.c_str());
+
+			if (oldFile) {
+				oldFile.seekg(0, std::ios::end);
+				int size = oldFile.tellg();
+				if ( size != 0 ) {
+					if ( noPrompting ) {
+						cout << endl << "The mysqld port of '" + mysqlPort + "' is already in-use" << endl;
+						cout << "For No-prompt install, use the command line argument of 'port' to enter a different number" << endl;
+						exit(1);
+					}
+					else
+						inUse = true;
+				}
 			}
+		}
 
-			cout << "The mysqld port of '" + mysqlPort + "' is already in-use on " << remoteModuleName << endl;
+		// if not inuse by local, go check remote servers
+		if ( !inUse )
+		{
+			ChildModuleList::iterator list1 = childmodulelist.begin();
+			for (; list1 != childmodulelist.end() ; list1++)
+			{
+				string remoteModuleName = (*list1).moduleName;
+				string remoteModuleIP = (*list1).moduleIP;
+				string remoteHostName = (*list1).hostName;
+				string remoteModuleType = remoteModuleName.substr(0,MAX_MODULE_TYPE_SIZE);
+		
+				if ( remoteModuleType == "um" ||
+					(remoteModuleType == "pm" && IserverTypeInstall == oam::INSTALL_COMBINE_DM_UM_PM) ||
+					(remoteModuleType == "pm" && pmwithum) )
+				{
 
-			pcommand = readline("Enter a port number > ");
+					string cmd = installDir + "/bin/remote_command_verify.sh " + remoteModuleIP + " " + " " + USER + " " + password + " '" + remotenetstat + "' tcp error 5 0 > /dev/null 2>&1";
+					int rtnCode = system(cmd.c_str());
+					if (WEXITSTATUS(rtnCode) == 0) {
+						if ( noPrompting ) {
+							cout << endl << "The mysqld port of '" + mysqlPort + "' is already in-use on " << remoteModuleName << endl;
+							cout << "For No-prompt install, use the command line argument of 'port' to enter a different number" << endl;
+							cout << "exiting..." << endl;
+							exit(1);
+						}
+						else
+						{
+							inUse = true;
+							break;
+						}
+					}
+				}
+			}
+		}
+
+		if ( inUse )
+		{
+			cout << endl << "The mysqld port of '" + mysqlPort + "' is already in-use" << endl;
+
+			pcommand = readline("Enter a different port number > ");
 			if (pcommand)
 			{
 				if (strlen(pcommand) > 0) mysqlPort = pcommand;
 				free(pcommand);
 				pcommand = 0;
 			}
+
+			inUse = false;
 		}
 		else
 		{
+			cout << endl;
+
 			try {
 				sysConfig->setConfig("Installation", "MySQLPort", mysqlPort);
 			}
@@ -730,6 +791,9 @@ void checkRemoteMysqlPort(std::string remoteModuleIP, std::string remoteModuleNa
 			break;
 		}
 	}
+
+	// set mysql password
+	oam.changeMyCnf( "port", mysqlPort );
 
 	return;
 }
