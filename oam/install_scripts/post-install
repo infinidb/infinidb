@@ -262,7 +262,7 @@ $installdir/bin/postConfigure -i $installdir
 
 If you are intending to install InfiniDB without Hadoop, the next steps are:
 
-export INFINIDB_INSTALL_DIR=$installdir/bin
+export INFINIDB_INSTALL_DIR=$installdir
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$installdir/lib:$installdir/mysql/lib/mysql
 $installdir/bin/postConfigure -i $installdir
 
@@ -301,7 +301,7 @@ $installdir/bin/postConfigure -i $installdir
 
 If you are intending to install InfiniDB without Hadoop, the next steps are:
 
-export INFINIDB_INSTALL_DIR=$installdir/bin
+export INFINIDB_INSTALL_DIR=$installdir
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$installdir/lib:$installdir/mysql/lib/mysql
 $installdir/bin/postConfigure -i $installdir
 

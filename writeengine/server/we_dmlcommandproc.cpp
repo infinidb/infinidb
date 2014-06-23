@@ -865,6 +865,7 @@ uint8_t WE_DMLCommandProc::processBatchInsert(messageqcpp::ByteStream& bs, std::
 			err = ec.errorString(rc);
 			err += " Check err.log for detailed information.";
 			fIsFirstBatchPm = false;
+			rc = 1;
 			return rc;
 		}
 	}
@@ -1477,6 +1478,7 @@ uint8_t WE_DMLCommandProc::processBatchInsertHwm(messageqcpp::ByteStream& bs, st
 		fIsFirstBatchPm = true;
 		fWEWrapper.setIsInsert(true);
 		fWEWrapper.setBulkFlag(true);
+		rc = 1;
 		return rc;
 	}
 

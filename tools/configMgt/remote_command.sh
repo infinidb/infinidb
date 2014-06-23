@@ -10,6 +10,7 @@
 # Argument 5 - Bad Response
 # Argument 6 - timeout
 # Argument 7 - Debug flag
+set stty_init {cols 512 -opost};
 set timeout 30
 set SERVER [lindex $argv 0]
 set USERNAME [lindex $argv 1]

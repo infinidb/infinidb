@@ -1,6 +1,9 @@
 @echo off
 
-set branch=4.5
+set branch=%1
+IF "%1" == "" (
+  set branch=4.5.1
+)
 set basedir=\InfiniDB_%branch%
 echo Building %basedir%
 

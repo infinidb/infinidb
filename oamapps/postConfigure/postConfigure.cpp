@@ -448,6 +448,10 @@ int main(int argc, char *argv[])
 	catch(...)
 	{}
 
+	//run post install for coverage of possible binary package install
+	cmd = installDir + "/bin/post-install --installdir=" + installDir + " > /dev/null 2>&1";
+	system(cmd.c_str());
+
 	//check Config saved files
 	if ( !checkSaveConfigFile())
 	{
@@ -4936,7 +4940,7 @@ bool updateBash()
 		if ( rootUser)
 			cmd = "su - hdfs -c 'hadoop fs -mkdir -p " + installDir + ";hadoop fs -chown root:root " + installDir + "' >/dev/null 2>&1";
 		else
-			cmd = "sudo su - hdfs -c 'hadoop fs -mkdir -p " + installDir + ";hadoop fs -chown " + USER + ":" + USER + " + installDir + ' >/dev/null 2>&1";
+			cmd = "sudo su - hdfs -c 'hadoop fs -mkdir -p " + installDir + ";hadoop fs -chown " + USER + ":" + USER + " " + installDir + "' >/dev/null 2>&1";
 	
 		system(cmd.c_str());
 	}

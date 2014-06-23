@@ -316,6 +316,8 @@ logicalpartition.h \
 mastersegmenttable.h \
 sessionmanagerserver.h \
 shmkeys.h \
+slavecomm.h \
+slavedbrmnode.h \
 tracer.h \
 undoable.h \
 vbbm.h \

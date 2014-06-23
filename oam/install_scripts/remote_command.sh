@@ -9,6 +9,7 @@
 # Argument 4 - debug flag
 # Argument 5 - Remote user name (optional)
 # Argument 6 - Force a tty to be allocated (optional)
+set stty_init {cols 512 -opost};
 set timeout 30
 set SERVER [lindex $argv 0]
 set PASSWORD [lindex $argv 1]

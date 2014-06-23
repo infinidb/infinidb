@@ -226,9 +226,9 @@ wait_for_pid () {
 kill_by_pid() {
   # let's see if we can kill the 2 mysql procs by hand
   # get the our mysql from ps
-  eval $(ps -ef | grep "$INFINIDB_INSTALL_DIR/mysql/libexec/mysqld" | grep -v grep | head -1 | awk '{printf "pname=%s\npid=%d\n", $1, $2}')
+  eval $(ps -ef | grep "$INFINIDB_INSTALL_DIR/mysql/libexec/mysqld" | grep -v grep | head -1 | awk '{printf "pid=%d\n", $2}')
 
-  if [ x$pname = xmysql ]; then
+  if [ -n "$pid" ]; then
 	ppid=$(ps -o ppid= -p $pid)
         $SUDO kill -9 $ppid
         sleep 1
