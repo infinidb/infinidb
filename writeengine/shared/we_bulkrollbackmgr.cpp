@@ -1030,16 +1030,48 @@ void BulkRollbackMgr::deleteColumn2ExtentsV4 ( const char* inBuf )
     logAMessage( logging::LOG_TYPE_INFO,
         logging::M0073, columnOID, msg0073Text.str() );
 
+    // @bug 5644 - If user dropped all partitions in a dbroot, partNumHwm will
+    // be 0, but we may start importing into part# > 0 (to line up with other
+    // DBRoots).  Use extent map to find first partition added by this import.
+    std::vector<struct BRM::EMEntry> extEntries;
+    int rc = BRMWrapper::getInstance()->getExtents_dbroot( columnOID,
+        extEntries, dbRootHwm );
+    if (rc != NO_ERROR)
+    {
+        WErrorCodes ec;
+        std::ostringstream oss;
+        oss << "Error getting extent list from extent map for " <<
+            columnOID <<
+            "; dbRoot-"    << dbRootHwm    <<
+            "; "           << ec.errorString(rc);
+
+        throw WeException( oss.str(), ERR_BRM_BULK_RB_COLUMN );
+    }
+    u_int32_t part1 = partNumHwm; // lowest part# for column and DBRoot
+    if (extEntries.size() > 0)
+    {
+        part1 = extEntries[0].partitionNum;
+        for (unsigned int kk=0; kk<extEntries.size(); kk++)
+        {
+            if (extEntries[kk].partitionNum < part1)
+                part1 = extEntries[kk].partitionNum;
+        }
+    }
+
     // Delete extents from the extentmap
     std::ostringstream msg0074Text;
     msg0074Text << "Restoring empty DBRoot. "
         "dbRoot-"  << dbRootHwm  <<
         "; part#-" << partNumHwm <<
         "; seg#-"  << segNumHwm  <<
-        "; hwm-"   << lastLocalHwm;
+        "; hwm-"   << lastLocalHwm <<
+        "; delete starting at part#-" << part1;
     logAMessage( logging::LOG_TYPE_INFO,
         logging::M0074, columnOID, msg0074Text.str() );
     fAllColDctOIDs.insert( columnOID );
+
+    // Reset partNumHwm to partNum taken from extent map
+    partNumHwm = part1;
 
     // Create the object responsible for restoring the extents in the db files.
     BulkRollbackFile* fileRestorer = makeFileRestorer(compressionType);
@@ -1048,7 +1080,7 @@ void BulkRollbackMgr::deleteColumn2ExtentsV4 ( const char* inBuf )
     // DMC-We should probably change this to build up a list of BRM changes,
     //     and wait to make the call(s) to rollback the BRM changes "after" we
     //     have restored the db files, and purged PrimProc FD and block cache.
-    int rc = BRMWrapper::getInstance()->rollbackColumnExtents_DBroot (
+    rc = BRMWrapper::getInstance()->rollbackColumnExtents_DBroot (
         columnOID,
         true,           // true -> delete all extents (restore to empty DBRoot)
         (u_int16_t)dbRootHwm,
@@ -1226,6 +1258,40 @@ void BulkRollbackMgr::deleteDctnryExtentsV4 ( )
         hwms.push_back(    fPendingDctnryExtents[i].fHwm    );
     }
 
+    // @bug 5644 - If user dropped all partitions in a dbroot, fPartNum will
+    // be 0, but we may start importing into part# > 0 (to line up with other
+    // DBRoots).  Use extent map to find first partition added by this import.
+    u_int32_t part1 = fPendingDctnryExtents[0].fPartNum; // lowest part# for
+                                                        // OID and DBRoot
+    if (hwms.size() == 0) // empty DBRoot case
+    {
+        std::vector<struct BRM::EMEntry> extEntries;
+        int rc = BRMWrapper::getInstance()->getExtents_dbroot(
+            fPendingDctnryStoreOID,
+            extEntries,
+            fPendingDctnryStoreDbRoot );
+        if (rc != NO_ERROR)
+        {
+            WErrorCodes ec;
+            std::ostringstream oss;
+            oss << "Error getting extent list from extent map for " <<
+                fPendingDctnryStoreOID <<
+                "; dbRoot-"    << fPendingDctnryStoreDbRoot <<
+                "; "           << ec.errorString(rc);
+
+            throw WeException( oss.str(), ERR_BRM_BULK_RB_COLUMN );
+        }
+        if (extEntries.size() > 0)
+        {
+            part1 = extEntries[0].partitionNum;
+            for (unsigned int kk=0; kk<extEntries.size(); kk++)
+            {
+                if (extEntries[kk].partitionNum < part1)
+                    part1 = extEntries[kk].partitionNum;
+            }
+        }
+    }
+
     // Delete extents from the extentmap using hwms vector
     std::ostringstream msg0074Text;
     msg0074Text << "Restoring HWM dictionary store extents: "
@@ -1238,10 +1304,15 @@ void BulkRollbackMgr::deleteDctnryExtentsV4 ( )
             msg0074Text << ", ";
         msg0074Text << hwms[k];
     }
+    if (hwms.size() == 0)
+        msg0074Text << "; delete starting at part#-" << part1;
 
     logAMessage( logging::LOG_TYPE_INFO,
         logging::M0074, fPendingDctnryStoreOID, msg0074Text.str() );
     fAllColDctOIDs.insert( fPendingDctnryStoreOID );
+
+    // Reset partNum to partNum taken from extent map
+    u_int32_t partNum = part1;
 
     // Create the object responsible for restoring the extents in the db files.
     BulkRollbackFile* fileRestorer = makeFileRestorer(
@@ -1254,7 +1325,7 @@ void BulkRollbackMgr::deleteDctnryExtentsV4 ( )
     int rc = BRMWrapper::getInstance()->rollbackDictStoreExtents_DBroot (
         fPendingDctnryStoreOID,
         (u_int16_t)fPendingDctnryStoreDbRoot,
-        fPendingDctnryExtents[0].fPartNum,
+        partNum,
         segNums,
         hwms );
     if (rc != NO_ERROR)
@@ -1263,7 +1334,7 @@ void BulkRollbackMgr::deleteDctnryExtentsV4 ( )
         std::ostringstream oss;
         oss<< "Error rolling back dictionary extents from extent map for "<<
             fPendingDctnryStoreOID <<
-            "; partNum-" << fPendingDctnryExtents[0].fPartNum <<
+            "; partNum-" << partNum <<
             "; "         << ec.errorString(rc);
 
         throw WeException( oss.str(), ERR_BRM_BULK_RB_DCTNRY );
@@ -1276,7 +1347,6 @@ void BulkRollbackMgr::deleteDctnryExtentsV4 ( )
         (ROWS_PER_EXTENT * COL_WIDTH)/BYTE_PER_BLOCK;
 
     u_int32_t dbRoot  = fPendingDctnryStoreDbRoot;
-    u_int32_t partNum = fPendingDctnryExtents[0].fPartNum;
     std::string segFileListErrMsg;
 
     // Delete extents from the database files.

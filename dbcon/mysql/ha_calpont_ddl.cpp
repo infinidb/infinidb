@@ -608,7 +608,7 @@ bool anyNullInTheColumn (string& schema, string& table, string& columnName, int 
 }
 
 int ProcessDDLStatement(string& ddlStatement, string& schema, const string& table, int sessionID,
-	 string& emsg, int compressionTypeIn = 0, bool isAnyAutoincreCol = false, int64_t nextvalue = 1, std::string autoiColName = "")
+	 string& emsg, int compressionTypeIn = 2, bool isAnyAutoincreCol = false, int64_t nextvalue = 1, std::string autoiColName = "")
 {
   SqlParser parser;
   THD *thd = current_thd;
@@ -2154,8 +2154,23 @@ long long calonlinealter(UDF_INIT* initid, UDF_ARGS* args,
 	string db("");
 	if ( thd->db )
 		db = thd->db;
-		
-	int rc = ProcessDDLStatement(stmt, db, "", tid2sid(thd->thread_id), emsg);
+
+	int compressiontype = thd->variables.infinidb_compression_type;
+
+	if (compressiontype == 1) compressiontype = 2;
+	
+	if ( compressiontype == MAX_INT )
+		compressiontype = thd->variables.infinidb_compression_type;
+
+	//hdfs
+	if ((compressiontype ==0) && (useHdfs))
+	{
+		compressiontype = 2;
+	}
+
+	if (compressiontype == 1) compressiontype = 2;
+	
+	int rc = ProcessDDLStatement(stmt, db, "", tid2sid(thd->thread_id), emsg, compressiontype);
 	if (rc != 0)
 		push_warning(thd, MYSQL_ERROR::WARN_LEVEL_ERROR, 9999, emsg.c_str());
 

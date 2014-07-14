@@ -291,6 +291,14 @@ UniqId::UniqId(int o, const execplan::SimpleColumn* sc) :
 }
 
 
+string UniqId::toString() const
+{
+	ostringstream strstm;
+	strstm << fId << ":" << fTable << ":" << fSchema << ":" << fView << ":" << (int64_t)fSubId;
+	return strstm.str();
+}
+
+
 //------------------------------------------------------------------------------
 // Returns the table alias for the specified column
 //------------------------------------------------------------------------------

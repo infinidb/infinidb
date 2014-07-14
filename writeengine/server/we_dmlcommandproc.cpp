@@ -853,6 +853,17 @@ uint8_t WE_DMLCommandProc::processBatchInsert(messageqcpp::ByteStream& bs, std::
 			rc = 1;
 			return rc;
 		}
+		//@Bug 5996 validate hwm before starts
+		rc = validateColumnHWMs(ridList, systemCatalogPtr, colDBRootExtentInfo, "Starting");
+		if ( rc != 0)
+		{
+			WErrorCodes ec;
+			err = ec.errorString(rc);
+			err += " Check err.log for detailed information.";
+			fIsFirstBatchPm = false;
+			rc = 1;
+			return rc;
+		}
 	}
 	std::vector<BRM::LBIDRange>   rangeList;
 
@@ -1376,28 +1387,92 @@ uint8_t WE_DMLCommandProc::processBatchInsertHwm(messageqcpp::ByteStream& bs, st
 	std::vector<BRM::FileInfo> files;
 	std::vector<BRM::OID_t>  oidsToFlush;
 
-    BRM::FileInfo aFile;
-    TableMetaData* aTbaleMetaData = TableMetaData::makeTableMetaData(tableOid);
-    ColsExtsInfoMap colsExtsInfoMap = aTbaleMetaData->getColsExtsInfoMap();
-    ColsExtsInfoMap::iterator it = colsExtsInfoMap.begin();
-    ColExtsInfo::iterator aIt;
-    while (it != colsExtsInfoMap.end())
-    {
-                aIt = (it->second).begin();
-                aFile.oid = it->first;
-				oidsToFlush.push_back(aFile.oid);
-                while (aIt != (it->second).end())
-                {
-                        aFile.partitionNum = aIt->partNum;
-                        aFile.dbRoot =aIt->dbRoot;
-                        aFile.segmentNum = aIt->segNum;
-                        aFile.compType = aIt->compType;
-                        files.push_back(aFile);
-                        aIt++;
-                }
-                it++;
-    }
+	BRM::FileInfo aFile;
+	//BRM::FileInfo curFile;
+	TableMetaData* aTbaleMetaData = TableMetaData::makeTableMetaData(tableOid);
+	ColsExtsInfoMap colsExtsInfoMap = aTbaleMetaData->getColsExtsInfoMap();
+	ColsExtsInfoMap::iterator it = colsExtsInfoMap.begin();
+	ColExtsInfo::iterator aIt;
+	CalpontSystemCatalog::RIDList ridList;
+	CalpontSystemCatalog::ROPair roPair;
+	std::vector<DBRootExtentInfo> colDBRootExtentInfo;
+	DBRootExtentInfo aExtentInfo;
+	while (it != colsExtsInfoMap.end())
+	{
+		aIt = (it->second).begin();
+		aFile.oid = it->first;
+		oidsToFlush.push_back(aFile.oid);
+		roPair.objnum = aFile.oid;
+		aExtentInfo.fPartition = 0;
+		aExtentInfo.fDbRoot = 0;
+		aExtentInfo.fSegment = 0;
+		aExtentInfo.fLocalHwm = 0;
+		bool isDict = false;
+		while (aIt != (it->second).end())
+		{
+			aFile.partitionNum = aIt->partNum;
+			aFile.dbRoot =aIt->dbRoot;
+			aFile.segmentNum = aIt->segNum;
+			aFile.compType = aIt->compType;
+			files.push_back(aFile);
+			if (!aIt->isDict)
+			{
+				if ((aIt->partNum > aExtentInfo.fPartition) || ((aIt->partNum == aExtentInfo.fPartition) && (aIt->segNum > aExtentInfo.fSegment)) || 
+					((aIt->partNum == aExtentInfo.fPartition) && (aIt->segNum == aExtentInfo.fSegment) && (aIt->segNum >aExtentInfo.fLocalHwm )))
+				{
+					aExtentInfo.fPartition = aIt->partNum;
+					aExtentInfo.fDbRoot = aIt->dbRoot;
+					aExtentInfo.fSegment = aIt->segNum;
+					aExtentInfo.fLocalHwm = aIt->hwm;
+				}
+			}
+			else
+			{
+				isDict = true;
+			}
+			aIt++;
+		}
+		if (!isDict)
+		{
+			ridList.push_back(roPair);
+			colDBRootExtentInfo.push_back(aExtentInfo);
+		}
+		it++;
+	}
 
+	//@Bug 5996. Validate hwm before set them
+	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(0);
+	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
+	try {
+		CalpontSystemCatalog::TableName tableName = systemCatalogPtr->tableName(tableOid);
+		ridList = systemCatalogPtr->columnRIDs(tableName);		
+	}
+	catch(exception& ex)
+	{
+		err = ex.what();
+		rc = 1;
+		TableMetaData::removeTableMetaData(tableOid);
+
+		fIsFirstBatchPm = true;
+		//cout << "flush files when autocommit off" << endl;
+		fWEWrapper.setIsInsert(true);
+		fWEWrapper.setBulkFlag(true);
+		return rc;
+	}
+	rc = validateColumnHWMs(ridList, systemCatalogPtr, colDBRootExtentInfo, "Ending");
+	if ( rc != 0)
+	{
+		WErrorCodes ec;
+		err = ec.errorString(rc);
+		err += " Check err.log for detailed information.";
+		TableMetaData::removeTableMetaData(tableOid);
+
+		fIsFirstBatchPm = true;
+		fWEWrapper.setIsInsert(true);
+		fWEWrapper.setBulkFlag(true);
+		rc = 1;
+		return rc;
+	}
 
 	try {
 	if (isAutoCommitOn)
@@ -1422,27 +1497,28 @@ uint8_t WE_DMLCommandProc::processBatchInsertHwm(messageqcpp::ByteStream& bs, st
 	}
 	
 	// Handle case where isAutoCommitOn is false
-        BRM::DBRM dbrm;
-        //cout << " In processBatchInsertHwm setting hwm" << endl;
-        std::vector<BRM::BulkSetHWMArg> setHWMArgs;
-        it = colsExtsInfoMap.begin();
-        BulkSetHWMArg aArg;
-        while (it != colsExtsInfoMap.end())
-        {
-                aIt = (it->second).begin();
-                aArg.oid = it->first;
-                //cout << "for oid " << aArg.oid << endl;
-                while (aIt != (it->second).end())
-                {
-                        aArg.partNum = aIt->partNum;
-                        aArg.segNum = aIt->segNum;
-                        aArg.hwm = aIt->hwm;
-                        //cout << " part:seg:hwm = " << aArg.partNum <<":"<<aArg.segNum<<":"<<aArg.hwm<<endl;
-                        setHWMArgs.push_back(aArg);
-                        aIt++;
-                }
-                it++;
-        }
+		BRM::DBRM dbrm;
+		//cout << " In processBatchInsertHwm setting hwm" << endl;
+		std::vector<BRM::BulkSetHWMArg> setHWMArgs;
+		it = colsExtsInfoMap.begin();
+		BulkSetHWMArg aArg;
+		while (it != colsExtsInfoMap.end())
+		{
+				aIt = (it->second).begin();
+				aArg.oid = it->first;
+				//cout << "for oid " << aArg.oid << endl;
+				while (aIt != (it->second).end())
+				{
+						aArg.partNum = aIt->partNum;
+						aArg.segNum = aIt->segNum;
+						aArg.hwm = aIt->hwm;
+						//@Bug 6029 dictionary store files already set hwm.
+						if (!aIt->isDict)
+							setHWMArgs.push_back(aArg);
+						aIt++;
+				}
+				it++;
+		}
 
 	TableMetaData::removeTableMetaData(tableOid);
 
@@ -3160,5 +3236,262 @@ uint8_t WE_DMLCommandProc::processEndTransaction(ByteStream& bs, std::string & e
 	}
 	return rc;
 
+}
+//------------------------------------------------------------------------------
+// Validates the correctness of the current HWMs for this table.
+// The HWMs for all the 1 byte columns should be identical.  Same goes
+// for all the 2 byte columns, etc.  The 2 byte column HWMs should be
+// "roughly" (but not necessarily exactly) twice that of a 1 byte column.
+// Same goes for the 4 byte column HWMs vs their 2 byte counterparts, etc.
+// ridList - columns oids to be used to get column width on to use with validation.
+// segFileInfo - Vector of File objects carrying current DBRoot, partition,
+//            HWM, etc to be validated for the columns belonging to jobTable.
+// stage    - Current stage we are validating.  "Starting" or "Ending".
+//------------------------------------------------------------------------------
+int WE_DMLCommandProc::validateColumnHWMs(
+    CalpontSystemCatalog::RIDList& ridList,
+    boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr,
+    const std::vector<DBRootExtentInfo>& segFileInfo,
+    const char* stage )
+{
+    int rc = NO_ERROR;
+    if ((!fIsFirstBatchPm) && (strcmp(stage,"Starting") == 0))
+		return rc;
+    // Used to track first 1-byte, 2-byte, 4-byte, and 8-byte columns in table
+    int byte1First = -1;
+    int byte2First = -1;
+    int byte4First = -1;
+    int byte8First = -1;
+
+    // Make sure the HWMs for all 1-byte columns match; same for all 2-byte,
+    // 4-byte, and 8-byte columns as well.
+    CalpontSystemCatalog::ColType colType;
+    Convertor convertor;
+    for (unsigned k=0; k<segFileInfo.size(); k++)
+    {
+        int k1 = 0;
+
+        // Find out column width
+        colType = systemCatalogPtr->colType(ridList[k].objnum);
+		colType.colWidth = convertor.getCorrectRowWidth(colType.colDataType, colType.colWidth);
+        // Find the first 1-byte, 2-byte, 4-byte, and 8-byte columns.
+        // Use those as our reference HWM for the respective column widths.
+        switch ( colType.colWidth )
+        {
+            case 1:
+            {
+                if (byte1First == -1)
+                    byte1First = k;
+                k1 = byte1First;
+                break;
+            }
+            case 2:
+            {
+                if (byte2First == -1)
+                    byte2First = k;
+                k1 = byte2First;
+                break;
+            }
+            case 4:
+            {
+                if (byte4First == -1)
+                    byte4First = k;
+                k1 = byte4First;
+                break;
+            }
+            case 8:
+            default:
+            {
+                if (byte8First == -1)
+                    byte8First = k;
+                k1 = byte8First;
+                break;
+            }
+        } // end of switch based on column width (1,2,4, or 8)
+
+//std::cout << "dbg: comparing0 " << stage << " refcol-" << k1 <<
+//  "; wid-" << jobColK1.width << "; hwm-" << segFileInfo[k1].fLocalHwm <<
+//  " <to> col-" << k <<
+//  "; wid-" << jobColK.width << " ; hwm-"<<segFileInfo[k].fLocalHwm<<std::endl;
+
+        // Validate that the HWM for this column (k) matches that of the
+        // corresponding reference column with the same width.
+        if ((segFileInfo[k1].fDbRoot    != segFileInfo[k].fDbRoot)    ||
+            (segFileInfo[k1].fPartition != segFileInfo[k].fPartition) ||
+            (segFileInfo[k1].fSegment   != segFileInfo[k].fSegment)   ||
+            (segFileInfo[k1].fLocalHwm  != segFileInfo[k].fLocalHwm))
+        {
+			CalpontSystemCatalog::ColType colType2;
+			colType2 = systemCatalogPtr->colType(ridList[k1].objnum);
+            ostringstream oss;
+            oss << stage << " HWMs do not match for"
+                " OID1-"       << ridList[k1].objnum              <<
+                "; DBRoot-"    << segFileInfo[k1].fDbRoot      <<
+                "; partition-" << segFileInfo[k1].fPartition   <<
+                "; segment-"   << segFileInfo[k1].fSegment     <<
+                "; hwm-"       << segFileInfo[k1].fLocalHwm    <<
+                "; width-"     << colType2.colWidth << ':'<<std::endl<<
+                " and OID2-"   << ridList[k].objnum               <<
+                "; DBRoot-"    << segFileInfo[k].fDbRoot       <<
+                "; partition-" << segFileInfo[k].fPartition    <<
+                "; segment-"   << segFileInfo[k].fSegment      <<
+                "; hwm-"       << segFileInfo[k].fLocalHwm     <<
+                "; width-"     << colType.colWidth;
+            fLog.logMsg( oss.str(), ERR_UNKNOWN, MSGLVL_ERROR );
+            return ERR_BRM_HWMS_NOT_EQUAL;
+        }
+
+        // HWM DBRoot, partition, and segment number should match for all
+        // columns; so compare DBRoot, part#, and seg# with first column.
+        if ((segFileInfo[0].fDbRoot    != segFileInfo[k].fDbRoot)    ||
+            (segFileInfo[0].fPartition != segFileInfo[k].fPartition) ||
+            (segFileInfo[0].fSegment   != segFileInfo[k].fSegment))
+        {
+			CalpontSystemCatalog::ColType colType2;
+			colType2 = systemCatalogPtr->colType(ridList[0].objnum);
+            ostringstream oss;
+            oss << stage << " HWM DBRoot,Part#, or Seg# do not match for"
+                " OID1-"       << ridList[0].objnum               <<
+                "; DBRoot-"    << segFileInfo[0].fDbRoot       <<
+                "; partition-" << segFileInfo[0].fPartition    <<
+                "; segment-"   << segFileInfo[0].fSegment      <<
+                "; hwm-"       << segFileInfo[0].fLocalHwm     <<
+                "; width-"     << colType2.colWidth << ':'<<std::endl<<
+                " and OID2-"   << ridList[k].objnum               <<
+                "; DBRoot-"    << segFileInfo[k].fDbRoot       <<
+                "; partition-" << segFileInfo[k].fPartition    <<
+                "; segment-"   << segFileInfo[k].fSegment      <<
+                "; hwm-"       << segFileInfo[k].fLocalHwm     <<
+                "; width-"     << colType.colWidth;
+            fLog.logMsg( oss.str(), ERR_UNKNOWN, MSGLVL_ERROR );
+            return ERR_BRM_HWMS_NOT_EQUAL;
+        }
+    } // end of loop to compare all 1-byte HWMs, 2-byte HWMs, etc.
+
+    // Validate/compare HWM for 1-byte column in relation to 2-byte column, etc.
+    // Without knowing the exact row count, we can't extrapolate the exact HWM
+    // for the wider column, but we can narrow it down to an expected range.
+    int refCol = 0;
+    int colIdx = 0;
+
+    // Validate/compare HWMs given a 1-byte column as a starting point
+    if (byte1First >= 0)
+    {
+        refCol = byte1First;
+
+        if (byte2First >= 0)
+        {
+            HWM hwmLo = segFileInfo[byte1First].fLocalHwm * 2;
+            HWM hwmHi = hwmLo + 1;
+            if ((segFileInfo[byte2First].fLocalHwm < hwmLo) ||
+                (segFileInfo[byte2First].fLocalHwm > hwmHi))
+            {
+                colIdx = byte2First;
+                rc     = ERR_BRM_HWMS_OUT_OF_SYNC;
+                goto errorCheck;
+            }
+        }
+        if (byte4First >= 0)
+        {
+            HWM hwmLo = segFileInfo[byte1First].fLocalHwm * 4;
+            HWM hwmHi = hwmLo + 3;
+            if ((segFileInfo[byte4First].fLocalHwm < hwmLo) ||
+                (segFileInfo[byte4First].fLocalHwm > hwmHi))
+            {
+                colIdx = byte4First;
+                rc     = ERR_BRM_HWMS_OUT_OF_SYNC;
+                goto errorCheck;
+            }
+        }
+        if (byte8First >= 0)
+        {
+            HWM hwmLo = segFileInfo[byte1First].fLocalHwm * 8;
+            HWM hwmHi = hwmLo + 7;
+            if ((segFileInfo[byte8First].fLocalHwm < hwmLo) ||
+                (segFileInfo[byte8First].fLocalHwm > hwmHi))
+            {
+                colIdx = byte8First;
+                rc     = ERR_BRM_HWMS_OUT_OF_SYNC;
+                goto errorCheck;
+            }
+        }
+    }
+
+    // Validate/compare HWMs given a 2-byte column as a starting point
+    if (byte2First >= 0)
+    {
+        refCol = byte2First;
+
+        if (byte4First >= 0)
+        {
+            HWM hwmLo = segFileInfo[byte2First].fLocalHwm * 2;
+            HWM hwmHi = hwmLo + 1;
+            if ((segFileInfo[byte4First].fLocalHwm < hwmLo) ||
+                (segFileInfo[byte4First].fLocalHwm > hwmHi))
+            {
+                colIdx = byte4First;
+                rc     = ERR_BRM_HWMS_OUT_OF_SYNC;
+                goto errorCheck;
+            }
+        }
+        if (byte8First >= 0)
+        {
+            HWM hwmLo = segFileInfo[byte2First].fLocalHwm * 4;
+            HWM hwmHi = hwmLo + 3;
+            if ((segFileInfo[byte8First].fLocalHwm < hwmLo) ||
+                (segFileInfo[byte8First].fLocalHwm > hwmHi))
+            {
+                colIdx = byte8First;
+                rc     = ERR_BRM_HWMS_OUT_OF_SYNC;
+                goto errorCheck;
+            }
+        }
+    }
+
+    // Validate/compare HWMs given a 4-byte column as a starting point
+    if (byte4First >= 0)
+    {
+        refCol = byte4First;
+
+        if (byte8First >= 0)
+        {
+            HWM hwmLo = segFileInfo[byte4First].fLocalHwm * 2;
+            HWM hwmHi = hwmLo + 1;
+            if ((segFileInfo[byte8First].fLocalHwm < hwmLo) ||
+                (segFileInfo[byte8First].fLocalHwm > hwmHi))
+            {
+                colIdx = byte8First;
+                rc     = ERR_BRM_HWMS_OUT_OF_SYNC;
+                goto errorCheck;
+            }
+        }
+    }
+
+// To avoid repeating this message 6 times in the preceding source code, we
+// use the "dreaded" goto to branch to this single place for error handling.
+errorCheck:
+    if (rc != NO_ERROR)
+    {
+		CalpontSystemCatalog::ColType colType1, colType2;
+		colType1 = systemCatalogPtr->colType(ridList[refCol].objnum);
+		colType2 = systemCatalogPtr->colType(ridList[colIdx].objnum);
+        ostringstream oss;
+        oss << stage << " HWMs are not in sync for"
+            " OID1-"       << ridList[refCol].objnum                <<
+            "; DBRoot-"    << segFileInfo[refCol].fDbRoot      <<
+            "; partition-" << segFileInfo[refCol].fPartition   <<
+            "; segment-"   << segFileInfo[refCol].fSegment     <<
+            "; hwm-"       << segFileInfo[refCol].fLocalHwm    <<
+            "; width-"     << colType1.colWidth<< ':'<<std::endl<<
+            " and OID2-"   << ridList[colIdx].objnum                 <<
+            "; DBRoot-"    << segFileInfo[colIdx].fDbRoot      <<
+            "; partition-" << segFileInfo[colIdx].fPartition   <<
+            "; segment-"   << segFileInfo[colIdx].fSegment     <<
+            "; hwm-"       << segFileInfo[colIdx].fLocalHwm    <<
+            "; width-"     << colType2.colWidth;
+        fLog.logMsg( oss.str(), ERR_UNKNOWN, MSGLVL_ERROR );
+    }
+
+    return rc;
 }
 }

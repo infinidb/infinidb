@@ -1,37 +1,43 @@
-::@echo off
+@echo off
+
+set branch=4.0
+set basedir=\InfiniDB_%branch%
+echo Building %basedir%
 
 echo ======================================
 echo updating mysql source
-cd \InfiniDB\mysql
-git checkout 4.0
+cd %basedir%\mysql
+git checkout %branch%
+git stash
 git pull
+git stash pop
 IF %ERRORLEVEL% NEQ 0 GOTO ERROR_HANDLER
 
 echo ======================================
 echo updating InfiniDB source
-cd \InfiniDB\genii
-git checkout 4.0
-git pull origin_http 4.0
+cd %basedir%\genii
+git checkout %branch%
+git pull origin_http %branch%
 IF %ERRORLEVEL% NEQ 0 GOTO ERROR_HANDLER
 
 echo ======================================
 echo Building mysql
-cd \InfiniDB\mysql
+cd %basedir%\mysql
 VCBUILD /M8 /rebuild mysql.sln "Release|x64"
 IF %ERRORLEVEL% NEQ 0 GOTO ERROR_HANDLER
 
 echo ======================================
 echo Building InfiniDB
-cd \InfiniDB\genii\build
+cd %basedir%\genii\build
 VCBUILD /M8 /rebuild InfiniDB.sln "EnterpriseRelease|x64"
 IF %ERRORLEVEL% NEQ 0 GOTO ERROR_HANDLER
 
 echo ======================================
 echo Building infindb-ent
-cd \InfiniDB\infinidb-ent\build
+cd %basedir%\infinidb-ent\build
 call Build.bat
 IF %ERRORLEVEL% NEQ 0 GOTO ERROR_HANDLER
-cd \InfiniDB\genii\build
+cd %basedir%\genii\build
 
 echo ======================================
 echo Building CalpontVersion.txt
@@ -55,10 +61,12 @@ GOTO QUIT
 echo.
 echo ======================================
 echo Error occured. InfiniDB not built
+cd %basedir%\genii\build
 exit /B 1
 
 :QUIT
 echo ======================================
+cd %basedir%\genii\build
 echo    compiled at %date% %time%
 echo nightly build complete
 

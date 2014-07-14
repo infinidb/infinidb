@@ -43,7 +43,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\boost_1_54_0;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\startup"
+				AdditionalIncludeDirectories="&quot;$(SolutionDir)..\..\libxml2-2.7.6&quot;;$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\genii\utils\messageqcpp;$(SolutionDir)..\..\genii\utils\winport;$(SolutionDir)..\..\genii\utils\loggingcpp;$(SolutionDir)..\..\genii\utils\startup"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
@@ -55,7 +55,7 @@
 			/>
 			<Tool
 				Name="VCResourceCompilerTool"
-				AdditionalIncludeDirectories="C:\InfiniDB\genii\utils\winport"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\genii\utils\winport"
 			/>
 			<Tool
 				Name="VCPreLinkEventTool"
@@ -63,7 +63,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="libmessageqcpp.lib libloggingcpp.lib libidbboot.lib libwinport.lib libxml2.lib ws2_32.lib"
-				AdditionalLibraryDirectories="C:\InfiniDB\Debug"
+				AdditionalLibraryDirectories="$(SolutionDir)..\..\Debug"
 				GenerateDebugInformation="true"
 				TargetMachine="1"
 			/>
@@ -115,7 +115,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\boost_1_54_0;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\startup"
+				AdditionalIncludeDirectories="&quot;$(SolutionDir)..\..\libxml2-2.7.6&quot;;$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\genii\utils\messageqcpp;$(SolutionDir)..\..\genii\utils\winport;$(SolutionDir)..\..\genii\utils\loggingcpp;$(SolutionDir)..\..\genii\utils\startup"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
@@ -134,7 +134,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="libmessageqcpp.lib libloggingcpp.lib libidbboot.lib libwinport.lib libxml2.lib ws2_32.lib"
-				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_54_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\x64\Debug"
+				AdditionalLibraryDirectories="$(SolutionDir)..\..\boost_1_54_0;&quot;$(SolutionDir)..\..\libxml2-2.7.6&quot;;$(SolutionDir)..\..\x64\Debug"
 			/>
 			<Tool
 				Name="VCALinkTool"
@@ -185,7 +185,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\boost_1_54_0;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\startup"
+				AdditionalIncludeDirectories="&quot;$(SolutionDir)..\..\libxml2-2.7.6&quot;;$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\genii\utils\messageqcpp;$(SolutionDir)..\..\genii\utils\winport;$(SolutionDir)..\..\genii\utils\loggingcpp;$(SolutionDir)..\..\genii\utils\startup"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
 				WarningLevel="3"
@@ -197,7 +197,7 @@
 			/>
 			<Tool
 				Name="VCResourceCompilerTool"
-				AdditionalIncludeDirectories="C:\InfiniDB\genii\utils\winport"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\genii\utils\winport"
 			/>
 			<Tool
 				Name="VCPreLinkEventTool"
@@ -205,7 +205,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="libmessageqcpp.lib libloggingcpp.lib libidbboot.lib libwinport.lib libxml2.lib ws2_32.lib"
-				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_54_0\lib32;&quot;C:\InfiniDB\libxml2-2.7.6\lib32&quot;;C:\InfiniDB\Release"
+				AdditionalLibraryDirectories="$(SolutionDir)..\..\boost_1_54_0\lib32;&quot;$(SolutionDir)..\..\libxml2-2.7.6\lib32&quot;;$(SolutionDir)..\..\Release"
 				GenerateDebugInformation="true"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
@@ -261,7 +261,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\boost_1_54_0;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\startup"
+				AdditionalIncludeDirectories="&quot;$(SolutionDir)..\..\libxml2-2.7.6&quot;;$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\genii\utils\messageqcpp;$(SolutionDir)..\..\genii\utils\winport;$(SolutionDir)..\..\genii\utils\loggingcpp;$(SolutionDir)..\..\genii\utils\startup"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
 				WarningLevel="3"
@@ -280,7 +280,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="libmessageqcpp.lib libloggingcpp.lib libidbboot.lib libwinport.lib libxml2.lib ws2_32.lib"
-				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_54_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\x64\Release"
+				AdditionalLibraryDirectories="$(SolutionDir)..\..\boost_1_54_0;&quot;$(SolutionDir)..\..\libxml2-2.7.6&quot;;$(SolutionDir)..\..\x64\Release"
 			/>
 			<Tool
 				Name="VCALinkTool"
@@ -302,7 +302,7 @@
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
-				CommandLine="\InfiniDB\signit &quot;InfiniDB Config API&quot; \InfiniDB\x64\Release\libconfigcpp.dll"
+				CommandLine="$(SolutionDir)..\..\signit &quot;InfiniDB Config API&quot; $(SolutionDir)..\..\x64\Release\libconfigcpp.dll"
 			/>
 		</Configuration>
 		<Configuration
@@ -332,7 +332,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\boost_1_54_0;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\startup"
+				AdditionalIncludeDirectories="&quot;$(SolutionDir)..\..\libxml2-2.7.6&quot;;$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\genii\utils\messageqcpp;$(SolutionDir)..\..\genii\utils\winport;$(SolutionDir)..\..\genii\utils\loggingcpp;$(SolutionDir)..\..\genii\utils\startup"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
 				WarningLevel="3"
@@ -344,7 +344,7 @@
 			/>
 			<Tool
 				Name="VCResourceCompilerTool"
-				AdditionalIncludeDirectories="C:\InfiniDB\genii\utils\winport"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\genii\utils\winport"
 			/>
 			<Tool
 				Name="VCPreLinkEventTool"
@@ -352,7 +352,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="libmessageqcpp.lib libloggingcpp.lib libidbboot.lib libwinport.lib libxml2.lib ws2_32.lib"
-				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_54_0\lib32;&quot;C:\InfiniDB\libxml2-2.7.6\lib32&quot;;C:\InfiniDB\Release"
+				AdditionalLibraryDirectories="$(SolutionDir)..\..\boost_1_54_0\lib32;&quot;$(SolutionDir)..\..\libxml2-2.7.6\lib32&quot;;$(SolutionDir)..\..\Release"
 				GenerateDebugInformation="true"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
@@ -408,7 +408,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\boost_1_54_0;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\startup"
+				AdditionalIncludeDirectories="&quot;$(SolutionDir)..\..\libxml2-2.7.6&quot;;$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\genii\utils\messageqcpp;$(SolutionDir)..\..\genii\utils\winport;$(SolutionDir)..\..\genii\utils\loggingcpp;$(SolutionDir)..\..\genii\utils\startup"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
 				WarningLevel="3"
@@ -428,7 +428,7 @@
 				Name="VCLinkerTool"
 				LinkLibraryDependencies="true"
 				AdditionalDependencies="libmessageqcpp.lib libloggingcpp.lib libidbboot.lib libwinport.lib libxml2.lib ws2_32.lib"
-				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_54_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\x64\EnterpriseRelease"
+				AdditionalLibraryDirectories="$(SolutionDir)..\..\boost_1_54_0;&quot;$(SolutionDir)..\..\libxml2-2.7.6&quot;;$(SolutionDir)..\..\x64\EnterpriseRelease"
 				IgnoreAllDefaultLibraries="false"
 				TargetMachine="17"
 			/>
@@ -452,7 +452,7 @@
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
-				CommandLine="\InfiniDB\signit &quot;InfiniDB Config API&quot; \InfiniDB\x64\EnterpriseRelease\libconfigcpp.dll"
+				CommandLine="$(SolutionDir)..\..\signit &quot;InfiniDB Config API&quot; $(SolutionDir)..\..\x64\EnterpriseRelease\libconfigcpp.dll"
 			/>
 		</Configuration>
 	</Configurations>

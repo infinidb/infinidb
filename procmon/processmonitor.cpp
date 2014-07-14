@@ -941,6 +941,13 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 					int requestStatus = oam::API_SUCCESS;
 					log.writeLog(__LINE__,  "MSG RECEIVED: Start All process request...");
 
+					// change permissions on /dev/shm
+					string cmd = "chmod 777 /dev/shm >/dev/null 2>&1";
+					if ( !rootUser)
+						cmd = "sudo chmod 777 /dev/shm >/dev/null 2>&1";
+				
+					system(cmd.c_str());
+
 					//start the mysql daemon 
 					try {
 						oam.actionMysqlCalpont(MYSQL_START);
@@ -4392,13 +4399,11 @@ int ProcessMonitor::runUpgrade(std::string mysqlpw)
 	for ( int i = 0 ; i < 10 ; i++ )
 	{
 		//run upgrade script
-		string logdir("/var/log/Calpont");
-		if (access(logdir.c_str(), W_OK) != 0) logdir = "/tmp";
 		string cmd = startup::StartUp::installDir() + "/bin/upgrade-infinidb.sh doupgrade --password=" +
-			mysqlpw + " --installdir=" +  startup::StartUp::installDir() + "  > " + logdir + "/upgrade-infinidb.log1 2>&1";
+			mysqlpw + " --installdir=" +  startup::StartUp::installDir() + "  > " + "/tmp/upgrade-infinidb.log 2>&1";
 		system(cmd.c_str());
 
-		cmd = logdir + "/upgrade-infinidb.log1";
+		cmd = "/tmp/upgrade-infinidb.log";
 		if (oam.checkLogStatus(cmd, "OK")) {
 			log.writeLog(__LINE__, "upgrade-infinidb.sh: Successful return", LOG_TYPE_DEBUG);
 			return oam::API_SUCCESS;
@@ -4434,6 +4439,9 @@ bool ProcessMonitor::amazonIPCheck()
 	Oam oam;
 
 	log.writeLog(__LINE__, "amazonIPCheck function called", LOG_TYPE_DEBUG);
+
+	// delete description file so it will create a new one
+	unlink("/tmp/describeInstance.txt");
 
 	//
 	// Get Module Info
@@ -4749,7 +4757,7 @@ void ProcessMonitor::unmountExtraDBroots()
 	ModuleConfig moduleconfig;
 	Oam oam;
 
-	string DBRootStorageType = "local";
+	string DBRootStorageType = "internal";
 
 	try{
 		oam.getSystemConfig("DBRootStorageType", DBRootStorageType);
@@ -4839,7 +4847,7 @@ int ProcessMonitor::checkDataMount()
 
 	log.writeLog(__LINE__, "checkDataMount called ", LOG_TYPE_DEBUG);
 
-	string DBRootStorageType = "local";
+	string DBRootStorageType = "internal";
 	vector <string> dbrootList;
 	string installDir(startup::StartUp::installDir());
 

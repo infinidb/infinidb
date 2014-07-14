@@ -1398,6 +1398,7 @@ const JobStepVector doSemiJoin(const SimpleColumn* sc, const ReturnedColumn* rc,
 	CalpontSystemCatalog::OID tableOid1 = tableOid(sc, jobInfo.csc);
 	CalpontSystemCatalog::OID tableOid2 = execplan::CNX_VTABLE_ID;
 	string alias1(extractTableAlias(sc));
+	string alias2(jobInfo.subAlias);
 	CalpontSystemCatalog::ColType ct1 = sc->colType();
 	CalpontSystemCatalog::ColType ct2 = rc->resultType();
 
@@ -1444,6 +1445,7 @@ const JobStepVector doSemiJoin(const SimpleColumn* sc, const ReturnedColumn* rc,
 	thj->schema1(sc->schemaName());
 	thj->oid1(sc->oid());
 	thj->oid2(tableOid2 + 1 + rc->sequence());
+	thj->alias2(alias2);
 	thj->dictOid1(dictOid1);
 	thj->dictOid2(0);
 	thj->sequence1(sc->sequence());
@@ -1602,7 +1604,7 @@ const JobStepVector doSimpleFilter(SimpleFilter* sf, JobInfo& jobInfo)
 		string schema(sc->schemaName());
 		tbl_oid = tableOid(sc, jobInfo.csc);
 
-		if (sc->joinInfo() != 0 && (int32_t)cc->sequence() != -1)
+		if (sc->joinInfo() != 0 && cc->sequence() != -1)
 		{
 			// correlated, like in 'c1 in select 1' type sub queries.
 			return doSemiJoin(sc, cc, jobInfo);

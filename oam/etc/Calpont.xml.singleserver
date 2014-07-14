@@ -448,6 +448,8 @@
 		<UMAutoSync>n</UMAutoSync>
 		<AmazonAutoTagging>n</AmazonAutoTagging>
 		<CoreFileFlag>n</CoreFileFlag>
+		<JavaHome>unassigned</JavaHome>
+		<JavaPath>unassigned</JavaPath>
 	</Installation>
 	<ExtentMap>
 		<!--

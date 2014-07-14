@@ -96,6 +96,7 @@ private:
 	void normalize(const rowgroup::Row &in, rowgroup::Row *out);
 	void writeNull(rowgroup::Row *out, uint col);
 	void readInput(uint);
+	void formatMiniStats();
 
 	execplan::CalpontSystemCatalog::OID fTableOID;
 	// @bug 598 for self-join
@@ -148,6 +149,8 @@ private:
 	uint runnersDone;
 	uint distinctCount;
 	uint distinctDone;
+
+	uint64_t fRowsReturned;
 
 	// temporary hack to make sure JobList only calls run, join once
 	boost::mutex jlLock;

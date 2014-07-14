@@ -150,6 +150,7 @@ private:
     unsigned int  fRejectErrCnt;        // Running count in current err msg file
 
     ExtentStripeAlloc fExtentStrAlloc;  // Extent stripe allocator for this tbl
+    std::vector<BRM::LBID_t> fDictFlushBlks;//dict blks to be flushed from cache
 
     //--------------------------------------------------------------------------
     // Private Functions

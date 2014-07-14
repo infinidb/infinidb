@@ -2681,8 +2681,11 @@ void DBRM::rolledback(TxnID& txnid)
 			logging::LOG_TYPE_ERROR);
 	response >> tmp;
 	if (tmp != ERR_OK)
-		log("DBRM: error: SessionManager::rolledback() failed (valid error code)",
-			logging::LOG_TYPE_ERROR);
+	{		
+		if (getSystemReady() != 0 )
+			log("DBRM: error: SessionManager::rolledback() failed (valid error code)",
+				logging::LOG_TYPE_ERROR);
+	}
 }
 
 int DBRM::getUnlockedLBIDs(BlockList_t *list) DBRM_THROW

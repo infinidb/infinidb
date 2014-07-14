@@ -43,7 +43,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\writeengine\shared;C:\InfiniDB\genii\dbcon\ddlpackageproc;C:\InfiniDB\genii\dbcon\execplan;C:\InfiniDB\genii\versioning\BRM;C:\InfiniDB\genii\dbcon\ddlpackage;C:\InfiniDB\genii\writeengine\wrapper;C:\InfiniDB\genii\dmlib;C:\InfiniDB\genii\writeengine\index;C:\InfiniDB\genii\writeengine\dictionary;C:\InfiniDB\genii\dbcon\dmlpackage;C:\InfiniDB\genii\utils\dataconvert;C:\InfiniDB\genii\dbcon\dmlpackageproc;C:\InfiniDB\genii\dbcon\joblist;C:\InfiniDB\genii\utils\rwlock;C:\InfiniDB\genii\utils\multicast;C:\InfiniDB\genii\utils\common;C:\InfiniDB\genii\utils\joiner;C:\InfiniDB\genii\utils\rowgroup;C:\InfiniDB\genii\utils\funcexp;C:\InfiniDB\genii\oam\oamcpp;C:\InfiniDB\genii\snmpd\snmpmanager;C:\InfiniDB\genii\utils\compress;C:\InfiniDB\genii\writeengine\client;C:\InfiniDB\genii\utils\startup;C:\InfiniDB\genii\utils\querystats"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\boost_1_54_0;&quot;$(SolutionDir)..\..\libxml2-2.7.6&quot;;$(SolutionDir)..\..\genii\utils\winport;$(SolutionDir)..\..\genii\utils\messageqcpp;$(SolutionDir)..\..\genii\utils\loggingcpp;$(SolutionDir)..\..\genii\utils\configcpp;$(SolutionDir)..\..\genii\writeengine\shared;$(SolutionDir)..\..\genii\dbcon\ddlpackageproc;$(SolutionDir)..\..\genii\dbcon\execplan;$(SolutionDir)..\..\genii\versioning\BRM;$(SolutionDir)..\..\genii\dbcon\ddlpackage;$(SolutionDir)..\..\genii\writeengine\wrapper;$(SolutionDir)..\..\genii\dmlib;$(SolutionDir)..\..\genii\writeengine\index;$(SolutionDir)..\..\genii\writeengine\dictionary;$(SolutionDir)..\..\genii\dbcon\dmlpackage;$(SolutionDir)..\..\genii\utils\dataconvert;$(SolutionDir)..\..\genii\dbcon\dmlpackageproc;$(SolutionDir)..\..\genii\dbcon\joblist;$(SolutionDir)..\..\genii\utils\rwlock;$(SolutionDir)..\..\genii\utils\multicast;$(SolutionDir)..\..\genii\utils\common;$(SolutionDir)..\..\genii\utils\joiner;$(SolutionDir)..\..\genii\utils\rowgroup;$(SolutionDir)..\..\genii\utils\funcexp;$(SolutionDir)..\..\genii\oam\oamcpp;$(SolutionDir)..\..\genii\snmpd\snmpmanager;$(SolutionDir)..\..\genii\utils\compress;$(SolutionDir)..\..\genii\writeengine\client;$(SolutionDir)..\..\genii\utils\startup;$(SolutionDir)..\..\genii\utils\querystats"
 				PreprocessorDefinitions="SKIP_SNMP"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
@@ -63,7 +63,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="libddlpackage.lib libddlpackageproc.lib libdmlpackage.lib libdmlpackageproc.lib libwriteengine.lib libbrm.lib liboamcpp.lib libjoblist.lib libloggingcpp.lib libexecplan.lib libfuncexp.lib libconfigcpp.lib libdataconvert.lib libmessageqcpp.lib libcacheutils.lib libudfsdk.lib librowgroup.lib libweclient.lib librwlock.lib libcompress.lib libidbboot.lib libwinport.lib libxml2.lib iphlpapi.lib ws2_32.lib psapi.lib"
-				AdditionalLibraryDirectories="C:\InfiniDB\Debug"
+				AdditionalLibraryDirectories="$(SolutionDir)..\..\Debug"
 				GenerateDebugInformation="true"
 				TargetMachine="1"
 			/>
@@ -115,7 +115,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\writeengine\shared;C:\InfiniDB\genii\dbcon\ddlpackageproc;C:\InfiniDB\genii\dbcon\execplan;C:\InfiniDB\genii\versioning\BRM;C:\InfiniDB\genii\dbcon\ddlpackage;C:\InfiniDB\genii\writeengine\wrapper;C:\InfiniDB\genii\dmlib;C:\InfiniDB\genii\writeengine\index;C:\InfiniDB\genii\writeengine\dictionary;C:\InfiniDB\genii\dbcon\dmlpackage;C:\InfiniDB\genii\utils\dataconvert;C:\InfiniDB\genii\dbcon\dmlpackageproc;C:\InfiniDB\genii\dbcon\joblist;C:\InfiniDB\genii\utils\rwlock;C:\InfiniDB\genii\utils\multicast;C:\InfiniDB\genii\utils\common;C:\InfiniDB\genii\utils\joiner;C:\InfiniDB\genii\utils\rowgroup;C:\InfiniDB\genii\utils\funcexp;C:\InfiniDB\genii\oam\oamcpp;C:\InfiniDB\genii\snmpd\snmpmanager;C:\InfiniDB\genii\utils\compress;C:\InfiniDB\genii\writeengine\client;C:\InfiniDB\genii\utils\startup;C:\InfiniDB\genii\utils\querystats;C:\InfiniDB\genii\utils\idbdatafile"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\boost_1_54_0;&quot;$(SolutionDir)..\..\libxml2-2.7.6&quot;;$(SolutionDir)..\..\genii\utils\winport;$(SolutionDir)..\..\genii\utils\messageqcpp;$(SolutionDir)..\..\genii\utils\loggingcpp;$(SolutionDir)..\..\genii\utils\configcpp;$(SolutionDir)..\..\genii\writeengine\shared;$(SolutionDir)..\..\genii\dbcon\ddlpackageproc;$(SolutionDir)..\..\genii\dbcon\execplan;$(SolutionDir)..\..\genii\versioning\BRM;$(SolutionDir)..\..\genii\dbcon\ddlpackage;$(SolutionDir)..\..\genii\writeengine\wrapper;$(SolutionDir)..\..\genii\dmlib;$(SolutionDir)..\..\genii\writeengine\index;$(SolutionDir)..\..\genii\writeengine\dictionary;$(SolutionDir)..\..\genii\dbcon\dmlpackage;$(SolutionDir)..\..\genii\utils\dataconvert;$(SolutionDir)..\..\genii\dbcon\dmlpackageproc;$(SolutionDir)..\..\genii\dbcon\joblist;$(SolutionDir)..\..\genii\utils\rwlock;$(SolutionDir)..\..\genii\utils\multicast;$(SolutionDir)..\..\genii\utils\common;$(SolutionDir)..\..\genii\utils\joiner;$(SolutionDir)..\..\genii\utils\rowgroup;$(SolutionDir)..\..\genii\utils\funcexp;$(SolutionDir)..\..\genii\oam\oamcpp;$(SolutionDir)..\..\genii\snmpd\snmpmanager;$(SolutionDir)..\..\genii\utils\compress;$(SolutionDir)..\..\genii\writeengine\client;$(SolutionDir)..\..\genii\utils\startup;$(SolutionDir)..\..\genii\utils\querystats;$(SolutionDir)..\..\genii\utils\idbdatafile"
 				PreprocessorDefinitions="SKIP_SNMP"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
@@ -135,7 +135,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="libddlpackage.lib libddlpackageproc.lib libdmlpackage.lib libdmlpackageproc.lib libwriteengine.lib libbrm.lib liboamcpp.lib libjoblist.lib libloggingcpp.lib libexecplan.lib libfuncexp.lib libconfigcpp.lib libdataconvert.lib libmessageqcpp.lib libcacheutils.lib libudfsdk.lib librowgroup.lib libweclient.lib librwlock.lib libcompress.lib libidbboot.lib libwinport.lib libxml2.lib iphlpapi.lib ws2_32.lib psapi.lib libidbdatafile.lib"
-				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_54_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\x64\Debug"
+				AdditionalLibraryDirectories="$(SolutionDir)..\..\boost_1_54_0;&quot;$(SolutionDir)..\..\libxml2-2.7.6&quot;;$(SolutionDir)..\..\x64\Debug"
 				GenerateDebugInformation="true"
 				TargetMachine="17"
 			/>
@@ -188,7 +188,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\writeengine\shared;C:\InfiniDB\genii\dbcon\ddlpackageproc;C:\InfiniDB\genii\dbcon\execplan;C:\InfiniDB\genii\versioning\BRM;C:\InfiniDB\genii\dbcon\ddlpackage;C:\InfiniDB\genii\writeengine\wrapper;C:\InfiniDB\genii\dmlib;C:\InfiniDB\genii\writeengine\index;C:\InfiniDB\genii\writeengine\dictionary;C:\InfiniDB\genii\dbcon\dmlpackage;C:\InfiniDB\genii\utils\dataconvert;C:\InfiniDB\genii\dbcon\dmlpackageproc;C:\InfiniDB\genii\dbcon\joblist;C:\InfiniDB\genii\utils\rwlock;C:\InfiniDB\genii\utils\multicast;C:\InfiniDB\genii\utils\common;C:\InfiniDB\genii\utils\joiner;C:\InfiniDB\genii\utils\rowgroup;C:\InfiniDB\genii\utils\funcexp;C:\InfiniDB\genii\oam\oamcpp;C:\InfiniDB\genii\snmpd\snmpmanager;C:\InfiniDB\genii\utils\compress;C:\InfiniDB\genii\writeengine\client;C:\InfiniDB\genii\utils\startup;C:\InfiniDB\genii\utils\querystats"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\boost_1_54_0;&quot;$(SolutionDir)..\..\libxml2-2.7.6&quot;;$(SolutionDir)..\..\genii\utils\winport;$(SolutionDir)..\..\genii\utils\messageqcpp;$(SolutionDir)..\..\genii\utils\loggingcpp;$(SolutionDir)..\..\genii\utils\configcpp;$(SolutionDir)..\..\genii\writeengine\shared;$(SolutionDir)..\..\genii\dbcon\ddlpackageproc;$(SolutionDir)..\..\genii\dbcon\execplan;$(SolutionDir)..\..\genii\versioning\BRM;$(SolutionDir)..\..\genii\dbcon\ddlpackage;$(SolutionDir)..\..\genii\writeengine\wrapper;$(SolutionDir)..\..\genii\dmlib;$(SolutionDir)..\..\genii\writeengine\index;$(SolutionDir)..\..\genii\writeengine\dictionary;$(SolutionDir)..\..\genii\dbcon\dmlpackage;$(SolutionDir)..\..\genii\utils\dataconvert;$(SolutionDir)..\..\genii\dbcon\dmlpackageproc;$(SolutionDir)..\..\genii\dbcon\joblist;$(SolutionDir)..\..\genii\utils\rwlock;$(SolutionDir)..\..\genii\utils\multicast;$(SolutionDir)..\..\genii\utils\common;$(SolutionDir)..\..\genii\utils\joiner;$(SolutionDir)..\..\genii\utils\rowgroup;$(SolutionDir)..\..\genii\utils\funcexp;$(SolutionDir)..\..\genii\oam\oamcpp;$(SolutionDir)..\..\genii\snmpd\snmpmanager;$(SolutionDir)..\..\genii\utils\compress;$(SolutionDir)..\..\genii\writeengine\client;$(SolutionDir)..\..\genii\utils\startup;$(SolutionDir)..\..\genii\utils\querystats"
 				PreprocessorDefinitions="_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;SKIP_SNMP;SKIP_IDB_COMPRESSION"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
@@ -208,7 +208,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="libddlpackage.lib libddlpackageproc.lib libdmlpackage.lib libdmlpackageproc.lib libwriteengine.lib libbrm.lib liboamcpp.lib libjoblist.lib libloggingcpp.lib libexecplan.lib libfuncexp.lib libconfigcpp.lib libdataconvert.lib libmessageqcpp.lib librowgroup.lib libweclient.lib librwlock.lib libcacheutils.lib libidbboot.lib libwinport.lib libxml2.lib iphlpapi.lib ws2_32.lib psapi.lib"
-				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_54_0\lib32;&quot;C:\InfiniDB\libxml2-2.7.6\lib32&quot;;C:\InfiniDB\Release"
+				AdditionalLibraryDirectories="$(SolutionDir)..\..\boost_1_54_0\lib32;&quot;$(SolutionDir)..\..\libxml2-2.7.6\lib32&quot;;$(SolutionDir)..\..\Release"
 				GenerateDebugInformation="true"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
@@ -264,7 +264,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\writeengine\shared;C:\InfiniDB\genii\dbcon\ddlpackageproc;C:\InfiniDB\genii\dbcon\execplan;C:\InfiniDB\genii\versioning\BRM;C:\InfiniDB\genii\dbcon\ddlpackage;C:\InfiniDB\genii\writeengine\wrapper;C:\InfiniDB\genii\dmlib;C:\InfiniDB\genii\writeengine\index;C:\InfiniDB\genii\writeengine\dictionary;C:\InfiniDB\genii\dbcon\dmlpackage;C:\InfiniDB\genii\utils\dataconvert;C:\InfiniDB\genii\dbcon\dmlpackageproc;C:\InfiniDB\genii\dbcon\joblist;C:\InfiniDB\genii\utils\rwlock;C:\InfiniDB\genii\utils\multicast;C:\InfiniDB\genii\utils\common;C:\InfiniDB\genii\utils\joiner;C:\InfiniDB\genii\utils\rowgroup;C:\InfiniDB\genii\utils\funcexp;C:\InfiniDB\genii\oam\oamcpp;C:\InfiniDB\genii\snmpd\snmpmanager;C:\InfiniDB\genii\utils\compress;C:\InfiniDB\genii\writeengine\client;C:\InfiniDB\genii\utils\startup;C:\InfiniDB\genii\utils\querystats"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\boost_1_54_0;&quot;$(SolutionDir)..\..\libxml2-2.7.6&quot;;$(SolutionDir)..\..\genii\utils\winport;$(SolutionDir)..\..\genii\utils\messageqcpp;$(SolutionDir)..\..\genii\utils\loggingcpp;$(SolutionDir)..\..\genii\utils\configcpp;$(SolutionDir)..\..\genii\writeengine\shared;$(SolutionDir)..\..\genii\dbcon\ddlpackageproc;$(SolutionDir)..\..\genii\dbcon\execplan;$(SolutionDir)..\..\genii\versioning\BRM;$(SolutionDir)..\..\genii\dbcon\ddlpackage;$(SolutionDir)..\..\genii\writeengine\wrapper;$(SolutionDir)..\..\genii\dmlib;$(SolutionDir)..\..\genii\writeengine\index;$(SolutionDir)..\..\genii\writeengine\dictionary;$(SolutionDir)..\..\genii\dbcon\dmlpackage;$(SolutionDir)..\..\genii\utils\dataconvert;$(SolutionDir)..\..\genii\dbcon\dmlpackageproc;$(SolutionDir)..\..\genii\dbcon\joblist;$(SolutionDir)..\..\genii\utils\rwlock;$(SolutionDir)..\..\genii\utils\multicast;$(SolutionDir)..\..\genii\utils\common;$(SolutionDir)..\..\genii\utils\joiner;$(SolutionDir)..\..\genii\utils\rowgroup;$(SolutionDir)..\..\genii\utils\funcexp;$(SolutionDir)..\..\genii\oam\oamcpp;$(SolutionDir)..\..\genii\snmpd\snmpmanager;$(SolutionDir)..\..\genii\utils\compress;$(SolutionDir)..\..\genii\writeengine\client;$(SolutionDir)..\..\genii\utils\startup;$(SolutionDir)..\..\genii\utils\querystats"
 				PreprocessorDefinitions="_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;SKIP_SNMP;SKIP_IDB_COMPRESSION"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
@@ -284,7 +284,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="libddlpackage.lib libddlpackageproc.lib libdmlpackage.lib libdmlpackageproc.lib libwriteengine.lib libbrm.lib liboamcpp.lib libjoblist.lib libloggingcpp.lib libexecplan.lib libfuncexp.lib libconfigcpp.lib libdataconvert.lib libmessageqcpp.lib librowgroup.lib libweclient.lib librwlock.lib libcacheutils.lib libidbboot.lib libwinport.lib libxml2.lib iphlpapi.lib ws2_32.lib psapi.lib"
-				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_54_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\x64\Release"
+				AdditionalLibraryDirectories="$(SolutionDir)..\..\boost_1_54_0;&quot;$(SolutionDir)..\..\libxml2-2.7.6&quot;;$(SolutionDir)..\..\x64\Release"
 				GenerateDebugInformation="true"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
@@ -339,7 +339,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\writeengine\shared;C:\InfiniDB\genii\dbcon\ddlpackageproc;C:\InfiniDB\genii\dbcon\execplan;C:\InfiniDB\genii\versioning\BRM;C:\InfiniDB\genii\dbcon\ddlpackage;C:\InfiniDB\genii\writeengine\wrapper;C:\InfiniDB\genii\dmlib;C:\InfiniDB\genii\writeengine\index;C:\InfiniDB\genii\writeengine\dictionary;C:\InfiniDB\genii\dbcon\dmlpackage;C:\InfiniDB\genii\utils\dataconvert;C:\InfiniDB\genii\dbcon\dmlpackageproc;C:\InfiniDB\genii\dbcon\joblist;C:\InfiniDB\genii\utils\rwlock;C:\InfiniDB\genii\utils\multicast;C:\InfiniDB\genii\utils\common;C:\InfiniDB\genii\utils\joiner;C:\InfiniDB\genii\utils\rowgroup;C:\InfiniDB\genii\utils\funcexp;C:\InfiniDB\genii\oam\oamcpp;C:\InfiniDB\genii\snmpd\snmpmanager;C:\InfiniDB\genii\utils\compress;C:\InfiniDB\genii\writeengine\client;C:\InfiniDB\genii\utils\startup;C:\InfiniDB\genii\utils\querystats"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\boost_1_54_0;&quot;$(SolutionDir)..\..\libxml2-2.7.6&quot;;$(SolutionDir)..\..\genii\utils\winport;$(SolutionDir)..\..\genii\utils\messageqcpp;$(SolutionDir)..\..\genii\utils\loggingcpp;$(SolutionDir)..\..\genii\utils\configcpp;$(SolutionDir)..\..\genii\writeengine\shared;$(SolutionDir)..\..\genii\dbcon\ddlpackageproc;$(SolutionDir)..\..\genii\dbcon\execplan;$(SolutionDir)..\..\genii\versioning\BRM;$(SolutionDir)..\..\genii\dbcon\ddlpackage;$(SolutionDir)..\..\genii\writeengine\wrapper;$(SolutionDir)..\..\genii\dmlib;$(SolutionDir)..\..\genii\writeengine\index;$(SolutionDir)..\..\genii\writeengine\dictionary;$(SolutionDir)..\..\genii\dbcon\dmlpackage;$(SolutionDir)..\..\genii\utils\dataconvert;$(SolutionDir)..\..\genii\dbcon\dmlpackageproc;$(SolutionDir)..\..\genii\dbcon\joblist;$(SolutionDir)..\..\genii\utils\rwlock;$(SolutionDir)..\..\genii\utils\multicast;$(SolutionDir)..\..\genii\utils\common;$(SolutionDir)..\..\genii\utils\joiner;$(SolutionDir)..\..\genii\utils\rowgroup;$(SolutionDir)..\..\genii\utils\funcexp;$(SolutionDir)..\..\genii\oam\oamcpp;$(SolutionDir)..\..\genii\snmpd\snmpmanager;$(SolutionDir)..\..\genii\utils\compress;$(SolutionDir)..\..\genii\writeengine\client;$(SolutionDir)..\..\genii\utils\startup;$(SolutionDir)..\..\genii\utils\querystats"
 				PreprocessorDefinitions="_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;SKIP_SNMP"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
@@ -359,7 +359,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="libddlpackage.lib libddlpackageproc.lib libdmlpackage.lib libdmlpackageproc.lib libwriteengine.lib libbrm.lib liboamcpp.lib libjoblist.lib libloggingcpp.lib libexecplan.lib libfuncexp.lib libconfigcpp.lib libdataconvert.lib libmessageqcpp.lib libcacheutils.lib libudfsdk.lib librowgroup.lib libweclient.lib librwlock.lib libcompress.lib libidbboot.lib libwinport.lib libxml2.lib iphlpapi.lib ws2_32.lib psapi.lib"
-				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_54_0\lib32;&quot;C:\InfiniDB\libxml2-2.7.6\lib32&quot;;C:\InfiniDB\Release"
+				AdditionalLibraryDirectories="$(SolutionDir)..\..\boost_1_54_0\lib32;&quot;$(SolutionDir)..\..\libxml2-2.7.6\lib32&quot;;$(SolutionDir)..\..\Release"
 				GenerateDebugInformation="true"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
@@ -415,7 +415,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\writeengine\shared;C:\InfiniDB\genii\dbcon\ddlpackageproc;C:\InfiniDB\genii\dbcon\execplan;C:\InfiniDB\genii\versioning\BRM;C:\InfiniDB\genii\dbcon\ddlpackage;C:\InfiniDB\genii\writeengine\wrapper;C:\InfiniDB\genii\dmlib;C:\InfiniDB\genii\writeengine\index;C:\InfiniDB\genii\writeengine\dictionary;C:\InfiniDB\genii\dbcon\dmlpackage;C:\InfiniDB\genii\utils\dataconvert;C:\InfiniDB\genii\dbcon\dmlpackageproc;C:\InfiniDB\genii\dbcon\joblist;C:\InfiniDB\genii\utils\rwlock;C:\InfiniDB\genii\utils\multicast;C:\InfiniDB\genii\utils\common;C:\InfiniDB\genii\utils\joiner;C:\InfiniDB\genii\utils\rowgroup;C:\InfiniDB\genii\utils\funcexp;C:\InfiniDB\genii\oam\oamcpp;C:\InfiniDB\genii\snmpd\snmpmanager;C:\InfiniDB\genii\utils\compress;C:\InfiniDB\genii\writeengine\client;C:\InfiniDB\genii\utils\startup;C:\InfiniDB\genii\utils\querystats;C:\InfiniDB\genii\utils\idbdatafile"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\boost_1_54_0;&quot;$(SolutionDir)..\..\libxml2-2.7.6&quot;;$(SolutionDir)..\..\genii\utils\winport;$(SolutionDir)..\..\genii\utils\messageqcpp;$(SolutionDir)..\..\genii\utils\loggingcpp;$(SolutionDir)..\..\genii\utils\configcpp;$(SolutionDir)..\..\genii\writeengine\shared;$(SolutionDir)..\..\genii\dbcon\ddlpackageproc;$(SolutionDir)..\..\genii\dbcon\execplan;$(SolutionDir)..\..\genii\versioning\BRM;$(SolutionDir)..\..\genii\dbcon\ddlpackage;$(SolutionDir)..\..\genii\writeengine\wrapper;$(SolutionDir)..\..\genii\dmlib;$(SolutionDir)..\..\genii\writeengine\index;$(SolutionDir)..\..\genii\writeengine\dictionary;$(SolutionDir)..\..\genii\dbcon\dmlpackage;$(SolutionDir)..\..\genii\utils\dataconvert;$(SolutionDir)..\..\genii\dbcon\dmlpackageproc;$(SolutionDir)..\..\genii\dbcon\joblist;$(SolutionDir)..\..\genii\utils\rwlock;$(SolutionDir)..\..\genii\utils\multicast;$(SolutionDir)..\..\genii\utils\common;$(SolutionDir)..\..\genii\utils\joiner;$(SolutionDir)..\..\genii\utils\rowgroup;$(SolutionDir)..\..\genii\utils\funcexp;$(SolutionDir)..\..\genii\oam\oamcpp;$(SolutionDir)..\..\genii\snmpd\snmpmanager;$(SolutionDir)..\..\genii\utils\compress;$(SolutionDir)..\..\genii\writeengine\client;$(SolutionDir)..\..\genii\utils\startup;$(SolutionDir)..\..\genii\utils\querystats;$(SolutionDir)..\..\genii\utils\idbdatafile"
 				PreprocessorDefinitions="_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;SKIP_SNMP"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
@@ -435,7 +435,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="libddlpackage.lib libddlpackageproc.lib libdmlpackage.lib libdmlpackageproc.lib libwriteengine.lib libbrm.lib liboamcpp.lib libjoblist.lib libloggingcpp.lib libexecplan.lib libfuncexp.lib libconfigcpp.lib libdataconvert.lib libmessageqcpp.lib libcacheutils.lib libudfsdk.lib librowgroup.lib libweclient.lib librwlock.lib libcompress.lib libidbboot.lib libwinport.lib libxml2.lib iphlpapi.lib ws2_32.lib psapi.lib"
-				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_54_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\x64\EnterpriseRelease"
+				AdditionalLibraryDirectories="$(SolutionDir)..\..\boost_1_54_0;&quot;$(SolutionDir)..\..\libxml2-2.7.6&quot;;$(SolutionDir)..\..\x64\EnterpriseRelease"
 				GenerateDebugInformation="true"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"

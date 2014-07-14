@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -137,6 +137,7 @@ const char* pcommand = 0;
 
 string parentOAMModuleName;
 int pmNumber = 0;
+int umNumber = 0;
 
 string DBRootStorageLoc;
 string DBRootStorageType;
@@ -219,7 +220,7 @@ int main(int argc, char *argv[])
 	// -o to prompt for process to start offline
 
 	//default
-	installDir = "/usr/local/Calpont";
+	installDir = installDir + "";
 	//see if we can determine our own location
 	ostringstream oss;
 	oss << "/proc/" << getpid() << "/exe";
@@ -323,6 +324,8 @@ int main(int argc, char *argv[])
 				cout << "   ERROR: Valid MySQL Password not provided" << endl;
 				exit (1);
 			}			
+			if ( mysqlpw == "dummymysqlpw" )
+				mysqlpw = " ";
 		}
 		else if( string("-n") == argv[i] )
 			noPrompting = true;
@@ -461,8 +464,8 @@ int main(int argc, char *argv[])
 				temp = pcommand;
 			else
 				temp = singleServerInstall;
-			callFree(pcommand);
-			if (temp == "1") {
+				callFree(pcommand);
+				if (temp == "1") {
 				singleServerInstall = temp;
 				cout << endl << "Performing the Single Server Install." << endl; 
 
@@ -474,7 +477,7 @@ int main(int argc, char *argv[])
 					// within the same second which means the changes that are about to happen
 					// when Calpont.xml gets overwritten will be ignored because of the Config
 					// instance won't know to reload
-                    sleep(2);
+                    			sleep(2);
 
 					cmd = "rm -f " + installDir + "/etc/Calpont.xml.installSave  > /dev/null 2>&1";
 					system(cmd.c_str());
@@ -496,9 +499,9 @@ int main(int argc, char *argv[])
 					exit(1);
 				}
 
-				if (hdfs)
-                	if( !updateBash() )
-	                    cout << "updateBash error" << endl;
+				if (hdfs || !rootUser)
+                			if( !updateBash() )
+	                    		cout << "updateBash error" << endl;
 
 				// setup storage
 				if (!singleServerDBrootSetup())
@@ -978,7 +981,7 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	if (hdfs)
+	if (hdfs || !rootUser)
 		if( !updateBash() )
 			cout << "updateBash error" << endl;
 
@@ -2907,7 +2910,7 @@ int main(int argc, char *argv[])
 										{
 											cout << endl << "Additional MySQL Installation steps Successfully Completed on '" + remoteModuleName + "'" << endl << endl;
 	
-											cmd = installDir + "/bin/remote_command.sh " + remoteModuleIP + " " + password + " '/etc/init.d/mysql-Calpont stop'";
+											cmd = installDir + "/bin/remote_command.sh " + remoteModuleIP + " " + password + " '" + installDir + "/mysql/mysql-Calpont stop'";
 											int rtnCode = system(cmd.c_str());
 											if (WEXITSTATUS(rtnCode) != 0) {
 												cout << endl << "Error returned from mysql-Calpont stop" << endl;
@@ -3165,8 +3168,12 @@ int main(int argc, char *argv[])
 			if (hdfs)
 			{
 				cout << endl << "----- Starting InfiniDB Service on all Modules -----" << endl << endl;
-				string cmd = "pdsh -a '/etc/init.d/infinidb restart' > /tmp/postConfigure.pdsh 2>&1";
+				string cmd = "pdsh -a '" + installDir + "/bin/infinidb restart' > /tmp/postConfigure.pdsh 2>&1";
 				system(cmd.c_str());
+				if (oam.checkLogStatus("/tmp/postConfigure.pdsh", "exit") ) {
+					cout << endl << "ERROR: Starting InfiniDB Service failue, check /tmp/postConfigure.pdsh. exit..." << endl;
+					exit (1);
+				}
 			}
 			else
 			{
@@ -3223,7 +3230,7 @@ int main(int argc, char *argv[])
 					//run remote command script
 					cout << endl << "----- Starting InfiniDB on '" + remoteModuleName + "' -----" << endl << endl;
 					cmd = installDir + "/bin/remote_command.sh " + remoteModuleIP + " " + password +
-						" '" + installDir + "/bin/infinidb restart' " +  remote_installer_debug;
+						" '" + installDir + "/bin/infinidb restart' 0";
 					int rtnCode = system(cmd.c_str());
 					if (WEXITSTATUS(rtnCode) != 0)
 						cout << "Error with running remote_command.sh" << endl;
@@ -3233,7 +3240,7 @@ int main(int argc, char *argv[])
 		
 				//start InfiniDB on local server
 				cout << endl << "----- Starting InfiniDB on local server -----" << endl << endl;
-				cmd = installDir + "/bin/infinidb restart";
+				cmd = installDir + "/bin/infinidb restart > /dev/null 2>&1";
 				int rtnCode = system(cmd.c_str());
 				if (WEXITSTATUS(rtnCode) != 0) {
 					cout << "Error Starting InfiniDB local module" << endl;
@@ -3278,7 +3285,7 @@ int main(int argc, char *argv[])
 		if ( start == "y" ) {
 			//start InfiniDB on local server
 			cout << endl << "----- Starting InfiniDB on local Server '" + parentOAMModuleName + "' -----" << endl << endl;
-			string cmd = installDir + "/bin/infinidb restart";
+			string cmd = installDir + "/bin/infinidb restart > /dev/null 2>&1";
 			int rtnCode = system(cmd.c_str());
 			if (WEXITSTATUS(rtnCode) != 0) {
 				cout << "Error Starting InfiniDB local module" << endl;
@@ -4064,13 +4071,13 @@ bool storageSetup(string cloud)
 				DataFileEnvFile = "setenv-hdfs-20";
 			}
 
-			string DataFilePlugin = "/usr/local/Calpont/lib/hdfs-20.so";
+			string DataFilePlugin = installDir + "/lib/hdfs-20.so";
 			try {
 				DataFilePlugin = sysConfig->getConfig("SystemConfig", "DataFilePlugin");
 			}
 			catch(...)
 			{
-				DataFilePlugin = "/usr/local/Calpont/lib/hdfs-20.so";
+				DataFilePlugin = installDir + "/lib/hdfs-20.so";
 			}
 
 			while(true)
@@ -4081,7 +4088,7 @@ bool storageSetup(string cloud)
 				if (access(logdir.c_str(), W_OK) != 0) logdir = "/tmp";
 				string hdfslog = logdir + "/hdfsCheck.log1";
 
-				string cmd = "export JAVA_HOME=/usr/java/jdk1.6.0_31;export LD_LIBRARY_PATH=/usr/java/jdk1.6.0_3/jre/lib/amd64/server;. /root/" + DataFileEnvFile + ";" + installDir + "/bin/hdfsCheck " + DataFilePlugin +  " > " + hdfslog + " 2>&1";
+				string cmd = "export JAVA_HOME=/usr/java/jdk1.6.0_31;export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/java/jdk1.6.0_3/jre/lib/amd64/server;. ~/" + DataFileEnvFile + ";" + installDir + "/bin/hdfsCheck " + DataFilePlugin +  " > " + hdfslog + " 2>&1";
 				system(cmd.c_str());
 				if (oam.checkLogStatus(hdfslog, "All HDFS checks passed!")) 
 				{
@@ -4130,7 +4137,7 @@ bool storageSetup(string cloud)
 					if ( DataFilePlugin == "exit" )
 						exit (1);
 		
-					if ( DataFilePlugin != "/usr/local/Calpont/lib/hdfs-20.so" )
+					if ( DataFilePlugin != installDir + "/lib/hdfs-20.so" )
 						DataFileEnvFile = "setenv-hdfs-12";
 					else
 						DataFileEnvFile = "setenv-hdfs-20";
@@ -4414,17 +4421,17 @@ bool storageSetup(string cloud)
 	if ( storageType == "4" )
 	{
 		hdfs = true;
-		string DataFilePlugin = "/usr/local/Calpont/lib/hdfs-20.so";
+		string DataFilePlugin = installDir + "/lib/hdfs-20.so";
 		try {
 			DataFilePlugin = sysConfig->getConfig("SystemConfig", "DataFilePlugin");
 		}
 		catch(...)
 		{
-			DataFilePlugin = "/usr/local/Calpont/lib/hdfs-20.so";
+			DataFilePlugin = installDir + "/lib/hdfs-20.so";
 		}
 
 		if (DataFilePlugin.empty() || DataFilePlugin == "")
-			DataFilePlugin = "/usr/local/Calpont/lib/hdfs-20.so";
+			DataFilePlugin = installDir + "/lib/hdfs-20.so";
 	
 		DataFileEnvFile = "setenv-hdfs-20";
 		try {
@@ -4452,7 +4459,7 @@ bool storageSetup(string cloud)
 			if ( DataFilePlugin == "exit" )
 				exit (1);
 
-			if ( DataFilePlugin != "/usr/local/Calpont/lib/hdfs-20.so" )
+			if ( DataFilePlugin != installDir + "/lib/hdfs-20.so" )
 				DataFileEnvFile = "setenv-hdfs-12";
 
 			ifstream File (DataFilePlugin.c_str());
@@ -4755,17 +4762,45 @@ bool updateBash()
 
    	ifstream newFile (fileName.c_str());
 
-	string cmd = "echo export JAVA_HOME=/usr/java/jdk1.6.0_31 >> " + fileName;
-	system(cmd.c_str());
+	if ( hdfs ) 
+	{
+		string JavaHome;
+		string JavaPath;
+		try {
+			JavaHome = sysConfig->getConfig(InstallSection, "JavaHome");
+			JavaPath = sysConfig->getConfig(InstallSection, "JavaPath");
+		}
+		catch(...)
+		{
+			cout << "ERROR: Problem getting JavaPath from the InfiniDB System Configuration file" << endl;
+			exit(1);
+		}
 
-	cmd = "echo export LD_LIBRARY_PATH=/usr/java/jdk1.6.0_31/jre/lib/amd64/server >> " + fileName;
-	system(cmd.c_str());
+		string cmd = "echo export JAVA_HOME=" + JavaHome + " >> " + fileName;
+		system(cmd.c_str());
+	
+		cmd = "echo export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:" + JavaPath + " >> " + fileName;
+		system(cmd.c_str());
+	
+		cmd = "echo . ./" + DataFileEnvFile + " >> " + fileName;
+		system(cmd.c_str());
+	
+		if ( rootUser)
+			cmd = "su - hdfs -c 'hadoop fs -mkdir -p " + installDir + ";hadoop fs -chown root:root " + installDir + "' >/dev/null 2>&1";
+		else
+			cmd = "sudo su - hdfs -c 'hadoop fs -mkdir -p " + installDir + ";hadoop fs -chown " + USER + ":" + USER + " + installDir + ' >/dev/null 2>&1";
+	
+		system(cmd.c_str());
+	}
 
-	cmd = "echo . ./" + DataFileEnvFile + " >> " + fileName;
-	system(cmd.c_str());
-
-	cmd = "su - hdfs -c 'hadoop fs -mkdir -p /usr/local/Calpont;hadoop fs -chown root:root /usr/local/Calpont' >/dev/null 2>&1";
-	system(cmd.c_str());
+	if (!rootUser)
+	{
+		string cmd = "echo export INFINIDB_INSTALL_DIR=" + installDir + " >> " + fileName;
+		system(cmd.c_str());
+	
+		cmd = "echo export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$INFINIDB_INSTALL_DIR/lib:$INFINIDB_INSTALL_DIR/mysql/lib/mysql >> " + fileName;
+		system(cmd.c_str());
+	}
 
 	newFile.close();
 

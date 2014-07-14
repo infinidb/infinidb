@@ -728,7 +728,7 @@ uint TupleConstantOnlyStep::nextBand(messageqcpp::ByteStream &bs)
 void TupleConstantOnlyStep::fillInConstants()
 {
 	fRowGroupOut.getRow(0, &fRowOut);
-	idbassert(fRowConst.getSize() == fRowOut.getSize());
+	idbassert(fRowConst.getColumnCount() == fRowOut.getColumnCount());
 	copyRow(fRowConst, &fRowOut);
 	fRowGroupOut.resetRowGroup(0);
 	fRowGroupOut.setRowCount(1);

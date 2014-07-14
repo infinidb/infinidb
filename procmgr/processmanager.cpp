@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -1363,7 +1363,7 @@ void processMSG(messageqcpp::IOSocket* cfIos)
 						//run save.brm script
 						processManager.saveBRM();
 
-						string cmd = "pdsh -a -x " + localHostName + " '/etc/init.d/infinidb stop' > /dev/null 2>&1";
+						string cmd = "pdsh -a -x " + localHostName + " '" + startup::StartUp::installDir() + "/infinidb stop' > /dev/null 2>&1";
 						system(cmd.c_str());
 
 						break;
@@ -4903,6 +4903,7 @@ int ProcessManager::addModule(oam::DeviceNetworkList devicenetworklist, std::str
 					log.writeLog(__LINE__, "addModule - ERROR: user_installer.sh failed", LOG_TYPE_ERROR);
 					pthread_mutex_unlock(&THREAD_LOCK);
 					system(" cp /tmp/user_installer.log /tmp/user_installer.log.failed");
+					setModuleState(remoteModuleName, oam::FAILED);
 					return API_FAILURE;
 				}
 			}
@@ -4918,6 +4919,7 @@ int ProcessManager::addModule(oam::DeviceNetworkList devicenetworklist, std::str
 					log.writeLog(__LINE__, "addModule - ERROR: binary_installer.sh failed", LOG_TYPE_ERROR);
 					system(" cp /tmp/binary_installer.log /tmp/binary_installer.log.failed");
 					pthread_mutex_unlock(&THREAD_LOCK);
+					setModuleState(remoteModuleName, oam::FAILED);
 					return API_FAILURE;
 				}
 			}
@@ -4935,6 +4937,7 @@ int ProcessManager::addModule(oam::DeviceNetworkList devicenetworklist, std::str
 						log.writeLog(__LINE__, "addModule - ERROR: performance_installer.sh failed", LOG_TYPE_ERROR);
 						system(" cp /tmp/performance_installer.log /tmp/performance_installer.log.failed");
 						pthread_mutex_unlock(&THREAD_LOCK);
+						setModuleState(remoteModuleName, oam::FAILED);
 						return API_FAILURE;
 					}
 				}
@@ -4950,6 +4953,7 @@ int ProcessManager::addModule(oam::DeviceNetworkList devicenetworklist, std::str
 						log.writeLog(__LINE__, "addModule - ERROR: binary_installer.sh failed", LOG_TYPE_ERROR);
 						system(" cp /tmp/binary_installer.log /tmp/binary_installer.log.failed");
 						pthread_mutex_unlock(&THREAD_LOCK);
+						setModuleState(remoteModuleName, oam::FAILED);
 						return API_FAILURE;
 					}
 				}
@@ -5162,6 +5166,51 @@ int ProcessManager::removeModule(oam::DeviceNetworkList devicenetworklist, bool 
 						{
 							string tagValue = systemName + "-" + moduleName + "-terminated";
 							oam.createEC2tag( (*pt1).HostName, "Name", tagValue );
+						}
+						//check if any volumes need to be deleted
+						if ( moduleType == "um" )
+						{
+							string UMStorageType = "internal";
+							{
+								try{
+									oam.getSystemConfig("UMStorageType", UMStorageType);
+								}
+								catch(...) {}
+							}
+		
+							if ( UMStorageType == "external" )
+							{	//check if volume already assigned or need to create a new one
+								int moduleID = atoi(moduleName.substr(MAX_MODULE_TYPE_SIZE,MAX_MODULE_ID_SIZE).c_str());
+		
+								string volumeNameID = "UMVolumeName" + oam.itoa(moduleID);
+								string volumeName = oam::UnassignedName;
+								string deviceNameID = "UMVolumeDeviceName" + oam.itoa(moduleID);
+								string deviceName = oam::UnassignedName;
+								try {
+									oam.getSystemConfig( volumeNameID, volumeName);
+									oam.getSystemConfig( deviceNameID, deviceName);
+								}
+								catch(...)
+								{}
+							
+								if ( !volumeName.empty() || volumeName != oam::UnassignedName ) {
+									log.writeLog(__LINE__, "removeModule - detach / remove volume: " + volumeName + "/" + deviceName, LOG_TYPE_DEBUG);
+									oam.detachEC2Volume( volumeName );
+
+									oam.deleteEC2Volume( volumeName );
+							
+									try {
+										Config* sysConfig = Config::makeConfig();
+		
+										sysConfig->setConfig("Installation", volumeNameID, oam::UnassignedName);
+										sysConfig->setConfig("Installation", deviceNameID, oam::UnassignedName);
+		
+										sysConfig->write();
+									}
+									catch(...)
+									{}
+								}
+							}
 						}
 					}
 

@@ -87,10 +87,12 @@ TupleUnion::TupleUnion(CalpontSystemCatalog::OID tableOID, const JobInfo& jobInf
 	runnersDone(0),
 	distinctCount(0),
 	distinctDone(0),
+	fRowsReturned(0),
 	runRan(false),
 	joinRan(false)
 {
 	uniquer.reset(new Uniquer_t(10, Hasher(this), Eq(this), allocator));
+	fExtendedInfo = "TUS: ";
 }
 
 TupleUnion::~TupleUnion()
@@ -167,6 +169,9 @@ void TupleUnion::readInput(uint which)
 
 		it = dl->getIterator();
 		more = dl->next(it, &inRGData);
+
+		if (traceOn() && dlTimes.FirstReadTime().tv_sec==0)
+            dlTimes.setFirstReadTime();
 
 		while (more && !cancelled()) {
 			/*
@@ -255,7 +260,30 @@ void TupleUnion::readInput(uint which)
 				output->insert(outRGData);
 		}
 		if (++runnersDone == fInputJobStepAssociation.outSize())
+		{
 			output->endOfInput();
+
+			if (traceOn())
+			{
+				dlTimes.setLastReadTime();
+				dlTimes.setEndOfInputTime();
+
+				time_t t = time (0);
+				char timeString[50];
+				ctime_r (&t, timeString);
+				timeString[strlen (timeString )-1] = '\0';
+				ostringstream logStr;
+				logStr  << "ses:" << fSessionId << " st: " << fStepId << " finished at "
+						<< timeString << "; total rows returned-" << fRowsReturned << endl
+						<< "\t1st read " << dlTimes.FirstReadTimeString()
+						<< "; EOI " << dlTimes.EndOfInputTimeString() << "; runtime-"
+						<< JSTimeStamp::tsdiffstr(dlTimes.EndOfInputTime(),dlTimes.FirstReadTime())
+						<< "s;\n\tJob completion status " << status() << endl;
+				logEnd(logStr.str().c_str());
+				fExtendedInfo += logStr.str();
+				formatMiniStats();
+			}
+		}
 	}
 }
 
@@ -301,6 +329,7 @@ void TupleUnion::addToOutput(Row *r, RowGroup *rg, bool keepit,
 {
 	r->nextRow();
 	rg->incRowCount();
+	fRowsReturned++;
 	if (rg->getRowCount() == 8192) {
 		{
 			mutex::scoped_lock lock(sMutex);
@@ -831,6 +860,22 @@ void TupleUnion::writeNull(Row *out, uint col)
 			out->setVarBinaryField(joblist::CPNULLSTRMARK, col); break;
 		default: { }
 	}
+}
+
+void TupleUnion::formatMiniStats()
+{
+    ostringstream oss;
+    oss << "TUS "
+        << "UM "
+        << "- "
+        << "- "
+        << "- "
+        << "- "
+        << "- "
+        << "- "
+        << JSTimeStamp::tsdiffstr(dlTimes.EndOfInputTime(), dlTimes.FirstReadTime()) << " "
+        << fRowsReturned << " ";
+    fMiniInfo += oss.str();
 }
 
 }

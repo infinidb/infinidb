@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -1634,7 +1634,8 @@ int main(int argc, char *argv[])
 				}
 				else
 				{
-					if ( DataFilePlugin == "/usr/local/Calpont/lib/hdfs-20.so" )
+					string::size_type pos = DataFilePlugin.find("hdfs-20.so",0);
+					if (pos != string::npos)
 						DataFileEnvFile = "setenv-hdfs-20";
 					else
 						DataFileEnvFile = "setenv-hdfs-12";

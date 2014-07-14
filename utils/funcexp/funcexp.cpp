@@ -243,6 +243,9 @@ void FuncExp::evaluate(rowgroup::Row& row, std::vector<execplan::SRCP>& expressi
 			case CalpontSystemCatalog::DATE:
 			{
 				int64_t val = expression[i]->getIntVal(row, isNull);
+				// @bug6061, workaround date_add always return datetime for both date and datetime
+				if (val & 0xFFFFFFFF00000000)
+					val = (((val >> 32) & 0xFFFFFFC0) | 0x3E);
 				if (isNull)
 					row.setUintField<4>(DATENULL, expression[i]->outputIndex());
 				else

@@ -43,7 +43,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="C:\InfiniDB\genii\utils\mysqlcl_idb;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\boost_1_54_0"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\genii\utils\mysqlcl_idb;$(SolutionDir)..\..\genii\utils\configcpp;$(SolutionDir)..\..\genii\utils\winport;$(SolutionDir)..\..\boost_1_54_0"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
@@ -104,7 +104,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="C:\InfiniDB\genii\utils\mysqlcl_idb;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\boost_1_54_0"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\genii\utils\mysqlcl_idb;$(SolutionDir)..\..\genii\utils\configcpp;$(SolutionDir)..\..\genii\utils\winport;$(SolutionDir)..\..\boost_1_54_0"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
@@ -166,7 +166,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="C:\InfiniDB\genii\utils\mysqlcl_idb;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\boost_1_54_0"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\genii\utils\mysqlcl_idb;$(SolutionDir)..\..\genii\utils\configcpp;$(SolutionDir)..\..\genii\utils\winport;$(SolutionDir)..\..\boost_1_54_0"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
 				WarningLevel="3"
@@ -228,7 +228,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="C:\InfiniDB\genii\utils\mysqlcl_idb;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\boost_1_54_0"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\genii\utils\mysqlcl_idb;$(SolutionDir)..\..\genii\utils\configcpp;$(SolutionDir)..\..\genii\utils\winport;$(SolutionDir)..\..\boost_1_54_0"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
 				WarningLevel="3"
@@ -285,7 +285,7 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
-				AdditionalIncludeDirectories="C:\InfiniDB\genii\utils\mysqlcl_idb;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\boost_1_54_0"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\genii\utils\mysqlcl_idb;$(SolutionDir)..\..\genii\utils\configcpp;$(SolutionDir)..\..\genii\utils\winport;$(SolutionDir)..\..\boost_1_54_0"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
 			/>
@@ -340,7 +340,7 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
-				AdditionalIncludeDirectories="C:\InfiniDB\genii\utils\mysqlcl_idb;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\boost_1_54_0"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\genii\utils\mysqlcl_idb;$(SolutionDir)..\..\genii\utils\configcpp;$(SolutionDir)..\..\genii\utils\winport;$(SolutionDir)..\..\boost_1_54_0"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
 			/>

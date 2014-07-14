@@ -107,6 +107,19 @@ ReturnedColumn* buildBoundExp(WF_Boundary& bound, SRCP& order, gp_walk_info& gwi
 		// date_add
 		rc = new FunctionColumn();
 		string funcName = "date_add_interval";
+                // @bug6061 . YEAR, QUARTER, MONTH, WEEK, DAY type
+                CalpontSystemCatalog::ColType ct;
+                if (order->resultType().colDataType == CalpontSystemCatalog::DATE &&
+                    intervalCol->intervalType() <= IntervalColumn::INTERVAL_DAY)
+                {
+                        ct.colDataType = CalpontSystemCatalog::DATE;
+                        ct.colWidth = 4;
+                }
+                else
+                {
+                        ct.colDataType = CalpontSystemCatalog::DATETIME;
+                        ct.colWidth = 8;
+                }
 
 		// put interval val column to bound
 		(dynamic_cast<FunctionColumn*>(rc))->functionName(funcName);
@@ -128,13 +141,9 @@ ReturnedColumn* buildBoundExp(WF_Boundary& bound, SRCP& order, gp_walk_info& gwi
 			funcParms.push_back(sptp);
 		}
 		(dynamic_cast<FunctionColumn*>(rc))->functionParms(funcParms);
-		CalpontSystemCatalog::ColType ct;
-		ct.colDataType = CalpontSystemCatalog::DATETIME;
-		ct.colWidth = 8;
 		rc->resultType(ct);
-		FuncExp* funcexp = FuncExp::instance();
-		Func* functor = funcexp->getFunctor(funcName);
-		(dynamic_cast<FunctionColumn*>(rc))->operationType(functor->operationType(funcParms, rc->resultType()));
+                // @bug6061. Use result type as operation type for WF bound expression
+		rc->operationType(ct);
 		rc->expressionId(gwi.expressionId++);
 		return rc;
 	}

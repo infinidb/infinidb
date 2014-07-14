@@ -27,7 +27,7 @@
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
-				CommandLine="del \InfiniDB\primproc\rowaggregation.h \InfiniDB\primproc\rowgroup.h &gt;nul 2&gt;&amp;1"
+				CommandLine="del $(SolutionDir)..\..\primproc\rowaggregation.h $(SolutionDir)..\..\primproc\rowgroup.h &gt;nul 2&gt;&amp;1"
 			/>
 			<Tool
 				Name="VCCustomBuildTool"
@@ -44,7 +44,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\primproc;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\rowgroup;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\dbcon\joblist;C:\InfiniDB\genii\dbcon\execplan;C:\InfiniDB\genii\writeengine\shared;C:\InfiniDB\genii\versioning\BRM;&quot;C:\InfiniDB\linux-port&quot;;C:\InfiniDB\blockcache;C:\InfiniDB\genii\utils\joiner;C:\InfiniDB\genii\utils\common;C:\InfiniDB\genii\utils\dataconvert;C:\InfiniDB\genii\utils\funcexp;C:\InfiniDB\genii\utils\threadpool;C:\InfiniDB\genii\utils\rwlock;C:\InfiniDB\genii\writeengine\wrapper;C:\InfiniDB\genii\dmlib;C:\InfiniDB\genii\writeengine\index;C:\InfiniDB\genii\writeengine\dictionary;C:\InfiniDB\genii\oam\oamcpp;C:\InfiniDB\genii\snmpd\snmpmanager;C:\InfiniDB\genii\utils\multicast;C:\InfiniDB\genii\utils\compress"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\boost_1_54_0;&quot;$(SolutionDir)..\..\libxml2-2.7.6&quot;;$(SolutionDir)..\..\primproc;$(SolutionDir)..\..\genii\utils\loggingcpp;$(SolutionDir)..\..\genii\utils\rowgroup;$(SolutionDir)..\..\genii\utils\winport;$(SolutionDir)..\..\genii\utils\messageqcpp;$(SolutionDir)..\..\genii\utils\configcpp;$(SolutionDir)..\..\genii\dbcon\joblist;$(SolutionDir)..\..\genii\dbcon\execplan;$(SolutionDir)..\..\genii\writeengine\shared;$(SolutionDir)..\..\genii\versioning\BRM;&quot;$(SolutionDir)..\..\linux-port&quot;;$(SolutionDir)..\..\blockcache;$(SolutionDir)..\..\genii\utils\joiner;$(SolutionDir)..\..\genii\utils\common;$(SolutionDir)..\..\genii\utils\dataconvert;$(SolutionDir)..\..\genii\utils\funcexp;$(SolutionDir)..\..\genii\utils\threadpool;$(SolutionDir)..\..\genii\utils\rwlock;$(SolutionDir)..\..\genii\writeengine\wrapper;$(SolutionDir)..\..\genii\dmlib;$(SolutionDir)..\..\genii\writeengine\index;$(SolutionDir)..\..\genii\writeengine\dictionary;$(SolutionDir)..\..\genii\oam\oamcpp;$(SolutionDir)..\..\genii\snmpd\snmpmanager;$(SolutionDir)..\..\genii\utils\multicast;$(SolutionDir)..\..\genii\utils\compress"
 				PreprocessorDefinitions="SKIP_SNMP;SKIP_IDB_COMPRESSION"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
@@ -57,7 +57,7 @@
 			/>
 			<Tool
 				Name="VCResourceCompilerTool"
-				AdditionalIncludeDirectories="C:\InfiniDB\genii\utils\winport"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\genii\utils\winport"
 			/>
 			<Tool
 				Name="VCPreLinkEventTool"
@@ -65,7 +65,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="libbrm.lib liboamcpp.lib libwriteengine.lib libthreadpool.lib libloggingcpp.lib libconfigcpp.lib libmulticast.lib libjoiner.lib librowgroup.lib libfuncexp.lib librwlock.lib libcommon.lib libmessageqcpp.lib libcompress.lib libwinport.lib libidbboot.lib libexecplan.lib libcacheutils.lib libdataconvert.lib libjoblist.lib libudfsdk.lib ws2_32.lib psapi.lib iphlpapi.lib"
-				AdditionalLibraryDirectories="C:\InfiniDB\Debug"
+				AdditionalLibraryDirectories="$(SolutionDir)..\..\Debug"
 				GenerateDebugInformation="true"
 				TargetMachine="1"
 			/>
@@ -100,7 +100,7 @@
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
-				CommandLine="rm -f \InfiniDB\primproc\rowaggregation.h \InfiniDB\primproc\rowgroup.h &gt;nul 2&gt;&amp;1"
+				CommandLine="rm -f $(SolutionDir)..\..\primproc\rowaggregation.h $(SolutionDir)..\..\primproc\rowgroup.h &gt;nul 2&gt;&amp;1"
 			/>
 			<Tool
 				Name="VCCustomBuildTool"
@@ -118,7 +118,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\genii\primitives\primproc;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\rowgroup;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\dbcon\joblist;C:\InfiniDB\genii\dbcon\execplan;C:\InfiniDB\genii\writeengine\shared;C:\InfiniDB\genii\versioning\BRM;&quot;C:\InfiniDB\linux-port&quot;;C:\InfiniDB\blockcache;C:\InfiniDB\genii\utils\joiner;C:\InfiniDB\genii\utils\common;C:\InfiniDB\genii\utils\dataconvert;C:\InfiniDB\genii\utils\funcexp;C:\InfiniDB\genii\utils\threadpool;C:\InfiniDB\genii\utils\rwlock;C:\InfiniDB\genii\writeengine\wrapper;C:\InfiniDB\genii\dmlib;C:\InfiniDB\genii\writeengine\index;C:\InfiniDB\genii\writeengine\dictionary;C:\InfiniDB\genii\oam\oamcpp;C:\InfiniDB\genii\snmpd\snmpmanager;C:\InfiniDB\genii\utils\multicast;C:\InfiniDB\genii\utils\compress;C:\InfiniDB\genii\primitives\blockcache;&quot;C:\InfiniDB\genii\primitives\linux-port&quot;;C:\InfiniDB\genii\utils\idbdatafile"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\boost_1_54_0;&quot;$(SolutionDir)..\..\libxml2-2.7.6&quot;;$(SolutionDir)..\..\genii\primitives\primproc;$(SolutionDir)..\..\genii\utils\loggingcpp;$(SolutionDir)..\..\genii\utils\rowgroup;$(SolutionDir)..\..\genii\utils\winport;$(SolutionDir)..\..\genii\utils\messageqcpp;$(SolutionDir)..\..\genii\utils\configcpp;$(SolutionDir)..\..\genii\dbcon\joblist;$(SolutionDir)..\..\genii\dbcon\execplan;$(SolutionDir)..\..\genii\writeengine\shared;$(SolutionDir)..\..\genii\versioning\BRM;&quot;$(SolutionDir)..\..\linux-port&quot;;$(SolutionDir)..\..\blockcache;$(SolutionDir)..\..\genii\utils\joiner;$(SolutionDir)..\..\genii\utils\common;$(SolutionDir)..\..\genii\utils\dataconvert;$(SolutionDir)..\..\genii\utils\funcexp;$(SolutionDir)..\..\genii\utils\threadpool;$(SolutionDir)..\..\genii\utils\rwlock;$(SolutionDir)..\..\genii\writeengine\wrapper;$(SolutionDir)..\..\genii\dmlib;$(SolutionDir)..\..\genii\writeengine\index;$(SolutionDir)..\..\genii\writeengine\dictionary;$(SolutionDir)..\..\genii\oam\oamcpp;$(SolutionDir)..\..\genii\snmpd\snmpmanager;$(SolutionDir)..\..\genii\utils\multicast;$(SolutionDir)..\..\genii\utils\compress;$(SolutionDir)..\..\genii\primitives\blockcache;&quot;$(SolutionDir)..\..\genii\primitives\linux-port&quot;;$(SolutionDir)..\..\genii\utils\idbdatafile"
 				PreprocessorDefinitions="SKIP_SNMP"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
@@ -139,7 +139,7 @@
 				Name="VCLinkerTool"
 				LinkLibraryDependencies="true"
 				AdditionalDependencies="libbrm.lib liboamcpp.lib libwriteengine.lib libthreadpool.lib libloggingcpp.lib libconfigcpp.lib libmulticast.lib libjoiner.lib librowgroup.lib libfuncexp.lib librwlock.lib libcommon.lib libmessageqcpp.lib libcompress.lib libwinport.lib libidbboot.lib libexecplan.lib libcacheutils.lib libdataconvert.lib libjoblist.lib libudfsdk.lib ws2_32.lib psapi.lib iphlpapi.lib libidbdatafile.lib"
-				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_54_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\x64\Debug"
+				AdditionalLibraryDirectories="$(SolutionDir)..\..\boost_1_54_0;&quot;$(SolutionDir)..\..\libxml2-2.7.6&quot;;$(SolutionDir)..\..\x64\Debug"
 				GenerateDebugInformation="true"
 				SubSystem="1"
 				HeapReserveSize="2097152"
@@ -180,7 +180,7 @@
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
-				CommandLine="del \InfiniDB\primproc\rowaggregation.h \InfiniDB\primproc\rowgroup.h &gt;nul 2&gt;&amp;1"
+				CommandLine="del $(SolutionDir)..\..\primproc\rowaggregation.h $(SolutionDir)..\..\primproc\rowgroup.h &gt;nul 2&gt;&amp;1"
 			/>
 			<Tool
 				Name="VCCustomBuildTool"
@@ -200,7 +200,7 @@
 				InlineFunctionExpansion="2"
 				EnableIntrinsicFunctions="true"
 				FavorSizeOrSpeed="1"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\primproc;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\rowgroup;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\dbcon\joblist;C:\InfiniDB\genii\dbcon\execplan;C:\InfiniDB\genii\writeengine\shared;C:\InfiniDB\genii\versioning\BRM;&quot;C:\InfiniDB\linux-port&quot;;C:\InfiniDB\blockcache;C:\InfiniDB\genii\utils\joiner;C:\InfiniDB\genii\utils\common;C:\InfiniDB\genii\utils\dataconvert;C:\InfiniDB\genii\utils\funcexp;C:\InfiniDB\genii\utils\threadpool;C:\InfiniDB\genii\utils\rwlock;C:\InfiniDB\genii\writeengine\wrapper;C:\InfiniDB\genii\dmlib;C:\InfiniDB\genii\writeengine\index;C:\InfiniDB\genii\writeengine\dictionary;C:\InfiniDB\genii\oam\oamcpp;C:\InfiniDB\genii\snmpd\snmpmanager;C:\InfiniDB\genii\utils\multicast;C:\InfiniDB\genii\utils\compress"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\boost_1_54_0;&quot;$(SolutionDir)..\..\libxml2-2.7.6&quot;;$(SolutionDir)..\..\primproc;$(SolutionDir)..\..\genii\utils\loggingcpp;$(SolutionDir)..\..\genii\utils\rowgroup;$(SolutionDir)..\..\genii\utils\winport;$(SolutionDir)..\..\genii\utils\messageqcpp;$(SolutionDir)..\..\genii\utils\configcpp;$(SolutionDir)..\..\genii\dbcon\joblist;$(SolutionDir)..\..\genii\dbcon\execplan;$(SolutionDir)..\..\genii\writeengine\shared;$(SolutionDir)..\..\genii\versioning\BRM;&quot;$(SolutionDir)..\..\linux-port&quot;;$(SolutionDir)..\..\blockcache;$(SolutionDir)..\..\genii\utils\joiner;$(SolutionDir)..\..\genii\utils\common;$(SolutionDir)..\..\genii\utils\dataconvert;$(SolutionDir)..\..\genii\utils\funcexp;$(SolutionDir)..\..\genii\utils\threadpool;$(SolutionDir)..\..\genii\utils\rwlock;$(SolutionDir)..\..\genii\writeengine\wrapper;$(SolutionDir)..\..\genii\dmlib;$(SolutionDir)..\..\genii\writeengine\index;$(SolutionDir)..\..\genii\writeengine\dictionary;$(SolutionDir)..\..\genii\oam\oamcpp;$(SolutionDir)..\..\genii\snmpd\snmpmanager;$(SolutionDir)..\..\genii\utils\multicast;$(SolutionDir)..\..\genii\utils\compress"
 				PreprocessorDefinitions="_SCL_SECURE_NO_WARNINGS;SKIP_SNMP;SKIP_IDB_COMPRESSION"
 				RuntimeLibrary="2"
 				BufferSecurityCheck="false"
@@ -213,7 +213,7 @@
 			/>
 			<Tool
 				Name="VCResourceCompilerTool"
-				AdditionalIncludeDirectories="C:\InfiniDB\genii\utils\winport"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\genii\utils\winport"
 			/>
 			<Tool
 				Name="VCPreLinkEventTool"
@@ -222,7 +222,7 @@
 				Name="VCLinkerTool"
 				LinkLibraryDependencies="false"
 				AdditionalDependencies="libbrm.lib liboamcpp.lib libjoblist.lib libwriteengine.lib libthreadpool.lib libloggingcpp.lib libconfigcpp.lib libmulticast.lib libjoiner.lib librowgroup.lib libfuncexp.lib libdataconvert.lib libcacheutils.lib libexecplan.lib librwlock.lib libcommon.lib libmessageqcpp.lib libidbboot.lib libwinport.lib libxml2.lib iphlpapi.lib ws2_32.lib psapi.lib"
-				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_54_0\lib32;&quot;C:\InfiniDB\libxml2-2.7.6\lib32&quot;;C:\InfiniDB\Release"
+				AdditionalLibraryDirectories="$(SolutionDir)..\..\boost_1_54_0\lib32;&quot;$(SolutionDir)..\..\libxml2-2.7.6\lib32&quot;;$(SolutionDir)..\..\Release"
 				GenerateDebugInformation="true"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
@@ -248,7 +248,7 @@
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
-				CommandLine="\InfiniDB\signit &quot;InfiniDB Primitive Processor&quot; \InfiniDB\Release\PrimProc.exe"
+				CommandLine="$(SolutionDir)..\..\signit &quot;InfiniDB Primitive Processor&quot; $(SolutionDir)..\..\Release\PrimProc.exe"
 			/>
 		</Configuration>
 		<Configuration
@@ -261,7 +261,7 @@
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
-				CommandLine="del \InfiniDB\primproc\rowaggregation.h \InfiniDB\primproc\rowgroup.h &gt;nul 2&gt;&amp;1"
+				CommandLine="del $(SolutionDir)..\..\primproc\rowaggregation.h $(SolutionDir)..\..\primproc\rowgroup.h &gt;nul 2&gt;&amp;1"
 			/>
 			<Tool
 				Name="VCCustomBuildTool"
@@ -282,7 +282,7 @@
 				InlineFunctionExpansion="2"
 				EnableIntrinsicFunctions="true"
 				FavorSizeOrSpeed="1"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\primproc;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\rowgroup;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\dbcon\joblist;C:\InfiniDB\genii\dbcon\execplan;C:\InfiniDB\genii\writeengine\shared;C:\InfiniDB\genii\versioning\BRM;&quot;C:\InfiniDB\linux-port&quot;;C:\InfiniDB\blockcache;C:\InfiniDB\genii\utils\joiner;C:\InfiniDB\genii\utils\common;C:\InfiniDB\genii\utils\dataconvert;C:\InfiniDB\genii\utils\funcexp;C:\InfiniDB\genii\utils\threadpool;C:\InfiniDB\genii\utils\rwlock;C:\InfiniDB\genii\writeengine\wrapper;C:\InfiniDB\genii\dmlib;C:\InfiniDB\genii\writeengine\index;C:\InfiniDB\genii\writeengine\dictionary;C:\InfiniDB\genii\oam\oamcpp;C:\InfiniDB\genii\snmpd\snmpmanager;C:\InfiniDB\genii\utils\multicast;C:\InfiniDB\genii\utils\compress"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\boost_1_54_0;&quot;$(SolutionDir)..\..\libxml2-2.7.6&quot;;$(SolutionDir)..\..\primproc;$(SolutionDir)..\..\genii\utils\loggingcpp;$(SolutionDir)..\..\genii\utils\rowgroup;$(SolutionDir)..\..\genii\utils\winport;$(SolutionDir)..\..\genii\utils\messageqcpp;$(SolutionDir)..\..\genii\utils\configcpp;$(SolutionDir)..\..\genii\dbcon\joblist;$(SolutionDir)..\..\genii\dbcon\execplan;$(SolutionDir)..\..\genii\writeengine\shared;$(SolutionDir)..\..\genii\versioning\BRM;&quot;$(SolutionDir)..\..\linux-port&quot;;$(SolutionDir)..\..\blockcache;$(SolutionDir)..\..\genii\utils\joiner;$(SolutionDir)..\..\genii\utils\common;$(SolutionDir)..\..\genii\utils\dataconvert;$(SolutionDir)..\..\genii\utils\funcexp;$(SolutionDir)..\..\genii\utils\threadpool;$(SolutionDir)..\..\genii\utils\rwlock;$(SolutionDir)..\..\genii\writeengine\wrapper;$(SolutionDir)..\..\genii\dmlib;$(SolutionDir)..\..\genii\writeengine\index;$(SolutionDir)..\..\genii\writeengine\dictionary;$(SolutionDir)..\..\genii\oam\oamcpp;$(SolutionDir)..\..\genii\snmpd\snmpmanager;$(SolutionDir)..\..\genii\utils\multicast;$(SolutionDir)..\..\genii\utils\compress"
 				PreprocessorDefinitions="_SCL_SECURE_NO_WARNINGS;SKIP_SNMP;SKIP_IDB_COMPRESSION"
 				RuntimeLibrary="2"
 				BufferSecurityCheck="false"
@@ -303,7 +303,7 @@
 				Name="VCLinkerTool"
 				LinkLibraryDependencies="false"
 				AdditionalDependencies="libbrm.lib liboamcpp.lib libjoblist.lib libwriteengine.lib libthreadpool.lib libloggingcpp.lib libconfigcpp.lib libmulticast.lib libjoiner.lib librowgroup.lib libfuncexp.lib libdataconvert.lib libcacheutils.lib libexecplan.lib librwlock.lib libcommon.lib libmessageqcpp.lib libidbboot.lib libwinport.lib libxml2.lib iphlpapi.lib ws2_32.lib psapi.lib"
-				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_54_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\x64\Release"
+				AdditionalLibraryDirectories="$(SolutionDir)..\..\boost_1_54_0;&quot;$(SolutionDir)..\..\libxml2-2.7.6&quot;;$(SolutionDir)..\..\x64\Release"
 				GenerateDebugInformation="true"
 				SubSystem="1"
 				HeapReserveSize="2097152"
@@ -334,7 +334,7 @@
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
-				CommandLine="\InfiniDB\signit &quot;InfiniDB Primitive Processor&quot; \InfiniDB\x64\Release\PrimProc.exe"
+				CommandLine="$(SolutionDir)..\..\signit &quot;InfiniDB Primitive Processor&quot; $(SolutionDir)..\..\x64\Release\PrimProc.exe"
 			/>
 		</Configuration>
 		<Configuration
@@ -347,7 +347,7 @@
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
-				CommandLine="del \InfiniDB\primproc\rowaggregation.h \InfiniDB\primproc\rowgroup.h &gt;nul 2&gt;&amp;1"
+				CommandLine="del $(SolutionDir)..\..\primproc\rowaggregation.h $(SolutionDir)..\..\primproc\rowgroup.h &gt;nul 2&gt;&amp;1"
 			/>
 			<Tool
 				Name="VCCustomBuildTool"
@@ -367,7 +367,7 @@
 				InlineFunctionExpansion="2"
 				EnableIntrinsicFunctions="true"
 				FavorSizeOrSpeed="1"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\primproc;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\rowgroup;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\dbcon\joblist;C:\InfiniDB\genii\dbcon\execplan;C:\InfiniDB\genii\writeengine\shared;C:\InfiniDB\genii\versioning\BRM;&quot;C:\InfiniDB\linux-port&quot;;C:\InfiniDB\blockcache;C:\InfiniDB\genii\utils\joiner;C:\InfiniDB\genii\utils\common;C:\InfiniDB\genii\utils\dataconvert;C:\InfiniDB\genii\utils\funcexp;C:\InfiniDB\genii\utils\threadpool;C:\InfiniDB\genii\utils\rwlock;C:\InfiniDB\genii\writeengine\wrapper;C:\InfiniDB\genii\dmlib;C:\InfiniDB\genii\writeengine\index;C:\InfiniDB\genii\writeengine\dictionary;C:\InfiniDB\genii\oam\oamcpp;C:\InfiniDB\genii\snmpd\snmpmanager;C:\InfiniDB\genii\utils\multicast;C:\InfiniDB\genii\utils\compress"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\boost_1_54_0;&quot;$(SolutionDir)..\..\libxml2-2.7.6&quot;;$(SolutionDir)..\..\primproc;$(SolutionDir)..\..\genii\utils\loggingcpp;$(SolutionDir)..\..\genii\utils\rowgroup;$(SolutionDir)..\..\genii\utils\winport;$(SolutionDir)..\..\genii\utils\messageqcpp;$(SolutionDir)..\..\genii\utils\configcpp;$(SolutionDir)..\..\genii\dbcon\joblist;$(SolutionDir)..\..\genii\dbcon\execplan;$(SolutionDir)..\..\genii\writeengine\shared;$(SolutionDir)..\..\genii\versioning\BRM;&quot;$(SolutionDir)..\..\linux-port&quot;;$(SolutionDir)..\..\blockcache;$(SolutionDir)..\..\genii\utils\joiner;$(SolutionDir)..\..\genii\utils\common;$(SolutionDir)..\..\genii\utils\dataconvert;$(SolutionDir)..\..\genii\utils\funcexp;$(SolutionDir)..\..\genii\utils\threadpool;$(SolutionDir)..\..\genii\utils\rwlock;$(SolutionDir)..\..\genii\writeengine\wrapper;$(SolutionDir)..\..\genii\dmlib;$(SolutionDir)..\..\genii\writeengine\index;$(SolutionDir)..\..\genii\writeengine\dictionary;$(SolutionDir)..\..\genii\oam\oamcpp;$(SolutionDir)..\..\genii\snmpd\snmpmanager;$(SolutionDir)..\..\genii\utils\multicast;$(SolutionDir)..\..\genii\utils\compress"
 				PreprocessorDefinitions="_SCL_SECURE_NO_WARNINGS;SKIP_SNMP"
 				RuntimeLibrary="2"
 				BufferSecurityCheck="false"
@@ -380,7 +380,7 @@
 			/>
 			<Tool
 				Name="VCResourceCompilerTool"
-				AdditionalIncludeDirectories="C:\InfiniDB\genii\utils\winport"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\genii\utils\winport"
 			/>
 			<Tool
 				Name="VCPreLinkEventTool"
@@ -388,7 +388,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="libbrm.lib liboamcpp.lib libwriteengine.lib libthreadpool.lib libloggingcpp.lib libconfigcpp.lib libmulticast.lib libjoiner.lib librowgroup.lib libfuncexp.lib librwlock.lib libcommon.lib libmessageqcpp.lib libcompress.lib libwinport.lib libidbboot.lib libexecplan.lib libcacheutils.lib libdataconvert.lib libjoblist.lib libudfsdk.lib ws2_32.lib psapi.lib iphlpapi.lib"
-				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_54_0\lib32;&quot;C:\InfiniDB\libxml2-2.7.6\lib32&quot;;C:\InfiniDB\Release"
+				AdditionalLibraryDirectories="$(SolutionDir)..\..\boost_1_54_0\lib32;&quot;$(SolutionDir)..\..\libxml2-2.7.6\lib32&quot;;$(SolutionDir)..\..\Release"
 				GenerateDebugInformation="true"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
@@ -414,7 +414,7 @@
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
-				CommandLine="\InfiniDB\signit &quot;InfiniDB Primitive Processor&quot; \InfiniDB\Release\PrimProc.exe"
+				CommandLine="$(SolutionDir)..\..\signit &quot;InfiniDB Primitive Processor&quot; $(SolutionDir)..\..\Release\PrimProc.exe"
 			/>
 		</Configuration>
 		<Configuration
@@ -427,7 +427,7 @@
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
-				CommandLine="rm -f \InfiniDB\primproc\rowaggregation.h \InfiniDB\primproc\rowgroup.h &gt;nul 2&gt;&amp;1"
+				CommandLine="rm -f $(SolutionDir)..\..\primproc\rowaggregation.h $(SolutionDir)..\..\primproc\rowgroup.h &gt;nul 2&gt;&amp;1"
 			/>
 			<Tool
 				Name="VCCustomBuildTool"
@@ -448,7 +448,7 @@
 				InlineFunctionExpansion="2"
 				EnableIntrinsicFunctions="true"
 				FavorSizeOrSpeed="1"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\genii\primitives\primproc;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\rowgroup;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\dbcon\joblist;C:\InfiniDB\genii\dbcon\execplan;C:\InfiniDB\genii\writeengine\shared;C:\InfiniDB\genii\versioning\BRM;&quot;C:\InfiniDB\linux-port&quot;;C:\InfiniDB\blockcache;C:\InfiniDB\genii\utils\joiner;C:\InfiniDB\genii\utils\common;C:\InfiniDB\genii\utils\dataconvert;C:\InfiniDB\genii\utils\funcexp;C:\InfiniDB\genii\utils\threadpool;C:\InfiniDB\genii\utils\rwlock;C:\InfiniDB\genii\writeengine\wrapper;C:\InfiniDB\genii\dmlib;C:\InfiniDB\genii\writeengine\index;C:\InfiniDB\genii\writeengine\dictionary;C:\InfiniDB\genii\oam\oamcpp;C:\InfiniDB\genii\snmpd\snmpmanager;C:\InfiniDB\genii\utils\multicast;C:\InfiniDB\genii\utils\compress;C:\InfiniDB\genii\primitives\blockcache;&quot;C:\InfiniDB\genii\primitives\linux-port&quot;;C:\InfiniDB\genii\utils\idbdatafile"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\boost_1_54_0;&quot;$(SolutionDir)..\..\libxml2-2.7.6&quot;;$(SolutionDir)..\..\genii\primitives\primproc;$(SolutionDir)..\..\genii\utils\loggingcpp;$(SolutionDir)..\..\genii\utils\rowgroup;$(SolutionDir)..\..\genii\utils\winport;$(SolutionDir)..\..\genii\utils\messageqcpp;$(SolutionDir)..\..\genii\utils\configcpp;$(SolutionDir)..\..\genii\dbcon\joblist;$(SolutionDir)..\..\genii\dbcon\execplan;$(SolutionDir)..\..\genii\writeengine\shared;$(SolutionDir)..\..\genii\versioning\BRM;&quot;$(SolutionDir)..\..\linux-port&quot;;$(SolutionDir)..\..\blockcache;$(SolutionDir)..\..\genii\utils\joiner;$(SolutionDir)..\..\genii\utils\common;$(SolutionDir)..\..\genii\utils\dataconvert;$(SolutionDir)..\..\genii\utils\funcexp;$(SolutionDir)..\..\genii\utils\threadpool;$(SolutionDir)..\..\genii\utils\rwlock;$(SolutionDir)..\..\genii\writeengine\wrapper;$(SolutionDir)..\..\genii\dmlib;$(SolutionDir)..\..\genii\writeengine\index;$(SolutionDir)..\..\genii\writeengine\dictionary;$(SolutionDir)..\..\genii\oam\oamcpp;$(SolutionDir)..\..\genii\snmpd\snmpmanager;$(SolutionDir)..\..\genii\utils\multicast;$(SolutionDir)..\..\genii\utils\compress;$(SolutionDir)..\..\genii\primitives\blockcache;&quot;$(SolutionDir)..\..\genii\primitives\linux-port&quot;;$(SolutionDir)..\..\genii\utils\idbdatafile"
 				PreprocessorDefinitions="_SCL_SECURE_NO_WARNINGS;SKIP_SNMP"
 				RuntimeLibrary="2"
 				BufferSecurityCheck="false"
@@ -468,7 +468,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="libbrm.lib liboamcpp.lib libwriteengine.lib libthreadpool.lib libloggingcpp.lib libcommon.lib libconfigcpp.lib libmulticast.lib libjoiner.lib librowgroup.lib libfuncexp.lib librwlock.lib libmessageqcpp.lib libcompress.lib libwinport.lib libidbboot.lib libexecplan.lib libcacheutils.lib libdataconvert.lib libjoblist.lib libudfsdk.lib ws2_32.lib psapi.lib iphlpapi.lib libidbdatafile.lib"
-				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_54_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\x64\EnterpriseRelease"
+				AdditionalLibraryDirectories="$(SolutionDir)..\..\boost_1_54_0;&quot;$(SolutionDir)..\..\libxml2-2.7.6&quot;;$(SolutionDir)..\..\x64\EnterpriseRelease"
 				GenerateDebugInformation="true"
 				SubSystem="1"
 				HeapReserveSize="2097152"
@@ -499,7 +499,7 @@
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
-				CommandLine="\InfiniDB\signit &quot;InfiniDB Primitive Processor&quot; \InfiniDB\x64\EnterpriseRelease\PrimProc.exe"
+				CommandLine="$(SolutionDir)..\..\signit &quot;InfiniDB Primitive Processor&quot; $(SolutionDir)..\..\x64\EnterpriseRelease\PrimProc.exe"
 			/>
 		</Configuration>
 	</Configurations>

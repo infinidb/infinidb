@@ -118,6 +118,8 @@ struct UniqId
 		fId(i), fTable(t), fSchema(s), fView(v), fSubId(l) {}
 	UniqId(const execplan::SimpleColumn* sc);
 	UniqId(int o, const execplan::SimpleColumn* sc);
+
+	std::string toString() const;
 };
 bool operator < (const struct UniqId& x, const struct UniqId& y);
 bool operator == (const struct UniqId& x, const struct UniqId& y);
@@ -186,7 +188,6 @@ struct JobInfo
 		constantCol(CONST_COL_NONE),
 		hasDistinct(false),
 		hasAggregation(false),
-		hasImplicitGroupBy(false),
 		limitStart(0),
 		limitCount(-1),
 		joinNum(0),
@@ -236,7 +237,6 @@ struct JobInfo
 	// aggregation
 	bool       hasDistinct;
 	bool       hasAggregation;
-	bool       hasImplicitGroupBy;
 	std::vector<uint32_t>                  groupByColVec;
 	std::vector<uint32_t>                  distinctColVec;
 	std::vector<uint32_t>                  expressionVec;
@@ -303,6 +303,7 @@ struct JobInfo
 	int                    subId;         // id of current subquery
 	int                    pSubId;        // id of outer query
 	bool                   constantFalse; // has constant false filter
+	std::string            subAlias;      // unique alias to identify the subquery
 	JobStepVector          correlateSteps;
 	JobStepVector          selectAndFromSubs;
 	std::set<uint64_t>     returnColSet;

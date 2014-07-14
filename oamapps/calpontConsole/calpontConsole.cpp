@@ -15,7 +15,15 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
+
+/******************************************************************************************
+ * $Id: calpontConsole.cpp 3110 2013-06-20 18:09:12Z dhill $
+ *
+ ******************************************************************************************/
+
 #include <clocale>
+#include <netdb.h>
+extern int h_errno;
 
 #include "calpontConsole.h"
 #include "boost/filesystem/operations.hpp"
@@ -1924,14 +1932,14 @@ int processCommand(string* arguments)
 
         case 17: // shutdownSystem - parameters: graceful flag, Ack flag, suspendAnswer
         {
-			BRM::DBRM dbrm;
-			bool bDBRMReady = dbrm.isDBRMReady();
-            getFlags(arguments, gracefulTemp, ackTemp, suspendAnswer, bNeedsConfirm);
+		BRM::DBRM dbrm;
+		bool bDBRMReady = dbrm.isDBRMReady();
+            	getFlags(arguments, gracefulTemp, ackTemp, suspendAnswer, bNeedsConfirm);
 
-			cout << endl << "This command stops the processing of applications on all Modules within the Calpont System" << endl;
+		cout << endl << "This command stops the processing of applications on all Modules within the Calpont System" << endl;
 
-            try
-            {
+		try
+		{
     			if (gracefulTemp != GRACEFUL ||
     				!bDBRMReady ||
     				dbrm.isReadWrite())
@@ -1961,13 +1969,6 @@ int processCommand(string* arguments)
     				if (bActiveTransactions)
     				{
     					suspendAnswer = AskSuspendQuestion(CmdID);
-    //					if (suspendAnswer == FORCE)
-    //					{
-    //						if (confirmPrompt("Force may cause data problems and should only be used in extreme circumstances")) 
-    //						{
-    //							break;
-    //						}
-    //					}
     					bNeedsConfirm = false;
     				}
     				else
@@ -2010,68 +2011,76 @@ int processCommand(string* arguments)
     					break;
     			}
 
-				// This won't return until the system is shutdown. It might take a while to finish what we're working on first.
+			// This won't return until the system is shutdown. It might take a while to finish what we're working on first.
 
-                oam.stopSystem(gracefulTemp, ackTemp);
+                	oam.stopSystem(gracefulTemp, ackTemp);
 
-				if ( waitForStop() )
-					cout << endl << "   Successful stop of System " << endl << endl;
-				else
-					cout << endl << "**** stopSystem Failed : check log files" << endl;
+			if ( waitForStop() )
+				cout << endl << "   Successful stop of System " << endl << endl;
+			else
+				cout << endl << "**** stopSystem Failed : check log files" << endl;
 
-                oam.shutdownSystem(gracefulTemp, ackTemp);
+                	oam.shutdownSystem(gracefulTemp, ackTemp);
 
-				//hdfs / hadoop config 
-				string DBRootStorageType;
-				try {
-					oam.getSystemConfig( "DBRootStorageType", DBRootStorageType);
+			//hdfs / hadoop config 
+			string DBRootStorageType;
+			try {
+				oam.getSystemConfig( "DBRootStorageType", DBRootStorageType);
+			}
+			catch(...) {}
+		
+			if ( DBRootStorageType == "hdfs")
+			{
+				string cmd = "pdsh -a '/" + startup::StartUp::installDir() + "/bin/infinidb stop' > /tmp/cc-stop.pdsh 2>&1";
+				system(cmd.c_str());
+				if (oam.checkLogStatus("/tmp/cc-stop.pdsh", "exit") ) {
+					cout << endl << "ERROR: Stopping InfiniDB Service failue, check /tmp/cc-stop.pdsh. exit..." << endl;
 				}
-				catch(...) {}
-			
-				if ( DBRootStorageType == "hdfs")
-				{
-					string cmd = "pdsh -a '/etc/init.d/infinidb stop' > /tmp/cc-stop.pdsh 2>&1";
-					system(cmd.c_str());
-				}
-            }
-            catch (exception& e)
-            {
-				string Failed = e.what();
-
-				if ( gracefulTemp == FORCEFUL )
-				{
-					string cmd = startup::StartUp::installDir() + "/bin/infinidb stop > /tmp/status.log";
-					system(cmd.c_str());
-					cout << endl << "   Successful shutdown of System (stopped local infinidb service) " << endl << endl;
+			}
+		}
+            	catch (exception& e)
+            	{
+			string Failed = e.what();
+	
+			if ( gracefulTemp == FORCEFUL )
+			{
+				string cmd = startup::StartUp::installDir() + "/bin/infinidb stop > /tmp/status.log";
+				system(cmd.c_str());
+				cout << endl << "   Successful shutdown of System (stopped local infinidb service) " << endl << endl;
+			}
+	
+			if (Failed.find("Connection refused") != string::npos)
+			{
+				cout << endl << "**** shutdownSystem Error : ProcessManager not Active, stopping infinidb service" << endl;
+				string cmd = startup::StartUp::installDir() + "/bin/infinidb stop > /tmp/status.log";
+				system(cmd.c_str());
+				cout << endl << "   Successful stop of local infinidb service " << endl << endl;
+			}
+			else
+			{
+				cout << endl << "**** shutdownSystem Failure : " << e.what() << endl;
+				cout << "Retry using FORCEFUL option" << endl << endl;
+			}
+	
+			//hdfs / hadoop config 
+			string DBRootStorageType;
+			try {
+				oam.getSystemConfig( "DBRootStorageType", DBRootStorageType);
+			}
+			catch(...) {}
+		
+			if ( DBRootStorageType == "hdfs")
+			{
+				string cmd = "pdsh -a '" + startup::StartUp::installDir() + "/bin/infinidb stop' > /tmp/cc-stop.pdsh 2>&1";
+				system(cmd.c_str());
+				if (oam.checkLogStatus("/tmp/cc-stop.pdsh", "exit") ) {
+					cout << endl << "ERROR: Stopping InfiniDB Service failue, check /tmp/cc-stop.pdsh. exit..." << endl;
 					break;
 				}
+			}
+            	}
 
-				if (Failed.find("Connection refused") != string::npos)
-				{
-                	cout << endl << "**** shutdownSystem Error : ProcessManager not Active, stopping infinidb service" << endl;
-					string cmd = startup::StartUp::installDir() + "/bin/infinidb stop > /tmp/status.log";
-					system(cmd.c_str());
-					cout << endl << "   Successful stop of local infinidb service " << endl << endl;
-				}
-				else
-				{
-					cout << endl << "**** shutdownSystem Failure : " << e.what() << endl;
-					cout << "Retry using FORCEFUL option" << endl << endl;
-				}
-
-				//hdfs / hadoop config 
-				string DBRootStorageType;
-				try {
-					oam.getSystemConfig( "DBRootStorageType", DBRootStorageType);
-				}
-				catch(...) {}
-			
-				if ( DBRootStorageType == "hdfs")
-				{
-					string cmd = "pdsh -a '/etc/init.d/infinidb stop' > /tmp/cc-stop.pdsh 2>&1";
-					system(cmd.c_str());
-				}
-            }
+		sleep(10);
         }
         break;
 
@@ -2116,7 +2125,7 @@ int processCommand(string* arguments)
 				}
 				catch (exception& e)
 				{
-					cout << endl << "**** getModuleConfig Failed =  " << e.what() << endl;
+					cout << endl << "**** startSystem Failed =  " << e.what() << endl;
 					break;
 				}
 
@@ -2160,8 +2169,12 @@ int processCommand(string* arguments)
 				
 					if ( DBRootStorageType == "hdfs")
 					{
-						string cmd = "pdsh -a '/etc/init.d/infinidb restart' > /tmp/cc-restart.pdsh 2>&1";
+						string cmd = "pdsh -a '" + startup::StartUp::installDir() + "/bin/infinidb restart' > /tmp/cc-restart.pdsh 2>&1";
 						system(cmd.c_str());
+						if (oam.checkLogStatus("/tmp/cc-restart.pdsh", "exit") ) {
+							cout << endl << "ERROR: Restart InfiniDB Service failue, check /tmp/cc-restart.pdsh. exit..." << endl;
+							break;
+						}
 					}
 					else
 					{
@@ -2326,7 +2339,7 @@ int processCommand(string* arguments)
 				}
 				catch (exception& e)
 				{
-					cout << endl << "**** getModuleConfig Failed =  " << e.what() << endl;
+					cout << endl << "**** restartSystem Failed =  " << e.what() << endl;
 					break;
 				}
 
@@ -2364,8 +2377,12 @@ int processCommand(string* arguments)
 				
 					if ( DBRootStorageType == "hdfs")
 					{
-						string cmd = "pdsh -a '/etc/init.d/infinidb restart' > /tmp/cc-restart.pdsh 2>&1";
+						string cmd = "pdsh -a '" + startup::StartUp::installDir() + "/bin/infinidb restart' > /tmp/cc-restart.pdsh 2>&1";
 						system(cmd.c_str());
+						if (oam.checkLogStatus("/tmp/cc-restart.pdsh", "exit") ) {
+							cout << endl << "ERROR: Restart InfiniDB Service failue, check /tmp/cc-restart.pdsh. exit..." << endl;
+							break;
+						}
 					}
 					else
 					{
@@ -2861,7 +2878,7 @@ int processCommand(string* arguments)
 			if (DBRootStorageType == "internal" && GlusterConfig == "n")
 			{
 				cout << endl << "**** switchParentOAMModule Failed : DBRoot Storage type =  internal/non-data-replication" << endl;
-//				break;
+				break;
 			}
 
 			if (bUseHotStandby)
@@ -3110,254 +3127,261 @@ int processCommand(string* arguments)
 
         case 31: // movePmDbrootConfig parameters: pm-reside dbroot-list pm-to
         {
-			if ( localModule != parentOAMModule ) {
-				// exit out since not on active module
-				cout << endl << "**** movePmDbrootConfig Failed : Can only run command on Active OAM Parent Module (" << parentOAMModule << ")." << endl;
-				break;
-			}
+		if ( localModule != parentOAMModule ) {
+			// exit out since not on active module
+			cout << endl << "**** movePmDbrootConfig Failed : Can only run command on Active OAM Parent Module (" << parentOAMModule << ")." << endl;
+			break;
+		}
 
-			//check the system status / service status and only allow command when System is MAN_OFFLINE
-			string cmd = startup::StartUp::installDir() + "/bin/infinidb status > /tmp/status.log";
-			system(cmd.c_str());
-			if (oam.checkLogStatus("/tmp/status.log", "InfiniDB is running") ) 
-			{
-				SystemStatus systemstatus;
-				try {
-					oam.getSystemStatus(systemstatus);
-		
-					if (systemstatus.SystemOpState != oam::MAN_OFFLINE ) {
-					cout << endl << "**** movePmDbrootConfig Failed,  System has to be in a MAN_OFFLINE state, stop system first" << endl;
-						break;
-					}
-				}
-				catch (exception& e)
-				{
-					cout << endl << "**** movePmDbrootConfig Failed : " << e.what() << endl;
-					break;
-				}
-				catch(...)
-				{
-					cout << endl << "**** movePmDbrootConfig Failed,  Failed return from getSystemStatus API" << endl;
-					break;
-				}
-			}
-
-            if (arguments[3] == "")
-            {
-                // need arguments
-                cout << endl << "**** movePmDbrootConfig Failed : Missing a required Parameter, enter 'help' for additional information" << endl;
-                break;
-            }
-
-			string residePM = arguments[1];
-			string dbrootIDs = arguments[2];
-			string toPM = arguments[3];
-
-			string residePMID = residePM.substr(MAX_MODULE_TYPE_SIZE,MAX_MODULE_ID_SIZE);;
-			string toPMID = toPM.substr(MAX_MODULE_TYPE_SIZE,MAX_MODULE_ID_SIZE);;
-
-			// check module status
-			try{
-				bool degraded;
-				int opState;
-				oam.getModuleStatus(toPM, opState, degraded);
-
-				if (opState == oam::AUTO_DISABLED ||
-					opState == oam::MAN_DISABLED)
-				{
-					cout << "**** movePmDbrootConfig Failed: " << toPM << " is DISABLED." << endl;
-					cout << "Run alterSystem-EnableModule to enable module" << endl;
-					break;
-				}
-			}
-			catch (exception& ex)
-			{}
-
-			bool moveDBRoot1 = false;
-			bool found = false;
-			boost::char_separator<char> sep(", ");
-			boost::tokenizer< boost::char_separator<char> > tokens(dbrootIDs, sep);
-			for ( boost::tokenizer< boost::char_separator<char> >::iterator it = tokens.begin();
-					it != tokens.end();
-					++it)
-			{
-				if (*it == "1" ) {
-					moveDBRoot1 = true;
-					break;
-				}
-
-				//if gluster, check if toPM is has a copy
-				string GlusterConfig;
-				try {
-					oam.getSystemConfig("GlusterConfig", GlusterConfig);
-				}
-				catch(...) {}
-		
-				if ( GlusterConfig == "y" )
-				{
-					string pmList = "";
-					try {
-						string errmsg;
-						oam.glusterctl(oam::GLUSTER_WHOHAS, *it, pmList, errmsg);
-					}
-					catch (...)
-					{}
-	
-					boost::char_separator<char> sep(" ");
-					boost::tokenizer< boost::char_separator<char> > tokens(pmList, sep);
-					for ( boost::tokenizer< boost::char_separator<char> >::iterator it1 = tokens.begin();
-							it1 != tokens.end();
-							++it1)
-					{
-						if ( *it1 == toPMID )
-						{
-							found = true;
-							break;
-						}
-					}
-				
-					if (!found)
-					{
-						cout << endl << "**** movePmDbrootConfig Failed : Data Redundancy Configured, DBRoot #" << *it << " doesn't have a copy on " << toPM << endl;
-						cout << "Run getStorageConfig to get copy information" << endl << endl;
-						break;
-					}
-				}
-				else
-					found = true;
-			}
-
-			if (moveDBRoot1) {
-				cout << endl << "**** movePmDbrootConfig Failed : Can't move dbroot #1" << endl << endl;
-				break;
-			}
-
-			if (!found)
-			{
-				break;
-			}
-			
-
-			if (residePM.find("pm") == string::npos ) {
-				cout << endl << "**** movePmDbrootConfig Failed : Parmameter 1 is not a Performance Module name, enter 'help' for additional information" << endl;
-				break;
-			}
-
-			if (toPM.find("pm") == string::npos ) {
-				cout << endl << "**** movePmDbrootConfig Failed : Parmameter 3 is not a Performance Module name, enter 'help' for additional information" << endl;
-				break;
-			}
-
-			if (residePM == toPM ) {
-				cout << endl << "**** movePmDbrootConfig Failed : Reside and To Performance Modules are the same" << endl;
-				break;
-			}
-
-			//get dbroots ids for reside PM
-			DBRootConfigList residedbrootConfigList;
-            try
-            {
-                oam.getPmDbrootConfig(atoi(residePMID.c_str()), residedbrootConfigList);
-
-				cout << endl << "DBRoot IDs currently assigned to '" + residePM + "' = ";
-
-				DBRootConfigList::iterator pt = residedbrootConfigList.begin();
-				for( ; pt != residedbrootConfigList.end() ;)
-				{
-					cout << oam.itoa(*pt);
-					pt++;
-					if (pt != residedbrootConfigList.end())
-						cout << ", ";
-				}
-				cout << endl;
-            }
-            catch (exception& e)
-            {
-                cout << endl << "**** getPmDbrootConfig Failed for '" << residePM << "' : " << e.what() << endl;
-				break;
-            }
-
-			//get dbroots ids for reside PM
-			DBRootConfigList todbrootConfigList;
-            try
-            {
-                oam.getPmDbrootConfig(atoi(toPMID.c_str()), todbrootConfigList);
-
-				cout << "DBRoot IDs currently assigned to '" + toPM + "' = ";
-
-				DBRootConfigList::iterator pt = todbrootConfigList.begin();
-				for( ; pt != todbrootConfigList.end() ;)
-				{
-					cout << oam.itoa(*pt);
-					pt++;
-					if (pt != todbrootConfigList.end())
-						cout << ", ";
-				}
-				cout << endl;
-            }
-            catch (exception& e)
-            {
-                cout << endl << "**** getPmDbrootConfig Failed for '" << toPM << "' : " << e.what() << endl;
-				break;
-            }
-
-			cout << endl << "DBroot IDs being moved, please wait..." << endl << endl;
-
+		//check the system status / service status and only allow command when System is MAN_OFFLINE
+		string cmd = startup::StartUp::installDir() + "/bin/infinidb status > /tmp/status.log";
+		system(cmd.c_str());
+		if (oam.checkLogStatus("/tmp/status.log", "InfiniDB is running") ) 
+		{
+			SystemStatus systemstatus;
 			try {
-				oam.manualMovePmDbroot(residePM, dbrootIDs, toPM);
+				oam.getSystemStatus(systemstatus);
+	
+				if (systemstatus.SystemOpState != oam::MAN_OFFLINE ) {
+				cout << endl << "**** movePmDbrootConfig Failed,  System has to be in a MAN_OFFLINE state, stop system first" << endl;
+					break;
+				}
 			}
-			catch (...)
+			catch (exception& e)
 			{
-				cout << endl << "**** manualMovePmDbroot Failed : API Failure" << endl;
+				cout << endl << "**** movePmDbrootConfig Failed : " << e.what() << endl;
+				break;
+			}
+			catch(...)
+			{
+				cout << endl << "**** movePmDbrootConfig Failed,  Failed return from getSystemStatus API" << endl;
+				break;
+			}
+		}
+
+		if (arguments[3] == "")
+		{
+			// need arguments
+			cout << endl << "**** movePmDbrootConfig Failed : Missing a required Parameter, enter 'help' for additional information" << endl;
+			break;
+		}
+
+		string residePM = arguments[1];
+		string dbrootIDs = arguments[2];
+		string toPM = arguments[3];
+
+		string residePMID = residePM.substr(MAX_MODULE_TYPE_SIZE,MAX_MODULE_ID_SIZE);;
+		string toPMID = toPM.substr(MAX_MODULE_TYPE_SIZE,MAX_MODULE_ID_SIZE);;
+
+		// check module status
+		try{
+			bool degraded;
+			int opState;
+			oam.getModuleStatus(toPM, opState, degraded);
+
+			if (opState == oam::AUTO_DISABLED ||
+				opState == oam::MAN_DISABLED)
+			{
+				cout << "**** movePmDbrootConfig Failed: " << toPM << " is DISABLED." << endl;
+				cout << "Run alterSystem-EnableModule to enable module" << endl;
 				break;
 			}
 
-			//get dbroots ids for reside PM
-            try
-            {
-				residedbrootConfigList.clear();
-                oam.getPmDbrootConfig(atoi(residePMID.c_str()), residedbrootConfigList);
-
-				cout << "DBRoot IDs newly assigned to '" + residePM + "' = ";
-
-				DBRootConfigList::iterator pt = residedbrootConfigList.begin();
-				for( ; pt != residedbrootConfigList.end() ;)
-				{
-					cout << oam.itoa(*pt);
-					pt++;
-					if (pt != residedbrootConfigList.end())
-						cout << ", ";
-				}
-				cout << endl;
-            }
-            catch (exception& e)
-            {
-                cout << endl << "**** getPmDbrootConfig Failed for '" << toPM << "' : " << e.what() << endl;
+			if (opState == oam::FAILED)
+			{
+				cout << "**** movePmDbrootConfig Failed: " << toPM << " is in a FAILED state." << endl;
 				break;
-            }
+			}
+		}
+		catch (exception& ex)
+		{}
 
-            try
-            {
-				todbrootConfigList.clear();
-                oam.getPmDbrootConfig(atoi(toPMID.c_str()), todbrootConfigList);
-
-				cout << "DBRoot IDs newly assigned to '" + toPM + "' = ";
-
-				DBRootConfigList::iterator pt = todbrootConfigList.begin();
-				for( ; pt != todbrootConfigList.end() ;)
-				{
-					cout << oam.itoa(*pt);
-					pt++;
-					if (pt != todbrootConfigList.end())
-						cout << ", ";
-				}
-				cout << endl;
-            }
-            catch (exception& e)
-            {
-                cout << endl << "**** getPmDbrootConfig Failed for '" << toPM << "' : " << e.what() << endl;
+		bool moveDBRoot1 = false;
+		bool found = false;
+		boost::char_separator<char> sep(", ");
+		boost::tokenizer< boost::char_separator<char> > tokens(dbrootIDs, sep);
+		for ( boost::tokenizer< boost::char_separator<char> >::iterator it = tokens.begin();
+				it != tokens.end();
+				++it)
+		{
+			if (*it == "1" ) {
+				moveDBRoot1 = true;
 				break;
-            }
+			}
+
+			//if gluster, check if toPM is has a copy
+			string GlusterConfig;
+			try {
+				oam.getSystemConfig("GlusterConfig", GlusterConfig);
+			}
+			catch(...) {}
+	
+			if ( GlusterConfig == "y" )
+			{
+				string pmList = "";
+				try {
+					string errmsg;
+					oam.glusterctl(oam::GLUSTER_WHOHAS, *it, pmList, errmsg);
+				}
+				catch (...)
+				{}
+
+				boost::char_separator<char> sep(" ");
+				boost::tokenizer< boost::char_separator<char> > tokens(pmList, sep);
+				for ( boost::tokenizer< boost::char_separator<char> >::iterator it1 = tokens.begin();
+						it1 != tokens.end();
+						++it1)
+				{
+					if ( *it1 == toPMID )
+					{
+						found = true;
+						break;
+					}
+				}
+			
+				if (!found)
+				{
+					cout << endl << "**** movePmDbrootConfig Failed : Data Redundancy Configured, DBRoot #" << *it << " doesn't have a copy on " << toPM << endl;
+					cout << "Run getStorageConfig to get copy information" << endl << endl;
+					break;
+				}
+			}
+			else
+				found = true;
+		}
+
+		if (moveDBRoot1) {
+			cout << endl << "**** movePmDbrootConfig Failed : Can't move dbroot #1" << endl << endl;
+			break;
+		}
+
+		if (!found)
+		{
+			break;
+		}
+		
+
+		if (residePM.find("pm") == string::npos ) {
+			cout << endl << "**** movePmDbrootConfig Failed : Parmameter 1 is not a Performance Module name, enter 'help' for additional information" << endl;
+			break;
+		}
+
+		if (toPM.find("pm") == string::npos ) {
+			cout << endl << "**** movePmDbrootConfig Failed : Parmameter 3 is not a Performance Module name, enter 'help' for additional information" << endl;
+			break;
+		}
+
+		if (residePM == toPM ) {
+			cout << endl << "**** movePmDbrootConfig Failed : Reside and To Performance Modules are the same" << endl;
+			break;
+		}
+
+		//get dbroots ids for reside PM
+		DBRootConfigList residedbrootConfigList;
+
+		try
+		{
+			oam.getPmDbrootConfig(atoi(residePMID.c_str()), residedbrootConfigList);
+	
+			cout << endl << "DBRoot IDs currently assigned to '" + residePM + "' = ";
+
+			DBRootConfigList::iterator pt = residedbrootConfigList.begin();
+			for( ; pt != residedbrootConfigList.end() ;)
+			{
+				cout << oam.itoa(*pt);
+				pt++;
+				if (pt != residedbrootConfigList.end())
+					cout << ", ";
+			}
+			cout << endl;
+		}
+		catch (exception& e)
+		{
+			cout << endl << "**** getPmDbrootConfig Failed for '" << residePM << "' : " << e.what() << endl;
+					break;
+		}
+	
+				//get dbroots ids for reside PM
+				DBRootConfigList todbrootConfigList;
+		try
+		{
+	                oam.getPmDbrootConfig(atoi(toPMID.c_str()), todbrootConfigList);
+
+			cout << "DBRoot IDs currently assigned to '" + toPM + "' = ";
+
+			DBRootConfigList::iterator pt = todbrootConfigList.begin();
+			for( ; pt != todbrootConfigList.end() ;)
+			{
+				cout << oam.itoa(*pt);
+				pt++;
+				if (pt != todbrootConfigList.end())
+					cout << ", ";
+			}
+			cout << endl;
+		}
+		catch (exception& e)
+		{
+			cout << endl << "**** getPmDbrootConfig Failed for '" << toPM << "' : " << e.what() << endl;
+					break;
+		}
+
+		cout << endl << "DBroot IDs being moved, please wait..." << endl << endl;
+
+		try {
+			oam.manualMovePmDbroot(residePM, dbrootIDs, toPM);
+		}
+		catch (...)
+		{
+			cout << endl << "**** manualMovePmDbroot Failed : API Failure" << endl;
+			break;
+		}
+
+		//get dbroots ids for reside PM
+		try
+		{
+			residedbrootConfigList.clear();
+                	oam.getPmDbrootConfig(atoi(residePMID.c_str()), residedbrootConfigList);
+
+			cout << "DBRoot IDs newly assigned to '" + residePM + "' = ";
+
+			DBRootConfigList::iterator pt = residedbrootConfigList.begin();
+			for( ; pt != residedbrootConfigList.end() ;)
+			{
+				cout << oam.itoa(*pt);
+				pt++;
+				if (pt != residedbrootConfigList.end())
+					cout << ", ";
+			}
+			cout << endl;
+		}
+		catch (exception& e)
+		{
+			cout << endl << "**** getPmDbrootConfig Failed for '" << toPM << "' : " << e.what() << endl;
+					break;
+		}
+	
+		try
+		{
+			todbrootConfigList.clear();
+                	oam.getPmDbrootConfig(atoi(toPMID.c_str()), todbrootConfigList);
+
+			cout << "DBRoot IDs newly assigned to '" + toPM + "' = ";
+
+			DBRootConfigList::iterator pt = todbrootConfigList.begin();
+			for( ; pt != todbrootConfigList.end() ;)
+			{
+				cout << oam.itoa(*pt);
+				pt++;
+				if (pt != todbrootConfigList.end())
+					cout << ", ";
+			}
+			cout << endl;
+		}
+		catch (exception& e)
+		{
+			cout << endl << "**** getPmDbrootConfig Failed for '" << toPM << "' : " << e.what() << endl;
+					break;
+		}
 
         }
         break;
@@ -3509,8 +3533,86 @@ int processCommand(string* arguments)
 			break;
 		}
 
-        case 34: // AVAILABLE
+        case 34: // unassignDbrootPmConfig parameters: dbroot-list
         {
+			if ( localModule != parentOAMModule ) {
+				// exit out since not on active module
+				cout << endl << "**** unassignDbrootPmConfig Failed : Can only run command on Active OAM Parent Module (" << parentOAMModule << ")." << endl;
+				break;
+			}
+
+			//check the system status / service status and only allow command when System is MAN_OFFLINE
+			string cmd = startup::StartUp::installDir() + "/bin/infinidb status > /tmp/status.log";
+			system(cmd.c_str());
+			if (oam.checkLogStatus("/tmp/status.log", "InfiniDB is running") ) 
+			{
+				SystemStatus systemstatus;
+				try {
+					oam.getSystemStatus(systemstatus);
+		
+					if (systemstatus.SystemOpState != oam::MAN_OFFLINE ) {
+					cout << endl << "**** unassignDbrootPmConfig Failed,  System has to be in a MAN_OFFLINE state, stop system first" << endl;
+						break;
+					}
+				}
+				catch (exception& e)
+				{
+					cout << endl << "**** unassignDbrootPmConfig Failed : " << e.what() << endl;
+					break;
+				}
+				catch(...)
+				{
+					cout << endl << "**** unassignDbrootPmConfig Failed,  Failed return from getSystemStatus API" << endl;
+					break;
+				}
+			}
+			else
+			{
+				cout << endl << "**** unassignDbrootPmConfig Failed,  System is shutdown. Needs to be stopped" << endl;
+				break;
+			}
+
+           if (arguments[2] == "")
+            {
+                // need atleast 2 arguments
+                cout << endl << "**** unassignDbrootPmConfig Failed : Missing a required Parameter, enter 'help' for additional information" << endl;
+                break;
+            }
+
+			string dbrootIDs = arguments[1];
+			string residePM = arguments[2];
+
+			if (arguments[2].find("pm") == string::npos ) {
+				cout << endl << "**** unassignDbrootPmConfig Failed : Parmameter 2 is not a Performance Module name, enter 'help' for additional information" << endl;
+				break;
+			}
+
+			DBRootConfigList dbrootlist;
+
+			boost::char_separator<char> sep(", ");
+			boost::tokenizer< boost::char_separator<char> > tokens(dbrootIDs, sep);
+			for ( boost::tokenizer< boost::char_separator<char> >::iterator it = tokens.begin();
+					it != tokens.end();
+					++it)
+			{
+				dbrootlist.push_back(atoi((*it).c_str()));
+			}
+
+			cout << endl;
+
+			//get dbroots ids for reside PM
+            try
+            {
+                oam.unassignDbroot(residePM, dbrootlist);
+
+                cout << endl << "   Successfully Unassigned DBRoots " << endl << endl;
+		
+            }
+            catch (exception& e)
+            {
+                cout << endl << "**** Failed Unassign of DBRoots: " << e.what() << endl;
+		break;
+            }
         }
         break;
 
@@ -3567,6 +3669,29 @@ int processCommand(string* arguments)
 				cout << endl << "**** assignDbrootPmConfig Failed : Parmameter 2 is not a Performance Module name, enter 'help' for additional information" << endl;
 				break;
 			}
+
+			// check module status
+			try{
+				bool degraded;
+				int opState;
+				oam.getModuleStatus(toPM, opState, degraded);
+	
+				if (opState == oam::AUTO_DISABLED ||
+					opState == oam::MAN_DISABLED)
+				{
+					cout << "**** assignDbrootPmConfig Failed: " << toPM << " is DISABLED." << endl;
+					cout << "Run alterSystem-EnableModule to enable module" << endl;
+					break;
+				}
+	
+				if (opState == oam::FAILED)
+				{
+					cout << "**** assignDbrootPmConfig Failed: " << toPM << " is in a FAILED state." << endl;
+					break;
+				}
+			}
+			catch (exception& ex)
+			{}
 
 			DBRootConfigList dbrootlist;
 
@@ -5335,11 +5460,12 @@ int processCommand(string* arguments)
 					oam.getModuleStatus((*pt).DeviceName, opState, degraded);
 
 					if (opState == oam::MAN_OFFLINE ||
-						opState == oam::MAN_DISABLED)
+						opState == oam::MAN_DISABLED ||
+						opState == oam::FAILED)
 						continue;
 					else
 					{
-						cout << "**** removeModule Failed : " << (*pt).DeviceName << " is not MAN_OFFLINE OR DISABLED.";
+						cout << "**** removeModule Failed : " << (*pt).DeviceName << " is not MAN_OFFLINE, DISABLED, or FAILED state.";
 						quit = true;
 						cout << endl;
 						break;
@@ -5384,6 +5510,7 @@ int processCommand(string* arguments)
 
         case 51: // AVAILABLE
         {
+            break;
 		}
 
         case 52: // getModuleCpuUsers
@@ -6096,84 +6223,103 @@ int processCommand(string* arguments)
                 break;
             }
 
-			parentOAMModule = getParentOAMModule();
-			if ( arguments[1] == parentOAMModule ) {
-				// exit out since you can't manually remove OAM Parent Module
-                cout << endl << "**** alterSystem-disableModule Failed : can't manually disable the Active OAM Parent Module." << endl;
-                break;
-			}
+		parentOAMModule = getParentOAMModule();
+		if ( arguments[1] == parentOAMModule ) {
+		// exit out since you can't manually remove OAM Parent Module
+                	cout << endl << "**** alterSystem-disableModule Failed : can't manually disable the Active OAM Parent Module." << endl;
+                	break;
+		}
 
-			string moduleType = arguments[1].substr(0,MAX_MODULE_TYPE_SIZE);
+		string moduleType = arguments[1].substr(0,MAX_MODULE_TYPE_SIZE);
 
-            gracefulTemp = INSTALL;
+            	gracefulTemp = INSTALL;
 
-            // confirm request
+		//display Primary UM Module
+		string PrimaryUMModuleName;
+		try {
+			oam.getSystemConfig("PrimaryUMModuleName", PrimaryUMModuleName);
+		}
+		catch(...) {}
+
+		bool primUM = false;
+		if ( PrimaryUMModuleName == arguments[1] )
+		{
+			cout << endl << "This command stops the processing of applications on the Primary User Module, which is where DDL/DML are performed";
+			if (confirmPrompt("If there is another module that can be changed to a new Primary User Module, this will be done"))
+				break;
+			primUM = true;
+		}
+		else
+		{
+			// confirm request
 			if ( arguments[2] != "y" ) {
 				if (confirmPrompt("This command stops the processing of applications on a Module within the Calpont System"))
 					break;
 			}
+		}
 
-			//parse module names
-			DeviceNetworkConfig devicenetworkconfig;
-			DeviceNetworkList devicenetworklist;
+		//parse module names
+		DeviceNetworkConfig devicenetworkconfig;
+		DeviceNetworkList devicenetworklist;
 
-			boost::char_separator<char> sep(", ");
-			boost::tokenizer< boost::char_separator<char> > tokens(arguments[1], sep);
-			for ( boost::tokenizer< boost::char_separator<char> >::iterator it = tokens.begin();
-					it != tokens.end();
-					++it)
+		boost::char_separator<char> sep(", ");
+		boost::tokenizer< boost::char_separator<char> > tokens(arguments[1], sep);
+		for ( boost::tokenizer< boost::char_separator<char> >::iterator it = tokens.begin();
+				it != tokens.end();
+				++it)
+		{
+			devicenetworkconfig.DeviceName = *it;
+			devicenetworklist.push_back(devicenetworkconfig);
+		}
+
+		DeviceNetworkList::iterator pt = devicenetworklist.begin();
+		DeviceNetworkList::iterator endpt = devicenetworklist.end();
+
+		bool quit = false;
+
+		// check for module status and if any dbroots still assigned
+		if ( moduleType == "pm" ) {
+			for( ; pt != endpt ; pt++)
 			{
-				devicenetworkconfig.DeviceName = *it;
-				devicenetworklist.push_back(devicenetworkconfig);
-			}
-
-			DeviceNetworkList::iterator pt = devicenetworklist.begin();
-			DeviceNetworkList::iterator endpt = devicenetworklist.end();
-
-			bool quit = false;
-
-			// check for module status and if any dbroots still assigned
-			if ( moduleType == "pm" ) {
-				for( ; pt != endpt ; pt++)
-				{
-					// check for dbroots assigned
-					DBRootConfigList dbrootConfigList;
-					string moduleID = (*pt).DeviceName.substr(MAX_MODULE_TYPE_SIZE,MAX_MODULE_ID_SIZE);
-					try {
-						oam.getPmDbrootConfig(atoi(moduleID.c_str()), dbrootConfigList);
-					}
-					catch(...) 
-					{}
-	
-					if ( !dbrootConfigList.empty() ) {
-						cout << endl << "**** alterSystem-disableModule Failed : " << (*pt).DeviceName << " has dbroots still assigned and will not be disabled. Please run movePmDbrootConfig.";
-						quit = true;
-						cout << endl;
-						break;
-					}
+				// check for dbroots assigned
+				DBRootConfigList dbrootConfigList;
+				string moduleID = (*pt).DeviceName.substr(MAX_MODULE_TYPE_SIZE,MAX_MODULE_ID_SIZE);
+				try {
+					oam.getPmDbrootConfig(atoi(moduleID.c_str()), dbrootConfigList);
 				}
+				catch(...) 
+				{}
 
-				if (quit) {
+				if ( !dbrootConfigList.empty() ) {
+					cout << endl << "**** alterSystem-disableModule Failed : " << (*pt).DeviceName << " has dbroots still assigned and will not be disabled. Please run movePmDbrootConfig.";
+					quit = true;
 					cout << endl;
 					break;
 				}
 			}
 
-			if ( devicenetworklist.empty() ) {
-				cout << endl << "quiting, no modules to remove." << endl << endl;
+			if (quit) {
+				cout << endl;
 				break;
 			}
+		}
 
-			// stop module
-			try
-			{
-				cout << endl << "   Stopping Modules" << endl;
-				oam.stopModule(devicenetworklist, gracefulTemp, ackTemp);
-				cout << "   Successful stop of Modules " << endl;
-			}
-			catch (exception& e)
-			{
-                string Failed = e.what();
+		if ( devicenetworklist.empty() ) {
+			cout << endl << "quiting, no modules to remove." << endl << endl;
+			break;
+		}
+
+		// stop module
+		try
+		{
+			cout << endl << "   Stopping Modules" << endl;
+			oam.stopModule(devicenetworklist, gracefulTemp, ackTemp);
+			cout << "   Successful stop of Modules " << endl;
+		}
+		catch (exception& e)
+		{
+
+		string Failed = e.what();
                 if (Failed.find("Disabled") != string::npos)
 					cout << endl << "   Successful stop of Modules " << endl;
 				else {
@@ -6188,6 +6334,18 @@ int processCommand(string* arguments)
 				cout << endl << "   Disabling Modules" << endl;
 				oam.disableModule(devicenetworklist);
 				cout << "   Successful disable of Modules " << endl;
+
+				//display Primary UM Module
+				string PrimaryUMModuleName;
+				try {
+					oam.getSystemConfig("PrimaryUMModuleName", PrimaryUMModuleName);
+				}
+				catch(...) {}
+		
+				if ( primUM && 
+					PrimaryUMModuleName != arguments[1] )
+					cout << endl << "   New Primary User Module = " << PrimaryUMModuleName << endl;
+
 			}
 			catch (exception& e)
 			{
@@ -7318,7 +7476,7 @@ void printSystemStatus()
 		printState(state, extraInfo);
 		cout.width(24);
 		string stime = systemstatus.StateChangeDate;
-        stime = stime.substr (0,24);
+        	stime = stime.substr (0,24);
 		cout << stime << endl << endl;
 
 		for( unsigned int i = 0 ; i < systemstatus.systemmodulestatus.modulestatus.size(); i++)
@@ -7600,7 +7758,7 @@ void printModuleDisk(ModuleDisk moduledisk)
 			cout.width(31);
 			cout << moduledisk.diskusage[i].DeviceName;
 			cout.width(14);
-			cout << oam.itoa(moduledisk.diskusage[i].TotalBlocks);
+			cout << moduledisk.diskusage[i].TotalBlocks;
 			cout.width(17);
 			cout << moduledisk.diskusage[i].UsedBlocks;
 			cout.width(2);

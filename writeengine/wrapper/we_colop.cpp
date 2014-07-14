@@ -315,6 +315,7 @@ int ColumnOp::allocRowId(const TxnID& txnid, bool useStartingExtent,
 				{
 					setColParam(newCol, 0, newColStructList[i].colWidth, newColStructList[i].colDataType, newColStructList[i].colType, 
 						newColStructList[i].dataOid, newColStructList[i].fCompressionType, dbRoot, partition, segment);
+					compressionType(newColStructList[i].fCompressionType);
 					rc = extendColumn(newCol, false, extents[i].startBlkOffset, extents[i].startLbid, extents[i].allocSize, 
 						dbRoot, partition, segment, segFile, pFile, newFile);
 					if (rc != NO_ERROR)

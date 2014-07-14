@@ -189,20 +189,21 @@ const string SimpleColumn::toString() const
 {
 	ostringstream output;
 	output << "SimpleColumn " << data() << endl;
-	output << "  s/t/c/v/o/ct/TA/CA/RA/#/card/join/source/engine: " << schemaName() << '/'
-	                          << tableName() << '/'
-	                          << columnName() << '/'
-	                          << viewName() << '/'
-	                          << oid() << '/'
-				  << colDataTypeToString(fResultType.colDataType) << '/'
-	                          << tableAlias() << '/'
-	                          << alias() << '/'
-	                          << returnAll() << '/'
-	                          << (int32_t)sequence() << '/'
-	                          << cardinality() << '/'
-	                          << joinInfo() << '/'
-	                          << colSource() << '/'
-	                          << (isInfiniDB()? "InfiniDB" : "ForeignEngine") << endl;
+	output << "  s/t/c/v/o/ct/TA/CA/RA/#/card/join/source/engine/colPos: " << schemaName() << '/'
+	       << tableName() << '/'
+	       << columnName() << '/'
+	       << viewName() << '/'
+	       << oid() << '/'
+	       << colDataTypeToString(fResultType.colDataType) << '/'
+	       << tableAlias() << '/'
+	       << alias() << '/'
+	       << returnAll() << '/'
+	       << sequence() << '/'
+	       << cardinality() << '/'
+	       << joinInfo() << '/'
+	       << colSource() << '/'
+	       << (isInfiniDB()? "InfiniDB" : "ForeignEngine") << '/'
+	       << colPosition() << endl;
 
 	return output.str();
 }

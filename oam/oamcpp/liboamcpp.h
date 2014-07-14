@@ -1223,8 +1223,8 @@ namespace oam
     struct DiskUsage_s
     {
         std::string DeviceName;              	//!< Device Name
-		uint32_t TotalBlocks;					//!< Total Blocks
-		uint32_t UsedBlocks;					//!< Used Blocks
+		uint64_t TotalBlocks;					//!< Total Blocks
+		uint64_t UsedBlocks;					//!< Used Blocks
         uint16_t DiskUsage;               		//!< Disk Usage %
     };	
     typedef struct DiskUsage_s DiskUsage;

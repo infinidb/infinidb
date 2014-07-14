@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Calpont Corp.
+/* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -757,7 +757,8 @@ static void startMgrProcessThread()
 		processManager.setSystemState(oam::FAILED);
 		// exit thread
 		log.writeLog(__LINE__, "startMgrProcessThread Exit with a failure, not all ProcMons ACTIVE", LOG_TYPE_CRITICAL);
-		system("/etc/init.d/infinidb stop");
+		string cmd = startup::StartUp::installDir() + "/etc/init.d/infinidb stop";
+		system(cmd.c_str());
 		exit(1);
 	}
 	else
@@ -941,8 +942,8 @@ void pingDeviceThread()
 		}
 
 		// Module Heartbeat period and failure count
-	    int ModuleHeartbeatPeriod;
-    	int ModuleHeartbeatCount;
+	    	int ModuleHeartbeatPeriod;
+    		int ModuleHeartbeatCount;
 	
 		try {
 			oam.getSystemConfig("ModuleHeartbeatPeriod", ModuleHeartbeatPeriod);
@@ -1209,26 +1210,31 @@ void pingDeviceThread()
 							{
 								log.writeLog(__LINE__, "Module alive, bring it back online: " + moduleName, LOG_TYPE_DEBUG);
 
-								// skip module check if DMLProc is BUSY_INIT (rollback)
-								SystemProcessStatus systemprocessstatus;
-								ProcessStatus processstatus;
+								string PrimaryUMModuleName = config.moduleName();
+								try {
+									oam.getSystemConfig("PrimaryUMModuleName", PrimaryUMModuleName);
+								}
+								catch(...) {}
 
 								bool busy = false;
-								try {
-									oam.getProcessStatus(systemprocessstatus);
-								
-									for( unsigned int i = 0 ; i < systemprocessstatus.processstatus.size(); i++)
-									{
-										if ( systemprocessstatus.processstatus[i].ProcessName == "DMLProc" &&
-											systemprocessstatus.processstatus[i].ProcessOpState == oam::BUSY_INIT) {
+								for ( int retry = 0 ; retry < 20 ; retry++ )
+								{
+									busy = false;
+									ProcessStatus DMLprocessstatus;
+									try {
+										oam.getProcessStatus("DMLProc", PrimaryUMModuleName, DMLprocessstatus);
+									
+										if ( DMLprocessstatus.ProcessOpState == oam::BUSY_INIT) {
 											log.writeLog(__LINE__, "DMLProc in BUSY_INIT, skip bringing module online " + moduleName, LOG_TYPE_DEBUG);
 											busy = true;
-											break;
+											sleep (5);
 										}
+										else
+											break;
 									}
+									catch(...)
+									{}
 								}
-								catch(...)
-								{}
 
 								if (busy)
 									break;
@@ -2138,7 +2144,8 @@ system(cmd.c_str());
                         {
                             bool degraded;
                             oam.getModuleStatus(moduleName, opState, degraded);
-                            if (opState == oam::ACTIVE || 
+                            if (opState == oam::ACTIVE ||
+				opState == oam::DEGRADED || 
                                 opState == oam::MAN_DISABLED || 
                                 opState == oam::AUTO_DISABLED )
                                 continue;

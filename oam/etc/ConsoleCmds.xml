@@ -223,7 +223,11 @@
 		<Arg1>None</Arg1>
 	</Cmd33>
 	<Cmd34>
-		<Name>AVAILABLE</Name>
+		<Name>unassignDbrootPmConfig</Name>
+		<Desc1>Unassign DBroots from a Performance Module</Desc1>
+		<Desc2>This command could be used before a DBRoot is removed</Desc2>
+		<Arg1>Required: List of Dbroot IDs to be unassigned</Arg1>
+		<Arg2>Required: Performance Module Name</Arg2>
 	</Cmd34>
 	<Cmd35>
 		<Name>assignDbrootPmConfig</Name>

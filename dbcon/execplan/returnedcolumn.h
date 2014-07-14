@@ -103,8 +103,8 @@ public:
 	const u_int32_t sessionID() const {return fSessionID;}
 	void sessionID(const u_int32_t sessionID) { fSessionID = sessionID; }
 
-	inline const uint32_t sequence() const {return fSequence;}
-	inline void sequence(const uint32_t sequence) {fSequence = sequence;}
+	inline const int32_t sequence() const {return fSequence;}
+	inline void sequence(const int32_t sequence) {fSequence = sequence;}
 
 	inline const std::string& alias() const { return fAlias; }
 	inline void alias(const std::string& alias) {  fAlias = alias; }
@@ -132,9 +132,9 @@ public:
 
 	virtual uint64_t colSource() const { return fColSource; }
 	virtual void colSource(const uint64_t colSource) { fColSource = colSource; }
-	
-	virtual uint64_t colPosition() const { return fColPosition; }
-	virtual void colPosition(const uint64_t colPosition) { fColPosition = colPosition; }
+
+	virtual int64_t colPosition() const { return fColPosition; }
+	virtual void colPosition(const int64_t colPosition) { fColPosition = colPosition; }
 
 	/**
 	 * Operations
@@ -214,16 +214,16 @@ protected:
 	// return all flag set if the other column is outer join column (+)
 	bool fReturnAll;
 	uint32_t fSessionID;
-	uint32_t fSequence;                 /// column sequence on the SELECT mapped to the correlated joins
+	int32_t  fSequence;           /// column sequence on the SELECT mapped to the correlated joins
 	uint64_t fCardinality;
-	std::string fAlias;                 /// column alias
+	std::string fAlias;           /// column alias
 	bool fDistinct;
 	uint64_t fJoinInfo;
-	bool fAsc;                          /// for order by column
-	bool fNullsFirst;                   /// for window function
-	uint64_t fOrderPos;                 /// for order by and group by column
-	uint64_t fColSource;                /// from which subquery
-	uint64_t fColPosition;              /// the column position in the source subquery 
+	bool fAsc;                    /// for order by column
+	bool fNullsFirst;             /// for window function
+	uint64_t fOrderPos;           /// for order by and group by column
+	uint64_t fColSource;          /// from which subquery
+	int64_t  fColPosition;        /// the column position in the source subquery
 	std::vector<SimpleColumn*> fSimpleColumnList;
 	std::vector<AggregateColumn*> fAggColumnList;
 	std::vector<WindowFunctionColumn*> fWindowFunctionColumnList;

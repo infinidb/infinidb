@@ -4329,9 +4329,9 @@ namespace oam
 
 		ByteStream::byte entries;
 		string deviceName;
-		ByteStream::quadbyte totalBlocks;
-		ByteStream::quadbyte usedBlocks;
-		ByteStream::byte diskUsage;
+		uint64_t totalBlocks;
+		uint64_t usedBlocks;
+		uint8_t diskUsage;
 
         // setup message
         msg << (ByteStream::byte) GET_MODULE_DISK_USAGE;

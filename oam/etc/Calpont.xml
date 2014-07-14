@@ -462,6 +462,8 @@
 		<GlusterCopies>0</GlusterCopies>
 		<GlusterStorageType>unassigned</GlusterStorageType>
 		<CoreFileFlag>n</CoreFileFlag>
+		<JavaHome>unassigned</JavaHome>
+		<JavaPath>unassigned</JavaPath>
 	</Installation>
 	<ExtentMap>
 		<!--

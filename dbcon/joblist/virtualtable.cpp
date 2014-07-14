@@ -76,6 +76,8 @@ void VirtualTable::addColumn(const SRCP& column)
 	UniqId colId;
 	if ((sc = dynamic_cast<SimpleColumn*>(column.get())) != NULL)
 	{
+		if (sc->schemaName().empty())
+			sc->oid(fTableOid+sc->colPosition()+1);
 		columnName = sc->columnName();
 		colId = UniqId(sc);
 	}

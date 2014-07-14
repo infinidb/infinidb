@@ -53,8 +53,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 4, 0, 0, 1
- PRODUCTVERSION 4, 0, 0, 1
+ FILEVERSION 4,0,4,1
+ PRODUCTVERSION 4,0,4,1
  FILEFLAGSMASK 0x17L
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -70,12 +70,12 @@ BEGIN
         BLOCK "040904b0"
         BEGIN
             VALUE "FileDescription", "InfiniDB Bulk Loader"
-            VALUE "FileVersion", "4.0.0-1"
+            VALUE "FileVersion", "4.0.4-1"
             VALUE "InternalName", "splitter"
             VALUE "LegalCopyright", "Copyright (C) 2013"
             VALUE "OriginalFilename", "cpimport.exe"
             VALUE "ProductName", "InfiniDB"
-            VALUE "ProductVersion", "4.0.0-1"
+            VALUE "ProductVersion", "4.0.4.1 GA"
         END
     END
     BLOCK "VarFileInfo"

@@ -43,7 +43,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;C:\InfiniDB\genii\utils\winport"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\genii\utils\winport"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
@@ -55,7 +55,7 @@
 			/>
 			<Tool
 				Name="VCResourceCompilerTool"
-				AdditionalIncludeDirectories="C:\InfiniDB\genii\utils\winport"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\genii\utils\winport"
 			/>
 			<Tool
 				Name="VCPreLinkEventTool"
@@ -63,7 +63,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="libwinport.lib psapi.lib"
-				AdditionalLibraryDirectories="C:\InfiniDB\Debug"
+				AdditionalLibraryDirectories="$(SolutionDir)..\..\Debug"
 				GenerateDebugInformation="true"
 				TargetMachine="1"
 			/>
@@ -115,7 +115,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;C:\InfiniDB\genii\utils\winport"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\genii\utils\winport"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
@@ -134,7 +134,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="libwinport.lib psapi.lib ws2_32.lib"
-				AdditionalLibraryDirectories="C:\InfiniDB\x64\Debug;C:\InfiniDB\boost_1_54_0"
+				AdditionalLibraryDirectories="$(SolutionDir)..\..\x64\Debug;$(SolutionDir)..\..\boost_1_54_0"
 				GenerateDebugInformation="true"
 				TargetMachine="17"
 			/>
@@ -187,7 +187,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;C:\InfiniDB\genii\utils\winport"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\genii\utils\winport"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
 				WarningLevel="3"
@@ -198,7 +198,7 @@
 			/>
 			<Tool
 				Name="VCResourceCompilerTool"
-				AdditionalIncludeDirectories="C:\InfiniDB\genii\utils\winport"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\genii\utils\winport"
 			/>
 			<Tool
 				Name="VCPreLinkEventTool"
@@ -206,7 +206,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="libwinport.lib psapi.lib"
-				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_54_0\lib32;&quot;C:\InfiniDB\libxml2-2.7.6\lib32&quot;;C:\InfiniDB\Release"
+				AdditionalLibraryDirectories="$(SolutionDir)..\..\boost_1_54_0\lib32;&quot;$(SolutionDir)..\..\libxml2-2.7.6\lib32&quot;;$(SolutionDir)..\..\Release"
 				GenerateDebugInformation="true"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
@@ -262,7 +262,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;C:\InfiniDB\genii\utils\winport"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\genii\utils\winport"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
 				WarningLevel="3"
@@ -280,7 +280,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="libwinport.lib psapi.lib"
-				AdditionalLibraryDirectories="C:\InfiniDB\x64\Release"
+				AdditionalLibraryDirectories="$(SolutionDir)..\..\x64\Release"
 				GenerateDebugInformation="true"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
@@ -306,7 +306,7 @@
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
-				CommandLine="\InfiniDB\signit &quot;InfiniDB Windows Service Manager&quot; \InfiniDB\x64\Release\winfinidb.exe"
+				CommandLine="$(SolutionDir)..\..\signit &quot;InfiniDB Windows Service Manager&quot; $(SolutionDir)..\..\x64\Release\winfinidb.exe"
 			/>
 		</Configuration>
 		<Configuration
@@ -336,7 +336,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;C:\InfiniDB\genii\utils\winport"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\genii\utils\winport"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
 				WarningLevel="3"
@@ -347,7 +347,7 @@
 			/>
 			<Tool
 				Name="VCResourceCompilerTool"
-				AdditionalIncludeDirectories="C:\InfiniDB\genii\utils\winport"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\genii\utils\winport"
 			/>
 			<Tool
 				Name="VCPreLinkEventTool"
@@ -355,7 +355,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="libwinport.lib psapi.lib"
-				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_54_0\lib32;&quot;C:\InfiniDB\libxml2-2.7.6\lib32&quot;;C:\InfiniDB\Release"
+				AdditionalLibraryDirectories="$(SolutionDir)..\..\boost_1_54_0\lib32;&quot;$(SolutionDir)..\..\libxml2-2.7.6\lib32&quot;;$(SolutionDir)..\..\Release"
 				GenerateDebugInformation="true"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
@@ -411,7 +411,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;C:\InfiniDB\genii\utils\winport"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\genii\utils\winport"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
 				WarningLevel="3"
@@ -429,7 +429,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="libwinport.lib psapi.lib ws2_32.lib"
-				AdditionalLibraryDirectories="C:\InfiniDB\x64\EnterpriseRelease;C:\InfiniDB\boost_1_54_0"
+				AdditionalLibraryDirectories="$(SolutionDir)..\..\x64\EnterpriseRelease;$(SolutionDir)..\..\boost_1_54_0"
 				GenerateDebugInformation="true"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
@@ -455,7 +455,7 @@
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
-				CommandLine="\InfiniDB\signit &quot;InfiniDB Windows Service Manager&quot; \InfiniDB\x64\EnterpriseRelease\winfinidb.exe"
+				CommandLine="$(SolutionDir)..\..\signit &quot;InfiniDB Windows Service Manager&quot; $(SolutionDir)..\..\x64\EnterpriseRelease\winfinidb.exe"
 			/>
 		</Configuration>
 	</Configurations>

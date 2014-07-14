@@ -43,7 +43,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\dbcon\execplan;C:\InfiniDB\genii\versioning\BRM;C:\InfiniDB\genii\utils\rwlock;C:\InfiniDB\genii\writeengine\shared;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\dbcon\joblist;C:\InfiniDB\genii\utils\common"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\boost_1_54_0;&quot;$(SolutionDir)..\..\libxml2-2.7.6&quot;;$(SolutionDir)..\..\genii\utils\winport;$(SolutionDir)..\..\genii\dbcon\execplan;$(SolutionDir)..\..\genii\versioning\BRM;$(SolutionDir)..\..\genii\utils\rwlock;$(SolutionDir)..\..\genii\writeengine\shared;$(SolutionDir)..\..\genii\utils\messageqcpp;$(SolutionDir)..\..\genii\utils\loggingcpp;$(SolutionDir)..\..\genii\utils\configcpp;$(SolutionDir)..\..\genii\dbcon\joblist;$(SolutionDir)..\..\genii\utils\common"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
@@ -62,7 +62,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="librwlock.lib libbrm.lib libconfigcpp.lib libmessageqcpp.lib libloggingcpp.lib libexecplan.lib liboamcpp.lib librowgroup.lib libjoblist.lib libdataconvert.lib libcacheutils.lib libcompress.lib libfuncexp.lib libudfsdk.lib libidbboot.lib libwinport.lib ws2_32.lib psapi.lib iphlpapi.lib"
-				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_54_0\lib32;C:\InfiniDB\Debug"
+				AdditionalLibraryDirectories="$(SolutionDir)..\..\boost_1_54_0\lib32;$(SolutionDir)..\..\Debug"
 				GenerateDebugInformation="true"
 				TargetMachine="1"
 			/>
@@ -114,7 +114,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\dbcon\execplan;C:\InfiniDB\genii\versioning\BRM;C:\InfiniDB\genii\utils\rwlock;C:\InfiniDB\genii\writeengine\shared;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\dbcon\joblist;C:\InfiniDB\genii\utils\common;C:\InfiniDB\genii\utils\idbdatafile"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\boost_1_54_0;&quot;$(SolutionDir)..\..\libxml2-2.7.6&quot;;$(SolutionDir)..\..\genii\utils\winport;$(SolutionDir)..\..\genii\dbcon\execplan;$(SolutionDir)..\..\genii\versioning\BRM;$(SolutionDir)..\..\genii\utils\rwlock;$(SolutionDir)..\..\genii\writeengine\shared;$(SolutionDir)..\..\genii\utils\messageqcpp;$(SolutionDir)..\..\genii\utils\loggingcpp;$(SolutionDir)..\..\genii\utils\configcpp;$(SolutionDir)..\..\genii\dbcon\joblist;$(SolutionDir)..\..\genii\utils\common;$(SolutionDir)..\..\genii\utils\idbdatafile"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
@@ -133,7 +133,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="librwlock.lib libbrm.lib libconfigcpp.lib libmessageqcpp.lib libloggingcpp.lib libexecplan.lib liboamcpp.lib librowgroup.lib libjoblist.lib libdataconvert.lib libcacheutils.lib libcompress.lib libfuncexp.lib libudfsdk.lib libidbboot.lib libwinport.lib ws2_32.lib psapi.lib iphlpapi.lib libidbdatafile.lib"
-				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_54_0;C:\InfiniDB\x64\Debug"
+				AdditionalLibraryDirectories="$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\x64\Debug"
 				GenerateDebugInformation="true"
 				TargetMachine="17"
 			/>
@@ -186,7 +186,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\dbcon\execplan;C:\InfiniDB\genii\versioning\BRM;C:\InfiniDB\genii\utils\rwlock;C:\InfiniDB\genii\writeengine\shared;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\dbcon\joblist;C:\InfiniDB\genii\utils\common"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\boost_1_54_0;&quot;$(SolutionDir)..\..\libxml2-2.7.6&quot;;$(SolutionDir)..\..\genii\utils\winport;$(SolutionDir)..\..\genii\dbcon\execplan;$(SolutionDir)..\..\genii\versioning\BRM;$(SolutionDir)..\..\genii\utils\rwlock;$(SolutionDir)..\..\genii\writeengine\shared;$(SolutionDir)..\..\genii\utils\messageqcpp;$(SolutionDir)..\..\genii\utils\loggingcpp;$(SolutionDir)..\..\genii\utils\configcpp;$(SolutionDir)..\..\genii\dbcon\joblist;$(SolutionDir)..\..\genii\utils\common"
 				PreprocessorDefinitions="_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
@@ -205,7 +205,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="librwlock.lib libbrm.lib libconfigcpp.lib libmessageqcpp.lib libloggingcpp.lib libexecplan.lib liboamcpp.lib librowgroup.lib libjoblist.lib libdataconvert.lib libcacheutils.lib libfuncexp.lib libidbboot.lib libwinport.lib ws2_32.lib psapi.lib iphlpapi.lib"
-				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_54_0\lib32;C:\InfiniDB\Release"
+				AdditionalLibraryDirectories="$(SolutionDir)..\..\boost_1_54_0\lib32;$(SolutionDir)..\..\Release"
 				GenerateDebugInformation="true"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
@@ -261,7 +261,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\dbcon\execplan;C:\InfiniDB\genii\versioning\BRM;C:\InfiniDB\genii\utils\rwlock;C:\InfiniDB\genii\writeengine\shared;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\dbcon\joblist;C:\InfiniDB\genii\utils\common"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\boost_1_54_0;&quot;$(SolutionDir)..\..\libxml2-2.7.6&quot;;$(SolutionDir)..\..\genii\utils\winport;$(SolutionDir)..\..\genii\dbcon\execplan;$(SolutionDir)..\..\genii\versioning\BRM;$(SolutionDir)..\..\genii\utils\rwlock;$(SolutionDir)..\..\genii\writeengine\shared;$(SolutionDir)..\..\genii\utils\messageqcpp;$(SolutionDir)..\..\genii\utils\loggingcpp;$(SolutionDir)..\..\genii\utils\configcpp;$(SolutionDir)..\..\genii\dbcon\joblist;$(SolutionDir)..\..\genii\utils\common"
 				PreprocessorDefinitions="_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
@@ -280,7 +280,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="librwlock.lib libbrm.lib libconfigcpp.lib libmessageqcpp.lib libloggingcpp.lib libexecplan.lib liboamcpp.lib librowgroup.lib libjoblist.lib libdataconvert.lib libcacheutils.lib libfuncexp.lib libidbboot.lib libwinport.lib ws2_32.lib psapi.lib iphlpapi.lib"
-				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_54_0;C:\InfiniDB\x64\Release"
+				AdditionalLibraryDirectories="$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\x64\Release"
 				GenerateDebugInformation="true"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
@@ -335,7 +335,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\dbcon\execplan;C:\InfiniDB\genii\versioning\BRM;C:\InfiniDB\genii\utils\rwlock;C:\InfiniDB\genii\writeengine\shared;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\dbcon\joblist;C:\InfiniDB\genii\utils\common"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\boost_1_54_0;&quot;$(SolutionDir)..\..\libxml2-2.7.6&quot;;$(SolutionDir)..\..\genii\utils\winport;$(SolutionDir)..\..\genii\dbcon\execplan;$(SolutionDir)..\..\genii\versioning\BRM;$(SolutionDir)..\..\genii\utils\rwlock;$(SolutionDir)..\..\genii\writeengine\shared;$(SolutionDir)..\..\genii\utils\messageqcpp;$(SolutionDir)..\..\genii\utils\loggingcpp;$(SolutionDir)..\..\genii\utils\configcpp;$(SolutionDir)..\..\genii\dbcon\joblist;$(SolutionDir)..\..\genii\utils\common"
 				PreprocessorDefinitions="_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
@@ -354,7 +354,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="librwlock.lib libbrm.lib libconfigcpp.lib libmessageqcpp.lib libloggingcpp.lib libexecplan.lib liboamcpp.lib librowgroup.lib libjoblist.lib libdataconvert.lib libcacheutils.lib libcompress.lib libfuncexp.lib libudfsdk.lib libidbboot.lib libwinport.lib ws2_32.lib psapi.lib iphlpapi.lib"
-				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_54_0\lib32"
+				AdditionalLibraryDirectories="$(SolutionDir)..\..\boost_1_54_0\lib32"
 				GenerateDebugInformation="true"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
@@ -410,7 +410,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\dbcon\execplan;C:\InfiniDB\genii\versioning\BRM;C:\InfiniDB\genii\utils\rwlock;C:\InfiniDB\genii\writeengine\shared;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\dbcon\joblist;C:\InfiniDB\genii\utils\common;C:\InfiniDB\genii\utils\idbdatafile"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\boost_1_54_0;&quot;$(SolutionDir)..\..\libxml2-2.7.6&quot;;$(SolutionDir)..\..\genii\utils\winport;$(SolutionDir)..\..\genii\dbcon\execplan;$(SolutionDir)..\..\genii\versioning\BRM;$(SolutionDir)..\..\genii\utils\rwlock;$(SolutionDir)..\..\genii\writeengine\shared;$(SolutionDir)..\..\genii\utils\messageqcpp;$(SolutionDir)..\..\genii\utils\loggingcpp;$(SolutionDir)..\..\genii\utils\configcpp;$(SolutionDir)..\..\genii\dbcon\joblist;$(SolutionDir)..\..\genii\utils\common;$(SolutionDir)..\..\genii\utils\idbdatafile"
 				PreprocessorDefinitions="_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
@@ -429,7 +429,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="librwlock.lib libbrm.lib libconfigcpp.lib libmessageqcpp.lib libloggingcpp.lib libexecplan.lib liboamcpp.lib librowgroup.lib libjoblist.lib libdataconvert.lib libcacheutils.lib libcompress.lib libfuncexp.lib libudfsdk.lib libidbboot.lib libwinport.lib ws2_32.lib psapi.lib iphlpapi.lib libidbdatafile.lib"
-				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_54_0;C:\InfiniDB\x64\EnterpriseRelease"
+				AdditionalLibraryDirectories="$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\x64\EnterpriseRelease"
 				GenerateDebugInformation="true"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"

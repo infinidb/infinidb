@@ -77,6 +77,7 @@ TupleHashJoinStep::TupleHashJoinStep(const JobInfo& jobInfo) :
 	joinIsTooBig(false),
 	isExeMgr(jobInfo.isExeMgr),
 	lastSmallOuterJoiner(-1),
+	fTokenJoin(false),
 	fStatsMutexPtr(new boost::mutex())
 {
 	/* Need to figure out how much memory these use...
@@ -950,6 +951,8 @@ void TupleHashJoinStep::joinRunnerFcn(uint threadID)
 		joinedRowData.clear();
 		grabSomeWork(&inputData);
 	}
+	while (!inputData.empty())
+		grabSomeWork(&inputData);
 }
 
 void TupleHashJoinStep::makeDupList(const RowGroup &rg)

@@ -743,7 +743,7 @@ void addOrderByAndLimit(CalpontSelectExecutionPlan* csep, JobInfo& jobInfo)
 			}
 			else
 			{
-				if (sc->colPosition() == (uint64_t) -1)
+				if (sc->colPosition() == -1)
 				{
 					sc = dynamic_cast<SimpleColumn*>(jobInfo.deliveredCols[sc->orderPos()].get());
 				}

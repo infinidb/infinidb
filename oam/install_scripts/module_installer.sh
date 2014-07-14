@@ -110,15 +110,39 @@ if [ -n "$plugin" ]; then
 	echo "Setup .bashrc on Module"
 
 	setenv=`$INFINIDB_INSTALL_DIR/bin/getConfig SystemConfig DataFileEnvFile`
+	JavaHome=`$INFINIDB_INSTALL_DIR/bin/getConfig Installation JavaHome`
+	JavaPath=`$INFINIDB_INSTALL_DIR/bin/getConfig Installation JavaPath`
 
 	eval userhome=~$user
 	bashFile=$userhome/.bashrc
 	touch ${bashFile}
 
 	echo " " >> ${bashFile}
-	echo "export JAVA_HOME=/usr/java/jdk1.6.0_31" >> ${bashFile}
-	echo "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/java/jdk1.6.0_31/jre/lib/amd64/server" >> ${bashFile}
-	echo ". ./$setenv" >> ${bashFile}
+	echo "export JAVA_HOME=$JavaHome" >> ${bashFile}
+	echo "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$JavaPath" >> ${bashFile}
+	echo ". ~/$setenv" >> ${bashFile}
+fi
+
+if [ $user != "root" ]; then
+	echo "Setup .bashrc on Module for non-root"
+
+	eval userhome=~$user
+	bashFile=$userhome/.bashrc
+	touch ${bashFile}
+
+	echo " " >> ${bashFile}
+	echo "export INFINIDB_INSTALL_DIR=$INFINIDB_INSTALL_DIR" >> ${bashFile}
+	echo "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$INFINIDB_INSTALL_DIR/lib:$INFINIDB_INSTALL_DIR/mysql/lib/mysql" >> ${bashFile}
+fi
+
+# if mysqlrep is on and module has a my.cnf file, upgrade it
+
+MySQLRep=`$INFINIDB_INSTALL_DIR/bin/getConfig Installation MySQLRep`
+if [ $MySQLRep = "y" ]; then
+	if test -f $INFINIDB_INSTALL_DIR/mysql/my.cnf ; then
+		echo "Run Upgrade on my.cnf on Module"
+		$INFINIDB_INSTALL_DIR/bin/mycnfUpgrade > /tmp/mycnfUpgrade.log 2>&1
+	fi
 fi
 
 echo " "

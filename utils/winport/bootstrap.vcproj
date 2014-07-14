@@ -43,7 +43,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\utils\common"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\boost_1_54_0;&quot;$(SolutionDir)..\..\libxml2-2.7.6&quot;;$(SolutionDir)..\..\genii\utils\winport;$(SolutionDir)..\..\genii\utils\configcpp;$(SolutionDir)..\..\genii\utils\common"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
@@ -62,7 +62,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="libwinport.lib"
-				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_54_0\lib32"
+				AdditionalLibraryDirectories="$(SolutionDir)..\..\boost_1_54_0\lib32"
 				GenerateDebugInformation="true"
 				TargetMachine="1"
 			/>
@@ -114,7 +114,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\utils\common"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\boost_1_54_0;&quot;$(SolutionDir)..\..\libxml2-2.7.6&quot;;$(SolutionDir)..\..\genii\utils\winport;$(SolutionDir)..\..\genii\utils\configcpp;$(SolutionDir)..\..\genii\utils\common"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
@@ -133,7 +133,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="libwinport.lib"
-				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_54_0;C:\InfiniDB\x64\Debug"
+				AdditionalLibraryDirectories="$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\x64\Debug"
 				GenerateDebugInformation="true"
 				TargetMachine="17"
 			/>
@@ -186,7 +186,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\utils\common"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\boost_1_54_0;&quot;$(SolutionDir)..\..\libxml2-2.7.6&quot;;$(SolutionDir)..\..\genii\utils\winport;$(SolutionDir)..\..\genii\utils\configcpp;$(SolutionDir)..\..\genii\utils\common"
 				PreprocessorDefinitions="SKIP_MYSQL_SETUP4"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
@@ -205,7 +205,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="libwinport.lib"
-				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_54_0\lib32;C:\InfiniDB\Release"
+				AdditionalLibraryDirectories="$(SolutionDir)..\..\boost_1_54_0\lib32;$(SolutionDir)..\..\Release"
 				GenerateDebugInformation="true"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
@@ -261,7 +261,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\utils\common"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\boost_1_54_0;&quot;$(SolutionDir)..\..\libxml2-2.7.6&quot;;$(SolutionDir)..\..\genii\utils\winport;$(SolutionDir)..\..\genii\utils\configcpp;$(SolutionDir)..\..\genii\utils\common"
 				PreprocessorDefinitions="SKIP_MYSQL_SETUP4"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
@@ -280,7 +280,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="libwinport.lib"
-				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_54_0;C:\InfiniDB\x64\Release"
+				AdditionalLibraryDirectories="$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\x64\Release"
 				GenerateDebugInformation="true"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
@@ -335,7 +335,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\utils\common"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\boost_1_54_0;&quot;$(SolutionDir)..\..\libxml2-2.7.6&quot;;$(SolutionDir)..\..\genii\utils\winport;$(SolutionDir)..\..\genii\utils\configcpp;$(SolutionDir)..\..\genii\utils\common"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
 				WarningLevel="3"
@@ -353,7 +353,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="libwinport.lib"
-				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_54_0\lib32"
+				AdditionalLibraryDirectories="$(SolutionDir)..\..\boost_1_54_0\lib32"
 				GenerateDebugInformation="true"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
@@ -409,7 +409,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\utils\common"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\boost_1_54_0;&quot;$(SolutionDir)..\..\libxml2-2.7.6&quot;;$(SolutionDir)..\..\genii\utils\winport;$(SolutionDir)..\..\genii\utils\configcpp;$(SolutionDir)..\..\genii\utils\common"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
 				WarningLevel="3"
@@ -427,7 +427,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="libwinport.lib"
-				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_54_0;C:\InfiniDB\x64\EnterpriseRelease"
+				AdditionalLibraryDirectories="$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\x64\EnterpriseRelease"
 				GenerateDebugInformation="true"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"

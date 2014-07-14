@@ -44,7 +44,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;C:\InfiniDB\genii\utils\winport"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\genii\utils\winport"
 				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
@@ -66,7 +66,7 @@
 				Name="VCLinkerTool"
 				AdditionalDependencies="libwinport.lib ws2_32.lib"
 				LinkIncremental="2"
-				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_54_0"
+				AdditionalLibraryDirectories="$(SolutionDir)..\..\boost_1_54_0"
 				GenerateDebugInformation="true"
 				SubSystem="1"
 				TargetMachine="1"
@@ -119,7 +119,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;C:\InfiniDB\genii\utils\winport"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\genii\utils\winport"
 				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
@@ -141,7 +141,7 @@
 				Name="VCLinkerTool"
 				AdditionalDependencies="libwinport.lib ws2_32.lib"
 				LinkIncremental="2"
-				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_54_0;C:\InfiniDB\x64\Debug"
+				AdditionalLibraryDirectories="$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\x64\Debug"
 				GenerateDebugInformation="true"
 				SubSystem="1"
 				TargetMachine="17"
@@ -195,7 +195,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;C:\InfiniDB\genii\utils\winport"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\genii\utils\winport"
 				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
@@ -217,7 +217,7 @@
 				Name="VCLinkerTool"
 				AdditionalDependencies="libwinport.lib ws2_32.lib"
 				LinkIncremental="1"
-				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_54_0"
+				AdditionalLibraryDirectories="$(SolutionDir)..\..\boost_1_54_0"
 				GenerateDebugInformation="true"
 				SubSystem="1"
 				OptimizeReferences="2"
@@ -274,7 +274,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;C:\InfiniDB\genii\utils\winport"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\genii\utils\winport"
 				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
@@ -296,7 +296,7 @@
 				Name="VCLinkerTool"
 				AdditionalDependencies="libwinport.lib ws2_32.lib"
 				LinkIncremental="1"
-				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_54_0;C:\InfiniDB\x64\Release"
+				AdditionalLibraryDirectories="$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\x64\Release"
 				GenerateDebugInformation="true"
 				SubSystem="1"
 				OptimizeReferences="2"
@@ -323,7 +323,7 @@
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
-				CommandLine="\InfiniDB\signit &quot;InfiniDB V1 Decompression Server&quot; \InfiniDB\x64\Release\DecomSvr.exe"
+				CommandLine="$(SolutionDir)..\..\signit &quot;InfiniDB V1 Decompression Server&quot; $(SolutionDir)..\..\x64\Release\DecomSvr.exe"
 			/>
 		</Configuration>
 		<Configuration
@@ -353,7 +353,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;C:\InfiniDB\genii\utils\winport"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\genii\utils\winport"
 				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
@@ -375,7 +375,7 @@
 				Name="VCLinkerTool"
 				AdditionalDependencies="libwinport.lib ws2_32.lib"
 				LinkIncremental="1"
-				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_54_0"
+				AdditionalLibraryDirectories="$(SolutionDir)..\..\boost_1_54_0"
 				GenerateDebugInformation="true"
 				SubSystem="1"
 				OptimizeReferences="2"
@@ -432,7 +432,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;C:\InfiniDB\genii\utils\winport"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\genii\utils\winport"
 				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
@@ -454,7 +454,7 @@
 				Name="VCLinkerTool"
 				AdditionalDependencies="libwinport.lib ws2_32.lib"
 				LinkIncremental="1"
-				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_54_0;C:\InfiniDB\x64\EnterpriseRelease"
+				AdditionalLibraryDirectories="$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\x64\EnterpriseRelease"
 				GenerateDebugInformation="true"
 				SubSystem="1"
 				OptimizeReferences="2"
@@ -481,7 +481,7 @@
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
-				CommandLine="\InfiniDB\signit &quot;InfiniDB V1 Decompression Server&quot; \InfiniDB\x64\EnterpriseRelease\DecomSvr.exe"
+				CommandLine="$(SolutionDir)..\..\signit &quot;InfiniDB V1 Decompression Server&quot; $(SolutionDir)..\..\x64\EnterpriseRelease\DecomSvr.exe"
 			/>
 		</Configuration>
 	</Configurations>

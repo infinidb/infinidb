@@ -99,7 +99,6 @@ rm -rf $RPM_BUILD_ROOT $RPM_BUILD_DIR/%{name}-%{version}-%{release}
 /usr/local/Calpont/bin/calpontSyslog-ng 
 /usr/local/Calpont/bin/syslogSetup.sh
 /usr/local/Calpont/bin/cplogger
-/usr/local/Calpont/bin/install-infinidb.sh
 /usr/local/Calpont/bin/infinidb.def
 /usr/local/Calpont/bin/dbbuilder
 /usr/local/Calpont/bin/cpimport.bin

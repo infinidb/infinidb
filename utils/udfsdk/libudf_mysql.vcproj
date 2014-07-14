@@ -27,7 +27,7 @@
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
-				CommandLine="del \InfiniDB\genii\dbcon\mysql\errorids.h &gt;nul 2&gt;&amp;1"
+				CommandLine="del $(SolutionDir)..\..\genii\dbcon\mysql\errorids.h &gt;nul 2&gt;&amp;1"
 			/>
 			<Tool
 				Name="VCCustomBuildTool"
@@ -44,7 +44,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\genii\dbcon\execplan;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\writeengine\shared;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\utils\dataconvert;C:\InfiniDB\genii\dbcon\mysql;&quot;C:\InfiniDB\mysql\include&quot;;&quot;C:\InfiniDB\mysql\sql&quot;;&quot;C:\InfiniDB\mysql\extra\yassl\include&quot;;C:\InfiniDB\genii\utils\funcexp;C:\InfiniDB\genii\utils\rowgroup;C:\InfiniDB\genii\dbcon\joblist"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\boost_1_54_0;&quot;$(SolutionDir)..\..\libxml2-2.7.6&quot;;$(SolutionDir)..\..\genii\dbcon\execplan;$(SolutionDir)..\..\genii\utils\winport;$(SolutionDir)..\..\genii\writeengine\shared;$(SolutionDir)..\..\genii\utils\messageqcpp;$(SolutionDir)..\..\genii\utils\loggingcpp;$(SolutionDir)..\..\genii\utils\configcpp;$(SolutionDir)..\..\genii\utils\dataconvert;$(SolutionDir)..\..\genii\dbcon\mysql;&quot;$(SolutionDir)..\..\mysql\include&quot;;&quot;$(SolutionDir)..\..\mysql\sql&quot;;&quot;$(SolutionDir)..\..\mysql\extra\yassl\include&quot;;$(SolutionDir)..\..\genii\utils\funcexp;$(SolutionDir)..\..\genii\utils\rowgroup;$(SolutionDir)..\..\genii\dbcon\joblist"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
@@ -115,7 +115,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\genii\dbcon\execplan;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\writeengine\shared;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\utils\dataconvert;C:\InfiniDB\genii\dbcon\mysql;&quot;C:\InfiniDB\mysql\include&quot;;&quot;C:\InfiniDB\mysql\sql&quot;;&quot;C:\InfiniDB\mysql\extra\yassl\include&quot;;C:\InfiniDB\genii\utils\funcexp;C:\InfiniDB\genii\utils\rowgroup;C:\InfiniDB\genii\dbcon\joblist;C:\InfiniDB\genii\utils\common"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\boost_1_54_0;&quot;$(SolutionDir)..\..\libxml2-2.7.6&quot;;$(SolutionDir)..\..\genii\dbcon\execplan;$(SolutionDir)..\..\genii\utils\winport;$(SolutionDir)..\..\genii\writeengine\shared;$(SolutionDir)..\..\genii\utils\messageqcpp;$(SolutionDir)..\..\genii\utils\loggingcpp;$(SolutionDir)..\..\genii\utils\configcpp;$(SolutionDir)..\..\genii\utils\dataconvert;$(SolutionDir)..\..\genii\dbcon\mysql;&quot;$(SolutionDir)..\..\mysql\include&quot;;&quot;$(SolutionDir)..\..\mysql\sql&quot;;&quot;$(SolutionDir)..\..\mysql\extra\yassl\include&quot;;$(SolutionDir)..\..\genii\utils\funcexp;$(SolutionDir)..\..\genii\utils\rowgroup;$(SolutionDir)..\..\genii\dbcon\joblist;$(SolutionDir)..\..\genii\utils\common"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
@@ -135,7 +135,7 @@
 				Name="VCLinkerTool"
 				AdditionalDependencies="libloggingcpp.lib libconfigcpp.lib libfuncexp.lib libdataconvert.lib libidbboot.lib libwinport.lib ws2_32.lib"
 				OutputFile="$(OutDir)\libudf_mysql.dll"
-				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_54_0;C:\InfiniDB\x64\Debug"
+				AdditionalLibraryDirectories="$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\x64\Debug"
 				GenerateDebugInformation="true"
 				TargetMachine="17"
 			/>
@@ -171,7 +171,7 @@
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
-				CommandLine="del \InfiniDB\genii\dbcon\mysql\errorids.h &gt;nul 2&gt;&amp;1"
+				CommandLine="del $(SolutionDir)..\..\genii\dbcon\mysql\errorids.h &gt;nul 2&gt;&amp;1"
 			/>
 			<Tool
 				Name="VCCustomBuildTool"
@@ -189,7 +189,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\genii\dbcon\execplan;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\writeengine\shared;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\utils\dataconvert;C:\InfiniDB\genii\dbcon\mysql;&quot;C:\InfiniDB\mysql\include&quot;;&quot;C:\InfiniDB\mysql\sql&quot;;&quot;C:\InfiniDB\mysql\extra\yassl\include&quot;;C:\InfiniDB\genii\utils\funcexp;C:\InfiniDB\genii\utils\rowgroup;C:\InfiniDB\genii\dbcon\joblist"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\boost_1_54_0;&quot;$(SolutionDir)..\..\libxml2-2.7.6&quot;;$(SolutionDir)..\..\genii\dbcon\execplan;$(SolutionDir)..\..\genii\utils\winport;$(SolutionDir)..\..\genii\writeengine\shared;$(SolutionDir)..\..\genii\utils\messageqcpp;$(SolutionDir)..\..\genii\utils\loggingcpp;$(SolutionDir)..\..\genii\utils\configcpp;$(SolutionDir)..\..\genii\utils\dataconvert;$(SolutionDir)..\..\genii\dbcon\mysql;&quot;$(SolutionDir)..\..\mysql\include&quot;;&quot;$(SolutionDir)..\..\mysql\sql&quot;;&quot;$(SolutionDir)..\..\mysql\extra\yassl\include&quot;;$(SolutionDir)..\..\genii\utils\funcexp;$(SolutionDir)..\..\genii\utils\rowgroup;$(SolutionDir)..\..\genii\dbcon\joblist"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
 				WarningLevel="3"
@@ -244,7 +244,7 @@
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
-				CommandLine="del \InfiniDB\genii\dbcon\mysql\errorids.h &gt;nul 2&gt;&amp;1"
+				CommandLine="del $(SolutionDir)..\..\genii\dbcon\mysql\errorids.h &gt;nul 2&gt;&amp;1"
 			/>
 			<Tool
 				Name="VCCustomBuildTool"
@@ -263,7 +263,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\genii\dbcon\execplan;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\writeengine\shared;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\utils\dataconvert;C:\InfiniDB\genii\dbcon\mysql;&quot;C:\InfiniDB\mysql\include&quot;;&quot;C:\InfiniDB\mysql\sql&quot;;&quot;C:\InfiniDB\mysql\extra\yassl\include&quot;;C:\InfiniDB\genii\utils\funcexp;C:\InfiniDB\genii\utils\rowgroup;C:\InfiniDB\genii\dbcon\joblist;C:\InfiniDB\genii\utils\common"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\boost_1_54_0;&quot;$(SolutionDir)..\..\libxml2-2.7.6&quot;;$(SolutionDir)..\..\genii\dbcon\execplan;$(SolutionDir)..\..\genii\utils\winport;$(SolutionDir)..\..\genii\writeengine\shared;$(SolutionDir)..\..\genii\utils\messageqcpp;$(SolutionDir)..\..\genii\utils\loggingcpp;$(SolutionDir)..\..\genii\utils\configcpp;$(SolutionDir)..\..\genii\utils\dataconvert;$(SolutionDir)..\..\genii\dbcon\mysql;&quot;$(SolutionDir)..\..\mysql\include&quot;;&quot;$(SolutionDir)..\..\mysql\sql&quot;;&quot;$(SolutionDir)..\..\mysql\extra\yassl\include&quot;;$(SolutionDir)..\..\genii\utils\funcexp;$(SolutionDir)..\..\genii\utils\rowgroup;$(SolutionDir)..\..\genii\dbcon\joblist;$(SolutionDir)..\..\genii\utils\common"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
 				WarningLevel="3"
@@ -281,7 +281,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="libloggingcpp.lib libconfigcpp.lib libfuncexp.lib libidbboot.lib libwinport.lib ws2_32.lib"
-				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_54_0;C:\InfiniDB\x64\Release"
+				AdditionalLibraryDirectories="$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\x64\Release"
 				GenerateDebugInformation="true"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
@@ -319,7 +319,7 @@
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
-				CommandLine="del \InfiniDB\genii\dbcon\mysql\errorids.h &gt;nul 2&gt;&amp;1"
+				CommandLine="del $(SolutionDir)..\..\genii\dbcon\mysql\errorids.h &gt;nul 2&gt;&amp;1"
 			/>
 			<Tool
 				Name="VCCustomBuildTool"
@@ -337,7 +337,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\genii\dbcon\execplan;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\writeengine\shared;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\utils\dataconvert;C:\InfiniDB\genii\dbcon\mysql;&quot;C:\InfiniDB\mysql\include&quot;;&quot;C:\InfiniDB\mysql\sql&quot;;&quot;C:\InfiniDB\mysql\extra\yassl\include&quot;;C:\InfiniDB\genii\utils\funcexp;C:\InfiniDB\genii\utils\rowgroup;C:\InfiniDB\genii\dbcon\joblist"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\boost_1_54_0;&quot;$(SolutionDir)..\..\libxml2-2.7.6&quot;;$(SolutionDir)..\..\genii\dbcon\execplan;$(SolutionDir)..\..\genii\utils\winport;$(SolutionDir)..\..\genii\writeengine\shared;$(SolutionDir)..\..\genii\utils\messageqcpp;$(SolutionDir)..\..\genii\utils\loggingcpp;$(SolutionDir)..\..\genii\utils\configcpp;$(SolutionDir)..\..\genii\utils\dataconvert;$(SolutionDir)..\..\genii\dbcon\mysql;&quot;$(SolutionDir)..\..\mysql\include&quot;;&quot;$(SolutionDir)..\..\mysql\sql&quot;;&quot;$(SolutionDir)..\..\mysql\extra\yassl\include&quot;;$(SolutionDir)..\..\genii\utils\funcexp;$(SolutionDir)..\..\genii\utils\rowgroup;$(SolutionDir)..\..\genii\dbcon\joblist"
 				PreprocessorDefinitions="_CRT_SECURE_NO_WARNINGS"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
@@ -413,7 +413,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="C:\InfiniDB\boost_1_54_0;&quot;C:\InfiniDB\libxml2-2.7.6&quot;;C:\InfiniDB\genii\dbcon\execplan;C:\InfiniDB\genii\utils\winport;C:\InfiniDB\genii\writeengine\shared;C:\InfiniDB\genii\utils\messageqcpp;C:\InfiniDB\genii\utils\loggingcpp;C:\InfiniDB\genii\utils\configcpp;C:\InfiniDB\genii\utils\dataconvert;C:\InfiniDB\genii\dbcon\mysql;&quot;C:\InfiniDB\mysql\include&quot;;&quot;C:\InfiniDB\mysql\sql&quot;;&quot;C:\InfiniDB\mysql\extra\yassl\include&quot;;C:\InfiniDB\genii\utils\funcexp;C:\InfiniDB\genii\utils\rowgroup;C:\InfiniDB\genii\dbcon\joblist;C:\InfiniDB\genii\utils\common"
+				AdditionalIncludeDirectories="$(SolutionDir)..\..\boost_1_54_0;&quot;$(SolutionDir)..\..\libxml2-2.7.6&quot;;$(SolutionDir)..\..\genii\dbcon\execplan;$(SolutionDir)..\..\genii\utils\winport;$(SolutionDir)..\..\genii\writeengine\shared;$(SolutionDir)..\..\genii\utils\messageqcpp;$(SolutionDir)..\..\genii\utils\loggingcpp;$(SolutionDir)..\..\genii\utils\configcpp;$(SolutionDir)..\..\genii\utils\dataconvert;$(SolutionDir)..\..\genii\dbcon\mysql;&quot;$(SolutionDir)..\..\mysql\include&quot;;&quot;$(SolutionDir)..\..\mysql\sql&quot;;&quot;$(SolutionDir)..\..\mysql\extra\yassl\include&quot;;$(SolutionDir)..\..\genii\utils\funcexp;$(SolutionDir)..\..\genii\utils\rowgroup;$(SolutionDir)..\..\genii\dbcon\joblist;$(SolutionDir)..\..\genii\utils\common"
 				PreprocessorDefinitions="_CRT_SECURE_NO_WARNINGS"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
@@ -434,7 +434,7 @@
 				Name="VCLinkerTool"
 				AdditionalDependencies="libloggingcpp.lib libconfigcpp.lib libfuncexp.lib libdataconvert.lib libidbboot.lib libwinport.lib ws2_32.lib"
 				OutputFile="$(OutDir)\libudf_mysql.dll"
-				AdditionalLibraryDirectories="C:\InfiniDB\boost_1_54_0;C:\InfiniDB\x64\EnterpriseRelease"
+				AdditionalLibraryDirectories="$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\x64\EnterpriseRelease"
 				GenerateDebugInformation="true"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
@@ -460,7 +460,7 @@
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
-				CommandLine="\InfiniDB\signit &quot;InfiniDB UDF MYSQL&quot; \InfiniDB\x64\EnterpriseRelease\libudf_mysql.dll"
+				CommandLine="$(SolutionDir)..\..\signit &quot;InfiniDB UDF MYSQL&quot; $(SolutionDir)..\..\x64\EnterpriseRelease\libudf_mysql.dll"
 			/>
 		</Configuration>
 	</Configurations>
