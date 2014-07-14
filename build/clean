@@ -7,7 +7,6 @@ for x in \
 dbcon \
 ddlproc \
 decomsvr \
-dmlib \
 dmlproc \
 exemgr \
 mysql \

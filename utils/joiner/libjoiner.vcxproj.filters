@@ -21,12 +21,18 @@
     <ClCompile Include="tuplejoiner.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="joinpartition.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="joiner.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="tuplejoiner.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="joinpartition.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

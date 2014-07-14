@@ -15,7 +15,14 @@
 #include <boost/assert.hpp>
 #include <boost/thread/exceptions.hpp>
 #include <boost/detail/interlocked.hpp>
+//#include <boost/detail/winapi/synchronization.hpp>
 #include <algorithm>
+
+#ifndef BOOST_THREAD_WIN32_HAS_GET_TICK_COUNT_64
+#if _WIN32_WINNT >= 0x0600 && ! defined _WIN32_WINNT_WS08
+#define BOOST_THREAD_WIN32_HAS_GET_TICK_COUNT_64
+#endif
+#endif
 
 #if defined( BOOST_USE_WINDOWS_H )
 # include <windows.h>
@@ -26,6 +33,11 @@ namespace boost
     {
         namespace win32
         {
+#ifdef BOOST_THREAD_WIN32_HAS_GET_TICK_COUNT_64
+            typedef unsigned long long ticks_type;
+#else
+            typedef unsigned long ticks_type;
+#endif
             typedef ULONG_PTR ulong_ptr;
             typedef HANDLE handle;
             unsigned const infinite=INFINITE;
@@ -33,6 +45,8 @@ namespace boost
             handle const invalid_handle_value=INVALID_HANDLE_VALUE;
             unsigned const event_modify_state=EVENT_MODIFY_STATE;
             unsigned const synchronize=SYNCHRONIZE;
+            unsigned const wait_abandoned=WAIT_ABANDONED;
+
 
 # ifdef BOOST_NO_ANSI_APIS
             using ::CreateMutexW;
@@ -61,6 +75,11 @@ namespace boost
             using ::Sleep;
             using ::QueueUserAPC;
             using ::GetTickCount;
+#ifdef BOOST_THREAD_WIN32_HAS_GET_TICK_COUNT_64
+            using ::GetTickCount64;
+#else
+            inline ticks_type GetTickCount64() { return GetTickCount(); }
+#endif
         }
     }
 }
@@ -88,13 +107,18 @@ typedef void* HANDLE;
 #  endif
 # endif
 
+
 namespace boost
 {
     namespace detail
     {
         namespace win32
         {
-
+#ifdef BOOST_THREAD_WIN32_HAS_GET_TICK_COUNT_64
+            typedef unsigned long long ticks_type;
+#else
+            typedef unsigned long ticks_type;
+#endif
 # ifdef _WIN64
             typedef unsigned __int64 ulong_ptr;
 # else
@@ -106,6 +130,7 @@ namespace boost
             handle const invalid_handle_value=(handle)(-1);
             unsigned const event_modify_state=2;
             unsigned const synchronize=0x100000u;
+            unsigned const wait_abandoned=0x00000080u;
 
             extern "C"
             {
@@ -133,7 +158,9 @@ namespace boost
                 __declspec(dllimport) unsigned long __stdcall QueueUserAPC(queue_user_apc_callback_function,void*,ulong_ptr);
 
                 __declspec(dllimport) unsigned long __stdcall GetTickCount();
-
+# ifdef BOOST_THREAD_WIN32_HAS_GET_TICK_COUNT_64
+                __declspec(dllimport) ticks_type __stdcall GetTickCount64();
+# endif
 # ifndef UNDER_CE
                 __declspec(dllimport) unsigned long __stdcall GetCurrentProcessId();
                 __declspec(dllimport) unsigned long __stdcall GetCurrentThreadId();
@@ -150,6 +177,9 @@ namespace boost
                 using ::ResetEvent;
 # endif
             }
+# ifndef BOOST_THREAD_WIN32_HAS_GET_TICK_COUNT_64
+            inline ticks_type GetTickCount64() { return GetTickCount(); }
+# endif
         }
     }
 }
@@ -232,7 +262,7 @@ namespace boost
                 BOOST_VERIFY(ReleaseSemaphore(semaphore,count,0)!=0);
             }
 
-            class handle_manager
+            class BOOST_THREAD_DECL handle_manager
             {
             private:
                 handle handle_to_manage;

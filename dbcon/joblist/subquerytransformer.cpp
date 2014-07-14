@@ -41,6 +41,7 @@ using namespace logging;
 
 #include "jobstep.h"
 #include "jlf_common.h"
+#include "jlf_tuplejoblist.h"
 #include "distributedenginecomm.h"
 #include "expressionstep.h"
 #include "tuplehashjoin.h"
@@ -86,6 +87,9 @@ SubQueryTransformer::~SubQueryTransformer()
 SJSTEP& SubQueryTransformer::makeSubQueryStep(execplan::CalpontSelectExecutionPlan* csep,
                                               bool subInFromClause)
 {
+	if (fOutJobInfo->trace)
+		cout << (*csep) << endl;
+
 	// Setup job info, job list and error status relation.
 	fSubJobInfo = new JobInfo(fOutJobInfo->rm);
 	fSubJobInfo->sessionId = fOutJobInfo->sessionId;
@@ -105,7 +109,7 @@ SJSTEP& SubQueryTransformer::makeSubQueryStep(execplan::CalpontSelectExecutionPl
 	fOutJobInfo->subNum++;
 	fSubJobInfo->subCount = fOutJobInfo->subCount;
 	fSubJobInfo->subId = ++(*(fSubJobInfo->subCount));
-	fSubJobInfo->pSubId = fOutJobInfo->subId;
+	fSubJobInfo->pJobInfo = fOutJobInfo;
 	fSubJobList.reset(new TupleJobList(true));
 	fSubJobList->priority(csep->priority());
 	fSubJobInfo->projectingTableOID = fSubJobList->projectingTableOIDPtr();
@@ -114,6 +118,13 @@ SJSTEP& SubQueryTransformer::makeSubQueryStep(execplan::CalpontSelectExecutionPl
 	fSubJobInfo->localQuery = fOutJobInfo->localQuery;
 	fSubJobInfo->uuid = fOutJobInfo->uuid;
 	fOutJobInfo->jobListPtr->addSubqueryJobList(fSubJobList);
+
+	fSubJobInfo->smallSideLimit = fOutJobInfo->smallSideLimit;
+	fSubJobInfo->largeSideLimit = fOutJobInfo->largeSideLimit;
+	fSubJobInfo->smallSideUsage = fOutJobInfo->smallSideUsage;
+	fSubJobInfo->partitionSize = fOutJobInfo->partitionSize;
+	fSubJobInfo->umMemLimit = fOutJobInfo->umMemLimit;
+	fSubJobInfo->isDML = fOutJobInfo->isDML;
 
 	// Update v-table's alias.
 	fVtable.name("$sub");
@@ -126,7 +137,7 @@ SJSTEP& SubQueryTransformer::makeSubQueryStep(execplan::CalpontSelectExecutionPl
 			<< "_" << fOutJobInfo->subNum;
 		fVtable.alias(oss.str());
 	}
-	fSubJobInfo->subAlias = fVtable.alias(); //@bug5844, unique alias for sub 
+	fSubJobInfo->subAlias = fVtable.alias(); //@bug5844, unique alias for sub
 
 	// Make the jobsteps out of the execution plan.
 	JobStepVector querySteps;
@@ -141,7 +152,6 @@ SJSTEP& SubQueryTransformer::makeSubQueryStep(execplan::CalpontSelectExecutionPl
 
 	if (fSubJobInfo->trace)
 	{
-		cout << (*csep) << endl;
 		ostringstream oss;
 		oss << boldStart
 			<< "\nsubquery " << fSubJobInfo->subLevel << "." << fOutJobInfo->subNum << " steps:"
@@ -192,7 +202,9 @@ SJSTEP& SubQueryTransformer::makeSubQueryStep(execplan::CalpontSelectExecutionPl
 	const RowGroup& rg = fSubJobList->getOutputRowGroup();
 	Row row;
 	rg.initRow(&row);
-	for (uint64_t i = 0; i < fSubReturnedCols.size(); i++)
+	uint64_t outputCols = rg.getColumnCount() < fSubReturnedCols.size() ?
+	                      rg.getColumnCount() : fSubReturnedCols.size() ;
+	for (uint64_t i = 0; i < outputCols; i++)
 	{
 		fVtable.addColumn(fSubReturnedCols[i]);
 
@@ -230,12 +242,16 @@ SJSTEP& SubQueryTransformer::makeSubQueryStep(execplan::CalpontSelectExecutionPl
 		// build tuple info to export to outer query
 		TupleInfo ti(setTupleInfo(fVtable.columnType(i), fVtable.columnOid(i), *fOutJobInfo,
 									tblOid, fVtable.columns()[i].get(), alias));
-		pos.push_back(pos.back() + ti.width);
-		oids.push_back(ti.oid);
-		keys.push_back(ti.key);
-		types.push_back(ti.dtype);
-		scale.push_back(ti.scale);
-		precision.push_back(ti.precision);
+
+		if (i < rg.getColumnCount())
+		{
+			pos.push_back(pos.back() + ti.width);
+			oids.push_back(ti.oid);
+			keys.push_back(ti.key);
+			types.push_back(ti.dtype);
+			scale.push_back(ti.scale);
+			precision.push_back(ti.precision);
+		}
 
 		fOutJobInfo->vtableColTypes[UniqId(fVtable.columnOid(i), fVtable.alias(), "", "")] =
 				fVtable.columnType(i);
@@ -288,6 +304,10 @@ void SubQueryTransformer::updateCorrelateInfo()
 	set<uint32_t> subTables;
 	for (uint64_t i = 0; i < fSubJobInfo->tableList.size(); i++)
 		subTables.insert(fSubJobInfo->tableList[i]);
+
+	// any function joins
+	fOutJobInfo->functionJoins.insert(fOutJobInfo->functionJoins.end(),
+	    fSubJobInfo->functionJoins.begin(), fSubJobInfo->functionJoins.end());
 
 	// Update correlated steps
 	const map<UniqId, uint32_t>& subMap = fVtable.columnMap();
@@ -349,6 +369,10 @@ void SubQueryTransformer::updateCorrelateInfo()
 		}
 		else if (es)
 		{
+			// already handled by function join
+			if (es->functionJoin())
+				continue;
+
 			vector<ReturnedColumn*>& scList = es->columns();
 			vector<CalpontSystemCatalog::OID>& tableOids = es->tableOids();
 			vector<string>& aliases = es->aliases();
@@ -356,6 +380,8 @@ void SubQueryTransformer::updateCorrelateInfo()
 			vector<string>& schemas = es->schemas();
 			vector<uint32_t>& tableKeys = es->tableKeys();
 			vector<uint32_t>& columnKeys = es->columnKeys();
+
+			// update simple columns
 			for (uint64_t j = 0; j < scList.size(); j++)
 			{
 				SimpleColumn* sc = dynamic_cast<SimpleColumn*>(scList[j]);
@@ -386,11 +412,6 @@ void SubQueryTransformer::updateCorrelateInfo()
 					}
 					else
 					{
-						if ((sc->joinInfo() & JOIN_CORRELATED) != 0)
-						{
-							sc->joinInfo(0);
-						}
-
 						const CalpontSystemCatalog::ColType&
 							ct = fOutJobInfo->keyInfo->colType[columnKeys[j]];
 						sc->joinInfo(0);
@@ -423,6 +444,45 @@ void SubQueryTransformer::updateCorrelateInfo()
 			}
 
 			es->updateColumnOidAlias(*fOutJobInfo);
+
+			// update function join info
+			boost::shared_ptr<FunctionJoinInfo>& fji = es->functionJoinInfo();
+			if (fji && fji->fCorrelatedSide)
+			{
+				// replace sub side with a virtual column
+				int64_t subSide = (fji->fCorrelatedSide == 1) ? 1 : 0;
+				ReturnedColumn* rc = fji->fExpression[subSide];
+				SimpleColumn*   sc = dynamic_cast<SimpleColumn*>(rc);
+				if (sc == NULL)
+				{
+					UniqId colId = UniqId(rc->expressionId(), "", "", "");
+					const map<UniqId, uint32_t>::const_iterator k = subMap.find(colId);
+					if (k == subMap.end())
+							throw IDBExcept(logging::ERR_NON_SUPPORT_SUB_QUERY_TYPE);
+
+					SSC vc = fVtable.columns()[k->second];
+					sc = vc.get();
+				}
+
+				// virtual table info in outer query
+				TupleInfo ti(setTupleInfo(sc->colType(), sc->oid(), *fOutJobInfo,
+				                          fVtable.tableOid(), sc, fVtable.alias()));
+
+				set<uint32_t> cids;
+				cids.insert(ti.key);
+				fji->fJoinKey[subSide]  = ti.key;
+				fji->fTableKey[subSide]  = ti.tkey;
+				fji->fColumnKeys[subSide] = cids;
+				fji->fTableOid[subSide]  = fVtable.tableOid();
+				fji->fAlias[subSide]    = fVtable.alias();
+				fji->fView[subSide]      = fVtable.view();
+				fji->fSchema[subSide]    = "";
+
+				// turn off correlated flag
+				fji->fExpression[fji->fCorrelatedSide-1]->joinInfo(0);
+				fji->fJoinType ^= CORRELATED;
+				fji->fJoinId = 0;
+			}
 		}
 		else
 		{

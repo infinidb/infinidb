@@ -35,14 +35,17 @@ typedef std::vector<ChildModule> ChildModuleList;
 
 extern bool waitForActive();
 extern void dbrmDirCheck();
-extern void mysqlSetup();
+extern void mysqlSetup(bool EM = false);
 extern int sendMsgProcMon( std::string module, ByteStream msg, int requestID, int timeout );
 extern int sendUpgradeRequest(int IserverTypeInstall, bool pmwithum);
 extern int sendReplicationRequest(int IserverTypeInstall, std::string password, std::string mysqlPort);
 extern void checkFilesPerPartion(int DBRootCount, Config* sysConfig);
-extern void checkMysqlPort( string& mysqlPort, Config* sysConfig );
+extern void checkMysqlPort( string& mysqlPort, Config* sysConfig, bool EM = false);
 extern bool writeConfig(Config* sysConfig);
-extern void checkSystemMySQLPort(std::string& mysqlPort, Config* sysConfig, std::string USER, std::string password, ChildModuleList childmodulelist, int IserverTypeInstall, bool pmwithum);
+extern void checkSystemMySQLPort(std::string& mysqlPort, Config* sysConfig, std::string USER, std::string password, ChildModuleList childmodulelist, int IserverTypeInstall, bool pmwithum, bool EM = false);
+extern const char* callReadline(string prompt);
+extern void callFree(const char* );
+
 
 
 

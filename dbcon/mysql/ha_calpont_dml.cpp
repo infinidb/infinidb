@@ -64,6 +64,7 @@ using namespace messageqcpp;
 using namespace config;
 
 #include "calpontsystemcatalog.h"
+using namespace execplan;
 
 #include "resourcemanager.h"
 using namespace joblist;
@@ -77,6 +78,7 @@ namespace
 ResourceManager rm;
 uint64_t fBatchInsertGroupRows = rm.getRowsPerBatch();
 bool useHdfs = rm.useHdfs();
+
 //convenience fcn
 inline uint32_t tid2sid(const uint32_t tid)
 {
@@ -224,6 +226,7 @@ uint32_t buildValueList (TABLE* table, cal_connection_info& ci )
 	size = ci.tableValuesMap[0].size();
 	return size;
 }
+
 
 int ProcessCommandStatement(THD *thd, string& dmlStatement, cal_connection_info& ci, std::string schema="")
 {
@@ -411,6 +414,7 @@ int doProcessInsertValues ( TABLE* table, uint32_t size, cal_connection_info& ci
 				{
 					delete ci.dmlProc;
 					ci.dmlProc = new MessageQueueClient("DMLProc");
+					//cout << "doProcessInsertValues starts a client " << ci.dmlProc << " for session " << thd->thread_id << endl;
 					try
 					{
 						ci.dmlProc->write(bytestream);
@@ -453,6 +457,7 @@ int doProcessInsertValues ( TABLE* table, uint32_t size, cal_connection_info& ci
 			{
 				delete ci.dmlProc;
 				ci.dmlProc = new MessageQueueClient("DMLProc");
+				//cout << "doProcessInsertValues exception starts a client " << ci.dmlProc << " for session " << thd->thread_id << endl;
 				try
 				{
 					ci.dmlProc->write(bytestream);
@@ -678,6 +683,854 @@ int ha_calpont_impl_write_row_(uchar *buf, TABLE* table, cal_connection_info& ci
 	{
 		return rc;
 	}	
+}
+
+int ha_calpont_impl_write_batch_row_(uchar *buf, TABLE* table, cal_impl_if::cal_connection_info& ci)
+{
+	ByteStream rowData;
+	int rc = 0;
+	//std::ostringstream  data;
+    bool nullVal = false;
+    uchar *bufHdr = buf;
+    uint16_t colpos = 0;
+    uint16_t hdrLen = 0;
+    buf  = buf + ci.headerLength;  
+    //char delimiter = '|';
+    //char delimiter = '\7';
+    while ((hdrLen < ci.headerLength) && (colpos < ci.columnTypes.size())) //test bitmap for null values
+    {
+		char tmp = *bufHdr++;
+		hdrLen++;
+		uint8_t numLoop = 7;
+		if ((ci.useXbit) || (colpos > 6))
+			numLoop++;
+			
+		for (uint8_t i = 0; i < numLoop; i++)
+		{
+			if (colpos == ci.columnTypes.size())
+				break;
+				
+			//if a column has not null constraint, it will not be in the bit map
+			if (ci.columnTypes[colpos].constraintType != CalpontSystemCatalog::NOTNULL_CONSTRAINT)
+			{
+				if (!ci.useXbit && (colpos == 0))
+				{
+					tmp = tmp>>1;
+				}
+				nullVal = tmp & 0x01;
+				tmp = tmp>>1;
+			}
+			else
+				nullVal = false;
+				
+			switch (ci.columnTypes[colpos].colDataType)
+			{
+				case CalpontSystemCatalog::DATE: //date fetch
+				{
+				
+					if (nullVal && (ci.columnTypes[colpos].constraintType != CalpontSystemCatalog::NOTNULL_CONSTRAINT))
+					{
+						fprintf(ci.filePtr, "%c", ci.delimiter);
+					}
+					else
+					{
+						uchar *tmp1 = buf;
+						uint32_t tmp = (tmp1[2] << 16) + (tmp1[1] << 8) + tmp1[0];
+				
+						int day = tmp & 0x0000001fl;
+						int month = (tmp >> 5) & 0x0000000fl;
+						int year = tmp >> 9;
+						fprintf(ci.filePtr, "%04d-%02d-%02d%c", year,month,day,ci.delimiter);
+					}
+					buf += 3;
+					break;
+				}
+				case CalpontSystemCatalog::DATETIME:
+				{
+					if (nullVal && (ci.columnTypes[colpos].constraintType != CalpontSystemCatalog::NOTNULL_CONSTRAINT))
+					{
+						fprintf(ci.filePtr, "%c", ci.delimiter);
+					}
+					else
+					{
+						long long value = *((long long*) buf);
+						long datePart = (long) (value/1000000ll);
+						int day = datePart % 100;
+						int month = (datePart/100) % 100;
+						int year = datePart/10000;
+						fprintf(ci.filePtr, "%04d-%02d-%02d ", year,month,day);
+				
+						long timePart = (long) (value - (long long) datePart*1000000ll);
+						int second = timePart % 100;
+						int min = (timePart/100) % 100;
+						int hour = timePart/10000;
+						fprintf(ci.filePtr, "%02d:%02d:%02d%c", hour,min,second, ci.delimiter);
+					}
+					buf += 8;
+					break;
+				}
+				case CalpontSystemCatalog::CHAR:
+				{
+					if (nullVal && (ci.columnTypes[colpos].constraintType != CalpontSystemCatalog::NOTNULL_CONSTRAINT))
+					{
+						fprintf(ci.filePtr, "%c", ci.delimiter);
+					}
+					else
+						fprintf(ci.filePtr, "%.*s%c", ci.columnTypes[colpos].colWidth, buf, ci.delimiter); 
+						
+					if (ci.utf8)
+						buf += (ci.columnTypes[colpos].colWidth * 3);
+					else
+						buf += ci.columnTypes[colpos].colWidth;
+					break;
+				}
+				case CalpontSystemCatalog::VARCHAR:
+				{
+					if (nullVal && (ci.columnTypes[colpos].constraintType != CalpontSystemCatalog::NOTNULL_CONSTRAINT))
+					{
+						fprintf(ci.filePtr, "%c", ci.delimiter);
+						if (!ci.utf8)
+						{
+							if (ci.columnTypes[colpos].colWidth < 256)
+							{
+								buf++;
+							}
+							else
+							{
+								buf = buf + 2 ;
+							}
+						}
+						else //utf8
+						{
+							if (ci.columnTypes[colpos].colWidth < 86)
+							{
+								buf++;
+							}
+							else
+							{
+								buf = buf + 2 ;
+							}
+						}
+					}
+					else
+					{
+						int dataLength = 0;
+						if (!ci.utf8)
+						{
+							if (ci.columnTypes[colpos].colWidth < 256)
+							{
+								dataLength = *(int8_t*) buf;
+								buf++;
+							}
+							else
+							{
+								dataLength = *(int16_t*) buf;
+								buf = buf + 2 ;
+							}
+							fprintf(ci.filePtr, "%.*s%c", dataLength, buf, ci.delimiter); 							
+						}
+						else //utf8
+						{
+							if (ci.columnTypes[colpos].colWidth < 86)
+							{
+								dataLength = *(int8_t*) buf;
+								buf++;
+							}
+							else
+							{
+								dataLength = *(uint16_t*) buf;
+								buf = buf + 2 ;
+							}
+							if ( dataLength > ci.columnTypes[colpos].colWidth)
+								dataLength = ci.columnTypes[colpos].colWidth;
+							
+							fprintf(ci.filePtr, "%.*s%c", dataLength, buf, ci.delimiter); 
+						}
+					}
+					//buf += ci.columnTypes[colpos].colWidth;
+					if (ci.utf8)
+						buf += (ci.columnTypes[colpos].colWidth * 3);
+					else
+						buf += ci.columnTypes[colpos].colWidth;
+					
+					break;
+				}
+				case CalpontSystemCatalog::BIGINT:
+				{
+					if (nullVal && (ci.columnTypes[colpos].constraintType != CalpontSystemCatalog::NOTNULL_CONSTRAINT))
+						fprintf(ci.filePtr, "%c", ci.delimiter);
+					else
+						fprintf(ci.filePtr, "%lld%c", *((long long*)buf), ci.delimiter);
+						
+					buf += 8;
+					break;
+				}
+				case CalpontSystemCatalog::UBIGINT:
+				{
+					if (nullVal && (ci.columnTypes[colpos].constraintType != CalpontSystemCatalog::NOTNULL_CONSTRAINT))
+						fprintf(ci.filePtr, "%c", ci.delimiter);
+					else
+						fprintf(ci.filePtr, "%llu%c", *((long long unsigned*)buf), ci.delimiter);
+					buf += 8;
+					break;
+				}
+				case CalpontSystemCatalog::INT:
+				{
+					if (nullVal && (ci.columnTypes[colpos].constraintType != CalpontSystemCatalog::NOTNULL_CONSTRAINT))
+						fprintf(ci.filePtr, "%c", ci.delimiter);
+					else
+						fprintf(ci.filePtr, "%d%c", *((int32_t*)buf), ci.delimiter);
+					buf += 4;
+					break;
+				}
+				case CalpontSystemCatalog::UINT:
+				{
+					if (nullVal && (ci.columnTypes[colpos].constraintType != CalpontSystemCatalog::NOTNULL_CONSTRAINT))
+						fprintf(ci.filePtr, "%c", ci.delimiter);
+					else
+					{
+						fprintf(ci.filePtr, "%u%c", *((uint32_t*)buf), ci.delimiter);
+						//printf("%u|", *((uint32_t*)buf));
+						//cout << *((uint32_t*)buf) << endl;
+					}
+					buf += 4;
+					break;
+				}
+				case CalpontSystemCatalog::SMALLINT:
+				{
+					if (nullVal && (ci.columnTypes[colpos].constraintType != CalpontSystemCatalog::NOTNULL_CONSTRAINT))
+						fprintf(ci.filePtr, "%c", ci.delimiter);
+					else
+						fprintf(ci.filePtr, "%d%c", *((int16_t*)buf), ci.delimiter);
+					buf += 2;
+					break;
+				}
+				case CalpontSystemCatalog::USMALLINT:
+				{
+					if (nullVal && (ci.columnTypes[colpos].constraintType != CalpontSystemCatalog::NOTNULL_CONSTRAINT))
+						fprintf(ci.filePtr, "%c", ci.delimiter);
+					else
+						fprintf(ci.filePtr, "%u%c", *((uint16_t*)buf), ci.delimiter);
+					buf += 2;
+					break;
+				}
+				case CalpontSystemCatalog::TINYINT:
+				{
+					if (nullVal && (ci.columnTypes[colpos].constraintType != CalpontSystemCatalog::NOTNULL_CONSTRAINT))
+						fprintf(ci.filePtr, "%c", ci.delimiter);
+					else
+						fprintf(ci.filePtr, "%d%c", *((int8_t*)buf), ci.delimiter);
+					buf += 1;
+					break;
+				}
+				case CalpontSystemCatalog::UTINYINT:
+				{
+					if (nullVal && (ci.columnTypes[colpos].constraintType != CalpontSystemCatalog::NOTNULL_CONSTRAINT))
+						fprintf(ci.filePtr, "%c", ci.delimiter);
+					else
+						fprintf(ci.filePtr, "%u%c", *((uint8_t*)buf), ci.delimiter);
+					buf += 1;
+					break;
+				}
+				case CalpontSystemCatalog::FLOAT:
+				case CalpontSystemCatalog::UFLOAT:
+				{
+					if (nullVal && (ci.columnTypes[colpos].constraintType != CalpontSystemCatalog::NOTNULL_CONSTRAINT))
+						fprintf(ci.filePtr, "%c", ci.delimiter);
+					else
+					{
+						float val = *((float*)buf);
+						if ((fabs(val) > (1.0 / IDB_pow[4])) && (fabs(val) < (float) IDB_pow[6]))
+						{
+							fprintf(ci.filePtr, "%.7f%c", val, ci.delimiter);
+						}
+						else
+						{
+							fprintf(ci.filePtr, "%e%c", val, ci.delimiter);
+						}
+						
+						
+						//fprintf(ci.filePtr, "%.7g|", *((float*)buf));
+						//printf("%.7f|", *((float*)buf));
+					}
+					buf += 4;
+					break;
+				}
+				case CalpontSystemCatalog::DOUBLE:
+				case CalpontSystemCatalog::UDOUBLE:
+				{
+					if (nullVal && (ci.columnTypes[colpos].constraintType != CalpontSystemCatalog::NOTNULL_CONSTRAINT))
+						fprintf(ci.filePtr, "%c", ci.delimiter);
+					else
+					{
+						fprintf(ci.filePtr, "%.15g%c", *((double*)buf), ci.delimiter);
+						//printf("%.15g|", *((double*)buf));
+					}
+					buf += 8;
+					break;
+				}
+				case CalpontSystemCatalog::DECIMAL:
+				case CalpontSystemCatalog::UDECIMAL:
+				{
+					uint bytesBefore = 1;
+					uint totalBytes = 9;
+						
+					switch (ci.columnTypes[colpos].precision)
+					{
+						case 18:
+						case 17:
+						case 16:
+						{
+							totalBytes = 8;
+							break;
+						}
+						case 15:
+						case 14:
+						{
+							totalBytes = 7;
+							break;	
+						}
+						case 13:
+						case 12:
+						{
+							totalBytes =  6;
+							break;
+						}
+						case 11:
+						{
+							totalBytes =  5;
+							break;
+						}
+						case 10:
+						{
+							totalBytes =  5;
+							break;
+						}
+						case 9:
+						case 8:
+						case 7:
+						{
+							totalBytes =  4;
+							break;
+						}
+						case 6:
+						case 5:
+						{
+							totalBytes = 3;
+							break;
+						}
+						case 4:
+						case 3:
+						{
+							totalBytes =  2;
+							break;
+						}
+						case 2:
+						case 1:
+						{
+							totalBytes = 1;
+							break;
+						}
+						default:
+							break;
+					}
+				
+					switch (ci.columnTypes[colpos].scale)
+					{
+						case 0:
+						{
+							bytesBefore = totalBytes;
+							break;
+						}
+						case 1: //1 byte for digits after decimal point
+						{	
+							if ((ci.columnTypes[colpos].precision != 16) && (ci.columnTypes[colpos].precision != 14)
+								&& (ci.columnTypes[colpos].precision != 12) && (ci.columnTypes[colpos].precision != 10)
+								&& (ci.columnTypes[colpos].precision != 7) && (ci.columnTypes[colpos].precision != 5)
+								&& (ci.columnTypes[colpos].precision != 3) && (ci.columnTypes[colpos].precision != 1))		
+								totalBytes++;				  
+							bytesBefore = totalBytes-1;
+							break;		
+						}
+						case 2: //1 byte for digits after decimal point
+						{
+							if ((ci.columnTypes[colpos].precision == 18) || (ci.columnTypes[colpos].precision == 9))
+								totalBytes++;
+							bytesBefore = totalBytes-1;
+							break;	
+						}
+					case 3: //2 bytes for digits after decimal point
+					{
+						if ((ci.columnTypes[colpos].precision != 16) && (ci.columnTypes[colpos].precision != 14)
+							&& (ci.columnTypes[colpos].precision != 12) && (ci.columnTypes[colpos].precision != 7)
+							&& (ci.columnTypes[colpos].precision != 5) && (ci.columnTypes[colpos].precision != 3)) 
+							totalBytes++;
+							
+						bytesBefore = totalBytes-2;
+						break;
+					}
+					case 4:
+					{
+						if ((ci.columnTypes[colpos].precision == 18) || (ci.columnTypes[colpos].precision == 11)
+							|| (ci.columnTypes[colpos].precision == 9)) 
+							totalBytes++;
+						bytesBefore = totalBytes-2;
+						break;
+								
+					}
+					case 5:
+					{
+						if ((ci.columnTypes[colpos].precision != 16) && (ci.columnTypes[colpos].precision != 14)
+							&& (ci.columnTypes[colpos].precision != 7) && (ci.columnTypes[colpos].precision != 5))
+							totalBytes++;
+						bytesBefore = totalBytes-3;
+						break;
+					}
+					case 6:
+					{
+						if ((ci.columnTypes[colpos].precision == 18) || (ci.columnTypes[colpos].precision == 13)
+							|| (ci.columnTypes[colpos].precision == 11) || (ci.columnTypes[colpos].precision == 9))
+							totalBytes++;
+						bytesBefore = totalBytes-3;
+						break;
+					}
+					case 7:
+					{
+						if ((ci.columnTypes[colpos].precision != 16) && (ci.columnTypes[colpos].precision != 7))
+							totalBytes++;
+						bytesBefore = totalBytes-4;
+						break;
+					}
+					case 8:
+					{
+						if ((ci.columnTypes[colpos].precision == 18) || (ci.columnTypes[colpos].precision == 15)
+							|| (ci.columnTypes[colpos].precision == 13) || (ci.columnTypes[colpos].precision == 11)
+							|| (ci.columnTypes[colpos].precision == 9))
+							totalBytes++;
+						bytesBefore = totalBytes-4;;
+						break;
+					}
+					case 9:
+					{
+						bytesBefore = totalBytes-4;;
+						break;
+					}
+					case 10:
+					{
+						if ((ci.columnTypes[colpos].precision != 16) && (ci.columnTypes[colpos].precision != 14)
+							&& (ci.columnTypes[colpos].precision != 12) && (ci.columnTypes[colpos].precision != 10))
+							totalBytes++;
+						bytesBefore = totalBytes-5;;
+						break;
+					}
+					case 11:
+					{
+						if (ci.columnTypes[colpos].precision == 18)
+							totalBytes++;	
+						bytesBefore = totalBytes-5;
+						break;
+					}
+					case 12:
+					{
+						if ((ci.columnTypes[colpos].precision != 16) && (ci.columnTypes[colpos].precision != 14)
+							&& (ci.columnTypes[colpos].precision != 12))
+							totalBytes++;
+						bytesBefore = totalBytes-6;
+						break;
+					}
+					case 13:
+					{
+						if (ci.columnTypes[colpos].precision == 18)
+							totalBytes++;
+						bytesBefore = totalBytes-6;
+						break;
+					}
+					case 14:
+					{
+						if ((ci.columnTypes[colpos].precision != 16) && (ci.columnTypes[colpos].precision != 14))
+							totalBytes++;
+						bytesBefore = totalBytes-7;
+						break;
+					}
+					case 15:
+					{
+						if (ci.columnTypes[colpos].precision == 18)
+							totalBytes++;
+						bytesBefore = totalBytes-7;
+						break;
+					}
+					case 16:
+					{
+						if (ci.columnTypes[colpos].precision != 16)
+							totalBytes++;
+						bytesBefore = totalBytes-8;
+						break;
+					}
+					case 17:
+					{
+						if (ci.columnTypes[colpos].precision == 18)
+							totalBytes++;
+						bytesBefore = totalBytes-8;
+						break;
+					}
+					case 18:
+					{
+						bytesBefore = totalBytes-8;		
+						break;
+					}
+					default:
+						break;
+				}
+				
+				if (nullVal && (ci.columnTypes[colpos].constraintType != CalpontSystemCatalog::NOTNULL_CONSTRAINT))
+				{
+					fprintf(ci.filePtr, "%c", ci.delimiter);
+					//printf("|");
+				}
+				else
+				{
+					uint32_t mask [5] = {0, 0xFF, 0xFFFF, 0xFFFFFF, 0xFFFFFFFF};
+					char neg = '-';
+					
+					if (ci.columnTypes[colpos].scale == 0)
+					{					
+						uchar* tmpBuf = buf;
+						//test flag bit for sign
+						bool posNum  = tmpBuf[0] & (0x80);					
+						tmpBuf[0] ^= 0x80; //flip the bit
+						int32_t tmp1 = tmpBuf[0];
+								
+						if (totalBytes > 4)
+						{
+							for (uint i=1; i<(totalBytes-4); i++)
+							{
+								tmp1 = (tmp1 << 8) + tmpBuf[i];
+							}	
+							if (( tmp1 != 0 ) && (tmp1 != -1))
+							{
+								if (!posNum)
+								{
+									tmp1 = mask[totalBytes-4] - tmp1;
+									if(tmp1 != 0)
+									{
+										fprintf(ci.filePtr, "%c", neg);
+										//printf("%c", neg);
+									}
+								}
+								if(tmp1 != 0)
+								{	
+									fprintf(ci.filePtr, "%d", tmp1);
+									////printf("%d", tmp1);
+								}
+							}
+
+							int32_t tmp2 = tmpBuf[totalBytes-4];
+							for (uint i=(totalBytes-3); i<totalBytes; i++) 
+							{
+								tmp2 = (tmp2 << 8) + tmpBuf[i];
+							}
+							if ( tmp1 != 0 ) 
+							{
+								if (!posNum)
+								{
+									tmp2 = mask[4] - tmp2;
+									if (tmp1 == -1)
+									{
+										fprintf(ci.filePtr, "%c", neg);	
+										fprintf(ci.filePtr, "%d%c", tmp2, ci.delimiter);
+										////printf("%c", neg);	
+										//////printf( "%d|", tmp2);
+									}
+									else
+									{
+										fprintf(ci.filePtr, "%09u%c", tmp2, ci.delimiter);
+										////printf("%09u|", tmp2);
+									}
+								}
+								else
+								{
+									fprintf(ci.filePtr, "%09u%c", tmp2, ci.delimiter);
+									//printf("%09u|", tmp2);
+								}
+							}
+							else
+							{
+								if (!posNum)
+								{
+									tmp2 = mask[4] - tmp2;
+									fprintf(ci.filePtr, "%c", neg);
+									//printf("%c", neg);
+								}
+								fprintf(ci.filePtr, "%d%c", tmp2, ci.delimiter);
+								//printf("%d|", tmp2);
+							}													
+						}
+						else
+						{
+							for (uint i=1; i<totalBytes; i++)
+							{
+								tmp1 = (tmp1 << 8) + tmpBuf[i];
+							}
+							if (!posNum)
+							{
+								tmp1 = mask[totalBytes] - tmp1;
+								fprintf(ci.filePtr, "%c", neg);
+								//printf("%c", neg);
+							}		
+							fprintf(ci.filePtr, "%d%c", tmp1, ci.delimiter);
+							//printf("%d|", tmp1);
+						}
+					}
+					else
+					{
+						uchar* tmpBuf = buf;
+						//test flag bit for sign
+						bool posNum  = tmpBuf[0] & (0x80);					
+						tmpBuf[0] ^= 0x80; //flip the bit
+						int32_t tmp1 = tmpBuf[0];
+						//fetch the digits before decimal point
+						if (bytesBefore == 0)
+						{
+							if (!posNum)
+							{
+								fprintf(ci.filePtr, "%c", neg);
+								//printf("%c", neg);
+							}
+							fprintf(ci.filePtr, "0.");
+							//printf("0.");
+						}										
+						else if (bytesBefore > 4)
+						{
+							for (uint i=1; i<(bytesBefore-4); i++) 
+							{
+								tmp1 = (tmp1 << 8) + tmpBuf[i];
+							}
+							if (!posNum)
+							{
+								tmp1 = mask[bytesBefore-4] - tmp1;
+							}		
+							if (( tmp1 != 0 ) && (tmp1 != -1))
+							{
+								if (!posNum)
+								{
+									fprintf(ci.filePtr, "%c", neg);
+									//printf("%c", neg);
+								}
+									
+								fprintf(ci.filePtr, "%d", tmp1);
+								//printf("%d", tmp1);
+							}
+							tmpBuf += (bytesBefore-4);								
+							int32_t tmp2 = *((int32_t*)tmpBuf); 
+							tmp2 = ntohl(tmp2);
+							
+							if ( tmp1 != 0 ) 
+							{
+								if (!posNum)
+								{
+									tmp2 = mask[4] - tmp2;
+								}
+								if (tmp1 == -1)
+								{
+									fprintf(ci.filePtr, "%c", neg);	
+									fprintf(ci.filePtr, "%d.", tmp2);
+									//printf("%c", neg);	
+									//printf("%d.", tmp2);
+								}
+								else
+								{
+									fprintf(ci.filePtr, "%09u.", tmp2);
+									//printf("%09u.", tmp2);
+								}
+							}
+							else
+							{
+								if (!posNum)
+								{
+									tmp2 = mask[4] - tmp2;
+									fprintf(ci.filePtr, "%c", neg);
+									//printf("%c", neg);
+								}
+								fprintf(ci.filePtr, "%d.", tmp2);
+								//printf("%d.", tmp2);
+							}
+						}
+						else
+						{
+							for (uint i=1; i<bytesBefore; i++) 
+							{
+								tmp1 = (tmp1 << 8) + tmpBuf[i];
+							}
+							if (!posNum)
+							{
+								tmp1 = mask[bytesBefore] - tmp1;
+								fprintf(ci.filePtr, "%c", neg);
+								//printf("%c", neg);
+							} 
+							fprintf(ci.filePtr, "%d.", tmp1);
+							//printf("%d.", tmp1);
+						}
+								
+						//fetch the digits after decimal point
+						int32_t tmp2 = 0;
+						
+						if (bytesBefore > 4)
+							tmpBuf += 4;
+						else
+							tmpBuf += bytesBefore;
+							
+						tmp2 = tmpBuf[0];
+						if ((totalBytes-bytesBefore) < 5)
+						{
+							for (uint j=1; j < (totalBytes-bytesBefore); j++)
+							{
+								tmp2 = (tmp2<<8) + tmpBuf[j];
+							}
+							int8_t digits = ci.columnTypes[colpos].scale - 9; //9 digits is a 4 bytes chunk
+							if ( digits <= 0 )
+								digits = ci.columnTypes[colpos].scale;
+									
+							if (!posNum)
+							{					
+								tmp2 = mask[totalBytes-bytesBefore] - tmp2;
+							}	
+							fprintf(ci.filePtr, "%0*u%c", digits, tmp2, ci.delimiter);
+							//printf("%0*u|", digits, tmp2);
+						}
+						else
+						{
+							for (uint j=1; j < 4; j++)
+							{
+								tmp2 = (tmp2 << 8) +  tmpBuf[j];
+							}
+							if (!posNum)
+							{
+								tmp2 = mask[4] - tmp2;
+							} 
+							fprintf(ci.filePtr, "%09u", tmp2);
+							//printf("%09u", tmp2);
+						
+							tmpBuf += 4;
+							int32_t tmp3 = tmpBuf[0];
+							for (uint j=1; j < (totalBytes-bytesBefore-4); j++)
+							{
+								tmp3 = (tmp3 << 8) +  tmpBuf[j];
+							}
+							int8_t digits = ci.columnTypes[colpos].scale - 9; //9 digits is a 4 bytes chunk
+							if ( digits < 0 )
+								digits = ci.columnTypes[colpos].scale;
+										
+							if (!posNum)
+							{
+								tmp3 = mask[totalBytes-bytesBefore-4] - tmp3;
+							}	
+							fprintf(ci.filePtr, "%0*u%c", digits, tmp3, ci.delimiter);
+							//printf("%0*u|", digits, tmp3);
+						}
+					}
+				}				
+				buf += totalBytes;
+				break;
+			}
+			case CalpontSystemCatalog::VARBINARY:
+			{
+				if (nullVal && (ci.columnTypes[colpos].constraintType != CalpontSystemCatalog::NOTNULL_CONSTRAINT))
+				{
+					fprintf(ci.filePtr, "%c", ci.delimiter);
+					
+					if (!ci.utf8)
+					{
+						if (ci.columnTypes[colpos].colWidth < 256)
+						{
+							buf++;
+						}
+						else
+						{
+							buf = buf + 2 ;
+						}
+					}
+					else //utf8
+					{
+						if (ci.columnTypes[colpos].colWidth < 86)
+						{
+							buf++;
+						}
+						else
+						{
+							buf = buf + 2 ;
+						}
+					}
+				}
+				else
+				{
+					int dataLength = 0;
+					
+					if (!ci.utf8)
+					{
+						if (ci.columnTypes[colpos].colWidth < 256)
+						{
+							dataLength = *(int8_t*) buf;
+							buf++;
+						}
+						else
+						{
+							dataLength = *(int16_t*) buf;
+							buf = buf + 2 ;
+						}
+					
+						uchar* tmpBuf = buf;
+						for (int32_t i=0; i<dataLength; i++)
+						{
+							fprintf(ci.filePtr, "%02x", *(uint8_t*)tmpBuf); 
+							tmpBuf++;
+						}
+						fprintf(ci.filePtr, "%c", ci.delimiter);
+					}
+					else //utf8
+					{
+						if (ci.columnTypes[colpos].colWidth < 86)
+						{
+							dataLength = *(int8_t*) buf;
+							buf++;
+						}
+						else
+						{
+							dataLength = *(uint16_t*) buf;
+							buf = buf + 2 ;
+						}
+						if ( dataLength > ci.columnTypes[colpos].colWidth)
+							dataLength = ci.columnTypes[colpos].colWidth;
+							
+						uchar* tmpBuf = buf;
+						for (int32_t i=0; i<dataLength; i++)
+						{
+							fprintf(ci.filePtr, "%02x", *(uint8_t*)tmpBuf); 
+							tmpBuf++;
+						}
+						fprintf(ci.filePtr, "%c", ci.delimiter);
+					}
+				}
+					
+				if (ci.utf8)
+					buf += (ci.columnTypes[colpos].colWidth * 3);
+				else
+					buf += ci.columnTypes[colpos].colWidth;					
+				break;
+			}
+			default:	// treat as int64
+			{
+				break;
+			}
+		}
+			colpos++;
+		}
+	}
+    rc = fprintf(ci.filePtr, "\n"); //@bug 6077 check whether thhe pipe is still open
+    if ( rc < 0)
+		rc = -1;
+	else
+		rc = 0;
+	return rc;
 }
 
  std::string  ha_calpont_impl_viewtablelock( cal_impl_if::cal_connection_info& ci, execplan::CalpontSystemCatalog::TableName& tablename)

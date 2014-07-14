@@ -140,7 +140,7 @@ void STLPoolAllocator<T>::deallocate(typename STLPoolAllocator<T>::pointer p,
 template<class T>
 typename STLPoolAllocator<T>::size_type STLPoolAllocator<T>::max_size() const throw()
 {
-	return std::numeric_limits<uint32_t>::max()/sizeof(T);
+	return std::numeric_limits<uint64_t>::max()/sizeof(T);
 }
 
 template<class T>

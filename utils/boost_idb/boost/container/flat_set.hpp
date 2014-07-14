@@ -11,7 +11,7 @@
 #ifndef BOOST_CONTAINER_FLAT_SET_HPP
 #define BOOST_CONTAINER_FLAT_SET_HPP
 
-#if (defined _MSC_VER) && (_MSC_VER >= 1200)
+#if defined(_MSC_VER)
 #  pragma once
 #endif
 
@@ -25,8 +25,8 @@
 #include <boost/container/detail/flat_tree.hpp>
 #include <boost/container/detail/mpl.hpp>
 #include <boost/container/allocator_traits.hpp>
-#include <boost/move/move.hpp>
-#include <boost/move/move_helpers.hpp>
+#include <boost/move/utility.hpp>
+#include <boost/move/detail/move_helpers.hpp>
 
 namespace boost {
 namespace container {
@@ -51,9 +51,7 @@ inline bool operator<(const flat_set<Key,Compare,Allocator>& x,
 /// @endcond
 
 //! flat_set is a Sorted Associative Container that stores objects of type Key.
-//! flat_set is a Simple Associative Container, meaning that its value type,
-//! as well as its key type, is Key. It is also a Unique Associative Container,
-//! meaning that no two elements are the same.
+//! It is also a Unique Associative Container, meaning that no two elements are the same.
 //!
 //! flat_set is similar to std::set but it's implemented like an ordered vector.
 //! This means that inserting a new element into a flat_set invalidates
@@ -61,6 +59,8 @@ inline bool operator<(const flat_set<Key,Compare,Allocator>& x,
 //!
 //! Erasing an element of a flat_set invalidates iterators and references
 //! pointing to elements that come after (their keys are bigger) the erased element.
+//!
+//! This container provides random-access iterators.
 #ifdef BOOST_CONTAINER_DOXYGEN_INVOKED
 template <class Key, class Compare = std::less<Key>, class Allocator = std::allocator<Key> >
 #else
@@ -119,6 +119,13 @@ class flat_set
    explicit flat_set(const Compare& comp,
                      const allocator_type& a = allocator_type())
       : m_flat_tree(comp, a)
+   {}
+
+   //! <b>Effects</b>: Constructs an empty flat_set using the specified allocator.
+   //!
+   //! <b>Complexity</b>: Constant.
+   explicit flat_set(const allocator_type& a)
+      : m_flat_tree(a)
    {}
 
    //! <b>Effects</b>: Constructs an empty set using the specified comparison object and
@@ -197,7 +204,7 @@ class flat_set
    //!   was passed to the object's constructor.
    //!
    //! <b>Complexity</b>: Constant.
-   allocator_type get_allocator() const
+   allocator_type get_allocator() const BOOST_CONTAINER_NOEXCEPT
       { return m_flat_tree.get_allocator(); }
 
    //! <b>Effects</b>: Returns a reference to the internal allocator.
@@ -207,7 +214,7 @@ class flat_set
    //! <b>Complexity</b>: Constant.
    //!
    //! <b>Note</b>: Non-standard extension.
-   stored_allocator_type &get_stored_allocator()
+   stored_allocator_type &get_stored_allocator() BOOST_CONTAINER_NOEXCEPT
    {  return m_flat_tree.get_stored_allocator(); }
 
    //! <b>Effects</b>: Returns a reference to the internal allocator.
@@ -217,7 +224,7 @@ class flat_set
    //! <b>Complexity</b>: Constant.
    //!
    //! <b>Note</b>: Non-standard extension.
-   const stored_allocator_type &get_stored_allocator() const
+   const stored_allocator_type &get_stored_allocator() const BOOST_CONTAINER_NOEXCEPT
    {  return m_flat_tree.get_stored_allocator(); }
 
    //////////////////////////////////////////////
@@ -231,7 +238,7 @@ class flat_set
    //! <b>Throws</b>: Nothing.
    //!
    //! <b>Complexity</b>: Constant.
-   iterator begin()
+   iterator begin() BOOST_CONTAINER_NOEXCEPT
       { return m_flat_tree.begin(); }
 
    //! <b>Effects</b>: Returns a const_iterator to the first element contained in the container.
@@ -239,7 +246,7 @@ class flat_set
    //! <b>Throws</b>: Nothing.
    //!
    //! <b>Complexity</b>: Constant.
-   const_iterator begin() const
+   const_iterator begin() const BOOST_CONTAINER_NOEXCEPT
       { return m_flat_tree.begin(); }
 
    //! <b>Effects</b>: Returns an iterator to the end of the container.
@@ -247,7 +254,7 @@ class flat_set
    //! <b>Throws</b>: Nothing.
    //!
    //! <b>Complexity</b>: Constant.
-   iterator end()
+   iterator end() BOOST_CONTAINER_NOEXCEPT
       { return m_flat_tree.end(); }
 
    //! <b>Effects</b>: Returns a const_iterator to the end of the container.
@@ -255,7 +262,7 @@ class flat_set
    //! <b>Throws</b>: Nothing.
    //!
    //! <b>Complexity</b>: Constant.
-   const_iterator end() const
+   const_iterator end() const BOOST_CONTAINER_NOEXCEPT
       { return m_flat_tree.end(); }
 
    //! <b>Effects</b>: Returns a reverse_iterator pointing to the beginning
@@ -264,7 +271,7 @@ class flat_set
    //! <b>Throws</b>: Nothing.
    //!
    //! <b>Complexity</b>: Constant.
-   reverse_iterator rbegin()
+   reverse_iterator rbegin() BOOST_CONTAINER_NOEXCEPT
       { return m_flat_tree.rbegin(); }
 
    //! <b>Effects</b>: Returns a const_reverse_iterator pointing to the beginning
@@ -273,7 +280,7 @@ class flat_set
    //! <b>Throws</b>: Nothing.
    //!
    //! <b>Complexity</b>: Constant.
-   const_reverse_iterator rbegin() const
+   const_reverse_iterator rbegin() const BOOST_CONTAINER_NOEXCEPT
       { return m_flat_tree.rbegin(); }
 
    //! <b>Effects</b>: Returns a reverse_iterator pointing to the end
@@ -282,7 +289,7 @@ class flat_set
    //! <b>Throws</b>: Nothing.
    //!
    //! <b>Complexity</b>: Constant.
-   reverse_iterator rend()
+   reverse_iterator rend() BOOST_CONTAINER_NOEXCEPT
       { return m_flat_tree.rend(); }
 
    //! <b>Effects</b>: Returns a const_reverse_iterator pointing to the end
@@ -291,7 +298,7 @@ class flat_set
    //! <b>Throws</b>: Nothing.
    //!
    //! <b>Complexity</b>: Constant.
-   const_reverse_iterator rend() const
+   const_reverse_iterator rend() const BOOST_CONTAINER_NOEXCEPT
       { return m_flat_tree.rend(); }
 
    //! <b>Effects</b>: Returns a const_iterator to the first element contained in the container.
@@ -299,7 +306,7 @@ class flat_set
    //! <b>Throws</b>: Nothing.
    //!
    //! <b>Complexity</b>: Constant.
-   const_iterator cbegin() const
+   const_iterator cbegin() const BOOST_CONTAINER_NOEXCEPT
       { return m_flat_tree.cbegin(); }
 
    //! <b>Effects</b>: Returns a const_iterator to the end of the container.
@@ -307,7 +314,7 @@ class flat_set
    //! <b>Throws</b>: Nothing.
    //!
    //! <b>Complexity</b>: Constant.
-   const_iterator cend() const
+   const_iterator cend() const BOOST_CONTAINER_NOEXCEPT
       { return m_flat_tree.cend(); }
 
    //! <b>Effects</b>: Returns a const_reverse_iterator pointing to the beginning
@@ -316,7 +323,7 @@ class flat_set
    //! <b>Throws</b>: Nothing.
    //!
    //! <b>Complexity</b>: Constant.
-   const_reverse_iterator crbegin() const
+   const_reverse_iterator crbegin() const BOOST_CONTAINER_NOEXCEPT
       { return m_flat_tree.crbegin(); }
 
    //! <b>Effects</b>: Returns a const_reverse_iterator pointing to the end
@@ -325,7 +332,7 @@ class flat_set
    //! <b>Throws</b>: Nothing.
    //!
    //! <b>Complexity</b>: Constant.
-   const_reverse_iterator crend() const
+   const_reverse_iterator crend() const BOOST_CONTAINER_NOEXCEPT
       { return m_flat_tree.crend(); }
 
 
@@ -340,7 +347,7 @@ class flat_set
    //! <b>Throws</b>: Nothing.
    //!
    //! <b>Complexity</b>: Constant.
-   bool empty() const
+   bool empty() const BOOST_CONTAINER_NOEXCEPT
       { return m_flat_tree.empty(); }
 
    //! <b>Effects</b>: Returns the number of the elements contained in the container.
@@ -348,7 +355,7 @@ class flat_set
    //! <b>Throws</b>: Nothing.
    //!
    //! <b>Complexity</b>: Constant.
-   size_type size() const
+   size_type size() const BOOST_CONTAINER_NOEXCEPT
       { return m_flat_tree.size(); }
 
    //! <b>Effects</b>: Returns the largest possible size of the container.
@@ -356,7 +363,7 @@ class flat_set
    //! <b>Throws</b>: Nothing.
    //!
    //! <b>Complexity</b>: Constant.
-   size_type max_size() const
+   size_type max_size() const BOOST_CONTAINER_NOEXCEPT
       { return m_flat_tree.max_size(); }
 
    //! <b>Effects</b>: Number of elements for which memory has been allocated.
@@ -365,7 +372,7 @@ class flat_set
    //! <b>Throws</b>: Nothing.
    //!
    //! <b>Complexity</b>: Constant.
-   size_type capacity() const
+   size_type capacity() const BOOST_CONTAINER_NOEXCEPT
       { return m_flat_tree.capacity(); }
 
    //! <b>Effects</b>: If n is less than or equal to capacity(), this call has no
@@ -375,10 +382,10 @@ class flat_set
    //!
    //! <b>Throws</b>: If memory allocation allocation throws or Key's copy constructor throws.
    //!
-   //! <b>Note</b>: If capacity() is less than "count", iterators and references to
+   //! <b>Note</b>: If capacity() is less than "cnt", iterators and references to
    //!   to values might be invalidated.
-   void reserve(size_type count_)
-      { m_flat_tree.reserve(count_);   }
+   void reserve(size_type cnt)      
+      { m_flat_tree.reserve(cnt);   }
 
    //! <b>Effects</b>: Tries to deallocate the excess of memory created
    //    with previous allocations. The size of the vector is unchanged
@@ -505,7 +512,7 @@ class flat_set
    //! <b>Note</b>: If an element is inserted it might invalidate elements.
    iterator insert(const_iterator position, value_type &&x);
    #else
-   BOOST_MOVE_CONVERSION_AWARE_CATCH_1ARG(insert, value_type, iterator, this->priv_insert, const_iterator)
+   BOOST_MOVE_CONVERSION_AWARE_CATCH_1ARG(insert, value_type, iterator, this->priv_insert, const_iterator, const_iterator)
    #endif
 
    //! <b>Requires</b>: first, last are not iterators into *this.
@@ -582,7 +589,7 @@ class flat_set
    //! <b>Postcondition</b>: size() == 0.
    //!
    //! <b>Complexity</b>: linear in size().
-   void clear()
+   void clear() BOOST_CONTAINER_NOEXCEPT
       { m_flat_tree.clear(); }
 
    //////////////////////////////////////////////
@@ -629,7 +636,7 @@ class flat_set
    //!
    //! <b>Complexity</b>: log(size())+count(k)
    size_type count(const key_type& x) const
-      {  return m_flat_tree.find(x) == m_flat_tree.end() ? 0 : 1;  }
+      {  return static_cast<size_type>(m_flat_tree.find(x) != m_flat_tree.end());  }
 
    //! <b>Returns</b>: An iterator pointing to the first element with key not less
    //!   than k, or a.end() if such an element is not found.
@@ -726,15 +733,15 @@ inline void swap(flat_set<Key,Compare,Allocator>& x, flat_set<Key,Compare,Alloca
 /// @cond
 
 }  //namespace container {
-/*
+
 //!has_trivial_destructor_after_move<> == true_type
 //!specialization for optimizations
 template <class Key, class C, class Allocator>
 struct has_trivial_destructor_after_move<boost::container::flat_set<Key, C, Allocator> >
 {
-   static const bool value = has_trivial_destructor<Allocator>::value &&has_trivial_destructor<C>::value;
+   static const bool value = has_trivial_destructor_after_move<Allocator>::value &&has_trivial_destructor_after_move<C>::value;
 };
-*/
+
 namespace container {
 
 // Forward declaration of operators < and ==, needed for friend declaration.
@@ -756,16 +763,17 @@ inline bool operator<(const flat_multiset<Key,Compare,Allocator>& x,
 /// @endcond
 
 //! flat_multiset is a Sorted Associative Container that stores objects of type Key.
-//! flat_multiset is a Simple Associative Container, meaning that its value type,
-//! as well as its key type, is Key.
-//! flat_Multiset can store multiple copies of the same key value.
+//!
+//! flat_multiset can store multiple copies of the same key value.
 //!
 //! flat_multiset is similar to std::multiset but it's implemented like an ordered vector.
 //! This means that inserting a new element into a flat_multiset invalidates
 //! previous iterators and references
 //!
-//! Erasing an element of a flat_multiset invalidates iterators and references
-//! pointing to elements that come after (their keys are equal or bigger) the erased element.
+//! Erasing an element invalidates iterators and references
+//! pointing to elements that come after (their keys are bigger) the erased element.
+//!
+//! This container provides random-access iterators.
 #ifdef BOOST_CONTAINER_DOXYGEN_INVOKED
 template <class Key, class Compare = std::less<Key>, class Allocator = std::allocator<Key> >
 #else
@@ -810,9 +818,21 @@ class flat_multiset
       : m_flat_tree()
    {}
 
+   //! <b>Effects</b>: Constructs an empty flat_multiset using the specified
+   //! comparison object and allocator.
+   //!
+   //! <b>Complexity</b>: Constant.
    explicit flat_multiset(const Compare& comp,
                           const allocator_type& a = allocator_type())
-      : m_flat_tree(comp, a) {}
+      : m_flat_tree(comp, a)
+   {}
+
+   //! <b>Effects</b>: Constructs an empty flat_multiset using the specified allocator.
+   //!
+   //! <b>Complexity</b>: Constant.
+   explicit flat_multiset(const allocator_type& a)
+      : m_flat_tree(a)
+   {}
 
    template <class InputIterator>
    flat_multiset(InputIterator first, InputIterator last,
@@ -884,7 +904,7 @@ class flat_multiset
    //!   was passed to the object's constructor.
    //!
    //! <b>Complexity</b>: Constant.
-   allocator_type get_allocator() const
+   allocator_type get_allocator() const BOOST_CONTAINER_NOEXCEPT
    { return m_flat_tree.get_allocator(); }
 
    //! <b>Effects</b>: Returns a reference to the internal allocator.
@@ -894,7 +914,7 @@ class flat_multiset
    //! <b>Complexity</b>: Constant.
    //!
    //! <b>Note</b>: Non-standard extension.
-   stored_allocator_type &get_stored_allocator()
+   stored_allocator_type &get_stored_allocator() BOOST_CONTAINER_NOEXCEPT
    { return m_flat_tree.get_stored_allocator(); }
 
    //! <b>Effects</b>: Returns a reference to the internal allocator.
@@ -904,7 +924,7 @@ class flat_multiset
    //! <b>Complexity</b>: Constant.
    //!
    //! <b>Note</b>: Non-standard extension.
-   const stored_allocator_type &get_stored_allocator() const
+   const stored_allocator_type &get_stored_allocator() const BOOST_CONTAINER_NOEXCEPT
    { return m_flat_tree.get_stored_allocator(); }
 
    //! <b>Effects</b>: Returns an iterator to the first element contained in the container.
@@ -912,7 +932,7 @@ class flat_multiset
    //! <b>Throws</b>: Nothing.
    //!
    //! <b>Complexity</b>: Constant.
-   iterator begin()
+   iterator begin() BOOST_CONTAINER_NOEXCEPT
       { return m_flat_tree.begin(); }
 
    //! <b>Effects</b>: Returns a const_iterator to the first element contained in the container.
@@ -928,7 +948,7 @@ class flat_multiset
    //! <b>Throws</b>: Nothing.
    //!
    //! <b>Complexity</b>: Constant.
-   const_iterator cbegin() const
+   const_iterator cbegin() const BOOST_CONTAINER_NOEXCEPT
       { return m_flat_tree.cbegin(); }
 
    //! <b>Effects</b>: Returns an iterator to the end of the container.
@@ -936,7 +956,7 @@ class flat_multiset
    //! <b>Throws</b>: Nothing.
    //!
    //! <b>Complexity</b>: Constant.
-   iterator end()
+   iterator end() BOOST_CONTAINER_NOEXCEPT
       { return m_flat_tree.end(); }
 
    //! <b>Effects</b>: Returns a const_iterator to the end of the container.
@@ -944,7 +964,7 @@ class flat_multiset
    //! <b>Throws</b>: Nothing.
    //!
    //! <b>Complexity</b>: Constant.
-   const_iterator end() const
+   const_iterator end() const BOOST_CONTAINER_NOEXCEPT
       { return m_flat_tree.end(); }
 
    //! <b>Effects</b>: Returns a const_iterator to the end of the container.
@@ -952,7 +972,7 @@ class flat_multiset
    //! <b>Throws</b>: Nothing.
    //!
    //! <b>Complexity</b>: Constant.
-   const_iterator cend() const
+   const_iterator cend() const BOOST_CONTAINER_NOEXCEPT
       { return m_flat_tree.cend(); }
 
    //! <b>Effects</b>: Returns a reverse_iterator pointing to the beginning
@@ -961,7 +981,7 @@ class flat_multiset
    //! <b>Throws</b>: Nothing.
    //!
    //! <b>Complexity</b>: Constant.
-   reverse_iterator rbegin()
+   reverse_iterator rbegin() BOOST_CONTAINER_NOEXCEPT
       { return m_flat_tree.rbegin(); }
 
    //! <b>Effects</b>: Returns a const_reverse_iterator pointing to the beginning
@@ -970,7 +990,7 @@ class flat_multiset
    //! <b>Throws</b>: Nothing.
    //!
    //! <b>Complexity</b>: Constant.
-   const_reverse_iterator rbegin() const
+   const_reverse_iterator rbegin() const BOOST_CONTAINER_NOEXCEPT
       { return m_flat_tree.rbegin(); }
 
    //! <b>Effects</b>: Returns a const_reverse_iterator pointing to the beginning
@@ -979,7 +999,7 @@ class flat_multiset
    //! <b>Throws</b>: Nothing.
    //!
    //! <b>Complexity</b>: Constant.
-   const_reverse_iterator crbegin() const
+   const_reverse_iterator crbegin() const BOOST_CONTAINER_NOEXCEPT
       { return m_flat_tree.crbegin(); }
 
    //! <b>Effects</b>: Returns a reverse_iterator pointing to the end
@@ -988,7 +1008,7 @@ class flat_multiset
    //! <b>Throws</b>: Nothing.
    //!
    //! <b>Complexity</b>: Constant.
-   reverse_iterator rend()
+   reverse_iterator rend() BOOST_CONTAINER_NOEXCEPT
       { return m_flat_tree.rend(); }
 
    //! <b>Effects</b>: Returns a const_reverse_iterator pointing to the end
@@ -997,7 +1017,7 @@ class flat_multiset
    //! <b>Throws</b>: Nothing.
    //!
    //! <b>Complexity</b>: Constant.
-   const_reverse_iterator rend() const
+   const_reverse_iterator rend() const BOOST_CONTAINER_NOEXCEPT
       { return m_flat_tree.rend(); }
 
    //! <b>Effects</b>: Returns a const_reverse_iterator pointing to the end
@@ -1006,7 +1026,7 @@ class flat_multiset
    //! <b>Throws</b>: Nothing.
    //!
    //! <b>Complexity</b>: Constant.
-   const_reverse_iterator crend() const
+   const_reverse_iterator crend() const BOOST_CONTAINER_NOEXCEPT
       { return m_flat_tree.crend(); }
 
    //////////////////////////////////////////////
@@ -1020,7 +1040,7 @@ class flat_multiset
    //! <b>Throws</b>: Nothing.
    //!
    //! <b>Complexity</b>: Constant.
-   bool empty() const
+   bool empty() const BOOST_CONTAINER_NOEXCEPT
       { return m_flat_tree.empty(); }
 
    //! <b>Effects</b>: Returns the number of the elements contained in the container.
@@ -1028,7 +1048,7 @@ class flat_multiset
    //! <b>Throws</b>: Nothing.
    //!
    //! <b>Complexity</b>: Constant.
-   size_type size() const
+   size_type size() const BOOST_CONTAINER_NOEXCEPT
       { return m_flat_tree.size(); }
 
    //! <b>Effects</b>: Returns the largest possible size of the container.
@@ -1036,7 +1056,7 @@ class flat_multiset
    //! <b>Throws</b>: Nothing.
    //!
    //! <b>Complexity</b>: Constant.
-   size_type max_size() const
+   size_type max_size() const BOOST_CONTAINER_NOEXCEPT
       { return m_flat_tree.max_size(); }
 
    //! <b>Effects</b>: Number of elements for which memory has been allocated.
@@ -1045,7 +1065,7 @@ class flat_multiset
    //! <b>Throws</b>: Nothing.
    //!
    //! <b>Complexity</b>: Constant.
-   size_type capacity() const
+   size_type capacity() const BOOST_CONTAINER_NOEXCEPT
       { return m_flat_tree.capacity(); }
 
    //! <b>Effects</b>: If n is less than or equal to capacity(), this call has no
@@ -1055,10 +1075,10 @@ class flat_multiset
    //!
    //! <b>Throws</b>: If memory allocation allocation throws or Key's copy constructor throws.
    //!
-   //! <b>Note</b>: If capacity() is less than "count", iterators and references to
+   //! <b>Note</b>: If capacity() is less than "cnt", iterators and references to
    //!   to values might be invalidated.
-   void reserve(size_type count_)
-      { m_flat_tree.reserve(count_);   }
+   void reserve(size_type cnt)      
+      { m_flat_tree.reserve(cnt);   }
 
    //! <b>Effects</b>: Tries to deallocate the excess of memory created
    //    with previous allocations. The size of the vector is unchanged
@@ -1169,7 +1189,7 @@ class flat_multiset
    //! <b>Note</b>: If an element is inserted it might invalidate elements.
    iterator insert(const_iterator position, value_type &&x);
    #else
-   BOOST_MOVE_CONVERSION_AWARE_CATCH_1ARG(insert, value_type, iterator, this->priv_insert, const_iterator)
+   BOOST_MOVE_CONVERSION_AWARE_CATCH_1ARG(insert, value_type, iterator, this->priv_insert, const_iterator, const_iterator)
    #endif
 
    //! <b>Requires</b>: first, last are not iterators into *this.
@@ -1244,7 +1264,7 @@ class flat_multiset
    //! <b>Postcondition</b>: size() == 0.
    //!
    //! <b>Complexity</b>: linear in size().
-   void clear()
+   void clear() BOOST_CONTAINER_NOEXCEPT
       { m_flat_tree.clear(); }
 
    //////////////////////////////////////////////
@@ -1388,15 +1408,15 @@ inline void swap(flat_multiset<Key,Compare,Allocator>& x, flat_multiset<Key,Comp
 /// @cond
 
 }  //namespace container {
-/*
+
 //!has_trivial_destructor_after_move<> == true_type
 //!specialization for optimizations
 template <class Key, class C, class Allocator>
 struct has_trivial_destructor_after_move<boost::container::flat_multiset<Key, C, Allocator> >
 {
-   static const bool value = has_trivial_destructor<Allocator>::value && has_trivial_destructor<C>::value;
+   static const bool value = has_trivial_destructor_after_move<Allocator>::value && has_trivial_destructor_after_move<C>::value;
 };
-*/
+
 namespace container {
 
 /// @endcond

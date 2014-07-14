@@ -203,7 +203,20 @@ namespace joblist
 
 void DistributedEngineComm::Setup()
 {
-    makeBusy(true);
+    // This is here to ensure that this function does not get invoked multiple times simultaneously.
+    mutex::scoped_lock setupLock(fSetupMutex);
+
+	makeBusy(true);
+
+	// This needs to be here to ensure that whenever Setup function is called, the lists are
+	// empty. It's possible junk was left behind if exception.
+	ClientList::iterator iter;
+	for (iter = newClients.begin(); iter != newClients.end(); ++iter)
+	{
+		(*iter)->shutdown();
+	}
+	newClients.clear();
+	newLocks.clear();
 
 	throttleThreshold = fRm.getDECThrottleThreshold();
     uint32_t newPmCount = fRm.getPsCount();

@@ -41,6 +41,7 @@ using namespace std;
 namespace ba=boost::algorithm;
 
 #include "idbregistry.h"
+#include "syslog.h"
 
 namespace
 {

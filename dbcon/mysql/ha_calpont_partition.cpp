@@ -754,16 +754,16 @@ void partitionByValue_common(UDF_ARGS* args,								// input
 			}
 		}
 	}
-	catch (IDBExcept& ex)
-	{
-		errMsg = ex.what();
-		return;
-	}
 	catch (QueryDataExcept& ex)
 	{
 		Message::Args args;
 		args.add(ex.what());
 		errMsg = IDBErrorInfo::instance()->errorMsg(ERR_INVALID_FUNC_ARGUMENT, args);
+		return;
+	}
+	catch (IDBExcept& ex)
+	{
+		errMsg = ex.what();
 		return;
 	}
 	catch (...)
@@ -1730,12 +1730,7 @@ const char* calshowpartitionsbyvalue(UDF_INIT* initid, UDF_ARGS* args,
 				}
 			}
 		}
-	} catch (IDBExcept& ex)
-	{
-		current_thd->main_da.can_overwrite_status = true;
-		current_thd->main_da.set_error_status(current_thd, HA_ERR_UNSUPPORTED, ex.what());
-		return result;
-	}
+	} 
 	catch (logging::QueryDataExcept& ex)
 	{
 		Message::Args args;
@@ -1743,6 +1738,12 @@ const char* calshowpartitionsbyvalue(UDF_INIT* initid, UDF_ARGS* args,
 		errMsg = IDBErrorInfo::instance()->errorMsg(ERR_INVALID_FUNC_ARGUMENT, args);
 		current_thd->main_da.can_overwrite_status = true;
 		current_thd->main_da.set_error_status(current_thd, HA_ERR_UNSUPPORTED, (char*)errMsg.c_str());
+		return result;
+	}
+	catch (IDBExcept& ex)
+	{
+		current_thd->main_da.can_overwrite_status = true;
+		current_thd->main_da.set_error_status(current_thd, HA_ERR_UNSUPPORTED, ex.what());
 		return result;
 	}
 	catch (...)

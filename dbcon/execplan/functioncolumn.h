@@ -103,13 +103,13 @@ public:
 
 	/** get table alias name
 	 *
-	 * get the table alias name for this aggregate function
+	 * get the table alias name for this function
 	 */
 	inline const std::string& tableAlias () const { return fTableAlias; }
 
 	/** set table alias name
 	 *
-	 * set the table alias name for this aggregate function
+	 * set the table alias name for this function
 	 */
 	inline void tableAlias (const std::string& tableAlias) { fTableAlias = tableAlias; }
 
@@ -137,6 +137,18 @@ public:
 	virtual bool hasWindowFunc();
 	virtual void setDerivedTable();
 	virtual void replaceRealCol(std::vector<SRCP>&);
+	virtual const std::vector<SimpleColumn*>& simpleColumnList() const
+	{ return fSimpleColumnList; }
+
+	virtual void setSimpleColumnList();
+	/**
+	 * Return the tableAlias name of the table that the column arguments belong to.
+	 * 
+	 * @param TableAliasName that will be set in the function
+	 * @return true, if all arguments belong to one table
+	 *         false, if multiple tables are involved in the function
+	 */
+	virtual bool singleTable(CalpontSystemCatalog::TableAliasName& tan);
 
 private:
 	/**

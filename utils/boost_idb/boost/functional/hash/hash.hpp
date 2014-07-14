@@ -16,6 +16,7 @@
 #include <string>
 #include <boost/limits.hpp>
 #include <boost/type_traits/is_enum.hpp>
+#include <boost/type_traits/is_integral.hpp>
 #include <boost/utility/enable_if.hpp>
 
 #if defined(BOOST_NO_TEMPLATE_PARTIAL_SPECIALIZATION)
@@ -24,6 +25,13 @@
 
 #if !defined(BOOST_NO_CXX11_HDR_TYPEINDEX)
 #include <typeindex>
+#endif
+
+#if defined(BOOST_MSVC)
+#pragma warning(push)
+#pragma warning(disable:6295) // Ill-defined for-loop : 'unsigned int' values
+                              // are always of range '0' to '4294967295'.
+                              // Loop executes infinitely.
 #endif
 
 #if BOOST_WORKAROUND(__GNUC__, < 3) \
@@ -40,8 +48,8 @@ namespace boost
         struct enable_hash_value { typedef std::size_t type; };
 
         template <typename T> struct basic_numbers {};
-        template <typename T> struct long_numbers {};
-        template <typename T> struct ulong_numbers {};
+        template <typename T> struct long_numbers;
+        template <typename T> struct ulong_numbers;
         template <typename T> struct float_numbers {};
 
         template <> struct basic_numbers<bool> :
@@ -70,10 +78,25 @@ namespace boost
             boost::hash_detail::enable_hash_value {};
 #endif
 
+        // long_numbers is defined like this to allow for separate
+        // specialization for long_long and int128_type, in case
+        // they conflict.
+        template <typename T> struct long_numbers2 {};
+        template <typename T> struct ulong_numbers2 {};
+        template <typename T> struct long_numbers : long_numbers2<T> {};
+        template <typename T> struct ulong_numbers : ulong_numbers2<T> {};
+
 #if !defined(BOOST_NO_LONG_LONG)
         template <> struct long_numbers<boost::long_long_type> :
             boost::hash_detail::enable_hash_value {};
         template <> struct ulong_numbers<boost::ulong_long_type> :
+            boost::hash_detail::enable_hash_value {};
+#endif
+
+#if defined(BOOST_HAS_INT128)
+        template <> struct long_numbers2<boost::int128_type> :
+            boost::hash_detail::enable_hash_value {};
+        template <> struct ulong_numbers2<boost::uint128_type> :
             boost::hash_detail::enable_hash_value {};
 #endif
 
@@ -94,7 +117,7 @@ namespace boost
 
     template <typename T>
     typename boost::enable_if<boost::is_enum<T>, std::size_t>::type
-    	hash_value(T);
+        hash_value(T);
 
 #if !BOOST_WORKAROUND(__DMC__, <= 0x848)
     template <class T> std::size_t hash_value(T* const&);
@@ -187,9 +210,9 @@ namespace boost
 
     template <typename T>
     typename boost::enable_if<boost::is_enum<T>, std::size_t>::type
-    	hash_value(T v)
+        hash_value(T v)
     {
-    	return static_cast<std::size_t>(v);
+        return static_cast<std::size_t>(v);
     }
 
     // Implementation by Alberto Barbati and Dave Harris.
@@ -423,6 +446,11 @@ namespace boost
     BOOST_HASH_SPECIALIZE(boost::ulong_long_type)
 #endif
 
+#if defined(BOOST_HAS_INT128)
+    BOOST_HASH_SPECIALIZE(boost::int128_type)
+    BOOST_HASH_SPECIALIZE(boost::uint128_type)
+#endif
+
 #if !defined(BOOST_NO_CXX11_HDR_TYPEINDEX)
     BOOST_HASH_SPECIALIZE(std::type_index)
 #endif
@@ -496,6 +524,10 @@ namespace boost
 }
 
 #undef BOOST_HASH_CHAR_TRAITS
+
+#if defined(BOOST_MSVC)
+#pragma warning(pop)
+#endif
 
 #endif // BOOST_FUNCTIONAL_HASH_HASH_HPP
 

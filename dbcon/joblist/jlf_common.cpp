@@ -57,7 +57,7 @@ uint32_t uniqTupleKey(JobInfo& jobInfo,
 {
 	uint64_t subId = jobInfo.subId;
 	if (correlated)
-		subId = jobInfo.pSubId;
+		subId = jobInfo.pJobInfo->subId;
 
 	string alias(ta);
 //	if (!ca.empty())
@@ -165,54 +165,31 @@ TupleInfo setTupleInfo_(const CalpontSystemCatalog::ColType& ct,
                         const string& tbl_name,
                         const string& tbl_alias,
                         const string& vw_name,
+                        bool correlated = false,
                         uint32_t pc_id = 0,
-                        uint64_t engine = 0,
-                        bool correlated = false)
+                        uint64_t engine = 0)
 {
 	// get the unique tupleOids for this column
 	uint32_t tbl_key = uniqTupleKey(jobInfo, tbl_oid, tbl_oid, "", "", tbl_name, tbl_alias,
 	                                sch_name, vw_name, 0, engine, correlated);
 	uint32_t col_key = uniqTupleKey(jobInfo, col_oid, tbl_oid, col_name, col_alias, tbl_name,
                                     tbl_alias, sch_name, vw_name, pc_id, engine, correlated);
-	TupleInfo ti = TupleInfo(fudgeWidth(ct, col_oid), col_oid, col_key, tbl_key,
-	                                    ct.scale, ct.precision, ct.colDataType);
 	//If this is the first time we've seen this col, add it to the tim
-	TupleInfoMap::iterator i1;
-	TupleInfoMap::mapped_type v;
-	i1 = jobInfo.keyInfo->tupleInfoMap.find(tbl_key);
-	if (i1 != jobInfo.keyInfo->tupleInfoMap.end())
+	TupleInfoMap::iterator it = jobInfo.keyInfo->tupleInfoMap.find(col_key);
+	TupleInfo ti;
+	if (it != jobInfo.keyInfo->tupleInfoMap.end())
 	{
-		//We've seen the table, now look for the col
-		v = i1->second;
-		TupleInfoMap::mapped_type::iterator it2 = v.begin();
-		TupleInfoMap::mapped_type::iterator end2 = v.end();;
-		bool found = false;
-		while (it2 != end2)
-		{
-			if (it2->key == ti.key)
-			{
-				found = true;
-				ti = *it2;
-				break;
-			}
-			++it2;
-		}
-
-		if (!found)
-		{
-			v.push_back(ti);
-			i1->second = v;
-			jobInfo.keyInfo->colKeyToTblKey[col_key] = tbl_key;
-			jobInfo.keyInfo->colType[col_key] = ct;
-			jobInfo.keyInfo->pseudoType[col_key] = pc_id;
-		}
+		//We've seen the key
+		ti = it->second;
 	}
 	else
 	{
 		//Haven't even seen the table yet, much less this col
-		v.push_back(ti);
-		jobInfo.keyInfo->tupleInfoMap[tbl_key] = v;
+		ti = TupleInfo(fudgeWidth(ct, col_oid), col_oid, col_key, tbl_key,
+	                             ct.scale, ct.precision, ct.colDataType);
+		jobInfo.keyInfo->tupleInfoMap[col_key] = ti;
 		jobInfo.keyInfo->colKeyToTblKey[col_key] = tbl_key;
+		jobInfo.keyInfo->colKeyToTblKey[tbl_key] = tbl_key;
 		jobInfo.keyInfo->colType[col_key] = ct;
 		jobInfo.keyInfo->pseudoType[col_key] = pc_id;
 	}
@@ -230,13 +207,13 @@ uint32_t getTupleKey_(const JobInfo& jobInfo,
 				const string& tblAlias,
 				const string& schema,
 				const string& view,
+				bool correlated = false,
 				uint32_t pseudo = 0,
-				uint64_t engine = 0,
-				bool correlated = false)
+				uint64_t engine = 0)
 {
 	uint64_t subId = jobInfo.subId;
 	if (correlated)
-		subId = jobInfo.pSubId;
+		subId = jobInfo.pJobInfo->subId;
 
 	string alias(tblAlias);
 	string name(tblAlias);
@@ -287,6 +264,9 @@ UniqId::UniqId(const execplan::SimpleColumn* sc) :
 	fPseudo(0),
 	fSubId(-1)
 {
+	const PseudoColumn* pc = dynamic_cast<const execplan::PseudoColumn*>(sc);
+	uint32_t pseudoType = (pc) ? pc->pseudoType() : execplan::PSEUDO_UNKNOWN;
+	fPseudo = pseudoType;
 }
 
 
@@ -319,6 +299,7 @@ string extractTableAlias(const SimpleColumn* sc)
 	return  ba::to_lower_copy(sc->tableAlias());
 }
 
+
 //------------------------------------------------------------------------------
 // Returns the table alias for the specified column
 //------------------------------------------------------------------------------
@@ -326,6 +307,7 @@ string extractTableAlias(const SSC& sc)
 {
 	return  ba::to_lower_copy(sc->tableAlias());
 }
+
 
 //------------------------------------------------------------------------------
 // Returns OID associated with colType if it is a dictionary column, else
@@ -341,6 +323,7 @@ CalpontSystemCatalog::OID isDictCol(const CalpontSystemCatalog::ColType& colType
 
 	return 0;
 }
+
 
 //------------------------------------------------------------------------------
 // Determines if colType is a character column
@@ -362,6 +345,7 @@ bool isCharCol(const CalpontSystemCatalog::ColType& colType)
 	return false;
 }
 
+
 //------------------------------------------------------------------------------
 // Returns OID associated with a table
 //------------------------------------------------------------------------------
@@ -378,16 +362,18 @@ CalpontSystemCatalog::OID tableOid(const SimpleColumn* sc, boost::shared_ptr<Cal
 	return p.objnum;
 }
 
+
 uint32_t getTupleKey(const JobInfo& jobInfo,
 				const execplan::SimpleColumn* sc)
 {
 	const PseudoColumn* pc = dynamic_cast<const execplan::PseudoColumn*>(sc);
 	uint32_t pseudoType = (pc) ? pc->pseudoType() : execplan::PSEUDO_UNKNOWN;
 	return getTupleKey_(jobInfo, sc->oid(), sc->columnName(), extractTableAlias(sc),
-						sc->schemaName(), sc->viewName(), pseudoType,
-						(sc->isInfiniDB() ? 0 : 1),
-						((sc->joinInfo() & execplan::JOIN_CORRELATED) != 0));
+	                    sc->schemaName(), sc->viewName(),
+	                    ((sc->joinInfo() & execplan::JOIN_CORRELATED) != 0),
+	                    pseudoType, (sc->isInfiniDB() ? 0 : 1));
 }
+
 
 uint32_t getTupleKey(JobInfo& jobInfo, const SRCP& srcp, bool add)
 {
@@ -459,16 +445,25 @@ uint32_t getTupleKey(JobInfo& jobInfo, const SRCP& srcp, bool add)
 	return key;
 }
 
+
 uint32_t getTableKey(const JobInfo& jobInfo, execplan::CalpontSystemCatalog::OID tableOid,
                      const string& alias, const string& schema, const string& view)
 {
 	return getTupleKey_(jobInfo, tableOid, "", alias, schema, view);
 }
 
+
 uint32_t getTableKey(const JobInfo& jobInfo, uint32_t cid)
 {
 	return jobInfo.keyInfo->colKeyToTblKey[cid];
 }
+
+
+void updateTableKey(uint32_t cid, uint32_t tid, JobInfo& jobInfo)
+{
+	jobInfo.keyInfo->colKeyToTblKey[cid] = tid;
+}
+
 
 uint32_t getTableKey(JobInfo& jobInfo, JobStep* js)
 {
@@ -476,13 +471,15 @@ uint32_t getTableKey(JobInfo& jobInfo, JobStep* js)
 	return getTupleKey_(jobInfo, tableOid, "", js->alias(), js->schema(), js->view());
 }
 
+
 uint32_t makeTableKey(JobInfo& jobInfo, const execplan::SimpleColumn* sc)
 {
 	CalpontSystemCatalog::OID o = tableOid(sc, jobInfo.csc);
 	return uniqTupleKey(jobInfo, o, o, "", "", sc->tableName(), extractTableAlias(sc),
-						sc->schemaName(), sc->viewName(), 0, (sc->isInfiniDB() ? 0 : 1),
-						((sc->joinInfo() & execplan::JOIN_CORRELATED) != 0));
+	                    sc->schemaName(), sc->viewName(), 0, (sc->isInfiniDB() ? 0 : 1),
+	                    ((sc->joinInfo() & execplan::JOIN_CORRELATED) != 0));
 }
+
 
 uint32_t makeTableKey(JobInfo& jobInfo,
 				CalpontSystemCatalog::OID o,
@@ -495,20 +492,12 @@ uint32_t makeTableKey(JobInfo& jobInfo,
 	return uniqTupleKey(jobInfo, o, o, "", "", tn, ta, sn, vn, 0, en);
 }
 
-TupleInfo getTupleInfo(uint32_t tableKey, uint32_t columnKey, const JobInfo& jobInfo)
-{
-	TupleInfoMap::const_iterator cit = jobInfo.keyInfo->tupleInfoMap.find(tableKey);
-	assert (cit != jobInfo.keyInfo->tupleInfoMap.end());
-	TupleInfoMap::mapped_type mt = cit->second;
-	TupleInfoMap::mapped_type::iterator mtit = mt.begin();
-	while (mtit != mt.end())
-	{
-		if (mtit->key == columnKey)
-			break;
-		++mtit;
-	}
 
-	if (mtit == mt.end())
+TupleInfo getTupleInfo(uint32_t columnKey, const JobInfo& jobInfo)
+{
+	TupleInfoMap::const_iterator cit = jobInfo.keyInfo->tupleInfoMap.find(columnKey);
+	if ((cit == jobInfo.keyInfo->tupleInfoMap.end()) ||
+	    (cit->second.dtype == CalpontSystemCatalog::BIT))
 	{
 		ostringstream strstm;
 		strstm << "TupleInfo for (" << jobInfo.keyInfo->tupleKeyVec[columnKey].fId << ","
@@ -526,8 +515,9 @@ TupleInfo getTupleInfo(uint32_t tableKey, uint32_t columnKey, const JobInfo& job
 		throw runtime_error("column's tuple info could not be found");
 	}
 
-	return *mtit;
+	return cit->second;
 }
+
 
 TupleInfo setTupleInfo(const execplan::CalpontSystemCatalog::ColType& ct,
 	execplan::CalpontSystemCatalog::OID col_oid,
@@ -540,37 +530,49 @@ TupleInfo setTupleInfo(const execplan::CalpontSystemCatalog::ColType& ct,
 	uint32_t pseudoType = (pc) ? pc->pseudoType() : execplan::PSEUDO_UNKNOWN;
 	return setTupleInfo_(ct, col_oid, jobInfo, tbl_oid, sc->columnName(), sc->alias(),
 	                     sc->schemaName(), sc->tableName(), alias, sc->viewName(),
-	                     pseudoType, (sc->isInfiniDB() ? 0 : 1),
-	                     ((sc->joinInfo() & execplan::JOIN_CORRELATED) != 0));
+	                     ((sc->joinInfo() & execplan::JOIN_CORRELATED) != 0),
+	                     pseudoType, (sc->isInfiniDB() ? 0 : 1));
 }
+
 
 TupleInfo setExpTupleInfo(const execplan::CalpontSystemCatalog::ColType& ct, uint64_t expressionId,
-	const string& alias, JobInfo& jobInfo)
+	const string& alias, JobInfo& jobInfo, bool cr)
 {
-	// pretend all expressions belong to "virtual" table EXPRESSION, (3000, expression)
-	// OID 3000 is not for user table or column, there will be no confilict in queries.
-	stringstream ss;
-	ss << "$exp";
-	if (jobInfo.subLevel > 0)
-		ss << "_" << jobInfo.subId << "_" << jobInfo.subLevel << "_" << jobInfo.subNum;
-	return setTupleInfo_(ct, expressionId, jobInfo, 3000, "", alias, "", "$exp", ss.str(), "");
+	// pretend all expressions belong to "virtual" table EXPRESSION, (CNX_EXP_TABLE_ID, expression)
+	// CNX_EXP_TABLE_ID(999) is not for user table or column, there will be no confilict in queries.
+	JobInfo* ji = &jobInfo;
+	if (cr)
+		ji = jobInfo.pJobInfo;
+
+	string expAlias("$exp");
+	if (!(ji->subAlias.empty()))
+		expAlias = ji->subAlias;
+
+	return setTupleInfo_(
+		ct, expressionId, jobInfo, CNX_EXP_TABLE_ID, "", alias, "", "$exp", expAlias, "", cr);
 }
 
-uint32_t getExpTupleKey(const JobInfo& jobInfo, uint64_t eid)
+
+TupleInfo setExpTupleInfo(const execplan::ReturnedColumn* rc, JobInfo& jobInfo)
 {
-	stringstream ss;
-	ss << "$exp";
-	if (jobInfo.subLevel > 0)
-		ss << "_" << jobInfo.subId << "_" << jobInfo.subLevel << "_" << jobInfo.subNum;
-	return getTupleKey_(jobInfo, eid, "", ss.str(), "", "");
+	return setExpTupleInfo(rc->resultType(), rc->expressionId(), rc->alias(), jobInfo,
+	                       ((rc->joinInfo() & execplan::JOIN_CORRELATED) != 0));
 }
 
-TupleInfo getExpTupleInfo(uint32_t expKey, const JobInfo& jobInfo)
+
+uint32_t getExpTupleKey(const JobInfo& jobInfo, uint64_t eid, bool cr)
 {
-	// first retrieve the expression virtual table key
-	uint32_t evtKey = getExpTupleKey(jobInfo, 3000);
-	return getTupleInfo(evtKey, expKey, jobInfo);
+	const JobInfo* ji = &jobInfo;
+	if (cr)
+		ji = jobInfo.pJobInfo;
+
+	string expAlias("$exp");
+	if (!(ji->subAlias.empty()))
+		expAlias = ji->subAlias;
+
+	return getTupleKey_(jobInfo, eid, "", expAlias, "", "", cr);
 }
+
 
 void addAggregateColumn(AggregateColumn* agc, int idx, RetColsVector& vec, JobInfo& jobInfo)
 {
@@ -677,6 +679,105 @@ bool filterWithDictionary(execplan::CalpontSystemCatalog::OID dictOid, uint64_t 
 	}
 
 	return ret;
+}
+
+
+// @Bug 1230 & 1955
+// Don't allow join/compare on "incompatible" cols
+// Compatible columns:
+// any 1,2,4,8-byte int to any 1,2,4,8-byte int
+// decimal w/scale x to decimal w/scale x
+// date to date
+// datetime to datetime
+// string to string
+bool compatibleColumnTypes(const CalpontSystemCatalog::ColType& ct1,
+                           const CalpontSystemCatalog::ColType& ct2,
+                           bool  forJoin)
+{
+	return compatibleColumnTypes(ct1.colDataType, ct1.scale, ct2.colDataType, ct2.scale, forJoin);
+}
+
+
+bool compatibleColumnTypes(const CalpontSystemCatalog::ColDataType& dt1, uint32_t scale1,
+                           const CalpontSystemCatalog::ColDataType& dt2, uint32_t scale2,
+                           bool  forJoin)
+{
+	// disable VARBINARY used in join
+	if (dt1 == CalpontSystemCatalog::VARBINARY ||
+		dt2 == CalpontSystemCatalog::VARBINARY)
+		throw runtime_error("Comparsion between VARBINARY columns is not supported.");
+
+	switch (dt1)
+	{
+	case CalpontSystemCatalog::BIT:
+		if (dt2 != CalpontSystemCatalog::BIT) return false;
+		break;
+	case CalpontSystemCatalog::TINYINT:
+	case CalpontSystemCatalog::SMALLINT:
+	case CalpontSystemCatalog::MEDINT:
+	case CalpontSystemCatalog::INT:
+	case CalpontSystemCatalog::BIGINT:
+	case CalpontSystemCatalog::DECIMAL:
+    case CalpontSystemCatalog::UTINYINT:
+    case CalpontSystemCatalog::USMALLINT:
+    case CalpontSystemCatalog::UMEDINT:
+    case CalpontSystemCatalog::UINT:
+    case CalpontSystemCatalog::UBIGINT:
+    case CalpontSystemCatalog::UDECIMAL:
+		if (dt2 != CalpontSystemCatalog::TINYINT &&
+			dt2 != CalpontSystemCatalog::SMALLINT &&
+			dt2 != CalpontSystemCatalog::MEDINT &&
+			dt2 != CalpontSystemCatalog::INT &&
+			dt2 != CalpontSystemCatalog::BIGINT &&
+			dt2 != CalpontSystemCatalog::DECIMAL &&
+            dt2 != CalpontSystemCatalog::UTINYINT &&
+            dt2 != CalpontSystemCatalog::USMALLINT &&
+            dt2 != CalpontSystemCatalog::UMEDINT &&
+            dt2 != CalpontSystemCatalog::UINT &&
+            dt2 != CalpontSystemCatalog::UBIGINT &&
+            dt2 != CalpontSystemCatalog::UDECIMAL) return false;
+			if (scale2 != scale1) return false;
+		break;
+	case CalpontSystemCatalog::DATE:
+		if (dt2 != CalpontSystemCatalog::DATE) return false;
+		break;
+	case CalpontSystemCatalog::DATETIME:
+		if (dt2 != CalpontSystemCatalog::DATETIME) return false;
+		break;
+	case CalpontSystemCatalog::CHAR:
+	case CalpontSystemCatalog::VARCHAR:
+		// @bug 1495 compound/string join
+		if (dt2 != CalpontSystemCatalog::VARCHAR &&
+			dt2 != CalpontSystemCatalog::CHAR)
+			return false;
+		break;
+	case CalpontSystemCatalog::VARBINARY:
+		if (dt2 != CalpontSystemCatalog::VARBINARY) return false;
+		break;
+	case CalpontSystemCatalog::FLOAT:
+	case CalpontSystemCatalog::UFLOAT:
+		if (forJoin && (dt2 != CalpontSystemCatalog::FLOAT &&
+		                dt2 != CalpontSystemCatalog::FLOAT)) return false;
+		else if (dt2 != CalpontSystemCatalog::FLOAT &&
+				 dt2 != CalpontSystemCatalog::DOUBLE &&
+				 dt2 != CalpontSystemCatalog::UFLOAT &&
+		         dt2 != CalpontSystemCatalog::UDOUBLE) return false;
+		break;
+	case CalpontSystemCatalog::DOUBLE:
+	case CalpontSystemCatalog::UDOUBLE:
+		if (forJoin && (dt2 != CalpontSystemCatalog::DOUBLE &&
+		                dt2 != CalpontSystemCatalog::UDOUBLE)) return false;
+		else if (dt2 != CalpontSystemCatalog::FLOAT &&
+				 dt2 != CalpontSystemCatalog::DOUBLE &&
+				 dt2 != CalpontSystemCatalog::UFLOAT &&
+		         dt2 != CalpontSystemCatalog::UDOUBLE) return false;
+		break;
+	default:
+		return false;
+		break;
+	}
+
+	return true;
 }
 
 

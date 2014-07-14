@@ -23,8 +23,8 @@ AM_CFLAGS = $(idb_cflags)
 AM_CXXFLAGS = $(idb_cxxflags)
 AM_LDFLAGS = -version-info 1:0:0 $(idb_ldflags)
 lib_LTLIBRARIES = libjoiner.la
-libjoiner_la_SOURCES = joiner.cpp tuplejoiner.cpp
-include_HEADERS = joiner.h tuplejoiner.h
+libjoiner_la_SOURCES = joiner.cpp tuplejoiner.cpp joinpartition.cpp
+include_HEADERS = joiner.h tuplejoiner.h joinpartition.h
 
 test:
 

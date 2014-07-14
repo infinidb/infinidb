@@ -1171,7 +1171,8 @@ int XMLJob::genJobXMLFileName(
     const string& schemaName,
     const string& tableName,
     boost::filesystem::path& xmlFilePath,
-    string& errMsg )
+    string& errMsg,
+    std::string&	   tableOIDStr )
 {
     // get full file directory path for XML job description file
     if (sXMLJobDir.empty())
@@ -1205,10 +1206,10 @@ int XMLJob::genJobXMLFileName(
     {
         // Create tmp directory if does not exist
         RETURN_ON_ERROR( createTempJobDir( xmlFilePath.string(), errMsg ) );
-
-        jobFileName += schemaName;
-        jobFileName += '_';
-        jobFileName += tableName;
+		jobFileName +=tableOIDStr;
+        //jobFileName += schemaName;
+       // jobFileName += '_';
+       // jobFileName += tableName;
         jobFileName += "_D";
 
         string now(boost::posix_time::to_iso_string(

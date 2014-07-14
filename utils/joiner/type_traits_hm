@@ -1,0 +1,196 @@
+#ifndef UTIL_TYPE_TRAITS__
+#define UTIL_TYPE_TRAITS__
+
+namespace std {
+
+template <class T, T v>
+struct integral_constant {
+  static const T value = v;
+  typedef T value_type;
+  typedef integral_constant<T,v> type;
+  inline operator T() { return v; }
+};
+
+typedef integral_constant<bool, false> false_type;
+typedef integral_constant<bool, true> true_type;
+
+template<class T, class U>
+struct is_same : false_type {};
+
+template<class T>
+struct is_same<T, T> : true_type {};
+
+template<typename T> struct is_integral                           : public false_type {};
+template<>           struct is_integral<bool>                     : public true_type {};
+template<>           struct is_integral<char>                     : public true_type {};
+template<>           struct is_integral<signed char>              : public true_type {};
+template<>           struct is_integral<unsigned char>            : public true_type {};
+template<>           struct is_integral<short>                    : public true_type {};
+template<>           struct is_integral<unsigned short>           : public true_type {};
+template<>           struct is_integral<int>                      : public true_type {};
+template<>           struct is_integral<unsigned int>             : public true_type {};
+template<>           struct is_integral<long>                     : public true_type {};
+template<>           struct is_integral<unsigned long>            : public true_type {};
+template<>           struct is_integral<long long>                : public true_type {};
+template<>           struct is_integral<unsigned long long>       : public true_type {};
+template<>           struct is_integral<const bool>               : public true_type {};
+template<>           struct is_integral<const char>               : public true_type {};
+template<>           struct is_integral<const unsigned char>      : public true_type {};
+template<>           struct is_integral<const short>              : public true_type {};
+template<>           struct is_integral<const unsigned short>     : public true_type {};
+template<>           struct is_integral<const int>                : public true_type {};
+template<>           struct is_integral<const unsigned int>       : public true_type {};
+template<>           struct is_integral<const long>               : public true_type {};
+template<>           struct is_integral<const unsigned long>      : public true_type {};
+template<>           struct is_integral<const long long>          : public true_type {};
+template<>           struct is_integral<const unsigned long long> : public true_type {};
+
+template<typename T> struct is_floating_point              : public false_type {};
+template<>           struct is_floating_point<float>       : public true_type {};
+template<>           struct is_floating_point<double>      : public true_type {};
+template<>           struct is_floating_point<long double> : public true_type {};
+
+template<typename T> struct is_arithmetic               : public is_integral<T> {};
+template<>           struct is_arithmetic<float>        : public true_type {};
+template<>           struct is_arithmetic<double>       : public true_type {};
+template<>           struct is_arithmetic<const float>  : public true_type {};
+template<>           struct is_arithmetic<const double> : public true_type {};
+
+template<typename T> struct is_pointer      : public false_type {};
+template<typename T> struct is_pointer<T *> : public true_type  {};
+
+template<typename T> struct is_device_ptr  : public false_type {};
+
+template<typename T> struct is_void       : public false_type {};
+template<>           struct is_void<void> : public true_type {};
+
+template<typename T> struct is_const          : public false_type {};
+template<typename T> struct is_const<const T> : public true_type {};
+
+template<typename T> struct is_volatile             : public false_type {};
+template<typename T> struct is_volatile<volatile T> : public true_type {};
+
+template<typename T> struct is_reference     : public false_type {};
+template<typename T> struct is_reference<T&> : public true_type {};
+
+template< class T > struct remove_const          { typedef T type; };
+template< class T > struct remove_const<const T> { typedef T type; };
+
+template< class T > struct remove_volatile             { typedef T type; };
+template< class T > struct remove_volatile<volatile T> { typedef T type; };
+
+template< class T >
+struct remove_cv {
+    typedef typename remove_volatile<typename remove_const<T>::type>::type type;
+};
+
+template<typename _Tp, bool = (is_void<_Tp>::value || is_reference<_Tp>::value)>
+  struct __add_reference_helper
+  { typedef _Tp&    type; };
+
+template<typename _Tp>
+  struct __add_reference_helper<_Tp, true>
+  { typedef _Tp     type; };
+
+template<typename _Tp>
+  struct add_reference
+    : public __add_reference_helper<_Tp>{};
+
+template<typename T>
+  struct remove_reference
+{
+  typedef T type;
+}; // end remove_reference
+
+template<typename T>
+  struct remove_reference<T&>
+{
+  typedef T type;
+}; // end remove_reference
+
+// Types small_ and big_ are promise that sizeof(small_) < sizeof(big_)
+typedef char small_;
+
+struct big_ {
+  char dummy[2];
+};
+
+namespace tt_detail
+{
+
+template<typename T>
+  struct is_int_or_cref
+{
+  typedef typename remove_reference<T>::type type_sans_ref;
+  static const bool value = (is_integral<T>::value
+                             || (is_integral<type_sans_ref>::value
+                                 && is_const<type_sans_ref>::value
+                                 && !is_volatile<type_sans_ref>::value));
+}; // end is_int_or_cref
+
+template<typename From, typename To>
+  struct is_convertible_sfinae
+{
+  private:
+    typedef char                          one_byte;
+    typedef struct { char two_chars[2]; } two_bytes;
+
+    static one_byte  test(To);
+    static two_bytes test(...);
+    static From      m_from;
+
+  public:
+    static const bool value = sizeof(test(m_from)) == sizeof(one_byte);
+}; // end is_convertible_sfinae
+
+
+template<typename From, typename To>
+  struct is_convertible_needs_simple_test
+{
+  static const bool from_is_void      = is_void<From>::value;
+  static const bool to_is_void        = is_void<To>::value;
+  static const bool from_is_float     = is_floating_point<typename remove_reference<From>::type>::value;
+  static const bool to_is_int_or_cref = is_int_or_cref<To>::value;
+
+  static const bool value = (from_is_void || to_is_void || (from_is_float && to_is_int_or_cref));
+}; // end is_convertible_needs_simple_test
+
+
+template<typename From, typename To,
+         bool = is_convertible_needs_simple_test<From,To>::value>
+  struct is_convertible
+{
+  static const bool value = (is_void<To>::value
+                             || (is_int_or_cref<To>::value
+                                 && !is_void<From>::value));
+}; // end is_convertible
+
+
+template<typename From, typename To>
+  struct is_convertible<From, To, false>
+{
+  static const bool value = (is_convertible_sfinae<typename
+                             add_reference<From>::type, To>::value);
+}; // end is_convertible
+
+
+} // end tt_detail
+
+template<typename From, typename To>
+  struct is_convertible
+    : public integral_constant<bool, tt_detail::is_convertible<From, To>::value>
+{
+}; // end is_convertible
+
+
+template<typename T1, typename T2>
+  struct is_one_convertible_to_the_other
+    : public integral_constant<
+        bool,
+        is_convertible<T1,T2>::value || is_convertible<T2,T1>::value
+      >
+{};
+
+}
+
+#endif // UTIL_TYPE_TRAITS__

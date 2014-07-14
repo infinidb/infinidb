@@ -817,9 +817,16 @@ uint8_t WE_DMLCommandProc::processBatchInsert(messageqcpp::ByteStream& bs, std::
 				std::string trkErrMsg;
 				bool bEmptyPM;
 				if (i == 0)
+				{
 					rc = pDBRootExtentTracker->selectFirstSegFile(dbRootExtent,bFirstExtentOnThisPM, bEmptyPM, trkErrMsg);
+				/*	cout << "bEmptyPM = " << (int) bEmptyPM << " bFirstExtentOnThisPM= " << (int)bFirstExtentOnThisPM <<
+					" oid:dbroot:hwm = " << ridList[i].objnum << ":"<<dbRootExtent.fDbRoot << ":"
+					<<":"<<dbRootExtent.fLocalHwm << " err = " << trkErrMsg << endl; */
+				}
 				else
 					pDBRootExtentTracker->assignFirstSegFile(*(dbRootExtTrackerVec[0].get()),dbRootExtent);
+					
+				
 				colDBRootExtentInfo.push_back(dbRootExtent);
 
 				Column aColumn;
@@ -871,8 +878,6 @@ uint8_t WE_DMLCommandProc::processBatchInsert(messageqcpp::ByteStream& bs, std::
 	}
 	std::vector<BRM::LBIDRange>   rangeList;
 
-	if ( fIsFirstBatchPm && isAutocommitOn)
-
 	// use of MetaFile for bulk rollback support
 	if ( fIsFirstBatchPm && isAutocommitOn)
 	{
@@ -902,27 +907,6 @@ uint8_t WE_DMLCommandProc::processBatchInsert(messageqcpp::ByteStream& bs, std::
 		if ( rc != 0)
 			return rc;
 
-		if (!bFirstExtentOnThisPM) //If no extent on this pm, there is no need to version it
-		{
-			//rc = fWEWrapper.processBatchVersions(txnid.id, columns, rangeList);
-			if (rc != 0)
-			{
-				//Nothing need rollback.
-				try
-				{
-					fRBMetaWriter->deleteFile();
-				}
-				catch (WeException ex)
-				{
-					rc = 1;
-					err = ex.what();
-				}
-				//set error message
-				WErrorCodes ec;
-				err = ec.errorString(rc);
-				return rc;
-			}
-		}
 	}
 
 	std::vector<string> colNames;
@@ -1214,9 +1198,10 @@ uint8_t WE_DMLCommandProc::processBatchInsert(messageqcpp::ByteStream& bs, std::
 						dbRootExtTrackerVec, fRBMetaWriter.get(), bFirstExtentOnThisPM, isInsertSelect, 0, roPair.objnum, fIsFirstBatchPm)))
 End-Disable use of MetaFile for bulk rollback support
 */
+				
 			if (NO_ERROR !=
 			(error = fWEWrapper.insertColumnRecs(txnid.id, colStructs, colValuesList, dctnryStructList, dicStringList,
-						dbRootExtTrackerVec, 0, bFirstExtentOnThisPM, isInsertSelect, 0, roPair.objnum, fIsFirstBatchPm)))
+						dbRootExtTrackerVec, 0, bFirstExtentOnThisPM, isInsertSelect, isAutocommitOn, roPair.objnum, fIsFirstBatchPm)))
 			{
 				if (error == ERR_BRM_DEAD_LOCK)
 				{
@@ -1250,7 +1235,7 @@ End-Disable use of MetaFile for bulk rollback support
 	if ( isWarningSet && ( rc == NO_ERROR ) )
 	{
 		rc = dmlpackageprocessor::DMLPackageProcessor::IDBRANGE_WARNING;
-		cout << "Got warning" << endl;
+		//cout << "Got warning" << endl;
 		Message::Args args;
 		string cols = "'" + colNames[0] + "'";
 
@@ -3450,7 +3435,8 @@ int WE_DMLCommandProc::validateColumnHWMs(
 
         // Find out column width
         colType = systemCatalogPtr->colType(ridList[k].objnum);
-		colType.colWidth = convertor.getCorrectRowWidth(colType.colDataType, colType.colWidth);
+        colType.colWidth = convertor.getCorrectRowWidth(colType.colDataType, colType.colWidth);
+     
         // Find the first 1-byte, 2-byte, 4-byte, and 8-byte columns.
         // Use those as our reference HWM for the respective column widths.
         switch ( colType.colWidth )
@@ -3651,7 +3637,13 @@ errorCheck:
     {
 		CalpontSystemCatalog::ColType colType1, colType2;
 		colType1 = systemCatalogPtr->colType(ridList[refCol].objnum);
+		colType1.colWidth = convertor.getCorrectRowWidth(
+				colType1.colDataType, colType1.colWidth);
+     
 		colType2 = systemCatalogPtr->colType(ridList[colIdx].objnum);
+		colType2.colWidth = convertor.getCorrectRowWidth(
+				colType2.colDataType, colType2.colWidth);
+     
         ostringstream oss;
         oss << stage << " HWMs are not in sync for"
             " OID1-"       << ridList[refCol].objnum                <<

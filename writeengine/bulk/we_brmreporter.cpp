@@ -316,7 +316,7 @@ void BRMReporter::sendCPToFile( )
 void BRMReporter::reportTotals(
     uint64_t totalReadRows,
     uint64_t totalInsertedRows,
-    const std::vector<boost::tuple<CalpontSystemCatalog::ColDataType, std::string, uint64_t> >& satCounts)
+    const std::vector<boost::tuple<CalpontSystemCatalog::ColDataType, uint64_t, uint64_t> >& satCounts)
 {
     if (fRptFile.is_open())
     {
@@ -391,7 +391,7 @@ int BRMReporter::openRptFile( )
     fRptFile << "#CP:   startLBID max min seqnum type newExtent" << std::endl;
     fRptFile << "#HWM:  oid partition segment hwm"               << std::endl;
     fRptFile << "#ROWS: numRowsRead numRowsInserted"             << std::endl;
-    fRptFile << "#DATA: columNum columnType columnName numOutOfRangeValues"   << std::endl;
+    fRptFile << "#DATA: columNum columnType columnOid numOutOfRangeValues"   << std::endl;
     fRptFile << "#ERR:  error message file"                      << std::endl;
     fRptFile << "#BAD:  bad data file, with rejected rows"       << std::endl;
     fRptFile << "#MERR: critical error messages in cpimport.bin" << std::endl;

@@ -108,7 +108,7 @@ typedef tr1::unordered_set<BRM::OID_t> USOID;
 
 // make global for blockcache
 //
-static const char* statsName ={"pm"};
+static const char* statsName = {"pm"};
 dbbc::Stats* gPMStatsPtr=0;
 bool gPMProfOn=false;
 uint32_t gSession=0;
@@ -121,195 +121,177 @@ oam::OamCache *oamCache = oam::OamCache::makeOamCache();
 //FIXME: there is an anon ns burried later in between 2 named namespaces...
 namespace primitiveprocessor
 {
-    boost::shared_ptr<threadpool::PriorityThreadPool> OOBPool;
+boost::shared_ptr<threadpool::PriorityThreadPool> OOBPool;
 
-	BlockRequestProcessor **BRPp;
+BlockRequestProcessor **BRPp;
 #ifndef _MSC_VER
-	dbbc::Stats stats;
+dbbc::Stats stats;
 #endif
-	extern DebugLevel gDebugLevel;
-	BRM::DBRM* brm;
-	int fCacheCount;
-	bool fPMProfOn;
-	bool fLBIDTraceOn;
+extern DebugLevel gDebugLevel;
+BRM::DBRM* brm;
+int fCacheCount;
+bool fPMProfOn;
+bool fLBIDTraceOn;
 
-	/* params from the config file */
-	uint32_t BPPCount;
-	uint32_t blocksReadAhead;
-	uint32_t defaultBufferSize;
-	uint32_t connectionsPerUM;
-	uint32_t highPriorityThreads;
-	uint32_t medPriorityThreads;
-	uint32_t lowPriorityThreads;
-	int  directIOFlag = O_DIRECT;
-	int  noVB = 0;
+/* params from the config file */
+uint32_t BPPCount;
+uint32_t blocksReadAhead;
+uint32_t defaultBufferSize;
+uint32_t connectionsPerUM;
+uint32_t highPriorityThreads;
+uint32_t medPriorityThreads;
+uint32_t lowPriorityThreads;
+int  directIOFlag = O_DIRECT;
+int  noVB = 0;
 
-	const uint8_t fMaxColWidth(8);
-	BPPMap bppMap;
-	mutex bppLock;
-	mutex djLock;  // djLock synchronizes destroy and joiner msgs, see bug 2619
-	volatile int32_t asyncCounter;
-	const int asyncMax = 20;	// current number of asynchronous loads
+const uint8_t fMaxColWidth(8);
+BPPMap bppMap;
+mutex bppLock;
+mutex djLock;  // djLock synchronizes destroy and joiner msgs, see bug 2619
+volatile int32_t asyncCounter;
+const int asyncMax = 20;	// current number of asynchronous loads
 
-	extern bool utf8;
+extern bool utf8;
 
-	struct preFetchCond {
-		//uint64_t lbid;
-		boost::condition cond;
-		unsigned waiters;
+struct preFetchCond {
+	//uint64_t lbid;
+	boost::condition cond;
+	unsigned waiters;
 
-		preFetchCond(const uint64_t l) {
-			waiters = 0;
-		}
-
-		~preFetchCond() { }
-	};
-
-	typedef preFetchCond preFetchBlock_t;
-	typedef std::tr1::unordered_map<uint64_t, preFetchBlock_t*> pfBlockMap_t;
-	typedef std::tr1::unordered_map<uint64_t, preFetchBlock_t*>::iterator pfBlockMapIter_t;
-
-	pfBlockMap_t pfBlockMap;
-	boost::mutex pfbMutex; // = PTHREAD_MUTEX_INITIALIZER;
-
-	pfBlockMap_t pfExtentMap;
-	boost::mutex pfMutex; // = PTHREAD_MUTEX_INITIALIZER;
-
-	map<uint32_t, boost::shared_ptr<DictEqualityFilter> > dictEqualityFilters;
-	mutex eqFilterMutex;
-
-	uint32_t cacheNum(uint64_t lbid)
-	{
-		return ( lbid / brm->getExtentSize() ) % fCacheCount;
+	preFetchCond(const uint64_t l) {
+		waiters = 0;
 	}
 
-	void buildOidFileName(const BRM::OID_t oid,
-						  const uint16_t dbRoot,
-						  const uint16_t partNum,
-						  const uint32_t segNum,
-						  char* file_name)
-	{
-		WriteEngine::FileOp fileOp(false);
+	~preFetchCond() { }
+};
 
-		if (fileOp.getFileName(oid, file_name, dbRoot, partNum, segNum) != WriteEngine::NO_ERROR)
-		{
-			file_name[0]=0;
-			throw std::runtime_error("fileOp.getFileName failed");
-		}
-		//cout << "Oid2Filename o: " << oid << " n: " << file_name << endl;
+typedef preFetchCond preFetchBlock_t;
+typedef std::tr1::unordered_map<uint64_t, preFetchBlock_t*> pfBlockMap_t;
+typedef std::tr1::unordered_map<uint64_t, preFetchBlock_t*>::iterator pfBlockMapIter_t;
+
+pfBlockMap_t pfBlockMap;
+boost::mutex pfbMutex; // = PTHREAD_MUTEX_INITIALIZER;
+
+pfBlockMap_t pfExtentMap;
+boost::mutex pfMutex; // = PTHREAD_MUTEX_INITIALIZER;
+
+map<uint32_t, boost::shared_ptr<DictEqualityFilter> > dictEqualityFilters;
+mutex eqFilterMutex;
+
+uint32_t cacheNum(uint64_t lbid)
+{
+	return ( lbid / brm->getExtentSize() ) % fCacheCount;
+}
+
+void buildOidFileName(const BRM::OID_t oid,
+					  const uint16_t dbRoot,
+					  const uint16_t partNum,
+					  const uint32_t segNum,
+					  char* file_name)
+{
+	WriteEngine::FileOp fileOp(false);
+
+	if (fileOp.getFileName(oid, file_name, dbRoot, partNum, segNum) != WriteEngine::NO_ERROR)
+	{
+		file_name[0]=0;
+		throw std::runtime_error("fileOp.getFileName failed");
 	}
+	//cout << "Oid2Filename o: " << oid << " n: " << file_name << endl;
+}
 
 
-	void waitForRetry(long count)
-	{
-		timespec ts;
-		ts.tv_sec = 5L*count/10L;
-		ts.tv_nsec = (5L*count%10L)*100000000L;
+void waitForRetry(long count)
+{
+	timespec ts;
+	ts.tv_sec = 5L*count/10L;
+	ts.tv_nsec = (5L*count%10L)*100000000L;
 #ifdef _MSC_VER
-		Sleep(ts.tv_sec * 1000 + ts.tv_nsec / 1000 / 1000);
+	Sleep(ts.tv_sec * 1000 + ts.tv_nsec / 1000 / 1000);
 #else
-		nanosleep(&ts, 0);
+	nanosleep(&ts, 0);
 #endif
+}
+
+
+void prefetchBlocks(const uint64_t lbid,
+					const int compType,
+					uint32_t* rCount)
+{
+	uint16_t dbRoot;
+	uint32_t partNum;
+	uint16_t segNum;
+	uint32_t hwm;
+	uint32_t fbo;
+	uint32_t lowfbo;
+	uint32_t highfbo;
+	BRM::OID_t oid;
+	pfBlockMap_t::const_iterator iter;
+	uint64_t lowlbid = (lbid/blocksReadAhead) * blocksReadAhead;
+	blockCacheClient bc(*BRPp[cacheNum(lbid)]);
+	BRM::InlineLBIDRange range;
+	int err;
+
+	pfbMutex.lock();
+
+	iter = pfBlockMap.find(lowlbid);
+	if (iter!=pfBlockMap.end()) {
+		iter->second->waiters++;
+		iter->second->cond.wait(pfbMutex);
+		iter->second->waiters--;
+		pfbMutex.unlock();
+		return;
 	}
 
+	preFetchBlock_t* pfb = 0;
+	pfb = new preFetchBlock_t(lowlbid);
 
-	void prefetchBlocks(const uint64_t lbid,
-						const int compType,
-						uint32_t* rCount)
+	pfBlockMap[lowlbid]=pfb;
+	pfbMutex.unlock();
+
+	// loadBlock will catch a versioned block so vbflag can be set to false here
+	err = brm->lookupLocal(lbid, 0, false, oid, dbRoot, partNum, segNum, fbo); // need the oid
+	if (err < 0) {
+		cerr << "prefetchBlocks(): BRM lookupLocal failed! Expect more errors.\n";
+		goto cleanup;
+	}
+
+	// We ignore extState that tells us whether the extent is
+	// an outOfService extent to be ignored.  The filtering for
+	// outOfService extents is done elsewhere.
+	int extState;
+	err = brm->getLocalHWM(oid, partNum, segNum, hwm, extState);
+	if (err < 0) {
+		cerr << "prefetchBlock(): BRM getLocalHWM failed! Expect more errors.\n";
+		goto cleanup;
+	}
+
+	lowfbo = fbo - (lbid - lowlbid);
+	highfbo = lowfbo + blocksReadAhead - 1;
+	range.start = lowlbid;
+	if (hwm < highfbo)
+		range.size = hwm - lowfbo + 1;
+	else
+		range.size = blocksReadAhead;
+
+	try {
+		if (range.size>blocksReadAhead) {
+			ostringstream os;
+			os << "Invalid Range from HWM for lbid " << lbid
+			<< ", range size should be <= blocksReadAhead: HWM " << hwm
+			<< ", dbroot " << dbRoot
+			<< ", highfbo " << highfbo << ", lowfbo " << lowfbo
+			<< ", blocksReadAhead " << blocksReadAhead
+			<< ", range size " << (int) range.size << endl;
+			throw logging::InvalidRangeHWMExcept(os.str());
+		}
+
+		idbassert(range.size<=blocksReadAhead);
+
+		bc.check(range, QueryContext(numeric_limits<VER_t>::max()), 0, compType, *rCount);
+	}
+	catch (...)
 	{
-		uint16_t dbRoot;
-		uint32_t partNum;
-		uint16_t segNum;
-		uint32_t hwm;
-		uint32_t fbo;
-		uint32_t lowfbo;
-		uint32_t highfbo;
-		BRM::OID_t oid;
-		pfBlockMap_t::const_iterator iter;
-		uint64_t lowlbid = (lbid/blocksReadAhead) * blocksReadAhead;
-		blockCacheClient bc(*BRPp[cacheNum(lbid)]);
-		BRM::InlineLBIDRange range;
-		int err;
-
-		pfbMutex.lock();
-
-		iter = pfBlockMap.find(lowlbid);
-		if (iter!=pfBlockMap.end()) {
-			iter->second->waiters++;
-			iter->second->cond.wait(pfbMutex);
-			iter->second->waiters--;
-			pfbMutex.unlock();
-			return;
-		}
-
-		preFetchBlock_t* pfb = 0;
-		pfb = new preFetchBlock_t(lowlbid);
-
-		pfBlockMap[lowlbid]=pfb;
-		pfbMutex.unlock();
-
-		// loadBlock will catch a versioned block so vbflag can be set to false here
-		err = brm->lookupLocal(lbid, 0, false, oid, dbRoot, partNum, segNum, fbo); // need the oid
-		if (err < 0) {
-			cerr << "prefetchBlocks(): BRM lookupLocal failed! Expect more errors.\n";
-			goto cleanup;
-		}
-
-		// We ignore extState that tells us whether the extent is
-		// an outOfService extent to be ignored.  The filtering for
-		// outOfService extents is done elsewhere.
-		int extState;
-		err = brm->getLocalHWM(oid, partNum, segNum, hwm, extState);
-		if (err < 0) {
-			cerr << "prefetchBlock(): BRM getLocalHWM failed! Expect more errors.\n";
-			goto cleanup;
-		}
-
-		lowfbo = fbo - (lbid - lowlbid);
-		highfbo = lowfbo + blocksReadAhead - 1;
-		range.start = lowlbid;
-		if (hwm < highfbo)
-			range.size = hwm - lowfbo + 1;
-		else
-			range.size = blocksReadAhead;
-
-		try {
-			if (range.size>blocksReadAhead) {
-				ostringstream os;
-				os << "Invalid Range from HWM for lbid " << lbid
-					<< ", range size should be <= blocksReadAhead: HWM " << hwm
-					<< ", dbroot " << dbRoot
-					<< ", highfbo " << highfbo << ", lowfbo " << lowfbo
-					<< ", blocksReadAhead " << blocksReadAhead
-					<< ", range size " << (int) range.size << endl;
-				throw logging::InvalidRangeHWMExcept(os.str());
-			}
-
-			idbassert(range.size<=blocksReadAhead);
-
-			bc.check(range, QueryContext(numeric_limits<VER_t>::max()), 0, compType, *rCount);
-		}
-		catch (...)
-		{
-			// Perform necessary cleanup before rethrowing the exception
-			pfb->cond.notify_all();
-
-			pfbMutex.lock();
-			while (pfb->waiters > 0)
-			{
-				pfbMutex.unlock();
-				//handle race condition with other threads going into wait before the broadcast above
-				pfb->cond.notify_one();
-				usleep(1);
-				pfbMutex.lock();
-			}
-			if (pfBlockMap.erase(lowlbid) > 0)
-				delete pfb;
-			pfb=0;
-			pfbMutex.unlock();
-			throw;
-		}
-	cleanup:
+		// Perform necessary cleanup before rethrowing the exception
 		pfb->cond.notify_all();
 
 		pfbMutex.lock();
@@ -325,329 +307,391 @@ namespace primitiveprocessor
 			delete pfb;
 		pfb=0;
 		pfbMutex.unlock();
+		throw;
+	}
+cleanup:
+	pfb->cond.notify_all();
 
-	} // prefetchBlocks()
-
-	// returns the # that were cached.
-	uint32_t loadBlocks (
-		LBID_t *lbids,
-		QueryContext qc,
-		VER_t txn,
-		int compType,
-		uint8_t **bufferPtrs,
-		uint32_t *rCount,
-		bool LBIDTrace,
-		uint32_t sessionID,
-		uint32_t blockCount,
-		bool *blocksWereVersioned,
-		bool doPrefetch,
-		VSSCache *vssCache)
+	pfbMutex.lock();
+	while (pfb->waiters > 0)
 	{
-		blockCacheClient bc(*BRPp[cacheNum(lbids[0])]);
-		uint32_t blksRead=0;
-		VSSCache::iterator it;
-		uint32_t i, ret;
-		bool *vbFlags;
-		int *vssRCs;
-		bool *cacheThisBlock;
-		bool *wasCached;
+		pfbMutex.unlock();
+		//handle race condition with other threads going into wait before the broadcast above
+		pfb->cond.notify_one();
+		usleep(1);
+		pfbMutex.lock();
+	}
+	if (pfBlockMap.erase(lowlbid) > 0)
+		delete pfb;
+	pfb=0;
+	pfbMutex.unlock();
 
-		*blocksWereVersioned = false;
+} // prefetchBlocks()
+
+// returns the # that were cached.
+uint32_t loadBlocks (
+	LBID_t *lbids,
+	QueryContext qc,
+	VER_t txn,
+	int compType,
+	uint8_t **bufferPtrs,
+	uint32_t *rCount,
+	bool LBIDTrace,
+	uint32_t sessionID,
+	uint32_t blockCount,
+	bool *blocksWereVersioned,
+	bool doPrefetch,
+	VSSCache *vssCache)
+{
+	blockCacheClient bc(*BRPp[cacheNum(lbids[0])]);
+	uint32_t blksRead=0;
+	VSSCache::iterator it;
+	uint32_t i, ret;
+	bool *vbFlags;
+	int *vssRCs;
+	bool *cacheThisBlock;
+	bool *wasCached;
+
+	*blocksWereVersioned = false;
 
 #ifndef _MSC_VER
-		if (LBIDTrace) {
-			for (i = 0; i < blockCount; i++) {
-
-				stats.touchedLBID(lbids[i], pthread_self(), sessionID);
-			}
-		}
-#endif
-		VER_t *vers = (VER_t *) alloca(blockCount * sizeof(VER_t));
-		vbFlags = (bool *) alloca(blockCount);
-		vssRCs = (int *) alloca(blockCount * sizeof(int));
-		cacheThisBlock = (bool *) alloca(blockCount);
-		wasCached = (bool *) alloca(blockCount);
+	if (LBIDTrace) {
 		for (i = 0; i < blockCount; i++) {
-			if (vssCache) {
-				it = vssCache->find(lbids[i]);
-				if (it != vssCache->end()) {
-					VSSData &vd = it->second;
-					vers[i] = vd.verID;
-					vbFlags[i] = vd.vbFlag;
-					vssRCs[i] = vd.returnCode;
-					if (vssRCs[i] == ERR_SNAPSHOT_TOO_OLD)
-						throw runtime_error("Snapshot too old");
-				}
-			}
-			if (!vssCache || it == vssCache->end())
-				vssRCs[i] = brm->vssLookup(lbids[i], qc, txn, &vers[i], &vbFlags[i]);
-			*blocksWereVersioned |= vbFlags[i];
 
-			// If the block is being modified by this txn, set the useCache flag to false
-			if (txn > 0 && vers[i] == txn && !vbFlags[i])
-				cacheThisBlock[i] = false;
-			else
-				cacheThisBlock[i] = true;
+			stats.touchedLBID(lbids[i], pthread_self(), sessionID);
 		}
+	}
+#endif
+	VER_t *vers = (VER_t *) alloca(blockCount * sizeof(VER_t));
+	vbFlags = (bool *) alloca(blockCount);
+	vssRCs = (int *) alloca(blockCount * sizeof(int));
+	cacheThisBlock = (bool *) alloca(blockCount);
+	wasCached = (bool *) alloca(blockCount);
+	for (i = 0; i < blockCount; i++) {
+		if (vssCache) {
+			it = vssCache->find(lbids[i]);
+			if (it != vssCache->end()) {
+				VSSData &vd = it->second;
+				vers[i] = vd.verID;
+				vbFlags[i] = vd.vbFlag;
+				vssRCs[i] = vd.returnCode;
+				if (vssRCs[i] == ERR_SNAPSHOT_TOO_OLD)
+					throw runtime_error("Snapshot too old");
+			}
+		}
+		if (!vssCache || it == vssCache->end())
+			vssRCs[i] = brm->vssLookup(lbids[i], qc, txn, &vers[i], &vbFlags[i]);
+		*blocksWereVersioned |= vbFlags[i];
 
-		/*
-		cout << "  resolved ver #s: ";
-		for (uint32_t i = 0; i < blockCount; i++)
-			cout << " <" << vers[i] << ", " << (int) vbFlags[i] << ", " << (int)
-				cacheThisBlock[i] << ">";
-		cout << endl;
-		*/
+		// If the block is being modified by this txn, set the useCache flag to false
+		if (txn > 0 && vers[i] == txn && !vbFlags[i])
+			cacheThisBlock[i] = false;
+		else
+			cacheThisBlock[i] = true;
+	}
 
-		ret = bc.getCachedBlocks(lbids, vers, bufferPtrs, wasCached, blockCount);
+	/*
+	cout << "  resolved ver #s: ";
+	for (uint32_t i = 0; i < blockCount; i++)
+		cout << " <" << vers[i] << ", " << (int) vbFlags[i] << ", " << (int)
+			cacheThisBlock[i] << ">";
+	cout << endl;
+	*/
 
-		// Do we want to check any VB flags here?  Initial thought: no, because we have
-		// no idea whether any other blocks in the prefetch range are versioned,
-		// what's the difference if one in the visible range is?
-		if (ret != blockCount && doPrefetch) {
-			prefetchBlocks(lbids[0], compType, &blksRead);
+	ret = bc.getCachedBlocks(lbids, vers, bufferPtrs, wasCached, blockCount);
+
+	// Do we want to check any VB flags here?  Initial thought: no, because we have
+	// no idea whether any other blocks in the prefetch range are versioned,
+	// what's the difference if one in the visible range is?
+	if (ret != blockCount && doPrefetch) {
+		prefetchBlocks(lbids[0], compType, &blksRead);
 
 #ifndef _MSC_VER
-			if (fPMProfOn)
-				pmstats.markEvent(lbids[0], (pthread_t)-1, sessionID, 'M');
+		if (fPMProfOn)
+			pmstats.markEvent(lbids[0], (pthread_t)-1, sessionID, 'M');
 #endif
-			/* After the prefetch they're all cached if they are in the same range, so
-			 * prune the block list and try getCachedBlocks again first, then fall back
-			 * to single-block IO requests if for some reason they aren't. */
-			uint32_t l_blockCount = 0;
-			for (i = 0; i < blockCount; i++) {
-				if (!wasCached[i]) {
-					lbids[l_blockCount] = lbids[i];
-					vers[l_blockCount] = vers[i];
-					bufferPtrs[l_blockCount] = bufferPtrs[i];
-					vbFlags[l_blockCount] = vbFlags[i];
-					cacheThisBlock[l_blockCount] = cacheThisBlock[i];
-					++l_blockCount;
-				}
-			}
-			ret += bc.getCachedBlocks(lbids, vers, bufferPtrs, wasCached, l_blockCount);
-
-			if (ret != blockCount) {
-				for (i = 0; i < l_blockCount; i++)
-					if (!wasCached[i]) {
-						bool ver;
-
-						qc.currentScn = vers[i];
-						bc.getBlock(lbids[i], qc, txn, compType, (void *) bufferPtrs[i],
-							vbFlags[i], wasCached[i], &ver, cacheThisBlock[i], false);
-						*blocksWereVersioned |= ver;
-						blksRead++;
-					}
+		/* After the prefetch they're all cached if they are in the same range, so
+		 * prune the block list and try getCachedBlocks again first, then fall back
+		 * to single-block IO requests if for some reason they aren't. */
+		uint32_t l_blockCount = 0;
+		for (i = 0; i < blockCount; i++) {
+			if (!wasCached[i]) {
+				lbids[l_blockCount] = lbids[i];
+				vers[l_blockCount] = vers[i];
+				bufferPtrs[l_blockCount] = bufferPtrs[i];
+				vbFlags[l_blockCount] = vbFlags[i];
+				cacheThisBlock[l_blockCount] = cacheThisBlock[i];
+				++l_blockCount;
 			}
 		}
-		/* Some blocks weren't cached, prefetch is disabled -> issue single-block IO requests,
-		 * skip checking the cache again. */
-		else if (ret != blockCount) {
-			for (i = 0; i < blockCount; i++) {
+		ret += bc.getCachedBlocks(lbids, vers, bufferPtrs, wasCached, l_blockCount);
+
+		if (ret != blockCount) {
+			for (i = 0; i < l_blockCount; i++)
 				if (!wasCached[i]) {
 					bool ver;
 
 					qc.currentScn = vers[i];
-					bc.getBlock(lbids[i], qc, txn, compType, (void *) bufferPtrs[i], vbFlags[i],
-						wasCached[i], &ver, cacheThisBlock[i], false);
+					bc.getBlock(lbids[i], qc, txn, compType, (void *) bufferPtrs[i],
+								vbFlags[i], wasCached[i], &ver, cacheThisBlock[i], false);
 					*blocksWereVersioned |= ver;
 					blksRead++;
 				}
+		}
+	}
+	/* Some blocks weren't cached, prefetch is disabled -> issue single-block IO requests,
+	 * skip checking the cache again. */
+	else if (ret != blockCount) {
+		for (i = 0; i < blockCount; i++) {
+			if (!wasCached[i]) {
+				bool ver;
+
+				qc.currentScn = vers[i];
+				bc.getBlock(lbids[i], qc, txn, compType, (void *) bufferPtrs[i], vbFlags[i],
+							wasCached[i], &ver, cacheThisBlock[i], false);
+				*blocksWereVersioned |= ver;
+				blksRead++;
 			}
 		}
-
-		if (rCount)
-			*rCount = blksRead;
-		//if (*verBlocks)
-		//	cout << "loadBlock says there were versioned blocks\n";
-		return ret;
 	}
 
-	void loadBlock (
-		uint64_t lbid,
-		QueryContext v,
-		uint32_t t,
-		int compType,
-		void* bufferPtr,
-		bool* pWasBlockInCache,
-		uint32_t* rCount,
-		bool LBIDTrace,
-		uint32_t sessionID,
-		bool doPrefetch,
-		VSSCache *vssCache)
-	{
-		bool flg = false;
-		BRM::OID_t oid;
-		BRM::VER_t txn = (BRM::VER_t)t;
-		uint16_t dbRoot=0;
-		uint32_t partitionNum=0;
-		uint16_t segmentNum=0;
-		int rc;
-		BRM::VER_t ver;
-		blockCacheClient bc(*BRPp[cacheNum(lbid)]);
-		char file_name[WriteEngine::FILE_NAME_SIZE]={0};
-		char* fileNamePtr = file_name;
-		uint32_t blksRead=0;
-		VSSCache::iterator it;
+	if (rCount)
+		*rCount = blksRead;
+	//if (*verBlocks)
+	//	cout << "loadBlock says there were versioned blocks\n";
+	return ret;
+}
+
+void loadBlock (
+	uint64_t lbid,
+	QueryContext v,
+	uint32_t t,
+	int compType,
+	void* bufferPtr,
+	bool* pWasBlockInCache,
+	uint32_t* rCount,
+	bool LBIDTrace,
+	uint32_t sessionID,
+	bool doPrefetch,
+	VSSCache *vssCache)
+{
+	bool flg = false;
+	BRM::OID_t oid;
+	BRM::VER_t txn = (BRM::VER_t)t;
+	uint16_t dbRoot=0;
+	uint32_t partitionNum=0;
+	uint16_t segmentNum=0;
+	int rc;
+	BRM::VER_t ver;
+	blockCacheClient bc(*BRPp[cacheNum(lbid)]);
+	char file_name[WriteEngine::FILE_NAME_SIZE]= {0};
+	char* fileNamePtr = file_name;
+	uint32_t blksRead=0;
+	VSSCache::iterator it;
 
 #ifndef _MSC_VER
-		if (LBIDTrace)
-			stats.touchedLBID(lbid, pthread_self(), sessionID);
+	if (LBIDTrace)
+		stats.touchedLBID(lbid, pthread_self(), sessionID);
 #endif
 
-		if (vssCache) {
-			it = vssCache->find(lbid);
-			if (it != vssCache->end()) {
-				VSSData &vd = it->second;
-				ver = vd.verID;
-				flg	= vd.vbFlag;
-				rc = vd.returnCode;
-			}
+	if (vssCache) {
+		it = vssCache->find(lbid);
+		if (it != vssCache->end()) {
+			VSSData &vd = it->second;
+			ver = vd.verID;
+			flg	= vd.vbFlag;
+			rc = vd.returnCode;
 		}
-		if (!vssCache || it == vssCache->end())
-			rc = brm->vssLookup((BRM::LBID_t)lbid, v, txn, &ver, &flg);
+	}
+	if (!vssCache || it == vssCache->end())
+		rc = brm->vssLookup((BRM::LBID_t)lbid, v, txn, &ver, &flg);
 
-		v.currentScn = ver;
-			//cout << "VSS l/u: l=" << lbid << " v=" << ver << " t=" << txn << " flg=" << flg << " rc: " << rc << endl;
+	v.currentScn = ver;
+	//cout << "VSS l/u: l=" << lbid << " v=" << ver << " t=" << txn << " flg=" << flg << " rc: " << rc << endl;
 
-		// if this block is locked by this session, don't cache it, just read it directly from disk
-		if (txn > 0 && ver == txn && !flg && !noVB) {
-			uint64_t offset;
-			uint32_t fbo;
-			boost::scoped_array<uint8_t> newBufferSa;
-			boost::scoped_array<char> cmpHdrBufSa;
-			boost::scoped_array<char> cmpBufSa;
-			boost::scoped_array<unsigned char> uCmpBufSa;
-
-
-
-			ptrdiff_t alignedBuffer = 0;
-			void* readBufferPtr = NULL;
-			char* cmpHdrBuf = NULL;
-			char* cmpBuf = NULL;
-			unsigned char* uCmpBuf = NULL;
-			uint64_t cmpBufLen = 0;
-			int blockReadRetryCount = 0;
-			unsigned idx = 0;
-			int pageSize = getpagesize();
-			IDBDataFile* fp = 0;
-			try {
-				rc = brm->lookupLocal((BRM::LBID_t)lbid,
-									ver,
-									flg,
-									oid,
-									dbRoot,
-									partitionNum,
-									segmentNum,
-									fbo);
+	// if this block is locked by this session, don't cache it, just read it directly from disk
+	if (txn > 0 && ver == txn && !flg && !noVB) {
+		uint64_t offset;
+		uint32_t fbo;
+		boost::scoped_array<uint8_t> newBufferSa;
+		boost::scoped_array<char> cmpHdrBufSa;
+		boost::scoped_array<char> cmpBufSa;
+		boost::scoped_array<unsigned char> uCmpBufSa;
 
 
-				// load the block
-				buildOidFileName(oid, dbRoot, partitionNum, segmentNum, fileNamePtr);
-				int opts = directIOFlag ? IDBDataFile::USE_ODIRECT : 0;
-				fp = IDBDataFile::open(
-									IDBPolicy::getType( fileNamePtr, IDBPolicy::PRIMPROC ),
-									fileNamePtr,
-									"r",
-									opts);
-				if( fp == NULL ) {
-					int errCode = errno;
-					SUMMARY_INFO2("open failed: ", fileNamePtr);
-					char errbuf[80];
-					string errMsg;
+
+		ptrdiff_t alignedBuffer = 0;
+		void* readBufferPtr = NULL;
+		char* cmpHdrBuf = NULL;
+		char* cmpBuf = NULL;
+		unsigned char* uCmpBuf = NULL;
+		uint64_t cmpBufLen = 0;
+		int blockReadRetryCount = 0;
+		unsigned idx = 0;
+		int pageSize = getpagesize();
+		IDBDataFile* fp = 0;
+		try {
+			rc = brm->lookupLocal((BRM::LBID_t)lbid,
+								  ver,
+								  flg,
+								  oid,
+								  dbRoot,
+								  partitionNum,
+								  segmentNum,
+								  fbo);
+
+
+			// load the block
+			buildOidFileName(oid, dbRoot, partitionNum, segmentNum, fileNamePtr);
+			int opts = directIOFlag ? IDBDataFile::USE_ODIRECT : 0;
+			fp = IDBDataFile::open(
+					 IDBPolicy::getType( fileNamePtr, IDBPolicy::PRIMPROC ),
+					 fileNamePtr,
+					 "r",
+					 opts);
+			if( fp == NULL ) {
+				int errCode = errno;
+				SUMMARY_INFO2("open failed: ", fileNamePtr);
+				char errbuf[80];
+				string errMsg;
 #ifdef __linux__
 //#if STRERROR_R_CHAR_P
-					const char* p;
-					if ((p = strerror_r(errCode, errbuf, 80)) != 0)
-						errMsg = p;
+				const char* p;
+				if ((p = strerror_r(errCode, errbuf, 80)) != 0)
+					errMsg = p;
 #else
-					int p;
-					if ((p = strerror_r(errCode, errbuf, 80)) == 0)
-						errMsg = errbuf;
+				int p;
+				if ((p = strerror_r(errCode, errbuf, 80)) == 0)
+					errMsg = errbuf;
 #endif
 
 #ifndef _MSC_VER
-					if (errCode == EINVAL) {
-						throw logging::IDBExcept(logging::IDBErrorInfo::instance()->
-								errorMsg(logging::ERR_O_DIRECT), logging::ERR_O_DIRECT);
-					}
-#endif
-					string errStr(fileNamePtr);
-					errStr += ": open: ";
-					errStr += errMsg;
-					throw std::runtime_error(errStr);
+				if (errCode == EINVAL) {
+					throw logging::IDBExcept(logging::IDBErrorInfo::instance()->
+											 errorMsg(logging::ERR_O_DIRECT), logging::ERR_O_DIRECT);
 				}
+#endif
+				string errStr(fileNamePtr);
+				errStr += ": open: ";
+				errStr += errMsg;
+				throw std::runtime_error(errStr);
+			}
 
-				//  fd >= 0 must be true, otherwise above exception thrown.
-				offset = (uint64_t)fbo * (uint64_t)DATA_BLOCK_SIZE;
-				idx = offset / (4 * 1024 * 1024);
+			//  fd >= 0 must be true, otherwise above exception thrown.
+			offset = (uint64_t)fbo * (uint64_t)DATA_BLOCK_SIZE;
+			idx = offset / (4 * 1024 * 1024);
 
-				errno = 0;
-				rc = 0;
-				int i = -1;
+			errno = 0;
+			rc = 0;
+			int i = -1;
 
 
-				if (compType == 0)
-                {
-					newBufferSa.reset(new uint8_t[DATA_BLOCK_SIZE + pageSize]);
-					alignedBuffer = (ptrdiff_t) newBufferSa.get();
-					if ((alignedBuffer % pageSize) != 0) {
-						alignedBuffer &= ~((ptrdiff_t)pageSize - 1);
-						alignedBuffer += pageSize;
-					}
-					readBufferPtr = (void*) alignedBuffer;
-					i = fp->pread( readBufferPtr, offset, DATA_BLOCK_SIZE );
-					memcpy(bufferPtr, readBufferPtr, i);
+			if (compType == 0)
+			{
+				newBufferSa.reset(new uint8_t[DATA_BLOCK_SIZE + pageSize]);
+				alignedBuffer = (ptrdiff_t) newBufferSa.get();
+				if ((alignedBuffer % pageSize) != 0) {
+					alignedBuffer &= ~((ptrdiff_t)pageSize - 1);
+					alignedBuffer += pageSize;
+				}
+				readBufferPtr = (void*) alignedBuffer;
+				i = fp->pread( readBufferPtr, offset, DATA_BLOCK_SIZE );
+				memcpy(bufferPtr, readBufferPtr, i);
 #ifdef IDB_COMP_POC_DEBUG
-{
-boost::mutex::scoped_lock lk(primitiveprocessor::compDebugMutex);
-cout << "pread2(" << fd << ", 0x" << hex << (ptrdiff_t)readBufferPtr << dec << ", " << DATA_BLOCK_SIZE << ", " << offset << ") = " << i << endl;
-}
+				{
+					boost::mutex::scoped_lock lk(primitiveprocessor::compDebugMutex);
+					cout << "pread2(" << fd << ", 0x" << hex << (ptrdiff_t)readBufferPtr << dec << ", " << DATA_BLOCK_SIZE << ", " << offset << ") = " << i << endl;
+				}
 #endif // IDB_COMP_POC_DEBUG
-				}  // if (compType == 0)
-				else {  // if (compType != 0)
+			}  // if (compType == 0)
+			else {  // if (compType != 0)
 // retry if file is out of sync -- compressed column file only.
 blockReadRetry:
 
-					uCmpBufSa.reset(new unsigned char[4 * 1024 * 1024 + 4]);
-					uCmpBuf = uCmpBufSa.get();
-					cmpHdrBufSa.reset(new char[4096 * 3 + pageSize]);
-					alignedBuffer = (ptrdiff_t) cmpHdrBufSa.get();
-					if ((alignedBuffer % pageSize) != 0) {
-						alignedBuffer &= ~((ptrdiff_t)pageSize - 1);
-						alignedBuffer += pageSize;
-					}
-					cmpHdrBuf = (char*) alignedBuffer;
+				uCmpBufSa.reset(new unsigned char[4 * 1024 * 1024 + 4]);
+				uCmpBuf = uCmpBufSa.get();
+				cmpHdrBufSa.reset(new char[4096 * 3 + pageSize]);
+				alignedBuffer = (ptrdiff_t) cmpHdrBufSa.get();
+				if ((alignedBuffer % pageSize) != 0) {
+					alignedBuffer &= ~((ptrdiff_t)pageSize - 1);
+					alignedBuffer += pageSize;
+				}
+				cmpHdrBuf = (char*) alignedBuffer;
 
-					i = fp->pread( &cmpHdrBuf[0], 0, 4096 * 3);
+				i = fp->pread( &cmpHdrBuf[0], 0, 4096 * 3);
 
-					CompChunkPtrList ptrList;
-					IDBCompressInterface decompressor;
-					int dcrc = 0;
-					if (i == 4096 * 3) {
-						uint64_t numHdrs = 0; // extra headers
-						dcrc = decompressor.getPtrList(&cmpHdrBuf[4096], 4096, ptrList);
-						if (dcrc == 0 && ptrList.size() > 0)
-							numHdrs = ptrList[0].first / 4096ULL - 2ULL;
+				CompChunkPtrList ptrList;
+				IDBCompressInterface decompressor;
+				int dcrc = 0;
+				if (i == 4096 * 3) {
+					uint64_t numHdrs = 0; // extra headers
+					dcrc = decompressor.getPtrList(&cmpHdrBuf[4096], 4096, ptrList);
+					if (dcrc == 0 && ptrList.size() > 0)
+						numHdrs = ptrList[0].first / 4096ULL - 2ULL;
 
-						if (numHdrs > 0) {
-							boost::scoped_array<char> nextHdrBufsa(new char[numHdrs * 4096 + pageSize]);
-							alignedBuffer = (ptrdiff_t) nextHdrBufsa.get();
-							if ((alignedBuffer % pageSize) != 0) {
-								alignedBuffer &= ~((ptrdiff_t)pageSize - 1);
-								alignedBuffer += pageSize;
-							}
-							char* nextHdrBufPtr = (char*) alignedBuffer;
-
-							i = fp->pread( &nextHdrBufPtr[0], 4096 * 2, numHdrs * 4096 );
-
-							CompChunkPtrList nextPtrList;
-							dcrc = decompressor.getPtrList(&nextHdrBufPtr[0], numHdrs * 4096, nextPtrList);
-							if (dcrc == 0)
-								ptrList.insert(ptrList.end(), nextPtrList.begin(), nextPtrList.end());
+					if (numHdrs > 0) {
+						boost::scoped_array<char> nextHdrBufsa(new char[numHdrs * 4096 + pageSize]);
+						alignedBuffer = (ptrdiff_t) nextHdrBufsa.get();
+						if ((alignedBuffer % pageSize) != 0) {
+							alignedBuffer &= ~((ptrdiff_t)pageSize - 1);
+							alignedBuffer += pageSize;
 						}
+						char* nextHdrBufPtr = (char*) alignedBuffer;
+
+						i = fp->pread( &nextHdrBufPtr[0], 4096 * 2, numHdrs * 4096 );
+
+						CompChunkPtrList nextPtrList;
+						dcrc = decompressor.getPtrList(&nextHdrBufPtr[0], numHdrs * 4096, nextPtrList);
+						if (dcrc == 0)
+							ptrList.insert(ptrList.end(), nextPtrList.begin(), nextPtrList.end());
+					}
+				}
+
+				if (dcrc != 0 || idx >= ptrList.size()) {
+					// Due to race condition, the header on disk may not upated yet.
+					// Log an info message and retry.
+					if (blockReadRetryCount == 0) {
+						logging::Message::Args args;
+						args.add(oid);
+						ostringstream infoMsg;
+						infoMsg << "retry read from " << fileNamePtr << ". dcrc=" << dcrc
+						<< ", idx=" << idx << ", ptr.size=" << ptrList.size();
+						args.add(infoMsg.str());
+						mlp->logInfoMessage(logging::M0061, args);
 					}
 
-					if (dcrc != 0 || idx >= ptrList.size()) {
+					if (++blockReadRetryCount < 30) {
+						waitForRetry(blockReadRetryCount);
+						goto blockReadRetry;
+					}
+					else {
+						rc = -1004;
+					}
+				}
+
+				if (rc == 0) {
+					unsigned cmpBlkOff = offset % (4 * 1024 * 1024);
+					uint64_t cmpBufOff = ptrList[idx].first;
+					uint64_t cmpBufSz = ptrList[idx].second;
+					if (cmpBufSa.get() == NULL || cmpBufLen < cmpBufSz) {
+						cmpBufSa.reset(new char[cmpBufSz + pageSize]);
+						cmpBufLen = cmpBufSz;
+						alignedBuffer = (ptrdiff_t) cmpBufSa.get();
+						if ((alignedBuffer % pageSize) != 0) {
+							alignedBuffer &= ~((ptrdiff_t)pageSize - 1);
+							alignedBuffer += pageSize;
+						}
+						cmpBuf = (char*) alignedBuffer;
+					}
+					unsigned blen = 4 * 1024 * 1024;
+
+					i = fp->pread( cmpBuf, cmpBufOff, cmpBufSz );
+
+					dcrc = decompressor.uncompressBlock(cmpBuf, cmpBufSz, uCmpBuf, blen);
+					if (dcrc == 0) {
+						memcpy(bufferPtr, &uCmpBuf[cmpBlkOff], DATA_BLOCK_SIZE);
+					}
+					else {
 						// Due to race condition, the header on disk may not upated yet.
 						// Log an info message and retry.
 						if (blockReadRetryCount == 0) {
@@ -655,7 +699,7 @@ blockReadRetry:
 							args.add(oid);
 							ostringstream infoMsg;
 							infoMsg << "retry read from " << fileNamePtr << ". dcrc=" << dcrc
-									<< ", idx=" << idx << ", ptr.size=" << ptrList.size();
+							<< ", idx=" << idx << ", ptr.size=" << ptrList.size();
 							args.add(infoMsg.str());
 							mlp->logInfoMessage(logging::M0061, args);
 						}
@@ -665,263 +709,219 @@ blockReadRetry:
 							goto blockReadRetry;
 						}
 						else {
-							rc = -1004;
-						}
-					}
-
-					if (rc == 0) {
-						unsigned cmpBlkOff = offset % (4 * 1024 * 1024);
-						uint64_t cmpBufOff = ptrList[idx].first;
-						uint64_t cmpBufSz = ptrList[idx].second;
-						if (cmpBufSa.get() == NULL || cmpBufLen < cmpBufSz) {
-							cmpBufSa.reset(new char[cmpBufSz + pageSize]);
-							cmpBufLen = cmpBufSz;
-							alignedBuffer = (ptrdiff_t) cmpBufSa.get();
-							if ((alignedBuffer % pageSize) != 0) {
-								alignedBuffer &= ~((ptrdiff_t)pageSize - 1);
-								alignedBuffer += pageSize;
-							}
-							cmpBuf = (char*) alignedBuffer;
-						}
-						unsigned blen = 4 * 1024 * 1024;
-
-						i = fp->pread( cmpBuf, cmpBufOff, cmpBufSz );
-
-						dcrc = decompressor.uncompressBlock(cmpBuf, cmpBufSz, uCmpBuf, blen);
-						if (dcrc == 0) {
-							memcpy(bufferPtr, &uCmpBuf[cmpBlkOff], DATA_BLOCK_SIZE);
-						}
-						else {
-							// Due to race condition, the header on disk may not upated yet.
-							// Log an info message and retry.
-							if (blockReadRetryCount == 0) {
-								logging::Message::Args args;
-								args.add(oid);
-								ostringstream infoMsg;
-								infoMsg << "retry read from " << fileNamePtr << ". dcrc=" << dcrc
-										<< ", idx=" << idx << ", ptr.size=" << ptrList.size();
-								args.add(infoMsg.str());
-								mlp->logInfoMessage(logging::M0061, args);
-							}
-
-							if (++blockReadRetryCount < 30) {
-								waitForRetry(blockReadRetryCount);
-								goto blockReadRetry;
-							}
-							else {
-								rc = -1006;
-							}
+							rc = -1006;
 						}
 					}
 				}
-
-				if ( rc < 0 ) {
-					string msg("pread failed");
-					ostringstream infoMsg;
-					infoMsg << " rc:" << rc << ")";
-					msg = msg + ", error:" + strerror(errno) + infoMsg.str();
-					SUMMARY_INFO(msg);
-					//FIXME: free-up allocated memory!
-					throw std::runtime_error(msg);
-				}
-			}
-			catch (...) {
-				delete fp;
-				fp = 0;
-				throw;
 			}
 
+			if ( rc < 0 ) {
+				string msg("pread failed");
+				ostringstream infoMsg;
+				infoMsg << " rc:" << rc << ")";
+				msg = msg + ", error:" + strerror(errno) + infoMsg.str();
+				SUMMARY_INFO(msg);
+				//FIXME: free-up allocated memory!
+				throw std::runtime_error(msg);
+			}
+		}
+		catch (...) {
 			delete fp;
 			fp = 0;
-			// log the retries
-			if (blockReadRetryCount > 0) {
-				logging::Message::Args args;
-				args.add(oid);
-				ostringstream infoMsg;
-				infoMsg << "Successfully uncompress " << fileNamePtr << " chunk "
-						<< idx << " @" << " blockReadRetry:" << blockReadRetryCount;
-				args.add(infoMsg.str());
-				mlp->logInfoMessage(logging::M0006, args);
-			}
-
-			if (pWasBlockInCache)
-				*pWasBlockInCache = false;
-			if (rCount)
-				*rCount = 1;
-
-			return;
+			throw;
 		}
 
-		FileBuffer* fbPtr=0;
-		bool wasBlockInCache=false;
-
-		fbPtr = bc.getBlockPtr(lbid, ver, flg);
-		if (fbPtr) {
-			memcpy(bufferPtr, fbPtr->getData(), BLOCK_SIZE);
-			wasBlockInCache = true;
-		}
-
-		if (doPrefetch && !wasBlockInCache && !flg) {
-			prefetchBlocks(lbid, compType, &blksRead);
-
-#ifndef _MSC_VER
-			if (fPMProfOn)
-				pmstats.markEvent(lbid, (pthread_t)-1, sessionID, 'M');
-#endif
-				bc.getBlock(lbid, v, txn, compType, (uint8_t *) bufferPtr, flg, wasBlockInCache);
-				if (!wasBlockInCache)
-					blksRead++;
-		}
-		else if (!wasBlockInCache) {
-			bc.getBlock(lbid, v, txn, compType, (uint8_t *) bufferPtr, flg, wasBlockInCache);
-			if (!wasBlockInCache)
-				blksRead++;
+		delete fp;
+		fp = 0;
+		// log the retries
+		if (blockReadRetryCount > 0) {
+			logging::Message::Args args;
+			args.add(oid);
+			ostringstream infoMsg;
+			infoMsg << "Successfully uncompress " << fileNamePtr << " chunk "
+			<< idx << " @" << " blockReadRetry:" << blockReadRetryCount;
+			args.add(infoMsg.str());
+			mlp->logInfoMessage(logging::M0006, args);
 		}
 
 		if (pWasBlockInCache)
-			*pWasBlockInCache = wasBlockInCache;
+			*pWasBlockInCache = false;
 		if (rCount)
-			*rCount = blksRead;
+			*rCount = 1;
 
+		return;
 	}
 
-	struct AsynchLoader {
-		AsynchLoader(uint64_t l,
-					const QueryContext &v,
-					uint32_t t,
-					int ct,
-					uint32_t *cCount,
-					uint32_t *rCount,
-					bool trace,
-					uint32_t sesID,
-					boost::mutex *m,
-					uint32_t *loaderCount,
-					VSSCache *vCache) :
-								lbid(l),
-								ver(v),
-								txn(t),
-								compType(ct),
-								LBIDTrace(trace),
-								sessionID(sesID),
-								cacheCount(cCount),
-								readCount(rCount),
-								busyLoaders(loaderCount),
-								mutex(m),
-								vssCache(vCache)
-		{ }
+	FileBuffer* fbPtr=0;
+	bool wasBlockInCache=false;
 
-		void operator()()
-		{
-			bool cached=false;
-			uint32_t rCount=0;
-			char buf[BLOCK_SIZE];
+	fbPtr = bc.getBlockPtr(lbid, ver, flg);
+	if (fbPtr) {
+		memcpy(bufferPtr, fbPtr->getData(), BLOCK_SIZE);
+		wasBlockInCache = true;
+	}
 
- 			//cout << "asynch started " << pthread_self() << " l: " << lbid << endl;
-			try {
-				loadBlock(lbid, ver, txn, compType, buf, &cached, &rCount, LBIDTrace, sessionID, true, vssCache);
-			}
-			catch (std::exception& ex) {
-				cerr << "AsynchLoader caught loadBlock exception: " << ex.what() << endl;
-				idbassert(asyncCounter > 0);
-				(void)atomicops::atomicDec(&asyncCounter);
-				mutex->lock();
-				--(*busyLoaders);
-				mutex->unlock();
-				logging::Message::Args args;
-				args.add(string("PrimProc AsyncLoader caught error: "));
-				args.add(ex.what());
-				primitiveprocessor::mlp->logMessage(logging::M0000, args, false);
-				return;
-			}
-			catch (...) {
-				cerr << "AsynchLoader caught unknown exception: " << endl;
-				//FIXME Use a locked processor primitive?
-				idbassert(asyncCounter > 0);
-				(void)atomicops::atomicDec(&asyncCounter);
-				mutex->lock();
-				--(*busyLoaders);
-				mutex->unlock();
-				logging::Message::Args args;
-				args.add(string("PrimProc AsyncLoader caught unknown error"));
-				primitiveprocessor::mlp->logMessage(logging::M0000, args, false);
-				return;
-			}
+	if (doPrefetch && !wasBlockInCache && !flg) {
+		prefetchBlocks(lbid, compType, &blksRead);
+
+#ifndef _MSC_VER
+		if (fPMProfOn)
+			pmstats.markEvent(lbid, (pthread_t)-1, sessionID, 'M');
+#endif
+		bc.getBlock(lbid, v, txn, compType, (uint8_t *) bufferPtr, flg, wasBlockInCache);
+		if (!wasBlockInCache)
+			blksRead++;
+	}
+	else if (!wasBlockInCache) {
+		bc.getBlock(lbid, v, txn, compType, (uint8_t *) bufferPtr, flg, wasBlockInCache);
+		if (!wasBlockInCache)
+			blksRead++;
+	}
+
+	if (pWasBlockInCache)
+		*pWasBlockInCache = wasBlockInCache;
+	if (rCount)
+		*rCount = blksRead;
+
+}
+
+struct AsynchLoader {
+	AsynchLoader(uint64_t l,
+				 const QueryContext &v,
+				 uint32_t t,
+				 int ct,
+				 uint32_t *cCount,
+				 uint32_t *rCount,
+				 bool trace,
+				 uint32_t sesID,
+				 boost::mutex *m,
+				 uint32_t *loaderCount,
+				 VSSCache *vCache) :
+		lbid(l),
+		ver(v),
+		txn(t),
+		compType(ct),
+		LBIDTrace(trace),
+		sessionID(sesID),
+		cacheCount(cCount),
+		readCount(rCount),
+		busyLoaders(loaderCount),
+		mutex(m),
+		vssCache(vCache)
+	{ }
+
+	void operator()()
+	{
+		bool cached=false;
+		uint32_t rCount=0;
+		char buf[BLOCK_SIZE];
+
+		//cout << "asynch started " << pthread_self() << " l: " << lbid << endl;
+		try {
+			loadBlock(lbid, ver, txn, compType, buf, &cached, &rCount, LBIDTrace, sessionID, true, vssCache);
+		}
+		catch (std::exception& ex) {
+			cerr << "AsynchLoader caught loadBlock exception: " << ex.what() << endl;
 			idbassert(asyncCounter > 0);
 			(void)atomicops::atomicDec(&asyncCounter);
 			mutex->lock();
-			if (cached)
-				(*cacheCount)++;
-			*readCount += rCount;
 			--(*busyLoaders);
 			mutex->unlock();
-// 			cerr << "done\n";
-		}
-
-		private:
-			uint64_t lbid;
-			QueryContext ver;
-			uint32_t txn;
-			int compType;
-			uint8_t dataWidth;
-			bool LBIDTrace;
-			uint32_t sessionID;
-			uint32_t *cacheCount;
-			uint32_t *readCount;
-			uint32_t *busyLoaders;
-			boost::mutex *mutex;
-			VSSCache *vssCache;
-	};
-
-	void loadBlockAsync(uint64_t lbid,
-						const QueryContext &c,
-						uint32_t txn,
-						int compType,
-						uint32_t *cCount,
-						uint32_t *rCount,
-						bool LBIDTrace,
-						uint32_t sessionID,
-						boost::mutex *m,
-						uint32_t *busyLoaders,
-						VSSCache *vssCache)
-	{
-		blockCacheClient bc(*BRPp[cacheNum(lbid)]);
-		bool vbFlag;
-		BRM::VER_t ver;
-		VSSCache::iterator it;
-
-		if (vssCache) {
-			it = vssCache->find(lbid);
-			if (it != vssCache->end()) {
-				//cout << "async: vss cache hit on " << lbid << endl;
-				VSSData &vd = it->second;
-				ver = vd.verID;
-				vbFlag = vd.vbFlag;
-			}
-		}
-		if (!vssCache || it == vssCache->end())
-			brm->vssLookup((BRM::LBID_t) lbid, c, txn, &ver, &vbFlag);
-
-		if (bc.exists(lbid, ver))
+			logging::Message::Args args;
+			args.add(string("PrimProc AsyncLoader caught error: "));
+			args.add(ex.what());
+			primitiveprocessor::mlp->logMessage(logging::M0000, args, false);
 			return;
-
-		/* a quick and easy stand-in for a threadpool for loaders */
-		atomicops::atomicMb();
-		if (asyncCounter >= asyncMax)
-			return;
-		(void)atomicops::atomicInc(&asyncCounter);
-
-		mutex::scoped_lock sl(*m);
-		try {
-			boost::thread thd(AsynchLoader(lbid, c, txn, compType, cCount, rCount,
-				LBIDTrace, sessionID, m, busyLoaders, vssCache));
-			(*busyLoaders)++;
 		}
-		catch (boost::thread_resource_error &e) {
-			cerr << "AsynchLoader: caught a thread resource error, need to lower asyncMax\n";
+		catch (...) {
+			cerr << "AsynchLoader caught unknown exception: " << endl;
+			//FIXME Use a locked processor primitive?
 			idbassert(asyncCounter > 0);
 			(void)atomicops::atomicDec(&asyncCounter);
+			mutex->lock();
+			--(*busyLoaders);
+			mutex->unlock();
+			logging::Message::Args args;
+			args.add(string("PrimProc AsyncLoader caught unknown error"));
+			primitiveprocessor::mlp->logMessage(logging::M0000, args, false);
+			return;
+		}
+		idbassert(asyncCounter > 0);
+		(void)atomicops::atomicDec(&asyncCounter);
+		mutex->lock();
+		if (cached)
+			(*cacheCount)++;
+		*readCount += rCount;
+		--(*busyLoaders);
+		mutex->unlock();
+// 			cerr << "done\n";
+	}
+
+private:
+	uint64_t lbid;
+	QueryContext ver;
+	uint32_t txn;
+	int compType;
+	uint8_t dataWidth;
+	bool LBIDTrace;
+	uint32_t sessionID;
+	uint32_t *cacheCount;
+	uint32_t *readCount;
+	uint32_t *busyLoaders;
+	boost::mutex *mutex;
+	VSSCache *vssCache;
+};
+
+void loadBlockAsync(uint64_t lbid,
+					const QueryContext &c,
+					uint32_t txn,
+					int compType,
+					uint32_t *cCount,
+					uint32_t *rCount,
+					bool LBIDTrace,
+					uint32_t sessionID,
+					boost::mutex *m,
+					uint32_t *busyLoaders,
+					VSSCache *vssCache)
+{
+	blockCacheClient bc(*BRPp[cacheNum(lbid)]);
+	bool vbFlag;
+	BRM::VER_t ver;
+	VSSCache::iterator it;
+
+	if (vssCache) {
+		it = vssCache->find(lbid);
+		if (it != vssCache->end()) {
+			//cout << "async: vss cache hit on " << lbid << endl;
+			VSSData &vd = it->second;
+			ver = vd.verID;
+			vbFlag = vd.vbFlag;
 		}
 	}
+	if (!vssCache || it == vssCache->end())
+		brm->vssLookup((BRM::LBID_t) lbid, c, txn, &ver, &vbFlag);
+
+	if (bc.exists(lbid, ver))
+		return;
+
+	/* a quick and easy stand-in for a threadpool for loaders */
+	atomicops::atomicMb();
+	if (asyncCounter >= asyncMax)
+		return;
+	(void)atomicops::atomicInc(&asyncCounter);
+
+	mutex::scoped_lock sl(*m);
+	try {
+		boost::thread thd(AsynchLoader(lbid, c, txn, compType, cCount, rCount,
+									   LBIDTrace, sessionID, m, busyLoaders, vssCache));
+		(*busyLoaders)++;
+	}
+	catch (boost::thread_resource_error &e) {
+		cerr << "AsynchLoader: caught a thread resource error, need to lower asyncMax\n";
+		idbassert(asyncCounter > 0);
+		(void)atomicops::atomicDec(&asyncCounter);
+	}
+}
 
 } //namespace primitiveprocessor
 
@@ -1006,7 +1006,7 @@ private:
 };
 
 DictScanJob::DictScanJob(SP_UM_IOSOCK ios, SBS bs, SP_UM_MUTEX writeLock) :
-		fIos(ios), fByteStream(bs), fWriteLock(writeLock)
+	fIos(ios), fByteStream(bs), fWriteLock(writeLock)
 {
 	dieTime = posix_time::second_clock::universal_time() + posix_time::seconds(100);
 }
@@ -1076,14 +1076,14 @@ int DictScanJob::operator()()
 
 		for (uint16_t i = 0; i < runCount; ++i) {
 			loadBlock(cmd->LBID,
-				verInfo,
-				cmd->Hdr.TransactionID,
-				cmd->CompType,
-				data,
-				&wasBlockInCache,
-				&blocksRead,
-				fLBIDTraceOn,
-				session);
+					  verInfo,
+					  cmd->Hdr.TransactionID,
+					  cmd->CompType,
+					  data,
+					  &wasBlockInCache,
+					  &blocksRead,
+					  fLBIDTraceOn,
+					  session);
 			pproc.setBlockPtr((int*) data);
 			pproc.p_TokenByScan(cmd, output, output_buf_size, utf8, eqFilter);
 
@@ -1138,40 +1138,51 @@ struct BPPHandler
 {
 	BPPHandler(PrimitiveServer* ps) : fPrimitiveServerPtr(ps) { }
 
-    struct BPPHandlerFunctor : public PriorityThreadPool::Functor {
-        BPPHandlerFunctor(BPPHandler *r, SBS b) : rt(r), bs(b)
-        {
-            dieTime = posix_time::second_clock::universal_time() + posix_time::seconds(100);
-        }
+	struct BPPHandlerFunctor : public PriorityThreadPool::Functor {
+		BPPHandlerFunctor(BPPHandler *r, SBS b) : rt(r), bs(b)
+		{
+			dieTime = posix_time::second_clock::universal_time() + posix_time::seconds(100);
+		}
 
-        BPPHandler *rt;
-        SBS bs;
-        posix_time::ptime dieTime;
-    };
+		BPPHandler *rt;
+		SBS bs;
+		posix_time::ptime dieTime;
+	};
 
 	struct LastJoiner : public BPPHandlerFunctor {
-        LastJoiner(BPPHandler *r, SBS b) : BPPHandlerFunctor(r, b) { }
-        int operator()() { return rt->lastJoinerMsg(*bs, dieTime); }
+		LastJoiner(BPPHandler *r, SBS b) : BPPHandlerFunctor(r, b) { }
+		int operator()() {
+			return rt->lastJoinerMsg(*bs, dieTime);
+		}
 	};
 
 	struct Create : public BPPHandlerFunctor {
-        Create(BPPHandler *r, SBS b) : BPPHandlerFunctor(r, b) { }
-        int operator()() { rt->createBPP(*bs); return 0; }
+		Create(BPPHandler *r, SBS b) : BPPHandlerFunctor(r, b) { }
+		int operator()() {
+			rt->createBPP(*bs);
+			return 0;
+		}
 	};
 
-    struct Destroy : public BPPHandlerFunctor {
-        Destroy(BPPHandler *r, SBS b) : BPPHandlerFunctor(r, b) { }
-        int operator()() { return rt->destroyBPP(*bs, dieTime); }
+	struct Destroy : public BPPHandlerFunctor {
+		Destroy(BPPHandler *r, SBS b) : BPPHandlerFunctor(r, b) { }
+		int operator()() {
+			return rt->destroyBPP(*bs, dieTime);
+		}
 	};
 
-    struct AddJoiner : public BPPHandlerFunctor {
-        AddJoiner(BPPHandler *r, SBS b) : BPPHandlerFunctor(r, b) { }
-        int operator()() { return rt->addJoinerToBPP(*bs, dieTime); }
+	struct AddJoiner : public BPPHandlerFunctor {
+		AddJoiner(BPPHandler *r, SBS b) : BPPHandlerFunctor(r, b) { }
+		int operator()() {
+			return rt->addJoinerToBPP(*bs, dieTime);
+		}
 	};
 
-    struct Abort : public BPPHandlerFunctor {
-        Abort(BPPHandler *r, SBS b) : BPPHandlerFunctor(r, b) { }
-        int operator()() { return rt->doAbort(*bs, dieTime); }
+	struct Abort : public BPPHandlerFunctor {
+		Abort(BPPHandler *r, SBS b) : BPPHandlerFunctor(r, b) { }
+		int operator()() {
+			return rt->doAbort(*bs, dieTime);
+		}
 	};
 
 	int doAbort(ByteStream &bs, const posix_time::ptime &dieTime)
@@ -1187,13 +1198,13 @@ struct BPPHandler
 			it->second->abort();
 			bppMap.erase(it);
 		}
-        else {
-            bs.rewind();
-            if (posix_time::second_clock::universal_time() > dieTime)
-                return 0;
-            else
-                return -1;
-        }
+		else {
+			bs.rewind();
+			if (posix_time::second_clock::universal_time() > dieTime)
+				return 0;
+			else
+				return -1;
+		}
 		scoped.unlock();
 		fPrimitiveServerPtr->getProcessorThreadPool()->removeJobs(key);
 		OOBPool->removeJobs(key);
@@ -1213,11 +1224,11 @@ struct BPPHandler
 
 		bpps = grabBPPs(key);
 		if (bpps) {
-            bpps->getSendThread()->sendMore(msgCount);
-            return 0;
-        }
+			bpps->getSendThread()->sendMore(msgCount);
+			return 0;
+		}
 		else
-            return -1;
+			return -1;
 	}
 
 	void createBPP(ByteStream &bs)
@@ -1230,10 +1241,10 @@ struct BPPHandler
 		// make the new BPP object
 		bppv.reset(new BPPV());
 		bpp.reset(new BatchPrimitiveProcessor(bs, fPrimitiveServerPtr->prefetchThreshold(),
-			bppv->getSendThread()));
+											  bppv->getSendThread()));
 		if (bs.length() > 0)
 			bs >> initMsgsLeft;
-		else{
+		else {
 			initMsgsLeft = -1;
 		}
 
@@ -1262,21 +1273,21 @@ struct BPPHandler
 		if (!newInsert) {
 			if (bpp->getSessionID() & 0x80000000)
 				cerr << "warning: createBPP() tried to clobber a BPP with duplicate sessionID & stepID. sessionID=" <<
-					(int) (bpp->getSessionID() ^ 0x80000000) << " stepID=" <<
-					bpp->getStepID()<< " (syscat)" << endl;
+					 (int) (bpp->getSessionID() ^ 0x80000000) << " stepID=" <<
+					 bpp->getStepID()<< " (syscat)" << endl;
 			else
 				cerr << "warning: createBPP() tried to clobber a BPP with duplicate sessionID & stepID.  sessionID=" <<
-					bpp->getSessionID() << " stepID=" << bpp->getStepID()<< endl;
+					 bpp->getSessionID() << " stepID=" << bpp->getStepID()<< endl;
 		}
 	}
 
 	SBPPV grabBPPs(uint32_t uniqueID)
 	{
 		BPPMap::iterator it;
-/*
-		uint32_t failCount = 0;
-		uint32_t maxFailCount = (fatal ? 500 : 5000);
-*/
+		/*
+				uint32_t failCount = 0;
+				uint32_t maxFailCount = (fatal ? 500 : 5000);
+		*/
 		SBPPV ret;
 
 		mutex::scoped_lock scoped(bppLock);
@@ -1284,24 +1295,24 @@ struct BPPHandler
 		if (it != bppMap.end())
 			return it->second;
 		else
-            return SBPPV();
-/*
-		do
-		{
-			if (++failCount == maxFailCount) {
-				//cout << "grabBPPs couldn't find the BPPs for " << uniqueID << endl;
-				return ret;
-				//throw logic_error("grabBPPs couldn't find the unique ID");
-			}
-			scoped.unlock();
-			usleep(5000);
-			scoped.lock();
-			it = bppMap.find(uniqueID);
-		} while (it == bppMap.end());
+			return SBPPV();
+		/*
+				do
+				{
+					if (++failCount == maxFailCount) {
+						//cout << "grabBPPs couldn't find the BPPs for " << uniqueID << endl;
+						return ret;
+						//throw logic_error("grabBPPs couldn't find the unique ID");
+					}
+					scoped.unlock();
+					usleep(5000);
+					scoped.lock();
+					it = bppMap.find(uniqueID);
+				} while (it == bppMap.end());
 
-		ret = it->second;
-		return ret;
-*/
+				ret = it->second;
+				return ret;
+		*/
 	}
 
 	int addJoinerToBPP(ByteStream &bs, const posix_time::ptime &dieTime)
@@ -1322,10 +1333,10 @@ struct BPPHandler
 			return 0;
 		}
 		else {
-            if (posix_time::second_clock::universal_time() > dieTime)
-                return 0;
-            else
-                return -1;
+			if (posix_time::second_clock::universal_time() > dieTime)
+				return 0;
+			else
+				return -1;
 		}
 	}
 
@@ -1334,7 +1345,7 @@ struct BPPHandler
 		SBPPV bppv;
 		uint32_t uniqueID, i;
 		const uint8_t *buf;
-        int err;
+		int err;
 
 		/* call endOfJoiner() on the every BPP */
 
@@ -1343,24 +1354,24 @@ struct BPPHandler
 		uniqueID = *((const uint32_t *) &buf[sizeof(ISMPacketHeader) + 2*sizeof(uint32_t)]);
 
 		bppv = grabBPPs(uniqueID);
-        if (!bppv) {
-            //cout << "got a lastJoiner msg for an unknown obj " << uniqueID << endl;
-            if (posix_time::second_clock::universal_time() > dieTime)
-                return 0;
-            else
-                return -1;
-        }
+		if (!bppv) {
+			//cout << "got a lastJoiner msg for an unknown obj " << uniqueID << endl;
+			if (posix_time::second_clock::universal_time() > dieTime)
+				return 0;
+			else
+				return -1;
+		}
 
 		mutex::scoped_lock lk(djLock);
 		for (i = 0; i < bppv->get().size(); i++) {
 			err = bppv->get()[i]->endOfJoiner();
 			if (err == -1) {
-                if (posix_time::second_clock::universal_time() > dieTime)
-                    return 0;
-                else
-                    return -1;
+				if (posix_time::second_clock::universal_time() > dieTime)
+					return 0;
+				else
+					return -1;
 			}
-        }
+		}
 
 		/* Note: some of the duplicate/run/join sync was moved to the BPPV class to do
 		more intelligent scheduling.  Once the join data is received, BPPV will
@@ -1381,31 +1392,31 @@ struct BPPHandler
 		bs >> stepID;
 		bs >> uniqueID;
 
-        mutex::scoped_lock lk(djLock);
-        mutex::scoped_lock scoped(bppLock);
+		mutex::scoped_lock lk(djLock);
+		mutex::scoped_lock scoped(bppLock);
 
-        it = bppMap.find(uniqueID);
-        if (it != bppMap.end()) {
-            it->second->abort();
-            bppMap.erase(it);
-        }
-        else {
-            //cout << "got a destroy for an unknown obj " << uniqueID << endl;
-            bs.rewind();
-            if (posix_time::second_clock::universal_time() > dieTime)
-                return 0;
-            else
-                return -1;
-        }
+		it = bppMap.find(uniqueID);
+		if (it != bppMap.end()) {
+			it->second->abort();
+			bppMap.erase(it);
+		}
+		else {
+			//cout << "got a destroy for an unknown obj " << uniqueID << endl;
+			bs.rewind();
+			if (posix_time::second_clock::universal_time() > dieTime)
+				return 0;
+			else
+				return -1;
+		}
 // 			cout << "  destroy: new size is " << bppMap.size() << endl;
-/*
-		if (sessionID & 0x80000000)
-			cerr << "destroyed BPP instances for sessionID " << (int)
-			(sessionID ^ 0x80000000) << " stepID "<< stepID << " (syscat)\n";
-		else
-			cerr << "destroyed BPP instances for sessionID " << sessionID <<
-			" stepID "<< stepID << endl;
-*/
+		/*
+				if (sessionID & 0x80000000)
+					cerr << "destroyed BPP instances for sessionID " << (int)
+					(sessionID ^ 0x80000000) << " stepID "<< stepID << " (syscat)\n";
+				else
+					cerr << "destroyed BPP instances for sessionID " << sessionID <<
+					" stepID "<< stepID << endl;
+		*/
 		fPrimitiveServerPtr->getProcessorThreadPool()->removeJobs(uniqueID);
 		OOBPool->removeJobs(uniqueID);
 		return 0;
@@ -1424,27 +1435,27 @@ struct BPPHandler
 			bppMap.begin()->second.get()->get()[0]->setError(error, errorCode);
 	}
 
-    // Would be good to define the structure of these msgs somewhere...
-    inline uint32_t getUniqueID(SBS bs, uint8_t command)
-    {
-        uint8_t *buf;
+	// Would be good to define the structure of these msgs somewhere...
+	inline uint32_t getUniqueID(SBS bs, uint8_t command)
+	{
+		uint8_t *buf;
 
-        buf = bs->buf();
-        switch (command) {
-            case BATCH_PRIMITIVE_ABORT:
-                return *((uint32_t *) &buf[sizeof(ISMPacketHeader)]);
-            case BATCH_PRIMITIVE_ACK: {
-                ISMPacketHeader *ism = (ISMPacketHeader *) buf;
-                return ism->Interleave;
-            }
-            case BATCH_PRIMITIVE_ADD_JOINER:
-            case BATCH_PRIMITIVE_END_JOINER:
-            case BATCH_PRIMITIVE_DESTROY:
-                return *((uint32_t *) &buf[sizeof(ISMPacketHeader) + 2*sizeof(uint32_t)]);
-            default:
-                return 0;
-        }
-    }
+		buf = bs->buf();
+		switch (command) {
+		case BATCH_PRIMITIVE_ABORT:
+			return *((uint32_t *) &buf[sizeof(ISMPacketHeader)]);
+		case BATCH_PRIMITIVE_ACK: {
+			ISMPacketHeader *ism = (ISMPacketHeader *) buf;
+			return ism->Interleave;
+		}
+		case BATCH_PRIMITIVE_ADD_JOINER:
+		case BATCH_PRIMITIVE_END_JOINER:
+		case BATCH_PRIMITIVE_DESTROY:
+			return *((uint32_t *) &buf[sizeof(ISMPacketHeader) + 2*sizeof(uint32_t)]);
+		default:
+			return 0;
+		}
+	}
 
 	PrimitiveServer* fPrimitiveServerPtr;
 };
@@ -1556,7 +1567,8 @@ struct ReadThread
 	{
 		uint8_t *buf = bs.buf();
 		buf += sizeof(ISMPacketHeader);
-		uint32_t count = *((uint32_t *) buf); buf += 4;
+		uint32_t count = *((uint32_t *) buf);
+		buf += 4;
 		uint32_t *oids = (uint32_t *) buf;
 
 		for (int i = 0; i < fCacheCount; i++) {
@@ -1654,7 +1666,7 @@ struct ReadThread
 	void operator()()
 	{
 		boost::shared_ptr<threadpool::PriorityThreadPool> procPoolPtr =
-				fPrimitiveServerPtr->getProcessorThreadPool();
+			fPrimitiveServerPtr->getProcessorThreadPool();
 		SBS bs;
 		UmSocketSelector* pUmSocketSelector = UmSocketSelector::instance();
 
@@ -1690,195 +1702,195 @@ struct ReadThread
 				break;
 			}
 			try {
-			if (bs->length() != 0) {
-				idbassert(bs->length() >= sizeof(ISMPacketHeader));
+				if (bs->length() != 0) {
+					idbassert(bs->length() >= sizeof(ISMPacketHeader));
 
-				const ISMPacketHeader* ismHdr = reinterpret_cast<const ISMPacketHeader*>(bs->buf());
+					const ISMPacketHeader* ismHdr = reinterpret_cast<const ISMPacketHeader*>(bs->buf());
 
-				/* This switch is for the OOB commands */
-				switch(ismHdr->Command) {
-				case CACHE_FLUSH_PARTITION:
-					doCacheFlushByPartition(outIos, *bs);
-					fIos.close();
-					return;
-				case CACHE_FLUSH_BY_OID:
-					doCacheFlushByOID(outIos, *bs);
-					fIos.close();
-					return;
-				case CACHE_FLUSH:
-					doCacheFlushCmd(outIos, *bs);
-					fIos.close();
-					return;
-				case CACHE_CLEAN_VSS:
-					doCacheCleanVSSCmd(outIos, *bs);
-					fIos.close();
-					return;
-				case FLUSH_ALL_VERSION:
-					doCacheFlushAllversion(outIos, *bs);
-					fIos.close();
-					return;
-				case CACHE_DROP_FDS:
-					doCacheDropFDs(outIos, *bs);
-					fIos.close();
-					return;
-				case CACHE_PURGE_FDS:
-					doCachePurgeFDs(outIos, *bs);
-					fIos.close();
-					return;
-				default:
-					break;
-				}
-
-				switch(ismHdr->Command) {
-				case DICT_CREATE_EQUALITY_FILTER: {
-				    PriorityThreadPool::Job job;
-				    job.functor = boost::shared_ptr<PriorityThreadPool::Functor>(new CreateEqualityFilter(bs));
-				    OOBPool->addJob(job);
-					break;
-				}
-				case DICT_DESTROY_EQUALITY_FILTER: {
-				    PriorityThreadPool::Job job;
-				    job.functor = boost::shared_ptr<PriorityThreadPool::Functor>(new DestroyEqualityFilter(bs));
-				    OOBPool->addJob(job);
-					break;
-				}
-				case DICT_TOKEN_BY_SCAN_COMPARE: {
-					idbassert(bs->length() >= sizeof(TokenByScanRequestHeader));
-					TokenByScanRequestHeader *hdr = (TokenByScanRequestHeader *) ismHdr;
-					if (bRotateDest) {
-						if (!pUmSocketSelector->nextIOSocket(
-							fIos, outIos, writeLock)) {
-							// If we ever fall into this part of the
-							// code we have a "bug" of some sort.
-							// See handleUmSockSelErr() for more info.
-							// We reset ios and mutex to defaults.
-							handleUmSockSelErr(string("default cmd"));
-							outIos		= outIosDefault;
-							writeLock	= writeLockDefault;
-							pUmSocketSelector->delConnection(fIos);
-							bRotateDest = false;
-						}
+					/* This switch is for the OOB commands */
+					switch(ismHdr->Command) {
+					case CACHE_FLUSH_PARTITION:
+						doCacheFlushByPartition(outIos, *bs);
+						fIos.close();
+						return;
+					case CACHE_FLUSH_BY_OID:
+						doCacheFlushByOID(outIos, *bs);
+						fIos.close();
+						return;
+					case CACHE_FLUSH:
+						doCacheFlushCmd(outIos, *bs);
+						fIos.close();
+						return;
+					case CACHE_CLEAN_VSS:
+						doCacheCleanVSSCmd(outIos, *bs);
+						fIos.close();
+						return;
+					case FLUSH_ALL_VERSION:
+						doCacheFlushAllversion(outIos, *bs);
+						fIos.close();
+						return;
+					case CACHE_DROP_FDS:
+						doCacheDropFDs(outIos, *bs);
+						fIos.close();
+						return;
+					case CACHE_PURGE_FDS:
+						doCachePurgeFDs(outIos, *bs);
+						fIos.close();
+						return;
+					default:
+						break;
 					}
-                    PriorityThreadPool::Job job;
-                    job.functor = boost::shared_ptr<DictScanJob>(new DictScanJob(outIos,
-                      bs, writeLock));
-                    job.id = hdr->Hdr.UniqueID;
-                    job.weight = LOGICAL_BLOCK_RIDS;
-                    job.priority = hdr->Hdr.Priority;
-					if (hdr->flags & IS_SYSCAT) {
-						//boost::thread t(DictScanJob(outIos, bs, writeLock));
-						// using already-existing threads may cut latency
-                        // if it's changed back to running in an independent thread
-						// change the issyscat() checks in BPPSeeder as well
+
+					switch(ismHdr->Command) {
+					case DICT_CREATE_EQUALITY_FILTER: {
+						PriorityThreadPool::Job job;
+						job.functor = boost::shared_ptr<PriorityThreadPool::Functor>(new CreateEqualityFilter(bs));
 						OOBPool->addJob(job);
+						break;
 					}
-					else {
-						procPoolPtr->addJob(job);
-					}
-					break;
-				}
-				case BATCH_PRIMITIVE_RUN: {
-					if (bRotateDest) {
-						if (!pUmSocketSelector->nextIOSocket(
-							fIos, outIos, writeLock)) {
-
-							// If we ever fall into this part of the
-							// code we have a "bug" of some sort.
-							// See handleUmSockSelErr() for more info.
-							// We reset ios and mutex to defaults.
-							handleUmSockSelErr(string("BPR cmd"));
-							outIos		= outIosDefault;
-							writeLock	= writeLockDefault;
-							pUmSocketSelector->delConnection(fIos);
-							bRotateDest = false;
-						}
-					}
-					/* Decide whether this is a syscat call and run
-					right away instead of queueing */
-					boost::shared_ptr<BPPSeeder> bpps(new BPPSeeder(bs, writeLock, outIos,
-							fPrimitiveServerPtr->ProcessorThreads(),
-							fPrimitiveServerPtr->PTTrace()));
-                    PriorityThreadPool::Job job;
-                    job.functor = bpps;
-                    job.id = bpps->getID();
-                    job.weight = ismHdr->Size;
-                    job.priority = bpps->priority();
-					if (bpps->isSysCat()) {
-						//boost::thread t(*bpps);
-						// using already-existing threads may cut latency
-						// if it's changed back to running in an independent thread
-						// change the issyscat() checks in BPPSeeder as well
+					case DICT_DESTROY_EQUALITY_FILTER: {
+						PriorityThreadPool::Job job;
+						job.functor = boost::shared_ptr<PriorityThreadPool::Functor>(new DestroyEqualityFilter(bs));
 						OOBPool->addJob(job);
+						break;
 					}
-                    else {
-						procPoolPtr->addJob(job);
+					case DICT_TOKEN_BY_SCAN_COMPARE: {
+						idbassert(bs->length() >= sizeof(TokenByScanRequestHeader));
+						TokenByScanRequestHeader *hdr = (TokenByScanRequestHeader *) ismHdr;
+						if (bRotateDest) {
+							if (!pUmSocketSelector->nextIOSocket(
+										fIos, outIos, writeLock)) {
+								// If we ever fall into this part of the
+								// code we have a "bug" of some sort.
+								// See handleUmSockSelErr() for more info.
+								// We reset ios and mutex to defaults.
+								handleUmSockSelErr(string("default cmd"));
+								outIos		= outIosDefault;
+								writeLock	= writeLockDefault;
+								pUmSocketSelector->delConnection(fIos);
+								bRotateDest = false;
+							}
+						}
+						PriorityThreadPool::Job job;
+						job.functor = boost::shared_ptr<DictScanJob>(new DictScanJob(outIos,
+									  bs, writeLock));
+						job.id = hdr->Hdr.UniqueID;
+						job.weight = LOGICAL_BLOCK_RIDS;
+						job.priority = hdr->Hdr.Priority;
+						if (hdr->flags & IS_SYSCAT) {
+							//boost::thread t(DictScanJob(outIos, bs, writeLock));
+							// using already-existing threads may cut latency
+							// if it's changed back to running in an independent thread
+							// change the issyscat() checks in BPPSeeder as well
+							OOBPool->addJob(job);
+						}
+						else {
+							procPoolPtr->addJob(job);
+						}
+						break;
 					}
+					case BATCH_PRIMITIVE_RUN: {
+						if (bRotateDest) {
+							if (!pUmSocketSelector->nextIOSocket(
+										fIos, outIos, writeLock)) {
+
+								// If we ever fall into this part of the
+								// code we have a "bug" of some sort.
+								// See handleUmSockSelErr() for more info.
+								// We reset ios and mutex to defaults.
+								handleUmSockSelErr(string("BPR cmd"));
+								outIos		= outIosDefault;
+								writeLock	= writeLockDefault;
+								pUmSocketSelector->delConnection(fIos);
+								bRotateDest = false;
+							}
+						}
+						/* Decide whether this is a syscat call and run
+						right away instead of queueing */
+						boost::shared_ptr<BPPSeeder> bpps(new BPPSeeder(bs, writeLock, outIos,
+														  fPrimitiveServerPtr->ProcessorThreads(),
+														  fPrimitiveServerPtr->PTTrace()));
+						PriorityThreadPool::Job job;
+						job.functor = bpps;
+						job.id = bpps->getID();
+						job.weight = ismHdr->Size;
+						job.priority = bpps->priority();
+						if (bpps->isSysCat()) {
+							//boost::thread t(*bpps);
+							// using already-existing threads may cut latency
+							// if it's changed back to running in an independent thread
+							// change the issyscat() checks in BPPSeeder as well
+							OOBPool->addJob(job);
+						}
+						else {
+							procPoolPtr->addJob(job);
+						}
+						break;
+					}
+					case BATCH_PRIMITIVE_CREATE: {
+						PriorityThreadPool::Job job;
+						job.functor = boost::shared_ptr<PriorityThreadPool::Functor>(new BPPHandler::Create(&fBPPHandler, bs));
+						OOBPool->addJob(job);
+						//fBPPHandler.createBPP(*bs);
+						break;
+					}
+					case BATCH_PRIMITIVE_ADD_JOINER: {
+						PriorityThreadPool::Job job;
+						job.functor = boost::shared_ptr<PriorityThreadPool::Functor>(new BPPHandler::AddJoiner(&fBPPHandler, bs));
+						job.id = fBPPHandler.getUniqueID(bs, ismHdr->Command);
+						OOBPool->addJob(job);
+						//fBPPHandler.addJoinerToBPP(*bs);
+						break;
+					}
+					case BATCH_PRIMITIVE_END_JOINER: {
+						// lastJoinerMsg can block; must do this in a different thread
+						//OOBPool->invoke(BPPHandler::LastJoiner(&fBPPHandler, bs));  // needs a threadpool that can resched
+						//boost::thread tmp(BPPHandler::LastJoiner(&fBPPHandler, bs));
+						PriorityThreadPool::Job job;
+						job.functor = boost::shared_ptr<PriorityThreadPool::Functor>(new BPPHandler::LastJoiner(&fBPPHandler, bs));
+						job.id = fBPPHandler.getUniqueID(bs, ismHdr->Command);
+						OOBPool->addJob(job);
+						break;
+					}
+					case BATCH_PRIMITIVE_DESTROY: {
+						//OOBPool->invoke(BPPHandler::Destroy(&fBPPHandler, bs));  // needs a threadpool that can resched
+						//boost::thread tmp(BPPHandler::Destroy(&fBPPHandler, bs));
+						PriorityThreadPool::Job job;
+						job.functor = boost::shared_ptr<PriorityThreadPool::Functor>(new BPPHandler::Destroy(&fBPPHandler, bs));
+						job.id = fBPPHandler.getUniqueID(bs, ismHdr->Command);
+						OOBPool->addJob(job);
+						//fBPPHandler.destroyBPP(*bs);
+						break;
+					}
+					case BATCH_PRIMITIVE_ACK: {
+						fBPPHandler.doAck(*bs);
+						break;
+					}
+					case BATCH_PRIMITIVE_ABORT: {
+						//OBPool->invoke(BPPHandler::Abort(&fBPPHandler, bs));
+						//fBPPHandler.doAbort(*bs);
+						PriorityThreadPool::Job job;
+						job.functor = boost::shared_ptr<PriorityThreadPool::Functor>(new BPPHandler::Abort(&fBPPHandler, bs));
+						job.id = fBPPHandler.getUniqueID(bs, ismHdr->Command);
+						OOBPool->addJob(job);
+						break;
+					}
+					default: {
+						std::ostringstream os;
+						Logger log;
+						os << "unknown primitive cmd: " << ismHdr->Command;
+						log.logMessage(os.str());
+						break;
+					}
+					}  // the switch stmt
+				}
+				else // bs.length() == 0
+				{
+					if (bRotateDest)
+						pUmSocketSelector->delConnection(fIos);
+					fIos.close();
 					break;
 				}
-				case BATCH_PRIMITIVE_CREATE: {
-				    PriorityThreadPool::Job job;
-				    job.functor = boost::shared_ptr<PriorityThreadPool::Functor>(new BPPHandler::Create(&fBPPHandler, bs));
-				    OOBPool->addJob(job);
-					//fBPPHandler.createBPP(*bs);
-					break;
-				}
-				case BATCH_PRIMITIVE_ADD_JOINER: {
-                    PriorityThreadPool::Job job;
-				    job.functor = boost::shared_ptr<PriorityThreadPool::Functor>(new BPPHandler::AddJoiner(&fBPPHandler, bs));
-				    job.id = fBPPHandler.getUniqueID(bs, ismHdr->Command);
-				    OOBPool->addJob(job);
-					//fBPPHandler.addJoinerToBPP(*bs);
-					break;
-				}
-				case BATCH_PRIMITIVE_END_JOINER: {
-					// lastJoinerMsg can block; must do this in a different thread
-					//OOBPool->invoke(BPPHandler::LastJoiner(&fBPPHandler, bs));  // needs a threadpool that can resched
-					//boost::thread tmp(BPPHandler::LastJoiner(&fBPPHandler, bs));
-                    PriorityThreadPool::Job job;
-				    job.functor = boost::shared_ptr<PriorityThreadPool::Functor>(new BPPHandler::LastJoiner(&fBPPHandler, bs));
-				    job.id = fBPPHandler.getUniqueID(bs, ismHdr->Command);
-				    OOBPool->addJob(job);
-					break;
-				}
-				case BATCH_PRIMITIVE_DESTROY: {
-				    //OOBPool->invoke(BPPHandler::Destroy(&fBPPHandler, bs));  // needs a threadpool that can resched
-				    //boost::thread tmp(BPPHandler::Destroy(&fBPPHandler, bs));
-                    PriorityThreadPool::Job job;
-				    job.functor = boost::shared_ptr<PriorityThreadPool::Functor>(new BPPHandler::Destroy(&fBPPHandler, bs));
-				    job.id = fBPPHandler.getUniqueID(bs, ismHdr->Command);
-				    OOBPool->addJob(job);
-					//fBPPHandler.destroyBPP(*bs);
-					break;
-				}
-				case BATCH_PRIMITIVE_ACK: {
-					fBPPHandler.doAck(*bs);
-					break;
-				}
-				case BATCH_PRIMITIVE_ABORT: {
-				    //OBPool->invoke(BPPHandler::Abort(&fBPPHandler, bs));
-					//fBPPHandler.doAbort(*bs);
-                    PriorityThreadPool::Job job;
-				    job.functor = boost::shared_ptr<PriorityThreadPool::Functor>(new BPPHandler::Abort(&fBPPHandler, bs));
-				    job.id = fBPPHandler.getUniqueID(bs, ismHdr->Command);
-				    OOBPool->addJob(job);
-					break;
-				}
-				default: {
-					std::ostringstream os;
-					Logger log;
-					os << "unknown primitive cmd: " << ismHdr->Command;
-					log.logMessage(os.str());
-					break;
-				}
-				}  // the switch stmt
-			}
-			else // bs.length() == 0
-			{
-				if (bRotateDest)
-					pUmSocketSelector->delConnection(fIos);
-				fIos.close();
-				break;
-			}
 			}   // the try- surrounding the if stmt
 			catch (std::exception &e) {
 				Logger logger;
@@ -1897,7 +1909,7 @@ struct ReadThread
 	{
 		ostringstream oss;
 		oss << "Unable to rotate through socket destinations (" <<
-			cmd << ") for connection: " << fIos.toString();
+		cmd << ") for connection: " << fIos.toString();
 		cerr << oss.str() << endl;
 		logging::Message::Args args;
 		args.add(oss.str());
@@ -1972,41 +1984,41 @@ struct ServerThread
 namespace primitiveprocessor
 {
 PrimitiveServer::PrimitiveServer(int serverThreads,
-								int serverQueueSize,
-								int processorWeight,
-								int processorQueueSize,
-								bool rotatingDestination,
-								uint32_t BRPBlocks,
-								int BRPThreads,
-								int cacheCount,
-								int maxBlocksPerRead,
-								int readAheadBlocks,
-								uint32_t deleteBlocks,
-								bool ptTrace,
-								double prefetch,
-								uint64_t smallSide
+								 int serverQueueSize,
+								 int processorWeight,
+								 int processorQueueSize,
+								 bool rotatingDestination,
+								 uint32_t BRPBlocks,
+								 int BRPThreads,
+								 int cacheCount,
+								 int maxBlocksPerRead,
+								 int readAheadBlocks,
+								 uint32_t deleteBlocks,
+								 bool ptTrace,
+								 double prefetch,
+								 uint64_t smallSide
 								):
-				fServerThreads(serverThreads),
-				fServerQueueSize(serverQueueSize),
-				fProcessorWeight(processorWeight),
-				fProcessorQueueSize(processorQueueSize),
-				fMaxBlocksPerRead(maxBlocksPerRead),
-				fReadAheadBlocks(readAheadBlocks),
-				fRotatingDestination(rotatingDestination),
-				fPTTrace(ptTrace),
-				fPrefetchThreshold(prefetch),
-				fPMSmallSide(smallSide)
+	fServerThreads(serverThreads),
+	fServerQueueSize(serverQueueSize),
+	fProcessorWeight(processorWeight),
+	fProcessorQueueSize(processorQueueSize),
+	fMaxBlocksPerRead(maxBlocksPerRead),
+	fReadAheadBlocks(readAheadBlocks),
+	fRotatingDestination(rotatingDestination),
+	fPTTrace(ptTrace),
+	fPrefetchThreshold(prefetch),
+	fPMSmallSide(smallSide)
 {
 	fCacheCount=cacheCount;
 	fServerpool.setMaxThreads(fServerThreads);
 	fServerpool.setQueueSize(fServerQueueSize);
 
 	fProcessorPool.reset(new threadpool::PriorityThreadPool(fProcessorWeight, highPriorityThreads,
-			medPriorityThreads, lowPriorityThreads, 0));
+						 medPriorityThreads, lowPriorityThreads, 0));
 
-    // We're not using either the priority or the job-clustering features, just need a threadpool
-    // that can reschedule jobs, and an unlimited non-blocking queue
-    OOBPool.reset(new threadpool::PriorityThreadPool(1, 5, 0, 0, 1));
+	// We're not using either the priority or the job-clustering features, just need a threadpool
+	// that can reschedule jobs, and an unlimited non-blocking queue
+	OOBPool.reset(new threadpool::PriorityThreadPool(1, 5, 0, 0, 1));
 
 	asyncCounter = 0;
 
@@ -2017,12 +2029,12 @@ PrimitiveServer::PrimitiveServer(int serverThreads,
 	{
 		for (int i = 0; i < fCacheCount; i++)
 			BRPp[i] = new BlockRequestProcessor(BRPBlocks/fCacheCount, BRPThreads/fCacheCount,
-				fMaxBlocksPerRead, deleteBlocks/fCacheCount);
+												fMaxBlocksPerRead, deleteBlocks/fCacheCount);
 	}
 	catch (...)
 	{
 		cerr << "Unable to allocate " << BRPBlocks << " cache blocks. Adjust the DBBC config parameter "
-			"downward." << endl;
+			 "downward." << endl;
 		mlp->logMessage(logging::M0045, logging::Message::Args(), true);
 		exit(1);
 	}
@@ -2110,7 +2122,7 @@ boost::shared_ptr<BatchPrimitiveProcessor> BPPV::next()
 		}
 	}
 	// They're all busy, make threadpool reschedule the job
- 	return boost::shared_ptr<BatchPrimitiveProcessor>();
+	return boost::shared_ptr<BatchPrimitiveProcessor>();
 #endif
 
 	//This block of code creates BPP instances if/when they are needed
@@ -2137,7 +2149,7 @@ boost::shared_ptr<BatchPrimitiveProcessor> BPPV::next()
 		newone->unlock();
 	newone->busy(true);
 	v.push_back(newone);
- 	return newone;
+	return newone;
 }
 
 void BPPV::abort()

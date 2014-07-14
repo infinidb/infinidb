@@ -99,6 +99,13 @@ struct gp_walk_info
 	execplan::CalpontSelectExecutionPlan::ReturnedColumnList subGroupByCols;
 	execplan::CalpontSelectExecutionPlan::ReturnedColumnList orderByCols;
 	execplan::CalpontSelectExecutionPlan::ColumnMap columnMap;
+	// This vector temporarily hold the projection columns to be added
+	// to the returnedCols vector for subquery processing. It will be appended
+	// to the end of returnedCols when the processing is finished.
+	execplan::CalpontSelectExecutionPlan::ReturnedColumnList additionalRetCols;
+	// the sequence # of the subselect local columns need to be set after
+	// the additionRetCols are merged to the returnedCols.
+	std::vector<execplan::ReturnedColumn*> localCols;
 	std::stack<execplan::ReturnedColumn*> rcWorkStack;
 	std::stack<execplan::ParseTree*> ptWorkStack;
 	boost::shared_ptr<execplan::SimpleColumn> scsp;
@@ -111,7 +118,6 @@ struct gp_walk_info
 	bool condPush;
 	bool dropCond;
 	std::string funcName;
-	uint32_t expressionId; // for F&E
 	std::vector<execplan::AggregateColumn*> count_asterisk_list;
 	std::vector<execplan::FunctionColumn*> no_parm_func_list;
 	std::vector<execplan::ReturnedColumn*> windowFuncList;
@@ -139,7 +145,6 @@ struct gp_walk_info
 				   fatalParseError(false),
 				   condPush(false),
 				   dropCond(false),
-				   expressionId(0),
 				   internalDecimalScale(4),
 				   thd(0),
 				   subSelectType(uint64_t(-1)),
@@ -199,7 +204,16 @@ struct cal_connection_info
 	                        rc(0),
 	                        tableOid(0), 
 	                        localPm(-1),
-	                        isSlaveNode(false)
+	                        isSlaveNode(false),
+	                        expressionId(0),
+	                        mysqld_pid(getpid()),
+	                        cpimport_pid(0),
+	                        filePtr(0),
+	                        headerLength(0),
+	                        useXbit(false),
+	                        utf8(false),
+	                        useCpimport(1),
+	                        delimiter('\7')
 	{
 		// check if this is a slave mysql daemon
 		isSlaveNode = checkSlave();
@@ -241,6 +255,24 @@ struct cal_connection_info
 	std::string warningMsg;
 	int64_t localPm;
 	bool isSlaveNode;
+	uint32_t expressionId; // for F&E
+	pid_t mysqld_pid;
+	pid_t cpimport_pid;
+	int fdt[2];
+#ifdef _MSC_VER
+	HANDLE cpimport_stdin_Rd;
+	HANDLE cpimport_stdin_Wr;
+	HANDLE cpimport_stdout_Rd;
+	HANDLE cpimport_stdout_Wr;
+	PROCESS_INFORMATION cpimportProcInfo; 
+#endif
+	FILE * filePtr;
+	uint8_t headerLength;
+	bool useXbit;
+	bool utf8;
+	uint8_t useCpimport;
+	char delimiter;
+	std::vector <execplan::CalpontSystemCatalog::ColType> columnTypes; 
 };
 
 typedef std::tr1::unordered_map<int, cal_connection_info> CalConnMap;
@@ -250,6 +282,7 @@ const std::string infinidb_err_msg = "\nThe query includes syntax that is not su
 int cp_get_plan(THD* thd, execplan::SCSEP& csep);
 int cp_get_table_plan(THD* thd, execplan::SCSEP& csep, cal_impl_if::cal_table_info& ti);
 int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex, execplan::SCSEP& csep, bool isUnion=false);
+void setError(THD* thd, uint32_t errcode, const std::string errmsg, gp_walk_info* gwi);
 void setError(THD* thd, uint32_t errcode, const std::string errmsg);
 void gp_walk(const Item *item, void *arg);
 void parse_item (Item *item, std::vector<Item_field*>& field_vec, bool& hasNonSupportItem, uint16& parseInfo);
@@ -265,7 +298,7 @@ execplan::ConstantColumn* buildDecimalColumn(Item *item, gp_walk_info &gwi);
 execplan::SimpleColumn* buildSimpleColumn(Item_field* item, gp_walk_info& gwi);
 execplan::FunctionColumn* buildCaseFunction(Item_func* item, gp_walk_info& gwi, bool& nonSupport);
 execplan::ParseTree* buildParseTree(Item_func* item, gp_walk_info& gwi, bool& nonSupport);
-execplan::AggregateColumn* buildAggregateColumn(Item* item, gp_walk_info& gwi);
+execplan::ReturnedColumn* buildAggregateColumn(Item* item, gp_walk_info& gwi);
 execplan::ReturnedColumn* buildWindowFunctionColumn(Item* item, gp_walk_info& gwi, bool& nonSupport);
 execplan::ReturnedColumn* buildPseudoColumn(Item* item, gp_walk_info& gwi, bool& nonSupport, uint32_t pseudoType);
 void addIntervalArgs(Item_func* ifp, funcexp::FunctionParm& functionParms);

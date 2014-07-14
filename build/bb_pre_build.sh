@@ -9,7 +9,7 @@ fi
 
 rm -rf infinidb mysql infinidb-ent
 
-git clone http://srvengcm1.calpont.com/repos/infinidb.git
+git clone http://srvgip1.calpont.com/repos/infinidb.git
 cd infinidb
 git checkout develop
 cd ..
@@ -19,7 +19,7 @@ cd mysql
 git checkout develop
 cd ..
 
-git clone http://srvengcm1.calpont.com/repos/infinidb-ent.git
+git clone http://srvgip1.calpont.com/repos/infinidb-ent.git
 cd infinidb-ent
 git checkout develop
 cd ..

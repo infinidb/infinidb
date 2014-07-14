@@ -33,6 +33,11 @@ public:
 	int enqImportTele(const ImportTele&);
 	int enqQueryTele(const QueryTele&);
 
+	/**
+	 * Wait for the consumer thread to post all messages
+	 **/
+	int waitForQueues();
+
 protected:
 
 private:

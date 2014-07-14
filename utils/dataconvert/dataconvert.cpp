@@ -1795,7 +1795,7 @@ int64_t DataConvert::stringToDate(const string& data)
 {
 	Date aDay;
 	if( stringToDateStruct( data, aDay ) )
-		return (*(reinterpret_cast<uint32_t *> (&aDay))) & 0xFFFFFFC0;
+		return (((*(reinterpret_cast<uint32_t *> (&aDay))) & 0xFFFFFFC0) | 0x3E);
 	else
 		return -1;
 }

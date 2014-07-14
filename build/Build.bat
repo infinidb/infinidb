@@ -1,11 +1,18 @@
-@echo off
+::@echo off
 
 set branch=%1
-IF "%1" == "" (
-  set branch=4.5.1
-)
 set basedir=\InfiniDB_%branch%
-echo Building %basedir%
+IF "%branch%" == "" (
+  set branch=develop
+  set basedir=\InfiniDB
+)
+IF "%branch%" == "trunk" (
+  set branch=develop
+  set basedir=\InfiniDB
+)
+echo %branch%
+
+echo building %basedir%
 
 echo ======================================
 echo updating mysql source
@@ -14,7 +21,6 @@ git checkout %branch%
 git stash
 git pull
 git stash pop
-IF %ERRORLEVEL% NEQ 0 GOTO ERROR_HANDLER
 
 echo ======================================
 echo updating InfiniDB source

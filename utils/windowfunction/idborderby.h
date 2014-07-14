@@ -253,6 +253,7 @@ protected:
 	uint64_t                            fRowsPerRG;
 	uint64_t                            fErrorCode;
 	joblist::ResourceManager*           fRm;
+	boost::shared_ptr<int64_t>			fSessionMemLimit;
 };
 
 

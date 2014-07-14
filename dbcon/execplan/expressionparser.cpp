@@ -45,8 +45,9 @@ ExpressionParser::~ExpressionParser()
 
 void ExpressionParser::invalid_operator_position(TreeNode* oper)
 {
+    std::string str = oper->data();
     delete oper;
-	throw std::runtime_error ("Invalid operator position: " + oper->data() + "\n");
+	throw std::runtime_error ("Invalid operator position: " + str + "\n");
 }
     
 void ExpressionParser::invalid_operator_position(const Token& oper)

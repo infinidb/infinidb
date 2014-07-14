@@ -40,12 +40,40 @@ string pwprompt = " ";
 
 string masterLogFile = oam::UnassignedName;
 string masterLogPos = oam::UnassignedName;
+string prompt;
+
+const char* pcommand = 0;
 
 extern string installDir;
 extern bool noPrompting;
 
 namespace installer
 {
+
+const char* callReadline(string prompt)
+{
+    	if ( !noPrompting )
+	{
+	        const char* ret = readline(prompt.c_str());
+	        if( ret == 0 )
+	            exit(1);
+        	return ret;
+	}
+    	else 
+	{
+        	cout << prompt << endl;
+        	return "";
+    	}
+}
+
+void callFree(const char* )
+{
+	if ( !noPrompting )
+		free((void*)pcommand);
+	pcommand = 0;
+}
+
+
 
 bool waitForActive() 
 {
@@ -78,8 +106,6 @@ void dbrmDirCheck()
 	string SystemSection = "SystemConfig";
 	Config* sysConfig = Config::makeConfig();
 	Config* sysConfigPrev = Config::makeConfig(fname);
-
-	char* pcommand = 0;
 
 	string dbrmroot = "";
 	string dbrmrootPrev = "";
@@ -183,11 +209,12 @@ void dbrmDirCheck()
 		while(true)
 		{
 			string answer = "n";
-			pcommand = readline("Enter 'y' when you are ready to continue > ");
+			prompt = "Enter 'y' when you are ready to continue > ";
+			pcommand = callReadline(prompt.c_str());
 			if (pcommand)
 			{
 				if (strlen(pcommand) > 0) answer = pcommand;
-				free(pcommand);
+				callFree(pcommand);
 				pcommand = 0;
 			}
 			if ( answer == "y" )
@@ -203,7 +230,7 @@ void dbrmDirCheck()
 	return;
 }
 
-void mysqlSetup() 
+void mysqlSetup(bool EM) 
 {
 	Oam oam;
 	string cmd;
@@ -232,7 +259,7 @@ void mysqlSetup()
 
 		if (oam.checkLogStatus("/tmp/idbmysql.log", "ERROR 1045") ) {
 			if ( mysqlpw == " " ) {
-				if ( noPrompting ) {
+				if ( noPrompting || EM ) {
 					cout << " *** MySQL password required, enter on command line, exiting..." << endl;
 					exit(1);
 				}
@@ -631,10 +658,9 @@ void checkFilesPerPartion(int DBRootCount, Config* sysConfig)
 	return;
 }
 
-void checkMysqlPort( std::string& mysqlPort, Config* sysConfig )
+void checkMysqlPort( std::string& mysqlPort, Config* sysConfig, bool EM )
 {
 	Oam oam;
-	char* pcommand = 0;
 
 	while(true)
 	{
@@ -647,7 +673,7 @@ void checkMysqlPort( std::string& mysqlPort, Config* sysConfig )
 			oldFile.seekg(0, std::ios::end);
 			int size = oldFile.tellg();
 			if ( size != 0 ) {
-				if ( noPrompting ) {
+				if ( noPrompting || EM ) {
 					cout << endl << "The mysqld port of '" + mysqlPort + "' is already in-use" << endl;
 					cout << "For No-prompt install, use the command line argument of 'port' to enter a different number" << endl;
 					exit(1);
@@ -655,11 +681,12 @@ void checkMysqlPort( std::string& mysqlPort, Config* sysConfig )
 
 				cout << "The mysqld port of '" + mysqlPort + "' is already in-use" << endl;
 
-				pcommand = readline("Enter a different port number > ");
+				prompt = "Enter a different port number > ";
+				pcommand = callReadline(prompt.c_str());
 				if (pcommand)
 				{
 					if (strlen(pcommand) > 0) mysqlPort = pcommand;
-					free(pcommand);
+					callFree(pcommand);
 					pcommand = 0;
 				}
 			}
@@ -689,10 +716,9 @@ void checkMysqlPort( std::string& mysqlPort, Config* sysConfig )
 	oam.changeMyCnf( "port", mysqlPort );
 }
 
-void checkSystemMySQLPort(std::string& mysqlPort, Config* sysConfig, std::string USER, std::string password, ChildModuleList childmodulelist, int IserverTypeInstall, bool pmwithum)
+void checkSystemMySQLPort(std::string& mysqlPort, Config* sysConfig, std::string USER, std::string password, ChildModuleList childmodulelist, int IserverTypeInstall, bool pmwithum, bool EM)
 {
 	Oam oam;
-	char* pcommand = 0;
 
 	bool inUse = false;
 
@@ -713,7 +739,7 @@ void checkSystemMySQLPort(std::string& mysqlPort, Config* sysConfig, std::string
 				oldFile.seekg(0, std::ios::end);
 				int size = oldFile.tellg();
 				if ( size != 0 ) {
-					if ( noPrompting ) {
+					if ( noPrompting || EM ) {
 						cout << endl << "The mysqld port of '" + mysqlPort + "' is already in-use" << endl;
 						cout << "For No-prompt install, use the command line argument of 'port' to enter a different number" << endl;
 						exit(1);
@@ -743,7 +769,7 @@ void checkSystemMySQLPort(std::string& mysqlPort, Config* sysConfig, std::string
 					string cmd = installDir + "/bin/remote_command_verify.sh " + remoteModuleIP + " " + " " + USER + " " + password + " '" + remotenetstat + "' tcp error 5 0 > /dev/null 2>&1";
 					int rtnCode = system(cmd.c_str());
 					if (WEXITSTATUS(rtnCode) == 0) {
-						if ( noPrompting ) {
+						if ( noPrompting || EM ) {
 							cout << endl << "The mysqld port of '" + mysqlPort + "' is already in-use on " << remoteModuleName << endl;
 							cout << "For No-prompt install, use the command line argument of 'port' to enter a different number" << endl;
 							cout << "exiting..." << endl;
@@ -763,11 +789,12 @@ void checkSystemMySQLPort(std::string& mysqlPort, Config* sysConfig, std::string
 		{
 			cout << endl << "The mysqld port of '" + mysqlPort + "' is already in-use" << endl;
 
-			pcommand = readline("Enter a different port number > ");
+			prompt = "Enter a different port number > ";
+			pcommand = callReadline(prompt.c_str());
 			if (pcommand)
 			{
 				if (strlen(pcommand) > 0) mysqlPort = pcommand;
-				free(pcommand);
+				callFree(pcommand);
 				pcommand = 0;
 			}
 

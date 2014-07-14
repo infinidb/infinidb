@@ -117,7 +117,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\libxml2-2.7.8\libxml2\include;$(SolutionDir)..\utils\configcpp;$(SolutionDir)..\utils\winport;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\libxml2-2.7.8\libxml2\include;$(SolutionDir)..\..\libiconv-1.14\libiconv\include;$(SolutionDir)..\utils\configcpp;$(SolutionDir)..\utils\winport;$(SolutionDir)..\utils\loggingcpp;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
@@ -125,7 +125,7 @@
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ws2_32.lib;iphlpapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)..\..\boost_1_54_0\lib32;C:\InfiniDB\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <TargetMachine>MachineX86</TargetMachine>
@@ -137,7 +137,7 @@
     </Midl>
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\libxml2-2.7.8\libxml2\include;$(SolutionDir)..\utils\configcpp;$(SolutionDir)..\utils\winport;$(SolutionDir)..\..\libiconv-1.14\libiconv\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\libxml2-2.7.8\libxml2\include;$(SolutionDir)..\..\libiconv-1.14\libiconv\include;$(SolutionDir)..\utils\configcpp;$(SolutionDir)..\utils\winport;$(SolutionDir)..\utils\loggingcpp;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
@@ -145,7 +145,7 @@
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ws2_32.lib;iphlpapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\libxml2-2.7.8\libxml2\win32\Debug;$(SolutionDir)..\..\x64\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <TargetMachine>MachineX64</TargetMachine>
@@ -155,14 +155,14 @@
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\libxml2-2.7.8\libxml2\include;$(SolutionDir)..\utils\configcpp;$(SolutionDir)..\utils\winport;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\libxml2-2.7.8\libxml2\include;$(SolutionDir)..\..\libiconv-1.14\libiconv\include;$(SolutionDir)..\utils\configcpp;$(SolutionDir)..\utils\winport;$(SolutionDir)..\utils\loggingcpp;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ws2_32.lib;iphlpapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)..\..\boost_1_54_0\lib32;C:\InfiniDB\Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <OptimizeReferences>true</OptimizeReferences>
@@ -177,14 +177,14 @@
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\libxml2-2.7.8\libxml2\include;$(SolutionDir)..\utils\configcpp;$(SolutionDir)..\utils\winport;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\libxml2-2.7.8\libxml2\include;$(SolutionDir)..\..\libiconv-1.14\libiconv\include;$(SolutionDir)..\utils\configcpp;$(SolutionDir)..\utils\winport;$(SolutionDir)..\utils\loggingcpp;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ws2_32.lib;iphlpapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\libxml2-2.7.8\libxml2\win32\Release;C:$(SolutionDir)..\..x64\Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <OptimizeReferences>true</OptimizeReferences>
@@ -196,14 +196,14 @@
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\libxml2-2.7.8\libxml2\include;$(SolutionDir)..\utils\configcpp;$(SolutionDir)..\utils\winport;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\libxml2-2.7.8\libxml2\include;$(SolutionDir)..\..\libiconv-1.14\libiconv\include;$(SolutionDir)..\utils\configcpp;$(SolutionDir)..\utils\winport;$(SolutionDir)..\utils\loggingcpp;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ws2_32.lib;iphlpapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)..\..\boost_1_54_0\lib32;C:\InfiniDB\Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <OptimizeReferences>true</OptimizeReferences>
@@ -218,7 +218,7 @@
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\libxml2-2.7.8\libxml2\include;$(SolutionDir)..\utils\configcpp;$(SolutionDir)..\utils\winport;$(SolutionDir)..\..\libiconv-1.14\libiconv\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\libxml2-2.7.8\libxml2\include;$(SolutionDir)..\..\libiconv-1.14\libiconv\include;$(SolutionDir)..\utils\configcpp;$(SolutionDir)..\utils\winport;$(SolutionDir)..\utils\loggingcpp;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <WarningLevel>Level3</WarningLevel>
@@ -226,7 +226,7 @@
       <BufferSecurityCheck>false</BufferSecurityCheck>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ws2_32.lib;iphlpapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\libxml2-2.7.8\libxml2\win32\Release;$(SolutionDir)..\..\x64\EnterpriseRelease;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <GenerateDebugInformation>false</GenerateDebugInformation>
       <OptimizeReferences>true</OptimizeReferences>

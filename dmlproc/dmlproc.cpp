@@ -533,7 +533,28 @@ int main(int argc, char* argv[])
 			serverQueueSize = temp;
 
 
-    DMLServer dmlserver(serverThreads, serverQueueSize,&dbrm);
+    bool rootUser = true;
+#ifndef _MSC_VER
+    //check if root-user
+    int user;
+    user = getuid();
+    if (user != 0)
+        rootUser = false;
+#endif
+    //read and cleanup port before trying to use
+    try {
+        string port = cf->getConfig(DMLProc, "Port");
+        string cmd = "fuser -k " + port + "/tcp >/dev/null >2>&1";
+        if ( !rootUser)
+            cmd = "sudo fuser -k " + port + "/tcp >/dev/null >2>&1";
+
+        (void)::system(cmd.c_str());
+    }
+    catch(...)
+    {
+    }
+
+	DMLServer dmlserver(serverThreads, serverQueueSize,&dbrm);
 
 	//set ACTIVE state
     try

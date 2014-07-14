@@ -122,6 +122,7 @@ void TableLockServer::load()
 			ostringstream os;
 			os << "TableLockServer::load(): could not load save file " << filename <<
 				" loaded " << i << "/" << size << " entries\n";
+			log(os.str(), logging::LOG_TYPE_WARNING);
 			throw;
 		}
 	}
@@ -150,6 +151,7 @@ void TableLockServer::load()
 
 			os << "TableLockServer::load(): could not load save file " << filename <<
 				" loaded " << i << "/" << size << " entries\n";
+			log(os.str(), logging::LOG_TYPE_WARNING);
 			throw;
 		}
 	}

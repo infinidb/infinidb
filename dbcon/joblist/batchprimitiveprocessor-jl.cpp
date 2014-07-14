@@ -737,9 +737,9 @@ void BatchPrimitiveProcessorJL::getRowGroupData(ByteStream &in, vector<RGData> *
 		rowCount = org.getRowCount();
 
 		bool pmSendsMatchesAnyway = (hasSmallOuterJoin && *countThis && PMJoinerCount > 0 &&
-            (fe2 || aggregatorPM));
+			(fe2 || aggregatorPM));
 
-        if (!pmSendsFinalResult() || pmSendsMatchesAnyway) {
+		if (!pmSendsFinalResult() || pmSendsMatchesAnyway) {
 			boost::shared_array<vector<uint32_t> > joinResults;
 			uint32_t i, j;
 
@@ -1015,16 +1015,16 @@ void BatchPrimitiveProcessorJL::createBPP(ByteStream &bs) const
 	if (ot == ROW_GROUP) {
 		primprocRG.reset(new RowGroup[threadCount]);
 		for (uint32_t i = 0; i < threadCount; i++)
-			if (aggregatorPM) 
+			if (aggregatorPM)
 				primprocRG[i] = aggregateRGPM;
-			else if (fe2) 
+			else if (fe2)
 				primprocRG[i] = fe2Output;
 			//This shouldn't be necessary. As of 2-17-14, PrimProc
 			//will only send joined results if fe2 || aggregatorPM,
 			//so it will never send back data for joinedRG.
 			//else if ((flags & HAS_JOINER) && sendTupleJoinRowGroupData)
 			//	primprocRG[i] = joinedRG;
-			else 
+			else
 				primprocRG[i] = projectionRG;
 	}
 
@@ -1197,9 +1197,9 @@ bool BatchPrimitiveProcessorJL::nextTupleJoinerMsg(ByteStream &bs)
 	Row r;
 	vector<Row::Pointer> *tSmallSide;
 	joiner::TypelessData tlData;
-    uint32_t smallKeyCol;
-    uint32_t largeKeyCol;
-    uint64_t smallkey;
+	uint32_t smallKeyCol;
+	uint32_t largeKeyCol;
+	uint64_t smallkey;
 	bool isNull;
 	bool bSignedUnsigned;
 
@@ -1248,29 +1248,29 @@ bool BatchPrimitiveProcessorJL::nextTupleJoinerMsg(ByteStream &bs)
 			bSignedUnsigned = tJoiners[joinerNum]->isSignedUnsignedJoin();
 			for (j = 0; j < smallSideKeys[joinerNum].size(); j++){
 				isNull |= r.isNullValue(smallSideKeys[joinerNum][j]);
-                if (UNLIKELY(bSignedUnsigned)) {
-                    // BUG 5628 If this is a signed/unsigned join column and the sign bit is set on either side,
-                    // then it should not compare. Send null to PM to prevent compare
-                    smallKeyCol = smallSideKeys[joinerNum][j];
-                    largeKeyCol = tJoiners[joinerNum]->getLargeKeyColumns()[j];
-                    if (r.isUnsigned(smallKeyCol) != largeSideRG.isUnsigned(largeKeyCol)) {
-                        if (r.isUnsigned(smallKeyCol))
-                            smallkey = r.getUintField(smallKeyCol);
-                        else
-                            smallkey = r.getIntField(smallKeyCol);
-                        if (smallkey & 0x8000000000000000ULL) {
-                            isNull = true;
-                            break;
-                        }
-                    }
-                }
-            }
+				if (UNLIKELY(bSignedUnsigned)) {
+					// BUG 5628 If this is a signed/unsigned join column and the sign bit is set on either side,
+					// then it should not compare. Send null to PM to prevent compare
+					smallKeyCol = smallSideKeys[joinerNum][j];
+					largeKeyCol = tJoiners[joinerNum]->getLargeKeyColumns()[j];
+					if (r.isUnsigned(smallKeyCol) != largeSideRG.isUnsigned(largeKeyCol)) {
+						if (r.isUnsigned(smallKeyCol))
+							smallkey = r.getUintField(smallKeyCol);
+						else
+							smallkey = r.getIntField(smallKeyCol);
+						if (smallkey & 0x8000000000000000ULL) {
+							isNull = true;
+							break;
+						}
+					}
+				}
+			}
 			bs << (uint8_t) isNull;
 			if (!isNull) {
-                tlData = makeTypelessKey(r, smallSideKeys[joinerNum],
-                  tlKeyLens[joinerNum], &fa);
-                tlData.serialize(bs);
-                bs << i;
+				tlData = makeTypelessKey(r, smallSideKeys[joinerNum],
+				  tlKeyLens[joinerNum], &fa);
+				tlData.serialize(bs);
+				bs << i;
 			}
 		}
 	}
@@ -1284,9 +1284,9 @@ bool BatchPrimitiveProcessorJL::nextTupleJoinerMsg(ByteStream &bs)
 		bs.needAtLeast(toSend * sizeof(JoinerElements));
 		arr = (JoinerElements *) bs.getInputPtr();
 
-        smallKeyCol = smallSideKeys[joinerNum][0];
-        bSignedUnsigned = r.isUnsigned(smallKeyCol) != largeSideRG.isUnsigned(tJoiners[joinerNum]->getLargeKeyColumns()[0]);
-        j = 0;
+		smallKeyCol = smallSideKeys[joinerNum][0];
+		bSignedUnsigned = r.isUnsigned(smallKeyCol) != largeSideRG.isUnsigned(tJoiners[joinerNum]->getLargeKeyColumns()[0]);
+		j = 0;
 		for (i = pos, j = 0; i < pos + toSend; ++i, ++j) {
 			r.setPointer((*tSmallSide)[i]);
 			if (r.isUnsigned(smallKeyCol))
@@ -1500,8 +1500,8 @@ void BatchPrimitiveProcessorJL::abortProcessing(ByteStream *bs)
 
 void BatchPrimitiveProcessorJL::deliverStringTableRowGroup(bool b)
 {
-    if (aggregatorPM)
-        aggregateRGPM.setUseStringTable(b);
+	if (aggregatorPM)
+		aggregateRGPM.setUseStringTable(b);
 	else if (fe2)
 		fe2Output.setUseStringTable(b);
 //	else if ((joiner.get() != NULL || tJoiners.size() > 0) && sendTupleJoinRowGroupData)

@@ -68,7 +68,7 @@ bool BrmReportParser::serialize(std::string RptFileName,
 	}
 	if(fRptFile.good())
 	{
-		char aBuff[1024];
+		char aBuff[10240];
 		unsigned int aLen=0;
 		while(fRptFile.good() && !fRptFile.eof())
 		{

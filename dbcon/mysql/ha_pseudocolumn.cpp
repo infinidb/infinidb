@@ -473,6 +473,10 @@ execplan::ReturnedColumn* buildPseudoColumn(Item* item,
                                             bool& nonSupport,
                                             uint32_t pseudoType)
 {
+	if (!(gwi.thd->infinidb_vtable.cal_conn_info))
+		gwi.thd->infinidb_vtable.cal_conn_info = (void*)(new cal_connection_info());
+	cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(gwi.thd->infinidb_vtable.cal_conn_info);
+
 	Item_func* ifp = (Item_func*)item;
 
 	// idblocalpm is replaced by constant
@@ -543,7 +547,7 @@ execplan::ReturnedColumn* buildPseudoColumn(Item* item,
 		sptp.reset(new ParseTree(seg));
 		parms.push_back(sptp);
 		fc->functionParms(parms);
-		fc->expressionId(gwi.expressionId++);
+		fc->expressionId(ci->expressionId++);
 
 		// string result type
 		CalpontSystemCatalog::ColType ct;

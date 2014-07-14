@@ -324,7 +324,7 @@ IdbOrderBy::IdbOrderBy() :
 IdbOrderBy::~IdbOrderBy()
 {
 	if (fRm)
-		fRm->returnMemory(fMemSize);
+		fRm->returnMemory(fMemSize, fSessionMemLimit);
 
 	// delete compare objects
 	vector<Compare*>::iterator i = fRule.fCompares.begin();
@@ -339,7 +339,7 @@ void IdbOrderBy::initialize(const RowGroup& rg)
 	IdbCompare::initialize(rg);
 
 	uint64_t newSize = fRowsPerRG * rg.getRowSize();
-	if (!fRm->getMemory(newSize))
+	if (!fRm->getMemory(newSize, fSessionMemLimit))
 	{
 		cerr << IDBErrorInfo::instance()->errorMsg(fErrorCode)
 			 << " @" << __FILE__ << ":" << __LINE__;

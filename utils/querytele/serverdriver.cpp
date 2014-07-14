@@ -64,7 +64,7 @@ const string st2str(enum StepType::type t)
 	case StepType::T_CES: return "CES";
 	case StepType::T_SQS: return "SQS";
 	case StepType::T_TAS: return "TAS";
-	case StepType::T_TXS: return "TXS";
+	case StepType::T_TNS: return "TNS";
 	case StepType::T_BPS: return "BPS";
 	case StepType::T_TCS: return "TCS";
 	case StepType::T_HVS: return "HVS";
@@ -179,7 +179,7 @@ int main(int argc, char **argv) {
   shared_ptr<atp::TProtocolFactory> protocolFactory(new atp::TBinaryProtocolFactory());
   shared_ptr<QueryTeleServiceHandler> handler(new QueryTeleServiceHandler());
   shared_ptr<at::TProcessor> processor(new QueryTeleServiceProcessor(handler));
-  shared_ptr<att::TServerTransport> serverTransport(new att::TServerSocket(9090));
+  shared_ptr<att::TServerTransport> serverTransport(new att::TServerSocket(9990));
   shared_ptr<att::TTransportFactory> transportFactory(new att::TBufferedTransportFactory());
 
   ats::TSimpleServer server(processor,

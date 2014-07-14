@@ -397,11 +397,14 @@ public:
 		TableAliasName ():fIsInfiniDB (true) {}
 		TableAliasName (std::string sch, std::string tb, std::string al) :
 					schema (sch), table (tb), alias (al), fIsInfiniDB(true) {}
+		TableAliasName (std::string sch, std::string tb, std::string al, std::string v) :
+                                        schema (sch), table (tb), alias (al), view(v), fIsInfiniDB(true) {}
 		std::string schema;
 		std::string table;
 		std::string alias;
 		std::string view;
 		bool fIsInfiniDB;
+		void clear();
 		bool operator<(const TableAliasName& rhs) const;
 		bool operator>=(const TableAliasName& rhs) const { return !(*this < rhs); }
 		bool operator==(const TableAliasName& rhs) const

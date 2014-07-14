@@ -189,6 +189,9 @@
 		<FifoSizeLargeSide>128</FifoSizeLargeSide>
 		<PmMaxMemorySmallSide>64M</PmMaxMemorySmallSide>
 		<TotalUmMemory>8G</TotalUmMemory>
+		<AllowDiskBasedJoin>N</AllowDiskBasedJoin>
+		<TempFilePath>$INSTALLDIR/tmp</TempFilePath>
+		<TempFileCompression>Y</TempFileCompression>
 	</HashJoin>
 	<JobList>
 		<FlushInterval>16K</FlushInterval>

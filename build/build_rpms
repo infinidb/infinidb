@@ -54,7 +54,15 @@ tar -cf - --exclude 'export/include' --exclude 'export/*.tar' export | tar -C $b
 mv $buildroot/export $buildroot/Calpont
 
 #get mysql server files
+if [ ! -d $mysqldir ]; then
+	echo -e "\nDidn't find MySQL install: $mysqldir!" 1>&2
+	exit 1
+fi
 pushd $mysqldir > /dev/null
+if [ ! -f files.lst ]; then
+	echo -e "\nDidn't find files.lst in $mysqldir!" 1>&2
+	exit 1
+fi
 mkdir -p $buildroot/Calpont/mysql
 cpio -pdmu --quiet $buildroot/Calpont/mysql < files.lst
 popd >/dev/null
@@ -124,6 +132,8 @@ echo done.
 if [ $verbose -gt 0 -o $rc -ne 0 ]; then
 	cat /tmp/rpmbuild.out.$$
 fi
+
+grep Wrote: /tmp/rpmbuild.out.$$
 
 rm -f /tmp/*.$$
 

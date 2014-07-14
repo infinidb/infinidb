@@ -77,10 +77,10 @@ public:
 	int getCompType() const { return colType.compressionType; }
 
 protected:
-    virtual void loadData();
+	virtual void loadData();
 	void duplicate(ColumnCommand *);
 
-   	// we only care about the width and type fields.
+	// we only care about the width and type fields.
 	//On the PM the rest is uninitialized
 	execplan::CalpontSystemCatalog::ColType colType;
 
@@ -137,7 +137,7 @@ private:
 	rowgroup::Row r;
 	uint32_t rowSize;
 
-    bool wasVersioned;
+	bool wasVersioned;
 
 	friend class RTSCommand;
 };

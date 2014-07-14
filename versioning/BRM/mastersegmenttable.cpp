@@ -161,7 +161,7 @@ MasterSegmentTable::MasterSegmentTable()
 		rwlock[0]->write_unlock();
 	}
 	else {
-		rwlock[0]->read_lock();     // this is to synch with the initializer
+		rwlock[0]->read_lock_priority();     // this is to synch with the initializer
 		rwlock[0]->read_unlock();
 	}
 }

@@ -24,5 +24,6 @@ leakcheck:
 docs:
 
 bootstrap: install-data-am
+	mkdir -p $(libdir)
 	$(install_sh) libjemalloc.so.3.3.0 $(libdir)
 

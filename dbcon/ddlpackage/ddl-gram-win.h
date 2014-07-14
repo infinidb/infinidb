@@ -112,7 +112,7 @@
      IDB_FLOAT = 328,
      REAL = 329,
      CHARSET = 330,
-     IF = 331,
+     IDB_IF = 331,
      EXISTS = 332,
      CHANGE = 333,
      TRUNCATE = 334,

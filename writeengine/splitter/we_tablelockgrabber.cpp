@@ -64,7 +64,15 @@ uint64_t WETableLockGrabber::grabTableLock(std::vector<unsigned int> &PmList,
 		cout << "ERROR: Failed to get Table Lock " << e.what() << endl;
 		throw runtime_error(e.what());
 	}
-
+	if (aLockId == 0)
+	{
+		ostringstream oss;
+		oss << " Table currently locked by process-" <<
+        aProcName << "; pid-" << aProcId <<
+        "; session-" << aSessId <<
+        "; txn-" << aTxnId;
+		throw runtime_error(oss.str());
+	}
 	//cout << "lock ID = " << aLockId << endl;
 	//if (aLockId == 0)
 	//	cout << " existing owner name = " << aProcName << " pid = " <<

@@ -3,7 +3,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.59)
-AC_INIT(infinidb, 4.5.1, support@infinidb.co)
+AC_INIT(infinidb, 4.6.0, support@infinidb.co)
 ### we don't want the deault CXXFLAGS set by AC_INIT, but we do want to allow the user to set them
 SAVE_CXXFLAGS=
 if test -n "$CXXFLAGS"; then
@@ -111,6 +111,10 @@ if test "x$ac_cv_header_ncurses_h" != "xyes"; then
 	AC_MSG_ERROR([Could not find a usable ncurses development environment!])
 fi
 
+CXX_FLAG_CHECK([-Wno-unused-local-typedefs])
+CXX_FLAG_CHECK([-Wno-unused-result])
+CXX_FLAG_CHECK([-Wno-format])
+
 AC_MSG_CHECKING(whether to enable debugging)
 AC_SUBST([idb_cppflags], [' '])
 AC_ARG_WITH([debug],
@@ -120,7 +124,7 @@ if test "x$with_debug" = "xyes"; then
 	AC_SUBST([idb_cflags],['-ggdb3 -Wall -DSAFE_MUTEX -DINFINIDB_DEBUG'])
 	AC_MSG_RESULT(yes)
 else
-	AC_SUBST([idb_cxxflags],['-g0 -O3 -fno-strict-aliasing -Wall'])
+	AC_SUBST([idb_cxxflags],["-g0 -O3 -fno-strict-aliasing -Wall $cxx_extra_flags"])
 	AC_SUBST([idb_cflags],['-g0 -O3 -fno-strict-aliasing -Wall'])
 	AC_MSG_RESULT(no)
 fi

@@ -104,14 +104,6 @@ extern unsigned int idb_crc32(const unsigned int, const unsigned char*, const si
 #define CLOCK_MONOTONIC 2
 extern long clock_gettime(clockid_t, struct timespec*);
 
-#define LOG_CONS 1
-#define LOG_PID 2
-#define LOG_DEBUG 3
-#define LOG_INFO 4
-#define LOG_WARNING 5
-#define LOG_ERR 6
-#define LOG_CRIT 7
-#define LOG_LOCAL2 8
 extern int syslog(int, const char*, ...);
 #ifdef __cplusplus
 extern int closelog(...);
@@ -131,6 +123,8 @@ extern pid_t waitpid(pid_t, int*, int);
 
 #define WIFEXITED(x) 0
 #define WEXITSTATUS(x) 0
+#define WIFSIGNALED(x) 0
+#define WTERMSIG(x) 0
 
 #define WNOHANG 0x01
 #define WUNTRACED 0x02

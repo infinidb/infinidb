@@ -156,8 +156,6 @@ pColScanStep::pColScanStep(
 	finishedSending=false;
 	recvWaiting=0;
 	recvExited = 0;
-	ridsReturned = 0;
-	sendWaiting=false;
 	rDoNothing = false;
 	fIsDict = false;
 
@@ -995,7 +993,6 @@ pColScanStep::pColScanStep(const pColStep& rhs) :
 	fIsDict = rhs.isDictCol();
 	sentCount = 0;
 	recvCount = 0;
-	ridsReturned = 0;
 	fScanLbidReqLimit = fRm.getJlScanLbidReqLimit();
 	fScanLbidReqThreshold = fRm.getJlScanLbidReqThreshold();
 	fStopSending = false;

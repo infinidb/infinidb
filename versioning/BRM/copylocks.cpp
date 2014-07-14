@@ -93,7 +93,7 @@ CopyLocksImpl* CopyLocksImpl::makeCopyLocksImpl(unsigned key, off_t size, bool r
 	{
 		if (key != fInstance->fCopyLocks.key())
 		{
-			BRMShmImpl newShm(key, size);
+			BRMShmImpl newShm(key, size, readOnly);
 			fInstance->swapout(newShm);
 		}
 		idbassert(key == fInstance->fCopyLocks.key());
@@ -151,9 +151,7 @@ void CopyLocks::lock(OPS op)
 				growCL();
 		else {
 			currentShmkey = shminfo->tableShmkey;
-			fCopyLocksImpl = CopyLocksImpl::makeCopyLocksImpl(currentShmkey, 0);
-			if (r_only)
-				fCopyLocksImpl->makeReadOnly();
+			fCopyLocksImpl = CopyLocksImpl::makeCopyLocksImpl(currentShmkey, 0, r_only);
 			entries = fCopyLocksImpl->get();
 			if (entries == NULL) {
 				log_errno(string("CopyLocks::lock(): shmat failed"));

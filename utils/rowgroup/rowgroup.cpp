@@ -792,7 +792,7 @@ int64_t Row::getSignedNullValue(uint32_t colIndex) const
 #endif
 }
 
-RowGroup::RowGroup() : columnCount(-1), data(NULL), rgData(NULL), strings(NULL),
+RowGroup::RowGroup() : columnCount(0), data(NULL), rgData(NULL), strings(NULL),
 	useStringTable(true), hasLongStringField(false), sTableThreshold(20)
 { }
 

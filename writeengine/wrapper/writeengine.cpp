@@ -820,8 +820,8 @@ int WriteEngineWrapper::insertColumnRecs(const TxnID& txnid,
    {
       if (!bFirstExtentOnThisPM)
          useTmpSuffix = true;
-   }
-
+   }  
+   
    unsigned i=0;
 #ifdef PROFILE
  StopWatch timer;
@@ -3007,7 +3007,7 @@ int WriteEngineWrapper::processBeginVBCopy(const TxnID& txnid, const vector<ColS
 	}
 	return rc;
  }
- #endif
+#endif
  void WriteEngineWrapper::writeVBEnd(const TxnID& txnid, std::vector<BRM::LBIDRange> &  rangeList)
  {
 	if (idbdatafile::IDBPolicy::useHdfs())

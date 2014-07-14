@@ -166,7 +166,7 @@ int32_t Func_str_to_date::getDateIntVal(rowgroup::Row& row,
 	dataconvert::DateTime dateTime;
 	dateTime = getDateTime(row, parm, isNull, ct);
 	int64_t time = *(reinterpret_cast<int64_t*>(&dateTime));
-	return (((int32_t)(time >> 32)) & 0xFFFFFFC0);
+	return ((((int32_t)(time >> 32)) & 0xFFFFFFC0) | 0x3E);
 }		
 
 int64_t Func_str_to_date::getDatetimeIntVal(rowgroup::Row& row,

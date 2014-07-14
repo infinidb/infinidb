@@ -180,8 +180,6 @@ private:
 
 typedef boost::shared_ptr<TupleJobList> STJLP;
 
-EXPORT void init_mysqlcl_idb();
-
 }
 
 #undef EXPORT

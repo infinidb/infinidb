@@ -155,6 +155,8 @@ private:
 	// temporary hack to make sure JobList only calls run, join once
 	boost::mutex jlLock;
 	bool runRan, joinRan;
+
+	boost::shared_ptr<int64_t> sessionMemLimit;
 };
 
 }

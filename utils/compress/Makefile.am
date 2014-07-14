@@ -19,7 +19,7 @@
 ## Process this file with automake to produce Makefile.in
 
 
-AM_CPPFLAGS = $(idb_common_includes) $(idb_cppflags)
+AM_CPPFLAGS = $(idb_common_includes) $(idb_cppflags) -DNDEBUG
 AM_CFLAGS = $(idb_cflags)
 AM_CXXFLAGS = $(idb_cxxflags)
 AM_LDFLAGS = -version-info 1:0:0 $(idb_ldflags)

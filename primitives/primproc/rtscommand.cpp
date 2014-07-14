@@ -156,7 +156,7 @@ void RTSCommand::prep(int8_t outputType, bool makeAbsRids)
 
 void RTSCommand::createCommand(ByteStream &bs)
 {
-    bs.advance(1);
+	bs.advance(1);
 	bs >> passThru;
 	if (!passThru) {
 		col.createCommand(bs);

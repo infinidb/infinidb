@@ -171,7 +171,9 @@ public:
 	inline virtual bool getBoolVal(rowgroup::Row& row, bool& isNull);
 
 	// get all simple columns involved in this column
-	const std::vector<SimpleColumn*>& simpleColumnList() const { return fSimpleColumnList; }
+	const std::vector<SimpleColumn*>& simpleColumnList();
+	// walk through the constant filter operands to re-populate fSimpleColumnList
+	void setSimpleColumnList();
 
 	// get all aggregate columns involved in this column
 	const std::vector<AggregateColumn*>& aggColumnList() const { return fAggColumnList; }

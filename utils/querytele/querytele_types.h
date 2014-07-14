@@ -47,7 +47,7 @@ struct StepType {
     T_CES = 3,
     T_SQS = 4,
     T_TAS = 5,
-    T_TXS = 6,
+    T_TNS = 6,
     T_BPS = 7,
     T_TCS = 8,
     T_HVS = 9,

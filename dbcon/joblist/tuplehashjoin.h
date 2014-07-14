@@ -36,6 +36,8 @@ namespace joblist
 class BatchPrimitive;
 class ResourceManager;
 class TupleBPS;
+struct FunctionJoinInfo;
+class DiskJoinStep;
 
 class TupleHashJoinStep : public JobStep, public TupleDeliveryStep
 {
@@ -174,16 +176,19 @@ public:
 	void addJoinFilter(boost::shared_ptr<execplan::ParseTree>, uint32_t index);
 	bool hasJoinFilter() const { return (fe.size() > 0); }
 	bool hasJoinFilter(uint32_t index) const;
+	boost::shared_ptr<funcexp::FuncExpWrapper> getJoinFilter(uint32_t index) const;
 	void setJoinFilterInputRG(const rowgroup::RowGroup &rg);
-
-	/* UM Join logic */
-	rowgroup::RGData joinOneRG(rowgroup::RGData input);
 
 	virtual bool stringTableFriendly() { return true; }
 
 	bool tokenJoin() const { return fTokenJoin; }
 	void tokenJoin(bool b) { fTokenJoin = b;    }
 
+	//@bug3683 function join
+	boost::shared_ptr<FunctionJoinInfo>& funcJoinInfo()               { return fFunctionJoinInfo; }
+	void funcJoinInfo(const boost::shared_ptr<FunctionJoinInfo>& fji) { fFunctionJoinInfo = fji;  }
+
+	void abort();
 private:
 	TupleHashJoinStep();
 	TupleHashJoinStep(const TupleHashJoinStep &);
@@ -331,7 +336,12 @@ private:
 	  rowgroup::RowGroup &inputRG, rowgroup::RowGroup &joinOutput, rowgroup::Row &largeSideRow,
 	  rowgroup::Row &joinFERow, rowgroup::Row &joinedRow, rowgroup::Row &baseRow,
 	  std::vector<std::vector<rowgroup::Row::Pointer> > &joinMatches,
-	  boost::shared_array<rowgroup::Row> &smallRowTemplates);
+	  boost::shared_array<rowgroup::Row> &smallRowTemplates,
+	  std::vector<boost::shared_ptr<joiner::TupleJoiner> > *joiners = NULL,
+	  boost::shared_array<boost::shared_array<int> > *rgMappings = NULL,
+	  boost::shared_array<boost::shared_array<int> > *feMappings = NULL,
+	  boost::scoped_array<boost::scoped_array<uint8_t> > *smallNullMem = NULL
+	  );
 	void finishSmallOuterJoin();
 	void makeDupList(const rowgroup::RowGroup &rg);
 	void processDupList(uint32_t threadID, rowgroup::RowGroup &ingrp,
@@ -356,6 +366,54 @@ private:
 
 	// moved from base class JobStep
 	boost::mutex* fStatsMutexPtr;
+
+	//@bug3683 function join
+	boost::shared_ptr<FunctionJoinInfo> fFunctionJoinInfo;
+	std::set<uint32_t> fFunctionJoinKeys;  // for skipping CP forward
+
+	/* Disk-based join support */
+	boost::scoped_array<DiskJoinStep> djs;
+	boost::scoped_array<boost::shared_ptr<RowGroupDL> > fifos;
+	void djsReaderFcn(int index);
+	boost::thread djsReader;
+	struct DJSReader {
+		DJSReader(TupleHashJoinStep *hj, uint32_t i) : HJ(hj), index(i) { }
+		void operator()() { HJ->djsReaderFcn(index); }
+		TupleHashJoinStep *HJ;
+		uint32_t index;
+	};
+
+	boost::thread djsRelay;
+	void djsRelayFcn();
+	struct DJSRelay {
+		DJSRelay(TupleHashJoinStep *hj) : HJ(hj) { }
+		void operator()() { HJ->djsRelayFcn(); }
+		TupleHashJoinStep *HJ;
+	};
+
+	boost::shared_ptr<int64_t> djsSmallUsage;
+	int64_t djsSmallLimit;
+	int64_t djsLargeLimit;
+	uint64_t djsPartitionSize;
+	bool isDML;
+	bool allowDJS;
+
+	// hacky mechanism to prevent nextBand from starting before the final
+	// THJS configuration is settled.  Debatable whether to use a bool and poll instead;
+	// once the config is settled it stays settled, technically no need to
+	// keep grabbing locks after that.
+	boost::mutex deliverMutex;
+	bool ownsOutputDL;
+
+	void segregateJoiners();
+	std::vector<boost::shared_ptr<joiner::TupleJoiner> > tbpsJoiners;
+	std::vector<boost::shared_ptr<joiner::TupleJoiner> > djsJoiners;
+	std::vector<int> djsJoinerMap;
+	boost::scoped_array<uint64_t> memUsedByEachJoin;
+	boost::mutex djsLock;
+	boost::shared_ptr<int64_t> sessionMemLimit;
+
+	friend class DiskJoinStep;
 };
 
 }

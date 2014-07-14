@@ -108,7 +108,7 @@ uint64_t Func::stringToDatetime(const string str)
 uint32_t Func::intToDate(int64_t i)
 {
 	if ((uint64_t) i > 0xFFFFFFFFL)
-		return ((uint32_t) (i >> 32)) & 0xFFFFFFC0L;
+		return ((((uint32_t) (i >> 32)) & 0xFFFFFFC0L) | 0x3E);
 
 	return i;
 }

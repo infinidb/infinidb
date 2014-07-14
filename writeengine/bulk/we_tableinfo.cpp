@@ -548,6 +548,7 @@ int  TableInfo::readTableData( )
     its.rows_so_far.pop_back();
     its.rows_so_far.push_back(fTotalReadRows);
     fQtc.postImportTele(its);
+    fQtc.waitForQueues();
 
     return NO_ERROR;    
 }
@@ -904,16 +905,16 @@ void TableInfo::reportTotals(double elapsedTime)
     fLog->logMsg(oss2.str(), MSGLVL_INFO2);
 
     // @bug 3504: Loop through columns to print saturation counts
-    std::vector<boost::tuple<CalpontSystemCatalog::ColDataType,std::string,uint64_t> > satCounts;
+    std::vector<boost::tuple<CalpontSystemCatalog::ColDataType,uint64_t,uint64_t> > satCounts;
     for (unsigned i=0; i < fColumns.size(); ++i)
     {
-        std::string colName(fTableName);
-        colName += '.';
-        colName += fColumns[i].column.colName;
+        //std::string colName(fTableName);
+       // colName += '.';
+       // colName += fColumns[i].column.colName;
         long long satCount = fColumns[i].saturatedCnt();
 
         satCounts.push_back(boost::make_tuple(fColumns[i].column.dataType, 
-                                              colName, 
+                                              fColumns[i].column.mapOid, 
                                               satCount));
 
         if (satCount > 0)
@@ -1100,8 +1101,11 @@ int  TableInfo::getColumnForParse(const int & id,
             if (columnId != -1)
                 oss << "; maxTime: " << maxTime;
             oss << endl;
-            cout << oss.str();
-            cout.flush();
+			if (!BulkLoad::disableConsoleOutput())
+			{
+	            cout << oss.str();
+		        cout.flush();
+			}
         }
         // @bug2099-
         

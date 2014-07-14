@@ -573,4 +573,3 @@ inline void TableInfo::setErrorDir( const std::string& errorDir ) {
 #endif
 }
 #endif
-

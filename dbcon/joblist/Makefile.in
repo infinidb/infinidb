@@ -41,8 +41,9 @@ subdir = dbcon/joblist
 DIST_COMMON = $(include_HEADERS) $(srcdir)/Makefile.am \
 	$(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
-am__aclocal_m4_deps = $(top_srcdir)/m4/functions.m4 \
-	$(top_srcdir)/m4/install.m4 $(top_srcdir)/configure.ac
+am__aclocal_m4_deps = $(top_srcdir)/m4/compilerflags.m4 \
+	$(top_srcdir)/m4/functions.m4 $(top_srcdir)/m4/install.m4 \
+	$(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 mkinstalldirs = $(install_sh) -d
@@ -62,6 +63,7 @@ am_libjoblist_la_OBJECTS = libjoblist_la-anydatalist.lo \
 	libjoblist_la-batchprimitiveprocessor-jl.lo \
 	libjoblist_la-columncommand-jl.lo libjoblist_la-command-jl.lo \
 	libjoblist_la-crossenginestep.lo libjoblist_la-dictstep-jl.lo \
+	libjoblist_la-diskjoinstep.lo \
 	libjoblist_la-distributedenginecomm.lo \
 	libjoblist_la-elementtype.lo libjoblist_la-expressionstep.lo \
 	libjoblist_la-filtercommand-jl.lo libjoblist_la-filterstep.lo \
@@ -274,6 +276,7 @@ libjoblist_la_SOURCES = \
         command-jl.cpp \
         crossenginestep.cpp \
         dictstep-jl.cpp \
+        diskjoinstep.cpp \
         distributedenginecomm.cpp \
         elementtype.cpp \
         expressionstep.cpp \
@@ -422,6 +425,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-command-jl.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-crossenginestep.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-dictstep-jl.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-diskjoinstep.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-distributedenginecomm.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-elementtype.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-expressionstep.Plo@am__quote@
@@ -529,6 +533,13 @@ libjoblist_la-dictstep-jl.lo: dictstep-jl.cpp
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='dictstep-jl.cpp' object='libjoblist_la-dictstep-jl.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-dictstep-jl.lo `test -f 'dictstep-jl.cpp' || echo '$(srcdir)/'`dictstep-jl.cpp
+
+libjoblist_la-diskjoinstep.lo: diskjoinstep.cpp
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-diskjoinstep.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-diskjoinstep.Tpo" -c -o libjoblist_la-diskjoinstep.lo `test -f 'diskjoinstep.cpp' || echo '$(srcdir)/'`diskjoinstep.cpp; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-diskjoinstep.Tpo" "$(DEPDIR)/libjoblist_la-diskjoinstep.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-diskjoinstep.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='diskjoinstep.cpp' object='libjoblist_la-diskjoinstep.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-diskjoinstep.lo `test -f 'diskjoinstep.cpp' || echo '$(srcdir)/'`diskjoinstep.cpp
 
 libjoblist_la-distributedenginecomm.lo: distributedenginecomm.cpp
 @am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-distributedenginecomm.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-distributedenginecomm.Tpo" -c -o libjoblist_la-distributedenginecomm.lo `test -f 'distributedenginecomm.cpp' || echo '$(srcdir)/'`distributedenginecomm.cpp; \

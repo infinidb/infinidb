@@ -290,7 +290,7 @@ cout << "Create table allocOIDs got the stating oid " << fStartingColOID << endl
 			fSessionManager.rolledback(txnID);
 			return result;
 		}
-
+	
 		int pmNum = 1;
 		bytestream << (uint32_t)dbRoot; 
 		tableDef.serialize(bytestream);

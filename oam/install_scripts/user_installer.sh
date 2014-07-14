@@ -381,9 +381,10 @@ if { $INSTALLTYPE == "initial"} {
 	}
 	set timeout 30
 	expect {
-		"!!!Module" 				  			{ send_user "DONE" }
-		"FAILED"   								{ send_user "ERROR: missing OS file\n" ; exit 1 }
+		"!!!Module" 	{ send_user "DONE" }
+		"FAILED"   	{ send_user "ERROR: missing OS file\n" ; exit 1 }
 		"closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
+		"No such file"   { send_user "ERROR: File Not Found\n" ; exit 1 }
 	}
 	send_user "\n"
 	set timeout 30

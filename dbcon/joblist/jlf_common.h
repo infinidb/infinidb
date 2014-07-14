@@ -66,10 +66,14 @@ const int8_t CONST_COL_NONE  = 0;
 const int8_t CONST_COL_EXIST = 1;
 const int8_t CONST_COL_ONLY  = 2;
 
+// pretend all expressions belong to "virtual" table EXPRESSION, (CNX_EXP_TABLE_ID, expression)
+// CNX_EXP_TABLE_ID(999) is not for user table or column, there will be no confilict in queries.
+const int32_t CNX_EXP_TABLE_ID = 999;
+
 struct TupleInfo
 {
 	TupleInfo(uint32_t w=0, uint32_t o=0, uint32_t k=-1, uint32_t t=-1, uint32_t s=0, uint32_t p=0,
-		execplan::CalpontSystemCatalog::ColDataType dt=execplan::CalpontSystemCatalog::BIGINT) :
+		execplan::CalpontSystemCatalog::ColDataType dt=execplan::CalpontSystemCatalog::BIT) :
 		width(w), oid(o), key(k), tkey(t), scale(s), precision(p), dtype(dt) { }
 	~TupleInfo() { }
 
@@ -95,13 +99,9 @@ struct JoinData
 };
 
 typedef std::stack<JobStepVector> JobStepVectorStack;
-typedef std::set<execplan::CalpontSystemCatalog::TableName> DeliveredTablesSet;
 typedef std::map<execplan::CalpontSystemCatalog::OID, execplan::CalpontSystemCatalog::OID> DictOidToColOidMap;
 typedef std::vector<TupleInfo> TupleInfoVector;
-typedef std::map<uint32_t, TupleInfoVector> TupleInfoMap;
-
-//@bug 598 & 1632 self-join
-//typedef std::pair<execplan::CalpontSystemCatalog::OID, std::string> OIDAliasPair;  //self-join
+typedef std::map<uint32_t, TupleInfo> TupleInfoMap;
 
 //for subquery support
 struct UniqId
@@ -133,28 +133,25 @@ typedef execplan::CalpontSelectExecutionPlan::ReturnedColumnList RetColsVector;
 
 //join data between table pairs
 typedef std::map<std::pair<uint32_t, uint32_t>, JoinData> TableJoinMap;
-// map<table<table A id, table B id>, pair<table A joinKey, table B joinKey> >
-//typedef std::map<std::pair<uint32_t, uint32_t>, std::pair<uint32_t, uint32_t> > TableJoinKeyMap;
-//typedef std::map<std::pair<uint32_t, uint32_t>, JoinType> JoinTypeMap;
 
 struct TupleKeyInfo
 {
-	uint32_t   nextKey;
+	uint32_t nextKey;
 	TupleKeyMap tupleKeyMap;
 	std::vector<UniqId> tupleKeyVec;
-	std::vector<std::string>  tupleKeyToName;
-	std::vector<bool>  crossEngine;
+	std::vector<std::string> tupleKeyToName;
+	std::vector<bool> crossEngine;
 
-	// TODO: better orgineze this structs
+	// TODO: better organize these structs
 	std::map<uint32_t, execplan::CalpontSystemCatalog::OID> tupleKeyToTableOid;
 	std::map<uint32_t, execplan::CalpontSystemCatalog::ColType> colType;
-	std::map<uint32_t, execplan::CalpontSystemCatalog::ColType> token2DictTypeMap; // i/c token only
+	std::map<uint32_t, execplan::CalpontSystemCatalog::ColType> token2DictTypeMap;
 	std::map<uint32_t, std::string> keyName;
 	std::map<uint32_t, uint32_t> colKeyToTblKey;
 	std::map<uint32_t, uint32_t> dictKeyMap;    // map token key to dictionary key
 	DictOidToColOidMap dictOidToColOid;         // map dictionary OID to column OID
 	std::map<uint32_t, uint32_t> pseudoType;    // key to pseudo column type
-
+	std::set<uint32_t> functionJoinKeys;        // key used in function join
 	TupleInfoMap tupleInfoMap;
 
 	TupleKeyInfo() : nextKey(0) {}
@@ -192,14 +189,13 @@ struct JobInfo
 		constantCol(CONST_COL_NONE),
 		hasDistinct(false),
 		hasAggregation(false),
-		hasImplicitGroupBy(false),
 		limitStart(0),
 		limitCount(-1),
 		joinNum(0),
 		subLevel(0),
 		subNum(0),
 		subId(0),
-		pSubId(-1),
+		pJobInfo(NULL),
 		constantFalse(false),
 		cntStarPos(-1),
 		stringScanThreshold(1),
@@ -213,7 +209,6 @@ struct JobInfo
 	uint32_t  statementId;
 	std::string  queryType;
 	boost::shared_ptr<execplan::CalpontSystemCatalog> csc;
-	DeliveredTablesSet tables;
 	int       maxBuckets;
 	uint64_t  maxElems;
 	JobStepVectorStack stack;
@@ -242,7 +237,6 @@ struct JobInfo
 	// aggregation
 	bool       hasDistinct;
 	bool       hasAggregation;
-	bool       hasImplicitGroupBy;
 	std::vector<uint32_t>                  groupByColVec;
 	std::vector<uint32_t>                  distinctColVec;
 	std::vector<uint32_t>                  expressionVec;
@@ -272,11 +266,14 @@ struct JobInfo
 	JobStepVector crossTableExpressions;
 	JobStepVector returnedExpressions;
 
+	// @bug3683, function join
+	std::vector<JobStep*>  functionJoins;   // store expressions can be converted to joins
+
 	// for function on aggregation
-	RetColsVector deliveredCols;    // columns to be sent to connector
-	RetColsVector nonConstCols;     // none constant columns
-	RetColsVector nonConstDelCols;  // delivered none constant columns
-	RetColsVector projectionCols;   // columns for projection
+	RetColsVector deliveredCols;            // columns to be sent to connector
+	RetColsVector nonConstCols;             // none constant columns
+	RetColsVector nonConstDelCols;          // delivered none constant columns
+	RetColsVector projectionCols;           // columns for projection
 	std::multimap<execplan::ReturnedColumn*, execplan::ReturnedColumn*> cloneAggregateColMap;
 	std::vector<std::pair<int, int> > aggEidIndexList;
 
@@ -306,7 +303,7 @@ struct JobInfo
 	int                    subLevel;      // subquery level
 	int                    subNum;        // # of subqueries @ level n
 	int                    subId;         // id of current subquery
-	int                    pSubId;        // id of outer query
+	JobInfo*               pJobInfo;      // jobinfo of outer query
 	bool                   constantFalse; // has constant false filter
 	std::string            subAlias;      // unique alias to identify the subquery
 	JobStepVector          correlateSteps;
@@ -358,6 +355,14 @@ struct JobInfo
 	// @bug4021, column map for all pseudo column queries
 	std::map<uint64_t, execplan::SRCP> tableColMap;
 	std::set<uint64_t> pseudoColTable;
+
+	/* Disk-based join vars */
+	boost::shared_ptr<int64_t> smallSideUsage;
+	boost::shared_ptr<int64_t> umMemLimit;
+	int64_t smallSideLimit;    // need to get these from a session var in execplan
+	int64_t largeSideLimit;
+	uint64_t partitionSize;
+	bool isDML;
 
 private:
 	//defaults okay
@@ -414,8 +419,13 @@ uint32_t getTableKey(const JobInfo& jobInfo,
 uint32_t getTableKey(JobInfo& jobInfo,
 	JobStep* js);
 
+void updateTableKey(uint32_t cid,
+    uint32_t tid,
+    JobInfo& jobInfo);
+
 uint32_t getExpTupleKey(const JobInfo& jobInfo,
-	uint64_t eid);
+	uint64_t eid,
+	bool cr = false);
 
 uint32_t makeTableKey(JobInfo& jobInfo,
 	const execplan::SimpleColumn* sc);
@@ -427,15 +437,11 @@ uint32_t makeTableKey(JobInfo& jobInfo,
 	const std::string& vw_name,
 	uint64_t engine = 0);
 
+
 /** @brief Returns the tupleInfo associate with the (table, column) key pair
  *
  */
-TupleInfo getTupleInfo(uint32_t tableKey, uint32_t columnKey, const JobInfo& jobInfo);
-
-/** @brief Returns the tupleInfo associate with the expression
- *
- */
-TupleInfo getExpTupleInfo(uint32_t expKey, const JobInfo& jobInfo);
+TupleInfo getTupleInfo(uint32_t columnKey, const JobInfo& jobInfo);
 
 /** @brief set tuple info for simple column
  *
@@ -453,7 +459,10 @@ TupleInfo setTupleInfo(const execplan::CalpontSystemCatalog::ColType& ct,
 TupleInfo setExpTupleInfo(const execplan::CalpontSystemCatalog::ColType& ct,
 	uint64_t expressionId,
 	const std::string& alias,
-	JobInfo& jobInfo);
+	JobInfo& jobInfo,
+	bool rc = false);
+
+TupleInfo setExpTupleInfo(const execplan::ReturnedColumn* rc, JobInfo& jobInfo);
 
 /** @brief add an aggregate column info
  *
@@ -461,15 +470,24 @@ TupleInfo setExpTupleInfo(const execplan::CalpontSystemCatalog::ColType& ct,
 void addAggregateColumn(execplan::AggregateColumn*, int, RetColsVector&, JobInfo&);
 
 void makeJobSteps(execplan::CalpontSelectExecutionPlan* csep, JobInfo& jobInfo,
-    JobStepVector& querySteps, JobStepVector& projectSteps, DeliveredTableMap& deliverySteps);
+	JobStepVector& querySteps, JobStepVector& projectSteps,
+	DeliveredTableMap& deliverySteps);
 
 void makeUnionJobSteps(execplan::CalpontSelectExecutionPlan* csep, JobInfo& jobInfo,
-    JobStepVector& querySteps, JobStepVector&, DeliveredTableMap& deliverySteps);
+	JobStepVector& querySteps, JobStepVector&, DeliveredTableMap& deliverySteps);
 
 void updateDerivedColumn(JobInfo&, execplan::SimpleColumn*,
 	execplan::CalpontSystemCatalog::ColType&);
 
 bool filterWithDictionary(execplan::CalpontSystemCatalog::OID dictOid, uint64_t n);
+
+bool compatibleColumnTypes(const execplan::CalpontSystemCatalog::ColType& ct1,
+                           const execplan::CalpontSystemCatalog::ColType& ct2,
+                           bool  forJoin = true);
+bool compatibleColumnTypes(const execplan::CalpontSystemCatalog::ColDataType& dt1, uint32_t scale1,
+                           const execplan::CalpontSystemCatalog::ColDataType& dt2, uint32_t scale2,
+                           bool  forJoin = true);
+
 
 } // end of jlf_common namespace
 

@@ -790,9 +790,9 @@ inline int64_t TreeNode::getDatetimeIntVal()
 inline int32_t TreeNode::getDateIntVal()
 {
 	if (fResultType.colDataType == execplan::CalpontSystemCatalog::DATETIME)
-		return (int32_t)(fResult.intVal >> 32) & 0xFFFFFFC0;
+		return (((int32_t)(fResult.intVal >> 32) & 0xFFFFFFC0) | 0x3E);
 	else if (fResultType.colDataType == execplan::CalpontSystemCatalog::DATE)
-		return fResult.intVal & 0xFFFFFFC0;
+		return ((fResult.intVal & 0xFFFFFFC0) | 0x3E);
 	else
 		return getIntVal();
 }

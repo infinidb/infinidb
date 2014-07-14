@@ -48,6 +48,7 @@ using namespace logging;
 using namespace execplan;
 
 #include "jlf_common.h"
+#include "jlf_tuplejoblist.h"
 #include "rowgroup.h"
 using namespace rowgroup;
 
@@ -61,7 +62,9 @@ ExpressionStep::ExpressionStep(const JobInfo& jobInfo) :
 	fExpressionId(-1),
 	fVarBinOK(false),
 	fSelectFilter(false),
-	fAssociatedJoinId(0)
+	fAssociatedJoinId(0),
+	fDoJoin(false),
+	fVirtual(false)
 {
 }
 
@@ -71,7 +74,6 @@ ExpressionStep::ExpressionStep(const ExpressionStep& rhs) :
 	fExpression(rhs.expression()),
 	fExpressionFilter(NULL),
 	fExpressionId(rhs.expressionId()),
-	fTableOids(tableOids()),
 	fAliases(rhs.aliases()),
 	fViews(rhs.views()),
 	fSchemas(rhs.schemas()),
@@ -79,7 +81,9 @@ ExpressionStep::ExpressionStep(const ExpressionStep& rhs) :
 	fColumnKeys(rhs.columnKeys()),
 	fVarBinOK(rhs.fVarBinOK),
 	fSelectFilter(rhs.fSelectFilter),
-	fAssociatedJoinId(rhs.fAssociatedJoinId)
+	fAssociatedJoinId(rhs.fAssociatedJoinId),
+	fDoJoin(rhs.fDoJoin),
+	fVirtual(rhs.fVirtual)
 {
 	if (rhs.expressionFilter() != NULL)
 		fExpressionFilter = new ParseTree(*(rhs.expressionFilter()));
@@ -109,15 +113,11 @@ void ExpressionStep::expression(const SRCP exp, JobInfo& jobInfo)
 
 	// set expression Id
 	ArithmeticColumn* ac = dynamic_cast<ArithmeticColumn*>(fExpression.get());
-	FunctionColumn*   fc = NULL;
-	if (ac != NULL)
-		fExpressionId = ac->expressionId();
-	else if ((fc = dynamic_cast<FunctionColumn*>(fExpression.get())) != NULL)
-		fExpressionId = fc->expressionId();
-	else
-		throw runtime_error("Unsupported Expression");
+	FunctionColumn*   fc = dynamic_cast<FunctionColumn*>(fExpression.get());
+	fExpressionId = exp.get()->expressionId();
 
-	addColumn(exp.get(), jobInfo);
+	if (ac != NULL || fc != NULL)
+		addColumn(exp.get(), jobInfo);
 }
 
 
@@ -141,6 +141,9 @@ void ExpressionStep::expressionFilter(const Filter* filter, JobInfo& jobInfo)
 	{
 		addColumn(sf->lhs(), jobInfo);
 		addColumn(sf->rhs(), jobInfo);
+
+		if (sf->op()->data() == "=")
+			functionJoinCheck(sf, jobInfo);
 	}
 	else if ((cf = dynamic_cast<ConstantFilter*>(f)) != NULL)
 	{
@@ -183,6 +186,9 @@ void ExpressionStep::addColumn(ReturnedColumn* rc, JobInfo& jobInfo)
 	SimpleColumn*                        sc = NULL;
 	WindowFunctionColumn*                wc = NULL;
 
+	// workaround for exp(sc) in (sub) where correlation is set on exp, but not sc.
+	//     populate it to sc for correct scope resolution
+	uint64_t correlated = rc->joinInfo();
 	if (NULL != (ac = dynamic_cast<ArithmeticColumn*>(rc)))
 	{
 		scs = &(ac->simpleColumnList());
@@ -204,6 +210,8 @@ void ExpressionStep::addColumn(ReturnedColumn* rc, JobInfo& jobInfo)
 			vector<SimpleColumn*>::const_iterator end = scs->end();
 			while (cit != end)
 			{
+				SimpleColumn* sc = *cit;
+				sc->joinInfo(sc->joinInfo() | correlated);
 				populateColumnInfo(*cit, jobInfo);
 				++cit;
 			}
@@ -225,6 +233,10 @@ void ExpressionStep::addColumn(ReturnedColumn* rc, JobInfo& jobInfo)
 		populateColumnInfo(sc, jobInfo);
 	}
 	else if (NULL != (wc = dynamic_cast<WindowFunctionColumn*>(rc)))
+	{
+		populateColumnInfo(rc, jobInfo);
+	}
+	else if (NULL != (dynamic_cast<AggregateColumn*>(rc)))
 	{
 		populateColumnInfo(rc, jobInfo);
 	}
@@ -252,10 +264,13 @@ void ExpressionStep::populateColumnInfo(ReturnedColumn* rc, JobInfo& jobInfo)
 
 	SimpleColumn* sc = dynamic_cast<SimpleColumn*>(rc);
 	WindowFunctionColumn* wc = NULL;
+	AggregateColumn* ac = NULL;
 	if (NULL != sc)
 		return populateColumnInfo(sc, jobInfo);
 	else if (NULL != (wc = dynamic_cast<WindowFunctionColumn*>(rc)))
 		return populateColumnInfo(wc, jobInfo);
+	else if (NULL != (ac = dynamic_cast<AggregateColumn*>(rc)))
+		return populateColumnInfo(ac, jobInfo);
 	else  // for now only allow simple and windowfunction column, more work to do.
 		throw runtime_error("Error in parsing expression.");
 }
@@ -351,8 +366,34 @@ void ExpressionStep::populateColumnInfo(WindowFunctionColumn* wc, JobInfo& jobIn
 }
 
 
+void ExpressionStep::populateColumnInfo(AggregateColumn* ac, JobInfo& jobInfo)
+{
+	// As of bug3695, make sure varbinary is not used in function expression.
+	if (ac->resultType().colDataType == CalpontSystemCatalog::VARBINARY && !fVarBinOK)
+		throw runtime_error("VARBINARY in filter or function is not supported.");
+
+	// This is for aggregate function in IN/EXISTS sub-query.
+	TupleInfo ti(setExpTupleInfo(ac->resultType(), ac->expressionId(), ac->alias(), jobInfo));
+	uint64_t acKey = ti.key;
+	string alias("");
+	string view("");
+	string schema("");
+	fTableOids.push_back(jobInfo.keyInfo->tupleKeyToTableOid[acKey]);
+	fAliases.push_back(alias);
+	fViews.push_back(view);
+	fSchemas.push_back(schema);
+	fTableKeys.push_back(jobInfo.keyInfo->colKeyToTblKey[acKey]);
+	fColumnKeys.push_back(acKey);
+	fColumns.push_back(ac);
+}
+
+
 void ExpressionStep::updateInputIndex(map<uint32_t, uint32_t>& indexMap, const JobInfo& jobInfo)
 {
+	// expression is handled as function join already
+	if (fDoJoin)
+		return;
+
 	if (jobInfo.trace)
 		cout << "Input indices of Expression:" << (int64_t) fExpressionId << endl;
 
@@ -393,27 +434,7 @@ void ExpressionStep::updateInputIndex(map<uint32_t, uint32_t>& indexMap, const J
 		}
 		else
 		{
-			ArithmeticColumn*     ac = dynamic_cast<ArithmeticColumn*>(*it);
-			AggregateColumn*      ag = NULL;
-			FunctionColumn*       fc = NULL;
-			WindowFunctionColumn* wc = NULL;
-
-			if (ac != NULL)
-			{
-				ac->inputIndex(indexMap[getExpTupleKey(jobInfo, ac->expressionId())]);
-			}
-			else if ((ag = dynamic_cast<AggregateColumn*>(*it)) != NULL)
-			{
-				ag->inputIndex(indexMap[getExpTupleKey(jobInfo, ag->expressionId())]);
-			}
-			else if ((fc = dynamic_cast<FunctionColumn*>(*it)) != NULL)
-			{
-				fc->inputIndex(indexMap[getExpTupleKey(jobInfo, fc->expressionId())]);
-			}
-			else if ((wc = dynamic_cast<WindowFunctionColumn*>(*it)) != NULL)
-			{
-				wc->inputIndex(indexMap[getExpTupleKey(jobInfo, wc->expressionId())]);
-			}
+			(*it)->inputIndex(indexMap[getExpTupleKey(jobInfo, (*it)->expressionId())]);
 
 			if (jobInfo.trace)
 				cout << "EID:" << (*it)->expressionId();
@@ -457,9 +478,184 @@ void ExpressionStep::updateColumnOidAlias(JobInfo& jobInfo)
 
 void ExpressionStep::substitute(uint64_t i, const SSC& ssc)
 {
-	fSubstitutes.push_back(ssc);
+	fVsc.insert(ssc);  // save a local copy in case the virtual table in subquery be out of scope.
 	fSubMap[ssc.get()] = fColumns[i];
 	fColumns[i] = ssc.get();
+}
+
+
+void ExpressionStep::functionJoinCheck(SimpleFilter* sf, JobInfo& jobInfo)
+{
+	// only handle one & only one table at each side, and not the same table
+	fFunctionJoinInfo.reset(new FunctionJoinInfo);
+	if ((parseFuncJoinColumn(sf->lhs(), jobInfo) == false) ||
+	    (parseFuncJoinColumn(sf->rhs(), jobInfo) == false) ||
+	    (fFunctionJoinInfo->fTableKey[0] == fFunctionJoinInfo->fTableKey[1]) ||
+	    (!compatibleColumnTypes(sf->lhs()->resultType(), sf->rhs()->resultType(), true)))
+	{
+		// for better error message
+		if (fFunctionJoinInfo->fTableKey.size() == 2)
+		{
+			uint32_t t1 = fFunctionJoinInfo->fTableKey[0];
+			uint32_t t2 = fFunctionJoinInfo->fTableKey[1];
+			jobInfo.incompatibleJoinMap[t1] = t2;
+			jobInfo.incompatibleJoinMap[t2] = t1;
+		}
+
+		// not convertible
+		fFunctionJoinInfo.reset();
+		return;
+	}
+
+    SJSTEP sjstep;
+	ReturnedColumn* sfLhs = sf->lhs();
+	ReturnedColumn* sfRhs = sf->rhs();
+	if (dynamic_cast<SimpleColumn*>(sfLhs) == NULL)
+	{
+		SRCP lhs(sfLhs->clone());
+		ExpressionStep* esLhs = new ExpressionStep(jobInfo);
+		esLhs->expression(lhs, jobInfo);
+		sjstep.reset(esLhs);
+	}
+	fFunctionJoinInfo->fStep.push_back(sjstep);
+	sjstep.reset();
+
+	if (dynamic_cast<SimpleColumn*>(sfRhs) == NULL)
+	{
+		SRCP rhs(sfRhs->clone());
+		ExpressionStep* esRhs = new ExpressionStep(jobInfo);
+		esRhs->expression(rhs, jobInfo);
+		sjstep.reset(esRhs);
+	}
+	fFunctionJoinInfo->fStep.push_back(sjstep);
+
+	JoinType jt = INNER;
+	if (sfLhs->returnAll())
+		jt = LEFTOUTER;
+	else if (sfRhs->returnAll())
+		jt = RIGHTOUTER;
+
+	uint64_t joinInfo = sfLhs->joinInfo() | sfRhs->joinInfo();
+	int64_t  correlatedSide = 0;
+	ExpressionStep* ve = NULL;
+	if (joinInfo != 0)
+	{
+		if (joinInfo & JOIN_SEMI)
+			jt |= SEMI;
+
+		if (joinInfo & JOIN_ANTI)
+			jt |= ANTI;
+
+		if (joinInfo & JOIN_SCALAR)
+			jt |= SCALAR;
+
+		if (joinInfo & JOIN_NULL_MATCH)
+			jt |= MATCHNULLS;
+
+		if (joinInfo & JOIN_CORRELATED)
+			jt |= CORRELATED;
+
+		if (joinInfo & JOIN_OUTER_SELECT)
+			jt |= LARGEOUTER;
+
+		if (sfLhs->joinInfo() & JOIN_CORRELATED)
+		{
+			correlatedSide = 1;
+			ve = dynamic_cast<ExpressionStep*>(fFunctionJoinInfo->fStep[1].get());
+		}
+		else if (sfRhs->joinInfo() & JOIN_CORRELATED)
+		{
+			correlatedSide = 2;
+			ve = dynamic_cast<ExpressionStep*>(fFunctionJoinInfo->fStep[0].get());
+		}
+	}
+
+	if (ve != NULL)
+		ve->virtualStep();
+
+	fFunctionJoinInfo->fJoinType = jt;
+	fFunctionJoinInfo->fCorrelatedSide = correlatedSide;
+	fFunctionJoinInfo->fJoinId = ++jobInfo.joinNum;
+
+	jobInfo.functionJoins.push_back(this);
+}
+
+
+bool ExpressionStep::parseFuncJoinColumn(ReturnedColumn* rc, JobInfo& jobInfo)
+{
+	set<uint32_t> tids;     // tables used in the expression
+	set<uint32_t> cids;     // columns used in the expression
+	uint32_t key = -1;      // join key
+	uint32_t tid = -1;      // table Id of the simple column
+	bool isSc = false;      // rc is a simple column
+
+	ArithmeticColumn* ac = dynamic_cast<ArithmeticColumn*>(rc);
+	FunctionColumn*   fc = dynamic_cast<FunctionColumn*>(rc);
+	SimpleColumn*     sc = dynamic_cast<SimpleColumn*>(rc);
+	if (sc != NULL)
+	{
+		isSc = true;
+		key = getTupleKey(jobInfo, sc);
+		tid = getTableKey(jobInfo, key);
+		if (jobInfo.keyInfo->dictKeyMap.find(key) != jobInfo.keyInfo->dictKeyMap.end())
+			key = jobInfo.keyInfo->dictKeyMap[key];
+		tids.insert(tid);
+		cids.insert(key);
+	}
+	else if (ac != NULL || fc != NULL)
+	{
+		TupleInfo ti(setExpTupleInfo(rc, jobInfo));
+		key = ti.key;
+		for (uint32_t i = 0; i < rc->simpleColumnList().size(); i++)
+		{
+			sc = rc->simpleColumnList()[i];
+			uint32_t cid = getTupleKey(jobInfo, sc);
+			tid = getTableKey(jobInfo, cid);
+			tids.insert(tid);
+			cids.insert(cid);
+		}
+	}
+
+	int32_t tableOid = -1;
+	int32_t oid = -1;
+	string alias;
+	string view;
+	string schema;
+	if (sc && tids.size() == 1)
+	{
+		tableOid = joblist::tableOid(sc, jobInfo.csc);
+		oid = sc->oid();
+		alias = extractTableAlias(sc);
+		view = sc->viewName();
+		schema = sc->schemaName();
+	}
+	else if (dynamic_cast<AggregateColumn*>(rc)  || dynamic_cast<WindowFunctionColumn*>(rc) ||
+	         dynamic_cast<ArithmeticColumn*>(rc) || dynamic_cast<FunctionColumn*>(rc))
+	{
+		tableOid = execplan::CNX_VTABLE_ID;
+		oid = rc->expressionId();
+		alias = jobInfo.subAlias;
+	}
+	else
+	{
+		return false;
+	}
+
+	if (isSc == false)
+		jobInfo.keyInfo->functionJoinKeys.insert(key);
+
+	fFunctionJoinInfo->fExpression.push_back(rc);
+	fFunctionJoinInfo->fJoinKey.push_back(key);
+	fFunctionJoinInfo->fTableKey.push_back(tid);
+	fFunctionJoinInfo->fColumnKeys.push_back(cids);
+	fFunctionJoinInfo->fTableOid.push_back(tableOid);
+	fFunctionJoinInfo->fOid.push_back(oid);
+	fFunctionJoinInfo->fSequence.push_back(rc->sequence());
+	fFunctionJoinInfo->fAlias.push_back(alias);
+	fFunctionJoinInfo->fView.push_back(view);
+	fFunctionJoinInfo->fSchema.push_back(schema);
+
+	return true;
 }
 
 

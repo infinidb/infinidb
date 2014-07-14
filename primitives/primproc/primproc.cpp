@@ -91,7 +91,7 @@ bool utf8 = false;
 
 bool isDebug( const DebugLevel level )
 {
-        return level <= gDebugLevel;
+	return level <= gDebugLevel;
 }
 
 }
@@ -101,29 +101,29 @@ namespace
 
 int toInt(const string& val)
 {
-        if (val.length() == 0)
-                return -1;
-        return static_cast<int>(Config::fromText(val));
+	if (val.length() == 0)
+		return -1;
+	return static_cast<int>(Config::fromText(val));
 }
 
 void setupSignalHandlers()
 {
 #ifndef _MSC_VER
-		signal(SIGHUP, SIG_IGN);
+	signal(SIGHUP, SIG_IGN);
 
-        struct sigaction ign;
+	struct sigaction ign;
 
-        memset(&ign, 0, sizeof(ign));
-        ign.sa_handler = SIG_IGN;
-        sigaction(SIGPIPE, &ign, 0);
+	memset(&ign, 0, sizeof(ign));
+	ign.sa_handler = SIG_IGN;
+	sigaction(SIGPIPE, &ign, 0);
 
-        memset(&ign, 0, sizeof(ign));
-        ign.sa_handler = SIG_IGN;
-        sigaction(SIGUSR1, &ign, 0);
+	memset(&ign, 0, sizeof(ign));
+	ign.sa_handler = SIG_IGN;
+	sigaction(SIGUSR1, &ign, 0);
 
-        memset(&ign, 0, sizeof(ign));
-        ign.sa_handler = SIG_IGN;
-        sigaction(SIGUSR2, &ign, 0);
+	memset(&ign, 0, sizeof(ign));
+	ign.sa_handler = SIG_IGN;
+	sigaction(SIGUSR2, &ign, 0);
 
 	sigset_t sigset;
 	sigemptyset(&sigset);
@@ -137,36 +137,36 @@ void setupSignalHandlers()
 
 void setupCwd(Config* cf)
 {
-        string workdir = cf->getConfig("SystemConfig", "WorkingDir");
-        if (workdir.length() == 0)
-                workdir = ".";
-        (void)chdir(workdir.c_str());
-        if (access(".", W_OK) != 0)
-                (void)chdir("/tmp");
+	string workdir = cf->getConfig("SystemConfig", "WorkingDir");
+	if (workdir.length() == 0)
+		workdir = ".";
+	(void)chdir(workdir.c_str());
+	if (access(".", W_OK) != 0)
+		(void)chdir("/tmp");
 }
 
 int setupResources()
 {
 #ifndef _MSC_VER
-        struct rlimit rlim;
+	struct rlimit rlim;
 
-        if (getrlimit(RLIMIT_NOFILE, &rlim) != 0) {
-                return -1;
-        }
-        rlim.rlim_cur = rlim.rlim_max = 65536;
-        if (setrlimit(RLIMIT_NOFILE, &rlim) != 0) {
-                return -2;
-        }
+	if (getrlimit(RLIMIT_NOFILE, &rlim) != 0) {
+		return -1;
+	}
+	rlim.rlim_cur = rlim.rlim_max = 65536;
+	if (setrlimit(RLIMIT_NOFILE, &rlim) != 0) {
+		return -2;
+	}
 
-        if (getrlimit(RLIMIT_NOFILE, &rlim) != 0) {
-                return -3;
-        }
+	if (getrlimit(RLIMIT_NOFILE, &rlim) != 0) {
+		return -3;
+	}
 
-        if (rlim.rlim_cur != 65536) {
-                return -4;
-        }
+	if (rlim.rlim_cur != 65536) {
+		return -4;
+	}
 #endif
-        return 0;
+	return 0;
 }
 
 #ifdef QSIZE_DEBUG
@@ -197,12 +197,12 @@ public:
 
 				ostringstream oss;
 				oss << setfill('0')
-					<< setw(2) << tm.tm_hour << ':'
-					<< setw(2) << tm.tm_min << ':'
-					<< setw(2) << tm.tm_sec
-					<< '.'
-					<< setw(4) << tv.tv_usec/100
-					;
+				<< setw(2) << tm.tm_hour << ':'
+				<< setw(2) << tm.tm_min << ':'
+				<< setw(2) << tm.tm_sec
+				<< '.'
+				<< setw(4) << tv.tv_usec/100
+				;
 
 				*fQszLog << oss.str() << ' ' << qd << endl;
 			}
@@ -259,8 +259,7 @@ void* waitForSIGUSR1(void* p)
 				BRPp[i]->formatLRUList(out);
 				out << "###" << endl;
 			}
-		} else
-		if (rec_sig == SIGUSR2)
+		} else if (rec_sig == SIGUSR2)
 		{
 			// is reporting currently on?
 			rpt_state = BRPp[0]->ReportingFrequency();
@@ -284,9 +283,9 @@ int main(int argc, char* argv[])
 {
 	// get and set locale language
 	systemLang = funcexp::utf8::idb_setlocale();
-    if ( systemLang != "en_US.UTF-8" &&
-        systemLang.find("UTF") != string::npos )
-        utf8 = true;
+	if ( systemLang != "en_US.UTF-8" &&
+			systemLang.find("UTF") != string::npos )
+		utf8 = true;
 
 	Config* cf = Config::makeConfig();
 
@@ -402,7 +401,7 @@ int main(int argc, char* argv[])
 		// responses to ExeMgr and vice versa, if we rotated socket dest.
 		temp = toInt(cf->getConfig("Installation", "ServerTypeInstall"));
 		if ((temp == oam::INSTALL_COMBINE_DM_UM_PM) ||
-			(temp == oam::INSTALL_COMBINE_PM_UM))
+				(temp == oam::INSTALL_COMBINE_PM_UM))
 			rotatingDestination = false;
 	}
 
@@ -460,7 +459,7 @@ int main(int argc, char* argv[])
 	{
 		//make sure we've got an integral factor of extent size
 		for (; (MaxExtentSize%temp)!=0; ++temp);
-			blocksReadAhead=temp;
+		blocksReadAhead=temp;
 	}
 
 	temp = toInt(cf->getConfig(primitiveServers, "PTTrace"));
@@ -479,7 +478,7 @@ int main(int argc, char* argv[])
 		maxPct = temp;
 
 	// @bug4507, configurable pm aggregation AggregationMemoryCheck
-    // We could use this same mechanism for other growing buffers.
+	// We could use this same mechanism for other growing buffers.
 	int aggPct = 95;
 	temp = toInt(cf->getConfig("SystemConfig", "MemoryCheckPercent"));
 	if (temp >= 0)
@@ -543,14 +542,14 @@ int main(int argc, char* argv[])
 
 	// the default is ~10% low, 30% medium, 60% high, (where 2*cores = 100%)
 	if (highPriorityPercentage == 0 && medPriorityPercentage == 0 &&
-	  lowPriorityPercentage == 0) {
+			lowPriorityPercentage == 0) {
 		lowPriorityThreads = max(1, (2*numCores)/10);
 		medPriorityThreads = max(1, (2*numCores)/3);
 		highPriorityThreads = (2 * numCores) - lowPriorityThreads - medPriorityThreads;
 	}
 	else {
 		uint32_t totalThreads = (uint32_t) ((lowPriorityPercentage + medPriorityPercentage +
-		  highPriorityPercentage) / 100.0 * (2*numCores));
+											 highPriorityPercentage) / 100.0 * (2*numCores));
 
 		if (totalThreads == 0)
 			totalThreads = 1;
@@ -586,15 +585,15 @@ int main(int argc, char* argv[])
 		noVB = 1;
 
 	cout << "Starting PrimitiveServer: st = " << serverThreads << ", sq = " << serverQueueSize <<
-		", pw = " << processorWeight << ", pq = " << processorQueueSize <<
-		", nb = " << BRPBlocks << ", nt = " << BRPThreads << ", nc = " << cacheCount <<
-		", ra = " << blocksReadAhead <<  ", db = " << deleteBlocks << ", mb = " << maxBlocksPerRead <<
-		", rd = " << rotatingDestination << ", tr = " << PTTrace <<
-		", ss = " << PMSmallSide << ", bp = " << BPPCount << endl;
+		 ", pw = " << processorWeight << ", pq = " << processorQueueSize <<
+		 ", nb = " << BRPBlocks << ", nt = " << BRPThreads << ", nc = " << cacheCount <<
+		 ", ra = " << blocksReadAhead <<  ", db = " << deleteBlocks << ", mb = " << maxBlocksPerRead <<
+		 ", rd = " << rotatingDestination << ", tr = " << PTTrace <<
+		 ", ss = " << PMSmallSide << ", bp = " << BPPCount << endl;
 
 	PrimitiveServer server(serverThreads, serverQueueSize, processorWeight, processorQueueSize,
-		rotatingDestination, BRPBlocks, BRPThreads, cacheCount, maxBlocksPerRead, blocksReadAhead,
-		deleteBlocks, PTTrace, prefetchThreshold, PMSmallSide);
+						   rotatingDestination, BRPBlocks, BRPThreads, cacheCount, maxBlocksPerRead, blocksReadAhead,
+						   deleteBlocks, PTTrace, prefetchThreshold, PMSmallSide);
 
 #ifdef QSIZE_DEBUG
 	thread* qszMonThd;

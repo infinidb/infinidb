@@ -46,6 +46,9 @@ using namespace execplan;
 #include "rowgroup.h"
 using namespace rowgroup;
 
+#include "querytele.h"
+using namespace querytele;
+
 #include "jlf_common.h"
 #include "tupleconstantstep.h"
 
@@ -81,6 +84,7 @@ TupleConstantStep::TupleConstantStep(const JobInfo& jobInfo) :
 		fEndOfResult(false)
 {
 	fExtendedInfo = "TCS: ";
+	fQtc.stepParms().stepType = StepTeleStats::T_TCS;
 }
 
 
@@ -176,6 +180,7 @@ void TupleConstantStep::constructContanstRow(const JobInfo& jobInfo)
 	// construct a row with only the constant values
 	fConstRowData.reset(new uint8_t[fRowConst.getSize()]);
 	fRowConst.setData(fConstRowData.get());
+	fRowConst.initToNull(); // make sure every col is init'd to something, because later we copy the whole row
 	const vector<CalpontSystemCatalog::ColDataType>& types = fRowGroupOut.getColTypes();
 	for (vector<uint64_t>::iterator i = fIndexConst.begin(); i != fIndexConst.end(); i++)
 	{
@@ -374,11 +379,18 @@ void TupleConstantStep::execute()
 	RGData rgDataIn;
 	RGData rgDataOut;
 	bool more = false;
+	StepTeleStats sts;
+	sts.query_uuid = fQueryUuid;
+	sts.step_uuid = fStepUuid;
 
 	try
 	{
 		more = fInputDL->next(fInputIterator, &rgDataIn);
 		if (traceOn()) dlTimes.setFirstReadTime();
+
+		sts.msg_type = StepTeleStats::ST_START;
+		sts.total_units_of_work = 1;
+		postStepStartTele(sts);
 
 		if (!more && cancelled())
 		{
@@ -417,6 +429,11 @@ void TupleConstantStep::execute()
 //	if (!fEndOfResult)
 		while (more)
 			more = fInputDL->next(fInputIterator, &rgDataIn);
+
+	sts.msg_type = StepTeleStats::ST_SUMMARY;
+	sts.total_units_of_work = sts.units_of_work_completed = 1;
+	sts.rows = fRowsReturned;
+	postStepSummaryTele(sts);
 
 	// Bug 3136, let mini stats to be formatted if traceOn.
 	if (traceOn())
@@ -730,7 +747,7 @@ uint32_t TupleConstantOnlyStep::nextBand(messageqcpp::ByteStream &bs)
 void TupleConstantOnlyStep::fillInConstants()
 {
 	fRowGroupOut.getRow(0, &fRowOut);
-	idbassert(fRowConst.getSize() == fRowOut.getSize());
+	idbassert(fRowConst.getColumnCount() == fRowOut.getColumnCount());
 	copyRow(fRowConst, &fRowOut);
 	fRowGroupOut.resetRowGroup(0);
 	fRowGroupOut.setRowCount(1);

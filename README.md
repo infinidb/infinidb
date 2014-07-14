@@ -1,9 +1,9 @@
-# This is InfiniDB 4.5.1
+# This is InfiniDB 4.6
 
 ## Build prerequisites
 To build InfiniDB from source you will need:
 
-  * a CentOS/RHEL 5/6, debian 5/6 or Ubuntu 10/12 linux host configured for software development
+  * a CentOS/RHEL 5/6, debian 6/7 or Ubuntu 12/14 linux host configured for software development
 
 Along with a working C++ compiler and GNU software development tools you will need the following extra packages:
 
@@ -22,9 +22,9 @@ Along with a working C++ compiler and GNU software development tools you will ne
 
 ### InfiniDB MySQL
 
-    wget -Omysql-4.5.1-3.tar.gz https://github.com/infinidb/mysql/archive/4.5.1-3.tar.gz
-    tar -zxf mysql-4.5.1-3.tar.gz
-    ln -s mysql-4.5.1-3 mysql
+    wget -Omysql-4.6.0-1.tar.gz https://github.com/infinidb/mysql/archive/4.6.0-1.tar.gz
+    tar -zxf mysql-4.6.0-1.tar.gz
+    ln -s mysql-4.6.0-1 mysql
     cd mysql
     ./configure --prefix=$HOME/infinidb/mysql
     make
@@ -33,14 +33,14 @@ Along with a working C++ compiler and GNU software development tools you will ne
 ### InfiniDB
 
     cd ..
-    wget -Oinfinidb-4.5.1-3.tar.gz https://github.com/infinidb/infinidb/archive/4.5.1-3.tar.gz
-    tar -zxf infinidb-4.5.1-3.tar.gz
-    ln -s infinidb-4.5.1-3 infinidb
+    wget -Oinfinidb-4.6.0-1.tar.gz https://github.com/infinidb/infinidb/archive/4.6.0-1.tar.gz
+    tar -zxf infinidb-4.6.0-1.tar.gz
+    ln -s infinidb-4.6.0-1 infinidb
     cd infinidb
     ./configure --prefix=$HOME/infinidb
     make
     make install
     
 This will leave you with `$HOME/infinidb` as a binary tree. Follow the Binary Download
-instructions in the InfiniDB 4.5 Installation Guide (available on http://www.infinidb.co/).
+instructions in the InfiniDB 4.6 Installation Guide (available on http://www.infinidb.co/).
 

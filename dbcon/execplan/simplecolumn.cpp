@@ -64,15 +64,29 @@ void getSimpleCols(execplan::ParseTree* n, void* obj)
 	SimpleFilter *sf = dynamic_cast<SimpleFilter*>(tn);
 	ConstantFilter *cf = dynamic_cast<ConstantFilter*>(tn);
 	if (sc)
+	{
 		list->push_back(sc);
+	}
 	else if (fc)
+	{
+		fc->setSimpleColumnList();
 		list->insert(list->end(), fc->simpleColumnList().begin(), fc->simpleColumnList().end());
+	}
 	else if (ac)
+	{
+		ac->setSimpleColumnList();
 		list->insert(list->end(), ac->simpleColumnList().begin(), ac->simpleColumnList().end());
+	}
 	else if (sf)
+	{
+		sf->setSimpleColumnList();
 		list->insert(list->end(), sf->simpleColumnList().begin(), sf->simpleColumnList().end());
+	}
 	else if (cf)
+	{
+		cf->setSimpleColumnList();
 		list->insert(list->end(), cf->simpleColumnList().begin(), cf->simpleColumnList().end());
+	}
 }
 
 ParseTree* replaceRefCol(ParseTree*& n, CalpontSelectExecutionPlan::ReturnedColumnList& derivedColList)
@@ -180,7 +194,6 @@ SimpleColumn::SimpleColumn (const SimpleColumn& rhs,const uint32_t sessionID):
 
 SimpleColumn::~SimpleColumn()
 {}
-
 /**
  * Methods
  */
@@ -322,7 +335,6 @@ void SimpleColumn::serialize(messageqcpp::ByteStream& b) const
 	b << fData;
 	//b << fAlias;
 	b << fTableAlias;
-	b << static_cast<const ByteStream::doublebyte>(fReturnAll);
 	b << (uint32_t) fSequence;
 	b << static_cast<const ByteStream::doublebyte>(fIsInfiniDB);
 }
@@ -340,7 +352,6 @@ void SimpleColumn::unserialize(messageqcpp::ByteStream& b)
 	b >> fData;
 	//b >> fAlias;
 	b >> fTableAlias;
-	b >> reinterpret_cast< ByteStream::doublebyte&>(fReturnAll);
 	b >> (uint32_t&) fSequence;
 	b >> reinterpret_cast< ByteStream::doublebyte&>(fIsInfiniDB);
 }
@@ -424,6 +435,16 @@ void SimpleColumn::setDerivedTable()
 	     dynamic_cast<WindowFunctionColumn*>(fDerivedRefCol)))
 		fDerivedTable = "";
 }
+
+bool SimpleColumn::singleTable(CalpontSystemCatalog::TableAliasName& tan)
+{
+	tan.table = fTableName;
+	tan.schema = fSchemaName;
+	tan.view = fViewName;
+	tan.alias = fTableAlias;
+	return true;
+}
+
 
 // @todo move to inline
 void SimpleColumn::evaluate(Row& row, bool& isNull)

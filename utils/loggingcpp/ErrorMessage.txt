@@ -35,6 +35,7 @@
 1015	ERR_OUTER_JOIN_SUBSELECT	Subquery on OUTER JOIN ON clause is currently not supported.
 1016	ERR_PARTITION_BY_RANGE	The column type %1% is currently  not supported in %2% function.
 1017	ERR_SP_FUNCTION_NOT_SUPPORT	Stored function is currently not supported in InfiniDB.
+1018	ERR_DBJ_ANTI_NULL	Cannot currently process a disk-based antijoin with a function filter and a NULL join column in the large-side table.
 
 # Other errors ...
 2001	ERR_JOIN_TOO_BIG	Join or subselect exceeds memory limit.
@@ -90,6 +91,12 @@
 2046	ERR_READ_INPUT_DATALIST	Input datalist read error.
 2047	ERR_LOCAL_QUERY_UM	Query attempted on UM (no PM) with infinidb_local_query set.
 
+# disk-based join runtime errors from supported queries
+2048	ERR_DBJ_FILE_IO_ERROR	There was an IO error doing a disk-based join.
+2049	ERR_DBJ_UNKNOWN_ERROR	An unknown error error occured doing a disk-based join.  Check the error log & contact support.
+2050	ERR_DBJ_DISK_USAGE_LIMIT	This query exceeded the temp disk usage limit.  Raise infinidb_diskjoin_smallsidelimit if possible and try again.
+2051	ERR_DBJ_DATA_DISTRIBUTION	The data distribution in this query overflowed a disk-based join bucket.  If possible, raise infinidb_diskjoin_bucketsize and try again.
+2052	INFO_SWITCHING_TO_DJS	Out of UM memory, switching to disk-based join.
 
 # Sub-query errors
 3001	ERR_NON_SUPPORT_SUB_QUERY_TYPE	This subquery type is not supported yet.

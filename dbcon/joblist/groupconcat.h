@@ -150,6 +150,7 @@ protected:
 	uint64_t                              fErrorCode;
 	uint64_t                              fMemSize;
 	ResourceManager*                      fRm;
+	boost::shared_ptr<int64_t>			  fSessionMemLimit;
 };
 
 

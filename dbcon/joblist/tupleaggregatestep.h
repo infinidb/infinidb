@@ -188,6 +188,8 @@ private:
 	boost::scoped_array<uint64_t> fMemUsage;
 	vector<boost::shared_ptr<boost::thread> > fFirstPhaseRunners;
 	uint32_t fFirstPhaseThreadCount;
+
+	boost::shared_ptr<int64_t> fSessionMemLimit;
 };
 
 

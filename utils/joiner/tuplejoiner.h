@@ -84,6 +84,8 @@ extern TypelessData makeTypelessKey(const rowgroup::Row &,
 	const std::vector<uint32_t> &, uint32_t keylen, utils::FixedAllocator *fa);
 extern TypelessData makeTypelessKey(const rowgroup::Row &,
 	const std::vector<uint32_t> &, utils::PoolAllocator *fa);
+extern uint64_t getHashOfTypelessKey(const rowgroup::Row &, const std::vector<uint32_t> &,
+	uint32_t seed=0);
 
 
 class TupleJoiner
@@ -118,7 +120,7 @@ public:
 	~TupleJoiner();
 
 	size_t size() const;
-	void insert(rowgroup::Row &r);
+	void insert(rowgroup::Row &r, bool zeroTheRid = true);
 	void doneInserting();
 
 	/* match() returns the small-side rows that match the large-side row.
@@ -189,6 +191,11 @@ public:
 	inline uint64_t getJoinNullValue() { return joblist::BIGINTNULL; }   // a normalized NULL value
 	inline uint64_t smallNullValue() { return nullValueForJoinColumn; }
 
+	// Disk-based join support
+	void clearData();
+	boost::shared_ptr<TupleJoiner> copyForDiskJoin();
+	bool isFinished() { return finished; }
+
 private:
 	typedef std::tr1::unordered_multimap<int64_t, uint8_t *, hasher, std::equal_to<int64_t>,
 	  utils::STLPoolAllocator<std::pair<const int64_t, uint8_t *> > > hash_t;
@@ -258,6 +265,7 @@ private:
 	boost::scoped_array<bool> discreteValues;
 	boost::scoped_array<std::vector<int64_t> > cpValues;    // if !discreteValues, [0] has min, [1] has max
 	uint32_t uniqueLimit;
+	bool finished;
 };
 
 }

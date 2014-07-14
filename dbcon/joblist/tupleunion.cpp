@@ -25,6 +25,9 @@
 #include <boost/thread/mutex.hpp>
 #include <boost/uuid/uuid_io.hpp>
 
+#include "querytele.h"
+using namespace querytele;
+
 #include "dataconvert.h"
 #include "hasher.h"
 #include "jlf_common.h"
@@ -90,15 +93,17 @@ TupleUnion::TupleUnion(CalpontSystemCatalog::OID tableOID, const JobInfo& jobInf
 	distinctDone(0),
 	fRowsReturned(0),
 	runRan(false),
-	joinRan(false)
+	joinRan(false),
+	sessionMemLimit(jobInfo.umMemLimit)
 {
 	uniquer.reset(new Uniquer_t(10, Hasher(this), Eq(this), allocator));
-	fExtendedInfo = "TUS: ";
+	fExtendedInfo = "TUN: ";
+	fQtc.stepParms().stepType = StepTeleStats::T_TUN;
 }
 
 TupleUnion::~TupleUnion()
 {
-	rm.returnMemory(memUsage);
+	rm.returnMemory(memUsage, sessionMemLimit);
 	if (!runRan && output)
 		output->endOfInput();
 }
@@ -129,11 +134,11 @@ void TupleUnion::readInput(uint32_t which)
 	/* The handling of the output got a little kludgey with the string table enhancement.
 	 * When there is no distinct check, the outputs are all generated independently of
 	 * each other locally in this fcn.  When there is a distinct check, threads
-	 * share the output, which is built in the 'rowMemory' vector rather than in 
+	 * share the output, which is built in the 'rowMemory' vector rather than in
 	 * thread-local memory.  Building the result in a common space allows us to
 	 * store 8-byte offsets in rowMemory rather than 16-bytes for absolute pointers.
 	 */
-	
+
 	RowGroupDL *dl = NULL;
 	bool more = true;
 	RGData inRGData, outRGData, *tmpRGData;
@@ -142,8 +147,10 @@ void TupleUnion::readInput(uint32_t which)
 	Row inRow, outRow, tmpRow;
 	bool distinct;
 	uint64_t memUsageBefore, memUsageAfter, memDiff;
+	StepTeleStats sts;
+	sts.query_uuid = fQueryUuid;
+	sts.step_uuid = fStepUuid;
 
-	
 	l_outputRG = outputRG;
 	dl = inputs[which];
 	l_inputRG = inputRGs[which];
@@ -165,19 +172,26 @@ void TupleUnion::readInput(uint32_t which)
 		l_outputRG.resetRowGroup(0);
 		l_outputRG.getRow(0, &outRow);
 	}
-		
+
 	try {
 
 		it = dl->getIterator();
 		more = dl->next(it, &inRGData);
 
-		if (traceOn() && dlTimes.FirstReadTime().tv_sec==0)
+		if (dlTimes.FirstReadTime().tv_sec==0)
             dlTimes.setFirstReadTime();
+
+		if (fStartTime == -1)
+		{
+			sts.msg_type = StepTeleStats::ST_START;
+			sts.total_units_of_work = 1;
+			postStepStartTele(sts);
+		}
 
 		while (more && !cancelled()) {
 			/*
 				normalize each row
-				  if distinct flag is set 
+				  if distinct flag is set
 					copy the row into the output and test for uniqueness
 					  if unique, increment the row count
 				  else
@@ -213,7 +227,7 @@ void TupleUnion::readInput(uint32_t which)
 					memDiff += (memUsageAfter - memUsageBefore);
 					memUsage += memDiff;
 				}
-				if (!rm.getMemory(memDiff)) {
+				if (!rm.getMemory(memDiff, sessionMemLimit)) {
 					fLogger->logMessage(logging::LOG_TYPE_INFO, logging::ERR_UNION_TOO_BIG);
 					if (status() == 0) // preserve existing error code
 					{
@@ -263,6 +277,11 @@ void TupleUnion::readInput(uint32_t which)
 		if (++runnersDone == fInputJobStepAssociation.outSize())
 		{
 			output->endOfInput();
+
+			sts.msg_type = StepTeleStats::ST_SUMMARY;
+			sts.total_units_of_work = sts.units_of_work_completed = 1;
+			sts.rows = fRowsReturned;
+			postStepSummaryTele(sts);
 
 			if (traceOn())
 			{
@@ -746,7 +765,7 @@ void TupleUnion::run()
 			distinctCount++;
 			normalizedData[i].reinit(outputRG);
 		}
-	}	
+	}
 
 	for (i = 0; i < inputs.size(); i++) {
 		boost::shared_ptr<boost::thread> th(new boost::thread(Runner(this, i)));
@@ -770,7 +789,7 @@ void TupleUnion::join()
 	runners.clear();
 	uniquer->clear();
 	rowMemory.clear();
-	rm.returnMemory(memUsage);
+	rm.returnMemory(memUsage, sessionMemLimit);
 	memUsage = 0;
 }
 

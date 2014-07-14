@@ -154,6 +154,17 @@ public:
 
 	virtual void setDerivedTable();
 	virtual void replaceRealCol(std::vector<SRCP>&);
+	virtual const std::vector<SimpleColumn*>& simpleColumnList() const
+	{ return fSimpleColumnList; }
+	virtual void setSimpleColumnList();
+
+	/**
+	 * Return the table that the column arguments belong to.
+	 * 
+	 * @return tablename, if all arguments belong to one table
+	 *         empty string "", if multiple tables are involved in this func
+	 */
+	virtual bool singleTable(CalpontSystemCatalog::TableAliasName& tan);
 
 private:
 	std::string fTableAlias;   // table alias for this column

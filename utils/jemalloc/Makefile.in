@@ -55,8 +55,9 @@ host_triplet = @host@
 subdir = utils/jemalloc
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
-am__aclocal_m4_deps = $(top_srcdir)/m4/functions.m4 \
-	$(top_srcdir)/m4/install.m4 $(top_srcdir)/configure.ac
+am__aclocal_m4_deps = $(top_srcdir)/m4/compilerflags.m4 \
+	$(top_srcdir)/m4/functions.m4 $(top_srcdir)/m4/install.m4 \
+	$(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 mkinstalldirs = $(install_sh) -d
@@ -367,6 +368,7 @@ leakcheck:
 docs:
 
 bootstrap: install-data-am
+	mkdir -p $(libdir)
 	$(install_sh) libjemalloc.so.3.3.0 $(libdir)
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

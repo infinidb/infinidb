@@ -375,10 +375,11 @@ if { $INSTALLTYPE == "initial"} {
 	}
 	set timeout 30
 	expect {
-		"!!!Module" 				  			{ send_user "DONE" }
+		"!!!Module" 	{ send_user "DONE" }
 		"Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit 1 }
-		"FAILED"   								{ send_user "ERROR: missing OS file\n" ; exit 1 }
+		"FAILED"   { send_user "ERROR: missing OS file\n" ; exit 1 }
 		"closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
+		"No such file"   { send_user "ERROR: File Not Found\n" ; exit 1 }
 	}
 	send_user "\n"
 }

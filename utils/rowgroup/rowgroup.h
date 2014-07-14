@@ -314,12 +314,13 @@ class Row
 
 		inline bool usesStringTable() const { return useStringTable; }
 		inline bool hasLongString() const { return hasLongStringField; }
-		inline uint64_t hash(const std::vector<uint32_t> &keyColumns) const;
+
+		// these are for cases when you already know the type definitions are the same.
+		// a fcn to check the type defs seperately doesn't exist yet.  No normalization.
+		inline uint64_t hash(const std::vector<uint32_t> &keyColumns, uint32_t seed=0) const;
 		inline uint64_t hash(uint32_t lastCol) const;  // generates a hash for cols [0-lastCol]
 		inline uint64_t hash() const;  // generates a hash for all cols
 
-		// these are for cases when you already know the type definitions are the same.
-		// a fcn to check the type defs seperately doesn't exist yet.
 		inline bool equals(const Row &, const std::vector<uint32_t> &keyColumns) const;
 		inline bool equals(const Row &, uint32_t lastCol) const;
 		inline bool equals(const Row &) const;
@@ -809,10 +810,10 @@ inline uint64_t Row::hash() const
 	return hash(columnCount-1);
 }
 
-inline uint64_t Row::hash(const std::vector<uint32_t> &keyCols) const
+inline uint64_t Row::hash(const std::vector<uint32_t> &keyCols, uint32_t seed) const
 {
 	utils::Hasher_r h;
-	uint32_t ret = 0;
+	uint32_t ret = seed;
 
 	for (uint32_t i = 0; i < keyCols.size(); i++) {
 		const uint32_t &col = keyCols[i];

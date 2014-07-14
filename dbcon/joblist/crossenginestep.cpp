@@ -48,6 +48,9 @@ using namespace rowgroup;
 #include "dataconvert.h"
 using namespace dataconvert;
 
+#include "querytele.h"
+using namespace querytele;
+
 #include "funcexp.h"
 
 #include "jobstep.h"
@@ -191,6 +194,7 @@ CrossEngineStep::CrossEngineStep(
 {
 	fExtendedInfo = "CES: ";
 	getMysqldInfo(jobInfo);
+	fQtc.stepParms().stepType = StepTeleStats::T_CES;
 }
 
 
@@ -218,6 +222,12 @@ bool CrossEngineStep::deliverStringTableRowGroup() const
 }
 
 
+void CrossEngineStep::addFcnJoinExp(const vector<execplan::SRCP>& fe)
+{
+	fFeFcnJoin = fe;
+}
+
+
 void CrossEngineStep::addFcnExpGroup1(const boost::shared_ptr<ParseTree>& fe)
 {
 	fFeFilters = fe;
@@ -230,7 +240,7 @@ void CrossEngineStep::setFE1Input(const rowgroup::RowGroup& rg)
 }
 
 
-void CrossEngineStep::setFcnExpGroup3(const vector<boost::shared_ptr<ReturnedColumn> >& fe)
+void CrossEngineStep::setFcnExpGroup3(const vector<execplan::SRCP>& fe)
 {
 	fFeSelects = fe;
 }
@@ -248,7 +258,7 @@ void CrossEngineStep::makeMappings()
 	for (uint64_t i = 0; i < fColumnCount; ++i)
 		fFe1Column[i] = -1;
 
-	if (fFeFilters != NULL)
+	if (fFeFilters != NULL || fFeFcnJoin.size() > 0)
 	{
 		const std::vector<uint32_t>& colInFe1 = fRowGroupFe1.getKeys();
 		for (uint64_t i = 0; i < colInFe1.size(); i++)
@@ -256,8 +266,6 @@ void CrossEngineStep::makeMappings()
 			map<uint32_t, uint32_t>::iterator it = fColumnMap.find(colInFe1[i]);
 			if (it != fColumnMap.end())
 				fFe1Column[it->second] = i;
-			else
-				throw logic_error("Column not projected.");
 		}
 
 		fFeMapping1 = makeMapping(fRowGroupFe1, fRowGroupOut);
@@ -475,9 +483,16 @@ void CrossEngineStep::execute()
 {
 	DrizzleMySQL drizzle;
 	int ret = 0;
+	StepTeleStats sts;
+	sts.query_uuid = fQueryUuid;
+	sts.step_uuid = fStepUuid;
 
 	try
 	{
+		sts.msg_type = StepTeleStats::ST_START;
+		sts.total_units_of_work = 1;
+		postStepStartTele(sts);
+
 		ret = drizzle.init(fHost.c_str(), fPort, fUser.c_str(), fPasswd.c_str(), fSchema.c_str());
 		if (ret != 0)
 			handleMySqlError(drizzle.getError().c_str(), ret);
@@ -508,7 +523,9 @@ void CrossEngineStep::execute()
 
 		// Any functions to evaluate
 		makeMappings();
-		if (fFeSelects.empty() && fFeFilters == NULL)
+		bool doFE1 = ((fFeFcnJoin.size() > 0) || (fFeFilters != NULL));
+		bool doFE3 =  (fFeSelects.size() > 0);
+		if (!doFE1 && !doFE3)
 		{
 			while ((rowIn = drizzle.nextRow()) && !cancelled())
 			{
@@ -519,7 +536,7 @@ void CrossEngineStep::execute()
 			}
 		}
 
-		else if (fFeSelects.empty() && fFeFilters != NULL)  // FE in WHERE clause only
+		else if (doFE1 && !doFE3)  // FE in WHERE clause only
 		{
 			shared_array<uint8_t> rgDataFe1;  // functions in where clause
 			Row rowFe1;                       // row for fe evaluation
@@ -536,8 +553,11 @@ void CrossEngineStep::execute()
 						setField(fFe1Column[i], rowIn[i], rowFe1);
 				}
 
-				if (fFeInstance->evaluate(rowFe1, fFeFilters.get()) == false)
+				if (fFeFilters && fFeInstance->evaluate(rowFe1, fFeFilters.get()) == false)
 					continue;
+
+				// evaluate the FE join column
+				fFeInstance->evaluate(rowFe1, fFeFcnJoin);
 
 				// Pass throug the parsed columns, and parse the remaining columns.
 				applyMapping(fFeMapping1, rowFe1, &fRowDelivered);
@@ -551,7 +571,7 @@ void CrossEngineStep::execute()
 			}
 		}
 
-		else if (!fFeSelects.empty() && fFeFilters == NULL)  // FE in SELECT clause only
+		else if (!doFE1 && doFE3)  // FE in SELECT clause only
 		{
 			shared_array<uint8_t> rgDataFe3;  // functions in select clause
 			Row rowFe3;                       // row for fe evaluation
@@ -565,13 +585,15 @@ void CrossEngineStep::execute()
 					setField(i, rowIn[i], rowFe3);
 
 				fFeInstance->evaluate(rowFe3, fFeSelects);
+				fFeInstance->evaluate(rowFe3, fFeSelects);
+
 				applyMapping(fFeMapping3, rowFe3, &fRowDelivered);
 
 				addRow(rgDataDelivered);
 			}
 		}
 
-		else  // FE in SELECT clause and WHERE clause
+		else  // FE in SELECT clause, FE join and WHERE clause
 		{
 			shared_array<uint8_t> rgDataFe1;  // functions in where clause
 			Row rowFe1;                       // row for fe1 evaluation
@@ -594,8 +616,11 @@ void CrossEngineStep::execute()
 						setField(fFe1Column[i], rowIn[i], rowFe1);
 				}
 
-				if (fFeInstance->evaluate(rowFe1, fFeFilters.get()) == false)
+				if (fFeFilters && fFeInstance->evaluate(rowFe1, fFeFilters.get()) == false)
 					continue;
+
+				// evaluate the FE join column
+				fFeInstance->evaluate(rowFe1, fFeFcnJoin);
 
 				// Pass throug the parsed columns, and parse the remaining columns.
 				applyMapping(fFeMapping1, rowFe1, &rowFe3);
@@ -629,6 +654,11 @@ void CrossEngineStep::execute()
 		catchHandler("CrossEngineStep execute caught an unknown exception",
 						ERR_CROSS_ENGINE_CONNECT, fErrorInfo, fSessionId);
 	}
+
+	sts.msg_type = StepTeleStats::ST_SUMMARY;
+	sts.total_units_of_work = sts.units_of_work_completed = 1;
+	sts.rows = fRowsReturned;
+	postStepSummaryTele(sts);
 
 	fEndOfResult = true;
 	fOutputDL->endOfInput();
@@ -890,12 +920,6 @@ void CrossEngineStep::formatMiniStats()
 		<< JSTimeStamp::tsdiffstr(dlTimes.EndOfInputTime(), dlTimes.FirstReadTime()) << " "
 		<< fRowsReturned << " ";
 	fMiniInfo += oss.str();
-}
-
-
-// static
-void CrossEngineStep::init_mysqlcl_idb()
-{
 }
 
 

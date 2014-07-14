@@ -104,7 +104,7 @@ void printUsage()
   "    [-c readBufSize] [-e maxErrs] [-B libBufSize] [-n NullOption] " << endl<<
   "    [-E encloseChar] [-C escapeChar] [-I binaryOpt] [-S] "
   "[-d debugLevel] [-i] " << endl<<
-  "    [-D] [-L rejectDir]" << endl;
+  "     [-D] [-N] [-L rejectDir]" << endl;
 
     cout << endl << "Traditional usage without positional parameters "
       "(XML job file required):" << endl <<
@@ -112,8 +112,9 @@ void printUsage()
   "    [-h] [-r readers] [-w parsers] [-s c] [-f path] [-b readBufs] " << endl<<
   "    [-c readBufSize] [-e maxErrs] [-B libBufSize] [-n NullOption] " << endl<<
   "    [-E encloseChar] [-C escapeChar] [-I binaryOpt] [-S] "
-  "[-d debugLevel] [-i] "                                              << endl<<
-  "    [-p path] [-l loadFile] [-D] [-L rejectDir]" << endl << endl;
+  "[-d debugLevel] [-i] " << endl<<
+  "    [-p path] [-l loadFile]" << endl<<
+  "     [-D] [-N] [-L rejectDir]" << endl << endl;
 
     cout << "    Positional parameters:" << endl <<
         "        dbName    Name of database to load" << endl <<
@@ -159,7 +160,8 @@ void printUsage()
         "        -I Binary import; binaryOpt 1-import NULL values"   << endl <<
         "                                    2-saturate NULL values" << endl <<
         "        -S Treat string truncations as errors" << endl << 
-		"        -D Disable timeout when waiting for table lock" << endl <<
+        "        -D Disable timeout when waiting for table lock" << endl <<
+        "        -N Disable console output" << endl <<
         "        -L send *.err and *.bad (reject) files here" << endl << endl;
 
     cout << "    Example1:" << endl <<
@@ -187,10 +189,11 @@ void handleSigTerm(int i)
 //------------------------------------------------------------------------------
 void handleControlC(int i)
 {
-    std::cout << "Received Control-C to terminate the process..." << std::endl;
+	if (!BulkLoad::disableConsoleOutput())
+		std::cout << "Received Control-C to terminate the process..." << std::endl;
     BulkStatus::setJobStatus( EXIT_FAILURE );
 }
-
+
 //------------------------------------------------------------------------------
 // If error occurs during startup, this function is called to log the specified
 // message and terminate the process.
@@ -198,12 +201,14 @@ void handleControlC(int i)
 void startupError( const std::string& errMsg, bool showHint )
 {
     // Log to console
-    cerr << errMsg << endl;
+    if (!BulkLoad::disableConsoleOutput())
+		cerr << errMsg << endl;
     if (showHint)
     {
         std::ostringstream oss;
         oss  << "Try '" << pgmName << " -h' for more information.";
-        cerr << oss.str() << endl;
+        if (!BulkLoad::disableConsoleOutput())
+			cerr << oss.str() << endl;
     }
 
     // Log to syslog
@@ -225,7 +230,7 @@ void startupError( const std::string& errMsg, bool showHint )
 
     exit( EXIT_FAILURE );
 }
-
+
 //------------------------------------------------------------------------------
 // Initialize signal handling
 //------------------------------------------------------------------------------
@@ -265,7 +270,7 @@ void setupSignalHandlers()
     sigaction(SIGTERM, &act, 0);
 #endif
 }
-
+
 //------------------------------------------------------------------------------
 // Parse the command line arguments
 //------------------------------------------------------------------------------
@@ -289,7 +294,7 @@ void parseCmdLineArgs(
     std::string jobUUID;
 
     while( (option=getopt(
-        argc,argv,"b:c:d:e:f:hij:kl:m:n:p:r:s:u:w:B:C:DE:I:P:R:SX:L:")) != EOF )
+        argc,argv,"b:c:d:e:f:hij:kl:m:n:p:r:s:u:w:B:C:DE:I:P:R:SX:NL:")) != EOF )
     {
         switch(option)
         {
@@ -341,7 +346,8 @@ void parseCmdLineArgs(
                 {
                     bDebug = true;
                     curJob.setAllDebug( (DebugLevel) debugLevel );
-                    cout << "\nDebug level is set to " << debugLevel << endl;
+					if (!BulkLoad::disableConsoleOutput())
+					    cout << "\nDebug level is set to " << debugLevel << endl;
                 }
                 break;
             }
@@ -467,7 +473,8 @@ void parseCmdLineArgs(
                 }
 #endif
                 curJob.setNoOfReadThreads(numOfReaders);
-                cout << "number of read threads : " << numOfReaders << endl;
+                if (!BulkLoad::disableConsoleOutput())
+					cout << "number of read threads : " << numOfReaders << endl;
                 break;
             }
 
@@ -477,15 +484,22 @@ void parseCmdLineArgs(
                 if (!strcmp(optarg,"\\t"))
                 {
                     delim = '\t';
-                    cout << "Column delimiter : " << "\\t" << endl;
+                    if (!BulkLoad::disableConsoleOutput())
+						cout << "Column delimiter : " << "\\t" << endl;
                 }
                 else
                 {
                     delim = optarg[0];
                     if (delim == '\t') // special case to print a <TAB>
-                        cout << "Column delimiter : '\\t'" << endl;
+                    {
+						if (!BulkLoad::disableConsoleOutput())
+							cout << "Column delimiter : '\\t'" << endl;
+                    }
                     else
-                        cout << "Column delimiter : " << delim << endl;
+                    {
+						if (!BulkLoad::disableConsoleOutput())
+							cout << "Column delimiter : " << delim << endl;
+					}
                 }
                 curJob.setColDelimiter( delim );
                 break;
@@ -519,7 +533,8 @@ void parseCmdLineArgs(
                 }
 #endif
                 curJob.setNoOfParseThreads( numOfParser );
-                cout << "number of parse threads : " << numOfParser << endl;
+                if (!BulkLoad::disableConsoleOutput())
+					cout << "number of parse threads : " << numOfParser << endl;
                 break;
             }
 
@@ -542,14 +557,16 @@ void parseCmdLineArgs(
             case 'C':                                // -C: enclosed escape char
             {
                 curJob.setEscapeChar( optarg[0] );
-                cout << "Escape Character  : " << optarg[0] << endl;
+				if (!BulkLoad::disableConsoleOutput())
+				    cout << "Escape Character  : " << optarg[0] << endl;
                 break;
             }
 
             case 'E':                                // -E: enclosed by char
             {
                 curJob.setEnclosedByChar( optarg[0] );
-                cout << "Enclosed by Character : " << optarg[0] << endl;
+				if (!BulkLoad::disableConsoleOutput())
+	                cout << "Enclosed by Character : " << optarg[0] << endl;
                 break;
             }
 
@@ -574,7 +591,7 @@ void parseCmdLineArgs(
 				break;
 			}
 
-			case 'P':                                // -P: Calling moduleid
+            case 'P':                                // -P: Calling moduleid
             {                                        //     and PID
                 sModuleIDandPID = optarg;
                 break;
@@ -604,6 +621,11 @@ void parseCmdLineArgs(
                 curJob.disableTimeOut(true);
                 break;
             }
+            case 'N':  								  // silent the output to console
+            {
+				BulkLoad::disableConsoleOutput(true);
+				break;
+			}
             default :
             {
                 ostringstream oss;
@@ -727,7 +749,7 @@ void parseCmdLineArgs(
         }
     }
 }
-
+
 //------------------------------------------------------------------------------
 // Print the path of the input load file(s), and the name of the job xml file.
 //------------------------------------------------------------------------------
@@ -741,23 +763,66 @@ void printInputSource(
         {
             char cwdBuf[4096];
             ::getcwd(cwdBuf,sizeof(cwdBuf));
-            cout << "Input file(s) will be read from : " << cwdBuf << endl;
+            if (!(BulkLoad::disableConsoleOutput()))
+				cout << "Input file(s) will be read from : " << cwdBuf << endl;
         }
         else
         {
-            cout << "Input file(s) will be read from : " <<
-                alternateImportDir << endl;
+			if (!(BulkLoad::disableConsoleOutput()))
+				cout << "Input file(s) will be read from : " <<
+					alternateImportDir << endl;
         }
     }
     else
     {
-        cout << "Input file(s) will be read from Bulkload root directory : " <<
-            Config::getBulkRoot() << endl;
+		if (!(BulkLoad::disableConsoleOutput()))
+			cout << "Input file(s) will be read from Bulkload root directory : " <<
+        Config::getBulkRoot() << endl;
+    }
+	if (!(BulkLoad::disableConsoleOutput()))
+		cout << "Job description file : "    << jobDescFile << endl;
+}
+
+//------------------------------------------------------------------------------
+// Get TableOID string for the specified db and table name.
+//------------------------------------------------------------------------------
+void getTableOID(const std::string& xmlGenSchema,
+                 const std::string& xmlGenTable,
+                 std::string& tableOIDStr)
+{
+    OID tableOID = 0;
+
+    execplan::CalpontSystemCatalog::TableName tbl(
+        xmlGenSchema, xmlGenTable );
+    try
+    {
+        boost::shared_ptr<CalpontSystemCatalog> cat =
+            CalpontSystemCatalog::makeCalpontSystemCatalog(
+            BULK_SYSCAT_SESSION_ID);
+        cat->identity(CalpontSystemCatalog::EC);
+        tableOID = cat->tableRID(tbl).objnum;
+    }
+    catch (std::exception& ex)
+    {
+        std::ostringstream oss;
+        oss << "Unable to set default JobID; " <<
+            "Error getting OID for table " <<
+            tbl.schema << '.' << tbl.table << ": " << ex.what();
+        startupError( oss.str(), false );
+    }
+    catch (...)
+    {
+        std::ostringstream oss;
+        oss << "Unable to set default JobID; " <<
+            "Unknown error getting OID for table " <<
+            tbl.schema << '.' << tbl.table;
+        startupError( oss.str(), false );
     }
 
-    cout << "Job description file : "    << jobDescFile << endl;
+    std::ostringstream oss;
+    oss << tableOID;
+    tableOIDStr = oss.str();
 }
-
 //------------------------------------------------------------------------------
 // Construct temporary Job XML file if user provided schema, job, and
 // optional load filename.
@@ -778,14 +843,21 @@ void constructTempXmlFile(
 {
     // Construct the job description file name
     std::string xmlErrMsg;
-    int rc = XMLJob::genJobXMLFileName( std::string(),
+    int rc = 0;
+    std::string tableOIDStr;
+    getTableOID(xmlGenSchema,
+                xmlGenTable,
+                tableOIDStr);            
+		rc = XMLJob::genJobXMLFileName( std::string(),
                                         tempJobDir,
                                         sJobIdStr,
                                         true, // using temp job xml file
                                         xmlGenSchema,
                                         xmlGenTable,
                                         sFileName,
-                                        xmlErrMsg );
+                                        xmlErrMsg,
+                                        tableOIDStr );
+   	
     if (rc != NO_ERROR)
     {
         std::ostringstream oss;
@@ -835,48 +907,9 @@ void constructTempXmlFile(
 
     genProc.writeXMLFile( sFileName.string() );
 }
-
-//------------------------------------------------------------------------------
-// Get TableOID string for the specified db and table name.
-//------------------------------------------------------------------------------
-void getTableOID(const std::string& xmlGenSchema,
-                 const std::string& xmlGenTable,
-                 std::string& tableOIDStr)
-{
-    OID tableOID = 0;
 
-    execplan::CalpontSystemCatalog::TableName tbl(
-        xmlGenSchema, xmlGenTable );
-    try
-    {
-        boost::shared_ptr<CalpontSystemCatalog> cat =
-            CalpontSystemCatalog::makeCalpontSystemCatalog(
-            BULK_SYSCAT_SESSION_ID);
-        cat->identity(CalpontSystemCatalog::EC);
-        tableOID = cat->tableRID(tbl).objnum;
-    }
-    catch (std::exception& ex)
-    {
-        std::ostringstream oss;
-        oss << "Unable to set default JobID; " <<
-            "Error getting OID for table " <<
-            tbl.schema << '.' << tbl.table << ": " << ex.what();
-        startupError( oss.str(), false );
-    }
-    catch (...)
-    {
-        std::ostringstream oss;
-        oss << "Unable to set default JobID; " <<
-            "Unknown error getting OID for table " <<
-            tbl.schema << '.' << tbl.table;
-        startupError( oss.str(), false );
-    }
 
-    std::ostringstream oss;
-    oss << tableOID;
-    tableOIDStr = oss.str();
-}
-
+
 //------------------------------------------------------------------------------
 // Verify we are running from a PM node.
 //------------------------------------------------------------------------------
@@ -892,7 +925,7 @@ void verifyNode()
             true );
     }
 }
-
+
 //------------------------------------------------------------------------------
 // Log initiate message
 //------------------------------------------------------------------------------
@@ -905,7 +938,7 @@ void logInitiateMsg( const char* initText )
         logging::LOG_TYPE_INFO,
         logging::M0086);
 }
-
+
 //------------------------------------------------------------------------------
 // Main entry point into the cpimport.bin program
 //------------------------------------------------------------------------------
@@ -932,6 +965,7 @@ int main(int argc, char **argv)
     // Log job initiation unless user is asking for help
     std::ostringstream ossArgList;
     bool bHelpFlag = false;
+    
     for (int m=1; m<argc; m++)
     {
         if (strcmp(argv[m],"-h") == 0)
@@ -1096,7 +1130,8 @@ int main(int argc, char **argv)
     boost::filesystem::path sFileName;
     bool bUseTempJobFile = false;
 
-    cout << std::endl; // print blank line before we start
+	if (!BulkLoad::disableConsoleOutput())
+	    cout << std::endl; // print blank line before we start
 
     // Start tracking time to create/load jobfile;
     // The elapsed time for this step is logged at the end of loadJobInfo()
@@ -1110,9 +1145,9 @@ int main(int argc, char **argv)
             getTableOID(xmlGenSchema,
                         xmlGenTable,
                         tableOIDStr);
-
-            cout << "Using table OID " << tableOIDStr <<
-                " as the default JOB ID" << std::endl;
+			if ( !(BulkLoad::disableConsoleOutput()))
+				cout << "Using table OID " << tableOIDStr <<
+						" as the default JOB ID" << std::endl;
             sJobIdStr = tableOIDStr;
         }
 
@@ -1132,6 +1167,7 @@ int main(int argc, char **argv)
     {
         // Construct the job description file name
         std::string xmlErrMsg;
+        std::string tableOIdStr("");
         rc = XMLJob::genJobXMLFileName( sXMLJobDir,
                                         curJob.getJobDir(),
                                         sJobIdStr,
@@ -1139,7 +1175,8 @@ int main(int argc, char **argv)
                                         std::string(),
                                         std::string(),
                                         sFileName,
-                                        xmlErrMsg );
+                                        xmlErrMsg,
+                                        tableOIdStr );
         if (rc != NO_ERROR)
         {
             std::ostringstream oss;
@@ -1147,7 +1184,7 @@ int main(int argc, char **argv)
                 xmlErrMsg;
             startupError( oss.str(), false );
         }
-        printInputSource( curJob.getAlternateImportDir(), sFileName.string() );
+        printInputSource( curJob.getAlternateImportDir(), sFileName.string());
     }
     if (bDebug)
         logInitiateMsg( "Job xml file is established" );
@@ -1180,6 +1217,7 @@ int main(int argc, char **argv)
     task = TASK_LOAD_JOBFILE;
     rc = curJob.loadJobInfo( sFileName.string(), bUseTempJobFile,
         systemLang, argc, argv, bLogInfo2ToConsole, bValidateColumnList );
+    
     if( rc != NO_ERROR )
     {
         WErrorCodes ec;
@@ -1204,8 +1242,9 @@ int main(int argc, char **argv)
     curJob.printJob();
 
     rc = curJob.processJob( );
-    if( rc != NO_ERROR )
-        cerr << endl << "Error in loading job data" << endl;
+    if( rc != NO_ERROR ) {
+		if (!BulkLoad::disableConsoleOutput())
+			cerr << endl << "Error in loading job data" << endl; }
     }
     catch (std::exception& ex)
     {
@@ -1250,3 +1289,4 @@ int main(int argc, char **argv)
     else
         return ( EXIT_SUCCESS );
 }
+

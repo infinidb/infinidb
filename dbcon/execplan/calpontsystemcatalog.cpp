@@ -299,6 +299,14 @@ bool CalpontSystemCatalog::TableName::operator<(const TableName& rhs) const
     return false;
 }
 
+void CalpontSystemCatalog::TableAliasName::clear()
+{
+    schema.clear();
+    table.clear();
+    alias.clear();
+    view.clear();
+}
+
 bool CalpontSystemCatalog::TableAliasName::operator<(const TableAliasName& rhs) const
 {
     if (schema < rhs.schema)
@@ -3187,6 +3195,8 @@ const CalpontSystemCatalog::ROPair CalpontSystemCatalog::tableRID(const TableNam
     ostringstream oss;
     oss << "select objectid from systable where schema='" << aTableName.schema << "' and tablename='" <<
         aTableName.table << "' --tableRID/";
+        
+    csep.data(oss.str()); //@bug 6078. Log the statement
     if (fIdentity == EC) oss << "EC";
     else oss << "FE";
     NJLSysDataList sysDataList;

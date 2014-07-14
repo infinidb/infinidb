@@ -42,6 +42,7 @@ using namespace std;
 #include "resourcemanager.h"
 #include "tupleaggregatestep.h"
 #include "errorids.h"
+#include "diskjoinstep.h"
 
 using namespace execplan;
 using namespace joiner;
@@ -81,7 +82,9 @@ TupleHashJoinStep::TupleHashJoinStep(const JobInfo& jobInfo) :
 	isExeMgr(jobInfo.isExeMgr),
 	lastSmallOuterJoiner(-1),
 	fTokenJoin(false),
-	fStatsMutexPtr(new boost::mutex())
+	fStatsMutexPtr(new boost::mutex()),
+	fFunctionJoinKeys(jobInfo.keyInfo->functionJoinKeys),
+	sessionMemLimit(jobInfo.umMemLimit)
 {
 	/* Need to figure out how much memory these use...
 		Overhead storing 16 byte elements is about 32 bytes.  That
@@ -97,15 +100,35 @@ TupleHashJoinStep::TupleHashJoinStep(const JobInfo& jobInfo) :
 	largeBPS = NULL;
 	moreInput = true;
 	fQtc.stepParms().stepType = StepTeleStats::T_HJS;
+	outputDL = NULL;
+	ownsOutputDL = false;
+	djsSmallUsage = jobInfo.smallSideUsage;
+	djsSmallLimit = jobInfo.smallSideLimit;
+	djsLargeLimit = jobInfo.largeSideLimit;
+	djsPartitionSize = jobInfo.partitionSize;
+	isDML = jobInfo.isDML;
+
+	config::Config *config = config::Config::makeConfig();
+	string str = config->getConfig("HashJoin", "AllowDiskBasedJoin");
+	if (str.empty() || str == "y" || str == "Y")
+		allowDJS = true;
+	else
+		allowDJS = false;
+
+	/* Debugging, rand() is used to simulate failures
+	time_t t = time(NULL);
+	srand(t);
+	*/
+
 }
 
 TupleHashJoinStep::~TupleHashJoinStep()
 {
 	delete fStatsMutexPtr;
-	if (!largeBPS && fDelivery)
+	if (ownsOutputDL)
 		delete outputDL;
 	if (totalUMMemoryUsage != 0)
-		resourceManager.returnMemory(totalUMMemoryUsage);
+		resourceManager.returnMemory(totalUMMemoryUsage, sessionMemLimit);
 	//cout << "deallocated THJS, UM memory available: " << resourceManager.availableMemory() << endl;
 }
 
@@ -117,6 +140,8 @@ void TupleHashJoinStep::run()
 	if (runRan)
 		return;
 	runRan = true;
+
+	deliverMutex.lock();
 
 // 	cout << "TupleHashJoinStep::run(): fOutputJobStepAssociation.outSize = " << fOutputJobStepAssociation.outSize() << ", fDelivery = " << boolalpha << fDelivery << endl;
 	idbassert((fOutputJobStepAssociation.outSize() == 1 && !fDelivery) ||
@@ -131,9 +156,11 @@ void TupleHashJoinStep::run()
 			smallIts.push_back(smallDLs.back()->getIterator());
 		}
 	}
+
 	if (!fDelivery)
 		outputDL = fOutputJobStepAssociation.outAt(0)->rowGroupDL();
 	else if (!largeBPS) {
+		ownsOutputDL = true;
 		outputDL = new RowGroupDL(1, 5);
 		outputIt = outputDL->getIterator();
 	}
@@ -149,9 +176,13 @@ void TupleHashJoinStep::join()
 		return;
 	joinRan = true;
 	mainRunner->join();
-	for (uint32_t i = 0; i < smallRunners.size(); i++)
-		smallRunners[i]->join();
-	smallRunners.clear();
+	if (djs) {
+		for (int i = 0; i < (int) djsJoiners.size(); i++)
+			djs[i].join();
+		djsReader.join();
+		djsRelay.join();
+		//cout << "THJS: joined all DJS threads, shared usage = " << *djsSmallUsage << endl;
+	}
 }
 
 /* Index is which small input to read. */
@@ -169,7 +200,7 @@ void TupleHashJoinStep::smallRunnerFcn(uint32_t index)
 	boost::shared_ptr<TupleJoiner> joiner;
 
 	string extendedInfo;
-	extendedInfo += toString();
+	extendedInfo += toString();  // is each small side supposed to have the whole THJS info?
 
 	smallDL = smallDLs[index];
 	smallIt = smallIts[index];
@@ -201,72 +232,98 @@ void TupleHashJoinStep::smallRunnerFcn(uint32_t index)
 // 	cout << "reading smallDL" << endl;
 	more = smallDL->next(smallIt, &oneRG);
 	ostringstream oss;
-
-	/* check for join types unsupported on the PM. */
-	if (!largeBPS || !isExeMgr) {
-		flippedUMSwitch = true;
-		oss << "UM join (" << index << ")";
-#ifdef JLF_DEBUG
-		cout << oss.str() << endl;
-#endif
-		extendedInfo += oss.str();
-		joiner->setInUM();
-	}
-
-	resourceManager.getMemory(joiner->getMemUsage());
-	(void)atomicops::atomicAdd(&totalUMMemoryUsage, joiner->getMemUsage());
-
-	while (more && !cancelled()) {
-		uint64_t memUseBefore, memUseAfter;
-
-		smallRG.setData(&oneRG);
-		if (smallRG.getRowCount() == 0)
-			goto next;
-
-		smallRG.getRow(0, &r);
-
-		memUseBefore = joiner->getMemUsage() + rgDataSize;
-
-		// TupleHJ owns the row memory
-		rgData[index].push_back(oneRG);
-		rgDataSize += smallRG.getSizeWithStrings();
-		for (i = 0; i < smallRG.getRowCount(); i++, r.nextRow()) {
-			//cout << "inserting " << r.toString() << endl;
-			joiner->insert(r);
-		}
-		memUseAfter = joiner->getMemUsage() + rgDataSize;
-
-		if (UNLIKELY(!flippedUMSwitch && (memUseAfter >= pmMemLimit))) {
+	try
+	{
+		/* check for join types unsupported on the PM. */
+		if (!largeBPS || !isExeMgr) {
 			flippedUMSwitch = true;
-			oss << "UM join (" << index << ") ";
+			oss << "UM join (" << index << ")";
 #ifdef JLF_DEBUG
 			cout << oss.str() << endl;
 #endif
 			extendedInfo += oss.str();
 			joiner->setInUM();
+		}
+
+		resourceManager.getMemory(joiner->getMemUsage(), sessionMemLimit, false);
+		(void)atomicops::atomicAdd(&totalUMMemoryUsage, joiner->getMemUsage());
+		memUsedByEachJoin[index] += joiner->getMemUsage();
+
+		while (more && !cancelled()) {
+			uint64_t memUseBefore, memUseAfter;
+
+			smallRG.setData(&oneRG);
+			if (smallRG.getRowCount() == 0)
+				goto next;
+
+			smallRG.getRow(0, &r);
+
+			memUseBefore = joiner->getMemUsage() + rgDataSize;
+
+			// TupleHJ owns the row memory
+			rgData[index].push_back(oneRG);
+			rgDataSize += smallRG.getSizeWithStrings();
+			for (i = 0; i < smallRG.getRowCount(); i++, r.nextRow()) {
+				//cout << "inserting " << r.toString() << endl;
+				joiner->insert(r);
+			}
 			memUseAfter = joiner->getMemUsage() + rgDataSize;
-		}
 
-		gotMem = resourceManager.getMemory(memUseAfter - memUseBefore);
-		atomicops::atomicAdd(&totalUMMemoryUsage, memUseAfter - memUseBefore);
-		if (UNLIKELY(!gotMem)) {
-			/* bail out until we get an LHJ impl */
-			fLogger->logMessage(logging::LOG_TYPE_INFO, logging::ERR_JOIN_TOO_BIG);
-			errorMessage(logging::IDBErrorInfo::instance()->errorMsg(logging::ERR_JOIN_TOO_BIG));
-			status(logging::ERR_JOIN_TOO_BIG);
-			fDie = true;
-			joinIsTooBig = true;
-			oss << "join too big ";
-			cout << oss.str() << endl;
-			extendedInfo += oss.str();
-			break;
-		}
+			if (UNLIKELY(!flippedUMSwitch && (memUseAfter >= pmMemLimit))) {
+				flippedUMSwitch = true;
+				oss << "UM join (" << index << ") ";
+#ifdef JLF_DEBUG
+				cout << oss.str() << endl;
+#endif
+				extendedInfo += oss.str();
+				joiner->setInUM();
+				memUseAfter = joiner->getMemUsage() + rgDataSize;
+			}
+
+			gotMem = resourceManager.getMemory(memUseAfter - memUseBefore, sessionMemLimit, false);
+			atomicops::atomicAdd(&totalUMMemoryUsage, memUseAfter - memUseBefore);
+			memUsedByEachJoin[index] += memUseAfter - memUseBefore;
+			/* This is kind of kludgy and overlaps with segreateJoiners() atm.
+			If this join won't be converted to disk-based, this fcn needs to abort the same as
+			it did before.  If it will be converted, it should just return. */
+			if (UNLIKELY(!gotMem)) {
+				if (isDML || !allowDJS || (fSessionId & 0x80000000) || tableOid() < 3000) {
+					joinIsTooBig = true;
+					fLogger->logMessage(logging::LOG_TYPE_INFO, logging::ERR_JOIN_TOO_BIG);
+					errorMessage(logging::IDBErrorInfo::instance()->errorMsg(logging::ERR_JOIN_TOO_BIG));
+					status(logging::ERR_JOIN_TOO_BIG);
+					cout << "Join is too big, raise the UM join limit for now" << endl;
+					abort();
+					break;
+				}
+				else
+					return;
+			}
 next:
-// 		cout << "inserted one rg into the joiner, rowcount = " <<
-// 			smallRG.getRowCount() << endl;
-		more = smallDL->next(smallIt, &oneRG);
+//  		cout << "inserted one rg into the joiner, rowcount = " <<
+//  			smallRG.getRowCount() << endl;
+			more = smallDL->next(smallIt, &oneRG);
+		}
 	}
-
+	catch (boost::exception& e)
+	{
+		ostringstream oss;
+		oss << "TupleHashJoinStep::smallRunnerFcn failed due to " << boost::diagnostic_information(e);
+		fLogger->logMessage(logging::LOG_TYPE_ERROR, oss.str());
+		status(logging::ERR_EXEMGR_MALFUNCTION);
+	}
+	catch (std::exception& e)
+	{
+		ostringstream oss;
+		oss << "TupleHashJoinStep::smallRunnerFcn failed due to " << e.what();
+		fLogger->logMessage(logging::LOG_TYPE_ERROR, oss.str());
+		status(logging::ERR_EXEMGR_MALFUNCTION);
+	}
+	catch (...)
+	{
+		fLogger->logMessage(logging::LOG_TYPE_ERROR, "TupleHashJoinStep::smallRunnerFcn failed due to an unknown reason (...)");
+		status(logging::ERR_EXEMGR_MALFUNCTION);
+	}
 	if (!flippedUMSwitch && !cancelled()) {
 		oss << "PM join (" << index << ")";
 #ifdef JLF_DEBUG
@@ -308,10 +365,129 @@ void TupleHashJoinStep::forwardCPData()
 		for (col = 0; col < joiners[i]->getSmallKeyColumns().size(); col++) {
 			if (smallRGs[i].isLongString(joiners[i]->getSmallKeyColumns()[col]))
 				continue;
+
+			// @bug3683, not to add CP predicates if large side is not simple column
+			if (fFunctionJoinKeys.find(largeRG.getKeys()[joiners[i]->getLargeKeyColumns()[col]]) !=
+			    fFunctionJoinKeys.end())
+				continue;
+
 			largeBPS->addCPPredicates(largeRG.getOIDs()[joiners[i]->getLargeKeyColumns()[col]],
 			  joiners[i]->getCPData()[col], !joiners[i]->discreteCPValues()[col]);
 		}
 	}
+}
+
+void TupleHashJoinStep::djsRelayFcn()
+{
+	/*
+		read from largeDL
+		map to largeRG + outputRG format
+		insert into fifos[0]
+	*/
+
+	RowGroup djsInputRG = largeRG + outputRG;
+	RowGroup l_largeRG = (tbpsJoiners.empty() ? largeRG : largeRG + outputRG);
+	boost::shared_array<int> relayMapping = makeMapping(l_largeRG, djsInputRG);
+	bool more;
+	RGData inData, outData;
+	Row l_largeRow, djsInputRow;
+	int i;
+
+	l_largeRG.initRow(&l_largeRow);
+	djsInputRG.initRow(&djsInputRow);
+
+	//cout << "Relay started" << endl;
+
+	more = largeDL->next(largeIt, &inData);
+	while (more && !cancelled()) {
+		l_largeRG.setData(&inData);
+		//if (fSessionId < 0x80000000)
+		//	cout << "got largeside data = " << l_largeRG.toString() << endl;
+		if (l_largeRG.getRowCount() == 0)
+			goto next;
+		outData.reinit(djsInputRG, l_largeRG.getRowCount());
+		djsInputRG.setData(&outData);
+		djsInputRG.resetRowGroup(0);
+		l_largeRG.getRow(0, &l_largeRow);
+		djsInputRG.getRow(0, &djsInputRow);
+		for (i = 0; i < (int) l_largeRG.getRowCount(); i++, l_largeRow.nextRow(), djsInputRow.nextRow()) {
+			applyMapping(relayMapping, l_largeRow, &djsInputRow);
+			djsInputRG.incRowCount();
+		}
+		fifos[0]->insert(outData);
+next:
+		more = largeDL->next(largeIt, &inData);
+	}
+
+	while (more)
+		more = largeDL->next(largeIt, &inData);
+	fifos[0]->endOfInput();
+}
+
+void TupleHashJoinStep::djsReaderFcn(int index)
+{
+	/*
+		read from fifos[index]
+		   - incoming rgdata's have outputRG format
+		do FE2 processing
+		put into outputDL, to be picked up by the next JS or nextBand()
+	*/
+
+	int it = fifos[index]->getIterator();
+	bool more = true;
+	RowGroup l_outputRG = outputRG;
+	RGData rgData;
+	vector<RGData> v_rgData;
+
+	RowGroup l_fe2RG;
+	Row fe2InRow, fe2OutRow;
+	FuncExpWrapper l_fe;
+
+	if (fe2) {
+		l_fe2RG = fe2Output;
+		l_outputRG.initRow(&fe2InRow);
+		l_fe2RG.initRow(&fe2OutRow);
+		l_fe = *fe2;
+	}
+
+	makeDupList(fe2 ? l_fe2RG : l_outputRG);
+
+	while (!cancelled()) {
+		more = fifos[index]->next(it, &rgData);
+		if (!more)
+			break;
+		l_outputRG.setData(&rgData);
+		if (l_outputRG.getRowCount() == 0)
+			continue;
+
+		v_rgData.clear();
+		v_rgData.push_back(rgData);
+		if (fe2)
+			processFE2(l_outputRG, l_fe2RG, fe2InRow, fe2OutRow, &v_rgData, &l_fe);
+		processDupList(0, (fe2 ? l_fe2RG : l_outputRG), &v_rgData);
+#if 0
+		if (!v_rgData.empty() && fSessionId < 0x80000000) {
+			if (fe2) {
+				l_fe2RG.setData(&v_rgData[0]);
+				cout << "fully processed rowgroup: " << l_fe2RG.toString() << endl;
+			}
+			else {
+				l_outputRG.setData(&v_rgData[0]);
+				cout << "fully processed rowgroup: " << l_outputRG.toString() << endl;
+			}
+		}
+		cout << "ownsOutputDL = " << (int) ownsOutputDL << " fDelivery = " << (int) fDelivery << endl;
+#endif
+		sendResult(v_rgData);
+	}
+	while (more)
+		more = fifos[index]->next(it, &rgData);
+
+	for (int i = 0; i < (int) djsJoiners.size(); i++) {
+		fExtendedInfo += djs[i].extendedInfo();
+		fMiniInfo += djs[i].miniInfo();
+	}
+	outputDL->endOfInput();
 }
 
 void TupleHashJoinStep::hjRunner()
@@ -322,22 +498,30 @@ void TupleHashJoinStep::hjRunner()
 		if (fOutputJobStepAssociation.outSize() > 0)
 			fOutputJobStepAssociation.outAt(0)->rowGroupDL()->endOfInput();
 		startAdjoiningSteps();
+		deliverMutex.unlock();
 		return;
 	}
 
 	StepTeleStats sts;
-	sts.query_uuid = fQueryUuid;
-	sts.step_uuid = fStepUuid;
-	sts.msg_type = StepTeleStats::ST_START;
-	sts.start_time = QueryTeleClient::timeNowms();
 	if (fTableOID1 >= 3000)
-		fQtc.postStepTele(sts);
+	{
+		sts.query_uuid = fQueryUuid;
+		sts.step_uuid = fStepUuid;
+		sts.msg_type = StepTeleStats::ST_START;
+		sts.start_time = QueryTeleClient::timeNowms();
+		sts.total_units_of_work = 1;
+		postStepStartTele(sts);
+	}
 
 	idbassert(joinTypes.size() == smallDLs.size());
 	idbassert(joinTypes.size() == joiners.size());
 
 	/* Start the small-side runners */
 	rgData.reset(new vector<RGData>[smallDLs.size()]);
+	memUsedByEachJoin.reset(new uint64_t[smallDLs.size()]);
+	for (i = 0; i < smallDLs.size(); i++)
+		memUsedByEachJoin[i] = 0;
+
 	try {
 		/* Note: the only join that can have a useful small outer table is the last small outer,
 		 * the others get clobbered by the join after it. Turn off small outer for 'the others'.
@@ -369,29 +553,150 @@ void TupleHashJoinStep::hjRunner()
 		status(logging::threadResourceErr);
 		errorLogging(emsg, logging::threadResourceErr);
 		fDie = true;
+		deliverMutex.unlock();
 	}
 
 	for (i = 0; i < smallRunners.size(); i++)
 		smallRunners[i]->join();
 	smallRunners.clear();
 
-// 	cout << "joined the small runners\n";
+	for (i = 0; i < feIndexes.size() && joiners.size() > 0; i++)
+		joiners[feIndexes[i]]->setFcnExpFilter(fe[i]);
 
-	forwardCPData(); 	// this fcn has its own exclusion list
+	/* segregate the Joiners into ones for TBPS and ones for DJS */
+	segregateJoiners();
 
-	if (cancelled()) {
-		vector<boost::shared_ptr<joiner::TupleJoiner> > empty_joiners;
-		if (joinIsTooBig)
-			cout << "Join is too big, raise the UM join limit for now\n";
-		//minor optimization: clear out mem as soon as it's not necessary
-		rgData.reset();
-		joiners.swap(empty_joiners);
-		resourceManager.returnMemory(totalUMMemoryUsage);
-		totalUMMemoryUsage = 0;
+	/* Need to clean this stuff up.  If the query was cancelled before this, and this would have had
+	   a disk join, it's still necessary to construct the DJS objects to finish the abort. */
+	if (!djsJoiners.empty()) {
+		joinIsTooBig = false;
+		if (!cancelled())
+			fLogger->logMessage(logging::LOG_TYPE_INFO, logging::INFO_SWITCHING_TO_DJS);
+
+		uint32_t smallSideCount = djsJoiners.size();
+
+		if (!outputDL) {
+			ownsOutputDL = true;
+			outputDL = new RowGroupDL(1, 5);
+			outputIt = outputDL->getIterator();
+		}
+
+		djs.reset(new DiskJoinStep[smallSideCount]);
+		fifos.reset(new boost::shared_ptr<RowGroupDL>[smallSideCount+1]);
+
+		for (i = 0; i <= smallSideCount; i++)
+			fifos[i].reset(new RowGroupDL(1, 5));
+
+		try {
+			boost::mutex::scoped_lock sl(djsLock);
+			for (i = 0; i < smallSideCount; i++) {
+				// these link themselves fifos[0]->DSJ[0]->fifos[1]->DSJ[1] ... ->fifos[smallSideCount],
+				// THJS puts data into fifos[0], reads it from fifos[smallSideCount]
+
+				djs[i] = DiskJoinStep(this, i, djsJoinerMap[i], (i == smallSideCount - 1));
+
+			}
+			sl.unlock();
+			for (i = 0; !cancelled() && i < smallSideCount; i++) {
+				vector<RGData> empty;
+				resourceManager.returnMemory(memUsedByEachJoin[djsJoinerMap[i]], sessionMemLimit);
+				atomicops::atomicSub(&totalUMMemoryUsage, memUsedByEachJoin[djsJoinerMap[i]]);
+				djs[i].loadExistingData(rgData[djsJoinerMap[i]]);
+				rgData[djsJoinerMap[i]].swap(empty);
+			}
+		}
+		catch (logging::IDBExcept &e) {
+			cout << e.what() << endl;
+			if (!status()) {
+				errorMessage(logging::IDBErrorInfo::instance()->errorMsg(e.errorCode()));
+				status(e.errorCode());
+			}
+			abort();
+		}
+		catch (std::exception &e) {
+			cout << e.what() << endl;
+			if (!status()) {
+				errorMessage(logging::IDBErrorInfo::instance()->errorMsg(logging::ERR_DBJ_UNKNOWN_ERROR));
+				status(logging::ERR_DBJ_UNKNOWN_ERROR);
+			}
+			abort();
+		}
+
+		if (fe2)
+			fe2Mapping = makeMapping(outputRG, fe2Output);
+
+		bool relay = false, reader = false;
+		try {
+			djsRelay = boost::thread(DJSRelay(this));
+			relay = true;
+			djsReader = boost::thread(DJSReader(this, smallSideCount));
+			reader = true;
+			/* This is tricky error-handling code.  If DJS threw an error earlier, i < smallSideCount and
+			there is a gap in the FIFO chain.  All FIFOs are empty, but need to close the fifo
+			Reader is reading from,	then aborting should happen as expected */
+			if (i == smallSideCount)
+				for (i = 0; i < smallSideCount; i++)
+					djs[i].run();
+			else
+				fifos[smallSideCount]->endOfInput();
+
+		}
+		catch (thread_resource_error&) {
+			string emsg = "TupleHashJoin caught a thread resource error, aborting...\n";
+			errorMessage("too many threads");
+			status(logging::threadResourceErr);
+			errorLogging(emsg, logging::threadResourceErr);
+			abort();
+			if (reader && relay) {   // must have been thrown from the djs::run() loop
+				// fill the gap in the chain: drain input of last DJS, close the last fifo
+				if (largeBPS)
+					largeDL->endOfInput();
+				int it = fifos[i]->getIterator();
+				RGData rg;
+				while (fifos[i]->next(it, &rg));
+				fifos[smallSideCount]->endOfInput();
+			}
+			else {   // no DJS's have been started
+				if (relay) {
+					// drain Relay's output
+					if (largeBPS)
+						largeDL->endOfInput();
+					int it = fifos[0]->getIterator();
+					RGData rg;
+					while (fifos[0]->next(it, &rg));
+				}
+				if (reader)
+					// close Reader's input
+					fifos[smallSideCount]->endOfInput();
+				else  // close the next JobStep's input
+					outputDL->endOfInput();
+			}
+		}
 	}
 
-	for (uint32_t i = 0; i < feIndexes.size() && joiners.size() > 0; i++)
-		joiners[feIndexes[i]]->setFcnExpFilter(fe[i]);
+	/* Final THJS configuration is settled here at the moment */
+	deliverMutex.unlock();
+
+	if (cancelled()) {
+		if (joinIsTooBig && !status()) {
+			fLogger->logMessage(logging::LOG_TYPE_INFO, logging::ERR_JOIN_TOO_BIG);
+			errorMessage(logging::IDBErrorInfo::instance()->errorMsg(logging::ERR_JOIN_TOO_BIG));
+			status(logging::ERR_JOIN_TOO_BIG);
+			cout << "Join is too big, raise the UM join limit for now" << endl;
+			/* Drop memory */
+			if (!fDelivery) {
+				joiners.clear();
+				tbpsJoiners.clear();
+				rgData.reset();
+				resourceManager.returnMemory(totalUMMemoryUsage, sessionMemLimit);
+				totalUMMemoryUsage = 0;
+			}
+		}
+	}
+
+	// todo: forwardCPData needs to grab data from djs
+	if (!djs)
+		forwardCPData(); 	// this fcn has its own exclusion list
 
 	// decide if perform aggregation on PM
 	if (dynamic_cast<TupleAggregateStep*>(fDeliveryStep.get()) != NULL && largeBPS)
@@ -406,30 +711,35 @@ void TupleHashJoinStep::hjRunner()
 	// can we sort the joiners?  Currently they all have to be inner joins.
 	// Note, any vars that used to parallel the joiners list will be invalidated
 	// (ie. smallTableNames)
-	for (i = 0; i < joiners.size(); i++)
-		if (!joiners[i]->innerJoin())
+
+	for (i = 0; i < tbpsJoiners.size(); i++)
+		if (!tbpsJoiners[i]->innerJoin())
 			break;
-	if (i == joiners.size())
-		sort(joiners.begin(), joiners.end(), JoinerSorter());
+	if (i == tbpsJoiners.size())
+		sort(tbpsJoiners.begin(), tbpsJoiners.end(), JoinerSorter());
 
 	/* Each thread independently decides whether a given join can execute on the PM.
 	 * A PM join can't follow a UM join, so we fix that here.
 	 */
 	bool doUM;
-	for (i = 0, doUM = false; i < joiners.size(); i++) {
-		if (joiners[i]->inUM())
+	for (i = 0, doUM = false; i < tbpsJoiners.size(); i++) {
+		if (tbpsJoiners[i]->inUM())
 			doUM = true;
-		if (joiners[i]->inPM() && doUM) {
+		if (tbpsJoiners[i]->inPM() && doUM) {
 #ifdef JLF_DEBUG
 			cout << "moving join " << i << " to UM (PM join can't follow a UM join)\n";
 #endif
-			joiners[i]->setInUM();
+			tbpsJoiners[i]->setInUM();
 		}
 	}
 
-	if (largeBPS) {
-		largeBPS->useJoiners(joiners);
-		largeBPS->setJoinedResultRG(outputRG);
+	// there is an in-mem UM or PM join
+	if (largeBPS && !tbpsJoiners.empty()) {
+		largeBPS->useJoiners(tbpsJoiners);
+		if (djs)
+			largeBPS->setJoinedResultRG(largeRG + outputRG);
+		else
+			largeBPS->setJoinedResultRG(outputRG);
 		if (!feIndexes.empty())
 			largeBPS->setJoinFERG(joinFilterRG);
 // 		cout << "join UM memory available is " << totalUMMemoryUsage << endl;
@@ -439,7 +749,7 @@ void TupleHashJoinStep::hjRunner()
 		For now, the alg is "assume if any joins are done on the UM, fe2 has to go on
 		the UM."  The structs and logic aren't in place yet to track all of the tables
 		through a joblist. */
-		if (fe2) {
+		if (fe2 && !djs) {
 			/* Can't do a small outer join when the PM sends back joined rows */
 			runFE2onPM = true;
 			if (joinTypes[joiners.size()-1] == SMALLOUTER)
@@ -458,8 +768,10 @@ void TupleHashJoinStep::hjRunner()
 #endif
 			largeBPS->setFcnExpGroup2(fe2, fe2Output, runFE2onPM);
 		}
+		else if (fe2)
+			runFE2onPM = false;
 
-		if (!fDelivery) {
+		if (!fDelivery && !djs) {
 			/* connect the largeBPS directly to the next step */
 			JobStepAssociation newJsa;
 			newJsa.outAdd(fOutputJobStepAssociation.outAt(0));
@@ -469,14 +781,22 @@ void TupleHashJoinStep::hjRunner()
 		}
 		startAdjoiningSteps();
 	}
-	else
+	else if (largeBPS) {
+		// there are no in-mem UM or PM joins, only disk-joins
+		startAdjoiningSteps();
+	}
+	else if (!djs)
+		// if there's no largeBPS, all joins are either done by DJS or join threads,
+		// this clause starts the THJS join threads.
 		startJoinThreads();
 
-	sts.msg_type = StepTeleStats::ST_SUMMARY;
-	sts.end_time = QueryTeleClient::timeNowms();
 	if (fTableOID1 >= 3000)
-		fQtc.postStepTele(sts);
-
+	{
+		sts.msg_type = StepTeleStats::ST_SUMMARY;
+		sts.end_time = QueryTeleClient::timeNowms();
+		sts.total_units_of_work = sts.units_of_work_completed = 1;
+		postStepSummaryTele(sts);
+	}
 }
 
 uint32_t TupleHashJoinStep::nextBand(messageqcpp::ByteStream &bs)
@@ -489,13 +809,15 @@ uint32_t TupleHashJoinStep::nextBand(messageqcpp::ByteStream &bs)
 
 	idbassert(fDelivery);
 
+	boost::mutex::scoped_lock lk(deliverMutex);
+
 	RowGroup* deliveredRG;
 	if (fe2)
 		deliveredRG = &fe2Output;
 	else
 		deliveredRG = &outputRG;
 
-	if (largeBPS) {
+	if (largeBPS && !djs) {
 		dl = largeDL;
 		it = largeIt;
 	}
@@ -516,13 +838,14 @@ uint32_t TupleHashJoinStep::nextBand(messageqcpp::ByteStream &bs)
 				more = dl->next(it, &oneRG);
 			joiners.clear();
 			rgData.reset();
-			resourceManager.returnMemory(totalUMMemoryUsage);
+			resourceManager.returnMemory(totalUMMemoryUsage, sessionMemLimit);
 			totalUMMemoryUsage = 0;
 			return 0;
 		}
 		more = dl->next(it, &oneRG);
 		if (!more) {
 			joiners.clear();
+			tbpsJoiners.clear();
 			rgData.reset();
 			oneRG.reinit(*deliveredRG, 0);
 			deliveredRG->setData(&oneRG);
@@ -531,7 +854,7 @@ uint32_t TupleHashJoinStep::nextBand(messageqcpp::ByteStream &bs)
 			if (status() != 0)
 				cout << " -- returning error status " << deliveredRG->getStatus() << endl;
 			deliveredRG->serializeRGData(bs);
-			resourceManager.returnMemory(totalUMMemoryUsage);
+			resourceManager.returnMemory(totalUMMemoryUsage, sessionMemLimit);
 			totalUMMemoryUsage = 0;
 			return 0;
 		}
@@ -744,11 +1067,18 @@ void TupleHashJoinStep::addJoinFilter(boost::shared_ptr<execplan::ParseTree> pt,
 
 bool TupleHashJoinStep::hasJoinFilter(uint32_t index) const
 {
-	//FIXME: this assumes that index fits into signed space...
 	for (uint32_t i = 0; i < feIndexes.size(); i++)
 		if (feIndexes[i] == static_cast<int>(index))
 			return true;
 	return false;
+}
+
+boost::shared_ptr<funcexp::FuncExpWrapper> TupleHashJoinStep::getJoinFilter(uint32_t index) const
+{
+	for (uint32_t i = 0; i < feIndexes.size(); i++)
+		if (feIndexes[i] == static_cast<int>(index))
+			return fe[i];
+	return boost::shared_ptr<funcexp::FuncExpWrapper>();
 }
 
 void TupleHashJoinStep::setJoinFilterInputRG(const rowgroup::RowGroup &rg)
@@ -762,6 +1092,9 @@ void TupleHashJoinStep::startJoinThreads()
 	uint32_t smallSideCount = smallDLs.size();
 	bool more = true;
 	RGData oneRG;
+
+	if (joinRunners)
+		return;
 
 	//@bug4836, in error case, stop process, and unblock the next step.
 	if (cancelled()) {
@@ -969,6 +1302,7 @@ void TupleHashJoinStep::joinRunnerFcn(uint32_t threadID)
 		joinedRowData.clear();
 		grabSomeWork(&inputData);
 	}
+
 	while (!inputData.empty())
 		grabSomeWork(&inputData);
 }
@@ -1078,10 +1412,32 @@ void TupleHashJoinStep::grabSomeWork(vector<RGData> *work)
 void TupleHashJoinStep::joinOneRG(uint32_t threadID, vector<RGData> *out,
 	RowGroup &inputRG, RowGroup &joinOutput, Row &largeSideRow, Row &joinFERow,
 	Row &joinedRow, Row &baseRow, vector<vector<Row::Pointer> > &joinMatches,
-	shared_array<Row> &smallRowTemplates)
+	shared_array<Row> &smallRowTemplates,
+	// disk-join support vars.  This param list is insane; refactor attempt would be nice at some point.
+	vector<boost::shared_ptr<joiner::TupleJoiner> > *tjoiners,
+	boost::shared_array<boost::shared_array<int> > *rgMappings,
+	boost::shared_array<boost::shared_array<int> > *feMappings,
+	boost::scoped_array<boost::scoped_array<uint8_t> > *smallNullMem
+	)
 {
+
+	/* Disk-join support.
+	   These dissociate the fcn from THJS's members & allow this fcn to be called from DiskJoinStep
+	*/
+	if (!tjoiners)
+		tjoiners = &joiners;
+
+	if (!rgMappings)
+		rgMappings = &columnMappings;
+
+	if (!feMappings)
+		feMappings = &fergMappings;
+
+	if (!smallNullMem)
+		smallNullMem = &smallNullMemory;
+
 	RGData joinedData;
-	uint32_t matchCount, smallSideCount = smallDLs.size();
+	uint32_t matchCount, smallSideCount = tjoiners->size();
 	uint32_t j, k;
 
 	joinedData.reinit(joinOutput);
@@ -1089,11 +1445,12 @@ void TupleHashJoinStep::joinOneRG(uint32_t threadID, vector<RGData> *out,
 	joinOutput.resetRowGroup(inputRG.getBaseRid());
 	joinOutput.setDBRoot(inputRG.getDBRoot());
 	inputRG.getRow(0, &largeSideRow);
+	//cout << "jointype = " << (*tjoiners)[0]->getJoinType() << endl;
 	for (k = 0; k < inputRG.getRowCount() && !cancelled(); k++, largeSideRow.nextRow()) {
 		//cout << "THJS: Large side row: " << largeSideRow.toString() << endl;
 		matchCount = 0;
 		for (j = 0; j < smallSideCount; j++) {
-			joiners[j]->match(largeSideRow, k, threadID, &joinMatches[j]);
+			(*tjoiners)[j]->match(largeSideRow, k, threadID, &joinMatches[j]);
 			/* Debugging code to print the matches
 				Row r;
 				smallRGs[j].initRow(&r);
@@ -1104,27 +1461,28 @@ void TupleHashJoinStep::joinOneRG(uint32_t threadID, vector<RGData> *out,
 				}
 			*/
 			matchCount = joinMatches[j].size();
-			if (joiners[j]->hasFEFilter() && matchCount > 0) {
+			if ((*tjoiners)[j]->hasFEFilter() && matchCount > 0) {
+				//cout << "doing FE filter" << endl;
 				vector<Row::Pointer> newJoinMatches;
-				applyMapping(fergMappings[smallSideCount], largeSideRow, &joinFERow);
+				applyMapping((*feMappings)[smallSideCount], largeSideRow, &joinFERow);
 				for (uint32_t z = 0; z < joinMatches[j].size(); z++) {
 					smallRowTemplates[j].setPointer(joinMatches[j][z]);
-					applyMapping(fergMappings[j], smallRowTemplates[j], &joinFERow);
-					if (!joiners[j]->evaluateFilter(joinFERow, threadID))
+					applyMapping((*feMappings)[j], smallRowTemplates[j], &joinFERow);
+					if (!(*tjoiners)[j]->evaluateFilter(joinFERow, threadID))
 						matchCount--;
 					else {
 						/* The first match includes it in a SEMI join result and excludes it from an ANTI join
 						 * result.  If it's SEMI & SCALAR however, it needs to continue.
 						 */
 						newJoinMatches.push_back(joinMatches[j][z]);
-						if (joiners[j]->antiJoin() || (joiners[j]->semiJoin() && !joiners[j]->scalar()))
+						if ((*tjoiners)[j]->antiJoin() || ((*tjoiners)[j]->semiJoin() && !(*tjoiners)[j]->scalar()))
 							break;
 					}
 				}
 				// the filter eliminated all matches, need to join with the NULL row
-				if (matchCount == 0 && joiners[j]->largeOuterJoin()) {
+				if (matchCount == 0 && (*tjoiners)[j]->largeOuterJoin()) {
 					newJoinMatches.clear();
-					newJoinMatches.push_back(Row::Pointer(smallNullMemory[j].get()));
+					newJoinMatches.push_back(Row::Pointer((*smallNullMem)[j].get()));
 					matchCount = 1;
 				}
 
@@ -1132,36 +1490,37 @@ void TupleHashJoinStep::joinOneRG(uint32_t threadID, vector<RGData> *out,
 			}
 
 			/* If anti-join, reverse the result */
-			if (joiners[j]->antiJoin())
+			if ((*tjoiners)[j]->antiJoin()) {
 				matchCount = (matchCount ? 0 : 1);
+			}
 
 			if (matchCount == 0) {
 				joinMatches[j].clear();
 				break;
 			}
-			else if (!joiners[j]->scalar() && (joiners[j]->semiJoin() || joiners[j]->antiJoin())) {
+			else if (!(*tjoiners)[j]->scalar() && ((*tjoiners)[j]->semiJoin() || (*tjoiners)[j]->antiJoin())) {
 					joinMatches[j].clear();
-					joinMatches[j].push_back(Row::Pointer(smallNullMemory[j].get()));
+					joinMatches[j].push_back(Row::Pointer((*smallNullMem)[j].get()));
 					matchCount = 1;
 			}
 
-			if (matchCount == 0 && joiners[j]->innerJoin())
+			if (matchCount == 0 && (*tjoiners)[j]->innerJoin())
 				break;
 
-			if (joiners[j]->scalar() && matchCount > 1) {
+			if ((*tjoiners)[j]->scalar() && matchCount > 1) {
 				errorMessage(logging::IDBErrorInfo::instance()->errorMsg(logging::ERR_MORE_THAN_1_ROW));
 				status(logging::ERR_MORE_THAN_1_ROW);
 				abort();
 			}
-			if (joiners[j]->smallOuterJoin())
-				joiners[j]->markMatches(threadID, joinMatches[j]);
+			if ((*tjoiners)[j]->smallOuterJoin())
+				(*tjoiners)[j]->markMatches(threadID, joinMatches[j]);
 
 		}
 		if (matchCount > 0) {
 			/* TODO!!!  See TupleBPS for the fix for bug 3510! */
-			applyMapping(columnMappings[smallSideCount], largeSideRow, &baseRow);
+			applyMapping((*rgMappings)[smallSideCount], largeSideRow, &baseRow);
 			baseRow.setRid(largeSideRow.getRelRid());
-			generateJoinResultSet(joinMatches, baseRow, columnMappings,
+			generateJoinResultSet(joinMatches, baseRow, *rgMappings,
 			  0, joinOutput, joinedData, out, smallRowTemplates, joinedRow);
 		}
 	}
@@ -1177,7 +1536,7 @@ void TupleHashJoinStep::generateJoinResultSet(const vector<vector<Row::Pointer> 
 {
 	uint32_t i;
 	Row &smallRow = smallRows[depth];
-	uint32_t smallSideCount = smallDLs.size();
+	uint32_t smallSideCount = joinerOutput.size();
 
 	if (depth < smallSideCount - 1) {
 		for (i = 0; i < joinerOutput[depth].size(); i++) {
@@ -1212,6 +1571,103 @@ void TupleHashJoinStep::generateJoinResultSet(const vector<vector<Row::Pointer> 
 	}
 }
 
+void TupleHashJoinStep::segregateJoiners()
+{
+	uint32_t i;
+	bool allInnerJoins = true;
+	bool anyTooLarge = false;
+	uint32_t smallSideCount = smallDLs.size();
+
+	boost::mutex::scoped_lock sl(djsLock);
+
+	for (i = 0; i < smallSideCount; i++) {
+		allInnerJoins &= (joinTypes[i] == INNER);
+		anyTooLarge |= !joiners[i]->isFinished();
+	}
+
+	/* When DDL updates syscat, the syscat checks here are necessary */
+	if (isDML || !allowDJS || (fSessionId & 0x80000000) || tableOid() < 3000) {
+		if (anyTooLarge) {
+			joinIsTooBig = true;
+			abort();
+		}
+		tbpsJoiners = joiners;
+		return;
+	}
+	/* Debugging code, this makes all eligible joins disk-based.
+	else {
+		for (i = 0; i < smallSideCount; i++) {
+			joinIsTooBig = true;
+			djsJoiners.push_back(joiners[i]);
+			djsJoinerMap.push_back(i);
+		}
+		return;
+	}
+	*/
+
+	/* For now if there is no largeBPS all joins need to either be DJS or not, not mixed */
+	if (!largeBPS) {
+		if (anyTooLarge) {
+			joinIsTooBig = true;
+			for (i = 0; i < smallSideCount; i++) {
+				djsJoiners.push_back(joiners[i]);
+				djsJoinerMap.push_back(i);
+			}
+		}
+		else
+			tbpsJoiners = joiners;
+		return;
+	}
+
+	/* If they are all inner joins they can be segregated w/o respect to
+	ordering; if they're not, the ordering has to stay consistent therefore
+	the first joiner that isn't finished and everything after has to be
+	done by DJS. */
+
+	if (allInnerJoins) {
+		for (i = 0; i < smallSideCount; i++) {
+			//if (joiners[i]->isFinished() && (rand() % 2)) {    // for debugging
+			if (joiners[i]->isFinished()) {
+				//cout << "1joiner " << i << "  " << hex << (uint64_t) joiners[i].get() << dec << " -> TBPS" << endl;
+				tbpsJoiners.push_back(joiners[i]);
+			}
+			else {
+				joinIsTooBig = true;
+				//cout << "1joiner " << i << "  " << hex << (uint64_t) joiners[i].get() << dec << " -> DJS" << endl;
+				djsJoiners.push_back(joiners[i]);
+				djsJoinerMap.push_back(i);
+			}
+		}
+	}
+	else {
+		//uint limit = rand() % smallSideCount;
+		for (i = 0; i < smallSideCount; i++) {
+			//if (joiners[i]->isFinished() && i < limit) {  // debugging
+			if (joiners[i]->isFinished()) {
+				//cout << "2joiner " << i << "  " << hex << (uint64_t) joiners[i].get() << dec << " -> TBPS" << endl;
+				tbpsJoiners.push_back(joiners[i]);
+			}
+			else
+				break;
+		}
+		for (; i < smallSideCount; i++) {
+			joinIsTooBig = true;
+			//cout << "2joiner " << i << "  " << hex << (uint64_t) joiners[i].get() << dec << " -> DJS" << endl;
+			djsJoiners.push_back(joiners[i]);
+			djsJoinerMap.push_back(i);
+		}
+	}
+}
+
+void TupleHashJoinStep::abort()
+{
+	JobStep::abort();
+	boost::mutex::scoped_lock sl(djsLock);
+	if (djs) {
+		for (uint32_t i = 0; i < djsJoiners.size(); i++)
+			djs[i].abort();
+	}
+}
 
 }
 // vim:ts=4 sw=4:

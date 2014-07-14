@@ -214,11 +214,13 @@ private:
 
 	static configMap_t fInstanceMap;
 	static boost::mutex fInstanceMapMutex;
+	static boost::mutex fXmlLock;
+	static boost::mutex fWriteXmlLock;
 
 	xmlDocPtr fDoc;
 	const std::string fConfigFile;
 	time_t fMtime;
-	boost::mutex fLock;
+	mutable boost::mutex fLock;
 	const std::string fInstallDir;
 	XMLParser fParser;
 

@@ -29,7 +29,7 @@ CALPONT_INCLUDE_PATH=$(EXPORT_ROOT)/include
 IDB_COMMON_LIBS=-lwindowfunction -ljoblist -lexecplan -ljoiner -lrowgroup -lfuncexp -ludfsdk \
 -loamcpp -lsnmpmanager -ldataconvert -lbrm -lcacheutils -lmessageqcpp -lloggingcpp -lconfigcpp -lrwlock \
 -lcommon -lcompress -lxml2 -lidbboot -lboost_idb -lmysqlcl_idb -lquerystats -lidbdatafile -lquerytele \
--lthrift
+-lthrift -lpthread -lrt
 IDB_WRITE_LIBS=-lddlpackageproc -lddlpackage -ldmlpackageproc -ldmlpackage -lwriteengine -lwriteengineclient -lcompress -lcacheutils
 IDB_SNMP_LIBS=-lnetsnmpagent -lnetsnmp -lnetsnmpmibs -lnetsnmphelpers
 

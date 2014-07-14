@@ -139,6 +139,7 @@ void ReturnedColumn::serialize(messageqcpp::ByteStream& b) const
 	b << (uint32_t)fInputIndex;
 	b << (uint32_t)fOutputIndex;
 	b << (int32_t)fSequence;
+	b << (uint8_t)fReturnAll;
 	fResultType.serialize(b);
 	fOperationType.serialize(b);
 	b << (uint32_t)fExpressionId;
@@ -160,6 +161,7 @@ void ReturnedColumn::unserialize(messageqcpp::ByteStream& b)
 	b >> (uint32_t&)fInputIndex;
 	b >> (uint32_t&)fOutputIndex;
 	b >> (int32_t&)fSequence;
+	b >> (uint8_t&)fReturnAll;
 	fResultType.unserialize(b);
 	fOperationType.unserialize(b);
 	b >> (uint32_t&)fExpressionId;
@@ -225,7 +227,18 @@ const string ReturnedColumn::data() const
 
 const string ReturnedColumn::toString() const
 {
-	return string(">ReturnedColumn<");
+	ostringstream oss;
+	oss << ">ReturnedColumn " << fJoinInfo << "<" << endl;
+	return oss.str();
 }
+
+// All columns that may have simple column added to the list need to implement
+// this function. Default behavior is to have no SC added to the list so
+// fSimpleColumnList will be cleared.
+void ReturnedColumn::setSimpleColumnList()
+{
+	fSimpleColumnList.clear();
+}
+
 
 } // namespace execplan

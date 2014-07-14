@@ -71,10 +71,10 @@ WECmdArgs::WECmdArgs(int argc, char** argv) :
 	fCpiInvoke(false),
 	fBlockMode3(false),
 	fbTruncationAsError(false),
-	fUUID(boost::uuids::nil_generator()())
+	fUUID(boost::uuids::nil_generator()()),
+	fConsoleOutput(true)
 {
-
-    try
+	try
     {
 		appTestFunction();
 	    parseCmdLineArgs(argc, argv);
@@ -550,7 +550,7 @@ void WECmdArgs::parseCmdLineArgs(int argc, char** argv)
 	//	fPrgmName = "/home/bpaul/genii/export/bin/cpimport";
 
 	while ((aCh = getopt(argc, argv,
-		"d:j:w:s:v:l:r:b:e:B:f:q:ihm:E:C:P:I:n:p:c:S"))
+		"d:j:w:s:v:l:r:b:e:B:f:q:ihm:E:C:P:I:n:p:c:S:N"))
 			!= EOF)
 	{
 		switch (aCh)
@@ -768,6 +768,11 @@ void WECmdArgs::parseCmdLineArgs(int argc, char** argv)
 			fBatchQty = lValue;
 			if(fBatchQty<10000) fBatchQty = 10000;
 			else if(fBatchQty>100000) fBatchQty = 10000;
+			break;
+		}
+		case 'N': //-N no console output
+		{
+			fConsoleOutput = false;
 			break;
 		}
 		default:

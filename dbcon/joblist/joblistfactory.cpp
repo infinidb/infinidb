@@ -575,9 +575,6 @@ void checkGroupByCols(CalpontSelectExecutionPlan* csep, JobInfo& jobInfo)
 			if (dynamic_cast<ConstantColumn*>(i->get()) != NULL)
 				continue;
 
-			if ((*i)->orderPos() == (uint64_t) -1)
-				jobInfo.hasImplicitGroupBy = true;
-
 			ReturnedColumn *rc = i->get();
 			SimpleColumn* sc = dynamic_cast<SimpleColumn*>(rc);
 
@@ -1632,6 +1629,17 @@ SJLP makeJobList_(
 	jobInfo.localQuery = csep->localQuery();
 	jobInfo.uuid = csep->uuid();
 
+	/* disk-based join vars */
+	jobInfo.smallSideLimit = csep->djsSmallSideLimit();
+	jobInfo.largeSideLimit = csep->djsLargeSideLimit();
+	jobInfo.partitionSize = csep->djsPartitionSize();
+	jobInfo.umMemLimit.reset(new int64_t);
+	*(jobInfo.umMemLimit) = csep->umMemLimit();
+	jobInfo.isDML = csep->isDML();
+
+	jobInfo.smallSideUsage.reset(new int64_t);
+	*jobInfo.smallSideUsage = 0;
+
 	// set fifoSize to 1 for CalpontSystemCatalog query
 	if (csep->sessionID() & 0x80000000)
 		jobInfo.fifoSize = 1;
@@ -1739,14 +1747,6 @@ SJLP makeJobList_(
 		errCode = iex.errorCode();
 		exceptionHandler(jl, jobInfo, iex.what(), LOG_TYPE_DEBUG);
 		emsg = iex.what();
-		goto bailout;
-	}
-	catch (QueryDataExcept& uee)
-	{
-		jobInfo.errorInfo->errCode = uee.errorCode();
-		errCode = uee.errorCode();
-		exceptionHandler(jl, jobInfo, uee.what(), LOG_TYPE_DEBUG);
-		emsg = uee.what();
 		goto bailout;
 	}
 	catch (const std::exception& ex)

@@ -76,7 +76,12 @@ CalpontSelectExecutionPlan::CalpontSelectExecutionPlan(const int location):
 							fStringScanThreshold(ULONG_MAX),
 							fQueryType(SELECT),
 							fPriority(querystats::DEFAULT_USER_PRIORITY_LEVEL),
-							fStringTableThreshold(20)
+							fStringTableThreshold(20),
+							fDJSSmallSideLimit(0),
+							fDJSLargeSideLimit(0),
+							fDJSPartitionSize(100 * 1024 * 1024),  // 100MB mem usage for disk based join,
+							fUMMemLimit(numeric_limits<int64_t>::max()),
+							fIsDML(false)
 {
 	fUuid = QueryTeleClient::genUUID();
 }
@@ -114,7 +119,12 @@ CalpontSelectExecutionPlan::CalpontSelectExecutionPlan(
 							 fStringScanThreshold(ULONG_MAX),
 							 fQueryType(SELECT),
 							 fPriority(querystats::DEFAULT_USER_PRIORITY_LEVEL),
-							 fStringTableThreshold(20)
+							 fStringTableThreshold(20),
+							 fDJSSmallSideLimit(0),
+							 fDJSLargeSideLimit(0),
+							 fDJSPartitionSize(100 * 1024 * 1024),  // 100MB mem usage for disk based join
+							 fUMMemLimit(numeric_limits<int64_t>::max()),
+							 fIsDML(false)
 {
 	fUuid = QueryTeleClient::genUUID();
 }
@@ -135,7 +145,12 @@ CalpontSelectExecutionPlan::CalpontSelectExecutionPlan (string data) :
 							 fStringScanThreshold(ULONG_MAX),
 							 fQueryType(SELECT),
 							 fPriority(querystats::DEFAULT_USER_PRIORITY_LEVEL),
-							 fStringTableThreshold(20)
+							 fStringTableThreshold(20),
+							 fDJSSmallSideLimit(0),
+ 							 fDJSLargeSideLimit(0),
+ 							 fDJSPartitionSize(100 * 1024 * 1024),  // 100MB mem usage for disk based join
+							 fUMMemLimit(numeric_limits<int64_t>::max()),
+ 							 fIsDML(false)
 {
 	fUuid = QueryTeleClient::genUUID();
 }
@@ -428,8 +443,13 @@ void CalpontSelectExecutionPlan::serialize(messageqcpp::ByteStream& b) const
 	b << fPriority;
 	b << fStringTableThreshold;
 	b << fSchemaName;
-	b << fLocalQuery;		
+	b << fLocalQuery;
 	b << fUuid;
+	b << fDJSSmallSideLimit;
+	b << fDJSLargeSideLimit;
+	b << fDJSPartitionSize;
+	b << fUMMemLimit;
+	b << (uint8_t) fIsDML;
 }
 
 void CalpontSelectExecutionPlan::unserialize(messageqcpp::ByteStream& b)
@@ -437,6 +457,7 @@ void CalpontSelectExecutionPlan::unserialize(messageqcpp::ByteStream& b)
 	ReturnedColumn *rc;
 	CalpontExecutionPlan *cep;
 	string colName;
+	uint8_t tmp8;
 
 	ObjectReader::checkType(b, ObjectReader::CALPONTSELECTEXECUTIONPLAN);
 
@@ -573,8 +594,14 @@ void CalpontSelectExecutionPlan::unserialize(messageqcpp::ByteStream& b)
 	b >> fPriority;
 	b >> fStringTableThreshold;
 	b >> fSchemaName;
-	b >> fLocalQuery;		
+	b >> fLocalQuery;
 	b >> fUuid;
+	b >> fDJSSmallSideLimit;
+	b >> fDJSLargeSideLimit;
+	b >> fDJSPartitionSize;
+	b >> fUMMemLimit;
+	b >> tmp8;
+	fIsDML = tmp8;
 }
 
 bool CalpontSelectExecutionPlan::operator==(const CalpontSelectExecutionPlan& t) const
@@ -660,6 +687,14 @@ bool CalpontSelectExecutionPlan::operator==(const CalpontSelectExecutionPlan& t)
 	if (fPriority != t.fPriority)
 		return false;
 	if (fStringTableThreshold != t.fStringTableThreshold)
+		return false;
+	if (fDJSSmallSideLimit != t.fDJSSmallSideLimit)
+		return false;
+	if (fDJSLargeSideLimit != t.fDJSLargeSideLimit)
+		return false;
+	if (fDJSPartitionSize != t.fDJSPartitionSize)
+		return false;
+	if (fUMMemLimit != t.fUMMemLimit)
 		return false;
 
 	return true;

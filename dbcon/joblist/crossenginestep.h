@@ -106,15 +106,15 @@ public:
 	bool  deliverStringTableRowGroup() const;
 	uint32_t nextBand(messageqcpp::ByteStream &bs);
 
+	void addFcnJoinExp(const vector<execplan::SRCP>&);
 	void addFcnExpGroup1(const boost::shared_ptr<execplan::ParseTree>&);
 	void setFE1Input(const rowgroup::RowGroup&);
-	void setFcnExpGroup3(const vector<boost::shared_ptr<execplan::ReturnedColumn> >&);
+	void setFcnExpGroup3(const vector<execplan::SRCP>&);
 	void setFE23Output(const rowgroup::RowGroup&);
 
 	void addFilter(JobStep* jobStep);
 	void addProject(JobStep* jobStep);
 
-	static void init_mysqlcl_idb();
 
 protected:
 	virtual void execute();
@@ -174,6 +174,7 @@ protected:
 	// Function & Expression columns
 	boost::shared_ptr<execplan::ParseTree> fFeFilters;
 	std::vector<boost::shared_ptr<execplan::ReturnedColumn> > fFeSelects;
+	std::vector<boost::shared_ptr<execplan::ReturnedColumn> > fFeFcnJoin;
 	std::map<uint32_t, uint32_t> fColumnMap;   // projected key position (k->p)
 	uint64_t fColumnCount;
 	boost::scoped_array<int> fFe1Column;

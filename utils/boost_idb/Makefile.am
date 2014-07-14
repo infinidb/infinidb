@@ -25,33 +25,36 @@ AM_CXXFLAGS = $(idb_cxxflags)
 AM_LDFLAGS = -version-info 1:0:0 $(idb_ldflags)
 lib_LTLIBRARIES = libboost_idb.la
 libboost_idb_la_SOURCES = \
-	c_regex_traits.cpp \
+	codecvt_error_category.cpp \
 	cpp_regex_traits.cpp \
 	cregex.cpp \
-	date_generators.cpp \
+	c_regex_traits.cpp \
 	error_code.cpp \
 	fileiter.cpp \
+	future.cpp \
 	greg_month.cpp \
-	greg_weekday.cpp \
-	gregorian_types.cpp \
 	icu.cpp \
 	instances.cpp \
 	once.cpp \
 	operations.cpp \
 	path.cpp \
+	path_traits.cpp \
 	portability.cpp \
 	posix_api.cpp \
-	posix_time_types.cpp \
 	regex.cpp \
 	regex_debug.cpp \
 	regex_raw_buffer.cpp \
 	regex_traits_defaults.cpp \
 	static_mutex.cpp \
 	thread.cpp \
+	tss_null.cpp \
+	unique_path.cpp \
 	usinstances.cpp \
+	utf8_codecvt_facet.cpp \
 	w32_regex_traits.cpp \
 	wc_regex_traits.cpp \
 	wide_posix_api.cpp \
+	windows_file_codecvt.cpp \
 	winstances.cpp
 include_HEADERS =
 

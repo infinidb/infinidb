@@ -296,6 +296,7 @@ const string ArithmeticColumn::toString() const
 	if (fAlias.length() > 0) oss << "Alias: " << fAlias << endl;
 	if (fExpression != 0) fExpression->walk(walkfn, oss);
 	oss << "expressionId=" << fExpressionId << endl;
+	oss << "joinInfo=" << fJoinInfo << " returnAll=" << fReturnAll << " sequence#=" << fSequence << endl;
 	oss << "resultType=" << colDataTypeToString(fResultType.colDataType) << "|" << fResultType.colWidth << 
 endl;
 	return oss.str();
@@ -405,6 +406,30 @@ void ArithmeticColumn::replaceRealCol(std::vector<SRCP>& derivedColList)
 {
 	if (fExpression)
 		replaceRefCol(fExpression, derivedColList);
+}
+
+void ArithmeticColumn::setSimpleColumnList()
+{
+	fSimpleColumnList.clear();
+	fExpression->walk(getSimpleCols, &fSimpleColumnList);
+}
+
+bool ArithmeticColumn::singleTable(CalpontSystemCatalog::TableAliasName& tan)
+{
+	tan.clear();
+	setSimpleColumnList();
+	for (uint32_t i = 0; i < fSimpleColumnList.size(); i++)
+	{
+		CalpontSystemCatalog::TableAliasName stan(fSimpleColumnList[i]->schemaName(),
+		                    fSimpleColumnList[i]->tableName(),
+		                    fSimpleColumnList[i]->tableAlias(),
+		                    fSimpleColumnList[i]->viewName());
+		if (tan.table.empty())
+			tan = stan;
+		else if (stan != tan)
+			return false;
+	}
+	return true;
 }
 
 } // namespace

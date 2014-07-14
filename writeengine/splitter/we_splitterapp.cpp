@@ -105,7 +105,22 @@ WESplitterApp::WESplitterApp(WECmdArgs& CmdArgs) :
 				logging::Message::Args errMsgArgs;
 				errMsgArgs.add(err);
 				fpSysLog->logMsg(errMsgArgs,logging::LOG_TYPE_ERROR,logging::M0000);
-				SPLTR_EXIT_STATUS=1;
+				if (!fCmdArgs.getConsoleOutput())
+				{
+					ofstream dmlFile;
+					ostringstream oss;
+					oss << "/tmp/" <<fDh.getTableOID() << ".txt";
+					dmlFile.open(oss.str().c_str());
+					if (dmlFile.is_open())
+					{
+						dmlFile << err;
+						dmlFile << endl;
+						dmlFile.close();
+					}
+					SPLTR_EXIT_STATUS=2;
+				}
+				else
+					SPLTR_EXIT_STATUS=1;
 				//cout << err << endl;
 				fDh.fLog.logMsg( err, MSGLVL_ERROR );
 				fContinue = false;
@@ -135,10 +150,23 @@ void WESplitterApp::setupSignalHandlers()
 #ifdef _MSC_VER
 	//FIXME
 #else
+	struct sigaction sa;
+	memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = WESplitterApp::onSigInterrupt;
+	sigaction(SIGINT, &sa, 0);
+	sa.sa_handler = WESplitterApp::onSigTerminate;
+	sigaction(SIGTERM, &sa, 0);
+	sa.sa_handler = SIG_IGN;
+	sigaction(SIGPIPE, &sa, 0);
+	sa.sa_handler = WESplitterApp::onSigHup;
+	sigaction(SIGPIPE, &sa, 0);
+	sa.sa_handler = WESplitterApp::onSigInterrupt;
+	sigaction(SIGUSR1, &sa, 0);
+/*	
 	signal(SIGPIPE, SIG_IGN);
 	signal(SIGINT, WESplitterApp::onSigInterrupt);
 	signal(SIGTERM, WESplitterApp::onSigTerminate);
-	signal(SIGHUP, WESplitterApp::onSigHup);
+	signal(SIGHUP, WESplitterApp::onSigHup); */
 #endif
 }
 //------------------------------------------------------------------------------
@@ -146,6 +174,7 @@ void WESplitterApp::setupSignalHandlers()
 //------------------------------------------------------------------------------
 void WESplitterApp::onSigTerminate(int aInt)
 {
+	cout << "onSigTerminate received signal " << aInt << endl;
 	if(15 == aInt)
 	{
 		fSignaled = true;
@@ -160,9 +189,11 @@ void WESplitterApp::onSigTerminate(int aInt)
 //------------------------------------------------------------------------------
 void WESplitterApp::onSigInterrupt(int aInt)
 {
-	if(2 == aInt)
+	//cout << "onSigInterrupt received signal " << aInt << endl;
+	if((2 == aInt) || (10 == aInt))
 	{
 		fSignaled = true;
+		//cout << "ctrl-c received" << endl;
 	}
 	fContinue = false; //force to call destructor
 	if(aInt == 1) SPLTR_EXIT_STATUS = 1;

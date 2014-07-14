@@ -162,6 +162,9 @@
     <ClCompile Include="pseudocc-jl.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="diskjoinstep.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="batchprimitiveprocessor-jl.h">
@@ -357,6 +360,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="pseudocc-jl.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="diskjoinstep.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

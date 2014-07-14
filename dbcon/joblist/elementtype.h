@@ -333,8 +333,8 @@ namespace joblist
 class AnyDataList
 {
 public:
-	AnyDataList() : fDl3(0), fDl6(0), fDl9(0), fDl20(0), fDisown(false) { }
-	~AnyDataList() { if (!fDisown) { delete fDl3; delete fDl6; delete fDl9; delete fDl20; } }
+	AnyDataList() : fDl3(0), fDl6(0), fDl9(0), fDisown(false) { }
+	~AnyDataList() { if (!fDisown) { delete fDl3; delete fDl6; delete fDl9; } }
 
 //	AnyDataList() : fDl1(0), fDl2(0), fDl3(0), fDl4(0), fDl5(0), fDl6(0), fDl7(0), fDl8(0), fDl9(0),
 //		fDl10(0), fDl11(0), fDl12(0), fDl13(0), fDl14(0), fDl15(0), fDl16(0), fDl17(0), fDl18(0),
@@ -413,14 +413,15 @@ public:
 //	inline DeliveryWSDL * deliveryWSDL() { return fDl19; }
 //	inline const DeliveryWSDL * deliveryWSDL() const { return fDl19; }
 
-	inline void rowGroupDL(RowGroupDL *dl) { fDl20 = dl; }
-	inline RowGroupDL * rowGroupDL() { return fDl20; }
-	inline const RowGroupDL * rowGroupDL() const { return fDl20; }
+	inline void rowGroupDL(boost::shared_ptr<RowGroupDL> dl) { fDl20 = dl; }
+	inline void rowGroupDL(RowGroupDL *dl) { fDl20.reset(dl); }
+	inline RowGroupDL * rowGroupDL() { return fDl20.get(); }
+	inline const RowGroupDL * rowGroupDL() const { return fDl20.get(); }
 
 	DataList_t* dataList() {
 		if (fDl3 != NULL) return reinterpret_cast<DataList_t*>(fDl3);
 		else if (fDl9 != NULL) return fDl9;
-		return reinterpret_cast<DataList_t*>(fDl20);
+		return reinterpret_cast<DataList_t*>(fDl20.get());
 //		if (fDl1 != NULL) return fDl1;
 //		else if (fDl2 != NULL) return fDl2;
 //		else if (fDl3 != NULL) return reinterpret_cast<DataList_t*>(fDl3);
@@ -508,7 +509,7 @@ public:
 //		else if (fDl20 != NULL) return 1;
 //		else return 0;
 
-		if (fDl20 != NULL) return 1;
+		if (fDl20) return 1;
 		else if (fDl3 != NULL) return fDl3->getNumConsumers();
 		else if (fDl6 != NULL) return fDl6->getNumConsumers();
 		return 0;
@@ -543,7 +544,7 @@ private:
 //	TupleDataList* fDl17;
 //	TupleBucketDataList *fDl18;
 //	DeliveryWSDL *fDl19;
-	RowGroupDL *fDl20;
+	boost::shared_ptr<RowGroupDL> fDl20;
 	bool fDisown;
 
 };

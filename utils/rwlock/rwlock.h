@@ -156,12 +156,15 @@ class RWLock {
 		/** @brief Grab a read lock
 		 *
 		 * Grab a read lock.  This will block iff writers are waiting or
-		 * a writer is active.
+		 * a writer is active. The version with priority ignores any 
+		 * waiting threads and grabs the lock. 
 		 * 
 		 * @param block (For testing only) If false, will throw 
 		 * wouldblock instead of blocking
 		 */
 		EXPORT void read_lock(bool block = true);
+
+		EXPORT void read_lock_priority(bool block = true);
 
 		/** @brief Release a read lock.
 		 *

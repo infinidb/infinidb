@@ -143,10 +143,6 @@ public:
 	 */
     const std::string toString() const;
 
-	/** @brief virtual set the rowgroup for FE to work on
-	 */
-	void setFeRowGroup(const rowgroup::RowGroup& rg);
-
 	/** @brief virtual set the output rowgroup
 	 */
 	void setOutputRowGroup(const rowgroup::RowGroup& rg);
@@ -175,6 +171,15 @@ public:
 	 */
 	bool  deliverStringTableRowGroup() const;
 
+	/** @brief set the rowgroup for FE to work on
+	 */
+	void setFeRowGroup(const rowgroup::RowGroup& rg);
+
+	/** @brief get the rowgroup for FE
+     *  @returns RowGroup
+	 */
+	const rowgroup::RowGroup& getFeRowGroup() const { return fRowGroupFe; }
+
 	/** @brief get subquery step
 	 */
 	const SJSTEP& subStep() const { return fSubStep; }
@@ -186,6 +191,10 @@ public:
 	/** @brief add function columns (returned columns)
 	 */
 	void addExpression(const vector<execplan::SRCP>&);
+
+	/** @brief add function join expresssion
+	 */
+	void addFcnJoinExp(const vector<execplan::SRCP>&);
 
 
 protected:

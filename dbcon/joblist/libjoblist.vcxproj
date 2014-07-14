@@ -284,6 +284,7 @@
     <ClCompile Include="command-jl.cpp" />
     <ClCompile Include="crossenginestep.cpp" />
     <ClCompile Include="dictstep-jl.cpp" />
+    <ClCompile Include="diskjoinstep.cpp" />
     <ClCompile Include="distributedenginecomm.cpp" />
     <ClCompile Include="elementtype.cpp" />
     <ClCompile Include="expressionstep.cpp" />
@@ -339,6 +340,7 @@
     <ClInclude Include="datalistimpl.h" />
     <ClInclude Include="deliverywsdl.h" />
     <ClInclude Include="dictstep-jl.h" />
+    <ClInclude Include="diskjoinstep.h" />
     <ClInclude Include="distributedenginecomm.h" />
     <ClInclude Include="elementcompression.h" />
     <ClInclude Include="elementtype.h" />

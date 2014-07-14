@@ -2643,53 +2643,53 @@ namespace oam
         string localModuleType;
         int localModuleID;
 
-		// Get Module Name from module-file
-		string fileName = InstallDir + "/local/module";
+	// Get Module Name from module-file
+	string fileName = InstallDir + "/local/module";
+
+	ifstream oldFile (fileName.c_str());
 	
-		ifstream oldFile (fileName.c_str());
-		
-		char line[400];
-		while (oldFile.getline(line, 400))
-		{
-			localModule = line;
-			break;
-		}
-		oldFile.close();
+	char line[400];
+	while (oldFile.getline(line, 400))
+	{
+		localModule = line;
+		break;
+	}
+	oldFile.close();
 
-		if (localModule.empty() ) {
-			// not found
-			//system("touch /var/log/Calpont/test8");
-       		exceptionControl("getModuleInfo", API_FAILURE);
-		}
+	if (localModule.empty() ) {
+		// not found
+		//system("touch /var/log/Calpont/test8");	
+		exceptionControl("getModuleInfo", API_FAILURE);
+	}
 
-		localModuleType = localModule.substr(0,MAX_MODULE_TYPE_SIZE);
-		localModuleID = atoi(localModule.substr(MAX_MODULE_TYPE_SIZE,MAX_MODULE_ID_SIZE).c_str());
+	localModuleType = localModule.substr(0,MAX_MODULE_TYPE_SIZE);
+	localModuleID = atoi(localModule.substr(MAX_MODULE_TYPE_SIZE,MAX_MODULE_ID_SIZE).c_str());
 
-		// Get Parent OAM Module name
-	
-		string ParentOAMModule = oam::UnassignedName;
-		string StandbyOAMModule = oam::UnassignedName;
-        bool parentOAMModuleFlag = false;
+	// Get Parent OAM Module name
+
+	string ParentOAMModule = oam::UnassignedName;
+	string StandbyOAMModule = oam::UnassignedName;
+	bool parentOAMModuleFlag = false;
         bool standbyOAMModuleFlag = false;
-		int serverTypeInstall = 1;
+	int serverTypeInstall = 1;
 
-		try {
-			Config* sysConfig = Config::makeConfig(CalpontConfigFile.c_str());
-			string Section = "SystemConfig";
-			ParentOAMModule = sysConfig->getConfig(Section, "ParentOAMModuleName");
-			StandbyOAMModule = sysConfig->getConfig(Section, "StandbyOAMModuleName");
+	try {
+		Config* sysConfig = Config::makeConfig(CalpontConfigFile.c_str());
+		string Section = "SystemConfig";
+		ParentOAMModule = sysConfig->getConfig(Section, "ParentOAMModuleName");
+		StandbyOAMModule = sysConfig->getConfig(Section, "StandbyOAMModuleName");
+
+		if ( localModule == ParentOAMModule )
+			parentOAMModuleFlag = true;
+
+		if ( localModule == StandbyOAMModule )
+			standbyOAMModuleFlag = true;
+
+		// Get Server Type Install ID
 	
-			if ( localModule == ParentOAMModule )
-				parentOAMModuleFlag = true;
-
-			if ( localModule == StandbyOAMModule )
-				standbyOAMModuleFlag = true;
-
-			// Get Server Type Install ID
-		
-			serverTypeInstall = atoi(sysConfig->getConfig("Installation", "ServerTypeInstall").c_str());
-		}
-		catch (...) {}
+		serverTypeInstall = atoi(sysConfig->getConfig("Installation", "ServerTypeInstall").c_str());
+	}
+	catch (...) {}
 
         return boost::make_tuple(localModule, localModuleType, localModuleID, ParentOAMModule, parentOAMModuleFlag, serverTypeInstall, StandbyOAMModule, standbyOAMModuleFlag);
     }

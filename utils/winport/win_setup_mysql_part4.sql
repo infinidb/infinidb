@@ -18,3 +18,4 @@ CREATE FUNCTION idbextentmin RETURNS STRING soname 'libcalmysql.dll';
 CREATE FUNCTION idbextentmax RETURNS STRING soname 'libcalmysql.dll';
 CREATE FUNCTION idbpartition RETURNS STRING soname 'libcalmysql.dll';
 CREATE FUNCTION idblocalpm RETURNS INTEGER soname 'libcalmysql.dll';
+

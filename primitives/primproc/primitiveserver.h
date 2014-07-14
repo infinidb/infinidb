@@ -51,7 +51,7 @@ extern oam::OamCache *oamCache;
 
 namespace primitiveprocessor
 {
-    extern boost::shared_ptr<threadpool::PriorityThreadPool> OOBPool;
+	extern boost::shared_ptr<threadpool::PriorityThreadPool> OOBPool;
 	extern dbbc::BlockRequestProcessor **BRPp;
 	extern BRM::DBRM *brm;
 	extern boost::mutex bppLock;
@@ -107,14 +107,14 @@ namespace primitiveprocessor
 	uint32_t cacheNum(uint64_t lbid);
 	void buildFileName(BRM::OID_t oid, char* fileName);
 
-    /** @brief process primitives as they arrive
-     */
-    class PrimitiveServer
-    {
-        public:
-            /** @brief ctor
-             */
-            PrimitiveServer(int serverThreads,
+	/** @brief process primitives as they arrive
+	*/
+	class PrimitiveServer
+	{
+		public:
+			/** @brief ctor
+				*/
+			PrimitiveServer(int serverThreads,
 						int serverQueueSize,
 						int processorWeight,
 						int processorQueueSize,
@@ -129,18 +129,18 @@ namespace primitiveprocessor
 						double prefetchThreshold = 0,
 						uint64_t pmSmallSide = 0);
 
-            /** @brief dtor
-             */
-            ~PrimitiveServer();
+			/** @brief dtor
+			*/
+			~PrimitiveServer();
 
-            /** @brief start the primitive server
-             *
-             */
-            void start();
+			/** @brief start the primitive server
+			*
+			*/
+			void start();
 
-            /** @brief get a pointer the shared processor thread pool
-             */
-            inline boost::shared_ptr<threadpool::PriorityThreadPool> getProcessorThreadPool() const { return fProcessorPool; }
+			/** @brief get a pointer the shared processor thread pool
+			 */
+			inline boost::shared_ptr<threadpool::PriorityThreadPool> getProcessorThreadPool() const { return fProcessorPool; }
 
 // 			int fCacheCount;
 			const int ReadAheadBlocks() const {return fReadAheadBlocks;}
@@ -148,30 +148,30 @@ namespace primitiveprocessor
 			bool PTTrace() const {return fPTTrace;}
 			double prefetchThreshold() const { return fPrefetchThreshold; }
 			uint32_t ProcessorThreads() const { return highPriorityThreads + medPriorityThreads + lowPriorityThreads; }
-        protected:
+		protected:
 
-        private:
-            /** @brief the thread pool used to listen for
-             * incoming primitive commands
-             */
-            threadpool::ThreadPool fServerpool;
+		private:
+			/** @brief the thread pool used to listen for
+			* incoming primitive commands
+			*/
+			threadpool::ThreadPool fServerpool;
 
-            /** @brief the thread pool used to process
-             * primitive commands
-             */
-            boost::shared_ptr<threadpool::PriorityThreadPool> fProcessorPool;
+			/** @brief the thread pool used to process
+			 * primitive commands
+			 */
+			boost::shared_ptr<threadpool::PriorityThreadPool> fProcessorPool;
 
-            int fServerThreads;
-            int fServerQueueSize;
-            int fProcessorWeight;
-            int fProcessorQueueSize;
+			int fServerThreads;
+			int fServerQueueSize;
+			int fProcessorWeight;
+			int fProcessorQueueSize;
 			int fMaxBlocksPerRead;
 			int fReadAheadBlocks;
 			bool fRotatingDestination;
 			bool fPTTrace;
 			double fPrefetchThreshold;
 			uint64_t fPMSmallSide;
-    };
+	};
 
 
 } // namespace primitiveprocessor

@@ -12,7 +12,7 @@ if [ -z "$INFINIDB_INSTALL_DIR" ]; then
 	INFINIDB_INSTALL_DIR=/usr/local/Calpont
 fi
 
-declare -x INFINIDB_INSTALL_DIR=$INFINIDB_INSTALL_DIR
+export INFINIDB_INSTALL_DIR=$INFINIDB_INSTALL_DIR
 
 InstallDir=$INFINIDB_INSTALL_DIR
 
@@ -24,17 +24,17 @@ fi
 case "$1" in
  setconfig)
 
-	if  test ! $4 ; then 
+	if [ $# -ne 4 ]; then 
 		echo $"Usage: $0 setconfig section variable set-value"
 		exit 1
 	fi
 
 	oldvalue=$($InstallDir/bin/getConfig $2 $3)
 
-	if [ -z $oldvalue ]; then 
-		echo "$2 / $3 not found in Calpont.xml"	
-		exit 1
-	fi
+	#if [ -z $oldvalue ]; then 
+	#	echo "$2 / $3 not found in Calpont.xml"	
+	#	exit 1
+	#fi
 
 	echo "Old value of $2 / $3 is $oldvalue"
 
@@ -50,7 +50,11 @@ case "$1" in
 
 	echo "Old value of $2 / $3 is $oldvalue"
 
-	$InstallDir/bin/setConfig $2 $3 $4
+	if ( [ $# -eq 4 ] && [ -z $4 ] ); then
+		$InstallDir/bin/setConfig $2 $3 ""
+	else
+		$InstallDir/bin/setConfig $2 $3 $4
+	fi
 
 	newvalue=$($InstallDir/bin/getConfig $2 $3)
 

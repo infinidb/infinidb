@@ -245,6 +245,7 @@ private:
 	unsigned fLBIDShift;
 	volatile uint32_t pmCount;
 	boost::mutex fOnErrMutex;   // to lock function scope to reset pmconnections under error condition
+	boost::mutex fSetupMutex;   
 
 	// event listener data
 	std::vector<DECEventListener *> eventListeners;

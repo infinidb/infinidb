@@ -35,6 +35,7 @@ namespace execplan
 // forward reference
 class ReturnedColumn;
 class SimpleColumn;
+class SimpleFilter;
 class WindowFunctionColumn;
 };
 
@@ -43,6 +44,7 @@ namespace joblist
 {
 
 struct JobInfo;
+struct FunctionJoinInfo;
 
 class ExpressionStep : public JobStep
 {
@@ -103,11 +105,23 @@ class ExpressionStep : public JobStep
 	void associatedJoinId(uint64_t i) { fAssociatedJoinId = i; }
 	uint64_t associatedJoinId() const { return fAssociatedJoinId; }
 
+	void functionJoin(bool b) { fDoJoin = b;    }
+	bool functionJoin() const { return fDoJoin; }
+
+	void virtualStep(bool b) { fVirtual = b;    }
+	bool virtualStep() const { return fVirtual; }
+
+	boost::shared_ptr<FunctionJoinInfo>& functionJoinInfo() { return fFunctionJoinInfo; }
+	void resetJoinInfo() { fFunctionJoinInfo.reset(); }
+
   protected:
 	virtual void addColumn(execplan::ReturnedColumn* rc, JobInfo& jobInfo);
 	virtual void populateColumnInfo(execplan::ReturnedColumn* rc, JobInfo& jobInfo);
 	virtual void populateColumnInfo(execplan::SimpleColumn* sc, JobInfo& jobInfo);
 	virtual void populateColumnInfo(execplan::WindowFunctionColumn* wc, JobInfo& jobInfo);
+	virtual void populateColumnInfo(execplan::AggregateColumn* ac, JobInfo& jobInfo);
+	virtual void functionJoinCheck(execplan::SimpleFilter* sf, JobInfo& jobInfo);
+	virtual bool parseFuncJoinColumn(ReturnedColumn* rc, JobInfo& jobInfo);
 
 
 	// expression
@@ -120,8 +134,8 @@ class ExpressionStep : public JobStep
 	std::vector<std::string>                         fAliases;
 	std::vector<std::string>                         fViews;
 	std::vector<std::string>                         fSchemas;
-	std::vector<uint32_t>                                fTableKeys;
-	std::vector<uint32_t>                                fColumnKeys;
+	std::vector<uint32_t>                            fTableKeys;
+	std::vector<uint32_t>                            fColumnKeys;
 	std::vector<execplan::ReturnedColumn*>           fColumns;
 
   private:
@@ -139,8 +153,13 @@ class ExpressionStep : public JobStep
 	uint64_t                                         fAssociatedJoinId;
 
 	// @bug 4531, for window function in IN/EXISTS sub-query.
-	std::vector<execplan::SSC>                                   fSubstitutes;
 	std::map<execplan::SimpleColumn*, execplan::ReturnedColumn*> fSubMap;
+	std::set<SSC>                                                fVsc; // for substitute wc with vsc
+
+	// @bug 3683, function join
+	boost::shared_ptr<FunctionJoinInfo>              fFunctionJoinInfo;
+	bool                                             fDoJoin;
+	bool                                             fVirtual;
 };
 
 }

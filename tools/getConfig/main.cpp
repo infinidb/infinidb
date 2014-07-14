@@ -24,6 +24,11 @@
 #include <unistd.h>
 using namespace std;
 
+#include "logger.h"
+#include "loggingid.h"
+#include "messagelog.h"
+#include <syslog.h>
+#include <exception>
 #include "configcpp.h"
 using namespace config;
 
@@ -83,53 +88,67 @@ int main(int argc, char** argv)
 		return 1;
 	}
 
-	Config* cf;
-	if (configFile.length() > 0)
-		cf = Config::makeConfig(configFile);
-	else
-		cf = Config::makeConfig();
+    try
+    {
+        openlog("getConfig", LOG_CONS | LOG_PID | LOG_NDELAY, LOG_USER);
+		Config* cf;
+		if (configFile.length() > 0)
+			cf = Config::makeConfig(configFile);
+		else
+			cf = Config::makeConfig();
 
-	if (vflg)
-	{
-		cout << "Using config file: " << cf->configFile() << endl;
-	}
-
-	if (aflg)
-	{
-		vector<string> secs;
-		vector<string> parms;
-		secs = cf->enumConfig();
-		vector<string>::iterator siter;
-		vector<string>::iterator send;
-		vector<string>::iterator piter;
-		vector<string>::iterator pend;
-		siter = secs.begin();
-		send = secs.end();
-		while (siter != send)
+		if (vflg)
 		{
-			if (iflg)
-				cout << '[' << *siter << ']' << endl;
-			parms = cf->enumSection(*siter);
-			piter = parms.begin();
-			pend = parms.end();
-			while (piter != pend)
+			cout << "Using config file: " << cf->configFile() << endl;
+		}
+
+		if (aflg)
+		{
+			vector<string> secs;
+			vector<string> parms;
+			secs = cf->enumConfig();
+			vector<string>::iterator siter;
+			vector<string>::iterator send;
+			vector<string>::iterator piter;
+			vector<string>::iterator pend;
+			siter = secs.begin();
+			send = secs.end();
+			while (siter != send)
 			{
 				if (iflg)
-					cout << *piter << " = " << cf->getConfig(*siter, *piter) << endl;
-				else
-					cout << *siter << '.' << *piter << " = " <<
-						cf->getConfig(*siter, *piter) << endl;
-				++piter;
+					cout << '[' << *siter << ']' << endl;
+				parms = cf->enumSection(*siter);
+				piter = parms.begin();
+				pend = parms.end();
+				while (piter != pend)
+				{
+					if (iflg)
+						cout << *piter << " = " << cf->getConfig(*siter, *piter) << endl;
+					else
+						cout << *siter << '.' << *piter << " = " <<
+							cf->getConfig(*siter, *piter) << endl;
+					++piter;
+				}
+				++siter;
+				if (iflg)
+					cout << endl;
 			}
-			++siter;
-			if (iflg)
-				cout << endl;
+			return 0;
 		}
-		return 0;
+
+		cout << cf->getConfig(argv[optind + 0], argv[optind + 1]) << endl;
+        closelog();
+    }
+    catch(exception &e)
+    {
+        syslog(LOG_ERR, "Exception in getConfig for %s %s : %s", argv[optind + 0], argv[optind + 1], e.what());
+        closelog(); 
+    }
+    catch(...)
+    {
+        syslog(LOG_ERR, "Exception in getConfig for %s %s : Unknown exception", argv[optind + 0], argv[optind + 1]);
+        closelog();
 	}
-
-	cout << cf->getConfig(argv[optind + 0], argv[optind + 1]) << endl;
-
 	return 0;
 }
 

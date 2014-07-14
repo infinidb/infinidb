@@ -76,6 +76,7 @@ namespace WriteEngine
     /* static */ const std::string   BulkLoad::DIR_BULK_TEMP_JOB("tmpjob");
     /* static */ const std::string   BulkLoad::DIR_BULK_IMPORT("/data/import/");
     /* static */ const std::string   BulkLoad::DIR_BULK_LOG("/log/");
+    /* static */ bool     			 BulkLoad::fNoConsoleOutput = false;
 
 //------------------------------------------------------------------------------
 // A thread to periodically call dbrm to see if a user is
@@ -110,22 +111,25 @@ struct CancellationThread
                 {
                     if (iShutdown == ERR_BRM_SHUTDOWN)
                     {
-                        cout << "System stop has been ordered. Rollback" 
-                             << endl;
+						if (!BulkLoad::disableConsoleOutput())
+			                cout << "System stop has been ordered. Rollback" 
+				                 << endl;
                     }
                     else
                     {
-					cout << "Database writes have been suspended. Rollback" 
-                         << endl;
+						if (!BulkLoad::disableConsoleOutput())
+							cout << "Database writes have been suspended. Rollback" 
+						         << endl;
                     }
                     BulkStatus::setJobStatus( EXIT_FAILURE );
                 }
                 else
                 if (bForce)
                 {
-                    cout << "Immediate system stop has been ordered. "
-                         << "No rollback" 
-                         << endl;
+					if (!BulkLoad::disableConsoleOutput())
+		                cout << "Immediate system stop has been ordered. "
+			                 << "No rollback" 
+				             << endl;
                 }
             }
         }
@@ -268,13 +272,22 @@ int BulkLoad::loadJobInfo(
               Convertor::int2Str( curJob.id ) + LOG_SUFFIX;
     errlogFile = fRootDir + DIR_BULK_LOG + "Job_" +
               Convertor::int2Str( curJob.id ) + ERR_LOG_SUFFIX;
-    fLog.setLogFileName(logFile.c_str(),errlogFile.c_str(),bLogInfo2ToConsole);
+              
+    if (disableConsoleOutput())
+		fLog.setLogFileName(logFile.c_str(),errlogFile.c_str(),false);
+    else
+		fLog.setLogFileName(logFile.c_str(),errlogFile.c_str(),(int)bLogInfo2ToConsole);
 
     std::ostringstream ossLocale;
     ossLocale << "Locale is : " << systemLang;
-    fLog.logMsg( ossLocale.str(), MSGLVL_INFO2 );
-    cout << "Log file for this job: " << logFile << std::endl;
-    fLog.logMsg( "successfully loaded job file " + fullName, MSGLVL_INFO1 );
+    
+    if (!(disableConsoleOutput()))
+    {
+		fLog.logMsg( ossLocale.str(), MSGLVL_INFO2 );
+		if (!BulkLoad::disableConsoleOutput())
+			cout << "Log file for this job: " << logFile << std::endl;
+		fLog.logMsg( "successfully loaded job file " + fullName, MSGLVL_INFO1 );
+	}
     if (argc > 1)
     {
         std::ostringstream oss;
@@ -983,7 +996,10 @@ int BulkLoad::processJob( )
         tableInfo->setTruncationAsError(getTruncationAsError());
         rc = manageImportDataFileList( curJob, i, tableInfo );
         if (rc != NO_ERROR)
+		{
+			tableInfo->fBRMReporter.sendErrMsgToFile(tableInfo->fBRMRptFileName);
             return rc;     
+		}
 
         tables.push_back( tableInfo );
     }
@@ -1150,21 +1166,24 @@ int BulkLoad::manageImportDataFileList(Job& job,
     if (fAlternateImportDir == IMPORT_PATH_STDIN)
     {
         bUseStdin = true;
+        fLog.logMsg( "Using STDIN for input data", MSGLVL_INFO2 );
 
-        int rc = buildImportDataFileList(std::string(),
+		int rc = buildImportDataFileList(std::string(),
             loadFileName,
             loadFilesList);
         if (rc != NO_ERROR)
         {
             return rc;
         }
-        if (loadFilesList.size() > 1)
+		// BUG 4737 - in Mode 1, all data coming from STDIN, ignore input files
+        if ((loadFilesList.size() > 1) && (fBulkMode != BULK_MODE_REMOTE_SINGLE_SRC))
         {
             ostringstream oss;
             oss << "Table " << tableInfo->getTableName() <<
                 " specifies multiple "
                 "load files; This is not allowed when using STDIN";
             fLog.logMsg( oss.str(), ERR_INVALID_PARAM, MSGLVL_ERROR );
+			tableInfo->fBRMReporter.addToErrMsgEntry(oss.str());
             return ERR_INVALID_PARAM;
         }
     }
@@ -1236,6 +1255,7 @@ int BulkLoad::manageImportDataFileList(Job& job,
                 ostringstream oss;
                 oss << "input data file " << loadFilesList[ndx] << " does not exist";
                 fLog.logMsg( oss.str(), ERR_FILE_NOT_EXIST, MSGLVL_ERROR );
+				tableInfo->fBRMReporter.addToErrMsgEntry(oss.str());
                 return ERR_FILE_NOT_EXIST;
         	}
 			else

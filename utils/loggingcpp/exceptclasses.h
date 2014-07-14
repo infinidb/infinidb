@@ -35,19 +35,19 @@
 #include "idberrorinfo.h"
 #include "logger.h"
 
-namespace logging 
+namespace logging
 {
 
 /** @brief specific error exception class
 *
-*  
+*
 */
 class IDBExcept : public std::runtime_error
 {
 public:
-	IDBExcept(uint16_t code) : 
+	IDBExcept(uint16_t code) :
 		std::runtime_error(IDBErrorInfo::instance()->errorMsg(code)), fErrCode(code) {}
-	IDBExcept(uint16_t code, const Message::Args& args) : 
+	IDBExcept(uint16_t code, const Message::Args& args) :
 		std::runtime_error(IDBErrorInfo::instance()->errorMsg(code, args)), fErrCode(code){}
 	IDBExcept(const std::string& msg, uint16_t code) :
 		std::runtime_error(msg), fErrCode(code){ }
@@ -64,7 +64,7 @@ public:
 	{ }
 };
 
-class LargeDataListExcept : public std::runtime_error 
+class LargeDataListExcept : public std::runtime_error
 {
 public:
 	/** Takes a character string describing the error.  */
@@ -76,34 +76,27 @@ public:
 
 /** @brief specific error exception class for query data
 *   @bug 1155
-*  
+*
 */
-class QueryDataExcept : public std::runtime_error 
+class QueryDataExcept : public IDBExcept
 {
 public:
 	/** Takes a character string describing the error.  */
 	QueryDataExcept(const std::string& msg, uint16_t code) :
-		std::runtime_error(msg), fErrorCode(code) { }
+		IDBExcept(msg, code)  { }
 
 	virtual	~QueryDataExcept() throw() { }
-
-	void errorCode(uint16_t code) { fErrorCode = code; }
-	uint16_t errorCode() const    { return fErrorCode; }
-
 private:
 	//defaults okay
 	//QueryDataExcept(const QueryDataExcept& rhs);
 	//QueryDataExcept& operator=(const QueryDataExcept& rhs);
-
-	//why is this only 16 bits?
-	uint16_t fErrorCode;
 };
 
 /** @brief specific error exception class for VBBM Version Buffer overflow
 *   @bug 1949
-*  
+*
 */
-class VBBMBufferOverFlowExcept : public std::runtime_error 
+class VBBMBufferOverFlowExcept : public std::runtime_error
 {
 public:
 	/** Takes a character string describing the error.  */
@@ -118,7 +111,7 @@ private:
 
 /** @brief specific error exception class for VBBM Version Buffer overflow
 *   @bug 1949
-*  
+*
 */
 class PrimitiveColumnProjectResultExcept : public QueryDataExcept
 {
@@ -130,9 +123,9 @@ public:
 
 /** @brief specific error exception class for PrimProc invalid HWM
 *   @bug 2173
-*  
+*
 */
-class InvalidRangeHWMExcept : public QueryDataExcept 
+class InvalidRangeHWMExcept : public QueryDataExcept
 {
 public:
 	/** Takes a character string describing the error.  */
@@ -187,7 +180,7 @@ public:
 
 /** @brief specific error exception class for getSysData in Calpontsystemcatalog.
 *   @bug 2574
-*  
+*
 */
 class NoTableExcept : public std::runtime_error
 {

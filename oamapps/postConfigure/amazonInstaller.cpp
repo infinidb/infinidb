@@ -124,8 +124,8 @@ string AMIrootPassword = "Calpont1";
 ModuleIPList elasticiplist;
 ModuleIPList moduleiplist;
 
-char* pcommand = 0;
-string prompt;
+char* pcommand1 = 0;
+string prompt1;
 string NMSIPAddress = "0.0.0.0";
 string systemName = "calpont-1";
 string UserModuleInstanceType = oam::UnassignedName;
@@ -285,14 +285,14 @@ int main(int argc, char *argv[])
 		while(true) {
 			string ready = "n";
 			if ( systemCleanup )
-				prompt = "WARNING - You are about the delete '" + systemName + "' cluster.  Are you sure you want to do this?  [y,n] (n) > ";
+				prompt1 = "WARNING - You are about the delete '" + systemName + "' cluster.  Are you sure you want to do this?  [y,n] (n) > ";
 			else
-				prompt = "WARNING - You are about the stop the instances on '" + systemName + "' cluster.  Are you sure you want to do this?  [y,n] (n) > ";
-			pcommand = readline(prompt.c_str());
-			if (pcommand) {
-				if (strlen(pcommand) > 0) ready = pcommand;
-				free(pcommand);
-				pcommand = 0;
+				prompt1 = "WARNING - You are about the stop the instances on '" + systemName + "' cluster.  Are you sure you want to do this?  [y,n] (n) > ";
+			pcommand1 = readline(prompt1.c_str());
+			if (pcommand1) {
+				if (strlen(pcommand1) > 0) ready = pcommand1;
+				free(pcommand1);
+				pcommand1 = 0;
 				if (ready == "n")
 					exit(0);
 			}
@@ -482,12 +482,12 @@ int main(int argc, char *argv[])
 	
 			while(true) {
 				string ready = "y";
-				prompt = "Are these files installed and ready to continue [y,n] (y) > ";
-				pcommand = readline(prompt.c_str());
-				if (pcommand) {
-					if (strlen(pcommand) > 0) ready = pcommand;
-					free(pcommand);
-					pcommand = 0;
+				prompt1 = "Are these files installed and ready to continue [y,n] (y) > ";
+				pcommand1 = readline(prompt1.c_str());
+				if (pcommand1) {
+					if (strlen(pcommand1) > 0) ready = pcommand1;
+					free(pcommand1);
+					pcommand1 = 0;
 					if (ready == "n") {
 						cout << endl << "Please Install these files and re-run amazonInstaller. exiting..." << endl;
 						exit(0);
@@ -512,12 +512,12 @@ int main(int argc, char *argv[])
 	
 			while(true)
 			{
-				prompt = "Enter name with directory of the X.509 Certificate file (" + x509Cert + ") > ";
-				pcommand = readline(prompt.c_str());
-				if (pcommand) {
-					if (strlen(pcommand) > 0) x509Cert = pcommand;
-					free(pcommand);
-					pcommand = 0;
+				prompt1 = "Enter name with directory of the X.509 Certificate file (" + x509Cert + ") > ";
+				pcommand1 = readline(prompt1.c_str());
+				if (pcommand1) {
+					if (strlen(pcommand1) > 0) x509Cert = pcommand1;
+					free(pcommand1);
+					pcommand1 = 0;
 				}
 				ifstream File (x509Cert.c_str());
 				if (!File)
@@ -528,12 +528,12 @@ int main(int argc, char *argv[])
 	
 			while(true)
 			{
-				prompt = "Enter name with directory of the X.509 Private Key file (" + x509PriKey + ") > ";
-				pcommand = readline(prompt.c_str());
-				if (pcommand) {
-					if (strlen(pcommand) > 0) x509PriKey = pcommand;
-					free(pcommand);
-					pcommand = 0;
+				prompt1 = "Enter name with directory of the X.509 Private Key file (" + x509PriKey + ") > ";
+				pcommand1 = readline(prompt1.c_str());
+				if (pcommand1) {
+					if (strlen(pcommand1) > 0) x509PriKey = pcommand1;
+					free(pcommand1);
+					pcommand1 = 0;
 				}
 				ifstream File (x509PriKey.c_str());
 				if (!File)
@@ -544,12 +544,12 @@ int main(int argc, char *argv[])
 
 			while(true)
 			{
-				prompt = "Enter the Amazon Region you are running in (" + region + ") > ";
-				pcommand = readline(prompt.c_str());
-				if (pcommand) {
-					if (strlen(pcommand) > 0) region = pcommand;
-					free(pcommand);
-					pcommand = 0;
+				prompt1 = "Enter the Amazon Region you are running in (" + region + ") > ";
+				pcommand1 = readline(prompt1.c_str());
+				if (pcommand1) {
+					if (strlen(pcommand1) > 0) region = pcommand1;
+					free(pcommand1);
+					pcommand1 = 0;
 				}
 				break;
 			}
@@ -578,12 +578,12 @@ int main(int argc, char *argv[])
 		cout << endl << "===== Setup System Configuration =====" << endl << endl;
 	
 		//system Name
-		prompt = "Enter System Name (" + systemName + ") > ";
-		pcommand = readline(prompt.c_str());
-		if (pcommand) {
-			if (strlen(pcommand) > 0) systemName = pcommand;
-			free(pcommand);
-			pcommand = 0;
+		prompt1 = "Enter System Name (" + systemName + ") > ";
+		pcommand1 = readline(prompt1.c_str());
+		if (pcommand1) {
+			if (strlen(pcommand1) > 0) systemName = pcommand1;
+			free(pcommand1);
+			pcommand1 = 0;
 		}
 
 		cout << endl << "There are 2 options when configuring the System Module Type: separate and combined" << endl << endl;
@@ -593,14 +593,14 @@ int main(int argc, char *argv[])
 		string serverTypeInstall = "2";
 		while(true)
 		{
-			prompt =  "Select the type of System Module Install [1=separate, 2=combined] (2) > ";
-			pcommand = readline(prompt.c_str());
+			prompt1 =  "Select the type of System Module Install [1=separate, 2=combined] (2) > ";
+			pcommand1 = readline(prompt1.c_str());
 			cout << endl;
-			if (pcommand)
+			if (pcommand1)
 			{
-				if (strlen(pcommand) > 0) serverTypeInstall = pcommand;
-				free(pcommand);
-				pcommand = 0;
+				if (strlen(pcommand1) > 0) serverTypeInstall = pcommand1;
+				free(pcommand1);
+				pcommand1 = 0;
 			}
 	
 			if ( serverTypeInstall != "1" && serverTypeInstall != "2" ) {
@@ -625,12 +625,12 @@ int main(int argc, char *argv[])
 				while(true)
 				{
 					umNumber = 1;
-					prompt = "Enter number of User Modules [1,1024] (" + oam.itoa(umNumber) + ") > ";
-					pcommand = readline(prompt.c_str());
-					if (pcommand) {
-						if (strlen(pcommand) > 0) umNumber = atoi(pcommand);
-						free(pcommand);
-						pcommand = 0;
+					prompt1 = "Enter number of User Modules [1,1024] (" + oam.itoa(umNumber) + ") > ";
+					pcommand1 = readline(prompt1.c_str());
+					if (pcommand1) {
+						if (strlen(pcommand1) > 0) umNumber = atoi(pcommand1);
+						free(pcommand1);
+						pcommand1 = 0;
 					}
 		
 					if ( umNumber < 1 || umNumber > oam::MAX_MODULE ) {
@@ -642,12 +642,12 @@ int main(int argc, char *argv[])
 
 				cout << endl;
 				//get exist um imstance list
-				prompt = "Enter List of Existing User Modules Instances (id1,id2,id3) or hit enter for none > ";
-				pcommand = readline(prompt.c_str());
-				if (pcommand) {
-					if (strlen(pcommand) > 0) existingPMInstances = pcommand;
-					free(pcommand);
-					pcommand = 0;
+				prompt1 = "Enter List of Existing User Modules Instances (id1,id2,id3) or hit enter for none > ";
+				pcommand1 = readline(prompt1.c_str());
+				if (pcommand1) {
+					if (strlen(pcommand1) > 0) existingPMInstances = pcommand1;
+					free(pcommand1);
+					pcommand1 = 0;
 				}
 
 				instanceType = oam.getEC2LocalInstanceType();
@@ -662,12 +662,12 @@ int main(int argc, char *argv[])
 				//get UserModuleInstanceType
 				while(true)
 				{
-					prompt = "Enter User Module Instance Type or hit enter to default to current type (" + instanceType + ") > ";
-					pcommand = readline(prompt.c_str());
-					if (pcommand) {
-						if (strlen(pcommand) > 0) UserModuleInstanceType = pcommand;
-						free(pcommand);
-						pcommand = 0;
+					prompt1 = "Enter User Module Instance Type or hit enter to default to current type (" + instanceType + ") > ";
+					pcommand1 = readline(prompt1.c_str());
+					if (pcommand1) {
+						if (strlen(pcommand1) > 0) UserModuleInstanceType = pcommand1;
+						free(pcommand1);
+						pcommand1 = 0;
 					}
 				}
 
@@ -675,12 +675,12 @@ int main(int argc, char *argv[])
 				//get UserModuleSecurityGroup
 				while(true)
 				{
-					prompt = "Enter User Module Security Group or hit enter to default to current Security Group > ";
-					pcommand = readline(prompt.c_str());
-					if (pcommand) {
-						if (strlen(pcommand) > 0) UserModuleSecurityGroup = pcommand;
-						free(pcommand);
-						pcommand = 0;
+					prompt1 = "Enter User Module Security Group or hit enter to default to current Security Group > ";
+					pcommand1 = readline(prompt1.c_str());
+					if (pcommand1) {
+						if (strlen(pcommand1) > 0) UserModuleSecurityGroup = pcommand1;
+						free(pcommand1);
+						pcommand1 = 0;
 					}
 					break;
 				}
@@ -691,12 +691,12 @@ int main(int argc, char *argv[])
 				//get UMEBS volume info
 				while(true) {
 					string answer = "y";
-					prompt = "We recommend using EBS Volumes for User Module storage, you want to use EBS Volume? [y,n] (y) > ";
-					pcommand = readline(prompt.c_str());
-					if (pcommand) {
-						if (strlen(pcommand) > 0) answer = pcommand;
-						free(pcommand);
-						pcommand = 0;
+					prompt1 = "We recommend using EBS Volumes for User Module storage, you want to use EBS Volume? [y,n] (y) > ";
+					pcommand1 = readline(prompt1.c_str());
+					if (pcommand1) {
+						if (strlen(pcommand1) > 0) answer = pcommand1;
+						free(pcommand1);
+						pcommand1 = 0;
 					}
 			
 					if ( answer == "n" ) {
@@ -709,12 +709,12 @@ int main(int argc, char *argv[])
 					if ( answer == "y") {
 						while (true)
 						{
-							prompt = "Default Volume size is 10gbs, change if you like [1,1024] (100) > ";
-							pcommand = readline(prompt.c_str());
-							if (pcommand) {
-								if (strlen(pcommand) > 0) UMvolumeSize = atoi(pcommand);
-								free(pcommand);
-								pcommand = 0;
+							prompt1 = "Default Volume size is 10gbs, change if you like [1,1024] (100) > ";
+							pcommand1 = readline(prompt1.c_str());
+							if (pcommand1) {
+								if (strlen(pcommand1) > 0) UMvolumeSize = atoi(pcommand1);
+								free(pcommand1);
+								pcommand1 = 0;
 							}
 				
 							if ( UMvolumeSize < 1 || UMvolumeSize > 1024 ) {
@@ -742,12 +742,12 @@ int main(int argc, char *argv[])
 		while(true)
 		{
 			pmNumber = 1;
-			prompt = "Enter number of Performance Modules [1,1024] (" + oam.itoa(pmNumber) + ") > ";
-			pcommand = readline(prompt.c_str());
-			if (pcommand) {
-				if (strlen(pcommand) > 0) pmNumber = atoi(pcommand);
-				free(pcommand);
-				pcommand = 0;
+			prompt1 = "Enter number of Performance Modules [1,1024] (" + oam.itoa(pmNumber) + ") > ";
+			pcommand1 = readline(prompt1.c_str());
+			if (pcommand1) {
+				if (strlen(pcommand1) > 0) pmNumber = atoi(pcommand1);
+				free(pcommand1);
+				pcommand1 = 0;
 			}
 	
 			if ( pmNumber < 1 || pmNumber > oam::MAX_MODULE ) {
@@ -759,24 +759,24 @@ int main(int argc, char *argv[])
 
 		cout << endl;
 		//get exist pm imstance list
-		prompt = "Enter List of Existing Performance Modules Instances (id1,id2,id3) or hit enter for none > ";
-		pcommand = readline(prompt.c_str());
-		if (pcommand) {
-			if (strlen(pcommand) > 0) existingPMInstances = pcommand;
-			free(pcommand);
-			pcommand = 0;
+		prompt1 = "Enter List of Existing Performance Modules Instances (id1,id2,id3) or hit enter for none > ";
+		pcommand1 = readline(prompt1.c_str());
+		if (pcommand1) {
+			if (strlen(pcommand1) > 0) existingPMInstances = pcommand1;
+			free(pcommand1);
+			pcommand1 = 0;
 		}
 
 		cout << endl;
 		//get EBS Volume info
 		while(true) {
 			string answer = "y";
-			prompt = "We recommend using EBS Volumes for Performance Module storage, you want to use EBS Volumes? [y,n] (y) > ";
-			pcommand = readline(prompt.c_str());
-			if (pcommand) {
-				if (strlen(pcommand) > 0) answer = pcommand;
-				free(pcommand);
-				pcommand = 0;
+			prompt1 = "We recommend using EBS Volumes for Performance Module storage, you want to use EBS Volumes? [y,n] (y) > ";
+			pcommand1 = readline(prompt1.c_str());
+			if (pcommand1) {
+				if (strlen(pcommand1) > 0) answer = pcommand1;
+				free(pcommand1);
+				pcommand1 = 0;
 			}
 	
 			if ( answer == "n" ) {
@@ -790,12 +790,12 @@ int main(int argc, char *argv[])
 				while (true)
 				{
 					cout << "The default setting is 1 EBS Volume (dbroot) per Performance Module." << endl;
-					prompt = "How many EBS Volumes do you want to assign to each Performance Module (1) > ";
-					pcommand = readline(prompt.c_str());
-					if (pcommand) {
-						if (strlen(pcommand) > 0) dbrootPer = atoi(pcommand);
-						free(pcommand);
-						pcommand = 0;
+					prompt1 = "How many EBS Volumes do you want to assign to each Performance Module (1) > ";
+					pcommand1 = readline(prompt1.c_str());
+					if (pcommand1) {
+						if (strlen(pcommand1) > 0) dbrootPer = atoi(pcommand1);
+						free(pcommand1);
+						pcommand1 = 0;
 					}
 		
 					if ( dbrootPer > 0  )
@@ -806,12 +806,12 @@ int main(int argc, char *argv[])
 		
 				while (true)
 				{
-					prompt = "Default Volume size is 100gbs, change if you like [1,1024] (100) > ";
-					pcommand = readline(prompt.c_str());
-					if (pcommand) {
-						if (strlen(pcommand) > 0) PMvolumeSize = atoi(pcommand);
-						free(pcommand);
-						pcommand = 0;
+					prompt1 = "Default Volume size is 100gbs, change if you like [1,1024] (100) > ";
+					pcommand1 = readline(prompt1.c_str());
+					if (pcommand1) {
+						if (strlen(pcommand1) > 0) PMvolumeSize = atoi(pcommand1);
+						free(pcommand1);
+						pcommand1 = 0;
 					}
 		
 					if ( PMvolumeSize < 1 || PMvolumeSize > 1024 ) {
@@ -829,12 +829,12 @@ int main(int argc, char *argv[])
 
 		cout << endl;
 		//get Elasitic UP list
-		prompt = "Enter List of Elastic IPs with Assigned ModuleName (x.x.x.x,um1,y.y.y.y,pm1) or hit enter for none > ";
-		pcommand = readline(prompt.c_str());
-		if (pcommand) {
-			if (strlen(pcommand) > 0) elasticIPs = pcommand;
-			free(pcommand);
-			pcommand = 0;
+		prompt1 = "Enter List of Elastic IPs with Assigned ModuleName (x.x.x.x,um1,y.y.y.y,pm1) or hit enter for none > ";
+		pcommand1 = readline(prompt1.c_str());
+		if (pcommand1) {
+			if (strlen(pcommand1) > 0) elasticIPs = pcommand1;
+			free(pcommand1);
+			pcommand1 = 0;
 		}
 
 		cout << endl;
@@ -842,12 +842,12 @@ int main(int argc, char *argv[])
 		//get auto tagging
 		while(true) {
 			string answer = "n";
-			prompt = "Instance and Volume Name Auto tagging is enabled, do you want to disable it? [y,n] (n) > ";
-			pcommand = readline(prompt.c_str());
-			if (pcommand) {
-				if (strlen(pcommand) > 0) answer = pcommand;
-				free(pcommand);
-				pcommand = 0;
+			prompt1 = "Instance and Volume Name Auto tagging is enabled, do you want to disable it? [y,n] (n) > ";
+			pcommand1 = readline(prompt1.c_str());
+			if (pcommand1) {
+				if (strlen(pcommand1) > 0) answer = pcommand1;
+				free(pcommand1);
+				pcommand1 = 0;
 			}
 	
 			if ( answer == "n" ) {
@@ -865,24 +865,24 @@ int main(int argc, char *argv[])
 
 		cout << endl;
 		//get TotalUmMemory
-		prompt = "Enter TotalUmMemory size or hit enter to default standard size > ";
-		pcommand = readline(prompt.c_str());
-		if (pcommand) {
-			if (strlen(pcommand) > 0) TotalUmMemory = pcommand;
-			free(pcommand);
-			pcommand = 0;
+		prompt1 = "Enter TotalUmMemory size or hit enter to default standard size > ";
+		pcommand1 = readline(prompt1.c_str());
+		if (pcommand1) {
+			if (strlen(pcommand1) > 0) TotalUmMemory = pcommand1;
+			free(pcommand1);
+			pcommand1 = 0;
 		}
 
 		cout << endl;
 		//get NumBlocksPct
 		while(true)
 		{
-			prompt = "Enter NumBlocksPct size or hit enter to default standard size [1,100] > ";
-			pcommand = readline(prompt.c_str());
-			if (pcommand) {
-				if (strlen(pcommand) > 0) NumBlocksPct = pcommand;
-				free(pcommand);
-				pcommand = 0;
+			prompt1 = "Enter NumBlocksPct size or hit enter to default standard size [1,100] > ";
+			pcommand1 = readline(prompt1.c_str());
+			if (pcommand1) {
+				if (strlen(pcommand1) > 0) NumBlocksPct = pcommand1;
+				free(pcommand1);
+				pcommand1 = 0;
 			}
 			if ( ( atoi(NumBlocksPct.c_str()) < 0 || atoi(NumBlocksPct.c_str()) > 100)
 					&&  NumBlocksPct != oam::UnassignedName)
@@ -896,12 +896,12 @@ int main(int argc, char *argv[])
 		snmpAppCheck();
 
 		//get root password
-		prompt = "Enter Root-Password used to access the Instances or hit enter to default to 'Calpont1' > ";
-		pcommand = readline(prompt.c_str());
-		if (pcommand) {
-			if (strlen(pcommand) > 0) rootPassword = pcommand;
-			free(pcommand);
-			pcommand = 0;
+		prompt1 = "Enter Root-Password used to access the Instances or hit enter to default to 'Calpont1' > ";
+		pcommand1 = readline(prompt1.c_str());
+		if (pcommand1) {
+			if (strlen(pcommand1) > 0) rootPassword = pcommand1;
+			free(pcommand1);
+			pcommand1 = 0;
 		}
 
 		cout << endl;
@@ -2236,13 +2236,13 @@ void snmpAppCheck()
 
 	cout << "This would be used to receive SNMP Traps from InfiniDB, like a Network Control Center" << endl;
 	cout << "Default to 0.0.0.0 to not enable snmptrap forwarding" << endl << endl;
-	prompt = "Enter IP Address(es) of NMS Server (0.0.0.0) > ";
-	pcommand = readline(prompt.c_str());
-	if (pcommand)
+	prompt1 = "Enter IP Address(es) of NMS Server (0.0.0.0) > ";
+	pcommand1 = readline(prompt1.c_str());
+	if (pcommand1)
 	{
-		if (strlen(pcommand) > 0) NMSIPAddress = pcommand;
-		free(pcommand);
-		pcommand = 0;
+		if (strlen(pcommand1) > 0) NMSIPAddress = pcommand1;
+		free(pcommand1);
+		pcommand1 = 0;
 	}
 
 	return;
@@ -2251,13 +2251,13 @@ void snmpAppCheck()
 void setSystemName()
 {
 
-	prompt = "Enter System Name (" + systemName + ") > ";
-	pcommand = readline(prompt.c_str());
-	if (pcommand)
+	prompt1 = "Enter System Name (" + systemName + ") > ";
+	pcommand1 = readline(prompt1.c_str());
+	if (pcommand1)
 	{
-		if (strlen(pcommand) > 0) systemName = pcommand;
-		free(pcommand);
-		pcommand = 0;
+		if (strlen(pcommand1) > 0) systemName = pcommand1;
+		free(pcommand1);
+		pcommand1 = 0;
 	}
 }
 

@@ -63,7 +63,7 @@ fi
 find ${prefix}/Calpont -type d | xargs chmod +rx
 find ${prefix}/Calpont -type f | xargs chmod +r
 
-mkdir -p /usr/local/Calpont/data1/systemFiles/dbrm
+mkdir -p ${prefix}/Calpont/data1/systemFiles/dbrm
 
 if [ ! -e ${prefix}/Calpont/lib/libjemalloc.so ]; then
 	pushd ${prefix}/Calpont/lib >/dev/null
@@ -84,6 +84,13 @@ sed -i -e 's/port.*=.*3306/port=14406/' ${prefix}/Calpont/mysql/my.cnf
 
 # configure the s/w
 ${prefix}/Calpont/bin/postConfigure -n
+
+# restart (argh)
+#${prefix}/Calpont/bin/calpontConsole RestartSystem y
+
+sleep 30
+pkill DMLProc
+sleep 30
 
 # perform the tests
 if [ ! -x ${builddir}/build/mini-tests.sh ]; then

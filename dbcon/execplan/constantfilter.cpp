@@ -220,6 +220,23 @@ void ConstantFilter::replaceRealCol(std::vector<SRCP>& derivedColList)
 		fFilterList[i]->replaceRealCol(derivedColList);
 }
 
+const std::vector<SimpleColumn*>& ConstantFilter::simpleColumnList()
+{
+	return fSimpleColumnList;
+}
+
+void ConstantFilter::setSimpleColumnList()
+{
+	fSimpleColumnList.clear();
+	for (uint32_t i = 0; i < fFilterList.size(); i++) 
+	{
+		fFilterList[i]->setSimpleColumnList();
+		fSimpleColumnList.insert(fSimpleColumnList.end(),
+							 fFilterList[i]->simpleColumnList().begin(),
+							 fFilterList[i]->simpleColumnList().end());
+	}
+}
+
 
 } // namespace execplan
 // vim:ts=4 sw=4:

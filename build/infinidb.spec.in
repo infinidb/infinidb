@@ -9,7 +9,7 @@ Vendor: InfiniDB, Inc.
 URL: http://www.calpont.com/
 @@PACKAGER@@
 Group: Applications
-License: Copyright (c) 2014 InfiniDB, Inc., all rights reserved
+License: Copyright (c) 2014 InfiniDB, Inc., all rights reserved; redistributable under the terms of the GPL, see the file COPYING for details.
 BuildRoot: %{_tmppath}/%{name}-%{release}-buildroot
 
 %description
@@ -38,6 +38,7 @@ Summary: InfiniDB Enterprise software binaries
 Group: Applications
 Obsoletes: calpont
 Requires: infinidb-libs, infinidb-platform
+License: Proprietary; Copyright (c) 2014 InfiniDB, Inc., all rights reserved
 
 %description enterprise
 InfiniDB Enterprise binary files
@@ -168,6 +169,7 @@ rm -rf $RPM_BUILD_ROOT $RPM_BUILD_DIR/%{name}-%{version}-%{release}
 %attr(0666, root, root) /usr/local/Calpont/local/module
 #
 /usr/local/Calpont/releasenum
+/usr/local/Calpont/COPYING
 
 # Tools...
 /usr/local/Calpont/bin/rollback

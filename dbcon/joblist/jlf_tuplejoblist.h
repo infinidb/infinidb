@@ -71,24 +71,50 @@ struct TableInfo
 	uint64_t                  fSubId;
 	JobStepVector             fQuerySteps;
 	JobStepVector             fProjectSteps;
+	JobStepVector             fFuncJoinExps;
 	JobStepVector             fOneTableExpSteps;
-	std::vector<uint32_t>         fProjectCols;
-	std::vector<uint32_t>         fColsInExp1;    // 1 table expression
-	std::vector<uint32_t>         fColsInExp2;    // 2 or more tables in expression
-	std::vector<uint32_t>         fColsInRetExp;  // expression in selection/group by clause
-	std::vector<uint32_t>         fColsInOuter;   // delayed outer join filter
-	std::vector<uint32_t>         fColsInColMap;  // columns in column map
-	std::vector<uint32_t>         fJoinKeys;
-	std::vector<uint32_t>         fAdjacentList;  // tables joined with
+	std::vector<uint32_t>     fProjectCols;
+	std::vector<uint32_t>     fColsInExp1;      // 1 table expression
+	std::vector<uint32_t>     fColsInExp2;      // 2 or more tables in expression
+	std::vector<uint32_t>     fColsInRetExp;    // expression in selection/group by clause
+	std::vector<uint32_t>     fColsInOuter;     // delayed outer join filter
+	std::vector<uint32_t>     fColsInFuncJoin;  // expression for function join
+	std::vector<uint32_t>     fColsInColMap;    // columns in column map
+	std::vector<uint32_t>     fJoinKeys;
+	std::vector<uint32_t>     fAdjacentList;    // tables joined with
 	bool                      fVisited;
 
-	AnyDataListSPtr           fDl;            // output data list
-	rowgroup::RowGroup        fRowGroup;      // output rowgroup meta data
-	std::set<uint32_t>            fJoinedTables;  // tables directly/indirectly joined to this table
+	AnyDataListSPtr           fDl;              // output data list
+	rowgroup::RowGroup        fRowGroup;        // output rowgroup meta data
+	std::set<uint32_t>        fJoinedTables;    // tables directly/indirectly joined to this table
 
 	TableInfo() : fTableOid(-1), fVisited(false) {}
 };
 typedef std::map<uint32_t, TableInfo> TableInfoMap;
+
+
+struct FunctionJoinInfo
+{
+	std::vector<uint32_t>     fTableKey;
+	std::vector<uint32_t>     fJoinKey;
+	std::vector<int32_t>      fTableOid;
+	std::vector<int32_t>      fOid;
+	std::vector<int32_t>      fSequence;
+	std::vector<std::string>  fAlias;
+	std::vector<std::string>  fView;
+	std::vector<std::string>  fSchema;
+	JobStepVector             fStep;
+	JoinType                  fJoinType;
+	int64_t                   fJoinId;
+	int64_t                   fCorrelatedSide;
+	std::vector<std::set<uint32_t> > fColumnKeys;
+	std::vector<execplan::ReturnedColumn*>  fExpression;
+
+	FunctionJoinInfo() : fJoinType(0), fJoinId(0), fCorrelatedSide(0) {}
+};
+typedef boost::shared_ptr<FunctionJoinInfo> SP_FuncJoinInfo;
+typedef std::pair<uint32_t, uint32_t>       KeyPair;
+
 
 // combine and associate tuple job steps
 void associateTupleJobSteps(JobStepVector& querySteps,

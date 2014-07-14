@@ -510,7 +510,6 @@ private:
 	boost::condition condvarWakeupProducer;
 	bool finishedSending, sendWaiting, rDoNothing, fIsDict;
 	uint32_t recvWaiting, recvExited;
-	uint64_t ridsReturned;
 
 	std::vector<struct BRM::EMEntry> extents;
 	uint32_t extentSize, divShift, ridsPerBlock, rpbShift, numExtents;
@@ -796,6 +795,7 @@ private:
 	uint64_t fMsgBytesIn;   // total byte count for incoming messages
 	uint64_t fMsgBytesOut;  // total byte count for outcoming messages
     uint32_t fMsgsToPm;     // total number of messages sent to PMs
+	uint32_t fMsgsExpect;   // total blocks to scan
 	uint32_t uniqueID;
 	ResourceManager& fRm;
 	BPSOutputType fOutType;
@@ -840,6 +840,7 @@ public:
 	virtual void setJobInfo(const JobInfo* jobInfo) = 0;
 	virtual void setOutputRowGroup(const rowgroup::RowGroup& rg) = 0;
 	virtual const rowgroup::RowGroup& getOutputRowGroup() const = 0;
+	virtual void addFcnJoinExp(const std::vector<execplan::SRCP>& fe) = 0;
 	virtual void addFcnExpGroup1(const boost::shared_ptr<execplan::ParseTree>& fe) = 0;
 	virtual void setFE1Input(const rowgroup::RowGroup& feInput) = 0;
 	virtual void setFcnExpGroup3(const std::vector<execplan::SRCP>& fe) = 0;
@@ -906,7 +907,7 @@ public:
 	void setBppStep() { }
 	void setIsProjectionOnly() { }
 
-	uint64_t getRows() const { return rowsReturned; }
+	uint64_t getRows() const { return ridsReturned; }
 	void setFirstStepType(PrimitiveStepType firstStepType) { ffirstStepType = firstStepType;}
 	PrimitiveStepType getPrimitiveStepType () { return ffirstStepType; }
 	void setStepCount() { fStepCount++; }
@@ -986,6 +987,7 @@ public:
 		JLF should register that object with the TBPS for that table.  If it's
 		cross-table, then JLF should register it with the join step.
 	*/
+	void addFcnJoinExp(const std::vector<execplan::SRCP>& fe);
 	void addFcnExpGroup1(const boost::shared_ptr<execplan::ParseTree>& fe);
 	void setFE1Input(const rowgroup::RowGroup& feInput);
 
@@ -1048,7 +1050,6 @@ private:
 
     DistributedEngineComm* fDec;
     boost::shared_ptr<BatchPrimitiveProcessorJL> fBPP;
-	uint32_t rowCount;
 	uint16_t fNumSteps;
 	int fColWidth;
 	uint32_t fStepCount;
@@ -1081,7 +1082,6 @@ private:
 	uint32_t recvWaiting;
 	uint32_t recvExited;
 	uint64_t ridsReturned;
-	uint64_t rowsReturned;
 	std::map<execplan::CalpontSystemCatalog::OID, std::tr1::unordered_map<int64_t, struct BRM::EMEntry> > extentsMap;
 	std::vector<BRM::EMEntry> scannedExtents;
 	OIDVector projectOids;
@@ -1102,6 +1102,7 @@ private:
 	boost::mutex mutex;
 	boost::mutex dlMutex;
 	boost::mutex cpMutex;
+	boost::mutex serializeJoinerMutex;
 	boost::condition condvarWakeupProducer, condvar;
 
 	std::vector<bool> scanFlags; // use to keep track of which extents to eliminate from this step

@@ -158,6 +158,7 @@ namespace joblist {
             }
         }
 	}
+	configuredUmMemLimit = totalUmMemLimit;
 	//cout << "RM: total UM memory = " << totalUmMemLimit << endl;
 
 	// multi-thread aggregate
@@ -182,7 +183,7 @@ namespace joblist {
 
 	// window function
 	string wt = fConfig->getConfig("WindowFunction", "WorkThreads");
-	if (nt.empty())
+	if (wt.empty())
 		fWindowFunctionThreads = numCores();
 	else
 		fWindowFunctionThreads = fConfig->uFromText(wt);
@@ -330,6 +331,22 @@ bool ResourceManager::userPriorityEnabled() const
 	std::string val(getStringVal("UserPriority", "Enabled", "N" ));
 	boost::to_upper(val);
 	return "Y" == val;
+}
+
+bool ResourceManager::getMemory(int64_t amount, boost::shared_ptr<int64_t> sessionLimit, bool patience)
+{
+	bool ret1 = (atomicops::atomicSub(&totalUmMemLimit, amount) >= 0);
+	bool ret2 = (atomicops::atomicSub(sessionLimit.get(), amount) >= 0);
+
+	uint32_t retryCounter = 0, maxRetries = 20;   // 10s delay
+	while (patience && !(ret1 && ret2) && retryCounter++ < maxRetries) {
+		atomicops::atomicAdd(&totalUmMemLimit, amount);
+		atomicops::atomicAdd(sessionLimit.get(), amount);
+		usleep(500000);
+		ret1 = (atomicops::atomicSub(&totalUmMemLimit, amount) >= 0);
+		ret2 = (atomicops::atomicSub(sessionLimit.get(), amount) >= 0);
+	}
+	return (ret1 && ret2);
 }
 
 

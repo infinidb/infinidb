@@ -108,10 +108,11 @@ ostream& operator<<(ostream& output, const FunctionColumn& rhs)
 
 const string FunctionColumn::toString() const
 {
-  ostringstream output;
+	ostringstream output;
 	output << "FunctionColumn: " << fFunctionName << endl;
 	if (fAlias.length() > 0) output << "/Alias: " << fAlias;
 	output << "expressionId=" << fExpressionId << endl;
+	output << "joinInfo=" << fJoinInfo << " returnAll=" << fReturnAll << " sequence#=" << fSequence << endl;
 	output << "resultType=" << colDataTypeToString(fResultType.colDataType) << "|" << fResultType.colWidth << endl;
 	output << "operationType=" << colDataTypeToString(fOperationType.colDataType) << endl;
 	output << "function parm: " << endl;
@@ -363,9 +364,7 @@ bool FunctionColumn::hasWindowFunc()
 
 void FunctionColumn::setDerivedTable()
 {
-	fSimpleColumnList.clear();
-	for (uint32_t i = 0; i < fFunctionParms.size(); i++)
-		fFunctionParms[i]->walk(getSimpleCols, &fSimpleColumnList);
+	setSimpleColumnList();
 
 	string derivedTableAlias = "";
 	for (uint32_t i = 0; i < fSimpleColumnList.size(); i++)
@@ -397,4 +396,29 @@ void FunctionColumn::replaceRealCol(CalpontSelectExecutionPlan::ReturnedColumnLi
 	}
 }
 
-}   //namespace
+void FunctionColumn::setSimpleColumnList()
+{
+	fSimpleColumnList.clear();
+	for (uint i = 0; i < fFunctionParms.size(); i++)
+		fFunctionParms[i]->walk(getSimpleCols, &fSimpleColumnList);
+}
+
+bool FunctionColumn::singleTable(CalpontSystemCatalog::TableAliasName& tan)
+{
+	tan.clear();
+	setSimpleColumnList();
+	for (uint i = 0; i < fSimpleColumnList.size(); i++)
+	{
+		CalpontSystemCatalog::TableAliasName stan(fSimpleColumnList[i]->schemaName(),
+		                    fSimpleColumnList[i]->tableName(),
+		                    fSimpleColumnList[i]->tableAlias(),
+		                    fSimpleColumnList[i]->viewName());
+		if (tan.table.empty())
+			tan = stan;
+		else if (stan != tan)
+			return false;
+	}
+	return true;
+}
+
+}  //namespace

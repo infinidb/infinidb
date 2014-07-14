@@ -54,6 +54,7 @@ extern void ha_calpont_impl_set_error(THD* thd, uint64_t errCode, LEX_STRING* ar
 #include "calpontsystemcatalog.h"
 extern int ha_calpont_impl_rename_table_(const char* from, const char* to, cal_impl_if::cal_connection_info& ci);
 extern int ha_calpont_impl_write_row_(uchar *buf, TABLE* table, cal_impl_if::cal_connection_info& ci, ha_rows& rowsInserted);
+extern int ha_calpont_impl_write_batch_row_(uchar *buf,TABLE* table, cal_impl_if::cal_connection_info& ci);
 extern int ha_calpont_impl_write_last_batch(TABLE* table, cal_impl_if::cal_connection_info& ci, bool abort);
 extern int ha_calpont_impl_commit_ (handlerton *hton, THD *thd, bool all, cal_impl_if::cal_connection_info& ci);
 extern int ha_calpont_impl_rollback_ (handlerton *hton, THD *thd, bool all, cal_impl_if::cal_connection_info& ci);

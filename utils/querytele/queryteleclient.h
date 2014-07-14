@@ -60,6 +60,8 @@ public:
 	inline const QueryStepParms& stepParms() const { return fStepParms; }
 	inline QueryStepParms& stepParms() { return fStepParms; }
 
+	EXPORT void waitForQueues();
+
 	EXPORT static boost::uuids::uuid genUUID();
 	EXPORT static int64_t timeNowms();
 

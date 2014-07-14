@@ -72,8 +72,8 @@ ColumnCommand::ColumnCommand() :
 	blockCount(0),
 	loadCount(0),
 	suppressFilter(false)
-	{
-	}
+{
+}
 
 ColumnCommand::~ColumnCommand() { }
 
@@ -168,12 +168,12 @@ void ColumnCommand::loadData()
 			loadCount++;
 		}
 		else if (lastBlockReached && _isScan)
-		{ // fill remaining blocks with empty values when col scan
+		{	// fill remaining blocks with empty values when col scan
 			int blockLen = BLOCK_SIZE/colType.colWidth;
-		 	ByteStream::octbyte* oPtr=NULL;
-		 	ByteStream::quadbyte* qPtr=NULL;
-		 	ByteStream::byte* bPtr=NULL;
-		 	ByteStream::doublebyte* dPtr=NULL;
+			ByteStream::octbyte* oPtr=NULL;
+			ByteStream::quadbyte* qPtr=NULL;
+			ByteStream::byte* bPtr=NULL;
+			ByteStream::doublebyte* dPtr=NULL;
 			if (colType.colWidth==1)
 				bPtr = reinterpret_cast<ByteStream::byte*>(&bpp->blockData[i*BLOCK_SIZE]);
 			//@Bug 1812. Added two bytes column handling
@@ -214,17 +214,17 @@ void ColumnCommand::loadData()
 
 	/* Do the load */
 	wasCached = primitiveprocessor::loadBlocks(lbids,
-									bpp->versionInfo,
-									bpp->txnID,
-									colType.compressionType,
-									blockPtrs,
-									&blocksRead,
-									bpp->LBIDTrace,
-									bpp->sessionID,
-									blocksToLoad,
-									&wasVersioned,
-									willPrefetch(),
-									&bpp->vssCache);
+				bpp->versionInfo,
+				bpp->txnID,
+				colType.compressionType,
+				blockPtrs,
+				&blocksRead,
+				bpp->LBIDTrace,
+				bpp->sessionID,
+				blocksToLoad,
+				&wasVersioned,
+				willPrefetch(),
+				&bpp->vssCache);
 	bpp->cachedIO += wasCached;
 	bpp->physIO += blocksRead;
 	bpp->touchedBlocks += blocksToLoad;
@@ -234,7 +234,7 @@ void ColumnCommand::issuePrimitive()
 {
 	uint32_t resultSize;
 
-    loadData();
+	loadData();
 
 // 	cout << "issuing primitive for LBID " << primMsg->LBID << endl;
 	if (!suppressFilter)
@@ -244,7 +244,7 @@ void ColumnCommand::issuePrimitive()
 	bpp->pp.p_Col(primMsg, outMsg, bpp->outMsgSize, (unsigned int*)&resultSize);
 
 	/* Update CP data, the PseudoColumn code should always be !_isScan.  Should be safe
-        to leave this here for now. */
+	    to leave this here for now. */
 	if (_isScan) {
 		bpp->validCPData = (outMsg->ValidMinMax && !wasVersioned);
 		//if (wasVersioned && outMsg->ValidMinMax)
@@ -266,42 +266,45 @@ void ColumnCommand::process_OT_BOTH()
 
 	/* this is verbose and repetative to minimize the work per row */
 	switch(colType.colWidth) {
-		case 8:
-			for (i = 0, pos = sizeof(NewColResultHeader); i < outMsg->NVALS; ++i) {
-				if (makeAbsRids)
-					bpp->absRids[i] = *((uint16_t *) &bpp->outputMsg[pos]) + bpp->baseRid;
-				bpp->relRids[i] = *((uint16_t *) &bpp->outputMsg[pos]);
-				pos += 2;
-				values[i] = *((int64_t *) &bpp->outputMsg[pos]); pos += 8;
-			}
-			break;
-		case 4:
-			for (i = 0, pos = sizeof(NewColResultHeader); i < outMsg->NVALS; ++i) {
-				if (makeAbsRids)
-					bpp->absRids[i] = *((uint16_t *) &bpp->outputMsg[pos]) + bpp->baseRid;
-				bpp->relRids[i] = *((uint16_t *) &bpp->outputMsg[pos]);
-				pos += 2;
-				values[i] = *((int32_t *) &bpp->outputMsg[pos]); pos += 4;
-			}
-			break;
-		case 2:
-			for (i = 0, pos = sizeof(NewColResultHeader); i < outMsg->NVALS; ++i) {
-				if (makeAbsRids)
-					bpp->absRids[i] = *((uint16_t *) &bpp->outputMsg[pos]) + bpp->baseRid;
-				bpp->relRids[i] = *((uint16_t *) &bpp->outputMsg[pos]);
-				pos += 2;
-				values[i] = *((int16_t *) &bpp->outputMsg[pos]); pos += 2;
-			}
-			break;
-		case 1:
-			for (i = 0, pos = sizeof(NewColResultHeader); i < outMsg->NVALS; ++i) {
-				if (makeAbsRids)
-					bpp->absRids[i] = *((uint16_t *) &bpp->outputMsg[pos]) + bpp->baseRid;
-				bpp->relRids[i] = *((uint16_t *) &bpp->outputMsg[pos]);
-				pos += 2;
-				values[i] = *((int8_t *) &bpp->outputMsg[pos++]);
-			}
-			break;
+	case 8:
+		for (i = 0, pos = sizeof(NewColResultHeader); i < outMsg->NVALS; ++i) {
+			if (makeAbsRids)
+				bpp->absRids[i] = *((uint16_t *) &bpp->outputMsg[pos]) + bpp->baseRid;
+			bpp->relRids[i] = *((uint16_t *) &bpp->outputMsg[pos]);
+			pos += 2;
+			values[i] = *((int64_t *) &bpp->outputMsg[pos]);
+			pos += 8;
+		}
+		break;
+	case 4:
+		for (i = 0, pos = sizeof(NewColResultHeader); i < outMsg->NVALS; ++i) {
+			if (makeAbsRids)
+				bpp->absRids[i] = *((uint16_t *) &bpp->outputMsg[pos]) + bpp->baseRid;
+			bpp->relRids[i] = *((uint16_t *) &bpp->outputMsg[pos]);
+			pos += 2;
+			values[i] = *((int32_t *) &bpp->outputMsg[pos]);
+			pos += 4;
+		}
+		break;
+	case 2:
+		for (i = 0, pos = sizeof(NewColResultHeader); i < outMsg->NVALS; ++i) {
+			if (makeAbsRids)
+				bpp->absRids[i] = *((uint16_t *) &bpp->outputMsg[pos]) + bpp->baseRid;
+			bpp->relRids[i] = *((uint16_t *) &bpp->outputMsg[pos]);
+			pos += 2;
+			values[i] = *((int16_t *) &bpp->outputMsg[pos]);
+			pos += 2;
+		}
+		break;
+	case 1:
+		for (i = 0, pos = sizeof(NewColResultHeader); i < outMsg->NVALS; ++i) {
+			if (makeAbsRids)
+				bpp->absRids[i] = *((uint16_t *) &bpp->outputMsg[pos]) + bpp->baseRid;
+			bpp->relRids[i] = *((uint16_t *) &bpp->outputMsg[pos]);
+			pos += 2;
+			values[i] = *((int8_t *) &bpp->outputMsg[pos++]);
+		}
+		break;
 	}
 
 }
@@ -319,33 +322,33 @@ void ColumnCommand::process_OT_DATAVALUE()
 	bpp->ridCount = outMsg->NVALS;
 // 	cout << "rid Count is " << bpp->ridCount << endl;
 	switch(colType.colWidth) {
-		case 8:
-		{
-			memcpy(values, outMsg + 1, outMsg->NVALS << 3);
+	case 8:
+	{
+		memcpy(values, outMsg + 1, outMsg->NVALS << 3);
 // 			cout << "  CC: first value is " << values[0] << endl;
-			break;
-		}
-		case 4:
-		{
-			int32_t* arr32 = (int32_t *) (outMsg + 1);
-			for (uint64_t i = 0; i < outMsg->NVALS; ++i)
-				values[i] = arr32[i];
-			break;
-		}
-		case 2:
-		{
-			int16_t* arr16 = (int16_t *) (outMsg + 1);
-			for (uint64_t i = 0; i < outMsg->NVALS; ++i)
-				values[i] = arr16[i];
-			break;
-		}
-		case 1:
-		{
-			int8_t* arr8 = (int8_t *) (outMsg + 1);
-			for (uint64_t i = 0; i < outMsg->NVALS; ++i)
-				values[i] = arr8[i];
-			break;
-		}
+		break;
+	}
+	case 4:
+	{
+		int32_t* arr32 = (int32_t *) (outMsg + 1);
+		for (uint64_t i = 0; i < outMsg->NVALS; ++i)
+			values[i] = arr32[i];
+		break;
+	}
+	case 2:
+	{
+		int16_t* arr16 = (int16_t *) (outMsg + 1);
+		for (uint64_t i = 0; i < outMsg->NVALS; ++i)
+			values[i] = arr16[i];
+		break;
+	}
+	case 1:
+	{
+		int8_t* arr8 = (int8_t *) (outMsg + 1);
+		for (uint64_t i = 0; i < outMsg->NVALS; ++i)
+			values[i] = arr8[i];
+		break;
+	}
 	}
 }
 
@@ -358,12 +361,18 @@ void ColumnCommand::processResult()
 // 		idbassert(outMsg->NVALS == bpp->ridCount);
 
 	switch (outMsg->OutputType) {
-		case OT_BOTH: process_OT_BOTH(); break;
-		case OT_RID: process_OT_RID(); break;
-		case OT_DATAVALUE: process_OT_DATAVALUE(); break;
-		default:
-			cout << "outputType = " << outMsg->OutputType << endl;
-			throw logic_error("ColumnCommand got a bad OutputType");
+	case OT_BOTH:
+		process_OT_BOTH();
+		break;
+	case OT_RID:
+		process_OT_RID();
+		break;
+	case OT_DATAVALUE:
+		process_OT_DATAVALUE();
+		break;
+	default:
+		cout << "outputType = " << outMsg->OutputType << endl;
+		throw logic_error("ColumnCommand got a bad OutputType");
 	}
 
 	// check if feeding a filtercommand
@@ -386,7 +395,7 @@ void ColumnCommand::createCommand(ByteStream &bs)
 {
 	uint8_t tmp8;
 
-    bs.advance(1);
+	bs.advance(1);
 	bs >> tmp8;
 	_isScan = tmp8;
 	bs >> traceFlags;
@@ -416,12 +425,12 @@ void ColumnCommand::createCommand(ByteStream &bs)
 	//cout << "CreateCommand() o:" << getOID() << " lastLbid: " << lastLbid << endl;
 	Command::createCommand(bs);
 
-	parsedColumnFilter = bpp->pp.parseColumnFilter(filterString.buf(), colType.colWidth,
-		colType.colDataType, filterCount, BOP);
+	parsedColumnFilter = primitives::parseColumnFilter(filterString.buf(), colType.colWidth,
+						 colType.colDataType, filterCount, BOP);
 
 	/* OR hack */
-	emptyFilter = bpp->pp.parseColumnFilter(filterString.buf(), colType.colWidth,
-		colType.colDataType, 0, BOP);
+	emptyFilter = primitives::parseColumnFilter(filterString.buf(), colType.colWidth,
+											colType.colDataType, 0, BOP);
 
 	/* XXXPAT: for debugging only */
 // 	bs >> colType.columnOID;
@@ -439,7 +448,7 @@ void ColumnCommand::prep(int8_t outputType, bool absRids)
 	/* make the template NewColRequestHeader */
 
 	baseMsgLength = sizeof(NewColRequestHeader) +
-		  (suppressFilter ? 0 : filterString.length());
+					(suppressFilter ? 0 : filterString.length());
 
 	if (!inputMsg)
 		inputMsg.reset(new uint8_t[baseMsgLength + (LOGICAL_BLOCK_RIDS * 2)]);
@@ -461,12 +470,12 @@ void ColumnCommand::prep(int8_t outputType, bool absRids)
 	primMsg->DataSize = colType.colWidth;
 	primMsg->DataType = colType.colDataType;
 	primMsg->CompType = colType.compressionType;
- 	primMsg->OutputType = outputType;
+	primMsg->OutputType = outputType;
 	primMsg->BOP = BOP;
 	primMsg->NOPS = (suppressFilter ? 0 : filterCount);
 	primMsg->sort = 0;
 #if 0
- 	cout << "filter length is " << filterString.length() << endl;
+	cout << "filter length is " << filterString.length() << endl;
 
 	cout << "appending filter string: ";
 	for (uint32_t i = 0; i < filterString.length(); ++i)
@@ -480,13 +489,25 @@ void ColumnCommand::prep(int8_t outputType, bool absRids)
 
 
 	switch (colType.colWidth) {
-		case 1: shift = 8; mask = 0xFF; break;
-		case 2: shift = 4; mask = 0x0F; break;
-		case 4: shift = 2; mask = 0x03; break;
-		case 8: shift = 1; mask = 0x01; break;
-		default:
-			cout << "CC: colWidth is " << colType.colWidth << endl;
-			throw logic_error("ColumnCommand: bad column width?");
+	case 1:
+		shift = 8;
+		mask = 0xFF;
+		break;
+	case 2:
+		shift = 4;
+		mask = 0x0F;
+		break;
+	case 4:
+		shift = 2;
+		mask = 0x03;
+		break;
+	case 8:
+		shift = 1;
+		mask = 0x01;
+		break;
+	default:
+		cout << "CC: colWidth is " << colType.colWidth << endl;
+		throw logic_error("ColumnCommand: bad column width?");
 	}
 
 	/* TODO: re-optimize with parameterized output RG */
@@ -531,49 +552,49 @@ void ColumnCommand::projectResult()
 
 void ColumnCommand::removeRowsFromRowGroup(RowGroup &rg)
 {
-    uint32_t gapSize = colType.colWidth + 2;
-    uint8_t *msg8;
-    uint16_t rid;
-    Row oldRow, newRow;
-    uint32_t oldIdx, newIdx;
+	uint32_t gapSize = colType.colWidth + 2;
+	uint8_t *msg8;
+	uint16_t rid;
+	Row oldRow, newRow;
+	uint32_t oldIdx, newIdx;
 
-    rg.initRow(&oldRow);
-    rg.initRow(&newRow);
-    rg.getRow(0, &oldRow);
-    rg.getRow(0, &newRow);
-    msg8 = (uint8_t *) (outMsg + 1);
-    for (oldIdx = newIdx = 0; newIdx < outMsg->NVALS; newIdx++, msg8 += gapSize) {
-        rid = *((uint16_t *) msg8);
-        while (rid != bpp->relRids[oldIdx]) {
-            // need to find rid in relrids, and it is in there
-            oldIdx++;
-            oldRow.nextRow();
-        }
-        if (oldIdx != newIdx) {
-            bpp->relRids[newIdx] = rid;
-            // we use a memcpy here instead of copyRow() to avoid expanding the string table;
-            memcpy(newRow.getData(), oldRow.getData(), newRow.getSize());
-        }
-        oldIdx++;
-        oldRow.nextRow();
-        newRow.nextRow();
-    }
-    rg.setRowCount(outMsg->NVALS);   // this gets rid of trailing rows, no need to set them to NULL
-    bpp->ridCount = outMsg->NVALS;
-    primMsg->NVALS = outMsg->NVALS;
+	rg.initRow(&oldRow);
+	rg.initRow(&newRow);
+	rg.getRow(0, &oldRow);
+	rg.getRow(0, &newRow);
+	msg8 = (uint8_t *) (outMsg + 1);
+	for (oldIdx = newIdx = 0; newIdx < outMsg->NVALS; newIdx++, msg8 += gapSize) {
+		rid = *((uint16_t *) msg8);
+		while (rid != bpp->relRids[oldIdx]) {
+			// need to find rid in relrids, and it is in there
+			oldIdx++;
+			oldRow.nextRow();
+		}
+		if (oldIdx != newIdx) {
+			bpp->relRids[newIdx] = rid;
+			// we use a memcpy here instead of copyRow() to avoid expanding the string table;
+			memcpy(newRow.getData(), oldRow.getData(), newRow.getSize());
+		}
+		oldIdx++;
+		oldRow.nextRow();
+		newRow.nextRow();
+	}
+	rg.setRowCount(outMsg->NVALS);   // this gets rid of trailing rows, no need to set them to NULL
+	bpp->ridCount = outMsg->NVALS;
+	primMsg->NVALS = outMsg->NVALS;
 }
 
 void ColumnCommand::projectResultRG(RowGroup &rg, uint32_t pos)
 {
 	uint32_t i, offset, gapSize;
-    uint8_t *msg8 = (uint8_t *) (outMsg + 1);
-    if (noVB) {
-        // outMsg has rids in this case
-        msg8 += 2;
-        gapSize = colType.colWidth + 2;
-    }
-    else
-        gapSize = colType.colWidth;
+	uint8_t *msg8 = (uint8_t *) (outMsg + 1);
+	if (noVB) {
+		// outMsg has rids in this case
+		msg8 += 2;
+		gapSize = colType.colWidth + 2;
+	}
+	else
+		gapSize = colType.colWidth;
 
 	/* TODO: reoptimize these away */
 	rg.initRow(&r);
@@ -597,14 +618,14 @@ void ColumnCommand::projectResultRG(RowGroup &rg, uint32_t pos)
 		else
 			os << ": ridcount " << bpp->ridCount;
 		os << ",  output rids " << outMsg->NVALS;
-/*
-		BRM::VSSData entry;
-		if (bpp->vssCache.find(lbid) != bpp->vssCache.end()) {
-			entry = bpp->vssCache[lbid];
-			if (entry.returnCode == 0)
-				os << "  requested version " << entry.verID;
-		}
-*/
+		/*
+				BRM::VSSData entry;
+				if (bpp->vssCache.find(lbid) != bpp->vssCache.end()) {
+					entry = bpp->vssCache[lbid];
+					if (entry.returnCode == 0)
+						os << "  requested version " << entry.verID;
+				}
+		*/
 		os << endl;
 		if (bpp->sessionID & 0x80000000)
 			throw NeedToRestartJob(os.str());
@@ -612,40 +633,40 @@ void ColumnCommand::projectResultRG(RowGroup &rg, uint32_t pos)
 			throw PrimitiveColumnProjectResultExcept(os.str());
 	}
 	else if (primMsg->NVALS != outMsg->NVALS || outMsg->NVALS != bpp->ridCount)
-        removeRowsFromRowGroup(rg);
+		removeRowsFromRowGroup(rg);
 
 	idbassert(primMsg->NVALS == outMsg->NVALS);
 	idbassert(outMsg->NVALS == bpp->ridCount);
 	rg.getRow(0, &r);
 	switch (colType.colWidth) {
-		case 1: {
-			for (i = 0; i < outMsg->NVALS; ++i, msg8 += gapSize) {
-				r.setUintField_offset<1>(*msg8, offset);
-				r.nextRow(rowSize);
-			}
-			break;
+	case 1: {
+		for (i = 0; i < outMsg->NVALS; ++i, msg8 += gapSize) {
+			r.setUintField_offset<1>(*msg8, offset);
+			r.nextRow(rowSize);
 		}
-		case 2: {
-			for (i = 0; i < outMsg->NVALS; ++i, msg8 += gapSize) {
-				r.setUintField_offset<2>(*((uint16_t *) msg8), offset);
-				r.nextRow(rowSize);
-			}
-			break;
+		break;
+	}
+	case 2: {
+		for (i = 0; i < outMsg->NVALS; ++i, msg8 += gapSize) {
+			r.setUintField_offset<2>(*((uint16_t *) msg8), offset);
+			r.nextRow(rowSize);
 		}
-		case 4: {
-			for (i = 0; i < outMsg->NVALS; ++i, msg8 += gapSize) {
-				r.setUintField_offset<4>(*((uint32_t *) msg8), offset);
-				r.nextRow(rowSize);
-			}
-			break;
+		break;
+	}
+	case 4: {
+		for (i = 0; i < outMsg->NVALS; ++i, msg8 += gapSize) {
+			r.setUintField_offset<4>(*((uint32_t *) msg8), offset);
+			r.nextRow(rowSize);
 		}
-		case 8: {
-			for (i = 0; i < outMsg->NVALS; ++i, msg8 += gapSize) {
-				r.setUintField_offset<8>(*((uint64_t *) msg8), offset);
-				r.nextRow(rowSize);
-			}
-			break;
+		break;
+	}
+	case 8: {
+		for (i = 0; i < outMsg->NVALS; ++i, msg8 += gapSize) {
+			r.setUintField_offset<8>(*((uint64_t *) msg8), offset);
+			r.nextRow(rowSize);
 		}
+		break;
+	}
 	}
 }
 
@@ -680,21 +701,21 @@ void ColumnCommand::nextLBID()
 
 void ColumnCommand::duplicate(ColumnCommand *cc)
 {
-    cc->_isScan = _isScan;
-    cc->traceFlags = traceFlags;
-    cc->filterString = filterString;
-    cc->colType.colDataType = colType.colDataType;
-    cc->colType.compressionType = colType.compressionType;
-    cc->colType.colWidth = colType.colWidth;
-    cc->BOP = BOP;
-    cc->filterCount = filterCount;
-    cc->fFilterFeeder = fFilterFeeder;
-    cc->parsedColumnFilter = parsedColumnFilter;
-    cc->suppressFilter = suppressFilter;
-    cc->lastLbid = lastLbid;
-    cc->r = r;
-    cc->rowSize = rowSize;
-    cc->Command::duplicate(this);
+	cc->_isScan = _isScan;
+	cc->traceFlags = traceFlags;
+	cc->filterString = filterString;
+	cc->colType.colDataType = colType.colDataType;
+	cc->colType.compressionType = colType.compressionType;
+	cc->colType.colWidth = colType.colWidth;
+	cc->BOP = BOP;
+	cc->filterCount = filterCount;
+	cc->fFilterFeeder = fFilterFeeder;
+	cc->parsedColumnFilter = parsedColumnFilter;
+	cc->suppressFilter = suppressFilter;
+	cc->lastLbid = lastLbid;
+	cc->r = r;
+	cc->rowSize = rowSize;
+	cc->Command::duplicate(this);
 }
 
 SCommand ColumnCommand::duplicate()
@@ -758,7 +779,7 @@ bool ColumnCommand::willPrefetch()
 
 	//return false;
 	return (blockCount == 0 || ((double)loadCount)/((double)blockCount) >
-		bpp->prefetchThreshold);
+			bpp->prefetchThreshold);
 }
 
 void ColumnCommand::disableFilters()
@@ -785,60 +806,78 @@ void ColumnCommand::enableFilters()
 ***********************************************************/
 const uint64_t ColumnCommand::getEmptyRowValue( const execplan::CalpontSystemCatalog::ColDataType dataType, const int width ) const
 {
-    uint64_t emptyVal = 0;
-    int offset;
+	uint64_t emptyVal = 0;
+	int offset;
 
-    offset = ( dataType == execplan::CalpontSystemCatalog::VARCHAR )? -1 : 0;
-    switch ( dataType )
-    {
-        case execplan::CalpontSystemCatalog::TINYINT : emptyVal = joblist::TINYINTEMPTYROW; break;
-        case execplan::CalpontSystemCatalog::SMALLINT: emptyVal = joblist::SMALLINTEMPTYROW; break;
-        case execplan::CalpontSystemCatalog::MEDINT :
-        case execplan::CalpontSystemCatalog::INT :     emptyVal = joblist::INTEMPTYROW; break;
-        case execplan::CalpontSystemCatalog::BIGINT :  emptyVal = joblist::BIGINTEMPTYROW; break;
+	offset = ( dataType == execplan::CalpontSystemCatalog::VARCHAR )? -1 : 0;
+	switch ( dataType )
+	{
+	case execplan::CalpontSystemCatalog::TINYINT :
+		emptyVal = joblist::TINYINTEMPTYROW;
+		break;
+	case execplan::CalpontSystemCatalog::SMALLINT:
+		emptyVal = joblist::SMALLINTEMPTYROW;
+		break;
+	case execplan::CalpontSystemCatalog::MEDINT :
+	case execplan::CalpontSystemCatalog::INT :
+		emptyVal = joblist::INTEMPTYROW;
+		break;
+	case execplan::CalpontSystemCatalog::BIGINT :
+		emptyVal = joblist::BIGINTEMPTYROW;
+		break;
 
-        case execplan::CalpontSystemCatalog::UTINYINT : emptyVal = joblist::UTINYINTEMPTYROW; break;
-        case execplan::CalpontSystemCatalog::USMALLINT: emptyVal = joblist::USMALLINTEMPTYROW; break;
-        case execplan::CalpontSystemCatalog::UMEDINT :
-        case execplan::CalpontSystemCatalog::UINT :     emptyVal = joblist::UINTEMPTYROW; break;
-        case execplan::CalpontSystemCatalog::UBIGINT :  emptyVal = joblist::UBIGINTEMPTYROW; break;
+	case execplan::CalpontSystemCatalog::UTINYINT :
+		emptyVal = joblist::UTINYINTEMPTYROW;
+		break;
+	case execplan::CalpontSystemCatalog::USMALLINT:
+		emptyVal = joblist::USMALLINTEMPTYROW;
+		break;
+	case execplan::CalpontSystemCatalog::UMEDINT :
+	case execplan::CalpontSystemCatalog::UINT :
+		emptyVal = joblist::UINTEMPTYROW;
+		break;
+	case execplan::CalpontSystemCatalog::UBIGINT :
+		emptyVal = joblist::UBIGINTEMPTYROW;
+		break;
 
-        case execplan::CalpontSystemCatalog::FLOAT :
-        case execplan::CalpontSystemCatalog::UFLOAT :   emptyVal = joblist::FLOATEMPTYROW; break;
-        case execplan::CalpontSystemCatalog::DOUBLE :
-        case execplan::CalpontSystemCatalog::UDOUBLE :  emptyVal = joblist::DOUBLEEMPTYROW; break;
+	case execplan::CalpontSystemCatalog::FLOAT :
+	case execplan::CalpontSystemCatalog::UFLOAT :
+		emptyVal = joblist::FLOATEMPTYROW;
+		break;
+	case execplan::CalpontSystemCatalog::DOUBLE :
+	case execplan::CalpontSystemCatalog::UDOUBLE :
+		emptyVal = joblist::DOUBLEEMPTYROW;
+		break;
 
-        case execplan::CalpontSystemCatalog::DECIMAL :
-        case execplan::CalpontSystemCatalog::UDECIMAL :
-            if ( width <= 1 )
-                emptyVal = joblist::TINYINTEMPTYROW;
-            else if (width <= 2)
-                emptyVal = joblist::SMALLINTEMPTYROW;
-            else if ( width <= 4 )
-                emptyVal = joblist::INTEMPTYROW;
-            else
-                emptyVal = joblist::BIGINTEMPTYROW;
-            break;
+	case execplan::CalpontSystemCatalog::DECIMAL :
+	case execplan::CalpontSystemCatalog::UDECIMAL :
+		if ( width <= 1 )
+			emptyVal = joblist::TINYINTEMPTYROW;
+		else if (width <= 2)
+			emptyVal = joblist::SMALLINTEMPTYROW;
+		else if ( width <= 4 )
+			emptyVal = joblist::INTEMPTYROW;
+		else
+			emptyVal = joblist::BIGINTEMPTYROW;
+		break;
 
-        case execplan::CalpontSystemCatalog::CHAR :
-        case execplan::CalpontSystemCatalog::VARCHAR :
-        case execplan::CalpontSystemCatalog::DATE :
-        case execplan::CalpontSystemCatalog::DATETIME :
-        case execplan::CalpontSystemCatalog::VARBINARY :
-        default:
-            emptyVal = joblist::CHAR1EMPTYROW;
-            if ( width == (2 + offset) )
-                emptyVal = joblist::CHAR2EMPTYROW;
-            else
-                if ( width >= (3 + offset) && width <= ( 4 + offset ) )
-                emptyVal = joblist::CHAR4EMPTYROW;
-            else
-                if ( width >= (5 + offset)  )
-                emptyVal = joblist::CHAR8EMPTYROW;
-            break;
-    }
+	case execplan::CalpontSystemCatalog::CHAR :
+	case execplan::CalpontSystemCatalog::VARCHAR :
+	case execplan::CalpontSystemCatalog::DATE :
+	case execplan::CalpontSystemCatalog::DATETIME :
+	case execplan::CalpontSystemCatalog::VARBINARY :
+	default:
+		emptyVal = joblist::CHAR1EMPTYROW;
+		if ( width == (2 + offset) )
+			emptyVal = joblist::CHAR2EMPTYROW;
+		else if ( width >= (3 + offset) && width <= ( 4 + offset ) )
+			emptyVal = joblist::CHAR4EMPTYROW;
+		else if ( width >= (5 + offset)  )
+			emptyVal = joblist::CHAR8EMPTYROW;
+		break;
+	}
 
-    return emptyVal;
+	return emptyVal;
 }
 
 void ColumnCommand::getLBIDList(uint32_t loopCount, vector<int64_t> *lbids)

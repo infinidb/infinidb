@@ -60,6 +60,7 @@ LimitedOrderBy::~LimitedOrderBy()
 void LimitedOrderBy::initialize(const RowGroup& rg, const JobInfo& jobInfo)
 {
 	fRm = &jobInfo.rm;
+	fSessionMemLimit = jobInfo.umMemLimit;
 	fErrorCode = ERR_LIMIT_TOO_BIG;
 
 	// locate column position in the rowgroup
@@ -125,7 +126,7 @@ void LimitedOrderBy::processRow(const rowgroup::Row& row)
 		{
 			fDataQueue.push(fData);
 			uint64_t newSize = fRowsPerRG * fRowGroup.getRowSize();
-			if (!fRm->getMemory(newSize))
+			if (!fRm->getMemory(newSize, fSessionMemLimit))
 			{
 				cerr << IDBErrorInfo::instance()->errorMsg(fErrorCode)
 					 << " @" << __FILE__ << ":" << __LINE__;
@@ -171,7 +172,7 @@ void LimitedOrderBy::finalize()
 	if (fStart != 0)
 	{
 		uint64_t newSize = fRowsPerRG * fRowGroup.getRowSize();
-		if (!fRm->getMemory(newSize))
+		if (!fRm->getMemory(newSize, fSessionMemLimit))
 		{
 			cerr << IDBErrorInfo::instance()->errorMsg(fErrorCode)
 				 << " @" << __FILE__ << ":" << __LINE__;
@@ -197,7 +198,7 @@ void LimitedOrderBy::finalize()
 			if (fRowGroup.getRowCount() >= fRowsPerRG)
 			{
 				tempQueue.push(fData);
-				if (!fRm->getMemory(newSize))
+				if (!fRm->getMemory(newSize, fSessionMemLimit))
 				{
 					cerr << IDBErrorInfo::instance()->errorMsg(fErrorCode)
 					 << " @" << __FILE__ << ":" << __LINE__;

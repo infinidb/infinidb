@@ -307,7 +307,41 @@ int fixupCalpontXML()
 			cf->delConfig(section, parm);
 			cout << "Deleting " << section << "." << parm << endl;
 		}
-		cf->write();
+
+		//Fixup AllowDiskBasedJoin
+		section = "HashJoin";
+		parm = "AllowDiskBasedJoin";
+		val = cf->getConfig(section, parm);
+		if (val.empty())
+		{
+			val = "N"; //We've decided to default to no.
+			cf->setConfig(section, parm, val);
+			cout << "Adding " << section << "." << parm << " = " << val << endl;
+		}
+
+		//Fixup TempFilePath
+		section = "HashJoin";
+		parm = "TempFilePath";
+		val = cf->getConfig(section, parm);
+		if (val.empty())
+		{
+			val = "$INSTALLDIR/tmp";
+			cf->setConfig(section, parm, val);
+			cout << "Adding " << section << "." << parm << " = " << val << endl;
+		}
+        
+		//Fixup TempFileCompression
+		section = "HashJoin";
+		parm = "TempFileCompression";
+		val = cf->getConfig(section, parm);
+		if (val.empty())
+		{
+			val = "Y";
+			cf->setConfig(section, parm, val);
+			cout << "Adding " << section << "." << parm << " = " << val << endl;
+		}
+        
+        cf->write();
 		rc = 0;
 	}
 	catch (exception& e)

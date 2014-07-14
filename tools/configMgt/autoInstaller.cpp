@@ -61,13 +61,12 @@ int main(int argc, char *argv[])
 	string XMpassword = "dummypw";
 	string configFile = "NULL";
 	string release = "Latest";
-	string SHARED = "//calweb/shared";
-//	string SHARED = "//srvfrisco2/public";
 	string installDir = "/usr/local";
 	string MySQLpassword = "dummymysqlpw";
+	string MySQLport= oam::UnassignedName;
 	string installPackageType = "";
 
-    char* pcommand = 0;
+    	char* pcommand = 0;
 	string prompt;
 	bool noprompt = false;
 	string CE = "0";
@@ -75,6 +74,15 @@ int main(int argc, char *argv[])
 	int forceVer = -1;
 
 	Config* sysConfig = Config::makeConfig("./systems/CalpontSystems.xml");
+
+	//gethostname to determine where to get the packages
+	string SHARED = "//srvfrisco2/public";
+	char hostname[128];
+	gethostname(hostname, sizeof hostname);
+	string hostName = hostname;
+	string::size_type pos = hostName.find("srvnightly",0);
+	if (pos != string::npos)
+		SHARED = "//calweb/shared";
 
 	for( int i = 1; i < argc; i++ )
 	{
@@ -92,19 +100,20 @@ int main(int argc, char *argv[])
 			cout << "configuration of the 'Calpont.xml' located on the system being" << endl;
 			cout << "or can be passed as an argument into 'quickInstaller'." << endl;
 			cout << endl;
-   			cout << "Usage: autoInstaller -s system [-h][-ce][-r release][-c configFile][-n][-d][-p package-type][-m mysql-password]" << endl;
+   			cout << "Usage: autoInstaller -s system [-h][-ce][-r release][-c configFile][-n][-d][-p package-type][-m mysql-password][-port mysql-port]" << endl;
 			cout << "			-s system-name" << endl;
 			cout << "			-ce community-edition install" << endl;
 			cout << "			-r release-number (optional, default to 'Latest')" << endl;
 			cout << "			-c InfiniDB Config File located in system-name directory (optional, default to system configuration)" << endl;
 			cout << "			-n No Prompt (Used for automated Installs)" << endl;
 			cout << "			-m System MySQL Password, if set" << endl;
+			cout << "			-port System MySQL Port, if set" << endl;
 			cout << "			-d Debug Flag" << endl;
 			cout << "			-p Install Package Type (rpm or binary), defaults to " << sysConfig->configFile() << " setting" << endl;
 			cout << "			-3 Force a version 3 install, defaults to autodetect" << endl;
 			exit(0);
 		}
-      	else if( string("-s") == argv[i] ) {
+      		else if( string("-s") == argv[i] ) {
 			i++;
 			if ( argc == i ) {
 				cout << "ERROR: missing system argument" << endl;
@@ -147,10 +156,18 @@ int main(int argc, char *argv[])
 		else if( string("-m") == argv[i] ) {
 			i++;
 			if ( argc == i ) {
-				cout << "ERROR: missing release argument" << endl;
+				cout << "ERROR: missing mysql password argument" << endl;
 				exit(1);
 			}
 			MySQLpassword = argv[i];
+		}
+		else if( string("-port") == argv[i] ) {
+			i++;
+			if ( argc == i ) {
+				cout << "ERROR: missing mysql port argument" << endl;
+				exit(1);
+			}
+			MySQLport = argv[i];
 		}
 		else if( string("-p") == argv[i] ) {
 			i++;
@@ -171,14 +188,7 @@ int main(int argc, char *argv[])
 
 	if (systemName.empty() ) {
 		cout << endl;
-		cout << "Usage: autoInstaller -s system [-h][-ce][-r release][-c configFile][-n][-d]" << endl;
-		cout << "			-s system-name" << endl;
-		cout << "			-ce community-edition install" << endl;
-		cout << "			-r release (optional, default to 'Latest') " << endl;
-		cout << "			-c InfiniDB Config File (optional, default to system copy) " << endl;
-		cout << "			-n no prompt Flag" << endl;
-		cout << "			-d debug Flag" << endl;
-		cout << "			-3 Force a version 3 install, defaults to autodetect" << endl;
+   		cout << "Usage: autoInstaller -s system [-h][-ce][-r release][-c configFile][-n][-d][-p package-type][-m mysql-password][-port mysql-port]" << endl;
 		exit(1);
 	}
 
@@ -711,8 +721,20 @@ CONFIGDONE:
 		exit(1);
 	}
 
-	if ( DBRootStorageType == "hdfs" )
+	string DataFileEnvFile = "setenv-hdfs-20";
+	if ( DBRootStorageType == "hdfs" ) {
 		HDFS = true;
+
+		try {
+			DataFileEnvFile = sysConfigOld->getConfig("Installation", "DataFileEnvFile");
+		}
+		catch(...)
+		{
+			cout << "ERROR: Problem reading DataFileEnvFile from the InfiniDB System Configuration file, exiting" << endl;
+			cerr << "ERROR: Problem reading DataFileEnvFile from the InfiniDB System Configuration file, exiting" << endl;
+			exit(1);
+		}
+	}
 
 	if ( serverTypeInstall != oam::INSTALL_COMBINE_DM_UM_PM && CE == "1")
 	{
@@ -721,7 +743,7 @@ CONFIGDONE:
 		exit (0);
 	}
 
-	string::size_type pos = parentOAMModuleIPAddr.find("208",0);
+	pos = parentOAMModuleIPAddr.find("208",0);
 	if( pos != string::npos) {
 		string newIP = parentOAMModuleIPAddr.substr(0,pos) + "8" + parentOAMModuleIPAddr.substr(pos+3,80);
 		parentOAMModuleIPAddr = newIP;
@@ -782,7 +804,7 @@ CONFIGDONE:
 	// run calpontUninstaller script
 	cout << "Run calpontUninstall script                   " << flush;
 
-	cmd = "./remote_command.sh " + installParentModuleIPAddr + " " + systemUser + " " + password + " '" + installDir + "/Calpont/bin/calpontUninstall.sh -d -p " + password + "' 'Uninstall Completed' FAILED 120 " + debug_flag;
+	cmd = "./remote_command.sh " + installParentModuleIPAddr + " " + systemUser + " " + password + " '" + installDir + "/Calpont/bin/calpontUninstall.sh -d -p " + password + "' 'Uninstall Completed' FAILED 500 " + debug_flag;
 	rtnCode = system(cmd.c_str());
 	if (rtnCode == 0)
 		cout << "DONE" << endl;
@@ -841,12 +863,26 @@ CONFIGDONE:
 	{
 		if (HDFS)
 		{
-			string DataFileEnvFile = "setenv-hdfs-20";
-			cmd = "./remote_command.sh " + installParentModuleIPAddr + " " + systemUser + " " + password + " '. " + installDir + "/Calpont/bin/" + DataFileEnvFile + ";" + installDir + "/Calpont/bin/postConfigure -i " + installDir + "/Calpont -n -mp " + MySQLpassword + " -p " + password + "' 'System is Active' Error 1200 " + debug_flag;
+			if ( MySQLport == oam::UnassignedName )
+			{
+				cmd = "./remote_command.sh " + installParentModuleIPAddr + " " + systemUser + " " + password + " '. " + installDir + "/Calpont/bin/" + DataFileEnvFile + ";" + installDir + "/Calpont/bin/postConfigure -i " + installDir + "/Calpont -n -mp " + MySQLpassword + " -p " + password + "' 'System is Active' Error 1200 " + debug_flag;
+			}
+			else
+			{
+				cmd = "./remote_command.sh " + installParentModuleIPAddr + " " + systemUser + " " + password + " '. " + installDir + "/Calpont/bin/" + DataFileEnvFile + ";" + installDir + "/Calpont/bin/postConfigure -i " + installDir + "/Calpont -n -mp " + MySQLpassword + " -p " + password + " -port " + MySQLport + "' 'System is Active' Error 1200 " + debug_flag;
+			}
 		}
 		else
 		{
-			cmd = "./remote_command.sh " + installParentModuleIPAddr + " " + systemUser + " " + password + " '" + installDir + "/Calpont/bin/postConfigure -i " + installDir + "/Calpont -n -mp " + MySQLpassword + " -p " + password + "' 'System is Active' Error 1200 " + debug_flag;
+			if ( MySQLport == oam::UnassignedName )
+			{
+				cmd = "./remote_command.sh " + installParentModuleIPAddr + " " + systemUser + " " + password + " '" + installDir + "/Calpont/bin/postConfigure -i " + installDir + "/Calpont -n -mp " + MySQLpassword + " -p " + password + "' 'System is Active' Error 1200 " + debug_flag;
+			}
+			else
+			{
+				cmd = "./remote_command.sh " + installParentModuleIPAddr + " " + systemUser + " " + password + " '" + installDir + "/Calpont/bin/postConfigure -i " + installDir + "/Calpont -n -mp " + MySQLpassword + " -p " + password + " -port " + MySQLport + "' 'System is Active' Error 1200 " + debug_flag;
+				string DataFileEnvFile = "setenv-hdfs-20";
+			}
 		}
 	}
 

@@ -857,7 +857,7 @@ int main(int argc, char *argv[])
 				moduleDisableState = oam::ENABLEDSTATE;
 
 			if ( moduleDisableState == oam::AUTODISABLEDSTATE )
-				moduleDisableState == oam::ENABLEDSTATE;
+				moduleDisableState = oam::ENABLEDSTATE;
 
 			//set Module Disable State
 			string moduleDisableStateParm = "ModuleDisableState" + oam.itoa(moduleID) + "-" + oam.itoa(i+1);

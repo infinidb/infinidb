@@ -135,7 +135,7 @@
     </Midl>
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\libxml2-2.7.8\libxml2\include;$(SolutionDir)..\utils\rowgroup;$(SolutionDir)..\utils\common;$(SolutionDir)..\dbcon\joblist;$(SolutionDir)..\utils\winport;$(SolutionDir)..\utils\messageqcpp;$(SolutionDir)..\dbcon\execplan;$(SolutionDir)..\writeengine\shared;$(SolutionDir)..\utils\funcexp;$(SolutionDir)..\utils\loggingcpp;$(SolutionDir)..\utils\configcpp;$(SolutionDir)..\utils\dataconvert;$(SolutionDir)..\versioning\BRM;$(SolutionDir)..\utils\rwlock;$(SolutionDir)..\..\libiconv-1.14\libiconv\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\libxml2-2.7.8\libxml2\include;$(SolutionDir)..\utils\rowgroup;$(SolutionDir)..\utils\common;$(SolutionDir)..\dbcon\joblist;$(SolutionDir)..\utils\winport;$(SolutionDir)..\utils\messageqcpp;$(SolutionDir)..\dbcon\execplan;$(SolutionDir)..\writeengine\shared;$(SolutionDir)..\utils\funcexp;$(SolutionDir)..\utils\loggingcpp;$(SolutionDir)..\utils\configcpp;$(SolutionDir)..\utils\dataconvert;$(SolutionDir)..\versioning\BRM;$(SolutionDir)..\utils\rwlock;$(SolutionDir)..\utils\compress;$(SolutionDir)..\..\libiconv-1.14\libiconv\include</AdditionalIncludeDirectories>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
@@ -166,7 +166,7 @@
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\libxml2-2.7.8\libxml2\include;$(SolutionDir)..\utils\rowgroup;$(SolutionDir)..\utils\common;$(SolutionDir)..\dbcon\joblist;$(SolutionDir)..\utils\winport;$(SolutionDir)..\utils\messageqcpp;$(SolutionDir)..\dbcon\execplan;$(SolutionDir)..\writeengine\shared;$(SolutionDir)..\utils\funcexp;$(SolutionDir)..\utils\loggingcpp;$(SolutionDir)..\utils\configcpp;$(SolutionDir)..\utils\dataconvert;$(SolutionDir)..\versioning\BRM;$(SolutionDir)..\utils\rwlock;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\libxml2-2.7.8\libxml2\include;$(SolutionDir)..\utils\rowgroup;$(SolutionDir)..\utils\common;$(SolutionDir)..\dbcon\joblist;$(SolutionDir)..\utils\winport;$(SolutionDir)..\utils\messageqcpp;$(SolutionDir)..\dbcon\execplan;$(SolutionDir)..\writeengine\shared;$(SolutionDir)..\utils\funcexp;$(SolutionDir)..\utils\loggingcpp;$(SolutionDir)..\utils\configcpp;$(SolutionDir)..\utils\dataconvert;$(SolutionDir)..\versioning\BRM;$(SolutionDir)..\utils\rwlock;$(SolutionDir)..\utils\idbcompress.h</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FunctionLevelLinking>false</FunctionLevelLinking>
       <WarningLevel>Level2</WarningLevel>
@@ -197,7 +197,7 @@
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\libxml2-2.7.8\libxml2\include;$(SolutionDir)..\utils\rowgroup;$(SolutionDir)..\utils\common;$(SolutionDir)..\dbcon\joblist;$(SolutionDir)..\utils\winport;$(SolutionDir)..\utils\messageqcpp;$(SolutionDir)..\dbcon\execplan;$(SolutionDir)..\writeengine\shared;$(SolutionDir)..\utils\funcexp;$(SolutionDir)..\utils\loggingcpp;$(SolutionDir)..\utils\configcpp;$(SolutionDir)..\utils\dataconvert;$(SolutionDir)..\versioning\BRM;$(SolutionDir)..\utils\rwlock;$(SolutionDir)..\..\libiconv-1.14\libiconv\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\boost_1_54_0;$(SolutionDir)..\..\libxml2-2.7.8\libxml2\include;$(SolutionDir)..\utils\rowgroup;$(SolutionDir)..\utils\common;$(SolutionDir)..\dbcon\joblist;$(SolutionDir)..\utils\winport;$(SolutionDir)..\utils\messageqcpp;$(SolutionDir)..\dbcon\execplan;$(SolutionDir)..\writeengine\shared;$(SolutionDir)..\utils\funcexp;$(SolutionDir)..\utils\loggingcpp;$(SolutionDir)..\utils\configcpp;$(SolutionDir)..\utils\dataconvert;$(SolutionDir)..\versioning\BRM;$(SolutionDir)..\utils\rwlock;$(SolutionDir)..\utils\compress;$(SolutionDir)..\..\libiconv-1.14\libiconv\include</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <WarningLevel>Level2</WarningLevel>
@@ -208,10 +208,12 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="joiner.cpp" />
+    <ClCompile Include="joinpartition.cpp" />
     <ClCompile Include="tuplejoiner.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="joiner.h" />
+    <ClInclude Include="joinpartition.h" />
     <ClInclude Include="tuplejoiner.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

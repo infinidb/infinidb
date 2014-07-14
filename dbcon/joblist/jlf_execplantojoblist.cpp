@@ -33,7 +33,9 @@
 using namespace std;
 
 #include <boost/shared_ptr.hpp>
+#include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/case_conv.hpp>
+#include <boost/algorithm/string/split.hpp>
 namespace ba=boost::algorithm;
 
 #include "calpontexecutionplan.h"
@@ -85,6 +87,7 @@ using namespace logging;
 
 #include "jlf_common.h"
 #include "jlf_subquery.h"
+#include "jlf_tuplejoblist.h"
 
 
 namespace
@@ -120,6 +123,9 @@ const Operator opnotlike("not like");
 const Operator opNOTLIKE("NOT LIKE");
 const Operator opisnotnull("isnotnull");
 const Operator opisnull("isnull");
+
+
+const JobStepVector doSimpleFilter(SimpleFilter* sf, JobInfo& jobInfo);
 
 
 /* This looks like an inefficient way to get NULL values. Much easier ways
@@ -591,76 +597,6 @@ boost::shared_ptr<pColStep> doWhereFcn(const SimpleColumn* sc, const SOP& sop, c
 	return ret;
 }
 
-// @Bug 1955
-// Don't allow filter on "incompatible" cols
-// Compatible columns:
-// any 1,2,4,8-byte int/decimal to any 1,2,4,8-byte int/decimal
-// date to date
-// datetime to datetime
-// string to string
-bool compatibleFilterColumns(const SimpleColumn* sc1, const CalpontSystemCatalog::ColType& ct1,
-	const SimpleColumn* sc2, const CalpontSystemCatalog::ColType& ct2)
-{
-	switch (ct1.colDataType)
-	{
-	case CalpontSystemCatalog::BIT:
-		if (ct2.colDataType != CalpontSystemCatalog::BIT) return false;
-		break;
-	case CalpontSystemCatalog::TINYINT:
-	case CalpontSystemCatalog::SMALLINT:
-	case CalpontSystemCatalog::MEDINT:
-	case CalpontSystemCatalog::INT:
-	case CalpontSystemCatalog::BIGINT:
-	case CalpontSystemCatalog::DECIMAL:
-	case CalpontSystemCatalog::UTINYINT:
-	case CalpontSystemCatalog::USMALLINT:
-	case CalpontSystemCatalog::UMEDINT:
-	case CalpontSystemCatalog::UINT:
-	case CalpontSystemCatalog::UBIGINT:
-	case CalpontSystemCatalog::UDECIMAL:
-		if (ct2.colDataType != CalpontSystemCatalog::TINYINT &&
-			ct2.colDataType != CalpontSystemCatalog::SMALLINT &&
-			ct2.colDataType != CalpontSystemCatalog::MEDINT &&
-			ct2.colDataType != CalpontSystemCatalog::INT &&
-			ct2.colDataType != CalpontSystemCatalog::BIGINT &&
-			ct2.colDataType != CalpontSystemCatalog::DECIMAL &&
-            ct2.colDataType != CalpontSystemCatalog::UTINYINT &&
-			ct2.colDataType != CalpontSystemCatalog::USMALLINT &&
-			ct2.colDataType != CalpontSystemCatalog::UMEDINT &&
-			ct2.colDataType != CalpontSystemCatalog::UINT &&
-			ct2.colDataType != CalpontSystemCatalog::UBIGINT &&
-			ct2.colDataType != CalpontSystemCatalog::UDECIMAL) return false;
-		break;
-	case CalpontSystemCatalog::DATE:
-		if (ct2.colDataType != CalpontSystemCatalog::DATE) return false;
-		break;
-	case CalpontSystemCatalog::DATETIME:
-		if (ct2.colDataType != CalpontSystemCatalog::DATETIME) return false;
-		break;
-	case CalpontSystemCatalog::VARCHAR:
-	case CalpontSystemCatalog::CHAR:
-		if (ct2.colDataType != CalpontSystemCatalog::VARCHAR &&
-			ct2.colDataType != CalpontSystemCatalog::CHAR) return false;
-		break;
-	case CalpontSystemCatalog::VARBINARY:
-		if (ct2.colDataType != CalpontSystemCatalog::VARBINARY) return false;
-		break;
-	case CalpontSystemCatalog::FLOAT:
-	case CalpontSystemCatalog::DOUBLE:
-	case CalpontSystemCatalog::UFLOAT:
-	case CalpontSystemCatalog::UDOUBLE:
-		if (ct2.colDataType != CalpontSystemCatalog::FLOAT &&
-			ct2.colDataType != CalpontSystemCatalog::DOUBLE &&
-            ct2.colDataType != CalpontSystemCatalog::UFLOAT &&
-            ct2.colDataType != CalpontSystemCatalog::UDOUBLE) return false;
-		break;
-	default:
-		return false;
-		break;
-	}
-
-	return true;
-}
 
 const JobStepVector doColFilter(const SimpleColumn* sc1, const SimpleColumn* sc2, JobInfo& jobInfo,
 								const SOP& sop, SimpleFilter* sf)
@@ -1045,105 +981,6 @@ const JobStepVector doColFilter(const SimpleColumn* sc1, const SimpleColumn* sc2
 	return jsv;
 }
 
-bool sameTable(const SimpleColumn* sc1, const SimpleColumn* sc2)
-{
-	if (sc1->schemaName() != sc2->schemaName()) return false;
-	if (sc1->tableName() != sc2->tableName()) return false;
-	return true;
-}
-
-// @Bug 1230
-// Don't allow join on "incompatible" cols
-// Compatible columns:
-// any 1,2,4,8-byte int to any 1,2,4,8-byte int
-// decimal w/scale x to decimal w/scale x
-// date to date
-// datetime to datetime
-// string to string
-bool compatibleJoinColumns(const SimpleColumn* sc1, const CalpontSystemCatalog::ColType& ct1,
-	const SimpleColumn* sc2, const CalpontSystemCatalog::ColType& ct2)
-{
-	// disable VARBINARY used in join
-	if (ct1.colDataType == CalpontSystemCatalog::VARBINARY ||
-		ct2.colDataType == CalpontSystemCatalog::VARBINARY)
-		throw runtime_error("VARBINARY in join is not supported.");
-
-	switch (ct1.colDataType)
-	{
-	case CalpontSystemCatalog::BIT:
-		if (ct2.colDataType != CalpontSystemCatalog::BIT) return false;
-		break;
-	case CalpontSystemCatalog::TINYINT:
-	case CalpontSystemCatalog::SMALLINT:
-	case CalpontSystemCatalog::MEDINT:
-	case CalpontSystemCatalog::INT:
-	case CalpontSystemCatalog::BIGINT:
-	case CalpontSystemCatalog::DECIMAL:
-    case CalpontSystemCatalog::UTINYINT:
-    case CalpontSystemCatalog::USMALLINT:
-    case CalpontSystemCatalog::UMEDINT:
-    case CalpontSystemCatalog::UINT:
-    case CalpontSystemCatalog::UBIGINT:
-    case CalpontSystemCatalog::UDECIMAL:
-		if (ct2.colDataType != CalpontSystemCatalog::TINYINT &&
-			ct2.colDataType != CalpontSystemCatalog::SMALLINT &&
-			ct2.colDataType != CalpontSystemCatalog::MEDINT &&
-			ct2.colDataType != CalpontSystemCatalog::INT &&
-			ct2.colDataType != CalpontSystemCatalog::BIGINT &&
-			ct2.colDataType != CalpontSystemCatalog::DECIMAL &&
-            ct2.colDataType != CalpontSystemCatalog::UTINYINT &&
-            ct2.colDataType != CalpontSystemCatalog::USMALLINT &&
-            ct2.colDataType != CalpontSystemCatalog::UMEDINT &&
-            ct2.colDataType != CalpontSystemCatalog::UINT &&
-            ct2.colDataType != CalpontSystemCatalog::UBIGINT &&
-            ct2.colDataType != CalpontSystemCatalog::UDECIMAL) return false;
-			if (ct2.scale != ct1.scale) return false;
-		break;
-	case CalpontSystemCatalog::DATE:
-		if (ct2.colDataType != CalpontSystemCatalog::DATE) return false;
-		break;
-	case CalpontSystemCatalog::DATETIME:
-		if (ct2.colDataType != CalpontSystemCatalog::DATETIME) return false;
-		break;
-	case CalpontSystemCatalog::VARCHAR:
-		// @bug 1495 compound/string join
-		if (ct2.colDataType == CalpontSystemCatalog::VARCHAR ||
-			ct2.colDataType == CalpontSystemCatalog::CHAR)
-			break;
-		// @bug 1920. disable joins on dictionary column
-		if (ct1.colWidth > 7 ) return false;
-		if (ct2.colDataType != CalpontSystemCatalog::VARCHAR && ct2.colDataType != CalpontSystemCatalog::CHAR) return false;
-		if (ct2.colDataType == CalpontSystemCatalog::VARCHAR && ct2.colWidth > 7) return false;
-		if (ct2.colDataType == CalpontSystemCatalog::CHAR && ct2.colWidth > 8) return false;
-		break;
-	case CalpontSystemCatalog::CHAR:
-		// @bug 1495 compound/string join
-		if (ct2.colDataType == CalpontSystemCatalog::VARCHAR ||
-			ct2.colDataType == CalpontSystemCatalog::CHAR)
-			break;
-		// @bug 1920. disable joins on dictionary column
-		if (ct1.colWidth > 8 ) return false;
-		if (ct2.colDataType != CalpontSystemCatalog::VARCHAR && ct2.colDataType != CalpontSystemCatalog::CHAR) return false;
-		if (ct2.colDataType == CalpontSystemCatalog::VARCHAR && ct2.colWidth > 7) return false;
-		if (ct2.colDataType == CalpontSystemCatalog::CHAR && ct2.colWidth > 8) return false;
-		break;
-	case CalpontSystemCatalog::VARBINARY:
-		if (ct2.colDataType != CalpontSystemCatalog::VARBINARY) return false;
-		break;
-
-	case CalpontSystemCatalog::FLOAT:
-		if (ct2.colDataType != CalpontSystemCatalog::FLOAT) return false;
-		break;
-	case CalpontSystemCatalog::DOUBLE:
-		if (ct2.colDataType != CalpontSystemCatalog::DOUBLE) return false;
-		break;
-	default:
-		return false;
-		break;
-	}
-
-	return true;
-}
 
 const JobStepVector doFilterExpression(const SimpleColumn* sc1, const SimpleColumn* sc2, JobInfo& jobInfo, const SOP& sop)
 {
@@ -1208,7 +1045,7 @@ const JobStepVector doJoin(
 	//Bug 590
 	if (tableOid1 == tableOid2 && alias1 == alias2 && view1 == view2 && joinInfo == 0)
 	{
-		if (sc1->schemaName().empty() || !compatibleFilterColumns(sc1, ct1, sc2, ct2))
+		if (sc1->schemaName().empty() || !compatibleColumnTypes(ct1, ct2, false))
 		{
 			return doFilterExpression(sc1, sc2, jobInfo, sop);
 		}
@@ -1219,7 +1056,7 @@ const JobStepVector doJoin(
 	}
 
 	// different tables
-	if (!compatibleJoinColumns(sc1, ct1, sc2, ct2))
+	if (!compatibleColumnTypes(ct1, ct2, true))
 	{
 		JobStepVector jsv;
 		jsv = doFilterExpression(sc1, sc2, jobInfo, sop);
@@ -1331,7 +1168,6 @@ const JobStepVector doJoin(
 	thj->sequence2(sc2->sequence());
 	thj->column1(sc1);
 	thj->column2(sc2);
-//	thj->joinId(jobInfo.joinNum++);
 	thj->joinId((joinInfo == 0) ? (++jobInfo.joinNum) : 0);
 
 	// Check if SEMI/ANTI join.
@@ -1480,7 +1316,6 @@ const JobStepVector doSemiJoin(const SimpleColumn* sc, const ReturnedColumn* rc,
 	thj->sequence2(rc->sequence());
 	thj->column1(sc);
 	thj->column2(rc);
-//	thj->joinId(jobInfo.joinNum++);
 	thj->joinId(0);
 	thj->tupleId1(tupleId1);
 	thj->tupleId2(tupleId2);
@@ -1517,39 +1352,37 @@ const JobStepVector doSemiJoin(const SimpleColumn* sc, const ReturnedColumn* rc,
 }
 
 
-const JobStepVector doFunctionColumn(const FunctionColumn* fc, JobInfo& jobInfo)
+SJSTEP expressionToFuncJoin(ExpressionStep* es, JobInfo& jobInfo)
 {
-	throw logic_error("jlf_execplantojoblist.cpp:doFunctionColumn(): Not implemented");
-}
+	idbassert(es);
+	boost::shared_ptr<FunctionJoinInfo> fji = es->functionJoinInfo();
+	es->functionJoin(true);
+	TupleHashJoinStep* thjs= new TupleHashJoinStep(jobInfo);
+	thjs->tableOid1(fji->fTableOid[0]);
+	thjs->tableOid2(fji->fTableOid[1]);
+	thjs->oid1(fji->fOid[0]);
+	thjs->oid2(fji->fOid[1]);
+	thjs->alias1(fji->fAlias[0]);
+	thjs->alias2(fji->fAlias[1]);
+	thjs->view1(fji->fView[0]);
+	thjs->view2(fji->fView[1]);
+	thjs->schema1(fji->fSchema[0]);
+	thjs->schema2(fji->fSchema[1]);
+	thjs->column1(fji->fExpression[0]);
+	thjs->column2(fji->fExpression[1]);
+	thjs->sequence1(fji->fSequence[0]);
+	thjs->sequence2(fji->fSequence[1]);
+	thjs->joinId(fji->fJoinId);
+	thjs->setJoinType(fji->fJoinType);
+	thjs->correlatedSide(fji->fCorrelatedSide);
+	thjs->funcJoinInfo(fji);
+	thjs->tupleId1(fji->fJoinKey[0]);
+	thjs->tupleId2(fji->fJoinKey[1]);
 
-// This function returns a JobStepVector with the steps necessary to evaluate the passed Arithmetic column.
-// It recurses directly and indirectly through calls to doFunctionColumn.
-const JobStepVector doArithmeticColumn(const ArithmeticColumn* ac, JobInfo& jobInfo)
-{
-	JobStepVector jsv;
+	updateTableKey(fji->fJoinKey[0], fji->fTableKey[0], jobInfo);
+	updateTableKey(fji->fJoinKey[1], fji->fTableKey[1], jobInfo);
 
-
-	TreeNodeStack stack;
-	ac->expression()->walk(walkTreeNode, &stack);
-
-	const TreeNode* tnop;
-
-	tnop = stack.top();
-	stack.pop();
-
-	// Only handling ArithmeticColumns that contain FunctionColumn for now.
-	if(TreeNode2Type(tnop) == FUNCTIONCOLUMN)
-	{
-		const FunctionColumn* fc = static_cast<const FunctionColumn*>(tnop);
-		jsv = doFunctionColumn(fc, jobInfo);
-	}
-	else
-	{
-		cerr << boldStart << "doArithmeticColumn: Unhandled Type." << boldStop << endl;
-	}
-
-	return jsv;
-
+	return SJSTEP(thjs);
 }
 
 
@@ -1579,6 +1412,30 @@ const JobStepVector doExpressionFilter(const Filter* f, JobInfo& jobInfo)
 	SJSTEP sjstep(es);
 	jsv.push_back(sjstep);
 
+	// @bug3683, support in/exists suquery function join
+	const SimpleFilter* sf = dynamic_cast<const SimpleFilter*>(f);
+	if (sf != NULL)
+	{
+		const ReturnedColumn* lrc =  static_cast<const ReturnedColumn*>(sf->lhs());
+		const ReturnedColumn* rrc =  static_cast<const ReturnedColumn*>(sf->rhs());
+		if (lrc->joinInfo())
+		{
+			const ReturnedColumn* lac = dynamic_cast<const ArithmeticColumn*>(lrc);
+			const ReturnedColumn* lfc = dynamic_cast<const FunctionColumn*>(lrc);
+			const ReturnedColumn* lsc = dynamic_cast<const SimpleColumn*>(lrc);
+			if ((lac || lfc || lsc) && es->functionJoinInfo())
+				jsv.push_back(expressionToFuncJoin(es, jobInfo));
+		}
+		else if (rrc->joinInfo())
+		{
+			const ReturnedColumn* rac = dynamic_cast<const ArithmeticColumn*>(lrc);
+			const ReturnedColumn* rfc = dynamic_cast<const FunctionColumn*>(lrc);
+			const ReturnedColumn* rsc = dynamic_cast<const SimpleColumn*>(lrc);
+			if ((rac || rfc || rsc) && es->functionJoinInfo())
+				jsv.push_back(expressionToFuncJoin(es, jobInfo));
+		}
+	}
+
 	return jsv;
 }
 
@@ -1596,6 +1453,50 @@ const JobStepVector doConstantBooleanFilter(const ParseTree* n, JobInfo& jobInfo
 	jsv.push_back(sjstep);
 
 	return jsv;
+}
+
+
+bool optimizeIdbPatitionSimpleFilter(SimpleFilter* sf, JobStepVector& jsv, JobInfo& jobInfo)
+{
+	//@bug5848, not equal filter is not optimized.
+	if (sf->op()->op() != opeq.op())
+		return false;
+
+	const FunctionColumn* fc = static_cast<const FunctionColumn*>(sf->lhs());
+	const ConstantColumn* cc = static_cast<const ConstantColumn*>(sf->rhs());
+	if (fc == NULL)
+	{
+		cc = static_cast<const ConstantColumn*>(sf->lhs());
+		fc = static_cast<const FunctionColumn*>(sf->rhs());
+	}
+
+	// not a function or not idbparttition
+	if (fc == NULL || cc == NULL || fc->functionName().compare("idbpartition") != 0)
+		return false;
+
+	// make sure the cc has 3 tokens
+	vector<string> cv;
+	boost::split(cv, cc->constval(), boost::is_any_of("."));
+	if (cv.size() != 3)
+		return false;
+
+	// construct separate filters, then make job steps
+	JobStepVector v;
+	SOP sop = sf->op();
+	const funcexp::FunctionParm& parms = fc->functionParms();
+	
+	for (uint64_t i = 0; i < 3; i++)
+	{
+		// very weird parms order is: db root, physical partition, segment
+		// logical partition string : physical partition, segment, db root
+		ReturnedColumn* lhs = dynamic_cast<ReturnedColumn*>(parms[(i+1)%3]->data());
+		ConstantColumn* rhs = new ConstantColumn(cv[i]);
+		SimpleFilter* f = new SimpleFilter(sop, lhs->clone(), rhs);
+		v = doSimpleFilter(f, jobInfo); 
+		jsv.insert(jsv.end(), v.begin(), v.end());
+	}
+
+	return true;
 }
 
 
@@ -1651,8 +1552,6 @@ const JobStepVector doSimpleFilter(SimpleFilter* sf, JobInfo& jobInfo)
 		size_t spos = constval.find_last_not_of(" ");
 		if (spos != string::npos) constval = constval.substr(0, spos+1);
 
-		if (!sc->schemaName().empty())
-			jobInfo.tables.insert(make_table(sc->schemaName(), sc->tableName()));
 		CalpontSystemCatalog::OID dictOid = 0;
 		CalpontSystemCatalog::ColType ct = sc->colType();
 		const PseudoColumn* pc = dynamic_cast<const PseudoColumn*>(sc);
@@ -1765,7 +1664,6 @@ const JobStepVector doSimpleFilter(SimpleFilter* sf, JobInfo& jobInfo)
 				thj->schema2(schema);
 				thj->oid1(sc->oid());
 				thj->oid2(sc->oid());
-//				thj->joinId(jobInfo.joinNum++);
 				thj->joinId(0);
 				thj->setJoinType(INNER);
 
@@ -1997,13 +1895,6 @@ const JobStepVector doSimpleFilter(SimpleFilter* sf, JobInfo& jobInfo)
 		SimpleColumn* sc1 = static_cast<SimpleColumn*>(lhs);
 		SimpleColumn* sc2 = static_cast<SimpleColumn*>(rhs);
 
-		// @bug 1349. no-op rules:
-		// 1. If two columns of a simple filter are of the two different tables, and the
-		//    filter operator is not "=", no-op this simple filter,
-		// 2. If a join filter has "ANTI" option, no op this filter before ANTI hashjoin
-		//    is supported in ExeMgr.
-		// @bug 1933. Throw exception instead of no-op for MySQL virtual table
-        //            (no connector re-filter).
 		// @bug 1496. handle non equal operator as expression in v-table mode
 		if ((sc1->tableName() != sc2->tableName() ||
 			 sc1->tableAlias() != sc2->tableAlias() ||
@@ -2013,13 +1904,17 @@ const JobStepVector doSimpleFilter(SimpleFilter* sf, JobInfo& jobInfo)
 			return doExpressionFilter(sf, jobInfo);
 		}
 
+		// @bug 1349. no-op rules:
+		// 1. If two columns of a simple filter are of the two different tables, and the
+		//    filter operator is not "=", no-op this simple filter,
+		// 2. If a join filter has "ANTI" option, no op this filter before ANTI hashjoin
+		//    is supported in ExeMgr.
+		// @bug 1933. Throw exception instead of no-op for MySQL virtual table
+        //            (no connector re-filter).
 		if (sf->joinFlag() == SimpleFilter::ANTI)
 			throw runtime_error("Anti join is not currently supported");
 
-		if (!sc1->schemaName().empty())
-			jobInfo.tables.insert(make_table(sc1->schemaName(), sc1->tableName()));
-		if (!sc2->schemaName().empty())
-			jobInfo.tables.insert(make_table(sc2->schemaName(), sc2->tableName()));
+		// Do a simple column join
 		JobStepVector join = doJoin(sc1, sc2, jobInfo, sop, sf);
 		// set cardinality for the hashjoin step. hj result card <= larger input card
 		uint32_t card = 0;
@@ -2045,7 +1940,16 @@ const JobStepVector doSimpleFilter(SimpleFilter* sf, JobInfo& jobInfo)
 	else if (lhsType == ARITHMETICCOLUMN || rhsType == ARITHMETICCOLUMN ||
 			 lhsType == FUNCTIONCOLUMN || rhsType == FUNCTIONCOLUMN)
 	{
-		jsv = doExpressionFilter(sf, jobInfo);
+		const ReturnedColumn* rc = static_cast<const ReturnedColumn*>(lhs);
+		if (rc && (!rc->joinInfo()) && rhsType == AGGREGATECOLUMN)
+			throw IDBExcept(ERR_AGG_IN_WHERE);
+
+		// @bug5848, CP elimination for idbPartition(col)
+		JobStepVector sv;
+		if (optimizeIdbPatitionSimpleFilter(sf, sv, jobInfo))
+			jsv.swap(sv);
+		else
+			jsv = doExpressionFilter(sf, jobInfo);
 	}
 	else if (lhsType == SIMPLECOLUMN &&
 			(rhsType == AGGREGATECOLUMN || rhsType == ARITHMETICCOLUMN || rhsType == FUNCTIONCOLUMN))
@@ -2105,7 +2009,7 @@ const JobStepVector doOuterJoinOnFilter(OuterJoinOnFilter* oj, JobInfo& jobInfo)
 
 	// Parse the join on filter to join steps and an expression step, if any.
 	stack<ParseTree*> nodeStack;        // stack used for pre-order traverse
-	vector<ParseTree*> doneNodes;       // vector of joins and simple filters solved
+	set<ParseTree*> doneNodes;          // solved joins and simple filters
 	map<ParseTree*, ParseTree*> cpMap;  // <child, parent> link for node removal
 	JobStepVector join;                 // join step with its projection steps
 	set<ParseTree*> nodesToRemove;      // nodes to be removed after converted to steps
@@ -2120,6 +2024,9 @@ const JobStepVector doOuterJoinOnFilter(OuterJoinOnFilter* oj, JobInfo& jobInfo)
 
 	// @bug5311, optimization for outer join on clause
 	set<uint64_t> tablesInJoin;
+
+	// @bug3683, function join
+	vector<pair<ParseTree*, SJSTEP> > fjCandidates;
 
 	// while stack is not empty
 	while(!nodeStack.empty())
@@ -2149,11 +2056,6 @@ const JobStepVector doOuterJoinOnFilter(OuterJoinOnFilter* oj, JobInfo& jobInfo)
 				 sc1->tableAlias() != sc2->tableAlias() ||
 				 sc1->viewName() != sc2->viewName()))
 			{
-				if (!sc1->schemaName().empty())
-					jobInfo.tables.insert(make_table(sc1->schemaName(), sc1->tableName()));
-				if (!sc2->schemaName().empty())
-					jobInfo.tables.insert(make_table(sc2->schemaName(), sc2->tableName()));
-
 				// @bug3037, workaround on join order, wish this can be corrected soon,
 				// cascade outer table attribute.
 				CalpontSystemCatalog::OID tableOid1 = tableOid(sc1, jobInfo.csc);
@@ -2186,7 +2088,19 @@ const JobStepVector doOuterJoinOnFilter(OuterJoinOnFilter* oj, JobInfo& jobInfo)
 				join[join.size()-1].get()->cardinality(card);
 
 				jsv.insert(jsv.end(), join.begin(), join.end());
-				doneNodes.push_back(cn);
+				doneNodes.insert(cn);
+			}
+			else
+			{
+				ExpressionStep* es = new ExpressionStep(jobInfo);
+				if (es == NULL)
+					throw runtime_error("Failed to create ExpressionStep 2");
+
+				SJSTEP sjstep;
+				es->expressionFilter(sf, jobInfo);
+				sjstep.reset(es);
+				if (es->functionJoinInfo())
+					fjCandidates.push_back(make_pair(cn, sjstep));
 			}
 		}
 
@@ -2215,6 +2129,31 @@ const JobStepVector doOuterJoinOnFilter(OuterJoinOnFilter* oj, JobInfo& jobInfo)
 			thjs = dynamic_cast<TupleHashJoinStep*>(i->get());
 	}
 
+	// no simple column join found, try function join
+	if (thjs == NULL)
+	{
+		// check any expressions can be converted to function joins.
+		vector<pair<ParseTree*, SJSTEP> >::iterator i = fjCandidates.begin();
+		while (i != fjCandidates.end())
+		{
+			ExpressionStep* es = dynamic_cast<ExpressionStep*>((i->second).get());
+			SJSTEP sjstep = expressionToFuncJoin(es, jobInfo);
+			idbassert(sjstep.get());
+			jsv.push_back(sjstep);
+
+			doneNodes.insert(i->first);
+
+			i++;
+		}
+	}
+
+	// check again if we got a join step.
+	for (JobStepVector::iterator i = jsv.begin(); i != jsv.end(); i++)
+	{
+		if (dynamic_cast<TupleHashJoinStep*>(i->get()) != thjs)
+			thjs = dynamic_cast<TupleHashJoinStep*>(i->get());
+	}
+
 	if (thjs != NULL)
 	{
 		// @bug5311, optimization for outer join on clause, move out small side simple filters.
@@ -2233,7 +2172,7 @@ const JobStepVector doOuterJoinOnFilter(OuterJoinOnFilter* oj, JobInfo& jobInfo)
 				continue;
 
 			SimpleFilter* sf = dynamic_cast<SimpleFilter*>(tn);
-			if (sf != NULL)
+			if ((sf != NULL) && (doneNodes.find(cn) == doneNodes.end()))
 			{
 				// joins are done, this is not a join.
 				ReturnedColumn* lhs = sf->lhs();
@@ -2262,9 +2201,6 @@ const JobStepVector doOuterJoinOnFilter(OuterJoinOnFilter* oj, JobInfo& jobInfo)
 
 				if (sc != NULL)
 				{
-					if (!sc->schemaName().empty())
-						jobInfo.tables.insert(make_table(sc->schemaName(), sc->tableName()));
-
 					CalpontSystemCatalog::OID tblOid = tableOid(sc, jobInfo.csc);
 					uint64_t tid = getTableKey(
 						jobInfo, tblOid, sc->tableAlias(), sc->schemaName(), sc->viewName());
@@ -2285,7 +2221,7 @@ const JobStepVector doOuterJoinOnFilter(OuterJoinOnFilter* oj, JobInfo& jobInfo)
 
 					jsv.insert(jsv.end(), sfv.begin(), sfv.end());
 
-					doneNodes.push_back(cn);
+					doneNodes.insert(cn);
 				}
 			}
 
@@ -2307,7 +2243,7 @@ const JobStepVector doOuterJoinOnFilter(OuterJoinOnFilter* oj, JobInfo& jobInfo)
 
 		// remove joins from the original filters
 		ParseTree* nullTree = NULL;
-		for (vector<ParseTree*>::iterator i = doneNodes.begin(); i != doneNodes.end() && isOk; i++)
+		for (set<ParseTree*>::iterator i = doneNodes.begin(); i != doneNodes.end() && isOk; i++)
 		{
 			ParseTree* c = *i;
 			map<ParseTree*, ParseTree*>::iterator j = cpMap.find(c);
@@ -2600,6 +2536,7 @@ bool tryCombineFilters(JobStepVector& jsv1, JobStepVector& jsv2, int8_t bop)
 	return false;
 }
 
+
 const JobStepVector doConstantFilter(const ConstantFilter* cf, JobInfo& jobInfo)
 {
 	JobStepVector jsv;
@@ -2621,7 +2558,6 @@ const JobStepVector doConstantFilter(const ConstantFilter* cf, JobInfo& jobInfo)
 			return doExpressionFilter(cf, jobInfo);
 		}
 
-		jobInfo.tables.insert(make_table(sc->schemaName(), sc->tableName()));
 		ConstantFilter::FilterList fl = cf->filterList();
 		CalpontSystemCatalog::OID dictOid = 0;
 		CalpontSystemCatalog::ColType ct = sc.get()->colType();
@@ -2779,7 +2715,6 @@ const JobStepVector doConstantFilter(const ConstantFilter* cf, JobInfo& jobInfo)
 				thj->schema2(schema);
 				thj->oid1(sc->oid());
 				thj->oid2(sc->oid());
-//				thj->joinId(jobInfo.joinNum++);
 				thj->joinId(0);
 				thj->setJoinType(INNER);
 
@@ -2919,6 +2854,112 @@ const JobStepVector doConstantFilter(const ConstantFilter* cf, JobInfo& jobInfo)
 }
 
 
+const JobStepVector doFunctionFilter(const ParseTree* n, JobInfo& jobInfo)
+{
+	FunctionColumn* fc = dynamic_cast<FunctionColumn*>(n->data());
+	idbassert(fc);
+
+	JobStepVector jsv;
+	string functionName = ba::to_lower_copy(fc->functionName());
+	if (functionName.compare("in") == 0 || functionName.compare(" in ") == 0)
+	{
+		const funcexp::FunctionParm& parms = fc->functionParms();
+		FunctionColumn* parm0Fc = dynamic_cast<FunctionColumn*>(parms[0]->data());
+		PseudoColumn*   parm0Pc = dynamic_cast<PseudoColumn*>(parms[0]->data());
+		vector<vector<string> > constParms(3);
+		uint64_t constParmsCount = 0;
+		if (parm0Fc && parm0Fc->functionName().compare("idbpartition") == 0)
+		{
+			for (uint64_t i = 1; i < parms.size(); i++)
+			{
+				ConstantColumn* cc = dynamic_cast<ConstantColumn*>(parms[i]->data());
+				if (cc)
+				{
+					vector<string> cv;
+					boost::split(cv, cc->constval(), boost::is_any_of("."));
+					if (cv.size() == 3)
+					{
+						constParms[1].push_back(cv[0]);
+						constParms[2].push_back(cv[1]);
+						constParms[0].push_back(cv[2]);
+						constParmsCount++;
+					}
+				}
+			}
+
+			if (constParmsCount == (parms.size() - 1))
+			{
+				const funcexp::FunctionParm& pcs = parm0Fc->functionParms();
+				for (uint64_t i = 0; i < 3; i++)
+				{
+					ConstantFilter* cf = new ConstantFilter();
+					SOP sop(new LogicOperator("or"));
+					PseudoColumn* pc = dynamic_cast<PseudoColumn*>(pcs[i]->data());
+					idbassert(pc);
+					SSC col(pc->clone());
+					cf->op(sop);
+					cf->col(col);
+					sop.reset(new PredicateOperator("="));
+					for (uint64_t j = 0; j < constParmsCount; j++)
+					{
+						SimpleFilter* f = new SimpleFilter(sop, col->clone(),
+						                                   new ConstantColumn(constParms[i][j]));
+						cf->pushFilter(f);
+					}
+
+					JobStepVector sv = doConstantFilter(cf, jobInfo);
+					delete cf;
+
+					jsv.insert(jsv.end(), sv.begin(), sv.end());
+				}
+			}
+
+			// put the separate filtered resulted together
+			JobStepVector sv = doExpressionFilter(n, jobInfo);
+			jsv.insert(jsv.end(), sv.begin(), sv.end());
+		}
+		else if (parm0Pc != NULL)
+		{
+			for (uint64_t i = 1; i < parms.size(); i++)
+			{
+				ConstantColumn* cc = dynamic_cast<ConstantColumn*>(parms[i]->data());
+				if (cc)
+				{
+					constParms[0].push_back(cc->constval());
+					constParmsCount++;
+				}
+			}
+
+			if (constParmsCount == (parms.size() - 1))
+			{
+				ConstantFilter* cf = new ConstantFilter();
+				SOP sop(new LogicOperator("or"));
+				SSC col(parm0Pc->clone());
+				cf->op(sop);
+				cf->col(col);
+				sop.reset(new PredicateOperator("="));
+				for (uint64_t j = 0; j < constParmsCount; j++)
+				{
+					SimpleFilter* f = new SimpleFilter(sop, col->clone(),
+					                                   new ConstantColumn(constParms[0][j]));
+					cf->pushFilter(f);
+				}
+
+				JobStepVector sv = doConstantFilter(cf, jobInfo);
+				delete cf;
+
+				jsv.insert(jsv.end(), sv.begin(), sv.end());
+			}
+		}
+	}
+
+	if (jsv.empty())
+		jsv = doExpressionFilter(n, jobInfo);
+
+	return jsv;
+}
+
+
 void doAND(JobStepVector& jsv, JobInfo& jobInfo)
 {
 //	idbassert(jobInfo.stack.size() >= 2);
@@ -3035,6 +3076,9 @@ JLF_ExecPlanToJobList::walkTree(ParseTree* n, void* obj)
 		jobInfo->stack.push(jsv);
 		break;
 	case FUNCTIONCOLUMN:
+		jsv = doFunctionFilter(n, *jobInfo);
+		jobInfo->stack.push(jsv);
+		break;
 	case ARITHMETICCOLUMN:
 		jsv = doExpressionFilter(n, *jobInfo);
 		jobInfo->stack.push(jsv);

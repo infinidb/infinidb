@@ -25,17 +25,17 @@
  *
  * This is the ?main? program for dealing with execution plans and
  * result sets. It sits in a loop waiting for CalpontExecutionPlan
- * from the FEP. It then passes the CalpontExecutionPlan to the 
+ * from the FEP. It then passes the CalpontExecutionPlan to the
  * JobListFactory from which a JobList is obtained. This is passed
- * to to the Query Manager running in the real-time portion of the 
- * EC. The ExecutionPlanManager waits until the Query Manager 
- * returns a result set for the job list. These results are passed 
- * into the CalpontResultFactory, which outputs a CalpontResultSet. 
- * The ExecutionPlanManager passes the CalpontResultSet into the 
- * VendorResultFactory which produces a result set tailored to the 
- * specific DBMS front end in use. The ExecutionPlanManager then 
+ * to to the Query Manager running in the real-time portion of the
+ * EC. The ExecutionPlanManager waits until the Query Manager
+ * returns a result set for the job list. These results are passed
+ * into the CalpontResultFactory, which outputs a CalpontResultSet.
+ * The ExecutionPlanManager passes the CalpontResultSet into the
+ * VendorResultFactory which produces a result set tailored to the
+ * specific DBMS front end in use. The ExecutionPlanManager then
  * sends the VendorResultSet back to the Calpont Database Connector
- * on the Front-End Processor where it is returned to the DBMS 
+ * on the Front-End Processor where it is returned to the DBMS
  * front-end.
  */
 #include <iostream>
@@ -94,6 +94,7 @@ using namespace querytele;
 #include "femsghandler.h"
 
 #include "utils_utf8.h"
+#include "boost/filesystem.hpp"
 
 namespace {
 
@@ -437,7 +438,7 @@ private:
 
 		if (up)
 			roundedValue++;
-		
+
 		ostringstream oss;
 		oss << roundedValue << units[i];
 		return oss.str();
@@ -474,7 +475,7 @@ private:
 			}
 		}
 	}
-	
+
 	void buildSysCache(const CalpontSelectExecutionPlan& csep, boost::shared_ptr<CalpontSystemCatalog> csc)
 	{
 		const CalpontSelectExecutionPlan::ColumnMap& colMap = csep.columnMap();
@@ -577,18 +578,20 @@ new_plan:
 				csep.unserialize(bs);
 
 				QueryTeleStats qts;
-				qts.query_uuid = csep.uuid();
-				qts.msg_type = QueryTeleStats::QT_START;
-				qts.start_time = QueryTeleClient::timeNowms();
-				qts.query = csep.data();
-				qts.session_id = csep.sessionID();
-				qts.query_type = csep.queryType();
-				qts.system_name = fOamCachePtr->getSystemName();
-				qts.module_name = fOamCachePtr->getModuleName();
-				qts.local_query = csep.localQuery();
-				qts.schema_name = csep.schemaName();
-				if ((csep.sessionID()&0x80000000) == 0)
+				if ((csep.sessionID()&0x80000000) == 0 && csep.queryType().compare("SELECT") == 0)
+				{
+					qts.query_uuid = csep.uuid();
+					qts.msg_type = QueryTeleStats::QT_START;
+					qts.start_time = QueryTeleClient::timeNowms();
+					qts.query = csep.data();
+					qts.session_id = csep.sessionID();
+					qts.query_type = csep.queryType();
+					qts.system_name = fOamCachePtr->getSystemName();
+					qts.module_name = fOamCachePtr->getModuleName();
+					qts.local_query = csep.localQuery();
+					qts.schema_name = csep.schemaName();
 					fTeleClient.postQueryTele(qts);
+				}
 
 				if (gDebug > 1 || (gDebug && (csep.sessionID()&0x80000000)==0))
 					cout << "### For session id " << csep.sessionID() << ", got a CSEP" << endl;
@@ -602,7 +605,7 @@ new_plan:
 						CalpontSystemCatalog::makeCalpontSystemCatalog(csep.sessionID());
 					buildSysCache(csep, csc);
 				}
-	
+
 				// As soon as we have a session id for this thread, update the
 				// thread count per session; only do this once per thread.
 				// Mask 0x80000000 is for associate user query and csc query
@@ -639,11 +642,11 @@ new_plan:
 									  li);
 					needDbProfEndStatementMsg = true;
 				}
-				
+
 				//Don't log subsequent self joins after first.
 				if (selfJoin)
 					sqlText = "";
-				
+
 				ostringstream oss;
 				oss << sqlText << "; |" << csep.schemaName() <<"|";
 				SQLLogger sqlLog(oss.str(), li);
@@ -661,7 +664,7 @@ new_plan:
 								&csep, fRm, true, true);
 						// assign query stats
 						jl->queryStats(fStats);
-						
+
 						ByteStream tbs;
 
 						if ((jl->status()) == 0 && (jl->putEngineComm(fEc) == 0))
@@ -708,7 +711,7 @@ new_plan:
 							"response; ";
 						throw runtime_error( errMsg.str() );
 					}
-				
+
 					if (!usingTuples)
 					{
 						if (gDebug)
@@ -833,7 +836,7 @@ new_plan:
 								bs << empty;
 								bs << empty;
 							}
-							
+
 							// send stats to connector for inserting to the querystats table
 							fStats.serialize(bs);
 							fIos.write(bs);
@@ -884,7 +887,7 @@ new_plan:
 						msgHandler.stop();
 						if (jl->status()) {
 							IDBErrorInfo* errInfo = IDBErrorInfo::instance();
-							
+
 							if (jl->errMsg().length() != 0)
 								bs << jl->errMsg();
 							else
@@ -1052,31 +1055,33 @@ new_plan:
 				{
 					//QueryTeleStats qts;
 					//qts.query_uuid = csep.uuid();
-					qts.msg_type = QueryTeleStats::QT_SUMMARY;
-					qts.max_mem_pct = fStats.fMaxMemPct;
-					qts.num_files = fStats.fNumFiles;
-					qts.phy_io = fStats.fPhyIO;
-					qts.cache_io = fStats.fCacheIO;
-					qts.msg_rcv_cnt = fStats.fMsgRcvCnt;
-					qts.cp_blocks_skipped = fStats.fCPBlocksSkipped;
-					qts.msg_bytes_in = fStats.fMsgBytesIn;
-					qts.msg_bytes_out = fStats.fMsgBytesOut;
-					qts.rows = totalRowCount;
-					//qts.start_time = 
-					qts.end_time = QueryTeleClient::timeNowms();
-					//qts.error_no = 
-					//qts.blocks_changed = 
-					qts.session_id = csep.sessionID();
-					qts.query_type = csep.queryType();
-					qts.query = csep.data();
-					qts.system_name = fOamCachePtr->getSystemName();
-					qts.module_name = fOamCachePtr->getModuleName();
-					qts.local_query = csep.localQuery();
-					//qts.user =
-					//qts.host =
-					//qts.priority =
-					if ((csep.sessionID()&0x80000000) == 0)
+					if ((csep.sessionID()&0x80000000) == 0 && csep.queryType().compare("SELECT") == 0)
+					{
+						qts.msg_type = QueryTeleStats::QT_SUMMARY;
+						qts.max_mem_pct = fStats.fMaxMemPct;
+						qts.num_files = fStats.fNumFiles;
+						qts.phy_io = fStats.fPhyIO;
+						qts.cache_io = fStats.fCacheIO;
+						qts.msg_rcv_cnt = fStats.fMsgRcvCnt;
+						qts.cp_blocks_skipped = fStats.fCPBlocksSkipped;
+						qts.msg_bytes_in = fStats.fMsgBytesIn;
+						qts.msg_bytes_out = fStats.fMsgBytesOut;
+						qts.rows = totalRowCount;
+						//qts.start_time =
+						qts.end_time = QueryTeleClient::timeNowms();
+						//qts.error_no =
+						//qts.blocks_changed =
+						qts.session_id = csep.sessionID();
+						qts.query_type = csep.queryType();
+						qts.query = csep.data();
+						qts.system_name = fOamCachePtr->getSystemName();
+						qts.module_name = fOamCachePtr->getModuleName();
+						qts.local_query = csep.localQuery();
+						//qts.user =
+						//qts.host =
+						//qts.priority =
 						fTeleClient.postQueryTele(qts);
+					}
 				}
 
 			}
@@ -1118,7 +1123,7 @@ public:
     RssMonFcn(size_t maxPct, int pauseSeconds) :
         MonitorProcMem(maxPct, 0, 21, pauseSeconds) {}
 
-    /*virtual*/ 
+    /*virtual*/
     void operator()() const
     {
         for (;;)
@@ -1274,6 +1279,28 @@ int setupResources()
 
 }
 
+void cleanTempDir()
+{
+	config::Config *config = config::Config::makeConfig();
+	string allowDJS = config->getConfig("HashJoin", "AllowDiskBasedJoin");
+	string tmpPrefix = config->getConfig("HashJoin", "TempFilePath");
+
+	if (allowDJS == "N" || allowDJS == "n")
+		return;
+
+	if (tmpPrefix.empty())
+		tmpPrefix = "/tmp/infinidb";
+
+	tmpPrefix += "/";
+
+	assert(tmpPrefix != "/");
+
+	/* This is quite scary as ExeMgr usually runs as root */
+	boost::filesystem::remove_all(tmpPrefix);
+	boost::filesystem::create_directories(tmpPrefix);
+}
+
+
 int main(int argc, char* argv[])
 {
 	// get and set locale language
@@ -1321,8 +1348,10 @@ int main(int argc, char* argv[])
 #endif
 	setupSignalHandlers();
 	setupResources();
-	
+
 	setupCwd(rm);
+
+	cleanTempDir();
 
 	MsgMap msgMap;
 	msgMap[logDefaultMsg]           = Message(logDefaultMsg);
@@ -1405,15 +1434,6 @@ int main(int argc, char* argv[])
 		catch (...)
 		{
 		}
-	}
-
-	// init mysql client if cross engine support is configured
-	try
-	{
-		joblist::init_mysqlcl_idb();
-	}
-	catch (...)
-	{
 	}
 
 	for (;;)

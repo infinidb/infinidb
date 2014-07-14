@@ -303,6 +303,7 @@ void SimpleFilter::unserialize(messageqcpp::ByteStream& b)
 	}
 	else if (lfc)
 	{
+		lfc->setSimpleColumnList();
 		fSimpleColumnList.insert(fSimpleColumnList.end(), lfc->simpleColumnList().begin(), lfc->simpleColumnList().end());
 		fAggColumnList.insert(fAggColumnList.end(), lfc->aggColumnList().begin(), lfc->aggColumnList().end());
 		fWindowFunctionColumnList.insert
@@ -310,6 +311,7 @@ void SimpleFilter::unserialize(messageqcpp::ByteStream& b)
 	}
 	else if (lac)
 	{
+		lac->setSimpleColumnList();
 		fSimpleColumnList.insert(fSimpleColumnList.end(), lac->simpleColumnList().begin(), lac->simpleColumnList().end());
 		fAggColumnList.insert(fAggColumnList.end(), lac->aggColumnList().begin(), lac->aggColumnList().end());
 		fWindowFunctionColumnList.insert
@@ -330,6 +332,7 @@ void SimpleFilter::unserialize(messageqcpp::ByteStream& b)
 	}
 	else if (rfc)
 	{
+		rfc->setSimpleColumnList();
 		fSimpleColumnList.insert
 		  (fSimpleColumnList.end(), rfc->simpleColumnList().begin(), rfc->simpleColumnList().end());
 		fAggColumnList.insert
@@ -339,6 +342,7 @@ void SimpleFilter::unserialize(messageqcpp::ByteStream& b)
 	}
 	else if (rac)
 	{
+		rac->setSimpleColumnList();
 		fSimpleColumnList.insert(fSimpleColumnList.end(), rac->simpleColumnList().begin(), rac->simpleColumnList().end());
 		fAggColumnList.insert(fAggColumnList.end(), rac->aggColumnList().begin(), rac->aggColumnList().end());
 		fWindowFunctionColumnList.insert
@@ -584,6 +588,40 @@ void SimpleFilter::replaceRealCol(CalpontSelectExecutionPlan::ReturnedColumnList
 		{
 			fRhs->replaceRealCol(derivedColList);
 		}
+	}
+}
+
+const std::vector<SimpleColumn*>& SimpleFilter::simpleColumnList()
+{
+	return fSimpleColumnList;
+}
+
+void SimpleFilter::setSimpleColumnList()
+{
+	SimpleColumn *lsc = dynamic_cast<SimpleColumn*>(fLhs);
+	SimpleColumn *rsc = dynamic_cast<SimpleColumn*>(fRhs);
+	fSimpleColumnList.clear();
+
+	if (lsc)
+	{
+		fSimpleColumnList.push_back(lsc);
+	}
+	else if (fLhs)
+	{
+		fLhs->setSimpleColumnList();
+		fSimpleColumnList.insert
+		  (fSimpleColumnList.end(), fLhs->simpleColumnList().begin(), fLhs->simpleColumnList().end());
+	}
+
+	if (rsc)
+	{
+		fSimpleColumnList.push_back(rsc);
+	}
+	else if (fRhs)
+	{
+		fRhs->setSimpleColumnList();
+		fSimpleColumnList.insert
+		  (fSimpleColumnList.end(), fRhs->simpleColumnList().begin(), fRhs->simpleColumnList().end());
 	}
 }
 

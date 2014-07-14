@@ -123,7 +123,7 @@ int32_t Func_from_unixtime::getDateIntVal(rowgroup::Row& row,
 							bool& isNull,
 							CalpontSystemCatalog::ColType& ct)
 {
-	return (getDatetimeIntVal(row, parm, isNull, ct) >> 32) & 0xFFFFFFC0;
+	return (((getDatetimeIntVal(row, parm, isNull, ct) >> 32) & 0xFFFFFFC0) | 0x3E);
 }		
 
 int64_t Func_from_unixtime::getDatetimeIntVal(rowgroup::Row& row,

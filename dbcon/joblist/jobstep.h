@@ -101,6 +101,7 @@ public:
 
     /** constructor
      */
+	JobStep() { }
     JobStep(const JobInfo&);
     /** destructor
      */
@@ -220,7 +221,7 @@ public:
     void errorInfo(SErrorInfo& sp) { fErrorInfo = sp; }
 
 	bool cancelled() { return (fErrorInfo->errCode > 0 || fDie); }
-	
+
 	virtual bool stringTableFriendly() { return false; }
 
 	bool delivery() const  { return fDelivery; }
@@ -233,6 +234,32 @@ public:
 	void onClauseFilter(bool b) { fOnClauseFilter = b;    }
 
 protected:
+
+	//@bug6088, for telemetry posting
+	static const int64_t STEP_TELE_INTERVAL = 5000;  // now, this is the browser refresh rate
+	void postStepStartTele(querytele::StepTeleStats& sts)
+	{
+		fStartTime = fLastStepTeleTime = sts.start_time = querytele::QueryTeleClient::timeNowms();
+		fQtc.postStepTele(sts);
+	}
+	void postStepProgressTele(querytele::StepTeleStats& sts)
+	{ 
+		int64_t crntTime = querytele::QueryTeleClient::timeNowms();
+		if ((crntTime - fLastStepTeleTime) >= STEP_TELE_INTERVAL)
+		{
+			// interval between step telemetry
+			sts.start_time = fStartTime;
+			fQtc.postStepTele(sts);
+			fLastStepTeleTime = crntTime;
+		}
+	}
+	void postStepSummaryTele(querytele::StepTeleStats& sts)
+	{
+		sts.start_time = fStartTime;
+		sts.end_time = fLastStepTeleTime = querytele::QueryTeleClient::timeNowms();
+		fQtc.postStepTele(sts);
+	}
+
     JobStepAssociation fInputJobStepAssociation;
     JobStepAssociation fOutputJobStepAssociation;
 
@@ -268,6 +295,9 @@ protected:
 	boost::uuids::uuid fQueryUuid;
 	boost::uuids::uuid fStepUuid;
 	querytele::QueryTeleClient fQtc;
+	uint64_t fProgress;
+	int64_t  fStartTime;
+	int64_t  fLastStepTeleTime;
 
 private:
     static boost::mutex fLogMutex;

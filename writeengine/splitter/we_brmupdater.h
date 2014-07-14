@@ -65,7 +65,8 @@ public:
 
 
 public:
-    static bool prepareRowsInsertedInfo(std::string Entry,	int& TotRows, int& InsRows);
+    static bool prepareRowsInsertedInfo(std::string Entry, int64_t& TotRows, 
+											int64_t& InsRows);
     static bool prepareColumnOutOfRangeInfo(std::string Entry, int& ColNum, 
                                             CalpontSystemCatalog::ColDataType& ColType,
                                             std::string& ColName, int& OorValues);
@@ -81,7 +82,7 @@ private:
     std::vector<BRM::CPInfoMerge> fCPInfo;
 	std::vector<BRM::BulkSetHWMArg> fHWMInfo;
 	std::vector<BRM::CPInfo> fCPInfoData;
-
+	
 
 };
 

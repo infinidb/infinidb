@@ -173,7 +173,7 @@ public:
     {   fWeSplClients[CIdx]->updateRowTx(RowCnt);    }
     void resetRowTx(){ for (int aCnt = 1; aCnt <= fPmCount; aCnt++)
     	{if (fWeSplClients[aCnt] != 0) {fWeSplClients[aCnt]->resetRowTx(); } } }
-    void setRowsUploadInfo(int PmId, int RowsRead, int RowsInserted)
+    void setRowsUploadInfo(int PmId, int64_t RowsRead, int64_t RowsInserted)
     { fWeSplClients[PmId]->setRowsUploadInfo(RowsRead, RowsInserted); }
     void add2ColOutOfRangeInfo(int PmId, int ColNum, 
                                CalpontSystemCatalog::ColDataType ColType,
@@ -246,8 +246,8 @@ private:
     	~WEImportRslt(){}
     public:
     	void reset(){fRowsPro=0; fRowsIns=0; fTotTime=0; fColOorVec.clear();}
-    	void updateRowsProcessed(int Rows){ fRowsPro+=Rows; }
-    	void updateRowsInserted(int Rows){ fRowsIns+=Rows; }
+    	void updateRowsProcessed(int64_t Rows){ fRowsPro+=Rows; }
+    	void updateRowsInserted(int64_t Rows){ fRowsIns+=Rows; }
 		void updateColOutOfRangeInfo(int aColNum, CalpontSystemCatalog::ColDataType aColType, 
                                      std::string aColName, int aNoOfOors)
 		{
@@ -298,8 +298,8 @@ private:
     	}
 
     public:
-    	int fRowsPro;	//Rows processed
-    	int fRowsIns;	//Rows inserted
+    	int64_t fRowsPro;	//Rows processed
+    	int64_t fRowsIns;	//Rows inserted
     	timeval fStartTime;	//StartTime
     	timeval fEndTime;	//EndTime
     	float fTotTime;	//TotalTime

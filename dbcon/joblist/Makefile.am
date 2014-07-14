@@ -28,6 +28,7 @@ libjoblist_la_SOURCES = \
         command-jl.cpp \
         crossenginestep.cpp \
         dictstep-jl.cpp \
+        diskjoinstep.cpp \
         distributedenginecomm.cpp \
         elementtype.cpp \
         expressionstep.cpp \

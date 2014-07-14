@@ -1,13 +1,23 @@
 @echo off
 pushd .
+set help=
+if "%1" == "-h" (set help=true)
+if "%1" == "/h" (set help=true)
+if "%1" == "--help" (set help=true)
+if "%help%"=="true" (
+  echo The InfiniDB Support Report creates a report that can be sent to InfiniDB
+  echo for help with field support. There are no options to this command.
+  set help=
+  exit /B 0 
+)
 
 echo.  
-echo Running the Calpont InfiniDB Support Report, outputting to calpontSupportReport.txt
+echo Running the InfiniDB Support Report, outputting to InfiniDBSupportReport.txt
 
-call :func > calpontSupportReport.txt 2>&1
+call :func > InfiniDBSupportReport.txt 2>&1
 
 echo.  
-echo Reported finished
+echo Report finished
 
 popd
 exit /B 0
@@ -23,25 +33,25 @@ exit /B 1
 
   setlocal
   set key="HKLM\SOFTWARE\Calpont\InfiniDB"
-  set homeValue=CalpontHome
+  set homeValue=InfiniDBHome
   set configValue=ConfigFile
 
   for /f "tokens=3,*" %%a in ('reg query %key% /ve 2^>NUL ^| findstr REG_SZ') do (
-    set CalpontInstall=%%b
+    set InfiniDBInstall=%%b
    )
 
-  if "%CalpontInstall%" == "" (
+  if "%InfiniDBInstall%" == "" (
   	for /f "tokens=2,*" %%a in ('reg query %key% /ve 2^>NUL ^| findstr REG_SZ') do (
-    	set CalpontInstall=%%b
+    	set InfiniDBInstall=%%b
    	)
   )
 
   ::error out if can't locate Install Directory
-  if "%CalpontInstall%" == "" GOTO ErrorExit
+  if "%InfiniDBInstall%" == "" GOTO ErrorExit
 
 echo #######################################################################
 echo #                                                                     #
-echo #     Calpont InfiniDB Support Report - %date% %time%
+echo #     InfiniDB Support Report - %date% %time%
 echo #                                                                     #
 echo #######################################################################
 echo.
@@ -51,8 +61,8 @@ echo =                    Software/Version Report                          =
 echo =======================================================================
 echo. 
 echo.
-echo -- Calpont InfiniDB Software Version --
-type %CalpontInstall%\etc\CalpontVersion.txt
+echo -- InfiniDB Software Version --
+type %InfiniDBInstall%\etc\CalpontVersion.txt
 echo. 
 echo -- mysql Software Version --
 mysql --user=root -e status
@@ -87,12 +97,12 @@ echo.
 echo -- Windows InfiniDB Registry Values --
 echo.
 
-  echo CalpontInstall = %CalpontInstall%
+  echo InfiniDBInstall = %InfiniDBInstall%
 
   for /f "tokens=2,*" %%a in ('reg query %key% /v %homeValue% 2^>NUL ^| findstr %homeValue%') do (
-    set CalpontHome=%%b
+    set InfiniDBHome=%%b
   )
-  echo CalpontHome    = %CalpontHome%
+  echo InfiniDBHome    = %InfiniDBHome%
 
   for /f "tokens=2,*" %%a in ('reg query %key% /v %configValue% 2^>NUL ^| findstr %configValue%') do (
     set ConfigFile=%%b
@@ -102,7 +112,7 @@ echo.
 echo.
 echo -- InfiniDB System Configuration Information -- 
 echo.
-cd %CalpontInstall%\bin
+cd %InfiniDBInstall%\bin
 for /f "delims=" %%a in ('getConfig.exe DBBC NumBlocksPct') do @echo NumBlocksPct = %%a
 for /f "delims=" %%a in ('getConfig.exe HashJoin TotalUmMemory') do @echo TotalUmMemory = %%a
 for /f "delims=" %%a in ('getConfig.exe VersionBuffer VersionBufferFileSize') do @echo VersionBufferFileSize = %%a
@@ -133,17 +143,17 @@ ipconfig
 echo.
 echo  -- Disk BRM Data files --
 echo.   
-dir "%CalpontInstall%\dbrm\"
+dir "%InfiniDBInstall%\dbrm\"
 echo.   
 echo  -- View Table Locks --
 echo.   
-cd %CalpontInstall%\bin\
+cd %InfiniDBInstall%\bin\
 viewtablelock.exe
 echo.   
 echo.    
 echo   -- BRM Extent Map  --
 echo.    
-cd %CalpontInstall%\bin\
+cd %InfiniDBInstall%\bin\
 editem.exe -i
 echo.
 echo.
@@ -153,28 +163,28 @@ echo =======================================================================
 echo. 
 echo -- InfiniDB Platform Logs --
 echo. 
-type "%CalpontInstall%\log\InfiniDBLog.txt"
+type "%InfiniDBInstall%\log\InfiniDBLog.txt"
 echo. 
 echo. 
 echo -- InfiniDB MySQl log --
 echo.
-type "%CalpontInstall%\mysqldb\*.err" 
+type "%InfiniDBInstall%\mysqldb\*.err" 
 echo.
 echo. 
 echo -- InfiniDB Bulk Load Logs --
 echo. 
-dir "%CalpontInstall%\bulk\data"
+dir "%InfiniDBInstall%\bulk\data"
 echo. 
-dir "%CalpontInstall%\bulk\log"
+dir "%InfiniDBInstall%\bulk\log"
 echo. 
-dir "%CalpontInstall%\bulk\job"
+dir "%InfiniDBInstall%\bulk\job"
 echo.
 echo -- Check for Errors in Bulk Logs --
 echo.
-cd "%CalpontInstall%\bulk\log"
+cd "%InfiniDBInstall%\bulk\log"
 findstr /spin /c:"error" *
 findstr /spin /c:"failed" *
-cd "%CalpontInstall%\bulk\job"
+cd "%InfiniDBInstall%\bulk\job"
 findstr /spin /c:"error" *
 findstr /spin /c:"failed" *
 echo.
@@ -208,10 +218,10 @@ mysql --user=root -e "show variables"
 echo. 
 echo -- DBMS Mysql InfiniDB config file -- 
 echo.
-type "%CalpontInstall%\my.ini"
+type "%InfiniDBInstall%\my.ini"
 echo.
 echo -- Active Queries -- 
 
-
+::cd \InfiniDB\genii\oamapps\calpontSupport
 
 

@@ -42,6 +42,9 @@ using namespace rowgroup;
 #include "exceptclasses.h"
 using namespace logging;
 
+#include "querytele.h"
+using namespace querytele;
+
 #include "funcexp.h"
 
 #include "jobstep.h"
@@ -60,6 +63,7 @@ SubQueryStep::SubQueryStep(const JobInfo& jobInfo)
 	, fRowsReturned(0)
 {
 	fExtendedInfo = "SQS: ";
+	fQtc.stepParms().stepType = StepTeleStats::T_SQS;
 }
 
 SubQueryStep::~SubQueryStep()
@@ -263,7 +267,7 @@ void SubAdapterStep::setFeRowGroup(const rowgroup::RowGroup& rg)
 void SubAdapterStep::setOutputRowGroup(const rowgroup::RowGroup& rg)
 {
 	fRowGroupOut = fRowGroupDeliver = rg;
-	if (fRowGroupFe.getColumnCount() == (uint32_t) -1)
+	if (fRowGroupFe.getColumnCount() == 0)
 		fIndexMap = makeMapping(fRowGroupIn, fRowGroupOut);
 	else
 		fIndexMap = makeMapping(fRowGroupFe, fRowGroupOut);
@@ -347,8 +351,11 @@ void SubAdapterStep::execute()
 	fRowGroupOut.initRow(&rowOut);
 
 	RGData rowFeData;
+	StepTeleStats sts;
+	sts.query_uuid = fQueryUuid;
+	sts.step_uuid = fStepUuid;
 	bool usesFE = false;
-	if (fRowGroupFe.getColumnCount() != (uint32_t) -1)
+	if (fRowGroupFe.getColumnCount() > 0)
 	{
 		usesFE = true;
 		fRowGroupFe.initRow(&rowFe, true);
@@ -360,6 +367,10 @@ void SubAdapterStep::execute()
 	bool more = false;
 	try
 	{
+		sts.msg_type = StepTeleStats::ST_START;
+		sts.total_units_of_work = 1;
+		postStepStartTele(sts);
+
 		fSubStep->run();
 
 		more = fInputDL->next(fInputIterator, &rgDataIn);
@@ -433,6 +444,11 @@ void SubAdapterStep::execute()
 		printCalTrace();
 	}
 
+	sts.msg_type = StepTeleStats::ST_SUMMARY;
+	sts.total_units_of_work = sts.units_of_work_completed = 1;
+	sts.rows = fRowsReturned;
+	postStepSummaryTele(sts);
+
 	// Bug 3136, let mini stats to be formatted if traceOn.
 	fOutputDL->endOfInput();
 }
@@ -485,6 +501,12 @@ void SubAdapterStep::addExpression(const vector<SRCP>& exps)
 
 	for (vector<SRCP>::const_iterator i = exps.begin(); i != exps.end(); i++)
 		fExpression->addReturnedColumn(*i);
+}
+
+
+void SubAdapterStep::addFcnJoinExp(const vector<SRCP>& exps)
+{
+	addExpression(exps);
 }
 
 

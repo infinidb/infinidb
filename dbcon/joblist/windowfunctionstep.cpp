@@ -70,6 +70,9 @@ using namespace ordering;
 #include "funcexp.h"
 using namespace funcexp;
 
+#include "querytele.h"
+using namespace querytele;
+
 #include "jlf_common.h"
 #include "jobstep.h"
 #include "windowfunctionstep.h"
@@ -150,17 +153,19 @@ WindowFunctionStep::WindowFunctionStep(const JobInfo& jobInfo) :
 	fTotalThreads(1),
 	fNextIndex(0),
 	fMemUsage(0),
-	fRm(jobInfo.rm)
+	fRm(jobInfo.rm),
+	fSessionMemLimit(jobInfo.umMemLimit)
 {
 	fTotalThreads = fRm.windowFunctionThreads();
 	fExtendedInfo = "WFS: ";
+	fQtc.stepParms().stepType = StepTeleStats::T_WFS;
 }
 
 
 WindowFunctionStep::~WindowFunctionStep()
 {
 	if (fMemUsage > 0)
-		fRm.returnMemory(fMemUsage);
+		fRm.returnMemory(fMemUsage, fSessionMemLimit);
 }
 
 
@@ -253,9 +258,6 @@ uint32_t WindowFunctionStep::nextBand(messageqcpp::ByteStream &bs)
 		fRowGroupDelivered.resetRowGroup(0);
 		fRowGroupDelivered.setStatus(status());
 		fRowGroupDelivered.serializeRGData(bs);
-
-		if (traceOn())
-			printCalTrace();
 	}
 
 	return rowCount;
@@ -746,6 +748,13 @@ void WindowFunctionStep::execute()
 
 	if (traceOn()) dlTimes.setFirstReadTime();
 
+	StepTeleStats sts;
+	sts.query_uuid = fQueryUuid;
+	sts.step_uuid = fStepUuid;
+	sts.msg_type = StepTeleStats::ST_START;
+	sts.total_units_of_work = 1;
+	postStepStartTele(sts);
+
 	try
 	{
 		while (more && !cancelled())
@@ -757,7 +766,7 @@ void WindowFunctionStep::execute()
 			{
 				fInRowGroupData.push_back(rgData);
 				uint64_t memAdd = fRowGroupIn.getSizeWithStrings() + rowCnt * sizeof(RowPosition);
-				if (fRm.getMemory(memAdd) == false)
+				if (fRm.getMemory(memAdd, fSessionMemLimit) == false)
 					throw IDBExcept(ERR_WF_DATA_SET_TOO_BIG);
 				fMemUsage += memAdd;
 
@@ -769,6 +778,9 @@ void WindowFunctionStep::execute()
 					fRows.push_back(RowPosition(i, j));
 					row.nextRow();
 				}
+
+				// window function does not change row count
+				fRowsReturned += rowCnt;
 
 				i++;
 			}
@@ -797,6 +809,11 @@ void WindowFunctionStep::execute()
 			more = fInputDL->next(fInputIterator, &rgData);
 
 		fOutputDL->endOfInput();
+
+		sts.msg_type = StepTeleStats::ST_SUMMARY;
+		sts.total_units_of_work = sts.units_of_work_completed = 1;
+		sts.rows = fRowsReturned;
+		postStepSummaryTele(sts);
 
 		if (traceOn())
 		{
@@ -849,6 +866,11 @@ void WindowFunctionStep::execute()
 
 	fOutputDL->endOfInput();
 
+	sts.msg_type = StepTeleStats::ST_SUMMARY;
+	sts.total_units_of_work = sts.units_of_work_completed = 1;
+	sts.rows = fRowsReturned;
+	postStepSummaryTele(sts);
+
 	if (traceOn())
 	{
 		dlTimes.setEndOfInputTime();
@@ -876,7 +898,7 @@ void WindowFunctionStep::doFunction()
 		while (((i = nextFunctionIndex()) < fFunctionCount) && !cancelled())
 		{
 			uint64_t memAdd = fRows.size() * sizeof(RowPosition);
-			if (fRm.getMemory(memAdd) == false)
+			if (fRm.getMemory(memAdd, fSessionMemLimit) == false)
 				throw IDBExcept(ERR_WF_DATA_SET_TOO_BIG);
 			fMemUsage += memAdd;
 			fFunctions[i]->setCallback(this, i);
@@ -1045,7 +1067,7 @@ boost::shared_ptr<FrameBound> WindowFunctionStep::parseFrameBoundRows(
 		int type = (b.fFrame==WF_PRECEDING)?WF__EXPRESSION_PRECEDING:WF__EXPRESSION_FOLLOWING;
 		uint64_t id = getTupleKey(jobInfo, b.fVal);
 		uint64_t idx = getColumnIndex(b.fVal, m, jobInfo);
-		TupleInfo ti = getTupleInfo(getTableKey(jobInfo, id), id, jobInfo);
+		TupleInfo ti = getTupleInfo(id, jobInfo);
 		switch(ti.dtype)
 		{
 			case execplan::CalpontSystemCatalog::TINYINT:
@@ -1156,7 +1178,7 @@ boost::shared_ptr<FrameBound> WindowFunctionStep::parseFrameBoundRange(const exe
 	index.push_back(getColumnIndex(b.fBound, m, jobInfo));
 
 	FrameBoundRange* fbr = NULL;
-	TupleInfo ti = getTupleInfo(getTableKey(jobInfo, ids[0]), ids[0], jobInfo);
+	TupleInfo ti = getTupleInfo(ids[0], jobInfo);
 	bool asc = o[0]->asc();
 	bool nlf = o[0]->nullsFirst();
 	switch(ti.dtype)

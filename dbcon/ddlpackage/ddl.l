@@ -150,7 +150,7 @@ FLOAT {return IDB_FLOAT;}
 DOUBLE {return DOUBLE;}
 REAL {return REAL;}
 CHARSET {return CHARSET;}
-IF {return IF;}
+IF {return IDB_IF;}
 EXISTS {return EXISTS;}
 CHANGE {return CHANGE;}
 TRUNCATE {return TRUNCATE;}

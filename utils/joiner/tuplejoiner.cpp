@@ -42,18 +42,18 @@ TupleJoiner::TupleJoiner(
 	uint32_t largeJoinColumn,
 	JoinType jt) :
 	smallRG(smallInput), largeRG(largeInput), joinAlg(INSERTING), joinType(jt),
-	threadCount(1), typelessJoin(false), bSignedUnsignedJoin(false), uniqueLimit(100)
+	threadCount(1), typelessJoin(false), bSignedUnsignedJoin(false), uniqueLimit(100), finished(false)
 {
 	if (smallRG.usesStringTable()) {
 		STLPoolAllocator<pair<const int64_t, Row::Pointer> > alloc(64*1024*1024 + 1);
 		_pool = alloc.getPoolAllocator();
-	
+
 		sth.reset(new sthash_t(10, hasher(), sthash_t::key_equal(), alloc));
 	}
 	else {
 		STLPoolAllocator<pair<const int64_t, uint8_t *> > alloc(64*1024*1024 + 1);
 		_pool = alloc.getPoolAllocator();
-	
+
 		h.reset(new hash_t(10, hasher(), hash_t::key_equal(), alloc));
 	}
 
@@ -69,7 +69,7 @@ TupleJoiner::TupleJoiner(
 	discreteValues.reset(new bool[1]);
 	cpValues.reset(new vector<int64_t>[1]);
 	discreteValues[0] = false;
-    if (smallRG.isUnsigned(0))
+    if (smallRG.isUnsigned(smallKeyColumns[0]))
     {
         cpValues[0].push_back(numeric_limits<uint64_t>::max());
         cpValues[0].push_back(0);
@@ -93,11 +93,11 @@ TupleJoiner::TupleJoiner(
 	smallRG(smallInput), largeRG(largeInput), joinAlg(INSERTING),
 	joinType(jt), threadCount(1), typelessJoin(true),
 	smallKeyColumns(smallJoinColumns), largeKeyColumns(largeJoinColumns),
-	bSignedUnsignedJoin(false), uniqueLimit(100)
+	bSignedUnsignedJoin(false), uniqueLimit(100), finished(false)
 {
 	STLPoolAllocator<pair<const TypelessData, Row::Pointer> > alloc(64*1024*1024 + 1);
 	_pool = alloc.getPoolAllocator();
-	
+
 	ht.reset(new typelesshash_t(10, hasher(), typelesshash_t::key_equal(), alloc));
 	smallRG.initRow(&smallNullRow);
 	if (smallOuterJoin() || largeOuterJoin() || semiJoin() || antiJoin()) {
@@ -119,7 +119,7 @@ TupleJoiner::TupleJoiner(
        }
     }
 	storedKeyAlloc = FixedAllocator(keyLength);
-	
+
 	discreteValues.reset(new bool[smallKeyColumns.size()]);
 	cpValues.reset(new vector<int64_t>[smallKeyColumns.size()]);
 	for (uint32_t i = 0; i < smallKeyColumns.size(); i++) {
@@ -137,14 +137,14 @@ TupleJoiner::TupleJoiner(
 	}
 }
 
-TupleJoiner::TupleJoiner() { throw runtime_error("TupleJoiner() shouldn't be called."); }
+TupleJoiner::TupleJoiner() { }
 
-TupleJoiner::TupleJoiner(const TupleJoiner &j) 
-{ 
+TupleJoiner::TupleJoiner(const TupleJoiner &j)
+{
 	throw runtime_error("TupleJoiner(TupleJoiner) shouldn't be called.");
 }
 
-TupleJoiner & TupleJoiner::operator=(const TupleJoiner &j) 
+TupleJoiner & TupleJoiner::operator=(const TupleJoiner &j)
 {
 	throw runtime_error("TupleJoiner::operator=() shouldn't be called.");
 	return *this;
@@ -160,15 +160,19 @@ bool TupleJoiner::operator<(const TupleJoiner &tj) const
 	return size() < tj.size();
 }
 
-void TupleJoiner::insert(Row &r) {
-	r.zeroRid();
+void TupleJoiner::insert(Row &r, bool zeroTheRid)
+{
+	/* when doing a disk-based join, only the first iteration on the large side
+	will 'zeroTheRid'.  The successive iterations will need it unchanged. */
+	if (zeroTheRid)
+		r.zeroRid();
 	updateCPData(r);
 	if (joinAlg == UM) {
 		if (typelessJoin) {
                 ht->insert(pair<TypelessData, Row::Pointer>
-                  (makeTypelessKey(r, smallKeyColumns, keyLength, &storedKeyAlloc), 
+                  (makeTypelessKey(r, smallKeyColumns, keyLength, &storedKeyAlloc),
                   r.getPointer()));
-        } 
+        }
         else if (!smallRG.usesStringTable()) {
             int64_t smallKey;
             if (r.isUnsigned(smallKeyColumns[0]))
@@ -200,7 +204,7 @@ void TupleJoiner::match(rowgroup::Row &largeSideRow, uint32_t largeRowIndex, uin
 	bool isNull = hasNullJoinColumn(largeSideRow);
 
 	matches->clear();
-	if (inPM()) { 
+	if (inPM()) {
 		vector<uint32_t> &v = pmJoinResults[threadID][largeRowIndex];
 		uint32_t size = v.size();
 		for (i = 0; i < size; i++)
@@ -320,11 +324,12 @@ void TupleJoiner::doneInserting()
 		if (uniquer.size() > uniqueLimit) \
 			return;
 #endif
-	
+
 	uint32_t col;
 
 	/* Put together the discrete values for the runtime casual partitioning restriction */
 
+	finished = true;
 	for (col = 0; col < smallKeyColumns.size(); col++) {
 		tr1::unordered_set<int64_t> uniquer;
 		tr1::unordered_set<int64_t>::iterator uit;
@@ -333,11 +338,11 @@ void TupleJoiner::doneInserting()
 		typelesshash_t::iterator thit;
 		uint32_t i, pmpos = 0, rowCount;
 		Row smallRow;
-	
+
 		smallRG.initRow(&smallRow);
 		if (smallRow.isCharType(smallKeyColumns[col]))
 			continue;
-		
+
 		rowCount = size();
 		if (joinAlg == PM)
 			pmpos = 0;
@@ -347,7 +352,7 @@ void TupleJoiner::doneInserting()
 			hit = h->begin();
 		else
 			sthit = sth->begin();
-			
+
 		for (i = 0; i < rowCount; i++) {
 			if (joinAlg == PM)
 				smallRow.setPointer(rows[pmpos++]);
@@ -392,6 +397,9 @@ void TupleJoiner::setInUM()
 	vector<Row::Pointer> empty;
 	Row smallRow;
 	uint32_t i, size;
+
+	if (joinAlg == UM)
+		return;
 
 	joinAlg = UM;
 	size = rows.size();
@@ -506,7 +514,7 @@ void TupleJoiner::getUnmarkedRows(vector<Row::Pointer> *out)
 		}
 		else {
 			sthash_t::iterator it;
-			
+
 			for (it = sth->begin(); it != sth->end(); ++it) {
 				smallR.setPointer(it->second);
 				if (!smallR.isMarked())
@@ -545,9 +553,9 @@ void TupleJoiner::updateCPData(const Row &r)
 	for (col = 0; col < smallKeyColumns.size(); col++) {
 		if (r.isLongString(smallKeyColumns[col]))
 			continue;
-			
+
 		int64_t &min = cpValues[col][0], &max = cpValues[col][1];
-        if (r.isCharType(smallKeyColumns[col])) 
+        if (r.isCharType(smallKeyColumns[col]))
         {
             int64_t val = r.getIntField(smallKeyColumns[col]);
             if (order_swap(val) < order_swap(min) ||
@@ -587,7 +595,7 @@ size_t TupleJoiner::size() const
 			return ht->size();
 		else if (!smallRG.usesStringTable())
 			return h->size();
-		else 
+		else
 			return sth->size();
 	}
 	return rows.size();
@@ -652,7 +660,7 @@ TypelessData makeTypelessKey(const Row &r, const vector<uint32_t> &keyCols, Pool
 		else
 			keylen += 8;
 	}
-	
+
 	ret.data = (uint8_t *) fa->allocate(keylen);
 	for (i = 0; i < keyCols.size(); i++) {
 		type = r.getColTypes()[keyCols[i]];
@@ -679,12 +687,50 @@ TypelessData makeTypelessKey(const Row &r, const vector<uint32_t> &keyCols, Pool
 	return ret;
 }
 
+uint64_t getHashOfTypelessKey(const Row &r, const vector<uint32_t> &keyCols, uint32_t seed)
+{
+	Hasher_r hasher;
+	uint64_t ret = seed, tmp;
+	uint32_t i;
+	uint32_t width = 0;
+	char nullChar = '\0';
+	execplan::CalpontSystemCatalog::ColDataType type;
+
+	for (i = 0; i < keyCols.size(); i++) {
+		type = r.getColTypes()[keyCols[i]];
+		if (type == CalpontSystemCatalog::VARCHAR || type == CalpontSystemCatalog::CHAR) {
+			// this is a string, copy a normalized version
+			const uint8_t *str = r.getStringPointer(keyCols[i]);
+			uint32_t len = r.getStringLength(keyCols[i]);
+			ret = hasher((const char *) str, len, ret);
+			/*
+			for (uint32_t j = 0; j < width && str[j] != 0; j++)
+				ret.data[off++] = str[j];
+			*/
+			ret = hasher(&nullChar, 1, ret);
+			width += len + 1;
+		}
+		else {
+			width += 8;
+            if (r.isUnsigned(keyCols[i])) {
+                tmp = r.getUintField(keyCols[i]);
+                ret = hasher((char *) &tmp, 8, ret);
+            }
+            else {
+                tmp = r.getIntField(keyCols[i]);
+                ret = hasher((char *) &tmp, 8, ret);
+            }
+		}
+	}
+	ret = hasher.finalize(ret, width);
+	return ret;
+}
 
 string TypelessData::toString() const
 {
 	uint32_t i;
 	ostringstream os;
-	
+
 	os << hex;
 	for (i = 0; i < len; i++) {
 		os << (uint32_t) data[i] << " ";
@@ -723,7 +769,7 @@ bool TupleJoiner::hasNullJoinColumn(const Row &r) const
 			return true;
 		if (UNLIKELY(bSignedUnsignedJoin)) {
 			// BUG 5628 If this is a signed/unsigned join column and the sign bit is set on either
-			// side, then this row should not compare. Treat as NULL to prevent compare, even if 
+			// side, then this row should not compare. Treat as NULL to prevent compare, even if
 			// the bit patterns match.
 			if (smallRG.isUnsigned(smallKeyColumns[i]) != largeRG.isUnsigned(largeKeyColumns[i])) {
 				if (r.isUnsigned(largeKeyColumns[i]))
@@ -748,5 +794,74 @@ void TupleJoiner::setTableName(const string &tname)
 {
 	tableName = tname;
 }
+
+/* Disk based join support */
+
+void TupleJoiner::clearData()
+{
+	STLPoolAllocator<pair<const TypelessData, Row::Pointer> > alloc(64*1024*1024 + 1);
+	_pool = alloc.getPoolAllocator();
+
+	if (typelessJoin)
+		ht.reset(new typelesshash_t(10, hasher(), typelesshash_t::key_equal(), alloc));
+	else if (smallRG.usesStringTable())
+		sth.reset(new sthash_t(10, hasher(), sthash_t::key_equal(), alloc));
+	else
+		h.reset(new hash_t(10, hasher(), hash_t::key_equal(), alloc));
+
+	std::vector<rowgroup::Row::Pointer> empty;
+	rows.swap(empty);
+	finished = false;
+}
+
+boost::shared_ptr<TupleJoiner> TupleJoiner::copyForDiskJoin()
+{
+	boost::shared_ptr<TupleJoiner> ret(new TupleJoiner());
+
+	ret->smallRG = smallRG;
+	ret->largeRG = largeRG;
+	ret->smallNullMemory = smallNullMemory;
+	ret->smallNullRow = smallNullRow;
+	ret->joinType = joinType;
+	ret->tableName = tableName;
+	ret->typelessJoin = typelessJoin;
+	ret->smallKeyColumns = smallKeyColumns;
+	ret->largeKeyColumns = largeKeyColumns;
+	ret->keyLength = keyLength;
+	ret->bSignedUnsignedJoin = bSignedUnsignedJoin;
+	ret->fe = fe;
+
+	ret->nullValueForJoinColumn = nullValueForJoinColumn;
+	ret->uniqueLimit = uniqueLimit;
+
+	ret->discreteValues.reset(new bool[smallKeyColumns.size()]);
+	ret->cpValues.reset(new vector<int64_t>[smallKeyColumns.size()]);
+	for (uint32_t i = 0; i < smallKeyColumns.size(); i++) {
+		ret->discreteValues[i] = false;
+        if (isUnsigned(smallRG.getColType(i)))
+        {
+            ret->cpValues[i].push_back(static_cast<int64_t>(numeric_limits<uint64_t>::max()));
+            ret->cpValues[i].push_back(0);
+        }
+        else
+        {
+            ret->cpValues[i].push_back(numeric_limits<int64_t>::max());
+            ret->cpValues[i].push_back(numeric_limits<int64_t>::min());
+        }
+	}
+
+    if (typelessJoin)
+		ret->storedKeyAlloc = FixedAllocator(keyLength);
+
+	ret->setThreadCount(1);
+	ret->clearData();
+	ret->setInUM();
+	return ret;
+}
+
+
+
+
+
 
 };

@@ -166,7 +166,7 @@ void TupleBPS::initializeConfigParms()
 	fRequestSize = fRm.getJlRequestSize();
 	fMaxOutstandingRequests = fRm.getJlMaxOutstandingRequests();
 	fProcessorThreadsPerScan = fRm.getJlProcessorThreadsPerScan();
-    fNumThreads = 0;
+	fNumThreads = 0;
 
 	config::Config* cf = config::Config::makeConfig();
 	string epsf = cf->getConfig("ExtentMap", "ExtentsPerSegmentFile");
@@ -175,15 +175,15 @@ void TupleBPS::initializeConfigParms()
 
 	if (fRequestSize >= fMaxOutstandingRequests)
 		fRequestSize = 1;
-    if ((fSessionId & 0x80000000) == 0)
-        fMaxNumThreads = fRm.getJlNumScanReceiveThreads();
-    else
-        fMaxNumThreads = 1;
+	if ((fSessionId & 0x80000000) == 0)
+		fMaxNumThreads = fRm.getJlNumScanReceiveThreads();
+	else
+		fMaxNumThreads = 1;
 
 	fProducerThread.reset(new SPTHD[fMaxNumThreads]);
-    // Make maxnum thread objects even if they don't get used to make join() safe.
-    for (uint32_t i = 0; i < fMaxNumThreads; i++)
-        fProducerThread[i].reset(new thread());
+	// Make maxnum thread objects even if they don't get used to make join() safe.
+	for (uint32_t i = 0; i < fMaxNumThreads; i++)
+		fProducerThread[i].reset(new thread());
 }
 
 TupleBPS::TupleBPS(const pColStep& rhs, const JobInfo& jobInfo) :
@@ -213,7 +213,6 @@ TupleBPS::TupleBPS(const pColStep& rhs, const JobInfo& jobInfo) :
 	numExtents = rhs.numExtents;
 	ridsRequested = 0;
 	ridsReturned = 0;
-	rowsReturned = 0;
 	recvExited = 0;
 	totalMsgs = 0;
 	msgsSent = 0;
@@ -267,8 +266,8 @@ TupleBPS::TupleBPS(const pColStep& rhs, const JobInfo& jobInfo) :
 	fQtc.stepParms().stepType = StepTeleStats::T_BPS;
 
 
-    hasPCFilter = hasPMFilter = hasRIDFilter = hasSegmentFilter = hasDBRootFilter = hasSegmentDirFilter =
-        hasPartitionFilter = hasMaxFilter = hasMinFilter = hasLBIDFilter = hasExtentIDFilter = false;
+	hasPCFilter = hasPMFilter = hasRIDFilter = hasSegmentFilter = hasDBRootFilter = hasSegmentDirFilter =
+		hasPartitionFilter = hasMaxFilter = hasMinFilter = hasLBIDFilter = hasExtentIDFilter = false;
 //	cout << "TBPSCount = " << ++TBPSCount << endl;
 }
 
@@ -299,7 +298,6 @@ TupleBPS::TupleBPS(const pColScanStep& rhs, const JobInfo& jobInfo) :
 	msgsRecvd = 0;
 	ridsReturned = 0;
 	ridsRequested = 0;
-	rowsReturned = 0;
 	fNumBlksSkipped = 0;
 	fMsgBytesIn = 0;
 	fMsgBytesOut = 0;
@@ -357,8 +355,8 @@ TupleBPS::TupleBPS(const pColScanStep& rhs, const JobInfo& jobInfo) :
 	initExtentMarkers();
 	fQtc.stepParms().stepType = StepTeleStats::T_BPS;
 
-    hasPCFilter = hasPMFilter = hasRIDFilter = hasSegmentFilter = hasDBRootFilter = hasSegmentDirFilter =
-        hasPartitionFilter = hasMaxFilter = hasMinFilter = hasLBIDFilter = hasExtentIDFilter = false;
+	hasPCFilter = hasPMFilter = hasRIDFilter = hasSegmentFilter = hasDBRootFilter = hasSegmentDirFilter =
+		hasPartitionFilter = hasMaxFilter = hasMinFilter = hasLBIDFilter = hasExtentIDFilter = false;
 }
 
 TupleBPS::TupleBPS(const PassThruStep& rhs, const JobInfo& jobInfo) :
@@ -371,7 +369,6 @@ TupleBPS::TupleBPS(const PassThruStep& rhs, const JobInfo& jobInfo) :
 	fOid = rhs.oid();
 	fTableOid = rhs.tableOid();
 	ridsReturned = 0;
-	rowsReturned = 0;
 	ridsRequested = 0;
 	fMsgBytesIn = 0;
 	fMsgBytesOut = 0;
@@ -428,8 +425,8 @@ TupleBPS::TupleBPS(const PassThruStep& rhs, const JobInfo& jobInfo) :
 	fExtendedInfo = "TBPS: ";
 	fQtc.stepParms().stepType = StepTeleStats::T_BPS;
 
-    hasPCFilter = hasPMFilter = hasRIDFilter = hasSegmentFilter = hasDBRootFilter = hasSegmentDirFilter =
-        hasPartitionFilter = hasMaxFilter = hasMinFilter = hasLBIDFilter = hasExtentIDFilter = false;
+	hasPCFilter = hasPMFilter = hasRIDFilter = hasSegmentFilter = hasDBRootFilter = hasSegmentDirFilter =
+		hasPartitionFilter = hasMaxFilter = hasMinFilter = hasLBIDFilter = hasExtentIDFilter = false;
 
 //	cout << "TBPSCount = " << ++TBPSCount << endl;
 }
@@ -446,7 +443,6 @@ TupleBPS::TupleBPS(const pDictionaryStep& rhs, const JobInfo& jobInfo) :
 	msgsSent = 0;
 	msgsRecvd = 0;
 	ridsReturned = 0;
-	rowsReturned = 0;
 	ridsRequested = 0;
 	fNumBlksSkipped = 0;
 	fBlockTouched = 0;
@@ -498,8 +494,8 @@ TupleBPS::TupleBPS(const pDictionaryStep& rhs, const JobInfo& jobInfo) :
 	fExtendedInfo = "TBPS: ";
 	fQtc.stepParms().stepType = StepTeleStats::T_BPS;
 
-    hasPCFilter = hasPMFilter = hasRIDFilter = hasSegmentFilter = hasDBRootFilter = hasSegmentDirFilter =
-        hasPartitionFilter = hasMaxFilter = hasMinFilter = hasLBIDFilter = hasExtentIDFilter = false;
+	hasPCFilter = hasPMFilter = hasRIDFilter = hasSegmentFilter = hasDBRootFilter = hasSegmentDirFilter =
+		hasPartitionFilter = hasMaxFilter = hasMinFilter = hasLBIDFilter = hasExtentIDFilter = false;
 
 //	cout << "TBPSCount = " << ++TBPSCount << endl;
 }
@@ -541,28 +537,28 @@ void TupleBPS::setBPP(JobStep* jobStep)
 	int colWidth = 0;
 	if (pcsp != 0)
 	{
-        PseudoColStep *pseudo = dynamic_cast<PseudoColStep *>(jobStep);
-        if (pseudo) {
-            //cout << "adding a pseudo col filter" << endl;
-            fBPP->addFilterStep(*pseudo);
-            if (pseudo->filterCount() > 0) {
-                hasPCFilter = true;
-                switch(pseudo->pseudoColumnId()) {
-                    case PSEUDO_EXTENTRELATIVERID: hasRIDFilter = true; break;
-                    case PSEUDO_DBROOT: hasDBRootFilter = true; break;
-                    case PSEUDO_PM: hasPMFilter = true; break;
-                    case PSEUDO_SEGMENT: hasSegmentFilter = true; break;
-                    case PSEUDO_SEGMENTDIR: hasSegmentDirFilter = true; break;
-                    case PSEUDO_EXTENTMIN: hasMinFilter = true; break;
-                    case PSEUDO_EXTENTMAX: hasMaxFilter = true; break;
-                    case PSEUDO_BLOCKID: hasLBIDFilter = true; break;
-                    case PSEUDO_EXTENTID: hasExtentIDFilter = true; break;
-                    case PSEUDO_PARTITION: hasPartitionFilter = true; break;
-                }
-            }
-        }
-        else
-            fBPP->addFilterStep(*pcsp);
+		PseudoColStep *pseudo = dynamic_cast<PseudoColStep *>(jobStep);
+		if (pseudo) {
+			//cout << "adding a pseudo col filter" << endl;
+			fBPP->addFilterStep(*pseudo);
+			if (pseudo->filterCount() > 0) {
+				hasPCFilter = true;
+				switch(pseudo->pseudoColumnId()) {
+					case PSEUDO_EXTENTRELATIVERID: hasRIDFilter = true; break;
+					case PSEUDO_DBROOT: hasDBRootFilter = true; break;
+					case PSEUDO_PM: hasPMFilter = true; break;
+					case PSEUDO_SEGMENT: hasSegmentFilter = true; break;
+					case PSEUDO_SEGMENTDIR: hasSegmentDirFilter = true; break;
+					case PSEUDO_EXTENTMIN: hasMinFilter = true; break;
+					case PSEUDO_EXTENTMAX: hasMaxFilter = true; break;
+					case PSEUDO_BLOCKID: hasLBIDFilter = true; break;
+					case PSEUDO_EXTENTID: hasExtentIDFilter = true; break;
+					case PSEUDO_PARTITION: hasPartitionFilter = true; break;
+				}
+			}
+		}
+		else
+			fBPP->addFilterStep(*pcsp);
 
 		extentsMap[pcsp->fOid] = tr1::unordered_map<int64_t, EMEntry>();
 		tr1::unordered_map<int64_t, EMEntry> &ref = extentsMap[pcsp->fOid];
@@ -659,13 +655,13 @@ void TupleBPS::setProjectBPP(JobStep* jobStep1, JobStep* jobStep2)
 		pColStep* pcsp = dynamic_cast<pColStep*>(jobStep1);
 		if (pcsp != 0)
 		{
-            PseudoColStep *pseudo = dynamic_cast<PseudoColStep *>(jobStep1);
-            if (pseudo) {
-                //cout << "adding a pseudo col projection" << endl;
-                fBPP->addProjectStep(*pseudo);
-            }
-            else
-                fBPP->addProjectStep(*pcsp);
+			PseudoColStep *pseudo = dynamic_cast<PseudoColStep *>(jobStep1);
+			if (pseudo) {
+				//cout << "adding a pseudo col projection" << endl;
+				fBPP->addProjectStep(*pseudo);
+			}
+			else
+				fBPP->addProjectStep(*pcsp);
 
 			extentsMap[pcsp->fOid] = tr1::unordered_map<int64_t, EMEntry>();
 			tr1::unordered_map<int64_t, EMEntry> &ref = extentsMap[pcsp->fOid];
@@ -756,8 +752,8 @@ void TupleBPS::storeCasualPartitionInfo(const bool estimateRowCounts)
 		// @Bug 3503. Use the total table size as the estimate for non CP columns.
 		else if (fEstimatedRows == 0 && estimateRowCounts)
 		{
-	        RowEstimator rowEstimator;
-    	    fEstimatedRows = rowEstimator.estimateRowsForNonCPColumn(*colCmd);
+			RowEstimator rowEstimator;
+			fEstimatedRows = rowEstimator.estimateRowsForNonCPColumn(*colCmd);
 		}
 	}
 
@@ -816,10 +812,10 @@ void TupleBPS::startAggregationThread()
 //             fProducerThread[i].reset(new boost::thread(TupleBPSAggregators(this, i)));
 
 //  This block of code starts one thread at a time
-    if (fNumThreads >= fMaxNumThreads)
-        return;
-    fNumThreads++;
-    fProducerThread[fNumThreads-1].reset(new boost::thread(TupleBPSAggregators(this, fNumThreads-1)));
+	if (fNumThreads >= fMaxNumThreads)
+		return;
+	fNumThreads++;
+	fProducerThread[fNumThreads-1].reset(new boost::thread(TupleBPSAggregators(this, fNumThreads-1)));
 }
 
 //#include "boost/date_time/posix_time/posix_time.hpp"
@@ -834,7 +830,10 @@ void TupleBPS::serializeJoiner()
 	/* false from nextJoinerMsg means it's the last msg,
 		it's not exactly the exit condition*/
 	while (more) {
-		more = fBPP->nextTupleJoinerMsg(bs);
+		{ // code block to release the lock immediatly
+			boost::mutex::scoped_lock lk(serializeJoinerMutex);
+			more = fBPP->nextTupleJoinerMsg(bs);
+		}
 #ifdef JLF_DEBUG
 		cout << "serializing joiner into " << bs.length() << " bytes" << endl;
 #endif
@@ -847,6 +846,9 @@ void TupleBPS::serializeJoiner()
 
 void TupleBPS::serializeJoiner(uint32_t conn)
 {
+    // We need this lock for TupleBPS::serializeJoiner()
+    boost::mutex::scoped_lock lk(serializeJoinerMutex);
+
 	ByteStream bs;
 	bool more = true;
 
@@ -1336,7 +1338,7 @@ bool TupleBPS::compareRange(uint8_t COP, int64_t min, int64_t max, int64_t val) 
 	switch(COP) {
 		case COMPARE_LT:
 		case COMPARE_NGE:
-            return (min < val);
+			return (min < val);
 		case COMPARE_LE:
 		case COMPARE_NGT:
 			return (min <= val);
@@ -1355,190 +1357,190 @@ bool TupleBPS::compareRange(uint8_t COP, int64_t min, int64_t max, int64_t val) 
 }
 
 bool TupleBPS::processSingleFilterString_ranged(int8_t BOP, int8_t colWidth, int64_t min, int64_t max, const uint8_t *filterString,
-    uint32_t filterCount) const
+	uint32_t filterCount) const
 {
-    uint j;
-    bool ret = true;
+	uint j;
+	bool ret = true;
 
-    for (j = 0; j < filterCount; j++) {
-        int8_t COP;
-        int64_t val2;
-        bool thisPredicate;
-        COP = *filterString++;
-        filterString++;   // skip the round var, don't think that applies here
-        switch (colWidth) {
-            case 1:
-                val2 = *((int8_t *) filterString);
-                filterString++;
-                break;
-            case 2:
-                val2 = *((int16_t *) filterString);
-                filterString += 2;
-                break;
-            case 4:
-                val2 = *((int32_t *) filterString);
-                filterString += 4;
-                break;
-            case 8:
-                val2 = *((int64_t *) filterString);
-                filterString += 8;
-                break;
-            default:
-                throw logic_error("invalid column width");
-        }
-        thisPredicate = compareRange(COP, min, max, val2);
-        if (j == 0)
-            ret = thisPredicate;
-        if (BOP == BOP_OR && thisPredicate)
-            return true;
-        else if (BOP == BOP_AND && !thisPredicate)
-            return false;
-    }
-    return ret;
+	for (j = 0; j < filterCount; j++) {
+		int8_t COP;
+		int64_t val2;
+		bool thisPredicate;
+		COP = *filterString++;
+		filterString++;   // skip the round var, don't think that applies here
+		switch (colWidth) {
+			case 1:
+				val2 = *((int8_t *) filterString);
+				filterString++;
+				break;
+			case 2:
+				val2 = *((int16_t *) filterString);
+				filterString += 2;
+				break;
+			case 4:
+				val2 = *((int32_t *) filterString);
+				filterString += 4;
+				break;
+			case 8:
+				val2 = *((int64_t *) filterString);
+					filterString += 8;
+				break;
+			default:
+				throw logic_error("invalid column width");
+		}
+		thisPredicate = compareRange(COP, min, max, val2);
+		if (j == 0)
+			ret = thisPredicate;
+		if (BOP == BOP_OR && thisPredicate)
+			return true;
+		else if (BOP == BOP_AND && !thisPredicate)
+			return false;
+	}
+	return ret;
 }
 
 bool TupleBPS::processSingleFilterString(int8_t BOP, int8_t colWidth, int64_t val, const uint8_t *filterString,
-    uint32_t filterCount) const
+	uint32_t filterCount) const
 {
-    uint j;
-    bool ret = true;
+	uint j;
+	bool ret = true;
 
-    for (j = 0; j < filterCount; j++) {
-        int8_t COP;
-        int64_t val2;
-        bool thisPredicate;
-        COP = *filterString++;
-        filterString++;   // skip the round var, don't think that applies here
-        switch (colWidth) {
-            case 1:
-                val2 = *((int8_t *) filterString);
-                filterString++;
-                break;
-            case 2:
-                val2 = *((int16_t *) filterString);
-                filterString += 2;
-                break;
-            case 4:
-                val2 = *((int32_t *) filterString);
-                filterString += 4;
-                break;
-            case 8:
-                val2 = *((int64_t *) filterString);
-                filterString += 8;
-                break;
-            default:
-                throw logic_error("invalid column width");
-        }
-        thisPredicate = compareSingleValue(COP, val, val2);
-        if (j == 0)
-            ret = thisPredicate;
-        if (BOP == BOP_OR && thisPredicate)
-            return true;
-        else if (BOP == BOP_AND && !thisPredicate)
-            return false;
-    }
-    return ret;
+	for (j = 0; j < filterCount; j++) {
+		int8_t COP;
+		int64_t val2;
+		bool thisPredicate;
+		COP = *filterString++;
+		filterString++;   // skip the round var, don't think that applies here
+		switch (colWidth) {
+			case 1:
+				val2 = *((int8_t *) filterString);
+				filterString++;
+				break;
+			case 2:
+				val2 = *((int16_t *) filterString);
+				filterString += 2;
+				break;
+			case 4:
+				val2 = *((int32_t *) filterString);
+				filterString += 4;
+				break;
+			case 8:
+				val2 = *((int64_t *) filterString);
+				filterString += 8;
+				break;
+			default:
+				throw logic_error("invalid column width");
+		}
+		thisPredicate = compareSingleValue(COP, val, val2);
+		if (j == 0)
+			ret = thisPredicate;
+		if (BOP == BOP_OR && thisPredicate)
+			return true;
+		else if (BOP == BOP_AND && !thisPredicate)
+			return false;
+	}
+	return ret;
 }
 
 bool TupleBPS::processOneFilterType(int8_t colWidth, int64_t value, uint32_t type) const
 {
-    const vector<SCommand>& filters = fBPP->getFilterSteps();
-    uint i;
-    bool ret = true;
-    bool firstPseudo = true;
+	const vector<SCommand>& filters = fBPP->getFilterSteps();
+	uint i;
+	bool ret = true;
+	bool firstPseudo = true;
 
-    for (i = 0; i < filters.size(); i++) {
-        PseudoCCJL *pseudo = dynamic_cast<PseudoCCJL *>(filters[i].get());
-        if (!pseudo || pseudo->getFunction() != type)
-            continue;
+	for (i = 0; i < filters.size(); i++) {
+		PseudoCCJL *pseudo = dynamic_cast<PseudoCCJL *>(filters[i].get());
+		if (!pseudo || pseudo->getFunction() != type)
+			continue;
 
-        int8_t BOP = pseudo->getBOP();  // I think this is the same as TupleBPS's bop var...?
+		int8_t BOP = pseudo->getBOP();  // I think this is the same as TupleBPS's bop var...?
 
-        /* 1-byte COP, 1-byte 'round', colWidth-bytes value */
-        const uint8_t *filterString = pseudo->getFilterString().buf();
-        uint32_t filterCount = pseudo->getFilterCount();
-        bool thisPredicate = processSingleFilterString(BOP, colWidth, value, filterString, filterCount);
+		/* 1-byte COP, 1-byte 'round', colWidth-bytes value */
+		const uint8_t *filterString = pseudo->getFilterString().buf();
+		uint32_t filterCount = pseudo->getFilterCount();
+		bool thisPredicate = processSingleFilterString(BOP, colWidth, value, filterString, filterCount);
 
-        if (firstPseudo) {
-            firstPseudo = false;
-            ret = thisPredicate;
-        }
-        if (bop == BOP_OR && thisPredicate)
-            return true;
-        else if (bop == BOP_AND && !thisPredicate)
-            return false;
-    }
-    return ret;
+		if (firstPseudo) {
+			firstPseudo = false;
+			ret = thisPredicate;
+		}
+		if (bop == BOP_OR && thisPredicate)
+			return true;
+		else if (bop == BOP_AND && !thisPredicate)
+			return false;
+	}
+	return ret;
 }
 
 bool TupleBPS::processLBIDFilter(const EMEntry &emEntry) const
 {
-    const vector<SCommand>& filters = fBPP->getFilterSteps();
-    uint i;
-    bool ret = true;
-    bool firstPseudo = true;
-    LBID_t firstLBID = emEntry.range.start;
-    LBID_t lastLBID = firstLBID + (emEntry.range.size * 1024) - 1;
+	const vector<SCommand>& filters = fBPP->getFilterSteps();
+	uint i;
+	bool ret = true;
+	bool firstPseudo = true;
+	LBID_t firstLBID = emEntry.range.start;
+	LBID_t lastLBID = firstLBID + (emEntry.range.size * 1024) - 1;
 
-    for (i = 0; i < filters.size(); i++) {
-        PseudoCCJL *pseudo = dynamic_cast<PseudoCCJL *>(filters[i].get());
-        if (!pseudo || pseudo->getFunction() != PSEUDO_BLOCKID)
-            continue;
+	for (i = 0; i < filters.size(); i++) {
+		PseudoCCJL *pseudo = dynamic_cast<PseudoCCJL *>(filters[i].get());
+		if (!pseudo || pseudo->getFunction() != PSEUDO_BLOCKID)
+			continue;
 
-        int8_t BOP = pseudo->getBOP();  // I think this is the same as TupleBPS's bop var...?
+		int8_t BOP = pseudo->getBOP();  // I think this is the same as TupleBPS's bop var...?
 
-        /* 1-byte COP, 1-byte 'round', colWidth-bytes value */
-        const uint8_t *filterString = pseudo->getFilterString().buf();
-        uint32_t filterCount = pseudo->getFilterCount();
-        bool thisPredicate = processSingleFilterString_ranged(BOP, 8,
-            firstLBID, lastLBID, filterString, filterCount);
+		/* 1-byte COP, 1-byte 'round', colWidth-bytes value */
+		const uint8_t *filterString = pseudo->getFilterString().buf();
+		uint32_t filterCount = pseudo->getFilterCount();
+		bool thisPredicate = processSingleFilterString_ranged(BOP, 8,
+		  firstLBID, lastLBID, filterString, filterCount);
 
-        if (firstPseudo) {
-            firstPseudo = false;
-            ret = thisPredicate;
-        }
-        if (bop == BOP_OR && thisPredicate)
-            return true;
-        else if (bop == BOP_AND && !thisPredicate)
-            return false;
-    }
-    return ret;
+		if (firstPseudo) {
+			firstPseudo = false;
+			ret = thisPredicate;
+		}
+		if (bop == BOP_OR && thisPredicate)
+			return true;
+		else if (bop == BOP_AND && !thisPredicate)
+			return false;
+	}
+	return ret;
 }
 
 bool TupleBPS::processPseudoColFilters(uint32_t extentIndex, boost::shared_ptr<map<int, int> > dbRootPMMap) const
 {
-    if (!hasPCFilter)
-        return true;
+	if (!hasPCFilter)
+		return true;
 
-    const EMEntry &emEntry = scannedExtents[extentIndex];
+	const EMEntry &emEntry = scannedExtents[extentIndex];
 
-    if (bop == BOP_AND) {
-        /* All Pseudocolumns have been promoted to 8-bytes except the casual partitioning filters */
-        return (!hasPMFilter || processOneFilterType(8, (*dbRootPMMap)[emEntry.dbRoot], PSEUDO_PM))
-            && (!hasSegmentFilter || processOneFilterType(8, emEntry.segmentNum, PSEUDO_SEGMENT))
-            && (!hasDBRootFilter || processOneFilterType(8, emEntry.dbRoot, PSEUDO_DBROOT))
-            && (!hasSegmentDirFilter || processOneFilterType(8, emEntry.partitionNum, PSEUDO_SEGMENTDIR))
-            && (!hasExtentIDFilter || processOneFilterType(8, emEntry.range.start, PSEUDO_EXTENTID))
-            && (!hasMaxFilter || (emEntry.partition.cprange.isValid == BRM::CP_VALID ?
-                    processOneFilterType(emEntry.range.size, emEntry.partition.cprange.hi_val, PSEUDO_EXTENTMAX) : true))
-            && (!hasMinFilter || (emEntry.partition.cprange.isValid == BRM::CP_VALID ?
-                    processOneFilterType(emEntry.range.size, emEntry.partition.cprange.lo_val, PSEUDO_EXTENTMIN) : true))
-            && (!hasLBIDFilter || processLBIDFilter(emEntry))
-            ;
-    }
-    else {
-        return (hasPMFilter && processOneFilterType(8, (*dbRootPMMap)[emEntry.dbRoot], PSEUDO_PM))
-            || (hasSegmentFilter && processOneFilterType(8, emEntry.segmentNum, PSEUDO_SEGMENT))
-            || (hasDBRootFilter && processOneFilterType(8, emEntry.dbRoot, PSEUDO_DBROOT))
-            || (hasSegmentDirFilter && processOneFilterType(8, emEntry.partitionNum, PSEUDO_SEGMENTDIR))
-            || (hasExtentIDFilter && processOneFilterType(8, emEntry.range.start, PSEUDO_EXTENTID))
-            || (hasMaxFilter && (emEntry.partition.cprange.isValid == BRM::CP_VALID ?
-                    processOneFilterType(emEntry.range.size, emEntry.partition.cprange.hi_val, PSEUDO_EXTENTMAX) : false))
-            || (hasMinFilter && (emEntry.partition.cprange.isValid == BRM::CP_VALID ?
-                    processOneFilterType(emEntry.range.size, emEntry.partition.cprange.lo_val, PSEUDO_EXTENTMIN) : false))
-            || (hasLBIDFilter && processLBIDFilter(emEntry))
-            ;
-    }
+	if (bop == BOP_AND) {
+		/* All Pseudocolumns have been promoted to 8-bytes except the casual partitioning filters */
+		return (!hasPMFilter || processOneFilterType(8, (*dbRootPMMap)[emEntry.dbRoot], PSEUDO_PM))
+			&& (!hasSegmentFilter || processOneFilterType(8, emEntry.segmentNum, PSEUDO_SEGMENT))
+			&& (!hasDBRootFilter || processOneFilterType(8, emEntry.dbRoot, PSEUDO_DBROOT))
+			&& (!hasSegmentDirFilter || processOneFilterType(8, emEntry.partitionNum, PSEUDO_SEGMENTDIR))
+			&& (!hasExtentIDFilter || processOneFilterType(8, emEntry.range.start, PSEUDO_EXTENTID))
+			&& (!hasMaxFilter || (emEntry.partition.cprange.isValid == BRM::CP_VALID ?
+					processOneFilterType(emEntry.range.size, emEntry.partition.cprange.hi_val, PSEUDO_EXTENTMAX) : true))
+			&& (!hasMinFilter || (emEntry.partition.cprange.isValid == BRM::CP_VALID ?
+					processOneFilterType(emEntry.range.size, emEntry.partition.cprange.lo_val, PSEUDO_EXTENTMIN) : true))
+			&& (!hasLBIDFilter || processLBIDFilter(emEntry))
+			;
+	}
+	else {
+		return (hasPMFilter && processOneFilterType(8, (*dbRootPMMap)[emEntry.dbRoot], PSEUDO_PM))
+			|| (hasSegmentFilter && processOneFilterType(8, emEntry.segmentNum, PSEUDO_SEGMENT))
+			|| (hasDBRootFilter && processOneFilterType(8, emEntry.dbRoot, PSEUDO_DBROOT))
+			|| (hasSegmentDirFilter && processOneFilterType(8, emEntry.partitionNum, PSEUDO_SEGMENTDIR))
+			|| (hasExtentIDFilter && processOneFilterType(8, emEntry.range.start, PSEUDO_EXTENTID))
+			|| (hasMaxFilter && (emEntry.partition.cprange.isValid == BRM::CP_VALID ?
+					processOneFilterType(emEntry.range.size, emEntry.partition.cprange.hi_val, PSEUDO_EXTENTMAX) : false))
+			|| (hasMinFilter && (emEntry.partition.cprange.isValid == BRM::CP_VALID ?
+					processOneFilterType(emEntry.range.size, emEntry.partition.cprange.lo_val, PSEUDO_EXTENTMIN) : false))
+			|| (hasLBIDFilter && processLBIDFilter(emEntry))
+			;
+	}
 }
 
 
@@ -1569,8 +1571,8 @@ void TupleBPS::makeJobs(vector<Job> *jobs)
 			((int) i < lastExtent[scannedExtents[i].dbRoot-1]) &&
 			(scannedExtents[i].status <= EXTENTSTATUSMAX))
 			lbidsToScan = scannedExtents[i].range.size * 1024;
-        else
-            lbidsToScan = scannedExtents[i].HWM - scannedExtents[i].blockOffset + 1;
+		else
+			lbidsToScan = scannedExtents[i].HWM - scannedExtents[i].blockOffset + 1;
 
 		// skip this extent if CP data rules it out or the scan has already passed
 		// the last extent for that DBRoot (import may be adding extents that shouldn't
@@ -1579,22 +1581,22 @@ void TupleBPS::makeJobs(vector<Job> *jobs)
 
 		bool inBounds = ((int)i <= lastExtent[scannedExtents[i].dbRoot-1]);
 
-        if (!inBounds) {
-            //cout << "out of bounds" << endl;
-            continue;
-        }
+		if (!inBounds) {
+			//cout << "out of bounds" << endl;
+			continue;
+		}
 
 		if (!scanFlags[i]) {
-            //cout << "CP elimination" << endl;
-            fNumBlksSkipped += lbidsToScan;
-            continue;
-        }
+			//cout << "CP elimination" << endl;
+			fNumBlksSkipped += lbidsToScan;
+			continue;
+		}
 
-        if (!processPseudoColFilters(i, dbRootPMMap)) {
-            //cout << "Skipping an extent due to pseudo-column filter elimination" << endl;
-            fNumBlksSkipped += lbidsToScan;
-            continue;
-        }
+		if (!processPseudoColFilters(i, dbRootPMMap)) {
+			//cout << "Skipping an extent due to pseudo-column filter elimination" << endl;
+			fNumBlksSkipped += lbidsToScan;
+			continue;
+		}
 
 		//if (!scanFlags[i] || !inBounds)
 		//	continue;
@@ -1608,10 +1610,8 @@ void TupleBPS::makeJobs(vector<Job> *jobs)
 		// Bug5741 If we are local only and this doesn't belongs to us, skip it
 		if (fLocalQuery == execplan::CalpontSelectExecutionPlan::LOCAL_QUERY)
 		{
-			cout << "Checking localPMId" << endl;
 			if (localPMId == 0)
 			{
-				cout << "localPMId is 0, Throwing IDBExcept" << endl;
 				throw IDBExcept(ERR_LOCAL_QUERY_UM);
 			}
 			if (dbRootPMMap->find(scannedExtents[i].dbRoot)->second != localPMId)
@@ -1679,17 +1679,17 @@ void TupleBPS::sendPrimitiveMessages()
 		sendJobs(jobs);
 	}
 	catch(const IDBExcept &e) {
-		cout << "Caught IDBExcept" << e.what() << e.errorCode() << endl;
+		//cout << "Caught IDBExcept" << e.what() << e.errorCode() << endl;
 		sendError(e.errorCode());
 		processError(e.what(), e.errorCode(), "TupleBPS::sendPrimitiveMessages()");
 	}
 	catch(const std::exception& ex) {
-		cout << "Caught exception" << endl;
+		//cout << "Caught exception" << endl;
 		sendError(ERR_TUPLE_BPS);
 		processError(ex.what(), ERR_TUPLE_BPS, "TupleBPS::sendPrimitiveMessages()");
 	}
 	catch(...) {
-		cout << "Caught ..." << endl;
+		//cout << "Caught ..." << endl;
 		sendError(ERR_TUPLE_BPS);
 		processError("unknown", ERR_TUPLE_BPS, "TupleBPS::sendPrimitiveMessages()");
 	}
@@ -1788,6 +1788,7 @@ try
 		local_outputRG.initRow(&joinedBaseRow, true);
 		joinedBaseRowData.reset(new uint8_t[joinedBaseRow.getSize()]);
 		joinedBaseRow.setData(joinedBaseRowData.get());
+		joinedBaseRow.initToNull();
 		largeMapping = makeMapping(local_primRG, local_outputRG);
 
 		bool hasJoinFE = false;
@@ -1865,11 +1866,39 @@ try
 		if (msgsSent == msgsRecvd && finishedSending)
 			break;
 
-        bool flowControlOn;
+		bool flowControlOn;
 		fDec->read_some(uniqueID, fNumThreads, bsv, &flowControlOn);
 		size = bsv.size();
-        if ((size > 5 || flowControlOn) && fNumThreads < fMaxNumThreads)
-            startAggregationThread();
+
+		// @bug 4562
+		if (traceOn() && fOid>=3000 && dlTimes.FirstReadTime().tv_sec==0)
+			dlTimes.setFirstReadTime();
+
+		if (fOid>=3000 && threadID == 0 && sts.msg_type == StepTeleStats::ST_INVALID && size > 0)
+		{
+			sts.msg_type = StepTeleStats::ST_START;
+			sts.total_units_of_work = totalMsgs;
+			postStepStartTele(sts);
+		}
+
+		/* This is a simple ramp-up of the TBPS msg processing threads.
+		One thread is created by run(), and add'l threads are created
+		as needed.  Right now, "as needed" means that flow control
+		is on, which means that the UM is not keeping up by definition,
+		or size > 5.  We found that using flow control alone was not aggressive
+		enough when the messages were small.  The 'size' parameter checks
+		the number of msgs waiting in the DEC buffers.  Since each
+		message can be processed independently of the others, they can all
+		be processed in different threads.  In benchmarking we found that
+		there was no end-to-end performance difference between using 1
+		and 20 msgs as the threshold.  Erring on the side of aggressiveness,
+		we chose '5'.
+		'5' still preserves the original goal of not starting MAX threads
+		for small queries or when the UM can keep up with the PMs with
+		fewer threads.  Tweak as necessary. */
+
+		if ((size > 5 || flowControlOn) && fNumThreads < fMaxNumThreads)
+			startAggregationThread();
 
 		for (uint32_t z = 0; z < size; z++) {
 			if (bsv[z]->length() > 0 && fBPP->countThisMsg(*(bsv[z])))
@@ -1882,10 +1911,6 @@ try
 			condvarWakeupProducer.notify_one();
 			THROTTLEDEBUG << "receiveMultiPrimitiveMessages wakes up sending side .. " << "  msgsSent: " << msgsSent << "  msgsRecvd = " << msgsRecvd << endl;
 		}
-
-		// @bug 4562
-		if (fOid>=3000 && traceOn() && dlTimes.FirstReadTime().tv_sec==0)
-			dlTimes.setFirstReadTime();
 
 		/* If there's an error and the joblist is being aborted, don't
 			sit around forever waiting for responses.  */
@@ -1943,7 +1968,6 @@ try
 				fromPrimProc.pop_back();
 
 				local_primRG.setData(&rgData);
-// 				cout << "rowcount is " << local_primRG.getRowCount() << endl;
 				ridsReturned_Thread += local_primRG.getRowCount();   // TODO need the pre-join count even on PM joins... later
 
 				/* TupleHashJoinStep::joinOneRG() is a port of the main join loop here.  Any
@@ -1954,15 +1978,18 @@ try
 					local_outputRG.resetRowGroup(local_primRG.getBaseRid());
 					local_outputRG.setDBRoot(local_primRG.getDBRoot());
 					local_primRG.getRow(0, &largeSideRow);
+					//cout << "large-side raw data: " << local_primRG.toString() << endl;
+
+					//cout << "jointype = " << tjoiners[0]->getJoinType() << endl;
 					for (k = 0; k < local_primRG.getRowCount() && !cancelled(); k++, largeSideRow.nextRow()) {
-						//	cout << "TBPS: Large side row: " << largeSideRow.toString() << endl;
+						//cout << "TBPS: Large side row: " << largeSideRow.toString() << endl;
 						matchCount = 0;
 						for (j = 0; j < smallSideCount; j++) {
 							tjoiners[j]->match(largeSideRow, k, threadID, &joinerOutput[j]);
 							/* Debugging code to print the matches
 								Row r;
 								joinerMatchesRGs[j].initRow(&r);
-								cout << "matches: \n";
+								cout << joinerOutput[j].size() << " matches: \n";
 								for (uint32_t z = 0; z < joinerOutput[j].size(); z++) {
 									r.setPointer(joinerOutput[j][z]);
 									cout << "  " << r.toString() << endl;
@@ -1972,6 +1999,7 @@ try
 							if (tjoiners[j]->inUM()) {
 								/* Count the # of rows that pass the join filter */
 								if (tjoiners[j]->hasFEFilter() && matchCount > 0) {
+									//cout << "doing FE filter" << endl;
 									vector<Row::Pointer> newJoinerOutput;
 									applyMapping(fergMappings[smallSideCount], largeSideRow, &joinFERow);
 									for (uint32_t z = 0; z < joinerOutput[j].size(); z++) {
@@ -2086,29 +2114,8 @@ try
 		}  // end of the per-bytestream loop
 
 		// @bug 4562
-		if (fOid>=3000 && dlTimes.FirstInsertTime().tv_sec==0)
-		{
-			sts.msg_type = StepTeleStats::ST_START;
-			sts.start_time = QueryTeleClient::timeNowms();
-			sts.total_units_of_work = totalMsgs;
-			fQtc.postStepTele(sts);
-			if (traceOn())
-				dlTimes.setFirstInsertTime();
-		}
-		else
-		{
-			if (msgsSent > msgsRecvd)
-			{
-				sts.msg_type = StepTeleStats::ST_PROGRESS;
-				sts.total_units_of_work = totalMsgs;
-				sts.units_of_work_completed = msgsRecvd;
-				if (sts.total_units_of_work > 0)
-				{
-					if ((fOid >= 3000) && ((sts.units_of_work_completed*100/sts.total_units_of_work) % 10 == 0))
-						fQtc.postStepTele(sts);
-				}
-			}
-		}
+		if (traceOn() && fOid>=3000)
+			dlTimes.setFirstInsertTime();
 
 		//update casual partition
 		size = cpv.size();
@@ -2121,7 +2128,24 @@ try
 			cpMutex.unlock();
 		}
 		cpv.clear();
+
 		mutex.lock();
+
+		if (fOid >= 3000)
+		{
+			uint64_t progress = msgsRecvd * 100 / totalMsgs;
+			bool postProgress = (progress > fProgress);
+			if (postProgress)
+			{
+				fProgress = progress;
+	
+				sts.msg_type = StepTeleStats::ST_PROGRESS;
+				sts.total_units_of_work = totalMsgs;
+				sts.units_of_work_completed = msgsRecvd;
+				postStepProgressTele(sts);
+			}
+		}
+
 	} // done reading
 
 }//try
@@ -2199,7 +2223,7 @@ out:
 			mutex.unlock();
 		}
 
-		if (fOid>=3000 && traceOn()) {
+		if (traceOn() && fOid>=3000) {
 			//...Casual partitioning could cause us to do no processing.  In that
 			//...case these time stamps did not get set.  So we set them here.
 			if (dlTimes.FirstReadTime().tv_sec==0) {
@@ -2214,12 +2238,12 @@ out:
 		ByteStream bs;
 
 		try {
-		    if (BPPIsAllocated) {
-                fDec->removeDECEventListener(this);
-                fBPP->destroyBPP(bs);
-                fDec->write(uniqueID, bs);
-                BPPIsAllocated = false;
-		    }
+			if (BPPIsAllocated) {
+				fDec->removeDECEventListener(this);
+				fBPP->destroyBPP(bs);
+				fDec->write(uniqueID, bs);
+				BPPIsAllocated = false;
+			}
 		}
 		// catch and do nothing. Let it continues with the clean up and profiling
 		catch (const std::exception& e)
@@ -2327,17 +2351,18 @@ out:
 			formatMiniStats();
 		}
 
-		sts.msg_type = StepTeleStats::ST_SUMMARY;
-		sts.phy_io = fPhysicalIO;
-		sts.cache_io = fCacheIO;
-		sts.msg_rcv_cnt = sts.total_units_of_work = sts.units_of_work_completed = msgsRecvd;
-		sts.cp_blocks_skipped = fNumBlksSkipped;
-		sts.msg_bytes_in = fMsgBytesIn;
-		sts.msg_bytes_out = fMsgBytesOut;
-		sts.rows = ridsReturned;
-		sts.end_time = QueryTeleClient::timeNowms();;
-		if (fOid >= 3000)
-			fQtc.postStepTele(sts);
+		if (lastThread && fOid >= 3000)
+		{
+			sts.msg_type = StepTeleStats::ST_SUMMARY;
+			sts.phy_io = fPhysicalIO;
+			sts.cache_io = fCacheIO;
+			sts.msg_rcv_cnt = sts.total_units_of_work = sts.units_of_work_completed = msgsRecvd;
+			sts.cp_blocks_skipped = fNumBlksSkipped;
+			sts.msg_bytes_in = fMsgBytesIn;
+			sts.msg_bytes_out = fMsgBytesOut;
+			sts.rows = ridsReturned;
+			postStepSummaryTele(sts);
+		}
 
 		if (ffirstStepType == SCAN && bop == BOP_AND && !cancelled())
 		{
@@ -2635,6 +2660,15 @@ void TupleBPS::stepId(uint16_t stepId)
 	fBPP->setStepID(stepId);
 }
 
+void TupleBPS::addFcnJoinExp(const vector<execplan::SRCP>& fe)
+{
+	if (!fe1)
+		fe1.reset(new funcexp::FuncExpWrapper());
+
+	for (uint32_t i = 0; i < fe.size(); i++)
+		fe1->addReturnedColumn(fe[i]);
+}
+
 void TupleBPS::addFcnExpGroup1(const boost::shared_ptr<execplan::ParseTree>& fe)
 {
 	if (!fe1)
@@ -2659,7 +2693,7 @@ void TupleBPS::setFcnExpGroup2(const boost::shared_ptr<funcexp::FuncExpWrapper>&
 		fBPP->setFEGroup2(fe2, fe2Output);
 }
 
-void TupleBPS::setFcnExpGroup3(const vector<boost::shared_ptr<execplan::ReturnedColumn> >& fe)
+void TupleBPS::setFcnExpGroup3(const vector<execplan::SRCP>& fe)
 {
 	if (!fe2)
 		fe2.reset(new funcexp::FuncExpWrapper());
@@ -2795,12 +2829,8 @@ void TupleBPS::formatMiniStats()
 		<< fPhysicalIO << " "
 		<< fCacheIO << " "
 		<< fNumBlksSkipped << " "
-		<< JSTimeStamp::tsdiffstr(dlTimes.EndOfInputTime(), dlTimes.FirstReadTime()) << " ";
-
-	if (ridsReturned == 0)
-		oss << rowsReturned << " ";
-	else
-		oss << ridsReturned << " ";
+		<< JSTimeStamp::tsdiffstr(dlTimes.EndOfInputTime(), dlTimes.FirstReadTime()) << " "
+		<< ridsReturned << " ";
 
 	fMiniInfo += oss.str();
 }
@@ -2811,10 +2841,12 @@ void TupleBPS::rgDataToDl(RGData &rgData, RowGroup& rg, RowGroupDL* dlp)
 	if (dupColumns.size() > 0)
 		dupOutputColumns(rgData, rg);
 
-	//if (!(fSessionId & 0x80000000)) {
-	//	rg.setData(&rgData);
-	//	cerr << "TBPS output: " << rg.toString() << endl;
-	//}
+/*
+	if (!(fSessionId & 0x80000000)) {
+		rg.setData(&rgData);
+		cerr << "TBPS rowcount: " << rg.getRowCount() << endl;
+	}
+*/
 	dlp->insert(rgData);
 }
 
@@ -2874,13 +2906,13 @@ void TupleBPS::addCPPredicates(uint32_t OID, const vector<int64_t> &vals, bool i
 			tr1::unordered_map<int64_t, struct BRM::EMEntry> *extentsPtr = NULL;
 			vector<struct BRM::EMEntry> extents;  // in case the extents of OID is not in Map
 
-            // TODO: store the sorted vectors from the pcolscans/steps as a minor optimization
-            dbrm.getExtents(OID, extents);
-            if (extents.empty()) {
-                ostringstream os;
-                os << "TupleBPS::addCPPredicates(): OID " << OID << " is empty.";
-                throw runtime_error(os.str());
-            }
+			// TODO: store the sorted vectors from the pcolscans/steps as a minor optimization
+			dbrm.getExtents(OID, extents);
+			if (extents.empty()) {
+				ostringstream os;
+				os << "TupleBPS::addCPPredicates(): OID " << OID << " is empty.";
+				throw runtime_error(os.str());
+			}
 			sort(extents.begin(), extents.end(), ExtentSorter());
 
 			if (extentsMap.find(OID) != extentsMap.end()) {
@@ -2950,7 +2982,7 @@ void TupleBPS::abort_nolock()
 void TupleBPS::abort()
 {
 	boost::mutex::scoped_lock scoped(mutex);
-    abort_nolock();
+	abort_nolock();
 }
 
 }   //namespace

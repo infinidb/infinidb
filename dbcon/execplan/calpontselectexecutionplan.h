@@ -391,6 +391,21 @@ public:
 	void uuid(boost::uuids::uuid uuid) { fUuid = uuid; }
 	const boost::uuids::uuid& uuid() const { return fUuid; }
 
+	void djsSmallSideLimit(uint64_t l) { fDJSSmallSideLimit = l; }
+	uint64_t djsSmallSideLimit() { return fDJSSmallSideLimit; }
+
+	void djsLargeSideLimit(uint64_t l) { fDJSLargeSideLimit = l; }
+	uint64_t djsLargeSideLimit() { return fDJSLargeSideLimit; }
+
+	void djsPartitionSize(uint64_t l) { fDJSPartitionSize = l; }
+	uint64_t djsPartitionSize() { return fDJSPartitionSize; }
+
+	void umMemLimit(uint64_t l) { fUMMemLimit = l; }
+	int64_t umMemLimit() { return fUMMemLimit; }
+
+	void isDML(bool b) { fIsDML = b; }
+	bool isDML() { return fIsDML; }
+
 	/**
 	 * The serialization interface
 	 */
@@ -564,6 +579,13 @@ private:
 	std::vector<SCSEP> fSubSelectList;
 
 	boost::uuids::uuid fUuid;
+
+	/* Disk-based join vars */
+	uint64_t fDJSSmallSideLimit;
+	uint64_t fDJSLargeSideLimit;
+	uint64_t fDJSPartitionSize;
+	int64_t fUMMemLimit;
+	bool fIsDML;
 };
 
 }

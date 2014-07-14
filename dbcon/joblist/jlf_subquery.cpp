@@ -256,35 +256,35 @@ void ssfInHaving(ParseTree* pt, void* obj)
 }
 
 
-void getSemiJoins(ParseTree* pt, void* obj)
+void getCorrelatedFilters(ParseTree* pt, void* obj)
 {
 	SimpleFilter* sf = dynamic_cast<SimpleFilter*>(pt->data());
 
 	if (sf != NULL)
 	{
-		SimpleColumn* sc1  = dynamic_cast<SimpleColumn*>(sf->lhs());
-		SimpleColumn* sc2  = dynamic_cast<SimpleColumn*>(sf->rhs());
+		ReturnedColumn* rc1  = dynamic_cast<ReturnedColumn*>(sf->lhs());
+		ReturnedColumn* rc2  = dynamic_cast<ReturnedColumn*>(sf->rhs());
 
-		bool semijoin = false;
-		if (sc1 != NULL && sc1->joinInfo() != 0)
-			semijoin = true;
+		bool correlated = false;
+		if (rc1 != NULL && rc1->joinInfo() != 0)
+			correlated = true;
 
-		if (sc2 != NULL && sc2->joinInfo() != 0)
-			semijoin = true;
+		if (rc2 != NULL && rc2->joinInfo() != 0)
+			correlated = true;
 
-		if (semijoin)
+		if (correlated)
 		{
-			ParseTree** semiJoins = reinterpret_cast<ParseTree**>(obj);
-			if (*semiJoins == NULL)
+			ParseTree** correlatedFilters = reinterpret_cast<ParseTree**>(obj);
+			if (*correlatedFilters == NULL)
 			{
-				*semiJoins = new ParseTree(sf);
+				*correlatedFilters = new ParseTree(sf);
 			}
 			else
 			{
-				ParseTree* left = *semiJoins;
-				*semiJoins = new ParseTree(new LogicOperator("and"));
-				(*semiJoins)->left(left);
-				(*semiJoins)->right(new ParseTree(sf));
+				ParseTree* left = *correlatedFilters;
+				*correlatedFilters = new ParseTree(new LogicOperator("and"));
+				(*correlatedFilters)->left(left);
+				(*correlatedFilters)->right(new ParseTree(sf));
 			}
 
 			pt->data(NULL);
@@ -352,6 +352,7 @@ void handleNotIn(JobStepVector& jsv, JobInfo* jobInfo)
 			throw runtime_error("Failed to create ExpressionStep 2");
 
 		es->expressionFilter(sf, *jobInfo);
+		es->resetJoinInfo();  // Not to be done as join
 		i->reset(es);
 
 		delete sf;
@@ -413,7 +414,7 @@ void doCorrelatedExists(const ExistsFilter* ef, JobInfo& jobInfo)
 	SErrorInfo errorInfo(jobInfo.errorInfo);
 	SubQueryTransformer transformer(&jobInfo, errorInfo);
 	CalpontSelectExecutionPlan* csep = ef->sub().get();
-	alterCsepInExistsFilter(csep, jobInfo);
+	//alterCsepInExistsFilter(csep, jobInfo);
 	SJSTEP subQueryStep = transformer.makeSubQueryStep(csep);
 
 	// @bug3524, special handling of not in.
@@ -658,7 +659,6 @@ void doSelectFilter(const ParseTree* p, JobInfo& jobInfo)
 	}
 
 	jobInfo.stack.push(jsv);
-
 }
 
 
@@ -674,15 +674,15 @@ void preprocessHavingClause(CalpontSelectExecutionPlan* csep, JobInfo& jobInfo)
 	havings->walk(ssfInHaving, &jobInfo);
 
 	// check correlated columns in having
-	ParseTree* semiJoins = NULL;
-	havings->walk(getSemiJoins, &semiJoins);
+	ParseTree* correlatedFilters = NULL;
+	havings->walk(getCorrelatedFilters, &correlatedFilters);
 	trim(havings);
 
-	if (semiJoins != NULL)
+	if (correlatedFilters != NULL)
 	{
 		ParseTree* newFilters = new ParseTree(new LogicOperator("and"));
 		newFilters->left(csep->filters());
-		newFilters->right(semiJoins);
+		newFilters->right(correlatedFilters);
 
 		csep->filters(newFilters);
 		csep->having(havings);

@@ -96,6 +96,8 @@ class WECmdArgs
 		{ fbTruncationAsError = bTruncationAsError;	}
 		bool isJobLogOnly() const { return fJobLogOnly; }
 		void setJobUUID(const boost::uuids::uuid& jobUUID) { fUUID = jobUUID; }
+		bool getConsoleOutput( ) {return fConsoleOutput; }
+
 
     private:	// variables for SplitterApp
         typedef std::vector<std::string> VecArgs;
@@ -167,7 +169,8 @@ class WECmdArgs
         bool fCpiInvoke;		// invoke cpimport in mode 3
         bool fBlockMode3;		// Do not allow Mode 3
         bool fbTruncationAsError; // Treat string truncation as error
-	boost::uuids::uuid fUUID;
+		boost::uuids::uuid fUUID;
+        bool fConsoleOutput;    // If false, no output to console.
 };
 //----------------------------------------------------------------------
 

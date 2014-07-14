@@ -102,12 +102,12 @@ class BRMReporter
      *  @param totalReadRows Total number of rows read
      *  @param totalInsertedRows Total number of rows inserted
      *  @param satCounts Number of out-of-range values for each column,
-     *                   Vector is vector of column name, count pairs.
+     *                   Vector is vector of column oid, count pairs.
      */
     void reportTotals(uint64_t totalReadRows,
                       uint64_t totalInsertedRows,
                const std::vector<boost::tuple<CalpontSystemCatalog::ColDataType,
-                                 std::string,uint64_t> >& satCounts);
+                                 uint64_t,uint64_t> >& satCounts);
 
     /** @brief Generate report for job that exceeds error limit
      *  @param rptFileName Name of file to save info, else info is dropped

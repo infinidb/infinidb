@@ -193,6 +193,15 @@ public:
 
 	void setDerivedTable();
 
+/**
+	 * Return the tableAlias name of the table that the column arguments belong to.
+	 * 
+	 * @param TableAliasName that will be set in the function
+	 * @return true, if all arguments belong to one table
+	 *         false, if multiple tables are involved in the function
+	 */
+	virtual bool singleTable(CalpontSystemCatalog::TableAliasName& tan);
+
 protected:
 	/**
 	 * Fields

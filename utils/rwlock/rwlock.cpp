@@ -343,6 +343,39 @@ void RWLock::read_lock(bool block)
 	}
 }
 	
+void RWLock::read_lock_priority(bool block)
+{
+	down(MUTEX, true);
+	CHECKSAFETY();
+	CHECKLIVENESS();
+	
+	if (fPImpl->fState->writing > 0) {
+		if (!block) {
+			up(MUTEX);
+			throw wouldblock();
+		}
+
+		fPImpl->fState->readerswaiting++;
+		CHECKSAFETY();
+		CHECKLIVENESS();
+		up(MUTEX);
+		down(READERS);			//unblocked by write_unlock();
+#ifdef RWLOCK_DEBUG
+		down(MUTEX, true);
+		CHECKSAFETY();
+		CHECKLIVENESS();
+		up(MUTEX);
+#endif
+	}
+	else {
+		fPImpl->fState->reading++;
+
+		CHECKSAFETY();
+		CHECKLIVENESS();
+		up(MUTEX);
+	}
+}
+
 void RWLock::read_unlock()
 {
 	down(MUTEX, true);

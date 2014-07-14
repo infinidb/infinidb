@@ -187,9 +187,15 @@ public:
 	virtual bool sameColumn(const ReturnedColumn* rc) const
 	{return (fData.compare(rc->data()) == 0);}
 
-	// get all simple columns involved in this expression
-	const std::vector<SimpleColumn*>& simpleColumnList() const
+	virtual const std::vector<SimpleColumn*>& simpleColumnList() const
 	{ return fSimpleColumnList; }
+
+	/* @brief traverse this ReturnedColumn and re-populate fSimpleColumnList.
+	 * 
+	 * @note all ReturnedColumns that may have simple column arguments added
+	 * to the list need to implement thhis function.
+	 */
+	virtual void setSimpleColumnList();
 
 	// get all aggregate column list in this expression
 	const std::vector<AggregateColumn*>& aggColumnList() const
@@ -212,6 +218,16 @@ public:
 	virtual bool hasWindowFunc() = 0;
 
 	virtual void replaceRealCol(std::vector<SRCP>&){}
+
+	/**
+	 * Return the tableAlias name of the table that the column arguments belong to.
+	 * 
+	 * @param TableAliasName that will be set in the function
+	 * @return true, if all arguments belong to one table
+	 *         false, if multiple tables are involved in the function
+	 */
+	virtual bool singleTable(CalpontSystemCatalog::TableAliasName& tan) 
+	{ return false; }
 
 protected:
 	// return all flag set if the other column is outer join column (+)

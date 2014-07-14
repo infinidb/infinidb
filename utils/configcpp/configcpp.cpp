@@ -70,6 +70,8 @@ namespace config
 {
 Config::configMap_t Config::fInstanceMap;
 boost::mutex Config::fInstanceMapMutex;
+boost::mutex Config::fXmlLock;
+boost::mutex Config::fWriteXmlLock;
 
 Config* Config::makeConfig(const string& cf)
 {
@@ -168,7 +170,9 @@ void Config::parseDoc(void)
 			cerr << oss.str() << endl;
 		}
 
+        fXmlLock.lock(); 
 		fDoc = xmlParseFile(fConfigFile.c_str());
+        fXmlLock.unlock();
 
 		fl.l_type   = F_UNLCK;	//unlock
 		fcntl(fd, F_SETLK, &fl);
@@ -319,6 +323,7 @@ void Config::delConfig(const string& section, const string& name)
 
 void Config::writeConfig(const string& configFile) const
 {
+	mutex::scoped_lock lk(fLock);
 	FILE *fi;
 	if (fDoc == 0)
 		throw runtime_error("Config::writeConfig: no XML document!");
@@ -411,6 +416,7 @@ void Config::writeConfig(const string& configFile) const
 
 void Config::write(void) const
 {
+	mutex::scoped_lock lk(fWriteXmlLock);
 #ifdef _MSC_VER
 	writeConfig(fConfigFile);
 #else
@@ -435,7 +441,18 @@ void Config::write(const string& configFile) const
 		if (fcntl(fd, F_SETLKW, &fl) == -1)
 			throw runtime_error("Config::write: file lock error " + configFile);
 
-		writeConfig(configFile);
+
+        try
+        {
+            writeConfig(configFile);
+        }
+        catch(...)
+        {
+            fl.l_type   = F_UNLCK;	//unlock
+            if (fcntl(fd, F_SETLK, &fl) == -1)
+                throw runtime_error("Config::write: file unlock error after exception in writeConfig " + configFile);
+            throw;
+        }
 
 		fl.l_type   = F_UNLCK;	//unlock
 		if (fcntl(fd, F_SETLK, &fl) == -1)

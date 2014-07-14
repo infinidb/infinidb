@@ -207,7 +207,7 @@ KeyStorage::KeyStorage(const RowGroup &keys, Row **tRow) :tmpRow(tRow), rg(keys)
 inline RowPosition KeyStorage::addKey()
 {
 	RowPosition pos;
-	
+
 	if (rg.getRowCount() == 8192)
 	{
 		RGData data(rg);
@@ -216,7 +216,7 @@ inline RowPosition KeyStorage::addKey()
 		rg.getRow(0, &row);
 		storage.push_back(data);
 	}
-	
+
 	copyRow(**tmpRow, &row);
 	memUsage += row.getRealSize();
 	pos.group = storage.size()-1;
@@ -232,7 +232,7 @@ inline uint64_t KeyStorage::getMemUsage()
 }
 
 
-ExternalKeyHasher::ExternalKeyHasher(const RowGroup &r, KeyStorage *k, uint32_t keyColCount, Row **tRow) : 
+ExternalKeyHasher::ExternalKeyHasher(const RowGroup &r, KeyStorage *k, uint32_t keyColCount, Row **tRow) :
 	tmpRow(tRow), lastKeyCol(keyColCount-1), ks(k)
 {
 	r.initRow(&row);
@@ -249,7 +249,7 @@ inline uint64_t ExternalKeyHasher::operator()(const RowPosition &pos) const
 }
 
 
-ExternalKeyEq::ExternalKeyEq(const RowGroup &r, KeyStorage *k, uint32_t keyColCount, Row **tRow) : 
+ExternalKeyEq::ExternalKeyEq(const RowGroup &r, KeyStorage *k, uint32_t keyColCount, Row **tRow) :
 	tmpRow(tRow), lastKeyCol(keyColCount-1), ks(k)
 {
 	r.initRow(&row1);
@@ -259,7 +259,7 @@ ExternalKeyEq::ExternalKeyEq(const RowGroup &r, KeyStorage *k, uint32_t keyColCo
 inline bool ExternalKeyEq::operator()(const RowPosition &pos1, const RowPosition &pos2) const
 {
 	Row *r1, *r2;
-	
+
 	if (pos1.group == RowPosition::MSB)
 		r1 = *tmpRow;
 	else {
@@ -628,7 +628,7 @@ RowAggregation::RowAggregation(const RowAggregation& rhs):
 {
 	//fGroupByCols.clear();
 	//fFunctionCols.clear();
-	
+
 	fGroupByCols.assign(rhs.fGroupByCols.begin(), rhs.fGroupByCols.end());
 	fFunctionCols.assign(rhs.fFunctionCols.begin(), rhs.fFunctionCols.end());
 }
@@ -1321,7 +1321,7 @@ void RowAggregation::doBitOp(const Row& rowIn, int64_t colIn, int64_t colOut, in
 		case execplan::CalpontSystemCatalog::DATE:
 		{
 			uint64_t dt = rowIn.getUintField(colIn);
-			dt = dt & 0xFFFFFFC0;
+			dt = dt & 0xFFFFFFC0;  // no need to set spare bits to 3E, will shift out
 			valIn = ((dt >> 16) * 10000) + (((dt >> 12) & 0xF) * 100) + ((dt >> 6) & 077);
 			break;
 		}
@@ -1781,9 +1781,10 @@ void RowAggregation::loadEmptySet(messageqcpp::ByteStream& bs)
 //------------------------------------------------------------------------------
 RowAggregationUM::RowAggregationUM(const vector<SP_ROWAGG_GRPBY_t>& rowAggGroupByCols,
                                    const vector<SP_ROWAGG_FUNC_t>&  rowAggFunctionCols,
-                                   joblist::ResourceManager *r) :
+                                   joblist::ResourceManager *r, boost::shared_ptr<int64_t> sessionLimit) :
 	RowAggregation(rowAggGroupByCols, rowAggFunctionCols), fHasAvg(false), fKeyOnHeap(false),
-	fHasStatsFunc(false), fTotalMemUsage(0), fRm(r), fLastMemUsage(0), fNextRGIndex(0)
+	fHasStatsFunc(false), fTotalMemUsage(0), fRm(r), fSessionMemLimit(sessionLimit),
+	fLastMemUsage(0), fNextRGIndex(0)
 {
 	// Check if there are any avg functions.
 	for (uint64_t i = 0; i < fFunctionCols.size(); i++)
@@ -1817,6 +1818,7 @@ RowAggregationUM::RowAggregationUM(const RowAggregationUM& rhs) :
 	fRm(rhs.fRm),
 	fConstantAggregate(rhs.fConstantAggregate),
 	fGroupConcat(rhs.fGroupConcat),
+	fSessionMemLimit(rhs.fSessionMemLimit),
 	fLastMemUsage(rhs.fLastMemUsage),
 	fNextRGIndex(0)
 {
@@ -1832,7 +1834,7 @@ RowAggregationUM::~RowAggregationUM()
 
 	// fAggMapPtr deleted by base destructor.
 
-	fRm->returnMemory(fTotalMemUsage);
+	fRm->returnMemory(fTotalMemUsage, fSessionMemLimit);
 }
 
 
@@ -2714,9 +2716,9 @@ bool RowAggregationUM::newRowGroup()
 		memDiff = fAlloc->getMemUsage() - fLastMemUsage;
 
 	fLastMemUsage += memDiff;
-	
+
 	fTotalMemUsage += allocSize + memDiff;
-	if (fRm->getMemory(allocSize + memDiff))
+	if (fRm->getMemory(allocSize + memDiff, fSessionMemLimit))
 	{
 		boost::shared_ptr<RGData> data(new RGData(*fRowGroupOut, AGG_ROWGROUP_SIZE));
 
@@ -2781,8 +2783,9 @@ bool RowAggregationUM::nextRowGroup()
 //------------------------------------------------------------------------------
 RowAggregationUMP2::RowAggregationUMP2(const vector<SP_ROWAGG_GRPBY_t>& rowAggGroupByCols,
 										const vector<SP_ROWAGG_FUNC_t>&  rowAggFunctionCols,
-										joblist::ResourceManager *r) :
-	RowAggregationUM(rowAggGroupByCols, rowAggFunctionCols, r)
+										joblist::ResourceManager *r,
+										boost::shared_ptr<int64_t> sessionLimit) :
+	RowAggregationUM(rowAggGroupByCols, rowAggFunctionCols, r, sessionLimit)
 {
 }
 
@@ -3041,10 +3044,11 @@ void RowAggregationUMP2::doBitOp(const Row& rowIn, int64_t colIn, int64_t colOut
 //------------------------------------------------------------------------------
 RowAggregationDistinct::RowAggregationDistinct(const vector<SP_ROWAGG_GRPBY_t>& rowAggGroupByCols,
 									const vector<SP_ROWAGG_FUNC_t>&  rowAggFunctionCols,
-									joblist::ResourceManager *r) :
-	RowAggregationUMP2(rowAggGroupByCols, rowAggFunctionCols, r)
+									joblist::ResourceManager *r,
+									boost::shared_ptr<int64_t> sessionLimit) :
+	RowAggregationUMP2(rowAggGroupByCols, rowAggFunctionCols, r, sessionLimit)
 {
-	
+
 }
 
 
@@ -3240,8 +3244,9 @@ void RowAggregationDistinct::updateEntry(const Row& rowIn)
 RowAggregationSubDistinct::RowAggregationSubDistinct(
 								const vector<SP_ROWAGG_GRPBY_t>& rowAggGroupByCols,
 								const vector<SP_ROWAGG_FUNC_t>&  rowAggFunctionCols,
-								joblist::ResourceManager *r) :
-	RowAggregationUM(rowAggGroupByCols, rowAggFunctionCols, r)
+								joblist::ResourceManager *r,
+								boost::shared_ptr<int64_t> sessionLimit) :
+	RowAggregationUM(rowAggGroupByCols, rowAggFunctionCols, r, sessionLimit)
 {
 }
 
@@ -3350,7 +3355,7 @@ void RowAggregationSubDistinct::addRowGroup(const RowGroup* pRows, std::vector<R
 			copyRow(fDistRow, &fRow);
 
 			// replace the key value with an equivalent copy, yes this is OK
-			const_cast<RowPosition &>(*(inserted.first)) = 
+			const_cast<RowPosition &>(*(inserted.first)) =
 				RowPosition(fResultDataVec.size() - 1, fRowGroupOut->getRowCount() - 1);
 		}
 	}
@@ -3375,8 +3380,9 @@ void RowAggregationSubDistinct::doGroupConcat(const Row& rowIn, int64_t i, int64
 RowAggregationMultiDistinct::RowAggregationMultiDistinct(
 								const vector<SP_ROWAGG_GRPBY_t>& rowAggGroupByCols,
 								const vector<SP_ROWAGG_FUNC_t>&  rowAggFunctionCols,
-								joblist::ResourceManager *r) :
-	RowAggregationDistinct(rowAggGroupByCols, rowAggFunctionCols, r)
+								joblist::ResourceManager *r,
+								boost::shared_ptr<int64_t> sessionLimit) :
+	RowAggregationDistinct(rowAggGroupByCols, rowAggFunctionCols, r, sessionLimit)
 {
 }
 
@@ -3397,7 +3403,7 @@ RowAggregationMultiDistinct::RowAggregationMultiDistinct(const RowAggregationMul
 	{
 #if 0
 		fTotalMemUsage += fSubRowGroups[i].getDataSize(AGG_ROWGROUP_SIZE);
-		if (!fRm->getMemory(fSubRowGroups[i].getDataSize(AGG_ROWGROUP_SIZE)))
+		if (!fRm->getMemory(fSubRowGroups[i].getDataSize(AGG_ROWGROUP_SIZE, fSessionMemLimit)))
 			throw logging::IDBExcept(logging::IDBErrorInfo::instance()->
 				errorMsg(logging::ERR_AGGREGATION_TOO_BIG), logging::ERR_AGGREGATION_TOO_BIG);
 #endif
@@ -3441,15 +3447,15 @@ void RowAggregationMultiDistinct::addSubAggregator(const boost::shared_ptr<RowAg
 	boost::shared_ptr<RGData> data;
 #if 0
 	fTotalMemUsage += rg.getDataSize(AGG_ROWGROUP_SIZE);
-	if (!fRm->getMemory(rg.getDataSize(AGG_ROWGROUP_SIZE)))
+	if (!fRm->getMemory(rg.getDataSize(AGG_ROWGROUP_SIZE), fSessionMemLimit))
 		throw logging::IDBExcept(logging::IDBErrorInfo::instance()->
 			errorMsg(logging::ERR_AGGREGATION_TOO_BIG), logging::ERR_AGGREGATION_TOO_BIG);
 #endif
 	data.reset(new RGData(rg, AGG_ROWGROUP_SIZE));
 	fSubRowData.push_back(data);
-	
+
 	//assert (agg->aggMapKeyLength() > 0);
-	
+
 	fSubAggregators.push_back(agg);
 	fSubRowGroups.push_back(rg);
 	fSubRowGroups.back().setData(data.get());
@@ -3562,7 +3568,7 @@ inline uint64_t AggHasher::operator()(const RowPosition &data) const
 {
 	uint64_t ret;
 	Row *row;
-	
+
 	if (data.group == RowPosition::MSB)
 		row = *tmpRow;
 	else {
@@ -3585,23 +3591,23 @@ inline bool AggComparator::operator()(const RowPosition &d1, const RowPosition &
 {
 	bool ret;
 	Row *pr1, *pr2;
-	
+
 	if (d1.group == RowPosition::MSB)
 		pr1 = *tmpRow;
 	else {
 		agg->fResultDataVec[d1.group]->getRow(d1.row, &r1);
 		pr1 = &r1;
 	}
-	
+
 	if (d2.group == RowPosition::MSB)
 		pr2 = *tmpRow;
 	else {
 		agg->fResultDataVec[d2.group]->getRow(d2.row, &r2);
 		pr2 = &r2;
 	}
-	
+
 	ret = pr1->equals(*pr2, lastKeyCol);
-	//cout << "eq=" << (int) ret << " keys=" << keyColCount << ": r1=" << r1.toString() << 
+	//cout << "eq=" << (int) ret << " keys=" << keyColCount << ": r1=" << r1.toString() <<
 	//"\n             r2=" << r2.toString() << endl;
 	return ret;
 }

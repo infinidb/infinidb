@@ -115,7 +115,7 @@ public:
     void                addToCmdLineImportFileList(const std::string& importFile);
     const std::string&  getAlternateImportDir( ) const;
     const std::string&  getErrorDir          ( ) const;
-    const std::string&  getJobDir            ( ) const;
+	const std::string&  getJobDir            ( ) const;
     const std::string&  getSchema            ( ) const;
     const std::string&  getTempJobDir        ( ) const;
     bool                getTruncationAsError ( ) const;
@@ -153,6 +153,11 @@ public:
     
     void                disableTimeOut       ( const bool disableTimeOut);
     bool                disableTimeOut       ( ) const;
+    
+    static void 				disableConsoleOutput ( const bool noConsoleOutput)
+	{ fNoConsoleOutput = noConsoleOutput; } 
+	static bool 				disableConsoleOutput ( )
+	{ return fNoConsoleOutput; }
 
 	// Add error message into appropriate BRM updater 
     static bool         addErrorMsg2BrmUpdater(const std::string& tablename, const std::ostringstream& oss);
@@ -214,6 +219,7 @@ private:
     static const std::string   DIR_BULK_LOG;     // Bulk job log directory
     bool        fDisableTimeOut;           // disable timeout when waiting for table lock
     boost::uuids::uuid fUUID;               // job UUID
+    static bool		fNoConsoleOutput;		   // disable output to console
 
     //--------------------------------------------------------------------------
     // Private Functions
@@ -404,7 +410,6 @@ inline void BulkLoad::disableTimeOut( const bool disableTimeOut) {
 
 inline bool BulkLoad::disableTimeOut() const {
   return fDisableTimeOut; }
-
 
 } // end of namespace
 

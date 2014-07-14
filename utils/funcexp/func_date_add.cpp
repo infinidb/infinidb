@@ -31,6 +31,7 @@ using namespace boost::assign;
 #include "functor_dtm.h"
 #include "functioncolumn.h"
 #include "intervalcolumn.h"
+#include "constantcolumn.h"
 #include "rowgroup.h"
 using namespace execplan;
 
@@ -640,6 +641,7 @@ int64_t Func_date_add::getIntVal(rowgroup::Row& row,
 							CalpontSystemCatalog::ColType& ct)
 {
 	int64_t val = 0;
+	bool dateType = false;
 	switch (parm[0]->data()->resultType().colDataType)
 	{
 		case execplan::CalpontSystemCatalog::BIGINT:
@@ -665,7 +667,8 @@ int64_t Func_date_add::getIntVal(rowgroup::Row& row,
 		}
 		case execplan::CalpontSystemCatalog::DATE:
 		{
-			val = parm[0]->data()->getDatetimeIntVal(row, isNull);
+			val = parm[0]->data()->getDateIntVal(row, isNull);
+			dateType = true;
 			break;
 		}
 		case execplan::CalpontSystemCatalog::DATETIME:
@@ -686,14 +689,24 @@ int64_t Func_date_add::getIntVal(rowgroup::Row& row,
 	}	
 	
 	IntervalColumn::interval_type unit = static_cast<IntervalColumn::interval_type>(parm[2]->data()->getIntVal(row, isNull));
-	OpType funcType = static_cast<OpType>(parm[3]->data()->getIntVal(row, isNull));
+	OpType funcType = OP_ADD;
+	ConstantColumn* constCol = dynamic_cast<ConstantColumn*>(parm[3]->data());
+	execplan::CalpontSystemCatalog::ColType ct3 = parm[3]->data()->resultType();
+	if ((ct3.colDataType == execplan::CalpontSystemCatalog::CHAR ||
+	     ct3.colDataType == execplan::CalpontSystemCatalog::VARCHAR) &&
+	    constCol != NULL && constCol->constval().compare("SUB") == 0)
+		funcType = OP_SUB;
+	else
+		funcType = static_cast<OpType>(parm[3]->data()->getIntVal(row, isNull));
 
-	bool dateType = false;
-
-	uint64_t value = helpers::dateAdd( val, parm[1]->data()->getStrVal(row, isNull), unit, dateType, funcType );
+	uint64_t value = helpers::dateAdd(
+						val, parm[1]->data()->getStrVal(row, isNull), unit, dateType, funcType);
 
 	if ( value == 0 )
 		isNull = true;
+
+//	if (dateType)
+//		value = (((value >> 32) & 0xFFFFFFC0) | 0x3E);
 
 	return value;
 }

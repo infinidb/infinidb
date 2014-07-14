@@ -393,14 +393,15 @@ void WEDataLoader::teardownCpimport(bool useStoredWaitPidStatus) // @bug 4267
 		}
 		else
 		{
+			int termsig=(WIFSIGNALED(aStatus) ? WTERMSIG(aStatus) : -1);
 			if(!fForceKill)
 			{
-				cout << "\tCpimport exit on failure" << endl;
+				cout << "\tCpimport exit on failure (signal " << termsig << ')' << endl;
 				ostringstream oss;
-				oss << getObjId() <<" : cpimport exit on failure";
+				oss << getObjId() << " : cpimport exit on failure (signal " << termsig << ')';
 				logging::Message::Args errMsgArgs;
 				errMsgArgs.add(oss.str());
-				fpSysLog->logMsg(errMsgArgs, logging::LOG_TYPE_INFO, logging::M0000);
+				fpSysLog->logMsg(errMsgArgs, logging::LOG_TYPE_ERROR, logging::M0000);
 				onCpimportFailure();
 			}
 			else
@@ -655,8 +656,8 @@ void WEDataLoader::onCpimportSuccess()
 		cout << "Failed to serialize BRMRpt "<< endl;
 	}
 
-	if(remove(fBrmRptFileName.c_str()) != 0)
-		cout <<"Failed to delete BRMRpt File "<< fBrmRptFileName << endl;
+//	if(remove(fBrmRptFileName.c_str()) != 0)
+//		cout <<"Failed to delete BRMRpt File "<< fBrmRptFileName << endl;
 	//usleep(1000000);	//sleep 1 second.
 
 	obs.reset();

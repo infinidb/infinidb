@@ -82,6 +82,10 @@ WF_FRAME frame(BOUND& bound)
 
 ReturnedColumn* buildBoundExp(WF_Boundary& bound, SRCP& order, gp_walk_info& gwi)
 {
+	if (!(gwi.thd->infinidb_vtable.cal_conn_info))
+		gwi.thd->infinidb_vtable.cal_conn_info = (void*)(new cal_connection_info());
+	cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(gwi.thd->infinidb_vtable.cal_conn_info);
+
 	bool addOp = true;
 	ReturnedColumn* rc = NULL;
 	if (bound.fFrame == execplan::WF_PRECEDING)
@@ -107,7 +111,20 @@ ReturnedColumn* buildBoundExp(WF_Boundary& bound, SRCP& order, gp_walk_info& gwi
 		// date_add
 		rc = new FunctionColumn();
 		string funcName = "date_add_interval";
-
+		
+		// @bug6061 . YEAR, QUARTER, MONTH, WEEK, DAY type
+		CalpontSystemCatalog::ColType ct;
+		if (order->resultType().colDataType == CalpontSystemCatalog::DATE &&
+		    intervalCol->intervalType() <= IntervalColumn::INTERVAL_DAY)
+		{
+			ct.colDataType = CalpontSystemCatalog::DATE;
+			ct.colWidth = 4;
+		}
+		else
+		{
+			ct.colDataType = CalpontSystemCatalog::DATETIME;
+			ct.colWidth = 8;
+		}
 		// put interval val column to bound
 		(dynamic_cast<FunctionColumn*>(rc))->functionName(funcName);
 		sptp.reset(new ParseTree(order->clone()));
@@ -128,14 +145,11 @@ ReturnedColumn* buildBoundExp(WF_Boundary& bound, SRCP& order, gp_walk_info& gwi
 			funcParms.push_back(sptp);
 		}
 		(dynamic_cast<FunctionColumn*>(rc))->functionParms(funcParms);
-		CalpontSystemCatalog::ColType ct;
-		ct.colDataType = CalpontSystemCatalog::DATETIME;
-		ct.colWidth = 8;
+
 		rc->resultType(ct);
-		FuncExp* funcexp = FuncExp::instance();
-		Func* functor = funcexp->getFunctor(funcName);
-		(dynamic_cast<FunctionColumn*>(rc))->operationType(functor->operationType(funcParms, rc->resultType()));
-		rc->expressionId(gwi.expressionId++);
+		// @bug6061. Use result type as operation type for WF bound expression
+		rc->operationType(ct);
+		rc->expressionId(ci->expressionId++);
 		return rc;
 	}
 
@@ -157,7 +171,7 @@ ReturnedColumn* buildBoundExp(WF_Boundary& bound, SRCP& order, gp_walk_info& gwi
 	(dynamic_cast<ArithmeticColumn*>(rc))->expression(pt);
 	rc->resultType(aop->resultType());
 	rc->operationType(aop->operationType());
-	rc->expressionId(gwi.expressionId++);
+	rc->expressionId(ci->expressionId++);
 	return rc;
 }
 
@@ -166,7 +180,10 @@ ReturnedColumn* buildWindowFunctionColumn(Item* item, gp_walk_info& gwi, bool& n
 	//@todo fix print for create view
 	//String str;
 	//item->print(&str, QT_INFINIDB_NO_QUOTE);
-	//cout << "XXXXXX " << str.c_ptr() << endl;
+	//cout << str.c_ptr() << endl;
+	if (!(gwi.thd->infinidb_vtable.cal_conn_info))
+		gwi.thd->infinidb_vtable.cal_conn_info = (void*)(new cal_connection_info());
+	cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(gwi.thd->infinidb_vtable.cal_conn_info);
 
 	gwi.hasWindowFunc = true;
 	Item_func_window* wf = (Item_func_window*)item;
@@ -401,14 +418,14 @@ ReturnedColumn* buildWindowFunctionColumn(Item* item, gp_walk_info& gwi, bool& n
 		setError(gwi.thd, HA_ERR_UNSUPPORTED, gwi.parseErrorText);
 		return NULL;
 	}
-    
+
 	ac->resultType(colType_MysqlToIDB(wf));
-	
+
 	// bug5736. Make the result type double for some window functions when
-    // infinidb_double_for_decimal_math is set.
-    ac->adjustResultType();
-	    
-	ac->expressionId(gwi.expressionId++);
+	// infinidb_double_for_decimal_math is set.
+	ac->adjustResultType();
+
+	ac->expressionId(ci->expressionId++);
 	if (item->name)
 		ac->alias(item->name);
 	

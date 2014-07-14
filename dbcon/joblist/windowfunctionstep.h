@@ -208,6 +208,7 @@ private:
 	// for resource management
 	uint64_t                         fMemUsage;
 	ResourceManager&                 fRm;
+	boost::shared_ptr<int64_t>		 fSessionMemLimit;
 
 	friend class windowfunction::WindowFunction;
 };

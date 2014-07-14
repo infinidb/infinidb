@@ -85,6 +85,7 @@ void GroupConcatInfo::prepGroupConcat(JobInfo& jobInfo)
 		groupConcat->fDistinct = gcc->distinct();
 		groupConcat->fSize = gcc->resultType().colWidth;
 		groupConcat->fRm = &(jobInfo.rm);
+		groupConcat->fSessionMemLimit = jobInfo.umMemLimit;
 
 		int key = -1;
 		const vector<SRCP>& cols = rcp->columnVec();
@@ -659,6 +660,7 @@ void GroupConcatOrderBy::initialize(const rowgroup::SP_GroupConcat& gcc)
 	fRowsPerRG = 128;
 	fErrorCode = ERR_AGGREGATION_TOO_BIG;
 	fRm = gcc->fRm;
+	fSessionMemLimit = gcc->fSessionMemLimit;
 
 	vector<std::pair<uint32_t, uint32_t> >::iterator i = gcc->fGroupCols.begin();
 	while (i != gcc->fGroupCols.end())
@@ -711,7 +713,7 @@ void GroupConcatOrderBy::processRow(const rowgroup::Row& row)
 			fDataQueue.push(fData);
 
 			uint64_t newSize = fRowsPerRG * fRowGroup.getRowSize();
-			if (!fRm->getMemory(newSize))
+			if (!fRm->getMemory(newSize, fSessionMemLimit))
 			{
 				cerr << IDBErrorInfo::instance()->errorMsg(fErrorCode)
 					 << " @" << __FILE__ << ":" << __LINE__;
@@ -891,7 +893,7 @@ GroupConcatNoOrder::GroupConcatNoOrder() :
 GroupConcatNoOrder::~GroupConcatNoOrder()
 {
 	if (fRm)
-		fRm->returnMemory(fMemSize);
+		fRm->returnMemory(fMemSize, fSessionMemLimit);
 }
 
 
@@ -903,13 +905,14 @@ void GroupConcatNoOrder::initialize(const rowgroup::SP_GroupConcat& gcc)
 	fRowsPerRG = 128;
 	fErrorCode = ERR_AGGREGATION_TOO_BIG;
 	fRm = gcc->fRm;
+	fSessionMemLimit = gcc->fSessionMemLimit;
 
 	vector<std::pair<uint32_t, uint32_t> >::iterator i = gcc->fGroupCols.begin();
 	while (i != gcc->fGroupCols.end())
 		fConcatColumns.push_back((*(i++)).second);
 
 	uint64_t newSize = fRowsPerRG * fRowGroup.getRowSize();
-	if (!fRm->getMemory(newSize))
+	if (!fRm->getMemory(newSize, fSessionMemLimit))
 	{
 		cerr << IDBErrorInfo::instance()->errorMsg(fErrorCode)
 			 << " @" << __FILE__ << ":" << __LINE__;
@@ -945,7 +948,7 @@ void GroupConcatNoOrder::processRow(const rowgroup::Row& row)
 		{
 			uint64_t newSize = fRowsPerRG * fRowGroup.getRowSize();
 
-			if (!fRm->getMemory(newSize))
+			if (!fRm->getMemory(newSize, fSessionMemLimit))
 			{
 				cerr << IDBErrorInfo::instance()->errorMsg(fErrorCode)
 					 << " @" << __FILE__ << ":" << __LINE__;

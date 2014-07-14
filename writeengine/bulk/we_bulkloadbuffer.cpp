@@ -531,6 +531,7 @@ void BulkLoadBuffer::convert(char *field, int fieldLength,
                 bufStats.maxBufferVal = binChar;
 
             pVal = charTmpBuf;
+           // cout << "In convert: fieldLength = " << fieldLength <<endl;
             break;
         }
 
@@ -2176,6 +2177,20 @@ void BulkLoadBuffer::tokenize(
             //------------------------------------------------------------------
             if (curCol < fNumColsInFile)
             {
+				const JobColumn& jobCol = columnsInfo[curCol].column;
+				//tmp code to test trailing space
+                if (jobCol.dataType ==CalpontSystemCatalog::CHAR) 
+                {
+					//cout << "triming ... " << endl;
+					char * tmp = p;
+					
+					while (*(--tmp) == ' ')
+					{
+						//cout << "offset is " << offset <<endl;
+						offset--;
+						
+					}
+				}
                 fTokens[curRowNum1][curCol].start  = start;
                 fTokens[curRowNum1][curCol].offset = offset;
 #ifdef DEBUG_TOKEN_PARSING
@@ -2186,7 +2201,6 @@ void BulkLoadBuffer::tokenize(
                 // inline function, but code may be too long for compiler
                 // to inline.  And factoring out into a non-inline function
                 // slows down the read thread by 10%.  So left code here.
-                const JobColumn& jobCol = columnsInfo[curCol].column;
                 if (offset)
                 {
                     switch (fTokens[curRowNum1][curCol].offset)
@@ -2321,19 +2335,23 @@ void BulkLoadBuffer::tokenize(
                         bRowGenAutoInc = true;
                 }
 
+                // For non-autoincrement column,
                 // Validate a NotNull column is supplied a value or a default
-                if ((jobCol.fNotNull) &&
-                    (fTokens[curRowNum1][curCol].offset ==
-                      COLPOSPAIR_NULL_TOKEN_OFFSET) &&
-                    (!jobCol.fWithDefault) &&
-                    (bValidRow))
+                if (!bRowGenAutoInc)
                 {
-                    bValidRow = false;
+                    if ((jobCol.fNotNull) &&
+                        (fTokens[curRowNum1][curCol].offset ==
+                          COLPOSPAIR_NULL_TOKEN_OFFSET) &&
+                        (!jobCol.fWithDefault) &&
+                        (bValidRow))
+                    {
+                        bValidRow = false;
   
-                    ostringstream ossErrMsg;
-                    ossErrMsg << INPUT_ERROR_NULL_CONSTRAINT <<
-                        "; field " << (curFld+1);
-                    validationErrMsg = ossErrMsg.str();
+                        ostringstream ossErrMsg;
+                        ossErrMsg << INPUT_ERROR_NULL_CONSTRAINT <<
+                            "; field " << (curFld+1);
+                        validationErrMsg = ossErrMsg.str();
+                    }
                 }
             } // end if curCol < fNumberOfColumns
 

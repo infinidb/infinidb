@@ -151,9 +151,13 @@ CommandPackageProcessor::processPackage(dmlpackage::CalpontDMLPackage& cpackage)
                                 queRemoved = true;
                                 WE_DDLCommandClient ddlClient;
                                 uint8_t rc = ddlClient.UpdateSyscolumnNextval(columnOid, nextValInController);
+                                //@bug 5894. Need release lock.
+                                aDbrm->releaseAILock(columnOid);
                                 if (rc != 0)
                                     throw std::runtime_error("Error in UpdateSyscolumnNextval");
                             }
+                            else
+								aDbrm->releaseAILock(columnOid);
                         }
                     }
                     catch (std::exception& ex)

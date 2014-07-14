@@ -25,12 +25,6 @@
 #ifndef PSEUDOCOLUMN_H
 #define PSEUDOCOLUMN_H
 #include <string>
-#include <boost/shared_ptr.hpp>
-
-#include "returnedcolumn.h"
-#include "treenode.h"
-#include "calpontsystemcatalog.h"
-#include "dataconvert.h"
 #include "simplecolumn.h"
 
 namespace messageqcpp {

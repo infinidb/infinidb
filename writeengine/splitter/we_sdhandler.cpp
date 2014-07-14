@@ -70,7 +70,7 @@ using namespace batchloader;
 #include "we_tablelockgrabber.h"
 #include "we_simplesyslog.h"
 
-namespace WriteEngine 
+namespace WriteEngine
 {
 //------------------------------------------------------------------------------
 //
@@ -422,7 +422,7 @@ void WESDHandler::setup()
 	bool bForce;
 	aPid << getpid();
 	std::string aTimeStamp = getTime2Str();
-	std::string aLogName;	
+	std::string aLogName;
 	std::string aErrLogName;
 	if(fRef.fCmdArgs.isJobLogOnly())
         aLogName = fRef.fCmdArgs.getBulkRootDir()+"/log/"+
@@ -616,6 +616,7 @@ void WESDHandler::setup()
 
 		std::vector<unsigned int> aPmVec = fRef.fCmdArgs.getPmVec();
 		WETableLockGrabber aTLG(*this);
+		string errMsg;
 		for (int aIdx = 0; aIdx < (aWaitIntvl*10); aIdx++)
 		{
 			try
@@ -624,9 +625,9 @@ void WESDHandler::setup()
 				if (getDebugLvl() > 1)
 					cout << "Table Lock = " << fTableLock << endl;
 			}
-			catch (std::exception&)
+			catch (std::exception& ex)
 			{
-				//throw runtime_error(ex.what());
+				errMsg = ex.what();
 			}
 			if (fTableLock != 0) break;
 			usleep(100000);
@@ -637,7 +638,7 @@ void WESDHandler::setup()
 	        ostringstream oss;
 	        oss << "Failed to acquire Table Lock of ";
 	        oss << fRef.fCmdArgs.getSchemaName() << ".";
-			oss << fRef.fCmdArgs.getTableName()<<" ... exiting";
+			oss << fRef.fCmdArgs.getTableName()<< "; " << errMsg;
 	        //fLog.logMsg( oss.str(), MSGLVL_ERROR );
 			setContinue(false);
 			throw runtime_error(oss.str());
@@ -729,7 +730,9 @@ void WESDHandler::setup()
 				oss << "Reading input from STDIN to import into table ";
 				oss << fRef.fCmdArgs.getSchemaName() << ".";
 				oss << fRef.fCmdArgs.getTableName() << "...";
-				fLog.logMsg( oss.str(), MSGLVL_INFO1 );
+				
+				if ( fRef.fCmdArgs.getConsoleOutput())
+					fLog.logMsg( oss.str(), MSGLVL_INFO1 );
 			}
 			if(getDebugLvl())
 				cout << "BatchQuantity="<<fRef.fCmdArgs.getBatchQuantity()<<endl;
@@ -763,7 +766,8 @@ void WESDHandler::setup()
 			}
 			oss << " ...";
 		}
-		fLog.logMsg( oss.str(), MSGLVL_INFO1 );
+		if ( fRef.fCmdArgs.getConsoleOutput())
+			fLog.logMsg( oss.str(), MSGLVL_INFO1 );
 	}
 
 
@@ -784,7 +788,8 @@ void WESDHandler::cancelOutstandingCpimports()
 {
 	std::string aStr = "Canceling outstanding cpimports";
 	if(getDebugLvl()) cout << aStr << endl;
-	fLog.logMsg( aStr, MSGLVL_INFO1 );
+	if ( fRef.fCmdArgs.getConsoleOutput())
+		fLog.logMsg( aStr, MSGLVL_INFO1 );
 
 	fFileReadThread.shutdown();
 	bool aSetFail = false;
@@ -1024,7 +1029,8 @@ void WESDHandler::onEodResponse(int PmId) {
 			    //Bulk load completed, total run time :    2.98625 seconds
 			    oss1 << "Load file distribution completed, total run time : ";
 			    oss1 << fImportRslt.getTotalRunTime()<<" seconds" << endl;
-			    fLog.logMsg( oss1.str(), MSGLVL_INFO1 );
+			    if ( fRef.fCmdArgs.getConsoleOutput())
+					fLog.logMsg( oss1.str(), MSGLVL_INFO1 );
 				fRef.onSigInterrupt(0); // 1 for the sake of it
 			}
 		}
@@ -1062,7 +1068,6 @@ void WESDHandler::onImpFileError(int PmId)
 	snprintf(aRedCol, sizeof(aRedCol), "\033[0;31m");
 	cout << aRedCol << aStrStr.str() << aDefCon << endl;
 	fLog.logMsg(aStrStr.str(), MSGLVL_ERROR);
-
 
 	if (!fWeSplClients[PmId]->isCpiFailed())
 		fWeSplClients[PmId]->setCpiFailed(true);
@@ -1135,7 +1140,8 @@ void WESDHandler::onCpimportFail(int PmId, bool SigHandle)
 		fLog.logMsg( aStrStr.str(), MSGLVL_ERROR );
 		std::stringstream aStrStr2;
 		aStrStr2 << "Please verify error log files in PM"<< PmId;
-		fLog.logMsg( aStrStr2.str(), MSGLVL_INFO1 );
+		if ( fRef.fCmdArgs.getConsoleOutput())
+			fLog.logMsg( aStrStr2.str(), MSGLVL_INFO1 );
 
 		if (!fWeSplClients[PmId]->isCpiFailed())
 			fWeSplClients[PmId]->setCpiFailed(true);
@@ -1178,8 +1184,8 @@ void WESDHandler::onBrmReport(int PmId, messageqcpp::SBS& Sbs) {
 	fWeSplClients[PmId]->setBrmRptRcvd(true);
 
 	std::string aStr;
-	int aTotRows = 0;
-	int aInsRows = 0;
+	int64_t aTotRows = 0;
+	int64_t aInsRows = 0;
 	int aColNum = 0;
 	CalpontSystemCatalog::ColDataType aColType = CalpontSystemCatalog::INT;
 	int aOorVal = 0;
@@ -1189,6 +1195,7 @@ void WESDHandler::onBrmReport(int PmId, messageqcpp::SBS& Sbs) {
 
     if (getDebugLvl()>2)
         cout <<"BRM Report length : "<< (*Sbs).length() << endl;
+
 	while ((*Sbs).length() > 0)
 	{
 		(*Sbs) >> aStr;
@@ -1203,7 +1210,7 @@ void WESDHandler::onBrmReport(int PmId, messageqcpp::SBS& Sbs) {
 			fImportRslt.updateRowsProcessed(aTotRows);
 			fImportRslt.updateRowsInserted(aInsRows);
 		}
-		aRet = WEBrmUpdater::prepareColumnOutOfRangeInfo(aStr, aColNum, aColType, 
+		aRet = WEBrmUpdater::prepareColumnOutOfRangeInfo(aStr, aColNum, aColType,
 														 aColName, aOorVal);
 		if (aRet)
 		{
@@ -1220,7 +1227,8 @@ void WESDHandler::onBrmReport(int PmId, messageqcpp::SBS& Sbs) {
 			{
 				std::stringstream aOss;
 				aOss << "Bad File : " << aBadFileName << " @ PM"<< PmId;
-				fLog.logMsg( aOss.str(), MSGLVL_INFO1 );
+				if ( fRef.fCmdArgs.getConsoleOutput())
+					fLog.logMsg( aOss.str(), MSGLVL_INFO1 );
 			}
 		}
 		aRet = WEBrmUpdater::prepareErrorFileInfo(aStr, aErrFileName);
@@ -1233,7 +1241,8 @@ void WESDHandler::onBrmReport(int PmId, messageqcpp::SBS& Sbs) {
 			{
 				std::stringstream aOss;
 				aOss << "Err File : " << aErrFileName << " @ PM"<< PmId;
-				fLog.logMsg( aOss.str(), MSGLVL_INFO1 );
+				if ( fRef.fCmdArgs.getConsoleOutput())
+					fLog.logMsg( aOss.str(), MSGLVL_INFO1 );
 			}
 		}
 
@@ -1244,6 +1253,18 @@ void WESDHandler::onBrmReport(int PmId, messageqcpp::SBS& Sbs) {
 			aOss << "PM"<< PmId << " : " << aStr;
 			logging::Message::Args errMsgArgs;
 			errMsgArgs.add(aOss.str());
+			if (!fRef.fCmdArgs.getConsoleOutput())
+			{
+				ostringstream oss;
+				oss << "/tmp/" <<fTableOId << ".txt";
+				ofstream dmlFile(oss.str().c_str(), std::ofstream::app);
+				if (dmlFile.is_open())
+				{
+					dmlFile << aOss.str();
+					dmlFile << endl;
+				}
+				dmlFile.close();	
+			}	
 			fRef.fpSysLog->logMsg(errMsgArgs, logging::LOG_TYPE_ERROR, logging::M0000);
 			if (getDebugLvl()) cout << aOss.str() << endl;
 			fLog.logMsg( aOss.str(), MSGLVL_ERROR );
@@ -1390,7 +1411,8 @@ void WESDHandler::onErrorFile(int PmId, messageqcpp::SBS& Sbs) {
 		setErrorFileName(PmId, aErrFileName);
 		aStrStr.str(std::string());
 		aStrStr << "Row numbers with error reasons are listed in file : "<< aErrFileName;
-		fLog.logMsg( aStrStr.str(), MSGLVL_INFO1 );
+		if ( fRef.fCmdArgs.getConsoleOutput())
+			fLog.logMsg( aStrStr.str(), MSGLVL_INFO1 );
 
 	} catch (std::exception&) {
 		cout << "Error in opening the ERROR file!!" << aErrFileName << endl;
@@ -1480,7 +1502,8 @@ void WESDHandler::onBadFile(int PmId, messageqcpp::SBS& Sbs) {
 
 		aStrStr.str(std::string());
 		aStrStr << "Exact error rows are listed in file : "<< aBadFileName;
-		fLog.logMsg( aStrStr.str(), MSGLVL_INFO1 );
+		if ( fRef.fCmdArgs.getConsoleOutput())
+			fLog.logMsg( aStrStr.str(), MSGLVL_INFO1 );
 	}
 	catch (std::exception& ex)
 	{
@@ -1632,10 +1655,20 @@ void WESDHandler::onCleanupResult(int PmId, messageqcpp::SBS& Sbs) {
 			oss << fRef.fCmdArgs.getTableName() << ": ";
 			oss << fImportRslt.fRowsPro << " rows processed and ";
 			oss << fImportRslt.fRowsIns << " rows inserted.";
-		    fLog.logMsg( oss.str(), MSGLVL_INFO1 );
+			
+			if ( fRef.fCmdArgs.getConsoleOutput())
+				fLog.logMsg( oss.str(), MSGLVL_INFO1 );
 
 			// BUG 4399 Print out WARN messages for out of range counts
 			WEColOorVec::iterator aIt = fImportRslt.fColOorVec.begin();
+			ofstream dmlFile;
+			if (!fRef.fCmdArgs.getConsoleOutput()) //for DML to use file /tmp/
+			{
+				ostringstream oss;
+				oss << "/tmp/" <<fTableOId << ".txt";
+				dmlFile.open(oss.str().c_str());
+			}			
+			
 			while(aIt != fImportRslt.fColOorVec.end())
 			{
 				if ((*aIt).fNoOfOORs > 0)
@@ -1662,16 +1695,26 @@ void WESDHandler::onCleanupResult(int PmId, messageqcpp::SBS& Sbs) {
 					}
 					ossSatCnt << (*aIt).fNoOfOORs;
 					fLog.logMsg(ossSatCnt.str(), MSGLVL_WARNING);
+					if (!fRef.fCmdArgs.getConsoleOutput()) //for DML to use
+					{
+						if (dmlFile.is_open())
+						{
+							dmlFile << (*aIt).fNoOfOORs;
+							dmlFile << endl;
+						}
+					}
 				}
 				aIt++;
 			}
-
+			dmlFile.close();
 			fImportRslt.stopTimer();
 		    ostringstream oss1;
 		    //Bulk load completed, total run time :    2.98625 seconds
 		    oss1 << "Bulk load completed, total run time : ";
 		    oss1 << fImportRslt.getTotalRunTime()<<" seconds";
-		    fLog.logMsg( oss1.str(), MSGLVL_INFO1 );
+		    
+		    if ( fRef.fCmdArgs.getConsoleOutput())
+				fLog.logMsg( oss1.str(), MSGLVL_INFO1 );
 
 			fRef.onSigInterrupt(0); // 0 for entire success
 		}
@@ -1681,14 +1724,16 @@ void WESDHandler::onCleanupResult(int PmId, messageqcpp::SBS& Sbs) {
 			oss << "Table "<<fRef.fCmdArgs.getSchemaName()<<".";
 			oss << fRef.fCmdArgs.getTableName() << ": (OID-";
 			oss << this->getTableOID() << ") was NOT successfully loaded.";
-			fLog.logMsg( oss.str(), MSGLVL_INFO1 );
+			if ( fRef.fCmdArgs.getConsoleOutput())
+				fLog.logMsg( oss.str(), MSGLVL_INFO1 );
 
 			fImportRslt.stopTimer();
 			ostringstream oss1;
 			//Bulk load completed, total run time :    2.98625 seconds
 			oss1 << "Bulk load completed, total run time : ";
 			oss1 << fImportRslt.getTotalRunTime()<<" seconds";
-			fLog.logMsg( oss1.str(), MSGLVL_INFO1 );
+			if ( fRef.fCmdArgs.getConsoleOutput())
+				fLog.logMsg( oss1.str(), MSGLVL_INFO1 );
 			// Even though cleanup is success, entire process is failure
 			fRef.onSigInterrupt(1); // therefore 1
 		}
@@ -2076,7 +2121,7 @@ unsigned int WESDHandler::calcTableRecLen(
 		{
 			CalpontSystemCatalog::TableColName colName;
 			colName = systemCatalogPtr->colName(oid);
-			
+
 			setIter = colListInJobFile.find( colName.column );
 			if (setIter != colListInJobFile.end())
 			{
@@ -2134,7 +2179,7 @@ void WESDHandler::check4CpiInvokeMode() {
 			//BUG 4165
 			if (fRef.fCmdArgs.getMode() == 3) {
 				throw runtime_error("Mode 3 imports can only be run on a PM.");
-			} 
+			}
 			else if (fRef.fCmdArgs.getMode() == -1) //default mode //BUG 4210
 					{
 				fRef.fCmdArgs.setMode(1);
@@ -2345,7 +2390,9 @@ void WESDHandler::onHandlingSignal()
 	snprintf(aDefCon, sizeof(aDefCon), "\033[0m");
 	snprintf(aRedCol, sizeof(aRedCol), "\033[0;31m");
 	aStrStr <<aRedCol<<"Received signal to terminate the process."<<aDefCon;
-	fLog.logMsg( aStrStr.str(), MSGLVL_INFO1 );
+	
+	if ( fRef.fCmdArgs.getConsoleOutput())
+		fLog.logMsg( aStrStr.str(), MSGLVL_INFO1 );
 
 	logging::Message::Args errMsgArgs;
 	errMsgArgs.add(aStrStr.str());
@@ -2353,7 +2400,8 @@ void WESDHandler::onHandlingSignal()
 
 	std::stringstream aStrStr1;
 	aStrStr1 <<"Handling signal ......";
-	fLog.logMsg( aStrStr1.str(), MSGLVL_INFO1 );
+	if ( fRef.fCmdArgs.getConsoleOutput())
+		fLog.logMsg( aStrStr1.str(), MSGLVL_INFO1 );
 
 	fRef.fSignaled = false;
 	bool aTblLockReleased = false;
@@ -2364,7 +2412,8 @@ void WESDHandler::onHandlingSignal()
 	//				So we have to wait some more time.
 	std::stringstream aStrStr2;
 	aStrStr2 << "Rolling back ..........";
-	fLog.logMsg( aStrStr2.str(), MSGLVL_INFO1 );
+	if ( fRef.fCmdArgs.getConsoleOutput())
+		fLog.logMsg( aStrStr2.str(), MSGLVL_INFO1 );
 	for(int aIdx=0; aIdx<60; aIdx++)
 	{
 		int aStatus = check4RollbackRslts();
@@ -2383,7 +2432,9 @@ void WESDHandler::onHandlingSignal()
 
 	std::stringstream aStrStr3;
 	aStrStr3 << "Cleaning up ..........";
-	fLog.logMsg( aStrStr3.str(), MSGLVL_INFO1 );
+	
+	if ( fRef.fCmdArgs.getConsoleOutput())
+		fLog.logMsg( aStrStr3.str(), MSGLVL_INFO1 );
 	for(int aIdx=0; aIdx<60; aIdx++)
 	{
 		int aStatus = check4CleanupRslts();
@@ -2413,7 +2464,8 @@ void WESDHandler::onHandlingSigHup()
 	snprintf(aDefCon, sizeof(aDefCon), "\033[0m");
 	snprintf(aRedCol, sizeof(aRedCol), "\033[0;31m");
 	aStrStr <<aRedCol<<"Interrupt received .... Program exiting."<<aDefCon;
-	fLog.logMsg( aStrStr.str(), MSGLVL_INFO1 );
+	if ( fRef.fCmdArgs.getConsoleOutput())
+		fLog.logMsg( aStrStr.str(), MSGLVL_INFO1 );
 
 	logging::Message::Args errMsgArgs;
 	errMsgArgs.add(aStrStr.str());
@@ -2432,7 +2484,8 @@ void WESDHandler::onHandlingSigHup()
 void WESDHandler::onDisconnectFailure()
 {
 	string aStr("Trying to reconnect and rollback");
-	fLog.logMsg( aStr, MSGLVL_INFO1 );
+	if ( fRef.fCmdArgs.getConsoleOutput())
+		fLog.logMsg( aStr, MSGLVL_INFO1 );
 
 	for (int aSec = 0; aSec < 15; aSec++ )
 	{
@@ -2468,7 +2521,8 @@ void WESDHandler::onDisconnectFailure()
 	//				So we have to wait some more time.
 	std::stringstream aStrStr2;
 	aStrStr2 << "Rolling back ..........";
-	fLog.logMsg( aStrStr2.str(), MSGLVL_INFO1 );
+	if ( fRef.fCmdArgs.getConsoleOutput())
+		fLog.logMsg( aStrStr2.str(), MSGLVL_INFO1 );
 	for(int aIdx=0; aIdx<10; aIdx++)
 	{
 		int aStatus = check4RollbackRslts();
@@ -2488,7 +2542,8 @@ void WESDHandler::onDisconnectFailure()
 
 	std::stringstream aStrStr3;
 	aStrStr3 << "Cleaning up ..........";
-	fLog.logMsg( aStrStr3.str(), MSGLVL_INFO1 );
+	if ( fRef.fCmdArgs.getConsoleOutput())
+		fLog.logMsg( aStrStr3.str(), MSGLVL_INFO1 );
 	for(int aIdx=0; aIdx<10; aIdx++)
 	{
 		int aStatus = check4CleanupRslts();

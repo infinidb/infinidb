@@ -121,8 +121,6 @@ string calpontPackage3;
 string mysqlPackage;
 string mysqldPackage;
 
-const char* pcommand = 0;
-
 string parentOAMModuleName;
 int pmNumber = 0;
 int umNumber = 0;
@@ -138,7 +136,6 @@ Config* sysConfig = Config::makeConfig();
 string SystemSection = "SystemConfig";
 string InstallSection = "Installation";
 string ModuleSection = "SystemModuleConfig";
-string prompt;
 string serverTypeInstall;
 int    IserverTypeInstall;
 string parentOAMModuleIPAddr;
@@ -165,6 +162,7 @@ bool pmwithum = false;
 bool mysqlRep = false;
 string MySQLRep = "n";
 string PMwithUM = "n";
+bool EM = false;
 
 string DataFileEnvFile;
 
@@ -173,28 +171,8 @@ string installDir;
 extern string pwprompt;
 string mysqlpw = " ";
 
-const char* callReadline(string prompt)
-{
-    	if ( !noPrompting )
-	{
-	        const char* ret = readline(prompt.c_str());
-	        if( ret == 0 )
-	            exit(1);
-        	return ret;
-	}
-    	else 
-	{
-        	cout << prompt << endl;
-        	return "";
-    	}
-}
-
-void callFree(const char* )
-{
-	if ( !noPrompting )
-		free((void*)pcommand);
-	pcommand = 0;
-}
+extern const char* pcommand;
+extern string prompt;
 
 /* create thread argument struct for thr_func() */
 typedef struct _thread_data_t {
@@ -222,6 +200,7 @@ int main(int argc, char *argv[])
 	// hidden options
 	// -f for force use nodeps on rpm install
 	// -o to prompt for process to start offline
+	// -em for Enterprise Manager
 
 	//default
 	installDir = installDir + "";
@@ -296,6 +275,8 @@ int main(int argc, char *argv[])
 			nodeps = "--nodeps";
 		else if( string("-o") == argv[i] )
 			startOfflinePrompt = true;
+		else if( string("-em") == argv[i] )
+			EM = true;
 		else if( string("-c") == argv[i] ) {
 			i++;
 			if (i >= argc ) {
@@ -590,7 +571,7 @@ int main(int argc, char *argv[])
 				if (startOfflinePrompt)
 					offLineAppCheck();
 
-				checkMysqlPort(mysqlPort, sysConfig);
+				checkMysqlPort(mysqlPort, sysConfig, EM);
 
 				if ( !writeConfig(sysConfig) ) {
 					cout << "ERROR: Failed trying to update InfiniDB System Configuration file" << endl;
@@ -2656,10 +2637,10 @@ int main(int argc, char *argv[])
 		//run the mysql / mysqld setup scripts
 		cout << endl << "===== Running the InfiniDB MySQL setup scripts =====" << endl << endl;
 
-		checkMysqlPort(mysqlPort, sysConfig);
+		checkMysqlPort(mysqlPort, sysConfig, EM);
 
 		// call the mysql setup scripts
-		mysqlSetup();
+		mysqlSetup(EM);
 		sleep(5);
 	}
 
@@ -2890,7 +2871,7 @@ int main(int argc, char *argv[])
 				password = "'" + password + "'";
 			}
 
-			checkSystemMySQLPort(mysqlPort, sysConfig, USER, password, childmodulelist, IserverTypeInstall, pmwithum);
+			checkSystemMySQLPort(mysqlPort, sysConfig, USER, password, childmodulelist, IserverTypeInstall, pmwithum, EM);
 
 			if ( ( IserverTypeInstall == oam::INSTALL_COMBINE_DM_UM_PM ) ||
 				( (IserverTypeInstall != oam::INSTALL_COMBINE_DM_UM_PM) && pmwithum ) )
@@ -2907,7 +2888,7 @@ int main(int argc, char *argv[])
 				}
 
 				// call the mysql setup scripts
-				mysqlSetup();
+				mysqlSetup(EM);
 				sleep(5);
 			}
 
@@ -3419,7 +3400,7 @@ int main(int argc, char *argv[])
 		cout << " DONE" << endl;
 
 		if (hdfs)
-			cmd = ". " + installDir + "/bin/" + DataFileEnvFile + ";" + installDir + "/bin/dbbuilder 7 > /tmp/dbbuilder.log";
+			cmd = "bash -c '. " + installDir + "/bin/" + DataFileEnvFile + ";" + installDir + "/bin/dbbuilder 7 > /tmp/dbbuilder.log'";
 		else
 			cmd = installDir + "/bin/dbbuilder 7 > /tmp/dbbuilder.log";
 

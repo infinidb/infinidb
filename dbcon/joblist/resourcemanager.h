@@ -123,7 +123,7 @@ namespace joblist
 
   const uint64_t defaultDECThrottleThreshold = 200000000;  // ~200 MB
 
-
+  const uint8_t defaultUseCpimport = 1;
   /** @brief ResourceManager
    *	Returns requested values from Config
    *
@@ -212,6 +212,11 @@ namespace joblist
     uint64_t  	getRowsPerBatch() const
 	{ return  getUintVal(fBatchInsertStr, "RowsPerBatch", defaultRowsPerBatch); }
 
+	uint8_t  	getUseCpimport() const
+	{
+		int val = getIntVal(fBatchInsertStr, "UseCpimport", defaultUseCpimport);
+		return val; }
+
     uint64_t  	getOrderByLimitMaxMemory() const
 	{ return  getUintVal(fOrderByLimitStr, "MaxMemory", defaultOrderByLimitMaxMemory); }
 
@@ -232,11 +237,13 @@ namespace joblist
     EXPORT void  hjPmMaxMemorySmallSide();
 
 	/* new HJ/Union/Aggregation mem interface, used by TupleBPS */
-	inline bool getMemory(int64_t amount) {
-		return (atomicops::atomicSub(&totalUmMemLimit, amount) >= 0);
-	}
-	inline void returnMemory(int64_t amount) {
-		(void)atomicops::atomicAdd(&totalUmMemLimit, amount);
+	/* sessionLimit is a pointer to the var holding the session-scope limit, should be JobInfo.umMemLimit
+	   for the query. */
+	/* Temporary parameter 'patience', will wait for up to 10s to get the memory. */
+	EXPORT bool getMemory(int64_t amount, boost::shared_ptr<int64_t> sessionLimit, bool patience = true);
+	inline void returnMemory(int64_t amount, boost::shared_ptr<int64_t> sessionLimit) {
+		atomicops::atomicAdd(&totalUmMemLimit, amount);
+		atomicops::atomicAdd(sessionLimit.get(), amount);
 	}
 	inline int64_t availableMemory() { return totalUmMemLimit; }
 
@@ -316,13 +323,14 @@ namespace joblist
 
     void windowFunctionThreads(uint32_t n) { fWindowFunctionThreads = n; }
     uint32_t windowFunctionThreads() const { return fWindowFunctionThreads; }
-	
+
 	bool useHdfs() const { return fUseHdfs; }
 
 	EXPORT bool getMysqldInfo(std::string& h, std::string& u, std::string& w, unsigned int& p) const;
 	EXPORT bool queryStatsEnabled() const;
 	EXPORT bool userPriorityEnabled() const;
 
+	uint64_t getConfiguredUMMemLimit() const { return configuredUmMemLimit; }
   private:
 
     void logResourceChangeMessage(logging::LOG_TYPE logType, uint32_t sessionID, uint64_t newvalue, uint64_t value, const std::string& source, logging::Message::MessageID mid);
@@ -371,6 +379,7 @@ namespace joblist
 
 	/* new HJ/Union/Aggregation support */
 	volatile int64_t totalUmMemLimit;	// mem limit for join, union, and aggregation on the UM
+	uint64_t configuredUmMemLimit;
 	uint64_t pmJoinMemLimit;	// mem limit on individual PM joins
 
 	/* multi-thread aggregate */
