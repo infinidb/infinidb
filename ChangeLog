@@ -1,0 +1,445 @@
+/***********************************************************************
+*
+*   Copyright (C) 2013 InfiniDB Corp
+*   All Rights Reserved
+*
+***********************************************************************/
+
+July 7, 2014
+Version 4.6
+
+
+ENHANCEMENTS INCLUDED IN THIS RELEASE
+-------------------------------------
+Enh #   Short Description
+1505	Implement temp file based LargeHashJoin for tuple joins	
+3683	Allow function(column) = function(column) join	
+5308	Improve performance of load data infile and insert into select from	
+
+
+ISSUES RESOLVED IN THIS RELEASE
+-------------------------------
+Bug #   Short Description                                                                                                                                            
+
+3858	While "load data infile" is in progress, PrimProc fails to read compressed chunk and retries for more than a minute
+4295	CPimport Mode 2:  Should check for input files on all PMs before starting loading
+4737	Distributed cpimport does not support a list of import files to a single table
+4789	InfiniDB came up normally after encountering an critical sessionManager::rollback() error
+5134	Source package:  After compilation and installation, InfiniDB reported lib not found error during startup
+5140	second and subsequent load data infiles have 30 second delay with auto increment
+5523	Mysql is resetting when running a query on a information_schema.table and an InfiniDB table.
+5727	Improve logging around controllernode start up
+5756	After a failed addModule command movePmDbrootConfig did not fail
+5758	when amazon UM modules are removed, their associated EBS storages are not removed
+5761	Support additional versions of Java for Hadoop installations
+5762	Need a method to handle MySQL port conflict on a multi-server install
+5773	Startsystem is failing when shutdown has not completed.
+5847	IDB-2021 on query using multiple pseudo column functions against same column and aggregation
+5848	No CP elimination from idbPartition(col) in the where clause
+5865	ERROR 138 (HY000): IDB-1000: 'orders' and 'sub-query' are not joined on a query with an or condition and not in condition
+5891	getsystemdisk reporting minus value
+5894	Performance issue when inserting a value in an autoincrement column
+5930	Not in group by error on query grouping by idbPm and idbDbRoot functions
+5931	current builds do not support a non-root / hdfs install
+5946	load data infile error: ERROR 122 (HY000): CAL0006:  Error verifying compression headers
+5947	calonlinealter always creates non compressed columns
+5950	getModuleHostNames command on AWS returned a segmentation fault error
+5954	calpontSupport for Windows does not recognize options
+5958	Query with a subselect is getting an assertion error
+5963	configxml.sh fails to set CrossEngineSupport Password from the default setting
+5978	crash with prepared statements
+5987	hadoop test failed on install, hadoop not install where setenv was looking and not a parcel
+5992	Bulk load fails on long schema name, long table name, and long column name combination.
+5993	IDB-2016: Non supported item 'c2' on the GROUP BY list.
+5996	Table reporting errors after a LDI
+5997	standard mysql and infinidb mysql incorrectly starting/stopping each other
+6000	New MySQL port test is insufficient
+6001	cpimport performance improvement for tables with many dictionary columns
+6005	addModule command failed to add an UM
+6010	InfiniDB mysql replication doesn't work when UM mysql Port address is not 3306
+6013	HW 2.1 testing with 4.5.1-2 - different JAVA_HOME's are setup
+6017	Queries with "where date(col) in (select dtCol)" not finding rows
+6026	Prevent potential infinite loops reading input in postConfigure
+6027	post-install message for a non-root hadoop install is incorrect..
+6029	when autocommit off, batchinsert set hwm of dictionary store file to 0
+6041	When loading 4160825419 rows cpimport  reported as -134141877 rows
+6044	'union all' query generates tupleconstantstep.cpp@731: assertion 'fRowConst.getSize() == fRowOut.getSize()' failed
+6061	window function returned incorrect results
+6066	query with alias is returning IDB-3009: Unknown column error.
+6073	setenv scripts issues on Ubuntu
+
+/***********************************************************************
+*
+*   Copyright (C) 2013 InfiniDB Corp
+*   All Rights Reserved
+*
+***********************************************************************/
+
+June 23, 2014
+Version 4.5.1
+
+
+ENHANCEMENTS INCLUDED IN THIS RELEASE
+-------------------------------------
+Enh #   Short Description
+
+
+
+ISSUES RESOLVED IN THIS RELEASE
+-------------------------------
+Bug #   Short Description                                                                                                                                            
+
+4438	Implement -j option with simple usage to create a specific job log file
+4638	Update from 2.2.x to 3.0 is not supported with multiple dbroots
+5501	update with subquery using a view with an order by receives an error when using infinidb tables
+5523	Mysql is resetting when running a query on a information_schema.table and an InfiniDB table.
+5739	install-infinidb.sh script should be removed
+5756	After a failed addModule command movePmDbrootConfig did not fail
+5758	when amazon UM modules are removed, their associated EBS storages aren't
+5761    Add support for additional Java versions with installation on HDFS
+5762	Need a method to handle MySQL port conflict on a multi-server install
+5785	While running a complex query a Control C aborts the query but may not clear ExeMgr memory
+5804	mysql reset occurring following an install when /dev/shm permissions were not set correctly
+5838	no prompt postConfigure does not work when mysql password is required.
+5873	install failure - No Calpont.xml: failed to be written in config api
+5881	with replication, delete with idbpm(colname) in where clause failed with an error.
+5884	query returns incorrect results when using an on clause filter involving a table not directly involved in the outer join
+5887	" Incorrect results of Is Null "
+5891    getsystemdisk returns minus value
+5893	Pseudo column functions return an "BPS not created 1" error when used as the 2nd expression in a where clause
+5896	getConfig has no linefeed after returning value
+5900	PrimProc crashes if NumBlocksPct has '%' in value
+5903	startsystem reported successful system start when mysqld aborted
+5904	Changing dbroot-to-pm assignment during postConfigure causes double-mounted storage devices
+5906	Diagnostic messages logged in the err.log file during new installation
+5907	After installation, a rsync error was report in UM1 but the stack seems to be in working state
+5908	4.5 non-root install problems
+5909	On a stack with replication and local query enabled, rerunning postConfigure caused the two features to become disabled
+5910	Object names > 64 cause replication errors
+5913	Renaming an autoincrement column is resetting the next value
+5915	On hadoop system, SYSTABLE's update was not flushed to disk when implementing split dbroots for systables
+5916	query using a view on a view causes ERROR 2013 (HY000): Lost connection to MySQL server during query
+5917	non-root gluster / hadoop installs fail - storage types not being offered in postConfigure
+5919    Warning of future deprecated "default-character-set" setting on Windows install
+5923	ERROR 122 (HY000): Lost connection to DDLProc
+5925	Add the two new options to postConfigure -h
+5932	Queries with limits sometimes set the extent map min / max incorrectly
+5943	mysql daemon fails to start on pm2 of a non-root install local-query configured system
+5944	Incorrect schema name in error message
+5946	load data infile error: ERROR 122 (HY000): CAL0006:  Error verifying compression headers
+5947	calonlinealter always creates non compressed columns
+5956	Error Code: 138 IDB-2015: Sorting length exceeded when using a view
+5958	Query with a subselect is getting an assertion error
+5973	large system (1um-30pm) failing to start, ProcMgr incorrect stopping with ProcMons not active
+5981	postconfigure upgrade when enabling local-query fails
+5983	all the hdfs settings are not in the .bashrc file after install
+5993	IDB-2016: Non supported item 'c2' on the GROUP BY list.
+5996    Table reporting errors after a LDI
+6001	cpimport performance improvement for tables with many dictionary columns
+6029    with autocommit off, batchinsert set hwm of dictionary store file to 0
+
+/***********************************************************************
+*
+*   Copyright (C) 2013 InfiniDB Corp
+*   All Rights Reserved
+*
+***********************************************************************/
+
+March 31, 2014
+Version 4.5
+
+
+ENHANCEMENTS INCLUDED IN THIS RELEASE
+-------------------------------------
+Enh #   Short Description
+
+4021    Selectable pseudo columns for row/PM identification
+4578	Upgrade to latest MySQL 5.1.73
+5572	Optimizations to cpimport with Hadoop
+5634	Optimization:  Project only the necessary columns from views with union all or union
+5635	Optimization:  Use partition elimination for from clause sub queries and views with union / union all
+5657	Local PM query interface
+5660	Local PM Sqoop Import 
+5740	Enable use of MySQL Replication on UMs with InfiniDB
+5799    Enhancement request to not provide information when performing a non-hadoop install on a system with hadoop
+
+
+ISSUES RESOLVED IN THIS RELEASE
+-------------------------------
+Bug #   Short Description                                                                                                                                            
+
+5443       An error is not issued when changing a column's datatype
+5444       alter table will not allow an autoincrement column to be renamed.
+5611       Windows MySQL doesn't build out of github
+5640       Hadoop:  dumpcol and eval returned a java error with stack trace when non-existing file is supplied
+5647       cpimport -i option doesn't work with modes 1 and 2
+5745       hadoop: unknown bulk rollback error on 4PM stack
+5748       startsystem failure when user-module is disabled
+5805       Query with avg windowing function returning the average at the wrong decimal scale
+5806       cpimport loads data incorrectly on a multi-server stack when the table has a mix of compressed and non-compressed columns
+5807       concat producing an incorrect count when using a view
+5808       colxml error reported on Windows system.
+5811       selecting from a view which has  a cross engine join produces an ERROR 122 (HY000): fatal error executing query in crossengine client lib(17)(17)
+5817       addModule / altersystem-enablemodule fails on amazon with InfiniDB 4.x
+5819       Calpont.xml and Calpont.xml.singleserver do not have the same parameters.
+5820       Inconsistent rounding on percentile_cont windowing function
+5861       post-install reported to have run the setenv-hdfs-12 script on a CDH 4 install
+5864       Include calpontSupport in the standard edition
+5874       Reset of ProcessMonitor on PM2 on a combo system left mysqld as man_offline
+
+
+
+
+/***********************************************************************
+*
+*   Copyright (C) 2014 InfiniDB Corp
+*   All Rights Reserved
+*
+***********************************************************************/
+
+April 14, 2014
+Version 4.0.3
+
+
+ENHANCEMENTS INCLUDED IN THIS RELEASE
+-------------------------------------
+Enh #   Short Description
+
+
+
+ISSUES RESOLVED IN THIS RELEASE
+-------------------------------
+Bug #   Short Description                                                                                                                                            
+
+4638	Update from 2.2.x to 3.0 is not supported with multiple dbroots
+5610	The MySQL front end no longer outputs a descriptive messages when version buffer is full
+5748	startsystem failure when user-module is disabled
+5778	Distributed import error message for auto increment overflow is not friendly
+5793	Remove O/S version checking in glusterconf
+5801	Queries with string comparison in where clause occasionally causes a PM to hang
+5805	Query with avg windowing function returning the average at the wrong decimal scale
+5806	cpimport loads data incorrectly on a multi-server stack when the table has a mix of compressed and non-compressed columns
+5807	concat producing an incorrect count when using a view
+5808	colxml error reported on Windows system.
+5810	update doesn't flush string file with table oid 3000
+5811	selecting from a view which has  a cross engine join produces an ERROR 122 (HY000): fatal error executing query in crossengine client lib(17)(17)
+5817	addModule / altersystem-enablemodule fails on amazon 4.x
+5820	Inconsistent rounding on percentile_cont windowing function
+5821	PM join with F & E in-join filter + a UM join will crash ExeMgr
+5823	System hung when running concurrent queries with autocommit off
+5838	no prompt postConfigure does not work when mysql password is required.
+5874	Reset of ProcessMonitor on PM2 on a combo system left mysqld as man_offline
+5877	After loading 1 extent worth of data into a table, select count(*) failed.
+5882	cleartablelock fails on a multi server system.
+5884	query returns incorrect results when using an on clause filter involving a table not directly involved in the outer join
+5887	" Incorrect results of Is Null "
+5870    select following delete statement is encountering a rid error. 
+5896	getConfig has no linefeed after returning value
+5900	PrimProc crashes if NumBlocksPct has '%' in value
+5904	Changing dbroot-to-pm assignment during postConfigure causes double-mounted storage devices
+5915	On hadoop system, SYSTABLE's update was not flushed to disk when implementing split dbroots for systables
+5916	query using a view on a view causes ERROR 2013 (HY000): Lost connection to MySQL server during query
+5917	non-root gluster / hadoop installs fail - storage types not being offered in postConfigure
+5932	Queries with limits sometimes set the extent map min / max incorrectly
+
+
+
+
+/***********************************************************************
+*
+*   Copyright (C) 2013 Calpont Corp
+*   All Rights Reserved
+*
+***********************************************************************/
+
+February 10, 2014
+Version 4.0.2
+
+
+ENHANCEMENTS INCLUDED IN THIS RELEASE
+-------------------------------------
+Enh #   Short Description
+
+5760	Hadoop with Cloudera parcel-based install
+5769	Optimization to not preallocate database column files in HDFS
+5732	Add ability to report compressed bytes used rather than file size on disk
+
+
+ISSUES RESOLVED IN THIS RELEASE
+-------------------------------
+Bug #   Short Description                                                                                                                                            
+
+2437	When expression results in data overflow, no error or warning was returned
+4930	no prompt install on AWS had an error when it did not use the volume information.
+5363	HAVING statement regression on 4.0 with COUNT DISTINCT
+5383	NOT NULL constraint cpimport issues
+5604	cpimport jobs hanging on HDFS installs
+5617	Invalid Package error reported during the running of calpontSupport - incorrect error message
+5636	query gives ERROR 1054 (42S22): Unknown column
+5678	ERROR 138 (HY000): 'date_last_update_tk' isn't in tuple.
+5682	HDFS updating a row that was inserted sometimes does not update the row
+5687	TIMESTAMPADD(SECOND,2147483647, returns incorrect information.
+5696	insert statement not providing a warning for truncated data
+5697	IDB produces different results for equivalent calculations
+5705	hadoop: HdfsFileSystem::listDirectory() not returning all files in directory; bulk rollback not deleting db files
+5712	left('unsigned int',6) provides incorrect result
+5715	incorrect calculation provided in result set
+5716	union sql statement not displaying correct result
+5717	create table with invalid Infinidb option does not provide an error or warning
+5718	cross engine join results in  ERROR 122 (HY000): InetStreamSocket::readToMagic: Remote is closed
+5721	amazon upgrade 4.0.0 to 4.0.1 issues
+5722	cpimport failing on table to PM17; not handling a boundary case where 2 DBRoots have partial HWM extents
+5726	amazon 3.6.3 to 4.0.1 upgrade issue - the ebs storage data not given in postConfigure
+5728	update Server cpu-info and disk scheduler in calpontSupport output
+5733	databaseSizeReport doesn't report the size of dictionary string files in calpontsys tables
+5735	Launching simultaneous databaseSizeReports at virtually the same time can sometimes yield incorrect results
+5749	addModule for failed on Amazon system - user_installer password error
+5750	dbrm halt/resumes need to be put around the load of dbrm files
+5752	ERROR 138 (HY000) at line 2: Sub-query failed: error code 2003 error for query that exceeded TotalUmMemory
+5753	When PrimProc restarts, DML statement didn't reset the connections to PrimProc in connector
+5757	addModule for UM failed on Amazon system - remote_command error
+5759	Must use -p option for hadoop fs -mkdir when creating /usr/local/Calpont
+5764	select count(*) from a complex view is returning an incorrect answer.
+5765	truncate statement does not show schema in the debug.log
+5767	'create table' creates table in front end when spaces are in the table name.
+5775	Windows does not log when PrimProc goes down or restarts
+5777	LAG function returns invalid answer on a float column
+
+
+
+
+/***********************************************************************
+*
+*   Copyright (C) 2013 Calpont Corp
+*   All Rights Reserved
+*
+***********************************************************************/
+
+December 2, 2013
+Version 4.0.1
+
+
+ENHANCEMENTS INCLUDED IN THIS RELEASE
+-------------------------------------
+Enh #   Short Description
+
+5619	Support VPC environment with AMI
+
+
+ISSUES RESOLVED IN THIS RELEASE
+-------------------------------
+Bug #   Short Description                                                                                                                                            
+
+4996	removeDbroot should be disabled when GlusterFS is configured
+5268	Incorrect date_format answer from infindb table
+5402	OAM getSystemStatus message in Windows log
+5429	LDI updated casual partitioning min/max values for an extent when where is no update to the actual column value.
+5454	assignDbrootPmConfig needs to error out when the system is shutdown
+5463	calpontSupport is not including the -c option when -a is selected.
+5499	'Memory leak of ExeMgr'
+5529	_CpNoTf_ is reported in results set
+5549	update on two columns with an AND causes mysql reset
+5555	HDFS tools installed on non-Hadoop system
+5558	Issuing Ctrl-C on a repetitive OAM command will set terminal session to echo off
+5566	hdfs error message printed to screen in calpontConsole - run before hdfs is up
+5573	hadoop: update a string column is very slow.
+5588	Delete statement left table locked.
+5596	postConfigure/glusterconf is creating gluster brick directories owned by root user
+5614	"hdfsCheck failed" message logged in crit.log when the stack came up normal
+5621	can't create large (20+ pm) amazon systems using 4.0 AMI
+5626	PrimProc crash running on HDFS
+5628	Bug joining against unsigned tinyint data type
+5631	After applying the row_number() function the table content is going to be lost.
+5638	issue with using a constant in group by column
+5642	system hung during distributed import
+5646	Left outer join on varchar column and date datetime column to date column not returning all matching rows
+5651	Query wrapped in a select * () returns invalid results.
+5652	alter table add dictionary column doesn’t set Number of allocated blocks correctly
+5667	Gluster Install with debian - 'glusterctl status' returns with NOTINSTALLED
+5669	gluster install - dbroot setup in gluster was mismatched to OAM setup per pm
+5670	DecomSrv is restarting after upgrade to 4.0
+5672	dbroot gets unmounted during upgrade when a softlink is used and disk type is internal
+5681	cpimport sometimes fails during concurrent query / import test on HDFS
+5683	HdfsRdwrMemBuffer: unable to write all bytes error in cpimport
+5689	rename table leaves table inaccessible in HDFS
+
+/***********************************************************************
+*
+*   Copyright (C) 2013 Calpont Corp
+*   All Rights Reserved
+*
+***********************************************************************/
+
+October 15, 2013
+Version 4.0
+
+
+ENHANCEMENTS INCLUDED IN THIS RELEASE
+-------------------------------------
+Enh #   Short Description
+
+3581	Optimize Memory Utilization for wide string columns
+4531	Add support for Windowing Functions
+4568	Add ability to report database, schema, and table sizes
+4901	Improve performance of concat function
+4902	Improve performance of insert() and replace() string functions
+4919	Improve performance of makedate() and maketime() functions
+4920	Improve performance of adddate(), date_add(), subdate(), date_sub() functions.
+5087	Enhance InfiniDB to support over 32 PMs.
+5208	Change the Status Updates messages to have state show an ASCII value
+5237	Remove restriction preventing user from dropping a logical partition (segment file) in the last physical partition for a DBRoot
+5243	Add setting in Calpont.xml for enable/disable corefiles
+5300	calpontSupport script performance improvement and additional features
+5316	Include schema name in SQL statement debug log entries
+5410	Add support for InfiniDB on Apache Hadoop
+5414	Add Infinidb support for Apache Sqoop
+5421	Add support for running InfiniDB under a Linux Control Group
+       
+
+
+ISSUES RESOLVED IN THIS RELEASE
+-------------------------------
+Bug # Launchpad Short Description                                                                                                                                            
+
+2871	        Exceeding aggregation limits can block session
+4208	        'drop table' cannot delete files on NFS
+4345	        Specific SQL statements exhausts memory in seconds
+4552  1025340   Load data infile and cpimport produce different results
+      1025247
+4757            Incorrect results with correlated subquery
+4774		Port Data Duplication to debian & Ubuntu
+5160		Incorrect result on query with "DATE(IF(t1.`end_date` - INTERVAL 30 DAY < t1.`start_date`, t1.`start_date`, t1.`end_date` - INTERVAL 30 DAY))" expression
+5222		Update errors out when dealing with out-of-range date and datetime values
+5256		OAM ops returning without DDLProc fully up
+5269		swap limit exceeded and not cleared by OAM restart of the system
+5272		cast function returns incorrect result
+5274		alter table add column returned "Constraints are currently not supported in InfiniDB" error
+5287		system came up Active while a pm was disabled and dbroot was assigned to it
+5299		stopsystem with Force Option is incorrectly resetting dbrm and save_brm too early
+5301		startsystem command system status ended up in MAN_OFFLINE instead of ACTIVE
+5304		Windows command prompt exit hangs after cpimport on upgraded database from 3.0.x and earlier
+5321		Delete from table command fails when pm1 is down on a combo 2pm system
+5322		query failed after disabling and enabling partitions
+5323		Backup error opening column file for OID-3132 on a multi node cpimport
+5331		select calshowpartitions not showing limits incorrectly for char fields in empty table
+5332		shutdownSystem command incorrectly reported 'success'
+5349	        ERR  : Backup error for column file error message occurred running cpimport
+5356		Default syslog.conf to the asynchronous option
+5374	        Data mismatch occurred running query via view
+5379	        LPAD is not functioning correctly when using a Japanese character
+5391	        ERROR 138 (HY000): IDB-1000: 'c1, c2' and 'c3' are not joined error message on a query
+5392		Reset invalid locale alarm when locale has been corrected
+5426	        calshowprocesslist issue hard-coded to look for host in first 13 bytes
+5427		Distributed cpimport not handling connection failure with WriteEngineServer
+5429		Load data infile cleared the min/max values for an extent that was not updated
+5436		ERROR 122 (HY000): CAL0001: Alter table Failed:  AlterTableProcessor::addColumn  Failed to set offset in a compressed data file.
+5438		query filters issue
+5447		cpimport is reporting that -i is an invalid option
+5448		Bug in date_add() with InfiniDB table
+5455		PrimProc resets during a particular sql statement
+5463		calpontSupport is not including the -c option when -a is selected.
+5481		Maintain DBBC/NumThreads setting through upgrade
+5488		PrimProc hangs when DecomSvr dies
+5494		calpontSupport -a option is not capturing the logs from PM1
+5495		DB occasionally hangs querying old data loaded in 3.5.0 or prior release
+
