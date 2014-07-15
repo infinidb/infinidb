@@ -53,7 +53,7 @@ using namespace execplan;
 namespace rowgroup
 {
 
-StringStore::StringStore() : empty(true) { }
+StringStore::StringStore() : empty(true), fUseStoreStringMutex(false) { }
 
 StringStore::StringStore(const StringStore &)
 {
@@ -85,7 +85,7 @@ StringStore::~StringStore()
 uint32_t StringStore::storeString(const uint8_t *data, uint32_t len)
 {
 	MemChunk *lastMC = NULL;
-	uint32_t ret;
+	uint32_t ret = 0;
 
 	empty = false;   // At least a NULL is being stored.
 
@@ -96,6 +96,11 @@ uint32_t StringStore::storeString(const uint8_t *data, uint32_t len)
 	if ((len == 8 || len == 9) &&
 	  *((uint64_t *) data) == *((uint64_t *) joblist::CPNULLSTRMARK.c_str()))
 		return numeric_limits<uint32_t>::max();
+
+	//@bug6065, make StringStore::storeString() thread safe
+	boost::mutex::scoped_lock lk(fMutex, defer_lock);
+	if (fUseStoreStringMutex)
+		lk.lock();
 
 	if (mem.size() > 0)
 		lastMC = (MemChunk *) mem.back().get();
@@ -122,6 +127,7 @@ uint32_t StringStore::storeString(const uint8_t *data, uint32_t len)
 	cout << "' at position " << lastMC->currentSize << " len " << len << dec << endl;
 	*/
 	lastMC->currentSize += len;
+
 	return ret;
 }
 
@@ -365,11 +371,11 @@ string Row::toString() const
 					break;
 				}
 				case CalpontSystemCatalog::FLOAT:
-                case CalpontSystemCatalog::UFLOAT:
+				case CalpontSystemCatalog::UFLOAT:
 					os << getFloatField(i) << " ";
 					break;
 				case CalpontSystemCatalog::DOUBLE:
-                case CalpontSystemCatalog::UDOUBLE:
+				case CalpontSystemCatalog::UDOUBLE:
 					os << getDoubleField(i) << " ";
 					break;
 				case CalpontSystemCatalog::LONGDOUBLE:
@@ -413,11 +419,11 @@ string Row::toCSV() const
 					os << getStringField(i).c_str();
 					break;
 				case CalpontSystemCatalog::FLOAT:
-                case CalpontSystemCatalog::UFLOAT:
+				case CalpontSystemCatalog::UFLOAT:
 					os << getFloatField(i);
 					break;
 				case CalpontSystemCatalog::DOUBLE:
-                case CalpontSystemCatalog::UDOUBLE:
+				case CalpontSystemCatalog::UDOUBLE:
 					os << getDoubleField(i);
 					break;
 				case CalpontSystemCatalog::LONGDOUBLE:
@@ -456,7 +462,7 @@ void Row::initToNull()
 			case CalpontSystemCatalog::INT:
 				*((int32_t *) &data[offsets[i]]) = static_cast<int32_t>(joblist::INTNULL); break;
 			case CalpontSystemCatalog::FLOAT:
-            case CalpontSystemCatalog::UFLOAT:
+			case CalpontSystemCatalog::UFLOAT:
 				*((int32_t *) &data[offsets[i]]) = static_cast<int32_t>(joblist::FLOATNULL); break;
 			case CalpontSystemCatalog::DATE:
 				*((int32_t *) &data[offsets[i]]) = static_cast<int32_t>(joblist::DATENULL); break;
@@ -467,7 +473,7 @@ void Row::initToNull()
 					*((uint64_t *) &data[offsets[i]]) = 0;
 				break;
 			case CalpontSystemCatalog::DOUBLE:
-            case CalpontSystemCatalog::UDOUBLE:
+			case CalpontSystemCatalog::UDOUBLE:
 				*((uint64_t *) &data[offsets[i]]) = joblist::DOUBLENULL; break;
 			case CalpontSystemCatalog::DATETIME:
 				*((uint64_t *) &data[offsets[i]]) = joblist::DATETIMENULL; break;
@@ -501,8 +507,8 @@ void Row::initToNull()
 			case CalpontSystemCatalog::VARBINARY:
 				*((uint16_t *) &data[offsets[i]]) = 0; break;
 			case CalpontSystemCatalog::DECIMAL:
-            case CalpontSystemCatalog::UDECIMAL:
-            {
+			case CalpontSystemCatalog::UDECIMAL:
+			{
 				uint32_t len = getColumnWidth(i);
 				switch (len) {
 					case 1 : data[offsets[i]] = joblist::TINYINTNULL; break;
@@ -512,15 +518,15 @@ void Row::initToNull()
 				}
 				break;
 			}
-            case CalpontSystemCatalog::UTINYINT:
-                data[offsets[i]] = joblist::UTINYINTNULL; break;
-            case CalpontSystemCatalog::USMALLINT:
-                *((uint16_t *) &data[offsets[i]]) = joblist::USMALLINTNULL; break;
-            case CalpontSystemCatalog::UMEDINT:
-            case CalpontSystemCatalog::UINT:
-                *((uint32_t *) &data[offsets[i]]) = joblist::UINTNULL; break;
-            case CalpontSystemCatalog::UBIGINT:
-                *((uint64_t *) &data[offsets[i]]) = joblist::UBIGINTNULL; break;
+			case CalpontSystemCatalog::UTINYINT:
+				data[offsets[i]] = joblist::UTINYINTNULL; break;
+			case CalpontSystemCatalog::USMALLINT:
+				*((uint16_t *) &data[offsets[i]]) = joblist::USMALLINTNULL; break;
+			case CalpontSystemCatalog::UMEDINT:
+			case CalpontSystemCatalog::UINT:
+				*((uint32_t *) &data[offsets[i]]) = joblist::UINTNULL; break;
+			case CalpontSystemCatalog::UBIGINT:
+				*((uint64_t *) &data[offsets[i]]) = joblist::UBIGINTNULL; break;
 			case CalpontSystemCatalog::LONGDOUBLE: {
 				// no NULL value for long double yet, this is a nan.
 				memset(&data[offsets[i]], 0xFF, getColumnWidth(i));
@@ -547,14 +553,14 @@ bool Row::isNullValue(uint32_t colIndex) const
 		case CalpontSystemCatalog::INT:
 			return (*((int32_t *) &data[offsets[colIndex]]) == static_cast<int32_t>(joblist::INTNULL));
 		case CalpontSystemCatalog::FLOAT:
-        case CalpontSystemCatalog::UFLOAT:
+		case CalpontSystemCatalog::UFLOAT:
 			return (*((int32_t *) &data[offsets[colIndex]]) == static_cast<int32_t>(joblist::FLOATNULL));
 		case CalpontSystemCatalog::DATE:
 			return (*((int32_t *) &data[offsets[colIndex]]) == static_cast<int32_t>(joblist::DATENULL));
 		case CalpontSystemCatalog::BIGINT:
 			return (*((int64_t *) &data[offsets[colIndex]]) == static_cast<int64_t>(joblist::BIGINTNULL));
 		case CalpontSystemCatalog::DOUBLE:
-        case CalpontSystemCatalog::UDOUBLE:
+		case CalpontSystemCatalog::UDOUBLE:
 			return (*((uint64_t *) &data[offsets[colIndex]]) == joblist::DOUBLENULL);
 		case CalpontSystemCatalog::DATETIME:
 			return (*((uint64_t *) &data[offsets[colIndex]]) == joblist::DATETIMENULL);
@@ -586,8 +592,8 @@ bool Row::isNullValue(uint32_t colIndex) const
 			break;
 		}
 		case CalpontSystemCatalog::DECIMAL:
-        case CalpontSystemCatalog::UDECIMAL:
-        {
+		case CalpontSystemCatalog::UDECIMAL:
+		{
 			uint32_t len = getColumnWidth(colIndex);
 			switch (len) {
 				case 1 : return (data[offsets[colIndex]] == joblist::TINYINTNULL);
@@ -614,15 +620,15 @@ bool Row::isNullValue(uint32_t colIndex) const
 
 			break;
 		}
-        case CalpontSystemCatalog::UTINYINT:
-            return (data[offsets[colIndex]] == joblist::UTINYINTNULL);
-        case CalpontSystemCatalog::USMALLINT:
-            return (*((uint16_t *) &data[offsets[colIndex]]) == joblist::USMALLINTNULL);
-        case CalpontSystemCatalog::UMEDINT:
-        case CalpontSystemCatalog::UINT:
-            return (*((uint32_t *) &data[offsets[colIndex]]) == joblist::UINTNULL);
-        case CalpontSystemCatalog::UBIGINT:
-            return (*((uint64_t *) &data[offsets[colIndex]]) == joblist::UBIGINTNULL);
+		case CalpontSystemCatalog::UTINYINT:
+			return (data[offsets[colIndex]] == joblist::UTINYINTNULL);
+		case CalpontSystemCatalog::USMALLINT:
+			return (*((uint16_t *) &data[offsets[colIndex]]) == joblist::USMALLINTNULL);
+		case CalpontSystemCatalog::UMEDINT:
+		case CalpontSystemCatalog::UINT:
+			return (*((uint32_t *) &data[offsets[colIndex]]) == joblist::UINTNULL);
+		case CalpontSystemCatalog::UBIGINT:
+			return (*((uint64_t *) &data[offsets[colIndex]]) == joblist::UBIGINTNULL);
 		case CalpontSystemCatalog::LONGDOUBLE:
 			// return false;  // no NULL value for long double yet
 			break;
@@ -640,7 +646,7 @@ bool Row::isNullValue(uint32_t colIndex) const
 
 uint64_t Row::getNullValue(uint32_t colIndex) const
 {
-    return utils::getNullValue(types[colIndex], getColumnWidth(colIndex));
+	return utils::getNullValue(types[colIndex], getColumnWidth(colIndex));
 #if 0
 	switch (types[colIndex]) {
 		case CalpontSystemCatalog::TINYINT:
@@ -651,14 +657,14 @@ uint64_t Row::getNullValue(uint32_t colIndex) const
 		case CalpontSystemCatalog::INT:
 			return joblist::INTNULL;
 		case CalpontSystemCatalog::FLOAT:
-        case CalpontSystemCatalog::UFLOAT:
+		case CalpontSystemCatalog::UFLOAT:
 			return joblist::FLOATNULL;
 		case CalpontSystemCatalog::DATE:
 			return joblist::DATENULL;
 		case CalpontSystemCatalog::BIGINT:
 			return joblist::BIGINTNULL;
 		case CalpontSystemCatalog::DOUBLE:
-        case CalpontSystemCatalog::UDOUBLE:
+		case CalpontSystemCatalog::UDOUBLE:
 			return joblist::DOUBLENULL;
 		case CalpontSystemCatalog::DATETIME:
 			return joblist::DATETIMENULL;
@@ -681,8 +687,8 @@ uint64_t Row::getNullValue(uint32_t colIndex) const
 			break;
 		}
 		case CalpontSystemCatalog::DECIMAL:
-        case CalpontSystemCatalog::UDECIMAL:
-        {
+		case CalpontSystemCatalog::UDECIMAL:
+		{
 			uint32_t len = getColumnWidth(colIndex);
 			switch (len) {
 				case 1 : return joblist::TINYINTNULL;
@@ -692,15 +698,15 @@ uint64_t Row::getNullValue(uint32_t colIndex) const
 			}
 			break;
 		}
-        case CalpontSystemCatalog::UTINYINT:
-            return joblist::UTINYINTNULL;
-        case CalpontSystemCatalog::USMALLINT:
-            return joblist::USMALLINTNULL;
-        case CalpontSystemCatalog::UMEDINT:
-        case CalpontSystemCatalog::UINT:
-            return joblist::UINTNULL;
-        case CalpontSystemCatalog::UBIGINT:
-            return joblist::UBIGINTNULL;
+		case CalpontSystemCatalog::UTINYINT:
+			return joblist::UTINYINTNULL;
+		case CalpontSystemCatalog::USMALLINT:
+			return joblist::USMALLINTNULL;
+		case CalpontSystemCatalog::UMEDINT:
+		case CalpontSystemCatalog::UINT:
+			return joblist::UINTNULL;
+		case CalpontSystemCatalog::UBIGINT:
+			return joblist::UBIGINTNULL;
 		case CalpontSystemCatalog::LONGDOUBLE:
 			return -1;  // no NULL value for long double yet, this is a nan.
 		case CalpontSystemCatalog::VARBINARY:
@@ -719,7 +725,7 @@ uint64_t Row::getNullValue(uint32_t colIndex) const
  */
 int64_t Row::getSignedNullValue(uint32_t colIndex) const
 {
-    return utils::getSignedNullValue(types[colIndex], getColumnWidth(colIndex));
+	return utils::getSignedNullValue(types[colIndex], getColumnWidth(colIndex));
 #if 0
 	switch (types[colIndex]) {
 		case CalpontSystemCatalog::TINYINT:
@@ -730,14 +736,14 @@ int64_t Row::getSignedNullValue(uint32_t colIndex) const
 		case CalpontSystemCatalog::INT:
 			return (int64_t) ((int32_t) joblist::INTNULL);
 		case CalpontSystemCatalog::FLOAT:
-        case CalpontSystemCatalog::UFLOAT:
+		case CalpontSystemCatalog::UFLOAT:
 			return (int64_t) ((int32_t) joblist::FLOATNULL);
 		case CalpontSystemCatalog::DATE:
 			return (int64_t) ((int32_t) joblist::DATENULL);
 		case CalpontSystemCatalog::BIGINT:
 			return joblist::BIGINTNULL;
 		case CalpontSystemCatalog::DOUBLE:
-        case CalpontSystemCatalog::UDOUBLE:
+		case CalpontSystemCatalog::UDOUBLE:
 			return joblist::DOUBLENULL;
 		case CalpontSystemCatalog::DATETIME:
 			return joblist::DATETIMENULL;
@@ -760,7 +766,7 @@ int64_t Row::getSignedNullValue(uint32_t colIndex) const
 			break;
 		}
 		case CalpontSystemCatalog::DECIMAL:
-        case CalpontSystemCatalog::UDECIMAL: {
+		case CalpontSystemCatalog::UDECIMAL: {
 			uint32_t len = getColumnWidth(colIndex);
 			switch (len) {
 				case 1 : return (int64_t) ((int8_t)  joblist::TINYINTNULL);
@@ -770,15 +776,15 @@ int64_t Row::getSignedNullValue(uint32_t colIndex) const
 			}
 			break;
 		}
-        case CalpontSystemCatalog::UTINYINT:
-            return (int64_t) ((int8_t) joblist::UTINYINTNULL);
-        case CalpontSystemCatalog::USMALLINT:
-            return (int64_t) ((int16_t) joblist::USMALLINTNULL);
-        case CalpontSystemCatalog::UMEDINT:
-        case CalpontSystemCatalog::UINT:
-            return (int64_t) ((int32_t) joblist::UINTNULL);
-        case CalpontSystemCatalog::UBIGINT:
-            return (int64_t)joblist::UBIGINTNULL;
+		case CalpontSystemCatalog::UTINYINT:
+			return (int64_t) ((int8_t) joblist::UTINYINTNULL);
+		case CalpontSystemCatalog::USMALLINT:
+			return (int64_t) ((int16_t) joblist::USMALLINTNULL);
+		case CalpontSystemCatalog::UMEDINT:
+		case CalpontSystemCatalog::UINT:
+			return (int64_t) ((int32_t) joblist::UINTNULL);
+		case CalpontSystemCatalog::UBIGINT:
+			return (int64_t)joblist::UBIGINTNULL;
 		case CalpontSystemCatalog::LONGDOUBLE:
 			return -1;  // no NULL value for long double yet, this is a nan.
 		case CalpontSystemCatalog::VARBINARY:
@@ -1091,8 +1097,8 @@ void applyMapping(const int *mapping, const Row &in, Row *out)
 				out->setVarBinaryField(in.getVarBinaryField(i), in.getVarBinaryLength(i), mapping[i]);
 			else if (UNLIKELY(in.getColTypes()[i] == execplan::CalpontSystemCatalog::LONGDOUBLE))
 				out->setLongDoubleField(in.getLongDoubleField(i), mapping[i]);
-            else if (in.isUnsigned(i))
-                out->setUintField(in.getUintField(i), mapping[i]);
+			else if (in.isUnsigned(i))
+				out->setUintField(in.getUintField(i), mapping[i]);
 			else
 				out->setIntField(in.getIntField(i), mapping[i]);
 		}
@@ -1197,7 +1203,7 @@ void RowGroup::addToSysDataList(execplan::CalpontSystemCatalog::NJLSysDataList& 
 				}
 				case CalpontSystemCatalog::MEDINT:
 				case CalpontSystemCatalog::INT:
-                case CalpontSystemCatalog::UINT:
+				case CalpontSystemCatalog::UINT:
 					cr->PutData(row.getIntField<4>(j));
 					break;
 				case CalpontSystemCatalog::DATE:

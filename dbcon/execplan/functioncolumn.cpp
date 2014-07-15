@@ -237,7 +237,6 @@ void FunctionColumn::funcParms (const string& funcParmsInString)
 			fFunctionParms.push_back(sc);
 		}
 	}
-
 }
 
 void FunctionColumn::serialize(messageqcpp::ByteStream& b) const
@@ -342,13 +341,14 @@ bool FunctionColumn::operator!=(const TreeNode* t) const
 
 bool FunctionColumn::hasAggregate()
 {
+	if (fHasAggregate) return true;
 	fAggColumnList.clear();
 	for (uint32_t i = 0; i < fFunctionParms.size(); i++)
 		fFunctionParms[i]->walk(getAggCols, &fAggColumnList);
 
-	if (fAggColumnList.empty())
-		return false;
-	return true;
+	if (!fAggColumnList.empty())
+		fHasAggregate = true;
+	return fHasAggregate;
 }
 
 bool FunctionColumn::hasWindowFunc()
@@ -364,8 +364,13 @@ bool FunctionColumn::hasWindowFunc()
 
 void FunctionColumn::setDerivedTable()
 {
-	setSimpleColumnList();
+	if (hasAggregate())
+	{
+		fDerivedTable = "";
+		return;
+	}
 
+	setSimpleColumnList();
 	string derivedTableAlias = "";
 	for (uint32_t i = 0; i < fSimpleColumnList.size(); i++)
 	{

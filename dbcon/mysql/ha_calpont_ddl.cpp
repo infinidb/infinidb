@@ -625,6 +625,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
   cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(thd->infinidb_vtable.cal_conn_info);
   if(parser.Good())
   {
+	boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
+	csc->identity(execplan::CalpontSystemCatalog::FE);
 	const ddlpackage::ParseTree &ptree = parser.GetParseTree();
 	SqlStatement &stmt = *ptree.fList[0];
 	bool isVarbinaryAllowed = false;
@@ -1649,8 +1651,6 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 					if (autoIncre)
 					{
 						//Check if the table already has autoincrement column
-						boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
-						csc->identity(execplan::CalpontSystemCatalog::FE);
 						CalpontSystemCatalog::TableName tableName;
 						tableName.schema = alterTable->fTableName->fSchema;
 						tableName.table = alterTable->fTableName->fName;

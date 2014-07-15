@@ -57,20 +57,22 @@ int InsertDMLPackage::write(messageqcpp::ByteStream& bytestream)
     messageqcpp::ByteStream::quadbyte session_id = fSessionID;
     bytestream << session_id;
 
+    bytestream << fUuid;
+
     bytestream << fDMLStatement;
     bytestream << fDMLStatement;
     bytestream << fSchemaName;
-	bytestream << (uint8_t)fLogging;
-	bytestream << (uint8_t)fLogending;
+    bytestream << (uint8_t)fLogging;
+    bytestream << (uint8_t)fLogending;
     if (fTable != 0)
     {
         retval = fTable->write(bytestream);
     }
-	bytestream << fTableOid;
-	bytestream << static_cast<const messageqcpp::ByteStream::byte>(fIsInsertSelect);
-	bytestream << static_cast<const messageqcpp::ByteStream::byte>(fIsBatchInsert);
-	bytestream << static_cast<const messageqcpp::ByteStream::byte>(fIsAutocommitOn);
-	
+    bytestream << fTableOid;
+    bytestream << static_cast<const messageqcpp::ByteStream::byte>(fIsInsertSelect);
+    bytestream << static_cast<const messageqcpp::ByteStream::byte>(fIsBatchInsert);
+    bytestream << static_cast<const messageqcpp::ByteStream::byte>(fIsAutocommitOn);
+
     return retval;
 }
 
@@ -81,24 +83,25 @@ int InsertDMLPackage::read(messageqcpp::ByteStream& bytestream)
     messageqcpp::ByteStream::quadbyte session_id;
     bytestream >> session_id;
     fSessionID = session_id;
+    bytestream >> fUuid;
 
     std::string dmlStatement;
     bytestream >> fDMLStatement;
-    bytestream >> fSQLStatement; 
+    bytestream >> fSQLStatement;
     bytestream >> fSchemaName;
-	uint8_t logging;
-	bytestream >> logging;
-	fLogging = (logging != 0);
-	uint8_t logending;
-	bytestream >> logending;
-	fLogending = (logending != 0);
-	
+    uint8_t logging;
+    bytestream >> logging;
+    fLogging = (logging != 0);
+    uint8_t logending;
+    bytestream >> logending;
+    fLogending = (logending != 0);
+
     fTable = new DMLTable();
     retval = fTable->read(bytestream);
-	bytestream >> fTableOid;
-    bytestream >> reinterpret_cast< messageqcpp::ByteStream::byte&>(fIsInsertSelect);	
-	bytestream >> reinterpret_cast< messageqcpp::ByteStream::byte&>(fIsBatchInsert);	
-	bytestream >> reinterpret_cast< messageqcpp::ByteStream::byte&>(fIsAutocommitOn);
+    bytestream >> fTableOid;
+    bytestream >> reinterpret_cast< messageqcpp::ByteStream::byte&>(fIsInsertSelect);
+    bytestream >> reinterpret_cast< messageqcpp::ByteStream::byte&>(fIsBatchInsert);
+    bytestream >> reinterpret_cast< messageqcpp::ByteStream::byte&>(fIsAutocommitOn);
     return retval;
 }
 
@@ -150,27 +153,27 @@ int InsertDMLPackage::buildFromBuffer(std::string& buffer, int columns, int rows
 
 int InsertDMLPackage::buildFromMysqlBuffer(ColNameList& colNameList, TableValuesMap& tableValuesMap, int columns, int rows )
 {
-	int retval = 1;
+    int retval = 1;
 
     initializeTable();
-	Row *aRowPtr = new Row();
-	std::string colName;
-	std::vector<std::string> colValList;
-	for (int j = 0; j < columns; j++)
+    Row *aRowPtr = new Row();
+    std::string colName;
+    std::vector<std::string> colValList;
+    for (int j = 0; j < columns; j++)
     {
       //Build a column list
       colName = colNameList[j];
-      
+
       colValList = tableValuesMap[j];
 
       DMLColumn* aColumn = new DMLColumn(colName, colValList, false);
       (aRowPtr->get_ColumnList()).push_back(aColumn);
     }
-	//build a row list for a table
+    //build a row list for a table
     fTable->get_RowList().push_back(aRowPtr);
-	aRowPtr = NULL;
-	delete aRowPtr;
-	return retval;
+    aRowPtr = NULL;
+    delete aRowPtr;
+    return retval;
 }
 
 int InsertDMLPackage::buildFromSqlStatement(SqlStatement& sqlStatement)
@@ -184,7 +187,7 @@ int InsertDMLPackage::buildFromSqlStatement(SqlStatement& sqlStatement)
         throw runtime_error("insertStmt.fValuesOrQueryPtr == NULL");
 
     initializeTable();
-	bool isNULL = false;
+    bool isNULL = false;
     // only if we don't have a select statement
     if (0 == insertStmt.fValuesOrQueryPtr->fQuerySpecPtr)
     {
@@ -219,13 +222,13 @@ int InsertDMLPackage::buildFromSqlStatement(SqlStatement& sqlStatement)
             {
                 colValue = *iter;
                 if ( strcasecmp(colValue.c_str(), "NULL") == 0)
-            	{
-            		isNULL = true;
-            	}
-            	else
-            	{
-            		isNULL = false;
-            	}
+                {
+                    isNULL = true;
+                }
+                else
+                {
+                    isNULL = false;
+                }
                 DMLColumn *aColumn = new DMLColumn(colName,colValue, isNULL);
                 (aRow->get_ColumnList()).push_back(aColumn);
 

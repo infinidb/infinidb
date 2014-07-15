@@ -40,6 +40,7 @@ namespace execplan {
 
 class ReturnedColumn;
 class AggregateColumn;
+class WindowFunctionColumn;
 
 /**
  * @brief A class to represent a simple column op constant predicate
@@ -151,6 +152,7 @@ public:
 
 	void setDerivedTable();
 	virtual void replaceRealCol(std::vector<SRCP>&);
+	virtual bool hasAggregate();
 
 private:
 	SOP fOp;       /// connect operator (and or)
@@ -181,6 +183,7 @@ public:
 private:
 	std::vector<SimpleColumn*> fSimpleColumnList;
 	std::vector<AggregateColumn*> fAggColumnList;
+	std::vector<WindowFunctionColumn*> fWindowFunctionColumnList;
 };
 
 inline bool ConstantFilter::getBoolVal(rowgroup::Row& row, bool& isNull)

@@ -314,7 +314,7 @@ int fixupCalpontXML()
 		val = cf->getConfig(section, parm);
 		if (val.empty())
 		{
-			val = "N"; //We've decided to default to no.
+			val = "N"; // We default to No
 			cf->setConfig(section, parm, val);
 			cout << "Adding " << section << "." << parm << " = " << val << endl;
 		}

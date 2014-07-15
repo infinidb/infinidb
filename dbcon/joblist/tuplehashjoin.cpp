@@ -287,7 +287,8 @@ void TupleHashJoinStep::smallRunnerFcn(uint32_t index)
 			If this join won't be converted to disk-based, this fcn needs to abort the same as
 			it did before.  If it will be converted, it should just return. */
 			if (UNLIKELY(!gotMem)) {
-				if (isDML || !allowDJS || (fSessionId & 0x80000000) || tableOid() < 3000) {
+				if (isDML || !allowDJS || (fSessionId & 0x80000000) ||
+						(tableOid() < 3000 && tableOid() >= 1000)) {
 					joinIsTooBig = true;
 					fLogger->logMessage(logging::LOG_TYPE_INFO, logging::ERR_JOIN_TOO_BIG);
 					errorMessage(logging::IDBErrorInfo::instance()->errorMsg(logging::ERR_JOIN_TOO_BIG));
@@ -587,16 +588,15 @@ void TupleHashJoinStep::hjRunner()
 		for (i = 0; i <= smallSideCount; i++)
 			fifos[i].reset(new RowGroupDL(1, 5));
 
+		boost::mutex::scoped_lock sl(djsLock);
+		for (i = 0; i < smallSideCount; i++) {
+			// these link themselves fifos[0]->DSJ[0]->fifos[1]->DSJ[1] ... ->fifos[smallSideCount],
+			// THJS puts data into fifos[0], reads it from fifos[smallSideCount]
+			djs[i] = DiskJoinStep(this, i, djsJoinerMap[i], (i == smallSideCount - 1));
+		}
+		sl.unlock();
+
 		try {
-			boost::mutex::scoped_lock sl(djsLock);
-			for (i = 0; i < smallSideCount; i++) {
-				// these link themselves fifos[0]->DSJ[0]->fifos[1]->DSJ[1] ... ->fifos[smallSideCount],
-				// THJS puts data into fifos[0], reads it from fifos[smallSideCount]
-
-				djs[i] = DiskJoinStep(this, i, djsJoinerMap[i], (i == smallSideCount - 1));
-
-			}
-			sl.unlock();
 			for (i = 0; !cancelled() && i < smallSideCount; i++) {
 				vector<RGData> empty;
 				resourceManager.returnMemory(memUsedByEachJoin[djsJoinerMap[i]], sessionMemLimit);
@@ -626,29 +626,27 @@ void TupleHashJoinStep::hjRunner()
 			fe2Mapping = makeMapping(outputRG, fe2Output);
 
 		bool relay = false, reader = false;
+		/* If an error happened loading the existing data, these threads are necessary
+		to finish the abort */
 		try {
 			djsRelay = boost::thread(DJSRelay(this));
 			relay = true;
 			djsReader = boost::thread(DJSReader(this, smallSideCount));
 			reader = true;
-			/* This is tricky error-handling code.  If DJS threw an error earlier, i < smallSideCount and
-			there is a gap in the FIFO chain.  All FIFOs are empty, but need to close the fifo
-			Reader is reading from,	then aborting should happen as expected */
-			if (i == smallSideCount)
-				for (i = 0; i < smallSideCount; i++)
-					djs[i].run();
-			else
-				fifos[smallSideCount]->endOfInput();
-
+			for (i = 0; i < smallSideCount; i++)
+				djs[i].run();
 		}
 		catch (thread_resource_error&) {
+			/* This means there is a gap somewhere in the chain, need to identify
+			   where the gap is, drain the input, and close the output. */
+
 			string emsg = "TupleHashJoin caught a thread resource error, aborting...\n";
 			errorMessage("too many threads");
 			status(logging::threadResourceErr);
 			errorLogging(emsg, logging::threadResourceErr);
 			abort();
 			if (reader && relay) {   // must have been thrown from the djs::run() loop
-				// fill the gap in the chain: drain input of last DJS, close the last fifo
+				// fill the gap in the chain: drain input of the failed DJS (i), close the last fifo
 				if (largeBPS)
 					largeDL->endOfInput();
 				int it = fifos[i]->getIterator();
@@ -1586,7 +1584,8 @@ void TupleHashJoinStep::segregateJoiners()
 	}
 
 	/* When DDL updates syscat, the syscat checks here are necessary */
-	if (isDML || !allowDJS || (fSessionId & 0x80000000) || tableOid() < 3000) {
+	if (isDML || !allowDJS || (fSessionId & 0x80000000) ||
+		(tableOid() < 3000 && tableOid() >= 1000)) {
 		if (anyTooLarge) {
 			joinIsTooBig = true;
 			abort();
@@ -1596,6 +1595,7 @@ void TupleHashJoinStep::segregateJoiners()
 	}
 	/* Debugging code, this makes all eligible joins disk-based.
 	else {
+		cout << "making all joins disk-based" << endl;
 		for (i = 0; i < smallSideCount; i++) {
 			joinIsTooBig = true;
 			djsJoiners.push_back(joiners[i]);

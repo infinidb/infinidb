@@ -52,14 +52,16 @@ namespace dmlpackage
         messageqcpp::ByteStream::quadbyte session_id = fSessionID;
         bytestream << session_id;
 
+        bytestream << fUuid;
+
         bytestream << fDMLStatement;
         bytestream << fSQLStatement; // for cleartablelock, this is table lockID
-		bytestream << (uint8_t)fLogging;
-		bytestream << fSchemaName; 
-        bytestream << fTableName; 
-		bytestream << fTableOid;
-		bytestream << static_cast<const messageqcpp::ByteStream::byte>(fIsAutocommitOn);
-		bytestream << static_cast<const messageqcpp::ByteStream::byte>(fIsBatchInsert);
+        bytestream << (uint8_t)fLogging;
+        bytestream << fSchemaName;
+        bytestream << fTableName;
+        bytestream << fTableOid;
+        bytestream << static_cast<const messageqcpp::ByteStream::byte>(fIsAutocommitOn);
+        bytestream << static_cast<const messageqcpp::ByteStream::byte>(fIsBatchInsert);
         return retval;
     }
 
@@ -70,17 +72,18 @@ namespace dmlpackage
         messageqcpp::ByteStream::quadbyte session_id;
         bytestream >> session_id;
         fSessionID = session_id;
+        bytestream >> fUuid;
 
         bytestream >> fDMLStatement;
         bytestream >> fSQLStatement; // for cleartablelock, this is table lockID
-		uint8_t logging;
-		bytestream >> logging;
-		fLogging = (logging != 0);
-		bytestream >> fSchemaName; 
-        bytestream >> fTableName; 
-		bytestream >> fTableOid;
-		bytestream >> reinterpret_cast< messageqcpp::ByteStream::byte&>(fIsAutocommitOn);
-		bytestream >> reinterpret_cast< messageqcpp::ByteStream::byte&>(fIsBatchInsert);
+        uint8_t logging;
+        bytestream >> logging;
+        fLogging = (logging != 0);
+        bytestream >> fSchemaName;
+        bytestream >> fTableName;
+        bytestream >> fTableOid;
+        bytestream >> reinterpret_cast< messageqcpp::ByteStream::byte&>(fIsAutocommitOn);
+        bytestream >> reinterpret_cast< messageqcpp::ByteStream::byte&>(fIsBatchInsert);
         return retval;
     }
 

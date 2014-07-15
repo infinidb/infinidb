@@ -1757,6 +1757,54 @@ int main(int argc, char *argv[])
 	{}
 
 
+	string AllowDiskBasedJoin;
+	string TempFilePath;
+	string TempFileCompression;
+
+	try {
+		AllowDiskBasedJoin = sysConfigOld->getConfig("HashJoin", "AllowDiskBasedJoin");
+
+		if ( !AllowDiskBasedJoin.empty() )
+		{
+			TempFilePath = sysConfigOld->getConfig("HashJoin", "TempFilePath");
+			TempFileCompression = sysConfigOld->getConfig("HashJoin", "TempFileCompression");
+
+			try {
+				sysConfigNew->setConfig("HashJoin", "AllowDiskBasedJoin", AllowDiskBasedJoin);
+				sysConfigNew->setConfig("HashJoin", "TempFilePath", TempFilePath);
+				sysConfigNew->setConfig("HashJoin", "TempFileCompression", TempFileCompression);
+			}
+			catch(...)
+			{
+				cout << "ERROR: Problem setting AllowDiskBasedJoin in the Calpont System Configuration file" << endl;
+				exit(-1);
+			}
+		}
+	}
+	catch(...)
+	{}
+
+	try {
+		Host = sysConfigOld->getConfig("QueryTele", "Host");
+
+		if ( !Host.empty() )
+		{
+			TempFilePath = sysConfigOld->getConfig("QueryTele", "Port");
+
+			try {
+				sysConfigNew->setConfig("QueryTele", "Host", Host);
+				sysConfigNew->setConfig("QueryTele", "Port", Port);
+			}
+			catch(...)
+			{
+				cout << "ERROR: Problem setting QueryTele in the Calpont System Configuration file" << endl;
+				exit(-1);
+			}
+		}
+	}
+	catch(...)
+	{}
+
 
 	//Write out Updated System Configuration File
 	sysConfigNew->write();

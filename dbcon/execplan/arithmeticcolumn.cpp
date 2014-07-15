@@ -324,7 +324,6 @@ void ArithmeticColumn::unserialize(messageqcpp::ByteStream& b)
 	b >> reinterpret_cast< ByteStream::doublebyte&>(fAsc);
 
 	fSimpleColumnList.clear();
-	fAggColumnList.clear();
 	fExpression->walk(getSimpleCols, &fSimpleColumnList);
 	fAggColumnList.clear();
 	fExpression->walk(getAggCols, &fAggColumnList);
@@ -377,11 +376,12 @@ bool ArithmeticColumn::operator!=(const TreeNode* t) const
 
 bool ArithmeticColumn::hasAggregate()
 {
+	if (fHasAggregate) return true;
 	fAggColumnList.clear();
 	fExpression->walk(getAggCols, &fAggColumnList);
-	if (fAggColumnList.empty())
-		return false;
-	return true;
+	if (!fAggColumnList.empty())
+		fHasAggregate = true;
+	return fHasAggregate;
 }
 
 bool ArithmeticColumn::hasWindowFunc()
@@ -395,6 +395,11 @@ bool ArithmeticColumn::hasWindowFunc()
 
 void ArithmeticColumn::setDerivedTable()
 {
+	if (hasAggregate())
+	{
+		fDerivedTable = "";
+		return;
+	}
 	if (fExpression)
 	{
 		fExpression->setDerivedTable();

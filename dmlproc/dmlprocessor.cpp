@@ -325,6 +325,7 @@ void PackageHandler::run()
 					qts.query_uuid = QueryTeleClient::genUUID();
 					qts.msg_type = QueryTeleStats::QT_START;
 					qts.start_time = QueryTeleClient::timeNowms();
+					qts.session_id = fSessionID;
 					qts.query_type = "INSERT";
 					qts.query = insertPkg.get_SQLStatement();
 					qts.system_name = oamCache->getSystemName();
@@ -668,9 +669,10 @@ void PackageHandler::run()
 					updatePkg->read(*(fByteStream.get()));
 					updatePkg->set_TxnID(fTxnid);
 					QueryTeleStats qts;
-					qts.query_uuid = QueryTeleClient::genUUID();
+					qts.query_uuid = updatePkg->uuid();
 					qts.msg_type = QueryTeleStats::QT_START;
 					qts.start_time = QueryTeleClient::timeNowms();
+					qts.session_id = fSessionID;
 					qts.query_type = "UPDATE";
 					qts.query = updatePkg->get_SQLStatement();
 					qts.system_name = oamCache->getSystemName();
@@ -707,9 +709,10 @@ void PackageHandler::run()
 					deletePkg->read(*(fByteStream.get()));
 					deletePkg->set_TxnID(fTxnid);
 					QueryTeleStats qts;
-					qts.query_uuid = QueryTeleClient::genUUID();
+					qts.query_uuid = deletePkg->uuid();
 					qts.msg_type = QueryTeleStats::QT_START;
 					qts.start_time = QueryTeleClient::timeNowms();
+					qts.session_id = fSessionID;
 					qts.query_type = "DELETE";
 					qts.query = deletePkg->get_SQLStatement();
 					qts.system_name = oamCache->getSystemName();

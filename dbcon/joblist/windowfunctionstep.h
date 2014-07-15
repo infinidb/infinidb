@@ -159,6 +159,7 @@ private:
 	uint64_t                         fRowsReturned;
 	bool                             fEndOfResult;
 	bool                             fIsSelect;
+	bool                             fUseSSMutex; //@bug6065, mutex for setStringField
 
 	// for input/output datalist
 	RowGroupDL*                      fInputDL;

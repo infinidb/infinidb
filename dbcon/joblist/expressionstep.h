@@ -116,6 +116,8 @@ class ExpressionStep : public JobStep
 
   protected:
 	virtual void addColumn(execplan::ReturnedColumn* rc, JobInfo& jobInfo);
+	virtual void addFilter(execplan::ParseTree* filter, JobInfo& jobInfo);
+	virtual void addSimpleFilter(execplan::SimpleFilter* sf, JobInfo& jobInfo);
 	virtual void populateColumnInfo(execplan::ReturnedColumn* rc, JobInfo& jobInfo);
 	virtual void populateColumnInfo(execplan::SimpleColumn* sc, JobInfo& jobInfo);
 	virtual void populateColumnInfo(execplan::WindowFunctionColumn* wc, JobInfo& jobInfo);

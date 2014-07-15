@@ -35,6 +35,7 @@ using namespace std;
 #include "bytestream.h"
 #include "objectreader.h"
 #include "aggregatecolumn.h"
+#include "windowfunctioncolumn.h"
 
 namespace {
 template<class T> struct deleter : public unary_function<T&, void>
@@ -73,6 +74,7 @@ ConstantFilter::ConstantFilter(const ConstantFilter& rhs):
 {
 	fFilterList.clear();
 	fSimpleColumnList.clear();
+	fWindowFunctionColumnList.clear();
 	SSFP ssfp;
 	for (uint32_t i = 0; i < rhs.fFilterList.size(); i++)
 	{
@@ -81,6 +83,12 @@ ConstantFilter::ConstantFilter(const ConstantFilter& rhs):
 		fSimpleColumnList.insert(fSimpleColumnList.end(),
 								 ssfp->simpleColumnList().begin(),
 								 ssfp->simpleColumnList().end());
+		fAggColumnList.insert(fAggColumnList.end(),
+								 ssfp->aggColumnList().begin(),
+								 ssfp->aggColumnList().end());
+		fWindowFunctionColumnList.insert(fWindowFunctionColumnList.end(),
+								 ssfp->windowfunctionColumnList().begin(),
+								 ssfp->windowfunctionColumnList().end());
 	}
 }
 
@@ -111,6 +119,19 @@ ostream& operator<<(ostream& output, const ConstantFilter& rhs)
 	return output;
 }
 
+bool ConstantFilter::hasAggregate()
+{
+	fAggColumnList.clear();
+	for (uint32_t i = 0; i < fFilterList.size(); i++)
+	{
+		if (fFilterList[i]->hasAggregate())
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
 void ConstantFilter::serialize(messageqcpp::ByteStream& b) const
 {
 	FilterList::const_iterator it;
@@ -134,7 +155,7 @@ void ConstantFilter::unserialize(messageqcpp::ByteStream& b)
 {
 	uint32_t size, i;
 	ObjectReader::checkType(b, ObjectReader::CONSTANTFILTER);
-	SimpleFilter *sc;
+	SimpleFilter *sf;
 
 	Filter::unserialize(b);
 	fOp.reset(dynamic_cast<Operator*>(ObjectReader::createTreeNode(b)));
@@ -143,9 +164,10 @@ void ConstantFilter::unserialize(messageqcpp::ByteStream& b)
 	fFilterList.clear();
 	fSimpleColumnList.clear();
 	fAggColumnList.clear();
+	fWindowFunctionColumnList.clear();
 	for (i = 0; i < size; i++) {
-		sc = dynamic_cast<SimpleFilter*>(ObjectReader::createTreeNode(b));
-		SSFP ssfp(sc);
+		sf = dynamic_cast<SimpleFilter*>(ObjectReader::createTreeNode(b));
+		SSFP ssfp(sf);
 		fFilterList.push_back(ssfp);
 		fSimpleColumnList.insert(fSimpleColumnList.end(),
 								 ssfp->simpleColumnList().begin(),
@@ -153,6 +175,9 @@ void ConstantFilter::unserialize(messageqcpp::ByteStream& b)
 		fAggColumnList.insert(fAggColumnList.end(),
 								 ssfp->aggColumnList().begin(),
 								 ssfp->aggColumnList().end());
+		fWindowFunctionColumnList.insert(fWindowFunctionColumnList.end(),
+								 ssfp->windowfunctionColumnList().begin(),
+								 ssfp->windowfunctionColumnList().end());
 	}
 	b >> fFunctionName;
 }
@@ -209,6 +234,11 @@ bool ConstantFilter::operator!=(const TreeNode* t) const
 
 void ConstantFilter::setDerivedTable()
 {
+	if (fCol->hasAggregate())
+	{
+		fDerivedTable = "";
+		return;
+	}
 	fDerivedTable = fCol->derivedTable();
 }
 
@@ -232,8 +262,8 @@ void ConstantFilter::setSimpleColumnList()
 	{
 		fFilterList[i]->setSimpleColumnList();
 		fSimpleColumnList.insert(fSimpleColumnList.end(),
-							 fFilterList[i]->simpleColumnList().begin(),
-							 fFilterList[i]->simpleColumnList().end());
+		                         fFilterList[i]->simpleColumnList().begin(),
+		                         fFilterList[i]->simpleColumnList().end());
 	}
 }
 

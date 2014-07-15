@@ -201,6 +201,11 @@
       <DisableSpecificWarnings>4267;4244;4996;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <BufferSecurityCheck>false</BufferSecurityCheck>
     </ClCompile>
+    <PostBuildEvent>
+      <Command>cd $(SolutionDir)
+$(SolutionDir)BuildCalpontVersion.bat</Command>
+      <Message>BuildCalpontVersion.bat</Message>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="crc.c" />

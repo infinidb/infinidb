@@ -1309,6 +1309,7 @@ SimpleColumn* buildSimpleColFromDerivedTable(gp_walk_info& gwi, Item_field* ifp)
 					sc->tableAlias(lower(tableAlias));
 					sc->viewName(lower(viewName));
 					sc->resultType(cols[j]->resultType());
+					sc->hasAggregate(cols[j]->hasAggregate());
 					if (col)
 						sc->isInfiniDB(col->isInfiniDB());
 
@@ -4629,7 +4630,7 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex, SCSEP& csep, bool i
 				}
 
 				ReturnedColumn* rc = buildFunctionColumn(ifp, gwi, hasNonSupportItem);
-
+				SRCP srcp(rc);
 				if (rc)
 				{
 					if (!hasNonSupportItem && !nonConstFunc(ifp) && !(parseInfo & AF_BIT) && tmpVec.size() == 0)
@@ -4637,7 +4638,7 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex, SCSEP& csep, bool i
 						if (isUnion || unionSel || gwi.subSelectType != CalpontSelectExecutionPlan::MAIN_SELECT ||
 							  parseInfo & SUB_BIT || select_lex.group_list.elements != 0)
 						{
-							SRCP srcp(buildReturnedColumn(item, gwi, gwi.fatalParseError));
+							srcp.reset(buildReturnedColumn(item, gwi, gwi.fatalParseError));
 							gwi.returnedCols.push_back(srcp);
 							if (ifp->name)
 								srcp->alias(ifp->name);
@@ -4659,7 +4660,7 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex, SCSEP& csep, bool i
 						break;
 					}
 
-					SRCP srcp(rc);
+					//SRCP srcp(rc);
 					gwi.returnedCols.push_back(srcp);
 					if ( ((gwi.thd->lex)->sql_command == SQLCOM_UPDATE ) || ((gwi.thd->lex)->sql_command == SQLCOM_DELETE ) || ((gwi.thd->lex)->sql_command == SQLCOM_UPDATE_MULTI ) || ((gwi.thd->lex)->sql_command == SQLCOM_DELETE_MULTI ))
 					{ }
@@ -4947,6 +4948,11 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex, SCSEP& csep, bool i
 			{
 				coltypes.push_back(
 				   dynamic_cast<CalpontSelectExecutionPlan*>(csep->unionVec()[j].get())->returnedCols()[i]->resultType());
+
+				// @bug5976. set hasAggregate true for the main column if 
+				// one corresponding union column has aggregate
+				if (dynamic_cast<CalpontSelectExecutionPlan*>(csep->unionVec()[j].get())->returnedCols()[i]->hasAggregate())
+					gwi.returnedCols[i]->hasAggregate(true);
 			}
 			gwi.returnedCols[i]->resultType(dataconvert::DataConvert::convertUnionColType(coltypes));
 		}

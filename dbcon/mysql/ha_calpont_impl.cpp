@@ -1331,6 +1331,7 @@ uint32_t doUpdateDelete(THD *thd)
 	//updateCP->traceFlags(1);
 	// cout<< "Plan is " << endl << *updateCP << endl;
 	pDMLPackage->HasFilter(true);
+	pDMLPackage->uuid(updateCP->uuid());
 
 	ByteStream bytestream, bytestream1;
 	bytestream << sessionID;
@@ -1391,6 +1392,12 @@ uint32_t doUpdateDelete(THD *thd)
 				{
 					ci->dmlProc = new MessageQueueClient("DMLProc");
 					//cout << "doUpdateDelete start new DMLProc client " << ci->dmlProc << " for session " << sessionID << endl;
+				}
+				else
+				{
+					delete ci->dmlProc;
+					ci->dmlProc = NULL;
+					ci->dmlProc = new MessageQueueClient("DMLProc");
 				}
 
 				// Send the request to DMLProc
@@ -1608,6 +1615,8 @@ uint32_t doUpdateDelete(THD *thd)
 		string msg = string("InfiniDB Query Stats - ") + e.what();
 		push_warning(thd, MYSQL_ERROR::WARN_LEVEL_WARN, 9999, msg.c_str());
 	}
+	delete ci->dmlProc;
+	ci->dmlProc = NULL;
 	return 0;
 }
 
@@ -3374,12 +3383,12 @@ void ha_calpont_impl_start_bulk_insert(ha_rows rows, TABLE* table)
  				bSuccess = SetHandleInformation(ci->cpimport_stdout_Rd, HANDLE_FLAG_INHERIT, 0);
 			}
 #endif     
-bSuccess = true;
+            bSuccess = true;
 			// Create a pipe for the child process's STDIN. 
 			if (bSuccess)
 			{
 				pSectionMsg = "Create Stdin";
-				bSuccess = CreatePipe(&ci->cpimport_stdin_Rd, &ci->cpimport_stdin_Wr, &saAttr, 0);
+				bSuccess = CreatePipe(&ci->cpimport_stdin_Rd, &ci->cpimport_stdin_Wr, &saAttr, 65536);
 				// Ensure the write handle to the pipe for STDIN is not inherited. 
 				if (bSuccess)
 				{

@@ -61,10 +61,12 @@ int UpdateDMLPackage::write(messageqcpp::ByteStream& bytestream)
     messageqcpp::ByteStream::quadbyte hasFilter = fHasFilter;
     bytestream << hasFilter;
 
+    bytestream << fUuid;
+
     bytestream << fDMLStatement;
     bytestream << fSQLStatement;
     bytestream << fSchemaName;
-	bytestream << (uint8_t)fIsFromCol;
+    bytestream << (uint8_t)fIsFromCol;
     if (fTable != 0)
     {
         retval = fTable->write(bytestream);
@@ -72,7 +74,7 @@ int UpdateDMLPackage::write(messageqcpp::ByteStream& bytestream)
     if(fHasFilter)
     {
         bytestream += *(fPlan.get());
-    } 
+    }
 
     return retval;
 }
@@ -92,13 +94,15 @@ int UpdateDMLPackage::read(messageqcpp::ByteStream& bytestream)
     bytestream >> hasFilter;
     fHasFilter = (hasFilter != 0);
 
+    bytestream >> fUuid;
+
     std::string dmlStatement;
     bytestream >> fDMLStatement;
     bytestream >> fSQLStatement;
     bytestream >> fSchemaName;
-	uint8_t isFromCol;
-	bytestream >> isFromCol;
-	fIsFromCol = (isFromCol != 0);
+    uint8_t isFromCol;
+    bytestream >> isFromCol;
+    fIsFromCol = (isFromCol != 0);
     fTable = new DMLTable();
     retval = fTable->read(bytestream);
     if(fHasFilter)
@@ -204,25 +208,25 @@ int UpdateDMLPackage::buildFromBuffer(std::string& buffer, int columns, int rows
 }
 int UpdateDMLPackage::buildFromMysqlBuffer(ColNameList& colNameList, TableValuesMap& tableValuesMap, int columns, int rows )
 {
-	int retval = 1;
+    int retval = 1;
 
     initializeTable();
-	Row *aRowPtr = new Row();
-	std::string colName;
-	std::vector<std::string> colValList;
-	for (int j = 0; j < columns; j++)
+    Row *aRowPtr = new Row();
+    std::string colName;
+    std::vector<std::string> colValList;
+    for (int j = 0; j < columns; j++)
     {
       //Build a column list
       colName = colNameList[j];
-      
+
       colValList = tableValuesMap[j];
 
       DMLColumn* aColumn = new DMLColumn(colName, colValList, false);
       (aRowPtr->get_ColumnList()).push_back(aColumn);
     }
-	//build a row list for a table
+    //build a row list for a table
     fTable->get_RowList().push_back(aRowPtr);
-	return retval;
+    return retval;
 }
 
 void UpdateDMLPackage::buildUpdateFromMysqlBuffer(UpdateSqlStatement&  updateStmt)

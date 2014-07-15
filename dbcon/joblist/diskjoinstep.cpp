@@ -69,6 +69,7 @@ DiskJoinStep::DiskJoinStep(TupleHashJoinStep *t, int djsIndex, int joinIndex, bo
 	largeDL = thjs->fifos[djsIndex];
 	outputDL = thjs->fifos[djsIndex+1];
 	smallDL = thjs->smallDLs[joinerIndex];
+	largeIt = largeDL->getIterator();
 
 	smallUsage = thjs->djsSmallUsage;
 	smallLimit = thjs->djsSmallLimit;
@@ -80,29 +81,18 @@ DiskJoinStep::DiskJoinStep(TupleHashJoinStep *t, int djsIndex, int joinIndex, bo
 	if (largeLimit == 0)
 		largeLimit = numeric_limits<int64_t>::max();
 
-	try {
-		uint64_t totalUMMemory = thjs->resourceManager.getConfiguredUMMemLimit();
-		jp.reset(new JoinPartition(largeRG, smallRG, smallKeyCols, largeKeyCols, typeless,
-				(joinType & ANTI) && (joinType & MATCHNULLS), (bool) fe, totalUMMemory, partitionSize));
+	uint64_t totalUMMemory = thjs->resourceManager.getConfiguredUMMemLimit();
+	jp.reset(new JoinPartition(largeRG, smallRG, smallKeyCols, largeKeyCols, typeless,
+		(joinType & ANTI) && (joinType & MATCHNULLS), (bool) fe, totalUMMemory, partitionSize));
+
+	if (cancelled()) {
+		// drain inputs, close output
+		smallReader();    // only small input is supplying input at this point
+		// largeReader();
+		outputDL->endOfInput();
+		closedOutput = true;
 	}
-	catch(IDBExcept &e) {
-		if (!status()) {
-			errorMessage(IDBErrorInfo::instance()->errorMsg(e.errorCode()));
-			status(e.errorCode());
-		}
-		cout << "DJS(): " << e.what() << endl;
-		abort();
-		throw;
-	}
-	catch (exception &e) {
-		if (status() == 0) {
-			errorMessage(IDBErrorInfo::instance()->errorMsg(ERR_DBJ_UNKNOWN_ERROR));
-			status(ERR_DBJ_UNKNOWN_ERROR);
-		}
-		abort();
-		cout << "DJS(): " << e.what() << endl;
-		throw;
-	}
+
 	largeIterationCount = 0;
 	lastLargeIteration = false;
 	fMiniInfo.clear();
@@ -392,6 +382,7 @@ void DiskJoinStep::joinFcn()
 	smallNullRow.setData(smallNullMem[0].get());
 	smallNullRow.initToNull();
 
+	try {
 	while (1) {
 		more = buildFIFO->next(it, &in);
 		if (!more || cancelled())
@@ -468,6 +459,23 @@ void DiskJoinStep::joinFcn()
 			}
 		}
 	}
+	}  // the try stmt above; need to reformat.
+	catch(IDBExcept &e) {
+		if (!status()) {
+			errorMessage(IDBErrorInfo::instance()->errorMsg(e.errorCode()));
+			status(e.errorCode());
+		}
+		cout << "DJS join thread: " << e.what() << endl;
+		abort();
+	}
+	catch(exception &e) {
+		if (!status()) {
+			errorMessage(IDBErrorInfo::instance()->errorMsg(ERR_DBJ_UNKNOWN_ERROR));
+			status(ERR_DBJ_UNKNOWN_ERROR);
+		}
+		cout << "DJS join thread: " << e.what() << endl;
+		abort();
+	}
 
 out:
 	while (more)
@@ -488,7 +496,7 @@ void DiskJoinStep::mainRunner()
 	*/
 	try {
 		smallReader();
-		largeIt = largeDL->getIterator();
+
 		while (!lastLargeIteration && !cancelled()) {
 			//cout << "large iteration " << largeIterationCount << endl;
 			jp->initForLargeSideFeed();
@@ -509,16 +517,6 @@ void DiskJoinStep::mainRunner()
 			buildThread->join();
 			joinThread->join();
 		}
-
-		// make sure we drain all inputs
-		if (cancelled()) {
-			jp->initForLargeSideFeed();
-			largeReader();
-		}
-		if (!closedOutput) {
-			outputDL->endOfInput();
-			closedOutput = true;
-		}
 	}
 	catch (IDBExcept &e) {
 		if (!status()) {
@@ -535,6 +533,19 @@ void DiskJoinStep::mainRunner()
 		}
 		cout << "DJS(): " << e.what() << endl;
 		abort();
+	}
+
+	// make sure all inputs were drained & output closed
+	if (cancelled()) {
+		try {
+			jp->initForLargeSideFeed();
+		} catch (...) { } // doesn't matter if this fails to open the large-file
+
+		largeReader();    // large reader will only drain the fifo when cancelled()
+		if (!closedOutput) {
+			outputDL->endOfInput();
+			closedOutput = true;
+		}
 	}
 }
 

@@ -39,6 +39,7 @@
 //#define NDEBUG
 #include <cassert>
 #include <boost/shared_array.hpp>
+#include <boost/thread/mutex.hpp>
 #include <cmath>
 #include <cfloat>
 #ifdef __linux__
@@ -107,6 +108,10 @@ public:
 	void serialize(messageqcpp::ByteStream &) const;
 	uint32_t deserialize(messageqcpp::ByteStream &);
 
+	//@bug6065, make StringStore::storeString() thread safe
+	void useStoreStringMutex(bool b) { fUseStoreStringMutex = b;    }
+	bool useStoreStringMutex() const { return fUseStoreStringMutex; }
+
 private:
 	StringStore(const StringStore &);
 	StringStore & operator=(const StringStore &);
@@ -123,6 +128,9 @@ private:
 
 	std::vector<boost::shared_array<uint8_t> > mem;
 	bool empty;
+	bool fUseStoreStringMutex; //@bug6065, make StringStore::storeString() thread safe
+	boost::mutex fMutex;
+
 };
 
 #ifdef _MSC_VER
@@ -163,6 +171,10 @@ public:
 	// where it's inconvenient to instantiate one.
 	inline void getRow(uint32_t num, Row *row);
 
+	//@bug6065, make StringStore::storeString() thread safe
+	void useStoreStringMutex(bool b) { if (strings) strings->useStoreStringMutex(b); }
+	bool useStoreStringMutex() const { return (strings ? (strings->useStoreStringMutex()) : false); }
+
 	boost::shared_array<uint8_t> rowData;
 	boost::shared_ptr<StringStore> strings;
 
@@ -173,7 +185,7 @@ private:
 	// Need sig to support backward compat.  RGData can deserialize both forms.
 	static const uint32_t RGDATA_SIG = 0xffffffff;  //won't happen for 'old' Rowgroup data
 
-friend class RowGroup;
+	friend class RowGroup;
 };
 
 
@@ -220,7 +232,7 @@ class Row
 
 		// this returns true if the type is not CHAR or VARCHAR
 		inline bool isCharType(uint32_t colIndex) const;
-        inline bool isUnsigned(uint32_t colIndex) const;
+		inline bool isUnsigned(uint32_t colIndex) const;
 		inline bool isShortString(uint32_t colIndex) const;
 		inline bool isLongString(uint32_t colIndex) const;
 
@@ -421,12 +433,12 @@ inline const execplan::CalpontSystemCatalog::ColDataType* Row::getColTypes() con
 
 inline bool Row::isCharType(uint32_t colIndex) const
 {
-    return execplan::isCharType(types[colIndex]);
+	return execplan::isCharType(types[colIndex]);
 }
 
 inline bool Row::isUnsigned(uint32_t colIndex) const
 {
-    return execplan::isUnsigned(types[colIndex]);
+	return execplan::isUnsigned(types[colIndex]);
 }
 
 inline bool Row::isShortString(uint32_t colIndex) const
@@ -997,7 +1009,7 @@ public:
 	inline const std::vector<uint32_t> & getOIDs() const;
 	inline const std::vector<uint32_t> & getKeys() const;
 	inline const std::vector<uint32_t> & getColWidths() const;
-    inline execplan::CalpontSystemCatalog::ColDataType getColType(uint32_t colIndex) const;
+	inline execplan::CalpontSystemCatalog::ColDataType getColType(uint32_t colIndex) const;
 	inline const std::vector<execplan::CalpontSystemCatalog::ColDataType>& getColTypes() const;
 	inline std::vector<execplan::CalpontSystemCatalog::ColDataType>& getColTypes();
 	inline boost::shared_array<bool> &getForceInline();
@@ -1005,7 +1017,7 @@ public:
 
 	// this returns true if the type is CHAR or VARCHAR
 	inline bool isCharType(uint32_t colIndex) const;
-    inline bool isUnsigned(uint32_t colIndex) const;
+	inline bool isUnsigned(uint32_t colIndex) const;
 	inline bool isShortString(uint32_t colIndex) const;
 	inline bool isLongString(uint32_t colIndex) const;
 
@@ -1198,7 +1210,7 @@ void RowGroup::initRow(Row *r, bool forceInlineData) const
 {
 	r->columnCount = columnCount;
 	if (LIKELY(!types.empty())) {
-    	r->colWidths = (uint32_t *) &colWidths[0];
+		r->colWidths = (uint32_t *) &colWidths[0];
 		r->types = (execplan::CalpontSystemCatalog::ColDataType *) &(types[0]);
 		r->scale = (uint32_t *) &(scale[0]);
 		r->precision = (uint32_t *) &(precision[0]);
@@ -1240,12 +1252,12 @@ inline uint64_t RowGroup::getSizeWithStrings() const
 
 inline bool RowGroup::isCharType(uint32_t colIndex) const
 {
-    return execplan::isCharType(types[colIndex]);
+	return execplan::isCharType(types[colIndex]);
 }
 
 inline bool RowGroup::isUnsigned(uint32_t colIndex) const
 {
-    return execplan::isUnsigned(types[colIndex]);
+	return execplan::isUnsigned(types[colIndex]);
 }
 
 inline bool RowGroup::isShortString(uint32_t colIndex) const
@@ -1370,13 +1382,13 @@ inline void RowGroup::getLocation(uint32_t *partNum, uint16_t *segNum,
 // returns the first RID of the logical block identified by baseRid
 inline uint64_t getExtentRelativeRid(uint64_t baseRid)
 {
-    uint64_t blockNum = baseRid & 0x3ff;
+	uint64_t blockNum = baseRid & 0x3ff;
 	return (blockNum << 13);
 }
 
 inline uint64_t Row::getExtentRelativeRid() const
 {
-    return rowgroup::getExtentRelativeRid(baseRid) | (getRelRid() & 0x1fff);
+	return rowgroup::getExtentRelativeRid(baseRid) | (getRelRid() & 0x1fff);
 }
 
 // returns the first RID of the logical block identified by baseRid
@@ -1389,7 +1401,7 @@ inline uint64_t getFileRelativeRid(uint64_t baseRid)
 
 inline uint64_t Row::getFileRelativeRid() const
 {
-    return rowgroup::getFileRelativeRid(baseRid) | (getRelRid() & 0x1fff);
+	return rowgroup::getFileRelativeRid(baseRid) | (getRelRid() & 0x1fff);
 }
 
 inline void Row::getLocation(uint32_t *partNum, uint16_t *segNum, uint8_t *extentNum,

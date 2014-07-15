@@ -519,6 +519,8 @@ void SimpleFilter::setDerivedTable()
 {
 	string lDerivedTable = "";
 	string rDerivedTable = "";
+	if (hasAggregate())
+		return;
 
 	if (fLhs)
 	{
@@ -623,6 +625,34 @@ void SimpleFilter::setSimpleColumnList()
 		fSimpleColumnList.insert
 		  (fSimpleColumnList.end(), fRhs->simpleColumnList().begin(), fRhs->simpleColumnList().end());
 	}
+}
+
+bool SimpleFilter::hasAggregate()
+{
+	AggregateColumn *lac = dynamic_cast<AggregateColumn*>(fLhs);
+	AggregateColumn *rac = dynamic_cast<AggregateColumn*>(fRhs);
+	fAggColumnList.clear();
+
+	if (lac)
+	{
+		return true;
+	}
+	else if (fLhs)
+	{
+		if (fLhs->hasAggregate())
+			return true;
+	}
+
+	if (rac)
+	{
+		return true;
+	}
+	else if (fRhs)
+	{
+		if (fRhs->hasAggregate())
+			return true;
+	}
+	return false;
 }
 
 

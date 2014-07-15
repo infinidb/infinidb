@@ -62,7 +62,8 @@ JoinPartition::JoinPartition(const RowGroup &lRG,
 			smallKeyCols(smallKeys), largeKeyCols(largeKeys), typelessJoin(typeless),
 			nextPartitionToReturn(0), htSizeEstimate(0), htTargetSize(partitionSize), rootNode(true),
 			antiWithMatchNulls(antiWMN), needsAllNullRows(hasFEFilter), gotNullRow(false),
-			totalBytesRead(0), totalBytesWritten(0), maxLargeSize(0), maxSmallSize(0)
+			totalBytesRead(0), totalBytesWritten(0), maxLargeSize(0), maxSmallSize(0),
+			nextSmallOffset(0), nextLargeOffset(0)
 {
 	config::Config *config = config::Config::makeConfig();
 	string cfgTxt;
@@ -108,7 +109,8 @@ JoinPartition::JoinPartition(const JoinPartition &jp, bool splitMode) :
 			rootNode(false), antiWithMatchNulls(jp.antiWithMatchNulls),
 			needsAllNullRows(jp.needsAllNullRows), gotNullRow(false),
 			useCompression(jp.useCompression), totalBytesRead(0),
-			totalBytesWritten(0), maxLargeSize(0), maxSmallSize(0)
+			totalBytesWritten(0), maxLargeSize(0), maxSmallSize(0),
+			nextSmallOffset(0), nextLargeOffset(0)
 {
 	config::Config *config = config::Config::makeConfig();
 	boost::posix_time::ptime t;
@@ -140,13 +142,6 @@ JoinPartition::JoinPartition(const JoinPartition &jp, bool splitMode) :
 	largeFilename = filenamePrefix + "-large";
 
 	smallSizeOnDisk = largeSizeOnDisk = 0;
-
-	smallFile.open(smallFilename.c_str(), ios::binary | ios::in | ios::out | ios::trunc);
-	int saveErrno = errno;
-	if (!smallFile) {
-		cout << "couldn't open " << smallFilename << strerror(saveErrno) << endl;
-		throw IDBExcept("couldn't open small file", ERR_DBJ_FILE_IO_ERROR);
-	}
 
 	buffer.reinit(smallRG);
 	smallRG.setData(&buffer);
@@ -304,9 +299,9 @@ int64_t JoinPartition::convertToSplitMode()
 
 	RowGroup &rg = smallRG;
 	Row &row = smallRow;
-	smallFile.seekg(0);
-	while (smallFile) {
-		readByteStream(smallFile, &bs);
+	nextSmallOffset = 0;
+	while (1) {
+		readByteStream(0, &bs);
 		if (bs.length() == 0)
 			break;
 		rgData.deserialize(bs);
@@ -338,7 +333,6 @@ int64_t JoinPartition::convertToSplitMode()
 			ret += buckets[hash]->insertSmallSideRow(row);
 		}
 	}
-	smallFile.close();
 	boost::filesystem::remove(smallFilename);
 	smallFilename.clear();
 
@@ -361,9 +355,6 @@ int64_t JoinPartition::processSmallBuffer()
 {
 	int64_t ret;
 
-	if (smallRG.getRowCount() == 0)
-		return 0;
-
 	ret = processSmallBuffer(buffer);
 	smallRG.resetRowGroup(0);
 	smallRG.getRow(0, &smallRow);
@@ -378,17 +369,16 @@ int64_t JoinPartition::processSmallBuffer(RGData &rgData)
 	int64_t ret = 0;
 
 	rg.setData(&rgData);
-	if (rg.getRowCount() == 0)
-		return 0;
-
 	//if (rootNode)
 		//cout << "smallside RGData: " << rg.toString() << endl;
 
 	if (fileMode) {
 		ByteStream bs;
 		rg.serializeRGData(bs);
+		//cout << "writing RGData: " << rg.toString() << endl;
 
-		ret = writeByteStream(smallFile, bs);
+		ret = writeByteStream(0, bs);
+		//cout << "wrote " << ret << " bytes" << endl;
 
 		/* Check whether this partition is now too big -> convert to split mode.
 
@@ -445,9 +435,6 @@ int64_t JoinPartition::processLargeBuffer()
 {
 	int64_t ret;
 
-	if (largeRG.getRowCount() == 0)
-		return 0;
-
 	ret = processLargeBuffer(buffer);
 	largeRG.resetRowGroup(0);
 	largeRG.getRow(0, &largeRow);
@@ -462,8 +449,6 @@ int64_t JoinPartition::processLargeBuffer(RGData &rgData)
 	int i, j;
 
 	rg.setData(&rgData);
-	if (rg.getRowCount() == 0)
-		return 0;
 
 	//if (rootNode)
 	//	cout << "largeside RGData: "  << rg.toString() << endl;
@@ -483,7 +468,9 @@ int64_t JoinPartition::processLargeBuffer(RGData &rgData)
 	if (fileMode) {
 		ByteStream bs;
 		rg.serializeRGData(bs);
-		ret = writeByteStream(largeFile, bs);
+		//cout << "writing large RGData: " << rg.toString() << endl;
+		ret = writeByteStream(1, bs);
+		//cout << "wrote " << ret << " bytes" << endl;
 	}
 	else {
 		uint64_t hash, tmp;
@@ -520,9 +507,9 @@ bool JoinPartition::getNextPartition(vector<RGData> *smallData, uint64_t *partit
 			return false;
 
 		//cout << "reading the small side" << endl;
-		smallFile.seekg(0);
-		while (smallFile) {
-			readByteStream(smallFile, &bs);
+		nextSmallOffset = 0;
+		while (1) {
+			readByteStream(0, &bs);
 			if (bs.length() == 0)
 				break;
 			rgData.deserialize(bs);
@@ -549,18 +536,15 @@ boost::shared_ptr<RGData> JoinPartition::getNextLargeRGData()
 {
 	boost::shared_ptr<RGData> ret;
 
-	if (largeFile) {
-		ByteStream bs;
-		readByteStream(largeFile, &bs);
-		if (bs.length() != 0) {
-			ret.reset(new RGData());
-			ret->deserialize(bs);
-		}
-		else {
-			largeFile.close();
-			boost::filesystem::remove(largeFilename);
-			largeSizeOnDisk = 0;
-		}
+	ByteStream bs;
+	readByteStream(1, &bs);
+	if (bs.length() != 0) {
+		ret.reset(new RGData());
+		ret->deserialize(bs);
+	}
+	else {
+		boost::filesystem::remove(largeFilename);
+		largeSizeOnDisk = 0;
 	}
 	return ret;
 }
@@ -582,10 +566,8 @@ void JoinPartition::initForProcessing()
 	if (!fileMode)
 		for (i = 0; i < (int) bucketCount; i++)
 			buckets[i]->initForProcessing();
-	else {
-		smallFile.clear();
-		largeFile.seekg(0);
-	}
+	else
+		nextLargeOffset = 0;
 }
 
 void JoinPartition::initForLargeSideFeed()
@@ -600,15 +582,8 @@ void JoinPartition::initForLargeSideFeed()
 	}
 
 	largeSizeOnDisk = 0;
-	if (fileMode) {
-		largeFile.close();
-		largeFile.open(largeFilename.c_str(), ios::binary | ios::in | ios::out | ios::trunc);
-		int saveErrno = errno;
-		if (!largeFile) {
-			cout << "couldn't open " << largeFilename << strerror(saveErrno) << endl;
-			throw IDBExcept("couldn't open large file", ERR_DBJ_FILE_IO_ERROR);
-		}
-	}
+	if (fileMode)
+		nextLargeOffset = 0;
 	else
 		for (i = 0; i < (int) bucketCount; i++)
 			buckets[i]->initForLargeSideFeed();
@@ -616,33 +591,46 @@ void JoinPartition::initForLargeSideFeed()
 
 void JoinPartition::saveSmallSidePartition(vector<RGData> &rgData)
 {
-	smallFile.close();
 	//cout << "JP: saving partition: " << id << endl;
 	htSizeEstimate = 0;
 	smallSizeOnDisk = 0;
-	smallFile.open(smallFilename.c_str(), ios::binary | ios::in | ios::out | ios::trunc);
-	int saveErrno = errno;
-	if (!smallFile) {
-		cout << "couldn't open " << smallFilename << strerror(saveErrno) << endl;
-		throw IDBExcept("couldn't open small file", ERR_DBJ_FILE_IO_ERROR);
-	}
+	nextSmallOffset = 0;
+	boost::filesystem::remove(smallFilename);
 	insertSmallSideRGData(rgData);
 	doneInsertingSmallData();
 }
 
-void JoinPartition::readByteStream(fstream &fs, ByteStream *bs)
+void JoinPartition::readByteStream(int which, ByteStream *bs)
 {
+	size_t &offset = (which == 0 ? nextSmallOffset : nextLargeOffset);
+	fstream &fs = (which == 0 ? smallFile : largeFile);
+	const char *filename = (which == 0 ? smallFilename.c_str() : largeFilename.c_str());
+
 	size_t len;
 
 	bs->restart();
+
+	fs.open(filename, ios::binary | ios::in);
+	int saveErrno = errno;
+	if (!fs) {
+		fs.close();
+		cout << "couldn't open " << filename << strerror(saveErrno) << endl;
+		throw IDBExcept("couldn't open file", ERR_DBJ_FILE_IO_ERROR);
+	}
+
+	fs.seekg(offset);
 	fs.read((char *) &len, sizeof(len));
-	if (!fs)
+	if (!fs) {
+		fs.close();
 		return;
+	}
+	idbassert(len != 0);
 	totalBytesRead += sizeof(len);
 	if (!useCompression) {
 		bs->needAtLeast(len);
 		fs.read((char *) bs->getInputPtr(), len);
 		if (!fs) {
+			fs.close();
 			cout << "File IO read error" << endl;
 			throw IDBExcept("File IO read error", ERR_DBJ_FILE_IO_ERROR);
 		}
@@ -655,6 +643,7 @@ void JoinPartition::readByteStream(fstream &fs, ByteStream *bs)
 
 		fs.read(buf.get(), len);
 		if (!fs) {
+			fs.close();
 			cout << "file IO read error" << endl;
 			throw IDBExcept("File IO read error", ERR_DBJ_FILE_IO_ERROR);
 		}
@@ -664,18 +653,37 @@ void JoinPartition::readByteStream(fstream &fs, ByteStream *bs)
 		compressor.uncompress(buf.get(), len, (char *) bs->getInputPtr());
 		bs->advanceInputPtr(uncompressedSize);
 	}
+
+	offset = fs.tellg();
+	fs.close();
 }
 
-uint64_t JoinPartition::writeByteStream(fstream &fs, ByteStream &bs)
+uint64_t JoinPartition::writeByteStream(int which, ByteStream &bs)
 {
+	size_t &offset = (which == 0 ? nextSmallOffset : nextLargeOffset);
+	fstream &fs = (which == 0 ? smallFile : largeFile);
+	const char *filename = (which == 0 ? smallFilename.c_str() : largeFilename.c_str());
+
+	fs.open(filename, ios::binary | ios::out | ios::app);
+	int saveErrno = errno;
+	if (!fs) {
+		fs.close();
+		cout << "write couldn't open " << filename << strerror(saveErrno) << endl;
+		throw IDBExcept("couldn't open file", ERR_DBJ_FILE_IO_ERROR);
+	}
+
 	uint64_t ret = 0;
 	size_t len = bs.length();
+	idbassert(len != 0);
+
+	fs.seekp(offset);
 
 	if (!useCompression) {
 		ret = len + 4;
 		fs.write((char *) &len, sizeof(len));
 		fs.write((char *) bs.buf(), len);
 		if (!fs) {
+			fs.close();
 			cout << "file IO write error" << endl;
 			throw IDBExcept("File IO write error", ERR_DBJ_FILE_IO_ERROR);
 		}
@@ -691,12 +699,16 @@ uint64_t JoinPartition::writeByteStream(fstream &fs, ByteStream &bs)
 		fs.write((char *) &actualSize, sizeof(actualSize));
 		fs.write((char *) compressed.get(), actualSize);
 		if (!fs) {
+			fs.close();
 			cout << "File IO write error" << endl;
 			throw IDBExcept("File IO write error", ERR_DBJ_FILE_IO_ERROR);
 		}
 		totalBytesWritten += sizeof(actualSize) + actualSize;
 	}
 	bs.advance(len);
+
+	offset = fs.tellp();
+	fs.close();
 	return ret;
 }
 

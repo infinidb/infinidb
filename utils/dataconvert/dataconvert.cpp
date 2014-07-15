@@ -1390,7 +1390,23 @@ int32_t DataConvert::convertColumnDate(
 		return value;
 	}
 
-	if ( dataOrgLen < 10)
+	// @bug 5787: allow for leading blanks
+	unsigned int dataLen = dataOrgLen;
+	if ((dataOrgLen > 0) && (dataOrg[0] == ' '))
+	{
+		unsigned nblanks = 0;
+		for (unsigned nn=0; nn<dataOrgLen; nn++)
+		{
+			if (dataOrg[nn] == ' ')
+				nblanks++;
+			else
+				break;
+		}
+		p       = dataOrg    + nblanks;
+		dataLen = dataOrgLen - nblanks;
+	}
+
+	if ( dataLen < 10)
 	{
 		status = -1;
 		return value;
@@ -1458,7 +1474,23 @@ int64_t DataConvert::convertColumnDatetime(
 		return value;
 	}
 
-	if ( dataOrgLen < 10)
+	// @bug 5787: allow for leading blanks
+	unsigned int dataLen = dataOrgLen;
+	if ((dataOrgLen > 0) && (dataOrg[0] == ' '))
+	{
+		unsigned nblanks = 0;
+		for (unsigned nn=0; nn<dataOrgLen; nn++)
+		{
+			if (dataOrg[nn] == ' ')
+				nblanks++;
+			else
+				break;
+		}
+		p       = dataOrg    + nblanks;
+		dataLen = dataOrgLen - nblanks;
+	}
+
+	if ( dataLen < 10)
 	{
 		status = -1;
 		return value;
@@ -1480,17 +1512,15 @@ int64_t DataConvert::convertColumnDatetime(
 
 	inDay = strtol(fld, 0, 10);
 
-	int len = dataOrgLen;
-
 	inHour        = 0;
 	inMinute      = 0;
 	inSecond      = 0;
 	inMicrosecond = 0;
-	if (len > 12)
+	if (dataLen > 12)
 	{
 		// For backwards compatability we still allow leading blank
-		if ((!isdigit(dataOrg[11]) && (dataOrg[11] != ' ')) ||
-			 !isdigit(dataOrg[12]))
+		if ((!isdigit(p[11]) && (p[11] != ' ')) ||
+			 !isdigit(p[12]))
 		{
 			status = -1;
 			return value;
@@ -1501,9 +1531,9 @@ int64_t DataConvert::convertColumnDatetime(
 
 		inHour = strtol(fld, 0, 10);
 
-		if (len > 15)
+		if (dataLen > 15)
 		{
-			if (!isdigit(dataOrg[14]) || !isdigit(dataOrg[15]))
+			if (!isdigit(p[14]) || !isdigit(p[15]))
 			{
 				status = -1;
 				return value;
@@ -1514,9 +1544,9 @@ int64_t DataConvert::convertColumnDatetime(
 
 			inMinute = strtol(fld, 0, 10);
 
-			if (len > 18)
+			if (dataLen > 18)
 			{
-				if (!isdigit(dataOrg[17]) || !isdigit(dataOrg[18]))
+				if (!isdigit(p[17]) || !isdigit(p[18]))
 				{
 					status = -1;
 					return value;
@@ -1527,9 +1557,9 @@ int64_t DataConvert::convertColumnDatetime(
 
 				inSecond = strtol(fld, 0, 10);
 
-				if (len > 20)
+				if (dataLen > 20)
 				{
-					unsigned int microFldLen = len - 20;
+					unsigned int microFldLen = dataLen - 20;
 					if (microFldLen > (sizeof(fld)-1))
 						microFldLen = sizeof(fld) - 1;
 					memcpy( fld, p+20, microFldLen);

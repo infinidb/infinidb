@@ -61,6 +61,24 @@ class JoinPartition
 								JoinPartition **jp);
 
 		boost::shared_ptr<rowgroup::RGData> getNextLargeRGData();
+
+		/* It's important to follow the sequence of operations to maintain the correct
+		   internal state.  Right now it doesn't check that you the programmer are doing things
+		   right, it'll likely fail queries or crash if you do things wrong.
+		   This should be made simpler at some point.
+
+		   On construction, the JP is config'd for small-side reading.
+		   After that's done, call doneInsertingSmallData() and initForLargeSideFeed().
+		   Then, insert the large-side data.  When done, call doneInsertingLargeData()
+		   and initForProcessing().
+		   In the processing phase, use getNextPartition() and getNextLargeRGData()
+		   to get the data back out.  After processing all partitions, if it's necessary
+		   to process more iterations of the large side, call initForProcessing() again, and
+		   continue as before.
+		*/
+
+
+
 		/* Call this before reading into the large side */
 		void initForLargeSideFeed();
 		/* Call this between large-side insertion & join processing */
@@ -124,8 +142,9 @@ class JoinPartition
 		bool gotNullRow;
 		bool hasNullJoinColumn(rowgroup::Row &);
 
-		void readByteStream(std::fstream &fs, messageqcpp::ByteStream *bs);
-		uint64_t writeByteStream(std::fstream &ofs, messageqcpp::ByteStream &bs);
+		// which = 0 -> smallFile, which = 1 -> largeFile
+		void readByteStream(int which, messageqcpp::ByteStream *bs);
+		uint64_t writeByteStream(int which, messageqcpp::ByteStream &bs);
 
 		/* Compression support */
 		bool useCompression;
@@ -135,6 +154,10 @@ class JoinPartition
 		/* Some stats for reporting */
 		uint64_t totalBytesRead, totalBytesWritten;
 		uint64_t maxLargeSize, maxSmallSize;
+
+		/* file descriptor reduction */
+		size_t nextSmallOffset;
+		size_t nextLargeOffset;
 };
 
 
