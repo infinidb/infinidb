@@ -230,6 +230,7 @@ int ProcessCommandStatement(THD *thd, string& dmlStatement, cal_connection_info&
 	int rc = 0;
 
 	ulong sessionID = tid2sid(thd->thread_id);
+	
 	CalpontDMLPackage* pDMLPackage; 
 	//@Bug 2721 and 2722. Log the statement before issuing commit/rollback
 	if ( dmlStatement == "LOGGING" )
@@ -263,8 +264,6 @@ int ProcessCommandStatement(THD *thd, string& dmlStatement, cal_connection_info&
     
     pDMLPackage->write(bytestream);
     delete pDMLPackage;
-	
-	idbassert( ci.dmlProc );
 	
     ByteStream::byte b = 0;
 	string errormsg;
@@ -311,7 +310,8 @@ int ProcessCommandStatement(THD *thd, string& dmlStatement, cal_connection_info&
 		thd->killed = THD::KILL_QUERY;
 		thd->main_da.set_error_status(thd, HA_ERR_INTERNAL_ERROR,  errormsg.c_str());
 	}
-
+	delete ci.dmlProc;
+	ci.dmlProc = NULL;
     return rc;
 }
 
@@ -395,7 +395,6 @@ int doProcessInsertValues ( TABLE* table, uint32_t size, cal_connection_info& ci
    
 		pDMLPackage->write(bytestream);
 		delete pDMLPackage;
-		idbassert( ci.dmlProc );
 		
 		ByteStream::byte b = 0;
 		string errormsg;
@@ -531,6 +530,9 @@ int ha_calpont_impl_write_last_batch(TABLE* table, cal_connection_info& ci, bool
 		command = "COMMIT";
 		std::string schema;
 		schema = table->s->db.str;
+		//@Bug 6112. if no row to be insert and no rows have been inserted, no need to send to DMLProc
+		if ((size == 0) && (ci.rowsHaveInserted == 0))
+			return rc;
 		//@Bug 2715 Check the saved error code.
 		//@Bug 4516 always send the last package to allow DMLProc receive all messages from WES
 		if (( ci.rc != 0 ) || abort )
@@ -696,7 +698,6 @@ int ha_calpont_impl_write_row_(uchar *buf, TABLE* table, cal_connection_info& ci
     pDMLPackage->write(bytestream);
     delete pDMLPackage;
 	
-	idbassert( ci.dmlProc );
     ByteStream::byte b = 0;
 	ByteStream::octbyte rows;
 	std::string errorMsg;
@@ -817,8 +818,6 @@ int ha_calpont_impl_write_row_(uchar *buf, TABLE* table, cal_connection_info& ci
     bytestream << static_cast<uint32_t>(sessionID);
     pDMLPackage->write(bytestream);
     delete pDMLPackage;
-	
-	idbassert( ci.dmlProc );
 	
     ByteStream::byte b = 0;
 	ByteStream::octbyte rows;

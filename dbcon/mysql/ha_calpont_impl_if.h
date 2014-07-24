@@ -265,7 +265,7 @@ execplan::ConstantColumn* buildDecimalColumn(Item *item, gp_walk_info &gwi);
 execplan::SimpleColumn* buildSimpleColumn(Item_field* item, gp_walk_info& gwi);
 execplan::FunctionColumn* buildCaseFunction(Item_func* item, gp_walk_info& gwi, bool& nonSupport);
 execplan::ParseTree* buildParseTree(Item_func* item, gp_walk_info& gwi, bool& nonSupport);
-execplan::AggregateColumn* buildAggregateColumn(Item* item, gp_walk_info& gwi);
+execplan::ReturnedColumn* buildAggregateColumn(Item* item, gp_walk_info& gwi);
 execplan::ReturnedColumn* buildWindowFunctionColumn(Item* item, gp_walk_info& gwi, bool& nonSupport);
 execplan::ReturnedColumn* buildPseudoColumn(Item* item, gp_walk_info& gwi, bool& nonSupport, uint32_t pseudoType);
 void addIntervalArgs(Item_func* ifp, funcexp::FunctionParm& functionParms);

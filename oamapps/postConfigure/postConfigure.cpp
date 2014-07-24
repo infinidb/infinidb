@@ -1662,10 +1662,15 @@ int main(int argc, char *argv[])
 					else
 					{
 						if (cloud != "amazon") {
-							//get IP Address
-							string IPAddress = oam.getIPAddress( newModuleHostName);
-							if ( !IPAddress.empty() )
-								newModuleIPAddr = IPAddress;
+							if ( moduleIPAddr == oam::UnassignedIpAddr )
+							{
+								//get IP Address
+								string IPAddress = oam.getIPAddress( newModuleHostName);
+								if ( !IPAddress.empty() )
+									newModuleIPAddr = IPAddress;
+								else
+									newModuleIPAddr = oam::UnassignedIpAddr;
+							}
 							else
 								newModuleIPAddr = moduleIPAddr;
 
@@ -3419,7 +3424,7 @@ int main(int argc, char *argv[])
 		cout << " DONE" << endl;
 
 		if (hdfs)
-			cmd = ". " + installDir + "/bin/" + DataFileEnvFile + ";" + installDir + "/bin/dbbuilder 7 > /tmp/dbbuilder.log";
+			cmd = "bash -c '. " + installDir + "/bin/" + DataFileEnvFile + ";" + installDir + "/bin/dbbuilder 7 > /tmp/dbbuilder.log'";
 		else
 			cmd = installDir + "/bin/dbbuilder 7 > /tmp/dbbuilder.log";
 
@@ -4936,12 +4941,12 @@ bool updateBash()
 	{	
 		string cmd = "echo . " + installDir + "/bin/" + DataFileEnvFile + " >> " + fileName;
 		system(cmd.c_str());
-	
+
 		if ( rootUser)
 			cmd = "su - hdfs -c 'hadoop fs -mkdir -p " + installDir + ";hadoop fs -chown root:root " + installDir + "' >/dev/null 2>&1";
 		else
 			cmd = "sudo su - hdfs -c 'hadoop fs -mkdir -p " + installDir + ";hadoop fs -chown " + USER + ":" + USER + " " + installDir + "' >/dev/null 2>&1";
-	
+
 		system(cmd.c_str());
 	}
 

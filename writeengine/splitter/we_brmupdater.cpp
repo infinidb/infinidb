@@ -433,7 +433,7 @@ bool WEBrmUpdater::prepareHighWaterMarkInfo()
 //#ROWS: numRowsRead numRowsInserted
 
 bool WEBrmUpdater::prepareRowsInsertedInfo(std::string Entry,
-													int& TotRows, int& InsRows)
+									int64_t& TotRows, int64_t& InsRows)
 {
 	bool aFound=false;
 	//ROWS: 3 1
@@ -454,7 +454,7 @@ bool WEBrmUpdater::prepareRowsInsertedInfo(std::string Entry,
 
 		pTok = strtok(NULL, " ");
 		if (pTok)
-			TotRows = atoi(pTok);
+			TotRows = strtol(pTok, NULL, 10);
 		else {
 			//cout << "HWM Entry : " << aEntry << endl;
 			throw(runtime_error("Bad Tot ROWS entry string"));
@@ -462,7 +462,7 @@ bool WEBrmUpdater::prepareRowsInsertedInfo(std::string Entry,
 
 		pTok = strtok(NULL, " ");
 		if (pTok)
-			InsRows = atoi(pTok);
+			InsRows = strtol(pTok, NULL, 10);
 		else {
 			//cout << "HWM Entry : " << aEntry << endl;
 			throw(runtime_error("Bad inserted ROWS in entry string"));

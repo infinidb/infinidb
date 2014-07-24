@@ -137,6 +137,10 @@ public:
 	virtual int64_t colPosition() const { return fColPosition; }
 	virtual void colPosition(const int64_t colPosition) { fColPosition = colPosition; }
 
+	// Columns that may have aggregate column involved should implement this interface.
+	virtual bool hasAggregate() { return fHasAggregate;}
+	virtual void hasAggregate(bool hasAgg) { fHasAggregate = hasAgg; }
+
 	/**
 	 * Operations
 	 */
@@ -199,12 +203,6 @@ public:
 	const std::vector<WindowFunctionColumn*>& windowfunctionColumnList() const
 	{ return fWindowFunctionColumnList; }
 
-	/* @brief if this column is or contains aggregate column
-	 *
-	 * @note after this function call fAggColumnList is populated
-	 */
-	virtual bool hasAggregate() = 0;
-
 	/* @brief if this column is or contains window function column
 	 *
 	 * @note after this function call fWindowFunctionColumnList is populated
@@ -230,6 +228,7 @@ protected:
 	std::vector<SimpleColumn*> fSimpleColumnList;
 	std::vector<AggregateColumn*> fAggColumnList;
 	std::vector<WindowFunctionColumn*> fWindowFunctionColumnList;
+	bool fHasAggregate;           /// connector internal use. no need to serialize
 
 private:
 	std::string fData;

@@ -108,7 +108,7 @@ struct StepTeleStats
 		T_CES,		//CrossEngineStep
 		T_SQS,		//SubQueryStep
 		T_TAS,		//TupleAggregateStep
-		T_TXS,		//TupleAnnexStep
+		T_TNS,		//TupleAnnexStep
 		T_BPS,		//TupleBPS
 		T_TCS,		//TupleConstantStep
 		T_HVS,		//TupleHavingStep

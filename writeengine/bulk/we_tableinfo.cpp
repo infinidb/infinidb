@@ -548,6 +548,7 @@ int  TableInfo::readTableData( )
     its.rows_so_far.pop_back();
     its.rows_so_far.push_back(fTotalReadRows);
     fQtc.postImportTele(its);
+    fQtc.waitForQueues();
 
     return NO_ERROR;    
 }

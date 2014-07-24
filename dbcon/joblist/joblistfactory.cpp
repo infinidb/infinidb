@@ -575,9 +575,6 @@ void checkGroupByCols(CalpontSelectExecutionPlan* csep, JobInfo& jobInfo)
 			if (dynamic_cast<ConstantColumn*>(i->get()) != NULL)
 				continue;
 
-			if ((*i)->orderPos() == (uint64_t) -1)
-				jobInfo.hasImplicitGroupBy = true;
-
 			ReturnedColumn *rc = i->get();
 			SimpleColumn* sc = dynamic_cast<SimpleColumn*>(rc);
 

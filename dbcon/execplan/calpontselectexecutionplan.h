@@ -388,8 +388,8 @@ public:
 	void stringTableThreshold(uint32_t t) { fStringTableThreshold = t; }
 	uint32_t stringTableThreshold() const { return fStringTableThreshold; }
 
-	void uuid(boost::uuids::uuid uuid) { fUuid = uuid; }
-	const boost::uuids::uuid& uuid() const { return fUuid; }
+	void uuid(const boost::uuids::uuid& uuid) { fUuid = uuid; }
+	const boost::uuids::uuid& uuid() const    { return fUuid; }
 
 	/**
 	 * The serialization interface

@@ -269,15 +269,15 @@ private:
     	WERowsUploadInfo():fRowsRead(0),fRowsInserted(0){}
     	~WERowsUploadInfo(){}
     public:
-    	int fRowsRead;
-    	int fRowsInserted;
+    	int64_t fRowsRead;
+    	int64_t fRowsInserted;
     };
     WERowsUploadInfo fRowsUploadInfo;
     WEColOorVec fColOorVec;
     std::string fBadDataFile;
     std::string fErrInfoFile;
 
-    void setRowsUploadInfo(int RowsRead, int RowsInserted);
+    void setRowsUploadInfo(int64_t RowsRead, int64_t RowsInserted);
     void add2ColOutOfRangeInfo(int ColNum, 
                                CalpontSystemCatalog::ColDataType ColType, 
                                std::string&  ColName, int NoOfOors);

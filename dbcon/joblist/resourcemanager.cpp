@@ -182,7 +182,7 @@ namespace joblist {
 
 	// window function
 	string wt = fConfig->getConfig("WindowFunction", "WorkThreads");
-	if (nt.empty())
+	if (wt.empty())
 		fWindowFunctionThreads = numCores();
 	else
 		fWindowFunctionThreads = fConfig->uFromText(wt);

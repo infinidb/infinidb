@@ -33,7 +33,9 @@
 using namespace std;
 
 #include <boost/shared_ptr.hpp>
+#include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/case_conv.hpp>
+#include <boost/algorithm/string/split.hpp>
 namespace ba=boost::algorithm;
 
 #include "calpontexecutionplan.h"
@@ -120,6 +122,9 @@ const Operator opnotlike("not like");
 const Operator opNOTLIKE("NOT LIKE");
 const Operator opisnotnull("isnotnull");
 const Operator opisnull("isnull");
+
+
+const JobStepVector doSimpleFilter(SimpleFilter* sf, JobInfo& jobInfo);
 
 
 /* This looks like an inefficient way to get NULL values. Much easier ways
@@ -1599,6 +1604,50 @@ const JobStepVector doConstantBooleanFilter(const ParseTree* n, JobInfo& jobInfo
 }
 
 
+bool optimizeIdbPatitionSimpleFilter(SimpleFilter* sf, JobStepVector& jsv, JobInfo& jobInfo)
+{
+	//@bug5848, not equal filter is not optimized.
+	if (sf->op()->op() != opeq.op())
+		return false;
+
+	const FunctionColumn* fc = static_cast<const FunctionColumn*>(sf->lhs());
+	const ConstantColumn* cc = static_cast<const ConstantColumn*>(sf->rhs());
+	if (fc == NULL)
+	{
+		cc = static_cast<const ConstantColumn*>(sf->lhs());
+		fc = static_cast<const FunctionColumn*>(sf->rhs());
+	}
+
+	// not a function or not idbparttition
+	if (fc == NULL || cc == NULL || fc->functionName().compare("idbpartition") != 0)
+		return false;
+
+	// make sure the cc has 3 tokens
+	vector<string> cv;
+	boost::split(cv, cc->constval(), boost::is_any_of("."));
+	if (cv.size() != 3)
+		return false;
+
+	// construct separate filters, then make job steps
+	JobStepVector v;
+	SOP sop = sf->op();
+	const funcexp::FunctionParm& parms = fc->functionParms();
+	
+	for (uint64_t i = 0; i < 3; i++)
+	{
+		// very weird parms order is: db root, physical partition, segment
+		// logical partition string : physical partition, segment, db root
+		ReturnedColumn* lhs = dynamic_cast<ReturnedColumn*>(parms[(i+1)%3]->data());
+		ConstantColumn* rhs = new ConstantColumn(cv[i]);
+		SimpleFilter* f = new SimpleFilter(sop, lhs->clone(), rhs);
+		v = doSimpleFilter(f, jobInfo); 
+		jsv.insert(jsv.end(), v.begin(), v.end());
+	}
+
+	return true;
+}
+
+
 const JobStepVector doSimpleFilter(SimpleFilter* sf, JobInfo& jobInfo)
 {
 	JobStepVector jsv;
@@ -2045,7 +2094,16 @@ const JobStepVector doSimpleFilter(SimpleFilter* sf, JobInfo& jobInfo)
 	else if (lhsType == ARITHMETICCOLUMN || rhsType == ARITHMETICCOLUMN ||
 			 lhsType == FUNCTIONCOLUMN || rhsType == FUNCTIONCOLUMN)
 	{
-		jsv = doExpressionFilter(sf, jobInfo);
+		const ReturnedColumn* rc = static_cast<const ReturnedColumn*>(lhs);
+		if (rc && (!rc->joinInfo()) && rhsType == AGGREGATECOLUMN)
+			throw IDBExcept(ERR_AGG_IN_WHERE);
+
+		// @bug5848, CP elimination for idbPartition(col)
+		JobStepVector sv;
+		if (optimizeIdbPatitionSimpleFilter(sf, sv, jobInfo))
+			jsv.swap(sv);
+		else
+			jsv = doExpressionFilter(sf, jobInfo);
 	}
 	else if (lhsType == SIMPLECOLUMN &&
 			(rhsType == AGGREGATECOLUMN || rhsType == ARITHMETICCOLUMN || rhsType == FUNCTIONCOLUMN))
@@ -2600,6 +2658,7 @@ bool tryCombineFilters(JobStepVector& jsv1, JobStepVector& jsv2, int8_t bop)
 	return false;
 }
 
+
 const JobStepVector doConstantFilter(const ConstantFilter* cf, JobInfo& jobInfo)
 {
 	JobStepVector jsv;
@@ -2919,6 +2978,112 @@ const JobStepVector doConstantFilter(const ConstantFilter* cf, JobInfo& jobInfo)
 }
 
 
+const JobStepVector doFunctionFilter(const ParseTree* n, JobInfo& jobInfo)
+{
+	FunctionColumn* fc = dynamic_cast<FunctionColumn*>(n->data());
+	idbassert(fc);
+
+	JobStepVector jsv;
+	string functionName = ba::to_lower_copy(fc->functionName());
+	if (functionName.compare("in") == 0 || functionName.compare(" in ") == 0)
+	{
+		const funcexp::FunctionParm& parms = fc->functionParms();
+		FunctionColumn* parm0Fc = dynamic_cast<FunctionColumn*>(parms[0]->data());
+		PseudoColumn*   parm0Pc = dynamic_cast<PseudoColumn*>(parms[0]->data());
+		vector<vector<string> > constParms(3);
+		uint64_t constParmsCount = 0;
+		if (parm0Fc && parm0Fc->functionName().compare("idbpartition") == 0)
+		{
+			for (uint64_t i = 1; i < parms.size(); i++)
+			{
+				ConstantColumn* cc = dynamic_cast<ConstantColumn*>(parms[i]->data());
+				if (cc)
+				{
+					vector<string> cv;
+					boost::split(cv, cc->constval(), boost::is_any_of("."));
+					if (cv.size() == 3)
+					{
+						constParms[1].push_back(cv[0]);
+						constParms[2].push_back(cv[1]);
+						constParms[0].push_back(cv[2]);
+						constParmsCount++;
+					}
+				}
+			}
+
+			if (constParmsCount == (parms.size() - 1))
+			{
+				const funcexp::FunctionParm& pcs = parm0Fc->functionParms();
+				for (uint64_t i = 0; i < 3; i++)
+				{
+					ConstantFilter* cf = new ConstantFilter();
+					SOP sop(new LogicOperator("or"));
+					PseudoColumn* pc = dynamic_cast<PseudoColumn*>(pcs[i]->data());
+					idbassert(pc);
+					SSC col(pc->clone());
+					cf->op(sop);
+					cf->col(col);
+					sop.reset(new PredicateOperator("="));
+					for (uint64_t j = 0; j < constParmsCount; j++)
+					{
+						SimpleFilter* f = new SimpleFilter(sop, col->clone(),
+						                                   new ConstantColumn(constParms[i][j]));
+						cf->pushFilter(f);
+					}
+
+					JobStepVector sv = doConstantFilter(cf, jobInfo);
+					delete cf;
+
+					jsv.insert(jsv.end(), sv.begin(), sv.end());
+				}
+			}
+
+			// put the separate filtered resulted together
+			JobStepVector sv = doExpressionFilter(n, jobInfo);
+			jsv.insert(jsv.end(), sv.begin(), sv.end());
+		}
+		else if (parm0Pc != NULL)
+		{
+			for (uint64_t i = 1; i < parms.size(); i++)
+			{
+				ConstantColumn* cc = dynamic_cast<ConstantColumn*>(parms[i]->data());
+				if (cc)
+				{
+					constParms[0].push_back(cc->constval());
+					constParmsCount++;
+				}
+			}
+
+			if (constParmsCount == (parms.size() - 1))
+			{
+				ConstantFilter* cf = new ConstantFilter();
+				SOP sop(new LogicOperator("or"));
+				SSC col(parm0Pc->clone());
+				cf->op(sop);
+				cf->col(col);
+				sop.reset(new PredicateOperator("="));
+				for (uint64_t j = 0; j < constParmsCount; j++)
+				{
+					SimpleFilter* f = new SimpleFilter(sop, col->clone(),
+					                                   new ConstantColumn(constParms[0][j]));
+					cf->pushFilter(f);
+				}
+
+				JobStepVector sv = doConstantFilter(cf, jobInfo);
+				delete cf;
+
+				jsv.insert(jsv.end(), sv.begin(), sv.end());
+			}
+		}
+	}
+
+	if (jsv.empty())
+		jsv = doExpressionFilter(n, jobInfo);
+
+	return jsv;
+}
+
+
 void doAND(JobStepVector& jsv, JobInfo& jobInfo)
 {
 //	idbassert(jobInfo.stack.size() >= 2);
@@ -3035,6 +3200,9 @@ JLF_ExecPlanToJobList::walkTree(ParseTree* n, void* obj)
 		jobInfo->stack.push(jsv);
 		break;
 	case FUNCTIONCOLUMN:
+		jsv = doFunctionFilter(n, *jobInfo);
+		jobInfo->stack.push(jsv);
+		break;
 	case ARITHMETICCOLUMN:
 		jsv = doExpressionFilter(n, *jobInfo);
 		jobInfo->stack.push(jsv);

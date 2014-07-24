@@ -231,7 +231,7 @@ void QueryTeleClient::postStepTele(const StepTeleStats& sts)
 	QT_STYPE_CASE_(T_CES);
 	QT_STYPE_CASE_(T_SQS);
 	QT_STYPE_CASE_(T_TAS);
-	QT_STYPE_CASE_(T_TXS);
+	QT_STYPE_CASE_(T_TNS);
 	QT_STYPE_CASE_(T_BPS);
 	QT_STYPE_CASE_(T_TCS);
 	QT_STYPE_CASE_(T_HVS);
@@ -251,6 +251,12 @@ void QueryTeleClient::postImportTele(const ImportTeleStats& its)
 	if (!fProtoImpl) return;
 	ImportTele itdata = its2it(its);
 	fProtoImpl->enqImportTele(itdata);
+}
+
+void QueryTeleClient::waitForQueues()
+{
+	if (fProtoImpl)
+		fProtoImpl->waitForQueues();
 }
 
 }

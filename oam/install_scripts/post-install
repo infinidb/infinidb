@@ -174,7 +174,7 @@ elif [ -z "$NO_NONROOT_SUDO" ]; then
 	sudo rm -f /tmp/StopCalpont
 
 	sed -i -e s@/usr/local/Calpont@$installdir@g $installdir/bin/infinidb.def
-	sudo $installdir/bin/infinidb.def /etc/default/infinidb
+	sudo cp $installdir/bin/infinidb.def /etc/default/infinidb
 fi
 
 #check if InfiniDB system logging was setup

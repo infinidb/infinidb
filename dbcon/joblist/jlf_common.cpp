@@ -287,6 +287,9 @@ UniqId::UniqId(const execplan::SimpleColumn* sc) :
 	fPseudo(0),
 	fSubId(-1)
 {
+	const PseudoColumn* pc = dynamic_cast<const execplan::PseudoColumn*>(sc);
+	uint32_t pseudoType = (pc) ? pc->pseudoType() : execplan::PSEUDO_UNKNOWN;
+	fPseudo = pseudoType;
 }
 
 

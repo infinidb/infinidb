@@ -153,7 +153,6 @@ public:
 	 */
 	bool operator!=(const ConstantColumn& t) const;
 
-	virtual bool hasAggregate() {return false;}
 	virtual bool hasWindowFunc() {return false;}
 
 	/** Constant column on the filte can always be moved into derived table */

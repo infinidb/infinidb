@@ -515,6 +515,8 @@ void SimpleFilter::setDerivedTable()
 {
 	string lDerivedTable = "";
 	string rDerivedTable = "";
+	if (hasAggregate())
+		return;
 
 	if (fLhs)
 	{
@@ -587,5 +589,32 @@ void SimpleFilter::replaceRealCol(CalpontSelectExecutionPlan::ReturnedColumnList
 	}
 }
 
+bool SimpleFilter::hasAggregate()
+{
+	AggregateColumn *lac = dynamic_cast<AggregateColumn*>(fLhs);
+	AggregateColumn *rac = dynamic_cast<AggregateColumn*>(fRhs);
+	fAggColumnList.clear();
+
+	if (lac)
+	{
+		return true;
+	}
+	else if (fLhs)
+	{
+		if (fLhs->hasAggregate())
+			return true;
+	}
+
+	if (rac)
+	{
+		return true;
+	}
+	else if (fRhs)
+	{
+		if (fRhs->hasAggregate())
+			return true;
+	}
+	return false;
+}
 
 } // namespace execplan

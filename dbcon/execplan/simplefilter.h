@@ -37,6 +37,7 @@
  */
 namespace execplan {
 	class AggregateColumn;
+	class WindowFunctionColumn;
 
 /**
  * @brief A class to represent a simple WHERE clause predicate
@@ -198,6 +199,8 @@ public:
 
 	// get all simple columns involved in this column
 	const std::vector<SimpleColumn*>& simpleColumnList() const { return fSimpleColumnList; }
+	// walk through the simple filter operands to check existence of aggregate
+	bool hasAggregate();
 
 	// get all aggregate columns involved in this column
 	const std::vector<AggregateColumn*>& aggColumnList() const { return fAggColumnList; }

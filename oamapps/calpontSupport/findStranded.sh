@@ -14,7 +14,7 @@ if [ -z "$INFINIDB_INSTALL_DIR" ]; then
 	INFINIDB_INSTALL_DIR=/usr/local/Calpont
 fi
 
-declare -x INFINIDB_INSTALL_DIR=$INFINIDB_INSTALL_DIR
+export INFINIDB_INSTALL_DIR=$INFINIDB_INSTALL_DIR
 
 if [ $INFINIDB_INSTALL_DIR != "/usr/local/Calpont" ]; then
 	export PATH=$INFINIDB_INSTALL_DIR/bin:$INFINIDB_INSTALL_DIR/mysql/bin:/bin:/usr/bin

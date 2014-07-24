@@ -53,6 +53,9 @@ using namespace execplan;
 #include "rowaggregation.h"
 using namespace rowgroup;
 
+#include "querytele.h"
+using namespace querytele;
+
 #include "jlf_common.h"
 #include "jobstep.h"
 #include "primitivestep.h"
@@ -200,6 +203,7 @@ TupleAggregateStep::TupleAggregateStep(
 	memset(fMemUsage.get(), 0, fNumOfThreads * sizeof(uint64_t));
 
 	fExtendedInfo = "TAS: ";
+	fQtc.stepParms().stepType = StepTeleStats::T_TAS;
 }
 
 
@@ -382,7 +386,7 @@ void TupleAggregateStep::doThreadedSecondPhaseAggregate(uint32_t threadID)
 	}
 	catch(...)
 	{
-		catchHandler("TupleAggregateStep::aggregateRowGroups() caught an unknown exception",
+		catchHandler("doThreadedSecondPhaseAggregate() caught an unknown exception",
 						tupleAggregateStepErr, fErrorInfo, fSessionId);
 		caughtException = true;
 	}
@@ -464,6 +468,14 @@ uint32_t TupleAggregateStep::nextBand_singleThread(messageqcpp::ByteStream &bs)
 
 	if (fEndOfResult)
 	{
+		StepTeleStats sts;
+		sts.query_uuid = fQueryUuid;
+		sts.step_uuid = fStepUuid;
+		sts.msg_type = StepTeleStats::ST_SUMMARY;
+		sts.total_units_of_work = sts.units_of_work_completed = 1;
+		sts.rows = fRowsReturned;
+		postStepSummaryTele(sts);
+
 		// send an empty / error band
 		RGData rgData(fRowGroupOut, 0);
 		fRowGroupOut.setData(&rgData);
@@ -935,6 +947,10 @@ void TupleAggregateStep::prep1PhaseAggregate(
 	// for distinct column
 	for (uint64_t i = 0; i < jobInfo.distinctColVec.size(); i++)
 	{
+		//@bug6126, continue if already in group by
+		if (groupbyMap.find(jobInfo.distinctColVec[i]) != groupbyMap.end())
+			continue;
+
 		int64_t colProj = projColPosMap[jobInfo.distinctColVec[i]];
 		SP_ROWAGG_GRPBY_t groupby(new RowAggGroupByCol(colProj, -1));
 		groupBy.push_back(groupby);
@@ -1424,6 +1440,10 @@ void TupleAggregateStep::prep1PhaseDistinctAggregate(
 				cerr << endl;
 				throw logic_error(emsg.str());
 			}
+
+			// check for dup distinct column -- @bug6126
+			if (find(keysAgg.begin(), keysAgg.end(), key) != keysAgg.end())
+				continue;
 
 			uint64_t colProj = projColPosMap[key];
 
@@ -2428,6 +2448,10 @@ void TupleAggregateStep::prep2PhasesAggregate(
 
 			uint64_t colProj = projColPosMap[key];
 
+			// check for dup distinct column -- @bug6126
+			if (find(keysAggPm.begin(), keysAggPm.end(), key) != keysAggPm.end())
+				continue;
+
 			SP_ROWAGG_GRPBY_t groupby(new RowAggGroupByCol(colProj, colAggPm));
 			groupByPm.push_back(groupby);
 
@@ -3072,7 +3096,7 @@ void TupleAggregateStep::prep2PhasesDistinctAggregate(
 				throw logic_error(emsg.str());
 			}
 
-			// check for dup distinct column
+			// check for dup distinct column -- @bug6126
 			if (find(keysAggPm.begin(), keysAggPm.end(), key) != keysAggPm.end())
 				continue;
 
@@ -3783,6 +3807,7 @@ void TupleAggregateStep::prep2PhasesDistinctAggregate(
 				groupBySub.push_back(groupby);
 				k++;
 			}
+
 			// add the distinct column as groupby
 			SP_ROWAGG_GRPBY_t groupby(new RowAggGroupByCol(j, k));
 			groupBySub.push_back(groupby);
@@ -4021,6 +4046,13 @@ void TupleAggregateStep::aggregateRowGroups()
 		more = dlIn->next(fInputIter, &rgData);
 		if (traceOn()) dlTimes.setFirstReadTime();
 
+		StepTeleStats sts;
+		sts.query_uuid = fQueryUuid;
+		sts.step_uuid = fStepUuid;
+		sts.msg_type = StepTeleStats::ST_START;
+		sts.total_units_of_work = 1;
+		postStepStartTele(sts);
+
 		try
 		{
 			// this check covers the no row case
@@ -4129,7 +4161,18 @@ void TupleAggregateStep::threadedAggregateRowGroups(uint32_t threadID)
 					more = dlIn->next(fInputIter, &rgData);
 					if (firstRead)
 					{
-						if (traceOn() && threadID == 0) dlTimes.setFirstReadTime();
+						if (threadID == 0)
+						{
+							if (traceOn())
+								dlTimes.setFirstReadTime();
+
+							StepTeleStats sts;
+							sts.query_uuid = fQueryUuid;
+							sts.step_uuid = fStepUuid;
+							sts.msg_type = StepTeleStats::ST_START;
+							sts.total_units_of_work = 1;
+							postStepStartTele(sts);
+						}
 
 						multiDist = dynamic_cast<RowAggregationMultiDistinct*>(fAggregator.get());
 						if (multiDist)
@@ -4326,7 +4369,7 @@ void TupleAggregateStep::threadedAggregateRowGroups(uint32_t threadID)
 		}
 		catch(...)
 		{
-			catchHandler("TupleAggregateStep::aggregateRowGroups() caught an unknown exception",
+			catchHandler("threadedAggregateRowGroups() caught an unknown exception",
 							tupleAggregateStepErr, fErrorInfo, fSessionId);
 			caughtException = true;
 		}
@@ -4404,6 +4447,14 @@ void TupleAggregateStep::doAggregate_singleThread()
 
 	if (traceOn())
 		printCalTrace();
+
+	StepTeleStats sts;
+	sts.query_uuid = fQueryUuid;
+	sts.step_uuid = fStepUuid;
+	sts.msg_type = StepTeleStats::ST_SUMMARY;
+	sts.total_units_of_work = sts.units_of_work_completed = 1;
+	sts.rows = fRowsReturned;
+	postStepSummaryTele(sts);
 
 	// Bug 3136, let mini stats to be formatted if traceOn.
 	fEndOfResult = true;
@@ -4613,6 +4664,14 @@ uint64_t TupleAggregateStep::doThreadedAggregate(ByteStream& bs, RowGroupDL* dlp
 
 	if (fEndOfResult)
 	{
+		StepTeleStats sts;
+		sts.query_uuid = fQueryUuid;
+		sts.step_uuid = fStepUuid;
+		sts.msg_type = StepTeleStats::ST_SUMMARY;
+		sts.total_units_of_work = sts.units_of_work_completed = 1;
+		sts.rows = fRowsReturned;
+		postStepSummaryTele(sts);
+
 		if (dlp)
 		{
 			dlp->endOfInput();

@@ -1,8 +1,8 @@
 @echo off
 
 set branch=%1
-IF "%1" == "" (
-  set branch=4.5.1
+IF "%branch%" == "" (
+  set branch=4.5
 )
 set basedir=\InfiniDB_%branch%
 echo Building %basedir%
@@ -14,7 +14,6 @@ git checkout %branch%
 git stash
 git pull
 git stash pop
-IF %ERRORLEVEL% NEQ 0 GOTO ERROR_HANDLER
 
 echo ======================================
 echo updating InfiniDB source

@@ -638,7 +638,7 @@ void checkMysqlPort( std::string& mysqlPort, Config* sysConfig )
 
 	while(true)
 	{
-		string cmd = "netstat -na | grep '" + mysqlPort + "' | grep LISTEN > /tmp/mysqlport";
+		string cmd = "netstat -na | grep ':" + mysqlPort + " ' | grep LISTEN > /tmp/mysqlport";
 
 		system(cmd.c_str());
 		string fileName = "/tmp/mysqlport";
@@ -698,8 +698,8 @@ void checkSystemMySQLPort(std::string& mysqlPort, Config* sysConfig, std::string
 
 	while(true)
 	{
-		string localnetstat = "netstat -na | grep :" + mysqlPort + " | grep LISTEN > /tmp/mysqlport";
-		string remotenetstat = "netstat -na | grep :" + mysqlPort + " | grep LISTEN";
+		string localnetstat = "netstat -na | grep ':" + mysqlPort + " ' | grep LISTEN > /tmp/mysqlport";
+		string remotenetstat = "netstat -na | grep ':" + mysqlPort + " ' | grep LISTEN";
 
 		//first check local mysql, if needed
 		if ( ( IserverTypeInstall == oam::INSTALL_COMBINE_DM_UM_PM ) ||

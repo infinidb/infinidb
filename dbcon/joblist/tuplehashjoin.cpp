@@ -80,7 +80,7 @@ TupleHashJoinStep::TupleHashJoinStep(const JobInfo& jobInfo) :
 	joinIsTooBig(false),
 	isExeMgr(jobInfo.isExeMgr),
 	lastSmallOuterJoiner(-1),
-	fTokenJoin(false),
+	fTokenJoin(-1),
 	fStatsMutexPtr(new boost::mutex())
 {
 	/* Need to figure out how much memory these use...
@@ -326,12 +326,15 @@ void TupleHashJoinStep::hjRunner()
 	}
 
 	StepTeleStats sts;
-	sts.query_uuid = fQueryUuid;
-	sts.step_uuid = fStepUuid;
-	sts.msg_type = StepTeleStats::ST_START;
-	sts.start_time = QueryTeleClient::timeNowms();
 	if (fTableOID1 >= 3000)
-		fQtc.postStepTele(sts);
+	{
+		sts.query_uuid = fQueryUuid;
+		sts.step_uuid = fStepUuid;
+		sts.msg_type = StepTeleStats::ST_START;
+		sts.start_time = QueryTeleClient::timeNowms();
+		sts.total_units_of_work = 1;
+		postStepStartTele(sts);
+	}
 
 	idbassert(joinTypes.size() == smallDLs.size());
 	idbassert(joinTypes.size() == joiners.size());
@@ -472,11 +475,13 @@ void TupleHashJoinStep::hjRunner()
 	else
 		startJoinThreads();
 
-	sts.msg_type = StepTeleStats::ST_SUMMARY;
-	sts.end_time = QueryTeleClient::timeNowms();
 	if (fTableOID1 >= 3000)
-		fQtc.postStepTele(sts);
-
+	{
+		sts.msg_type = StepTeleStats::ST_SUMMARY;
+		sts.end_time = QueryTeleClient::timeNowms();
+		sts.total_units_of_work = sts.units_of_work_completed = 1;
+		postStepSummaryTele(sts);
+	}
 }
 
 uint32_t TupleHashJoinStep::nextBand(messageqcpp::ByteStream &bs)

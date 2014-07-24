@@ -88,6 +88,7 @@ using namespace funcexp;
 const uint64_t AGG_BIT = 0x01;
 const uint64_t SUB_BIT = 0x02;
 const uint64_t AF_BIT = 0x04;
+const uint64_t CORRELATED = 0x08;
 
 //#define OUTER_JOIN_DEBUG
 namespace
@@ -380,6 +381,7 @@ void debug_walk(const Item *item, void *arg)
 		cout << "ROW_ITEM: " << endl;
 		for (uint32_t i = 0; i < row->cols(); i++)
 			debug_walk(row->element_index(i), 0);
+		break;
 	}
 	case Item::WINDOW_FUNC_ITEM:
 	{
@@ -1273,9 +1275,11 @@ SimpleColumn* buildSimpleColFromDerivedTable(gp_walk_info& gwi, Item_field* ifp)
 			{
 				// @bug 3167 duplicate column alias is full name
 				SimpleColumn *col = dynamic_cast<SimpleColumn*>(cols[j].get());
-				if (strcasecmp(ifp->field_name, cols[j]->alias().c_str()) == 0 ||
-					  (col && cols[j]->alias().find(".") != string::npos &&
-					  strcasecmp(ifp->field_name, col->columnName().c_str()) == 0))
+				string alias = cols[j]->alias();
+				if (strcasecmp(ifp->field_name, alias.c_str()) == 0 ||
+				   (col && alias.find(".") != string::npos &&
+				   (strcasecmp(ifp->field_name, col->columnName().c_str()) == 0 ||
+				    strcasecmp(ifp->field_name, (alias.substr(alias.find_last_of(".")+1)).c_str()) == 0))) //@bug6066
 				{
 					// @bug4827. Remove the checking because outside tables could be the same
 					// name as inner tables. This function is to identify column from a table,
@@ -1303,6 +1307,7 @@ SimpleColumn* buildSimpleColFromDerivedTable(gp_walk_info& gwi, Item_field* ifp)
 					sc->tableAlias(lower(tableAlias));
 					sc->viewName(lower(viewName));
 					sc->resultType(cols[j]->resultType());
+					sc->hasAggregate(cols[j]->hasAggregate());
 					if (col)
 						sc->isInfiniDB(col->isInfiniDB());
 
@@ -2872,7 +2877,7 @@ ParseTree* buildParseTree(Item_func* item, gp_walk_info& gwi, bool& nonSupport)
 	return pt;
 }
 
-AggregateColumn* buildAggregateColumn(Item* item, gp_walk_info& gwi)
+ReturnedColumn* buildAggregateColumn(Item* item, gp_walk_info& gwi)
 {
 	Item_sum* isp = reinterpret_cast<Item_sum*>(item);
 	Item** sfitempp = isp->args;
@@ -2882,7 +2887,7 @@ AggregateColumn* buildAggregateColumn(Item* item, gp_walk_info& gwi)
 		gwi.aggOnSelect = true;
 
 	// N.B. arg_count is the # of formal parms to the agg fcn. InifniDB only supports 1 argument
-	if (isp->arg_count > 1 && isp->sum_func() != Item_sum::GROUP_CONCAT_FUNC)
+	if (isp->arg_count != 1 && isp->sum_func() != Item_sum::GROUP_CONCAT_FUNC)
 	{
 		gwi.fatalParseError = true;
 		gwi.parseErrorText = IDBErrorInfo::instance()->errorMsg(ERR_MUL_ARG_AGG);
@@ -2924,8 +2929,9 @@ AggregateColumn* buildAggregateColumn(Item* item, gp_walk_info& gwi)
 		}
 
 		ORDER **order_item, **end;
-		for (order_item= gc->order, end=order_item + gc->order_field();order_item < end;
-       order_item++)
+		for (order_item= gc->order, 
+		     end=order_item + gc->order_field();order_item < end;
+		     order_item++)
 		{
 				Item *ord_col= *(*order_item)->item;
 				if (ord_col->type() == Item::INT_ITEM)
@@ -2986,7 +2992,6 @@ AggregateColumn* buildAggregateColumn(Item* item, gp_walk_info& gwi)
 					if (ac->aggOp() == AggregateColumn::COUNT)
 						ac->aggOp(AggregateColumn::COUNT_ASTERISK);
 
-					gwi.count_asterisk_list.push_back(ac);
 					ac->constCol(SRCP(buildReturnedColumn(sfitemp, gwi, gwi.fatalParseError)));
 					break;
 				}
@@ -2995,7 +3000,6 @@ AggregateColumn* buildAggregateColumn(Item* item, gp_walk_info& gwi)
 					//ac->aggOp(AggregateColumn::COUNT);
 					parm.reset(new ConstantColumn("", ConstantColumn::NULLDATA));
 					//ac->functionParms(parm);
-					gwi.count_asterisk_list.push_back(ac);
 					ac->constCol(SRCP(buildReturnedColumn(sfitemp, gwi, gwi.fatalParseError)));
 					break;
 				}
@@ -3027,7 +3031,6 @@ AggregateColumn* buildAggregateColumn(Item* item, gp_walk_info& gwi)
 							if (dynamic_cast<ConstantColumn*>(rc))
 							{
 								//@bug5229. handle constant function on aggregate argument
-								gwi.count_asterisk_list.push_back(ac);
 								ac->constCol(SRCP(rc));
 								break;
 							}
@@ -3231,6 +3234,20 @@ AggregateColumn* buildAggregateColumn(Item* item, gp_walk_info& gwi)
 			if (*ac == gwi.returnedCols[i].get())
 				ac->expressionId(gwi.returnedCols[i]->expressionId());
 		}
+	}
+	
+	// @bug5977 @note Temporary fix to avoid mysqld crash. The permanent fix will
+	// be applied in ExeMgr. When the ExeMgr fix is available, this checking
+	// will be taken out.
+	if (ac->constCol() && gwi.tbList.empty() && gwi.derivedTbList.empty())
+	{
+		gwi.fatalParseError = true;
+		gwi.parseErrorText = "No project column found for aggregate function";
+		return NULL;
+	}
+	else if (ac->constCol())
+	{
+		gwi.count_asterisk_list.push_back(ac);
 	}
 	return ac;
 }
@@ -3580,23 +3597,36 @@ void gp_walk(const Item *item, void *arg)
 				//if (gwip->ptWorkStack.size() < icp->argument_list()->elements)
 				{
 					List_iterator_fast<Item> li(*(icp->argument_list()));
-	  			while (Item *it= li++)
-	  			{
-	  				if ((it->type() == Item::FIELD_ITEM
-	  					  || it->type() == Item::INT_ITEM
-	  					  || it->type() == Item::DECIMAL_ITEM
-	  					  || it->type() == Item::STRING_ITEM
-	  					  || it->type() == Item::REAL_ITEM
-	  					  || it->type() == Item::NULL_ITEM
-	  					  || (it->type() == Item::FUNC_ITEM
-	  					  && !isPredicateFunction(it, gwip))) && !gwip->rcWorkStack.empty()
-	  					 )
-	  				{
-	  					gwip->ptWorkStack.push(new ParseTree(gwip->rcWorkStack.top()));
-	  					gwip->rcWorkStack.pop();
-	  				}
-	  			}
-  			}
+					while (Item *it= li++)
+					{
+						//@bug5865 error out non-supported OR with correlated subquery
+						if (icp->functype() == Item_func::COND_OR_FUNC)
+						{
+							vector <Item_field*> fieldVec;
+							uint16_t parseInfo = 0;
+							parse_item(it, fieldVec, gwip->fatalParseError, parseInfo);
+							if (parseInfo & CORRELATED)
+							{
+								gwip->fatalParseError = true;
+								gwip->parseErrorText = IDBErrorInfo::instance()->errorMsg(ERR_CORRELATED_SUB_OR);
+								return;
+							}
+						}
+						if ((it->type() == Item::FIELD_ITEM
+							  || it->type() == Item::INT_ITEM
+							  || it->type() == Item::DECIMAL_ITEM
+							  || it->type() == Item::STRING_ITEM
+							  || it->type() == Item::REAL_ITEM
+							  || it->type() == Item::NULL_ITEM
+							  || (it->type() == Item::FUNC_ITEM
+							  && !isPredicateFunction(it, gwip))) && !gwip->rcWorkStack.empty()
+							 )
+						{
+							gwip->ptWorkStack.push(new ParseTree(gwip->rcWorkStack.top()));
+							gwip->rcWorkStack.pop();
+						}
+					}
+				}
 				// @bug1603. MySQL's filter tree is a multi-tree grouped by operator. So more than
 				// two filters saved on the stack so far might belong to this operator.
 				uint32_t leftInStack = gwip->ptWorkStack.size() - icp->argument_list()->elements + 1;
@@ -3639,23 +3669,6 @@ void gp_walk(const Item *item, void *arg)
 					}
 					Operator* op = new LogicOperator(icp->func_name());
 					ParseTree* ptp = new ParseTree(op);
-
-					// bug 3459. error out non-supported OR with correlated subquery
-					if (icp->functype() == Item_func::COND_OR_FUNC)
-					{
-						SelectFilter *lsel = dynamic_cast<SelectFilter*>(lhs->data());
-						SelectFilter *rsel = dynamic_cast<SelectFilter*>(rhs->data());
-						ExistsFilter *lexists = dynamic_cast<ExistsFilter*>(lhs->data());
-						ExistsFilter *rexists = dynamic_cast<ExistsFilter*>(rhs->data());
-
-						if ((lsel && lsel->correlated()) || (rsel && rsel->correlated()) ||
-						   (lexists && lexists->correlated()) || (rexists && rexists->correlated()))
-						{
-							gwip->fatalParseError = true;
-							gwip->parseErrorText = IDBErrorInfo::instance()->errorMsg(ERR_CORRELATED_SUB_OR);
-							break;
-						}
-					}
 
 					ptp->left(lhs);
 					ptp->right(rhs);
@@ -3859,6 +3872,12 @@ void parse_item (Item *item, vector<Item_field*>& field_vec, bool& hasNonSupport
 		case Item::FUNC_ITEM:
 		{
 			Item_func* isp = reinterpret_cast<Item_func*>(item);
+			if (string(isp->func_name()) == "<in_optimizer>")
+			{
+				parseInfo |= SUB_BIT;
+				parseInfo |= CORRELATED;
+				break;
+			}
 			Item** sfitempp = isp->arguments();
 			for (uint32_t i = 0; i < isp->arg_count; i++)
 				parse_item(sfitempp[i], field_vec, hasNonSupportItem, parseInfo);
@@ -3928,8 +3947,13 @@ void parse_item (Item *item, vector<Item_field*>& field_vec, bool& hasNonSupport
 			break;
 		}
 		case Item::SUBSELECT_ITEM:
+		{
 			parseInfo |= SUB_BIT;
+			Item_subselect* sub = (Item_subselect*)item;
+			if (sub->is_correlated)
+				parseInfo |= CORRELATED;
 			break;
+		}
 		case Item::ROW_ITEM:
 		{
 			Item_row *row = (Item_row*)item;
@@ -4445,7 +4469,7 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex, SCSEP& csep, bool i
 			//aggregate column
 			case Item::SUM_FUNC_ITEM:
 			{
-				AggregateColumn *ac = buildAggregateColumn(item, gwi);
+				ReturnedColumn *ac = buildAggregateColumn(item, gwi);
 				if (gwi.fatalParseError)
 				{
 					// e.g., non-support ref column
@@ -4455,7 +4479,7 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex, SCSEP& csep, bool i
 				}
 
 				// add this agg col to returnedColumnList
-				boost::shared_ptr<AggregateColumn> spac(ac);
+				boost::shared_ptr<ReturnedColumn> spac(ac);
 				gwi.returnedCols.push_back(spac);
 				gwi.selectCols.push_back('`' + escapeBackTick(spac->alias().c_str()) + '`');
 				String str(256);
@@ -4502,7 +4526,7 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex, SCSEP& csep, bool i
 				}
 
 				ReturnedColumn* rc = buildFunctionColumn(ifp, gwi, hasNonSupportItem);
-
+				SRCP srcp(rc);
 				if (rc)
 				{
 					if (!hasNonSupportItem && !nonConstFunc(ifp) && !(parseInfo & AF_BIT) && tmpVec.size() == 0)
@@ -4510,7 +4534,7 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex, SCSEP& csep, bool i
 						if (isUnion || unionSel || gwi.subSelectType != CalpontSelectExecutionPlan::MAIN_SELECT ||
 							  parseInfo & SUB_BIT || select_lex.group_list.elements != 0)
 						{
-							SRCP srcp(buildReturnedColumn(item, gwi, gwi.fatalParseError));
+							srcp.reset(buildReturnedColumn(item, gwi, gwi.fatalParseError));
 							gwi.returnedCols.push_back(srcp);
 							if (ifp->name)
 								srcp->alias(ifp->name);
@@ -4532,7 +4556,7 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex, SCSEP& csep, bool i
 						break;
 					}
 
-					SRCP srcp(rc);
+					//SRCP srcp(rc);
 					gwi.returnedCols.push_back(srcp);
 					if ( ((gwi.thd->lex)->sql_command == SQLCOM_UPDATE ) || ((gwi.thd->lex)->sql_command == SQLCOM_DELETE ) || ((gwi.thd->lex)->sql_command == SQLCOM_UPDATE_MULTI ) || ((gwi.thd->lex)->sql_command == SQLCOM_DELETE_MULTI ))
 					{ }
@@ -4820,6 +4844,11 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex, SCSEP& csep, bool i
 			{
 				coltypes.push_back(
 				   dynamic_cast<CalpontSelectExecutionPlan*>(csep->unionVec()[j].get())->returnedCols()[i]->resultType());
+
+				// @bug5976. set hasAggregate true for the main column if 
+				// one corresponding union column has aggregate
+				if (dynamic_cast<CalpontSelectExecutionPlan*>(csep->unionVec()[j].get())->returnedCols()[i]->hasAggregate())
+					gwi.returnedCols[i]->hasAggregate(true);
 			}
 			gwi.returnedCols[i]->resultType(dataconvert::DataConvert::convertUnionColType(coltypes));
 		}
@@ -5962,7 +5991,7 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex, SCSEP& csep, bool i
 		if (gwi.derivedTbList.size() >= 1)
 		{
 			SimpleColumn* sc1 = new SimpleColumn();
-
+			sc1->columnName(sc->columnName());
 			sc1->tableName(sc->tableName());
 			sc1->tableAlias(sc->tableAlias());
 			sc1->viewName(lower(sc->viewName()));
@@ -5971,9 +6000,17 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex, SCSEP& csep, bool i
 		}
 	}
 
-
 	for (coliter = gwi.count_asterisk_list.begin(); coliter != gwi.count_asterisk_list.end(); ++coliter)
 	{
+		// @bug5977 @note should never throw this, but checking just in case.
+		// When ExeMgr fix is ready, this should not error out...
+		if (dynamic_cast<AggregateColumn*>(minSc.get()))
+		{
+			gwi.fatalParseError = true;
+			gwi.parseErrorText = "No project column found for aggregate function";
+			setError(gwi.thd, HA_ERR_INTERNAL_ERROR, gwi.parseErrorText);
+			return HA_ERR_UNSUPPORTED;
+		}
 		(*coliter)->functionParms(minSc);
 	}
 

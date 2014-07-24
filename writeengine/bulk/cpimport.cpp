@@ -159,7 +159,6 @@ void printUsage()
         "        -I Binary import; binaryOpt 1-import NULL values"   << endl <<
         "                                    2-saturate NULL values" << endl <<
         "        -S Treat string truncations as errors" << endl << 
-		"        -D Disable timeout when waiting for table lock" << endl <<
         "        -L send *.err and *.bad (reject) files here" << endl << endl;
 
     cout << "    Example1:" << endl <<

@@ -33,21 +33,21 @@
  * also requires file IO.  Most functions throw an exception if a hard IO error
  * occurs more than MaxRetries times in a row.  Right now the code makes
  * no attempt to back out changes that occured before the error although it
- * may be possible to do so for certain errors.  Probably the best course of 
+ * may be possible to do so for certain errors.  Probably the best course of
  * action would be to halt the system if an exception is thrown here
- * to prevent database corruption resulting allocation of OIDs from a 
+ * to prevent database corruption resulting allocation of OIDs from a
  * possibly corrupt OID bitmap.  The OID bitmap can be rebuilt at system
  * startup if necessary (need to write a tool to do that still).
  *
- * There are a few checks to verify the safety of allocations and 
- * deallocations & the correctness of this implementation in general.  
- * Those errors will throw logic_error.  IO errors will throw 
+ * There are a few checks to verify the safety of allocations and
+ * deallocations & the correctness of this implementation in general.
+ * Those errors will throw logic_error.  IO errors will throw
  * ios_base::failure.
  *
  * There are probably oodles of optimizations possible given this implmementation.
  * For example:
  * 		- make fullScan() construct a freelist
- *		- sorting & coalescing free list entries will raise the hit rate 
+ *		- sorting & coalescing free list entries will raise the hit rate
  *		  (at what cost?)
  *		- implement a bias for high numbered OIDs in the free list to reduce
  *	 	  the number of fullScans searching far in the bitmap
@@ -334,6 +334,7 @@ OIDServer::OIDServer() : fFp(NULL), fFd(-1)
 			{
 				os << "Extent Map not empty and " << fFilename << " not found. Setting system to read-only";
 				cerr << os.str() << endl;
+				log(os.str());
 				em.setReadOnly(true);
 				throw runtime_error(os.str());
 			}
@@ -382,6 +383,7 @@ OIDServer::OIDServer() : fFp(NULL), fFd(-1)
 			{
 				os << "Extent Map not empty and " << fFilename << " not found. Setting system to read-only";
 				cerr << os.str() << endl;
+				log(os.str());
 				em.setReadOnly(true);
 				throw runtime_error(os.str());
 			}

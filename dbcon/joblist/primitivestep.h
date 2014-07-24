@@ -796,6 +796,7 @@ private:
 	uint64_t fMsgBytesIn;   // total byte count for incoming messages
 	uint64_t fMsgBytesOut;  // total byte count for outcoming messages
     uint32_t fMsgsToPm;     // total number of messages sent to PMs
+	uint32_t fMsgsExpect;   // total blocks to scan
 	uint32_t uniqueID;
 	ResourceManager& fRm;
 	BPSOutputType fOutType;

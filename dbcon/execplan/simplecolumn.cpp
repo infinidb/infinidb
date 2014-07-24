@@ -415,6 +415,12 @@ bool SimpleColumn::sameColumn(const ReturnedColumn* rc) const
 
 void SimpleColumn::setDerivedTable()
 {
+	if (hasAggregate())
+	{
+		fDerivedTable = "";
+		return;
+	}
+
 	// fDerivedTable is set at the parsing phase
 	if (!fSchemaName.empty())
 		fDerivedTable = "";

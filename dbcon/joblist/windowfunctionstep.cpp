@@ -70,6 +70,9 @@ using namespace ordering;
 #include "funcexp.h"
 using namespace funcexp;
 
+#include "querytele.h"
+using namespace querytele;
+
 #include "jlf_common.h"
 #include "jobstep.h"
 #include "windowfunctionstep.h"
@@ -142,6 +145,7 @@ WindowFunctionStep::WindowFunctionStep(const JobInfo& jobInfo) :
 	fRowsReturned(0),
 	fEndOfResult(false),
 	fIsSelect(true),
+	fUseSSMutex(false),
 	fInputDL(NULL),
 	fOutputDL(NULL),
 	fInputIterator(-1),
@@ -154,6 +158,7 @@ WindowFunctionStep::WindowFunctionStep(const JobInfo& jobInfo) :
 {
 	fTotalThreads = fRm.windowFunctionThreads();
 	fExtendedInfo = "WFS: ";
+	fQtc.stepParms().stepType = StepTeleStats::T_WFS;
 }
 
 
@@ -253,9 +258,6 @@ uint32_t WindowFunctionStep::nextBand(messageqcpp::ByteStream &bs)
 		fRowGroupDelivered.resetRowGroup(0);
 		fRowGroupDelivered.setStatus(status());
 		fRowGroupDelivered.serializeRGData(bs);
-
-		if (traceOn())
-			printCalTrace();
 	}
 
 	return rowCount;
@@ -503,7 +505,6 @@ SJSTEP WindowFunctionStep::makeWindowFunctionStep(SJSTEP& step, JobInfo& jobInfo
 
 void WindowFunctionStep::initialize(const RowGroup& rg, JobInfo& jobInfo)
 {
-
 	if (jobInfo.trace) cout << "Input to WindowFunctionStep: " << rg.toString() << endl;
 
 	// query type decides the output by dbroot or partition
@@ -527,12 +528,26 @@ void WindowFunctionStep::initialize(const RowGroup& rg, JobInfo& jobInfo)
 	for (uint64_t i = 0; i < colCntIn; i++)
 		colIndexMap.insert(make_pair(keys[i], i));
 
+	// @bug6065, window functions that will update string table
+	int64_t wfsUpdateStringTable = 0;
 	for (RetColsVector::iterator i=jobInfo.windowCols.begin(); i<jobInfo.windowCols.end(); i++)
 	{
 		// window function type
 		WindowFunctionColumn* wc = dynamic_cast<WindowFunctionColumn*>(i->get());
+		uint64_t ridx = getColumnIndex(*i, colIndexMap, jobInfo);    // result index
+		// @bug6065, window functions that will update string table
+		{
+			CalpontSystemCatalog::ColType rt = wc->resultType();
+			if ((types[ridx] == CalpontSystemCatalog::CHAR || 
+			     types[ridx] == CalpontSystemCatalog::VARCHAR) &&
+			    rg.getColumnWidth(ridx) >= jobInfo.stringTableThreshold)
+			{
+				wfsUpdateStringTable++;
+			} 
+		}
+
 		vector<int64_t> fields;
-		fields.push_back(getColumnIndex(*i, colIndexMap, jobInfo));  // result
+		fields.push_back(ridx);  // result
 		const RetColsVector& parms = wc->functionParms();
 		for (uint64_t i = 0; i < parms.size(); i++)                  // arguments
 		{
@@ -732,6 +747,9 @@ void WindowFunctionStep::initialize(const RowGroup& rg, JobInfo& jobInfo)
 	if (jobInfo.trace)
  		cout << "delivered RG: " << fRowGroupDelivered.toString() << endl << endl;
 
+	if (wfsUpdateStringTable > 1)
+		fUseSSMutex = true;
+
 	fRowGroupOut = fRowGroupDelivered;
 }
 
@@ -745,6 +763,13 @@ void WindowFunctionStep::execute()
 	uint64_t i = 0; // for RowGroup index in the fInRowGroupData
 
 	if (traceOn()) dlTimes.setFirstReadTime();
+
+	StepTeleStats sts;
+	sts.query_uuid = fQueryUuid;
+	sts.step_uuid = fStepUuid;
+	sts.msg_type = StepTeleStats::ST_START;
+	sts.total_units_of_work = 1;
+	postStepStartTele(sts);
 
 	try
 	{
@@ -769,6 +794,12 @@ void WindowFunctionStep::execute()
 					fRows.push_back(RowPosition(i, j));
 					row.nextRow();
 				}
+
+				//@bug6065, make StringStore::storeString() thread safe, default to false.
+				rgData.useStoreStringMutex(fUseSSMutex);
+
+				// window function does not change row count
+				fRowsReturned += rowCnt;
 
 				i++;
 			}
@@ -797,6 +828,11 @@ void WindowFunctionStep::execute()
 			more = fInputDL->next(fInputIterator, &rgData);
 
 		fOutputDL->endOfInput();
+
+		sts.msg_type = StepTeleStats::ST_SUMMARY;
+		sts.total_units_of_work = sts.units_of_work_completed = 1;
+		sts.rows = fRowsReturned;
+		postStepSummaryTele(sts);
 
 		if (traceOn())
 		{
@@ -848,6 +884,11 @@ void WindowFunctionStep::execute()
 	}
 
 	fOutputDL->endOfInput();
+
+	sts.msg_type = StepTeleStats::ST_SUMMARY;
+	sts.total_units_of_work = sts.units_of_work_completed = 1;
+	sts.rows = fRowsReturned;
+	postStepSummaryTele(sts);
 
 	if (traceOn())
 	{

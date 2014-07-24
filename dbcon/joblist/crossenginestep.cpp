@@ -48,6 +48,9 @@ using namespace rowgroup;
 #include "dataconvert.h"
 using namespace dataconvert;
 
+#include "querytele.h"
+using namespace querytele;
+
 #include "funcexp.h"
 
 #include "jobstep.h"
@@ -191,6 +194,7 @@ CrossEngineStep::CrossEngineStep(
 {
 	fExtendedInfo = "CES: ";
 	getMysqldInfo(jobInfo);
+	fQtc.stepParms().stepType = StepTeleStats::T_CES;
 }
 
 
@@ -475,9 +479,16 @@ void CrossEngineStep::execute()
 {
 	DrizzleMySQL drizzle;
 	int ret = 0;
+	StepTeleStats sts;
+	sts.query_uuid = fQueryUuid;
+	sts.step_uuid = fStepUuid;
 
 	try
 	{
+		sts.msg_type = StepTeleStats::ST_START;
+		sts.total_units_of_work = 1;
+		postStepStartTele(sts);
+
 		ret = drizzle.init(fHost.c_str(), fPort, fUser.c_str(), fPasswd.c_str(), fSchema.c_str());
 		if (ret != 0)
 			handleMySqlError(drizzle.getError().c_str(), ret);
@@ -629,6 +640,11 @@ void CrossEngineStep::execute()
 		catchHandler("CrossEngineStep execute caught an unknown exception",
 						ERR_CROSS_ENGINE_CONNECT, fErrorInfo, fSessionId);
 	}
+
+	sts.msg_type = StepTeleStats::ST_SUMMARY;
+	sts.total_units_of_work = sts.units_of_work_completed = 1;
+	sts.rows = fRowsReturned;
+	postStepSummaryTele(sts);
 
 	fEndOfResult = true;
 	fOutputDL->endOfInput();

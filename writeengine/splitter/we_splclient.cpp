@@ -420,7 +420,7 @@ void WESplClient::onDisconnect()
 
 //------------------------------------------------------------------------------
 
-void WESplClient::setRowsUploadInfo(int RowsRead, int RowsInserted)
+void WESplClient::setRowsUploadInfo(int64_t RowsRead, int64_t RowsInserted)
 {
 	fRowsUploadInfo.fRowsRead = RowsRead;
 	fRowsUploadInfo.fRowsInserted = RowsInserted;

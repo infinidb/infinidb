@@ -25,6 +25,9 @@
 #include <boost/thread/mutex.hpp>
 #include <boost/uuid/uuid_io.hpp>
 
+#include "querytele.h"
+using namespace querytele;
+
 #include "dataconvert.h"
 #include "hasher.h"
 #include "jlf_common.h"
@@ -93,7 +96,8 @@ TupleUnion::TupleUnion(CalpontSystemCatalog::OID tableOID, const JobInfo& jobInf
 	joinRan(false)
 {
 	uniquer.reset(new Uniquer_t(10, Hasher(this), Eq(this), allocator));
-	fExtendedInfo = "TUS: ";
+	fExtendedInfo = "TUN: ";
+	fQtc.stepParms().stepType = StepTeleStats::T_TUN;
 }
 
 TupleUnion::~TupleUnion()
@@ -142,8 +146,10 @@ void TupleUnion::readInput(uint32_t which)
 	Row inRow, outRow, tmpRow;
 	bool distinct;
 	uint64_t memUsageBefore, memUsageAfter, memDiff;
+	StepTeleStats sts;
+	sts.query_uuid = fQueryUuid;
+	sts.step_uuid = fStepUuid;
 
-	
 	l_outputRG = outputRG;
 	dl = inputs[which];
 	l_inputRG = inputRGs[which];
@@ -171,8 +177,15 @@ void TupleUnion::readInput(uint32_t which)
 		it = dl->getIterator();
 		more = dl->next(it, &inRGData);
 
-		if (traceOn() && dlTimes.FirstReadTime().tv_sec==0)
+		if (dlTimes.FirstReadTime().tv_sec==0)
             dlTimes.setFirstReadTime();
+
+		if (fStartTime == -1)
+		{
+			sts.msg_type = StepTeleStats::ST_START;
+			sts.total_units_of_work = 1;
+			postStepStartTele(sts);
+		}
 
 		while (more && !cancelled()) {
 			/*
@@ -263,6 +276,11 @@ void TupleUnion::readInput(uint32_t which)
 		if (++runnersDone == fInputJobStepAssociation.outSize())
 		{
 			output->endOfInput();
+
+			sts.msg_type = StepTeleStats::ST_SUMMARY;
+			sts.total_units_of_work = sts.units_of_work_completed = 1;
+			sts.rows = fRowsReturned;
+			postStepSummaryTele(sts);
 
 			if (traceOn())
 			{

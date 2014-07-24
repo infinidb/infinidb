@@ -144,6 +144,7 @@ pDictionaryScan::pDictionaryScan(
 	fMsgBytesIn(0),
 	fMsgBytesOut(0),
 	fMsgsToPm(0),
+	fMsgsExpect(0),
 	fRm(jobInfo.rm),
 	isEquality(false)
 {
@@ -353,7 +354,7 @@ void pDictionaryScan::sendPrimitiveMessages()
 			int extState;
 			dbrm.getLocalHWM(oid, partNum, segNum, hwm, extState);
 
-			uint32_t remainingLbids =
+			uint32_t remainingLbids = fMsgsExpect = 
 				( (hwm > (fbo + it->size - 1)) ? (it->size) : (hwm - fbo + 1) );
 
 			uint32_t msgLbidCount   =  fLogicalBlocksPerScan;
@@ -537,11 +538,12 @@ void pDictionaryScan::receivePrimitiveMessages()
 	StepTeleStats sts;
 	sts.query_uuid = fQueryUuid;
 	sts.step_uuid = fStepUuid;
-	sts.msg_type = StepTeleStats::ST_START;
-	sts.start_time = QueryTeleClient::timeNowms();
-	sts.total_units_of_work = msgsSent;
 	if (fOid >= 3000)
-		fQtc.postStepTele(sts);
+	{
+		sts.msg_type = StepTeleStats::ST_START;
+		sts.total_units_of_work = fMsgsExpect;
+		postStepStartTele(sts);
+	}
 
 	uint16_t error = status();
 	//...Be careful here.  Mutex is locked prior to entering the loop, so
@@ -629,11 +631,18 @@ void pDictionaryScan::receivePrimitiveMessages()
 				mutex.lock();
 				msgsRecvd++;
 
-				sts.msg_type = StepTeleStats::ST_PROGRESS;
-				sts.total_units_of_work = msgsSent;
-				sts.units_of_work_completed = msgsRecvd;
 				if (fOid >= 3000)
-					fQtc.postStepTele(sts);
+				{
+					uint64_t progress = msgsRecvd * 100 / fMsgsExpect;
+					if (progress > fProgress)
+					{
+						fProgress = progress;
+						sts.msg_type = StepTeleStats::ST_PROGRESS;
+						sts.total_units_of_work = fMsgsExpect;
+						sts.units_of_work_completed = msgsRecvd;
+						postStepProgressTele(sts);
+					}
+				}
 
 				//...If producer is waiting, and we have gone below our threshold value,
 				//...then we signal the producer to request more data from primproc
@@ -758,19 +767,16 @@ void pDictionaryScan::receivePrimitiveMessages()
 			fExtendedInfo += toString() + logStr.str();
 			formatMiniStats();
 		}
+
+		sts.msg_type = StepTeleStats::ST_SUMMARY;
+		sts.phy_io = fPhysicalIO;
+		sts.cache_io = fCacheIO;
+		sts.msg_rcv_cnt = sts.total_units_of_work = sts.units_of_work_completed = msgsRecvd;
+		sts.msg_bytes_in = fMsgBytesIn;
+		sts.msg_bytes_out = fMsgBytesOut;
+		sts.rows = fRidResults;
+		postStepSummaryTele(sts);
 	}
-	sts.query_uuid = fQueryUuid;
-	sts.step_uuid = fStepUuid;
-	sts.msg_type = StepTeleStats::ST_SUMMARY;
-	sts.phy_io = fPhysicalIO;
-	sts.cache_io = fCacheIO;
-	sts.msg_rcv_cnt = sts.total_units_of_work = sts.units_of_work_completed = msgsRecvd;
-	sts.msg_bytes_in = fMsgBytesIn;
-	sts.msg_bytes_out = fMsgBytesOut;
-	sts.rows = fRidResults;
-	sts.end_time = QueryTeleClient::timeNowms();
-	if (fOid >= 3000)
-		fQtc.postStepTele(sts);
 
 	rgFifo->endOfInput();
 }

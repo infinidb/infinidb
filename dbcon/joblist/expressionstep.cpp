@@ -134,20 +134,7 @@ void ExpressionStep::expressionFilter(const Filter* filter, JobInfo& jobInfo)
 		throw runtime_error(errmsg.str());
 	}
 
-	// populate the oid vectors
-	SimpleFilter* sf = NULL;
-	ConstantFilter* cf = NULL;
-	if ((sf = dynamic_cast<SimpleFilter*>(f)) != NULL)
-	{
-		addColumn(sf->lhs(), jobInfo);
-		addColumn(sf->rhs(), jobInfo);
-	}
-	else if ((cf = dynamic_cast<ConstantFilter*>(f)) != NULL)
-	{
-		//addColumn(cf->col().get(), jobInfo);
-		for (uint32_t i = 0; i < cf->simpleColumnList().size(); i++)
-			addColumn(cf->simpleColumnList()[i], jobInfo);
-	}
+	addFilter(fExpressionFilter, jobInfo);
 }
 
 
@@ -164,13 +151,89 @@ void ExpressionStep::expressionFilter(const ParseTree* filter, JobInfo& jobInfo)
 	}
 	fExpressionFilter->copyTree(*filter);
 
+	addFilter(fExpressionFilter, jobInfo);
+}
+
+
+void ExpressionStep::addSimpleFilter(SimpleFilter* sf, JobInfo& jobInfo)
+{
+	addColumn(sf->lhs(), jobInfo);
+	addColumn(sf->rhs(), jobInfo);
+}
+
+
+void ExpressionStep::addFilter(ParseTree* filter, JobInfo& jobInfo)
+{
+	stack<ParseTree*> filterStack;
+	while (filter || !filterStack.empty())
+	{
+		if(filter !=  NULL)
+		{
+			filterStack.push(filter);
+			filter = filter->left();
+		}
+		else if (!filterStack.empty())
+		{
+			filter = filterStack.top();
+			filterStack.pop();
+
+			TreeNode* tn = filter->data();
+			filter = filter->right();
+
+			ReturnedColumn* rc = dynamic_cast<ReturnedColumn*>(tn);
+			SimpleFilter *sf = dynamic_cast<SimpleFilter*>(tn);
+			ConstantFilter *cf = dynamic_cast<ConstantFilter*>(tn);
+			Operator* op = dynamic_cast<Operator*>(tn);
+			if (rc != NULL)
+			{
+				addColumn(rc, jobInfo);
+			}
+			else if (sf != NULL)
+			{
+				addSimpleFilter(sf, jobInfo);
+			}
+			else if (cf != NULL)
+			{
+				const ConstantFilter::FilterList& fs = cf->filterList();
+				for (ConstantFilter::FilterList::const_iterator i = fs.begin(); i != fs.end(); i++)
+				{
+					SimpleFilter* f = dynamic_cast<SimpleFilter*>(i->get());
+					if (f != NULL)
+						addSimpleFilter(f, jobInfo);
+					else
+						throw logic_error("unknow filter type in constant filter.");
+				}
+			}
+			else if (op == NULL)
+			{
+				throw logic_error("tree node not handled in Expression step.");
+			}
+		}
+	}
+
+#if 0  // have to workaround correlation on exp, the following approach does not work
 	// extract simple columns from parse tree
 	vector<SimpleColumn*> scv;
-	fExpressionFilter->walk(getSimpleCols, &scv);
+	filter->walk(getSimpleCols, &scv);
 
 	// populate the oid vectors
 	for (vector<SimpleColumn*>::iterator it = scv.begin(); it != scv.end(); it++)
 		addColumn(*it, jobInfo);
+
+	// aggregate columns
+	vector<AggregateColumn*> acv;
+	filter->walk(getAggCols, &acv);
+	for (vector<AggregateColumn*>::iterator it = acv.begin(); it != acv.end(); it++)
+		addColumn(*it, jobInfo);
+
+	// window function columns
+	vector<WindowFunctionColumn*> wcv;
+	filter->walk(getWindowFunctionCols, &wcv);
+	for (vector<WindowFunctionColumn*>::iterator it = wcv.begin(); it != wcv.end(); it++)
+		addColumn(*it, jobInfo);
+#endif
+
+	return;
 }
 
 
@@ -228,6 +291,10 @@ void ExpressionStep::addColumn(ReturnedColumn* rc, JobInfo& jobInfo)
 	{
 		populateColumnInfo(rc, jobInfo);
 	}
+	else if (NULL != (dynamic_cast<AggregateColumn*>(rc)))
+	{
+		populateColumnInfo(rc, jobInfo);
+	}
 	else
 	{
 		ConstantColumn* cc = dynamic_cast<ConstantColumn*>(rc);
@@ -252,10 +319,13 @@ void ExpressionStep::populateColumnInfo(ReturnedColumn* rc, JobInfo& jobInfo)
 
 	SimpleColumn* sc = dynamic_cast<SimpleColumn*>(rc);
 	WindowFunctionColumn* wc = NULL;
+	AggregateColumn* ac = NULL;
 	if (NULL != sc)
 		return populateColumnInfo(sc, jobInfo);
 	else if (NULL != (wc = dynamic_cast<WindowFunctionColumn*>(rc)))
 		return populateColumnInfo(wc, jobInfo);
+	else if (NULL != (ac = dynamic_cast<AggregateColumn*>(rc)))
+		return populateColumnInfo(ac, jobInfo);
 	else  // for now only allow simple and windowfunction column, more work to do.
 		throw runtime_error("Error in parsing expression.");
 }
@@ -348,6 +418,28 @@ void ExpressionStep::populateColumnInfo(WindowFunctionColumn* wc, JobInfo& jobIn
 	fTableKeys.push_back(jobInfo.keyInfo->colKeyToTblKey[wcKey]);
 	fColumnKeys.push_back(wcKey);
 	fColumns.push_back(wc);
+}
+
+
+void ExpressionStep::populateColumnInfo(AggregateColumn* ac, JobInfo& jobInfo)
+{
+	// As of bug3695, make sure varbinary is not used in function expression.
+	if (ac->resultType().colDataType == CalpontSystemCatalog::VARBINARY && !fVarBinOK)
+		throw runtime_error("VARBINARY in filter or function is not supported.");
+
+	// This is for aggregate function in IN/EXISTS sub-query.
+	TupleInfo ti(setExpTupleInfo(ac->resultType(), ac->expressionId(), ac->alias(), jobInfo));
+	uint64_t acKey = ti.key;
+	string alias("");
+	string view("");
+	string schema("");
+	fTableOids.push_back(jobInfo.keyInfo->tupleKeyToTableOid[acKey]);
+	fAliases.push_back(alias);
+	fViews.push_back(view);
+	fSchemas.push_back(schema);
+	fTableKeys.push_back(jobInfo.keyInfo->colKeyToTblKey[acKey]);
+	fColumnKeys.push_back(acKey);
+	fColumns.push_back(ac);
 }
 
 

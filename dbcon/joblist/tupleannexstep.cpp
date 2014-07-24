@@ -53,6 +53,9 @@ using namespace rowgroup;
 #include "stlpoolallocator.h"
 using namespace utils;
 
+#include "querytele.h"
+using namespace querytele;
+
 #include "funcexp.h"
 #include "jobstep.h"
 #include "jlf_common.h"
@@ -115,7 +118,8 @@ TupleAnnexStep::TupleAnnexStep(const JobInfo& jobInfo) :
 		fFeInstance(funcexp::FuncExp::instance()),
 		fJobList(jobInfo.jobListPtr)
 {
-	fExtendedInfo = "TXS: ";
+	fExtendedInfo = "TNS: ";
+	fQtc.stepParms().stepType = StepTeleStats::T_TNS;
 }
 
 
@@ -223,9 +227,6 @@ uint32_t TupleAnnexStep::nextBand(messageqcpp::ByteStream &bs)
 		bs.restart();
 
 		more = fOutputDL->next(fOutputIterator, &rgDataOut);
-		if (traceOn() && dlTimes.FirstReadTime().tv_sec ==0)
-			dlTimes.setFirstReadTime();
-
 		if (more && !cancelled())
 		{
 			fRowGroupDeliver.setData(&rgDataOut);
@@ -263,15 +264,6 @@ uint32_t TupleAnnexStep::nextBand(messageqcpp::ByteStream &bs)
 		fRowGroupDeliver.resetRowGroup(0);
 		fRowGroupDeliver.setStatus(status());
 		fRowGroupDeliver.serializeRGData(bs);
-
-		if (traceOn())
-		{
-			dlTimes.setLastReadTime();
-			dlTimes.setEndOfInputTime();
-		}
-
-		if (traceOn())
-			printCalTrace();
 	}
 
 	return rowCount;
@@ -286,6 +278,24 @@ void TupleAnnexStep::execute()
 		executeNoOrderByWithDistinct();
 	else
 		executeNoOrderBy();
+
+	StepTeleStats sts;
+	sts.query_uuid = fQueryUuid;
+	sts.step_uuid = fStepUuid;
+	sts.msg_type = StepTeleStats::ST_SUMMARY;
+	sts.total_units_of_work = sts.units_of_work_completed = 1;
+	sts.rows = fRowsReturned;
+	postStepSummaryTele(sts);
+
+	if (traceOn())
+	{
+		if (dlTimes.FirstReadTime().tv_sec ==0)
+			dlTimes.setFirstReadTime();
+
+		dlTimes.setLastReadTime();
+		dlTimes.setEndOfInputTime();
+		printCalTrace();
+	}
 }
 
 
@@ -299,6 +309,13 @@ void TupleAnnexStep::executeNoOrderBy()
 	{
 		more = fInputDL->next(fInputIterator, &rgDataIn);
 		if (traceOn()) dlTimes.setFirstReadTime();
+
+		StepTeleStats sts;
+		sts.query_uuid = fQueryUuid;
+		sts.step_uuid = fStepUuid;
+		sts.msg_type = StepTeleStats::ST_START;
+		sts.total_units_of_work = 1;
+		postStepStartTele(sts);
 
 		while (more && !cancelled() && !fLimitHit)
 		{
@@ -360,13 +377,6 @@ void TupleAnnexStep::executeNoOrderBy()
 	while (more)
 		more = fInputDL->next(fInputIterator, &rgDataIn);
 
-	if (traceOn())
-	{
-		dlTimes.setLastReadTime();
-		dlTimes.setEndOfInputTime();
-		printCalTrace();
-	}
-
 	// Bug 3136, let mini stats to be formatted if traceOn.
 	fOutputDL->endOfInput();
 }
@@ -392,6 +402,13 @@ void TupleAnnexStep::executeNoOrderByWithDistinct()
 	{
 		more = fInputDL->next(fInputIterator, &rgDataIn);
 		if (traceOn()) dlTimes.setFirstReadTime();
+
+		StepTeleStats sts;
+		sts.query_uuid = fQueryUuid;
+		sts.step_uuid = fStepUuid;
+		sts.msg_type = StepTeleStats::ST_START;
+		sts.total_units_of_work = 1;
+		postStepStartTele(sts);
 
 		while (more && !cancelled() && !fLimitHit)
 		{
@@ -456,13 +473,6 @@ void TupleAnnexStep::executeNoOrderByWithDistinct()
 	while (more)
 		more = fInputDL->next(fInputIterator, &rgDataIn);
 
-	if (traceOn() && !fDelivery)
-	{
-		dlTimes.setLastReadTime();
-		dlTimes.setEndOfInputTime();
-		printCalTrace();
-	}
-
 	// Bug 3136, let mini stats to be formatted if traceOn.
 	fOutputDL->endOfInput();
 }
@@ -478,6 +488,13 @@ void TupleAnnexStep::executeWithOrderBy()
 	{
 		more = fInputDL->next(fInputIterator, &rgDataIn);
 		if (traceOn()) dlTimes.setFirstReadTime();
+
+		StepTeleStats sts;
+		sts.query_uuid = fQueryUuid;
+		sts.step_uuid = fStepUuid;
+		sts.msg_type = StepTeleStats::ST_START;
+		sts.total_units_of_work = 1;
+		postStepStartTele(sts);
 
 		while (more && !cancelled())
 		{
@@ -549,13 +566,6 @@ void TupleAnnexStep::executeWithOrderBy()
 
 	while (more)
 		more = fInputDL->next(fInputIterator, &rgDataIn);
-
-	if (traceOn() && !fDelivery)
-	{
-		dlTimes.setLastReadTime();
-		dlTimes.setEndOfInputTime();
-		printCalTrace();
-	}
 
 	// Bug 3136, let mini stats to be formatted if traceOn.
 	fOutputDL->endOfInput();

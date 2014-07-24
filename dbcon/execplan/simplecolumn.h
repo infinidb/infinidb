@@ -188,7 +188,6 @@ public:
 	/** @brief set the column's OID from the syscat */
 	void setOID();
 
-	virtual bool hasAggregate() {return false;}
 	virtual bool hasWindowFunc() {return false;}
 
 	void setDerivedTable();

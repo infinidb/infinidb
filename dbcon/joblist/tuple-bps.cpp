@@ -1868,6 +1868,18 @@ try
         bool flowControlOn;
 		fDec->read_some(uniqueID, fNumThreads, bsv, &flowControlOn);
 		size = bsv.size();
+
+		// @bug 4562
+		if (traceOn() && fOid>=3000 && dlTimes.FirstReadTime().tv_sec==0)
+			dlTimes.setFirstReadTime();
+
+		if (fOid>=3000 && threadID == 0 && sts.msg_type == StepTeleStats::ST_INVALID && size > 0)
+		{
+			sts.msg_type = StepTeleStats::ST_START;
+			sts.total_units_of_work = totalMsgs;
+			postStepStartTele(sts);
+		}
+
         if ((size > 5 || flowControlOn) && fNumThreads < fMaxNumThreads)
             startAggregationThread();
 
@@ -1882,10 +1894,6 @@ try
 			condvarWakeupProducer.notify_one();
 			THROTTLEDEBUG << "receiveMultiPrimitiveMessages wakes up sending side .. " << "  msgsSent: " << msgsSent << "  msgsRecvd = " << msgsRecvd << endl;
 		}
-
-		// @bug 4562
-		if (fOid>=3000 && traceOn() && dlTimes.FirstReadTime().tv_sec==0)
-			dlTimes.setFirstReadTime();
 
 		/* If there's an error and the joblist is being aborted, don't
 			sit around forever waiting for responses.  */
@@ -2086,29 +2094,8 @@ try
 		}  // end of the per-bytestream loop
 
 		// @bug 4562
-		if (fOid>=3000 && dlTimes.FirstInsertTime().tv_sec==0)
-		{
-			sts.msg_type = StepTeleStats::ST_START;
-			sts.start_time = QueryTeleClient::timeNowms();
-			sts.total_units_of_work = totalMsgs;
-			fQtc.postStepTele(sts);
-			if (traceOn())
-				dlTimes.setFirstInsertTime();
-		}
-		else
-		{
-			if (msgsSent > msgsRecvd)
-			{
-				sts.msg_type = StepTeleStats::ST_PROGRESS;
-				sts.total_units_of_work = totalMsgs;
-				sts.units_of_work_completed = msgsRecvd;
-				if (sts.total_units_of_work > 0)
-				{
-					if ((fOid >= 3000) && ((sts.units_of_work_completed*100/sts.total_units_of_work) % 10 == 0))
-						fQtc.postStepTele(sts);
-				}
-			}
-		}
+		if (traceOn() && fOid>=3000)
+			dlTimes.setFirstInsertTime();
 
 		//update casual partition
 		size = cpv.size();
@@ -2121,7 +2108,24 @@ try
 			cpMutex.unlock();
 		}
 		cpv.clear();
+
 		mutex.lock();
+
+		if (fOid >= 3000)
+		{
+			uint64_t progress = msgsRecvd * 100 / totalMsgs;
+			bool postProgress = (progress > fProgress);
+			if (postProgress)
+			{
+				fProgress = progress;
+	
+				sts.msg_type = StepTeleStats::ST_PROGRESS;
+				sts.total_units_of_work = totalMsgs;
+				sts.units_of_work_completed = msgsRecvd;
+				postStepProgressTele(sts);
+			}
+		}
+
 	} // done reading
 
 }//try
@@ -2199,7 +2203,7 @@ out:
 			mutex.unlock();
 		}
 
-		if (fOid>=3000 && traceOn()) {
+		if (traceOn() && fOid>=3000) {
 			//...Casual partitioning could cause us to do no processing.  In that
 			//...case these time stamps did not get set.  So we set them here.
 			if (dlTimes.FirstReadTime().tv_sec==0) {
@@ -2327,17 +2331,18 @@ out:
 			formatMiniStats();
 		}
 
-		sts.msg_type = StepTeleStats::ST_SUMMARY;
-		sts.phy_io = fPhysicalIO;
-		sts.cache_io = fCacheIO;
-		sts.msg_rcv_cnt = sts.total_units_of_work = sts.units_of_work_completed = msgsRecvd;
-		sts.cp_blocks_skipped = fNumBlksSkipped;
-		sts.msg_bytes_in = fMsgBytesIn;
-		sts.msg_bytes_out = fMsgBytesOut;
-		sts.rows = ridsReturned;
-		sts.end_time = QueryTeleClient::timeNowms();;
-		if (fOid >= 3000)
-			fQtc.postStepTele(sts);
+		if (lastThread && fOid >= 3000)
+		{
+			sts.msg_type = StepTeleStats::ST_SUMMARY;
+			sts.phy_io = fPhysicalIO;
+			sts.cache_io = fCacheIO;
+			sts.msg_rcv_cnt = sts.total_units_of_work = sts.units_of_work_completed = msgsRecvd;
+			sts.cp_blocks_skipped = fNumBlksSkipped;
+			sts.msg_bytes_in = fMsgBytesIn;
+			sts.msg_bytes_out = fMsgBytesOut;
+			sts.rows = ridsReturned;
+			postStepSummaryTele(sts);
+		}
 
 		if (ffirstStepType == SCAN && bop == BOP_AND && !cancelled())
 		{
@@ -2876,11 +2881,6 @@ void TupleBPS::addCPPredicates(uint32_t OID, const vector<int64_t> &vals, bool i
 
             // TODO: store the sorted vectors from the pcolscans/steps as a minor optimization
             dbrm.getExtents(OID, extents);
-            if (extents.empty()) {
-                ostringstream os;
-                os << "TupleBPS::addCPPredicates(): OID " << OID << " is empty.";
-                throw runtime_error(os.str());
-            }
 			sort(extents.begin(), extents.end(), ExtentSorter());
 
 			if (extentsMap.find(OID) != extentsMap.end()) {

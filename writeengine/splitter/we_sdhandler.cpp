@@ -1178,8 +1178,8 @@ void WESDHandler::onBrmReport(int PmId, messageqcpp::SBS& Sbs) {
 	fWeSplClients[PmId]->setBrmRptRcvd(true);
 
 	std::string aStr;
-	int aTotRows = 0;
-	int aInsRows = 0;
+	int64_t aTotRows = 0;
+	int64_t aInsRows = 0;
 	int aColNum = 0;
 	CalpontSystemCatalog::ColDataType aColType = CalpontSystemCatalog::INT;
 	int aOorVal = 0;
@@ -2357,6 +2357,7 @@ void WESDHandler::onHandlingSignal()
 
 	fRef.fSignaled = false;
 	bool aTblLockReleased = false;
+	bool aRollbackSuccess = false;
 	onCpimportFail(0, true);
 	usleep(2000000*fPmCount);
 
@@ -2371,6 +2372,7 @@ void WESDHandler::onHandlingSignal()
 		if(1==aStatus)
 		{
 			if (getDebugLvl()) cout << "Rollback Successful... " << endl;
+			aRollbackSuccess = true;
 			break;
 		}
 		else if(-1 == aStatus)
@@ -2380,6 +2382,15 @@ void WESDHandler::onHandlingSignal()
 		}
 		usleep(2000000*fPmCount);
 	}
+
+	//Bug 5774 - if rollback failed, leave the tablelock
+	if(!aRollbackSuccess)
+	{    
+		std::stringstream aStrStr2a;
+		aStrStr2a << "Rollback Failed; Leaving Tablelock ... "; 
+		fLog.logMsg( aStrStr2a.str(), MSGLVL_INFO1 );
+		return;
+	}    
 
 	std::stringstream aStrStr3;
 	aStrStr3 << "Cleaning up ..........";
@@ -2397,7 +2408,7 @@ void WESDHandler::onHandlingSignal()
 		usleep(2000000*fPmCount);
 	}
 
-	if(!aTblLockReleased)
+	if((!aTblLockReleased) && (aRollbackSuccess))
 	{
 		releaseTableLocks();
 	}

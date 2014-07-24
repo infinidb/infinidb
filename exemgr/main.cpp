@@ -577,18 +577,20 @@ new_plan:
 				csep.unserialize(bs);
 
 				QueryTeleStats qts;
-				qts.query_uuid = csep.uuid();
-				qts.msg_type = QueryTeleStats::QT_START;
-				qts.start_time = QueryTeleClient::timeNowms();
-				qts.query = csep.data();
-				qts.session_id = csep.sessionID();
-				qts.query_type = csep.queryType();
-				qts.system_name = fOamCachePtr->getSystemName();
-				qts.module_name = fOamCachePtr->getModuleName();
-				qts.local_query = csep.localQuery();
-				qts.schema_name = csep.schemaName();
-				if ((csep.sessionID()&0x80000000) == 0)
+				if ((csep.sessionID()&0x80000000) == 0 && csep.queryType().compare("SELECT") == 0)
+				{
+					qts.query_uuid = csep.uuid();
+					qts.msg_type = QueryTeleStats::QT_START;
+					qts.start_time = QueryTeleClient::timeNowms();
+					qts.query = csep.data();
+					qts.session_id = csep.sessionID();
+					qts.query_type = csep.queryType();
+					qts.system_name = fOamCachePtr->getSystemName();
+					qts.module_name = fOamCachePtr->getModuleName();
+					qts.local_query = csep.localQuery();
+					qts.schema_name = csep.schemaName();
 					fTeleClient.postQueryTele(qts);
+				}
 
 				if (gDebug > 1 || (gDebug && (csep.sessionID()&0x80000000)==0))
 					cout << "### For session id " << csep.sessionID() << ", got a CSEP" << endl;
@@ -1052,31 +1054,33 @@ new_plan:
 				{
 					//QueryTeleStats qts;
 					//qts.query_uuid = csep.uuid();
-					qts.msg_type = QueryTeleStats::QT_SUMMARY;
-					qts.max_mem_pct = fStats.fMaxMemPct;
-					qts.num_files = fStats.fNumFiles;
-					qts.phy_io = fStats.fPhyIO;
-					qts.cache_io = fStats.fCacheIO;
-					qts.msg_rcv_cnt = fStats.fMsgRcvCnt;
-					qts.cp_blocks_skipped = fStats.fCPBlocksSkipped;
-					qts.msg_bytes_in = fStats.fMsgBytesIn;
-					qts.msg_bytes_out = fStats.fMsgBytesOut;
-					qts.rows = totalRowCount;
-					//qts.start_time = 
-					qts.end_time = QueryTeleClient::timeNowms();
-					//qts.error_no = 
-					//qts.blocks_changed = 
-					qts.session_id = csep.sessionID();
-					qts.query_type = csep.queryType();
-					qts.query = csep.data();
-					qts.system_name = fOamCachePtr->getSystemName();
-					qts.module_name = fOamCachePtr->getModuleName();
-					qts.local_query = csep.localQuery();
-					//qts.user =
-					//qts.host =
-					//qts.priority =
-					if ((csep.sessionID()&0x80000000) == 0)
+					if ((csep.sessionID()&0x80000000) == 0 && csep.queryType().compare("SELECT") == 0)
+					{
+						qts.msg_type = QueryTeleStats::QT_SUMMARY;
+						qts.max_mem_pct = fStats.fMaxMemPct;
+						qts.num_files = fStats.fNumFiles;
+						qts.phy_io = fStats.fPhyIO;
+						qts.cache_io = fStats.fCacheIO;
+						qts.msg_rcv_cnt = fStats.fMsgRcvCnt;
+						qts.cp_blocks_skipped = fStats.fCPBlocksSkipped;
+						qts.msg_bytes_in = fStats.fMsgBytesIn;
+						qts.msg_bytes_out = fStats.fMsgBytesOut;
+						qts.rows = totalRowCount;
+						//qts.start_time =
+						qts.end_time = QueryTeleClient::timeNowms();
+						//qts.error_no =
+						//qts.blocks_changed =
+						qts.session_id = csep.sessionID();
+						qts.query_type = csep.queryType();
+						qts.query = csep.data();
+						qts.system_name = fOamCachePtr->getSystemName();
+						qts.module_name = fOamCachePtr->getModuleName();
+						qts.local_query = csep.localQuery();
+						//qts.user =
+						//qts.host =
+						//qts.priority =
 						fTeleClient.postQueryTele(qts);
+					}
 				}
 
 			}

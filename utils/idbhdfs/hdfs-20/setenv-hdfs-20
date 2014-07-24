@@ -1,8 +1,21 @@
+#!/bin/bash
 if [ -z "$INFINIDB_INSTALL_DIR" ]; then
 	INFINIDB_INSTALL_DIR=/usr/local/Calpont
 fi
 
-declare -x INFINIDB_INSTALL_DIR=$INFINIDB_INSTALL_DIR
+export INFINIDB_INSTALL_DIR=$INFINIDB_INSTALL_DIR
+
+# Returns 0 if the specified string contains the specified substring,
+# otherwise returns 1.
+strContains() {
+	str="$1"
+	sub="$2"
+	if test "${str#*$sub}" != "$str"; then
+	        return 0    # $sub is in $str
+	else
+		return 1    # $sub is not in $str
+	fi
+}
 
 # Determine where Hadoop is installed
 hadoop=`which hadoop 2>/dev/null`
@@ -23,7 +36,8 @@ while true; do
 	tmppath=$path
 done
 
-if [[ ! ("$hadooppath" == *bin/hadoop*) ]]; then
+strContains "$hadooppath" "bin/hadoop"
+if [ $? -eq 1 ]; then
 	echo "Hadoop binary path not located in $hadooppath"
 	echo "Please Contact InfiniDB Customer Support. "
 	echo "Exiting"
@@ -151,7 +165,8 @@ $INFINIDB_INSTALL_DIR/bin/setConfig -d Installation JavaPath $javalibpath
 # Add the jars from hadoop classpath to the CLASSPATH.
 hadoop classpath | tr : \\n > /tmp/hadoopClasspath.txt
 for f in `cat /tmp/hadoopClasspath.txt`; do
-        if [[ ("$f" == *.jar) ]]; then
+	strContains "$f" ".jar"
+	if [ $? -eq 0 ]; then
                 CLASSPATH=${CLASSPATH}:$f;
         fi
 done

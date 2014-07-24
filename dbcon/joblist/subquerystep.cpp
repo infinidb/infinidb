@@ -42,6 +42,9 @@ using namespace rowgroup;
 #include "exceptclasses.h"
 using namespace logging;
 
+#include "querytele.h"
+using namespace querytele;
+
 #include "funcexp.h"
 
 #include "jobstep.h"
@@ -60,6 +63,7 @@ SubQueryStep::SubQueryStep(const JobInfo& jobInfo)
 	, fRowsReturned(0)
 {
 	fExtendedInfo = "SQS: ";
+	fQtc.stepParms().stepType = StepTeleStats::T_SQS;
 }
 
 SubQueryStep::~SubQueryStep()
@@ -347,6 +351,9 @@ void SubAdapterStep::execute()
 	fRowGroupOut.initRow(&rowOut);
 
 	RGData rowFeData;
+	StepTeleStats sts;
+	sts.query_uuid = fQueryUuid;
+	sts.step_uuid = fStepUuid;
 	bool usesFE = false;
 	if (fRowGroupFe.getColumnCount() != (uint32_t) -1)
 	{
@@ -360,6 +367,10 @@ void SubAdapterStep::execute()
 	bool more = false;
 	try
 	{
+		sts.msg_type = StepTeleStats::ST_START;
+		sts.total_units_of_work = 1;
+		postStepStartTele(sts);
+
 		fSubStep->run();
 
 		more = fInputDL->next(fInputIterator, &rgDataIn);
@@ -432,6 +443,11 @@ void SubAdapterStep::execute()
 		dlTimes.setEndOfInputTime();
 		printCalTrace();
 	}
+
+	sts.msg_type = StepTeleStats::ST_SUMMARY;
+	sts.total_units_of_work = sts.units_of_work_completed = 1;
+	sts.rows = fRowsReturned;
+	postStepSummaryTele(sts);
 
 	// Bug 3136, let mini stats to be formatted if traceOn.
 	fOutputDL->endOfInput();
