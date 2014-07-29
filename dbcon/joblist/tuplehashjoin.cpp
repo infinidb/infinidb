@@ -81,7 +81,7 @@ TupleHashJoinStep::TupleHashJoinStep(const JobInfo& jobInfo) :
 	joinIsTooBig(false),
 	isExeMgr(jobInfo.isExeMgr),
 	lastSmallOuterJoiner(-1),
-	fTokenJoin(false),
+	fTokenJoin(-1),
 	fStatsMutexPtr(new boost::mutex()),
 	fFunctionJoinKeys(jobInfo.keyInfo->functionJoinKeys),
 	sessionMemLimit(jobInfo.umMemLimit)

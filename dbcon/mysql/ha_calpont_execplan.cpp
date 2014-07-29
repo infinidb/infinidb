@@ -3336,27 +3336,14 @@ ReturnedColumn* buildAggregateColumn(Item* item, gp_walk_info& gwi)
 		}
 	}
 	
-	// @bug5977. For constant aggregate and no table list, replace the aggregate with
-	// the const column. e.g., select sum(1) union select count(1) from region;
+	// @bug5977 @note Temporary fix to avoid mysqld crash. The permanent fix will
+	// be applied in ExeMgr. When the ExeMgr fix is available, this checking
+	// will be taken out.
 	if (ac->constCol() && gwi.tbList.empty() && gwi.derivedTbList.empty())
 	{
-		ReturnedColumn* rc = ac->constCol()->clone();
-		// adjust decimal result according to scale difference. This is for avg()
-		// function whose result is argument.scale+4. The IDB_pow function should
-		// be able to be replace with 10000.
-		if (sfitempp[0]->type() == Item::INT_ITEM || sfitempp[0]->type() == Item::DECIMAL_ITEM)
-		{
-			IDB_Decimal d(rc->result().decimalVal.value * IDB_pow[ac->resultType().scale - rc->result().decimalVal.scale], 
-			              ac->resultType().scale, ac->resultType().precision);
-			Result r = rc->result();
-			r.decimalVal = d;
-			rc->result(r);
-		}
-
-		rc->resultType(ac->resultType());
-		rc->alias(ac->alias());
-		delete ac;
-		return rc;
+		gwi.fatalParseError = true;
+		gwi.parseErrorText = "No project column found for aggregate function";
+		return NULL;
 	}
 	else if (ac->constCol())
 	{
@@ -6110,7 +6097,7 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex, SCSEP& csep, bool i
 		if (gwi.derivedTbList.size() >= 1)
 		{
 			SimpleColumn* sc1 = new SimpleColumn();
-
+			sc1->columnName(sc->columnName());
 			sc1->tableName(sc->tableName());
 			sc1->tableAlias(sc->tableAlias());
 			sc1->viewName(lower(sc->viewName()));
@@ -6121,7 +6108,8 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex, SCSEP& csep, bool i
 
 	for (coliter = gwi.count_asterisk_list.begin(); coliter != gwi.count_asterisk_list.end(); ++coliter)
 	{
-		// should never throw this, but checking just in case...
+		// @bug5977 @note should never throw this, but checking just in case.
+		// When ExeMgr fix is ready, this should not error out...
 		if (dynamic_cast<AggregateColumn*>(minSc.get()))
 		{
 			gwi.fatalParseError = true;

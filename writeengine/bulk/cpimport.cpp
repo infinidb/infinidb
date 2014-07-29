@@ -194,6 +194,22 @@ void handleControlC(int i)
     BulkStatus::setJobStatus( EXIT_FAILURE );
 }
 
+#ifdef _MSC_VER
+BOOL WINAPI HandlerCtrlCRoutine( _In_  DWORD dwCtrlType)
+{
+    // Log to syslog
+    logging::Message::Args errMsgArgs;
+    errMsgArgs.add("Received Break to terminate the process");
+    SimpleSysLog::instance()->logMsg(
+        errMsgArgs, 
+        logging::LOG_TYPE_DEBUG,
+        logging::M0087);
+
+    handleControlC(dwCtrlType);
+    return true;
+}
+#endif
+
 //------------------------------------------------------------------------------
 // If error occurs during startup, this function is called to log the specified
 // message and terminate the process.
@@ -237,7 +253,7 @@ void startupError( const std::string& errMsg, bool showHint )
 void setupSignalHandlers()
 {
 #ifdef _MSC_VER
-    //FIXME
+    BOOL brtn = SetConsoleCtrlHandler(HandlerCtrlCRoutine, true);
 #else
     struct sigaction ign;
 

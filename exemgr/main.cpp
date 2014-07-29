@@ -529,7 +529,7 @@ public:
 				bs = fIos.read();
 				if (bs.length() == 0)
 				{
-					if (gDebug > 1 || (gDebug && (csep.sessionID()&0x80000000)==0))
+					if (gDebug > 1 || (gDebug && !csep.isInternal()))
 						cout << "### Got a close(1) for session id " << csep.sessionID() << endl;
 					// connection closed by client
 					fIos.close();
@@ -578,7 +578,8 @@ new_plan:
 				csep.unserialize(bs);
 
 				QueryTeleStats qts;
-				if ((csep.sessionID()&0x80000000) == 0 && csep.queryType().compare("SELECT") == 0)
+				if ( !csep.isInternal() &&
+					(csep.queryType() == "SELECT" || csep.queryType() == "INSERT_SELECT") )
 				{
 					qts.query_uuid = csep.uuid();
 					qts.msg_type = QueryTeleStats::QT_START;
@@ -593,13 +594,13 @@ new_plan:
 					fTeleClient.postQueryTele(qts);
 				}
 
-				if (gDebug > 1 || (gDebug && (csep.sessionID()&0x80000000)==0))
+				if (gDebug > 1 || (gDebug && !csep.isInternal()))
 					cout << "### For session id " << csep.sessionID() << ", got a CSEP" << endl;
 
 				setRMParms(csep.rmParms());
 				// @bug 1021. try to get schema cache for a come in query.
 				// skip system catalog queries.
-				if ((csep.sessionID()&0x80000000)==0)
+				if (!csep.isInternal())
 				{
 					boost::shared_ptr<CalpontSystemCatalog> csc =
 						CalpontSystemCatalog::makeCalpontSystemCatalog(csep.sessionID());
@@ -754,7 +755,7 @@ new_plan:
 					bs = fIos.read();
 					if (bs.length() == 0)
 					{
-						if (gDebug > 1 || (gDebug && (csep.sessionID()&0x80000000)==0))
+						if (gDebug > 1 || (gDebug && !csep.isInternal()))
 							cout << "### Got a close(2) for session id " << csep.sessionID() << endl;
 						break;
 					}
@@ -778,7 +779,7 @@ new_plan:
 					try // @bug2244: try/catch around fIos.write() calls responding to qb command
 					{
 						bs >> qb;
-						if (gDebug > 1 || (gDebug && (csep.sessionID()&0x80000000)==0))
+						if (gDebug > 1 || (gDebug && !csep.isInternal()))
 							cout << "### For session id " << csep.sessionID() << ", got a command = " << qb << endl;
 						if (qb == 0)
 						{
@@ -800,7 +801,7 @@ new_plan:
 							DeliveredTableMap::iterator iter = tm.begin();
 							if (iter == tm.end())
 							{
-								if (gDebug > 1 || (gDebug && (csep.sessionID()&0x80000000)==0))
+								if (gDebug > 1 || (gDebug && !csep.isInternal()))
 									cout << "### For session id " << csep.sessionID() << ", returning end flag" << endl;
 								bs.restart();
 								bs << (ByteStream::byte)1;
@@ -1052,36 +1053,27 @@ new_plan:
 
 				statementsRunningCount->decr(stmtCounted);
 
+				if ( !csep.isInternal() &&
+					(csep.queryType() == "SELECT" || csep.queryType() == "INSERT_SELECT") )
 				{
-					//QueryTeleStats qts;
-					//qts.query_uuid = csep.uuid();
-					if ((csep.sessionID()&0x80000000) == 0 && csep.queryType().compare("SELECT") == 0)
-					{
-						qts.msg_type = QueryTeleStats::QT_SUMMARY;
-						qts.max_mem_pct = fStats.fMaxMemPct;
-						qts.num_files = fStats.fNumFiles;
-						qts.phy_io = fStats.fPhyIO;
-						qts.cache_io = fStats.fCacheIO;
-						qts.msg_rcv_cnt = fStats.fMsgRcvCnt;
-						qts.cp_blocks_skipped = fStats.fCPBlocksSkipped;
-						qts.msg_bytes_in = fStats.fMsgBytesIn;
-						qts.msg_bytes_out = fStats.fMsgBytesOut;
-						qts.rows = totalRowCount;
-						//qts.start_time =
-						qts.end_time = QueryTeleClient::timeNowms();
-						//qts.error_no =
-						//qts.blocks_changed =
-						qts.session_id = csep.sessionID();
-						qts.query_type = csep.queryType();
-						qts.query = csep.data();
-						qts.system_name = fOamCachePtr->getSystemName();
-						qts.module_name = fOamCachePtr->getModuleName();
-						qts.local_query = csep.localQuery();
-						//qts.user =
-						//qts.host =
-						//qts.priority =
-						fTeleClient.postQueryTele(qts);
-					}
+					qts.msg_type = QueryTeleStats::QT_SUMMARY;
+					qts.max_mem_pct = fStats.fMaxMemPct;
+					qts.num_files = fStats.fNumFiles;
+					qts.phy_io = fStats.fPhyIO;
+					qts.cache_io = fStats.fCacheIO;
+					qts.msg_rcv_cnt = fStats.fMsgRcvCnt;
+					qts.cp_blocks_skipped = fStats.fCPBlocksSkipped;
+					qts.msg_bytes_in = fStats.fMsgBytesIn;
+					qts.msg_bytes_out = fStats.fMsgBytesOut;
+					qts.rows = totalRowCount;
+					qts.end_time = QueryTeleClient::timeNowms();
+					qts.session_id = csep.sessionID();
+					qts.query_type = csep.queryType();
+					qts.query = csep.data();
+					qts.system_name = fOamCachePtr->getSystemName();
+					qts.module_name = fOamCachePtr->getModuleName();
+					qts.local_query = csep.localQuery();
+					fTeleClient.postQueryTele(qts);
 				}
 
 			}

@@ -1146,11 +1146,47 @@ uint32_t doUpdateDelete(THD *thd)
 		updateStmt.fNamePtr = qualifiedTablName;
 		pDMLPackage = CalpontDMLFactory::makeCalpontUpdatePackageFromMysqlBuffer( dmlStatement, updateStmt );
 	}
+	else if ((thd->lex)->sql_command == SQLCOM_DELETE_MULTI) //@Bug 6121 error out on multi tables delete.
+	{
+		if ( (thd->lex->select_lex.join) != 0)
+		{
+			multi_delete* deleteTable = (multi_delete*)((thd->lex->select_lex.join)->result);
+			first_table= (TABLE_LIST*) deleteTable->get_tables();
+			if (deleteTable->num_of_tables == 1)
+			{
+				schemaName = first_table->db;
+				tableName = first_table->table_name;
+				aliasName = first_table->alias;
+				qualifiedTablName->fName = tableName;
+				qualifiedTablName->fSchema = schemaName;
+				pDMLPackage = CalpontDMLFactory::makeCalpontDMLPackageFromMysqlBuffer(dmlStatement);
+			}
+			else
+			{
+				string emsg("Deleting rows from multiple tables in a single statement is currently not supported.");
+				thd->main_da.set_error_status(thd, HA_ERR_INTERNAL_ERROR, emsg.c_str());
+				ci->rc = 1;
+				thd->row_count_func = 0;
+				return 0;
+			}
+		}
+		else
+		{
+			first_table= (TABLE_LIST*) thd->lex->select_lex.table_list.first;
+			schemaName = first_table->table->s->db.str;
+			tableName = first_table->table->s->table_name.str;
+			aliasName = first_table->alias;
+			qualifiedTablName->fName = tableName;
+			qualifiedTablName->fSchema = schemaName;
+			pDMLPackage = CalpontDMLFactory::makeCalpontDMLPackageFromMysqlBuffer(dmlStatement);
+		}
+	}
 	else
 	{
 		first_table= (TABLE_LIST*) thd->lex->select_lex.table_list.first;
 		schemaName = first_table->table->s->db.str;
 		tableName = first_table->table->s->table_name.str;
+		aliasName = first_table->alias;
 		qualifiedTablName->fName = tableName;
 		qualifiedTablName->fSchema = schemaName;
 		pDMLPackage = CalpontDMLFactory::makeCalpontDMLPackageFromMysqlBuffer(dmlStatement);
@@ -1172,11 +1208,16 @@ uint32_t doUpdateDelete(THD *thd)
 	pDMLPackage->set_SQLStatement( origStmt );
 
 	//Save the item list
-	List<Item> items = (thd->lex->select_lex.item_list);
-	thd->lex->select_lex.item_list = thd->lex->value_list;
-
-	SELECT_LEX select_lex = lex->select_lex;
-
+	List<Item> items;
+	SELECT_LEX select_lex;
+	if (( (thd->lex)->sql_command == SQLCOM_UPDATE ) || ( (thd->lex)->sql_command == SQLCOM_UPDATE_MULTI ) )
+	{
+		items = (thd->lex->select_lex.item_list);
+		thd->lex->select_lex.item_list = thd->lex->value_list;
+	}
+	select_lex = lex->select_lex;
+	
+		
 	//@Bug 2808 Error out on order by or limit clause
 	//@bug5096. support dml limit.
 	if (/*( select_lex.explicit_limit ) || */( select_lex.order_list.elements != 0 ) )
@@ -1254,7 +1295,7 @@ uint32_t doUpdateDelete(THD *thd)
 			return -1;
 
 		}
-
+//cout<< "Plan before is " << endl << *updateCP << endl;
 		//set the large side by putting the updated table at the first
 		CalpontSelectExecutionPlan::TableList tbList = updateCP->tableList();
 
@@ -1305,6 +1346,47 @@ uint32_t doUpdateDelete(THD *thd)
 			throw runtime_error ("column map is empty!");
 		if (returnedCols.empty())
 			returnedCols.push_back((updateCP->columnMap()).begin()->second);
+		//@Bug 6123. get the correct returned columnlist	
+		if (( (thd->lex)->sql_command == SQLCOM_DELETE ) || ( (thd->lex)->sql_command == SQLCOM_DELETE_MULTI ) ) 
+		{
+			returnedCols.clear();
+			//choose the smallest column to project
+			CalpontSystemCatalog::TableName deleteTableName;
+			deleteTableName.schema = schemaName;
+			deleteTableName.table = tableName;
+			CalpontSystemCatalog::RIDList colrids;
+			try {
+				colrids = csc->columnRIDs(deleteTableName);
+			}
+			catch (IDBExcept &ie) {
+				thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, ie.what());
+				ci->rc = -1;
+				thd->row_count_func = 0;
+				return 0;
+			}
+			int minColWidth = -1;
+			int minWidthColOffset = 0;
+			for (unsigned int j = 0; j < colrids.size(); j++)
+			{
+				CalpontSystemCatalog::ColType ct = csc->colType(colrids[j].objnum);
+				if (ct.colDataType == CalpontSystemCatalog::VARBINARY)
+					continue;
+
+				if (minColWidth == -1 || ct.colWidth < minColWidth)
+				{
+					minColWidth = ct.colWidth;
+					minWidthColOffset= j;
+				}
+			}
+			CalpontSystemCatalog::TableColName tcn = csc->colName(colrids[minWidthColOffset].objnum);
+			SimpleColumn *sc = new SimpleColumn(tcn.schema, tcn.table, tcn.column, csc->sessionID());
+			sc->tableAlias(aliasName);
+			sc->resultType(csc->colType(colrids[minWidthColOffset].objnum));
+			SRCP srcp;
+			srcp.reset(sc);
+			returnedCols.push_back(srcp);
+			//cout << "tablename:alias = " << tcn.table<<":"<<aliasName<<endl;
+		}
 		updateCP->returnedCols( returnedCols );
 		if (( (thd->lex)->sql_command == SQLCOM_UPDATE ) || ( (thd->lex)->sql_command == SQLCOM_UPDATE_MULTI ) )
 		{
@@ -1323,13 +1405,14 @@ uint32_t doUpdateDelete(THD *thd)
 					ptsub->walk(makeUpdateSemiJoin, &tbList[0] );
 			}
 			//cout<< "Plan is " << endl << *updateCP << endl;
-			thd->lex->select_lex.item_list = items;
+			if (( (thd->lex)->sql_command == SQLCOM_UPDATE ) || ( (thd->lex)->sql_command == SQLCOM_UPDATE_MULTI ) )
+				thd->lex->select_lex.item_list = items;
 		}
 		//cout<< "Plan is " << endl << *updateCP << endl;
 	}
 
 	//updateCP->traceFlags(1);
-	// cout<< "Plan is " << endl << *updateCP << endl;
+	//cout<< "Plan is " << endl << *updateCP << endl;
 	pDMLPackage->HasFilter(true);
 	pDMLPackage->uuid(updateCP->uuid());
 
@@ -3243,11 +3326,7 @@ void ha_calpont_impl_start_bulk_insert(ha_rows rows, TABLE* table)
 	    ((thd->lex)->sql_command == SQLCOM_LOAD) ||
 	    (thd->lex)->sql_command == SQLCOM_INSERT_SELECT) && !ci->singleInsert )
 	{
-//#ifdef _MSC_VER
-//				ci->useCpimport = 0;
-//#else
-				ci->useCpimport = thd->variables.infinidb_use_import_for_batchinsert;
-//#endif
+    	ci->useCpimport = thd->variables.infinidb_use_import_for_batchinsert;
 
 		if (((thd->lex)->sql_command == SQLCOM_INSERT) && (rows > 0))
 			ci->useCpimport = 0;
@@ -3270,20 +3349,23 @@ void ha_calpont_impl_start_bulk_insert(ha_rows rows, TABLE* table)
 				ci->singleInsert = true;
 				return;
 			}
-
+			//@bug 6122 Check how many columns have not null constraint. columnn with not null constraint will not show up in header.
+			unsigned int numberNotNull = 0; 
 			for (unsigned int j = 0; j < colrids.size(); j++)
 			{
 				CalpontSystemCatalog::ColType ctype = csc->colType(colrids[j].objnum);
 				ci->columnTypes.push_back(ctype);
 				if ((( ctype.colDataType == CalpontSystemCatalog::VARCHAR ) || ( ctype.colDataType == CalpontSystemCatalog::VARBINARY )) && !ci->useXbit )
 					ci->useXbit = true;
+				if (ctype.constraintType == CalpontSystemCatalog::NOTNULL_CONSTRAINT)
+					numberNotNull++;
 			}
 
 			// The length of the record header is:(1 + number of columns + 7) / 8 bytes
 			if (ci->useXbit)
-				ci->headerLength = (1 + colrids.size() + 7 - 1) /8; //xbit is used
+				ci->headerLength = (1 + colrids.size() + 7 - 1-numberNotNull) /8; //xbit is used
 			else
-				ci->headerLength = (1 + colrids.size() + 7) /8;
+				ci->headerLength = (1 + colrids.size() + 7 - numberNotNull) /8;
 
 			if ((strncmp(table->s->table_charset->comment, "UTF-8", 5) == 0) || (strncmp(table->s->table_charset->comment, "utf-8", 5) == 0))
 			{
@@ -3373,7 +3455,7 @@ void ha_calpont_impl_start_bulk_insert(ha_rows rows, TABLE* table)
 			HANDLE handleList[2];
 			const char* pSectionMsg;
 			// Create a pipe for the child process's STDOUT. 
-#if 0
+#if 0       // We don't need stdout to come back right now.
 			pSectionMsg = "Create Stdout";
 			bSuccess = CreatePipe(&ci->cpimport_stdout_Rd, &ci->cpimport_stdout_Wr, &saAttr, 0);
 			// Ensure the read handle to the pipe for STDIN is not inherited. 
@@ -3434,6 +3516,11 @@ void ha_calpont_impl_start_bulk_insert(ha_rows rows, TABLE* table)
 			if (bSuccess)
 			{
      			pSectionMsg = "CreateProcess";
+                // In order for GenerateConsoleCtrlEvent (used when job is canceled) to work, 
+                // this process must have a Console, which Services don't have. We create this 
+                // when we create the child process. Once created, we leave it around for next time.
+                // AllocConsole will silently fail if it already exists, so no pain.
+                AllocConsole();
 				// Set up members of the PROCESS_INFORMATION structure. 
  				memset(&ci->cpimportProcInfo, 0, sizeof(PROCESS_INFORMATION));
  
@@ -3441,7 +3528,6 @@ void ha_calpont_impl_start_bulk_insert(ha_rows rows, TABLE* table)
 				// This structure specifies the STDIN and STDOUT handles for redirection.
  				memset(&siStartInfo, 0, sizeof(STARTUPINFOEX));
 				siStartInfo.StartupInfo.cb = sizeof(STARTUPINFOEX); 
-//				siStartInfo.StartupInfo.cb = sizeof(STARTUPINFO); 
 				siStartInfo.lpAttributeList = lpAttributeList;
 				siStartInfo.StartupInfo.hStdError = NULL;
 				siStartInfo.StartupInfo.hStdOutput = NULL;
@@ -3455,8 +3541,7 @@ void ha_calpont_impl_start_bulk_insert(ha_rows rows, TABLE* table)
 										NULL,          // process security attributes 
 										NULL,          // primary thread security attributes 
 										TRUE,          // handles are inherited 
-//										0,
-										EXTENDED_STARTUPINFO_PRESENT,             // creation flags 
+                                        EXTENDED_STARTUPINFO_PRESENT | CREATE_NEW_PROCESS_GROUP, // creation flags 
 										NULL,          // use parent's environment 
 										NULL,          // use parent's current directory 
 										&siStartInfo.StartupInfo,  // STARTUPINFO pointer 
@@ -3518,7 +3603,6 @@ void ha_calpont_impl_start_bulk_insert(ha_rows rows, TABLE* table)
 				logger.logMessage(LOG_TYPE_DEBUG, msg, logid);
 				return;
 			}
-			ci->filePtr = fdopen(ci->fdt[1], "w");
 			//cout << "maxFD = " << maxFD <<endl;
 			errno = 0;
 			pid_t aChPid = fork();
@@ -3581,9 +3665,11 @@ void ha_calpont_impl_start_bulk_insert(ha_rows rows, TABLE* table)
 			}
 			else	// parent
 			{
+				ci->filePtr = fdopen(ci->fdt[1], "w");
 				ci->cpimport_pid = aChPid;	// This is the child PID
 				//cout << "Child PID is " << aChPid << endl;
 				close(ci->fdt[0]);	//close the READER of PARENT
+				ci->fdt[0] = -1;
 				// now we can send all the data thru FIFO[1], writer of PARENT
 			}
 
@@ -3699,37 +3785,54 @@ int ha_calpont_impl_end_bulk_insert(bool abort, TABLE* table)
 			((thd->lex)->sql_command == SQLCOM_INSERT) || ((thd->lex)->sql_command == SQLCOM_LOAD) ||
 	    ((thd->lex)->sql_command == SQLCOM_INSERT_SELECT)) )
 	    {
+#ifdef _MSC_VER
+			if (thd->killed > 0)
+			{
+				errno = 0;
+                // GenerateConsoleCtrlEvent sends a signal to cpimport
+                BOOL brtn = GenerateConsoleCtrlEvent(CTRL_BREAK_EVENT, ci->cpimportProcInfo.dwProcessId);
+                if (!brtn)
+                {
+    				int errnum = GetLastError();
+    				char errmsg[512];
+    				FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, NULL, errnum, 0, errmsg, 512, NULL);
+	    			ostringstream oss;
+		    		oss <<"GenerateConsoleCtrlEvent: (errno-" << errnum << "); " << errmsg;
+			        LoggingID logid( 24, 0, 0);
+			        logging::Message::Args args1;
+			        logging::Message msg(1);
+			        args1.add(oss.str());
+			        msg.format( args1 );
+			        Logger logger(logid.fSubsysID);
+			        logger.logMessage(LOG_TYPE_DEBUG, msg, logid);
+                }
+				// Close handles to the cpimport process and its primary thread.
+				fclose (ci->filePtr);
+				ci->filePtr = 0;
+				ci->fdt[1] = -1;
+				CloseHandle(ci->cpimportProcInfo.hProcess);
+				CloseHandle(ci->cpimportProcInfo.hThread);
+				WaitForSingleObject(ci->cpimportProcInfo.hProcess, INFINITE);
+            }
+#else
 			if ( (thd->killed > 0) && (ci->cpimport_pid > 0) ) //handle CTRL-C
 			{
 				//cout << "sending ctrl-c to cpimport" << endl;
 				errno = 0;
-#ifdef _MSC_VER
-				TerminateProcess(ci->cpimportProcInfo.hProcess, 1);
-				// No need to wait, since Windows can't create Zombies
-				// Close handles to the cpimport process and its primary thread.
-				fclose (ci->filePtr);
-				ci->filePtr = 0;
-				_close(ci->fdt[1]);
-				ci->fdt[1] = -1;
-				CloseHandle(ci->cpimportProcInfo.hProcess);
-				CloseHandle(ci->cpimportProcInfo.hThread);
-#else
 				kill( ci->cpimport_pid, SIGUSR1 );
 				fclose (ci->filePtr);
 				ci->filePtr = 0;
-				close(ci->fdt[1]);
 				ci->fdt[1] = -1;
 				int aStatus;
 				waitpid(ci->cpimport_pid, &aStatus, 0); // wait until cpimport finishs
-#endif
 			}
+#endif
 			else
 			{
 				//tear down cpimport
 #ifdef _MSC_VER
 				fclose (ci->filePtr);
 				ci->filePtr = 0;
-				_close(ci->fdt[1]);
 				ci->fdt[1] = -1;
 				DWORD exitCode;
 				WaitForSingleObject(ci->cpimportProcInfo.hProcess, INFINITE);
@@ -3742,11 +3845,9 @@ int ha_calpont_impl_end_bulk_insert(bool abort, TABLE* table)
 				// Close handles to the cpimport process and its primary thread.
 				CloseHandle(ci->cpimportProcInfo.hProcess);
 				CloseHandle(ci->cpimportProcInfo.hThread);
-				// No need to wait, since Windows can't create Zombies
 #else
 				fclose (ci->filePtr);
 				ci->filePtr = 0;
-				close(ci->fdt[1]);
 				ci->fdt[1] = -1;
 				int aStatus;
 				pid_t aPid = waitpid(ci->cpimport_pid, &aStatus, 0); // wait until cpimport finishs

@@ -1013,11 +1013,28 @@ const char* calshowpartitions(UDF_INIT* initid, UDF_ARGS* args,
 		oss << partIt->first;
 		output << "\n  " << setw(10) << oss.str();
 		if (partIt->second.status & CPINVALID)
+		{
 			output << setw(30) << "N/A" << setw(30) << "N/A";
-		else if (partIt->second.min == maxLimit && partIt->second.max == minLimit)
-			output << setw(30) << "Empty/Null" << setw(30) << "Empty/Null";
+		}
 		else
-			output << setw(30) << format(partIt->second.min, ct) << setw(30) << format(partIt->second.max, ct);
+		{
+			if ((isUnsigned(ct.colDataType)))
+			{
+				if (static_cast<uint64_t>(partIt->second.min) == numeric_limits<uint64_t>::max() 
+				&&  static_cast<uint64_t>(partIt->second.max) == numeric_limits<uint64_t>::min())
+					output << setw(30) << "Empty/Null" << setw(30) << "Empty/Null";
+				else
+					output << setw(30) << format(mapit->second.min, ct) << setw(30) << format(mapit->second.max, ct);
+			}
+			else
+			{
+				if (partIt->second.min == maxLimit && partIt->second.max == minLimit)
+					output << setw(30) << "Empty/Null" << setw(30) << "Empty/Null";
+				else
+					output << setw(30) << format(partIt->second.min, ct) << setw(30) << format(partIt->second.max, ct);
+			}
+		}
+
 		if (partIt->second.status & ET_DISABLED)
 			output << "Disabled";
 		else

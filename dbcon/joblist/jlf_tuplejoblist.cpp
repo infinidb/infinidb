@@ -1107,7 +1107,7 @@ bool combineJobStepsByTable(TableInfoMap::iterator& mit, JobInfo& jobInfo)
 			thjs->setLargeSideBPS(tbps);
 			thjs->joinId(-1); // token join is a filter force it done before other joins
 			thjs->setJoinType(INNER);
-			thjs->tokenJoin(true);
+			thjs->tokenJoin(mit->first);
 			tbps->incWaitToRunStepCnt();
 			SJSTEP spthjs(thjs);
 
@@ -2004,7 +2004,7 @@ SP_JoinInfo joinToLargeTable(uint32_t large, TableInfoMap& tableInfoMap,
 
 		size_t dcf = 0; // for dictionary column filters, 0 if thjs is null.
 		RowGroup largeSideRG = tableInfoMap[large].fRowGroup;
-		if (thjs && thjs->tokenJoin())
+		if (thjs && thjs->tokenJoin() == large)
 		{
 			dcf = thjs->getLargeKeys().size();
 			largeSideRG = thjs->getLargeRowGroup();
@@ -2592,7 +2592,7 @@ void joinTablesInOrder(uint32_t largest, JobStepVector& joinSteps, TableInfoMap&
 
 		size_t startPos = 0; // start point to add new smallsides
 		RowGroup largeSideRG = joinInfoMap[large]->fRowGroup;
-		if (thjs && thjs->tokenJoin())
+		if (thjs && thjs->tokenJoin() == large)
 			largeSideRG = thjs->getLargeRowGroup();
 
 		// get info to config the TupleHashjoin
@@ -3020,6 +3020,12 @@ void joinTablesInOrder(uint32_t largest, JobStepVector& joinSteps, TableInfoMap&
 
 			if (*i != large)
 			{
+				//@bug6117, token should be done for small side tables.
+				SJSTEP smallJs = joinStepMap[*i].first;
+				TupleHashJoinStep* smallThjs = dynamic_cast<TupleHashJoinStep*>(smallJs.get());
+				if (smallThjs && smallThjs->tokenJoin())
+					smallThjs->tokenJoin(-1);
+
 				// Set join priority for smallsides.
 				joinStepMap[*i] = make_pair(spjs, l);
 

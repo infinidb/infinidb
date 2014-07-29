@@ -25,6 +25,34 @@ using namespace rowgroup;
 using namespace joiner;
 using namespace logging;
 
+// a couple space-savers...
+
+#define LOG(x) {\
+	logging::Logger logger(16); \
+	LoggingID id(16, fSessionId); \
+	logger.logMessage(LOG_TYPE_ERROR, x, id); \
+}
+
+#define CATCH_AND_LOG \
+	catch(IDBExcept &e) { \
+		if (!status()) { \
+			errorMessage(e.what()); \
+			status(e.errorCode()); \
+			LOG(string(e.what())); \
+		} \
+		abort(); \
+	} \
+	catch(exception &e) { \
+		if (!status()) { \
+			ostringstream os; \
+			os << "Disk join caught an error: " << e.what(); \
+			errorMessage(os.str().c_str()); \
+			LOG(os.str()); \
+			status(ERR_DBJ_UNKNOWN_ERROR); \
+		} \
+		abort(); \
+	}
+
 namespace joblist {
 
 DiskJoinStep::DiskJoinStep() { }
@@ -178,22 +206,7 @@ void DiskJoinStep::smallReader()
 			}
 		}
 	}
-	catch(IDBExcept &e) {
-		if (!status()) {
-			errorMessage(IDBErrorInfo::instance()->errorMsg(e.errorCode()));
-			status(e.errorCode());
-		}
-		cout << "DJS small reader: " << e.what() << endl;
-		abort();
-	}
-	catch(exception &e) {
-		if (!status()) {
-			errorMessage(IDBErrorInfo::instance()->errorMsg(ERR_DBJ_UNKNOWN_ERROR));
-			status(ERR_DBJ_UNKNOWN_ERROR);
-		}
-		cout << "DJS small reader: " << e.what() << endl;
-		abort();
-	}
+	CATCH_AND_LOG;
 
 	while (more)
 		more = smallDL->next(0, &rgData);
@@ -228,22 +241,7 @@ void DiskJoinStep::largeReader()
 		if (!more)
 			lastLargeIteration = true;
 	}
-	catch(IDBExcept &e) {
-		if (!status()) {
-			errorMessage(IDBErrorInfo::instance()->errorMsg(e.errorCode()));
-			status(e.errorCode());
-		}
-		cout << "DJS large reader: " << e.what() << endl;
-		abort();
-	}
-	catch(exception &e) {
-		if (!status()) {
-			errorMessage(IDBErrorInfo::instance()->errorMsg(ERR_DBJ_UNKNOWN_ERROR));
-			status(ERR_DBJ_UNKNOWN_ERROR);
-		}
-		cout << "DJS large reader: " << e.what() << endl;
-		abort();
-	}
+	CATCH_AND_LOG;
 
 	if (cancelled())
 		while (more)
@@ -266,22 +264,8 @@ void DiskJoinStep::loadFcn()
 			}
 		} while (ret && !cancelled());
 	}
-	catch(IDBExcept &e) {
-		if (!status()) {
-			errorMessage(IDBErrorInfo::instance()->errorMsg(e.errorCode()));
-			status(e.errorCode());
-		}
-		cout << "DJS loader: " << e.what() << endl;
-		abort();
-	}
-	catch(exception &e) {
-		if (!status()) {
-			errorMessage(IDBErrorInfo::instance()->errorMsg(ERR_DBJ_UNKNOWN_ERROR));
-			status(ERR_DBJ_UNKNOWN_ERROR);
-		}
-		cout << "DJS loader: " << e.what() << endl;
-		abort();
-	}
+	CATCH_AND_LOG;
+
 	loadFIFO->endOfInput();
 }
 
@@ -460,22 +444,7 @@ void DiskJoinStep::joinFcn()
 		}
 	}
 	}  // the try stmt above; need to reformat.
-	catch(IDBExcept &e) {
-		if (!status()) {
-			errorMessage(IDBErrorInfo::instance()->errorMsg(e.errorCode()));
-			status(e.errorCode());
-		}
-		cout << "DJS join thread: " << e.what() << endl;
-		abort();
-	}
-	catch(exception &e) {
-		if (!status()) {
-			errorMessage(IDBErrorInfo::instance()->errorMsg(ERR_DBJ_UNKNOWN_ERROR));
-			status(ERR_DBJ_UNKNOWN_ERROR);
-		}
-		cout << "DJS join thread: " << e.what() << endl;
-		abort();
-	}
+	CATCH_AND_LOG;
 
 out:
 	while (more)
@@ -518,22 +487,7 @@ void DiskJoinStep::mainRunner()
 			joinThread->join();
 		}
 	}
-	catch (IDBExcept &e) {
-		if (!status()) {
-			errorMessage(IDBErrorInfo::instance()->errorMsg(e.errorCode()));
-			status(e.errorCode());
-		}
-		cout << "DJS(): " << e.what() << endl;
-		abort();
-	}
-	catch (exception &e) {
-		if (!status()) {
-			errorMessage(IDBErrorInfo::instance()->errorMsg(ERR_DBJ_UNKNOWN_ERROR));
-			status(ERR_DBJ_UNKNOWN_ERROR);
-		}
-		cout << "DJS(): " << e.what() << endl;
-		abort();
-	}
+	CATCH_AND_LOG;
 
 	// make sure all inputs were drained & output closed
 	if (cancelled()) {

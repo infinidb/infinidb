@@ -1,4 +1,4 @@
-# This is InfiniDB 4.6
+# This is InfiniDB 4.6.1
 
 ## Build prerequisites
 To build InfiniDB from source you will need:
@@ -22,9 +22,9 @@ Along with a working C++ compiler and GNU software development tools you will ne
 
 ### InfiniDB MySQL
 
-    wget -Omysql-4.6.0-1.tar.gz https://github.com/infinidb/mysql/archive/4.6.0-1.tar.gz
-    tar -zxf mysql-4.6.0-1.tar.gz
-    ln -s mysql-4.6.0-1 mysql
+    wget -Omysql-4.6.1-1.tar.gz https://github.com/infinidb/mysql/archive/4.6.1-1.tar.gz
+    tar -zxf mysql-4.6.1-1.tar.gz
+    ln -s mysql-4.6.1-1 mysql
     cd mysql
     ./configure --prefix=$HOME/infinidb/mysql
     make
@@ -33,9 +33,9 @@ Along with a working C++ compiler and GNU software development tools you will ne
 ### InfiniDB
 
     cd ..
-    wget -Oinfinidb-4.6.0-1.tar.gz https://github.com/infinidb/infinidb/archive/4.6.0-1.tar.gz
-    tar -zxf infinidb-4.6.0-1.tar.gz
-    ln -s infinidb-4.6.0-1 infinidb
+    wget -Oinfinidb-4.6.1-1.tar.gz https://github.com/infinidb/infinidb/archive/4.6.1-1.tar.gz
+    tar -zxf infinidb-4.6.1-1.tar.gz
+    ln -s infinidb-4.6.1-1 infinidb
     cd infinidb
     ./configure --prefix=$HOME/infinidb
     make
@@ -43,4 +43,18 @@ Along with a working C++ compiler and GNU software development tools you will ne
     
 This will leave you with `$HOME/infinidb` as a binary tree. Follow the Binary Download
 instructions in the InfiniDB 4.6 Installation Guide (available on http://www.infinidb.co/).
+
+## How to Contribute
+  * You may submit your contributions via GitHub pull requests.
+  * The submission must be by the original author.
+  * Along with any pull requests, please state that the contribution is your original work
+and that you license the work to the project under the project's open source license
+and the InfiniDB Contributor Agreement
+(see InfiniDBContributorAgreement.pdf). Whether or not you state this explicitly,
+by submitting any copyrighted material via pull request, email, or other means you agree to
+license the material under the project's open source license and warrant that you have the
+legal authority to do so.
+  * The InfiniDB Project committee will review your pull request and shall decide when and
+whether to merge your request in the main InfiniDB project. The InfiniDB Project
+committee will inform you of any decision regarding your request.
 

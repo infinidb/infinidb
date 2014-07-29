@@ -260,11 +260,12 @@ struct cal_connection_info
 	pid_t cpimport_pid;
 	int fdt[2];
 #ifdef _MSC_VER
+    // Used for launching cpimport for Load Data Infile
 	HANDLE cpimport_stdin_Rd;
 	HANDLE cpimport_stdin_Wr;
 	HANDLE cpimport_stdout_Rd;
 	HANDLE cpimport_stdout_Wr;
-	PROCESS_INFORMATION cpimportProcInfo; 
+	PROCESS_INFORMATION cpimportProcInfo;
 #endif
 	FILE * filePtr;
 	uint8_t headerLength;

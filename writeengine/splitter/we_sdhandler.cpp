@@ -2405,6 +2405,7 @@ void WESDHandler::onHandlingSignal()
 
 	fRef.fSignaled = false;
 	bool aTblLockReleased = false;
+	bool aRollbackSuccess = false;
 	onCpimportFail(0, true);
 	usleep(2000000*fPmCount);
 
@@ -2420,6 +2421,7 @@ void WESDHandler::onHandlingSignal()
 		if(1==aStatus)
 		{
 			if (getDebugLvl()) cout << "Rollback Successful... " << endl;
+			aRollbackSuccess = true;
 			break;
 		}
 		else if(-1 == aStatus)
@@ -2429,6 +2431,16 @@ void WESDHandler::onHandlingSignal()
 		}
 		usleep(2000000*fPmCount);
 	}
+
+    //Bug 5774 - if rollback failed, leave the tablelock
+	if(!aRollbackSuccess)
+	{    
+		std::stringstream aStrStr2a;
+		aStrStr2a << "Rollback Failed; Leaving Tablelock ... "; 
+		if ( fRef.fCmdArgs.getConsoleOutput())
+			fLog.logMsg( aStrStr2a.str(), MSGLVL_INFO1 );
+		return;
+	}    
 
 	std::stringstream aStrStr3;
 	aStrStr3 << "Cleaning up ..........";
@@ -2448,7 +2460,7 @@ void WESDHandler::onHandlingSignal()
 		usleep(2000000*fPmCount);
 	}
 
-	if(!aTblLockReleased)
+	if((!aTblLockReleased) && (aRollbackSuccess))
 	{
 		releaseTableLocks();
 	}

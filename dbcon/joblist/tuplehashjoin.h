@@ -181,8 +181,8 @@ public:
 
 	virtual bool stringTableFriendly() { return true; }
 
-	bool tokenJoin() const { return fTokenJoin; }
-	void tokenJoin(bool b) { fTokenJoin = b;    }
+	uint32_t tokenJoin() const { return fTokenJoin; }
+	void tokenJoin(uint32_t k) { fTokenJoin = k;    }
 
 	//@bug3683 function join
 	boost::shared_ptr<FunctionJoinInfo>& funcJoinInfo()               { return fFunctionJoinInfo; }
@@ -361,8 +361,8 @@ private:
 	bool isExeMgr;
 	uint32_t lastSmallOuterJoiner;
 
-	//@bug5958, for identify token join
-	bool fTokenJoin;
+	//@bug5958 & 6117, stores the table key for identify token join
+	uint32_t fTokenJoin;
 
 	// moved from base class JobStep
 	boost::mutex* fStatsMutexPtr;

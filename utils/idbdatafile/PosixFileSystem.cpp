@@ -151,15 +151,7 @@ int PosixFileSystem::listDirectory(const char* pathname, std::list<std::string>&
 			itr != end_itr;
 			++itr )
 		{
-#ifdef BOOST_WINDOWS_API   // Implies path.c_str() returns a wchar_t*
-            wchar_t* wpath = (wchar_t*)itr->path().filename().c_str();
-            size_t strmblen = funcexp::utf8::idb_wcstombs(0, wpath, 0) + 1;
-	        char* outbuf = (char*)alloca(strmblen * sizeof(char));
-            strmblen = funcexp::utf8::idb_wcstombs(outbuf, wpath, strmblen);
-			contents.push_back( outbuf );
-#else
-			contents.push_back( itr->path().filename().c_str() );
-#endif
+            contents.push_back( itr->path().filename().generic_string() );
 		}
 	}
 	catch (std::exception)

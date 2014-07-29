@@ -1789,7 +1789,7 @@ int main(int argc, char *argv[])
 
 		if ( !Host.empty() )
 		{
-			TempFilePath = sysConfigOld->getConfig("QueryTele", "Port");
+			Port = sysConfigOld->getConfig("QueryTele", "Port");
 
 			try {
 				sysConfigNew->setConfig("QueryTele", "Host", Host);

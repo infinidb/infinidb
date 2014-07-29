@@ -88,13 +88,13 @@ if [ "$daemon" = "syslog-ng" ]; then
 		echo ""
 	fi
 elif [ "$daemon" = "rsyslog" ]; then
-	if [ -d /etc/rsyslog.d ]; then
-		syslog_conf=/etc/rsyslog.d/calpont.conf
-		echo ""
-		echo "System logging being used: rsyslog"
-		echo ""
-	elif [ -f /etc/rsyslog.conf ]; then
-		syslog_conf=/etc/rsyslog.conf
+	if [ -f /etc/rsyslog.conf ]; then
+		cnt=`grep "/etc/rsyslog.d/" /etc/rsyslog.conf | wc -l`
+		if [ $cnt -gt 0 ]; then
+			syslog_conf=/etc/rsyslog.d/calpont.conf
+		else
+			syslog_conf=/etc/rsyslog.conf
+		fi
 		echo ""
 		echo "System logging being used: rsyslog"
 		echo ""
@@ -104,6 +104,12 @@ elif [ "$daemon" = "syslog" ]; then
 		syslog_conf=/etc/syslog.conf
 		echo ""
 		echo "System logging being used: syslog"
+		echo ""
+	elif [ -d /etc/syslog-ng/syslog-ng.conf ]; then
+		syslog_conf=/etc/syslog-ng/syslog-ng.conf
+		calpontSyslogFile=$installdir/bin/calpontSyslog-ng
+		echo ""
+		echo "System logging being used: syslog-ng"
 		echo ""
 	fi
 else

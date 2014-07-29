@@ -2034,7 +2034,7 @@ int processCommand(string* arguments)
 				string cmd = "pdsh -a '/" + startup::StartUp::installDir() + "/bin/infinidb stop' > /tmp/cc-stop.pdsh 2>&1";
 				system(cmd.c_str());
 				if (oam.checkLogStatus("/tmp/cc-stop.pdsh", "exit") ) {
-					cout << endl << "ERROR: Stopping InfiniDB Service failue, check /tmp/cc-stop.pdsh. exit..." << endl;
+					cout << endl << "ERROR: Stopping InfiniDB Service failure, check /tmp/cc-stop.pdsh. exit..." << endl;
 				}
 			}
 		}
@@ -2074,7 +2074,7 @@ int processCommand(string* arguments)
 				string cmd = "pdsh -a '" + startup::StartUp::installDir() + "/bin/infinidb stop' > /tmp/cc-stop.pdsh 2>&1";
 				system(cmd.c_str());
 				if (oam.checkLogStatus("/tmp/cc-stop.pdsh", "exit") ) {
-					cout << endl << "ERROR: Stopping InfiniDB Service failue, check /tmp/cc-stop.pdsh. exit..." << endl;
+					cout << endl << "ERROR: Stopping InfiniDB Service failure, check /tmp/cc-stop.pdsh. exit..." << endl;
 					break;
 				}
 			}
@@ -2172,7 +2172,7 @@ int processCommand(string* arguments)
 						string cmd = "pdsh -a '" + startup::StartUp::installDir() + "/bin/infinidb restart' > /tmp/cc-restart.pdsh 2>&1";
 						system(cmd.c_str());
 						if (oam.checkLogStatus("/tmp/cc-restart.pdsh", "exit") ) {
-							cout << endl << "ERROR: Restart InfiniDB Service failue, check /tmp/cc-restart.pdsh. exit..." << endl;
+							cout << endl << "ERROR: Restart InfiniDB Service failure, check /tmp/cc-restart.pdsh. exit..." << endl;
 							break;
 						}
 					}
@@ -2380,7 +2380,7 @@ int processCommand(string* arguments)
 						string cmd = "pdsh -a '" + startup::StartUp::installDir() + "/bin/infinidb restart' > /tmp/cc-restart.pdsh 2>&1";
 						system(cmd.c_str());
 						if (oam.checkLogStatus("/tmp/cc-restart.pdsh", "exit") ) {
-							cout << endl << "ERROR: Restart InfiniDB Service failue, check /tmp/cc-restart.pdsh. exit..." << endl;
+							cout << endl << "ERROR: Restart InfiniDB Service failure, check /tmp/cc-restart.pdsh. exit..." << endl;
 							break;
 						}
 					}

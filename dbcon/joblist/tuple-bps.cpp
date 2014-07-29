@@ -2908,11 +2908,6 @@ void TupleBPS::addCPPredicates(uint32_t OID, const vector<int64_t> &vals, bool i
 
 			// TODO: store the sorted vectors from the pcolscans/steps as a minor optimization
 			dbrm.getExtents(OID, extents);
-			if (extents.empty()) {
-				ostringstream os;
-				os << "TupleBPS::addCPPredicates(): OID " << OID << " is empty.";
-				throw runtime_error(os.str());
-			}
 			sort(extents.begin(), extents.end(), ExtentSorter());
 
 			if (extentsMap.find(OID) != extentsMap.end()) {

@@ -203,14 +203,16 @@ void CalpontSelectExecutionPlan::havingTokenList( const FilterTokenList& havingT
 		having(parser.parse(tokens.begin(), tokens.end()));
 }
 
-ostream &operator<< (ostream &output, const CalpontSelectExecutionPlan &cep)
+string CalpontSelectExecutionPlan::toString() const
 {
-	output << ">SELECT " ;
-	if (cep.distinct())
-		output << "DISTINCT ";
-	output << "limit: " << cep.limitStart() << " - " << cep.limitNum() << endl;
+	ostringstream output;
 
-	switch (cep.location())
+	output << ">SELECT " ;
+	if (distinct())
+		output << "DISTINCT ";
+	output << "limit: " << limitStart() << " - " << limitNum() << endl;
+
+	switch (location())
 	{
 		case CalpontSelectExecutionPlan::MAIN:
 		output << "MAIN" << endl;
@@ -227,7 +229,7 @@ ostream &operator<< (ostream &output, const CalpontSelectExecutionPlan &cep)
 	}
 
 	// Returned Column
-	CalpontSelectExecutionPlan::ReturnedColumnList retCols = cep.returnedCols();
+	CalpontSelectExecutionPlan::ReturnedColumnList retCols = returnedCols();
 	output << ">>Returned Columns" << endl;
 	uint32_t seq = 0;
 	for (unsigned int i = 0; i < retCols.size(); i++)
@@ -236,14 +238,14 @@ ostream &operator<< (ostream &output, const CalpontSelectExecutionPlan &cep)
 		if (retCols[i]->colSource() & SELECT_SUB)
 		{
 			output << "select sub -- " << endl;
-			CalpontSelectExecutionPlan *plan = dynamic_cast<CalpontSelectExecutionPlan*>(cep.fSelectSubList[seq++].get());
+			CalpontSelectExecutionPlan *plan = dynamic_cast<CalpontSelectExecutionPlan*>(fSelectSubList[seq++].get());
 			if (plan)
 				output << "{" << *plan << "}" << endl;
 		}
 	}
 
 	// From Clause
-	CalpontSelectExecutionPlan::TableList tables = cep.tableList();
+	CalpontSelectExecutionPlan::TableList tables = tableList();
 	output << ">>From Tables" << endl;
 	seq = 0;
 	for (unsigned int i = 0; i < tables.size(); i++)
@@ -252,7 +254,7 @@ ostream &operator<< (ostream &output, const CalpontSelectExecutionPlan &cep)
 		if (tables[i].schema.length() == 0 && tables[i].table.length() == 0)
 		{
 			output << "derived table - " << tables[i].alias << endl;
-			CalpontSelectExecutionPlan *plan = dynamic_cast<CalpontSelectExecutionPlan*>(cep.fDerivedTableList[seq++].get());
+			CalpontSelectExecutionPlan *plan = dynamic_cast<CalpontSelectExecutionPlan*>(fDerivedTableList[seq++].get());
 			if (plan)
 				output << "{" << *plan << "}" << endl;
 		}
@@ -264,69 +266,65 @@ ostream &operator<< (ostream &output, const CalpontSelectExecutionPlan &cep)
 
 	// Filters
 	output << ">>Filters" << endl;
-	if (cep.filters() != 0)
-		cep.filters()->walk (ParseTree::print, output);
+	if (filters() != 0)
+		filters()->walk (ParseTree::print, output);
 	else
 		output << "empty filter tree" << endl;
 
 	// Group by columns
-	CalpontSelectExecutionPlan::GroupByColumnList groupByCols = cep.groupByCols();
-	if (groupByCols.size() > 0)
+	const CalpontSelectExecutionPlan::GroupByColumnList& gbc = groupByCols();
+	if (gbc.size() > 0)
 	{
 	output << ">>Group By Columns" << endl;
-	for (unsigned int i = 0; i < groupByCols.size(); i++)
-		output << *groupByCols[i] << endl;
+	for (unsigned int i = 0; i < gbc.size(); i++)
+		output << *gbc[i] << endl;
 	}
 
 	// Having
-	if (cep.having() != 0)
+	if (having() != 0)
 	{
 		output << ">>Having" << endl;
-		cep.having()->walk (ParseTree::print, output);
+		having()->walk (ParseTree::print, output);
 	}
 
 	// Order by columns
-	CalpontSelectExecutionPlan::OrderByColumnList orderByCols = cep.orderByCols();
-	if (orderByCols.size() > 0)
+	const CalpontSelectExecutionPlan::OrderByColumnList& obc = orderByCols();
+	if (obc.size() > 0)
 	{
 		output << ">>Order By Columns" << endl;
-		for (unsigned int i = 0; i < orderByCols.size(); i++)
-			output << *orderByCols[i] << endl;
+		for (unsigned int i = 0; i < obc.size(); i++)
+			output << *obc[i] << endl;
 	}
-	output << "SessionID: " << cep.fSessionID << endl;
-	output << "TxnID: " << cep.fTxnID << endl;
-	output << "VerID: " << cep.fVerID << endl;
-	output << "TraceFlags: " << cep.fTraceFlags << endl;
-	output << "StatementID: " << cep.fStatementID << endl;
-	output << "DistUnionNum: " << (int)cep.fDistinctUnionNum << endl;
-	output << "Limit: " << cep.fLimitStart << " - " << cep.fLimitNum << endl;
-	output << "String table threshold: " << cep.fStringTableThreshold << endl;
+	output << "SessionID: " << fSessionID << endl;
+	output << "TxnID: " << fTxnID << endl;
+	output << "VerID: " << fVerID << endl;
+	output << "TraceFlags: " << fTraceFlags << endl;
+	output << "StatementID: " << fStatementID << endl;
+	output << "DistUnionNum: " << (int)fDistinctUnionNum << endl;
+	output << "Limit: " << fLimitStart << " - " << fLimitNum << endl;
+	output << "String table threshold: " << fStringTableThreshold << endl;
 
 	output << "--- Column Map ---" << endl;
 	CalpontSelectExecutionPlan::ColumnMap::const_iterator iter;
-	for (iter = cep.columnMap().begin(); iter != cep.columnMap().end(); iter++)
+	for (iter = columnMap().begin(); iter != columnMap().end(); iter++)
 		output << (*iter).first << " : " << (*iter).second << endl;
-	output << "UUID: " << cep.fUuid << endl;
+	output << "UUID: " << fUuid << endl;
+	output << "QueryType: " << queryType() << endl;
 
-	if (!cep.unionVec().empty())
+	if (!unionVec().empty())
 		output << "\n--- Union Unit ---" << endl;
-	for (unsigned i = 0; i < cep.unionVec().size(); i++)
+	for (unsigned i = 0; i < unionVec().size(); i++)
 	{
 		CalpontSelectExecutionPlan *plan =
-			 dynamic_cast<CalpontSelectExecutionPlan*>(cep.unionVec()[i].get());
+			 dynamic_cast<CalpontSelectExecutionPlan*>(unionVec()[i].get());
 		if (plan)
 			output << "{" << *plan << "}\n" << endl;
 	}
 
-	return output;
+	return output.str();
 }
 
-const std::string CalpontSelectExecutionPlan::queryType() const
-{
-	return queryTypeToString(fQueryType);
-}
-
-std::string CalpontSelectExecutionPlan::queryTypeToString(const uint32_t queryType)
+string CalpontSelectExecutionPlan::queryTypeToString(const uint32_t queryType)
 {
 	switch (queryType)
 	{

@@ -33,6 +33,13 @@ for arg in "$@"; do
 	fi
 done
 
+#remove ending '/'
+case "$installdir" in
+*/)
+	installdir=${installdir%/*}
+	;;
+esac
+
 if [ $installdir != "/usr/local/Calpont" ]; then
 	export INFINIDB_INSTALL_DIR=$installdir
 	export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$installdir/lib
@@ -203,13 +210,13 @@ fi
 
 #check and get amazon EC2 env variables
 if [ -n "$EC2_HOME" ]; then
-	$installdir/bin/setConfig -d Installation EC2_HOME $EC2_HOME
+	$installdir/bin/setConfig -d Installation EC2_HOME $EC2_HOME >/dev/null 2>&1
 
 	if [ -n "$EC2_HOME" ]; then
-		$installdir/bin/setConfig -d Installation JAVA_HOME $JAVA_HOME
+		$installdir/bin/setConfig -d Installation JAVA_HOME $JAVA_HOME >/dev/null 2>&1
 	fi
 
-	$installdir/bin/setConfig -d Installation EC2_PATH $PATH:/home/ec2/bin:/opt/aws/bin
+	$installdir/bin/setConfig -d Installation EC2_PATH $PATH:/home/ec2/bin:/opt/aws/bin >/dev/null 2>&1
 fi
 
 #log install message
@@ -219,7 +226,7 @@ LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$installdir/lib $installdir/bin/cplogger -i 19 
 #setup hadoop
 hadoop=`which hadoop 2>/dev/null`
 if [ -z $hadoop ]; then
-	#check for non-root user
+	#not hadoop - check for non-root user
 	if [ $installdir != "/usr/local/Calpont" -a $quiet -eq 0 ]; then
 cat <<EOD
 The next steps are:
@@ -239,26 +246,58 @@ EOD
 	fi
         exit 0
 else
+	#hadoop install
 	chmod 777 $installdir/bin/setenv-hdfs-12
 	chmod 777 $installdir/bin/setenv-hdfs-20
 
-	. $installdir/bin/setenv-hdfs-20
-	$installdir/bin/hdfsCheck $installdir/lib/hdfs-20.so > /tmp/hdfs-20-test.log 2>&1
-	if [ $? -eq 0 ]; then
-		#Passed set in config file
-		$installdir/bin/setConfig -d SystemConfig DataFilePlugin $installdir/lib/hdfs-20.so
-		$installdir/bin/setConfig -d SystemConfig DataFileEnvFile setenv-hdfs-20
-	
-		#check for non-root user
-		if [ $installdir != "/usr/local/Calpont" -a $quiet -eq 0 ]; then
+	DATAPLUGIN=`$installdir/bin/getConfig SystemConfig DataFilePlugin`
+	DATAENV=`$installdir/bin/getConfig SystemConfig DataFileEnvFile`
+
+	PASS=true
+	if [ $DATAENV != "unassigned" ]; then
+		. $installdir/bin/$DATAENV
+		$installdir/bin/hdfsCheck $DATAPLUGIN > /tmp/hdfs-config-test.log 2>&1
+		if [ $? -ne 0 ]; then
+			PASS=false
+		fi
+	else
+		PASS=false
+	fi
+
+	if [ !PASS ]; then
+		#Failed, see what passes
+		. $installdir/bin/setenv-hdfs-20
+		$installdir/bin/hdfsCheck $installdir/lib/hdfs-20.so > /tmp/hdfs-20-test.log 2>&1
+		if [ $? -eq 0 ]; then
+			#Passed, save
+			DATAPLUGIN=$installdir/lib/hdfs-20.so
+			DATAENV=setenv-hdfs-20
+		else
+			. $installdir/bin/setenv-hdfs-12
+			$installdir/bin/hdfsCheck $installdir/lib/hdfs-12.so > /tmp/hdfs-12-test.log 2>&1
+			if [ $? -eq 0 ]; then
+				#Passed, save
+				DATAPLUGIN=$installdir/lib/hdfs-12.so
+				DATAENV=setenv-hdfs-12
+			else
+				DATAPLUGIN="unassigned"
+				DATAENV="unassigned"
+			fi
+		fi
+
+		#set in config file
+		$installdir/bin/setConfig -d SystemConfig DataFilePlugin $DATAPLUGIN >/dev/null 2>&1
+		$installdir/bin/setConfig -d SystemConfig DataFileEnvFile $DATAENV >/dev/null 2>&1
+
+		#hadoop test error
+		if [ $DATAENV == "unassigned" ]; then
+			#check for non-root user
+			if [ $installdir != "/usr/local/Calpont" -a $quiet -eq 0 ]; then
 cat <<EOD
 
-If you are intending to install InfiniDB over Hadoop, the next steps are:
-
-export INFINIDB_INSTALL_DIR=$installdir
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$installdir/lib:$installdir/mysql/lib/mysql
-. $installdir/bin/setenv-hdfs-20
-$installdir/bin/postConfigure -i $installdir
+If you are intending to install InfiniDB over Hadoop, the Hadoop sanity check did not pass.  
+Check the hdfs logs in /tmp for additional information and make sure the HDFS services is running
+Please Contact InfiniDB Customer Support for addition support.
 
 If you are intending to install InfiniDB without Hadoop, the next steps are:
 
@@ -267,36 +306,30 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$installdir/lib:$installdir/mysql/lib/my
 $installdir/bin/postConfigure -i $installdir
 
 EOD
-		else
+			else
 cat <<EOD
 
-If you are intending to install InfiniDB over Hadoop, the next steps are:
+If you are intending to install InfiniDB over Hadoop, the Hadoop sanity check did not pass.  
+Check the hdfs logs in /tmp for additional information and make sure the HDFS services is running
+Please Contact InfiniDB Customer Support for addition support.
 
-. $installdir/bin/setenv-hdfs-20
-$installdir/bin/postConfigure
-
-If you are intending to install InfiniDB without Hadoop, the next step is:
+If you are intending to install InfiniDB without Hadoop, the next steps are:
 
 $installdir/bin/postConfigure
 
 EOD
-		fi
-	else
-		. $installdir/bin/setenv-hdfs-12
-		$installdir/bin/hdfsCheck $installdir/lib/hdfs-12.so > /tmp/hdfs-12-test.log 2>&1
-		if [ $? -eq 0 ]; then
-			#Passed set in config file
-			$installdir/bin/setConfig -d SystemConfig DataFilePlugin $installdir/lib/hdfs-12.so
-			$installdir/bin/setConfig -d SystemConfig DataFileEnvFile setenv-hdfs-12
-
+			fi
+		else
+			#hadoop test passed, check for non-root user
 			if [ $installdir != "/usr/local/Calpont" -a $quiet -eq 0 ]; then
 cat <<EOD
 
 If you are intending to install InfiniDB over Hadoop, the next steps are:
 
 export INFINIDB_INSTALL_DIR=$installdir
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$installdir/lib:$installdir/mysql/lib/mysql:$libpath
-. $installdir/bin/setenv-hdfs-12
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$installdir/lib:$installdir/mysql/lib/mysql
+
+. $installdir/bin/$DATAENV
 $installdir/bin/postConfigure -i $installdir
 
 If you are intending to install InfiniDB without Hadoop, the next steps are:
@@ -311,7 +344,7 @@ cat <<EOD
 
 If you are intending to install InfiniDB over Hadoop, the next steps are:
 
-. $installdir/bin/setenv-hdfs-12
+. $installdir/bin/$DATAENV
 $installdir/bin/postConfigure
 
 If you are intending to install InfiniDB without Hadoop, the next step is:
@@ -320,13 +353,6 @@ $installdir/bin/postConfigure
 
 EOD
 			fi
-		else
-cat <<EOD
-
-If you are intending to install InfiniDB over Hadoop, the Hadoop sanity check did not pass.  
-Most likely there is an environment setup conflict or the hdfs services are down.
-Please Contact InfiniDB Customer Support.
-EOD
 		fi
 	fi
 fi

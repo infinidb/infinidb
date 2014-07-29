@@ -614,25 +614,37 @@ void JoinPartition::readByteStream(int which, ByteStream *bs)
 	int saveErrno = errno;
 	if (!fs) {
 		fs.close();
-		cout << "couldn't open " << filename << strerror(saveErrno) << endl;
-		throw IDBExcept("couldn't open file", ERR_DBJ_FILE_IO_ERROR);
+		ostringstream os;
+		os << "Disk join could not open file (read access) " << filename << ": " << strerror(saveErrno) << endl;
+		throw IDBExcept(os.str().c_str(), ERR_DBJ_FILE_IO_ERROR);
 	}
 
 	fs.seekg(offset);
 	fs.read((char *) &len, sizeof(len));
+	saveErrno = errno;
 	if (!fs) {
-		fs.close();
-		return;
+		if (fs.eof()) {
+			fs.close();
+			return;
+		}
+		else {
+			fs.close();
+			ostringstream os;
+			os << "Disk join could not read file " << filename << ": " << strerror(saveErrno) << endl;
+			throw IDBExcept(os.str().c_str(), ERR_DBJ_FILE_IO_ERROR);
+		}
 	}
 	idbassert(len != 0);
 	totalBytesRead += sizeof(len);
 	if (!useCompression) {
 		bs->needAtLeast(len);
 		fs.read((char *) bs->getInputPtr(), len);
+		saveErrno = errno;
 		if (!fs) {
 			fs.close();
-			cout << "File IO read error" << endl;
-			throw IDBExcept("File IO read error", ERR_DBJ_FILE_IO_ERROR);
+			ostringstream os;
+			os << "Disk join could not read file " << filename << ": " << strerror(saveErrno) << endl;
+			throw IDBExcept(os.str().c_str(), ERR_DBJ_FILE_IO_ERROR);
 		}
 		totalBytesRead += len;
 		bs->advanceInputPtr(len);
@@ -642,10 +654,12 @@ void JoinPartition::readByteStream(int which, ByteStream *bs)
 		boost::scoped_array<char> buf(new char[len]);
 
 		fs.read(buf.get(), len);
+		saveErrno = errno;
 		if (!fs) {
 			fs.close();
-			cout << "file IO read error" << endl;
-			throw IDBExcept("File IO read error", ERR_DBJ_FILE_IO_ERROR);
+			ostringstream os;
+			os << "Disk join could not read file " << filename << ": " << strerror(saveErrno) << endl;
+			throw IDBExcept(os.str().c_str(), ERR_DBJ_FILE_IO_ERROR);
 		}
 		totalBytesRead += len;
 		compressor.getUncompressedSize(buf.get(), len, &uncompressedSize);
@@ -668,8 +682,9 @@ uint64_t JoinPartition::writeByteStream(int which, ByteStream &bs)
 	int saveErrno = errno;
 	if (!fs) {
 		fs.close();
-		cout << "write couldn't open " << filename << strerror(saveErrno) << endl;
-		throw IDBExcept("couldn't open file", ERR_DBJ_FILE_IO_ERROR);
+		ostringstream os;
+		os << "Disk join could not open file (write access) " << filename << ": " << strerror(saveErrno) << endl;
+		throw IDBExcept(os.str().c_str(), ERR_DBJ_FILE_IO_ERROR);
 	}
 
 	uint64_t ret = 0;
@@ -682,10 +697,12 @@ uint64_t JoinPartition::writeByteStream(int which, ByteStream &bs)
 		ret = len + 4;
 		fs.write((char *) &len, sizeof(len));
 		fs.write((char *) bs.buf(), len);
+		saveErrno = errno;
 		if (!fs) {
 			fs.close();
-			cout << "file IO write error" << endl;
-			throw IDBExcept("File IO write error", ERR_DBJ_FILE_IO_ERROR);
+			ostringstream os;
+			os << "Disk join could not write file " << filename << ": " << strerror(saveErrno) << endl;
+			throw IDBExcept(os.str().c_str(), ERR_DBJ_FILE_IO_ERROR);
 		}
 		totalBytesWritten += sizeof(len) + len;
 	}
@@ -698,10 +715,12 @@ uint64_t JoinPartition::writeByteStream(int which, ByteStream &bs)
 		ret = actualSize + 4;
 		fs.write((char *) &actualSize, sizeof(actualSize));
 		fs.write((char *) compressed.get(), actualSize);
+		saveErrno = errno;
 		if (!fs) {
 			fs.close();
-			cout << "File IO write error" << endl;
-			throw IDBExcept("File IO write error", ERR_DBJ_FILE_IO_ERROR);
+			ostringstream os;
+			os << "Disk join could not write file " << filename << ": " << strerror(saveErrno) << endl;
+			throw IDBExcept(os.str().c_str(), ERR_DBJ_FILE_IO_ERROR);
 		}
 		totalBytesWritten += sizeof(actualSize) + actualSize;
 	}

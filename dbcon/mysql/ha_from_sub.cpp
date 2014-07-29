@@ -56,8 +56,12 @@ void derivedTableOptimization(SCSEP& csep)
 		vector<CalpontSelectExecutionPlan::ReturnedColumnList> unionColVec;
 
 		// only do vertical optimization for union all
-		if (plan->distinctUnionNum() == 0 )
+		// @bug6134. Also skip the vertical optimization for select distinct
+		// because all columns need to be projected to check the distinctness.
+		bool verticalOptimization = false;
+		if (plan->distinctUnionNum() == 0 && !plan->distinct())
 		{
+			verticalOptimization = true;
 			for (uint j = 0; j < plan->unionVec().size(); j++)
 			{
 				unionColVec.push_back(
@@ -65,24 +69,27 @@ void derivedTableOptimization(SCSEP& csep)
 			}
 		}
 
-		int64_t val = 1;
-		for (uint i = 0; i < cols.size(); i++)
+		if (verticalOptimization)
 		{
-			//if (cols[i]->derivedTable().empty())
-			if (cols[i]->refCount() == 0)
+			int64_t val = 1;
+			for (uint i = 0; i < cols.size(); i++)
 			{
-				if (cols[i]->derivedRefCol())
-					cols[i]->derivedRefCol()->decRefCount();
-				cols[i].reset(new ConstantColumn(val));
-				for (uint j = 0; j < unionColVec.size(); j++)
-					unionColVec[j][i].reset(new ConstantColumn(val));
+				//if (cols[i]->derivedTable().empty())
+				if (cols[i]->refCount() == 0)
+				{
+					if (cols[i]->derivedRefCol())
+						cols[i]->derivedRefCol()->decRefCount();
+					cols[i].reset(new ConstantColumn(val));
+					for (uint j = 0; j < unionColVec.size(); j++)
+						unionColVec[j][i].reset(new ConstantColumn(val));
+				}
 			}
-		}
 
-		// set back
-		plan->returnedCols(cols);
-		for (uint j = 0; j < unionColVec.size(); j++)
-			dynamic_cast<CalpontSelectExecutionPlan*>(plan->unionVec()[j].get())->returnedCols(unionColVec[j]);
+			// set back
+			plan->returnedCols(cols);
+			for (uint j = 0; j < unionColVec.size(); j++)
+				dynamic_cast<CalpontSelectExecutionPlan*>(plan->unionVec()[j].get())->returnedCols(unionColVec[j]);
+		}
 	}
 
 	/*

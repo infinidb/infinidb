@@ -695,14 +695,13 @@ int ha_calpont_impl_write_batch_row_(uchar *buf, TABLE* table, cal_impl_if::cal_
     bool nullVal = false;
     uchar *bufHdr = buf;
     uint16_t colpos = 0;
-    uint16_t hdrLen = 0;
     buf  = buf + ci.headerLength;  
     //char delimiter = '|';
     //char delimiter = '\7';
-    while ((hdrLen < ci.headerLength) && (colpos < ci.columnTypes.size())) //test bitmap for null values
+    //@Bug 6122 if all columns have not null constraint, there is no information in the header
+    while (colpos < ci.columnTypes.size()) //test bitmap for null values
     {
 		char tmp = *bufHdr++;
-		hdrLen++;
 		uint8_t numLoop = 7;
 		if ((ci.useXbit) || (colpos > 6))
 			numLoop++;

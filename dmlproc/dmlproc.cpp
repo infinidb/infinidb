@@ -544,9 +544,9 @@ int main(int argc, char* argv[])
     //read and cleanup port before trying to use
     try {
         string port = cf->getConfig(DMLProc, "Port");
-        string cmd = "fuser -k " + port + "/tcp >/dev/null >2>&1";
+        string cmd = "fuser -k " + port + "/tcp >/dev/null 2>&1";
         if ( !rootUser)
-            cmd = "sudo fuser -k " + port + "/tcp >/dev/null >2>&1";
+            cmd = "sudo fuser -k " + port + "/tcp >/dev/null 2>&1";
 
         (void)::system(cmd.c_str());
     }

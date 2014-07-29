@@ -344,6 +344,11 @@ int main(int argc, char *argv[])
 				exit (1);
 			}
 			mysqlPort = argv[i];
+			if ( atoi(mysqlPort.c_str()) < 1000 || atoi(mysqlPort.c_str()) > 9999)
+			{
+				cout << "   ERROR: Invalid MySQL Port ID supplied, must be between 1000-9999" << endl;
+				exit (1);
+			}
 		}
 		else
 		{
@@ -1643,10 +1648,15 @@ int main(int argc, char *argv[])
 					else
 					{
 						if (cloud != "amazon") {
-							//get IP Address
-							string IPAddress = oam.getIPAddress( newModuleHostName);
-							if ( !IPAddress.empty() )
-								newModuleIPAddr = IPAddress;
+							if ( moduleIPAddr == oam::UnassignedIpAddr )
+							{
+								//get IP Address
+								string IPAddress = oam.getIPAddress( newModuleHostName);
+								if ( !IPAddress.empty() )
+									newModuleIPAddr = IPAddress;
+								else
+									newModuleIPAddr = oam::UnassignedIpAddr;
+							}
 							else
 								newModuleIPAddr = moduleIPAddr;
 

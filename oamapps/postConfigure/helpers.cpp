@@ -664,7 +664,7 @@ void checkMysqlPort( std::string& mysqlPort, Config* sysConfig, bool EM )
 
 	while(true)
 	{
-		string cmd = "netstat -na | grep ':" + mysqlPort + " ' | grep LISTEN > /tmp/mysqlport";
+		string cmd = "netstat -na | grep -e :" + mysqlPort + "[[:space:]] | grep LISTEN > /tmp/mysqlport";
 
 		system(cmd.c_str());
 		string fileName = "/tmp/mysqlport";
@@ -681,13 +681,23 @@ void checkMysqlPort( std::string& mysqlPort, Config* sysConfig, bool EM )
 
 				cout << "The mysqld port of '" + mysqlPort + "' is already in-use" << endl;
 
-				prompt = "Enter a different port number > ";
-				pcommand = callReadline(prompt.c_str());
-				if (pcommand)
+				while(true)
 				{
-					if (strlen(pcommand) > 0) mysqlPort = pcommand;
-					callFree(pcommand);
-					pcommand = 0;
+					prompt = "Enter a different port number > ";
+					pcommand = callReadline(prompt.c_str());
+					if (pcommand)
+					{
+						if (strlen(pcommand) > 0) mysqlPort = pcommand;
+						callFree(pcommand);
+						pcommand = 0;
+					}
+	
+					if ( atoi(mysqlPort.c_str()) < 1000 || atoi(mysqlPort.c_str()) > 9999)
+					{
+						cout << "   ERROR: Invalid MySQL Port ID supplied, must be between 1000-9999" << endl;
+					}
+					else
+						break;
 				}
 			}
 			else
@@ -724,8 +734,8 @@ void checkSystemMySQLPort(std::string& mysqlPort, Config* sysConfig, std::string
 
 	while(true)
 	{
-		string localnetstat = "netstat -na | grep ':" + mysqlPort + " ' | grep LISTEN > /tmp/mysqlport";
-		string remotenetstat = "netstat -na | grep ':" + mysqlPort + " ' | grep LISTEN";
+		string localnetstat = "netstat -na | grep -e :" + mysqlPort + "[[:space:]] | grep LISTEN > /tmp/mysqlport";
+		string remotenetstat = "netstat -na | grep -e :" + mysqlPort + "[[:space:]] | grep LISTEN";
 
 		//first check local mysql, if needed
 		if ( ( IserverTypeInstall == oam::INSTALL_COMBINE_DM_UM_PM ) ||
@@ -789,13 +799,23 @@ void checkSystemMySQLPort(std::string& mysqlPort, Config* sysConfig, std::string
 		{
 			cout << endl << "The mysqld port of '" + mysqlPort + "' is already in-use" << endl;
 
-			prompt = "Enter a different port number > ";
-			pcommand = callReadline(prompt.c_str());
-			if (pcommand)
+			while(true)
 			{
-				if (strlen(pcommand) > 0) mysqlPort = pcommand;
-				callFree(pcommand);
-				pcommand = 0;
+				prompt = "Enter a different port number > ";
+				pcommand = callReadline(prompt.c_str());
+				if (pcommand)
+				{
+					if (strlen(pcommand) > 0) mysqlPort = pcommand;
+					callFree(pcommand);
+					pcommand = 0;
+				}
+
+				if ( atoi(mysqlPort.c_str()) < 1000 || atoi(mysqlPort.c_str()) > 9999)
+				{
+					cout << "   ERROR: Invalid MySQL Port ID supplied, must be between 1000-9999" << endl;
+				}
+				else
+					break;
 			}
 
 			inUse = false;
