@@ -94,6 +94,7 @@ rm -rf utils/multicast
 rm -rf utils/openpgm
 rm -rf tools/reserveStacks
 rm -rf dbcon/doc dbcon/ingres dbcon/plsql
+rm -rf dmlib
 cd tools
 rm -rf brmtest dataPump evalidx fixdate nettest pgm pingproc rebuildEM snconvert updateGenii valprint
 rm -rf cfread dbgen dbgen-ssb ddldriver dmldriver idb_comp sendPlan vbgen

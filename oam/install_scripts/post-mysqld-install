@@ -28,15 +28,11 @@ for arg in "$@"; do
 	fi
 done
 
-cd $installdir/mysql/lib/mysql
-for file in libmysqlclient libmysqlclient_r; do
-	ln -sf $file.so.16.0.0 $file.so
-	ln -sf $file.so.16.0.0 $file.so.16
-done
-cd $installdir/mysql/lib/mysql/plugin
-for file in ha_archive ha_blackhole ha_federated ha_innodb ha_innodb_plugin; do
-	ln -sf $file.so.0.0.0 $file.so
-	ln -sf $file.so.0.0.0 $file.so.0
+mkdir -p $installdir/mysql/lib/mysql/plugin
+cd $installdir/mysql/lib
+for file in libmysqlclient; do
+	ln -sf $file.so.18.1.0 $file.so
+	ln -sf $file.so.18.1.0 $file.so.18
 done
 
 ### taken from MySQL-server-5.1.30-0.glibc23.i386.rpm
@@ -67,7 +63,16 @@ fi
 test -x /usr/local/bin/idb-testing-mysql-pre-start && /usr/local/bin/idb-testing-mysql-pre-start $installdir/mysql
 
 ### Don't give the user the notes, we'll fix them ourselves...
-$installdir/mysql/bin/mysql_install_db --rpm --user=$user --defaults-file=$installdir/mysql/my.cnf --basedir=$installdir/mysql >/dev/null
+### install script moved in 5.6
+minstall=$installdir/mysql/scripts/mysql_install_db
+if [ ! -x $minstall ]; then
+	minstall=$installdir/mysql/bin/mysql_install_db
+	if [ ! -x $minstall ]; then
+		echo "Failed to locate a usable mysql_install_db script!" 1>&2
+		exit 1
+	fi
+fi
+$minstall --rpm --user=$user --defaults-file=$installdir/mysql/my.cnf --basedir=$installdir/mysql >/dev/null 2>&1
 # Change permissions again to fix any new files.
 chown -R $user:$user $mysql_datadir
 

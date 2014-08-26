@@ -4,81 +4,11 @@ Installation Instructions
 Copyright (C) 1994, 1995, 1996, 1999, 2000, 2001, 2002, 2004, 2005 Free
 Software Foundation, Inc.
 
-Copyright (C) 2014 InfiniDB, Inc.
-
 This file is free documentation; the Free Software Foundation gives
 unlimited permission to copy, distribute and modify it.
 
-InfiniDB, Inc. also gives unlimited permission to copy, distribute and
-modify it.
-
-Basic Installation from source
-==============================
-
-**** InfiniDB source build instructions ****
-
-Consult the generic installation instructions
-that follow for detailed information. The short version is:
-
-cd $HOME
-git clone http://github.com/infinidb/mysql
-git clone http://github.com/infinidb/infinidb
--- or --
-tar -zxf <srcfile>
-cd mysql
-./configure --prefix=$HOME
-make
-make install
-cd ../infinidb
-./configure --prefix=$HOME
-make
-make install
-
-This will create a directory called Calpont in $HOME which conatins
-all the software you need.
-
-Install the InfiniDB software into /usr/local (for example) by copying
-the entire Calpont directory tree there.
-
-After untaring the sofware or installing the RPM's, setup the software
-to run (this script needs to run with root privileges). Check the Installation
-Guide for addition details on using postConfigure:
-/usr/local/Calpont/bin/postConfigure
-
-Setup some aliases:
-. /usr/local/Calpont/bin/calpontAlias
-
-Connect to MySQL:
-idbmysql
-
-A suggested test scenario:
-create database calpont;
-use calpont;
-create table caltest (col1 int, col2 int) engine=infinidb;
-show create table caltest;
-set autocommit=0;
-insert into caltest values (1, 2);
-insert into caltest values (3, 4);
-commit;
-select * from caltest;
-
-To use bulk load:
-1. A delimited import file should be created to match the table that 
-   you want to import data to similar to the following. In this 
-   example, the file will be saved as idbtest.tbl:
-    100|1001|
-    200|2002|
-2. Save/place this file in a directory.
-3. From that same directory, import the rows:
-     /usr/local/Calpont/bin/cpimport calpont caltest caltest.tbl
-
-And check the import:
-calpontmysql calpont
-select * from caltest;
-
-
-That's it. Enjoy.
-
+Basic Installation
+==================
 
 These are generic installation instructions.
 

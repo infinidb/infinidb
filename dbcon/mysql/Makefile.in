@@ -255,7 +255,7 @@ libcalmysql_la_LDFLAGS = -version-info 1:0:0 $(idb_common_ldflags) $(idb_common_
 libcalmysql_la_CPPFLAGS = -I/usr/include/libxml2 -I../../../mysql/include -I../../../mysql/sql -I../../../mysql/regex -DMYSQL_DYNAMIC_PLUGIN $(AM_CPPFLAGS)
 include_HEADERS = idb_mysql.h
 dist_mysql_DATA = syscatalog_mysql.sql dumpcat_mysql.sql calsetuserpriority.sql calremoveuserpriority.sql calshowprocesslist.sql my.cnf
-dist_mysql_SCRIPTS = install_calpont_mysql.sh mysql-Calpont dumpcat.pl
+dist_mysql_SCRIPTS = install_calpont_mysql.sh mysql-Calpont dumpcat.pl pre-mysql-upgrade.sh post-mysql-upgrade.sh
 all: all-am
 
 .SUFFIXES:
@@ -380,6 +380,13 @@ distclean-compile:
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(LTCXXCOMPILE) -c -o $@ $<
+
+libcalmysql_la-ha_calpont.lo: ha_calpont.cpp
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcalmysql_la_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT libcalmysql_la-ha_calpont.lo -MD -MP -MF "$(DEPDIR)/libcalmysql_la-ha_calpont.Tpo" -c -o libcalmysql_la-ha_calpont.lo `test -f 'ha_calpont.cpp' || echo '$(srcdir)/'`ha_calpont.cpp; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libcalmysql_la-ha_calpont.Tpo" "$(DEPDIR)/libcalmysql_la-ha_calpont.Plo"; else rm -f "$(DEPDIR)/libcalmysql_la-ha_calpont.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='ha_calpont.cpp' object='libcalmysql_la-ha_calpont.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcalmysql_la_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o libcalmysql_la-ha_calpont.lo `test -f 'ha_calpont.cpp' || echo '$(srcdir)/'`ha_calpont.cpp
 
 libcalmysql_la-ha_calpont_impl.lo: ha_calpont_impl.cpp
 @am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcalmysql_la_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT libcalmysql_la-ha_calpont_impl.lo -MD -MP -MF "$(DEPDIR)/libcalmysql_la-ha_calpont_impl.Tpo" -c -o libcalmysql_la-ha_calpont_impl.lo `test -f 'ha_calpont_impl.cpp' || echo '$(srcdir)/'`ha_calpont_impl.cpp; \
@@ -709,10 +716,6 @@ leakcheck:
 docs:
 
 bootstrap: install-data-am
-
-libcalmysql_la-ha_calpont.lo: ha_calpont.cpp
-	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcalmysql_la_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -fno-rtti -fno-implicit-templates -MT libcalmysql_la-ha_calpont.lo -MD -MP -MF "$(DEPDIR)/libcalmysql_la-ha_calpont.Tpo" -c -o libcalmysql_la-ha_calpont.lo `test -f 'ha_calpont.cpp' || echo '$(srcdir)/'`ha_calpont.cpp; \
-	then mv -f "$(DEPDIR)/libcalmysql_la-ha_calpont.Tpo" "$(DEPDIR)/libcalmysql_la-ha_calpont.Plo"; else rm -f "$(DEPDIR)/libcalmysql_la-ha_calpont.Tpo"; exit 1; fi
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
 .NOEXPORT:

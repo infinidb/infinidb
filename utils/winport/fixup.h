@@ -22,7 +22,7 @@
 
 namespace bootstrap
 {
-	extern int fixupConfig(const std::string&, const std::string&);
+	extern int fixupConfig(const std::string&, const std::string&, bool);
 }
 
 #endif

@@ -122,6 +122,7 @@ libfuncexp_la_SOURCES = \
 	func_unix_timestamp.cpp \
 	func_week.cpp \
 	func_weekday.cpp \
+	func_xor.cpp \
 	func_year.cpp \
 	func_yearweek.cpp
 

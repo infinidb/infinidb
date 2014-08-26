@@ -433,7 +433,7 @@ bool WEBrmUpdater::prepareHighWaterMarkInfo()
 //#ROWS: numRowsRead numRowsInserted
 
 bool WEBrmUpdater::prepareRowsInsertedInfo(std::string Entry,
-													int64_t& TotRows, int64_t& InsRows)
+									int64_t& TotRows, int64_t& InsRows)
 {
 	bool aFound=false;
 	//ROWS: 3 1

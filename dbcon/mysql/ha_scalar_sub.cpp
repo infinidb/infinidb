@@ -235,7 +235,7 @@ execplan::ParseTree* ScalarSub::buildParseTree(PredicateOperator* op)
 	gwi.tbList.insert(gwi.tbList.begin(), fGwip.tbList.begin(), fGwip.tbList.end());
 	gwi.derivedTbList.insert(gwi.derivedTbList.begin(), fGwip.derivedTbList.begin(), fGwip.derivedTbList.end());
 
-	if (getSelectPlan(gwi, *(fSub->get_select_lex()), csep) != 0)
+	if (getSelectPlan(gwi, *(fSub->unit->first_select()), csep) != 0)
 	{
 		//@todo more in error handling
 		if (!gwi.fatalParseError)
@@ -287,7 +287,9 @@ execplan::ParseTree* ScalarSub::buildParseTree(PredicateOperator* op)
 	csep->tableList(tblist);
 	csep->derivedTableList(derivedTbList);
 
-	if (fSub->is_correlated)
+	// checking correlation. Changed in 5.6
+	//if (fSub->is_correlated)
+	if (fSub->unit->first_select()->master_unit()->uncacheable)
 	{
 		SelectFilter *subFilter = new SelectFilter();
 		subFilter->correlated(true);

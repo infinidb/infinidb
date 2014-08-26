@@ -3269,11 +3269,14 @@ int main(int argc, char *argv[])
 			if (hdfs)
 			{
 				cout << endl << "----- Starting InfiniDB Service on all Modules -----" << endl << endl;
-				string cmd = "pdsh -a '" + installDir + "/bin/infinidb restart' > /tmp/postConfigure.pdsh 2>&1";
-				system(cmd.c_str());
-				if (oam.checkLogStatus("/tmp/postConfigure.pdsh", "exit") ) {
-					cout << endl << "ERROR: Starting InfiniDB Service failue, check /tmp/postConfigure.pdsh. exit..." << endl;
-					exit (1);
+				string cmd = installDir + "/bin/infinidb restart";
+
+				try {
+					oam.pdsh( "", cmd );
+				}
+				catch(...)
+				{
+					cout << endl << "ERROR: Restart InfiniDB Service failure, check logs." << endl;
 				}
 			}
 			else

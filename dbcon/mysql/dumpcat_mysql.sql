@@ -1,6 +1,7 @@
 -- $Id: dumpcat_mysql.sql 7049 2010-09-14 16:43:13Z rdempsey $
 -- 
 
+use calpontsys;
 select
 	`schema`, TABLENAME, COLUMNNAME COLNAME, OBJECTID, DICTOBJECTID DICT, 
 	case datatype when 0 then 'BIT' 
@@ -16,11 +17,22 @@ select
 	              when 10 then 'DOUBLE'
 	              when 11 then 'DATETIME'
 	              when 12 then 'VARCHAR'
-	              when 13 then 'CLOB'
-	              when 14 then 'BLOB'
+	              when 13 then 'VARBINARY'
+	              when 14 then 'CLOB'
+	              when 15 then 'BLOB'
+	              when 16 then 'UTINYINT'
+	              when 17 then 'USMALLINT'
+	              when 18 then 'UDECIMAL'
+	              when 19 then 'UMEDINT'
+	              when 20 then 'UINT'
+	              when 21 then 'UFLOAT'
+	              when 22 then 'UBIGINT'
+	              when 23 then 'UDOUBLE'
 	              end DATATYPE, 
-	SCALE, PREC, COLUMNLENGTH COLLEN, COLUMNPOSITION POS, COMPRESSIONTYPE CT
+	SCALE, PREC, COLUMNLENGTH COLLEN, COLUMNPOSITION POS, COMPRESSIONTYPE CT,
+	DEFAULTVALUE DEF, NULLABLE 'NULL', AUTOINCREMENT AI
 from
 	SYSCOLUMN
 order by
 	`schema`, TABLENAME, POS;
+

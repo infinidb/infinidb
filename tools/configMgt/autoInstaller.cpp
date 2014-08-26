@@ -804,7 +804,7 @@ CONFIGDONE:
 	// run calpontUninstaller script
 	cout << "Run calpontUninstall script                   " << flush;
 
-	cmd = "./remote_command.sh " + installParentModuleIPAddr + " " + systemUser + " " + password + " '" + installDir + "/Calpont/bin/calpontUninstall.sh -d -p " + password + "' 'Uninstall Completed' FAILED 500 " + debug_flag;
+	cmd = "./remote_command.sh " + installParentModuleIPAddr + " " + systemUser + " " + password + " '" + installDir + "/Calpont/bin/calpontUninstall.sh -d -p " + password + "' 'Uninstall Completed' FAILED 600 " + debug_flag;
 	rtnCode = system(cmd.c_str());
 	if (rtnCode == 0)
 		cout << "DONE" << endl;

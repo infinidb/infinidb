@@ -856,7 +856,7 @@ void StringHashJoinStep::doStringHashJoin()
 		ostringstream oss;
 		oss << "StringHashJoinStep::run() null pointer from new -- ";
 		oss << "StringDataList A(0x" << hex << (ptrdiff_t)dlA << "), B(0x"
-			<< (ptrdiff_t)dlB << "), HashJoin hj(0x" << (ptrdiff_t)hj << ")";
+			<< (ptrdiff_t)dlB << "), HashJoin hj(0x" << (ptrdiff_t)hj << dec << ")";
 		throw(runtime_error(oss.str().c_str()));
 	}
 

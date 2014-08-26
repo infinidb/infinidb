@@ -33,7 +33,7 @@
 
 #include "idb_mysql.h"
 
-struct st_table;
+struct TABLE;
 struct st_ha_create_information;
 
 #include "configcpp.h"
@@ -91,6 +91,79 @@ enum ClauseType
 typedef std::vector<JoinInfo> JoinInfoVec;
 typedef std::map<execplan::CalpontSystemCatalog::TableAliasName, std::pair<int, TABLE_LIST*> > TableMap;
 
+// IDB stack for debug purpose
+template <class T>
+class IDB_Stack { 
+private: 
+	std::stack<T> elems;      
+	std::string name;
+
+public: 
+	void setName(std::string stackName) { name = stackName; }
+	void push(T const&); 
+	void pop();
+	T top() const;
+	bool empty() const
+	{
+	return elems.empty(); 
+	} 
+	uint size() const
+	{ return elems.size(); }
+};
+
+template <class T>
+void IDB_Stack<T>::push (T const& elem) 
+{
+	// append copy of passed element 
+	elems.push(elem);
+#ifdef DEBUG_WALK_COND
+	execplan::ReturnedColumn* rc = 0;
+	execplan::ParseTree* pt = 0;
+	if ((rc = dynamic_cast<execplan::ReturnedColumn*>(elem)))
+		std::cout << name << " pushed RT " << rc->data() << std::endl;
+	else if ((pt = dynamic_cast<execplan::ParseTree*>(elem)))
+		std::cout << name << " pushed PT " << pt->data() << std::endl;
+	else
+		std::cout << name << " pushed unknow column" << std::endl;
+#endif
+} 
+
+template <class T>
+void IDB_Stack<T>::pop () 
+{
+	if (elems.empty())
+	{
+		std::cout << "Stack<>::pop(): empty stack" << std::endl; 
+		return;
+	}
+
+#ifdef DEBUG_WALK_COND
+	T t = elems.top();
+	execplan::ReturnedColumn* rc = 0;
+	execplan::ParseTree* pt = 0;
+	if ((rc = dynamic_cast<execplan::ReturnedColumn*>(t)))
+		std::cout << name << " poped RT " << rc->data() << std::endl;
+	else if ((pt = dynamic_cast<execplan::ParseTree*>(t)))
+		std::cout << name << " poped PT " << pt->data() << std::endl;
+	else
+		std::cout << name << " poped unknow column" << std::endl;
+#endif
+	// remove last element 
+	elems.pop();     
+} 
+
+template <class T>
+T IDB_Stack<T>::top () const 
+{
+	if (elems.empty())
+	{
+		std::cout << "Stack<>::top(): empty stack" << std::endl; 
+		return NULL;
+	}
+	// return copy of last element 
+	return elems.top();
+}
+
 struct gp_walk_info
 {
 	std::vector <std::string> selectCols;
@@ -106,8 +179,8 @@ struct gp_walk_info
 	// the sequence # of the subselect local columns need to be set after
 	// the additionRetCols are merged to the returnedCols.
 	std::vector<execplan::ReturnedColumn*> localCols;
-	std::stack<execplan::ReturnedColumn*> rcWorkStack;
-	std::stack<execplan::ParseTree*> ptWorkStack;
+	IDB_Stack<execplan::ReturnedColumn*> rcWorkStack;
+	IDB_Stack<execplan::ParseTree*> ptWorkStack;
 	boost::shared_ptr<execplan::SimpleColumn> scsp;
 	uint32_t sessionid;
 	bool fatalParseError;
@@ -155,7 +228,10 @@ struct gp_walk_info
 				   hasSubSelect(false),
 				   lastSub(0),
 				   derivedTbCnt(0)
-	{}
+	{
+		ptWorkStack.setName("ptWorkStack");
+		rcWorkStack.setName("rcWorkStack");
+	}
 
 	~gp_walk_info() {}
 };
@@ -176,7 +252,7 @@ struct cal_table_info
 	sm::cpsm_tplh_t* tpl_ctx;
 	sm::sp_cpsm_tplsch_t tpl_scan_ctx;
 	unsigned c; // for debug purpose
-	st_table* msTablePtr; // no ownership
+	TABLE* msTablePtr; // no ownership
 	sm::cpsm_conhdl_t* conn_hndl;
 	gp_walk_info* condInfo;
 	execplan::SCSEP csep;
@@ -213,8 +289,9 @@ struct cal_connection_info
 	                        useXbit(false),
 	                        utf8(false),
 	                        useCpimport(1),
-	                        delimiter('\7')
+	                        delimiter('\007')
 	{
+		fdt[0] = fdt[1] = -1;
 		// check if this is a slave mysql daemon
 		isSlaveNode = checkSlave();
 	}
@@ -309,13 +386,13 @@ void castTypeArgs(Item_func* ifp, funcexp::FunctionParm& functionParms);
 void parse_item (Item *item, std::vector<Item_field*>& field_vec, bool& hasNonSupportItem, uint16& parseInfo);
 bool isPredicateFunction(Item* item, gp_walk_info* gwip);
 execplan::ParseTree* buildRowPredicate(execplan::RowColumn* lhs, execplan::RowColumn* rhs, std::string predicateOp);
-void buildRowColumnFilter(gp_walk_info* gwip, execplan::RowColumn* rhs, execplan::RowColumn* lhs, Item_func* ifp);
-void buildPredicateItem(Item_func* ifp, gp_walk_info* gwip);
+bool buildRowColumnFilter(gp_walk_info* gwip, execplan::RowColumn* rhs, execplan::RowColumn* lhs, Item_func* ifp);
+bool buildPredicateItem(Item_func* ifp, gp_walk_info* gwip);
 void collectAllCols(gp_walk_info& gwi, Item_field* ifp);
 void buildSubselectFunc(Item_func* ifp, gp_walk_info* gwip);
 uint32_t buildOuterJoin(gp_walk_info& gwi, SELECT_LEX& select_lex);
 std::string getViewName(TABLE_LIST* table_ptr);
-void buildConstPredicate(Item_func* ifp, execplan::ReturnedColumn* rhs, gp_walk_info* gwip);
+bool buildConstPredicate(Item_func* ifp, execplan::ReturnedColumn* rhs, gp_walk_info* gwip);
 execplan::CalpontSystemCatalog::ColType fieldType_MysqlToIDB (const Field* field);
 execplan::CalpontSystemCatalog::ColType colType_MysqlToIDB (const Item* item);
 execplan::SPTP getIntervalType(int interval_type);

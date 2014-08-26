@@ -266,7 +266,7 @@ public:
 
   THR_LOCK_DATA **store_lock(THD *thd, THR_LOCK_DATA **to,
                              enum thr_lock_type lock_type);     ///< required
-  const COND *cond_push(const COND *cond);
+  const Item *cond_push(const Item *cond);
 };
 #endif //HA_CALPONT_H__
 

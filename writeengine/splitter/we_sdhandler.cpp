@@ -2432,15 +2432,15 @@ void WESDHandler::onHandlingSignal()
 		usleep(2000000*fPmCount);
 	}
 
-    //Bug 5774 - if rollback failed, leave the tablelock
+	//Bug 5774 - if rollback failed, leave the tablelock
 	if(!aRollbackSuccess)
-	{    
+	{
 		std::stringstream aStrStr2a;
 		aStrStr2a << "Rollback Failed; Leaving Tablelock ... "; 
 		if ( fRef.fCmdArgs.getConsoleOutput())
 			fLog.logMsg( aStrStr2a.str(), MSGLVL_INFO1 );
 		return;
-	}    
+	}
 
 	std::stringstream aStrStr3;
 	aStrStr3 << "Cleaning up ..........";
@@ -2460,6 +2460,7 @@ void WESDHandler::onHandlingSignal()
 		usleep(2000000*fPmCount);
 	}
 
+	//Bug 5774 - Rollback success, evenif cleanup failed release tablelock
 	if((!aTblLockReleased) && (aRollbackSuccess))
 	{
 		releaseTableLocks();

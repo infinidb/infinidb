@@ -130,7 +130,7 @@ std::string Func_lpad::getStrVal(rowgroup::Row& row,
     // char string won't be longer than
     strwclen = tstr.length(); // a guess to start with. This will be >= to the real count.
     int alen = len;
-	if(strwclen > len)
+	if(strwclen > (unsigned)len)
 		alen = strwclen;
 	int bufsize = (alen+1) * sizeof(wchar_t);
 
@@ -147,14 +147,14 @@ std::string Func_lpad::getStrVal(rowgroup::Row& row,
 
     // If the incoming str is exactly the len of the result str,
     // return the original
-    if (strSize == len)
+    if (strSize == (unsigned)len)
     {
         return tstr;
     }
 
     // If the incoming str is too big for the result str
     // truncate the widechar buffer and return as a string
-    if (strSize > len) 
+    if (strSize > (unsigned)len)
     {
 		// Trim the excess length of the buffer
 		wstring trimmed = wstring(wcbuf, len);

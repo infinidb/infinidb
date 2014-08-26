@@ -99,7 +99,7 @@ if { $INSTALLTYPE == "initial" || $INSTALLTYPE == "uninstall" } {
 	# erase InfiniDB packages
 	#
 	send_user "Erase InfiniDB Packages on Module           "
-	send "ssh $USERNAME@$SERVER '$PKGERASE calpont >/dev/null 2>&1; $PKGERASE calpont-mysql >/dev/null 2>&1; $PKGERASE calpont-mysqld >/dev/null 2>&1; $PKGERASE infinidb-enterprise >/dev/null 2>&1; $PKGERASE infinidb-libs infinidb-platform;$PKGERASE infinidb-storage-engine infinidb-mysql;$PKGERASE dummy'\n"
+	send "ssh $USERNAME@$SERVER '$PKGERASE calpont >/dev/null 2>&1; $PKGERASE calpont-mysql >/dev/null 2>&1; $PKGERASE calpont-mysqld >/dev/null 2>&1; $PKGERASE infinidb-enterprise >/dev/null 2>&1; $PKGERASE infinidb-libs; $PKGERASE infinidb-platform; $PKGERASE infinidb-storage-engine; $PKGERASE infinidb-mysql;$PKGERASE dummy'\n"
 	if { $PASSWORD != "ssh" } {
 		set timeout 30
 		expect {

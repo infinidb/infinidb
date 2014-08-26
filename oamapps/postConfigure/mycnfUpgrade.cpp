@@ -15,43 +15,22 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-/******************************************************************************************
-* $Id: mycnfUpgrade.cpp 64 2006-10-12 22:21:51Z dhill $
-*
-*
-*		
-******************************************************************************************/
 /**
  * @file
  */
 
 #include <unistd.h>
-#include <iterator>
-#include <numeric>
-#include <deque>
 #include <iostream>
-#include <ostream>
-#include <fstream>
-#include <cstdlib>
 #include <string>
-#include <limits.h>
-#include <sstream>
-#include <exception>
-#include <stdexcept>
+#include <fstream>
 #include <vector>
-#include <stdio.h>
-#include <ctype.h>
-#include <netdb.h>
-#include <sys/sysinfo.h>
-#include <climits>
-#include <cstring>
-#include <glob.h>
+#include <algorithm>
+using namespace std;
 
 #include "liboamcpp.h"
-#include "installdir.h"
-
-using namespace std;
 using namespace oam;
+
+#include "installdir.h"
 
 int main(int argc, char *argv[])
 {
@@ -100,35 +79,35 @@ int main(int argc, char *argv[])
 	}
 
 	//go though include list
-	char line[200];
+	char line[2000];
 	string includeArg;
-	while (includefile.getline(line, 200))
+	while (includefile.getline(line, 2000))
 	{
 		includeArg = line;
 
 		//see if in my.cnf.rpmsave
-		ifstream mycnfsavefile (mycnfsaveFile.c_str());
-		char line[200];
+		ifstream mycnfsavefile(mycnfsaveFile.c_str());
+		char line[2000];
 		string oldbuf;
-		while (mycnfsavefile.getline(line, 200))
+		while (mycnfsavefile.getline(line, 2000))
 		{
 			oldbuf = line;
 			string::size_type pos = oldbuf.find(includeArg,0);
-			if ( pos != string::npos ) {
+			if (pos != string::npos) {
 				//check if this is commented out
-				if ( line[0] != '#' ) 
+				if (line[0] != '#') 
 				{
 					// no, find in my.cnf and replace
 
-					ifstream mycnffile (mycnfFile.c_str());
-					vector <string> lines;
-					char line1[200];
+					ifstream mycnffile(mycnfFile.c_str());
+					vector<string> lines;
+					char line1[2000];
 					string newbuf;
-					while (mycnffile.getline(line1, 200))
+					while (mycnffile.getline(line1, 2000))
 					{
 						newbuf = line1;
 						string::size_type pos = newbuf.find(includeArg,0);
-						if ( pos != string::npos )
+						if (pos != string::npos)
 							newbuf = oldbuf;
 
 						//output to temp file
@@ -137,10 +116,11 @@ int main(int argc, char *argv[])
 
 					//write out a new my.cnf
 					mycnffile.close();
-					unlink (mycnfFile.c_str());
-					ofstream newFile (mycnfFile.c_str());	
+					unlink(mycnfFile.c_str());
+					ofstream newFile(mycnfFile.c_str());	
 					
 					//create new file
+					//FIXME: didn't the above ofstream ctor already do this???
 					int fd = open(mycnfFile.c_str(), O_RDWR|O_CREAT, 0666);
 					
 					copy(lines.begin(), lines.end(), ostream_iterator<string>(newFile, "\n"));
@@ -152,6 +132,7 @@ int main(int argc, char *argv[])
 				break;
 			}
 		}
+		mycnfsavefile.close();
 	}
 
 	exit (0);

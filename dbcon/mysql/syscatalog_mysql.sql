@@ -35,6 +35,6 @@ create table if not exists syscolumn (`schema` varchar(128),
                         distcount integer,
                         nullcount integer,
                         minvalue varchar(64),
-                        maxvalue varchar(64),
+                        `maxvalue` varchar(64),
                         compressiontype integer,
 						nextvalue bigint) engine=infinidb comment='SCHEMA SYNC ONLY';

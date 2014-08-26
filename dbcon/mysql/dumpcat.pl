@@ -90,11 +90,47 @@ while (defined($schema))
 	}
 	elsif ($dt == 13)
 	{
-		$dts = 'clob';
+		$dts = 'varbinary';
 	}
 	elsif ($dt == 14)
 	{
+		$dts = 'clob';
+	}
+	elsif ($dt == 15)
+	{
 		$dts = 'blob';
+	}
+	elsif ($dt == 16)
+	{
+		$dts = 'utinyint';
+	}
+	elsif ($dt == 17)
+	{
+		$dts = 'usmallint';
+	}
+	elsif ($dt == 18)
+	{
+		$dts = 'udecimal';
+	}
+	elsif ($dt == 19)
+	{
+		$dts = 'umedint';
+	}
+	elsif ($dt == 20)
+	{
+		$dts = 'uint';
+	}
+	elsif ($dt == 21)
+	{
+		$dts = 'ufloat';
+	}
+	elsif ($dt == 22)
+	{
+		$dts = 'ubigint';
+	}
+	elsif ($dt == 23)
+	{
+		$dts = 'udouble';
 	}
 	else
 	{

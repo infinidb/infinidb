@@ -200,6 +200,24 @@ private:
 	bool fIsNotNull;
 };
 
+/** @brief Func_xor class
+  * XOR function could be evaluated as logical operator or as function,
+  * because XOR cound come out of MySQL optimizer as COND_ITEM or FUNC_ITEM.
+  */
+class Func_xor : public Func_Bool
+{
+public:
+        Func_xor() : Func_Bool("xor") {}
+        virtual ~Func_xor() {}
+
+        execplan::CalpontSystemCatalog::ColType operationType(FunctionParm& fp, execplan::CalpontSystemCatalog::ColType& resultType);
+
+        bool getBoolVal(rowgroup::Row& row,
+                                                FunctionParm& fp,
+                                                bool& isNull,
+                                                execplan::CalpontSystemCatalog::ColType& op_ct);
+};
+
 
 }
 

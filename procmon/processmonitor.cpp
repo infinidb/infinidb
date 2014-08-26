@@ -4602,9 +4602,9 @@ int ProcessMonitor::changeMyCnf(std::string type)
 	{
 		// set master replication entries
 		vector <string> lines;
-		char line[200];
+		char line[2000];
 		string buf;
-		while (file.getline(line, 200))
+		while (file.getline(line, 2000))
 		{
 			buf = line;
 			string::size_type pos = buf.find("server-id =",0);
@@ -4712,9 +4712,9 @@ int ProcessMonitor::changeMyCnf(std::string type)
 
 		// set slave replication entries
 		vector <string> lines;
-		char line[200];
+		char line[2000];
 		string buf;
-		while (file.getline(line, 200))
+		while (file.getline(line, 2000))
 		{
 			buf = line;
 			string::size_type pos = buf.find("server-id",0);

@@ -25,7 +25,7 @@ libcalmysql_la_CPPFLAGS = -I/usr/include/libxml2 -I../../../mysql/include -I../.
 include_HEADERS = idb_mysql.h
 
 dist_mysql_DATA = syscatalog_mysql.sql dumpcat_mysql.sql calsetuserpriority.sql calremoveuserpriority.sql calshowprocesslist.sql my.cnf
-dist_mysql_SCRIPTS = install_calpont_mysql.sh mysql-Calpont dumpcat.pl
+dist_mysql_SCRIPTS = install_calpont_mysql.sh mysql-Calpont dumpcat.pl pre-mysql-upgrade.sh post-mysql-upgrade.sh
 
 test:
 
@@ -36,8 +36,4 @@ leakcheck:
 docs:
 
 bootstrap: install-data-am
-
-libcalmysql_la-ha_calpont.lo: ha_calpont.cpp
-	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcalmysql_la_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -fno-rtti -fno-implicit-templates -MT libcalmysql_la-ha_calpont.lo -MD -MP -MF "$(DEPDIR)/libcalmysql_la-ha_calpont.Tpo" -c -o libcalmysql_la-ha_calpont.lo `test -f 'ha_calpont.cpp' || echo '$(srcdir)/'`ha_calpont.cpp; \
-	then mv -f "$(DEPDIR)/libcalmysql_la-ha_calpont.Tpo" "$(DEPDIR)/libcalmysql_la-ha_calpont.Plo"; else rm -f "$(DEPDIR)/libcalmysql_la-ha_calpont.Tpo"; exit 1; fi
 

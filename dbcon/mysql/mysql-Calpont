@@ -49,7 +49,7 @@
 # overwritten by settings in the MySQL configuration files.
 
 if [ -z "$INFINIDB_INSTALL_DIR" ]; then
-	test -f /etc/default/infinidb && . /etc/default/infinidb
+	test -f /etc/default/infinidb && source /etc/default/infinidb
 fi
 
 if [ -z "$INFINIDB_INSTALL_DIR" ]; then
@@ -57,6 +57,15 @@ if [ -z "$INFINIDB_INSTALL_DIR" ]; then
 fi
 
 export INFINIDB_INSTALL_DIR=$INFINIDB_INSTALL_DIR
+
+if [ -z "$LD_LIBRARY_PATH" ]; then
+	export LD_LIBRARY_PATH=$INFINIDB_INSTALL_DIR/lib
+else
+	echo "$LD_LIBRARY_PATH" | egrep -qs "$INFINIDB_INSTALL_DIR/lib"
+	if [ $? -ne 0 ]; then
+		export LD_LIBRARY_PATH=$INFINIDB_INSTALL_DIR/lib:$LD_LIBRARY_PATH
+	fi
+fi
 
 basedir=$INFINIDB_INSTALL_DIR/mysql
 datadir=$basedir/db
@@ -109,7 +118,7 @@ datadir_set=
 #
 lsb_functions="/lib/lsb/init-functions"
 if test -f $lsb_functions ; then
-  . $lsb_functions
+  source $lsb_functions
 else
   log_success_msg()
   {
@@ -340,9 +349,7 @@ case "$mode" in
 
     # @bug 2104. remove all left over vtables. Look for @0024vtable ($vtable). 
     # "@0024vtable" is a reserved word of InfiniDB and can not be used in regular user table name.
-    cd db
-    find . -name '@0024vtable*' | xargs /bin/rm -f
-    cd ..
+    find $datadir -name '@0024vtable*' | xargs /bin/rm -f
 
     # hook for InfiniDB automated testing
     test -x /usr/local/bin/idb-testing-mysql-pre-start && /usr/local/bin/idb-testing-mysql-pre-start $basedir
@@ -409,11 +416,11 @@ case "$mode" in
       $SUDO kill $mysqlmanager_pid
       # mysqlmanager should remove the pid_file when it exits, so wait for it.
       wait_for_pid removed "$mysqlmanager_pid"
-			
+
       # @bug2639. force kill mysqld and mysqld_safe after timeout
-        $SUDO kill -9 $(ps -efl|awk "{if (\$4==$mysqlmanager_pid) print \$5}") &>/dev/null 
-        $SUDO kill -9 $mysqlmanager_pid &>/dev/null
-        log_success_msg
+      $SUDO kill -9 $(ps -efl|awk "{if (\$4==$mysqlmanager_pid) print \$5}") &>/dev/null
+      $SUDO kill -9 $mysqlmanager_pid &>/dev/null
+      log_success_msg
 
       # delete lock for RedHat / SuSE
       if test -f $lock_dir

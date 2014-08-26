@@ -43,8 +43,9 @@ namespace {
 void bailout(char* error, const string& funcName)
 {
 	string errMsg = IDBErrorInfo::instance()->errorMsg(ERR_PSEUDOCOL_IDB_ONLY, funcName);
-	current_thd->main_da.can_overwrite_status = true;
-	current_thd->main_da.set_error_status(current_thd, HA_ERR_INTERNAL_ERROR, errMsg.c_str());
+	current_thd->get_stmt_da()->set_overwrite_status(true);
+	current_thd->get_stmt_da()->set_error_status(HA_ERR_INTERNAL_ERROR, errMsg.c_str(), mysql_errno_to_sqlstate(HA_ERR_INTERNAL_ERROR), 0);
+
 	*error = 1;
 }
 
@@ -488,7 +489,7 @@ execplan::ReturnedColumn* buildPseudoColumn(Item* item,
 			cc = new ConstantColumn(localPm);
 		else
 			cc = new ConstantColumn("", ConstantColumn::NULLDATA);
-		cc->alias(ifp->name? ifp->name : "");
+		cc->alias(ifp->full_name()? ifp->full_name() : "");
 		return cc;
 	}
 
@@ -558,14 +559,14 @@ execplan::ReturnedColumn* buildPseudoColumn(Item* item,
 		// operation type integer
 		funcexp::Func_idbpartition* idbpartition = new funcexp::Func_idbpartition();
 		fc->operationType(idbpartition->operationType(parms, fc->resultType()));
-		fc->alias(ifp->name? ifp->name : "");
+		fc->alias(ifp->full_name()? ifp->full_name() : "");
 		return fc;
 	}
 
 	PseudoColumn *pc = new PseudoColumn(*sc, pseudoType);
 
 	// @bug5892. set alias for derived table column matching.
-	pc->alias(ifp->name? ifp->name : "");
+	pc->alias(ifp->full_name()? ifp->full_name() : "");
 	return pc;
 }
 

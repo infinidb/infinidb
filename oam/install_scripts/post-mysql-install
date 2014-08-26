@@ -53,10 +53,18 @@ fi
 
 if [ -x $installdir/mysql/mysql-Calpont ]; then
 
+	# Do any pre-upgrade stuff. This needs to make the server at least startable so
+	#  that post-mysql-upgrade.sh can connect & fix. Also, this scripts needs to
+	#  work without mysqld running...
+	$installdir/mysql/pre-mysql-upgrade.sh --password=$password --installdir=$installdir
+
 	# Restart in the same way that mysqld will be started normally.
 	$installdir/mysql/mysql-Calpont start
 
 	sleep 2
+
+	# Do any upgrade stuff...
+	$installdir/mysql/post-mysql-upgrade.sh --password=$password --installdir=$installdir
 
 	# Install various Calpont stuff...
 	$installdir/mysql/install_calpont_mysql.sh --password=$password --installdir=$installdir

@@ -356,6 +356,7 @@ int fixupCalpontXML()
 	return rc;
 }
 
+// Most (all) of the fixup work is done in-line in fixupConfig...
 int fixupMyIni()
 {
 	return 0;
@@ -366,7 +367,7 @@ int fixupMyIni()
 namespace bootstrap
 {
 
-int fixupConfig(const string& installDir, const string& mysqlPort)
+int fixupConfig(const string& installDir, const string& mysqlPort, bool mUp)
 {
 	int rc = -1;
 
@@ -430,6 +431,14 @@ int fixupConfig(const string& installDir, const string& mysqlPort)
 	fs::remove(tmpPath);
 	ifs.open(cFilePath.string().c_str());
 	ofs.open(tmpPath.string().c_str());
+	// fixup 5.1 my.ini:
+	//    remove ignore_builtin_innodb
+	//    remove plugin_load=innodb=ha_innodb_plugin.dll
+	//    remove skip-innodb
+	//    remove innodb_additional_mem_pool_size
+	//    remove table_cache
+	//    add innodb_data_file_path = ibdata1:10M:autoextend
+	//    add explicit_defaults_for_timestamp
 	getline(ifs, strLine);
 	while (ifs.good())
 	{
@@ -437,13 +446,29 @@ int fixupConfig(const string& installDir, const string& mysqlPort)
 		{
 			sedit(strLine, "##INSTDIR##", id);
 			sedit(strLine, "##PORT##", mysqlPort);
+			sedit(strLine,  "infinidb_compression_type=1",
+					"infinidb_compression_type=2");
+			// we want to delete lines like these
+			if (sedit(strLine, "ignore_builtin_innodb", ""))
+				goto skip;
+			if (sedit(strLine, "plugin_load=innodb=ha_innodb_plugin.dll", ""))
+				goto skip;
+			if (sedit(strLine, "skip-innodb", ""))
+				goto skip;
+			if (sedit(strLine, "innodb_additional_mem_pool_size", ""))
+				goto skip;
+			if (sedit(strLine, "table_cache", ""))
+				goto skip;
 		}
-#ifndef SKIP_MYSQL_SETUP4
-		sedit(strLine, "#infinidb_compression_type=0", "infinidb_compression_type=2");
-		sedit(strLine, "infinidb_compression_type=1", "infinidb_compression_type=2");
-#endif
 		ofs << strLine << endl;
+skip:
 		getline(ifs, strLine);
+	}
+	if (mUp)
+	{
+		ofs << "innodb_data_file_path = ibdata1:10M:autoextend" << endl;
+		ofs << "explicit_defaults_for_timestamp = 1" << endl;
+		ofs << "optimizer_switch=index_merge=on,index_merge_union=on,index_merge_sort_union=on,index_merge_intersection=on,engine_condition_pushdown=on,index_condition_pushdown=on,mrr=on,mrr_cost_based=on,block_nested_loop=on,batched_key_access=off,materialization=on,semijoin=off,loosescan=on,firstmatch=on,subquery_materialization_cost_based=on,use_index_extensions=on" << endl;
 	}
 	if (!ifs.bad() && !ofs.bad())
 		okayToRename = true;

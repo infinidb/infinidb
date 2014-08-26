@@ -98,14 +98,14 @@ execplan::ParseTree* ExistsSub::transform()
 	gwi.tbList.insert(gwi.tbList.begin(), fGwip.tbList.begin(), fGwip.tbList.end());
 	gwi.derivedTbList.insert(gwi.derivedTbList.begin(), fGwip.derivedTbList.begin(), fGwip.derivedTbList.end());
 
-	if (fSub->get_select_lex()->with_sum_func)
+	if (fSub->unit->first_select()->with_sum_func)
 	{
 		fGwip.fatalParseError = true;
 		fGwip.parseErrorText = logging::IDBErrorInfo::instance()->errorMsg(logging::ERR_AGG_EXISTS);
 		return NULL;
 	}
 
-	if (getSelectPlan(gwi, *(fSub->get_select_lex()), csep) != 0)
+	if (getSelectPlan(gwi, *(fSub->unit->first_select()), csep) != 0)
 	{
 		fGwip.fatalParseError = true;
 		if (gwi.fatalParseError && !gwi.parseErrorText.empty())

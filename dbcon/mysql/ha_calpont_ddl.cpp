@@ -644,9 +644,9 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 		if (!(boost::iequals(schema, createTable->fTableDef->fQualifiedName->fSchema)) || !(boost::iequals(table,createTable->fTableDef->fQualifiedName->fName)))
 		{
 			rc = 1;
-			thd->main_da.can_overwrite_status = true;
+			thd->get_stmt_da()->set_overwrite_status(true);
 
-			thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_CREATE_DATATYPE_NOT_SUPPORT)).c_str());
+			thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_CREATE_DATATYPE_NOT_SUPPORT)).c_str(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 			ci->alterTableState = cal_connection_info::NOT_ALTER;
 			ci->isAlter = false;
 			return rc;
@@ -667,9 +667,9 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 					if (createTable->fTableDef->fColumns[i]->fConstraints[j]->fConstraintType != DDL_NOT_NULL)
 					{
 						rc = 1;
-						thd->main_da.can_overwrite_status = true;
+						thd->get_stmt_da()->set_overwrite_status(true);
 
-						thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_CONSTRAINTS)).c_str());
+						thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_CONSTRAINTS)).c_str(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 						ci->alterTableState = cal_connection_info::NOT_ALTER;
 						ci->isAlter = false;
 						return rc;
@@ -681,9 +681,9 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 			if ((createTable->fTableDef->fColumns[i]->fType->fType == ddlpackage::DDL_VARBINARY) && !isVarbinaryAllowed)
 			{
 				rc = 1;
-  	 			thd->main_da.can_overwrite_status = true;
+  	 			thd->get_stmt_da()->set_overwrite_status(true);
 
-	 			thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Varbinary is currently not supported by InfiniDB.");
+				thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, "Varbinary is currently not supported by InfiniDB.", mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 				ci->alterTableState = cal_connection_info::NOT_ALTER;
 				ci->isAlter = false;
 	 			return rc;
@@ -693,9 +693,9 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 			((createTable->fTableDef->fColumns[i]->fType->fLength > 8000) || (createTable->fTableDef->fColumns[i]->fType->fLength < 8)))
 			{
 				rc = 1;
-  	 			thd->main_da.can_overwrite_status = true;
+  	 			thd->get_stmt_da()->set_overwrite_status(true);
 
-	 			thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Varbinary length has to be between 8 and 8000.");
+				thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, "Varbinary length has to be between 8 and 8000.", mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 				ci->alterTableState = cal_connection_info::NOT_ALTER;
 				ci->isAlter = false;
 	 			return rc;
@@ -706,9 +706,9 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 				if ((!createTable->fTableDef->fColumns[i]->fDefaultValue->fNull) && (createTable->fTableDef->fColumns[i]->fType->fType == ddlpackage::DDL_VARBINARY))
 				{
 					rc = 1;
-					thd->main_da.can_overwrite_status = true;
+					thd->get_stmt_da()->set_overwrite_status(true);
 
-					thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Varbinary column cannot have default value.");
+					thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, "Varbinary column cannot have default value.", mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 					ci->alterTableState = cal_connection_info::NOT_ALTER;
 					ci->isAlter = false;
 					return rc;
@@ -732,8 +732,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 					catch(std::exception&)
 					{
 						rc = 1;
-						thd->main_da.can_overwrite_status = true;
-						thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "The default value is out of range for the specified data type.");
+						thd->get_stmt_da()->set_overwrite_status(true);
+						thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, "The default value is out of range for the specified data type.", mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 						ci->alterTableState = cal_connection_info::NOT_ALTER;
 						ci->isAlter = false;
 						return rc;
@@ -741,8 +741,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 					if (pushWarning)
 					{
 						rc = 1;
-						thd->main_da.can_overwrite_status = true;
-						thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "The default value is out of range for the specified data type.");
+						thd->get_stmt_da()->set_overwrite_status(true);
+						thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, "The default value is out of range for the specified data type.", mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 						ci->alterTableState = cal_connection_info::NOT_ALTER;
 						ci->isAlter = false;
 						return rc;
@@ -751,8 +751,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 									((colType.colDataType == execplan::CalpontSystemCatalog::DATETIME) && (createTable->fTableDef->fColumns[i]->fDefaultValue->fValue =="0000-00-00 00:00:00")))
 					{
 						rc = 1;
-						thd->main_da.can_overwrite_status = true;
-						thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "The default value is out of range for the specified data type.");
+						thd->get_stmt_da()->set_overwrite_status(true);
+						thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, "The default value is out of range for the specified data type.", mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 						ci->alterTableState = cal_connection_info::NOT_ALTER;
 						ci->isAlter = false;
 						return rc;
@@ -773,7 +773,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 				else if ( compressionType < 0 )
 				{
 					rc = 1;
-					thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_INVALID_COMPRESSION_TYPE)).c_str());
+					thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_INVALID_COMPRESSION_TYPE)).c_str(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 					ci->alterTableState = cal_connection_info::NOT_ALTER;
 					ci->isAlter = false;
 					return rc;
@@ -786,11 +786,11 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 					ci->isAlter = false;
 #ifdef SKIP_IDB_COMPRESSION
 		Message::Args args;
-		thd->main_da.can_overwrite_status = true;
+		thd->get_stmt_da()->set_overwrite_status(true);
 		args.add("The compression type");
-		thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_ENTERPRISE_ONLY, args)).c_str());
+		thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_ENTERPRISE_ONLY, args)).c_str(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 #else
-		thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_INVALID_COMPRESSION_TYPE)).c_str());
+		thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_INVALID_COMPRESSION_TYPE)).c_str(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 #endif
 					return rc;
 				}
@@ -803,8 +803,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 	if ( comment.find("AUTOINCREMENT") != string::npos )
 	{
 		int rc = 1;
-		thd->main_da.can_overwrite_status = true;
-		thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_CREATE_AUTOINCREMENT_NOT_SUPPORT)).c_str());
+		thd->get_stmt_da()->set_overwrite_status(true);
+		thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_CREATE_AUTOINCREMENT_NOT_SUPPORT)).c_str(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 		ci->alterTableState = cal_connection_info::NOT_ALTER;
 		ci->isAlter = false;
 		return rc;
@@ -817,8 +817,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 						if ((isAnyAutoincreCol) && !(boost::iequals(autoiColName, createTable->fTableDef->fColumns[i]->fName)))
 						{
 							rc = 1;
-							thd->main_da.can_overwrite_status = true;
-							thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_INVALID_NUMBER_AUTOINCREMENT)).c_str());
+							thd->get_stmt_da()->set_overwrite_status(true);
+							thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_INVALID_NUMBER_AUTOINCREMENT)).c_str(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 							ci->alterTableState = cal_connection_info::NOT_ALTER;
 							ci->isAlter = false;
 							return rc;
@@ -836,8 +836,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 							if (!createTable->fTableDef->fColumns[i]->fDefaultValue->fNull)
 							{
 								rc = 1;
-								thd->main_da.can_overwrite_status = true;
-								thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Autoincrement column cannot have a default value.");
+								thd->get_stmt_da()->set_overwrite_status(true);
+								thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, "Autoincrement column cannot have a default value.", mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 								ci->alterTableState = cal_connection_info::NOT_ALTER;
 								ci->isAlter = false;
 								return rc;
@@ -848,8 +848,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 				catch (runtime_error& ex)
 				{
 					rc = 1;
-					thd->main_da.can_overwrite_status = true;
-					thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, ex.what());
+					thd->get_stmt_da()->set_overwrite_status(true);
+					thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, ex.what(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 					ci->alterTableState = cal_connection_info::NOT_ALTER;
 					ci->isAlter = false;
 					return rc;
@@ -866,8 +866,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 			if (startValue <= 0)
 			{
 				rc = 1;
-				thd->main_da.can_overwrite_status = true;
-				thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_NEGATIVE_STARTVALUE)).c_str());
+				thd->get_stmt_da()->set_overwrite_status(true);
+				thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_NEGATIVE_STARTVALUE)).c_str(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 				ci->alterTableState = cal_connection_info::NOT_ALTER;
 				ci->isAlter = false;
 				return rc;
@@ -878,8 +878,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 					if (!validateAutoincrementDatatype(createTable->fTableDef->fColumns[i]->fType->fType))
 					{
 						rc = 1;
-						thd->main_da.can_overwrite_status = true;
-						thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_INVALID_AUTOINCREMENT_TYPE)).c_str());
+						thd->get_stmt_da()->set_overwrite_status(true);
+						thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_CREATE_DATATYPE_NOT_SUPPORT)).c_str(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 						ci->alterTableState = cal_connection_info::NOT_ALTER;
 						ci->isAlter = false;
 						return rc;
@@ -889,8 +889,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 			if (!validateNextValue(createTable->fTableDef->fColumns[i]->fType->fType, startValue))
 			{
 				rc = 1;
-				thd->main_da.can_overwrite_status = true;
-				thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_INVALID_STARTVALUE)).c_str());
+				thd->get_stmt_da()->set_overwrite_status(true);
+				thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_INVALID_STARTVALUE)).c_str(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 				ci->alterTableState = cal_connection_info::NOT_ALTER;
 				ci->isAlter = false;
 				return rc;
@@ -901,7 +901,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 			{
 				compressionType = 2;
 				string errmsg ("The table is created with infinidb compression type 2 under HDFS." );
-				push_warning(thd, MYSQL_ERROR::WARN_LEVEL_WARN, 9999, errmsg.c_str());
+				push_warning(thd, Sql_condition::WARN_LEVEL_WARN, 9999, errmsg.c_str());
 			}
 
 			(createTable->fTableDef->fColumns[i]->fType)->fCompressiontype = compressionType;
@@ -917,9 +917,9 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 		{
 			rc = 1;
 			Message::Args args;
-			thd->main_da.can_overwrite_status = true;
+			thd->get_stmt_da()->set_overwrite_status(true);
 			args.add(autoiColName);
-			thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED,(IDBErrorInfo::instance()->errorMsg(ERR_UNKNOWN_COL, args)).c_str());
+			thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_UNKNOWN_COL, args)).c_str(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 			ci->alterTableState = cal_connection_info::NOT_ALTER;
 			ci->isAlter = false;
 			return rc;
@@ -934,9 +934,9 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 			if ( schema.length() == 0 )
 			{
 				rc = 1;
-  	 			thd->main_da.can_overwrite_status = true;
+  	 			thd->get_stmt_da()->set_overwrite_status(true);
 
-	 			thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "No database selected.");
+				thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, "No database selected.", mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 				ci->alterTableState = cal_connection_info::NOT_ALTER;
 				ci->isAlter = false;
 	 			return rc;
@@ -947,9 +947,9 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 		if (actionList.size() > 1) //@bug 3753 we don't support multiple actions in alter table statement
 		{
 			rc = 1;
-			thd->main_da.can_overwrite_status = true;
+			thd->get_stmt_da()->set_overwrite_status(true);
 
-			thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Multiple actions in alter table statement is currently not supported by InfiniDB.");
+			thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, "Multiple actions in alter table statement is currently not supported by InfiniDB.", mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 
 			ci->alterTableState = cal_connection_info::NOT_ALTER;
 			ci->isAlter = false;
@@ -964,8 +964,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 				if ((addColumnPtr->fColumnDef->fType->fType == ddlpackage::DDL_VARBINARY) && !isVarbinaryAllowed)
 				{
 					rc = 1;
-					thd->main_da.can_overwrite_status = true;
-					thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Varbinary is currently not supported by InfiniDB.");
+					thd->get_stmt_da()->set_overwrite_status(true);
+					thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, "Varbinary is currently not supported by InfiniDB.", mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 					ci->alterTableState = cal_connection_info::NOT_ALTER;
 					ci->isAlter = false;
 					return rc;
@@ -975,8 +975,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 				((addColumnPtr->fColumnDef->fType->fLength > 8000) || (addColumnPtr->fColumnDef->fType->fLength < 8)))
 				{
 					rc = 1;
-					thd->main_da.can_overwrite_status = true;
-					thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Varbinary length has to be between 8 and 8000.");
+					thd->get_stmt_da()->set_overwrite_status(true);
+					thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, "Varbinary length has to be between 8 and 8000.", mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 					ci->alterTableState = cal_connection_info::NOT_ALTER;
 					ci->isAlter = false;
 					return rc;
@@ -991,8 +991,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 						if (addColumnPtr->fColumnDef->fConstraints[j]->fConstraintType != DDL_NOT_NULL)
 						{
 							rc = 1;
-							thd->main_da.can_overwrite_status = true;
-							thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_CONSTRAINTS)).c_str());
+							thd->get_stmt_da()->set_overwrite_status(true);
+							thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_CONSTRAINTS)).c_str(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 							ci->alterTableState = cal_connection_info::NOT_ALTER;
 							ci->isAlter = false;
 							return rc;
@@ -1009,8 +1009,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 							catch (runtime_error& ex)
 							{
 								rc = 1;
-								thd->main_da.can_overwrite_status = true;
-								thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, ex.what());
+								thd->get_stmt_da()->set_overwrite_status(true);
+								thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, ex.what(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 								ci->alterTableState = cal_connection_info::NOT_ALTER;
 								ci->isAlter = false;
 								return rc;
@@ -1018,8 +1018,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 							catch (...)
 							{
 								rc = 1;
-								thd->main_da.can_overwrite_status = true;
-								thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Unknown exception caught when checking any rows in the table.");
+								thd->get_stmt_da()->set_overwrite_status(true);
+								thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, "Unknown exception caught when checking any rows in the table.", mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 								ci->alterTableState = cal_connection_info::NOT_ALTER;
 								ci->isAlter = false;
 								return rc;
@@ -1027,8 +1027,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 							if (anyRow)
 							{
 								rc = 1;
-								thd->main_da.can_overwrite_status = true;
-								thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Table is not empty. New column has to have a default value if NOT NULL required.");
+								thd->get_stmt_da()->set_overwrite_status(true);
+								thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, "Table is not empty. New column has to have a default value if NOT NULL required.", mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 								ci->alterTableState = cal_connection_info::NOT_ALTER;
 								ci->isAlter = false;
 								return rc;
@@ -1039,8 +1039,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 							if (addColumnPtr->fColumnDef->fDefaultValue->fValue.length() == 0) //empty string is NULL in infinidb
 							{
 								rc = 1;
-								thd->main_da.can_overwrite_status = true;
-								thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "New column has to have a default value if NOT NULL required.");
+								thd->get_stmt_da()->set_overwrite_status(true);
+								thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, "New column has to have a default value if NOT NULL required.", mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 								ci->alterTableState = cal_connection_info::NOT_ALTER;
 								ci->isAlter = false;
 								return rc;
@@ -1053,8 +1053,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 						if ((!addColumnPtr->fColumnDef->fDefaultValue->fNull) && (addColumnPtr->fColumnDef->fType->fType == ddlpackage::DDL_VARBINARY))
 						{
 							rc = 1;
-							thd->main_da.can_overwrite_status = true;
-							thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Varbinary column cannot have default value.");
+							thd->get_stmt_da()->set_overwrite_status(true);
+							thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, "Varbinary column cannot have default value.", mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 							ci->alterTableState = cal_connection_info::NOT_ALTER;
 							ci->isAlter = false;
 							return rc;
@@ -1076,8 +1076,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 						catch(std::exception&)
 						{
 							rc = 1;
-							thd->main_da.can_overwrite_status = true;
-							thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "The default value is out of range for the specified data type.");
+							thd->get_stmt_da()->set_overwrite_status(true);
+							thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, "The default value is out of range for the specified data type.", mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 							ci->alterTableState = cal_connection_info::NOT_ALTER;
 							ci->isAlter = false;
 							return rc;
@@ -1085,8 +1085,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 						if (pushWarning)
 						{
 							rc = 1;
-							thd->main_da.can_overwrite_status = true;
-							thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "The default value is out of range for the specified data type.");
+							thd->get_stmt_da()->set_overwrite_status(true);
+							thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, "The default value is out of range for the specified data type.", mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 							ci->alterTableState = cal_connection_info::NOT_ALTER;
 							ci->isAlter = false;
 							return rc;
@@ -1095,8 +1095,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 									((colType.colDataType == execplan::CalpontSystemCatalog::DATETIME) && (addColumnPtr->fColumnDef->fDefaultValue->fValue =="0000-00-00 00:00:00")))
 						{
 							rc = 1;
-							thd->main_da.can_overwrite_status = true;
-							thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "The default value is out of range for the specified data type.");
+							thd->get_stmt_da()->set_overwrite_status(true);
+							thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, "The default value is out of range for the specified data type.", mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 							ci->alterTableState = cal_connection_info::NOT_ALTER;
 							ci->isAlter = false;
 							return rc;
@@ -1123,7 +1123,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 					else if ( compressionType < 0 )
 					{
 						rc = 1;
-						thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_INVALID_COMPRESSION_TYPE)).c_str());
+						thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_INVALID_COMPRESSION_TYPE)).c_str(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 						ci->alterTableState = cal_connection_info::NOT_ALTER;
 						ci->isAlter = false;
 						return rc;
@@ -1134,11 +1134,11 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 						rc = 1;
 #ifdef SKIP_IDB_COMPRESSION
 		Message::Args args;
-		thd->main_da.can_overwrite_status = true;
+		thd->get_stmt_da()->set_overwrite_status(true);
 		args.add("The compression type");
-		thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_ENTERPRISE_ONLY, args)).c_str());
+		thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_ENTERPRISE_ONLY.args)).c_str(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 #else
-		thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_INVALID_COMPRESSION_TYPE)).c_str());
+		thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_INVALID_COMPRESSION_TYPE)).c_str(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 #endif
 						ci->alterTableState = cal_connection_info::NOT_ALTER;
 						ci->isAlter = false;
@@ -1149,7 +1149,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 					{
 						compressionType = 2;
 						string errmsg ("The column is created with infinidb compression type 2 under HDFS." );
-						push_warning(thd, MYSQL_ERROR::WARN_LEVEL_WARN, 9999, errmsg.c_str());
+						push_warning(thd, Sql_condition::WARN_LEVEL_WARN, 9999, errmsg.c_str());
 					}
 
 					try {
@@ -1160,8 +1160,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 	if ( comment.find("AUTOINCREMENT") != string::npos )
 	{
 		int rc = 1;
-		thd->main_da.can_overwrite_status = true;
-		thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_CREATE_AUTOINCREMENT_NOT_SUPPORT)).c_str());
+		thd->get_stmt_da()->set_overwrite_status(true);
+		thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_CREATE_AUTOINCREMENT_NOT_SUPPORT)).c_str(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 		ci->alterTableState = cal_connection_info::NOT_ALTER;
 		ci->isAlter = false;
 		return rc;
@@ -1172,8 +1172,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 					catch (runtime_error& ex)
 					{
 						rc = 1;
-						thd->main_da.can_overwrite_status = true;
-						thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, ex.what());
+						thd->get_stmt_da()->set_overwrite_status(true);
+						thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, ex.what(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 						ci->alterTableState = cal_connection_info::NOT_ALTER;
 						ci->isAlter = false;
 						return rc;
@@ -1193,8 +1193,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 						catch (runtime_error& ex)
 						{
 							rc = 1;
-							thd->main_da.can_overwrite_status = true;
-							thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, ex.what());
+							thd->get_stmt_da()->set_overwrite_status(true);
+							thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, ex.what(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 							ci->alterTableState = cal_connection_info::NOT_ALTER;
 							ci->isAlter = false;
 							return rc;
@@ -1203,8 +1203,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 						if (tblInfo.tablewithautoincr == 1)
 						{
 							rc = 1;
-							thd->main_da.can_overwrite_status = true;
-							thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_INVALID_NUMBER_AUTOINCREMENT)).c_str());
+							thd->get_stmt_da()->set_overwrite_status(true);
+							thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_INVALID_NUMBER_AUTOINCREMENT)).c_str(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 							ci->alterTableState = cal_connection_info::NOT_ALTER;
 							ci->isAlter = false;
 							return rc;
@@ -1213,8 +1213,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 						if (!validateAutoincrementDatatype(addColumnPtr->fColumnDef->fType->fType))
 						{
 							rc = 1;
-							thd->main_da.can_overwrite_status = true;
-							thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_INVALID_AUTOINCREMENT_TYPE)).c_str());
+							thd->get_stmt_da()->set_overwrite_status(true);
+							thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_INVALID_AUTOINCREMENT_TYPE)).c_str(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 							ci->alterTableState = cal_connection_info::NOT_ALTER;
 							ci->isAlter = false;
 							return rc;
@@ -1222,8 +1222,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 						if (!validateNextValue(addColumnPtr->fColumnDef->fType->fType, startValue))
 						{
 							rc = 1;
-							thd->main_da.can_overwrite_status = true;
-							thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_INVALID_STARTVALUE)).c_str());
+							thd->get_stmt_da()->set_overwrite_status(true);
+							thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_INVALID_STARTVALUE)).c_str(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 							ci->alterTableState = cal_connection_info::NOT_ALTER;
 							ci->isAlter = false;
 							return rc;
@@ -1232,8 +1232,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 						if (startValue <= 0)
 						{
 							rc = 1;
-							thd->main_da.can_overwrite_status = true;
-							thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_NEGATIVE_STARTVALUE)).c_str());
+							thd->get_stmt_da()->set_overwrite_status(true);
+							thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_NEGATIVE_STARTVALUE)).c_str(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 							ci->alterTableState = cal_connection_info::NOT_ALTER;
 							ci->isAlter = false;
 							return rc;
@@ -1252,9 +1252,9 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 			else if ( dynamic_cast<AtaAddTableConstraint*> (actionList[i]))
 			{
 				rc = 1;
-  	 			thd->main_da.can_overwrite_status = true;
+  	 			thd->get_stmt_da()->set_overwrite_status(true);
 
-	 			thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_CONSTRAINTS)).c_str());
+				thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_CONSTRAINTS)).c_str(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 				ci->alterTableState = cal_connection_info::NOT_ALTER;
 				ci->isAlter = false;
 	 			return rc;
@@ -1262,8 +1262,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 /*			else if ( dynamic_cast<AtaSetColumnDefault*> (actionList[i]) )
 			{
 				rc = 1;
-  	 			thd->main_da.can_overwrite_status = true;
-	 			thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_CONSTRAINTS)).c_str());
+  	 			thd->get_stmt_da()->set_overwrite_status(true);
+				thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_CONSTRAINTS)).c_str(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 				ci->alterTableState = cal_connection_info::NOT_ALTER;
 				ci->isAlter = false;
 	 			return rc;
@@ -1271,8 +1271,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 			else if ( dynamic_cast<AtaDropColumnDefault*> (actionList[i]) )
 			{
 				rc = 1;
-  	 			thd->main_da.can_overwrite_status = true;
-	 			thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_CONSTRAINTS)).c_str());
+  	 			thd->get_stmt_da()->set_overwrite_status(true);
+				thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_CONSTRAINTS)).c_str(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 				ci->alterTableState = cal_connection_info::NOT_ALTER;
 				ci->isAlter = false;
 	 			return rc;
@@ -1283,8 +1283,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 				if ((addColumnsPtr->fColumns).size() > 1)
 				{
 					rc = 1;
-					thd->main_da.can_overwrite_status = true;
-					thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Multiple actions in alter table statement is currently not supported by InfiniDB.");
+					thd->get_stmt_da()->set_overwrite_status(true);
+					thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, "Multiple actions in alter table statement is currently not supported by InfiniDB.", mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 					ci->alterTableState = cal_connection_info::NOT_ALTER;
 					ci->isAlter = false;
 					return rc;
@@ -1294,8 +1294,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 				if ((addColumnsPtr->fColumns[0]->fType->fType == ddlpackage::DDL_VARBINARY) && !isVarbinaryAllowed)
 				{
 					rc = 1;
-					thd->main_da.can_overwrite_status = true;
-					thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Varbinary is currently not supported by InfiniDB.");
+					thd->get_stmt_da()->set_overwrite_status(true);
+					thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, "Varbinary is currently not supported by InfiniDB.", mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 					ci->alterTableState = cal_connection_info::NOT_ALTER;
 					ci->isAlter = false;
 					return rc;
@@ -1306,8 +1306,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 				((addColumnsPtr->fColumns[0]->fType->fLength > 8000) || (addColumnsPtr->fColumns[0]->fType->fLength < 8)))
 				{
 					rc = 1;
-					thd->main_da.can_overwrite_status = true;
-					thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Varbinary length has to be between 8 and 8000.");
+					thd->get_stmt_da()->set_overwrite_status(true);
+					thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, "Varbinary length has to be between 8 and 8000.", mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 					ci->alterTableState = cal_connection_info::NOT_ALTER;
 					ci->isAlter = false;
 					return rc;
@@ -1322,8 +1322,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 						if (addColumnsPtr->fColumns[0]->fConstraints[j]->fConstraintType != DDL_NOT_NULL)
 						{
 							rc = 1;
-							thd->main_da.can_overwrite_status = true;
-							thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_CONSTRAINTS)).c_str());
+							thd->get_stmt_da()->set_overwrite_status(true);
+							thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_CONSTRAINTS)).c_str(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 							ci->alterTableState = cal_connection_info::NOT_ALTER;
 							ci->isAlter = false;
 							return rc;
@@ -1340,8 +1340,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 							catch (runtime_error& ex)
 							{
 								rc = 1;
-								thd->main_da.can_overwrite_status = true;
-								thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, ex.what());
+								thd->get_stmt_da()->set_overwrite_status(true);
+								thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, ex.what(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 								ci->alterTableState = cal_connection_info::NOT_ALTER;
 								ci->isAlter = false;
 								return rc;
@@ -1349,8 +1349,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 							catch (...)
 							{
 								rc = 1;
-								thd->main_da.can_overwrite_status = true;
-								thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Unknown exception caught when checking any rows in the table.");
+								thd->get_stmt_da()->set_overwrite_status(true);
+								thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, "Unknown exception caught when checking any rows in the table.", mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 								ci->alterTableState = cal_connection_info::NOT_ALTER;
 								ci->isAlter = false;
 								return rc;
@@ -1358,8 +1358,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 							if (anyRow)
 							{
 								rc = 1;
-								thd->main_da.can_overwrite_status = true;
-								thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Table is not empty. New column has to have a default value if NOT NULL required.");
+								thd->get_stmt_da()->set_overwrite_status(true);
+								thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, "Table is not empty. New column has to have a default value if NOT NULL required.", mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 								ci->alterTableState = cal_connection_info::NOT_ALTER;
 								ci->isAlter = false;
 								return rc;
@@ -1370,8 +1370,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 							if (addColumnsPtr->fColumns[0]->fDefaultValue->fValue.length() == 0) //empty string is NULL in infinidb
 							{
 								rc = 1;
-								thd->main_da.can_overwrite_status = true;
-								thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "New column has to have a default value if NOT NULL required.");
+								thd->get_stmt_da()->set_overwrite_status(true);
+								thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, "New column has to have a default value if NOT NULL required.", mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 								ci->alterTableState = cal_connection_info::NOT_ALTER;
 								ci->isAlter = false;
 								return rc;
@@ -1384,8 +1384,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 						if ((!addColumnsPtr->fColumns[0]->fDefaultValue->fNull) && (addColumnsPtr->fColumns[0]->fType->fType == ddlpackage::DDL_VARBINARY))
 						{
 							rc = 1;
-							thd->main_da.can_overwrite_status = true;
-							thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Varbinary column cannot have default value.");
+							thd->get_stmt_da()->set_overwrite_status(true);
+							thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, "Varbinary column cannot have default value.", mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 							ci->alterTableState = cal_connection_info::NOT_ALTER;
 							ci->isAlter = false;
 							return rc;
@@ -1407,8 +1407,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 						catch(std::exception&)
 						{
 							rc = 1;
-							thd->main_da.can_overwrite_status = true;
-							thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "The default value is out of range for the specified data type.");
+							thd->get_stmt_da()->set_overwrite_status(true);
+							thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, "The default value is out of range for the specified data type.", mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 							ci->alterTableState = cal_connection_info::NOT_ALTER;
 							ci->isAlter = false;
 							return rc;
@@ -1416,8 +1416,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 						if (pushWarning)
 						{
 							rc = 1;
-							thd->main_da.can_overwrite_status = true;
-							thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "The default value is out of range for the specified data type.");
+							thd->get_stmt_da()->set_overwrite_status(true);
+							thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, "The default value is out of range for the specified data type.", mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 							ci->alterTableState = cal_connection_info::NOT_ALTER;
 							ci->isAlter = false;
 							return rc;
@@ -1426,8 +1426,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 									((colType.colDataType == execplan::CalpontSystemCatalog::DATETIME) && (addColumnsPtr->fColumns[0]->fDefaultValue->fValue =="0000-00-00 00:00:00")))
 						{
 							rc = 1;
-							thd->main_da.can_overwrite_status = true;
-							thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "The default value is out of range for the specified data type.");
+							thd->get_stmt_da()->set_overwrite_status(true);
+							thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, "The default value is out of range for the specified data type.", mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 							ci->alterTableState = cal_connection_info::NOT_ALTER;
 							ci->isAlter = false;
 							return rc;
@@ -1447,7 +1447,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 					else if ( compressionType < 0 )
 					{
 						rc = 1;
-						thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_INVALID_COMPRESSION_TYPE)).c_str());
+						thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_INVALID_COMPRESSION_TYPE)).c_str(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 						ci->alterTableState = cal_connection_info::NOT_ALTER;
 						ci->isAlter = false;
 						return rc;
@@ -1458,11 +1458,11 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 						rc = 1;
 #ifdef SKIP_IDB_COMPRESSION
 		Message::Args args;
-		thd->main_da.can_overwrite_status = true;
+		thd->get_stmt_da()->set_overwrite_status(true);
 		args.add("The compression type");
-		thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_ENTERPRISE_ONLY, args)).c_str());
+		thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_ENTERPRISE_ONLY, args)).c_str(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 #else
-		thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_INVALID_COMPRESSION_TYPE)).c_str());
+		thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_INVALID_COMPRESSION_TYPE)).c_str(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 #endif
 						ci->alterTableState = cal_connection_info::NOT_ALTER;
 						ci->isAlter = false;
@@ -1473,7 +1473,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 					{
 						compressionType = 2;
 						string errmsg ("The column is created with infinidb compression type 2 under HDFS." );
-						push_warning(thd, MYSQL_ERROR::WARN_LEVEL_WARN, 9999, errmsg.c_str());
+						push_warning(thd, Sql_condition::WARN_LEVEL_WARN, 9999, errmsg.c_str());
 					}
 
 
@@ -1485,8 +1485,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 	if ( comment.find("AUTOINCREMENT") != string::npos )
 	{
 		int rc = 1;
-		thd->main_da.can_overwrite_status = true;
-		thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_CREATE_AUTOINCREMENT_NOT_SUPPORT)).c_str());
+		thd->get_stmt_da()->set_overwrite_status(true);
+		thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_CREATE_AUTOINCREMENT_NOT_SUPPORT)).c_str(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 		ci->alterTableState = cal_connection_info::NOT_ALTER;
 		ci->isAlter = false;
 		return rc;
@@ -1497,8 +1497,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 					catch (runtime_error& ex)
 					{
 						rc = 1;
-						thd->main_da.can_overwrite_status = true;
-						thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, ex.what());
+						thd->get_stmt_da()->set_overwrite_status(true);
+						thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, ex.what(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 						ci->alterTableState = cal_connection_info::NOT_ALTER;
 						ci->isAlter = false;
 						return rc;
@@ -1518,8 +1518,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 						catch (runtime_error& ex)
 						{
 							rc = 1;
-							thd->main_da.can_overwrite_status = true;
-							thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, ex.what());
+							thd->get_stmt_da()->set_overwrite_status(true);
+							thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, ex.what(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 							ci->alterTableState = cal_connection_info::NOT_ALTER;
 							ci->isAlter = false;
 							return rc;
@@ -1528,8 +1528,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 						if (tblInfo.tablewithautoincr == 1)
 						{
 							rc = 1;
-							thd->main_da.can_overwrite_status = true;
-							thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_INVALID_NUMBER_AUTOINCREMENT)).c_str());
+							thd->get_stmt_da()->set_overwrite_status(true);
+							thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_INVALID_NUMBER_AUTOINCREMENT)).c_str(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 							ci->alterTableState = cal_connection_info::NOT_ALTER;
 							ci->isAlter = false;
 							return rc;
@@ -1538,8 +1538,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 						if (!validateAutoincrementDatatype(addColumnsPtr->fColumns[0]->fType->fType))
 						{
 							rc = 1;
-							thd->main_da.can_overwrite_status = true;
-							thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_INVALID_AUTOINCREMENT_TYPE)).c_str());
+							thd->get_stmt_da()->set_overwrite_status(true);
+							thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_INVALID_AUTOINCREMENT_TYPE)).c_str(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 							ci->alterTableState = cal_connection_info::NOT_ALTER;
 							ci->isAlter = false;
 							return rc;
@@ -1547,8 +1547,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 						if (!validateNextValue(addColumnsPtr->fColumns[0]->fType->fType, startValue))
 						{
 							rc = 1;
-							thd->main_da.can_overwrite_status = true;
-							thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_INVALID_STARTVALUE)).c_str());
+							thd->get_stmt_da()->set_overwrite_status(true);
+							thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_INVALID_STARTVALUE)).c_str(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 							ci->alterTableState = cal_connection_info::NOT_ALTER;
 							ci->isAlter = false;
 							return rc;
@@ -1556,8 +1556,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 						if (startValue <= 0)
 						{
 							rc = 1;
-							thd->main_da.can_overwrite_status = true;
-							thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_NEGATIVE_STARTVALUE)).c_str());
+							thd->get_stmt_da()->set_overwrite_status(true);
+							thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_NEGATIVE_STARTVALUE)).c_str(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 							return rc;
 						}
 					}
@@ -1588,7 +1588,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 					else if ( compressionType < 0 )
 					{
 						rc = 1;
-						thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_INVALID_COMPRESSION_TYPE)).c_str());
+						thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_INVALID_COMPRESSION_TYPE)).c_str(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 						ci->alterTableState = cal_connection_info::NOT_ALTER;
 						ci->isAlter = false;
 						return rc;
@@ -1599,11 +1599,11 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 						rc = 1;
 #ifdef SKIP_IDB_COMPRESSION
 		Message::Args args;
-		thd->main_da.can_overwrite_status = true;
+		thd->get_stmt_da()->set_overwrite_status(true);
 		args.add("The compression type");
-		thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_ENTERPRISE_ONLY, args)).c_str());
+		thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_ENTERPRISE_ONLY, args)).c_str(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 #else
-		thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_INVALID_COMPRESSION_TYPE)).c_str());
+		thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_INVALID_COMPRESSION_TYPE)).c_str(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 #endif
 						ci->alterTableState = cal_connection_info::NOT_ALTER;
 						ci->isAlter = false;
@@ -1614,7 +1614,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 					{
 						compressionType = 2;
 						string errmsg ("The column is created with infinidb compression type 2 under HDFS." );
-						push_warning(thd, MYSQL_ERROR::WARN_LEVEL_WARN, 9999, errmsg.c_str());
+						push_warning(thd, Sql_condition::WARN_LEVEL_WARN, 9999, errmsg.c_str());
 					}
 
 				}
@@ -1630,8 +1630,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 	if ( comment.find("AUTOINCREMENT") != string::npos )
 	{
 		int rc = 1;
-		thd->main_da.can_overwrite_status = true;
-		thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_CREATE_AUTOINCREMENT_NOT_SUPPORT)).c_str());
+		thd->get_stmt_da()->set_overwrite_status(true);
+		thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_CREATE_AUTOINCREMENT_NOT_SUPPORT)).c_str(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 		ci->alterTableState = cal_connection_info::NOT_ALTER;
 		ci->isAlter = false;
 		return rc;
@@ -1642,8 +1642,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 					catch (runtime_error& ex)
 					{
 						rc = 1;
-						thd->main_da.can_overwrite_status = true;
-						thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, ex.what());
+						thd->get_stmt_da()->set_overwrite_status(true);
+						thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, ex.what(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 						ci->alterTableState = cal_connection_info::NOT_ALTER;
 						ci->isAlter = false;
 						return rc;
@@ -1660,8 +1660,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 					/*	if (tblInfo.tablewithautoincr == 1)
 						{
 							rc = 1;
-							thd->main_da.can_overwrite_status = true;
-							thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_INVALID_NUMBER_AUTOINCREMENT)).c_str());
+							thd->get_stmt_da()->set_overwrite_status(true);
+							thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_INVALID_NUMBER_AUTOINCREMENT)).c_str(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 							ci->alterTableState = cal_connection_info::NOT_ALTER;
 							ci->isAlter = false;
 							return rc;
@@ -1670,8 +1670,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 						if (!validateAutoincrementDatatype(renameColumnsPtr->fNewType->fType))
 						{
 							rc = 1;
-							thd->main_da.can_overwrite_status = true;
-							thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_INVALID_AUTOINCREMENT_TYPE)).c_str());
+							thd->get_stmt_da()->set_overwrite_status(true);
+							thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_INVALID_AUTOINCREMENT_TYPE)).c_str(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 							ci->alterTableState = cal_connection_info::NOT_ALTER;
 							ci->isAlter = false;
 							return rc;
@@ -1679,8 +1679,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 						if (!validateNextValue(renameColumnsPtr->fNewType->fType, startValue))
 						{
 							rc = 1;
-							thd->main_da.can_overwrite_status = true;
-							thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_INVALID_STARTVALUE)).c_str());
+							thd->get_stmt_da()->set_overwrite_status(true);
+							thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_INVALID_STARTVALUE)).c_str(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 							ci->alterTableState = cal_connection_info::NOT_ALTER;
 							ci->isAlter = false;
 							return rc;
@@ -1711,8 +1711,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 							catch (runtime_error& ex)
 							{
 								rc = 1;
-								thd->main_da.can_overwrite_status = true;
-								thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, ex.what());
+								thd->get_stmt_da()->set_overwrite_status(true);
+								thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, ex.what(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 								ci->alterTableState = cal_connection_info::NOT_ALTER;
 								ci->isAlter = false;
 								return rc;
@@ -1720,8 +1720,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 							catch (...)
 							{
 								rc = 1;
-								thd->main_da.can_overwrite_status = true;
-								thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Unknown exception caught when checking any existing null values in the column.");
+								thd->get_stmt_da()->set_overwrite_status(true);
+								thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, "Unknown exception caught when checking any existing null values in the column.", mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 								ci->alterTableState = cal_connection_info::NOT_ALTER;
 								ci->isAlter = false;
 								return rc;
@@ -1729,8 +1729,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 							if (anyNullVal)
 							{
 								rc = 1;
-								thd->main_da.can_overwrite_status = true;
-								thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "The existing rows in this column has null value already.");
+								thd->get_stmt_da()->set_overwrite_status(true);
+								thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, "The existing rows in this column has null value already.", mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 								ci->alterTableState = cal_connection_info::NOT_ALTER;
 								ci->isAlter = false;
 								return rc;
@@ -1739,8 +1739,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 						else
 						{
 							rc = 1;
-							thd->main_da.can_overwrite_status = true;
-							thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_CONSTRAINTS)).c_str());
+							thd->get_stmt_da()->set_overwrite_status(true);
+							thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_CONSTRAINTS)).c_str(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 							ci->alterTableState = cal_connection_info::NOT_ALTER;
 							ci->isAlter = false;
 							return rc;
@@ -1759,8 +1759,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 		&& ( typeid ( stmt ) != typeid ( DropPartitionStatement )))
 	{
 		rc = 1;
-		thd->main_da.can_overwrite_status = true;
-		thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_NON_SUPPORT_SYNTAX)).c_str());
+		thd->get_stmt_da()->set_overwrite_status(true);
+		thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_NON_SUPPORT_SYNTAX)).c_str(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 		ci->alterTableState = cal_connection_info::NOT_ALTER;
 		ci->isAlter = false;
 		return rc;	
@@ -1772,8 +1772,8 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 	if (rc != 0 )
 	{
 		rc = 1;
-		thd->main_da.can_overwrite_status = true;
-		thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Cannot execute the statement. DBRM is read only!");
+		thd->get_stmt_da()->set_overwrite_status(true);
+		thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, "Cannot execute the statement. DBRM is read only!", mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 		ci->alterTableState = cal_connection_info::NOT_ALTER;
 		ci->isAlter = false;
 		return rc;
@@ -1796,9 +1796,9 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 	  if ( bytestream.length() == 0 )
 	  {
 		rc = 1;
-	  	thd->main_da.can_overwrite_status = true;
+	  	thd->get_stmt_da()->set_overwrite_status(true);
 
-	  	thd->main_da.set_error_status(thd, HA_ERR_INTERNAL_ERROR, "Lost connection to DDLProc");
+	  	thd->get_stmt_da()->set_error_status(HA_ERR_INTERNAL_ERROR, "Lost connection to DDLProc", mysql_errno_to_sqlstate(HA_ERR_INTERNAL_ERROR), 0);
 		ci->alterTableState = cal_connection_info::NOT_ALTER;
 		ci->isAlter = false;
 	  }
@@ -1812,34 +1812,34 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 	catch (runtime_error&)
 	{
 	  rc =1;
-	  thd->main_da.can_overwrite_status = true;
+	  thd->get_stmt_da()->set_overwrite_status(true);
 
-	  thd->main_da.set_error_status(thd, HA_ERR_INTERNAL_ERROR, "Lost connection to DDLProc");
+		thd->get_stmt_da()->set_error_status(HA_ERR_INTERNAL_ERROR, "Lost connection to DDLProc", mysql_errno_to_sqlstate(HA_ERR_INTERNAL_ERROR), 0);
 	  ci->alterTableState = cal_connection_info::NOT_ALTER;
 	  ci->isAlter = false;
 	}
 	catch (...)
 	{
 	  rc = 1;
-	  thd->main_da.can_overwrite_status = true;
+	  thd->get_stmt_da()->set_overwrite_status(true);
 
-	  thd->main_da.set_error_status(thd, HA_ERR_INTERNAL_ERROR, "Unknown error caught");
+		thd->get_stmt_da()->set_error_status(HA_ERR_INTERNAL_ERROR, "Unknown error caught", mysql_errno_to_sqlstate(HA_ERR_INTERNAL_ERROR), 0);
 	  ci->alterTableState = cal_connection_info::NOT_ALTER;
 	  ci->isAlter = false;
 	}
 
 	if ((b != 0) && (b!=ddlpackageprocessor::DDLPackageProcessor::WARNING))
 	{
-	  thd->main_da.can_overwrite_status = true;
+	  thd->get_stmt_da()->set_overwrite_status(true);
 
-	  thd->main_da.set_error_status(thd, HA_ERR_INTERNAL_ERROR, emsg.c_str());
+		thd->get_stmt_da()->set_error_status(HA_ERR_INTERNAL_ERROR, emsg.c_str(), mysql_errno_to_sqlstate(HA_ERR_INTERNAL_ERROR), 0);
 	}
 
 	if (b ==ddlpackageprocessor::DDLPackageProcessor::WARNING)
 	{
 		rc = 0;
 		string errmsg ("Error occured during file deletion. Restart DMLProc or use command tool ddlcleanup to clean up. " );
-		push_warning(thd, MYSQL_ERROR::WARN_LEVEL_WARN, 9999, errmsg.c_str());
+		push_warning(thd, Sql_condition::WARN_LEVEL_WARN, 9999, errmsg.c_str());
 	}
 	return rc;
 
@@ -1847,19 +1847,19 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
   else
   {
   	 rc = 1;
-  	 thd->main_da.can_overwrite_status = true;
+  	 thd->get_stmt_da()->set_overwrite_status(true);
 	 //@Bug 3602. Error message for MySql syntax for autoincrement
 	 algorithm::to_upper(ddlStatement);
 	 if (ddlStatement.find("AUTO_INCREMENT") != string::npos)
 	 {
-		thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Use of the MySQL auto_increment syntax is not supported in InfiniDB. If you wish to create an auto increment column in InfiniDB, please consult the InfiniDB SQL Syntax Guide for the correct usage.");
+		thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, "Use of the MySQL auto_increment syntax is not supported in InfiniDB. If you wish to create an auto increment column in InfiniDB, please consult the InfiniDB SQL Syntax Guide for the correct usage.", mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 		ci->alterTableState = cal_connection_info::NOT_ALTER;
 		ci->isAlter = false;
 	 }
 	 else
 	 {
 		//@Bug 1888,1885. update error message
-		thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "The syntax or the data type(s) is not supported by InfiniDB. Please check the InfiniDB syntax guide for supported syntax or data types.");
+		thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, "The syntax or the data type(s) is not supported by InfiniDB. Please check the InfiniDB syntax guide for supported syntax or data types.", mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 		ci->alterTableState = cal_connection_info::NOT_ALTER;
 		ci->isAlter = false;
 	 }
@@ -1920,16 +1920,16 @@ int ha_calpont_impl_create_(const char *name, TABLE *table_arg, HA_CREATE_INFO *
 			if ( tablecomment.find("AUTOINCREMENT") != string::npos )
 			{
 				int rc = 1;
-				thd->main_da.can_overwrite_status = true;
-				thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_CREATE_AUTOINCREMENT_NOT_SUPPORT)).c_str());
+				thd->get_stmt_da()->set_overwrite_status(true);
+				thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_CREATE_AUTOINCREMENT_NOT_SUPPORT)).c_str(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 				return rc;
 			}
 #endif
 		}
 		catch (runtime_error& ex)
 		{
-			thd->main_da.can_overwrite_status = true;
-			thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, ex.what());
+			thd->get_stmt_da()->set_overwrite_status(true);
+			thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, ex.what(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 			return 1;
 		}
 		algorithm::to_upper(tablecomment);
@@ -1947,8 +1947,8 @@ int ha_calpont_impl_create_(const char *name, TABLE *table_arg, HA_CREATE_INFO *
 	    && tbl != "sysconstraint" && tbl != "sysindexcol"
 	    && tbl != "sysconstraintcol" )
 	{
-		thd->main_da.can_overwrite_status = true;
-		thd->main_da.set_error_status(thd, HA_ERR_INTERNAL_ERROR, "Can not create non-system Calpont tables in calpontsys database");
+		thd->get_stmt_da()->set_overwrite_status(true);
+		thd->get_stmt_da()->set_error_status(HA_ERR_INTERNAL_ERROR, "Can not create non-system Calpont tables in calpontsys database", mysql_errno_to_sqlstate(HA_ERR_INTERNAL_ERROR), 0);
 		return 1;
 	}
 
@@ -1977,14 +1977,14 @@ int ha_calpont_impl_create_(const char *name, TABLE *table_arg, HA_CREATE_INFO *
 	{
 		if (db == "calpontsys")
 		{
-				thd->main_da.can_overwrite_status = true;
-				thd->main_da.set_error_status(thd, HA_ERR_INTERNAL_ERROR, "Calpont system tables can only be created with 'SCHEMA SYNC ONLY'");
+				thd->get_stmt_da()->set_overwrite_status(true);
+				thd->get_stmt_da()->set_error_status(HA_ERR_INTERNAL_ERROR, "Calpont system tables can only be created with 'SCHEMA SYNC ONLY'", mysql_errno_to_sqlstate(HA_ERR_INTERNAL_ERROR), 0);
 				return 1;
 		}
 		else if ( db == "infinidb_vtable") //@bug 3540. table created in infinidb_vtable schema could be dropped when select statement happen to have same tablename.
 		{
-			thd->main_da.can_overwrite_status = true;
-			thd->main_da.set_error_status(thd, HA_ERR_INTERNAL_ERROR, "Table creation is not allowed in infinidb_vtable schema.");
+			thd->get_stmt_da()->set_overwrite_status(true);
+			thd->get_stmt_da()->set_error_status(HA_ERR_INTERNAL_ERROR, "Table creation is not allowed in infinidb_vtable schema.", mysql_errno_to_sqlstate(HA_ERR_INTERNAL_ERROR), 0);
 			return 1;
 		}
 	}
@@ -2025,8 +2025,8 @@ int ha_calpont_impl_create_(const char *name, TABLE *table_arg, HA_CREATE_INFO *
 	{
 		rc = 1;
 		Message::Args args;
-		thd->main_da.can_overwrite_status = true;
-		thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_CONSTRAINTS, args)).c_str());
+		thd->get_stmt_da()->set_overwrite_status(true);
+		thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_CONSTRAINTS, args)).c_str(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 		ci.alterTableState = cal_connection_info::NOT_ALTER;
 		ci.isAlter = false;
 		return rc;
@@ -2046,7 +2046,7 @@ int ha_calpont_impl_create_(const char *name, TABLE *table_arg, HA_CREATE_INFO *
 	else if ( compressiontype < 0 )
 	{
 		rc = 1;
-		thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_INVALID_COMPRESSION_TYPE)).c_str());
+		thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_INVALID_COMPRESSION_TYPE)).c_str(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 		ci.alterTableState = cal_connection_info::NOT_ALTER;
 		ci.isAlter = false;
 		return rc;
@@ -2057,7 +2057,7 @@ int ha_calpont_impl_create_(const char *name, TABLE *table_arg, HA_CREATE_INFO *
 	{
 		compressiontype = 2;
 		string errmsg ("The table is created with infinidb compression type 2 under HDFS." );
-		push_warning(thd, MYSQL_ERROR::WARN_LEVEL_WARN, 9999, errmsg.c_str());
+		push_warning(thd, Sql_condition::WARN_LEVEL_WARN, 9999, errmsg.c_str());
 	}
 
 	if (compressiontype == 1) compressiontype = 2;
@@ -2068,11 +2068,11 @@ int ha_calpont_impl_create_(const char *name, TABLE *table_arg, HA_CREATE_INFO *
 		rc = 1;
 #ifdef SKIP_IDB_COMPRESSION
 		Message::Args args;
-		thd->main_da.can_overwrite_status = true;
+		thd->get_stmt_da()->set_overwrite_status(true);
 		args.add("The compression type");
-		thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_ENTERPRISE_ONLY, args)).c_str());
+		thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_ENTERPRISE_ONLY, args)).c_str(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 #else
-		thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_INVALID_COMPRESSION_TYPE)).c_str());
+		thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_INVALID_COMPRESSION_TYPE)).c_str(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 #endif
 		ci.alterTableState = cal_connection_info::NOT_ALTER;
 		ci.isAlter = false;
@@ -2082,7 +2082,7 @@ int ha_calpont_impl_create_(const char *name, TABLE *table_arg, HA_CREATE_INFO *
 	rc = ProcessDDLStatement(stmt, db, tbl, tid2sid(thd->thread_id), emsg, compressiontype, isAnyAutoincreCol, startValue, columnName);
 
 	if (rc != 0) {
-	  push_warning(thd, MYSQL_ERROR::WARN_LEVEL_NOTE, 9999, emsg.c_str());
+	  push_warning(thd, Sql_condition::WARN_LEVEL_NOTE, 9999, emsg.c_str());
 	  //Bug 1705 reset the flag if error occurs
 	  ci.alterTableState = cal_connection_info::NOT_ALTER;
 	  ci.isAlter = false;
@@ -2124,13 +2124,13 @@ int ha_calpont_impl_delete_table_(const char *name, cal_connection_info& ci)
 	}
 
 	TABLE_LIST *first_table= (TABLE_LIST*) thd->lex->select_lex.table_list.first;
-		string db = first_table->table->s->db.str;
+	string db = first_table->db;
 	string emsg;
 	stmt = idb_mysql_query_str(thd);
 	stmt += ";";
 	int rc = ProcessDDLStatement(stmt, db, tbl, tid2sid(thd->thread_id), emsg);
 	if (rc != 0)
-		push_warning(thd, MYSQL_ERROR::WARN_LEVEL_NOTE, 9999, emsg.c_str());
+		push_warning(thd, Sql_condition::WARN_LEVEL_NOTE, 9999, emsg.c_str());
 	return rc;
 }
 
@@ -2162,8 +2162,8 @@ int ha_calpont_impl_rename_table_(const char* from, const char* to, cal_connecti
 
 	if (fromPair.first != toPair.first)
 	{
-		thd->main_da.can_overwrite_status = true;
-		thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Both tables must be in the same database to use RENAME TABLE");
+		thd->get_stmt_da()->set_overwrite_status(true);
+		thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, "Both tables must be in the same database to use RENAME TABLE", mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 		return -1;
 	}
 
@@ -2180,7 +2180,7 @@ int ha_calpont_impl_rename_table_(const char* from, const char* to, cal_connecti
 
 	int rc = ProcessDDLStatement(stmt, db, "", tid2sid(thd->thread_id), emsg);
 	if (rc != 0)
-		push_warning(thd, MYSQL_ERROR::WARN_LEVEL_ERROR, 9999, emsg.c_str());
+		push_warning(thd, Sql_condition::WARN_LEVEL_WARN, 9999, emsg.c_str());
 
 	return rc;
 }
@@ -2220,7 +2220,7 @@ long long calonlinealter(UDF_INIT* initid, UDF_ARGS* args,
 	
 	int rc = ProcessDDLStatement(stmt, db, "", tid2sid(thd->thread_id), emsg, compressiontype);
 	if (rc != 0)
-		push_warning(thd, MYSQL_ERROR::WARN_LEVEL_ERROR, 9999, emsg.c_str());
+		push_warning(thd, Sql_condition::WARN_LEVEL_WARN, 9999, emsg.c_str());
 
 	return rc;
 }

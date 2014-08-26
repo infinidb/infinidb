@@ -315,6 +315,9 @@
     <ClCompile Include="func_idbpartition.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="func_xor.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="utf8\checked.h">

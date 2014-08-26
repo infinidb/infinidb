@@ -255,10 +255,8 @@ int ProcessCommandStatement(THD *thd, string& dmlStatement, cal_connection_info&
 	{
 		pDMLPackage->set_isBatchInsert(true);
 	}
-		
-	if (!(thd->options & (OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN)))	
+	if (!(thd->variables.option_bits & (OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN)))	
 		pDMLPackage->set_isAutocommitOn(true);
-		
 	if (useHdfs)
 		pDMLPackage->set_isAutocommitOn(true);
 			
@@ -279,9 +277,9 @@ int ProcessCommandStatement(THD *thd, string& dmlStatement, cal_connection_info&
         {
             rc = 1;
 			thd->killed = THD::KILL_QUERY;
-            thd->main_da.can_overwrite_status = true;
+            thd->get_stmt_da()->set_overwrite_status(true);
 
-            thd->main_da.set_error_status(thd, HA_ERR_INTERNAL_ERROR, "Lost connection to DMLProc [1]");
+            thd->get_stmt_da()->set_error_status(HA_ERR_INTERNAL_ERROR, "Lost connection to DMLProc [1]", mysql_errno_to_sqlstate(HA_ERR_INTERNAL_ERROR), 0);
 
         }
 		else {
@@ -294,27 +292,22 @@ int ProcessCommandStatement(THD *thd, string& dmlStatement, cal_connection_info&
     {
 		rc =1 ;
 		thd->killed = THD::KILL_QUERY;
-		thd->main_da.can_overwrite_status = true;
+		thd->get_stmt_da()->set_overwrite_status(true);
 
-        thd->main_da.set_error_status(thd, HA_ERR_INTERNAL_ERROR, "Lost connection to DMLProc [2]");
+		thd->get_stmt_da()->set_error_status(HA_ERR_INTERNAL_ERROR, "Lost connection to DMLProc [2]", mysql_errno_to_sqlstate(HA_ERR_INTERNAL_ERROR), 0);
     }
     catch (...)
     {
 		rc = 1;
 		thd->killed = THD::KILL_QUERY;
-		thd->main_da.can_overwrite_status = true;
+		thd->get_stmt_da()->set_overwrite_status(true);
 
-        thd->main_da.set_error_status(thd, HA_ERR_INTERNAL_ERROR, "Caught unknown error");
+		thd->get_stmt_da()->set_error_status(HA_ERR_INTERNAL_ERROR, "Caught unknown error", mysql_errno_to_sqlstate(HA_ERR_INTERNAL_ERROR), 0);
     }
 
-	if (( b !=0 ) && (!thd->main_da.is_set()))
-	{
-		rc = 1;
-		thd->killed = THD::KILL_QUERY;
-		thd->main_da.set_error_status(thd, HA_ERR_INTERNAL_ERROR,  errormsg.c_str());
-	}
 	delete ci.dmlProc;
 	ci.dmlProc = NULL;
+
     return rc;
 }
 
@@ -337,8 +330,8 @@ int doProcessInsertValues ( TABLE* table, uint32_t size, cal_connection_info& ci
 		{
 			rc = -1;
 			string emsg("Calpont DML package cannot build. ");
-			thd->main_da.can_overwrite_status = true;
-			thd->main_da.set_error_status(thd, HA_ERR_INTERNAL_ERROR, emsg.c_str());
+			thd->get_stmt_da()->set_overwrite_status(true);
+			thd->get_stmt_da()->set_error_status(HA_ERR_INTERNAL_ERROR, emsg.c_str(), mysql_errno_to_sqlstate(HA_ERR_INTERNAL_ERROR), 0);
 			return rc;
 		}
 		
@@ -384,7 +377,7 @@ int doProcessInsertValues ( TABLE* table, uint32_t size, cal_connection_info& ci
 			
 		//Carry session autocommit info in the pkg to use in DMLProc
 		//cout << "Thread options = "  << thd->options << " and  OPTION_NOT_AUTOCOMMIT:OPTION_BEGIN = " << OPTION_NOT_AUTOCOMMIT << ":" << OPTION_BEGIN << endl;
-		if (!(thd->options & (OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN)))	
+		if (!(thd->variables.option_bits & (OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN)))
 		{
 			//cout << "autocommit is on" << endl;
 			pDMLPackage->set_isAutocommitOn(true);
@@ -435,7 +428,7 @@ int doProcessInsertValues ( TABLE* table, uint32_t size, cal_connection_info& ci
 					catch (runtime_error&)
 					{
 						rc = -1;
-						thd->main_da.can_overwrite_status = true;
+						thd->get_stmt_da()->set_overwrite_status(true);
 						errormsg = "Lost connection to DMLProc [4]";
 						b = 1;
 					}
@@ -478,7 +471,7 @@ int doProcessInsertValues ( TABLE* table, uint32_t size, cal_connection_info& ci
 				catch (std::exception& rrex)
 				{
 					rc = -1;
-					thd->main_da.can_overwrite_status = true;
+					thd->get_stmt_da()->set_overwrite_status(true);
 					errormsg = string("Lost connection to DMLProc after getting a new client [2:") + rex.what() + " then " + rrex.what() + "]";
 					b = 1;
 				}	
@@ -486,7 +479,7 @@ int doProcessInsertValues ( TABLE* table, uint32_t size, cal_connection_info& ci
 			else //really lost connection
 			{
 				rc = -1;
-				thd->main_da.can_overwrite_status = true;
+				thd->get_stmt_da()->set_overwrite_status(true);
 				errormsg = string("Lost connection to DMLProc really [1:") + rex.what() + "]";
 				b = 1;
 			}
@@ -494,7 +487,7 @@ int doProcessInsertValues ( TABLE* table, uint32_t size, cal_connection_info& ci
 		catch (...)
 		{
 			rc = -1;
-			thd->main_da.can_overwrite_status = true;
+			thd->get_stmt_da()->set_overwrite_status(true);
 
 			errormsg = "Unknown error caught";
 			b = 1;
@@ -503,15 +496,15 @@ int doProcessInsertValues ( TABLE* table, uint32_t size, cal_connection_info& ci
 		
 		if ((b != 0) && (b != dmlpackageprocessor::DMLPackageProcessor::IDBRANGE_WARNING))
 		{
-			thd->main_da.can_overwrite_status = true;
+			thd->get_stmt_da()->set_overwrite_status(true);
 
-			thd->main_da.set_error_status(thd, HA_ERR_INTERNAL_ERROR, errormsg.c_str());
+			thd->get_stmt_da()->set_error_status(HA_ERR_INTERNAL_ERROR, errormsg.c_str(), mysql_errno_to_sqlstate(HA_ERR_INTERNAL_ERROR), 0);
 
 		}
 		if ( b == dmlpackageprocessor::DMLPackageProcessor::IDBRANGE_WARNING )
 		{
 			rc = 0;
-			push_warning(thd, MYSQL_ERROR::WARN_LEVEL_WARN, 9999, errormsg.c_str());
+			push_warning(thd, Sql_condition::WARN_LEVEL_WARN, 9999, errormsg.c_str());
 		}
 		
 		if ( rc != 0 )
@@ -567,16 +560,16 @@ int ha_calpont_impl_write_last_batch(TABLE* table, cal_connection_info& ci, bool
 		if ( abort )
 		{
 			rc = 1;
-			thd->main_da.can_overwrite_status = true;
+			thd->get_stmt_da()->set_overwrite_status(true);
 			std::string errormsg = "statement is aborted.";
-			thd->main_da.set_error_status(thd, HA_ERR_INTERNAL_ERROR, errormsg.c_str());
+			thd->get_stmt_da()->set_error_status(HA_ERR_INTERNAL_ERROR, errormsg.c_str(), mysql_errno_to_sqlstate(HA_ERR_INTERNAL_ERROR), 0);
 		}
 		
 		if ( rc == dmlpackageprocessor::DMLPackageProcessor::ACTIVE_TRANSACTION_ERROR  )
 			return rc;
 		
 		//@Bug 4605
-		if ( (rc == 0) && !abort && (!(thd->options & (OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN))))
+		if ( (rc == 0) && !abort && (!(thd->variables.option_bits & (OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN))))
 		{
 				ci.rowsHaveInserted += size;
 				command = "COMMIT";
@@ -620,8 +613,8 @@ int ha_calpont_impl_write_row_(uchar *buf, TABLE* table, cal_connection_info& ci
 	{
 		rc = 1;
 		ci.rc = rc; //@Bug 2790 Save the error infomation.
-		thd->main_da.can_overwrite_status = true;
-		thd->main_da.set_error_status(thd, HA_ERR_INTERNAL_ERROR, rex.what());
+		thd->get_stmt_da()->set_overwrite_status(true);
+		thd->get_stmt_da()->set_error_status(HA_ERR_INTERNAL_ERROR, rex.what(), mysql_errno_to_sqlstate(HA_ERR_INTERNAL_ERROR), 0);
 		return rc;
 	}
 	//timer.stop( "buildValueList");
@@ -664,12 +657,13 @@ int ha_calpont_impl_write_row_(uchar *buf, TABLE* table, cal_connection_info& ci
 					command = "ROLLBACK";
 					ProcessCommandStatement ( thd, command, ci, schema );
 				}
-				else if (( rc == 0 ) && (!(thd->options & (OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN))))
+				else if (( rc == 0 ) && (!(thd->variables.option_bits & (OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN))))
 				{
 					command = "COMMIT";
 					ProcessCommandStatement ( thd, command, ci, schema );
 				}
-				else if (useHdfs)
+				else
+				if (useHdfs)
 				{
 					command = "COMMIT";
 					ProcessCommandStatement ( thd, command, ci, schema );
@@ -697,7 +691,7 @@ int ha_calpont_impl_write_batch_row_(uchar *buf, TABLE* table, cal_impl_if::cal_
     uint16_t colpos = 0;
     buf  = buf + ci.headerLength;  
     //char delimiter = '|';
-    //char delimiter = '\7';
+    //char delimiter = '\007';
     //@Bug 6122 if all columns have not null constraint, there is no information in the header
     while (colpos < ci.columnTypes.size()) //test bitmap for null values
     {
@@ -751,23 +745,55 @@ int ha_calpont_impl_write_batch_row_(uchar *buf, TABLE* table, cal_impl_if::cal_
 					if (nullVal && (ci.columnTypes[colpos].constraintType != CalpontSystemCatalog::NOTNULL_CONSTRAINT))
 					{
 						fprintf(ci.filePtr, "%c", ci.delimiter);
+						//buf += 8; need to revisit with new parser
+						buf += 5;
+
 					}
 					else
 					{
-						long long value = *((long long*) buf);
-						long datePart = (long) (value/1000000ll);
-						int day = datePart % 100;
-						int month = (datePart/100) % 100;
-						int year = datePart/10000;
-						fprintf(ci.filePtr, "%04d-%02d-%02d ", year,month,day);
-				
-						long timePart = (long) (value - (long long) datePart*1000000ll);
-						int second = timePart % 100;
-						int min = (timePart/100) % 100;
-						int hour = timePart/10000;
-						fprintf(ci.filePtr, "%02d:%02d:%02d%c", hour,min,second, ci.delimiter);
+						/*datetime2: first 5 bytes are date.
+						 	1 bit  sign           (1= non-negative, 0= negative)
+							17 bits year*13+month  (year 0-9999, month 0-12)
+							5 bits day            (0-31)
+							5 bits hour           (0-23)
+							6 bits minute         (0-59)
+							6 bits second         (0-59)
+							---------------------------
+							40 bits = 5 bytes 
+						*/
+						
+						uchar* tmpBuf = buf;
+						int32_t first4Byte = *((int32_t*)tmpBuf);
+						first4Byte = ntohl(first4Byte);
+						first4Byte ^= 0x80000000;
+						first4Byte = first4Byte >> 14; //year and month
+						lldiv_t result = lldiv(first4Byte, 13);
+						int month = result.rem;
+						int year = result.quot;
+						buf++;
+						uchar* tmpBuf2 = buf;
+						int32_t sec4Byte = *((int32_t*)tmpBuf2);
+						sec4Byte = ntohl(sec4Byte);
+						int second = sec4Byte & 0x3F;
+						sec4Byte = sec4Byte >> 6;
+						int minute = sec4Byte & 0x3F;
+						sec4Byte = sec4Byte >> 6;
+						int hour = sec4Byte & 0x1F;
+						sec4Byte = sec4Byte >> 5;
+						int day = sec4Byte & 0x1F;
+						buf += 4;
+						int microsec = 0;
+						fprintf(ci.filePtr, "%04d-%02d-%02d %02d:%02d:%02d.%06d%c", year,month,day, hour,minute,second,microsec,ci.delimiter);
+						
+						/* need to revisit after new parssser					
+						uchar* tmpBuf3 = buf;
+						int32_t last4Byte = *((int32_t*)tmpBuf3);
+						last4Byte = ntohl(last4Byte);
+						int microsec = last4Byte & 0x00FFFFFF;
+						printf("%04d-%02d-%02d %02d:%02d:%02d.%06d%c\n", year,month,day, hour,minute,second,microsec,ci.delimiter);
+						fprintf(ci.filePtr, "%04d-%02d-%02d %02d:%02d:%02d.%06d%c", year,month,day, hour,minute,second,microsec,ci.delimiter);
+						*/
 					}
-					buf += 8;
 					break;
 				}
 				case CalpontSystemCatalog::CHAR:
@@ -1562,9 +1588,9 @@ int ha_calpont_impl_write_batch_row_(uchar *buf, TABLE* table, cal_impl_if::cal_
         bytestream = ci.dmlProc->read();
 		if ( bytestream.length() == 0 )
         {
-            thd->main_da.can_overwrite_status = true;
+            thd->get_stmt_da()->set_overwrite_status(true);
 
-            thd->main_da.set_error_status(thd, HA_ERR_INTERNAL_ERROR, "Lost connection to DMLProc [5]");
+			thd->get_stmt_da()->set_error_status(HA_ERR_INTERNAL_ERROR, "Lost connection to DMLProc [5]", mysql_errno_to_sqlstate(HA_ERR_INTERNAL_ERROR), 0);
 
         }
 		else
@@ -1578,15 +1604,15 @@ int ha_calpont_impl_write_batch_row_(uchar *buf, TABLE* table, cal_impl_if::cal_
     }
     catch (runtime_error&)
     {
-		thd->main_da.can_overwrite_status = true;
+		thd->get_stmt_da()->set_overwrite_status(true);
 
-        thd->main_da.set_error_status(thd, HA_ERR_INTERNAL_ERROR, "Lost connection to DMLProc [6]");
+		thd->get_stmt_da()->set_error_status(HA_ERR_INTERNAL_ERROR, "Lost connection to DMLProc [6]", mysql_errno_to_sqlstate(HA_ERR_INTERNAL_ERROR), 0);
     }
     catch (...)
     {
-		thd->main_da.can_overwrite_status = true;
+		thd->get_stmt_da()->set_overwrite_status(true);
 
-        thd->main_da.set_error_status(thd, HA_ERR_INTERNAL_ERROR, "Caught unknown error");
+		thd->get_stmt_da()->set_error_status(HA_ERR_INTERNAL_ERROR, "Caught unknown error", mysql_errno_to_sqlstate(HA_ERR_INTERNAL_ERROR), 0);
     }
 	if ( b != 0 )
 		tableLockInfo = errorMsg;
@@ -1638,9 +1664,9 @@ int ha_calpont_impl_write_batch_row_(uchar *buf, TABLE* table, cal_impl_if::cal_
 		eMsg += " Error ";
 		eMsg += prelimTask;
 
-		thd->main_da.can_overwrite_status = true;
+		thd->get_stmt_da()->set_overwrite_status(true);
 
-		thd->main_da.set_error_status(thd, HA_ERR_INTERNAL_ERROR, eMsg.c_str());
+		thd->get_stmt_da()->set_error_status(HA_ERR_INTERNAL_ERROR, eMsg.c_str(), mysql_errno_to_sqlstate(HA_ERR_INTERNAL_ERROR), 0);
 		return tableLockInfo;
 	}
 	catch (...)
@@ -1648,9 +1674,9 @@ int ha_calpont_impl_write_batch_row_(uchar *buf, TABLE* table, cal_impl_if::cal_
 		std::string eMsg(" Error ");
 		eMsg += prelimTask;
 
-		thd->main_da.can_overwrite_status = true;
+		thd->get_stmt_da()->set_overwrite_status(true);
 
-		thd->main_da.set_error_status(thd, HA_ERR_INTERNAL_ERROR, eMsg.c_str());
+		thd->get_stmt_da()->set_error_status(HA_ERR_INTERNAL_ERROR, eMsg.c_str(), mysql_errno_to_sqlstate(HA_ERR_INTERNAL_ERROR), 0);
 		return tableLockInfo;
 	}
 
@@ -1681,10 +1707,9 @@ int ha_calpont_impl_write_batch_row_(uchar *buf, TABLE* table, cal_impl_if::cal_
         bytestream = ci.dmlProc->read();
 		if ( bytestream.length() == 0 )
         {
-            thd->main_da.can_overwrite_status = true;
+            thd->get_stmt_da()->set_overwrite_status(true);
 
-            thd->main_da.set_error_status(thd, HA_ERR_INTERNAL_ERROR,
-				"Lost connection to DMLProc [7]");
+			thd->get_stmt_da()->set_error_status(HA_ERR_INTERNAL_ERROR, "Lost connection to DMLProc [7]", mysql_errno_to_sqlstate(HA_ERR_INTERNAL_ERROR), 0);
         }
 		else
 		{
@@ -1697,17 +1722,15 @@ int ha_calpont_impl_write_batch_row_(uchar *buf, TABLE* table, cal_impl_if::cal_
     }
     catch (runtime_error&)
     {
-		thd->main_da.can_overwrite_status = true;
+		thd->get_stmt_da()->set_overwrite_status(true);
 
-        thd->main_da.set_error_status(thd, HA_ERR_INTERNAL_ERROR,
-			"Lost connection to DMLProc [8]");
+		thd->get_stmt_da()->set_error_status(HA_ERR_INTERNAL_ERROR, "Lost connection to DMLProc [8]", mysql_errno_to_sqlstate(HA_ERR_INTERNAL_ERROR), 0);
     }
     catch (...)
     {
-		thd->main_da.can_overwrite_status = true;
+		thd->get_stmt_da()->set_overwrite_status(true);
 
-        thd->main_da.set_error_status(thd, HA_ERR_INTERNAL_ERROR,
-			"Caught unknown error");
+		thd->get_stmt_da()->set_error_status(HA_ERR_INTERNAL_ERROR, "Caught unknown error", mysql_errno_to_sqlstate(HA_ERR_INTERNAL_ERROR), 0);
     }
 	//@Bug 2606. Send error message back to sql session
 	if ( b != 0 )
@@ -1741,7 +1764,7 @@ int ha_calpont_impl_rollback_ (handlerton *hton, THD *thd, bool all, cal_connect
 	{
 		string msg = string("Some non-transactional changed tables couldn't be rolled back");
 	//	cout << "Some non-transactional changed tables couldn't be rolled back" << endl;
-		push_warning(thd, MYSQL_ERROR::WARN_LEVEL_WARN, 1196, msg.c_str());
+		push_warning(thd, Sql_condition::WARN_LEVEL_WARN, 1196, msg.c_str());
 		return rc;
 	}
 		

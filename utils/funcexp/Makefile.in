@@ -105,7 +105,7 @@ am_libfuncexp_la_OBJECTS = functor.lo funcexp.lo funcexpwrapper.lo \
 	func_timediff.lo func_timestampdiff.lo func_to_days.lo \
 	func_trim.lo func_truncate.lo func_ucase.lo func_unhex.lo \
 	func_unix_timestamp.lo func_week.lo func_weekday.lo \
-	func_year.lo func_yearweek.lo
+	func_xor.lo func_year.lo func_yearweek.lo
 libfuncexp_la_OBJECTS = $(am_libfuncexp_la_OBJECTS)
 DEFAULT_INCLUDES = -I. -I$(srcdir) -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
@@ -361,6 +361,7 @@ libfuncexp_la_SOURCES = \
 	func_unix_timestamp.cpp \
 	func_week.cpp \
 	func_weekday.cpp \
+	func_xor.cpp \
 	func_year.cpp \
 	func_yearweek.cpp
 
@@ -536,6 +537,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/func_unix_timestamp.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/func_week.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/func_weekday.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/func_xor.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/func_year.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/func_yearweek.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/funcexp.Plo@am__quote@

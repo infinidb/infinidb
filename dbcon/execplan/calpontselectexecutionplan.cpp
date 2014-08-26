@@ -207,7 +207,7 @@ string CalpontSelectExecutionPlan::toString() const
 {
 	ostringstream output;
 
-	output << ">SELECT " ;
+	output << dec << ">SELECT ";
 	if (distinct())
 		output << "DISTINCT ";
 	output << "limit: " << limitStart() << " - " << limitNum() << endl;
@@ -599,7 +599,7 @@ void CalpontSelectExecutionPlan::unserialize(messageqcpp::ByteStream& b)
 	b >> fDJSPartitionSize;
 	b >> fUMMemLimit;
 	b >> tmp8;
-	fIsDML = tmp8;
+	fIsDML = (tmp8 != 0);
 }
 
 bool CalpontSelectExecutionPlan::operator==(const CalpontSelectExecutionPlan& t) const

@@ -234,7 +234,7 @@ ReturnedColumn* buildWindowFunctionColumn(Item* item, gp_walk_info& gwi, bool& n
 					srcp.reset(buildReturnedColumn(orderItem, gwi, nonSupport));
 					if (!srcp)
 						return nullOnError(gwi);
-					srcp->asc(orderCol->asc);
+					srcp->asc(orderCol->direction==st_order::ORDER_ASC);
 					srcp->nullsFirst(orderCol->nulls); // nulls 1-nulls first 0-nulls last
 					orders.push_back(srcp);
 				}
@@ -424,11 +424,11 @@ ReturnedColumn* buildWindowFunctionColumn(Item* item, gp_walk_info& gwi, bool& n
 	// bug5736. Make the result type double for some window functions when
 	// infinidb_double_for_decimal_math is set.
 	ac->adjustResultType();
-
+	    
 	ac->expressionId(ci->expressionId++);
-	if (item->name)
-		ac->alias(item->name);
-	
+	if (item->full_name())
+		ac->alias(item->full_name());
+
 	// put ac on windowFuncList
 	gwi.windowFuncList.push_back(ac);
 	return ac;

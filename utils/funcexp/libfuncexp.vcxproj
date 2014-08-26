@@ -296,6 +296,7 @@
     <ClCompile Include="func_unix_timestamp.cpp" />
     <ClCompile Include="func_week.cpp" />
     <ClCompile Include="func_weekday.cpp" />
+    <ClCompile Include="func_xor.cpp" />
     <ClCompile Include="func_year.cpp" />
     <ClCompile Include="func_yearweek.cpp" />
     <ClCompile Include="funcexp.cpp" />

@@ -121,7 +121,7 @@ static int calpont_commit(handlerton *hton, THD* thd, bool all);
 
 static int calpont_rollback(handlerton *hton, THD* thd, bool all);                                      
 static int calpont_close_connection ( handlerton *hton, THD* thd );
-static void calpont_set_error( THD*, uint64_t, LEX_STRING*, uint32_t);
+static void calpont_set_error(THD*, long long unsigned int, LEX_STRING*, uint);
 handlerton *calpont_hton;
 
 /* Variables for example share methods */
@@ -164,23 +164,17 @@ static int calpont_init_func(void *p)
 {
   DBUG_ENTER("calpont_init_func");
 
-  struct tm tm;
-  time_t t;
+  char str[1024];
 
-  time(&t);
-  localtime_r(&t, &tm);
-  fprintf(stderr,"%02d%02d%02d %2d:%02d:%02d ",
-    tm.tm_year % 100, tm.tm_mon + 1, tm.tm_mday,
-    tm.tm_hour, tm.tm_min, tm.tm_sec);
-
-  fprintf(stderr, "InfiniDB: Started; Version: %s-%s\n", idb_version.c_str(), idb_release.c_str());
+  snprintf(str, 1024, "Started; Version: %s-%s", idb_version.c_str(), idb_release.c_str());
+  sql_print_information("InfiniDB: %s", str);
 
   calpont_hton= (handlerton *)p;
 #ifndef _MSC_VER
-  VOID(pthread_mutex_init(&calpont_mutex,MY_MUTEX_INIT_FAST));
+  pthread_mutex_init(&calpont_mutex,MY_MUTEX_INIT_FAST);
 #endif
-  (void) hash_init(&calpont_open_tables,system_charset_info,32,0,0,
-                   (hash_get_key) calpont_get_key,0,0);
+  (void) my_hash_init(&calpont_open_tables,system_charset_info,32,0,0,
+                   (my_hash_get_key) calpont_get_key,0,0);
 
   calpont_hton->state=   SHOW_OPTION_YES;
   calpont_hton->create=  calpont_create_handler;
@@ -198,7 +192,7 @@ static int calpont_done_func(void *p)
 {
   DBUG_ENTER("calpont_done_func");
 
-  hash_free(&calpont_open_tables);
+  my_hash_free(&calpont_open_tables);
 #ifndef _MSC_VER
   pthread_mutex_destroy(&calpont_mutex);
 #endif
@@ -307,7 +301,7 @@ static int calpont_close_connection ( handlerton *hton, THD* thd )
 	return rc;
 }
 
-static void calpont_set_error(THD* thd, uint64_t errCode, LEX_STRING* args, uint32_t argCount)
+static void calpont_set_error(THD* thd, long long unsigned int errCode, LEX_STRING* args, uint argCount)
 {
 	return ha_calpont_impl_set_error(thd, errCode, args, argCount);
 }
@@ -783,6 +777,15 @@ int ha_calpont::extra(enum ha_extra_function operation)
         case HA_EXTRA_PREPARE_FOR_RENAME:
             hefs = "HA_EXTRA_PREPARE_FOR_RENAME";
             break;
+        case HA_EXTRA_ADD_CHILDREN_LIST:
+            hefs = "HA_EXTRA_ADD_CHILDREN_LIST";
+            break;
+        case HA_EXTRA_IS_ATTACHED_CHILDREN:
+            hefs = "HA_EXTRA_IS_ATTACHED_CHILDREN";
+            break;
+        case HA_EXTRA_DETACH_CHILDREN:
+            hefs = "HA_EXTRA_DETACH_CHILDREN";
+            break;
         default:
             hefs = "UNKNOWN ENUM!";
             break;
@@ -841,7 +844,7 @@ int ha_calpont::external_lock(THD *thd, int lock_type)
 {
   DBUG_ENTER("ha_calpont::external_lock");
   //@Bug 2526 Only register the transaction when autocommit is off
-  if ((thd->options & (OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN)))
+  if ((thd->variables.option_bits & (OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN)))
 	trans_register_ha( thd, true, calpont_hton);
   int rc = ha_calpont_impl_external_lock(thd, table, lock_type);
   DBUG_RETURN(rc);
@@ -1006,10 +1009,10 @@ int ha_calpont::create(const char *name, TABLE *table_arg,
   DBUG_RETURN(rc);
 }
 
-const COND *ha_calpont::cond_push(const COND *cond)
+const Item *ha_calpont::cond_push(const Item *cond)
 {
 	DBUG_ENTER("ha_calpont::cond_push");
-	DBUG_RETURN(ha_calpont_impl_cond_push(const_cast<COND*>(cond), table));
+	DBUG_RETURN(ha_calpont_impl_cond_push(const_cast<Item*>(cond), table));
 }
 
 
@@ -1070,7 +1073,7 @@ mysql_declare_plugin(calpont)
   PLUGIN_LICENSE_GPL,
   calpont_init_func,                            /* Plugin Init */
   calpont_done_func,                            /* Plugin Deinit */
-  0x0001 /* 0.1 */,
+  0x0500 /* 5.0 */,
   NULL,                                         /* status variables */
   calpont_system_variables,                     /* system variables */
   NULL                                          /* config options */

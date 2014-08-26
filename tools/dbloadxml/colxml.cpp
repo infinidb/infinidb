@@ -27,6 +27,7 @@
 #include <boost/filesystem.hpp>
 
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <unistd.h>
 #include <iostream>
 #include <string>
@@ -51,6 +52,7 @@ int main(int argc, char **argv)
     setlocale(LC_ALL, "");
     WriteEngine::Config::initConfigCache(); // load Calpont.xml config settings
 
+
 	//Bug 6137
 	std::string aBulkRoot = WriteEngine::Config::getBulkRoot();
 	if (!aBulkRoot.empty())
@@ -67,7 +69,7 @@ int main(int argc, char **argv)
 			aSS << aBulkRoot;
 			aSS << "/job";
 			std::string jobDir = aSS.str();
-			if (!boost::filesystem::exists(jobDir.c_str()))
+			if(!boost::filesystem::exists(jobDir.c_str()))
 			{
 				cout << "Creating directory : " << jobDir << endl;
 				bool aSuccess = boost::filesystem::create_directories(jobDir.c_str());
@@ -82,7 +84,7 @@ int main(int argc, char **argv)
 			aSS2 << aBulkRoot;
 			aSS2 << "/log";
 			std::string logDir = aSS2.str();
-			if (!boost::filesystem::exists(logDir.c_str()))
+			if(!boost::filesystem::exists(logDir.c_str()))
 			{
 				cout << "Creating directory : " << logDir << endl;
 				bool aSuccess = boost::filesystem::create_directories(logDir.c_str());

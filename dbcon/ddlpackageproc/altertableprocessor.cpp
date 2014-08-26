@@ -524,6 +524,12 @@ void AlterTableProcessor::addColumn (uint32_t sessionID, execplan::CalpontSystem
 	tableColName.schema = inTableName.fSchema;
 	tableColName.table = inTableName.fName;
 	tableColName.column = columnDefPtr->fName;
+	//@Bug 5445 check for name over 128 bytes
+	if ((columnDefPtr->fName).length() > 128)
+	{
+		result.result = ALTER_ERROR;
+		throw std::runtime_error("Column name is too long.");
+	}
 	CalpontSystemCatalog::OID columnOid;
 	try {
 		columnOid = systemCatalogPtr->lookupOID(tableColName);

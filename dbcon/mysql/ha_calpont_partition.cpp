@@ -93,7 +93,7 @@ void push_warnings(THD* thd, string& warnings)
 
 	for (tokenizer::iterator tok_iter = tokens.begin(); tok_iter != tokens.end(); ++tok_iter)
 	{
-		push_warning(thd, MYSQL_ERROR::WARN_LEVEL_WARN, 9999, (*tok_iter).c_str());
+		push_warning(thd, Sql_condition::WARN_LEVEL_WARN, 9999, (*tok_iter).c_str());
 	}
 }
 
@@ -480,8 +480,8 @@ int processPartition ( SqlStatement* stmt)
 		if ( bytestream.length() == 0 )
 		{
 			rc = 1;
-			thd->main_da.can_overwrite_status = true;
-			thd->main_da.set_error_status(thd, HA_ERR_INTERNAL_ERROR, "Lost connection to DDLProc");
+			thd->get_stmt_da()->set_overwrite_status(true);
+			thd->get_stmt_da()->set_error_status(HA_ERR_INTERNAL_ERROR, "Lost connection to DDLProc", mysql_errno_to_sqlstate(HA_ERR_INTERNAL_ERROR), 0);
 		}
 		else
 		{
@@ -493,14 +493,14 @@ int processPartition ( SqlStatement* stmt)
 	catch (runtime_error&)
 	{
 		rc =1;
-		thd->main_da.can_overwrite_status = true;
-		thd->main_da.set_error_status(thd, HA_ERR_INTERNAL_ERROR, "Lost connection to DDLProc");
+		thd->get_stmt_da()->set_overwrite_status(true);
+		thd->get_stmt_da()->set_error_status(HA_ERR_INTERNAL_ERROR, "Lost connection to DDLProc", mysql_errno_to_sqlstate(HA_ERR_INTERNAL_ERROR), 0);
 	}
 	catch (...)
 	{
 		rc = 1;
-		thd->main_da.can_overwrite_status = true;
-		thd->main_da.set_error_status(thd, HA_ERR_INTERNAL_ERROR, "Unknown error caught");
+		thd->get_stmt_da()->set_overwrite_status(true);
+		thd->get_stmt_da()->set_error_status(HA_ERR_INTERNAL_ERROR, "Unknown error caught", mysql_errno_to_sqlstate(HA_ERR_INTERNAL_ERROR), 0);
 	}
 
 	if (b == ddlpackageprocessor::DDLPackageProcessor::WARN_NO_PARTITION)
@@ -521,8 +521,8 @@ int processPartition ( SqlStatement* stmt)
 	}
 	else if (b != 0 && b != ddlpackageprocessor::DDLPackageProcessor::WARN_NO_PARTITION)
 	{
-		thd->main_da.can_overwrite_status = true;
-		thd->main_da.set_error_status(thd, HA_ERR_INTERNAL_ERROR, emsg.c_str());
+		thd->get_stmt_da()->set_overwrite_status(true);
+		thd->get_stmt_da()->set_error_status(HA_ERR_INTERNAL_ERROR, emsg.c_str(), mysql_errno_to_sqlstate(HA_ERR_INTERNAL_ERROR), 0);
 	}
 	return rc;
 }
@@ -979,14 +979,14 @@ const char* calshowpartitions(UDF_INIT* initid, UDF_ARGS* args,
 		}
 	} catch (IDBExcept& ex)
 	{
-		current_thd->main_da.can_overwrite_status = true;
-		current_thd->main_da.set_error_status(current_thd, HA_ERR_UNSUPPORTED, ex.what());
+		current_thd->get_stmt_da()->set_overwrite_status(true);
+		current_thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, ex.what(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 		return result;
 	}
 	catch (...)
 	{
-		current_thd->main_da.can_overwrite_status = true;
-		current_thd->main_da.set_error_status(current_thd, HA_ERR_UNSUPPORTED, "Error occured when calling CALSHOWPARTITIONS");
+		current_thd->get_stmt_da()->set_overwrite_status(true);
+		current_thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, "Error occured when calling CALSHOWPARTITIONS", mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 		return result;
 	}
 
@@ -1193,13 +1193,8 @@ const char* calenablepartitions(UDF_INIT* initid, UDF_ARGS* args,
 		tableName.table = args->args[0];
 		if (!current_thd->db)
 		{
-			current_thd->main_da.can_overwrite_status = true;
-			current_thd->main_da.set_error_status
-			(
-			   current_thd,
-			   HA_ERR_INTERNAL_ERROR,
-			   IDBErrorInfo::instance()->errorMsg(ERR_PARTITION_NO_SCHEMA).c_str()
-			);
+			current_thd->get_stmt_da()->set_overwrite_status(true);
+			current_thd->get_stmt_da()->set_error_status(HA_ERR_INTERNAL_ERROR, IDBErrorInfo::instance()->errorMsg(ERR_PARTITION_NO_SCHEMA).c_str(), mysql_errno_to_sqlstate(HA_ERR_INTERNAL_ERROR), 0);
 			return result;
 		}
 		tableName.schema = current_thd->db;
@@ -1282,9 +1277,8 @@ const char* caldroppartitions(UDF_INIT* initid, UDF_ARGS* args,
 		tableName.table = args->args[0];
 		if (!current_thd->db)
 		{
-			current_thd->main_da.can_overwrite_status = true;
-			current_thd->main_da.set_error_status( current_thd, HA_ERR_INTERNAL_ERROR,
-			     IDBErrorInfo::instance()->errorMsg(ERR_PARTITION_NO_SCHEMA).c_str());
+			current_thd->get_stmt_da()->set_overwrite_status(true);
+			current_thd->get_stmt_da()->set_error_status(HA_ERR_INTERNAL_ERROR, IDBErrorInfo::instance()->errorMsg(ERR_PARTITION_NO_SCHEMA).c_str(), mysql_errno_to_sqlstate(HA_ERR_INTERNAL_ERROR), 0);
 			return result;
 		}
 		tableName.schema = current_thd->db;
@@ -1369,8 +1363,8 @@ const char* caldroppartitionsbyvalue(UDF_INIT* initid, UDF_ARGS* args,
 
 	if (!msg.empty())
 	{
-		current_thd->main_da.can_overwrite_status = true;
-		current_thd->main_da.set_error_status(current_thd, HA_ERR_INTERNAL_ERROR, msg.c_str());
+		current_thd->get_stmt_da()->set_overwrite_status(true);
+		current_thd->get_stmt_da()->set_error_status(HA_ERR_INTERNAL_ERROR, msg.c_str(), mysql_errno_to_sqlstate(HA_ERR_INTERNAL_ERROR), 0);
 		return result;
 	}
 
@@ -1440,8 +1434,8 @@ const char* caldisablepartitionsbyvalue(UDF_INIT* initid, UDF_ARGS* args,
 
 	if (!msg.empty())
 	{
-		current_thd->main_da.can_overwrite_status = true;
-		current_thd->main_da.set_error_status(current_thd, HA_ERR_INTERNAL_ERROR, msg.c_str());
+		current_thd->get_stmt_da()->set_overwrite_status(true);
+		current_thd->get_stmt_da()->set_error_status(HA_ERR_INTERNAL_ERROR, msg.c_str(), mysql_errno_to_sqlstate(HA_ERR_INTERNAL_ERROR), 0);
 		return result;
 	}
 
@@ -1511,8 +1505,8 @@ const char* calenablepartitionsbyvalue(UDF_INIT* initid, UDF_ARGS* args,
 
 	if (!msg.empty())
 	{
-		current_thd->main_da.can_overwrite_status = true;
-		current_thd->main_da.set_error_status(current_thd, HA_ERR_INTERNAL_ERROR, msg.c_str());
+		current_thd->get_stmt_da()->set_overwrite_status(true);
+		current_thd->get_stmt_da()->set_error_status(HA_ERR_INTERNAL_ERROR, msg.c_str(), mysql_errno_to_sqlstate(HA_ERR_INTERNAL_ERROR), 0);
 		return result;
 	}
 
@@ -1747,26 +1741,26 @@ const char* calshowpartitionsbyvalue(UDF_INIT* initid, UDF_ARGS* args,
 				}
 			}
 		}
-	} 
+	}
 	catch (logging::QueryDataExcept& ex)
 	{
 		Message::Args args;
 		args.add(ex.what());
 		errMsg = IDBErrorInfo::instance()->errorMsg(ERR_INVALID_FUNC_ARGUMENT, args);
-		current_thd->main_da.can_overwrite_status = true;
-		current_thd->main_da.set_error_status(current_thd, HA_ERR_UNSUPPORTED, (char*)errMsg.c_str());
+		current_thd->get_stmt_da()->set_overwrite_status(true);
+		current_thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, errMsg.c_str(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 		return result;
 	}
 	catch (IDBExcept& ex)
 	{
-		current_thd->main_da.can_overwrite_status = true;
-		current_thd->main_da.set_error_status(current_thd, HA_ERR_UNSUPPORTED, ex.what());
+		current_thd->get_stmt_da()->set_overwrite_status(true);
+		current_thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, ex.what(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 		return result;
 	}
 	catch (...)
 	{
-		current_thd->main_da.can_overwrite_status = true;
-		current_thd->main_da.set_error_status(current_thd, HA_ERR_UNSUPPORTED, "Error occured when calling CALSHOWPARTITIONS");
+		current_thd->get_stmt_da()->set_overwrite_status(true);
+		current_thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, "Error occured when calling CALSHOWPARTITIONS", mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 		return result;
 	}
 
@@ -1830,8 +1824,8 @@ const char* calshowpartitionsbyvalue(UDF_INIT* initid, UDF_ARGS* args,
 	if (noPartFound)
 	{
 		errMsg = IDBErrorInfo::instance()->errorMsg(WARN_NO_PARTITION_FOUND);
-		current_thd->main_da.can_overwrite_status = true;
-		current_thd->main_da.set_error_status(current_thd, HA_ERR_UNSUPPORTED, errMsg.c_str());
+		current_thd->get_stmt_da()->set_overwrite_status(true);
+		current_thd->get_stmt_da()->set_error_status(HA_ERR_UNSUPPORTED, errMsg.c_str(), mysql_errno_to_sqlstate(HA_ERR_UNSUPPORTED), 0);
 		return result;
 	}
 

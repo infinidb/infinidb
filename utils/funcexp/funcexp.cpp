@@ -203,6 +203,7 @@ FuncExp::FuncExp()
 	fFuncMap["week"] = new Func_week();	//dlh
 	fFuncMap["weekday"] = new Func_weekday();	
 	fFuncMap["weekofyear"] = new Func_week();	//dlh
+	fFuncMap["xor"] = new Func_xor();
 	fFuncMap["year"] = new Func_year();	//dlh
 	fFuncMap["yearweek"] = new Func_yearweek();	//dlh
 #ifndef SKIP_UDF

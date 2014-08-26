@@ -44,7 +44,7 @@ namespace
 
 	int fixPath()
 	{
-		int rc;
+		int rc=-1;
 		string newDir = installDir + "\\bin";
 		rc = _chdir(newDir.c_str());
 		return rc;
@@ -82,19 +82,73 @@ namespace
 
 	int installMySQL()
 	{
-		int rc;
+		int rc=-1;
 		char* cmdLine = (char*)_malloca(cmdLineLen);
 		sprintf_s(cmdLine, cmdLineLen,
-			"%s\\bin\\mysqld.exe --defaults-file=%s\\my.ini --bootstrap --loose-skip-innodb < %s\\etc\\win_setup_mysql_part1.sql",
+			"%s\\bin\\mysqld.exe --defaults-file=%s\\my.ini --bootstrap < %s\\etc\\win_setup_mysql_part1.sql",
 			installDir.c_str(), installDir.c_str(), installDir.c_str());
 		rc = system(cmdLine);
 		_freea(cmdLine);
 		return rc;
 	}
 
+	int upgradeMySQL()
+	{
+		int rc=-1;
+		BOOL cpRc;
+		PROCESS_INFORMATION pInfo;
+		STARTUPINFO sInfo;
+
+		// fixupConfig() has already been run by now...
+
+		// start mysqld in a thread
+		char* cmdLine = (char*)_malloca(cmdLineLen);
+		sprintf_s(cmdLine, cmdLineLen,
+			"%s\\bin\\mysqld.exe --defaults-file=%s\\my.ini",
+			installDir.c_str(), installDir.c_str());
+		ZeroMemory(&sInfo, sizeof(sInfo));
+		ZeroMemory(&pInfo, sizeof(pInfo));
+		cpRc = CreateProcess(0, cmdLine, 0, 0, false, 0, 0, 0, &sInfo, &pInfo);
+		if (cpRc == 0)
+		{
+			//Couldn't start mysqld...
+			_freea(cmdLine);
+			return rc;
+		}
+		WaitForInputIdle(pInfo.hProcess, 10 * 1000);
+
+		// run mysql_upgrade
+		sprintf_s(cmdLine, cmdLineLen,
+			"%s\\bin\\mysql_upgrade.exe --defaults-file=%s\\my.ini > nul 2>&1",
+			installDir.c_str(), installDir.c_str());
+		rc = system(cmdLine);
+
+		// fixup mysql.user table
+		sprintf_s(cmdLine, cmdLineLen,
+			"%s\\bin\\mysql.exe --defaults-file=%s\\my.ini --user=root --force < %s\\etc\\win_upgrade_mysql_part1.sql > nul 2>&1",
+			installDir.c_str(), installDir.c_str(), installDir.c_str());
+		rc = system(cmdLine);
+
+		// run mysql_upgrade again
+		sprintf_s(cmdLine, cmdLineLen,
+			"%s\\bin\\mysql_upgrade.exe --defaults-file=%s\\my.ini > nul 2>&1",
+			installDir.c_str(), installDir.c_str());
+		rc = system(cmdLine);
+
+		Sleep(5 * 1000);
+
+		// shutdown mysqld
+		TerminateProcess(pInfo.hProcess, 0);
+		CloseHandle(pInfo.hProcess);
+
+		_freea(cmdLine);
+		rc = 0;
+		return rc;
+	}
+
 	int installIDBConn()
 	{
-		int rc;
+		int rc=-1;
 		char* cmdLine = (char*)_malloca(cmdLineLen);
 		sprintf_s(cmdLine, cmdLineLen,
 			"%s\\bin\\mysql.exe --defaults-file=%s\\my.ini --user=root --force < %s\\etc\\win_setup_mysql_part2.sql > nul 2>&1",
@@ -195,7 +249,7 @@ out:
 
 	int startupIDB()
 	{
-		int rc;
+		int rc=-1;
 		string cmd;
 		cmd = installDir + "\\bin\\winfinidb.exe start";
 		rc = runIt(cmd);
@@ -204,7 +258,7 @@ out:
 
 	int installIDBDB()
 	{
-		int rc;
+		int rc=-1;
 
 		for (int retry = 0; retry < 5; retry++)
 		{
@@ -228,7 +282,7 @@ out:
 
 	int upgradeInfiniDB()
 	{
-		int rc = 0;
+		int rc = -1;
 
 		//We'll just have to blast these changes in...
 		installIDBConn();
@@ -290,20 +344,41 @@ int main(int argc, char** argv)
 		mfs.close();
 	}
 
-	if (fixupConfig(installDir, mysqlPort))
+	bool isMySQLUpgrade = false;
+	bool hasMySQLDB = false;
+
+	string mysqldb = installDir + "\\mysqldb\\mysql\\user.frm";
+	struct _stat statbuf;
+
+	// There is an existing DB, this might be an upgrade
+	hasMySQLDB = (_stat(mysqldb.c_str(), &statbuf) == 0);
+
+	if (hasMySQLDB)
+	{
+		// Let's see if my.ini contains a 5.6 parm.
+		// If it does, this is not a MySQL upgrade
+		string myinifile = installDir + "\\my.ini";
+		ifstream ifs(myinifile.c_str());
+		isMySQLUpgrade = !grepit(ifs, "^explicit_defaults_for_timestamp.*");
+		ifs.close();
+	}
+
+	if (fixupConfig(installDir, mysqlPort, isMySQLUpgrade))
 	{
 		cerr << "Something went wrong fixing up a config file" << endl;
 		return 1;
 	}
 
-	string mysqldb = installDir + "\\mysqldb\\mysql\\user.frm";
-	struct _stat statbuf;
-
-	if (_stat(mysqldb.c_str(), &statbuf) == 0)
+	if (isMySQLUpgrade)
 	{
-		cout << "Using existing MySQL database." << endl;
+		cout << "Upgrading existing MySQL database." << endl;
+		if (upgradeMySQL())
+		{
+			cerr << "Something went wrong trying to upgrade MySQL" << endl;
+			return 1;
+		}
 	}
-	else
+	else if (!hasMySQLDB)
 	{
 		cout << "Installing empty MySQL database..." << endl;
 

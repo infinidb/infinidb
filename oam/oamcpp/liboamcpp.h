@@ -2390,6 +2390,23 @@ namespace oam
 	**/
 	EXPORT bool changeMyCnf( std::string paramater, std::string value );
 
+	/**
+	* @brief	pdsh
+	*
+	* purpose:	run pdsh command
+	*
+	**/
+	EXPORT void pdsh( std::string localHost, std::string command );
+
+	/**
+	* @brief	pdcp
+	*
+	* purpose:	run pdcp command
+	*
+	**/
+	EXPORT void pdcp( std::string localHost, std::string file, std::string directory, bool systemCopy );
+
+
         private:
 
             /** @brief check Gluster Log after a Gluster control call

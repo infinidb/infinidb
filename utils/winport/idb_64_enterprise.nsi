@@ -8,9 +8,9 @@ OutFile InfiniDB64-ent.exe
 
 !define DISPLAY_URL http://www.infinidb.co/
 
-!define DISPLAY_VERSION "4.6"
-VIAddVersionKey "FileVersion" "4.6-0"
-VIProductVersion "4.6.0.0"
+!define DISPLAY_VERSION "5.0"
+VIAddVersionKey "FileVersion" "5.0-0"
+VIProductVersion "5.0.0.0"
 
 VIAddVersionKey "ProductVersion" "${DISPLAY_VERSION}"
 VIAddVersionKey "CompanyName" "InfiniDB, Inc."
@@ -84,26 +84,22 @@ File ..\..\..\x64\EnterpriseRelease\getConfig.exe
 File ..\..\..\x64\EnterpriseRelease\setConfig.exe
 File ..\..\..\x64\EnterpriseRelease\dbrmctl.exe
 File ..\..\..\x64\EnterpriseRelease\reset_locks.exe
-File ..\..\..\mysql\sql\Release\mysqld.exe
-File ..\..\..\mysql\storage\myisam\Release\myisam_ftdump.exe
-File ..\..\..\mysql\storage\myisam\Release\myisamchk.exe
-File ..\..\..\mysql\storage\myisam\Release\myisamlog.exe
-File ..\..\..\mysql\storage\myisam\Release\myisampack.exe
-File ..\..\..\mysql\client\Release\mysql.exe
-File ..\..\..\mysql\client\Release\mysql_upgrade.exe
-File ..\..\..\mysql\client\Release\mysqladmin.exe
-File ..\..\..\mysql\client\Release\mysqlbinlog.exe
-File ..\..\..\mysql\client\Release\mysqlcheck.exe
-File ..\..\..\mysql\client\Release\mysqldump.exe
-File ..\..\..\mysql\client\Release\mysqlimport.exe
-File ..\..\..\mysql\server-tools\instance-manager\Release\mysqlmanager.exe
-File ..\..\..\mysql\client\Release\mysqlshow.exe
-File ..\..\..\mysql\client\Release\mysqlslap.exe
-File ..\..\..\mysql\client\Release\mysqltest.exe
-File ..\..\..\mysql\storage\archive\Release\ha_archive.dll
-File ..\..\..\mysql\storage\federated\Release\ha_federated.dll
-File ..\..\..\mysql\storage\innodb_plugin\Release\ha_innodb_plugin.dll
-File ..\..\..\mysql\libmysql\Release\libmysql.dll
+File ..\..\..\mysql-obj\sql\Release\mysqld.exe
+File ..\..\..\mysql-obj\storage\myisam\Release\myisam_ftdump.exe
+File ..\..\..\mysql-obj\storage\myisam\Release\myisamchk.exe
+File ..\..\..\mysql-obj\storage\myisam\Release\myisamlog.exe
+File ..\..\..\mysql-obj\storage\myisam\Release\myisampack.exe
+File ..\..\..\mysql-obj\client\Release\mysql.exe
+File ..\..\..\mysql-obj\client\Release\mysql_upgrade.exe
+File ..\..\..\mysql-obj\client\Release\mysqladmin.exe
+File ..\..\..\mysql-obj\client\Release\mysqlbinlog.exe
+File ..\..\..\mysql-obj\client\Release\mysqlcheck.exe
+File ..\..\..\mysql-obj\client\Release\mysqldump.exe
+File ..\..\..\mysql-obj\client\Release\mysqlimport.exe
+File ..\..\..\mysql-obj\client\Release\mysqlshow.exe
+File ..\..\..\mysql-obj\client\Release\mysqlslap.exe
+File ..\..\..\mysql-obj\client\Release\mysqltest.exe
+File ..\..\..\mysql-obj\libmysql\Release\libmysql.dll
 
 File ..\..\..\x64\EnterpriseRelease\libcalmysql.dll
 File ..\..\..\x64\EnterpriseRelease\libconfigcpp.dll
@@ -137,6 +133,7 @@ File win_setup_mysql_part3.sql
 File win_setup_mysql_part3.1.sql
 File win_setup_mysql_part4.sql
 File win_setup_mysql_part5.sql
+File win_upgrade_mysql_part1.sql
 File CalpontVersion.txt
 IfFileExists $INSTDIR\etc\Calpont.xml 0 CfgNotExists
 File /oname=$INSTDIR\etc\Calpont_dist.xml Calpont.xml
@@ -150,31 +147,30 @@ SetOutPath $INSTDIR\log
 SetOutPath $INSTDIR\local
 SetOutPath $INSTDIR\mysqldb
 SetOutPath $INSTDIR\share
-File /r ..\..\..\mysql\sql\share\charsets
-File /r ..\..\..\mysql\sql\share\czech
-File /r ..\..\..\mysql\sql\share\danish
-File /r ..\..\..\mysql\sql\share\dutch
-File /r ..\..\..\mysql\sql\share\english
-File /r ..\..\..\mysql\sql\share\estonian
-File /r ..\..\..\mysql\sql\share\french
-File /r ..\..\..\mysql\sql\share\german
-File /r ..\..\..\mysql\sql\share\greek
-File /r ..\..\..\mysql\sql\share\hungarian
-File /r ..\..\..\mysql\sql\share\italian
-File /r ..\..\..\mysql\sql\share\japanese
-File /r ..\..\..\mysql\sql\share\japanese-sjis
-File /r ..\..\..\mysql\sql\share\korean
-File /r ..\..\..\mysql\sql\share\norwegian
-File /r ..\..\..\mysql\sql\share\norwegian-ny
-File /r ..\..\..\mysql\sql\share\polish
-File /r ..\..\..\mysql\sql\share\portuguese
-File /r ..\..\..\mysql\sql\share\romanian
-File /r ..\..\..\mysql\sql\share\russian
-File /r ..\..\..\mysql\sql\share\serbian
-File /r ..\..\..\mysql\sql\share\slovak
-File /r ..\..\..\mysql\sql\share\spanish
-File /r ..\..\..\mysql\sql\share\swedish
-File /r ..\..\..\mysql\sql\share\ukrainian
+File /r ..\..\..\mysql-obj\sql\share\bulgarian
+File /r ..\..\..\mysql-obj\sql\share\czech
+File /r ..\..\..\mysql-obj\sql\share\danish
+File /r ..\..\..\mysql-obj\sql\share\dutch
+File /r ..\..\..\mysql-obj\sql\share\english
+File /r ..\..\..\mysql-obj\sql\share\estonian
+File /r ..\..\..\mysql-obj\sql\share\french
+File /r ..\..\..\mysql-obj\sql\share\german
+File /r ..\..\..\mysql-obj\sql\share\greek
+File /r ..\..\..\mysql-obj\sql\share\hungarian
+File /r ..\..\..\mysql-obj\sql\share\italian
+File /r ..\..\..\mysql-obj\sql\share\japanese
+File /r ..\..\..\mysql-obj\sql\share\korean
+File /r ..\..\..\mysql-obj\sql\share\norwegian
+File /r ..\..\..\mysql-obj\sql\share\norwegian-ny
+File /r ..\..\..\mysql-obj\sql\share\polish
+File /r ..\..\..\mysql-obj\sql\share\portuguese
+File /r ..\..\..\mysql-obj\sql\share\romanian
+File /r ..\..\..\mysql-obj\sql\share\russian
+File /r ..\..\..\mysql-obj\sql\share\serbian
+File /r ..\..\..\mysql-obj\sql\share\slovak
+File /r ..\..\..\mysql-obj\sql\share\spanish
+File /r ..\..\..\mysql-obj\sql\share\swedish
+File /r ..\..\..\mysql-obj\sql\share\ukrainian
 SetOutPath $INSTDIR\tmp
 SetOutPath $INSTDIR\sql
 File ..\..\dbcon\mysql\dumpcat_mysql.sql
@@ -298,7 +294,6 @@ Delete $INSTDIR\bin\mysqlcheck.exe
 Delete $INSTDIR\bin\mysqld.exe
 Delete $INSTDIR\bin\mysqldump.exe
 Delete $INSTDIR\bin\mysqlimport.exe
-Delete $INSTDIR\bin\mysqlmanager.exe
 Delete $INSTDIR\bin\mysqlshow.exe
 Delete $INSTDIR\bin\mysqlslap.exe
 Delete $INSTDIR\bin\mysqltest.exe
@@ -320,9 +315,6 @@ Delete $INSTDIR\bin\svcwait.bat
 Delete $INSTDIR\bin\idbsvsta.bat
 Delete $INSTDIR\bin\idbsvsto.bat
 Delete $INSTDIR\bin\idbmysql.bat
-Delete $INSTDIR\bin\ha_archive.dll
-Delete $INSTDIR\bin\ha_federated.dll
-Delete $INSTDIR\bin\ha_innodb_plugin.dll
 Delete $INSTDIR\bin\libmysql.dll
 Delete $INSTDIR\bin\calpontSupport.bat
 
@@ -334,10 +326,11 @@ Delete $INSTDIR\etc\win_setup_mysql_part3.sql
 Delete $INSTDIR\etc\win_setup_mysql_part3.1.sql
 Delete $INSTDIR\etc\win_setup_mysql_part4.sql
 Delete $INSTDIR\etc\win_setup_mysql_part5.sql
+Delete $INSTDIR\etc\win_upgrade_mysql_part1.sql
 Delete $INSTDIR\etc\Calpont_save.xml
 Rename $INSTDIR\etc\Calpont.xml $INSTDIR\etc\Calpont_save.xml
 
-RMDir /r $INSTDIR\share\charsets
+RMDir /r $INSTDIR\share\bulgarian
 RMDir /r $INSTDIR\share\czech
 RMDir /r $INSTDIR\share\danish
 RMDir /r $INSTDIR\share\dutch
@@ -349,7 +342,6 @@ RMDir /r $INSTDIR\share\greek
 RMDir /r $INSTDIR\share\hungarian
 RMDir /r $INSTDIR\share\italian
 RMDir /r $INSTDIR\share\japanese
-RMDir /r $INSTDIR\share\japanese-sjis
 RMDir /r $INSTDIR\share\korean
 RMDir /r $INSTDIR\share\norwegian
 RMDir /r $INSTDIR\share\norwegian-ny

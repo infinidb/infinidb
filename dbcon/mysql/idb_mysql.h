@@ -34,21 +34,29 @@ template <class T> bool isnan(T);
 #undef LOG_INFO
 
 #ifdef _MSC_VER
-#ifdef _DEBUG
-#define SAFEMALLOC
-#define DBUG_ON 1
+  #ifdef _DEBUG
+    #define SAFEMALLOC
+    #define DBUG_ON 1
+  #else
+    #define DBUG_OFF 1
+  #endif
+  #define MYSQL_DYNAMIC_PLUGIN
+  #define DONT_DEFINE_VOID
+  #ifdef ETIMEDOUT
+    #undef ETIMEDOUT
+  #endif
 #else
-#define DBUG_OFF 1
-#endif
-#define MYSQL_DYNAMIC_PLUGIN
-#define DONT_DEFINE_VOID
-#ifdef ETIMEDOUT
-#undef ETIMEDOUT
-#endif
+  #ifndef SAFE_MUTEX
+    #define DBUG_OFF 1
+  #endif
 #endif
 
-#include "mysql_priv.h"
+#include "my_config.h"
+#include "sql_priv.h"
 #include "sql_select.h"
+#include "table.h"
+#include "sql_optimizer.h"
+#include "item_window_function.h"
 
 // Now clean up the pollution as best we can...
 #undef min
@@ -75,6 +83,7 @@ template <class T> bool isnan(T);
 #undef PACKAGE_BUGREPORT
 #undef DEBUG
 #undef set_bits
+#undef mode_t
 
 namespace {
 inline char* idb_mysql_query_str(THD* thd)

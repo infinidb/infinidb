@@ -51,7 +51,7 @@ create table if not exists syscolumn (
 	distcount int,
 	nullcount int,
 	minvalue varchar(64),
-	maxvalue varchar(64),
+	`maxvalue` varchar(64),
 	compressiontype int,
 	nextvalue bigint
 	) engine=infinidb comment='SCHEMA SYNC ONLY';
