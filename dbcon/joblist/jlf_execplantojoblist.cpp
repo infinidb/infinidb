@@ -210,8 +210,10 @@ int64_t valueNullNum(const CalpontSystemCatalog::ColType& ct)
 			//n = *((uint64_t *) i.c_str());
 			/* this matches what dataconvert is returning; not valid to copy
 			 * 8 bytes every time. */
-			if (ct.colDataType == CalpontSystemCatalog::CHAR) {
-				switch (ct.colWidth) {
+			if (ct.colDataType == CalpontSystemCatalog::CHAR)
+			{
+				switch (ct.colWidth)
+				{
 					case 1: n = *((uint8_t *) i.data()); break;
 					case 2: n = *((uint16_t *) i.data()); break;
 					case 3:
@@ -219,8 +221,10 @@ int64_t valueNullNum(const CalpontSystemCatalog::ColType& ct)
 					default: n = *((uint64_t *) i.data()); break;
 				}
 			}
-			else {
-				switch (ct.colWidth) {
+			else
+			{
+				switch (ct.colWidth)
+				{
 					case 1: n = *((uint16_t *) i.data()); break;
 					case 2: n = *((uint32_t *) i.data()); break;
 					default: n = *((uint64_t *) i.data()); break;
@@ -528,73 +532,6 @@ TreeNodeType TreeNode2Type(const TreeNode* tn)
 	if (typeid(*tn) == typeid(SimpleScalarFilter))
 		return SIMPLESCALARFILTER;
 	return UNKNOWN;
-}
-
-void walkTreeNode(const ParseTree* n, void* obj)
-{
-	TreeNodeStack* stack = reinterpret_cast<TreeNodeStack*>(obj);
-	const TreeNode* tn = n->data();
-	switch (TreeNode2Type(tn))
-	{
-	case OPERATOR:
-		stack->push(tn);
-		break;
-	case CONSTANTCOLUMN:
-		stack->push(tn);
-		break;
-	case SIMPLECOLUMN:
-		stack->push(tn);
-		break;
-	case FUNCTIONCOLUMN:
-		stack->push(tn);
-		break;
-	case UNKNOWN:
-		cerr << boldStart << "walkTreeNode: Unknown" << boldStop << endl;
-		break;
-	default:
-/*
-	TREENODE,
-	FILTER,
-	SIMPLEFILTER,
-	OUTERJOINONFILTER,
-	CONSTANTFILTER,
-	EXISTSFILTER,
-	SELECTFILTER,
-	RETURNEDCOLUMN,
-	ARITHMETICCOLUMN,
-	TREENODEIMPL,
-*/
-		cerr << boldStart << "walkTreeNode: Not handled: " << TreeNode2Type(tn) << boldStop << endl;
-		break;
-	}
-}
-
-boost::shared_ptr<pColStep> doWhereFcn(const SimpleColumn* sc, const SOP& sop, const ArithmeticColumn* ac, const JobInfo& jobInfo)
-{
-	// We only handle one very specific form here right now, the rest we bail on
-
-	boost::shared_ptr<pColStep> ret;
-	TreeNodeStack stack;
-	ac->expression()->walk(walkTreeNode, &stack);
-
-	if (stack.size() != 3) return ret;
-
-	const TreeNode* tncc1;
-	const TreeNode* tncc2;
-	const TreeNode* tnop;
-
-	tnop = stack.top();
-	stack.pop();
-	if (TreeNode2Type(tnop) != OPERATOR) return ret;
-	tncc1 = stack.top();
-	stack.pop();
-	if (TreeNode2Type(tncc1) != CONSTANTCOLUMN) return ret;
-	tncc2 = stack.top();
-	stack.pop();
-	if (TreeNode2Type(tncc2) != SIMPLECOLUMN) return ret;
-
-	cerr << boldStart << "doWhereFcn: Not handled." << boldStop << endl;
-	return ret;
 }
 
 
@@ -1724,7 +1661,7 @@ const JobStepVector doSimpleFilter(SimpleFilter* sf, JobInfo& jobInfo)
 				 ConstantColumn::NULLDATA != cc->type() &&
 				 (cop & COMPARE_LIKE) ) // both like and not like
 		{
-				return doExpressionFilter(sf, jobInfo);
+			return doExpressionFilter(sf, jobInfo);
 		}
 		else
 		{
@@ -1952,7 +1889,7 @@ const JobStepVector doSimpleFilter(SimpleFilter* sf, JobInfo& jobInfo)
 			jsv = doExpressionFilter(sf, jobInfo);
 	}
 	else if (lhsType == SIMPLECOLUMN &&
-			(rhsType == AGGREGATECOLUMN || rhsType == ARITHMETICCOLUMN || rhsType == FUNCTIONCOLUMN))
+		(rhsType == AGGREGATECOLUMN || rhsType == ARITHMETICCOLUMN || rhsType == FUNCTIONCOLUMN))
 	{
 		const SimpleColumn* sc = static_cast<const SimpleColumn*>(lhs);
 		const ReturnedColumn* rc = static_cast<const ReturnedColumn*>(rhs);
@@ -1965,7 +1902,7 @@ const JobStepVector doSimpleFilter(SimpleFilter* sf, JobInfo& jobInfo)
 			throw logic_error("doSimpleFilter: Unhandled SimpleFilter.");
 	}
 	else if (rhsType == SIMPLECOLUMN &&
-			(lhsType == AGGREGATECOLUMN || lhsType == ARITHMETICCOLUMN || lhsType == FUNCTIONCOLUMN))
+		(lhsType == AGGREGATECOLUMN || lhsType == ARITHMETICCOLUMN || lhsType == FUNCTIONCOLUMN))
 	{
 		const SimpleColumn* sc = static_cast<const SimpleColumn*>(rhs);
 		const ReturnedColumn* rc = static_cast<const ReturnedColumn*>(lhs);
@@ -2960,6 +2897,7 @@ const JobStepVector doFunctionFilter(const ParseTree* n, JobInfo& jobInfo)
 }
 
 
+#if 0
 void doAND(JobStepVector& jsv, JobInfo& jobInfo)
 {
 //	idbassert(jobInfo.stack.size() >= 2);
@@ -3022,6 +2960,163 @@ void doOR(const ParseTree* n, JobStepVector& jsv, JobInfo& jobInfo, bool tryComb
 	jsv = doExpressionFilter(n, jobInfo);
 	jobInfo.stack.push(jsv);
 }
+#endif
+
+
+void doOR(ParseTree* n, JobInfo& jobInfo, bool tryCombine)
+{
+	JobStepVector jsv;
+
+	// convert simple scalar filter sub to parse tree to be evaluated by expression
+	{
+		// travering in post-order because a node may be expanded
+		ParseTree* node = n;
+		stack<ParseTree*> nodeStack;
+		ParseTree* lastVisit = NULL;
+		while ((node || !nodeStack.empty()))
+		{
+			if (node)
+			{
+				nodeStack.push(node);
+				node = node->left();
+			}
+			else
+			{
+				ParseTree* top = nodeStack.top();
+				ParseTree* right = top->right();
+				if (right && lastVisit != right)
+				{
+					node = right;
+				}
+				else
+				{
+					nodeStack.pop();
+
+					TreeNode* tn = top->data();
+					if (TreeNode2Type(tn) == SIMPLESCALARFILTER)
+					{
+						SimpleScalarFilter* sf = dynamic_cast<SimpleScalarFilter*>(tn);
+						ParseTree* parseTree = NULL;
+						if (simpleScalarFilterToParseTree(sf, parseTree, jobInfo))
+						{
+							ParseTree* ccp = node;
+							delete ccp->data();
+							ccp->left(parseTree->left());
+							ccp->right(parseTree->right());
+							ccp->data(parseTree->data());
+						}
+					}
+
+					lastVisit = top;
+				}
+			}
+		}
+	}
+
+	if (tryCombine)
+	{
+		// travering OR branch n in post-order iteratively
+		ParseTree* node = n;
+		stack<ParseTree*> nodeStack;
+		ParseTree* lastVisit = NULL;
+		bool okToCombine = true;
+		while ((node || !nodeStack.empty()) && okToCombine)
+		{
+			if (node)
+			{
+				nodeStack.push(node);
+				node = node->left();
+			}
+			else
+			{
+				ParseTree* top = nodeStack.top();
+				ParseTree* right = top->right();
+				if (right && lastVisit != right)
+				{
+					node = right;
+				}
+				else
+				{
+					nodeStack.pop();
+					lastVisit = top;
+
+					TreeNode* tn = top->data();
+					JobStepVector nsv;
+					switch (TreeNode2Type(tn))
+					{
+						case SIMPLEFILTER:
+						{
+							nsv = doSimpleFilter(dynamic_cast<SimpleFilter*>(tn), jobInfo);
+							break;
+						}
+						case OPERATOR:
+						{
+							const Operator* op = static_cast<const Operator*>(tn);
+							if (*op == opAND || *op == opand || *op == opXOR || *op == opxor)
+				 				okToCombine = false;
+							else if (*op != opOR && *op != opor)
+								throw logic_error("doOR: unknow operator type.");
+							break;
+						}
+						case CONSTANTFILTER:
+						{
+							nsv = doConstantFilter(dynamic_cast<const ConstantFilter*>(tn), jobInfo);
+							break;
+						}
+						case SIMPLESCALARFILTER:
+						{
+							// not possible, should be converted in the block above
+							break;
+						}
+						case OUTERJOINONFILTER:
+						case FUNCTIONCOLUMN:
+						case ARITHMETICCOLUMN:
+						case SIMPLECOLUMN:
+						case CONSTANTCOLUMN:
+						case EXISTSFILTER:
+						case SELECTFILTER:
+						{
+							okToCombine = false;
+							break;
+						}
+						case UNKNOWN:
+						{
+							cerr << boldStart << "doOR: Unknown" << boldStop << endl;
+							throw logic_error("doOR: unknow type.");
+							break;
+						}
+						default:
+						{
+							cerr << boldStart << "doOR: Not handled: " << TreeNode2Type(tn)
+							     << boldStop << endl;
+							throw logic_error("doOR: Not handled treeNode type.");
+							break;
+						}
+					}
+
+					if (nsv.size() > 0 && okToCombine)
+					{
+						if (jsv.empty())
+							jsv = nsv;
+						else
+ 							okToCombine = tryCombineFilters(jsv, nsv, BOP_OR);
+					}
+				}
+			}
+		}
+
+		if (!okToCombine)
+			jsv.clear();
+	}
+
+	if (jsv.empty())
+	{
+		// OR is processed as an expression
+		jsv = doExpressionFilter(n, jobInfo);
+	}
+
+	JLF_ExecPlanToJobList::addJobSteps(jsv, jobInfo, false);
+}
 
 
 } // end of unnamed namespace
@@ -3032,95 +3127,121 @@ namespace joblist
 
 // This method is the entry point into the execution plan to joblist
 // conversion performed by the functions in this file.
+// @bug6131, pre-order traversing
 /* static */ void
-JLF_ExecPlanToJobList::walkTree(ParseTree* n, void* obj)
+JLF_ExecPlanToJobList::walkTree(ParseTree* n, JobInfo& jobInfo)
 {
-	JobInfo* jobInfo = reinterpret_cast<JobInfo*>(obj);
 	TreeNode* tn = n->data();
 	JobStepVector jsv;
-	const Operator* op = 0;
-	switch (TreeNode2Type(tn))
+	TreeNodeType tnType = TreeNode2Type(tn);
+	switch (tnType)
 	{
-	case SIMPLEFILTER:
-		jsv = doSimpleFilter(dynamic_cast<SimpleFilter*>(tn), *jobInfo);
-		jobInfo->stack.push(jsv);
-		break;
-	case OUTERJOINONFILTER:
-		jsv = doOuterJoinOnFilter(dynamic_cast<OuterJoinOnFilter*>(tn), *jobInfo);
-		jobInfo->stack.push(jsv);
-		break;
-	case OPERATOR:
-		op = static_cast<const Operator*>(tn);
+		case SIMPLEFILTER:
+			jsv = doSimpleFilter(dynamic_cast<SimpleFilter*>(tn), jobInfo);
+			JLF_ExecPlanToJobList::addJobSteps(jsv, jobInfo, true);
+			break;
+		case OUTERJOINONFILTER:
+			jsv = doOuterJoinOnFilter(dynamic_cast<OuterJoinOnFilter*>(tn), jobInfo);
+			JLF_ExecPlanToJobList::addJobSteps(jsv, jobInfo, true);
+			break;
+		case OPERATOR:
+			break;
+		case CONSTANTFILTER:
+			//cout << "ConstantFilter" << endl;
+			jsv = doConstantFilter(dynamic_cast<const ConstantFilter*>(tn), jobInfo);
+			JLF_ExecPlanToJobList::addJobSteps(jsv, jobInfo, false);
+			break;
+		case FUNCTIONCOLUMN:
+			jsv = doFunctionFilter(n, jobInfo);
+			JLF_ExecPlanToJobList::addJobSteps(jsv, jobInfo, false);
+			break;
+		case ARITHMETICCOLUMN:
+			jsv = doExpressionFilter(n, jobInfo);
+			JLF_ExecPlanToJobList::addJobSteps(jsv, jobInfo, false);
+			break;
+		case SIMPLECOLUMN:
+			jsv = doExpressionFilter(n, jobInfo);
+			JLF_ExecPlanToJobList::addJobSteps(jsv, jobInfo, false);
+			break;
+		case CONSTANTCOLUMN:
+			jsv = doConstantBooleanFilter(n, jobInfo);
+			JLF_ExecPlanToJobList::addJobSteps(jsv, jobInfo, false);
+			break;
+		case SIMPLESCALARFILTER:
+			doSimpleScalarFilter(n, jobInfo);
+			break;
+		case EXISTSFILTER:
+			doExistsFilter(n, jobInfo);
+			break;
+		case SELECTFILTER:
+			doSelectFilter(n, jobInfo);
+			break;
+		case UNKNOWN:
+			cerr << boldStart << "walkTree: Unknown" << boldStop << endl;
+			throw logic_error("walkTree: unknow type.");
+			break;
+		default:
+/*
+		TREENODE,
+		FILTER,
+		RETURNEDCOLUMN,
+		AGGREGATECOLUMN,
+		TREENODEIMPL,
+*/
+			cerr << boldStart << "walkTree: Not handled: " << TreeNode2Type(tn) << boldStop << endl;
+			throw logic_error("walkTree: Not handled treeNode type.");
+			break;
+	}
+	//cout << *tn << endl;
+
+
+	if (tnType == OPERATOR)
+	{
+		const Operator* op = static_cast<const Operator*>(tn);
 		if (*op == opAND || *op == opand)
 		{
-			doAND(jsv, *jobInfo);
+			/*doAND(jsv, jobInfo)*/;
+			if (n->left())
+				walkTree(n->left(), jobInfo);
+
+			if (n->right())
+				walkTree(n->right(), jobInfo);
 		}
 		else if (*op == opOR || *op == opor)
 		{
-			doOR(n, jsv, *jobInfo, true);
+			doOR(n, jobInfo, true);
 		}
 		else if (*op == opXOR || *op == opxor)
 		{
-			doOR(n, jsv, *jobInfo, false);
+			doOR(n, jobInfo, false);
 		}
 		else
 		{
 			cerr << boldStart
 				 << "walkTree: only know how to handle 'and' and 'or' right now, got: " << *op
 				 << boldStop << endl;
+			throw logic_error("walkTree: unknow operator type.");
 		}
-		break;
-	case CONSTANTFILTER:
-		//cout << "ConstantFilter" << endl;
-		jsv = doConstantFilter(dynamic_cast<const ConstantFilter*>(tn), *jobInfo);
-		jobInfo->stack.push(jsv);
-		break;
-	case FUNCTIONCOLUMN:
-		jsv = doFunctionFilter(n, *jobInfo);
-		jobInfo->stack.push(jsv);
-		break;
-	case ARITHMETICCOLUMN:
-		jsv = doExpressionFilter(n, *jobInfo);
-		jobInfo->stack.push(jsv);
-		break;
-	case SIMPLECOLUMN:
-		jsv = doExpressionFilter(n, *jobInfo);
-		jobInfo->stack.push(jsv);
-		break;
-	case CONSTANTCOLUMN:
-		jsv = doConstantBooleanFilter(n, *jobInfo);
-		jobInfo->stack.push(jsv);
-		break;
-	case SIMPLESCALARFILTER:
-		doSimpleScalarFilter(n, *jobInfo);
-		break;
-	case EXISTSFILTER:
-		doExistsFilter(n, *jobInfo);
-		break;
-	case SELECTFILTER:
-		doSelectFilter(n, *jobInfo);
-		break;
-	case UNKNOWN:
-		cerr << boldStart << "walkTree: Unknown" << boldStop << endl;
-		throw logic_error("walkTree: unknow type.");
-		break;
-	default:
-/*
-	TREENODE,
-	FILTER,
-	RETURNEDCOLUMN,
-	AGGREGATECOLUMN,
-	ARITHMETICCOLUMN,
-	SIMPLECOLUMN,
-	CONSTANTCOLUMN,
-	TREENODEIMPL,
-*/
-		cerr << boldStart << "walkTree: Not handled: " << TreeNode2Type(tn) << boldStop << endl;
-		throw logic_error("walkTree: Not handled treeNode type.");
-		break;
 	}
-	//cout << *tn << endl;
 }
+
+
+void JLF_ExecPlanToJobList::addJobSteps(JobStepVector& nsv, JobInfo& jobInfo, bool tryCombine)
+{
+	idbassert(jobInfo.stack.size() < 2);
+
+	if (jobInfo.stack.size() > 0)
+	{
+		JobStepVector& jsv = jobInfo.stack.top();
+		if (tryCombine == false || tryCombineFilters(jsv, nsv, BOP_AND) == false)
+			jsv.insert(jsv.end(), nsv.begin(), nsv.end());
+	}
+	else
+	{
+		jobInfo.stack.push(nsv);
+	}
+}
+
 
 } // end of joblist namespace
 // vim:ts=4 sw=4:

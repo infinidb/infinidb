@@ -32,6 +32,8 @@
 #include "calpontsystemcatalog.h"
 using namespace execplan;
 
+#include "jlf_common.h"
+
 namespace joblist
 {
 
@@ -46,9 +48,17 @@ public:
 	/** @brief This function is the entry point into CEP to joblist conversion
 	 *
 	 * @param ParseTree (in) is CEP to be translated to a joblist
-	 * @param void*     (in/out)is the JobInfo pointer that is loaded
+	 * @param JobInfo&  (in/out) is the JobInfo reference that is loaded
 	 */
-	static void walkTree(ParseTree* n, void* obj);
+	static void walkTree(ParseTree* n, JobInfo& jobInfo);
+
+	/** @brief This function add new job steps to the job step vector in JobInfo
+	 *
+	 * @param JobStepVector& (in) is a vector of new job steps
+	 * @param JobInfo&       (in/out) is the JobInfo reference that is loaded
+	 * @param bool           (in) is combine job step possible
+	 */
+	static void addJobSteps(JobStepVector& nsv, JobInfo& jobInfo, bool tryCombine);
 
 private:
 	// Disable constructor since this class only contains a static method

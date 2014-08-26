@@ -711,23 +711,9 @@ string doubleToString(double d)
     return buf;
 }
 
-inline
-string decimalToString( execplan::IDB_Decimal x, int p )
-{
-    char buf[32];
-#ifndef __LP64__
-    if (x.scale > 0)
-        snprintf( buf, 32, "%lld.%.*lld", x.value / p, (int) x.scale, x.value % p );
-    else
-        snprintf( buf, 32, "%lld", x.value * p );
-#else
-    if (x.scale > 0)
-        snprintf( buf, 32, "%ld.%.*ld", x.value / p, (int) x.scale, x.value % p );
-    else
-        snprintf( buf, 32, "%ld", x.value * p );
-#endif
-    return buf;
-}
+//@bug6146, remove duplicate function with incorrect impl. Use the DataConvert::decimalToString()
+//string decimalToString( execplan::IDB_Decimal x, int p )
+
 
 uint64_t dateAdd( uint64_t time, const std::string& expr, execplan::IntervalColumn::interval_type unit, bool dateType, execplan::OpType funcType );
 const std::string IDB_date_format(const dataconvert::DateTime&, const std::string&);

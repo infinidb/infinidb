@@ -31,7 +31,7 @@ using namespace std;
 
 
 // minor space-savers
-#define RETURN_NO_GROUP(err) { \
+#define RETURN_NO_GROUP(err) do { \
     if (!printedWarning) { \
         printedWarning = true; \
         ostringstream os; \
@@ -40,9 +40,9 @@ using namespace std;
         log(logging::LOG_TYPE_WARNING, os.str()); \
     } \
     return err; \
-}
+} while (0)
 
-#define RETURN_READ_ERROR(err) { \
+#define RETURN_READ_ERROR(err) do { \
     if (!printedWarning) { \
         printedWarning = true; \
         ostringstream os; \
@@ -51,7 +51,7 @@ using namespace std;
         log(logging::LOG_TYPE_WARNING, os.str()); \
     } \
     return err; \
-}
+} while (0)
 
 namespace {
 
@@ -86,10 +86,11 @@ CGroupConfigurator::~CGroupConfigurator()
 
 uint32_t CGroupConfigurator::getNumCoresFromCGroup()
 {
-    ostringstream filename;
-    filename << "/sys/fs/cgroup/cpuset/" << cGroupName << "/cpus";
+    ostringstream filename_os;
+    filename_os << "/sys/fs/cgroup/cpuset/" << cGroupName << "/cpus";
+    string filename = filename_os.str();
 
-    ifstream in(filename.str().c_str());
+    ifstream in(filename.c_str());
     string cpusString;
     uint32_t cpus = 0;
 

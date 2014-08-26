@@ -63,8 +63,60 @@ std::string Func_lpad::getStrVal(rowgroup::Row& row,
     const string& tstr = fp[0]->data()->getStrVal(row, isNull);
 
     // The result length in number of characters
-    unsigned int len = fp[1]->data()->getIntVal(row, isNull);
-    if (len < 1)
+    int len = 0;
+	switch (fp[1]->data()->resultType().colDataType)
+	{
+		case execplan::CalpontSystemCatalog::BIGINT:
+		case execplan::CalpontSystemCatalog::INT:
+		case execplan::CalpontSystemCatalog::MEDINT:
+		case execplan::CalpontSystemCatalog::TINYINT:
+		case execplan::CalpontSystemCatalog::SMALLINT:
+		{
+			len = fp[1]->data()->getIntVal(row, isNull);
+		}
+		break;
+
+		case execplan::CalpontSystemCatalog::UBIGINT:
+		case execplan::CalpontSystemCatalog::UINT:
+		case execplan::CalpontSystemCatalog::UMEDINT:
+		case execplan::CalpontSystemCatalog::UTINYINT:
+		case execplan::CalpontSystemCatalog::USMALLINT:
+		{
+			len = fp[1]->data()->getUintVal(row, isNull);
+		}
+		break;
+
+		case execplan::CalpontSystemCatalog::FLOAT:
+		case execplan::CalpontSystemCatalog::UFLOAT:
+		case execplan::CalpontSystemCatalog::DOUBLE:
+		case execplan::CalpontSystemCatalog::UDOUBLE:
+		case execplan::CalpontSystemCatalog::DECIMAL:
+		case execplan::CalpontSystemCatalog::UDECIMAL:
+		{
+			double value = fp[1]->data()->getDoubleVal(row, isNull);
+			if (value > 0)
+				value += 0.5;
+			else if (value < 0)
+				value -= 0.5;
+			else if (value < 0)
+				value -= 0.5;
+
+			int64_t ret = (int64_t) value;
+			if (value > (double) numeric_limits<int64_t>::max())
+				ret = numeric_limits<int64_t>::max();
+			else if (value < (double) (numeric_limits<int64_t>::min()+2))
+				ret = numeric_limits<int64_t>::min() + 2; // IDB min for bigint
+
+			len = ret;
+		}
+		break;
+		default:
+		{
+			len = fp[1]->data()->getIntVal(row, isNull);
+		}
+	}
+
+	if (len < 1)
         return "";
 
     // The pad characters.

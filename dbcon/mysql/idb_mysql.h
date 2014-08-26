@@ -23,6 +23,9 @@
 
 #ifdef _MSC_VER
 #include <stdint.h>
+#if _MSC_VER >= 1800
+template <class T> bool isnan(T);
+#endif
 #endif
 
 #define MYSQL_SERVER 1 //needed for definition of struct THD in mysql_priv.h

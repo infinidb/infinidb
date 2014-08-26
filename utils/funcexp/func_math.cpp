@@ -64,7 +64,7 @@ inline double radians(double degree)
 	return (degree * M_PI / 180.0);
 }
 
-#ifdef _MSC_VER
+#if defined(_MSC_VER) && MSC_VER < 1800
 inline double log2(double x)
 {
 	return (log(x) / M_LN2);

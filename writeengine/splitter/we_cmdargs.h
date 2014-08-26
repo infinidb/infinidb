@@ -46,6 +46,7 @@ class WECmdArgs
         void usage();
         void usageMode3();
         bool checkForCornerCases();
+		void checkForBulkLogDir(const std::string& BulkRoot);
 
         void addJobFilesToVector(std::string& JobName);
     	void splitConfigFilePerTable(std::string& ConfigName, int tblCount);

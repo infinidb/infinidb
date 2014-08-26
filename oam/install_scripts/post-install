@@ -212,7 +212,7 @@ fi
 if [ -n "$EC2_HOME" ]; then
 	$installdir/bin/setConfig -d Installation EC2_HOME $EC2_HOME >/dev/null 2>&1
 
-	if [ -n "$EC2_HOME" ]; then
+	if [ -n "$JAVA_HOME" ]; then
 		$installdir/bin/setConfig -d Installation JAVA_HOME $JAVA_HOME >/dev/null 2>&1
 	fi
 
@@ -254,6 +254,10 @@ else
 	DATAENV=`$installdir/bin/getConfig SystemConfig DataFileEnvFile`
 
 	PASS=true
+	if [ -z "$DATAENV" ]; then
+		DATAENV="unassigned"
+	fi
+
 	if [ $DATAENV != "unassigned" ]; then
 		. $installdir/bin/$DATAENV
 		$installdir/bin/hdfsCheck $DATAPLUGIN > /tmp/hdfs-config-test.log 2>&1

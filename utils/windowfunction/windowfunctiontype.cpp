@@ -40,7 +40,7 @@ using namespace ordering;
 
 #include "calpontsystemcatalog.h"
 #include "constantcolumn.h"
-#include "treenode.h"                               // int64_t IDB_pow[19]
+#include "dataconvert.h"                            // int64_t IDB_pow[19]
 using namespace execplan;
 
 #include "windowfunctionstep.h"

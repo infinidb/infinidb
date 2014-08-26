@@ -284,7 +284,9 @@ struct PackageHandler
 
                 ml.logErrorMessage( result.message );
             }
-			cleanPMSysCache();
+			string hdfstest = config::Config::makeConfig()->getConfig("Installation", "DBRootStorageType");
+			if (hdfstest == "hdfs" || hdfstest == "HDFS")
+				cleanPMSysCache();
             messageqcpp::ByteStream results;
             messageqcpp::ByteStream::byte status =  result.result;
             results << status;

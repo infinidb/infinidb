@@ -2217,7 +2217,8 @@ void BulkLoadBuffer::tokenize(
                                 bRowGenAutoInc = true;
                             }
                             else if (jobCol.dataType ==
-                                     CalpontSystemCatalog::VARBINARY)
+                                     CalpontSystemCatalog::VARBINARY &&
+                                (bValidRow))
                             {
                                 bValidRow = false;
 
@@ -2286,27 +2287,6 @@ void BulkLoadBuffer::tokenize(
                                 validationErrMsg = ossErrMsg.str();
                             }
 
-                            // @bug 4037: When cmd line option set, treat char
-                            // and varchar fields that are too long as errors
-                            else if (getTruncationAsError())
-                            {
-                                if ((jobCol.dataType ==
-                                     CalpontSystemCatalog::VARCHAR ||
-                                     jobCol.dataType ==
-                                     CalpontSystemCatalog::CHAR)   
-                                 && (fTokens[curRowNum1][curCol].offset >
-                                     jobCol.definedWidth))
-                                {
-                                    bValidRow = false;
-                                    ostringstream ossErrMsg;
-                                    ossErrMsg << INPUT_ERROR_STRING_TOO_LONG <<
-                                        "field " << (curFld+1) <<
-                                        " longer than " << jobCol.definedWidth<<
-                                        " bytes";
-                                    validationErrMsg = ossErrMsg.str();
-                                }
-                            }
-                             
                             // @bug 3478: Truncate instead of rejecting dctnry
                             // strings>8000. Only reject numeric cols>1000 bytes
                             else if ((fTokens[curRowNum1][curCol].offset >
@@ -2326,6 +2306,29 @@ void BulkLoadBuffer::tokenize(
                             break;
                         }
                     } // end of switch on offset
+
+                    // @bug 4037: When cmd line option set, treat char
+                    // and varchar fields that are too long as errors
+                    if (getTruncationAsError() && bValidRow &&
+                        (fTokens[curRowNum1][curCol].offset !=
+                            COLPOSPAIR_NULL_TOKEN_OFFSET))
+                    {
+                        if ((jobCol.dataType == CalpontSystemCatalog::VARCHAR ||
+                             jobCol.dataType == CalpontSystemCatalog::CHAR)   &&
+                            (fTokens[curRowNum1][curCol].offset >
+                             jobCol.definedWidth))
+                        {
+                            bValidRow = false;
+
+                            ostringstream ossErrMsg;
+                            ossErrMsg << INPUT_ERROR_STRING_TOO_LONG <<
+                                "field " << (curFld+1) <<
+                                " longer than " << jobCol.definedWidth<<
+                                " bytes";
+                            validationErrMsg = ossErrMsg.str();
+                        }
+                    }
+
                 } // end of "if (offset)"
                 else
                 {

@@ -21,7 +21,10 @@
 
 #include "unistd.h"
 
+#if _MSC_VER < 1800
 long long atoll(const char* nptr)
 {
 	return strtoll(nptr, 0, 0);
 }
+#endif
+

@@ -33,10 +33,12 @@
 extern "C" {
 #endif
 
+#if _MSC_VER < 1800
 extern unsigned long long strtoull(const char*, char**, int);
 extern long long atoll(const char*);
 #if _MSC_VER < 1600
 extern lldiv_t lldiv(const long long, const long long);
+#endif
 #endif
 extern unsigned int sleep(unsigned int);
 

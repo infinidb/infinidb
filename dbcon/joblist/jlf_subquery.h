@@ -29,12 +29,14 @@ namespace execplan
 {
 
 class ParseTree;
-
+class SimpleScalarFilter;
 }
 
 
 namespace joblist
 {
+
+bool simpleScalarFilterToParseTree(SimpleScalarFilter* sf, ParseTree*& pt, JobInfo& jobInfo);
 
 void addOrderByAndLimit(execplan::CalpontSelectExecutionPlan*, JobInfo&);
 

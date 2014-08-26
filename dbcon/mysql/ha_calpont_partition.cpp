@@ -895,7 +895,6 @@ const char* calshowpartitions(UDF_INIT* initid, UDF_ARGS* args,
 	vector<struct EMEntry>::iterator iter;
 	vector<struct EMEntry>::iterator end;
 	PartitionMap partMap;
-	PartitionMap::iterator mapit;
 	int32_t seqNum;
 	string schema, table, column;
 	CalpontSystemCatalog::ColType ct;
@@ -903,6 +902,7 @@ const char* calshowpartitions(UDF_INIT* initid, UDF_ARGS* args,
 
 	try
 	{
+		PartitionMap::iterator mapit;
 		if (args->arg_count == 3)
 		{
 			schema = (char*)(args->args[0]);
@@ -1024,7 +1024,7 @@ const char* calshowpartitions(UDF_INIT* initid, UDF_ARGS* args,
 				&&  static_cast<uint64_t>(partIt->second.max) == numeric_limits<uint64_t>::min())
 					output << setw(30) << "Empty/Null" << setw(30) << "Empty/Null";
 				else
-					output << setw(30) << format(mapit->second.min, ct) << setw(30) << format(mapit->second.max, ct);
+					output << setw(30) << format(partIt->second.min, ct) << setw(30) << format(partIt->second.max, ct);
 			}
 			else
 			{

@@ -184,7 +184,7 @@ public:
 	inline bool antiJoin() { return ((joinType & joblist::ANTI) != 0); }
 	inline bool scalar() { return ((joinType & joblist::SCALAR) != 0); }
 	inline bool matchnulls() { return ((joinType & joblist::MATCHNULLS) != 0); }
-	inline bool hasFEFilter() { return fe; }
+	inline bool hasFEFilter() { return fe.get(); }
 	inline boost::shared_ptr<funcexp::FuncExpWrapper> getFcnExpFilter() { return fe; }
 	void setFcnExpFilter(boost::shared_ptr<funcexp::FuncExpWrapper> fe);
 	inline bool evaluateFilter(rowgroup::Row &r, uint32_t index) { return fes[index].evaluate(&r); }

@@ -33,6 +33,7 @@ using namespace std;
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
+#include <boost/filesystem.hpp>
 
 #include "liboamcpp.h"
 using namespace oam;
@@ -550,7 +551,7 @@ void WECmdArgs::parseCmdLineArgs(int argc, char** argv)
 	//	fPrgmName = "/home/bpaul/genii/export/bin/cpimport";
 
 	while ((aCh = getopt(argc, argv,
-		"d:j:w:s:v:l:r:b:e:B:f:q:ihm:E:C:P:I:n:p:c:S:N"))
+		"d:j:w:s:v:l:r:b:e:B:f:q:ihm:E:C:P:I:n:p:c:SN"))
 			!= EOF)
 	{
 		switch (aCh)
@@ -789,6 +790,8 @@ void WECmdArgs::parseCmdLineArgs(int argc, char** argv)
 	if(fArgMode != -1) fMode = fArgMode;	//BUG 4210
 
 	std::string bulkRootPath = getBulkRootDir();
+
+	checkForBulkLogDir(bulkRootPath);
 
 	if (aJobType)
 	{
@@ -1641,6 +1644,58 @@ void WECmdArgs::getColumnList( std::set<std::string>& columnList ) const
 	}
 }
 
+//-----------------------------------------------------------------------------
+// check for the bulkload log directory. If it is not existing, create it
+// w.r.t Bug 6137
+//-----------------------------------------------------------------------------
+
+void WECmdArgs::checkForBulkLogDir(const std::string& BulkRoot)
+{
+		if( !boost::filesystem::exists(BulkRoot.c_str()) )
+		{
+			cout << "Creating directory : " << BulkRoot <<endl;
+			boost::filesystem::create_directories(BulkRoot.c_str());
+		}
+		
+		if( boost::filesystem::exists(BulkRoot.c_str()) )
+		{
+			// create the job directory also if not existing 
+			std::ostringstream aSS;
+			aSS << BulkRoot;
+			aSS << "/job";
+			std::string jobDir = aSS.str();
+			if( !boost::filesystem::exists(jobDir.c_str()) )
+			{
+				cout << "Creating directory : " << jobDir << endl;
+				bool aSuccess = boost::filesystem::create_directories(jobDir.c_str());
+				if (!aSuccess)
+				{
+					cout << "\nFailed to create job directory, check permissions\n" << endl;
+        			throw runtime_error("Failed to create job directory, check permissions");
+				}
+			}
+
+			std::ostringstream aSS2;
+			aSS2 << BulkRoot;
+			aSS2 << "/log";
+			std::string logDir = aSS2.str();
+			if( !boost::filesystem::exists(logDir.c_str()) )
+			{
+				cout << "Creating directory : " << logDir << endl;
+				bool aSuccess = boost::filesystem::create_directories(logDir.c_str());
+				if (!aSuccess)
+				{
+					cout << "\nFailed to create bulk log directory, check permissions\n" << endl;
+        			throw runtime_error("Failed to create bulk log directory, check permissions");
+				}
+			}
+		}
+		else
+		{
+			cout << "\nFailed to create bulk directory, check permissions\n" << endl;
+        	throw runtime_error("Failed to create bulk directory, check permissions");
+		}
+}
 
 
 } /* namespace WriteEngine */

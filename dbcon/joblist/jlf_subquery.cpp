@@ -144,78 +144,6 @@ void getColumnValue(ConstantColumn** cc, uint64_t i, const Row& row)
 }
 
 
-bool simpleScalarFilterToParseTree(SimpleScalarFilter* sf, ParseTree*& pt, JobInfo& jobInfo)
-{
-	const vector<SRCP>& cols = sf->cols();
-	CalpontSelectExecutionPlan* csep = sf->sub().get();
-	SOP sop = sf->op();
-
-	// For row construct, supports only =, <> in Release 1.1.
-	// Other operators are errored out by connector.
-	string lop("and");
-	if ((cols.size() > 1)  && (sop->data() == "<>"))
-		lop = "or";
-
-	// Transformer sub to a scalar result.
-	SErrorInfo errorInfo(jobInfo.errorInfo);
-	SimpleScalarTransformer transformer(&jobInfo, errorInfo, false);
-	transformer.makeSubQueryStep(csep);
-
-	// Do not catch exceptions here, let caller handle them.
-	transformer.run();
-
-	// if subquery errored out
-	if (errorInfo->errCode)
-	{
-		ostringstream oss;
-		oss << "Sub-query failed: ";
-		if (errorInfo->errMsg.empty())
-		{
-			oss << "error code " << errorInfo->errCode;
-			errorInfo->errMsg = oss.str();
-		}
-		throw runtime_error(errorInfo->errMsg);
-	}
-
-	// Construct simple filters based on the scalar result.
-	bool isScalar = false;
-	if (transformer.emptyResultSet() == false)
-	{
-		const Row& row = transformer.resultRow();
-		uint64_t i = 0;
-		for (; i < cols.size(); i++)
-		{
-			// = null is always false
-			if (row.isNullValue(i) == true)
-				break;
-
-			// set fResult for cc
-			ConstantColumn* cc = NULL;
-			getColumnValue(&cc, i, row);
-			sop->setOpType(cols[i]->resultType(), cc->resultType());
-
-			SimpleFilter* sf = new SimpleFilter(sop, cols[i]->clone(), cc);
-			if (i == 0)
-			{
-				pt = new ParseTree(sf);
-			}
-			else
-			{
-				ParseTree* left = pt;
-				pt = new ParseTree(new LogicOperator(lop));
-				pt->left(left);
-				pt->right(new ParseTree(sf));
-			}
-		}
-
-		if (i >= cols.size())
-			isScalar = true;
-	}
-
-	return isScalar;
-}
-
-
 void sfInHaving(ParseTree* pt, void*)
 {
 	SelectFilter* sf = dynamic_cast<SelectFilter*>(pt->data());
@@ -424,7 +352,7 @@ void doCorrelatedExists(const ExistsFilter* ef, JobInfo& jobInfo)
 
 	transformer.updateCorrelateInfo();
 	jsv.push_back(subQueryStep);
-	jobInfo.stack.push(jsv);
+	JLF_ExecPlanToJobList::addJobSteps(jsv, jobInfo, false);
 }
 
 
@@ -491,7 +419,7 @@ void doNonCorrelatedExists(const ExistsFilter* ef, JobInfo& jobInfo)
 	JobStepVector jsv;
 	SJSTEP tcs(new TupleConstantBooleanStep(jobInfo, exists));
 	jsv.push_back(tcs);
-	jobInfo.stack.push(jsv);
+	JLF_ExecPlanToJobList::addJobSteps(jsv, jobInfo, false);
 }
 
 
@@ -557,6 +485,78 @@ const SRCP doSelectSubquery(CalpontExecutionPlan* ep, SRCP& sc, JobInfo& jobInfo
 namespace joblist
 {
 
+bool simpleScalarFilterToParseTree(SimpleScalarFilter* sf, ParseTree*& pt, JobInfo& jobInfo)
+{
+	const vector<SRCP>& cols = sf->cols();
+	CalpontSelectExecutionPlan* csep = sf->sub().get();
+	SOP sop = sf->op();
+
+	// For row construct, supports only =, <> in Release 1.1.
+	// Other operators are errored out by connector.
+	string lop("and");
+	if ((cols.size() > 1)  && (sop->data() == "<>"))
+		lop = "or";
+
+	// Transformer sub to a scalar result.
+	SErrorInfo errorInfo(jobInfo.errorInfo);
+	SimpleScalarTransformer transformer(&jobInfo, errorInfo, false);
+	transformer.makeSubQueryStep(csep);
+
+	// Do not catch exceptions here, let caller handle them.
+	transformer.run();
+
+	// if subquery errored out
+	if (errorInfo->errCode)
+	{
+		ostringstream oss;
+		oss << "Sub-query failed: ";
+		if (errorInfo->errMsg.empty())
+		{
+			oss << "error code " << errorInfo->errCode;
+			errorInfo->errMsg = oss.str();
+		}
+		throw runtime_error(errorInfo->errMsg);
+	}
+
+	// Construct simple filters based on the scalar result.
+	bool isScalar = false;
+	if (transformer.emptyResultSet() == false)
+	{
+		const Row& row = transformer.resultRow();
+		uint64_t i = 0;
+		for (; i < cols.size(); i++)
+		{
+			// = null is always false
+			if (row.isNullValue(i) == true)
+				break;
+
+			// set fResult for cc
+			ConstantColumn* cc = NULL;
+			getColumnValue(&cc, i, row);
+			sop->setOpType(cols[i]->resultType(), cc->resultType());
+
+			SimpleFilter* sf = new SimpleFilter(sop, cols[i]->clone(), cc);
+			if (i == 0)
+			{
+				pt = new ParseTree(sf);
+			}
+			else
+			{
+				ParseTree* left = pt;
+				pt = new ParseTree(new LogicOperator(lop));
+				pt->left(left);
+				pt->right(new ParseTree(sf));
+			}
+		}
+
+		if (i >= cols.size())
+			isScalar = true;
+	}
+
+	return isScalar;
+}
+
+
 void doSimpleScalarFilter(ParseTree* p, JobInfo& jobInfo)
 {
 	SimpleScalarFilter* sf = dynamic_cast<SimpleScalarFilter*>(p->data());
@@ -574,7 +574,7 @@ void doSimpleScalarFilter(ParseTree* p, JobInfo& jobInfo)
 		ccp->data(parseTree->data());
 
 		// create job steps for each simple filter
-		parseTree->walk(JLF_ExecPlanToJobList::walkTree, &jobInfo);
+		JLF_ExecPlanToJobList::walkTree(parseTree, jobInfo);
 
 		// don't delete the parseTree, it has been placed in the plan.
 		// delete parseTree;
@@ -586,7 +586,7 @@ void doSimpleScalarFilter(ParseTree* p, JobInfo& jobInfo)
 		JobStepVector jsv;
 		SJSTEP tcs(new TupleConstantBooleanStep(jobInfo, false));
 		jsv.push_back(tcs);
-		jobInfo.stack.push(jsv);
+		JLF_ExecPlanToJobList::addJobSteps(jsv, jobInfo, false);
 	}
 }
 
@@ -658,7 +658,7 @@ void doSelectFilter(const ParseTree* p, JobInfo& jobInfo)
 		jsv.push_back(SJSTEP(es));
 	}
 
-	jobInfo.stack.push(jsv);
+	JLF_ExecPlanToJobList::addJobSteps(jsv, jobInfo, false);
 }
 
 

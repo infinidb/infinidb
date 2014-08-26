@@ -418,10 +418,10 @@ void checkHavingClause(CalpontSelectExecutionPlan* csep, JobInfo& jobInfo)
 		jobInfo.havingStep.reset();
 
 		// parse the having expression
-		const ParseTree* filters = csep->having();
+		ParseTree* filters = csep->having();
 		if (filters != 0)
 		{
-			filters->walk(JLF_ExecPlanToJobList::walkTree, &jobInfo);
+			JLF_ExecPlanToJobList::walkTree(filters, jobInfo);
 		}
 
 		if (!jobInfo.stack.empty())
@@ -1271,11 +1271,11 @@ void exceptionHandler(JobList* joblist, const JobInfo& jobInfo, const string& lo
 void parseExecutionPlan(CalpontSelectExecutionPlan* csep, JobInfo& jobInfo,
 	JobStepVector& querySteps, JobStepVector& projectSteps, DeliveredTableMap& deliverySteps)
 {
-	const ParseTree* filters = csep->filters();
+	ParseTree* filters = csep->filters();
 	jobInfo.deliveredCols = csep->returnedCols();
 	if (filters != 0)
 	{
-		filters->walk(JLF_ExecPlanToJobList::walkTree, &jobInfo);
+		JLF_ExecPlanToJobList::walkTree(filters, jobInfo);
 	}
 
 	if (jobInfo.trace)

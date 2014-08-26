@@ -269,7 +269,7 @@ int main(int argc, char* argv[])
 				if (err != 0) {
 					ostringstream os;
 					os << "Warning: running " << cmd << " failed.  This is usually non-fatal.";
-					cerr << os << endl;
+					cerr << os.str() << endl;
 					errorHandler(sysCatalogErr, "Save BRM", os.str());
 				}
 			}

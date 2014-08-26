@@ -1251,7 +1251,7 @@ void RowAggregation::doBitOp(const Row& rowIn, int64_t colIn, int64_t colOut, in
 			if ((fRowGroupIn.getScale())[colIn] != 0)
 			{
 				valIn = rowIn.getIntField(colIn);
-				valIn /= execplan::IDB_pow[fRowGroupIn.getScale()[colIn]-1];
+				valIn /= IDB_pow[fRowGroupIn.getScale()[colIn]-1];
 				if (valIn > 0)
 					valIn += 5;
 				else if (valIn < 0)

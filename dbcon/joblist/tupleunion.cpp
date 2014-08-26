@@ -731,7 +731,7 @@ dec3:					/* have to pick a scale to use for the double. using 5... */
 				ostringstream os;
 				os << "TupleUnion::normalize(): unknown input type (" << in.getColTypes()[i]
 					<< ")";
-				cout << os << endl;
+				cout << os.str() << endl;
 				throw logic_error(os.str());
 			}
 		}
