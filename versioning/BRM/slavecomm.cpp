@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: slavecomm.cpp 1839 2013-02-01 17:42:03Z pleblanc $
+ * $Id: slavecomm.cpp 1837 2013-01-31 19:13:18Z pleblanc $
  *
  ****************************************************************************/
 #include <unistd.h>
@@ -35,16 +35,12 @@
 #include "bytestream.h"
 #include "socketclosed.h"
 #include "configcpp.h"
-#include "IDBDataFile.h"
-#include "IDBPolicy.h"
-
 #define SLAVECOMM_DLLEXPORT
 #include "slavecomm.h"
 #undef SLAVECOMM_DLLEXPORT
 
 using namespace std;
 using namespace messageqcpp;
-using namespace idbdatafile;
 
 namespace {
 void timespec_sub(const struct timespec &tv1,
@@ -58,7 +54,7 @@ void timespec_sub(const struct timespec &tv1,
 namespace BRM {
 
 SlaveComm::SlaveComm(string hostname, SlaveDBRMNode *s) :
-	slave(s), currentSaveFD(-1), currentSaveFile(NULL), journalh(NULL)
+	slave(s)
 #ifdef _MSC_VER
 	, fPids(0), fMaxPids(64)
 #endif
@@ -114,20 +110,12 @@ SlaveComm::SlaveComm(string hostname, SlaveDBRMNode *s) :
 		journalCount = 0;
 
 		firstSlave = true;
+		currentSaveFD = -1;
 		journalName = savefile + "_journal";
-		const char* filename = journalName.c_str();
-		uint32_t utmp = ::umask(0);
-		if (IDBPolicy::useHdfs())
-		{
-			journalh = IDBDataFile::open(
-					IDBPolicy::getType(filename, IDBPolicy::WRITEENG), filename, "r+b", 0);
-		}
-		else
-		{
-			journal.open(filename, ios_base::binary | ios_base::out | ios_base::app);
-		}
+		uint utmp = ::umask(0);
+		journal.open(journalName.c_str(), ios_base::binary | ios_base::out);
 		::umask(utmp);
-		if ((journal.is_open() == false) && (journalh == NULL))
+		if (!journal)
 			throw runtime_error("Could not open the BRM journal for writing!");
 	}
 	else {
@@ -154,9 +142,8 @@ SlaveComm::SlaveComm(string hostname, SlaveDBRMNode *s) :
 }
 
 SlaveComm::SlaveComm()
-	: currentSaveFD(-1), currentSaveFile(NULL), journalh(NULL)
 #ifdef _MSC_VER
-	, fPids(0), fMaxPids(64)
+	: fPids(0), fMaxPids(64)
 #endif
 {
 	config::Config *config = config::Config::makeConfig();
@@ -187,15 +174,8 @@ SlaveComm::SlaveComm()
 SlaveComm::~SlaveComm()
 {
 	delete server;
-	server = NULL;
-	if (firstSlave) {
+	if (firstSlave)
 		close(currentSaveFD);
-		delete currentSaveFile;
-		currentSaveFile = NULL;
-	}
-
-	delete journalh;
-	journalh = NULL;
 }
 
 void SlaveComm::stop()
@@ -205,7 +185,7 @@ void SlaveComm::stop()
 
 void SlaveComm::reset()
 {
-	release = true;
+        release = true;
 }
 
 void SlaveComm::run()
@@ -214,7 +194,7 @@ void SlaveComm::run()
 
 	while (!die) {
 #ifdef BRM_VERBOSE
-//		cerr << "WorkerComm: waiting for a connection" << endl;
+		cerr << "WorkerComm: waiting for a connection" << endl;
 #endif
 		master = server->accept(&MSG_TIMEOUT);
 		while (!die && master.isOpen()) {
@@ -275,10 +255,7 @@ void SlaveComm::processCommand(ByteStream &msg)
 			delta = msg;
 	}
 	msg >> cmd;
-#ifdef BRM_VERBOSE
-    cerr << "WorkerComm: command " << (int) cmd << endl;
-#endif
-    switch (cmd) {
+	switch (cmd) {
 		case CREATE_STRIPE_COLUMN_EXTENTS:
 			do_createStripeColumnExtents(msg); break;
 		case CREATE_COLUMN_EXTENT_DBROOT:
@@ -304,10 +281,10 @@ void SlaveComm::processCommand(ByteStream &msg)
 		case VB_ROLLBACK1: do_vbRollback1(msg); break;
 		case VB_ROLLBACK2: do_vbRollback2(msg); break;
 		case VB_COMMIT: do_vbCommit(msg); break;
-		case BRM_UNDO: do_undo(); break;
+		case UNDO: do_undo(); break;
 		case CONFIRM: do_confirm(); break;
 		case FLUSH_INODE_CACHES: do_flushInodeCache(); break;
-		case BRM_CLEAR: do_clear(); break;
+		case CLEAR: do_clear(); break;
 		case MARKEXTENTINVALID: do_markInvalid(msg); break;
 		case MARKMANYEXTENTSINVALID: do_markManyExtentsInvalid(msg); break;
 		case SETEXTENTMAXMIN: do_setExtentMaxMin(msg); break;
@@ -357,7 +334,7 @@ void SlaveComm::do_createStripeColumnExtents(ByteStream &msg)
 	if (printOnly) {
 		cout << "createStripeColumnExtents().  " <<
 			"DBRoot=" << dbRoot << "; Part#=" << partitionNum << endl;
-		for (uint32_t i = 0; i < cols.size(); i++)
+		for (uint i = 0; i < cols.size(); i++)
 			cout << "StripeColExt arg "    << i + 1 <<
 				": oid="  << cols[i].oid   <<
 				" width=" << cols[i].width << endl;
@@ -394,7 +371,6 @@ void SlaveComm::do_createStripeColumnExtents(ByteStream &msg)
 void SlaveComm::do_createColumnExtent_DBroot(ByteStream &msg)
 {
 	int allocdSize, err;
-	uint8_t    tmp8;
 	uint16_t   tmp16;
 	uint32_t   tmp32;
 	OID_t      oid;
@@ -405,7 +381,7 @@ void SlaveComm::do_createColumnExtent_DBroot(ByteStream &msg)
 	LBID_t     lbid;
 	uint32_t   startBlockOffset;
 	ByteStream reply;
-	execplan::CalpontSystemCatalog::ColDataType colDataType;
+
 #ifdef BRM_VERBOSE
 	cerr << "WorkerComm: do_createColumnExtent_DBroot()" << endl;
 #endif
@@ -420,8 +396,6 @@ void SlaveComm::do_createColumnExtent_DBroot(ByteStream &msg)
 	partitionNum = tmp32;
 	msg >> tmp16;
 	segmentNum = tmp16;
-	msg >> tmp8;
-	colDataType = (execplan::CalpontSystemCatalog::ColDataType)tmp8;
 
 	if (printOnly) {
 		cout << "createColumnExtent_DBroot: oid=" << oid <<
@@ -432,7 +406,7 @@ void SlaveComm::do_createColumnExtent_DBroot(ByteStream &msg)
 		return;
 	}
 
-	err = slave->createColumnExtent_DBroot(oid, colWidth, dbRoot, colDataType,
+	err = slave->createColumnExtent_DBroot(oid, colWidth, dbRoot,
 		partitionNum, segmentNum, lbid, allocdSize, startBlockOffset);
 	reply << (uint8_t) err;
 	if (err == ERR_OK) {
@@ -462,7 +436,6 @@ void SlaveComm::do_createColumnExtent_DBroot(ByteStream &msg)
 void SlaveComm::do_createColumnExtentExactFile(ByteStream &msg)
 {
 	int allocdSize, err;
-	uint8_t    tmp8;
 	uint16_t   tmp16;
 	uint32_t   tmp32;
 	OID_t      oid;
@@ -473,7 +446,7 @@ void SlaveComm::do_createColumnExtentExactFile(ByteStream &msg)
 	LBID_t     lbid;
 	uint32_t   startBlockOffset;
 	ByteStream reply;
-	execplan::CalpontSystemCatalog::ColDataType colDataType;
+
 #ifdef BRM_VERBOSE
 	cerr << "WorkerComm: do_createColumnExtentExactFile()" << endl;
 #endif
@@ -488,8 +461,7 @@ void SlaveComm::do_createColumnExtentExactFile(ByteStream &msg)
 	partitionNum = tmp32;
 	msg >> tmp16;
 	segmentNum = tmp16;
-	msg >> tmp8;
-	colDataType = (execplan::CalpontSystemCatalog::ColDataType)tmp8;
+
 	if (printOnly) {
 		cout << "createColumnExtentExactFile: oid=" << oid <<
 			" colWidth=" << colWidth <<
@@ -500,7 +472,7 @@ void SlaveComm::do_createColumnExtentExactFile(ByteStream &msg)
 	}
 
 	err = slave->createColumnExtentExactFile(oid, colWidth, dbRoot,
-		partitionNum, segmentNum, colDataType, lbid, allocdSize, startBlockOffset);
+		partitionNum, segmentNum, lbid, allocdSize, startBlockOffset);
 	reply << (uint8_t) err;
 	if (err == ERR_OK) {
 		reply << partitionNum;
@@ -536,6 +508,7 @@ void SlaveComm::do_createDictStoreExtent(ByteStream &msg)
 	uint16_t   segmentNum;
 	LBID_t     lbid;
 	ByteStream reply;
+
 #ifdef BRM_VERBOSE
 	cerr << "WorkerComm: do_createDictStoreExtent()" << endl;
 #endif
@@ -548,6 +521,7 @@ void SlaveComm::do_createDictStoreExtent(ByteStream &msg)
 	partitionNum = tmp32;
 	msg >> tmp16;
 	segmentNum = tmp16;
+
 	if (printOnly) {
 		cout << "createDictStoreExtent: oid=" << oid << " dbRoot=" << dbRoot << 
 			" partitionNum=" << partitionNum << " segmentNum=" << segmentNum << endl;
@@ -661,7 +635,7 @@ void SlaveComm::do_rollbackDictStoreExtents_DBroot(ByteStream &msg)
 			" dbRoot=" << dbRoot <<
 			" partitionNum=" << partitionNum <<
 			" hwms..." << endl;
-		for (uint32_t i = 0; i < hwms.size(); i++)
+		for (uint i = 0; i < hwms.size(); i++)
 			cout << "   " << i << ": " << hwms[i] << endl;
 		return;
 	}
@@ -922,7 +896,7 @@ void SlaveComm::do_bulkSetHWM(ByteStream &msg)
 
 	if (printOnly) {
 		cout << "bulkSetHWM().  TransID = " << transID << endl;
-		for (uint32_t i = 0; i < args.size(); i++)
+		for (uint i = 0; i < args.size(); i++)
 			cout << "bulkSetHWM arg " << i + 1 << ": oid=" << args[i].oid << " partitionNum=" << args[i].partNum <<
 					" segmentNum=" << args[i].segNum << " hwm=" << args[i].hwm << endl;
 		return;
@@ -961,7 +935,7 @@ void SlaveComm::do_bulkSetHWMAndCP(ByteStream &msg)
 #if 0
 	if (printOnly) {
 		cout << "bulkSetHWM().  TransID = " << transID << endl;
-		for (uint32_t i = 0; i < args.size(); i++)
+		for (uint i = 0; i < args.size(); i++)
 			cout << "bulkSetHWM arg " << i + 1 << ": oid=" << args[i].oid << " partitionNum=" << args[i].partNum <<
 					" segmentNum=" << args[i].segNum << " hwm=" << args[i].hwm << endl;
 		return;
@@ -995,7 +969,7 @@ void SlaveComm::do_bulkUpdateDBRoot(ByteStream &msg)
 void SlaveComm::do_markInvalid(ByteStream &msg)
 {
 	LBID_t lbid;
-	uint32_t colDataType;
+	uint64_t tmp64;
 	int err;
 	ByteStream reply;
 
@@ -1003,15 +977,15 @@ void SlaveComm::do_markInvalid(ByteStream &msg)
 	cerr << "WorkerComm: do_markInvalid()" << endl;
 #endif
 
-	msg >> lbid;
-	msg >> colDataType;
+	msg >> tmp64;
+	lbid = tmp64;
 	
 	if (printOnly) {
-		cout << "markExtentInvalid: lbid=" << lbid << "colDataType=" << colDataType << endl;
+		cout << "markExtentInvalid: lbid=" << lbid << endl;
 		return;
 	}
 	
-	err = slave->markExtentInvalid(lbid, (execplan::CalpontSystemCatalog::ColDataType)colDataType);
+	err = slave->markExtentInvalid(lbid);
 	reply << (uint8_t)err;
 #ifdef BRM_VERBOSE
 	cerr << "WorkerComm: do_markInvalid() err code is " << err << endl;
@@ -1024,11 +998,9 @@ void SlaveComm::do_markInvalid(ByteStream &msg)
 void SlaveComm::do_markManyExtentsInvalid(ByteStream &msg)
 {
 	uint64_t tmp64;
-	uint32_t colDataType;
 	int err;
 	ByteStream reply;
 	vector<LBID_t> lbids;
-	vector<execplan::CalpontSystemCatalog::ColDataType> colDataTypes;
 	uint32_t size, i;
 
 #ifdef BRM_VERBOSE
@@ -1042,17 +1014,15 @@ void SlaveComm::do_markManyExtentsInvalid(ByteStream &msg)
 	
 	for (i = 0; i < size; ++i) {
 		msg >> tmp64;
-		msg >> colDataType;
 		lbids.push_back(tmp64);
-		colDataTypes.push_back((execplan::CalpontSystemCatalog::ColDataType)colDataType);
 		if (printOnly)
-			cout << "   " << tmp64 << " " << colDataType << endl;
+			cout << "   " << tmp64 << endl;
 	}
 
 	if (printOnly)
 		return;
 		
-	err = slave->markExtentsInvalid(lbids, colDataTypes);
+	err = slave->markExtentsInvalid(lbids);
 	reply << (uint8_t)err;
 #ifdef BRM_VERBOSE
 	cerr << "WorkerComm: do_markManyExtentsInvalid() err code is " << err<<endl;
@@ -1201,7 +1171,7 @@ void SlaveComm::do_mergeExtentsMaxMin(ByteStream &msg)
 		cpMaxMin.seqNum = tmp32;	
 
 		msg >> tmp32;
-		cpMaxMin.type = (execplan::CalpontSystemCatalog::ColDataType)tmp32;	
+		cpMaxMin.isChar = tmp32;	
 
 		msg >> tmp32;
 		cpMaxMin.newExtent = tmp32;	
@@ -1209,8 +1179,8 @@ void SlaveComm::do_mergeExtentsMaxMin(ByteStream &msg)
 		cpMap[startLbid] = cpMaxMin;
 		if (printOnly)
 			cout << "   startLBID=" << startLbid << " max=" << cpMaxMin.max << " min=" <<
-				cpMaxMin.min << " sequenceNum=" << cpMaxMin.seqNum << " type=" << (int)
-				cpMaxMin.type << " newExtent=" << (int) cpMaxMin.newExtent << endl;
+				cpMaxMin.min << " sequenceNum=" << cpMaxMin.seqNum << " isChar=" << (int)
+				cpMaxMin.isChar << " newExtent=" << (int) cpMaxMin.newExtent << endl;
 	}
 
 	if (printOnly)
@@ -1499,8 +1469,14 @@ void SlaveComm::do_writeVBEntry(ByteStream &msg)
 			vbOID << " vbFBO=" << vbFBO << endl;
 		return;
 	}
-
-	err = slave->writeVBEntry(transID, lbid, vbOID, vbFBO);
+	
+	try {
+		err = slave->writeVBEntry(transID, lbid, vbOID, vbFBO);
+	}
+	catch (runtime_error &e) {
+		cerr << e.what() << endl;
+		err = -2;
+	}
 	reply << (uint8_t) err;
 #ifdef BRM_VERBOSE
 	cerr << "WorkerComm: do_writeVBEntry() err code is " << err << endl;
@@ -1532,7 +1508,7 @@ void SlaveComm::do_beginVBCopy(ByteStream &msg)
 	if (printOnly) {
 		cout << "beginVBCopy: transID=" << transID << " dbRoot=" << dbRoot << " size="
 				<< ranges.size() <<	" ranges..." << endl;
-		for (uint32_t i = 0; i < ranges.size(); i++)
+		for (uint i = 0; i < ranges.size(); i++)
 			cout << "   start=" << ranges[i].start << " size=" << ranges[i].size << endl;
 		return;
 	}
@@ -1568,7 +1544,7 @@ void SlaveComm::do_endVBCopy(ByteStream &msg)
 	if (printOnly) {
 		cout << "endVBCopy: transID=" << transID << " size=" << ranges.size() << 
 			" ranges..." << endl;
-		for (uint32_t i = 0; i < ranges.size(); i++)
+		for (uint i = 0; i < ranges.size(); i++)
 			cout << "   start=" << ranges[i].start << " size=" << ranges[i].size << endl;
 		return;
 	}
@@ -1602,7 +1578,7 @@ void SlaveComm::do_vbRollback1(ByteStream &msg)
 	if (printOnly) {
 		cout << "vbRollback1: transID=" << transID << " size=" << lbidList.size() <<
 			" lbids..." << endl;
-		for (uint32_t i = 0; i < lbidList.size(); i++)
+		for (uint i = 0; i < lbidList.size(); i++)
 			cout << "   start=" << lbidList[i].start << " size=" << lbidList[i].size << endl;
 		return;
 	}
@@ -1636,7 +1612,7 @@ void SlaveComm::do_vbRollback2(ByteStream &msg)
 	if (printOnly) {
 		cout << "vbRollback2: transID=" << transID << " size=" << lbidList.size() <<
 			" lbids..." << endl;
-		for (uint32_t i = 0; i < lbidList.size(); i++)
+		for (uint i = 0; i < lbidList.size(); i++)
 			cout << "   " << lbidList[i] << endl;
 		return;
 	}
@@ -1698,6 +1674,8 @@ void SlaveComm::do_undo()
 
 void SlaveComm::do_confirm()
 {
+	string tmp;
+
 #ifdef BRM_VERBOSE
 	cerr << "WorkerComm: do_confirm()" << endl;
 #endif
@@ -1714,87 +1692,52 @@ void SlaveComm::do_confirm()
 
 	slave->confirmChanges();
 
-	string tmp = savefile + "_current";
 	if (firstSlave && (takeSnapshot ||
 		(journalCount >= snapshotInterval && snapshotInterval >= 0))) {
-		const char* filename = tmp.c_str();
-		if (!IDBPolicy::useHdfs() && currentSaveFD < 0) {
-			currentSaveFD = open(filename, O_WRONLY | O_CREAT, 0666);
-		}
-		else if (IDBPolicy::useHdfs() && !currentSaveFile) {
-			currentSaveFile = IDBDataFile::open(
-				IDBPolicy::getType(filename, IDBPolicy::WRITEENG), filename, "wb", 0);
-		}
-
-		if (currentSaveFD < 0 && currentSaveFile == NULL) {
-			ostringstream os;
-			os << "WorkerComm: failed to open the current savefile. errno: " 
-				<< strerror(errno);
-			log(os.str());
-			throw runtime_error(os.str());
-		}
+		if (currentSaveFD < 0) {
+			tmp = savefile + "_current";
+			currentSaveFD = open(tmp.c_str(), O_WRONLY | O_CREAT, 0666);
+			if (currentSaveFD < 0) {
+				ostringstream os;
+				os << "WorkerComm: failed to open the current savefile. errno: " 
+					<< strerror(errno);
+				log(os.str());
+				throw runtime_error(os.str());
+			}
 #ifndef _MSC_VER
-		chmod(filename, 0666);
+			fchmod(currentSaveFD, 0666);
 #endif
+		}
 		tmp = savefile + (saveFileToggle ? 'A' : 'B');
 		slave->saveState(tmp);
 #ifndef _MSC_VER
 		tmp += '\n';
 #endif
-		int err = 0;
-		if (currentSaveFile) {
-			err = currentSaveFile->write(tmp.c_str(), tmp.length());
-			if (err < (int) tmp.length()) {
-				ostringstream os;
-				os  << "WorkerComm: currentfile write() returned " << err
-					<< " file pointer is " << currentSaveFile;
-				if (err < 0) 
-					os << " errno: " << strerror(errno);
-				log(os.str());
-			}
-
-			currentSaveFile->flush();
-			delete currentSaveFile;
-			currentSaveFile = NULL;
-			saveFileToggle = !saveFileToggle;
-
-			const char* filename = journalName.c_str();
-			uint32_t utmp = ::umask(0);
-			delete journalh;
-			journalh = IDBDataFile::open(
-						IDBPolicy::getType(filename, IDBPolicy::WRITEENG), filename, "w+b", 0);
-			::umask(utmp);
-			if (!journalh)
-				throw runtime_error("Could not open the BRM journal for writing!");
+		lseek(currentSaveFD, 0, SEEK_SET);
+		int err = write(currentSaveFD, tmp.c_str(), tmp.length());
+		if (err < (int) tmp.length()) {
+			ostringstream os;
+			os << "WorkerComm: currentfile write() returned " << err << " fd is " << currentSaveFD;
+			if (err < 0) 
+				os << " errno: " << strerror(errno);
+			log(os.str());
 		}
-		else {
-			lseek(currentSaveFD, 0, SEEK_SET);
-			err = write(currentSaveFD, tmp.c_str(), tmp.length());
-			if (err < (int) tmp.length()) {
-				ostringstream os;
-				os  << "WorkerComm: currentfile write() returned " << err
-					<< " fd is " << currentSaveFD;
-				if (err < 0) 
-					os << " errno: " << strerror(errno);
-				log(os.str());
-			}
 #ifdef _MSC_VER
-			//FIXME: Do we need to account for Windows EOL conversions?
-			_chsize_s(currentSaveFD, tmp.length());
-			_commit(currentSaveFD);
+		//FIXME: Do we need to account for Windows EOL conversions?
+		_chsize_s(currentSaveFD, tmp.length());
+		_commit(currentSaveFD);
 #else
-			err = ftruncate(currentSaveFD, tmp.length());
-			fsync(currentSaveFD);
+		err = ftruncate(currentSaveFD, tmp.length());
+		fsync(currentSaveFD);
 #endif
-			saveFileToggle = !saveFileToggle;
+		saveFileToggle = !saveFileToggle;
 
-			/* Is there a nicer way to truncate the file using an ofstream? */
-			journal.close();
-			uint32_t utmp = ::umask(0);
-			journal.open(journalName.c_str(), ios_base::binary | ios_base::out | ios_base::trunc);
-			::umask(utmp);
-		}
-
+		/* Is there a nicer way to truncate the file using an ofstream? */
+		journal.close();
+		uint utmp = ::umask(0);
+		journal.open(journalName.c_str(), ios_base::binary | ios_base::out |
+		  ios_base::trunc);
+		::umask(utmp);
 		takeSnapshot = false;
 		doSaveDelta = false;
 		journalCount = 0;
@@ -1804,6 +1747,7 @@ void SlaveComm::do_confirm()
 void SlaveComm::do_flushInodeCache()
 {
 	ByteStream reply;
+	int err;
 
 #ifdef BRM_VERBOSE
 	cerr << "WorkerComm: do_flushInodeCache()" << endl;
@@ -1856,7 +1800,7 @@ void SlaveComm::do_flushInodeCache()
 #else
 	int fd=-1;
 	if ((fd = open("/proc/sys/vm/drop_caches", O_WRONLY)) >= 0) {
-		write(fd, "3\n", 2);
+		err = write(fd, "3\n", 2);
 		close(fd);
 	}
 #endif
@@ -1897,6 +1841,8 @@ int SlaveComm::replayJournal(string prefix)
 	ByteStream cmd;
 	uint32_t len;
 	int ret = 0;
+	ifstream journalf;
+
 
 	// @Bug 2667+  
 	// Fix for issue where load_brm was using the journal file from DBRMRoot instead of the one from the command line
@@ -1921,69 +1867,34 @@ int SlaveComm::replayJournal(string prefix)
 		fName = prefix + "_journal";
 	}
 
-	const char* filename = journalName.c_str();
-	if (IDBPolicy::useHdfs()) { 
-		IDBDataFile* journalf = IDBDataFile::open(
-					IDBPolicy::getType(filename, IDBPolicy::WRITEENG), filename, "rb", 0);
-		if (!journalf) {
-			cout << "Error opening journal file " << fName << endl;
-			return -1;
-		}
-		if (journalf->size() == 0)  // empty file, nothing to replay
-			return 0;
-
-		ssize_t readIn = 0;
-		do {
-			readIn = journalf->read((char *) &len, sizeof(len));
-
-			if (readIn > 0) {
-				cmd.needAtLeast(len);
-				readIn = journalf->read((char *) cmd.getInputPtr(), len);
-				cmd.advanceInputPtr(len);
-				try {
-					processCommand(cmd);
-				}
-				catch(exception &e) {
-					cout << e.what() << "  Journal replay was incomplete." << endl;
-					slave->undoChanges();
-					return -1;
-				}
-
-				slave->confirmChanges();
-				cmd.restart();
-				ret++;
-			}
-		} while (readIn > 0);
-	}
-	else {
-		ifstream journalf;
-		journalf.open(filename, ios_base::in | ios_base::binary);
-		if (!journalf.is_open()) {
-			cout << "Error opening journal file " << fName << endl;
-			return -1;
-		}
-
-		while (journalf) {
-			journalf.read((char *) &len, sizeof(len));
-			if (!journalf)
-				break;
-			cmd.needAtLeast(len);
-			journalf.read((char *) cmd.getInputPtr(), len);
-			cmd.advanceInputPtr(len);
-			try {
-				processCommand(cmd);
-			}
-			catch(exception &e) {
-				cout << e.what() << "  Journal replay was incomplete." << endl;
-				slave->undoChanges();
-				return -1;
-			}
-			slave->confirmChanges();
-			cmd.restart();
-			ret++;
-		}
+	// journalf.open(journalName.c_str(), ios_base::in | ios_base::binary);
+	journalf.open(fName.c_str(), ios_base::in | ios_base::binary);
+	if (!journalf.is_open()) {
+		cout << "Error opening journal file " << fName << endl;
+		return -1;
 	}
 
+	// @Bug 2667-
+	
+	while (journalf) {
+		journalf.read((char *) &len, sizeof(len));
+		if (!journalf)
+			break;
+		cmd.needAtLeast(len);
+		journalf.read((char *) cmd.getInputPtr(), len);
+		cmd.advanceInputPtr(len);
+		try {
+			processCommand(cmd);
+		}
+		catch(exception &e) {
+			cout << e.what() << "  Journal replay was incomplete." << endl;
+			slave->undoChanges();
+			return -1;
+		}
+		slave->confirmChanges();
+		cmd.restart();
+		ret++;
+	}
 	return ret;
 }
 
@@ -2007,18 +1918,10 @@ void SlaveComm::saveDelta()
 {
 	try {
 		uint32_t len = delta.length();
-		if (IDBPolicy::useHdfs()) {
-			journalh->write((const char *) &len, sizeof(len));
-			journalh->write((const char *) delta.buf(), delta.length());
-			journalh->flush();
-		}
-		else {
-			journal.seekg(0, ios_base::end);
-			journal.write((const char *) &len, sizeof(len));
-			journal.write((const char *) delta.buf(), delta.length());
-			journal.sync();
-		}
-
+		journal.seekg(0, ios_base::end);
+		journal.write((const char *) &len, sizeof(len));
+		journal.write((const char *) delta.buf(), delta.length());
+		journal.sync();
 		journalCount++;
 	}
 	catch (exception &e) {
@@ -2160,7 +2063,7 @@ void SlaveComm::do_dmlLockLBIDRanges(ByteStream &msg)
 	if (printOnly) {
 		cout << "dmlLockLBIDRanges: transID=" << txnID << " size="
 				<< ranges.size() <<	" ranges..." << endl;
-		for (uint32_t i = 0; i < ranges.size(); i++)
+		for (uint i = 0; i < ranges.size(); i++)
 			cout << "   start=" << ranges[i].start << " size=" << ranges[i].size << endl;
 		return;
 	}
@@ -2186,7 +2089,7 @@ void SlaveComm::do_dmlReleaseLBIDRanges(ByteStream &msg)
 
 	if (printOnly) {
 		cout << "dmlLockLBIDRanges: size=" << ranges.size() << " ranges..." << endl;
-		for (uint32_t i = 0; i < ranges.size(); i++)
+		for (uint i = 0; i < ranges.size(); i++)
 			cout << "   start=" << ranges[i].start << " size=" << ranges[i].size << endl;
 		return;
 	}

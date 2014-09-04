@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: ha_select_sub.cpp 9210 2013-01-21 14:10:42Z rdempsey $
+*   $Id: ha_select_sub.cpp 9010 2012-10-19 18:40:12Z zzhu $
 *
 *
 ***********************************************************************/
@@ -59,9 +59,9 @@ SCSEP SelectSubQuery::transform()
 {
 	idbassert(fSelSub);
 	SCSEP csep(new CalpontSelectExecutionPlan());
-	csep->sessionID(fGwip.sessionid);
+	csep->sessionID(fGwip.sessionid);	
 	csep->subType (CalpontSelectExecutionPlan::SELECT_SUBS);
-
+	
 	// gwi for the sub query
 	gp_walk_info gwi;
 	gwi.thd = fGwip.thd;
@@ -69,9 +69,9 @@ SCSEP SelectSubQuery::transform()
 
 	// @4632 merge table list to gwi in case there is FROM sub to be referenced
 	// in the SELECT sub
-	gwi.derivedTbCnt = fGwip.derivedTbList.size();
-	uint32_t tbCnt = fGwip.tbList.size();
-
+	uint derivedTbCnt = fGwip.derivedTbList.size();
+	uint tbCnt = fGwip.tbList.size();
+	
 	gwi.tbList.insert(gwi.tbList.begin(), fGwip.tbList.begin(), fGwip.tbList.end());
 	gwi.derivedTbList.insert(gwi.derivedTbList.begin(), fGwip.derivedTbList.begin(), fGwip.derivedTbList.end());
 
@@ -90,20 +90,16 @@ SCSEP SelectSubQuery::transform()
 		csep.reset();
 		return csep;
 	}
-
-	fGwip.subselectList.push_back(csep);
-
 	// remove outer query tables
 	CalpontSelectExecutionPlan::TableList tblist;
 	if (csep->tableList().size() >= tbCnt)
 		tblist.insert(tblist.begin(),csep->tableList().begin()+tbCnt, csep->tableList().end());
 	CalpontSelectExecutionPlan::SelectList derivedTbList;
-
-	if (csep->derivedTableList().size() >= gwi.derivedTbCnt)
-		derivedTbList.insert(derivedTbList.begin(), csep->derivedTableList().begin()+gwi.derivedTbCnt, csep->derivedTableList().end());
+	if (csep->derivedTableList().size() >= derivedTbCnt)
+		derivedTbList.insert(derivedTbList.begin(), csep->derivedTableList().begin()+derivedTbCnt, csep->derivedTableList().end());
 	csep->tableList(tblist);
 	csep->derivedTableList(derivedTbList);
-	return csep;
+	return csep;	
 }
 
 }

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: calpontdmlfactory.cpp 9642 2013-06-24 14:57:42Z rdempsey $
+ *   $Id: calpontdmlfactory.cpp 8707 2012-07-13 19:08:12Z rdempsey $
  *
  *
  ***********************************************************************/
@@ -49,6 +49,7 @@ boost::mutex CalpontDMLFactory::fParserLock;
 dmlpackage::CalpontDMLPackage* CalpontDMLFactory::makeCalpontDMLPackage(dmlpackage::VendorDMLStatement& vpackage,
         std::string defaultSchema /*= ""*/)
 {
+    int retval = 1;
     CalpontDMLPackage* packagePtr = 0;
     try
     {
@@ -68,6 +69,12 @@ dmlpackage::CalpontDMLPackage* CalpontDMLFactory::makeCalpontDMLPackage(dmlpacka
             const ParseTree &ptree = parser.getParseTree();
             SqlStatement* statementPtr = ptree[0];
 
+#ifdef DML_PACKAGE_DEBUG
+            //std::cout << ptree;
+            //std::cout << statementPtr->getQueryString();
+            //std::cout << endl;
+#endif
+
             int dmlStatementType = statementPtr->getStatementType();
 
             switch (dmlStatementType)
@@ -76,26 +83,26 @@ dmlpackage::CalpontDMLPackage* CalpontDMLFactory::makeCalpontDMLPackage(dmlpacka
                     packagePtr = new InsertDMLPackage(statementPtr->getSchemaName(), statementPtr->getTableName(),
                                                       ptree.fSqlText, vpackage.get_SessionID() );
 		    packagePtr->set_SQLStatement(dmlStatement);
-                    (void)packagePtr->buildFromSqlStatement(*statementPtr);
+                    retval = packagePtr->buildFromSqlStatement(*statementPtr);
                     break;
 
                 case DML_UPDATE:
                     packagePtr = new UpdateDMLPackage(statementPtr->getSchemaName(), statementPtr->getTableName(),
                                                       ptree.fSqlText, vpackage.get_SessionID() );
 		    packagePtr->set_SQLStatement(dmlStatement);
-                    (void)packagePtr->buildFromSqlStatement(*statementPtr);
+                    retval = packagePtr->buildFromSqlStatement(*statementPtr);
                     break;
 
                 case DML_DELETE:
                     packagePtr = new DeleteDMLPackage(statementPtr->getSchemaName(), statementPtr->getTableName(),
                                                       ptree.fSqlText, vpackage.get_SessionID() );
 		    packagePtr->set_SQLStatement(dmlStatement);
-                    (void)packagePtr->buildFromSqlStatement(*statementPtr);
+                    retval = packagePtr->buildFromSqlStatement(*statementPtr);
                     break;
 
                 case DML_COMMAND:
                     packagePtr = new CommandDMLPackage(ptree.fSqlText, vpackage.get_SessionID());
-                    (void)packagePtr->buildFromSqlStatement(*statementPtr);
+                    retval = packagePtr->buildFromSqlStatement(*statementPtr);
                     break;
 
                 default:
@@ -121,6 +128,7 @@ dmlpackage::CalpontDMLPackage* CalpontDMLFactory::makeCalpontDMLPackage(dmlpacka
 
 dmlpackage::CalpontDMLPackage* CalpontDMLFactory::makeCalpontDMLPackageFromBuffer(dmlpackage::VendorDMLStatement& vpackage)
 {
+    int retval = 1;
     CalpontDMLPackage* packagePtr = 0;
     try
     {
@@ -129,19 +137,19 @@ dmlpackage::CalpontDMLPackage* CalpontDMLFactory::makeCalpontDMLPackageFromBuffe
         {
             case DML_INSERT:
                 packagePtr = new InsertDMLPackage(vpackage.get_SchemaName(), vpackage.get_TableName(), vpackage.get_DMLStatement(), vpackage.get_SessionID());
-                (void)packagePtr->buildFromBuffer(vpackage.get_DataBuffer
+                retval = packagePtr->buildFromBuffer(vpackage.get_DataBuffer
                                                      (),vpackage.get_Columns(), vpackage.get_Rows());
                 break;
             case DML_UPDATE:
                 packagePtr = new UpdateDMLPackage(vpackage.get_SchemaName(),
                                                   vpackage.get_TableName(),vpackage.get_DMLStatement(), vpackage.get_SessionID());
-                (void)packagePtr->buildFromBuffer(vpackage.get_DataBuffer
+                retval = packagePtr->buildFromBuffer(vpackage.get_DataBuffer
                                                      (),vpackage.get_Columns(), vpackage.get_Rows());
                 break;
             case DML_DELETE:
                 packagePtr = new DeleteDMLPackage(vpackage.get_SchemaName(),
                                                   vpackage.get_TableName(),vpackage.get_DMLStatement(), vpackage.get_SessionID());
-                (void)packagePtr->buildFromBuffer(vpackage.get_DataBuffer
+                retval = packagePtr->buildFromBuffer(vpackage.get_DataBuffer
                                                      (),vpackage.get_Columns(), vpackage.get_Rows());
                 break;
             case DML_COMMAND:
@@ -166,6 +174,7 @@ dmlpackage::CalpontDMLPackage* CalpontDMLFactory::makeCalpontDMLPackageFromBuffe
 
 dmlpackage::CalpontDMLPackage* CalpontDMLFactory::makeCalpontDMLPackageFromMysqlBuffer(dmlpackage::VendorDMLStatement& vpackage)
 {
+	int retval = 1;
     CalpontDMLPackage* packagePtr = 0;
 	try
     {
@@ -174,7 +183,7 @@ dmlpackage::CalpontDMLPackage* CalpontDMLFactory::makeCalpontDMLPackageFromMysql
         {
             case DML_INSERT:
                 packagePtr = new InsertDMLPackage(vpackage.get_SchemaName(), vpackage.get_TableName(), vpackage.get_DMLStatement(), vpackage.get_SessionID());
-                (void)packagePtr->buildFromMysqlBuffer(vpackage.get_ColNames(), vpackage.get_values(), vpackage.get_Columns(), vpackage.get_Rows());
+                retval = packagePtr->buildFromMysqlBuffer(vpackage.get_ColNames(), vpackage.get_values(), vpackage.get_Columns(), vpackage.get_Rows());
                 break;
 			case  DML_COMMAND:
                 packagePtr = new CommandDMLPackage(vpackage.get_DMLStatement(), vpackage.get_SessionID() );
@@ -182,7 +191,7 @@ dmlpackage::CalpontDMLPackage* CalpontDMLFactory::makeCalpontDMLPackageFromMysql
 			case DML_DELETE:
                 packagePtr = new DeleteDMLPackage(vpackage.get_SchemaName(), vpackage.get_TableName(),
                                                       vpackage.get_DMLStatement(), vpackage.get_SessionID() );
-                (void)packagePtr->buildFromMysqlBuffer(vpackage.get_ColNames(), vpackage.get_values(), vpackage.get_Columns(), vpackage.get_Rows());
+                retval = packagePtr->buildFromMysqlBuffer(vpackage.get_ColNames(), vpackage.get_values(), vpackage.get_Columns(), vpackage.get_Rows());
                 break;
 			default:
                 cerr << "makeCalpontDMLPackage: invalid statement type" << endl;

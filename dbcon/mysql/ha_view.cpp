@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: ha_view.cpp 9642 2013-06-24 14:57:42Z rdempsey $
+*   $Id: ha_view.cpp 9010 2012-10-19 18:40:12Z zzhu $
 *
 *
 ***********************************************************************/
@@ -42,7 +42,7 @@ using namespace execplan;
 
 namespace cal_impl_if
 {
-extern uint32_t buildOuterJoin(gp_walk_info& gwi, SELECT_LEX& select_lex);
+extern uint buildOuterJoin(gp_walk_info& gwi, SELECT_LEX& select_lex);
 extern string getViewName(TABLE_LIST* table_ptr);
 
 CalpontSystemCatalog::TableAliasName& View::viewName()
@@ -62,7 +62,12 @@ void View::transform()
 
 	// gwi for the sub query
 	gp_walk_info gwi;
-	gwi.thd = fParentGwip->thd;
+	gwi.thd = fParentGwip->thd;	
+	
+	JOIN* join = fSelect.join;
+	Item_cond* icp = 0;
+	if (join != 0)
+		icp = reinterpret_cast<Item_cond*>(join->conds);
 
 	uint32_t sessionID = csep->sessionID();
 	gwi.sessionid = sessionID;

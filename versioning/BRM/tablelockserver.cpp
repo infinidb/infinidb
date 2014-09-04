@@ -20,20 +20,15 @@
  *
  ****************************************************************************/
 
-#include <exception>
-#include <boost/scoped_ptr.hpp>
-
-#include "configcpp.h"
-#include "IDBDataFile.h"
-#include "IDBPolicy.h"
-
 #define BRMTBLLOCKSVR_DLLEXPORT
 #include "tablelockserver.h"
 #undef BRMTBLLOCKSVR_DLLEXPORT
 
+#include "configcpp.h"
+#include <exception>
+
 using namespace std;
 using namespace boost;
-using namespace idbdatafile;
 
 namespace BRM {
 
@@ -56,34 +51,17 @@ TableLockServer::~TableLockServer()
 // call with lock held
 void TableLockServer::save()
 {
+	ofstream out(filename.c_str(), ios::trunc | ios::binary | ios::out );
 	lit_t it;
-	uint32_t count = locks.size();
+	uint count = locks.size();
 
-	const char* filename_p = filename.c_str();
-	if (IDBPolicy::useHdfs()) {
-		scoped_ptr<IDBDataFile> out(IDBDataFile::open(
-					                IDBPolicy::getType(filename_p, IDBPolicy::WRITEENG),
-									filename_p, "wb", 0));
+	if (!out)
+		throw runtime_error("TableLockServer::save():  could not open save file");
+	out.write((char *) &count, 4);
+	for (it = locks.begin(); it != locks.end(); ++it) {
 		if (!out)
-			throw runtime_error("TableLockServer::save():  could not open save file");
-		out->write((char *) &count, 4);
-		for (it = locks.begin(); it != locks.end(); ++it) {
-			if (!out)
-				throw runtime_error("TableLockServer::save():  could not write save file");
-			it->second.serialize(out.get());
-		}
-	}
-	else {
-		ofstream out(filename.c_str(), ios::trunc | ios::binary | ios::out );
-
-		if (!out)
-			throw runtime_error("TableLockServer::save():  could not open save file");
-		out.write((char *) &count, 4);
-		for (it = locks.begin(); it != locks.end(); ++it) {
-			if (!out)
-				throw runtime_error("TableLockServer::save():  could not write save file");
-			it->second.serialize(out);
-		}
+			throw runtime_error("TableLockServer::save():  could not write save file");
+		it->second.serialize(out);
 	}
 }
 
@@ -91,79 +69,45 @@ void TableLockServer::save()
 void TableLockServer::load()
 {
 	uint32_t size;
-	uint32_t i = 0;
+	ifstream in(filename.c_str(), ios::binary | ios::in);
+	uint i = 0;
 	TableLockInfo tli;
 
 	/* Need to standardize the file error handling */
-	if (IDBPolicy::useHdfs()) {
-		const char* filename_p = filename.c_str();
-		scoped_ptr<IDBDataFile>  in(IDBDataFile::open(
-					                IDBPolicy::getType(filename_p, IDBPolicy::WRITEENG),
-									filename_p, "rb", 0));
-		if (!in) {
-			ostringstream os;
-			os << "TableLockServer::load(): could not open the save file"
-					<< filename;
-			log(os.str(), logging::LOG_TYPE_WARNING);
-			return;
-		}
-
-		try {
-			in->read((char *) &size, 4);
-			for (i = 0; i < size; i++) {
-				tli.deserialize(in.get());
-				tli.id = sms->getUnique64();   // Need new #s...
-				if (tli.id == 0)	// 0 is an error code
-					tli.id = sms->getUnique64();
-				locks[tli.id] = tli;
-			}
-		}
-		catch (std::exception &e) {
-			ostringstream os;
-			os << "TableLockServer::load(): could not load save file " << filename <<
-				" loaded " << i << "/" << size << " entries\n";
-			log(os.str(), logging::LOG_TYPE_WARNING);
-			throw;
+	if (!in) {
+		ostringstream os;
+		os << "TableLockServer::load(): could not open the save file"
+				<< filename;
+		log(os.str(), logging::LOG_TYPE_WARNING);
+		return;
+	}
+	in.exceptions(ios::failbit | ios::badbit);
+	try {
+		in.read((char *) &size, 4);
+		for (i = 0; i < size; i++) {
+			tli.deserialize(in);
+			tli.id = sms->getUnique64();   // Need new #s...
+			if (tli.id == 0)	// 0 is an error code
+				tli.id = sms->getUnique64();
+			locks[tli.id] = tli;
 		}
 	}
-	else {
-		ifstream in(filename.c_str(), ios::binary | ios::in);
-		if (!in) {
-			ostringstream os;
-			os << "TableLockServer::load(): could not open the save file"
-					<< filename;
-			log(os.str(), logging::LOG_TYPE_WARNING);
-			return;
-		}
-		in.exceptions(ios::failbit | ios::badbit);
-		try {
-			in.read((char *) &size, 4);
-			for (i = 0; i < size; i++) {
-				tli.deserialize(in);
-				tli.id = sms->getUnique64();   // Need new #s...
-				if (tli.id == 0)	// 0 is an error code
-					tli.id = sms->getUnique64();
-				locks[tli.id] = tli;
-			}
-		}
-		catch (std::exception &e) {
-			ostringstream os;
+	catch (std::exception &e) {
+		ostringstream os;
 
-			os << "TableLockServer::load(): could not load save file " << filename <<
-				" loaded " << i << "/" << size << " entries\n";
-			log(os.str(), logging::LOG_TYPE_WARNING);
-			throw;
-		}
+		os << "TableLockServer::load(): could not load save file " << filename <<
+			" loaded " << i << "/" << size << " entries\n";
+		throw;
 	}
+
 }
-
 
 // throws on a failed save()
 uint64_t TableLockServer::lock(TableLockInfo *tli)
 {
 	set<uint32_t> dbroots;
 	lit_t it;
-	uint32_t i;
+	uint i;
 	mutex::scoped_lock lk(mutex);
 
 	for (i = 0; i < tli->dbrootList.size(); i++)
@@ -235,7 +179,7 @@ bool TableLockServer::changeState(uint64_t id, LockState state)
 	return true;
 }
 
-bool TableLockServer::changeOwner(uint64_t id, const string &ownerName, uint32_t pid, int32_t session,
+bool TableLockServer::changeOwner(uint64_t id, const string &ownerName, uint pid, int32_t session,
 		int32_t txnID)
 {
 	lit_t it;

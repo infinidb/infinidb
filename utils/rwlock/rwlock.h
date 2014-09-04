@@ -82,7 +82,7 @@ struct LockState {
 class RWLockShmImpl
 {
 public:
-	static RWLockShmImpl* makeRWLockShmImpl(int key, bool* excl=0);
+	static RWLockShmImpl* makeRWLockShmImpl(int key, bool excl=false);
 
 	boost::interprocess::shared_memory_object fStateShm;
 	boost::interprocess::mapped_region fRegion;
@@ -149,22 +149,19 @@ class RWLock {
 		 * this is not the first instance, it will throw not_excl.  The intent
 		 * is similar to the IPC_EXCL flag in the sem/shm implementations.
 		 */
-		EXPORT explicit RWLock(int key, bool* excl = 0);
+		EXPORT explicit RWLock(int key, bool excl = false);
 
 		EXPORT ~RWLock();
 		
 		/** @brief Grab a read lock
 		 *
 		 * Grab a read lock.  This will block iff writers are waiting or
-		 * a writer is active. The version with priority ignores any 
-		 * waiting threads and grabs the lock. 
+		 * a writer is active.
 		 * 
 		 * @param block (For testing only) If false, will throw 
 		 * wouldblock instead of blocking
 		 */
 		EXPORT void read_lock(bool block = true);
-
-		EXPORT void read_lock_priority(bool block = true);
 
 		/** @brief Release a read lock.
 		 *
@@ -191,7 +188,7 @@ class RWLock {
 		 * the RWLockMonitor class.
 		 */
 		EXPORT bool timed_write_lock(const struct timespec &ts,
-				struct LockState *state = 0);
+				struct LockState *state = NULL);
 
 		/** @brief Release a write lock.
 		 *
@@ -231,7 +228,6 @@ class RWLock {
 		inline int getReading() const { return fPImpl->fState->reading; }
 		inline int getWritersWaiting() const { return fPImpl->fState->writerswaiting; }
 		inline int getReadersWaiting() const { return fPImpl->fState->readerswaiting; }
-		LockState getLockState();
 		
 	private:
 		RWLock(const RWLock& rwl);

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: tdriver-bdl.cpp 9210 2013-01-21 14:10:42Z rdempsey $
+*   $Id: tdriver-bdl.cpp 8436 2012-04-04 18:18:21Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -225,11 +225,11 @@ public:
 		eofInputTag += testDesc;
 		consumeTag  += testDesc;
 
-		uint32_t i;
-		uint32_t numOfProducers = NUM_PRODUCERS;
-		uint32_t numOfConsumers = NUM_CONSUMERS;
-		uint32_t numBuckets     = NUM_BUCKETS;
-		uint32_t maxElements    = MAX_ELEMENTS;
+		uint i;
+		uint numOfProducers = NUM_PRODUCERS;
+		uint numOfConsumers = NUM_CONSUMERS;
+		uint numBuckets     = NUM_BUCKETS;
+		uint maxElements    = MAX_ELEMENTS;
 		BucketDL<Element> bdl(numBuckets, 1, maxElements); 
 	    bdl.setMultipleProducers(true);		
 		bdl.setElementMode(1); // RID_VALUE
@@ -323,11 +323,11 @@ public:
 		eofInputTag += testDesc;
 		consumeTag  += testDesc;
 
-		uint32_t i;
-		uint32_t numOfProducers = NUM_PRODUCERS;
-		uint32_t numOfConsumers = NUM_CONSUMERS;
-		uint32_t numBuckets     = NUM_BUCKETS;
-		uint32_t maxElements    = MAX_ELEMENTS;
+		uint i;
+		uint numOfProducers = NUM_PRODUCERS;
+		uint numOfConsumers = NUM_CONSUMERS;
+		uint numBuckets     = NUM_BUCKETS;
+		uint maxElements    = MAX_ELEMENTS;
 		BucketDL<Element> bdl(numBuckets, 1, maxElements); 
 	    bdl.setMultipleProducers(true);		
 		if ( compress )
@@ -405,7 +405,7 @@ public:
 	    typedef ElementType Element;
 
     	vector <Element> v;
-    	for (uint32_t i = 0; i < ::count; i++)
+    	for (uint i = 0; i < ::count; i++)
     	    v.push_back(Element(i,i));
     	
     	vector<Element> v1;

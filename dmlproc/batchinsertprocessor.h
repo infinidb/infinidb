@@ -1,22 +1,22 @@
-/* Copyright (C) 2014 InfiniDB, Inc.
+/*
+  Copyright (C) 2009-2012 Calpont Corporation.
 
-   This program is free software; you can redistribute it and/or
-   modify it under the terms of the GNU General Public License
-   as published by the Free Software Foundation; version 2 of
-   the License.
+  This program is free software; you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation; version 2 of the License.
 
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
 
-   You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-   MA 02110-1301, USA. */
+  You should have received a copy of the GNU General Public License along
+  with this program; if not, write to the Free Software Foundation, Inc.,
+  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+*/
 
 // $Id: batchinsertprocessor.h 525 2010-01-19 23:18:05Z xlou $
-
+//
 /** @file */
 
 #ifndef BATCHINSERTPROCESSOR_H__
@@ -34,9 +34,7 @@
 #include "insertdmlpackage.h"
 #include "resourcemanager.h"
 #include "bytestream.h"
-#include "dbrm.h"
-#include "batchloader.h"
-#include "we_clients.h"
+
 namespace dmlprocessor 
 {
 class BatchInsertProc
@@ -44,52 +42,31 @@ class BatchInsertProc
 public:
 	typedef std::queue<messageqcpp::ByteStream > pkg_type;	
 	typedef boost::shared_ptr<pkg_type>  SP_PKG;
-	typedef std::vector<BRM::BulkSetHWMArg> BulkSetHWMArgs;
-	BatchInsertProc(bool isAutocommitOn, uint32_t tableOid, execplan::CalpontSystemCatalog::SCN txnId, BRM::DBRM* aDbrm);
-	BatchInsertProc(const BatchInsertProc& rhs);
+	static BatchInsertProc* makeBatchInsertProc(execplan::CalpontSystemCatalog::SCN txnid, uint32_t tableOid);
+	static void removeBatchInsertProc(int & rc, std::string & errMsg);
 	~BatchInsertProc();
-	uint64_t grabTableLock(int32_t sessionId);
+
 	SP_PKG  getInsertQueue ();
-	uint32_t getNumDBRoots();
-	void setLastPkg (bool lastPkg);
-	void addPkg(messageqcpp::ByteStream & insertBs);
-	messageqcpp::ByteStream getPkg();
+	uint getNumDBRoots();
+	void addPkg(messageqcpp::ByteStream & insertBs, bool lastpkg = false, bool isAutocommitOn = true, uint32_t tableOid=0);
+	messageqcpp::ByteStream getPkg(bool & lastPkg, bool & isAutocommitOn, uint32_t  &tableOid);
 	void setError(int errorCode, std::string errMsg);
 	void getError(int & errorCode, std::string & errMsg);
-	int sendPkg(int pmId);
-	void buildPkg(messageqcpp::ByteStream& bs);
-	void buildLastPkg(messageqcpp::ByteStream& bs);
-	void sendFirstBatch();
-	void sendNextBatch();
-	void sendlastBatch();
-	void collectHwm();
-	void setHwm();
-	void receiveAllMsg();
-	void receiveOutstandingMsg();
 private:
+	/** Constuctors */
+    explicit BatchInsertProc();
+    explicit BatchInsertProc(const BatchInsertProc& rhs);
 	SP_PKG fInsertPkgQueue;
 	boost::condition condvar;
-	execplan::CalpontSystemCatalog::SCN fTxnid;
-	int fErrorCode;
-	std::string fErrMsg;
+	static BatchInsertProc* fInstance;
+	static uint fNumDBRoots;
+	static boost::thread* fProcessorThread;
+	static execplan::CalpontSystemCatalog::SCN fTxnid;
+	static int fErrorCode;
+	static std::string fErrMsg;
 	bool fLastpkg;
 	bool fIsAutocommitOn;
-	uint32_t fTableOid;
-	uint64_t fUniqueId;
-	BRM::DBRM* fDbrm;
-	WriteEngine::WEClients* fWEClient;
-	oam::OamCache *fOamcache;
-	std::vector<uint32_t> fPMs; //active PMs
-	batchloader::BatchLoader* fBatchLoader;
-	std::map<unsigned, bool> fPmState;
-	uint32_t fCurrentPMid;
-	boost::shared_ptr<messageqcpp::ByteStream> bsIn;
-	messageqcpp::ByteStream::byte tmp8;
-	messageqcpp::ByteStream::quadbyte tmp32;
-	std::vector<BulkSetHWMArgs> fHwmArgsAllPms;
-	uint64_t fTableLockid;
-	
-	
+	static uint32_t fTableOid;
 };
 
 } // namespace dmlprocessor

@@ -33,7 +33,6 @@ using namespace logging;
 
 #include "returnedcolumn.h"
 #include "aggregatecolumn.h"
-#include "windowfunctioncolumn.h"
 #include "arithmeticcolumn.h"
 #include "constantcolumn.h"
 #include "functioncolumn.h"
@@ -58,26 +57,25 @@ void VirtualTable::initialize()
 }
 
 
-void VirtualTable::addColumn(const SRCP& column)
+void VirtualTable::addColumn(const SRCP& column, const string& view)
 {
 	// As of bug3695, make sure varbinary is not used in subquery.
 	if (column->resultType().colDataType == CalpontSystemCatalog::VARBINARY && !fVarBinOK)
 		throw runtime_error ("VARBINARY in subquery is not supported.");
 
-	AggregateColumn*      agc = NULL;
-	ArithmeticColumn*     arc = NULL;
-	ConstantColumn*       cc  = NULL;
-	FunctionColumn*       fc  = NULL;
-	SimpleColumn*         sc  = NULL;
-	WindowFunctionColumn* wc  = NULL;
+	AggregateColumn*  agc = NULL;
+	ArithmeticColumn* arc = NULL;
+	ConstantColumn*   cc  = NULL;
+	FunctionColumn*   fc  = NULL;
+	SimpleColumn*     sc  = NULL;
+	SRCP              nc;
 
 	string columnName;
+	string viewName(view);
 	ostringstream oss;
 	UniqId colId;
 	if ((sc = dynamic_cast<SimpleColumn*>(column.get())) != NULL)
 	{
-		if (sc->schemaName().empty())
-			sc->oid(fTableOid+sc->colPosition()+1);
 		columnName = sc->columnName();
 		colId = UniqId(sc);
 	}
@@ -86,32 +84,25 @@ void VirtualTable::addColumn(const SRCP& column)
 //		oss << agc->functionName() << "_" << agc->expressionId();
 //		oss << "Aggregate_" << agc->expressionId();
 		columnName = agc->data();
-		colId = UniqId(agc->expressionId(), "", "", "");
-	}
-	else if ((wc = dynamic_cast<WindowFunctionColumn*>(column.get())) != NULL)
-	{
-//		oss << wc->functionName() << "_" << wc->expressionId();
-//		oss << "Window_" << wc->expressionId();
-		columnName = wc->data();
-		colId = UniqId(wc->expressionId(), "", "", "");
+		colId = UniqId(agc->expressionId(), agc->alias(), "", viewName);
 	}
 	else if ((arc = dynamic_cast<ArithmeticColumn*>(column.get())) != NULL)
 	{
 //		oss << "Arithmetic_" << arc->expressionId();
 		columnName = arc->data();
-		colId = UniqId(arc->expressionId(), "", "", "");
+		colId = UniqId(arc->expressionId(), arc->alias(), "", viewName);
 	}
 	else if ((fc = dynamic_cast<FunctionColumn*>(column.get())) != NULL)
 	{
 //		oss << fc->functionName() << "_" << fc->expressionId();
 		columnName = fc->data();
-		colId = UniqId(fc->expressionId(), "", "", "");
+		colId = UniqId(fc->expressionId(), fc->alias(), "", viewName);
 	}
 	else if ((cc = dynamic_cast<ConstantColumn*>(column.get())) != NULL)
 	{
 //		oss << "Constant_" << cc->expressionId();
 		columnName = cc->data();
-		colId = UniqId(cc->expressionId(), cc->alias(), "", fView);
+		colId = UniqId(cc->expressionId(), cc->alias(), "", viewName);
 	}
 	else // new column type has added, but this code is not updated.
 	{
@@ -127,9 +118,9 @@ void VirtualTable::addColumn(const SRCP& column)
 	vc->tableAlias(fAlias);
 	vc->columnName(columnName);
 	vc->alias(column->alias());
-	vc->viewName(fView);
+	vc->viewName(viewName);
 
-	uint32_t index = fColumns.size();
+	uint index = fColumns.size();
 	vc->colPosition(index);
 	vc->oid(fTableOid+index+1);
 	vc->resultType(column->resultType());
@@ -141,13 +132,13 @@ void VirtualTable::addColumn(const SRCP& column)
 }
 
 
-const CalpontSystemCatalog::OID& VirtualTable::columnOid(uint32_t i) const
+const CalpontSystemCatalog::OID& VirtualTable::columnOid(uint i) const
 {
 	idbassert(i < fColumns.size());
 	return fColumns[i]->oid();
 }
 
-void VirtualTable::columnType(CalpontSystemCatalog::ColType& type, uint32_t i)
+void VirtualTable::columnType(CalpontSystemCatalog::ColType& type, uint i)
 {
 	idbassert(i < fColumnTypes.size());
 	fColumnTypes[i] = type;
@@ -155,7 +146,7 @@ void VirtualTable::columnType(CalpontSystemCatalog::ColType& type, uint32_t i)
 }
 
 
-const CalpontSystemCatalog::ColType& VirtualTable::columnType(uint32_t i) const
+const CalpontSystemCatalog::ColType& VirtualTable::columnType(uint i) const
 {
 	idbassert(i < fColumnTypes.size());
 	return fColumnTypes[i];

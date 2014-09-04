@@ -16,10 +16,10 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: rtscommand-jl.h 9655 2013-06-25 23:08:13Z xlou $
+// $Id: rtscommand-jl.h 8436 2012-04-04 18:18:21Z rdempsey $
 // C++ Interface: ridtostringcommand-jl
 //
-// Description:
+// Description: 
 //
 //
 // Author: Patrick <pleblanc@localhost.localdomain>, (C) 2008
@@ -46,7 +46,7 @@ class RTSCommandJL : public CommandJL
 		RTSCommandJL(const PassThruStep &, const pDictionaryStep &);
 		virtual ~RTSCommandJL();
 
-		void setLBID(uint64_t data, uint32_t dbroot);		// converts a rid or dictionary token to an LBID.  For ColumnCommandJL it's a RID, for a DictStep it's a token.
+		void setLBID(uint64_t data, uint dbroot);		// converts a rid or dictionary token to an LBID.  For ColumnCommandJL it's a RID, for a DictStep it's a token.
 		uint8_t getTableColumnType();
 		std::string toString();
 		bool isPassThru() { return (passThru != 0); }

@@ -20,7 +20,9 @@
  *
  *
  ***********************************************************************/
+#define RESTOREPARTITIONPROC_DLLEXPORT
 #include "restorepartitionprocessor.h"
+#undef RESTOREPARTITIONPROC_DLLEXPORT
 
 #include "messagelog.h"
 #include "sqllogger.h"
@@ -48,7 +50,7 @@ namespace ddlpackageprocessor
 		txnID.valid= fTxnid.valid;
 		
 		int rc = 0;
-		rc = fDbrm->isReadWrite();
+		rc = fDbrm.isReadWrite();
 		if (rc != 0 )
 		{
 			logging::Message::Args args;
@@ -65,9 +67,7 @@ namespace ddlpackageprocessor
 		CalpontSystemCatalog::DictOIDList dictOIDList;
 		std::string  processName("DDLProc");
 
-		string stmt = restorePartitionStmt.fSql + "|" + restorePartitionStmt.fTableName->fSchema +"|";
-		SQLLogger logger(stmt, fDDLLoggingId, restorePartitionStmt.fSessionID, txnID.id);
-		
+		SQLLogger logger(restorePartitionStmt.fSql, fDDLLoggingId, restorePartitionStmt.fSessionID, txnID.id);
 		uint32_t processID = 0;
 		uint64_t uniqueID = 0;
 		uint32_t sessionID = restorePartitionStmt.fSessionID;
@@ -92,14 +92,14 @@ namespace ddlpackageprocessor
 			processID = ::getpid();
 			oam::OamCache * oamcache = oam::OamCache::makeOamCache();
 			std::vector<int> pmList = oamcache->getModuleIds();
-			std::vector<uint32_t> pms;
+			std::vector<uint> pms;
 			for (unsigned i=0; i < pmList.size(); i++)
 			{
-				pms.push_back((uint32_t)pmList[i]);
+				pms.push_back((uint)pmList[i]);
 			}
 				
 			try {
-				uniqueID = fDbrm->getTableLock(pms, roPair.objnum, &processName, &processID, (int32_t*)&sessionID, (int32_t*)&txnID.id, BRM::LOADING );
+				uniqueID = fDbrm.getTableLock(pms, roPair.objnum, &processName, &processID, (int32_t*)&sessionID, (int32_t*)&txnID.id, BRM::LOADING );
 			}
 			catch (std::exception&)
 			{
@@ -142,7 +142,7 @@ namespace ddlpackageprocessor
 					processName = "DDLProc";
 					
 					try {
-						uniqueID = fDbrm->getTableLock(pms, roPair.objnum, &processName, &processID, (int32_t*)&sessionID, (int32_t*)&txnID.id, BRM::LOADING );
+						uniqueID = fDbrm.getTableLock(pms, roPair.objnum, &processName, &processID, (int32_t*)&sessionID, (int32_t*)&txnID.id, BRM::LOADING );
 					}
 					catch (std::exception&)
 					{
@@ -198,7 +198,7 @@ namespace ddlpackageprocessor
 
 			//Remove the partition from extent map
 			string emsg;
-			rc = fDbrm->restorePartition( oidList, restorePartitionStmt.fPartitions, emsg);
+			rc = fDbrm.restorePartition( oidList, restorePartitionStmt.fPartitions, emsg);
 			if ( rc != 0 )
 			{
 				throw std::runtime_error(emsg);
@@ -219,7 +219,7 @@ namespace ddlpackageprocessor
 
 			result.message = message;
 			try {
-				fDbrm->releaseTableLock(uniqueID);
+				fDbrm.releaseTableLock(uniqueID);
 			} catch (std::exception&)
 			{
 				result.result = DROP_ERROR;
@@ -243,7 +243,7 @@ namespace ddlpackageprocessor
 			result.result = DROP_ERROR;
 			result.message = message;
 			try {
-				fDbrm->releaseTableLock(uniqueID);
+				fDbrm.releaseTableLock(uniqueID);
 			} catch (std::exception&)
 			{
 				result.result = DROP_ERROR;
@@ -255,7 +255,7 @@ namespace ddlpackageprocessor
 		// Log the DDL statement
 		logging::logDDL(restorePartitionStmt.fSessionID, txnID.id, restorePartitionStmt.fSql, restorePartitionStmt.fOwner);
 		try {
-			fDbrm->releaseTableLock(uniqueID);
+			fDbrm.releaseTableLock(uniqueID);
 		} catch (std::exception&)
 		{
 			result.result = DROP_ERROR;

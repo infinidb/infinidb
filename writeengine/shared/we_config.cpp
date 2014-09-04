@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_config.cpp 4737 2013-08-14 20:45:46Z bwilkinson $
+* $Id: we_config.cpp 4496 2013-01-31 19:13:20Z pleblanc $
 *
 *******************************************************************************/
 /** @file */
@@ -31,13 +31,10 @@ using namespace std;
 #include "configcpp.h"
 #include "liboamcpp.h"
 #include "installdir.h"
+#define WRITEENGINECONFIG_DLLEXPORT
 #include "we_config.h"
+#undef WRITEENGINECONFIG_DLLEXPORT
 using namespace config;
-
-#include "IDBPolicy.h"
-using namespace idbdatafile;
-
-#include <boost/algorithm/string.hpp>
 
 namespace WriteEngine
 {
@@ -52,6 +49,7 @@ namespace WriteEngine
     const char*    DEFAULT_LOCAL_MODULE_TYPE          = "pm";
 
     int              Config::m_dbRootCount = 0;
+    int              Config::m_totalDbRootCount = 0;
     Config::strvec_t Config::m_dbRootPath;
     Config::intstrmap_t Config::m_dbRootPathMap;
     Config::uint16vec_t Config::m_dbRootId;
@@ -91,7 +89,7 @@ void Config::initConfigCache()
     boost::mutex::scoped_lock lk(fCacheLock);
     checkReload( );
 }
-
+
 /*******************************************************************************
  * DESCRIPTION:
  *    Reload local cache using contents of Calpont.xml file.
@@ -101,7 +99,6 @@ void Config::initConfigCache()
 void Config::checkReload( )
 {
     bool bFirstLoad = false;
-
     if (fCacheTime == 0)
         bFirstLoad = true;
 
@@ -205,62 +202,6 @@ void Config::checkReload( )
     if ( ncpb.length() != 0 )
         m_NumCompressedPadBlks = cf->uFromText(ncpb);
 
-#if 0  // common code, moved to IDBPolicy
-    //--------------------------------------------------------------------------
-    // IDBDataFile logging
-    //--------------------------------------------------------------------------
-    bool idblog = false;
-    string idblogstr = cf->getConfig("SystemConfig", "DataFileLog");
-    if ( idblogstr.length() != 0 )
-    {
-    	boost::to_upper(idblogstr);
-    	idblog = ( idblogstr == "ON" );
-    }
-
-    //--------------------------------------------------------------------------
-    // Optional File System Plugin - if a HDFS type plugin is loaded
-    // then the system will use HDFS for all IDB data files
-    //--------------------------------------------------------------------------
-    string fsplugin = cf->getConfig("SystemConfig", "DataFilePlugin");
-    if ( fsplugin.length() != 0 )
-    {
-        IDBPolicy::installPlugin(fsplugin);
-    }
-
-    //--------------------------------------------------------------------------
-    // HDFS file buffering
-    //--------------------------------------------------------------------------
-    // Maximum amount of memory to use for hdfs buffering.
-    bool bUseRdwrMemBuffer = true;  // If true, use in-memory buffering, else use file buffering
-    int64_t hdfsRdwrBufferMaxSize = 0;
-    string strBufferMaxSize = cf->getConfig("SystemConfig", "hdfsRdwrBufferMaxSize");
-    if (strBufferMaxSize.length() == 0)
-    {
-        // Default is use membuf with no maximum size.
-        bUseRdwrMemBuffer = true;
-    }
-    else
-    {
-        hdfsRdwrBufferMaxSize = static_cast<int64_t>(cf->uFromText(strBufferMaxSize));
-        if ( hdfsRdwrBufferMaxSize == 0 )
-        {
-            // If we're given a size of 0, turn off membuffering.
-            bUseRdwrMemBuffer = false;
-        }
-    }
-
-    // Directory in which to place file buffer temporary files.
-    string hdfsRdwrScratch = cf->getConfig("SystemConfig", "hdfsRdwrScratch");
-    if ( hdfsRdwrScratch.length() == 0 )
-    {
-        hdfsRdwrScratch = "/tmp/hdfsscratch";
-    }
-
-	IDBPolicy::init( idblog, bUseRdwrMemBuffer, hdfsRdwrScratch, hdfsRdwrBufferMaxSize );
-#endif
-
-	IDBPolicy::configIDBPolicy();
-
     //--------------------------------------------------------------------------
     // Initialize Parent OAM Module flag
     // Initialize Module Type
@@ -295,7 +236,8 @@ void Config::checkReload( )
     }
 
     //--------------------------------------------------------------------------
-    // Initialize m_dbRootCount, m_dbRootPath, m_dbRootPathMap, m_dbRootId.
+    // Initialize m_dbRootCount, m_dbRootPath, m_dbRootPathMap, m_dbRootId,
+    // and m_totalDbRootCount.
     // Note this uses m_localModuleType and m_LocalModuleID, so this init
     // section must be after the section(s) that set m_localModuleType and
     // m_LocalModuleID.
@@ -347,6 +289,10 @@ void Config::checkReload( )
         }
     }
 
+    // Get/save the total dbroot count as well
+    m_totalDbRootCount =
+        cf->fromText( cf->getConfig("SystemConfig","DBRootCount") );
+
 //  for (unsigned int n=0; n<m_dbRootPath.size(); n++)
 //  {
 //      std::cout << "dbrootpath: " << n << ". " << m_dbRootPath[n] <<std::endl;
@@ -361,7 +307,7 @@ void Config::checkReload( )
 //      std::cout << "dbrootmap: " << k->first << "," << k->second << std::endl;
 //  }
 }
-
+
 /*******************************************************************************
  * DESCRIPTION:
  *    Get db root count for local PM
@@ -376,6 +322,22 @@ size_t Config::DBRootCount()
     checkReload( );
 
     return m_dbRootCount;
+}
+
+/*******************************************************************************
+ * DESCRIPTION:
+ *    Get total db root count for all PMs
+ * PARAMETERS:
+ *    none
+ * RETURN:
+ *    Number of DBRoot paths to be used for database files
+ ******************************************************************************/
+size_t Config::totalDBRootCount()
+{
+    boost::mutex::scoped_lock lk(fCacheLock);
+    checkReload( );
+
+    return m_totalDbRootCount;
 }
 
 /*******************************************************************************
@@ -448,7 +410,7 @@ std::string Config::getDBRootByNum(unsigned num)
  * RETURN:
  *    The list of DBRoot ids
  ******************************************************************************/
-void Config::getRootIdList( std::vector<uint16_t>& rootIds )
+void Config::getRootIdList( std::vector<u_int16_t>& rootIds )
 {
     boost::mutex::scoped_lock lk(fCacheLock);
     checkReload( );
@@ -632,7 +594,7 @@ std::string Config::getLocalModuleType()
  * PARAMETERS:
  *    none
  ******************************************************************************/
-uint16_t Config::getLocalModuleID()
+u_int16_t Config::getLocalModuleID()
 {
     boost::mutex::scoped_lock lk(fCacheLock);
     checkReload( );
@@ -676,6 +638,5 @@ bool Config::hasLocalDBRootListChanged()
 
     return false;
 }
-
-
+   
 } //end of namespace

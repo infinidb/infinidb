@@ -16,10 +16,10 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: dictstep-jl.h 9655 2013-06-25 23:08:13Z xlou $
+// $Id: dictstep-jl.h 8436 2012-04-04 18:18:21Z rdempsey $
 // C++ Interface: dictstep-js
 //
-// Description:
+// Description: 
 //
 //
 // Author: Patrick LeBlanc <pleblanc@calpont.com>, (C) 2008
@@ -44,7 +44,7 @@ class DictStepJL : public CommandJL
 		DictStepJL(const pDictionaryStep &);
 		virtual ~DictStepJL();
 
-		void setLBID(uint64_t data, uint32_t dbroot);		// converts a rid or dictionary token to an LBID.  For ColumnCommandJL it's a RID, for a DictStep it's a token.
+		void setLBID(uint64_t data, uint dbroot);		// converts a rid or dictionary token to an LBID.  For ColumnCommandJL it's a RID, for a DictStep it's a token.
 		uint8_t getTableColumnType();
 		std::string toString();
 

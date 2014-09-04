@@ -9,30 +9,6 @@
 		<!-- System Type: combined (um and pm functionality on same instance)
 					separate (um and pm functionality on separate instances) -->
 		<SystemType>separate</SystemType>
-
-		<!--- VPC Configuration Setup -->
-		<!---  						  -->
-		<!--- subnet ID -->
-		<!--- The ID of the Amazon VPC subnet in which to launch the instance(s) -->
-		<SubNetID>unassigned</SubNetID>
-		
-		<!-- VPC Starting Private IP Address -->
-		<!-- Requires the SubNetID to be setup -->
-		<!-- Use this if you want InfiniDB to assigned IP Addresses starting with this one -->
-		<!-- Set value to 'autoassign' if you want Amazon to auto-assign IP Addresses within the subnet range -->
-		<VPCStartPrivateIP>unassigned</VPCStartPrivateIP>
-		
-		<!-- User Modules Private IP Address list, use when running on a Amazon VPC -->
-		<!-- Requires the SubNetID to be setup -->
-		<!-- This list would start with um1, list is seperated by commands. i.e 'ip1,ip2,ip3' -->
-		<!-- IGNORED when VPCStartPrivateIP is set -->
-		<UserModulePrivateIP>unassigned</UserModulePrivateIP>
-		
-		<!-- Performance Modules Private IP Address list, use when running on a Amazon VPC -->
-		<!-- Requires the SubNetID to be setup -->
-		<!-- This list would start with pm2, list is seperated by commands. i.e 'ip1,ip2,ip3' -->
-		<!-- IGNORED when VPCStartPrivateIP is set -->
-		<PerformanceModulePrivateIP>unassigned</PerformanceModulePrivateIP>
 		
 		<!-- Elastic IP to Module Assignment -->
 		<!--- Example usages: x.x.x.x:um1 -->
@@ -60,6 +36,14 @@
 		<!-- Applicable for system type = 'separate' only -->
 		<UMEBSVolumeSize>10</UMEBSVolumeSize>
 		
+		<!-- User Module MySQL Database Auto Sync -->
+		<!-- Setting this enables the Automatic syncing of the MySQL Database from the Primary User Module -->
+		<!-- to other User Modules. And will sync the dastabase when a new User Module is Added -->
+		<UserModuleAutoSync>y</UserModuleAutoSync>
+		
+		<!-- User Module MySQL Database Auto Sync Time in Minutes -->
+		<UserModuleSyncTime>10</UserModuleSyncTime>
+		
 		<!-- Number of Performance Modules -->
 		<PerformanceModuleCount>2</PerformanceModuleCount>
 		
@@ -80,7 +64,8 @@
 		<!-- SNMP Trap Receiver IP Address: 0.0.0.0 means no snmptraps will be forwarded -->
 		<SNMPTrapIPAddr>0.0.0.0</SNMPTrapIPAddr>
 		
-		<!-- Total UM Memory Size Percentage, default to postConfigure setting -->
+		<!-- Total UM Memory Size, default to postConfigure setting -->
+		<!-- Use xxG for Gigibytes, ie. 16G, xxM for megabytes, ie. 256M -->
 		<TotalUmMemory>unassigned</TotalUmMemory>
 		
 		<!-- Blocks Cache Size Percentage, default to postConfigure setting -->
@@ -88,6 +73,9 @@
 
 		<!-- Root Password or 'ssh' for ssh-key setup -->
 		<RootPassword>Calpont1</RootPassword>
+		
+		<!-- License Key, default to 30 days -->
+		<LicenseKey>unassigned</LicenseKey>
 		
 		<!-- Enables Automatic Amazon Instance/Volume tagging -->
 		<!-- When set 'y', Instance Name Tags will be set to 'system-name'-'module-name' -->

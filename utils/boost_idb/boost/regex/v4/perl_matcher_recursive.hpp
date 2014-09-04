@@ -641,13 +641,7 @@ bool perl_matcher<BidiIterator, Allocator, traits>::match_set_repeat()
    if(::boost::is_random_access_iterator<BidiIterator>::value)
    {
       BidiIterator end = position;
-      // Move end forward by "desired", preferably without using distance or advance if we can
-      // as these can be slow for some iterator types.
-      std::size_t len = (desired == (std::numeric_limits<std::size_t>::max)()) ? 0u : ::boost::re_detail::distance(position, last);
-      if(desired >= len)
-         end = last;
-      else
-         std::advance(end, desired);
+      std::advance(end, (std::min)((std::size_t)::boost::re_detail::distance(position, last), desired));
       BidiIterator origin(position);
       while((position != end) && map[static_cast<unsigned char>(traits_inst.translate(*position, icase))])
       {
@@ -737,13 +731,7 @@ bool perl_matcher<BidiIterator, Allocator, traits>::match_long_set_repeat()
    if(::boost::is_random_access_iterator<BidiIterator>::value)
    {
       BidiIterator end = position;
-      // Move end forward by "desired", preferably without using distance or advance if we can
-      // as these can be slow for some iterator types.
-      std::size_t len = (desired == (std::numeric_limits<std::size_t>::max)()) ? 0u : ::boost::re_detail::distance(position, last);
-      if(desired >= len)
-         end = last;
-      else
-         std::advance(end, desired);
+      std::advance(end, (std::min)((std::size_t)::boost::re_detail::distance(position, last), desired));
       BidiIterator origin(position);
       while((position != end) && (position != re_is_set_member(position, last, set, re.get_data(), icase)))
       {

@@ -57,7 +57,7 @@ void makeAntiJoin(const ParseTree* n)
 	if (!sf)
 		return;
 	uint64_t lJoinInfo = sf->lhs()->joinInfo();
-
+	
 	if (lJoinInfo & JOIN_SEMI)
 	{
 		lJoinInfo &= ~JOIN_SEMI;
@@ -77,7 +77,7 @@ void makeAntiJoin(const ParseTree* n)
 	}
 }
 
-InSub::InSub(gp_walk_info& gwip) : WhereSubQuery(gwip)
+InSub::InSub(gp_walk_info& gwip) : WhereSubQuery(gwip) 
 {}
 
 InSub::InSub(gp_walk_info& gwip, Item_func* func) :
@@ -109,31 +109,31 @@ execplan::ParseTree* InSub::transform()
 		fGwip.parseErrorText = "Unsupported item in IN subquery";
 		return NULL;
 	}
-
+	
 	ReturnedColumn* rhs = fGwip.rcWorkStack.top();
 	fGwip.rcWorkStack.pop();
 	delete rhs;
 	ReturnedColumn* lhs = fGwip.rcWorkStack.top();
-	fGwip.rcWorkStack.pop();
-	delete lhs;
-
+	fGwip.rcWorkStack.pop();	
+	delete lhs;	
+	
 	fSub = (Item_subselect*)(fFunc->arguments()[1]);
 	idbassert(fSub && fFunc);
-
+	
 	SCSEP csep (new CalpontSelectExecutionPlan());
-	csep->sessionID(fGwip.sessionid);
+	csep->sessionID(fGwip.sessionid);	
 	csep->location(CalpontSelectExecutionPlan::WHERE);
 	csep->subType (CalpontSelectExecutionPlan::IN_SUBS);
-
+	
 	// gwi for the sub query
 	gp_walk_info gwi;
 	gwi.thd = fGwip.thd;
 	gwi.subQuery = this;
-
+	
 	// @4827 merge table list to gwi in case there is FROM sub to be referenced
 	// in the FROM sub
-	gwi.derivedTbCnt = fGwip.derivedTbList.size();
-	uint32_t tbCnt = fGwip.tbList.size();
+	uint derivedTbCnt = fGwip.derivedTbList.size();
+	uint tbCnt = fGwip.tbList.size();
 
 	gwi.tbList.insert(gwi.tbList.begin(), fGwip.tbList.begin(), fGwip.tbList.end());
 	gwi.derivedTbList.insert(gwi.derivedTbList.begin(), fGwip.derivedTbList.begin(), fGwip.derivedTbList.end());
@@ -147,23 +147,21 @@ execplan::ParseTree* InSub::transform()
 			fGwip.parseErrorText = "Error occured in InSub::transform()";
 		return NULL;
 	}
-
+	
 	// remove outer query tables
 	CalpontSelectExecutionPlan::TableList tblist;
 	if (csep->tableList().size() >= tbCnt)
 		tblist.insert(tblist.begin(),csep->tableList().begin()+tbCnt, csep->tableList().end());
 	CalpontSelectExecutionPlan::SelectList derivedTbList;
-	if (csep->derivedTableList().size() >= gwi.derivedTbCnt)
-		derivedTbList.insert(derivedTbList.begin(), 
-		                     csep->derivedTableList().begin()+gwi.derivedTbCnt, 
-		                     csep->derivedTableList().end());
-
+	if (csep->derivedTableList().size() >= derivedTbCnt)
+		derivedTbList.insert(derivedTbList.begin(), csep->derivedTableList().begin()+derivedTbCnt, csep->derivedTableList().end());
+	
 	csep->tableList(tblist);
 	csep->derivedTableList(derivedTbList);
-
+		
 	ExistsFilter *subFilter = new ExistsFilter();
 	subFilter->sub(csep);
-
+	
 	if (gwi.subQuery->correlated())
 		subFilter->correlated(true);
 	else
@@ -173,9 +171,8 @@ execplan::ParseTree* InSub::transform()
 		fGwip.fatalParseError = true;
 		fGwip.parseErrorText = logging::IDBErrorInfo::instance()->errorMsg(logging::ERR_NON_SUPPORT_HAVING);
 	}
-
-	fGwip.subselectList.push_back(csep);
-	return new ParseTree(subFilter);
+	
+	return new ParseTree(subFilter);	
 }
 
 /**
@@ -196,7 +193,7 @@ void InSub::handleFunc(gp_walk_info* gwip, Item_func* func)
 			return;
 		}
 		Item_cond* cond;
-
+		
 		if (func->functype() == Item_func::TRIG_COND_FUNC)
 		{
 			Item* item;
@@ -233,9 +230,9 @@ void InSub::handleFunc(gp_walk_info* gwip, Item_func* func)
 				//idbassert(sf && sf->op()->op() == execplan::OP_EQ);
 				if (!sf || sf->op()->op() != execplan::OP_EQ)
 					return;
-
+					
 				// set NULLMATCH for both operand. It's really a setting for the join.
-				// should only set NULLMATCH when the subtype is NOT_IN. for some IN subquery
+				// should only set NULLMATCH when the subtype is NOT_IN. for some IN subquery 
 				// with aggregation column, MySQL inefficiently convert to:
 				// (cache=item or item is null) and item is not null, which is equivalent to
 				// cache = item. Do not set NULLMATCH for this case.
@@ -259,7 +256,7 @@ void InSub::handleFunc(gp_walk_info* gwip, Item_func* func)
 			SimpleFilter *sf = dynamic_cast<SimpleFilter*>(pt->data());
 			if (!sf || sf->op()->op() != execplan::OP_EQ)
 				return;
-
+					
 			if (sf->lhs()->joinInfo() & JOIN_CORRELATED)
 				sf->lhs()->joinInfo(sf->lhs()->joinInfo() | JOIN_NULLMATCH_CANDIDATE);
 			if (sf->rhs()->joinInfo() & JOIN_CORRELATED)

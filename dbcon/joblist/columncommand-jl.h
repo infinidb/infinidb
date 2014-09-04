@@ -16,10 +16,10 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: columncommand-jl.h 9655 2013-06-25 23:08:13Z xlou $
+// $Id: columncommand-jl.h 8757 2012-07-27 19:00:31Z pleblanc $
 // C++ Interface: columncommand
 //
-// Description:
+// Description: 
 //
 //
 // Author: Patrick LeBlanc <pleblanc@calpont.com>, (C) 2008
@@ -42,14 +42,15 @@ class ColumnCommandJL : public CommandJL
 {
 public:
 	ColumnCommandJL(const pColScanStep &, std::vector<BRM::LBID_t> lastLBID);
+	ColumnCommandJL(const pColScanStep &);
 	ColumnCommandJL(const pColStep &);
 	virtual ~ColumnCommandJL();
 
-	virtual void createCommand(messageqcpp::ByteStream &bs) const;
-	virtual void runCommand(messageqcpp::ByteStream &bs) const;
-	void setLBID(uint64_t rid, uint32_t dbroot);
+	void createCommand(messageqcpp::ByteStream &bs) const;
+	void runCommand(messageqcpp::ByteStream &bs) const;
+	void setLBID(uint64_t rid, uint dbroot);
 	uint8_t getTableColumnType();
-	virtual std::string toString();
+	std::string toString();
 	uint16_t getWidth();
 	CommandType getCommandType() { return COLUMN_COMMAND; }
 	// @bug 1098
@@ -58,18 +59,14 @@ public:
 	const uint16_t getFilterCount() const { return filterCount; }
 	const std::vector<struct BRM::EMEntry>& getExtents() { return extents; }
 	const execplan::CalpontSystemCatalog::ColType& getColType() const { return colType; }
+	bool isCharType() const;
 	bool isDict() const { return fIsDict; }
 
 	void  scan(bool b) { isScan = b; }
 	bool  scan() { return isScan; }
+	uint8_t fcnOrd() { return fFcnOrd; }
 
 	void reloadExtents();
-
-protected:
-    uint32_t currentExtentIndex;
-	messageqcpp::ByteStream filterString;
-	std::vector<struct BRM::EMEntry> extents;
-	execplan::CalpontSystemCatalog::ColType colType;
 
 private:
 	ColumnCommandJL();
@@ -82,19 +79,23 @@ private:
 	uint32_t traceFlags;  // probably move this to Command
 	uint8_t BOP;
 	uint32_t rpbShift, divShift, modMask;
+	std::vector<struct BRM::EMEntry> extents;
+	messageqcpp::ByteStream filterString;
 	uint16_t filterCount;
+	uint8_t fFcnOrd;
 	std::vector<BRM::LBID_t> fLastLbid;
 
+	// care about colDataType, colWidth and scale fields.  On the PM the rest is uninitialized
+	execplan::CalpontSystemCatalog::ColType colType;
 	bool fIsDict;
 
 	// @Bug 2889.  Added two members below for drop partition enhancement.
 	// RJD: make sure that we keep enough significant digits around for partition math
 	uint64_t fFilesPerColumnPartition;
 	uint64_t fExtentsPerSegmentFile;
+	uint64_t fExtentRows;
 
-	uint32_t numDBRoots;
-	uint32_t dbroot;
-
+	uint numDBRoots;
 	static const unsigned DEFAULT_FILES_PER_COLUMN_PARTITION = 32;
 	static const unsigned DEFAULT_EXTENTS_PER_SEGMENT_FILE   =  4;
 };

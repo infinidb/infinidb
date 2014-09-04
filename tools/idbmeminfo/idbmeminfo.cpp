@@ -132,23 +132,29 @@ int main(int argc, char** argv)
 {
 	opterr = 0;
 	int c;
+	bool mFlg = true;
 	bool gFlg = false;
 	bool tFlg = true;
+	bool fFlg = false;
 
 	while ((c = getopt(argc, argv, "tfgmh")) != EOF)
 		switch (c)
 		{
 		case 'm':
+			mFlg = true;
 			gFlg = false;
 			break;
 		case 'g':
+			mFlg = false;
 			gFlg = true;
 			break;
 		case 't':
 			tFlg = true;
+			fFlg = false;
 			break;
 		case 'f':
 			tFlg = false;
+			fFlg = true;
 			break;
 		case 'h':
 		case '?':

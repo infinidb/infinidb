@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: cvt_em.cpp 1823 2013-01-21 14:13:09Z rdempsey $
+ * $Id: cvt_em.cpp 1547 2012-04-04 18:19:01Z rdempsey $
  *
  ****************************************************************************/
 
@@ -140,8 +140,8 @@ int ExtentMapConverter::doCvt(unsigned oldExtentSize, unsigned newExtentSize, co
 	try {
 		typedef map<int, vector<int> > OIDMap_t;
 		OIDMap_t OIDMap;
-		uint8_t buf[emNumElements * sizeof(EMEntry)]; 
-		uint8_t buf2[flNumElements * sizeof(InlineLBIDRange)];
+		u_int8_t buf[emNumElements * sizeof(EMEntry)]; 
+		u_int8_t buf2[flNumElements * sizeof(InlineLBIDRange)];
 
 		in.read((char *) buf, emNumElements * sizeof(EMEntry));
 

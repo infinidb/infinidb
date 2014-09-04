@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_div.cpp 3921 2013-06-19 18:59:56Z bwilkinson $
+* $Id: func_div.cpp 3048 2012-04-04 15:33:45Z rdempsey $
 *
 *
 ****************************************************************************/
@@ -60,22 +60,6 @@ int64_t Func_div::getIntVal(rowgroup::Row& row,
 }
 
 
-uint64_t Func_div::getUintVal(rowgroup::Row& row,
-						      FunctionParm& parm,
-						      bool& isNull,
-						      CalpontSystemCatalog::ColType& op_ct)
-{
-	uint64_t val1 = parm[0]->data()->getUintVal(row, isNull);
-	uint64_t val2 = parm[1]->data()->getUintVal(row, isNull);
-	if (val2 == 0)
-	{
-		isNull = true;
-		return 0;
-	}
-	return val1 / val2;
-}
-
-
 double Func_div::getDoubleVal(rowgroup::Row& row,
 						FunctionParm& parm,
 						bool& isNull,
@@ -90,7 +74,9 @@ string Func_div::getStrVal(rowgroup::Row& row,
 							bool& isNull,
 							CalpontSystemCatalog::ColType& ct)
 {
-	return intToString(getIntVal(row, parm, isNull, ct));
+	ostringstream oss;
+	oss << getIntVal(row, parm, isNull, ct);
+	return oss.str();
 }
 
 

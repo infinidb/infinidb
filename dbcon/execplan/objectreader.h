@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: objectreader.h 9633 2013-06-19 13:36:01Z rdempsey $
+ * $Id: objectreader.h 8436 2012-04-04 18:18:21Z rdempsey $
  *
  *****************************************************************************/
 
@@ -68,7 +68,7 @@ public:
 	enum CLASSID {
 		ZERO,      // an appropriate initializer
 		NULL_CLASS,		// to denote that some member is NULL
-
+		
 		/**** TreeNodes */
 		TREENODE,
 		TREENODEIMPL,
@@ -79,18 +79,12 @@ public:
 		CONSTANTCOLUMN,
 		FUNCTIONCOLUMN,
 		ROWCOLUMN,
-		WINDOWFUNCTIONCOLUMN,
-		PSEUDOCOLUMN,
-
+		
 		SIMPLECOLUMN,
 		SIMPLECOLUMN_INT1,
 		SIMPLECOLUMN_INT2,
 		SIMPLECOLUMN_INT4,
 		SIMPLECOLUMN_INT8,
-		SIMPLECOLUMN_UINT1,
-		SIMPLECOLUMN_UINT2,
-		SIMPLECOLUMN_UINT4,
-		SIMPLECOLUMN_UINT8,
 		SIMPLECOLUMN_DECIMAL1,
 		SIMPLECOLUMN_DECIMAL2,
 		SIMPLECOLUMN_DECIMAL4,
@@ -109,14 +103,14 @@ public:
 		LOGICOPERATOR,
 
 		/**** /TreeNodes */
-
+		
 		PARSETREE,
 		CALPONTSELECTEXECUTIONPLAN,
 		CONSTANTFILTER,
 		OUTERJOINONFILTER,
 	};
 
-	typedef uint8_t id_t;    //expand as necessary
+	typedef u_int8_t id_t;    //expand as necessary
 
 	/** @brief Creates a new TreeNode object from the ByteStream
 	 *
@@ -124,30 +118,34 @@ public:
 	 * @return A newly allocated TreeNode
 	 */
 	static TreeNode* createTreeNode(messageqcpp::ByteStream& b);
-
+	
 	/** @brief Creates a new ParseTree from the ByteStream
 	 *
+	 * @note This is much faster than a version that creates a fully
+	 * generalized ExpressionTree<T> but is obviously less flexible.
 	 * @param b The ByteStream to create it from
 	 * @return A newly allocated ParseTree
 	 */
 	static ParseTree* createParseTree(messageqcpp::ByteStream& b);
-
+	
 	/** @brief Creates a new CalpontExecutionPlan from the ByteStream
 	 *
 	 * @param b The ByteStream to create it from
 	 * @return A newly allocated CalpontExecutionPlan
 	 */
 	static CalpontExecutionPlan* createExecutionPlan(messageqcpp::ByteStream& b);
-
+	
 	/** @brief Serialize() for ParseTrees
 	 *
-	 * This function effectively serializes a ParseTree.
+	 * This function effectively serializes a ParseTree.  It is not part
+	 * of ExpressionTree because it cannot be easily generalized for all
+	 * possible instantiations.
 	 * @param tree The ParseTree to write out
 	 * @param b The ByteStream to write tree to
 	 */
-	static void writeParseTree(const ParseTree* tree,
-				   messageqcpp::ByteStream& b);
-
+	static void writeParseTree(const ParseTree* tree, 
+							   messageqcpp::ByteStream& b);
+	
 	/** @brief Verify the type of the next object in the ByteStream
 	 *
 	 * @param b The ByteStream to read from

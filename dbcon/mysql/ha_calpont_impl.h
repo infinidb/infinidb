@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
- * $Id: ha_calpont_impl.h 9413 2013-04-22 22:03:42Z zzhu $
+ * $Id: ha_calpont_impl.h 8436 2012-04-04 18:18:21Z rdempsey $
  */
 
 /** @file */
@@ -29,7 +29,7 @@
 #ifdef NEED_CALPONT_EXTERNS
 extern int ha_calpont_impl_create(const char *name, TABLE *table_arg, HA_CREATE_INFO *create_info);
 extern int ha_calpont_impl_delete_table(const char *name);
-extern int ha_calpont_impl_open(const char *name, int mode, uint32_t test_if_locked);
+extern int ha_calpont_impl_open(const char *name, int mode, uint test_if_locked);
 extern int ha_calpont_impl_close(void);
 extern int ha_calpont_impl_rnd_init(TABLE* table);
 extern int ha_calpont_impl_rnd_next(uchar *buf, TABLE* table);
@@ -46,7 +46,6 @@ extern int ha_calpont_impl_external_lock(THD *thd, TABLE* table, int lock_type);
 extern int ha_calpont_impl_update_row();
 extern int ha_calpont_impl_delete_row();
 extern int ha_calpont_impl_rnd_pos(uchar *buf, uchar *pos);
-extern void ha_calpont_impl_set_error(THD* thd, uint64_t errCode, LEX_STRING* args, uint32_t argCount);
 #endif
 
 #ifdef NEED_CALPONT_INTERFACE
@@ -54,7 +53,6 @@ extern void ha_calpont_impl_set_error(THD* thd, uint64_t errCode, LEX_STRING* ar
 #include "calpontsystemcatalog.h"
 extern int ha_calpont_impl_rename_table_(const char* from, const char* to, cal_impl_if::cal_connection_info& ci);
 extern int ha_calpont_impl_write_row_(uchar *buf, TABLE* table, cal_impl_if::cal_connection_info& ci, ha_rows& rowsInserted);
-extern int ha_calpont_impl_write_batch_row_(uchar *buf,TABLE* table, cal_impl_if::cal_connection_info& ci);
 extern int ha_calpont_impl_write_last_batch(TABLE* table, cal_impl_if::cal_connection_info& ci, bool abort);
 extern int ha_calpont_impl_commit_ (handlerton *hton, THD *thd, bool all, cal_impl_if::cal_connection_info& ci);
 extern int ha_calpont_impl_rollback_ (handlerton *hton, THD *thd, bool all, cal_impl_if::cal_connection_info& ci);

@@ -1,19 +1,10 @@
-/* Copyright (C) 2014 InfiniDB, Inc.
-
-   This program is free software; you can redistribute it and/or
-   modify it under the terms of the GNU General Public License
-   as published by the Free Software Foundation; version 2 of
-   the License.
-
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-   MA 02110-1301, USA. */
+/******************************************************************************************
+* $Id: main.cpp 1976 2013-02-08 16:50:01Z dhill $
+*
+* Copyright (C) 2009-2012 Calpont Corporation
+*
+* All rights reserved
+******************************************************************************************/
 
 #include <boost/interprocess/shared_memory_object.hpp>
 #include <boost/interprocess/mapped_region.hpp>
@@ -23,8 +14,6 @@ namespace bi=boost::interprocess;
 #include "processmonitor.h"
 #include "installdir.h"
 
-#include "IDBPolicy.h"
-
 using namespace std;
 using namespace messageqcpp;
 using namespace processmonitor;
@@ -32,7 +21,6 @@ using namespace oam;
 using namespace logging;
 using namespace snmpmanager;
 using namespace config;
-using namespace idbdatafile;
 
 //using namespace procheartbeat;
 
@@ -47,7 +35,6 @@ string systemOAM;
 string dm_server;
 string cloud;
 string GlusterConfig = "n";
-bool HDFS = false;
 
 void updateShareMemory(processStatusList* aPtr);
 
@@ -55,7 +42,6 @@ bool runStandby = false;
 bool processInitComplete = false;
 bool rootUser = true;
 string USER = "root";
-string PMwithUM = "n";
 
 //extern std::string gOAMParentModuleName;
 extern bool gOAMParentModuleFlag;
@@ -88,9 +74,6 @@ int main(int argc, char **argv)
 		open("/dev/null", O_WRONLY);
 	}
 
-	// setup environment for using HDFS.
-	idbdatafile::IDBPolicy::configIDBPolicy();
-
 	Oam oam;
 	MonitorLog log;
 	MonitorConfig config;
@@ -117,25 +100,18 @@ int main(int argc, char **argv)
 	if (p && *p)
    		USER = p;
 
-	// change permissions on /dev/shm
-	string cmd = "chmod 777 /dev/shm >/dev/null 2>&1";
-	if ( !rootUser)
-		cmd = "sudo chmod 777 /dev/shm >/dev/null 2>&1";
-
-	system(cmd.c_str());
-
-  	// get and set locale language    
+  // get and set locale language    
 	string systemLang = "C";
 
 	try{
-        	oam.getSystemConfig("SystemLang", systemLang);
-	}
-	catch(...)
-	{
+        oam.getSystemConfig("SystemLang", systemLang);
+    }
+    catch(...)
+    {
 		systemLang = "C";
 	}
 
-    	setlocale(LC_ALL, systemLang.c_str());
+    setlocale(LC_ALL, systemLang.c_str());
 
 	// if amazon cloud, check and update Instance IP Addresses and volumes
 	try {
@@ -143,7 +119,7 @@ int main(int argc, char **argv)
 	}
 	catch(...) {}
 
-	if ( cloud == "amazon-ec2" ) {
+	if ( cloud == "amazon" ) {
 		if(!aMonitor.amazonIPCheck()) {
 			string cmd = startup::StartUp::installDir() + "/bin/infinidb stop > /dev/null 2>&1";
 			system(cmd.c_str());
@@ -162,24 +138,6 @@ int main(int argc, char **argv)
 
 	if ( GlusterConfig == "y" ) {
 		system("mount -a > /dev/null 2>&1");
-	}
-
-	//hdfs / hadoop config 
-	string DBRootStorageType;
-	try {
-		oam.getSystemConfig( "DBRootStorageType", DBRootStorageType);
-	}
-	catch(...) {}
-
-	if ( DBRootStorageType == "hdfs" )
-		HDFS = true;
-
-	//PMwithUM config 
-	try {
-		oam.getSystemConfig( "PMwithUM", PMwithUM);
-	}
-	catch(...) {
-		PMwithUM = "n";
 	}
 
 	//define entry if missing
@@ -292,8 +250,8 @@ int main(int argc, char **argv)
 	}
 
 	// not active Parent, get updated Calpont.xml, retry in case ProcMgr isn't up yet
-	if ( !gOAMParentModuleFlag && !HDFS)
-	{
+	if ( !gOAMParentModuleFlag )
+	{ 
 		int count = 0;
 		while(true)
 		{
@@ -332,17 +290,11 @@ int main(int argc, char **argv)
 			try {
 				bool degraded;
 				oam.getModuleStatus(config.moduleName(), moduleStatus, degraded);
-				// if HDFS, wait until module state is MAN_INIT before continuing
-				if (HDFS)
-				{
-					if ( moduleStatus == oam::MAN_INIT)
-						break;
-				}
 				break;
 			}
 			catch(...)
 			{
-				log.writeLog(__LINE__, "wating for good return from getModuleStatus", LOG_TYPE_DEBUG);
+				log.writeLog(__LINE__, "error return from getModuleStatus", LOG_TYPE_DEBUG);
 				sleep (1);
 			}
 		}
@@ -402,9 +354,35 @@ int main(int argc, char **argv)
 		if ( ret != 0 )
 			log.writeLog(__LINE__, "pthread_create failed, return code = " + oam.itoa(ret), LOG_TYPE_ERROR);
 
-		sleep(6);	// give the Status thread time to fully initialize
+		sleep(5);	// give the Status thread time to fully initialize
 
+/*		if ( config.ServerInstallType() == oam::INSTALL_COMBINE_DM_UM_PM ) {
+			// start mysqld to make sure it's running
+			// need for addmodule command
+			try {
+				oam.actionMysqlCalpont(MYSQL_START);
+			}
+			catch(...)
+			{}
+		}
+*/	}
+/*	else
+	{	// um, start mysqld to make sure it's running
+		// need for reconfiguremodule command
+		try {
+			oam.actionMysqlCalpont(MYSQL_START);
+		}
+		catch(...)
+		{}
 	}
+*/
+
+	// stop mysqld to make sure it's not running after reboot
+	try {
+		oam.actionMysqlCalpont(MYSQL_STOP);
+	}
+	catch(...)
+	{}
 
 	SystemStatus systemstatus;
 
@@ -493,7 +471,7 @@ int main(int argc, char **argv)
 				if ( procstat.ProcessOpState == oam::ACTIVE )
 					break;
 				sleep(1);
-				log.writeLog(__LINE__, "Waiting for process-manager to go ACTIVE", LOG_TYPE_DEBUG);
+				log.writeLog(__LINE__, "Waiting for process-manager to go ACTIVE", LOG_TYPE_ERROR);
 			}
 			catch (exception& ex)
 			{
@@ -553,13 +531,11 @@ int main(int argc, char **argv)
 				systemprocessconfig.processconfig[i].LaunchID == 0 )
 			continue;
 
-		if ( (systemprocessconfig.processconfig[i].ModuleType == config.moduleType() ) ||
-			( systemprocessconfig.processconfig[i].ModuleType == "um" && 
-				config.moduleType() == "pm" && PMwithUM == "y") ||
-			( systemprocessconfig.processconfig[i].ModuleType == "ChildExtOAMModule") ||
-			( systemprocessconfig.processconfig[i].ModuleType == "ChildOAMModule" ) ||
-			( systemprocessconfig.processconfig[i].ModuleType == "ParentOAMModule" &&
-			  	config.moduleType() == OAMParentModuleType ) )
+		if (systemprocessconfig.processconfig[i].ModuleType == config.moduleType() ||
+			systemprocessconfig.processconfig[i].ModuleType == "ChildExtOAMModule" ||
+			(systemprocessconfig.processconfig[i].ModuleType == "ChildOAMModule" ) ||
+			(systemprocessconfig.processconfig[i].ModuleType == "ParentOAMModule" &&
+			config.moduleType() == OAMParentModuleType ) )
 		{
 			// If Process Monitor, update local state
 			if ( systemprocessconfig.processconfig[i].ProcessName == "ProcessMonitor")
@@ -579,17 +555,6 @@ int main(int argc, char **argv)
 			}	
 			else
 			{
-				if ( systemprocessconfig.processconfig[i].ModuleType == "um" && 
-					config.moduleType() == "pm" && PMwithUM == "y" &&
-					systemprocessconfig.processconfig[i].ProcessName == "DMLProc" )
-					continue;
-
-
-				if ( systemprocessconfig.processconfig[i].ModuleType == "um" && 
-					config.moduleType() == "pm" && PMwithUM == "y" &&
-					systemprocessconfig.processconfig[i].ProcessName == "DDLProc" )
-					continue;
-
 				// Get Last Known Process Status and PID
 				int state = oam::AUTO_OFFLINE;
 				int PID = 0;
@@ -954,9 +919,11 @@ static void sigchldHandleThread()
 static void	SIGCHLDHandler(int signal_number)
 {
 	int status;
+	pid_t procID;
 
-	waitpid(-1, &status, WNOHANG);
-
+	procID = waitpid(-1, &status, WNOHANG);
+//	procID = wait(&status);
+//	if (WIFEXITED (status))
 	return;
 }
 
@@ -1041,9 +1008,7 @@ static void chldHandleThread(MonitorConfig config)
 
 								//force restart the un-initted process
 								log.writeLog(__LINE__, (*listPtr).ProcessName + "/" + oam.itoa((*listPtr).processID) + " failed to init in 20 seconds, force killing it so it can restart", LOG_TYPE_CRITICAL);
-								//skip killing 0 or 1
-								if ( (*listPtr).processID > 1 )
-									kill((*listPtr).processID, SIGKILL);
+								kill((*listPtr).processID, SIGKILL);
 								break;
 							}
 							break;
@@ -1088,21 +1053,6 @@ static void chldHandleThread(MonitorConfig config)
 								log.writeLog(__LINE__, (*listPtr).ProcessName + " failed initialization", LOG_TYPE_WARNING);
 								aMonitor.sendAlarm((*listPtr).ProcessName, PROCESS_INIT_FAILURE, SET);
 								(*listPtr).state = state;
-
-								//setModule status to failed
-								try{
-									oam.setModuleStatus(config.moduleName(), oam::FAILED);
-								}
-								catch (exception& ex)
-								{
-									string error = ex.what();
-									log.writeLog(__LINE__, "EXCEPTION ERROR on setModuleStatus: " + error, LOG_TYPE_ERROR);
-								}
-								catch(...)
-								{
-									log.writeLog(__LINE__, "EXCEPTION ERROR on setModuleStatus: Caught unknown exception!", LOG_TYPE_ERROR);
-								}
-
 								break;
 							}
 
@@ -1456,23 +1406,10 @@ static void statusControlThread()
 				string processModuleType = systemprocessconfig.processconfig[j].ModuleType;
 
 				if (processModuleType == systemModuleType
-					|| ( processModuleType == "um" && 
-						systemModuleType == "pm" && PMwithUM == "y")
 					|| processModuleType == "ChildExtOAMModule"
 					|| (processModuleType == "ChildOAMModule" )
 					|| (processModuleType == "ParentOAMModule" && systemModuleType == OAMParentModuleType) )
 				{
-					if ( processModuleType == "um" && 
-						systemModuleType == "pm" && PMwithUM == "y" &&
-						systemprocessconfig.processconfig[j].ProcessName == "DMLProc" )
-						continue;
-	
-	
-					if ( processModuleType == "um" && 
-						systemModuleType == "pm" && PMwithUM == "y" &&
-						systemprocessconfig.processconfig[j].ProcessName == "DDLProc" )
-						continue;
-	
 					processstatus procstat;
 					procstat.ProcessName = systemprocessconfig.processconfig[j].ProcessName;
 					procstat.ModuleName = (*pt).DeviceName;
@@ -1880,7 +1817,7 @@ static void statusControlThread()
 
 	//Initialize Shared memory
 	if (memInit) {
-		// Init DBRoot Status Memory
+		// Init Ext Device Status Memory
 		memset(fShmDbrootStatus, 0, DBROOTSTATshmsize);
 		for ( int i=0; i < dbrootNumber ; ++i)
 		{
@@ -1902,6 +1839,9 @@ static void statusControlThread()
 	//
 	ModuleTypeConfig moduletypeconfig;
 
+	ByteStream msg;
+	IOSocket fIos;
+
 	//read and cleanup port before trying to use
 	try {
 		Config* sysConfig = Config::makeConfig();
@@ -1910,6 +1850,7 @@ static void statusControlThread()
 		if ( !rootUser)
 			cmd = "sudo fuser -k " + port + "/tcp >/dev/null 2>&1";
 
+		
 		system(cmd.c_str());
 	}
 	catch(...)
@@ -1918,16 +1859,11 @@ static void statusControlThread()
 
 	log.writeLog(__LINE__, "statusControlThread Thread reading " + portName + " port", LOG_TYPE_DEBUG);
 
-	ByteStream msg;
-	IOSocket fIos;
-	MessageQueueServer* mqs=0;
-
-	struct timespec ts = { 1, 0 };
-
 	for (;;)
 	{
 		try
 		{
+			MessageQueueServer* mqs;
 			mqs = new MessageQueueServer(portName);
 			mqs->syncProto(false);
 
@@ -1940,9 +1876,6 @@ static void statusControlThread()
 					mqs = new MessageQueueServer(portName);
 					mqs->syncProto(false);
 					log.writeLog(__LINE__, "statusControlThread Thread reading " + portName + " port", LOG_TYPE_DEBUG);
-
-					processStatusList* aPtr = aMonitor.statusListPtr();
-					updateShareMemory(aPtr);
 				}
 
 				if (runStandby && portName == "ProcStatusControl") {
@@ -1953,6 +1886,7 @@ static void statusControlThread()
 					log.writeLog(__LINE__, "statusControlThread Thread reading " + portName + " port", LOG_TYPE_DEBUG);
 				}
 
+				struct timespec ts = { 1, 0 };
 				try
 				{
 					fIos = mqs->accept(&ts);
@@ -2032,7 +1966,7 @@ static void statusControlThread()
 									fIos.write(ackmsg);
 								}
 
-								log.writeLog(__LINE__, "statusControl: REQUEST RECEIVED: Set Process " + moduleName + "/" + processName + " State = " + oamState[state], LOG_TYPE_DEBUG);
+								log.writeLog(__LINE__, "statusControl: REQUEST RECEIVED: Set Process " + moduleName + "/" + processName + " State = " + oam.itoa(state), LOG_TYPE_DEBUG);
 
 								processStatusList::iterator listPtr;
 								processStatusList* aPtr = aMonitor.statusListPtr();
@@ -2050,7 +1984,7 @@ static void statusControlThread()
 		
 								if (listPtr == aPtr->end()) {
 									// not in list
-									log.writeLog(__LINE__, "statusControl: SET_PROC_STATUS: Process not valid: " + moduleName + "/" + processName, LOG_TYPE_DEBUG);
+									log.writeLog(__LINE__, "statusControl: SET_PROC_STATUS: Process not valid: " + processName + " / " + moduleName, LOG_TYPE_DEBUG);
 									break;
 								}
 
@@ -2105,38 +2039,18 @@ static void statusControlThread()
 								// invalid state change ACTIVE TO MAN_INIT / AUTO_INIT
 								if ( fShmProcessStatus[shmIndex].ProcessOpState == oam::ACTIVE ) {
 									if ( state == oam::MAN_INIT || state == oam::AUTO_INIT ) {
-										log.writeLog(__LINE__, "statusControl: " + moduleName + "/" + processName + " Current State = ACTIVE, invalid update request to " + oamState[state], LOG_TYPE_DEBUG);
+										log.writeLog(__LINE__, "statusControl: Process " + processName + " of module " + moduleName + " Current State = ACTIVE, invalid update request to " + oam.itoa(state), LOG_TYPE_DEBUG);
 										break;
 									}
 								}
 
-								if (  PID < 0 )
-									PID = 0;
-
-								log.writeLog(__LINE__, "statusControl: Set Process " + moduleName + "/" + processName +  + " State = " + oamState[state] + " PID = " + oam.itoa(PID), LOG_TYPE_DEBUG);
+								log.writeLog(__LINE__, "statusControl: Set Process " + processName + " of module " + moduleName + " State = " + oam.itoa(state) + " PID = " + oam.itoa(PID), LOG_TYPE_DEBUG);
 
 								//update table
-								if (  state < STATE_MAX )
-									fShmProcessStatus[shmIndex].ProcessOpState = state;
+								fShmProcessStatus[shmIndex].ProcessOpState = state;
 								if (  PID != 1 )
 									fShmProcessStatus[shmIndex].ProcessID = PID;
 								memcpy(fShmProcessStatus[shmIndex].StateChangeDate, oam.getCurrentTime().c_str(), DATESIZE);
-
-								//if DMLProc set to ACTIVE, set system state to ACTIVE
-								if ( processName == "DMLProc" && state == oam::ACTIVE )
-								{
-									fShmSystemStatus[0].OpState = state;
-									memcpy(fShmSystemStatus[0].StateChangeDate, oam.getCurrentTime().c_str(), DATESIZE);
-									log.writeLog(__LINE__, "statusControl: REQUEST RECEIVED: Set System State = " + oamState[state], LOG_TYPE_DEBUG);
-								}
-
-								//if DMLProc set to BUSY_INIT, set system state to BUSY_INIT
-								if ( processName == "DMLProc" && state == oam::BUSY_INIT )
-								{
-									fShmSystemStatus[0].OpState = state;
-									memcpy(fShmSystemStatus[0].StateChangeDate, oam.getCurrentTime().c_str(), DATESIZE);
-									log.writeLog(__LINE__, "statusControl: REQUEST RECEIVED: Set System State = " + oamState[state], LOG_TYPE_DEBUG);
-								}
 							}
 							break;
 		
@@ -2152,7 +2066,7 @@ static void statusControlThread()
 								processStatusList::iterator listPtr;
 								processStatusList* aPtr = aMonitor.statusListPtr();
 
-								ackmsg << (ByteStream::quadbyte) aPtr->size();
+								ackmsg << (ByteStream::byte) aPtr->size();
 		
 								for ( unsigned int i = 0 ; i < systemModuleTypeConfig.moduletypeconfig.size(); i++)
 								{
@@ -2331,7 +2245,7 @@ static void statusControlThread()
 								msg >> state;
 								fShmSystemStatus[0].OpState = state;
 								memcpy(fShmSystemStatus[0].StateChangeDate, oam.getCurrentTime().c_str(), DATESIZE);
-								log.writeLog(__LINE__, "statusControl: REQUEST RECEIVED: Set System State = " + oamState[state], LOG_TYPE_DEBUG);
+								log.writeLog(__LINE__, "statusControl: REQUEST RECEIVED: Set System State = " + oam.itoa(state), LOG_TYPE_DEBUG);
 
 								if (!runStandby) {
 									ByteStream ackmsg;
@@ -2357,7 +2271,7 @@ static void statusControlThread()
 									fIos.write(ackmsg);
 								}
 
-								log.writeLog(__LINE__, "statusControl: REQUEST RECEIVED: Set Module " + moduleName + " State = " + oamState[state], LOG_TYPE_DEBUG);
+								log.writeLog(__LINE__, "statusControl: REQUEST RECEIVED: Set Module " + moduleName + " State = " + oam.itoa(state), LOG_TYPE_DEBUG);
 
 								//Handle Module RunType of ACTIVE_STANDBY
 								string moduletype = moduleName.substr(0,MAX_MODULE_TYPE_SIZE);
@@ -2528,7 +2442,7 @@ static void statusControlThread()
 									fIos.write(ackmsg);
 								}
 
-								log.writeLog(__LINE__, "statusControl: REQUEST RECEIVED: Set Ext Device " + name + " State = " + oamState[state], LOG_TYPE_DEBUG);
+								log.writeLog(__LINE__, "statusControl: REQUEST RECEIVED: Set Ext Device " + name + " State = " + oam.itoa(state), LOG_TYPE_DEBUG);
 		
 								int i=0;
 								for ( ; i < extDeviceNumber; ++i)
@@ -2566,7 +2480,7 @@ static void statusControlThread()
 									fIos.write(ackmsg);
 								}
 
-								log.writeLog(__LINE__, "statusControl: REQUEST RECEIVED: Set DBroot " + name + " State = " + oamState[state], LOG_TYPE_DEBUG);
+								log.writeLog(__LINE__, "statusControl: REQUEST RECEIVED: Set DBroot " + name + " State = " + oam.itoa(state), LOG_TYPE_DEBUG);
 
 								if ( dbrootNumber == 0 ) {
 									// no dbroots setup in shared memory, must be internal
@@ -2610,7 +2524,7 @@ static void statusControlThread()
 									fIos.write(ackmsg);
 								}
 
-								log.writeLog(__LINE__, "statusControl: REQUEST RECEIVED: Set NIC " + hostName + " State = " + oamState[state], LOG_TYPE_DEBUG);
+								log.writeLog(__LINE__, "statusControl: REQUEST RECEIVED: Set NIC " + hostName + " State = " + oam.itoa(state), LOG_TYPE_DEBUG);
 
 								int i=0;
 								for ( ; i < NICNumber; ++i)
@@ -2693,23 +2607,10 @@ static void statusControlThread()
 										string processModuleType = systemprocessconfig.processconfig[j].ModuleType;
 
 										if (processModuleType == moduleType
-										|| ( processModuleType == "um" && 
-											moduleType == "pm" && PMwithUM == "y")
 											|| processModuleType == "ChildExtOAMModule"
 											|| (processModuleType == "ChildOAMModule" )
 											|| (processModuleType == "ParentOAMModule" && moduleType == OAMParentModuleType) )
 										{
-											if ( processModuleType == "um" && 
-												moduleType == "pm" && PMwithUM == "y" &&
-												systemprocessconfig.processconfig[j].ProcessName == "DMLProc" )
-												continue;
-							
-							
-											if ( processModuleType == "um" && 
-												moduleType == "pm" && PMwithUM == "y" &&
-												systemprocessconfig.processconfig[j].ProcessName == "DDLProc" )
-												continue;
-
 											processstatus procstat;
 											procstat.ProcessName = systemprocessconfig.processconfig[j].ProcessName;
 											procstat.ModuleName = (*pt).DeviceName;
@@ -2856,9 +2757,9 @@ static void statusControlThread()
 
 								msg >> device;
 
-								for ( int j=0 ; j < extDeviceNumber ; j++ )
+								for ( int j=0 ; j < fmoduleNumber ; j++ )
 								{
-									memcpy(charName, fShmExtDeviceStatus[j].Name, NAMESIZE);
+									memcpy(charName, fShmSystemStatus[j].Name, NAMESIZE);
 									shmName = charName;
 									if ( device == shmName ) {
 										for ( int k=j+1 ; k < extDeviceNumber ; k++)
@@ -2877,65 +2778,6 @@ static void statusControlThread()
 
 								if (!runStandby) {
 									ackmsg << (ByteStream::byte) REMOVE_EXT_DEVICE;
-									fIos.write(ackmsg);
-								}
-							}
-							break;
-
-							case ADD_DBROOT:
-							{
-								ByteStream ackmsg;
-								string device;
-
-								log.writeLog(__LINE__, "statusControl: REQUEST RECEIVED: Add DBRoot");
-
-								msg >> device;
-
-								fShmDbrootStatus[dbrootNumber].OpState = oam::INITIAL;
-								memcpy(fShmDbrootStatus[dbrootNumber].Name, device.c_str(), NAMESIZE);
-								memcpy(fShmDbrootStatus[dbrootNumber].StateChangeDate, oam.getCurrentTime().c_str(), DATESIZE);
-
-								dbrootNumber++;
-
-								if (!runStandby) {
-									ackmsg << (ByteStream::byte) ADD_DBROOT;
-									fIos.write(ackmsg);
-								}
-							}
-							break;
-
-							case REMOVE_DBROOT:
-							{
-								ByteStream ackmsg;
-								string device;
-								std::string shmName;
-								char charName[NAMESIZE];
-
-								log.writeLog(__LINE__, "statusControl: REQUEST RECEIVED: Remove DBRoot");
-
-								msg >> device;
-
-								for ( int j=0 ; j < dbrootNumber ; j++ )
-								{
-									memcpy(charName, fShmDbrootStatus[j].Name, NAMESIZE);
-									shmName = charName;
-									if ( device == shmName ) {
-										for ( int k=j+1 ; k < dbrootNumber ; k++)
-										{
-											string name = fShmDbrootStatus[k].Name;
-											int state = fShmDbrootStatus[k].OpState;
-											string changeDate = fShmDbrootStatus[k].StateChangeDate;
-
-											memcpy(fShmDbrootStatus[j].Name, name.c_str(), NAMESIZE);
-											fShmDbrootStatus[j].OpState = state;
-											memcpy(fShmDbrootStatus[j].StateChangeDate, changeDate.c_str(), DATESIZE);
-										}
-										dbrootNumber--;
-									}
-								}
-
-								if (!runStandby) {
-									ackmsg << (ByteStream::byte) REMOVE_DBROOT;
 									fIos.write(ackmsg);
 								}
 							}
@@ -2980,6 +2822,7 @@ static void statusControlThread()
 		
 						} // end of switch
 					}
+
 				}
 				catch (exception& ex)
 				{
@@ -3023,8 +2866,6 @@ static void statusControlThread()
 			// takes 2 - 4 minites to free sockets, sleep and retry
 			sleep(1);
         }
-
-		delete mqs;
 	}
 }
 

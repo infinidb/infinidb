@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*********************************************************************
- *   $Id: tdriver.cpp 1823 2013-01-21 14:13:09Z rdempsey $
+ *   $Id: tdriver.cpp 1547 2012-04-04 18:19:01Z rdempsey $
  *
  ********************************************************************/
 
@@ -243,11 +243,11 @@ public:
 		ExtentMap em;
 		int i, err, oid, iterations = 1300;  // (EM_INITIAL_SIZE + 3*EM_INCREMENT)
 		int caughtException = 0, allocdSize;
-		uint32_t fbo, hwm;
+		u_int32_t fbo, hwm;
 		BRM::HWM_t hwm2;
 		BRM::VER_t txnID;
 		vector<LBID_t> lbids;
-		const uint32_t extentSize = em.getExtentSize();
+		const uint extentSize = em.getExtentSize();
 		
 // 		cerr << "em_good_1" << endl;
 
@@ -255,7 +255,7 @@ public:
 			em.createExtent(extentSize, i, lbids, allocdSize);
 			em.confirmChanges();
 			CPPUNIT_ASSERT(lbids.size() == 1);
-			CPPUNIT_ASSERT((uint32_t)allocdSize == extentSize);
+			CPPUNIT_ASSERT((uint)allocdSize == extentSize);
 			CPPUNIT_ASSERT(lbids.back() == static_cast<LBID_t>((i-1)*extentSize));
 		}
 		
@@ -306,10 +306,10 @@ public:
 			
 			hwm = em.getHWM(i);
 			CPPUNIT_ASSERT(hwm == 0);
-			em.setHWM(i, ((uint32_t)i > (extentSize - 1) ? extentSize - 1 : i));
+			em.setHWM(i, ((uint)i > (extentSize - 1) ? extentSize - 1 : i));
 			em.confirmChanges();
 			hwm = em.getHWM(i);
-			CPPUNIT_ASSERT(hwm == static_cast<uint32_t>((uint32_t)i > extentSize-1 ? extentSize-1 : i));
+			CPPUNIT_ASSERT(hwm == static_cast<u_int32_t>((uint)i > extentSize-1 ? extentSize-1 : i));
 		}
 
 		em.checkConsistency();
@@ -353,17 +353,17 @@ public:
 		ExtentMap em;
 		int i, err, iterations = 1300;  // (EM_INITIAL_SIZE + 3*EM_INCREMENT)
 		int caughtException = 0, allocdSize;
-		uint32_t hwm;
+		u_int32_t hwm;
 		BRM::HWM_t hwm2;
 		BRM::VER_t txnID;
 		vector<LBID_t> lbids;
-		const uint32_t extentSize = em.getExtentSize();
+		const uint extentSize = em.getExtentSize();
 		
 		for (i = 1; i < iterations; i++) {
 			em.createRangeExtent(extentSize, i, lbids, allocdSize, EMRangePartition_t(0, 10, true,true));
 			em.confirmChanges();
 			CPPUNIT_ASSERT(lbids.size() == 1);
-			CPPUNIT_ASSERT((uint32_t)allocdSize == extentSize);
+			CPPUNIT_ASSERT((uint)allocdSize == extentSize);
 			CPPUNIT_ASSERT(lbids.back() == static_cast<LBID_t>((i-1)*extentSize));
 		}
 		
@@ -559,11 +559,11 @@ public:
 		BlockResolutionManager brm;
 		int i, err, oid, allocdSize, 
 			iterations = 1300;  // (EM_INITIAL_SIZE + 3*EM_INCREMENT)
-		uint32_t fbo, hwm;
+		u_int32_t fbo, hwm;
 		vector<LBID_t> lbids;
 		HWM_t hwm2;
 		VER_t txnID;
-		const uint32_t extentSize = brm.getExtentSize();
+		const uint extentSize = brm.getExtentSize();
 		
 // 		cerr << "brm_extentmap_good_1" << endl;
 
@@ -629,7 +629,7 @@ public:
 		uint32_t offset;
 		for(i=1; i < iterations; i++) {
 			lbid = (i-1)*extentSize;
-			for (int j=0; (uint32_t)j < extentSize;j++)
+			for (int j=0; (uint)j < extentSize;j++)
 				lbidVector.push_back(lbid+j);
 			err=em.markInvalid(lbidVector);
 			em.confirmChanges();
@@ -688,11 +688,11 @@ public:
 			err = brm.getHWM(i, hwm);
 			CPPUNIT_ASSERT(err == 0);
 			CPPUNIT_ASSERT(hwm == 0);
-			err = brm.setHWM(i, ((uint32_t)i > extentSize - 1 ? extentSize - 1 : i));
+			err = brm.setHWM(i, ((uint)i > extentSize - 1 ? extentSize - 1 : i));
 			CPPUNIT_ASSERT(err == 0);
 			err = brm.getHWM(i, hwm);
 			CPPUNIT_ASSERT(err == 0);
-			CPPUNIT_ASSERT(hwm == static_cast<uint32_t>((uint32_t)i > extentSize - 1 ? extentSize - 1 : i));
+			CPPUNIT_ASSERT(hwm == static_cast<u_int32_t>((uint)i > extentSize - 1 ? extentSize - 1 : i));
 		}
 		
  		CPPUNIT_ASSERT(brm.checkConsistency() == 0);
@@ -724,11 +724,11 @@ public:
 			oid, 
 			allocdSize, 
 			iterations = 1300;  // (EM_INITIAL_SIZE + 3*EM_INCREMENT)
-		uint32_t fbo, hwm;
+		u_int32_t fbo, hwm;
 		vector<LBID_t> lbids;
 		HWM_t hwm2;
 		VER_t txnID;
-		const uint32_t extentSize = brm.getExtentSize();
+		const uint extentSize = brm.getExtentSize();
 	    LBIDRange_v lbidList;
 	
 // 		cerr << "brm_extentmap_range_1" << endl;
@@ -788,7 +788,7 @@ public:
 			CPPUNIT_ASSERT(err == 0);
 			err = brm.getHWM(i, hwm);
 			CPPUNIT_ASSERT(err == 0);
-			CPPUNIT_ASSERT(hwm == static_cast<uint32_t>(i > extentSize - 1 ? extentSize - 1 : i));
+			CPPUNIT_ASSERT(hwm == static_cast<u_int32_t>(i > extentSize - 1 ? extentSize - 1 : i));
 		}
 		
  		CPPUNIT_ASSERT(brm.checkConsistency() == 0);
@@ -825,7 +825,7 @@ public:
 		vector<VBRange>::iterator vbRangesIT;
 		EMEntry em;
 		OID_t oid;
-		uint32_t fbo;
+		u_int32_t fbo;
 		LBIDRange range;
 		VBRange vbRange;
 		VER_t verID;
@@ -859,7 +859,7 @@ public:
 		
 		em = *(extents.begin());
 // 		CPPUNIT_ASSERT(em.range.start == 0);
- 		CPPUNIT_ASSERT(em.range.size*1024 == static_cast<uint32_t>(brm.getExtentSize()));
+ 		CPPUNIT_ASSERT(em.range.size*1024 == static_cast<u_int32_t>(brm.getExtentSize()));
 		CPPUNIT_ASSERT(em.HWM == 0);
 		CPPUNIT_ASSERT(em.blockOffset == 0);
 		
@@ -958,7 +958,7 @@ public:
 			err = brm.lookup(i, verID, vbFlag, oid, fbo);
 			CPPUNIT_ASSERT(err == 0);
 			CPPUNIT_ASSERT(oid == vbRange.vbOID);
-			CPPUNIT_ASSERT(fbo == static_cast<uint32_t>(i + vbRange.vbFBO));
+			CPPUNIT_ASSERT(fbo == static_cast<u_int32_t>(i + vbRange.vbFBO));
 			
 			vbbm.lock(VBBM::WRITE);
 			vss.lock(VSS::WRITE);
@@ -1006,7 +1006,7 @@ public:
 		LBIDRange_v tmp;
 		EMEntry em;
 		OID_t oid;
-		uint32_t fbo;
+		u_int32_t fbo;
 		LBIDRange range;
 		VBRange vbRange;
 		VER_t verID;
@@ -1039,7 +1039,7 @@ public:
 		
 		em = *(extents.begin());
  		CPPUNIT_ASSERT(em.range.start == 0);
-		CPPUNIT_ASSERT(em.range.size*1024 == static_cast<uint32_t>(brm.getExtentSize()));
+		CPPUNIT_ASSERT(em.range.size*1024 == static_cast<u_int32_t>(brm.getExtentSize()));
 		CPPUNIT_ASSERT(em.HWM == 0);
 		CPPUNIT_ASSERT(em.blockOffset == 0);
 		
@@ -1144,7 +1144,7 @@ public:
 			err = brm.lookup(i, verID, vbFlag, oid, fbo);
 			CPPUNIT_ASSERT(err == 0);
 			CPPUNIT_ASSERT(oid == 1);
-			CPPUNIT_ASSERT(fbo == static_cast<uint32_t>(i));
+			CPPUNIT_ASSERT(fbo == static_cast<u_int32_t>(i));
 			
 			vbbm.lock(VBBM::WRITE);
 			vss.lock(VSS::WRITE);
@@ -1261,7 +1261,7 @@ public:
 		vector<VBRange>::iterator it;
 		int i, iterations = 100010, err;
 		OID_t oid;
-		uint32_t fbo, fbo2;
+		u_int32_t fbo, fbo2;
 		
 		// Buildbot times out on the getBlocks() call during leakcheck b/c it takes
 		// > 5 mins for some reason.  Have to ping it before 300 seconds go by.
@@ -1311,7 +1311,7 @@ public:
 			err = vbbm.lookup(i, i+1, oid, fbo);
 			CPPUNIT_ASSERT(err == 0);
 			CPPUNIT_ASSERT(oid == i + 2);
-			CPPUNIT_ASSERT(fbo == static_cast<uint32_t>(i + 3));
+			CPPUNIT_ASSERT(fbo == static_cast<u_int32_t>(i + 3));
 		}
 		*/
 
@@ -1333,7 +1333,7 @@ public:
 			err = vbbm.lookup(i, i+1, oid, fbo);
 			CPPUNIT_ASSERT(err == 0);
 			CPPUNIT_ASSERT(oid == i + 2);
-			CPPUNIT_ASSERT(fbo == static_cast<uint32_t>(i + 3));
+			CPPUNIT_ASSERT(fbo == static_cast<u_int32_t>(i + 3));
 	} */
 		
 //   		cerr << "step 4/4: remove all entries" << endl;
@@ -1533,7 +1533,7 @@ public:
 		ExtentMap **ems;
 		int i, allocdSize, iterations = 1400;  // (EM_INITIAL_SIZE + 4*EM_INCREMENT)
 		vector<LBID_t> lbids;
-		uint32_t extentSize;
+		uint extentSize;
 		
 //  		cerr << endl << "Extent Map instance test" << endl;
 		

@@ -1,4 +1,4 @@
-# $Id: SubsystemIDs.txt 3929 2013-06-20 18:27:03Z dhill $
+# $Id: SubsystemIDs.txt 3022 2012-03-22 12:58:08Z pleblanc $
 #
 # This file contains the mapping of numeric Subsystem IDs to actual software and 
 #  hardware subsystems. This file is intended as a simple mechanism to control the
@@ -11,7 +11,7 @@
 04 - execplan 
 05 - joblist 
 06 - resultset 
-07 - calpontConsole 
+07 - calpont-console 
 08 - oamcpp 
 09 - servermonitor 
 10 - traphandler 

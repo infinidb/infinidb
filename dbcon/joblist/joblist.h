@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: joblist.h 9623 2013-06-13 19:56:23Z rdempsey $
+//  $Id: joblist.h 9227 2013-01-28 22:58:06Z xlou $
 
 
 /** @file */
@@ -68,7 +68,7 @@ public:
 	virtual int doQuery();
 
 	/* returns row count */
-	virtual uint32_t projectTable(execplan::CalpontSystemCatalog::OID, messageqcpp::ByteStream&) = 0;
+	virtual uint projectTable(execplan::CalpontSystemCatalog::OID, messageqcpp::ByteStream&) = 0;
 	virtual int  putEngineComm(DistributedEngineComm*);
 
 	virtual void addQuery(const JobStepVector& query) { fQuery = query; }
@@ -79,8 +79,8 @@ public:
 	virtual void querySummary(bool extendedStats);
 	virtual void graph(uint32_t sessionID);
 
-	virtual const SErrorInfo& errorInfo() const { return errInfo; }
-	virtual void errorInfo(SErrorInfo sp) { errInfo = sp; }
+	virtual const SErrorInfo& statusPtr() const { return errInfo; }
+	virtual void statusPtr(SErrorInfo sp) { errInfo = sp; }
 
 	virtual const uint32_t status() const { return errInfo->errCode; }
 	virtual void status(uint32_t ec) { errInfo->errCode = ec; }
@@ -113,12 +113,16 @@ public:
 	 */
 	EXPORT virtual void abort();
 	EXPORT virtual bool aborted()
-		{ return (fAborted != 0); }
+#ifdef _MSC_VER
+	{ return (fAborted != 0); }
+#else
+	{ return fAborted; }
+#endif
 
 	std::string toString() const;
 
-	void priority(uint32_t p) { fPriority = p; }
-	uint32_t priority() { return fPriority; }
+	void priority(uint p) { _priority = p; }
+	uint priority() { return _priority; }
 
 	// @bug4848, enhance and unify limit handling.
 	EXPORT virtual void abortOnLimit(JobStep* js);
@@ -143,9 +147,13 @@ protected:
 	std::string fMiniInfo;
 	std::vector<SJLP> subqueryJoblists;
 
-	volatile uint32_t fAborted;
+#ifdef _MSC_VER
+	volatile LONG fAborted;
+#else
+	volatile bool fAborted;
+#endif
 
-	uint32_t fPriority;   //higher #s = higher priority
+	uint _priority;   //higher #s = higher priority
 };
 
 class TupleJobList : public JobList
@@ -154,7 +162,7 @@ public:
 	TupleJobList(bool isEM=false);
 	virtual ~TupleJobList();
 
-	EXPORT uint32_t projectTable(execplan::CalpontSystemCatalog::OID, messageqcpp::ByteStream&);
+	EXPORT uint projectTable(execplan::CalpontSystemCatalog::OID, messageqcpp::ByteStream&);
 	EXPORT const rowgroup::RowGroup& getOutputRowGroup() const;
 	TupleDeliveryStep* getDeliveryStep() { return ds; }
 	const JobStepVector& querySteps() const { return fQuery; }
@@ -179,6 +187,8 @@ private:
 };
 
 typedef boost::shared_ptr<TupleJobList> STJLP;
+
+EXPORT void init_mysqlcl_idb();
 
 }
 

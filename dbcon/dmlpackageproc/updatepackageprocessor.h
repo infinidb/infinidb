@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: updatepackageprocessor.h 9302 2013-03-07 16:06:59Z chao $
+ *   $Id: updatepackageprocessor.h 8436 2012-04-04 18:18:21Z rdempsey $
  *
  *
  ***********************************************************************/
@@ -29,7 +29,7 @@
 #include <vector>
 #include "joblist.h"
 
-#if defined(_MSC_VER) && defined(DMLPKGPROC_DLLEXPORT)
+#if defined(_MSC_VER) && defined(UPDATEPKGPROC_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
@@ -45,7 +45,7 @@ class UpdatePackageProcessor : public DMLPackageProcessor
 {
 
 public:
-	UpdatePackageProcessor(BRM::DBRM* aDbrm, uint32_t sid) : DMLPackageProcessor(aDbrm, sid) {
+	UpdatePackageProcessor() : DMLPackageProcessor() {
 	}
     /** @brief process an UpdateDMLPackage
      *
@@ -62,7 +62,7 @@ private:
 	 * @param result the result of the operation
      * @return rows processed
      */
-    uint64_t fixUpRows(dmlpackage::CalpontDMLPackage& cpackage, DMLResult& result, const uint64_t uniqueId, const uint32_t tableOid);
+    uint64_t fixUpRows(dmlpackage::CalpontDMLPackage& cpackage, DMLResult& result, const uint64_t uniqueId);
 
 
     /** @brief send row group to the PM to process
@@ -71,8 +71,8 @@ private:
 	 * @param result the result of the operation
      * @return the error code
      */
-    bool processRowgroup(messageqcpp::ByteStream & aRowGroup, DMLResult& result, const uint64_t uniqueId, dmlpackage::CalpontDMLPackage& cpackage, std::map<unsigned, bool>& pmState, bool isMeta = false, uint32_t dbroot=1);
-	bool receiveAll(DMLResult& result, const uint64_t uniqueId, std::vector<int>& fPMs, std::map<unsigned, bool>& pmState, const uint32_t tableOid);
+    bool processRowgroup(messageqcpp::ByteStream & aRowGroup, DMLResult& result, const uint64_t uniqueId, dmlpackage::CalpontDMLPackage& cpackage, bool isMeta = false, uint dbroot=1);
+	bool receiveAll(DMLResult& result, const uint64_t uniqueId, std::vector<int>& fPMs);
 	};
 
 }

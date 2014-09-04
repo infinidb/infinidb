@@ -17,7 +17,7 @@
 
 /***************************************************************************
  *
- *   $Id: filebuffermgr.cpp 2045 2013-01-30 20:26:59Z pleblanc $
+ *   $Id: filebuffermgr.cpp 2046 2013-01-31 19:13:16Z pleblanc $
  *
  *   jrodriguez@calpont.com   *
  *                                                                         *
@@ -181,7 +181,7 @@ void FileBufferMgr::flushManyAllversion(const LBID_t* laVptr, uint32_t cnt)
 	if (fCacheSize == 0 || cnt == 0)
 		return;
 
-	for (uint32_t i = 0; i < cnt; i++)
+	for (uint i = 0; i < cnt; i++)
 		uniquer.insert(laVptr[i]);
 
 	for (it = fbSet.begin(); it != fbSet.end();) {
@@ -202,10 +202,10 @@ void FileBufferMgr::flushManyAllversion(const LBID_t* laVptr, uint32_t cnt)
 void FileBufferMgr::flushOIDs(const uint32_t *oids, uint32_t count)
 {
 	DBRM dbrm;
-	uint32_t i;
+	uint i;
 	vector<EMEntry> extents;
 	int err;
-	uint32_t currentExtent;
+	uint currentExtent;
 	LBID_t currentLBID;
 	typedef tr1::unordered_multimap<LBID_t, filebuffer_uset_t::iterator> byLBID_t;
 	byLBID_t byLBID;
@@ -213,7 +213,7 @@ void FileBufferMgr::flushOIDs(const uint32_t *oids, uint32_t count)
 	filebuffer_uset_t::iterator it;
 
 	// If there are more than this # of extents to drop, the whole cache will be cleared
-	const uint32_t clearThreshold = 50000;
+	const uint clearThreshold = 50000;
 
 	mutex::scoped_lock lk(fWLock);
 	
@@ -255,10 +255,10 @@ void FileBufferMgr::flushOIDs(const uint32_t *oids, uint32_t count)
 void FileBufferMgr::flushPartition(const vector<OID_t> &oids, const set<BRM::LogicalPartition> &partitions)
 {
 	DBRM dbrm;
-	uint32_t i;
+	uint i;
 	vector<EMEntry> extents;
 	int err;
-	uint32_t currentExtent;
+	uint currentExtent;
 	LBID_t currentLBID;
 	typedef tr1::unordered_multimap<LBID_t, filebuffer_uset_t::iterator> byLBID_t;
 	byLBID_t byLBID;
@@ -368,7 +368,7 @@ bool FileBufferMgr::find(const HashObject_t& keyFb, void* bufferPtr)
 	filebuffer_uset_iter_t it = fbSet.find(keyFb);
 	if (fbSet.end()!=it)
 	{
-		uint32_t idx = it->poolIdx;
+		uint idx = it->poolIdx;
 
 		//@bug 669 LRU cache, move block to front of list as last recently used.
 		fFBPool[idx].listLoc()->hits++;
@@ -387,12 +387,12 @@ bool FileBufferMgr::find(const HashObject_t& keyFb, void* bufferPtr)
 	return ret;
 }
 
-uint32_t FileBufferMgr::bulkFind(const BRM::LBID_t *lbids, const BRM::VER_t *vers, uint8_t **buffers,
-  bool *wasCached, uint32_t count)
+uint FileBufferMgr::bulkFind(const BRM::LBID_t *lbids, const BRM::VER_t *vers, uint8_t **buffers,
+  bool *wasCached, uint count)
 {
-	uint32_t i, ret = 0;
+	uint i, ret = 0;
 	filebuffer_uset_iter_t *it = (filebuffer_uset_iter_t *) alloca(count * sizeof(filebuffer_uset_iter_t));
-	uint32_t *indexes = (uint32_t *) alloca(count * 4);
+	uint *indexes = (uint *) alloca(count * 4);
 	
 	if (gPMProfOn && gPMStatsPtr) {
 		for (i = 0; i < count; i++) {
@@ -664,7 +664,7 @@ uint32_t FileBufferMgr::doBlockCopy(const BRM::LBID_t &lbid, const BRM::VER_t &v
 
 int FileBufferMgr::bulkInsert(const vector<CacheInsert_t> &ops)
 {
-	uint32_t i;
+	uint i;
 	int32_t pi;
 	int ret = 0;
 

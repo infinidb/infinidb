@@ -1,11 +1,3 @@
-#! /usr/bin/perl -w
-#
-# $Id: genErrId.pl 3048 2012-04-04 15:33:45Z rdempsey $
-#
-
-open FH, "< ./ErrorMessage.txt" or die;
-
-$frontmatter = <<'EOD';
 /* Copyright (C) 2014 InfiniDB, Inc.
 
    This program is free software; you can redistribute it and/or
@@ -22,6 +14,14 @@ $frontmatter = <<'EOD';
    along with this program; if not, write to the Free Software
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
+these changes are made, Calpont will make a new copy of the Calpont End User
+License Agreement available at http://www.calpont.com and a new copy of the
+Calpont Open Source License Agreement available at http:///www.infinidb.org.
+You understand and agree that if you use the Program after the date on which
+the license agreement authorizing your use has changed, Calpont will treat your
+use as acceptance of the updated License.
+
+*/
 /******************************************************************************************
 * $Id: genErrId.pl 3048 2012-04-04 15:33:45Z rdempsey $
 *

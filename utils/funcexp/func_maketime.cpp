@@ -72,8 +72,8 @@ string Func_maketime::getStrVal(rowgroup::Row& row,
 		case CalpontSystemCatalog::DECIMAL:
 		{
 			IDB_Decimal d = parm[0]->data()->getDecimalVal(row, isNull);
-			hour = d.value / helpers::power(d.scale);
-			int lefto = (d.value - hour * helpers::power(d.scale)) / helpers::power(d.scale-1);
+			hour = d.value / power(d.scale);
+			int lefto = (d.value - hour * power(d.scale)) / power(d.scale-1);
 			if ( hour >= 0 && lefto > 4 )
 				hour++;
 			if ( hour < 0 && lefto < -4 )
@@ -105,8 +105,8 @@ string Func_maketime::getStrVal(rowgroup::Row& row,
 		case CalpontSystemCatalog::DECIMAL:
 		{
 			IDB_Decimal d = parm[1]->data()->getDecimalVal(row, isNull);
-			min = d.value / helpers::power(d.scale);
-			int lefto = (d.value - min * helpers::power(d.scale)) / helpers::power(d.scale-1);
+			min = d.value / power(d.scale);
+			int lefto = (d.value - min * power(d.scale)) / power(d.scale-1);
 			if ( min >= 0 && lefto > 4 )
 				min++;
 			if ( min < 0 && lefto < -4 )
@@ -144,8 +144,8 @@ string Func_maketime::getStrVal(rowgroup::Row& row,
 		case CalpontSystemCatalog::DECIMAL:
 		{
 			IDB_Decimal d = parm[2]->data()->getDecimalVal(row, isNull);
-			sec = d.value / helpers::power(d.scale);
-			int lefto = (d.value - sec * helpers::power(d.scale)) / helpers::power(d.scale-1);
+			sec = d.value / power(d.scale);
+			int lefto = (d.value - sec * power(d.scale)) / power(d.scale-1);
 			if ( sec >= 0 && lefto > 4 )
 				sec++;
 			if ( sec < 0 && lefto < -4 )
@@ -177,11 +177,10 @@ string Func_maketime::getStrVal(rowgroup::Row& row,
 		sec = 59;
 	}
 
-	// in worst case hour is 4 characters (3 digits + '-') so max
-    // string length is 11 (4:2:2 + '\0')
-    char buf[11];
-    snprintf(buf, 11, "%02d:%02d:%02d", (int) hour, (int) min, (int) sec);
-    return buf;
+	ostringstream oss;
+	oss << setw(2) << setfill('0') << hour << ":" << setw(2) << setfill('0') << min << ":" << setw(2) << setfill('0') <<sec;
+
+	return oss.str();
 }
 
 

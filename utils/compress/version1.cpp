@@ -1,20 +1,3 @@
-/* Copyright (C) 2014 InfiniDB, Inc.
-
-   This program is free software; you can redistribute it and/or
-   modify it under the terms of the GNU General Public License
-   as published by the Free Software Foundation; version 2 of
-   the License.
-
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-   MA 02110-1301, USA. */
-
 #ifdef _MSC_VER
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -221,7 +204,7 @@ void initCtlShm()
 	STARTUPINFO sInfo;
 	ZeroMemory(&sInfo, sizeof(sInfo));
 
-	idbassert_s(CreateProcess(0, (LPSTR)srvrpath.c_str(), 0, 0, false, DETACHED_PROCESS, 0, 0, &sInfo, &pInfo) != 0,
+	idbassert_s(CreateProcess(0, (LPSTR)srvrpath.c_str(), 0, 0, false, 0, 0, 0, &sInfo, &pInfo) != 0,
 				"couldn't exec DecomSvr");
 	//if (CreateProcess(0, (LPSTR)srvrpath.c_str(), 0, 0, false, 0, 0, 0, &sInfo, &pInfo) == 0)
 	//	throw runtime_error("couldn't exec DecomSvr");
@@ -310,8 +293,8 @@ void readn(int fd, void* buf, const size_t wanted)
 			oss << "compress::v1::readn: poll() returned " << prc << " (" << strerror(en) << ")";
 			idbassert_s(0, oss.str());
 		}
-		//Check if there's data to be read
-		if ((fds[0].revents & POLLIN) == 0)
+		//revents == POLLHUP if DecomSvr dies in the middle of writing
+		if (fds[0].revents != POLLIN)
 		{
 			oss << "compress::v1::readn: revents for fd " << fds[0].fd << " was " << fds[0].revents;
 			idbassert_s(0, oss.str());
@@ -399,6 +382,7 @@ bool decompress(const char* in, const uint32_t inLen, unsigned char* out, size_t
 	string s;
 	string cpipe;
 	string upipe;
+	int thdid = 0;
 	ScopedCleaner cleaner;
 	int fd = -1;
 
@@ -408,9 +392,9 @@ bool decompress(const char* in, const uint32_t inLen, unsigned char* out, size_t
 	bi::scoped_lock<bi::interprocess_mutex> cfLock(Ctlshmptr->controlFifoMutex, bi::defer_lock);
 
 #ifndef _MSC_VER
-	pthread_t thdid = pthread_self();
+	thdid = pthread_self();
 #else
-	DWORD thdid = GetCurrentThreadId();
+	thdid = GetCurrentThreadId();
 #endif
 
 #ifdef _MSC_VER
@@ -435,7 +419,7 @@ bool decompress(const char* in, const uint32_t inLen, unsigned char* out, size_t
 	//	throw runtime_error("while creating udata fifo");
 	cleaner.upipeh = upipeh;
 #else
-	oss << "/tmp/cdatafifo" << hex << thdid;
+	oss << "/tmp/cdatafifo" << thdid;
 	s = oss.str();
 	cpipe = s + ".c";
 	upipe = s + ".u";

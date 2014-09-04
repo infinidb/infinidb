@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
-* $Id: we_bulkrollbackfilecompressed.h 4726 2013-08-07 03:38:36Z bwilkinson $
+* $Id: we_bulkrollbackfilecompressed.h 3911 2012-06-10 19:12:14Z dcathey $
 */
 
 /** @file
@@ -65,9 +65,9 @@ public:
      * @param segNum Segment number for the segment file in question
      */
     virtual bool doWeReInitExtent( OID columnOID,
-                        uint32_t   dbRoot,
-                        uint32_t   partNum,
-                        uint32_t   segNum) const;
+                        u_int32_t   dbRoot,
+                        u_int32_t   partNum,
+                        u_int32_t   segNum) const;
 
     /** @brief Reinitialize the specified column segment file starting at
      * startOffsetBlk, and truncate trailing extents.
@@ -83,13 +83,13 @@ public:
      * @param restoreHwmChk Restore HWM chunk
      */
     virtual void reInitTruncColumnExtent(OID columnOID,
-                                uint32_t   dbRoot,
-                                uint32_t   partNum,
-                                uint32_t   segNum,
+                                u_int32_t   dbRoot,
+                                u_int32_t   partNum,
+                                u_int32_t   segNum,
                                 long long   startOffsetBlk,
                                 int         nBlocks,
-                                execplan::CalpontSystemCatalog::ColDataType colType,
-                                uint32_t   colWidth,
+                                ColDataType colType,
+                                u_int32_t   colWidth,
                                 bool        restoreHwmChk );
 
     /** @brief Reinitialize the specified dictionary store segment file starting
@@ -103,9 +103,9 @@ public:
      * @param nBlocks Number of blocks to be reinitialized
      */
     virtual void reInitTruncDctnryExtent(OID columnOID,
-                                uint32_t   dbRoot,
-                                uint32_t   partNum,
-                                uint32_t   segNum,
+                                u_int32_t   dbRoot,
+                                u_int32_t   partNum,
+                                u_int32_t   segNum,
                                 long long   startOffsetBlk,
                                 int         nBlocks );
 
@@ -117,9 +117,9 @@ public:
      * @param fileSizeBlocks Number of blocks to retain in the file
      */
     virtual void truncateSegmentFile( OID    columnOID,
-                                uint32_t   dbRoot,
-                                uint32_t   partNum,
-                                uint32_t   segNum,
+                                u_int32_t   dbRoot,
+                                u_int32_t   partNum,
+                                u_int32_t   segNum,
                                 long long   filesSizeBlocks );
 
 private:
@@ -127,22 +127,19 @@ private:
     BulkRollbackFileCompressed(const BulkRollbackFileCompressed& rhs);
     BulkRollbackFileCompressed& operator=(const BulkRollbackFileCompressed& rhs);
 
-    size_t readFillBuffer    (  IDBDataFile* pFile,
-                                char*       buffer,
-                                size_t      bytesReq) const;
-    int restoreHWMChunk      (  IDBDataFile* pFile,
+    int restoreHWMChunk      (  FILE*       pFile,
                                 OID         columnOID,
-                                uint32_t   partNum,
-                                uint32_t   segNum,
+                                u_int32_t   partNum,
+                                u_int32_t   segNum,
                                 uint64_t    fileOffsetByteForRestoredChunk,
                                 uint64_t&   restoredChunkLen,
                                 uint64_t&   restoredFileSize,
                                 std::string& errMsg );
-    int loadColumnHdrPtrs    (  IDBDataFile* pFile,
+    int loadColumnHdrPtrs    (  FILE*       pFile,
                                 char*       hdrs,
                                 compress::CompChunkPtrList& chunkPtrs,
                                 std::string& errMsg) const;
-    int loadDctnryHdrPtrs    (  IDBDataFile* pFile,
+    int loadDctnryHdrPtrs    (  FILE*       pFile,
                                 char*       controlHdr,
                                 compress::CompChunkPtrList& chunkPtrs,
                                 uint64_t&   ptrHdrSize,

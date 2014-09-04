@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: errorcodes.h 3495 2013-01-21 14:09:51Z rdempsey $
+*   $Id: errorcodes.h 3048 2012-04-04 15:33:45Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -72,6 +72,7 @@ enum ErrorCodeValues
  primitiveServerErr,
  projectResultErr,
  hwmRangeSizeErr,
+ multicastErr,
  // user input data error
  formatErr = 201,
  dataTypeErr,

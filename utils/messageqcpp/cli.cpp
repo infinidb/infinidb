@@ -16,7 +16,7 @@ int main(int argc, char** argv)
 	ByteStream obs;
 	string msg("Hello, world!");
 	ByteStream ibs;
-	uint32_t qb;
+	ByteStream::quadbyte qb;
 	for (int i = 0; i < 10; i++)
 	{
 		obs.restart();

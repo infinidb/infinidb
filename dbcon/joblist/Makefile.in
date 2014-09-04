@@ -14,6 +14,25 @@
 
 @SET_MAKE@
 
+#  Copyright (C) 2014 InfiniDB, Inc.
+#
+#  This program is free software; you can redistribute it and/or
+#  modify it under the terms of the GNU General Public License
+#  as published by the Free Software Foundation; version 2 of
+#  the License.
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#
+#  You should have received a copy of the GNU General Public License
+#  along with this program; if not, write to the Free Software
+#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+#  MA 02110-1301, USA.
+
+# $Id: Makefile.am 864 2009-04-02 19:22:49Z rdempsey $
+
 
 srcdir = @srcdir@
 top_srcdir = @top_srcdir@
@@ -41,9 +60,8 @@ subdir = dbcon/joblist
 DIST_COMMON = $(include_HEADERS) $(srcdir)/Makefile.am \
 	$(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
-am__aclocal_m4_deps = $(top_srcdir)/m4/compilerflags.m4 \
-	$(top_srcdir)/m4/functions.m4 $(top_srcdir)/m4/install.m4 \
-	$(top_srcdir)/configure.ac
+am__aclocal_m4_deps = $(top_srcdir)/m4/functions.m4 \
+	$(top_srcdir)/m4/install.m4 $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 mkinstalldirs = $(install_sh) -d
@@ -63,7 +81,6 @@ am_libjoblist_la_OBJECTS = libjoblist_la-anydatalist.lo \
 	libjoblist_la-batchprimitiveprocessor-jl.lo \
 	libjoblist_la-columncommand-jl.lo libjoblist_la-command-jl.lo \
 	libjoblist_la-crossenginestep.lo libjoblist_la-dictstep-jl.lo \
-	libjoblist_la-diskjoinstep.lo \
 	libjoblist_la-distributedenginecomm.lo \
 	libjoblist_la-elementtype.lo libjoblist_la-expressionstep.lo \
 	libjoblist_la-filtercommand-jl.lo libjoblist_la-filterstep.lo \
@@ -80,7 +97,6 @@ am_libjoblist_la_OBJECTS = libjoblist_la-anydatalist.lo \
 	libjoblist_la-passthrustep.lo libjoblist_la-pcolscan.lo \
 	libjoblist_la-pcolstep.lo libjoblist_la-pdictionary.lo \
 	libjoblist_la-pdictionaryscan.lo libjoblist_la-primitivemsg.lo \
-	libjoblist_la-pseudocc-jl.lo \
 	libjoblist_la-resourcedistributor.lo \
 	libjoblist_la-resourcemanager.lo libjoblist_la-rowestimator.lo \
 	libjoblist_la-rtscommand-jl.lo libjoblist_la-subquerystep.lo \
@@ -92,8 +108,7 @@ am_libjoblist_la_OBJECTS = libjoblist_la-anydatalist.lo \
 	libjoblist_la-tuplehashjoin.lo \
 	libjoblist_la-tuplehavingstep.lo libjoblist_la-tupleunion.lo \
 	libjoblist_la-unique32generator.lo \
-	libjoblist_la-virtualtable.lo \
-	libjoblist_la-windowfunctionstep.lo
+	libjoblist_la-virtualtable.lo
 libjoblist_la_OBJECTS = $(am_libjoblist_la_OBJECTS)
 DEFAULT_INCLUDES = -I. -I$(srcdir) -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
@@ -172,9 +187,6 @@ SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
 STRIP = @STRIP@
 VERSION = @VERSION@
-XML2_CONFIG = @XML2_CONFIG@
-XML_CPPFLAGS = @XML_CPPFLAGS@
-XML_LIBS = @XML_LIBS@
 YACC = @YACC@
 ac_ct_AR = @ac_ct_AR@
 ac_ct_CC = @ac_ct_CC@
@@ -216,7 +228,6 @@ idb_exec_libs = @idb_exec_libs@
 idb_ldflags = @idb_ldflags@
 idb_oam_libs = @idb_oam_libs@
 idb_write_libs = @idb_write_libs@
-idbinstall = @idbinstall@
 includedir = @includedir@
 infodir = @infodir@
 install_sh = @install_sh@
@@ -230,11 +241,6 @@ mibdir = @mibdir@
 mkdir_p = @mkdir_p@
 mysqldir = @mysqldir@
 netsnmp_libs = @netsnmp_libs@
-netsnmpagntdir = @netsnmpagntdir@
-netsnmpdir = @netsnmpdir@
-netsnmplibrdir = @netsnmplibrdir@
-netsnmpmachdir = @netsnmpmachdir@
-netsnmpsysdir = @netsnmpsysdir@
 oldincludedir = @oldincludedir@
 postdir = @postdir@
 prefix = @prefix@
@@ -245,23 +251,6 @@ sharedstatedir = @sharedstatedir@
 sysconfdir = @sysconfdir@
 target_alias = @target_alias@
 toolsdir = @toolsdir@
-
-#  Copyright (C) 2014 InfiniDB, Inc.
-#
-#  This program is free software; you can redistribute it and/or
-#  modify it under the terms of the GNU General Public License
-#  as published by the Free Software Foundation; version 2 of
-#  the License.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software
-#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-#  MA 02110-1301, USA.
 AM_CPPFLAGS = $(idb_common_includes) $(idb_cppflags)
 AM_CFLAGS = $(idb_cflags)
 AM_CXXFLAGS = $(idb_cxxflags)
@@ -276,7 +265,6 @@ libjoblist_la_SOURCES = \
         command-jl.cpp \
         crossenginestep.cpp \
         dictstep-jl.cpp \
-        diskjoinstep.cpp \
         distributedenginecomm.cpp \
         elementtype.cpp \
         expressionstep.cpp \
@@ -302,7 +290,6 @@ libjoblist_la_SOURCES = \
         pdictionary.cpp \
         pdictionaryscan.cpp \
         primitivemsg.cpp \
-	pseudocc-jl.cpp \
         resourcedistributor.cpp \
         resourcemanager.cpp \
         rowestimator.cpp \
@@ -319,8 +306,7 @@ libjoblist_la_SOURCES = \
         tuplehavingstep.cpp \
         tupleunion.cpp \
         unique32generator.cpp \
-        virtualtable.cpp \
-		windowfunctionstep.cpp
+        virtualtable.cpp
 
 include_HEADERS = \
         bpp-jl.h \
@@ -329,7 +315,6 @@ include_HEADERS = \
         distributedenginecomm.h \
         elementcompression.h \
         elementtype.h \
-        errorinfo.h \
         fifo.h \
         groupconcat.h \
         jl_logger.h \
@@ -347,8 +332,7 @@ include_HEADERS = \
         threadsafequeue.h \
         timeset.h \
         timestamp.h \
-        unique32generator.h \
-		windowfunctionstep.h
+        unique32generator.h
 
 all: all-am
 
@@ -425,7 +409,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-command-jl.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-crossenginestep.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-dictstep-jl.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-diskjoinstep.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-distributedenginecomm.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-elementtype.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-expressionstep.Plo@am__quote@
@@ -451,7 +434,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-pdictionary.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-pdictionaryscan.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-primitivemsg.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-pseudocc-jl.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-resourcedistributor.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-resourcemanager.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-rowestimator.Plo@am__quote@
@@ -469,7 +451,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-tupleunion.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-unique32generator.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-virtualtable.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-windowfunctionstep.Plo@am__quote@
 
 .cpp.o:
 @am__fastdepCXX_TRUE@	if $(CXXCOMPILE) -MT $@ -MD -MP -MF "$(DEPDIR)/$*.Tpo" -c -o $@ $<; \
@@ -533,13 +514,6 @@ libjoblist_la-dictstep-jl.lo: dictstep-jl.cpp
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='dictstep-jl.cpp' object='libjoblist_la-dictstep-jl.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-dictstep-jl.lo `test -f 'dictstep-jl.cpp' || echo '$(srcdir)/'`dictstep-jl.cpp
-
-libjoblist_la-diskjoinstep.lo: diskjoinstep.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-diskjoinstep.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-diskjoinstep.Tpo" -c -o libjoblist_la-diskjoinstep.lo `test -f 'diskjoinstep.cpp' || echo '$(srcdir)/'`diskjoinstep.cpp; \
-@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-diskjoinstep.Tpo" "$(DEPDIR)/libjoblist_la-diskjoinstep.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-diskjoinstep.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='diskjoinstep.cpp' object='libjoblist_la-diskjoinstep.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-diskjoinstep.lo `test -f 'diskjoinstep.cpp' || echo '$(srcdir)/'`diskjoinstep.cpp
 
 libjoblist_la-distributedenginecomm.lo: distributedenginecomm.cpp
 @am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-distributedenginecomm.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-distributedenginecomm.Tpo" -c -o libjoblist_la-distributedenginecomm.lo `test -f 'distributedenginecomm.cpp' || echo '$(srcdir)/'`distributedenginecomm.cpp; \
@@ -716,13 +690,6 @@ libjoblist_la-primitivemsg.lo: primitivemsg.cpp
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-primitivemsg.lo `test -f 'primitivemsg.cpp' || echo '$(srcdir)/'`primitivemsg.cpp
 
-libjoblist_la-pseudocc-jl.lo: pseudocc-jl.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-pseudocc-jl.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-pseudocc-jl.Tpo" -c -o libjoblist_la-pseudocc-jl.lo `test -f 'pseudocc-jl.cpp' || echo '$(srcdir)/'`pseudocc-jl.cpp; \
-@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-pseudocc-jl.Tpo" "$(DEPDIR)/libjoblist_la-pseudocc-jl.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-pseudocc-jl.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='pseudocc-jl.cpp' object='libjoblist_la-pseudocc-jl.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-pseudocc-jl.lo `test -f 'pseudocc-jl.cpp' || echo '$(srcdir)/'`pseudocc-jl.cpp
-
 libjoblist_la-resourcedistributor.lo: resourcedistributor.cpp
 @am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-resourcedistributor.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-resourcedistributor.Tpo" -c -o libjoblist_la-resourcedistributor.lo `test -f 'resourcedistributor.cpp' || echo '$(srcdir)/'`resourcedistributor.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-resourcedistributor.Tpo" "$(DEPDIR)/libjoblist_la-resourcedistributor.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-resourcedistributor.Tpo"; exit 1; fi
@@ -841,13 +808,6 @@ libjoblist_la-virtualtable.lo: virtualtable.cpp
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='virtualtable.cpp' object='libjoblist_la-virtualtable.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-virtualtable.lo `test -f 'virtualtable.cpp' || echo '$(srcdir)/'`virtualtable.cpp
-
-libjoblist_la-windowfunctionstep.lo: windowfunctionstep.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-windowfunctionstep.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-windowfunctionstep.Tpo" -c -o libjoblist_la-windowfunctionstep.lo `test -f 'windowfunctionstep.cpp' || echo '$(srcdir)/'`windowfunctionstep.cpp; \
-@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-windowfunctionstep.Tpo" "$(DEPDIR)/libjoblist_la-windowfunctionstep.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-windowfunctionstep.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='windowfunctionstep.cpp' object='libjoblist_la-windowfunctionstep.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-windowfunctionstep.lo `test -f 'windowfunctionstep.cpp' || echo '$(srcdir)/'`windowfunctionstep.cpp
 
 mostlyclean-libtool:
 	-rm -f *.lo

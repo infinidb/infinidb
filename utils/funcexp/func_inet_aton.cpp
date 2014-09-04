@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_inet_aton.cpp 3923 2013-06-19 21:43:06Z bwilkinson $
+* $Id: func_inet_aton.cpp 3048 2012-04-04 15:33:45Z rdempsey $
 *
 *
 ****************************************************************************/
@@ -56,7 +56,7 @@ int64_t Func_inet_aton::getIntVal(rowgroup::Row& row,
 
 	int64_t iValue = joblist::NULL_INT64;
 
-	const std::string& sValue = fp[0]->data()->getStrVal(row, isNull);
+	std::string sValue = fp[0]->data()->getStrVal(row, isNull);
 	if (!isNull)
 	{
 		int64_t iVal = convertAton( sValue, isNull );
@@ -80,7 +80,7 @@ double Func_inet_aton::getDoubleVal(rowgroup::Row& row,
 
 	double dValue = doubleNullVal();
 
-	const std::string& sValue = fp[0]->data()->getStrVal(row, isNull);
+	std::string sValue = fp[0]->data()->getStrVal(row, isNull);
 	if (!isNull)
 	{
 		int64_t iValue = convertAton( sValue, isNull );
@@ -106,7 +106,7 @@ std::string Func_inet_aton::getStrVal(rowgroup::Row& row,
 {
 //	std::cout << "In Func_inet_aton::getStrVal" << std::endl;
 
-	const std::string& sValue = fp[0]->data()->getStrVal(row, isNull);
+	std::string sValue = fp[0]->data()->getStrVal(row, isNull);
 	if (!isNull)
 	{
 		convertAton( sValue, isNull ); // ignore return value
@@ -127,7 +127,7 @@ bool Func_inet_aton::getBoolVal(rowgroup::Row& row,
 {
 	bool bValue = false;
 
-	const std::string& sValue = fp[0]->data()->getStrVal(row, isNull);
+	std::string sValue = fp[0]->data()->getStrVal(row, isNull);
 	if (!isNull)
 	{
 		int64_t iVal = convertAton( sValue, isNull );
@@ -151,7 +151,7 @@ execplan::IDB_Decimal Func_inet_aton::getDecimalVal(rowgroup::Row& row,
 
 	execplan::IDB_Decimal dValue ( joblist::NULL_INT64, 0, 0 );
 
-	const std::string& sValue = fp[0]->data()->getStrVal(row, isNull);
+	std::string sValue = fp[0]->data()->getStrVal(row, isNull);
 	if (!isNull)
 	{
 		int64_t iValue = convertAton( sValue, isNull );
@@ -174,7 +174,7 @@ int32_t Func_inet_aton::getDateIntVal(rowgroup::Row& row,
 {
 	int32_t iValue = joblist::DATENULL;
 
-	const std::string& sValue = fp[0]->data()->getStrVal(row, isNull);
+	std::string sValue = fp[0]->data()->getStrVal(row, isNull);
 	if (!isNull)
 	{
 		int64_t iVal = convertAton( sValue, isNull );
@@ -198,7 +198,7 @@ int64_t Func_inet_aton::getDatetimeIntVal(rowgroup::Row& row,
 {
 	int64_t iValue = joblist::DATETIMENULL;
 
-	const std::string& sValue = fp[0]->data()->getStrVal(row, isNull);
+	std::string sValue = fp[0]->data()->getStrVal(row, isNull);
 	if (!isNull)
 	{
 		int64_t iVal = convertAton( sValue, isNull );

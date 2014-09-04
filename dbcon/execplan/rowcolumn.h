@@ -14,6 +14,7 @@
    along with this program; if not, write to the Free Software
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
+
 /***********************************************************************
 *   $Id: rowcolumn.h 6309 2010-03-04 19:33:12Z zzhu $
 *
@@ -126,8 +127,6 @@ public:
 	 * @return false iff every member of t is a duplicate copy of every member of this; true otherwise
 	 */
 	bool operator!=(const RowColumn& t) const;
-	virtual bool hasAggregate() {return false;}
-	virtual bool hasWindowFunc() {return false;}
 
 private:
 	/**
@@ -144,9 +143,6 @@ public:
 	SubSelect(): ReturnedColumn() {}
 	~SubSelect() {}
 	SubSelect* clone() const { return new SubSelect(); }
-	virtual bool hasAggregate() {return false;}
-	virtual bool hasWindowFunc() {return false;}
-	virtual const std::string toString() const;
 };
 
 

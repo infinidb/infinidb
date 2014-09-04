@@ -26,7 +26,6 @@
 #define CONFIG_XMLPARSER_H_
 
 #include <string>
-#include <vector>
 #include <libxml/parser.h>
 
 namespace config
@@ -48,10 +47,6 @@ public:
 		const std::string& value);
 
 	void delConfig(xmlDocPtr doc, const std::string& section, const std::string& name);
-
-	const std::vector<std::string> enumConfig(const xmlDocPtr doc) const;
-
-	const std::vector<std::string> enumSection(const xmlDocPtr doc, const std::string& section) const;
 
 private:
 	//defaults okay

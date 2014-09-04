@@ -16,10 +16,10 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: columncommand.cpp 2057 2013-02-13 17:00:10Z pleblanc $
+// $Id: columncommand.cpp 2058 2013-02-13 18:07:30Z pleblanc $
 // C++ Implementation: columncommand
 //
-// Description:
+// Description: 
 //
 //
 // Author: Patrick LeBlanc <pleblanc@calpont.com>, (C) 2008
@@ -60,20 +60,53 @@ double cotangent(double in)
 	return (1.0 / tan(in));
 }
 
+inline UDFFcnPtr_t ord2Fptr(uint8_t ord)
+{
+#ifndef _MSC_VER
+	if (ord == 0)
+		return 0;
+
+	if (ord == 255) return reinterpret_cast<UDFFcnPtr_t>(::llabs);
+	if (ord == 254) return reinterpret_cast<UDFFcnPtr_t>(::acos);
+	if (ord == 253) return reinterpret_cast<UDFFcnPtr_t>(::asin);
+	if (ord == 252) return reinterpret_cast<UDFFcnPtr_t>(::atan);
+	if (ord == 251) return reinterpret_cast<UDFFcnPtr_t>(::cos);
+	if (ord == 250) return reinterpret_cast<UDFFcnPtr_t>(cotangent);
+	if (ord == 249) return reinterpret_cast<UDFFcnPtr_t>(::exp);
+	if (ord == 248) return reinterpret_cast<UDFFcnPtr_t>(::log);
+#ifdef __linux__
+	if (ord == 247) return reinterpret_cast<UDFFcnPtr_t>(::log2);
+#else
+	if (ord == 247) return reinterpret_cast<UDFFcnPtr_t>(::log);
+#endif
+	if (ord == 246) return reinterpret_cast<UDFFcnPtr_t>(::log10);
+	if (ord == 245) return reinterpret_cast<UDFFcnPtr_t>(::sin);
+	if (ord == 244) return reinterpret_cast<UDFFcnPtr_t>(::sqrt);
+	if (ord == 243) return reinterpret_cast<UDFFcnPtr_t>(::tan);
+
+	//we'd like to avoid having to lock the map, so we need to use const methods only
+	UDFFcnMap_t::const_iterator it = UDFFcnMap.find(ord);
+	if (it == UDFFcnMap.end())
+		return 0;
+
+	return it->second;
+#else
+	return 0;
+#endif
+}
 }
 
 namespace primitiveprocessor
 {
 
-extern int noVB;
-
 ColumnCommand::ColumnCommand() :
 	Command(COLUMN_COMMAND),
 	blockCount(0),
 	loadCount(0),
-	suppressFilter(false)
-{
-}
+	suppressFilter(false),
+	fUdfFuncPtr(0)
+	{
+	}
 
 ColumnCommand::~ColumnCommand() { }
 
@@ -107,7 +140,7 @@ void ColumnCommand::execute()
 	_execute();
 }
 
-void ColumnCommand::execute(int64_t *vals)
+void ColumnCommand::execute(int64_t *vals) 
 {
 	values = vals;
 	_execute();
@@ -126,8 +159,8 @@ void ColumnCommand::makeScanMsg()
 	primMsg->LBID = lbid;
 	primMsg->RidFlags = 0xFF;
 
-// 	cout << "scanning lbid " << lbid << " colwidth = " << primMsg->DataSize <<
-// 		" filterCount = " << filterCount << " outputType = " <<
+// 	cout << "scanning lbid " << lbid << " colwidth = " << primMsg->DataSize << 
+// 		" filterCount = " << filterCount << " outputType = " << 
 // 		(int) primMsg->OutputType << endl;
 }
 
@@ -141,39 +174,43 @@ void ColumnCommand::makeStepMsg()
 // 	cout << "lbid is " << lbid << endl;
 }
 
-void ColumnCommand::loadData()
+void ColumnCommand::issuePrimitive()
 {
-	uint32_t wasCached;
+	int i;
+	
+	bool wasVersioned;
+	uint wasCached;
 	uint32_t blocksRead;
+	uint32_t resultSize;
 	uint8_t _mask;
 	uint64_t oidLastLbid=0;
 	bool lastBlockReached=false;
 	oidLastLbid = getLastLbid();
-	uint32_t blocksToLoad = 0;
+	uint blocksToLoad = 0;
 	BRM::LBID_t *lbids = (BRM::LBID_t *) alloca(8 * sizeof(BRM::LBID_t));
-	uint8_t **blockPtrs = (uint8_t **) alloca(8 * sizeof(uint8_t *));
-	int i;
-
+	BRM::VER_t *vers = (BRM::VER_t *) alloca(8 * sizeof(BRM::VER_t));
+	uint8_t **blockPtrs = (uint8_t **) alloca(8 * sizeof(uint8_t *));	
 
 	_mask = mask;
 // 	primMsg->RidFlags = 0xff;   // disables selective block loading
 	//cout <<__FILE__ << "::issuePrimitive() o: " << getOID() << " l:" << primMsg->LBID << " ll: " << oidLastLbid << endl;
-
+	
 	for (i=0; i < colType.colWidth; ++i, _mask <<= shift) {
 
 		if ((!lastBlockReached && _isScan) || (!_isScan && primMsg->RidFlags & _mask)) {
 			lbids[blocksToLoad] = primMsg->LBID + i;
+			vers[blocksToLoad] = bpp->versionNum;
 			blockPtrs[blocksToLoad] = &bpp->blockData[i * BLOCK_SIZE];
 			blocksToLoad++;
 			loadCount++;
 		}
 		else if (lastBlockReached && _isScan)
-		{	// fill remaining blocks with empty values when col scan
+		{ // fill remaining blocks with empty values when col scan
 			int blockLen = BLOCK_SIZE/colType.colWidth;
-			ByteStream::octbyte* oPtr=NULL;
-			ByteStream::quadbyte* qPtr=NULL;
-			ByteStream::byte* bPtr=NULL;
-			ByteStream::doublebyte* dPtr=NULL;
+		 	ByteStream::octbyte* oPtr=NULL;
+		 	ByteStream::quadbyte* qPtr=NULL;
+		 	ByteStream::byte* bPtr=NULL;
+		 	ByteStream::doublebyte* dPtr=NULL;
 			if (colType.colWidth==1)
 				bPtr = reinterpret_cast<ByteStream::byte*>(&bpp->blockData[i*BLOCK_SIZE]);
 			//@Bug 1812. Added two bytes column handling
@@ -204,47 +241,39 @@ void ColumnCommand::loadData()
 					oPtr[idx] = o;
 				}
 			}
-
+				
 		}// else
 
 		if ( (primMsg->LBID+i)==oidLastLbid)
 			lastBlockReached=true;
 		blockCount++;
 	} // for
-
+	
 	/* Do the load */
-	wasCached = primitiveprocessor::loadBlocks(lbids,
-				bpp->versionInfo,
-				bpp->txnID,
-				colType.compressionType,
-				blockPtrs,
-				&blocksRead,
-				bpp->LBIDTrace,
-				bpp->sessionID,
-				blocksToLoad,
-				&wasVersioned,
-				willPrefetch(),
-				&bpp->vssCache);
+	wasCached = primitiveprocessor::loadBlocks(lbids, 
+									vers, 
+									bpp->txnID,
+									colType.compressionType,
+									blockPtrs, 
+									&blocksRead,
+									bpp->LBIDTrace, 
+									bpp->sessionID,
+									blocksToLoad,
+									&wasVersioned,
+									willPrefetch(),
+									&bpp->vssCache);
 	bpp->cachedIO += wasCached;
 	bpp->physIO += blocksRead;
 	bpp->touchedBlocks += blocksToLoad;
-}
-
-void ColumnCommand::issuePrimitive()
-{
-	uint32_t resultSize;
-
-	loadData();
 
 // 	cout << "issuing primitive for LBID " << primMsg->LBID << endl;
 	if (!suppressFilter)
 		bpp->pp.setParsedColumnFilter(parsedColumnFilter);
 	else
 		bpp->pp.setParsedColumnFilter(emptyFilter);
-	bpp->pp.p_Col(primMsg, outMsg, bpp->outMsgSize, (unsigned int*)&resultSize);
+	bpp->pp.p_Col(primMsg, outMsg, bpp->outMsgSize, (unsigned int*)&resultSize, fUdfFuncPtr);
 
-	/* Update CP data, the PseudoColumn code should always be !_isScan.  Should be safe
-	    to leave this here for now. */
+	/* Update CP data */
 	if (_isScan) {
 		bpp->validCPData = (outMsg->ValidMinMax && !wasVersioned);
 		//if (wasVersioned && outMsg->ValidMinMax)
@@ -266,45 +295,42 @@ void ColumnCommand::process_OT_BOTH()
 
 	/* this is verbose and repetative to minimize the work per row */
 	switch(colType.colWidth) {
-	case 8:
-		for (i = 0, pos = sizeof(NewColResultHeader); i < outMsg->NVALS; ++i) {
-			if (makeAbsRids)
-				bpp->absRids[i] = *((uint16_t *) &bpp->outputMsg[pos]) + bpp->baseRid;
-			bpp->relRids[i] = *((uint16_t *) &bpp->outputMsg[pos]);
-			pos += 2;
-			values[i] = *((int64_t *) &bpp->outputMsg[pos]);
-			pos += 8;
-		}
-		break;
-	case 4:
-		for (i = 0, pos = sizeof(NewColResultHeader); i < outMsg->NVALS; ++i) {
-			if (makeAbsRids)
-				bpp->absRids[i] = *((uint16_t *) &bpp->outputMsg[pos]) + bpp->baseRid;
-			bpp->relRids[i] = *((uint16_t *) &bpp->outputMsg[pos]);
-			pos += 2;
-			values[i] = *((int32_t *) &bpp->outputMsg[pos]);
-			pos += 4;
-		}
-		break;
-	case 2:
-		for (i = 0, pos = sizeof(NewColResultHeader); i < outMsg->NVALS; ++i) {
-			if (makeAbsRids)
-				bpp->absRids[i] = *((uint16_t *) &bpp->outputMsg[pos]) + bpp->baseRid;
-			bpp->relRids[i] = *((uint16_t *) &bpp->outputMsg[pos]);
-			pos += 2;
-			values[i] = *((int16_t *) &bpp->outputMsg[pos]);
-			pos += 2;
-		}
-		break;
-	case 1:
-		for (i = 0, pos = sizeof(NewColResultHeader); i < outMsg->NVALS; ++i) {
-			if (makeAbsRids)
-				bpp->absRids[i] = *((uint16_t *) &bpp->outputMsg[pos]) + bpp->baseRid;
-			bpp->relRids[i] = *((uint16_t *) &bpp->outputMsg[pos]);
-			pos += 2;
-			values[i] = *((int8_t *) &bpp->outputMsg[pos++]);
-		}
-		break;
+		case 8:
+			for (i = 0, pos = sizeof(NewColResultHeader); i < outMsg->NVALS; ++i) {
+				if (makeAbsRids)
+					bpp->absRids[i] = *((uint16_t *) &bpp->outputMsg[pos]) + bpp->baseRid;
+				bpp->relRids[i] = *((uint16_t *) &bpp->outputMsg[pos]);
+				pos += 2;
+				values[i] = *((int64_t *) &bpp->outputMsg[pos]); pos += 8;
+			}
+			break;
+		case 4:
+			for (i = 0, pos = sizeof(NewColResultHeader); i < outMsg->NVALS; ++i) {
+				if (makeAbsRids)
+					bpp->absRids[i] = *((uint16_t *) &bpp->outputMsg[pos]) + bpp->baseRid;
+				bpp->relRids[i] = *((uint16_t *) &bpp->outputMsg[pos]);
+				pos += 2;
+				values[i] = *((int32_t *) &bpp->outputMsg[pos]); pos += 4;
+			}
+			break;
+		case 2:
+			for (i = 0, pos = sizeof(NewColResultHeader); i < outMsg->NVALS; ++i) {
+				if (makeAbsRids)
+					bpp->absRids[i] = *((uint16_t *) &bpp->outputMsg[pos]) + bpp->baseRid;
+				bpp->relRids[i] = *((uint16_t *) &bpp->outputMsg[pos]);
+				pos += 2;
+				values[i] = *((int16_t *) &bpp->outputMsg[pos]); pos += 2;
+			}
+			break;
+		case 1:
+			for (i = 0, pos = sizeof(NewColResultHeader); i < outMsg->NVALS; ++i) {
+				if (makeAbsRids)
+					bpp->absRids[i] = *((uint16_t *) &bpp->outputMsg[pos]) + bpp->baseRid;
+				bpp->relRids[i] = *((uint16_t *) &bpp->outputMsg[pos]);
+				pos += 2;
+				values[i] = *((int8_t *) &bpp->outputMsg[pos++]);
+			}
+			break;
 	}
 
 }
@@ -322,33 +348,33 @@ void ColumnCommand::process_OT_DATAVALUE()
 	bpp->ridCount = outMsg->NVALS;
 // 	cout << "rid Count is " << bpp->ridCount << endl;
 	switch(colType.colWidth) {
-	case 8:
-	{
-		memcpy(values, outMsg + 1, outMsg->NVALS << 3);
-// 			cout << "  CC: first value is " << values[0] << endl;
-		break;
-	}
-	case 4:
-	{
-		int32_t* arr32 = (int32_t *) (outMsg + 1);
-		for (uint64_t i = 0; i < outMsg->NVALS; ++i)
-			values[i] = arr32[i];
-		break;
-	}
-	case 2:
-	{
-		int16_t* arr16 = (int16_t *) (outMsg + 1);
-		for (uint64_t i = 0; i < outMsg->NVALS; ++i)
-			values[i] = arr16[i];
-		break;
-	}
-	case 1:
-	{
-		int8_t* arr8 = (int8_t *) (outMsg + 1);
-		for (uint64_t i = 0; i < outMsg->NVALS; ++i)
-			values[i] = arr8[i];
-		break;
-	}
+		case 8:
+		{
+			memcpy(values, outMsg + 1, outMsg->NVALS << 3);
+// 			cout << "  CC: first value is " << values[0] << endl; 
+			break;
+		}
+		case 4:
+		{
+			int32_t* arr32 = (int32_t *) (outMsg + 1);
+			for (uint64_t i = 0; i < outMsg->NVALS; ++i)
+				values[i] = arr32[i];
+			break;
+		}
+		case 2:
+		{
+			int16_t* arr16 = (int16_t *) (outMsg + 1);
+			for (uint64_t i = 0; i < outMsg->NVALS; ++i)
+				values[i] = arr16[i];
+			break;
+		}
+		case 1:
+		{
+			int8_t* arr8 = (int8_t *) (outMsg + 1);
+			for (uint64_t i = 0; i < outMsg->NVALS; ++i)
+				values[i] = arr8[i];
+			break;
+		}
 	}
 }
 
@@ -361,18 +387,12 @@ void ColumnCommand::processResult()
 // 		idbassert(outMsg->NVALS == bpp->ridCount);
 
 	switch (outMsg->OutputType) {
-	case OT_BOTH:
-		process_OT_BOTH();
-		break;
-	case OT_RID:
-		process_OT_RID();
-		break;
-	case OT_DATAVALUE:
-		process_OT_DATAVALUE();
-		break;
-	default:
-		cout << "outputType = " << outMsg->OutputType << endl;
-		throw logic_error("ColumnCommand got a bad OutputType");
+		case OT_BOTH: process_OT_BOTH(); break;
+		case OT_RID: process_OT_RID(); break;
+		case OT_DATAVALUE: process_OT_DATAVALUE(); break;
+		default:
+			cout << "outputType = " << outMsg->OutputType << endl;
+			throw logic_error("ColumnCommand got a bad OutputType");
 	}
 
 	// check if feeding a filtercommand
@@ -395,14 +415,14 @@ void ColumnCommand::createCommand(ByteStream &bs)
 {
 	uint8_t tmp8;
 
-	bs.advance(1);
+	bs >> tmp8;  // eat the Command
 	bs >> tmp8;
 	_isScan = tmp8;
 	bs >> traceFlags;
 	bs >> filterString;
 #if 0
 	cout << "filter string: ";
-	for (uint32_t i = 0; i < filterString.length(); ++i)
+	for (uint i = 0; i < filterString.length(); ++i)
 		cout << (int) filterString.buf()[i] << " ";
 	cout << endl;
 #endif
@@ -416,21 +436,28 @@ void ColumnCommand::createCommand(ByteStream &bs)
 	colType.compressionType = tmp8;
 	bs >> BOP;
 	bs >> filterCount;
+	bs >> tmp8;  // UDF ordinal number
+	fUdfFuncPtr = ord2Fptr(tmp8);
+	if (tmp8 != 0 && fUdfFuncPtr == 0) {
+		Message::Args args;
+		args.add(tmp8);
+		mlp->logMessage(logging::M0069, args);
+	}
 	deserializeInlineVector(bs, lastLbid);
 //	cout << "lastLbid count=" << lastLbid.size() << endl;
-//	for (uint32_t i = 0; i < lastLbid.size(); i++)
+//	for (uint i = 0; i < lastLbid.size(); i++)
 //		cout << "  " << lastLbid[i];
 
 
 	//cout << "CreateCommand() o:" << getOID() << " lastLbid: " << lastLbid << endl;
 	Command::createCommand(bs);
 
-	parsedColumnFilter = primitives::parseColumnFilter(filterString.buf(), colType.colWidth,
-						 colType.colDataType, filterCount, BOP);
+	parsedColumnFilter = bpp->pp.parseColumnFilter(filterString.buf(), colType.colWidth,
+		colType.colDataType, filterCount, BOP);
 
 	/* OR hack */
-	emptyFilter = primitives::parseColumnFilter(filterString.buf(), colType.colWidth,
-											colType.colDataType, 0, BOP);
+	emptyFilter = bpp->pp.parseColumnFilter(filterString.buf(), colType.colWidth,
+		colType.colDataType, 0, BOP);
 
 	/* XXXPAT: for debugging only */
 // 	bs >> colType.columnOID;
@@ -448,7 +475,7 @@ void ColumnCommand::prep(int8_t outputType, bool absRids)
 	/* make the template NewColRequestHeader */
 
 	baseMsgLength = sizeof(NewColRequestHeader) +
-					(suppressFilter ? 0 : filterString.length());
+		  (suppressFilter ? 0 : filterString.length());
 
 	if (!inputMsg)
 		inputMsg.reset(new uint8_t[baseMsgLength + (LOGICAL_BLOCK_RIDS * 2)]);
@@ -458,27 +485,27 @@ void ColumnCommand::prep(int8_t outputType, bool absRids)
 
 	primMsg->ism.Interleave = 0;
 	primMsg->ism.Flags = 0;
-// 	primMsg->ism.Flags = PrimitiveMsg::planFlagsToPrimFlags(traceFlags);
+// 	primMsg->ism.Flags = PrimitiveMsg::planFlagsToPrimFlags(traceFlags);	
 	primMsg->ism.Command=COL_BY_SCAN;
 	primMsg->ism.Size = sizeof(NewColRequestHeader) + (suppressFilter ? 0 : filterString.length());
 	primMsg->ism.Type = 2;
 	primMsg->hdr.SessionID = bpp->sessionID;
 	//primMsg->hdr.StatementID = 0;
 	primMsg->hdr.TransactionID = bpp->txnID;
-	primMsg->hdr.VerID = bpp->versionInfo.currentScn;
+	primMsg->hdr.VerID = bpp->versionNum;
 	primMsg->hdr.StepID = bpp->stepID;
 	primMsg->DataSize = colType.colWidth;
 	primMsg->DataType = colType.colDataType;
 	primMsg->CompType = colType.compressionType;
-	primMsg->OutputType = outputType;
+ 	primMsg->OutputType = outputType;
 	primMsg->BOP = BOP;
 	primMsg->NOPS = (suppressFilter ? 0 : filterCount);
 	primMsg->sort = 0;
 #if 0
-	cout << "filter length is " << filterString.length() << endl;
+ 	cout << "filter length is " << filterString.length() << endl;
 
 	cout << "appending filter string: ";
-	for (uint32_t i = 0; i < filterString.length(); ++i)
+	for (uint i = 0; i < filterString.length(); ++i)
 		cout << (int) filterString.buf()[i] << " ";
 	cout << endl;
 #endif
@@ -489,25 +516,13 @@ void ColumnCommand::prep(int8_t outputType, bool absRids)
 
 
 	switch (colType.colWidth) {
-	case 1:
-		shift = 8;
-		mask = 0xFF;
-		break;
-	case 2:
-		shift = 4;
-		mask = 0x0F;
-		break;
-	case 4:
-		shift = 2;
-		mask = 0x03;
-		break;
-	case 8:
-		shift = 1;
-		mask = 0x01;
-		break;
-	default:
-		cout << "CC: colWidth is " << colType.colWidth << endl;
-		throw logic_error("ColumnCommand: bad column width?");
+		case 1: shift = 8; mask = 0xFF; break;
+		case 2: shift = 4; mask = 0x0F; break;
+		case 4: shift = 2; mask = 0x03; break;
+		case 8: shift = 1; mask = 0x01; break;
+		default:
+			cout << "CC: colWidth is " << colType.colWidth << endl;
+			throw logic_error("ColumnCommand: bad column width?");
 	}
 
 	/* TODO: re-optimize with parameterized output RG */
@@ -531,7 +546,7 @@ void ColumnCommand::projectResult()
 		uint16_t segNum;
 		uint32_t fbo;
 		brm.lookupLocal(lbid, 0, false, oid, l_dbroot, partNum, segNum, fbo);
-
+		
 		os << __FILE__ << " error on projection for oid " << oid << " lbid " << lbid;
 		if (primMsg->NVALS != outMsg->NVALS )
 			os << ": input rids " << primMsg->NVALS;
@@ -550,58 +565,16 @@ void ColumnCommand::projectResult()
 	bpp->serialized->append((uint8_t *) (outMsg + 1), outMsg->NVALS * colType.colWidth);
 }
 
-void ColumnCommand::removeRowsFromRowGroup(RowGroup &rg)
+void ColumnCommand::projectResultRG(RowGroup &rg, uint pos)
 {
-	uint32_t gapSize = colType.colWidth + 2;
-	uint8_t *msg8;
-	uint16_t rid;
-	Row oldRow, newRow;
-	uint32_t oldIdx, newIdx;
-
-	rg.initRow(&oldRow);
-	rg.initRow(&newRow);
-	rg.getRow(0, &oldRow);
-	rg.getRow(0, &newRow);
-	msg8 = (uint8_t *) (outMsg + 1);
-	for (oldIdx = newIdx = 0; newIdx < outMsg->NVALS; newIdx++, msg8 += gapSize) {
-		rid = *((uint16_t *) msg8);
-		while (rid != bpp->relRids[oldIdx]) {
-			// need to find rid in relrids, and it is in there
-			oldIdx++;
-			oldRow.nextRow();
-		}
-		if (oldIdx != newIdx) {
-			bpp->relRids[newIdx] = rid;
-			// we use a memcpy here instead of copyRow() to avoid expanding the string table;
-			memcpy(newRow.getData(), oldRow.getData(), newRow.getSize());
-		}
-		oldIdx++;
-		oldRow.nextRow();
-		newRow.nextRow();
-	}
-	rg.setRowCount(outMsg->NVALS);   // this gets rid of trailing rows, no need to set them to NULL
-	bpp->ridCount = outMsg->NVALS;
-	primMsg->NVALS = outMsg->NVALS;
-}
-
-void ColumnCommand::projectResultRG(RowGroup &rg, uint32_t pos)
-{
-	uint32_t i, offset, gapSize;
-	uint8_t *msg8 = (uint8_t *) (outMsg + 1);
-	if (noVB) {
-		// outMsg has rids in this case
-		msg8 += 2;
-		gapSize = colType.colWidth + 2;
-	}
-	else
-		gapSize = colType.colWidth;
+	uint i, offset;
 
 	/* TODO: reoptimize these away */
 	rg.initRow(&r);
 	offset = r.getOffset(pos);
 	rowSize = r.getSize();
 
-	if ((primMsg->NVALS != outMsg->NVALS || outMsg->NVALS != bpp->ridCount) && (!noVB || bpp->sessionID & 0x80000000))
+	if (primMsg->NVALS != outMsg->NVALS || outMsg->NVALS != bpp->ridCount)
 	{
 		ostringstream os;
 		BRM::DBRM brm;
@@ -611,62 +584,66 @@ void ColumnCommand::projectResultRG(RowGroup &rg, uint32_t pos)
 		uint16_t segNum;
 		uint32_t fbo;
 		brm.lookupLocal(lbid, 0, false, oid, dbroot, partNum, segNum, fbo);
-
+		
 		os << __FILE__ << " error on projectResultRG for oid " << oid << " lbid " << lbid;
 		if (primMsg->NVALS != outMsg->NVALS )
 			os << ": input rids " << primMsg->NVALS;
 		else
 			os << ": ridcount " << bpp->ridCount;
 		os << ",  output rids " << outMsg->NVALS;
-		/*
-				BRM::VSSData entry;
-				if (bpp->vssCache.find(lbid) != bpp->vssCache.end()) {
-					entry = bpp->vssCache[lbid];
-					if (entry.returnCode == 0)
-						os << "  requested version " << entry.verID;
-				}
-		*/
+/*
+		BRM::VSSData entry;
+		if (bpp->vssCache.find(lbid) != bpp->vssCache.end()) {
+			entry = bpp->vssCache[lbid];
+			if (entry.returnCode == 0)
+				os << "  requested version " << entry.verID;
+		}
+*/
 		os << endl;
 		if (bpp->sessionID & 0x80000000)
 			throw NeedToRestartJob(os.str());
 		else
 			throw PrimitiveColumnProjectResultExcept(os.str());
 	}
-	else if (primMsg->NVALS != outMsg->NVALS || outMsg->NVALS != bpp->ridCount)
-		removeRowsFromRowGroup(rg);
 
 	idbassert(primMsg->NVALS == outMsg->NVALS);
 	idbassert(outMsg->NVALS == bpp->ridCount);
 	rg.getRow(0, &r);
 	switch (colType.colWidth) {
-	case 1: {
-		for (i = 0; i < outMsg->NVALS; ++i, msg8 += gapSize) {
-			r.setUintField_offset<1>(*msg8, offset);
-			r.nextRow(rowSize);
+		case 1: {
+			uint8_t *val8 = (uint8_t *) (outMsg + 1);
+			for (i = 0; i < outMsg->NVALS; ++i) {
+				r.setUintField_offset<1>(val8[i], offset);
+				r.nextRow(rowSize);
+			}
+			break;
 		}
-		break;
-	}
-	case 2: {
-		for (i = 0; i < outMsg->NVALS; ++i, msg8 += gapSize) {
-			r.setUintField_offset<2>(*((uint16_t *) msg8), offset);
-			r.nextRow(rowSize);
+		case 2: {
+			uint16_t *val16 = (uint16_t *) (outMsg + 1);
+			for (i = 0; i < outMsg->NVALS; ++i) {
+				r.setUintField_offset<2>(val16[i], offset);
+				r.nextRow(rowSize);
+			}
+			break;
 		}
-		break;
-	}
-	case 4: {
-		for (i = 0; i < outMsg->NVALS; ++i, msg8 += gapSize) {
-			r.setUintField_offset<4>(*((uint32_t *) msg8), offset);
-			r.nextRow(rowSize);
+		case 4: {
+			uint32_t *val32 = (uint32_t *) (outMsg + 1);
+			for (i = 0; i < outMsg->NVALS; ++i) {
+// 				if (OID > 3000)
+// 					cout << "column primitive for oid " << OID << " inserting " << val32[i] << endl;
+				r.setUintField_offset<4>(val32[i], offset);
+				r.nextRow(rowSize);
+			}
+			break;
 		}
-		break;
-	}
-	case 8: {
-		for (i = 0; i < outMsg->NVALS; ++i, msg8 += gapSize) {
-			r.setUintField_offset<8>(*((uint64_t *) msg8), offset);
-			r.nextRow(rowSize);
+		case 8: {
+			uint64_t *val64 = (uint64_t *) (outMsg + 1);
+			for (i = 0; i < outMsg->NVALS; ++i) {
+				r.setUintField_offset<8>(val64[i], offset);
+				r.nextRow(rowSize);
+			}
+			break;
 		}
-		break;
-	}
 	}
 }
 
@@ -683,7 +660,7 @@ void ColumnCommand::project()
 	projectResult();
 }
 
-void ColumnCommand::projectIntoRowGroup(RowGroup &rg, uint32_t pos)
+void ColumnCommand::projectIntoRowGroup(RowGroup &rg, uint pos)
 {
 	if (bpp->ridCount == 0) {
 		blockCount += colType.colWidth;
@@ -699,8 +676,13 @@ void ColumnCommand::nextLBID()
 	lbid += colType.colWidth;
 }
 
-void ColumnCommand::duplicate(ColumnCommand *cc)
+SCommand ColumnCommand::duplicate()
 {
+	SCommand ret;
+	ColumnCommand *cc;
+
+	ret.reset(new ColumnCommand());
+	cc = (ColumnCommand *) ret.get();
 	cc->_isScan = _isScan;
 	cc->traceFlags = traceFlags;
 	cc->filterString = filterString;
@@ -716,14 +698,6 @@ void ColumnCommand::duplicate(ColumnCommand *cc)
 	cc->r = r;
 	cc->rowSize = rowSize;
 	cc->Command::duplicate(this);
-}
-
-SCommand ColumnCommand::duplicate()
-{
-	SCommand ret;
-
-	ret.reset(new ColumnCommand());
-	duplicate((ColumnCommand *) ret.get());
 	return ret;
 }
 
@@ -779,7 +753,7 @@ bool ColumnCommand::willPrefetch()
 
 	//return false;
 	return (blockCount == 0 || ((double)loadCount)/((double)blockCount) >
-			bpp->prefetchThreshold);
+		bpp->prefetchThreshold);
 }
 
 void ColumnCommand::disableFilters()
@@ -804,86 +778,68 @@ void ColumnCommand::enableFilters()
 * RETURN:
 *    emptyVal - the value of empty row
 ***********************************************************/
-const uint64_t ColumnCommand::getEmptyRowValue( const execplan::CalpontSystemCatalog::ColDataType dataType, const int width ) const
+const int64_t ColumnCommand::getEmptyRowValue( const execplan::CalpontSystemCatalog::ColDataType dataType, const int width ) const
 {
-	uint64_t emptyVal = 0;
-	int offset;
+      int64_t emptyVal = 0;
+      int offset;
 
-	offset = ( dataType == execplan::CalpontSystemCatalog::VARCHAR )? -1 : 0;
-	switch ( dataType )
-	{
-	case execplan::CalpontSystemCatalog::TINYINT :
-		emptyVal = joblist::TINYINTEMPTYROW;
-		break;
-	case execplan::CalpontSystemCatalog::SMALLINT:
-		emptyVal = joblist::SMALLINTEMPTYROW;
-		break;
-	case execplan::CalpontSystemCatalog::MEDINT :
-	case execplan::CalpontSystemCatalog::INT :
-		emptyVal = joblist::INTEMPTYROW;
-		break;
-	case execplan::CalpontSystemCatalog::BIGINT :
-		emptyVal = joblist::BIGINTEMPTYROW;
-		break;
+      offset = ( dataType == execplan::CalpontSystemCatalog::VARCHAR )? -1 : 0;
+      switch( dataType ) {
+         case execplan::CalpontSystemCatalog::TINYINT : emptyVal = joblist::TINYINTEMPTYROW; break;
+         case execplan::CalpontSystemCatalog::SMALLINT: emptyVal = joblist::SMALLINTEMPTYROW; break;
+         case execplan::CalpontSystemCatalog::MEDINT :  
+         case execplan::CalpontSystemCatalog::INT :  
+                        emptyVal = joblist::INTEMPTYROW; break;
+         case execplan::CalpontSystemCatalog::BIGINT :  emptyVal = joblist::BIGINTEMPTYROW; break;
+         case execplan::CalpontSystemCatalog::FLOAT :   emptyVal = joblist::FLOATEMPTYROW; break;
+         case execplan::CalpontSystemCatalog::DOUBLE :  emptyVal = joblist::DOUBLEEMPTYROW; break;
+         case execplan::CalpontSystemCatalog::DECIMAL : 
+/*               if( width <= 4 )
+                  emptyVal = joblist::SMALLINTEMPTYROW;
+               else
+               if( width <= 9 )
+                  emptyVal = joblist::INTEMPTYROW;
+               else
+               if( width <= 18 )
+                  emptyVal = joblist::BIGINTEMPTYROW; 
+               else
+                  emptyVal = joblist::CHAR8EMPTYROW; 
+*/ 
+               // @bug 194 use the correct logic in handling empty value for decimal
+               if( width <= 1 )
+					emptyVal = joblist::TINYINTEMPTYROW; 
+				else if (width <= 2)
+                  emptyVal = joblist::SMALLINTEMPTYROW;
+               else if( width <= 4 )
+                  emptyVal = joblist::INTEMPTYROW;
+               else
+                  emptyVal = joblist::BIGINTEMPTYROW;
+               break;
+         case execplan::CalpontSystemCatalog::CHAR : 
+         case execplan::CalpontSystemCatalog::VARCHAR : 
+         case execplan::CalpontSystemCatalog::DATE :
+         case execplan::CalpontSystemCatalog::DATETIME :
+         case execplan::CalpontSystemCatalog::VARBINARY : 
+         default:
+               emptyVal = joblist::CHAR1EMPTYROW;
+               if( width == (2 + offset) )
+                  emptyVal = joblist::CHAR2EMPTYROW; 
+               else
+               if( width >= (3 + offset) && width <= ( 4 + offset ) )
+                  emptyVal = joblist::CHAR4EMPTYROW; 
+               else
+               if( width >= (5 + offset)  )
+                  emptyVal = joblist::CHAR8EMPTYROW;
+               break;
+      }
 
-	case execplan::CalpontSystemCatalog::UTINYINT :
-		emptyVal = joblist::UTINYINTEMPTYROW;
-		break;
-	case execplan::CalpontSystemCatalog::USMALLINT:
-		emptyVal = joblist::USMALLINTEMPTYROW;
-		break;
-	case execplan::CalpontSystemCatalog::UMEDINT :
-	case execplan::CalpontSystemCatalog::UINT :
-		emptyVal = joblist::UINTEMPTYROW;
-		break;
-	case execplan::CalpontSystemCatalog::UBIGINT :
-		emptyVal = joblist::UBIGINTEMPTYROW;
-		break;
-
-	case execplan::CalpontSystemCatalog::FLOAT :
-	case execplan::CalpontSystemCatalog::UFLOAT :
-		emptyVal = joblist::FLOATEMPTYROW;
-		break;
-	case execplan::CalpontSystemCatalog::DOUBLE :
-	case execplan::CalpontSystemCatalog::UDOUBLE :
-		emptyVal = joblist::DOUBLEEMPTYROW;
-		break;
-
-	case execplan::CalpontSystemCatalog::DECIMAL :
-	case execplan::CalpontSystemCatalog::UDECIMAL :
-		if ( width <= 1 )
-			emptyVal = joblist::TINYINTEMPTYROW;
-		else if (width <= 2)
-			emptyVal = joblist::SMALLINTEMPTYROW;
-		else if ( width <= 4 )
-			emptyVal = joblist::INTEMPTYROW;
-		else
-			emptyVal = joblist::BIGINTEMPTYROW;
-		break;
-
-	case execplan::CalpontSystemCatalog::CHAR :
-	case execplan::CalpontSystemCatalog::VARCHAR :
-	case execplan::CalpontSystemCatalog::DATE :
-	case execplan::CalpontSystemCatalog::DATETIME :
-	case execplan::CalpontSystemCatalog::VARBINARY :
-	default:
-		emptyVal = joblist::CHAR1EMPTYROW;
-		if ( width == (2 + offset) )
-			emptyVal = joblist::CHAR2EMPTYROW;
-		else if ( width >= (3 + offset) && width <= ( 4 + offset ) )
-			emptyVal = joblist::CHAR4EMPTYROW;
-		else if ( width >= (5 + offset)  )
-			emptyVal = joblist::CHAR8EMPTYROW;
-		break;
-	}
-
-	return emptyVal;
+      return emptyVal;
 }
 
-void ColumnCommand::getLBIDList(uint32_t loopCount, vector<int64_t> *lbids)
+void ColumnCommand::getLBIDList(uint loopCount, vector<int64_t> *lbids)
 {
 	int64_t firstLBID = lbid, lastLBID = firstLBID + (loopCount * colType.colWidth) - 1, i;
-
+	
 	for (i = firstLBID; i <= lastLBID; i++)
 		lbids->push_back(i);
 }

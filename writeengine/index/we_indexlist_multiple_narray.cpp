@@ -54,7 +54,7 @@ namespace WriteEngine
     ***********************************************************/   
 
     const int IndexList::addIndexListHdr( FILE* pFile, const RID* ridList, 
-                                          const int size, const uint64_t& key, 
+                                          const int size, const i64& key, 
                                           IdxEmptyListEntry* newEmptyListPtr)
     {
       int rc;   
@@ -273,7 +273,7 @@ namespace WriteEngine
     *    failure    - it did not create the index list header    
     ***********************************************************/
     const int IndexList::updateIndexList(FILE* pFile, const RID* ridList, 
-                                         const int size, const uint64_t &key, 
+                                         const int size, const i64 &key, 
                                          IdxEmptyListEntry* curIdxRidListHdrPtr)
     {
       int rc;   
@@ -362,7 +362,7 @@ namespace WriteEngine
        
       width= LIST_ENTRY_WIDTH; 
       memset(&m_lastIdxRidListPtr, 0, sizeof(m_lastIdxRidListPtr));               
-      if (m_lastLbid == (uint64_t)INVALID_LBID)
+      if (m_lastLbid == (i64)INVALID_LBID)
       {    
         rc = getSubBlk(m_lbid, m_sbid, m_entry);
         m_curType  =  ((IdxEmptyListEntry*)
@@ -491,7 +491,7 @@ namespace WriteEngine
                        {
                            if (m_lastLbid != INVALID_LBID)
                            {
-                             uint64_t zlbid = INVALID_LBID;
+                             i64 zlbid = INVALID_LBID;
                              rc = setLastLbid(zlbid);
                            }
                        }

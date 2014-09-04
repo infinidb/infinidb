@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_in.cpp 3954 2013-07-08 16:30:15Z bpaul $
+* $Id: func_in.cpp 3956 2013-07-08 19:17:26Z bpaul $
 *
 *
 ****************************************************************************/
@@ -74,7 +74,7 @@ namespace
 				int64_t val = pm[0]->data()->getIntVal(row, isNull);
 				if (isNull)
 					return false;
-				for (uint32_t i = 1; i < pm.size(); i++)
+				for (uint i = 1; i < pm.size(); i++)
 				{
 					isNull = false;
 					if (val == pm[i]->data()->getIntVal(row, isNull) && !isNull )
@@ -84,31 +84,12 @@ namespace
 				}
 				return false;	
 			}
-            case execplan::CalpontSystemCatalog::UBIGINT:
-            case execplan::CalpontSystemCatalog::UINT:
-            case execplan::CalpontSystemCatalog::UMEDINT:
-            case execplan::CalpontSystemCatalog::UTINYINT:
-            case execplan::CalpontSystemCatalog::USMALLINT:	
-            {
-                uint64_t val = pm[0]->data()->getUintVal(row, isNull);
-                if (isNull)
-                    return false;
-                for (uint32_t i = 1; i < pm.size(); i++)
-                {
-                    isNull = false;
-                    if (val == pm[i]->data()->getUintVal(row, isNull) && !isNull )
-                        return true;
-                    if (isNull && isNotIn)
-                        return true; // will be reversed to false by the caller
-                }
-                return false;	
-            }
 			case execplan::CalpontSystemCatalog::DATE:
 			{
 				int32_t val = pm[0]->data()->getDateIntVal(row, isNull);
 				if (isNull)
 					return false;
-				for (uint32_t i = 1; i < pm.size(); i++)
+				for (uint i = 1; i < pm.size(); i++)
 				{
 					isNull = false;
 					if ( val == pm[i]->data()->getDateIntVal(row, isNull) && !isNull )
@@ -123,7 +104,7 @@ namespace
 				int64_t val = pm[0]->data()->getDatetimeIntVal(row, isNull);
 				if (isNull)
 					return false;
-				for (uint32_t i = 1; i < pm.size(); i++)
+				for (uint i = 1; i < pm.size(); i++)
 				{
 					isNull = false;
 					if ( val == pm[i]->data()->getDatetimeIntVal(row, isNull) && !isNull )
@@ -134,14 +115,12 @@ namespace
 				return false;	
 			}
 			case execplan::CalpontSystemCatalog::DOUBLE:
-            case execplan::CalpontSystemCatalog::UDOUBLE:
 			case execplan::CalpontSystemCatalog::FLOAT:
-            case execplan::CalpontSystemCatalog::UFLOAT:
 			{
 				double val = pm[0]->data()->getDoubleVal(row, isNull);
 				if (isNull)
 					return false;
-				for (uint32_t i = 1; i < pm.size(); i++)
+				for (uint i = 1; i < pm.size(); i++)
 				{
 					isNull = false;
 					if ( val == pm[i]->data()->getDoubleVal(row, isNull) && !isNull )
@@ -152,12 +131,11 @@ namespace
 				return false;	
 			}
 			case execplan::CalpontSystemCatalog::DECIMAL:
-            case execplan::CalpontSystemCatalog::UDECIMAL:
 			{				
 				IDB_Decimal val = pm[0]->data()->getDecimalVal(row, isNull);
 				if (isNull)
 					return false;
-				for (uint32_t i = 1; i < pm.size(); i++)
+				for (uint i = 1; i < pm.size(); i++)
 				{
 					isNull = false;
 					if ( val == pm[i]->data()->getDecimalVal(row, isNull) && !isNull )
@@ -170,10 +148,10 @@ namespace
 			case execplan::CalpontSystemCatalog::VARCHAR: // including CHAR'
 			case execplan::CalpontSystemCatalog::CHAR:
 			{
-				const string& val = pm[0]->data()->getStrVal(row, isNull);
+				string val = pm[0]->data()->getStrVal(row, isNull);
 				if (isNull)
 					return false;
-				for (uint32_t i = 1; i < pm.size(); i++)
+				for (uint i = 1; i < pm.size(); i++)
 				{
 					isNull = false;
 					if ( utf8::idb_strcoll(val.c_str(), pm[i]->data()->getStrVal(row, isNull).c_str()) == 0 && !isNull)
@@ -207,7 +185,7 @@ CalpontSystemCatalog::ColType Func_in::operationType( FunctionParm& fp, CalpontS
 	bool allString = true;
 	bool allNonToken = true;
 	
-	for (uint32_t i = 0; i < fp.size(); i++)
+	for (uint i = 0; i < fp.size(); i++)
 	{
 		//op.setOpType(op.operationType(), fp[i]->data()->resultType());
 		if (fp[i]->data()->resultType().colDataType != CalpontSystemCatalog::CHAR &&
@@ -244,7 +222,7 @@ CalpontSystemCatalog::ColType Func_in::operationType( FunctionParm& fp, CalpontS
 	if (op.operationType().colDataType == CalpontSystemCatalog::DATE)
 	{
 		ConstantColumn *cc = NULL;
-		for (uint32_t i = 1; i < fp.size(); i++)
+		for (uint i = 1; i < fp.size(); i++)
 		{
 			cc = dynamic_cast<ConstantColumn*>(fp[i]->data());
 			if (cc)
@@ -258,7 +236,7 @@ CalpontSystemCatalog::ColType Func_in::operationType( FunctionParm& fp, CalpontS
 	else if (op.operationType().colDataType == CalpontSystemCatalog::DATETIME)
 	{
 		ConstantColumn *cc = NULL;
-		for (uint32_t i = 1; i < fp.size(); i++)
+		for (uint i = 1; i < fp.size(); i++)
 		{
 			cc = dynamic_cast<ConstantColumn*>(fp[i]->data());
 			if (cc)

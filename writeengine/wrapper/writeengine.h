@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: writeengine.h 4726 2013-08-07 03:38:36Z bwilkinson $
+//  $Id: writeengine.h 4374 2012-12-03 22:16:10Z xlou $
 
 
 /** @file */
@@ -44,12 +44,13 @@
 #include "we_tablemetadata.h"
 #include "we_dbrootextenttracker.h"
 #include "we_rbmetawriter.h"
-#include "brmtypes.h"
+#define WRITEENGINECHUNKMGR_DLLEXPORT
 #include "we_chunkmanager.h"
+#undef WRITEENGINECHUNKMGR_DLLEXPORT
 
 #define IO_BUFF_SIZE 81920
 
-#if defined(_MSC_VER) && defined(WRITEENGINE_DLLEXPORT)
+#if defined(_MSC_VER) && defined(WRITEENGINEWRAPPER_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
@@ -115,16 +116,16 @@ public:
     * @brief Build a index from an oid file (NOTE: this is write engine internal used function, just for test purpose and not for generic use
     */
    int buildIndex(const OID& colOid, const OID& treeOid, const OID& listOid,
-                         execplan::CalpontSystemCatalog::ColDataType colDataType, int width, int hwm,
-                         bool resetFile, uint64_t& totalRows, int maxRow = IDX_DEFAULT_READ_ROW)
+                         ColDataType colDataType, int width, int hwm,
+                         bool resetFile, i64& totalRows, int maxRow = IDX_DEFAULT_READ_ROW)
    { return -1; }
 
    /**
     * @brief Build a index from a file
     */
    int buildIndex(const std::string& sourceFileName, const OID& treeOid, const OID& listOid,
-                         execplan::CalpontSystemCatalog::ColDataType colDataType, int width, int hwm, bool resetFile,
-                         uint64_t& totalRows, const std::string& indexName, Log* pLogger,
+                         ColDataType colDataType, int width, int hwm, bool resetFile,
+                         i64& totalRows, const std::string& indexName, Log* pLogger,
                          int maxRow = IDX_DEFAULT_READ_ROW)
    { return -1; }
 
@@ -136,7 +137,7 @@ public:
    /**
     * @brief Close a dictionary
     */
-   int closeDctnry(const TxnID& txnid, int i, bool realClose = true) { return m_dctnry[op(i)]->closeDctnry(realClose); }
+   int closeDctnry(const TxnID& txnid, int i) { return m_dctnry[op(i)]->closeDctnry(); }
 
    /**
     * @brief Commit transaction
@@ -161,7 +162,7 @@ public:
     * @param compressionType compression type
     */
    EXPORT int createColumn(const TxnID& txnid, const OID& dataOid,
-                           execplan::CalpontSystemCatalog::ColDataType dataType, int dataWidth,
+                           ColDataType dataType, int dataWidth,
                            uint16_t dbRoot, uint32_t partition=0, int compressionType = 0);
 
    //BUG931
@@ -177,9 +178,9 @@ public:
     * @param refColDataType Data-type of the referecne column
     * @param refColWidth Width of the reference column
     */
-   EXPORT int fillColumn(const TxnID& txnid, const OID& dataOid, execplan::CalpontSystemCatalog::ColDataType dataType,
+   EXPORT int fillColumn(const TxnID& txnid, const OID& dataOid, ColDataType dataType,
                          int dataWidth, ColTuple defaultVal,
-                         const OID& refColOID, execplan::CalpontSystemCatalog::ColDataType refColDataType,
+                         const OID& refColOID, ColDataType refColDataType,
                          int refColWidth, int refCompressionType, bool isNULL, int compressionType,
                          const std::string& defaultValStr, const OID& dictOid = 0, bool autoincrement = false);
 
@@ -210,17 +211,7 @@ public:
     * @param rowIdList row id list
     */
    EXPORT int deleteRow(const TxnID& txnid, std::vector<ColStructList>& colExtentsStruct,
-                         std::vector<void *>& colOldValueList, std::vector<RIDList>& ridLists, const int32_t tableOid);
-                         
-   /**
-    * @brief Delete a list of rows from a table
-    * @param colStructList column struct list
-    * @param rowIdList row id list
-    */
-    
-   EXPORT int deleteBadRows(const TxnID& txnid, ColStructList& colStructs,
-                         RIDList& ridList, DctnryStructList& dctnryStructList);
-
+                         std::vector<void *>& colOldValueList, std::vector<RIDList>& ridLists);
 
    /**
     * @brief delete a dictionary signature and its token
@@ -297,7 +288,7 @@ public:
                                ColValueList& colValueList,
                                DctnryStructList& dctnryStructList,
                                DictStrList& dictStrList,
-                               std::vector<boost::shared_ptr<DBRootExtentTracker> > & dbRootExtentTrackers,
+                               std::vector<DBRootExtentTracker*> & dbRootExtentTrackers,
 							   RBMetaWriter* fRBMetaWriter,
                                bool bFirstExtentOnThisPM,
                                bool insertSelect = false, 
@@ -315,8 +306,7 @@ public:
                                ColStructList& colStructList,
                                ColValueList& colValueList,
                                DctnryStructList& dctnryStructList,
-                               DictStrList& dictStrList,
-							   const int32_t tableOid);
+                               DictStrList& dictStrList);
    
    /**
     * @brief Insert a row 
@@ -328,31 +318,25 @@ public:
                                ColStructList& colStructList,
                                ColValueList& colValueList,
                                DctnryStructList& dctnryStructList,
-                               DictStrList& dictStrList,
-							   const int32_t tableOid);
+                               DictStrList& dictStrList);
    /**
     * @brief Open dictionary
-    * @param txnid relevant transaction
-    * @param dctnryStruct dictionary column to open
-    * @param useTmpSuffix Bulk HDFS usage: use *.tmp file suffix
+    * @param dctnryOid dictionary signature file object id
+    * @param treeOid dictionary tree file object id
+    * @param listOid index list file object id
     */
-   // @bug 5572 - HDFS usage: add *.tmp file backup flag
-   int openDctnry(const TxnID& txnid, DctnryStruct dctnryStruct, bool useTmpSuffix)
+   int openDctnry(const TxnID& txnid, DctnryStruct dctnryStruct)
    {
       int compress_op = op(dctnryStruct.fCompressionType);
       m_dctnry[compress_op]->setTransId(txnid);
       return m_dctnry[compress_op]->openDctnry(
                                 dctnryStruct.dctnryOid,
+//                                dctnryStruct.treeOid,
+//                                dctnryStruct.listOid,
                                 dctnryStruct.fColDbRoot,
                                 dctnryStruct.fColPartition,
-                                dctnryStruct.fColSegment,
-                                useTmpSuffix);
+                                dctnryStruct.fColSegment);
    }
-
-   /**
-    * @brief Rollback transaction (common portion)
-    */
-   EXPORT int rollbackCommon(const TxnID& txnid, int sessionId);
 
    /**
     * @brief Rollback transaction
@@ -376,7 +360,7 @@ public:
    void setIsInsert(bool bIsInsert)
    { 
        m_colOp[COMPRESSED_OP]->chunkManager()->setIsInsert(bIsInsert); 
-       m_dctnry[COMPRESSED_OP]->chunkManager()->setIsInsert(true); 
+       m_dctnry[COMPRESSED_OP]->chunkManager()->setIsInsert(bIsInsert); 
    }
    
    /**
@@ -390,11 +374,6 @@ public:
        return m_colOp[COMPRESSED_OP]->chunkManager()->getIsInsert(); 
    }
    
-   std::tr1::unordered_map<TxnID, SP_TxnLBIDRec_t>&  getTxnMap()
-   {
-
-	return m_txnLBIDMap;
-   };
    /**
    * @brief Flush the ChunkManagers. 
    */
@@ -418,77 +397,14 @@ public:
        }
    }
 
-	/**
-   * @brief Set the fIsBulk id into all fileops
-   */
-   void setBulkFlag(bool isBulk)
-   { 
-       for (int i = 0; i < TOTAL_COMPRESS_OP; i++) 
-       {
-           m_colOp[i]->setBulkFlag(isBulk);
-           m_dctnry[i]->setBulkFlag(isBulk);
-       }
-   }
-   
-   	/**
-   * @brief Set the fIsFix  into all fileops
-   */
-   void setFixFlag(bool isFix = false)
-   { 
-       for (int i = 0; i < TOTAL_COMPRESS_OP; i++) 
-       {
-           m_colOp[i]->setFixFlag(isFix);
-           m_dctnry[i]->setFixFlag(isFix);
-       }
-   }
-   
-	/**
-   * @brief let chunkmanager start transaction. 
-   * 
-   */
-   int startTransaction(const TxnID& txnid)
-   { 
-	   int rc = 0;
-       rc = m_colOp[COMPRESSED_OP]->chunkManager()->startTransaction(txnid); 
-	   //if ( rc == 0)
-		//	rc = m_dctnry[COMPRESSED_OP]->chunkManager()->startTransaction(txnid); 
-	   return rc;
-   }
-   
-   /**
-   * @brief let chunkmanager confirm transaction. 
-   * 
-   */
-   int confirmTransaction (const TxnID& txnid)
-   { 
-	   int rc = 0;
-       rc = m_colOp[COMPRESSED_OP]->chunkManager()->confirmTransaction (txnid); 
-	   return rc;
-   }
-   
-   
-   /**
-   * @brief let chunkmanager end transaction. 
-   * 
-   */
-   int endTransaction(const TxnID& txnid, bool success)
-   { 
-	   int rc = 0;
-       rc = m_colOp[COMPRESSED_OP]->chunkManager()->endTransaction(txnid, success); 
-	   //if ( rc == 0)
-		//	rc = m_dctnry[COMPRESSED_OP]->chunkManager()->endTransaction(txnid, success); 
-	   return rc;
-   }
-   
+
    /**
     * @brief Tokenize a dictionary signature into a token
     * @param dctnryStruct dictionary structure
     * @param dctnryTuple dictionary tuple
-    * @param useTmpSuffix Bulk HDFS usage: use *.tmp file suffix
     */
    EXPORT int tokenize(const TxnID& txnid, DctnryTuple&, int compType ); // Files need open first
-   EXPORT int tokenize(const TxnID& txnid, DctnryStruct& dctnryStruct, DctnryTuple& dctnryTuple,
-                       bool useTmpSuffix);
+   EXPORT int tokenize(const TxnID& txnid, DctnryStruct& dctnryStruct, DctnryTuple& dctnryTuple);
 
    /**
     * @brief Update values into a column (New one)
@@ -503,8 +419,7 @@ public:
                                std::vector<void *>& colOldValueList,
                                std::vector<RIDList>& ridLists,
                                std::vector<DctnryStructList>& dctnryExtentsStruct,
-                               DctnryValueList& dctnryValueList,
-							   const int32_t tableOid);
+                               DctnryValueList& dctnryValueList);
 
   /**
     * @brief Update values into columns
@@ -516,8 +431,7 @@ public:
    EXPORT int updateColumnRecs(const TxnID& txnid,
                                 std::vector<ColStruct>& colStructList,
                                 ColValueList& colValueList,
-                                const RIDList & ridLists,
-								const int32_t tableOid);
+                                const RIDList & ridLists);
 
    /**
     * @brief Release specified table lock.
@@ -549,7 +463,7 @@ public:
     * @brief update SYSCOLUMN next value
     * @param oidValueMap
     */
-   EXPORT int updateNextValue(const TxnID txnId, const OID& columnoid, const uint64_t nextVal,  const uint32_t sessionID, const uint16_t dbRoot);
+   EXPORT int updateNextValue(const OID& columnoid, const long long nextVal,  const uint32_t sessionID);
 
    /**
     * @brief write active datafiles to disk
@@ -613,20 +527,16 @@ private:
    /**
     * @brief Process version buffer
     */
-   int processVersionBuffer(IDBDataFile* pFile, const TxnID& txnid, const ColStruct& colStruct,
+   int processVersionBuffer(FILE* pFile, const TxnID& txnid, const ColStruct& colStruct,
                             int width, int totalRow, const RID* rowIdArray,
                             std::vector<BRM::LBIDRange> &  rangeList);
 
    /**
     * @brief Process version buffers for update and delete @Bug 1886,2870
     */
-   int processVersionBuffers(IDBDataFile* pFile, const TxnID& txnid, const ColStruct& colStruct,
+   int processVersionBuffers(FILE* pFile, const TxnID& txnid, const ColStruct& colStruct,
                              int width, int totalRow, const RIDList& ridList,
                              std::vector<BRM::LBIDRange> &  rangeList);
-							 
-   int processBeginVBCopy(const TxnID& txnid, const std::vector<ColStruct> & colStructList, const RIDList & ridList, 
-							std::vector<BRM::VBRange> & freeList, std::vector<std::vector<uint32_t> > & fboLists, 
-							std::vector<std::vector<BRM::LBIDRange> > & rangeLists, std::vector<BRM::LBIDRange>&   rangeListTot);
 
    void setDebugLevel(const DebugLevel level)
    {
@@ -642,23 +552,19 @@ private:
     * @brief Common methods to write values to a column
     */
     int writeColumnRec(const TxnID& txnid, const ColStructList& colStructList,
-                       ColValueList& colValueList,
+                       const ColValueList& colValueList, ColValueList& colOldValueList,
                        RID* rowIdArray, const ColStructList& newColStructList,
-                       ColValueList& newColValueList, const int32_t tableOid,
-					   bool useTmpSuffix, bool versioning = true);
-
-
+                       const ColValueList& newColValueList, bool versioning = true);
 
     //@Bug 1886,2870 pass the address of ridList vector
     int writeColumnRec(const TxnID& txnid, const ColStructList& colStructList,
                        const ColValueList& colValueList, std::vector<void *>& colOldValueList,
-                       const RIDList& ridList, const int32_t tableOid,
-					   bool convertStructFlag = true, ColTupleList::size_type nRows = 0);
+                       const RIDList& ridList, bool convertStructFlag = true,
+                       ColTupleList::size_type nRows = 0);
 
     //For update column from column to use
     int writeColumnRecords(const TxnID& txnid, std::vector<ColStruct>& colStructList,
-                           ColValueList& colValueList, const RIDList & ridLists, 
-						   const int32_t tableOid, bool versioning = true);
+                           ColValueList& colValueList, const RIDList & ridLists, bool versioning = true);
 
     /**
     * @brief util method to convert rowid to a column file
@@ -673,8 +579,9 @@ private:
     // list should be trimmed if it gets too big.
     int AddLBIDtoList(const TxnID     txnid,
                       std::vector<BRM::LBID_t>& lbids,
-                      std::vector<execplan::CalpontSystemCatalog::ColDataType>& colDataTypes,
-                      const ColStruct& colStruct,
+                      const OID       oid,
+                      const u_int32_t colPartition,
+                      const u_int16_t segment,
                       const int       fbo);
 
     int RemoveTxnFromLBIDMap(const TxnID txnid);

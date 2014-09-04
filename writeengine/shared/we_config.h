@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_config.h 4726 2013-08-07 03:38:36Z bwilkinson $
+* $Id: we_config.h 4496 2013-01-31 19:13:20Z pleblanc $
 *
 *******************************************************************************/
 /** @file */
@@ -33,7 +33,7 @@
 
 //#define SHARED_NOTHING_DEMO_2
 
-#if defined(_MSC_VER) && defined(WRITEENGINE_DLLEXPORT)
+#if defined(_MSC_VER) && defined(WRITEENGINECONFIG_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
@@ -79,7 +79,7 @@ public:
     /**
      * @brief Get list of applicable DBRoot ids for this job.
      */
-    EXPORT static void getRootIdList( std::vector<uint16_t>& dbRootIds );
+    EXPORT static void getRootIdList( std::vector<u_int16_t>& dbRootIds );
 
 #ifdef SHARED_NOTHING_DEMO_2
     EXPORT static void getSharedNothingRoot(char *);  // pass in an char[FILE_NAME_SIZE]
@@ -94,6 +94,11 @@ public:
      * @brief DBRoot count for local PM
      */
     EXPORT static size_t DBRootCount();
+
+    /**
+     * @brief Total DBRoot count for all PMs
+     */
+    EXPORT static size_t totalDBRootCount();
 
     /**
      * @brief Wait Period
@@ -144,7 +149,7 @@ public:
     /**
      * @brief Local Module ID   (ex: 1   )
      */
-    EXPORT static uint16_t getLocalModuleID();
+    EXPORT static u_int16_t getLocalModuleID();
 
     /**
      * @brief Version Buffer root
@@ -166,11 +171,12 @@ public:
 private:
     typedef std::vector<std::string>  strvec_t;
     typedef std::map<int,std::string> intstrmap_t;
-    typedef std::vector<uint16_t>    uint16vec_t;
+    typedef std::vector<u_int16_t>    uint16vec_t;
 
     static void         checkReload();
 
     static int          m_dbRootCount;           // num DBRoots for local PM
+    static int          m_totalDbRootCount;      // total number of DBRoot paths
     static strvec_t     m_dbRootPath;            // root paths for open files
     static intstrmap_t  m_dbRootPathMap;         // map of root id to root paths
     static uint16vec_t  m_dbRootId;              // list of root ids

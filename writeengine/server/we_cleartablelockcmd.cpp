@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: we_cleartablelockcmd.cpp 4450 2013-01-21 14:13:24Z rdempsey $
+ * $Id: we_cleartablelockcmd.cpp 3762 2012-04-13 18:16:17Z dcathey $
  *
  ****************************************************************************/
 #include "we_cleartablelockcmd.h"
@@ -25,9 +25,6 @@
 #include <stdexcept>
 
 #include "we_bulkrollbackmgr.h"
-#include "we_confirmhdfsdbfile.h"
-
-#include "IDBPolicy.h"
 
 namespace WriteEngine
 {
@@ -89,10 +86,6 @@ int WE_ClearTableLockCmd::processRollback(
 //------------------------------------------------------------------------------
 // Process a bulk rollback cleanup request based on input from the specified
 // input bytestream object.
-// Optionally, an additional flag is appended to the message to indicate
-// whether HDFS db file *.orig db files are to be cleaned up as well.
-// We only need this for the "successful" case, as the bulk rollback takes
-// care of db file cleanup in the "unsuccessful" case.
 //------------------------------------------------------------------------------
 int WE_ClearTableLockCmd::processCleanup(
 	messageqcpp::ByteStream& bs,
@@ -109,32 +102,6 @@ int WE_ClearTableLockCmd::processCleanup(
 		std::cout << "ClearTableLockCmd::processCleanup for " << fUserDesc;
 		bs >> tableOID;
 		std::cout << ": tableOID-" << tableOID << std::endl;
-
-		// On an HDFS system, this is where we delete any DB files
-		// (ex: *.orig) that we no longer need.
-		if ((idbdatafile::IDBPolicy::useHdfs()) &&
-			(bs.length() >= sizeof(messageqcpp::ByteStream::byte)))
-		{
-			messageqcpp::ByteStream::byte deleteHdfsTempDbFiles;
-			bs >> deleteHdfsTempDbFiles;
-			if (deleteHdfsTempDbFiles)
-			{
-				std::string endDbErrMsg;
-				ConfirmHdfsDbFile confirmHdfs;
-
-                // We always pass "true", as this only applies to the "success-
-                // ful" case.  See comments that precede this function.
-				int endRc = confirmHdfs.endDbFileListFromMetaFile(
-					tableOID, true, endDbErrMsg);
-
-				// In this case, a deletion error is not fatal.
-				// so we don't propagate a bad return code.  We
-				// may want to add syslog msg (TBD)
-				if (endRc != NO_ERROR)
-					std::cout << "Orig db file deletion error: " <<
-					endDbErrMsg << std::endl;
-			}
-		}
 
 		BulkRollbackMgr::deleteMetaFile( tableOID );
 	}

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: timestamp.cpp 9210 2013-01-21 14:10:42Z rdempsey $
+// $Id: timestamp.cpp 8698 2012-07-10 14:47:53Z rdempsey $
 //
 
 #include <unistd.h>
@@ -33,9 +33,6 @@ namespace
 {
 const struct timeval zerotime = {0, 0};
 }
-
-namespace joblist
-{
 
 JSTimeStamp::JSTimeStamp() :
 	fFirstInsertTime(zerotime),
@@ -94,14 +91,4 @@ const string JSTimeStamp::tsdiffstr(const struct timeval& t2, const struct timev
 	res = timeString;
 	return res;
 }
-
-/* static */
-const string JSTimeStamp::timeNow()
-{
-	struct timeval tv;
-	gettimeofday(&tv, 0);
-	return JSTimeStamp::format(tv);
-}
-
-} //namespace joblist
 

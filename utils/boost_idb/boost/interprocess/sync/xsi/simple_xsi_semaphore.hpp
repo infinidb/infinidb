@@ -1,12 +1,3 @@
-//////////////////////////////////////////////////////////////////////////////
-//
-// (C) Copyright Ion Gaztanaga 2011-2012. Distributed under the Boost
-// Software License, Version 1.0. (See accompanying file
-// LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
-//
-// See http://www.boost.org/libs/interprocess for documentation.
-//
-//////////////////////////////////////////////////////////////////////////////
 #ifndef BOOST_INTERPROCESS_SYNC_XSI_SIMPLE_XSI_SEMAPHORE_HPP
 #define BOOST_INTERPROCESS_SYNC_XSI_SIMPLE_XSI_SEMAPHORE_HPP
 
@@ -112,5 +103,3 @@ inline bool simple_sem_op(int id, int value, bool undo = true)
 }  //namespace xsi {
 }  //namespace interprocess {
 }  //namespace boost {
-
-#endif //BOOST_INTERPROCESS_SYNC_XSI_SIMPLE_XSI_SEMAPHORE_HPP

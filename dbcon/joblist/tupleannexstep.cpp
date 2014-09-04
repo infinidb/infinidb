@@ -15,23 +15,17 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: tupleannexstep.cpp 9661 2013-07-01 20:33:05Z pleblanc $
+//  $Id: tupleannexstep.cpp 9662 2013-07-01 20:34:26Z pleblanc $
 
 
 //#define NDEBUG
 #include <cassert>
 #include <sstream>
 #include <iomanip>
-#ifdef _MSC_VER
-#include <unordered_set>
-#else
-#include <tr1/unordered_set>
-#endif
 using namespace std;
 
 #include <boost/shared_ptr.hpp>
 #include <boost/shared_array.hpp>
-#include <boost/uuid/uuid_io.hpp>
 using namespace boost;
 
 #include "messagequeue.h"
@@ -42,6 +36,7 @@ using namespace messageqcpp;
 using namespace logging;
 
 #include "calpontsystemcatalog.h"
+#include "aggregatecolumn.h"
 #include "constantcolumn.h"
 #include "simplecolumn.h"
 using namespace execplan;
@@ -50,11 +45,8 @@ using namespace execplan;
 using namespace rowgroup;
 
 #include "hasher.h"
-#include "stlpoolallocator.h"
+#include "simpleallocator.h"
 using namespace utils;
-
-#include "querytele.h"
-using namespace querytele;
 
 #include "funcexp.h"
 #include "jobstep.h"
@@ -66,60 +58,38 @@ using namespace querytele;
 
 namespace
 {
-struct TAHasher {
-	joblist::TupleAnnexStep *ts;
-	utils::Hasher_r h;
-	TAHasher(joblist::TupleAnnexStep *t) : ts(t) { }
-	uint64_t operator()(const rowgroup::Row::Pointer &) const;
-};
-struct TAEq {
-	joblist::TupleAnnexStep *ts;
-	TAEq(joblist::TupleAnnexStep *t) : ts(t) { }
-	bool operator()(const rowgroup::Row::Pointer &, const rowgroup::Row::Pointer &) const;
-};
-//TODO:  Generalize these and put them back in utils/common/hasher.h
-typedef tr1::unordered_set<rowgroup::Row::Pointer, TAHasher, TAEq,
-							STLPoolAllocator<rowgroup::Row::Pointer> > DistinctMap_t;
+typedef tr1::unordered_map<uint8_t*, uint8_t*, TupleHasher, TupleComparator,
+							SimpleAllocator<pair<uint8_t* const, uint8_t*> > > DistinctMap_t;
 };
 
-inline uint64_t TAHasher::operator()(const Row::Pointer &p) const
-{
-	Row &row = ts->row1;
-	row.setPointer(p);
-	return row.hash();
-}
-
-inline bool TAEq::operator()(const Row::Pointer &d1, const Row::Pointer &d2) const
-{
-	Row &r1 = ts->row1, &r2 = ts->row2;
-	r1.setPointer(d1);
-	r2.setPointer(d2);
-	return r1.equals(r2);
-}
 
 namespace joblist
 {
 
-TupleAnnexStep::TupleAnnexStep(const JobInfo& jobInfo) :
-		JobStep(jobInfo),
+TupleAnnexStep::TupleAnnexStep(
+	uint32_t sessionId,
+	uint32_t txnId,
+	uint32_t verId,
+	uint32_t statementId,
+	const JobInfo& jobInfo) :
+		fSessionId(sessionId),
+		fTxnId(txnId),
+		fVerId(verId),
+		fStatementId(statementId),
 		fInputDL(NULL),
 		fOutputDL(NULL),
 		fInputIterator(0),
 		fOutputIterator(0),
-		fRowsProcessed(0),
 		fRowsReturned(0),
-		fLimitStart(0),
-		fLimitCount(-1),
-		fLimitHit(false),
 		fEndOfResult(false),
+		fDelivery(false),
 		fDistinct(false),
 		fOrderBy(NULL),
 		fConstant(NULL),
 		fFeInstance(funcexp::FuncExp::instance()),
 		fJobList(jobInfo.jobListPtr)
 {
-	fExtendedInfo = "TNS: ";
-	fQtc.stepParms().stepType = StepTeleStats::T_TNS;
+	fExtendedInfo = "TXS: ";
 }
 
 
@@ -154,12 +124,12 @@ void TupleAnnexStep::initialize(const RowGroup& rgIn, const JobInfo& jobInfo)
 
 	if (fConstant == NULL)
 	{
-		vector<uint32_t> oids, oidsIn = fRowGroupIn.getOIDs();
-		vector<uint32_t> keys, keysIn = fRowGroupIn.getKeys();
-		vector<uint32_t> scale, scaleIn = fRowGroupIn.getScale();
-		vector<uint32_t> precision, precisionIn = fRowGroupIn.getPrecision();
+		vector<uint> oids, oidsIn = fRowGroupIn.getOIDs();
+		vector<uint> keys, keysIn = fRowGroupIn.getKeys();
+		vector<uint> scale, scaleIn = fRowGroupIn.getScale();
+		vector<uint> precision, precisionIn = fRowGroupIn.getPrecision();
 		vector<CalpontSystemCatalog::ColDataType> types, typesIn = fRowGroupIn.getColTypes();
-		vector<uint32_t> pos, posIn = fRowGroupIn.getOffsets();
+		vector<uint> pos, posIn = fRowGroupIn.getOffsets();
 
 		size_t n = jobInfo.nonConstDelCols.size();
 		oids.insert(oids.end(), oidsIn.begin(), oidsIn.begin() + n);
@@ -169,7 +139,7 @@ void TupleAnnexStep::initialize(const RowGroup& rgIn, const JobInfo& jobInfo)
 		types.insert(types.end(), typesIn.begin(), typesIn.begin() + n);
 		pos.insert(pos.end(), posIn.begin(), posIn.begin() + n + 1);
 
-		fRowGroupOut = RowGroup(oids.size(), pos, oids, keys, types, scale, precision, jobInfo.stringTableThreshold);
+		fRowGroupOut = RowGroup(oids.size(), pos, oids, keys, types, scale, precision);
 	}
 	else
 	{
@@ -194,7 +164,7 @@ void TupleAnnexStep::run()
 	fInputIterator = fInputDL->getIterator();
 
 	if (fOutputJobStepAssociation.outSize() == 0)
-		throw logic_error("No output data list for annex step.");
+		throw logic_error("No output data list for non-delivery annex step.");
 
 	fOutputDL = fOutputJobStepAssociation.outAt(0)->rowGroupDL();
 	if (fOutputDL == NULL)
@@ -216,21 +186,24 @@ void TupleAnnexStep::join()
 }
 
 
-uint32_t TupleAnnexStep::nextBand(messageqcpp::ByteStream &bs)
+uint TupleAnnexStep::nextBand(messageqcpp::ByteStream &bs)
 {
-	RGData rgDataOut;
+	shared_array<uint8_t> rgDataOut;
 	bool more = false;
-	uint32_t rowCount = 0;
+	uint rowCount = 0;
 
 	try
 	{
 		bs.restart();
 
 		more = fOutputDL->next(fOutputIterator, &rgDataOut);
-		if (more && !cancelled())
+		if (traceOn() && dlTimes.FirstReadTime().tv_sec ==0)
+			dlTimes.setFirstReadTime();
+
+		if (more && (0 == fOutputJobStepAssociation.status()) && !die)
 		{
-			fRowGroupDeliver.setData(&rgDataOut);
-			fRowGroupDeliver.serializeRGData(bs);
+			fRowGroupDeliver.setData(rgDataOut.get());
+			bs.load(fRowGroupDeliver.getData(), fRowGroupDeliver.getDataSize());
 			rowCount = fRowGroupDeliver.getRowCount();
 		}
 		else
@@ -242,28 +215,38 @@ uint32_t TupleAnnexStep::nextBand(messageqcpp::ByteStream &bs)
 	}
 	catch(const std::exception& ex)
 	{
-		catchHandler(ex.what(), ERR_IN_DELIVERY, fErrorInfo, fSessionId);
-		while (more)
-			more = fOutputDL->next(fOutputIterator, &rgDataOut);
+		catchHandler(ex.what(), fSessionId);
+		if (fOutputJobStepAssociation.status() == 0)
+			fOutputJobStepAssociation.status(ERR_IN_DELIVERY);
+		while (more) more = fOutputDL->next(fOutputIterator, &rgDataOut);
 		fEndOfResult = true;
 	}
 	catch(...)
 	{
-		catchHandler("TupleAnnexStep next band caught an unknown exception",
-					 ERR_IN_DELIVERY, fErrorInfo, fSessionId);
-		while (more)
-			more = fOutputDL->next(fOutputIterator, &rgDataOut);
+		catchHandler("TupleAnnexStep next band caught an unknown exception", fSessionId);
+		if (fOutputJobStepAssociation.status() == 0)
+			fOutputJobStepAssociation.status(ERR_IN_DELIVERY);
+		while (more) more = fOutputDL->next(fOutputIterator, &rgDataOut);
 		fEndOfResult = true;
 	}
 
 	if (fEndOfResult)
 	{
 		// send an empty / error band
-		rgDataOut.reinit(fRowGroupDeliver, 0);
-		fRowGroupDeliver.setData(&rgDataOut);
+		rgDataOut.reset(new uint8_t[fRowGroupDeliver.getEmptySize()]);
+		fRowGroupDeliver.setData(rgDataOut.get());
 		fRowGroupDeliver.resetRowGroup(0);
-		fRowGroupDeliver.setStatus(status());
-		fRowGroupDeliver.serializeRGData(bs);
+		fRowGroupDeliver.setStatus(fOutputJobStepAssociation.status());
+		bs.load(rgDataOut.get(), fRowGroupDeliver.getDataSize());
+
+		if (traceOn())
+		{
+			dlTimes.setLastReadTime();
+			dlTimes.setEndOfInputTime();
+		}
+
+		if (traceOn())
+			printCalTrace();
 	}
 
 	return rowCount;
@@ -278,80 +261,50 @@ void TupleAnnexStep::execute()
 		executeNoOrderByWithDistinct();
 	else
 		executeNoOrderBy();
-
-	StepTeleStats sts;
-	sts.query_uuid = fQueryUuid;
-	sts.step_uuid = fStepUuid;
-	sts.msg_type = StepTeleStats::ST_SUMMARY;
-	sts.total_units_of_work = sts.units_of_work_completed = 1;
-	sts.rows = fRowsReturned;
-	postStepSummaryTele(sts);
-
-	if (traceOn())
-	{
-		if (dlTimes.FirstReadTime().tv_sec ==0)
-			dlTimes.setFirstReadTime();
-
-		dlTimes.setLastReadTime();
-		dlTimes.setEndOfInputTime();
-		printCalTrace();
-	}
 }
 
 
 void TupleAnnexStep::executeNoOrderBy()
 {
-	RGData rgDataIn;
-	RGData rgDataOut;
+	shared_array<uint8_t> rgDataIn;
+	shared_array<uint8_t> rgDataOut;
 	bool more = false;
+	bool hitLimit = false;
 
 	try
 	{
 		more = fInputDL->next(fInputIterator, &rgDataIn);
 		if (traceOn()) dlTimes.setFirstReadTime();
 
-		StepTeleStats sts;
-		sts.query_uuid = fQueryUuid;
-		sts.step_uuid = fStepUuid;
-		sts.msg_type = StepTeleStats::ST_START;
-		sts.total_units_of_work = 1;
-		postStepStartTele(sts);
-
-		while (more && !cancelled() && !fLimitHit)
+		while (more && (0 == fInputJobStepAssociation.status()) && !die && !hitLimit)
 		{
-			fRowGroupIn.setData(&rgDataIn);
+			fRowGroupIn.setData(rgDataIn.get());
 			fRowGroupIn.getRow(0, &fRowIn);
 
 			// Get a new output rowgroup for each input rowgroup to preserve the rids
-			rgDataOut.reinit(fRowGroupOut, fRowGroupIn.getRowCount());
-			fRowGroupOut.setData(&rgDataOut);
+			rgDataOut.reset(new uint8_t[fRowGroupOut.getDataSize(fRowGroupIn.getRowCount())]);
+			fRowGroupOut.setData(rgDataOut.get());
 			fRowGroupOut.resetRowGroup(fRowGroupIn.getBaseRid());
 			fRowGroupOut.setDBRoot(fRowGroupIn.getDBRoot());
 			fRowGroupOut.getRow(0, &fRowOut);
 
-			for (uint64_t i = 0; i < fRowGroupIn.getRowCount() && !cancelled() && !fLimitHit; ++i)
+			for (uint64_t i = 0; i < fRowGroupIn.getRowCount() &&
+					(0 == fInputJobStepAssociation.status()) && !die && !hitLimit; ++i)
 			{
-				// skip first limit-start rows
-				if (fRowsProcessed++ < fLimitStart)
-				{
-					fRowIn.nextRow();
-					continue;
-				}
-
 				if (fConstant)
 					fConstant->fillInConstants(fRowIn, fRowOut);
 				else
-					copyRow(fRowIn, &fRowOut);
+					memcpy(fRowOut.getData(), fRowIn.getData(), fRowOut.getSize());
 
 				fRowGroupOut.incRowCount();
-				if (++fRowsReturned < fLimitCount)
+				if (++fRowsReturned < fLimit)
 				{
 					fRowOut.nextRow();
 					fRowIn.nextRow();
 				}
 				else
 				{
-					fLimitHit = true;
+					hitLimit = true;
 					fJobList->abortOnLimit((JobStep*) this);
 				}
 			}
@@ -366,16 +319,26 @@ void TupleAnnexStep::executeNoOrderBy()
 	}
 	catch(const std::exception& ex)
 	{
-		catchHandler(ex.what(), ERR_IN_PROCESS, fErrorInfo, fSessionId);
+		catchHandler(ex.what(), fSessionId);
+		if (fOutputJobStepAssociation.status() == 0)
+			fOutputJobStepAssociation.status(ERR_IN_PROCESS);
 	}
 	catch(...)
 	{
-		catchHandler("TupleAnnexStep execute caught an unknown exception",
-					 ERR_IN_PROCESS, fErrorInfo, fSessionId);
+		catchHandler("TupleAnnexStep execute caught an unknown exception", fSessionId);
+		if (fOutputJobStepAssociation.status() == 0)
+			fOutputJobStepAssociation.status(ERR_IN_PROCESS);
 	}
 
-	while (more)
-		more = fInputDL->next(fInputIterator, &rgDataIn);
+	while (more) more = fInputDL->next(fInputIterator, &rgDataIn);
+
+
+	if (traceOn() && !fDelivery)
+	{
+		dlTimes.setLastReadTime();
+		dlTimes.setEndOfInputTime();
+		printCalTrace();
+	}
 
 	// Bug 3136, let mini stats to be formatted if traceOn.
 	fOutputDL->endOfInput();
@@ -384,63 +347,63 @@ void TupleAnnexStep::executeNoOrderBy()
 
 void TupleAnnexStep::executeNoOrderByWithDistinct()
 {
-	scoped_ptr<DistinctMap_t> distinctMap(new DistinctMap_t(10, TAHasher(this), TAEq(this)));
-	vector<RGData> dataVec;
-	RGData rgDataIn;
-	RGData rgDataOut;
+	uint64_t keyLength = fRowOut.getSize() - 2;
+	utils::TupleHasher   hasher(keyLength);
+	utils::TupleComparator comp(keyLength);
+	shared_ptr<utils::SimplePool> pool(new utils::SimplePool);
+	utils::SimpleAllocator<pair<uint8_t* const, uint8_t*> > alloc(pool);
+	scoped_ptr<DistinctMap_t> distinctMap(new DistinctMap_t(10, hasher, comp, alloc));
+	vector<shared_array<uint8_t> > dataVec;
+	shared_array<uint8_t> rgDataIn;
+	shared_array<uint8_t> rgDataOut;
 	bool more = false;
+	bool hitLimit = false;
 
-	rgDataOut.reinit(fRowGroupOut);
-	fRowGroupOut.setData(&rgDataOut);
+	rgDataOut.reset(new uint8_t[fRowGroupOut.getDataSize(8192)]);
+	fRowGroupOut.setData(rgDataOut.get());
 	fRowGroupOut.resetRowGroup(0);
 	fRowGroupOut.getRow(0, &fRowOut);
-
-	fRowGroupOut.initRow(&row1);
-	fRowGroupOut.initRow(&row2);
 
 	try
 	{
 		more = fInputDL->next(fInputIterator, &rgDataIn);
 		if (traceOn()) dlTimes.setFirstReadTime();
 
-		StepTeleStats sts;
-		sts.query_uuid = fQueryUuid;
-		sts.step_uuid = fStepUuid;
-		sts.msg_type = StepTeleStats::ST_START;
-		sts.total_units_of_work = 1;
-		postStepStartTele(sts);
-
-		while (more && !cancelled() && !fLimitHit)
+		while (more && (0 == fInputJobStepAssociation.status()) && !die && !hitLimit)
 		{
-			fRowGroupIn.setData(&rgDataIn);
+			fRowGroupIn.setData(rgDataIn.get());
 			fRowGroupIn.getRow(0, &fRowIn);
 
-			for (uint64_t i = 0; i < fRowGroupIn.getRowCount() && !cancelled() && !fLimitHit; ++i)
+			for (uint64_t i = 0; i < fRowGroupIn.getRowCount() &&
+					(0 == fInputJobStepAssociation.status()) && !die && !hitLimit; ++i)
 			{
-				pair<DistinctMap_t::iterator, bool> inserted;
 				if (fConstant)
 					fConstant->fillInConstants(fRowIn, fRowOut);
 				else
-					copyRow(fRowIn, &fRowOut);
+					memcpy(fRowOut.getData(), fRowIn.getData(), fRowOut.getSize());
 
-				++fRowsProcessed;
 				fRowIn.nextRow();
 
-				inserted = distinctMap->insert(fRowOut.getPointer());
-				if (inserted.second) {
+				if (distinctMap->find(fRowOut.getData()+2) == distinctMap->end())
+				{
+					distinctMap->insert(make_pair(fRowOut.getData()+2, fRowOut.getData()));
+
 					fRowGroupOut.incRowCount();
-					fRowOut.nextRow();
-					if (UNLIKELY(++fRowsReturned >= fLimitCount))
+					if (++fRowsReturned < fLimit)
 					{
-						fLimitHit = true;
+						fRowOut.nextRow();
+					}
+					else
+					{
+						hitLimit = true;
 						fJobList->abortOnLimit((JobStep*) this);
 					}
 
-					if (UNLIKELY(fRowGroupOut.getRowCount() >= 8192))
+					if (fRowGroupOut.getRowCount() >= 8192)
 					{
 						dataVec.push_back(rgDataOut);
-						rgDataOut.reinit(fRowGroupOut);
-						fRowGroupOut.setData(&rgDataOut);
+						rgDataOut.reset(new uint8_t[fRowGroupOut.getDataSize(8192)]);
+						fRowGroupOut.setData(rgDataOut.get());
 						fRowGroupOut.resetRowGroup(0);
 						fRowGroupOut.getRow(0, &fRowOut);
 					}
@@ -453,25 +416,34 @@ void TupleAnnexStep::executeNoOrderByWithDistinct()
 		if (fRowGroupOut.getRowCount() > 0)
 			dataVec.push_back(rgDataOut);
 
-		for (vector<RGData>::iterator i = dataVec.begin(); i != dataVec.end(); i++)
+		for (vector<shared_array<uint8_t> >::iterator i = dataVec.begin(); i != dataVec.end(); i++)
 		{
 			rgDataOut = *i;
-			fRowGroupOut.setData(&rgDataOut);
+			fRowGroupOut.setData(rgDataOut.get());
 			fOutputDL->insert(rgDataOut);
 		}
 	}
 	catch(const std::exception& ex)
 	{
-		catchHandler(ex.what(), ERR_IN_PROCESS, fErrorInfo, fSessionId);
+		catchHandler(ex.what(), fSessionId);
+		if (fOutputJobStepAssociation.status() == 0)
+			fOutputJobStepAssociation.status(ERR_IN_PROCESS);
 	}
 	catch(...)
 	{
-		catchHandler("TupleAnnexStep execute caught an unknown exception",
-					 ERR_IN_PROCESS, fErrorInfo, fSessionId);
+		catchHandler("TupleAnnexStep execute caught an unknown exception", fSessionId);
+		if (fOutputJobStepAssociation.status() == 0)
+			fOutputJobStepAssociation.status(ERR_IN_PROCESS);
 	}
 
-	while (more)
-		more = fInputDL->next(fInputIterator, &rgDataIn);
+	while (more) more = fInputDL->next(fInputIterator, &rgDataIn);
+
+	if (traceOn() && !fDelivery)
+	{
+		dlTimes.setLastReadTime();
+		dlTimes.setEndOfInputTime();
+		printCalTrace();
+	}
 
 	// Bug 3136, let mini stats to be formatted if traceOn.
 	fOutputDL->endOfInput();
@@ -480,8 +452,8 @@ void TupleAnnexStep::executeNoOrderByWithDistinct()
 
 void TupleAnnexStep::executeWithOrderBy()
 {
-	RGData rgDataIn;
-	RGData rgDataOut;
+	shared_array<uint8_t> rgDataIn;
+	shared_array<uint8_t> rgDataOut;
 	bool more = false;
 
 	try
@@ -489,19 +461,14 @@ void TupleAnnexStep::executeWithOrderBy()
 		more = fInputDL->next(fInputIterator, &rgDataIn);
 		if (traceOn()) dlTimes.setFirstReadTime();
 
-		StepTeleStats sts;
-		sts.query_uuid = fQueryUuid;
-		sts.step_uuid = fStepUuid;
-		sts.msg_type = StepTeleStats::ST_START;
-		sts.total_units_of_work = 1;
-		postStepStartTele(sts);
-
-		while (more && !cancelled())
+		while (more && (0 == fInputJobStepAssociation.status()) && !die)
 		{
-			fRowGroupIn.setData(&rgDataIn);
+			fRowGroupIn.setData(rgDataIn.get());
 			fRowGroupIn.getRow(0, &fRowIn);
 
-			for (uint64_t i = 0; i < fRowGroupIn.getRowCount() && !cancelled(); ++i)
+			for (uint64_t i = 0;
+				 i < fRowGroupIn.getRowCount() && (0 == fInputJobStepAssociation.status()) && !die;
+				 ++i)
 			{
 				fOrderBy->processRow(fRowIn);
 				fRowIn.nextRow();
@@ -512,7 +479,7 @@ void TupleAnnexStep::executeWithOrderBy()
 
 		fOrderBy->finalize();
 
-		if (!cancelled())
+		if (fOutputJobStepAssociation.status() == 0 && !die)
 		{
 			while (fOrderBy->getData(rgDataIn))
 			{
@@ -520,15 +487,15 @@ void TupleAnnexStep::executeWithOrderBy()
 					fRowGroupOut.getColumnCount() == fRowGroupIn.getColumnCount())
 				{
 					rgDataOut = rgDataIn;
-					fRowGroupOut.setData(&rgDataOut);
+					fRowGroupOut.setData(rgDataOut.get());
 				}
 				else
 				{
-					fRowGroupIn.setData(&rgDataIn);
+					fRowGroupIn.setData(rgDataIn.get());
 					fRowGroupIn.getRow(0, &fRowIn);
 
-					rgDataOut.reinit(fRowGroupOut, fRowGroupIn.getRowCount());
-					fRowGroupOut.setData(&rgDataOut);
+					rgDataOut.reset(new uint8_t[fRowGroupOut.getDataSize(fRowGroupIn.getRowCount())]);
+					fRowGroupOut.setData(rgDataOut.get());
 					fRowGroupOut.resetRowGroup(fRowGroupIn.getBaseRid());
 					fRowGroupOut.setDBRoot(fRowGroupIn.getDBRoot());
 					fRowGroupOut.getRow(0, &fRowOut);
@@ -538,7 +505,7 @@ void TupleAnnexStep::executeWithOrderBy()
 						if (fConstant)
 							fConstant->fillInConstants(fRowIn, fRowOut);
 						else
-							copyRow(fRowIn, &fRowOut);
+							memcpy(fRowOut.getData(), fRowIn.getData(), fRowOut.getSize());
 
 						fRowGroupOut.incRowCount();
 						fRowOut.nextRow();
@@ -556,16 +523,25 @@ void TupleAnnexStep::executeWithOrderBy()
 	}
 	catch(const std::exception& ex)
 	{
-		catchHandler(ex.what(), ERR_IN_PROCESS, fErrorInfo, fSessionId);
+		catchHandler(ex.what(), fSessionId);
+		if (fOutputJobStepAssociation.status() == 0)
+			fOutputJobStepAssociation.status(ERR_IN_PROCESS);
 	}
 	catch(...)
 	{
-		catchHandler("TupleAnnexStep execute caught an unknown exception",
-					 ERR_IN_PROCESS, fErrorInfo, fSessionId);
+		catchHandler("TupleAnnexStep execute caught an unknown exception", fSessionId);
+		if (fOutputJobStepAssociation.status() == 0)
+			fOutputJobStepAssociation.status(ERR_IN_PROCESS);
 	}
 
-	while (more)
-		more = fInputDL->next(fInputIterator, &rgDataIn);
+	while (more) more = fInputDL->next(fInputIterator, &rgDataIn);
+
+	if (traceOn() && !fDelivery)
+	{
+		dlTimes.setLastReadTime();
+		dlTimes.setEndOfInputTime();
+		printCalTrace();
+	}
 
 	// Bug 3136, let mini stats to be formatted if traceOn.
 	fOutputDL->endOfInput();
@@ -581,20 +557,6 @@ const RowGroup& TupleAnnexStep::getOutputRowGroup() const
 const RowGroup& TupleAnnexStep::getDeliveredRowGroup() const
 {
 	return fRowGroupDeliver;
-}
-
-
-void TupleAnnexStep::deliverStringTableRowGroup(bool b)
-{
-	fRowGroupOut.setUseStringTable(b);
-	fRowGroupDeliver.setUseStringTable(b);
-}
-
-
-bool TupleAnnexStep::deliverStringTableRowGroup() const
-{
-	idbassert(fRowGroupOut.usesStringTable() == fRowGroupDeliver.usesStringTable());
-	return fRowGroupDeliver.usesStringTable();
 }
 
 
@@ -633,8 +595,7 @@ void TupleAnnexStep::printCalTrace()
 			<< "\t1st read " << dlTimes.FirstReadTimeString()
 			<< "; EOI " << dlTimes.EndOfInputTimeString() << "; runtime-"
 			<< JSTimeStamp::tsdiffstr(dlTimes.EndOfInputTime(), dlTimes.FirstReadTime())
-			<< "s;\n\tUUID " << uuids::to_string(fStepUuid) << endl
-			<< "\tJob completion status " << status() << endl;
+			<< "s;\n\tJob completion status " << fOutputJobStepAssociation.status() << endl;
 	logEnd(logStr.str().c_str());
 	fExtendedInfo += logStr.str();
 	formatMiniStats();

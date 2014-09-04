@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: brmtypes.cpp 1896 2013-06-07 19:50:51Z rdempsey $
+ * $Id: brmtypes.cpp 1704 2012-09-19 18:26:16Z pleblanc $
  *
  ****************************************************************************/
 
@@ -37,9 +37,7 @@
 #include "messagelog.h"
 #include "loggingid.h"
 #include "idberrorinfo.h"
-#include "errorids.h"
-#include "IDBDataFile.h"
-#include "IDBPolicy.h"
+#include "errorids.h" 
 
 #define BRMTYPES_DLLEXPORT
 #include "brmtypes.h"
@@ -48,7 +46,6 @@
 using namespace messageqcpp;
 using namespace std;
 using namespace logging;
-using namespace idbdatafile;
 
 // local unnamed namespace
 namespace {
@@ -62,7 +59,7 @@ LBIDRange::LBIDRange()
 {
 	start = 0;
 	size = 0;
-}
+}	
 
 LBIDRange::LBIDRange(const LBIDRange& l)
 {
@@ -143,13 +140,13 @@ void _SIDTIDEntry::init()
 	txnid.valid    = false;
 }
 
-VBRange::VBRange()
+VBRange::VBRange() 
 {
 	vbOID = 0;
 	vbFBO = 0;
 	size = 0;
 }
-
+	
 VBRange::VBRange(const VBRange& v)
 {
 	vbOID = v.vbOID;
@@ -171,7 +168,7 @@ VBRange& VBRange::operator= (const VBRange& v)
 
 void VBRange::deserialize(ByteStream& bs)
 {
-	uint32_t tmp;
+	u_int32_t tmp;
 
 	bs >> tmp;
 	vbOID = tmp;
@@ -181,7 +178,7 @@ void VBRange::deserialize(ByteStream& bs)
 
 void VBRange::serialize(ByteStream& bs) const
 {
-	bs << (uint32_t) vbOID;
+	bs << (u_int32_t) vbOID;
 	bs << vbFBO;
 	bs << size;
 }
@@ -333,11 +330,6 @@ void errString(int rc, string& errMsg)
 			errMsg = IDBErrorInfo::instance()->errorMsg(ERR_PARTITION_ALREADY_ENABLED);
 			break;
 		}
-		case ERR_OLDTXN_OVERWRITING_NEWTXN:
-		{
-			errMsg = "A newer transaction has already written to the same block(s)";
-			break;
-		}
 		default:
 		{
 			ostringstream oss;
@@ -354,7 +346,7 @@ bool TableLockInfo::overlaps(const TableLockInfo &t, const std::set<uint32_t> &s
 {
 	if (tableOID != t.tableOID)
 		return false;
-	for (uint32_t i = 0; i < dbrootList.size(); i++)
+	for (uint i = 0; i < dbrootList.size(); i++)
 		if (sDbrootList.find(dbrootList[i]) != sDbrootList.end())
 			return true;
 	return false;
@@ -396,7 +388,7 @@ void TableLockInfo::serialize(ostream &o) const
 	o.write((char *) &nameLen, 2);
 	o.write((char *) ownerName.c_str(), nameLen);
 	o.write((char *) &dbrootListSize, 2);
-	for (uint32_t j = 0; j < dbrootListSize; j++)
+	for (uint j = 0; j < dbrootListSize; j++)
 		o.write((char *) &dbrootList[j], 4);
 }
 
@@ -419,50 +411,8 @@ void TableLockInfo::deserialize(istream &i)
 	ownerName = string(buf.get(), nameLen);
 	i.read((char *) &dbrootListSize, 2);
 	dbrootList.resize(dbrootListSize);
-	for (uint32_t j = 0; j < dbrootListSize; j++)
+	for (uint j = 0; j < dbrootListSize; j++)
 		i.read((char *) &dbrootList[j], 4);
-}
-
-void TableLockInfo::serialize(IDBDataFile* o) const
-{
-	uint16_t nameLen = ownerName.length();
-	uint16_t dbrootListSize = dbrootList.size();
-
-	o->write((char *) &id, 8);
-	o->write((char *) &tableOID, 4);
-	o->write((char *) &ownerPID, 4);
-	o->write((char *) &state, 4);
-	o->write((char *) &ownerSessionID, 4);
-	o->write((char *) &ownerTxnID, 4);
-	o->write((char *) &creationTime, sizeof(time_t));
-	o->write((char *) &nameLen, 2);
-	o->write((char *) ownerName.c_str(), nameLen);
-	o->write((char *) &dbrootListSize, 2);
-	for (uint32_t j = 0; j < dbrootListSize; j++)
-		o->write((char *) &dbrootList[j], 4);
-}
-
-void TableLockInfo::deserialize(IDBDataFile* i)
-{
-	uint16_t nameLen;
-	uint16_t dbrootListSize;
-	boost::scoped_array<char> buf;
-
-	i->read((char *) &id, 8);
-	i->read((char *) &tableOID, 4);
-	i->read((char *) &ownerPID, 4);
-	i->read((char *) &state, 4);
-	i->read((char *) &ownerSessionID, 4);
-	i->read((char *) &ownerTxnID, 4);
-	i->read((char *) &creationTime, sizeof(time_t));
-	i->read((char *) &nameLen, 2);
-	buf.reset(new char[nameLen]);
-	i->read(buf.get(), nameLen);
-	ownerName = string(buf.get(), nameLen);
-	i->read((char *) &dbrootListSize, 2);
-	dbrootList.resize(dbrootListSize);
-	for (uint32_t j = 0; j < dbrootListSize; j++)
-		i->read((char *) &dbrootList[j], 4);
 }
 
 bool TableLockInfo::operator<(const TableLockInfo &tli) const
@@ -470,13 +420,5 @@ bool TableLockInfo::operator<(const TableLockInfo &tli) const
 	return (id < tli.id);
 }
 
-ostream & operator<<(ostream &os, const QueryContext &qc)
-{
-	os << "  SCN: " << qc.currentScn << endl;
-	os << "  Txns: ";
-	for (uint32_t i = 0; i < qc.currentTxns->size(); i++)
-		os << (*qc.currentTxns)[i] << " ";
-	return os;
-}
 
 }  //namespace

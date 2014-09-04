@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: mastersegmenttable.cpp 1904 2013-06-14 18:30:46Z dhall $
+ * $Id: mastersegmenttable.cpp 1547 2012-04-04 18:19:01Z rdempsey $
  *
  ****************************************************************************/
 
@@ -137,17 +137,20 @@ MasterSegmentTable::MasterSegmentTable()
 	RWLockKeys[3] = fShmKeys.KEYRANGE_VSS_BASE;
 	RWLockKeys[4] = fShmKeys.KEYRANGE_CL_BASE;
 		
-    try
-    {
-        // if initializer is returned false, then this is not the first time for this key.
-        rwlock[0].reset(new RWLock(RWLockKeys[0], &initializer));
+	try {
+		rwlock[0].reset(new RWLock(RWLockKeys[0], true));
+		initializer = true;
 	}
-	catch (exception &e) 
-    {
-		cerr << "ControllerSegmentTable: RWLock() threw: " << e.what() << endl;
-		throw;
+	catch(rwlock::not_excl& e) {
+		try {
+			rwlock[0].reset(new RWLock(RWLockKeys[0]));
+		}
+		catch (exception &e) {
+			cerr << "ControllerSegmentTable: RWLock() threw: " << e.what() << endl;
+			throw;
+		}
 	}
-	if (rwlock[0] == NULL) {
+	if (!rwlock[0]) {
 		cerr << "ControllerSegmentTable(): RWLock() failed..?" << endl;
 		throw runtime_error("ControllerSegmentTable(): RWLock() failed..?");
 	}
@@ -161,17 +164,13 @@ MasterSegmentTable::MasterSegmentTable()
 		rwlock[0]->write_unlock();
 	}
 	else {
-		rwlock[0]->read_lock_priority();     // this is to synch with the initializer
+		rwlock[0]->read_lock();     // this is to synch with the initializer
 		rwlock[0]->read_unlock();
 	}
 }
 
 MasterSegmentTable::~MasterSegmentTable()
 {
-//	int i;
-	
-//	for (i = 0; i < nTables; i++)
-//		delete rwlock[i];
 }
 	
 void MasterSegmentTable::makeMSTSegment()

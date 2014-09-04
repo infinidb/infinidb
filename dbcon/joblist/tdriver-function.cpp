@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-// $Id: tdriver-function.cpp 9210 2013-01-21 14:10:42Z rdempsey $
+// $Id: tdriver-function.cpp 8436 2012-04-04 18:18:21Z rdempsey $
 #include <iostream>
 #include <list>
 #include <sstream>
@@ -140,7 +140,7 @@ class MultiTimer {
 			total.fStartCount = 1;
 			fProcessStats.push_back(total);
 
-			for(uint32_t i = 0; i < fProcessStats.size(); i++) {
+			for(uint i = 0; i < fProcessStats.size(); i++) {
 
 				if(i == (fProcessStats.size() - 1)) {
 					cout << endl;
@@ -216,8 +216,8 @@ class MultiTimer {
 
 void MultiTimer::stop(const string& message) {
 	bool found = false;
-	uint32_t idx = 0;
-	for(uint32_t i = 0; i < fProcessStats.size(); i++) {
+	uint idx = 0;
+	for(uint i = 0; i < fProcessStats.size(); i++) {
 		if(fProcessStats[i].fProcess == message) {
 			idx = i;
 			found = true;
@@ -232,13 +232,13 @@ void MultiTimer::stop(const string& message) {
 
 void MultiTimer::start(const string& message) {
 	bool found = false;
-	uint32_t idx = 0;
+	uint idx = 0;
 	ProcessStats processStats;
 	if(!fStarted) {
 		fStarted = true;
 		gettimeofday(&fTvStart, 0);
 	}
-	for(uint32_t i = 0; i < fProcessStats.size(); i++) {
+	for(uint i = 0; i < fProcessStats.size(); i++) {
 		if(fProcessStats[i].fProcess == message) {
 			idx = i;
 			found = true;
@@ -541,7 +541,7 @@ private:
         // double list
         WSDL<DoubleElementType>* wsdlInD1 = new WSDL<DoubleElementType>(20, numRows, fRm);
         WSDL<DoubleElementType>* wsdlInD2 = new WSDL<DoubleElementType>(20, numRows, fRm);
-        // uint32_t list
+        // uint list
         WSDL<ElementType>* wsdlInU1 = new WSDL<ElementType>(20, numRows, fRm);
         WSDL<ElementType>* wsdlInU2 = new WSDL<ElementType>(20, numRows, fRm);
         // string list
@@ -602,7 +602,7 @@ private:
             }
         }
 
-		// double add(double, uint32_t)
+		// double add(double, uint)
         {
             DoubleElementType el0, el1;
             ElementType       el2;
@@ -666,7 +666,7 @@ private:
             }
         }
 
-		// double add(uint32_t, double)
+		// double add(uint, double)
         {
             DoubleElementType el0, el2;
             ElementType       el1;
@@ -698,7 +698,7 @@ private:
             }
         }
 
-		// double add(uint32_t, uint32_t)
+		// double add(uint, uint)
         {
             DoubleElementType el0;
             ElementType       el1, el2;
@@ -730,7 +730,7 @@ private:
             }
         }
 
-		// double add(uint32_t, string)
+		// double add(uint, string)
         {
             DoubleElementType el0;
             ElementType       el1;
@@ -795,7 +795,7 @@ private:
             }
         }
 
-		// double add(string, uint32_t)
+		// double add(string, uint)
         {
             DoubleElementType el0;
             StringElementType el1;

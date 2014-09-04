@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: ddlindexpopulator.h 9210 2013-01-21 14:10:42Z rdempsey $
+ *   $Id: ddlindexpopulator.h 8436 2012-04-04 18:18:21Z rdempsey $
  *
  *
  ***********************************************************************/
@@ -62,7 +62,7 @@ public:
    */
   DDLIndexPopulator(WriteEngine::WriteEngineWrapper* writeEngine, 
 		    execplan::SessionManager* sessionManager, 
-		    uint32_t sessionID, 
+		    u_int32_t sessionID, 
 		    execplan::CalpontSystemCatalog::SCN txnID, 
 		    DDLPackageProcessor::DDLResult& result, 
 		    const DDLPackageProcessor::IndexOID& idxOID, 
@@ -157,6 +157,12 @@ public:
      */
     void makeCsep(execplan::CalpontSelectExecutionPlan&  csep);
 
+    bool isCharType(const execplan::CalpontSystemCatalog::ColType& colType)
+    {
+    	return ( execplan::CalpontSystemCatalog::CHAR == colType.colDataType 
+	 || execplan::CalpontSystemCatalog::VARCHAR == colType.colDataType );
+    }
+
     /** @brief return if ColumnResult string type
      *
      * Uses same logic as ColumnResult from type to return getStringData (true)
@@ -168,9 +174,7 @@ public:
   	return (type == execplan::CalpontSystemCatalog::CHAR 
 		|| type == execplan::CalpontSystemCatalog::VARCHAR
 		|| type == execplan::CalpontSystemCatalog::FLOAT
-		|| type == execplan::CalpontSystemCatalog::DOUBLE
-        || type == execplan::CalpontSystemCatalog::UFLOAT
-        || type == execplan::CalpontSystemCatalog::UDOUBLE );
+		|| type == execplan::CalpontSystemCatalog::DOUBLE );
     }
 
     /** @brief converts column result data
@@ -245,7 +249,7 @@ public:
 
     WriteEngine::WriteEngineWrapper*	fWriteEngine;
     execplan::SessionManager*        	fSessionManager;
-    uint32_t 				fSessionID;
+    u_int32_t 				fSessionID;
     execplan::CalpontSystemCatalog::SCN fTxnID;
     DDLPackageProcessor::DDLResult	fResult;
     DDLPackageProcessor::IndexOID    	fIdxOID;

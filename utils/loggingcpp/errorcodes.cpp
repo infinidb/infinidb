@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: errorcodes.cpp 3495 2013-01-21 14:09:51Z rdempsey $
+ *   $Id: errorcodes.cpp 3048 2012-04-04 15:33:45Z rdempsey $
  *
  *
  ***********************************************************************/
@@ -69,6 +69,7 @@ namespace logging {
     fErrorCodes[projectResultErr] = "error in BatchPrimitiveProcessor projectResult.  Please check crit.log for more details.";
     fErrorCodes[hwmRangeSizeErr] = "error in PrimitiveServer load block with HWM.  Please check crit.log for more details.";
     fErrorCodes[formatErr] = "format mismatch.";
+    fErrorCodes[multicastErr] = "error in Multicast transport.  Please check crit.log for more details.";
     fErrorCodes[dataTypeErr] = "data type unknown.";
     fErrorCodes[incompatJoinCols] = "incompatible column types specified for join condition.";
     fErrorCodes[incompatFilterCols] = "incompatible column types specified for filter condition.";

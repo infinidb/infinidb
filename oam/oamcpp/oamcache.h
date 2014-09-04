@@ -46,14 +46,11 @@ public:
 	EXPORT dbRootPMMap_t getDBRootToPMMap();
 	EXPORT dbRootPMMap_t getDBRootToConnectionMap();
 	EXPORT PMDbrootsMap_t getPMToDbrootsMap();
-	EXPORT uint32_t getDBRootCount();
+	EXPORT uint getDBRootCount();
 	EXPORT DBRootConfigList& getDBRootNums();
 	EXPORT std::vector<int> & getModuleIds();
 	EXPORT static OamCache * makeOamCache();
 	EXPORT std::string getOAMParentModuleName();
-	EXPORT int getLocalPMId();	// return the PM id of this machine.
-	EXPORT std::string getSystemName();
-	EXPORT std::string getModuleName();
 
 private:
 	OamCache();
@@ -63,14 +60,11 @@ private:
 	dbRootPMMap_t dbRootPMMap;
 	dbRootPMMap_t dbRootConnectionMap;
 	PMDbrootsMap_t pmDbrootsMap;
-	uint32_t numDBRoots;
+	uint numDBRoots;
 	time_t mtime;
 	DBRootConfigList dbroots;
 	std::vector<int> moduleIds;
 	std::string OAMParentModuleName;
-	int mLocalPMId;	// The PM id running on this machine
-	std::string systemName;
-	std::string moduleName;
 };
 
 } /* namespace */

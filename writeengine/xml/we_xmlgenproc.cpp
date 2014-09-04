@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
- *   $Id: we_xmlgenproc.cpp 4639 2013-05-08 17:32:10Z dcathey $
+ *   $Id: we_xmlgenproc.cpp 3806 2012-05-01 12:23:02Z dcathey $
  *
  ******************************************************************************/
 #define WRITEENGINEXMLGENPROC_DLLEXPORT
@@ -136,15 +136,10 @@ void XMLGenProc::startXMLFile( )
                 BAD_CAST xmlTagTable[TAG_ENCLOSED_BY_CHAR],
                 BAD_CAST fInputMgr->getParm(
                     XMLGenData::ENCLOSED_BY_CHAR).c_str() );
+            xmlTextWriterWriteElement(fWriter,
+                BAD_CAST xmlTagTable[TAG_ESCAPE_CHAR],
+                BAD_CAST fInputMgr->getParm(XMLGenData::ESCAPE_CHAR).c_str() );
         }
-
-        // Include escape character regardless of whether the "enclosed by"
-        // character is given, because the escape character can still be used
-        // to override the default NULL escape sequence '\N', to be something
-        // else like '#N'.
-        xmlTextWriterWriteElement(fWriter,
-            BAD_CAST xmlTagTable[TAG_ESCAPE_CHAR],
-            BAD_CAST fInputMgr->getParm(XMLGenData::ESCAPE_CHAR).c_str() );
 
         // Added new tags for configurable parameters
         xmlTextWriterStartElement(fWriter,
@@ -300,8 +295,7 @@ bool XMLGenProc::makeColumnData(const CalpontSystemCatalog::TableName& table)
 
             // Old logic went by scale > 0; New logic checks for "decimal" type
             if ( (0 < col->colType.scale ) ||
-                (col->colType.colDataType == CalpontSystemCatalog::DECIMAL) ||
-                (col->colType.colDataType == CalpontSystemCatalog::UDECIMAL) )
+                (col->colType.colDataType == CalpontSystemCatalog::DECIMAL) )
             {
                 xmlTextWriterWriteFormatAttribute(fWriter,
                     BAD_CAST xmlTagTable[TAG_PRECISION], "%d",

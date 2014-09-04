@@ -95,7 +95,7 @@ public:
 	 ***********************************************************/
 	inline virtual void evaluate(rowgroup::Row& row, bool& isNull, ParseTree* lop, ParseTree* rop);
 
-	virtual const std::string& getStrVal(rowgroup::Row& row, bool& isNull, ParseTree* lop, ParseTree* rop)
+	virtual std::string getStrVal(rowgroup::Row& row, bool& isNull, ParseTree* lop, ParseTree* rop)
 	{
 		evaluate(row, isNull, lop, rop);
 		return TreeNode::getStrVal();
@@ -104,11 +104,6 @@ public:
 	{
 		evaluate(row, isNull, lop, rop);
 		return TreeNode::getIntVal();
-	}
-	virtual uint64_t getUintVal(rowgroup::Row& row, bool& isNull,ParseTree* lop, ParseTree* rop)
-	{
-		evaluate(row, isNull, lop, rop);
-		return TreeNode::getUintVal();
 	}
 	virtual float getFloatVal(rowgroup::Row& row, bool& isNull,ParseTree* lop, ParseTree* rop)
 	{
@@ -123,19 +118,6 @@ public:
 	virtual IDB_Decimal getDecimalVal(rowgroup::Row& row, bool& isNull, ParseTree* lop, ParseTree* rop)
 	{
 		evaluate(row, isNull, lop, rop);
-
-		// @bug5736, double type with precision -1 indicates that this type is for decimal math,
-		//      the original decimal scale is stored in scale field, which is no use for double.
-		if (fResultType.colDataType == CalpontSystemCatalog::DOUBLE && fResultType.precision == -1)
-		{
-			IDB_Decimal rv;
-			rv.scale = fResultType.scale;
-			rv.precision = 15;
-			rv.value = (int64_t)(TreeNode::getDoubleVal() * IDB_pow[rv.scale]);
-
-			return rv;
-		}
-
 		return TreeNode::getDecimalVal();
 	}
 	virtual int32_t getDateIntVal(rowgroup::Row& row, bool& isNull,ParseTree* lop, ParseTree* rop)
@@ -153,7 +135,6 @@ public:
 		evaluate(row, isNull, lop, rop);
 		return TreeNode::getBoolVal();
 	}
-	void adjustResultType(const CalpontSystemCatalog::ColType& m);
 
 private:
 	template <typename result_t>
@@ -175,19 +156,11 @@ inline void ArithmeticOperator::evaluate(rowgroup::Row& row, bool& isNull, Parse
 		case execplan::CalpontSystemCatalog::TINYINT:
 			fResult.intVal = execute(lop->getIntVal(row, isNull), rop->getIntVal(row, isNull), isNull);
 			break;
-		case execplan::CalpontSystemCatalog::UBIGINT:
-		case execplan::CalpontSystemCatalog::UINT:
-		case execplan::CalpontSystemCatalog::UMEDINT:
-		case execplan::CalpontSystemCatalog::USMALLINT:
-		case execplan::CalpontSystemCatalog::UTINYINT:
-			fResult.uintVal = execute(lop->getUintVal(row, isNull), rop->getUintVal(row, isNull), isNull);
-			break;
 		case execplan::CalpontSystemCatalog::DOUBLE:
 		case execplan::CalpontSystemCatalog::FLOAT:
 			fResult.doubleVal = execute(lop->getDoubleVal(row, isNull), rop->getDoubleVal(row, isNull), isNull);
 			break;
 		case execplan::CalpontSystemCatalog::DECIMAL:
-		case execplan::CalpontSystemCatalog::UDECIMAL:
 			execute (fResult.decimalVal, lop->getDecimalVal(row, isNull), rop->getDecimalVal(row, isNull), isNull);
 			break;
 		default:

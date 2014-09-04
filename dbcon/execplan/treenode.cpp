@@ -16,17 +16,15 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: treenode.cpp 9317 2013-03-19 21:37:22Z dhall $
+*   $Id: treenode.cpp 8436 2012-04-04 18:18:21Z rdempsey $
 *
 *
 ***********************************************************************/
 /** @file */
 
-#include <unistd.h>
 #include <string>
 #include <exception>
 #include <typeinfo>
-#include <cstring>
 
 #include "bytestream.h"
 #include "treenode.h"
@@ -38,30 +36,22 @@ namespace execplan{
 /**
  * Constructors/Destructors
  */
-TreeNode::TreeNode(): fDerivedTable(""),
-                      fRefCount(0),
-                      fDerivedRefCol(NULL)
-{ memset(tmp, 0, 312); }
+TreeNode::TreeNode() {}
 
 TreeNode::TreeNode(const TreeNode& rhs):
-           fResult(rhs.fResult),
-           fResultType(rhs.resultType()),
-           fOperationType(rhs.operationType()),
-           fRegex (rhs.regex()),
-           fDerivedTable (rhs.derivedTable()),
-           fRefCount(rhs.refCount()),
-           fDerivedRefCol(rhs.derivedRefCol())
-{ memcpy(tmp, rhs.tmp, 312); }
+	        fResult(rhs.fResult),
+	        fResultType(rhs.resultType()),
+	        fOperationType(rhs.operationType()),
+	        fRegex (rhs.regex()) {}
 
 TreeNode::~TreeNode() {}
 
-void TreeNode::resultType ( const execplan::CalpontSystemCatalog::ColType& resultType)
-{
-	fResultType = resultType;
-
+void TreeNode::resultType ( const execplan::CalpontSystemCatalog::ColType& resultType) 
+{ 
+	fResultType = resultType; 
+		
 	// set scale/precision for the result
-	if (fResultType.colDataType == execplan::CalpontSystemCatalog::DECIMAL ||
-	    fResultType.colDataType == execplan::CalpontSystemCatalog::UDECIMAL)
+	if (fResultType.colDataType == execplan::CalpontSystemCatalog::DECIMAL)
 	{
 		fResult.decimalVal.scale = fResultType.scale;
 		fResult.decimalVal.precision = fResultType.precision;

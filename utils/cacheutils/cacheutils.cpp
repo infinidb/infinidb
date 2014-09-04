@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-// $Id: cacheutils.cpp 4051 2013-08-09 22:38:47Z wweeks $
+// $Id: cacheutils.cpp 3518 2013-01-31 19:13:17Z pleblanc $
 
 #include <unistd.h>
 
@@ -27,6 +27,9 @@
 #include <limits>
 //#define NDEBUG
 #include <cassert>
+#ifdef _MSC_VER
+#include <intrin.h>
+#endif
 using namespace std;
 
 #include <boost/scoped_ptr.hpp>
@@ -46,8 +49,6 @@ using namespace messageqcpp;
 #include "brmtypes.h"
 using namespace BRM;
 
-#include "atomicops.h"
-
 namespace
 {
 
@@ -55,13 +56,17 @@ namespace
 mutex CacheOpsMutex;
 
 //This global is updated only w/ atomic ops
-volatile uint32_t MultiReturnCode;
+#ifdef _MSC_VER
+volatile LONG MultiReturnCode;
+#else
+volatile int32_t MultiReturnCode __attribute__((aligned));
+#endif
 
 int32_t extractRespCode(const ByteStream& bs)
 {
 		if (bs.length() < (sizeof(ISMPacketHeader) + sizeof(int32_t)))
 			return 1;
-		const uint8_t* bytePtr = bs.buf();
+		const ByteStream::byte* bytePtr = bs.buf();
 		const ISMPacketHeader* hdrp = reinterpret_cast<const ISMPacketHeader*>(bytePtr);
 		if (hdrp->Command != CACHE_OP_RESULTS)
 			return 1;
@@ -89,7 +94,11 @@ public:
 			rc = 1;
 		}
 		if (rc != 0)
-			atomicops::atomicCAS<uint32_t>(&MultiReturnCode, 0, 1);
+#ifdef _MSC_VER
+			_InterlockedOr(&MultiReturnCode, 1);
+#else
+			__sync_or_and_fetch(&MultiReturnCode, 1);
+#endif
 	}
 
 private:
@@ -147,7 +156,7 @@ int flushPrimProcCache()
 	try
 	{
 		const int msgsize = sizeof(ISMPacketHeader);
-		uint8_t msgbuf[msgsize];
+		ByteStream::byte msgbuf[msgsize];
 		memset(msgbuf, 0, sizeof(ISMPacketHeader));
 		ISMPacketHeader* hdrp = reinterpret_cast<ISMPacketHeader*>(&msgbuf[0]);
 		hdrp->Command = CACHE_FLUSH;
@@ -178,7 +187,7 @@ int flushPrimProcBlocks(const BRM::BlockList_t& list)
 	try
 	{
 		const size_t msgsize = sizeof(ISMPacketHeader) + sizeof(uint32_t) + sizeof(LbidAtVer) * list.size();
-		scoped_array<uint8_t> msgbuf(new uint8_t[msgsize]);
+		scoped_array<ByteStream::byte> msgbuf(new ByteStream::byte[msgsize]);
 		memset(msgbuf.get(), 0, sizeof(ISMPacketHeader));
 		ISMPacketHeader* hdrp = reinterpret_cast<ISMPacketHeader*>(msgbuf.get());
 		hdrp->Command = CACHE_CLEAN_VSS;
@@ -243,7 +252,7 @@ int flushOIDsFromCache(const vector<BRM::OID_t> &oids)
 
 	ByteStream bs;
 	ISMPacketHeader ism;
-	uint32_t i;
+	uint i;
 
 	memset(&ism, 0, sizeof(ISMPacketHeader));
 	ism.Command = CACHE_FLUSH_BY_OID;
@@ -290,6 +299,7 @@ int dropPrimProcFdCache()
 	ISMPacketHeader* hdrp = reinterpret_cast<ISMPacketHeader*>(&msgbuf[0]);
 	hdrp->Command = CACHE_DROP_FDS;
 	ByteStream bs(msgbuf, msgsize);
+	
 	try
 	{
 		mutex::scoped_lock lk(CacheOpsMutex);
@@ -302,31 +312,6 @@ int dropPrimProcFdCache()
 	return -1;
 }
 
-int purgePrimProcFdCache(const std::vector<BRM::FileInfo> files, const int pmId)
-{
-	const int msgsize = sizeof(ISMPacketHeader);
-	uint8_t msgbuf[msgsize];
-	memset(msgbuf, 0, sizeof(ISMPacketHeader));
-	ISMPacketHeader* hdrp = reinterpret_cast<ISMPacketHeader*>(&msgbuf[0]);
-	hdrp->Command = CACHE_PURGE_FDS;
-	ByteStream bs(msgbuf, msgsize);
-	serializeInlineVector<FileInfo>(bs, files);
-	int32_t rc = 0;
-	try
-	{
-		struct timespec ts = { 10, 0 };		
-		ostringstream oss;
-		oss << "PMS" << pmId;
-		scoped_ptr<MessageQueueClient> cl(new MessageQueueClient(oss.str())); 
-		cl->write(bs);
-		rc = extractRespCode(cl->read(&ts));
-	}
-	catch (...)
-	{
-		rc = -1;
-	}
-	return rc;
-}
 }
 
 // vim:ts=4 sw=4:

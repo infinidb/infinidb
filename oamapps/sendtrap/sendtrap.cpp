@@ -128,9 +128,21 @@ int main(int argc, char **argv)
 	size_t   pid_oid_len = OID_LENGTH(PID_OID);
 	const CALPONT_OID      *tid_oid   = TID_OID;
 	size_t   tid_oid_len = OID_LENGTH(TID_OID);
-
-	string alarm_data = "CALALARM|" + oam.itoa(alarmID) + "|" + componentID + "|" + oam.itoa(state) + "|" + ModuleName + "|" + processName + "|" + oam.itoa(pid) + "|" + oam.itoa(tid);
-
+	
+	// alarm_data
+	char alarm_data [100];
+//	char* alarm_data;
+//	alarm_data = new char(100);
+	int pos;
+	pos = sprintf (alarm_data, "%s|", "CALALARM");
+	pos += sprintf (alarm_data+pos, "%d|", alarmID);
+	pos += sprintf (alarm_data+pos, "%s|", componentID);
+	pos += sprintf (alarm_data+pos, "%d|", state);
+	pos += sprintf (alarm_data+pos, "%s|", ModuleName.c_str());
+	pos += sprintf (alarm_data+pos, "%s|", processName.c_str());
+	pos += sprintf (alarm_data+pos, "%d|", pid);
+	pos += sprintf (alarm_data+pos, "%d", tid);
+	
 	netsnmp_variable_list *notification_vars = NULL;
 	
 	/*
@@ -160,7 +172,7 @@ int main(int argc, char **argv)
 	snmp_varlist_add_variable(&notification_vars,
 				calalarm_data_oid, calalarm_data_oid_len,
 				ASN_OCTET_STR,
-				(u_char*)alarm_data.c_str(), alarm_data.length());
+				(u_char*)alarm_data, strlen((char*)alarm_data));
 	snmp_varlist_add_variable(&notification_vars,
 				component_id_oid, component_id_oid_len,
 				ASN_OCTET_STR,
@@ -179,12 +191,12 @@ int main(int argc, char **argv)
 	snmp_varlist_add_variable(&notification_vars,
 				sname_oid, sname_oid_len,
 				ASN_OCTET_STR,
-				(u_char*)ModuleName.c_str(), ModuleName.length());
+				(u_char*)&ModuleName, ModuleName.length());
 						
 	snmp_varlist_add_variable(&notification_vars,
 				pname_oid, pname_oid_len,
 				ASN_OCTET_STR,
-				(u_char*)processName.c_str(), processName.length());
+				(u_char*)&processName, processName.length());
 						
 	snmp_varlist_add_variable(&notification_vars,
 				pid_oid, pid_oid_len,

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: filter.cpp 9210 2013-01-21 14:10:42Z rdempsey $
+*   $Id: filter.cpp 8436 2012-04-04 18:18:21Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -95,6 +95,17 @@ bool Filter::operator!=(const Filter& t) const
 bool Filter::operator!=(const TreeNode* t) const
 {
 	return (!(*this == t));
+}
+
+Filter* Filter::combinable(Filter* f, Operator* op)
+{
+    SimpleFilter *sf = dynamic_cast<SimpleFilter*>(f);
+    if (sf) 
+        return sf->combinable(this, op);
+    ConstantFilter *cf = dynamic_cast<ConstantFilter*>(f);
+    if (cf)
+        return cf->combinable(this, op);
+    return NULL;
 }
 
 /**

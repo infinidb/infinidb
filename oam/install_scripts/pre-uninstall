@@ -27,9 +27,10 @@ for arg in "$@"; do
 	elif [ `expr -- "$arg" : '--quiet'` -eq 7 ]; then
 		quiet=1
 	else
-		echo "post-uninstall: ignoring unknown argument: $arg" 1>&2
+		echo "post-install: ignoring unknown argument: $arg" 1>&2
 	fi
 done
+
 
 #stop services
 $installdir/bin/infinidb stop > /dev/null 2>&1
@@ -52,13 +53,12 @@ fi
 if test -f /etc/rc.local.calpontSave ; then
 	mv -f /etc/rc.local.calpontSave /etc/rc.local > /dev/null 2>&1
 fi
- 
+
 #remove log file directories
 #rm -rf /var/log/Calpont > /dev/null 2>&1
 #rm -f $installdir/mysql/db/*.err > /dev/null 2>&1
 rm -f /var/log/Calpont/activeAlarms > /dev/null 2>&1
 rm -f /var/log/Calpont/*.log1 > /dev/null 2>&1
-rm -rf $installdir/mysql/db/infinidb_log_archive > /dev/null 2>&1
 
 # remove Calpont Log Rotate File abd Transaction Log File
 rm -f /etc/logrotate.d/calpont > /dev/null 2>&1
@@ -84,21 +84,16 @@ rm -f /var/lock/subsys/infinidb
 rm -f /tmp/pkgcheck
 rm -f /tmp/upgrade-status.log.*
 rm -f /tmp/mount.log
+rm -f /tmp/idb*
 rm -f $installdir/data/bulk/tmpjob/* >/dev/null 2>&1
 rm -rf /tmp/infinidb_tmp_files
 rm -f $installdir/local/moveDbrootTransactionLog
 
-#delete any old setenv files under home directory
-if [ $user = "root" ]; then
-	rm -f /root/setenv-hdfs*
-else
-	rm -f /home/$user/setenv-hdfs*
-fi
 
 # delete core files
-#rm -f /var/log/Calpont/corefiles/* > /dev/null 2>&1
+rm -f /var/log/Calpont/corefiles/* > /dev/null 2>&1
 
-#uninstall InfiniDB system logging
+#un-setup InfiniDB system logging
 if [ -x $installdir/bin/syslogSetup.sh ]; then
 	if [ $user = "root" ]; then
 		$installdir/bin/syslogSetup.sh uninstall >/dev/null 2>&1
@@ -115,11 +110,9 @@ elif [ -x /usr/sbin/update-rc.d ]; then
 	/usr/sbin/update-rc.d -f infinidb remove > /dev/null 2>&1
 fi
 
-if [ $quiet != 1 ]; then
-	#make copy of Calpont.xml
-	/bin/cp -f $installdir/etc/Calpont.xml $installdir/etc/Calpont.xml.rpmsave > /dev/null 2>&1
-	/bin/cp -f $installdir/mysql/my.cnf $installdir/mysql/my.cnf.rpmsave > /dev/null 2>&1
-fi
+#make copy of Calpont.xml
+/bin/cp -f $installdir/etc/Calpont.xml $installdir/etc/Calpont.xml.rpmsave > /dev/null 2>&1
+/bin/cp -f $installdir/mysql/my.cnf $installdir/mysql/my.cnf.rpmsave > /dev/null 2>&1
 
 #umount file systems
 if [ $user = "root" ]; then

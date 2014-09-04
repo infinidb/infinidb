@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: slavedbrmnode.h 1828 2013-01-30 16:13:05Z pleblanc $
+ * $Id: slavedbrmnode.h 1837 2013-01-31 19:13:18Z pleblanc $
  *
  *****************************************************************************/
 
@@ -106,10 +106,10 @@ class SlaveDBRMNode {
 		 */
 		EXPORT int createStripeColumnExtents(
 				 const std::vector<CreateStripeColumnExtentsArgIn>& cols,
-						 uint16_t  dbRoot,
-						 uint32_t& partitionNum,
-						 uint16_t& segmentNum,
-                         std::vector<CreateStripeColumnExtentsArgOut>& extents) throw();
+						 u_int16_t  dbRoot,
+						 u_int32_t& partitionNum,
+						 u_int16_t& segmentNum,
+				 std::vector<CreateStripeColumnExtentsArgOut>& extents) throw();
 		
 		/** @brief Allocate extent in the specified segment file
 		 *
@@ -120,21 +120,19 @@ class SlaveDBRMNode {
 		 * @param dbRoot (in) DBRoot where extent is to be added.
 		 * @param partitionNum (in) Partition number in file path.
 		 * @param segmentNum (in) Segment number in file path.
-         * @param colDataType (in) the column type
 		 * @param lbid (out) The first LBID of the extent created.
 		 * @param allocdSize (out) The total number of LBIDs allocated.
-         * @param startBlockOffset (out) The first block of the extent created. 
+		 * @param startBlockOffset (out) The first block of the extent created.
 		 * @return 0 on success, -1 on error
 		 */
 		 EXPORT int createColumnExtentExactFile(OID_t oid,
-						 uint32_t  colWidth,
-						 uint16_t  dbRoot,
-						 uint32_t  partitionNum,
-						 uint16_t  segmentNum,
-                         execplan::CalpontSystemCatalog::ColDataType colDataType,
+						 u_int32_t  colWidth,
+						 u_int16_t  dbRoot,
+						 u_int32_t  partitionNum,
+						 u_int16_t  segmentNum,
 						 LBID_t&    lbid,
 						 int&       allocdSize,
-						 uint32_t& startBlockOffset) throw();
+						 u_int32_t& startBlockOffset) throw();
 
 		/** @brief Allocate an extent for a column file
 		 *
@@ -142,7 +140,6 @@ class SlaveDBRMNode {
 		 * @param OID (in) The OID requesting the extent.
 		 * @param colWidth (in) Column width of the OID.
 		 * @param dbRoot (in) DBRoot where extent is to be added.
-         * @param colDataType (in) the column type
 		 * @param partitionNum (in/out) Partition number in file path.
 		 *        If allocating OID's first extent for this DBRoot, then
 		 *        partitionNum is input, else it is an output arg.
@@ -155,14 +152,13 @@ class SlaveDBRMNode {
 		 * @return 0 on success, -1 on error
 		 */
 		 EXPORT int createColumnExtent_DBroot(OID_t oid,
-						 uint32_t  colWidth,
-						 uint16_t  dbRoot,
-                         execplan::CalpontSystemCatalog::ColDataType colDataType,
-                         uint32_t& partitionNum,
-						 uint16_t& segmentNum,
+						 u_int32_t  colWidth,
+						 u_int16_t  dbRoot,
+						 u_int32_t& partitionNum,
+						 u_int16_t& segmentNum,
 						 LBID_t&    lbid,
 						 int&       allocdSize,
-						 uint32_t& startBlockOffset) throw();
+						 u_int32_t& startBlockOffset) throw();
 
 		/** @brief Allocate an extent for a dictionary store file
 		 *
@@ -177,9 +173,9 @@ class SlaveDBRMNode {
 		 * @return 0 on success, -1 on error
 		 */
 		 EXPORT int createDictStoreExtent(OID_t oid,
-						 uint16_t  dbRoot,
-						 uint32_t  partitionNum,
-						 uint16_t  segmentNum,
+						 u_int16_t  dbRoot,
+						 u_int32_t  partitionNum,
+						 u_int16_t  segmentNum,
 						 LBID_t&    lbid,
 						 int&       allocdSize) throw();
 
@@ -231,7 +227,7 @@ class SlaveDBRMNode {
 		 * @return 0 on success, -1 on error
 		 */
 		EXPORT int rollbackDictStoreExtents(OID_t oid,
-						 uint32_t         partitionNum,
+						 u_int32_t         partitionNum,
 						 const std::vector<HWM_t>& hwms) throw ();
 
 		/** @brief Rollback (delete) a set of dict store extents for an OID &
@@ -251,7 +247,7 @@ class SlaveDBRMNode {
 		 */
 		EXPORT int rollbackDictStoreExtents_DBroot(OID_t oid,
 						 uint16_t          dbRoot,
-						 uint32_t         partitionNum,
+						 u_int32_t         partitionNum,
 						 const std::vector<uint16_t>& segNums,
 						 const std::vector<HWM_t>& hwms) throw ();
 						 
@@ -360,7 +356,7 @@ class SlaveDBRMNode {
 		 * @return 0 on success, -1 on error
 		 */
 		EXPORT int writeVBEntry(VER_t transID, LBID_t lbid, OID_t vbOID, 
-						 uint32_t vbFBO) throw();
+						 u_int32_t vbFBO) throw();
 		
 		/** @brief Atomically prepare to copy data to the version buffer
 		 * 
@@ -446,10 +442,8 @@ class SlaveDBRMNode {
 		/** @brief mark the extent containing the lbid as not having valid max and min values
 		*
 		**/
-		EXPORT int markExtentInvalid(const LBID_t lbid,
-                execplan::CalpontSystemCatalog::ColDataType colDataType);
-		EXPORT int markExtentsInvalid(const std::vector<LBID_t> &lbids,
-                const std::vector<execplan::CalpontSystemCatalog::ColDataType>& colDataTypes);
+		EXPORT int markExtentInvalid(const LBID_t lbid);
+		EXPORT int markExtentsInvalid(const std::vector<LBID_t> &lbids);
 
 		/** @brief update the extent with the lbidRange with max, min, & seqNum values
 		*

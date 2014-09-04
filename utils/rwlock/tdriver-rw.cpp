@@ -40,7 +40,6 @@
 #include "rwlock_local.h"
 
 using namespace std;
-using namespace rwlock;
 
 int threadStop;
 
@@ -51,12 +50,16 @@ static void *RWRunner(void *arg)
 	RWLock* rwlock;
 	
 	gettimeofday(&tv, NULL);
-	rwlock = new RWLock(reinterpret_cast<int64_t>(arg));
+	rwlock = new RWLock(reinterpret_cast<int>(arg));
 	
 	while (!threadStop) {
-		op = rand_r(reinterpret_cast<uint32_t *>(&tv.tv_usec)) % 10;
-		if (op < 8) {   // read
-				interval = rand_r(reinterpret_cast<uint32_t *>(&tv.tv_usec)) % 100000;
+		op = rand_r(reinterpret_cast<uint *>(&tv.tv_usec)) % 5;
+		switch(op) {
+			case 0:    //read
+			case 1:
+			case 2:
+			{
+				interval = rand_r(reinterpret_cast<uint *>(&tv.tv_usec)) % 100000;
 				rwlock->read_lock();
 				rwlock->lock();
 				CPPUNIT_ASSERT(rwlock->getReading() > 0);
@@ -64,7 +67,7 @@ static void *RWRunner(void *arg)
 				rwlock->unlock();
 				usleep(interval);
 
-				op2 = rand_r(reinterpret_cast<uint32_t *>(&tv.tv_usec)) % 2;
+				op2 = rand_r(reinterpret_cast<uint *>(&tv.tv_usec)) % 2;
 				if (op2) {
 					rwlock->upgrade_to_write();
 					rwlock->lock();
@@ -74,17 +77,14 @@ static void *RWRunner(void *arg)
 					usleep(interval);
 					rwlock->write_unlock();
 				}
-				else {
-					/* For testing the lock recovery code in the BRM workernodes */
-					/*
-					int crash = rand_r((uint32_t *) &tv.tv_usec) % 100;
-					if (crash > 0)   // 1% chance of crashing
-						rwlock->read_unlock();
-					*/
-				}
-		}
-		else if (op < 9) {    // write
-				interval = rand_r(reinterpret_cast<uint32_t *>(&tv.tv_usec)) % 100000;
+				else
+
+					rwlock->read_unlock();
+				break;
+			}
+			case 3:		//write
+			{
+				interval = rand_r(reinterpret_cast<uint *>(&tv.tv_usec)) % 100000;
 				rwlock->write_lock();
 				rwlock->lock();
 				CPPUNIT_ASSERT(rwlock->getReading() == 0);
@@ -92,7 +92,7 @@ static void *RWRunner(void *arg)
 				rwlock->unlock();
 				usleep(interval);
 
-				op2 = rand_r(reinterpret_cast<uint32_t *>(&tv.tv_usec)) % 2;
+				op2 = rand_r(reinterpret_cast<uint *>(&tv.tv_usec)) % 2;
 				if (op2) {
 					rwlock->downgrade_to_read();
 					rwlock->lock();
@@ -105,10 +105,16 @@ static void *RWRunner(void *arg)
 				else		
 
 					rwlock->write_unlock();
-		}
-		else if (op == 9) {   // delete
+				break;
+			}
+			case 4:		//delete
+			{
 				delete rwlock;
-				rwlock = new RWLock(reinterpret_cast<int64_t>(arg));
+				rwlock = new RWLock(reinterpret_cast<int>(arg));
+				break;
+			}
+			default:
+				break;
 		}
 	}
 	delete rwlock;
@@ -124,27 +130,21 @@ static void *RWRunner_local(void *arg)
 	gettimeofday(&tv, NULL);
 	
 	while (!threadStop) {
-		op = rand_r(reinterpret_cast<uint32_t *>(&tv.tv_usec)) % 10;
+		op = rand_r(reinterpret_cast<uint *>(&tv.tv_usec)) % 4;
 //    		cout << "doing op " << op << endl;
 		switch(op) {
 			case 0:    //read
 			case 1:
 			case 2:
-			case 3:
-			case 4:
-			case 5:
-			case 6:
-			case 7:
-			case 8:
 			{
-				interval = rand_r(reinterpret_cast<uint32_t *>(&tv.tv_usec)) % 100000;
+				interval = rand_r(reinterpret_cast<uint *>(&tv.tv_usec)) % 100000;
 				rwlock->read_lock();
 				rwlock->lock();
 				CPPUNIT_ASSERT(rwlock->getReading() > 0);
 				CPPUNIT_ASSERT(rwlock->getWriting() == 0);
 				rwlock->unlock();
  				usleep(interval);
-				op2 = rand_r(reinterpret_cast<uint32_t *>(&tv.tv_usec)) % 2;
+				op2 = rand_r(reinterpret_cast<uint *>(&tv.tv_usec)) % 2;
 				if (op2) {
 					rwlock->upgrade_to_write();
 // 					rwlock->lock();
@@ -154,18 +154,20 @@ static void *RWRunner_local(void *arg)
  					usleep(interval);
 					rwlock->write_unlock();
 				}
+				else
+					rwlock->read_unlock();
 				break;
 			}
-			case 9:		//write
+			case 3:		//write
 			{
-				interval = rand_r(reinterpret_cast<uint32_t *>(&tv.tv_usec)) % 100000;
+				interval = rand_r(reinterpret_cast<uint *>(&tv.tv_usec)) % 100000;
 				rwlock->write_lock();
 // 				rwlock->lock();
 				CPPUNIT_ASSERT(rwlock->getReading() == 0);
 				CPPUNIT_ASSERT(rwlock->getWriting() == 1);
 // 				rwlock->unlock();
  				usleep(interval);
-				op2 = rand_r(reinterpret_cast<uint32_t *>(&tv.tv_usec)) % 2;
+				op2 = rand_r(reinterpret_cast<uint *>(&tv.tv_usec)) % 2;
 				if (op2) {
 					rwlock->downgrade_to_read();
 					rwlock->lock();
@@ -191,22 +193,22 @@ class RWLockTest : public CppUnit::TestFixture {
 
 CPPUNIT_TEST_SUITE(RWLockTest);
 
-CPPUNIT_TEST(LongRWTest_1);
-//CPPUNIT_TEST(LongRWLocalTest_1);
+// CPPUNIT_TEST(LongRWTest_1);
+CPPUNIT_TEST(LongRWLocalTest_1);
 
 CPPUNIT_TEST_SUITE_END();
 
 private:
 public:
 	void LongRWTest_1() {
-		int key = 0x20000;  // the extentmap key
+		int key = 0x8215125f;
 		
-		const int threadCount = 30;
+		const int threadCount = 40;
 		int i;
 		pthread_t threads[threadCount];
 	
 		cerr << endl << "Multithreaded RWLock test.  "
-				"This runs for 60 minutes." << endl;
+				"This runs for 5 minutes." << endl;
 	
 		threadStop = 0;
 		
@@ -216,7 +218,7 @@ public:
 				throw logic_error("Error creating threads for the ipc test");
 		}
 		
- 		sleep(3600);
+ 		sleep(300);
 		threadStop = 1;
 		for (i = 0; i < threadCount; i++) {
 			cerr << "Waiting for thread #" << i << endl;

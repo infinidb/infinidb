@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: we_colbuf.h 4726 2013-08-07 03:38:36Z bwilkinson $
+ * $Id: we_colbuf.h 3720 2012-04-04 18:18:49Z rdempsey $
  *
  *****************************************************************************/
 
@@ -70,13 +70,13 @@ class ColumnBuffer {
      */
     virtual int resetToBeCompressedColBuf( long long& startFileOffset );
 
-    /** @brief Set the IDBDataFile* destination for the applicable col segment file.
+    /** @brief Set the FILE* destination for the applicable col segment file.
      * 
-     * @param The destination IDBDataFile stream to which buffer data will be written
+     * @param The destination FILE stream to which buffer data will be written
      * @param Starting HWM for cFile
      * @param Headers with ptr information (only applies to compressed files)
      */
-    virtual int setDbFile(IDBDataFile * const cFile, HWM startHwm, const char* hdrs);
+    virtual int setDbFile(FILE * const cFile, HWM startHwm, const char* hdrs);
 
     /** @brief Resize the buffer, also copying the section denoted by the
      * offsets to the new buffer.  If offsets are -1, then the buffer is
@@ -114,7 +114,7 @@ class ColumnBuffer {
 
     unsigned char* fBuffer; // Internal buffer
     int   fBufSize;         // Size of the internal buffer
-    IDBDataFile* fFile;            // The column file output stream
+    FILE* fFile;            // The column file output stream
     ColumnInfo* fColInfo;   // parent ColumnInfo Object
     Log*  fLog;             // Logger
     HWM   fStartingHwm;     // Starting HWM for current column segment file

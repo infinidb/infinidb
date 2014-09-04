@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//   $Id: updatepackageprocessor.cpp 9673 2013-07-09 15:59:49Z chao $
+//   $Id: updatepackageprocessor.cpp 9138 2012-12-11 20:13:47Z chao $
 
 #include <iostream>
 #include <fstream>
@@ -26,7 +26,9 @@
 #include <map>
 #include <boost/scoped_ptr.hpp>
 using namespace std;
+#define UPDATEPKGPROC_DLLEXPORT
 #include "updatepackageprocessor.h"
+#undef UPDATEPKGPROC_DLLEXPORT
 #include "writeengine.h"
 #include "joblistfactory.h"
 #include "messagelog.h"
@@ -59,7 +61,7 @@ using namespace oam;
 //#define PROFILE 1
 namespace dmlpackageprocessor
 {
-
+std::map<unsigned, bool> pmState;
 
 //StopWatch timer;
 DMLPackageProcessor::DMLResult
@@ -72,40 +74,10 @@ UpdatePackageProcessor::processPackage(dmlpackage::CalpontDMLPackage& cpackage)
     result.result = NO_ERROR;
 	result.rowCount = 0;
 	BRM::TxnID txnid;
-	// set-up the transaction
-    txnid.id  = cpackage.get_TxnID();		
-	txnid.valid = true;
     fSessionID = cpackage.get_SessionID();
     VERBOSE_INFO("Processing Update DML Package...");
 	TablelockData * tablelockData = TablelockData::makeTablelockData(fSessionID);
-	uint64_t uniqueId = 0;
-	//Bug 5070. Added exception handling
-	try {
-		uniqueId = fDbrm->getUnique64();
-	}
-	catch (std::exception& ex)
-	{
-		logging::Message::Args args;
-		logging::Message message(9);
-		args.add(ex.what());
-		message.format(args);
-		result.result = UPDATE_ERROR;	
-		result.message = message;
-		fSessionManager.rolledback(txnid);
-		return result;
-	}
-	catch ( ... )
-	{
-		logging::Message::Args args;
-		logging::Message message(9);
-		args.add("Unknown error occured while getting unique number.");
-		message.format(args);
-		result.result = UPDATE_ERROR;	
-		result.message = message;
-		fSessionManager.rolledback(txnid);
-		return result;
-	}
-	
+	uint64_t uniqueId = fDbrm.getUnique64();
 	uint64_t tableLockId = 0;
 	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(fSessionID);
 	CalpontSystemCatalog::TableName tableName;		
@@ -114,19 +86,19 @@ UpdatePackageProcessor::processPackage(dmlpackage::CalpontDMLPackage& cpackage)
 	tableName.schema = tablePtr->get_SchemaName();
 	tableName.table = tablePtr->get_TableName();
 	fWEClient->addQueue(uniqueId);
-	execplan::CalpontSystemCatalog::ROPair roPair;
 //#ifdef PROFILE
 //	StopWatch timer;
 //#endif
     try
     {
+        // set-up the transaction
+        txnid.id  = cpackage.get_TxnID();		
+		txnid.valid = true;
 		LoggingID logid( DMLLoggingId, fSessionID, txnid.id);
 		logging::Message::Args args1;
 		logging::Message msg(1);
 		args1.add("Start SQL statement: ");
-		ostringstream oss;
-		oss << cpackage.get_SQLStatement() << "|" << tablePtr->get_SchemaName()<<"|";
-		args1.add(oss.str());
+		args1.add(cpackage.get_SQLStatement());
 		msg.format( args1 );
 		logging::Logger logger(logid.fSubsysID);
 		logger.logMessage(LOG_TYPE_DEBUG, msg, logid);
@@ -143,27 +115,29 @@ UpdatePackageProcessor::processPackage(dmlpackage::CalpontDMLPackage& cpackage)
 				fWEClient->removeQueue(uniqueId);
                 return result;
             }
+         
+			execplan::CalpontSystemCatalog::ROPair roPair;
 			
 			roPair = systemCatalogPtr->tableRID(tableName);
 			tableLockId = tablelockData->getTablelockId(roPair.objnum); //check whether this table is locked already for this session
 			if (tableLockId == 0)
 			{
 				//cout << "tablelock is not found in cache, getting from dbrm" << endl;
-				uint32_t  processID = ::getpid();
+				u_int32_t  processID = ::getpid();
 				int32_t   txnId = txnid.id;
 				int32_t sessionId = fSessionID;
 				std::string  processName("DMLProc");
 				int i = 0;
 				OamCache * oamcache = OamCache::makeOamCache();
 				std::vector<int> pmList = oamcache->getModuleIds();
-				std::vector<uint32_t> pms;
+				std::vector<uint> pms;
 				for (unsigned i=0; i < pmList.size(); i++)
 				{
-					pms.push_back((uint32_t)pmList[i]);
+					pms.push_back((uint)pmList[i]);
 				}
 				
 				try {
-					tableLockId = fDbrm->getTableLock(pms, roPair.objnum, &processName, &processID, &sessionId, &txnId, BRM::LOADING );
+					tableLockId = fDbrm.getTableLock(pms, roPair.objnum, &processName, &processID, &sessionId, &txnId, BRM::LOADING );
 				}
 				catch (std::exception&)
 				{
@@ -200,7 +174,7 @@ UpdatePackageProcessor::processPackage(dmlpackage::CalpontDMLPackage& cpackage)
 							txnId = txnid.id;
 							sessionId = fSessionID;
 							processName = "DMLProc";
-							tableLockId = fDbrm->getTableLock(pms, roPair.objnum, &processName, &processID, &sessionId, &txnId, BRM::LOADING );
+							tableLockId = fDbrm.getTableLock(pms, roPair.objnum, &processName, &processID, &sessionId, &txnId, BRM::LOADING );
 						}
 						catch (std::exception&)
 						{
@@ -239,17 +213,9 @@ UpdatePackageProcessor::processPackage(dmlpackage::CalpontDMLPackage& cpackage)
 				colType = systemCatalogPtr->colType(roPair.objnum);
 				if (colType.autoincrement)
 				{
-                    try 
-                    {
-                        uint64_t nextVal = systemCatalogPtr->nextAutoIncrValue(tableName);
-                        fDbrm->startAISequence(roPair.objnum, nextVal, colType.colWidth, colType.colDataType);
-                        break; //Only one autoincrement column per table
-                    }
-                    catch (std::exception& ex)
-                    {
-                        result.result = UPDATE_ERROR;
-                        throw std::runtime_error(ex.what());
-                    }
+					uint64_t nextVal = systemCatalogPtr->nextAutoIncrValue(tableName);
+					fDbrm.startAISequence(roPair.objnum, nextVal, colType.colWidth);
+					break; //Only one autoincrement column per table
 				}
 				++rid_iterator;
 			}
@@ -257,7 +223,7 @@ UpdatePackageProcessor::processPackage(dmlpackage::CalpontDMLPackage& cpackage)
 			uint64_t  rowsProcessed = 0;
 			if (!fRollbackPending)
 			{
-				rowsProcessed = fixUpRows(cpackage, result, uniqueId, roPair.objnum);
+				rowsProcessed = fixUpRows(cpackage, result, uniqueId);
 			}
 			
 			//@Bug 4994 Cancelled job is not error
@@ -323,57 +289,29 @@ UpdatePackageProcessor::processPackage(dmlpackage::CalpontDMLPackage& cpackage)
   // timer.finish();
 	//@Bug 1886,2870 Flush VM cache only once per statement. send to all PMs.
 	//WriteEngineWrapper writeEngine;
-	std::map<uint32_t,uint32_t> oids;
-	int rc = 0;
+	std::map<u_int32_t,u_int32_t> oids;
     if (result.result == NO_ERROR || result.result == IDBRANGE_WARNING)
     {
-        if ((rc = flushDataFiles(NO_ERROR, oids, uniqueId, txnid, roPair.objnum)) != NO_ERROR)
+        if (flushDataFiles(NO_ERROR, oids, uniqueId, txnid) != NO_ERROR)
         {
-           	 cerr << "UpdatePackageProcessor::processPackage: write data to disk failed" << endl;
-	    	if (!fRollbackPending)
-	   	{
-            		logging::Message::Args args;
-            		logging::Message message(7);
-            		args.add("Update Failed: ");
-            		args.add("error when writing data to disk");
-            		args.add("");
-            		args.add("");
-            		message.format(args);
+            cerr << "UpdatePackageProcessor::processPackage: write data to disk failed" << endl;
+            logging::Message::Args args;
+            logging::Message message(7);
+            args.add("Update Failed: ");
+            args.add("error when writing data to disk");
+            args.add("");
+            args.add("");
+            message.format(args);
 
-            		result.result = UPDATE_ERROR;
-            		result.message = message;
-            		result.rowCount = 0;
-	    	}
-		rc = endTransaction(uniqueId, txnid, false);
+            result.result = UPDATE_ERROR;
+            result.message = message;
+            result.rowCount = 0;
         }
-	else
-	{
-		if (fRollbackPending)
-		  	rc = endTransaction(uniqueId, txnid, false);
-		else
-			rc = endTransaction(uniqueId, txnid, true);
-		if (( rc != NO_ERROR) && (!fRollbackPending))
-		{
-			logging::Message::Args args;
-			logging::Message message(7);
-			args.add("Update Failed: ");
-			args.add("error when cleaning up data files");
-			args.add("");
-			args.add("");
-			message.format(args);
-
-			result.result = UPDATE_ERROR;
-			result.message = message;
-			result.rowCount = 0;
-			
-		}
-	}
     }
     else
     {
-        //@Bug 4563. Always flush. error is already set
-        rc = flushDataFiles(result.result, oids, uniqueId, txnid, roPair.objnum);
-	rc = endTransaction(uniqueId, txnid, false);
+        //@Bug 4563. Always flush.
+        flushDataFiles(NO_ERROR, oids, uniqueId, txnid);
     }
 	//timer.finish();
 
@@ -395,28 +333,57 @@ UpdatePackageProcessor::processPackage(dmlpackage::CalpontDMLPackage& cpackage)
     return result;
 }
 
-uint64_t UpdatePackageProcessor::fixUpRows(dmlpackage::CalpontDMLPackage& cpackage, DMLResult& result, 
-											const uint64_t uniqueId, const uint32_t tableOid)
+uint64_t UpdatePackageProcessor::fixUpRows(dmlpackage::CalpontDMLPackage& cpackage, DMLResult& result, const uint64_t uniqueId)
 {
 	ByteStream msg, msgBk, emsgBs;
-	RGData rgData;
-	uint32_t qb = 4;
+	ByteStream::quadbyte qb = 4;
 	msg << qb;
 	boost::scoped_ptr<rowgroup::RowGroup> rowGroup;
-	uint64_t rowsProcessed = 0;
-	uint32_t dbroot = 1;
+	uint64_t  rowsProcessed = 0;
+	uint dbroot = 1;
 	bool metaData = false;
 	oam::OamCache * oamCache = oam::OamCache::makeOamCache();
 	std::vector<int> fPMs = oamCache->getModuleIds();
-	std::map<unsigned, bool> pmState;
-	//boost::scoped_ptr<messageqcpp::MessageQueueClient> fExeMgr;
-	//fExeMgr.reset( new messageqcpp::MessageQueueClient("ExeMgr1"));
+	
 	try {
+#if !defined(_MSC_VER) && !defined(SKIP_OAM_INIT)
+		//@Bug 4495 check PM status first
+		std::vector<int> tmpPMs;
+		for (unsigned i=0; i<fPMs.size(); i++)
+		{
+			int opState = 0;
+			bool aDegraded = false;
+			ostringstream aOss;
+			aOss << "pm" << fPMs[i];
+			std::string aModName = aOss.str();
+			try
+			{
+				fOam.getModuleStatus(aModName, opState, aDegraded);
+			}
+			catch(std::exception& ex)
+			{
+				ostringstream oss;
+				oss << "Exception on getModuleStatus on module ";
+				oss <<	aModName;
+				oss <<  ":  ";
+				oss <<  ex.what();
+				throw runtime_error( oss.str() );
+			}
 
+			if(opState == oam::ACTIVE )
+			{
+				pmState[fPMs[i]] = true;
+				tmpPMs.push_back(fPMs[i]);
+			}
+		}
+		
+		fPMs.swap(tmpPMs);
+#else
 		for (unsigned i=0; i<fPMs.size(); i++)
 		{
 			pmState[fPMs[i]] = true;
 		}
+#endif
 	//timer.start("ExeMgr");
 		fExeMgr->write(msg);
 		fExeMgr->write(*(cpackage.get_ExecutionPlan()));	
@@ -426,7 +393,7 @@ uint64_t UpdatePackageProcessor::fixUpRows(dmlpackage::CalpontDMLPackage& cpacka
 		msg = fExeMgr->read(); //error handling
 		emsgBs = fExeMgr->read();
 		string emsg;			
-		uint32_t qb;
+		ByteStream::quadbyte qb;
 							
 		if (emsgBs.length() == 0)
 		{
@@ -499,7 +466,7 @@ uint64_t UpdatePackageProcessor::fixUpRows(dmlpackage::CalpontDMLPackage& cpacka
 					metaData = true;
 					//cout << "sending meta data" << endl;
 					//timer.start("Meta");
-					err = processRowgroup(msgBk, result, uniqueId, cpackage, pmState, metaData, dbroot);
+					err = processRowgroup(msgBk, result, uniqueId, cpackage, metaData, dbroot);
 					rowGroup.reset(new rowgroup::RowGroup());
 					rowGroup->deserialize(msg);
 					qb = 100;
@@ -510,14 +477,12 @@ uint64_t UpdatePackageProcessor::fixUpRows(dmlpackage::CalpontDMLPackage& cpacka
 					//timer.stop("Meta");
 					continue;
 				}
-				uint32_t amount = rgData.deserialize(msg, true);
-				rowGroup->setData(&rgData);
-				//rowGroup->setData(const_cast<uint8_t*>(msg.buf())); 
+
+				rowGroup->setData(const_cast<uint8_t*>(msg.buf())); 
 				err = (rowGroup->getStatus() != 0);
 				if (err)
 				{
-					msgBk.advance(amount);
-					//msgBk.advance(rowGroup->getDataSize());
+					msgBk.advance(rowGroup->getDataSize());
 					string errorMsg;
 					msgBk >> errorMsg;
 					logging::Message::Args args;
@@ -528,7 +493,7 @@ uint64_t UpdatePackageProcessor::fixUpRows(dmlpackage::CalpontDMLPackage& cpacka
 					result.result = UPDATE_ERROR;
 					result.message = message;
 					DMLResult tmpResult;
-					receiveAll( tmpResult, uniqueId, fPMs, pmState, tableOid);
+					receiveAll( tmpResult, uniqueId, fPMs);
 /*					qb = 100;
 					//@Bug 4358 get rid of broken pipe error.
 					msg.restart();
@@ -539,7 +504,7 @@ uint64_t UpdatePackageProcessor::fixUpRows(dmlpackage::CalpontDMLPackage& cpacka
 					//err = true;
 					break;
 				}
-				if (rowGroup->getRGData() == NULL)
+				if (rowGroup->getData() == NULL)
 				{
 					msg.restart();			
 				}
@@ -547,18 +512,18 @@ uint64_t UpdatePackageProcessor::fixUpRows(dmlpackage::CalpontDMLPackage& cpacka
 				{
 					//timer.finish();
 					//need to receive all response
-					err = receiveAll( result, uniqueId, fPMs, pmState, tableOid);
+					err = receiveAll( result, uniqueId, fPMs);
 					//return rowsProcessed;
 					break;
 				}
-				if (rowGroup->getBaseRid() == (uint64_t) (-1))
+				if (rowGroup->getBaseRid() == (uint64_t) (-1 & ~0x1fff))
 				{
 					continue;  // @bug4247, not valid row ids, may from small side outer
 				}
 				dbroot = rowGroup->getDBRoot();
 				//cout << "dbroot in the rowgroup is " << dbroot << endl;
 				//timer.start("processRowgroup");
-				err = processRowgroup(msgBk, result, uniqueId, cpackage, pmState, metaData, dbroot);
+				err = processRowgroup(msgBk, result, uniqueId, cpackage, metaData, dbroot);
 				//timer.stop("processRowgroup");
 				if (err) {
 					//timer.finish();
@@ -570,7 +535,7 @@ uint64_t UpdatePackageProcessor::fixUpRows(dmlpackage::CalpontDMLPackage& cpacka
 					logging::Logger logger(logid.fSubsysID);
 					logger.logMessage(LOG_TYPE_DEBUG, msg1, logid); 
 					DMLResult tmpResult;
-					receiveAll( tmpResult, uniqueId, fPMs, pmState, tableOid);
+					receiveAll( tmpResult, uniqueId, fPMs);
 					logging::Message::Args args2;
 					logging::Message msg2(1);
 					args2.add("SQL statement erroring out, received all messages from WES");
@@ -607,7 +572,7 @@ uint64_t UpdatePackageProcessor::fixUpRows(dmlpackage::CalpontDMLPackage& cpacka
 
 			// Clean out the pipe;
 			DMLResult tmpResult;
-			receiveAll( tmpResult, uniqueId, fPMs, pmState, tableOid);
+			receiveAll( tmpResult, uniqueId, fPMs);
 		}
 		// get stats from ExeMgr
 		if (!err)
@@ -643,10 +608,6 @@ uint64_t UpdatePackageProcessor::fixUpRows(dmlpackage::CalpontDMLPackage& cpacka
 		message.format(args);
 		result.result = UPDATE_ERROR;
 		result.message = message;
-		qb = 0;
-		msg.restart();
-		msg << qb;
-		fExeMgr->write(msg);
 		return rowsProcessed;
 	}
 	catch ( ... )
@@ -659,10 +620,6 @@ uint64_t UpdatePackageProcessor::fixUpRows(dmlpackage::CalpontDMLPackage& cpacka
 		message.format(args);
 		result.result = UPDATE_ERROR;
 		result.message = message;
-		qb = 0;
-		msg.restart();
-		msg << qb;
-		fExeMgr->write(msg);
 		return rowsProcessed;
 	}
 	//timer.finish();
@@ -670,25 +627,25 @@ uint64_t UpdatePackageProcessor::fixUpRows(dmlpackage::CalpontDMLPackage& cpacka
 }
 
 bool UpdatePackageProcessor::processRowgroup(ByteStream & aRowGroup, DMLResult& result, const uint64_t uniqueId, 
-			dmlpackage::CalpontDMLPackage& cpackage, std::map<unsigned, bool>& pmState,  bool isMeta, uint32_t dbroot)
+			dmlpackage::CalpontDMLPackage& cpackage, bool isMeta, uint dbroot)
 {
 	bool rc = false;
 	//cout << "Get dbroot " << dbroot << endl;
-	uint32_t pmNum = (*fDbRootPMMap)[dbroot];
+	int pmNum = (*fDbRootPMMap)[dbroot];
 	
 	ByteStream bytestream;
-	bytestream << (uint8_t)WE_SVR_UPDATE;
+	bytestream << (ByteStream::byte)WE_SVR_UPDATE;
 	bytestream << uniqueId;
-	bytestream << pmNum;
-	bytestream << (uint32_t)cpackage.get_TxnID();
+	bytestream << (ByteStream::quadbyte) pmNum;
+	bytestream << (ByteStream::quadbyte) cpackage.get_TxnID();
 	bytestream += aRowGroup;
 	//cout << "sending rows to pm " << pmNum << " with msg length " << bytestream.length() << endl;
-	uint32_t msgRecived = 0;
+	uint msgRecived = 0;
 	boost::shared_ptr<messageqcpp::ByteStream> bsIn;
 	bsIn.reset(new ByteStream());
 	ByteStream::byte tmp8;
 	string errorMsg;
-	uint32_t tmp32;
+	ByteStream::quadbyte tmp32;
 	uint64_t blocksChanged = 0;
 	
 	if (isMeta) //send to all PMs
@@ -731,7 +688,7 @@ bool UpdatePackageProcessor::processRowgroup(ByteStream & aRowGroup, DMLResult& 
 	{ 	
 		try {
 			//cout << "sending rows to pm " << pmNum << " with msg length " << bytestream.length() << endl;
-			fWEClient->write(bytestream, (uint32_t)pmNum);
+			fWEClient->write(bytestream, (uint)pmNum);
 			pmState[pmNum] = false;
 		}
 		catch (runtime_error& ex) //write error
@@ -770,8 +727,7 @@ bool UpdatePackageProcessor::processRowgroup(ByteStream & aRowGroup, DMLResult& 
 					errorMsg = "Lost connection to Write Engine Server while updating";
 					throw std::runtime_error(errorMsg); 
 				}			
-				else 
-                {
+				else {
 					*bsIn >> tmp8;
 					*bsIn >> errorMsg;
 					if (tmp8 == IDBRANGE_WARNING)
@@ -793,14 +749,13 @@ bool UpdatePackageProcessor::processRowgroup(ByteStream & aRowGroup, DMLResult& 
 					pmState[tmp32] = true;
 					*bsIn >> blocksChanged;
 					result.stats.fBlocksChanged += blocksChanged;
-					if (rc != 0) 
-                    {
+					if (rc != 0) {
 						throw std::runtime_error(errorMsg); 
 					}
-					if (tmp32 == (uint32_t)pmNum)
+					if ( tmp32 == (uint)pmNum )
 					{
 						//cout << "sending rows to pm " << pmNum << " with msg length " << bytestream.length() << endl;
-						fWEClient->write(bytestream, (uint32_t)pmNum);
+						fWEClient->write(bytestream, (uint)pmNum);
 						pmState[pmNum] = false;
 						break;
 					}
@@ -835,11 +790,10 @@ bool UpdatePackageProcessor::processRowgroup(ByteStream & aRowGroup, DMLResult& 
 	return rc;
 }
 
-bool UpdatePackageProcessor::receiveAll(DMLResult& result, const uint64_t uniqueId, std::vector<int>& fPMs, 
-										std::map<unsigned, bool>& pmState, const uint32_t tableOid)
+bool UpdatePackageProcessor::receiveAll(DMLResult& result, const uint64_t uniqueId, std::vector<int>& fPMs)
 {
 	//check how many message we need to receive
-	uint32_t messagesNotReceived = 0;
+	uint messagesNotReceived = 0;
 	bool err = false;
 	for (unsigned i=0; i<fPMs.size(); i++)
 	{
@@ -847,10 +801,6 @@ bool UpdatePackageProcessor::receiveAll(DMLResult& result, const uint64_t unique
 			messagesNotReceived++;
 	}
 	
-	boost::shared_ptr<messageqcpp::ByteStream> bsIn;
-	ByteStream::byte tmp8;
-	string errorMsg;
-	uint32_t msgReceived = 0;
 	if (messagesNotReceived > 0)
 	{
 		LoggingID logid( DMLLoggingId, fSessionID, fSessionID);
@@ -876,8 +826,12 @@ bool UpdatePackageProcessor::receiveAll(DMLResult& result, const uint64_t unique
 			return err;
 		}
 		
+		boost::shared_ptr<messageqcpp::ByteStream> bsIn;
 		bsIn.reset(new ByteStream());
+		ByteStream::byte tmp8;
+		string errorMsg;
 		ByteStream::quadbyte tmp32;
+		uint msgReceived = 0;
 		uint64_t blocksChanged = 0;
 
 		while (1)

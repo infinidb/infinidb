@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-// $Id: iomanager.cpp 2147 2013-08-14 20:44:44Z bwilkinson $
+// $Id: iomanager.cpp 2089 2013-05-06 17:56:34Z pleblanc $
 //
 // C++ Implementation: iomanager
 //
@@ -89,6 +89,23 @@ using namespace logging;
 
 #include "fsutils.h"
 
+typedef tr1::unordered_set<BRM::OID_t> USOID;
+
+namespace primitiveprocessor
+{
+extern Logger* mlp;
+extern int directIOFlag;
+#ifdef _MSC_VER
+extern CRITICAL_SECTION preadCSObject;
+#else
+//#define IDB_COMP_USE_CMP_SUFFIX
+//#define IDB_COMP_POC_DEBUG
+#ifdef IDB_COMP_POC_DEBUG
+extern boost::mutex compDebugMutex;
+#endif
+#endif
+}
+
 #include "rwlock_local.h"
 
 #include "iomanager.h"
@@ -96,20 +113,6 @@ using namespace logging;
 
 #include "idbcompress.h"
 using namespace compress;
-
-#include "IDBDataFile.h"
-#include "IDBPolicy.h"
-#include "IDBLogger.h"
-using namespace idbdatafile;
-
-typedef tr1::unordered_set<BRM::OID_t> USOID;
-
-namespace primitiveprocessor
-{
-extern Logger* mlp;
-extern int directIOFlag;
-extern int noVB;
-}
 
 #ifndef O_BINARY
 #  define O_BINARY 0
@@ -133,8 +136,8 @@ const uint32_t MAX_OPEN_FILES=16384;
 const uint32_t DECREASE_OPEN_FILES=4096;
 
 void timespec_sub(const struct timespec &tv1,
-				  const struct timespec &tv2,
-				  double &tm)
+				const struct timespec &tv2,
+				double &tm)
 {
 	tm = (double)(tv2.tv_sec - tv1.tv_sec) + 1.e-9*(tv2.tv_nsec - tv1.tv_nsec);
 }
@@ -152,50 +155,84 @@ class FdEntry
 {
 public:
 	FdEntry() : oid(0), dbroot(0), partNum(0), segNum(0),
-		fp(0), c(0), inUse(0), compType(0)
+#ifdef _MSC_VER
+		fd(INVALID_HANDLE_VALUE),
+#else
+		fd(-1),
+#endif
+		c(0), inUse(0), compType(0)
 	{
+#ifdef _MSC_VER
+		cmpMTime.QuadPart = 0;
+#else
 		cmpMTime = 0;
+#endif
 	}
 
-	FdEntry(const BRM::OID_t o, const uint16_t d, const uint32_t p, const uint16_t s, const int ct, IDBDataFile* f) :
-		oid(o), dbroot(d), partNum(p), segNum(s), fp(f), c(0), inUse(0), compType(0)
+	FdEntry(const BRM::OID_t o, const uint16_t d, const uint32_t p, const uint16_t s, const int ct,
+#ifdef _MSC_VER
+		const HANDLE f
+#else
+		const int f
+#endif
+		) :
+			oid(o), dbroot(d), partNum(p), segNum(s), fd(f), c(0), inUse(0), compType(0)
 	{
+#ifdef _MSC_VER
+		cmpMTime.QuadPart = 0;
+#else
 		cmpMTime = 0;
+#endif
 		if (oid >= 1000)
 			compType = ct;
 	}
 
 	~FdEntry()
 	{
-		delete fp;
-		fp = 0;
+#ifdef _MSC_VER
+		if (fd != INVALID_HANDLE_VALUE)
+			CloseHandle(fd);
+#else
+		if (fd >= 0)
+			close(fd);
+#endif
 	}
 
 	BRM::OID_t oid;
 	uint16_t dbroot;
 	uint32_t partNum;
 	uint16_t segNum;
-	IDBDataFile* fp;
+#ifdef _MSC_VER
+	HANDLE fd;
+#else
+	int fd;
+#endif
 	uint32_t c;
 	int inUse;
 
 	CompChunkPtrList ptrList;
 
 	int compType;
-	bool isCompressed() const {
-		return (oid >= 1000 && compType != 0);
-	}
+	bool isCompressed() const { return (oid >= 1000 && compType != 0); }
+#ifdef _MSC_VER
+	ULARGE_INTEGER cmpMTime;
+#else
 	time_t cmpMTime;
+#endif
 	friend ostream& operator<<(ostream& out, const FdEntry& o)
 	{
 		out << " o: " << o.oid
-		<< " f: " << o.fp
-		<< " d: " << o.dbroot
-		<< " p: " << o.partNum
-		<< " s: " << o.segNum
-		<< " c: " << o.c
-		<< " t: " << o.compType
-		<< " m: " << o.cmpMTime;
+			<< " f: " << o.fd
+			<< " d: " << o.dbroot
+			<< " p: " << o.partNum
+			<< " s: " << o.segNum
+			<< " c: " << o.c
+			<< " t: " << o.compType
+#ifdef _MSC_VER
+			<< " m: " << o.cmpMTime.QuadPart;
+#else
+			<< " m: " << o.cmpMTime;
+#endif
 		return out;
 	}
 };
@@ -205,16 +242,16 @@ struct fdCacheMapLessThan
 	bool operator()(const FdEntry& lhs, const FdEntry& rhs) const
 	{
 		if (lhs.oid < rhs.oid)
-			return true;
+		  return true;
 
 		if (lhs.oid==rhs.oid && lhs.dbroot < rhs.dbroot)
-			return true;
+		  return true;
 
 		if (lhs.oid==rhs.oid && lhs.dbroot==rhs.dbroot && lhs.partNum < rhs.partNum)
-			return true;
+		  return true;
 
 		if (lhs.oid==rhs.oid && lhs.dbroot==rhs.dbroot && lhs.partNum==rhs.partNum && lhs.segNum < rhs.segNum)
-			return true;
+		  return true;
 
 		return false;
 
@@ -225,10 +262,10 @@ struct fdMapEqual
 {
 	bool operator()(const FdEntry& lhs, const FdEntry& rhs) const
 	{
-		return (lhs.oid == rhs.oid &&
-				lhs.dbroot == rhs.dbroot &&
-				lhs.partNum == rhs.partNum &&
-				lhs.segNum == rhs.segNum);
+	   return (lhs.oid == rhs.oid &&
+		   lhs.dbroot == rhs.dbroot &&
+		   lhs.partNum == rhs.partNum &&
+		   lhs.segNum == rhs.segNum);
 	}
 
 };
@@ -240,7 +277,7 @@ struct FdCountEntry
 {
 	FdCountEntry() {}
 	FdCountEntry(const BRM::OID_t o, const uint16_t d, const uint32_t p, const uint16_t s, const uint32_t c,
-				 const FdCacheType_t::iterator it) : oid(o), dbroot(d), partNum(p), segNum(s), cnt(c), fdit(it) {}
+		const FdCacheType_t::iterator it) : oid(o), dbroot(d), partNum(p), segNum(s), cnt(c), fdit(it) {}
 	~FdCountEntry() {}
 
 	BRM::OID_t oid;
@@ -253,10 +290,10 @@ struct FdCountEntry
 	friend ostream& operator<<(ostream& out, const FdCountEntry& o)
 	{
 		out << " o: " << o.oid
-		<< " d: " << o.dbroot
-		<< " p: " << o.partNum
-		<< " s: " << o.segNum
-		<< " c: " << o.cnt;
+			<< " d: " << o.dbroot
+			<< " p: " << o.partNum
+			<< " s: " << o.segNum
+			<< " c: " << o.cnt;
 
 		return out;
 	}
@@ -307,7 +344,7 @@ const vector<pair<string, string> > getDBRootList()
 {
 	vector<pair<string, string> > ret;
 	Config *config;
-	uint32_t dbrootCount, i;
+	uint dbrootCount, i;
 	string stmp, devname, mountpoint;
 	char devkey[80], mountkey[80];
 
@@ -339,20 +376,20 @@ const vector<pair<string, string> > getDBRootList()
 
 char* alignTo(const char* in, int av)
 {
-	ptrdiff_t inx = reinterpret_cast<ptrdiff_t>(in);
-	ptrdiff_t avx = static_cast<ptrdiff_t>(av);
-	if ((inx % avx) != 0)
-	{
-		inx &= ~(avx - 1);
-		inx += avx;
-	}
-	char* outx = reinterpret_cast<char*>(inx);
-	return outx;
+		ptrdiff_t inx = reinterpret_cast<ptrdiff_t>(in);
+		ptrdiff_t avx = static_cast<ptrdiff_t>(av);
+		if ((inx % avx) != 0)
+		{
+			inx &= ~(avx - 1);
+			inx += avx;
+		}
+		char* outx = reinterpret_cast<char*>(inx);
+		return outx;
 }
 
 void waitForRetry(long count)
 {
-	usleep(5000 * count);
+	usleep(5000 * count); 
 	return;
 }
 
@@ -361,8 +398,8 @@ void waitForRetry(long count)
 int updateptrs(char* ptr, FdCacheType_t::iterator fdit, const IDBCompressInterface& decompressor)
 {
 	ssize_t i;
-	uint32_t progress;
-
+	struct stat statbuf;
+	ssize_t progress;
 
 	// ptr is taken from buffer, already been checked: realbuff.get() == 0
 	if (ptr == 0)
@@ -372,11 +409,32 @@ int updateptrs(char* ptr, FdCacheType_t::iterator fdit, const IDBCompressInterfa
 	if (fdit->second.get() == 0)
 		return -2;
 
-	IDBDataFile* fp = fdit->second->fp;
-	if (fp == INVALID_HANDLE_VALUE)
+#ifdef _MSC_VER
+	HANDLE fd = fdit->second->fd;
+	if (fd == INVALID_HANDLE_VALUE)
 	{
 		Message::Args args;
-		args.add("updateptrs got invalid fp.");
+		args.add("updateptrs got invalid fd.");
+		primitiveprocessor::mlp->logInfoMessage(logging::M0006, args);
+		return -3;
+	}
+
+	OVERLAPPED ovl;
+	ZeroMemory(&ovl, sizeof(ovl));
+	ovl.Offset = 0;
+	ovl.OffsetHigh = 0;
+	DWORD bytesRead;
+	if (ReadFile(fd, ptr, 4096 * 3, &bytesRead, &ovl))
+		i = bytesRead;
+	else
+		i = -1;
+	progress = i;
+#else
+	int fd = fdit->second->fd;
+	if (fd < 0)
+	{
+		Message::Args args;
+		args.add("updateptrs got invalid fd.");
 		primitiveprocessor::mlp->logInfoMessage(logging::M0006, args);
 		return -3;
 	}
@@ -385,18 +443,29 @@ int updateptrs(char* ptr, FdCacheType_t::iterator fdit, const IDBCompressInterfa
 	//FIXME: re-work all of this so we don't have to re-read the 3rd block.
 	progress = 0;
 	while (progress < 4096 * 3) {
-		i = fp->pread(&ptr[progress], progress, (4096 * 3) - progress);
+		i = pread(fd, &ptr[progress], (4096 * 3) - progress, progress);
 		if (i <= 0)
 			break;
 		progress += i;
 	}
+#endif
 	if (progress != 4096 * 3)
 		return -4;   // let it retry. Not likely, but ...
 
+#ifdef _MSC_VER
+	//FIXME:
+	fdit->second->cmpMTime.QuadPart = 0;
+	FILETIME ft;
+	if (GetFileTime(fd, 0, 0, &ft))
+	{
+		fdit->second->cmpMTime.LowPart = ft.dwLowDateTime;
+		fdit->second->cmpMTime.HighPart = ft.dwHighDateTime;
+	}
+#else
 	fdit->second->cmpMTime = 0;
-	time_t mtime = fp->mtime();
-	if( mtime != (time_t) -1 )
-		fdit->second->cmpMTime = mtime;
+	if (fstat(fd, &statbuf) == 0)
+		fdit->second->cmpMTime = statbuf.st_mtime;
+#endif
 
 	int gplRc = 0;
 	gplRc = decompressor.getPtrList(&ptr[4096], 4096, fdit->second->ptrList);
@@ -414,17 +483,27 @@ int updateptrs(char* ptr, FdCacheType_t::iterator fdit, const IDBCompressInterfa
 
 		nextHdrBufPtr = alignTo(nextHdrBufsa.get(), 4096);
 
+#ifdef _MSC_VER
+		ZeroMemory(&ovl, sizeof(ovl));
+		ovl.Offset = 4096 * 2;
+		ovl.OffsetHigh = 0;
+		if (ReadFile(fd, &nextHdrBufPtr[0], numHdrs * 4096, &bytesRead, &ovl))
+			i = bytesRead;
+		else
+			i = -1;
+		progress = i;
+#else
 		progress = 0;
 		while (progress < numHdrs * 4096) {
-			i = fp->pread(&nextHdrBufPtr[progress], (4096 * 2) + progress,
-						  (numHdrs * 4096) - progress);
+			i = pread(fd, &nextHdrBufPtr[progress], (numHdrs * 4096) - progress, 
+			  (4096 * 2) + progress);
 			if (i <= 0)
 				break;
 			progress += i;
 		}
+#endif
 		if (progress != numHdrs * 4096)
 			return -8;
-
 		CompChunkPtrList nextPtrList;
 		gplRc = decompressor.getPtrList(&nextHdrBufPtr[0], numHdrs * 4096, nextPtrList);
 		if (gplRc != 0)
@@ -444,7 +523,6 @@ void* thr_popper(ioManager *arg) {
 	BRM::LBID_t lbid=0;
 	BRM::OID_t oid=0;
 	BRM::VER_t ver=0;
-	BRM::QueryContext qc;
 	BRM::VER_t txn=0;
 	int compType = 0;
 	int blocksLoaded=0;
@@ -454,6 +532,7 @@ void* thr_popper(ioManager *arg) {
 	char fileName[WriteEngine::FILE_NAME_SIZE];
 	const uint64_t fileBlockSize = BLOCK_SIZE;
 	bool flg=false;
+	bool inFlg=false;
 	bool useCache;
 	uint16_t dbroot=0;
 	uint32_t partNum=0;
@@ -462,11 +541,12 @@ void* thr_popper(ioManager *arg) {
 	char* fileNamePtr=fileName;
 	uint64_t longSeekOffset=0;
 	int err;
-	uint32_t dlen = 0, acc, readSize, blocksThisRead, j;
+	uint dlen = 0, acc, readSize, blocksThisRead, j;
 	uint32_t blocksRequested=0;
 	ssize_t i;
+	uint32_t sz=0;
 	char* alignedbuff=0;
-	boost::scoped_array<char> realbuff;
+ 	boost::scoped_array<char> realbuff;
 	pthread_t threadId=0;
 	ostringstream iomLogFileName;
 	ofstream lFile;
@@ -495,9 +575,13 @@ void* thr_popper(ioManager *arg) {
 	}
 
 	FdCacheType_t::iterator fdit;
-	IDBDataFile* fp = 0;
-	uint32_t maxCompSz = IDBCompressInterface::maxCompressedSize(iom->blocksPerRead * BLOCK_SIZE);
-	uint32_t readBufferSz = maxCompSz + pageSize;
+#ifdef _MSC_VER
+	HANDLE fd = INVALID_HANDLE_VALUE;
+#else
+	int fd = -1;
+#endif
+	//usually iom->blocksPerRead = 512, so adding 87 is giving us 117% room for decomp expansion
+	uint32_t readBufferSz=((iom->blocksPerRead+87)*BLOCK_SIZE)+pageSize;
 
 	realbuff.reset(new char[readBufferSz]);
 	if (realbuff.get() == 0) {
@@ -508,7 +592,7 @@ void* thr_popper(ioManager *arg) {
 	alignedbuff = alignTo(realbuff.get(), 4096);
 
 	if ((((ptrdiff_t)alignedbuff - (ptrdiff_t)realbuff.get()) >= (ptrdiff_t)pageSize) ||
-			(((ptrdiff_t)alignedbuff % pageSize) != 0))
+		(((ptrdiff_t)alignedbuff % pageSize) != 0))
 		throw runtime_error("aligned buffer size is not matching the page size.");
 
 	uint8_t* uCmpBuf = 0;
@@ -532,9 +616,10 @@ void* thr_popper(ioManager *arg) {
 		if (iom->IOTrace())
 			clock_gettime(CLOCK_REALTIME, &rqst1);
 		lbid = fr->Lbid();
-		qc = fr->Ver();
+		ver = fr->Ver();
 		txn = fr->Txn();
 		flg = fr->Flg();
+		inFlg = fr->Flg();
 		compType = fr->CompType();
 		useCache = fr->useCache();
 		blocksLoaded=0;
@@ -547,35 +632,35 @@ void* thr_popper(ioManager *arg) {
 		segNum=0;
 		offset=0;
 
-		// special case for getBlock.
+		int rc = 0;
+
+ 		// special case for getBlock.
 		iom->dbrm()->lockLBIDRange(lbid, blocksRequested);
 		copyLocked = true;
 
+		//cout << "IOM: got request: start=" << lbid << " count=" << blocksRequested << " ver=" << ver << endl;
+
 		// special case for getBlock.
 		if (blocksRequested==1) {
-			BRM::VER_t outVer;
-			iom->dbrm()->vssLookup((BRM::LBID_t) lbid, qc, txn, &outVer, &flg);
-			ver = outVer;
+			rc=iom->dbrm()->vssLookup((BRM::LBID_t)(lbid), ver, txn, flg);
 			fr->versioned(flg);
 		}
-		else {
+		else
 			fr->versioned(false);
-			ver = qc.currentScn;
-		}
 
 		err = iom->localLbidLookup(lbid,
-								   ver,
-								   flg,
-								   oid,
-								   dbroot,
-								   partNum,
-								   segNum,
-								   offset);
+								ver,
+								flg,
+								oid,
+								dbroot,
+								partNum,
+								segNum,
+								offset);
 
 		if (err == BRM::ERR_SNAPSHOT_TOO_OLD) {
 			ostringstream errMsg;
 			errMsg << "thr_popper: version " << ver << " of LBID " << lbid <<
-			"is too old";
+					"is too old";
 			iom->handleBlockReadError(fr, errMsg.str(), &copyLocked);
 			continue;
 		}
@@ -583,23 +668,29 @@ void* thr_popper(ioManager *arg) {
 		{
 			ostringstream errMsg;
 			errMsg << "thr_popper: BRM lookup failure; lbid=" <<
-			lbid << "; ver=" << ver << "; flg=" << (flg ? 1 : 0);
+				lbid << "; ver=" << ver << "; flg=" << (flg ? 1 : 0);
 			iom->handleBlockReadError( fr, errMsg.str(), &copyLocked, fileRequest::BRM_LOOKUP_ERROR);
 			continue;
 		}
 
 #ifdef IDB_COMP_POC_DEBUG
-		{
-			boost::mutex::scoped_lock lk(primitiveprocessor::compDebugMutex);
-			if (compType != 0) cout << boldStart;
-			cout << "fileRequest: " << *fr << endl;
-			if (compType != 0) cout << boldStop;
-		}
+{
+boost::mutex::scoped_lock lk(primitiveprocessor::compDebugMutex);
+if (compType != 0) cout << boldStart;
+cout << "fileRequest: " << *fr << endl;
+if (compType != 0) cout << boldStop;
+}
 #endif
 		const uint32_t extentSize = iom->getExtentRows();
-		FdEntry fdKey(oid, dbroot, partNum, segNum, compType, NULL);
+		FdEntry fdKey(oid, dbroot, partNum, segNum, compType,
+#ifdef _MSC_VER
+			INVALID_HANDLE_VALUE
+#else
+			-1
+#endif
+			);
 		//cout << "Looking for " << fdKey << endl
-		//   << "O: " << oid << " D: " << dbroot << " P: " << partNum << " S: " << segNum << endl;
+		 //   << "O: " << oid << " D: " << dbroot << " P: " << partNum << " S: " << segNum << endl;
 
 		fdMapMutex.lock();
 		fdit = fdcache.find(fdKey);
@@ -615,7 +706,7 @@ void* thr_popper(ioManager *arg) {
 				primitiveprocessor::mlp->logMessage(logging::M0053, args, true);
 				ostringstream errMsg;
 				errMsg << "thr_popper: Error building filename for OID " <<
-				oid << "; " << exc.what();
+					oid << "; " << exc.what();
 				iom->handleBlockReadError( fr, errMsg.str(), &copyLocked );
 				continue;
 			}
@@ -649,9 +740,9 @@ void* thr_popper(ioManager *arg) {
 					if (iom->FDCacheTrace())
 					{
 						iom->FDTraceFile()
-						<< "Before flushing sz: " << fdcache.size()
-						<< " delCount: " << iom->DecreaseOpenFilesCount()
-						<< endl;
+							<< "Before flushing sz: " << fdcache.size()
+							<< " delCount: " << iom->DecreaseOpenFilesCount()
+							<< endl;
 
 						for (FdCacheType_t::iterator it = fdcache.begin(); it != fdcache.end(); it++)
 							iom->FDTraceFile() << *(*it).second << endl;
@@ -665,12 +756,18 @@ void* thr_popper(ioManager *arg) {
 
 					uint32_t delCount=0;
 					for(FdCacheCountType_t::reverse_iterator rit=fdCountSort.rbegin();
-							rit != fdCountSort.rend() &&
-							fdcache.size()>0 &&
-							delCount < iom->DecreaseOpenFilesCount();
-							rit++)
+						rit != fdCountSort.rend() &&
+						fdcache.size()>0 &&
+						delCount < iom->DecreaseOpenFilesCount();
+						rit++)
 					{
-						FdEntry oldfdKey(rit->oid, rit->dbroot, rit->partNum, rit->segNum, 0, NULL);
+						FdEntry oldfdKey(rit->oid, rit->dbroot, rit->partNum, rit->segNum, 0,
+#ifdef _MSC_VER
+							INVALID_HANDLE_VALUE
+#else
+							-1
+#endif
+							);
 						FdCacheType_t::iterator it = fdcache.find(oldfdKey);
 						if (it!=fdcache.end())
 						{
@@ -678,12 +775,12 @@ void* thr_popper(ioManager *arg) {
 							{
 								if (!rit->fdit->second->inUse)
 									iom->FDTraceFile()
-									<< "Removing dc: " << delCount << " sz: " << fdcache.size()
-									<< *(*it).second << " u: " << rit->fdit->second->inUse << endl;
+										<< "Removing dc: " << delCount << " sz: " << fdcache.size()
+										<< *(*it).second << " u: " << rit->fdit->second->inUse << endl;
 								else
 									iom->FDTraceFile()
-									<< "Skip Remove in use dc: " << delCount << " sz: " << fdcache.size()
-									<< *(*it).second << " u: " << rit->fdit->second->inUse << endl;
+										<< "Skip Remove in use dc: " << delCount << " sz: " << fdcache.size()
+										<< *(*it).second << " u: " << rit->fdit->second->inUse << endl;
 							}
 
 							if (rit->fdit->second->inUse<=0)
@@ -700,7 +797,7 @@ void* thr_popper(ioManager *arg) {
 						for (FdCacheType_t::iterator it = fdcache.begin(); it != fdcache.end(); it++)
 						{
 							iom->FDTraceFile()
-							<< *(*it).second << endl;
+								<< *(*it).second << endl;
 						}
 						iom->FDTraceFile() << "==================" << endl << endl;
 					}
@@ -708,24 +805,27 @@ void* thr_popper(ioManager *arg) {
 					fdCountSort.clear();
 
 				} // if (fdcache.size()...
-			} // if (oid > 3000)
-
-			int opts = primitiveprocessor::directIOFlag ? IDBDataFile::USE_ODIRECT : 0;
-			fp = NULL;
-			uint32_t openRetries = 0;
-			int saveErrno;
-			while (fp == NULL && openRetries++ < 5) {
-				fp = IDBDataFile::open(
-						 IDBPolicy::getType( fileNamePtr, IDBPolicy::PRIMPROC ),
-						 fileNamePtr,
-						 "r",
-						 opts);
-				saveErrno = errno;
-				if (fp == NULL)
-					sleep(1);
 			}
-			if( fp == NULL )
+
+#if defined(EM_AS_A_TABLE_POC__)
+			if (oid == 1084)
+				fd = numeric_limits<int>::max();
+			else
+				fd = open(fileNamePtr, O_RDONLY|primitiveprocessor::directIOFlag|O_LARGEFILE|O_NOATIME);
+#elif defined(_MSC_VER)
+			//FIXME: What does FILE_SHARE_DELETE do?
+			fd = CreateFile(fileNamePtr, GENERIC_READ, FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE, 0,
+				OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL|FILE_FLAG_NO_BUFFERING, 0);
+#else
+			fd = open(fileNamePtr, O_RDONLY|O_BINARY|O_LARGEFILE|O_NOATIME|primitiveprocessor::directIOFlag);
+#endif
+#ifdef _MSC_VER
+			if (fd == INVALID_HANDLE_VALUE)
+#else
+			if (fd < 0)
+#endif
 			{
+				int saveErrno = errno;
 				Message::Args args;
 				fdit = fdcache.end();
 				fdMapMutex.unlock();
@@ -734,7 +834,7 @@ void* thr_popper(ioManager *arg) {
 				primitiveprocessor::mlp->logMessage(logging::M0053, args, true);
 				ostringstream errMsg;
 				errMsg << "thr_popper: Error opening file for OID " << oid << "; "
-				<< fileNamePtr << "; " << strerror(saveErrno);
+						<< fileNamePtr << "; " << strerror(saveErrno);
 				int errorCode = fileRequest::FAILED;
 				if (saveErrno == EINVAL)
 					errorCode = fileRequest::FS_EINVAL;
@@ -744,7 +844,7 @@ void* thr_popper(ioManager *arg) {
 				continue;
 			}
 
-			fe.reset( new FdEntry(oid, dbroot, partNum, segNum, compType, fp) );
+			fe.reset( new FdEntry(oid, dbroot, partNum, segNum, compType, fd) );
 			fe->inUse++;
 			fdcache[fdKey] = fe;
 			fdit = fdcache.find(fdKey);
@@ -755,20 +855,16 @@ void* thr_popper(ioManager *arg) {
 			if (fdit->second.get()) {
 				fdit->second->c++;
 				fdit->second->inUse++;
-				fp = fdit->second->fp;
+				fd = fdit->second->fd;
 			}
 			else {
 				Message::Args args;
-                fdit = fdcache.end();
-                fdMapMutex.unlock();
 				args.add(oid);
 				ostringstream errMsg;
 				errMsg << "Null FD cache entry. (dbroot, partNum, segNum, compType) = ("
-				<< dbroot << ", " << partNum << ", " << segNum << ", " << compType << ")";
+					<< dbroot << ", " << partNum << ", " << segNum << ", " << compType << ")";
 				args.add(errMsg.str());
 				primitiveprocessor::mlp->logMessage(logging::M0053, args, true);
-                iom->handleBlockReadError( fr, errMsg.str(), &copyLocked );
-                continue;
 			}
 		}
 		fdMapMutex.unlock();
@@ -784,18 +880,19 @@ void* thr_popper(ioManager *arg) {
 		longSeekOffset=(uint64_t)offset * (uint64_t)fileBlockSize;
 		lldiv_t cmpOffFact = lldiv(longSeekOffset, (4LL * 1024LL * 1024LL));
 		totalRqst++;
+		sz=0;
 
 		uint32_t readCount=0;
 		uint32_t bytesRead=0;
 		uint32_t compressedBytesRead=0; // @Bug 3149.  IOMTrace was not reporting bytesRead correctly for compressed columns.
-		uint32_t jend = blocksRequested/iom->blocksPerRead;
+		uint jend = blocksRequested/iom->blocksPerRead;
 		if (iom->IOTrace())
 			clock_gettime(CLOCK_REALTIME, &tm);
 		ostringstream errMsg;
 		bool errorOccurred = false;
 		string errorString;
 #ifdef IDB_COMP_POC_DEBUG
-		bool debugWrite=false;
+bool debugWrite=false;
 #endif
 
 #ifdef EM_AS_A_TABLE_POC__
@@ -817,34 +914,164 @@ decompRetry:
 			acc = 0;
 			while (acc < readSize) {
 #if defined(EM_AS_A_TABLE_POC__)
-				if (oid == 1084)
+			if (oid == 1084)
+			{
+				uint32_t h;
+				int32_t o = 0;
+				int32_t* ip;
+				ip = (int32_t*)(&alignedbuff[acc]);
+				for (o = 0; o < 2048; o++)
 				{
-					uint32_t h;
-					int32_t o = 0;
-					int32_t* ip;
-					ip = (int32_t*)(&alignedbuff[acc]);
-					for (o = 0; o < 2048; o++)
+					if (iom->dbrm()->getHWM(o+3000, h) == 0)
+						*ip++ = h;
+					else
+						*ip++ = numeric_limits<int32_t>::min() + 1;
+				}
+				i = BLOCK_SIZE;
+			}
+			else
+				i = pread(fd, &alignedbuff[acc], readSize - acc, longSeekOffset);
+
+#elif defined(_MSC_VER)
+				DWORD bytesRead;
+				OVERLAPPED ovl;
+
+				if (fdit->second->isCompressed())
+				{
+retryReadHeaders:
+					//hdrs may have been modified since we cached them in fdit->second...
+					ULARGE_INTEGER cur_mtime;
+					cur_mtime.QuadPart = numeric_limits<ULONGLONG>::max();
+					int updatePtrsRc = 0;
+					fdMapMutex.lock();
+					//FIXME:
+					FILETIME ft;
+					if (GetFileTime(fd, 0, 0, &ft))
 					{
-						if (iom->dbrm()->getHWM(o+3000, h) == 0)
-							*ip++ = h;
-						else
-							*ip++ = numeric_limits<int32_t>::min() + 1;
+						cur_mtime.LowPart = ft.dwLowDateTime;
+						cur_mtime.HighPart = ft.dwHighDateTime;
 					}
-					i = BLOCK_SIZE;
+					if (decompRetryCount > 0 || retryReadHeadersCount > 0 ||
+							cur_mtime.QuadPart > fdit->second->cmpMTime.QuadPart)
+						updatePtrsRc = updateptrs(&alignedbuff[0], fdit, decompressor);
+					fdMapMutex.unlock();
+
+					int idx = cmpOffFact.quot;
+					if (updatePtrsRc != 0 || idx >= (signed)fdit->second->ptrList.size())
+					{
+						// Due to race condition, the header on disk may not upated yet.
+						// Log an info message and retry.
+						if (retryReadHeadersCount == 0)
+						{
+							Message::Args args;
+							args.add(oid);
+							ostringstream infoMsg;
+							iom->buildOidFileName(oid, dbroot, partNum, segNum, fileNamePtr);
+							infoMsg << "retry updateptrs for " << fileNamePtr
+									<< ". rc=" << updatePtrsRc << ", idx="
+									<< idx << ", ptr.size=" << fdit->second->ptrList.size();
+							infoMsg << " retryReadHeadersCount:" << retryReadHeadersCount
+									<< " decompRetryCount:" << decompRetryCount;
+							args.add(infoMsg.str());
+							primitiveprocessor::mlp->logInfoMessage(logging::M0061, args);
+						}
+
+						if (++retryReadHeadersCount < 30)
+						{
+							fdit->second->cmpMTime.QuadPart = 0;
+							waitForRetry(retryReadHeadersCount);
+							goto retryReadHeaders;
+						}
+						else
+						{
+							// still fail after all the retries.
+							errorOccurred = true;
+							errMsg << "Error update header ptr. rc=" << updatePtrsRc << ", idx="
+									<< idx << ", ptr.size=" << fdit->second->ptrList.size();
+							errorString = errMsg.str();
+							break;
+						}
+					}
+
+					//FIXME: make sure alignedbuff can hold fdit->second->ptrList[idx].second bytes
+					if (fdit->second->ptrList[idx].second > (iom->blocksPerRead+87)*BLOCK_SIZE)
+					{
+						errorOccurred = true;
+						errMsg << "aligned buff too small. dataSize="
+							<< fdit->second->ptrList[idx].second
+							<< ", buffSize=" << (iom->blocksPerRead+87)*BLOCK_SIZE;
+						errorString = errMsg.str();
+						break;
+					}
+
+					//i = pread(fd, &alignedbuff[0], fdit->second->ptrList[idx].second, fdit->second->ptrList[idx].first);
+					ZeroMemory(&ovl, sizeof(ovl));
+					ovl.Offset = static_cast<DWORD>(fdit->second->ptrList[idx].first);
+					ovl.OffsetHigh = static_cast<DWORD>(fdit->second->ptrList[idx].first>>32);
+					if (ReadFile(fd, &alignedbuff[0], fdit->second->ptrList[idx].second, &bytesRead, &ovl))
+						i = bytesRead;
+					else
+						i = -1;
+
+					// @bug3407, give it some retries if pread failed.
+					if (i != (ssize_t)fdit->second->ptrList[idx].second)
+					{
+						// log an info message
+						if (retryReadHeadersCount == 0)
+						{
+							Message::Args args;
+							args.add(oid);
+							ostringstream infoMsg;
+							iom->buildOidFileName(oid, dbroot, partNum, segNum, fileNamePtr);
+							infoMsg << " Read from " << fileNamePtr << " failed at chunk " << idx
+									<< ". (offset, size, actuall read) = ("
+									<< fdit->second->ptrList[idx].first << ", "
+									<< fdit->second->ptrList[idx].second << ", " << i << ")";
+							infoMsg << " retryReadHeadersCount:" << retryReadHeadersCount
+									<< " decompRetryCount:" << decompRetryCount;
+							args.add(infoMsg.str());
+							primitiveprocessor::mlp->logInfoMessage(logging::M0061, args);
+						}
+
+						if (++retryReadHeadersCount < 30)
+						{
+							fdit->second->cmpMTime.QuadPart = 0;
+							waitForRetry(retryReadHeadersCount);
+							goto retryReadHeaders;
+						}
+						else
+						{
+							errorOccurred = true;
+							errMsg << "Error reading chunk " << idx;
+							errorString = errMsg.str();
+							break;
+						}
+					}
+
+					i = readSize;
 				}
 				else
-					i = pread(fd, &alignedbuff[acc], readSize - acc, longSeekOffset);
+				{
+					//i = pread(fd, &alignedbuff[acc], readSize - acc, longSeekOffset);
+					ZeroMemory(&ovl, sizeof(ovl));
+					ovl.Offset = static_cast<DWORD>(longSeekOffset);
+					ovl.OffsetHigh = static_cast<DWORD>(longSeekOffset>>32);
+					if (ReadFile(fd, &alignedbuff[acc], readSize - acc, &bytesRead, &ovl))
+						i = bytesRead;
+					else
+						i = -1;
+				}
 #else
 				if (fdit->second->isCompressed())
 				{
 retryReadHeaders:
 					//hdrs may have been modified since we cached them in fdit->second...
+					struct stat statbuf;
 					time_t cur_mtime = numeric_limits<time_t>::max();
 					int updatePtrsRc = 0;
 					fdMapMutex.lock();
-					time_t fp_mtime = fp->mtime();
-					if( fp_mtime != (time_t) -1)
-						cur_mtime = fp_mtime;
+					if (fstat(fd, &statbuf) == 0)
+						cur_mtime = statbuf.st_mtime;
 					if (decompRetryCount > 0 || retryReadHeadersCount > 0 || cur_mtime > fdit->second->cmpMTime)
 						updatePtrsRc = updateptrs(&alignedbuff[0], fdit, decompressor);
 					fdMapMutex.unlock();
@@ -861,8 +1088,8 @@ retryReadHeaders:
 							ostringstream infoMsg;
 							iom->buildOidFileName(oid, dbroot, partNum, segNum, fileNamePtr);
 							infoMsg << "retry updateptrs for " << fileNamePtr
-							<< ". rc=" << updatePtrsRc << ", idx="
-							<< idx << ", ptr.size=" << fdit->second->ptrList.size();
+									<< ". rc=" << updatePtrsRc << ", idx="
+									<< idx << ", ptr.size=" << fdit->second->ptrList.size();
 							args.add(infoMsg.str());
 							primitiveprocessor::mlp->logInfoMessage(logging::M0061, args);
 						}
@@ -878,30 +1105,30 @@ retryReadHeaders:
 							// still fail after all the retries.
 							errorOccurred = true;
 							errMsg << "Error reading compression header. rc=" << updatePtrsRc << ", idx="
-							<< idx << ", ptr.size=" << fdit->second->ptrList.size();
+									<< idx << ", ptr.size=" << fdit->second->ptrList.size();
 							errorString = errMsg.str();
 							break;
 						}
 					}
 
 					//FIXME: make sure alignedbuff can hold fdit->second->ptrList[idx].second bytes
-					if (fdit->second->ptrList[idx].second > maxCompSz)
+					if (fdit->second->ptrList[idx].second > (iom->blocksPerRead+87)*BLOCK_SIZE)
 					{
 						errorOccurred = true;
 						errMsg << "aligned buff too small. dataSize="
-						<< fdit->second->ptrList[idx].second
-						<< ", buffSize=" << maxCompSz;
+							<< fdit->second->ptrList[idx].second
+							<< ", buffSize=" << (iom->blocksPerRead+87)*BLOCK_SIZE;
 						errorString = errMsg.str();
 						break;
 					}
 
-					i = fp->pread(&alignedbuff[0], fdit->second->ptrList[idx].first, fdit->second->ptrList[idx].second );
+					i = pread(fd, &alignedbuff[0], fdit->second->ptrList[idx].second, fdit->second->ptrList[idx].first);
 #ifdef IDB_COMP_POC_DEBUG
-					{
-						boost::mutex::scoped_lock lk(primitiveprocessor::compDebugMutex);
-						cout << boldStart << "pread1.1(" << fp << ", 0x" << hex << (ptrdiff_t)&alignedbuff[0] << dec << ", " << fdit->second->ptrList[idx].second <<
-							 ", " << fdit->second->ptrList[idx].first << ") = " << i << ' ' << cmpOffFact.quot << ' ' << cmpOffFact.rem << boldStop << endl;
-					}
+{
+boost::mutex::scoped_lock lk(primitiveprocessor::compDebugMutex);
+cout << boldStart << "pread1.1(" << fd << ", 0x" << hex << (ptrdiff_t)&alignedbuff[0] << dec << ", " << fdit->second->ptrList[idx].second <<
+", " << fdit->second->ptrList[idx].first << ") = " << i << ' ' << cmpOffFact.quot << ' ' << cmpOffFact.rem << boldStop << endl;
+}
 #endif
 					// @bug3407, give it some retries if pread failed.
 					if (i != (ssize_t)fdit->second->ptrList[idx].second)
@@ -914,9 +1141,9 @@ retryReadHeaders:
 							ostringstream infoMsg;
 							iom->buildOidFileName(oid, dbroot, partNum, segNum, fileNamePtr);
 							infoMsg << " Read from " << fileNamePtr << " failed at chunk " << idx
-							<< ". (offset, size, actuall read) = ("
-							<< fdit->second->ptrList[idx].first << ", "
-							<< fdit->second->ptrList[idx].second << ", " << i << ")";
+									<< ". (offset, size, actuall read) = ("
+									<< fdit->second->ptrList[idx].first << ", "
+									<< fdit->second->ptrList[idx].second << ", " << i << ")";
 							args.add(infoMsg.str());
 							primitiveprocessor::mlp->logInfoMessage(logging::M0061, args);
 						}
@@ -941,13 +1168,13 @@ retryReadHeaders:
 				}
 				else
 				{
-					i = fp->pread(&alignedbuff[acc], longSeekOffset, readSize - acc);
+					i = pread(fd, &alignedbuff[acc], readSize - acc, longSeekOffset);
 #ifdef IDB_COMP_POC_DEBUG
-					{
-						boost::mutex::scoped_lock lk(primitiveprocessor::compDebugMutex);
-						cout << "pread1.2(" << fp << ", 0x" << hex << (ptrdiff_t)&alignedbuff[acc] << dec << ", " << (readSize - acc) <<
-							 ", " << longSeekOffset << ") = " << i << ' ' << cmpOffFact.quot << ' ' << cmpOffFact.rem << endl;
-					}
+{
+boost::mutex::scoped_lock lk(primitiveprocessor::compDebugMutex);
+cout << "pread1.2(" << fd << ", 0x" << hex << (ptrdiff_t)&alignedbuff[acc] << dec << ", " << (readSize - acc) <<
+", " << longSeekOffset << ") = " << i << ' ' << cmpOffFact.quot << ' ' << cmpOffFact.rem << endl;
+}
 #endif
 				}
 #endif
@@ -969,8 +1196,8 @@ retryReadHeaders:
 					errorString   = strerror(errno);
 					errorOccurred = true;
 					errMsg << "thr_popper: Error reading file for OID " << oid << "; "
-					<< " fp " << fp << "; offset " << longSeekOffset << "; fileName "
-					<< fileNamePtr << "; " << errorString;
+							<< " fd " << fd << "; offset " << longSeekOffset << "; fileName "
+							<< fileNamePtr << "; " << errorString;
 					break; // break from "while(acc..." loop
 				}
 				else if (i == 0)
@@ -979,7 +1206,7 @@ retryReadHeaders:
 					errorString   = "early EOF";
 					errorOccurred = true;
 					errMsg << "thr_popper: Early EOF reading file for OID " <<
-					oid << "; " << fileNamePtr;
+						oid << "; " << fileNamePtr;
 					break; // break from "while(acc..." loop
 				}
 				acc += i;
@@ -1006,18 +1233,11 @@ retryReadHeaders:
 			/* New bulk VSS lookup code */
 			{
 				vector<BRM::LBID_t> lbids;
-				vector<BRM::VER_t> versions;
-				vector<bool> isLocked;
-				for (i = 0; (uint32_t) i < blocksThisRead; i++)
+				vector<BRM::VSSData> vssData;
+				for (i = 0; (uint) i < blocksThisRead; i++)
 					lbids.push_back((BRM::LBID_t) (lbid + i) + (j * iom->blocksPerRead));
 
-				if (blocksRequested > 1 || !flg)  // prefetch, or an unversioned single-block read
-					iom->dbrm()->bulkGetCurrentVersion(lbids, &versions, &isLocked);
-				else {   // a single-block read that was versioned
-					versions.push_back(ver);
-					isLocked.push_back(false);
-				}
-
+				rc = iom->dbrm()->bulkVSSLookup(lbids, ver, txn, &vssData);
 				uint8_t *ptr = (uint8_t*)&alignedbuff[0];
 				if (blocksThisRead > 0 && fdit->second->isCompressed())
 				{
@@ -1027,13 +1247,13 @@ retryReadHeaders:
 					uint32_t blen = 4 * 1024 * 1024 + 4;
 #endif
 #ifdef IDB_COMP_POC_DEBUG
-					{
-						boost::mutex::scoped_lock lk(primitiveprocessor::compDebugMutex);
-						cout << "decompress(0x" << hex << (ptrdiff_t)&alignedbuff[0] << dec << ", " << fdit->second->ptrList[cmpOffFact.quot].second << ", 0x" << hex << (ptrdiff_t)uCmpBuf << dec << ", " << blen << ")" << endl;
-					}
+{
+	boost::mutex::scoped_lock lk(primitiveprocessor::compDebugMutex);
+	cout << "decompress(0x" << hex << (ptrdiff_t)&alignedbuff[0] << dec << ", " << fdit->second->ptrList[cmpOffFact.quot].second << ", 0x" << hex << (ptrdiff_t)uCmpBuf << dec << ", " << blen << ")" << endl;
+}
 #endif
 					int dcrc = decompressor.uncompressBlock(&alignedbuff[0],
-															fdit->second->ptrList[cmpOffFact.quot].second, uCmpBuf, blen);
+						fdit->second->ptrList[cmpOffFact.quot].second, uCmpBuf, blen);
 
 					if (dcrc != 0)
 					{
@@ -1053,8 +1273,8 @@ retryReadHeaders:
 								ostringstream infoMsg;
 								iom->buildOidFileName(oid, dbroot, partNum, segNum, fileNamePtr);
 								infoMsg << "decompress retry for " << fileNamePtr
-								<< " decompRetry chunk " << cmpOffFact.quot
-								<< " code=" << dcrc;
+										<< " decompRetry chunk " << cmpOffFact.quot
+										<< " code=" << dcrc;
 								args.add(infoMsg.str());
 								primitiveprocessor::mlp->logInfoMessage(logging::M0061, args);
 							}
@@ -1085,51 +1305,56 @@ retryReadHeaders:
 						ostringstream infoMsg;
 						iom->buildOidFileName(oid, dbroot, partNum, segNum, fileNamePtr);
 						infoMsg << "Successfully uncompress " << fileNamePtr << " chunk "
-						<< cmpOffFact.quot << " @";
+								<< cmpOffFact.quot << " @";
 						if (retryReadHeadersCount > 0)
-							infoMsg << " HeaderRetry:" << retryReadHeadersCount;
+								infoMsg << " HeaderRetry:" << retryReadHeadersCount;
 						if (decompRetryCount > 0)
-							infoMsg << " UncompressRetry:" << decompRetryCount;
+								infoMsg << " UncompressRetry:" << decompRetryCount;
 
 						args.add(infoMsg.str());
 						primitiveprocessor::mlp->logInfoMessage(logging::M0006, args);
 					}
 				}
-				for (i = 0; useCache && (uint32_t) i < lbids.size(); i++) {
-					if (!isLocked[i]) {
+				for (i = 0; useCache && (uint) i < vssData.size(); i++) {
+					BRM::VSSData &vd = vssData[i];
+					// if it was a prefetch and a block is marked versioned, don't cache
+					if ((blocksRequested > 1 && !vd.vbFlag) || blocksRequested == 1) {
 #ifdef IDB_COMP_POC_DEBUG
-						{
-							if (debugWrite)
-							{
-								boost::mutex::scoped_lock lk(primitiveprocessor::compDebugMutex);
-								cout << boldStart << "i = " << i << ", ptr = 0x" << hex << (ptrdiff_t)&ptr[i*BLOCK_SIZE] << dec << boldStop << endl;
-								cout << boldStart;
+{
+	if (debugWrite)
+	{
+		boost::mutex::scoped_lock lk(primitiveprocessor::compDebugMutex);
+		cout << boldStart << "i = " << i << ", ptr = 0x" << hex << (ptrdiff_t)&ptr[i*BLOCK_SIZE] << dec << boldStop << endl;
+		cout << boldStart;
 #if 0
-								int32_t* i32p;
-								i32p = (int32_t*)&ptr[i*BLOCK_SIZE];
-								for (int iy = 0; iy < 2; iy++)
-								{
-									for (int ix = 0; ix < 8; ix++, i32p++)
-										cout << *i32p << ' ';
-									cout << endl;
-								}
+		int32_t* i32p;
+		i32p = (int32_t*)&ptr[i*BLOCK_SIZE];
+		for (int iy = 0; iy < 2; iy++)
+		{
+			for (int ix = 0; ix < 8; ix++, i32p++)
+				cout << *i32p << ' ';
+			cout << endl;
+		}
 #else
-								int64_t* i64p;
-								i64p = (int64_t*)&ptr[i*BLOCK_SIZE];
-								for (int iy = 0; iy < 2; iy++)
-								{
-									for (int ix = 0; ix < 8; ix++, i64p++)
-										cout << *i64p << ' ';
-									cout << endl;
-								}
+		int64_t* i64p;
+		i64p = (int64_t*)&ptr[i*BLOCK_SIZE];
+		for (int iy = 0; iy < 2; iy++)
+		{
+			for (int ix = 0; ix < 8; ix++, i64p++)
+				cout << *i64p << ' ';
+			cout << endl;
+		}
 #endif
-								cout << boldStop << endl;
-							}
-						}
+		cout << boldStop << endl;
+	}
+}
 #endif
-						cacheInsertOps.push_back(CacheInsert_t(lbids[i], versions[i], (uint8_t *)
-															   &alignedbuff[i*BLOCK_SIZE]));
+						cacheInsertOps.push_back(CacheInsert_t(lbids[i], vd.verID, (uint8_t *)
+							  &alignedbuff[i*BLOCK_SIZE]));
 					}
+//					else
+//						cout << "IOM: not inserting " << lbids[i] << "," << vd.verID << " vbflag=" << (int)
+//							vd.vbFlag << endl;
 				}
 				if (useCache) {
 					blocksLoaded += fbm->bulkInsert(cacheInsertOps);
@@ -1179,20 +1404,20 @@ retryReadHeaders:
 			uint32_t reportBytesRead = (compressedBytesRead > 0) ? compressedBytesRead : bytesRead;
 
 			lFile
-			<< left  << setw(5) << setfill(' ') << oid
-			<< right << setw(5) << setfill(' ') << offset/extentSize << " "
-			<< right << setw(11) << setfill(' ') << lbid << " "
-			<< right << setw(9) << bytesRead/(readCount << 13) << " "
-			<< right << setw(9)	<< blocksRequested << " "
-			<< right << setw(10) << fixed << tm3 << " "
-			<< right << fixed << ((double)(rqst1.tv_sec+(1.e-9*rqst1.tv_nsec))) << " "
-			<< right << setw(10) << fixed << rqst3 << " "
-			<< right << setw(10) << fixed << longSeekOffset << " "
-			<< right << setw(10) << fixed << reportBytesRead << " "
-			<< right << setw(3) << fixed << dbroot << " "
-			<< right << setw(3) << fixed << partNum << " "
-			<< right << setw(3) << fixed << segNum << " "
-			<< endl;
+				<< left  << setw(5) << setfill(' ') << oid
+				<< right << setw(5) << setfill(' ') << offset/extentSize << " "
+				<< right << setw(11) << setfill(' ') << lbid << " "
+				<< right << setw(9) << bytesRead/(readCount << 13) << " "
+				<< right << setw(9)	<< blocksRequested << " "
+				<< right << setw(10) << fixed << tm3 << " "
+				<< right << fixed << ((double)(rqst1.tv_sec+(1.e-9*rqst1.tv_nsec))) << " "
+				<< right << setw(10) << fixed << rqst3 << " "
+				<< right << setw(10) << fixed << longSeekOffset << " "
+				<< right << setw(10) << fixed << reportBytesRead << " "
+				<< right << setw(3) << fixed << dbroot << " "
+				<< right << setw(3) << fixed << partNum << " "
+				<< right << setw(3) << fixed << segNum << " "
+				<< endl;
 		}
 
 	} // for(;;)
@@ -1226,29 +1451,15 @@ void dropFDCache()
 	fdcache.clear();
 	localLock.write_unlock();
 }
-void purgeFDCache(std::vector<BRM::FileInfo>& files)
-{
-	localLock.write_lock();
-
-	FdCacheType_t::iterator fdit;
-	for ( uint32_t i=0; i < files.size(); i++)
-	{
-		FdEntry fdKey(files[i].oid, files[i].dbRoot, files[i].partitionNum, files[i].segmentNum, files[i].compType, NULL);
-		fdit = fdcache.find(fdKey);
-		if (fdit!=fdcache.end())
-			fdcache.erase(fdit);
-	}
-	localLock.write_unlock();
-}
 
 ioManager::ioManager(FileBufferMgr& fbm,
-					 fileBlockRequestQueue& fbrq,
-					 int thrCount,
-					 int bsPerRead):
-	blocksPerRead(bsPerRead),
-	fIOMfbMgr(fbm),
-	fIOMRequestQueue(fbrq),
-	fFileOp(false)
+					fileBlockRequestQueue& fbrq,
+					int thrCount,
+					int bsPerRead):
+		blocksPerRead(bsPerRead),
+		fIOMfbMgr(fbm),
+		fIOMRequestQueue(fbrq),
+		fFileOp(false)
 {
 	if (thrCount<=0)
 		thrCount=1;
@@ -1318,36 +1529,29 @@ const int ioManager::localLbidLookup(BRM::LBID_t lbid,
 									 uint16_t& segmentNum,
 									 uint32_t& fileBlockOffset)
 {
-	if (primitiveprocessor::noVB > 0)
-		vbFlag = false;
-
 	int rc = fdbrm.lookupLocal(lbid,
-							   verid,
-							   vbFlag,
-							   oid,
-							   dbRoot,
-							   partitionNum,
-							   segmentNum,
-							   fileBlockOffset);
+						verid,
+						vbFlag,
+						oid,
+						dbRoot,
+						partitionNum,
+						segmentNum,
+						fileBlockOffset);
 
 	return rc;
 }
 
 struct LambdaKludge {
 	LambdaKludge(ioManager *i) : iom(i) { }
-	~LambdaKludge() {
-		iom = NULL;
-	}
+	~LambdaKludge() { iom = NULL; }
 	ioManager *iom;
-	void operator()() {
-		thr_popper(iom);
-	}
+	void operator()() { thr_popper(iom); }
 };
 
 void ioManager::createReaders() {
 	int idx;
 
-	for (idx = 0; idx < fThreadCount; idx++) {
+	for (idx = 0; idx < fThreadCount; idx++){
 		try {
 			fThreadArr.create_thread(LambdaKludge(this));
 		}
@@ -1396,7 +1600,7 @@ fileRequest* ioManager::getNextRequest() {
 // Lastly, notifies waiting thread that fileRequest has been completed.
 //------------------------------------------------------------------------------
 void ioManager::handleBlockReadError( fileRequest* fr,
-									  const string& errMsg, bool *copyLocked, int errorCode ) {
+		const string& errMsg, bool *copyLocked, int errorCode ) {
 	try {
 		dbrm()->releaseLBIDRange(fr->Lbid(), fr->BlocksRequested());
 		*copyLocked = false;

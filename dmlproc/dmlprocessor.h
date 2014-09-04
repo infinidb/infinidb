@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: dmlprocessor.h 955 2013-03-20 19:37:27Z rdempsey $
+*   $Id: dmlprocessor.h 863 2012-10-02 21:30:34Z dhall $
 *
 *
 ***********************************************************************/
@@ -42,8 +42,7 @@
 #include "dmlpackageprocessor.h"
 #include "calpontsystemcatalog.h"
 #include "dmlpackageprocessor.h"
-#include "batchinsertprocessor.h"
-#include "querytele.h"
+//#include "iosocket.h"
 
 namespace dmlprocessor
 {
@@ -53,7 +52,7 @@ namespace dmlprocessor
 class DMLServer
 {
 public:
-	DMLServer(int packageMaxThreads, int packageWorkQueueSize, BRM::DBRM * aDbrm);
+	DMLServer(int packageMaxThreads, int packageWorkQueueSize);
 
 	~DMLServer() { }
 
@@ -93,7 +92,6 @@ private:
     int fPackageWorkQueueSize; /** @brief max number of packages waiting in the work queue */
 
     boost::scoped_ptr<messageqcpp::MessageQueueServer> fMqServer;
-	BRM::DBRM* fDbrm;
 };
 
 /** @brief Thread to process a single dml package.
@@ -102,10 +100,8 @@ private:
 class PackageHandler
 {
 public:
-    PackageHandler(const messageqcpp::IOSocket& ios, boost::shared_ptr<messageqcpp::ByteStream> bs,
-		uint8_t packageType, joblist::DistributedEngineComm *ec, uint64_t maxDeleteRows,
-		uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnId, BRM::DBRM * aDbrm,
-		const querytele::QueryTeleClient& qtc);
+    PackageHandler(const messageqcpp::IOSocket& ios, boost::shared_ptr<messageqcpp::ByteStream> bs, messageqcpp::ByteStream::quadbyte packageType,
+		joblist::DistributedEngineComm *ec, uint64_t maxDeleteRows, uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnId);
 	~PackageHandler();
 
     void run();
@@ -123,8 +119,6 @@ private:
 	uint32_t fSessionID;
 	execplan::CalpontSystemCatalog::SCN fTxnid;
 	execplan::SessionManager sessionManager;
-	BRM::DBRM *fDbrm;
-	querytele::QueryTeleClient fQtc;
 };
 
 /** @brief processes dml packages as they arrive
@@ -137,7 +131,7 @@ public:
       * @param packageMaxThreads the maximum number of threads to process dml  packages
       * @param packageWorkQueueSize the maximum number of dml packages in the work queue
       */
-    DMLProcessor(messageqcpp::IOSocket ios, BRM::DBRM* aDbrm);
+    DMLProcessor(messageqcpp::IOSocket ios);
 
     /** @brief entry point for the DMLProcessor
       */
@@ -146,30 +140,21 @@ public:
 	static void log(const std::string& msg, logging::LOG_TYPE level);
 private:
 	messageqcpp::IOSocket fIos;
-	
 	execplan::SessionManager sessionManager;
 	boost::shared_ptr<execplan::CalpontSystemCatalog> csc;
-	BRM::DBRM* fDbrm;
-	querytele::QueryTeleClient fQtc;
 
 	// A map to hold pointers to all active PackageProcessors
-	typedef std::map<uint32_t, boost::shared_ptr<PackageHandler> > PackageHandlerMap_t;
-	static PackageHandlerMap_t packageHandlerMap;
+	static std::map<uint32_t, PackageHandler*> packageHandlerMap;
 	static boost::mutex packageHandlerMapLock;
 
-	// A map to hold pointers to all BatchInsertProc object
-	static std::map<uint32_t, BatchInsertProc*> batchinsertProcessorMap;
-	static boost::mutex batchinsertProcessorMapLock;
-	
     friend struct CancellationThread;
-	friend class PackageHandler;
 };
 
 class RollbackTransactionProcessor : public dmlpackageprocessor::DMLPackageProcessor
 {
 
 public:
-	RollbackTransactionProcessor(BRM::DBRM* aDbrm) : DMLPackageProcessor(aDbrm, 1) {}
+	RollbackTransactionProcessor() : DMLPackageProcessor() {}
     /** @brief process an Rollback transactions
      *
      * @param cpackage the UpdateDMLPackage to process
@@ -181,7 +166,7 @@ public:
 		return result;
 	 }
 	 
-	 void processBulkRollback (BRM::TableLockInfo lockInfo, BRM::DBRM * dbrm, uint64_t uniqueId, 
+	 void processBulkRollback (BRM::TableLockInfo lockInfo, BRM::DBRM & dbrm, uint64_t uniqueId, 
 			oam::OamCache::dbRootPMMap_t& dbRootPMMap, bool & lockReleased);
 	
 protected:

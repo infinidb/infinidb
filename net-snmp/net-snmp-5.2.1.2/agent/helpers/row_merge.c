@@ -1,4 +1,3 @@
-#include <stddef.h>
 #include <net-snmp/net-snmp-config.h>
 
 #if HAVE_STRING_H
@@ -35,7 +34,7 @@ netsnmp_get_row_merge_handler(int prefix_len)
     ret = netsnmp_create_handler("row_merge",
                                   netsnmp_row_merge_helper_handler);
     if (ret) {
-        ret->myvoid = (void *)(ptrdiff_t)prefix_len;
+        ret->myvoid = (void *) prefix_len;
     }
     return ret;
 }
@@ -72,7 +71,7 @@ netsnmp_row_merge_helper_handler(netsnmp_mib_handler *handler,
      * Use the prefix length as supplied during registration, rather
      *  than trying to second-guess what the MIB implementer wanted.
      */
-    int SKIP_OID = (int)(ptrdiff_t)handler->myvoid;
+    int SKIP_OID = (int)handler->myvoid;
 
     DEBUGMSGTL(("helper:row_merge", "Got request (%d)\n", SKIP_OID));
     DEBUGMSGOID(("helper:row_merge", reginfo->rootoid, reginfo->rootoid_len));

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_between.cpp 3954 2013-07-08 16:30:15Z bpaul $
+* $Id: func_between.cpp 3956 2013-07-08 19:17:26Z bpaul $
 *
 *
 ****************************************************************************/
@@ -56,13 +56,13 @@ namespace
 		return op1 <= op2;
 	}
 
-	inline bool strGE(const string& op1, const string& op2)
+	inline bool strGE(string op1, string op2)
 	{
 		//return strcoll(op1.c_str(), op2.c_str()) >= 0;
 		return utf8::idb_strcoll(op1.c_str(), op2.c_str()) >= 0;
 	}
 
-	inline bool strLE(const string& op1, const string& op2)
+	inline bool strLE(string op1, string op2)
 	{
 		//return strcoll(op1.c_str(), op2.c_str()) <= 0;
 		return utf8::idb_strcoll(op1.c_str(), op2.c_str()) <= 0;
@@ -94,24 +94,6 @@ namespace
 						numericGE(val, pm[1]->data()->getIntVal(row, isNull)) &&
 						numericLE(val, pm[2]->data()->getIntVal(row, isNull)) && !isNull;
 			}
-            case execplan::CalpontSystemCatalog::UBIGINT:
-            case execplan::CalpontSystemCatalog::UINT:
-            case execplan::CalpontSystemCatalog::UMEDINT:
-            case execplan::CalpontSystemCatalog::UTINYINT:
-            case execplan::CalpontSystemCatalog::USMALLINT:
-            {
-                uint64_t val = pm[0]->data()->getUintVal(row, isNull);
-                if (notBetween)
-                {
-                    if (!numericGE(val, pm[1]->data()->getUintVal(row, isNull)) && !isNull)
-                        return true;
-                    isNull = false;
-                    return (!numericLE(val, pm[2]->data()->getUintVal(row, isNull)) && !isNull);
-                }
-                return !isNull &&
-                        numericGE(val, pm[1]->data()->getUintVal(row, isNull)) &&
-                        numericLE(val, pm[2]->data()->getUintVal(row, isNull)) && !isNull;
-            }
 			case execplan::CalpontSystemCatalog::DATE:
 			{
 				int32_t val = pm[0]->data()->getDateIntVal(row, isNull);
@@ -141,9 +123,7 @@ namespace
 						numericLE(val, pm[2]->data()->getDatetimeIntVal(row, isNull));
 			}
 			case execplan::CalpontSystemCatalog::DOUBLE:
-            case execplan::CalpontSystemCatalog::UDOUBLE:
 			case execplan::CalpontSystemCatalog::FLOAT:
-            case execplan::CalpontSystemCatalog::UFLOAT:
 			{
 				double val = pm[0]->data()->getDoubleVal(row, isNull);
 				if (notBetween)
@@ -157,8 +137,7 @@ namespace
 						numericGE(val, pm[1]->data()->getDoubleVal(row, isNull)) &&
 						numericLE(val, pm[2]->data()->getDoubleVal(row, isNull));
 			}
-            case execplan::CalpontSystemCatalog::DECIMAL:
-			case execplan::CalpontSystemCatalog::UDECIMAL:
+			case execplan::CalpontSystemCatalog::DECIMAL:
 			{
 				IDB_Decimal val = pm[0]->data()->getDecimalVal(row, isNull);
 				if (notBetween)
@@ -175,7 +154,7 @@ namespace
 			case execplan::CalpontSystemCatalog::VARCHAR: // including CHAR'
 			case execplan::CalpontSystemCatalog::CHAR:
 			{
-				const string& val = pm[0]->data()->getStrVal(row, isNull);
+				string val = pm[0]->data()->getStrVal(row, isNull);
 				if (notBetween)
 				{
 					if (!strGE(val, pm[1]->data()->getStrVal(row, isNull)) && !isNull)
@@ -208,7 +187,7 @@ CalpontSystemCatalog::ColType Func_between::operationType( FunctionParm& fp, Cal
 	//op.operationType(fp[0]->data()->resultType());
 	bool allString = true;
 
-	for (uint32_t i = 1; i < fp.size(); i++)
+	for (uint i = 1; i < fp.size(); i++)
 	{
 		//op.setOpType(op.operationType(), fp[i]->data()->resultType());
 		op.setOpType(ct, fp[i]->data()->resultType());
@@ -232,7 +211,7 @@ CalpontSystemCatalog::ColType Func_between::operationType( FunctionParm& fp, Cal
 	else if (op.operationType().colDataType == CalpontSystemCatalog::DATETIME)
 	{
 		ConstantColumn *cc = NULL;
-		for (uint32_t i = 1; i < fp.size(); i++)
+		for (uint i = 1; i < fp.size(); i++)
 		{
 			cc = dynamic_cast<ConstantColumn*>(fp[i]->data());
 			if (cc)

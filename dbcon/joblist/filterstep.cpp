@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-// $Id: filterstep.cpp 9655 2013-06-25 23:08:13Z xlou $
+// $Id: filterstep.cpp 8526 2012-05-17 02:28:10Z xlou $
 
 #include <string>
 #include <sstream>
@@ -60,13 +60,17 @@ namespace joblist
 //		}
 //    }
 //};
-
-FilterStep::FilterStep(
-	const execplan::CalpontSystemCatalog::ColType& colType,
-	const JobInfo& jobInfo) :
-		JobStep(jobInfo),
-		fTableOID(0),
-		fColType(colType)
+    
+FilterStep::FilterStep(uint32_t sessionId,
+		uint32_t txnId,
+		uint32_t statementId,
+		execplan::CalpontSystemCatalog::ColType colType) :
+	fSessionId(sessionId),
+	fTxnId(txnId),
+	fStepId(0),
+	fStatementId(statementId),
+	fTableOID(0),
+	fColType(colType)
 {
 }
 
@@ -104,12 +108,12 @@ void FilterStep::doFilter()
 // 	StringFifoDataList* fStrFBp = 0;
 // 	StringFifoDataList* strFifo = 0;
 // 	StrDataList* strResult = 0;
-//
+// 	
 // 	FifoDataList* fFBP = 0;
 //	FifoDataList* fFAP = 0;
 //	FifoDataList* fifo = 0;
 //	DataList_t* result = 0;
-//
+//	
 //	TimeSet timer;
 //try
 //{
@@ -119,20 +123,20 @@ void FilterStep::doFilter()
 //	{
 //		fStrFAp = fInputJobStepAssociation.outAt(0)->stringDL();
 //		idbassert(fStrFAp);
-//
+//		
 //		fStrFBp = fInputJobStepAssociation.outAt(1)->stringDL();
 //		idbassert(fStrFBp);
-//
+//		
 //		strFifo = fOutputJobStepAssociation.outAt(0)->stringDL();
-//
+//		
 //		strResult = fOutputJobStepAssociation.outAt(0)->stringDataList();
 //	}
 //	else
-//	{
+//	{		
 //		fFBP = fInputJobStepAssociation.outAt(1)->fifoDL();
 //		idbassert(fFBP);
 //		fifo = fOutputJobStepAssociation.outAt(0)->fifoDL();
-//
+//		
 //		result = fOutputJobStepAssociation.outAt(0)->dataList();
 //	}
 //	ostringstream ss;  //tester
@@ -143,9 +147,13 @@ void FilterStep::doFilter()
 //	{
 //		dlTimes.setFirstReadTime();
 //	}
-//	uint32_t                cop = BOP();
-//
-//	if (0 == status())
+//	uint                cop = BOP();
+//		
+//	if (0 < fInputJobStepAssociation.status())
+//	{
+//		fOutputJobStepAssociation.status(fInputJobStepAssociation.status());
+//	}
+//	else
 //	{
 //		FilterOperation filterOP;
 //		if ( !fFAP )
@@ -170,25 +178,25 @@ void FilterStep::doFilter()
 //				filterOP.filter( cop, *fFAP, *fFBP, *result,resultCount, timer );
 //			}
 //		}
-//	} // status() == 0
+//	} //else fInputJobStepAssociation.status() == 0
 //}//try
-//catch (std::exception &e)
+//catch (std::exception &e) 
 //{
 //	std::cout << "FilterStep caught: " << e.what() << std::endl;
 //	unblockDataLists(fifo, strFifo, strResult, result);
 //	catchHandler(e.what());
-//	status(logging::filterStepErr);
+//	fOutputJobStepAssociation.status(logging::filterStepErr);
 //}
-//catch (...)
+//catch (...) 
 //{
 //	string msg("FSRunner caught something not an exception!");
 //	std::cout << msg << std::endl;
 //	unblockDataLists(fifo, strFifo, strResult, result);
 //	catchHandler(msg);
-//	status(logging::filterStepErr);
+//	fOutputJobStepAssociation.status(logging::filterStepErr);
 //}
 //
-//
+//		
 //	if (fTableOID >= 3000)
 //		dlTimes.setEndOfInputTime();
 //	//...Print job step completion information
@@ -198,7 +206,7 @@ void FilterStep::doFilter()
 //		char finTimeString[50];
 //		ctime_r(&finTime, finTimeString);
 //		finTimeString[strlen(finTimeString)-1 ] = '\0';
-//
+//		
 //		ostringstream logStr;
 //		logStr << "ses:" << fSessionId << " st: " << fStepId <<
 //			" finished at " << finTimeString <<
@@ -206,18 +214,18 @@ void FilterStep::doFilter()
 //			"; EOI " << dlTimes.EndOfInputTimeString()
 //		<<"; Output:"<<resultCount
 //		<< "\n\trun time: " << JSTimeStamp::tsdiffstr(dlTimes.EndOfInputTime(), dlTimes.FirstReadTime())
-//		<< "s, " << filterCompare << timer.totalTime(filterCompare)
-//		<< "s, " << filterInsert << timer.totalTime(filterInsert)
+//		<< "s, " << filterCompare << timer.totalTime(filterCompare) 
+//		<< "s, " << filterInsert << timer.totalTime(filterInsert) 
 //		<< "s, " << filterFinish << timer.totalTime(filterFinish)
-//		<< "s\n\t" << "Job completion status: " << status() << endl;
-//
+//		<< "s\n\t" << "Job completion status: " << fOutputJobStepAssociation.status() << endl;
+//		
 //		logEnd(logStr.str().c_str());
 //
 //			syslogEndStep(16, // exemgr subsystem
 //				0,            // no blocked datalist input  to report
 //				0);           // no blocked datalist output to report
-//	}
-}
+//	} 
+}	
 
 //void FilterStep::unblockDataLists(FifoDataList* fifo, StringFifoDataList* strFifo, StrDataList* strResult, DataList_t* result )
 //{
@@ -242,7 +250,7 @@ const string FilterStep::toString() const
 
 	idlsz = fInputJobStepAssociation.outSize();
 	idbassert(idlsz == 2);
-
+	
 	oss << "FilterStep      ses:" << fSessionId << " txn:" << fTxnId <<
 		" st:" << fStepId;
 	oss << " in  tb/col1:" << fTableOID << "/";

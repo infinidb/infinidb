@@ -1,19 +1,34 @@
-/* Copyright (C) 2014 InfiniDB, Inc.
+/*
 
-   This program is free software; you can redistribute it and/or
-   modify it under the terms of the GNU General Public License
-   as published by the Free Software Foundation; version 2 of
-   the License.
+   Copyright (C) 2009-2012 Calpont Corporation.
 
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   Use of and access to the Calpont InfiniDB Community software is subject to the
+   terms and conditions of the Calpont Open Source License Agreement. Use of and
+   access to the Calpont InfiniDB Enterprise software is subject to the terms and
+   conditions of the Calpont End User License Agreement.
 
-   You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-   MA 02110-1301, USA. */
+   This program is distributed in the hope that it will be useful, and unless
+   otherwise noted on your license agreement, WITHOUT ANY WARRANTY; without even
+   the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+   Please refer to the Calpont Open Source License Agreement and the Calpont End
+   User License Agreement for more details.
+
+   You should have received a copy of either the Calpont Open Source License
+   Agreement or the Calpont End User License Agreement along with this program; if
+   not, it is your responsibility to review the terms and conditions of the proper
+   Calpont license agreement by visiting http://www.calpont.com for the Calpont
+   InfiniDB Enterprise End User License Agreement or http://www.infinidb.org for
+   the Calpont InfiniDB Community Calpont Open Source License Agreement.
+
+   Calpont may make changes to these license agreements from time to time. When
+   these changes are made, Calpont will make a new copy of the Calpont End User
+   License Agreement available at http://www.calpont.com and a new copy of the
+   Calpont Open Source License Agreement available at http:///www.infinidb.org.
+   You understand and agree that if you use the Program after the date on which
+   the license agreement authorizing your use has changed, Calpont will treat your
+   use as acceptance of the updated License.
+
+*/
 
 /*******************************************************************************
 * $Id$ 
@@ -22,12 +37,9 @@
 #ifndef WE_CMDARGS_H_
 #define WE_CMDARGS_H_
 
-#include <set>
-
-#include <boost/uuid/uuid.hpp>
 
 #include "we_xmlgetter.h"
-#include "we_type.h"
+
 
 namespace WriteEngine
 {
@@ -43,11 +55,14 @@ class WECmdArgs
         std::string getCpImportCmdLine();
         void setSchemaAndTableFromJobFile(std::string& JobName);
         void setEnclByAndEscCharFromJobFile(std::string& JobName);
+        static void str2Argv(std::string CmdLine, std::vector<char*>& V1);
         void usage();
         void usageMode3();
         bool checkForCornerCases();
 
         void addJobFilesToVector(std::string& JobName);
+        void setSchemaAndTableFromTblNameAttribute(std::string& tblName);
+        void setInputFileNameFromLoadNameAttribute(std::string& loadName);
     	void splitConfigFilePerTable(std::string& ConfigName, int tblCount);
     	void write2ConfigFiles(std::vector<std::ofstream*>& Files,
     												char*pBuff, int FileIdx);
@@ -74,7 +89,6 @@ class WECmdArgs
 		char getEnclChar() { return fEnclosedChar; }
 		char getEscChar() { return fEscChar;	}
 		char getDelimChar() { return fColDelim; }
-		ImportDataMode getImportDataMode() const { return fImportDataMode; }
 		bool getConsoleLog() { return fConsoleLog; }
 
 		bool isCpimportInvokeMode(){return (fBlockMode3)? false : fCpiInvoke;}
@@ -94,21 +108,16 @@ class WECmdArgs
 		void setBlockMode3(bool Block) { this->fBlockMode3 = Block; }
 		void setTruncationAsError(bool bTruncationAsError)
 		{ fbTruncationAsError = bTruncationAsError;	}
-		bool isJobLogOnly() const { return fJobLogOnly; }
-		void setJobUUID(const boost::uuids::uuid& jobUUID) { fUUID = jobUUID; }
-		bool getConsoleOutput( ) {return fConsoleOutput; }
-
 
     private:	// variables for SplitterApp
         typedef std::vector<std::string> VecArgs;
         VecArgs fVecArgs;
+        const int MAXARG;
         typedef std::vector<unsigned int> VecInts;
         VecInts fPmVec;
 
         VecArgs fVecJobFiles;		//JobFiles splitter from master JobFile
         int fMultiTableCount;		//MultiTable count
-        VecArgs fColFldsFromJobFile;//List of columns from any job file, that
-                                    // represent fields in the import data
 
     public:
 		bool getPmStatus(int Id);
@@ -127,12 +136,10 @@ class WECmdArgs
 		void setMultiTableCount(int Count) { fMultiTableCount = Count; }
 
 		std::string PrepMode2ListOfFiles(std::string& FileName); // Bug 4342
-		void getColumnList( std::set<std::string>& columnList ) const;
 
     private:	// variables for SplitterApp
-        std::string fJobId;		// JobID
+        std::string fJobId;				// JobID
         std::string fOrigJobId;	// Original JobID, in case we have to split it
-		bool fJobLogOnly;		// Job number is only for log filename only
         bool fHelp;				// Help mode
         int fMode;				// splitter Mode
         int fArgMode;			// Argument mode, dep. on this fMode is decided.
@@ -161,7 +168,6 @@ class WECmdArgs
         char fEscChar;			// esc char
         int fNoOfWriteThrds;	// No. of write threads
         bool fNullStrMode;		// set null string mode - treat null as null
-        ImportDataMode fImportDataMode; // Importing text or binary data		
         std::string fPrgmName;	// argv[0]
         std::string fSchema;	// Schema name - positional parmater
         std::string fTable;		// Table name - table name parameter
@@ -169,8 +175,6 @@ class WECmdArgs
         bool fCpiInvoke;		// invoke cpimport in mode 3
         bool fBlockMode3;		// Do not allow Mode 3
         bool fbTruncationAsError; // Treat string truncation as error
-		boost::uuids::uuid fUUID;
-        bool fConsoleOutput;    // If false, no output to console.
 };
 //----------------------------------------------------------------------
 

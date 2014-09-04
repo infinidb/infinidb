@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: rowaggregation.cpp 4017 2013-07-26 16:20:29Z pleblanc $
+//  $Id: rowaggregation.cpp 3956 2013-07-08 19:17:26Z bpaul $
 
 
 /** @file rowaggregation.cpp
@@ -46,7 +46,6 @@
 #include "rowgroup.h"
 #include "funcexp.h"
 #include "rowaggregation.h"
-#include "calpontsystemcatalog.h"
 #include "utils_utf8.h"
 
 //..comment out NDEBUG to enable assertions, uncomment NDEBUG to disable
@@ -56,6 +55,7 @@
 using namespace std;
 using namespace boost;
 using namespace dataconvert;
+
 
 // inlines of RowAggregation that used only in this file
 namespace
@@ -116,49 +116,13 @@ inline uint64_t getUintNullValue(int colType, int colWidth = 0)
 			return joblist::DATETIMENULL;
 		}
 		case execplan::CalpontSystemCatalog::DECIMAL:
-		case execplan::CalpontSystemCatalog::UDECIMAL:
-		{
-			switch (colWidth)
-			{
-				case 1:
-				{
-					return joblist::TINYINTNULL;
-				}
-				case 2:
-				{
-					return joblist::SMALLINTNULL;
-				}
-				case 4:
-				{
-					return joblist::INTNULL;
-				}
-				default:
-				{
-					return joblist::BIGINTNULL;
-				}
-			}
-		}
-		case execplan::CalpontSystemCatalog::UTINYINT:
-		{
-			return joblist::UTINYINTNULL;
-		}
-		case execplan::CalpontSystemCatalog::USMALLINT:
-		{
-			return joblist::USMALLINTNULL;
-		}
-		case execplan::CalpontSystemCatalog::UMEDINT:
-		case execplan::CalpontSystemCatalog::UINT:
-		{
-			return joblist::UINTNULL;
-		}
-		case execplan::CalpontSystemCatalog::UBIGINT:
-		{
-			return joblist::UBIGINTNULL;
-		}
-		default:
-		{
+			if (colWidth == 1) return joblist::TINYINTNULL;
+			else if (colWidth == 2) return joblist::SMALLINTNULL;
+			else if (colWidth == 4) return joblist::INTNULL;
+			else  return joblist::BIGINTNULL;
 			break;
-		}
+		default:
+			break;
 	}
 
 	return joblist::CHAR8NULL;
@@ -186,96 +150,12 @@ inline string getStringNullValue()
 	return joblist::CPNULLSTRMARK;
 }
 
+
 }
 
 
 namespace rowgroup
 {
-
-KeyStorage::KeyStorage(const RowGroup &keys, Row **tRow) :tmpRow(tRow), rg(keys)
-{
-	RGData data(rg);
-
-	rg.setData(&data);
-	rg.resetRowGroup(0);
-	rg.initRow(&row);
-	rg.getRow(0, &row);
-	storage.push_back(data);
-	memUsage = 0;
-}
-
-inline RowPosition KeyStorage::addKey()
-{
-	RowPosition pos;
-
-	if (rg.getRowCount() == 8192)
-	{
-		RGData data(rg);
-		rg.setData(&data);
-		rg.resetRowGroup(0);
-		rg.getRow(0, &row);
-		storage.push_back(data);
-	}
-
-	copyRow(**tmpRow, &row);
-	memUsage += row.getRealSize();
-	pos.group = storage.size()-1;
-	pos.row = rg.getRowCount();
-	rg.incRowCount();
-	row.nextRow();
-	return pos;
-}
-
-inline uint64_t KeyStorage::getMemUsage()
-{
-	return memUsage;
-}
-
-
-ExternalKeyHasher::ExternalKeyHasher(const RowGroup &r, KeyStorage *k, uint32_t keyColCount, Row **tRow) :
-	tmpRow(tRow), lastKeyCol(keyColCount-1), ks(k)
-{
-	r.initRow(&row);
-}
-
-inline uint64_t ExternalKeyHasher::operator()(const RowPosition &pos) const
-{
-	if (pos.group == RowPosition::MSB)
-		return (*tmpRow)->hash(lastKeyCol);
-
-	RGData &rgData = ks->storage[pos.group];
-	rgData.getRow(pos.row, &row);
-	return row.hash(lastKeyCol);
-}
-
-
-ExternalKeyEq::ExternalKeyEq(const RowGroup &r, KeyStorage *k, uint32_t keyColCount, Row **tRow) :
-	tmpRow(tRow), lastKeyCol(keyColCount-1), ks(k)
-{
-	r.initRow(&row1);
-	r.initRow(&row2);
-}
-
-inline bool ExternalKeyEq::operator()(const RowPosition &pos1, const RowPosition &pos2) const
-{
-	Row *r1, *r2;
-
-	if (pos1.group == RowPosition::MSB)
-		r1 = *tmpRow;
-	else {
-		ks->storage[pos1.group].getRow(pos1.row, &row1);
-		r1 = &row1;
-	}
-	if (pos2.group == RowPosition::MSB)
-		r2 = *tmpRow;
-	else {
-		ks->storage[pos2.group].getRow(pos2.row, &row2);
-		r2 = &row2;
-	}
-
-	return r1->equals(*r2, lastKeyCol);
-}
-
 
 static const string overflowMsg("Aggregation overflow.");
 
@@ -364,8 +244,7 @@ inline void RowAggregation::updateIntSum(int64_t val1, int64_t val2, int64_t col
 			((val2 <  0) && ((numeric_limits<int64_t>::min() - val2) <= val1)))
 			fRow.setIntField(val1 + val2, col);
 #else /* PROMOTE_AGGR_OVRFLW_TO_DBL */
-		if (fRow.getColTypes()[col] != execplan::CalpontSystemCatalog::DOUBLE &&
-			fRow.getColTypes()[col] != execplan::CalpontSystemCatalog::UDOUBLE)
+		if (fRow.getColTypes()[col] != execplan::CalpontSystemCatalog::DOUBLE)
 		{
 			if (((val2 >= 0) && ((numeric_limits<int64_t>::max() - val2) >= val1)) ||
 				((val2 <  0) && ((numeric_limits<int64_t>::min() - val2) <= val1)))
@@ -382,64 +261,17 @@ inline void RowAggregation::updateIntSum(int64_t val1, int64_t val2, int64_t col
 		}
 #endif /* PROMOTE_AGGR_OVRFLW_TO_DBL */
 		else
-		{
 #ifndef PROMOTE_AGGR_OVRFLW_TO_DBL
-			ostringstream oss;
-			oss << overflowMsg << ": " << val2 << "+" << val1;
-			if (val2 > 0)
-				oss << " > " << numeric_limits<uint64_t>::max();
-			else
-				oss << " < " << numeric_limits<uint64_t>::min();
-			throw logging::QueryDataExcept(oss.str(), logging::aggregateDataErr);
+			throw logging::QueryDataExcept(overflowMsg, logging::aggregateDataErr);
 #else /* PROMOTE_AGGR_OVRFLW_TO_DBL */
+		{
 			double* dp2 = (double*)&val2;
 			updateDoubleSum((double)val1, *dp2, col);
-#endif /* PROMOTE_AGGR_OVRFLW_TO_DBL */
 		}
+#endif /* PROMOTE_AGGR_OVRFLW_TO_DBL */
 	}
 }
 
-inline void RowAggregation::updateUintSum(uint64_t val1, uint64_t val2, int64_t col)
-{
-	if (isNull(fRowGroupOut, fRow, col))
-	{
-		fRow.setUintField(val1, col);
-	}
-	else
-	{
-#ifndef PROMOTE_AGGR_OVRFLW_TO_DBL
-		if ((numeric_limits<uint64_t>::max() - val2) >= val1)
-			fRow.setUintField(val1 + val2, col);
-		else
-		{
-			ostringstream oss;
-			oss << overflowMsg << ": " << val2 << "+" << val1 << " > " << numeric_limits<uint64_t>::max();
-			throw logging::QueryDataExcept(oss.str(), logging::aggregateDataErr);
-		}
-#else /* PROMOTE_AGGR_OVRFLW_TO_DBL */
-		if (fRow.getColTypes()[col] != execplan::CalpontSystemCatalog::DOUBLE &&
-			fRow.getColTypes()[col] != execplan::CalpontSystemCatalog::UDOUBLE)
-		{
-			if ((numeric_limits<uint64_t>::max() - val2) >= val1)
-			{
-				fRow.setUintField(val1 + val2, col);
-			}
-			else
-			{
-				execplan::CalpontSystemCatalog::ColDataType* cdtp = fRow.getColTypes();
-				cdtp += col;
-				*cdtp = execplan::CalpontSystemCatalog::DOUBLE;
-				updateDoubleSum((double)val1, (double)val2, col);
-			}
-		}
-		else
-		{
-			double* dp2 = (double*)&val2;
-			updateDoubleSum((double)val1, *dp2, col);
-		}
-#endif /* PROMOTE_AGGR_OVRFLW_TO_DBL */
-	}
-}
 
 inline void RowAggregation::updateDoubleSum(double val1, double val2, int64_t col)
 {
@@ -467,7 +299,6 @@ inline void RowAggregation::updateFloatSum(float val1, float val2, int64_t col)
 //------------------------------------------------------------------------------
 inline bool RowAggregation::isNull(const RowGroup* pRowGroup, const Row& row, int64_t col)
 {
-	/* TODO: Can we replace all of this with a call to row.isNullValue(col)? */
 	bool ret = false;
 
 	int colDataType = (pRowGroup->getColTypes())[col];
@@ -476,11 +307,6 @@ inline bool RowAggregation::isNull(const RowGroup* pRowGroup, const Row& row, in
 		case execplan::CalpontSystemCatalog::TINYINT:
 		{
 			ret = ((uint8_t)row.getIntField(col) == joblist::TINYINTNULL);
-			break;
-		}
-		case execplan::CalpontSystemCatalog::UTINYINT:
-		{
-			ret = ((uint8_t)row.getIntField(col) == joblist::UTINYINTNULL);
 			break;
 		}
 		case execplan::CalpontSystemCatalog::CHAR:
@@ -522,13 +348,7 @@ inline bool RowAggregation::isNull(const RowGroup* pRowGroup, const Row& row, in
 			ret = ((uint16_t)row.getIntField(col) == joblist::SMALLINTNULL);
 			break;
 		}
-		case execplan::CalpontSystemCatalog::USMALLINT:
-		{
-			ret = ((uint16_t)row.getIntField(col) == joblist::USMALLINTNULL);
-			break;
-		}
 		case execplan::CalpontSystemCatalog::DOUBLE:
-		case execplan::CalpontSystemCatalog::UDOUBLE:
 		{
 			ret = ((uint64_t)row.getUintField(col) == joblist::DOUBLENULL);
 			break;
@@ -539,14 +359,7 @@ inline bool RowAggregation::isNull(const RowGroup* pRowGroup, const Row& row, in
 			ret = ((uint32_t)row.getIntField(col) == joblist::INTNULL);
 			break;
 		}
-		case execplan::CalpontSystemCatalog::UMEDINT:
-		case execplan::CalpontSystemCatalog::UINT:
-		{
-			ret = ((uint32_t)row.getIntField(col) == joblist::UINTNULL);
-			break;
-		}
 		case execplan::CalpontSystemCatalog::FLOAT:
-		case execplan::CalpontSystemCatalog::UFLOAT:
 		{
 			ret = ((uint32_t)row.getUintField(col) == joblist::FLOATNULL);
 			break;
@@ -561,13 +374,7 @@ inline bool RowAggregation::isNull(const RowGroup* pRowGroup, const Row& row, in
 			ret = ((uint64_t)row.getIntField(col) == joblist::BIGINTNULL);
 			break;
 		}
-		case execplan::CalpontSystemCatalog::UBIGINT:
-		{
-			ret = ((uint64_t)row.getIntField(col) == joblist::UBIGINTNULL);
-			break;
-		}
 		case execplan::CalpontSystemCatalog::DECIMAL:
-		case execplan::CalpontSystemCatalog::UDECIMAL:
 		{
 			int colWidth = pRowGroup->getColumnWidth(col);
 			int64_t val = row.getIntField(col);
@@ -603,8 +410,8 @@ inline bool RowAggregation::isNull(const RowGroup* pRowGroup, const Row& row, in
 // Row Aggregation default constructor
 //------------------------------------------------------------------------------
 RowAggregation::RowAggregation() :
-	fAggMapPtr(NULL), fRowGroupOut(NULL),
-	fTotalRowCount(0), fMaxTotalRowCount(AGG_ROWGROUP_SIZE),
+	fAggMapPtr(NULL), fAggMapKeyLength(0), fRowGroupOut(NULL),
+	fTotalRowCount(0), fMaxTotalRowCount(AGG_ROWGROUP_SIZE), fPrimaryRowData(NULL),
 	fSmallSideRGs(NULL), fLargeSideRG(NULL), fSmallSideCount(0)
 {
 }
@@ -612,8 +419,8 @@ RowAggregation::RowAggregation() :
 
 RowAggregation::RowAggregation(const vector<SP_ROWAGG_GRPBY_t>& rowAggGroupByCols,
                                const vector<SP_ROWAGG_FUNC_t>&  rowAggFunctionCols) :
-	fAggMapPtr(NULL), fRowGroupOut(NULL),
-	fTotalRowCount(0), fMaxTotalRowCount(AGG_ROWGROUP_SIZE),
+	fAggMapPtr(NULL), fAggMapKeyLength(0), fRowGroupOut(NULL),
+	fTotalRowCount(0), fMaxTotalRowCount(AGG_ROWGROUP_SIZE), fPrimaryRowData(NULL),
 	fSmallSideRGs(NULL), fLargeSideRG(NULL), fSmallSideCount(0)
 {
 	fGroupByCols.assign(rowAggGroupByCols.begin(), rowAggGroupByCols.end());
@@ -622,13 +429,12 @@ RowAggregation::RowAggregation(const vector<SP_ROWAGG_GRPBY_t>& rowAggGroupByCol
 
 
 RowAggregation::RowAggregation(const RowAggregation& rhs):
-	fAggMapPtr(NULL), fRowGroupOut(NULL),
-	fTotalRowCount(0), fMaxTotalRowCount(AGG_ROWGROUP_SIZE),
+	fAggMapPtr(NULL), fAggMapKeyLength(0), fRowGroupOut(NULL),
+	fTotalRowCount(0), fMaxTotalRowCount(AGG_ROWGROUP_SIZE), fPrimaryRowData(NULL),
 	fSmallSideRGs(NULL), fLargeSideRG(NULL), fSmallSideCount(0)
 {
 	//fGroupByCols.clear();
 	//fFunctionCols.clear();
-
 	fGroupByCols.assign(rhs.fGroupByCols.begin(), rhs.fGroupByCols.end());
 	fFunctionCols.assign(rhs.fFunctionCols.begin(), rhs.fFunctionCols.end());
 }
@@ -648,6 +454,25 @@ RowAggregation::~RowAggregation()
 
 
 //------------------------------------------------------------------------------
+// Calculates the length of the hash key based on the concatenation of the
+// "GROUP BY" columns in the RowGroup column offsets.
+//------------------------------------------------------------------------------
+void RowAggregation::calculateMapKeyLength()
+{
+	const vector<uint>& groupByOffsets = fRowGroupIn.getOffsets();
+	fAggMapKeyLength = 0;
+
+	for (unsigned int i=0; i < fGroupByCols.size(); ++i)
+	{
+		uint colIndex1 = fGroupByCols[i]->fInputColumnIndex;
+		uint colIndex2 = colIndex1 + 1;
+
+		fAggMapKeyLength += (groupByOffsets[colIndex2] - groupByOffsets[colIndex1]);
+	}
+}
+
+
+//------------------------------------------------------------------------------
 // Aggregate the rows in pRows.  User should make Multiple calls to
 // addRowGroup() to aggregate multiple RowGroups. When all RowGroups have
 // been input, a call should be made to endOfInput() to signal the end of data.
@@ -658,8 +483,17 @@ RowAggregation::~RowAggregation()
 //------------------------------------------------------------------------------
 void RowAggregation::addRowGroup(const RowGroup* pRows)
 {
+#if 0
+	Row r;
+
+	pRows->initRow(&r);
+	pRows->getRow(0, &r);
+	for (uint i = 0; i < pRows->getRowCount(); i++, r.nextRow())
+		cout << " agg step got: " << r.toString() << endl;
+#endif
+
 	// no group by == no map, everything done in fRow
-	if (fGroupByCols.empty())
+	if (fAggMapKeyLength == 0)
 	{
 		fRowGroupOut->setRowCount(1);
 
@@ -674,23 +508,31 @@ void RowAggregation::addRowGroup(const RowGroup* pRows)
 
 	Row rowIn;
 	pRows->initRow(&rowIn);
-	pRows->getRow(0, &rowIn);
 	for (uint64_t i = 0; i < pRows->getRowCount(); ++i)
 	{
+		pRows->getRow(i, &rowIn);
 		aggregateRow(rowIn);
-		rowIn.nextRow();
 	}
 }
 
 
-void RowAggregation::addRowGroup(const RowGroup* pRows, vector<Row::Pointer>& inRows)
+void RowAggregation::addRowGroup(const RowGroup* pRows, vector<uint8_t*>& inRows)
 {
+#if 0
+	Row r;
+
+	pRows->initRow(&r);
+	pRows->getRow(0, &r);
+	for (uint i = 0; i < pRows->getRowCount(); i++, r.nextRow())
+		cout << " agg step got: " << r.toString() << endl;
+#endif
+
 	// this function is for threaded aggregation, which is for group by and distinct.
 	// if (countSpecial(pRows))
 
 	Row rowIn;
 	pRows->initRow(&rowIn);
-	for (uint32_t i = 0; i < inRows.size(); i++)
+	for (uint i = 0; i < inRows.size(); i++)
 	{
 		rowIn.setData(inRows[i]);
 		aggregateRow(rowIn);
@@ -708,15 +550,108 @@ void RowAggregation::setJoinRowGroups(vector<RowGroup> *pSmallSideRG, RowGroup *
 	fSmallSideCount = fSmallSideRGs->size();
 	fSmallMappings.reset(new shared_array<int>[fSmallSideCount]);
 
-	for (uint32_t i = 0; i < fSmallSideCount; i++)
+#if 0
+	cout << endl << "Target Rowgroup OIDS: ";
+	for (uint i = 0; i < fRowGroupIn.getColumnCount(); i++)
+		cout << fRowGroupIn.getOIDs()[i] << " ";
+	cout << endl;
+#endif
+
+	for (uint i = 0; i < fSmallSideCount; i++) {
 		fSmallMappings[i] = makeMapping((*fSmallSideRGs)[i], fRowGroupIn);
+#if 0
+		cout << endl << " small RG " << i << " OIDs: ";
+		for (uint j = 0; j < (*fSmallSideRGs)[i].getColumnCount(); j++)
+			cout << (*fSmallSideRGs)[i].getOIDs()[j] << " ";
+		cout << endl << "    mapping: ";
+		for (uint j = 0; j < (*fSmallSideRGs)[i].getColumnCount(); j++)
+			cout << fSmallMappings[i][j] << " ";
+		cout << endl;
+#endif
+	}
 
 	fLargeMapping = makeMapping(*fLargeSideRG, fRowGroupIn);
 
+#if 0
+	cout << endl << "fLargeSideRG OIDs: ";
+	for (uint i = 0; i < fLargeSideRG->getColumnCount(); i++)
+		cout << fLargeSideRG->getOIDs()[i] << " ";
+	cout << endl;
+
+	cout << "large mapping: ";
+	for (uint j = 0; j < fLargeSideRG->getColumnCount(); j++)
+		cout << fLargeMapping[j] << " ";
+	cout << endl;
+#endif
+
 	rowSmalls.reset(new Row[fSmallSideCount]);
-	for (uint32_t i = 0; i < fSmallSideCount; i++)
+	for (uint i = 0; i < fSmallSideCount; i++)
 		(*fSmallSideRGs)[i].initRow(&rowSmalls[i]);
 }
+
+
+#if 0
+//------------------------------------------------------------------------------
+// Apply HashJoin result and aggregate on the result row.
+//
+// This function avoids the creation of the hashjoin results set.  Called on PM.
+//
+// pRows(in) - RowGroup to be aggregated.
+//------------------------------------------------------------------------------
+void RowAggregation::addHashJoinRowGroup(
+  const RowGroup &pRowGroupProj,
+  const shared_array<vector<vector<uint32_t> > > &matches,
+  const shared_array<shared_array<uint8_t> > &rowData)
+{
+	Row rowIn, rowProj;
+
+	fRowGroupIn.initRow(&rowIn);
+	boost::scoped_array<uint8_t> rowInData(new uint8_t[rowIn.getSize()]);
+	rowIn.setData(rowInData.get());
+	pRowGroupProj.initRow(&rowProj);
+
+	// no group by == no map, everything done in fRow
+	if (fAggMapKeyLength == 0) fRowGroupOut->setRowCount(1);
+
+	fRowGroupIn.setData(NULL);
+	for (uint i = 0; i < pRowGroupProj.getRowCount(); i++) {
+		pRowGroupProj.getRow(i, &rowProj);
+		applyMapping(fLargeMapping, rowProj, &rowIn);
+		generateJoinResultSet(matches, rowData, i, rowIn, fSmallMappings, 0);
+	}
+}
+
+/* This fcn was adapted from a version in tuple-bps.cpp */
+void RowAggregation::generateJoinResultSet(
+  const shared_array<vector<vector<uint32_t> > > &joinResults,
+  const shared_array<shared_array<uint8_t> > &rowData,
+  const uint rowNumber,
+  rowgroup::Row &baseRow,
+  const shared_array<shared_array<int> > &mappings,
+  const uint depth)
+{
+	uint i;
+	uint64_t rowOffset;
+	Row &smallRow = rowSmalls[depth];
+	const vector<uint32_t> &results = joinResults[depth][rowNumber];
+	const bool lowestLvl = (depth == fSmallSideCount - 1);
+	const uint size = results.size();
+	const uint emptySize = (*fSmallSideRGs)[depth].getEmptySize();
+	const uint smallRowSize = smallRow.getSize();
+	const shared_array<uint8_t> &rowDataAtThisLvl = rowData[depth];
+
+	for (i = 0; i < size; i++) {
+		rowOffset = results[i] * smallRowSize;
+		smallRow.setData(&rowDataAtThisLvl[rowOffset] + emptySize);
+		applyMapping(mappings[depth], smallRow, &baseRow);
+		if (!lowestLvl)
+			generateJoinResultSet(joinResults, rowData, rowNumber, baseRow, mappings,
+			  depth + 1);
+		else
+			aggregateRow(baseRow);
+	}
+}
+#endif
 
 
 //------------------------------------------------------------------------------
@@ -726,7 +661,7 @@ void RowAggregation::setJoinRowGroups(vector<RowGroup> *pSmallSideRG, RowGroup *
 void RowAggregation::initialize()
 {
 	// Calculate the length of the hashmap key.
-	fAggMapKeyCount = fGroupByCols.size();
+	calculateMapKeyLength();
 
 	// Initialize the work row.
 	fRowGroupOut->resetRowGroup(0);
@@ -735,21 +670,19 @@ void RowAggregation::initialize()
 	makeAggFieldsNull(fRow);
 
 	// Keep a copy of the null row to initialize new map entries.
-	fRowGroupOut->initRow(&fNullRow, true);
-	fNullRowData.reset(new uint8_t[fNullRow.getSize()]);
-	fNullRow.setData(fNullRowData.get());
-	copyRow(fRow, &fNullRow);
+	fNullRowData.reset(new uint8_t[fRow.getSize()]);
+	memcpy(fNullRowData.get(), fRow.getData(), fRow.getSize());
 
 	// save the original output rowgroup data as primary row data
-	fPrimaryRowData = fRowGroupOut->getRGData();
+	fPrimaryRowData = fRowGroupOut->getData();
 
 	// Need map only if groupby list is not empty.
-	if (!fGroupByCols.empty())
+	if (fAggMapKeyLength != 0)
 	{
-		fHasher.reset(new AggHasher(fRow, &tmpRow, fGroupByCols.size(), this));
-		fEq.reset(new AggComparator(fRow, &tmpRow, fGroupByCols.size(), this));
-		fAlloc.reset(new utils::STLPoolAllocator<RowPosition>());
-		fAggMapPtr = new RowAggMap_t(10, *fHasher, *fEq, *fAlloc);
+		utils::TupleHasher  aggHasher(fAggMapKeyLength);
+		utils::TupleComparator aggComp(fAggMapKeyLength);
+		fAlloc.reset(new utils::STLPoolAllocator<pair<uint8_t* const, uint8_t*> >());
+		fAggMapPtr = new RowAggMap_t(10, aggHasher, aggComp, *fAlloc);
 	}
 	else
 	{
@@ -759,20 +692,20 @@ void RowAggregation::initialize()
 
 
 	// Save the RowGroup data pointer
-	fResultDataVec.push_back(fRowGroupOut->getRGData());
+	fResultDataVec.push_back(fRowGroupOut->getData());
 
 	// for 8k poc: an empty output row group to match message count
 	fEmptyRowGroup = *fRowGroupOut;
-	fEmptyRowData.reinit(*fRowGroupOut, 1);
-	fEmptyRowGroup.setData(&fEmptyRowData);
+	fEmptyRowData.reset(new uint8_t[fRowGroupOut->getEmptySize() + fRow.getSize()]);
+	fEmptyRowGroup.setData(fEmptyRowData.get());
 	fEmptyRowGroup.resetRowGroup(0);
 	fEmptyRowGroup.initRow(&fEmptyRow);
 	fEmptyRowGroup.getRow(0, &fEmptyRow);
-
-	copyRow(fNullRow, &fEmptyRow);
-	if (fGroupByCols.empty())  // no groupby
+	memcpy(fEmptyRow.getData(), fNullRowData.get(), fEmptyRow.getSize());
+	if (fAggMapKeyLength == 0)  // no groupby
 		fEmptyRowGroup.setRowCount(1);
 }
+
 
 //------------------------------------------------------------------------------
 // Reset the working data to aggregate next logical block
@@ -786,92 +719,28 @@ void RowAggregation::reset()
 	fRowGroupOut->getRow(0, &fRow);
 	copyNullRow(fRow);
 	attachGroupConcatAg();
-
-	if (!fGroupByCols.empty())
+	if (fAggMapKeyLength != 0)
 	{
-		fHasher.reset(new AggHasher(fRow, &tmpRow, fGroupByCols.size(), this));
-		fEq.reset(new AggComparator(fRow, &tmpRow, fGroupByCols.size(), this));
-		fAlloc.reset(new utils::STLPoolAllocator<RowPosition>());
+		utils::TupleHasher  aggHasher(fAggMapKeyLength);
+		utils::TupleComparator aggComp(fAggMapKeyLength);
+		fAlloc.reset(new utils::STLPoolAllocator<pair<uint8_t* const, uint8_t*> >());
 		delete fAggMapPtr;
-		fAggMapPtr = new RowAggMap_t(10, *fHasher, *fEq, *fAlloc);
+		fAggMapPtr = new RowAggMap_t(10, aggHasher, aggComp, *fAlloc);
 	}
-
 	fResultDataVec.clear();
-	fResultDataVec.push_back(fRowGroupOut->getRGData());
+	fResultDataVec.push_back(fRowGroupOut->getData());
 }
 
-
-void RowAggregationUM::reset()
-{
-	RowAggregation::reset();
-
-	if (fKeyOnHeap)
-	{
-		fKeyRG = fRowGroupIn.truncate(fGroupByCols.size());
-		fKeyStore.reset(new KeyStorage(fKeyRG, &tmpRow));
-		fExtEq.reset(new ExternalKeyEq(fKeyRG, fKeyStore.get(), fKeyRG.getColumnCount(), &tmpRow));
-		fExtHash.reset(new ExternalKeyHasher(fKeyRG, fKeyStore.get(), fKeyRG.getColumnCount(), &tmpRow));
-		fExtKeyMapAlloc.reset(new utils::STLPoolAllocator<pair<RowPosition, RowPosition> >());
-		fExtKeyMap.reset(new ExtKeyMap_t(10, *fExtHash, *fExtEq, *fExtKeyMapAlloc));
-	}
-}
-
-
-void RowAggregationUM::aggregateRowWithRemap(Row& row)
-{
-	pair<ExtKeyMap_t::iterator, bool> inserted;
-	RowPosition pos(RowPosition::MSB, 0);
-
-	tmpRow = &row;
-	inserted = fExtKeyMap->insert(pair<RowPosition, RowPosition>(pos, pos));
-	if (inserted.second)
-	{
-		// if it was successfully inserted, fix the inserted values
-		if (++fTotalRowCount > fMaxTotalRowCount && !newRowGroup())
-		{
-			throw logging::IDBExcept(logging::IDBErrorInfo::instance()->
-				errorMsg(logging::ERR_AGGREGATION_TOO_BIG), logging::ERR_AGGREGATION_TOO_BIG);
-		}
-
-		pos = fKeyStore->addKey();
-		fRowGroupOut->getRow(fRowGroupOut->getRowCount(), &fRow);
-		fRowGroupOut->incRowCount();
-		initMapData(row);     //seems heavy-handed
-		attachGroupConcatAg();
-		inserted.first->second = RowPosition(fResultDataVec.size()-1, fRowGroupOut->getRowCount()-1);
-
-		// replace the key value with an equivalent copy, yes this is OK
-		const_cast<RowPosition &>((inserted.first->first)) = pos;
-	}
-	else
-	{
-		pos = inserted.first->second;
-		fResultDataVec[pos.group]->getRow(pos.row, &fRow);
-	}
-
-	updateEntry(row);
-}
-
-
-
-void RowAggregationUM::aggregateRow(Row &row)
-{
-	if (UNLIKELY(fKeyOnHeap))
-		aggregateRowWithRemap(row);
-	else
-		RowAggregation::aggregateRow(row);
-}
 
 void RowAggregation::aggregateRow(Row& row)
 {
 	// groupby column list is not empty, find the entry.
-	if (!fGroupByCols.empty())
+	if (fAggMapKeyLength > 0)
 	{
 		pair<RowAggMap_t::iterator, bool> inserted;
 
 		// do a speculative insert
-		tmpRow = &row;
-		inserted = fAggMapPtr->insert(RowPosition(RowPosition::MSB, 0));
+		inserted = fAggMapPtr->insert(make_pair(row.getData() + 2, row.getData()));
 		if (inserted.second)
 		{
 			// if it was successfully inserted, fix the inserted values
@@ -884,17 +753,15 @@ void RowAggregation::aggregateRow(Row& row)
 			fRowGroupOut->getRow(fRowGroupOut->getRowCount(), &fRow);
 			fRowGroupOut->incRowCount();
 			initMapData(row);     //seems heavy-handed
-
 			attachGroupConcatAg();
+			inserted.first->second = fRow.getData();
 
 			// replace the key value with an equivalent copy, yes this is OK
-			const_cast<RowPosition &>(*(inserted.first)) =
-				RowPosition(fResultDataVec.size() - 1, fRowGroupOut->getRowCount() - 1);
+			const_cast<uint8_t *&>(inserted.first->first) = makeMapKey(row.getData() + 2);
 		}
-		else {
-			//fRow.setData(*(inserted.first));
-			const RowPosition &pos = *(inserted.first);
-			fResultDataVec[pos.group]->getRow(pos.row, &fRow);
+		else
+		{
+			fRow.setData(inserted.first->second);
 		}
 	}
 
@@ -927,18 +794,8 @@ void RowAggregation::initMapData(const Row& rowIn)
 			case execplan::CalpontSystemCatalog::INT:
 			case execplan::CalpontSystemCatalog::BIGINT:
 			case execplan::CalpontSystemCatalog::DECIMAL:
-			case execplan::CalpontSystemCatalog::UDECIMAL:
 			{
 				fRow.setIntField(rowIn.getIntField(colIn), colOut);
-				break;
-			}
-			case execplan::CalpontSystemCatalog::UTINYINT:
-			case execplan::CalpontSystemCatalog::USMALLINT:
-			case execplan::CalpontSystemCatalog::UMEDINT:
-			case execplan::CalpontSystemCatalog::UINT:
-			case execplan::CalpontSystemCatalog::UBIGINT:
-			{
-				fRow.setUintField(rowIn.getUintField(colIn), colOut);
 				break;
 			}
 			case execplan::CalpontSystemCatalog::CHAR:
@@ -951,19 +808,16 @@ void RowAggregation::initMapData(const Row& rowIn)
 				}
 				else
 				{
-					fRow.setStringField(rowIn.getStringPointer(colIn),
-										rowIn.getStringLength(colIn), colOut);
+					fRow.setStringField(rowIn.getStringField(colIn), colOut);
 				}
 				break;
 			}
 			case execplan::CalpontSystemCatalog::DOUBLE:
-			case execplan::CalpontSystemCatalog::UDOUBLE:
 			{
 				fRow.setDoubleField(rowIn.getDoubleField(colIn), colOut);
 				break;
 			}
 			case execplan::CalpontSystemCatalog::FLOAT:
-			case execplan::CalpontSystemCatalog::UFLOAT:
 			{
 				fRow.setFloatField(rowIn.getFloatField(colIn), colOut);
 				break;
@@ -998,7 +852,6 @@ void RowAggregation::makeAggFieldsNull(Row& row)
 {
 	// initialize all bytes to 0
 	memset(row.getData(), 0, row.getSize());
-	//row.initToNull();
 
 	for (uint64_t i = 0; i < fFunctionCols.size(); i++)
 	{
@@ -1042,17 +895,7 @@ void RowAggregation::makeAggFieldsNull(Row& row)
 				row.setIntField(getIntNullValue(colDataType), colOut);
 				break;
 			}
-			case execplan::CalpontSystemCatalog::UTINYINT:
-			case execplan::CalpontSystemCatalog::USMALLINT:
-			case execplan::CalpontSystemCatalog::UMEDINT:
-			case execplan::CalpontSystemCatalog::UINT:
-			case execplan::CalpontSystemCatalog::UBIGINT:
-			{
-				row.setUintField(getUintNullValue(colDataType), colOut);
-				break;
-			}
 			case execplan::CalpontSystemCatalog::DECIMAL:
-			case execplan::CalpontSystemCatalog::UDECIMAL:
 			{
 				int colWidth = fRowGroupOut->getColumnWidth(colOut);
 				row.setIntField(getUintNullValue(colDataType, colWidth), colOut);
@@ -1073,13 +916,11 @@ void RowAggregation::makeAggFieldsNull(Row& row)
 				break;
 			}
 			case execplan::CalpontSystemCatalog::DOUBLE:
-			case execplan::CalpontSystemCatalog::UDOUBLE:
 			{
 				row.setDoubleField(getDoubleNullValue(), colOut);
 				break;
 			}
 			case execplan::CalpontSystemCatalog::FLOAT:
-			case execplan::CalpontSystemCatalog::UFLOAT:
 			{
 				row.setFloatField(getFloatNullValue(), colOut);
 				break;
@@ -1123,7 +964,6 @@ void RowAggregation::doMinMaxSum(const Row& rowIn, int64_t colIn, int64_t colOut
 		case execplan::CalpontSystemCatalog::INT:
 		case execplan::CalpontSystemCatalog::BIGINT:
 		case execplan::CalpontSystemCatalog::DECIMAL:
-		case execplan::CalpontSystemCatalog::UDECIMAL:
 		{
 			int64_t valIn = rowIn.getIntField(colIn);
 			int64_t valOut = fRow.getIntField(colOut);
@@ -1131,20 +971,6 @@ void RowAggregation::doMinMaxSum(const Row& rowIn, int64_t colIn, int64_t colOut
 				updateIntSum(valIn, valOut, colOut);
 			else
 				updateIntMinMax(valIn, valOut, colOut, funcType);
-			break;
-		}
-		case execplan::CalpontSystemCatalog::UTINYINT:
-		case execplan::CalpontSystemCatalog::USMALLINT:
-		case execplan::CalpontSystemCatalog::UMEDINT:
-		case execplan::CalpontSystemCatalog::UINT:
-		case execplan::CalpontSystemCatalog::UBIGINT:
-		{
-			uint64_t valIn = rowIn.getUintField(colIn);
-			uint64_t valOut = fRow.getUintField(colOut);
-			if (funcType == ROWAGG_SUM || funcType == ROWAGG_DISTINCT_SUM)
-				updateUintSum(valIn, valOut, colOut);
-			else
-				updateUintMinMax(valIn, valOut, colOut, funcType);
 			break;
 		}
 		case execplan::CalpontSystemCatalog::CHAR:
@@ -1174,7 +1000,6 @@ void RowAggregation::doMinMaxSum(const Row& rowIn, int64_t colIn, int64_t colOut
 			break;
 		}
 		case execplan::CalpontSystemCatalog::DOUBLE:
-		case execplan::CalpontSystemCatalog::UDOUBLE:
 		{
 			double valIn = rowIn.getDoubleField(colIn);
 			double valOut = fRow.getDoubleField(colOut);
@@ -1185,7 +1010,6 @@ void RowAggregation::doMinMaxSum(const Row& rowIn, int64_t colIn, int64_t colOut
 			break;
 		}
 		case execplan::CalpontSystemCatalog::FLOAT:
-		case execplan::CalpontSystemCatalog::UFLOAT:
 		{
 			float valIn = rowIn.getFloatField(colIn);
 			float valOut = fRow.getFloatField(colOut);
@@ -1236,7 +1060,6 @@ void RowAggregation::doBitOp(const Row& rowIn, int64_t colIn, int64_t colOut, in
 		return;
 
 	int64_t valIn = 0;
-	uint64_t uvalIn = 0;
 	switch (colDataType)
 	{
 		case execplan::CalpontSystemCatalog::TINYINT:
@@ -1245,7 +1068,6 @@ void RowAggregation::doBitOp(const Row& rowIn, int64_t colIn, int64_t colOut, in
 		case execplan::CalpontSystemCatalog::INT:
 		case execplan::CalpontSystemCatalog::BIGINT:
 		case execplan::CalpontSystemCatalog::DECIMAL:
-		case execplan::CalpontSystemCatalog::UDECIMAL:
 		{
 			valIn = rowIn.getIntField(colIn);
 			if ((fRowGroupIn.getScale())[colIn] != 0)
@@ -1261,24 +1083,6 @@ void RowAggregation::doBitOp(const Row& rowIn, int64_t colIn, int64_t colOut, in
 			break;
 		}
 
-		case execplan::CalpontSystemCatalog::UTINYINT:
-		case execplan::CalpontSystemCatalog::USMALLINT:
-		case execplan::CalpontSystemCatalog::UMEDINT:
-		case execplan::CalpontSystemCatalog::UINT:
-		case execplan::CalpontSystemCatalog::UBIGINT:
-		{
-			uvalIn = rowIn.getUintField(colIn);
-			uint64_t uvalOut = fRow.getUintField(colOut);
-			if (funcType == ROWAGG_BIT_AND)
-				fRow.setUintField(uvalIn & uvalOut, colOut);
-			else if (funcType == ROWAGG_BIT_OR)
-				fRow.setUintField(uvalIn | uvalOut, colOut);
-			else
-				fRow.setUintField(uvalIn ^ uvalOut, colOut);
-			return;
-			break;
-		}
-
 		case execplan::CalpontSystemCatalog::CHAR:
 		case execplan::CalpontSystemCatalog::VARCHAR:
 		{
@@ -1289,12 +1093,9 @@ void RowAggregation::doBitOp(const Row& rowIn, int64_t colIn, int64_t colOut, in
 
 		case execplan::CalpontSystemCatalog::DOUBLE:
 		case execplan::CalpontSystemCatalog::FLOAT:
-		case execplan::CalpontSystemCatalog::UDOUBLE:
-		case execplan::CalpontSystemCatalog::UFLOAT:
 		{
 			double dbl = 0.0;
-			if (colDataType == execplan::CalpontSystemCatalog::DOUBLE ||
-				colDataType == execplan::CalpontSystemCatalog::UDOUBLE)
+			if (colDataType == execplan::CalpontSystemCatalog::DOUBLE)
 				dbl = rowIn.getDoubleField(colIn);
 			else
 				dbl = rowIn.getFloatField(colIn);
@@ -1321,10 +1122,11 @@ void RowAggregation::doBitOp(const Row& rowIn, int64_t colIn, int64_t colOut, in
 		case execplan::CalpontSystemCatalog::DATE:
 		{
 			uint64_t dt = rowIn.getUintField(colIn);
-			dt = dt & 0xFFFFFFC0;  // no need to set spare bits to 3E, will shift out
+			dt = dt & 0xFFFFFFC0;
 			valIn = ((dt >> 16) * 10000) + (((dt >> 12) & 0xF) * 100) + ((dt >> 6) & 077);
 			break;
 		}
+
 
 		case execplan::CalpontSystemCatalog::DATETIME:
 		{
@@ -1506,7 +1308,6 @@ void RowAggregation::doAvg(const Row& rowIn, int64_t colIn, int64_t colOut, int6
 		case execplan::CalpontSystemCatalog::INT:
 		case execplan::CalpontSystemCatalog::BIGINT:
 		case execplan::CalpontSystemCatalog::DECIMAL:
-		case execplan::CalpontSystemCatalog::UDECIMAL:
 		{
 			int64_t valIn = rowIn.getIntField(colIn);
 			if (fRow.getIntField(colAux) == 0)
@@ -1542,15 +1343,7 @@ void RowAggregation::doAvg(const Row& rowIn, int64_t colIn, int64_t colOut, int6
 #endif /* PROMOTE_AGGR_OVRFLW_TO_DBL */
 				else
 #ifndef PROMOTE_AGGR_OVRFLW_TO_DBL
-				{
-					ostringstream oss;
-					oss << overflowMsg << ": " << valOut << "+" << valIn;
-					if (valOut > 0)
-						oss << " > " << numeric_limits<uint64_t>::max();
-					else
-						oss << " < " << numeric_limits<uint64_t>::min();
-					throw logging::QueryDataExcept(oss.str(), logging::aggregateDataErr);
-				}
+					throw logging::QueryDataExcept(overflowMsg, logging::aggregateDataErr);
 
 				fRow.setIntField(fRow.getIntField(colAux) + 1, colAux);
 #else /* PROMOTE_AGGR_OVRFLW_TO_DBL */
@@ -1563,62 +1356,7 @@ void RowAggregation::doAvg(const Row& rowIn, int64_t colIn, int64_t colOut, int6
 			}
 			break;
 		}
-		case execplan::CalpontSystemCatalog::UTINYINT:
-		case execplan::CalpontSystemCatalog::USMALLINT:
-		case execplan::CalpontSystemCatalog::UMEDINT:
-		case execplan::CalpontSystemCatalog::UINT:
-		case execplan::CalpontSystemCatalog::UBIGINT:
-		{
-			uint64_t valIn = rowIn.getUintField(colIn);
-			if (fRow.getUintField(colAux) == 0)
-			{
-				fRow.setUintField(valIn, colOut);
-				fRow.setUintField(1, colAux);
-			}
-			else
-			{
-				uint64_t valOut = fRow.getUintField(colOut);
-#ifndef PROMOTE_AGGR_OVRFLW_TO_DBL
-				if ((numeric_limits<uint64_t>::max() - valOut) >= valIn)
-				{
-					fRow.setUintField(valIn + valOut, colOut);
-					fRow.setUintField(fRow.getUintField(colAux) + 1, colAux);
-				}
-				else
-				{
-					ostringstream oss;
-					oss << overflowMsg << ": " << valOut << "+" << valIn << " > " << numeric_limits<uint64_t>::max();
-					throw logging::QueryDataExcept(oss.str(), logging::aggregateDataErr);
-				}
-#else /* PROMOTE_AGGR_OVRFLW_TO_DBL */
-				if (fRow.getColTypes()[colOut] != execplan::CalpontSystemCatalog::DOUBLE)
-				{
-					if ((numeric_limits<uint64_t>::max() - valOut) >= valIn)
-					{
-						fRow.setUintField(valIn + valOut, colOut);
-						fRow.setUintField(fRow.getUintField(colAux) + 1, colAux);
-					}
-					else
-					{
-						execplan::CalpontSystemCatalog::ColDataType* cdtp = fRow.getColTypes();
-						cdtp += colOut;
-						*cdtp = execplan::CalpontSystemCatalog::DOUBLE;
-						fRow.setDoubleField((double)valIn + (double)valOut, colOut);
-						fRow.setUintField(fRow.getUintField(colAux) + 1, colAux);
-					}
-				}
-				else
-				{
-					double* dp = (double*)&valOut;
-					fRow.setDoubleField((double)valIn + *dp, colOut);
-					fRow.setUintField(fRow.getUintField(colAux) + 1, colAux);
-				}
-#endif /* PROMOTE_AGGR_OVRFLW_TO_DBL */
-			}
-			break;
-		}
 		case execplan::CalpontSystemCatalog::DOUBLE:
-		case execplan::CalpontSystemCatalog::UDOUBLE:
 		{
 			double valIn = rowIn.getDoubleField(colIn);
 			if (fRow.getIntField(colAux) == 0)
@@ -1635,7 +1373,6 @@ void RowAggregation::doAvg(const Row& rowIn, int64_t colIn, int64_t colOut, int6
 			break;
 		}
 		case execplan::CalpontSystemCatalog::FLOAT:
-		case execplan::CalpontSystemCatalog::UFLOAT:
 		{
 			float valIn = rowIn.getFloatField(colIn);
 			if (fRow.getIntField(colAux) == 0)
@@ -1686,26 +1423,15 @@ void RowAggregation::doStatistics(const Row& rowIn, int64_t colIn, int64_t colOu
 		case execplan::CalpontSystemCatalog::MEDINT:
 		case execplan::CalpontSystemCatalog::INT:
 		case execplan::CalpontSystemCatalog::BIGINT:
-		case execplan::CalpontSystemCatalog::DECIMAL:   // handle scale later
-		case execplan::CalpontSystemCatalog::UDECIMAL:  // handle scale later
+		case execplan::CalpontSystemCatalog::DECIMAL:  // handle scale later
 			valIn = (long double) rowIn.getIntField(colIn);
 			break;
 
-		case execplan::CalpontSystemCatalog::UTINYINT:
-		case execplan::CalpontSystemCatalog::USMALLINT:
-		case execplan::CalpontSystemCatalog::UMEDINT:
-		case execplan::CalpontSystemCatalog::UINT:
-		case execplan::CalpontSystemCatalog::UBIGINT:
-			valIn = (long double) rowIn.getUintField(colIn);
-			break;
-
 		case execplan::CalpontSystemCatalog::DOUBLE:
-		case execplan::CalpontSystemCatalog::UDOUBLE:
 			valIn = (long double) rowIn.getDoubleField(colIn);
 			break;
 
 		case execplan::CalpontSystemCatalog::FLOAT:
-		case execplan::CalpontSystemCatalog::UFLOAT:
 			valIn = (long double) rowIn.getFloatField(colIn);
 			break;
 
@@ -1731,13 +1457,13 @@ bool RowAggregation::newRowGroup()
 {
 	// For now, n*n relation is not supported, no memory limit.
 	// May apply a restriction when more resarch is done -- bug 1604
-	boost::shared_ptr<RGData> data(new RGData(*fRowGroupOut, AGG_ROWGROUP_SIZE));
-
+	boost::shared_array<uint8_t> data;
+	data.reset(new uint8_t[fRowGroupOut->getDataSize(AGG_ROWGROUP_SIZE)]);
 	if (data.get() != NULL)
 	{
+		fSecondaryRowDataVec.push_back(data);
 		fRowGroupOut->setData(data.get());
 		fRowGroupOut->resetRowGroup(0);
-		fSecondaryRowDataVec.push_back(data);
 		fResultDataVec.push_back(data.get());
 		fMaxTotalRowCount += AGG_ROWGROUP_SIZE;
 	}
@@ -1755,23 +1481,41 @@ bool RowAggregation::newRowGroup()
 //------------------------------------------------------------------------------
 void RowAggregation::loadResult(messageqcpp::ByteStream& bs)
 {
-	uint32_t size = fResultDataVec.size();
-	bs << size;
-	for (uint32_t i = 0; i < size; i++)
+	// caculate total row count
+	uint64_t rowCount = fRowGroupOut->getRowCount();
+	if (fResultDataVec.size() > 1)
+		rowCount += (fResultDataVec.size() - 1) * AGG_ROWGROUP_SIZE;
+
+	// add the header
+	uint64_t headerSize = fRowGroupOut->getEmptySize();
+	bs << (messageqcpp::ByteStream::quadbyte)(headerSize + rowCount * fRow.getSize());
+	// temporary change the row count to cover all rowgroups.
+	uint64_t origRowCount = fRowGroupOut->getRowCount();
+	fRowGroupOut->setRowCount(rowCount);
+	bs.append(fRowGroupOut->getData(), headerSize);
+	fRowGroupOut->setRowCount(origRowCount);  // change the row count back.
+
+	// load the each rowgroup
+	while (fResultDataVec.size() > 0)
 	{
-		fRowGroupOut->setData(fResultDataVec[i]);
-		fRowGroupOut->serializeRGData(bs);
+		fRowGroupOut->setData(fResultDataVec.back());
+		bs.append(fRowGroupOut->getData() + headerSize, fRowGroupOut->getDataSize() - headerSize);
+		fResultDataVec.pop_back();
 	}
 
-	fResultDataVec.clear();
 	fSecondaryRowDataVec.clear();
 }
 
 
 void RowAggregation::loadEmptySet(messageqcpp::ByteStream& bs)
 {
-	bs << (uint32_t) 1;
-	fEmptyRowGroup.serializeRGData(bs);
+	// caculate total row count
+	uint64_t rowCount = fEmptyRowGroup.getRowCount();
+
+	// add the header
+	uint64_t dataSize = fEmptyRowGroup.getEmptySize() + rowCount * fEmptyRow.getSize();
+	bs << (uint32_t) dataSize;
+	bs.append(fEmptyRowGroup.getData(), dataSize);
 }
 
 
@@ -1781,11 +1525,10 @@ void RowAggregation::loadEmptySet(messageqcpp::ByteStream& bs)
 //------------------------------------------------------------------------------
 RowAggregationUM::RowAggregationUM(const vector<SP_ROWAGG_GRPBY_t>& rowAggGroupByCols,
                                    const vector<SP_ROWAGG_FUNC_t>&  rowAggFunctionCols,
-                                   joblist::ResourceManager *r, boost::shared_ptr<int64_t> sessionLimit) :
+								   joblist::ResourceManager *r) :
 	RowAggregation(rowAggGroupByCols, rowAggFunctionCols), fHasAvg(false), fKeyOnHeap(false),
-	fHasStatsFunc(false), fTotalMemUsage(0), fRm(r), fSessionMemLimit(sessionLimit),
-	fLastMemUsage(0), fNextRGIndex(0)
-{
+	fHasStatsFunc(false), fTotalMemUsage(0), fRm(r), fLastMemUsage(0)
+{	
 	// Check if there are any avg functions.
 	for (uint64_t i = 0; i < fFunctionCols.size(); i++)
 	{
@@ -1802,6 +1545,8 @@ RowAggregationUM::RowAggregationUM(const vector<SP_ROWAGG_GRPBY_t>& rowAggGroupB
 		if (fGroupByCols[i]->fInputColumnIndex != fGroupByCols[i]->fOutputColumnIndex)
 		{
 			fKeyOnHeap = true;
+			fKeyAlloc.reset(new utils::STLPoolAllocator<uint8_t>());
+			assert (fKeyAlloc);
 			break;
 		}
 	}
@@ -1818,11 +1563,10 @@ RowAggregationUM::RowAggregationUM(const RowAggregationUM& rhs) :
 	fRm(rhs.fRm),
 	fConstantAggregate(rhs.fConstantAggregate),
 	fGroupConcat(rhs.fGroupConcat),
-	fSessionMemLimit(rhs.fSessionMemLimit),
-	fLastMemUsage(rhs.fLastMemUsage),
-	fNextRGIndex(0)
+	fLastMemUsage(rhs.fLastMemUsage)
 {
-
+	if (fKeyOnHeap)
+		fKeyAlloc.reset(new utils::STLPoolAllocator<uint8_t>());
 }
 
 
@@ -1834,7 +1578,7 @@ RowAggregationUM::~RowAggregationUM()
 
 	// fAggMapPtr deleted by base destructor.
 
-	fRm->returnMemory(fTotalMemUsage, fSessionMemLimit);
+	fRm->returnMemory(fTotalMemUsage);
 }
 
 
@@ -1857,16 +1601,6 @@ void RowAggregationUM::initialize()
 		fFunctionColGc = fFunctionCols;
 
 	RowAggregation::initialize();
-
-	if (fKeyOnHeap)
-	{
-		fKeyRG = fRowGroupIn.truncate(fGroupByCols.size());
-		fKeyStore.reset(new KeyStorage(fKeyRG, &tmpRow));
-		fExtEq.reset(new ExternalKeyEq(fKeyRG, fKeyStore.get(), fKeyRG.getColumnCount(), &tmpRow));
-		fExtHash.reset(new ExternalKeyHasher(fKeyRG, fKeyStore.get(), fKeyRG.getColumnCount(), &tmpRow));
-		fExtKeyMapAlloc.reset(new utils::STLPoolAllocator<pair<RowPosition, RowPosition> >());
-		fExtKeyMap.reset(new ExtKeyMap_t(10, *fExtHash, *fExtEq, *fExtKeyMapAlloc));
-	}
 }
 
 
@@ -1905,6 +1639,23 @@ void RowAggregationUM::finalize()
 
 	if (fExpression.size() > 0)
 		evaluateExpression();
+}
+
+
+//------------------------------------------------------------------------------
+// Create a hash key for the specified Row on the heap
+//------------------------------------------------------------------------------
+uint8_t* RowAggregationUM::makeMapKey(const uint8_t* pKey)
+{
+	uint8_t* pMapKeyHeap;
+	if (UNLIKELY(fKeyOnHeap))
+	{
+		pMapKeyHeap = fKeyAlloc->allocate(fAggMapKeyLength);
+		memcpy(pMapKeyHeap, pKey, fAggMapKeyLength);
+	}
+	else
+		pMapKeyHeap = (fRow.getData() + 2);
+	return pMapKeyHeap;
 }
 
 
@@ -2031,8 +1782,7 @@ void RowAggregationUM::calculateAvgColumns()
 {
 	for (uint64_t i = 0; i < fFunctionCols.size(); i++)
 	{
-		if (fFunctionCols[i]->fAggFunction == ROWAGG_AVG ||
-			fFunctionCols[i]->fAggFunction==ROWAGG_DISTINCT_AVG)
+		if (fFunctionCols[i]->fAggFunction == ROWAGG_AVG || fFunctionCols[i]->fAggFunction==ROWAGG_DISTINCT_AVG)
 		{
 			int64_t colOut = fFunctionCols[i]->fOutputColumnIndex;
 			int64_t colAux = fFunctionCols[i]->fAuxColumnIndex;
@@ -2050,86 +1800,41 @@ void RowAggregationUM::calculateAvgColumns()
 					continue;
 
 				long double sum = 0.0;
-				long double avg = 0.0;
-				switch (colDataType)
+				if (colDataType == execplan::CalpontSystemCatalog::DOUBLE)
+					sum = fRow.getDoubleField(colOut);
+				else if (colDataType == execplan::CalpontSystemCatalog::FLOAT)
+					sum = fRow.getFloatField(colOut);
+				else
+					sum = static_cast<long double>(fRow.getIntField(colOut));
+				long double avg = sum / cnt;
+				if (colDataType == execplan::CalpontSystemCatalog::DOUBLE)
 				{
-					case execplan::CalpontSystemCatalog::DOUBLE:
-					case execplan::CalpontSystemCatalog::UDOUBLE:
+					fRow.setDoubleField(avg, colOut);
+				}
+				else if (colDataType == execplan::CalpontSystemCatalog::FLOAT)
+				{
+					fRow.setFloatField(avg, colOut);
+				}
+				else
+				{
+					avg *= factor;
+					avg += (avg < 0) ? (-0.5) : (0.5);
+					if (avg > (long double) numeric_limits<int64_t>::max() ||
+						avg < (long double) numeric_limits<int64_t>::min())
+#ifndef PROMOTE_AGGR_OVRFLW_TO_DBL
+						throw logging::QueryDataExcept(overflowMsg, logging::aggregateDataErr);
+					fRow.setIntField((int64_t) avg, colOut);
+#else /* PROMOTE_AGGR_OVRFLW_TO_DBL */
+					{
 						sum = fRow.getDoubleField(colOut);
 						avg = sum / cnt;
+						avg += (avg < 0) ? (-0.5) : (0.5);
+						fRow.getColTypes()[colOut] = execplan::CalpontSystemCatalog::DOUBLE;
 						fRow.setDoubleField(avg, colOut);
-						break;
-					case execplan::CalpontSystemCatalog::FLOAT:
-					case execplan::CalpontSystemCatalog::UFLOAT:
-						sum = fRow.getFloatField(colOut);
-						avg = sum / cnt;
-						fRow.setFloatField(avg, colOut);
-						break;
-					case execplan::CalpontSystemCatalog::TINYINT:
-					case execplan::CalpontSystemCatalog::SMALLINT:
-					case execplan::CalpontSystemCatalog::MEDINT:
-					case execplan::CalpontSystemCatalog::INT:
-					case execplan::CalpontSystemCatalog::BIGINT:
-					case execplan::CalpontSystemCatalog::DECIMAL:
-					case execplan::CalpontSystemCatalog::UDECIMAL:
-						sum = static_cast<long double>(fRow.getIntField(colOut));
-						avg = sum / cnt;
-						avg *= factor;
-						avg += (avg < 0) ? (-0.5) : (0.5);
-						if (avg > (long double) numeric_limits<int64_t>::max() ||
-							avg < (long double) numeric_limits<int64_t>::min())
-#ifndef PROMOTE_AGGR_OVRFLW_TO_DBL
-						{
-							ostringstream oss;
-							oss << overflowMsg << ": " << avg << "(incl factor " << factor;
-							if (avg > 0)
-								oss << ") > " << numeric_limits<uint64_t>::max();
-							else
-								oss << ") < " << numeric_limits<uint64_t>::min();
-							throw logging::QueryDataExcept(oss.str(), logging::aggregateDataErr);
-						}
-						fRow.setIntField((int64_t) avg, colOut);
-#else /* PROMOTE_AGGR_OVRFLW_TO_DBL */
-						{
-							sum = fRow.getDoubleField(colOut);
-							avg = sum / cnt;
-							avg += (avg < 0) ? (-0.5) : (0.5);
-							fRow.getColTypes()[colOut] = execplan::CalpontSystemCatalog::DOUBLE;
-							fRow.setDoubleField(avg, colOut);
-						}
-						else
-							fRow.setIntField((int64_t)avg, colOut);
+					}
+					else
+						fRow.setIntField((int64_t)avg, colOut);
 #endif /* PROMOTE_AGGR_OVRFLW_TO_DBL */
-						break;
-					case execplan::CalpontSystemCatalog::UTINYINT:
-					case execplan::CalpontSystemCatalog::USMALLINT:
-					case execplan::CalpontSystemCatalog::UMEDINT:
-					case execplan::CalpontSystemCatalog::UINT:
-					case execplan::CalpontSystemCatalog::UBIGINT:
-						sum = static_cast<long double>(fRow.getUintField(colOut));
-						avg = sum / cnt;
-						avg *= factor;
-						avg += (avg < 0) ? (-0.5) : (0.5);
-						if (avg > (long double) numeric_limits<uint64_t>::max())
-#ifndef PROMOTE_AGGR_OVRFLW_TO_DBL
-						{
-							ostringstream oss;
-							oss << overflowMsg << ": " << avg << "(incl factor " << factor << ") > " << numeric_limits<uint64_t>::max();
-							throw logging::QueryDataExcept(oss.str(), logging::aggregateDataErr);
-						}
-						fRow.setUintField((uint64_t) avg, colOut);
-#else /* PROMOTE_AGGR_OVRFLW_TO_DBL */
-						{
-							sum = fRow.getDoubleField(colOut);
-							avg = sum / cnt;
-							avg += 0.5;
-							fRow.getColTypes()[colOut] = execplan::CalpontSystemCatalog::DOUBLE;
-							fRow.setDoubleField(avg, colOut);
-						}
-						else
-							fRow.setUintField((uint64_t)avg, colOut);
-#endif /* PROMOTE_AGGR_OVRFLW_TO_DBL */
-						break;
 				}
 			}
 		}
@@ -2148,9 +1853,10 @@ void RowAggregationUM::calculateStatisticsFunctions()
 	boost::scoped_array<pair<double, uint64_t> >
 		auxCount(new pair<double, uint64_t>[fRow.getColumnCount()]);
 
-	fRowGroupOut->getRow(0, &fRow);
-	for (uint64_t j = 0; j < fRowGroupOut->getRowCount(); j++, fRow.nextRow())
+	for (uint64_t j = 0; j < fRowGroupOut->getRowCount(); j++)
 	{
+		fRowGroupOut->getRow(j, &fRow);
+
 		for (uint64_t i = 0; i < fFunctionCols.size(); i++)
 		{
 			if (fFunctionCols[i]->fAggFunction == ROWAGG_STATS ||
@@ -2171,7 +1877,7 @@ void RowAggregationUM::calculateStatisticsFunctions()
 					colAux = auxCount[colAux].second;
 				}
 
-				if (cnt == 0.0) // empty set, set null.
+				if (cnt == 0.0)     // empty set, set null.
 				{
 					fRow.setUintField(joblist::DOUBLENULL, colOut);
 				}
@@ -2183,7 +1889,7 @@ void RowAggregationUM::calculateStatisticsFunctions()
 					else
 						fRow.setDoubleField(0.0, colOut);
 				}
-				else // count > 1
+				else                // count > 1
 				{
 					long double sum1 = fRow.getLongDoubleField(colAux);
 					long double sum2 = fRow.getLongDoubleField(colAux+1);
@@ -2233,9 +1939,9 @@ void RowAggregationUM::fixDuplicates(RowAggFunctionType funct)
 		return;
 
 	// fix each row in the row group
-	fRowGroupOut->getRow(0, &fRow);
-	for (uint64_t i = 0; i < fRowGroupOut->getRowCount(); i++, fRow.nextRow())
+	for (uint64_t i = 0; i < fRowGroupOut->getRowCount(); i++)
 	{
+		fRowGroupOut->getRow(i, &fRow);
 		for (uint64_t j = 0; j < dup.size(); j++)
 			fRow.copyField(dup[j]->fOutputColumnIndex,dup[j]->fAuxColumnIndex);
 	}
@@ -2248,10 +1954,11 @@ void RowAggregationUM::fixDuplicates(RowAggFunctionType funct)
 void RowAggregationUM::evaluateExpression()
 {
 	funcexp::FuncExp* fe = funcexp::FuncExp::instance();
-	fRowGroupOut->getRow(0, &fRow);
-	for (uint64_t i = 0; i < fRowGroupOut->getRowCount(); i++, fRow.nextRow())
+	for (uint64_t i = 0; i < fRowGroupOut->getRowCount(); i++)
 	{
-		fe->evaluate(fRow, fExpression);
+		fRowGroupOut->getRow(i, &fRow);
+		for (uint64_t j = 0; j < fExpression.size(); j++)
+			fe->evaluate(fRow, fExpression);
 	}
 }
 
@@ -2262,7 +1969,7 @@ void RowAggregationUM::evaluateExpression()
 void RowAggregationUM::fixConstantAggregate()
 {
 	// find the field has the count(*).
-	int64_t cntIdx = 0;
+	int64_t cntIdx = 0; 
 	for (uint64_t k = 0; k < fFunctionCols.size(); k++)
 	{
 		if (fFunctionCols[k]->fAggFunction == ROWAGG_CONSTANT)
@@ -2272,9 +1979,10 @@ void RowAggregationUM::fixConstantAggregate()
 		}
 	}
 
-	fRowGroupOut->getRow(0, &fRow);
-	for (uint64_t i = 0; i < fRowGroupOut->getRowCount(); i++, fRow.nextRow())
+	for (uint64_t i = 0; i < fRowGroupOut->getRowCount(); i++)
 	{
+		fRowGroupOut->getRow(i, &fRow);
+
 		int64_t rowCnt = fRow.getIntField(cntIdx);
 		vector<ConstantAggData>::iterator j = fConstantAggregate.begin();
 		for (uint64_t k = 0; k < fFunctionCols.size(); k++)
@@ -2285,7 +1993,6 @@ void RowAggregationUM::fixConstantAggregate()
 					doNullConstantAggregate(*j, k);
 				else
 					doNotNullConstantAggregate(*j, k);
-
 				j++;
 			}
 		}
@@ -2319,31 +2026,18 @@ void RowAggregationUM::doNullConstantAggregate(const ConstantAggData& aggData, u
 				case execplan::CalpontSystemCatalog::INT:
 				case execplan::CalpontSystemCatalog::BIGINT:
 				case execplan::CalpontSystemCatalog::DECIMAL:
-				case execplan::CalpontSystemCatalog::UDECIMAL:
 				{
 					fRow.setIntField(getIntNullValue(colDataType), colOut);
 				}
 				break;
 
-				case execplan::CalpontSystemCatalog::UTINYINT:
-				case execplan::CalpontSystemCatalog::USMALLINT:
-				case execplan::CalpontSystemCatalog::UMEDINT:
-				case execplan::CalpontSystemCatalog::UINT:
-				case execplan::CalpontSystemCatalog::UBIGINT:
-				{
-					fRow.setUintField(getUintNullValue(colDataType), colOut);
-				}
-				break;
-
 				case execplan::CalpontSystemCatalog::DOUBLE:
-				case execplan::CalpontSystemCatalog::UDOUBLE:
 				{
 					fRow.setDoubleField(getDoubleNullValue(), colOut);
 				}
 				break;
 
 				case execplan::CalpontSystemCatalog::FLOAT:
-				case execplan::CalpontSystemCatalog::UFLOAT:
 				{
 					fRow.setFloatField(getFloatNullValue(), colOut);
 				}
@@ -2426,19 +2120,7 @@ void RowAggregationUM::doNotNullConstantAggregate(const ConstantAggData& aggData
 				}
 				break;
 
-				// AVG should not be uint32_t result type.
-				case execplan::CalpontSystemCatalog::UTINYINT:
-				case execplan::CalpontSystemCatalog::USMALLINT:
-				case execplan::CalpontSystemCatalog::UMEDINT:
-				case execplan::CalpontSystemCatalog::UINT:
-				case execplan::CalpontSystemCatalog::UBIGINT:
-				{
-					fRow.setUintField(strtoul(aggData.fConstValue.c_str(), 0, 10), colOut);
-				}
-				break;
-
 				case execplan::CalpontSystemCatalog::DECIMAL:
-				case execplan::CalpontSystemCatalog::UDECIMAL:
 				{
 					double dbl = strtod(aggData.fConstValue.c_str(), 0);
 					double scale = pow(10.0, (double) fRowGroupOut->getScale()[i]);
@@ -2447,14 +2129,12 @@ void RowAggregationUM::doNotNullConstantAggregate(const ConstantAggData& aggData
 				break;
 
 				case execplan::CalpontSystemCatalog::DOUBLE:
-				case execplan::CalpontSystemCatalog::UDOUBLE:
 				{
 					fRow.setDoubleField(strtod(aggData.fConstValue.c_str(), 0), colOut);
 				}
 				break;
 
 				case execplan::CalpontSystemCatalog::FLOAT:
-				case execplan::CalpontSystemCatalog::UFLOAT:
 				{
 #ifdef _MSC_VER
 					fRow.setFloatField(strtod(aggData.fConstValue.c_str(), 0), colOut);
@@ -2512,19 +2192,7 @@ void RowAggregationUM::doNotNullConstantAggregate(const ConstantAggData& aggData
 				}
 				break;
 
-				case execplan::CalpontSystemCatalog::UTINYINT:
-				case execplan::CalpontSystemCatalog::USMALLINT:
-				case execplan::CalpontSystemCatalog::UMEDINT:
-				case execplan::CalpontSystemCatalog::UINT:
-				case execplan::CalpontSystemCatalog::UBIGINT:
-				{
-					uint64_t constVal = strtoul(aggData.fConstValue.c_str(), 0, 10);
-					fRow.setUintField(constVal*rowCnt, colOut);
-				}
-				break;
-
 				case execplan::CalpontSystemCatalog::DECIMAL:
-				case execplan::CalpontSystemCatalog::UDECIMAL:
 				{
 					double dbl = strtod(aggData.fConstValue.c_str(), 0);
 					dbl *= pow(10.0, (double) fRowGroupOut->getScale()[i]);
@@ -2538,7 +2206,6 @@ void RowAggregationUM::doNotNullConstantAggregate(const ConstantAggData& aggData
 				break;
 
 				case execplan::CalpontSystemCatalog::DOUBLE:
-				case execplan::CalpontSystemCatalog::UDOUBLE:
 				{
 					double dbl = strtod(aggData.fConstValue.c_str(), 0) * rowCnt;
 					fRow.setDoubleField(dbl, colOut);
@@ -2546,7 +2213,6 @@ void RowAggregationUM::doNotNullConstantAggregate(const ConstantAggData& aggData
 				break;
 
 				case execplan::CalpontSystemCatalog::FLOAT:
-				case execplan::CalpontSystemCatalog::UFLOAT:
 				{
 					double flt;
 #ifdef _MSC_VER
@@ -2582,31 +2248,18 @@ void RowAggregationUM::doNotNullConstantAggregate(const ConstantAggData& aggData
 				case execplan::CalpontSystemCatalog::INT:
 				case execplan::CalpontSystemCatalog::BIGINT:
 				case execplan::CalpontSystemCatalog::DECIMAL:
-				case execplan::CalpontSystemCatalog::UDECIMAL:
 				{
 					fRow.setIntField(0, colOut);
 				}
 				break;
 
-				case execplan::CalpontSystemCatalog::UTINYINT:
-				case execplan::CalpontSystemCatalog::USMALLINT:
-				case execplan::CalpontSystemCatalog::UMEDINT:
-				case execplan::CalpontSystemCatalog::UINT:
-				case execplan::CalpontSystemCatalog::UBIGINT:
-				{
-					fRow.setUintField(0, colOut);
-				}
-				break;
-
 				case execplan::CalpontSystemCatalog::DOUBLE:
-				case execplan::CalpontSystemCatalog::UDOUBLE:
 				{
 					fRow.setDoubleField(0.0, colOut);
 				}
 				break;
 
 				case execplan::CalpontSystemCatalog::FLOAT:
-				case execplan::CalpontSystemCatalog::UFLOAT:
 				{
 					fRow.setFloatField(0.0, colOut);
 				}
@@ -2678,21 +2331,19 @@ void RowAggregationUM::doNotNullConstantAggregate(const ConstantAggData& aggData
 //------------------------------------------------------------------------------
 void RowAggregationUM::setGroupConcatString()
 {
-	fRowGroupOut->getRow(0, &fRow);
-	for (uint64_t i = 0; i < fRowGroupOut->getRowCount(); i++, fRow.nextRow())
+//	for (uint64_t i = 0; i < fGroupConcat.size(); i++)
+	for (uint64_t i = 0; i < fRowGroupOut->getRowCount(); i++)
 	{
 		for (uint64_t j = 0; j < fFunctionCols.size(); j++)
 		{
+			fRowGroupOut->getRow(i, &fRow);
 			uint8_t* data = fRow.getData();
 
 			if (fFunctionCols[j]->fAggFunction == ROWAGG_GROUP_CONCAT)
 			{
 				uint8_t* buff = data + fRow.getOffset(fFunctionCols[j]->fOutputColumnIndex);
-				uint8_t* gcString;
 				joblist::GroupConcatAgUM* gccAg = *((joblist::GroupConcatAgUM**)buff);
-				gcString = gccAg->getResult();
-				fRow.setStringField((char *) gcString, fFunctionCols[j]->fOutputColumnIndex);
-				//gccAg->getResult(buff);
+				gccAg->getResult(buff);
 			}
 		}
 	}
@@ -2705,50 +2356,37 @@ void RowAggregationUM::setGroupConcatString()
 //------------------------------------------------------------------------------
 bool RowAggregationUM::newRowGroup()
 {
-	uint64_t allocSize = 0;
-	uint64_t memDiff = 0;
-	bool     ret = false;
+	boost::shared_array<uint8_t> data;
+	uint64_t allocSize = fRowGroupOut->getDataSize(AGG_ROWGROUP_SIZE);
+	uint64_t memDiff;
 
-	allocSize = fRowGroupOut->getSizeWithStrings();
 	if (fKeyOnHeap)
-		memDiff = fKeyStore->getMemUsage() + fExtKeyMapAlloc->getMemUsage() - fLastMemUsage;
+	{
+		memDiff = fKeyAlloc->getMemUsage() + fAlloc->getMemUsage() - fLastMemUsage;
+		fLastMemUsage = fKeyAlloc->getMemUsage() + fAlloc->getMemUsage();
+	}
 	else
+	{
 		memDiff = fAlloc->getMemUsage() - fLastMemUsage;
-
-	fLastMemUsage += memDiff;
+		fLastMemUsage = fAlloc->getMemUsage();
+	}
 
 	fTotalMemUsage += allocSize + memDiff;
-	if (fRm->getMemory(allocSize + memDiff, fSessionMemLimit))
+	if (!fRm->getMemory(allocSize + memDiff))
+		return false;
+
+	data.reset(new uint8_t[allocSize]);
+
+	if (data)
 	{
-		boost::shared_ptr<RGData> data(new RGData(*fRowGroupOut, AGG_ROWGROUP_SIZE));
-
-		if (data.get() != NULL)
-		{
-			fMaxTotalRowCount += AGG_ROWGROUP_SIZE;
-			fSecondaryRowDataVec.push_back(data);
-			fRowGroupOut->setData(data.get());
-			fResultDataVec.push_back(data.get());
-			fRowGroupOut->resetRowGroup(0);
-
-			ret = true;
-		}
+		fSecondaryRowDataVec.push_back(data);
+		fRowGroupOut->setData(data.get());
+		fRowGroupOut->resetRowGroup(0);
+		fMaxTotalRowCount += AGG_ROWGROUP_SIZE;
+		fResultDataVec.push_back(data.get());
 	}
 
-	return ret;
-}
-
-void RowAggregationUM::setInputOutput(const RowGroup& pRowGroupIn, RowGroup* pRowGroupOut)
-{
-	RowAggregation::setInputOutput(pRowGroupIn, pRowGroupOut);
-	if (fKeyOnHeap)
-	{
-		fKeyRG = fRowGroupIn.truncate(fGroupByCols.size());
-		fKeyStore.reset(new KeyStorage(fKeyRG, &tmpRow));
-		fExtEq.reset(new ExternalKeyEq(fKeyRG, fKeyStore.get(), fKeyRG.getColumnCount(), &tmpRow));
-		fExtHash.reset(new ExternalKeyHasher(fKeyRG, fKeyStore.get(), fKeyRG.getColumnCount(), &tmpRow));
-		fExtKeyMapAlloc.reset(new utils::STLPoolAllocator<pair<RowPosition, RowPosition> >());
-		fExtKeyMap.reset(new ExtKeyMap_t(10, *fExtHash, *fExtEq, *fExtKeyMapAlloc));
-	}
+	return data;
 }
 
 
@@ -2783,9 +2421,8 @@ bool RowAggregationUM::nextRowGroup()
 //------------------------------------------------------------------------------
 RowAggregationUMP2::RowAggregationUMP2(const vector<SP_ROWAGG_GRPBY_t>& rowAggGroupByCols,
 										const vector<SP_ROWAGG_FUNC_t>&  rowAggFunctionCols,
-										joblist::ResourceManager *r,
-										boost::shared_ptr<int64_t> sessionLimit) :
-	RowAggregationUM(rowAggGroupByCols, rowAggFunctionCols, r, sessionLimit)
+										joblist::ResourceManager *r) :
+	RowAggregationUM(rowAggGroupByCols, rowAggFunctionCols, r)
 {
 }
 
@@ -2903,7 +2540,6 @@ void RowAggregationUMP2::doAvg(const Row& rowIn, int64_t colIn, int64_t colOut, 
 		case execplan::CalpontSystemCatalog::INT:
 		case execplan::CalpontSystemCatalog::BIGINT:
 		case execplan::CalpontSystemCatalog::DECIMAL:
-		case execplan::CalpontSystemCatalog::UDECIMAL:
 		{
 			int64_t valIn = rowIn.getIntField(colIn);
 			if (fRow.getIntField(colAux) == 0)
@@ -2919,28 +2555,7 @@ void RowAggregationUMP2::doAvg(const Row& rowIn, int64_t colIn, int64_t colOut, 
 			}
 			break;
 		}
-		case execplan::CalpontSystemCatalog::UTINYINT:
-		case execplan::CalpontSystemCatalog::USMALLINT:
-		case execplan::CalpontSystemCatalog::UMEDINT:
-		case execplan::CalpontSystemCatalog::UINT:
-		case execplan::CalpontSystemCatalog::UBIGINT:
-		{
-			uint64_t valIn = rowIn.getUintField(colIn);
-			if (fRow.getUintField(colAux) == 0)
-			{
-				fRow.setUintField(valIn, colOut);
-				fRow.setUintField(rowIn.getUintField(colIn+1), colAux);
-			}
-			else
-			{
-				uint64_t valOut = fRow.getUintField(colOut);
-				fRow.setUintField(valIn + valOut, colOut);
-				fRow.setUintField(rowIn.getUintField(colIn+1)+fRow.getUintField(colAux), colAux);
-			}
-			break;
-		}
 		case execplan::CalpontSystemCatalog::DOUBLE:
-		case execplan::CalpontSystemCatalog::UDOUBLE:
 		{
 			double valIn = rowIn.getDoubleField(colIn);
 			if (fRow.getIntField(colAux) == 0)
@@ -2957,7 +2572,6 @@ void RowAggregationUMP2::doAvg(const Row& rowIn, int64_t colIn, int64_t colOut, 
 			break;
 		}
 		case execplan::CalpontSystemCatalog::FLOAT:
-		case execplan::CalpontSystemCatalog::UFLOAT:
 		{
 			float valIn = rowIn.getFloatField(colIn);
 			if (fRow.getIntField(colAux) == 0)
@@ -3029,14 +2643,14 @@ void RowAggregationUMP2::doGroupConcat(const Row& rowIn, int64_t i, int64_t o)
 //------------------------------------------------------------------------------
 void RowAggregationUMP2::doBitOp(const Row& rowIn, int64_t colIn, int64_t colOut, int funcType)
 {
-	uint64_t valIn = rowIn.getUintField(colIn);
-	uint64_t valOut = fRow.getUintField(colOut);
+	int64_t valIn = rowIn.getIntField(colIn);
+	int64_t valOut = fRow.getIntField(colOut);
 	if (funcType == ROWAGG_BIT_AND)
-		fRow.setUintField(valIn & valOut, colOut);
+		fRow.setIntField(valIn & valOut, colOut);
 	else if (funcType == ROWAGG_BIT_OR)
-		fRow.setUintField(valIn | valOut, colOut);
+		fRow.setIntField(valIn | valOut, colOut);
 	else
-		fRow.setUintField(valIn ^ valOut, colOut);
+		fRow.setIntField(valIn ^ valOut, colOut);
 }
 
 
@@ -3044,11 +2658,9 @@ void RowAggregationUMP2::doBitOp(const Row& rowIn, int64_t colIn, int64_t colOut
 //------------------------------------------------------------------------------
 RowAggregationDistinct::RowAggregationDistinct(const vector<SP_ROWAGG_GRPBY_t>& rowAggGroupByCols,
 									const vector<SP_ROWAGG_FUNC_t>&  rowAggFunctionCols,
-									joblist::ResourceManager *r,
-									boost::shared_ptr<int64_t> sessionLimit) :
-	RowAggregationUMP2(rowAggGroupByCols, rowAggFunctionCols, r, sessionLimit)
+									joblist::ResourceManager *r) :
+	RowAggregationUMP2(rowAggGroupByCols, rowAggFunctionCols, r)
 {
-
 }
 
 
@@ -3074,8 +2686,9 @@ void RowAggregationDistinct::setInputOutput(const RowGroup& pRowGroupIn, RowGrou
 	fRowGroupIn = fRowGroupDist;
 	fRowGroupOut = pRowGroupOut;
 	initialize();
-	fDataForDist.reinit(fRowGroupDist, AGG_ROWGROUP_SIZE);
-	fRowGroupDist.setData(&fDataForDist);
+
+	fDataForDist.reset(new uint8_t[fRowGroupDist.getDataSize(AGG_ROWGROUP_SIZE)]);
+	fRowGroupDist.setData(fDataForDist.get());
 	fAggregator->setInputOutput(pRowGroupIn, &fRowGroupDist);
 }
 
@@ -3102,7 +2715,7 @@ void RowAggregationDistinct::addRowGroup(const RowGroup* pRows)
 }
 
 
-void RowAggregationDistinct::addRowGroup(const RowGroup* pRows, vector<Row::Pointer>& inRows)
+void RowAggregationDistinct::addRowGroup(const RowGroup* pRows, vector<uint8_t*>& inRows)
 {
 	fAggregator->addRowGroup(pRows, inRows);
 }
@@ -3116,20 +2729,22 @@ void RowAggregationDistinct::doDistinctAggregation()
 {
 	while (dynamic_cast<RowAggregationUM*>(fAggregator.get())->nextRowGroup())
 	{
-		fRowGroupIn.setData(fAggregator.get()->getOutputRowGroup()->getRGData());
+		//fRowGroupIn.setData(fRowGroupDist.getData());
+		fRowGroupIn.setData(fAggregator.get()->getOutputRowGroup()->getData());
 
 		Row rowIn;
 		fRowGroupIn.initRow(&rowIn);
-		fRowGroupIn.getRow(0, &rowIn);
-		for (uint64_t i = 0; i < fRowGroupIn.getRowCount(); ++i, rowIn.nextRow())
+		for (uint64_t i = 0; i < fRowGroupIn.getRowCount(); ++i)
 		{
+			fRowGroupIn.getRow(i, &rowIn);
 			aggregateRow(rowIn);
 		}
 	}
+	//cout << "fRow: " << fRow.toString() << endl;
 }
 
 
-void RowAggregationDistinct::doDistinctAggregation_rowVec(vector<Row::Pointer>& inRows)
+void RowAggregationDistinct::doDistinctAggregation_rowVec(vector<uint8_t*>& inRows)
 {
 		Row rowIn;
 		fRowGroupIn.initRow(&rowIn);
@@ -3244,9 +2859,8 @@ void RowAggregationDistinct::updateEntry(const Row& rowIn)
 RowAggregationSubDistinct::RowAggregationSubDistinct(
 								const vector<SP_ROWAGG_GRPBY_t>& rowAggGroupByCols,
 								const vector<SP_ROWAGG_FUNC_t>&  rowAggFunctionCols,
-								joblist::ResourceManager *r,
-								boost::shared_ptr<int64_t> sessionLimit) :
-	RowAggregationUM(rowAggGroupByCols, rowAggFunctionCols, r, sessionLimit)
+								joblist::ResourceManager *r) :
+	RowAggregationUM(rowAggGroupByCols, rowAggFunctionCols, r)
 {
 }
 
@@ -3272,8 +2886,8 @@ void RowAggregationSubDistinct::setInputOutput(const RowGroup& pRowGroupIn, RowG
 	RowAggregation::setInputOutput(pRowGroupIn, pRowGroupOut);
 
 	// initialize the aggregate row
-	fRowGroupOut->initRow(&fDistRow, true);
-	fDistRowData.reset(new uint8_t[fDistRow.getSize()]);
+	fRowGroupOut->initRow(&fDistRow);
+	fDistRowData.reset(new uint8_t[fRow.getSize()]);
 	fDistRow.setData(fDistRowData.get());
 }
 
@@ -3287,22 +2901,20 @@ void RowAggregationSubDistinct::addRowGroup(const RowGroup *pRows)
 {
 	Row rowIn;
 	pair<RowAggMap_t::iterator, bool> inserted;
-	uint32_t i, j;
+	uint i, j;
 
 	pRows->initRow(&rowIn);
 	pRows->getRow(0, &rowIn);
 
 	for (i = 0; i < pRows->getRowCount(); ++i, rowIn.nextRow())
 	{
-		/* TODO: We can make the functors a little smarter and avoid doing this copy before the
-		 * tentative insert */
 		for (j = 0; j < fGroupByCols.size(); j++)
 		{
-			rowIn.copyField(fDistRow, j, fGroupByCols[j]->fInputColumnIndex);
+			rowIn.copyField(fDistRow.getData() + fRowGroupOut->getOffsets()[j],
+				fGroupByCols[j]->fInputColumnIndex);
 		}
 
-		tmpRow = &fDistRow;
-		inserted = fAggMapPtr->insert(RowPosition(RowPosition::MSB, 0));
+		inserted = fAggMapPtr->insert(make_pair(fDistRow.getData() + 2, rowIn.getData()));
 		if (inserted.second)
 		{
 			// if it was successfully inserted, fix the inserted values
@@ -3314,33 +2926,34 @@ void RowAggregationSubDistinct::addRowGroup(const RowGroup *pRows)
 
 			fRowGroupOut->getRow(fRowGroupOut->getRowCount(), &fRow);
 			fRowGroupOut->incRowCount();
-			copyRow(fDistRow, &fRow);
+			memcpy(fRow.getData(), fDistRow.getData(), fDistRow.getSize());
+			inserted.first->second = fRow.getData();
 
 			// replace the key value with an equivalent copy, yes this is OK
-			const_cast<RowPosition &>(*(inserted.first)) =
-				RowPosition(fResultDataVec.size() - 1, fRowGroupOut->getRowCount() - 1);
+			const_cast<uint8_t *&>(inserted.first->first) = makeMapKey(fRow.getData() + 2);
 		}
 	}
 }
 
-void RowAggregationSubDistinct::addRowGroup(const RowGroup* pRows, std::vector<Row::Pointer>& inRows)
+
+void RowAggregationSubDistinct::addRowGroup(const RowGroup* pRows, std::vector<uint8_t*>& inRows)
 {
 	Row rowIn;
 	pair<RowAggMap_t::iterator, bool> inserted;
-	uint32_t i, j;
+	uint i, j;
 
 	pRows->initRow(&rowIn);
 
 	for (i = 0; i < inRows.size(); ++i, rowIn.nextRow())
 	{
 		rowIn.setData(inRows[i]);
-		/* TODO: We can make the functors a little smarter and avoid doing this copy before the
-		 * tentative insert */
 		for (j = 0; j < fGroupByCols.size(); j++)
-			rowIn.copyField(fDistRow, j, fGroupByCols[j]->fInputColumnIndex);
+		{
+			rowIn.copyField(fDistRow.getData() + fRowGroupOut->getOffsets()[j],
+				fGroupByCols[j]->fInputColumnIndex);
+		}
 
-		tmpRow = &fDistRow;
-		inserted = fAggMapPtr->insert(RowPosition(RowPosition::MSB, 0));
+		inserted = fAggMapPtr->insert(make_pair(fDistRow.getData() + 2, rowIn.getData()));
 		if (inserted.second)
 		{
 			// if it was successfully inserted, fix the inserted values
@@ -3352,11 +2965,11 @@ void RowAggregationSubDistinct::addRowGroup(const RowGroup* pRows, std::vector<R
 
 			fRowGroupOut->getRow(fRowGroupOut->getRowCount(), &fRow);
 			fRowGroupOut->incRowCount();
-			copyRow(fDistRow, &fRow);
+			memcpy(fRow.getData(), fDistRow.getData(), fDistRow.getSize());
+			inserted.first->second = fRow.getData();
 
 			// replace the key value with an equivalent copy, yes this is OK
-			const_cast<RowPosition &>(*(inserted.first)) =
-				RowPosition(fResultDataVec.size() - 1, fRowGroupOut->getRowCount() - 1);
+			const_cast<uint8_t *&>(inserted.first->first) = makeMapKey(fRow.getData() + 2);
 		}
 	}
 }
@@ -3380,9 +2993,8 @@ void RowAggregationSubDistinct::doGroupConcat(const Row& rowIn, int64_t i, int64
 RowAggregationMultiDistinct::RowAggregationMultiDistinct(
 								const vector<SP_ROWAGG_GRPBY_t>& rowAggGroupByCols,
 								const vector<SP_ROWAGG_FUNC_t>&  rowAggFunctionCols,
-								joblist::ResourceManager *r,
-								boost::shared_ptr<int64_t> sessionLimit) :
-	RowAggregationDistinct(rowAggGroupByCols, rowAggFunctionCols, r, sessionLimit)
+								joblist::ResourceManager *r) :
+	RowAggregationDistinct(rowAggGroupByCols, rowAggFunctionCols, r)
 {
 }
 
@@ -3394,20 +3006,19 @@ RowAggregationMultiDistinct::RowAggregationMultiDistinct(const RowAggregationMul
 {
 	fAggregator.reset(rhs.fAggregator->clone());
 
-	boost::shared_ptr<RGData> data;
+	boost::shared_array<uint8_t> data;
 	fSubAggregators.clear();
 	fSubRowData.clear();
 
 	boost::shared_ptr<RowAggregationUM> agg;
-	for (uint32_t i = 0; i < rhs.fSubAggregators.size(); i++)
+	for (uint i = 0; i < rhs.fSubAggregators.size(); i++)
 	{
-#if 0
 		fTotalMemUsage += fSubRowGroups[i].getDataSize(AGG_ROWGROUP_SIZE);
-		if (!fRm->getMemory(fSubRowGroups[i].getDataSize(AGG_ROWGROUP_SIZE, fSessionMemLimit)))
+		if (!fRm->getMemory(fSubRowGroups[i].getDataSize(AGG_ROWGROUP_SIZE)))
 			throw logging::IDBExcept(logging::IDBErrorInfo::instance()->
 				errorMsg(logging::ERR_AGGREGATION_TOO_BIG), logging::ERR_AGGREGATION_TOO_BIG);
-#endif
-		data.reset(new RGData(fSubRowGroups[i], AGG_ROWGROUP_SIZE));
+
+		data.reset(new uint8_t[fSubRowGroups[i].getDataSize(AGG_ROWGROUP_SIZE)]);
 		fSubRowData.push_back(data);
 		fSubRowGroups[i].setData(data.get());
 		agg.reset(rhs.fSubAggregators[i]->clone());
@@ -3444,18 +3055,15 @@ void RowAggregationMultiDistinct::addSubAggregator(const boost::shared_ptr<RowAg
 													const RowGroup& rg,
 													const vector<SP_ROWAGG_FUNC_t>& funct)
 {
-	boost::shared_ptr<RGData> data;
-#if 0
+	boost::shared_array<uint8_t> data;
 	fTotalMemUsage += rg.getDataSize(AGG_ROWGROUP_SIZE);
-	if (!fRm->getMemory(rg.getDataSize(AGG_ROWGROUP_SIZE), fSessionMemLimit))
+	if (!fRm->getMemory(rg.getDataSize(AGG_ROWGROUP_SIZE)))
 		throw logging::IDBExcept(logging::IDBErrorInfo::instance()->
 			errorMsg(logging::ERR_AGGREGATION_TOO_BIG), logging::ERR_AGGREGATION_TOO_BIG);
-#endif
-	data.reset(new RGData(rg, AGG_ROWGROUP_SIZE));
+
+	data.reset(new uint8_t[rg.getDataSize(AGG_ROWGROUP_SIZE)]);
+
 	fSubRowData.push_back(data);
-
-	//assert (agg->aggMapKeyLength() > 0);
-
 	fSubAggregators.push_back(agg);
 	fSubRowGroups.push_back(rg);
 	fSubRowGroups.back().setData(data.get());
@@ -3475,8 +3083,7 @@ void RowAggregationMultiDistinct::addRowGroup(const RowGroup* pRows)
 // Aggregation DISTINCT columns
 //
 //------------------------------------------------------------------------------
-void RowAggregationMultiDistinct::addRowGroup(const RowGroup* pRowGroupIn,
-                                              vector<vector<Row::Pointer> >& inRows)
+void RowAggregationMultiDistinct::addRowGroup(const RowGroup* pRowGroupIn, vector<vector<uint8_t*> >& inRows)
 {
 	for (uint64_t i = 0; i < fSubAggregators.size(); ++i)
 	{
@@ -3504,14 +3111,14 @@ void RowAggregationMultiDistinct::doDistinctAggregation()
 		fRowGroupIn.initRow(&rowIn);
 		while (dynamic_cast<RowAggregationUM*>(fSubAggregators[i].get())->nextRowGroup())
 		{
-			fRowGroupIn.setData(fSubAggregators[i]->getOutputRowGroup()->getRGData());
+			fRowGroupIn.setData(fSubAggregators[i]->getOutputRowGroup()->getData());
 			// no group by == no map, everything done in fRow
-			if (fGroupByCols.empty())
+			if (fAggMapKeyLength == 0)
 				fRowGroupOut->setRowCount(1);
 
-			fRowGroupIn.getRow(0, &rowIn);
-			for (uint64_t j = 0; j < fRowGroupIn.getRowCount(); ++j, rowIn.nextRow())
+			for (uint64_t j = 0; j < fRowGroupIn.getRowCount(); ++j)
 			{
+				fRowGroupIn.getRow(j, &rowIn);
 				aggregateRow(rowIn);
 			}
 		}
@@ -3522,7 +3129,7 @@ void RowAggregationMultiDistinct::doDistinctAggregation()
 }
 
 
-void RowAggregationMultiDistinct::doDistinctAggregation_rowVec(vector<vector<Row::Pointer> >& inRows)
+void RowAggregationMultiDistinct::doDistinctAggregation_rowVec(vector<vector<uint8_t*> >& inRows)
 {
 	// backup the function column vector for finalize().
 	vector<SP_ROWAGG_FUNC_t> origFunctionCols = fFunctionCols;
@@ -3555,61 +3162,6 @@ GroupConcatAg::GroupConcatAg(SP_GroupConcat& gcc) : fGroupConcat(gcc)
 
 GroupConcatAg::~GroupConcatAg()
 {
-}
-
-
-
-AggHasher::AggHasher(const Row &row, Row **tRow, uint32_t keyCount, RowAggregation *ra)
-	: agg(ra), tmpRow(tRow), r(row), lastKeyCol(keyCount-1)
-{
-}
-
-inline uint64_t AggHasher::operator()(const RowPosition &data) const
-{
-	uint64_t ret;
-	Row *row;
-
-	if (data.group == RowPosition::MSB)
-		row = *tmpRow;
-	else {
-		agg->fResultDataVec[data.group]->getRow(data.row, &r);
-		row = &r;
-	}
-
-	ret = row->hash(lastKeyCol);
-	//cout << "hash=" << ret << " keys=" << keyColCount << " row=" << r.toString() << endl;
-	return ret;
-}
-
-
-AggComparator::AggComparator(const Row &row, Row **tRow, uint32_t keyCount, RowAggregation *ra)
-	: agg(ra), tmpRow(tRow), r1(row), r2(row), lastKeyCol(keyCount-1)
-{
-}
-
-inline bool AggComparator::operator()(const RowPosition &d1, const RowPosition &d2) const
-{
-	bool ret;
-	Row *pr1, *pr2;
-
-	if (d1.group == RowPosition::MSB)
-		pr1 = *tmpRow;
-	else {
-		agg->fResultDataVec[d1.group]->getRow(d1.row, &r1);
-		pr1 = &r1;
-	}
-
-	if (d2.group == RowPosition::MSB)
-		pr2 = *tmpRow;
-	else {
-		agg->fResultDataVec[d2.group]->getRow(d2.row, &r2);
-		pr2 = &r2;
-	}
-
-	ret = pr1->equals(*pr2, lastKeyCol);
-	//cout << "eq=" << (int) ret << " keys=" << keyColCount << ": r1=" << r1.toString() <<
-	//"\n             r2=" << r2.toString() << endl;
-	return ret;
 }
 
 

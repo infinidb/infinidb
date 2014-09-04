@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-// $Id: reset_locks.cpp 1823 2013-01-21 14:13:09Z rdempsey $
+// $Id: reset_locks.cpp 1704 2012-09-19 18:26:16Z pleblanc $
 //
 #include <unistd.h>
 #include <iostream>
@@ -69,8 +69,6 @@ int main(int argc, char** argv)
 	string tmpEnv = "TMP=" + SystemRoot + "\\Temp";
 	_putenv(tmpEnv.c_str());
 #endif
-
-	BRM::DBRM dbrm;
 
 	int c;
 	opterr = 0;
@@ -134,17 +132,14 @@ int main(int argc, char** argv)
 		RESET("VBBM", 2);
 		RESET("VSS", 3);
 		RESET("CL", 4);
-
-		if (dbrm.isDBRMReady())
-		{
-			cout << " - resetting SessionManager semaphore" << endl;
-			try {
-				execplan::SessionManager sm;
-				sm.reset();
-			}
-			catch (std::exception &e) {
-				std::cout << e.what() << std::endl;
-			}
+		
+		cout << " - resetting SessionManager semaphore" << endl;
+		try {
+			execplan::SessionManager sm;
+			sm.reset();
+		}
+		catch (std::exception &e) {
+			std::cout << e.what() << std::endl;
 		}
 	}
 

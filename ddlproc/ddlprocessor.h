@@ -27,7 +27,6 @@
 #include "ddlproc.h"
 #include "threadpool.h"
 #include "calpontsystemcatalog.h"
-#include "querytele.h"
 
 namespace ddlprocessor
 {
@@ -42,7 +41,7 @@ public:
       * @param packageWorkQueueSize the maximum number of ddl packages in the work queue 
       */
     DDLProcessor( int packageMaxThreads, int packageWorkQueueSize );
-	~DDLProcessor();
+
     /** @brief entry point for the DDLProcessor
       */
     void process();
@@ -81,9 +80,8 @@ private:
 
     messageqcpp::MessageQueueServer fMqServer;
     boost::shared_ptr<execplan::CalpontSystemCatalog> csc;
-    WriteEngine::WEClients* fWEClient;
-    uint32_t fPMCount;
-    querytele::QueryTeleClient fQtc;
+	WriteEngine::WEClients* fWEClient;
+	uint fPMCount;
 };
 
 

@@ -196,54 +196,6 @@ const string XMLParser::expand(const std::string& in) const
 	return out;
 }
 
-const vector<string> XMLParser::enumConfig(const xmlDocPtr doc) const
-{
-	vector<string> resv;
-	string res;
-
-	xmlNodePtr cur1 = xmlDocGetRootElement(doc);
-	if (cur1 == NULL)
-		throw runtime_error("XMLParser::getConfig: error accessing XML root");
-
-	cur1 = cur1->xmlChildrenNode;
-	while (cur1 != NULL)
-	{
-		res = reinterpret_cast<const char*>(cur1->name);
-		if (res != "text" && res != "comment")
-			resv.push_back(res);
-		cur1 = cur1->next;
-	}
-	return resv;
-}
-
-const vector<string> XMLParser::enumSection(const xmlDocPtr doc, const string& section) const
-{
-	vector<string> resv;
-	string res;
-
-	xmlNodePtr cur1 = xmlDocGetRootElement(doc);
-	if (cur1 == NULL)
-		throw runtime_error("XMLParser::getConfig: error accessing XML root");
-
-	cur1 = cur1->xmlChildrenNode;
-	while (cur1 != NULL)
-	{
-		if ((!xmlStrcmp(cur1->name, (const xmlChar *)section.c_str())))
-		{
-			xmlNodePtr cur2 = cur1->xmlChildrenNode;
-			while (cur2 != NULL)
-			{
-				res = reinterpret_cast<const char*>(cur2->name);
-				if (res != "text" && res != "comment")
-					resv.push_back(expand(res));
-				cur2 = cur2->next;
-			}
-		}
-		cur1 = cur1->next;
-	}
-	return resv;
-}
-
 } //namespace
 // vim:ts=4 sw=4:
 

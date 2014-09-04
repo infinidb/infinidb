@@ -4,7 +4,6 @@
 	<ExeMgr1>
 		<IPAddr>127.0.0.1</IPAddr>
 		<Port>8601</Port>
-		<Module>pm1</Module>
 	</ExeMgr1>
 	<JobProc>
 		<IPAddr>0.0.0.0</IPAddr>
@@ -82,7 +81,6 @@
 		<!-- <HighPriorityPercentage>60</HighPriorityPercentage> -->
 		<!-- <MediumPriorityPercentage>30</MediumPriorityPercentage> -->
 		<!-- <LowPriorityPercentage>10</LowPriorityPercentage> -->
-	<AggregationMemoryCheck>95</AggregationMemoryCheck>
 	</PrimitiveServers>
 	<PMS1>
 		<IPAddr>127.0.0.1</IPAddr>
@@ -244,12 +242,6 @@
 		<ProcessRestartPeriod>120</ProcessRestartPeriod>
 		<SwapAction>restartSystem</SwapAction>	<!-- OAM command (or 'none') to run when swap space exceeds Major Threshold -->
 		<ActivePmFailoverDisabled>n</ActivePmFailoverDisabled>
-                <MemoryCheckPercent>95</MemoryCheckPercent> <!-- Max real memory to limit growth of buffers to -->
-		<DataFileLog>OFF</DataFileLog>
-		<!-- enable if you want to limit how much memory may be used for hdfs read/write memory buffers.
- 		<hdfsRdwrBufferMaxSize>8G</hdfsRdwrBufferMaxSize>
-		-->
- 		<hdfsRdwrScratch>/tmp/rdwrscratch</hdfsRdwrScratch> <!-- Do not set to an hdfs file path -->
 	</SystemConfig>
 	<SystemModuleConfig>
 		<ModuleType1>dm</ModuleType1>
@@ -277,7 +269,7 @@
 		<ModuleDBRootID1-1-1>unassigned</ModuleDBRootID1-1-1>
 		<ModuleType2>um</ModuleType2>
 		<ModuleDesc2>User Module</ModuleDesc2>
-		<RunType2>SIMPLEX</RunType2>
+		<RunType2>LOADSHARE</RunType2>
 		<ModuleCount2>0</ModuleCount2>
 		<ModuleIPAddr1-1-2>0.0.0.0</ModuleIPAddr1-1-2>
 		<ModuleHostName1-1-2>unassigned</ModuleHostName1-1-2>
@@ -415,7 +407,7 @@
 	</DBRM_Worker10>
 	<DBBC>
 		<!-- The percentage of RAM to use for the disk block cache. Defaults to 86% -->
-		<NumBlocksPct>50</NumBlocksPct>
+		<NumBlocksPct>66</NumBlocksPct>
 		<!-- <NumThreads>16</NumThreads> --> <!-- 1-256.  Default is 16. -->
 		<NumCaches>1</NumCaches><!-- # of parallel caches to instantiate -->
 		<IOMTracing>0</IOMTracing>
@@ -430,33 +422,24 @@
 		<InitialInstallFlag>y</InitialInstallFlag>
 		<SingleServerInstall>y</SingleServerInstall>
 		<ServerTypeInstall>2</ServerTypeInstall>
-		<PMwithUM>n</PMwithUM>
-		<MySQLRep>n</MySQLRep>
 		<DBRootStorageType>internal</DBRootStorageType>
 		<UMStorageType>internal</UMStorageType>
 		<SystemLogConfigFile>unassigned</SystemLogConfigFile>	
 		<rpw>unassigned</rpw>
-		<Cloud>unassigned</Cloud>
+		<Cloud>n</Cloud>
 		<EEPackageType>rpm</EEPackageType>
 		<EnableSNMP>y</EnableSNMP>
 		<AmazonX509Certificate>unassigned</AmazonX509Certificate>
 		<AmazonX509PrivateKey>unassigned</AmazonX509PrivateKey>
 		<AmazonRegion>us-east-1</AmazonRegion>
 		<AmazonZone>unassigned</AmazonZone>
-		<AmazonSubNetID>unassigned</AmazonSubNetID>
-		<AmazonVPCNextPrivateIP>unassigned</AmazonVPCNextPrivateIP>
 		<PMInstanceType>unassigned</PMInstanceType>
 		<UMInstanceType>unassigned</UMInstanceType>
 		<UMSecurityGroup>unassigned</UMSecurityGroup>
 		<UMVolumeSize>unassigned</UMVolumeSize>
 		<PMVolumeSize>unassigned</PMVolumeSize>
+		<UMAutoSync>n</UMAutoSync>
 		<AmazonAutoTagging>n</AmazonAutoTagging>
-		<AmazonElasticIPCount>0</AmazonElasticIPCount>
-		<AmazonElasticIPAddr1>unassigned</AmazonElasticIPAddr1>
-		<AmazonElasticModule1>unassigned</AmazonElasticModule1>
-		<CoreFileFlag>n</CoreFileFlag>
-		<JavaHome>unassigned</JavaHome>
-		<JavaPath>unassigned</JavaPath>
 	</Installation>
 	<ExtentMap>
 		<!--
@@ -472,15 +455,8 @@
 		<MaxElems>128K</MaxElems>  <!-- 128 buckets * 128K * 16 = 256 MB -->
 		<FifoSizeLargeSide>128</FifoSizeLargeSide>
 		<PmMaxMemorySmallSide>64M</PmMaxMemorySmallSide><!-- divide by 48 to get element count -->
-		<TotalUmMemory>25%</TotalUmMemory>
-		<TotalPmUmMemory>10%</TotalPmUmMemory>
+		<TotalUmMemory>8G</TotalUmMemory>
 		<CPUniqueLimit>100</CPUniqueLimit>
-		<AllowDiskBasedJoin>N</AllowDiskBasedJoin>
-		<!-- Be careful modifying TempFilePath!  On start, ExeMgr deletes
-			the entire directory and recreates it to make sure no
-			files are left behind.  -->
-		<TempFilePath>$INSTALLDIR/tmp</TempFilePath>
-		<TempFileCompression>Y</TempFileCompression>
 	</HashJoin>
 	<JobList>
 		<FlushInterval>16K</FlushInterval>
@@ -512,17 +488,4 @@
 		<User>unassigned</User>
 		<Password></Password>
 	</CrossEngineSupport>
-	<QueryStats>
-		<Enabled>N</Enabled>
-	</QueryStats>
-	<UserPriority>
-		<Enabled>N</Enabled>
-	</UserPriority>
-	<NetworkCompression>
-		<Enabled>Y</Enabled>
-	</NetworkCompression>
-	<QueryTele>
-		<Host>127.0.0.1</Host>
-		<Port>0</Port>
-	</QueryTele>
 </Calpont>

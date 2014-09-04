@@ -33,21 +33,21 @@
  * also requires file IO.  Most functions throw an exception if a hard IO error
  * occurs more than MaxRetries times in a row.  Right now the code makes
  * no attempt to back out changes that occured before the error although it
- * may be possible to do so for certain errors.  Probably the best course of
+ * may be possible to do so for certain errors.  Probably the best course of 
  * action would be to halt the system if an exception is thrown here
- * to prevent database corruption resulting allocation of OIDs from a
+ * to prevent database corruption resulting allocation of OIDs from a 
  * possibly corrupt OID bitmap.  The OID bitmap can be rebuilt at system
  * startup if necessary (need to write a tool to do that still).
  *
- * There are a few checks to verify the safety of allocations and
- * deallocations & the correctness of this implementation in general.
- * Those errors will throw logic_error.  IO errors will throw
+ * There are a few checks to verify the safety of allocations and 
+ * deallocations & the correctness of this implementation in general.  
+ * Those errors will throw logic_error.  IO errors will throw 
  * ios_base::failure.
  *
  * There are probably oodles of optimizations possible given this implmementation.
  * For example:
  * 		- make fullScan() construct a freelist
- *		- sorting & coalescing free list entries will raise the hit rate
+ *		- sorting & coalescing free list entries will raise the hit rate 
  *		  (at what cost?)
  *		- implement a bias for high numbered OIDs in the free list to reduce
  *	 	  the number of fullScans searching far in the bitmap
@@ -81,13 +81,9 @@
 #include <sstream>
 //#define NDEBUG
 #include <cassert>
-#include <boost/thread/thread.hpp>
-
-#include "IDBDataFile.h"
-#include "IDBPolicy.h"
+#include <boost/thread.hpp>
 
 using namespace std;
-using namespace idbdatafile;
 
 #include "dbrm.h"
 
@@ -114,88 +110,53 @@ class EOFException : public exception
 
 namespace BRM {
 
-boost::mutex OIDServer::fMutex;
-
-#if 0
 void OIDServer::lockFile() const
 {
 	int err, errCount;
-
-	int errnoSave = 0;
+	
 	for (errCount = 0, err = -1; err != 0 && errCount < MaxRetries;) {
 		err = flock(fFd, LOCK_EX);
 		if (err < 0 && errno != EINTR) {  // EINTR isn't really an error
 			errCount++;
-			errnoSave = errno; // save errno because perror may overwrite
 			perror("OIDServer::lockFile(): flock (retrying)");
 		}
 	}
 	if (errCount == MaxRetries) {
 		ostringstream oss;
-		oss << "OIDServer::lockFile(): flock error:  " << strerror(errnoSave);
+		oss << "OIDServer::lockFile(): flock error:  " << strerror(errno);
 		throw ios_base::failure(oss.str());
 	}
 }
-#endif
 
 void OIDServer::writeData(uint8_t *buf, off_t offset, int size) const
 {
 	int errCount, err, progress;
 	off_t seekerr = -1;
-
+	
 	if (size == 0)
 		return;
 
-	if (IDBPolicy::useHdfs()) {
-		for (errCount = 0; errCount < MaxRetries && seekerr != offset; errCount++) {
-			seekerr = fFp->seek(offset, SEEK_SET);
-			if (seekerr >= 0)
-				seekerr = fFp->tell(); // IDBDataFile may use fseek for seek.
-			if (seekerr < 0)
-				perror("OIDServer::writeDataHdfs(): lseek");
-		}
-		if (errCount == MaxRetries)
-			throw ios_base::failure("OIDServer::writeDataHdfs(): lseek failed "
-					"too many times");
-
-		for (progress = 0, errCount = 0; progress < size && errCount < MaxRetries;) {
-			err = fFp->write(&buf[progress], size - progress);
-			if (err < 0) {
-				if (errno != EINTR) {  // EINTR isn't really an error
-					errCount++;
-					perror("OIDServer::writeDataHdfs(): write (retrying)");
-				}
-			}
-			else
-				progress += err;
-		}
-
-		fFp->tell();
+	for (errCount = 0; errCount < MaxRetries && seekerr != offset; errCount++) {
+		seekerr = lseek(fFd, offset, SEEK_SET);
+		if (seekerr < 0)
+			perror("OIDServer::writeData(): lseek");
 	}
-	else {
-		for (errCount = 0; errCount < MaxRetries && seekerr != offset; errCount++) {
-			seekerr = lseek(fFd, offset, SEEK_SET);
-			if (seekerr < 0)
-				perror("OIDServer::writeData(): lseek");
-		}
-		if (errCount == MaxRetries)
-			throw ios_base::failure("OIDServer::writeData(): lseek failed "
-					"too many times");
-
-		for (progress = 0, errCount = 0; progress < size && errCount < MaxRetries;) {
-			err = write(fFd, &buf[progress], size - progress);
-			if (err < 0) {
-				if (errno != EINTR) {  // EINTR isn't really an error
-					errCount++;
-					perror("OIDServer::writeData(): write (retrying)");
-				}
-			}
-			else
-				progress += err;
-		}
-	}
-
 	if (errCount == MaxRetries)
+		throw ios_base::failure("OIDServer::writeData(): lseek failed "
+				"too many times");
+	
+	for (progress = 0, errCount = 0; progress < size && errCount < MaxRetries;) {
+		err = write(fFd, &buf[progress], size - progress);
+		if (err < 0) {
+			if (errno != EINTR) {  // EINTR isn't really an error
+				errCount++;
+				perror("OIDServer::writeData(): write (retrying)");
+			}
+		}
+		else 
+			progress += err;		
+	}
+	if (errCount == MaxRetries) 
 		throw ios_base::failure("OIDServer::writeData(): write error");
 }
 
@@ -203,64 +164,35 @@ void OIDServer::readData(uint8_t *buf, off_t offset, int size) const
 {
 	int errCount, err, progress;
 	off_t seekerr = -1;
-
+	
 	if (size == 0)
 		return;
 
-	if (IDBPolicy::useHdfs()) {
-		for (errCount = 0; errCount < MaxRetries && seekerr != offset; errCount++) {
-			seekerr = fFp->seek(offset, SEEK_SET);
-			if (seekerr >= 0)
-				seekerr = fFp->tell(); // IDBDataFile may use fseek for seek.
-			if (seekerr < 0)
-				perror("OIDServer::readDataHdfs(): lseek");
-		}
-		if (errCount == MaxRetries)
-			throw ios_base::failure("OIDServer::readDataHdfs(): lseek failed "
-					"too many times");
-
-		for (progress = 0, errCount = 0; progress < size && errCount < MaxRetries;) {
-			err = fFp->read(&buf[progress], size - progress);
-			if (err < 0) {
-				if (errno != EINTR) {  // EINTR isn't really an error
-					errCount++;
-					perror("OIDServer::readDataHdfs(): read (retrying)");
-				}
-			}
-			else if (err == 0)
-				throw EOFException();
-			else
-				progress += err;
-		}
+	for (errCount = 0; errCount < MaxRetries && seekerr != offset; errCount++) {
+		seekerr = lseek(fFd, offset, SEEK_SET);
+		if (seekerr < 0)
+			perror("OIDServer::readData(): lseek");
 	}
-	else {
-		for (errCount = 0; errCount < MaxRetries && seekerr != offset; errCount++) {
-			seekerr = lseek(fFd, offset, SEEK_SET);
-			if (seekerr < 0)
-				perror("OIDServer::readData(): lseek");
-		}
-		if (errCount == MaxRetries)
-			throw ios_base::failure("OIDServer::readData(): lseek failed "
-					"too many times");
-
-		for (progress = 0, errCount = 0; progress < size && errCount < MaxRetries;) {
-			err = read(fFd, &buf[progress], size - progress);
-			if (err < 0) {
-				if (errno != EINTR) {  // EINTR isn't really an error
-					errCount++;
-					perror("OIDServer::readData(): read (retrying)");
-				}
-			}
-			else if (err == 0)
-				throw EOFException();
-			else
-				progress += err;
-		}
-	}
-
 	if (errCount == MaxRetries)
+		throw ios_base::failure("OIDServer::readData(): lseek failed "
+				"too many times");
+	
+	for (progress = 0, errCount = 0; progress < size && errCount < MaxRetries;) {
+		err = read(fFd, &buf[progress], size - progress);
+		if (err < 0) {
+			if (errno != EINTR) {  // EINTR isn't really an error
+				errCount++;
+				perror("OIDServer::readData(): read (retrying)");
+			}
+		}
+		else if (err == 0)
+			throw EOFException();
+		else
+			progress += err;		
+	}
+	if (errCount == MaxRetries) 
 		throw ios_base::failure("OIDServer::readData(): read error");
-}
+}	
 
 void OIDServer::initializeBitmap() const
 {
@@ -271,7 +203,7 @@ void OIDServer::initializeBitmap() const
 	int64_t ltmp;
 	int firstOID;
 	config::Config *conf;
-
+	
 	conf = config::Config::makeConfig();
 	try {
 		stmp = conf->getConfig("OIDManager", "FirstOID");
@@ -286,38 +218,55 @@ void OIDServer::initializeBitmap() const
 	}
 	firstOID = static_cast<int>(ltmp);
 
-	boost::mutex::scoped_lock lk(fMutex);
+	lockFile();
+			
 	h1 = reinterpret_cast<struct FEntry*>(buf);
 	//write the initial header
 	h1[0].begin = firstOID;
 	h1[0].end = 0x00ffffff;
+
 	for (i = 1; i < FreeListEntries; i++) {
 		h1[i].begin = -1;
 		h1[i].end = -1;
 	}
-	writeData(buf, 0, HeaderSize);
+	
+	try {
+		writeData(buf, 0, HeaderSize);
+	}
+	catch (...) {
+		flock(fFd, LOCK_UN);
+		throw;
+	}
 
 	// reset buf to all 0's and write the bitmap
 	for (i = 0; i < HeaderSize; i++)
 		buf[i] = 0;
 
-	for (i = 0; i < bitmapSize; i += HeaderSize)
-		writeData(buf, HeaderSize+i, (bitmapSize-i > HeaderSize ? HeaderSize : bitmapSize-i));
-
-	flipOIDBlock(0, firstOID, 0);
+	try {
+		for (i = 0; i < bitmapSize; i += HeaderSize)
+			writeData(buf, HeaderSize + i, (bitmapSize - i > HeaderSize ? HeaderSize : bitmapSize - i));
+	
+		flipOIDBlock(0, firstOID, 0);
+	}
+	catch (...) {
+		flock(fFd, LOCK_UN);
+		throw;
+	}
 
 	/* append a 16-bit 0 to indicate 0 entries in the vboid->dbroot mapping */
 	writeData(buf, StartOfVBOidSection, 2);
+
+	flock(fFd, LOCK_UN);
 }
 
-OIDServer::OIDServer() : fFp(NULL), fFd(-1)
+OIDServer::OIDServer()
 {
 	boost::mutex::scoped_lock lk(CtorMutex);
 
 	config::Config* conf;
 	string tmp;
 	ostringstream os;
-
+	
 	conf = config::Config::makeConfig();
 	fFilename = conf->getConfig("OIDManager", "OIDBitmapFile");
 
@@ -327,97 +276,46 @@ OIDServer::OIDServer() : fFp(NULL), fFd(-1)
 		throw runtime_error(os.str());
 	}
 
-	if (IDBPolicy::useHdfs()) {
-		if (!IDBPolicy::exists(fFilename.c_str())) { //no bitmap file
-			BRM::DBRM em;
-			if (!em.isEMEmpty())
-			{
-				os << "Extent Map not empty and " << fFilename << " not found. Setting system to read-only";
-				cerr << os.str() << endl;
-				log(os.str());
-				em.setReadOnly(true);
-				throw runtime_error(os.str());
-			}
-
-			fFp = IDBDataFile::open(IDBPolicy::getType(fFilename.c_str(), IDBPolicy::WRITEENG),
-									fFilename.c_str(), "w+b", 0, 1);
-
-			if (!fFp) {
-				os << "Couldn't create oid bitmap file " << fFilename << ": " <<
-						strerror(errno);
-				log(os.str());
-				throw ios_base::failure(os.str());
-			}
-#ifndef _MSC_VER
-			//FIXME:
-			//fchmod(fFd, 0666);   // XXXPAT: override umask at least for testing
-			if (fFp)
-				chmod(fFilename.c_str(), 0666);   // XXXPAT: override umask at least for testing
-#endif
-			try {
-				initializeBitmap();
-			}
-			catch(...) {
-				delete fFp;
-				fFp = NULL;
-				throw;
-			}
-		}
-		else {
-			fFp = IDBDataFile::open(IDBPolicy::getType(fFilename.c_str(), IDBPolicy::WRITEENG),
-									fFilename.c_str(), "r+b", 0, 1);
-			if (!fFp) {
-				ostringstream os;
-				os << "Couldn't open oid bitmap file" << fFilename << ": " <<
-						strerror(errno);
-				log(os.str());
-				throw ios_base::failure(os.str());
-			}
+	if (access(fFilename.c_str(), F_OK) != 0) //no bitmap file
+	{
+		BRM::DBRM em;
+		if (!em.isEMEmpty())
+		{
+			os << "Extent Map not empty and " << fFilename << " not found. Setting system to read-only";
+			cerr << os.str() << endl;
+			em.setReadOnly(true);
+			throw runtime_error(os.str());
 		}
 	}
-	else {
-		if (access(fFilename.c_str(), F_OK) != 0) //no bitmap file
-		{
-			BRM::DBRM em;
-			if (!em.isEMEmpty())
-			{
-				os << "Extent Map not empty and " << fFilename << " not found. Setting system to read-only";
-				cerr << os.str() << endl;
-				log(os.str());
-				em.setReadOnly(true);
-				throw runtime_error(os.str());
-			}
-		}
 
-		fFd = open(fFilename.c_str(), O_CREAT | O_EXCL | O_RDWR | O_BINARY, 0666);
-		if (fFd >= 0) {
+	fFd = open(fFilename.c_str(), O_CREAT | O_EXCL | O_RDWR | O_BINARY, 0666);
+	if (fFd >= 0) {
 #ifndef _MSC_VER
-			//FIXME:
-			fchmod(fFd, 0666);   // XXXPAT: override umask at least for testing
+		//FIXME:
+		fchmod(fFd, 0666);   // XXXPAT: override umask at least for testing
 #endif
-			try {
-				initializeBitmap();
-			}
-			catch(...) {
-				close(fFd);
-				throw;
-			}
+		try {
+			initializeBitmap();
 		}
-		else if (errno == EEXIST) {
-			fFd = open(fFilename.c_str(), O_RDWR | O_BINARY);
-			if (fFd < 0) {
-				os << "Couldn't open oid bitmap file " << fFilename << ": " <<
-						strerror(errno);
-				log(os.str());
-				throw ios_base::failure(os.str());
-			}
+		catch(...) {
+			close(fFd);
+			throw;
 		}
-		else {
-			os << "Couldn't create oid bitmap file " << fFilename << ": " <<
+	}
+	else if (errno == EEXIST) {
+		fFd = open(fFilename.c_str(), O_RDWR | O_BINARY);
+		if (fFd < 0) {
+			os << "Couldn't open oid bitmap file " << fFilename << ": " <<
 					strerror(errno);
 			log(os.str());
 			throw ios_base::failure(os.str());
 		}
+	}
+	else {
+		os << "Couldn't create oid bitmap file " << fFilename << ": " <<
+				strerror(errno);
+		log(os.str());
+		throw ios_base::failure(os.str());
 	}
 
 	loadVBOIDs();
@@ -425,11 +323,7 @@ OIDServer::OIDServer() : fFp(NULL), fFd(-1)
 
 OIDServer::~OIDServer()
 {
-	if (fFd >= 0)
-		close(fFd);
-
-	delete fFp;
-	fFp = NULL;
+	close(fFd);
 }
 
 void OIDServer::loadVBOIDs()
@@ -449,13 +343,12 @@ void OIDServer::loadVBOIDs()
 
 	vbOidDBRootMap.resize(size);
 	readData((uint8_t *) &vbOidDBRootMap[0], StartOfVBOidSection + 2, size * 2);
-
 	//cout << "loaded " << size << " vboids: ";
-	//for (uint32_t i = 0; i < size; i++)
+	//for (uint i = 0; i < size; i++)
 	//	cout << (int) vbOidDBRootMap[i] << " ";
 	//cout << endl;
 }
-
+			
 void OIDServer::useFreeListEntry(struct FEntry &fe, int num)
 {
 	int blockSize;
@@ -472,23 +365,23 @@ void OIDServer::useFreeListEntry(struct FEntry &fe, int num)
 // mode = 0 -> allocate, mode = 1 -> deallocate
 // this currently verifies the request as it makes the requested changes
 // it might make more sense to verify before making the changes instead.
-// either way, it implies a larger programming error, so maybe it doesn't
+// either way, it implies a larger programming error, so maybe it doesn't 
 // matter.
 void OIDServer::flipOIDBlock(int blockStart, int num, int mode) const
 {
 	int offset, i, oidCount, byteSize, blockEnd;
 	uint8_t *buf;
 	uint8_t mask;
-
+	
 	// safety check
-	if (blockStart + num - 1 > 0x00ffffff)
+	if (blockStart + num - 1 > 0x00ffffff)		
 		throw logic_error("flipOIDBlock: request overruns oid space");
-
+	
 	blockEnd = blockStart + num - 1;
 	offset = blockStart/8 + HeaderSize;
 	byteSize = blockEnd/8 - blockStart/8 + 1;
 	i = 0;
-retry:
+retry:	
 	try {
 		buf = new uint8_t[byteSize];
 	}
@@ -500,7 +393,7 @@ retry:
 	}
 	oidCount = 0;
 	readData(buf, offset, byteSize);
-
+	
 	// verify 1st byte
 	mask = 0x80 >> (blockStart % 8);
 	while (mask != 0 && oidCount < num) {
@@ -517,13 +410,10 @@ retry:
 	}
 	if (oidCount == num) {
 		writeData(buf, offset, byteSize);
-		if (IDBPolicy::useHdfs())
-			fFp->flush();
-
 		delete [] buf;
 		return;
 	}
-
+		   
 	// verify the middle bytes
 	for (i = 1; i < byteSize - 1; i++, oidCount+=8)
 		if (buf[i] != (mode ? 0xff : 0)) {
@@ -535,7 +425,7 @@ retry:
 				buf[i] = 0;
 			else
 				buf[i] = 0xff;
-
+		
 	// verify the last byte
 	mask = 0x80;
 	while (mask != 0 && oidCount < num) {
@@ -555,13 +445,10 @@ retry:
 	}
 	if (oidCount == num) {
 		writeData(buf, offset, byteSize);
-		if (IDBPolicy::useHdfs())
-			fFp->flush();
-
 		delete [] buf;
 		return;
 	}
-
+	
 	delete [] buf;
 	throw logic_error("logic error in flipOIDBlock detected");
 }
@@ -577,7 +464,6 @@ int OIDServer::fullScan(int num, struct FEntry* freelist) const
 	// this assumes the bitmap is a multiple of 4096
 	while (fileOffset < StartOfVBOidSection) {
 		readData(reinterpret_cast<uint8_t*>(buf), fileOffset, 4096);
-
 		for (i = 0; i < 4096; i++) {
 			if (countingZeros) {
 				mask = 0x80;
@@ -615,26 +501,29 @@ countZeros:		while ((buf[i] & mask) == 0 && bitOffset < 8 && blockCount < num) {
 				goto skipOnes;
 			}
 		}
-		fileOffset += 4096;
+		fileOffset += 4096;	
 	}
 	return -1;
 }
 
-void OIDServer::patchFreelist(struct FEntry* freelist, int start, int num) const
+void OIDServer::patchFreelist(struct FEntry* freelist, int start,
+								   int num) const
 {
-	int i, changed = 0, end = start + num - 1;
-
+	int i, changed = 0, end;
+	
+	end = start + num - 1;
+	
 	for (i = 0; i < FreeListEntries; i++) {
-
+		
 		if (freelist[i].begin == -1)
 			continue;
-
+		
 		// the allocated block overlaps the beginning of this entry.
 		// this is the only clause that should execute unless there's an
 		// error in the implementation somewhere (probably fullscan)
 		if (start <= freelist[i].begin && end >= freelist[i].begin) {
 			changed = 1;
-
+			
 			// if possible, truncate this entry otherwise invalidate it
 			if (end < freelist[i].end)
 				freelist[i].begin = end + 1;
@@ -643,7 +532,7 @@ void OIDServer::patchFreelist(struct FEntry* freelist, int start, int num) const
 				freelist[i].end = -1;
 			}
 		}
-
+		
 		// the allocated block is contained in the middle of this block.
 		// (this shouldn't be possible; allocOIDs should have
 		// picked this entry to allocate from)
@@ -651,37 +540,32 @@ void OIDServer::patchFreelist(struct FEntry* freelist, int start, int num) const
 			throw logic_error("patchFreelist: a block was allocated in the "
 					"middle of a known-free block");
 	}
-
-	if (changed) {
+	
+	if (changed)
 		writeData(reinterpret_cast<uint8_t*>(freelist), 0, HeaderSize);
-		if (IDBPolicy::useHdfs())
-			fFp->flush();
-	}
 }
 
 int OIDServer::allocVBOID(uint16_t dbroot)
 {
 	int ret;
-	uint32_t offset;
+	uint offset;
 
 	ret = vbOidDBRootMap.size();
 
 	offset = StartOfVBOidSection + 2 + (vbOidDBRootMap.size() * 2);
 	vbOidDBRootMap.push_back(dbroot);
-
 	try {
 		uint16_t size = vbOidDBRootMap.size();
-		boost::mutex::scoped_lock lk(fMutex);
+		lockFile();
 		writeData((uint8_t *) &size, StartOfVBOidSection, 2);
 		writeData((uint8_t *) &dbroot, offset, 2);
+		flock(fFd, LOCK_UN);
 	}
 	catch(...) {
+		flock(fFd, LOCK_UN);
 		vbOidDBRootMap.pop_back();
 		throw;
 	}
-
-	if (IDBPolicy::useHdfs())
-		fFp->flush();
 
 	return ret;
 }
@@ -701,7 +585,7 @@ const vector<uint16_t> & OIDServer::getVBOIDToDBRootMap()
 
 int OIDServer::getVBOIDOfDBRoot(uint32_t dbRoot)
 {
-	uint32_t i;
+	uint i;
 
 	for (i = 0; i < vbOidDBRootMap.size(); i++)
 		if (vbOidDBRootMap[i] == dbRoot)
@@ -712,12 +596,19 @@ int OIDServer::getVBOIDOfDBRoot(uint32_t dbRoot)
 int OIDServer::allocOIDs(int num)
 {
 	struct FEntry freelist[FreeListEntries];
-	int i, size, bestMatchIndex, bestMatchSize, bestMatchBegin=0;
+	int i, size, bestMatchIndex, bestMatchSize, bestMatchBegin=0, ret;
 
-	boost::mutex::scoped_lock lk(fMutex);
-	readData(reinterpret_cast<uint8_t*>(freelist), 0, HeaderSize);
+	lockFile();
 
-	// scan freelist using best fit strategy (an attempt to maximize hits on
+	try {
+		readData(reinterpret_cast<uint8_t*>(freelist), 0, HeaderSize);
+	}
+	catch (...) {
+		flock(fFd, LOCK_UN);
+		throw;
+	}
+
+	// scan freelist using best fit strategy (an attempt to maximize hits on 
 	// the freelist)
 	bestMatchSize = numeric_limits<int>::max();
 	for (i = 0, bestMatchIndex = -1; i < FreeListEntries; i++) {
@@ -735,18 +626,33 @@ int OIDServer::allocOIDs(int num)
 			bestMatchBegin = freelist[i].begin;
 		}
 	}
-
-	if (bestMatchIndex == -1) {
-		return fullScan(num, freelist);
+	if (bestMatchIndex == -1) {	
+		try {
+			ret = fullScan(num, freelist);
+		}
+		catch (...) {
+			flock(fFd, LOCK_UN);
+/* ret can't be relied on here...
+			if (ret != -1)
+				cerr << "OIDServer::allocOIDs(): WARNING, the Object ID "
+						"file may have been corrupted" << endl;
+*/
+			throw;
+		}
+		
+		flock(fFd, LOCK_UN);
+		return ret;
 	}
-
-	useFreeListEntry(freelist[bestMatchIndex], num);
-	writeData(reinterpret_cast<uint8_t*>(freelist), 0, HeaderSize);
-	flipOIDBlock(bestMatchBegin, num, 0);
-
-	if (IDBPolicy::useHdfs())
-		fFp->flush();
-
+	try {
+		useFreeListEntry(freelist[bestMatchIndex], num);
+		writeData(reinterpret_cast<uint8_t*>(freelist), 0, HeaderSize);
+		flipOIDBlock(bestMatchBegin, num, 0);
+	}
+	catch (...) {
+		flock(fFd, LOCK_UN);
+		throw;
+	}
+	flock(fFd, LOCK_UN);
 	return bestMatchBegin;
 }
 
@@ -756,7 +662,7 @@ void OIDServer::returnOIDs(int start, int end) const
 /*	struct FEntry freelist[FreeListEntries];
 	int i, emptyEntry = -1, entryBefore = -1, entryAfter = -1;
 	bool changed = true;
-
+	
 	lockFile();
 
 	try {
@@ -766,9 +672,9 @@ void OIDServer::returnOIDs(int start, int end) const
 		flock(fFd, LOCK_UN);
 		throw;
 	}
-
+	
 	for (i = 0; i < FreeListEntries; i++) {
-
+	
 		//this entry is empty
 	    if (freelist[i].begin == -1) {
 			if (emptyEntry == -1)
@@ -798,7 +704,7 @@ void OIDServer::returnOIDs(int start, int end) const
 		else
 			changed = false;
 
-
+		
 //	    "Old Reliable"
 	for (i = 0; i < FreeListEntries; i++)
 		if (freelist[i].begin == -1) {
@@ -807,7 +713,7 @@ void OIDServer::returnOIDs(int start, int end) const
 			break;
 		}
 
-
+		
 	try {
  		if (i != FreeListEntries)
 		if (changed)
@@ -818,31 +724,38 @@ void OIDServer::returnOIDs(int start, int end) const
 		flock(fFd, LOCK_UN);
 		throw;
 	}
-
+	
 	flock(fFd, LOCK_UN);
 */
 }
 
 int OIDServer::size() const
 {
-	int ret = 0, offset = 0, bytenum = 0;
-	uint8_t buf[4096], mask = 0;
-
-	boost::mutex::scoped_lock lk(fMutex);
-	for (offset = HeaderSize; offset < StartOfVBOidSection; offset+=4096) {
-		readData(buf, offset, 4096);
-		for (bytenum = 0; bytenum < 4096; bytenum++)
-			for (mask = 0x80; mask != 0; mask >>= 1)
-				if ((buf[bytenum] & mask) == mask)
-					ret++;
+	int ret, offset, bytenum;
+	uint8_t buf[4096], mask;
+	
+	ret = 0;
+	lockFile();
+	try {
+		for (offset = HeaderSize; offset < StartOfVBOidSection; offset+=4096) {
+			readData(buf, offset, 4096);
+			for (bytenum = 0; bytenum < 4096; bytenum++)
+				for (mask = 0x80; mask != 0; mask >>= 1)
+					if ((buf[bytenum] & mask) == mask)
+						ret++;
+		}
 	}
-
-	return ret;
+	catch(...) {
+		flock(fFd, LOCK_UN);
+		throw;
+	}
+	flock(fFd, LOCK_UN);
+	return ret;	
 }
 
 const string OIDServer::getFilename() const
 {
 	return fFilename;
 }
-
+	
 }  // namespace

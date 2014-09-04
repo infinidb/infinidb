@@ -22,17 +22,16 @@ set MODULETYPE [lindex $argv 4]
 set INSTALLTYPE [lindex $argv 5]
 set PKGTYPE "binary"
 set SERVERTYPE [lindex $argv 6]
-set MYSQLPORT [lindex $argv 7]
-set DEBUG [lindex $argv 8]
+set DEBUG [lindex $argv 7]
 set INSTALLDIR "/usr/local/Calpont"
-set IDIR [lindex $argv 9]
+set IDIR [lindex $argv 8]
 if { $IDIR != "" } {
 	set INSTALLDIR $IDIR
 }
 set env(INFINIDB_INSTALL_DIR) $INSTALLDIR
 set PREFIX [file dirname $INSTALLDIR]
 set USERNAME $env(USER)
-set UNM [lindex $argv 10]
+set UNM [lindex $argv 9]
 if { $UNM != "" } {
 	set USERNAME $UNM
 }
@@ -53,27 +52,27 @@ if { $INSTALLTYPE == "initial" || $INSTALLTYPE == "uninstall" } {
 	send_user "Uninstall Calpont Package                       "
 	send " \n"
 	send date\n
-	send "ssh $USERNAME@$SERVER 'rm -f /etc/init.d/infinidb /etc/init.d/mysql-Calpont $INSTALLDIR/releasenum >/dev/null 2>&1'\n"
+	send "ssh $USERNAME@$SERVER 'test -x $INSTALLDIR/bin/pre-uninstall && $INSTALLDIR/bin/pre-uninstall --installdir=$INSTALLDIR; rm -f /etc/init.d/infinidb /etc/init.d/mysql-Calpont $INSTALLDIR/releasenum >/dev/null 2>&1'\n"
 	set timeout 20
 	expect {
-		"Host key verification failed" { send_user "FAILED: Host key verification failed\n" ; exit 1}
-		"service not known" { send_user "FAILED: Invalid Host\n" ; exit 1}
-		"authenticity" { send "yes\n" 
+		-re "Host key verification failed" { send_user "FAILED: Host key verification failed\n" ; exit 1}
+		-re "service not known" { send_user "FAILED: Invalid Host\n" ; exit 1}
+		-re "authenticity" { send "yes\n" 
 							expect {
-								"word: " { send "$PASSWORD\n" }
-								"passphrase" { send "$PASSWORD\n" }
+								-re "word: " { send "$PASSWORD\n" } abort
+								-re "passphrase" { send "$PASSWORD\n" } abort
 							}
 		}
-		"word: " { send "$PASSWORD\n" }
-		"passphrase" { send "$PASSWORD\n" }
-		"Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit 1 }
-		"No route to host"   { send_user "ERROR: No route to host\n" ; exit 1 }
-		"Calpont uninstall completed"	{ send_user "DONE" }
+		-re "word: " { send "$PASSWORD\n" } abort
+		-re "passphrase" { send "$PASSWORD\n" } abort
+		-re "Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit 1 }
+		-re "No route to host"   { send_user "ERROR: No route to host\n" ; exit 1 }
+		-re "Calpont uninstall completed"	{ send_user "DONE" } abort
 	}
 	set timeout 30
 	expect {
-		"Read-only file system" { send_user "ERROR: local disk - Read-only file system\n" ; exit 1}
-		"Calpont uninstall completed"	{ send_user "DONE" }
+		-re "Read-only file system" { send_user "ERROR: local disk - Read-only file system\n" ; exit 1}
+		-re "Calpont uninstall completed"	{ send_user "DONE" } abort
 	}
 	send_user "\n"
 }
@@ -90,21 +89,21 @@ send date\n
 send "scp $CALPONTPKG $USERNAME@$SERVER:$CALPONTPKG\n"
 set timeout 10
 expect {
-	"word: " { send "$PASSWORD\n" }
-	"passphrase" { send "$PASSWORD\n" }
+	-re "word: " { send "$PASSWORD\n" } abort
+	-re "passphrase" { send "$PASSWORD\n" } abort
 }
 set timeout 120
 expect {
-	"100%" 				{ send_user "DONE" }
-	"scp:"  			{ send_user "ERROR\n" ; 
+	-re "100%" 				{ send_user "DONE" } abort
+	-re "scp:"  			{ send_user "ERROR\n" ; 
 				 			send_user "\n*** Installation ERROR\n" ; 
 							exit 1 }
-	"Permission denied, please try again"         { send_user "ERROR: Invalid password\n" ; exit 1 }
-	"No such file or directory" { send_user "ERROR: Invalid package\n" ; exit 1 }
-	"Read-only file system" { send_user "ERROR: local disk - Read-only file system\n" ; exit 1}
-	"Connection refused"   { send_user "ERROR: Connection refused\n" ; exit 1 }
-	"closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
-	"No route to host"   { send_user "ERROR: No route to host\n" ; exit 1 }
+	-re "Permission denied, please try again"         { send_user "ERROR: Invalid password\n" ; exit 1 }
+	-re "No such file or directory" { send_user "ERROR: Invalid package\n" ; exit 1 }
+	-re "Read-only file system" { send_user "ERROR: local disk - Read-only file system\n" ; exit 1}
+	-re "Connection refused"   { send_user "ERROR: Connection refused\n" ; exit 1 }
+	-re "closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
+	-re "No route to host"   { send_user "ERROR: No route to host\n" ; exit 1 }
 	timeout { send_user "ERROR: Timeout\n" ; exit 1 }
 }
 send_user "\n"
@@ -119,18 +118,18 @@ send date\n
 send "ssh $USERNAME@$SERVER 'tar -C $PREFIX --exclude db -zxf $CALPONTPKG;cat $INSTALLDIR/releasenum'\n"
 set timeout 10
 expect {
-	"word: " { send "$PASSWORD\n" }
-	"passphrase" { send "$PASSWORD\n" }
+	-re "word: " { send "$PASSWORD\n" } abort
+	-re "passphrase" { send "$PASSWORD\n" } abort
 }
 set timeout 120
 expect {
-	"release=" 		  	{ send_user "DONE" }
-	"No such file" 		  { send_user "ERROR: Binary Install Failed, binary/releasenum not found\n" ; exit 1 }
-	"Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit 1 }
-	"Read-only file system" { send_user "ERROR: local disk - Read-only file system\n" ; exit 1}
-	"Connection refused"   { send_user "ERROR: Connection refused\n" ; exit 1 }
-	"closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
-	"No route to host"   { send_user "ERROR: No route to host\n" ; exit 1 }
+	-re "release=" 		  	{ send_user "DONE" } abort
+	-re "No such file" 		  { send_user "ERROR: Binary Install Failed, binary/releasenum not found\n" ; exit 1 }
+	-re "Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit 1 }
+	-re "Read-only file system" { send_user "ERROR: local disk - Read-only file system\n" ; exit 1}
+	-re "Connection refused"   { send_user "ERROR: Connection refused\n" ; exit 1 }
+	-re "closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
+	-re "No route to host"   { send_user "ERROR: No route to host\n" ; exit 1 }
 	timeout { send_user "ERROR: Timeout\n" ; exit 1 }
 }
 #sleep to give time for cat Calpont/releasenum to complete
@@ -143,19 +142,19 @@ send date\n
 send "ssh $USERNAME@$SERVER '$INSTALLDIR/bin/post-install --installdir=$INSTALLDIR'\n"
 set timeout 10
 expect {
-	"word: " { send "$PASSWORD\n" }
-	"passphrase" { send "$PASSWORD\n" }
+	-re "word: " { send "$PASSWORD\n" } abort
+	-re "passphrase" { send "$PASSWORD\n" } abort
 }
 set timeout 60
 # check return
 expect {
-	"InfiniDB syslog logging not working" { send_user "ERROR: InfiniDB System logging not setup\n" ; exit 1 }
-	"Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit 1 }
-	"Read-only file system" { send_user "ERROR: local disk - Read-only file system\n" ; exit 1}
-	"Connection refused"   { send_user "ERROR: Connection refused\n" ; exit 1 }
-	"closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
-	"No route to host"   { send_user "ERROR: No route to host\n" ; exit 1 }
-	"postConfigure" { send_user "DONE" }
+	-re "InfiniDB syslog logging not working" { send_user "ERROR: InfiniDB System logging not setup\n" ; exit 1 }
+	-re "Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit 1 }
+	-re "Read-only file system" { send_user "ERROR: local disk - Read-only file system\n" ; exit 1}
+	-re "Connection refused"   { send_user "ERROR: Connection refused\n" ; exit 1 }
+	-re "closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
+	-re "No route to host"   { send_user "ERROR: No route to host\n" ; exit 1 }
+	-re "postConfigure" { send_user "DONE" } abort
 }
 send_user "\n"
 sleep 10
@@ -170,17 +169,17 @@ if { $INSTALLTYPE == "initial"} {
 	send "scp $INSTALLDIR/etc/* $USERNAME@$SERVER:$INSTALLDIR/etc\n"
 	set timeout 10
 	expect {
-		"word: " { send "$PASSWORD\n" }
-		"passphrase" { send "$PASSWORD\n" }
+		-re "word: " { send "$PASSWORD\n" } abort
+		-re "passphrase" { send "$PASSWORD\n" } abort
 	}
 	set timeout 30
 	expect {
-		-re {[$#] } 		  		  { send_user "DONE" }
-		"Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit 1 }
-		"Read-only file system" { send_user "ERROR: local disk - Read-only file system\n" ; exit 1}
-		"Connection refused"   { send_user "ERROR: Connection refused\n" ; exit 1 }
-		"closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
-		"No route to host"   { send_user "ERROR: No route to host\n" ; exit 1 }
+		-re "#|$" 		  		  { send_user "DONE" } abort
+		-re "Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit 1 }
+		-re "Read-only file system" { send_user "ERROR: local disk - Read-only file system\n" ; exit 1}
+		-re "Connection refused"   { send_user "ERROR: Connection refused\n" ; exit 1 }
+		-re "closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
+		-re "No route to host"   { send_user "ERROR: No route to host\n" ; exit 1 }
 	}
 	send_user "\n"
 	#
@@ -192,17 +191,17 @@ if { $INSTALLTYPE == "initial"} {
 	send "scp -r $INSTALLDIR/local/etc $USERNAME@$SERVER:$INSTALLDIR/local\n"
 	set timeout 10
 	expect {
-		"word: " { send "$PASSWORD\n" }
-		"passphrase" { send "$PASSWORD\n" }
+		-re "word: " { send "$PASSWORD\n" } abort
+		-re "passphrase" { send "$PASSWORD\n" } abort
 	}
 	set timeout 60
 	expect {
-		-re {[$#] } 		  		  { send_user "DONE" }
-		"Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit 1 }
-		"Read-only file system" { send_user "ERROR: local disk - Read-only file system\n" ; exit 1}
-		"Connection refused"   { send_user "ERROR: Connection refused\n" ; exit 1 }
-		"closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
-		"No route to host"   { send_user "ERROR: No route to host\n" ; exit 1 }
+		-re "#|$" 		  		  { send_user "DONE" } abort
+		-re "Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit 1 }
+		-re "Read-only file system" { send_user "ERROR: local disk - Read-only file system\n" ; exit 1}
+		-re "Connection refused"   { send_user "ERROR: Connection refused\n" ; exit 1 }
+		-re "closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
+		-re "No route to host"   { send_user "ERROR: No route to host\n" ; exit 1 }
 	}
 	send_user "\n"
 	#
@@ -214,17 +213,17 @@ if { $INSTALLTYPE == "initial"} {
 	send "scp $INSTALLDIR/local/etc/$MODULE/*  $USERNAME@$SERVER:$INSTALLDIR/local\n"
 	set timeout 10
 	expect {
-		"word: " { send "$PASSWORD\n" }
-		"passphrase" { send "$PASSWORD\n" }
-		"Read-only file system" { send_user "ERROR: local disk - Read-only file system\n" ; exit 1}
+		-re "word: " { send "$PASSWORD\n" } abort
+		-re "passphrase" { send "$PASSWORD\n" } abort
+		-re "Read-only file system" { send_user "ERROR: local disk - Read-only file system\n" ; exit 1}
 	}
 	set timeout 60
 	expect {
-		-re {[$#] } 		  		  { send_user "DONE" }
-		"Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit 1 }
-		"Connection refused"   { send_user "ERROR: Connection refused\n" ; exit 1 }
-		"closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
-		"No route to host"   { send_user "ERROR: No route to host\n" ; exit 1 }
+		-re "#|$" 		  		  { send_user "DONE" } abort
+		-re "Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit 1 }
+		-re "Connection refused"   { send_user "ERROR: Connection refused\n" ; exit 1 }
+		-re "closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
+		-re "No route to host"   { send_user "ERROR: No route to host\n" ; exit 1 }
 	}
 	send_user "\n"
 	#
@@ -233,26 +232,25 @@ if { $INSTALLTYPE == "initial"} {
 	send_user "Run Module Installer                            "
 	send " \n"
 	send date\n
-	send "ssh $USERNAME@$SERVER '$INSTALLDIR/bin/module_installer.sh --module=$MODULETYPE --port=$MYSQLPORT --installdir=$INSTALLDIR $MODULETYPE'\n"
+	send "ssh $USERNAME@$SERVER '$INSTALLDIR/bin/module_installer.sh --installdir=$INSTALLDIR $MODULETYPE'\n"
 	set timeout 10
 	expect {
-		"word: " { send "$PASSWORD\n" }
-		"passphrase" { send "$PASSWORD\n" }
+		-re "word: " { send "$PASSWORD\n" } abort
+		-re "passphrase" { send "$PASSWORD\n" } abort
 	}
 	set timeout 60
 	expect {
-		"!!!Module" 				  			{ send_user "DONE" }
-		"Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit 1 }
-		"FAILED"   								{ send_user "ERROR: missing module file\n" ; exit 1 }
-		"Read-only file system" { send_user "ERROR: local disk - Read-only file system\n" ; exit 1}
-		"Connection refused"   { send_user "ERROR: Connection refused\n" ; exit 1 }
-		"closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
-		"No route to host"   { send_user "ERROR: No route to host\n" ; exit 1 }
-		"No such file"   { send_user "ERROR: File Not Found\n" ; exit 1 }
+		-re "!!!Module" 				  			{ send_user "DONE" } abort
+		-re "Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit 1 }
+		-re "FAILED"   								{ send_user "ERROR: missing module file\n" ; exit 1 }
+		-re "Read-only file system" { send_user "ERROR: local disk - Read-only file system\n" ; exit 1}
+		-re "Connection refused"   { send_user "ERROR: Connection refused\n" ; exit 1 }
+		-re "closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
+		-re "No route to host"   { send_user "ERROR: No route to host\n" ; exit 1 }
 	}
 	send_user "\n"
 	sleep 10
-	if { $MODULETYPE == "um" || $SERVERTYPE == "2" || $SERVERTYPE == "pmwithum" } { 
+	if { $MODULETYPE == "um" || $SERVERTYPE == "2" } { 
 		#
 		# run mysql setup scripts
 		#
@@ -262,41 +260,41 @@ if { $INSTALLTYPE == "initial"} {
 		send "ssh $USERNAME@$SERVER '$INSTALLDIR/bin/post-mysqld-install --installdir=$INSTALLDIR'\n"
 		set timeout 10
 		expect {
-			"word: " { send "$PASSWORD\n" }
-			"passphrase" { send "$PASSWORD\n" }
+			-re "word: " { send "$PASSWORD\n" } abort
+			-re "passphrase" { send "$PASSWORD\n" } abort
 		}
 		set timeout 60
 		expect {
-			"ERROR" { send_user "ERROR: Daemon failed to run";
+			-re "ERROR" { send_user "ERROR: Daemon failed to run";
 			exit 1 }
-			"FAILED" { send_user "ERROR: Daemon failed to run";
+			-re "FAILED" { send_user "ERROR: Daemon failed to run";
 			exit 1 }
-			"Read-only file system" { send_user "ERROR: local disk - Read-only file system\n" ; exit 1}
-			"Connection refused"   { send_user "ERROR: Connection refused\n" ; exit 1 }
-			"closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
-			"No route to host"   { send_user "ERROR: No route to host\n" ; exit 1 }
+			-re "Read-only file system" { send_user "ERROR: local disk - Read-only file system\n" ; exit 1}
+			-re "Connection refused"   { send_user "ERROR: Connection refused\n" ; exit 1 }
+			-re "closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
+			-re "No route to host"   { send_user "ERROR: No route to host\n" ; exit 1 }
 		}
-
+		#
 		send " \n"
 		send date\n
 		send "ssh $USERNAME@$SERVER '$INSTALLDIR/bin/post-mysql-install --installdir=$INSTALLDIR'\n"
 		set timeout 10
 		expect {
-			"word: " { send "$PASSWORD\n" }
-			"passphrase" { send "$PASSWORD\n" }
+			-re "word: " { send "$PASSWORD\n" } abort
+			-re "passphrase" { send "$PASSWORD\n" } abort
 		}
 		set timeout 60
 		expect {
-			"Shutting down mysql." { send_user "DONE" }
-			timeout { send_user "DONE" }
-			"ERROR" { send_user "ERROR: Daemon failed to run";
+			-re "Shutting down mysql." { send_user "DONE" } abort
+			timeout { send_user "DONE" } abort
+			-re "ERROR" { send_user "ERROR: Daemon failed to run";
 			exit 1 }
-			"FAILED" { send_user "ERROR: Daemon failed to run";
+			-re "FAILED" { send_user "ERROR: Daemon failed to run";
 			exit 1 }
-			"Read-only file system" { send_user "ERROR: local disk - Read-only file system\n" ; exit 1}
-			"Connection refused"   { send_user "ERROR: Connection refused\n" ; exit 1 }
-			"closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
-			"No route to host"   { send_user "ERROR: No route to host\n" ; exit 1 }
+			-re "Read-only file system" { send_user "ERROR: local disk - Read-only file system\n" ; exit 1}
+			-re "Connection refused"   { send_user "ERROR: Connection refused\n" ; exit 1 }
+			-re "closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
+			-re "No route to host"   { send_user "ERROR: No route to host\n" ; exit 1 }
 		}
 		send_user "\n"
 	}
@@ -311,20 +309,21 @@ send date\n
 send "ssh $USERNAME@$SERVER '$INSTALLDIR/bin/syslogSetup.sh check'\n"
 set timeout 10
 expect {
-	"word: " { send "$PASSWORD\n" }
-	"passphrase" { send "$PASSWORD\n" }
+	-re "word: " { send "$PASSWORD\n" } abort
+	-re "passphrase" { send "$PASSWORD\n" } abort
 }
 set timeout 30
 expect {
-	"Logging working" { send_user "DONE" }
-	timeout { send_user "DONE" }
-	"not working" { send_user "WARNING: InfiniDB system logging functionality not working" }
-	"Connection refused"   { send_user "ERROR: Connection refused\n" ; exit 1 }
-	"closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
-	"No route to host"   { send_user "ERROR: No route to host\n" ; exit 1 }
+	-re "Logging working" { send_user "DONE" } abort
+	timeout { send_user "DONE" } abort
+	-re "not working" { send_user "WARNING: InfiniDB system logging functionality not working" } abort
+	-re "Connection refused"   { send_user "ERROR: Connection refused\n" ; exit 1 }
+	-re "closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
+	-re "No route to host"   { send_user "ERROR: No route to host\n" ; exit 1 }
 }
 send_user "\n"
 
+#
 send_user "\nInstallation Successfully Completed on '$MODULE'\n"
 exit 0
 

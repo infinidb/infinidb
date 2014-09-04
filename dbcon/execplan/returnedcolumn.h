@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: returnedcolumn.h 9679 2013-07-11 22:32:03Z zzhu $
+*   $Id: returnedcolumn.h 8436 2012-04-04 18:18:21Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -32,6 +32,8 @@
 
 #include "treenode.h"
 #include "calpontsystemcatalog.h"
+//#include "exceptclasses.h"
+//#include "dataconvert.h"
 
 namespace messageqcpp {
 	class ByteStream;
@@ -66,11 +68,6 @@ const uint64_t CORRELATED_JOIN = 0x0008;
  */
 class SimpleColumn;
 class AggregateColumn;
-class WindowFunctionColumn;
-class ReturnedColumn;
-class CalpontSelectExecutionPlan;
-
-typedef boost::shared_ptr<ReturnedColumn> SRCP;
 
 /**
  * @brief class ReturnedColumn
@@ -84,8 +81,8 @@ public:
 	 */
 	ReturnedColumn();
 	ReturnedColumn(const std::string& sql);
-	ReturnedColumn(const uint32_t sessionID, const bool returnAll = false);
-	ReturnedColumn(const ReturnedColumn& rhs, const uint32_t sessionID = 0);
+	ReturnedColumn(const u_int32_t sessionID, const bool returnAll = false);
+	ReturnedColumn(const ReturnedColumn& rhs, const u_int32_t sessionID = 0);
 
 	/**
 	 * Destructors
@@ -101,11 +98,11 @@ public:
 	virtual const bool returnAll() const {return fReturnAll;}
 	virtual void returnAll(const bool returnAll) { fReturnAll = returnAll; }
 
-	const uint32_t sessionID() const {return fSessionID;}
-	void sessionID(const uint32_t sessionID) { fSessionID = sessionID; }
+	const u_int32_t sessionID() const {return fSessionID;}
+	void sessionID(const u_int32_t sessionID) { fSessionID = sessionID; }
 
-	inline const int32_t sequence() const {return fSequence;}
-	inline void sequence(const int32_t sequence) {fSequence = sequence;}
+	inline const uint32_t sequence() const {return fSequence;}
+	inline void sequence(const uint32_t sequence) {fSequence = sequence;}
 
 	inline const std::string& alias() const { return fAlias; }
 	inline void alias(const std::string& alias) {  fAlias = alias; }
@@ -116,8 +113,8 @@ public:
 	virtual bool distinct() const { return fDistinct;}
 	virtual void distinct(const bool distinct) { fDistinct=distinct; }
 
-	const uint32_t expressionId() const { return fExpressionId; }
-	void expressionId(const uint32_t expressionId) { fExpressionId = expressionId; }
+	const uint expressionId() const { return fExpressionId; }
+	void expressionId(const uint expressionId) { fExpressionId = expressionId; }
 
 	virtual uint64_t joinInfo() const { return fJoinInfo; }
 	virtual void joinInfo(const uint64_t joinInfo) { fJoinInfo = joinInfo; }
@@ -125,21 +122,14 @@ public:
 	virtual const bool asc() const { return fAsc; }
 	virtual void asc(const bool asc) { fAsc = asc; }
 
-	virtual const bool nullsFirst() const { return fNullsFirst; }
-	virtual void nullsFirst(const bool nullsFirst) { fNullsFirst = nullsFirst; }
-
 	virtual uint64_t orderPos() const { return fOrderPos; }
 	virtual void orderPos(const uint64_t orderPos) { fOrderPos = orderPos; }
 
 	virtual uint64_t colSource() const { return fColSource; }
 	virtual void colSource(const uint64_t colSource) { fColSource = colSource; }
-
-	virtual int64_t colPosition() const { return fColPosition; }
-	virtual void colPosition(const int64_t colPosition) { fColPosition = colPosition; }
-
-	// Columns that may have aggregate column involved should implement this interface.
-	virtual bool hasAggregate() { return fHasAggregate;}
-	virtual void hasAggregate(bool hasAgg) { fHasAggregate = hasAgg; }
+	
+	virtual uint64_t colPosition() const { return fColPosition; }
+	virtual void colPosition(const uint64_t colPosition) { fColPosition = colPosition; }
 
 	/**
 	 * Operations
@@ -191,60 +181,29 @@ public:
 	virtual bool sameColumn(const ReturnedColumn* rc) const
 	{return (fData.compare(rc->data()) == 0);}
 
-	virtual const std::vector<SimpleColumn*>& simpleColumnList() const
+	// get all simple columns involved in this expression                                           
+	const std::vector<SimpleColumn*>& simpleColumnList() const
 	{ return fSimpleColumnList; }
 
-	/* @brief traverse this ReturnedColumn and re-populate fSimpleColumnList.
-	 * 
-	 * @note all ReturnedColumns that may have simple column arguments added
-	 * to the list need to implement thhis function.
-	 */
-	virtual void setSimpleColumnList();
-
-	// get all aggregate column list in this expression
+	// get & set aggregate column list in this expression
 	const std::vector<AggregateColumn*>& aggColumnList() const
 	{ return fAggColumnList; }
-
-	// get all window function column list in this expression
-	const std::vector<WindowFunctionColumn*>& windowfunctionColumnList() const
-	{ return fWindowFunctionColumnList; }
-
-	/* @brief if this column is or contains window function column
-	 *
-	 * @note after this function call fWindowFunctionColumnList is populated
-	 */
-	virtual bool hasWindowFunc() = 0;
-
-	virtual void replaceRealCol(std::vector<SRCP>&){}
-
-	/**
-	 * Return the tableAlias name of the table that the column arguments belong to.
-	 * 
-	 * @param TableAliasName that will be set in the function
-	 * @return true, if all arguments belong to one table
-	 *         false, if multiple tables are involved in the function
-	 */
-	virtual bool singleTable(CalpontSystemCatalog::TableAliasName& tan) 
-	{ return false; }
 
 protected:
 	// return all flag set if the other column is outer join column (+)
 	bool fReturnAll;
 	uint32_t fSessionID;
-	int32_t  fSequence;           /// column sequence on the SELECT mapped to the correlated joins
+	uint32_t fSequence;	/// column sequence on the SELECT mapped to the correlated joins
 	uint64_t fCardinality;
-	std::string fAlias;           /// column alias
+	std::string fAlias;                /// column alias
 	bool fDistinct;
 	uint64_t fJoinInfo;
-	bool fAsc;                    /// for order by column
-	bool fNullsFirst;             /// for window function
-	uint64_t fOrderPos;           /// for order by and group by column
-	uint64_t fColSource;          /// from which subquery
-	int64_t  fColPosition;        /// the column position in the source subquery
+	bool fAsc;	/// for order by column
+	uint64_t fOrderPos;	/// for order by and group by column
+	uint64_t fColSource;	/// from which subquery
+	uint64_t fColPosition;	/// the column position in the source subquery 
 	std::vector<SimpleColumn*> fSimpleColumnList;
 	std::vector<AggregateColumn*> fAggColumnList;
-	std::vector<WindowFunctionColumn*> fWindowFunctionColumnList;
-	bool fHasAggregate;           /// connector internal use. no need to serialize
 
 private:
 	std::string fData;
@@ -253,17 +212,19 @@ private:
  *                   F&E framework                                *
  ******************************************************************/
 public:
-	const uint32_t inputIndex() const { return fInputIndex; }
-	void inputIndex ( const uint32_t inputIndex ) { fInputIndex = inputIndex; }
-	const uint32_t outputIndex() const { return fOutputIndex; }
-	void outputIndex ( const uint32_t outputIndex ) { fOutputIndex = outputIndex; }
+	const uint inputIndex() const { return fInputIndex; }
+	void inputIndex ( const uint inputIndex ) { fInputIndex = inputIndex; }
+	const uint outputIndex() const { return fOutputIndex; }
+	void outputIndex ( const uint outputIndex ) { fOutputIndex = outputIndex; }
 
 protected:
-	std::string fErrMsg;   /// error occured in evaluation
-	uint32_t fInputIndex;  /// index to the input rowgroup
-	uint32_t fOutputIndex; /// index to the output rowgroup
-	uint32_t fExpressionId;    /// unique id for this expression
+	std::string fErrMsg;   // error occured in evaluation
+	uint32_t fInputIndex;  // index to the input rowgroup
+	uint32_t fOutputIndex; // index to the output rowgroup
+	uint fExpressionId;    // unique id for this expression
 };
+
+typedef boost::shared_ptr<ReturnedColumn> SRCP;
 
 std::ostream& operator<<(std::ostream& os, const ReturnedColumn& rhs);
 

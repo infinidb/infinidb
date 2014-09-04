@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: commandpackageprocessor.h 9302 2013-03-07 16:06:59Z chao $
+*   $Id: commandpackageprocessor.h 8436 2012-04-04 18:18:21Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -34,7 +34,7 @@
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/condition.hpp>
 
-#if defined(_MSC_VER) && defined(DMLPKGPROC_DLLEXPORT)
+#if defined(_MSC_VER) && defined(COMMANDPKGPROC_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
@@ -50,7 +50,6 @@ class CommandPackageProcessor : public DMLPackageProcessor
 {
 
 public:
-	CommandPackageProcessor(BRM::DBRM* aDbrm, uint32_t sid) : DMLPackageProcessor(aDbrm, sid){}
     /** @brief process an CommandDMLPackage
       *
       * @param cpackage the CommandDMLPackage to process

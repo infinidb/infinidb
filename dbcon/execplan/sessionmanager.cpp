@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: sessionmanager.cpp 9215 2013-01-24 18:40:12Z pleblanc $
+ * $Id: sessionmanager.cpp 8924 2012-09-19 18:25:54Z pleblanc $
  *
  ****************************************************************************/
 
@@ -69,12 +69,12 @@ SessionManager::~SessionManager()
 {
 }
 
-const QueryContext SessionManager::verID()
+const CalpontSystemCatalog::SCN SessionManager::verID()
 {
 	return dbrm.verID();
 }
 
-const QueryContext SessionManager::sysCatVerID()
+const CalpontSystemCatalog::SCN SessionManager::sysCatVerID()
 {
 	return dbrm.sysCatVerID();
 }

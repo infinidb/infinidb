@@ -1,22 +1,5 @@
-/* Copyright (C) 2014 InfiniDB, Inc.
-
-   This program is free software; you can redistribute it and/or
-   modify it under the terms of the GNU General Public License
-   as published by the Free Software Foundation; version 2 of
-   the License.
-
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-   MA 02110-1301, USA. */
-
 /******************************************************************************************
-* $Id: processmanager.h 2163 2013-04-04 18:40:54Z rdempsey $
+* $Id: processmanager.h 2051 2012-11-29 21:09:31Z dhill $
 *
 ******************************************************************************************/
 
@@ -71,12 +54,11 @@
 
 void pingDeviceThread();
 
+
 namespace processmanager{
 
 	void startSystemThread(oam::DeviceNetworkList devicenetworklist);
-	void stopSystemThread(oam::DeviceNetworkList devicenetworklist);
 	void startModuleThread(std::string moduleName);
-	void stopModuleThread(std::string moduleName);
 	void processMSG(messageqcpp::IOSocket* fIos);
 	void sendUpgradeRequest();
 
@@ -285,12 +267,12 @@ public:
      /**
      *@brief Stop all processes on the specified module
      */
-    int stopModule(std::string target, messageqcpp::ByteStream::byte actionIndicator, bool manualFlag, int timeout = 240 );
+    int stopModule(std::string target, messageqcpp::ByteStream::byte actionIndicator, bool manualFlag);
 
     /**
      *@brief power off the specified module
      */
-    int shutdownModule(std::string target, messageqcpp::ByteStream::byte actionIndicator, bool manualFlag, int timeout = 10 );
+    int shutdownModule(std::string target, messageqcpp::ByteStream::byte actionIndicator, bool manualFlag);
 
      /**
      *@brief Disable a specified module
@@ -322,7 +304,7 @@ public:
     /**
      *@brief stop process on a specific module
      */
-	int stopProcess(std::string moduleName, std::string processName, messageqcpp::ByteStream::byte actionIndicator, bool manualFlag, int timeout = 10);
+	int stopProcess(std::string moduleName, std::string processName, messageqcpp::ByteStream::byte actionIndicator, bool manualFlag);
 
     /**
      *@brief start process on a specific module
@@ -493,7 +475,7 @@ public:
 
 	/** @brief get DBRM Data and send to requester
 		*/
-	int getDBRMData(messageqcpp::IOSocket fIos, std::string moduleName);
+	int getDBRMData(messageqcpp::IOSocket fIos);
 
 	/** @brief remount the dbroot disk
 		*/
@@ -529,10 +511,6 @@ public:
 	/** @brief distribute fstab update message
 		*/
 	int updateFstab(std::string moduleName, std::string entry);
-
-	/** @brief Set MySQL Replication
-		*/
-	int setMySQLReplication(oam::DeviceNetworkList devicenetworklist, std::string masterModule = oam::UnassignedName, bool failover = false, bool distributeDB = false, std::string password = oam::UnassignedName);
 
 
 private:

@@ -62,12 +62,12 @@ public:
 						   BRM::VER_t verid,
 						   bool vbFlag,
 						   BRM::OID_t& oid,
-						   uint32_t& offset);
+						   u_int32_t& offset);
 	void buildOidFileName(const BRM::OID_t oid, char* file_name);
 
-	uint32_t getExtentSize() { return fdbrm.getExtentSize(); }
+	uint getExtentSize() { return fdbrm.getExtentSize(); }
 
-	uint32_t blocksPerRead;
+	uint blocksPerRead;
 
 	bool IOTrace() const { return fIOTrace;}
 

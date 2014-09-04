@@ -11,11 +11,9 @@ set USERNAME $env(USER)
 set PASSWORD " "
 set DEBUG 0
 
-set INFINIDBRPM1 "infinidb-libs"
-set INFINIDBRPM2 "infinidb-platform"
-set INFINIDBRPM3 "infinidb-enterprise"
-set CONNECTORRPM1 "infinidb-mysql"
-set CONNECTORRPM2 "infinidb-storage-engine"
+set CALPONTRPM "calpont"
+set CONNECTORRPM1 "calpont-mysql"
+set CONNECTORRPM2 "calpont-mysqld"
 
 spawn -noecho /bin/bash
 
@@ -57,15 +55,15 @@ set timeout 2
 set INSTALL 2
 send "$INFINIDB_INSTALL_DIR/bin/getConfig DBRM_Controller NumWorkers\n"
 expect {
-        1                         { set INSTALL 1 }
+        -re 1                         { set INSTALL 1 } abort
 }
 
 set PACKAGE "rpm"
 send "$INFINIDB_INSTALL_DIR/bin/getConfig Installation EEPackageType\n"
 expect {
-        rpm                         { set PACKAGE rpm }
-        deb                         { set PACKAGE deb }
-        binary                         { set PACKAGE binary }
+        -re rpm                         { set PACKAGE rpm } abort
+        -re deb                         { set PACKAGE deb } abort
+        -re binary                         { set PACKAGE binary } abort
 }
 
 set timeout 60
@@ -78,10 +76,10 @@ send_user "\nPerforming InfiniDB System Uninstall\n\n"
 # shutdownSystem
 #
 send_user "Shutdown InfiniDB System                         "
-expect -re {[$#] }
+expect -re "# "
 send "$INFINIDB_INSTALL_DIR/bin/calpontConsole shutdownsystem y\n"
 expect {
-	"shutdownSystem "       { send_user "DONE" }
+	-re "shutdownSystem "       { send_user "DONE" } abort
 }
 send_user "\n"
 
@@ -92,10 +90,10 @@ if { $INSTALL == "2"} {
 	# Run installer
 	#
 	send_user "Run System Uninstaller                           "
-	send "$INFINIDB_INSTALL_DIR/bin/installer $INFINIDBRPM1 $INFINIDBRPM2 $INFINIDBRPM3 $CONNECTORRPM1 $CONNECTORRPM2 uninstall $PASSWORD n --nodeps dummymysqlpw $DEBUG\n"
+	send "$INFINIDB_INSTALL_DIR/bin/installer $CALPONTRPM $CONNECTORRPM1 $CONNECTORRPM2 uninstall $PASSWORD n --nodeps dummymysqlpw $DEBUG\n"
 	expect {
-		"uninstall request successful" 			{ send_user "DONE" }
-		"ERROR"   								{ send_user "FAILED" ; exit -1 }
+		-re "uninstall request successful" 			{ send_user "DONE" } abort
+		-re "ERROR"   								{ send_user "FAILED" ; exit -1 }
 	}
 	send_user "\n"
 }
@@ -103,7 +101,7 @@ if { $INSTALL == "2"} {
 if { $PACKAGE == "binary" } {
 	send "$INFINIDB_INSTALL_DIR/bin/pre-uninstall\n"
 	expect {
-		-re {[$#] }                  {  }
+		-re "# "                  {  } abort
 	}
 
 	send_user "\n"

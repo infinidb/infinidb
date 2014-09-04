@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: sessionmonitor.h 9210 2013-01-21 14:10:42Z rdempsey $
+ * $Id: sessionmonitor.h 8436 2012-04-04 18:18:21Z rdempsey $
  *
  *****************************************************************************/
 
@@ -199,7 +199,7 @@ class SessionMonitor {
 		// the second is used to block processes when there are too many concurrent txns
 		int fsems;
 		int fshmid; 	// shared memory segment id
-		uint32_t fuid; // user id used to create the shared memory key 
+		u_int32_t fuid; // user id used to create the shared memory key 
 
 		SessionManager sm;
 

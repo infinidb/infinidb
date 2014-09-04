@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_date.cpp 3923 2013-06-19 21:43:06Z bwilkinson $
+* $Id: func_date.cpp 3048 2012-04-04 15:33:45Z rdempsey $
 *
 *
 ****************************************************************************/
@@ -77,19 +77,11 @@ int64_t Func_date::getIntVal(rowgroup::Row& row,
 		case execplan::CalpontSystemCatalog::MEDINT:
 		case execplan::CalpontSystemCatalog::TINYINT:
 		case execplan::CalpontSystemCatalog::SMALLINT:
-        case execplan::CalpontSystemCatalog::UBIGINT:
-        case execplan::CalpontSystemCatalog::UINT:
-        case execplan::CalpontSystemCatalog::UMEDINT:
-        case execplan::CalpontSystemCatalog::UTINYINT:
-        case execplan::CalpontSystemCatalog::USMALLINT:
-        case execplan::CalpontSystemCatalog::DOUBLE:
-		case execplan::CalpontSystemCatalog::UDOUBLE:
+		case execplan::CalpontSystemCatalog::DOUBLE:
 		case execplan::CalpontSystemCatalog::FLOAT:
-        case execplan::CalpontSystemCatalog::UFLOAT:
 		case execplan::CalpontSystemCatalog::VARCHAR:
 		case execplan::CalpontSystemCatalog::CHAR:
 		case execplan::CalpontSystemCatalog::DECIMAL:
-        case execplan::CalpontSystemCatalog::UDECIMAL:
 		{
 			isNull = true;
 			return 0;
@@ -112,7 +104,7 @@ string Func_date::getStrVal(rowgroup::Row& row,
 							bool& isNull,
 							CalpontSystemCatalog::ColType&)
 {
-	const string& val = parm[0]->data()->getStrVal(row, isNull);
+	string val = parm[0]->data()->getStrVal(row, isNull);
 
 	return val.substr(0,10);
 }

@@ -14,22 +14,20 @@ set USERNAME root
 set MODULE [lindex $argv 0]
 set SERVER [lindex $argv 1]
 set PASSWORD [lindex $argv 2]
-set CALPONTRPM1 [lindex $argv 3]
-set CALPONTRPM2 [lindex $argv 4]
-set CALPONTRPM3 [lindex $argv 5]
-set CALPONTMYSQLRPM [lindex $argv 6]
-set CALPONTMYSQLDRPM [lindex $argv 7]
-set INSTALLTYPE [lindex $argv 8]
-set PKGTYPE [lindex $argv 9]
-set NODEPS [lindex $argv 10]
-set DEBUG [lindex $argv 11]
+set CALPONTRPM [lindex $argv 3]
+set CALPONTMYSQLRPM [lindex $argv 4]
+set CALPONTMYSQLDRPM [lindex $argv 5]
+set INSTALLTYPE [lindex $argv 6]
+set PKGTYPE [lindex $argv 7]
+set NODEPS [lindex $argv 8]
+set DEBUG [lindex $argv 9]
 set INSTALLDIR "/usr/local/Calpont"
-set IDIR [lindex $argv 12]
+set IDIR [lindex $argv 10]
 if { $IDIR != "" } {
 	set INSTALLDIR $IDIR
 }
 set USERNAME "root"
-set UNM [lindex $argv 13]
+set UNM [lindex $argv 11]
 if { $UNM != "" } {
 	set USERNAME $UNM
 }
@@ -64,256 +62,242 @@ send_user " "
 send "ssh $USERNAME@$SERVER 'time'\n"
 set timeout 60
 expect {
-	"Host key verification failed" { send_user "FAILED: Host key verification failed\n" ; exit 1 }
-	"service not known" { send_user "FAILED: Invalid Host\n" ; exit 1 }
-	"authenticity" { send "yes\n" 
+	-re "Host key verification failed" { send_user "FAILED: Host key verification failed\n" ; exit 1 }
+	-re "service not known" { send_user "FAILED: Invalid Host\n" ; exit 1 }
+	-re "authenticity" { send "yes\n" 
 						expect {
-							"word: " { send "$PASSWORD\n" }
-							"passphrase" { send "$PASSWORD\n" }
+							-re "word: " { send "$PASSWORD\n" } abort
+							-re "passphrase" { send "$PASSWORD\n" } abort
 						}
 	}
-	"sys" { set PASSWORD "ssh" }
-	"word: " { send "$PASSWORD\n" }
-	"passphrase" { send "$PASSWORD\n" }
-	"Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit 1 }
-	"Connection refused"   { send_user "ERROR: Connection refused\n" ; exit 1 }
-	"closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
-	"No route to host"   { send_user "ERROR: No route to host\n" ; exit 1 }
+	-re "sys" { set PASSWORD "ssh" } abort
+	-re "word: " { send "$PASSWORD\n" } abort
+	-re "passphrase" { send "$PASSWORD\n" } abort
+	-re "Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit 1 }
+	-re "Connection refused"   { send_user "ERROR: Connection refused\n" ; exit 1 }
+	-re "closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
+	-re "No route to host"   { send_user "ERROR: No route to host\n" ; exit 1 }
 	timeout { send_user "ERROR: Timeout to host\n" ; exit 1 }
 }
 set timeout 30
 expect {
-	-re {[$#] }        {  }
-	"sys" {  }
+	-re "# "        {  } abort
+	-re "sys" {  } abort
 }
 send_user "\n"
-#BUG 5749 - SAS: didn't work on their system until I added the sleep 60
-
-sleep 60
+sleep 5
 
 if { $INSTALLTYPE == "initial" || $INSTALLTYPE == "uninstall" } {
 	# 
 	# erase package
 	#
-	send_user "Erase InfiniDB Packages on Module                 "
-	send "ssh $USERNAME@$SERVER '$PKGERASE calpont >/dev/null 2>&1; $PKGERASE infinidb-enterprise >/dev/null 2>&1; $PKGERASE infinidb-libs infinidb-platform;$PKGERASE dummy'\n"
+	send_user "Erase calpont Package on Module                 "
+	send "ssh $USERNAME@$SERVER '$PKGERASE calpont'\n"
 	if { $PASSWORD != "ssh" } {
 		set timeout 30
 		expect {
-			"word: " { send "$PASSWORD\n" }
-			"passphrase" { send "$PASSWORD\n" }
+			-re "word: " { send "$PASSWORD\n" } abort
+			-re "passphrase" { send "$PASSWORD\n" } abort
 		}
 	}
-	set timeout 120
+	set timeout 30
 	expect {
-		"package dummy" { send_user "DONE" }
-		"error: Failed dependencies" { send_user "ERROR: Failed dependencies\n" ; exit 1 }
-		"Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit 1 }
-		"Connection refused"   { send_user "ERROR: Connection refused\n" ; exit 1 }
-		"closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
-		"No route to host"   { send_user "ERROR: No route to host\n" ; exit 1 }
+		-re "# "                  { send_user "DONE" } abort
+		-re "uninstall completed" { send_user "DONE" } abort
+		-re "removing" { send_user "DONE" } abort
+		-re "error: Failed dependencies" { send_user "ERROR: Failed dependencies\n" ; exit 1 }
+		-re "Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit 1 }
+		-re "error: package"       { send_user "INFO: Package not installed" } abort
+		-re "not installed"       { send_user "INFO: Package not installed" } abort
+		-re "isn't installed"       { send_user "INFO: Package not installed" } abort
+		-re "Connection refused"   { send_user "ERROR: Connection refused\n" ; exit 1 }
+		-re "closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
+		-re "No route to host"   { send_user "ERROR: No route to host\n" ; exit 1 }
 	}
 	send_user "\n"
 }
-
 if { $INSTALLTYPE == "uninstall" } { exit 0 }
 
+#gives time for the rpmsave to be done
+sleep 5
 # 
 # send the package
 #
 set timeout 30
-#expect -re {[$#] }
-send_user "Copy New InfiniDB Package to Module              "
-send "ssh $USERNAME@$SERVER 'rm -f /root/infinidb-*.$PKGTYPE'\n"
+expect -re "# "
+send_user "Copy New calpont Package to Module              "
+send "ssh $USERNAME@$SERVER 'rm -f /root/calpont*.$PKGTYPE'\n"
 if { $PASSWORD != "ssh" } {
 	set timeout 30
 	expect {
-		"word: " { send "$PASSWORD\n" }
-		"passphrase" { send "$PASSWORD\n" }
+		-re "word: " { send "$PASSWORD\n" } abort
+		-re "passphrase" { send "$PASSWORD\n" } abort
 	}
 }
 expect {
-	-re {[$#] } { }
-	"Connection refused"   { send_user "ERROR: Connection refused\n" ; exit 1 }
-	"closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
-	"No route to host"   { send_user "ERROR: No route to host\n" ; exit 1 }
+	-re "# " { } abort
+	-re "Connection refused"   { send_user "ERROR: Connection refused\n" ; exit 1 }
+	-re "closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
+	-re "No route to host"   { send_user "ERROR: No route to host\n" ; exit 1 }
 }
 set timeout 30
-expect {
-        -re {[$#] } { }
-}
-
-send "scp $CALPONTRPM1 $CALPONTRPM2 $CALPONTMYSQLRPM $CALPONTMYSQLDRPM $USERNAME@$SERVER:.;$PKGERASE dummy\n"
+expect -re "# "
+send "scp $CALPONTRPM  $USERNAME@$SERVER:$CALPONTRPM\n"
 if { $PASSWORD != "ssh" } {
-        set timeout 30
-        expect {
-                "word: " { send "$PASSWORD\n" }
-                "passphrase" { send "$PASSWORD\n" }
-        }
+	set timeout 30
+	expect {
+		-re "word: " { send "$PASSWORD\n" } abort
+		-re "passphrase" { send "$PASSWORD\n" } abort
+	}
 }
 set timeout 120
 expect {
-        "package dummy"         { send_user "DONE" }
-        "directory"             { send_user "ERROR\n" ;
-                                        send_user "\n*** Installation ERROR\n" ;
-                                        exit 1 }
-        "closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
+	-re "100%" 				{ send_user "DONE" } abort
+	-re "directory"  		{ send_user "ERROR\n" ; 
+				 			send_user "\n*** Installation ERROR\n" ; 
+							exit 1 }
+	-re "Permission denied, please try again"         { send_user "ERROR: Invalid password\n" ; exit 1 }
+	-re "No such file or directory" { send_user "ERROR: Invalid package\n" ; exit 1 }
+	-re "Connection refused"   { send_user "ERROR: Connection refused\n" ; exit 1 }
+	-re "closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
+	-re "No route to host"   { send_user "ERROR: No route to host\n" ; exit 1 }
 }
 send_user "\n"
-
 #sleep to make sure it's finished
 sleep 5
-if { $CALPONTRPM3 != "dummy.rpm" } {
-        expect -re {[$#] }
-        send_user "Copy new InfiniDB Enterprise Packages to Module   "
-        send "scp $CALPONTRPM3 $USERNAME@$SERVER:.\n"
-        if { $PASSWORD != "ssh" } {
-                set timeout 30
-                expect {
-                        "word: " { send "$PASSWORD\n" }
-                        "passphrase" { send "$PASSWORD\n" }
-                }
-        }
-        set timeout 120
-        expect {
-                "100%"                  { send_user "DONE" }
-                "directory"             { send_user "ERROR\n" ;
-                                                send_user "\n*** Installation ERROR\n" ;
-                                                exit 1 }
-                "closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
-        }
-        send_user "\n"
+# 
+# send the package
+#
+send_user "Copy New calpont-mysql Package to Module        "
+send "scp $CALPONTMYSQLRPM  $USERNAME@$SERVER:$CALPONTMYSQLRPM\n"
+if { $PASSWORD != "ssh" } {
+	set timeout 30
+	expect {
+		-re "word: " { send "$PASSWORD\n" } abort
+		-re "passphrase" { send "$PASSWORD\n" } abort
+	}
 }
-
+set timeout 120
+expect {
+	-re "100%" 				{ send_user "DONE" } abort
+	-re "directory"  		{ send_user "ERROR\n" ; 
+				 			send_user "\n*** Installation ERROR\n" ; 
+							exit 1 }
+	-re "Permission denied, please try again"         { send_user "ERROR: Invalid password\n" ; exit 1 }
+	-re "No such file or directory" { send_user "ERROR: Invalid package\n" ; exit 1 }
+	-re "Connection refused"   { send_user "ERROR: Connection refused\n" ; exit 1 }
+	-re "closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
+	-re "No route to host"   { send_user "ERROR: No route to host\n" ; exit 1 }
+}
+send_user "\n"
 #sleep to make sure it's finished
 sleep 5
-
+# 
+# send the package
+#
+send_user "Copy New calpont-mysqld Package to Module       "
+send "scp $CALPONTMYSQLDRPM  $USERNAME@$SERVER:$CALPONTMYSQLDRPM\n"
+if { $PASSWORD != "ssh" } {
+	set timeout 30
+	expect {
+		-re "word: " { send "$PASSWORD\n" } abort
+		-re "passphrase" { send "$PASSWORD\n" } abort
+	}
+}
+set timeout 120
+expect {
+	-re "100%" 				{ send_user "DONE" } abort
+	-re "directory"  		{ send_user "ERROR\n" ; 
+				 			send_user "\n*** Installation ERROR\n" ; 
+							exit 1 }
+	-re "Permission denied, please try again"         { send_user "ERROR: Invalid password\n" ; exit 1 }
+	-re "No such file or directory" { send_user "ERROR: Invalid package\n" ; exit 1 }
+	-re "Connection refused"   { send_user "ERROR: Connection refused\n" ; exit 1 }
+	-re "closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
+	-re "No route to host"   { send_user "ERROR: No route to host\n" ; exit 1 }
+}
+send_user "\n"
+#sleep to make sure it's finished
+sleep 5
 #
 if { $INSTALLTYPE == "initial"} {
 	#
 	# install package
 	#
-	send_user "Install InfiniDB Packages on Module               "
-
-	send "ssh $USERNAME@$SERVER '$PKGINSTALL $CALPONTRPM1 $CALPONTRPM2;$PKGERASE dummy'\n"
+	send_user "Install calpont Package on Module               "
+	send "ssh $USERNAME@$SERVER '$PKGINSTALL $CALPONTRPM'\n"
 	if { $PASSWORD != "ssh" } {
 		set timeout 30
 		expect {
-			"word: " { send "$PASSWORD\n" }
-			"passphrase" { send "$PASSWORD\n" }
-		}
-	}
-	set timeout 180
-	expect {
-		"package dummy" 		  { send_user "DONE" }
-		"error: Failed dependencies" { send_user "ERROR: Failed dependencies\n" ; 
-									send_user "\n*** Installation ERROR\n" ; 
-										exit 1 }
-		"Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit 1 }
-		"closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
-		"needs"    { send_user "ERROR: disk space issue\n" ; exit 1 }
-		"conflicts"	   { send_user "ERROR: File Conflict issue\n" ; exit 1 }
-	}
-
-	if { $CALPONTRPM3 != "dummy.rpm" } {
-        expect -re {[$#] }
-		send_user "\n"
-		send_user "Install InfiniDB Enterprise Packages on Module    "
-		send "ssh $USERNAME@$SERVER '$PKGINSTALL $CALPONTRPM3'\n"
-		if { $PASSWORD != "ssh" } {
-			set timeout 30
-			expect {
-				"word: " { send "$PASSWORD\n" }
-				"passphrase" { send "$PASSWORD\n" }
-			}
-		}
-		set timeout 60
-		expect {
-			"completed" 		  { send_user "DONE" }
-			"Setting up" 		  { send_user "DONE" }
-			"error: Failed dependencies" { send_user "ERROR: Failed dependencies\n" ; 
-										send_user "\n*** Installation ERROR\n" ; 
-											exit 1 }
-			"Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit 1 }
-			"closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
-			"conflicts"	   { send_user "ERROR: File Conflict issue\n" ; exit 1 }
-		}
-	}
-
-} else {
-	#
-	# upgrade package
-	#
-	send_user "Upgrade InfiniDB Packages on Module               "
-
-	send "ssh $USERNAME@$SERVER '$PKGUPGRADE $CALPONTRPM1 $CALPONTRPM2;$PKGERASE dummy'\n"
-	if { $PASSWORD != "ssh" } {
-		set timeout 30
-		expect {
-			"word: " { send "$PASSWORD\n" }
-			"passphrase" { send "$PASSWORD\n" }
+			-re "word: " { send "$PASSWORD\n" } abort
+			-re "passphrase" { send "$PASSWORD\n" } abort
 		}
 	}
 	set timeout 60
 	expect {
-		"package dummy" 		  { send_user "DONE" }
-		"already installed"   { send_user "INFO: Already Installed\n" ; exit 1 }
-		"error: Failed dependencies" { send_user "ERROR: Failed dependencies\n" ; 
+		-re "completed" 		  { send_user "DONE" } abort
+		-re "Setting up" 		  { send_user "DONE" } abort
+		-re "error: Failed dependencies" { send_user "ERROR: Failed dependencies\n" ; 
 									send_user "\n*** Installation ERROR\n" ; 
 										exit 1 }
-		"Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit 1 }
-		"closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
+		-re "Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit 1 }
+		-re "Connection refused"   { send_user "ERROR: Connection refused\n" ; exit 1 }
+		-re "closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
+		-re "No route to host"   { send_user "ERROR: No route to host\n" ; exit 1 }
+		-re "No such file or directory"   { send_user "ERROR: file not found\n" ; exit 1 }
 	}
-
-	if { $CALPONTRPM3 != "dummy.rpm" } {
-		send_user "\n"
-		send_user "Upgrade InfiniDB Enterprise Packages on Module    "
-
-		send "ssh $USERNAME@$SERVER '$PKGUPGRADE $CALPONTRPM3'\n"
-		if { $PASSWORD != "ssh" } {
-			set timeout 30
-			expect {
-				"word: " { send "$PASSWORD\n" }
-				"passphrase" { send "$PASSWORD\n" }
-			}
-		}
-		set timeout 60
+} else {
+	#
+	# upgrade package
+	#
+	send_user "Upgrade calpont Package on Module               "
+	send "ssh $USERNAME@$SERVER '$PKGUPGRADE  $CALPONTRPM'\n"
+	if { $PASSWORD != "ssh" } {
+		set timeout 30
 		expect {
-			"completed" 		  { send_user "DONE" }
-			"Setting up" 		  { send_user "DONE" }
-			"already installed"   { send_user "INFO: Already Installed\n" ; exit 1 }
-			"error: Failed dependencies" { send_user "ERROR: Failed dependencies\n" ; 
-										send_user "\n*** Installation ERROR\n" ; 
-											exit 1 }
-			"Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit 1 }
-			"closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
+			-re "word: " { send "$PASSWORD\n" } abort
+			-re "passphrase" { send "$PASSWORD\n" } abort
 		}
 	}
-
+	set timeout 60
+	expect {
+		-re "completed" 		  { send_user "DONE" } abort
+		-re "Setting up" 		  { send_user "DONE" } abort
+		-re "already installed"   { send_user "INFO: Already Installed\n" ; exit 1 }
+		-re "error: Failed dependencies" { send_user "ERROR: Failed dependencies\n" ; 
+									send_user "\n*** Installation ERROR\n" ; 
+										exit 1 }
+		-re "Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit 1 }
+		-re "Connection refused"   { send_user "ERROR: Connection refused\n" ; exit 1 }
+		-re "closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
+		-re "No route to host"   { send_user "ERROR: No route to host\n" ; exit 1 }
+	}
 }
 send_user "\n"
-#sleep to make sure it's finished
-sleep 5
 set timeout 30
-#expect -re {[$#] }
+expect -re "# "
+#sleep to make sure rpm install has finsihed
+sleep 10
 if { $INSTALLTYPE == "initial"} {
 	#
-	# copy over InfiniDB config file
+	# copy over calpont config file
 	#
-	send_user "Copy InfiniDB Config file to Module              "
+	send_user "Copy Calpont Config file to Module              "
 	send "scp $INSTALLDIR/etc/*  $USERNAME@$SERVER:$INSTALLDIR/etc/.\n"
 	if { $PASSWORD != "ssh" } {
 		set timeout 30
 		expect {
-			"word: " { send "$PASSWORD\n" }
-			"passphrase" { send "$PASSWORD\n" }
+			-re "word: " { send "$PASSWORD\n" } abort
+			-re "passphrase" { send "$PASSWORD\n" } abort
 		}
 	}
 	set timeout 30
 	expect {
-		-re {[$#] } 		  		  { send_user "DONE" }
-		"Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit 1 }
-		"closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
+		-re "# " 		  		  { send_user "DONE" } abort
+		-re "Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit 1 }
+		-re "Connection refused"   { send_user "ERROR: Connection refused\n" ; exit 1 }
+		-re "closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
+		-re "No route to host"   { send_user "ERROR: No route to host\n" ; exit 1 }
 	}
 	send_user "\n"
 	#sleep to make sure it's finished
@@ -326,36 +310,40 @@ if { $INSTALLTYPE == "initial"} {
 	if { $PASSWORD != "ssh" } {
 		set timeout 30
 		expect {
-			"word: " { send "$PASSWORD\n" }
-			"passphrase" { send "$PASSWORD\n" }
+			-re "word: " { send "$PASSWORD\n" } abort
+			-re "passphrase" { send "$PASSWORD\n" } abort
 		}
 	}
 	set timeout 30
 	expect {
-		-re {[$#] } 		  		  { send_user "DONE" }
-		"Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit 1 }
-		"closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
+		-re "# " 		  		  { send_user "DONE" } abort
+		-re "Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit 1 }
+		-re "Connection refused"   { send_user "ERROR: Connection refused\n" ; exit 1 }
+		-re "closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
+		-re "No route to host"   { send_user "ERROR: No route to host\n" ; exit 1 }
 	}
 	send_user "\n"
 	#sleep to make sure it's finished
 	sleep 5
 	#
-	# copy over InfiniDB OS files
+	# copy over calpont OS files
 	#
-	send_user "Copy InfiniDB OS files to Module                 "
+	send_user "Copy Calpont OS files to Module                 "
 	send "scp $INSTALLDIR/local/etc/$MODULE/*  $USERNAME@$SERVER:$INSTALLDIR/local/.\n"
 	if { $PASSWORD != "ssh" } {
 		set timeout 30
 		expect {
-			"word: " { send "$PASSWORD\n" }
-			"passphrase" { send "$PASSWORD\n" }
+			-re "word: " { send "$PASSWORD\n" } abort
+			-re "passphrase" { send "$PASSWORD\n" } abort
 		}
 	}
 	set timeout 30
 	expect {
-		-re {[$#] } 		  		  { send_user "DONE" }
-		"Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit 1 }
-		"closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
+		-re "# " 		  		  { send_user "DONE" } abort
+		-re "Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit 1 }
+		-re "Connection refused"   { send_user "ERROR: Connection refused\n" ; exit 1 }
+		-re "closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
+		-re "No route to host"   { send_user "ERROR: No route to host\n" ; exit 1 }
 	}
 	#
 	send_user "\n"
@@ -365,21 +353,23 @@ if { $INSTALLTYPE == "initial"} {
 	# Start module installer to setup Custom OS files
 	#
 	send_user "Run Module Installer                            "
-	send "ssh $USERNAME@$SERVER '$BASH $INSTALLDIR/bin/module_installer.sh --module=pm'\n"
+	send "ssh $USERNAME@$SERVER '$BASH $INSTALLDIR/bin/module_installer.sh pm'\n"
 	if { $PASSWORD != "ssh" } {
 		set timeout 30
 		expect {
-			"word: " { send "$PASSWORD\n" }
-			"passphrase" { send "$PASSWORD\n" }
+			-re "word: " { send "$PASSWORD\n" } abort
+			-re "passphrase" { send "$PASSWORD\n" } abort
 		}
 	}
 	set timeout 30
 	expect {
-		"!!!Module" 	{ send_user "DONE" }
-		"Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit 1 }
-		"FAILED"   { send_user "ERROR: missing OS file\n" ; exit 1 }
-		"closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
-		"No such file"   { send_user "ERROR: File Not Found\n" ; exit 1 }
+		-re "!!!Module" 				  			{ send_user "DONE" } abort
+		-re "Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit 1 }
+		-re "FAILED"   								{ send_user "ERROR: missing OS file\n" ; exit 1 }
+		-re "Connection refused"   { send_user "ERROR: Connection refused\n" ; exit 1 }
+		-re "closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
+		-re "No route to host"   { send_user "ERROR: No route to host\n" ; exit 1 }
+		-re "No such file or directory"   { send_user "ERROR: file not found\n" ; exit 1 }
 	}
 	send_user "\n"
 }
@@ -388,7 +378,7 @@ if { $INSTALLTYPE == "initial"} {
 # check InfiniDB syslog functionality
 #
 set timeout 30
-#expect -re {[$#] }
+expect -re "# "
 
 send_user "Check InfiniDB system logging functionality     "
 send " \n"
@@ -397,21 +387,23 @@ send "ssh $USERNAME@$SERVER '$BASH $INSTALLDIR/bin/syslogSetup.sh check'\n"
 if { $PASSWORD != "ssh" } {
 	set timeout 30
 	expect {
-		"word: " { send "$PASSWORD\n" }
-		"passphrase" { send "$PASSWORD\n" }
+		-re "word: " { send "$PASSWORD\n" } abort
+		-re "passphrase" { send "$PASSWORD\n" } abort
 	}
 }
 set timeout 30
 expect {
-	"Logging working" { send_user "DONE" }
+	-re "Logging working" { send_user "DONE" } abort
 	timeout { send_user "DONE" } 
-	"not working" { send_user "WARNING: InfiniDB system logging functionality not working" }
-	"closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
+	-re "not working" { send_user "WARNING: InfiniDB system logging functionality not working" } abort
+	-re "Connection refused"   { send_user "ERROR: Connection refused\n" ; exit 1 }
+	-re "closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
+	-re "No route to host"   { send_user "ERROR: No route to host\n" ; exit 1 }
+	-re "No such file or directory"   { send_user "ERROR: file not found\n" ; exit 1 }
 }
 send_user "\n"
 
 #
 send_user "\nInstallation Successfully Completed on '$MODULE'\n"
 exit 0
-# vim:ts=4 sw=4:
 

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: copylocks.h 1936 2013-07-09 22:10:29Z dhall $
+ * $Id: copylocks.h 1938 2013-07-11 17:06:49Z dhall $
  *
  *****************************************************************************/
 
@@ -53,11 +53,6 @@
 #else
 #define EXPORT
 #endif
-
-
-namespace idbdatafile {
-class IDBDataFile;
-}
 
 namespace BRM {
 
@@ -120,6 +115,13 @@ class CopyLocks : public Undoable {
 		EXPORT void setReadOnly();
 		EXPORT void getCurrentTxnIDs(std::set<VER_t> &txnList) const;
 
+/* Deprecated, but they still exist */
+		EXPORT void writeData(int fd, u_int8_t *buf, off_t offset, int size) const;
+		EXPORT void readData(int fd, u_int8_t *buf, off_t offset, int size);
+		EXPORT void load(std::string filename);
+		EXPORT void save(std::string filename);
+/* /Dep... */
+
 		EXPORT void forceRelease(const LBIDRange &range);
 
 	private:
@@ -135,7 +137,7 @@ class CopyLocks : public Undoable {
 		MSTEntry* shminfo;
 		MasterSegmentTable mst;
 		bool r_only;
-		static boost::mutex mutex;
+		static boost::mutex mutex; // @bug5355 - made mutex static
 		static const int MAX_IO_RETRIES=10;
 		ShmKeys fShmKeys;
 		CopyLocksImpl* fCopyLocksImpl;

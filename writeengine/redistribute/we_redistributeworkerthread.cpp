@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
-* $Id: we_redistributeworkerthread.cpp 4646 2013-05-23 20:58:08Z xlou $
+* $Id: we_redistributeworkerthread.cpp 4299 2012-11-02 06:00:33Z xlou $
 */
 
 #include <iostream>
@@ -58,13 +58,8 @@ using namespace execplan;
 #include "exceptclasses.h"
 using namespace logging;
 
-#include "IDBFileSystem.h"
-#include "IDBPolicy.h"
-using namespace idbdatafile;
-
 #include "we_fileop.h"
 #include "we_messages.h"
-#include "we_convertor.h"
 #include "we_redistributedef.h"
 #include "we_redistributecontrol.h"
 #include "we_redistributeworkerthread.h"
@@ -83,7 +78,6 @@ boost::mutex RedistributeWorkerThread::fActionMutex;
 volatile bool RedistributeWorkerThread::fStopAction = false;
 volatile bool RedistributeWorkerThread::fCommitted = false;
 string RedistributeWorkerThread::fWesInUse;
-
 
 RedistributeWorkerThread::RedistributeWorkerThread(ByteStream& bs, IOSocket& ios) :
 	fBs(bs),
@@ -242,7 +236,7 @@ int RedistributeWorkerThread::grabTableLock()
 	fTableLockId = 0;
 	try
 	{
-		vector<uint32_t> pms;
+		vector<uint> pms;
 		pms.push_back(fMyId.second);
 		if (fMyId.second != fPeerId.second)
 			pms.push_back(fPeerId.second);
@@ -468,12 +462,7 @@ int RedistributeWorkerThread::sendData()
 	uint32_t partition = fPlanEntry.partition;
 	int16_t source = fPlanEntry.source;
 	int16_t dest = fPlanEntry.destination;
-
-	IDBDataFile::Types fileType = 
-		(IDBPolicy::useHdfs() ? IDBDataFile::HDFS : IDBDataFile::UNBUFFERED);
-	IDBFileSystem& fs = IDBFileSystem::getFs( fileType );
-
-	if ((remotePM) && (fileType != IDBDataFile::HDFS))
+	if (remotePM)
 	{
 		if (connectToWes(fPeerId.second) != 0)
 		{
@@ -643,11 +632,9 @@ int RedistributeWorkerThread::sendData()
 
 			}  // segments
 		}  // for oids
-	}   // remote peer non-hdfs
-	else                                           // local or HDFS file copy
+	}   // remote peer
+	else
 	{
-		std::map<int,std::string> rootToPathMap;
-
 		// use cp, in case failed in middle.  May consider to use rename if possible.
 		for (vector<int64_t>::iterator i = fOids.begin(); i != fOids.end(); i++)
 		{
@@ -656,189 +643,53 @@ int RedistributeWorkerThread::sendData()
 				if (fStopAction)
 					return RED_EC_USER_STOP;
 
-				if (fileType == IDBDataFile::HDFS) // HDFS file copy
+				char sourceName[WriteEngine::FILE_NAME_SIZE];
+				int rc = fileOp.oid2FileName(*i, sourceName, false, source, partition, *j);
+				if (rc != WriteEngine::NO_ERROR)
 				{
-					string sourceName;
-					int rc = buildFullHdfsPath(
-						rootToPathMap, // map of root to path
-                        *i,            // OID
-						source,        // dbroot
-						partition,     // partition
-						*j,            // segment
-						sourceName );  // full path name
-					if (rc != 0)
-					{
-						fErrorCode = RED_EC_OID_TO_FILENAME;
-						ostringstream oss;
-						oss << "Failed to get src file name: oid=" << *i
-							<< ", dbroot=" << source
-							<< ", partition=" << partition
-							<< ", segment=" << *j;
-						fErrorMsg = oss.str();
-						logMessage(fErrorMsg, __LINE__);
-						return fErrorCode;
-					}
-
-					string destName;
-					rc = buildFullHdfsPath(
-						rootToPathMap, // map of root to path
-                        *i,            // OID
-						dest,          // dbroot
-						partition,     // partition
-						*j,            // segment
-						destName );    // full path name
-					if (rc != 0)
-					{
-						fErrorCode = RED_EC_OID_TO_FILENAME;
-						ostringstream oss;
-						oss << "Failed to get dest file name: oid=" << *i
-							<< ", dbroot=" << dest
-							<< ", partition=" << partition
-							<< ", segment=" << *j;
-						fErrorMsg = oss.str();
-						logMessage(fErrorMsg, __LINE__);
-						return fErrorCode;
-					}
-
+					fErrorCode = RED_EC_OID_TO_FILENAME;
 					ostringstream oss;
-					oss << "<=redistributing(hdfs): " << sourceName << ", oid="
-						<< *i << ", db=" << source << ", part=" << partition
-						<< ", seg=" << *j << " to db=" << dest;
-					logMessage(oss.str(), __LINE__);
-
-					// add to set for remove after commit/abort
-					addToDirSet(sourceName.c_str(), true);
-					addToDirSet(destName.c_str(), false);
-
-					int ret = fs.copyFile(sourceName.c_str(), destName.c_str());
-					if (ret != 0)
-					{
-						fErrorCode = RED_EC_COPY_FILE_FAIL;
-						ostringstream oss;
-						oss << "Failed to copy " << sourceName << " to " <<
-							destName << "; error is: " << strerror(errno);
-						fErrorMsg = oss.str();
-						logMessage(fErrorMsg, __LINE__);
-						return fErrorCode;
-					}
+					oss << "Failed to get file name: oid=" << *i << ", dbroot=" << source
+						<< ", partition=" << partition << ", segment=" << *j;
+					fErrorMsg = oss.str();
+					logMessage(fErrorMsg, __LINE__);
+					return fErrorCode;
 				}
-				else                               // local file copy
+
+				char destName[WriteEngine::FILE_NAME_SIZE];
+				rc = fileOp.oid2FileName(*i, destName, true, dest, partition, *j);
+				if (rc != WriteEngine::NO_ERROR)
 				{
-					char sourceName[WriteEngine::FILE_NAME_SIZE];
-					int rc = fileOp.oid2FileName(*i, sourceName, false, source,
-						partition, *j);
-					if (rc != WriteEngine::NO_ERROR)
-					{
-						fErrorCode = RED_EC_OID_TO_FILENAME;
-						ostringstream oss;
-						oss << "Failed to get file name: oid=" << *i
-							<< ", dbroot=" << source
-							<< ", partition=" << partition
-							<< ", segment=" << *j;
-						fErrorMsg = oss.str();
-						logMessage(fErrorMsg, __LINE__);
-						return fErrorCode;
-					}
-
-					char destName[WriteEngine::FILE_NAME_SIZE];
-					rc = fileOp.oid2FileName(*i, destName, true,
-						dest, partition, *j);
-					if (rc != WriteEngine::NO_ERROR)
-					{
-						fErrorCode = RED_EC_OID_TO_FILENAME;
-						ostringstream oss;
-						oss << "Failed to get file name: oid=" << *i
-							<< ", dbroot=" << dest
-							<< ", partition=" << partition
-							<< ", segment=" << *j;
-						fErrorMsg = oss.str();
-						logMessage(fErrorMsg, __LINE__);
-						return fErrorCode;
-					}
-
+					fErrorCode = RED_EC_OID_TO_FILENAME;
 					ostringstream oss;
-					oss << "<=redistributing(copy): " << sourceName << ", oid="
-						<< *i << ", db=" << source << ", part=" << partition
-						<< ", seg=" << *j << " to db=" << dest;
-					logMessage(oss.str(), __LINE__);
+					oss << "Failed to get file name: oid=" << *i << ", dbroot=" << dest
+						<< ", partition=" << partition << ", segment=" << *j;
+					fErrorMsg = oss.str();
+					logMessage(fErrorMsg, __LINE__);
+					return fErrorCode;
+				}
 
-					// add to set for remove after commit/abort
-					addToDirSet(sourceName, true);
-					addToDirSet(destName, false);
+				// add to set for remove after commit/abort
+				addToDirSet(sourceName, true);
+				addToDirSet(destName, false);
 
-					// Using boost::copy_file() instead of IDBFileSystem::copy-
-					// File() so we can capture/report any boost exception error
-					// msg that IDBFileSystem::copyFile() currently swallows.
-					try
-					{
-						filesystem::copy_file(sourceName, destName);
-					}
-#if BOOST_VERSION >= 105200
-					catch(filesystem::filesystem_error& e)
-#else
-					catch(filesystem::basic_filesystem_error<filesystem::path>& e)
-#endif
-					{
-						fErrorCode = RED_EC_COPY_FILE_FAIL;
-						ostringstream oss;
-						oss << "Failed to copy " << sourceName << " to " <<
-							destName << "; error is: " << e.what();
-						fErrorMsg = oss.str();
-						logMessage(fErrorMsg, __LINE__);
-						return fErrorCode;
-					}
+				try
+				{
+					filesystem::copy_file(sourceName, destName);
+				}
+				catch(filesystem::basic_filesystem_error<filesystem::path> e)
+				{
+					fErrorCode = RED_EC_COPY_FILE_FAIL;
+					ostringstream oss;
+					oss << "Failed to copy " << sourceName << " to " << destName
+						<< "error is: " << e.what();
+					fErrorMsg = oss.str();
+					logMessage(fErrorMsg, __LINE__);
+					return fErrorCode;
 				}
 			}  // segment
 		}  // oid
 	}  // !remote
-
-	return 0;
-}
-
-
-//------------------------------------------------------------------------------
-// Construct a full path name based on the given oid, root, partition, and seg.
-// The rootToPathMap is the map of dbroot to dbrootPath that we are using.  We
-// are using this function instead of the usual FileOp::oid2FileName() function,
-// because that function only works with "local" DBRoots.  In the case of
-// an HDFS copy, we will be copying files from/to DBRoots that are not on the
-// local PM.
-//------------------------------------------------------------------------------
-int  RedistributeWorkerThread::buildFullHdfsPath(
-	std::map<int,std::string>& rootToPathMap,
-	int64_t      colOid,
-	int16_t      dbRoot,
-	uint32_t     partition,
-	int16_t      segment,
-	std::string& fullFileName)
-{
-	std::map<int,std::string>::const_iterator iter = rootToPathMap.find(dbRoot);
-	if (iter == rootToPathMap.end())
-	{
-		ostringstream oss;
-		oss << "DBRoot" << dbRoot;
-		std::string dbRootPath = fConfig->getConfig("SystemConfig", oss.str());
-		if (dbRootPath.empty())
-		{
-			return 1;
-		}
-		rootToPathMap[ dbRoot ] = dbRootPath;
-		iter = rootToPathMap.find( dbRoot );
-	}
-
-	char tempFileName[WriteEngine::FILE_NAME_SIZE];
-	char dbDir[WriteEngine::MAX_DB_DIR_LEVEL][WriteEngine::MAX_DB_DIR_NAME_SIZE];
-
-	int rc = WriteEngine::Convertor::oid2FileName(
-		colOid, tempFileName, dbDir, partition, segment );
-	if (rc != WriteEngine::NO_ERROR)
-	{
-		return 2;
-	}
-
-	ostringstream fullFileNameOss;
-	fullFileNameOss << iter->second << '/' << tempFileName;
-	fullFileName = fullFileNameOss.str();
 
 	return 0;
 }
@@ -1005,9 +856,6 @@ void RedistributeWorkerThread::confirmToPeer()
 		}
 	}
 
-	IDBFileSystem& fs = IDBFileSystem::getFs(
-		(IDBPolicy::useHdfs() ? IDBDataFile::HDFS : IDBDataFile::UNBUFFERED) );
-
 	uint32_t confirmCode = RED_DATA_COMMIT;
 	if (fErrorCode != RED_EC_OK || fStopAction == true) // fCommitted must be false
 		confirmCode = RED_DATA_ABORT;
@@ -1031,7 +879,13 @@ void RedistributeWorkerThread::confirmToPeer()
 	{
 		for (set<string>::iterator i = fNewDirSet.begin(); i != fNewDirSet.end(); i++)
 		{
-			fs.remove(i->c_str()); // ignoring return code
+			try
+			{
+				filesystem::remove_all(*i);
+			}
+			catch(filesystem::basic_filesystem_error<filesystem::path> e)
+			{
+			}
 		}
 	}
 
@@ -1040,7 +894,13 @@ void RedistributeWorkerThread::confirmToPeer()
 	{
 		for (set<string>::iterator i = fOldDirSet.begin(); i != fOldDirSet.end(); i++)
 		{
-			fs.remove(i->c_str()); // ignoring return code
+			try
+			{
+				filesystem::remove_all(*i);
+			}
+			catch(filesystem::basic_filesystem_error<filesystem::path> e)
+			{
+			}
 		}
 	}
 
@@ -1464,13 +1324,19 @@ void RedistributeWorkerThread::handleDataAbort(SBS& sbs, size_t& size)
 	if (fNewFilePtr != NULL)
 		closeFile(fNewFilePtr);
 
-	IDBFileSystem& fs = IDBFileSystem::getFs(
-		(IDBPolicy::useHdfs() ? IDBDataFile::HDFS : IDBDataFile::UNBUFFERED) );
-
 	// remove local files
 	for (set<string>::iterator i = fNewDirSet.begin(); i != fNewDirSet.end(); i++)
 	{
-		fs.remove(i->c_str()); // ignoring return code
+		try
+		{
+			filesystem::remove_all(*i);
+		}
+		catch (const std::exception&)
+		{
+		}
+		catch (...)
+		{
+		}
 	}
 
 	// send ack

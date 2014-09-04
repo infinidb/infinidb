@@ -14,6 +14,25 @@
 
 @SET_MAKE@
 
+#  Copyright (C) 2014 InfiniDB, Inc.
+#
+#  This program is free software; you can redistribute it and/or
+#  modify it under the terms of the GNU General Public License
+#  as published by the Free Software Foundation; version 2 of
+#  the License.
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#
+#  You should have received a copy of the GNU General Public License
+#  along with this program; if not, write to the Free Software
+#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+#  MA 02110-1301, USA.
+
+# $Id: Makefile.am 864 2009-04-02 19:22:49Z rdempsey $
+
 
 srcdir = @srcdir@
 top_srcdir = @top_srcdir@
@@ -41,9 +60,8 @@ subdir = dbcon/execplan
 DIST_COMMON = $(include_HEADERS) $(srcdir)/Makefile.am \
 	$(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
-am__aclocal_m4_deps = $(top_srcdir)/m4/compilerflags.m4 \
-	$(top_srcdir)/m4/functions.m4 $(top_srcdir)/m4/install.m4 \
-	$(top_srcdir)/configure.ac
+am__aclocal_m4_deps = $(top_srcdir)/m4/functions.m4 \
+	$(top_srcdir)/m4/install.m4 $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 mkinstalldirs = $(install_sh) -d
@@ -60,19 +78,17 @@ libLTLIBRARIES_INSTALL = $(INSTALL)
 LTLIBRARIES = $(lib_LTLIBRARIES)
 libexecplan_la_LIBADD =
 am_libexecplan_la_OBJECTS = calpontsystemcatalog.lo aggregatecolumn.lo \
-	arithmeticcolumn.lo arithmeticoperator.lo \
-	calpontexecutionplan.lo calpontexecutionplanfactory.lo \
-	calpontselectexecutionplan.lo clientrotator.lo \
-	constantcolumn.lo constantfilter.lo existsfilter.lo \
-	expressionparser.lo filter.lo functioncolumn.lo \
-	groupconcatcolumn.lo intervalcolumn.lo logicoperator.lo \
-	mysqlexecutionplan.lo objectidmanager.lo objectreader.lo \
-	operator.lo oracleexecutionplan.lo outerjoinonfilter.lo \
-	predicateoperator.lo pseudocolumn.lo range.lo \
-	returnedcolumn.lo rowcolumn.lo selectfilter.lo \
-	sessionmanager.lo simplecolumn.lo simplefilter.lo \
-	simplescalarfilter.lo treenode.lo treenodeimpl.lo \
-	vendorexecutionplan.lo windowfunctioncolumn.lo
+	arithmeticcolumn.lo calpontexecutionplan.lo \
+	calpontexecutionplanfactory.lo calpontselectexecutionplan.lo \
+	constantcolumn.lo existsfilter.lo filter.lo functioncolumn.lo \
+	groupconcatcolumn.lo mysqlexecutionplan.lo objectidmanager.lo \
+	objectreader.lo operator.lo outerjoinonfilter.lo \
+	oracleexecutionplan.lo range.lo returnedcolumn.lo rowcolumn.lo \
+	selectfilter.lo sessionmanager.lo simplecolumn.lo \
+	simplefilter.lo simplescalarfilter.lo vendorexecutionplan.lo \
+	treenode.lo expressionparser.lo treenodeimpl.lo \
+	constantfilter.lo clientrotator.lo arithmeticoperator.lo \
+	logicoperator.lo predicateoperator.lo
 libexecplan_la_OBJECTS = $(am_libexecplan_la_OBJECTS)
 DEFAULT_INCLUDES = -I. -I$(srcdir) -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
@@ -151,9 +167,6 @@ SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
 STRIP = @STRIP@
 VERSION = @VERSION@
-XML2_CONFIG = @XML2_CONFIG@
-XML_CPPFLAGS = @XML_CPPFLAGS@
-XML_LIBS = @XML_LIBS@
 YACC = @YACC@
 ac_ct_AR = @ac_ct_AR@
 ac_ct_CC = @ac_ct_CC@
@@ -195,7 +208,6 @@ idb_exec_libs = @idb_exec_libs@
 idb_ldflags = @idb_ldflags@
 idb_oam_libs = @idb_oam_libs@
 idb_write_libs = @idb_write_libs@
-idbinstall = @idbinstall@
 includedir = @includedir@
 infodir = @infodir@
 install_sh = @install_sh@
@@ -209,11 +221,6 @@ mibdir = @mibdir@
 mkdir_p = @mkdir_p@
 mysqldir = @mysqldir@
 netsnmp_libs = @netsnmp_libs@
-netsnmpagntdir = @netsnmpagntdir@
-netsnmpdir = @netsnmpdir@
-netsnmplibrdir = @netsnmplibrdir@
-netsnmpmachdir = @netsnmpmachdir@
-netsnmpsysdir = @netsnmpsysdir@
 oldincludedir = @oldincludedir@
 postdir = @postdir@
 prefix = @prefix@
@@ -224,23 +231,6 @@ sharedstatedir = @sharedstatedir@
 sysconfdir = @sysconfdir@
 target_alias = @target_alias@
 toolsdir = @toolsdir@
-
-#  Copyright (C) 2014 InfiniDB, Inc.
-#
-#  This program is free software; you can redistribute it and/or
-#  modify it under the terms of the GNU General Public License
-#  as published by the Free Software Foundation; version 2 of
-#  the License.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software
-#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-#  MA 02110-1301, USA.
 AM_CPPFLAGS = $(idb_common_includes) $(idb_cppflags)
 AM_CFLAGS = $(idb_cflags)
 AM_CXXFLAGS = $(idb_cxxflags)
@@ -249,28 +239,20 @@ lib_LTLIBRARIES = libexecplan.la
 libexecplan_la_SOURCES = calpontsystemcatalog.cpp \
 aggregatecolumn.cpp \
 arithmeticcolumn.cpp \
-arithmeticoperator.cpp \
 calpontexecutionplan.cpp \
 calpontexecutionplanfactory.cpp \
 calpontselectexecutionplan.cpp \
-clientrotator.cpp \
 constantcolumn.cpp \
-constantfilter.cpp \
 existsfilter.cpp \
-expressionparser.cpp \
 filter.cpp \
 functioncolumn.cpp \
 groupconcatcolumn.cpp \
-intervalcolumn.cpp \
-logicoperator.cpp \
 mysqlexecutionplan.cpp \
 objectidmanager.cpp \
 objectreader.cpp \
 operator.cpp \
-oracleexecutionplan.cpp \
 outerjoinonfilter.cpp \
-predicateoperator.cpp \
-pseudocolumn.cpp \
+oracleexecutionplan.cpp \
 range.cpp \
 returnedcolumn.cpp \
 rowcolumn.cpp \
@@ -279,56 +261,57 @@ sessionmanager.cpp \
 simplecolumn.cpp \
 simplefilter.cpp \
 simplescalarfilter.cpp \
-treenode.cpp \
-treenodeimpl.cpp \
 vendorexecutionplan.cpp \
-windowfunctioncolumn.cpp
+treenode.cpp \
+expressionparser.cpp \
+treenodeimpl.cpp \
+constantfilter.cpp \
+clientrotator.cpp \
+arithmeticoperator.cpp \
+logicoperator.cpp \
+predicateoperator.cpp
 
 include_HEADERS = aggregatecolumn.h \
 arithmeticcolumn.h \
-arithmeticoperator.h \
-blocksize.h \
 calpontexecutionplanfactory.h \
 calpontexecutionplan.h \
-calpontsystemcatalog.h \
 calpontselectexecutionplan.h \
-clientrotator.h \
 columnresult.h \
 constantcolumn.h \
-constantfilter.h \
 existsfilter.h \
-expressionparser.h \
-exp_templates.h \
 filter.h \
 functioncolumn.h \
 groupconcatcolumn.h \
-intervalcolumn.h \
-logicoperator.h \
 mysqlexecutionplan.h \
 njlcolumnresult.h \
 objectidmanager.h \
 objectreader.h \
 operator.h \
-oracleexecutionplan.h \
 outerjoinonfilter.h \
-parsetree.h \
-predicateoperator.h \
-pseudocolumn.h \
+oracleexecutionplan.h \
 range.h \
 returnedcolumn.h \
 rowcolumn.h \
 selectfilter.h \
 sessionmanager.h \
 simplecolumn.h \
-simplecolumn_decimal.h \
-simplecolumn_int.h \
-simplecolumn_uint.h \
 simplefilter.h \
 simplescalarfilter.h \
-treenode.h \
-treenodeimpl.h \
 vendorexecutionplan.h \
-windowfunctioncolumn.h
+calpontsystemcatalog.h \
+treenode.h \
+parsetree.h \
+expressionparser.h \
+treenodeimpl.h \
+constantfilter.h \
+clientrotator.h \
+blocksize.h \
+exp_templates.h \
+arithmeticoperator.h \
+logicoperator.h \
+predicateoperator.h \
+simplecolumn_int.h \
+simplecolumn_decimal.h
 
 all: all-am
 
@@ -414,7 +397,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/filter.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/functioncolumn.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/groupconcatcolumn.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/intervalcolumn.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/logicoperator.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mysqlexecutionplan.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/objectidmanager.Plo@am__quote@
@@ -423,7 +405,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/oracleexecutionplan.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/outerjoinonfilter.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/predicateoperator.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pseudocolumn.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/range.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/returnedcolumn.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rowcolumn.Plo@am__quote@
@@ -435,7 +416,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/treenode.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/treenodeimpl.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/vendorexecutionplan.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/windowfunctioncolumn.Plo@am__quote@
 
 .cpp.o:
 @am__fastdepCXX_TRUE@	if $(CXXCOMPILE) -MT $@ -MD -MP -MF "$(DEPDIR)/$*.Tpo" -c -o $@ $<; \

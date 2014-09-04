@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: save_brm.cpp 1910 2013-06-18 15:19:15Z rdempsey $
+ * $Id: save_brm.cpp 1547 2012-04-04 18:19:01Z rdempsey $
  *
  ****************************************************************************/
 
@@ -26,12 +26,6 @@
  * More detailed description
  */
 
-#include <unistd.h>
-#include <iostream>
-#include <sys/types.h>
-#include <sys/stat.h>
-using namespace std;
-
 #include "brmtypes.h"
 #include "rwlock.h"
 #include "mastersegmenttable.h"
@@ -40,12 +34,15 @@ using namespace std;
 #include "vss.h"
 #include "vbbm.h"
 #include "blockresolutionmanager.h"
-#include "IDBDataFile.h"
-#include "IDBPolicy.h"
-using namespace idbdatafile;
-using namespace BRM;
-
+#include <iostream>
+#include <fstream>
 #include "configcpp.h"
+
+#include <sys/types.h>
+#include <sys/stat.h>
+
+using namespace BRM;
+using namespace std;
 
 int main (int argc, char **argv)
 {
@@ -53,7 +50,7 @@ int main (int argc, char **argv)
 	config::Config *config = config::Config::makeConfig();
 	int err;
 	string prefix, currentFilename;
-	IDBDataFile* currentFile = NULL;
+	ofstream currentFile;
 
 	if (argc > 1)
 		prefix = argv[1];
@@ -65,8 +62,6 @@ int main (int argc, char **argv)
 		}
 	}
 
-	idbdatafile::IDBPolicy::configIDBPolicy();
-
 	err = brm.saveState(prefix);
 	if (err == 0)
 		cout << "Saved to " << prefix << endl;
@@ -74,38 +69,34 @@ int main (int argc, char **argv)
 		cout << "Save failed" << endl;
 		exit(1);
 	}
-
-	(void)::umask(0);
-
+#ifndef _MSC_VER
+	mode_t utmp;
+	utmp = ::umask(0);
+#endif
 	currentFilename = prefix + "_current";
-	currentFile = IDBDataFile::open(IDBPolicy::getType(currentFilename.c_str(),
-									IDBPolicy::WRITEENG),
-									currentFilename.c_str(),
-									"wb",
-									0);
-
+	currentFile.open(currentFilename.c_str(), ios_base::trunc);
 	if (!currentFile) {
 		cerr << "Error: could not open " << currentFilename << "for writing" << endl;
 		exit(1);
 	}
 	try {
-#ifndef _MSC_VER
-		prefix += '\n';
-#endif
-		currentFile->write(prefix.c_str(), prefix.length());
+		currentFile << prefix << endl;
 	}
 	catch (exception &e) {
 		cerr << "Error: failed to write to " << currentFilename << ": " << e.what() << endl;
 		exit(1);
 	}
 	try {
-		delete currentFile;
-		currentFile = NULL;
+		currentFile.close();
 	}
 	catch (exception &e) {
 		cerr << "Error: failed to close " << currentFilename << ": " << e.what() << endl;
 		exit(1);
 	}
+
+#ifndef _MSC_VER
+	utmp = ::umask(0);
+#endif
 
 	return 0;
 }

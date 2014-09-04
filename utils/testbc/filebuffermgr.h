@@ -49,7 +49,7 @@ namespace dbbc {
 typedef struct {
 	BRM::LBID_t lbid;
 	BRM::VER_t ver;
-	uint32_t poolIdx;	
+	u_int32_t poolIdx;	
 	} FileBufferIndex_t;
 
 typedef FileBufferIndex_t HashObject_t;

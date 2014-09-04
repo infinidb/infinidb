@@ -70,7 +70,7 @@ public:
 	/**
 	 * @brief the disk block from lbid@ver, and a data block len bytes long
 	 **/
-	FileBuffer(const BRM::LBID_t lbid, const BRM::VER_t ver, const uint8_t* data, const uint32_t len);
+	FileBuffer(const BRM::LBID_t lbid, const BRM::VER_t ver, const u_int8_t* data, const uint32_t len);
 
 	/**
 	 * @brief disk block lbid@ver and empty data
@@ -85,13 +85,13 @@ public:
 	/**
 	 * @brief set the data value of this block to d have len bytestream
 	 **/
-	void setData(const uint8_t* d, const int len=8192);
+	void setData(const u_int8_t* d, const int len=8192);
 
 	/**
 	 * @brief retrieve the data in byte* format from this data block
 	 **/
-	const uint8_t* getData() const {return fByteData;}
-	uint8_t* getData() {return fByteData;}
+	const u_int8_t* getData() const {return fByteData;}
+	u_int8_t* getData() {return fByteData;}
 
 	const uint32_t datLen() const {return fDataLen;}
 
@@ -137,7 +137,7 @@ public:
 
 private:
 
-	uint8_t fByteData[WriteEngine::BYTE_PER_BLOCK];
+	u_int8_t fByteData[WriteEngine::BYTE_PER_BLOCK];
 	uint32_t fDataLen;
 
 	BRM::LBID_t fLbid;

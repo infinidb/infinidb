@@ -14,22 +14,22 @@
 
 @SET_MAKE@
 
-# Copyright (C) 2014 InfiniDB, Inc.
+#  Copyright (C) 2014 InfiniDB, Inc.
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; version 2 of
-# the License.
+#  This program is free software; you can redistribute it and/or
+#  modify it under the terms of the GNU General Public License
+#  as published by the Free Software Foundation; version 2 of
+#  the License.
 #
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
 #
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-# MA 02110-1301, USA.
+#  You should have received a copy of the GNU General Public License
+#  along with this program; if not, write to the Free Software
+#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+#  MA 02110-1301, USA.
 
 # $Id: Makefile.am 864 2009-04-02 19:22:49Z rdempsey $
 
@@ -59,14 +59,13 @@ build_triplet = @build@
 host_triplet = @host@
 bin_PROGRAMS = controllernode$(EXEEXT) workernode$(EXEEXT) \
 	dbrmctl$(EXEEXT) reset_locks$(EXEEXT) rollback$(EXEEXT) \
-	save_brm$(EXEEXT) load_brm$(EXEEXT)
+	save_brm$(EXEEXT) load_brm$(EXEEXT) print_journal$(EXEEXT)
 subdir = versioning/BRM
 DIST_COMMON = $(include_HEADERS) $(srcdir)/Makefile.am \
 	$(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
-am__aclocal_m4_deps = $(top_srcdir)/m4/compilerflags.m4 \
-	$(top_srcdir)/m4/functions.m4 $(top_srcdir)/m4/install.m4 \
-	$(top_srcdir)/configure.ac
+am__aclocal_m4_deps = $(top_srcdir)/m4/functions.m4 \
+	$(top_srcdir)/m4/install.m4 $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 mkinstalldirs = $(install_sh) -d
@@ -108,6 +107,9 @@ dbrmctl_DEPENDENCIES = libbrm.la
 am_load_brm_OBJECTS = load_brm.$(OBJEXT)
 load_brm_OBJECTS = $(am_load_brm_OBJECTS)
 load_brm_DEPENDENCIES = libbrm.la
+am_print_journal_OBJECTS = print_journal.$(OBJEXT)
+print_journal_OBJECTS = $(am_print_journal_OBJECTS)
+print_journal_DEPENDENCIES = libbrm.la
 am_reset_locks_OBJECTS = reset_locks.$(OBJEXT)
 reset_locks_OBJECTS = $(am_reset_locks_OBJECTS)
 reset_locks_DEPENDENCIES = libbrm.la
@@ -132,10 +134,12 @@ CXXLD = $(CXX)
 CXXLINK = $(LIBTOOL) --tag=CXX --mode=link $(CXXLD) $(AM_CXXFLAGS) \
 	$(CXXFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
 SOURCES = $(libbrm_la_SOURCES) $(controllernode_SOURCES) \
-	$(dbrmctl_SOURCES) $(load_brm_SOURCES) $(reset_locks_SOURCES) \
+	$(dbrmctl_SOURCES) $(load_brm_SOURCES) \
+	$(print_journal_SOURCES) $(reset_locks_SOURCES) \
 	$(rollback_SOURCES) $(save_brm_SOURCES) $(workernode_SOURCES)
 DIST_SOURCES = $(libbrm_la_SOURCES) $(controllernode_SOURCES) \
-	$(dbrmctl_SOURCES) $(load_brm_SOURCES) $(reset_locks_SOURCES) \
+	$(dbrmctl_SOURCES) $(load_brm_SOURCES) \
+	$(print_journal_SOURCES) $(reset_locks_SOURCES) \
 	$(rollback_SOURCES) $(save_brm_SOURCES) $(workernode_SOURCES)
 includeHEADERS_INSTALL = $(INSTALL_HEADER)
 HEADERS = $(include_HEADERS)
@@ -201,9 +205,6 @@ SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
 STRIP = @STRIP@
 VERSION = @VERSION@
-XML2_CONFIG = @XML2_CONFIG@
-XML_CPPFLAGS = @XML_CPPFLAGS@
-XML_LIBS = @XML_LIBS@
 YACC = @YACC@
 ac_ct_AR = @ac_ct_AR@
 ac_ct_CC = @ac_ct_CC@
@@ -245,7 +246,6 @@ idb_exec_libs = @idb_exec_libs@
 idb_ldflags = @idb_ldflags@
 idb_oam_libs = @idb_oam_libs@
 idb_write_libs = @idb_write_libs@
-idbinstall = @idbinstall@
 includedir = @includedir@
 infodir = @infodir@
 install_sh = @install_sh@
@@ -259,11 +259,6 @@ mibdir = @mibdir@
 mkdir_p = @mkdir_p@
 mysqldir = @mysqldir@
 netsnmp_libs = @netsnmp_libs@
-netsnmpagntdir = @netsnmpagntdir@
-netsnmpdir = @netsnmpdir@
-netsnmplibrdir = @netsnmplibrdir@
-netsnmpmachdir = @netsnmpmachdir@
-netsnmpsysdir = @netsnmpsysdir@
 oldincludedir = @oldincludedir@
 postdir = @postdir@
 prefix = @prefix@
@@ -317,34 +312,35 @@ logicalpartition.h \
 mastersegmenttable.h \
 sessionmanagerserver.h \
 shmkeys.h \
-slavecomm.h \
-slavedbrmnode.h \
 tracer.h \
 undoable.h \
 vbbm.h \
 vss.h
 
 controllernode_SOURCES = masternode.cpp masterdbrmnode.cpp
-controllernode_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_exec_libs) $(netsnmp_libs) $(AM_LDFLAGS)
+controllernode_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_brm_libs) $(netsnmp_libs) $(idb_exec_libs) $(AM_LDFLAGS)
 controllernode_LDADD = libbrm.la
 workernode_SOURCES = slavenode.cpp
-workernode_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_exec_libs) $(netsnmp_libs) $(AM_LDFLAGS)
+workernode_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_brm_libs) $(netsnmp_libs) $(idb_exec_libs) $(AM_LDFLAGS)
 workernode_LDADD = libbrm.la
 dbrmctl_SOURCES = dbrmctl.cpp
-dbrmctl_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_exec_libs) $(netsnmp_libs) $(AM_LDFLAGS)
+dbrmctl_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_brm_libs) $(netsnmp_libs) $(idb_exec_libs) $(AM_LDFLAGS)
 dbrmctl_LDADD = libbrm.la
 reset_locks_SOURCES = reset_locks.cpp
-reset_locks_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_exec_libs) $(netsnmp_libs) $(AM_LDFLAGS)
+reset_locks_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_brm_libs) $(netsnmp_libs) $(idb_exec_libs) $(AM_LDFLAGS)
 reset_locks_LDADD = libbrm.la
 rollback_SOURCES = rollback.cpp
-rollback_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_exec_libs) $(netsnmp_libs) $(AM_LDFLAGS)
+rollback_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_brm_libs) $(netsnmp_libs) $(idb_exec_libs) $(AM_LDFLAGS)
 rollback_LDADD = libbrm.la
 save_brm_SOURCES = save_brm.cpp
-save_brm_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_exec_libs) $(netsnmp_libs) $(AM_LDFLAGS)
+save_brm_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_brm_libs) $(netsnmp_libs) $(idb_exec_libs) $(AM_LDFLAGS)
 save_brm_LDADD = libbrm.la
 load_brm_SOURCES = load_brm.cpp
-load_brm_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_exec_libs) $(netsnmp_libs) $(AM_LDFLAGS)
+load_brm_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_brm_libs) $(netsnmp_libs) $(idb_exec_libs) $(AM_LDFLAGS)
 load_brm_LDADD = libbrm.la
+print_journal_SOURCES = print_journal.cpp
+print_journal_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_brm_libs) $(netsnmp_libs) $(idb_exec_libs) $(AM_LDFLAGS)
+print_journal_LDADD = libbrm.la
 all: all-am
 
 .SUFFIXES:
@@ -443,6 +439,9 @@ dbrmctl$(EXEEXT): $(dbrmctl_OBJECTS) $(dbrmctl_DEPENDENCIES)
 load_brm$(EXEEXT): $(load_brm_OBJECTS) $(load_brm_DEPENDENCIES) 
 	@rm -f load_brm$(EXEEXT)
 	$(CXXLINK) $(load_brm_LDFLAGS) $(load_brm_OBJECTS) $(load_brm_LDADD) $(LIBS)
+print_journal$(EXEEXT): $(print_journal_OBJECTS) $(print_journal_DEPENDENCIES) 
+	@rm -f print_journal$(EXEEXT)
+	$(CXXLINK) $(print_journal_LDFLAGS) $(print_journal_OBJECTS) $(print_journal_LDADD) $(LIBS)
 reset_locks$(EXEEXT): $(reset_locks_OBJECTS) $(reset_locks_DEPENDENCIES) 
 	@rm -f reset_locks$(EXEEXT)
 	$(CXXLINK) $(reset_locks_LDFLAGS) $(reset_locks_OBJECTS) $(reset_locks_LDADD) $(LIBS)
@@ -490,6 +489,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/load_brm.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/masterdbrmnode.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/masternode.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/print_journal.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/reset_locks.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rollback.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/save_brm.Po@am__quote@
@@ -891,7 +891,7 @@ uninstall-am: uninstall-binPROGRAMS uninstall-includeHEADERS \
 .PRECIOUS: dbrm
 dbrm: controllernode workernode dbrmctl 
 
-tools: reset_locks rollback save_brm load_brm
+tools: reset_locks rollback save_brm load_brm print_journal
 
 install_dbrm:
 

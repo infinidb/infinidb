@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_log.h 4504 2013-02-02 00:07:43Z bpaul $
+* $Id: we_log.h 4506 2013-02-02 00:11:15Z bpaul $
 *
 *******************************************************************************/
 /** @file */
@@ -36,7 +36,7 @@
 
 #include <boost/thread.hpp>
 
-#if defined(_MSC_VER) && defined(WRITEENGINE_DLLEXPORT)
+#if defined(_MSC_VER) && defined(WELOG_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT

@@ -16,10 +16,10 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: rtscommand-jl.cpp 9655 2013-06-25 23:08:13Z xlou $
+// $Id: rtscommand-jl.cpp 8476 2012-04-25 22:28:15Z xlou $
 // C++ Implementation: rtscommand-jl
 //
-// Description:
+// Description: 
 //
 //
 // Author: Patrick <pleblanc@localhost.localdomain>, (C) 2008
@@ -66,7 +66,7 @@ RTSCommandJL::~RTSCommandJL()
 {
 }
 
-void RTSCommandJL::setLBID(uint64_t data, uint32_t dbroot)
+void RTSCommandJL::setLBID(uint64_t data, uint dbroot)
 {
 	if (!passThru)
 		col->setLBID(data, dbroot);
@@ -87,7 +87,7 @@ void RTSCommandJL::runCommand(ByteStream &bs) const
 {
 	if (!passThru)
 		col->runCommand(bs);
-	dict->runCommand(bs);
+	dict->runCommand(bs);	
 }
 
 uint8_t RTSCommandJL::getTableColumnType()

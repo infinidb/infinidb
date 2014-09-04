@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: slavecomm.h 1823 2013-01-21 14:13:09Z rdempsey $
+ * $Id: slavecomm.h 1716 2012-09-28 23:08:26Z xlou $
  *
  *****************************************************************************/
 
@@ -42,13 +42,6 @@
 #else
 #define EXPORT
 #endif
-
-// forward reference
-namespace idbdatafile
-{
-class IDBDataFile;
-}
-
 
 namespace BRM {
 
@@ -124,16 +117,14 @@ class SlaveComm {
 		bool release, die, firstSlave, saveFileToggle, takeSnapshot, doSaveDelta, standalone, printOnly;
 		messageqcpp::ByteStream delta;
 		int currentSaveFD;
-		idbdatafile::IDBDataFile* currentSaveFile;
 		std::string journalName;
 		std::fstream journal;
-		idbdatafile::IDBDataFile* journalh;
 		int64_t snapshotInterval, journalCount;
 		struct timespec MSG_TIMEOUT;
 #ifdef _MSC_VER
-		boost::mutex fPidMemLock;
-		DWORD* fPids;
-		DWORD fMaxPids;
+	boost::mutex fPidMemLock;
+	DWORD* fPids;
+	DWORD fMaxPids;
 #endif
 };
 

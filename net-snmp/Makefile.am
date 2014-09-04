@@ -11,5 +11,5 @@ docs:
 
 bootstrap:
 	cd net-snmp-5.2.1.2; \
-	./CalpontConfigure.sh --prefix=$(prefix)
+	./CalpontConfigure.sh --prefix=@prefix@/Calpont
 

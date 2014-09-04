@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: vss.cpp 1926 2013-06-30 21:18:14Z wweeks $
+ * $Id: vss.cpp 1928 2013-06-30 21:20:52Z wweeks $
  *
  ****************************************************************************/
 
@@ -31,7 +31,6 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <boost/thread.hpp>
-#include <boost/scoped_ptr.hpp>
 
 #ifdef _MSC_VER
 #include <io.h>
@@ -43,8 +42,6 @@
 #include "vbbm.h"
 #include "extentmap.h"
 #include "cacheutils.h"
-#include "IDBDataFile.h"
-#include "IDBPolicy.h"
 
 
 #define VSS_DLLEXPORT
@@ -54,8 +51,6 @@
 #define VSS_MAGIC_V1	0x7218db12
 
 using namespace std;
-using namespace boost;
-using namespace idbdatafile;
 
 namespace BRM {
 
@@ -334,7 +329,7 @@ void VSS::insert(LBID_t lbid, VER_t verID, bool vbFlag, bool locked)
 	entry.verID = verID;
 	entry.vbFlag = vbFlag;
 	entry.locked = locked;
-	//cerr << "Insert to vss lbid:verID:locked:vbFlag = " << entry.lbid <<":" <<entry.verID<<":"<< entry.locked <<":"<<entry.vbFlag<<endl;
+	//cout << "Insert to vss lbid:verID:locked:vbFlag = " << entry.lbid <<":" <<entry.verID<<":"<< entry.locked <<":"<<entry.vbFlag<<endl;
 	// check for resize
 	if (vss->currentSize == vss->capacity)
 		growVSS();
@@ -379,8 +374,8 @@ void VSS::_insert(VSSEntry& e, VSSShmsegHeader *dest, int *destHash,
 }
 	
 //assumes read lock is held
-int VSS::lookup(LBID_t lbid, const QueryContext_vss &verInfo, VER_t txnID, VER_t *outVer,
-				bool *vbFlag, bool vbOnly) const
+int VSS::lookup(LBID_t lbid, VER_t &verID, VER_t txnID, bool &vbFlag, 
+				bool vbOnly) const
 {
 	int hashIndex, maxVersion = -1, minVersion = -1, currentIndex;
 	VSSEntry *listEntry, *maxEntry = NULL;
@@ -390,7 +385,7 @@ int VSS::lookup(LBID_t lbid, const QueryContext_vss &verInfo, VER_t txnID, VER_t
 		log("VSS::lookup(): lbid must be >= 0", logging::LOG_TYPE_DEBUG);
 		throw invalid_argument("VSS::lookup(): lbid must be >= 0");
 	}
-	if (verInfo.currentScn < 0) {
+	if (verID < 0) {
 		log("VSS::lookup(): verID must be >= 0", logging::LOG_TYPE_DEBUG);
 		throw invalid_argument("VSS::lookup(): verID must be >= 0");
 	}
@@ -400,111 +395,57 @@ int VSS::lookup(LBID_t lbid, const QueryContext_vss &verInfo, VER_t txnID, VER_t
 	}
 #endif
 
+    /* bug 3330.  SessionManager::verID() now returns the SCN - # of transactions.
+     * For the transaction, that means it gets a # too low to see its own
+     * uncommitted changes.  This change is the least invasive way to fix that.
+     */
+    if (txnID != 0)
+        verID = txnID;
+
 	hashIndex = lbid % vss->numHashBuckets;
 
 	currentIndex = hashBuckets[hashIndex];
 	while (currentIndex != -1) {
 		listEntry = &storage[currentIndex];
 		if (listEntry->lbid == lbid) {
-
-			if (vbOnly && !listEntry->vbFlag)
-				goto next;
 			
-			/* "if it is/was part of a different transaction, ignore it"
-			 */
-			if (txnID != listEntry->verID &&
-					(verInfo.txns->find(listEntry->verID) != verInfo.txns->end()))
-				goto next;
-
-			/* fast exit if the exact version is found */
-			if (verInfo.currentScn == listEntry->verID) {
-				*outVer = listEntry->verID;
-				*vbFlag = listEntry->vbFlag;
-				return 0;
+			if (vbOnly && !listEntry->vbFlag) {
+				currentIndex = listEntry->next;
+				continue;
 			}
-
-			/* Track the min version of this LBID */
+			
 			if (minVersion > listEntry->verID || minVersion == -1)
 				minVersion = listEntry->verID;
 
-			/* Pick the highest version <= the SCN of the query */
-			if (verInfo.currentScn > listEntry->verID && maxVersion < listEntry->verID) {
-				maxVersion = listEntry->verID;
-				maxEntry = listEntry;
+			if (!listEntry->locked || txnID == listEntry->verID)
+			{
+				if (verID == listEntry->verID) {
+					vbFlag = listEntry->vbFlag;
+					return 0;
+				}
+				else if (verID > listEntry->verID && maxVersion < listEntry->verID) {
+					maxVersion = listEntry->verID;
+					maxEntry = listEntry;
+				}
 			}
-		}
-next:
+		}	
 		currentIndex = listEntry->next;
 	}
+	
 	if (maxEntry != NULL) {
-		*outVer = maxVersion;
-		*vbFlag = maxEntry->vbFlag;
+		verID = maxVersion;
+		vbFlag = maxEntry->vbFlag;
 		return 0;
 	}
-	else if (minVersion > verInfo.currentScn) {
-		*outVer = 0;
-		*vbFlag = false;
+	else if (minVersion > verID) {
+		verID = 0;
+		vbFlag = false;
 		return ERR_SNAPSHOT_TOO_OLD;
 	}
-
-	*outVer = 0;
-	*vbFlag = false;
+	
+	verID = 0;
+	vbFlag = false;
 	return -1;
-}
-
-VER_t VSS::getCurrentVersion(LBID_t lbid, bool *isLocked) const
-{
-	int hashIndex, currentIndex;
-	VSSEntry *listEntry;
-
-	hashIndex = lbid % vss->numHashBuckets;
-	currentIndex = hashBuckets[hashIndex];
-	while (currentIndex != -1) {
-		listEntry = &storage[currentIndex];
-		if (listEntry->lbid == lbid && !listEntry->vbFlag) {
-			if (isLocked != NULL)
-				*isLocked = listEntry->locked;
-			return listEntry->verID;
-		}
-		currentIndex = listEntry->next;
-	}
-	if (isLocked != NULL)
-		*isLocked = false;
-	return 0;
-}
-
-VER_t VSS::getHighestVerInVB(LBID_t lbid, VER_t max) const
-{
-	int hashIndex, currentIndex;
-	VER_t ret = -1;
-	VSSEntry *listEntry;
-
-	hashIndex = lbid % vss->numHashBuckets;
-	currentIndex = hashBuckets[hashIndex];
-	while (currentIndex != -1) {
-		listEntry = &storage[currentIndex];
-		if ((listEntry->lbid == lbid && listEntry->vbFlag) &&
-				(listEntry->verID <= max && listEntry->verID > ret))
-			ret = listEntry->verID;
-		currentIndex = listEntry->next;
-	}
-	return ret;
-}
-
-bool VSS::isVersioned(LBID_t lbid, VER_t version) const
-{
-	int hashIndex, currentIndex;
-	VSSEntry *listEntry;
-
-	hashIndex = lbid % vss->numHashBuckets;
-	currentIndex = hashBuckets[hashIndex];
-	while (currentIndex != -1) {
-		listEntry = &storage[currentIndex];
-		if (listEntry->lbid == lbid && listEntry->verID == version)
-			return listEntry->vbFlag;
-		currentIndex = listEntry->next;
-	}
-	return false;
 }
 
 bool VSS::isLocked(const LBIDRange& range, VER_t transID) const
@@ -772,6 +713,20 @@ void VSS::commit(VER_t txnID)
 			if (vss->lockedEntryCount > 0)
 				vss->lockedEntryCount--;
 		}
+		
+		
+		BlockList_t lbids;
+		getLockedLBIDs(lbids);
+		if ( lbids.size() > 0 )
+		{
+				ostringstream ostr;
+				ostr << "VSS::commit(): After commit for transaction " << txnID << ", entries still locked with lbid:txnId : ";
+				log(ostr.str(), logging::LOG_TYPE_DEBUG);
+		}
+		else if ( vss->lockedEntryCount > 0 )
+		{
+			log("locked entry count does not match locked lbids", logging::LOG_TYPE_CRITICAL);
+		}
 }
 	
 //read lock
@@ -957,7 +912,7 @@ int VSS::checkConsistency(const VBBM &vbbm, ExtentMap &em) const
 	/* Test 1 */
 	
 	OID_t oid;
-	uint32_t fbo;
+	u_int32_t fbo;
 	
 	for (i = 0; i < vss->capacity; i++) {
 		if (storage[i].lbid != -1) {
@@ -1040,6 +995,73 @@ void VSS::getCurrentTxnIDs(set<VER_t> &list) const
 			list.insert(storage[i].verID);
 }
 
+void VSS::writeData(int fd, u_int8_t *buf, off_t offset, int size) const
+{
+	int errCount, err, progress;
+	off_t seekerr = -1;
+	
+	for (errCount = 0; errCount < MAX_IO_RETRIES && seekerr != offset; errCount++) {
+		seekerr = lseek(fd, offset, SEEK_SET);
+		if (seekerr < 0)
+			log_errno("VSS::writeData(): lseek");
+	}
+	if (errCount == MAX_IO_RETRIES) {
+		log("VSS::writeData(): lseek failed too many times");
+		throw std::ios_base::failure("VSS::writeData(): lseek failed "
+				"too many times");
+	}
+	
+	for (progress = 0, errCount = 0; progress < size && errCount < MAX_IO_RETRIES;) {
+		err = write(fd, &buf[progress], size - progress);
+		if (err < 0) {
+			if (errno != EINTR) {  // EINTR isn't really an error
+				errCount++;
+				log_errno("VSS::writeData(): write (retrying)");
+			}
+		}
+		else 
+			progress += err;		
+	}
+	if (errCount == MAX_IO_RETRIES) {
+		log("VSS::writeData(): write error failed too many times");
+		throw std::ios_base::failure("VSS::writeData(): write error");	
+	}
+}
+
+void VSS::readData(int fd, u_int8_t *buf, off_t offset, int size)
+{
+	int errCount, err, progress;
+	off_t seekerr = -1;
+	
+	for (errCount = 0; errCount < MAX_IO_RETRIES && seekerr != offset; errCount++) {
+		seekerr = lseek(fd, offset, SEEK_SET);
+		if (seekerr < 0)
+			log_errno("VSS::readData(): lseek");
+	}
+	if (errCount == MAX_IO_RETRIES) {
+		log("VSS::readData(): lseek failed too many times");
+		throw std::ios_base::failure("VSS::readData(): lseek failed "
+				"too many times");
+	}
+	
+	for (progress = 0, errCount = 0; progress < size && errCount < MAX_IO_RETRIES;) {
+		err = read(fd, &buf[progress], size - progress);
+		if (err < 0) {
+			if (errno != EINTR) {  // EINTR isn't really an error
+				errCount++;
+				log_errno("VSS::readData(): read (retrying)");
+			}
+		}
+		else 
+			progress += err;		
+	}
+	if (errCount == MAX_IO_RETRIES) {
+		log("VSS::readData(): read error");
+		throw std::ios_base::failure("VSS::readData(): read error");
+	}
+}	
+
+
 /* File Format:
 
 		VSS V1 magic (32-bits)
@@ -1057,63 +1079,33 @@ void VSS::save(string filename)
 {
 	int i;
 	struct Header header;
-	mode_t utmp = ::umask(0);
+	ofstream out;
+	mode_t utmp;
 
-	if (IDBPolicy::useHdfs()) {
-		const char* filename_p = filename.c_str();
-		scoped_ptr<IDBDataFile> out(IDBDataFile::open(
-									IDBPolicy::getType(filename_p, IDBPolicy::WRITEENG),
-									filename_p, "wb", IDBDataFile::USE_VBUF));
-		::umask(utmp);
-		if (!out) {
-			log_errno("VSS::save()");
-			throw runtime_error("VSS::save(): Failed to open the file");
-		}
-		
-		header.magic = VSS_MAGIC_V1;
-		header.entries = vss->currentSize;
-
-		if (out->write((char *)&header, sizeof(header)) != sizeof(header)) {
-			log_errno("VSS::save()");
-			throw runtime_error("VSS::save(): Failed to write header to the file");
-		}
-
-		for (i = 0; i < vss->capacity; i++) {
-			if (storage[i].lbid != -1) {
-				if (out->write((char *)&storage[i], sizeof(VSSEntry)) != sizeof(VSSEntry)) {
-					log_errno("VSS::save()");
-					throw runtime_error("VSS::save(): Failed to write vss entry to the file");
-				}
-			}
-		}
+	utmp = ::umask(0);
+	out.open(filename.c_str(), ios_base::trunc|ios_base::out|ios_base::binary);
+	::umask(utmp);
+	if (!out) {
+		log_errno("VSS::save()");
+		throw runtime_error("VSS::save(): Failed to open the file");
 	}
-	else {
-		ofstream out;
-		out.open(filename.c_str(), ios_base::trunc|ios_base::out|ios_base::binary);
-		::umask(utmp);
-		if (!out) {
-			log_errno("VSS::save()");
-			throw runtime_error("VSS::save(): Failed to open the file");
-		}
-		out.exceptions(ios_base::badbit);
-		
-		header.magic = VSS_MAGIC_V1;
-		header.entries = vss->currentSize;
+	out.exceptions(ios_base::badbit);
+	
+	header.magic = VSS_MAGIC_V1;
+	header.entries = vss->currentSize;
 
-		try {
-			out.write((char *)&header, sizeof(header));
+	try {
+		out.write((char *)&header, sizeof(header));
 
-			for (i = 0; i < vss->capacity; i++)
-				if (storage[i].lbid != -1)
-					out.write((char *)&storage[i], sizeof(VSSEntry));
-		}
-		catch (std::exception &e) {
-			out.close();
-			throw;
-		}
+		for (i = 0; i < vss->capacity; i++)
+			if (storage[i].lbid != -1)
+				out.write((char *)&storage[i], sizeof(VSSEntry));
+	}
+	catch (exception &e) {
 		out.close();
+		throw;
 	}
-
+	out.close();
 }
 
 // Ideally, we;d like to get in and out of this fcn as quickly as possible.
@@ -1146,19 +1138,21 @@ void VSS::load(string filename)
 	int i;
 	struct Header header;
 	struct VSSEntry entry;
+	ifstream in;
 
-	const char* filename_p = filename.c_str();
-	scoped_ptr<IDBDataFile>  in(IDBDataFile::open(
-								IDBPolicy::getType(filename_p, IDBPolicy::WRITEENG),
-								filename_p, "rb", 0));
+ 	in.open(filename.c_str(), ios_base::in | ios_base::binary);
 	if (!in) {
 		log_errno("VSS::load()");
 		throw runtime_error("VSS::load(): Failed to open the file");
 	}
 
-	if (in->read((char *)&header, sizeof(header)) != sizeof(header)) {
-		log_errno("VSS::load()");
-		throw runtime_error("VSS::load(): Failed to read header");
+ 	in.exceptions(ios_base::badbit | ios_base::failbit);
+	try {
+		in.read((char *)&header, sizeof(header));
+	}
+	catch (ios_base::failure &e) {
+		in.close();
+		throw;
 	}
 
 	if (header.magic != VSS_MAGIC_V1) {
@@ -1178,14 +1172,18 @@ void VSS::load(string filename)
 	vss->lockedEntryCount = 0;
 	vss->LWM = 0;
 
-	for (i = 0; i < header.entries; i++) {
-		if (in->read((char *)&entry, sizeof(entry)) != sizeof(entry)) {
-			log_errno("VSS::load()");
-			throw runtime_error("VSS::load(): Failed to read entry");
+	try {
+		for (i = 0; i < header.entries; i++) {
+			in.read((char *)&entry, sizeof(entry));
+			insert(entry.lbid, entry.verID, entry.vbFlag, entry.locked);
+			confirmChanges();
 		}
-		insert(entry.lbid, entry.verID, entry.vbFlag, entry.locked);
-		confirmChanges();
 	}
+	catch (exception &e) {
+		in.close();
+		throw;
+	}
+	in.close();
 }
 
 #ifndef __LP64__
@@ -1204,19 +1202,21 @@ void VSS::load64(string filename)
 	int i;
 	struct Header header;
 	struct VSSEntry_ entry;
+	ifstream in;
 
-	const char* filename_p = filename.c_str();
-	scoped_ptr<IDBDataFile>  in(IDBDataFile::open(
-								IDBPolicy::getType(filename_p, IDBPolicy::WRITEENG),
-								filename_p, "rb", 0));
+ 	in.open(filename.c_str(), ios_base::in | ios_base::binary);
 	if (!in) {
 		log_errno("VSS::load()");
 		throw runtime_error("VSS::load(): Failed to open the file");
 	}
 
-	if (in->read((char *)&header, sizeof(header)) != sizeof(header)) {
-		log_errno("VSS::load()");
-		throw runtime_error("VSS::load(): Failed to read header");
+ 	in.exceptions(ios_base::badbit | ios_base::failbit);
+	try {
+		in.read((char *)&header, sizeof(header));
+	}
+	catch (ios_base::failure &e) {
+		in.close();
+		throw;
 	}
 
 	if (header.magic != VSS_MAGIC_V1) {
@@ -1236,14 +1236,18 @@ void VSS::load64(string filename)
 	vss->lockedEntryCount = 0;
 	vss->LWM = 0;
 
-	for (i = 0; i < header.entries; i++) {
-		if (in->read((char *)&entry, sizeof(entry)) != sizeof(entry)) {
-			log_errno("VSS::load()");
-			throw runtime_error("VSS::load(): Failed to read entry");
+	try {
+		for (i = 0; i < header.entries; i++) {
+			in.read((char *)&entry, sizeof(entry));
+			insert(entry.lbid, entry.verID, entry.vbFlag, entry.locked);
+			confirmChanges();
 		}
-		insert(entry.lbid, entry.verID, entry.vbFlag, entry.locked);
-		confirmChanges();
 	}
+	catch (exception &e) {
+		in.close();
+		throw;
+	}
+	in.close();
 }
 #endif
 
@@ -1254,13 +1258,5 @@ int VSS::getShmid() const
 	return vssShmid;
 }
 #endif
-
-QueryContext_vss::QueryContext_vss(const QueryContext &qc) :
-	currentScn(qc.currentScn)
-{
-	txns.reset(new set<VER_t>());
-	for (uint32_t i = 0; i < qc.currentTxns->size(); i++)
-		txns->insert((*qc.currentTxns)[i]);
-}
 
 }   //namespace

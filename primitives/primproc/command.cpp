@@ -15,6 +15,19 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
+//
+// $Id: command.cpp 1855 2012-04-04 18:20:09Z rdempsey $
+// C++ Implementation: command
+//
+// Description: 
+//
+//
+// Author: Patrick LeBlanc <pleblanc@calpont.com>, (C) 2008
+//
+// Copyright: See COPYING file that comes with this distribution
+//
+//
+
 #include <unistd.h>
 
 #include "bpp.h"
@@ -30,12 +43,10 @@ Command::Command(CommandType c) : cmdType(c), fFilterFeeder(NOT_FEEDER) { }
 
 Command::~Command() { };
 
-void Command::createCommand(ByteStream &bs)
+void Command::createCommand(ByteStream &bs) 
 {
 	bs >> OID;
 	bs >> tupleKey;
-	bs >> queryUuid;
-	bs >> stepUuid;
 }
 
 void Command::resetCommand(ByteStream &bs) { };
@@ -65,9 +76,6 @@ Command* Command::makeCommand(ByteStream &bs, CommandType *type, vector<SCommand
 		case FILTER_COMMAND:
 			ret = FilterCommand::makeFilterCommand(bs, cmds);
 			break;
-        case PSEUDOCOLUMN:
-            ret = new PseudoCC();
-            break;
 		default:
 			throw logic_error("Command::makeCommand(): can't deserialize this bytestream");
 	};
@@ -75,7 +83,7 @@ Command* Command::makeCommand(ByteStream &bs, CommandType *type, vector<SCommand
 	return ret;
 }
 
-void Command::setBatchPrimitiveProcessor(BatchPrimitiveProcessor *b)
+void Command::setBatchPrimitiveProcessor(BatchPrimitiveProcessor *b) 
 {
 	bpp = b;
 }
@@ -139,6 +147,21 @@ bool Command::operator==(const Command &c) const
 	return true;
 }
 
+bool Command::operator!=(const Command &c) const
+{
+	return !(*this == c);
+}
+
+uint32_t Command::getOID() const
+{
+	return OID;
+}
+
+uint32_t Command::getTupleKey() const
+{
+	return tupleKey;
+}
+
 void Command::duplicate(Command *c)
 {
 	bpp = c->bpp;
@@ -146,8 +169,10 @@ void Command::duplicate(Command *c)
 	fFilterFeeder = c->fFilterFeeder;
 	OID = c->OID;
 	tupleKey = c->tupleKey;
-	queryUuid = c->queryUuid;
-	stepUuid = c->stepUuid;
 }
 
+void Command::getLBIDList(uint count, vector<int64_t> *out)
+{
 }
+
+};

@@ -17,7 +17,7 @@
 
 /***************************************************************************
  *
- *   $Id: filerequest.cpp 2055 2013-02-08 19:09:09Z pleblanc $
+ *   $Id: filerequest.cpp 1855 2012-04-04 18:20:09Z rdempsey $
  *
  *   jrodriguez@calpont.com   *
  *                                                                         *
@@ -36,7 +36,7 @@ fileRequest::fileRequest() :
 	init(); //resets fFRPredicate, fLength, fblksRead, fblksLoaded, fRqstStatus
 }
 
-fileRequest::fileRequest(BRM::LBID_t lbid, const BRM::QueryContext &ver, bool flg, BRM::VER_t txn, int compType,
+fileRequest::fileRequest(BRM::LBID_t lbid, BRM::VER_t ver, bool flg, BRM::VER_t txn, int compType,
   uint8_t *ptr, bool cacheIt) :
 	data(ptr), fLBID(lbid), fVer(ver), fFlg(flg), fTxn(txn), fRqstType(LBIDREQUEST), fCompType(compType),
 	cache(cacheIt), wasVersioned(false)
@@ -45,7 +45,7 @@ fileRequest::fileRequest(BRM::LBID_t lbid, const BRM::QueryContext &ver, bool fl
 	fLength = 1;
 }
 
-fileRequest::fileRequest(const BRM::InlineLBIDRange& range, const BRM::QueryContext &ver, BRM::VER_t txn, int compType) :
+fileRequest::fileRequest(const BRM::InlineLBIDRange& range, const BRM::VER_t ver, BRM::VER_t txn, int compType) :
 	data(0), fLBID(range.start), fVer(ver), fFlg(false), fTxn(txn), fLength(range.size), 
 	fRqstType(RANGEREQUEST), fCompType(compType), cache(true), wasVersioned(false)
 {

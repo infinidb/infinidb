@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_dctnry.cpp 4737 2013-08-14 20:45:46Z bwilkinson $
+* $Id: we_dctnry.cpp 4213 2012-09-28 13:04:51Z dcathey $
 *
 *******************************************************************************/
 /** @we_dctnry.cpp
@@ -30,7 +30,9 @@
 #include <cstring>
 #include <vector>
 #include <sstream>
+#ifndef _MSC_VER
 #include <inttypes.h>
+#endif
 #include <iostream>
 using namespace std;
 
@@ -39,22 +41,20 @@ using namespace std;
 #include "extentmap.h"    // for DICT_COL_WIDTH
 #include "we_stats.h"
 #include "we_log.h"
+#define WRITEENGINEDCTNRY_DLLEXPORT
 #include "we_dctnry.h"
+#undef WRITEENGINEDCTNRY_DLLEXPORT
 using namespace messageqcpp;
 using namespace WriteEngine;
 using namespace BRM;
-#include "IDBDataFile.h"
-#include "IDBPolicy.h"
-#include "cacheutils.h"
-using namespace idbdatafile;
 
 namespace
 {
     // These used to be member variables, hence the "m_" prefix.  But they are
     // all constants, so I removed them as member variables.  May change the
     // variable name later (to remove the m_ prefix) as time allows.
-    const uint16_t m_endHeader = DCTNRY_END_HEADER; // end of header flag (0xffff)
-    const uint16_t m_offSetZero= BYTE_PER_BLOCK;    // value for 0 offset (8192)
+    const i16 m_endHeader = DCTNRY_END_HEADER; // end of header flag (0xffff)
+    const i16 m_offSetZero= BYTE_PER_BLOCK;    // value for 0 offset (8192)
     const int m_lastOffSet= BYTE_PER_BLOCK;    // end of last offset
     const int m_totalHdrBytes =                // # bytes in header
           HDR_UNIT_SIZE + NEXT_PTR_BYTES + HDR_UNIT_SIZE + HDR_UNIT_SIZE;
@@ -90,8 +90,7 @@ Dctnry::Dctnry() :
     m_newStartOffset(0),
     m_freeSpace(0),
     m_curOp(0),
-    m_colWidth(0),
-    m_importDataMode(IMPORT_DATA_TEXT)
+    m_colWidth(0)
 {
     memset( m_dctnryHeader, 0, sizeof(m_dctnryHeader));
     memset( m_curBlock.data, 0, sizeof(m_curBlock.data));
@@ -194,7 +193,7 @@ int  Dctnry::createDctnry( const OID& dctnryOID, int colWidth,
     int   allocSize = 0;
     char  fileName[FILE_NAME_SIZE];
     int   rc;
-    std::map<FID,FID> oids;
+	std::map<FID,FID> oids;
 
 #ifdef PROFILE
     Stats::startParseEvent(WE_STATS_ALLOC_DCT_EXTENT);
@@ -299,8 +298,11 @@ int  Dctnry::expandDctnryExtent()
 {
     RETURN_ON_NULL( m_dFile, ERR_FILE_SEEK );
 
-    off64_t oldOffset = m_dFile->tell();
-
+#ifdef _MSC_VER
+    __int64 oldOffset = _ftelli64(m_dFile);
+#else
+    off_t oldOffset = ftello( m_dFile ); //save current offset
+#endif
     RETURN_ON_ERROR( setFileOffset(m_dFile, 0, SEEK_END) );
 
     // Based on extent size, see how many blocks to add to fill the extent
@@ -341,7 +343,7 @@ int  Dctnry::expandDctnryExtent()
  * RETURN:
  *    none
  ******************************************************************************/
-int Dctnry::closeDctnry(bool realClose)
+int Dctnry::closeDctnry()
 {
     if ( !m_dFile )
         return NO_ERROR;
@@ -350,7 +352,7 @@ int Dctnry::closeDctnry(bool realClose)
     CommBlock cb;
     cb.file.oid = m_dctnryOID;
     cb.file.pFile = m_dFile;
-    std::map<FID,FID> oids;
+	std::map<FID,FID> oids;
     if (m_curBlock.state==BLK_WRITE)
     {
         rc = writeDBFile(cb, &m_curBlock, m_curBlock.lbid);
@@ -363,44 +365,18 @@ int Dctnry::closeDctnry(bool realClose)
         // m_curBlock.state== BLK_INIT;
     }
 
-	//@Bug 5572. always close file for uncompressed file.
-    if (FileOp::compressionType() == 0)
-		realClose = true;
-		
-    if (realClose) {
-		//@Bug 5689. Need pass oid to write to the right file.
-		oids[m_dctnryOID] = m_dctnryOID;
-		// dmc-error handling (should detect/report error in closing file)
-		closeDctnryFile(true, oids);
-		
-	}
+    // dmc-error handling (should detect/report error in closing file)
+    closeDctnryFile(true, oids);
 
     m_hwm = (HWM)m_lastFbo;
     idbassert(m_dctnryOID>=0);
-	
-	if (idbdatafile::IDBPolicy::useHdfs() && realClose) 
-	{
-		BRM::FileInfo aFile;
-		std::vector<BRM::OID_t>  oidsToFlush;
-		oidsToFlush.push_back(m_dctnryOID);
-        aFile.oid     = m_dctnryOID;
-        aFile.partitionNum = m_partition;
-        aFile.segmentNum  = m_segment;
-        aFile.dbRoot     = m_dbRoot;
-		aFile.compType = FileOp::compressionType();
-		std::vector<BRM::FileInfo> aFileInfo;
-		aFileInfo.push_back(aFile);
-		cacheutils::purgePrimProcFdCache(aFileInfo, Config::getLocalModuleID());
-		cacheutils::flushOIDsFromCache(oidsToFlush);
-	}	
     rc = BRMWrapper::getInstance()->setLocalHWM(
         m_dctnryOID, m_partition, m_segment, m_hwm);
     if (rc != NO_ERROR)
         return rc;
 
     //cout <<"Init called! m_dctnryOID ="  << m_dctnryOID << endl;
-    if (realClose)
-		freeStringCache( );
+    freeStringCache( );
 
     return NO_ERROR;
 }
@@ -422,7 +398,7 @@ int Dctnry::closeDctnryOnly( )
         return NO_ERROR;
 
     // dmc-error handling (should detect/report error in closing file)
-    std::map<FID,FID> oids;
+	std::map<FID,FID> oids;
     closeDctnryFile(false, oids);
 
     freeStringCache( );
@@ -459,18 +435,15 @@ int  Dctnry::dropDctnry( const OID& dctnryOID)
  *    dbRoot   -- DBRoot for dictionary store segment file
  *    partition-- partition for dictionary store segment file
  *    segment  -- segment for dictionary store segment file
- *    useTmpSuffix - for Bulk HDFS usage: use or not use *.tmp file suffix
  *
  * RETURN:
  *    successful- NO_ERROR
  *    Fail      - Error Code
  ******************************************************************************/
-// @bug 5572 - HDFS usage: add *.tmp file backup flag
 int Dctnry::openDctnry(const OID& dctnryOID,
     const uint16_t dbRoot,
     const uint32_t partition,
-    const uint16_t segment,
-    const bool     useTmpSuffix)
+    const uint16_t segment)
 {
 #ifdef PROFILE
     Stats::startParseEvent(WE_STATS_OPEN_DCT_FILE);
@@ -481,35 +454,34 @@ int Dctnry::openDctnry(const OID& dctnryOID,
     m_partition = partition;
     m_segment   = segment;
 
-    m_dFile = openDctnryFile(useTmpSuffix);
+    m_dFile = openDctnryFile();
     if( m_dFile == NULL )
-    {
-        ostringstream oss;
-        oss << "oid:partition:segment " <<
-            dctnryOID <<":"<<partition<<":"<<segment;
-        logging::Message::Args args;
-        logging::Message message(1);
-        args.add("Error opening dictionary file ");
-        args.add(oss.str());
-        args.add("");
-        args.add("");
-        message.format(args);
-        logging::LoggingID lid(21);
+	{
+		ostringstream oss;
+		oss << "oid:partition:segment " << dctnryOID <<":"<<partition<<":"<<segment;
+		logging::Message::Args args;
+		logging::Message message(1);
+		args.add("Error opening dictionary file ");
+		args.add(oss.str());
+		args.add("");
+		args.add("");
+		message.format(args);
+		logging::LoggingID lid(21);
         logging::MessageLog ml(lid);
 
         ml.logErrorMessage( message );
         return ERR_FILE_OPEN;
-    }
+		
+	}
 
     m_numBlocks = numOfBlocksInFile();
-    std::map<FID,FID> oids;
+	std::map<FID,FID> oids;
 
     //Initialize other misc member variables
     init();
 
-    int extState;
     rc=BRMWrapper::getInstance()->getLocalHWM(dctnryOID,
-        m_partition, m_segment, m_hwm, extState);
+        m_partition, m_segment, m_hwm);
     if (rc!=NO_ERROR)
     {
         closeDctnryFile(false, oids);
@@ -546,19 +518,17 @@ int Dctnry::openDctnry(const OID& dctnryOID,
         closeDctnryFile(false, oids);
         return rc;
     }
-	//@Bug 5567  Don't seek for compressed file.
-	if (m_compressionType == 0) 
-	{
-   		 // Position file to the start of the current block;
-   	 	// Determine file byte offset based on the current block offset (m_curFbo)
-    	long long byteOffset = ((long long)m_curFbo) * (long)BYTE_PER_BLOCK;
-    	rc = setFileOffset(m_dFile, byteOffset);
-    	if (rc!=NO_ERROR)
-   		{
-        	closeDctnryFile(false, oids);
-        	return rc;
-    	}
-	}
+
+    // Position file to the start of the current block;
+    // Determine file byte offset based on the current block offset (m_curFbo)
+    long long byteOffset = ((long long)m_curFbo) * (long)BYTE_PER_BLOCK;
+    rc = setFileOffset(m_dFile, byteOffset);
+    if (rc!=NO_ERROR)
+    {
+        closeDctnryFile(false, oids);
+        return rc;
+    }
+
     m_curBlock.lbid = m_curLbid;
     m_curBlock.state= BLK_READ;
     int opCnt       = 0;
@@ -681,25 +651,6 @@ int Dctnry::insertDctnry(const char* buf,
         memset(&curSig, 0, sizeof(curSig));
         curSig.size = pos[startPos][col].offset;
 
-        // Strip trailing null bytes '\0' (by adjusting curSig.size) if import-
-        // ing in binary mode.  If entire string is binary zeros, then we treat
-        // as a NULL value.
-        if (m_importDataMode != IMPORT_DATA_TEXT)
-        {
-            if ((curSig.size > 0) &&
-                (curSig.size != COLPOSPAIR_NULL_TOKEN_OFFSET))
-            {
-                char* fld = (char*)buf + pos[startPos][col].start;
-                int kk = curSig.size-1;
-                for (; kk>=0; kk--)
-                {
-                    if (fld[kk] != '\0')
-                        break;
-                }
-                curSig.size = kk + 1;
-            }
-        }
-
         // Read thread should validate against max size so that the entire row
         // can be rejected up front.  Once we get here in the parsing thread,
         // it is too late to reject the row.  However, as a precaution, we
@@ -807,7 +758,7 @@ int Dctnry::insertDctnry(const char* buf,
             next = false;
             m_lastFbo++;
             m_curFbo = m_lastFbo;
-
+			
             //...Expand current extent if it is an abbreviated initial extent
             if ((m_curFbo    == m_numBlocks) &&
                 (m_numBlocks == NUM_BLOCKS_PER_INITIAL_EXTENT))
@@ -843,22 +794,16 @@ int Dctnry::insertDctnry(const char* buf,
                     m_logger->logMsg( oss.str(), MSGLVL_INFO2 );
                 }
                 m_curLbid = startLbid;
-
+#ifdef PROFILE
+                Stats::startParseEvent(WE_STATS_PARSE_DCT_SEEK_EXTENT_BLK);
+#endif
                 // now seek back to the curFbo, after adding an extent
-                // @bug5769 For uncompressed only;
-                // ChunkManager manages the file offset for the compression case
-                if (m_compressionType == 0)
-                {
+                long long byteOffset = m_curFbo;
+                byteOffset *= BYTE_PER_BLOCK;
+                RETURN_ON_ERROR( setFileOffset(m_dFile, byteOffset) );
 #ifdef PROFILE
-                    Stats::startParseEvent(WE_STATS_PARSE_DCT_SEEK_EXTENT_BLK);
+                Stats::stopParseEvent(WE_STATS_PARSE_DCT_SEEK_EXTENT_BLK);
 #endif
-                    long long byteOffset = m_curFbo;
-                    byteOffset *= BYTE_PER_BLOCK;
-                    RETURN_ON_ERROR( setFileOffset(m_dFile, byteOffset) );
-#ifdef PROFILE
-                    Stats::stopParseEvent(WE_STATS_PARSE_DCT_SEEK_EXTENT_BLK);
-#endif
-                }
             }
             else
             {
@@ -941,6 +886,7 @@ int Dctnry::insertDctnry(const int& sgnature_size,
 {
     int rc = 0;
     int i;
+    bool found = false;
     unsigned char* value = NULL;
     int size;
     if (sgnature_size > MAX_SIGNATURE_SIZE)
@@ -967,6 +913,7 @@ int Dctnry::insertDctnry(const int& sgnature_size,
         if( (m_freeSpace>= (size + HDR_UNIT_SIZE)) &&
             (m_curOp    <  (MAX_OP_COUNT-1)) )
         { // found the perfect block; signature size fit in this block
+            found = true;
             insertDctnryHdr(m_curBlock.data, size);
             insertSgnture(m_curBlock.data, size, value);
             m_curBlock.state = BLK_WRITE;
@@ -979,8 +926,8 @@ int Dctnry::insertDctnry(const int& sgnature_size,
             if (m_curOp < (MAX_OP_COUNT-1))
                 return NO_ERROR;
         }//end Found
-
-        //@bug 3832. check error code
+		
+		//@bug 3832. check error code
         RETURN_ON_ERROR( writeDBFile(cb, &m_curBlock, m_curLbid) );
         memset( m_curBlock.data, 0, sizeof(m_curBlock.data));
         memcpy( m_curBlock.data, &m_dctnryHeader2, m_totalHdrBytes);
@@ -1024,9 +971,8 @@ int Dctnry::insertDctnry(const int& sgnature_size,
             if ( rc != NO_ERROR )
             {
                 //roll back the extent             
-                BRMWrapper::getInstance()->deleteEmptyDictStoreExtents(
-                    dictExtentInfo);
-                return rc;
+				BRMWrapper::getInstance()->deleteEmptyDictStoreExtents(dictExtentInfo);
+				return rc;
             }
         }
         RETURN_ON_ERROR( BRMWrapper::getInstance()->getBrmInfo(m_dctnryOID,
@@ -1063,8 +1009,8 @@ void Dctnry::insertDctnryHdr( unsigned char* blockBuf,
 
     m_freeSpace -= (size + HDR_UNIT_SIZE);
     memcpy(&blockBuf[endHdrLoc],&m_endHeader,HDR_UNIT_SIZE);
-    uint16_t lastOffset =*(uint16_t*)&blockBuf[lastOffsetLoc];
-    uint16_t nextOffset = lastOffset- size;
+    i16 lastOffset =*(i16*)&blockBuf[lastOffsetLoc];
+    i16 nextOffset = lastOffset- size;
 
     memcpy(&blockBuf[0], &m_freeSpace, HDR_UNIT_SIZE);
     memcpy(&blockBuf[nextOffsetLoc], &nextOffset, HDR_UNIT_SIZE);
@@ -1138,8 +1084,8 @@ void  Dctnry::preLoadStringCache( const DataBlock& fileBlock )
 {
     int hdrOffsetBeg = HDR_UNIT_SIZE + NEXT_PTR_BYTES + HDR_UNIT_SIZE;
     int hdrOffsetEnd = HDR_UNIT_SIZE + NEXT_PTR_BYTES;
-    uint16_t offBeg = 0;
-    uint16_t offEnd = 0;
+    i16 offBeg = 0;
+    i16 offEnd = 0;
     memcpy( &offBeg, &fileBlock.data[hdrOffsetBeg], HDR_UNIT_SIZE );
     memcpy( &offEnd, &fileBlock.data[hdrOffsetEnd], HDR_UNIT_SIZE );
 
@@ -1167,11 +1113,11 @@ void  Dctnry::preLoadStringCache( const DataBlock& fileBlock )
 
     //std::cout << "Preloading strings..." << std::endl;
     //char strSig[1000];
-    //uint64_t tokenVal;
+    //i64 tokenVal;
     //for (int i=0; i<m_arraySize; i++)
     //{
     //  memcpy(strSig, m_sigArray[i].signature, m_sigArray[i].size );
-    //  memcpy(&tokenVal, &m_sigArray[i].token, sizeof(uint64_t));
+    //  memcpy(&tokenVal, &m_sigArray[i].token, sizeof(i64));
     //  strSig[m_sigArray[i].size] = '\0';
     //  std::cout << "op-"      << m_sigArray[i].token.op  <<
     //               "; fbo-"   << m_sigArray[i].token.fbo <<
@@ -1211,7 +1157,7 @@ void  Dctnry::addToStringCache( const Signature& newSig )
  *        Success -- found and deleted
  *        Fail    -- ERR_DICT_INVALID_DELETE
  ******************************************************************************/
-int  Dctnry::getEndOp(IDBDataFile* dFile, int lbid, int &endOp)
+int  Dctnry::getEndOp(FILE* dFile, int lbid, int &endOp)
 {
     DataBlock fileBlock;
     Offset newOffset;
@@ -1291,21 +1237,19 @@ int  Dctnry::updateDctnry(unsigned char* sigValue, int& sigSize,
 /*******************************************************************************
  * open dictionary file
  ******************************************************************************/
-IDBDataFile* Dctnry::createDctnryFile(
+FILE* Dctnry::createDctnryFile(
     const char *name, int, const char *mode, int ioBuffSize)
 {
-    return openFile(name, mode, ioBuffSize, false);
+    return openFile(name, mode, ioBuffSize);
 }
 
 /*******************************************************************************
  * open dictionary file
  ******************************************************************************/
-// @bug 5572 - HDFS usage: add *.tmp file backup flag
-IDBDataFile* Dctnry::openDctnryFile(bool useTmpSuffix)
+FILE* Dctnry::openDctnryFile()
 {
     return openFile(
-        m_dctnryOID, m_dbRoot, m_partition, m_segment, m_segFileName,
-            "r+b", DEFAULT_COLSIZ, useTmpSuffix);
+        m_dctnryOID, m_dbRoot, m_partition, m_segment, m_segFileName);
 }
 
 /*******************************************************************************
@@ -1320,7 +1264,7 @@ void Dctnry::closeDctnryFile(bool doFlush, std::map<FID,FID> & oids)
 int Dctnry::numOfBlocksInFile()
 {
     long long fileSizeBytes = 0;
-    getFileSize(m_dFile,fileSizeBytes); //dmc-error handling (ignoring rc)
+    getFileSize2(m_dFile,fileSizeBytes); //dmc-error handling (ignoring rc)
     return fileSizeBytes/BYTE_PER_BLOCK;
 }
 
@@ -1328,5 +1272,562 @@ void Dctnry::copyDctnryHeader(void* buf)
 {
     memcpy(buf, m_dctnryHeader2, m_totalHdrBytes);
 }
+
+#if 0
+//------------------------------------------------------------------------------
+// None of the delete functions that follow are currently actively used.
+// They will need to be reevaluated and tested later if we decide to use.
+//------------------------------------------------------------------------------
+
+/*******************************************************************************
+ * Description:
+ * Delete a token/pointer from the dictionary store
+ * input
+ *      dFile
+ *        --file handle
+ *      token
+ *        -- Token value of the signature
+ *           contain fbo and op information
+ *
+ * return value
+ *        Success -- found and deleted
+ *        Fail    -- ERR_DICT_INVALID_DELETE
+ ******************************************************************************/
+int  Dctnry::deleteDctnryValue( FILE* dFile, Token& token)
+{
+    int rc;
+    DataBlock fileBlock;
+    Offset dOffset;
+    Offset prevOffset;
+    int size;
+    CommBlock cb;
+    cb.file.oid = m_dctnryOID;
+    cb.file.pFile = dFile;
+    if (!dFile) // Make sure that we have non-null filehandle
+        return ERR_FILE_NULL;
+    m_dFile = dFile;
+
+    //check if token is valid
+    if  ((int)token.fbo <0)
+        return ERR_DICT_BAD_TOKEN_LBID;
+    if (((int)token.op < 1) || ((int)token.op >= MAX_OP_COUNT))
+        return ERR_DICT_BAD_TOKEN_OP;
+    //check if exceeds the end
+    int endOp =0;
+    rc = getEndOp( dFile, token.fbo, endOp) ;
+
+    if ((int)token.op >= endOp)
+        return ERR_DICT_BAD_TOKEN_OP;
+    //end of check token
+    memset( fileBlock.data, 0, sizeof(fileBlock.data));
+    memset(m_dctnryHeader,0,sizeof(m_dctnryHeader));
+
+    rc=readSubBlockEntry( cb, &fileBlock, token.fbo, 0, 0,
+                              HDR_UNIT_SIZE + NEXT_PTR_BYTES +
+                              HDR_UNIT_SIZE + HDR_UNIT_SIZE,
+                              &m_dctnryHeader);
+    if (rc!= NO_ERROR)
+        return rc;
+    memcpy(&m_freeSpace, m_dctnryHeader, HDR_UNIT_SIZE);
+    memcpy(&m_nextPtr,m_dctnryHeader + HDR_UNIT_SIZE, NEXT_PTR_BYTES);
+
+    dOffset.hdrLoc= HDR_UNIT_SIZE + NEXT_PTR_BYTES +((token.op)* HDR_UNIT_SIZE);
+    memcpy(&(dOffset.offset), &(fileBlock.data[dOffset.hdrLoc]), HDR_UNIT_SIZE);
+    if (dOffset.offset == DCTNRY_END_HEADER)
+        return ERR_DICT_NO_OP_DELETE;
+    prevOffset.hdrLoc= HDR_UNIT_SIZE + NEXT_PTR_BYTES +
+                       ((token.op-1)*HDR_UNIT_SIZE);
+    memcpy(&(prevOffset.offset),
+           &(fileBlock.data[prevOffset.hdrLoc]), HDR_UNIT_SIZE);
+
+    size = prevOffset.offset- dOffset.offset;
+    if (size == 0)
+        return ERR_DICT_ZERO_LEN;
+    else if (size <0)
+        return ERR_DICT_NO_OP_DELETE;
+    rc = deleteValue(fileBlock.data, (i16&) dOffset.hdrLoc, size );
+    if (rc!= NO_ERROR)
+        return rc;
+
+    // if it is bigger than m_bigSpace, then the empty
+    // block no increment by 1
+    rc = deleteRecalHdr(fileBlock.data, dOffset.hdrLoc, size);
+
+    if (rc!= NO_ERROR)
+        return rc;
+    if ((m_nextPtr!= NOT_USED_PTR) )
+    {
+        Token nextToken;
+
+        nextToken.fbo = ((Token*)&m_nextPtr)->fbo;
+        nextToken.op  = ((Token*)&m_nextPtr)->op;
+        rc =deleteDctnryValue( m_dFile, nextToken );
+        if (rc!= NO_ERROR)
+        {
+            return rc;
+        }
+    }
+    rc = writeDBFile(cb,&fileBlock, token.fbo);
+        return rc;
+}
+
+/*******************************************************************************
+ * DESCRIPTION:
+ * delete the value at offset store in the op location in the header
+ *
+ * PARAMETERS:
+ *    input blockBuf
+ *       --the block buffer
+ *    input loc
+ *       -- the header location to find the offset
+ *    input size
+ *       -- size of the value
+ *
+ * RETURN:
+ *    success    - successfully delete the value
+ *    failure    - it did not   delete the value
+ ******************************************************************************/
+int  Dctnry::deleteValue(unsigned char* blockBuf, i16& loc, int& size)
+{
+    int rc;
+    Offset curOffset, prevOffset, dOffset, lastOffset;
+    //ready to be deleted at
+
+    dOffset.hdrLoc = loc;
+    memcpy(&(dOffset.offset), &blockBuf[dOffset.hdrLoc], HDR_UNIT_SIZE );
+    //previous Offset
+    prevOffset.hdrLoc = dOffset.hdrLoc-HDR_UNIT_SIZE;
+    memcpy(&(prevOffset.offset), &blockBuf[prevOffset.hdrLoc], HDR_UNIT_SIZE);
+    //current starting Offset
+    curOffset.hdrLoc = loc;
+    memcpy(&(curOffset.offset), &blockBuf[curOffset.hdrLoc], HDR_UNIT_SIZE);
+
+    while ( curOffset.offset != DCTNRY_END_HEADER)
+    {
+        prevOffset.offset = curOffset.offset;
+        prevOffset.hdrLoc = curOffset.hdrLoc;
+
+        curOffset.hdrLoc+= HDR_UNIT_SIZE;
+        memcpy(&(curOffset.offset), &blockBuf[curOffset.hdrLoc],HDR_UNIT_SIZE);
+    } //end while
+
+    lastOffset.hdrLoc = prevOffset.hdrLoc;
+    lastOffset.offset = prevOffset.offset;
+
+    rc = deleteMoveValues(blockBuf, dOffset.offset, size, lastOffset.offset);
+    return rc ;
+}
+
+/*******************************************************************************
+ * DESCRIPTION:
+ * delete the value in the block and move the values after the deleted
+ * one to fill the gap
+ *
+ * PARAMETERS:
+ *    input blockBuf
+ *       --the block buffer
+ *    input curOffset
+ *       --value starting location in the block
+ *    input size
+ *       --size of the value
+ *    input lastOffset
+ *       --last offset starting location in the block
+ *
+ * RETURN:
+ *    success    - successfully created the index list header
+ *    failure    - it did not create the index list header
+ ******************************************************************************/
+int Dctnry::deleteMoveValues(unsigned char* blockBuf, i16& curOffset,
+                             int& size, i16& lastOffset)
+{
+    int moveOffsetSize = curOffset - lastOffset;
+    //unsigned char cBuff[moveOffsetSize];
+    unsigned char* cBuff = (unsigned char*)alloca(moveOffsetSize);
+
+    if ((moveOffsetSize< 0) ||(moveOffsetSize > (m_bigSpace -HDR_UNIT_SIZE)))
+        return ERR_DICT_NO_OFFSET_DELETE;
+    if (moveOffsetSize>0)
+    {
+        memcpy(cBuff, &blockBuf[lastOffset], moveOffsetSize);
+        memcpy(&blockBuf[lastOffset + size], cBuff, moveOffsetSize);
+    }
+    memset(&blockBuf[lastOffset],0,size);
+    return NO_ERROR;
+}
+
+/*******************************************************************************
+ * DESCRIPTION:
+ *  delete the offset in the header for the deleted value
+ *  and put the previous offset in here to make zero length
+ *
+ * PARAMETERS:
+ *    input blockBuf
+ *       --the block buffer
+ *    input loc
+ *       -- location of the current header for the delete value
+ *    input size
+ *       -- total size of the value
+ *
+ * RETURN:
+ *    success    - successfully delete the offset in header
+ *    failure    - it did not delete the offset in header
+ ******************************************************************************/
+int Dctnry::deleteRecalHdr(unsigned char* blockBuf, int& loc,int& size)
+{
+    Offset  curOffset;
+    Offset  prevOffset;
+    Offset  nextOffset;
+    i16     freeSpace;
+    int     opCount;
+
+    memcpy(&freeSpace, &blockBuf[0],HDR_UNIT_SIZE );
+    curOffset.hdrLoc = loc;
+    memcpy(&(curOffset.offset), &blockBuf[curOffset.hdrLoc], HDR_UNIT_SIZE );
+    nextOffset.hdrLoc = curOffset.hdrLoc + HDR_UNIT_SIZE ;
+    memcpy(&(nextOffset.offset), &blockBuf[nextOffset.hdrLoc], HDR_UNIT_SIZE);
+
+    if (nextOffset.offset== DCTNRY_END_HEADER)
+    { //last one
+        freeSpace= freeSpace + size + HDR_UNIT_SIZE ;
+        //put the end of header into the last location,
+        //which is in the nextOffset header loc
+        memcpy(&blockBuf[curOffset.hdrLoc],&(nextOffset.offset), HDR_UNIT_SIZE);
+        //zero out the previous end of header
+        memset(&blockBuf[nextOffset.hdrLoc],0,HDR_UNIT_SIZE );
+        // put the new free space in the header
+        memcpy(&blockBuf[0], &freeSpace, HDR_UNIT_SIZE );
+        m_freeSpace = freeSpace;
+        //Now let's clean up the whole header
+        opCount = (curOffset.hdrLoc - (HDR_UNIT_SIZE + NEXT_PTR_BYTES +
+                                       HDR_UNIT_SIZE))/HDR_UNIT_SIZE ;
+        if ((m_freeSpace + (opCount)*HDR_UNIT_SIZE)==
+            (BYTE_PER_BLOCK-DCTNRY_HEADER_SIZE))
+        {//cleanup if no signature in the block but only headers
+
+            memset(&blockBuf[DCTNRY_HEADER_SIZE-HDR_UNIT_SIZE],
+                   0, HDR_UNIT_SIZE*(opCount+1));
+            memcpy(&blockBuf[DCTNRY_HEADER_SIZE-HDR_UNIT_SIZE],
+                   &DCTNRY_END_HEADER, HDR_UNIT_SIZE);
+            m_freeSpace = m_freeSpace+ opCount*HDR_UNIT_SIZE;
+            memcpy(&blockBuf[0], &m_freeSpace, HDR_UNIT_SIZE);
+        }
+        return NO_ERROR;
+    }
+
+    freeSpace = freeSpace + size;
+    memcpy(&blockBuf[0], &freeSpace, HDR_UNIT_SIZE);
+    m_freeSpace = freeSpace;
+
+    prevOffset.hdrLoc = curOffset.hdrLoc-HDR_UNIT_SIZE;
+    memcpy(&(prevOffset.offset), &blockBuf[prevOffset.hdrLoc],HDR_UNIT_SIZE);
+    memcpy(&blockBuf[curOffset.hdrLoc],&(prevOffset.offset),HDR_UNIT_SIZE);
+
+    while ( nextOffset.offset != DCTNRY_END_HEADER)
+    {
+        nextOffset.offset = nextOffset.offset + size ;
+        memcpy(&blockBuf[nextOffset.hdrLoc],&(nextOffset.offset),HDR_UNIT_SIZE);
+        nextOffset.hdrLoc += HDR_UNIT_SIZE;
+        memcpy(&(nextOffset.offset),&blockBuf[nextOffset.hdrLoc],HDR_UNIT_SIZE);
+    } //end while
+
+    opCount = (nextOffset.hdrLoc -
+               (DCTNRY_HEADER_SIZE-HDR_UNIT_SIZE))/HDR_UNIT_SIZE;
+    if ((m_freeSpace + opCount*HDR_UNIT_SIZE)==
+               (BYTE_PER_BLOCK-DCTNRY_HEADER_SIZE))
+    {//cleanup
+        memset(&blockBuf[DCTNRY_HEADER_SIZE-HDR_UNIT_SIZE],
+               0, HDR_UNIT_SIZE*(opCount+1));
+        memcpy(&blockBuf[DCTNRY_HEADER_SIZE-HDR_UNIT_SIZE],
+               &DCTNRY_END_HEADER,HDR_UNIT_SIZE);
+        m_freeSpace = m_freeSpace+opCount*HDR_UNIT_SIZE;
+        memcpy(&blockBuf[0], &m_freeSpace, HDR_UNIT_SIZE);
+    }
+    return NO_ERROR;
+}
+
+/*******************************************************************************
+ * Description:
+ * Delete a token/pointer from the dictionary store
+ * input
+ *      dFile
+ *        --file handle
+ *      token
+ *        -- Token value of the signature
+ *           contain fbo and op information
+ * output
+ *      sigSize -- return the deleted signature Size
+ *      sigValue -- return the deleted signature value
+ *
+ * return value
+ *        Success -- found and deleted
+ *        Fail    -- ERR_DICT_INVALID_DELETE
+ ******************************************************************************/
+int  Dctnry::deleteDctnryValue( Token& token, int& sigSize,
+                                unsigned char** sigValue)
+{
+    int rc = NO_ERROR;
+    DataBlock fileBlock;
+    Offset dOffset;
+    Offset prevOffset;
+    int size;
+    CommBlock cb;
+    cb.file.oid = m_dctnryOID;
+    cb.file.pFile = m_dFile;
+    if (!m_dFile) // Make sure that we have non-null filehandle
+    {
+        return ERR_FILE_NULL;
+    }
+    long long fileSizeBytes;
+    rc = getFileSize2(m_dFile,fileSizeBytes)
+    if (rc != NO_ERROR)
+        return rc;
+    m_numBlocks = fileSizeBytes / BYTE_PER_BLOCK;
+    //get max lbid
+
+    if ((int)token.fbo <0)
+        return ERR_DICT_BAD_TOKEN_LBID;
+    if ((token.op < 1) || (token.op >= (int)MAX_OP_COUNT))
+        return ERR_DICT_BAD_TOKEN_OP;
+    //check if exceeds the end
+    int endOp =0;
+    rc = getEndOp( m_dFile, token.fbo, endOp) ;
+
+    if ((int)token.op >= endOp)
+    {
+        sigSize =0;
+        return ERR_DICT_NO_OP_DELETE;
+    }
+    memset( fileBlock.data, 0, sizeof(fileBlock.data));
+    memset(m_dctnryHeader,0,sizeof(m_dctnryHeader));
+
+    rc=readSubBlockEntry( cb, &fileBlock, token.fbo, 0, 0,
+                      HDR_UNIT_SIZE+NEXT_PTR_BYTES+HDR_UNIT_SIZE+HDR_UNIT_SIZE,
+                          &m_dctnryHeader);
+    if (rc!= NO_ERROR)
+        return rc;
+    memcpy(&m_freeSpace,m_dctnryHeader,HDR_UNIT_SIZE);
+    memcpy(&m_nextPtr,m_dctnryHeader+HDR_UNIT_SIZE,NEXT_PTR_BYTES);
+
+    dOffset.hdrLoc= HDR_UNIT_SIZE+NEXT_PTR_BYTES+((token.op)*HDR_UNIT_SIZE);
+    memcpy(&(dOffset.offset), &(fileBlock.data[dOffset.hdrLoc]),HDR_UNIT_SIZE);
+    prevOffset.hdrLoc=HDR_UNIT_SIZE+NEXT_PTR_BYTES+((token.op-1)*HDR_UNIT_SIZE);
+    memcpy(&(prevOffset.offset),
+           &(fileBlock.data[prevOffset.hdrLoc]),HDR_UNIT_SIZE);
+
+    size = prevOffset.offset- dOffset.offset;
+    if (size == 0)
+        return ERR_DICT_ZERO_LEN;
+    *sigValue = (unsigned char*)malloc(size*sizeof(unsigned char));
+    memcpy(*sigValue,&(fileBlock.data[dOffset.offset]), size);
+    sigSize = size;
+
+    rc = deleteValue(fileBlock.data,  (i16&) dOffset.hdrLoc, size );
+    if (rc!= NO_ERROR)
+        return rc;
+
+    rc = deleteRecalHdr(fileBlock.data, dOffset.hdrLoc, size);
+    if (rc!= NO_ERROR)
+        return rc;
+
+    rc = writeDBFile(cb,&fileBlock, token.fbo);
+    return rc;
+}
+#endif
+
+//------------------------------------------------------------------------------
+// End of obsolete delete functions
+//------------------------------------------------------------------------------
+
+#if 0
+//------------------------------------------------------------------------------
+// The following functions should only be enabled and used by testdrivers
+//------------------------------------------------------------------------------
+
+/*******************************************************************************
+ * Description:
+ * Writes out "m_numBlocks" initialized block headers, using m_dctnryHeader2
+ * as the initialization template.  Header blocks are written to
+ * to the file dFile, starting at m_lastFbo.
+ *
+ * PARAMETERS:
+ *    input
+ *        dFile  - File Handler
+ *
+ * RETURN:
+ *    success    - successfully write the header to block
+ *    failure    - it did not  write the header to block
+ ******************************************************************************/
+int Dctnry::initDctnryHdr(FILE* dFile)
+{
+    int i;
+    int rc = 0;
+    DataBlock fileBlock;
+
+    m_dFile = dFile;
+    CommBlock cb;
+    cb.file.oid = m_dctnryOID;
+    cb.file.pFile = m_dFile;
+
+    long long fileSizeBytes;
+    rc = getFileSize2(dFile,fileSizeBytes)
+    if (rc != NO_ERROR)
+        return rc;
+    m_numBlocks = fileSizeBytes / BYTE_PER_BLOCK;
+    //initialization
+    bool oldUseVb = BRMWrapper::getUseVb();
+    BRMWrapper::setUseVb( false );
+
+    memset( fileBlock.data, 0, sizeof(fileBlock.data));
+
+    memcpy(&fileBlock,&m_dctnryHeader2,m_totalHdrBytes);
+    for (i=m_lastFbo; i< m_numBlocks; i++)
+    {
+        BRM::LBID_t lbid;
+        BRMWrapper::getInstance()->getBrmInfo( m_dctnryOID,
+            m_partition, m_segment,
+            i, lbid );
+        rc=writeDBFile(cb, &fileBlock, lbid);
+    }
+    BRMWrapper::setUseVb( oldUseVb );
+    return rc;
+}
+
+/*******************************************************************************
+ * Description:
+ * find a value from a given token
+ * input
+ *      dFile
+ *        --file handle
+ *      token
+ *        -- Token value of the signature
+ *           contain fbo and op information
+ *
+ * return value
+ *        Success -- found and deleted
+ *        Fail    -- ERR_DICT_INVALID_DELETE
+ ******************************************************************************/
+int  Dctnry::findTokenValue (FILE* dFile, Token& token,
+                             unsigned char* sigValue,
+                             int& sigSize )
+{
+    int rc;
+    DataBlock fileBlock;
+    Offset dOffset;
+    Offset prevOffset;
+    int size;
+    CommBlock cb;
+    cb.file.oid = m_dctnryOID;
+    cb.file.pFile = dFile;
+    m_dFile = dFile;
+    long long fileSizeBytes;
+    rc = getFileSize2(m_dFile,fileSizeBytes)
+    if (rc != NO_ERROR)
+        return rc;
+    m_numBlocks = fileSizeBytes / BYTE_PER_BLOCK;
+    memset( fileBlock.data, 0, sizeof(fileBlock.data));
+    memset(m_dctnryHeader,0,sizeof(m_dctnryHeader));
+
+    if ((int)token.fbo <0)
+        return ERR_DICT_BAD_TOKEN_LBID;
+
+    if (((i64)token.op < 1) || ((int)token.op >= MAX_OP_COUNT))
+        return ERR_DICT_BAD_TOKEN_OP;
+    //check if exceeds the end
+    int endOp =0;
+    rc = getEndOp( m_dFile, token.fbo, endOp) ;
+
+    if ((int)token.op >= endOp)
+    {
+        sigSize =0;
+        return ERR_DICT_BAD_TOKEN_OP;
+    }
+
+    rc=readSubBlockEntry( cb, &fileBlock, token.fbo, 0, 0,
+                          HDR_UNIT_SIZE + NEXT_PTR_BYTES + HDR_UNIT_SIZE +
+                          HDR_UNIT_SIZE,
+                          &m_dctnryHeader);
+    if (rc!= NO_ERROR)
+        return rc;
+    memcpy(&m_freeSpace,m_dctnryHeader, HDR_UNIT_SIZE);
+    memcpy(&m_nextPtr,m_dctnryHeader + HDR_UNIT_SIZE, NEXT_PTR_BYTES);
+
+    dOffset.hdrLoc= HDR_UNIT_SIZE + NEXT_PTR_BYTES+((token.op)*HDR_UNIT_SIZE);
+    memcpy(&(dOffset.offset), &(fileBlock.data[dOffset.hdrLoc]),HDR_UNIT_SIZE);
+    prevOffset.hdrLoc= 2+NEXT_PTR_BYTES+((token.op-1)*HDR_UNIT_SIZE);
+    memcpy(
+      &(prevOffset.offset), &(fileBlock.data[prevOffset.hdrLoc]),HDR_UNIT_SIZE);
+
+    size = prevOffset.offset- dOffset.offset;
+    if ((size == 0))
+        return ERR_DICT_TOKEN_NOT_FOUND;
+    sigSize = size;
+    memcpy(sigValue, &fileBlock.data[dOffset.offset],sigSize);
+    return NO_ERROR;
+}
+
+/*******************************************************************************
+ * Description:
+ * get the op Count and offsets for a block
+ * input
+ *      dFile - file handler
+ *      fbo  - block number
+ * output
+ *      op_count - total op count
+ *      offsetArray - where the offsets are
+ *
+ * return value
+ *        Success -- found and deleted
+ *        Fail    -- ERR_DICT_INVALID_DELETE
+ ******************************************************************************/
+void  Dctnry::getBlockHdr( FILE* dFile, int fbo, int & op_count,
+                           Offset* offsetArray)
+{
+    DataBlock fileBlock;
+    Offset    newOffset;
+
+    int       rc;
+    m_dFile = dFile;
+    BRM::LBID_t lbid;
+    CommBlock cb;
+    cb.file.oid = m_dctnryOID;
+    cb.file.pFile = dFile;
+    memset( fileBlock.data, 0, sizeof(fileBlock.data));
+    BRMWrapper::getInstance()->getBrmInfo( m_dctnryOID,
+                                           m_partition, m_segment,
+                                           fbo,         lbid );
+    rc=readSubBlockEntry( cb, &fileBlock, lbid, 0, 0, HDR_UNIT_SIZE +
+                                                      NEXT_PTR_BYTES+
+                                                      HDR_UNIT_SIZE +
+                                                      HDR_UNIT_SIZE,
+                                                      &m_dctnryHeader);
+
+    memcpy(&m_freeSpace, &fileBlock.data[0], HDR_UNIT_SIZE);
+    memcpy(&m_nextPtr, &fileBlock.data[HDR_UNIT_SIZE], NEXT_PTR_BYTES);
+    op_count =0;
+    newOffset.hdrLoc = HDR_UNIT_SIZE + NEXT_PTR_BYTES + HDR_UNIT_SIZE;
+    memcpy(&newOffset.offset,&fileBlock.data[newOffset.hdrLoc],HDR_UNIT_SIZE);
+    offsetArray[0].hdrLoc = newOffset.hdrLoc;
+    offsetArray[0].offset = newOffset.offset;
+
+    while ( newOffset.offset !=DCTNRY_END_HEADER)
+    {
+        if (op_count >= MAX_OP_COUNT)
+        {
+            op_count =-1;
+            return;
+        }
+        op_count++;
+        newOffset.hdrLoc += HDR_UNIT_SIZE;
+        memcpy(
+            &newOffset.offset,&fileBlock.data[newOffset.hdrLoc],HDR_UNIT_SIZE);
+        offsetArray[op_count].hdrLoc = newOffset.hdrLoc;
+        offsetArray[op_count].offset = newOffset.offset;
+    }
+}
+#endif
+
+//------------------------------------------------------------------------------
+// End of testdriver functions
+//------------------------------------------------------------------------------
 
 } //end of namespace

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
-* $Id: primitivemsg.h 9655 2013-06-25 23:08:13Z xlou $
+* $Id: primitivemsg.h 8774 2012-07-31 21:00:09Z pleblanc $
 */
 
 /** @file */
@@ -164,7 +164,6 @@ enum ISMPACKETCOMMAND
 	FLUSH_ALL_VERSION          = PRIM_CACHEBASE+4, // Drop all versions of specified LBIDs
 	CACHE_FLUSH_BY_OID		   = PRIM_CACHEBASE+5, // Drop all versions of all LBIDs for the given OIDs
 	CACHE_FLUSH_PARTITION	   = PRIM_CACHEBASE+6, // Drop a partition
-	CACHE_PURGE_FDS			   = PRIM_CACHEBASE+7, // Purge the file descriptor cache for the modified files
 
 	//max of 250-200=50 commands
 	DICT_RESULTS                = PRIM_DICTBASE+0,
@@ -249,12 +248,12 @@ struct ISMPacketHeader
 //@Bug 2744 changed all variables to 32 bit, and took out StatementID
 struct PrimitiveHeader
 {
-	uint32_t SessionID;     // Front end Session Identifier
-	uint32_t TransactionID; // Front end Transaction Identifier
-	uint32_t VerID;         // DB Version ID used for this Session/Statement
-	uint32_t StepID;        // Internal Primitive Sequence number
-	uint32_t UniqueID;      // Unique ID for DEC and BPP
-	uint32_t Priority;      // Priority level of the user
+	uint32_t SessionID;                         // Front end Session Identifier
+	uint32_t TransactionID;                     // Front end Transaction Identifier
+	uint32_t VerID;                             // DB Version ID used for this Session/Statement
+	uint32_t StepID;                            // Internal Primitive Sequence number
+	uint32_t UniqueID;                          // Unique ID for DEC and BPP
+	uint32_t Priority;							// Priority level of the user
 };
 
 #if 0
@@ -278,7 +277,7 @@ struct DiskResultsHeader
 
 struct ColLoopback
 {
-	PrimitiveHeader Hdr;    // 64 bit header
+	PrimitiveHeader Hdr;                      // 64 bit header
 };
 
 //      COL_BY_SCAN
@@ -286,13 +285,13 @@ struct ColLoopback
 
 struct ColByScanRequestHeader
 {
-	PrimitiveHeader Hdr;    // 64 bit header
+	PrimitiveHeader Hdr;                      // 64 bit header
 	uint64_t LBID;
 	int32_t CompType;
 	uint16_t DataSize;
-	uint8_t DataType;       // enum ColDataType defined in calpont system catalog header file
-	uint8_t OutputType;     // 1 = RID, 2 = Token, 3 = Both
-	uint8_t BOP;            // 0 = N/A, 1 = AND, 2 = OR
+	uint8_t DataType;                            // enum ColDataType defined in calpont system catalog header file
+	uint8_t OutputType;                          // 1 = RID, 2 = Token, 3 = Both
+	uint8_t BOP;                                 // 0 = N/A, 1 = AND, 2 = OR
 	uint8_t RidFlags;		// a bitmap indicating the rid ranges in the resultM SB => row 7168-8191
 	uint16_t NOPS;
 	uint16_t NVALS;
@@ -304,13 +303,13 @@ struct ColByScanRequestHeader
 
 struct ColByScanRangeRequestHeader
 {
-	PrimitiveHeader Hdr;    // 64 bit header
-	uint64_t LBID;		    // starting LBID
+	PrimitiveHeader Hdr;            // 64 bit header
+	uint64_t LBID;		//starting LBID		
 	int32_t CompType;
 	uint16_t DataSize;
-	uint8_t DataType;       // enum ColDataType defined in calpont system catalog header file
-	uint8_t OutputType;     // 1 = RID, 2 = Token, 3 = Both
-	uint8_t BOP;            // 0 = N/A, 1 = AND, 2 = OR
+	uint8_t DataType;                  // enum ColDataType defined in calpont system catalog header file
+	uint8_t OutputType;                // 1 = RID, 2 = Token, 3 = Both
+	uint8_t BOP;                       // 0 = N/A, 1 = AND, 2 = OR
 	uint8_t RidFlags;		// a bitmap indicating the rid ranges in the result MSB => row 7168-8191
 	uint16_t NOPS;
 	uint16_t NVALS;
@@ -702,8 +701,8 @@ struct NewColResultHeader
 	uint16_t NVALS;
 	uint16_t ValidMinMax;		// 1 if Min/Max are valid, otherwise 0
 	uint32_t OutputType;
-	int64_t Min; 			    // Minimum value in this block for signed data types
-	int64_t Max; 			    // Maximum value in this block for signed data types
+	int64_t Min; 			// Minimum value in this block (signed)
+	int64_t Max; 			// Maximum value in this block (signed)
 	uint32_t CacheIO;			// I/O count from buffer cache
 	uint32_t PhysicalIO;		// Physical I/O count from disk
 	// if OutputType was OT_DATAVALUE, what follows is DataType[NVALS]
@@ -711,7 +710,22 @@ struct NewColResultHeader
 	// if OutputType was OT_BOTH, what follows is NVALS <Rid, DataType> pairs
 };
 
+struct NewColAggResultHeader
+{
+	ISMPacketHeader ism;
+	PrimitiveHeader hdr;
+	uint64_t LBID;
+	int64_t Sum;
+	uint16_t SumOverflow;	// SUM = (SumSign) Sum + (SumOverflow * 2^63)
+	uint8_t SumSign;			// 0 = +, 1 = -
+	int64_t Min;
+	int64_t Max;
+	uint16_t NVALS;		//number of values in the block
+};
+
+
 /* additional types to support p_dictionary */
+
 struct DictFilterElement
 {
 	uint8_t COP;
@@ -725,7 +739,7 @@ struct DictInput
 	PrimitiveHeader hdr;
 	uint64_t LBID;
 	uint8_t BOP;
-	uint8_t InputFlags;		// 1 -> 64-bit RID, 64-bit token pairs (old p_GetSignature behavior),
+	uint8_t InputFlags;		// 1 -> 64-bit RID, 64-bit token pairs (old p_GetSignature behavior), 
 							// 0-> new behavior
 	uint8_t OutputType;
 	uint16_t NOPS;
@@ -762,8 +776,8 @@ struct DictOutput
 };		//same as TokenByScanResultHeader at the moment
 
 struct OldGetSigParams {
-	uint64_t rid;
-	uint16_t offsetIndex;
+	u_int64_t rid;
+	u_int16_t offsetIndex;
 };
 
 struct LbidAtVer

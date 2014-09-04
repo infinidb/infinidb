@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: we_colbuf.cpp 4737 2013-08-14 20:45:46Z bwilkinson $
+ * $Id: we_colbuf.cpp 3720 2012-04-04 18:18:49Z rdempsey $
  *
  ****************************************************************************/
 
@@ -30,8 +30,6 @@
 #include "we_log.h"
 #include "we_stats.h"
 #include <string.h>
-#include "IDBDataFile.h"
-using namespace idbdatafile;
 
 namespace WriteEngine {
 
@@ -55,7 +53,7 @@ int ColumnBuffer::resetToBeCompressedColBuf( long long& startFileOffset )
     return NO_ERROR;
 }
 
-int ColumnBuffer::setDbFile(IDBDataFile* f, HWM startHwm, const char* /*hdrs*/)
+int ColumnBuffer::setDbFile(FILE* f, HWM startHwm, const char* /*hdrs*/)
 {
     fFile        = f;
     fStartingHwm = startHwm;
@@ -106,7 +104,7 @@ int ColumnBuffer::writeToFile(int startOffset, int writeSize)
 #ifdef PROFILE
     Stats::startParseEvent(WE_STATS_WRITE_COL);
 #endif
-    size_t nitems = fFile->write(fBuffer + startOffset, writeSize) / writeSize;
+    size_t nitems = fwrite(fBuffer + startOffset, writeSize, 1, fFile);
     if (nitems != 1)
         return ERR_FILE_WRITE;
 #ifdef PROFILE

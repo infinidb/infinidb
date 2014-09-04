@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: we_chunkmanager.cpp 4737 2013-08-14 20:45:46Z bwilkinson $
+//  $Id: we_chunkmanager.cpp 4395 2012-12-13 21:10:31Z chao $
 
 #include <unistd.h>
 #include <sys/stat.h>
@@ -27,26 +27,19 @@
 #include <cassert>
 using namespace std;
 
-#include <boost/scoped_array.hpp>
-#include <boost/scoped_ptr.hpp>
-
 #include "logger.h"
 #include "cacheutils.h"
 
+#define WRITEENGINECHUNKMGR_DLLEXPORT
 #include "we_chunkmanager.h"
+#undef WRITEENGINECHUNKMGR_DLLEXPORT
 
 #include "we_macro.h"
 #include "we_brm.h"
 #include "we_config.h"
-#include "we_confirmhdfsdbfile.h"
 #include "we_fileop.h"
 #include "we_dctnry.h"
 #include "we_stats.h"
-using namespace execplan;
-
-#include "IDBDataFile.h"
-#include "IDBPolicy.h"
-using namespace idbdatafile;
 
 namespace
 {
@@ -87,12 +80,7 @@ ChunkData* CompFileData::findChunk(int64_t id) const
 // ChunkManager constructor
 //------------------------------------------------------------------------------
 ChunkManager::ChunkManager() : fMaxActiveChunkNum(100), fLenCompressed(0), fIsBulkLoad(false),
-                               fDropFdCache(false), fIsInsert(false), fIsHdfs(IDBPolicy::useHdfs()),
-                               fFileOp(0), fSysLogger(NULL), fTransId(-1),
-                               fLocalModuleId(Config::getLocalModuleID()),
-                               fFs(fIsHdfs ?
-                                   IDBFileSystem::getFs(IDBDataFile::HDFS) :
-                                   IDBFileSystem::getFs(IDBDataFile::BUFFERED))
+                               fDropFdCache(false), fIsInsert(false), fFileOp(0)
 {
     fUserPaddings = Config::getNumCompressedPadBlks() * BYTE_PER_BLOCK;
     fCompressor.numUserPaddingBytes(fUserPaddings);
@@ -119,177 +107,171 @@ ChunkManager::~ChunkManager()
     fSysLogger = NULL;
 }
 
-
 //------------------------------------------------------------------------------
 // Log a message into the DML recovery log.
 //------------------------------------------------------------------------------
 int ChunkManager::writeLog(TxnID txnId, string backUpFileType, string filename,
-                           string& aDMLLogFileName, int64_t size, int64_t offset) const
+                           string& aDMLLogFileName, int64_t size, int64_t offset)
 {
-    //Get log file name
-    if (getDMLLogFileName(aDMLLogFileName, txnId) != NO_ERROR)
-        return ERR_DML_LOG_NAME;
-
-    //Open file
-    boost::scoped_ptr<IDBDataFile> aDMLLogFile;
-    try
+    string prefix;
+    config::Config *config = config::Config::makeConfig();
+    prefix = config->getConfig("SystemConfig", "DBRMRoot");
+    if (prefix.length() == 0)
     {
-        aDMLLogFile.reset(IDBDataFile::open(
-                               IDBPolicy::getType(aDMLLogFileName.c_str(), IDBPolicy::WRITEENG),
-                               aDMLLogFileName.c_str(), "a+b", 0));
-
-        if (!aDMLLogFile)
-        {
-            ostringstream oss;
-            oss << "trans " << txnId << ":File " << aDMLLogFileName
-                << " can't be opened (no exception thrown)";
-            logMessage(oss.str(), logging::LOG_TYPE_ERROR);
-            return ERR_OPEN_DML_LOG;
-        }
+        cerr << "Need a valid DBRMRoot entry in Calpont configuation file";
+        return -1;
     }
-    catch (exception& e)
+
+    uint64_t pos =  prefix.find_last_of ("/") ;
+    if (pos != string::npos)
     {
+        aDMLLogFileName = prefix.substr(0, pos+1); //Get the file path
+    }
+    else
+    {
+        cerr << "Cannot find the dbrm directory for the DML log file";
+        return -1;
+    }
+
+    ostringstream oss;
+    oss << txnId;
+    aDMLLogFileName += "DMLLog_" + oss.str();
+    ofstream           aDMLLogFile;
+    errno = 0;
+    aDMLLogFile.open(aDMLLogFileName.c_str(), ios::app);
+
+    int errRc = errno;
+    if (!aDMLLogFile)
+    {
+        std::string errnoMsg;
+        Convertor::mapErrnoToString(errRc, errnoMsg);
         ostringstream oss;
         oss << "trans " << txnId << ":File " << aDMLLogFileName
-            << " can't be opened: " << e.what();
+            << " can't be opened (no exception thrown) due to " << errnoMsg;
         logMessage(oss.str(), logging::LOG_TYPE_ERROR);
-        return ERR_OPEN_DML_LOG;
+        cerr << "DML log file " << aDMLLogFileName << " cannot be created due to " << errnoMsg << endl;
+        return -1;
     }
-
     //Write the log
-    ostringstream entry;
-    entry << backUpFileType << '\n' << filename << '\n' << size << '\n' << offset <<'\n';
-    string tmp = entry.str();
-    aDMLLogFile->seek(0, SEEK_END);
-    aDMLLogFile->tell();
-    aDMLLogFile->write(tmp.c_str(), tmp.size());
-
-    return NO_ERROR;
+    aDMLLogFile << backUpFileType << '\n' << filename << '\n' << size << '\n' << offset <<'\n';
+    aDMLLogFile.close();
+    return 0;
 }
 
 int ChunkManager::removeBackups(TxnID txnId)
 {
-    // HDFS update/delete is handled differently
-    if (fIsHdfs || fIsBulkLoad)
-        return NO_ERROR;
-
-    string aDMLLogFileName;
-    if (getDMLLogFileName(aDMLLogFileName, txnId) != NO_ERROR)
-        return ERR_DML_LOG_NAME;
-
-    if (IDBPolicy::exists(aDMLLogFileName.c_str()))
+	string prefix;
+    config::Config *config = config::Config::makeConfig();
+    prefix = config->getConfig("SystemConfig", "DBRMRoot");
+    if (prefix.length() == 0)
     {
-        boost::scoped_ptr<IDBDataFile> aDMLLogFile(IDBDataFile::open(
-                                            IDBPolicy::getType(aDMLLogFileName.c_str(),
-                                            IDBPolicy::WRITEENG),
-                                            aDMLLogFileName.c_str(), "r", 0));
-
-        if (aDMLLogFile) //need recover
-        {
-            ssize_t fileSize = aDMLLogFile->size();
-            boost::scoped_array<char> buf(new char[fileSize]);
-            if (aDMLLogFile->read(buf.get(), fileSize) != fileSize)
-                return ERR_FILE_READ;
-
-            std::istringstream strstream(string(buf.get(), fileSize));
-            std::string backUpFileType;
-            std::string filename;
-            int64_t size;
-            int64_t offset;
-            while (strstream >> backUpFileType >> filename >> size >> offset)
-            {
-                if (backUpFileType.compare("tmp") == 0 )
-                {
-                    filename += ".tmp";
-                    IDBPolicy::remove(filename.c_str());
-                }
-                else
-                {
-                    std::string backFileName(filename);
-                    if (backUpFileType.compare("chk") == 0 )
-                        backFileName += ".chk";
-                    else
-                        backFileName += ".hdr";
-
-                    IDBPolicy::remove(backFileName.c_str());
-                }
-            }
-
-            aDMLLogFile.reset();  // closes the file in IDBDataFile destructor.
-
-            IDBPolicy::remove(aDMLLogFileName.c_str());
-        }
-        else
-        {
-            return ERR_OPEN_DML_LOG;
-        }
+        cerr << "Need a valid DBRMRoot entry in Calpont configuation file";
+        return -1;
+    }
+	string aDMLLogFileName;
+    uint64_t pos =  prefix.find_last_of ("/") ;
+    if (pos != string::npos)
+    {
+        aDMLLogFileName = prefix.substr(0, pos+1); //Get the file path
+    }
+    else
+    {
+        cerr << "Cannot find the dbrm directory for the DML log file";
+        return -1;
     }
 
-    return NO_ERROR;
-}
+    ostringstream oss;
+    oss << txnId;
+    aDMLLogFileName += "DMLLog_" + oss.str();
+	struct stat stFileInfo; 
+	int intStat = stat(aDMLLogFileName.c_str(),&stFileInfo); 
+	if ( intStat == 0 ) //File exists
+	{
+		std::ifstream	       aDMLLogFile; 
+		aDMLLogFile.open(aDMLLogFileName.c_str(), ios::in);
 
+		if (aDMLLogFile) 
+		{
+			std::string backUpFileType;
+			std::string filename;
+			int64_t size;
+			int64_t offset;
+			while (aDMLLogFile >> backUpFileType >> filename >> size >> offset)
+			{
+				//cout << "Found: " <<  backUpFileType << " name " << filename << " size: " << size << " offset: " << offset << endl;
+				if (backUpFileType.compare("tmp") == 0 )
+				{
+					//remove the tmp file
+					filename += ".tmp";
+					//cout << " File removed: " << filename << endl;
+					remove(filename.c_str());
+				}
+				else
+				{
+					//copy back to the data file
+					std::string backFileName(filename);
+					if (backUpFileType.compare("chk") == 0 )
+						backFileName += ".chk";
+					else
+						backFileName += ".hdr";
+					
+					remove(backFileName.c_str());
+				}
+			}
+			aDMLLogFile.close();
+			remove(aDMLLogFileName.c_str());
+		}
+	}
+	return NO_ERROR;
+}
 //------------------------------------------------------------------------------
-// Get/Return IDBDataFile* for specified OID, root, partition, and segment.
+// Get/Return FILE* for specified OID, root, partition, and segment.
 // Function is to be used to open column files.
-// If the IDBDataFile* is not found, then a segment file will be opened using the
+// If the FILE* is not found, then a segment file will be opened using the
 // mode (mode) and I/O buffer size (size) that is given.  Name of the resulting
 // file is returned in filename.
-//
-// For Bulk HDFS usage:
-//  If useTmpSuffix flag is set, then IDBDataFile will use *.tmp for output.
 //------------------------------------------------------------------------------
-// @bug 5572 - HDFS usage: add *.tmp file backup flag
-IDBDataFile* ChunkManager::getFilePtr(const Column& column,
+FILE* ChunkManager::getFilePtr(const Column& column,
                                uint16_t root,
                                uint32_t partition,
                                uint16_t segment,
                                string& filename,
                                const char* mode,
-                               int size,
-                               bool useTmpSuffix) const
+                               int size) const
 {
     CompFileData* fileData = getFileData(column.dataFile.fid, root, partition, segment,
-        filename, mode, size, column.colDataType, column.colWidth, useTmpSuffix);
+        filename, mode, size, column.colDataType, column.colWidth);
     return (fileData ? fileData->fFilePtr : NULL);
 }
 
 //------------------------------------------------------------------------------
-// Get/Return IDBDataFile* for specified OID, root, partition, and segment.
+// Get/Return FILE* for specified OID, root, partition, and segment.
 // Function is to be used to open dictionary store files.
-// If the IDBDataFile* is not found, then a segment file will be opened using the
+// If the FILE* is not found, then a segment file will be opened using the
 // mode (mode) and I/O buffer size (size) that is given.  Name of the resulting
 // file is returned in filename.
-//
-// For Bulk HDFS usage:
-//  If useTmpSuffix flag is set, then IDBDataFile will use *.tmp for output.
 //------------------------------------------------------------------------------
-// @bug 5572 - HDFS usage: add *.tmp file backup flag
-IDBDataFile* ChunkManager::getFilePtr(const FID& fid,
+FILE* ChunkManager::getFilePtr(const FID& fid,
                                uint16_t root,
                                uint32_t partition,
                                uint16_t segment,
                                string& filename,
                                const char* mode,
-                               int size,
-                               bool useTmpSuffix) const
+                               int size) const
 {
     CompFileData* fileData = getFileData(fid, root, partition, segment, filename, mode, size,
-        CalpontSystemCatalog::VARCHAR, 8, useTmpSuffix, true);  // hard code (varchar, 8) are dummy values for dictionary file
+        VARCHAR, 8, true);  // hard code (varchar, 8) are dummy values for dictionary file
     return (fileData ? fileData->fFilePtr : NULL);
 }
 
 //------------------------------------------------------------------------------
 // Get/Return CompFileData* for specified column OID, root, partition, and
-// segment.  If the IDBDataFile* is not found, then a segment file will be opened
+// segment.  If the FILE* is not found, then a segment file will be opened
 // using the mode (mode) and I/O buffer size (size) that is given.  Name of
 // the resulting file is returned in filename.
 // If the CompFileData* needs to be created, it will also be created and
 // inserted into the fFileMap and fFilePtrMap for later use.
-//
-// For Bulk HDFS usage:
-//  If useTmpSuffix flag is set, then IDBDataFile will use *.tmp for output.
 //------------------------------------------------------------------------------
-// @bug 5572 - HDFS usage: add *.tmp file backup flag
 CompFileData* ChunkManager::getFileData(const FID& fid,
                                         uint16_t root,
                                         uint32_t partition,
@@ -297,9 +279,8 @@ CompFileData* ChunkManager::getFileData(const FID& fid,
                                         string& filename,
                                         const char* mode,
                                         int size,
-                                        const CalpontSystemCatalog::ColDataType colDataType,
+                                        const ColDataType& colDataType,
                                         int colWidth,
-                                        bool useTmpSuffix,
                                         bool dctnry) const
 {
     FileID fileID(fid, root, partition, segment);
@@ -323,7 +304,7 @@ CompFileData* ChunkManager::getFileData(const FID& fid,
 
     CompFileData* fileData = new CompFileData(fileID, fid, colDataType, colWidth);
     fileData->fFileName = filename = name;
-    if (openFile(fileData, mode, colWidth, useTmpSuffix, __LINE__) != NO_ERROR)
+    if (openFile(fileData, mode, __LINE__) != NO_ERROR)
     {
         WE_COMP_DBG(cout << "Failed to open " << fileData->fFileName << " ." << endl;)
         delete fileData;
@@ -331,11 +312,7 @@ CompFileData* ChunkManager::getFileData(const FID& fid,
     }
     fileData->fIoBuffer.reset(new char[size]);
     fileData->fIoBSize = size;
-// TODO-There is no current way to make this setvbuf call as IDBDataFile only
-// accepts the USE_VBUF at construction time and then uses a buffer that it manages
-// Can either propagate an option through the openFile() call above and let
-// IDBDataFile manage it internally or expose a new setBuffer() option.
-//  setvbuf(fileData->fFilePtr, fileData->fIoBuffer.get(), _IOFBF, size);
+    setvbuf(fileData->fFilePtr, fileData->fIoBuffer.get(), _IOFBF, size);
     fileData->fDctnryCol = dctnry;
     WE_COMP_DBG(cout << "open file* " << name << endl;)
     // get the control data in header.
@@ -379,14 +356,14 @@ CompFileData* ChunkManager::getFileData(const FID& fid,
 }
 
 //------------------------------------------------------------------------------
-// Return new IDBDataFile* for specified dictionary OID, root, partition, segment, and
+// Return new FILE* for specified dictionary OID, root, partition, segment, and
 // width.  A new segment file will be opened using the mode (mode) and I/O
 // buffer size (size) that is given.  Name of the resulting file is returned
 // in filename.
 // A corresponding CompFileData* is created and inserted into fFileMap and
 // fFilePtrMap for later use.
 //------------------------------------------------------------------------------
-IDBDataFile* ChunkManager::createDctnryFile(const FID& fid,
+FILE* ChunkManager::createDctnryFile(const FID& fid,
                                      int64_t width,
                                      uint16_t root,
                                      uint32_t partition,
@@ -396,9 +373,9 @@ IDBDataFile* ChunkManager::createDctnryFile(const FID& fid,
                                      int size)
 {
     FileID fileID(fid, root, partition, segment);
-    CompFileData* fileData = new CompFileData(fileID, fid, CalpontSystemCatalog::VARCHAR, width);
+    CompFileData* fileData = new CompFileData(fileID, fid, VARCHAR, width);
     fileData->fFileName = filename;
-    if (openFile(fileData, mode, width, false, __LINE__) != NO_ERROR) // @bug 5572 HDFS tmp file
+    if (openFile(fileData, mode, __LINE__) != NO_ERROR)
     {
         WE_COMP_DBG(cout << "Failed to open " << fileData->fFileName << " ." << endl;)
         delete fileData;
@@ -406,8 +383,7 @@ IDBDataFile* ChunkManager::createDctnryFile(const FID& fid,
     }
     fileData->fIoBuffer.reset(new char[size]);
     fileData->fIoBSize = size;
-//  see TODO- comment above
-//  setvbuf(fileData->fFilePtr, fileData->fIoBuffer.get(), _IOFBF, size);
+    setvbuf(fileData->fFilePtr, fileData->fIoBuffer.get(), _IOFBF, size);
     fileData->fDctnryCol = true;
     WE_COMP_DBG(cout << "create file* " << filename << endl;)
     int hdrSize = calculateHeaderSize(width);
@@ -427,8 +403,8 @@ IDBDataFile* ChunkManager::createDctnryFile(const FID& fid,
         delete fileData;
         return NULL;
     }
-    //@Bug 4977 remove log file
-    removeBackups(fTransId);
+	//@Bug 4977 remove log file
+	removeBackups(fTransId);
     fFileMap.insert(make_pair(fileID, fileData));
     fFilePtrMap.insert(make_pair(fileData->fFilePtr, fileData));
     return fileData->fFilePtr;
@@ -438,9 +414,9 @@ IDBDataFile* ChunkManager::createDctnryFile(const FID& fid,
 // Read the block for the specified fbo, from pFile's applicable chunk, and
 // into readBuf.
 //------------------------------------------------------------------------------
-int ChunkManager::readBlock(IDBDataFile* pFile, unsigned char* readBuf, uint64_t fbo)
+int ChunkManager::readBlock(FILE* pFile, unsigned char* readBuf, i64 fbo)
 {
-    map<IDBDataFile*, CompFileData*>::iterator fpIt = fFilePtrMap.find(pFile);
+    map<FILE*, CompFileData*>::iterator fpIt = fFilePtrMap.find(pFile);
     if (fpIt == fFilePtrMap.end())
     {
         logMessage(ERR_COMP_FILE_NOT_FOUND, logging::LOG_TYPE_ERROR, __LINE__);
@@ -472,10 +448,10 @@ int ChunkManager::readBlock(IDBDataFile* pFile, unsigned char* readBuf, uint64_t
 // Write writeBuf to the block for the specified fbo, within pFile's applicable
 // chunk.
 //------------------------------------------------------------------------------
-int ChunkManager::saveBlock(IDBDataFile* pFile, const unsigned char* writeBuf, uint64_t fbo)
+int ChunkManager::saveBlock(FILE* pFile, const unsigned char* writeBuf, i64 fbo)
 {
     WE_COMP_DBG(cout << "save block fbo:" << fbo << endl;)
-    map<IDBDataFile*, CompFileData*>::iterator fpIt = fFilePtrMap.find(pFile);
+    map<FILE*, CompFileData*>::iterator fpIt = fFilePtrMap.find(pFile);
     if (fpIt == fFilePtrMap.end())
     {
         logMessage(ERR_COMP_FILE_NOT_FOUND, logging::LOG_TYPE_ERROR, __LINE__);
@@ -504,10 +480,10 @@ int ChunkManager::saveBlock(IDBDataFile* pFile, const unsigned char* writeBuf, u
             ((rc = writeHeader(fpIt->second, __LINE__)) == NO_ERROR))
         {
             //cout << "saveblock flushed the full chunk"<<endl;
-            pFile->flush();
-
-            //@Bug 4977 remove log file
-            removeBackups(fTransId);
+            fflush(pFile);
+			
+			//@Bug 4977 remove log file
+			removeBackups(fTransId);
         }
     }
 
@@ -519,16 +495,16 @@ int ChunkManager::saveBlock(IDBDataFile* pFile, const unsigned char* writeBuf, u
 //------------------------------------------------------------------------------
 int ChunkManager::flushChunks(int rc, const std::map<FID, FID> & columOids)
 {
-    // shall fail the the statement if failed here
     WE_COMP_DBG(cout << "flushChunks." << endl;)
+    // shall fail the the statement if failed here
 
     int k = fFilePtrMap.size();
     std::map<FID,FID>::const_iterator it;
     if ((rc == NO_ERROR) && fIsInsert)
     {
-        while (k-- > 0 && rc == NO_ERROR)
+        while (k-- > 0)
         {
-            map<IDBDataFile*, CompFileData*>::iterator i = fFilePtrMap.begin();
+            map<FILE*, CompFileData*>::iterator i = fFilePtrMap.begin();
             // sort the chunk list first
             CompFileData* fileData = i->second;
             it = columOids.find (fileData->fFid);
@@ -552,9 +528,9 @@ int ChunkManager::flushChunks(int rc, const std::map<FID, FID> & columOids)
                 // finally update the header
                 if ((rc = writeHeader(fileData, __LINE__)) != NO_ERROR)
                     break;
-
-                //@Bug 4977 remove log file
-                removeBackups(fTransId);
+					
+				//@Bug 4977 remove log file
+				removeBackups(fTransId);
 
                 // closeFile invalidates the iterator
                 closeFile(fileData);
@@ -563,9 +539,9 @@ int ChunkManager::flushChunks(int rc, const std::map<FID, FID> & columOids)
     }
     else if (rc == NO_ERROR)
     {
-        while (k-- > 0 && rc == NO_ERROR)
+        while (k-- > 0)
         {
-            map<IDBDataFile*, CompFileData*>::iterator i = fFilePtrMap.begin();
+            map<FILE*, CompFileData*>::iterator i = fFilePtrMap.begin();
             // sort the chunk list first
             CompFileData* fileData = i->second;
 
@@ -586,10 +562,10 @@ int ChunkManager::flushChunks(int rc, const std::map<FID, FID> & columOids)
             // finally update the header
             if ((rc = writeHeader(fileData, __LINE__)) != NO_ERROR)
                 break;
-
-            //@Bug 4977 remove log file
-            removeBackups(fTransId);
-
+				
+			//@Bug 4977 remove log file
+			removeBackups(fTransId);
+			
             // closeFile invalidates the iterator
             closeFile(fileData);
         }
@@ -610,7 +586,6 @@ int ChunkManager::flushChunks(int rc, const std::map<FID, FID> & columOids)
         cacheutils::dropPrimProcFdCache();
         fDropFdCache = false;
     }
-
     return NO_ERROR;
 }
 
@@ -623,25 +598,25 @@ int ChunkManager::flushChunks(int rc, const std::map<FID, FID> & columOids)
 // If the header ptr for the requested chunk is 0 (or has length 0), then
 // chunkData is initialized with a new empty chunk.
 //------------------------------------------------------------------------------
-int ChunkManager::fetchChunkFromFile(IDBDataFile* pFile, int64_t id, ChunkData*& chunkData)
+int ChunkManager::fetchChunkFromFile(FILE* pFile, int64_t id, ChunkData*& chunkData)
 {
     // return value
     int rc = NO_ERROR;
 
     // remove the oldest one if the max active chunk number is reached.
     WE_COMP_DBG(cout << "fActiveChunks.size:" << fActiveChunks.size() << endl;)
-    //cout << "fetchChunkFromFile1: pFile = " << pFile << endl;
-    map<IDBDataFile*, CompFileData*>::iterator fpIt = fFilePtrMap.find(pFile);
+	//cout << "fetchChunkFromFile1: pFile = " << pFile << endl;
+	map<FILE*, CompFileData*>::iterator fpIt = fFilePtrMap.find(pFile);
     if (fpIt == fFilePtrMap.end())
     {
         logMessage(ERR_COMP_FILE_NOT_FOUND, logging::LOG_TYPE_ERROR, __LINE__);
         return ERR_COMP_FILE_NOT_FOUND;
     }
-
-    CompFileData* fileData = fpIt->second;
-
+	
+	CompFileData* fileData = fpIt->second;
+	
     if (fActiveChunks.size() >= fMaxActiveChunkNum)
-    {
+    {		
         list<std::pair<FileID, ChunkData*> >::iterator lIt = fActiveChunks.begin();
         if (!fIsBulkLoad && !(fpIt->second->fDctnryCol))
         {
@@ -657,7 +632,7 @@ int ChunkManager::fetchChunkFromFile(IDBDataFile* pFile, int64_t id, ChunkData*&
                 logMessage(ERR_COMP_FILE_NOT_FOUND, logging::LOG_TYPE_ERROR, __LINE__);
                 return ERR_COMP_FILE_NOT_FOUND;
             }
-
+			
             if ((rc = writeChunkToFile(fIt->second, lIt->second)) != NO_ERROR)
             {
                 ostringstream oss;
@@ -672,9 +647,9 @@ int ChunkManager::fetchChunkFromFile(IDBDataFile* pFile, int64_t id, ChunkData*&
                 // logged by writeHeader
                 return rc;
             }
-
-            //@Bug 4977 remove the log files
-            removeBackups(fTransId);
+			
+			//@Bug 4977 remove the log files
+			removeBackups(fTransId);
         }
     }
 
@@ -683,7 +658,24 @@ int ChunkManager::fetchChunkFromFile(IDBDataFile* pFile, int64_t id, ChunkData*&
 #endif
     // get a new ChunkData object
     chunkData = new ChunkData(id);
-    pFile = fileData->fFilePtr; //update to get the reopened file ptr.
+/*    map<FILE*, CompFileData*>::iterator fpIt = fFilePtrMap.find(pFile);
+	cout << "fetchChunkFromFile2: pFile = " << pFile << endl;
+    if (fpIt == fFilePtrMap.end())
+    {
+		
+        fpIt = fFilePtrMap.begin();
+        while (fpIt != fFilePtrMap.end())
+        {
+            fpIt++;
+        }
+		cout << "fetchChunkFromFile: cannot fine pFile = " << pFile << endl;
+        logMessage(ERR_COMP_FILE_NOT_FOUND, logging::LOG_TYPE_ERROR, __LINE__);
+        return ERR_COMP_FILE_NOT_FOUND;
+    }
+
+	pFile = fileDataPtr;
+    CompFileData* fileData = fpIt->second; */
+	pFile = fileData->fFilePtr; //update to get the reopened file ptr.
     fileData->fChunkList.push_back(chunkData);
     fActiveChunks.push_back(make_pair(fileData->fFileID, chunkData));
 
@@ -712,31 +704,8 @@ int ChunkManager::fetchChunkFromFile(IDBDataFile* pFile, int64_t id, ChunkData*&
         if (fCompressor.uncompressBlock((char*)fBufCompressed, chunkSize,
                     (unsigned char*)chunkData->fBufUnCompressed, dataLen) != 0)
         {
-			if (fIsFix)
-			{
-				uint64_t blocks = 512;
-				if (id == 0)
-				{
-					char* hdr = fileData->fFileHeader.fControlData;
-					if (fCompressor.getBlockCount(hdr) < 512)
-						blocks = 256;
-				}
-				
-				dataLen = 8192 * blocks;
-				
-				// load the uncompressed buffer with empty values.
-				char* buf = chunkData->fBufUnCompressed;
-				chunkData->fLenUnCompressed = UNCOMPRESSED_CHUNK_SIZE;
-				if (fileData->fDctnryCol)
-					initializeDctnryChunk(buf, UNCOMPRESSED_CHUNK_SIZE);
-				else
-					initializeColumnChunk(buf, fileData);					
-			}
-			else
-			{
-				logMessage(ERR_COMP_UNCOMPRESS, logging::LOG_TYPE_ERROR, __LINE__);
-				return ERR_COMP_UNCOMPRESS;
-			}
+            logMessage(ERR_COMP_UNCOMPRESS, logging::LOG_TYPE_ERROR, __LINE__);
+            return ERR_COMP_UNCOMPRESS;
         }
 
 //@bug 3313-Remove validation that incorrectly fails for long string store files
@@ -777,7 +746,7 @@ int ChunkManager::fetchChunkFromFile(IDBDataFile* pFile, int64_t id, ChunkData*&
 void ChunkManager::initializeColumnChunk(char* buf, CompFileData* fileData)
 {
     int size = UNCOMPRESSED_CHUNK_SIZE;
-    uint64_t emptyVal = fFileOp->getEmptyRowValue(fileData->fColDataType, fileData->fColWidth);
+    i64 emptyVal = fFileOp->getEmptyRowValue(fileData->fColDataType, fileData->fColWidth);
     fFileOp->setEmptyBuf((unsigned char*)buf, size, emptyVal, fileData->fColWidth);
 }
 
@@ -900,7 +869,7 @@ int ChunkManager::writeChunkToFile(CompFileData* fileData, ChunkData* chunkData)
             WE_COMP_DBG(cout << "Last chunk:" << chunkId << ", padded to " << fLenCompressed;)
 
             // This is the last chunk, safe to write any length of data.
-            //@Bug 3888. Assign the error code
+			//@Bug 3888. Assign the error code
             if ((rc = writeCompressedChunk(fileData, ptrs[chunkId], spaceAvl)) != NO_ERROR)
             {
                 // log in writeCompressedChunk by setFileOffset and writeFile
@@ -929,7 +898,7 @@ int ChunkManager::writeChunkToFile(CompFileData* fileData, ChunkData* chunkData)
             << " filename:" << fileData->fFileName << ", chunkId:" << chunkData->fChunkId
             << " data size:" << fLenCompressed << "/available:" << spaceAvl << " -- shifting ";
         if ((rc = reallocateChunks(fileData)) == NO_ERROR)
-        {
+		{
             oss << "SUCCESS";
             logMessage(oss.str(), logging::LOG_TYPE_INFO);
         }
@@ -953,7 +922,7 @@ int ChunkManager::writeCompressedChunk(CompFileData* fileData, int64_t offset, i
 {
     int rc = NO_ERROR;
 
-    if (!fIsBulkLoad && !fIsHdfs)
+    if (!fIsBulkLoad)
     {
         // backup current chunk to chk file
         string chkFileName(fileData->fFileName + ".chk");
@@ -965,22 +934,17 @@ int ChunkManager::writeCompressedChunk(CompFileData* fileData, int64_t offset, i
             ((rc = readFile(fileData->fFilePtr, fileData->fFileName, buf, size, __LINE__)) ==
              NO_ERROR))
         {
-            IDBDataFile*  chkFilePtr = IDBDataFile::open(
-                                            IDBPolicy::getType(chkFileName.c_str(),
-                                                IDBPolicy::WRITEENG),
-                                            chkFileName.c_str(),
-                                            "w+b",
-                                            0 );
+            FILE*  chkFilePtr = fopen(chkFileName.c_str(), "w+b");
             if (chkFilePtr)
             {
                 rc = writeFile(chkFilePtr, chkFileName, buf, size, __LINE__);
-                delete chkFilePtr;
+                fclose(chkFilePtr);
             }
             delete [] buf;
 
             if (rc != NO_ERROR)
             {
-                IDBPolicy::remove(chkFileName.c_str());
+                remove(chkFileName.c_str());
                 return rc;
             }
 
@@ -998,9 +962,9 @@ int ChunkManager::writeCompressedChunk(CompFileData* fileData, int64_t offset, i
         // write out the compressed data + padding
         if ((rc == NO_ERROR) && ((rc = writeCompressedChunk_(fileData, offset)) == NO_ERROR))
         {
-            if ((fileData->fFilePtr)->flush() != 0) //@Bug3162.
+            if ((fflush(fileData->fFilePtr)) != 0) //@Bug3162.
             {
-                rc = ERR_FILE_WRITE;
+				rc = ERR_FILE_WRITE;
                 ostringstream oss;
                 oss << "Failed to flush " << fileData->fFileName << " @line: " << __LINE__;
                 logMessage(oss.str(), logging::LOG_TYPE_ERROR);
@@ -1034,46 +998,11 @@ inline int ChunkManager::writeCompressedChunk_(CompFileData* fileData, int64_t o
 // Open the specified segment file (fileData) using the given mode.
 // ln is the source code line number of the code invoking this operation
 // (ex __LINE__); this is used for logging error messages.
-//
-// useTmpSuffix controls whether HDFS file is opened with USE_TMPFILE bit set.
-// Typically set for bulk load, single insert, and batch insert, when adding
-// rows to an "existing" file.
-// Typically always set for DML update and delete.
-//
-// @bug 5572 - HDFS usage: add *.tmp file backup flag to API
 //------------------------------------------------------------------------------
-int ChunkManager::openFile(CompFileData* fileData, const char* mode, int colWidth,
-    bool useTmpSuffix, int ln) const
+int ChunkManager::openFile(CompFileData* fileData, const char* mode, int ln) const
 {
     int rc = NO_ERROR;
-    unsigned opts = IDBDataFile::USE_VBUF;
-    if (fIsHdfs)
-    {
-        if (useTmpSuffix)
-        {
-            if (!fIsBulkLoad)
-            {
-                // keep a DML log for confirm or cleanup the .tmp file
-                string aDMLLogFileName;
-                if ((rc = writeLog(fTransId, "tmp", fileData->fFileName,
-                    aDMLLogFileName, 0)) != NO_ERROR)
-                {
-                    ostringstream oss;
-                    oss << "Failed to put " << fileData->fFileName << " into DML log.";
-                    logMessage(oss.str(), logging::LOG_TYPE_ERROR);
-
-                    return rc;
-                }
-            }
-
-            opts |= IDBDataFile::USE_TMPFILE;
-        }
-    }
-
-    fileData->fFilePtr = IDBDataFile::open(
-                            IDBPolicy::getType( fileData->fFileName.c_str(), IDBPolicy::WRITEENG ),
-                            fileData->fFileName.c_str(), mode, opts, colWidth);
-
+    fileData->fFilePtr = fopen(fileData->fFileName.c_str(), mode);
     if (fileData->fFilePtr == NULL)
     {
         ostringstream oss;
@@ -1092,10 +1021,14 @@ int ChunkManager::openFile(CompFileData* fileData, const char* mode, int colWidt
 // (ex __LINE__); this is used for logging error messages.  Likewise, filename
 // is used for logging any error message.
 //------------------------------------------------------------------------------
-int ChunkManager::setFileOffset(IDBDataFile* pFile, const string& fileName, off64_t offset, int ln) const
+int ChunkManager::setFileOffset(FILE* pFile, const string& fileName, size_t offset, int ln) const
 {
     int rc = NO_ERROR;
-    if (pFile->seek(offset, SEEK_SET) != 0) rc = ERR_COMP_SET_OFFSET;
+#ifdef _MSC_VER
+    if (_fseeki64(pFile, offset, SEEK_SET) != 0) rc = ERR_COMP_SET_OFFSET;
+#else
+    if (fseeko(pFile, offset, SEEK_SET) != 0) rc = ERR_COMP_SET_OFFSET;
+#endif
 
     if (rc != NO_ERROR)
     {
@@ -1114,9 +1047,9 @@ int ChunkManager::setFileOffset(IDBDataFile* pFile, const string& fileName, off6
 // (ex __LINE__); this is used for logging error messages.  Likewise, filename
 // is used for logging any error message.
 //------------------------------------------------------------------------------
-int ChunkManager::readFile(IDBDataFile* pFile, const string& fileName, void* buf, size_t size, int ln) const
+int ChunkManager::readFile(FILE* pFile, const string& fileName, void* buf, size_t size, int ln) const
 {
-    size_t bytes = pFile->read(buf, size);
+    size_t bytes = fread(buf, 1, size, pFile);
     if (bytes != size)
     {
         ostringstream oss;
@@ -1135,9 +1068,9 @@ int ChunkManager::readFile(IDBDataFile* pFile, const string& fileName, void* buf
 // (ex __LINE__); this is used for logging error messages.  Likewise, filename
 // is used for logging any error message.
 //------------------------------------------------------------------------------
-int ChunkManager::writeFile(IDBDataFile* pFile, const string& fileName, void* buf, size_t size, int ln) const
+int ChunkManager::writeFile(FILE* pFile, const string& fileName, void* buf, size_t size, int ln) const
 {
-    size_t bytes = pFile->write(buf, size);
+    size_t bytes = fwrite(buf, 1, size, pFile);
     if (bytes != size)
     {
         ostringstream oss;
@@ -1156,19 +1089,19 @@ int ChunkManager::writeFile(IDBDataFile* pFile, const string& fileName, void* bu
 //------------------------------------------------------------------------------
 int ChunkManager::closeFile(CompFileData* fileData)
 {
-    int rc = NO_ERROR;
 
     WE_COMP_DBG(cout << "closing file:" << fileData->fFileName << endl;)
+
     fFileMap.erase(fileData->fFileID);
     fFilePtrMap.erase(fileData->fFilePtr);
 
     if (fileData->fFilePtr)
-        delete fileData->fFilePtr;
+        fclose(fileData->fFilePtr);
 
     delete fileData;
     fileData = NULL;
 
-    return rc;
+    return NO_ERROR;
 }
 
 //------------------------------------------------------------------------------
@@ -1184,18 +1117,12 @@ int ChunkManager::writeHeader(CompFileData* fileData, int ln)
     int headerSize = fCompressor.getHdrSize(fileData->fFileHeader.fControlData);
     int ptrSecSize = headerSize - COMPRESSED_FILE_HEADER_UNIT;
 
-    if (!fIsHdfs && !fIsBulkLoad)
+    if (!fIsBulkLoad)
     {
         // write a backup header
         string hdrFileName(fileData->fFileName + ".hdr");
         string aDMLLogFileName;
-        IDBDataFile*  hdrFilePtr = IDBDataFile::open(
-                                        IDBPolicy::getType(hdrFileName.c_str(),
-                                                           IDBPolicy::WRITEENG),
-                                        hdrFileName.c_str(),
-                                        "w+b",
-                                        0,
-                                        fileData->fColWidth );
+        FILE*  hdrFilePtr = fopen(hdrFileName.c_str(), "w+b");
         if (hdrFilePtr)
         {
             rc = writeFile(hdrFilePtr, hdrFileName, fileData->fFileHeader.fControlData,
@@ -1205,7 +1132,7 @@ int ChunkManager::writeHeader(CompFileData* fileData, int ln)
                 rc = writeFile(hdrFilePtr, hdrFileName, fileData->fFileHeader.fPtrSection,
                                ptrSecSize, __LINE__);
 
-            delete hdrFilePtr;
+            fclose(hdrFilePtr);
         }
 
         if (rc == NO_ERROR)
@@ -1221,20 +1148,21 @@ int ChunkManager::writeHeader(CompFileData* fileData, int ln)
 
             if ((rc == NO_ERROR) && (rc = writeHeader_(fileData, ptrSecSize)) == NO_ERROR)
             {
-                (fileData->fFilePtr)->flush();
+                fflush(fileData->fFilePtr);
+
+                // remove the backup
+               // remove(hdrFileName.c_str());
+               // remove(aDMLLogFileName.c_str());
             }
         }
         else
         {
-            IDBPolicy::remove(hdrFileName.c_str());
+            remove(hdrFileName.c_str());
         }
     }
     else
     {
-        if ((rc = writeHeader_(fileData, ptrSecSize)) == NO_ERROR)
-        {
-            (fileData->fFilePtr)->flush();
-        }
+        rc = writeHeader_(fileData, ptrSecSize);
     }
 
     if (rc != NO_ERROR)
@@ -1272,9 +1200,9 @@ inline int ChunkManager::writeHeader_(CompFileData* fileData, int ptrSecSize)
 // For the specified segment file (pFile), read in an abbreviated/compressed
 // chunk extent, uncompress, and expand to a full chunk for a full extent.
 //------------------------------------------------------------------------------
-int ChunkManager::expandAbbrevColumnExtent(IDBDataFile* pFile, uint64_t emptyVal, int width)
+int ChunkManager::expandAbbrevColumnExtent(FILE* pFile, i64 emptyVal, int width)
 {
-    map<IDBDataFile*, CompFileData*>::iterator i = fFilePtrMap.find(pFile);
+    map<FILE*, CompFileData*>::iterator i = fFilePtrMap.find(pFile);
     if (i == fFilePtrMap.end())
     {
         logMessage(ERR_COMP_FILE_NOT_FOUND, logging::LOG_TYPE_ERROR, __LINE__);
@@ -1303,45 +1231,34 @@ int ChunkManager::expandAbbrevColumnExtent(IDBDataFile* pFile, uint64_t emptyVal
 // Increment the block count stored in the chunk header used to track how many
 // blocks are allocated to the corresponding segment file.
 //------------------------------------------------------------------------------
-int ChunkManager::updateColumnExtent(IDBDataFile* pFile, int addBlockCount)
+int ChunkManager::updateColumnExtent(FILE* pFile, int addBlockCount)
 {
-    map<IDBDataFile*, CompFileData*>::iterator i = fFilePtrMap.find(pFile);
+    map<FILE*, CompFileData*>::iterator i = fFilePtrMap.find(pFile);
     if (i == fFilePtrMap.end())
     {
         logMessage(ERR_COMP_FILE_NOT_FOUND, logging::LOG_TYPE_ERROR, __LINE__);
         return ERR_COMP_FILE_NOT_FOUND;
     }
 
-    CompFileData* pFileData = i->second;
-    if (!pFileData)
-    {
-        logMessage(ERR_COMP_FILE_NOT_FOUND, logging::LOG_TYPE_ERROR, __LINE__);
-        return ERR_COMP_FILE_NOT_FOUND;
-    }
     int rc = NO_ERROR;
-    char* hdr = pFileData->fFileHeader.fControlData;
+    char* hdr = i->second->fFileHeader.fControlData;
     fCompressor.setBlockCount(hdr, fCompressor.getBlockCount(hdr) + addBlockCount);
-    ChunkData* chunkData = (pFileData)->findChunk(0);
+    ChunkData* chunkData = (i->second)->findChunk(0);
     if (chunkData != NULL)
     {
-        if ((rc = writeChunkToFile(pFileData, chunkData)) == NO_ERROR)
+        if ((rc = writeChunkToFile(i->second, chunkData)) == NO_ERROR)
         {
-            rc = writeHeader(pFileData, __LINE__);
-            if ( rc == NO_ERROR)
-            {
-                //@Bug 4977 remove log files
-                removeBackups(fTransId);
-            }
+            rc = writeHeader(i->second, __LINE__);
         }
         else
         {
             ostringstream oss;
-            oss << "write chunk to file failed when updateColumnExtent: " << pFileData->fFileName;
+            oss << "write chunk to file failed when updateColumnExtent: " << i->second->fFileName;
             logMessage(oss.str(), logging::LOG_TYPE_ERROR);
         }
     }
 
-    pFile->flush();
+    fflush(pFile);
     return rc;
 }
 
@@ -1350,9 +1267,9 @@ int ChunkManager::updateColumnExtent(IDBDataFile* pFile, int addBlockCount)
 // Increment the block count stored in the chunk header used to track how many
 // blocks are allocated to the corresponding segment file.
 //------------------------------------------------------------------------------
-int ChunkManager::updateDctnryExtent(IDBDataFile* pFile, int addBlockCount)
+int ChunkManager::updateDctnryExtent(FILE* pFile, int addBlockCount)
 {
-    map<IDBDataFile*, CompFileData*>::iterator i = fFilePtrMap.find(pFile);
+    map<FILE*, CompFileData*>::iterator i = fFilePtrMap.find(pFile);
     if (i == fFilePtrMap.end())
     {
         logMessage(ERR_COMP_FILE_NOT_FOUND, logging::LOG_TYPE_ERROR, __LINE__);
@@ -1377,11 +1294,11 @@ int ChunkManager::updateDctnryExtent(IDBDataFile* pFile, int addBlockCount)
         if ((rc = writeChunkToFile(i->second, chunkData)) == NO_ERROR)
         {
             rc = writeHeader(i->second, __LINE__);
-            if ( rc == NO_ERROR)
-            {
-                //@Bug 4977 remove the log file
-                removeBackups(fTransId);
-            }
+			if ( rc == NO_ERROR)
+			{
+				//@Bug 4977 remove the log file
+				removeBackups(fTransId);
+			}
         }
         else
         {
@@ -1412,7 +1329,7 @@ void ChunkManager::cleanUp(const std::map<FID, FID> & columOids)
 {
     WE_COMP_DBG(cout << "cleanUp with " << fActiveChunks.size() << " active chunk(s)." << endl;)
     std::map<FID,FID>::const_iterator it;
-    map<IDBDataFile*, CompFileData*>::iterator i = fFilePtrMap.begin();
+    map<FILE*, CompFileData*>::iterator i = fFilePtrMap.begin();
     while ( i != fFilePtrMap.end() )
     {
         CompFileData* fileData = i->second;
@@ -1424,7 +1341,7 @@ void ChunkManager::cleanUp(const std::map<FID, FID> & columOids)
             for (list<ChunkData*>::iterator j = chunks.begin(); j != chunks.end(); ++j)
                 delete *j;
 
-            delete fileData->fFilePtr;
+            fclose(fileData->fFilePtr);
             fFileMap.erase(fileData->fFileID);
             fFilePtrMap.erase(i++);
 
@@ -1437,7 +1354,7 @@ void ChunkManager::cleanUp(const std::map<FID, FID> & columOids)
             for (list<ChunkData*>::iterator j = chunks.begin(); j != chunks.end(); ++j)
                 delete *j;
 
-            delete fileData->fFilePtr;
+            fclose(fileData->fFilePtr);
             fFileMap.erase(fileData->fFileID);
             fFilePtrMap.erase(i++);
 
@@ -1459,7 +1376,7 @@ void ChunkManager::cleanUp(const std::map<FID, FID> & columOids)
 //------------------------------------------------------------------------------
 // Read "n" blocks from pFile starting at fbo, into readBuf.
 //------------------------------------------------------------------------------
-int ChunkManager::readBlocks(IDBDataFile* pFile, unsigned char* readBuf, uint64_t fbo, size_t n)
+int ChunkManager::readBlocks(FILE* pFile, unsigned char* readBuf, i64 fbo, size_t n)
 {
     WE_COMP_DBG(cout << "backup blocks fbo:" << fbo << "  num:" << n << " file:" << pFile << endl;)
 
@@ -1469,7 +1386,7 @@ int ChunkManager::readBlocks(IDBDataFile* pFile, unsigned char* readBuf, uint64_
         return -1;
     }
 
-    map<IDBDataFile*, CompFileData*>::iterator fpIt = fFilePtrMap.find(pFile);
+    map<FILE*, CompFileData*>::iterator fpIt = fFilePtrMap.find(pFile);
     if (fpIt == fFilePtrMap.end())
     {
         return -1;
@@ -1519,14 +1436,14 @@ int ChunkManager::readBlocks(IDBDataFile* pFile, unsigned char* readBuf, uint64_
 // Updated chunk is not flushed to disk but left pending in the applicable
 // CompFileData object.
 //------------------------------------------------------------------------------
-int ChunkManager::restoreBlock(IDBDataFile* pFile, const unsigned char* writeBuf, uint64_t fbo)
+int ChunkManager::restoreBlock(FILE* pFile, const unsigned char* writeBuf, i64 fbo)
 {
     WE_COMP_DBG(cout << "restore blocks fbo:" << fbo << " file:" << pFile << endl;)
     // safety check
     if (pFile == NULL)
         return -1;
 
-    map<IDBDataFile*, CompFileData*>::iterator fpIt = fFilePtrMap.find(pFile);
+    map<FILE*, CompFileData*>::iterator fpIt = fFilePtrMap.find(pFile);
     if (fpIt == fFilePtrMap.end())
         return -1;
 
@@ -1552,9 +1469,9 @@ int ChunkManager::restoreBlock(IDBDataFile* pFile, const unsigned char* writeBuf
 //------------------------------------------------------------------------------
 // Get the allocated block count from the header, for the specified file (pFile)
 //------------------------------------------------------------------------------
-int ChunkManager::getBlockCount(IDBDataFile* pFile)
+int ChunkManager::getBlockCount(FILE* pFile)
 {
-    map<IDBDataFile*, CompFileData*>::iterator fpIt = fFilePtrMap.find(pFile);
+    map<FILE*, CompFileData*>::iterator fpIt = fFilePtrMap.find(pFile);
     idbassert(fpIt != fFilePtrMap.end());
 
     return fCompressor.getBlockCount(fpIt->second->fFileHeader.fControlData);
@@ -1566,10 +1483,6 @@ int ChunkManager::getBlockCount(IDBDataFile* pFile)
 void ChunkManager::fileOp(FileOp* fileOp)
 {
     fFileOp = fileOp;
-    if (fileOp)
-    {
-        setTransId(fileOp->getTransId());
-    }
 }
 
 //------------------------------------------------------------------------------
@@ -1621,8 +1534,7 @@ int ChunkManager::reallocateChunks(CompFileData* fileData)
 
     // original file info
     string origFileName = fileData->fFileName;
-    IDBDataFile*  origFilePtr = fileData->fFilePtr;
-    origFilePtr->flush();
+    FILE*  origFilePtr = fileData->fFilePtr;
 
     // back out the current pointers
     int headerSize = fCompressor.getHdrSize(fileData->fFileHeader.fControlData);
@@ -1653,34 +1565,29 @@ int ChunkManager::reallocateChunks(CompFileData* fileData)
     }
 
     // new file name and pointer
-    string rlcFileName(fileData->fFileName + ".rlc");
-    IDBDataFile*  rlcFilePtr = IDBDataFile::open(
-                                    IDBPolicy::getType( rlcFileName.c_str(), IDBPolicy::WRITEENG ),
-                                    rlcFileName.c_str(),
-                                    "w+b",
-                                    0,
-                                    fileData->fColWidth );
+    string tmpFileName(fileData->fFileName + ".tmp");
+    FILE*  tmpFilePtr = fopen(tmpFileName.c_str(), "w+b");
 
-    if (!rlcFilePtr)
+    if (!tmpFilePtr)
     {
         ostringstream oss;
-        oss << "Chunk shifting failed, file:" << origFileName << " -- cannot open rlc file.";
+        oss << "Chunk shifting failed, file:" << origFileName << " -- cannot open tmp file.";
         logMessage(oss.str(), logging::LOG_TYPE_ERROR);
         return ERR_FILE_OPEN;
     }
 
     // log the recover information here
     string aDMLLogFileName;
-    rc = writeLog(fTransId, "rlc", fileData->fFileName, aDMLLogFileName);
+    rc = writeLog(fFileOp->getTransId(), "tmp", fileData->fFileName, aDMLLogFileName);
     if (rc != NO_ERROR)
     {
         ostringstream oss;
-        oss << "log " << fileData->fFileName << ".rlc to DML logfile failed.";
+        oss << "log " << fileData->fFileName << ".hdr to DML logfile failed.";
         logMessage(oss.str(), logging::LOG_TYPE_ERROR);
 
-        delete rlcFilePtr;
-        rlcFilePtr = NULL;
-        IDBPolicy::remove(rlcFileName.c_str());
+        fclose(tmpFilePtr);
+        tmpFilePtr = NULL;
+        remove(tmpFileName.c_str());
         return rc;
     }
 
@@ -1693,9 +1600,9 @@ int ChunkManager::reallocateChunks(CompFileData* fileData)
 
     // bug3913, file size 0 after reallocate.
     // write the header, to be updated later, make sure there is someing in the file
-    if ((rc = writeFile(rlcFilePtr, rlcFileName, fileData->fFileHeader.fControlData,
+    if ((rc = writeFile(tmpFilePtr, tmpFileName, fileData->fFileHeader.fControlData,
                               COMPRESSED_FILE_HEADER_UNIT, __LINE__)) == NO_ERROR)
-        rc = writeFile(rlcFilePtr, rlcFileName, fileData->fFileHeader.fPtrSection,
+        rc = writeFile(tmpFilePtr, tmpFileName, fileData->fFileHeader.fPtrSection,
                               ptrSecSize, __LINE__);
 
     int k = 0;
@@ -1744,7 +1651,7 @@ int ChunkManager::reallocateChunks(CompFileData* fileData)
             {
                 ostringstream oss;
                 oss << "Compress data failed @line:" << __LINE__ << "with retCode:" << rc
-                    << " filename:" << rlcFileName;
+                    << " filename:" << tmpFileName;
                 logMessage(oss.str(), logging::LOG_TYPE_ERROR);
 
                 rc = ERR_COMP_COMPRESS;
@@ -1760,7 +1667,7 @@ int ChunkManager::reallocateChunks(CompFileData* fileData)
                 WE_COMP_DBG(cout << ", but padding failed." << endl;)
                 ostringstream oss;
                 oss << "Compress data failed @line:" << __LINE__ << "with retCode:" << rc
-                    << " filename:" << rlcFileName;
+                    << " filename:" << tmpFileName;
                 logMessage(oss.str(), logging::LOG_TYPE_ERROR);
 
                 rc = ERR_COMP_PAD_DATA;
@@ -1773,14 +1680,14 @@ int ChunkManager::reallocateChunks(CompFileData* fileData)
         }
 
         // write is in sequence, no need to call setFileOffset
-        //cout << "reallocateChunks: writing to temp file " << rlcFileName << " with fileptr " << rlcFilePtr << endl;
-        rc = writeFile(rlcFilePtr, rlcFileName, buf, chunkSize, __LINE__);
+        //cout << "reallocateChunks: writing to temp file " << tmpFileName << " with fileptr " << tmpFilePtr << endl;
+        rc = writeFile(tmpFilePtr, tmpFileName, buf, chunkSize, __LINE__);
         if (rc != NO_ERROR)
         {
-            //cout << "reallocateChunks: writing to temp file " << rlcFileName << " with fileptr " << rlcFilePtr << " failed" << endl;
+            //cout << "reallocateChunks: writing to temp file " << tmpFileName << " with fileptr " << tmpFilePtr << " failed" << endl;
             ostringstream oss;
             oss << "write file failed @line:" << __LINE__ << "with retCode:" << rc
-                << " filename:" << rlcFileName;
+                << " filename:" << tmpFileName;
             logMessage(oss.str(), logging::LOG_TYPE_ERROR);
             continue;
         }
@@ -1804,12 +1711,12 @@ int ChunkManager::reallocateChunks(CompFileData* fileData)
 
     // finally update the header
     if (rc == NO_ERROR)
-        rc = setFileOffset(rlcFilePtr, rlcFileName, 0, __LINE__);
+        rc = setFileOffset(tmpFilePtr, tmpFileName, 0, __LINE__);
     if (rc == NO_ERROR)
-        rc = writeFile(rlcFilePtr, rlcFileName, fileData->fFileHeader.fControlData,
+        rc = writeFile(tmpFilePtr, tmpFileName, fileData->fFileHeader.fControlData,
                               COMPRESSED_FILE_HEADER_UNIT, __LINE__);
     if (rc == NO_ERROR)
-        rc = writeFile(rlcFilePtr, rlcFileName, fileData->fFileHeader.fPtrSection,
+        rc = writeFile(tmpFilePtr, tmpFileName, fileData->fFileHeader.fPtrSection,
                               ptrSecSize, __LINE__);
 
     if (rc != NO_ERROR)
@@ -1820,62 +1727,54 @@ int ChunkManager::reallocateChunks(CompFileData* fileData)
         localtime_r(reinterpret_cast<time_t*>(&tv.tv_sec), &ltm);
         char tmText[24];
         snprintf(tmText, sizeof(tmText), ".%04d%02d%02d%02d%02d%02d%06ld",
-                ltm.tm_year+1900, ltm.tm_mon+1,
+        		ltm.tm_year+1900, ltm.tm_mon+1,
                 ltm.tm_mday, ltm.tm_hour, ltm.tm_min,
                 ltm.tm_sec, tv.tv_usec);
-        string dbgFileName(rlcFileName + tmText);
+        string dbgFileName(tmpFileName + tmText);
 
         ostringstream oss;
         oss << "Chunk shifting failed, file:" << origFileName;
-        if (IDBPolicy::rename(rlcFileName.c_str(), dbgFileName.c_str()) == 0)
-            oss << ", rlc file is:" << dbgFileName;
+        if (rename(tmpFileName.c_str(), dbgFileName.c_str()) == 0)
+            oss << ", tmp file is:" << dbgFileName;
 
-        // write out the header for debugging in case the header in rlc file is bad or not updated.
-        string rlcPtrFileName(dbgFileName + ".ptr");
-
-        IDBDataFile*  rlcPtrFilePtr = IDBDataFile::open(
-                                        IDBPolicy::getType(rlcPtrFileName.c_str(),
-                                            IDBPolicy::WRITEENG),
-                                        rlcPtrFileName.c_str(),
-                                        "w+b",
-                                        0,
-                                        fileData->fColWidth);
-
-        if (rlcPtrFilePtr &&
-            (writeFile(rlcPtrFilePtr, rlcPtrFileName, fileData->fFileHeader.fControlData,
+        // write out the header for debugging in case the header in tmp file is bad or not updated.
+        string tmpPtrFileName(dbgFileName + ".ptr");
+        FILE*  tmpPtrFilePtr = fopen(tmpPtrFileName.c_str(), "w+b");
+        if (tmpPtrFilePtr &&
+            (writeFile(tmpPtrFilePtr, tmpPtrFileName, fileData->fFileHeader.fControlData,
                               COMPRESSED_FILE_HEADER_UNIT, __LINE__) == NO_ERROR) &&
-            (writeFile(rlcPtrFilePtr, rlcPtrFileName, fileData->fFileHeader.fPtrSection,
+            (writeFile(tmpPtrFilePtr, tmpPtrFileName, fileData->fFileHeader.fPtrSection,
                               ptrSecSize, __LINE__) == NO_ERROR))
         {
-            oss << ", rlc file header in memory: " << rlcPtrFileName;
+            oss << ", tmp file header in memory: " << tmpPtrFileName;
         }
         else
         {
-            oss << ", possible incomplete rlc file header in memory: " << rlcPtrFileName;
+            oss << ", possible incomplete tmp file header in memory: " << tmpPtrFileName;
         }
 
         logMessage(oss.str(), logging::LOG_TYPE_ERROR);
 
         closeFile(fileData);
-        delete rlcFilePtr;
-        rlcFilePtr = NULL;
+        fclose(tmpFilePtr);
+        tmpFilePtr = NULL;
 
-        if (rlcPtrFilePtr != NULL)
+        if (tmpPtrFilePtr != NULL)
         {
-            delete rlcPtrFilePtr;
-            rlcPtrFilePtr = NULL;
+            fclose(tmpPtrFilePtr);
+            tmpPtrFilePtr = NULL;
         }
 
         return rc;
     }
 
     // update the file pointer map w/ new file pointer
-    //cout << "realloc1: remove ptr = " << fileData->fFilePtr << endl;
+	//cout << "realloc1: remove ptr = " << fileData->fFilePtr << endl;
     fFilePtrMap.erase(fileData->fFilePtr);
-    delete fileData->fFilePtr;
-    fileData->fFilePtr = NULL;
-    delete rlcFilePtr;
-    rlcFilePtr = NULL;
+    fclose(fileData->fFilePtr);
+    fileData->fFilePtr = 0;
+    fclose(tmpFilePtr);
+    tmpFilePtr = NULL;
 
     // put reallocated file size here for logging purpose.
     uint64_t fileSize = 0;
@@ -1893,36 +1792,53 @@ int ChunkManager::reallocateChunks(CompFileData* fileData)
         // @bug3913, keep the original file until the new file is properly renamed.
         // 1. check the new file size is NOT 0, matching ptr[k].
         // 2. mv the current to be backup.
-        // 3. rename the rlc file.
+        // 3. rename the tmp file.
         // 4. check the file size again.
         // 5. verify each chunk.
         // 5. rm the bak file or mv bak file back.
 
         // check the new file size using two methods mostly for curiosity on 0 size file.
         // They can be removed because all chunks are to be verified after rename.
-        if ( IDBPolicy::size( rlcFileName.c_str() ) != (int64_t) ptrs[k] )
+        struct stat tmpFileStat;
+        stat(tmpFileName.c_str(), &tmpFileStat);
+        fileSize = tmpFileStat.st_size;
+        if (fileSize != ptrs[k])
         {
             ostringstream oss;
             oss << "Incorrect file size, expect:" << ptrs[k] << ", stat:" << fileSize
-                << ", filename:" << rlcFileName;
+                << ", filename:" << tmpFileName;
+            logMessage(oss.str(), logging::LOG_TYPE_ERROR);
+            rc = ERR_COMP_RENAME_FILE;
+        } 
+
+        // save the original file
+        errno = 0;
+        string bakFileName(fileData->fFileName + ".orig");
+        if (rc == NO_ERROR && rename(fileData->fFileName.c_str(), bakFileName.c_str()) != 0)
+        {
+            ostringstream oss;
+            oss << "rename " << fileData->fFileName << " to " << bakFileName << " failed: " 
+                << strerror(errno);
+            logMessage(oss.str(), logging::LOG_TYPE_ERROR);
+            rc = ERR_COMP_RENAME_FILE;
+        } 
+
+        // rename the new file
+        if (rc == NO_ERROR && rename(tmpFileName.c_str(), fileData->fFileName.c_str()) != 0)
+        {
+            ostringstream oss;
+            oss << "rename " << tmpFileName << " to " << fileData->fFileName << " failed: " 
+                << strerror(errno);
             logMessage(oss.str(), logging::LOG_TYPE_ERROR);
             rc = ERR_COMP_RENAME_FILE;
         }
 
-        if (rc == NO_ERROR)
+        if ((rc == NO_ERROR) && (rc = openFile(fileData, "r+b", __LINE__)) == NO_ERROR)
         {
-            if (fIsHdfs)
-                rc = swapTmpFile(rlcFileName, fileData->fFileName+".tmp");
-            else
-                rc = swapTmpFile(rlcFileName, fileData->fFileName);
-        }
-
-        if ((rc == NO_ERROR) &&
-            (rc = openFile(fileData, "r+b", fileData->fColWidth, true, __LINE__)) == NO_ERROR) // @bug 5572 HDFS tmp file
-        {
-//          see TODO- above regarding setvbuf
-//          setvbuf(fileData->fFilePtr, fileData->fIoBuffer.get(), _IOFBF, fileData->fIoBSize);
-            fileSize = fileData->fFilePtr->size();
+            setvbuf(fileData->fFilePtr, fileData->fIoBuffer.get(), _IOFBF, fileData->fIoBSize);
+            fseek(fileData->fFilePtr, 0, SEEK_END);     // go to end of file
+            fileSize = ftell(fileData->fFilePtr);       // get current file size
+            fseek(fileData->fFilePtr, 0, SEEK_SET);     // rewind
             if (fileSize == ptrs[k])
             {
                rc = verifyChunksAfterRealloc(fileData);
@@ -1931,120 +1847,108 @@ int ChunkManager::reallocateChunks(CompFileData* fileData)
             {
                 ostringstream oss;
                 oss << "Incorrect file size, expect:" << ptrs[k] << ", stat:" << fileSize
-                    << ", filename:" << fileData->fFileName;
+                    << ", filename:" << tmpFileName;
                 logMessage(oss.str(), logging::LOG_TYPE_ERROR);
                 rc = ERR_COMP_RENAME_FILE;
-            }
+            } 
 
             if (rc == NO_ERROR)
             {
                 fFilePtrMap.insert(make_pair(fileData->fFilePtr, fileData));
-                //cout << "realloc2: insert ptr = " << fileData->fFilePtr << endl;
+				//cout << "realloc2: insert ptr = " << fileData->fFilePtr << endl;
                 // notify the PrimProc of unlinking original data file
                 fDropFdCache = true;
             }
         }
 
-        if (!fIsHdfs)
+        if (rc == NO_ERROR)
         {
-            string bakFileName(fileData->fFileName + ".orig");
-            if (rc == NO_ERROR)
+            // unlink the original file (remove is portable)
+            if (remove(bakFileName.c_str()) != 0)
             {
-                // unlink the original file (remove is portable)
-                if (fFs.remove(bakFileName.c_str()) != 0)
-                {
-                    ostringstream oss;
-                    oss << "remove backup file " << bakFileName << " failed: " << strerror(errno);
-
-                    // not much we can do, log an info message for manual cleanup
-                    logMessage(oss.str(), logging::LOG_TYPE_INFO);
-                }
+                ostringstream oss;
+                oss << "remove backup file " << bakFileName << " failed: " << strerror(errno);
+    
+                // not much we can do, log an info message for manual cleanup
+                logMessage(oss.str(), logging::LOG_TYPE_INFO);
             }
-            else
+        }
+        else
+        {
+            // keep the bad file for debugging purpose
+            if (rename(fileData->fFileName.c_str(), tmpFileName.c_str()) == 0)
             {
-                // keep the bad file for debugging purpose
-                if (fFs.rename(fileData->fFileName.c_str(), rlcFileName.c_str()) == 0)
-                {
-                    ostringstream oss;
-                    oss << "data file after chunk shifting failed verification.";
-                    logMessage(oss.str(), logging::LOG_TYPE_ERROR);
-                }
+                ostringstream oss;
+                oss << "data file after chunk shifting failed verification.";
+                logMessage(oss.str(), logging::LOG_TYPE_ERROR);
+            }
 
-                // roll back the bak file
-                if (fFs.rename(bakFileName.c_str(), fileData->fFileName.c_str()) != 0)
-                {
-                    ostringstream oss;
-                    oss << "rename " << bakFileName << " to " << fileData->fFileName << " failed: "
-                        << strerror(errno);
+            // roll back the bak file
+            if (rename(bakFileName.c_str(), fileData->fFileName.c_str()) != 0)
+            {
+                ostringstream oss;
+                oss << "rename " << bakFileName << " to " << fileData->fFileName << " failed: " 
+                    << strerror(errno);
 
-                    // must manually move it back
-                    logMessage(oss.str(), logging::LOG_TYPE_ERROR);
-                }
+                // must manually move it back
+                logMessage(oss.str(), logging::LOG_TYPE_ERROR);
             }
         }
     }
 
-    if (!fIsHdfs)
+    if (rc == NO_ERROR)
     {
-        if (rc == NO_ERROR)
+        // remove the log file
+        remove(aDMLLogFileName.c_str());
+    }
+    else
+    {
+        struct timeval tv;
+        gettimeofday(&tv, 0);
+        struct tm ltm;
+        localtime_r(reinterpret_cast<time_t*>(&tv.tv_sec), &ltm);
+        char tmText[24];
+        snprintf(tmText, sizeof(tmText), ".%04d%02d%02d%02d%02d%02d%06ld",
+        		ltm.tm_year+1900, ltm.tm_mon+1,
+                ltm.tm_mday, ltm.tm_hour, ltm.tm_min,
+                ltm.tm_sec, tv.tv_usec);
+        string dbgFileName(tmpFileName + tmText);
+
+        ostringstream oss;
+        oss << "Chunk shifting failed, file:" << origFileName;
+        if (rename(tmpFileName.c_str(), dbgFileName.c_str()) == 0)
+            oss << ", tmp file is:" << dbgFileName;
+
+        // write out the header for debugging in case the header in tmp file is bad.
+        string tmpPtrFileName(dbgFileName + ".hdr");
+        FILE*  tmpPtrFilePtr = fopen(tmpPtrFileName.c_str(), "w+b");
+        if (tmpPtrFilePtr &&
+            (writeFile(tmpPtrFilePtr, tmpPtrFileName, fileData->fFileHeader.fControlData,
+                              COMPRESSED_FILE_HEADER_UNIT, __LINE__) == NO_ERROR) &&
+            (writeFile(tmpPtrFilePtr, tmpPtrFileName, fileData->fFileHeader.fPtrSection,
+                              ptrSecSize, __LINE__) == NO_ERROR))
         {
-            // remove the log file
-            fFs.remove(aDMLLogFileName.c_str());
+            oss << ", tmp file header in memory: " << tmpPtrFileName;
         }
         else
         {
-            struct timeval tv;
-            gettimeofday(&tv, 0);
-            struct tm ltm;
-            localtime_r(reinterpret_cast<time_t*>(&tv.tv_sec), &ltm);
-            char tmText[24];
-            snprintf(tmText, sizeof(tmText), ".%04d%02d%02d%02d%02d%02d%06ld",
-                    ltm.tm_year+1900, ltm.tm_mon+1,
-                    ltm.tm_mday, ltm.tm_hour, ltm.tm_min,
-                    ltm.tm_sec, tv.tv_usec);
-            string dbgFileName(rlcFileName + tmText);
+            oss << ", possible incomplete tmp file header in memory: " << tmpPtrFileName;
+        }
 
-            ostringstream oss;
-            oss << "Chunk shifting failed, file:" << origFileName;
-            if (IDBPolicy::rename(rlcFileName.c_str(), dbgFileName.c_str()) == 0)
-                oss << ", rlc file is:" << dbgFileName;
+        logMessage(oss.str(), logging::LOG_TYPE_ERROR);
 
-            // write out the header for debugging in case the header in rlc file is bad.
-            string rlcPtrFileName(dbgFileName + ".hdr");
-            IDBDataFile*  rlcPtrFilePtr = IDBDataFile::open(
-                                            IDBPolicy::getType(rlcPtrFileName.c_str(),
-                                                IDBPolicy::WRITEENG),
-                                            rlcPtrFileName.c_str(),
-                                            "w+b",
-                                            0);
-            if (rlcPtrFilePtr &&
-                (writeFile(rlcPtrFilePtr, rlcPtrFileName, fileData->fFileHeader.fControlData,
-                                  COMPRESSED_FILE_HEADER_UNIT, __LINE__) == NO_ERROR) &&
-                (writeFile(rlcPtrFilePtr, rlcPtrFileName, fileData->fFileHeader.fPtrSection,
-                                  ptrSecSize, __LINE__) == NO_ERROR))
-            {
-                oss << ", rlc file header in memory: " << rlcPtrFileName;
-            }
-            else
-            {
-                oss << ", possible incomplete rlc file header in memory: " << rlcPtrFileName;
-            }
+        closeFile(fileData);
 
-            logMessage(oss.str(), logging::LOG_TYPE_ERROR);
+        if (tmpFilePtr != NULL)
+        {
+            fclose(tmpFilePtr);
+            tmpFilePtr = NULL;
+        }
 
-            closeFile(fileData);
-
-            if (rlcFilePtr != NULL)
-            {
-                delete rlcFilePtr;
-                rlcFilePtr = NULL;
-            }
-
-            if (rlcPtrFilePtr != NULL)
-            {
-                delete rlcPtrFilePtr;
-                rlcPtrFilePtr = NULL;
-            }
+        if (tmpPtrFilePtr != NULL)
+        {
+            fclose(tmpPtrFilePtr);
+            tmpPtrFilePtr = NULL;
         }
     }
 
@@ -2076,7 +1980,7 @@ int ChunkManager::verifyChunksAfterRealloc(CompFileData* fileData)
         oss << "Invalid header in new " << fileData->fFileName << ", roll back";
         logMessage(oss.str(), logging::LOG_TYPE_ERROR);
 
-        return rc;
+		return rc;
     }
 
     int headerSize = fCompressor.getHdrSize(fileData->fFileHeader.fControlData);
@@ -2089,7 +1993,7 @@ int ChunkManager::verifyChunksAfterRealloc(CompFileData* fileData)
         ostringstream oss;
         oss << "Failed to read pointer header from new " << fileData->fFileName << "@" << __LINE__;
         logMessage(oss.str(), logging::LOG_TYPE_ERROR);
-        return rc;
+		return rc;
     }
 
     // get pointer list
@@ -2167,333 +2071,5 @@ void ChunkManager::logMessage(const string& msg, int level) const
         logging::LoggingID(SUBSYSTEM_ID_WE, 0, fTransId));
 }
 
-//------------------------------------------------------------------------------
-// Replace the cdf file with the updated tmp file.
-//------------------------------------------------------------------------------
-int ChunkManager::swapTmpFile(const string& src, const string& dest)
-{
-    // return value
-    int rc = NO_ERROR;
-
-    // if no change to the cdf, the tmp may not exist, no need to swap.
-    if (!fFs.exists(src.c_str()))
-        return rc;
-
-    ssize_t srcFileSize = IDBPolicy::size(src.c_str());
-    if (srcFileSize <= 0)
-    {
-        ostringstream oss;
-        oss << "swapTmpFile aborted. Source file size = " << srcFileSize;
-        logMessage(oss.str(), logging::LOG_TYPE_CRITICAL);
-        rc = ERR_COMP_RENAME_FILE;
-
-        return rc;
-    }
-
-    errno = 0;
-    // save the original file
-    string orig(dest + ".orig");
-    fFs.remove(orig.c_str());  // remove left overs
-    if (fFs.rename(dest.c_str(), orig.c_str()) != 0)
-    {
-        ostringstream oss;
-        oss << "rename " << dest << " to " << orig << " failed: " << strerror(errno);
-        logMessage(oss.str(), logging::LOG_TYPE_ERROR);
-        rc = ERR_COMP_RENAME_FILE;
-    }
-
-    // rename the new file
-    if (rc == NO_ERROR && fFs.rename(src.c_str(), dest.c_str()) != 0)
-    {
-        ostringstream oss;
-        oss << "rename " << src << " to " << dest << " failed: " << strerror(errno);
-        logMessage(oss.str(), logging::LOG_TYPE_ERROR);
-        rc = ERR_COMP_RENAME_FILE;
-    }
-
-    if (rc == NO_ERROR && fFs.remove(orig.c_str()) != 0)
-        rc = ERR_COMP_REMOVE_FILE;
-
-    return rc;
 }
-
-
-//------------------------------------------------------------------------------
-// Construct a DML log file name based on transaction ID, etc.
-//------------------------------------------------------------------------------
-int ChunkManager::getDMLLogFileName(string& aDMLLogFileName, const TxnID& txnId) const
-{
-    config::Config *config = config::Config::makeConfig();
-    string prefix = config->getConfig("SystemConfig", "DBRMRoot");
-    if (prefix.length() == 0)
-    {
-        ostringstream oss;
-        oss << "trans " << txnId << ":Need a valid DBRMRoot entry in Calpont configuation file";
-        logMessage(oss.str(), logging::LOG_TYPE_ERROR);
-        return ERR_DML_LOG_NAME;
-    }
-
-    uint64_t pos =  prefix.find_last_of ("/") ;
-    if (pos != string::npos)
-    {
-        aDMLLogFileName = prefix.substr(0, pos+1); //Get the file path
-    }
-    else
-    {
-        ostringstream oss;
-        oss << "trans " << txnId << ":Cannot find the dbrm directory ("
-            << prefix.c_str() << ") for the DML log file";
-        logMessage(oss.str(), logging::LOG_TYPE_ERROR);
-        return ERR_DML_LOG_NAME;
-    }
-
-    ostringstream oss;
-    oss << txnId << "_" << fLocalModuleId;
-    aDMLLogFileName += "DMLLog_" + oss.str();
-
-    return NO_ERROR;
-}
-
-
-//------------------------------------------------------------------------------
-// clear the DML log file
-//------------------------------------------------------------------------------
-int ChunkManager::startTransaction(const TxnID& txnId) const
-{
-    // this step is for HDFS update/delete only.
-    if (!fIsHdfs || fIsBulkLoad)
-        return NO_ERROR;
-
-    // Construct the DML log file name
-    string aDMLLogFileName;
-    if (getDMLLogFileName(aDMLLogFileName, txnId) != NO_ERROR)
-        return ERR_DML_LOG_NAME;
-
-    // truncate the existing file
-    boost::scoped_ptr<IDBDataFile> aDMLLogFile(IDBDataFile::open(
-                    IDBPolicy::getType(aDMLLogFileName.c_str(), IDBPolicy::WRITEENG),
-                    aDMLLogFileName.c_str(), "wb", 0));
-
-    if (!aDMLLogFile)
-    {
-        ostringstream oss;
-        oss << "trans " << txnId << ":File " << aDMLLogFileName << " can't be opened.";
-        logMessage(oss.str(), logging::LOG_TYPE_ERROR);
-        return ERR_OPEN_DML_LOG;
-    }
-
-    return NO_ERROR;
-}
-
-
-//------------------------------------------------------------------------------
-// Backup cdf file and replace the with the updated tmp file.
-//------------------------------------------------------------------------------
-int ChunkManager::confirmTransaction(const TxnID& txnId) const
-{
-    // return value
-    int rc = NO_ERROR;
-    // this step is for HDFS update/delete only.
-    if (!fIsHdfs || fIsBulkLoad)
-        return rc;
-
-    string aDMLLogFileName;
-    if (getDMLLogFileName(aDMLLogFileName, txnId) != NO_ERROR)
-        return ERR_DML_LOG_NAME;
-
-    //Open log file
-    boost::scoped_ptr<IDBDataFile> aDMLLogFile;
-    aDMLLogFile.reset(IDBDataFile::open(
-                      IDBPolicy::getType(aDMLLogFileName.c_str(), IDBPolicy::WRITEENG),
-                      aDMLLogFileName.c_str(), "r", 0));
-
-    if (!aDMLLogFile)
-    {
-        ostringstream oss;
-        oss << "trans " << txnId << ":File " << aDMLLogFileName << " can't be opened";
-        logMessage(oss.str(), logging::LOG_TYPE_ERROR);
-        return ERR_OPEN_DML_LOG;
-    }
-
-    ssize_t logSize = fFs.size(aDMLLogFileName.c_str());
-    boost::scoped_array<char> buf(new char[logSize]);
-    if (aDMLLogFile->read(buf.get(), logSize) != logSize)
-                return ERR_FILE_READ;
-
-    std::istringstream strstream(string(buf.get(), logSize));
-    std::string backUpFileType;
-    std::string filename;
-    int64_t size;
-    int64_t offset;
-    ConfirmHdfsDbFile confirmHdfs;
-    while (strstream >> backUpFileType >> filename >> size >> offset)
-    {
-        std::string confirmErrMsg;
-        rc = confirmHdfs.confirmDbFileChange( backUpFileType,
-            filename, confirmErrMsg );
-        if (rc != NO_ERROR)
-        {
-            logMessage(confirmErrMsg, logging::LOG_TYPE_ERROR);
-            break;
-        }
-    }
-
-    return rc;
-}
-
-
-//------------------------------------------------------------------------------
-// Finalize the chages
-// if success, remove the orig
-// otherwise,  move the orig back to cdf
-//------------------------------------------------------------------------------
-int ChunkManager::endTransaction(const TxnID& txnId, bool success) const
-{
-    // return value
-    int rc = NO_ERROR;
-
-    // this step is for HDFS update/delete only.
-    if (!fIsHdfs || fIsBulkLoad)
-        return rc;
-
-    string aDMLLogFileName;
-    if (getDMLLogFileName(aDMLLogFileName, txnId) != NO_ERROR)
-        return ERR_DML_LOG_NAME;
-
-    //Open log file
-    boost::scoped_ptr<IDBDataFile> aDMLLogFile;
-    aDMLLogFile.reset(IDBDataFile::open(
-                      IDBPolicy::getType(aDMLLogFileName.c_str(), IDBPolicy::WRITEENG),
-                      aDMLLogFileName.c_str(), "r", 0));
-
-    if (!aDMLLogFile)
-    {
-        ostringstream oss;
-        oss << "trans " << txnId << ":File " << aDMLLogFileName << " can't be opened";
-        logMessage(oss.str(), logging::LOG_TYPE_ERROR);
-        return ERR_OPEN_DML_LOG;
-    }
-
-    ssize_t logSize = fFs.size(aDMLLogFileName.c_str());
-    ssize_t logRead = 0;
-    boost::scoped_array<char> buf(new char[logSize]);
-    if ((logRead = aDMLLogFile->read(buf.get(), logSize)) != logSize)
-    {
-        ostringstream oss;
-        oss << "trans " << txnId << ":File " << aDMLLogFileName << " filed to read: "
-            << logRead << "/" << logSize;
-        logMessage(oss.str(), logging::LOG_TYPE_ERROR);
-        return ERR_FILE_READ;
-    }
-
-    std::istringstream strstream(string(buf.get(), logSize));
-    std::string backUpFileType;
-    std::string filename;
-    int64_t size;
-    int64_t offset;
-    ConfirmHdfsDbFile confirmHdfs;
-    while (strstream >> backUpFileType >> filename >> size >> offset)
-    {
-        std::string finalizeErrMsg;
-        rc = confirmHdfs.endDbFileChange( backUpFileType,
-            filename, success, finalizeErrMsg );
-        if (rc != NO_ERROR)
-        {
-            logMessage(finalizeErrMsg, logging::LOG_TYPE_ERROR);
-            break;
-        }
-    }
-
-    // final clean up or recover
-    if (rc == NO_ERROR)
-        rc = fFs.remove(aDMLLogFileName.c_str());
-
-    return rc;
-}
-
-int ChunkManager::checkFixLastDictChunk(const FID& fid,
-                    uint16_t root,
-                    uint32_t partition,
-                    uint16_t segment)
-{
-	
-	int rc = 0;
-	//Find the file info
-	FileID fileID(fid, root, partition, segment);
-    map<FileID, CompFileData*>::const_iterator mit = fFileMap.find(fileID);
-
-    WE_COMP_DBG(cout << "getFileData: fid:" << fid << " root:" << root << " part:" << partition
-                    << " seg:" << segment << " file* " << ((mit != fFileMap.end()) ? "" : "not ")
-                    << "found." << endl;)
-
-    // Get CompFileData pointer for existing Dictionary store file mit->second is CompFileData
-    if (mit != fFileMap.end())
-    {
-
-		int headerSize = fCompressor.getHdrSize(mit->second->fFileHeader.fControlData);
-		int ptrSecSize = headerSize - COMPRESSED_FILE_HEADER_UNIT;
-
-		// get pointer list
-		compress::CompChunkPtrList ptrs;
-		if (fCompressor.getPtrList(mit->second->fFileHeader.fPtrSection, ptrSecSize, ptrs) != 0)
-		{
-			ostringstream oss;
-			oss << "Failed to parse pointer list from new " << mit->second->fFileName << "@" << __LINE__;
-			logMessage(oss.str(), logging::LOG_TYPE_ERROR);
-			return ERR_COMP_PARSE_HDRS;
-		}
-
-		// now verify last chunk
-		ChunkData* chunkData;
-		int numOfChunks = ptrs.size();  // number of chunks in the file	
-        unsigned int chunkSize = ptrs[numOfChunks-1].second;
-        if ((rc = setFileOffset(mit->second->fFilePtr, mit->second->fFileName, ptrs[numOfChunks-1].first, __LINE__)))
-        {
-            ostringstream oss;
-            oss << "Failed to setFileOffset new " << mit->second->fFileName << "@" << __LINE__;
-            logMessage(oss.str(), logging::LOG_TYPE_ERROR);
-            return rc;
-        }
-
-        if ((rc = readFile(mit->second->fFilePtr, mit->second->fFileName,
-                          fBufCompressed, chunkSize, __LINE__)))
-        {
-            ostringstream oss;
-            oss << "Failed to read chunk from new " << mit->second->fFileName << "@" << __LINE__;
-            logMessage(oss.str(), logging::LOG_TYPE_ERROR);
-            return rc;
-        }
-
-        // uncompress the read in buffer
-        chunkData = new ChunkData(numOfChunks-1);
-        unsigned int dataLen = sizeof(chunkData->fBufUnCompressed);
-        if (fCompressor.uncompressBlock((char*)fBufCompressed, chunkSize,
-                    (unsigned char*)chunkData->fBufUnCompressed, dataLen) != 0)
-        {
-			mit->second->fChunkList.push_back(chunkData);
-			fActiveChunks.push_back(make_pair(mit->second->fFileID, chunkData));
-            //replace this chunk with empty chunk
-            uint64_t blocks = 512;
-			if ((numOfChunks-1)== 0)
-			{
-					char* hdr = mit->second->fFileHeader.fControlData;
-					if (fCompressor.getBlockCount(hdr) < 512)
-						blocks = 256;
-			}
-				
-			dataLen = 8192 * blocks;
-				
-			// load the uncompressed buffer with empty values.
-			char* buf = chunkData->fBufUnCompressed;
-			chunkData->fLenUnCompressed = UNCOMPRESSED_CHUNK_SIZE;
-			initializeDctnryChunk(buf, UNCOMPRESSED_CHUNK_SIZE);	
-			chunkData->fLenUnCompressed = dataLen;	
-			chunkData->fWriteToFile = true;		
-        }     
-    }
-	return rc;
-}
-
-}
-
 // vim:ts=4 sw=4:

@@ -245,7 +245,7 @@ netsnmp_access_interface_entry_get_by_name(netsnmp_container *container,
         return NULL;
     }
 
-    tmp.name = (char*)name;
+    tmp.name = name;
     return CONTAINER_FIND(container->next, &tmp);
 }
 
@@ -397,7 +397,7 @@ _access_interface_entry_save_name(const char *name, oid index)
     if(NULL == name)
         return;
 
-    tmp = se_find_value_in_slist("interfaces", (char*)name);
+    tmp = se_find_value_in_slist("interfaces", name);
     if (tmp == SE_DNE) {
         se_add_pair_to_slist("interfaces", strdup(name), index);
         DEBUGMSGTL(("access:interface:ifIndex", "saved ifIndex %d for %s\n",

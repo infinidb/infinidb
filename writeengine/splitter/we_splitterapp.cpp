@@ -1,19 +1,34 @@
-/* Copyright (C) 2014 InfiniDB, Inc.
+/*
 
-   This program is free software; you can redistribute it and/or
-   modify it under the terms of the GNU General Public License
-   as published by the Free Software Foundation; version 2 of
-   the License.
+ Copyright (C) 2009-2012 Calpont Corporation.
 
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+ Use of and access to the Calpont InfiniDB Community software is subject to the
+ terms and conditions of the Calpont Open Source License Agreement. Use of and
+ access to the Calpont InfiniDB Enterprise software is subject to the terms and
+ conditions of the Calpont End User License Agreement.
 
-   You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-   MA 02110-1301, USA. */
+ This program is distributed in the hope that it will be useful, and unless
+ otherwise noted on your license agreement, WITHOUT ANY WARRANTY; without even
+ the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ Please refer to the Calpont Open Source License Agreement and the Calpont End
+ User License Agreement for more details.
+
+ You should have received a copy of either the Calpont Open Source License
+ Agreement or the Calpont End User License Agreement along with this program; if
+ not, it is your responsibility to review the terms and conditions of the proper
+ Calpont license agreement by visiting http://www.calpont.com for the Calpont
+ InfiniDB Enterprise End User License Agreement or http://www.infinidb.org for
+ the Calpont InfiniDB Community Calpont Open Source License Agreement.
+
+ Calpont may make changes to these license agreements from time to time. When
+ these changes are made, Calpont will make a new copy of the Calpont End User
+ License Agreement available at http://www.calpont.com and a new copy of the
+ Calpont Open Source License Agreement available at http:///www.infinidb.org.
+ You understand and agree that if you use the Program after the date on which
+ the license agreement authorizing your use has changed, Calpont will treat your
+ use as acceptance of the updated License.
+
+ */
 
 /*******************************************************************************
  * $Id$
@@ -27,16 +42,12 @@
  *      Author: bpaul
  */
 
-#include <unistd.h>
 #include <cstdlib>
 #include <csignal>
 
 #include <string>
+#include <stdexcept>
 using namespace std;
-
-#include <boost/uuid/uuid.hpp>
-#include <boost/uuid/uuid_generators.hpp>
-#include <boost/uuid/uuid_io.hpp>
 
 #include "batchloader.h"
 using namespace batchloader;
@@ -105,22 +116,7 @@ WESplitterApp::WESplitterApp(WECmdArgs& CmdArgs) :
 				logging::Message::Args errMsgArgs;
 				errMsgArgs.add(err);
 				fpSysLog->logMsg(errMsgArgs,logging::LOG_TYPE_ERROR,logging::M0000);
-				if (!fCmdArgs.getConsoleOutput())
-				{
-					ofstream dmlFile;
-					ostringstream oss;
-					oss << "/tmp/" <<fDh.getTableOID() << ".txt";
-					dmlFile.open(oss.str().c_str());
-					if (dmlFile.is_open())
-					{
-						dmlFile << err;
-						dmlFile << endl;
-						dmlFile.close();
-					}
-					SPLTR_EXIT_STATUS=2;
-				}
-				else
-					SPLTR_EXIT_STATUS=1;
+				SPLTR_EXIT_STATUS=1;
 				//cout << err << endl;
 				fDh.fLog.logMsg( err, MSGLVL_ERROR );
 				fContinue = false;
@@ -137,6 +133,10 @@ WESplitterApp::~WESplitterApp()
 	usleep(1000); //1 millisec just checking
 
 	std::string aStr = "Calling WESplitterApp Destructor\n";
+	//logging::Message::Args errMsgArgs;
+	//errMsgArgs.add(aStr);
+	//fpSysLog->logMsg(errMsgArgs, logging::LOG_TYPE_INFO, logging::M0000);
+	//fDh.fLog.logMsg( aStr, MSGLVL_INFO2 );
 	if(fDh.getDebugLvl()) cout << aStr << endl;
 
 }
@@ -150,23 +150,10 @@ void WESplitterApp::setupSignalHandlers()
 #ifdef _MSC_VER
 	//FIXME
 #else
-	struct sigaction sa;
-	memset(&sa, 0, sizeof(sa));
-    sa.sa_handler = WESplitterApp::onSigInterrupt;
-	sigaction(SIGINT, &sa, 0);
-	sa.sa_handler = WESplitterApp::onSigTerminate;
-	sigaction(SIGTERM, &sa, 0);
-	sa.sa_handler = SIG_IGN;
-	sigaction(SIGPIPE, &sa, 0);
-	sa.sa_handler = WESplitterApp::onSigHup;
-	sigaction(SIGPIPE, &sa, 0);
-	sa.sa_handler = WESplitterApp::onSigInterrupt;
-	sigaction(SIGUSR1, &sa, 0);
-/*	
 	signal(SIGPIPE, SIG_IGN);
 	signal(SIGINT, WESplitterApp::onSigInterrupt);
 	signal(SIGTERM, WESplitterApp::onSigTerminate);
-	signal(SIGHUP, WESplitterApp::onSigHup); */
+	signal(SIGHUP, WESplitterApp::onSigHup);
 #endif
 }
 //------------------------------------------------------------------------------
@@ -174,7 +161,6 @@ void WESplitterApp::setupSignalHandlers()
 //------------------------------------------------------------------------------
 void WESplitterApp::onSigTerminate(int aInt)
 {
-	cout << "onSigTerminate received signal " << aInt << endl;
 	if(15 == aInt)
 	{
 		fSignaled = true;
@@ -189,11 +175,9 @@ void WESplitterApp::onSigTerminate(int aInt)
 //------------------------------------------------------------------------------
 void WESplitterApp::onSigInterrupt(int aInt)
 {
-	//cout << "onSigInterrupt received signal " << aInt << endl;
-	if((2 == aInt) || (10 == aInt))
+	if(2 == aInt)
 	{
 		fSignaled = true;
-		//cout << "ctrl-c received" << endl;
 	}
 	fContinue = false; //force to call destructor
 	if(aInt == 1) SPLTR_EXIT_STATUS = 1;
@@ -221,9 +205,6 @@ void WESplitterApp::onSigHup(int aInt)
 //------------------------------------------------------------------------------
 void WESplitterApp::processMessages()
 {
-    boost::uuids::uuid u=boost::uuids::random_generator()();
-    fCmdArgs.setJobUUID(u);
-
 	messageqcpp::ByteStream aBs;
 	unsigned int aRollCount = 0;
 
@@ -241,7 +222,7 @@ void WESplitterApp::processMessages()
 			fDh.send2Pm(aBs);
 
 			std::string aJobId = fCmdArgs.getJobId();
-			if((aJobId.length()>0)&&(!fCmdArgs.isJobLogOnly())) // Export jobFile NOW
+			if(aJobId.length()>0) // Export jobFile NOW
 			{
 				std::string aJobFileName = fCmdArgs.getJobFileName();
 				fDh.exportJobFile(aJobId, aJobFileName );
@@ -285,7 +266,7 @@ void WESplitterApp::processMessages()
 
 			std::string aJobId = fCmdArgs.getJobId();
 			if(fDh.getDebugLvl()) cout<<"ProcessMsgs aJobId "<<aJobId<<endl;
-			if((aJobId.length()>0)&&(!fCmdArgs.isJobLogOnly())) // Export jobFile NOW
+			if(aJobId.length()>0)				// Export jobFile NOW
 			{
 				std::string aJobFileName = fCmdArgs.getJobFileName();
 				if(fDh.getDebugLvl()) cout<<"ProcessMsgs Calling exportJobFile "<<endl;
@@ -391,17 +372,15 @@ void WESplitterApp::processMessages()
 				oss << "Table "<<fCmdArgs.getSchemaName()<<".";
 				oss << fCmdArgs.getTableName() << ": (OID-";
 				oss << fDh.getTableOID() << ") was NOT successfully loaded.";
+				//fLog.logMsg( oss.str(), MSGLVL_INFO1 );
 				cout << oss.str() << endl;
 				logging::Message::Args errMsgArgs;
-				//BUG 4152
-				errMsgArgs.add(fCmdArgs.getSchemaName());
-				errMsgArgs.add(fCmdArgs.getTableName());
-				errMsgArgs.add(fDh.getTableOID());
+				errMsgArgs.add(oss.str());
 				std::string aStr = "Immediate system stop has been ordered, rollback deferred";
 				cout << aStr << endl;
 				SPLTR_EXIT_STATUS = 1;
 				errMsgArgs.add(aStr);
-				fpSysLog->logMsg(errMsgArgs, logging::LOG_TYPE_INFO, logging::M0096);
+				fpSysLog->logMsg(errMsgArgs, logging::LOG_TYPE_INFO, logging::M0000);
 				exit(SPLTR_EXIT_STATUS);
 				//BUG 5012  - commented out to avoid rollback
 				//cout << "Immediate system stop has been ordered. No rollback" << endl;
@@ -430,13 +409,10 @@ void WESplitterApp::processMessages()
 
 void WESplitterApp::invokeCpimport()
 {
-    boost::uuids::uuid u=boost::uuids::random_generator()();
-    fCmdArgs.setJobUUID(u);
-
 	//BUG 4361 - check cpimport.bin is available or not
 	std::string aCpiBinFile = getCalpontHome() + "/cpimport.bin";			//BUG 4361
-	if (access(aCpiBinFile.c_str(), X_OK) != 0)
-		throw runtime_error("Error: Missing File " + aCpiBinFile);
+	ifstream iGoodFile(aCpiBinFile.c_str());										//BUG 4361
+	if(!iGoodFile.good()) throw runtime_error("Error : Missing File "+ aCpiBinFile);//BUG 4361
 
 	fCmdArgs.setMode(3);
 	std::string aCmdLineStr = fCmdArgs.getCpImportCmdLine();

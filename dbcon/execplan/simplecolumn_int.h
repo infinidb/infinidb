@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: simplecolumn_int.h 9635 2013-06-19 21:42:30Z bwilkinson $
+*   $Id: simplecolumn_int.h 8536 2012-05-21 21:27:17Z zzhu $
 *
 *
 ***********************************************************************/
@@ -51,13 +51,13 @@ public:
  
 	/** Constructors */ 
 	SimpleColumn_INT();
-	SimpleColumn_INT(const std::string& token, const uint32_t sessionID = 0);
+	SimpleColumn_INT(const std::string& token, const u_int32_t sessionID = 0);
 	SimpleColumn_INT(const std::string& schema, 
 		               const std::string& table, 
 		               const std::string& col, 
 		               const bool isInfiniDB,
-		               const uint32_t sessionID = 0);
-	SimpleColumn_INT(const SimpleColumn& rhs, const uint32_t sessionID = 0);
+		               const u_int32_t sessionID = 0);
+	SimpleColumn_INT(const SimpleColumn& rhs, const u_int32_t sessionID = 0);
 	
 	/** Destructor */
 	virtual ~SimpleColumn_INT(){}
@@ -68,9 +68,8 @@ public:
 	}	
 	
 	/** Evaluate methods */
-	virtual inline const std::string& getStrVal(rowgroup::Row& row, bool& isNull);
+	virtual inline std::string getStrVal(rowgroup::Row& row, bool& isNull);
 	virtual inline int64_t getIntVal(rowgroup::Row& row, bool& isNull);
-    virtual inline uint64_t getUintVal(rowgroup::Row& row, bool& isNull);
 	virtual inline float getFloatVal(rowgroup::Row& row, bool& isNull);
 	virtual inline double getDoubleVal(rowgroup::Row& row, bool& isNull);	
 	virtual inline IDB_Decimal getDecimalVal(rowgroup::Row& row, bool& isNull);
@@ -92,7 +91,7 @@ SimpleColumn_INT<len>::SimpleColumn_INT():SimpleColumn()
 }
 
 template<int len>
-SimpleColumn_INT<len>::SimpleColumn_INT(const std::string& token, const uint32_t sessionID):
+SimpleColumn_INT<len>::SimpleColumn_INT(const std::string& token, const u_int32_t sessionID):
 		SimpleColumn(token, sessionID) 
 {
 	setNullVal();
@@ -103,14 +102,14 @@ SimpleColumn_INT<len>::SimpleColumn_INT(const std::string& schema,
 		           const std::string& table, 
 		           const std::string& col, 
 		           const bool isInfiniDB,
-		           const uint32_t sessionID) :
+		           const u_int32_t sessionID) :
 		          SimpleColumn(schema, table, col, isInfiniDB, sessionID) 
 {
 	setNullVal();
 }
 
 template<int len>
-SimpleColumn_INT<len>::SimpleColumn_INT(const SimpleColumn& rhs, const uint32_t sessionID):
+SimpleColumn_INT<len>::SimpleColumn_INT(const SimpleColumn& rhs, const u_int32_t sessionID):
 		SimpleColumn(rhs,sessionID) 
 {
 	setNullVal();
@@ -139,7 +138,7 @@ void SimpleColumn_INT<len>::setNullVal()
 }
 
 template<int len>
-inline const std::string& SimpleColumn_INT<len>:: getStrVal(rowgroup::Row& row, bool& isNull)
+inline std::string SimpleColumn_INT<len>:: getStrVal(rowgroup::Row& row, bool& isNull)
 { 
 	if (row.equals<len>(fNullVal, fInputIndex))
 		isNull = true;
@@ -151,8 +150,7 @@ inline const std::string& SimpleColumn_INT<len>:: getStrVal(rowgroup::Row& row, 
 		snprintf(tmp, 20, "%ld", (int64_t)row.getIntField<len>(fInputIndex));
 #endif
 	}
-	fResult.strVal = std::string(tmp);
-    return fResult.strVal;
+	return std::string(tmp);
 }
 
 template<int len>
@@ -161,14 +159,6 @@ inline int64_t SimpleColumn_INT<len>:: getIntVal(rowgroup::Row& row, bool& isNul
 	if (row.equals<len>(fNullVal, fInputIndex))
 		isNull = true;
 	return (int64_t)row.getIntField<len>(fInputIndex);		
-}
-	
-template<int len>
-inline uint64_t SimpleColumn_INT<len>:: getUintVal(rowgroup::Row& row, bool& isNull) 
-{ 
-	if (row.equals<len>(fNullVal, fInputIndex))
-		isNull = true;
-	return (uint64_t)row.getIntField<len>(fInputIndex);		
 }
 	
 template<int len>

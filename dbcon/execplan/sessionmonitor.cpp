@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: sessionmonitor.cpp 9210 2013-01-21 14:10:42Z rdempsey $
+ * $Id: sessionmonitor.cpp 8436 2012-04-04 18:18:21Z rdempsey $
  *
  ****************************************************************************/
 
@@ -273,7 +273,7 @@ void SessionMonitor::copyPreviousSegment()
 bool SessionMonitor::readMonitorDataFromFile(const std::string filename)
 {
 	int err = 0;
-	uint32_t headerSize = 2*sizeof(int);
+	uint headerSize = 2*sizeof(int);
 	char* data = reinterpret_cast<char *>(&fPrevSegment);
 	int fd = open(filename.c_str(), O_RDONLY);
 	

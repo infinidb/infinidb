@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_conv.cpp 3923 2013-06-19 21:43:06Z bwilkinson $
+* $Id: func_conv.cpp 3589 2013-02-14 13:23:49Z rdempsey $
 *
 *
 ****************************************************************************/
@@ -34,8 +34,10 @@ using namespace execplan;
 #include "rowgroup.h"
 using namespace rowgroup;
 
-namespace
+namespace funcexp
 {
+char digit_upper[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
 int64_t convStrToNum(const string& str, int base, bool unsignedFlag)
 {
 	int negative;
@@ -67,7 +69,7 @@ int64_t convStrToNum(const string& str, int base, bool unsignedFlag)
 	save = i;
 	
 	cutoff = (~(uint64_t) 0) / (uint64_t) base;
-	cutlim = (uint32_t) ((~(uint64_t) 0) % (uint64_t) base);
+	cutlim = (uint) ((~(uint64_t) 0) % (uint64_t) base);
 	
 	overflow = 0;
 	j = 0;
@@ -118,41 +120,20 @@ int64_t convStrToNum(const string& str, int base, bool unsignedFlag)
 
 	return (negative ? -((int64_t) j) : (int64_t) j);
 }
-}
 
-namespace funcexp
-{
-namespace helpers
-{
 const char *convNumToStr(int64_t val,char *dst,int radix)
 {
 	if (radix == 16 || radix == -16)
-#ifdef _MSC_VER
-		sprintf(dst, "%llX", val);
-#else
 		sprintf(dst, "%lX", val);
-#endif
 	else if (radix == 8 || radix == -8)
-#ifdef _MSC_VER
-		sprintf(dst, "%llo", val);
-#else
 		sprintf(dst, "%lo", val);
-#endif
 	else if (radix == 10)
 	{
 		uint64_t uval = static_cast<uint64_t>(val);
-#ifdef _MSC_VER
-		sprintf(dst, "%llu", uval);
-#else
 		sprintf(dst, "%lu", uval);
-#endif
 	}
 	else if (radix == -10)
-#ifdef _MSC_VER
-		sprintf(dst, "%lld", val);
-#else
 		sprintf(dst, "%ld", val);
-#endif
 	else if (radix == 2 || radix == -2)
 	{
 		char tmp[65];
@@ -250,7 +231,6 @@ const char *convNumToStr(int64_t val,char *dst,int radix)
 		*dst = 0;
 	return dst;
 }
-} //namespace funcexp::helpers
 
 CalpontSystemCatalog::ColType Func_conv::operationType(FunctionParm& fp, CalpontSystemCatalog::ColType& resultType)
 {
@@ -264,7 +244,7 @@ string Func_conv::getStrVal(rowgroup::Row& row,
 							bool& isNull,
 							CalpontSystemCatalog::ColType& op_ct)
 {
-	const string& res= parm[0]->data()->getStrVal(row, isNull);
+	string res= parm[0]->data()->getStrVal(row, isNull);
 	string str;
 	char ans[65];
 	int64_t dec;
@@ -283,7 +263,7 @@ string Func_conv::getStrVal(rowgroup::Row& row,
 	else
 		dec= (int64_t) convStrToNum( res, from_base, true);
 
-	str = helpers::convNumToStr(dec, ans, to_base);
+	str = convNumToStr(dec, ans, to_base);
 
 	isNull = str.empty();
 

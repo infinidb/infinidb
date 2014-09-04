@@ -36,7 +36,14 @@
 //
 namespace boost{
 
-class static_mutex;
+class BOOST_REGEX_DECL scoped_static_mutex_lock;
+
+class static_mutex
+{
+public:
+   typedef scoped_static_mutex_lock scoped_lock;
+   pthread_mutex_t m_mutex;
+};
 
 #define BOOST_STATIC_MUTEX_INIT { PTHREAD_MUTEX_INITIALIZER, }
 
@@ -60,12 +67,6 @@ private:
    bool m_have_lock;
 };
 
-class static_mutex
-{
-public:
-   typedef scoped_static_mutex_lock scoped_lock;
-   pthread_mutex_t m_mutex;
-};
 
 } // namespace boost
 #elif defined(BOOST_HAS_WINTHREADS)

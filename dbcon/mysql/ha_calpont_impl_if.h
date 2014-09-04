@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-// $Id: ha_calpont_impl_if.h 9701 2013-07-17 18:51:55Z zzhu $
+// $Id: ha_calpont_impl_if.h 8984 2012-10-12 21:16:32Z zzhu $
 /** @file */
 #ifndef HA_CALPONT_IMPL_IF_H__
 #define HA_CALPONT_IMPL_IF_H__
@@ -36,14 +36,10 @@
 struct st_table;
 struct st_ha_create_information;
 
-#include "configcpp.h"
 #include "idberrorinfo.h"
 #include "calpontselectexecutionplan.h"
-#include "windowfunctioncolumn.h"
-#include "pseudocolumn.h"
 #include "querystats.h"
 #include "sm.h"
-#include "functor.h"
 
 /** Debug macro */
 #if INFINIDB_DEBUG
@@ -59,10 +55,6 @@ namespace execplan
 	class SimpleFilter;
 	class AggregateColumn;
 	class FunctionColumn;
-	class ArithmeticColumn;
-	class ParseTree;
-	class ConstantColumn;
-	class RowColumn;
 }
 
 namespace cal_impl_if
@@ -99,13 +91,6 @@ struct gp_walk_info
 	execplan::CalpontSelectExecutionPlan::ReturnedColumnList subGroupByCols;
 	execplan::CalpontSelectExecutionPlan::ReturnedColumnList orderByCols;
 	execplan::CalpontSelectExecutionPlan::ColumnMap columnMap;
-	// This vector temporarily hold the projection columns to be added
-	// to the returnedCols vector for subquery processing. It will be appended
-	// to the end of returnedCols when the processing is finished.
-	execplan::CalpontSelectExecutionPlan::ReturnedColumnList additionalRetCols;
-	// the sequence # of the subselect local columns need to be set after
-	// the additionRetCols are merged to the returnedCols.
-	std::vector<execplan::ReturnedColumn*> localCols;
 	std::stack<execplan::ReturnedColumn*> rcWorkStack;
 	std::stack<execplan::ParseTree*> ptWorkStack;
 	boost::shared_ptr<execplan::SimpleColumn> scsp;
@@ -118,9 +103,9 @@ struct gp_walk_info
 	bool condPush;
 	bool dropCond;
 	std::string funcName;
+	uint expressionId; // for F&E
 	std::vector<execplan::AggregateColumn*> count_asterisk_list;
 	std::vector<execplan::FunctionColumn*> no_parm_func_list;
-	std::vector<execplan::ReturnedColumn*> windowFuncList;
 	TableMap tableMap;
 	boost::shared_ptr<execplan::CalpontSystemCatalog> csc;
 	int8_t internalDecimalScale;
@@ -133,30 +118,21 @@ struct gp_walk_info
 	ClauseType clauseType;
 	execplan::CalpontSystemCatalog::TableAliasName viewName;
 	bool aggOnSelect;
-	bool hasWindowFunc;
-	bool hasSubSelect;
-	SubQuery* lastSub;
 	std::vector<View*> viewList;
-	std::map<std::string, execplan::ParseTree*> derivedTbFilterMap;
-	uint32_t derivedTbCnt;
-	std::vector<execplan::SCSEP> subselectList;
 
-	gp_walk_info() : sessionid(0),
-				   fatalParseError(false),
-				   condPush(false),
-				   dropCond(false),
-				   internalDecimalScale(4),
-				   thd(0),
-				   subSelectType(uint64_t(-1)),
-				   subQuery(0),
-				   clauseType(INIT),
-				   aggOnSelect(false),
-				   hasWindowFunc(false),
-				   hasSubSelect(false),
-				   lastSub(0),
-				   derivedTbCnt(0)
-	{}
-
+	gp_walk_info() : sessionid(0), 
+		               fatalParseError(false), 
+		               condPush(false), 
+		               dropCond(false), 
+		               expressionId(0),
+		               internalDecimalScale(4),
+		               thd(0),
+		               subSelectType(uint64_t(-1)),
+		               subQuery(0),
+		               clauseType(INIT),
+		               aggOnSelect(false)
+	{ }
+	
 	~gp_walk_info() {}
 };
 
@@ -165,12 +141,12 @@ struct cal_table_info
 	enum RowSources { FROM_ENGINE, FROM_FILE };
 
 	cal_table_info() : tpl_ctx(0),
-						 //tpl_scan_ctx(0),
-						 c(0),
-						 msTablePtr(0),
-						 conn_hndl(0),
-						 condInfo(0),
-						 moreRows(false)
+		                 //tpl_scan_ctx(0),
+		                 c(0),
+		                 msTablePtr(0),
+		                 conn_hndl(0),
+		                 condInfo(0),
+		                 moreRows(false)
 	{ }
 	~cal_table_info() {}
 	sm::cpsm_tplh_t* tpl_ctx;
@@ -190,47 +166,9 @@ typedef std::map<uint32_t, ColValuesList> TableValuesMap;
 struct cal_connection_info
 {
 	enum AlterTableState { NOT_ALTER, ALTER_SECOND_RENAME, ALTER_FIRST_RENAME };
-	cal_connection_info() : cal_conn_hndl(0), 
-	                        queryState(0),
-	                        currentTable(0),
-	                        traceFlags(0),
-	                        alterTableState(NOT_ALTER),
-	                        isAlter(false),
-	                        bulkInsertRows(0),
-	                        singleInsert(true),
-	                        isLoaddataInfile( false ),
-	                        dmlProc(0),
-	                        rowsHaveInserted(0),
-	                        rc(0),
-	                        tableOid(0), 
-	                        localPm(-1),
-	                        isSlaveNode(false),
-	                        expressionId(0),
-	                        mysqld_pid(getpid()),
-	                        cpimport_pid(0),
-	                        filePtr(0),
-	                        headerLength(0),
-	                        useXbit(false),
-	                        utf8(false),
-	                        useCpimport(1),
-	                        delimiter('\7')
-	{
-		// check if this is a slave mysql daemon
-		isSlaveNode = checkSlave();
-	}
-
-	static bool checkSlave()
-	{
-		config::Config* cf = config::Config::makeConfig();
-		std::string configVal = cf->getConfig("Installation", "MySQLRep");
-		bool isMysqlRep = (configVal == "y" || configVal == "Y");
-		if (!isMysqlRep) return false;
-		configVal = cf->getConfig("SystemConfig", "PrimaryUMModuleName");
-		std::string module = execplan::ClientRotator::getModule();
-		if (boost::iequals(configVal, module))
-			return false;
-		return true;
-	}
+	cal_connection_info() : cal_conn_hndl(0), queryState(0), currentTable(0), traceFlags(0), alterTableState(NOT_ALTER), isAlter(false),
+	bulkInsertRows(0), singleInsert(true), isLoaddataInfile( false ), dmlProc(0), rowsHaveInserted(0), rc(0), tableOid(0)
+	{ }
 
 	sm::cpsm_conhdl_t* cal_conn_hndl;
 	int queryState;
@@ -253,27 +191,6 @@ struct cal_connection_info
 	uint32_t tableOid;
 	querystats::QueryStats stats;
 	std::string warningMsg;
-	int64_t localPm;
-	bool isSlaveNode;
-	uint32_t expressionId; // for F&E
-	pid_t mysqld_pid;
-	pid_t cpimport_pid;
-	int fdt[2];
-#ifdef _MSC_VER
-    // Used for launching cpimport for Load Data Infile
-	HANDLE cpimport_stdin_Rd;
-	HANDLE cpimport_stdin_Wr;
-	HANDLE cpimport_stdout_Rd;
-	HANDLE cpimport_stdout_Wr;
-	PROCESS_INFORMATION cpimportProcInfo;
-#endif
-	FILE * filePtr;
-	uint8_t headerLength;
-	bool useXbit;
-	bool utf8;
-	uint8_t useCpimport;
-	char delimiter;
-	std::vector <execplan::CalpontSystemCatalog::ColType> columnTypes; 
 };
 
 typedef std::tr1::unordered_map<int, cal_connection_info> CalConnMap;
@@ -283,48 +200,12 @@ const std::string infinidb_err_msg = "\nThe query includes syntax that is not su
 int cp_get_plan(THD* thd, execplan::SCSEP& csep);
 int cp_get_table_plan(THD* thd, execplan::SCSEP& csep, cal_impl_if::cal_table_info& ti);
 int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex, execplan::SCSEP& csep, bool isUnion=false);
-void setError(THD* thd, uint32_t errcode, const std::string errmsg, gp_walk_info* gwi);
-void setError(THD* thd, uint32_t errcode, const std::string errmsg);
+void setError(THD* thd, uint errcode, const std::string errmsg);
 void gp_walk(const Item *item, void *arg);
 void parse_item (Item *item, std::vector<Item_field*>& field_vec, bool& hasNonSupportItem, uint16& parseInfo);
 execplan::ReturnedColumn* buildReturnedColumn(Item* item, gp_walk_info& gwi, bool& nonSupport);
 const std::string bestTableName(const Item_field* ifp);
 bool isInfiniDB(TABLE* table_ptr);
-
-// execution plan util functions prototypes
-execplan::ReturnedColumn* buildReturnedColumn(Item* item, gp_walk_info& gwi, bool& nonSupport);
-execplan::ReturnedColumn* buildFunctionColumn(Item_func* item, gp_walk_info& gwi, bool& nonSupport);
-execplan::ArithmeticColumn* buildArithmeticColumn(Item_func* item, gp_walk_info &gwi, bool& nonSupport);
-execplan::ConstantColumn* buildDecimalColumn(Item *item, gp_walk_info &gwi);
-execplan::SimpleColumn* buildSimpleColumn(Item_field* item, gp_walk_info& gwi);
-execplan::FunctionColumn* buildCaseFunction(Item_func* item, gp_walk_info& gwi, bool& nonSupport);
-execplan::ParseTree* buildParseTree(Item_func* item, gp_walk_info& gwi, bool& nonSupport);
-execplan::ReturnedColumn* buildAggregateColumn(Item* item, gp_walk_info& gwi);
-execplan::ReturnedColumn* buildWindowFunctionColumn(Item* item, gp_walk_info& gwi, bool& nonSupport);
-execplan::ReturnedColumn* buildPseudoColumn(Item* item, gp_walk_info& gwi, bool& nonSupport, uint32_t pseudoType);
-void addIntervalArgs(Item_func* ifp, funcexp::FunctionParm& functionParms);
-void castCharArgs(Item_func* ifp, funcexp::FunctionParm& functionParms);
-void castDecimalArgs(Item_func* ifp, funcexp::FunctionParm& functionParms);
-void castTypeArgs(Item_func* ifp, funcexp::FunctionParm& functionParms);
-void parse_item (Item *item, std::vector<Item_field*>& field_vec, bool& hasNonSupportItem, uint16& parseInfo);
-bool isPredicateFunction(Item* item, gp_walk_info* gwip);
-execplan::ParseTree* buildRowPredicate(execplan::RowColumn* lhs, execplan::RowColumn* rhs, std::string predicateOp);
-void buildRowColumnFilter(gp_walk_info* gwip, execplan::RowColumn* rhs, execplan::RowColumn* lhs, Item_func* ifp);
-void buildPredicateItem(Item_func* ifp, gp_walk_info* gwip);
-void collectAllCols(gp_walk_info& gwi, Item_field* ifp);
-void buildSubselectFunc(Item_func* ifp, gp_walk_info* gwip);
-uint32_t buildOuterJoin(gp_walk_info& gwi, SELECT_LEX& select_lex);
-std::string getViewName(TABLE_LIST* table_ptr);
-void buildConstPredicate(Item_func* ifp, execplan::ReturnedColumn* rhs, gp_walk_info* gwip);
-execplan::CalpontSystemCatalog::ColType fieldType_MysqlToIDB (const Field* field);
-execplan::CalpontSystemCatalog::ColType colType_MysqlToIDB (const Item* item);
-execplan::SPTP getIntervalType(int interval_type);
-uint32_t isPseudoColumn(std::string funcName);
-void setDerivedTable(execplan::ParseTree* n);
-execplan::ParseTree* setDerivedFilter(execplan::ParseTree*& n, 
-									  std::map<std::string, execplan::ParseTree*>& obj,
-									  execplan::CalpontSelectExecutionPlan::SelectList& derivedTbList);
-void derivedTableOptimization(execplan::SCSEP& csep);
 
 #ifdef DEBUG_WALK_COND
 void debug_walk(const Item *item, void *arg);

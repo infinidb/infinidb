@@ -28,7 +28,6 @@ using namespace std;
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/thread.hpp>
-#include <boost/uuid/uuid_io.hpp>
 using namespace boost;
 
 #include "parsetree.h"
@@ -41,9 +40,6 @@ using namespace rowgroup;
 #include "errorids.h"
 #include "exceptclasses.h"
 using namespace logging;
-
-#include "querytele.h"
-using namespace querytele;
 
 #include "funcexp.h"
 
@@ -58,12 +54,17 @@ using namespace joblist;
 namespace joblist
 {
 
-SubQueryStep::SubQueryStep(const JobInfo& jobInfo)
-	: JobStep(jobInfo)
-	, fRowsReturned(0)
+SubQueryStep::SubQueryStep(
+	uint32_t sessionId,
+	uint32_t txnId,
+	uint32_t statementId) :
+		fSessionId(sessionId),
+		fTxnId(txnId),
+		fStepId(0),
+		fStatementId(statementId),
+		fRowsReturned(0)
 {
 	fExtendedInfo = "SQS: ";
-	fQtc.stepParms().stepType = StepTeleStats::T_SQS;
 }
 
 SubQueryStep::~SubQueryStep()
@@ -116,7 +117,7 @@ void SubQueryStep::printCalTrace()
 			<< "\t1st read " << dlTimes.FirstReadTimeString()
 			<< "; EOI " << dlTimes.EndOfInputTimeString() << "; runtime-"
 			<< JSTimeStamp::tsdiffstr(dlTimes.EndOfInputTime(), dlTimes.FirstReadTime())
-			<< "s;\n\tJob completion status " << status() << endl;
+			<< "s;\n\tJob completion status " << fOutputJobStepAssociation.status() << endl;
 	logEnd(logStr.str().c_str());
 	fExtendedInfo += logStr.str();
 	formatMiniStats();
@@ -141,13 +142,16 @@ void SubQueryStep::formatMiniStats()
 */
 
 
-SubAdapterStep::SubAdapterStep(SJSTEP& s, const JobInfo& jobInfo)
-	: JobStep(jobInfo)
+SubAdapterStep::SubAdapterStep(uint32_t sessionId, uint32_t txnId, uint32_t statementId, SJSTEP& s)
+	: fSessionId(sessionId)
+	, fTxnId(txnId)
+	, fStepId(0)
+	, fStatementId(statementId)
 	, fTableOid(s->tableOid())
 	, fSubStep(s)
-	, fRowsInput(0)
 	, fRowsReturned(0)
 	, fEndOfResult(false)
+	, fDelivery(false)
 	, fInputIterator(0)
 	, fOutputIterator(0)
 {
@@ -173,7 +177,7 @@ void SubAdapterStep::abort()
 void SubAdapterStep::run()
 {
 	if (fInputJobStepAssociation.outSize() == 0)
-		throw logic_error("No input data list for subquery adapter step.");
+		throw logic_error("No input data list for constant step.");
 
 	fInputDL = fInputJobStepAssociation.outAt(0)->rowGroupDL();
 	if (fInputDL == NULL)
@@ -202,56 +206,56 @@ void SubAdapterStep::join()
 }
 
 
-uint32_t SubAdapterStep::nextBand(messageqcpp::ByteStream &bs)
+uint SubAdapterStep::nextBand(messageqcpp::ByteStream &bs)
 {
-	RGData rgDataOut;
+	shared_array<uint8_t> rgDataOut;
 	bool more = false;
-	uint32_t rowCount = 0;
+	uint rowCount = 0;
 
 	try
 	{
 		bs.restart();
 		
 		more = fOutputDL->next(fOutputIterator, &rgDataOut);
-		if (!more || cancelled())
+		if (!more || (0 < fOutputJobStepAssociation.status() || die))
 		{
 			//@bug4459.
-			while (more)
-				more = fOutputDL->next(fOutputIterator, &rgDataOut);			
+			while (more) more = fOutputDL->next(fOutputIterator, &rgDataOut);			
 			fEndOfResult = true;
 		}
 
 		if (more && !fEndOfResult)
 		{
-			fRowGroupDeliver.setData(&rgDataOut);
-			fRowGroupDeliver.serializeRGData(bs);
+			fRowGroupDeliver.setData(rgDataOut.get());
+			bs.load(rgDataOut.get(), fRowGroupDeliver.getDataSize());
 			rowCount = fRowGroupDeliver.getRowCount();
 		}
 	}
 	catch(const std::exception& ex)
 	{
-		catchHandler(ex.what(), ERR_IN_DELIVERY, fErrorInfo, fSessionId);
-		while (more)
-			more = fOutputDL->next(fOutputIterator, &rgDataOut);
+		catchHandler(ex.what(), fSessionId);
+		if (fOutputJobStepAssociation.status() == 0)
+			fOutputJobStepAssociation.status(tupleConstantStepErr);
+		while (more) more = fOutputDL->next(fOutputIterator, &rgDataOut);
 		fEndOfResult = true;
 	}
 	catch(...)
 	{
-		catchHandler("SubAdapterStep next band caught an unknown exception",
-						ERR_IN_DELIVERY, fErrorInfo, fSessionId);
-		while (more)
-			more = fOutputDL->next(fOutputIterator, &rgDataOut);
+		catchHandler("TupleConstantStep next band caught an unknown exception", fSessionId);
+		if (fOutputJobStepAssociation.status() == 0)
+			fOutputJobStepAssociation.status(tupleConstantStepErr);
+		while (more) more = fOutputDL->next(fOutputIterator, &rgDataOut);
 		fEndOfResult = true;
 	}
 
 	if (fEndOfResult)
 	{
 		// send an empty / error band
-		RGData rgData(fRowGroupDeliver, 0);
-		fRowGroupDeliver.setData(&rgData);
+		shared_array<uint8_t> rgData(new uint8_t[fRowGroupDeliver.getEmptySize()]);
+		fRowGroupDeliver.setData(rgData.get());
 		fRowGroupDeliver.resetRowGroup(0);
-		fRowGroupDeliver.setStatus(status());
-		fRowGroupDeliver.serializeRGData(bs);
+		fRowGroupDeliver.setStatus(fOutputJobStepAssociation.status());
+		bs.load(rgData.get(), fRowGroupDeliver.getDataSize());
 	}
 
 	return rowCount;
@@ -267,7 +271,7 @@ void SubAdapterStep::setFeRowGroup(const rowgroup::RowGroup& rg)
 void SubAdapterStep::setOutputRowGroup(const rowgroup::RowGroup& rg)
 {
 	fRowGroupOut = fRowGroupDeliver = rg;
-	if (fRowGroupFe.getColumnCount() == 0)
+	if (fRowGroupFe.getColumnCount() == (uint) -1)
 		fIndexMap = makeMapping(fRowGroupIn, fRowGroupOut);
 	else
 		fIndexMap = makeMapping(fRowGroupFe, fRowGroupOut);
@@ -278,12 +282,12 @@ void SubAdapterStep::setOutputRowGroup(const rowgroup::RowGroup& rg)
 
 void SubAdapterStep::checkDupOutputColumns()
 {
-	map<uint32_t, uint32_t> keymap; // map<unique col key, col index in the row group>
+	map<uint, uint> keymap; // map<unique col key, col index in the row group>
 	fDupColumns.clear();
-	const vector<uint32_t>& keys = fRowGroupDeliver.getKeys();
-	for (uint32_t i = 0; i < keys.size(); i++)
+	const vector<uint>& keys = fRowGroupDeliver.getKeys();
+	for (uint i = 0; i < keys.size(); i++)
 	{
-		map<uint32_t, uint32_t>::iterator j = keymap.find(keys[i]);
+		map<uint, uint>::iterator j = keymap.find(keys[i]);
 		if (j == keymap.end())
 			keymap.insert(make_pair(keys[i], i));           // map key to col index
 		else
@@ -311,20 +315,6 @@ void SubAdapterStep::outputRow(Row& rowIn, Row& rowOut)
 }
 
 
-void SubAdapterStep::deliverStringTableRowGroup(bool b)
-{
-	fRowGroupOut.setUseStringTable(b);
-	fRowGroupDeliver.setUseStringTable(b);
-}
-
-
-bool SubAdapterStep::deliverStringTableRowGroup() const
-{
-	idbassert(fRowGroupOut.usesStringTable() == fRowGroupDeliver.usesStringTable());
-	return fRowGroupDeliver.usesStringTable();
-}
-
-
 const string SubAdapterStep::toString() const
 {
 	ostringstream oss;
@@ -342,51 +332,44 @@ const string SubAdapterStep::toString() const
 
 void SubAdapterStep::execute()
 {
-	RGData rgDataIn;
-	RGData rgDataOut;
+	shared_array<uint8_t> rgDataIn;
+	shared_array<uint8_t> rgDataOut;
 	Row rowIn;
 	Row rowFe;
 	Row rowOut;
 	fRowGroupIn.initRow(&rowIn);
 	fRowGroupOut.initRow(&rowOut);
 
-	RGData rowFeData;
-	StepTeleStats sts;
-	sts.query_uuid = fQueryUuid;
-	sts.step_uuid = fStepUuid;
-	bool usesFE = false;
-	if (fRowGroupFe.getColumnCount() > 0)
+	scoped_array<uint8_t> rowFeData;
+	if (fRowGroupFe.getColumnCount() != (uint) -1)
 	{
-		usesFE = true;
-		fRowGroupFe.initRow(&rowFe, true);
-		rowFeData = RGData(fRowGroupFe, 1);
-		fRowGroupFe.setData(&rowFeData);
-		fRowGroupFe.getRow(0, &rowFe);
+		fRowGroupFe.initRow(&rowFe);
+		rowFeData.reset(new uint8_t[rowFe.getSize()]);
+		rowFe.setData(rowFeData.get());
 	}
 
 	bool more = false;
 	try
 	{
-		sts.msg_type = StepTeleStats::ST_START;
-		sts.total_units_of_work = 1;
-		postStepStartTele(sts);
-
 		fSubStep->run();
 
 		more = fInputDL->next(fInputIterator, &rgDataIn);
 		if (traceOn()) dlTimes.setFirstReadTime();
 
-		while (more && !cancelled())
+		while (more && 0 == fInputJobStepAssociation.status() && !die)
 		{
-			fRowGroupIn.setData(&rgDataIn);
-			rgDataOut.reinit(fRowGroupOut, fRowGroupIn.getRowCount());
-			fRowGroupOut.setData(&rgDataOut);
-			fRowGroupOut.resetRowGroup(fRowGroupIn.getBaseRid());
+			fRowGroupIn.setData(rgDataIn.get());
+			rgDataOut.reset(new uint8_t[fRowGroupOut.getDataSize(fRowGroupIn.getRowCount())]);
+#ifdef VALGRIND
+			/* As of 1/21/14, some columns are left uninitialized.  Valgrind doesn't like that. 
+			Nothing seems broken, this would be a minor optimization opportunity. */
+			memset(rgDataOut.get(), 0, fRowGroupOut.getDataSize(fRowGroupIn.getRowCount()));
+#endif
+			fRowGroupOut.setData(rgDataOut.get());
 
 			fRowGroupIn.getRow(0, &rowIn);
 			fRowGroupOut.getRow(0, &rowOut);
-
-			fRowsInput += fRowGroupIn.getRowCount();
+			fRowGroupOut.resetRowGroup(fRowGroupIn.getBaseRid());
 
 			for (uint64_t i = 0; i < fRowGroupIn.getRowCount(); ++i)
 			{
@@ -394,7 +377,7 @@ void SubAdapterStep::execute()
 				{
 					outputRow(rowIn, rowOut);
 				}
-				else if (!usesFE)
+				else if (rowFeData.get() == NULL)
 				{
 					if(fExpression->evaluate(&rowIn))
 					{
@@ -403,8 +386,7 @@ void SubAdapterStep::execute()
 				}
 				else
 				{
-					copyRow(rowIn, &rowFe, rowIn.getColumnCount());
-					//memcpy(rowFe.getData(), rowIn.getData(), rowIn.getSize());
+					memcpy(rowFe.getData(), rowIn.getData(), rowIn.getSize());
 					if(fExpression->evaluate(&rowFe))
 					{
 						outputRow(rowFe, rowOut);
@@ -421,21 +403,24 @@ void SubAdapterStep::execute()
 			}
 
 			more = fInputDL->next(fInputIterator, &rgDataIn);
+			
 		}
 	}
 	catch(const std::exception& ex)
 	{
-		catchHandler(ex.what(), ERR_EXEMGR_MALFUNCTION, fErrorInfo, fSessionId);
+		catchHandler(ex.what(), fSessionId);
+		if (fOutputJobStepAssociation.status() == 0)
+			fOutputJobStepAssociation.status(ERR_EXEMGR_MALFUNCTION);
 	}
 	catch(...)
 	{
-		catchHandler("SubAdapterStep execute caught an unknown exception",
-						ERR_EXEMGR_MALFUNCTION, fErrorInfo, fSessionId);
+		catchHandler("SubAdapterStep execute caught an unknown exception", fSessionId);
+		if (fOutputJobStepAssociation.status() == 0)
+			fOutputJobStepAssociation.status(ERR_EXEMGR_MALFUNCTION);
 	}
 
-	if (cancelled())
-		while (more)
-			more = fInputDL->next(fInputIterator, &rgDataIn);
+	if (fOutputJobStepAssociation.status() > 0 || die)
+		while (more) more = fInputDL->next(fInputIterator, &rgDataIn);
 
 	if (traceOn())
 	{
@@ -443,11 +428,6 @@ void SubAdapterStep::execute()
 		dlTimes.setEndOfInputTime();
 		printCalTrace();
 	}
-
-	sts.msg_type = StepTeleStats::ST_SUMMARY;
-	sts.total_units_of_work = sts.units_of_work_completed = 1;
-	sts.rows = fRowsReturned;
-	postStepSummaryTele(sts);
 
 	// Bug 3136, let mini stats to be formatted if traceOn.
 	fOutputDL->endOfInput();
@@ -457,8 +437,8 @@ void SubAdapterStep::execute()
 void SubAdapterStep::addExpression(const JobStepVector& exps, JobInfo& jobInfo)
 {
 	// maps key to the index in the RG
-	map<uint32_t, uint32_t> keyToIndexMap;
-	const vector<uint32_t>& keys = fRowGroupIn.getKeys();
+	map<uint, uint> keyToIndexMap;
+	const vector<uint>& keys = fRowGroupIn.getKeys();
 	for (size_t i = 0; i < keys.size(); i++)
 		keyToIndexMap[keys[i]] = i;
 
@@ -489,7 +469,7 @@ void SubAdapterStep::addExpression(const JobStepVector& exps, JobInfo& jobInfo)
 	// add to the expression wrapper
 	if (fExpression.get() == NULL)
 		fExpression.reset(new funcexp::FuncExpWrapper());
-	fExpression->addFilter(boost::shared_ptr<execplan::ParseTree>(filter));
+	fExpression->addFilter(shared_ptr<execplan::ParseTree>(filter));
 }
 
 
@@ -504,12 +484,6 @@ void SubAdapterStep::addExpression(const vector<SRCP>& exps)
 }
 
 
-void SubAdapterStep::addFcnJoinExp(const vector<SRCP>& exps)
-{
-	addExpression(exps);
-}
-
-
 void SubAdapterStep::printCalTrace()
 {
 	time_t t = time (0);
@@ -518,13 +492,11 @@ void SubAdapterStep::printCalTrace()
 	timeString[strlen (timeString )-1] = '\0';
 	ostringstream logStr;
 	logStr  << "ses:" << fSessionId << " st: " << fStepId << " finished at "<< timeString
-			<< "; total rows input-" << fRowsInput
 			<< "; total rows returned-" << fRowsReturned << endl
 			<< "\t1st read " << dlTimes.FirstReadTimeString()
 			<< "; EOI " << dlTimes.EndOfInputTimeString() << "; runtime-"
 			<< JSTimeStamp::tsdiffstr(dlTimes.EndOfInputTime(), dlTimes.FirstReadTime())
-			<< "s;\n\tUUID " << uuids::to_string(fStepUuid) << endl
-			<< "\tJob completion status " << status() << endl;
+			<< "s;\n\tJob completion status " << fOutputJobStepAssociation.status() << endl;
 	logEnd(logStr.str().c_str());
 	fExtendedInfo += logStr.str();
 	formatMiniStats();

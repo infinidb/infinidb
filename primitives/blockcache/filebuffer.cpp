@@ -17,7 +17,7 @@
 
 /***************************************************************************
  *
- *   $Id: filebuffer.cpp 2035 2013-01-21 14:12:19Z rdempsey $
+ *   $Id: filebuffer.cpp 1855 2012-04-04 18:20:09Z rdempsey $
  *
  *   jrodriguez@calpont.com   *
  *                                                                         *
@@ -49,7 +49,7 @@ FileBuffer::FileBuffer(const FileBuffer& rhs) {
 }
 
 
-FileBuffer::FileBuffer(const BRM::LBID_t lbid, const BRM::VER_t ver, const uint8_t* data, const uint32_t len) {
+FileBuffer::FileBuffer(const BRM::LBID_t lbid, const BRM::VER_t ver, const u_int8_t* data, const uint32_t len) {
 	fLbid = lbid;
 	fVerid = ver;
 	fDataLen=len;
@@ -73,7 +73,7 @@ FileBuffer& FileBuffer::operator= (const FileBuffer& rhs) {
 	return *this;
 }
 
-void FileBuffer::setData(const uint8_t* d, const int len)
+void FileBuffer::setData(const u_int8_t* d, const int len)
 {
 	if (d==NULL || len <=0)
 		return;

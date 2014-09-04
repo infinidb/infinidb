@@ -1,19 +1,34 @@
-/* Copyright (C) 2014 InfiniDB, Inc.
+/*
 
-   This program is free software; you can redistribute it and/or
-   modify it under the terms of the GNU General Public License
-   as published by the Free Software Foundation; version 2 of
-   the License.
+   Copyright (C) 2009-2012 Calpont Corporation.
 
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   Use of and access to the Calpont InfiniDB Community software is subject to the
+   terms and conditions of the Calpont Open Source License Agreement. Use of and
+   access to the Calpont InfiniDB Enterprise software is subject to the terms and
+   conditions of the Calpont End User License Agreement.
 
-   You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-   MA 02110-1301, USA. */
+   This program is distributed in the hope that it will be useful, and unless
+   otherwise noted on your license agreement, WITHOUT ANY WARRANTY; without even
+   the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+   Please refer to the Calpont Open Source License Agreement and the Calpont End
+   User License Agreement for more details.
+
+   You should have received a copy of either the Calpont Open Source License
+   Agreement or the Calpont End User License Agreement along with this program; if
+   not, it is your responsibility to review the terms and conditions of the proper
+   Calpont license agreement by visiting http://www.calpont.com for the Calpont
+   InfiniDB Enterprise End User License Agreement or http://www.infinidb.org for
+   the Calpont InfiniDB Community Calpont Open Source License Agreement.
+
+   Calpont may make changes to these license agreements from time to time. When
+   these changes are made, Calpont will make a new copy of the Calpont End User
+   License Agreement available at http://www.calpont.com and a new copy of the
+   Calpont Open Source License Agreement available at http:///www.infinidb.org.
+   You understand and agree that if you use the Program after the date on which
+   the license agreement authorizing your use has changed, Calpont will treat your
+   use as acceptance of the updated License.
+
+*/
 
 /*******************************************************************************
 * $Id$
@@ -36,6 +51,7 @@
 #include "calpontsystemcatalog.h"
 #include "objectidmanager.h"
 #include "sessionmanager.h"
+#include "brmtypes.h"
 #include "ddlpkg.h"
 #include "messageobj.h"
 #include "we_type.h"
@@ -44,8 +60,7 @@
 #include "columnresult.h"
 #include "brmtypes.h"
 #include "joblist.h"
-
-#if defined(_MSC_VER) && defined(xxxDDLPKGPROC_DLLEXPORT)
+#if defined(_MSC_VER) && defined(DDLPKGPROC_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
@@ -94,7 +109,7 @@ namespace WriteEngine
 		bool operator==(const extentInfo& rhs) const { return (dbRoot == rhs.dbRoot && partition == rhs.partition && segment == rhs.segment); }
 		bool operator!=(const extentInfo& rhs) const { return !(*this == rhs); }
 	};
-inline void  getColumnsForTable(uint32_t sessionID, std::string schema,std::string table,
+inline void  getColumnsForTable(u_int32_t sessionID, std::string schema,std::string table,
 		ColumnList& colList)
 {
 
@@ -155,24 +170,9 @@ inline boost::any getNullValueForType(const execplan::CalpontSystemCatalog::ColT
 			}
 			break;
 
-		case execplan::CalpontSystemCatalog::UTINYINT:
-			{
-				uint8_t tinyintvalue = joblist::UTINYINTNULL;
-				value = tinyintvalue;
-
-			}
-			break;
-
 		case execplan::CalpontSystemCatalog::SMALLINT:
 			{
 				short smallintvalue = joblist::SMALLINTNULL;
-				value = smallintvalue;
-			}
-			break;
-
-		case execplan::CalpontSystemCatalog::USMALLINT:
-			{
-				uint16_t smallintvalue = joblist::USMALLINTNULL;
 				value = smallintvalue;
 			}
 			break;
@@ -185,14 +185,6 @@ inline boost::any getNullValueForType(const execplan::CalpontSystemCatalog::ColT
 			}
 			break;
 
-		case execplan::CalpontSystemCatalog::UMEDINT:
-		case execplan::CalpontSystemCatalog::UINT:
-			{
-				uint32_t intvalue = joblist::UINTNULL;
-				value = intvalue;
-			}
-			break;
-
 		case execplan::CalpontSystemCatalog::BIGINT:
 			{
 				long long bigint = joblist::BIGINTNULL;
@@ -200,15 +192,7 @@ inline boost::any getNullValueForType(const execplan::CalpontSystemCatalog::ColT
 			}
 			break;
 
-        case execplan::CalpontSystemCatalog::UBIGINT:
-            {
-                uint64_t bigint = joblist::UBIGINTNULL;
-                value = bigint;
-            }
-            break;
-
-        case execplan::CalpontSystemCatalog::DECIMAL:
-		case execplan::CalpontSystemCatalog::UDECIMAL:
+		case execplan::CalpontSystemCatalog::DECIMAL:
 			{
 				if (colType.colWidth <= execplan::CalpontSystemCatalog::FOUR_BYTE)
 				{
@@ -233,7 +217,6 @@ inline boost::any getNullValueForType(const execplan::CalpontSystemCatalog::ColT
 			}
 			break;
 		case execplan::CalpontSystemCatalog::FLOAT:
-		case execplan::CalpontSystemCatalog::UFLOAT:
 			{
 				uint32_t jlfloatnull = joblist::FLOATNULL;
 				float* fp = reinterpret_cast<float*>(&jlfloatnull);
@@ -242,7 +225,6 @@ inline boost::any getNullValueForType(const execplan::CalpontSystemCatalog::ColT
 			break;
 
 		case execplan::CalpontSystemCatalog::DOUBLE:
-		case execplan::CalpontSystemCatalog::UDOUBLE:
 			{
 				uint64_t jldoublenull = joblist::DOUBLENULL;
 				double* dp = reinterpret_cast<double*>(&jldoublenull);
@@ -424,36 +406,7 @@ inline int convertDataType(int dataType)
 			calpontDataType = CalpontSystemCatalog::BLOB;
 			break;
 
-        case ddlpackage::DDL_UNSIGNED_TINYINT:
-            calpontDataType = CalpontSystemCatalog::UTINYINT;
-            break;
-
-        case ddlpackage::DDL_UNSIGNED_SMALLINT:
-            calpontDataType = CalpontSystemCatalog::USMALLINT;
-            break;
-
-        case ddlpackage::DDL_UNSIGNED_INT:
-            calpontDataType = CalpontSystemCatalog::UINT;
-            break;
-
-        case ddlpackage::DDL_UNSIGNED_BIGINT:
-            calpontDataType = CalpontSystemCatalog::UBIGINT;
-            break;
-
-        case ddlpackage::DDL_UNSIGNED_DECIMAL:
-        case ddlpackage::DDL_UNSIGNED_NUMERIC:
-            calpontDataType = CalpontSystemCatalog::UDECIMAL;
-            break;
-
-        case ddlpackage::DDL_UNSIGNED_FLOAT:
-            calpontDataType = CalpontSystemCatalog::UFLOAT;
-            break;
-
-        case ddlpackage::DDL_UNSIGNED_DOUBLE:
-            calpontDataType = CalpontSystemCatalog::UDOUBLE;
-            break;
-
-        default:
+		default:
 			throw runtime_error("Unsupported datatype!");
 
 	}
@@ -461,7 +414,7 @@ inline int convertDataType(int dataType)
 	return calpontDataType;
 }
 
-inline void findColumnData(uint32_t sessionID, execplan::CalpontSystemCatalog::TableName& systableName,
+inline void findColumnData(u_int32_t sessionID, execplan::CalpontSystemCatalog::TableName& systableName,
 		const std::string& colName, DDLColumn& sysCol)
 {
 	ColumnList columns;

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_tableinfo.h 4648 2013-05-29 21:42:40Z rdempsey $
+* $Id: we_tableinfo.h 4195 2012-09-19 18:12:27Z dcathey $
 *
 *******************************************************************************/
 #ifndef _WE_TABLEINFO_H
@@ -24,12 +24,11 @@
 
 #include <sys/time.h>
 #include <fstream>
+
 #include <utility>
 #include <vector>
-
 #include <boost/thread/mutex.hpp>
 #include <boost/ptr_container/ptr_vector.hpp>
-#include <boost/uuid/uuid.hpp>
 
 #include "we_type.h"
 #include "we_colop.h"
@@ -45,8 +44,6 @@
 #include "we_extentstripealloc.h"
 #include "messagelog.h"
 #include "brmtypes.h"
-#include "querytele.h"
-#include "oamcache.h"
 
 namespace WriteEngine
 {
@@ -127,10 +124,12 @@ private:
     bool fKeepRbMetaFile;               // Keep or delete bulk rollback meta
                                         //   data file
     bool fbTruncationAsError;           // Treat string truncation as error
-    ImportDataMode fImportDataMode;     // Import data in text or binary mode
 
+#ifdef _MSC_VER
+    volatile LONG fTableLocked;         // Do we have db table lock
+#else
     volatile bool fTableLocked;         // Do we have db table lock
-
+#endif
     bool fReadFromStdin;                // Read import file from STDIN
     bool fNullStringMode;               // Treat "NULL" as a null value
     char fEnclosedByChar;               // Character to enclose col values
@@ -141,9 +140,8 @@ private:
     std::string fBRMRptFileName;        // Name of distributed mode rpt file
     BRMReporter fBRMReporter;           // Object used to report BRM updates
     uint64_t fTableLockID;              // Unique table lock ID
-    std::vector<uint16_t> fOrigDbRootIds; // List of DBRoots at start of job
+    std::vector<u_int16_t> fOrigDbRootIds; // List of DBRoots at start of job
 
-	std::string  fErrorDir;             // Opt dir for *.err and *.bad files
     std::vector<std::string> fErrFiles; // List of *.err files for this table
     std::vector<std::string> fBadFiles; // List of *.bad files for this table
     std::ofstream fRejectDataFile;      // File containing rejected rows
@@ -154,10 +152,6 @@ private:
     unsigned int  fRejectErrCnt;        // Running count in current err msg file
 
     ExtentStripeAlloc fExtentStrAlloc;  // Extent stripe allocator for this tbl
-    querytele::QueryTeleClient fQtc;    // Query Tele client
-
-    oam::OamCache* fOamCachePtr;	// OamCache: ptr is copyable
-    boost::uuids::uuid fJobUUID;        // Job UUID
     std::vector<BRM::LBID_t> fDictFlushBlks;//dict blks to be flushed from cache
 
     //--------------------------------------------------------------------------
@@ -167,8 +161,6 @@ private:
     int  changeTableLockState();        // Change state of table lock to cleanup
     void closeTableFile();              // Close current tbl file; free buffer
     void closeOpenDbFiles();            // Close DB files left open at job's end
-    int  confirmDBFileChanges();        // Confirm DB file changes (on HDFS)
-    void deleteTempDBFileChanges();     // Delete DB temp swap files (on HDFS)
     int  finishBRM();                   // Finish reporting updates for BRM
     void freeProcessingBuffers();       // Free up Processing Buffers
     bool isBufferAvailable(bool report);// Is tbl buffer available for reading
@@ -214,7 +206,7 @@ public:
 
     /** @brief Acquire the DB table lock for this table
      */
-    int acquireTableLock(bool disableTimeOut = false );
+    int acquireTableLock( );
 
     /** @brief Get current table lock ID for this table
      */
@@ -248,10 +240,6 @@ public:
     /** @brief Delete the bulk rollback metadata file.
      */
     void deleteMetaDataRollbackFile( );
-
-    /** @brief Get binary import mode.
-     */
-    ImportDataMode getImportDataMode( ) const;
 
     /** @brief Get number of buffers
      */
@@ -306,10 +294,6 @@ public:
      */
     void setNullStringMode( bool bMode );
 
-    /** @brief Set binary import data mode (text or binary).
-     */
-    void setImportDataMode( ImportDataMode importMode );
-
     /** @brief Enable distributed mode, saving BRM updates in rptFileName
      */
     void setBulkLoadMode(BulkModeType bulkMode, const std::string& rptFileName);
@@ -338,12 +322,7 @@ public:
      */
     OID getTableOID( );
 
-	/** @brief Set the directory for *.err and *.bad files. May be
-	 *  	   empty string, in which case we use current dir.
-     */
-    void setErrorDir(const std::string& errorDir);
-
-	/** @brief get the bulk rollback meta data writer object for this table
+    /** @brief get the bulk rollback meta data writer object for this table
      */
     RBMetaWriter* rbMetaWriter();
 
@@ -354,12 +333,9 @@ public:
     /** @brief Initialize the buffer list
      *  @param noOfBuffers Number of buffers to create for this table
      *  @param jobFieldRefList List of fields in this import
-     *  @param fixedBinaryRecLen In binary mode, this is the fixed record length
-     *         used to read the buffer; in text mode, this value is not used.
      */
-    void initializeBuffers(int   noOfBuffers,
-                           const JobFieldRefList& jobFieldRefList,
-                           unsigned int fixedBinaryRecLen);
+    void initializeBuffers(const int &noOfBuffers,
+                           const JobFieldRefList& jobFieldRefList);
 
     /** @brief Read the table data into the read buffer
      */
@@ -432,7 +408,7 @@ public:
      *  "stage" indicates validation stage ("Starting" or "Ending" HWMs).
      */
     int validateColumnHWMs( const JobTable* jobTable,
-                            const std::vector<DBRootExtentInfo>& segFileInfo,
+                            const std::vector<File>& segFileInfo,
                             const char* stage );
 
     /** @brief Initialize the bulk rollback meta data writer for this table.
@@ -447,14 +423,12 @@ public:
      *  on this PM.
      */
     int saveBulkRollbackMetaData( Job& job,
-                            const std::vector<DBRootExtentInfo>& segFileInfo,
+                            const std::vector<File>& segFileInfo,
             const std::vector<BRM::EmDbRootHWMInfo_v>& dbRootHWMInfoColVec );
 
     /** @brief Mark table as complete
      */
     void markTableComplete( );
-
-    void setJobUUID(const boost::uuids::uuid& jobUUID);
 
 public:
     friend class BulkLoad;
@@ -471,9 +445,6 @@ inline int TableInfo::getCurrentParseBuffer() const {
 
 inline std::string TableInfo::getFileName() const {
     return fFileName; }
-
-inline ImportDataMode TableInfo::getImportDataMode() const {
-    return fImportDataMode; }
 
 inline int TableInfo::getNumberOfBuffers() const {
     return fReadBufCount; }
@@ -503,7 +474,11 @@ inline bool TableInfo::hasProcessingBegun() {
     return fProcessingBegun; }
 
 inline bool TableInfo::isTableLocked() {
+#ifdef _MSC_VER
+    return (fTableLocked != 0); }
+#else
     return fTableLocked; }
+#endif
 
 inline void TableInfo::markTableComplete() {
     boost::mutex::scoped_lock lock(fSyncUpdatesTI);
@@ -533,9 +508,6 @@ inline void TableInfo::setEscapeChar ( char esChar ) {
 inline void TableInfo::setFileBufferSize(const int fileBufSize) {
     fFileBufSize    = fileBufSize; }
 
-inline void TableInfo::setImportDataMode( ImportDataMode importMode ) {
-    fImportDataMode = importMode; }
-
 inline void TableInfo::setJobFileName(const std::string & jobFileName) {
     fjobFileName    = jobFileName; }
 
@@ -558,18 +530,6 @@ inline void TableInfo::setTableId(const int & id) {
 
 inline void TableInfo::setTruncationAsError(bool bTruncationAsError) {
     fbTruncationAsError = bTruncationAsError; }
-
-inline void TableInfo::setJobUUID(const boost::uuids::uuid& jobUUID) {
-    fJobUUID = jobUUID; }
-
-inline void TableInfo::setErrorDir( const std::string& errorDir ) {
-    fErrorDir = errorDir; 
-#ifdef _MSC_VER
-	if (fErrorDir.length() > 0 && *(--(fErrorDir.end())) != '/' && *(--(fErrorDir.end())) != '\\')
-		fErrorDir.push_back('\\'); }
-#else
-    if (fErrorDir.length() > 0 && *(--(fErrorDir.end())) != '/')
-        fErrorDir.push_back('/'); }
-#endif
 }
 #endif
+

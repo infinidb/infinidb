@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: groupconcatcolumn.h 9210 2013-01-21 14:10:42Z rdempsey $
+*   $Id: groupconcatcolumn.h 8436 2012-04-04 18:18:21Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -52,9 +52,9 @@ public:
 	 */
 	GroupConcatColumn();
 
-	GroupConcatColumn(const uint32_t sessionID);
+	GroupConcatColumn(const u_int32_t sessionID);
 
-	GroupConcatColumn(const GroupConcatColumn& rhs, const uint32_t sessionID=0);
+	GroupConcatColumn(const GroupConcatColumn& rhs, const u_int32_t sessionID=0);
 
 	/**
 	 * Destructors

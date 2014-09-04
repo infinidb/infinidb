@@ -48,6 +48,9 @@ int64_t Func_microsecond::getIntVal(rowgroup::Row& row,
 						bool& isNull,
 						CalpontSystemCatalog::ColType& op_ct)
 {
+	uint32_t year = 0;
+	uint32_t month = 0;
+	uint32_t day = 0;
 	int64_t val = 0;
 	uint32_t microSecond = 0;
 	
@@ -55,10 +58,16 @@ int64_t Func_microsecond::getIntVal(rowgroup::Row& row,
 	{
 		case CalpontSystemCatalog::DATE:
 			val = parm[0]->data()->getIntVal(row, isNull);
+			year = (uint32_t)((val >> 16) & 0xffff);
+			month = (uint32_t)((val >> 12) & 0xf);
+			day = (uint32_t)((val >> 6) & 0x3f);
 			microSecond = 0;
 			break;
 		case CalpontSystemCatalog::DATETIME:
 			val = parm[0]->data()->getIntVal(row, isNull);
+			year = (uint32_t)((val >> 48) & 0xffff);
+			month = (uint32_t)((val >> 44) & 0xf);
+			day = (uint32_t)((val >> 38) & 0x3f);
 			microSecond = (uint32_t)((val & 0xfffff));
 			break;
 		case CalpontSystemCatalog::CHAR:
@@ -71,6 +80,9 @@ int64_t Func_microsecond::getIntVal(rowgroup::Row& row,
 			}
 			else
 			{
+				year = (uint32_t)((val >> 48) & 0xffff);
+				month = (uint32_t)((val >> 44) & 0xf);
+				day = (uint32_t)((val >> 38) & 0x3f);
 				microSecond = (uint32_t)((val & 0xfffff));
 			}
 			break;
@@ -87,6 +99,9 @@ int64_t Func_microsecond::getIntVal(rowgroup::Row& row,
 			}
 			else
 			{
+				year = (uint32_t)((val >> 48) & 0xffff);
+				month = (uint32_t)((val >> 44) & 0xf);
+				day = (uint32_t)((val >> 38) & 0x3f);
 				microSecond = (uint32_t)((val & 0xfffff));
 			}
 			break;	
@@ -101,6 +116,9 @@ int64_t Func_microsecond::getIntVal(rowgroup::Row& row,
 				}
 				else
 				{
+					year = (uint32_t)((val >> 48) & 0xffff);
+					month = (uint32_t)((val >> 44) & 0xf);
+					day = (uint32_t)((val >> 38) & 0x3f);
 					microSecond = (uint32_t)((val & 0xfffff));
 				}
 			}

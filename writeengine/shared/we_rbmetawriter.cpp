@@ -16,10 +16,12 @@
    MA 02110-1301, USA. */
 
 /*
-* $Id: we_rbmetawriter.cpp 4737 2013-08-14 20:45:46Z bwilkinson $
+* $Id: we_rbmetawriter.cpp 4496 2013-01-31 19:13:20Z pleblanc $
 */
 
+#define WRITEENGINERBMETAWRITER_DLLEXPORT
 #include "we_rbmetawriter.h"
+#undef WRITEENGINERBMETAWRITER_DLLEXPORT
 
 #include <cerrno>
 #include <iostream>
@@ -35,29 +37,12 @@
 #include "we_bulkrollbackmgr.h"
 #include "idbcompress.h"
 using namespace compress;
-using namespace execplan;
-#include "IDBDataFile.h"
-#include "IDBFileSystem.h"
-#include "IDBPolicy.h"
-using namespace idbdatafile;
 
 namespace
 {
     const char* DATA_DIR_SUFFIX = "_data";
+    const char* DBROOT_BULK_ROLLBACK_SUBDIR = "bulkRollback";
     const char* TMP_FILE_SUFFIX = ".tmp";
-
-    const char* VERSION3_REC    = "# VERSION: 3";
-    const int   VERSION3_REC_LEN= 12;
-    const char* VERSION4_REC    = "# VERSION: 4";
-    const int   VERSION4_REC_LEN= 12;
-    const char* COLUMN1_REC     = "COLUM1"; // HWM extent for a DBRoot
-    const int   COLUMN1_REC_LEN = 6;
-    const char* COLUMN2_REC     = "COLUM2"; // Placeholder for empty DBRoot
-    const int   COLUMN2_REC_LEN = 6;
-    const char* DSTORE1_REC     = "DSTOR1"; // HWM extent for a DBRoot
-    const int   DSTORE1_REC_LEN = 6;
-    const char* DSTORE2_REC     = "DSTOR2"; // Placeholder for empty DBRoot
-    const int   DSTORE2_REC_LEN = 6;
 
     //--------------------------------------------------------------------------
     // Local Function that prints contents of an RBChunkInfo object
@@ -100,7 +85,7 @@ bool RBChunkInfoCompare::operator()
 //------------------------------------------------------------------------------
 RBMetaWriter::RBMetaWriter (
     const std::string& appDesc,
-    Log* logger ) : fMetaDataFile(NULL), fAppDesc(appDesc), fLog(logger), fCreatedSubDir(false)
+    Log* logger ) : fAppDesc(appDesc), fLog(logger), fCreatedSubDir(false)
 {
 }
 
@@ -117,7 +102,7 @@ void RBMetaWriter::init (
     fTableOID  = tableOID;
     fTableName = tableName;
 
-    std::vector<uint16_t> dbRoots;
+    std::vector<u_int16_t> dbRoots;
     Config::getRootIdList( dbRoots );
 
     std::string metaFileName;
@@ -139,8 +124,8 @@ void RBMetaWriter::init (
         tmpMetaFileName += TMP_FILE_SUFFIX;
 
         // Delete any files that collide with the filenames we intend to use
-        IDBPolicy::remove( metaFileName.c_str() );
-        IDBPolicy::remove( tmpMetaFileName.c_str() );
+        unlink( metaFileName.c_str() );
+        unlink( tmpMetaFileName.c_str() );
 
         // Clear out any data subdirectory
         deleteSubDir( metaFileName );
@@ -170,7 +155,7 @@ void RBMetaWriter::saveBulkRollbackMetaData(
 
     try
     {
-        std::vector<uint16_t> dbRoots;
+        std::vector<u_int16_t> dbRoots;
         Config::getRootIdList( dbRoots );
 
         // Loop through DBRoot HWMs for this PM
@@ -202,16 +187,15 @@ void RBMetaWriter::saveBulkRollbackMetaData(
                     throw WeException( oss.str(), ERR_INVALID_PARAM );
                 }
                     
-                uint16_t dbRoot    = dbRootHWMInfo[k].dbRoot;
-                uint32_t partition = 0;
-                uint16_t segment   = 0;
+                u_int16_t dbRoot    = dbRootHWMInfo[k].dbRoot;
+                u_int32_t partition = 0;
+                u_int16_t segment   = 0;
                 HWM       localHWM  = 0;
                 bool      bExtentWithData = false;
 
                 // For empty DBRoot (totalBlocks == 0),
                 // leave partition, segment, and HWM set to 0
-                if ((dbRootHWMInfo[k].totalBlocks > 0) ||
-                    (dbRootHWMInfo[k].status == BRM::EXTENTOUTOFSERVICE))
+                if (dbRootHWMInfo[k].totalBlocks > 0)
                 {
                     partition = dbRootHWMInfo[k].partitionNum;
                     segment   = dbRootHWMInfo[k].segmentNum;
@@ -236,14 +220,14 @@ void RBMetaWriter::saveBulkRollbackMetaData(
                 // Save dctnry store meta-data info to support bulk rollback
                 if ( dctnryStoreOids[i] > 0 ) 
                 {
-                    std::vector<uint32_t> segList;
+                    std::vector<u_int32_t> segList;
                     std::string segFileListErrMsg;
 
                     if (bExtentWithData)
                     {
                         std::string dirName;
                         FileOp fileOp(false);
-                        rc = fileOp.getDirName( dctnryStoreOids[i],
+                        rc = fileOp.getDirName2( dctnryStoreOids[i],
                             dbRoot, partition, dirName );
                         if (rc != NO_ERROR)
                         {
@@ -258,8 +242,7 @@ void RBMetaWriter::saveBulkRollbackMetaData(
                             throw WeException( oss.str(), rc );
                         }
 
-                        rc = BulkRollbackMgr::getSegFileList(dirName, false,
-                            segList,
+                        rc = BulkRollbackMgr::getSegFileList(dirName, segList,
                             segFileListErrMsg);       
                         if (rc != NO_ERROR)
                         {
@@ -294,13 +277,11 @@ void RBMetaWriter::saveBulkRollbackMetaData(
 
                             // check HWM for dictionary store file
                             HWM dictHWMStore;
-                            int extState;
                             rc = BRMWrapper::getInstance()->getLocalHWM(
                                 dctnryStoreOids[i],
                                 partition,
                                 segDictionary,
-                                dictHWMStore,
-                                extState );
+                                dictHWMStore );
                             if (rc != NO_ERROR)
                             {
                                 WErrorCodes ec;
@@ -326,12 +307,11 @@ void RBMetaWriter::saveBulkRollbackMetaData(
                     }     // dictionary OID has 1 or more seg files in partition
                 }         // if dictionary column
 
-                // For a compressed column, backup the starting HWM chunk if the
-                // starting HWM block is not on an empty DBRoot (or outOfSrvc)
+                // For a compressed column, backup the starting HWM chunk if
+                // the starting HWM block is not on an empty DBRoot
                 if ( (columns[i].compressionType) &&
-                     (columns[i].dataFile.fDbRoot == dbRootHWMInfo[k].dbRoot) &&
-                     (dbRootHWMInfo[k].totalBlocks > 0) &&
-                     (dbRootHWMInfo[k].status != BRM::EXTENTOUTOFSERVICE) )
+                    ((columns[i].dataFile.fDbRoot == dbRootHWMInfo[k].dbRoot) &&
+                     (dbRootHWMInfo[k].totalBlocks > 0)) )
                 {
                     backupColumnHWMChunk(
                         columns[i].dataFile.oid,
@@ -343,34 +323,6 @@ void RBMetaWriter::saveBulkRollbackMetaData(
 
             }         // End of loop through columns
 
-            // time to dump the string stream to file
-            std::string data(fMetaDataStream.str());
-
-            // this is to cover partical writes
-            // no need for retry if low layer takes care partial writes.
-            const char* p = data.c_str(); // buffer contents
-            size_t      s = data.size();  // buffer size
-            size_t      w = 0;            // total bytes written so far
-            ssize_t     n = 0;            // bytes written in one write
-            for (int i = 0; i < 10 && w < s; i++)
-            {
-                n = fMetaDataFile->write(p+w, s-w);
-                if (n < 0)
-                break;
-
-                w += n;
-            }
-            if (w != s)
-            {
-                int errRc = errno;
-                std::ostringstream oss;
-                oss << "Error writing bulk rollback meta-data file "
-                << metaFileName << "; written/expect:" << w << "/" << s
-                << "; err-" << errRc << "; " << strerror( errRc );
-               throw WeException(oss.str(), ERR_FILE_WRITE);
-            }
-
-            fMetaDataStream.str("");
             closeMetaFile( );
             bOpenedFile = false;
 
@@ -400,21 +352,54 @@ void RBMetaWriter::saveBulkRollbackMetaData(
 //------------------------------------------------------------------------------
 // Open a meta data file to save info about the specified table OID.
 //------------------------------------------------------------------------------
-std::string RBMetaWriter::openMetaFile ( uint16_t dbRoot )
+std::string RBMetaWriter::openMetaFile ( u_int16_t dbRoot )
 {
     std::string bulkRollbackPath( Config::getDBRootByNum( dbRoot ) );
     bulkRollbackPath += '/';
     bulkRollbackPath += DBROOT_BULK_ROLLBACK_SUBDIR;
+    boost::filesystem::path pathDir(bulkRollbackPath);
 
-    if( !IDBPolicy::exists( bulkRollbackPath.c_str() ) )
+    // create bulk rollback directory if it does not exist
+    try
     {
-        if( IDBPolicy::mkdir( bulkRollbackPath.c_str() ) != 0 )
+        if ( !boost::filesystem::exists( pathDir ) )
         {
-            std::ostringstream oss;
-            oss << "Error creating bulk rollback directory " <<
-                bulkRollbackPath << ";" << std::endl;
-            throw WeException( oss.str(), ERR_DIR_CREATE );
+            std::string boostErrString;
+            try
+            {
+                boost::filesystem::create_directories(pathDir);
+            }
+            catch (std::exception& ex)
+            {
+                // ignore exception for now; we may have just had a
+                // race condition where 2 jobs were creating dirs.
+                boostErrString = ex.what();
+            }
+
+            if ( !boost::filesystem::exists( pathDir ) )
+            {
+                std::ostringstream oss;
+                oss << "Error creating bulk rollback directory(1) " <<
+                    bulkRollbackPath << "; " << boostErrString;
+                throw WeException( oss.str(), ERR_DIR_CREATE );
+            }
         }
+    }
+    catch (std::exception& ex)
+    {
+        std::ostringstream oss;
+        oss << "Error creating bulk rollback directory(2) " <<
+            bulkRollbackPath << "; " << ex.what();
+        throw WeException( oss.str(), ERR_DIR_CREATE );
+    }
+
+    if (!boost::filesystem::is_directory(pathDir) )
+    {
+        std::ostringstream oss;
+        oss << "Error creating bulk rollback directory " <<
+            bulkRollbackPath << "; path already exists as non-directory" <<
+            std::endl;
+        throw WeException( oss.str(), ERR_DIR_CREATE );
     }
 
     // Open the file
@@ -426,11 +411,8 @@ std::string RBMetaWriter::openMetaFile ( uint16_t dbRoot )
 
     std::string tmpMetaFileName( metaFileName );
     tmpMetaFileName += TMP_FILE_SUFFIX;
-    fMetaDataFile = IDBDataFile::open(IDBPolicy::getType(tmpMetaFileName.c_str(),
-                                          IDBPolicy::WRITEENG),
-                                      tmpMetaFileName.c_str(), "wb", 0);
-
-    if ( !fMetaDataFile )
+    fMetaDataFile.open( tmpMetaFileName.c_str() );
+    if ( fMetaDataFile.fail() )
     {
         int errRc = errno;
         std::ostringstream oss;
@@ -441,7 +423,7 @@ std::string RBMetaWriter::openMetaFile ( uint16_t dbRoot )
         throw WeException( oss.str(), ERR_FILE_OPEN );
     }
 
-    fMetaDataStream <<
+    fMetaDataFile <<
         "# VERSION: 4"             << std::endl <<
         "# APPLICATION: " << fAppDesc<<std::endl<<
         "# PID:    " << ::getpid() << std::endl <<
@@ -473,8 +455,7 @@ std::string RBMetaWriter::openMetaFile ( uint16_t dbRoot )
 //------------------------------------------------------------------------------
 void RBMetaWriter::closeMetaFile ( )
 {
-    delete fMetaDataFile;
-    fMetaDataFile = NULL;
+    fMetaDataFile.close();
 }
 
 //------------------------------------------------------------------------------
@@ -493,7 +474,7 @@ void RBMetaWriter::renameMetaFile ( )
             std::string tmpMetaFileName = metaFileName;
             tmpMetaFileName += TMP_FILE_SUFFIX;
 
-            if ( IDBPolicy::rename(tmpMetaFileName.c_str(), metaFileName.c_str()) )
+            if ( rename(tmpMetaFileName.c_str(), metaFileName.c_str()) )
             {
                 int errRc = errno;
                 std::ostringstream oss;
@@ -527,8 +508,8 @@ void RBMetaWriter::deleteFile ( )
             std::string tmpMetaFileName = metaFileName;
             tmpMetaFileName += TMP_FILE_SUFFIX;
 
-            IDBPolicy::remove( metaFileName.c_str() );
-            IDBPolicy::remove( tmpMetaFileName.c_str() );
+            unlink( metaFileName.c_str() );
+            unlink( tmpMetaFileName.c_str() );
 
             deleteSubDir( metaFileName ); // can throw an exception
         }
@@ -548,14 +529,14 @@ void RBMetaWriter::writeColumnMetaData (
     uint32_t           partition,
     uint16_t           segment,
     HWM                lastLocalHwm,
-    CalpontSystemCatalog::ColDataType colType,
+    ColDataType        colType,
     const std::string& colTypeName,
     int                colWidth,
     int                compressionType )
 {
     if (withHWM)
     {
-        fMetaDataStream  << "COLUM1: " <<
+        fMetaDataFile    << "COLUM1: " <<
             columnOID    << ' ' <<
             dbRoot       << ' ' <<
             partition    << ' ' <<
@@ -567,7 +548,7 @@ void RBMetaWriter::writeColumnMetaData (
     }
     else
     {
-        fMetaDataStream  << "COLUM2: " <<
+        fMetaDataFile    << "COLUM2: " <<
             columnOID    << ' ' <<
             dbRoot       << ' ' <<
             partition    << ' ' <<
@@ -577,18 +558,15 @@ void RBMetaWriter::writeColumnMetaData (
             colWidth;
     }
     if (compressionType)
-        fMetaDataStream << ' ' << compressionType << ' ';
-    fMetaDataStream << std::endl;
+        fMetaDataFile << ' ' << compressionType << ' ';
+    fMetaDataFile    << std::endl;
 
     // If column is compressed, then create directory for storing HWM chunks
     if (compressionType)
     {
         if (!fCreatedSubDir)
         {
-            // @bug 5572 - Don't need db backup files for HDFS;
-            //             use hdfs buffer file
-            if (!IDBPolicy::useHdfs())
-                createSubDir( metaFileName );
+            createSubDir( metaFileName );
         }
     }
 }
@@ -605,7 +583,7 @@ void RBMetaWriter::writeDictionaryStoreMetaData (
     HWM      localHwm,
     int      compressionType )
 {
-    fMetaDataStream        << "DSTOR1: " <<
+    fMetaDataFile          << "DSTOR1: " <<
         columnOID          << ' ' <<
         dictionaryStoreOID << ' ' <<
         dbRoot             << ' ' <<
@@ -613,8 +591,8 @@ void RBMetaWriter::writeDictionaryStoreMetaData (
         segment            << ' ' <<
         localHwm;
     if (compressionType)
-        fMetaDataStream << ' ' << compressionType << ' ';
-    fMetaDataStream << std::endl;
+        fMetaDataFile << ' ' << compressionType << ' ';
+    fMetaDataFile << std::endl;
 
     // Save dictionary meta data for later use in backing up the HWM chunks
     if (compressionType)
@@ -639,15 +617,15 @@ void RBMetaWriter::writeDictionaryStoreMetaNoDataMarker (
     uint16_t segment,
     int      compressionType )
 {
-    fMetaDataStream        << "DSTOR2: " <<
+    fMetaDataFile          << "DSTOR2: " <<
         columnOID          << ' ' <<
         dictionaryStoreOID << ' ' <<
         dbRoot             << ' ' <<
         partition          << ' ' <<
         segment;
     if (compressionType)
-        fMetaDataStream << ' ' << compressionType << ' ';
-    fMetaDataStream << std::endl;
+        fMetaDataFile << ' ' << compressionType << ' ';
+    fMetaDataFile << std::endl;
 }
 
 //------------------------------------------------------------------------------
@@ -657,12 +635,18 @@ void RBMetaWriter::createSubDir( const std::string& metaFileName )
 {
     std::string bulkRollbackSubPath( metaFileName );
     bulkRollbackSubPath += DATA_DIR_SUFFIX;
+    boost::filesystem::path pathDir(bulkRollbackSubPath);
 
-    if( IDBPolicy::mkdir( bulkRollbackSubPath.c_str() ) != 0 )
+    try
     {
+        boost::filesystem::create_directories(pathDir);
+    }
+    catch (std::exception& ex)
+    {
+        std::string boostErrString = ex.what();
         std::ostringstream oss;
         oss << "Error creating bulk rollback data subdirectory " <<
-            bulkRollbackSubPath << ";";
+            bulkRollbackSubPath << "; " << boostErrString;
         throw WeException( oss.str(), ERR_DIR_CREATE );
     }
 
@@ -676,12 +660,19 @@ void RBMetaWriter::deleteSubDir( const std::string& metaFileName )
 {
     std::string bulkRollbackSubPath( metaFileName );
     bulkRollbackSubPath += DATA_DIR_SUFFIX;
+    boost::filesystem::path dirPath(bulkRollbackSubPath);
 
-    if( IDBPolicy::remove( bulkRollbackSubPath.c_str() ) != 0 )
+    // Delete bulk rollback data subdirectory
+    try
     {
+        boost::filesystem::remove_all(dirPath);
+    }
+    catch (std::exception& ex)
+    {
+        std::string boostErrString = ex.what();
         std::ostringstream oss;
         oss << "Error deleting bulk rollback data subdirectory " <<
-            bulkRollbackSubPath << ";";
+            bulkRollbackSubPath << "; " << boostErrString;
         throw WeException( oss.str(), ERR_FILE_DELETE );
     }
 }
@@ -698,12 +689,8 @@ void RBMetaWriter::backupColumnHWMChunk(
     uint16_t  segment,
     HWM       startingHWM)
 {
-    // @bug 5572 - Don't need db backup file for HDFS; we use hdfs buffer file
-    if (!IDBPolicy::useHdfs())
-    {
-        backupHWMChunk( true,
-            columnOID, dbRoot, partition, segment, startingHWM );
-    }
+    backupHWMChunk( true,
+        columnOID, dbRoot, partition, segment, startingHWM );
 }
 
 //------------------------------------------------------------------------------
@@ -712,22 +699,17 @@ void RBMetaWriter::backupColumnHWMChunk(
 // This operation is only performed for compressed columns.  Once the chunk is
 // saved, we remove that OID, partition, and segment from the internal list
 // (fRBChunkDctnrySet) that is maintained.
-// Return value indicates whether the specified file needs to be backed up or
-// not.
 //
 // This function MUST be maintained to be thread-safe so that multiple threads
 // can concurrently call this function, with each thread managing a different
 // dictionary column.
 //------------------------------------------------------------------------------
-// @bug 5572 - HDFS usage: add return flag to indicate backup status
-bool RBMetaWriter::backupDctnryHWMChunk(
+void RBMetaWriter::backupDctnryHWMChunk(
     OID       dctnryOID,
     uint16_t  dbRoot,
     uint32_t  partition,
     uint16_t  segment)
 {
-    bool bBackupApplies = false;
-
     if (fRBChunkDctnrySet.size() > 0)
     {
         RBChunkInfo chunkInfo(
@@ -751,15 +733,8 @@ bool RBMetaWriter::backupDctnryHWMChunk(
         {
             if (chunkInfoFound.fPartition == partition)
             {
-                // @bug 5572 - Don't need db backup file for HDFS;
-                //             we use hdfs buffer file.  Set backup flag
-                //             so application knows to use tmp buffer file.
-                bBackupApplies = true;
-                if (!IDBPolicy::useHdfs())
-                {
-                    backupHWMChunk(false, dctnryOID,
-                        dbRoot, partition, segment, chunkInfoFound.fHwm);
-                }
+                backupHWMChunk(false,
+                    dctnryOID, dbRoot, partition, segment, chunkInfoFound.fHwm);
             }
             else
             {
@@ -781,131 +756,12 @@ bool RBMetaWriter::backupDctnryHWMChunk(
             }
         }
     }
-
-    return bBackupApplies;
-}
-
-//------------------------------------------------------------------------------
-// Backup entire contents of HWM file for the specified columnOID,dbRoot,etc,
-// so that the file is available for bulk rollback.  This function is used for
-// HDFS files only.  This operation is only performed for compressed columns.
-//
-// This function MUST be kept thread-safe in support of backupDctnryHWMChunk().
-// See that function description for more details.  This is the reason
-// backupHWMChunk() has to have a local FileOp object.  We can't share/reuse
-// a FileOp data member variable unless we want to employ a mutex.
-//------------------------------------------------------------------------------
-// @bug 5572 - Stopped using backupHWMFile().
-// Don't need db backup file for HDFS; we use hdfs buffer file
-void RBMetaWriter::backupHWMFile(
-    bool      bColumnFile, // is this a column (vs dictionary) file
-    OID       columnOID,   // OID of column or dictionary store
-    uint16_t  dbRoot,      // DB Root for db segment file
-    uint32_t  partition,   // partition for db segment file
-    uint16_t  segment,     // segment for db segment file
-    HWM       startingHWM) // starting HWM for db segment file
-{
-    std::string fileType("column");
-    if (!bColumnFile)
-        fileType = "dictionary";
-
-    FileOp fileOp; // @bug 4960: to keep thread-safe, we use local FileOp
-
-    // Construct file name for db file to be backed up
-    char dbFileName[FILE_NAME_SIZE];
-    int rc = fileOp.getFileName( columnOID, dbFileName,
-        dbRoot, partition, segment );
-    if (rc != NO_ERROR)
-    {
-        std::ostringstream oss;
-        oss << "Error creating backup "   << fileType <<
-            " file for OID " << columnOID <<
-            "; Can't construct file name for DBRoot"  << dbRoot <<
-            "; partition-"   << partition <<
-            "; segment-"     << segment;
-        throw WeException( oss.str(), rc );
-    }    
-
-    // Construct file name for backup copy of db file
-    std::ostringstream ossFile;
-    ossFile << "/" << columnOID << ".p" << partition << ".s" << segment;
-    std::string backupFileName;
-    rc = getSubDirPath( dbRoot, backupFileName );
-    if (rc != NO_ERROR)
-    {
-        std::ostringstream oss;
-        oss << "Error creating backup "   << fileType <<
-            " file for OID " << columnOID <<
-            "; Can't find matching meta file for DBRoot" << dbRoot;
-        throw WeException( oss.str(), rc );
-    }
-    backupFileName += ossFile.str();
-
-    std::string backupFileNameTmp = backupFileName;
-    backupFileNameTmp += TMP_FILE_SUFFIX;
-
-    //if ( (fLog) && (fLog->isDebug(DEBUG_1)) )
-    if (fLog)
-    {
-        std::ostringstream oss;
-        oss << "Backing up HWM file for "      << fileType <<
-            " file for OID " << columnOID      <<
-            "; file-"     << backupFileNameTmp <<
-            "; HWM-"      << startingHWM;
-        fLog->logMsg( oss.str(), MSGLVL_INFO2 );
-    }
-
-    // Copy the db file to a temporary name
-    IDBFileSystem& fs = IDBPolicy::getFs( backupFileNameTmp.c_str() );
-
-    if ( !fs.exists(dbFileName) ) 
-    {
-        std::ostringstream oss; 
-        oss << "Error creating backup "   << fileType <<
-            " file for OID " << columnOID <<
-            "; dbfile does not exist for DBRoot" << dbRoot <<
-            "; partition-"   << partition <<
-            "; segment-"     << segment;
-        throw WeException( oss.str(), ERR_FILE_NOT_EXIST );
-    }
-
-    rc = fs.copyFile( dbFileName, backupFileNameTmp.c_str() );
-    if (rc != 0)
-    {
-        std::ostringstream oss;
-        oss << "Error copying backup for " << fileType <<
-            " OID-"        << columnOID <<
-            "; DBRoot-"    << dbRoot    <<
-            "; partition-" << partition <<
-            "; segment-"   << segment   <<
-            "; rc-"        << rc;
-
-        fs.remove( backupFileNameTmp.c_str() );
-        throw WeException( oss.str(), ERR_METADATABKUP_COMP_WRITE_BULK_BKUP );
-    }
-
-    // Rename temporary named backup file to final name
-    rc = fs.rename( backupFileNameTmp.c_str(), backupFileName.c_str() );
-    if (rc != 0)
-    {
-        std::ostringstream oss;
-        oss << "Error renaming temp backup for " << fileType <<
-            " OID-"        << columnOID <<
-            "; DBRoot-"    << dbRoot    <<
-            "; partition-" << partition <<
-            "; segment-"   << segment   <<
-            "; rc-"        << rc;
-
-        fs.remove( backupFileNameTmp.c_str() );
-        fs.remove( backupFileName.c_str() );
-        throw WeException( oss.str(), ERR_METADATABKUP_COMP_RENAME );
-    }
 }
 
 //------------------------------------------------------------------------------
 // Backup the contents of the HWM chunk for the specified columnOID,dbRoot,etc,
-// so that the chunk is available for bulk rollback.  This function is used for
-// non-hdfs files.  This operation is only performed for compressed columns.
+// so that the chunk is available for bulk rollback.
+// This operation is only performed for compressed columns.
 //
 // This function MUST be kept thread-safe in support of backupDctnryHWMChunk().
 // See that function description for more details.  This is the reason
@@ -927,12 +783,11 @@ void RBMetaWriter::backupHWMChunk(
     // Open the applicable database column segment file
     std::string segFile;
     FileOp fileOp; // @bug 4960: to keep thread-safe, we use local FileOp
-    IDBDataFile* dbFile = fileOp.openFile( columnOID,
+    FILE* dbFile = fileOp.openFile( columnOID,
         dbRoot,
         partition,
         segment,
-        segFile,
-        "rb" );
+        segFile );
     if ( !dbFile )
     {
         std::ostringstream oss;
@@ -946,7 +801,7 @@ void RBMetaWriter::backupHWMChunk(
 
     // Get the size of the file, so we know where to truncate back to.
     long long fileSizeBytes;
-    int rc = fileOp.getFileSize( dbFile, fileSizeBytes);
+    int rc = fileOp.getFileSize2( dbFile, fileSizeBytes);
     if (rc != NO_ERROR)
     {
         WErrorCodes ec;
@@ -1185,11 +1040,7 @@ int RBMetaWriter::writeHWMChunk(
         fLog->logMsg( oss.str(), MSGLVL_INFO2 );
     }
 
-    IDBDataFile*  backupFile = IDBDataFile::open(
-        IDBPolicy::getType( fileNameTmp.c_str(), IDBPolicy::WRITEENG ),
-        fileNameTmp.c_str(),
-        "w+b",
-        0 );
+    FILE* backupFile = fopen( fileNameTmp.c_str(), "w+b" );
     if (!backupFile)
     {
         int errRc = errno;
@@ -1203,8 +1054,6 @@ int RBMetaWriter::writeHWMChunk(
         return ERR_METADATABKUP_COMP_OPEN_BULK_BKUP;
     }
 
-    IDBFileSystem& fs = IDBPolicy::getFs( fileNameTmp.c_str() );
-
     // Format of backup compressed chunk file:
     //   8 byte unsigned int carrying chunk size
     //   8 byte unsigned int carrying original file size
@@ -1212,7 +1061,10 @@ int RBMetaWriter::writeHWMChunk(
     uint64_t sizeHdr[2];
     sizeHdr[0] = chunkSize;
     sizeHdr[1] = fileSize;
-    size_t itemsWritten = backupFile->write(sizeHdr, sizeof(uint64_t)*2) / (sizeof(uint64_t)*2);
+    size_t itemsWritten = fwrite(sizeHdr,
+                                sizeof(uint64_t)*2,
+                                1,
+                                backupFile);
     if (itemsWritten != 1)
     {
         int errRc = errno;
@@ -1224,14 +1076,17 @@ int RBMetaWriter::writeHWMChunk(
             "; " << eMsg;
         errMsg = oss.str();
 
-        delete backupFile;
-        fs.remove( fileNameTmp.c_str() );
+        fclose( backupFile );
+        unlink( fileNameTmp.c_str() );
         return ERR_METADATABKUP_COMP_WRITE_BULK_BKUP;
     }
 
     if (chunkSize > 0)
     {
-        itemsWritten = backupFile->write(compressedOutBuf, chunkSize ) / chunkSize;
+        itemsWritten = fwrite(compressedOutBuf,
+                            chunkSize,
+                            1,
+                            backupFile);
         if (itemsWritten != 1)
         {
             int errRc = errno;
@@ -1243,15 +1098,19 @@ int RBMetaWriter::writeHWMChunk(
                 "; " << eMsg;
             errMsg = oss.str();
 
-            delete backupFile;
-            fs.remove( fileNameTmp.c_str() );
+            fclose( backupFile );
+            unlink( fileNameTmp.c_str() );
             return ERR_METADATABKUP_COMP_WRITE_BULK_BKUP;
         }
     }
 
-    backupFile->flush();
-//   IDBDataFile flush() does a sync where appropriate
-    delete backupFile;
+    fflush( backupFile );
+#ifdef _MSC_VER
+    _commit(_fileno(backupFile));
+#else
+    fsync ( fileno(backupFile) );
+#endif
+    fclose( backupFile );
 
 #ifdef _MSC_VER
     //Windows rename() behaves differently from Linux: it will return an error
@@ -1262,7 +1121,7 @@ int RBMetaWriter::writeHWMChunk(
 #endif
 
     // Rename HWM backup file to final name.
-    if ( fs.rename(fileNameTmp.c_str(), fileName.c_str()) )
+    if ( rename(fileNameTmp.c_str(), fileName.c_str()) )
     {
         int errRc = errno;
         WErrorCodes ec;
@@ -1271,9 +1130,9 @@ int RBMetaWriter::writeHWMChunk(
         Convertor::mapErrnoToString(errRc, eMsg);
         oss << ec.errorString(ERR_METADATABKUP_COMP_RENAME) << "; " << eMsg;
         errMsg = oss.str();
-
-        fs.remove( fileNameTmp.c_str() );
-        fs.remove( fileName.c_str() );
+        //FIXME: do we really want to unlink BOTH files? (or _any_ files, ftm?)
+        unlink( fileNameTmp.c_str() );
+        unlink( fileName.c_str() );
         return ERR_METADATABKUP_COMP_RENAME;
     }
 
@@ -1336,78 +1195,6 @@ void RBMetaWriter::printDctnryChunkList(
         }
         fLog->logMsg( oss.str(), MSGLVL_INFO2 );
     }
-}
-
-//------------------------------------------------------------------------------
-// Verify that specified string represents Version 3 file format
-//------------------------------------------------------------------------------
-/* static */
-bool RBMetaWriter::verifyVersion3(const char* versionRec)
-{
-    if (strncmp(versionRec, VERSION3_REC, VERSION3_REC_LEN) == 0)
-        return true;
-    else
-        return false;
-}
-
-//------------------------------------------------------------------------------
-// Verify that specified string represents Version 4 file format
-//------------------------------------------------------------------------------
-/* static */
-bool RBMetaWriter::verifyVersion4(const char* versionRec)
-{
-    if (strncmp(versionRec, VERSION4_REC, VERSION4_REC_LEN) == 0)
-        return true;
-    else
-        return false;
-}
-
-//------------------------------------------------------------------------------
-// Verify that specified record type is a Column1 record
-//------------------------------------------------------------------------------
-/* static */
- bool RBMetaWriter::verifyColumn1Rec(const char* recType)
-{
-    if (strncmp(recType, COLUMN1_REC, COLUMN1_REC_LEN) == 0)
-        return true;
-    else
-        return false;
-}
-
-//------------------------------------------------------------------------------
-// Verify that specified record type is a Column2 record
-//------------------------------------------------------------------------------
-/* static */
-bool RBMetaWriter::verifyColumn2Rec(const char* recType)
-{
-    if (strncmp(recType, COLUMN2_REC, COLUMN2_REC_LEN) == 0)
-        return true;
-    else
-        return false;
-}
-
-//------------------------------------------------------------------------------
-// Verify that specified record type is a DStore1 record
-//------------------------------------------------------------------------------
-/* static */
-bool RBMetaWriter::verifyDStore1Rec(const char* recType)
-{
-    if (strncmp(recType, DSTORE1_REC, DSTORE1_REC_LEN) == 0)
-        return true;
-    else
-        return false;
-}
-
-//------------------------------------------------------------------------------
-// Verify that specified record type is a DStore2 record
-//------------------------------------------------------------------------------
-/* static */
-bool RBMetaWriter::verifyDStore2Rec(const char* recType)
-{
-    if (strncmp(recType, DSTORE2_REC, DSTORE2_REC_LEN) == 0)
-        return true;
-    else
-        return false;
 }
 
 } // end of namespace

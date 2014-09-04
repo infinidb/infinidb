@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_bulkstatus.cpp 4648 2013-05-29 21:42:40Z rdempsey $
+* $Id: we_bulkstatus.cpp 3720 2012-04-04 18:18:49Z rdempsey $
 *
 *******************************************************************************/
 
@@ -30,5 +30,23 @@
 namespace WriteEngine
 {
     /*static*/
+#ifdef _MSC_VER
+	volatile LONG BulkStatus::fJobStatus = EXIT_SUCCESS;
+#else
 	volatile int BulkStatus::fJobStatus = EXIT_SUCCESS;
+#endif
+//------------------------------------------------------------------------------
+// Set the job status
+//------------------------------------------------------------------------------
+/* static */
+void BulkStatus::setJobStatus(int jobStatus)
+{
+#ifdef _MSC_VER
+    (void)InterlockedCompareExchange (&fJobStatus, jobStatus, EXIT_SUCCESS);
+#else
+    (void)__sync_val_compare_and_swap(&fJobStatus, EXIT_SUCCESS, jobStatus);
+ 
+#endif
+}
+
 }

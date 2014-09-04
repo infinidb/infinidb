@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: operator.h 9635 2013-06-19 21:42:30Z bwilkinson $
+*   $Id: operator.h 8436 2012-04-04 18:18:21Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -146,9 +146,8 @@ public:
 	virtual void evaluate(rowgroup::Row& row, bool& isNull, ParseTree* lop, ParseTree* rop) {}
 	
 	// The following methods should be pure virtual. Currently too many instanslization exists.
-	virtual const std::string& getStrVal(rowgroup::Row& row, bool& isNull, ParseTree* lop, ParseTree* rop) { return fResult.strVal; }
+	virtual std::string getStrVal(rowgroup::Row& row, bool& isNull, ParseTree* lop, ParseTree* rop) { return fResult.strVal; }
 	virtual int64_t getIntVal(rowgroup::Row& row, bool& isNull, ParseTree* lop, ParseTree* rop) { return fResult.intVal; }
-    virtual uint64_t getUintVal(rowgroup::Row& row, bool& isNull, ParseTree* lop, ParseTree* rop) { return fResult.uintVal; }
 	virtual float getFloatVal(rowgroup::Row& row, bool& isNull, ParseTree* lop, ParseTree* rop) { return fResult.floatVal; }
 	virtual double getDoubleVal(rowgroup::Row& row, bool& isNull, ParseTree* lop, ParseTree* rop) { return fResult.doubleVal; }
 	virtual IDB_Decimal getDecimalVal(rowgroup::Row& row, bool& isNull, ParseTree* lop, ParseTree* rop) { return fResult.decimalVal; }

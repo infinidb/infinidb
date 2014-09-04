@@ -20,7 +20,7 @@
 
 /***************************************************************************
  *
- *   $Id: blockrequestprocessor.h 2055 2013-02-08 19:09:09Z pleblanc $
+ *   $Id: blockrequestprocessor.h 2046 2013-01-31 19:13:16Z pleblanc $
  *
  *   jrodriguez@calpont.com   *
  *                                                                         *
@@ -70,12 +70,12 @@ public:
 	/**
 	 * @brief verify that the lbid@ver disk block is in the block cache. Send request if it is not
 	 **/
-	int check(BRM::LBID_t lbid, const BRM::QueryContext &ver, BRM::VER_t txn, bool flg, int compType, bool& wasBlockInCache);
+	int check(BRM::LBID_t lbid, BRM::VER_t ver, BRM::VER_t txn, bool flg, int compType, bool& wasBlockInCache);
 
 	/**
 	 * @brief verify the LBIDRange of disk blocks is in the block cache. Send request if it is not
 	 **/
-	int check(const BRM::InlineLBIDRange& range, const BRM::QueryContext &ver, const BRM::VER_t txn, const int compType,
+	int check(const BRM::InlineLBIDRange& range, const BRM::VER_t ver, const BRM::VER_t txn, const int compType,
 		uint32_t& lbidCount);
 
 	/**
@@ -90,15 +90,20 @@ public:
 	/**
 	 * @brief retrieve the lbid@ver disk block from the block cache
 	 **/
-	inline const int read(const BRM::LBID_t& lbid, const BRM::VER_t &ver, void* bufferPtr) {
+	inline const int read(const BRM::LBID_t& lbid, const BRM::VER_t& ver, void* bufferPtr) {
 		return (fbMgr.find(HashObject_t(lbid, ver, 0), bufferPtr) ? 1 : 0); }
 	
-	const int getBlock(const BRM::LBID_t& lbid, const BRM::QueryContext &ver, BRM::VER_t txn, int compType,
+	/**
+	 * @brief retrieve the LBIDRange of disk blocks from the block cache
+	 **/
+	const int read(const BRM::InlineLBIDRange& range, FileBufferList_t& fbList, const BRM::VER_t ver);
+	
+	const int getBlock(const BRM::LBID_t& lbid, const BRM::VER_t& ver, BRM::VER_t txn, int compType,
 		void* bufferPtr, bool flg, bool &wasCached, bool *wasVersioned, bool insertIntoCache,
 		bool readFromCache);
 
 	int getCachedBlocks(const BRM::LBID_t *lbids, const BRM::VER_t *vers, uint8_t **ptrs,
-		bool *wasCached, uint32_t count);
+		bool *wasCached, uint count);
 
 	inline bool exists(BRM::LBID_t lbid, BRM::VER_t ver) {
 		return fbMgr.exists(HashObject_t(lbid, ver, 0)); }

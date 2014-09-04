@@ -15,34 +15,28 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//   $Id: createtableprocessor.cpp 9627 2013-06-18 13:59:21Z rdempsey $
+//   $Id: createtableprocessor.cpp 9066 2012-11-13 21:37:23Z chao $
 
-#include <unistd.h>
-#include <string>
-using namespace std;
-
-#include <boost/algorithm/string/case_conv.hpp>
-
+#define DDLPKGCREATETABLEPROC_DLLEXPORT
 #include "createtableprocessor.h"
-
-#include "ddlpkg.h"
-using namespace ddlpackage;
-
-#include "we_messages.h"
-using namespace WriteEngine;
-
-#include "oamcache.h"
-using namespace oam;
-
-#include "bytestream.h"
-using namespace messageqcpp;
-
-#include "calpontsystemcatalog.h"
-using namespace execplan;
-
-#include "sqllogger.h"
+#undef DDLPKGCREATETABLEPROC_DLLEXPORT
+#include "sessionmanager.h"
 #include "messagelog.h"
+#include <boost/algorithm/string/case_conv.hpp>
+#include "sqllogger.h"
+#include "we_messages.h"
+#include "bytestream.h"
+#include "oamcache.h"
+using namespace messageqcpp;
+using namespace boost::algorithm;
+using namespace std;
+using namespace execplan;
+using namespace ddlpackage;
 using namespace logging;
+using namespace BRM;
+using namespace WriteEngine;
+using namespace oam;
+using namespace boost;
 
 namespace ddlpackageprocessor
 {
@@ -58,11 +52,11 @@ CreateTableProcessor::DDLResult CreateTableProcessor::processPackage(
 	txnID.valid= fTxnid.valid;
 	result.result = NO_ERROR;
 	int rc1 = 0;
-	rc1 = fDbrm->isReadWrite();
+	rc1 = fDbrm.isReadWrite();
 	if (rc1 != 0 )
 	{
-		Message::Args args;
-		Message message(9);
+		logging::Message::Args args;
+		logging::Message message(9);
 		args.add("Unable to execute the statement due to DBRM is read only");
 		message.format(args);
 		result.result = CREATE_ERROR;	
@@ -107,8 +101,8 @@ CreateTableProcessor::DDLResult CreateTableProcessor::processPackage(
             //release transaction
             fSessionManager.rolledback(txnID);
             // Return the error for display to user
-            Message::Args args;
-            Message message(9);
+            logging::Message::Args args;
+            logging::Message message(9);
             args.add(ie.what());
             message.format(args);
             result.result = CREATE_ERROR;
@@ -124,8 +118,8 @@ CreateTableProcessor::DDLResult CreateTableProcessor::processPackage(
 			//release transaction
             fSessionManager.rolledback(txnID);
             // Return the error for display to user
-            Message::Args args;
-            Message message(9);
+            logging::Message::Args args;
+            logging::Message message(9);
             args.add(ie.what());
             message.format(args);
             result.result = CREATE_ERROR;
@@ -138,8 +132,8 @@ CreateTableProcessor::DDLResult CreateTableProcessor::processPackage(
 		//release transaction
         fSessionManager.rolledback(txnID);
         // Return the error for display to user
-        Message::Args args;
-        Message message(9);
+        logging::Message::Args args;
+        logging::Message message(9);
         args.add(ex.what());
         message.format(args);
         result.result = CREATE_ERROR;
@@ -151,8 +145,8 @@ CreateTableProcessor::DDLResult CreateTableProcessor::processPackage(
 		//release transaction
         fSessionManager.rolledback(txnID);
         // Return the error for display to user
-        Message::Args args;
-        Message message(9);
+        logging::Message::Args args;
+        logging::Message message(9);
         args.add("Unknown exception caught when checking if the table name is already in use.");
         message.format(args);
         result.result = CREATE_ERROR;
@@ -171,8 +165,8 @@ CreateTableProcessor::DDLResult CreateTableProcessor::processPackage(
 		if (roPair.objnum < 3000)
 			goto keepGoing;
 #endif
-		Message::Args args;
-		Message message(9);
+		logging::Message::Args args;
+		logging::Message message(9);
 		args.add("Internal create table error for");
 		args.add(tableName.toString());
 		args.add(": table already exists");
@@ -191,8 +185,7 @@ keepGoing:
 	// Start a new transaction
 	VERBOSE_INFO("Starting a new transaction");
 
-	string stmt = createTableStmt.fSql + "|" + tableDef.fQualifiedName->fSchema +"|";
-	SQLLogger logger(stmt, fDDLLoggingId, createTableStmt.fSessionID, txnID.id);
+	SQLLogger logger(createTableStmt.fSql, fDDLLoggingId, createTableStmt.fSessionID, txnID.id);
 
 
 	std::string err;
@@ -200,34 +193,7 @@ keepGoing:
 	OamCache * oamcache = OamCache::makeOamCache();
 	string errorMsg;
 	//get a unique number
-	uint64_t uniqueId = 0;
-	//Bug 5070. Added exception handling
-	try {
-		uniqueId = fDbrm->getUnique64();
-	}
-	catch (std::exception& ex)
-	{
-		Message::Args args;
-		Message message(9);
-		args.add(ex.what());
-		message.format(args);
-		result.result = CREATE_ERROR;	
-		result.message = message;
-		fSessionManager.rolledback(txnID);
-		return result;
-	}
-	catch ( ... )
-	{
-		Message::Args args;
-		Message message(9);
-		args.add("Unknown error occured while getting unique number.");
-		message.format(args);
-		result.result = CREATE_ERROR;	
-		result.message = message;
-		fSessionManager.rolledback(txnID);
-		return result;
-	}
-	
+	uint64_t uniqueId = fDbrm.getUnique64();
 	fWEClient->addQueue(uniqueId);
 	try
 	{
@@ -235,8 +201,8 @@ keepGoing:
 		VERBOSE_INFO("Allocating object ID for table");	
 		// Allocate a object ID for each column we are about to create
 		VERBOSE_INFO("Allocating object IDs for columns");
-		uint32_t numColumns = tableDef.fColumns.size();
-		uint32_t numDictCols = 0;
+		u_int32_t numColumns = tableDef.fColumns.size();
+		u_int32_t numDictCols = 0;
 		for (unsigned i=0; i < numColumns; i++)
 		{
 			int dataType;
@@ -254,52 +220,64 @@ cout << "Create table allocOIDs got the stating oid " << fStartingColOID << endl
 		{
 			result.result = CREATE_ERROR;
 			errorMsg = "Error in getting objectid from oidmanager.";
-			Message::Args args;
-			Message message(9);
+			logging::Message::Args args;
+			logging::Message message(9);
 			args.add("Create table failed due to ");
 			args.add(errorMsg);
-			message.format(args);
 			result.message = message;
 			fSessionManager.rolledback(txnID);
 			return result;
 		}
 
-		// Write the table metadata to the systemtable
-		VERBOSE_INFO("Writing meta data to SYSTABLE");
+		// Write the tables metadata to the system catalog
+		VERBOSE_INFO("Writing meta data to SYSTABLES");
 		ByteStream bytestream;
 		bytestream << (ByteStream::byte)WE_SVR_WRITE_SYSTABLE;
 		bytestream << uniqueId;
-		bytestream << (uint32_t) createTableStmt.fSessionID;
-		bytestream << (uint32_t)txnID.id;
-		bytestream << (uint32_t)fStartingColOID;
-		bytestream << (uint32_t)createTableStmt.fTableWithAutoi;
-		uint16_t  dbRoot;
+		bytestream << (u_int32_t) createTableStmt.fSessionID;
+		bytestream << (u_int32_t)txnID.id;
+		bytestream << (u_int32_t)fStartingColOID;
+		bytestream << (u_int32_t)createTableStmt.fTableWithAutoi;
+		
+		bytestream << numColumns;
+		for (unsigned i = 0; i <numColumns; ++i) {
+			bytestream << (u_int32_t)(fStartingColOID+i+1);
+		}	
+		bytestream << numDictCols;
+		for (unsigned i = 0; i <numDictCols; ++i) {
+			bytestream << (u_int32_t)(fStartingColOID+numColumns+i+1);
+		}	
+		
+		u_int8_t alterFlag = 0;
+		int colPos = 0;
+		bytestream << (ByteStream::byte)alterFlag;
+		bytestream << (u_int32_t)colPos;
+		
+		u_int16_t  dbRoot;
 		BRM::OID_t sysOid = 1001;
 		//Find out where systable is
-		rc = fDbrm->getSysCatDBRoot(sysOid, dbRoot); 
+		rc = fDbrm.getSysCatDBRoot(sysOid, dbRoot); 
 		if (rc != 0)
 		{
 			result.result =(ResultCode) rc;
-			Message::Args args;
-			Message message(9);
+			logging::Message::Args args;
+			logging::Message message(9);
 			args.add("Error while calling getSysCatDBRoot ");
 			args.add(errorMsg);
-			message.format(args);
 			result.message = message;
 			//release transaction
 			fSessionManager.rolledback(txnID);
 			return result;
 		}
-	
 		int pmNum = 1;
-		bytestream << (uint32_t)dbRoot; 
+		bytestream << (u_int32_t)dbRoot; 
 		tableDef.serialize(bytestream);
 		boost::shared_ptr<messageqcpp::ByteStream> bsIn;
 		boost::shared_ptr<std::map<int, int> > dbRootPMMap = oamcache->getDBRootToPMMap();
 		pmNum = (*dbRootPMMap)[dbRoot];
 		try
 		{			
-			fWEClient->write(bytestream, (unsigned)pmNum);
+			fWEClient->write(bytestream, (uint)pmNum);
 #ifdef IDB_DDL_DEBUG
 cout << "create table sending We_SVR_WRITE_SYSTABLE to pm " << pmNum << endl;
 #endif	
@@ -345,111 +323,8 @@ cout << "create table got unknown exception" << endl;
 		if (rc != 0)
 		{
 			result.result =(ResultCode) rc;
-			Message::Args args;
-			Message message(9);
-			args.add("Create table failed due to ");
-			args.add(errorMsg);
-			message.format( args );
-			result.message = message;
-			if (rc != NETWORK_ERROR)
-			{
-				rollBackTransaction( uniqueId, txnID, createTableStmt.fSessionID );	//What to do with the error code			
-			}
-			//release transaction
-			fSessionManager.rolledback(txnID);
-			return result;
-		}
-			
-		VERBOSE_INFO("Writing meta data to SYSCOLUMN");
-		bytestream.restart();
-		bytestream << (ByteStream::byte)WE_SVR_WRITE_CREATE_SYSCOLUMN;
-		bytestream << uniqueId;
-		bytestream << (uint32_t) createTableStmt.fSessionID;
-		bytestream << (uint32_t)txnID.id;			
-		bytestream << numColumns;
-		for (unsigned i = 0; i <numColumns; ++i) {
-			bytestream << (uint32_t)(fStartingColOID+i+1);
-		}	
-		bytestream << numDictCols;
-		for (unsigned i = 0; i <numDictCols; ++i) {
-			bytestream << (uint32_t)(fStartingColOID+numColumns+i+1);
-		}	
-		
-		uint8_t alterFlag = 0;
-		int colPos = 0;
-		bytestream << (ByteStream::byte)alterFlag;
-		bytestream << (uint32_t)colPos;
-				
-		sysOid = 1021;
-		//Find out where syscolumn is
-		rc = fDbrm->getSysCatDBRoot(sysOid, dbRoot); 
-		if (rc != 0)
-		{
-			result.result =(ResultCode) rc;
-			Message::Args args;
-			Message message(9);
-			args.add("Error while calling getSysCatDBRoot ");
-			args.add(errorMsg);
-			message.format(args);
-			result.message = message;
-			//release transaction
-			fSessionManager.rolledback(txnID);
-			return result;
-		}
-
-		bytestream << (uint32_t)dbRoot; 
-		tableDef.serialize(bytestream);
-		pmNum = (*dbRootPMMap)[dbRoot];
-		try
-		{			
-			fWEClient->write(bytestream, (uint32_t)pmNum);
-#ifdef IDB_DDL_DEBUG
-cout << "create table sending We_SVR_WRITE_SYSTABLE to pm " << pmNum << endl;
-#endif	
-			while (1)
-			{
-				bsIn.reset(new ByteStream());
-				fWEClient->read(uniqueId, bsIn);
-				if ( bsIn->length() == 0 ) //read error
-				{
-					rc = NETWORK_ERROR;
-					errorMsg = "Lost connection to Write Engine Server while updating SYSTABLES";
-					break;
-				}			
-				else {
-					*bsIn >> rc;
-					if (rc != 0) {
-                        errorMsg.clear();
-						*bsIn >> errorMsg;
-#ifdef IDB_DDL_DEBUG
-cout << "Create table We_SVR_WRITE_CREATETABLEFILES: " << errorMsg << endl;
-#endif
-					}
-					break;
-				}
-			}
-		}
-		catch (runtime_error& ex) //write error
-		{
-#ifdef IDB_DDL_DEBUG
-cout << "create table got exception" << ex.what() << endl;
-#endif			
-			rc = NETWORK_ERROR;
-			errorMsg = ex.what();
-		}
-		catch (...)
-		{
-			rc = NETWORK_ERROR;
-#ifdef IDB_DDL_DEBUG
-cout << "create table got unknown exception" << endl;
-#endif
-		}
-		
-		if (rc != 0)
-		{
-			result.result =(ResultCode) rc;
-			Message::Args args;
-			Message message(9);
+			logging::Message::Args args;
+			logging::Message message(9);
 			args.add("Create table failed due to ");
 			args.add(errorMsg);
 			message.format( args );
@@ -481,7 +356,6 @@ cout << "create table got unknown exception" << endl;
 		bytestream.restart();
 		bytestream << (ByteStream::byte)WE_SVR_WRITE_CREATETABLEFILES;
 		bytestream << uniqueId;
-		bytestream << (uint32_t)txnID.id;
 		bytestream << (numColumns + numDictCols);
 		unsigned colNum = 0;
 		unsigned dictNum = 0;
@@ -489,9 +363,8 @@ cout << "create table got unknown exception" << endl;
 		{
 			colDefPtr = *iter;
 
-			CalpontSystemCatalog::ColDataType dataType = convertDataType(colDefPtr->fType->fType);
-			if (dataType == CalpontSystemCatalog::DECIMAL ||
-                dataType == CalpontSystemCatalog::UDECIMAL)
+			int dataType1 = convertDataType(colDefPtr->fType->fType);
+			if (dataType1 == CalpontSystemCatalog::DECIMAL)
 			{
 				if (colDefPtr->fType->fPrecision == -1 || colDefPtr->fType->fPrecision == 0)
 				{
@@ -515,22 +388,23 @@ cout << "create table got unknown exception" << endl;
 					colDefPtr->fType->fLength = 8;
 				}	
 			}
+			WriteEngine::ColDataType dataType = static_cast<WriteEngine::ColDataType>(dataType1);
 			bytestream << (fStartingColOID + (colNum++) + 1);
-			bytestream << (uint8_t) dataType;
-			bytestream << (uint8_t) false;
+			bytestream << (u_int8_t) dataType;
+			bytestream << (u_int8_t) false;
 
 			bytestream << (uint32_t) colDefPtr->fType->fLength;
-			bytestream << (uint16_t) useDBRoot;
+			bytestream << (u_int16_t) useDBRoot;
 			bytestream << (uint32_t) colDefPtr->fType->fCompressiontype;
-			if ( (dataType == CalpontSystemCatalog::CHAR && colDefPtr->fType->fLength > 8) ||
-				 (dataType == CalpontSystemCatalog::VARCHAR && colDefPtr->fType->fLength > 7) ||
-				 (dataType == CalpontSystemCatalog::VARBINARY && colDefPtr->fType->fLength > 7) )
+			if ( (dataType == WriteEngine::CHAR && colDefPtr->fType->fLength > 8) ||
+				 (dataType == WriteEngine::VARCHAR && colDefPtr->fType->fLength > 7) ||
+				 (dataType == WriteEngine::VARBINARY && colDefPtr->fType->fLength > 7) )
 			{
 				bytestream << (uint32_t) (fStartingColOID+numColumns+(dictNum++)+1);
-				bytestream << (uint8_t) dataType;
-				bytestream << (uint8_t) true;
+				bytestream << (u_int8_t) dataType;
+				bytestream << (u_int8_t) true;
 				bytestream << (uint32_t) colDefPtr->fType->fLength;
-				bytestream << (uint16_t) useDBRoot;
+				bytestream << (u_int16_t) useDBRoot;
 				bytestream << (uint32_t) colDefPtr->fType->fCompressiontype;
 			}
 			++iter;
@@ -553,8 +427,8 @@ cout << "create table got unknown exception" << endl;
 		catch (std::exception& ex)
 		{
 			result.result =(ResultCode) rc;
-			Message::Args args;
-			Message message(9);
+			logging::Message::Args args;
+			logging::Message message(9);
 			args.add("Create table failed due to ");
 			args.add(ex.what());
 			message.format( args );
@@ -618,9 +492,6 @@ cout << "Create table We_SVR_WRITE_CREATETABLEFILES: " << errorMsg << endl;
 						break;
 					}
 				}
-				//@Bug 5464. Delete from extent map.
-				fDbrm->deleteOIDs(oidList);
-				
 			}		
 		}
 		catch (runtime_error&)
@@ -642,13 +513,13 @@ cout << "Create table We_SVR_WRITE_CREATETABLEFILES: " << errorMsg << endl;
 		}
 		
 		// Log the DDL statement.
-		logDDL(createTableStmt.fSessionID, txnID.id, createTableStmt.fSql, createTableStmt.fOwner);
+		logging::logDDL(createTableStmt.fSessionID, txnID.id, createTableStmt.fSql, createTableStmt.fOwner);
 	}
 	catch (std::exception& ex)
 	{
 		result.result = CREATE_ERROR;
-		Message::Args args;
-		Message message(9);
+		logging::Message::Args args;
+		logging::Message message(9);
 		args.add("Create table failed due to ");
 		args.add(ex.what());
 		message.format( args );
@@ -661,8 +532,8 @@ cout << "Create table We_SVR_WRITE_CREATETABLEFILES: " << errorMsg << endl;
 	if (rc !=0)
 	{
 		result.result = CREATE_ERROR;
-		Message::Args args;
-		Message message(9);
+		logging::Message::Args args;
+		logging::Message message(9);
 		args.add("Create table failed due to ");
 		args.add(errorMsg);
 		message.format( args );
@@ -676,8 +547,8 @@ void CreateTableProcessor::rollBackCreateTable(const string& error, BRM::TxnID t
 {
 	cerr << "CreatetableProcessor::processPackage: " << error << endl;
 
-	Message::Args args;
-	Message message(1);
+	logging::Message::Args args;
+	logging::Message message(1);
 	args.add("Create table Failed: ");
 	args.add(error);
 	args.add("");
@@ -704,8 +575,8 @@ void CreateTableProcessor::rollBackCreateTable(const string& error, BRM::TxnID t
 	}
 	catch (std::exception& ex)
 	{
-		Message::Args args;
-		Message message(6);
+		logging::Message::Args args;
+		logging::Message message(6);
 		args.add(ex.what());
 		message.format(args);
 		result.message = message;
@@ -713,15 +584,22 @@ void CreateTableProcessor::rollBackCreateTable(const string& error, BRM::TxnID t
 	}
 	catch (...)
 	{
-        Message::Args args;
-        Message message(6);
+        logging::Message::Args args;
+        logging::Message message(6);
         args.add("Unknown exception");
         message.format(args);
         result.message = message;
         result.result = CREATE_ERROR;
 		//cout << "returnOIDs error" << endl;
 	}
+	IndexOIDList::const_iterator idxoid_iter = fIndexOIDList.begin();
+	while (idxoid_iter != fIndexOIDList.end())
+	{
+		IndexOID idxOID = *idxoid_iter;
+		(void)0;
 
+		++idxoid_iter;
+	}
 	DictionaryOIDList::const_iterator dictoid_iter = fDictionaryOIDList.begin();
 	while (dictoid_iter != fDictionaryOIDList.end())
 	{
@@ -734,5 +612,42 @@ void CreateTableProcessor::rollBackCreateTable(const string& error, BRM::TxnID t
 	fSessionManager.rolledback(txnID);
 }
 
-} // namespace ddlpackageprocessor
+/*
+void CreateTableProcessor::createIndexFiles(DDLResult& result, ddlpackage::TableDef& tableDef)
+{
+	SUMMARY_INFO("CreateTableProcessor::createIndexFiles");
+
+	if (result.result != NO_ERROR)
+		return;
+
+	int error = NO_ERROR;
+
+	IndexOIDList::const_iterator iter = fIndexOIDList.begin();
+	while (iter != fIndexOIDList.end())
+	{
+		IndexOID idxOID = *iter;
+
+		error = fWriteEngine.createIndex(idxOID.treeOID, idxOID.listOID);
+		if (error != WriteEngine::NO_ERROR)
+		{
+			logging::Message::Args args;
+			logging::Message message(9);
+			args.add("Error creating index file: ");
+			args.add(idxOID.treeOID);
+			args.add("error number: ");
+			args.add(error);
+			message.format(args);
+
+			result.result = CREATE_ERROR;
+			result.message = message;
+
+			break;
+		}
+
+		++iter;
+	}
+
+}
+*/
+}												 // namespace ddlpackageprocessor
 // vim:ts=4 sw=4:

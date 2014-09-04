@@ -28,21 +28,26 @@
 using namespace std;
 using namespace boost;
 
-#include "atomicops.h"
+#if defined(_MSC_VER) && !defined(_WIN64)
+#  ifndef InterlockedAdd
+#    define InterlockedAdd64 InterlockedAdd
+#    define InterlockedAdd(x, y) ((x) + (y))
+#  endif
+#endif
 
 namespace primitiveprocessor
 {
 	
-extern uint32_t connectionsPerUM;
+extern uint connectionsPerUM;
 	
 BPPSendThread::BPPSendThread() : die(false), gotException(false), mainThreadWaiting(false),
 	sizeThreshold(100), msgsLeft(-1), waiting(false), sawAllConnections(false),
 	fcEnabled(false), currentByteSize(0), maxByteSize(25000000)
 {
 	runner = boost::thread(Runner_t(this));
-}
-
-BPPSendThread::BPPSendThread(uint32_t initMsgsLeft) : die(false), gotException(false),
+}	
+	
+BPPSendThread::BPPSendThread(uint initMsgsLeft) : die(false), gotException(false),
 	mainThreadWaiting(false), sizeThreshold(100), msgsLeft(initMsgsLeft), waiting(false),
 	sawAllConnections(false), fcEnabled(false), currentByteSize(0), maxByteSize(25000000)
 {
@@ -76,7 +81,11 @@ void BPPSendThread::sendResult(const Msg_t &msg, bool newConnection)
 	mutex::scoped_lock sl(msgQueueLock);
 	if (gotException)
 		throw runtime_error(exceptionString);
-	(void)atomicops::atomicAdd<uint64_t>(&currentByteSize, msg.msg->lengthWithHdrOverhead());
+#ifdef _MSC_VER
+	InterlockedAdd64(&currentByteSize, msg.msg->lengthWithHdrOverhead());
+#else		
+	__sync_add_and_fetch(&currentByteSize, msg.msg->lengthWithHdrOverhead());
+#endif
 	msgQueue.push(msg);
 	if (!sawAllConnections && newConnection) {
 		Connection_t ins(msg.sockLock, msg.sock);
@@ -112,8 +121,12 @@ void BPPSendThread::sendResults(const vector<Msg_t> &msgs, bool newConnection)
 			}
 		}
 	}
-	for (uint32_t i = 0; i < msgs.size(); i++) {
-		(void)atomicops::atomicAdd<uint64_t>(&currentByteSize, msgs[i].msg->lengthWithHdrOverhead());
+	for (uint i = 0; i < msgs.size(); i++) {
+#ifdef _MSC_VER
+		InterlockedAdd64(&currentByteSize, msgs[i].msg->lengthWithHdrOverhead());
+#else
+		__sync_add_and_fetch(&currentByteSize, msgs[i].msg->lengthWithHdrOverhead());
+#endif
 		msgQueue.push(msgs[i]);
 	}
 	if (mainThreadWaiting)
@@ -131,7 +144,11 @@ void BPPSendThread::sendMore(int num)
 		msgsLeft = 0;
 	}
 	else
-	(void)atomicops::atomicAdd(&msgsLeft, num);
+#ifdef _MSC_VER
+		InterlockedAdd(&msgsLeft, num);
+#else
+		__sync_add_and_fetch(&msgsLeft, num);
+#endif
 	if (waiting)
 		okToSend.notify_one();
 }
@@ -143,13 +160,13 @@ bool BPPSendThread::flowControlEnabled()
 
 void BPPSendThread::mainLoop()
 {
-	const uint32_t msgCap = 20;
+	const uint msgCap = 20;
 	boost::scoped_array<Msg_t> msg;
-	uint32_t msgCount = 0, i, msgsSent;
+	uint msgCount = 0, i, msgsSent;
 	SP_UM_MUTEX lock;
 	SP_UM_IOSOCK sock;
 	bool doLoadBalancing = false;
-
+	
 	msg.reset(new Msg_t[msgCap]);
 
 	while (!die) {
@@ -160,7 +177,7 @@ void BPPSendThread::mainLoop()
 			mainThreadWaiting = false;
 			continue;
 		}
-
+	
 		msgCount = (msgQueue.size() > msgCap ? msgCap : msgQueue.size());
 		for (i = 0; i < msgCount; i++) {
 			msg[i] = msgQueue.front();
@@ -174,9 +191,9 @@ void BPPSendThread::mainLoop()
 		msgsSent = 0;
 		while (msgsSent < msgCount && !die) {
 			uint64_t bsSize;
-			if (msgsLeft <= 0 && fcEnabled && !die) {
+			if (msgsLeft == 0 && fcEnabled && !die) {
 				mutex::scoped_lock sl2(ackLock);
-				while (msgsLeft <= 0 && fcEnabled && !die) {
+				while (msgsLeft == 0 && fcEnabled && !die) {
 					waiting = true;
 					okToSend.wait(sl2);
 					waiting = false;
@@ -205,8 +222,15 @@ void BPPSendThread::mainLoop()
 					gotException = true;
 					return;
 				}
-				(void)atomicops::atomicDec(&msgsLeft);
-				(void)atomicops::atomicSub(&currentByteSize, bsSize);
+#ifdef _MSC_VER
+				InterlockedAdd(&msgsLeft, -1);
+				//FIXME: is bsSize always small enough to fit into a signed var?
+				int64_t sbsSize = static_cast<int64_t>(bsSize);
+				InterlockedAdd64(&currentByteSize, -sbsSize);
+#else
+				__sync_sub_and_fetch(&msgsLeft, 1);
+				__sync_sub_and_fetch(&currentByteSize, bsSize);
+#endif			
 				msg[msgsSent].msg.reset();
 			}
 		}

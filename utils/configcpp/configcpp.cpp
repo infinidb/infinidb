@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************************
-* $Id: configcpp.cpp 3899 2013-06-17 20:54:10Z rdempsey $
+* $Id: configcpp.cpp 3281 2012-09-13 18:38:27Z rdempsey $
 *
 ******************************************************************************************/
 #include "config.h"
@@ -25,9 +25,6 @@
 #include <stdexcept>
 #include <iostream>
 #include <sstream>
-#include <fstream>
-#include <vector>
-#include <string>
 using namespace std;
 
 #include <boost/thread.hpp>
@@ -51,15 +48,15 @@ namespace fs=boost::filesystem;
 //#define NDEBUG
 #include <cassert>
 
+#define LIBCONFIG_DLLEXPORT
 #include "configcpp.h"
+#undef LIBCONFIG_DLLEXPORT
 
 #include "exceptclasses.h"
 #include "installdir.h"
 #ifdef _MSC_VER
 #include "idbregistry.h"
 #endif
-
-#include "bytestream.h"
 
 namespace
 {
@@ -70,8 +67,6 @@ namespace config
 {
 Config::configMap_t Config::fInstanceMap;
 boost::mutex Config::fInstanceMapMutex;
-boost::mutex Config::fXmlLock;
-boost::mutex Config::fWriteXmlLock;
 
 Config* Config::makeConfig(const string& cf)
 {
@@ -170,9 +165,7 @@ void Config::parseDoc(void)
 			cerr << oss.str() << endl;
 		}
 
-        fXmlLock.lock(); 
 		fDoc = xmlParseFile(fConfigFile.c_str());
-        fXmlLock.unlock();
 
 		fl.l_type   = F_UNLCK;	//unlock
 		fcntl(fd, F_SETLK, &fl);
@@ -323,7 +316,6 @@ void Config::delConfig(const string& section, const string& name)
 
 void Config::writeConfig(const string& configFile) const
 {
-	mutex::scoped_lock lk(fLock);
 	FILE *fi;
 	if (fDoc == 0)
 		throw runtime_error("Config::writeConfig: no XML document!");
@@ -362,9 +354,10 @@ void Config::writeConfig(const string& configFile) const
 		if ((fi = fopen(dcft.string().c_str(), "w+")) == NULL)
 			throw runtime_error("Config::writeConfig: error writing config file " + configFile);
 
-		int rc;
+		int rc, err=0;
 		rc = xmlDocDump(fi, fDoc);
 		if ( rc < 0) {
+			err = errno;
 			throw runtime_error("Config::writeConfig: error writing config file " + configFile);
 			//cout << "xmlDocDump " << rc << " " << errno << endl;
 		}
@@ -380,15 +373,9 @@ void Config::writeConfig(const string& configFile) const
 
 			//good read, save copy, copy temp file tp tmp then to Calpont.xml
 			//move to /tmp to get around a 'same file error' in mv command
-			try {
-				if (exists(scft)) fs::remove(scft);
-			} catch (fs::filesystem_error&) { }
+			unlink(scft.string().c_str());
 			fs::copy_file(dcf, scft, fs::copy_option::overwrite_if_exists);
-			try {
-				fs::permissions(scft, fs::add_perms | fs::owner_read | fs::owner_write |
-													  fs::group_read | fs::group_write |
-													  fs::others_read | fs::others_write);
-			} catch (fs::filesystem_error&) { }
+			chmod(scft.string().c_str(), 0666);
 
 			if (exists(tcft)) fs::remove(tcft);
 			fs::rename(dcft, tcft);
@@ -416,7 +403,6 @@ void Config::writeConfig(const string& configFile) const
 
 void Config::write(void) const
 {
-	mutex::scoped_lock lk(fWriteXmlLock);
 #ifdef _MSC_VER
 	writeConfig(fConfigFile);
 #else
@@ -441,18 +427,7 @@ void Config::write(const string& configFile) const
 		if (fcntl(fd, F_SETLKW, &fl) == -1)
 			throw runtime_error("Config::write: file lock error " + configFile);
 
-
-        try
-        {
-            writeConfig(configFile);
-        }
-        catch(...)
-        {
-            fl.l_type   = F_UNLCK;	//unlock
-            if (fcntl(fd, F_SETLK, &fl) == -1)
-                throw runtime_error("Config::write: file unlock error after exception in writeConfig " + configFile);
-            throw;
-        }
+		writeConfig(configFile);
 
 		fl.l_type   = F_UNLCK;	//unlock
 		if (fcntl(fd, F_SETLK, &fl) == -1)
@@ -465,44 +440,6 @@ void Config::write(const string& configFile) const
 		writeConfig(configFile);
 	}
 }
-
-void Config::writeConfigFile(messageqcpp::ByteStream msg) const
-{
-	struct flock fl;
-	int fd;
-
-	//get config file name being udated
-	string fileName;
-	msg >> fileName;
-
-	fl.l_type   = F_WRLCK;  // write lock
-	fl.l_whence = SEEK_SET;
-	fl.l_start  = 0;
-	fl.l_len    = 0;
-	fl.l_pid    = getpid();
-
-	// lock file if it exists
-	if ((fd = open(fileName.c_str(), O_WRONLY)) >= 0)
-	{
-		if (fcntl(fd, F_SETLKW, &fl) == -1)
-			throw runtime_error("Config::write: file lock error " + fileName);
-
-		ofstream out(fileName.c_str());
-		out << msg;
-
-		fl.l_type   = F_UNLCK;	//unlock
-		if (fcntl(fd, F_SETLK, &fl) == -1)
-			throw runtime_error("Config::write: file unlock error " + fileName);
-
-		close(fd);
-	}
-	else
-	{
-		ofstream out(fileName.c_str());
-		out << msg;
-	}
-}
-
 
 /* static */
 void Config::deleteInstanceMap()
@@ -569,50 +506,6 @@ time_t Config::getCurrentMTime()
 		return statbuf.st_mtime;
 	else
 		return 0;
-}
-
-const vector<string> Config::enumConfig()
-{
-	mutex::scoped_lock lk(fLock);
-
-	if (fDoc == 0){
-		throw runtime_error("Config::getConfig: no XML document!");
-	}
-
-	struct stat statbuf;
-	if (stat(fConfigFile.c_str(), &statbuf) == 0)
-	{
-		if (statbuf.st_mtime != fMtime)
-		{
-			closeConfig();
-			fMtime = statbuf.st_mtime;
-			parseDoc();
-		}
-	}
-
-	return fParser.enumConfig(fDoc);
-}
-
-const vector<string> Config::enumSection(const string& section)
-{
-	mutex::scoped_lock lk(fLock);
-
-	if (fDoc == 0){
-		throw runtime_error("Config::getConfig: no XML document!");
-	}
-
-	struct stat statbuf;
-	if (stat(fConfigFile.c_str(), &statbuf) == 0)
-	{
-		if (statbuf.st_mtime != fMtime)
-		{
-			closeConfig();
-			fMtime = statbuf.st_mtime;
-			parseDoc();
-		}
-	}
-
-	return fParser.enumSection(fDoc, section);
 }
 
 } //namespace config

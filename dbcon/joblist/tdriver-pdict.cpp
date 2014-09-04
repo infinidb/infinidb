@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: tdriver-pdict.cpp 9210 2013-01-21 14:10:42Z rdempsey $
+ * $Id: tdriver-pdict.cpp 8436 2012-04-04 18:18:21Z rdempsey $
  *
  ****************************************************************************/
 
@@ -53,7 +53,7 @@ public:
 		DistributedEngineComm* dec;
 		boost::shared_ptr<CalpontSystemCatalog> cat;
 		ElementType e;
-		uint32_t i, it;
+		uint i, it;
 		bool more;
 		BRM::DBRM dbrm;
 		const uint32_t dictOID=2064;
@@ -82,7 +82,7 @@ public:
 		// populate the element pair
 		UintRowGroup rw;
 
-		const uint32_t tcount=10;
+		const uint tcount=10;
 		for (i = 1; i <= tcount; i++) {
 			WriteEngine::Token token; // rid
 			token.op=i; // index of sig in block

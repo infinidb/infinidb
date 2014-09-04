@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_ucase.cpp 3923 2013-06-19 21:43:06Z bwilkinson $
+* $Id: func_ucase.cpp 3716 2013-04-18 16:35:52Z bpaul $
 *
 *
 ****************************************************************************/
@@ -61,7 +61,7 @@ std::string Func_ucase::getStrVal(rowgroup::Row& row,
 
 //	transform (str.begin(), str.end(), str.begin(), to_lower());
 
-	const string& tstr = fp[0]->data()->getStrVal(row, isNull);
+	string tstr = fp[0]->data()->getStrVal(row, isNull);
 	if (isNull)
 		return "";
 
@@ -70,7 +70,7 @@ std::string Func_ucase::getStrVal(rowgroup::Row& row,
 	strwclen = utf8::idb_mbstowcs(wcbuf, tstr.c_str(), strwclen);
 	wstring wstr(wcbuf, strwclen);
 
-	for (uint32_t i = 0; i < strwclen; i++)
+	for (uint i = 0; i < strwclen; i++)
 		wstr[i] = std::towupper(wstr[i]);
 
 	size_t strmblen = utf8::idb_wcstombs(0, wstr.c_str(), 0) + 1;

@@ -37,24 +37,18 @@ for arg in "$@"; do
 	elif [ $(expr -- "$arg" : '--quiet') -eq 7 ]; then
 		quiet=1
 		((shiftcnt++))
-	elif [ $(expr -- "$arg" : '--port') -eq 6 ]; then
-		mysqlPort="$(echo $arg | awk -F= '{print $2}')"
-		((shiftcnt++))
-	elif [ $(expr -- "$arg" : '--module') -eq 8 ]; then
-		module="$(echo $arg | awk -F= '{print $2}')"
-		((shiftcnt++))
 	fi
 done
 shift $shiftcnt
 
 if [ $installdir != "/usr/local/Calpont" ]; then
-	export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$INFINIDB_INSTALL_DIR/lib:$INFINIDB_INSTALL_DIR/mysql/lib/mysql
+	export LD_LIBRARY_PATH=$INFINIDB_INSTALL_DIR/lib:$INFINIDB_INSTALL_DIR/mysql/lib/mysql
 fi
 
 export INFINIDB_INSTALL_DIR=$installdir
 
 cloud=`$INFINIDB_INSTALL_DIR/bin/getConfig Installation Cloud`
-if [ $cloud = "amazon-ec2" ] || [ $cloud = "amazon-vpc" ]; then
+if [ $cloud = "amazon" ]; then
 	cp $INFINIDB_INSTALL_DIR/local/etc/*.pem /root/. > /dev/null 2>&1
 
 	if test -f $INFINIDB_INSTALL_DIR/local/fstab ; then
@@ -71,8 +65,8 @@ test -f $INFINIDB_INSTALL_DIR/post/functions && . $INFINIDB_INSTALL_DIR/post/fun
 mid=`module_id`
 
 #if um, cloud, separate system type, external um storage, then setup mount
-if [ $module = "um" ]; then
-	if [ $cloud = "amazon-ec2" ] || [ $cloud = "amazon-vpc" ]; then
+if [ "$1" = "um" ]; then
+	if [ $cloud = "amazon" ]; then
 		systemtype=`$INFINIDB_INSTALL_DIR/bin/getConfig Installation ServerTypeInstall`
 		if [ $systemtype = "1" ]; then
 			umstoragetype=`$INFINIDB_INSTALL_DIR/bin/getConfig Installation UMStorageType`
@@ -88,7 +82,7 @@ if [ $module = "um" ]; then
 fi
 
 #if pm, create dbroot directories
-if [ $module = "pm" ]; then
+if [ "$1" = "pm" ]; then
 	numdbroots=`$INFINIDB_INSTALL_DIR/bin/getConfig SystemConfig DBRootCount`
 	for (( id=1; id<$numdbroots+1; id++ )); do
 		mkdir -p $INFINIDB_INSTALL_DIR/data$id > /dev/null 2>&1
@@ -110,48 +104,6 @@ if [ $EUID -eq 0 -a -f $INFINIDB_INSTALL_DIR/local/rc.local.calpont ]; then
 		sudo cat $INFINIDB_INSTALL_DIR/local/rc.local.calpont >> /etc/rc.local
 	fi
 fi
-
-if [ $user != "root" ]; then
-	echo "Setup .bashrc on Module for non-root"
-
-	eval userhome=~$user
-	bashFile=$userhome/.bashrc
-	touch ${bashFile}
-
-	echo " " >> ${bashFile}
-	echo "export INFINIDB_INSTALL_DIR=$INFINIDB_INSTALL_DIR" >> ${bashFile}
-	echo "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$INFINIDB_INSTALL_DIR/lib:$INFINIDB_INSTALL_DIR/mysql/lib/mysql" >> ${bashFile}
-fi
-
-plugin=`$INFINIDB_INSTALL_DIR/bin/getConfig SystemConfig DataFilePlugin`
-if [ -n "$plugin" ]; then
-	echo "Setup .bashrc on Module for local-query"
-
-	setenv=`$INFINIDB_INSTALL_DIR/bin/getConfig SystemConfig DataFileEnvFile`
-
-	eval userhome=~$user
-	bashFile=$userhome/.bashrc
-	touch ${bashFile}
-
-	echo " " >> ${bashFile}
-	echo ". $INFINIDB_INSTALL_DIR/bin/$setenv" >> ${bashFile}
-fi
-
-# if mysqlrep is on and module has a my.cnf file, upgrade it
-
-MySQLRep=`$INFINIDB_INSTALL_DIR/bin/getConfig Installation MySQLRep`
-if [ $MySQLRep = "y" ]; then
-	if test -f $INFINIDB_INSTALL_DIR/mysql/my.cnf ; then
-		echo "Run Upgrade on my.cnf on Module"
-		$INFINIDB_INSTALL_DIR/bin/mycnfUpgrade > /tmp/mycnfUpgrade.log 2>&1
-	fi
-fi
-
-if test -f $INFINIDB_INSTALL_DIR/mysql/my.cnf ; then
-	echo "Run Mysql Port update on my.cnf on Module"
-	$INFINIDB_INSTALL_DIR/bin/mycnfUpgrade $mysqlPort > /tmp/mycnfUpgrade_port.log 2>&1
-fi
-
 
 echo " "
 echo "!!!Module Installation Successfully Completed!!!"

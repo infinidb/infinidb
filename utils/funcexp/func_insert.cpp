@@ -26,6 +26,7 @@ using namespace std;
 
 #include "functor_str.h"
 #include "functioncolumn.h"
+#include "utils_utf8.h"
 using namespace execplan;
 
 #include "rowgroup.h"
@@ -33,9 +34,6 @@ using namespace rowgroup;
 
 #include "joblisttypes.h"
 using namespace joblist;
-
-#include "utf8.h"
-using namespace utf8;
 
 #define STRCOLL_ENH__
 
@@ -48,52 +46,32 @@ CalpontSystemCatalog::ColType Func_insert::operationType(FunctionParm& fp, Calpo
 	return fp[0]->data()->resultType();
 }
 
-string insertStr(const string& src, int pos, int len, const string& targ)
-{
-	int64_t strLen = static_cast<int64_t>(src.length());
-
-    if ((pos <= 0) || ((pos-1) > strLen))
-        return src;
-
-    if ((len < 0) || (len > strLen))
-        len = strLen;
-
-    const char* srcptr = src.c_str();
-    advance(srcptr,pos-1,srcptr+strLen);
-    // srcptr now pointing to where we need to insert targ string
-
-    uint32_t srcPos = srcptr - src.c_str();
-
-    uint32_t finPos = strLen;
-	const char* finptr = src.c_str();
-    if ((strLen - (pos-1+len)) >= 0)
-    {
-	    advance(finptr,(pos-1+len),finptr+strLen);
-    	// finptr now pointing to the end of the string to replace
-		finPos = finptr - src.c_str();
-    }
-
-    string out;
-    out.reserve(srcPos + targ.length() + strLen-finPos + 1);
-    out.append( src.c_str(), srcPos );
-    out.append( targ.c_str(), targ.length() );
-    out.append( src.c_str() + finPos, strLen-finPos );
-
-    return out;
-}
-
 std::string Func_insert::getStrVal(rowgroup::Row& row,
 						FunctionParm& fp,
 						bool& isNull,
 						execplan::CalpontSystemCatalog::ColType&)
 {	
-	const string& tstr = stringValue(fp[0], row, isNull);
+	string tstr = stringValue(fp[0], row, isNull);
 	if (isNull)
 		return "";
 
-	const string& tnewstr = stringValue(fp[3], row, isNull);
+	size_t strwclen = utf8::idb_mbstowcs(0, tstr.c_str(), 0) + 1;
+	wchar_t* wcbuf = (wchar_t*)alloca(strwclen * sizeof(wchar_t));
+	strwclen = utf8::idb_mbstowcs(wcbuf, tstr.c_str(), strwclen);
+	wstring str(wcbuf, strwclen);
+
+	int64_t strLen = static_cast<int64_t>(str.length());
+
+	string tnewstr = stringValue(fp[3], row, isNull);
 	if (isNull)
 		return "";
+
+	strwclen = utf8::idb_mbstowcs(0, tnewstr.c_str(), 0) + 1;
+	wcbuf = (wchar_t*)alloca(strwclen * sizeof(wchar_t));
+	strwclen = utf8::idb_mbstowcs(wcbuf, tnewstr.c_str(), strwclen);
+	wstring newstr(wcbuf, strwclen);
+
+	int64_t newstrLen = static_cast<int64_t>(newstr.length());
 
 	int64_t pos = fp[1]->data()->getIntVal(row, isNull);
 	if (isNull)
@@ -103,7 +81,28 @@ std::string Func_insert::getStrVal(rowgroup::Row& row,
 	if (isNull)
 		return "";
 
-    return insertStr( tstr, pos, len, tnewstr );	
+	if ((pos < 0) || ((pos-1) > strLen))
+		return tstr;
+
+	if ((len < 0) || (len > strLen))
+		len = strLen;
+	
+	/* Re-testing with corrected params */
+	if ((pos-1) > strLen)
+		return tstr;
+
+	wstring out;
+	if (len >= strLen || (strLen - (pos-1+len)) < 0)
+		out = str.substr(0, pos-1) + newstr.substr(0, newstrLen);
+	else
+		out = str.substr(0, pos-1) + newstr.substr(0, newstrLen) + str.substr((pos-1+len), strLen);
+
+	size_t strmblen = utf8::idb_wcstombs(0, out.c_str(), 0) + 1;
+	char* outbuf = (char*)alloca(strmblen * sizeof(char));
+	strmblen = utf8::idb_wcstombs(outbuf, out.c_str(), strmblen);
+	return string(outbuf, strmblen);
+
+
 }
 
 

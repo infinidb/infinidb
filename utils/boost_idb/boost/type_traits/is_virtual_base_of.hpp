@@ -22,8 +22,8 @@ namespace detail {
 
 #ifdef BOOST_MSVC
 #pragma warning( push )
-#pragma warning( disable : 4584 4250)
-#elif defined(__GNUC__) && (__GNUC__ >= 4)
+#pragma warning( disable : 4584 )
+#elif defined __GNUC__
 #pragma GCC system_header
 #endif
 
@@ -52,14 +52,14 @@ struct is_virtual_base_of_impl<Base, Derived, mpl::true_>
        ~boost_type_traits_internal_struct_Y()throw();
     };
 #else
-    struct boost_type_traits_internal_struct_X : public Derived, virtual Base 
+    struct boost_type_traits_internal_struct_X : Derived, virtual Base 
     {
        boost_type_traits_internal_struct_X();
        boost_type_traits_internal_struct_X(const boost_type_traits_internal_struct_X&);
        boost_type_traits_internal_struct_X& operator=(const boost_type_traits_internal_struct_X&);
        ~boost_type_traits_internal_struct_X()throw();
     };
-    struct boost_type_traits_internal_struct_Y : public Derived 
+    struct boost_type_traits_internal_struct_Y : Derived 
     {
        boost_type_traits_internal_struct_Y();
        boost_type_traits_internal_struct_Y(const boost_type_traits_internal_struct_Y&);

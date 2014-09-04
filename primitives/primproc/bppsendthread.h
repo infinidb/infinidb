@@ -39,7 +39,7 @@ class BPPSendThread {
 
 	public:
 		BPPSendThread();   // starts unthrottled
-		BPPSendThread(uint32_t initMsgsLeft);   // starts throttled
+		BPPSendThread(uint initMsgsLeft);   // starts throttled
 		virtual ~BPPSendThread();
 
 		struct Msg_t {
@@ -83,8 +83,12 @@ class BPPSendThread {
 		boost::condition queueNotEmpty;
 		volatile bool die, gotException, mainThreadWaiting;
 		std::string exceptionString;
-		uint32_t sizeThreshold;
-		volatile int32_t msgsLeft;
+		uint sizeThreshold;
+#ifdef _MSC_VER
+		volatile LONG msgsLeft;
+#else
+		volatile int msgsLeft;
+#endif
 		bool waiting;
 		boost::mutex ackLock;
 		boost::condition okToSend;
@@ -106,7 +110,11 @@ class BPPSendThread {
 		volatile bool fcEnabled;
 		
 		/* secondary queue size restriction based on byte size */
-		volatile uint64_t currentByteSize;
+#ifdef _MSC_VER
+		volatile LONG64 currentByteSize;
+#else
+		uint64_t currentByteSize;
+#endif
 		uint64_t maxByteSize;
 };
 

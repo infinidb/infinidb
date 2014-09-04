@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: tuplehavingstep.h 9596 2013-06-04 19:59:04Z xlou $
+//  $Id: tuplehavingstep.h 8526 2012-05-17 02:28:10Z xlou $
 
 
 #ifndef JOBLIST_TUPLEHAVINGSTEP_H
@@ -40,8 +40,10 @@ class TupleHavingStep : public ExpressionStep, public TupleDeliveryStep
 {
 public:
     /** @brief TupleHavingStep constructor
+     * @param in the inputAssociation pointer
+     * @param out the outputAssociation pointer
      */
-    TupleHavingStep(const JobInfo& jobInfo);
+    TupleHavingStep( uint32_t sessionId, uint32_t txnId, uint32_t verId, uint32_t statementId);
 
     /** @brief TupleHavingStep destructor
      */
@@ -61,15 +63,12 @@ public:
 
 	/** @brief TupleDeliveryStep's pure virtual methods
 	 */
-	uint32_t nextBand(messageqcpp::ByteStream &bs);
+	uint nextBand(messageqcpp::ByteStream &bs);
 	const rowgroup::RowGroup& getDeliveredRowGroup() const;
-	void  deliverStringTableRowGroup(bool b);
-	bool  deliverStringTableRowGroup() const;
+	void setIsDelivery(bool b) { fDelivery = b; }
 
 	void initialize(const rowgroup::RowGroup& rgIn, const JobInfo& jobInfo);
 	void expressionFilter(const execplan::ParseTree* filter, JobInfo& jobInfo);
-	
-	virtual bool stringTableFriendly() { return true; }
 
 protected:
 	void execute();
@@ -101,6 +100,7 @@ protected:
 
 	uint64_t fRowsReturned;
 	bool     fEndOfResult;
+	bool     fDelivery;
 
 	funcexp::FuncExp* fFeInstance;
 };

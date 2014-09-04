@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_bulkstatus.h 4648 2013-05-29 21:42:40Z rdempsey $
+* $Id: we_bulkstatus.h 3720 2012-04-04 18:18:49Z rdempsey $
 *
 *******************************************************************************/
 /** @file */
@@ -40,7 +40,7 @@ class BulkStatus
 {
 public:
    static int     getJobStatus()           { return fJobStatus; }
-   static void setJobStatus(int jobStatus) { fJobStatus = jobStatus; }
+   EXPORT static void setJobStatus(int jobStatus);
 
 private:
     /* @brief Global job status flag.
@@ -49,7 +49,11 @@ private:
     * as a flag.  Making the variable volatile should suffice, to make it
     * work with multiple threads.
     */
+#ifdef _MSC_VER
+   static volatile LONG fJobStatus;
+#else
    static volatile int fJobStatus;
+#endif
 };
 
 } // end of namespace

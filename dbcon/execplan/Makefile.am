@@ -14,6 +14,10 @@
 #  along with this program; if not, write to the Free Software
 #  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 #  MA 02110-1301, USA.
+
+# $Id: Makefile.am 864 2009-04-02 19:22:49Z rdempsey $
+## Process this file with automake to produce Makefile.in
+
 AM_CPPFLAGS = $(idb_common_includes) $(idb_cppflags)
 AM_CFLAGS = $(idb_cflags)
 AM_CXXFLAGS = $(idb_cxxflags)
@@ -22,28 +26,20 @@ lib_LTLIBRARIES = libexecplan.la
 libexecplan_la_SOURCES = calpontsystemcatalog.cpp \
 aggregatecolumn.cpp \
 arithmeticcolumn.cpp \
-arithmeticoperator.cpp \
 calpontexecutionplan.cpp \
 calpontexecutionplanfactory.cpp \
 calpontselectexecutionplan.cpp \
-clientrotator.cpp \
 constantcolumn.cpp \
-constantfilter.cpp \
 existsfilter.cpp \
-expressionparser.cpp \
 filter.cpp \
 functioncolumn.cpp \
 groupconcatcolumn.cpp \
-intervalcolumn.cpp \
-logicoperator.cpp \
 mysqlexecutionplan.cpp \
 objectidmanager.cpp \
 objectreader.cpp \
 operator.cpp \
-oracleexecutionplan.cpp \
 outerjoinonfilter.cpp \
-predicateoperator.cpp \
-pseudocolumn.cpp \
+oracleexecutionplan.cpp \
 range.cpp \
 returnedcolumn.cpp \
 rowcolumn.cpp \
@@ -52,56 +48,56 @@ sessionmanager.cpp \
 simplecolumn.cpp \
 simplefilter.cpp \
 simplescalarfilter.cpp \
-treenode.cpp \
-treenodeimpl.cpp \
 vendorexecutionplan.cpp \
-windowfunctioncolumn.cpp
-
+treenode.cpp \
+expressionparser.cpp \
+treenodeimpl.cpp \
+constantfilter.cpp \
+clientrotator.cpp \
+arithmeticoperator.cpp \
+logicoperator.cpp \
+predicateoperator.cpp
 include_HEADERS = aggregatecolumn.h \
 arithmeticcolumn.h \
-arithmeticoperator.h \
-blocksize.h \
 calpontexecutionplanfactory.h \
 calpontexecutionplan.h \
-calpontsystemcatalog.h \
 calpontselectexecutionplan.h \
-clientrotator.h \
 columnresult.h \
 constantcolumn.h \
-constantfilter.h \
 existsfilter.h \
-expressionparser.h \
-exp_templates.h \
 filter.h \
 functioncolumn.h \
 groupconcatcolumn.h \
-intervalcolumn.h \
-logicoperator.h \
 mysqlexecutionplan.h \
 njlcolumnresult.h \
 objectidmanager.h \
 objectreader.h \
 operator.h \
-oracleexecutionplan.h \
 outerjoinonfilter.h \
-parsetree.h \
-predicateoperator.h \
-pseudocolumn.h \
+oracleexecutionplan.h \
 range.h \
 returnedcolumn.h \
 rowcolumn.h \
 selectfilter.h \
 sessionmanager.h \
 simplecolumn.h \
-simplecolumn_decimal.h \
-simplecolumn_int.h \
-simplecolumn_uint.h \
 simplefilter.h \
 simplescalarfilter.h \
-treenode.h \
-treenodeimpl.h \
 vendorexecutionplan.h \
-windowfunctioncolumn.h
+calpontsystemcatalog.h \
+treenode.h \
+parsetree.h \
+expressionparser.h \
+treenodeimpl.h \
+constantfilter.h \
+clientrotator.h \
+blocksize.h \
+exp_templates.h \
+arithmeticoperator.h \
+logicoperator.h \
+predicateoperator.h \
+simplecolumn_int.h \
+simplecolumn_decimal.h
 
 test:
 

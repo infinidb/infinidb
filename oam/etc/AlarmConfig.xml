@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- $Id: AlarmConfig.xml 3702 2013-08-06 22:29:48Z bpaul $ -->
+<!-- $Id: AlarmConfig.xml 3237 2012-09-24 20:09:28Z dhill $ -->
 <Calpont Version="V1.0.0">
 	<AlarmConfig1>
 		<AlarmID>1</AlarmID>
@@ -282,10 +282,10 @@
 	</AlarmConfig31>
 	<AlarmConfig32>
 		<AlarmID>32</AlarmID>
-		<BriefDesc>Unassigned</BriefDesc>
-		<DetailedDesc>Unassigned</DetailedDesc>
-		<Severity>0</Severity>
-		<Threshold>0</Threshold>
+		<BriefDesc>EE_LICENSE_EXPIRED</BriefDesc>
+		<DetailedDesc>Enterprise License has Expired, Contact Calpont Customer Support.</DetailedDesc>
+		<Severity>1</Severity>
+		<Threshold>100</Threshold>
 		<Occurrences>0</Occurrences>
 		<LastIssueTime>0</LastIssueTime>		
 	</AlarmConfig32>
@@ -316,13 +316,4 @@
 		<Occurrences>0</Occurrences>
 		<LastIssueTime>0</LastIssueTime>		
 	</AlarmConfig35>
-	<AlarmConfig36>
-		<AlarmID>36</AlarmID>
-		<BriefDesc>INVALID_LOCALE</BriefDesc>
-		<DetailedDesc>An Error was reported on setting system locale.</DetailedDesc>
-		<Severity>1</Severity>
-		<Threshold>100</Threshold>
-		<Occurrences>0</Occurrences>
-		<LastIssueTime>0</LastIssueTime>		
-	</AlarmConfig36>
 </Calpont>

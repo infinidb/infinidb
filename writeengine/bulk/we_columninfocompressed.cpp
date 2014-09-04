@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
-* $Id: we_columninfocompressed.cpp 4726 2013-08-07 03:38:36Z bwilkinson $
+* $Id: we_columninfocompressed.cpp 4244 2012-10-11 13:00:35Z dcathey $
 *
 *******************************************************************************/
 
@@ -32,8 +32,6 @@
 
 #include "idbcompress.h"
 using namespace compress;
-
-#include "IDBFileSystem.h"
 
 #include <iostream>
 
@@ -184,9 +182,9 @@ int ColumnInfoCompressed::setupInitialColumnFile( HWM oldHwm, HWM hwm )
 //------------------------------------------------------------------------------
 int ColumnInfoCompressed::resetFileOffsetsNewExtent(const char* hdr)
 {
+    fSavedHWM         = curCol.dataFile.hwm;
     setFileSize( curCol.dataFile.hwm, false );
-    long long byteOffset = (long long)curCol.dataFile.hwm *
-                           (long long)BYTE_PER_BLOCK;
+    long long byteOffset = (long long)fSavedHWM * (long long)BYTE_PER_BLOCK;
     fSizeWritten      = byteOffset;
     fSizeWrittenStart = fSizeWritten;
     availFileSize     = fileSize - fSizeWritten;
@@ -216,18 +214,15 @@ int ColumnInfoCompressed::resetFileOffsetsNewExtent(const char* hdr)
 // Save HWM chunk for compressed dictionary store files, so that the HWM chunk
 // can be restored by bulk rollback if an error should occur.
 //------------------------------------------------------------------------------
-// @bug 5572 - HDFS usage: add flag used to control *.tmp file usage
-int ColumnInfoCompressed::saveDctnryStoreHWMChunk(bool& needBackup)
+int ColumnInfoCompressed::saveDctnryStoreHWMChunk()
 {
 #ifdef PROFILE
     Stats::startParseEvent(WE_STATS_COMPRESS_DCT_BACKUP_CHUNK);
 #endif
-    needBackup = false;
     int rc = NO_ERROR;
     try
     {
-        needBackup = fRBMetaWriter->backupDctnryHWMChunk(
-            column.dctnry.dctnryOid,
+        fRBMetaWriter->backupDctnryHWMChunk( column.dctnry.dctnryOid,
             curCol.dataFile.fDbRoot,
             curCol.dataFile.fPartition,
             curCol.dataFile.fSegment );
@@ -268,130 +263,170 @@ int ColumnInfoCompressed::truncateDctnryStore(
 {
     int rc = NO_ERROR;
 
-    // @bug5769 Don't initialize extents or truncate db files on HDFS
-    if (idbdatafile::IDBPolicy::useHdfs())
+    // See if the relevant dictionary store file can/should be truncated
+    // (to the nearest extent)
+    std::string segFile;
+    FILE* dFile = fTruncateDctnryFileOp.openFile(dctnryOid,
+        root, pNum, sNum, segFile);
+    if (dFile == 0)
     {
-        std::ostringstream oss1;
-        oss1 << "Finished writing dictionary file"
-            ": OID-"    << dctnryOid <<
-            "; DBRoot-" << root      <<
-            "; part-"   << pNum      <<
-            "; seg-"    << sNum;
+        rc = ERR_FILE_OPEN;
 
-        // Have to rework this logging if we want to keep it.
-        // Filesize is not correct when adding data to an "existing" file,
-        // since in the case of HDFS, we are writing to a *.cdf.tmp file.
-        //char dctnryFileName[FILE_NAME_SIZE];
-        //if (colOp->getFileName(dctnryOid,dctnryFileName,
-        //    root, pNum, sNum) == NO_ERROR)
-        //{
-        //    off64_t dctnryFileSize = idbdatafile::IDBFileSystem::getFs(
-        //        IDBDataFile::HDFS).size(dctnryFileName);
-        //    if (dctnryFileSize != -1)
-        //    {
-        //        oss1 << "; size-" << dctnryFileSize;
-        //    }
-        //}
-        fLog->logMsg( oss1.str(), MSGLVL_INFO2 );
+        std::ostringstream oss;
+        oss << "Error opening compressed dictionary store segment "
+            "file for truncation" <<
+            ": OID-"       << dctnryOid <<
+            "; DbRoot-"    << root <<
+            "; partition-" << pNum <<
+            "; segment-"   << sNum;
+        fLog->logMsg( oss.str(), rc, MSGLVL_ERROR );
+
+        return rc;
     }
-    else
+
+    char controlHdr[ IDBCompressInterface::HDR_BUF_LEN ];
+    rc = fTruncateDctnryFileOp.readFile( dFile,
+        (unsigned char*)controlHdr, IDBCompressInterface::HDR_BUF_LEN);
+    if (rc != NO_ERROR)
     {
-        // See if the relevant dictionary store file can/should be truncated
-        // (to the nearest extent)
-        std::string segFile;
-        IDBDataFile* dFile = fTruncateDctnryFileOp.openFile(dctnryOid,
-            root, pNum, sNum, segFile);
-        if (dFile == 0)
-        {
-            rc = ERR_FILE_OPEN;
+        WErrorCodes ec;
+        std::ostringstream oss;
+        oss << "Error reading compressed dictionary store control hdr "
+            "for truncation" <<
+            ": OID-"       << dctnryOid <<
+            "; DbRoot-"    << root <<
+            "; partition-" << pNum <<
+            "; segment-"   << sNum <<
+            "; "           << ec.errorString(rc);
+        fLog->logMsg( oss.str(), rc, MSGLVL_ERROR );
+        fTruncateDctnryFileOp.closeFile( dFile );
 
-            std::ostringstream oss;
-            oss << "Error opening compressed dictionary store segment "
-                "file for truncation" <<
-                ": OID-"       << dctnryOid <<
-                "; DbRoot-"    << root <<
-                "; partition-" << pNum <<
-                "; segment-"   << sNum;
-            fLog->logMsg( oss.str(), rc, MSGLVL_ERROR );
+        return rc;
+    }
 
-            return rc;
-        }
+    IDBCompressInterface compressor;
+    int rc1 = compressor.verifyHdr( controlHdr );
+    if (rc1 != 0)
+    {
+        rc = ERR_COMP_VERIFY_HDRS;
 
-        char controlHdr[ IDBCompressInterface::HDR_BUF_LEN ];
-        rc = fTruncateDctnryFileOp.readFile( dFile,
-            (unsigned char*)controlHdr, IDBCompressInterface::HDR_BUF_LEN);
-        if (rc != NO_ERROR)
-        {
-            WErrorCodes ec;
-            std::ostringstream oss;
-            oss << "Error reading compressed dictionary store control hdr "
-                "for truncation" <<
-                ": OID-"       << dctnryOid <<
-                "; DbRoot-"    << root <<
-                "; partition-" << pNum <<
-                "; segment-"   << sNum <<
-                "; "           << ec.errorString(rc);
-            fLog->logMsg( oss.str(), rc, MSGLVL_ERROR );
-            fTruncateDctnryFileOp.closeFile( dFile );
+        WErrorCodes ec;
+        std::ostringstream oss;
+        oss << "Error verifying compressed dictionary store ptr hdr "
+            "for truncation" <<
+            ": OID-"       << dctnryOid <<
+            "; DbRoot-"    << root <<
+            "; partition-" << pNum <<
+            "; segment-"   << sNum <<
+            "; (" << rc1 << ")";
+        fLog->logMsg( oss.str(), rc, MSGLVL_ERROR );
+        fTruncateDctnryFileOp.closeFile( dFile );
 
-            return rc;
-        }
-
-        IDBCompressInterface compressor;
-        int rc1 = compressor.verifyHdr( controlHdr );
-        if (rc1 != 0)
-        {
-            rc = ERR_COMP_VERIFY_HDRS;
-
-            WErrorCodes ec;
-            std::ostringstream oss;
-            oss << "Error verifying compressed dictionary store ptr hdr "
-                "for truncation" <<
-                ": OID-"       << dctnryOid <<
-                "; DbRoot-"    << root <<
-                "; partition-" << pNum <<
-                "; segment-"   << sNum <<
-                "; (" << rc1 << ")";
-            fLog->logMsg( oss.str(), rc, MSGLVL_ERROR );
-            fTruncateDctnryFileOp.closeFile( dFile );
-
-            return rc;
-        }
+        return rc;
+    }
 
     // No need to perform file truncation if the dictionary file just contains
     // a single abbreviated extent.  Truncating up to the nearest extent would
     // actually grow the file (something we don't want to do), because we have
     // not yet reserved a full extent (on disk) for this dictionary store file.
-        const int PSEUDO_COL_WIDTH = 8;
-        uint64_t numBlocks = compressor.getBlockCount( controlHdr );
-        if ( numBlocks == uint64_t
-            (INITIAL_EXTENT_ROWS_TO_DISK*PSEUDO_COL_WIDTH/BYTE_PER_BLOCK) )
+    const int PSEUDO_COL_WIDTH = 8;
+    uint64_t numBlocks = compressor.getBlockCount( controlHdr );
+    if ( numBlocks ==
+        uint64_t(INITIAL_EXTENT_ROWS_TO_DISK*PSEUDO_COL_WIDTH/BYTE_PER_BLOCK) )
+    {
+        std::ostringstream oss1;
+        oss1 << "Skip truncating abbreviated dictionary file"
+            ": OID-"    << dctnryOid <<
+            "; DBRoot-" << root      <<
+            "; part-"   << pNum      <<
+            "; seg-"    << sNum      <<
+            "; blocks-" << numBlocks;
+        fLog->logMsg( oss1.str(), MSGLVL_INFO2 );
+        fTruncateDctnryFileOp.closeFile( dFile );
+
+        return NO_ERROR;
+    }
+
+    uint64_t hdrSize    = compressor.getHdrSize(controlHdr);
+    uint64_t ptrHdrSize = hdrSize - IDBCompressInterface::HDR_BUF_LEN;
+    char*    pointerHdr = new char[ptrHdrSize];
+
+    rc = fTruncateDctnryFileOp.readFile(dFile,
+        (unsigned char*)pointerHdr, ptrHdrSize);
+    if (rc != NO_ERROR)
+    {
+        WErrorCodes ec;
+        std::ostringstream oss;
+        oss << "Error reading compressed dictionary store pointer hdr "
+            "for truncation" <<
+            ": OID-"       << dctnryOid <<
+            "; DbRoot-"    << root <<
+            "; partition-" << pNum <<
+            "; segment-"   << sNum <<
+            "; "           << ec.errorString(rc);
+        fLog->logMsg( oss.str(), rc, MSGLVL_ERROR );
+        fTruncateDctnryFileOp.closeFile( dFile );
+
+        return rc;
+    }
+
+    CompChunkPtrList chunkPtrs;
+    rc1 = compressor.getPtrList( pointerHdr, ptrHdrSize, chunkPtrs );
+    delete[] pointerHdr;
+    if (rc1 != 0)
+    {
+        rc = ERR_COMP_PARSE_HDRS;
+
+        WErrorCodes ec;
+        std::ostringstream oss;
+        oss << "Error parsing compressed dictionary store ptr hdr "
+            "for truncation" <<
+            ": OID-"       << dctnryOid <<
+            "; DbRoot-"    << root <<
+            "; partition-" << pNum <<
+            "; segment-"   << sNum <<
+            "; (" << rc1 << ")";
+        fLog->logMsg( oss.str(), rc, MSGLVL_ERROR );
+        fTruncateDctnryFileOp.closeFile( dFile );
+
+        return rc;
+    }
+
+    // Truncate the relevant dictionary store file to the nearest extent
+    if (chunkPtrs.size() > 0)
+    {
+        long long dataByteLength = chunkPtrs[chunkPtrs.size()-1].first  +
+                                   chunkPtrs[chunkPtrs.size()-1].second -
+                                   hdrSize;                      
+
+        long long extentBytes =
+            BRMWrapper::getInstance()->getExtentRows() * PSEUDO_COL_WIDTH;
+
+        long long rem = dataByteLength % extentBytes;
+        if (rem > 0)
         {
-            std::ostringstream oss1;
-            oss1 << "Skip truncating abbreviated dictionary file"
-                ": OID-"    << dctnryOid <<
-                "; DBRoot-" << root      <<
-                "; part-"   << pNum      <<
-                "; seg-"    << sNum      <<
-                "; blocks-" << numBlocks;
-            fLog->logMsg( oss1.str(), MSGLVL_INFO2 );
-            fTruncateDctnryFileOp.closeFile( dFile );
-
-            return NO_ERROR;
+            dataByteLength = dataByteLength - rem + extentBytes;
         }
+        long long truncateFileSize = dataByteLength + hdrSize;
 
-        uint64_t hdrSize    = compressor.getHdrSize(controlHdr);
-        uint64_t ptrHdrSize = hdrSize - IDBCompressInterface::HDR_BUF_LEN;
-        char*    pointerHdr = new char[ptrHdrSize];
+        std::ostringstream oss1;
+        oss1 << "Truncating dictionary file"
+            ": OID-"    << dctnryOid <<
+            "; DBRoot-" << root      <<
+            "; part-"   << pNum      <<
+            "; seg-"    << sNum      <<
+            "; size-"   << truncateFileSize;
+        fLog->logMsg( oss1.str(), MSGLVL_INFO2 );
 
-        rc = fTruncateDctnryFileOp.readFile(dFile,
-            (unsigned char*)pointerHdr, ptrHdrSize);
+        if (truncateFileSize > 0)
+            rc = fTruncateDctnryFileOp.truncateFile( dFile, truncateFileSize );
+        else
+            rc = ERR_COMP_TRUNCATE_ZERO; //@bug 3913 - Catch truncate to 0 bytes
         if (rc != NO_ERROR)
         {
             WErrorCodes ec;
             std::ostringstream oss;
-            oss << "Error reading compressed dictionary store pointer hdr "
-                "for truncation" <<
+            oss << "Error truncating compressed dictionary store file"
                 ": OID-"       << dctnryOid <<
                 "; DbRoot-"    << root <<
                 "; partition-" << pNum <<
@@ -402,78 +437,9 @@ int ColumnInfoCompressed::truncateDctnryStore(
 
             return rc;
         }
-
-        CompChunkPtrList chunkPtrs;
-        rc1 = compressor.getPtrList( pointerHdr, ptrHdrSize, chunkPtrs );
-        delete[] pointerHdr;
-        if (rc1 != 0)
-        {
-            rc = ERR_COMP_PARSE_HDRS;
-
-            WErrorCodes ec;
-            std::ostringstream oss;
-            oss << "Error parsing compressed dictionary store ptr hdr "
-                "for truncation" <<
-                ": OID-"       << dctnryOid <<
-                "; DbRoot-"    << root <<
-                "; partition-" << pNum <<
-                "; segment-"   << sNum <<
-                "; (" << rc1 << ")";
-            fLog->logMsg( oss.str(), rc, MSGLVL_ERROR );
-            fTruncateDctnryFileOp.closeFile( dFile );
-
-            return rc;
-        }
-
-        // Truncate the relevant dictionary store file to the nearest extent
-        if (chunkPtrs.size() > 0)
-        {
-            long long dataByteLength = chunkPtrs[chunkPtrs.size()-1].first  +
-                                       chunkPtrs[chunkPtrs.size()-1].second -
-                                       hdrSize;                      
-
-            long long extentBytes =
-                fRowsPerExtent * PSEUDO_COL_WIDTH;
-
-            long long rem = dataByteLength % extentBytes;
-            if (rem > 0)
-            {
-                dataByteLength = dataByteLength - rem + extentBytes;
-            }
-            long long truncateFileSize = dataByteLength + hdrSize;
-
-            std::ostringstream oss1;
-            oss1 << "Truncating dictionary file"
-                ": OID-"    << dctnryOid <<
-                "; DBRoot-" << root      <<
-                "; part-"   << pNum      <<
-                "; seg-"    << sNum      <<
-                "; size-"   << truncateFileSize;
-            fLog->logMsg( oss1.str(), MSGLVL_INFO2 );
-
-            if (truncateFileSize > 0)
-                rc = fTruncateDctnryFileOp.truncateFile(dFile,truncateFileSize);
-            else
-                rc = ERR_COMP_TRUNCATE_ZERO;//@bug3913-Catch truncate to 0 bytes
-            if (rc != NO_ERROR)
-            {
-                WErrorCodes ec;
-                std::ostringstream oss;
-                oss << "Error truncating compressed dictionary store file"
-                    ": OID-"       << dctnryOid <<
-                    "; DbRoot-"    << root <<
-                    "; partition-" << pNum <<
-                    "; segment-"   << sNum <<
-                    "; "           << ec.errorString(rc);
-                fLog->logMsg( oss.str(), rc, MSGLVL_ERROR );
-                fTruncateDctnryFileOp.closeFile( dFile );
-
-                return rc;
-            }
-        }
-
-        fTruncateDctnryFileOp.closeFile( dFile );
     }
+
+    fTruncateDctnryFileOp.closeFile( dFile );
 
     return NO_ERROR;
 }
@@ -491,7 +457,7 @@ int ColumnInfoCompressed::extendColumnOldExtent(
     HWM         hwmNextIn )
 {
     const unsigned int BLKS_PER_EXTENT =
-        (fRowsPerExtent * column.width)/BYTE_PER_BLOCK;
+    (BRMWrapper::getInstance()->getExtentRows() * column.width)/BYTE_PER_BLOCK;
 
     // Round up HWM to the end of the current extent
     unsigned int nBlks = hwmNextIn + 1;

@@ -21,7 +21,9 @@
 ******************************************************************************************/
 /** @file */
 
+#define WRITEENGINECACHE_DLLEXPORT
 #include <we_cache.h>
+#undef WRITEENGINECACHE_DLLEXPORT
 
 using namespace std;
 
@@ -250,7 +252,7 @@ namespace WriteEngine
     * RETURN:
     *    NO_ERROR if success, other otherwise
     ***********************************************************/
-   const int  Cache::insertLRUList( CommBlock& cb, const uint64_t lbid, const uint64_t fbo, const unsigned char* buf  )
+   const int  Cache::insertLRUList( CommBlock& cb, const i64 lbid, const i64 fbo, const unsigned char* buf  )
    {  
       BlockBuffer*      buffer;
       vector<BlockBuffer*>::iterator  it;

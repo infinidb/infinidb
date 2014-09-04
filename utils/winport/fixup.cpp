@@ -19,7 +19,6 @@
 #include <string>
 #include <iostream>
 #include <fstream>
-#include <time.h>
 using namespace std;
 
 #include <boost/filesystem.hpp>
@@ -65,7 +64,7 @@ int fixupCalpontXML()
 		string section;
 		string parm;
 		string val;
-		
+
 		//Fixup ConnectionsPerPrimProc
 		section = "PrimitiveServers";
 		parm = "ConnectionsPerPrimProc";
@@ -76,11 +75,7 @@ int fixupCalpontXML()
 			cf->setConfig(section, parm, val);
 			cout << "Adding " << section << "." << parm << " = " << val << endl;
 		}
-		else
-		{
-			cf->delConfig(section, parm);
-			cf->setConfig(section, parm, val);
-		}
+
 		//Fixup PrefetchThreshold
 		parm = "PrefetchThreshold";
 		val = cf->getConfig(section, parm);
@@ -308,49 +303,12 @@ int fixupCalpontXML()
 			cout << "Deleting " << section << "." << parm << endl;
 		}
 
-		//Fixup AllowDiskBasedJoin
-		section = "HashJoin";
-		parm = "AllowDiskBasedJoin";
-		val = cf->getConfig(section, parm);
-		if (val.empty())
-		{
-			val = "N"; // We default to No
-			cf->setConfig(section, parm, val);
-			cout << "Adding " << section << "." << parm << " = " << val << endl;
-		}
+		cf->write();
 
-		//Fixup TempFilePath
-		section = "HashJoin";
-		parm = "TempFilePath";
-		val = cf->getConfig(section, parm);
-		if (val.empty())
-		{
-			val = "$INSTALLDIR/tmp";
-			cf->setConfig(section, parm, val);
-			cout << "Adding " << section << "." << parm << " = " << val << endl;
-		}
-        
-		//Fixup TempFileCompression
-		section = "HashJoin";
-		parm = "TempFileCompression";
-		val = cf->getConfig(section, parm);
-		if (val.empty())
-		{
-			val = "Y";
-			cf->setConfig(section, parm, val);
-			cout << "Adding " << section << "." << parm << " = " << val << endl;
-		}
-        
-        cf->write();
 		rc = 0;
-	}
-	catch (exception& e)
-	{
-		cout << "fixupCalpontXML caught exception: " << e.what() << endl;
 	}
 	catch (...)
 	{
-		cout << "fixupCalpontXML caught exception (...): " << endl;
 	}
 
 	return rc;
@@ -407,15 +365,8 @@ int fixupConfig(const string& installDir, const string& mysqlPort)
 	ifs.close();
 	if (okayToRename)
 	{
-		try
-		{
-			fs::remove(cFilePath);
-			fs::rename(tmpPath, cFilePath);
-		}
-		catch (exception& e)
-		{
-			cout << "Failed to remove " << cFilePath.c_str() << e.what() << endl;
-		}
+		fs::remove(cFilePath);
+		fs::rename(tmpPath, cFilePath);
 	}
 	else
 		return -1;
@@ -433,74 +384,12 @@ int fixupConfig(const string& installDir, const string& mysqlPort)
 	getline(ifs, strLine);
 	while (ifs.good())
 	{
-		if (strLine[0] != '#')
-		{
-			sedit(strLine, "##INSTDIR##", id);
-			sedit(strLine, "##PORT##", mysqlPort);
-		}
+		sedit(strLine, "##INSTDIR##", id);
+		sedit(strLine, "##PORT##", mysqlPort);
 #ifndef SKIP_MYSQL_SETUP4
 		sedit(strLine, "#infinidb_compression_type=0", "infinidb_compression_type=2");
 		sedit(strLine, "infinidb_compression_type=1", "infinidb_compression_type=2");
 #endif
-		ofs << strLine << endl;
-		getline(ifs, strLine);
-	}
-	if (!ifs.bad() && !ofs.bad())
-		okayToRename = true;
-	ofs.close();
-	ifs.close();
-	if (okayToRename)
-	{
-		try
-		{
-			fs::remove(cFilePath);
-			fs::rename(tmpPath, cFilePath);
-		}
-		catch (boost::exception const& ex)
-		{
-			std::exception const* se = dynamic_cast<std::exception const*>(&ex);
-			if(se)
-			{
-				// will enter here only for my application exception and not for pure boost exception
-				cerr << se->what() << "my.ini not fixedup" << endl;
-			}
-			else
-			{
-				cerr << " Boost exception while renaming my.ini: Failed to decode the exception" << endl;
-			}
-		}
-		catch (std::exception const& ex)
-		{
-				cerr << ex.what() << "my.ini not fixedup" << endl;
-		}
-		catch (...)
-		{
-			cerr << "An unknown exception (...) was caught while renaming my.ini" << endl;
-		}
-	}
-	else
-		return -1;
-	ifs.clear();
-	ofs.clear();
-
-	// Add install timestamp to CalpontVersion.txt
-	char szTime[24];
-	time_t now = time(NULL);
-	struct tm nowtm;
-	localtime_s(&nowtm, &now);
-	strftime(szTime, 24, "%Y-%m-%d %H:%M:%S", &nowtm);
-	okayToRename = false;
-	cFilePath = installDir;
-	cFilePath /= "etc/CalpontVersion.txt";
-	tmpPath = cFilePath;
-	tmpPath.replace_extension(".tmp");
-	fs::remove(tmpPath);
-	ifs.open(cFilePath.string().c_str());
-	ofs.open(tmpPath.string().c_str());
-	getline(ifs, strLine);
-	while (ifs.good())
-	{
-		sedit(strLine, "@@INSTALLDATE@@", szTime);
 		ofs << strLine << endl;
 		getline(ifs, strLine);
 	}

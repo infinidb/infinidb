@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: tablecolumn.h 9655 2013-06-25 23:08:13Z xlou $
+ * $Id: tablecolumn.h 8436 2012-04-04 18:18:21Z rdempsey $
  *
  *****************************************************************************/
 
@@ -35,7 +35,7 @@
 
 //#define TC_CHECK_RIDS 1
 
-#if defined(_MSC_VER) && defined(JOBLIST_DLLEXPORT)
+#if defined(_MSC_VER) && defined(TABLECOLUMN_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
@@ -64,10 +64,10 @@ public:
 		UNDEFINED
 	};
 
-	/** @brief constructor
+	/** @brief constructor 
 	*/
 	EXPORT TableColumn(const execplan::CalpontSystemCatalog::OID columnOID, const supportedType columnType);
-
+	
 	EXPORT TableColumn();
 
 	/** @brief getter for the column's OID.
@@ -77,7 +77,7 @@ public:
 	/** @brief getter for the column's values.
 	*/
 	inline const boost::shared_ptr<std::vector<uint64_t> > getIntValues() { return fIntValues; }
-
+	
 	inline const boost::shared_ptr<std::vector<std::string> > getStrValues() { return fStrValues; }
 
 	inline bool isNullColumn() const { return fIsNullColumn; }
@@ -88,24 +88,24 @@ public:
 	/** @brief serializes the object into the passed byte stream.
 	*/
 	EXPORT void serialize(messageqcpp::ByteStream& b);
-
+	
 	/** @brief inflates the object from the passed byte stream.
 	*/
 	EXPORT void unserialize(messageqcpp::ByteStream& b);
-
+	
 	/** @brief adds the column and it's values to the passed NJLSysDataList or appends the values if the column is already included in the NJLSysDataList.
 	*/
 	EXPORT void addToSysDataList(execplan::CalpontSystemCatalog::NJLSysDataList& sysDataList, const std::vector<uint64_t>& rids);
 
 #if 0
-	EXPORT void addToSysDataRids(execplan::CalpontSystemCatalog::NJLSysDataList& sysDataList, const std::vector<uint64_t>& rids);
+	EXPORT void addToSysDataRids(execplan::CalpontSystemCatalog::NJLSysDataList& sysDataList, const std::vector<uint64_t>& rids); 
 #endif
 	inline void setIntValues(boost::shared_ptr<std::vector<uint64_t> > sv)
 	{
 		fIntValues = sv;
 		fIsNullColumn = fIntValues->empty();
 	}
-
+	
 	inline void setStrValues(boost::shared_ptr<std::vector<std::string> > sv)
 	{
 		fStrValues = sv;

@@ -127,7 +127,7 @@ void m1()
 	MessageLog ml3(lid3);
 	args.reset();
 	m.reset();
-	args.add("subsystem 7 = calpontConsole test");
+	args.add("subsystem 7 = calpont-console test");
 	m.format(args);
 	ml3.logDebugMessage(m);
         Config::deleteInstanceMap();

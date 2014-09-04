@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: deletepackageprocessor.h 9302 2013-03-07 16:06:59Z chao $
+ *   $Id: deletepackageprocessor.h 8436 2012-04-04 18:18:21Z rdempsey $
  *
  *
  ***********************************************************************/
@@ -32,7 +32,7 @@
 #include <vector>
 #include "joblist.h"
 
-#if defined(_MSC_VER) && defined(DMLPKGPROC_DLLEXPORT)
+#if defined(_MSC_VER) && defined(DELETEPKGPROC_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
@@ -49,7 +49,7 @@ class DeletePackageProcessor : public DMLPackageProcessor
 
 public:
 
-    DeletePackageProcessor(BRM::DBRM* aDbrm, uint32_t sid) : DMLPackageProcessor(aDbrm, sid){}
+    DeletePackageProcessor() : DMLPackageProcessor(){}
     /** @brief process a DeleteDMLPackage
       *
       * @param cpackage the delete dml package to process
@@ -71,16 +71,15 @@ private:
                    WriteEngine::RIDList& rowIDList, WriteEngine::ColValueList& colOldValuesList,
                    DMLResult& result);
 	  */
-    bool processRowgroup(messageqcpp::ByteStream & aRowGroup, DMLResult& result, const uint64_t uniqueId, dmlpackage::CalpontDMLPackage& cpackage, std::map<unsigned, bool>& pmStateDel, 
-						bool isMeta = false, uint32_t dbroot=1);
+    bool processRowgroup(messageqcpp::ByteStream & aRowGroup, DMLResult& result, const uint64_t uniqueId, dmlpackage::CalpontDMLPackage& cpackage, bool isMeta = false, uint dbroot=1);
 
 
     /** @brief add all rows if we have no filter for the delete
       *
       * @param tablePtr a pointer to the table that is being operated on
       */
-   uint64_t fixUpRows(dmlpackage::CalpontDMLPackage& cpackage, DMLResult& result, const uint64_t uniqueId, const uint32_t tableOid);
-   bool receiveAll(DMLResult& result, const uint64_t uniqueId, std::vector<int>& fPMs, std::map<unsigned, bool>& pmStateDel, const uint32_t tableOid);
+   uint64_t fixUpRows(dmlpackage::CalpontDMLPackage& cpackage, DMLResult& result, const uint64_t uniqueId);
+   bool receiveAll(DMLResult& result, const uint64_t uniqueId, std::vector<int>& fPMs);
    
 	//bandListsByExtent bandListsMap;
 

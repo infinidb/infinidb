@@ -16,9 +16,11 @@
    MA 02110-1301, USA. */
 
 /*
-* $Id: we_dbrootextenttracker.cpp 4631 2013-05-02 15:21:09Z dcathey $
+* $Id: we_dbrootextenttracker.cpp 4195 2012-09-19 18:12:27Z dcathey $
 */
+#define WRITEENGINEDBEXTTRK_DLLEXPORT
 #include "we_dbrootextenttracker.h"
+#undef WRITEENGINEDBEXTTRK_DLLEXPORT
 
 #include <algorithm>
 #include <sstream>
@@ -32,8 +34,7 @@ namespace
     const char* stateStrings[] = { "initState"     ,
                                    "PartialExtent" ,
                                    "EmptyDbRoot"   ,
-                                   "ExtentBoundary",
-                                   "OutOfService" };
+                                   "ExtentBoundary" };
 }
 
 namespace WriteEngine
@@ -42,22 +43,40 @@ namespace WriteEngine
 //------------------------------------------------------------------------------
 // DBRootExtentInfo constructor
 //------------------------------------------------------------------------------
-DBRootExtentInfo::DBRootExtentInfo(
+DBRootExtentInfo::DBRootExtentInfo(int colWidth,
     uint16_t    dbRoot,
     uint32_t    partition,
     uint16_t    segment,
     BRM::LBID_t startLbid,
     HWM         localHwm,
-    uint64_t    dbrootTotalBlocks,
-    DBRootExtentInfoState state) :
+    uint64_t    dbrootTotalBlocks) :
     fPartition(partition),
     fDbRoot(dbRoot),
     fSegment(segment),
     fStartLbid(startLbid),
     fLocalHwm(localHwm),
-    fDBRootTotalBlocks(dbrootTotalBlocks),
-    fState(state)
+    fDBRootTotalBlocks(dbrootTotalBlocks)
 {
+    if (fDBRootTotalBlocks == 0)
+    {
+        fState = DBROOT_EXTENT_EMPTY_DBROOT;
+    }
+    else
+    {
+        fState = DBROOT_EXTENT_PARTIAL_EXTENT;
+
+        // See if local hwm is on an extent boundary, in which case the extent
+        // is full and we won't be adding any rows to the current HWM extent;
+        // we will instead need to allocate a new extent in order to begin
+        // adding any rows.
+        long long nRows = ((long long)(localHwm+1) * (long long)BYTE_PER_BLOCK)/
+                           (long long)colWidth;
+        long long nRem  = nRows % BRMWrapper::getInstance()->getExtentRows();
+        if (nRem == 0)
+        {
+            fState = DBROOT_EXTENT_EXTENT_BOUNDARY;
+        }
+    }
 }
 
 //------------------------------------------------------------------------------
@@ -78,68 +97,28 @@ bool DBRootExtentInfo::operator<(
 // before processing threads are spawned.
 //------------------------------------------------------------------------------
 DBRootExtentTracker::DBRootExtentTracker ( OID oid,
-    const std::vector<int>& colWidths,
-    const std::vector<BRM::EmDbRootHWMInfo_v>& dbRootHWMInfoColVec,
-    unsigned int columnIdx,
-    Log* logger ) :
+    int  colWidth,
+    Log* logger,
+    const BRM::EmDbRootHWMInfo_v& emDbRootHWMInfo ) :
     fOID(oid),
     fLog(logger),
     fCurrentDBRootIdx(-1),
-    fEmptyOrDisabledPM(false),
-    fEmptyPM(true),
-    fDisabledHWM(false)
+    fStartedWithEmptyPM(false),
+    fEmptyPMFirstDbRoot(0)
 {
-    const BRM::EmDbRootHWMInfo_v& emDbRootHWMInfo =
-        dbRootHWMInfoColVec[columnIdx];
-    int colWidth = colWidths[columnIdx];
-
     fBlksPerExtent = (long long)BRMWrapper::getInstance()->getExtentRows() *
         (long long)colWidth / (long long)BYTE_PER_BLOCK;
 
-    std::vector<bool> resetState;
     for (unsigned int i=0; i<emDbRootHWMInfo.size(); i++)
     {
-        resetState.push_back(false);
-        DBRootExtentInfoState state = determineState(
-            colWidths[columnIdx],
-            emDbRootHWMInfo[i].localHWM,
-            emDbRootHWMInfo[i].totalBlocks,
-            emDbRootHWMInfo[i].status);
-
-        // For a full extent...
-        // check to see if any of the column HWMs are partially full, in which
-        // case we consider all the columns for that DBRoot to be partially
-        // full.  (This can happen if a table has columns with varying widths,
-        // as the HWM may be at the last extent block for a shorter column, and
-        // still have free blocks for wider columns.)
-        if (state == DBROOT_EXTENT_EXTENT_BOUNDARY)
-        {
-            for (unsigned int kCol=0; kCol<dbRootHWMInfoColVec.size(); kCol++)
-            {
-                const BRM::EmDbRootHWMInfo_v& emDbRootHWMInfo2 =
-                    dbRootHWMInfoColVec[kCol];
-                DBRootExtentInfoState state2 = determineState(
-                    colWidths[kCol],
-                    emDbRootHWMInfo2[i].localHWM,
-                    emDbRootHWMInfo2[i].totalBlocks,
-                    emDbRootHWMInfo2[i].status);
-                if (state2 == DBROOT_EXTENT_PARTIAL_EXTENT)
-                {
-                    state = DBROOT_EXTENT_PARTIAL_EXTENT;
-                    resetState[ resetState.size()-1 ] = true;
-                    break;
-                }
-            }
-        }
-
         DBRootExtentInfo dbRootExtent(
+            colWidth,
             emDbRootHWMInfo[i].dbRoot,
             emDbRootHWMInfo[i].partitionNum,
             emDbRootHWMInfo[i].segmentNum,
             emDbRootHWMInfo[i].startLbid,
             emDbRootHWMInfo[i].localHWM,
-            emDbRootHWMInfo[i].totalBlocks,
-            state);
+            emDbRootHWMInfo[i].totalBlocks);
 
         fDBRootExtentList.push_back( dbRootExtent );
     }
@@ -164,8 +143,6 @@ DBRootExtentTracker::DBRootExtentTracker ( OID oid,
                     "/" << fDBRootExtentList[k].fStartLbid         <<
                     "/" << fDBRootExtentList[k].fDBRootTotalBlocks <<
                     "/" << stateStrings[ fDBRootExtentList[k].fState ];
-                if (resetState[k])
-                    oss << ".";
             }
             fLog->logMsg( oss.str(), MSGLVL_INFO2 );
         }
@@ -173,51 +150,9 @@ DBRootExtentTracker::DBRootExtentTracker ( OID oid,
 }
 
 //------------------------------------------------------------------------------
-// Determines the state of the HWM extent (for a DBRoot); considering the
-// current BRM status, HWM, and total block count for the DBRoot.
-//------------------------------------------------------------------------------
-DBRootExtentInfoState DBRootExtentTracker::determineState(int colWidth,
-    HWM      localHwm,
-    uint64_t dbRootTotalBlocks,
-    int16_t  status)
-{
-    DBRootExtentInfoState extentState;
-
-    if (status == BRM::EXTENTOUTOFSERVICE)
-    {
-        extentState = DBROOT_EXTENT_OUT_OF_SERVICE;
-    }
-    else
-    {
-        if (dbRootTotalBlocks == 0)
-        {
-            extentState = DBROOT_EXTENT_EMPTY_DBROOT;
-        }
-        else
-        {
-            extentState = DBROOT_EXTENT_PARTIAL_EXTENT;
-
-            // See if local hwm is on an extent bndry,in which case the extent
-            // is full and we won't be adding rows to the current HWM extent;
-            // we will instead need to allocate a new extent in order to begin
-            // adding any rows.
-            long long nRows= ((long long)(localHwm+1) *
-                              (long long)BYTE_PER_BLOCK)/ (long long)colWidth;
-            long long nRem = nRows % BRMWrapper::getInstance()->getExtentRows();
-            if (nRem == 0)
-            {
-                extentState = DBROOT_EXTENT_EXTENT_BOUNDARY;
-            }
-        }
-    }
-
-    return extentState;
-}
-
-//------------------------------------------------------------------------------
 // Select the first segment file to add rows to for the local PM.
 // Function will first try to find the HWM extent with the fewest blocks.
-// If all the HWM extents are full, then we select the DBRoot/segment file
+// If all the HWM extents are equal, then we select the DBRoot/segment file
 // with the fewest total overall blocks for that DBRoot.
 // Return value is 0 upon success, else non zero if no eligible entries found.
 //
@@ -225,14 +160,13 @@ DBRootExtentInfoState DBRootExtentTracker::determineState(int colWidth,
 // before processing threads are spawned.
 //------------------------------------------------------------------------------
 int DBRootExtentTracker::selectFirstSegFile(
-    DBRootExtentInfo& dbRootExtent, bool& bNoStartExtentOnThisPM,
-    bool& bEmptyPM,
+    DBRootExtentInfo& dbRootExtent, bool& bFirstExtentOnThisPM,
     std::string& errMsg )
 {
     int startExtentIdx       = -1;
     int fewestLocalBlocksIdx = -1; // track HWM extent with fewest blocks
     int fewestTotalBlocksIdx = -1; // track DBRoot with fewest total blocks
-    bNoStartExtentOnThisPM   = false;
+    bFirstExtentOnThisPM     = false;
 
     unsigned int fewestTotalBlks = UINT_MAX;
     unsigned int fewestLocalBlks = UINT_MAX;
@@ -240,8 +174,7 @@ int DBRootExtentTracker::selectFirstSegFile(
     uint16_t     fewestLocalBlkSegNum = USHRT_MAX;
 
     // Find DBRoot having HWM extent with fewest blocks.  If all HWM extents
-    // are full (remblks=0), then fall-back on selecting the DBRoot with fewest
-    // total blks.
+    // are equal, then fall-back on selecting the DBRoot with fewest total blks.
     //
     // Selecting HWM extent with fewest blocks should be straight forward, be-
     // cause all the DBRoots on a PM should end on an extent boundary except
@@ -254,9 +187,8 @@ int DBRootExtentTracker::selectFirstSegFile(
          iroot++)
     {
         // Skip over DBRoots which have no extents
-        if (fDBRootExtentList[iroot].fState == DBROOT_EXTENT_EMPTY_DBROOT)
+        if (fDBRootExtentList[iroot].fDBRootTotalBlocks == 0)
             continue;
-        fEmptyPM = false;
 
         // Find DBRoot and segment file with most incomplete extent.
         // Break a tie by selecting the lowest segment number.
@@ -286,47 +218,29 @@ int DBRootExtentTracker::selectFirstSegFile(
         }
     }
 
-    // Select HWM extent with fewest number of blocks;
-    // If chosen extent is disabled, then treat like an empty PM, 
-    // meaning we have to allocate a new extent before adding any rows
+    // Select HWM extent with fewest number of blocks
     if (fewestLocalBlocksIdx != -1)
     {
         startExtentIdx = fewestLocalBlocksIdx;
-        if (fDBRootExtentList[startExtentIdx].fState ==
-            DBROOT_EXTENT_OUT_OF_SERVICE)
-        {
-            fDisabledHWM = true;
-        }
     }
 
-    // If the HWM on each DBRoot ends on an extent boundary, then
-    // select the DBRoot with the fewest total number of blocks;
-    // If chosen extent is disabled, then treat like an empty PM, 
-    // meaning we have to allocate a new extent before adding any rows
+    // Select DBRoot with the fewest total number of blocks
     else if (fewestTotalBlocksIdx != -1)
     {
         startExtentIdx = fewestTotalBlocksIdx;
-        if (fDBRootExtentList[startExtentIdx].fState ==
-            DBROOT_EXTENT_OUT_OF_SERVICE)
-        {
-            fDisabledHWM = true;
-        }
     }
 
-    // PM with no extents (or all extents disabled), so select DBRoot/segment
-    // file from DBRoot list, where we will start inserting rows.
-    // Select lowest segment file number.
+    // PM with no extents, so select DBRoot/segment file from DBRoot list, where
+    // we will start inserting rows.  Select lowest segment file number.
     else
     {
         RETURN_ON_ERROR( selectFirstSegFileForEmptyPM( errMsg ) );
 
-        startExtentIdx = fCurrentDBRootIdx;
+        startExtentIdx   = fCurrentDBRootIdx;
     }
 
-    if ((fEmptyOrDisabledPM) || (fDisabledHWM))
-        bNoStartExtentOnThisPM = true;
-    bEmptyPM          = fEmptyPM;
-    fCurrentDBRootIdx = startExtentIdx;
+    bFirstExtentOnThisPM = fStartedWithEmptyPM;
+    fCurrentDBRootIdx    = startExtentIdx;
 
     // Finish Initializing DBRootExtentList for empty DBRoots w/o any extents
     initEmptyDBRoots( );
@@ -340,22 +254,23 @@ int DBRootExtentTracker::selectFirstSegFile(
 }
 
 //------------------------------------------------------------------------------
-// If we have encountered a PM with no extents (or all extent disabled), then
-// this function can be called to determine the DBRoot to be used for the 1st
-// extent for the applicable PM.  First DBRoot for relevant PM is selected.
-// At extent creation time, BRM will assign the segment number.
+// If we have encountered a PM with no extents, then this function can be
+// called to determine the DBRoot to be used for the first extent for the
+// applicable PM.  First DBRoot for relevant PM is selected.  At extent
+// creation time, BRM will assign the segment number.
 //
 // Mutex lock not needed in this function as it is only called from main thread
 // before processing threads are spawned.
 //------------------------------------------------------------------------------
 int DBRootExtentTracker::selectFirstSegFileForEmptyPM( std::string& errMsg )
 {
-    fEmptyOrDisabledPM = true;
+    fStartedWithEmptyPM = true;
 
-    fCurrentDBRootIdx = 0;    // Start with first DBRoot for this PM
+    fCurrentDBRootIdx   = 0;    // Start with first DBRoot for this PM
+    fEmptyPMFirstDbRoot = fDBRootExtentList[fCurrentDBRootIdx].fDbRoot;
 
-    // Always start empty PM with partition number 0.  If the DBRoot has a HWM
-    // extent that is disabled, then BRM will override this partition number.
+    // Always start empty PM with partition number 0.  If PM DBRoots were empty
+    // then fPartition should already be 0, but explicitly set just to be safe.
     fDBRootExtentList[fCurrentDBRootIdx].fPartition = 0;
 
     return NO_ERROR;
@@ -374,7 +289,7 @@ void DBRootExtentTracker::initEmptyDBRoots( )
          iroot<fDBRootExtentList.size();
          iroot++)
     {
-        if ((fDBRootExtentList[iroot].fState == DBROOT_EXTENT_EMPTY_DBROOT) &&
+        if ((fDBRootExtentList[iroot].fDBRootTotalBlocks == 0) &&
             ((int)iroot != startExtentIdx)) // skip over selected dbroot
         {
             if (fDBRootExtentList[iroot].fPartition !=
@@ -415,32 +330,40 @@ void DBRootExtentTracker::initEmptyDBRoots( )
 
 //------------------------------------------------------------------------------
 // Assign the DBRoot/segment file to be used for extent loading based on the
-// setting in the specified reference tracker (set for a reference column).
+// setting in the specified reference tracker.
 //
 // Mutex lock not needed in this function as it is only called from main thread
 // before processing threads are spawned.
 //------------------------------------------------------------------------------
 void DBRootExtentTracker::assignFirstSegFile(
     const DBRootExtentTracker& refTracker,
-    DBRootExtentInfo& dbRootExtent)
+    DBRootExtentInfo& dbRootExtent,
+    bool& bFirstExtentOnThisPM )
 {
     // Start with the same DBRoot index as the reference tracker; assumes that
     // DBRoots for each column are listed in same order in fDBRootExtentList.
     // That should be a safe assumption since DBRootExtentTracker constructor
     // sorts the entries in fDBRootExtentList by fDbRoot.
-    int startExtentIdx = refTracker.fCurrentDBRootIdx;
-    fEmptyOrDisabledPM = refTracker.fEmptyOrDisabledPM;
-    fEmptyPM           = refTracker.fEmptyPM;
-    fDisabledHWM       = refTracker.fDisabledHWM;
+    int startExtentIdx   = refTracker.fCurrentDBRootIdx;
+    fStartedWithEmptyPM  = refTracker.fStartedWithEmptyPM;
+    fEmptyPMFirstDbRoot  = refTracker.fEmptyPMFirstDbRoot;
   
-    // Always start empty PM with partition number 0.  If the DBRoot has a HWM
-    // extent that is disabled, then BRM will override this partition number.
-    if (fEmptyOrDisabledPM)
+    // For an empty PM, we pick up the DBRoot selected and saved in the
+    // reference tracker.
+    if (fStartedWithEmptyPM)
     {
-        fDBRootExtentList[startExtentIdx].fPartition = 0;
+        DBRootExtentInfo dbRootExtent2(4, // dummy column width
+            refTracker.fDBRootExtentList[startExtentIdx].fDbRoot,
+            0      , // always start empty PM with partition number 0
+            0      , // segment number (n/a)
+            0      , // starting LBID  (n/a)
+            0      , // local HWM      (n/a)
+            0);      // total blocks for this dbroot
+        fDBRootExtentList[startExtentIdx] = dbRootExtent2;
     }
 
-    fCurrentDBRootIdx = startExtentIdx;
+    bFirstExtentOnThisPM = fStartedWithEmptyPM;
+    fCurrentDBRootIdx    = startExtentIdx;
 
     // Finish Initializing DBRootExtentList for empty DBRoots w/o any extents
     initEmptyDBRoots( );
@@ -460,20 +383,15 @@ void DBRootExtentTracker::logFirstDBRootSelection( ) const
     {
         int extentIdx = fCurrentDBRootIdx;
 
-        if (fEmptyOrDisabledPM)
+        if (fStartedWithEmptyPM)
         {
             std::ostringstream oss;
-            oss << "No active extents; will add partition to start adding "
-                "rows for oid-" << fOID <<
-                "; DBRoot-" << fDBRootExtentList[extentIdx].fDbRoot;
-                fLog->logMsg( oss.str(), MSGLVL_INFO2 );
-        }
-        else if (fDisabledHWM)
-        {
-            std::ostringstream oss;
-            oss << "HWM extent disabled; will add partition to start adding "
-                "rows for oid-" << fOID <<
-                "; DBRoot-" << fDBRootExtentList[extentIdx].fDbRoot;
+            oss << "Will be creating first segFile on this PM for oid-" <<fOID<<
+                "; DBRoot-" << fDBRootExtentList[extentIdx].fDbRoot <<
+                ", part/seg/state: " <<fDBRootExtentList[extentIdx].fPartition<<
+                "/" << fDBRootExtentList[extentIdx].fSegment   <<
+                "/" << stateStrings[ fDBRootExtentList[extentIdx].fState ] <<
+                "; Based on first seg being on DBRoot" << fEmptyPMFirstDbRoot;
                 fLog->logMsg( oss.str(), MSGLVL_INFO2 );
         }
         else
@@ -495,15 +413,10 @@ void DBRootExtentTracker::logFirstDBRootSelection( ) const
 
 //------------------------------------------------------------------------------
 // Iterate/return next DBRoot to be used for the next extent
-//
 // If it is the "very" 1st extent for the specified DBRoot, then the applicable
-// partition to be used for the first extent, is also returned.
-// If a partial extent is to be filled in, then the current HWM
+// partition and segment number to be used for the first extent, are also
+// returned.  If a partial extent is to be filled in, then the current HWM
 // and starting LBID for the relevant extent are returned.
-// If a disabled extent is encountered, the return flag is true, so that
-// we can allocate a new extent at the next physical partition.  BRM should
-// take care of figuring out where to allocate this next extent.
-//
 // Returns true if new extent needs to be allocated, else false indicates that
 // the extent is partially full.
 //------------------------------------------------------------------------------

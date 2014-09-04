@@ -15,38 +15,13 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-/*
-  Copyright (c) 2007 Alexander Eremin <netwhistler@gmail.com>
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met: 
-
-1. Redistributions of source code must retain the above copyright notice, this
-   list of conditions and the following disclaimer. 
-2. Redistributions in binary form must reproduce the above copyright notice,
-   this list of conditions and the following disclaimer in the documentation
-   and/or other materials provided with the distribution. 
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
-ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-The views and conclusions contained in the software and documentation are those
-of the authors and should not be interpreted as representing official policies, 
-either expressed or implied, of the FreeBSD Project.
-*/
-
+/***********************************************************************
+*   $Id: inetstreamsocket.cpp 3292 2012-09-19 14:24:59Z rdempsey $
+*
+*
+***********************************************************************/
 #include "config.h"
 
-#include <cstdio>
 #include <cerrno>
 #ifdef _MSC_VER
 #define WIN32_LEAN_AND_MEAN
@@ -92,7 +67,6 @@ using boost::scoped_array;
 #include "socketclosed.h"
 #include "logger.h"
 #include "loggingid.h"
-#include "idbcompress.h"
 
 // some static functions
 namespace {
@@ -315,18 +289,17 @@ retry:
 
 /* returns true when the next thing in the stream is the beginning of a new
 ByteStream object. */
-bool InetStreamSocket::readToMagic(long msecs, bool* isTimeOut, Stats *stats) const
+bool InetStreamSocket::readToMagic(long msecs, bool* isTimeOut) const
 {
 	int err;
 	struct pollfd pfd[1];
 	uint8_t *magicBuffer8;
 
-	fMagicBuffer = 0;
 	magicBuffer8 = reinterpret_cast<uint8_t*>(&fMagicBuffer);
 	pfd[0].fd = fSocketParms.sd();
 	pfd[0].events = POLLIN;
-	
-	while ((fMagicBuffer != BYTESTREAM_MAGIC) && (fMagicBuffer != COMPRESSED_BYTESTREAM_MAGIC)) {
+
+	while (fMagicBuffer != BYTESTREAM_MAGIC) {
 
 		if (msecs >= 0) {
 			pfd[0].revents = 0;
@@ -414,13 +387,12 @@ retry:
 			else 
 				throw SocketClosed("InetStreamSocket::readToMagic: Remote is closed");
 		}
-		if (stats)
-			stats->dataRecvd(1);
 	}
+	fMagicBuffer = 0;
 	return true;
 }
 
-const SBS InetStreamSocket::read(const struct ::timespec* timeout, bool* isTimeOut, Stats *stats) const
+const SBS InetStreamSocket::read(const struct ::timespec* timeout, bool* isTimeOut) const
 {
  	long msecs = -1;
 
@@ -433,10 +405,10 @@ const SBS InetStreamSocket::read(const struct ::timespec* timeout, bool* isTimeO
 
 	// we need to read the 4-byte message length first.
 	uint32_t msglen;
-	uint8_t* msglenp = reinterpret_cast<uint8_t*>(&msglen);
+	ByteStream::byte* msglenp = reinterpret_cast<ByteStream::byte*>(&msglen);
 	size_t mlread = 0;
 	
-	if (readToMagic(msecs, isTimeOut, stats) == false)	//indicates a timeout or EOF
+	if (readToMagic(msecs, isTimeOut) == false)	//indicates a timeout or EOF
 		return SBS(new ByteStream(0));
 
 	//FIXME: This seems like a lot of work to read 4 bytes...
@@ -491,11 +463,9 @@ const SBS InetStreamSocket::read(const struct ::timespec* timeout, bool* isTimeO
 		}
 		mlread += t;
 	}
-	if (stats)
-		stats->dataRecvd(sizeof(msglen));
 
 	SBS res(new ByteStream(msglen));
- 	uint8_t* bufp = res->getInputPtr();
+ 	ByteStream::byte* bufp = res->getInputPtr();
 
 	size_t nread = 0;
 
@@ -519,8 +489,6 @@ const SBS InetStreamSocket::read(const struct ::timespec* timeout, bool* isTimeO
 			{
 				if (isTimeOut)
 					*isTimeOut = true;
-				if (stats) 
-					stats->dataRecvd(nread);
 				return SBS(new ByteStream(0));
 			}
 		}
@@ -533,8 +501,6 @@ const SBS InetStreamSocket::read(const struct ::timespec* timeout, bool* isTimeO
 #endif
 		if (t == 0) 
 		{
-			if (stats) 
-				stats->dataRecvd(nread);
 			if (timeout == NULL)
 				return SBS(new ByteStream(0));	// don't return an incomplete message
 			else
@@ -558,15 +524,12 @@ const SBS InetStreamSocket::read(const struct ::timespec* timeout, bool* isTimeO
 			oss << "InetStreamSocket::read: I/O error4: " <<
 				strerror(e);
 #endif
-			if (stats) 
-				stats->dataRecvd(nread);
 			throw runtime_error(oss.str());
 		}
 		nread += t;
 	}
-	if (stats) 
-		stats->dataRecvd(msglen);
 	res->advanceInputPtr(msglen);
+
 	return res;
 }
 
@@ -575,15 +538,10 @@ const SBS InetStreamSocket::read(const struct ::timespec* timeout, bool* isTimeO
 * read side, we reverse it.
 */
 
-void InetStreamSocket::write(SBS msg, Stats *stats)
-{
-	write(*msg, stats);
-}
-
-void InetStreamSocket::do_write(const ByteStream &msg, uint32_t whichMagic, Stats *stats) const
+void InetStreamSocket::write(const ByteStream& msg) const
 {
 	uint32_t msglen = msg.length();
-	uint32_t magic = whichMagic;
+	uint32_t magic = BYTESTREAM_MAGIC;
 	uint32_t *realBuf;
 
 	if (msglen == 0) return;
@@ -596,38 +554,29 @@ void InetStreamSocket::do_write(const ByteStream &msg, uint32_t whichMagic, Stat
 	realBuf[1] = msglen;
 
 	try {
-		written(fSocketParms.sd(), (const uint8_t*)realBuf, msglen + sizeof(msglen) + sizeof(magic));
+		writen(fSocketParms.sd(), (const uint8_t*)realBuf, msglen + sizeof(msglen) + sizeof(magic));
 	}
 	catch (std::exception& ex) {
 		string errorMsg(ex.what());
 		errorMsg += " -- write from " + toString();
 		throw runtime_error(errorMsg);
 	}
-	if (stats)
-		stats->dataSent(msglen + sizeof(msglen) + sizeof(magic));
 }
 
-void InetStreamSocket::write(const ByteStream& msg, Stats *stats)
-{
-	do_write(msg, BYTESTREAM_MAGIC, stats);
-}
-
-void InetStreamSocket::write_raw(const ByteStream& msg, Stats *stats) const
+void InetStreamSocket::write_raw(const ByteStream& msg) const
 {
 	uint32_t msglen = msg.length();
 
 	if (msglen == 0) return;
 
 	try {
-		written(fSocketParms.sd(), msg.buf(), msglen);
+		writen(fSocketParms.sd(), msg.buf(), msglen);
 	}
 	catch (std::exception& ex) {
 		string errorMsg(ex.what());
 		errorMsg += " -- write_raw from " + toString();
 		throw runtime_error(errorMsg);
 	}
-	if (stats)
-		stats->dataSent(msglen);
 }
 
 void InetStreamSocket::bind(const sockaddr* serv_addr)
@@ -816,10 +765,11 @@ void InetStreamSocket::connect(const sockaddr* serv_addr)
 
 	// success
 	if (ret == 1) {
+		int rd;
 #ifdef _MSC_VER
-		(void)::recv(socketParms().sd(), &buf, 1, 0);
+		rd = ::recv(socketParms().sd(), &buf, 1, 0);
 #else
-		(void)::read(socketParms().sd(), &buf, 1);
+		rd = ::read(socketParms().sd(), &buf, 1);
 #endif
 		return;
 	}
@@ -879,7 +829,7 @@ void InetStreamSocket::logIoError(const char* errMsg, int errNum) const
 	logger.logMessage(logging::LOG_TYPE_WARNING, logging::M0071, args, li);
 }
 
-ssize_t InetStreamSocket::written(int fd, const uint8_t* ptr, size_t nbytes) const
+ssize_t InetStreamSocket::writen(int fd, const ByteStream::byte* ptr, size_t nbytes) const
 {
 	size_t nleft;
 	ssize_t nwritten;

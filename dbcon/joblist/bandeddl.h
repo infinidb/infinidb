@@ -16,11 +16,11 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: bandeddl.h 9655 2013-06-25 23:08:13Z xlou $
+ * $Id: bandeddl.h 8476 2012-04-25 22:28:15Z xlou $
  *
  *****************************************************************************/
 
-/** @file
+/** @file 
  * class XXX interface
  */
 
@@ -47,8 +47,8 @@ class BandedDL : public LargeDataList<std::vector<element_t>, element_t>
 	typedef LargeDataList<std::vector<element_t>, element_t> base;
 
 	public:
-		BandedDL(uint32_t numConsumers, const ResourceManager& rm);
-//		BandedDL(BucketDL<element_t> &, uint32_t numConsumers, const ResourceManager& rm);
+		BandedDL(uint numConsumers, const ResourceManager& rm);
+//		BandedDL(BucketDL<element_t> &, uint numConsumers, const ResourceManager& rm);
 		virtual ~BandedDL();
 
 		int64_t saveBand();
@@ -73,22 +73,22 @@ class BandedDL : public LargeDataList<std::vector<element_t>, element_t>
 		explicit BandedDL() { };
 		explicit BandedDL(const BandedDL &) { };
 		BandedDL & operator=(const BandedDL &) { };
-
+		
 		// vars to support the WSDL-like next() fcn
 		boost::condition nextSetLoaded;
 		uint64_t waitingConsumers;
 };
 
 template<typename element_t>
-  BandedDL<element_t>::BandedDL(uint32_t nc, const ResourceManager& rm) : base(nc,  sizeof(uint64_t), sizeof(uint64_t), rm)
+  BandedDL<element_t>::BandedDL(uint nc, const ResourceManager& rm) : base(nc,  sizeof(uint64_t), sizeof(uint64_t), rm)
 {
 	//pthread_cond_init(&nextSetLoaded, NULL);
 	waitingConsumers = 0;
 }
-
+	
 #if 0
 template<typename element_t>
-  BandedDL<element_t>::BandedDL(BucketDL<element_t> &b, uint32_t nc, const ResourceManager& rm) : base(nc, sizeof(uint64_t), sizeof(uint64_t), rm)
+  BandedDL<element_t>::BandedDL(BucketDL<element_t> &b, uint nc, const ResourceManager& rm) : base(nc, sizeof(uint64_t), sizeof(uint64_t), rm)
 {
 	uint64_t i, it;
 	element_t e;
@@ -112,7 +112,7 @@ template<typename element_t>
 
 template<typename element_t>
 BandedDL<element_t>::~BandedDL()
-{
+{ 
 	//pthread_cond_destroy(&nextSetLoaded);
 }
 
@@ -120,7 +120,7 @@ template<typename element_t>
 int64_t BandedDL<element_t>::saveBand()
 {
 	int64_t ret;
-
+	
 	if (base::multipleProducers)
 	 	base::lock();
 	sort(base::c->begin(), base::c->end());
@@ -132,14 +132,14 @@ int64_t BandedDL<element_t>::saveBand()
 	base::registerNewSet();
 	if (base::multipleProducers)
 		base::unlock();
-
+	
 	return ret;
 }
 
 template<typename element_t>
 void BandedDL<element_t>::loadBand(uint64_t band)
 {
-
+	
 	base::lock();
 	if (typeid(element_t) == typeid(ElementType) ||
 		typeid(element_t) == typeid(DoubleElementType))
@@ -159,7 +159,7 @@ int64_t BandedDL<element_t>::bandCount()
 	base::lock();
 	ret = base::setCount();
 	base::unlock();
-	return ret;
+	return ret;	
 }
 
 template<typename element_t>
@@ -216,7 +216,7 @@ the more I think they're the same thing.  Not entirely sure yet though. */
 	guarantee the caller will be wakened when the next set is loaded.  It could
 	get skipped.  It won't happen realistically, but it exists... */
 
-	// signifies the caller is at the end of the loaded set,
+	// signifies the caller is at the end of the loaded set, 
 	// but there are more sets
 	if (ret == false && (base::loadedSet < base::setCount - 1)) {
 
@@ -245,7 +245,7 @@ the more I think they're the same thing.  Not entirely sure yet though. */
 	if (locked)
 		base::unlock();
 
-	return ret;
+	return ret;	
 
 }
 
@@ -350,7 +350,7 @@ uint64_t BandedDL<element_t>::totalSize()
 	base::lock();
 	ret = base::totalSize();
 	base::unlock();
-
+	
 	return ret;
 }
 

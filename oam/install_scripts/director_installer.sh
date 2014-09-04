@@ -13,20 +13,18 @@ set timeout 10
 set MODULE [lindex $argv 0]
 set SERVER [lindex $argv 1]
 set PASSWORD [lindex $argv 2]
-set CALPONTRPM1 [lindex $argv 3]
-set CALPONTRPM2 [lindex $argv 4]
-set CALPONTRPM3 [lindex $argv 5]
-set CALPONTMYSQLRPM [lindex $argv 6]
-set CALPONTMYSQLDRPM [lindex $argv 7]
-set INSTALLTYPE [lindex $argv 8]
-set DEBUG [lindex $argv 9]
+set CALPONTRPM [lindex $argv 3]
+set CALPONTMYSQLRPM [lindex $argv 4]
+set CALPONTMYSQLDRPM [lindex $argv 5]
+set INSTALLTYPE [lindex $argv 6]
+set DEBUG [lindex $argv 7]
 set INSTALLDIR "/usr/local/Calpont"
-set IDIR [lindex $argv 10]
+set IDIR [lindex $argv 8]
 if { $IDIR != "" } {
 	set INSTALLDIR $IDIR
 }
 set USERNAME "root"
-set UNM [lindex $argv 11]
+set UNM [lindex $argv 9]
 if { $UNM != "" } {
 	set USERNAME $UNM
 }
@@ -36,274 +34,352 @@ spawn -noecho /bin/bash
 #
 if { $INSTALLTYPE == "initial" || $INSTALLTYPE == "uninstall" } {
 	# 
-	# erase InfiniDB MySQL storage engine package
+	# erase Calpont-MySql package
 	#
-	send_user "Erase InfiniDB MySQL Storage Engine Package on Module           "
-	expect -re {[$#] }
-	send "ssh $USERNAME@$SERVER 'rpm -e --nodeps --allmatches calpont-mysql >/dev/null 2>&1; rpm -e --nodeps --allmatches infinidb-storage-engine'\n"
+	send_user "Erase Calpont-Mysql Package on Module           "
+	expect -re "# "
+	send "ssh $USERNAME@$SERVER ' rpm -e --nodeps --allmatches calpont-mysql'\n"
 	expect {
-		"Host key verification failed" { send_user "FAILED: Host key verification failed\n" ; exit }
-		"service not known" { send_user "FAILED: Invalid Host\n" ; exit }
-		"authenticity" { send "yes\n" 
+		-re "Host key verification failed" { send_user "FAILED: Host key verification failed\n" ; exit }
+		-re "service not known" { send_user "FAILED: Invalid Host\n" ; exit }
+		-re "authenticity" { send "yes\n" 
 							expect {
-								"word: " { send "$PASSWORD\n" }
+								-re "word: " { send "$PASSWORD\n" } abort
 							}
 		}
-		"word: " { send "$PASSWORD\n" }
-		"Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit -1 }
+		-re "word: " { send "$PASSWORD\n" } abort
+		-re "Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit -1 }
 	}
 	# password for ssh
 	send "$PASSWORD\n"
 	expect {
-		-re {[$#] }                  { send_user "DONE" }
-		"uninstall completed" { send_user "DONE" }
-		"error: Failed dependencies" { send_user "ERROR: Failed dependencies\n" ; exit -1 }
-		"Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit -1 }
-		"not installed"       { send_user "INFO: Package not installed" }
-	}
-	send_user "\n"
-	# 
-	# erase InfiniDB MySQL package
-	#
-	send_user "Erase InfiniDB MySQL Package on Module          "
-	expect -re {[$#] }
-	send "ssh $USERNAME@$SERVER 'rpm -e --nodeps --allmatches calpont-mysqld >/dev/null 2>&1; rpm -e --nodeps --allmatches infinidb-mysql'\n"
-	expect "word: "
-	# password for ssh
-	send "$PASSWORD\n"
-	expect {
-		-re {[$#] }                  { send_user "DONE" }
-		"uninstall completed" { send_user "DONE" }
-		"error: Failed dependencies" { send_user "ERROR: Failed dependencies\n" ; exit -1 }
-		"Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit -1 }
-		"not installed"       { send_user "INFO: Package not installed" }
+		-re "# "                  { send_user "DONE" } abort
+		-re "uninstall completed" { send_user "DONE" } abort
+		-re "error: Failed dependencies" { send_user "ERROR: Failed dependencies\n" ; exit -1 }
+		-re "Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit -1 }
+		-re "not installed"       { send_user "INFO: Package not installed" } abort
 	}
 	send_user "\n"
 	# 
-	# erase InfiniDB packages
+	# erase Calpont-MySqld package
 	#
-	send_user "Erase InfiniDB Packages on Module                 "
-	expect -re {[$#] }
-	send "ssh $USERNAME@$SERVER 'rpm -e --nodeps --allmatches calpont >/dev/null 2>&1; rpm -e --nodeps --allmatches infinidb-enterprise >/dev/null 2>&1; rpm -e --nodeps --allmatches infinidb-libs infinidb-platform'\n"
-	expect "word: "
+	send_user "Erase Calpont-Mysqld Package on Module          "
+	expect -re "# "
+	send "ssh $USERNAME@$SERVER ' rpm -e --nodeps --allmatches calpont-mysqld'\n"
+	expect -re "word: "
 	# password for ssh
 	send "$PASSWORD\n"
 	expect {
-		-re {[$#] }                  { send_user "DONE" }
-		"uninstall completed" { send_user "DONE" }
-		"error: Failed dependencies" { send_user "ERROR: Failed dependencies\n" ; exit -1 }
-		"Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit -1 }
-		"not installed"       { send_user "INFO: Package not installed" }
+		-re "# "                  { send_user "DONE" } abort
+		-re "uninstall completed" { send_user "DONE" } abort
+		-re "error: Failed dependencies" { send_user "ERROR: Failed dependencies\n" ; exit -1 }
+		-re "Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit -1 }
+		-re "not installed"       { send_user "INFO: Package not installed" } abort
+	}
+	send_user "\n"
+	# 
+	# erase Calpont package
+	#
+	send_user "Erase Calpont Package on Module                 "
+	expect -re "# "
+	send "ssh $USERNAME@$SERVER ' rpm -e --nodeps --allmatches calpont'\n"
+	expect -re "word: "
+	# password for ssh
+	send "$PASSWORD\n"
+	expect {
+		-re "# "                  { send_user "DONE" } abort
+		-re "uninstall completed" { send_user "DONE" } abort
+		-re "error: Failed dependencies" { send_user "ERROR: Failed dependencies\n" ; exit -1 }
+		-re "Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit -1 }
+		-re "not installed"       { send_user "INFO: Package not installed" } abort
 	}
 	send_user "\n"
 }
 if { $INSTALLTYPE == "uninstall" } { exit 0 }
 
 # 
-# send the InfiniDB package
+# send the Calpont package
 #
-expect -re {[$#] }
+expect -re "# "
 set timeout 20
-send_user "Copy New InfiniDB Package to Module              "
-send "ssh $USERNAME@$SERVER 'rm -f /root/infinidb-*.rpm'\n"
-expect "word: "
+send_user "Copy New Calpont Package to Module              "
+send "ssh $USERNAME@$SERVER 'rm -f /root/calpont*.rpm'\n"
+expect -re "word: "
 # password for ssh
 send "$PASSWORD\n"
 # check return
 expect {
-	-re {[$#] } { }
+	-re "# " { } abort
 }
-send "scp $CALPONTRPM1 $CALPONTRPM2 $CALPONTRPM3 $USERNAME@$SERVER:.\n"
-expect "word: "
+send "scp $CALPONTRPM  $USERNAME@$SERVER:$CALPONTRPM\n"
+expect -re "word: "
 # send the password
 send "$PASSWORD\n"
 # check return
 expect {
-	"100%" 				{ send_user "DONE" }
-	"scp"  				{ send_user "ERROR\n" ; 
+	-re "100%" 				{ send_user "DONE" } abort
+	-re "scp"  				{ send_user "ERROR\n" ; 
 				 			send_user "\n*** Installation ERROR\n" ; 
 							exit -1 }
-	"Permission denied, please try again"         { send_user "ERROR: Invalid password\n" ; exit -1 }
-	"No such file or directory" { send_user "ERROR: Invalid package\n" ; exit -1 }
+	-re "Permission denied, please try again"         { send_user "ERROR: Invalid password\n" ; exit -1 }
+	-re "No such file or directory" { send_user "ERROR: Invalid package\n" ; exit -1 }
 }
 send_user "\n"
 # 
-# send the InfiniDB MySQL sotrage engine package
+# send the Calpont-mysql package
 #
-send_user "Copy New InfiniDB MySQL Storage Engine Package to Module        "
+send_user "Copy New Calpont-MySql Package to Module        "
 send "scp $CALPONTMYSQLRPM  $USERNAME@$SERVER:$CALPONTMYSQLRPM\n"
-expect "word: "
+expect -re "word: "
 # send the password
 send "$PASSWORD\n"
 # check return
 expect {
-	"100%" 				{ send_user "DONE" }
-	"scp"  				{ send_user "ERROR\n" ; 
+	-re "100%" 				{ send_user "DONE" } abort
+	-re "scp"  				{ send_user "ERROR\n" ; 
 				 			send_user "\n*** Installation ERROR\n" ; 
 							exit -1 }
-	"Permission denied, please try again"         { send_user "ERROR: Invalid password\n" ; exit -1 }
-	"No such file or directory" { send_user "ERROR: Invalid package\n" ; exit -1 }
+	-re "Permission denied, please try again"         { send_user "ERROR: Invalid password\n" ; exit -1 }
+	-re "No such file or directory" { send_user "ERROR: Invalid package\n" ; exit -1 }
 }
 send_user "\n"
 # 
-# send the InfiniDB MySQL package
+# send the Calpont-mysqld package
 #
-send_user "Copy New InfiniDB MySQL Package to Module       "
+send_user "Copy New Calpont-MySqld Package to Module       "
 send "scp $CALPONTMYSQLDRPM  $USERNAME@$SERVER:$CALPONTMYSQLDRPM\n"
-expect "word: "
+expect -re "word: "
 # send the password
 send "$PASSWORD\n"
 # check return
 expect {
-	"100%" 				{ send_user "DONE" }
-	"scp"  				{ send_user "ERROR\n" ; 
+	-re "100%" 				{ send_user "DONE" } abort
+	-re "scp"  				{ send_user "ERROR\n" ; 
 				 			send_user "\n*** Installation ERROR\n" ; 
 							exit -1 }
-	"Permission denied, please try again"         { send_user "ERROR: Invalid password\n" ; exit -1 }
-	"No such file or directory" { send_user "ERROR: Invalid package\n" ; exit -1 }
+	-re "Permission denied, please try again"         { send_user "ERROR: Invalid password\n" ; exit -1 }
+	-re "No such file or directory" { send_user "ERROR: Invalid package\n" ; exit -1 }
 }
 #
 send_user "\n"
-expect -re {[$#] }
+expect -re "# "
 set timeout 60
 if { $INSTALLTYPE == "initial"} {
 	#
 	# install package
 	#
-	send_user "Install InfiniDB Packages on Module               "
-	send "ssh $USERNAME@$SERVER 'rpm -ivh $CALPONTRPM1 $CALPONTRPM2 $CALPONTRPM3 $CALPONTMYSQLDRPM $CALPONTMYSQLRPM'\n"
-	expect "word: "
+	send_user "Install Calpont Package on Module               "
+	send "ssh $USERNAME@$SERVER ' rpm -ivh $CALPONTRPM'\n"
+	expect -re "word: "
 	# password for ssh
 	send "$PASSWORD\n"
 	# check return
 	expect {
-		-re {[$#] } 		  		  { send_user "DONE" }
-		"completed" 		  { send_user "DONE" }
-		"error: Failed dependencies" { send_user "ERROR: Failed dependencies\n" ; 
+		-re "# " 		  		  { send_user "DONE" } abort
+		-re "completed" 		  { send_user "DONE" } abort
+		-re "error: Failed dependencies" { send_user "ERROR: Failed dependencies\n" ; 
 									send_user "\n*** Installation ERROR\n" ; 
 										exit -1 }
-		"Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit -1 }
+		-re "Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit -1 }
 	}
 	send_user "\n"
-	expect -re {[$#] }
+	expect -re "# "
+	#
+	# install package
+	#
+	send_user "Install Calpont-MySqld Package on Module        "
+	send "ssh $USERNAME@$SERVER ' rpm -ivh $CALPONTMYSQLDRPM'\n"
+	expect -re "word: "
+	# password for ssh
+	send "$PASSWORD\n"
+	# check return
+	expect {
+		-re "# " 		  		  { send_user "DONE" } abort
+		-re "completed" 		  { send_user "DONE" } abort
+		-re "error: Failed dependencies" { send_user "ERROR: Failed dependencies\n" ; 
+									send_user "\n*** Installation ERROR\n" ; 
+										exit -1 }
+		-re "Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit -1 }
+	}
+	send_user "\n"
+	expect -re "# "
+	#
+	# install package
+	#
+	send_user "Install Calpont-MySql Package on Module         "
+	send "ssh $USERNAME@$SERVER ' rpm -ivh $CALPONTMYSQLRPM'\n"
+	expect -re "word: "
+	# password for ssh
+	send "$PASSWORD\n"
+	# check return
+	expect {
+		-re "# " 		  		  { send_user "DONE" } abort
+		-re "completed" 		  { send_user "DONE" } abort
+		-re "error: Failed dependencies" { send_user "ERROR: Failed dependencies\n" ; 
+									send_user "\n*** Installation ERROR\n" ; 
+										exit -1 }
+		-re "Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit -1 }
+	}
+	send_user "\n"
+	expect -re "# "
 	set timeout 10
 	#
 	# install package
 	#
-	send_user "Running InfiniDB MySQL Setup Scripts on Module   "
+	send_user "Running Calpont-MySql Setup Scripts on Module   "
 	send "ssh $USERNAME@$SERVER '$INSTALLDIR/bin/post-mysql-install'\n"
-	expect "word: "
+	expect -re "word: "
 	# password for ssh
 	send "$PASSWORD\n"
 	# check return
 	expect {
-		"Shutting down MySQL." { send_user "DONE" }
-		timeout { send_user "DONE" }
-		"ERROR" { send_user "ERROR: Daemon failed to run";
+		-re "Shutting down MySQL." { send_user "DONE" } abort
+		timeout { send_user "DONE" } abort
+		-re "ERROR" { send_user "ERROR: Daemon failed to run";
 		exit -1 }
 	}
 	send_user "\n"
-	expect -re {[$#] }
+	expect -re "# "
 	#
 	# install package
 	#
-	send_user "Running InfiniDB MySQL Setup Scripts on Module  "
+	send_user "Running Calpont-MySqld Setup Scripts on Module  "
 	send "ssh $USERNAME@$SERVER '$INSTALLDIR/bin/post-mysqld-install'\n"
-	expect "word: "
+	expect -re "word: "
 	# password for ssh
 	send "$PASSWORD\n"
 	# check return
 	expect {
-		"Shutting down MySQL." { send_user "DONE" }
-		timeout { send_user "DONE" }
-		"ERROR" { send_user "ERROR: Daemon failed to run";
+		-re "Shutting down MySQL." { send_user "DONE" } abort
+		timeout { send_user "DONE" } abort
+		-re "ERROR" { send_user "ERROR: Daemon failed to run";
 		exit -1 }
 	}
 } else {
 	#
 	# upgrade package
 	#
-	expect -re {[$#] }
-	send_user "Upgrade InfiniDB Packages on Module               "
-	send "ssh $USERNAME@$SERVER ' rpm -Uvh --noscripts $CALPONTRPM1 $CALPONTRPM2 $CALPONTRPM3 $CALPONTMYSQLDRPM $CALPONTMYSQLRPM'\n"
-	expect "word: "
+	expect -re "# "
+	send_user "Upgrade Calpont Package on Module               "
+	send "ssh $USERNAME@$SERVER ' rpm -Uvh --noscripts $CALPONTRPM'\n"
+	expect -re "word: "
 	# password for ssh
 	send "$PASSWORD\n"
 	# check return
 	expect {
-		-re {[$#] } 		  		  { send_user "DONE" }
-		"completed" 		  { send_user "DONE" }
-		"already installed"   { send_user "INFO: Already Installed\n" ; exit -1 }
-		"error: Failed dependencies" { send_user "ERROR: Failed dependencies\n" ; 
+		-re "# " 		  		  { send_user "DONE" } abort
+		-re "completed" 		  { send_user "DONE" } abort
+		-re "already installed"   { send_user "INFO: Already Installed\n" ; exit -1 }
+		-re "error: Failed dependencies" { send_user "ERROR: Failed dependencies\n" ; 
 									send_user "\n*** Installation ERROR\n" ; 
 										exit -1 }
-		"Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit -1 }
+		-re "Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit -1 }
 	}
 	send_user "\n"
-	expect -re {[$#] }
+	expect -re "# "
+	#
+	# upgrade package
+	#
+	send_user "Upgrade Calpont-MySqld Package on Module        "
+	send "ssh $USERNAME@$SERVER ' rpm -Uvh --noscripts $CALPONTMYSQLDRPM'\n"
+	expect -re "word: "
+	# password for ssh
+	send "$PASSWORD\n"
+	# check return
+	expect {
+		-re "# " 		  		  { send_user "DONE" } abort
+		-re "completed" 		  { send_user "DONE" } abort
+		-re "already installed"   { send_user "INFO: Already Installed\n" ; exit -1 }
+		-re "error: Failed dependencies" { send_user "ERROR: Failed dependencies\n" ; 
+									send_user "\n*** Installation ERROR\n" ; 
+										exit -1 }
+		-re "Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit -1 }
+	}
+	send_user "\n"
+	expect -re "# "
+	#
+	# upgrade package
+	#
+	send_user "Upgrade Calpont-MySql Package on Module         "
+	send "ssh $USERNAME@$SERVER ' rpm -Uvh --noscripts $CALPONTMYSQLRPM'\n"
+	expect -re "word: "
+	# password for ssh
+	send "$PASSWORD\n"
+	# check return
+	expect {
+		-re "# " 		  		  { send_user "DONE" } abort
+		-re "completed" 		  { send_user "DONE" } abort
+		-re "already installed"   { send_user "INFO: Already Installed\n" ; exit -1 }
+		-re "error: Failed dependencies" { send_user "ERROR: Failed dependencies\n" ; 
+									send_user "\n*** Installation ERROR\n" ; 
+										exit -1 }
+		-re "Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit -1 }
+	}
+	send_user "\n"
+	expect -re "# "
 	set timeout 10
 	#
 	# install package
 	#
-	send_user "Running InfiniDB MySQL Setup Scripts on Module   "
+	send_user "Running Calpont-MySql Setup Scripts on Module   "
 	send "ssh $USERNAME@$SERVER '$INSTALLDIR/bin/post-mysql-install'\n"
-	expect "word: "
+	expect -re "word: "
 	# password for ssh
 	send "$PASSWORD\n"
 	# check return
 	expect {
-		"Shutting down MySQL." { send_user "DONE" }
-		timeout { send_user "DONE" }
-		"ERROR" { send_user "ERROR: Daemon failed to run";
+		-re "Shutting down MySQL." { send_user "DONE" } abort
+		timeout { send_user "DONE" } abort
+		-re "ERROR" { send_user "ERROR: Daemon failed to run";
 		exit -1 }
 	}
 	send_user "\n"
-	expect -re {[$#] }
+	expect -re "# "
 	#
 	# install package
 	#
-	send_user "Running InfiniDB MySQL Setup Scripts on Module  "
+	send_user "Running Calpont-MySqld Setup Scripts on Module  "
 	send "ssh $USERNAME@$SERVER '$INSTALLDIR/bin/post-mysqld-install'\n"
-	expect "word: "
+	expect -re "word: "
 	# password for ssh
 	send "$PASSWORD\n"
 	# check return
 	expect {
-		"Shutting down MySQL." { send_user "DONE" }
-		timeout { send_user "DONE" }
-		"ERROR" { send_user "ERROR: Daemon failed to run";
+		-re "Shutting down MySQL." { send_user "DONE" } abort
+		timeout { send_user "DONE" } abort
+		-re "ERROR" { send_user "ERROR: Daemon failed to run";
 		exit -1 }
 	}
 }
 send_user "\n"
-expect -re {[$#] }
+expect -re "# "
 set timeout 30
 #
 if { $INSTALLTYPE == "initial"} {
 	#
-	# copy over InfiniDB OS files
+	# copy over calpont OS files
 	#
-	send_user "Copy InfiniDB OS files to Module                 "
+	send_user "Copy Calpont OS files to Module                 "
 	send "scp $INSTALLDIR/local/etc/$MODULE/*  $USERNAME@$SERVER:$INSTALLDIR/local/.\n"
-	expect "word: "
+	expect -re "word: "
 	# send the password
 	send "$PASSWORD\n"
 	expect {
-		-re {[$#] } 		  		  { send_user "DONE" }
-		"Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit -1 }
+		-re "# " 		  		  { send_user "DONE" } abort
+		-re "Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit -1 }
 	}
 	send_user "\n"
 	#
-	# copy over InfiniDB config file
+	# copy over calpont config file
 	#
-	send_user "Copy InfiniDB Config file to Module              "
+	send_user "Copy Calpont Config file to Module              "
 	send "scp $INSTALLDIR/etc/*  $USERNAME@$SERVER:$INSTALLDIR/etc/.\n"
-	expect "word: "
+	expect -re "word: "
 	# send the password
 	send "$PASSWORD\n"
 	expect {
-		-re {[$#] } 		  		  { send_user "DONE" }
-		"Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit -1 }
+		-re "# " 		  		  { send_user "DONE" } abort
+		-re "Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit -1 }
 	}
 	send_user "\n"
 	#
@@ -311,12 +387,12 @@ if { $INSTALLTYPE == "initial"} {
 	#
 	send_user "Copy Custom OS files to Module                  "
 	send "scp -r $INSTALLDIR/local/etc  $USERNAME@$SERVER:$INSTALLDIR/local/.\n"
-	expect "word: "
+	expect -re "word: "
 	# send the password
 	send "$PASSWORD\n"
 	expect {
-		-re {[$#] } 		  		  { send_user "DONE" }
-		"Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit -1 }
+		-re "# " 		  		  { send_user "DONE" } abort
+		-re "Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit -1 }
 	}
 	send_user "\n"
 	#
@@ -324,13 +400,13 @@ if { $INSTALLTYPE == "initial"} {
 	#
 	send_user "Run Module Installer                            "
 	send "ssh $USERNAME@$SERVER '$INSTALLDIR/bin/module_installer.sh'\n"
-	expect "word: "
+	expect -re "word: "
 	# send the password
 	send "$PASSWORD\n"
 	expect {
-		"!!!Module" 				  			{ send_user "DONE" }
-		"Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit -1 }
-		"FAILED"   								{ send_user "ERROR: missing OS file\n" ; exit -1 }
+		-re "!!!Module" 				  			{ send_user "DONE" } abort
+		-re "Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit -1 }
+		-re "FAILED"   								{ send_user "ERROR: missing OS file\n" ; exit -1 }
 	}
 	send_user "\n"
 }

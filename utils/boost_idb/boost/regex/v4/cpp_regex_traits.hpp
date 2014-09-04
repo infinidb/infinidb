@@ -1,7 +1,7 @@
 /*
  *
- * Copyright (c) 2004 John Maddock
- * Copyright 2011 Garmin Ltd. or its subsidiaries
+ * Copyright (c) 2004
+ * John Maddock
  *
  * Use, modification and distribution are subject to the 
  * Boost Software License, Version 1.0. (See accompanying file 
@@ -20,7 +20,6 @@
 #define BOOST_CPP_REGEX_TRAITS_HPP_INCLUDED
 
 #include <boost/config.hpp>
-#include <boost/integer.hpp>
 
 #ifndef BOOST_NO_STD_LOCALE
 
@@ -108,14 +107,12 @@ template<class charT, class traits>
 typename parser_buf<charT, traits>::pos_type
 parser_buf<charT, traits>::seekoff(off_type off, ::std::ios_base::seekdir way, ::std::ios_base::openmode which)
 {
-   typedef typename boost::int_t<sizeof(way) * CHAR_BIT>::least cast_type;
-
    if(which & ::std::ios_base::out)
       return pos_type(off_type(-1));
    std::ptrdiff_t size = this->egptr() - this->eback();
    std::ptrdiff_t pos = this->gptr() - this->eback();
    charT* g = this->eback();
-   switch(static_cast<cast_type>(way))
+   switch(way)
    {
    case ::std::ios_base::beg:
       if((off < 0) || (off > size))
@@ -514,9 +511,7 @@ typename cpp_regex_traits_implementation<charT>::string_type
    // however at least one std lib will always throw
    // std::bad_alloc for certain arguments...
    //
-#ifndef BOOST_NO_EXCEPTIONS
    try{
-#endif
       //
       // What we do here depends upon the format of the sort key returned by
       // sort key returned by this->transform:
@@ -551,9 +546,7 @@ typename cpp_regex_traits_implementation<charT>::string_type
             result.erase(i);
             break;
       }
-#ifndef BOOST_NO_EXCEPTIONS
    }catch(...){}
-#endif
    while(result.size() && (charT(0) == *result.rbegin()))
       result.erase(result.size() - 1);
    if(result.empty())
@@ -583,9 +576,7 @@ typename cpp_regex_traits_implementation<charT>::string_type
    // std::bad_alloc for certain arguments...
    //
    string_type result;
-#ifndef BOOST_NO_EXCEPTIONS
    try{
-#endif
       result = this->m_pcollate->transform(p1, p2);
       //
       // Borland's STLPort version returns a NULL-terminated
@@ -602,12 +593,10 @@ typename cpp_regex_traits_implementation<charT>::string_type
          result.erase(result.size() - 1);
 #endif
       BOOST_ASSERT(std::find(result.begin(), result.end(), charT(0)) == result.end());
-#ifndef BOOST_NO_EXCEPTIONS
    }
    catch(...)
    {
    }
-#endif
    return result;
 }
 

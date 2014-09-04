@@ -4,9 +4,6 @@ create table if not exists infinidb_querystats.querystats
 (
   queryID bigint NOT NULL AUTO_INCREMENT,
   sessionID bigint DEFAULT NULL,
-  host varchar(50) DEFAULT NULL,
-  user varchar(50) DEFAULT NULL,
-  priority char(20) DEFAULT NULL,
   queryType char(25),
   query varchar(8000),
   startTime timestamp NOT NULL,

@@ -97,17 +97,17 @@
 	</Cmd13>
 	<Cmd14>
 		<Name>addDbroot</Name>
-		<Desc1>Add DBRoot Disk storage to the InfiniDB System</Desc1>
+		<Desc1>Add DBRoot Disk storage to the Calpont InfiniDB System</Desc1>
 		<Arg1>Required: Number of DBRoots to be added</Arg1>
 	</Cmd14>
 	<Cmd15>
 		<Name>removeDbroot</Name>
-		<Desc1>Remove DBRoot Disk storage from the InfiniDB System</Desc1>
+		<Desc1>Remove DBRoot Disk storage from the Calpont InfiniDB System</Desc1>
 		<Arg1>Required: List of Dbroot IDs to be removed</Arg1>
 	</Cmd15>
 	<Cmd16>
 		<Name>stopSystem</Name>
-		<Desc1>Stops the processing of the InfiniDB System</Desc1>
+		<Desc1>Stops the processing of the Calpont InfiniDB System</Desc1>
 		<Desc2>It will leave the Modules powered on and the Operating Systems enable </Desc2>
 		<Desc3>This command might be used for Software Maintenance reasons</Desc3>
 		<Arg1>Optional: GRACEFUL/FORCEFUL is the mode the process will be taken down. Default is FORCEFUL</Arg1>
@@ -115,21 +115,21 @@
 	</Cmd16>
 	<Cmd17>
 		<Name>shutdownSystem</Name>
-		<Desc1>Shuts down the InfiniDB System</Desc1>
-		<Desc2>This command stops the processing of applications on all Modules within the InfiniDB System</Desc2>
+		<Desc1>Shuts down the Calpont InfiniDB System</Desc1>
+		<Desc2>This command stops the processing of applications on all Modules within the Calpont InfiniDB System</Desc2>
 		<Desc3>It should be using when performing an upgrade</Desc3>
 		<Arg1>Optional: GRACEFUL/FORCEFUL is the mode the process will be taken down. Default is FORCEFUL</Arg1>
 		<Arg2>Optional: ACK_YES/ACK_NO is Acknowledgment response or not. Default is ACK_YES</Arg2>
 	</Cmd17>
 	<Cmd18>
 		<Name>startSystem</Name>
-		<Desc1>Starts a stopped or shutdown InfiniDB System</Desc1>
+		<Desc1>Starts a stopped or shutdown Calpont InfiniDB System</Desc1>
 		<Desc2>If system is shutdown, then a server root password should be entered if a ssh key is not defined</Desc2>
 		<Arg1>Optional: Server-root-password</Arg1>
 	</Cmd18>
 	<Cmd19>
 		<Name>restartSystem</Name>
-		<Desc1>Restarts a stopped or shutdown InfiniDB System</Desc1>
+		<Desc1>Restarts a stopped or shutdown Calpont InfiniDB System</Desc1>
 		<Desc2>If system is shutdown, then a server root password should be entered if a ssh key is not defined</Desc2>
 		<Arg1>Optional: GRACEFUL/FORCEFUL is the mode the process will be taken down. Default is FORCEFUL</Arg1>
 		<Arg2>Optional: ACK_YES/ACK_NO is Acknowledgment response or not. Default is ACK_YES</Arg2>
@@ -138,13 +138,13 @@
 	<Cmd20>
 		<Name>getSystemStatus</Name>
 		<Desc1>Get System and Modules Status</Desc1>
-		<Desc2>Get Status of the InfiniDB System and the modules within the InfiniDB Appliance</Desc2>
+		<Desc2>Get Status of the Calpont InfiniDB System and the modules within the Calpont InfiniDB Appliance</Desc2>
 		<Arg1>None</Arg1>
 	</Cmd20>
 	<Cmd21>
 		<Name>getProcessStatus</Name>
-		<Desc1>Get InfiniDB Process Statuses</Desc1>
-		<Desc2>Get Status of the InfiniDB Processes witin the InfiniDB System</Desc2>
+		<Desc1>Get Calpont InfiniDB Process Statuses</Desc1>
+		<Desc2>Get Status of the Calpont InfiniDB Processes witin the Calpont InfiniDB System</Desc2>
 		<Arg1>None</Arg1>
 	</Cmd21>
 	<Cmd22>
@@ -195,7 +195,7 @@
 	<Cmd29>
 		<Name>getStorageStatus</Name>
 		<Desc1>Get System Storage Status</Desc1>
-		<Desc2>Get Status of the InfiniDB DBRoot Storages within the InfiniDB Appliance</Desc2>
+		<Desc2>Get Status of the Calpont InfiniDB DBRoot Storages within the Calpont InfiniDB Appliance</Desc2>
 		<Desc2>Only Valid for External Configured disk</Desc2>
 		<Arg1>None</Arg1>
 	</Cmd29>
@@ -214,20 +214,16 @@
 	</Cmd31>
 	<Cmd32>
 		<Name>suspendDatabaseWrites</Name>
-		<Desc1>Suspend performing writes to the InfiniDB Database</Desc1>
+		<Desc1>Suspend performing writes to the Calpont InfiniDB Database</Desc1>
 		<Arg1>None</Arg1>
 	</Cmd32>
 	<Cmd33>
 		<Name>resumeDatabaseWrites</Name>
-		<Desc1>Resume performing writes to the InfiniDB Database</Desc1>
+		<Desc1>Resume performing writes to the Calpont InfiniDB Database</Desc1>
 		<Arg1>None</Arg1>
 	</Cmd33>
 	<Cmd34>
-		<Name>unassignDbrootPmConfig</Name>
-		<Desc1>Unassign DBroots from a Performance Module</Desc1>
-		<Desc2>This command could be used before a DBRoot is removed</Desc2>
-		<Arg1>Required: List of Dbroot IDs to be unassigned</Arg1>
-		<Arg2>Required: Performance Module Name</Arg2>
+		<Name>AVAILABLE</Name>
 	</Cmd34>
 	<Cmd35>
 		<Name>assignDbrootPmConfig</Name>
@@ -304,14 +300,14 @@
 	</Cmd46>
 	<Cmd47>
 		<Name>getCalpontSoftwareInfo</Name>
-		<Desc1>Get the InfiniDB RPM detailed information</Desc1>
+		<Desc1>Get the Calpont InfiniDB RPM detailed information</Desc1>
 		<Arg1>None</Arg1>
 	</Cmd47>
 	<Cmd48>
 		<Name>addModule</Name>
-		<Desc1>Add a Module within the InfiniDB System</Desc1>
+		<Desc1>Add a Module within the Calpont InfiniDB System</Desc1>
 		<Desc2>This command is used to configure a Module to the Configuration</Desc2>
-		<Desc3>Database within the InfiniDB System. It will also install the </Desc3>
+		<Desc3>Database within the Calpont InfiniDB System. It will also install the Calpont</Desc3>
 		<Desc4>InfiniDB Packages and setup the module to make it ready to be restored</Desc4>
 		<Arg1>Required: Module-type or Module-name being added</Arg1>
 		<Arg2>Required: Number-of-Modules being added when Module-type is specified</Arg2>
@@ -320,16 +316,14 @@
 	</Cmd48>
 	<Cmd49>
 		<Name>removeModule</Name>
-		<Desc1>Remove a Module within the InfiniDB System</Desc1>
+		<Desc1>Remove a Module within the Calpont InfiniDB System</Desc1>
 		<Desc2>This command is used to unconfigure a Module from the Configuration</Desc2>
-		<Desc3>Database within the InfiniDB System</Desc3>
+		<Desc3>Database within the Calpont InfiniDB System</Desc3>
 		<Arg1>Required: Module-type or Module-name being removed</Arg1>
 		<Arg2>Required: Number-of-Modules being remove when Module-type is specified</Arg2>
 	</Cmd49>
 	<Cmd50>
-		<Name>getModuleHostNames</Name>
-		<Desc1>Get a list of Module host names (NIC 1 only)</Desc1>
-		<Arg1>Optional: um or pm</Arg1>
+		<Name>AVAILABLE</Name>
 	</Cmd50>
 	<Cmd51>
 		<Name>AVAILABLE</Name>
@@ -412,16 +406,16 @@
 	</Cmd64>
 	<Cmd65>
 		<Name>alterSystem-disableModule</Name>
-		<Desc1>Disable a Module and Alter the InfiniDB System</Desc1>
+		<Desc1>Disable a Module and Alter the Calpont InfiniDB System</Desc1>
 		<Desc2>This command is used to place a Module in an disable state</Desc2>
-		<Desc3>and restart the associated processes the InfiniDB System. </Desc3>
+		<Desc3>and restart the associated processes the Calpont InfiniDB System. </Desc3>
 		<Arg1>Required: Module-name(s) being placed disable</Arg1>
 	</Cmd65>
 	<Cmd66>
 		<Name>alterSystem-enableModule</Name>
-		<Desc1>Enable a Module and Alter the InfiniDB System</Desc1>
+		<Desc1>Enable a Module and Alter the Calpont InfiniDB System</Desc1>
 		<Desc2>This command is used to place a Module in an enable state</Desc2>
-		<Desc3>and restart the associated processes the InfiniDB System. </Desc3>
+		<Desc3>and restart the associated processes the Calpont InfiniDB System. </Desc3>
 		<Arg1>Required: Module-name(s) being placed enable</Arg1>
 	</Cmd66>
 	<Cmd67>

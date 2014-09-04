@@ -78,8 +78,8 @@ void* thr_client(void* clientArgs) {
 	uint64_t noOpCount=0;
 	thr_wait_t* clientWait = (thr_wait_t*)clientArgs;
 	struct timeval tv, tv2;
-	uint32_t randstate=0;
-	randstate = static_cast<uint32_t>(tv.tv_usec);
+	uint randstate=0;
+	randstate = static_cast<uint>(tv.tv_usec);
 	pthread_mutex_lock(&clientWait->fMutex);
 	clientWait->predicate++;
 	pthread_mutex_unlock(&clientWait->fMutex);
@@ -155,7 +155,7 @@ void LoadRange(const LBIDRange_v& v, uint32_t& loadCount)
 	blockCacheClient bc(BRP);
 
 	uint32_t rCount=0;
-	for (uint32_t i =0; i<v.size() ; i++)
+	for (uint i =0; i<v.size() ; i++)
 	{
 		const InlineLBIDRange r={v[i].start, v[i].size};
 		if (r.size<=1024) {
@@ -174,7 +174,7 @@ void ReadRange(const LBIDRange_v& v)
 	int found=0;
 	int notfound=0;
 	int ret=0;
-	for(uint32_t i=0; i<v.size(); i++)
+	for(uint i=0; i<v.size(); i++)
 	{
 		const InlineLBIDRange r={v[i].start, v[i].size};
 		FileBuffer fb(-1, -1);
@@ -208,7 +208,7 @@ void  LoadLbid(const BRM::LBID_t lbid, const BRM::VER_t ver)
 void ReadLbid(const BRM::LBID_t lbid, const BRM::VER_t ver)
 {
 	static int found=0, notfound=0;
-	uint8_t d[8192];
+	u_int8_t d[8192];
 	blockCacheClient bc(BRP);
 	//FileBuffer fb(-1, -1);
 	//bc.read(lbid, ver, fb);
@@ -254,7 +254,7 @@ int main(int argc, char *argv[]) {
 				r[0].size = hwm - lowfbo + 1;
 			else
 				r[0].size = extentSize;
-			for (uint32_t idx=0; idx<r.size(); idx++)
+			for (uint idx=0; idx<r.size(); idx++)
 				totalExt+=r[idx].size;
 			ranges.push_back(r);
 		}
@@ -267,7 +267,7 @@ int main(int argc, char *argv[]) {
 	gettimeofday(&tv, NULL);
 	uint32_t blksLoaded=0;
 	int rangesLoaded=0;
-	for (uint32_t i =0; i<ranges.size() && blksLoaded < cacheSize; i++)
+	for (uint i =0; i<ranges.size() && blksLoaded < cacheSize; i++)
 	{
 		LoadRange(ranges[i], blksLoaded);
 		rangesLoaded++;
@@ -280,16 +280,16 @@ int main(int argc, char *argv[]) {
 	while (ranges.size() > rangesLoaded) ranges.pop_back();
 
 #ifdef BLAH
-	for (uint32_t i =0; i<ranges; i++)
+	for (uint i =0; i<ranges; i++)
 		ReadRange(ranges[i]);
 
-	for (uint32_t i =0; i<ranges.size(); i++)
+	for (uint i =0; i<ranges.size(); i++)
 	{
 		LBIDRange_v rv=ranges[i];
-		for(uint32_t j=0; j < rv.size(); j++)
+		for(uint j=0; j < rv.size(); j++)
 		{
 			const InlineLBIDRange l = {rv[j].start, rv[j].size};
-			for(uint32_t k=l.start; k<l.start+l.size; k++)
+			for(uint k=l.start; k<l.start+l.size; k++)
 			{
 				LoadLbid(k, ver);
 				ReadLbid(k, ver);

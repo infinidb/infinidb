@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_blockop.cpp 4500 2013-01-31 20:25:42Z dhall $
+* $Id: we_blockop.cpp 3720 2012-04-04 18:18:49Z rdempsey $
 *
 *******************************************************************************/
 /** @file */
@@ -26,13 +26,13 @@
 
 #include "joblisttypes.h"
 
+#define WRITEENGINEBLOCKOP_DLLEXPORT
 #include "we_blockop.h"
+#undef WRITEENGINEBLOCKOP_DLLEXPORT
 
 #include "we_config.h"
 #include "we_brm.h"
 #include "we_convertor.h"
-
-using namespace execplan;
 
 namespace WriteEngine
 {
@@ -77,29 +77,28 @@ bool BlockOp::calculateRowId(
  * DESCRIPTION:
  *    Get the value that represents empty row
  * PARAMETERS:
- *    colDataType - data type
+ *    dataType - data type
  *    width - data width in byte
  * RETURN:
  *    emptyVal - the value of empty row
  ***********************************************************/
-uint64_t BlockOp::getEmptyRowValue(
-    const CalpontSystemCatalog::ColDataType colDataType, const int width ) const
+i64 BlockOp::getEmptyRowValue(
+    const ColDataType dataType, const int width ) const
 {
-    uint64_t emptyVal = 0;
-    int offset = 0;
+    i64 emptyVal = 0;
+    int offset;
 
-    switch( colDataType ) {
-        case CalpontSystemCatalog::TINYINT : emptyVal = joblist::TINYINTEMPTYROW; break;
-        case CalpontSystemCatalog::SMALLINT: emptyVal = joblist::SMALLINTEMPTYROW; break;
-        case CalpontSystemCatalog::MEDINT :  
-        case CalpontSystemCatalog::INT :     emptyVal = joblist::INTEMPTYROW; break;
-        case CalpontSystemCatalog::BIGINT :  emptyVal = joblist::BIGINTEMPTYROW; break;
-        case CalpontSystemCatalog::FLOAT :
-        case CalpontSystemCatalog::UFLOAT :   emptyVal = joblist::FLOATEMPTYROW; break;
-        case CalpontSystemCatalog::DOUBLE :
-        case CalpontSystemCatalog::UDOUBLE :  emptyVal = joblist::DOUBLEEMPTYROW; break;
-        case CalpontSystemCatalog::DECIMAL : 
-        case CalpontSystemCatalog::UDECIMAL : 
+    offset = ( dataType == VARCHAR )? -1 : 0;
+    switch( dataType ) {
+        case TINYINT : emptyVal = joblist::TINYINTEMPTYROW; break;
+        case SMALLINT: emptyVal = joblist::SMALLINTEMPTYROW; break;
+        case MEDINT :  
+        case INT :  
+                       emptyVal = joblist::INTEMPTYROW; break;
+        case BIGINT :  emptyVal = joblist::BIGINTEMPTYROW; break;
+        case FLOAT :   emptyVal = joblist::FLOATEMPTYROW; break;
+        case DOUBLE :  emptyVal = joblist::DOUBLEEMPTYROW; break;
+        case DECIMAL : 
 /*          if( width <= 4 )
                 emptyVal = joblist::SMALLINTEMPTYROW;
             else
@@ -121,18 +120,11 @@ uint64_t BlockOp::getEmptyRowValue(
                 else
                     emptyVal = joblist::BIGINTEMPTYROW;
                 break;
-        case CalpontSystemCatalog::UTINYINT : emptyVal = joblist::UTINYINTEMPTYROW; break;
-        case CalpontSystemCatalog::USMALLINT: emptyVal = joblist::USMALLINTEMPTYROW; break;
-        case CalpontSystemCatalog::UMEDINT :  
-        case CalpontSystemCatalog::UINT :     emptyVal = joblist::UINTEMPTYROW; break;
-        case CalpontSystemCatalog::UBIGINT :  emptyVal = joblist::UBIGINTEMPTYROW; break;
-
-        case CalpontSystemCatalog::CHAR : 
-        case CalpontSystemCatalog::VARCHAR : 
-        case CalpontSystemCatalog::DATE :
-        case CalpontSystemCatalog::DATETIME :
+        case CHAR : 
+        case VARCHAR : 
+        case DATE :
+        case DATETIME :
         default:
-            offset = ( colDataType == CalpontSystemCatalog::VARCHAR )? -1 : 0;
             emptyVal = joblist::CHAR1EMPTYROW;
             if( width == (2 + offset) )
                 emptyVal = joblist::CHAR2EMPTYROW; 
@@ -152,15 +144,15 @@ uint64_t BlockOp::getEmptyRowValue(
  * DESCRIPTION:
  *    Get the correct width for a row
  * PARAMETERS:
- *    colDataType - data type
+ *    dataType - data type
  *    width - data width in byte
  * RETURN:
  *    emptyVal - the value of empty row
  ***********************************************************/
 int BlockOp::getCorrectRowWidth(
-    const CalpontSystemCatalog::ColDataType colDataType, const int width ) const
+    const ColDataType dataType, const int width ) const
 {
-    return Convertor::getCorrectRowWidth(colDataType, width);
+    return Convertor::getCorrectRowWidth(dataType, width);
 }
 
 /***********************************************************
@@ -223,7 +215,7 @@ void BlockOp::resetBuf(  unsigned char* buf, const int bufSize ) const
  ***********************************************************/
 /* static */
 void BlockOp::setEmptyBuf(
-    unsigned char* buf, const int bufSize, uint64_t emptyVal, const int width )
+    unsigned char* buf, const int bufSize, i64 emptyVal, const int width )
 {
     const int ARRAY_COUNT     = 128;
     const int NBYTES_IN_ARRAY = width * ARRAY_COUNT;

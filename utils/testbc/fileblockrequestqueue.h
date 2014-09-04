@@ -92,8 +92,8 @@ protected:
 	pthread_mutex_t mutex;
 	pthread_cond_t notEmpty;
 	fileBlockRequestQueue_t fbQueue;
-	uint32_t queueSize;
-	uint32_t readersWaiting;
+	uint queueSize;
+	uint readersWaiting;
 
 private:
 	// do not implement

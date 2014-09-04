@@ -16,14 +16,16 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_define.cpp 4726 2013-08-07 03:38:36Z bwilkinson $
+* $Id: we_define.cpp 4681 2013-06-18 17:31:02Z dcathey $
 *
 *******************************************************************************/
 /** @file" **/
 
 #include <string>
 
+#define WRITEENGINEERRORCODES_DLLEXPORT
 #include "we_define.h"
+#undef WRITEENGINEERRORCODES_DLLEXPORT
 
 #include "idberrorinfo.h"
 #include "errorids.h"
@@ -40,11 +42,7 @@ WErrorCodes::WErrorCodes() : fErrorCodes()
     fErrorCodes[ERR_INVALID_PARAM] = " due to Invalid parameters";
     fErrorCodes[ERR_STRUCT_EMPTY] = " because the Structure is empty";
     fErrorCodes[ERR_VALUE_OUTOFRANGE] = " because a Value is out of range";
-    fErrorCodes[ERR_PARSING] = " a Value is out of range";
-    fErrorCodes[ERR_NO_MEM] = " out of memory";
-    fErrorCodes[ERR_DML_LOG_NAME] = " construct DML log filename failed";
-    fErrorCodes[ERR_OPEN_DML_LOG] = " open DML log file failed";
-    fErrorCodes[ERR_HDFS_BACKUP] = " DML backup error in HDFS";
+    fErrorCodes[ERR_PARSING] =  " a Value is out of range.";
 
     // File level error
     fErrorCodes[ERR_FILE_CREATE] = " The column file could not be created; it may already exist or be inaccessible.";
@@ -155,8 +153,6 @@ WErrorCodes::WErrorCodes() : fErrorCodes()
     fErrorCodes[ERR_BULK_DBROOT_CHANGE] = " Local PM DBRoot settings changed during bulk load.";
     fErrorCodes[ERR_BULK_ROLLBACK_MISS_ROOT] = " Mode3 automatic rollback not performed. DBRoot missing.";
     fErrorCodes[ERR_BULK_ROLLBACK_SEG_LIST] = " Error building segment file list in a directory.";
-    fErrorCodes[ERR_BULK_BINARY_PARTIAL_REC] = " Binary import did not end on fixed length record boundary.";
-    fErrorCodes[ERR_BULK_BINARY_IGNORE_FLD] = " <IgnoreField> tag not supported for binary imports.";
 
     // BRM error
     fErrorCodes[ERR_BRM_LOOKUP_LBID] = " a BRM Lookup LBID error.";
@@ -189,7 +185,7 @@ WErrorCodes::WErrorCodes() : fErrorCodes()
     fErrorCodes[ERR_BRM_TAKE_SNAPSHOT] = "BRM error requesting snapshot of BRM state.";
     fErrorCodes[ERR_BRM_LOOKUP_START_LBID] = "BRM start LBID lookup error.";
     fErrorCodes[ERR_BRM_BULK_UPDATE] = "BRM error executing bulk update of HWM and CP.";
-    fErrorCodes[ERR_BRM_GET_EXT_STATE] = "BRM error getting segment file extent state.";
+    fErrorCodes[ERR_BRM_FLUSH_INODE_CACHE] = "BRM error flushing inode cache.";
     fErrorCodes[ERR_EXTENTMAP_LOOKUP] = " a extent map Lookup error.";
     fErrorCodes[ERR_BRM_LOOKUP_VERSION] = " a vssLookup version info error.";
     fErrorCodes[ERR_BRM_LOOKUP_LBID_RANGES] = " BRM error getting LBID ranges.";

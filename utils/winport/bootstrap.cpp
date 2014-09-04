@@ -168,26 +168,6 @@ namespace
 			installDir.c_str(), installDir.c_str(), installDir.c_str());
 		rc = system(cmdLine);
 		rc = 0;
-
-        // Install the user priority stored procedures
-        sprintf_s(cmdLine, cmdLineLen,
-			"%s\\bin\\mysql.exe --defaults-file=%s\\my.ini --user=root --force < %s\\sql\\calsetuserpriority.sql > nul 2>&1",
-			installDir.c_str(), installDir.c_str(), installDir.c_str());
-		rc = system(cmdLine);
-		rc = 0;
-
-        sprintf_s(cmdLine, cmdLineLen,
-			"%s\\bin\\mysql.exe --defaults-file=%s\\my.ini --user=root --force < %s\\sql\\calremoveuserpriority.sql > nul 2>&1",
-			installDir.c_str(), installDir.c_str(), installDir.c_str());
-		rc = system(cmdLine);
-		rc = 0;
-
-        sprintf_s(cmdLine, cmdLineLen,
-			"%s\\bin\\mysql.exe --defaults-file=%s\\my.ini --user=root --force < %s\\sql\\calshowprocesslist.sql > nul 2>&1",
-			installDir.c_str(), installDir.c_str(), installDir.c_str());
-		rc = system(cmdLine);
-		rc = 0;
-
 out:
 		_freea(cmdLine);
 		return rc;

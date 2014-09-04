@@ -68,7 +68,7 @@ int64_t Func_time_to_sec::getIntVal(rowgroup::Row& row,
 			sec = (uint32_t)((val >> 20) & 0x3f);
 			break;
 		case CalpontSystemCatalog::CHAR:
-        case CalpontSystemCatalog::VARCHAR:
+		case CalpontSystemCatalog::VARCHAR:
             {
                 std::string strVal = parm[0]->data()->getStrVal(row, isNull);
                 if (strVal[0] == '-')
@@ -77,17 +77,17 @@ int64_t Func_time_to_sec::getIntVal(rowgroup::Row& row,
                     strVal.replace(0, 1, 1, ' ');
                 }
                 val = dataconvert::DataConvert::stringToTime(strVal);
-                if (val == -1)
-                {
-                    isNull = true;
-                    return -1;
-                }
-                else
-                {
+			if (val == -1)
+			{
+				isNull = true;
+				return -1;
+			}
+			else
+			{
                     tval = *(reinterpret_cast<dataconvert::Time*>(&val));
                     hour = (uint32_t)(tval.hour);
-                    min = (uint32_t)(tval.minute);
-                    sec = (uint32_t)(tval.second);
+				min = (uint32_t)(tval.minute);
+				sec = (uint32_t)(tval.second);
                 }
             }
 			break;

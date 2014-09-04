@@ -1,20 +1,3 @@
-/* Copyright (C) 2014 InfiniDB, Inc.
-
-   This program is free software; you can redistribute it and/or
-   modify it under the terms of the GNU General Public License
-   as published by the Free Software Foundation; version 2 of
-   the License.
-
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-   MA 02110-1301, USA. */
-
 /******************************************************************************************
 * $Id: installer.cpp 64 2006-10-12 22:21:51Z dhill $
 *
@@ -71,13 +54,14 @@ bool makeBASH();
 bool makeModuleFile(string moduleName, string parentOAMModuleName);
 bool updateProcessConfig(int serverTypeInstall);
 bool makeRClocal(string moduleName, int IserverTypeInstall);
+bool createDbrootDirs(string DBRootStorageType);
 bool uncommentCalpontXml( string entry);
+bool writeConfig(Config* sysConfig);
 
 extern string pwprompt;
+extern string mysqlpw;
 
 string installDir;
-bool noPrompting;
-string mysqlpw = " ";
 
 int main(int argc, char *argv[])
 {
@@ -104,50 +88,36 @@ int main(int argc, char *argv[])
 	
 	string DBRootStorageType;
 
-	if (argc < 12)
+	if (argc < 10)
 	{
 		cerr << "installer: ERROR: not enough arguments" << endl;
 		exit(1);
 	}
-	string calpont_rpm1 = argv[1];
-	string calpont_rpm2 = argv[2];
-	string calpont_rpm3 = argv[3];
-	string mysql_rpm = argv[4];
-	string mysqld_rpm = argv[5];
-	string installType = argv[6];
-	string password = argv[7];
-	string reuseConfig = argv[8];
-	nodeps = argv[9];
-	mysqlpw = argv[10];
-	installer_debug = argv[11];
-	if (argc >= 13)
-		installDir = argv[12];
+	string calpont_rpm = argv[1];
+	string mysql_rpm = argv[2];
+	string mysqld_rpm = argv[3];
+	string installType = argv[4];
+	string password = argv[5];
+	string reuseConfig = argv[6];
+	nodeps = argv[7];
+	mysqlpw = argv[8];
+	installer_debug = argv[9];
+	if (argc >= 11)
+		installDir = argv[10];
 	else
 		installDir = "/usr/local/Calpont";
 
-    ofstream file("/dev/null");
-
-    //save cout stream buffer
-    streambuf* strm_buffer = cout.rdbuf();
-
-    // redirect cout to /dev/null
-    cout.rdbuf(file.rdbuf());
-
-	cout <<  calpont_rpm1 << endl;
-	cout << calpont_rpm2 << endl;
-	cout << calpont_rpm3 << endl;
-	cout << mysql_rpm << endl;
-	cout << mysqld_rpm << endl;
-	cout << installType << endl;
-	cout << password << endl;
-	cout << reuseConfig << endl;
-	cout << nodeps << endl;
-	cout << mysqlpw << endl;
-	cout << installer_debug << endl;
-	cout << installDir << endl;
-
-   // restore cout stream buffer
-    cout.rdbuf (strm_buffer);
+//	cout << calpont_rpm << endl;
+//	cout << mysql_rpm << endl;
+//	cout << mysqld_rpm << endl;
+//	cout << installType << endl;
+//	cout << password << endl;
+//	cout << reuseConfig << endl;
+//	cout << nodeps << endl;
+//	cout << mysqlpw << endl;
+//	cout << installer_debug << endl;
+//	cout << installDir << endl;
+	sleep(1);
 
 	if ( mysqlpw == "dummymysqlpw" )
 		mysqlpw = " ";
@@ -209,22 +179,9 @@ int main(int argc, char *argv[])
 				// are we using settings from previous config file?
 				if ( reuseConfig == "n" ) {
 					try {
-						DBRootStorageType = sysConfig->getConfig(InstallSection, "DBRootStorageType");
-					}
-					catch(...)
-					{
-						cout << "ERROR: Problem getting DB Storage Data from the InfiniDB System Configuration file" << endl;
-						return false;
-					}
+						sysConfig->setConfig("DBBC", "NumBlocksPct", "50");
 
-					string numBlocksPct = "50";
-					if ( DBRootStorageType == "hdfs")
-						numBlocksPct = "25";
-
-					try {
-						sysConfig->setConfig("DBBC", "NumBlocksPct", numBlocksPct);
-
-						cout << endl << "NOTE: Setting 'NumBlocksPct' to " << numBlocksPct << "%" << endl;
+						cout << endl << "NOTE: Setting 'NumBlocksPct' to 50%" << endl;
 					}
 					catch(...)
 					{
@@ -258,26 +215,7 @@ int main(int argc, char *argv[])
 					else
 						value = "16G";
 				
-					string percent = "25";
-					if ( DBRootStorageType == "hdfs")
-					{
-						percent = "12";
-	
-						if ( value == "512M")
-							value = "256M";
-						else if ( value == "1G" )
-							value = "512M";
-						else if ( value == "2G" )
-							value = "1G";
-						else if ( value == "4G" )
-							value = "2G";
-						else if ( value == "8G")
-							value = "4G";
-						else if ( value  == "16G" )
-							value = "8G";
-					}
-
-					cout << "      Setting 'TotalUmMemory' to " << percent << "% of total memory (Combined Server Install maximum value is 16G). Value set to " << value << endl;
+					cout << "      Setting 'TotalUmMemory' to 25% of total memory. Value set to " << value << endl;
 	
 					try {
 						sysConfig->setConfig("HashJoin", "TotalUmMemory", value);
@@ -609,9 +547,9 @@ int main(int argc, char *argv[])
 						temppwprompt = "none";
 						
 					cout << endl << "----- Performing Uninstall on Module '" + remoteModuleName + "' -----" << endl << endl;
-					cmd = installDir + "/bin/user_installer.sh " + remoteModuleName + " " + remoteModuleIP + " " + password + " " + calpont_rpm1 + " " + calpont_rpm2 + " " + calpont_rpm3 + " " + mysql_rpm + " " + mysqld_rpm + " " + installType + " " + packageType + " " + nodeps + " " + temppwprompt + " " + installer_debug;
+					cmd = installDir + "/bin/user_installer.sh " + remoteModuleName + " " + remoteModuleIP + " " + password + " " + calpont_rpm + " " + mysql_rpm + " " + mysqld_rpm + " " + installType + " " + packageType + " " + nodeps + " " + temppwprompt + " " + installer_debug;
 					int rtnCode = system(cmd.c_str());
-					if (WEXITSTATUS(rtnCode) != 0) {
+					if (rtnCode != 0) {
 						cout << endl << "ERROR: returned from user_installer.sh" << endl;
 						exit(1);
 					}
@@ -619,10 +557,10 @@ int main(int argc, char *argv[])
 				else
 				{	// do a binary package install
 					cmd = installDir + "/bin/binary_installer.sh " + remoteModuleName + " " + remoteModuleIP + " " +
-						password + " " + calpont_rpm1 + " " + remoteModuleType + " " + installType + " " +
+						password + " " + calpont_rpm + " " + remoteModuleType + " " + installType + " " +
 						serverTypeInstall + " " + installer_debug + " " + installDir;
 					int rtnCode = system(cmd.c_str());
-					if (WEXITSTATUS(rtnCode) != 0) {
+					if (rtnCode != 0) {
 						cout << endl << "ERROR: returned from binary_installer.sh" << endl;
 						exit(1);
 					}
@@ -635,9 +573,9 @@ int main(int argc, char *argv[])
 					if ( packageType != "binary" ) {
 						//run remote installer script
 						cout << endl << "----- Performing Uninstall on Module '" + remoteModuleName + "' -----" << endl << endl;
-						cmd = installDir + "/bin/performance_installer.sh " + remoteModuleName + " " + remoteModuleIP + " " + password + " " + calpont_rpm1 + " " + calpont_rpm2 + " " + calpont_rpm3 + " " + mysql_rpm + " " + mysqld_rpm + " " + installType + " " + packageType + " " + nodeps + " " + installer_debug;
+						cmd = installDir + "/bin/performance_installer.sh " + remoteModuleName + " " + remoteModuleIP + " " + password + " " + calpont_rpm + " " + mysql_rpm + " " + mysqld_rpm + " " + installType + " " + packageType + " " + nodeps + " " + installer_debug;
 						int rtnCode = system(cmd.c_str());
-						if (WEXITSTATUS(rtnCode) != 0) {
+						if (rtnCode != 0) {
 							cout << endl << "ERROR returned from performance_installer.sh" << endl;
 							exit(1);
 						}
@@ -645,10 +583,10 @@ int main(int argc, char *argv[])
 					else
 					{	// do a binary package install
 						cmd = installDir + "/bin/binary_installer.sh " + remoteModuleName + " " + remoteModuleIP +
-							" " + password + " " + calpont_rpm1 + " " + remoteModuleType + " " + installType + " " +
+							" " + password + " " + calpont_rpm + " " + remoteModuleType + " " + installType + " " +
 							serverTypeInstall + " " + installer_debug + " " + installDir;
 						int rtnCode = system(cmd.c_str());
-						if (WEXITSTATUS(rtnCode) != 0) {
+						if (rtnCode != 0) {
 							cout << endl << "ERROR returned from binary_installer.sh" << endl;
 							exit(1);
 						}
@@ -706,9 +644,9 @@ int main(int argc, char *argv[])
 						temppwprompt = "none";
 						
 					cout << endl << "----- Performing Install on Module '" + remoteModuleName + "' -----" << endl << endl;
-					cmd = installDir + "/bin/user_installer.sh " + remoteModuleName + " " + remoteModuleIP + " " + password + " " + calpont_rpm1 + " " + calpont_rpm2 + " " + calpont_rpm3 + " " + mysql_rpm + " " + mysqld_rpm + " " + installType + " " + packageType + " " + nodeps + " " + temppwprompt + " " + installer_debug;
+					cmd = installDir + "/bin/user_installer.sh " + remoteModuleName + " " + remoteModuleIP + " " + password + " " + calpont_rpm + " " + mysql_rpm + " " + mysqld_rpm + " " + installType + " " + packageType + " " + nodeps + " " + temppwprompt + " " + installer_debug;
 					int rtnCode = system(cmd.c_str());
-					if (WEXITSTATUS(rtnCode) != 0) {
+					if (rtnCode != 0) {
 						cout << endl << "ERROR returned from user_installer.sh" << endl;
 						exit(1);
 					}
@@ -716,10 +654,10 @@ int main(int argc, char *argv[])
 				else
 				{	// do a binary package install
 					cmd = installDir + "/bin/binary_installer.sh " + remoteModuleName + " " + remoteModuleIP + " " +
-						password + " " + calpont_rpm1 + " " + remoteModuleType + " " + installType + " " +
+						password + " " + calpont_rpm + " " + remoteModuleType + " " + installType + " " +
 						serverTypeInstall + " " + installer_debug + " " + installDir;
 					int rtnCode = system(cmd.c_str());
-					if (WEXITSTATUS(rtnCode) != 0) {
+					if (rtnCode != 0) {
 						cout << endl << "ERROR returned from binary_installer.sh" << endl;
 						exit(1);
 					}
@@ -732,9 +670,9 @@ int main(int argc, char *argv[])
 					//run remote installer script
 					if ( packageType != "binary" ) {
 						cout << endl << "----- Performing Install on Module '" + remoteModuleName + "' -----" << endl << endl;
-						cmd = installDir + "/bin/performance_installer.sh " + remoteModuleName + " " + remoteModuleIP + " " + password + " " + calpont_rpm1 + " " + calpont_rpm2 + " " + calpont_rpm3 + " " + mysql_rpm + " " + mysqld_rpm + " " + installType + " " + packageType + " " + nodeps + " " + installer_debug;
+						cmd = installDir + "/bin/performance_installer.sh " + remoteModuleName + " " + remoteModuleIP + " " + password + " " + calpont_rpm + " " + mysql_rpm + " " + mysqld_rpm + " " + installType + " " + packageType + " " + nodeps + " " + installer_debug;
 						int rtnCode = system(cmd.c_str());
-						if (WEXITSTATUS(rtnCode) != 0) {
+						if (rtnCode != 0) {
 							cout << endl << "ERROR returned from performance_installer.sh" << endl;
 							exit(1);
 						}
@@ -742,10 +680,10 @@ int main(int argc, char *argv[])
 					else
 					{	// do a binary package install
 						cmd = installDir + "/bin/binary_installer.sh " + remoteModuleName + " " + remoteModuleIP +
-							" " + password + " " + calpont_rpm1 + " " + remoteModuleType + " " + installType +
+							" " + password + " " + calpont_rpm + " " + remoteModuleType + " " + installType +
 							" " + serverTypeInstall + " " + installer_debug + " " + installDir;
 						int rtnCode = system(cmd.c_str());
-						if (WEXITSTATUS(rtnCode) != 0) {
+						if (rtnCode != 0) {
 							cout << endl << "ERROR returned from binary_installer.sh" << endl;
 							exit(1);
 						}
@@ -783,7 +721,7 @@ int main(int argc, char *argv[])
 			//run remote command script
 			cmd = installDir + "/bin/remote_command.sh " + remoteModuleIP + " " + password + " '" + idbstartcmd + "' " +  installer_debug;
 			int rtnCode = system(cmd.c_str());
-			if (WEXITSTATUS(rtnCode) != 0)
+			if (rtnCode != 0)
 				cout << "error with running remote_command.sh" << endl;
 		}
 
@@ -799,7 +737,7 @@ int main(int argc, char *argv[])
 		// 
 		// perform single-server install from auto-installer
 		//
-		if ( calpont_rpm1 != "dummy.rpm" ) {
+		if ( calpont_rpm != "dummy.rpm" ) {
 
 			//run the mysql / mysqld setup scripts
 			cout << endl << "Running the InfiniDB MySQL setup scripts" << endl << endl;
@@ -810,7 +748,7 @@ int main(int argc, char *argv[])
 	
 			//start on local module
 			int rtnCode = system(idbstartcmd.c_str());
-			if (WEXITSTATUS(rtnCode) != 0)
+			if (rtnCode != 0)
 				cout << "Error starting InfiniDB local module" << endl;
 			else
 				cout << "Start InfiniDB request successful" << endl;
@@ -857,8 +795,7 @@ int main(int argc, char *argv[])
 				cout.flush();
 
 				//send message to procmon's to run upgrade script
-				bool pmwithum = false;
-				int status = sendUpgradeRequest(IserverTypeInstall, pmwithum);
+				int status = sendUpgradeRequest(IserverTypeInstall);
 	
 				if ( status != 0 ) {
 					cout << "ERROR: Error return in running the upgrade script, check /tmp/upgrade.log" << endl;
@@ -1276,5 +1213,22 @@ bool uncommentCalpontXml( string entry)
 	return true;
 }
 
+/*
+ * writeConfig 
+ */
+bool writeConfig( Config* sysConfig ) 
+{
+	for ( int i = 0 ; i < 3 ; i++ )
+	{
+		try {
+			sysConfig->write();
+			return true;
+		}
+		catch(...)
+		{}
+	}
+
+	return false;
+}
 // vim:ts=4 sw=4:
 

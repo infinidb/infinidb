@@ -38,7 +38,7 @@
 #include <we_obj.h>
 #include <we_convertor.h>
 
-#if defined(_MSC_VER) && defined(WRITEENGINE_DLLEXPORT)
+#if defined(_MSC_VER) && defined(WRITEENGINECACHE_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
@@ -48,7 +48,7 @@ namespace WriteEngine
 {
 typedef std::vector<BlockBuffer*>   FreeBufList;      /** @brief Free buffer list */
 //typedef std::string                 CacheKey;         /** @brief Key definition */
-typedef uint64_t                    CacheKey;         /** @brief Key definition */
+typedef i64                 CacheKey;         /** @brief Key definition */
 
 //typedef std::map<CacheKey, BlockBuffer*, std::greater<CacheKey> >   CacheMap;      /** @brief Cache map */
 //typedef CacheMap::iterator          CacheMapIt;       /** @brief CacheMap iterator */
@@ -98,9 +98,9 @@ public:
    /**
     * @brief Check whether cache key exists
     */
-   static const bool    cacheKeyExist( CacheMap* map, const OID oid, const uint64_t lbid ) { CacheKey key = getCacheKey( oid, lbid ); return map->find(key) == map->end() ? false: true; }
+   static const bool    cacheKeyExist( CacheMap* map, const OID oid, const i64 lbid ) { CacheKey key = getCacheKey( oid, lbid ); return map->find(key) == map->end() ? false: true; }
    static const bool    cacheKeyExist( CacheMap* map, BlockBuffer* buffer ) { return cacheKeyExist( map, (*buffer).cb.file.oid, (*buffer).block.lbid ); }
-   static const bool    cacheKeyExist( const OID oid, const uint64_t lbid ) { return cacheKeyExist( m_lruList, oid, lbid ) || cacheKeyExist( m_writeList, oid, lbid ); }
+   static const bool    cacheKeyExist( const OID oid, const i64 lbid ) { return cacheKeyExist( m_lruList, oid, lbid ) || cacheKeyExist( m_writeList, oid, lbid ); }
 
    /**
     * @brief Clear the buffer
@@ -120,7 +120,7 @@ public:
    /**
     * @brief Get the cache key
     */
-   static CacheKey      getCacheKey( const OID oid, const uint64_t lbid ) { CacheKey key = lbid; /*Convertor::int2Str( oid ) + "|" + Convertor::int2Str(lbid)*/; return key; }
+   static CacheKey      getCacheKey( const OID oid, const i64 lbid ) { CacheKey key = lbid; /*Convertor::int2Str( oid ) + "|" + Convertor::int2Str(lbid)*/; return key; }
    static CacheKey      getCacheKey( const BlockBuffer* buffer ) { return getCacheKey( (*buffer).cb.file.oid, (*buffer).block.lbid ); }
 
    EXPORT static const int     getListSize( const CacheListType listType );
@@ -134,8 +134,8 @@ public:
    /**
     * @brief Insert into LRU list
     */
-   EXPORT static const int     insertLRUList( CommBlock& cb, const uint64_t lbid, const uint64_t fbo, const unsigned char* buf );
-   static const int     insertLRUList( CommBlock& cb, const uint64_t lbid, const uint64_t fbo, const DataBlock& block  ) { return insertLRUList( cb, lbid, fbo, block.data ); }
+   EXPORT static const int     insertLRUList( CommBlock& cb, const i64 lbid, const i64 fbo, const unsigned char* buf );
+   static const int     insertLRUList( CommBlock& cb, const i64 lbid, const i64 fbo, const DataBlock& block  ) { return insertLRUList( cb, lbid, fbo, block.data ); }
 
    /**
     * @brief Insert into Write list
@@ -175,7 +175,7 @@ public:
    static CacheMap*     m_lruList;                    // LRU buffer list
    static CacheMap*     m_writeList;                  // Write buffer list
 
-#if defined(_MSC_VER) && !defined(WRITEENGINE_DLLEXPORT)
+#if defined(_MSC_VER) && !defined(WRITEENGINECACHE_DLLEXPORT)
    __declspec(dllimport)
 #endif
    EXPORT static bool          m_useCache;                   // Use cache flag

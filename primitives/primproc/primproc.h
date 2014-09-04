@@ -17,7 +17,7 @@
 
 /******************************************************************************************
 *
-* $Id: primproc.h 2035 2013-01-21 14:12:19Z rdempsey $
+* $Id: primproc.h 1855 2012-04-04 18:20:09Z rdempsey $
 *
 ******************************************************************************************/
 /**
@@ -39,6 +39,10 @@
 
 namespace primitiveprocessor
 {
+
+typedef int64_t (*UDFFcnPtr_t)(int64_t);
+typedef std::map<unsigned, UDFFcnPtr_t> UDFFcnMap_t;
+extern UDFFcnMap_t UDFFcnMap;
 
 #define SUMMARY_INFO( message ) \
         if ( isDebug(SUMMARY) ) \

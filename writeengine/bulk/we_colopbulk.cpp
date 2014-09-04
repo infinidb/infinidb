@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: we_colopbulk.cpp 4726 2013-08-07 03:38:36Z bwilkinson $
+ * $Id: we_colopbulk.cpp 3720 2012-04-04 18:18:49Z rdempsey $
  *
  ****************************************************************************/
 
@@ -61,24 +61,22 @@ ColumnOpBulk::~ColumnOpBulk()
 //------------------------------------------------------------------------------
 // Open specified column file
 //------------------------------------------------------------------------------
-// @bug 5572 - HDFS usage: add *.tmp file backup flag
-IDBDataFile* ColumnOpBulk::openFile(const WriteEngine::Column& column,
+FILE* ColumnOpBulk::openFile(const WriteEngine::Column& column,
     uint16_t     dbRoot,
     uint32_t     partition,
     uint16_t     segment,
     std::string& segFile,
-    bool         useTmpSuffix,
     const char*  mode,
     int          ioBuffSize) const
 {
     return FileOp::openFile(column.dataFile.fid, dbRoot, partition, segment,
-        segFile, mode, column.colWidth, useTmpSuffix);
+        segFile, mode, ioBuffSize);
 }
 
 //------------------------------------------------------------------------------
 // Stub for abbreviatedExtent
 //------------------------------------------------------------------------------
-bool  ColumnOpBulk::abbreviatedExtent(IDBDataFile*, int) const
+bool  ColumnOpBulk::abbreviatedExtent(FILE*, int) const
 {
     throw std::logic_error(
         "Unauthorized use of ColumnOpBulk::abbreviatedExtent");
@@ -89,7 +87,7 @@ bool  ColumnOpBulk::abbreviatedExtent(IDBDataFile*, int) const
 //------------------------------------------------------------------------------
 // Stub for blocksInFile
 //------------------------------------------------------------------------------
-int   ColumnOpBulk::blocksInFile(IDBDataFile*) const
+int   ColumnOpBulk::blocksInFile(FILE*) const
 {
     throw std::logic_error(
         "Unauthorized use of ColumnOpBulk::blocksInFile");
@@ -100,7 +98,7 @@ int   ColumnOpBulk::blocksInFile(IDBDataFile*) const
 //------------------------------------------------------------------------------
 // Stub for readBlock
 //------------------------------------------------------------------------------
-int   ColumnOpBulk::readBlock(IDBDataFile*, unsigned char*, const uint64_t)
+int   ColumnOpBulk::readBlock(FILE*, unsigned char*, const i64)
 {
     throw std::logic_error(
         "Unauthorized use of ColumnOpBulk::readBlock");
@@ -111,7 +109,7 @@ int   ColumnOpBulk::readBlock(IDBDataFile*, unsigned char*, const uint64_t)
 //------------------------------------------------------------------------------
 // Stub for writeBlock
 //------------------------------------------------------------------------------
-int   ColumnOpBulk::saveBlock(IDBDataFile*, const unsigned char*, const uint64_t)
+int   ColumnOpBulk::saveBlock(FILE*, const unsigned char*, const i64)
 {
     throw std::logic_error(
         "Unauthorized use of ColumnOpBulk::saveBlock");

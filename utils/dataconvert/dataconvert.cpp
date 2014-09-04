@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: dataconvert.cpp 3901 2013-06-17 20:59:13Z rdempsey $
+* $Id: dataconvert.cpp 3763 2013-05-07 13:06:00Z dcathey $
 *
 *
 ****************************************************************************/
@@ -24,9 +24,8 @@
 #include <string>
 #include <cmath>
 #include <errno.h>
+#include <limits>
 #include <ctime>
-#include <stdlib.h>
-#include <string.h>
 using namespace std;
 #include <boost/algorithm/string/case_conv.hpp>
 using namespace boost::algorithm;
@@ -40,17 +39,31 @@ using namespace execplan;
 
 #include "joblisttypes.h"
 
+#include "errorcodes.h"
+#include "exceptclasses.h"
 #define DATACONVERT_DLLEXPORT
 #include "dataconvert.h"
 #undef DATACONVERT_DLLEXPORT
 
 #ifndef __linux__
-typedef uint32_t ulong;
+typedef u_long ulong;
 #endif
 
 using namespace logging;
 
 namespace {
+
+const short MIN_TINYINT = numeric_limits<int8_t>::min() + 2; //-126;
+const short MAX_TINYINT = numeric_limits<int8_t>::max(); //127;
+const short MIN_SMALLINT = numeric_limits<int16_t>::min() + 2; //-32766;
+const short MAX_SMALLINT = numeric_limits<int16_t>::max(); //32767;
+const int MIN_INT = numeric_limits<int32_t>::min() + 2; //-2147483646;
+const int MAX_INT = numeric_limits<int32_t>::max(); //2147483647;
+const long long MIN_BIGINT = numeric_limits<int64_t>::min() + 2; //-9223372036854775806LL;
+const float MAX_FLOAT = numeric_limits<float>::max(); //3.402823466385289e+38
+const float MIN_FLOAT = -numeric_limits<float>::max();
+const double MAX_DOUBLE = numeric_limits<double>::max(); //1.797693134862316e+308
+const double MIN_DOUBLE = -numeric_limits<double>::max();
 
 const int64_t infinidb_precision[19] = {
 0,
@@ -108,6 +121,24 @@ bool number_value ( const string& data )
 	return true;
 }
 
+
+int64_t string_to_ll( const string& data, bool& pushwarning )
+{
+	char *ep = NULL;
+	const char *str = data.c_str();
+	errno = 0;
+	int64_t value = strtoll(str, &ep, 10);
+
+	//  (no digits) || (more chars)  || (other errors & value = 0)
+	if ((ep == str) || (*ep != '\0') || (errno != 0 && value == 0))
+		throw QueryDataExcept("value is not numerical.", formatErr);
+
+	if (errno == ERANGE && (value == numeric_limits<int64_t>::max() || value == numeric_limits<int64_t>::min()))
+		pushwarning = true;
+
+	return value;
+}
+
 int64_t number_int_value(const string& data,
 						 const CalpontSystemCatalog::ColType& ct,
 						 bool& pushwarning,
@@ -144,8 +175,8 @@ int64_t number_int_value(const string& data,
 		// get the exponent
 		string exp = valStr.substr(epos+1);
 		bool overflow = false;
-		int64_t exponent = dataconvert::string_to_ll(exp, overflow);
-		// if the exponent can not be held in 64-bit, not supported or saturated.
+		int64_t exponent = string_to_ll(exp, overflow);
+		// if the exponent can not be hold in 64-bit, not supported or saturated.
 		if (overflow)
 			throw QueryDataExcept("value is invalid.", formatErr);
 
@@ -153,7 +184,7 @@ int64_t number_int_value(const string& data,
 		size_t dpos = coef.find('.');
 		if (dpos != string::npos)
 		{
-			// move "." to the end by mutiply 10 ** (# of fraction digits)
+			// move "." to the end by mutiply 10 ** (# of franction digits)
 			coef.erase(dpos, 1);
 			exponent -= coef.length() - dpos;
 		}
@@ -246,7 +277,7 @@ int64_t number_int_value(const string& data,
 	if (dp != string::npos)
 	{
 		//Check if need round up
-		int frac1 = dataconvert::string_to_ll(valStr.substr(dp+1, 1), pushwarning);
+		int frac1 = string_to_ll(valStr.substr(dp+1, 1), pushwarning);
 		if ((!noRoundup) && frac1 >= 5)
 			roundup = 1;
 
@@ -260,11 +291,11 @@ int64_t number_int_value(const string& data,
 		}
 	}
 
-	int64_t intVal = dataconvert::string_to_ll(intStr, pushwarning);
+	int64_t intVal = string_to_ll(intStr, pushwarning);
 	//@Bug 3350 negative value round up.
 	intVal += intVal>=0?roundup:-roundup;
 	bool dummy = false;
-	int64_t frnVal = (frnStr.length() > 0) ? dataconvert::string_to_ll(frnStr, dummy) : 0;
+	int64_t frnVal = (frnStr.length() > 0) ? string_to_ll(frnStr, dummy) : 0;
 	if (frnVal != 0)
 		pushwarning = true;
 
@@ -315,19 +346,18 @@ int64_t number_int_value(const string& data,
 			}
 			break;
 		case CalpontSystemCatalog::DECIMAL:
-		case CalpontSystemCatalog::UDECIMAL:
 			if (ct.colWidth == 1)
 			{
-				if (intVal < MIN_TINYINT)
-				{
-					intVal = MIN_TINYINT;
-					pushwarning = true;
-				}
-				else if (intVal > MAX_TINYINT)
-				{
-					intVal = MAX_TINYINT;
-					pushwarning = true;
-				}
+					if (intVal < MIN_TINYINT)
+					{
+						intVal = MIN_TINYINT;
+						pushwarning = true;
+					}
+					else if (intVal > MAX_TINYINT)
+					{
+						intVal = MAX_TINYINT;
+						pushwarning = true;
+					}
 			}
 			else if (ct.colWidth == 2)
 			{
@@ -369,9 +399,7 @@ int64_t number_int_value(const string& data,
 	}
 
 	// @ bug 3285 make sure the value is in precision range for decimal data type
-	if ( (ct.colDataType == CalpontSystemCatalog::DECIMAL) ||
-	     (ct.colDataType == CalpontSystemCatalog::UDECIMAL) ||
-	     (ct.scale > 0))
+	if ( (ct.colDataType == CalpontSystemCatalog::DECIMAL) || (ct.scale > 0))
 	{
 		int64_t rangeUp = infinidb_precision[ct.precision];
 		int64_t rangeLow = -rangeUp;
@@ -390,437 +418,575 @@ int64_t number_int_value(const string& data,
 	return intVal;
 }
 
-uint64_t number_uint_value(const string& data,
-					 	   const CalpontSystemCatalog::ColType& ct,
-						   bool& pushwarning,
-						   bool  noRoundup)
+bool isLeapYear ( int year)
 {
-	// copy of the original input
-	string valStr(data);
+	bool result;
 
-	// in case, the values are in parentheses
-	string::size_type x = valStr.find('(');
-	string::size_type y = valStr.find(')');
-	while (x < string::npos)
-	{
-		// erase y first
-		if (y == string::npos)
-			throw QueryDataExcept("'(' is not matched.", formatErr);
-		valStr.erase(y, 1);
-		valStr.erase(x, 1);
-		x = valStr.find('(');
-		y = valStr.find(')');
-	}
-	if (y != string::npos)
-		throw QueryDataExcept("')' is not matched.", formatErr);
+	if ( (year%4) != 0 )		//  or:	if ( year%4 )
+		result = false;			//  means: if year is not divisible by 4
+	else if ( (year%400) == 0 )	//  or:	if ( !(year%400) )
+		result = true;			//  means: if year is divisible by 400
+	else if ( (year%100) == 0 )	//  or:	if ( !(year%100) )
+		result = false;			//  means: if year is divisible by 100
+	else						//  (but not by 400, since that case
+		result = true;			//  considered already)
 
-	// convert to fixed-point notation if input is in scientific notation
-	if (valStr.find('E') < string::npos || valStr.find('e') < string::npos)
-	{
-		size_t epos = valStr.find('E');
-		if (epos == string::npos)
-			epos = valStr.find('e');
-
-		// get the coefficient
-		string coef = valStr.substr(0, epos);
-		// get the exponent
-		string exp = valStr.substr(epos+1);
-		bool overflow = false;
-		int64_t exponent = dataconvert::string_to_ll(exp, overflow);
-		// if the exponent can not be held in 64-bit, not supported or saturated.
-		if (overflow)
-			throw QueryDataExcept("value is invalid.", formatErr);
-
-		// find the optional "." point
-		size_t dpos = coef.find('.');
-		if (dpos != string::npos)
-		{
-			// move "." to the end by mutiply 10 ** (# of fraction digits)
-			coef.erase(dpos, 1);
-			exponent -= coef.length() - dpos;
-		}
-
-		if (exponent >= 0)
-		{
-			coef.resize(coef.length() + exponent, '0');
-		}
-		else
-		{
-			size_t bpos = coef.find_first_of("0123456789");
-			size_t epos = coef.length();
-			size_t mpos = -exponent;
-			dpos = epos - mpos;
-			int64_t padding = (int64_t)mpos - (int64_t)(epos-bpos);
-			if (padding > 0)
-			{
-				coef.insert(bpos, padding, '0');
-				dpos = bpos;
-			}
-			coef.insert(dpos, ".");
-		}
-
-		valStr = coef;
-	}
-
-	// now, convert to uint64_t
-	string intStr(valStr);
-	string frnStr = "";
-	size_t dp = valStr.find('.');
-	if (dp != string::npos)
-	{
-		intStr.erase(dp);
-		frnStr = valStr.substr(dp+1);
-		if ( intStr.length() == 0 )
-			intStr = "0";
-		else if (( intStr.length() == 1 ) && ( (intStr[0] == '+') || (intStr[0] == '-') ) )
-		{
-			intStr.insert( 1, 1, '0');
-		}
-	}
-
-	uint64_t uintVal = dataconvert::string_to_ull(intStr, pushwarning);
-
-	bool dummy = false;
-	uint64_t frnVal = (frnStr.length() > 0) ? dataconvert::string_to_ull(frnStr, dummy) : 0;
-	if (frnVal != 0)
-		pushwarning = true;
-
-	switch (ct.colDataType)
-	{
-		case CalpontSystemCatalog::UTINYINT:
-			if (uintVal > MAX_UTINYINT)
-			{
-				uintVal = MAX_UTINYINT;
-				pushwarning = true;
-			}
-			break;
-		case CalpontSystemCatalog::USMALLINT:
-			if (uintVal > MAX_USMALLINT)
-			{
-				uintVal = MAX_USMALLINT;
-				pushwarning = true;
-			}
-			break;
-		case CalpontSystemCatalog::UMEDINT:
-		case CalpontSystemCatalog::UINT:
-			if (uintVal > MAX_UINT)
-			{
-				uintVal = MAX_UINT;
-				pushwarning = true;
-			}
-			break;
-		case CalpontSystemCatalog::UBIGINT:
-			if (uintVal > MAX_UBIGINT)
-			{
-				uintVal = MAX_UBIGINT;
-				pushwarning = true;
-			}
-			break;
-		default:
-			break;
-	}
-	return uintVal;
+	return ( result );
 }
+
+bool isDateValid ( int day, int month, int year)
+{
+	bool valid = true;
+	int month_length[13] = { 0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+
+	if (month == 2)
+	{
+		if ( isLeapYear(year) )
+			month_length[2] = 29;
+			//  29 days in February in a leap year (including year 2000)
+	}
+	if ( ( year < 1000 ) || ( year > 9999 ) )
+		valid = false;
+	else if ( month < 1 || month > 12 )
+		valid = false;
+	else if ( day < 1 || day > month_length[month] )
+		valid = false;
+
+	return ( valid );
+}
+
+bool isDateTimeValid ( int hour, int minute, int second, int microSecond)
+{
+	bool valid = false;
+	if ( hour >= 0 && hour <= 24 )
+	{
+		if ( minute >= 0 && minute < 60 )
+		{
+			if ( second >= 0 && second < 60 )
+			{
+				if ( microSecond >= 0 && microSecond <= 999999 )
+				{
+					valid = true;
+				}
+			}
+		}
+	}
+	return valid;
+}
+
 
 } // namespace anon
 
 namespace dataconvert
 {
 
-/**
- * This function reads a decimal value from a string.  It will stop processing
- * in 3 cases:
- *     1) end of input string (null-terminated)
- *     2) non-digit hit
- *     3) max characters read (if max != 0 then at most max characters read)
- *
- * It's up to the caller to figure out whether an error occurred based on
- * their definition of an error and how many characters were read
- */
-uint32_t readDecimal( const char*& str, int32_t& value, uint32_t max=0 )
+// various code from my_time.h, my_time.c, m_ctype.h, and ctype-latin1.c
+// to get a faster str_to_datetime
+
+typedef enum mysql_timestamp_type
 {
-	value = 0;
-	uint32_t numread = 0;
-	while( (!max || numread < max) && *str && isdigit(*str) )
-	{
-		value = value * 10 + ((*str) - '0');
-		++numread;
-		++str;
-	}
-	return numread;
+	MYSQL_TIMESTAMP_NONE,        // String wasn't a timestamp
+	MYSQL_TIMESTAMP_DATE,        // DATE string (YY MM and DD parts ok)
+	MYSQL_TIMESTAMP_DATETIME,    // Full timestamp
+	MYSQL_TIMESTAMP_ERROR
+} mysql_timestamp_type;
+
+typedef unsigned char uchar;
+typedef bool my_bool;
+
+const uint MAX_DATE_PARTS = 8;
+static unsigned char internal_format_positions[]=
+{0, 1, 2, 3, 4, 5, 6, 255};
+
+const unsigned YY_PART_YEAR = 70;
+uchar days_in_month[]= {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 0};
+
+#define ULL(A) A ## ULL
+
+uint64_t log_10_int[20]=
+{
+  1, 10, 100, 1000, 10000UL, 100000UL, 1000000UL, 10000000UL,
+  ULL(100000000), ULL(1000000000), ULL(10000000000), ULL(100000000000),
+  ULL(1000000000000), ULL(10000000000000), ULL(100000000000000),
+  ULL(1000000000000000), ULL(10000000000000000), ULL(100000000000000000),
+  ULL(1000000000000000000), ULL(10000000000000000000)
+};
+
+// Pulled this over from ctype-latin1.c for implementing the my_isdigit,
+// my_isspace, etc. provides some performance gain over calling std functions
+// in ctype.h.   Leading '0' left but commented out from mysql impl as
+// the original #defines always jumped right over it anyway
+static uchar ctype_latin1[] = {
+   // 0,
+   32, 32, 32, 32, 32, 32, 32, 32, 32, 40, 40, 40, 40, 40, 32, 32,
+   32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32,
+   72, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16,
+  132,132,132,132,132,132,132,132,132,132, 16, 16, 16, 16, 16, 16,
+   16,129,129,129,129,129,129,  1,  1,  1,  1,  1,  1,  1,  1,  1,
+    1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1, 16, 16, 16, 16, 16,
+   16,130,130,130,130,130,130,  2,  2,  2,  2,  2,  2,  2,  2,  2,
+    2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2, 16, 16, 16, 16, 32,
+   16,  0, 16,  2, 16, 16, 16, 16, 16, 16,  1, 16,  1,  0,  1,  0,
+    0, 16, 16, 16, 16, 16, 16, 16, 16, 16,  2, 16,  2,  0,  2,  1,
+   72, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16,
+   16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16,
+    1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,
+    1,  1,  1,  1,  1,  1,  1, 16,  1,  1,  1,  1,  1,  1,  1,  2,
+    2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
+    2,  2,  2,  2,  2,  2,  2, 16,  2,  2,  2,  2,  2,  2,  2,  2
+};
+
+#define	_MY_NMR	04	/* Numeral (digit) */
+#define	_MY_SPC	010	/* Spacing character */
+#define	_MY_PNT	020	/* Punctuation */
+
+#define	my_isdigit(c)  (ctype_latin1[(uchar) (c)] & _MY_NMR)
+#define	my_isspace(c)  (ctype_latin1[(uchar) (c)] & _MY_SPC)
+#define	my_ispunct(c)  (ctype_latin1[(uchar) (c)] & _MY_PNT)
+
+/* Flags to str_to_datetime */
+#define TIME_FUZZY_DATE		1
+#define TIME_DATETIME_ONLY	2
+/* Must be same as MODE_NO_ZERO_IN_DATE */
+#define TIME_NO_ZERO_IN_DATE    (65536L*2*2*2*2*2*2*2)
+/* Must be same as MODE_NO_ZERO_DATE */
+#define TIME_NO_ZERO_DATE	(TIME_NO_ZERO_IN_DATE*2)
+#define TIME_INVALID_DATES	(TIME_NO_ZERO_DATE*2)
+
+#define DBUG_RETURN return
+#define set_if_bigger(a,b)  do { if ((a) < (b)) (a)=(b); } while(0)
+
+// Need to use an alternate data structure (as opposed to Date/DateTime
+// because mysql implementations expect to assign to fields and then
+// do error checking and thus field lengths cannot be constrained as
+// they are in the native IDB structs
+typedef struct st_mysql_time
+{
+  unsigned int  year, month, day, hour, minute, second;
+  unsigned long second_part;
+
+  st_mysql_time() :
+	  year(0),
+	  month(0),
+	  day(0),
+	  hour(0),
+	  minute(0),
+	  second(0),
+	  second_part(0)
+  	  {}
+} MYSQL_TIME;
+
+uint calc_days_in_year(uint year)
+{
+  return ((year & 3) == 0 && (year%100 || (year%400 == 0 && year)) ?
+          366 : 365);
 }
 
-bool mysql_str_to_datetime( const string& input, DateTime& output, bool& isDate )
+my_bool check_date(const MYSQL_TIME *ltime, my_bool not_zero_date,
+                   ulong flags, int *was_cut)
 {
-	/**
-	 *  First we are going to identify the stop/start of the date portion.
-	 *  The rules are:
-	 *      - Date portion must come before anything else
-	 *      - Date portion may only contain numbers and '-'
-	 *      - Date portion ends with ' ', 'T', or '\0'
-	 *      - Date portion always starts with Year
-	 *      - Without date separators ('-'):
-	 *            YYMMDD
-	 *            YYYYMMDD
-	 *      - With date separators there are no specific field length
-	 *        requirements
-	 */
-	int32_t datesepct = 0;
-	uint32_t dtend = 0;
-	for( ; dtend < input.length(); ++dtend )
-	{
-		char c = input[dtend];
-		if( isdigit( c ) )
-		{
-			continue;
-		}
-//		else if( dtend != 0 && c == '-' )
-		else if( dtend != 0 && ispunct(c) )
-		{
-			++datesepct;
-		}
-		else if( c == 'T' || c == ' ' )
-		{
-			break;
-		}
-		else
-		{
-			// some other character showed up
-			output.reset();
-			return false;
-		}
-	}
+  if (not_zero_date)
+  {
+    if ((((flags & TIME_NO_ZERO_IN_DATE) || !(flags & TIME_FUZZY_DATE)) &&
+         (ltime->month == 0 || ltime->day == 0)) ||
+        (!(flags & TIME_INVALID_DATES) &&
+         ltime->month && ltime->day > days_in_month[ltime->month-1] &&
+         (ltime->month != 2 || calc_days_in_year(ltime->year) != 366 ||
+          ltime->day != 29)))
+    {
+      *was_cut= 2;
+      return true;
+    }
+  }
+  else if (flags & TIME_NO_ZERO_DATE)
+  {
+    /*
+      We don't set *was_cut here to signal that the problem was a zero date
+      and not an invalid date
+    */
+    return true;
+  }
+  return false;
+}
 
-	int32_t year = -1;
-	int32_t mon = -1;
-	int32_t day = -1;
-	const char* ptr = input.c_str();
-	if( datesepct == 0 )
-	{
-		if( dtend == 6 || dtend == 12 )
-		{
-			readDecimal(ptr,year,2);
-			readDecimal(ptr,mon,2);
-			readDecimal(ptr,day,2);
-			year += 2000;
-			if( year > 2069 )
-				year -= 100;
-			if( dtend == 12 )
-				dtend -= 6;
-		}
-		else if( dtend == 8 || dtend == 14 )
-		{
-			readDecimal(ptr,year,4);
-			readDecimal(ptr,mon,2);
-			readDecimal(ptr,day,2);
-			if( dtend == 14 )
-				dtend -= 6;
-		}
-		else
-		{
-			output.reset();
-			return false;
-		}
-	}
-	else if( datesepct == 2 )
-	{
-		uint32_t numread = readDecimal(ptr,year);
+/*
+  Convert a timestamp string to a MYSQL_TIME value.
 
-		if( numread == 2 )
-		{
-			// special handling if we read a 2-byte year
-			year += 2000;
-			if( year > 2069 )
-				year -= 100;
-		}
-		++ptr; // skip one separator
-		readDecimal(ptr,mon);
-		++ptr; // skip one separator
-		readDecimal(ptr,day); // skip two separators
-	}
-	else
-	{
-		output.reset();
-		return false;
-	}
+  SYNOPSIS
+    str_to_datetime()
+    str                 String to parse
+    length              Length of string
+    l_time              Date is stored here
+    flags               Bitmap of following items
+                        TIME_FUZZY_DATE    Set if we should allow partial dates
+                        TIME_DATETIME_ONLY Set if we only allow full datetimes.
+                        TIME_NO_ZERO_IN_DATE	Don't allow partial dates
+                        TIME_NO_ZERO_DATE	Don't allow 0000-00-00 date
+                        TIME_INVALID_DATES	Allow 2000-02-31
+    was_cut             0	Value OK
+			1   If value was cut during conversion (i.e. extraneous trailing text found)
+			2	check_date(date,flags) considers date invalid
 
-	try
-	{
-		boost::gregorian::date d(year, mon, day);
-		// one more check - boost allows year 10000 but we want to limit at 9999
-		if( year > 9999 )
-		{
-			output.reset();
-			return false;
-		}
-		output.year = d.year();
-		output.month = d.month();
-		output.day = d.day();
-	}
-	catch (...)
-	{
-		output.reset();
-		return false;
-	}
+  DESCRIPTION
+    At least the following formats are recogniced (based on number of digits)
+    YYMMDD, YYYYMMDD, YYMMDDHHMMSS, YYYYMMDDHHMMSS
+    YY-MM-DD, YYYY-MM-DD, YY-MM-DD HH.MM.SS
+    YYYYMMDDTHHMMSS  where T is a the character T (ISO8601)
+    Also dates where all parts are zero are allowed
 
-	/**
-	 *  Now we need to deal with the time portion.
-	 *  The rules are:
-	 *      - Time portion may be empty
-	 *      - Time portion may start with 'T'
-	 *      - Time portion always ends with '\0'
-	 *      - Time portion always starts with hour
-	 *      - Without time separators (':'):
-	 *            HHMMSS
-	 *      - All Times can end with option .[microseconds]
-	 *      - With time separators there are no specific field length
-	 *        requirements
-	 */
-	while( input[dtend] == ' ' && dtend < input.length() )
-	{
-		++dtend;
-	}
-	if( dtend == input.length() )
-	{
-		isDate = true;
-		return true;
-	}
+    The second part may have an optional .###### fraction part.
 
-	uint32_t timesep_ct = 0;
-	bool has_usec = false;
-	uint32_t len_before_msec = 0;
-	uint32_t tmstart = ( input[dtend] == ' ' || input[dtend] == 'T' ) ? dtend+1 : dtend;
-	uint32_t tmend = tmstart;
-	for( ; tmend < input.length(); ++tmend )
-	{
-		char c = input[tmend];
-		if( isdigit( c ) )
-		{
-			// digits always ok
-			continue;
-		}
-//		else if( c == ':' )
-//		{
-//			timesep_ct++;
-//		}
-//		else if( c == '.' )
-//		{
-//			len_before_msec = ( tmend - tmstart );
-//			has_usec = true;
-//		}
-		else if( ispunct(c) )
-		{
-			if( c == '.' && timesep_ct ==2 )
-			{
-				len_before_msec = ( tmend - tmstart );
-				has_usec = true;
-			}
-			else
-			{
-				timesep_ct++;
-			}
-		}
-		else
-		{
-			// some other character showed up
-			output.reset();
-			return false;
-		}
-	}
-	if( !len_before_msec )
-		len_before_msec = ( tmend - tmstart );
+  NOTES
+   This function should work with a format position vector as long as the
+   following things holds:
+   - All date are kept together and all time parts are kept together
+   - Date and time parts must be separated by blank
+   - Second fractions must come after second part and be separated
+     by a '.'.  (The second fractions are optional)
+   - AM/PM must come after second fractions (or after seconds if no fractions)
+   - Year must always been specified.
+   - If time is before date, then we will use datetime format only if
+     the argument consist of two parts, separated by space.
+     Otherwise we will assume the argument is a date.
+   - The hour part must be specified in hour-minute-second order.
 
-	int32_t hour = -1;
-	int32_t min = 0;
-	int32_t sec = 0;
-	int32_t usec = 0;
-	const char* tstart = input.c_str() + tmstart;
-	if( timesep_ct == 2 )
-	{
-		readDecimal(tstart,hour);
-		++tstart; // skip one separator
-		readDecimal(tstart,min);
-		++tstart; // skip one separator
-		readDecimal(tstart,sec);
-	}
-	else if( timesep_ct == 1 )
-	{
-		readDecimal(tstart,hour);
-		++tstart; // skip one separator
-		readDecimal(tstart,min);
-	}
-	else if( timesep_ct == 0 && len_before_msec == 6 )
-	{
-		readDecimal(tstart,hour,2);
-		readDecimal(tstart,min,2);
-		readDecimal(tstart,sec,2);
-	}
-	else if( timesep_ct == 0 && len_before_msec == 4 )
-	{
-		readDecimal(tstart,hour,2);
-		readDecimal(tstart,min,2);
-	}
-	else if( timesep_ct == 0 && len_before_msec == 2 )
-	{
-		readDecimal(tstart,hour,2);
-	}
-	else
-	{
-		output.reset();
-		return false;
-	}
+  RETURN VALUES
+    MYSQL_TIMESTAMP_NONE        String wasn't a timestamp, like
+                                [DD [HH:[MM:[SS]]]].fraction.
+                                l_time is not changed.
+    MYSQL_TIMESTAMP_DATE        DATE string (YY MM and DD parts ok)
+    MYSQL_TIMESTAMP_DATETIME    Full timestamp
+    MYSQL_TIMESTAMP_ERROR       Timestamp with wrong values.
+                                All elements in l_time is set to 0
+*/
 
-	if( has_usec )
-	{
-		++tstart; // skip '.' character.  We could error check if we wanted to
-		uint32_t numread = readDecimal(tstart,usec);
-		if( numread > 6 || numread < 1 )
-		{
-			// don't allow more than 6 digits when specifying microseconds
-			output.reset();
-			return false;
-		}
+mysql_timestamp_type
+str_to_datetime(const char *str, uint length, MYSQL_TIME* l_time,
+                uint flags, int *was_cut)
+{
+  uint field_length, year_length=0, digits, i, number_of_fields;
+  uint date[MAX_DATE_PARTS], date_len[MAX_DATE_PARTS];
+  uint add_hours= 0, start_loop;
+  ulong not_zero_date, allow_space;
+  bool is_internal_format;
+  const char *pos, *last_field_pos=0;
+  const char *end=str+length;
+  const unsigned char *format_position;
+  bool found_delimitier= 0, found_space= 0;
+  uint frac_pos, frac_len;
+  mysql_timestamp_type time_type=MYSQL_TIMESTAMP_ERROR;
+  // DBUG_ENTER("str_to_datetime");
+  // DBUG_PRINT("ENTER",("str: %.*s",length,str));
 
-		// usec have to be scaled up so that it always represents microseconds
-		for( int i = numread; i < 6; i++ )
-			usec *= 10;
-	}
 
-	if( !isDateTimeValid( hour, min, sec, usec ) )
-	{
-		output.reset();
-		return false;
-	}
+  // LINT_INIT(field_length);
+  // LINT_INIT(last_field_pos);
 
-	output.hour = hour;
-	output.minute = min;
-	output.second = sec;
-	output.msecond = usec;
-	isDate = false;
-	return true;
+  *was_cut= 0;
+
+  /* Skip space at start */
+  for (; str != end && my_isspace(*str) ; str++)
+    ;
+  if (str == end || ! my_isdigit(*str))
+  {
+    *was_cut= 1;
+    return MYSQL_TIMESTAMP_NONE;
+  }
+
+  is_internal_format= 0;
+  /* This has to be changed if want to activate different timestamp formats */
+  format_position= internal_format_positions;
+
+  /*
+    Calculate number of digits in first part.
+    If length= 8 or >= 14 then year is of format YYYY.
+    (YYYY-MM-DD,  YYYYMMDD, YYYYYMMDDHHMMSS)
+  */
+  for (pos=str;
+	   pos != end && (my_isdigit(*pos) || *pos == 'T');
+       pos++)
+    ;
+
+  digits= (uint) (pos-str);
+  start_loop= 0;                                /* Start of scan loop */
+  date_len[format_position[0]]= 0;              /* Length of year field */
+  if (pos == end || *pos == '.')
+  {
+    /* Found date in internal format (only numbers like YYYYMMDD) */
+    year_length= (digits == 4 || digits == 8 || digits >= 14) ? 4 : 2;
+    field_length= year_length;
+    is_internal_format= 1;
+    format_position= internal_format_positions;
+  }
+  else
+  {
+    if (format_position[0] >= 3)                /* If year is after HHMMDD */
+    {
+      /*
+        If year is not in first part then we have to determinate if we got
+        a date field or a datetime field.
+        We do this by checking if there is two numbers separated by
+        space in the input.
+      */
+      while (pos < end && !my_isspace(*pos))
+        pos++;
+      while (pos < end && !my_isdigit(*pos))
+        pos++;
+      if (pos == end)
+      {
+        if (flags & TIME_DATETIME_ONLY)
+        {
+          *was_cut= 1;
+          DBUG_RETURN(MYSQL_TIMESTAMP_NONE);   /* Can't be a full datetime */
+        }
+        /* Date field.  Set hour, minutes and seconds to 0 */
+        date[0]= date[1]= date[2]= date[3]= date[4]= 0;
+        start_loop= 5;                         /* Start with first date part */
+      }
+    }
+
+    field_length= format_position[0] == 0 ? 4 : 2;
+  }
+
+  /*
+    Only allow space in the first "part" of the datetime field and:
+    - after days, part seconds
+    - before and after AM/PM (handled by code later)
+
+    2003-03-03 20:00:20 AM
+    20:00:20.000000 AM 03-03-2000
+  */
+  i= max((uint) format_position[0], (uint) format_position[1]);
+  set_if_bigger(i, (uint) format_position[2]);
+  allow_space= ((1 << i) | (1 << format_position[6]));
+  allow_space&= (1 | 2 | 4 | 8);
+
+  not_zero_date= 0;
+  for (i = start_loop;
+       i < MAX_DATE_PARTS-1 && str != end &&
+         my_isdigit(*str);
+       i++)
+  {
+    const char *start= str;
+    ulong tmp_value= (uint) (unsigned char) (*str++ - '0');
+
+    /*
+      Internal format means no delimiters; every field has a fixed
+      width. Otherwise, we scan until we find a delimiter and discard
+      leading zeroes -- except for the microsecond part, where leading
+      zeroes are significant, and where we never process more than six
+      digits.
+    */
+    bool     scan_until_delim= !is_internal_format &&
+                                  ((i != format_position[6]));
+
+    while (str != end && my_isdigit(str[0]) &&
+           (scan_until_delim || --field_length))
+    {
+      tmp_value=tmp_value*10 + (ulong) (unsigned char) (*str - '0');
+      str++;
+    }
+    date_len[i]= (uint) (str - start);
+    if (tmp_value > 999999)                     /* Impossible date part */
+    {
+      *was_cut= 1;
+      DBUG_RETURN(MYSQL_TIMESTAMP_NONE);
+    }
+    date[i]=tmp_value;
+    not_zero_date|= tmp_value;
+
+    /* Length of next field */
+    field_length= format_position[i+1] == 0 ? 4 : 2;
+
+    if ((last_field_pos= str) == end)
+    {
+      i++;                                      /* Register last found part */
+      break;
+    }
+    /* Allow a 'T' after day to allow CCYYMMDDT type of fields */
+    if (i == format_position[2] && *str == 'T')
+    {
+      str++;                                    /* ISO8601:  CCYYMMDDThhmmss */
+      continue;
+    }
+    if (i == format_position[5])                /* Seconds */
+    {
+      if (*str == '.')                          /* Followed by part seconds */
+      {
+        str++;
+        field_length= 6;                        /* 6 digits */
+      }
+      continue;
+    }
+    while (str != end &&
+           (my_ispunct(*str) ||
+            my_isspace(*str)))
+    {
+      if (my_isspace(*str))
+      {
+        if (!(allow_space & (1 << i)))
+        {
+          *was_cut= 1;
+          DBUG_RETURN(MYSQL_TIMESTAMP_NONE);
+        }
+        found_space= 1;
+      }
+      str++;
+      found_delimitier= 1;                      /* Should be a 'normal' date */
+    }
+    /* Check if next position is AM/PM */
+    if (i == format_position[6])                /* Seconds, time for AM/PM */
+    {
+      i++;                                      /* Skip AM/PM part */
+      if (format_position[7] != 255)            /* If using AM/PM */
+      {
+        if (str+2 <= end && (str[1] == 'M' || str[1] == 'm'))
+        {
+          if (str[0] == 'p' || str[0] == 'P')
+            add_hours= 12;
+          else if (str[0] != 'a' || str[0] != 'A')
+            continue;                           /* Not AM/PM */
+          str+= 2;                              /* Skip AM/PM */
+          /* Skip space after AM/PM */
+          while (str != end && my_isspace(*str))
+            str++;
+        }
+      }
+    }
+    last_field_pos= str;
+  }
+  if (found_delimitier && !found_space && (flags & TIME_DATETIME_ONLY))
+  {
+    *was_cut= 1;
+    DBUG_RETURN(MYSQL_TIMESTAMP_NONE);          /* Can't be a datetime */
+  }
+
+  str= last_field_pos;
+
+  number_of_fields= i - start_loop;
+  while (i < MAX_DATE_PARTS)
+  {
+    date_len[i]= 0;
+    date[i++]= 0;
+  }
+
+  if (!is_internal_format)
+  {
+    year_length= date_len[(uint) format_position[0]];
+    if (!year_length)                           /* Year must be specified */
+    {
+      *was_cut= 1;
+      DBUG_RETURN(MYSQL_TIMESTAMP_NONE);
+    }
+
+    l_time->year=               date[(uint) format_position[0]];
+    l_time->month=              date[(uint) format_position[1]];
+    l_time->day=                date[(uint) format_position[2]];
+    l_time->hour=               date[(uint) format_position[3]];
+    l_time->minute=             date[(uint) format_position[4]];
+    l_time->second=             date[(uint) format_position[5]];
+
+    frac_pos= (uint) format_position[6];
+    frac_len= date_len[frac_pos];
+    if (frac_len < 6)
+      date[frac_pos]*= (uint) log_10_int[6 - frac_len];
+    l_time->second_part= date[frac_pos];
+
+    if (format_position[7] != (uchar) 255)
+    {
+      if (l_time->hour > 12)
+      {
+        *was_cut= 1;
+        goto err;
+      }
+      l_time->hour= l_time->hour%12 + add_hours;
+    }
+  }
+  else
+  {
+    l_time->year=       date[0];
+    l_time->month=      date[1];
+    l_time->day=        date[2];
+    l_time->hour=       date[3];
+    l_time->minute=     date[4];
+    l_time->second=     date[5];
+    if (date_len[6] < 6)
+      date[6]*= (uint) log_10_int[6 - date_len[6]];
+    l_time->second_part=date[6];
+  }
+  // in mysql code but unused
+  // l_time->neg= 0;
+
+  if (year_length == 2 && not_zero_date)
+    l_time->year+= (l_time->year < YY_PART_YEAR ? 2000 : 1900);
+
+  if (number_of_fields < 3 ||
+      l_time->year > 9999 || l_time->month > 12 ||
+      l_time->day > 31 || l_time->hour > 23 ||
+      l_time->minute > 59 || l_time->second > 59)
+  {
+    /* Only give warning for a zero date if there is some garbage after */
+    if (!not_zero_date)                         /* If zero date */
+    {
+      for (; str != end ; str++)
+      {
+        if (!my_isspace(*str))
+        {
+          not_zero_date= 1;                     /* Give warning */
+          break;
+        }
+      }
+    }
+    *was_cut= (not_zero_date == 1);
+    goto err;
+  }
+
+  if (check_date(l_time, not_zero_date != 0, flags, was_cut))
+    goto err;
+
+  // use return value for this
+  time_type= (number_of_fields <= 3 ?
+                      MYSQL_TIMESTAMP_DATE : MYSQL_TIMESTAMP_DATETIME);
+
+  for (; str != end ; str++)
+  {
+    if (!my_isspace(*str))
+    {
+      *was_cut= 1;
+      break;
+    }
+  }
+
+  DBUG_RETURN(time_type);
+
+err:
+  memset(l_time, 0, sizeof(*l_time));
+  DBUG_RETURN(MYSQL_TIMESTAMP_ERROR);
 }
 
 bool stringToDateStruct( const string& data, Date& date )
 {
-	bool isDate;
-	DateTime dt;
-
-	if( !mysql_str_to_datetime( data, dt, isDate ))
+	MYSQL_TIME mtime;
+	int		   was_cut = 0;
+	mysql_timestamp_type ttype = str_to_datetime(data.c_str(), strlen(data.c_str()),&mtime,TIME_NO_ZERO_IN_DATE | TIME_NO_ZERO_DATE, &was_cut);
+	if (ttype == MYSQL_TIMESTAMP_ERROR || ttype == MYSQL_TIMESTAMP_NONE || was_cut)
 		return false;
 
-	date.year = dt.year;
-	date.month = dt.month;
-	date.day = dt.day;
+	date.year = mtime.year;
+	date.month = mtime.month;
+	date.day = mtime.day;
 	return true;
 }
 
 bool stringToDatetimeStruct(const string& data, DateTime& dtime, bool* date)
 {
-	bool isDate;
-	if( !mysql_str_to_datetime( data, dtime, isDate ) )
-		return false;
+	MYSQL_TIME mtime;
+	int		   was_cut = 0;
+	mysql_timestamp_type ttype = str_to_datetime(data.c_str(), strlen(data.c_str()),&mtime,TIME_NO_ZERO_IN_DATE | TIME_NO_ZERO_DATE, &was_cut);
 
-	if( isDate )
+	if (ttype == MYSQL_TIMESTAMP_ERROR || ttype == MYSQL_TIMESTAMP_NONE || was_cut)
+		return false;
+	else if (ttype == MYSQL_TIMESTAMP_DATE)
 	{
 		if (date)
 			*date = true;
@@ -830,24 +996,34 @@ bool stringToDatetimeStruct(const string& data, DateTime& dtime, bool* date)
 		dtime.second = 0;
 		dtime.msecond = 0;
 	}
+	else
+	{
+		dtime.hour = mtime.hour;
+		dtime.minute = mtime.minute;
+		dtime.second = mtime.second;
+		dtime.msecond = mtime.second_part;
+	}
+	dtime.year = mtime.year;
+	dtime.month = mtime.month;
+	dtime.day = mtime.day;
 
 	return true;
 }
 
 boost::any
-	DataConvert::convertColumnData(const CalpontSystemCatalog::ColType& colType,
-	const std::string& dataOrig, bool& pushWarning, bool nulFlag, bool noRoundup, bool isUpdate )
+	DataConvert::convertColumnData( execplan::CalpontSystemCatalog::ColType colType,
+	const std::string& dataOrig, bool& pushWarning, bool nulFlag, bool noRoundup )
 {
 	boost::any value;
 	std::string data( dataOrig );
 	pushWarning = false;
-	CalpontSystemCatalog::ColDataType type = colType.colDataType;
+	execplan::CalpontSystemCatalog::ColDataType type = colType.colDataType;
 	//if ( !data.empty() )
 	if (!nulFlag)
 	{
 		switch(type)
 		{
-			case CalpontSystemCatalog::BIT:
+			case execplan::CalpontSystemCatalog::BIT:
 			{
 				unsigned int x = data.find("(");
 				if (x <= data.length())
@@ -876,24 +1052,23 @@ boost::any
 			}
 			break;
 
-			case CalpontSystemCatalog::TINYINT:
+			case execplan::CalpontSystemCatalog::TINYINT:
 				value = (char) number_int_value(data, colType, pushWarning, noRoundup);
 			break;
 
-			case CalpontSystemCatalog::SMALLINT:
+			case execplan::CalpontSystemCatalog::SMALLINT:
 				value = (short) number_int_value(data, colType, pushWarning, noRoundup);
 			break;
 
-			case CalpontSystemCatalog::MEDINT:
-			case CalpontSystemCatalog::INT:
+			case execplan::CalpontSystemCatalog::MEDINT:
+			case execplan::CalpontSystemCatalog::INT:
 				value = (int) number_int_value(data, colType, pushWarning, noRoundup);
 			break;
 
-			case CalpontSystemCatalog::BIGINT:
+			case execplan::CalpontSystemCatalog::BIGINT:
 				value = (long long) number_int_value(data, colType, pushWarning, noRoundup);
 			break;
-
-			case CalpontSystemCatalog::DECIMAL:
+			case execplan::CalpontSystemCatalog::DECIMAL:
 				if (colType.colWidth == 1)
 					value = (char) number_int_value(data, colType, pushWarning, noRoundup);
 				else if (colType.colWidth == 2)
@@ -903,59 +1078,7 @@ boost::any
 				else if (colType.colWidth == 8)
 					value = (long long) number_int_value(data, colType, pushWarning, noRoundup);
 			break;
-			case CalpontSystemCatalog::UDECIMAL:
-				// UDECIMAL numbers may not be negative
-				if (colType.colWidth == 1)
-				{
-					char ival = (char) number_int_value(data, colType, pushWarning, noRoundup);
-					if (ival < 0 &&
-					    ival != static_cast<int8_t>(joblist::TINYINTEMPTYROW) &&
-					    ival != static_cast<int8_t>(joblist::TINYINTNULL))
-					{
-						ival = 0;
-						pushWarning = true;
-					}
-					value = ival;
-				}
-				else if (colType.colWidth == 2)
-				{
-					short ival = (short) number_int_value(data, colType, pushWarning, noRoundup);
-					if (ival < 0 &&
-					    ival != static_cast<int16_t>(joblist::SMALLINTEMPTYROW) &&
-					    ival != static_cast<int16_t>(joblist::SMALLINTNULL))
-					{
-						ival = 0;
-						pushWarning = true;
-					}
-					value = ival;
-				}
-				else if (colType.colWidth == 4)
-				{
-					int ival = static_cast<int>(number_int_value(data, colType, pushWarning, noRoundup));
-					if (ival < 0 &&
-					    ival != static_cast<int>(joblist::INTEMPTYROW) &&
-					    ival != static_cast<int>(joblist::INTNULL))
-					{
-						ival = 0;
-						pushWarning = true;
-					}
-					value = ival;
-				}
-				else if (colType.colWidth == 8)
-				{
-					long long ival = static_cast<long long>(number_int_value(data, colType, pushWarning, noRoundup));
-					if (ival < 0 &&
-					    ival != static_cast<long long>(joblist::BIGINTEMPTYROW) &&
-					    ival != static_cast<long long>(joblist::BIGINTNULL))
-					{
-						ival = 0;
-						pushWarning = true;
-					}
-					value = ival;
-				}
-			break;
-			case CalpontSystemCatalog::FLOAT:
-			case CalpontSystemCatalog::UFLOAT:
+			case execplan::CalpontSystemCatalog::FLOAT:
 			{
 				string::size_type x = data.find('(');
 				if (x < string::npos)
@@ -968,21 +1091,7 @@ boost::any
 					float floatvalue;
 					errno = 0;
 #ifdef _MSC_VER
-					double dval = strtod(data.c_str(), 0);
-					if (dval > MAX_FLOAT)
-					{
-						pushWarning = true;
-						floatvalue = MAX_FLOAT;
-					}
-					else if (dval < MIN_FLOAT)
-					{
-						pushWarning = true;
-						floatvalue = MIN_FLOAT;
-					}
-					else
-					{
-						floatvalue = (float)dval;
-					}
+					floatvalue = (float)strtod(data.c_str(), 0);
 #else
 					floatvalue = strtof(data.c_str(), 0);
 #endif
@@ -1003,12 +1112,6 @@ boost::any
 						else
 							floatvalue = 0;
 					}
-					if (floatvalue < 0.0 && type == CalpontSystemCatalog::UFLOAT &&
-					    floatvalue != joblist::FLOATEMPTYROW && floatvalue != joblist::FLOATNULL)
-					{
-						value = 0.0;
-						pushWarning = true;
-					}
 
 					value = floatvalue;
 				}
@@ -1017,8 +1120,7 @@ boost::any
 			}
 			break;
 
-			case CalpontSystemCatalog::DOUBLE:
-			case CalpontSystemCatalog::UDOUBLE:
+			case execplan::CalpontSystemCatalog::DOUBLE:
 			{
 				string::size_type x = data.find('(');
 				if (x < string::npos)
@@ -1050,13 +1152,6 @@ boost::any
 					}
 					else
 						value = doublevalue;
-
-					if (doublevalue < 0.0 && type == CalpontSystemCatalog::UDOUBLE &&
-						doublevalue != joblist::DOUBLEEMPTYROW && doublevalue != joblist::DOUBLENULL)
-					{
-						doublevalue = 0.0;
-						pushWarning = true;
-					}
 				}
 				else
 				{
@@ -1065,25 +1160,8 @@ boost::any
 			}
 			break;
 
-			case CalpontSystemCatalog::UTINYINT:
-				value = (uint8_t)number_uint_value(data, colType, pushWarning, noRoundup);
-			break;
-
-			case CalpontSystemCatalog::USMALLINT:
-				value = (uint16_t)number_uint_value(data, colType, pushWarning, noRoundup);
-			break;
-
-			case CalpontSystemCatalog::UMEDINT:
-			case CalpontSystemCatalog::UINT:
-				value = (uint32_t)number_uint_value(data, colType, pushWarning, noRoundup);
-			break;
-
-			case CalpontSystemCatalog::UBIGINT:
-				value = (uint64_t)number_uint_value(data, colType, pushWarning, noRoundup);
-			break;
-
-			case CalpontSystemCatalog::CHAR:
-			case CalpontSystemCatalog::VARCHAR:
+			case execplan::CalpontSystemCatalog::CHAR:
+			case execplan::CalpontSystemCatalog::VARCHAR:
 			{
 				//check data length
 				if ( data.length() > (unsigned int)colType.colWidth )
@@ -1103,7 +1181,7 @@ boost::any
 			}
 			break;
 
-			case CalpontSystemCatalog::DATE:
+			case execplan::CalpontSystemCatalog::DATE:
 			{
 				if (data == "0000-00-00")  //@Bug 3210 Treat blank date as null
 				{
@@ -1119,21 +1197,12 @@ boost::any
 				}
 				else
 				{
-					if ( isUpdate) //@Bug 5222 set to null for ot of range value
-					{
-						uint32_t d = joblist::DATENULL;
-						value = d;
-						pushWarning = true;
-					}
-					else
-					{
-						throw QueryDataExcept("Invalid date", formatErr);
-					}
+					throw QueryDataExcept("Invalid date", formatErr);
 				}
 			}
 			break;
 
-			case CalpontSystemCatalog::DATETIME:
+			case execplan::CalpontSystemCatalog::DATETIME:
 			{
 				if (data == "0000-00-00 00:00:00")  //@Bug 3210 Treat blank date as null
 				{
@@ -1149,27 +1218,35 @@ boost::any
 				}
 				else
 				{
-					if ( isUpdate) //@Bug 5222 set to null for ot of range value
-					{
-						uint64_t d = joblist::DATETIMENULL;
-						value = d;
-						pushWarning = true;
-					}
-					else
-						throw QueryDataExcept("Invalid datetime", formatErr);
+					throw QueryDataExcept("Invalid datetime", formatErr);
 				}
 			}
 			break;
-
-			case CalpontSystemCatalog::BLOB:
-			case CalpontSystemCatalog::CLOB:
+			case execplan::CalpontSystemCatalog::BLOB:
+			case execplan::CalpontSystemCatalog::CLOB:
 				value = data;
 			break;
-
-			case CalpontSystemCatalog::VARBINARY:
+			case execplan::CalpontSystemCatalog::VARBINARY:
+{
+//const char* p = dataOrig.data();
+//cerr << "dataOrig: ";
+//for (size_t i = 0; i < dataOrig.size(); i++, p++)
+//{
+//	if (isprint(*p)) cerr << *p << ' ';
+//	else {unsigned u = *p; u &= 0xff; cerr << "0x" << hex << u << dec << ' ';}
+//}
+//cerr << endl;
+//p = data.data();
+//cerr << "data: ";
+//for (size_t i = 0; i < data.size(); i++, p++)
+//{
+//	if (isprint(*p)) cerr << *p << ' ';
+//	else {unsigned u = *p; u &= 0xff; cerr << "0x" << hex << u << dec << ' ';}
+//}
+//cerr << endl;
 				value = data;
+}
 			break;
-
 			default:
 				throw QueryDataExcept("convertColumnData: unknown column data type.", dataTypeErr);
 			break;
@@ -1177,194 +1254,167 @@ boost::any
 	}
 	else									//null
 	{
-		switch (type)
-		{
-			case CalpontSystemCatalog::BIT:
+			switch (type)
 			{
-				//TODO: How to communicate with write engine?
-			}
-			break;
-			case CalpontSystemCatalog::TINYINT:
-			{
-				char tinyintvalue = joblist::TINYINTNULL;
-				value = tinyintvalue;
-			}
-			break;
-			case CalpontSystemCatalog::SMALLINT:
-			{
-				short smallintvalue = joblist::SMALLINTNULL;
-				value = smallintvalue;
-			}
-			break;
-			case CalpontSystemCatalog::MEDINT:
-			case CalpontSystemCatalog::INT:
-			{
-				int intvalue = joblist::INTNULL;
-				value = intvalue;
-			}
-			break;
-			case CalpontSystemCatalog::BIGINT:
-			{
-				long long bigint = joblist::BIGINTNULL;
-				value = bigint;
-			}
-			break;
-			case CalpontSystemCatalog::DECIMAL:
-			case CalpontSystemCatalog::UDECIMAL:
-			{
-				if (colType.colWidth == CalpontSystemCatalog::ONE_BYTE)
+				case execplan::CalpontSystemCatalog::BIT:
+				{
+					//TODO: How to communicate with write engine?
+				}
+				break;
+				case execplan::CalpontSystemCatalog::TINYINT:
 				{
 					char tinyintvalue = joblist::TINYINTNULL;
 					value = tinyintvalue;
 				}
-				else if (colType.colWidth ==CalpontSystemCatalog::TWO_BYTE)
+				break;
+				case execplan::CalpontSystemCatalog::SMALLINT:
 				{
 					short smallintvalue = joblist::SMALLINTNULL;
 					value = smallintvalue;
 				}
-				else if (colType.colWidth ==CalpontSystemCatalog::FOUR_BYTE)
+				break;
+				case execplan::CalpontSystemCatalog::MEDINT:
+				case execplan::CalpontSystemCatalog::INT:
 				{
 					int intvalue = joblist::INTNULL;
 					value = intvalue;
 				}
-				else if (colType.colWidth ==CalpontSystemCatalog::EIGHT_BYTE)
+				break;
+				case execplan::CalpontSystemCatalog::BIGINT:
 				{
-					long long eightbyte = joblist::BIGINTNULL;
-					value = eightbyte;
+					long long bigint = joblist::BIGINTNULL;
+					value = bigint;
 				}
-				else
+				break;
+				case execplan::CalpontSystemCatalog::DECIMAL:
+				{
+					if (colType.colWidth == execplan::CalpontSystemCatalog::ONE_BYTE)
+					{
+						char tinyintvalue = joblist::TINYINTNULL;
+						value = tinyintvalue;
+					}
+					else if (colType.colWidth ==execplan::CalpontSystemCatalog::TWO_BYTE)
+					{
+						short smallintvalue = joblist::SMALLINTNULL;
+						value = smallintvalue;
+					}
+					else if (colType.colWidth ==execplan::CalpontSystemCatalog::FOUR_BYTE)
+					{
+						int intvalue = joblist::INTNULL;
+						value = intvalue;
+					}
+					else if (colType.colWidth ==execplan::CalpontSystemCatalog::EIGHT_BYTE)
+					{
+						long long eightbyte = joblist::BIGINTNULL;
+						value = eightbyte;
+					}
+					else
+					{
+						WriteEngine::Token nullToken;
+						value = nullToken;
+					}
+				}
+				break;
+				case execplan::CalpontSystemCatalog::FLOAT:
+				{
+					uint32_t tmp = joblist::FLOATNULL;
+					float* floatvalue = (float*)&tmp;
+					value = *floatvalue;
+				}
+				break;
+				case execplan::CalpontSystemCatalog::DOUBLE:
+				{
+					uint64_t tmp = joblist::DOUBLENULL;
+					double* doublevalue = (double*)&tmp;
+					value = *doublevalue;
+				}
+				break;
+				case execplan::CalpontSystemCatalog::DATE:
+				{
+					uint32_t d = joblist::DATENULL;
+					value = d;
+				}
+				break;
+				case execplan::CalpontSystemCatalog::DATETIME:
+				{
+					uint64_t d = joblist::DATETIMENULL;
+					value = d;
+				}
+				break;
+				case execplan::CalpontSystemCatalog::CHAR:
+				{
+					std::string charnull;
+					if (colType.colWidth == 1)
+					{
+						//charnull = joblist::CHAR1NULL;
+						charnull = '\376';
+						value = charnull;
+					}
+					else if (colType.colWidth == 2)
+					{
+						//charnull = joblist::CHAR2NULL;
+						charnull = "\377\376";
+						value = charnull;
+					}
+					else if (( colType.colWidth < 5 ) && ( colType.colWidth > 2 ))
+					{
+						//charnull = joblist::CHAR4NULL;
+						charnull = "\377\377\377\376";
+						value = charnull;
+					}
+					else if (( colType.colWidth < 9 ) && ( colType.colWidth > 4 ))
+					{
+						//charnull = joblist::CHAR8NULL;
+						charnull = "\377\377\377\377\377\377\377\376";
+						value = charnull;
+					}
+					else
+					{
+						WriteEngine::Token nullToken;
+						value = nullToken;
+					}
+				}
+				break;
+				case execplan::CalpontSystemCatalog::VARCHAR:
+				{
+					std::string charnull;
+					if (colType.colWidth == 1 )
+					{
+						//charnull = joblist::CHAR2NULL;
+						charnull = "\377\376";
+						value = charnull;
+					}
+					else if ((colType.colWidth < 4)  && (colType.colWidth > 1))
+					{
+						//charnull = joblist::CHAR4NULL;
+						charnull = "\377\377\377\376";
+						value = charnull;
+					}
+					else if ((colType.colWidth < 8)  && (colType.colWidth > 3))
+					{
+						//charnull = joblist::CHAR8NULL;
+						charnull = "\377\377\377\377\377\377\377\376";
+						value = charnull;
+					}
+					else if ( colType.colWidth > 7 )
+					{
+						WriteEngine::Token nullToken;
+						value = nullToken;
+					}
+				}
+				break;
+				case execplan::CalpontSystemCatalog::VARBINARY:
 				{
 					WriteEngine::Token nullToken;
 					value = nullToken;
 				}
-			}
-			break;
-			case CalpontSystemCatalog::FLOAT:
-			case CalpontSystemCatalog::UFLOAT:
-			{
-				uint32_t tmp = joblist::FLOATNULL;
-				float* floatvalue = (float*)&tmp;
-				value = *floatvalue;
-			}
-			break;
-			case CalpontSystemCatalog::DOUBLE:
-			case CalpontSystemCatalog::UDOUBLE:
-			{
-				uint64_t tmp = joblist::DOUBLENULL;
-				double* doublevalue = (double*)&tmp;
-				value = *doublevalue;
-			}
-			break;
-			case CalpontSystemCatalog::DATE:
-			{
-				uint32_t d = joblist::DATENULL;
-				value = d;
-			}
-			break;
-			case CalpontSystemCatalog::DATETIME:
-			{
-				uint64_t d = joblist::DATETIMENULL;
-				value = d;
-			}
-			break;
-			case CalpontSystemCatalog::CHAR:
-			{
-				std::string charnull;
-				if (colType.colWidth == 1)
-				{
-					//charnull = joblist::CHAR1NULL;
-					charnull = '\376';
-					value = charnull;
-				}
-				else if (colType.colWidth == 2)
-				{
-					//charnull = joblist::CHAR2NULL;
-					charnull = "\377\376";
-					value = charnull;
-				}
-				else if (( colType.colWidth < 5 ) && ( colType.colWidth > 2 ))
-				{
-					//charnull = joblist::CHAR4NULL;
-					charnull = "\377\377\377\376";
-					value = charnull;
-				}
-				else if (( colType.colWidth < 9 ) && ( colType.colWidth > 4 ))
-				{
-					//charnull = joblist::CHAR8NULL;
-					charnull = "\377\377\377\377\377\377\377\376";
-					value = charnull;
-				}
-				else
-				{
-					WriteEngine::Token nullToken;
-					value = nullToken;
-				}
-			}
-			break;
-			case CalpontSystemCatalog::VARCHAR:
-			{
-				std::string charnull;
-				if (colType.colWidth == 1 )
-				{
-					//charnull = joblist::CHAR2NULL;
-					charnull = "\377\376";
-					value = charnull;
-				}
-				else if ((colType.colWidth < 4)  && (colType.colWidth > 1))
-				{
-					//charnull = joblist::CHAR4NULL;
-					charnull = "\377\377\377\376";
-					value = charnull;
-				}
-				else if ((colType.colWidth < 8)  && (colType.colWidth > 3))
-				{
-					//charnull = joblist::CHAR8NULL;
-					charnull = "\377\377\377\377\377\377\377\376";
-					value = charnull;
-				}
-				else if ( colType.colWidth > 7 )
-				{
-					WriteEngine::Token nullToken;
-					value = nullToken;
-				}
-			}
-			break;
-			case CalpontSystemCatalog::VARBINARY:
-			{
-				WriteEngine::Token nullToken;
-				value = nullToken;
-			}
-			break;
-			case CalpontSystemCatalog::UTINYINT:
-			{
-				uint8_t utinyintvalue = joblist::UTINYINTNULL;
-				value = utinyintvalue;
-			}
-			break;
-			case CalpontSystemCatalog::USMALLINT:
-			{
-				uint16_t usmallintvalue = joblist::USMALLINTNULL;
-				value = usmallintvalue;
-			}
-			break;
-			case CalpontSystemCatalog::UMEDINT:
-			case CalpontSystemCatalog::UINT:
-			{
-				uint32_t uintvalue = joblist::UINTNULL;
-				value = uintvalue;
-			}
-			break;
-			case CalpontSystemCatalog::UBIGINT:
-			{
-				uint64_t ubigint = joblist::UBIGINTNULL;
-				value = ubigint;
-			}
-			break;
-			default:
-				throw QueryDataExcept("convertColumnData: unknown column data type.", dataTypeErr);
-			break;
+				break;
+				default:
+					throw QueryDataExcept("convertColumnData: unknown column data type.", dataTypeErr);
+				break;
 
-		}
+			}
+
 	}
 
 	return value;
@@ -1373,7 +1423,7 @@ boost::any
 //------------------------------------------------------------------------------
 // Convert date string to binary date.  Used by BulkLoad.
 //------------------------------------------------------------------------------
-int32_t DataConvert::convertColumnDate(
+uint32_t DataConvert::convertColumnDate(
 	const char* dataOrg,
 	CalpontDateTimeFormat dateFormat,
 	int& status,
@@ -1383,30 +1433,14 @@ int32_t DataConvert::convertColumnDate(
 	const char* p;
 	p = dataOrg;
 	char fld[10];
-	int32_t value = 0;
+	uint32_t value = 0;
 	if ( dateFormat != CALPONTDATE_ENUM )
 	{
 		status = -1;
 		return value;
 	}
 
-	// @bug 5787: allow for leading blanks
-	unsigned int dataLen = dataOrgLen;
-	if ((dataOrgLen > 0) && (dataOrg[0] == ' '))
-	{
-		unsigned nblanks = 0;
-		for (unsigned nn=0; nn<dataOrgLen; nn++)
-		{
-			if (dataOrg[nn] == ' ')
-				nblanks++;
-			else
-				break;
-		}
-		p       = dataOrg    + nblanks;
-		dataLen = dataOrgLen - nblanks;
-	}
-
-	if ( dataLen < 10)
+	if ( dataOrgLen < 10)
 	{
 		status = -1;
 		return value;
@@ -1445,19 +1479,9 @@ int32_t DataConvert::convertColumnDate(
 }
 
 //------------------------------------------------------------------------------
-// Verify that specified date is valid
-//------------------------------------------------------------------------------
-bool DataConvert::isColumnDateValid( int32_t date )
-{
-	Date d;
-	memcpy(&d, &date, sizeof(int32_t));
-	return (isDateValid(d.day, d.month, d.year));
-}
-
-//------------------------------------------------------------------------------
 // Convert date/time string to binary date/time.  Used by BulkLoad.
 //------------------------------------------------------------------------------
-int64_t DataConvert::convertColumnDatetime(
+uint64_t DataConvert::convertColumnDatetime(
 	const char* dataOrg,
 	CalpontDateTimeFormat datetimeFormat,
 	int& status,
@@ -1467,30 +1491,14 @@ int64_t DataConvert::convertColumnDatetime(
 	const char* p;
 	p = dataOrg;
 	char fld[10];
-	int64_t value = 0;
+	uint64_t value = 0;
 	if ( datetimeFormat != CALPONTDATETIME_ENUM )
 	{
 		status = -1;
 		return value;
 	}
 
-	// @bug 5787: allow for leading blanks
-	unsigned int dataLen = dataOrgLen;
-	if ((dataOrgLen > 0) && (dataOrg[0] == ' '))
-	{
-		unsigned nblanks = 0;
-		for (unsigned nn=0; nn<dataOrgLen; nn++)
-		{
-			if (dataOrg[nn] == ' ')
-				nblanks++;
-			else
-				break;
-		}
-		p       = dataOrg    + nblanks;
-		dataLen = dataOrgLen - nblanks;
-	}
-
-	if ( dataLen < 10)
+	if ( dataOrgLen < 10)
 	{
 		status = -1;
 		return value;
@@ -1512,15 +1520,17 @@ int64_t DataConvert::convertColumnDatetime(
 
 	inDay = strtol(fld, 0, 10);
 
+	int len = dataOrgLen;
+
 	inHour        = 0;
 	inMinute      = 0;
 	inSecond      = 0;
 	inMicrosecond = 0;
-	if (dataLen > 12)
+	if (len > 12)
 	{
 		// For backwards compatability we still allow leading blank
-		if ((!isdigit(p[11]) && (p[11] != ' ')) ||
-			 !isdigit(p[12]))
+		if ((!isdigit(dataOrg[11]) && (dataOrg[11] != ' ')) ||
+			 !isdigit(dataOrg[12]))
 		{
 			status = -1;
 			return value;
@@ -1531,9 +1541,9 @@ int64_t DataConvert::convertColumnDatetime(
 
 		inHour = strtol(fld, 0, 10);
 
-		if (dataLen > 15)
+		if (len > 15)
 		{
-			if (!isdigit(p[14]) || !isdigit(p[15]))
+			if (!isdigit(dataOrg[14]) || !isdigit(dataOrg[15]))
 			{
 				status = -1;
 				return value;
@@ -1544,9 +1554,9 @@ int64_t DataConvert::convertColumnDatetime(
 
 			inMinute = strtol(fld, 0, 10);
 
-			if (dataLen > 18)
+			if (len > 18)
 			{
-				if (!isdigit(p[17]) || !isdigit(p[18]))
+				if (!isdigit(dataOrg[17]) || !isdigit(dataOrg[18]))
 				{
 					status = -1;
 					return value;
@@ -1557,9 +1567,9 @@ int64_t DataConvert::convertColumnDatetime(
 
 				inSecond = strtol(fld, 0, 10);
 
-				if (dataLen > 20)
+				if (len > 20)
 				{
-					unsigned int microFldLen = dataLen - 20;
+					unsigned int microFldLen = len - 20;
 					if (microFldLen > (sizeof(fld)-1))
 						microFldLen = sizeof(fld) - 1;
 					memcpy( fld, p+20, microFldLen);
@@ -1590,18 +1600,6 @@ int64_t DataConvert::convertColumnDatetime(
 	}
 
 	return value;
-}
-
-//------------------------------------------------------------------------------
-// Verify that specified datetime is valid
-//------------------------------------------------------------------------------
-bool DataConvert::isColumnDateTimeValid( int64_t dateTime )
-{
-	DateTime dt;
-	memcpy(&dt, &dateTime, sizeof(uint64_t));
-	if (isDateValid(dt.day, dt.month, dt.year))
-		return isDateTimeValid(dt.hour, dt.minute, dt.second, dt.msecond);
-	return false;
 }
 
 std::string DataConvert::dateToString( int  datevalue )
@@ -1647,32 +1645,31 @@ std::string DataConvert::datetimeToString1( long long  datetimevalue )
 	sprintf(buf,"%04d%02d%02d%02d%02d%02d%06d",dt.year,dt.month,dt.day,dt.hour,dt.minute,dt.second,dt.msecond);
 	return buf;
 }
-#if 0
+
 bool DataConvert::isNullData(ColumnResult* cr, int rownum, CalpontSystemCatalog::ColType colType)
 {
 	switch (colType.colDataType)
 	{
-		case CalpontSystemCatalog::TINYINT:
+		case execplan::CalpontSystemCatalog::TINYINT:
 			if (cr->GetData(rownum) == joblist::TINYINTNULL)
 				return true;
 			return false;
-		case CalpontSystemCatalog::SMALLINT:
+		case execplan::CalpontSystemCatalog::SMALLINT:
 			if (cr->GetData(rownum) == joblist::SMALLINTNULL)
 				return true;
 			return false;
-		case CalpontSystemCatalog::MEDINT:
-		case CalpontSystemCatalog::INT:
+		case execplan::CalpontSystemCatalog::MEDINT:
+		case execplan::CalpontSystemCatalog::INT:
 			if (cr->GetData(rownum) == joblist::INTNULL)
 				return true;
 			return false;
-		case CalpontSystemCatalog::BIGINT:
+		case execplan::CalpontSystemCatalog::BIGINT:
 			if (cr->GetData(rownum) == static_cast<int64_t>(joblist::BIGINTNULL))
 				return true;
 			return false;
-		case CalpontSystemCatalog::DECIMAL:
-		case CalpontSystemCatalog::UDECIMAL:
+		case execplan::CalpontSystemCatalog::DECIMAL:
 		{
-			if (colType.colWidth <= CalpontSystemCatalog::FOUR_BYTE)
+			if (colType.colWidth <= execplan::CalpontSystemCatalog::FOUR_BYTE)
 			{
 				if (cr->GetData(rownum) == joblist::SMALLINTNULL)
 					return true;
@@ -1697,27 +1694,25 @@ bool DataConvert::isNullData(ColumnResult* cr, int rownum, CalpontSystemCatalog:
 				return false;
 			}
 		}
-		case CalpontSystemCatalog::FLOAT:
-		case CalpontSystemCatalog::UFLOAT:
+		case execplan::CalpontSystemCatalog::FLOAT:
 			//if (cr->GetStringData(rownum) == joblist::FLOATNULL)
 			if (cr->GetStringData(rownum).compare("null") == 0 )
 				return true;
 			return false;
-		case CalpontSystemCatalog::DOUBLE:
-		case CalpontSystemCatalog::UDOUBLE:
+		case execplan::CalpontSystemCatalog::DOUBLE:
 			//if (cr->GetStringData(rownum) == joblist::DOUBLENULL)
 			if (cr->GetStringData(rownum).compare("null") == 0 )
 				return true;
 			return false;
-		case CalpontSystemCatalog::DATE:
+		case execplan::CalpontSystemCatalog::DATE:
 			if (cr->GetData(rownum) == joblist::DATENULL)
 				return true;
 			return false;
-		case CalpontSystemCatalog::DATETIME:
+		case execplan::CalpontSystemCatalog::DATETIME:
 			if (cr->GetData(rownum) == static_cast<int64_t>(joblist::DATETIMENULL))
 				return true;
 			return false;
-		case CalpontSystemCatalog::CHAR:
+		case execplan::CalpontSystemCatalog::CHAR:
 		{
 			std::string charnull;
 			if ( cr->GetStringData(rownum) == "")
@@ -1755,7 +1750,7 @@ bool DataConvert::isNullData(ColumnResult* cr, int rownum, CalpontSystemCatalog:
 				return false;
 			}
 		}
-		case CalpontSystemCatalog::VARCHAR:
+		case execplan::CalpontSystemCatalog::VARCHAR:
 		{
 			std::string charnull;
 			if ( cr->GetStringData(rownum) == "")
@@ -1789,28 +1784,11 @@ bool DataConvert::isNullData(ColumnResult* cr, int rownum, CalpontSystemCatalog:
 				return false;
 			}
 		}
-		case CalpontSystemCatalog::UTINYINT:
-			if (cr->GetData(rownum) == joblist::UTINYINTNULL)
-				return true;
-			return false;
-		case CalpontSystemCatalog::USMALLINT:
-			if (cr->GetData(rownum) == joblist::USMALLINTNULL)
-				return true;
-			return false;
-		case CalpontSystemCatalog::UMEDINT:
-		case CalpontSystemCatalog::UINT:
-			if (cr->GetData(rownum) == joblist::UINTNULL)
-				return true;
-			return false;
-		case CalpontSystemCatalog::UBIGINT:
-			if (cr->GetData(rownum) == joblist::UBIGINTNULL)
-				return true;
-			return false;
 		default:
 			throw QueryDataExcept("convertColumnData: unknown column data type.", dataTypeErr);
 	}
 }
-#endif
+
 int64_t DataConvert::dateToInt(const string& date)
 {
 	return stringToDate(date);
@@ -1825,7 +1803,7 @@ int64_t DataConvert::stringToDate(const string& data)
 {
 	Date aDay;
 	if( stringToDateStruct( data, aDay ) )
-		return (((*(reinterpret_cast<uint32_t *> (&aDay))) & 0xFFFFFFC0) | 0x3E);
+		return (*(reinterpret_cast<uint32_t *> (&aDay))) & 0xFFFFFFC0;
 	else
 		return -1;
 }
@@ -2068,7 +2046,7 @@ int64_t DataConvert::stringToTime(const string& data)
 	pos = time.find(".");
 	if (pos != string::npos)
 	{
-		msec = strtoll(time.substr(pos+1, time.length()-pos-1).c_str(), 0, 10);
+		msec = atol(time.substr(pos+1, time.length()-pos-1).c_str());
 		hms = time.substr(0, pos);
 	}
 	else
@@ -2133,12 +2111,6 @@ CalpontSystemCatalog::ColType DataConvert::convertUnionColType(vector<CalpontSys
 			case CalpontSystemCatalog::INT:
 			case CalpontSystemCatalog::BIGINT:
 			case CalpontSystemCatalog::DECIMAL:
-			case CalpontSystemCatalog::UTINYINT:
-			case CalpontSystemCatalog::USMALLINT:
-			case CalpontSystemCatalog::UMEDINT:
-			case CalpontSystemCatalog::UINT:
-			case CalpontSystemCatalog::UBIGINT:
-			case CalpontSystemCatalog::UDECIMAL:
 			{
 				switch (unionedType.colDataType)
 				{
@@ -2148,23 +2120,12 @@ CalpontSystemCatalog::ColType DataConvert::convertUnionColType(vector<CalpontSys
 					case CalpontSystemCatalog::INT:
 					case CalpontSystemCatalog::BIGINT:
 					case CalpontSystemCatalog::DECIMAL:
-					case CalpontSystemCatalog::UTINYINT:
-					case CalpontSystemCatalog::USMALLINT:
-					case CalpontSystemCatalog::UMEDINT:
-					case CalpontSystemCatalog::UINT:
-					case CalpontSystemCatalog::UBIGINT:
-					case CalpontSystemCatalog::UDECIMAL:
 						if (types[i].colWidth > unionedType.colWidth)
 						{
 							unionedType.colDataType = types[i].colDataType;
 							unionedType.colWidth = types[i].colWidth;
 						}
-						// If same size and result is signed but source is unsigned...
-						if (types[i].colWidth == unionedType.colWidth && !isUnsigned(unionedType.colDataType) && isUnsigned(types[i].colDataType))
-						{
-							unionedType.colDataType = types[i].colDataType;
-						}
-						if (types[i].colDataType == CalpontSystemCatalog::DECIMAL || types[i].colDataType == CalpontSystemCatalog::UDECIMAL)
+						if (types[i].colDataType == CalpontSystemCatalog::DECIMAL)
 						{
 							unionedType.colDataType = CalpontSystemCatalog::DECIMAL;
 						}
@@ -2179,17 +2140,12 @@ CalpontSystemCatalog::ColType DataConvert::convertUnionColType(vector<CalpontSys
 						unionedType.colWidth = 26;
 						break;
 					case CalpontSystemCatalog::CHAR:
+					case CalpontSystemCatalog::VARCHAR:
 						if (unionedType.colWidth < 20)
 							unionedType.colWidth = 20;
 						break;
-					case CalpontSystemCatalog::VARCHAR:
-						if (unionedType.colWidth < 21)
-							unionedType.colWidth = 21;
-						break;
 					case CalpontSystemCatalog::FLOAT:
 					case CalpontSystemCatalog::DOUBLE:
-					case CalpontSystemCatalog::UFLOAT:
-					case CalpontSystemCatalog::UDOUBLE:
 					default:
 						break;
 				}
@@ -2208,25 +2164,14 @@ CalpontSystemCatalog::ColType DataConvert::convertUnionColType(vector<CalpontSys
 					case CalpontSystemCatalog::DECIMAL:
 					case CalpontSystemCatalog::FLOAT:
 					case CalpontSystemCatalog::DOUBLE:
-					case CalpontSystemCatalog::UTINYINT:
-					case CalpontSystemCatalog::USMALLINT:
-					case CalpontSystemCatalog::UMEDINT:
-					case CalpontSystemCatalog::UINT:
-					case CalpontSystemCatalog::UBIGINT:
-					case CalpontSystemCatalog::UDECIMAL:
-					case CalpontSystemCatalog::UFLOAT:
-					case CalpontSystemCatalog::UDOUBLE:
 						unionedType.colDataType = CalpontSystemCatalog::CHAR;
 						unionedType.scale = 0;
 						unionedType.colWidth = 20;
 						break;
 					case CalpontSystemCatalog::CHAR:
+					case CalpontSystemCatalog::VARCHAR:
 						if (unionedType.colWidth < 10)
 							unionedType.colWidth = 10;
-						break;
-					case CalpontSystemCatalog::VARCHAR:
-						if (unionedType.colWidth < 11)
-							unionedType.colWidth = 11;
 						break;
 					case CalpontSystemCatalog::DATE:
 					case CalpontSystemCatalog::DATETIME:
@@ -2248,14 +2193,6 @@ CalpontSystemCatalog::ColType DataConvert::convertUnionColType(vector<CalpontSys
 					case CalpontSystemCatalog::DECIMAL:
 					case CalpontSystemCatalog::FLOAT:
 					case CalpontSystemCatalog::DOUBLE:
-					case CalpontSystemCatalog::UTINYINT:
-					case CalpontSystemCatalog::USMALLINT:
-					case CalpontSystemCatalog::UMEDINT:
-					case CalpontSystemCatalog::UINT:
-					case CalpontSystemCatalog::UBIGINT:
-					case CalpontSystemCatalog::UDECIMAL:
-					case CalpontSystemCatalog::UFLOAT:
-					case CalpontSystemCatalog::UDOUBLE:
 						unionedType.colDataType = CalpontSystemCatalog::CHAR;
 						unionedType.scale = 0;
 						unionedType.colWidth = 26;
@@ -2265,12 +2202,9 @@ CalpontSystemCatalog::ColType DataConvert::convertUnionColType(vector<CalpontSys
 						unionedType.colWidth = types[i].colWidth;
 						break;
 					case CalpontSystemCatalog::CHAR:
+					case CalpontSystemCatalog::VARCHAR:
 						if (unionedType.colWidth < 26)
 							unionedType.colWidth = 26;
-						break;
-					case CalpontSystemCatalog::VARCHAR:
-						if (unionedType.colWidth < 27)
-							unionedType.colWidth = 27;
 						break;
 					case CalpontSystemCatalog::DATETIME:
 					default:
@@ -2281,8 +2215,6 @@ CalpontSystemCatalog::ColType DataConvert::convertUnionColType(vector<CalpontSys
 
 			case CalpontSystemCatalog::FLOAT:
 			case CalpontSystemCatalog::DOUBLE:
-			case CalpontSystemCatalog::UFLOAT:
-			case CalpontSystemCatalog::UDOUBLE:
 			{
 				switch (unionedType.colDataType)
 				{
@@ -2297,12 +2229,9 @@ CalpontSystemCatalog::ColType DataConvert::convertUnionColType(vector<CalpontSys
 						unionedType.colWidth = 26;
 						break;
 					case CalpontSystemCatalog::CHAR:
+					case CalpontSystemCatalog::VARCHAR:
 						if (unionedType.colWidth < 20)
 							unionedType.colWidth = 20;
-						break;
-					case CalpontSystemCatalog::VARCHAR:
-						if (unionedType.colWidth < 21)
-							unionedType.colWidth = 21;
 						break;
 					case CalpontSystemCatalog::TINYINT:
 					case CalpontSystemCatalog::SMALLINT:
@@ -2312,14 +2241,6 @@ CalpontSystemCatalog::ColType DataConvert::convertUnionColType(vector<CalpontSys
 					case CalpontSystemCatalog::DECIMAL:
 					case CalpontSystemCatalog::FLOAT:
 					case CalpontSystemCatalog::DOUBLE:
-					case CalpontSystemCatalog::UTINYINT:
-					case CalpontSystemCatalog::USMALLINT:
-					case CalpontSystemCatalog::UMEDINT:
-					case CalpontSystemCatalog::UINT:
-					case CalpontSystemCatalog::UBIGINT:
-					case CalpontSystemCatalog::UDECIMAL:
-					case CalpontSystemCatalog::UFLOAT:
-					case CalpontSystemCatalog::UDOUBLE:
 						unionedType.colDataType = CalpontSystemCatalog::DOUBLE;
 						unionedType.scale = 0;
 						unionedType.colWidth = sizeof(double);
@@ -2343,14 +2264,6 @@ CalpontSystemCatalog::ColType DataConvert::convertUnionColType(vector<CalpontSys
 					case CalpontSystemCatalog::DECIMAL:
 					case CalpontSystemCatalog::FLOAT:
 					case CalpontSystemCatalog::DOUBLE:
-					case CalpontSystemCatalog::UTINYINT:
-					case CalpontSystemCatalog::USMALLINT:
-					case CalpontSystemCatalog::UMEDINT:
-					case CalpontSystemCatalog::UINT:
-					case CalpontSystemCatalog::UBIGINT:
-					case CalpontSystemCatalog::UDECIMAL:
-					case CalpontSystemCatalog::UFLOAT:
-					case CalpontSystemCatalog::UDOUBLE:
 						unionedType.scale = 0;
 						unionedType.colWidth = (types[i].colWidth > 20) ? types[i].colWidth : 20;
 						break;
@@ -2362,14 +2275,12 @@ CalpontSystemCatalog::ColType DataConvert::convertUnionColType(vector<CalpontSys
 						break;
 					case CalpontSystemCatalog::CHAR:
 					case CalpontSystemCatalog::VARCHAR:
-						// VARCHAR will fit in CHAR of the same width
 						if (unionedType.colWidth < types[i].colWidth)
 							unionedType.colWidth = types[i].colWidth;
-						break;
 					default:
 						break;
 				}
-				unionedType.colDataType = CalpontSystemCatalog::CHAR;
+				unionedType.colDataType = CalpontSystemCatalog::VARCHAR;
 				break;
 			}
 

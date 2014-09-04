@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_concat_ws.cpp 3714 2013-04-18 16:29:25Z bpaul $
+* $Id: func_concat_ws.cpp 3716 2013-04-18 16:35:52Z bpaul $
 *
 *
 ****************************************************************************/
@@ -88,7 +88,7 @@ string Func_concat_ws::getStrVal(Row& row,
 
 #else
 	string str;
-	for ( uint32_t i = 1 ; i < parm.size() ; i++) 
+	for ( uint i = 1 ; i < parm.size() ; i++) 
 	{
 		str += string(stringValue(parm[i], row, isNull).c_str()); 
 

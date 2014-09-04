@@ -18,6 +18,12 @@
 #ifndef SNMPGLOBAL_H
 #define SNMPGLOBAL_H
 
+//Major hack to get oam and brm to play nice.
+#ifdef OAM_BRM_LEAN_AND_MEAN
+#include <string>
+#include <cstddef>
+typedef u_long oid;
+#else
 #ifdef __linux__
 #include <sys/file.h>
 #include <linux/unistd.h>
@@ -30,7 +36,8 @@
 #include "net-snmp/net-snmp-includes.h"
 #include "net-snmp/agent/net-snmp-agent-includes.h"
 #else
-typedef uint64_t oid;
+typedef u_long oid;
+#endif
 #endif
 
 namespace snmpmanager {

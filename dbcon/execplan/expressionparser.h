@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: expressionparser.h 9633 2013-06-19 13:36:01Z rdempsey $
+*   $Id: expressionparser.h 8436 2012-04-04 18:18:21Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -42,6 +42,7 @@ namespace execplan {
 /**
  * type define
  */
+//typedef ExpressionTree <TreeNode*> ParseTree;
 typedef std::stack<ParseTree*> OperandStack;
 typedef std::stack<TreeNode*> OperatorStack;
 

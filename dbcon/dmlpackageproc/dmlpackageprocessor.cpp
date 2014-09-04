@@ -16,11 +16,13 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: dmlpackageprocessor.cpp 9673 2013-07-09 15:59:49Z chao $
+ *   $Id: dmlpackageprocessor.cpp 8953 2012-10-05 20:44:08Z dhall $
  *
  *
  ***********************************************************************/
+#define DMLPKGPROC_DLLEXPORT
 #include "dmlpackageprocessor.h"
+#undef DMLPKGPROC_DLLEXPORT
 
 #include <math.h>
 using namespace std;
@@ -63,19 +65,17 @@ const SOP opeq(new Operator("="));
 const SOP opne(new Operator("<>"));
 const SOP opor(new Operator("or"));
 const SOP opand(new Operator("and"));
+const int MAX_INT = numeric_limits<int32_t>::max();
+const short MAX_TINYINT = numeric_limits<int8_t>::max(); //127;
+const short MAX_SMALLINT = numeric_limits<int16_t>::max(); //32767;
+const long long MAX_BIGINT = numeric_limits<int64_t>::max();//9223372036854775807LL
 }
 
 namespace dmlpackageprocessor
 {
 
     DMLPackageProcessor::~DMLPackageProcessor()
-    {
-		//cout << "In DMLPackageProcessor destructor " << this << endl;
-		if (fWEClient)
-			delete fWEClient; 
-		if (fExeMgr)
-			delete fExeMgr;
-	}
+        { }
 
 //@bug 397
 void DMLPackageProcessor::cleanString(string& s)
@@ -97,7 +97,7 @@ void DMLPackageProcessor::cleanString(string& s)
 			s = s.substr(1, s.length()-2);
     }
 }
-#if 0
+
 boost::any DMLPackageProcessor::tokenizeData( execplan::CalpontSystemCatalog::SCN txnID,
 	execplan::CalpontSystemCatalog::ColType colType,
 	const std::string& data, DMLResult& result, bool isNULL )
@@ -158,7 +158,7 @@ boost::any DMLPackageProcessor::tokenizeData( execplan::CalpontSystemCatalog::SC
 	}
 	return value;
 }
-#endif
+
 void DMLPackageProcessor::getColumnsForTable(uint32_t sessionID, std::string schema,
 	std::string table, dmlpackage::ColumnList& colList)
 {
@@ -222,7 +222,7 @@ void DMLPackageProcessor::convertRidToColumn(uint64_t& rid, unsigned& dbRoot, un
 }
 
 
-string DMLPackageProcessor::projectTableErrCodeToMsg(uint32_t ec)
+string DMLPackageProcessor::projectTableErrCodeToMsg(uint ec)
 {
 	if (ec < 1000) // pre IDB error code
 	{
@@ -234,6 +234,60 @@ string DMLPackageProcessor::projectTableErrCodeToMsg(uint32_t ec)
 
 	// IDB error
 	return IDBErrorInfo::instance()->errorMsg(ec);
+}
+
+bool DMLPackageProcessor::validateNextValue(execplan::CalpontSystemCatalog::ColType colType, int64_t value,
+	bool& offByOne)
+{
+	bool validValue = true;
+	offByOne = false;
+	switch (colType.colDataType)
+	{
+	case CalpontSystemCatalog::BIGINT:
+	{
+		if (value > MAX_BIGINT)
+		{
+			validValue = false;
+			if ((value-1) == MAX_BIGINT)
+				offByOne = true;
+		}
+		break;
+	}
+	case CalpontSystemCatalog::INT:
+	{
+		if (value > MAX_INT)
+		{
+			validValue = false;
+			if ((value-1) == MAX_INT)
+				offByOne = true; 
+		}
+		break;
+	}
+	case CalpontSystemCatalog::SMALLINT:
+	{
+		if (value > MAX_SMALLINT)
+		{
+			validValue = false;
+			if ((value-1) == MAX_SMALLINT)
+				offByOne = true; 
+		}
+		break;
+	}
+	case CalpontSystemCatalog::TINYINT:
+	{
+		if (value > MAX_TINYINT)
+		{
+			validValue = false;
+			if ((value-1) == MAX_TINYINT)
+				offByOne = true; 
+		}
+		break;
+	}
+	default:
+		validValue = false;
+		break;
+	}
+	return validValue;
 }
 
 bool DMLPackageProcessor::validateVarbinaryVal( std::string & inStr)
@@ -253,7 +307,7 @@ bool DMLPackageProcessor::validateVarbinaryVal( std::string & inStr)
 
 int DMLPackageProcessor::commitTransaction(uint64_t uniqueId, BRM::TxnID txnID)
 {
-	int rc = fDbrm->vbCommit(txnID.id);
+	int rc = fDbrm.vbCommit(txnID.id);
 	return rc;
 }
 
@@ -265,15 +319,12 @@ int DMLPackageProcessor::rollBackTransaction(uint64_t uniqueId, BRM::TxnID txnID
 	BRM::LBIDRange   range;
 	int rc = 0;
 	//Check BRM status before processing.
-	rc = fDbrm->isReadWrite();
+	rc = fDbrm.isReadWrite();
 	if (rc != 0 )
 	{
-        std::string brmMsg;
-        errorMsg = "Can't read DBRM isReadWrite [ ";
-        BRM::errString(rc, brmMsg);
-        errorMsg += brmMsg;
-        errorMsg += "]";
+		BRM::errString(rc, errorMsg);
 		return rc;
+		
 	}
 
 	ByteStream bytestream;
@@ -283,7 +334,7 @@ int DMLPackageProcessor::rollBackTransaction(uint64_t uniqueId, BRM::TxnID txnID
 	bytestream << uniqueId;
 	bytestream << sessionID;
 	bytestream << (uint32_t)txnID.id;
-	uint32_t msgRecived = 0;
+	uint msgRecived = 0;
 	try {
 		fWEClient->write_to_all(bytestream);
 		boost::shared_ptr<messageqcpp::ByteStream> bsIn;
@@ -297,7 +348,6 @@ int DMLPackageProcessor::rollBackTransaction(uint64_t uniqueId, BRM::TxnID txnID
 			if ( bsIn->length() == 0 ) //read error
 			{
 				rc = NETWORK_ERROR;
-                errorMsg = "Network error reading WEClient";
 				fWEClient->removeQueue(uniqueId);
 				//cout << "erroring out remove queue id " << uniqueId << endl;
 				break;
@@ -306,12 +356,7 @@ int DMLPackageProcessor::rollBackTransaction(uint64_t uniqueId, BRM::TxnID txnID
 				*bsIn >> tmp8;
 				rc = tmp8;
 				if (rc != 0) {
-                    char szrc[20];
 					*bsIn >> errorMsg;
-                    errorMsg += " (WriteEngine returns error ";
-                    sprintf(szrc, "%d", rc);
-                    errorMsg += szrc;
-                    errorMsg += ")";
 					fWEClient->removeQueue(uniqueId);
 					cout << "erroring out remove queue id " << uniqueId << endl;
 					break;
@@ -328,7 +373,6 @@ int DMLPackageProcessor::rollBackTransaction(uint64_t uniqueId, BRM::TxnID txnID
 		errorMsg += e.what();
 		fWEClient->removeQueue(uniqueId);
 		cout << "erroring out remove queue id " << uniqueId << endl;
-		//delete fWEClient;
 		return rc;
 	}
 	catch ( ... )
@@ -337,28 +381,22 @@ int DMLPackageProcessor::rollBackTransaction(uint64_t uniqueId, BRM::TxnID txnID
 		errorMsg = "Unknown exception caught while rolling back transaction.";
 		fWEClient->removeQueue(uniqueId);
 		cout << "erroring out remove queue id " << uniqueId << endl;
-		//delete fWEClient;
 		return rc;
 	} 
 	
 	if (rc != 0)
 	{
-		//delete fWEClient;
 		return rc;
 	}
 	
 	fWEClient->removeQueue(uniqueId);
-	//delete fWEClient;
 //	cout << "success. remove queue id " << uniqueId << endl;
-	rc = fDbrm->getUncommittedLBIDs(txnID.id, lbidList);
+	rc = fDbrm.getUncommittedLBIDs(txnID.id, lbidList);
 	if (rc != 0 )
 	{
-        std::string brmMsg;
-        errorMsg = "DBRM getUncommittedLBIDs [ ";
-        BRM::errString(rc, brmMsg);
-        errorMsg += brmMsg;
-        errorMsg += "]";
-        return rc;
+		BRM::errString(rc, errorMsg);
+		return rc;
+		
 	}
 
 	for(size_t i = 0; i < lbidList.size(); i++) {
@@ -366,16 +404,13 @@ int DMLPackageProcessor::rollBackTransaction(uint64_t uniqueId, BRM::TxnID txnID
 		range.size = 1;
 		lbidRangeList.push_back(range);
 	}
-	rc =  fDbrm->vbRollback(txnID.id, lbidRangeList);	
+	rc =  fDbrm.vbRollback(txnID.id, lbidRangeList);	
 	
 	if (rc != 0 )
 	{
-        std::string brmMsg;
-        errorMsg = "DBRM vbRollback [ ";
-        BRM::errString(rc, brmMsg);
-        errorMsg += brmMsg;
-        errorMsg += "]";
-        return rc;
+		BRM::errString(rc, errorMsg);
+		return rc;
+		
 	}
 
 	return rc;
@@ -385,6 +420,7 @@ int DMLPackageProcessor::commitBatchAutoOnTransaction(uint64_t uniqueId, BRM::Tx
 {
 	//collect hwm info from all pms and set them here. remove table metadata if all successful
 	ByteStream bytestream;
+	//cout << "commiting batch insert " << endl;
 	fWEClient->addQueue(uniqueId);
 	bytestream << (ByteStream::byte)WE_SVR_COMMIT_BATCH_AUTO_ON;
 	bytestream << uniqueId;
@@ -392,7 +428,7 @@ int DMLPackageProcessor::commitBatchAutoOnTransaction(uint64_t uniqueId, BRM::Tx
 	bytestream << tableOid;
 	bytestream << fSessionID;
 	
-	uint32_t msgRecived = 0;
+	uint msgRecived = 0;
 	fWEClient->write_to_all(bytestream);
 	boost::shared_ptr<messageqcpp::ByteStream> bsIn;
 	bsIn.reset(new ByteStream());
@@ -453,17 +489,7 @@ int DMLPackageProcessor::commitBatchAutoOnTransaction(uint64_t uniqueId, BRM::Tx
 	
 	//cout << "setting hwm allHwm size " << allHwm.size() << endl;
 	vector<BRM::LBID_t> lbidList;
-	if (idbdatafile::IDBPolicy::useHdfs())
-	{
-		BRM::LBID_t startLbid;
-		for ( unsigned i=0; i < allHwm.size(); i++)
-		{
-			rc = fDbrm->lookupLocalStartLbid(allHwm[i].oid, allHwm[i].partNum, allHwm[i].segNum, allHwm[i].hwm, startLbid);
-			lbidList.push_back(startLbid);
-		}
-	}
-	else
-		fDbrm->getUncommittedExtentLBIDs(static_cast<BRM::VER_t>(txnID.id), lbidList);
+	fDbrm.getUncommittedExtentLBIDs(static_cast<BRM::VER_t>(txnID.id), lbidList);
 	vector<BRM::LBID_t>::const_iterator iter = lbidList.begin();
 	vector<BRM::LBID_t>::const_iterator end = lbidList.end();
 	BRM::CPInfoList_t cpInfos;
@@ -471,15 +497,14 @@ int DMLPackageProcessor::commitBatchAutoOnTransaction(uint64_t uniqueId, BRM::Tx
 	while (iter != end)
 	{
 		aInfo.firstLbid = *iter;
-		aInfo.max = numeric_limits<int64_t>::min(); // Not used
-		aInfo.min = numeric_limits<int64_t>::max(); // Not used
+		aInfo.max = numeric_limits<int64_t>::min();
+		aInfo.min = numeric_limits<int64_t>::max();
 		aInfo.seqNum = -1;
 		cpInfos.push_back(aInfo);
 		++iter;
 	}
 	std::vector<BRM::CPInfoMerge>  mergeCPDataArgs;
-	rc = fDbrm->bulkSetHWMAndCP(allHwm, cpInfos, mergeCPDataArgs, txnID.id);
-	fDbrm->takeSnapshot();
+	rc = fDbrm.bulkSetHWMAndCP(allHwm, cpInfos, mergeCPDataArgs, txnID.id);
 	//Set tablelock to rollforward remove meta files
 	
 	if (rc != 0)
@@ -490,7 +515,7 @@ int DMLPackageProcessor::commitBatchAutoOnTransaction(uint64_t uniqueId, BRM::Tx
 	uint64_t tablelockId = tablelockData->getTablelockId(tableOid);
 	
 	try {
-		stateChanged = fDbrm->changeState(tablelockId, BRM::CLEANUP);
+		stateChanged = fDbrm.changeState(tablelockId, BRM::CLEANUP);
 	}
 	catch (std::exception&)
 	{
@@ -505,7 +530,6 @@ int DMLPackageProcessor::commitBatchAutoOnTransaction(uint64_t uniqueId, BRM::Tx
 	//@Bug 4517 Remove meta data failure doesn't stop tablelock releasing.
 	bytestream << (ByteStream::byte)WE_SVR_BATCH_AUTOON_REMOVE_META;
 	bytestream << uniqueId;
-	bytestream << tableOid;
 	msgRecived = 0;
 	fWEClient->write_to_all(bytestream);
 	while (1)
@@ -535,10 +559,10 @@ int DMLPackageProcessor::rollBackBatchAutoOnTransaction(uint64_t uniqueId, BRM::
 	//Bulkrollback, rollback blocks, vbrollback, change state, remove meta file
 	//cout << "In rollBackBatchAutoOnTransaction" << endl;
 	std::vector<BRM::TableLockInfo> tableLocks;
-	tableLocks = fDbrm->getAllTableLocks();
+	tableLocks = fDbrm.getAllTableLocks();
 	//cout << " Got all tablelocks" << endl;
 	unsigned idx=0;
-	string ownerName ("DMLProc batchinsert");
+	string ownerName ("DMLProc");
 	uint64_t tableLockId = 0;
 	int rc = 0;
 	for (; idx<tableLocks.size(); idx++)
@@ -566,7 +590,7 @@ int DMLPackageProcessor::rollBackBatchAutoOnTransaction(uint64_t uniqueId, BRM::
 	bytestream << sessionID;
 	bytestream << tableLockId;
 	bytestream << tableOid;
-	uint32_t msgRecived = 0;
+	uint msgRecived = 0;
 	fWEClient->write_to_all(bytestream);
 	boost::shared_ptr<messageqcpp::ByteStream> bsIn;
 	bsIn.reset(new ByteStream());
@@ -602,7 +626,7 @@ int DMLPackageProcessor::rollBackBatchAutoOnTransaction(uint64_t uniqueId, BRM::
 		bool stateChanged = true;
 		//cout << "changing tablelock state" << endl;
 		try {
-			stateChanged = fDbrm->changeState(tableLockId, BRM::CLEANUP);
+			stateChanged = fDbrm.changeState(tableLockId, BRM::CLEANUP);
 		}
 		catch (std::exception&)
 		{
@@ -620,7 +644,6 @@ int DMLPackageProcessor::rollBackBatchAutoOnTransaction(uint64_t uniqueId, BRM::
 	bytestream.restart();
 	bytestream << (ByteStream::byte)WE_SVR_BATCH_AUTOON_REMOVE_META;
 	bytestream << uniqueId;
-	bytestream << tableOid;
 	msgRecived = 0;
 	fWEClient->write_to_all(bytestream);
 	while (1)
@@ -631,14 +654,14 @@ int DMLPackageProcessor::rollBackBatchAutoOnTransaction(uint64_t uniqueId, BRM::
 		if ( bsIn->length() == 0 ) //read error
 		{
 			fWEClient->removeQueue(uniqueId);
-			//cout << "erroring out remove queue id " << uniqueId << endl;
+			cout << "erroring out remove queue id " << uniqueId << endl;
 			break;
 		}			
 		else {
 			*bsIn >> tmp8;
 			msgRecived++;						
 		}
-	} 
+	}
 	fWEClient->removeQueue(uniqueId);				
 	return rc;
 }
@@ -646,10 +669,10 @@ int DMLPackageProcessor::rollBackBatchAutoOnTransaction(uint64_t uniqueId, BRM::
 int DMLPackageProcessor::commitBatchAutoOffTransaction(uint64_t uniqueId, BRM::TxnID txnID, const uint32_t tableOid, std::string & errorMsg)
 {
 	std::vector<BRM::TableLockInfo> tableLocks;
-	tableLocks = fDbrm->getAllTableLocks();
+	tableLocks = fDbrm.getAllTableLocks();
 	//cout << " Got all tablelocks" << endl;
 	unsigned idx=0;
-	string ownerName ("DMLProc batchinsert");
+	string ownerName ("DMLProc");
 	uint64_t tableLockId = 0;
 	int rc = 0;
 	boost::shared_ptr<messageqcpp::ByteStream> bsIn;
@@ -675,7 +698,7 @@ int DMLPackageProcessor::commitBatchAutoOffTransaction(uint64_t uniqueId, BRM::T
 	bool stateChanged = true;
 		//cout << "changing tablelock state" << endl;
 	try {
-			stateChanged = fDbrm->changeState(tableLockId, BRM::CLEANUP);
+			stateChanged = fDbrm.changeState(tableLockId, BRM::CLEANUP);
 	}
 	catch (std::exception&)
 	{
@@ -693,8 +716,7 @@ int DMLPackageProcessor::commitBatchAutoOffTransaction(uint64_t uniqueId, BRM::T
 	fWEClient->addQueue(uniqueId);
 	bytestream << (ByteStream::byte)WE_SVR_BATCH_AUTOON_REMOVE_META;
 	bytestream << uniqueId;
-	bytestream << tableOid;
-	uint32_t msgRecived = 0;
+	uint msgRecived = 0;
 	fWEClient->write_to_all(bytestream);
 	while (1)
 	{
@@ -725,7 +747,7 @@ int DMLPackageProcessor::rollBackBatchAutoOffTransaction(uint64_t uniqueId, BRM:
 	bytestream << sessionID;
 	bytestream << (uint32_t)txnID.id;
 	bytestream << tableOid;
-	uint32_t msgRecived = 0;
+	uint msgRecived = 0;
 	fWEClient->write_to_all(bytestream);
 	boost::shared_ptr<messageqcpp::ByteStream> bsIn;
 	bsIn.reset(new ByteStream());
@@ -759,7 +781,7 @@ int DMLPackageProcessor::rollBackBatchAutoOffTransaction(uint64_t uniqueId, BRM:
 	return rc;
 }
 
-int DMLPackageProcessor::flushDataFiles (int rcIn, std::map<FID,FID> & columnOids, uint64_t uniqueId, BRM::TxnID txnID, uint32_t tableOid)
+int DMLPackageProcessor::flushDataFiles (int rcIn, std::map<FID,FID> & columnOids, uint64_t uniqueId, BRM::TxnID txnID)
 {
 //cout <<"in flushDataFiles" << endl;
 	ByteStream bytestream;
@@ -767,8 +789,7 @@ int DMLPackageProcessor::flushDataFiles (int rcIn, std::map<FID,FID> & columnOid
 	bytestream << uniqueId;
 	bytestream << (uint32_t) rcIn;
 	bytestream << (uint32_t)txnID.id;
-	bytestream << tableOid;
-	uint32_t msgRecived = 0;
+	uint msgRecived = 0;
 	fWEClient->write_to_all(bytestream);
 	boost::shared_ptr<messageqcpp::ByteStream> bsIn;
 	bsIn.reset(new ByteStream());
@@ -804,48 +825,5 @@ int DMLPackageProcessor::flushDataFiles (int rcIn, std::map<FID,FID> & columnOid
 	return rc;
 }
 
-int DMLPackageProcessor::endTransaction (uint64_t uniqueId, BRM::TxnID txnID, bool success)
-{
-//cout <<"in flushDataFiles" << endl;
-	ByteStream bytestream;
-	bytestream << (ByteStream::byte) WE_END_TRANSACTION;
-	bytestream << uniqueId;
-	bytestream << (uint32_t)txnID.id;
-	bytestream << (ByteStream::byte)success;
-	uint32_t msgRecived = 0;
-	fWEClient->write_to_all(bytestream);
-	boost::shared_ptr<messageqcpp::ByteStream> bsIn;
-	bsIn.reset(new ByteStream());
-	int rc = 0;
-	ByteStream::byte tmp8;
-	std::string errorMsg;
-	try {
-		while (1)
-		{
-			if (msgRecived == fWEClient->getPmCount())
-				break;
-			fWEClient->read(uniqueId, bsIn);
-			if ( bsIn->length() == 0 ) //read error
-			{
-				rc = NETWORK_ERROR;
-				break;
-			}			
-			else {
-				*bsIn >> tmp8;
-				rc = tmp8;
-				if (rc != 0) {
-					*bsIn >> errorMsg;
-					break;
-				}
-				else
-					msgRecived++;						
-			}
-		}
-	}
-	catch (std::exception&) {
-	}
-
-	return rc;
-}
 }
 // vim:ts=4 sw=4:

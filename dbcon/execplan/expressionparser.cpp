@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: expressionparser.cpp 9210 2013-01-21 14:10:42Z rdempsey $
+*   $Id: expressionparser.cpp 8436 2012-04-04 18:18:21Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -45,9 +45,8 @@ ExpressionParser::~ExpressionParser()
 
 void ExpressionParser::invalid_operator_position(TreeNode* oper)
 {
-    std::string str = oper->data();
     delete oper;
-	throw std::runtime_error ("Invalid operator position: " + str + "\n");
+	throw std::runtime_error ("Invalid operator position: " + oper->data() + "\n");
 }
     
 void ExpressionParser::invalid_operator_position(const Token& oper)

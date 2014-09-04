@@ -3,7 +3,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.59)
-AC_INIT(infinidb, 4.6.0, support@infinidb.co)
+AC_INIT(Calpont, 1.0.0, support@calpont.com)
 ### we don't want the deault CXXFLAGS set by AC_INIT, but we do want to allow the user to set them
 SAVE_CXXFLAGS=
 if test -n "$CXXFLAGS"; then
@@ -91,32 +91,8 @@ AC_FUNC_STRTOD
 AC_FUNC_UTIME_NULL
 AC_CHECK_FUNCS([alarm dup2 floor ftime ftruncate gethostbyname getpagesize gettimeofday inet_ntoa isascii localtime_r memchr memmove memset mkdir pow regcomp rmdir select setenv setlocale socket strcasecmp strchr strcspn strdup strerror strrchr strspn strstr strtol strtoul strtoull utime])
 
-AM_PATH_XML2([2.6.26])
-if test "x$XML_CPPFLAGS" = "x"; then
-	AC_MSG_ERROR([Could not find a usable libxml2 development environment!])
-fi
-
-AC_CHECK_HEADERS([zlib.h])
-if test "x$ac_cv_header_zlib_h" != "xyes"; then
-	AC_MSG_ERROR([Could not find a usable zlib development environment!])
-fi
-
-AC_CHECK_HEADERS([readline/readline.h])
-if test "x$ac_cv_header_readline_readline_h" != "xyes"; then
-	AC_MSG_ERROR([Could not find a usable readline development environment!])
-fi
-
-AC_CHECK_HEADERS([ncurses.h])
-if test "x$ac_cv_header_ncurses_h" != "xyes"; then
-	AC_MSG_ERROR([Could not find a usable ncurses development environment!])
-fi
-
-CXX_FLAG_CHECK([-Wno-unused-local-typedefs])
-CXX_FLAG_CHECK([-Wno-unused-result])
-CXX_FLAG_CHECK([-Wno-format])
-
 AC_MSG_CHECKING(whether to enable debugging)
-AC_SUBST([idb_cppflags], [' '])
+AC_SUBST([idb_cppflags], ['-DSKIP_SNMP -DSKIP_UDF -DSKIP_IDB_COMPRESSION -DCOMMUNITY_KEYRANGE -DSKIP_VIEW -DSKIP_INSERT_SELECT -DSKIP_AUTOI -DSKIP_OAM_INIT'])
 AC_ARG_WITH([debug],
 	AS_HELP_STRING([--with-debug],[include debugging symbols/no optimization]))
 if test "x$with_debug" = "xyes"; then
@@ -124,12 +100,11 @@ if test "x$with_debug" = "xyes"; then
 	AC_SUBST([idb_cflags],['-ggdb3 -Wall -DSAFE_MUTEX -DINFINIDB_DEBUG'])
 	AC_MSG_RESULT(yes)
 else
-	AC_SUBST([idb_cxxflags],["-g0 -O3 -fno-strict-aliasing -Wall $cxx_extra_flags"])
+	AC_SUBST([idb_cxxflags],['-g0 -O3 -fno-strict-aliasing -Wall'])
 	AC_SUBST([idb_cflags],['-g0 -O3 -fno-strict-aliasing -Wall'])
 	AC_MSG_RESULT(no)
 fi
-AC_SUBST([idbinstall], ['${prefix}'])
-AC_SUBST([idb_ldflags],['-Wl,--rpath -Wl,${idbinstall}/lib -Wl,--no-as-needed -Wl,--add-needed'])
+AC_SUBST([idb_ldflags],['-Wl,--rpath -Wl,/usr/local/Calpont/lib -Wl,--no-as-needed -Wl,--add-needed'])
 
 AC_MSG_CHECKING(for CPU architecture)
 uname=`uname -m`
@@ -138,34 +113,29 @@ AS_IF(
    [AC_SUBST([march_flags], [' '])] [AC_MSG_RESULT(x86_64)]
 )
 
-AC_SUBST([libdir], ['${idbinstall}/lib'])
-AC_SUBST([bindir], ['${idbinstall}/bin'])
-AC_SUBST([includedir], ['${idbinstall}/include'])
-AC_SUBST([etcdir], ['${idbinstall}/etc'])
-AC_SUBST([sysconfdir], ['${idbinstall}/etc'])
-AC_SUBST([mandir], ['${idbinstall}/man'])
-AC_SUBST([sbindir], ['${idbinstall}/sbin'])
-AC_SUBST([sharedir], ['${idbinstall}/share'])
-AC_SUBST([postdir], ['${idbinstall}/post'])
-AC_SUBST([localdir], ['${idbinstall}/local'])
-AC_SUBST([mysqldir], ['${idbinstall}/mysql'])
-AC_SUBST([mibdir], ['${idbinstall}/share/snmp/mibs'])
-AC_SUBST([netsnmpdir], ['${idbinstall}/include/net-snmp'])
-AC_SUBST([netsnmpsysdir], ['${idbinstall}/include/net-snmp/system'])
-AC_SUBST([netsnmpmachdir], ['${idbinstall}/include/net-snmp/machine'])
-AC_SUBST([netsnmplibrdir], ['${idbinstall}/include/net-snmp/library'])
-AC_SUBST([netsnmpagntdir], ['${idbinstall}/include/net-snmp/agent'])
-AC_SUBST([toolsdir], ['${idbinstall}/tools'])
+AC_SUBST([libdir], ['${prefix}/Calpont/lib'])
+AC_SUBST([bindir], ['${prefix}/Calpont/bin'])
+AC_SUBST([includedir], ['${prefix}/Calpont/include'])
+AC_SUBST([etcdir], ['${prefix}/Calpont/etc'])
+AC_SUBST([sysconfdir], ['${prefix}/Calpont/etc'])
+AC_SUBST([mandir], ['${prefix}/Calpont/man'])
+AC_SUBST([sbindir], ['${prefix}/Calpont/sbin'])
+AC_SUBST([sharedir], ['${prefix}/Calpont/share'])
+AC_SUBST([postdir], ['${prefix}/Calpont/post'])
+AC_SUBST([localdir], ['${prefix}/Calpont/local'])
+AC_SUBST([mysqldir], ['${prefix}/Calpont/mysql'])
+AC_SUBST([toolsdir], ['${prefix}/Calpont/tools'])
+AC_SUBST([mibdir], ['${prefix}/Calpont/share/snmp/mibs'])
 
-AC_SUBST([netsnmp_libs], ['-lnetsnmpmibs -lnetsnmpagent -lnetsnmp -lnetsnmpmibs -lnetsnmphelpers'])
+AC_SUBST([netsnmp_libs], [' '])
 
 AC_SUBST([idb_common_libs], ['-lmessageqcpp -lloggingcpp -lconfigcpp -lidbboot -lboost_idb -lxml2 -lpthread -lrt'])
 AC_SUBST([idb_oam_libs], ['-loamcpp -lsnmpmanager ${netsnmp_libs}'])
-AC_SUBST([idb_brm_libs], ['-lbrm -lidbdatafile -lcacheutils -lrwlock ${idb_oam_libs} ${idb_common_libs}'])
-AC_SUBST([idb_exec_libs], ['-ljoblist -lexecplan -lwindowfunction -ljoiner -lrowgroup -lfuncexp -ludfsdk -ldataconvert -lcommon -lcompress -lmysqlcl_idb -lquerystats -lquerytele -lthrift -lthreadpool ${idb_brm_libs}'])
-AC_SUBST([idb_write_libs], ['-lddlpackageproc -lddlpackage -ldmlpackageproc -ldmlpackage -lwriteengine -lwriteengineclient -lidbdatafile -lcacheutils ${idb_exec_libs}'])
-AC_SUBST([idb_common_includes], ['-I${idbinstall}/include -I/usr/local/include -I/usr/local/include/libxml2 -I/usr/include/libxml2'])
-AC_SUBST([idb_common_ldflags], ['-L${idbinstall}/lib -L/usr/local/lib'])
+AC_SUBST([idb_brm_libs], ['-lbrm -lrwlock -lcacheutils ${idb_oam_libs} ${idb_common_libs}'])
+AC_SUBST([idb_exec_libs], ['-ljoblist -lexecplan -ljoiner -lrowgroup -lmulticast -lfuncexp -ldataconvert -lcommon -lmysqlcl_idb -lquerystats ${idb_brm_libs}'])
+AC_SUBST([idb_write_libs], ['-lddlpackageproc -lddlpackage -ldmlpackageproc -ldmlpackage -lwriteengine -lwriteengineclient -lcacheutils ${idb_exec_libs}'])
+AC_SUBST([idb_common_includes], ['-I${prefix}/Calpont/include -I/usr/local/include -I/usr/local/include/libxml2 -I/usr/include/libxml2'])
+AC_SUBST([idb_common_ldflags], ['-L${prefix}/Calpont/lib -L/usr/local/lib'])
 
 AC_CONFIG_FILES([
 	Makefile
@@ -182,23 +152,13 @@ AC_CONFIG_FILES([
 	utils/joiner/Makefile
 	utils/rowgroup/Makefile
 	utils/cacheutils/Makefile
-	utils/net-snmp/Makefile
+	utils/multicast/Makefile
 	utils/funcexp/Makefile
-	utils/udfsdk/Makefile
 	utils/compress/Makefile
 	utils/ddlcleanup/Makefile
 	utils/batchloader/Makefile
 	utils/mysqlcl_idb/Makefile
 	utils/querystats/Makefile
-	utils/jemalloc/Makefile
-	utils/windowfunction/Makefile
-	utils/idbdatafile/Makefile
-	utils/idbhdfs/Makefile
-	utils/idbhdfs/hdfs-12/Makefile
-	utils/idbhdfs/hdfs-20/Makefile
-	utils/winport/Makefile
-	utils/thrift/Makefile
-	utils/querytele/Makefile
 	exemgr/Makefile
 	ddlproc/Makefile
 	dbcon/Makefile
@@ -209,29 +169,21 @@ AC_CONFIG_FILES([
 	dbcon/execplan/Makefile
 	dbcon/joblist/Makefile
 	dbcon/mysql/Makefile
+	dbcon/sm/Makefile
 	dmlproc/Makefile
 	oam/Makefile
 	oam/etc/Makefile
 	oam/install_scripts/Makefile
 	oam/oamcpp/Makefile
 	oam/post/Makefile
-	oam/cloud/Makefile
+	oam/replaytxnlog/Makefile
 	oamapps/Makefile
-	oamapps/calpontConsole/Makefile
-	oamapps/calpontDB/Makefile
-	oamapps/postConfigure/Makefile
-	oamapps/serverMonitor/Makefile
-	oamapps/sessionWalker/Makefile
-	oamapps/traphandler/Makefile
-	oamapps/sendtrap/Makefile
-	oamapps/calpontSupport/Makefile
+	oamapps/replayTransactionLog/Makefile
 	primitives/Makefile
 	primitives/blockcache/Makefile
 	primitives/linux-port/Makefile
 	primitives/primproc/Makefile
 	decomsvr/Makefile
-	procmgr/Makefile
-	procmon/Makefile
 	snmpd/Makefile
 	snmpd/etc/Makefile
 	snmpd/snmpmanager/Makefile
@@ -243,7 +195,6 @@ AC_CONFIG_FILES([
 	tools/getConfig/Makefile
 	tools/dbbuilder/Makefile
 	tools/dbloadxml/Makefile
-	tools/configMgt/Makefile
 	tools/viewtablelock/Makefile
 	tools/cleartablelock/Makefile
 	tools/ddlcleanup/Makefile
@@ -260,7 +211,7 @@ AC_CONFIG_FILES([
 	writeengine/client/Makefile
 	writeengine/splitter/Makefile
 	writeengine/server/Makefile
+	writeengine/cpimport/Makefile
 	writeengine/redistribute/Makefile
-	net-snmp/Makefile
 ])
 AC_OUTPUT

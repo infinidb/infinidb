@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: we_dctnrycompress.h 4726 2013-08-07 03:38:36Z bwilkinson $
+//  $Id: we_dctnrycompress.h 4096 2012-08-07 20:06:09Z dhall $
 
 
 /** @file */
@@ -27,7 +27,7 @@
 
 #include "we_dctnry.h"
 #include "we_chunkmanager.h"
-#if defined(_MSC_VER) && defined(WRITEENGINE_DLLEXPORT)
+#if defined(_MSC_VER) && defined(WRITEENGINEDCTNRYCOMPRESS_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
@@ -77,19 +77,19 @@ public:
    /**
    * @brief virtual method in DBFileOp
    */
-   EXPORT int readDBFile(IDBDataFile* pFile, unsigned char* readBuf, const uint64_t lbid,
+   EXPORT int readDBFile(FILE* pFile, unsigned char* readBuf, const i64 lbid,
                          const bool isFbo = false );
 
    /**
    * @brief virtual method in DBFileOp
    */
-   EXPORT int writeDBFile(IDBDataFile* pFile, const unsigned char* writeBuf, const uint64_t lbid,
+   EXPORT int writeDBFile(FILE* pFile, const unsigned char* writeBuf, const i64 lbid,
                           const int numOfBlock = 1);
 
 	/**
    * @brief virtual method in DBFileOp
    */
-   EXPORT int writeDBFileNoVBCache(IDBDataFile* pFile,
+   EXPORT int writeDBFileNoVBCache(FILE *pFile,
                                            const unsigned char * writeBuf, const int fbo,
                                            const int numOfBlock = 1);
 
@@ -97,12 +97,12 @@ public:
    /**
    * @brief virtual method in Dctnry
    */
-   IDBDataFile* createDctnryFile(const char *name, int width, const char *mode, int ioBuffSize);
+   FILE* createDctnryFile(const char *name, int width, const char *mode, int ioBuffSize);
 
    /**
    * @brief virtual method in Dctnry
    */
-   IDBDataFile* openDctnryFile(bool useTmpSuffix);
+   FILE* openDctnryFile();
 
 	/**
    * @brief virtual method in Dctnry
@@ -119,8 +119,6 @@ public:
    */
    void setMaxActiveChunkNum(unsigned int maxActiveChunkNum) { m_chunkManager->setMaxActiveChunkNum(maxActiveChunkNum); };
    void setBulkFlag(bool isBulkLoad) {m_chunkManager->setBulkFlag(isBulkLoad);};
-   void setFixFlag(bool isFix) {m_chunkManager->setFixFlag(isFix);};
-   int checkFixLastDictChunk () { return m_chunkManager->checkFixLastDictChunk(m_dctnryOID, m_dbRoot, m_partition, m_segment); };
 //   void chunkManager(ChunkManager* cm);
 
    /**
@@ -139,12 +137,12 @@ protected:
    /**
    * @brief virtual method in FileOp
    */
-   int updateDctnryExtent(IDBDataFile* pFile, int nBlocks);
+   int updateDctnryExtent(FILE* pFile, int nBlocks);
 
    /**
    * @brief convert lbid to fbo
    */
-   int lbidToFbo(const uint64_t lbid, int& fbo);
+   int lbidToFbo(const i64 lbid, int& fbo);
 };
 
 

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_unhex.cpp 3923 2013-06-19 21:43:06Z bwilkinson $
+* $Id: func_unhex.cpp 3048 2012-04-04 15:33:45Z rdempsey $
 *
 *
 ****************************************************************************/
@@ -40,9 +40,9 @@ namespace
 	{
 	  if (c <= '9' && c >= '0')
 	    return c-'0';
-	  c = toupper(c);
-	  if (c <= 'F' && c >= 'A')
-	    return c-'A'+10;
+	  c|=32;
+	  if (c <= 'f' && c >= 'a')
+	    return c-'a'+10;
 	  return -1;
 	}
 }
@@ -61,7 +61,7 @@ string Func_unhex::getStrVal(rowgroup::Row& row,
 							bool& isNull,
 							CalpontSystemCatalog::ColType& op_ct)
 {
-	const string& from = parm[0]->data()->getStrVal(row, isNull);
+	string from = parm[0]->data()->getStrVal(row, isNull);
 	char* to = new char[2 + from.length()/2];
 	if (!to)
 	{

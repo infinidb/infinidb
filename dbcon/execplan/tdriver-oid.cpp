@@ -189,7 +189,7 @@ void* OIDManClient(void *arg)
 	ObjectIDManager o;
 	const int sizecap = 5;
 	int op, size, tmp;
-	uint32_t seed;
+	u_int32_t seed;
 	int threadnum = reinterpret_cast<int>(arg);	
 	
 	struct entry {

@@ -13,7 +13,7 @@ if [ -z "$INFINIDB_INSTALL_DIR" ]; then
 	INFINIDB_INSTALL_DIR=/usr/local/Calpont
 fi
 
-export INFINIDB_INSTALL_DIR=$INFINIDB_INSTALL_DIR
+declare -x INFINIDB_INSTALL_DIR=$INFINIDB_INSTALL_DIR
 
 test -f $INFINIDB_INSTALL_DIR/post/functions && . $INFINIDB_INSTALL_DIR/post/functions
 

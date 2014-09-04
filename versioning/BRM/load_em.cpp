@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: load_em.cpp 1823 2013-01-21 14:13:09Z rdempsey $
+ * $Id: load_em.cpp 1547 2012-04-04 18:19:01Z rdempsey $
  *
  ****************************************************************************/
 
@@ -26,7 +26,6 @@
  * More detailed description
  */
 
-#include "IDBPolicy.h"
 #include "brmtypes.h"
 #include "rwlock.h"
 #include "mastersegmenttable.h"
@@ -54,8 +53,6 @@ int main(int argc, char **argv)
 		prefix = argv[1];
 	else
 		prefix = "BRM_state";
-
-	idbdatafile::IDBPolicy::configIDBPolicy();
 
 	try {
 		em.load(prefix);

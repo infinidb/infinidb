@@ -465,7 +465,6 @@ MDsign(u_char * data, size_t len, u_char * mac, size_t maclen,
         goto update_end;
 
     i = len;
-#if 0
     if (((unsigned int) data) % sizeof(long) != 0) {
         /*
          * this relies on the ability to use integer math and thus we
@@ -476,9 +475,6 @@ MDsign(u_char * data, size_t len, u_char * mac, size_t maclen,
     } else {
         cp = data;
     }
-#else
-    cp = data;
-#endif
 
     while (i >= 64) {
         rc = MDupdate(&MD, cp, 64 * 8);

@@ -65,7 +65,7 @@ namespace WriteEngine
     *
     *******************************************************************/   
     const int IndexList::addIndexListHdr( FILE* pFile, const RID& rowId, 
-                                          const uint64_t& key, 
+                                          const i64& key, 
                                           IdxEmptyListEntry* newEmptyListPtr)
     {
          int rc;   
@@ -135,7 +135,7 @@ namespace WriteEngine
     *    failure    - it did not create the index list header    
     ***********************************************************/   
     const int IndexList::updateIndexList(FILE* pFile, const RID& newRid, 
-                                         const uint64_t& key, 
+                                         const i64 &key, 
                                          IdxEmptyListEntry* curIdxRidListHdrPtr)
     {      
          int rc; 
@@ -164,13 +164,13 @@ namespace WriteEngine
     *    success    - successfully created the index list header
     *    failure    - it did not create the index list header    
     ***********************************************************/   
-    const int IndexList::updateIndexList(const RID& newRid, const uint64_t& key)                                                                                   
+    const int IndexList::updateIndexList(const RID& newRid, const i64 &key)                                                                                   
     {      
        int rc = NO_ERROR;
 
        //m_lastLbid==0 or not determines if we can skip from the header,the first
        //subblock or go to the last inserted block
-       if (m_lastLbid ==(uint64_t)INVALID_LBID)
+       if (m_lastLbid ==(i64)INVALID_LBID)
        {
            rc = updateHdrSub(newRid, key);
        }
@@ -205,7 +205,7 @@ namespace WriteEngine
     *        Fail    -- ERR_IDX_LIST_INVALID_DELETE            
     ************************************************/        
     const int      IndexList::deleteIndexList( FILE* pFile, const RID& rowId, 
-                        const uint64_t& key, IdxEmptyListEntry* curIdxRidListHdrPtr)
+                        const i64& key, IdxEmptyListEntry* curIdxRidListHdrPtr)
     {
       int rc =ERR_IDX_LIST_INVALID_DELETE;          
       m_pFile = pFile;
@@ -240,7 +240,7 @@ namespace WriteEngine
     *        Success -- 0
     *        Fail    -- ERR_IDX_LIST_INVALID_DELETE            
     ************************************************/        
-    const int      IndexList::deleteIndexList( const RID& rowId,const uint64_t& key) 
+    const int      IndexList::deleteIndexList( const RID& rowId,const i64& key) 
     {
       int rc =ERR_IDX_LIST_INVALID_DELETE;    
       RID savedRid ;

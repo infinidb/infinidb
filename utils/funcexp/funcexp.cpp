@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: funcexp.cpp 3954 2013-07-08 16:30:15Z bpaul $
+* $Id: funcexp.cpp 3956 2013-07-08 19:17:26Z bpaul $
 *
 *
 ****************************************************************************/
@@ -41,13 +41,11 @@ using namespace joblist;
 #include "udfsdk.h"
 #endif
 
+bool cPo = false;		// extern-ed in utils_utf8.h
+
+
 namespace funcexp
 {
-namespace utf8
-{
-bool JPcodePoint = false;		// extern-ed in utils_utf8.h
-}
-
 /* static */
 FuncExp* FuncExp::fInstance = 0;
 
@@ -81,7 +79,6 @@ FuncExp::FuncExp()
 	fFuncMap["case_searched"] = new Func_searched_case();
 	fFuncMap["case_simple"] = new Func_simple_case();
 	fFuncMap["cast_as_signed"] = new Func_cast_signed();	//dlh
-    fFuncMap["cast_as_unsigned"] = new Func_cast_unsigned();	//dch
 	fFuncMap["cast_as_char"] = new Func_cast_char();	//dlh
 	fFuncMap["cast_as_date"] = new Func_cast_date();	//dlh
 	fFuncMap["cast_as_datetime"] = new Func_cast_datetime();	//dlh
@@ -120,7 +117,6 @@ FuncExp::FuncExp()
 	fFuncMap["greatest"] = new Func_greatest();	//dlh
 	fFuncMap["hex"] = new Func_hex();
 	fFuncMap["hour"] = new Func_hour();	//dlh
-	fFuncMap["idbpartition"] = new Func_idbpartition(); // pseudo column
 	fFuncMap["if"] = new Func_if();
 	fFuncMap["ifnull"] = new Func_ifnull();
 	fFuncMap["in"] = new Func_in();
@@ -238,7 +234,7 @@ Func* FuncExp::getFunctor(std::string& funcName)
 void FuncExp::evaluate(rowgroup::Row& row, std::vector<execplan::SRCP>& expression)
 {
 	bool isNull;
-	for (uint32_t i = 0; i < expression.size(); i++)
+	for (uint i = 0; i < expression.size(); i++)
 	{
 		isNull = false;
 		switch (expression[i]->resultType().colDataType)
@@ -246,9 +242,6 @@ void FuncExp::evaluate(rowgroup::Row& row, std::vector<execplan::SRCP>& expressi
 			case CalpontSystemCatalog::DATE:
 			{
 				int64_t val = expression[i]->getIntVal(row, isNull);
-				// @bug6061, workaround date_add always return datetime for both date and datetime
-				if (val & 0xFFFFFFFF00000000)
-					val = (((val >> 32) & 0xFFFFFFC0) | 0x3E);
 				if (isNull)
 					row.setUintField<4>(DATENULL, expression[i]->outputIndex());
 				else
@@ -267,7 +260,7 @@ void FuncExp::evaluate(rowgroup::Row& row, std::vector<execplan::SRCP>& expressi
 			case CalpontSystemCatalog::CHAR:
 			case CalpontSystemCatalog::VARCHAR:			
 			{			
-				const std::string& val = expression[i]->getStrVal(row, isNull);
+				std::string val = expression[i]->getStrVal(row, isNull);
 				if (isNull)
 					row.setStringField(CPNULLSTRMARK, expression[i]->outputIndex());
 				else
@@ -283,15 +276,6 @@ void FuncExp::evaluate(rowgroup::Row& row, std::vector<execplan::SRCP>& expressi
 					row.setIntField<8>(val, expression[i]->outputIndex());
 				break;								
 			}
-            case CalpontSystemCatalog::UBIGINT:
-            {
-                uint64_t val = expression[i]->getUintVal(row, isNull);
-                if (isNull)
-                    row.setUintField<8>(UBIGINTNULL, expression[i]->outputIndex());
-                else
-                    row.setUintField<8>(val, expression[i]->outputIndex());
-                break;								
-            }
 			case CalpontSystemCatalog::INT:
 			case CalpontSystemCatalog::MEDINT:
 			{
@@ -300,16 +284,6 @@ void FuncExp::evaluate(rowgroup::Row& row, std::vector<execplan::SRCP>& expressi
 					row.setIntField<4>(INTNULL, expression[i]->outputIndex());
 				else
 					row.setIntField<4>(val, expression[i]->outputIndex());
-				break;					
-			}
-			case CalpontSystemCatalog::UINT:
-			case CalpontSystemCatalog::UMEDINT:
-			{
-				uint64_t val = expression[i]->getUintVal(row, isNull);
-				if (isNull)
-					row.setUintField<4>(UINTNULL, expression[i]->outputIndex());
-				else
-					row.setUintField<4>(val, expression[i]->outputIndex());
 				break;					
 			}
 			case CalpontSystemCatalog::SMALLINT:
@@ -321,15 +295,6 @@ void FuncExp::evaluate(rowgroup::Row& row, std::vector<execplan::SRCP>& expressi
 					row.setIntField<2>(val, expression[i]->outputIndex());
 				break;	
 			}
-            case CalpontSystemCatalog::USMALLINT:
-            {
-                uint64_t val = expression[i]->getUintVal(row, isNull);
-                if (isNull)
-                    row.setUintField<2>(USMALLINTNULL, expression[i]->outputIndex());
-                else
-                    row.setUintField<2>(val, expression[i]->outputIndex());
-                break;	
-            }
 			case CalpontSystemCatalog::TINYINT:
 			{
 				int64_t val = expression[i]->getIntVal(row, isNull);
@@ -339,19 +304,9 @@ void FuncExp::evaluate(rowgroup::Row& row, std::vector<execplan::SRCP>& expressi
 					row.setIntField<1>(val, expression[i]->outputIndex());
 				break;	
 			}
-            case CalpontSystemCatalog::UTINYINT:
-            {
-                uint64_t val = expression[i]->getUintVal(row, isNull);
-                if (isNull)
-                    row.setUintField<1>(UTINYINTNULL, expression[i]->outputIndex());
-                else
-                    row.setUintField<1>(val, expression[i]->outputIndex());
-                break;	
-            }
 			//In this case, we're trying to load a double output column with float data. This is the
 			// case when you do sum(floatcol), e.g.
 			case CalpontSystemCatalog::DOUBLE:
-            case CalpontSystemCatalog::UDOUBLE:
 			{
 				double val = expression[i]->getDoubleVal(row, isNull);
 				if (isNull)
@@ -361,7 +316,6 @@ void FuncExp::evaluate(rowgroup::Row& row, std::vector<execplan::SRCP>& expressi
 				break;
 			}
 			case CalpontSystemCatalog::FLOAT:
-            case CalpontSystemCatalog::UFLOAT:
 			{
 				float val = expression[i]->getFloatVal(row, isNull);
 				if (isNull)
@@ -371,7 +325,6 @@ void FuncExp::evaluate(rowgroup::Row& row, std::vector<execplan::SRCP>& expressi
 				break;
 			}
 			case CalpontSystemCatalog::DECIMAL:
-            case CalpontSystemCatalog::UDECIMAL:
 			{
 				IDB_Decimal val = expression[i]->getDecimalVal(row, isNull);
 				if (isNull)

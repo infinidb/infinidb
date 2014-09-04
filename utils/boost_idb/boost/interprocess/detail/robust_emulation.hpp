@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////////////////
 //
-// (C) Copyright Ion Gaztanaga 2010-2012. Distributed under the Boost
+// (C) Copyright Ion Gaztanaga 2010-2010. Distributed under the Boost
 // Software License, Version 1.0. (See accompanying file
 // LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 //
@@ -24,12 +24,11 @@
 #include <boost/interprocess/detail/tmp_dir_helpers.hpp>
 #include <boost/interprocess/detail/intermodule_singleton.hpp>
 #include <boost/interprocess/exceptions.hpp>
-#include <boost/interprocess/sync/spin/wait.hpp>
 #include <string>
 
 namespace boost{
 namespace interprocess{
-namespace ipcdetail{
+namespace detail{
 
 namespace robust_emulation_helpers {
 
@@ -69,7 +68,7 @@ inline void robust_lock_path(std::string &s)
 
 inline void create_and_get_robust_lock_file_path(std::string &s, OS_process_id_t pid)
 {
-   intermodule_singleton_helpers::create_tmp_subdir_and_get_pid_based_filepath
+   file_locking_helpers::create_tmp_subdir_and_get_pid_based_filepath
       (robust_lock_subdir_path(), robust_lock_prefix(), pid, s);
 }
 
@@ -133,7 +132,7 @@ class robust_mutex_lock_file
             throw interprocess_exception(other_error, "Robust emulation robust_mutex_lock_file constructor failed: create_file filed with unexpected error");
          }
       }
-   }
+   }   
 
    ~robust_mutex_lock_file()
    {
@@ -155,7 +154,7 @@ class robust_mutex_lock_file
       {
          std::string pid_str;
          //If the lock file is not our own lock file, then try to do the cleanup
-         if(!intermodule_singleton_helpers::check_if_filename_complies_with_pid
+         if(!file_locking_helpers::check_if_filename_complies_with_pid
             (filename, robust_lock_prefix(), get_current_process_id(), pid_str)){
             remove_if_can_lock_file(filepath);
          }
@@ -174,9 +173,9 @@ class robust_mutex_lock_file
 
 //This is the mutex class. Mutex should follow mutex concept
 //with an additonal "take_ownership()" function to take ownership of the
-//mutex when robust_spin_mutex determines the previous owner was dead.
+//mutex when robust_emulation_mutex determines the previous owner was dead.
 template<class Mutex>
-class robust_spin_mutex
+class robust_emulation_mutex
 {
    public:
    static const boost::uint32_t correct_state = 0;
@@ -185,7 +184,7 @@ class robust_spin_mutex
 
    typedef robust_emulation_helpers::mutex_traits<Mutex> mutex_traits_t;
 
-   robust_spin_mutex();
+   robust_emulation_mutex();
    void lock();
    bool try_lock();
    bool timed_lock(const boost::posix_time::ptime &abs_time);
@@ -198,8 +197,8 @@ class robust_spin_mutex
    bool lock_own_unique_file();
    bool robust_check();
    bool check_if_owner_dead_and_take_ownership_atomically();
-   bool is_owner_dead(boost::uint32_t own);
-   void owner_to_filename(boost::uint32_t own, std::string &s);
+   bool is_owner_dead(boost::uint32_t owner);
+   void owner_to_filename(boost::uint32_t owner, std::string &s);
    //The real mutex
    Mutex mtx;
    //The pid of the owner
@@ -209,12 +208,12 @@ class robust_spin_mutex
 };
 
 template<class Mutex>
-inline robust_spin_mutex<Mutex>::robust_spin_mutex()
+inline robust_emulation_mutex<Mutex>::robust_emulation_mutex()
    : mtx(), owner(get_invalid_process_id()), state(correct_state)
 {}
 
 template<class Mutex>
-inline void robust_spin_mutex<Mutex>::lock()
+inline void robust_emulation_mutex<Mutex>::lock()
 {
    //If the mutex is broken (recovery didn't call consistent()),
    //then throw an exception
@@ -229,7 +228,7 @@ inline void robust_spin_mutex<Mutex>::lock()
 
    //Now the logic. Try to lock, if successful mark the owner
    //if it fails, start recovery logic
-   spin_wait swait;
+   unsigned int spin_count = 0;
    while(1){
       if (mtx.try_lock()){
          atomic_write32(&this->owner, get_current_process_id());
@@ -237,10 +236,14 @@ inline void robust_spin_mutex<Mutex>::lock()
       }
       else{
          //Do the dead owner checking each spin_threshold lock tries
-         swait.yield();
-         if(0 == (swait.count() & 255u)){
+         detail::thread_yield();
+         ++spin_count;
+         if(spin_count > spin_threshold){
             //Check if owner dead and take ownership if possible
-            if(this->robust_check()){
+            if(!this->robust_check()){
+               spin_count = 0;
+            }
+            else{
                break;
             }
          }
@@ -249,7 +252,7 @@ inline void robust_spin_mutex<Mutex>::lock()
 }
 
 template<class Mutex>
-inline bool robust_spin_mutex<Mutex>::try_lock()
+inline bool robust_emulation_mutex<Mutex>::try_lock()
 {
    //Same as lock() but without spinning
    if(atomic_read32(&this->state) == broken_state){
@@ -275,7 +278,7 @@ inline bool robust_spin_mutex<Mutex>::try_lock()
 }
 
 template<class Mutex>
-inline bool robust_spin_mutex<Mutex>::timed_lock
+inline bool robust_emulation_mutex<Mutex>::timed_lock
    (const boost::posix_time::ptime &abs_time)
 {
    //Same as lock() but with an additional timeout
@@ -289,7 +292,6 @@ inline bool robust_spin_mutex<Mutex>::timed_lock
    if(now >= abs_time)
       return this->try_lock();
 
-   spin_wait swait;
    do{
       if(this->try_lock()){
          break;
@@ -300,20 +302,20 @@ inline bool robust_spin_mutex<Mutex>::timed_lock
          return this->try_lock();
       }
       // relinquish current time slice
-      swait.yield();
+      detail::thread_yield();
    }while (true);
 
    return true;
 }
 
 template<class Mutex>
-inline void robust_spin_mutex<Mutex>::owner_to_filename(boost::uint32_t own, std::string &s)
+inline void robust_emulation_mutex<Mutex>::owner_to_filename(boost::uint32_t owner, std::string &s)
 {
-   robust_emulation_helpers::create_and_get_robust_lock_file_path(s, own);
+   robust_emulation_helpers::create_and_get_robust_lock_file_path(s, owner);
 }
 
 template<class Mutex>
-inline bool robust_spin_mutex<Mutex>::robust_check()
+inline bool robust_emulation_mutex<Mutex>::robust_check()
 {
    //If the old owner was dead, and we've acquired ownership, mark
    //the mutex as 'fixing'. This means that a "consistent()" is needed
@@ -322,11 +324,11 @@ inline bool robust_spin_mutex<Mutex>::robust_check()
       return false;
    }
    atomic_write32(&this->state, fixing_state);
-   return true;
+   return true;   
 }
 
 template<class Mutex>
-inline bool robust_spin_mutex<Mutex>::check_if_owner_dead_and_take_ownership_atomically()
+inline bool robust_emulation_mutex<Mutex>::check_if_owner_dead_and_take_ownership_atomically()
 {
    boost::uint32_t cur_owner = get_current_process_id();
    boost::uint32_t old_owner = atomic_read32(&this->owner), old_owner2;
@@ -347,16 +349,16 @@ inline bool robust_spin_mutex<Mutex>::check_if_owner_dead_and_take_ownership_ato
 }
 
 template<class Mutex>
-inline bool robust_spin_mutex<Mutex>::is_owner_dead(boost::uint32_t own)
+inline bool robust_emulation_mutex<Mutex>::is_owner_dead(boost::uint32_t owner)
 {
    //If owner is an invalid id, then it's clear it's dead
-   if(own == (boost::uint32_t)get_invalid_process_id()){
+   if(owner == (boost::uint32_t)get_invalid_process_id()){
       return true;
    }
 
    //Obtain the lock filename of the owner field
    std::string file;
-   this->owner_to_filename(own, file);
+   this->owner_to_filename(owner, file);
 
    //Now the logic is to open and lock it
    file_handle_t fhnd = open_existing_file(file.c_str(), read_write);
@@ -385,7 +387,7 @@ inline bool robust_spin_mutex<Mutex>::is_owner_dead(boost::uint32_t own)
 }
 
 template<class Mutex>
-inline void robust_spin_mutex<Mutex>::consistent()
+inline void robust_emulation_mutex<Mutex>::consistent()
 {
    //This function supposes the previous state was "fixing"
    //and the current process holds the mutex
@@ -398,14 +400,14 @@ inline void robust_spin_mutex<Mutex>::consistent()
 }
 
 template<class Mutex>
-inline bool robust_spin_mutex<Mutex>::previous_owner_dead()
+inline bool robust_emulation_mutex<Mutex>::previous_owner_dead()
 {
    //Notifies if a owner recovery has been performed in the last lock()
    return atomic_read32(&this->state) == fixing_state;
 };
 
 template<class Mutex>
-inline void robust_spin_mutex<Mutex>::unlock()
+inline void robust_emulation_mutex<Mutex>::unlock()
 {
    //If in "fixing" state, unlock and mark the mutex as unrecoverable
    //so next locks will fail and all threads will be notified that the
@@ -419,16 +421,16 @@ inline void robust_spin_mutex<Mutex>::unlock()
 }
 
 template<class Mutex>
-inline bool robust_spin_mutex<Mutex>::lock_own_unique_file()
+inline bool robust_emulation_mutex<Mutex>::lock_own_unique_file()
 {
    //This function forces instantiation of the singleton
-   robust_emulation_helpers::robust_mutex_lock_file* dummy =
-      &ipcdetail::intermodule_singleton
+   robust_emulation_helpers::robust_mutex_lock_file* dummy = 
+      &detail::intermodule_singleton
          <robust_emulation_helpers::robust_mutex_lock_file>::get();
    return dummy != 0;
 }
 
-}  //namespace ipcdetail{
+}  //namespace detail{
 }  //namespace interprocess{
 }  //namespace boost{
 

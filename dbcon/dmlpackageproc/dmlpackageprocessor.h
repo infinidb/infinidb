@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: dmlpackageprocessor.h 9673 2013-07-09 15:59:49Z chao $
+ *   $Id: dmlpackageprocessor.h 8839 2012-08-28 21:49:45Z dhall $
  *
  *
  ***********************************************************************/
@@ -42,7 +42,6 @@
 #include "liboamcpp.h"
 #include "oamcache.h"
 #include "querystats.h"
-#include "clientrotator.h"
 
 #if defined(_MSC_VER) && defined(DMLPKGPROC_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
@@ -150,25 +149,13 @@ public:
 	
     /** @brief ctor
      */ 
-    DMLPackageProcessor(BRM::DBRM* aDbrm, uint32_t sid) : fEC(0), DMLLoggingId(21), fRollbackPending(false), fDebugLevel(NONE)
+    DMLPackageProcessor() : fEC(0), DMLLoggingId(21), fRollbackPending(false), fDebugLevel(NONE)
 	{
-		try {
-		fWEClient = new WriteEngine::WEClients(WriteEngine::WEClients::DMLPROC);
-		//std::cout << "In DMLPackageProcessor constructor " << this << std::endl;
+		fWEClient = WriteEngine::WEClients::instance(WriteEngine::WEClients::DMLPROC);
 		fPMCount = fWEClient->getPmCount();
-		}
-		catch (...)
-		{
-			std::cout << "Cannot make connection to WES" << std::endl;
-		}
-		
+		fExeMgr.reset(new messageqcpp::MessageQueueClient("ExeMgr1"));
 		oam::OamCache * oamCache = oam::OamCache::makeOamCache();
 		fDbRootPMMap = oamCache->getDBRootToPMMap();
-		fDbrm = aDbrm;
-		fSessionID = sid;
-		fExeMgr =  new execplan::ClientRotator(fSessionID, "ExeMgr");
-		//std::cout << " fSessionID is " << fSessionID << std::endl;
-		fExeMgr->connect(0.005);
 	}
 
 
@@ -185,7 +172,7 @@ public:
      * @brief Get debug level
      */
     inline const DebugLevel getDebugLevel() const { return fDebugLevel; }
-    //int rollBackTransaction(uint64_t uniqueId, uint32_t txnID, uint32_t sessionID, std::string & errorMsg);
+    //int rollBackTransaction(u_int64_t uniqueId, u_int32_t txnID, u_int32_t sessionID, std::string & errorMsg);
     /**
      * @brief Set debug level
      */
@@ -206,7 +193,7 @@ public:
 
 	EXPORT int rollBackTransaction(uint64_t uniqueId, BRM::TxnID txnID, uint32_t sessionID, std::string & errorMsg);
 	
-	EXPORT int rollBackBatchAutoOnTransaction(uint64_t uniqueId, BRM::TxnID txnID, uint32_t sessionID, const uint32_t tableOid, std::string & errorMsg);
+	EXPORT int rollBackBatchAutoOnTransaction(u_int64_t uniqueId, BRM::TxnID txnID, u_int32_t sessionID, const u_int32_t tableOid, std::string & errorMsg);
     /**
      * @brief convert a columns data, represnted as a string, to it's native
      * data type
@@ -278,7 +265,7 @@ protected:
      * @param updateFlag 0: delete, 1: update, 2 insert
      * @param colNameList the updated column names, only valid for update SQL statement
      */
-    bool updateIndexes( uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, const std::string& schema,
+    bool updateIndexes( u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, const std::string& schema,
                         const std::string& table,const dmlpackage::RowList& rows, DMLResult& result,
                         std::vector<WriteEngine::RID> ridList,
                         WriteEngine::ColValueList& colValuesList, std::vector<std::string>& colNameList, const char updateFlag,
@@ -302,7 +289,7 @@ protected:
      * @param rows the lists of rows to check column constraints on
      * @param result the result structure
      */
-    bool violatesConstraints( uint32_t sessionID, const std::string& schema, const std::string& table,
+    bool violatesConstraints( u_int32_t sessionID, const std::string& schema, const std::string& table,
                               const dmlpackage::RowList& rows, DMLResult& result );
 
     /**	@brief validate that the column does not violate a unique constraint
@@ -354,14 +341,14 @@ protected:
      * @param rows the lists of rows to check column constraints on
      * @param result the result structure
      */   
-	 bool violatesPKRefConnstraint ( uint32_t sessionID,
+	 bool violatesPKRefConnstraint ( u_int32_t sessionID,
                                      const std::string& schema,
                                      const std::string& table,
                                      const dmlpackage::RowList& rows,
                                      const WriteEngine::ColValueList& oldValueList,
                                      DMLResult& result );
                                  
-    bool violatesPKRefConnstraint ( uint32_t sessionID, 
+    bool violatesPKRefConnstraint ( u_int32_t sessionID, 
                                      const std::string& schema, 
                                      const std::string& table,
                                      std::vector<WriteEngine::RID>& rowIDList, 
@@ -396,7 +383,7 @@ protected:
      * @param rows the lists of rows to check column constraints on
      * @param result the result structure
      */
-    bool violatesUpdtRefConstraints( uint32_t sessionID, 
+    bool violatesUpdtRefConstraints( u_int32_t sessionID, 
                                      const std::string& schema, 
                                      const std::string& table,
                                      const dmlpackage::RowList& rows, 
@@ -416,13 +403,22 @@ protected:
                                             DMLResult& result );            
 
         
+    /**
+     * @brief tokenize a columns data
+     *
+     * @param type the columns database type
+     * @param data the columns string representation of it's data
+     */
+    boost::any tokenizeData( execplan::CalpontSystemCatalog::SCN txnID, execplan::CalpontSystemCatalog::ColType,
+                             const std::string& data, DMLResult& result, bool isNULL );
+
     /** @brief get the column list for the supplied table
      *
      * @param schema the schema name
      * @param table the table name
      * @param colList ColumnList to fill with the columns for the supplied table
      */
-    void getColumnsForTable( uint32_t sessionID, std::string schema, std::string table, dmlpackage::ColumnList& colList );
+    void getColumnsForTable( u_int32_t sessionID, std::string schema, std::string table, dmlpackage::ColumnList& colList );
 	
 	/** @brief convert absolute rid to relative rid in a segement file
      *
@@ -432,7 +428,7 @@ protected:
      * @param startDBRoot the dbroot this table starts
      * @param dbrootCnt the number of dbroot in db
      */
-    void convertRidToColumn(uint64_t& rid, unsigned& dbRoot, unsigned& partition, 
+    void convertRidToColumn(u_int64_t& rid, unsigned& dbRoot, unsigned& partition, 
                                                     unsigned& segment, unsigned filesPerColumnPartition, 
                                                     unsigned  extentsPerSegmentFile, unsigned extentRows, 
                                                     unsigned startDBRoot, unsigned dbrootCnt,
@@ -457,33 +453,36 @@ protected:
      * @param   ec in:the error code received
      * @returns error string
      */
-    std::string projectTableErrCodeToMsg(uint32_t ec);
+    std::string projectTableErrCodeToMsg(uint ec);
     
-//    bool validateNextValue(execplan::CalpontSystemCatalog::ColType colType, int64_t value, bool & offByOne);
+    bool validateNextValue(execplan::CalpontSystemCatalog::ColType colType, int64_t value, bool & offByOne);
     
     bool validateVarbinaryVal( std::string & inStr);
-    int commitTransaction(uint64_t uniqueId, BRM::TxnID txnID);
-    int commitBatchAutoOnTransaction(uint64_t uniqueId, BRM::TxnID txnID, const uint32_t tableOid, std::string & errorMsg);
-    int commitBatchAutoOffTransaction(uint64_t uniqueId, BRM::TxnID txnID, const uint32_t tableOid, std::string & errorMsg);
-    int rollBackBatchAutoOffTransaction(uint64_t uniqueId, BRM::TxnID txnID, uint32_t sessionID, const uint32_t tableOid, std::string & errorMsg);
-    int flushDataFiles (int rc, std::map<uint32_t,uint32_t> & columnOids, uint64_t uniqueId, BRM::TxnID txnID, uint32_t tableOid);
-	int endTransaction (uint64_t uniqueId, BRM::TxnID txnID, bool success);
-    
+    int commitTransaction(u_int64_t uniqueId, BRM::TxnID txnID);
+    int commitBatchAutoOnTransaction(u_int64_t uniqueId, BRM::TxnID txnID, const u_int32_t tableOid, std::string & errorMsg);
+    int commitBatchAutoOffTransaction(u_int64_t uniqueId, BRM::TxnID txnID, const u_int32_t tableOid, std::string & errorMsg);
+    int rollBackBatchAutoOffTransaction(u_int64_t uniqueId, BRM::TxnID txnID, u_int32_t sessionID, const u_int32_t tableOid, std::string & errorMsg);
+    int flushDataFiles (int rc, std::map<u_int32_t,u_int32_t> & columnOids, u_int64_t uniqueId, BRM::TxnID txnID);
+
+    /** @brief the write engine wrapper interface
+     */
+    WriteEngine::WriteEngineWrapper fWriteEngine;
+
     /** @brief the Session Manager interface
      */
     execplan::SessionManager fSessionManager;
     joblist::DistributedEngineComm *fEC;
     joblist::ResourceManager* fRM;
     char* strlower(char* in);
-    uint32_t fSessionID;
+    u_int32_t fSessionID;
     const unsigned DMLLoggingId;
-    uint32_t fPMCount;
+    uint fPMCount;
     WriteEngine::WEClients* fWEClient;
-    BRM::DBRM* fDbrm;
+    BRM::DBRM fDbrm;
+    boost::shared_ptr<messageqcpp::MessageQueueClient> fExeMgr;
     boost::shared_ptr<std::map<int, int> > fDbRootPMMap;
     oam::Oam fOam;
     bool fRollbackPending;         // When set, any derived object should stop what it's doing and cleanup in preparation for a Rollback
-	execplan::ClientRotator* fExeMgr;
 
 private:
     

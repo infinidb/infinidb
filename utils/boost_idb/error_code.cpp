@@ -22,34 +22,30 @@
 #include <cstdlib>
 #include <cassert>
 
+using namespace boost::system;
+using namespace boost::system::errc;
+
 #include <cstring> // for strerror/strerror_r
 
 # if defined( BOOST_WINDOWS_API )
 #   include <windows.h>
-#   if !defined(WINAPI_FAMILY) || ((WINAPI_FAMILY & WINAPI_PARTITION_DESKTOP) != 0)
-#     include "local_free_on_destruction.hpp"
-#   endif
+#   include "local_free_on_destruction.hpp"
 #   ifndef ERROR_INCORRECT_SIZE
 #     define ERROR_INCORRECT_SIZE ERROR_BAD_ARGUMENTS
 #   endif
 # endif
 
 //----------------------------------------------------------------------------//
-namespace boost
-{
-    namespace system
-    {
 
 namespace
 {
-    
   //  standard error categories  ---------------------------------------------//
 
   class generic_error_category : public error_category
   {
   public:
     generic_error_category(){}
-    const char *   name() const BOOST_SYSTEM_NOEXCEPT;
+    const char *   name() const;
     std::string    message( int ev ) const;
   };
 
@@ -57,30 +53,25 @@ namespace
   {
   public:
     system_error_category(){}
-    const char *        name() const BOOST_SYSTEM_NOEXCEPT;
+    const char *        name() const;
     std::string         message( int ev ) const;
-    error_condition     default_error_condition( int ev ) const BOOST_SYSTEM_NOEXCEPT;
+    error_condition     default_error_condition( int ev ) const;
   };
 
   //  generic_error_category implementation  ---------------------------------//
 
-  const char * generic_error_category::name() const BOOST_SYSTEM_NOEXCEPT
+  const char * generic_error_category::name() const
   {
     return "generic";
   }
 
   std::string generic_error_category::message( int ev ) const
   {
-    using namespace boost::system::errc;
-#if defined(__PGI)
-      using boost::system::errc::invalid_argument;
-#endif
-      
     static std::string unknown_err( "Unknown error" );
   // strerror_r is preferred because it is always thread safe,
   // however, we fallback to strerror in certain cases because:
   //   -- Windows doesn't provide strerror_r.
-  //   -- HP and Sun do provide strerror_r on newer systems, but there is
+  //   -- HP and Sundo provide strerror_r on newer systems, but there is
   //      no way to tell if is available at runtime and in any case their
   //      versions of strerror are thread safe anyhow.
   //   -- Linux only sometimes provides strerror_r.
@@ -90,7 +81,6 @@ namespace
   # if defined(BOOST_WINDOWS_API) || defined(__hpux) || defined(__sun)\
      || (defined(__linux) && (!defined(__USE_XOPEN2K) || defined(BOOST_SYSTEM_USE_STRERROR)))\
      || (defined(__osf__) && !defined(_REENTRANT))\
-     || (defined(__INTEGRITY))\
      || (defined(__vms))\
      || (defined(__QNXNTO__))
       const char * c_str = std::strerror( ev );
@@ -139,9 +129,7 @@ namespace
         }
       }
       std::string msg;
-#   ifndef BOOST_NO_EXCEPTIONS
       try
-#   endif
       {
         msg = ( ( result == invalid_argument ) ? "Unknown error" : bp );
       }
@@ -162,29 +150,13 @@ namespace
   }
   //  system_error_category implementation  --------------------------------// 
 
-  const char * system_error_category::name() const BOOST_SYSTEM_NOEXCEPT
+  const char * system_error_category::name() const
   {
     return "system";
   }
 
-  error_condition system_error_category::default_error_condition( int ev ) const BOOST_SYSTEM_NOEXCEPT
+  error_condition system_error_category::default_error_condition( int ev ) const
   {
-    using namespace boost::system::errc;
-#if defined(__PGI)
-      using boost::system::errc::invalid_argument;
-#endif
-
-# if defined(BOOST_WINDOWS_API)
-#   if defined(WINAPI_FAMILY) && ((WINAPI_FAMILY & WINAPI_PARTITION_APP) != 0)
-    // When using the Windows Runtime, most system errors are reported as HRESULTs.
-    // We want to map the common Win32 errors to their equivalent error condition,
-    // whether or not they are reported via an HRESULT.
-    if ( ev < 0 ) // Check for failed HRESULTs only.
-      if ( HRESULT_FACILITY( ev ) == FACILITY_WIN32 )
-        ev = HRESULT_CODE( ev );
-#   endif
-# endif
-
     switch ( ev )
     {
     case 0: return make_error_condition( success );
@@ -372,36 +344,7 @@ namespace
 
   std::string system_error_category::message( int ev ) const
   {
-# if defined(WINAPI_FAMILY) && ((WINAPI_FAMILY & WINAPI_PARTITION_DESKTOP) == 0)
-    std::string str( 128, char() );
-    for (;;)
-    {
-      DWORD retval = ::FormatMessageA( 
-          FORMAT_MESSAGE_FROM_SYSTEM | 
-          FORMAT_MESSAGE_IGNORE_INSERTS,
-          NULL,
-          ev,
-          MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), // Default language
-          &str[0],
-          str.size(),
-          NULL 
-      );
-
-      if ( retval > 0 )
-      {
-        str.resize( retval );
-        break;
-      }
-      else if ( ::GetLastError() != ERROR_INSUFFICIENT_BUFFER )
-      {
-        return std::string("Unknown error");
-      }
-      else
-      {
-        str.resize( str.size() + str.size()/2 );
-      }
-    }
-# elif !defined(BOOST_NO_ANSI_APIS)
+# ifndef BOOST_NO_ANSI_APIS  
     LPVOID lpMsgBuf = 0;
     DWORD retval = ::FormatMessageA( 
         FORMAT_MESSAGE_ALLOCATE_BUFFER | 
@@ -454,6 +397,10 @@ namespace
 
 } // unnamed namespace
 
+namespace boost
+{
+  namespace system
+  {
 
 # ifndef BOOST_SYSTEM_NO_DEPRECATED
     BOOST_SYSTEM_DECL error_code throws; // "throw on error" special error_code;
@@ -463,13 +410,13 @@ namespace
                                          //  address for comparison purposes
 # endif
 
-    BOOST_SYSTEM_DECL const error_category & system_category() BOOST_SYSTEM_NOEXCEPT
+    BOOST_SYSTEM_DECL const error_category & system_category()
     {
       static const system_error_category  system_category_const;
       return system_category_const;
     }
 
-    BOOST_SYSTEM_DECL const error_category & generic_category() BOOST_SYSTEM_NOEXCEPT
+    BOOST_SYSTEM_DECL const error_category & generic_category()
     {
       static const generic_error_category generic_category_const;
       return generic_category_const;

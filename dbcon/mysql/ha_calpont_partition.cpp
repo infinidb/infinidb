@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
-* $Id: ha_calpont_partition.cpp 9642 2013-06-24 14:57:42Z rdempsey $
+* $Id: ha_calpont_partition.cpp 9038 2012-10-29 22:13:24Z zzhu $
 */
 
 #include <iostream>
@@ -75,12 +75,12 @@ inline uint32_t tid2sid(const uint32_t tid)
 }
 
 void CHECK( int rc)
-{
-	if (rc != 0)
+{ 
+	if (rc != 0) 
 	{
 		ostringstream oss;
 		oss << "Error in DBRM call " << rc << endl;
-		throw runtime_error(oss.str());
+		throw runtime_error(oss.str()); 
 	}
 }
 
@@ -93,7 +93,7 @@ void push_warnings(THD* thd, string& warnings)
 
 	for (tokenizer::iterator tok_iter = tokens.begin(); tok_iter != tokens.end(); ++tok_iter)
 	{
-		push_warning(thd, MYSQL_ERROR::WARN_LEVEL_WARN, 9999, (*tok_iter).c_str());
+		push_warning(thd, MYSQL_ERROR::WARN_LEVEL_WARN, 9999, (*tok_iter).c_str());		
 	}
 }
 
@@ -141,22 +141,6 @@ string name(CalpontSystemCatalog::ColType& ct)
 			return "BLOB";
 		case CalpontSystemCatalog::CLOB:
 			return "CLOB";
-		case CalpontSystemCatalog::UINT:
-			return "UINT";
-		case CalpontSystemCatalog::UTINYINT:
-			return "UTINYINT";
-		case CalpontSystemCatalog::UMEDINT:
-			return "UMEDINT";
-		case CalpontSystemCatalog::USMALLINT:
-			return "USMALLINT";
-		case CalpontSystemCatalog::UBIGINT:
-			return "UBIGINT";
-		case CalpontSystemCatalog::UDECIMAL:
-			return "UDECIMAL";
-		case CalpontSystemCatalog::UFLOAT:
-			return "UFLOAT";
-		case CalpontSystemCatalog::UDOUBLE:
-			return "UDOUBLE";
 		default:
 			return "Unknown Type";
 	}
@@ -165,21 +149,15 @@ string name(CalpontSystemCatalog::ColType& ct)
 bool CP_type(CalpontSystemCatalog::ColType& ct)
 {
 	if (ct.colDataType == CalpontSystemCatalog::INT ||
-		ct.colDataType == CalpontSystemCatalog::TINYINT ||
-		ct.colDataType == CalpontSystemCatalog::MEDINT ||
-		ct.colDataType == CalpontSystemCatalog::SMALLINT ||
-		ct.colDataType == CalpontSystemCatalog::BIGINT ||
-		ct.colDataType == CalpontSystemCatalog::DATE ||
-		ct.colDataType == CalpontSystemCatalog::DATETIME ||
-		ct.colDataType == CalpontSystemCatalog::DECIMAL ||
-		ct.colDataType == CalpontSystemCatalog::UTINYINT ||
-		ct.colDataType == CalpontSystemCatalog::USMALLINT ||
-		ct.colDataType == CalpontSystemCatalog::UMEDINT ||
-		ct.colDataType == CalpontSystemCatalog::UINT ||
-		ct.colDataType == CalpontSystemCatalog::UBIGINT ||
-		ct.colDataType == CalpontSystemCatalog::UDECIMAL ||
-		(ct.colDataType == CalpontSystemCatalog::CHAR && ct.colWidth <= 8) ||
-		(ct.colDataType == CalpontSystemCatalog::VARCHAR && ct.colWidth <= 7))
+			  ct.colDataType == CalpontSystemCatalog::TINYINT ||
+			  ct.colDataType == CalpontSystemCatalog::MEDINT ||
+			  ct.colDataType == CalpontSystemCatalog::SMALLINT ||
+			  ct.colDataType == CalpontSystemCatalog::BIGINT ||
+			  ct.colDataType == CalpontSystemCatalog::DATE ||
+			  ct.colDataType == CalpontSystemCatalog::DATETIME ||
+			  ct.colDataType == CalpontSystemCatalog::DECIMAL ||
+			  (ct.colDataType == CalpontSystemCatalog::CHAR && ct.colWidth <= 8) ||
+			  (ct.colDataType == CalpontSystemCatalog::VARCHAR && ct.colWidth <= 7))
 	{
 		return true;
 	}
@@ -194,9 +172,9 @@ struct PartitionInfo
 	int64_t min;
 	int64_t max;
 	uint64_t status;
-	PartitionInfo():min((uint64_t)0x8000000000000001ULL),
-					  max((uint64_t)-0x8000000000000001LL),
-					  status(0) {};
+	PartitionInfo():min((uint64_t)0x8000000000000001ULL), 
+		              max((uint64_t)-0x8000000000000001LL), 
+		              status(0) {};
 };
 
 typedef map<LogicalPartition, PartitionInfo> PartitionMap;
@@ -217,7 +195,7 @@ const string charcolToString(int64_t v)
 const string format(int64_t v, CalpontSystemCatalog::ColType& ct)
 {
 	ostringstream oss;
-
+	
 	switch (ct.colDataType)
 	{
 		case CalpontSystemCatalog::DATE:
@@ -232,6 +210,7 @@ const string format(int64_t v, CalpontSystemCatalog::ColType& ct)
 			// swap again to retain the string byte order
 			uint64_t tmp = uint64ToStr(v);
 			oss << (char*)(&tmp);
+
 			break;
 		}
 		case CalpontSystemCatalog::TINYINT:
@@ -240,11 +219,10 @@ const string format(int64_t v, CalpontSystemCatalog::ColType& ct)
 		case CalpontSystemCatalog::INT:
 		case CalpontSystemCatalog::BIGINT:
 		case CalpontSystemCatalog::DECIMAL:
-		case CalpontSystemCatalog::UDECIMAL:
 		{
 			if (ct.scale > 0)
 			{
-				double d = ((double)(v) / (double)pow((double)10, ct.scale));
+				double d = ((double)(v) / (double)pow((double)10, ct.scale));			
 				oss << setprecision(ct.scale) << fixed << d;
 			}
 			else
@@ -253,13 +231,6 @@ const string format(int64_t v, CalpontSystemCatalog::ColType& ct)
 			}
 			break;
 		}
-		case CalpontSystemCatalog::UTINYINT:
-		case CalpontSystemCatalog::USMALLINT:
-		case CalpontSystemCatalog::UMEDINT:
-		case CalpontSystemCatalog::UINT:
-		case CalpontSystemCatalog::UBIGINT:
-			oss << static_cast<uint64_t>(v);
-			break;
 		case CalpontSystemCatalog::VARBINARY:
 			oss << "N/A";
 			break;
@@ -285,14 +256,8 @@ const int64_t IDB_format(char* str, CalpontSystemCatalog::ColType& ct, uint8_t& 
 	case CalpontSystemCatalog::TINYINT:
 		v = boost::any_cast<char>(anyVal);
 		break;
-	case CalpontSystemCatalog::UTINYINT:
-		v = boost::any_cast<uint8_t>(anyVal);
-		break;
 	case CalpontSystemCatalog::SMALLINT:
 		v = boost::any_cast<int16_t>(anyVal);
-		break;
-	case CalpontSystemCatalog::USMALLINT:
-		v = boost::any_cast<uint16_t>(anyVal);
 		break;
 	case CalpontSystemCatalog::MEDINT:
 	case CalpontSystemCatalog::INT:
@@ -302,15 +267,8 @@ const int64_t IDB_format(char* str, CalpontSystemCatalog::ColType& ct, uint8_t& 
 		v = boost::any_cast<int32_t>(anyVal);
 #endif
 		break;
-	case CalpontSystemCatalog::UMEDINT:
-	case CalpontSystemCatalog::UINT:
-		v = boost::any_cast<uint32_t>(anyVal);
-		break;
 	case CalpontSystemCatalog::BIGINT:
 		v = boost::any_cast<long long>(anyVal);
-		break;
-	case CalpontSystemCatalog::UBIGINT:
-		v = boost::any_cast<uint64_t>(anyVal);
 		break;
 	case CalpontSystemCatalog::CHAR:
 	case CalpontSystemCatalog::VARCHAR:
@@ -333,7 +291,6 @@ const int64_t IDB_format(char* str, CalpontSystemCatalog::ColType& ct, uint8_t& 
 		v = boost::any_cast<uint64_t>(anyVal);
 		break;
 	case CalpontSystemCatalog::DECIMAL:
-	case CalpontSystemCatalog::UDECIMAL:
 		if (ct.colWidth == execplan::CalpontSystemCatalog::ONE_BYTE)
 			v = boost::any_cast<char>(anyVal);
 		else if (ct.colWidth == execplan::CalpontSystemCatalog::TWO_BYTE)
@@ -344,7 +301,7 @@ const int64_t IDB_format(char* str, CalpontSystemCatalog::ColType& ct, uint8_t& 
 #else
 			v = boost::any_cast<int32_t>(anyVal);
 #endif
-		else
+		else 
 			v = boost::any_cast<long long>(anyVal);
 		break;
 	default:
@@ -356,8 +313,7 @@ const int64_t IDB_format(char* str, CalpontSystemCatalog::ColType& ct, uint8_t& 
 		 ct.colDataType == CalpontSystemCatalog::MEDINT ||
 		 ct.colDataType == CalpontSystemCatalog::INT ||
 		 ct.colDataType == CalpontSystemCatalog::BIGINT ||
-		 ct.colDataType == CalpontSystemCatalog::DECIMAL ||
-		 ct.colDataType == CalpontSystemCatalog::UDECIMAL) &&
+		 ct.colDataType == CalpontSystemCatalog::DECIMAL) &&
 		pushWarning)
 	{
 		// get rid of leading white spaces and parentheses
@@ -375,11 +331,11 @@ const int64_t IDB_format(char* str, CalpontSystemCatalog::ColType& ct, uint8_t& 
 }
 
 
-void parsePartitionString(UDF_ARGS* args,
-						  int offset,
-						  set<LogicalPartition>& partitionNums,
-						  string& errMsg,
-						  execplan::CalpontSystemCatalog::TableName tableName)
+void parsePartitionString(UDF_ARGS* args, 
+                          int offset, 
+                          set<LogicalPartition>& partitionNums, 
+                          string& errMsg, 
+                          execplan::CalpontSystemCatalog::TableName tableName)
 {
 	//@Bug 4695
 	algorithm::to_lower(tableName.schema);
@@ -396,7 +352,7 @@ void parsePartitionString(UDF_ARGS* args,
 	char* tmp = partStrNoSpace;
 
 	// trim off space
-	for (uint32_t i = 0; i < partStr.length(); i++)
+	for (uint i = 0; i < partStr.length(); i++)
 	{
 		if (partStr[i] == ' ' || partStr[i] == '\t')
 			continue;
@@ -418,7 +374,7 @@ void parsePartitionString(UDF_ARGS* args,
 		LogicalPartition lp;
 
 		tokenizer tokens1((*tok_iter), sep1);
-		uint32_t ctn = 0;
+		uint ctn = 0;
 		for (tokenizer::iterator tok_iter1 = tokens1.begin(); tok_iter1 != tokens1.end(); ++tok_iter1, ctn++)
 		{
 			ss << *tok_iter1;
@@ -454,7 +410,7 @@ void parsePartitionString(UDF_ARGS* args,
 error:
 	errMsg = "Invalid partition identifier(s)";
 	return;
-
+		
 	// debug
 	set<LogicalPartition>::const_iterator it;
 	cout << "Partition: ";
@@ -481,7 +437,7 @@ int processPartition ( SqlStatement* stmt)
 		{
 			rc = 1;
 			thd->main_da.can_overwrite_status = true;
-			thd->main_da.set_error_status(thd, HA_ERR_INTERNAL_ERROR, "Lost connection to DDLProc");
+			thd->main_da.set_error_status(thd, HA_ERR_INTERNAL_ERROR, "Lost connection to DDLProc");	
 		}
 		else
 		{
@@ -506,7 +462,7 @@ int processPartition ( SqlStatement* stmt)
 	if (b == ddlpackageprocessor::DDLPackageProcessor::WARN_NO_PARTITION)
 	{
 		rc = b;
-		push_warnings(thd, emsg);
+		push_warnings(thd, emsg);		
 	}
 	else if (b == ddlpackageprocessor::DDLPackageProcessor::PARTITION_WARNING)
 	{
@@ -527,11 +483,11 @@ int processPartition ( SqlStatement* stmt)
 	return rc;
 }
 
-void partitionByValue_common(UDF_ARGS* args,								// input
-                             string& errMsg,								// output
-                             CalpontSystemCatalog::TableName& tableName,	// output
-                             set<LogicalPartition>& partSet,				// output
-                             string functionName)							// input
+void partitionByValue_common(UDF_ARGS* args,                               // input
+                             string& errMsg,                               // output
+                             CalpontSystemCatalog::TableName& tableName,   // output
+                             set<LogicalPartition>& partSet,                       // output
+                             string functionName)                          // input
 {
 	// identify partitions by the range
 	DBRM em;
@@ -540,11 +496,12 @@ void partitionByValue_common(UDF_ARGS* args,								// input
 	PartitionMap partMap;
 	PartitionMap::iterator mapit;
 	int32_t seqNum;
+	bool header;
 	string schema, table, column;
 	CalpontSystemCatalog::ColType ct;
 	int64_t startVal, endVal;
 	uint8_t rfMin = 0, rfMax = 0;
-
+	
 	if (args->arg_count == 5)
 	{
 		schema = (char*)(args->args[0]);
@@ -555,7 +512,7 @@ void partitionByValue_common(UDF_ARGS* args,								// input
 	{
 		if (current_thd->db)
 		{
-			schema = current_thd->db;
+			schema = current_thd->db; 
 		}
 		else
 		{
@@ -565,10 +522,10 @@ void partitionByValue_common(UDF_ARGS* args,								// input
 		table = (char*)(args->args[0]);
 		column = (char*)(args->args[1]);
 	}
-
+	
 	tableName.schema = schema;
 	tableName.table = table;
-
+	
 	//@Bug 4695
 	algorithm::to_lower(tableName.schema);
 	if (tableName.schema == "calpontsys")
@@ -580,7 +537,6 @@ void partitionByValue_common(UDF_ARGS* args,								// input
 	try
 	{
 		boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(tid2sid(current_thd->thread_id));
-		csc->identity(execplan::CalpontSystemCatalog::FE);
 		CalpontSystemCatalog::TableColName tcn = make_tcn(schema, table, column);
 		csc->identity(CalpontSystemCatalog::FE);
 		OID_t oid = csc->lookupOID(tcn);
@@ -592,7 +548,7 @@ void partitionByValue_common(UDF_ARGS* args,								// input
 			errMsg = IDBErrorInfo::instance()->errorMsg(ERR_TABLE_NOT_IN_CATALOG, args);
 			return;
 		}
-
+		
 		// check casual partition data type
 		if (!CP_type(ct))
 		{
@@ -606,75 +562,32 @@ void partitionByValue_common(UDF_ARGS* args,								// input
 		if (args->arg_count == 4)
 		{
 			if (!args->args[2])
-			{
-				if (isUnsigned(ct.colDataType))
-				{
-					startVal = 0;
-				}
-				else
-				{
-					startVal = numeric_limits<int64_t>::min();
-				}
-			}
+				startVal = numeric_limits<int64_t>::min();
 			else
-			{
 				startVal = IDB_format((char*) args->args[2], ct, rfMin);
-			}
 			if (!args->args[3])
-			{
-				if (isUnsigned(ct.colDataType))
-				{
-					endVal = static_cast<int64_t>(numeric_limits<uint64_t>::max());
-				}
-				else
-				{
-					endVal = numeric_limits<int64_t>::max();
-				}
-			}
+				endVal = numeric_limits<int64_t>::max();
 			else
-			{
 				endVal = IDB_format((char*) args->args[3], ct, rfMax);
-			}
 		}
 		else
 		{
 			if (!args->args[3])
-			{
-				if (isUnsigned(ct.colDataType))
-				{
-					startVal = 0;
-				}
-				else
-				{
-					startVal = numeric_limits<int64_t>::min();
-				}
-			}
+				startVal = numeric_limits<int64_t>::min();
 			else
-			{
 				startVal = IDB_format((char*) args->args[3], ct, rfMin);
-			}
 			if (!args->args[4])
-			{
-				if (isUnsigned(ct.colDataType))
-				{
-					endVal = static_cast<int64_t>(numeric_limits<uint64_t>::max());
-				}
-				else
-				{
-					endVal = numeric_limits<int64_t>::max();
-				}
-			}
+				endVal = numeric_limits<int64_t>::max();
 			else
-			{
 				endVal = IDB_format((char*) args->args[4], ct, rfMax);
-			}
 		}
-
+		
 		CHECK(em.getExtents(oid, entries, false, false, true));
 		if (entries.size() > 0)
 		{
+			header = false;
 			LogicalPartition logicalPartNum;
-
+			
 			for (iter = entries.begin(); iter != entries.end(); ++iter)
 			{
 				PartitionInfo partInfo;
@@ -683,18 +596,18 @@ void partitionByValue_common(UDF_ARGS* args,								// input
 				logicalPartNum.seg = (*iter).segmentNum;
 				if (iter->status == EXTENTOUTOFSERVICE)
 					partInfo.status |= ET_DISABLED;
-
+				
 				mapit = partMap.find(logicalPartNum);
 				int state = em.getExtentMaxMin(iter->range.start, partInfo.max, partInfo.min, seqNum);
-
+				
 				// char column order swap
-				if ((ct.colDataType == CalpontSystemCatalog::CHAR && ct.colWidth <= 8) ||
+				if ((ct.colDataType == CalpontSystemCatalog::CHAR && ct.colWidth <= 8) || 
 					  (ct.colDataType == CalpontSystemCatalog::VARCHAR && ct.colWidth <= 7))
 				{
 					partInfo.max = uint64ToStr(partInfo.max);
 					partInfo.min = uint64ToStr(partInfo.min);
 				}
-
+			
 				if (mapit == partMap.end())
 				{
 					if (state != CP_VALID)
@@ -705,54 +618,31 @@ void partitionByValue_common(UDF_ARGS* args,								// input
 				{
 					if (mapit->second.status & CPINVALID)
 						continue;
-					if (isUnsigned(ct.colDataType))
-					{
-						mapit->second.min = 
-						(static_cast<uint64_t>(partInfo.min) < static_cast<uint64_t>(mapit->second.min) ? partInfo.min : mapit->second.min);
-						mapit->second.max = 
-						(static_cast<uint64_t>(partInfo.max) > static_cast<uint64_t>(mapit->second.max) ? partInfo.max : mapit->second.max);
-					}
-					else
-					{
-						mapit->second.min = (partInfo.min < mapit->second.min ? partInfo.min : mapit->second.min);
-						mapit->second.max = (partInfo.max > mapit->second.max ? partInfo.max : mapit->second.max);
-					}
+					mapit->second.min = (partInfo.min < mapit->second.min ? partInfo.min : mapit->second.min);
+					mapit->second.max = (partInfo.max > mapit->second.max ? partInfo.max : mapit->second.max);
 				}
 			}
-
+			
 			// check col value range
 			for (mapit = partMap.begin(); mapit != partMap.end(); ++mapit)
 			{
 				// @bug 4595. check empty/null case
-				if (isUnsigned(ct.colDataType))
+				if (!(mapit->second.status & CPINVALID) && mapit->second.min >= startVal && mapit->second.max <= endVal && 
+					 !(mapit->second.min == numeric_limits<int64_t>::max() && mapit->second.max == numeric_limits<int64_t>::min()))
 				{
-					if (!(mapit->second.status & CPINVALID) &&
-						static_cast<uint64_t>(mapit->second.min) >= static_cast<uint64_t>(startVal) &&
-						static_cast<uint64_t>(mapit->second.max) <= static_cast<uint64_t>(endVal) &&
-						!(static_cast<uint64_t>(mapit->second.min) == numeric_limits<uint64_t>::max() &&
-						  static_cast<uint64_t>(mapit->second.max == 0)))
-					{
-						if (rfMin == ROUND_POS && mapit->second.min == startVal)
-							continue;
-						if (rfMax == ROUND_NEG && mapit->second.max == endVal)
-							continue;
-						partSet.insert(mapit->first);
-					}
-				}
-				else
-				{
-					if (!(mapit->second.status & CPINVALID) && mapit->second.min >= startVal && mapit->second.max <= endVal &&
-					    !(mapit->second.min == numeric_limits<int64_t>::max() && mapit->second.max == numeric_limits<int64_t>::min()))
-					{
-						if (rfMin == ROUND_POS && mapit->second.min == startVal)
-							continue;
-						if (rfMax == ROUND_NEG && mapit->second.max == endVal)
-							continue;
-						partSet.insert(mapit->first);
-					}
+					if (rfMin == ROUND_POS && mapit->second.min == startVal)
+						continue;
+					if (rfMax == ROUND_NEG && mapit->second.max == endVal)
+						continue;
+					partSet.insert(mapit->first);
 				}
 			}
-		}
+				
+		}	
+	} catch (IDBExcept& ex)
+	{
+		errMsg = ex.what();
+		return;
 	}
 	catch (QueryDataExcept& ex)
 	{
@@ -761,17 +651,12 @@ void partitionByValue_common(UDF_ARGS* args,								// input
 		errMsg = IDBErrorInfo::instance()->errorMsg(ERR_INVALID_FUNC_ARGUMENT, args);
 		return;
 	}
-	catch (IDBExcept& ex)
-	{
-		errMsg = ex.what();
-		return;
-	}
 	catch (...)
 	{
 		errMsg = string("Error occured when calling ") + functionName;
 		return;
 	}
-
+	
 	if (partSet.empty())
 	{
 		errMsg = IDBErrorInfo::instance()->errorMsg(WARN_NO_PARTITION_FOUND);
@@ -779,8 +664,7 @@ void partitionByValue_common(UDF_ARGS* args,								// input
 	}
 }
 
-std::string  ha_calpont_impl_markpartitions_(
-     execplan::CalpontSystemCatalog::TableName tableName, set<LogicalPartition>& partitionNums)
+std::string  ha_calpont_impl_markpartitions_ (execplan::CalpontSystemCatalog::TableName tableName, set<LogicalPartition>& partitionNums)
 {
 	ddlpackage::QualifiedName *qualifiedName = new QualifiedName();
 	qualifiedName->fSchema = tableName.schema;
@@ -799,8 +683,7 @@ std::string  ha_calpont_impl_markpartitions_(
 	return msg;
 }
 
-std::string  ha_calpont_impl_restorepartitions_(
-     execplan::CalpontSystemCatalog::TableName tableName, set<LogicalPartition>& partitionNums)
+std::string  ha_calpont_impl_restorepartitions_ (execplan::CalpontSystemCatalog::TableName tableName, set<LogicalPartition>& partitionNums)
 {
 	ddlpackage::QualifiedName *qualifiedName = new QualifiedName();
 	qualifiedName->fSchema = tableName.schema;
@@ -815,13 +698,12 @@ std::string  ha_calpont_impl_restorepartitions_(
 	if ( rc != 0 )
 		return msg;
 	msg = "Partitions are enabled successfully." ;
-
+	
 	delete stmt;
 	return msg;
 }
 
-std::string  ha_calpont_impl_droppartitions_(
-     execplan::CalpontSystemCatalog::TableName tableName, set<LogicalPartition>& partitionNums)
+std::string  ha_calpont_impl_droppartitions_ (execplan::CalpontSystemCatalog::TableName tableName, set<LogicalPartition>& partitionNums)
 {
 	ddlpackage::QualifiedName *qualifiedName = new QualifiedName();
 	qualifiedName->fSchema = tableName.schema;
@@ -836,7 +718,7 @@ std::string  ha_calpont_impl_droppartitions_(
 	int rc = processPartition( stmt);
 	if (rc == ddlpackageprocessor::DDLPackageProcessor::WARN_NO_PARTITION)
 		msg = "No partitions are dropped";
-
+	
 	delete stmt;
 	return msg;
 }
@@ -844,16 +726,16 @@ std::string  ha_calpont_impl_droppartitions_(
 extern "C"
 {
 
-/**
+/** 
  * CalShowPartitions
  */
-
+ 
 #ifdef _MSC_VER
 __declspec(dllexport)
 #endif
 my_bool calshowpartitions_init(UDF_INIT* initid, UDF_ARGS* args, char* message)
 {
-	if (args->arg_count < 2 ||
+	if (args->arg_count < 2 || 
 		  args->arg_count > 3 ||
 		  args->arg_type[0] != STRING_RESULT ||
 		  args->arg_type[1] != STRING_RESULT ||
@@ -862,8 +744,8 @@ my_bool calshowpartitions_init(UDF_INIT* initid, UDF_ARGS* args, char* message)
 		strcpy(message,"usage: CALSHOWPARTITIONS ([schema], table, column)");
 		return 1;
 	}
-
-	for (uint32_t i = 0; i < args->arg_count; i++)
+	
+	for (uint i = 0; i < args->arg_count; i++)
 	{
 		if (!args->args[i])
 		{
@@ -897,10 +779,11 @@ const char* calshowpartitions(UDF_INIT* initid, UDF_ARGS* args,
 	PartitionMap partMap;
 	PartitionMap::iterator mapit;
 	int32_t seqNum;
+	bool header;
 	string schema, table, column;
 	CalpontSystemCatalog::ColType ct;
 	string errMsg;
-
+	
 	try
 	{
 		if (args->arg_count == 3)
@@ -913,7 +796,7 @@ const char* calshowpartitions(UDF_INIT* initid, UDF_ARGS* args,
 		{
 			if (current_thd->db)
 			{
-				schema = current_thd->db;
+				schema = current_thd->db; 
 			}
 			else
 			{
@@ -922,7 +805,9 @@ const char* calshowpartitions(UDF_INIT* initid, UDF_ARGS* args,
 			table = (char*)(args->args[0]);
 			column = (char*)(args->args[1]);
 		}
-
+	
+	//try
+	//{
 		boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(tid2sid(current_thd->thread_id));
 		csc->identity(CalpontSystemCatalog::FE);
 		CalpontSystemCatalog::TableColName tcn = make_tcn(schema, table, column);
@@ -934,10 +819,11 @@ const char* calshowpartitions(UDF_INIT* initid, UDF_ARGS* args,
 			args.add("'" + schema + string(".") + table + string(".") + column + "'");
 			throw IDBExcept(ERR_TABLE_NOT_IN_CATALOG, args);
 		}
-
+		
 		CHECK(em.getExtents(oid, entries, false, false, true));
 		if (entries.size() > 0)
 		{
+			header = false;
 			iter = entries.begin();
 			end = entries.end();
 			LogicalPartition logicalPartNum;
@@ -947,21 +833,21 @@ const char* calshowpartitions(UDF_INIT* initid, UDF_ARGS* args,
 				logicalPartNum.dbroot = (*iter).dbRoot;
 				logicalPartNum.pp = (*iter).partitionNum;
 				logicalPartNum.seg = (*iter).segmentNum;
-
+				
 				if (iter->status == EXTENTOUTOFSERVICE)
 					partInfo.status |= ET_DISABLED;
-
+				
 				mapit = partMap.find(logicalPartNum);
 				int state = em.getExtentMaxMin(iter->range.start, partInfo.max, partInfo.min, seqNum);
-
+				
 				// char column order swap for compare
-				if ((ct.colDataType == CalpontSystemCatalog::CHAR && ct.colWidth <= 8) ||
+				if ((ct.colDataType == CalpontSystemCatalog::CHAR && ct.colWidth <= 8) || 
 					  (ct.colDataType == CalpontSystemCatalog::VARCHAR && ct.colWidth <= 7))
 				{
 					partInfo.max = uint64ToStr(partInfo.max);
 					partInfo.min = uint64ToStr(partInfo.min);
 				}
-
+			
 				if (mapit == partMap.end())
 				{
 					if (state != CP_VALID)
@@ -980,32 +866,22 @@ const char* calshowpartitions(UDF_INIT* initid, UDF_ARGS* args,
 	} catch (IDBExcept& ex)
 	{
 		current_thd->main_da.can_overwrite_status = true;
-		current_thd->main_da.set_error_status(current_thd, HA_ERR_UNSUPPORTED, ex.what());
+		current_thd->main_da.set_error_status(current_thd, HA_ERR_UNSUPPORTED, ex.what());	
 		return result;
 	}
 	catch (...)
 	{
 		current_thd->main_da.can_overwrite_status = true;
-		current_thd->main_da.set_error_status(current_thd, HA_ERR_UNSUPPORTED, "Error occured when calling CALSHOWPARTITIONS");
+		current_thd->main_da.set_error_status(current_thd, HA_ERR_UNSUPPORTED, "Error occured when calling CALSHOWPARTITIONS");	
 		return result;
 	}
-
+	
 	ostringstream output;
 	output.setf(ios::left, ios::adjustfield);
-	output << setw(10) << "Part#"
-	       << setw(30) << "Min"
+	output << setw(10) << "Part#" 
+	       << setw(30) << "Min" 
 	       << setw(30) << "Max" << "Status";
-
-	int64_t maxLimit = numeric_limits<int64_t>::max();
-	int64_t minLimit = numeric_limits<int64_t>::min();
-	// char column order swap for compare in subsequent loop
-	if ((ct.colDataType == CalpontSystemCatalog::CHAR && ct.colWidth <= 8) ||
-		(ct.colDataType == CalpontSystemCatalog::VARCHAR && ct.colWidth <= 7))
-	{
-		maxLimit = uint64ToStr(maxLimit);
-		minLimit = uint64ToStr(minLimit);
-	}
-
+	
 	PartitionMap::const_iterator partIt;
 	for (partIt = partMap.begin(); partIt != partMap.end(); ++partIt)
 	{
@@ -1013,34 +889,17 @@ const char* calshowpartitions(UDF_INIT* initid, UDF_ARGS* args,
 		oss << partIt->first;
 		output << "\n  " << setw(10) << oss.str();
 		if (partIt->second.status & CPINVALID)
-		{
 			output << setw(30) << "N/A" << setw(30) << "N/A";
-		}
+		else if (partIt->second.min == numeric_limits<int64_t>::max() && partIt->second.max == numeric_limits<int64_t>::min())
+			output << setw(30) << "Empty/Null" << setw(30) << "Empty/Null";
 		else
-		{
-			if ((isUnsigned(ct.colDataType)))
-			{
-				if (static_cast<uint64_t>(partIt->second.min) == numeric_limits<uint64_t>::max() 
-				&&  static_cast<uint64_t>(partIt->second.max) == numeric_limits<uint64_t>::min())
-					output << setw(30) << "Empty/Null" << setw(30) << "Empty/Null";
-				else
-					output << setw(30) << format(mapit->second.min, ct) << setw(30) << format(mapit->second.max, ct);
-			}
-			else
-			{
-				if (partIt->second.min == maxLimit && partIt->second.max == minLimit)
-					output << setw(30) << "Empty/Null" << setw(30) << "Empty/Null";
-				else
-					output << setw(30) << format(partIt->second.min, ct) << setw(30) << format(partIt->second.max, ct);
-			}
-		}
-
+			output << setw(30) << format(partIt->second.min, ct) << setw(30) << format(partIt->second.max, ct);
 		if (partIt->second.status & ET_DISABLED)
 			output << "Disabled";
 		else
 			output << "Enabled";
 	}
-
+	
 	// use our own buffer to make sure it fits.
 	initid->ptr = new char[output.str().length()+1];
 	memcpy(initid->ptr,output.str().c_str(),output.str().length());
@@ -1049,27 +908,27 @@ const char* calshowpartitions(UDF_INIT* initid, UDF_ARGS* args,
 }
 
 
-/**
+/** 
  * CalDisablePartitions
  */
-
+ 
 	#ifdef _MSC_VER
 __declspec(dllexport)
 #endif
 my_bool caldisablepartitions_init(UDF_INIT* initid, UDF_ARGS* args, char* message)
 {
 	bool err = false;
-
+	
 	if (args->arg_count < 2 || args->arg_count > 3)
 		err = true;
-	else if (args->arg_count == 3 && ((args->arg_type[0] != STRING_RESULT ||
-				 args->arg_type[1] != STRING_RESULT ||
-				 args->arg_type[2] != STRING_RESULT)))
+	else if (args->arg_count == 3 && ((args->arg_type[0] != STRING_RESULT || 
+			     args->arg_type[1] != STRING_RESULT ||
+			     args->arg_type[2] != STRING_RESULT)))
 			err = true;
 	else if (args->arg_count == 2 && ((args->arg_type[0] != STRING_RESULT || args->arg_type[1] != STRING_RESULT)))
 			err = true;
-
-	for (uint32_t i = 0; i < args->arg_count; i++)
+	
+	for (uint i = 0; i < args->arg_count; i++)
 	{
 		if (!args->args[i])
 		{
@@ -1077,7 +936,7 @@ my_bool caldisablepartitions_init(UDF_INIT* initid, UDF_ARGS* args, char* messag
 			break;
 		}
 	}
-
+	
 	if (err)
 	{
 		strcpy(message,"\nusage: CALDISABLEPARTITIONS (['schemaName'], 'tableName', 'partitionList')");
@@ -1094,7 +953,7 @@ __declspec(dllexport)
 const char* caldisablepartitions(UDF_INIT* initid, UDF_ARGS* args,
 					char* result, unsigned long* length,
 					char* is_null, char* error)
-{
+{	
 	CalpontSystemCatalog::TableName tableName;
 	set <LogicalPartition> partitionNums;
 	string errMsg;
@@ -1117,10 +976,10 @@ const char* caldisablepartitions(UDF_INIT* initid, UDF_ARGS* args,
 		tableName.schema = current_thd->db;
 		parsePartitionString(args, 1, partitionNums, errMsg, tableName);
 	}
-
+	
 	if (errMsg.empty())
 		errMsg = ha_calpont_impl_markpartitions_(tableName,partitionNums );
-
+	
 	memcpy(result,errMsg.c_str(), errMsg.length());
 	*length = errMsg.length();
 	return result;
@@ -1133,10 +992,10 @@ void caldisablepartitions_deinit(UDF_INIT* initid)
 {
 }
 
-/**
+/** 
  * CalEnablePartitions
  */
-
+ 
 #ifdef _MSC_VER
 __declspec(dllexport)
 #endif
@@ -1145,14 +1004,14 @@ my_bool calenablepartitions_init(UDF_INIT* initid, UDF_ARGS* args, char* message
 	bool err = false;
 	if (args->arg_count < 2 || args->arg_count > 3)
 		err = true;
-	else if (args->arg_count == 3 && ((args->arg_type[0] != STRING_RESULT ||
-				 args->arg_type[1] != STRING_RESULT ||
-				 args->arg_type[2] != STRING_RESULT)))
+	else if (args->arg_count == 3 && ((args->arg_type[0] != STRING_RESULT || 
+			     args->arg_type[1] != STRING_RESULT ||
+			     args->arg_type[2] != STRING_RESULT)))
 			err = true;
 	else if (args->arg_count == 2 && ((args->arg_type[0] != STRING_RESULT || args->arg_type[1] != STRING_RESULT)))
 			err = true;
-
-	for (uint32_t i = 0; i < args->arg_count; i++)
+			
+	for (uint i = 0; i < args->arg_count; i++)
 	{
 		if (!args->args[i])
 		{
@@ -1160,7 +1019,7 @@ my_bool calenablepartitions_init(UDF_INIT* initid, UDF_ARGS* args, char* message
 			break;
 		}
 	}
-
+	
 	if (err)
 	{
 		strcpy(message,"\nusage: CALENABLEPARTITIONS (['schemaName'], 'tableName', 'partitionList')");
@@ -1178,7 +1037,7 @@ __declspec(dllexport)
 const char* calenablepartitions(UDF_INIT* initid, UDF_ARGS* args,
 					char* result, unsigned long* length,
 					char* is_null, char* error)
-{
+{	
 	CalpontSystemCatalog::TableName tableName;
 	string errMsg;
 	set<LogicalPartition> partitionNums;
@@ -1194,21 +1053,18 @@ const char* calenablepartitions(UDF_INIT* initid, UDF_ARGS* args,
 		if (!current_thd->db)
 		{
 			current_thd->main_da.can_overwrite_status = true;
-			current_thd->main_da.set_error_status
-			(
-			   current_thd,
-			   HA_ERR_INTERNAL_ERROR,
-			   IDBErrorInfo::instance()->errorMsg(ERR_PARTITION_NO_SCHEMA).c_str()
-			);
+			current_thd->main_da.set_error_status(current_thd, 
+			                                      HA_ERR_INTERNAL_ERROR, 
+			                                      IDBErrorInfo::instance()->errorMsg(ERR_PARTITION_NO_SCHEMA).c_str());
 			return result;
 		}
 		tableName.schema = current_thd->db;
 		parsePartitionString(args, 1, partitionNums, errMsg, tableName);
 	}
-
+	
 	if (errMsg.empty())
 		errMsg = ha_calpont_impl_restorepartitions_(tableName,partitionNums );
-
+	
 	memcpy(result, errMsg.c_str(), errMsg.length());
 	*length = errMsg.length();
 	return result;
@@ -1221,10 +1077,10 @@ void calenablepartitions_deinit(UDF_INIT* initid)
 {
 }
 
-/**
+/** 
  * CalDropPartitions
  */
-
+ 
 #ifdef _MSC_VER
 __declspec(dllexport)
 #endif
@@ -1233,14 +1089,14 @@ my_bool caldroppartitions_init(UDF_INIT* initid, UDF_ARGS* args, char* message)
 	bool err = false;
 	if (args->arg_count < 2 || args->arg_count > 3)
 		err = true;
-	else if (args->arg_count == 3 && ((args->arg_type[0] != STRING_RESULT ||
-			 args->arg_type[1] != STRING_RESULT ||
-			 args->arg_type[2] != STRING_RESULT)))
-		err = true;
+	else if (args->arg_count == 3 && ((args->arg_type[0] != STRING_RESULT || 
+			     args->arg_type[1] != STRING_RESULT ||
+			     args->arg_type[2] != STRING_RESULT)))
+			err = true;
 	else if (args->arg_count == 2 && ((args->arg_type[0] != STRING_RESULT || args->arg_type[1] != STRING_RESULT)))
-		err = true;
-
-	for (uint32_t i = 0; i < args->arg_count; i++)
+			err = true;
+	
+	for (uint i = 0; i < args->arg_count; i++)
 	{
 		if (!args->args[i])
 		{
@@ -1248,7 +1104,7 @@ my_bool caldroppartitions_init(UDF_INIT* initid, UDF_ARGS* args, char* message)
 			break;
 		}
 	}
-
+	
 	if (err)
 	{
 		strcpy(message,"\nusage: CALDROPPARTITIONS (['schemaName'], 'tableName', 'partitionList')");
@@ -1264,13 +1120,13 @@ my_bool caldroppartitions_init(UDF_INIT* initid, UDF_ARGS* args, char* message)
 __declspec(dllexport)
 #endif
 const char* caldroppartitions(UDF_INIT* initid, UDF_ARGS* args,
-                              char* result, unsigned long* length,
-                              char* is_null, char* error)
-{
+					char* result, unsigned long* length,
+					char* is_null, char* error)
+{	
 	CalpontSystemCatalog::TableName tableName;
 	string errMsg;
 	set<LogicalPartition> partSet;
-
+	
 	if ( args->arg_count == 3 )
 	{
 		tableName.schema = args->args[0];
@@ -1283,8 +1139,9 @@ const char* caldroppartitions(UDF_INIT* initid, UDF_ARGS* args,
 		if (!current_thd->db)
 		{
 			current_thd->main_da.can_overwrite_status = true;
-			current_thd->main_da.set_error_status( current_thd, HA_ERR_INTERNAL_ERROR,
-			     IDBErrorInfo::instance()->errorMsg(ERR_PARTITION_NO_SCHEMA).c_str());
+			current_thd->main_da.set_error_status(current_thd, 
+			                                      HA_ERR_INTERNAL_ERROR, 
+			                                      IDBErrorInfo::instance()->errorMsg(ERR_PARTITION_NO_SCHEMA).c_str());
 			return result;
 		}
 		tableName.schema = current_thd->db;
@@ -1293,7 +1150,7 @@ const char* caldroppartitions(UDF_INIT* initid, UDF_ARGS* args,
 
 	if (errMsg.empty())
 		errMsg = ha_calpont_impl_droppartitions_(tableName,partSet);
-
+	
 	memcpy(result, errMsg.c_str(), errMsg.length());
 	*length = errMsg.length();
 	return result;
@@ -1306,10 +1163,10 @@ void caldroppartitions_deinit(UDF_INIT* initid)
 {
 }
 
-/**
+/** 
  * CalDropPartitionsByValue
  */
-
+ 
 #ifdef _MSC_VER
 __declspec(dllexport)
 #endif
@@ -1335,7 +1192,7 @@ my_bool caldroppartitionsbyvalue_init(UDF_INIT* initid, UDF_ARGS* args, char* me
 	}
 	else if (args->arg_count == 5)
 	{
-		if (args->arg_type[0] != STRING_RESULT || args->arg_type[1] != STRING_RESULT ||
+		if (args->arg_type[0] != STRING_RESULT || args->arg_type[1] != STRING_RESULT || 
 			  args->arg_type[2] != STRING_RESULT || args->arg_type[3] != STRING_RESULT || args->arg_type[4] != STRING_RESULT)
 			err = true;
 	}
@@ -1366,22 +1223,22 @@ const char* caldroppartitionsbyvalue(UDF_INIT* initid, UDF_ARGS* args,
 	CalpontSystemCatalog::TableName tableName;
 	set<LogicalPartition> partSet;
 	partitionByValue_common(args, msg, tableName, partSet, "calDropPartitionsByValue");
-
+	
 	if (!msg.empty())
 	{
 		current_thd->main_da.can_overwrite_status = true;
 		current_thd->main_da.set_error_status(current_thd, HA_ERR_INTERNAL_ERROR, msg.c_str());
 		return result;
 	}
-
+	
 	msg = ha_calpont_impl_droppartitions_(tableName,partSet);
-
+	
 	memcpy(result, msg.c_str(), msg.length());
 	*length = msg.length();
 	return result;
 }
 
-/**
+/** 
  * CalDisablePartitionsByValue
  */
 
@@ -1410,7 +1267,7 @@ my_bool caldisablepartitionsbyvalue_init(UDF_INIT* initid, UDF_ARGS* args, char*
 	}
 	else if (args->arg_count == 5)
 	{
-		if (args->arg_type[0] != STRING_RESULT || args->arg_type[1] != STRING_RESULT ||
+		if (args->arg_type[0] != STRING_RESULT || args->arg_type[1] != STRING_RESULT || 
 			  args->arg_type[2] != STRING_RESULT || args->arg_type[3] != STRING_RESULT || args->arg_type[4] != STRING_RESULT)
 			err = true;
 	}
@@ -1437,7 +1294,7 @@ const char* caldisablepartitionsbyvalue(UDF_INIT* initid, UDF_ARGS* args,
 	set<LogicalPartition> partSet;
 	CalpontSystemCatalog::TableName tableName;
 	partitionByValue_common(args, msg, tableName, partSet, "calDisablePartitionsByValue");
-
+	
 	if (!msg.empty())
 	{
 		current_thd->main_da.can_overwrite_status = true;
@@ -1446,14 +1303,14 @@ const char* caldisablepartitionsbyvalue(UDF_INIT* initid, UDF_ARGS* args,
 	}
 
 	msg = ha_calpont_impl_markpartitions_(tableName, partSet);
-
+	
 	memcpy(result, msg.c_str(), msg.length());
 	*length = msg.length();
 	return result;
 }
 
 
-/**
+/** 
  * CalEnablePartitionsByValue
  */
 #ifdef _MSC_VER
@@ -1481,11 +1338,11 @@ my_bool calenablepartitionsbyvalue_init(UDF_INIT* initid, UDF_ARGS* args, char* 
 	}
 	else if (args->arg_count == 5)
 	{
-		if (args->arg_type[0] != STRING_RESULT || args->arg_type[1] != STRING_RESULT ||
+		if (args->arg_type[0] != STRING_RESULT || args->arg_type[1] != STRING_RESULT || 
 			  args->arg_type[2] != STRING_RESULT || args->arg_type[3] != STRING_RESULT || args->arg_type[4] != STRING_RESULT)
 			err = true;
 	}
-
+	
 	if (err)
 	{
 		strcpy(message,"\nusage: CALENABLEPARTITIONSBYVALUE (['schema'], 'table', 'column', 'min', 'max')");
@@ -1508,7 +1365,7 @@ const char* calenablepartitionsbyvalue(UDF_INIT* initid, UDF_ARGS* args,
 	set<LogicalPartition> partSet;
 	CalpontSystemCatalog::TableName tableName;
 	partitionByValue_common(args, msg, tableName, partSet, "calEnablePartitionsByValue");
-
+	
 	if (!msg.empty())
 	{
 		current_thd->main_da.can_overwrite_status = true;
@@ -1517,13 +1374,13 @@ const char* calenablepartitionsbyvalue(UDF_INIT* initid, UDF_ARGS* args,
 	}
 
 	msg = ha_calpont_impl_restorepartitions_(tableName, partSet);
-
+	
 	memcpy(result, msg.c_str(), msg.length());
 	*length = msg.length();
 	return result;
 }
 
-/**
+/** 
  * CalShowPartitionsByValue
  */
 #ifdef _MSC_VER
@@ -1543,11 +1400,11 @@ my_bool calshowpartitionsbyvalue_init(UDF_INIT* initid, UDF_ARGS* args, char* me
 	}
 	else if (args->arg_count == 5)
 	{
-		if (args->arg_type[0] != STRING_RESULT || args->arg_type[1] != STRING_RESULT ||
+		if (args->arg_type[0] != STRING_RESULT || args->arg_type[1] != STRING_RESULT || 
 			  args->arg_type[2] != STRING_RESULT || args->arg_type[3] != STRING_RESULT || args->arg_type[4] != STRING_RESULT)
 			err = true;
 	}
-
+	
 	if (err)
 	{
 		strcpy(message,"\nusage: CALSHOWPARTITIONSBYVALUE (['schema'], 'table', 'column', 'min', 'max')");
@@ -1581,12 +1438,13 @@ const char* calshowpartitionsbyvalue(UDF_INIT* initid, UDF_ARGS* args,
 	PartitionMap partMap;
 	PartitionMap::iterator mapit;
 	int32_t seqNum;
+	bool header;
 	string schema, table, column;
 	CalpontSystemCatalog::ColType ct;
 	string errMsg;
 	int64_t startVal, endVal;
 	uint8_t rfMin = 0, rfMax = 0;
-
+	
 	try
 	{
 		if (args->arg_count == 5)
@@ -1599,7 +1457,7 @@ const char* calshowpartitionsbyvalue(UDF_INIT* initid, UDF_ARGS* args,
 		{
 			if (current_thd->db)
 			{
-				schema = current_thd->db;
+				schema = current_thd->db; 
 			}
 			else
 			{
@@ -1608,7 +1466,7 @@ const char* calshowpartitionsbyvalue(UDF_INIT* initid, UDF_ARGS* args,
 			table = (char*)(args->args[0]);
 			column = (char*)(args->args[1]);
 		}
-
+	
 		boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(tid2sid(current_thd->thread_id));
 		csc->identity(CalpontSystemCatalog::FE);
 		CalpontSystemCatalog::TableColName tcn = make_tcn(schema, table, column);
@@ -1620,7 +1478,7 @@ const char* calshowpartitionsbyvalue(UDF_INIT* initid, UDF_ARGS* args,
 			args.add("'" + schema + string(".") + table + string(".") + column + "'");
 			throw IDBExcept(ERR_TABLE_NOT_IN_CATALOG, args);
 		}
-
+		
 		// check casual partition data type
 		if (!CP_type(ct))
 		{
@@ -1629,77 +1487,34 @@ const char* calshowpartitionsbyvalue(UDF_INIT* initid, UDF_ARGS* args,
 			args.add("calShowPartitionsByValue");
 			throw IDBExcept(ERR_PARTITION_BY_RANGE, args);
 		}
-
+		
 		if (args->arg_count == 4)
 		{
 			if (!args->args[2])
-			{
-				if (isUnsigned(ct.colDataType))
-				{
-					startVal = 0;
-				}
-				else
-				{
-					startVal = numeric_limits<int64_t>::min();
-				}
-			}
+				startVal = numeric_limits<int64_t>::min();
 			else
-			{
 				startVal = IDB_format((char*) args->args[2], ct, rfMin);
-			}
 			if (!args->args[3])
-			{
-				if (isUnsigned(ct.colDataType))
-				{
-					endVal = static_cast<int64_t>(numeric_limits<uint64_t>::max());
-				}
-				else
-				{
-					endVal = numeric_limits<int64_t>::max();
-				}
-			}
+				endVal = numeric_limits<int64_t>::max();
 			else
-			{
 				endVal = IDB_format((char*) args->args[3], ct, rfMax);
-			}
 		}
 		else
 		{
 			if (!args->args[3])
-			{
-				if (isUnsigned(ct.colDataType))
-				{
-					startVal = 0;
-				}
-				else
-				{
-					startVal = numeric_limits<int64_t>::min();
-				}
-			}
+				startVal = numeric_limits<int64_t>::min();
 			else
-			{
 				startVal = IDB_format((char*) args->args[3], ct, rfMin);
-			}
 			if (!args->args[4])
-			{
-				if (isUnsigned(ct.colDataType))
-				{
-					endVal = static_cast<int64_t>(numeric_limits<uint64_t>::max());
-				}
-				else
-				{
-					endVal = numeric_limits<int64_t>::max();
-				}
-			}
+				endVal = numeric_limits<int64_t>::max();
 			else
-			{
 				endVal = IDB_format((char*) args->args[4], ct, rfMax);
-			}
 		}
-
+		
 		CHECK(em.getExtents(oid, entries, false, false, true));
 		if (entries.size() > 0)
 		{
+			header = false;
 			iter = entries.begin();
 			end = entries.end();
 			LogicalPartition logicalPartNum;
@@ -1711,12 +1526,12 @@ const char* calshowpartitionsbyvalue(UDF_INIT* initid, UDF_ARGS* args,
 				logicalPartNum.seg = (*iter).segmentNum;
 				if (iter->status == EXTENTOUTOFSERVICE)
 					partInfo.status |= ET_DISABLED;
-
+				
 				mapit = partMap.find(logicalPartNum);
 				int state = em.getExtentMaxMin(iter->range.start, partInfo.max, partInfo.min, seqNum);
-
+				
 				// char column order swap
-				if ((ct.colDataType == CalpontSystemCatalog::CHAR && ct.colWidth <= 8) ||
+				if ((ct.colDataType == CalpontSystemCatalog::CHAR && ct.colWidth <= 8) || 
 					  (ct.colDataType == CalpontSystemCatalog::VARCHAR && ct.colWidth <= 7))
 				{
 					partInfo.max = uint64ToStr(partInfo.max);
@@ -1732,44 +1547,33 @@ const char* calshowpartitionsbyvalue(UDF_INIT* initid, UDF_ARGS* args,
 				{
 					if (mapit->second.status & CPINVALID)
 						continue;
-					if (isUnsigned(ct.colDataType))
-					{
-						mapit->second.min = 
-						  (static_cast<uint64_t>(partInfo.min) < static_cast<uint64_t>(mapit->second.min) ? partInfo.min : mapit->second.min);
-						mapit->second.max = 
-						  (static_cast<uint64_t>(partInfo.max) > static_cast<uint64_t>(mapit->second.max) ? partInfo.max : mapit->second.max);
-					}
-					else
-					{
-						mapit->second.min = (partInfo.min < mapit->second.min ? partInfo.min : mapit->second.min);
-						mapit->second.max = (partInfo.max > mapit->second.max ? partInfo.max : mapit->second.max);
-					}
+					mapit->second.min = (partInfo.min < mapit->second.min ? partInfo.min : mapit->second.min);
+					mapit->second.max = (partInfo.max > mapit->second.max ? partInfo.max : mapit->second.max);
 				}
 			}
 		}
-	} 
+	} catch (IDBExcept& ex)
+	{
+		current_thd->main_da.can_overwrite_status = true;
+		current_thd->main_da.set_error_status(current_thd, HA_ERR_UNSUPPORTED, ex.what());	
+		return result;
+	}
 	catch (logging::QueryDataExcept& ex)
 	{
 		Message::Args args;
 		args.add(ex.what());
 		errMsg = IDBErrorInfo::instance()->errorMsg(ERR_INVALID_FUNC_ARGUMENT, args);
 		current_thd->main_da.can_overwrite_status = true;
-		current_thd->main_da.set_error_status(current_thd, HA_ERR_UNSUPPORTED, (char*)errMsg.c_str());
-		return result;
-	}
-	catch (IDBExcept& ex)
-	{
-		current_thd->main_da.can_overwrite_status = true;
-		current_thd->main_da.set_error_status(current_thd, HA_ERR_UNSUPPORTED, ex.what());
+		current_thd->main_da.set_error_status(current_thd, HA_ERR_UNSUPPORTED, (char*)errMsg.c_str());	
 		return result;
 	}
 	catch (...)
 	{
 		current_thd->main_da.can_overwrite_status = true;
-		current_thd->main_da.set_error_status(current_thd, HA_ERR_UNSUPPORTED, "Error occured when calling CALSHOWPARTITIONS");
+		current_thd->main_da.set_error_status(current_thd, HA_ERR_UNSUPPORTED, "Error occured when calling CALSHOWPARTITIONS");	
 		return result;
 	}
-
+	
 	// create a set of partInfo for sorting.
 	bool noPartFound = true;
 	ostringstream output;
@@ -1788,50 +1592,34 @@ const char* calshowpartitionsbyvalue(UDF_INIT* initid, UDF_ARGS* args,
 			if (noPartFound)
 			{
 				output.setf(ios::left, ios::adjustfield);
-				output << setw(10) << "Part#"
-					<< setw(30) << "Min"
-					<< setw(30) << "Max" << "Status";
+				output << setw(10) << "Part#" 
+	       << setw(30) << "Min" 
+	       << setw(30) << "Max" << "Status";
 			}
 			noPartFound = false;
-
+			
 			// print part info
 			ostringstream oss;
 			oss << mapit->first;
 			output << "\n  " << setw(10) << oss.str();
 			if (mapit->second.status & CPINVALID)
-			{
 				output << setw(30) << "N/A" << setw(30) << "N/A";
-			}
+			else if (mapit->second.min > mapit->second.max)
+				output << setw(30) << "Empty/Null" << setw(30) << "Empty/Null";
 			else
-			{
-				if ((isUnsigned(ct.colDataType)))
-				{
-					if (static_cast<uint64_t>(mapit->second.min) > static_cast<uint64_t>(mapit->second.max))
-						output << setw(30) << "Empty/Null" << setw(30) << "Empty/Null";
-					else
-						output << setw(30) << format(mapit->second.min, ct) << setw(30) << format(mapit->second.max, ct);
-				}
-				else
-				{
-					if (mapit->second.min > mapit->second.max)
-						output << setw(30) << "Empty/Null" << setw(30) << "Empty/Null";
-					else
-						output << setw(30) << format(mapit->second.min, ct) << setw(30) << format(mapit->second.max, ct);
-				}
-			}
-
+				output << setw(30) << format(mapit->second.min, ct) << setw(30) << format(mapit->second.max, ct);
 			if (mapit->second.status & ET_DISABLED)
 				output << "Disabled";
 			else
 				output << "Enabled";
 		}
 	}
-
+	
 	if (noPartFound)
 	{
 		errMsg = IDBErrorInfo::instance()->errorMsg(WARN_NO_PARTITION_FOUND);
 		current_thd->main_da.can_overwrite_status = true;
-		current_thd->main_da.set_error_status(current_thd, HA_ERR_UNSUPPORTED, errMsg.c_str());
+		current_thd->main_da.set_error_status(current_thd, HA_ERR_UNSUPPORTED, errMsg.c_str());	
 		return result;
 	}
 

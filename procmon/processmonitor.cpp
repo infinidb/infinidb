@@ -1,29 +1,8 @@
-/* Copyright (C) 2014 InfiniDB, Inc.
-
-   This program is free software; you can redistribute it and/or
-   modify it under the terms of the GNU General Public License
-   as published by the Free Software Foundation; version 2 of
-   the License.
-
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-   MA 02110-1301, USA. */
-
 /***************************************************************************
-* $Id: processmonitor.cpp 2044 2013-08-07 19:47:37Z dhill $
+* $Id: processmonitor.cpp 2024 2013-06-25 18:25:49Z dhill $
 *
  ***************************************************************************/
 
-#include <boost/scoped_ptr.hpp>
-
-#include "IDBDataFile.h"
-#include "IDBPolicy.h"
 #include "processmonitor.h"
 #include "installdir.h"
 #include "cacheutils.h"
@@ -37,8 +16,6 @@ using namespace snmpmanager;
 using namespace logging;
 using namespace config;
 
-using namespace idbdatafile;
-
 extern string systemOAM;
 extern string dm_server;
 extern bool runStandby;
@@ -48,8 +25,6 @@ extern string cloud;
 extern string GlusterConfig;
 extern bool rootUser;
 extern string USER;
-extern bool HDFS;
-extern string PMwithUM;
 
 //std::string gOAMParentModuleName;
 bool gOAMParentModuleFlag;
@@ -574,17 +549,17 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 						}
 
 						pid_t processID = startProcess(processconfig.ModuleType,
-										processconfig.ProcessName,
-										processconfig.ProcessLocation, 
-										processconfig.ProcessArgs, 
-										processconfig.LaunchID,
-										processconfig.BootLaunch,
-										processconfig.RunType,
-										processconfig.DepProcessName, 
-										processconfig.DepModuleName,
-										processconfig.LogFile,
-										initType,
-										actIndicator);
+														processconfig.ProcessName,
+														processconfig.ProcessLocation, 
+														processconfig.ProcessArgs, 
+														processconfig.LaunchID,
+														processconfig.BootLaunch,
+														processconfig.RunType,
+														processconfig.DepProcessName, 
+														processconfig.DepModuleName,
+														processconfig.LogFile,
+														initType,
+														actIndicator);
 						if ( processID > oam::API_MAX )
 							processID = oam::API_SUCCESS;
 						requestStatus = processID;
@@ -707,7 +682,7 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 				{
 					msg >> processName; 
 					msg >> manualFlag;
-
+					int requestStatus = API_SUCCESS;
 					log.writeLog(__LINE__, "MSG RECEIVED: Re-Init process request on: " + processName);
 
 					if ( processName == "cpimport" )
@@ -725,10 +700,12 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 							if ((*listPtr).ProcessName == processName) {
 								if ( (*listPtr).processID <= 1 ) {
 									log.writeLog(__LINE__,  "ERROR: process not active" , LOG_TYPE_DEBUG );
+									requestStatus = API_SUCCESS;
 									break;
 								}
 	
 								reinitProcess((*listPtr).processID, (*listPtr).ProcessName, actIndicator);
+								requestStatus = API_SUCCESS;
 								break;
 							}
 						}
@@ -736,10 +713,16 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 						if (listPtr == aPtr->end())
 						{
 							log.writeLog(__LINE__,  "ERROR: No such process: " + processName, LOG_TYPE_ERROR );
+							requestStatus = API_FAILURE;
 						}
 					}
 
-					log.writeLog(__LINE__, "PROCREINITPROCESS: completed, no ack to ProcMgr");
+					ackMsg << (ByteStream::byte) ACK;
+					ackMsg << (ByteStream::byte) PROCREINITPROCESS;
+					ackMsg << (ByteStream::byte) requestStatus;
+					mq.write(ackMsg);
+
+					log.writeLog(__LINE__, "PROCREINITPROCESS: ACK back to ProcMgr, return status = " + oam.itoa((int) requestStatus));
 					break;
 				}
 				case STOPALL:
@@ -838,55 +821,7 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 
 						//send down notification
 						oam.sendDeviceNotification(config.moduleName(), MODULE_DOWN);
-
-						//setModule status to offline
-						if ( manualFlag ) {
-							try{
-								oam.setModuleStatus(config.moduleName(), oam::MAN_OFFLINE);
-							}
-							catch (exception& ex)
-							{
-								string error = ex.what();
-								log.writeLog(__LINE__, "EXCEPTION ERROR on setModuleStatus: " + error, LOG_TYPE_ERROR);
-							}
-							catch(...)
-							{
-								log.writeLog(__LINE__, "EXCEPTION ERROR on setModuleStatus: Caught unknown exception!", LOG_TYPE_ERROR);
-							}
-						}
-						else
-						{
-							try{
-								oam.setModuleStatus(config.moduleName(), oam::AUTO_OFFLINE);
-							}
-							catch (exception& ex)
-							{
-								string error = ex.what();
-								log.writeLog(__LINE__, "EXCEPTION ERROR on setModuleStatus: " + error, LOG_TYPE_ERROR);
-							}
-							catch(...)
-							{
-								log.writeLog(__LINE__, "EXCEPTION ERROR on setModuleStatus: Caught unknown exception!", LOG_TYPE_ERROR);
-							}
-						}
 					}
-					else
-					{
-						//setModule status to failed
-						try{
-							oam.setModuleStatus(config.moduleName(), oam::FAILED);
-						}
-						catch (exception& ex)
-						{
-							string error = ex.what();
-							log.writeLog(__LINE__, "EXCEPTION ERROR on setModuleStatus: " + error, LOG_TYPE_ERROR);
-						}
-						catch(...)
-						{
-							log.writeLog(__LINE__, "EXCEPTION ERROR on setModuleStatus: Caught unknown exception!", LOG_TYPE_ERROR);
-						}
-					}
-
 
 					if ( config.moduleType() == "pm" ) {
 						//clearout auto move dbroots files
@@ -910,8 +845,8 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 					if ( actIndicator == oam::REMOVE ) {
 						log.writeLog(__LINE__,  "STOPALL: uninstall Calpont RPMs", LOG_TYPE_DEBUG);
 						if ( config.moduleType() == "um" ) {
-							system("rpm -e infinidb-libs infinidb-platform infinidb-enterprise infinidb-storage-engine infinidb-mysql --nodeps");
-							system("dpkg -P infinidb-libs infinidb-platform infinidb-enterprise infinidb-storage-engine infinidb-mysql");
+							system("rpm -e calpont calpont-mysqld calpont-mysql --nodeps");
+							system("dpkg -P calpont calpont-mysqld calpont-mysql");
 						}
 						else	// pm
 						{
@@ -925,8 +860,8 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 							system(cmd.c_str());
 							sleep(1);
 	
-							system("rpm -e infinidb-libs infinidb-platform infinidb-enterprise infinidb-storage-engine infinidb-mysql --nodeps");
-							system("dpkg -P infinidb-libs infinidb-platform infinidb-enterprise infinidb-storage-engine infinidb-mysql");
+							system("rpm -e calpont calpont-mysqld calpont-mysql --nodeps");
+							system("dpkg -P calpont calpont-mysqld calpont-mysql");
 						}
 						// should get here is packages get removed correctly
 						string cmd = startup::StartUp::installDir() + "/bin/infinidb stop > /dev/null 2>&1";
@@ -942,37 +877,12 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 					int requestStatus = oam::API_SUCCESS;
 					log.writeLog(__LINE__,  "MSG RECEIVED: Start All process request...");
 
-					// change permissions on /dev/shm
-					string cmd = "chmod 777 /dev/shm >/dev/null 2>&1";
-					if ( !rootUser)
-						cmd = "sudo chmod 777 /dev/shm >/dev/null 2>&1";
-				
-					system(cmd.c_str());
-
 					//start the mysql daemon 
 					try {
 						oam.actionMysqlCalpont(MYSQL_START);
 					}
 					catch(...)
-					{	// mysql didn't start, return with error
-						log.writeLog(__LINE__, "STARTALL: MySQL failed to start, start-module failure", LOG_TYPE_CRITICAL);
-						
-						ackMsg << (ByteStream::byte) ACK;
-						ackMsg << (ByteStream::byte) STARTALL;
-						ackMsg << (ByteStream::byte) oam::API_FAILURE;
-						mq.write(ackMsg);
-	
-						try {
-							oam.setProcessStatus("mysqld", config.moduleName(), oam::FAILED, 0);
-						}
-						catch(...)
-						{}
-
-						log.writeLog(__LINE__, "STARTALL: ACK back to ProcMgr, return status = " + oam.itoa((int) oam::API_FAILURE));
-		
-						break;
-
-					}
+					{}
 
 					if( config.moduleType() == "pm" )
 					{
@@ -996,27 +906,12 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 						}
 					}
 
-					//run HDFS startup test script to perform basic DB sanity testing
-					if ( HDFS ) {
-						if ( runHDFSTest() != oam::API_SUCCESS ) {
-							requestStatus = oam::API_FAILURE_DB_ERROR;
-
-							ackMsg << (ByteStream::byte) ACK;
-							ackMsg << (ByteStream::byte) STARTALL;
-							ackMsg << (ByteStream::byte) requestStatus;
-							mq.write(ackMsg);
-		
-							log.writeLog(__LINE__, "STARTALL: ACK back to ProcMgr, return status = " + oam.itoa((int) requestStatus));
-			
-							break;
-						}
-					}
-
 					//Loop through all Process belong to this module	
 					processList::iterator listPtr;
 					processList* aPtr = config.monitoredListPtr();
 					listPtr = aPtr->begin();
 					requestStatus = API_SUCCESS;
+					bool procmonProcessStart = false;
 	
 					//launched any processes controlled by ProcMon that aren't active
 					for (; listPtr != aPtr->end(); ++listPtr)
@@ -1024,14 +919,6 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 						if ( (*listPtr).BootLaunch != BOOT_LAUNCH)
 							continue;
 		
-						int opState;
-						bool degraded;
-						oam.getModuleStatus(config.moduleName(), opState, degraded);
-						if (opState == oam::FAILED) {
-							requestStatus = oam::API_FAILURE;
-							break;
-						}
-
 						//check the process current status & start the requested process
 						if ((*listPtr).state == oam::MAN_OFFLINE ||
 							(*listPtr).state == oam::AUTO_OFFLINE ||
@@ -1063,6 +950,7 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 			
 							if ( processID > oam::API_MAX ) {
 								processID = oam::API_SUCCESS;
+								procmonProcessStart = true;
 							}
 
 							requestStatus = processID;
@@ -1082,14 +970,6 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 							if ((*listPtr).BootLaunch != MGR_LAUNCH)
 								continue;
 			
-							int opState;
-							bool degraded;
-							oam.getModuleStatus(config.moduleName(), opState, degraded);
-							if (opState == oam::FAILED) {
-								requestStatus = oam::API_FAILURE;
-								break;
-							}
-
 							//check the process current status & start the requested process
 							if ((*listPtr).state == oam::MAN_OFFLINE ||
 								(*listPtr).state == oam::AUTO_OFFLINE ||
@@ -1192,7 +1072,7 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 
 					//Loop reversely thorugh the process list
 			
-/*					processList* aPtr = config.monitoredListPtr();
+					processList* aPtr = config.monitoredListPtr();
 					processList::reverse_iterator rPtr;
 					uint16_t rtnCode;
 		
@@ -1224,7 +1104,7 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 					}
 					catch(...)
 					{}
-*/
+
 					ackMsg << (ByteStream::byte) ACK;
 					ackMsg << (ByteStream::byte) SHUTDOWNMODULE;
 					ackMsg << (ByteStream::byte) API_SUCCESS;
@@ -1382,22 +1262,21 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 				}
 				catch(...)
 				{}
-				system("rpm -e infinidb-storage-engine infinidb-mysql");
-				system("dpkg -P infinidb-storage-engine infinidb-mysql");
+				system("rpm -e calpont-mysql calpont-mysqld");
+				system("dpkg -P calpont-mysql calpont-mysqld");
 				log.writeLog(__LINE__, "RECONFIGURE: removed mysql rpms");
 			}
 
 			// install mysql rpms if being reconfigured as a um
 			if ( reconfigureModuleName.find("um") != string::npos ) {
-				system("rpm -ivh /root/infinidb-storage-engine-*rpm /root/infinidb-mysql-*rpm > /tmp/rpminstall");
-				system("dpgk -i /root/infinidb-storage-engine-*deb /root/infinidb-mysql-*deb >> /tmp/rpminstall");
+				system("rpm -ivh /root/calpont-mysql-*rpm /root/calpont-mysqld-*rpm > /tmp/rpminstall");
+				system("dpgk -i /root/calpont-mysql-*deb /root/calpont-mysqld-*deb >> /tmp/rpminstall");
 
 				string cmd = startup::StartUp::installDir() + "/bin/post-mysqld-install >> /tmp/rpminstall";
 				system(cmd.c_str());
 				cmd = startup::StartUp::installDir() + "/bin/post-mysql-install >> /tmp/rpminstall";
 				system(cmd.c_str());
-				cmd = startup::StartUp::installDir() + "/mysql/mysql-Calpont start > /tmp/mysqldstart";
-				system(cmd.c_str());
+				system("/etc/init.d/mysql-Calpont start > /tmp/mysqldstart");
 
 				ifstream file ("/tmp/mysqldstart");
 				if (!file) {
@@ -1507,7 +1386,13 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 		{
 			log.writeLog(__LINE__,  "MSG RECEIVED: Update Calpont Config file");
 
-			(void)updateConfigFile(msg);
+			uint16_t rtnCode;
+			int requestStatus = API_SUCCESS;
+
+			rtnCode = updateConfigFile(msg);
+			if (rtnCode)
+				// error in updating log
+				requestStatus = API_FAILURE;
 
 			log.writeLog(__LINE__, "UPDATECONFIGFILE: Completed");
 
@@ -1655,7 +1540,6 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 				{
 					log.writeLog(__LINE__, "Unmount failed, device busy, dbroot: " + dbrootID, LOG_TYPE_ERROR);
 					return_status = API_FAILURE;
-					system("mv -f /tmp/umount.txt /tmp/umount_failed.txt");
 				}
 			}
 			else
@@ -1713,7 +1597,6 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 					if (!oam.checkLogStatus("/tmp/mount.txt", "already")) {
 						log.writeLog(__LINE__, "mount failed, dbroot: " + dbrootID, LOG_TYPE_ERROR);
 						return_status = API_FAILURE;
-						system("mv -f /tmp/mount.txt /tmp/mount_failed.txt");
 					}
 				}
 			}
@@ -1752,109 +1635,6 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 			mq.write(ackMsg);
 
 			log.writeLog(__LINE__, "PROCFSTABUPDATE: ACK back to ProcMgr");
-
-			break;
-		}
-
-		case MASTERREP:
-		{
-			log.writeLog(__LINE__,  "MSG RECEIVED: Run Master Replication script ");
-
-			string mysqlpw;
-			msg >> mysqlpw;
-
-			string masterLogFile = oam::UnassignedName;
-			string masterLogPos = oam::UnassignedName;
-
-			//change local my.cnf file
-			int ret = changeMyCnf("master");
-
-			if ( ret == oam::API_FAILURE )
-			{
-				ackMsg << (ByteStream::byte) ACK;
-				ackMsg << (ByteStream::byte) MASTERREP;
-				ackMsg << (ByteStream::byte) ret;
-				ackMsg <<  masterLogFile;
-				ackMsg <<  masterLogPos;
-				mq.write(ackMsg);
-	
-				log.writeLog(__LINE__, "MASTERREP: Error in changeMyCnf - ACK back to ProcMgr return status = " + oam.itoa((int) ret));
-				break;
-			}
-
-			// run Master Rep script
-			ret = runMasterRep(mysqlpw, masterLogFile, masterLogPos);
-
-			ackMsg << (ByteStream::byte) ACK;
-			ackMsg << (ByteStream::byte) MASTERREP;
-			ackMsg << (ByteStream::byte) ret;
-			ackMsg <<  masterLogFile;
-			ackMsg <<  masterLogPos;
-			mq.write(ackMsg);
-
-			log.writeLog(__LINE__, "MASTERREP: ACK back to ProcMgr return status = " + oam.itoa((int) ret));
-
-			break;
-		}
-
-		case SLAVEREP:
-		{
-			log.writeLog(__LINE__,  "MSG RECEIVED: Run Slave Replication script ");
-
-			string mysqlpw;
-			msg >> mysqlpw;
-			string masterLogFile;
-			msg >> masterLogFile;
-			string masterLogPos;
-			msg >> masterLogPos;
-			string port;
-			msg >> port;
-
-			//change local my.cnf file
-			int ret = changeMyCnf("slave");
-
-			if ( ret == oam::API_FAILURE )
-			{
-				ackMsg << (ByteStream::byte) ACK;
-				ackMsg << (ByteStream::byte) SLAVEREP;
-				ackMsg << (ByteStream::byte) ret;
-				mq.write(ackMsg);
-	
-				log.writeLog(__LINE__, "SLAVEREP: Error in changeMyCnf - ACK back to ProcMgr return status = " + oam.itoa((int) ret));
-				break;
-			}
-
-			// run Slave Rep script
-			ret = runSlaveRep(mysqlpw, masterLogFile, masterLogPos, port);
-
-			ackMsg << (ByteStream::byte) ACK;
-			ackMsg << (ByteStream::byte) SLAVEREP;
-			ackMsg << (ByteStream::byte) ret;
-			mq.write(ackMsg);
-
-			log.writeLog(__LINE__, "SLAVEREP: ACK back to ProcMgr return status = " + oam.itoa((int) ret));
-
-			break;
-		}
-
-		case MASTERDIST:
-		{
-			log.writeLog(__LINE__,  "MSG RECEIVED: Run Master DB Distribute command ");
-
-			string password;
-			msg >> password;
-			string module;
-			msg >> module;
-
-			// run Master Dist 
-			int ret = runMasterDist(password, module);
-
-			ackMsg << (ByteStream::byte) ACK;
-			ackMsg << (ByteStream::byte) MASTERDIST;
-			ackMsg << (ByteStream::byte) ret;
-			mq.write(ackMsg);
-
-			log.writeLog(__LINE__, "MASTERDIST: runMasterRep - ACK back to ProcMgr return status = " + oam.itoa((int) ret));
 
 			break;
 		}
@@ -1965,7 +1745,7 @@ pid_t ProcessMonitor::startProcess(string processModuleType, string processName,
 							launchID, newProcessID, FAILED, BootLaunch, RunType,
 							DepProcessName, DepModuleName, LogFile);
 
-		//Update Process Status: Mark Process INIT state 
+		//Update ProcessConfig.xml: Mark Process INIT state 
 		updateProcessInfo(processName, FAILED, newProcessID);
 
 		return oam::API_FAILURE;
@@ -2100,7 +1880,7 @@ pid_t ProcessMonitor::startProcess(string processModuleType, string processName,
 												launchID, newProcessID, FAILED, BootLaunch, RunType,
 												DepProcessName, DepModuleName, LogFile);
 					
-							//Update Process Status: Mark Process INIT state 
+							//Update ProcessConfig.xml: Mark Process INIT state 
 							updateProcessInfo(processName, FAILED, newProcessID);
 
 							return oam::API_FAILURE;
@@ -2174,7 +1954,7 @@ pid_t ProcessMonitor::startProcess(string processModuleType, string processName,
 			try {
 				int slavenodeID = oam.getLocalDBRMID(config.moduleName());
 				arg_list[i] = "DBRM_Worker" + oam.itoa(slavenodeID);
-				log.writeLog(__LINE__, "getLocalDBRMID Worker Node ID = " + oam.itoa(slavenodeID), LOG_TYPE_DEBUG);
+				log.writeLog(__LINE__, "*** getLocalDBRMID Worker Node ID = " + oam.itoa(slavenodeID), LOG_TYPE_DEBUG);
 			}
 			catch(...)
 			{
@@ -2185,7 +1965,7 @@ pid_t ProcessMonitor::startProcess(string processModuleType, string processName,
 									launchID, newProcessID, FAILED, BootLaunch, RunType,
 									DepProcessName, DepModuleName, LogFile);
 		
-				//Update Process Status: Mark Process INIT state 
+				//Update ProcessConfig.xml: Mark Process INIT state 
 				updateProcessInfo(processName, FAILED, newProcessID);
 
 				return oam::API_FAILURE;
@@ -2203,11 +1983,11 @@ pid_t ProcessMonitor::startProcess(string processModuleType, string processName,
 	argList[i] = NULL;
 
 	//run load-brm script before brm processes started
-	if ( actIndicator != oam::GRACEFUL) {
+	if ( actIndicator != oam::GRACEFUL ) {
 		if ( ( gOAMParentModuleFlag && processName == "DBRMControllerNode") ||
 				( !gOAMParentModuleFlag && processName == "DBRMWorkerNode") ) {
 			string DBRMDir;
-//			string tempDBRMDir = startup::StartUp::installDir() + "/data/dbrm";
+			string tempDBRMDir = startup::StartUp::installDir() + "/data/dbrm";
 	
 			// get DBRMroot config setting
 			string DBRMroot;
@@ -2226,7 +2006,7 @@ pid_t ProcessMonitor::startProcess(string processModuleType, string processName,
 									launchID, newProcessID, FAILED, BootLaunch, RunType,
 									DepProcessName, DepModuleName, LogFile);
 		
-				//Update Process Status: Mark Process INIT state 
+				//Update ProcessConfig.xml: Mark Process INIT state 
 				updateProcessInfo(processName, FAILED, newProcessID);
 
 				return oam::API_FAILURE;
@@ -2237,11 +2017,11 @@ pid_t ProcessMonitor::startProcess(string processModuleType, string processName,
 			system(cmd.c_str());
 	
 			// if Non Parent OAM Module, get the dbmr data from Parent OAM Module
-			if ( !gOAMParentModuleFlag && !HDFS ) {
+			if ( !gOAMParentModuleFlag ) {
 	
 				//create temp dbrm directory
-//				string cmd = "mkdir " + tempDBRMDir + " > /dev/null 2>&1";
-//				system(cmd.c_str());
+				string cmd = "mkdir " + tempDBRMDir + " > /dev/null 2>&1";
+				system(cmd.c_str());
 	
 				//setup softlink for editem on the 'um' or shared-nothing non active pm
 /*				if( config.moduleType() == "um" || 
@@ -2254,7 +2034,7 @@ pid_t ProcessMonitor::startProcess(string processModuleType, string processName,
 				}
 */	
 				//change DBRMDir to temp DBRMDir
-//				DBRMDir = tempDBRMDir;
+				DBRMDir = tempDBRMDir;
 
 				// remove all files for temp directory
 				cmd = "rm -f " + DBRMDir + "/*";
@@ -2269,7 +2049,7 @@ pid_t ProcessMonitor::startProcess(string processModuleType, string processName,
 
 				sendAlarm("DBRM", DBRM_LOAD_DATA_ERROR, CLEAR);	
 				// change DBRMroot to temp DBRMDir path
-//				DBRMroot = tempDBRMDir + "/BRM_saves";
+				DBRMroot = tempDBRMDir + "/BRM_saves";
 			}
 	
 			//
@@ -2278,24 +2058,19 @@ pid_t ProcessMonitor::startProcess(string processModuleType, string processName,
 			string loadScript = "load_brm";
 	
 			string fileName = DBRMroot + "_current";
-
-			ssize_t fileSize = IDBPolicy::size(fileName.c_str());
-			boost::scoped_ptr<IDBDataFile> oldFile(IDBDataFile::open(
-											IDBPolicy::getType(fileName.c_str(),
-											IDBPolicy::WRITEENG),
-											fileName.c_str(), "r", 0));
-			if (oldFile && fileSize > 0) {
-				char line[200] = {0};
-				oldFile->pread(line, 0, fileSize - 1);  // skip the \n
-				line[fileSize] = '\0';  // not necessary, but be sure.
+	
+			ifstream oldFile (fileName.c_str());
+			if (oldFile) {
+				char line[200];
+				oldFile.getline(line, 200);
 				string dbrmFile = line;
 	
-//				if ( !gOAMParentModuleFlag ) {
+				if ( !gOAMParentModuleFlag ) {
 	
-//					string::size_type pos = dbrmFile.find("/BRM_saves",0);
-//					if (pos != string::npos)
-//						dbrmFile = tempDBRMDir + dbrmFile.substr(pos,80);;
-//				}
+					string::size_type pos = dbrmFile.find("/BRM_saves",0);
+					if (pos != string::npos)
+						dbrmFile = tempDBRMDir + dbrmFile.substr(pos,80);;
+				}
 	
 				string logdir("/var/log/Calpont");
 				if (access(logdir.c_str(), W_OK) != 0) logdir = "/tmp";
@@ -2320,21 +2095,21 @@ pid_t ProcessMonitor::startProcess(string processModuleType, string processName,
 
 					//record the process information into processList 
 					config.buildList(processModuleType, processName, processLocation, arg_list, 
-										launchID, 0, FAILED, BootLaunch, RunType,
+										launchID, newProcessID, FAILED, BootLaunch, RunType,
 										DepProcessName, DepModuleName, LogFile);
 			
-					//Update Process Status: Mark Process FAILED state 
-					updateProcessInfo(processName, FAILED, 0);
+					//Update ProcessConfig.xml: Mark Process INIT state 
+					updateProcessInfo(processName, FAILED, newProcessID);
 
 					return oam::API_FAILURE;
 				}
 	
 				// now delete the dbrm data from local disk
-				if ( !gOAMParentModuleFlag && !HDFS ) {
-					string cmd = "rm -f " + DBRMDir + "/*";
-					system(cmd.c_str());
-					log.writeLog(__LINE__, "removed DBRM file with command: " + cmd, LOG_TYPE_DEBUG);
-				}
+//				if ( !gOAMParentModuleFlag) {
+//					string cmd = "rm -f " + tempDBRMDir + "/*";
+//					system(cmd.c_str());
+//					log.writeLog(__LINE__, "removed DBRM file with command: " + cmd, LOG_TYPE_DEBUG);
+//				}
 			}
 			else
 				log.writeLog(__LINE__, "No DBRM files exist, must be a initial startup", LOG_TYPE_DEBUG);
@@ -2422,7 +2197,8 @@ pid_t ProcessMonitor::startProcess(string processModuleType, string processName,
 		}
 
 		if (processLocation.find("snmp") != string::npos)
-		{	// snmp app is special...........
+		{
+			// snmpd app is special...........
 			// wait for up to 30 seconds for the pid file to be created
 
 			//get snmp app pid which was stored when app was launched
@@ -2453,13 +2229,12 @@ pid_t ProcessMonitor::startProcess(string processModuleType, string processName,
 				log.writeLog(__LINE__, "FAILURE: no valid PID stored in " + pidFileLocation, LOG_TYPE_ERROR);
 				return oam::API_MINOR_FAILURE;
 			}
-
 			//record the process information into processList 
 			config.buildList(processModuleType, processName, processLocation, arg_list, 
 								launchID, newProcessID, oam::ACTIVE, BootLaunch, RunType,
 								DepProcessName, DepModuleName, LogFile);
 	
-			//Update Process Status: Mark Process oam::ACTIVE state 
+			//Update ProcessConfig.xml: Mark Process oam::ACTIVE state 
 			updateProcessInfo(processName, oam::ACTIVE, newProcessID);
 
 		}
@@ -2472,8 +2247,8 @@ pid_t ProcessMonitor::startProcess(string processModuleType, string processName,
 								launchID, newProcessID, initType, BootLaunch, RunType,
 								DepProcessName, DepModuleName, LogFile);
 	
-			//Update Process Status: Update PID
-			updateProcessInfo(processName, STATE_MAX, newProcessID);
+			//Update ProcessConfig.xml: Mark Process INIT state 
+			updateProcessInfo(processName, initType, newProcessID);
 		}
 
 		log.writeLog(__LINE__, processName + " PID is " + oam.itoa(newProcessID), LOG_TYPE_DEBUG);
@@ -2483,21 +2258,13 @@ pid_t ProcessMonitor::startProcess(string processModuleType, string processName,
 		sendAlarm(processName, PROCESS_INIT_FAILURE, CLEAR);
 
 		//give time to get status updates from process before starting next process
-		if ( processName == "DBRMWorkerNode" || processName == "ExeMgr" || processName == "DDLProc")
+		//only for certain process on single-server system
+		if ( processName == "DBRMWorkerNode" || processName == "ExeMgr" )
 			sleep(3);
 		else
-		{
 			if ( config.ServerInstallType() == oam::INSTALL_COMBINE_DM_UM_PM )
-			{
 				if ( processName == "PrimProc" || processName == "WriteEngineServer")
 					sleep(3);
-			}
-			else
-			{
-				if ( (PMwithUM == "y") && processName == "PrimProc" )
-					sleep(3);
-			}
-		}
 
 		for (i=0; i < numAugs; i++)
 		{
@@ -2578,7 +2345,7 @@ pid_t ProcessMonitor::startProcess(string processModuleType, string processName,
 							launchID, newProcessID, FAILED, BootLaunch, RunType,
 							DepProcessName, DepModuleName, LogFile);
 
-		//Update Process Status: Mark Process INIT state 
+		//Update ProcessConfig.xml: Mark Process INIT state 
 		updateProcessInfo(processName, FAILED, newProcessID);
 
 		exit(oam::API_FAILURE);
@@ -3384,24 +3151,11 @@ int ProcessMonitor::updateConfig()
 	for( unsigned int i = 0 ; i < systemprocessconfig.processconfig.size(); i++)
 	{
 		if (systemprocessconfig.processconfig[i].ModuleType == systemModuleType
-			|| ( systemprocessconfig.processconfig[i].ModuleType == "um" &&
-				systemModuleType == "pm" && PMwithUM == "y" )
 			|| systemprocessconfig.processconfig[i].ModuleType == "ChildExtOAMModule"
 			|| ( systemprocessconfig.processconfig[i].ModuleType == "ChildOAMModule" )
 			|| (systemprocessconfig.processconfig[i].ModuleType == "ParentOAMModule" &&
 				systemModuleType == OAMParentModuleType) )
 		{
-			if ( systemprocessconfig.processconfig[i].ModuleType == "um" && 
-				systemModuleType == "pm" && PMwithUM == "y" &&
-				systemprocessconfig.processconfig[i].ProcessName == "DMLProc" )
-				continue;
-
-
-			if ( systemprocessconfig.processconfig[i].ModuleType == "um" && 
-				systemModuleType == "pm" && PMwithUM == "y" &&
-				systemprocessconfig.processconfig[i].ProcessName == "DDLProc" )
-				continue;
-
 			ProcessStatus processstatus;
 			try {
 				//Get the process information 
@@ -3420,17 +3174,17 @@ int ProcessMonitor::updateConfig()
 			}
 
 			config.buildList(systemprocessconfig.processconfig[i].ModuleType,
-					systemprocessconfig.processconfig[i].ProcessName,
-					systemprocessconfig.processconfig[i].ProcessLocation,
-					systemprocessconfig.processconfig[i].ProcessArgs,
-					systemprocessconfig.processconfig[i].LaunchID,
-					processstatus.ProcessID,
-					processstatus.ProcessOpState,
-					systemprocessconfig.processconfig[i].BootLaunch,
-					systemprocessconfig.processconfig[i].RunType,
-					systemprocessconfig.processconfig[i].DepProcessName, 
-					systemprocessconfig.processconfig[i].DepModuleName,
-					systemprocessconfig.processconfig[i].LogFile);
+								systemprocessconfig.processconfig[i].ProcessName,
+								systemprocessconfig.processconfig[i].ProcessLocation,
+								systemprocessconfig.processconfig[i].ProcessArgs,
+								systemprocessconfig.processconfig[i].LaunchID,
+								processstatus.ProcessID,
+								processstatus.ProcessOpState,
+								systemprocessconfig.processconfig[i].BootLaunch,
+								systemprocessconfig.processconfig[i].RunType,
+								systemprocessconfig.processconfig[i].DepProcessName, 
+								systemprocessconfig.processconfig[i].DepModuleName,
+								systemprocessconfig.processconfig[i].LogFile);
 		}
 	}
 	return API_SUCCESS;
@@ -3451,7 +3205,8 @@ int ProcessMonitor::buildSystemTables()
 
 	string fileName = DBdir + "/000.dir";
 
-	if (!IDBPolicy::exists(fileName.c_str())) {
+	ifstream oldFile (fileName.c_str());
+	if (!oldFile) {
 		string logdir("/var/log/Calpont");
 		if (access(logdir.c_str(), W_OK) != 0) logdir = "/tmp";
 		string cmd = startup::StartUp::installDir() + "/bin/dbbuilder 7 > " + logdir + "/dbbuilder.log &";
@@ -3545,9 +3300,7 @@ int ProcessMonitor::checkSpecialProcessState( std::string processName, std::stri
 
 		log.writeLog(__LINE__, "checkSpecialProcessState on : " + processName, LOG_TYPE_DEBUG);
 
-		if ( runType == SIMPLEX && PMwithUM == "y" && processModuleType == "um" && gOAMParentModuleFlag)
-			retStatus = oam::COLD_STANDBY;
-		else if ( runType == SIMPLEX && gOAMParentModuleFlag )
+		if ( runType == SIMPLEX && gOAMParentModuleFlag )
 			retStatus = oam::MAN_INIT;
 		else if ( runType == ACTIVE_STANDBY && processModuleType == "ParentOAMModule" && 
 				( gOAMParentModuleFlag || !runStandby ) )
@@ -3555,8 +3308,6 @@ int ProcessMonitor::checkSpecialProcessState( std::string processName, std::stri
 		else if ( runType == ACTIVE_STANDBY && processModuleType == "ParentOAMModule" && config.OAMStandbyParentFlag() )
 			retStatus = oam::STANDBY;
 		else if ( runType == ACTIVE_STANDBY && processModuleType == "ParentOAMModule" )
-			retStatus = oam::COLD_STANDBY;
-		else if ( runType == SIMPLEX && processModuleType == "ParentOAMModule" && !gOAMParentModuleFlag)
 			retStatus = oam::COLD_STANDBY;
 		else
 		{
@@ -3698,8 +3449,7 @@ int ProcessMonitor::createDataDirs(std::string cloud)
 
 	log.writeLog(__LINE__, "createDataDirs called", LOG_TYPE_DEBUG);
 
-	if ( config.moduleType() == "um" && 
-		( cloud == "amazon-ec2" || cloud == "amazon-vpc") )
+	if ( config.moduleType() == "um" && cloud == "amazon")
 	{
 		string UMStorageType;
 		try {
@@ -3754,7 +3504,7 @@ int ProcessMonitor::createDataDirs(std::string cloud)
 		
 					string cmd = "mkdir " + DBRootName + " > /dev/null 2>&1";
 					int rtnCode = system(cmd.c_str());
-					if (WEXITSTATUS(rtnCode) == 0)
+					if (rtnCode == 0)
 						log.writeLog(__LINE__, "Successful created directory " + DBRootName, LOG_TYPE_DEBUG);
 		
 					cmd = "chmod 1777 " + DBRootName + " > /dev/null 2>&1";
@@ -3769,9 +3519,8 @@ int ProcessMonitor::createDataDirs(std::string cloud)
 						system(cmd.c_str());
 					}
 
-					if ( (cloud == "amazon-ec2" || cloud == "amazon-vpc") && 
-							DBRootStorageType == "external" && 
-							config.moduleID() == moduleID)
+					if (cloud == "amazon" && DBRootStorageType == "external" && 
+						config.moduleID() == moduleID)
 					{
 						if(!amazonVolumeCheck(id)) {
 							//Set the alarm
@@ -3860,7 +3609,6 @@ int ProcessMonitor::getDBRMdata()
 	int returnStatus = API_FAILURE;
 
 	msg << (ByteStream::byte) GETDBRMDATA;
-	msg << config.moduleName();
 
 	try
 	{
@@ -3948,19 +3696,16 @@ int ProcessMonitor::getDBRMdata()
 								journalFile = true;
 
 							//change file name location to temp file local
-//							string::size_type pos1 = fileName.find("/dbrm",0);
-//							pos = fileName.find("data1",0);
-//							if (pos != string::npos)
-//							{
-//								string temp = fileName.substr(0,pos);
-//								string temp1 = temp + "data" + fileName.substr(pos1,80);
-//								fileName = temp1;
-//							}
+							string::size_type pos1 = fileName.find("/dbrm",0);
+							pos = fileName.find("data1",0);
+							if (pos != string::npos)
+							{
+								string temp = fileName.substr(0,pos);
+								string temp1 = temp + "data" + fileName.substr(pos1,80);
+								fileName = temp1;
+							}
 
-							boost::scoped_ptr<IDBDataFile> out(IDBDataFile::open(
-														IDBPolicy::getType(fileName.c_str(),
-														IDBPolicy::WRITEENG),
-														fileName.c_str(), "w", 0));
+							ofstream out(fileName.c_str());
 
 							// read file data
 							try {
@@ -3977,7 +3722,7 @@ int ProcessMonitor::getDBRMdata()
 							}
 					
 							if (receivedMSG.length() > 0) {
-								out->write(receivedMSG.buf(), receivedMSG.length());
+								out << receivedMSG;
 								log.writeLog(__LINE__, fileName, LOG_TYPE_DEBUG);
 								log.writeLog(__LINE__, oam.itoa(receivedMSG.length()), LOG_TYPE_DEBUG);
 							}
@@ -3991,7 +3736,7 @@ int ProcessMonitor::getDBRMdata()
 					//create journal file if none come across
 					if ( !journalFile)
 					{
-						string cmd = "touch " + startup::StartUp::installDir() + "/data1/systemFiles/dbrm/BRM_saves_journal";
+						string cmd = "touch " + startup::StartUp::installDir() + "/data/dbrm/BRM_saves_journal";
 						system(cmd.c_str());
 					}
 
@@ -4213,6 +3958,7 @@ void ProcessMonitor::setTransactionLog(bool action)
 	system("/etc/init.d/crond reload > /dev/null 2>&1");
 }
 
+
 /******************************************************************************************
 * @brief	runStartupTest
 *
@@ -4242,28 +3988,14 @@ int ProcessMonitor::runStartupTest()
 	system(cmd.c_str());
 
 	cmd = logdir + "/startupTests.log1";
-
-	bool fail = false;
-
 	if (oam.checkLogStatus(cmd, "OK")) {
-		log.writeLog(__LINE__, "startupTests passed", LOG_TYPE_DEBUG);
-	}
-	else
-	{
-		log.writeLog(__LINE__, "startupTests failed", LOG_TYPE_CRITICAL);
-		fail = true;
-	}
-	
-	if (!fail)
-	{
-		log.writeLog(__LINE__, "runStartupTest passed", LOG_TYPE_DEBUG);
+		log.writeLog(__LINE__, "Successfully ran startupTests", LOG_TYPE_DEBUG);
 		//Clear the alarm 
 		sendAlarm(config.moduleName().c_str(), STARTUP_DIAGNOTICS_FAILURE, CLEAR);
 		return oam::API_SUCCESS;
 	}
-	else
-	{
-		log.writeLog(__LINE__, "ERROR: runStartupTest failed", LOG_TYPE_CRITICAL);
+	else {
+		log.writeLog(__LINE__, "ERROR: Failure returned from startupTests", LOG_TYPE_CRITICAL);
 		//Set the alarm 
 		sendAlarm(config.moduleName().c_str(), STARTUP_DIAGNOTICS_FAILURE, SET);
 
@@ -4283,91 +4015,6 @@ int ProcessMonitor::runStartupTest()
 		return oam::API_FAILURE;
 	}
 }
-
-/******************************************************************************************
-* @brief	runHDFSTest
-*
-* purpose:	Runs HDFS sanity test
-*
-*
-******************************************************************************************/
-int ProcessMonitor::runHDFSTest()
-{
-	//ProcMon log file 
-	MonitorLog log;
-//	MonitorConfig config;
-//	ProcessMonitor aMonitor(config, log);
-	Oam oam;
-	bool fail = false;
-
-	string logdir("/var/log/Calpont");
-	if (access(logdir.c_str(), W_OK) != 0) logdir = "/tmp";
-	string hdfslog = logdir + "/hdfsCheck.log1";
-
-	//run hadoop test
-	string DataFilePlugin;
-	oam.getSystemConfig("DataFilePlugin", DataFilePlugin);
-
-	ifstream File (DataFilePlugin.c_str());
-	if (!File) {
-		log.writeLog(__LINE__, "Error: Hadoop Datafile Plugin File (" + DataFilePlugin + ") doesn't exist", LOG_TYPE_CRITICAL);
-		fail = true;
-	}
-	else
-	{
-		// retry since infinidb can startup before hadoop is full up
-		int retry = 0;
-		for (  ; retry < 12 ; retry++ )
-		{
-			string cmd = startup::StartUp::installDir() + "/bin/hdfsCheck " + DataFilePlugin +  " > " + hdfslog + " 2>&1";
-			system(cmd.c_str());
-			if (oam.checkLogStatus(hdfslog, "All HDFS checks passed!")) {
-				log.writeLog(__LINE__, "hdfsCheck passed", LOG_TYPE_DEBUG);
-				break;
-			}
-			else
-			{
-				log.writeLog(__LINE__, "hdfsCheck Failed, wait and try again", LOG_TYPE_DEBUG);
-				sleep(10);
-			}
-		}
-
-		if ( retry >= 12 )
-		{
-			log.writeLog(__LINE__, "hdfsCheck Failed, check " + hdfslog, LOG_TYPE_CRITICAL);
-			fail = true;
-		}
-	}
-	
-	if (!fail)
-	{
-		//Clear the alarm 
-		sendAlarm(config.moduleName().c_str(), STARTUP_DIAGNOTICS_FAILURE, CLEAR);
-		return oam::API_SUCCESS;
-	}
-	else
-	{
-		//Set the alarm 
-		sendAlarm(config.moduleName().c_str(), STARTUP_DIAGNOTICS_FAILURE, SET);
-
-		//setModule status to failed
-		try{
-			oam.setModuleStatus(config.moduleName(), oam::FAILED);
-		}
-		catch (exception& ex)
-		{
-			string error = ex.what();
-			log.writeLog(__LINE__, "EXCEPTION ERROR on setModuleStatus: " + error, LOG_TYPE_ERROR);
-		}
-		catch(...)
-		{
-			log.writeLog(__LINE__, "EXCEPTION ERROR on setModuleStatus: Caught unknown exception!", LOG_TYPE_ERROR);
-		}
-
-		return oam::API_FAILURE;
-	}
-}
-
 
 /******************************************************************************************
 * @brief	updateConfigFile
@@ -4377,13 +4024,80 @@ int ProcessMonitor::runHDFSTest()
 ******************************************************************************************/
 int ProcessMonitor::updateConfigFile(messageqcpp::ByteStream msg)
 {
-	Config* sysConfig = Config::makeConfig();
-	sysConfig->writeConfigFile(msg);
+	string fileName;
+	string calpontFile;
 
+	string installDir(startup::StartUp::installDir());
+	string defaultCalpontConfigFile(installDir + "/etc/Calpont.xml");
+	string defaultCalpontConfigFileTemp(installDir + "/etc/Calpont.xml.temp");
+	string tmpCalpontConfigFileTemp(installDir + "/etc/Calpont.xml.temp1");
+	string saveCalpontConfigFileTemp(installDir + "/etc/Calpont.xml.calpontSave");
+
+	msg >> fileName;
+	ofstream out(fileName.c_str());
+	out << msg;
+
+/*	if ( fileName == defaultCalpontConfigFile ) {
+		unlink (defaultCalpontConfigFileTemp.c_str());
+	
+		ofstream newFile (defaultCalpontConfigFileTemp.c_str());
+	
+		newFile.write (calpontFile.c_str(), calpontFile.size() );
+	
+		newFile.close();
+	
+		struct flock fl;
+		int fd;
+	
+		fl.l_type   = F_WRLCK;  // write lock
+		fl.l_whence = SEEK_SET;
+		fl.l_start  = 0;
+		fl.l_len    = 0;
+		fl.l_pid    = getpid();
+	
+		fd = open(defaultCalpontConfigFile.c_str(), O_WRONLY);
+	
+		if (fcntl(fd, F_SETLKW, &fl) == -1) {
+			log.writeLog(__LINE__, "ERROR: Config::write: file lock error", LOG_TYPE_ERROR);
+			return oam::API_FAILURE;
+		}
+	
+		//save copy, copy temp file tp tmp then to Calpont.xml
+		//move to /tmp to get around a 'same file error' in mv command
+		string cmd = "rm -f " + saveCalpontConfigFileTemp;
+		system(cmd.c_str());
+		cmd = "cp " + defaultCalpontConfigFile + " " + saveCalpontConfigFileTemp;
+		system(cmd.c_str());
+	
+		cmd = "rm -f " + tmpCalpontConfigFileTemp;
+		system(cmd.c_str());
+		cmd = "mv -f " + defaultCalpontConfigFileTemp + " " + tmpCalpontConfigFileTemp;
+		system(cmd.c_str());
+	
+		cmd = "mv -f " + tmpCalpontConfigFileTemp + " " + defaultCalpontConfigFile;
+		system(cmd.c_str());
+	
+		fl.l_type   = F_UNLCK;	//unlock
+		if (fcntl(fd, F_SETLK, &fl) == -1)
+			throw runtime_error("Config::write: file unlock error " + defaultCalpontConfigFile);
+	
+		close(fd);
+	}
+	else
+	{
+		//update a non Calpont.xml file
+		unlink (fileName.c_str());
+	
+		ofstream newFile (fileName.c_str());
+	
+		newFile.write (calpontFile.c_str(), calpontFile.size() );
+	
+		newFile.close();
+	}
+*/
 	return oam::API_SUCCESS;
+
 }
-
-
 
 /******************************************************************************************
 * @brief	sendMsgProcMon1
@@ -4475,6 +4189,23 @@ void ProcessMonitor::checkProcessFailover( std::string processName)
 {
 	Oam oam;
 
+	//check if license has expired
+	oam::LicenseKeyChecker keyChecker;
+
+	bool keyGood = true;
+	try {
+		keyGood = keyChecker.isGood();
+	}
+	catch(...)
+	{
+		keyGood = false;
+	}
+
+	if (!keyGood)
+	{
+		return;
+	}
+
 	//force failover on certain processes
 	if ( processName == "DDLProc" ||
 		processName == "DMLProc" ) {
@@ -4489,10 +4220,6 @@ void ProcessMonitor::checkProcessFailover( std::string processName)
 			{
 				if ( systemprocessstatus.processstatus[i].ProcessName == processName  &&
 						systemprocessstatus.processstatus[i].Module != config.moduleName() ) {
-					//make sure it matches module type
-					string procModuleType = systemprocessstatus.processstatus[i].Module.substr(0,MAX_MODULE_TYPE_SIZE);
-					if ( config.moduleType() != procModuleType )
-						continue;
 					if ( systemprocessstatus.processstatus[i].ProcessOpState == oam::COLD_STANDBY || 
 						systemprocessstatus.processstatus[i].ProcessOpState == oam::AUTO_OFFLINE ||
 						systemprocessstatus.processstatus[i].ProcessOpState == oam::FAILED ) {
@@ -4550,11 +4277,13 @@ int ProcessMonitor::runUpgrade(std::string mysqlpw)
 	for ( int i = 0 ; i < 10 ; i++ )
 	{
 		//run upgrade script
+		string logdir("/var/log/Calpont");
+		if (access(logdir.c_str(), W_OK) != 0) logdir = "/tmp";
 		string cmd = startup::StartUp::installDir() + "/bin/upgrade-infinidb.sh doupgrade --password=" +
-			mysqlpw + " --installdir=" +  startup::StartUp::installDir() + "  > " + "/tmp/upgrade-infinidb.log 2>&1";
+			mysqlpw + " --installdir=" +  startup::StartUp::installDir() + "  > " + logdir + "/upgrade-infinidb.log1 2>&1";
 		system(cmd.c_str());
 
-		cmd = "/tmp/upgrade-infinidb.log";
+		cmd = logdir + "/upgrade-infinidb.log1";
 		if (oam.checkLogStatus(cmd, "OK")) {
 			log.writeLog(__LINE__, "upgrade-infinidb.sh: Successful return", LOG_TYPE_DEBUG);
 			return oam::API_SUCCESS;
@@ -4578,462 +4307,6 @@ int ProcessMonitor::runUpgrade(std::string mysqlpw)
 	return oam::API_FAILURE;
 }
 
-
-/******************************************************************************************
-* @brief	changeMyCnf
-*
-* purpose:	Change my.cnf
-*
-******************************************************************************************/
-int ProcessMonitor::changeMyCnf(std::string type)
-{
-	Oam oam;
-
-	log.writeLog(__LINE__, "changeMyCnf function called for " + type, LOG_TYPE_DEBUG);
-
-	string mycnfFile = startup::StartUp::installDir() + "/mysql/my.cnf";
-	ifstream file (mycnfFile.c_str());
-	if (!file) {
-		log.writeLog(__LINE__, "changeMyCnf - my.cnf file not found: " + mycnfFile, LOG_TYPE_CRITICAL);
-		return oam::API_FAILURE;
-	}
-
-	if ( type == "master" )
-	{
-		// set master replication entries
-		vector <string> lines;
-		char line[200];
-		string buf;
-		while (file.getline(line, 200))
-		{
-			buf = line;
-			string::size_type pos = buf.find("server-id =",0);
-			if ( pos != string::npos ) {
-				buf = "server-id = 1";
-			}
-
-			pos = buf.find("# log-bin=mysql-bin",0);
-			if ( pos != string::npos ) {
-				buf = "log-bin=mysql-bin";
-			}
-
-			pos = buf.find("infinidb_local_query=1",0);
-			if ( pos != string::npos && pos == 0) {
-				buf = "# infinidb_local_query=1";
-			}
-
-			//output to temp file
-			lines.push_back(buf);
-		}
-
-		file.close();
-		unlink (mycnfFile.c_str());
-		ofstream newFile (mycnfFile.c_str());	
-		
-		//create new file
-		int fd = open(mycnfFile.c_str(), O_RDWR|O_CREAT, 0666);
-		
-		copy(lines.begin(), lines.end(), ostream_iterator<string>(newFile, "\n"));
-		newFile.close();
-		
-		close(fd);
-	}
-
-	if ( type == "slave" )
-	{
-		//get slave id based on ExeMgrx setup
-		string slaveID = "0";
-		string slaveModuleName = config.moduleName();
-		for ( int id = 1 ; ; id++ )
-		{
-			string Section = "ExeMgr" + oam.itoa(id);
-
-			string moduleName;
-
-			try {
-				Config* sysConfig = Config::makeConfig();
-				moduleName = sysConfig->getConfig(Section, "Module");
-
-				if ( moduleName == slaveModuleName )
-				{
-					slaveID = oam.itoa(id);
-
-					// if slave ID from above is 1, then it means this is a former Original master and use the ID of the current Master
-					if ( slaveID == "1" ) {
-						string PrimaryUMModuleName;
-						oam.getSystemConfig("PrimaryUMModuleName", PrimaryUMModuleName);
-
-						for ( int mid = 1 ; ; mid++ )
-						{
-							string Section = "ExeMgr" + oam.itoa(mid);
-				
-							string moduleName;
-				
-							try {
-								Config* sysConfig = Config::makeConfig();
-								moduleName = sysConfig->getConfig(Section, "Module");
-				
-								if ( moduleName == PrimaryUMModuleName )
-								{
-									slaveID = oam.itoa(mid);
-									break;
-								}
-							}
-							catch (...) {}
-						}
-					}
-					break;
-				}
-			}
-			catch (...) {}
-		}
-
-		if ( slaveID == "0" )
-		{
-			log.writeLog(__LINE__, "changeMyCnf: ExeMgr for local module doesn't exist", LOG_TYPE_ERROR);
-			return oam::API_FAILURE;
-		}
-
-		// get local host name
-		string HOSTNAME = "localhost";
-		try
-		{
-			ModuleConfig moduleconfig;
-			oam.getSystemConfig(config.moduleName(), moduleconfig);
-			HostConfigList::iterator pt1 = moduleconfig.hostConfigList.begin();
-			HOSTNAME = (*pt1).HostName;
-		}
-		catch(...)
-		{}
-
-		char* p= getenv("HOSTNAME");
-		if (p && *p)
-			HOSTNAME = p;
-
-		// set slave replication entries
-		vector <string> lines;
-		char line[200];
-		string buf;
-		while (file.getline(line, 200))
-		{
-			buf = line;
-			string::size_type pos = buf.find("server-id",0);
-			if ( pos != string::npos ) {
-				buf = "server-id = " + slaveID;
-			}
-
-			pos = buf.find("#relay-log=HOSTNAME-relay-bin",0);
-			if ( pos != string::npos ) {
-				buf = "relay-log=" + HOSTNAME + "-relay-bin";
-			}
-
-			// set local query flag if on pm
-			if ( (PMwithUM == "y") && config.moduleType() == "pm" )
-			{
-				pos = buf.find("# infinidb_local_query=1",0);
-				if ( pos != string::npos ) {
-					buf = "infinidb_local_query=1";
-				}
-			}
-			else
-			{ // disable, if needed
-				pos = buf.find("infinidb_local_query=1",0);
-				if ( pos != string::npos ) {
-					buf = "# infinidb_local_query=1";
-				}
-
-			}
-
-			pos = buf.find("log-bin=mysql-bin",0);
-			if ( pos != string::npos && pos == 0 ) {
-				buf = "# log-bin=mysql-bin";
-			}
-
-			//output to temp file
-			lines.push_back(buf);
-		}
-
-		file.close();
-		unlink (mycnfFile.c_str());
-		ofstream newFile (mycnfFile.c_str());	
-		
-		//create new file
-		int fd = open(mycnfFile.c_str(), O_RDWR|O_CREAT, 0666);
-		
-		copy(lines.begin(), lines.end(), ostream_iterator<string>(newFile, "\n"));
-		newFile.close();
-		
-		close(fd);
-	}
-
-	// restart mysql
-	try {
-		oam.actionMysqlCalpont(MYSQL_RESTART);
-	}
-	catch(...)
-	{}
-
-	return oam::API_SUCCESS;
-}
-
-/******************************************************************************************
-* @brief	runMasterRep
-*
-* purpose:	run Master Replication script
-*
-******************************************************************************************/
-int ProcessMonitor::runMasterRep(std::string& mysqlpw, std::string& masterLogFile, std::string& masterLogPos)
-{
-	Oam oam;
-
-	log.writeLog(__LINE__, "runMasterRep function called", LOG_TYPE_DEBUG);
-
-	SystemModuleTypeConfig systemModuleTypeConfig;
-	try {
-		oam.getSystemConfig(systemModuleTypeConfig);
-	}
-	catch (exception& ex)
-	{
-		string error = ex.what();
-		log.writeLog(__LINE__, "EXCEPTION ERROR on getSystemConfig: " + error, LOG_TYPE_ERROR);
-	}
-	catch(...)
-	{
-		log.writeLog(__LINE__, "EXCEPTION ERROR on getSystemConfig: Caught unknown exception!", LOG_TYPE_ERROR);
-	}
-
-	// create user for each module by ip address
-	for ( unsigned int i = 0 ; i < systemModuleTypeConfig.moduletypeconfig.size(); i++)
-	{
-		int moduleCount = systemModuleTypeConfig.moduletypeconfig[i].ModuleCount;
-		if( moduleCount == 0)
-			continue;
-
-		DeviceNetworkList::iterator pt = systemModuleTypeConfig.moduletypeconfig[i].ModuleNetworkList.begin();
-		for( ; pt != systemModuleTypeConfig.moduletypeconfig[i].ModuleNetworkList.end() ; pt++)
-		{
-			string moduleName =  (*pt).DeviceName;
-
-			HostConfigList::iterator pt1 = (*pt).hostConfigList.begin();
-			for ( ; pt1 != (*pt).hostConfigList.end() ; pt1++ )
-			{
-				string ipAddr = (*pt1).IPAddr;
-
-				string logFile = "/tmp/master-rep-infinidb-" + moduleName + ".log";
-				string cmd = startup::StartUp::installDir() + "/bin/master-rep-infinidb.sh --password=" +
-					mysqlpw + " --installdir=" + startup::StartUp::installDir() + " --hostIP=" + ipAddr + "  > " + logFile + " 2>&1";
-				system(cmd.c_str());
-		
-				if (oam.checkLogStatus(logFile, "OK"))
-					log.writeLog(__LINE__, "master-rep-infinidb.sh: Successful return for node " + moduleName, LOG_TYPE_DEBUG);
-				else 
-				{
-					if (oam.checkLogStatus(logFile, "ERROR 1045") ) {
-						log.writeLog(__LINE__, "master-rep-infinidb.sh: Missing Password error, return success", LOG_TYPE_DEBUG);
-						return oam::API_SUCCESS;
-					}
-					else
-					{
-						log.writeLog(__LINE__, "master-rep-infinidb.sh: Error return, check log " + logFile, LOG_TYPE_ERROR);
-						return oam::API_FAILURE;
-					}
-				}
-			}
-		}
-	}
-
-	// go parse out the MASTER_LOG_FILE and MASTER_LOG_POS
-	// this is what the output will look like
-	//
-	//	SHOW MASTER STATUS
-	//	File	Position	Binlog_Do_DB	Binlog_Ignore_DB
-	//	mysql-bin.000006	2921
-	// 
-	// in log - /tmp/show-master-status.log
-
-	ifstream file ("/tmp/show-master-status.log");
-	if (!file) {
-		log.writeLog(__LINE__, "runMasterRep - show master status log file doesn't exist - /tmp/show-master-status.log", LOG_TYPE_CRITICAL);
-		return oam::API_FAILURE;
-	}
-	else
-	{
-		char line[200];
-		string buf;
-		while (file.getline(line, 200))
-		{
-			buf = line;
-			string::size_type pos = buf.find("mysql-bin",0);
-			if ( pos != string::npos ) {
-				string::size_type pos1 = buf.find("\t",pos);
-				if ( pos1 != string::npos ) {
-					string masterlogfile = buf.substr(pos,pos1-pos);
-
-					//strip trailing spaces
-					string::size_type lead = masterlogfile.find_first_of(" ");
-					masterLogFile = masterlogfile.substr( 0, lead);
-
-					string masterlogpos = buf.substr(pos1,80);
-
-					//strip off leading tab masterlogpos
-					lead=masterlogpos.find_first_not_of("\t");
-					masterlogpos = masterlogpos.substr( lead, masterlogpos.length()-lead);
-
-					//string trailing spaces
-					lead = masterlogpos.find_first_of(" ");
-					masterLogPos = masterlogpos.substr( 0, lead);
-
-					log.writeLog(__LINE__, "runMasterRep: masterlogfile=" + masterLogFile + ", masterlogpos=" + masterLogPos, LOG_TYPE_DEBUG);
-					file.close();
-					return oam::API_SUCCESS;
-				}
-			}
-		}
-
-		file.close();
-	}
-
-	log.writeLog(__LINE__, "runMasterRep - 'mysql-bin not found in log file - /tmp/show-master-status.log", LOG_TYPE_CRITICAL);
-	return oam::API_FAILURE;
-}
-
-/******************************************************************************************
-* @brief	runSlaveRep
-*
-* purpose:	run Slave Replication script
-*
-******************************************************************************************/
-int ProcessMonitor::runSlaveRep(std::string& mysqlpw, std::string& masterLogFile, std::string& masterLogPos, std::string& port)
-{
-	Oam oam;
-
-	log.writeLog(__LINE__, "runSlaveRep function called", LOG_TYPE_DEBUG);
-
-	// get master replicaion module IP Address
-	string PrimaryUMModuleName;
-	oam.getSystemConfig("PrimaryUMModuleName", PrimaryUMModuleName);
-
-	string masterIPAddress;
-	try
-	{
-		ModuleConfig moduleconfig;
-		oam.getSystemConfig(PrimaryUMModuleName, moduleconfig);
-		HostConfigList::iterator pt1 = moduleconfig.hostConfigList.begin();
-		masterIPAddress = (*pt1).IPAddr;
-	}
-	catch(...)
-	{}
-
-	string cmd = startup::StartUp::installDir() + "/bin/slave-rep-infinidb.sh --password=" +
-		mysqlpw + " --installdir=" + startup::StartUp::installDir() + " --masteripaddr=" + masterIPAddress + " --masterlogfile=" + masterLogFile  + " --masterlogpos=" + masterLogPos + + " --port=" + port + "  >   /tmp/slave-rep-infinidb.log 2>&1";
-	system(cmd.c_str());
-
-	cmd = "/tmp/slave-rep-infinidb.log";
-	if (oam.checkLogStatus(cmd, "OK")) {
-		log.writeLog(__LINE__, "slave-rep-infinidb.sh: Successful return", LOG_TYPE_DEBUG);
-		return oam::API_SUCCESS;
-	}
-	else {
-		if (oam.checkLogStatus(cmd, "ERROR 1045") ) {
-			log.writeLog(__LINE__, "slave-rep-infinidb.sh: Missing Password error, return success", LOG_TYPE_DEBUG);
-			return oam::API_SUCCESS;
-		}
-
-		log.writeLog(__LINE__, "slave-rep-infinidb.sh: Error return, check log /tmp/slave-rep-infinidb.log", LOG_TYPE_ERROR);
-		return oam::API_FAILURE;
-	}
-
-	return oam::API_FAILURE;
-}
-
-/******************************************************************************************
-* @brief	runMasterDist
-*
-* purpose:	run Master DB Distribution
-*
-******************************************************************************************/
-int ProcessMonitor::runMasterDist(std::string& password, std::string& slaveModule)
-{
-	Oam oam;
-
-	log.writeLog(__LINE__, "runMasterDist function called", LOG_TYPE_DEBUG);
-
-	SystemModuleTypeConfig systemModuleTypeConfig;
-	try {
-		oam.getSystemConfig(systemModuleTypeConfig);
-	}
-	catch (exception& ex)
-	{
-		string error = ex.what();
-		log.writeLog(__LINE__, "EXCEPTION ERROR on getSystemConfig: " + error, LOG_TYPE_ERROR);
-	}
-	catch(...)
-	{
-		log.writeLog(__LINE__, "EXCEPTION ERROR on getSystemConfig: Caught unknown exception!", LOG_TYPE_ERROR);
-	}
-
-	if ( slaveModule == "all" )
-	{
-		// Distrubuted MySQL Front-end DB to Slave Modules
-		for ( unsigned int i = 0 ; i < systemModuleTypeConfig.moduletypeconfig.size(); i++)
-		{
-			int moduleCount = systemModuleTypeConfig.moduletypeconfig[i].ModuleCount;
-			if( moduleCount == 0)
-				continue;
-	
-			string moduleType = systemModuleTypeConfig.moduletypeconfig[i].ModuleType;
-	
-			if ( (PMwithUM == "n") && (moduleType == "pm") && ( config.ServerInstallType() != oam::INSTALL_COMBINE_DM_UM_PM) )
-				continue;
-	
-			DeviceNetworkList::iterator pt = systemModuleTypeConfig.moduletypeconfig[i].ModuleNetworkList.begin();
-			for( ; pt != systemModuleTypeConfig.moduletypeconfig[i].ModuleNetworkList.end() ; pt++)
-			{
-				string moduleName =  (*pt).DeviceName;
-	
-				//skip if local master mode
-				if ( moduleName == config.moduleName() )
-					continue;
-	
-				HostConfigList::iterator pt1 = (*pt).hostConfigList.begin();
-				for ( ; pt1 != (*pt).hostConfigList.end() ; pt1++ )
-				{
-					string ipAddr = (*pt1).IPAddr;
-	
-					string cmd = startup::StartUp::installDir() + "/bin/rsync.sh " + ipAddr + " " + password + " 1 > /tmp/master-dist_" + moduleName + ".log";
-					system(cmd.c_str());
-				
-					string logFile = "/tmp/master-dist_" + moduleName + ".log";
-					if (!oam.checkLogStatus(logFile, "FAILED"))
-						log.writeLog(__LINE__, "runMasterDist: Success rsync to module: " + moduleName, LOG_TYPE_DEBUG);
-					else
-						log.writeLog(__LINE__, "runMasterDist: Failure rsync to module: " + moduleName, LOG_TYPE_ERROR);
-				}
-			}
-		}
-	}
-	else
-	{
-		// get slave IP address
-		ModuleConfig moduleconfig;
-		oam.getSystemConfig(slaveModule, moduleconfig);
-		HostConfigList::iterator pt1 = moduleconfig.hostConfigList.begin();
-		string ipAddr = (*pt1).IPAddr;
-
-		string cmd = startup::StartUp::installDir() + "/bin/rsync.sh " + ipAddr + " " + password + " 1 > /tmp/master-dist_" + slaveModule + ".log";
-		system(cmd.c_str());
-	
-		string logFile = "/tmp/master-dist_" + slaveModule + ".log";
-		if (!oam.checkLogStatus(logFile, "FAILED"))
-			log.writeLog(__LINE__, "runMasterDist: Success rsync to module: " + slaveModule, LOG_TYPE_DEBUG);
-		else
-			log.writeLog(__LINE__, "runMasterDist: Failure rsync to module: " + slaveModule, LOG_TYPE_ERROR);
-	}
-
-	return oam::API_SUCCESS;
-}
-
-
 /******************************************************************************************
 * @brief	amazonIPCheck
 *
@@ -5046,9 +4319,6 @@ bool ProcessMonitor::amazonIPCheck()
 	Oam oam;
 
 	log.writeLog(__LINE__, "amazonIPCheck function called", LOG_TYPE_DEBUG);
-
-	// delete description file so it will create a new one
-	unlink("/tmp/describeInstance.txt");
 
 	//
 	// Get Module Info
@@ -5364,13 +4634,12 @@ void ProcessMonitor::unmountExtraDBroots()
 	ModuleConfig moduleconfig;
 	Oam oam;
 
-	string DBRootStorageType = "internal";
+	string DBRootStorageType = "local";
 
 	try{
 		oam.getSystemConfig("DBRootStorageType", DBRootStorageType);
 
-		if ( DBRootStorageType == "hdfs" ||
-			( DBRootStorageType == "internal" && GlusterConfig == "n") )
+		if ( DBRootStorageType == "internal" && GlusterConfig == "n")
 			return;
 	}
 	catch(...) {}
@@ -5454,52 +4723,45 @@ int ProcessMonitor::checkDataMount()
 
 	log.writeLog(__LINE__, "checkDataMount called ", LOG_TYPE_DEBUG);
 
-	string DBRootStorageType = "internal";
+	string DBRootStorageType = "local";
 	vector <string> dbrootList;
 	string installDir(startup::StartUp::installDir());
 
-	for ( int retry = 0 ; retry < 10 ; retry++)
+	try
 	{
-		try
+		systemStorageInfo_t t;
+		t = oam.getStorageConfig();
+
+		if ( boost::get<1>(t) == 0 ) {
+			log.writeLog(__LINE__, "No dbroots are configured in Calpont.xml file", LOG_TYPE_WARNING);
+			return API_INVALID_PARAMETER;
+		}
+
+		DeviceDBRootList moduledbrootlist = boost::get<2>(t);
+
+		DeviceDBRootList::iterator pt = moduledbrootlist.begin();
+		for( ; pt != moduledbrootlist.end() ; pt++)
 		{
-			systemStorageInfo_t t;
-			t = oam.getStorageConfig();
-	
-			if ( boost::get<1>(t) == 0 ) {
-				log.writeLog(__LINE__, "getStorageConfig return: No dbroots are configured in Calpont.xml file", LOG_TYPE_WARNING);
-				return API_INVALID_PARAMETER;
-			}
-	
-			DeviceDBRootList moduledbrootlist = boost::get<2>(t);
-	
-			DeviceDBRootList::iterator pt = moduledbrootlist.begin();
-			for( ; pt != moduledbrootlist.end() ; pt++)
+			int moduleID = (*pt).DeviceID;
+
+			DBRootConfigList::iterator pt1 = (*pt).dbrootConfigList.begin();
+			for( ; pt1 != (*pt).dbrootConfigList.end() ;pt1++)
 			{
-				int moduleID = (*pt).DeviceID;
-	
-				DBRootConfigList::iterator pt1 = (*pt).dbrootConfigList.begin();
-				for( ; pt1 != (*pt).dbrootConfigList.end() ;pt1++)
+				if (config.moduleID() == moduleID)
 				{
-					if (config.moduleID() == moduleID)
-					{
-						dbrootList.push_back(oam.itoa(*pt1));
-					}
+					dbrootList.push_back(oam.itoa(*pt1));
 				}
 			}
-
-			break;
 		}
-		catch (exception& ex)
-		{
-			string error = ex.what();
-			log.writeLog(__LINE__, "EXCEPTION ERROR on getStorageConfig: " + error, LOG_TYPE_ERROR);
-			sleep (1);
-		}
-		catch(...)
-		{
-			log.writeLog(__LINE__, "EXCEPTION ERROR on getStorageConfig: Caught unknown exception!", LOG_TYPE_ERROR);
-			sleep (1);
-		}
+	}
+	catch (exception& ex)
+	{
+		string error = ex.what();
+		log.writeLog(__LINE__, "EXCEPTION ERROR on getStorageConfig: " + error, LOG_TYPE_ERROR);
+	}
+	catch(...)
+	{
+		log.writeLog(__LINE__, "EXCEPTION ERROR on getStorageConfig: Caught unknown exception!", LOG_TYPE_ERROR);
 	}
 
 	if ( dbrootList.size() == 0 ) {
@@ -5535,10 +4797,12 @@ int ProcessMonitor::checkDataMount()
 				log.writeLog(__LINE__, "Exception assigning gluster dbroot# " + dbrootID, LOG_TYPE_ERROR);
 			}
 		}
+
+	//go unmount disk NOT assigned to this pm
+	unmountExtraDBroots();
 	}
 
-	if ( DBRootStorageType == "hdfs" ||
-		(DBRootStorageType == "internal" && GlusterConfig == "n") ) {
+	if ( DBRootStorageType == "internal" && GlusterConfig == "n") {
 		//create OAM-Test-Flag
 		vector<string>::iterator p = dbrootList.begin();
 		while ( p != dbrootList.end() )
@@ -5557,9 +4821,6 @@ int ProcessMonitor::checkDataMount()
 
 		return API_SUCCESS;
 	}
-
-	//go unmount disk NOT assigned to this pm
-	unmountExtraDBroots();
 
 	//Flush the cache
 	cacheutils::flushPrimProcCache();

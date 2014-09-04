@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************************
-* $Id: we_freemgr.cpp 4450 2013-01-21 14:13:24Z rdempsey $
+* $Id: we_freemgr.cpp 3720 2012-04-04 18:18:49Z rdempsey $
 *
 ******************************************************************************************/
 /** @file */
@@ -57,7 +57,7 @@ namespace WriteEngine
    const int FreeMgr::initBlockzero( DataBlock* blockZero)
    {
        IdxEmptyListEntry Pointer; 
-       uint64_t blankVal = 0;
+       i64    blankVal = 0;
        
        memset(blockZero->data, 0, sizeof(blockZero->data));
         
@@ -162,7 +162,7 @@ namespace WriteEngine
            return ERR_INVALID_PARAM;
        }
         // now write sb0 back to disk
-       uint64_t lbid = mapLBID( cb, 0, rc);
+       i64 lbid = mapLBID( cb, 0, rc);
        if (rc != NO_ERROR ){ return rc; }
        rc = writeDBFile( cb, blockZero, lbid );
        if (rc != NO_ERROR)
@@ -203,11 +203,11 @@ namespace WriteEngine
         DataBlock   blockZero;
         DataBlock   workBlock;
         int         sbIdx;
-        uint64_t     blkIdx;
+        i64         blkIdx;
         IdxEmptyListEntry emptyEntry;  // populate the chains with pointer to empty entries
         IdxEmptyListEntry nextPointer; // pointer at end of sub-block of pointers to emptyEntries
-        uint64_t     numBlocks; 
-        FILE*       indexFile;
+        i64   numBlocks; 
+        FILE* indexFile;
 
         indexFile = cb.file.pFile;
 
@@ -339,7 +339,7 @@ namespace WriteEngine
             printMemSubBlock( &blockZero, 0 );
         }
         
-        uint64_t lbid = mapLBID( cb, 0, rc);
+        i64 lbid = mapLBID( cb, 0, rc);
         if (rc != NO_ERROR ){ return rc; }
 
         rc = writeDBFile( cb, blockZero.data, lbid );
@@ -374,8 +374,8 @@ namespace WriteEngine
        int          listOffset; // entry in block zero of head pointer
        IdxEmptyListEntry emptyEntry;
        IdxEmptyListEntry emptyPtr;
-       IdxEmptyListEntry emptyMap;
-       uint64_t          numBlocks;
+      IdxEmptyListEntry emptyMap;
+       i64          numBlocks;
        IdxEmptyListEntry newSb;
        FILE* indexFile;
                
@@ -559,7 +559,7 @@ namespace WriteEngine
            }
            memcpy(assignPtr, &emptyEntry, 8);
            
-           uint64_t count;
+           i64 count;
            getSubBlockEntry( blockZero, 0, calcStatOffset(segmentType) , 8, &count );
            count--;
            setSubBlockEntry( blockZero, 0, calcStatOffset(segmentType) , 8, &count );
@@ -623,7 +623,7 @@ namespace WriteEngine
           rc = writeDBFile( cb, &workBlock, emptyPtr.fbo );
            // --
            
-           uint64_t count;
+           i64 count;
            getSubBlockEntry( blockZero, 0, calcStatOffset(segmentType) , 8, &count );
            count--;
            setSubBlockEntry( blockZero, 0, calcStatOffset(segmentType) , 8, &count );
@@ -656,7 +656,7 @@ namespace WriteEngine
        IdxEmptyListEntry emptyEntry;
        IdxEmptyListEntry emptyPtr, emptyMap;
        IdxEmptyListEntry newBlock;
-       uint64_t      numBlocks;
+       i64          numBlocks;
        FILE* indexFile;
                
        indexFile = cb.file.pFile;
@@ -802,7 +802,7 @@ namespace WriteEngine
 
            blockZero->dirty = 1;
            
-           uint64_t count;
+           i64 count;
            getSubBlockEntry( blockZero, 0, calcStatOffset(ENTRY_32) , 8, &count );
            count--;
            setSubBlockEntry( blockZero, 0, calcStatOffset(ENTRY_32) , 8, &count );
@@ -845,8 +845,8 @@ namespace WriteEngine
        int          listOffset; // entry in block zero of head pointer
        IdxEmptyListEntry emptyPtr;
        IdxEmptyListEntry newSb; 
-       uint64_t     numBlocks;
-       FILE*       indexFile;
+       i64   numBlocks;
+       FILE* indexFile;
                
        indexFile = cb.file.pFile;
 
@@ -879,7 +879,7 @@ namespace WriteEngine
            assignPtr->type = EMPTY_PTR;
            //            return ERR_FM_BAD_TYPE; // do not exit
        }
-       if ( assignPtr->group != (uint64_t)segmentType )
+       if ( assignPtr->group != (i64)segmentType )
        {
 //            printf("DBG: Weirdness in releaseSegment.. tried to return a pointer from group %i to group %i\n", (unsigned int)assignPtr->group, segmentType );
            return ERR_FM_RELEASE_ERR;
@@ -953,7 +953,7 @@ namespace WriteEngine
                setSubBlockEntry( blockZero, 0, listOffset, 8, &newSb );
                blockZero->dirty = 1;
 
-               uint64_t count;
+               i64 count;
                getSubBlockEntry( blockZero, 0, calcStatOffset(segmentType) , 8, &count );
                count++;
                setSubBlockEntry( blockZero, 0, calcStatOffset(segmentType) , 8, &count );
@@ -986,7 +986,7 @@ namespace WriteEngine
 
        }
 
-       uint64_t count;
+       i64 count;
        getSubBlockEntry( blockZero, 0, calcStatOffset(segmentType) , 8, &count );
        count++;
        setSubBlockEntry( blockZero, 0, calcStatOffset(segmentType) , 8, &count );
@@ -1003,8 +1003,8 @@ namespace WriteEngine
        DataBlock   extraBlock;
        int          listOffset; // entry in block zero of head pointer
        IdxEmptyListEntry emptyPtr, emptyMap ;
-       uint64_t     numBlocks;
-       FILE*       indexFile;
+       i64   numBlocks;
+       FILE* indexFile;
                
        indexFile = cb.file.pFile;
        /**
@@ -1139,7 +1139,7 @@ namespace WriteEngine
            blockZero->dirty = 1;
 
        }
-       uint64_t count;
+       i64 count;
        
        getSubBlockEntry( blockZero, 0, calcStatOffset(ENTRY_32) , 8, &count );
        count++;
@@ -1212,9 +1212,9 @@ namespace WriteEngine
     * @param fbo 
     * @return 
     */
-   const uint64_t FreeMgr::mapLBID( CommBlock &cb, const uint64_t fbo, int &rc )
+   const i64 FreeMgr::mapLBID( CommBlock &cb, const i64 fbo, int &rc )
    {
-       uint64_t lbid = 0;
+       i64 lbid = 0;
 
        rc = NO_ERROR;
 #ifdef BROKEN_BY_MULTIPLE_FILES_PER_OID

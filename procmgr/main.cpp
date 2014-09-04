@@ -1,29 +1,10 @@
-/* Copyright (C) 2014 InfiniDB, Inc.
-
-   This program is free software; you can redistribute it and/or
-   modify it under the terms of the GNU General Public License
-   as published by the Free Software Foundation; version 2 of
-   the License.
-
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-   MA 02110-1301, USA. */
-
 /*****************************************************************************************
-* $Id: main.cpp 2203 2013-07-08 16:50:51Z bpaul $
+* $Id: main.cpp 2205 2013-07-08 20:14:08Z bpaul $
 *
 *****************************************************************************************/
 
 
 #include <clocale>
-
-#include <boost/filesystem.hpp>
 
 #include "processmanager.h"
 #include "installdir.h"
@@ -45,18 +26,11 @@ bool runCold = false;
 string systemName = "system";
 string iface_name;
 string cloud;
-bool amazon = false;
 string PMInstanceType;
 string UMInstanceType;
 string GlusterConfig = "n";
 bool rootUser = true;
 string USER = "root";
-bool HDFS = false;
-string localHostName;
-string PMwithUM = "n";
-
-// pushing the ACTIVE_ALARMS_FILE to all nodes every 10 seconds.
-const int ACTIVE_ALARMS_PUSHING_INTERVAL = 10;
 
 typedef   map<string, int>	moduleList;
 moduleList	moduleInfoList;
@@ -73,7 +47,6 @@ extern bool gOAMParentModuleFlag;
 static void messageThread(Configuration config);
 static void sigUser1Handler(int sig);
 static void startMgrProcessThread();
-static void hdfsActiveAlarmsPushingThread();
 //static void pingDeviceThread();
 //static void heartbeatProcessThread();
 //static void heartbeatMsgThread();
@@ -104,6 +77,7 @@ int main(int argc, char **argv)
 	char* p= getenv("USER");
 	if (p && *p)
    		USER = p;
+
 
 	ProcessLog log;
 	Configuration config;
@@ -136,11 +110,10 @@ int main(int argc, char **argv)
 	catch(...) {}
 
 	//get amazon parameters
-	if ( cloud == "amazon-ec2" || cloud == "amazon-vpc" )
+	if ( cloud == "amazon" )
 	{
 		oam.getSystemConfig("PMInstanceType", PMInstanceType);
 		oam.getSystemConfig("UMInstanceType", UMInstanceType);
-		amazon = true;
 	}
 
 	//get gluster config
@@ -152,26 +125,33 @@ int main(int argc, char **argv)
 		GlusterConfig = "n";
 	}
 
-	//hdfs / hadoop config 
-	string DBRootStorageType;
-	try {
-		oam.getSystemConfig( "DBRootStorageType", DBRootStorageType);
-	}
-	catch(...) {}
-
-	if ( DBRootStorageType == "hdfs" )
-		HDFS = true;
-
-	//PMwithUM config 
-	try {
-		oam.getSystemConfig( "PMwithUM", PMwithUM);
-	}
-	catch(...) {
-		PMwithUM = "n";
-	}
-
 	// get system uptime and alarm if this is a restart after module outage
 	if ( gOAMParentModuleFlag ) {
+
+		oam::LicenseKeyChecker keyChecker;
+
+		bool keyGood = true;
+		try {
+			keyGood = keyChecker.isGood();
+		}
+		catch(...)
+		{
+			keyGood = false;
+		}
+
+		if (!keyGood)
+		{
+			//set alarm
+			aManager.sendAlarmReport(systemName.c_str(), EE_LICENSE_EXPIRED, SET);
+			log.writeLog(__LINE__, "Your trial period has expired.", LOG_TYPE_CRITICAL);
+
+			//shutdown system, this might fail if a cpimport job is running
+            oam.shutdownSystem(GRACEFUL, ACK_YES);
+			// sleep until 
+			sleep(100);
+
+			exit (1);
+		}
 
 		//clear alarm
 		aManager.sendAlarmReport(systemName.c_str(), EE_LICENSE_EXPIRED, CLEAR);
@@ -204,7 +184,6 @@ int main(int argc, char **argv)
 	oam.getSystemConfig(config.moduleName(), moduleconfig);
 	HostConfigList::iterator pt1 = moduleconfig.hostConfigList.begin();
 	string localIPaddr = (*pt1).IPAddr;
-	localHostName = (*pt1).HostName;
 
 	struct ifaddrs *addrs, *iap;
 	struct sockaddr_in *sa;
@@ -272,21 +251,13 @@ int main(int argc, char **argv)
 	{ //running active after startup
 		//Update DBRM section of Calpont.xml
 		processManager.updateWorkerNodeconfig();
-//		processManager.distributeConfigFile("system");
+		processManager.distributeConfigFile("system");
 
 		pthread_t srvThread;
 		int status = pthread_create (&srvThread, NULL, (void*(*)(void*)) &pingDeviceThread, NULL);
 
 		if ( status != 0 )
 			log.writeLog(__LINE__, "pingDeviceThread: pthread_create failed, return status = " + oam.itoa(status), LOG_TYPE_ERROR);
-
-		// if HDFS, create a thread to push an image of activeAlarms to HDFS filesystem
-		if (HDFS) {
-			pthread_t hdfsAlarmThread;
-			int status = pthread_create(&hdfsAlarmThread, NULL, (void*(*)(void*)) &hdfsActiveAlarmsPushingThread, NULL);
-			if ( status != 0 )
-				log.writeLog(__LINE__, "hdfsActiveAlarmsPushingThread pthread_create failed, return code = " + oam.itoa(status), LOG_TYPE_ERROR);
-		}
 
 		sleep(5);
 
@@ -632,12 +603,8 @@ static void startMgrProcessThread()
 		pthread_exit(0);
 	}
 
-	//configure the PMS settings
+	//configure the PMS NIC #1
 	processManager.updatePMSconfig();
-
-	if (HDFS)
-		//distribute config file
-		processManager.distributeConfigFile("system");
 
 	//now wait until all procmons are up and validate rpms on each module
 	int status = API_SUCCESS;
@@ -667,29 +634,6 @@ static void startMgrProcessThread()
 						(*pt).DisableState == oam::AUTODISABLEDSTATE )
 					continue;
 
-				int moduleOpState;
-				// check module state
-				try{
-					bool degraded;
-					oam.getModuleStatus(moduleName, moduleOpState, degraded);
-
-					// if up, set to MAN_INIT
-					if ( HDFS && 
-						(moduleOpState == oam::UP) )
-					{
-						processManager.setModuleState(moduleName, oam::MAN_INIT);
-					}
-				}
-				catch (exception& ex)
-				{
-					string error = ex.what();
-					log.writeLog(__LINE__, "EXCEPTION ERROR on getModuleStatus on module " + moduleName + ": " + error, LOG_TYPE_ERROR);
-				}
-				catch(...)
-				{
-					log.writeLog(__LINE__, "EXCEPTION ERROR on getModuleStatus on module " + moduleName + ": Caught unknown exception!", LOG_TYPE_ERROR);
-				}
-
 				// Is Module's ProcMon ACTIVE and module status has been updated
 				int opState;
 				try {
@@ -718,24 +662,50 @@ static void startMgrProcessThread()
 					continue;
 				}
 
-				//ProcMon ACTIVE, validate the software release and version of that module
-				ByteStream msg;
-				ByteStream::byte requestID = GETSOFTWAREINFO;
-				msg << requestID;
+				// Is Module ACTIVE
+				try{
+					bool degraded;
+					oam.getModuleStatus(moduleName, opState, degraded);
 
-				string moduleSoftwareInfo = processManager.sendMsgProcMon1( moduleName, msg, requestID );
-				if ( moduleSoftwareInfo == "FAILED" )
-					continue;
+					if (opState == oam::ACTIVE ||
+						opState == oam::MAN_OFFLINE ||
+						opState == oam::DOWN ||
+						opState == oam::FAILED ||
+						opState == oam::MAN_DISABLED ||
+						opState == oam::AUTO_DISABLED)
+						//skip
+						continue;
 
-				if ( localSoftwareInfo != moduleSoftwareInfo ) {
-					// module not running on same Calpont Software build as this local Director
-					// alarm and fail the module
-					log.writeLog(__LINE__, "Software Info mismatch : " + moduleName + "/" + localSoftwareInfo + "/" + moduleSoftwareInfo, LOG_TYPE_ERROR);	
+					//validate the software release and version of that module
+					ByteStream msg;
+					ByteStream::byte requestID = GETSOFTWAREINFO;
+					msg << requestID;
+	
+					string moduleSoftwareInfo = processManager.sendMsgProcMon1( moduleName, msg, requestID );
+					if ( moduleSoftwareInfo == "FAILED" ) {
+						status = API_FAILURE;
+						break;
+					}
 
-					aManager.sendAlarmReport(moduleName.c_str(), INVALID_SW_VERSION, SET);
-					processManager.setModuleState(moduleName, oam::FAILED);
-					status = API_FAILURE;
-					break;
+					if ( localSoftwareInfo != moduleSoftwareInfo ) {
+						// module not running on same Calpont Software build as this local Director
+						// alarm and fail the module
+						log.writeLog(__LINE__, "Software Info mismatch : " + moduleName + "/" + localSoftwareInfo + "/" + moduleSoftwareInfo, LOG_TYPE_ERROR);	
+
+						aManager.sendAlarmReport(moduleName.c_str(), INVALID_SW_VERSION, SET);
+						processManager.setModuleState(moduleName, oam::FAILED);
+						status = API_FAILURE;
+						break;
+					}
+				}
+				catch (exception& ex)
+				{
+					string error = ex.what();
+					log.writeLog(__LINE__, "EXCEPTION ERROR on getModuleStatus on module " + moduleName + ": " + error, LOG_TYPE_ERROR);
+				}
+				catch(...)
+				{
+					log.writeLog(__LINE__, "EXCEPTION ERROR on getModuleStatus on module " + moduleName + ": Caught unknown exception!", LOG_TYPE_ERROR);
 				}
 			}
 		}
@@ -764,13 +734,13 @@ static void startMgrProcessThread()
 		processManager.setSystemState(oam::FAILED);
 		// exit thread
 		log.writeLog(__LINE__, "startMgrProcessThread Exit with a failure, not all ProcMons ACTIVE", LOG_TYPE_CRITICAL);
-		log.writeLog(__LINE__, "startMgrProcessThread Exit - failure", LOG_TYPE_DEBUG);
-		pthread_exit(0);
+		system("/etc/init.d/infinidb stop");
+		exit(1);
 	}
 	else
 	{
 		//distribute config file
-//		processManager.distributeConfigFile("system");
+		processManager.distributeConfigFile("system");
 
 		if ( systemStartupOffline == "n" && status == API_SUCCESS ) {
 			oam::DeviceNetworkList devicenetworklist;
@@ -929,6 +899,33 @@ void pingDeviceThread()
 
 	while (true)
 	{
+		//check if license has expired
+		oam::LicenseKeyChecker keyChecker;
+
+		bool keyGood = true;
+		try {
+			keyGood = keyChecker.isGood();
+		}
+		catch(...)
+		{
+			keyGood = false;
+		}
+
+		if (!keyGood)
+		{
+			//set alarm
+			aManager.sendAlarmReport(systemName.c_str(), EE_LICENSE_EXPIRED, SET);
+
+			log.writeLog(__LINE__, "Your trial period has expired.", LOG_TYPE_CRITICAL);
+
+			//shutdown system, this might fail if a cpimport job is running
+            oam.shutdownSystem(GRACEFUL, ACK_YES);
+			// sleep until 
+			sleep(100);
+
+			exit (1);
+		}
+
 		//don't peform module test if system is MAN_OFFLINE or not getting status's
 		while(true)
 		{
@@ -948,8 +945,8 @@ void pingDeviceThread()
 		}
 
 		// Module Heartbeat period and failure count
-	    	int ModuleHeartbeatPeriod;
-    		int ModuleHeartbeatCount;
+	    int ModuleHeartbeatPeriod;
+    	int ModuleHeartbeatCount;
 	
 		try {
 			oam.getSystemConfig("ModuleHeartbeatPeriod", ModuleHeartbeatPeriod);
@@ -1079,7 +1076,6 @@ void pingDeviceThread()
 							// perform ping test
 							cmd = cmdLine + ipAddr + cmdOption;
 							rtnCode = system(cmd.c_str());
-							rtnCode = WEXITSTATUS(rtnCode);
 						}
 						else
 							rtnCode = 0;
@@ -1216,36 +1212,29 @@ void pingDeviceThread()
 							{
 								log.writeLog(__LINE__, "Module alive, bring it back online: " + moduleName, LOG_TYPE_DEBUG);
 
-								string PrimaryUMModuleName = config.moduleName();
-								try {
-									oam.getSystemConfig("PrimaryUMModuleName", PrimaryUMModuleName);
-								}
-								catch(...) {}
+								// skip module check if DMLProc is BUSY_INIT (rollback)
+								SystemProcessStatus systemprocessstatus;
+								ProcessStatus processstatus;
 
 								bool busy = false;
-								for ( int retry = 0 ; retry < 20 ; retry++ )
-								{
-									busy = false;
-									ProcessStatus DMLprocessstatus;
-									try {
-										oam.getProcessStatus("DMLProc", PrimaryUMModuleName, DMLprocessstatus);
-									
-										if ( DMLprocessstatus.ProcessOpState == oam::BUSY_INIT) {
+								try {
+									oam.getProcessStatus(systemprocessstatus);
+								
+									for( unsigned int i = 0 ; i < systemprocessstatus.processstatus.size(); i++)
+									{
+										if ( systemprocessstatus.processstatus[i].ProcessName == "DMLProc" &&
+											systemprocessstatus.processstatus[i].ProcessOpState == oam::BUSY_INIT) {
 											log.writeLog(__LINE__, "DMLProc in BUSY_INIT, skip bringing module online " + moduleName, LOG_TYPE_DEBUG);
 											busy = true;
-											sleep (5);
-										}
-										else
 											break;
+										}
 									}
-									catch(...)
-									{}
 								}
+								catch(...)
+								{}
 
 								if (busy)
 									break;
-
-								processManager.setSystemState(oam::BUSY_INIT);
 
 								processManager.reinitProcessType("cpimport");
 
@@ -1264,12 +1253,8 @@ void pingDeviceThread()
 								int status;
 	
 								// if pm, move dbroots back to pm
-								if ( ( moduleName.find("pm") == 0 && !amazon ) ||
-									( moduleName.find("pm") == 0 && amazon && downActiveOAMModule ) ) {
-
-									//restart to get the versionbuffer files closed so it can be unmounted
-									processManager.restartProcessType("WriteEngineServer");
-
+								if ( ( moduleName.find("pm") == 0 && cloud != "amazon" ) ||
+									( moduleName.find("pm") == 0 && cloud == "amazon" && downActiveOAMModule ) ) {
 									downActiveOAMModule = false;
 									try {
 										log.writeLog(__LINE__, "Call autoUnMovePmDbroot", LOG_TYPE_DEBUG);
@@ -1305,7 +1290,6 @@ void pingDeviceThread()
 												//clear count
 												moduleInfoList[moduleName] = 0;
 	
-												processManager.setSystemState(oam::ACTIVE);
 												break;
 											}
 										}
@@ -1338,13 +1322,13 @@ void pingDeviceThread()
 										//clear count
 										moduleInfoList[moduleName] = 0;
 
-										processManager.setSystemState(oam::ACTIVE);
 										break;
 									}
 								}
 
 								//restart module processes
 								int retry = 0;
+								bool stopSuccess = false;
 
 								int ModuleProcMonWaitCount = 30;
 								try{
@@ -1422,38 +1406,38 @@ void pingDeviceThread()
 									}
 
 									// next, stopmodule to start up clean
-									status = processManager.stopModule(moduleName, oam::FORCEFUL, false);
-									if ( status == oam::API_SUCCESS ) {
-										string newStandbyModule = processManager.getStandbyModule();
-										if ( !newStandbyModule.empty() && newStandbyModule != "NONE") {
-											processManager.setStandbyModule(newStandbyModule);
+//									if (!stopSuccess)
+//									{
+										status = processManager.stopModule(moduleName, oam::FORCEFUL, false);
+										if ( status == oam::API_SUCCESS ) {
+											stopSuccess = true;
+											string newStandbyModule = processManager.getStandbyModule();
+											if ( !newStandbyModule.empty() && newStandbyModule != "NONE") {
+												processManager.setStandbyModule(newStandbyModule);
+											}
+											else
+											{
+												if ( newStandbyModule == "NONE")
+													if ( moduleName.substr(0,MAX_MODULE_TYPE_SIZE) == "pm" )
+														processManager.setStandbyModule(moduleName);
+											}
 										}
-										else
-										{
-											if ( newStandbyModule == "NONE")
-												if ( moduleName.substr(0,MAX_MODULE_TYPE_SIZE) == "pm" )
-													processManager.setStandbyModule(moduleName);
+										else {
+											//stop failed, retry
+											log.writeLog(__LINE__, "stopModule, failed will retry: " + moduleName, LOG_TYPE_DEBUG);
+											sleep(5);
+											continue;
 										}
-									}
-									else {
-										//stop failed, retry
-										log.writeLog(__LINE__, "stopModule, failed will retry: " + moduleName, LOG_TYPE_DEBUG);
-										sleep(5);
-										continue;
-									}
-
-									//call dbrm control, need to resume before start so the getdbrmfiles halt doesn't hang
-									oam.dbrmctl("reload");
-									log.writeLog(__LINE__, "'dbrmctl reload' done", LOG_TYPE_DEBUG);
-	
-									// resume the dbrm
-									oam.dbrmctl("resume");
-									log.writeLog(__LINE__, "'dbrmctl resume' done", LOG_TYPE_DEBUG);
+//									}
 
 									// next, startmodule
 									status = processManager.startModule(moduleName, oam::FORCEFUL, oam::AUTO_OFFLINE);
 									if ( status == oam::API_SUCCESS )
 										break;
+
+									if ( status != oam::API_MINOR_FAILURE )
+										// do another stopModule
+										stopSuccess = false;
 
 									log.writeLog(__LINE__, "startModule, failed will retry: " + moduleName, LOG_TYPE_DEBUG);
 
@@ -1474,6 +1458,14 @@ void pingDeviceThread()
 										processManager.restartProcessType("mysql");
 									}
 
+									//call dbrm control
+									oam.dbrmctl("reload");
+									log.writeLog(__LINE__, "'dbrmctl reload' done", LOG_TYPE_DEBUG);
+	
+									// resume the dbrm
+									oam.dbrmctl("resume");
+									log.writeLog(__LINE__, "'dbrmctl resume' done", LOG_TYPE_DEBUG);
+
 									// if a PM module was started successfully, DMLProc/DDLProc
 									if( moduleName.find("pm") == 0 ) {
 										processManager.restartProcessType("DDLProc");
@@ -1485,14 +1477,6 @@ void pingDeviceThread()
 
 									//clear count
 									moduleInfoList[moduleName] = 0;
-
-									//setup MySQL Replication for started modules
-									log.writeLog(__LINE__, "Setup MySQL Replication for module recovering from outage", LOG_TYPE_DEBUG);
-									DeviceNetworkList devicenetworklist;
-									DeviceNetworkConfig devicenetworkconfig;
-									devicenetworkconfig.DeviceName = moduleName;
-									devicenetworklist.push_back(devicenetworkconfig);
-									processManager.setMySQLReplication(devicenetworklist);
 								}
 								else
 								{	// module failed to restart, place back in disabled state
@@ -1503,8 +1487,8 @@ void pingDeviceThread()
 									aManager.sendAlarmReport(moduleName.c_str(), MODULE_DOWN_AUTO, SET);
 
 									// if pm, move dbroots back to pm
-									if ( ( moduleName.find("pm") == 0 && !amazon ) ||
-										( moduleName.find("pm") == 0 && amazon && downActiveOAMModule ) ) {
+									if ( ( moduleName.find("pm") == 0 && cloud != "amazon" ) ||
+										( moduleName.find("pm") == 0 && cloud == "amazon" && downActiveOAMModule ) ) {
 										//move dbroots to other modules
 										try {
 											log.writeLog(__LINE__, "Call autoMovePmDbroot", LOG_TYPE_DEBUG);
@@ -1537,7 +1521,7 @@ void pingDeviceThread()
 
 									log.writeLog(__LINE__, "Module failed to auto start: " + moduleName, LOG_TYPE_CRITICAL);
 
-									if ( amazon )
+									if ( cloud == "amazon" )
 										processManager.setSystemState(oam::FAILED);
 									else
 										processManager.setSystemState(oam::ACTIVE);
@@ -1580,9 +1564,9 @@ void pingDeviceThread()
 								log.writeLog(__LINE__, "'dbrmctl halt' done", LOG_TYPE_DEBUG);
 
 								processManager.setSystemState(oam::BUSY_INIT);
-
-								string cmd = "/etc/init.d/glusterd restart > /dev/null 2>&1";
-								system(cmd.c_str());
+// TEST CODE
+string cmd = "/etc/init.d/glusterd restart > /dev/null 2>&1";
+system(cmd.c_str());
 
 								//send notification
 								oam.sendDeviceNotification(moduleName, MODULE_DOWN);
@@ -1604,7 +1588,7 @@ void pingDeviceThread()
 								// state = running, then instance is rebooting, monitor for recovery
 								// state = stopped, then try starting, if fail, remove/addmodule to launch new instance
 								// state = terminate or nothing, remove/addmodule to launch new instance
-								if ( amazon ) {
+								if ( cloud == "amazon" ) {
 
 									if ( moduleName.find("um") == 0 )
 									{
@@ -1727,11 +1711,7 @@ void pingDeviceThread()
 										HostConfig hostconfig;
 
 										devicenetworkconfig.DeviceName = moduleName;
-										if (cloud == "amazon-vpc")
-											hostconfig.IPAddr = ipAddr;
-										else
-											hostconfig.IPAddr = oam::UnassignedName;
-
+										hostconfig.IPAddr = oam::UnassignedName;
 										hostconfig.HostName = oam::UnassignedName;
 										hostconfig.NicID = 1;
 										devicenetworkconfig.hostConfigList.push_back(hostconfig);
@@ -1849,8 +1829,7 @@ void pingDeviceThread()
 
 											//set recycle process
 											processManager.recycleProcess(moduleName);
-
-											sleep(2);
+		
 											processManager.setSystemState(oam::ACTIVE);
 										}
 									}
@@ -1891,7 +1870,6 @@ void pingDeviceThread()
 									//set recycle process
 									processManager.recycleProcess(moduleName);
 
-									sleep(2);
 									processManager.setSystemState(oam::ACTIVE);
 
 									//check if down module was Standby OAM, if so find another one
@@ -2099,7 +2077,7 @@ void pingDeviceThread()
 			cmd = cmdLine + ipAddr + cmdOption;
 			rtnCode = system(cmd.c_str());
 
-			switch (WEXITSTATUS(rtnCode)){
+			switch (rtnCode){
 			case 0:
 				//Switch Ack ping, Check whether alarm have been issued 
 				if (extDeviceInfoList[extDeviceName] >= ModuleHeartbeatCount)
@@ -2158,8 +2136,7 @@ void pingDeviceThread()
                         {
                             bool degraded;
                             oam.getModuleStatus(moduleName, opState, degraded);
-                            if (opState == oam::ACTIVE ||
-				opState == oam::DEGRADED || 
+                            if (opState == oam::ACTIVE || 
                                 opState == oam::MAN_DISABLED || 
                                 opState == oam::AUTO_DISABLED )
                                 continue;
@@ -2186,8 +2163,10 @@ void pingDeviceThread()
 					catch(...) {}
 
 					ProcessStatus DMLprocessstatus;
+					ProcessStatus DDLprocessstatus;
 					try {
 						oam.getProcessStatus("DMLProc", PrimaryUMModuleName, DMLprocessstatus);
+						oam.getProcessStatus("DDLProc", PrimaryUMModuleName, DDLprocessstatus);
 					}
 					catch (exception& ex)
 					{
@@ -2199,7 +2178,8 @@ void pingDeviceThread()
 						log.writeLog(__LINE__, "EXCEPTION ERROR on getProcessStatus: Caught unknown exception!", LOG_TYPE_ERROR);
 					}
 		
-					if (DMLprocessstatus.ProcessOpState == oam::ACTIVE) {
+					if (DMLprocessstatus.ProcessOpState == oam::ACTIVE &&
+						DDLprocessstatus.ProcessOpState == oam::ACTIVE) {
 
 						//set the system status if a change has occurred
 						SystemStatus systemstatus;
@@ -2239,39 +2219,6 @@ void pingDeviceThread()
 
 	return;
 }
-
-/******************************************************************************************
-* @brief      hdfsActiveAlarmsPushingThread
-*
-* purpose:    Push an image of ActiveAlarms to HDFS for non-OAMParentModule to view.
-*
-******************************************************************************************/
-static void hdfsActiveAlarmsPushingThread()
-{
-	boost::filesystem::path filePath(ACTIVE_ALARM_FILE);
-	boost::filesystem::path dirPath = filePath.parent_path();
-	string dirName = boost::filesystem::canonical(dirPath).string();
-
-	if (boost::filesystem::exists("/etc/pdsh/machines"))
-	{
-		string cpCmd =  "pdcp -a -x " + localHostName + " " + ACTIVE_ALARM_FILE + " " + dirName +
-						" > /dev/null 2>&1";
-		string rmCmd =  "pdsh -a -x " + localHostName + " rm -f " + ACTIVE_ALARM_FILE +
-						" > /dev/null 2>&1";
-		while(1)
-		{
-			if (boost::filesystem::exists(filePath))
-				system(cpCmd.c_str());
-			else
-				system(rmCmd.c_str());
-
-			sleep(ACTIVE_ALARMS_PUSHING_INTERVAL);
-		}
-	}
-
-	return;
-}
-
 
 /*****************************************************************************************
 * @brief	Processor Heartbeat Msg Thread

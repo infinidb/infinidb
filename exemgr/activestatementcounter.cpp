@@ -15,14 +15,25 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-// $Id: activestatementcounter.cpp 940 2013-01-21 14:11:31Z rdempsey $
+// $Id: activestatementcounter.cpp 894 2012-11-02 21:17:14Z pleblanc $
 //
 
-#include <unistd.h>
+//#define NDEBUG
+#include <cassert>
+#include <limits>
 using namespace std;
 
 #include <boost/thread/mutex.hpp>
+#include <boost/scoped_ptr.hpp>
+#include <boost/scoped_array.hpp>
 using namespace boost;
+
+#include "vss.h"
+#include "dbrm.h"
+#include "brmtypes.h"
+using namespace BRM;
+
+#include "cacheutils.h"
 
 #include "activestatementcounter.h"
 
@@ -35,12 +46,9 @@ void ActiveStatementCounter::incr(bool& counted)
 	mutex::scoped_lock lk(fMutex);
 	if (upperLimit > 0)
 		while (fStatementCount >= upperLimit)
-		{
-			fStatementsWaiting++;
 			condvar.wait(lk);
-			--fStatementsWaiting;
-		}
 	fStatementCount++;
+//	cout << "incr: fStatementCount=" << fStatementCount << endl;
 }
 
 void ActiveStatementCounter::decr(bool& counted)
@@ -50,11 +58,37 @@ void ActiveStatementCounter::decr(bool& counted)
 
 	counted = false;
 	mutex::scoped_lock lk(fMutex);
+	//assert(fStatementCount > 0);
 	if (fStatementCount == 0)
 		return;
 
 	--fStatementCount;
+//	cout << "decr:  fStatementCount=" << fStatementCount << endl;
 	condvar.notify_one();
+	/* This doesn't take into account EC-mode syscat queries.  Need to think
+		about whether it's actually beneficial or not.  If it must happen,
+		the right place to do it is in PrimProc. */
+#if 0
+	if (fStatementCount == 0)
+	{
+		if (!fVss.isEmpty())
+		{
+			scoped_ptr<DBRM> dbrmp(new DBRM());
+			int len;
+			shared_array<SIDTIDEntry> entries = dbrmp->SIDTIDMap(len);
+			if (len == 0)
+			{
+				BlockList_t blist;
+				dbrmp->getUnlockedLBIDs(&blist);
+				if (!blist.empty())
+				{
+					cacheutils::flushPrimProcBlocks(blist);
+					dbrmp->clear();
+				}
+			}
+		}
+	}
+#endif
 }
 // vim:ts=4 sw=4:
 

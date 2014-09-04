@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_crc32.cpp 3923 2013-06-19 21:43:06Z bwilkinson $
+* $Id: func_crc32.cpp 3048 2012-04-04 15:33:45Z rdempsey $
 *
 *
 ****************************************************************************/
@@ -50,7 +50,7 @@ int64_t Func_crc32::getIntVal(rowgroup::Row& row,
 						bool& isNull,
 						CalpontSystemCatalog::ColType& ct)
 {
-	const string& val = parm[0]->data()->getStrVal(row, isNull);
+	string val = parm[0]->data()->getStrVal(row, isNull);
 	return (int64_t) crc32(0L, (unsigned char*)val.c_str(), strlen(val.c_str()));
 }
 

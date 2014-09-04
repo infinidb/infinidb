@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
-* $Id: threadsafequeue.h 9655 2013-06-25 23:08:13Z xlou $
+* $Id: threadsafequeue.h 8436 2012-04-04 18:18:21Z rdempsey $
 */
 
 /** @file */
@@ -42,7 +42,7 @@ namespace joblist
 
 struct TSQSize_t {
 	size_t size;
-	uint32_t count;
+	uint count;
 };
 
 /** @brief A thread-safe queue class
@@ -144,7 +144,7 @@ public:
 		bytes += v->lengthWithHdrOverhead();
 		fPimplCond->notify_one();
 		ret.size = bytes;
-		ret.count = static_cast<uint32_t>(fImpl.size());
+		ret.count = static_cast<uint>(fImpl.size());
 		return ret;
 	}
 	/** @brief remove the front item in the queue
@@ -182,17 +182,17 @@ public:
 		}
 		fImpl.pop();
 		ret.size = bytes;
-		ret.count = static_cast<uint32_t>(fImpl.size());
+		ret.count = static_cast<uint>(fImpl.size());
 		return ret;
 	}
 
 	/* If there are less than min elements in the queue, this fcn will return nothing
-	 * for up to 10 consecutive calls (poor man's timer).  On the 11th, it will return
+	 * for up to 10 consecutive calls (poor man's timer).  On the 11th, it will return 
 	 * the entire queue.  Note, the zeroCount var is non-critical.  Not a big deal if
 	 * it gets fudged now and then. */
-	TSQSize_t pop_some(uint32_t divisor, std::vector<T> &t, uint32_t min = 1)
+	TSQSize_t pop_some(uint divisor, std::vector<T> &t, uint min = 1)
 	{
-		uint32_t curSize, workSize;
+		uint curSize, workSize;
 		TSQSize_t ret = {0, 0};
 
 		if (fPimplLock == 0)
@@ -218,7 +218,7 @@ public:
 			workSize = curSize;
 			zeroCount = 0;
 		}
-		for (uint32_t i = 0; i < workSize; ++i) {
+		for (uint i = 0; i < workSize; ++i) {
 			t.push_back(fImpl.front());
 			bytes -= fImpl.front()->lengthWithHdrOverhead();
 			fImpl.pop();
@@ -253,7 +253,7 @@ public:
 		ret.count = fImpl.size();
 		return ret;
 	}
-
+		 
 	/** @brief shutdown the queue
 	 *
 	 * cause all readers blocked in front() to return a default-constructed T
@@ -265,8 +265,8 @@ public:
 			fPimplCond->notify_all();
 		return;
 	}
-
-	void clear()
+	
+	void clear() 
 	{
 	     if (fPimplLock == 0)
 			throw std::runtime_error("TSQ: clear(): no sync!");
@@ -296,7 +296,7 @@ private:
 #else
 	size_t bytes;
 #endif
-	uint32_t zeroCount;   // counts the # of times read_some returned 0
+	uint zeroCount;   // counts the # of times read_some returned 0
 };
 
 }

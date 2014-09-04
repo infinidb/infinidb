@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_add_time.cpp 3923 2013-06-19 21:43:06Z bwilkinson $
+* $Id: func_add_time.cpp 3048 2012-04-04 15:33:45Z rdempsey $
 *
 *
 ****************************************************************************/
@@ -36,10 +36,8 @@ using namespace dataconvert;
 #include "functor_dtm.h"
 #include "funchelpers.h"
 
-namespace
+namespace funcexp
 {
-using namespace funcexp;
-
 int64_t addTime(DateTime& dt1, Time& dt2)
 {
 	DateTime dt;
@@ -121,10 +119,6 @@ int64_t addTime(DateTime& dt1, Time& dt2)
 	
 	return *(reinterpret_cast<int64_t*>(&dt));
 }
-}
-
-namespace funcexp
-{
 
 CalpontSystemCatalog::ColType Func_add_time::operationType( FunctionParm& fp, CalpontSystemCatalog::ColType& resultType )
 {
@@ -144,7 +138,9 @@ string Func_add_time::getStrVal(rowgroup::Row& row,
 							bool& isNull,
 							CalpontSystemCatalog::ColType& ct)
 {
-	return intToString(getIntVal(row, parm, isNull, ct));
+	ostringstream oss;
+	oss << getIntVal(row, parm, isNull, ct);
+	return oss.str();
 }
 
 int32_t Func_add_time::getDateIntVal(rowgroup::Row& row,
@@ -152,7 +148,7 @@ int32_t Func_add_time::getDateIntVal(rowgroup::Row& row,
 							bool& isNull,
 							CalpontSystemCatalog::ColType& ct)
 {
-	return (((getDatetimeIntVal(row, parm, isNull, ct) >> 32) & 0xFFFFFFC0) | 0x3E);
+	return (getDatetimeIntVal(row, parm, isNull, ct) >> 32) & 0xFFFFFFC0;
 }
 
 int64_t Func_add_time::getDatetimeIntVal(rowgroup::Row& row,
@@ -164,7 +160,7 @@ int64_t Func_add_time::getDatetimeIntVal(rowgroup::Row& row,
 	if (isNull)
 		return -1;
 
-	const string& val2 = parm[1]->data()->getStrVal(row, isNull);
+	string val2 = parm[1]->data()->getStrVal(row, isNull);
 	int sign = parm[2]->data()->getIntVal(row, isNull);
 	DateTime dt1;
 	dt1.year = (val1 >> 48) & 0xffff;

@@ -37,7 +37,6 @@
 #include <boost/shared_array.hpp>
 #include <vector>
 #include <limits>
-#include <unistd.h>
 
 #if defined(_MSC_VER) && defined(xxxFIXEDALLOCATOR_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
@@ -71,21 +70,21 @@ public:
 	EXPORT FixedAllocator & operator=(const FixedAllocator &);
 	virtual ~FixedAllocator() {}
 
-	EXPORT void * allocate(); 
-	EXPORT void * allocate(uint32_t len);  // a hack to make it work more like a pool allocator (use PoolAllocator instead)
-	EXPORT void truncateBy(uint32_t amt);   // returns a portion of mem just allocated; use with caution
+	EXPORT void * allocate();
 	void deallocate() { }   // does nothing
 	EXPORT void deallocateAll();		// drops all memory in use
-	EXPORT uint64_t getMemUsage() const;
-	
+	EXPORT inline uint64_t getMemUsage() const {
+		return (tmpSpace ? elementSize * elementCount : currentlyStored * elementSize);
+	}
+
 private:
 	void newBlock();
 
 	std::vector<boost::shared_array<uint8_t> > mem;
 	unsigned long capacityRemaining;
-	uint64_t elementCount;
+	unsigned long elementCount;
 	unsigned long elementSize;
-	uint64_t currentlyStored;
+	unsigned long currentlyStored;
 	bool tmpSpace;
 	uint8_t* nextAlloc;
 };

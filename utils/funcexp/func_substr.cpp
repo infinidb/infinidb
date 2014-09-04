@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_substr.cpp 3923 2013-06-19 21:43:06Z bwilkinson $
+* $Id: func_substr.cpp 3716 2013-04-18 16:35:52Z bpaul $
 *
 *
 ****************************************************************************/
@@ -53,7 +53,7 @@ std::string Func_substr::getStrVal(rowgroup::Row& row,
 						execplan::CalpontSystemCatalog::ColType&)
 {
 #ifdef STRCOLL_ENH__
-	const string& tstr = fp[0]->data()->getStrVal(row, isNull);
+	string tstr = fp[0]->data()->getStrVal(row, isNull);
 	if (isNull)
 		return "";
 
@@ -97,7 +97,7 @@ std::string Func_substr::getStrVal(rowgroup::Row& row,
 	strmblen = utf8::idb_wcstombs(outbuf, out.c_str(), strmblen);
 	return string(outbuf, strmblen);
 #else
-	const string& str = fp[0]->data()->getStrVal(row, isNull);
+	string str = fp[0]->data()->getStrVal(row, isNull);
 	if (isNull)
 		return "";
 

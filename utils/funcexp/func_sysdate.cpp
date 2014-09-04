@@ -89,7 +89,7 @@ int32_t Func_sysdate::getDateIntVal(rowgroup::Row& row,
 							bool& isNull,
 							CalpontSystemCatalog::ColType& operationColType)
 {
-	return (((getIntVal(row, parm, isNull, operationColType) >> 32) & 0xFFFFFFC0) | 0x3E);
+	return (getIntVal(row, parm, isNull, operationColType) >> 32) & 0xFFFFFFC0;
 }
 
 int64_t Func_sysdate::getDatetimeIntVal(rowgroup::Row& row,

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: dmlcolumn.cpp 9210 2013-01-21 14:10:42Z rdempsey $
+*   $Id: dmlcolumn.cpp 8436 2012-04-04 18:18:21Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -97,7 +97,7 @@ int DMLColumn::write(messageqcpp::ByteStream& bytestream)
 {
     int retval = 1;
     bytestream << fName;
-	bytestream << static_cast<uint8_t>(fisNULL);
+	bytestream << static_cast<u_int8_t>(fisNULL);
 	uint32_t vectorSize = fColValuesList.size();
 	bytestream << vectorSize;
 	if (vectorSize > 0 )
@@ -110,8 +110,8 @@ int DMLColumn::write(messageqcpp::ByteStream& bytestream)
 	}
 	else
 		bytestream << fData; //deprecated.
-    //bytestream << static_cast<uint8_t>(fisNULL);
-	bytestream << static_cast<uint8_t>(fIsFromCol);
+    //bytestream << static_cast<u_int8_t>(fisNULL);
+	bytestream << static_cast<u_int8_t>(fIsFromCol);
 	bytestream <<(uint32_t)fFuncScale;
     return retval;
 }

@@ -155,7 +155,7 @@ int BCTest::LoadOid(const OidRanges_t& o, uint32_t& loadCount)
 	blockCacheClient bc(BRP);
 	uint32_t rCount=0;
 
-	for (uint32_t i =0; i<o.ranges.size() ; i++)
+	for (uint i =0; i<o.ranges.size() ; i++)
 	{
 		const InlineLBIDRange r={o.ranges[i].start, o.ranges[i].size};
 		if (r.size>0) {
@@ -180,7 +180,7 @@ int BCTest::ReadOidRanges(const OidRanges_t& v, uint32_t* hits, uint32_t* miss)
 	int32_t readBlocks=0;
 	int32_t missBlocks=0;
 
-	for(uint32_t i=0; i<v.ranges.size(); i++)
+	for(uint i=0; i<v.ranges.size(); i++)
 	{
 		FileBuffer fb(-1, -1);
 		const InlineLBIDRange r={v.ranges[i].start, v.ranges[i].size};
@@ -218,7 +218,7 @@ void BCTest::LoadLbid(const BRM::LBID_t lbid, const BRM::VER_t ver)
 //
 void BCTest::ReadOidLbids(const BRM::LBID_t lbid, const BRM::VER_t ver)
 {
-	uint8_t d[8192]={'\0'};
+	u_int8_t d[8192]={'\0'};
 	blockCacheClient bc(BRP);
 	bc.read(lbid, ver, d);
 } // ReadLbid
@@ -238,7 +238,7 @@ struct loadThr
 		uint32_t rc=0;
 
 		clock_gettime(CLOCK_REALTIME, &tm1);
-		for(uint32_t j=0; j<fReps; j++)	
+		for(uint j=0; j<fReps; j++)	
 			for(i=0; loadedBlocks<maxLoadBlocks && i<fBC.OidRangesList.size(); i++)
 			{
 				oidBlocks=0;
@@ -283,7 +283,7 @@ struct readThr
 
 	void operator()()
 	{
-		for (uint32_t k=0; k<fReps; k++) {
+		for (uint k=0; k<fReps; k++) {
 		}
 
 	} // operator()

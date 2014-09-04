@@ -283,11 +283,9 @@ BOOST_REGEX_DECL std::string BOOST_REGEX_CALL w32_cat_get(const cat_type& cat, l
    if (r == 0)
       return def;
 
-
-   int buf_size = 1 + ::WideCharToMultiByte(CP_ACP, 0,  wbuf, r,  NULL, 0,  NULL, NULL);
-   LPSTR buf = (LPSTR)_alloca(buf_size);
-   if (::WideCharToMultiByte(CP_ACP, 0,  wbuf, r,  buf, buf_size,  NULL, NULL) == 0)
-      return def; // failed conversion.
+   LPSTR buf = (LPSTR)_alloca( (r + 1) * 2 );
+   if (::WideCharToMultiByte(CP_ACP, 0,  wbuf, r,  buf, (r + 1) * 2,  NULL, NULL) == 0)
+      return def;
 #endif
    return std::string(buf);
 }
@@ -487,7 +485,7 @@ BOOST_REGEX_DECL char BOOST_REGEX_CALL w32_tolower(char c, lcid_type idx)
       return c;
 
    if (::WideCharToMultiByte(code_page, 0,  &wide_result, 1,  result, 2,  NULL, NULL) == 0)
-       return c;  // No single byte lower case equivalent available
+       return c;
 #endif
    return result[0];
 }
@@ -558,7 +556,7 @@ BOOST_REGEX_DECL char BOOST_REGEX_CALL w32_toupper(char c, lcid_type idx)
       return c;
 
    if (::WideCharToMultiByte(code_page, 0,  &wide_result, 1,  result, 2,  NULL, NULL) == 0)
-       return c;  // No single byte upper case equivalent available.
+       return c;
 #endif
    return result[0];
 }

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
-* $Id: we_bulkrollbackfile.cpp 4737 2013-08-14 20:45:46Z bwilkinson $
+* $Id: we_bulkrollbackfile.cpp 4213 2012-09-28 13:04:51Z dcathey $
 */
 
 #include "we_bulkrollbackfile.h"
@@ -27,14 +27,10 @@
 #include "we_define.h"
 #include "we_fileop.h"
 #include "messageids.h"
-#include "IDBDataFile.h"
-using namespace idbdatafile;
-
-using namespace execplan;
 
 namespace WriteEngine
 {
-
+
 //------------------------------------------------------------------------------
 // BulkRollbackFile constructor
 //------------------------------------------------------------------------------
@@ -42,11 +38,11 @@ BulkRollbackFile::BulkRollbackFile(BulkRollbackMgr* mgr) : fMgr(mgr)
 {
     // Initialize empty dictionary header block used when reinitializing
     // dictionary store extents.
-    const uint16_t freeSpace  = BYTE_PER_BLOCK -
+    const i16 freeSpace  = BYTE_PER_BLOCK -
         (HDR_UNIT_SIZE + NEXT_PTR_BYTES + HDR_UNIT_SIZE + HDR_UNIT_SIZE);
-    const uint64_t nextPtr    = NOT_USED_PTR;
-    const uint16_t offSetZero = BYTE_PER_BLOCK;
-    const uint16_t endHeader  = DCTNRY_END_HEADER;
+    const i64 nextPtr    = NOT_USED_PTR;
+    const i16 offSetZero = BYTE_PER_BLOCK;
+    const i16 endHeader  = DCTNRY_END_HEADER;
 
     memcpy(fDctnryHdr,                &freeSpace,  HDR_UNIT_SIZE);
     memcpy(fDctnryHdr+ HDR_UNIT_SIZE, &nextPtr,   NEXT_PTR_BYTES);
@@ -62,25 +58,29 @@ BulkRollbackFile::BulkRollbackFile(BulkRollbackMgr* mgr) : fMgr(mgr)
 BulkRollbackFile::~BulkRollbackFile()
 {
 }
-
+
 //------------------------------------------------------------------------------
-// Build the specified database segment file name.
+// Find the specified database segment file.
 //
 // columnOID      - OID of segment file to be found
 // fileTypeFlag   - true -> column file; false -> dictionary store file
 // dbRoot         - DBRoot of segment file to be found
 // partNum        - Partition number of segment file to be found
 // segNum         - Segment number of segment file to be found
+// segFileExisted (out) - indicates whether segment file was found or not
 // segFileName (out)    - Name of segment file
 //------------------------------------------------------------------------------
-void BulkRollbackFile::buildSegmentFileName(
+void BulkRollbackFile::findSegmentFile(
     OID          columnOID,
     bool         fileTypeFlag,
-    uint32_t    dbRoot,
-    uint32_t    partNum,
-    uint32_t    segNum,
+    u_int32_t    dbRoot,
+    u_int32_t    partNum,
+    u_int32_t    segNum,
+    bool&        segFileExists,
     std::string& segFileName )
 {
+    segFileExists = false;
+
     char fileName[FILE_NAME_SIZE];
     int rc = fDbFile.getFileName( columnOID, fileName,
         dbRoot, partNum, segNum );
@@ -100,9 +100,11 @@ void BulkRollbackFile::buildSegmentFileName(
         throw WeException( oss.str(), rc );
     }
 
-    segFileName = fileName;
-}
+    segFileName   = fileName;
 
+    segFileExists = fDbFile.exists( fileName );
+}
+
 //------------------------------------------------------------------------------
 // Delete the specified database segment file.
 //
@@ -116,9 +118,9 @@ void BulkRollbackFile::buildSegmentFileName(
 void BulkRollbackFile::deleteSegmentFile(
     OID       columnOID, 
     bool      fileTypeFlag,
-    uint32_t dbRoot,
-    uint32_t partNum, 
-    uint32_t segNum,
+    u_int32_t dbRoot,
+    u_int32_t partNum, 
+    u_int32_t segNum,
     const std::string& segFileName )
 {
     std::ostringstream msgText; 
@@ -148,7 +150,7 @@ void BulkRollbackFile::deleteSegmentFile(
         }
     }
 }
-
+
 //------------------------------------------------------------------------------
 // Truncate the specified database segment file to the given file offset.
 //
@@ -161,9 +163,9 @@ void BulkRollbackFile::deleteSegmentFile(
 //------------------------------------------------------------------------------
 void BulkRollbackFile::truncateSegmentFile(
     OID       columnOID,
-    uint32_t dbRoot,
-    uint32_t partNum,
-    uint32_t segNum,
+    u_int32_t dbRoot,
+    u_int32_t partNum,
+    u_int32_t segNum,
     long long fileSizeBlocks )
 {
     long long fileSizeBytes = fileSizeBlocks * BYTE_PER_BLOCK;
@@ -179,8 +181,7 @@ void BulkRollbackFile::truncateSegmentFile(
         logging::M0075, columnOID, msgText.str() );
 
     std::string segFile;
-    IDBDataFile* pFile = fDbFile.openFile(columnOID, dbRoot, partNum, segNum, segFile);
-
+    FILE* pFile = fDbFile.openFile(columnOID, dbRoot, partNum, segNum, segFile);
     if (pFile == 0)
     {
         std::ostringstream oss;
@@ -212,7 +213,7 @@ void BulkRollbackFile::truncateSegmentFile(
 
     fDbFile.closeFile( pFile );
 }
-
+
 //------------------------------------------------------------------------------
 // Reinitialize a column segment extent (in the db file) to empty values,
 // following the HWM.  Remaining extents in the file are truncated.
@@ -232,13 +233,13 @@ void BulkRollbackFile::truncateSegmentFile(
 //------------------------------------------------------------------------------
 void BulkRollbackFile::reInitTruncColumnExtent(
     OID         columnOID,
-    uint32_t    dbRoot,
-    uint32_t    partNum,
-    uint32_t    segNum,
+    u_int32_t   dbRoot,
+    u_int32_t   partNum,
+    u_int32_t   segNum,
     long long   startOffsetBlk,
     int         nBlocks,
-    CalpontSystemCatalog::ColDataType colType,
-    uint32_t  colWidth,
+    ColDataType colType,
+    u_int32_t   colWidth,
     bool        /*restoreHwmChk*/ )
 {
     long long startOffset = startOffsetBlk * BYTE_PER_BLOCK;
@@ -254,7 +255,7 @@ void BulkRollbackFile::reInitTruncColumnExtent(
         logging::M0075, columnOID, msgText.str() );
 
     std::string segFile;
-    IDBDataFile* pFile = fDbFile.openFile(columnOID, dbRoot, partNum, segNum, segFile);
+    FILE* pFile = fDbFile.openFile(columnOID, dbRoot, partNum, segNum, segFile);
     if (pFile == 0)
     {
         std::ostringstream oss;
@@ -301,7 +302,7 @@ void BulkRollbackFile::reInitTruncColumnExtent(
     }
 
     // Initialize the remainder of the extent after the HWM block
-    uint64_t emptyVal = fDbFile.getEmptyRowValue( colType, colWidth );
+    i64 emptyVal = fDbFile.getEmptyRowValue( colType, colWidth );
 
     int rc = fDbFile.reInitPartialColumnExtent( pFile,
         startOffset,
@@ -324,8 +325,11 @@ void BulkRollbackFile::reInitTruncColumnExtent(
     }
 
     // Truncate the remainder of the file
-    rc = fDbFile.truncateFile( pFile, pFile->tell() );
-
+#ifdef _MSC_VER
+    rc = fDbFile.truncateFile( pFile, _ftelli64(pFile) );
+#else
+    rc = fDbFile.truncateFile( pFile, ftello(pFile) );
+#endif
     if (rc != NO_ERROR)
     {
         WErrorCodes ec;
@@ -344,7 +348,7 @@ void BulkRollbackFile::reInitTruncColumnExtent(
 
     fDbFile.closeFile( pFile );
 }
-
+
 //------------------------------------------------------------------------------
 // Reinitialize a dictionary segment extent (in the db file) to empty blocks,
 // following the HWM.  Remaining extents in the file are truncated.
@@ -359,9 +363,9 @@ void BulkRollbackFile::reInitTruncColumnExtent(
 //------------------------------------------------------------------------------
 void BulkRollbackFile::reInitTruncDctnryExtent(
     OID         dStoreOID,
-    uint32_t   dbRoot,
-    uint32_t   partNum,
-    uint32_t   segNum,
+    u_int32_t   dbRoot,
+    u_int32_t   partNum,
+    u_int32_t   segNum,
     long long   startOffsetBlk,
     int         nBlocks )
 {
@@ -378,7 +382,7 @@ void BulkRollbackFile::reInitTruncDctnryExtent(
         logging::M0075, dStoreOID, msgText.str() );
 
     std::string segFile;
-    IDBDataFile* pFile = fDbFile.openFile(dStoreOID, dbRoot, partNum, segNum, segFile);
+    FILE* pFile = fDbFile.openFile(dStoreOID, dbRoot, partNum, segNum, segFile);
     if (pFile == 0)
     {
         std::ostringstream oss;
@@ -396,7 +400,7 @@ void BulkRollbackFile::reInitTruncDctnryExtent(
     // abbreviated extent, then we reset nBlocks to reflect the size of the file
     // (Unlike column files which only employ an abbreviated extent for the
     // 1st extent in part0, seg0, all new store files start with abbrev extent)
-    const uint32_t PSEUDO_COL_WIDTH = 8; // simulated col width for dictionary
+    const u_int32_t PSEUDO_COL_WIDTH = 8; // simulated col width for dictionary
     long long nBytesInAbbrevExtent = INITIAL_EXTENT_ROWS_TO_DISK *
                                      PSEUDO_COL_WIDTH;
     if (startOffset <= nBytesInAbbrevExtent)
@@ -445,8 +449,11 @@ void BulkRollbackFile::reInitTruncDctnryExtent(
     }
 
     // Truncate the remainder of the file
-    rc = fDbFile.truncateFile( pFile, pFile->tell() );
-
+#ifdef _MSC_VER
+    rc = fDbFile.truncateFile( pFile, _ftelli64(pFile) );
+#else
+    rc = fDbFile.truncateFile( pFile, ftello(pFile) );
+#endif
     if (rc != NO_ERROR)
     {
         WErrorCodes ec;
@@ -465,7 +472,7 @@ void BulkRollbackFile::reInitTruncDctnryExtent(
 
     fDbFile.closeFile( pFile );
 }
-
+
 //------------------------------------------------------------------------------
 // For uncompressed data...
 // Always return true, in order to always reInit the post-HWM blocks for the
@@ -475,9 +482,9 @@ void BulkRollbackFile::reInitTruncDctnryExtent(
 // on whether the HWM chunk was modified and backed up to disk.
 //------------------------------------------------------------------------------
 bool BulkRollbackFile::doWeReInitExtent( OID columnOID,
-    uint32_t dbRoot,
-    uint32_t partNum,
-    uint32_t segNum) const
+    u_int32_t dbRoot,
+    u_int32_t partNum,
+    u_int32_t segNum) const
 {
     return true;
 }

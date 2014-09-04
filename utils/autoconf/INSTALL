@@ -4,46 +4,49 @@ Installation Instructions
 Copyright (C) 1994, 1995, 1996, 1999, 2000, 2001, 2002, 2004, 2005 Free
 Software Foundation, Inc.
 
-Copyright (C) 2014 InfiniDB, Inc.
+Copyright (C) 2009-2012 Calpont Corp.
 
 This file is free documentation; the Free Software Foundation gives
 unlimited permission to copy, distribute and modify it.
 
-InfiniDB, Inc. also gives unlimited permission to copy, distribute and
+Calpont Corp. also gives unlimited permission to copy, distribute and
 modify it.
 
-Basic Installation from source
+Basic Installation from Source
 ==============================
 
-**** InfiniDB source build instructions ****
+**** Calpont infinidb source build instructions ****
 
-Consult the generic installation instructions
+Patch MySQL with Calpont extensions and get it built.
+You need to determine the root directory for the MySQL installation.
+A suggestion is $HOME. Now we can build MySQL/Calpont:
+
+./build_mysql.sh --prefix=$HOME
+
+Now we can build infinidb. Consult the generic installation instructions
 that follow for detailed information. The short version is:
 
-cd $HOME
-git clone http://github.com/infinidb/mysql
-git clone http://github.com/infinidb/infinidb
--- or --
-tar -zxf <srcfile>
-cd mysql
-./configure --prefix=$HOME
-make
-make install
-cd ../infinidb
 ./configure --prefix=$HOME
 make
 make install
 
-This will create a directory called Calpont in $HOME which conatins
+This will create a directory called Calpont in $HOME which contains
 all the software you need.
 
-Install the InfiniDB software into /usr/local (for example) by copying
+Install the Calpont software into /usr/local (for example) by copying
 the entire Calpont directory tree there.
 
+If you would like to do an RPM install, you can build RPM's with:
+./make_rpms
+
 After untaring the sofware or installing the RPM's, setup the software
-to run (this script needs to run with root privileges). Check the Installation
-Guide for addition details on using postConfigure:
-/usr/local/Calpont/bin/postConfigure
+to run (this script needs to run with root privileges):
+/usr/local/Calpont/bin/install-infinidb.sh
+
+Start the database:
+service infinidb start
+or:
+/usr/local/Calpont/bin/infinidb start
 
 Setup some aliases:
 . /usr/local/Calpont/bin/calpontAlias
@@ -76,9 +79,7 @@ And check the import:
 calpontmysql calpont
 select * from caltest;
 
-
 That's it. Enjoy.
-
 
 These are generic installation instructions.
 

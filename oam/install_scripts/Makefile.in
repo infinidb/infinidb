@@ -14,22 +14,22 @@
 
 @SET_MAKE@
 
-# Copyright (C) 2014 InfiniDB, Inc.
+#  Copyright (C) 2014 InfiniDB, Inc.
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; version 2 of
-# the License.
+#  This program is free software; you can redistribute it and/or
+#  modify it under the terms of the GNU General Public License
+#  as published by the Free Software Foundation; version 2 of
+#  the License.
 #
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
 #
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-# MA 02110-1301, USA.
+#  You should have received a copy of the GNU General Public License
+#  along with this program; if not, write to the Free Software
+#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+#  MA 02110-1301, USA.
 
 
 srcdir = @srcdir@
@@ -58,9 +58,8 @@ subdir = oam/install_scripts
 DIST_COMMON = $(dist_local_DATA) $(srcdir)/Makefile.am \
 	$(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
-am__aclocal_m4_deps = $(top_srcdir)/m4/compilerflags.m4 \
-	$(top_srcdir)/m4/functions.m4 $(top_srcdir)/m4/install.m4 \
-	$(top_srcdir)/configure.ac
+am__aclocal_m4_deps = $(top_srcdir)/m4/functions.m4 \
+	$(top_srcdir)/m4/install.m4 $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 mkinstalldirs = $(install_sh) -d
@@ -139,9 +138,6 @@ SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
 STRIP = @STRIP@
 VERSION = @VERSION@
-XML2_CONFIG = @XML2_CONFIG@
-XML_CPPFLAGS = @XML_CPPFLAGS@
-XML_LIBS = @XML_LIBS@
 YACC = @YACC@
 ac_ct_AR = @ac_ct_AR@
 ac_ct_CC = @ac_ct_CC@
@@ -183,7 +179,6 @@ idb_exec_libs = @idb_exec_libs@
 idb_ldflags = @idb_ldflags@
 idb_oam_libs = @idb_oam_libs@
 idb_write_libs = @idb_write_libs@
-idbinstall = @idbinstall@
 includedir = @includedir@
 infodir = @infodir@
 install_sh = @install_sh@
@@ -197,11 +192,6 @@ mibdir = @mibdir@
 mkdir_p = @mkdir_p@
 mysqldir = @mysqldir@
 netsnmp_libs = @netsnmp_libs@
-netsnmpagntdir = @netsnmpagntdir@
-netsnmpdir = @netsnmpdir@
-netsnmplibrdir = @netsnmplibrdir@
-netsnmpmachdir = @netsnmpmachdir@
-netsnmpsysdir = @netsnmpsysdir@
 oldincludedir = @oldincludedir@
 postdir = @postdir@
 prefix = @prefix@
@@ -212,15 +202,12 @@ sharedstatedir = @sharedstatedir@
 sysconfdir = @sysconfdir@
 target_alias = @target_alias@
 toolsdir = @toolsdir@
-bin_SCRIPTS = post-install pre-uninstall remote_command.sh \
-calpontLogRotate transactionLog transactionLogArchiver.sh system_installer.sh \
-module_installer.sh patch_installer.sh xm_installer.sh startupTests.sh \
-director_installer.sh user_installer.sh performance_installer.sh \
-remote_scp_get.sh calpontAlias run.sh upgrade-infinidb.sh \
-post-mysql-install post-mysqld-install binary_installer.sh \
-os_check.sh infinidb calpontSyslog calpontSyslog-ng syslogSetup.sh \
-remote_scp_put.sh calpontUninstall.sh infinidb.def \
-remotessh.exp rsync.sh remote_command_verify.sh
+bin_SCRIPTS = post-install pre-uninstall \
+calpontLogRotate transactionLog transactionLogArchiver.sh \
+startupTests.sh upgrade-infinidb.sh \
+infinidb install-infinidb.sh calpontAlias run.sh \
+post-mysql-install post-mysqld-install os_check.sh \
+calpontSyslog calpontSyslog-ng syslogSetup.sh infinidb.def
 
 dist_local_DATA = module
 all: all-am

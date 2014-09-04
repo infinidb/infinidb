@@ -42,7 +42,7 @@ using namespace logging;
 namespace funcexp
 {
 
-CalpontSystemCatalog::ColType Func_sec_to_time::operationType(FunctionParm& fp, CalpontSystemCatalog::ColType& resultType)
+CalpontSystemCatalog::ColType Func_sec_to_time::operationType( FunctionParm& fp, CalpontSystemCatalog::ColType& resultType )
 {
 	return resultType;
 }
@@ -62,11 +62,6 @@ string Func_sec_to_time::getStrVal(rowgroup::Row& row,
 		case execplan::CalpontSystemCatalog::MEDINT:
 		case execplan::CalpontSystemCatalog::TINYINT:
 		case execplan::CalpontSystemCatalog::SMALLINT:
-        case execplan::CalpontSystemCatalog::UBIGINT:
-        case execplan::CalpontSystemCatalog::UINT:
-        case execplan::CalpontSystemCatalog::UMEDINT:
-        case execplan::CalpontSystemCatalog::UTINYINT:
-        case execplan::CalpontSystemCatalog::USMALLINT:
 		{
 			val = parm[0]->data()->getIntVal(row, isNull);
 		}
@@ -74,10 +69,10 @@ string Func_sec_to_time::getStrVal(rowgroup::Row& row,
 
 		case execplan::CalpontSystemCatalog::DOUBLE:
 		{
-			const string& valStr = parm[0]->data()->getStrVal(row, isNull);
+			string valStr = parm[0]->data()->getStrVal(row, isNull);
 			val = parm[0]->data()->getIntVal(row, isNull);
 			size_t x = valStr.find(".");
-			if (x < string::npos)
+			if ( x < string::npos)
 			{
 				string tmp = valStr.substr(x+1,1);
 				char * ptr = &tmp[0];
@@ -95,10 +90,10 @@ string Func_sec_to_time::getStrVal(rowgroup::Row& row,
 
 		case execplan::CalpontSystemCatalog::FLOAT:
 		{
-			const string& valStr = parm[0]->data()->getStrVal(row, isNull);
+			string valStr = parm[0]->data()->getStrVal(row, isNull);
 			val = parm[0]->data()->getIntVal(row, isNull);
 			size_t x = valStr.find(".");
-			if (x < string::npos)
+			if ( x < string::npos)
 			{
 				string tmp = valStr.substr(x+1,1);
 				char * ptr = &tmp[0];
@@ -116,11 +111,11 @@ string Func_sec_to_time::getStrVal(rowgroup::Row& row,
 
 		case execplan::CalpontSystemCatalog::DECIMAL:
 		{
-			const string& valStr = parm[0]->data()->getStrVal(row, isNull);
+			string valStr = parm[0]->data()->getStrVal(row, isNull);
 			
 			val = parm[0]->data()->getIntVal(row, isNull);
 			size_t x = valStr.find(".");
-			if (x < string::npos)
+			if ( x < string::npos)
 			{
 				string tmp = valStr.substr(x+1,1);
 				char * ptr = &tmp[0];
@@ -167,15 +162,21 @@ string Func_sec_to_time::getStrVal(rowgroup::Row& row,
 	hour = posVal / 3600;
 	minute = (posVal - (hour * 3600)) / 60;
 	second = posVal - (hour * 3600) - (minute * 60);
-    
-    const char* minus = "-";
-    const char* nominus = "";
+	ostringstream oss;
+	if (val < 0)
+		oss << "-" ;
+	if (hour < 10)
+		oss << "0";
+	oss << hour << ":";
+	if (minute<10)
+		oss << "0";
+	oss << minute << ":";
+	if (second<10)
+		oss << "0";
 	
-	const char* signstr = (val < 0) ? minus : nominus;
-   
-	char buf[32]; // actual string either 9 or 10 characters
-    snprintf(buf, 32, "%s%02d:%02d:%02d", signstr, hour, minute, second);
-	return buf;
+	oss << second;
+
+	return oss.str();
 }
 
 
@@ -194,7 +195,7 @@ int64_t Func_sec_to_time::getIntVal(rowgroup::Row& row,
 		string time = getStrVal(row, parm, isNull, op_ct);
 		size_t x = time.find(":");
 		
-		while (x < string::npos)
+		while ( x < string::npos)
 		{
 			time.erase(x,1);
 			x = time.find(":");
@@ -224,7 +225,7 @@ double Func_sec_to_time::getDoubleVal(rowgroup::Row& row,
 		string time = getStrVal(row, parm, isNull, op_ct);
 		size_t x = time.find(":");
 		
-		while (x < string::npos)
+		while ( x < string::npos)
 		{
 			time.erase(x, 1);
 			x = time.find(":");
@@ -253,7 +254,7 @@ execplan::IDB_Decimal Func_sec_to_time::getDecimalVal(rowgroup::Row& row,
 		string time = getStrVal(row, parm, isNull, op_ct);
 		size_t x = time.find(":");
 		
-		while (x < string::npos)
+		while ( x < string::npos)
 		{
 			time.erase(x,1);
 			x = time.find(":");

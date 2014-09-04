@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: joblist.cpp 9655 2013-06-25 23:08:13Z xlou $
+//  $Id: joblist.cpp 9227 2013-01-28 22:58:06Z xlou $
 
 
 #include "errorcodes.h"
@@ -25,7 +25,9 @@
 #include <cassert>
 using namespace std;
 
+#define JOBLIST_DLLEXPORT
 #include "joblist.h"
+#undef JOBLIST_DLLEXPORT
 
 #include "calpontsystemcatalog.h"
 using namespace execplan;
@@ -35,14 +37,10 @@ using namespace execplan;
 #include "primitivestep.h"
 #include "crossenginestep.h"
 #include "subquerystep.h"
-#include "tupleaggregatestep.h"
-#include "tupleannexstep.h"
 #include "tuplehashjoin.h"
 #include "tupleunion.h"
 #include "tupleaggregatestep.h"
-#include "windowfunctionstep.h"
 
-#include "atomicops.h"
 
 namespace joblist
 {
@@ -62,8 +60,12 @@ JobList::JobList(bool isEM) :
 	fIsExeMgr(isEM),
 	fPmConnected(false),
 	projectingTableOID(0),
+#ifdef _MSC_VER
 	fAborted(0),
-	fPriority(50)
+#else
+	fAborted(false),
+#endif
+	_priority(50)
 {
 }
 
@@ -100,7 +102,7 @@ JobList::~JobList()
 				++iter;
 			}
 
-			for (uint32_t i = 0; i < joiners.size(); i++) {
+			for (uint i = 0; i < joiners.size(); i++) {
 				joiners[i]->join();
 				delete joiners[i];
 			}
@@ -125,10 +127,10 @@ int JobList::doQuery()
 	JobStep *js;
 
 	// Set the priority on the jobsteps
-	for (uint32_t i = 0; i < fQuery.size(); i++)
-		fQuery[i]->priority(fPriority);
-	for (uint32_t i = 0; i < fProject.size(); i++)
-		fProject[i]->priority(fPriority);
+	for (uint i = 0; i < fQuery.size(); i++)
+		fQuery[i]->priority(_priority);
+	for (uint i = 0; i < fProject.size(); i++)
+		fProject[i]->priority(_priority);
 
 	// I put this logging in a separate loop rather than including it in the
 	// other loop that calls run(), to insure that these logging msgs would
@@ -174,30 +176,43 @@ int JobList::doQuery()
 	JobStepVector::iterator iter = fQuery.begin();
 	JobStepVector::iterator end  = fQuery.end();
 
-	// Start the query running
-	while (iter != end)
-	{
-		js = iter->get();
-		if (!js->delayedRun())
+ 	//try
+ 	//{
+		// Start the query running
+		while (iter != end)
 		{
-			js->run();
+			js = iter->get();
+			if (!js->delayedRun())
+			{
+				js->run();
+			}
+			++iter;
 		}
-		++iter;
-	}
 
-	iter = fProject.begin();
-	end = fProject.end();
+		iter = fProject.begin();
+		end = fProject.end();
 
-	// Fire up the projection steps
-	while (iter != end)
-	{
-		if (!iter->get()->delayedRun())
+		// Fire up the projection steps
+		while (iter != end)
 		{
-			iter->get()->run();
+			if (!iter->get()->delayedRun())
+			{
+				iter->get()->run();
+			}
+			++iter;
 		}
-		++iter;
+	//}
+	/*
+	catch (exception& ex)
+	{
+		cerr << "JobList::doQuery: exception caught: " << ex.what() << endl;
+		return -1;
 	}
-
+	catch (...)
+	{
+		cerr << "JobList::doQuery: exception caught!" << endl;
+		return -1;
+	} */
 	fIsRunning = true;
 	rc = 0;
 	return rc;
@@ -230,11 +245,37 @@ int JobList::putEngineComm(DistributedEngineComm* dec)
 	{
 		SJSTEP sjstep = *iter;
 		JobStep* jsp = sjstep.get();
+//		if (typeid(*jsp) == typeid(pColScanStep))
+//		{
+//			pColScanStep* step = dynamic_cast<pColScanStep*>(jsp);
+//			step->dec(dec);
+//		}
+//		else if (typeid(*jsp) == typeid(pColStep))
+//		{
+//			pColStep* step = dynamic_cast<pColStep*>(jsp);
+//			step->dec(dec);
+//		}
+//		else if (typeid(*jsp) == typeid(pDictionaryScan))
 		if (typeid(*jsp) == typeid(pDictionaryScan))
 		{
 			pDictionaryScan* step = dynamic_cast<pDictionaryScan*>(jsp);
 			step->dec(dec);
 		}
+//		else if (typeid(*jsp) == typeid(pDictionaryStep))
+//		{
+//			pDictionaryStep* step = dynamic_cast<pDictionaryStep*>(jsp);
+//			step->dec(dec);
+//		}
+//		else if (typeid(*jsp) == typeid(pIdxWalk))
+//		{
+//			pIdxWalk* step = dynamic_cast<pIdxWalk*>(jsp);
+//			step->dec(dec);
+//		}
+//		else if (typeid(*jsp) == typeid(pIdxList))
+//		{
+//			pIdxList* step = dynamic_cast<pIdxList*>(jsp);
+//			step->dec(dec);
+//		}
 		else if (typeid(*jsp) == typeid(TupleBPS))
 		{
 			BatchPrimitive* step = dynamic_cast<BatchPrimitive*>(jsp);
@@ -251,6 +292,17 @@ int JobList::putEngineComm(DistributedEngineComm* dec)
 	{
 		SJSTEP sjstep = *iter;
 		JobStep* jsp = sjstep.get();
+//		if (typeid(*jsp) == typeid(pColStep))
+//		{
+//			pColStep* step = dynamic_cast<pColStep*>(jsp);
+//			step->dec(dec);
+//		}
+//		else if (typeid(*jsp) == typeid(pDictionaryStep))
+//		{
+//			pDictionaryStep* step = dynamic_cast<pDictionaryStep*>(jsp);
+//			step->dec(dec);
+//		}
+//		else if (typeid(*jsp) == typeid(TupleBPS))
 		if (typeid(*jsp) == typeid(TupleBPS))
 		{
 			BatchPrimitive* step = dynamic_cast<BatchPrimitive*>(jsp);
@@ -265,9 +317,9 @@ int JobList::putEngineComm(DistributedEngineComm* dec)
 
 // -- TupleJobList
 /* returns row count */
-uint32_t TupleJobList::projectTable(CalpontSystemCatalog::OID, messageqcpp::ByteStream& bs)
+uint TupleJobList::projectTable(CalpontSystemCatalog::OID, messageqcpp::ByteStream& bs)
 {
-	uint32_t ret = ds->nextBand(bs);
+	uint ret = ds->nextBand(bs);
 	moreData = (ret != 0);
 	return ret;
 }
@@ -292,7 +344,7 @@ void TupleJobList::setDeliveryFlag(bool f)
 	SJSTEP dstep = iter->second;
 	ds = dynamic_cast<TupleDeliveryStep *>(dstep.get());
 	if (ds) // if not dummy step
-		dstep->delivery(f);
+		ds->setIsDelivery(f);
 }
 
 //------------------------------------------------------------------------------
@@ -355,6 +407,86 @@ void JobList::querySummary(bool extendedStats)
 			else if (typeid(*js) == typeid(TupleBPS))
 				skipCnt = (dynamic_cast<BatchPrimitive*>(js))->blksSkipped ();
 			fStats.fCPBlocksSkipped += skipCnt;
+#if 0
+			cout << "qstep-"   << js->stepId() <<
+				"; adding phy, cache, msg, blkSkip, msgBytesIn, msgBytesOut: "<<
+				js->phyIOCount()    << ", "  <<
+				js->cacheIOCount()  << ", "  <<
+				js->msgsRcvdCount() << ", "  <<
+				skipCnt             << ", "  <<
+				js->msgBytesIn()    << ", "  <<
+				js->msgBytesOut()   << endl;
+#endif
+//			//
+//			//...Iterate through the output job step associations; adding up the
+//			//...temp file counts and sizes for the ZDL and Bucket datalists.
+//			//
+//			for (unsigned int i = 0;
+//				i < js->outputAssociation().outSize();
+//				i++)
+//			{
+//				uint64_t nFiles = 0;
+//				uint64_t nBytes = 0;
+//
+//				ZonedDL*              pZdl    = 0;
+//				StringZonedDL*        pStrZdl = 0;
+//				BucketDataList*       pBdl    = 0;
+//				StringBucketDataList* pStrBdl = 0;
+//				FifoDataList*         pFdl    = 0;
+//				DeliveryWSDL*         pDWSDL  = 0;
+//				bool                  updateTotals = false;
+//				//string              dlType;
+//
+//				const AnyDataListSPtr& pDl =
+//					js->outputAssociation().outAt(i);
+//				if      ((pZdl = pDl->zonedDL()) != 0)
+//				{
+//					pZdl->totalFileCounts(nFiles, nBytes);
+//					updateTotals = true;
+//					//dlType = "zdl";
+//				}
+//				else if ((pStrZdl = pDl->stringZonedDL()) != 0)
+//				{
+//					pStrZdl->totalFileCounts(nFiles, nBytes);
+//					updateTotals = true;
+//					//dlType = "strZdl";
+//				}
+//				else if ((pBdl = pDl->bucketDL()) != 0)
+//				{
+//					pBdl->totalFileCounts(nFiles, nBytes);
+//					updateTotals = true;
+//					//dlType = "bucketdl";
+//				}
+//				else if ((pStrBdl = pDl->stringBucketDL()) != 0)
+//				{
+//					pStrBdl->totalFileCounts(nFiles, nBytes);
+//					updateTotals = true;
+//					//dlType = "strBucketdl";
+//				}
+//				else if ((pFdl = pDl->fifoDL()) != 0)
+//				{
+//					pFdl->totalFileCounts(nFiles, nBytes);
+//					updateTotals = true;
+//					//dlType = "fifo";
+//				}
+//				else if ((pDWSDL = pDl->deliveryWSDL()) != 0)
+//				{
+//					pDWSDL->totalFileCounts(nFiles, nBytes);
+//					updateTotals = true;
+//					//dlType = "deliveryWSDL";
+//				}
+//
+//				if ( updateTotals )
+//				{
+//#if 0
+//					cout << "jobstep : " << js->stepId() <<  " qstep outlist " << i << " is type " << dlType <<
+//						": files-" << nFiles <<
+//						"; bytes-" << nBytes << endl;
+//#endif
+//					fStats.fNumFiles += nFiles;
+//					fStats.fFileBytes+= nBytes;
+//				}
+//			}
 
 			if (extendedStats)
 			{
@@ -405,6 +537,16 @@ void JobList::querySummary(bool extendedStats)
 			else if (typeid(*js) == typeid(TupleBPS))
 				skipCnt = (dynamic_cast<BatchPrimitive*>(js))->blksSkipped ();
 			fStats.fCPBlocksSkipped += skipCnt;
+#if 0
+			cout << "pstep-"   << js->stepId() <<
+				"; adding phy, cache, msg, blkSkip, msgBytesIn, msgBytesOut: "<<
+				js->phyIOCount()    << ", "  <<
+				js->cacheIOCount()  << ", "  <<
+				js->msgsRcvdCount() << ", "  <<
+				skipCnt             << ", "  <<
+				js->msgBytesIn()    << ", "  <<
+				js->msgBytesOut()   << endl;
+#endif
 			++pIter;
 		}
 
@@ -475,6 +617,7 @@ void JobList::graph(uint32_t sessionID)
 	uint64_t outSize = 0;
 	uint64_t msgs = 0;
 	uint64_t pio = 0;
+	uint64_t cio = 0;
 	int ctn = 0;
 	bool diskIo = false;
 	uint64_t saveTime = 0;
@@ -514,8 +657,7 @@ void JobList::graph(uint32_t sessionID)
 		uint16_t stepidIn = qsi->get()->stepId();
 		dotFile << stepidIn << " [label=\"st_" << stepidIn << " ";
 
-		// @Bug 1033.  colName was being called for dictionary steps that don't have column names.
-		//             Added if condition below.
+		// @Bug 1033.  colName was being called for dictionary steps that don't have column names.  Added if condition below.
 		if ( typeid(*(qsi->get())) == typeid(pColScanStep) ||
 			 typeid(*(qsi->get())) == typeid(pColStep))
 			tcn = csc->colName(qsi->get()->oid());
@@ -555,8 +697,7 @@ void JobList::graph(uint32_t sessionID)
 			tcn.table = qsi->get()->alias();
 		}
 
-		dotFile << JSTimeStamp::tsdiffstr(qsi->get()->dlTimes.EndOfInputTime(),
-		                                  qsi->get()->dlTimes.FirstReadTime()) << "s";
+		dotFile << JSTimeStamp::tsdiffstr(qsi->get()->dlTimes.EndOfInputTime(), qsi->get()->dlTimes.FirstReadTime()) << "s";
 
 		dotFile << ")";
 
@@ -590,18 +731,35 @@ void JobList::graph(uint32_t sessionID)
 		{
 			dotFile << "\"" << " shape=box style=dashed";
 		}
-		else if (typeid(*(qsi->get())) == typeid(TupleAggregateStep))
-		{
-			dotFile << "\"" << " shape=triangle orientation=180";
-		}
-		else if (typeid(*(qsi->get())) == typeid(TupleAnnexStep))
-		{
-			dotFile << "\"" << " shape=star";
-		}
-		else if (typeid(*(qsi->get())) == typeid(WindowFunctionStep))
-		{
-			dotFile << "\"" << " shape=triangle orientation=180 peripheries=2";
-		}
+//		else if (typeid(*(qsi->get())) == typeid(HashJoinStep) ||
+//				 typeid(*(qsi->get())) == typeid(StringHashJoinStep))
+//		{
+//			if (typeid(*(qsi->get())) == typeid(HashJoinStep))
+//			{
+//				hjs = static_cast<HashJoinStep*>(qsi->get());
+//				dotFile << "\\; rm: " << hjs->getUmMemoryTime() ;
+//				switch (hjs->hashJoinMode())
+//				{
+//					case HashJoinStep::PM_MEMORY:
+//						dotFile << "\"" << " shape=diamond style=dashed";
+//						break;
+//					case HashJoinStep::LARGE_HASHJOIN_CARD:
+//						dotFile << "\"" << " shape=diamond style=solid peripheries=2";
+//						break;
+//					case HashJoinStep::LARGE_HASHJOIN_RUNTIME:
+//						dotFile << "\"" << " shape=diamond style=solid peripheries=3";
+//						break;
+//					case HashJoinStep::UM_MEMORY:
+//					default:
+//						dotFile << "\"" << " shape=diamond style=solid";
+//						break;
+//				}
+//			}
+//			else
+//			{
+//				dotFile << "\"" << " shape=diamond";
+//			}
+//		}
 		else if (typeid(*(qsi->get())) == typeid(TupleHashJoinStep))
 		{
 			dotFile << "\"";
@@ -615,6 +773,10 @@ void JobList::graph(uint32_t sessionID)
 		{
 			dotFile << "\"" << " shape=trapezium";
 		}
+//		else if (typeid(*(qsi->get())) == typeid(ReduceStep))
+//		{
+//			dotFile << "\"" << " shape=triangle orientation=180";
+//		}
 		else if (typeid(*(qsi->get())) == typeid(FilterStep))
 		{
 			dotFile << "\"" << " shape=house orientation=180";
@@ -629,6 +791,15 @@ void JobList::graph(uint32_t sessionID)
 			dotFile << "\"" << " shape=box style=bold";
 			dotFile << " peripheries=2";
 		}
+//		else if (typeid(*(qsi->get())) == typeid(AggregateFilterStep))
+//		{
+//			dotFile << "\"" << " shape=hexagon peripheries=2 style=bold";
+//		}
+//		else if (typeid(*(qsi->get())) == typeid(BucketReuseStep))
+//		{
+//			dotFile << "\"" << " shape=box style=dashed";
+//
+//		}
 		else
 			dotFile << "\"";
 		dotFile << "]" << endl;
@@ -636,6 +807,7 @@ void JobList::graph(uint32_t sessionID)
 		// msgsRecived, physicalIO, cacheIO
 		msgs = qsi->get()->msgsRcvdCount();
 		pio = qsi->get()->phyIOCount();
+		cio = qsi->get()->cacheIOCount();
 
 		for (unsigned int i = 0; i < qsi->get()->outputAssociation().outSize(); i++)
 		{
@@ -656,9 +828,20 @@ void JobList::graph(uint32_t sessionID)
 				outSize = sdl->totalSize();
 				diskIo = sdl->totalDiskIoTime(saveTime, loadTime);
 			}
+//			else if ((tdl = qsi->get()->outputAssociation().outAt(i)->tupleDataList()))
+//			{
+//				dloutptr = (ptrdiff_t)tdl;
+//				outSize = tdl->totalSize();
+//				diskIo = tdl->totalDiskIoTime(saveTime, loadTime);
+//			}
 
 			// if HashJoinStep, determine if output fifo was cached to disk
 			bool hjTempDiskFlag = false;
+//			if (hjs)
+//			{
+//				hjTempDiskFlag = hjs->didOutputAssocUseDisk(i);
+//			}
+
 			for (unsigned int k = 0; k < querySteps.size(); k++)
 			{
 				uint16_t stepidOut = querySteps[k].get()->stepId();
@@ -668,6 +851,7 @@ void JobList::graph(uint32_t sessionID)
 					ptrdiff_t dlinptr = 0;
 					DataList_t *dlin = queryInputSA.outAt(j)->dataList();
 					StrDataList* sdl = 0;
+//					TupleDataList* tdl = 0;
 
 					if (dlin)
 						dlinptr = (ptrdiff_t)dlin;
@@ -675,6 +859,8 @@ void JobList::graph(uint32_t sessionID)
 					{
 						dlinptr = (ptrdiff_t)sdl;
 					}
+//					else if ((tdl = queryInputSA.outAt(j)->tupleDataList()))
+//						dlinptr = (ptrdiff_t)tdl;
 
 					if (dloutptr == dlinptr)
 					{
@@ -854,6 +1040,14 @@ void JobList::graph(uint32_t sessionID)
 			if (typeid(*(psi->get())) == typeid(TupleBPS))
 				dotFile << " peripheries=2";
 		}
+//		else if (typeid(*(psi->get())) == typeid(HashJoinStep))
+//		{
+//			dotFile << "\"" << " shape=diamond";
+//		}
+//		else if (typeid(*(psi->get())) == typeid(UnionStep))
+//		{
+//			dotFile << "\"" << " shape=triangle";
+//		}
 		else if (typeid(*(psi->get())) == typeid(pDictionaryStep))
 		{
 			dotFile << "\"" << " shape=trapezium";
@@ -862,6 +1056,10 @@ void JobList::graph(uint32_t sessionID)
 		{
 			dotFile << "\"" << " shape=octagon";
 		}
+//		else if (typeid(*(psi->get())) == typeid(ReduceStep))
+//		{
+//			dotFile << "\"" << " shape=triangle orientation=180";
+//		}
 		else if (typeid(*(psi->get())) == typeid(FilterStep))
 		{
 			dotFile << "\"" << " shape=house orientation=180";
@@ -873,6 +1071,7 @@ void JobList::graph(uint32_t sessionID)
 		// msgsRecived, physicalIO, cacheIO
 		msgs = psi->get()->msgsRcvdCount();
 		pio = psi->get()->phyIOCount();
+		cio = psi->get()->cacheIOCount();
 
 		CalpontSystemCatalog::OID tableOIDProject = 0;
 		if (bps)
@@ -908,7 +1107,7 @@ void JobList::graph(uint32_t sessionID)
 
 void JobList::validate() const
 {
-//	uint32_t i;
+//	uint i;
 //	DeliveredTableMap::const_iterator it;
 
 	/* Make sure there's at least one query step and that they're the right type */
@@ -931,19 +1130,22 @@ void JobList::validate() const
 //
 //	/* Check that all JobSteps use the right status pointer */
 //	for (i = 0; i < fQuery.size(); i++) {
-//		idbassert(fQuery[i]->errorInfo().get() == errorInfo().get());
+//		idbassert(fQuery[i]->inputAssociation().statusPtr().get() == statusPtr().get());
+//		idbassert(fQuery[i]->outputAssociation().statusPtr().get() == statusPtr().get());
 //	}
 //	for (i = 0; i < fProject.size(); i++) {
-//		idbassert(fProject[i]->errorInfo().get() == errorInfo().get());
+//		idbassert(fProject[i]->inputAssociation().statusPtr().get() == statusPtr().get());
+//		idbassert(fProject[i]->outputAssociation().statusPtr().get() == statusPtr().get());
 //	}
 //	for (it = fDeliveredTables.begin(); it != fDeliveredTables.end(); ++it) {
-//		idbassert(it->second->errorInfo().get() == errorInfo().get());
+//		idbassert(it->second->inputAssociation().statusPtr().get() == statusPtr().get());
+//		idbassert(it->second->outputAssociation().statusPtr().get() == statusPtr().get());
 //	}
 }
 
 void TupleJobList::validate() const
 {
-	uint32_t i, j;
+	uint i, j;
 	DeliveredTableMap::const_iterator it;
 
 	idbassert(fQuery.size() > 0);
@@ -970,21 +1172,32 @@ void TupleJobList::validate() const
 	idbassert(dynamic_cast<TupleDeliveryStep *>(fDeliveredTables.begin()->second.get()));
 
 	/* Check that all JobSteps use the right status pointer */
-	for (i = 0; i < fQuery.size(); i++)
-		idbassert(fQuery[i]->errorInfo().get() == errorInfo().get());
-
-	for (i = 0; i < fProject.size(); i++)
-		idbassert(fProject[i]->errorInfo().get() == errorInfo().get());
-
-	for (it = fDeliveredTables.begin(); it != fDeliveredTables.end(); ++it)
-		idbassert(it->second->errorInfo().get() == errorInfo().get());
+	for (i = 0; i < fQuery.size(); i++) {
+		idbassert(fQuery[i]->inputAssociation().statusPtr().get() == statusPtr().get());
+		idbassert(fQuery[i]->outputAssociation().statusPtr().get() == statusPtr().get());
+	}
+	for (i = 0; i < fProject.size(); i++) {
+		idbassert(fProject[i]->inputAssociation().statusPtr().get() == statusPtr().get());
+		idbassert(fProject[i]->outputAssociation().statusPtr().get() == statusPtr().get());
+	}
+	for (it = fDeliveredTables.begin(); it != fDeliveredTables.end(); ++it) {
+		idbassert(it->second->inputAssociation().statusPtr().get() == statusPtr().get());
+		idbassert(it->second->outputAssociation().statusPtr().get() == statusPtr().get());
+	}
 }
 
 void JobList::abort()
 {
-	uint32_t i;
-	//If we're not currently aborting, then start aborting...
-	if (atomicops::atomicCAS<uint32_t>(&fAborted, 0, 1)) {
+	uint i;
+#ifdef _MSC_VER
+	//If the current value of fAborted is 0 then set it to 1 and return the initial value
+	// of fAborted (which will be 0), else do nothing and return fAborted (which will be 1)
+	if (InterlockedCompareExchange(&fAborted, 1, 0) == 0) {
+#else
+	//If the current value of fAborted is false then set it to true and return true, else
+	// do not change fAborted and return false
+	if (__sync_bool_compare_and_swap(&fAborted, false, true)) {
+#endif
 		for (i = 0; i < fQuery.size(); i++)
 			fQuery[i]->abort();
 		for (i = 0; i < fProject.size(); i++)
@@ -994,10 +1207,16 @@ void JobList::abort()
 
 void JobList::abortOnLimit(JobStep* js)
 {
-	//If we're not currently aborting, then start aborting...
-	if (atomicops::atomicCAS<uint32_t>(&fAborted, 0, 1)) {
-		// @bug4848, enhance and unify limit handling.
-		for (uint32_t i = 0; i < fQuery.size(); i++) {
+#ifdef _MSC_VER
+	//If the current value of fAborted is 0 then set it to 1 and return the initial value
+	// of fAborted (which will be 0), else do nothing and return fAborted (which will be 1)
+	if (InterlockedCompareExchange(&fAborted, 1, 0) == 0) {
+#else
+	//If the current value of fAborted is false then set it to true and return true, else
+	// do not change fAborted and return false
+	if (__sync_bool_compare_and_swap(&fAborted, false, true)) {
+#endif
+		for (uint i = 0; i < fQuery.size(); i++) {
 			if (fQuery[i].get() == js)
 				break;
 
@@ -1008,7 +1227,7 @@ void JobList::abortOnLimit(JobStep* js)
 
 string JobList::toString() const
 {
-	uint32_t i;
+	uint i;
 	string ret;
 
 	ret = "Filter Steps:\n";
@@ -1025,14 +1244,18 @@ TupleJobList::TupleJobList(bool isEM) : JobList(isEM), ds(NULL), moreData(true)
 {
 }
 
-TupleJobList::~TupleJobList()
-{
+TupleJobList::~TupleJobList() 
+{ 
 	abort();
 }
 
 void TupleJobList::abort()
 {
+#ifdef _MSC_VER
 	if (fAborted == 0 && fIsRunning) {
+#else
+	if (!fAborted && fIsRunning) {
+#endif
 		JobList::abort();
 		messageqcpp::ByteStream bs;
 		if (ds && moreData)
@@ -1040,6 +1263,10 @@ void TupleJobList::abort()
 	}
 }
 
+void init_mysqlcl_idb()
+{
+	CrossEngineStep::init_mysqlcl_idb();
+}
 
 }
 

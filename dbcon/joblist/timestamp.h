@@ -18,7 +18,7 @@
 #ifndef TIMESTAMP_H_
 #define TIMESTAMP_H_
 //
-// $Id: timestamp.h 9210 2013-01-21 14:10:42Z rdempsey $
+// $Id: timestamp.h 8436 2012-04-04 18:18:21Z rdempsey $
 //
 
 /** @file */
@@ -27,9 +27,6 @@
 #include <ctime>
 #include <sys/time.h>
 #include <unistd.h>
-
-namespace joblist
-{
 
 class JSTimeStamp {
 
@@ -67,8 +64,6 @@ public:
 	//returns str rep of tvbuf
 	static const std::string format(const struct timeval& tvbuf);
 
-	static const std::string timeNow();
-
 protected:
 
 private:
@@ -79,7 +74,4 @@ private:
 	struct timeval fLastReadTime;
 };
 
-} //namespace joblist
-
 #endif
-

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_least.cpp 3954 2013-07-08 16:30:15Z bpaul $
+* $Id: func_least.cpp 3956 2013-07-08 19:17:26Z bpaul $
 *
 *
 ****************************************************************************/
@@ -68,7 +68,7 @@ int64_t Func_least::getIntVal(rowgroup::Row& row,
 	double str = fp[0]->data()->getDoubleVal(row, isNull);
 
 	double leastStr = str;
-	for (uint32_t i = 1; i < fp.size(); i++)
+	for (uint i = 1; i < fp.size(); i++)
 	{
 		double str1 = fp[i]->data()->getDoubleVal(row, isNull);
 
@@ -87,7 +87,7 @@ double Func_least::getDoubleVal(rowgroup::Row& row,
 	double str = fp[0]->data()->getDoubleVal(row, isNull);
 
 	double leastStr = str;
-	for (uint32_t i = 1; i < fp.size(); i++)
+	for (uint i = 1; i < fp.size(); i++)
 	{
 		double str1 = fp[i]->data()->getDoubleVal(row, isNull);
 
@@ -103,10 +103,12 @@ std::string Func_least::getStrVal(rowgroup::Row& row,
 						bool& isNull,
 						execplan::CalpontSystemCatalog::ColType& op_ct)
 {
-	string leastStr = fp[0]->data()->getStrVal(row, isNull);
-	for (uint32_t i = 1; i < fp.size(); i++)
+	string str = fp[0]->data()->getStrVal(row, isNull);
+
+	string leastStr = str;
+	for (uint i = 1; i < fp.size(); i++)
 	{
-		const string& str1 = fp[i]->data()->getStrVal(row, isNull);
+		string str1 = fp[i]->data()->getStrVal(row, isNull);
 
 		int tmp = utf8::idb_strcoll(leastStr.c_str(), str1.c_str());
 		if ( tmp > 0 )
@@ -126,7 +128,7 @@ IDB_Decimal Func_least::getDecimalVal(Row& row,
 	IDB_Decimal str = fp[0]->data()->getDecimalVal(row, isNull);
 
 	IDB_Decimal leastStr = str;
-	for (uint32_t i = 1; i < fp.size(); i++)
+	for (uint i = 1; i < fp.size(); i++)
 	{
 		IDB_Decimal str1 = fp[i]->data()->getDecimalVal(row, isNull);
 

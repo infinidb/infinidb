@@ -17,7 +17,7 @@ int main(int argc, char** argv)
 	IOSocket ios;
 	ByteStream ibs;
 	ByteStream obs;
-	uint32_t qb = 0;
+	ByteStream::quadbyte qb = 0;
 	while (1)
 	{
 		ios = mqs.accept();

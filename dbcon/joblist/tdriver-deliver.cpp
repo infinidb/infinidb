@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: tdriver-deliver.cpp 9210 2013-01-21 14:10:42Z rdempsey $
+ * $Id: tdriver-deliver.cpp 8436 2012-04-04 18:18:21Z rdempsey $
  *
  ****************************************************************************/
 
@@ -56,7 +56,7 @@ int fifoSize = 128;
 int startingOid = 3416;  // Oid for lineitem.l_orderkey on your database.
 // uint32_t flushInterval = 16384; // interval used in flushing table bands
 uint32_t flushInterval = 16384; // interval used in flushing table bands
-uint32_t columns;
+uint columns;
 
 Stopwatch timer;
 
@@ -101,7 +101,7 @@ class BSQueueMgr
          *
          * @return Next projected table band. Row count of 0 marks end of data
          */
-        messageqcpp::ByteStream* getNextByteStream(uint32_t &rowCount);
+        messageqcpp::ByteStream* getNextByteStream(uint &rowCount);
 
     private:
         //Disable these by declaring but not defining
@@ -110,7 +110,7 @@ class BSQueueMgr
 
 		struct QueueElement {
 			messageqcpp::ByteStream *bs;
-			uint32_t rowCount;
+			uint rowCount;
 		};
 
         DeliveryStep *ds;
@@ -164,7 +164,7 @@ void BSQueueMgr::project ( )
 
 	while ( moreData )
 	{
-		uint32_t rowCount;
+		uint rowCount;
 		QueueElement qe;
 		
 		qe.bs = new ByteStream;
@@ -196,7 +196,7 @@ void BSQueueMgr::project ( )
 // Returns next projected table band.  A row count of 0, marks the table
 // band as being the last.
 //------------------------------------------------------------------------------
-ByteStream * BSQueueMgr::getNextByteStream(uint32_t &rowCount)
+ByteStream * BSQueueMgr::getNextByteStream(uint &rowCount)
 {
 	QueueElement qe;
 
@@ -717,7 +717,7 @@ void *nextBandBenchProducer(void *arg)
 	FIFO<UintRowGroup>* dl1 = (FIFO<UintRowGroup>*) arg;
 	UintRowGroup rg;
 	uint64_t *arr;
-	uint32_t i;
+	uint i;
 
 	arr = (uint64_t*) rg.et;
 	for (i = 0; i < 8192; ++i)
@@ -737,7 +737,7 @@ void nextBandBenchmark()
 {
 	ByteStream bs;
 	pthread_t threads[columns];
-	uint32_t i, rowCount = 1;
+	uint i, rowCount = 1;
 	JobStepAssociation inJs;
 
 	for (i = 0; i < columns; ++i) {
@@ -774,7 +774,7 @@ void queuedBSBenchmark(int queueLength)
 {
     ByteStream *bs;
     pthread_t threads[columns];
-    uint32_t i, rowCount = 1;
+    uint i, rowCount = 1;
     JobStepAssociation inJs;
 
     for (i = 0; i < columns; ++i) {

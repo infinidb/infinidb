@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: selectfilter.cpp 9210 2013-01-21 14:10:42Z rdempsey $
+*   $Id: selectfilter.cpp 8436 2012-04-04 18:18:21Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -65,7 +65,7 @@ const string SelectFilter::toString() const
 {
     ostringstream oss;
     oss << "SelectFilter " << "returnedColPos=" << fReturnedColPos << endl;
-    for (uint32_t i = 0; i < fCols.size(); i++)
+    for (uint i = 0; i < fCols.size(); i++)
     	oss << fCols[i]->toString();
     oss << fOp->toString() << endl;
     oss << *(fSub.get());
@@ -83,7 +83,7 @@ void SelectFilter::serialize(messageqcpp::ByteStream& b) const
 	b << static_cast<ObjectReader::id_t>(ObjectReader::SELECTFILTER);
 	Filter::serialize(b);
 	b << static_cast<uint32_t>(fCols.size());
-	for (uint32_t i = 0; i < fCols.size(); i++)
+	for (uint i = 0; i < fCols.size(); i++)
 	{
 		if (fCols[i] != NULL)
 			fCols[i]->serialize(b);
@@ -110,7 +110,7 @@ void SelectFilter::unserialize(messageqcpp::ByteStream& b)
 	uint32_t size;
 	SRCP srcp;
 	b >> size;
-	for (uint32_t i = 0; i < size; i++)
+	for (uint i = 0; i < size; i++)
 	{
 		srcp.reset(dynamic_cast<ReturnedColumn*>(ObjectReader::createTreeNode(b)));
 		fCols.push_back(srcp);
@@ -130,7 +130,7 @@ bool SelectFilter::operator==(const SelectFilter& t) const
 		return false;
 	if (fCols.size() != t.fCols.size())
 		return false;
-	for (uint32_t i = 0; i < fCols.size(); i++)
+	for (uint i = 0; i < fCols.size(); i++)
 	{
 		if (fCols[i] != NULL) {
 			if (*(fCols[i]) != *(t.fCols[i]))

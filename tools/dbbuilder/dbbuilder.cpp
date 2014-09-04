@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: dbbuilder.cpp 2101 2013-01-21 14:12:52Z rdempsey $
+* $Id: dbbuilder.cpp 1798 2012-05-08 17:59:52Z rdempsey $
 *
 *******************************************************************************/
 #include <stdio.h>
@@ -25,18 +25,12 @@
 #include <stdexcept>
 using namespace std;
 
-#include <boost/algorithm/string.hpp>
-
 #include "dbbuilder.h"
 #include "systemcatalog.h"
 #include "liboamcpp.h"
-#include "configcpp.h"
-#include "IDBPolicy.h"
-
 using namespace oam;
 using namespace dmlpackageprocessor;
 using namespace dmlpackage;
-using namespace idbdatafile;
 
 #include "objectidmanager.h"
 using namespace execplan;
@@ -200,45 +194,6 @@ int main(int argc, char* argv[])
 					"System catalog appears to exist.  It will remain intact "
 						"for reuse.  The database is not recreated.",
 						false);
-				return 1;
-			}
-
-			//@bug5554, make sure IDBPolicy matches the Calpont.xml config
-			try
-			{
-				string calpontConfigFile(startup::StartUp::installDir() + "/etc/Calpont.xml");
-				config::Config* sysConfig = config::Config::makeConfig(calpontConfigFile.c_str());
-				string tmp = sysConfig->getConfig("Installation", "DBRootStorageType");
-				if (boost::iequals(tmp, "hdfs"))
-				{
-					// HDFS is configured
-					if (!IDBPolicy::useHdfs())  // error install plugin
-						throw runtime_error("HDFS is not enabled, installPlugin may have failed.");
-
-					else if (!IDBFileSystem::getFs(IDBDataFile::HDFS).filesystemIsUp())
-						throw runtime_error("HDFS FS is NULL, check env variables.");
-				}
-			}
-			catch(const exception& ex)
-			{
-				string cmd(string("echo 'FAILED: ") + ex.what() + "' > /tmp/dbbuilder.status");
-
-				if (canWrite)
-					(void)system(cmd.c_str());
-				else
-					cerr << cmd << endl;
-				errorHandler(sysCatalogErr, "Build system catalog", ex.what(), false);
-				return 1;
-			}
-			catch(...)
-			{
-				string cmd = "echo 'FAILED:  HDFS checking.' > /tmp/dbbuilder.status";
-
-				if (canWrite)
-					(void)system(cmd.c_str());
-				else
-					cerr << cmd << endl;
-				errorHandler(sysCatalogErr, "Build system catalog", "HDFS check failed.", false);
 				return 1;
 			}
 

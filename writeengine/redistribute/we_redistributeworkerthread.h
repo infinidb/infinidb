@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
-* $Id: we_redistributeworkerthread.h 4450 2013-01-21 14:13:24Z rdempsey $
+* $Id: we_redistributeworkerthread.h 4269 2012-10-26 16:36:52Z xlou $
 */
 
 #ifndef WE_REDISTRIBUTEWORKERTHREAD_H
@@ -102,13 +102,6 @@ class RedistributeWorkerThread
 	void  handleDataCommit(messageqcpp::SBS&, size_t&);
 	void  handleDataAbort(messageqcpp::SBS&, size_t&);
 	void  handleUnknowDataMsg();
-
-	int   buildFullHdfsPath( std::map<int,std::string>& rootToPathMap,
-		int64_t      colOid,
-    	int16_t      dbRoot,
-    	uint32_t     partition,
-    	int16_t      segment,
-    	std::string& fullFileName);
 
 	void  closeFile(FILE*);  // for tracing, may remove later.
 	void  addToDirSet(const char*, bool);

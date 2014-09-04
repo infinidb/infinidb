@@ -63,8 +63,6 @@ struct char_architype
    // conversion to integral type:
    operator long()const;
 };
-inline long hash_value(char_architype val)
-{  return val;  }
 //
 // char_architype can not be used with basic_string:
 //

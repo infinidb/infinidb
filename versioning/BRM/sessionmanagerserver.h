@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: sessionmanagerserver.h 1906 2013-06-14 19:15:32Z rdempsey $
+ * $Id: sessionmanagerserver.h 1704 2012-09-19 18:26:16Z pleblanc $
  *
  *****************************************************************************/
 
@@ -28,15 +28,9 @@
 #define _SESSIONMANAGERSERVER_H
 
 #include <map>
-
-#include <boost/shared_array.hpp>
-#include <boost/thread/mutex.hpp>
-#include <boost/thread/condition_variable.hpp>
-
 #include "calpontsystemcatalog.h"
 #include "brmtypes.h"
-
-#include "atomicops.h"
+#include "boost/shared_array.hpp"
 
 #if defined(_MSC_VER) && defined(xxxSESSIONMANAGERSERVER_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
@@ -92,7 +86,7 @@ namespace BRM {
 class SessionManagerServer {
 public:
 	/** @brief SID = Session ID */
-	typedef uint32_t SID;
+	typedef u_int32_t SID;
 
 	// State flags. These bit values are stored in Overlay::state and reflect the current state of the system
 	static const uint32_t SS_READY;				/// bit 0 => Set by dmlProc one time when dmlProc is ready
@@ -112,7 +106,17 @@ public:
 	 * here.
 	 */
 	EXPORT SessionManagerServer();
+	//EXPORT SessionManagerServer(const SessionManagerServer&);
 
+	/** @brief Constructor for use during debugging only
+	 * 
+	 * This constructor is only used to grab the semaphores & reset them
+	 * if they exist.  It does not attach the shared memory segment,
+	 * and no operation other than reset() should be performed on a
+	 * SessionManagerServer instantiated with this.
+	 */
+	EXPORT SessionManagerServer(bool nolock);
+	
 	/** @brief Destructor
 	 *
 	 * This detaches the shared memory segment.  If DESTROYSHMSEG is defined and this
@@ -120,19 +124,19 @@ public:
 	 * It does not destroy the semaphores.  Those persist until the system
 	 * is shut down.
 	 */
-	virtual ~SessionManagerServer() { if (txnidfd >=0 ) close(txnidfd); }
-
-	/** @brief Gets the current version ID
-	 *
-	 * Gets the current version ID.
-	 */
-	EXPORT const QueryContext verID();
+	EXPORT virtual ~SessionManagerServer();
 	
 	/** @brief Gets the current version ID
 	 *
 	 * Gets the current version ID.
 	 */
-	EXPORT const QueryContext sysCatVerID();
+	EXPORT const execplan::CalpontSystemCatalog::SCN verID(void);
+	
+	/** @brief Gets the current version ID
+	 *
+	 * Gets the current version ID.
+	 */
+	EXPORT const execplan::CalpontSystemCatalog::SCN sysCatVerID(void);
 	
 	/** @brief Gets a new Transaction ID
 	 *
@@ -157,7 +161,7 @@ public:
 	 * @param txnid The committed transaction ID.  This is marked invalid
 	 * on return.
 	 */
-	void committed(TxnID& txn) { finishTransaction(txn); }
+	EXPORT void committed(TxnID& txnid);
 	
 	/** @brief Record that a transaction has been rolled back
 	 *
@@ -167,7 +171,7 @@ public:
 	 * @param txnid The rolled back transaction ID.  This is marked invalid
 	 * on return.
 	 */
-	void rolledback(TxnID& txn) { finishTransaction(txn); }
+	EXPORT void rolledback(TxnID& txnid);
 	
 	/** @brief Gets the transaction ID associated with a given session ID
 	 * 
@@ -192,15 +196,8 @@ public:
 	 */
 	EXPORT boost::shared_array<SIDTIDEntry> SIDTIDMap(int &len);
 
-	/**
-	 * get a unique 32-bit number
-	 */
-	uint32_t getUnique32() { return atomicops::atomicInc(&unique32); }
-
-	/**
-	 * get a unique 64-bit number
-	 */
-	uint64_t getUnique64() { return atomicops::atomicInc(&unique64); }
+	EXPORT const uint32_t getUnique32();
+	EXPORT const uint64_t getUnique64();
 
 	/** @brief Resets the semaphores to their original state.  For testing only.
 	 * 
@@ -208,10 +205,7 @@ public:
 	 */
 	EXPORT void reset();
 
-	/**
-	 * get the Txn ID filename
-	 */
-	std::string getTxnIDFilename() const { return txnidFilename; }
+	EXPORT std::string getTxnIDFilename() const;
 
 	/** @brief set system state info
 	 * 
@@ -231,11 +225,8 @@ public:
 	 * 
 	 * Returns the Overlay::systemState flags
 	 */
-	void getSystemState(uint32_t &state) { state = systemState; }
+	EXPORT void getSystemState(uint32_t &state);
 	
-	/**
-	 * get the number of active txn's
-	 */
 	EXPORT uint32_t getTxnCount();
 
 private:
@@ -245,10 +236,14 @@ private:
 	void loadState();
 	void saveSystemState();
 	void finishTransaction(TxnID& txn);
-	void saveSMTxnIDAndState();
 
-	volatile uint32_t unique32;
-	volatile uint64_t unique64;
+#ifdef _MSC_VER
+	volatile LONG unique32;
+	volatile LONG64 unique64;
+#else
+	uint32_t unique32;
+	uint64_t unique64;
+#endif
 
 	int maxTxns;  // the maximum number of concurrent transactions
 	std::string txnidFilename;
@@ -262,7 +257,7 @@ private:
 
 	boost::mutex mutex;
 	boost::condition_variable condvar;		// used to synthesize a semaphore
-	uint32_t semValue;
+	uint semValue;
 };
 
 }   //namespace

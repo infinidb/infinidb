@@ -15,10 +15,9 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-// $Id: main.cpp 2336 2013-06-25 19:11:36Z rdempsey $
-#include <unistd.h>
-#include <cstdio>
+// $Id: main.cpp 1763 2012-04-04 18:20:36Z rdempsey $
 #include <iostream>
+#include <unistd.h>
 using namespace std;
 
 #include "messageobj.h"
@@ -40,6 +39,7 @@ int main(int argc, char** argv)
 	opterr = 0;
 	bool cflg = true;
 	bool wflg = false;
+	bool iflg = false;
 	unsigned subsysID = 8; //oamcpp
 
 	while ((c = getopt(argc, argv, "s:cwih")) != EOF)
@@ -48,14 +48,17 @@ int main(int argc, char** argv)
 		case 'c':
 			cflg = true;
 			wflg = false;
+			iflg = false;
 			break;
 		case 'w':
 			cflg = false;
 			wflg = true;
+			iflg = false;
 			break;
 		case 'i':
 			cflg = false;
 			wflg = false;
+			iflg = true;
 			break;
 		case 's':
 			subsysID = strtoul(optarg, 0, 0);

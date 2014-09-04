@@ -36,7 +36,7 @@ using namespace joblist;
 
 #define STRCOLL_ENH__
 
-namespace
+namespace funcexp
 {
 
 void reverse( char *start, char *end )
@@ -56,10 +56,6 @@ char *reverse_char( char *start )
     reverse( start, end );
     return( end+1 );
 }
-}
-
-namespace funcexp
-{
 
 CalpontSystemCatalog::ColType Func_reverse::operationType(FunctionParm& fp, CalpontSystemCatalog::ColType& resultType)
 {

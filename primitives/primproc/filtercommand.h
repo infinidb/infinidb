@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: filtercommand.h 2035 2013-01-21 14:12:19Z rdempsey $
+*   $Id: filtercommand.h 1855 2012-04-04 18:20:09Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -49,7 +49,7 @@ class FilterCommand : public Command
 		// virtuals from base class -- Command
 		void execute();
 		void project();
-		void projectIntoRowGroup(rowgroup::RowGroup &rg, uint32_t col);
+		void projectIntoRowGroup(rowgroup::RowGroup &rg, uint col);
 		uint64_t getLBID();
 		void nextLBID();
 		void createCommand(messageqcpp::ByteStream&);

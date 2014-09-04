@@ -7,7 +7,7 @@
  * Boost Software License, Version 1.0. (See accompanying
  * file LICENSE_1_0.txt or http://www.boost.org/LICENSE_1_0.txt)
  * Author: Jeff Garland, Bart Garst
- * $Date: 2013-10-15 08:22:02 -0700 (Tue, 15 Oct 2013) $
+ * $Date: 2009-06-04 04:24:49 -0400 (Thu, 04 Jun 2009) $
  */
 
 
@@ -256,6 +256,7 @@ class format_date_parser
     
     // skip leading whitespace
     while(std::isspace(*sitr) && sitr != stream_end) { ++sitr; } 
+    charT current_char = *sitr;
 
     short year(0), month(0), day(0), day_of_year(0);// wkday(0); 
     /* Initialized the following to their minimum values. These intermediate 
@@ -271,8 +272,7 @@ class format_date_parser
     const_itr itr(format_str.begin());
     while (itr != format_str.end() && (sitr != stream_end)) {
       if (*itr == '%') {
-        if ( ++itr == format_str.end())
-        	break;
+        itr++;
         if (*itr != '%') {
           switch(*itr) {
           case 'a': 
@@ -290,6 +290,7 @@ class format_date_parser
               }
               wkday = mr.current_match;
               if (mr.has_remaining()) {
+                current_char = mr.last_char();
                 use_current_char = true;
               }
               break;
@@ -309,6 +310,7 @@ class format_date_parser
               }
               wkday = mr.current_match;
               if (mr.has_remaining()) {
+                current_char = mr.last_char();
                 use_current_char = true;
               }
               break;
@@ -324,6 +326,7 @@ class format_date_parser
               }
               t_month = month_type(mr.current_match);
               if (mr.has_remaining()) {
+                current_char = mr.last_char();
                 use_current_char = true;
               }
               break;
@@ -339,6 +342,7 @@ class format_date_parser
               }
               t_month = month_type(mr.current_match);
               if (mr.has_remaining()) {
+                current_char = mr.last_char();
                 use_current_char = true;
               }
               break;
@@ -434,6 +438,7 @@ class format_date_parser
         itr++;
         if (use_current_char) {
           use_current_char = false;
+          current_char = *sitr;
         }
         else {
           sitr++;
@@ -471,14 +476,14 @@ class format_date_parser
     
     // skip leading whitespace
     while(std::isspace(*sitr) && sitr != stream_end) { ++sitr; } 
+    charT current_char = *sitr;
 
     short month(0);
     
     const_itr itr(format_str.begin());
     while (itr != format_str.end() && (sitr != stream_end)) {
       if (*itr == '%') {
-        if ( ++itr == format_str.end())
-        	break;
+        itr++;
         if (*itr != '%') {
           switch(*itr) {
           case 'b': 
@@ -486,6 +491,7 @@ class format_date_parser
               mr = m_month_short_names.match(sitr, stream_end);
               month = mr.current_match;
               if (mr.has_remaining()) {
+                current_char = mr.last_char();
                 use_current_char = true;
               }
               break;
@@ -495,6 +501,7 @@ class format_date_parser
               mr = m_month_long_names.match(sitr, stream_end);
               month = mr.current_match;
               if (mr.has_remaining()) {
+                current_char = mr.last_char();
                 use_current_char = true;
               }
               break;
@@ -522,6 +529,7 @@ class format_date_parser
         itr++;
         if (use_current_char) {
           use_current_char = false;
+          current_char = *sitr;
         }
         else {
           sitr++;
@@ -573,14 +581,14 @@ class format_date_parser
     
     // skip leading whitespace
     while(std::isspace(*sitr) && sitr != stream_end) { ++sitr; } 
+    charT current_char = *sitr;
 
     short wkday(0);
     
     const_itr itr(format_str.begin());
     while (itr != format_str.end() && (sitr != stream_end)) {
       if (*itr == '%') {
-        if ( ++itr == format_str.end())
-        	break;
+        itr++;
         if (*itr != '%') {
           switch(*itr) {
           case 'a': 
@@ -592,6 +600,7 @@ class format_date_parser
               mr = m_weekday_short_names.match(sitr, stream_end);
               wkday = mr.current_match;
               if (mr.has_remaining()) {
+                current_char = mr.last_char();
                 use_current_char = true;
               }
               break;
@@ -605,6 +614,7 @@ class format_date_parser
               mr = m_weekday_long_names.match(sitr, stream_end);
               wkday = mr.current_match;
               if (mr.has_remaining()) {
+                current_char = mr.last_char();
                 use_current_char = true;
               }
               break;
@@ -631,6 +641,7 @@ class format_date_parser
         itr++;
         if (use_current_char) {
           use_current_char = false;
+          current_char = *sitr;
         }
         else {
           sitr++;
@@ -663,14 +674,14 @@ class format_date_parser
     
     // skip leading whitespace
     while(std::isspace(*sitr) && sitr != stream_end) { ++sitr; } 
+    charT current_char = *sitr;
 
     unsigned short year(0);
     
     const_itr itr(format_str.begin());
     while (itr != format_str.end() && (sitr != stream_end)) {
       if (*itr == '%') {
-        if ( ++itr == format_str.end())
-        	break;
+        itr++;
         if (*itr != '%') {
           //match_results mr;
           switch(*itr) {
@@ -703,6 +714,7 @@ class format_date_parser
         itr++;
         if (use_current_char) {
           use_current_char = false;
+          current_char = *sitr;
         }
         else {
           sitr++;

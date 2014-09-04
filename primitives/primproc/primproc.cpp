@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: primproc.cpp 2147 2013-08-14 20:44:44Z bwilkinson $
+ *   $Id: primproc.cpp 2124 2013-07-08 19:47:42Z bpaul $
  *
  *
  ***********************************************************************/
@@ -55,7 +55,7 @@ using namespace logging;
 
 #include "primproc.h"
 #include "primitiveserver.h"
-#include "MonitorProcMem.h"
+#include "monitorprocmem.h"
 #include "pp_logger.h"
 #include "umsocketselector.h"
 using namespace primitiveprocessor;
@@ -65,34 +65,40 @@ using namespace oam;
 
 #include "utils_utf8.h"
 
-#include "IDBPolicy.h"
-using namespace idbdatafile;
-
-#include "cgroupconfigurator.h"
-
 namespace primitiveprocessor
 {
 
-extern uint32_t BPPCount;
-extern uint32_t blocksReadAhead;
-extern uint32_t defaultBufferSize;
-extern uint32_t connectionsPerUM;
-extern uint32_t highPriorityThreads;
-extern uint32_t medPriorityThreads;
-extern uint32_t lowPriorityThreads;
+extern uint BPPCount;
+extern uint blocksReadAhead;
+extern uint defaultBufferSize;
+extern uint connectionsPerUM;
+extern uint highPriorityThreads;
+extern uint medPriorityThreads;
+extern uint lowPriorityThreads;
 extern int  directIOFlag;
-extern int  noVB;
 
 
 DebugLevel gDebugLevel;
 Logger* mlp;
+UDFFcnMap_t UDFFcnMap;
 string systemLang;
 bool utf8 = false;
 
+#ifdef _MSC_VER
+CRITICAL_SECTION preadCSObject;
+#else
+//#define IDB_COMP_POC_DEBUG
+#ifdef IDB_COMP_POC_DEBUG
+boost::mutex compDebugMutex;
+#endif
+#endif
+
 bool isDebug( const DebugLevel level )
 {
-	return level <= gDebugLevel;
+        return level <= gDebugLevel;
 }
+
+extern void loadUDFs();
 
 }
 
@@ -101,29 +107,29 @@ namespace
 
 int toInt(const string& val)
 {
-	if (val.length() == 0)
-		return -1;
-	return static_cast<int>(Config::fromText(val));
+        if (val.length() == 0)
+                return -1;
+        return static_cast<int>(Config::fromText(val));
 }
 
 void setupSignalHandlers()
 {
 #ifndef _MSC_VER
-	signal(SIGHUP, SIG_IGN);
+		signal(SIGHUP, SIG_IGN);
 
-	struct sigaction ign;
+        struct sigaction ign;
 
-	memset(&ign, 0, sizeof(ign));
-	ign.sa_handler = SIG_IGN;
-	sigaction(SIGPIPE, &ign, 0);
+        memset(&ign, 0, sizeof(ign));
+        ign.sa_handler = SIG_IGN;
+        sigaction(SIGPIPE, &ign, 0);
 
-	memset(&ign, 0, sizeof(ign));
-	ign.sa_handler = SIG_IGN;
-	sigaction(SIGUSR1, &ign, 0);
+        memset(&ign, 0, sizeof(ign));
+        ign.sa_handler = SIG_IGN;
+        sigaction(SIGUSR1, &ign, 0);
 
-	memset(&ign, 0, sizeof(ign));
-	ign.sa_handler = SIG_IGN;
-	sigaction(SIGUSR2, &ign, 0);
+        memset(&ign, 0, sizeof(ign));
+        ign.sa_handler = SIG_IGN;
+        sigaction(SIGUSR2, &ign, 0);
 
 	sigset_t sigset;
 	sigemptyset(&sigset);
@@ -131,42 +137,41 @@ void setupSignalHandlers()
 	sigaddset(&sigset, SIGUSR1);
 	sigaddset(&sigset, SIGUSR2);
 	sigprocmask(SIG_BLOCK, &sigset, 0);
-
 #endif
 }
 
 void setupCwd(Config* cf)
 {
-	string workdir = cf->getConfig("SystemConfig", "WorkingDir");
-	if (workdir.length() == 0)
-		workdir = ".";
-	(void)chdir(workdir.c_str());
-	if (access(".", W_OK) != 0)
-		(void)chdir("/tmp");
+        string workdir = cf->getConfig("SystemConfig", "WorkingDir");
+        if (workdir.length() == 0)
+                workdir = ".";
+        (void)chdir(workdir.c_str());
+        if (access(".", W_OK) != 0)
+                (void)chdir("/tmp");
 }
 
 int setupResources()
 {
 #ifndef _MSC_VER
-	struct rlimit rlim;
+        struct rlimit rlim;
 
-	if (getrlimit(RLIMIT_NOFILE, &rlim) != 0) {
-		return -1;
-	}
-	rlim.rlim_cur = rlim.rlim_max = 65536;
-	if (setrlimit(RLIMIT_NOFILE, &rlim) != 0) {
-		return -2;
-	}
+        if (getrlimit(RLIMIT_NOFILE, &rlim) != 0) {
+                return -1;
+        }
+        rlim.rlim_cur = rlim.rlim_max = 65536;
+        if (setrlimit(RLIMIT_NOFILE, &rlim) != 0) {
+                return -2;
+        }
 
-	if (getrlimit(RLIMIT_NOFILE, &rlim) != 0) {
-		return -3;
-	}
+        if (getrlimit(RLIMIT_NOFILE, &rlim) != 0) {
+                return -3;
+        }
 
-	if (rlim.rlim_cur != 65536) {
-		return -4;
-	}
+        if (rlim.rlim_cur != 65536) {
+                return -4;
+        }
 #endif
-	return 0;
+        return 0;
 }
 
 #ifdef QSIZE_DEBUG
@@ -185,24 +190,24 @@ public:
 	{
 		for (;;)
 		{
-			uint32_t qd = fPsp->getProcessorThreadPool()->getWaiting();
-			if (fQszLog)
+			uint qd = fPsp->getProcessorThreadPool()->getWaiting();
+			if (fQszLog) 
 			{
 				// Get a timestamp for output.
 				struct tm tm;
 				struct timeval tv;
-
+			
 				gettimeofday(&tv, 0);
 				localtime_r(&tv.tv_sec, &tm);
-
+			
 				ostringstream oss;
 				oss << setfill('0')
-				<< setw(2) << tm.tm_hour << ':'
-				<< setw(2) << tm.tm_min << ':'
-				<< setw(2) << tm.tm_sec
-				<< '.'
-				<< setw(4) << tv.tv_usec/100
-				;
+					<< setw(2) << tm.tm_hour << ':'
+					<< setw(2) << tm.tm_min << ':'
+					<< setw(2) << tm.tm_sec
+					<< '.'
+					<< setw(4) << tv.tv_usec/100
+					;
 
 				*fQszLog << oss.str() << ' ' << qd << endl;
 			}
@@ -259,9 +264,10 @@ void* waitForSIGUSR1(void* p)
 				BRPp[i]->formatLRUList(out);
 				out << "###" << endl;
 			}
-		} else if (rec_sig == SIGUSR2)
+		} else
+		if (rec_sig == SIGUSR2)
 		{
-			// is reporting currently on?
+			// is reporting currently on?	
 			rpt_state = BRPp[0]->ReportingFrequency();
 			if (rpt_state>0)
 				rpt_state=0; // turn reporting off
@@ -277,15 +283,50 @@ void* waitForSIGUSR1(void* p)
 }
 #endif
 
+int getNumCores()
+{
+#ifdef _MSC_VER
+	SYSTEM_INFO siSysInfo;
+	GetSystemInfo(&siSysInfo);
+	return siSysInfo.dwNumberOfProcessors;
+#else
+	ifstream cpuinfo("/proc/cpuinfo");
+
+	if (!cpuinfo.good())
+		return -1;
+
+	int nc = 0;
+
+	regex re("Processor\\s*:\\s*[0-9]+", regex::normal|regex::icase);
+
+	string line;
+
+	getline(cpuinfo, line);
+
+	unsigned i = 0;
+	while (i < 10000 && cpuinfo.good() && !cpuinfo.eof())
+	{
+		if (regex_match(line, re))
+			nc++;
+
+		getline(cpuinfo, line);
+
+		++i;
+	}
+
+	return nc;
+#endif
+}
+
 }
 
 int main(int argc, char* argv[])
 {
 	// get and set locale language
 	systemLang = funcexp::utf8::idb_setlocale();
-	if ( systemLang != "en_US.UTF-8" &&
-			systemLang.find("UTF") != string::npos )
-		utf8 = true;
+    if ( systemLang != "en_US.UTF-8" &&
+        systemLang.find("UTF") != string::npos )
+        utf8 = true;
 
 	Config* cf = Config::makeConfig();
 
@@ -325,12 +366,13 @@ int main(int argc, char* argv[])
 	uint64_t extentRows = 8*1024*1024;
 	uint64_t MaxExtentSize = 0;
 	double prefetchThreshold;
+	bool multicast = false;
+	bool multicastloop = false;
 	uint64_t PMSmallSide = 67108864;
 	BPPCount = 16;
 	int numCores = -1;
 	int configNumCores = -1;
-	uint32_t highPriorityPercentage, medPriorityPercentage, lowPriorityPercentage;
-	utils::CGroupConfigurator cg;
+	uint highPriorityPercentage, medPriorityPercentage, lowPriorityPercentage;
 
 	gDebugLevel = primitiveprocessor::NONE;
 
@@ -401,12 +443,11 @@ int main(int argc, char* argv[])
 		// responses to ExeMgr and vice versa, if we rotated socket dest.
 		temp = toInt(cf->getConfig("Installation", "ServerTypeInstall"));
 		if ((temp == oam::INSTALL_COMBINE_DM_UM_PM) ||
-				(temp == oam::INSTALL_COMBINE_PM_UM))
+			(temp == oam::INSTALL_COMBINE_PM_UM))
 			rotatingDestination = false;
 	}
 
-	string strBlockPct = cf->getConfig(dbbc, "NumBlocksPct");
-	temp = atoi(strBlockPct.c_str());
+	temp = toInt(cf->getConfig(dbbc, "NumBlocksPct"));
 	if (temp > 0)
 		BRPBlocksPct = temp;
 
@@ -427,8 +468,7 @@ int main(int argc, char* argv[])
 #else
 	// _SC_PHYS_PAGES is in 4KB units. Dividing by 200 converts to 8KB and gets ready to work in pct
 	// _SC_PHYS_PAGES should always be >> 200 so we shouldn't see a total loss of precision
-	//BRPBlocks = sysconf(_SC_PHYS_PAGES) / 200 * BRPBlocksPct;
-	BRPBlocks = ((BRPBlocksPct/100.0) * (double) cg.getTotalMemory()) / 8192;
+	BRPBlocks = sysconf(_SC_PHYS_PAGES) / 200 * BRPBlocksPct;
 #endif
 #if 0
 	temp = toInt(cf->getConfig(dbbc, "NumThreads"));
@@ -443,8 +483,8 @@ int main(int argc, char* argv[])
 	if (temp > 0)
 		deleteBlocks = temp;
 
-	if ((uint32_t)(.01 * BRPBlocks) < deleteBlocks)
-		deleteBlocks = (uint32_t)(.01 * BRPBlocks);
+	if ((uint)(.01 * BRPBlocks) < deleteBlocks)
+		deleteBlocks = (uint)(.01 * BRPBlocks);
 
 	temp = toInt(cf->getConfig(primitiveServers, "ColScanBufferSizeBlocks"));
 	if (temp > (int) MaxReadAheadSz || temp < 1)
@@ -459,7 +499,7 @@ int main(int argc, char* argv[])
 	{
 		//make sure we've got an integral factor of extent size
 		for (; (MaxExtentSize%temp)!=0; ++temp);
-		blocksReadAhead=temp;
+			blocksReadAhead=temp;
 	}
 
 	temp = toInt(cf->getConfig(primitiveServers, "PTTrace"));
@@ -469,7 +509,7 @@ int main(int argc, char* argv[])
 	temp = toInt(cf->getConfig(primitiveServers, "PrefetchThreshold"));
 	if (temp < 0 || temp > 100)
 		prefetchThreshold = 0;
-	else
+	else 
 		prefetchThreshold = temp/100.0;
 
 	int maxPct = 0; //disable by default
@@ -478,14 +518,13 @@ int main(int argc, char* argv[])
 		maxPct = temp;
 
 	// @bug4507, configurable pm aggregation AggregationMemoryCheck
-	// We could use this same mechanism for other growing buffers.
 	int aggPct = 95;
-	temp = toInt(cf->getConfig("SystemConfig", "MemoryCheckPercent"));
+	temp = toInt(cf->getConfig(primitiveServers, "AggregationMemoryCheck"));
 	if (temp >= 0)
 		aggPct = temp;
 
 	//...Start the thread to monitor our memory usage
-	new boost::thread(utils::MonitorProcMem(maxPct, aggPct, 28));
+	new boost::thread(primitiveprocessor::MonitorProcMem(maxPct, aggPct, mlp));
 
 	// config file priority is 40..1 (highest..lowest)
 	string sPriority = cf->getConfig(primitiveServers, "Priority");
@@ -515,6 +554,19 @@ int main(int argc, char* argv[])
 			rotatingDestination = false;
 	}
 
+	strVal = cf->getConfig(primitiveServers, "Multicast");
+	if ((strVal == "y") || (strVal == "Y")) 
+		multicast = true;
+	if (multicast)
+	{
+		strVal = cf->getConfig(primitiveServers, "MulticastLoop");
+		if ((strVal == "y") || (strVal == "Y")) 
+			multicastloop = true;
+		uint64_t tmp = cf->uFromText(cf->getConfig("HashJoin", "PmMaxMemorySmallSide"));
+		if (tmp)
+			PMSmallSide = tmp;
+	}
+
 	//See if we want to override the calculated #cores
 	temp = toInt(cf->getConfig(primitiveServers, "NumCores"));
 	if (temp > 0)
@@ -523,9 +575,8 @@ int main(int argc, char* argv[])
 	if (configNumCores <= 0)
 	{
 		//count the actual #cores
-
-		numCores = cg.getNumCores();
-		if (numCores == 0)
+		numCores = getNumCores();
+		if (numCores <= 0)
 			numCores = 8;
 	}
 	else
@@ -542,20 +593,20 @@ int main(int argc, char* argv[])
 
 	// the default is ~10% low, 30% medium, 60% high, (where 2*cores = 100%)
 	if (highPriorityPercentage == 0 && medPriorityPercentage == 0 &&
-			lowPriorityPercentage == 0) {
+	  lowPriorityPercentage == 0) {
 		lowPriorityThreads = max(1, (2*numCores)/10);
 		medPriorityThreads = max(1, (2*numCores)/3);
 		highPriorityThreads = (2 * numCores) - lowPriorityThreads - medPriorityThreads;
 	}
 	else {
-		uint32_t totalThreads = (uint32_t) ((lowPriorityPercentage + medPriorityPercentage +
-											 highPriorityPercentage) / 100.0 * (2*numCores));
+		uint totalThreads = (uint) ((lowPriorityPercentage + medPriorityPercentage +
+		  highPriorityPercentage) / 100.0 * (2*numCores));
 
 		if (totalThreads == 0)
 			totalThreads = 1;
 
-		lowPriorityThreads = (uint32_t) (lowPriorityPercentage/100.0 * (2*numCores));
-		medPriorityThreads = (uint32_t) (medPriorityPercentage/100.0 * (2*numCores));
+		lowPriorityThreads = (uint) (lowPriorityPercentage/100.0 * (2*numCores));
+		medPriorityThreads = (uint) (medPriorityPercentage/100.0 * (2*numCores));
 		highPriorityThreads = totalThreads - lowPriorityThreads - medPriorityThreads;
 	}
 
@@ -574,26 +625,24 @@ int main(int argc, char* argv[])
 	// @bug4598, switch for O_DIRECT to support gluster fs.
 	// directIOFlag == O_DIRECT, by default
 	strVal = cf->getConfig(primitiveServers, "DirectIO");
-	if ((strVal == "n") || (strVal == "N"))
+	if ((strVal == "n") || (strVal == "N")) 
 		directIOFlag = 0;
 #endif
 
-	IDBPolicy::configIDBPolicy();
-
-	// no versionbuffer if using HDFS for performance reason
-	if (IDBPolicy::useHdfs())
-		noVB = 1;
-
+	loadUDFs();
+#ifdef _MSC_VER
+	InitializeCriticalSection(&preadCSObject);
+#endif
 	cout << "Starting PrimitiveServer: st = " << serverThreads << ", sq = " << serverQueueSize <<
-		 ", pw = " << processorWeight << ", pq = " << processorQueueSize <<
-		 ", nb = " << BRPBlocks << ", nt = " << BRPThreads << ", nc = " << cacheCount <<
-		 ", ra = " << blocksReadAhead <<  ", db = " << deleteBlocks << ", mb = " << maxBlocksPerRead <<
-		 ", rd = " << rotatingDestination << ", tr = " << PTTrace <<
-		 ", ss = " << PMSmallSide << ", bp = " << BPPCount << endl;
+		", pw = " << processorWeight << ", pq = " << processorQueueSize <<
+		", nb = " << BRPBlocks << ", nt = " << BRPThreads << ", nc = " << cacheCount <<
+		", ra = " << blocksReadAhead <<  ", db = " << deleteBlocks << ", mb = " << maxBlocksPerRead <<
+		", rd = " << rotatingDestination << ", tr = " << PTTrace << ", mc = " << boolalpha << multicast << 
+		", ml = " << multicastloop << ", ss = " << PMSmallSide << ", bp = " << BPPCount << endl;
 
 	PrimitiveServer server(serverThreads, serverQueueSize, processorWeight, processorQueueSize,
-						   rotatingDestination, BRPBlocks, BRPThreads, cacheCount, maxBlocksPerRead, blocksReadAhead,
-						   deleteBlocks, PTTrace, prefetchThreshold, PMSmallSide);
+		rotatingDestination, BRPBlocks, BRPThreads, cacheCount, maxBlocksPerRead, blocksReadAhead,
+		deleteBlocks, PTTrace, prefetchThreshold, multicast, multicastloop, PMSmallSide);
 
 #ifdef QSIZE_DEBUG
 	thread* qszMonThd;

@@ -1,19 +1,34 @@
-/* Copyright (C) 2014 InfiniDB, Inc.
+/*
 
-   This program is free software; you can redistribute it and/or
-   modify it under the terms of the GNU General Public License
-   as published by the Free Software Foundation; version 2 of
-   the License.
+   Copyright (C) 2009-2012 Calpont Corporation.
 
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   Use of and access to the Calpont InfiniDB Community software is subject to the
+   terms and conditions of the Calpont Open Source License Agreement. Use of and
+   access to the Calpont InfiniDB Enterprise software is subject to the terms and
+   conditions of the Calpont End User License Agreement.
 
-   You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-   MA 02110-1301, USA. */
+   This program is distributed in the hope that it will be useful, and unless
+   otherwise noted on your license agreement, WITHOUT ANY WARRANTY; without even
+   the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+   Please refer to the Calpont Open Source License Agreement and the Calpont End
+   User License Agreement for more details.
+
+   You should have received a copy of either the Calpont Open Source License
+   Agreement or the Calpont End User License Agreement along with this program; if
+   not, it is your responsibility to review the terms and conditions of the proper
+   Calpont license agreement by visiting http://www.calpont.com for the Calpont
+   InfiniDB Enterprise End User License Agreement or http://www.infinidb.org for
+   the Calpont InfiniDB Community Calpont Open Source License Agreement.
+
+   Calpont may make changes to these license agreements from time to time. When
+   these changes are made, Calpont will make a new copy of the Calpont End User
+   License Agreement available at http://www.calpont.com and a new copy of the
+   Calpont Open Source License Agreement available at http:///www.infinidb.org.
+   You understand and agree that if you use the Program after the date on which
+   the license agreement authorizing your use has changed, Calpont will treat your
+   use as acceptance of the updated License.
+
+*/
 
 /*******************************************************************************
 * $Id$
@@ -107,18 +122,28 @@ void WECpiFeederThread::add2MsgQueue(ByteStream& Ibs)
 
 void WECpiFeederThread::feedData2Cpi()
 {
+
 	while(isContinue())
 	{
 
 		mutex::scoped_lock aLock(fMsgQMutex);
+		//TODO create a wait signal here
+		//when continue is false we need to move and break out of loop
 		if(fMsgQueue.empty())
 		{
-			bool aTimedOut = fFeederCond.timed_wait(aLock, boost::posix_time::milliseconds(3000));
+			//cout << "Going to Lock MsgQMutex!!" << endl;
+			//fFeederCond.wait(aLock);
+			bool aTimeout = fFeederCond.timed_wait(aLock, boost::posix_time::milliseconds(3000));
 			if(!isContinue()) { aLock.unlock(); break; }
-			// to handle spurious wake ups and timeout wake ups
-			if((fMsgQueue.empty())||(!aTimedOut)) {	aLock.unlock();	continue; }
+			//mutex::scoped_lock aCondLock(fContMutex);
+			//if(!fContinue) break;
+			//aCondLock.unlock();
+			// to avoid spurious wake ups.
+			if((fMsgQueue.empty())||(!aTimeout)) {	aLock.unlock();	continue; }
 		}
 
+		//fPushing = true;	//make it false only when Q empty
+		//cout << "Poping from the MsgQueue" << endl;
 		messageqcpp::SBS aSbs = fMsgQueue.front();
 		fMsgQueue.pop();
 
@@ -129,7 +154,7 @@ void WECpiFeederThread::feedData2Cpi()
 			fOwner.pushData2Cpimport((*aSbs));
 			//cout << "Finished PUSHING data " << endl;
 		}
-		catch(runtime_error&)
+		catch(runtime_error& e)
 		{
 			//cout << "Caught exception : " << e.what() << endl;
 			//break;
@@ -137,11 +162,46 @@ void WECpiFeederThread::feedData2Cpi()
 
 		aSbs.reset();	//forcefully clearing it
 		// We start sending data request from here ONLY
+		//if(getQueueSize()< WEDataLoader::MAX_QSIZE) fOwner.sendDataRequest();
+		//fOwner.sendDataRequest();
+		//fPushing = false;
+		//usleep(1000);
 		if(getQueueSize() == WEDataLoader::MAX_QSIZE) fOwner.sendDataRequest();
 	}
 
 	cout << "CpiFeedThread Stopped!! " << endl;
 	fStopped = true;
+
+
+
+	/*
+	while(fContinue)
+	{
+
+		while(!fMsgQueue.empty())
+		{
+
+			fPushing = true;	//make it false only when Q empty
+			mutex::scoped_lock aLock(fMsgQMutex);
+			//when continue is false we need to move and break out of loop
+			//while((fMsgQueue.empty())&&(fContinue)) fFeederCond.wait(aLock);
+			//if(!fContinue) break;
+			//cout << "Poping from the MsgQueue" << endl;
+			messageqcpp::SBS aSbs = fMsgQueue.front();
+			fMsgQueue.pop();
+			aLock.unlock();
+
+			fOwner.pushData2Cpimport((*aSbs));
+			//cout << "Finished PUSHING data " << endl;
+		}
+		fPushing = false;
+		usleep(1000);
+	}
+	cout << "CpiFeedThread Stopped!! " << endl;
+	fStopped = true;
+	*/
+
+
 
 }
 

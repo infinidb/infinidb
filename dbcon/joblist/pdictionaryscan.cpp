@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: pdictionaryscan.cpp 9655 2013-06-25 23:08:13Z xlou $
+*   $Id: pdictionaryscan.cpp 9469 2013-05-01 18:38:43Z pleblanc $
 *
 *
 ***********************************************************************/
@@ -26,17 +26,14 @@
 #include <sstream>
 //#define NDEBUG
 #include <cassert>
-#include <ctime>
-using namespace std;
-
 #include <boost/thread.hpp>
 #include <boost/thread/condition.hpp>
+using namespace std;
 
 #include "distributedenginecomm.h"
 #include "elementtype.h"
 #include "unique32generator.h"
 #include "oamcache.h"
-#include "jlf_common.h"
 #include "primitivestep.h"
 
 #include "messagequeue.h"
@@ -60,8 +57,9 @@ using namespace BRM;
 #include "rowgroup.h"
 using namespace rowgroup;
 
-#include "querytele.h"
-using namespace querytele;
+//#define DEBUG 1
+//#define DEBUG2 1
+
 
 namespace joblist
 {
@@ -79,12 +77,11 @@ struct pDictionaryScanPrimitive
         }
         catch(runtime_error& re)
         {
-			catchHandler(re.what(), ERR_DICTIONARY_SCAN, fPDictScan->errorInfo(), fPDictScan->sessionId());
+			catchHandler(re.what());
 		}
         catch(...)
         {
-			catchHandler("pDictionaryScan send caught an unknown exception",
-							ERR_DICTIONARY_SCAN, fPDictScan->errorInfo(), fPDictScan->sessionId());
+			catchHandler("pDictionaryScan send caught an unknown exception");
 		}
 
     }
@@ -103,12 +100,11 @@ struct pDictionaryScanAggregator
         }
         catch(runtime_error& re)
         {
-			catchHandler(re.what(), ERR_DICTIONARY_SCAN, fPDictScan->errorInfo(), fPDictScan->sessionId());
+			catchHandler(re.what());
 		}
         catch(...)
         {
-			catchHandler("pDictionaryScan receive caught an unknown exception",
-							ERR_DICTIONARY_SCAN, fPDictScan->errorInfo(), fPDictScan->sessionId());
+			catchHandler("pDictionaryScan receive caught an unknown exception");
 		}
 
     }
@@ -116,15 +112,30 @@ struct pDictionaryScanAggregator
 
 
 pDictionaryScan::pDictionaryScan(
+	const JobStepAssociation& inputJobStepAssociation,
+	const JobStepAssociation& outputJobStepAssociation,
+	DistributedEngineComm* dec,
+	boost::shared_ptr<CalpontSystemCatalog> cat,
 	CalpontSystemCatalog::OID o,
+	int ct,
 	CalpontSystemCatalog::OID t,
-	const CalpontSystemCatalog::ColType& ct,
-	const JobInfo& jobInfo) :
-	JobStep(jobInfo),
-	fDec(NULL),
-	sysCat(jobInfo.csc),
+	uint32_t session,
+	uint32_t txn,
+	uint32_t verID,
+	uint16_t step,
+	uint32_t statement,
+	ResourceManager& rm) :
+	fInputJobStepAssociation(inputJobStepAssociation),
+	fOutputJobStepAssociation(outputJobStepAssociation),
+	fDec(dec),
+	sysCat(cat),
 	fOid(o),
 	fTableOid(t),
+	fSessionId(session),
+	fTxnId(txn),
+	fVerId(verID),
+	fStepId(step),
+	fStatementId(statement),
 	fFilterCount(0),
 	fBOP(BOP_NONE),
 	msgsSent(0),
@@ -134,9 +145,8 @@ pDictionaryScan::pDictionaryScan(
 	sendWaiting(false),
 	ridCount(0),
 	ridList(0),
-	colType(ct),
-	fScanLbidReqLimit(jobInfo.rm.getJlScanLbidReqLimit()),
-	fScanLbidReqThreshold(jobInfo.rm.getJlScanLbidReqThreshold()),
+	fScanLbidReqLimit(rm.getJlScanLbidReqLimit()),
+	fScanLbidReqThreshold(rm.getJlScanLbidReqThreshold()),
 	fStopSending(false),
 	fSingleThread(false),
 	fPhysicalIO(0),
@@ -144,14 +154,24 @@ pDictionaryScan::pDictionaryScan(
 	fMsgBytesIn(0),
 	fMsgBytesOut(0),
 	fMsgsToPm(0),
-	fMsgsExpect(0),
-	fRm(jobInfo.rm),
+	fRm(rm),
 	isEquality(false)
 {
 	int err;
 	DBRM dbrm;
 
-	// Get list of non outOfService extents for the OID of interest
+	fDictBlkCount=0;
+	err = dbrm.getHWM(fOid, fDictBlkCount);
+	if (err)
+	{
+		ostringstream oss;
+		oss << "pDictionaryScan: getHWM error! For OID-" << fOid;
+		throw runtime_error(oss.str());
+	}
+
+	if (fDictBlkCount <=0)
+		fDictBlkCount=1;
+
 	err = dbrm.lookup(fOid, fDictlbids);
 	if (err)
 	{
@@ -190,9 +210,11 @@ pDictionaryScan::pDictionaryScan(
 	fCOP2 = COMPARE_NIL;
 
 	uniqueID = UniqueNumberGenerator::instance()->getUnique32();
+	if (fDec)
+		fDec->addQueue(uniqueID);
  	initializeConfigParms();
 	fExtendedInfo = "DSS: ";
-	fQtc.stepParms().stepType = StepTeleStats::T_DSS;
+	colType.compressionType = colType.ddn.compressionType = ct;
 }
 
 pDictionaryScan::~pDictionaryScan()
@@ -314,67 +336,49 @@ void pDictionaryScan::sendPrimitiveMessages()
 	uint32_t partNum;
 	uint16_t segNum;
 	BRM::OID_t oid;
-	boost::shared_ptr<map<int, int> > dbRootConnectionMap;
 	boost::shared_ptr<map<int, int> > dbRootPMMap;
 	oam::OamCache *oamCache = oam::OamCache::makeOamCache();
-	int localPMId = oamCache->getLocalPMId();
 
 	try
 	{
-		dbRootConnectionMap = oamCache->getDBRootToConnectionMap();
-		dbRootPMMap = oamCache->getDBRootToPMMap();
+		dbRootPMMap = oamCache->getDBRootToConnectionMap();
 
 		it = fDictlbids.begin();
-		for (; it != fDictlbids.end() && !cancelled(); it++)
+		for (; it != fDictlbids.end() && !die; it++)
 		{
 			LBID_t	msgLbidStart = it->start;
         	dbrm.lookupLocal(msgLbidStart,
-						(BRM::VER_t)fVerId.currentScn,
-						false,
+						(BRM::VER_t)fVerId, 
+						false, 
 						oid,
-                        dbroot,
-						partNum,
+                        dbroot, 
+						partNum, 
 						segNum,
 						fbo);
 
-			// Bug5741 If we are local only and this doesn't belongs to us, skip it
-			if (fLocalQuery == execplan::CalpontSelectExecutionPlan::LOCAL_QUERY)
-			{
-				if (localPMId == 0)
-					throw IDBExcept(ERR_LOCAL_QUERY_UM);
-				if (dbRootPMMap->find(dbroot)->second != localPMId)
-					continue;
-			}
+			dbrm.getLastHWM_DBroot(oid, dbroot, partNum, segNum, hwm);
 
-			// Retrieve the HWM blk for the segment file specified by the oid,
-			// partition, and segment number.  The extState arg indicates
-			// whether the hwm block is outOfService or not, but we already
-			// filtered out the outOfService extents when we constructed the
-			// fDictlbids list, so extState is extraneous info at this point.
-			int extState;
-			dbrm.getLocalHWM(oid, partNum, segNum, hwm, extState);
+			u_int32_t remainingLbids =
+				( (hwm > (fbo + it->size - 1)) ? (it->size) : (hwm - fbo + 1) ); 
 
-			uint32_t remainingLbids = fMsgsExpect = 
-				( (hwm > (fbo + it->size - 1)) ? (it->size) : (hwm - fbo + 1) );
-
-			uint32_t msgLbidCount   =  fLogicalBlocksPerScan;
-
-			while ( remainingLbids && !cancelled())
-			{
-				if ( remainingLbids < msgLbidCount)
+			u_int32_t msgLbidCount   =  fLogicalBlocksPerScan;
+			
+			while ( remainingLbids && 0 == fInputJobStepAssociation.status() && !die)
+			{		
+				if ( remainingLbids < msgLbidCount)					
 					msgLbidCount = remainingLbids;
 
-				if (dbRootConnectionMap->find(dbroot) == dbRootConnectionMap->end())
+				if (dbRootPMMap->find(dbroot) == dbRootPMMap->end())
 					throw IDBExcept(ERR_DATA_OFFLINE);
-				sendAPrimitiveMessage(primMsg, msgLbidStart, msgLbidCount, (*dbRootConnectionMap)[dbroot]);
+				sendAPrimitiveMessage(primMsg, msgLbidStart, msgLbidCount, (*dbRootPMMap)[dbroot]);
 				primMsg.restart();
 
 				mutex.lock();
 				msgsSent += msgLbidCount;
 				if (recvWaiting)
 					condvar.notify_all();
-
-				while (( msgsSent - msgsRecvd) >  fScanLbidReqThreshold)
+		
+				while (( msgsSent - msgsRecvd) >  fScanLbidReqThreshold) 
 				{
 					sendWaiting = true;
 					condvarWakeupProducer.wait(mutex);
@@ -389,13 +393,12 @@ void pDictionaryScan::sendPrimitiveMessages()
 	}//try
 	catch(const exception& e)
     {
-      catchHandler(e.what(), ERR_DICTIONARY_SCAN, fErrorInfo, fSessionId);
+      catchHandler(e.what(), fSessionId);
       sendError(ERR_DICTIONARY_SCAN);
     }
 	catch(...)
     {
-      catchHandler("pDictionaryScan caught an unknown exception.",
-					ERR_DICTIONARY_SCAN, fErrorInfo, fSessionId);
+      catchHandler("pDictionaryScan caught an unknown exception.", fSessionId);
       sendError(ERR_DICTIONARY_SCAN);
     }
 
@@ -422,9 +425,9 @@ void pDictionaryScan::sendPrimitiveMessages()
 
 }
 
-void pDictionaryScan::sendError(uint16_t s)
+void pDictionaryScan::sendError(uint16_t status)
 {
-	status(s);
+	fOutputJobStepAssociation.status(status);
 }
 
 //------------------------------------------------------------------------------
@@ -449,7 +452,7 @@ void pDictionaryScan::sendAPrimitiveMessage(
 
 	hdr.Hdr.SessionID     = fSessionId;
 	hdr.Hdr.TransactionID = fTxnId;
-	hdr.Hdr.VerID         = fVerId.currentScn;
+	hdr.Hdr.VerID         = fVerId;
 	hdr.Hdr.StepID        = fStepId;
 	hdr.Hdr.UniqueID	  = uniqueID;
 	hdr.Hdr.Priority	  = priority();
@@ -470,24 +473,11 @@ void pDictionaryScan::sendAPrimitiveMessage(
 	if (fSessionId & 0x80000000)
 		hdr.flags |= IS_SYSCAT;
 
-
-	/* TODO: Need to figure out how to get the full fVerID into this msg.
-	 * XXXPAT: The way I did it is IMO the least kludgy, while requiring only a couple
-	 * changes.
-	 * The old msg was: TokenByScanRequestHeader + fFilterString
-	 * The new msg is: TokenByScanRequestHeader + fVerId + old message
-	 * Prepending verid wastes a few bytes that go over the network, but that is better
-	 * than putting it in the middle or at the end in terms of simplicity & memory usage,
-	 * given the current code.
-	 */
-
-	primMsg.load((const uint8_t *) &hdr, sizeof(DictTokenByScanRequestHeader));
-	primMsg << fVerId;
-	primMsg.append((const uint8_t*) &hdr, sizeof(DictTokenByScanRequestHeader));
+	primMsg.load((const uint8_t*) &hdr, sizeof(DictTokenByScanRequestHeader));
 	primMsg += fFilterString;
 
 	//cout << "Sending rqst LBIDS " << msgLbidStart
-	//	<< " hdr.Count " << hdr.Count
+	//	<< " blkCount " << fDictBlkCount << " hdr.Count " << hdr.Count
 	//	<< " filterCount " << fFilterCount << endl;
 #ifdef DEBUG2
     if (fOid >= 3000)
@@ -495,64 +485,66 @@ void pDictionaryScan::sendAPrimitiveMessage(
             ": sending req for lbid start "     << msgLbidStart <<
             "; lbid count " << msgLbidCount     << endl;
 #endif
-
+	
+	fMsgBytesOut += primMsg.lengthWithHdrOverhead();
 	try {
 		fDec->write(uniqueID, primMsg);
 	}
-	catch (const IDBExcept& e) {
+	catch (const IDBExcept &e) {
 		abort();
-		cerr << "pDictionaryScan::send() caught: " << e.what() << endl;
-		catchHandler(e.what(), e.errorCode(), fErrorInfo, fSessionId);
+		catchHandler(e.what());
+		if (fOutputJobStepAssociation.status() == 0)
+			fOutputJobStepAssociation.status(e.errorCode());
 	}
 	catch (const std::exception& e)
 	{
 		abort();
 		cerr << "pDictionaryScan::send() caught: " << e.what() << endl;
-		catchHandler(e.what(), ERR_DICTIONARY_SCAN, fErrorInfo, fSessionId);
+		catchHandler(e.what());
+		if (fOutputJobStepAssociation.status() == 0)
+			fOutputJobStepAssociation.status(ERR_DICTIONARY_SCAN);
 	}
 	catch (...)
 	{
 		abort();
 		cerr << "pDictionaryScan::send() caught unknown exception" << endl;
-		catchHandler("pDictionaryScan::send() caught unknown exception",
-					ERR_DICTIONARY_SCAN, fErrorInfo, fSessionId);
+		catchHandler("pDictionaryScan::send() caught unknown exception");
+		if (fOutputJobStepAssociation.status() == 0)
+			fOutputJobStepAssociation.status(ERR_DICTIONARY_SCAN);
 	}
 	fMsgsToPm++;
 }
 
 void pDictionaryScan::receivePrimitiveMessages()
 {
+	AnyDataListSPtr dl = fOutputJobStepAssociation.outAt(0);
+	DataList_t* dlp = dl->dataList();
+	FifoDataList *fifo = fOutputJobStepAssociation.outAt(0)->fifoDL();
 	RowGroupDL* rgFifo = fOutputJobStepAssociation.outAt(0)->rowGroupDL();
+	UintRowGroup rw;
 	boost::shared_ptr<ByteStream> bs;
-	RGData rgData;
+	boost::shared_array<uint8_t> rgData;
 	Row r;
 
 	fRidResults = 0;
 
-	idbassert(fOutputRowGroup.getColumnCount() > 0);
-	fOutputRowGroup.initRow(&r);
-	rgData = RGData(fOutputRowGroup);
-	fOutputRowGroup.setData(&rgData);
-	fOutputRowGroup.resetRowGroup(0);
-
-	StepTeleStats sts;
-	sts.query_uuid = fQueryUuid;
-	sts.step_uuid = fStepUuid;
-	if (fOid >= 3000)
+	if (rgFifo)
 	{
-		sts.msg_type = StepTeleStats::ST_START;
-		sts.total_units_of_work = fMsgsExpect;
-		postStepStartTele(sts);
+		idbassert(fOutputRowGroup.getColumnCount() > 0);
+		fOutputRowGroup.initRow(&r);
+		rgData.reset(new uint8_t[fOutputRowGroup.getMaxDataSize()]);
+		fOutputRowGroup.setData(rgData.get());
+		fOutputRowGroup.resetRowGroup(0);
 	}
 
-	uint16_t error = status();
+	uint16_t error = fOutputJobStepAssociation.status(); 
 	//...Be careful here.  Mutex is locked prior to entering the loop, so
 	//...any continue statement in the loop must be sure the mutex is locked.
 	//error condition will not go through loop
 	if (!error) mutex.lock();
 
 	try
-	{
+	{	
 		while (!error) {
 
 			// sync with the send side
@@ -570,9 +562,10 @@ void pDictionaryScan::receivePrimitiveMessages()
 			mutex.unlock();
 
 			fDec->read(uniqueID, bs);
+			fMsgBytesIn += bs->lengthWithHdrOverhead();
 			if (fOid>=3000 && traceOn() && dlTimes.FirstReadTime().tv_sec==0)
 				dlTimes.setFirstReadTime();
-			if (fOid>=3000 && traceOn()) dlTimes.setLastReadTime();
+			if (fOid>=3000 && traceOn()) dlTimes.setLastReadTime();	
 
 			if (bs->length() == 0)
 			{
@@ -585,9 +578,9 @@ void pDictionaryScan::receivePrimitiveMessages()
 			ISMPacketHeader *hdr = (ISMPacketHeader*)(bs->buf());
 			error = hdr->Status;
 			if (! error)
-			{
+			{	
 				const ByteStream::byte* bsp = bs->buf();
-
+					
 				// get the ResultHeader out of the bytestream
 				const TokenByScanResultHeader* crh = reinterpret_cast<const TokenByScanResultHeader*>(bsp);
 				bsp += sizeof(TokenByScanResultHeader);
@@ -597,7 +590,7 @@ void pDictionaryScan::receivePrimitiveMessages()
 
 				// From this point on the rest of the bytestream is the data that comes back from the primitive server
 				// This needs to be fed to a datalist that is retrieved from the outputassociation object.
-
+		 
 				PrimToken pt;
 				uint64_t token;
 #ifdef DEBUG
@@ -606,43 +599,48 @@ void pDictionaryScan::receivePrimitiveMessages()
 				if (fOid>=3000 && traceOn() && dlTimes.FirstInsertTime().tv_sec==0)
 					dlTimes.setFirstInsertTime();
 
-				for(int j = 0; j < crh->NVALS && !cancelled(); j++)
+				for(int j = 0; j < crh->NVALS && !die; j++)
 				{
 					memcpy(&pt, bsp, sizeof(pt));
 					bsp += sizeof(pt);
 					uint64_t rid = fRidResults++;
 					token = (pt.LBID << 10) | pt.offset;
 
-					fOutputRowGroup.getRow(fOutputRowGroup.getRowCount(), &r);
-					// load r up w/ values
-					r.setRid(rid);
-					r.setUintField<8>(token, 0);
-					fOutputRowGroup.incRowCount();
-					if (fOutputRowGroup.getRowCount() == 8192) {
-						//INSERT_ADAPTER(rgFifo, rgData);
-						//fOutputRowGroup.convertToInlineDataInPlace();
-						rgFifo->insert(rgData);
-						rgData = RGData(fOutputRowGroup);
-						fOutputRowGroup.setData(&rgData);
-						fOutputRowGroup.resetRowGroup(0);
+					if (fifo)
+					{
+						rw.et[rw.count++] = ElementType(rid, token);
+						if (rw.count == rw.ElementsPerGroup)
+						{
+							fifo->insert(rw);
+							rw.count = 0;
+						}
 					}
+					else if (rgFifo)
+					{
+						fOutputRowGroup.getRow(fOutputRowGroup.getRowCount(), &r);
+						// load r up w/ values
+						r.setRid(rid);
+// 						r.setUintField<8>(token, 1);
+						r.setUintField<8>(token, 0);
+						fOutputRowGroup.incRowCount();
+						if (fOutputRowGroup.getRowCount() == 8192) {
+							rgFifo->insert(rgData);
+							rgData.reset(new uint8_t[fOutputRowGroup.getMaxDataSize()]);
+							fOutputRowGroup.setData(rgData.get());
+							fOutputRowGroup.resetRowGroup(0);
+						}
+					}
+					else
+					{
+						dlp->insert(ElementType(rid, token));
+					}
+#ifdef DEBUG2
+					cout << "  -- inserting <" << rid << ", " << token << ">" << endl;
+#endif
 				}
 
 				mutex.lock();
 				msgsRecvd++;
-
-				if (fOid >= 3000)
-				{
-					uint64_t progress = msgsRecvd * 100 / fMsgsExpect;
-					if (progress > fProgress)
-					{
-						fProgress = progress;
-						sts.msg_type = StepTeleStats::ST_PROGRESS;
-						sts.total_units_of_work = fMsgsExpect;
-						sts.units_of_work_completed = msgsRecvd;
-						postStepProgressTele(sts);
-					}
-				}
 
 				//...If producer is waiting, and we have gone below our threshold value,
 				//...then we signal the producer to request more data from primproc
@@ -667,52 +665,39 @@ void pDictionaryScan::receivePrimitiveMessages()
 				fStopSending = true;
 				condvarWakeupProducer.notify_one();
 				mutex.unlock();
-				string errMsg;
-				//bs->advance(sizeof(ISMPacketHeader) + sizeof(PrimitiveHeader));
-				//*bs >> errMsg;
-				if (error < 1000)
-				{
-					logging::ErrorCodes errorcodes;
-					errMsg = errorcodes.errorString(error);
-				}
-				else
-				{
-					errMsg = IDBErrorInfo::instance()->errorMsg(error);
-				}
-				errorMessage(errMsg);
-				status(error);
+				fOutputJobStepAssociation.status(error);
 			}
 		} // end of loop to read LBID responses from primproc
 	}
 	catch(const LargeDataListExcept& ex)
     {
-		catchHandler(ex.what(), ERR_DICTIONARY_SCAN, fErrorInfo, fSessionId);
+		catchHandler(ex.what(), fSessionId);
+		fOutputJobStepAssociation.status(ERR_DICTIONARY_SCAN);
 		mutex.unlock();
     }
 	catch(const exception& e)
     {
-		catchHandler(e.what(), ERR_DICTIONARY_SCAN, fErrorInfo, fSessionId);
+		catchHandler(e.what(), fSessionId);
+		fOutputJobStepAssociation.status(ERR_DICTIONARY_SCAN);
 		mutex.unlock();
     }
 	catch(...)
     {
-		catchHandler("pDictionaryScan caught an unknown exception.",
-						ERR_DICTIONARY_SCAN, fErrorInfo, fSessionId);
+		catchHandler("pDictionaryScan caught an unknown exception.", fSessionId);
+		fOutputJobStepAssociation.status(ERR_DICTIONARY_SCAN);
 		mutex.unlock();
     }
 
-	if (fOutputRowGroup.getRowCount() > 0) {
-		//fOutputRowGroup.convertToInlineDataInPlace();
-		//INSERT_ADAPTER(rgFifo, rgData);
+	if (rgFifo && fOutputRowGroup.getRowCount() > 0) {
 		rgFifo->insert(rgData);
-		rgData = RGData(fOutputRowGroup);
-		fOutputRowGroup.setData(&rgData);
+		rgData.reset(new uint8_t[fOutputRowGroup.getMaxDataSize()]);
+		fOutputRowGroup.setData(rgData.get());
 		fOutputRowGroup.resetRowGroup(0);
 	}
 
-	Stats stats = fDec->getNetworkStats(uniqueID);
-	fMsgBytesIn = stats.dataRecvd();
-	fMsgBytesOut = stats.dataSent();
+	// send the last remaining tokens
+	if (fifo && rw.count > 0)
+		fifo->insert(rw);
 
 	//@bug 699: Reset StepMsgQueue
 	fDec->removeQueue(uniqueID);
@@ -723,16 +708,46 @@ void pDictionaryScan::receivePrimitiveMessages()
 		//...necessarily due to re-entrancy, but because we want to strip
 		//...the newline ('\n') off the end of the formatted string.
 		time_t t = time(0);
-		char timeString[50];
+		char timeString[50]; 
 		ctime_r(&t, timeString);
 		timeString[strlen(timeString)-1 ] = '\0';
+
+		FifoDataList* pFifo    = 0;
+		uint64_t totalBlockedReadCount  = 0;
+		uint64_t totalBlockedWriteCount = 0;
+
+		//...Sum up the blocked FIFO reads for all input associations
+		size_t inDlCnt  = fInputJobStepAssociation.outSize();
+		for (size_t iDataList=0; iDataList<inDlCnt; iDataList++)
+		{
+			pFifo = fInputJobStepAssociation.outAt(iDataList)->fifoDL();
+			if (pFifo)
+			{
+				totalBlockedReadCount += pFifo->blockedReadCount();
+			}
+		}
+
+		//...Sum up the blocked FIFO writes for all output associations
+		size_t outDlCnt = fOutputJobStepAssociation.outSize();
+		for (size_t iDataList=0; iDataList<outDlCnt; iDataList++)
+		{
+			pFifo = fOutputJobStepAssociation.outAt(iDataList)->fifoDL();
+			if (pFifo)
+			{
+				totalBlockedWriteCount += pFifo->blockedWriteCount();
+			}
+		}
 
 		//...Roundoff inbound msg byte count to nearest KB for display;
 		//...no need to do so for outbound, because it should be small.
 		uint64_t msgBytesInKB = fMsgBytesIn >> 10;
 		if (fMsgBytesIn & 512)
 			msgBytesInKB++;
-
+        
+        // @bug 828
+        if (fifo)
+            fifo->totalSize(fRidResults);  
+        
 		if (traceOn())
 		{
 			dlTimes.setEndOfInputTime();
@@ -742,14 +757,16 @@ void pDictionaryScan::receivePrimitiveMessages()
 			logStr << "ses:" << fSessionId << " st: " << fStepId <<" finished at "<<
 				timeString << "; PhyI/O-" << fPhysicalIO << "; CacheI/O-" <<
 				fCacheIO << "; MsgsSent-" << fMsgsToPm << "; MsgsRcvd-" << msgsRecvd <<
+				"; BlockedFifoIn/Out-" << totalBlockedReadCount << 
+				"/" << totalBlockedWriteCount <<
 				"; output size-" << fRidResults << endl <<
 				"\tMsgBytesIn-"  << msgBytesInKB  << "KB"
 				"; MsgBytesOut-" << fMsgBytesOut  << "B" << endl    <<
 				"\t1st read " << dlTimes.FirstReadTimeString() <<
 				"; EOI " << dlTimes.EndOfInputTimeString() << "; runtime-" <<
 				JSTimeStamp::tsdiffstr(dlTimes.EndOfInputTime(),dlTimes.FirstReadTime())<< "s" << endl
-				<< "\tJob completion status " << status() << endl;
-
+				<< "\tJob completion status " << fInputJobStepAssociation.status() << endl;
+				
 			logEnd(logStr.str().c_str());
 
 			syslogReadBlockCounts(16,    // exemgr subsystem
@@ -762,23 +779,17 @@ void pDictionaryScan::receivePrimitiveMessages()
 				dlTimes.FirstInsertTime(), // first datlist write
 				dlTimes.EndOfInputTime()); // last (endOfInput) datalist write
 			syslogEndStep(16,            // exemgr subsystem
+				totalBlockedReadCount,   // blocked datalist input
+				totalBlockedWriteCount,  // blocked datalist output
 				fMsgBytesIn,             // incoming msg byte count
 				fMsgBytesOut);           // outgoing msg byte count
 			fExtendedInfo += toString() + logStr.str();
 			formatMiniStats();
 		}
-
-		sts.msg_type = StepTeleStats::ST_SUMMARY;
-		sts.phy_io = fPhysicalIO;
-		sts.cache_io = fCacheIO;
-		sts.msg_rcv_cnt = sts.total_units_of_work = sts.units_of_work_completed = msgsRecvd;
-		sts.msg_bytes_in = fMsgBytesIn;
-		sts.msg_bytes_out = fMsgBytesOut;
-		sts.rows = fRidResults;
-		postStepSummaryTele(sts);
 	}
 
-	rgFifo->endOfInput();
+	// Bug 3136, let mini stats to be formatted if traceOn.
+	dlp->endOfInput();
 }
 
 const string pDictionaryScan::toString() const
@@ -838,7 +849,7 @@ void pDictionaryScan::serializeEqualityFilter()
 {
 	ByteStream msg;
 	ISMPacketHeader ism;
-	uint32_t i;
+	uint i;
 	vector<string> empty;
 
 	memset(&ism, 0, sizeof(ISMPacketHeader));
@@ -853,21 +864,25 @@ void pDictionaryScan::serializeEqualityFilter()
 	}
 	catch (const IDBExcept &e) {
 		abort();
-		cerr << "pDictionaryScan::serializeEqualityFilter() caught: " << e.what() << endl;
-		catchHandler(e.what(), e.errorCode(), fErrorInfo, fSessionId);
+		catchHandler(e.what());
+		if (fOutputJobStepAssociation.status() == 0)
+			fOutputJobStepAssociation.status(e.errorCode());
 	}
 	catch (const std::exception& e)
 	{
 		abort();
 		cerr << "pDictionaryScan::serializeEqualityFilter() caught: " << e.what() << endl;
-		catchHandler(e.what(), ERR_DICTIONARY_SCAN, fErrorInfo, fSessionId);
+		catchHandler(e.what());
+		if (fOutputJobStepAssociation.status() == 0)
+			fOutputJobStepAssociation.status(ERR_DICTIONARY_SCAN);
 	}
 	catch (...)
 	{
 		abort();
 		cerr << "pDictionaryScan::serializeEqualityFilter() caught unknown exception" << endl;
-		catchHandler("pDictionaryScan::serializeEqualityFilter() caught unknown exception",
-						ERR_DICTIONARY_SCAN, fErrorInfo, fSessionId);
+		catchHandler("pDictionaryScan::serializeEqualityFilter() caught unknown exception");
+		if (fOutputJobStepAssociation.status() == 0)
+			fOutputJobStepAssociation.status(ERR_DICTIONARY_SCAN);
 	}
 	empty.swap(equalityFilter);
 }
@@ -886,20 +901,25 @@ void pDictionaryScan::destroyEqualityFilter()
 	}
 	catch (const IDBExcept &e) {
 		abort();
-		catchHandler(e.what(), e.errorCode(), fErrorInfo, fSessionId);
+		catchHandler(e.what());
+		if (fOutputJobStepAssociation.status() == 0)
+			fOutputJobStepAssociation.status(e.errorCode());
 	}
 	catch (const std::exception& e)
 	{
 		abort();
 		cerr << "pDictionaryScan::destroyEqualityFilter() caught: " << e.what() << endl;
-		catchHandler(e.what(), ERR_DICTIONARY_SCAN, fErrorInfo, fSessionId);
+		catchHandler(e.what());
+		if (fOutputJobStepAssociation.status() == 0)
+			fOutputJobStepAssociation.status(ERR_DICTIONARY_SCAN);
 	}
 	catch (...)
 	{
 		abort();
 		cerr << "pDictionaryScan::destroyEqualityFilter() caught unknown exception" << endl;
-		catchHandler("pDictionaryScan::destroyEqualityFilter() caught unknown exception",
-						ERR_DICTIONARY_SCAN, fErrorInfo, fSessionId);
+		catchHandler("pDictionaryScan::destroyEqualityFilter() caught unknown exception");
+		if (fOutputJobStepAssociation.status() == 0)
+			fOutputJobStepAssociation.status(ERR_DICTIONARY_SCAN);
 	}
 }
 

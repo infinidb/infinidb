@@ -17,7 +17,7 @@
 
 
 /******************************************************************************
-* $Id: lbidlist.cpp 9655 2013-06-25 23:08:13Z xlou $
+* $Id: lbidlist.cpp 8727 2012-07-22 19:04:25Z dcathey $
 *
 ******************************************************************************/
 #include <iostream>
@@ -57,18 +57,19 @@ LBIDList::LBIDList()
 }
 
   /** @LBIDList(oid, debug)
-  *
+  * 
   *   Create a new LBIDList structure.
   *	  Used to apply CP logic but cannot perform updates of CP data
   */
 
 LBIDList::LBIDList(const int debug)
+				
 {
     fDebug=debug;
 }
-
+      							
   /** @LBIDList(oid, debug)
-  *
+  * 
   *   Create a new LBIDList structure.
   *	  ctor that prepares the object for updates
   *	  of the CP data.
@@ -79,9 +80,9 @@ LBIDList::LBIDList(const CalpontSystemCatalog::OID oid,
 {
 	init(oid, debug);
 }
-
+      							
   /** @LBIDList::Init() Initializes a LBIDList structure
-  *
+  * 
   *   Create a new LBIDList structure and initialize it
   */
 
@@ -145,8 +146,8 @@ LBIDList::~LBIDList()
 }
 
 
-void LBIDList::Dump(long Index, int Count) const
-{
+  void LBIDList::Dump(long Index, int Count) const
+  {
     LBIDRange LBIDR;
 
     const int RangeCount = LBIDRanges.size();
@@ -159,16 +160,15 @@ void LBIDList::Dump(long Index, int Count) const
     }
 
     cout << endl;
-}
+  }
 
 // Store max/min structure for update later. lbidPartitionVector serves a list of lbid,max,min to update
 // when the primitive returns with valid max/min values and the brm returns an invalid flag for the
 // requested lbid
 //
-bool LBIDList::GetMinMax(int64_t& min, int64_t& max, int64_t& seq, int64_t lbid,
-	const std::vector<struct BRM::EMEntry>* pEMEntries,
-    execplan::CalpontSystemCatalog::ColDataType colDataType)
-{
+  bool LBIDList::GetMinMax(int64_t& min, int64_t& max, int64_t& seq,
+	int64_t lbid, const std::vector<struct BRM::EMEntry>* pEMEntries)
+  {
     bool bRet = true;
     MinMaxPartition *mmp=NULL;
     LBIDRange LBIDR;
@@ -194,11 +194,11 @@ bool LBIDList::GetMinMax(int64_t& min, int64_t& max, int64_t& seq, int64_t lbid,
         seq = seq32;
 #ifdef DEBUG
         if (IS_VERBOSE)
-          cout << i
+          cout << i 
 			<< " GetMinMax() ret " << retVal
 			<< " Min " << min
 			<< " Max " << max
-          	<< " lbid " << lbid
+          	<< " lbid " << lbid 
 			<< " seq32 " << seq32 << endl;
 #endif
 
@@ -211,16 +211,8 @@ bool LBIDList::GetMinMax(int64_t& min, int64_t& max, int64_t& seq, int64_t lbid,
             mmp->lbid = (int64_t)LBIDR.start;
             mmp->lbidmax = (int64_t)(LBIDR.start+LBIDR.size);
             mmp->seq = seq32;
-            if (isUnsigned(colDataType))
-            {
-                mmp->max = 0;
-                mmp->min = static_cast<int64_t>(numeric_limits<uint64_t>::max());
-            }
-            else
-            {
-                mmp->max = numeric_limits<int64_t>::min();
-                mmp->min = numeric_limits<int64_t>::max();
-            }
+            mmp->max = numeric_limits<int64_t>::min();
+            mmp->min = numeric_limits<int64_t>::max();
             mmp->isValid = retVal;
             mmp->blksScanned = 0;
             lbidPartitionVector.push_back(mmp);
@@ -231,11 +223,10 @@ bool LBIDList::GetMinMax(int64_t& min, int64_t& max, int64_t& seq, int64_t lbid,
     }
 
     return false;
-}
+  }
 
 bool LBIDList::GetMinMax(int64_t *min, int64_t *max, int64_t *seq,
-	int64_t lbid, const tr1::unordered_map<int64_t, BRM::EMEntry> &entries,
-    execplan::CalpontSystemCatalog::ColDataType colDataType)
+	int64_t lbid, const tr1::unordered_map<int64_t, BRM::EMEntry> &entries)
 {
 	tr1::unordered_map<int64_t, BRM::EMEntry>::const_iterator it = entries.find(lbid);
 
@@ -250,16 +241,8 @@ bool LBIDList::GetMinMax(int64_t *min, int64_t *max, int64_t *seq,
         mmp->lbid = lbid;
         mmp->lbidmax = lbid + (entry.range.size * 1024);
         mmp->seq = entry.partition.cprange.sequenceNum;
-        if (isUnsigned(colDataType))
-        {
-            mmp->max = 0;
-            mmp->min = static_cast<int64_t>(numeric_limits<uint64_t>::max());
-        }
-        else
-        {
-            mmp->max = numeric_limits<int64_t>::min();
-            mmp->min = numeric_limits<int64_t>::max();
-        }
+        mmp->max = numeric_limits<int64_t>::min();
+        mmp->min = numeric_limits<int64_t>::max();
         mmp->isValid = entry.partition.cprange.isValid;
         mmp->blksScanned = 0;
         lbidPartitionVector.push_back(mmp);
@@ -304,7 +287,7 @@ int LBIDList::getMinMaxFromEntries(int64_t& min, int64_t& max, int32_t& seq,
 		<< " sz " << lbidPartitionVector.size() << endl;
 #endif
 
-    for(uint32_t i = 0; i<lbidPartitionVector.size(); i++)
+    for(uint i = 0; i<lbidPartitionVector.size(); i++)
     {
 
       mmp = lbidPartitionVector.at(i);
@@ -316,8 +299,8 @@ int LBIDList::getMinMaxFromEntries(int64_t& min, int64_t& max, int32_t& seq,
         if (IS_VERBOSE)
           cout << "UpdateMinMax() old Mn/Mx "
 			<< mmp->min << "/" << mmp->max
-			<< " lbid " << lbid
-			<< " seq " << mmp->seq
+			<< " lbid " << lbid 
+			<< " seq " << mmp->seq 
 			<< " valid " << mmp->isValid << endl;
 #endif
         if (!validData) {
@@ -326,10 +309,8 @@ int LBIDList::getMinMaxFromEntries(int64_t& min, int64_t& max, int32_t& seq,
         	return;
         }
 
-		if (mmp->isValid == BRM::CP_INVALID)
-		{
-			if (execplan::isCharType(type))
-			{
+		if (mmp->isValid == BRM::CP_INVALID) {
+			if (isChar(type)) {
 				if (order_swap(min) < order_swap(mmp->min) ||
 				  mmp->min == numeric_limits<int64_t>::max())
 					mmp->min = min;
@@ -337,29 +318,18 @@ int LBIDList::getMinMaxFromEntries(int64_t& min, int64_t& max, int32_t& seq,
 				  mmp->max == numeric_limits<int64_t>::min())
 					mmp->max = max;
 			}
-			else if (execplan::isUnsigned(type))
-			{
-	        	if (static_cast<uint64_t>(min) < static_cast<uint64_t>(mmp->min))
-					mmp->min = min;
-		        if (static_cast<uint64_t>(max) > static_cast<uint64_t>(mmp->max))
-					mmp->max = max;
+			else {
+	        	if (min < mmp->min) mmp->min = min;
+		        if (max > mmp->max) mmp->max = max;
 			}
-			else
-			{
-	        	if (min < mmp->min)
-					mmp->min = min;
-		        if (max > mmp->max)
-					mmp->max = max;
-			}
-
 		}
 
 #ifdef DEBUG
         if (IS_VERBOSE)
           cout << "UpdateMinMax() new Mn/Mx "
-			<< mmp->min << "/" << mmp->max << " "
-			<< " lbid " << lbid
-			<< " seq " << mmp->seq
+			<< mmp->min << "/" << mmp->max << " " 
+			<< " lbid " << lbid 
+			<< " seq " << mmp->seq 
 			<< " valid " << mmp->isValid << endl;
 #endif
         return;
@@ -372,57 +342,57 @@ void LBIDList::UpdateAllPartitionInfo()
     MinMaxPartition *mmp=NULL;
 #ifdef DEBUG
     if (IS_VERBOSE)
-        cout << "LBIDList::UpdateAllPartitionInfo() size " << lbidPartitionVector.size() << endl;
+       cout << "LBIDList::UpdateAllPartitionInfo() size " << lbidPartitionVector.size() << endl;
 #endif
 
-    // @bug 1970 - Added new dbrm interface that takes a vector of CPInfo objects to set the min and max for multiple
-    // extents at a time.  This cuts the number of calls way down and improves performance.
-    CPInfo cpInfo;
-    vector<CPInfo> vCpInfo;
+	// @bug 1970 - Added new dbrm interface that takes a vector of CPInfo objects to set the min and max for multiple
+	// extents at a time.  This cuts the number of calls way down and improves performance.
+	CPInfo cpInfo;
+	vector<CPInfo> vCpInfo;
 
-    uint32_t cpUpdateInterval = 25000;
-    for (uint32_t i=0;i<lbidPartitionVector.size(); i++)
+	uint cpUpdateInterval = 25000; 
+    for(uint i=0;i<lbidPartitionVector.size(); i++)
     {
 
-        mmp = lbidPartitionVector.at(i);
+      mmp = lbidPartitionVector.at(i);
 
-        //@bug4543: only update extentmap CP if blks were scanned for this extent
-        if ((mmp->isValid == BRM::CP_INVALID) && (mmp->blksScanned > 0))
-        {
-            cpInfo.firstLbid = mmp->lbid;
-            cpInfo.max = mmp->max;
-            cpInfo.min = mmp->min;
-            cpInfo.seqNum = (int32_t)mmp->seq;
-            vCpInfo.push_back(cpInfo);
+      //@bug4543: only update extentmap CP if blks were scanned for this extent
+      if ((mmp->isValid == BRM::CP_INVALID) && (mmp->blksScanned > 0))
+      {
+		cpInfo.firstLbid = mmp->lbid;
+		cpInfo.max = mmp->max;
+		cpInfo.min = mmp->min;
+		cpInfo.seqNum = (int32_t)mmp->seq;
+		vCpInfo.push_back(cpInfo);
 
-            // Limit the number of extents to update at a time.  A map is created within the call and this will prevent unbounded
-            // memory.  Probably will never approach this limit but just in case.
-            if ((i+1)%cpUpdateInterval == 0 || (i+1) == lbidPartitionVector.size())
-            {
-                em->setExtentsMaxMin(vCpInfo);
-                vCpInfo.clear();
-            }
+		// Limit the number of extents to update at a time.  A map is created within the call and this will prevent unbounded
+		// memory.  Probably will never approach this limit but just in case.
+		if((i+1)%cpUpdateInterval == 0 || (i+1) == lbidPartitionVector.size()) 
+		{
+			em->setExtentsMaxMin(vCpInfo);
+			vCpInfo.clear();
+		}
 
 #ifdef DEBUG
-            if (IS_VERBOSE)
-                cout << "LBIDList::UpdateAllPartitionInfo() updated mmp.lbid " << mmp->lbid
-                << " mmp->max " << mmp->max
-                << " mmp->min " << mmp->min
-                << " seq "      << mmp->seq
-                << " blksScanned " << mmp->blksScanned
-                << endl;
+        if (IS_VERBOSE)
+          cout << "LBIDList::UpdateAllPartitionInfo() updated mmp.lbid " << mmp->lbid
+            << " mmp->max " << mmp->max
+			<< " mmp->min " << mmp->min
+			<< " seq "      << mmp->seq
+			<< " blksScanned " << mmp->blksScanned
+			<< endl;
 #endif
-            mmp->isValid = BRM::CP_VALID;
-        }
-
-        //delete mmp;
+		mmp->isValid = BRM::CP_VALID;
+      }
+      
+      //delete mmp;
     }
 
-    // Send the last batch of CP info to BRM.
-    if (!vCpInfo.empty())
-    {
-        em->setExtentsMaxMin(vCpInfo);
-    }
+	// Send the last batch of CP info to BRM.
+	if (!vCpInfo.empty())
+	{
+	  em->setExtentsMaxMin(vCpInfo);
+	}
 }
 
 bool LBIDList::IsRangeBoundary(uint64_t lbid)
@@ -444,27 +414,21 @@ bool LBIDList::IsRangeBoundary(uint64_t lbid)
  *   returns false if casual partitioning predicate optimization is not possible for datatype.
  */
 
-bool LBIDList::CasualPartitionDataType(const CalpontSystemCatalog::ColDataType type, const uint8_t size) const
+bool LBIDList::CasualPartitionDataType(const uint8_t type, const uint8_t size) const
 {
 	switch(type) {
-		case CalpontSystemCatalog::CHAR:
+		case WriteEngine::CHAR:
 			return size <9;
-		case CalpontSystemCatalog::VARCHAR:
+		case WriteEngine::VARCHAR:
 			return size <8;
-		case CalpontSystemCatalog::TINYINT:
-		case CalpontSystemCatalog::SMALLINT:
-		case CalpontSystemCatalog::MEDINT:
-		case CalpontSystemCatalog::INT:
-		case CalpontSystemCatalog::BIGINT:
-		case CalpontSystemCatalog::DECIMAL:
-		case CalpontSystemCatalog::DATE:
-		case CalpontSystemCatalog::DATETIME:
-        case CalpontSystemCatalog::UTINYINT:
-        case CalpontSystemCatalog::USMALLINT:
-        case CalpontSystemCatalog::UDECIMAL:
-        case CalpontSystemCatalog::UMEDINT:
-        case CalpontSystemCatalog::UINT:
-        case CalpontSystemCatalog::UBIGINT:
+		case WriteEngine::TINYINT:
+		case WriteEngine::SMALLINT:
+		case WriteEngine::MEDINT:
+		case WriteEngine::INT:
+		case WriteEngine::BIGINT:
+		case WriteEngine::DECIMAL:
+		case WriteEngine::DATE:
+		case WriteEngine::DATETIME:
 			return true;
 		default:
 			return false;
@@ -473,7 +437,7 @@ bool LBIDList::CasualPartitionDataType(const CalpontSystemCatalog::ColDataType t
 
 /* Check for casual partitioning predicate optimization. This function applies the predicate using
  * column Min/Max values to determine if the scan is required.
- *
+ * 
  *   returns true if scan should be executed.
  *   returns false if casual partitioning predicate optimization has eliminated the scan.
  */
@@ -521,54 +485,65 @@ inline bool LBIDList::compareVal(const T& Min, const T& Max, const T& value, cha
 	return true;
 }
 
-bool LBIDList::checkSingleValue(int64_t min, int64_t max, int64_t value,
-								execplan::CalpontSystemCatalog::ColDataType type)
+
+template <class T>
+inline bool LBIDList::checkNull(execplan::CalpontSystemCatalog::ColDataType type, T val, T nullVal, T nullCharVal)
 {
-	if (isCharType(type))
-	{
-		uint64_t mmin = order_swap(min);
-		uint64_t mmax = order_swap(max);
-		uint64_t vvalue = order_swap(value);
+	if (isChar(type)) return  nullCharVal == val;
+	else return (nullVal == val);
+}
+
+inline bool LBIDList::checkNull32(execplan::CalpontSystemCatalog::ColDataType type, int32_t val)
+{
+	uint32_t uval = static_cast<uint32_t>(val);
+
+	if (isChar(type))
+		return (CHAR4NULL == uval);
+	else if (execplan::CalpontSystemCatalog::DATE == type)
+		return (DATENULL == uval);
+	else
+		 return (NULL_INT32 == val);
+}
+
+inline bool LBIDList::checkNull64(execplan::CalpontSystemCatalog::ColDataType type, int64_t val)
+{
+	uint64_t uval = static_cast<uint64_t>(val);
+
+	if (isChar(type))
+		return (CHAR8NULL == uval);
+	else if (execplan::CalpontSystemCatalog::DATETIME == type)
+		return (DATETIMENULL == uval);
+	else
+		 return (NULL_INT64 == val);
+}
+
+bool LBIDList::checkSingleValue(int64_t min, int64_t max, int64_t value, bool isChar)
+{	
+	if (isChar) {
+		uint64_t mmin = order_swap(min), mmax = order_swap(max), vvalue = order_swap(value);
 		return (vvalue >= mmin && vvalue <= mmax);
 	}
-	else if (isUnsigned(type))
-	{
-		return (static_cast<uint64_t>(value) >= static_cast<uint64_t>(min) &&
-				static_cast<uint64_t>(value) <= static_cast<uint64_t>(max));
-	}
 	else
-	{
 		return (value >= min && value <= max);
-	}
 }
 
 bool LBIDList::checkRangeOverlap(int64_t min, int64_t max, int64_t tmin, int64_t tmax,
-								 execplan::CalpontSystemCatalog::ColDataType type)
+  bool isChar)
 {
-	if (isCharType(type))
-	{
-		uint64_t min2 = order_swap(min);
-		uint64_t max2 = order_swap(max);
-		uint64_t tmin2 = order_swap(tmin);
-		uint64_t tmax2 = order_swap(tmax);
+	if (isChar) {
+		uint64_t min2 = order_swap(min), max2 = order_swap(max), tmin2 = order_swap(tmin),
+		  tmax2 = order_swap(tmax);
 		return (tmin2 <= max2 && tmax2 >= min2);
 	}
-	else if (isUnsigned(type))
-	{
-		return (static_cast<uint64_t>(tmin) <= static_cast<uint64_t>(max) &&
-				static_cast<uint64_t>(tmax) >= static_cast<uint64_t>(min));
-	}
 	else
-	{
 		return (tmin <= max && tmax >= min);
-	}
 }
 
-bool LBIDList::CasualPartitionPredicate(const int64_t Min,
-										const int64_t Max,
+bool LBIDList::CasualPartitionPredicate(const int64_t Min, 
+										const int64_t Max, 
 										const messageqcpp::ByteStream* bs,
-										const uint16_t NOPS,
-										const execplan::CalpontSystemCatalog::ColType& ct,
+										const uint16_t NOPS, 
+										const execplan::CalpontSystemCatalog::ColType& ct, 
 										const uint8_t BOP)
 {
 
@@ -576,8 +551,6 @@ bool LBIDList::CasualPartitionPredicate(const int64_t Min,
 	const char *MsgDataPtr = (const char *) bs->buf();
 	bool scan = true;
 	int64_t value=0;
-    bool bIsUnsigned = execplan::isUnsigned(ct.colDataType);
-    bool bIsChar = execplan::isCharType(ct.colDataType);
 	for (int i=0; i<NOPS; i++) {
 		scan = true;
 		pos += ct.colWidth + 2;  // predicate + op + lcf
@@ -591,78 +564,52 @@ bool LBIDList::CasualPartitionPredicate(const int64_t Min,
 
 		char op = *MsgDataPtr++;
 		uint8_t lcf = *(uint8_t*)MsgDataPtr++;
-        if (bIsUnsigned)
-        {
-            switch (ct.colWidth)
-            {
-                case 1: {
-                    uint8_t val = *(int8_t*)MsgDataPtr;
-                    value = val;
-                    break;
-                }
-                case 2: {
-                    uint16_t val = *(int16_t*)MsgDataPtr;
-                    value = val;
-                    break;
-                }
-                case 4: {
-                    uint32_t val = *(int32_t*)MsgDataPtr;
-                    value = val;
-                    break;
-                }
-                case 8: {
-                    uint64_t val = *(int64_t*)MsgDataPtr;
-                    value = static_cast<int64_t>(val);
-                }
-            }
-        }
-        else
-        {
-            switch (ct.colWidth)
-            {
-                case 1: {
-                    int8_t val = *(int8_t*)MsgDataPtr;
-                    value = val;
-                    break;
-                }
-                case 2: {
-                    int16_t val = *(int16_t*)MsgDataPtr;
-                    value = val;
-                    break;
-                }
-                case 4: {
-                    int32_t val = *(int32_t*)MsgDataPtr;
-                    value = val;
-                    break;
-                }
-                case 8: {
-                    int64_t val = *(int64_t*)MsgDataPtr;
-                    value = val;
-                }
-            }
-        }
-		// Should we also check for empty here?
-		if (isNull(value, ct))	// This will work even if the data column is unsigned.
+		switch (ct.colWidth)
 		{
-			continue;
+			case 1: {
+				int8_t val = *(int8_t*)MsgDataPtr;
+				if (checkNull<int8_t>(ct.colDataType, val, NULL_INT8, CHAR1NULL))
+					continue;
+				value = val;
+				break;
+			} 
+			case 2: {
+				int16_t val = *(int16_t*)MsgDataPtr;
+				if (checkNull<int16_t>(ct.colDataType, val, NULL_INT16, CHAR2NULL))
+					continue;
+				value = val;
+				break;
+			} 
+			case 4: {
+				int32_t val = *(int32_t*)MsgDataPtr;
+				if (checkNull32(ct.colDataType, val))
+					continue;
+				value = val;
+				break;
+			} 
+			case 8: {
+				int64_t val = *(int64_t*)MsgDataPtr;
+				if (checkNull64(ct.colDataType, val))
+					continue;
+				value = val;
+			}
 		}
 
 		MsgDataPtr += ct.colWidth;
+		if (pos > length) {
+#ifdef DEBUG
+			cout << "CasualPartitionPredicate: Filter parsing went beyond the end of the filter string!" << endl;
+#endif
+			return true;
+		}
 
-		if (bIsChar && 1 < ct.colWidth)
-        {
+        if (isChar(ct.colDataType) && 1 < ct.colWidth) {
 			scan = compareVal(order_swap(Min), order_swap(Max), order_swap(value),
 			  op, lcf);
-// 			cout << "scan=" << (uint32_t) scan << endl;
-		}
-		else if (bIsUnsigned)
-		{
-			scan = compareVal(static_cast<uint64_t>(Min), static_cast<uint64_t>(Max), static_cast<uint64_t>(value), op, lcf);
+// 			cout << "scan=" << (uint) scan << endl;
 		}
 		else
-		{
 			scan = compareVal(Min, Max, value, op, lcf);
-		}
 
 		if (BOP == BOP_AND && !scan) {
 			break;

@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: func_truncate.cpp 3921 2013-06-19 18:59:56Z bwilkinson $
+//  $Id: func_truncate.cpp 3048 2012-04-04 15:33:45Z rdempsey $
 
 #include <cstdlib>
 #include <iomanip>
@@ -67,8 +67,7 @@ namespace funcexp
 
 CalpontSystemCatalog::ColType Func_truncate::operationType(FunctionParm& fp, CalpontSystemCatalog::ColType& resultType)
 {
-	if (resultType.colDataType == execplan::CalpontSystemCatalog::DECIMAL ||
-        resultType.colDataType == execplan::CalpontSystemCatalog::UDECIMAL)
+	if (resultType.colDataType == execplan::CalpontSystemCatalog::DECIMAL)
 	{
 		CalpontSystemCatalog::ColType ct = fp[0]->data()->resultType();
 		switch (ct.colDataType)
@@ -78,13 +77,7 @@ CalpontSystemCatalog::ColType Func_truncate::operationType(FunctionParm& fp, Cal
    			case execplan::CalpontSystemCatalog::MEDINT:
 			case execplan::CalpontSystemCatalog::TINYINT:
 			case execplan::CalpontSystemCatalog::SMALLINT:
-            case execplan::CalpontSystemCatalog::UBIGINT:
-            case execplan::CalpontSystemCatalog::UINT:
-            case execplan::CalpontSystemCatalog::UMEDINT:
-            case execplan::CalpontSystemCatalog::UTINYINT:
-            case execplan::CalpontSystemCatalog::USMALLINT:
 			case execplan::CalpontSystemCatalog::DECIMAL:
-            case execplan::CalpontSystemCatalog::UDECIMAL:
 			{
 				if (resultType.scale > ct.scale)
 					(resultType).scale = ct.scale;
@@ -123,15 +116,6 @@ int64_t Func_truncate::getIntVal(Row& row,
 	}
 
 	return x.value;
-}
-
-
-uint64_t Func_truncate::getUintVal(Row& row,
-							FunctionParm& parm,
-							bool& isNull,
-							CalpontSystemCatalog::ColType& op_ct)
-{
-    return parm[0]->data()->getUintVal(row, isNull);
 }
 
 
@@ -203,13 +187,7 @@ IDB_Decimal Func_truncate::getDecimalVal(Row& row,
 		case execplan::CalpontSystemCatalog::MEDINT:
 		case execplan::CalpontSystemCatalog::TINYINT:
 		case execplan::CalpontSystemCatalog::SMALLINT:
-        case execplan::CalpontSystemCatalog::UBIGINT:
-        case execplan::CalpontSystemCatalog::UINT:
-        case execplan::CalpontSystemCatalog::UMEDINT:
-        case execplan::CalpontSystemCatalog::UTINYINT:
-        case execplan::CalpontSystemCatalog::USMALLINT:
 		case execplan::CalpontSystemCatalog::DECIMAL:
-        case execplan::CalpontSystemCatalog::UDECIMAL:
 		{
 			int64_t d = 0;
 			//@Bug 3101 - GCC 4.5.1 optimizes too aggressively here. Mark as volatile.
@@ -220,7 +198,7 @@ IDB_Decimal Func_truncate::getDecimalVal(Row& row,
 				int64_t nvp = p;
 				d = parm[1]->data()->getIntVal(row, isNull);
 				if (!isNull)
-					helpers::decimalPlaceDec(d, nvp, decimal.scale);
+					decimalPlaceDec(d, nvp, decimal.scale);
 				p = nvp;
 			}
 
@@ -259,9 +237,7 @@ IDB_Decimal Func_truncate::getDecimalVal(Row& row,
 		break;
 	
 		case execplan::CalpontSystemCatalog::DOUBLE:
-        case execplan::CalpontSystemCatalog::UDOUBLE:
 		case execplan::CalpontSystemCatalog::FLOAT:
-        case execplan::CalpontSystemCatalog::UFLOAT:
 		case execplan::CalpontSystemCatalog::VARCHAR:
 		case execplan::CalpontSystemCatalog::CHAR:
 		{
@@ -299,7 +275,7 @@ IDB_Decimal Func_truncate::getDecimalVal(Row& row,
 					s = 0;
 				if ( s > 0 )
 				{
-					x *= helpers::powerOf10_c[s];
+					x *= powerOf10_c[s];
 				}
 				else if (s < 0)
 				{
@@ -310,8 +286,8 @@ IDB_Decimal Func_truncate::getDecimalVal(Row& row,
 					}
 					else
 					{
-						x /= helpers::powerOf10_c[s];
-						x *= helpers::powerOf10_c[s];
+						x /= powerOf10_c[s];
+						x *= powerOf10_c[s];
 					}
 
 					s = 0;
@@ -343,7 +319,7 @@ IDB_Decimal Func_truncate::getDecimalVal(Row& row,
 					s = 0;
 				if ( s > 0 )
 				{
-					x *= helpers::powerOf10_c[s];
+					x *= powerOf10_c[s];
 				}
 				else if (s < 0)
 				{
@@ -354,8 +330,8 @@ IDB_Decimal Func_truncate::getDecimalVal(Row& row,
 					}
 					else
 					{
-						x /= helpers::powerOf10_c[s];
-						x *= helpers::powerOf10_c[s];
+						x /= powerOf10_c[s];
+						x *= powerOf10_c[s];
 					}
 
 					s = 0;
@@ -398,11 +374,6 @@ string Func_truncate::getStrVal(Row& row,
 		case execplan::CalpontSystemCatalog::MEDINT:
 		case execplan::CalpontSystemCatalog::TINYINT:
 		case execplan::CalpontSystemCatalog::SMALLINT:
-        case execplan::CalpontSystemCatalog::UBIGINT:
-        case execplan::CalpontSystemCatalog::UINT:
-        case execplan::CalpontSystemCatalog::UMEDINT:
-        case execplan::CalpontSystemCatalog::UTINYINT:
-        case execplan::CalpontSystemCatalog::USMALLINT:
 			if (x.scale > 0)
 			{
 				x.value /= p;
@@ -414,7 +385,13 @@ string Func_truncate::getStrVal(Row& row,
 			break;
 	}
 
-    return helpers::decimalToString( x, p );
+	ostringstream oss;
+	if (x.scale > 0)
+		oss << (x.value / p) << "." << setw(x.scale) << setfill('0') << (x.value % p);
+	else
+		oss << (x.value * p);
+
+	return oss.str();
 }
 
 

@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: primitivestep.h 9688 2013-07-15 19:27:22Z pleblanc $
+//  $Id: primitivestep.h 9144 2012-12-11 22:42:40Z pleblanc $
 
 
 /** @file */
@@ -55,6 +55,7 @@
 #include "primitivemsg.h"
 #include "elementtype.h"
 #include "distributedenginecomm.h"
+#include "jl_logger.h"
 #include "lbidlist.h"
 #include "joblisttypes.h"
 #include "timestamp.h"
@@ -78,7 +79,6 @@ class BatchPrimitiveProcessorJL;
 class pColStep;
 class pColScanStep;
 class PassThruStep;
-class PseudoColStep;
 
 
 typedef boost::shared_ptr<LBIDList> SP_LBIDList;
@@ -128,19 +128,32 @@ class pColScanStep;
 class pColStep : public JobStep, public PrimitiveMsg
 {
 
-	typedef std::pair<int64_t, int64_t> element_t;
+	typedef std::pair<int64_t, int64_t> element_t;	
 
 public:
     /** @brief pColStep constructor
-	 * @param flushInterval The interval in msgs at which the sending side should
+     * @param in the inputAssociation pointer
+     * @param out the outputAssociation pointer
+     * @param ec the DistributedEngineComm pointer
+	 * @param flushInterval The interval in msgs at which the sending side should 
 	 * wait for the receiveing side to catch up.  0 (default) means never.
      */
-    pColStep(
+    pColStep(const JobStepAssociation& in, 
+		const JobStepAssociation& out, 
+		DistributedEngineComm* ec,
+		boost::shared_ptr<execplan::CalpontSystemCatalog> sysCat,
 		execplan::CalpontSystemCatalog::OID oid,
 		execplan::CalpontSystemCatalog::OID tableOid,
 		const execplan::CalpontSystemCatalog::ColType& ct,
-		const JobInfo& jobInfo);
-
+		uint32_t sessionId,
+		uint32_t txnId,
+		uint32_t verId,
+		uint16_t stepId,
+		uint32_t statementId,
+		ResourceManager& rm,
+		uint32_t flushInterval = 0,
+		bool isEM = false);
+    
     pColStep(const pColScanStep& rhs);
 
     pColStep(const PassThruStep& rhs);
@@ -148,7 +161,7 @@ public:
 	virtual ~pColStep();
 
     /** @brief Starts processing.  Set at least the RID list before calling.
-	 *
+	 * 
 	 * Starts processing.  Set at least the RID list before calling this.
      */
     virtual void run();
@@ -158,8 +171,42 @@ public:
 	 */
     virtual void join();
 
-	virtual const std::string toString() const;
+    /** @brief virtual JobStepAssociation * inputAssociation
+     * 
+     * @returns JobStepAssociation *
+     */
+    virtual const JobStepAssociation& inputAssociation() const
+    {
+        return fInputJobStepAssociation;
+    }
+    
+	virtual void inputAssociation(const JobStepAssociation& inputAssociation)
+    {
+        fInputJobStepAssociation = inputAssociation;
+    }
 
+    /** @brief virtual JobStepAssociation * outputAssociation
+     * 
+     * @returns JobStepAssocation *
+     */
+    virtual const JobStepAssociation& outputAssociation() const
+    {
+        return fOutputJobStepAssociation;
+    }
+
+	virtual void outputAssociation(const JobStepAssociation& outputAssociation)
+    {
+        fOutputJobStepAssociation = outputAssociation;
+    }
+
+	virtual const std::string toString() const;
+	
+	/** @brief Set the step ID for this JobStep.
+	 * 
+	 * Set the step ID for this JobStep.
+	 */
+	virtual void stepId(uint16_t stepId) { fStepId = stepId; }
+	
 	virtual bool isDictCol() const { return fIsDict; };
 	bool isExeMgr() const { return isEM; }
 
@@ -168,9 +215,9 @@ public:
      * Set the config parameters this JobStep.
      */
     void initializeConfigParms();
-
-	/** @brief The main loop for the send-side thread
-	 *
+	
+	/** @brief The main loop for the send-side thread 
+	 * 
 	 * The main loop for the primitive-issuing thread.  Don't call it directly.
 	 */
     void sendPrimitiveMessages();
@@ -182,22 +229,22 @@ public:
     void receivePrimitiveMessages();
 
 	/** @brief Add a filter.  Use this interface when the column stores anything but 4-byte floats.
- 	 *
+ 	 * 
 	 * Add a filter.  Use this interface when the column stores anything but 4-byte floats.
  	 */
 	void addFilter(int8_t COP, int64_t value, uint8_t roundFlag = 0);
 	void addFilter(int8_t COP, float value);
 
 	/** @brief Sets the DataList to get RID values from.
-	 *
+	 * 
 	 * Sets the DataList to get RID values from.  Filtering by RID distinguishes
 	 * this class from pColScan.  Use pColScan if the every RID should be considered; it's
 	 * faster at that.
 	 */
 	void setRidList(DataList<ElementType> *rids);
-
+	
 	/** @brief Sets the String DataList to get RID values from.
-	 *
+	 * 
 	 * Sets the string DataList to get RID values from.  Filtering by RID distinguishes
 	 * this class from pColScan.  Use pColScan if the every RID should be considered; it's
 	 * faster at that.
@@ -205,27 +252,27 @@ public:
 	void setStrRidList(DataList<StringElementType> *strDl);
 
 	/** @brief Set the binary operator for the filter predicate (BOP_AND or BOP_OR).
-	 *
+	 * 
 	 * Set the binary operator for the filter predicate (BOP_AND or BOP_OR).
 	 */
 	void setBOP(int8_t BOP);
 
 	/** @brief Set the output type.
-	 *
+	 * 
 	 * Set the output type (1 = RID, 2 = Token, 3 = Both).
 	 */
 	void setOutputType(int8_t OutputType);
 
 	/** @brief Set the swallowRows flag.
-	 *
-	 *
+	 * 
+	 * 
 	 * If true, no rows will be inserted to the output datalists.
 	 */
 	void setSwallowRows(const bool swallowRows);
 
 	/** @brief Get the swallowRows flag.
-	 *
-	 *
+	 * 
+	 * 
 	 * If true, no rows will be inserted to the output datalists.
 	 */
 	bool getSwallowRows() const { return fSwallowRows; }
@@ -233,15 +280,33 @@ public:
 	virtual execplan::CalpontSystemCatalog::OID oid() const { return fOid; }
 
 	virtual execplan::CalpontSystemCatalog::OID tableOid() const { return fTableOid; }
+	
+/** @brief Set the DistributedEngineComm object this instance should use
+ *
+ * Set the DistributedEngineComm object this instance should use
+ */
+//	void dec(DistributedEngineComm* dec) {
+//		if (fDec) fDec->removeQueue(uniqueID);
+//		fDec = dec; 
+//		if (fDec) fDec->addQueue(uniqueID);
+//	 }
 
+//	DistributedEngineComm* dec() const { return fDec; }
+	uint32_t sessionId() const { return fSessionId; }
+	uint32_t txnId() const { return fTxnId; }
+	uint32_t verId() const { return fVerId; }
+	uint16_t stepId() const { return fStepId; }
+	uint32_t statementId() const { return fStatementId; }
 	uint32_t filterCount() const { return fFilterCount; }
-	const messageqcpp::ByteStream &filterString() const { return fFilterString; }
+	messageqcpp::ByteStream filterString() const { return fFilterString; }
 	int8_t BOP() const { return fBOP; }
 	const execplan::CalpontSystemCatalog::ColType& colType() const { return fColType; }
+	void logger(const SPJL& logger) { fLogger = logger; }
+	const SPJL& logger() const { return fLogger; }
 	void appendFilter(const messageqcpp::ByteStream& filter, unsigned count);
-	uint32_t flushInterval() const { return fFlushInterval; }
+	uint flushInterval() const { return fFlushInterval; }
 	bool getFeederFlag() const { return isFilterFeeder; }
-
+	
 	void setFeederFlag (bool filterFeeder) { isFilterFeeder = filterFeeder; }
 	virtual uint64_t phyIOCount    () const { return fPhysicalIO; }
 	virtual uint64_t cacheIOCount  () const { return fCacheIO;    }
@@ -255,6 +320,8 @@ public:
 	uint64_t blksSkipped           () const { return fNumBlksSkipped; }
 	ResourceManager& resourceManager() const { return fRm; }
 
+	std::string udfName() const { return fUdfName; };
+	void udfName(const std::string& name) { fUdfName = name; }
 	SP_LBIDList getlbidList() const { return lbidList;}
 
 	void addFilter(const execplan::Filter* f);
@@ -282,10 +349,18 @@ private:
 	uint64_t getFBO(uint64_t lbid);
 
 	ResourceManager& fRm;
+    JobStepAssociation fInputJobStepAssociation;
+    JobStepAssociation fOutputJobStepAssociation;
+    DistributedEngineComm* fDec;
 	boost::shared_ptr<execplan::CalpontSystemCatalog> sysCat;
 	execplan::CalpontSystemCatalog::OID fOid;
 	execplan::CalpontSystemCatalog::OID fTableOid;
 	execplan::CalpontSystemCatalog::ColType fColType;
+	uint32_t fSessionId;
+	uint32_t fTxnId;
+	uint32_t fVerId;
+	uint16_t fStepId;
+	uint32_t fStatementId;
 	uint32_t fFilterCount;
 	int8_t fBOP;
 	int8_t fOutputType;
@@ -294,20 +369,20 @@ private:
 	StrDataList* strRidList;
 	messageqcpp::ByteStream fFilterString;
 	std::vector<struct BRM::EMEntry> extents;
-	uint32_t extentSize, divShift, modMask, ridsPerBlock, rpbShift, blockSizeShift, numExtents;
-	uint64_t rpbMask;
+	uint extentSize, divShift, modMask, ridsPerBlock, rpbShift, blockSizeShift, numExtents;
+	uint64_t rpbMask;	
 	uint64_t msgsSent, msgsRecvd;
 	bool finishedSending, recvWaiting, fIsDict;
 	bool isEM;
 	int64_t ridCount;
-	uint32_t fFlushInterval;
+	uint fFlushInterval;
 
-	// @bug 663 - Added fSwallowRows for calpont.caltrace(16) which is TRACE_FLAGS::TRACE_NO_ROWS4.
+	// @bug 663 - Added fSwallowRows for calpont.caltrace(16) which is TRACE_FLAGS::TRACE_NO_ROWS4.  
 	// 	      Running with this one will swallow rows at projection.
-	bool fSwallowRows;
-	uint32_t fProjectBlockReqLimit;     // max number of rids to send in a scan
+	bool fSwallowRows;	
+	u_int32_t fProjectBlockReqLimit;     // max number of rids to send in a scan
                                      // request to primproc
-    uint32_t fProjectBlockReqThreshold; // min level of rids backlog before
+    u_int32_t fProjectBlockReqThreshold; // min level of rids backlog before
                                      // consumer will tell producer to send
                                      // more rids scan requests to primproc
 
@@ -318,7 +393,7 @@ private:
 	uint64_t fNumBlksSkipped;//total number of block scans skipped due to CP
 	uint64_t fMsgBytesIn;   // total byte count for incoming messages
 	uint64_t fMsgBytesOut;  // total byte count for outcoming messages
-
+	
 	BRM::DBRM dbrm;
 
 	boost::shared_ptr<boost::thread> cThread;  //consumer thread
@@ -326,9 +401,11 @@ private:
 	boost::mutex mutex;
 	boost::condition condvar;
 	boost::condition flushed;
+	SPJL fLogger;
 	SP_LBIDList lbidList;
 	std::vector<int> scanFlags; // use to keep track of which extents to eliminate from this step
-	uint32_t uniqueID;
+	uint32_t uniqueID;	
+	std::string fUdfName;
 
 	//@bug 2634
     //@bug 3128 change ParseTree* to vector<Filter*>
@@ -343,11 +420,11 @@ private:
 };
 
 /** @brief the pColScan Step
- *
+ * 
  *  The most common step which requires no input RID list, but may have value filters applied
- *
+ * 
  *  The input association will always be null here so that we can go as soon as the Run function is called
- *
+ * 
  *  The StartPrimitiveThread will spawn a new worker thread that will
  *  a) take any input filters and apply them to a primitive message to be sent
  *  b) walk the block resolution manager via an LBID list for the oid
@@ -358,18 +435,29 @@ class pColScanStep : public JobStep, public PrimitiveMsg
 {
 public:
     /** @brief pColScanStep constructor
+     * @param in the inputAssociation pointer
+     * @param out the outputAssociation pointer
+     * @param ec the DistributedEngineComm pointer
      */
-    pColScanStep(
+    pColScanStep(const JobStepAssociation& inputJobStepAssociation,
+	const JobStepAssociation& outputJobStepAssociation,
+	DistributedEngineComm* dec,
+	boost::shared_ptr<execplan::CalpontSystemCatalog> syscat,
 	execplan::CalpontSystemCatalog::OID oid,
 	execplan::CalpontSystemCatalog::OID tableOid,
 	const execplan::CalpontSystemCatalog::ColType& ct,
-	const JobInfo& jobInfo);
+	uint32_t sessionId,
+	uint32_t txnId,
+	uint32_t verId,
+	uint16_t stepId,
+	uint32_t statementId,
+	ResourceManager& rm);
 
     pColScanStep(const pColStep& rhs);
 	~pColScanStep();
 
     /** @brief Starts processing.
-	 *
+	 * 
 	 * Starts processing.
      */
     virtual void run();
@@ -380,10 +468,35 @@ public:
 	 */
     virtual void join();
 
+    /** @brief virtual JobStepAssociation * inputAssociation
+     * 
+     * @returns JobStepAssociation *
+     */
+    virtual const JobStepAssociation& inputAssociation() const
+    {
+        return fInputJobStepAssociation;
+    }
+    virtual void inputAssociation(const JobStepAssociation& inputAssociation)
+    {
+        fInputJobStepAssociation = inputAssociation;
+    }
+    /** @brief virtual JobStepAssociation * outputAssociation
+     * 
+     * @returns JobStepAssocation *
+     */
+    virtual const JobStepAssociation& outputAssociation() const
+    {
+        return fOutputJobStepAssociation;
+    }
+    virtual void outputAssociation(const JobStepAssociation& outputAssociation)
+    {
+        fOutputJobStepAssociation = outputAssociation;
+    }
+
 	virtual bool isDictCol() const { return fIsDict; };
 
-	/** @brief The main loop for the send-side thread
-	 *
+	/** @brief The main loop for the send-side thread 
+	 * 
 	 * The main loop for the primitive-issuing thread.  Don't call it directly.
 	 */
     void sendPrimitiveMessages();
@@ -394,8 +507,8 @@ public:
 	 */
     void receivePrimitiveMessages(uint64_t i = 0);
 
-	/** @brief Add a filter when the column is a 4-byte float type
-	 *
+	/** @brief Add a filter when the column is a 4-byte float type 
+	 * 
 	 * Add a filter when the column is a 4-byte float type
 	 */
 	void addFilter(int8_t COP, float value);
@@ -416,7 +529,7 @@ public:
 	int8_t BOP() const { return fBOP; }
 
 	bool getFeederFlag() const { return isFilterFeeder; }
-
+	
 	void setFeederFlag (bool filterFeeder) { isFilterFeeder = filterFeeder; }
 	/** @brief Get the string of the filter predicates
  	 *
@@ -426,19 +539,44 @@ public:
 
 	void setSingleThread(bool b);
 	bool getSingleThread() { return fSingleThread; }
-
+	
 	/** @brief Set the output type.
-	 *
+	 * 
 	 * Set the output type (1 = RID, 2 = Token, 3 = Both).pColScan
 	 */
 	void setOutputType(int8_t OutputType);
+//	DistributedEngineComm* dec() const { return fDec; }
+	uint32_t verId() const { return fVerId; }
 	uint32_t filterCount() const { return fFilterCount; }
+	/** @brief Set the DistributedEngineComm object this instance should use
+	 *
+	 * Set the DistributedEngineComm object this instance should use
+	 */
+//	void dec(DistributedEngineComm* dec) {
+//		if (fDec) fDec->removeQueue(uniqueID);
+//		fDec = dec;
+//		if (fDec) fDec->addQueue(uniqueID);
+//	}
+
+	/** @brief Set the step ID of this JobStep
+	 *
+	 * Set the step ID of this JobStep.  XXXPAT: todo: Need to update the DEC as well 
+	 * I assume.
+	 */
+	virtual void stepId(uint16_t stepId) { fStepId = stepId; }
+	virtual uint16_t stepId() const { return fStepId; }
+
+    virtual uint32_t sessionId()   const { return fSessionId; }
+    virtual uint32_t txnId()       const { return fTxnId; }
+    virtual uint32_t statementId() const { return fStatementId; }
 
 	virtual const std::string toString() const;
 
 	virtual execplan::CalpontSystemCatalog::OID oid() const { return fOid; }
 
 	virtual execplan::CalpontSystemCatalog::OID tableOid() const { return fTableOid; }
+	void logger(const SPJL& logger) { fLogger = logger; }
+	const SPJL& logger() const { return fLogger; }
 	const execplan::CalpontSystemCatalog::ColType& colType() const { return fColType; }
 	ResourceManager& resourceManager() const { return fRm; }
 
@@ -447,7 +585,7 @@ public:
 	virtual uint64_t msgsRcvdCount () const { return recvCount;   }
 	virtual uint64_t msgBytesIn    () const { return fMsgBytesIn; }
 	virtual uint64_t msgBytesOut   () const { return fMsgBytesOut;}
-    uint32_t getRidsPerBlock() const {return ridsPerBlock;}
+    uint getRidsPerBlock() const {return ridsPerBlock;}
 
 	//...Currently only supported by pColStep and pColScanStep, so didn't bother
 	//...to define abstract method in base class, but if start adding to other
@@ -479,27 +617,36 @@ private:
     void sendAPrimitiveMessage (
 		ISMPacketHeader& ism,
 		BRM::LBID_t msgLbidStart,
-		uint32_t msgLbidCount);
+		u_int32_t msgLbidCount);
 	uint64_t getFBO(uint64_t lbid);
-	bool isEmptyVal(const uint8_t *val8) const;
+	bool isEmptyVal(const u_int8_t *val8) const;
 
 	ResourceManager& fRm;
+    JobStepAssociation fInputJobStepAssociation;
+    JobStepAssociation fOutputJobStepAssociation;
+    DistributedEngineComm* fDec;
+    uint32_t fSessionId;
+	uint32_t fTxnId;
+	uint32_t fVerId;
+    uint16_t fStepId;
+	uint32_t fStatementId;
     ColByScanRangeRequestHeader fMsgHeader;
     SPTHD fConsumerThread;
     /// number of threads on the receive side
-	uint32_t fNumThreads;
-
+	uint fNumThreads;
+	
     SPTHD * fProducerThread;
 	messageqcpp::ByteStream fFilterString;
-	uint32_t fFilterCount;
+	uint fFilterCount;
 	execplan::CalpontSystemCatalog::OID fOid;
 	execplan::CalpontSystemCatalog::OID fTableOid;
 	execplan::CalpontSystemCatalog::ColType fColType;
 	int8_t fBOP;
 	int8_t fOutputType;
     uint32_t sentCount;
-	uint32_t recvCount;
+	uint32_t recvCount; 
 	BRM::LBIDRange_v lbidRanges;
+	uint32_t hwm;
 	BRM::DBRM dbrm;
 	SP_LBIDList lbidList;
 
@@ -509,15 +656,17 @@ private:
 	boost::condition condvar;
 	boost::condition condvarWakeupProducer;
 	bool finishedSending, sendWaiting, rDoNothing, fIsDict;
-	uint32_t recvWaiting, recvExited;
+	uint recvWaiting, recvExited;
+	uint64_t ridsReturned;
 
 	std::vector<struct BRM::EMEntry> extents;
-	uint32_t extentSize, divShift, ridsPerBlock, rpbShift, numExtents;
+	uint extentSize, divShift, ridsPerBlock, rpbShift, numExtents;
+	SPJL fLogger;
 // 	config::Config *fConfig;
 
-	uint32_t fScanLbidReqLimit;     // max number of LBIDs to send in a scan
+	u_int32_t fScanLbidReqLimit;     // max number of LBIDs to send in a scan
                                      // request to primproc
-	uint32_t fScanLbidReqThreshold; // min level of scan LBID backlog before
+	u_int32_t fScanLbidReqThreshold; // min level of scan LBID backlog before
                                      // consumer will tell producer to send
                                      // more LBID scan requests to primproc
 
@@ -578,13 +727,25 @@ class pDictionaryStep : public JobStep, public PrimitiveMsg
 
 public:
     /** @brief pDictionaryStep constructor
+     * @param in the inputAssociation pointer
+     * @param out the outputAssociation pointer
+     * @param ec the DistributedEngineComm pointer
      */
-
-    pDictionaryStep(
+    
+    pDictionaryStep(const JobStepAssociation& in, 
+		const JobStepAssociation& out, 
+		DistributedEngineComm* ec,
+		boost::shared_ptr<execplan::CalpontSystemCatalog> sysCat,
 		execplan::CalpontSystemCatalog::OID oid,
+		int ct,
 		execplan::CalpontSystemCatalog::OID tabelOid,
-		const execplan::CalpontSystemCatalog::ColType& ct,
-		const JobInfo& jobInfo);
+		uint32_t sessionId,
+		uint32_t txnId,
+		uint32_t verId,
+		uint16_t stepId,
+		uint32_t statementId,
+		ResourceManager& rm,
+		uint32_t interval=0);
 
 	virtual ~pDictionaryStep();
 
@@ -598,13 +759,58 @@ public:
 	void sendPrimitiveMessages();
 	void receivePrimitiveMessages();
 
+    virtual const JobStepAssociation& inputAssociation() const
+    {
+        return fInputJobStepAssociation;
+    }
+    
+	virtual void inputAssociation(const JobStepAssociation& inputAssociation)
+    {
+        fInputJobStepAssociation = inputAssociation;
+    }
+
+    /** @brief virtual JobStepAssociation * outputAssociation
+     * 
+     * @returns JobStepAssocation *
+     */
+    virtual const JobStepAssociation& outputAssociation() const
+    {
+        return fOutputJobStepAssociation;
+    }
+
+	virtual void outputAssociation(const JobStepAssociation& outputAssociation)
+    {
+        fOutputJobStepAssociation = outputAssociation;
+    }
+
 	virtual const std::string toString() const;
 
+	void stepId(uint16_t stepId) { fStepId = stepId; }
+    uint16_t stepId() const { return fStepId; }
+
+    uint32_t sessionId()   const { return fSessionId; }
+    uint32_t txnId()       const { return fTxnId; }
+    uint32_t statementId() const { return fStatementId; }
+//    DistributedEngineComm* dec() const { return fDec; }
+	uint32_t verId() const { return fVerId; }
 	execplan::CalpontSystemCatalog::ColType& colType() { return fColType; }
 	execplan::CalpontSystemCatalog::ColType colType() const { return fColType; }
 
+/** @brief Set the DistributedEngineComm object this instance should use
+ *
+ * Set the DistributedEngineComm object this instance should use
+ */
+//	void dec(DistributedEngineComm* dec) {
+//		if (fDec) fDec->removeQueue(uniqueID);
+//		fDec = dec; 
+//		if (fDec) fDec->addQueue(uniqueID);
+//	 }
+
 	virtual execplan::CalpontSystemCatalog::OID oid() const { return fOid; }
+
 	virtual execplan::CalpontSystemCatalog::OID tableOid() const { return fTableOid; }
+	void logger(const SPJL& logger) { fLogger = logger; }
+	const SPJL& logger() const { return fLogger; }
 	virtual uint64_t phyIOCount    () const { return fPhysicalIO; }
 	virtual uint64_t cacheIOCount  () const { return fCacheIO;    }
 	virtual uint64_t msgsRcvdCount () const { return msgsRecvd;   }
@@ -626,9 +832,17 @@ private:
     void startPrimitiveThread();
     void startAggregationThread();
 
+    JobStepAssociation fInputJobStepAssociation;
+    JobStepAssociation fOutputJobStepAssociation;
+    DistributedEngineComm* fDec;
 	boost::shared_ptr<execplan::CalpontSystemCatalog> sysCat;
 	execplan::CalpontSystemCatalog::OID fOid;
 	execplan::CalpontSystemCatalog::OID fTableOid;
+	uint32_t fSessionId;
+	uint32_t fTxnId;
+	uint32_t fVerId;
+	uint32_t fStepId;
+	uint32_t fStatementId;
 	uint32_t fBOP;
 	uint32_t msgsSent;
 	uint32_t msgsRecvd;
@@ -640,13 +854,14 @@ private:
 	boost::shared_ptr<boost::thread> cThread;  //producer thread
 
 	messageqcpp::ByteStream fFilterString;
-	uint32_t fFilterCount;
+	uint fFilterCount;
 
 	DataList_t* requestList;
 	//StringDataList* stringList;
 	boost::mutex mutex;
 	boost::condition condvar;
 	uint32_t fInterval;
+	SPJL fLogger;
 	uint64_t fPhysicalIO;	// total physical I/O count
 	uint64_t fCacheIO;		// total cache I/O count
 	uint64_t fMsgBytesIn;   // total byte count for incoming messages
@@ -656,7 +871,7 @@ private:
 
     //@bug 3128 change ParseTree* to vector<Filter*>
 	std::vector<const execplan::Filter*> fFilters;
-
+	
 	bool hasEqualityFilter;
 	int8_t tmpCOP;
 	std::vector<std::string> eqFilter;
@@ -673,16 +888,31 @@ private:
  */
 class pDictionaryScan : public JobStep, public PrimitiveMsg
 {
+
+//typedef StringElementType DictionaryStepElement_t;
+//typedef StringDataList DictionaryDataList;
+
 public:
 
     /** @brief pDictionaryScan constructor
+     * @param in the inputAssociation pointer
+     * @param out the outputAssociation pointer
+     * @param ec the DistributedEngineComm pointer
      */
-
-    pDictionaryScan(
+    
+    pDictionaryScan(const JobStepAssociation& in, 
+		const JobStepAssociation& out, 
+		DistributedEngineComm* ec,
+		boost::shared_ptr<execplan::CalpontSystemCatalog> syscat,
 		execplan::CalpontSystemCatalog::OID oid,
+		int ct,
 		execplan::CalpontSystemCatalog::OID tableOid,
-		const execplan::CalpontSystemCatalog::ColType& ct,
-		const JobInfo& jobInfo);
+		uint32_t sessionId,
+		uint32_t txnId,
+		uint32_t verId,
+		uint16_t step,
+		uint32_t statementId,
+		ResourceManager& rm);
 
     ~pDictionaryScan();
 
@@ -690,33 +920,68 @@ public:
      */
     virtual void run();
 	virtual void join();
+	//void setOutList(StringDataList* rids);
 	void setInputList(DataList_t* rids);
 	void setBOP(int8_t b);
 	void sendPrimitiveMessages();
 	void receivePrimitiveMessages();
 	void setSingleThread();
+    virtual const JobStepAssociation& inputAssociation() const
+    {
+        return fInputJobStepAssociation;
+    }
+    
+	virtual void inputAssociation(const JobStepAssociation& inputAssociation)
+    {
+        fInputJobStepAssociation = inputAssociation;
+    }
+
+    /** @brief virtual JobStepAssociation * outputAssociation
+     * 
+     * @returns JobStepAssocation *
+     */
+    virtual const JobStepAssociation& outputAssociation() const
+    {
+        return fOutputJobStepAssociation;
+    }
+
+	virtual void outputAssociation(const JobStepAssociation& outputAssociation)
+    {
+        fOutputJobStepAssociation = outputAssociation;
+    }
+
 	virtual const std::string toString() const;
+
+	virtual void stepId(uint16_t step) { fStepId = step; }
+
+    virtual uint16_t stepId() const { return fStepId; }
+
+    virtual uint32_t sessionId()   const { return fSessionId; }
+    virtual uint32_t txnId()       const { return fTxnId; }
+    virtual uint32_t statementId() const { return fStatementId; }
 
 	void setRidList(DataList<ElementType> *rids);
 
 	/** @brief Add a filter.  Use this interface when the column stores anything but 4-byte floats.
- 	 *
+ 	 * 
 	 * Add a filter.  Use this interface when the column stores anything but 4-byte floats.
  	 */
 	void addFilter(int8_t COP, const std::string& value);  // all but FLOATS can use this interface
 
-	/** @brief Set the DistributedEngineComm object this instance should use
-	 *
-	 * Set the DistributedEngineComm object this instance should use
-	 */
+/** @brief Set the DistributedEngineComm object this instance should use
+ *
+ * Set the DistributedEngineComm object this instance should use
+ */
 	void dec(DistributedEngineComm* dec) {
 		if (fDec) fDec->removeQueue(uniqueID);
-		fDec = dec;
-		if (fDec) fDec->addQueue(uniqueID);
+		fDec = dec; 
+		if (fDec) fDec->addQueue(uniqueID); 
 	}
 
 	virtual execplan::CalpontSystemCatalog::OID oid() const { return fOid; }
+
 	virtual execplan::CalpontSystemCatalog::OID tableOid() const { return fTableOid; }
+	void logger(const SPJL& logger) { fLogger = logger; }
 
 	uint64_t phyIOCount    () const { return fPhysicalIO; }
 	uint64_t cacheIOCount  () const { return fCacheIO;    }
@@ -754,10 +1019,18 @@ private:
 		uint32_t msgLbidCount, uint16_t dbroot);
 	void formatMiniStats();
 
+    JobStepAssociation fInputJobStepAssociation;
+    JobStepAssociation fOutputJobStepAssociation;
     DistributedEngineComm* fDec;
 	boost::shared_ptr<execplan::CalpontSystemCatalog> sysCat;
 	execplan::CalpontSystemCatalog::OID fOid;
 	execplan::CalpontSystemCatalog::OID fTableOid;
+	BRM::HWM_t fDictBlkCount;
+	uint32_t fSessionId;
+	uint32_t fTxnId;
+	uint32_t fVerId;
+	uint32_t fStepId;
+	uint32_t fStatementId;
 	uint32_t fFilterCount;
 	uint32_t fBOP;
 	uint32_t fCOP1;
@@ -768,7 +1041,7 @@ private:
 	uint32_t recvWaiting;
 	uint32_t sendWaiting;
 	int64_t  ridCount;
-	uint32_t fLogicalBlocksPerScan;
+	u_int32_t fLogicalBlocksPerScan;
 	DataList<ElementType> *ridList;
 	messageqcpp::ByteStream fFilterString;
 	execplan::CalpontSystemCatalog::ColType colType;
@@ -784,9 +1057,10 @@ private:
 	uint64_t extentSize;
 	uint64_t divShift;
 	uint64_t numExtents;
-	uint32_t fScanLbidReqLimit;     // max number of LBIDs to send in a scan
+	SPJL fLogger;
+	u_int32_t fScanLbidReqLimit;     // max number of LBIDs to send in a scan
                                      // request to primproc
-	uint32_t fScanLbidReqThreshold; // min level of scan LBID backlog before
+	u_int32_t fScanLbidReqThreshold; // min level of scan LBID backlog before
                                      // consumer will tell producer to send
 	bool fStopSending;
 	bool fSingleThread;
@@ -795,7 +1069,6 @@ private:
 	uint64_t fMsgBytesIn;   // total byte count for incoming messages
 	uint64_t fMsgBytesOut;  // total byte count for outcoming messages
     uint32_t fMsgsToPm;     // total number of messages sent to PMs
-	uint32_t fMsgsExpect;   // total blocks to scan
 	uint32_t uniqueID;
 	ResourceManager& fRm;
 	BPSOutputType fOutType;
@@ -812,19 +1085,17 @@ private:
 	void destroyEqualityFilter();
 };
 
-
 class BatchPrimitive : public JobStep, public PrimitiveMsg, public DECEventListener
 {
 public:
 
-	BatchPrimitive(const JobInfo& jobInfo) : JobStep(jobInfo) {}
 	virtual bool getFeederFlag() const = 0;
-	virtual uint64_t getLastTupleId() const = 0;
-	virtual uint32_t getStepCount () const = 0;
+	virtual execplan::CalpontSystemCatalog::OID getLastOid() const = 0;
+	virtual uint getStepCount () const = 0;
 	virtual void setBPP(JobStep* jobStep) = 0;
 	virtual void setFirstStepType(PrimitiveStepType firstStepType) = 0;
 	virtual void setIsProjectionOnly() = 0;
-	virtual void setLastTupleId(uint64_t) = 0;
+	virtual void setLastOid(execplan::CalpontSystemCatalog::OID colOid) = 0;
 	virtual void setOutputType(BPSOutputType outputType) = 0;
 	virtual void setProjectBPP(JobStep* jobStep1, JobStep* jobStep2) = 0;
 	virtual void setStepCount() = 0;
@@ -840,11 +1111,12 @@ public:
 	virtual void setJobInfo(const JobInfo* jobInfo) = 0;
 	virtual void setOutputRowGroup(const rowgroup::RowGroup& rg) = 0;
 	virtual const rowgroup::RowGroup& getOutputRowGroup() const = 0;
-	virtual void addFcnJoinExp(const std::vector<execplan::SRCP>& fe) = 0;
 	virtual void addFcnExpGroup1(const boost::shared_ptr<execplan::ParseTree>& fe) = 0;
 	virtual void setFE1Input(const rowgroup::RowGroup& feInput) = 0;
 	virtual void setFcnExpGroup3(const std::vector<execplan::SRCP>& fe) = 0;
 	virtual void setFE23Output(const rowgroup::RowGroup& rg) = 0;
+
+
 };
 
 
@@ -854,15 +1126,15 @@ public:
 class TupleBPS : public BatchPrimitive, public TupleDeliveryStep
 {
 public:
-	TupleBPS(const pColStep& rhs, const JobInfo& jobInfo);
-	TupleBPS(const pColScanStep& rhs, const JobInfo& jobInfo);
-	TupleBPS(const pDictionaryStep& rhs, const JobInfo& jobInfo);
-	TupleBPS(const pDictionaryScan& rhs, const JobInfo& jobInfo);
-	TupleBPS(const PassThruStep& rhs, const JobInfo& jobInfo);
+	TupleBPS(const pColStep& rhs);
+	TupleBPS(const pColScanStep& rhs);
+	TupleBPS(const pDictionaryStep& rhs);
+	TupleBPS(const pDictionaryScan& rhs);
+	TupleBPS(const PassThruStep& rhs);
 	virtual ~TupleBPS();
 
     /** @brief Starts processing.
-	 *
+	 * 
 	 * Starts processing.
      */
     virtual void run();
@@ -872,11 +1144,36 @@ public:
 	 */
     virtual void join();
 
-	void abort();
+    /** @brief virtual JobStepAssociation * inputAssociation
+     * 
+     * @returns JobStepAssociation *
+     */
+    virtual const JobStepAssociation& inputAssociation() const
+    {
+        return fInputJobStepAssociation;
+    }
+    virtual void inputAssociation(const JobStepAssociation& inputAssociation)
+    {
+        fInputJobStepAssociation = inputAssociation;
+    }
+    /** @brief virtual JobStepAssociation * outputAssociation
+     * 
+     * @returns JobStepAssocation *
+     */
+    virtual const JobStepAssociation& outputAssociation() const
+    {
+        return fOutputJobStepAssociation;
+    }
+    virtual void outputAssociation(const JobStepAssociation& outputAssociation)
+    {
+        fOutputJobStepAssociation = outputAssociation;
+    }
+
+	virtual void abort();
 	void abort_nolock();
 
-	/** @brief The main loop for the send-side thread
-	 *
+	/** @brief The main loop for the send-side thread 
+	 * 
 	 * The main loop for the primitive-issuing thread.  Don't call it directly.
 	 */
     void sendPrimitiveMessages();
@@ -885,7 +1182,7 @@ public:
 	 *
 	 * The main loop for the receive-side thread.  Don't call it directly.
 	 */
-    void receiveMultiPrimitiveMessages(uint32_t threadID);
+    void receiveMultiPrimitiveMessages(uint threadID);
 
 /** @brief Add a filter when the column is anything but a 4-byte float type.
  *
@@ -900,6 +1197,7 @@ public:
 	void setFeederFlag (bool filterFeeder) { isFilterFeeder = filterFeeder; }
 	void setSwallowRows(const bool swallowRows) {fSwallowRows = swallowRows; }
 	bool getSwallowRows() const { return fSwallowRows; }
+	void setIsDelivery(bool b) { isDelivery = b; }
 
 	/* Base class interface fcn that can go away */
 	void setOutputType(BPSOutputType) { } //Can't change the ot of a TupleBPS
@@ -907,26 +1205,39 @@ public:
 	void setBppStep() { }
 	void setIsProjectionOnly() { }
 
-	uint64_t getRows() const { return ridsReturned; }
+	uint64_t getRows() const { return rowsReturned; }
 	void setFirstStepType(PrimitiveStepType firstStepType) { ffirstStepType = firstStepType;}
 	PrimitiveStepType getPrimitiveStepType () { return ffirstStepType; }
 	void setStepCount() { fStepCount++; }
-	uint32_t getStepCount () const { return fStepCount; }
-	void setLastTupleId(uint64_t id) { fLastTupleId = id; }
-	uint64_t getLastTupleId() const { return fLastTupleId; }
+	uint getStepCount () const { return fStepCount; }
+	void setLastOid(execplan::CalpontSystemCatalog::OID colOid) { fLastOid = colOid; }
+	execplan::CalpontSystemCatalog::OID getLastOid() const { return fLastOid; }
 
-	/** @brief Set the DistributedEngineComm object this instance should use
-	 *
-	 * Set the DistributedEngineComm object this instance should use
-	 */
+/** @brief Set the DistributedEngineComm object this instance should use
+ *
+ * Set the DistributedEngineComm object this instance should use
+ */
 	void dec(DistributedEngineComm* dec);
 
+/** @brief Set the step ID of this JobStep
+ *
+ * Set the step ID of this JobStep.  XXXPAT: todo: Need to update the DEC as well 
+ * I assume.
+ */
 	virtual void stepId(uint16_t stepId);
 	virtual uint16_t stepId() const { return fStepId; }
+
+    virtual uint32_t sessionId()   const { return fSessionId; }
+    virtual uint32_t txnId()       const { return fTxnId; }
+    virtual uint32_t statementId() const { return fStatementId; }
+
 	virtual const std::string toString() const;
 
 	virtual execplan::CalpontSystemCatalog::OID oid() const { return fOid; }
+
 	virtual execplan::CalpontSystemCatalog::OID tableOid() const { return fTableOid; }
+	void logger(const SPJL& logger) { fLogger = logger; }
+	const SPJL& logger() const { return fLogger; }
 	const execplan::CalpontSystemCatalog::ColType& colType() const { return fColType; }
 	const OIDVector& getProjectOids() const { return projectOids; }
 	virtual uint64_t phyIOCount    () const { return fPhysicalIO; }
@@ -935,7 +1246,7 @@ public:
 	virtual uint64_t msgBytesIn    () const { return fMsgBytesIn; }
 	virtual uint64_t msgBytesOut   () const { return fMsgBytesOut;}
 	virtual uint64_t blockTouched  () const { return fBlockTouched;}
-	uint32_t nextBand(messageqcpp::ByteStream &bs);
+	uint nextBand(messageqcpp::ByteStream &bs);
 
 	//...Currently only supported by pColStep and pColScanStep, so didn't bother
 	//...to define abstract method in base class, but if start adding to other
@@ -949,7 +1260,7 @@ public:
 	bool wasStepRun() const { return fRunExecuted; }
 
 	// DEC event listener interface
-	void newPMOnline(uint32_t connectionNumber);
+	void newPMOnline(uint connectionNumber);
 
 	void setInputRowGroup(const rowgroup::RowGroup &rg);
 	void setOutputRowGroup(const rowgroup::RowGroup &rg);
@@ -966,8 +1277,8 @@ public:
 
 	void setJobInfo(const JobInfo* jobInfo);
 
-    // @bug 2123.  Added getEstimatedRowCount function.
-	/* @brief estimates the number of rows that will be returned for use in determining the
+    // @bug 2123.  Added getEstimatedRowCount function.   
+	/* @brief estimates the number of rows that will be returned for use in determining the 
 	*  large side table for hashjoins.
 	*/
     uint64_t getEstimatedRowCount();
@@ -987,7 +1298,6 @@ public:
 		JLF should register that object with the TBPS for that table.  If it's
 		cross-table, then JLF should register it with the join step.
 	*/
-	void addFcnJoinExp(const std::vector<execplan::SRCP>& fe);
 	void addFcnExpGroup1(const boost::shared_ptr<execplan::ParseTree>& fe);
 	void setFE1Input(const rowgroup::RowGroup& feInput);
 
@@ -1004,20 +1314,18 @@ public:
 
 	// rowgroup to connector
 	const rowgroup::RowGroup& getDeliveredRowGroup() const;
-	void  deliverStringTableRowGroup(bool b);
-	bool  deliverStringTableRowGroup() const;
 
 	/* Interface for adding add'l predicates for casual partitioning.
 	 * This fcn checks for any intersection between the values in vals
 	 * and the range of a given extent.  If there is no intersection, that extent
 	 * won't be processed.  For every extent in OID, it effectively calculates
-	 * ((vals[0] >= min && vals[0] <= max) || (vals[1] >= min && vals[1] <= max)) ...
+	 * ((vals[0] >= min && vals[0] <= max) || (vals[1] >= min && vals[1] <= max)) ... 
 	 * && (previous calculation for that extent).
 	 * Note that it is an adder not a setter.  For an extent to be scanned, all calls
 	 * must have a non-empty intersection.
 	 */
 	void addCPPredicates(uint32_t OID, const std::vector<int64_t> &vals, bool isRange);
-
+	
     /* semijoin adds */
 	void setJoinFERG(const rowgroup::RowGroup &rg);
 
@@ -1026,8 +1334,6 @@ public:
 	bool goodExtentCount();
 	void reloadExtentLists();
 	void initExtentMarkers();   // need a better name for this
-
-	virtual bool stringTableFriendly() { return true; }
 
 protected:
 	void sendError(uint16_t status);
@@ -1039,72 +1345,81 @@ private:
     typedef boost::shared_ptr<boost::thread> SPTHD;
 	typedef boost::shared_array<SPTHD> SATHD;
     void startPrimitiveThread();
-    void startAggregationThread();
+    void startAggregationThreads();
     void initializeConfigParms();
 	uint64_t getFBO(uint64_t lbid);
 	void checkDupOutputColumns(const rowgroup::RowGroup &rg);
 	void dupOutputColumns(rowgroup::RowGroup&);
-	void dupOutputColumns(rowgroup::RGData&, rowgroup::RowGroup&);
-	void rgDataToDl(rowgroup::RGData &, rowgroup::RowGroup&, RowGroupDL*);
-	void rgDataVecToDl(std::vector<rowgroup::RGData>&,rowgroup::RowGroup&,RowGroupDL*);
+	void dupOutputColumns(boost::shared_array<uint8_t>&, rowgroup::RowGroup&);
+	void rgDataToDl(boost::shared_array<uint8_t>&, rowgroup::RowGroup&, RowGroupDL*);
+	void rgDataVecToDl(std::vector<boost::shared_array<uint8_t> >&, rowgroup::RowGroup&, RowGroupDL*);
 
+    JobStepAssociation fInputJobStepAssociation;
+    JobStepAssociation fOutputJobStepAssociation;
     DistributedEngineComm* fDec;
     boost::shared_ptr<BatchPrimitiveProcessorJL> fBPP;
+	uint rowCount;
+    uint32_t fSessionId;
+	uint32_t fTxnId;
+	uint32_t fVerId;
+    uint16_t fStepId;
+	uint32_t fStatementId;
 	uint16_t fNumSteps;
 	int fColWidth;
-	uint32_t fStepCount;
+	uint fStepCount;
     bool fCPEvaluated;  // @bug 2123
 	uint64_t fEstimatedRows; // @bug 2123
     /// number of threads on the receive side
-    uint32_t fMaxNumThreads;
-	uint32_t fNumThreads;
+	uint fNumThreads;
 	PrimitiveStepType ffirstStepType;
 	bool isFilterFeeder;
     SATHD fProducerThread;
 	messageqcpp::ByteStream fFilterString;
-	uint32_t fFilterCount;
+	uint fFilterCount;
 	execplan::CalpontSystemCatalog::ColType fColType;
 	execplan::CalpontSystemCatalog::OID fOid;
 	execplan::CalpontSystemCatalog::OID fTableOid;
-	uint64_t fLastTupleId;
+	execplan::CalpontSystemCatalog::OID fLastOid;
 	BRM::LBIDRange_v lbidRanges;
+	boost::scoped_array<int32_t> hwm;
 	std::vector<int32_t> lastExtent;
 	std::vector<BRM::LBID_t> lastScannedLBID;
 	BRM::DBRM dbrm;
     SP_LBIDList lbidList;
 	uint64_t ridsRequested;
-	uint64_t totalMsgs;
-	volatile uint64_t msgsSent;
-	volatile uint64_t msgsRecvd;
+	volatile uint64_t msgsSent, msgsRecvd;
 	volatile bool finishedSending;
-	bool firstRead;
-	bool sendWaiting;
+	bool firstRead, sendWaiting;
 	uint32_t recvWaiting;
-	uint32_t recvExited;
+	uint recvExited;
 	uint64_t ridsReturned;
+	uint64_t rowsReturned;
 	std::map<execplan::CalpontSystemCatalog::OID, std::tr1::unordered_map<int64_t, struct BRM::EMEntry> > extentsMap;
 	std::vector<BRM::EMEntry> scannedExtents;
 	OIDVector projectOids;
-	uint32_t extentSize, divShift, rpbShift, numExtents, modMask;
-	uint32_t fRequestSize; // the number of logical extents per batch of requests sent to PrimProc.
-	uint32_t fProcessorThreadsPerScan; // The number of messages sent per logical extent.
-	bool fSwallowRows;
-    uint32_t fMaxOutstandingRequests; // The number of logical extents have not processed by PrimProc
+	uint extentSize, divShift, rpbShift, numExtents, modMask;
+	SPJL fLogger;
+// 	config::Config *fConfig;
+	u_int32_t fRequestSize; // the number of logical extents per batch of requests sent to PrimProc.
+	u_int32_t fProcessorThreadsPerScan; // The number of messages sent per logical extent. 
+	bool fSwallowRows;	
+    u_int32_t fMaxOutstandingRequests; // The number of logical extents have not processed by PrimProc
 	uint64_t fPhysicalIO;	// total physical I/O count
 	uint64_t fCacheIO;		// total cache I/O count
 	uint64_t fNumBlksSkipped;//total number of block scans skipped due to CP
 	uint64_t fMsgBytesIn;   // total byte count for incoming messages
 	uint64_t fMsgBytesOut;  // total byte count for outcoming messages
 	uint64_t fBlockTouched; // total blocks touched
-    uint32_t fExtentsPerSegFile;//config num of Extents Per Segment File
+    uint32_t fMsgBppsToPm;  // total number of BPP messages sent to PMs
+    uint32_t fExtentRows;  // config value of ExtentMap/ExtentRows
     boost::shared_ptr<boost::thread> cThread;  //consumer thread
 	boost::shared_ptr<boost::thread> pThread;  //producer thread
 	boost::mutex mutex;
 	boost::mutex dlMutex;
 	boost::mutex cpMutex;
-	boost::mutex serializeJoinerMutex;
 	boost::condition condvarWakeupProducer, condvar;
-
+	bool isDelivery;
+	
 	std::vector<bool> scanFlags; // use to keep track of which extents to eliminate from this step
 	bool BPPIsAllocated;
 	uint32_t uniqueID;
@@ -1113,19 +1428,19 @@ private:
 	/* HashJoin support */
 
 	void serializeJoiner();
-	void serializeJoiner(uint32_t connectionNumber);
+	void serializeJoiner(uint connectionNumber);
 
-	void generateJoinResultSet(const std::vector<std::vector<rowgroup::Row::Pointer> > &joinerOutput,
+	void generateJoinResultSet(const std::vector<std::vector<uint8_t *> > &joinerOutput,
 	  rowgroup::Row &baseRow, const std::vector<boost::shared_array<int> > &mappings,
-	  const uint32_t depth, rowgroup::RowGroup &outputRG, rowgroup::RGData &rgData,
-	  std::vector<rowgroup::RGData> *outputData,
+	  const uint depth, rowgroup::RowGroup &outputRG, boost::shared_array<uint8_t> &rgData,
+	  std::vector<boost::shared_array<uint8_t> > *outputData,
 	  const boost::scoped_array<rowgroup::Row> &smallRows, rowgroup::Row &joinedRow);
 
 	std::vector<boost::shared_ptr<joiner::TupleJoiner> > tjoiners;
 	bool doJoin, hasPMJoin, hasUMJoin;
 	std::vector<rowgroup::RowGroup> joinerMatchesRGs;   // parses the small-side matches from joiner
 
-	uint32_t smallSideCount;
+	uint smallSideCount;
 	int  smallOuterJoiner;
 
 	bool fRunExecuted; // was the run method executed for this step
@@ -1142,11 +1457,10 @@ private:
 
 	// temporary hack to make sure JobList only calls run and join once
 	boost::mutex jlLock;
-	bool runRan;
-	bool joinRan;
+	bool runRan, joinRan;
 
 	// bug 1965, trace duplicat columns in delivery list <dest, src>
-	std::vector<std::pair<uint32_t, uint32_t> > dupColumns;
+	std::vector<std::pair<uint, uint> > dupColumns;
 
 	/* Functions & Expressions vars */
 	boost::shared_ptr<funcexp::FuncExpWrapper> fe1, fe2;
@@ -1155,37 +1469,34 @@ private:
 	bool runFEonPM;
 
 	/* for UM F & E 2 processing */
-	rowgroup::RGData fe2Data;
+	boost::scoped_array<uint8_t> fe2Data;
 	rowgroup::Row fe2InRow, fe2OutRow;
-
+	
 	void processFE2(rowgroup::RowGroup &input, rowgroup::RowGroup &output,
 	  rowgroup::Row &inRow, rowgroup::Row &outRow,
-	  std::vector<rowgroup::RGData> *rgData,
+	  std::vector<boost::shared_array<uint8_t> > *rgData,
 	  funcexp::FuncExpWrapper* localFE2);
 	void processFE2_oneRG(rowgroup::RowGroup &input, rowgroup::RowGroup &output,
 	  rowgroup::Row &inRow, rowgroup::Row &outRow,
 	  funcexp::FuncExpWrapper* localFE2);
-
+	  
 	/* Runtime Casual Partitioning adjustments.  The CP code is needlessly complicated;
 	 * to avoid making it worse, decided to designate 'scanFlags' as the static
 	 * component and this new array as the runtime component.  The final CP decision
 	 * is scanFlags & runtimeCP.
 	 */
 	std::vector<bool> runtimeCPFlags;
-
+	
 	/* semijoin vars */
 	rowgroup::RowGroup joinFERG;
 
-	boost::shared_ptr<RowGroupDL> deliveryDL;
-	uint32_t deliveryIt;
-
 	/* shared nothing support */
 	struct Job {
-		Job(uint32_t d, uint32_t n, uint32_t b, boost::shared_ptr<messageqcpp::ByteStream> &bs) :
+		Job(uint d, uint n, uint b, boost::shared_ptr<messageqcpp::ByteStream> &bs) :
 			dbroot(d), connectionNum(n), expectedResponses(b), msg(bs) { }
-		uint32_t dbroot;
-		uint32_t connectionNum;
-		uint32_t expectedResponses;
+		uint dbroot;
+		uint connectionNum;
+		uint expectedResponses;
 		boost::shared_ptr<messageqcpp::ByteStream> msg;
 	};
 
@@ -1193,20 +1504,7 @@ private:
 	void makeJobs(std::vector<Job> *jobs);
 	void interleaveJobs(std::vector<Job> *jobs) const;
 	void sendJobs(const std::vector<Job> &jobs);
-	uint32_t numDBRoots;
-
-    /* Pseudo column filter processing.  Think about refactoring into a separate class. */
-    bool processPseudoColFilters(uint32_t extentIndex, boost::shared_ptr<std::map<int, int> > dbRootPMMap) const;
-    bool processOneFilterType(int8_t colWidth, int64_t value, uint32_t type) const;
-    bool processSingleFilterString(int8_t BOP, int8_t colWidth, int64_t val, const uint8_t *filterString,
-      uint32_t filterCount) const;
-    bool processSingleFilterString_ranged(int8_t BOP, int8_t colWidth, int64_t min, int64_t max,
-        const uint8_t *filterString, uint32_t filterCount) const;
-    bool processLBIDFilter(const BRM::EMEntry &emEntry) const;
-    bool compareSingleValue(uint8_t COP, int64_t val1, int64_t val2) const;
-    bool compareRange(uint8_t COP, int64_t min, int64_t max, int64_t val) const;
-    bool hasPCFilter, hasPMFilter, hasRIDFilter, hasSegmentFilter, hasDBRootFilter, hasSegmentDirFilter,
-        hasPartitionFilter, hasMaxFilter, hasMinFilter, hasLBIDFilter, hasExtentIDFilter;
+	uint numDBRoots;
 
 };
 
@@ -1217,7 +1515,10 @@ class FilterStep : public JobStep
 {
 public:
 
-    FilterStep(const execplan::CalpontSystemCatalog::ColType& colType, const JobInfo& jobInfo);
+    FilterStep(uint32_t sessionId,
+		uint32_t txnId,
+		uint32_t statementId,
+		execplan::CalpontSystemCatalog::ColType colType);
     ~FilterStep();
 
     /** @brief virtual void Run method
@@ -1225,14 +1526,47 @@ public:
     void run();
     void join();
 
+    /** @brief virtual JobStepAssociation * inputAssociation
+     * 
+     * @returns JobStepAssociation *
+     */
+    const JobStepAssociation& inputAssociation() const
+    {
+        return fInputJobStepAssociation;
+    }
+    void inputAssociation(const JobStepAssociation& inputAssociation)
+    {
+        fInputJobStepAssociation = inputAssociation;
+    }
+    /** @brief virtual JobStepAssociation * outputAssociation
+     * 
+     * @returns JobStepAssocation *
+     */
+    const JobStepAssociation& outputAssociation() const
+    {
+        return fOutputJobStepAssociation;
+    }
+    void outputAssociation(const JobStepAssociation& outputAssociation)
+    {
+        fOutputJobStepAssociation = outputAssociation;
+    }
+
+    void stepId(uint16_t stepId) { fStepId = stepId; }
+    virtual uint16_t stepId() const { return fStepId; }
+
+    virtual uint32_t sessionId()   const { return fSessionId; }
+    virtual uint32_t txnId()       const { return fTxnId; }
+    virtual uint32_t statementId() const { return fStatementId; }
+
     const std::string toString() const;
 
     execplan::CalpontSystemCatalog::OID tableOid() const { return fTableOID; }
     void tableOid(execplan::CalpontSystemCatalog::OID tableOid) { fTableOID = tableOid; }
 	const execplan::CalpontSystemCatalog::ColType& colType() const { return fColType; }
+	void logger(const SPJL& logger) { fLogger = logger; }
 	void setBOP(int8_t b);
 	int8_t BOP() const { return fBOP; }
-    friend struct FSRunner;
+    friend struct FSRunner;	
 
 	void addFilter(const execplan::Filter* f);
 	std::vector<const execplan::Filter*>& getFilters() { return fFilters; }
@@ -1248,8 +1582,15 @@ private:
 
 // 	config::Config *fConfig;
 
+    JobStepAssociation fInputJobStepAssociation;
+    JobStepAssociation fOutputJobStepAssociation;
+	uint32_t fSessionId;
+	uint32_t fTxnId;
+    uint16_t fStepId;
+	uint32_t fStatementId;
     execplan::CalpontSystemCatalog::OID fTableOID;
 	execplan::CalpontSystemCatalog::ColType fColType;
+    SPJL fLogger;
     int8_t fBOP;
     boost::shared_ptr<boost::thread> runner;    // @bug 686
 
@@ -1269,24 +1610,35 @@ private:
 class PassThruStep : public JobStep, public PrimitiveMsg
 {
 
-	typedef std::pair<int64_t, int64_t> element_t;
+	typedef std::pair<int64_t, int64_t> element_t;	
 
 public:
     /** @brief PassThruStep constructor
+     * @param in the inputAssociation pointer
+     * @param out the outputAssociation pointer
+     * @param ec the DistributedEngineComm pointer
+	 * wait for the receiveing side to catch up.  0 (default) means never.
      */
-    PassThruStep(
+    PassThruStep(const JobStepAssociation& in, 
+		const JobStepAssociation& out, 
+		DistributedEngineComm* dec,
+		execplan::CalpontSystemCatalog::ColType colType,
 		execplan::CalpontSystemCatalog::OID oid,
 		execplan::CalpontSystemCatalog::OID tableOid,
-		const execplan::CalpontSystemCatalog::ColType& colType,
-		const JobInfo& jobInfo);
+		uint32_t sessionId,
+		uint32_t txnId,
+		uint32_t verId,
+		uint16_t stepId,
+		uint32_t statementId,
+		bool isEM,
+		ResourceManager& rm);
 
-	PassThruStep(const pColStep& rhs);
-	PassThruStep(const PseudoColStep& rhs);
+	PassThruStep(const pColStep& rhs, bool isEM);
 
 	virtual ~PassThruStep();
 
     /** @brief Starts processing.  Set at least the RID list before calling.
-	 *
+	 * 
 	 * Starts processing.  Set at least the RID list before calling this.
      */
     virtual void run();
@@ -1297,20 +1649,60 @@ public:
 	 */
     virtual void join();
 
-	virtual const std::string toString() const;
+    /** @brief virtual JobStepAssociation * inputAssociation
+     * 
+     * @returns JobStepAssociation *
+     */
+    virtual const JobStepAssociation& inputAssociation() const
+    {
+        return fInputJobStepAssociation;
+    }
+    
+	virtual void inputAssociation(const JobStepAssociation& inputAssociation)
+    {
+        fInputJobStepAssociation = inputAssociation;
+    }
 
+    /** @brief virtual JobStepAssociation * outputAssociation
+     * 
+     * @returns JobStepAssocation *
+     */
+    virtual const JobStepAssociation& outputAssociation() const
+    {
+        return fOutputJobStepAssociation;
+    }
+
+	virtual void outputAssociation(const JobStepAssociation& outputAssociation)
+    {
+        fOutputJobStepAssociation = outputAssociation;
+    }
+
+	virtual const std::string toString() const;
+	
+	/** @brief Set the step ID for this JobStep.
+	 * 
+	 * Set the step ID for this JobStep.
+	 */
+	virtual void stepId(uint16_t stepId) { fStepId = stepId; }
+	
 	virtual execplan::CalpontSystemCatalog::OID oid() const { return fOid; }
 
 	virtual execplan::CalpontSystemCatalog::OID tableOid() const { return fTableOid; }
-
+	
+	DistributedEngineComm* dec() const { return fDec; }
+	void dec(DistributedEngineComm* dec) { fDec = dec; }
+	uint32_t sessionId() const { return fSessionId; }
+	uint32_t txnId() const { return fTxnId; }
+	uint32_t verId() const { return fVerId; }
+	uint16_t stepId() const { return fStepId; }
+	uint32_t statementId() const { return fStatementId; }
+	void logger(const SPJL& logger) { fLogger = logger; }
+	const SPJL& logger() const { return fLogger; }
 	uint8_t getColWidth() const { return colWidth; }
 	bool isDictCol() const { return isDictColumn; }
 	bool isExeMgr() const { return isEM; }
 	const execplan::CalpontSystemCatalog::ColType& colType() const { return fColType; }
 	ResourceManager& resourceManager() const { return fRm; }
-
-	void pseudoType(uint32_t p) { fPseudoType = p; }
-	uint32_t pseudoType() const { return fPseudoType; }
 
 protected:
 
@@ -1323,61 +1715,34 @@ private:
 	uint64_t getLBID(uint64_t rid, bool& scan);
 	uint64_t getFBO(uint64_t lbid);
 
+    JobStepAssociation fInputJobStepAssociation;
+    JobStepAssociation fOutputJobStepAssociation;
 	boost::shared_ptr<execplan::CalpontSystemCatalog> catalog;
+	DistributedEngineComm *fDec;
 	execplan::CalpontSystemCatalog::OID fOid;
 	execplan::CalpontSystemCatalog::OID fTableOid;
+	uint32_t fSessionId;
+	uint32_t fTxnId;
+	uint32_t fVerId;
+	uint16_t fStepId;
+	uint32_t fStatementId;
 	uint8_t colWidth;
 	uint16_t realWidth;
-	uint32_t fPseudoType;
-	execplan::CalpontSystemCatalog::ColType fColType;
+	execplan::CalpontSystemCatalog::ColType fColType; 
 	bool isDictColumn;
 	bool isEM;
 
 	boost::thread* fPTThd;
 
-	// @bug 663 - Added fSwallowRows for calpont.caltrace(16) which is TRACE_FLAGS::TRACE_NO_ROWS4.
+	// @bug 663 - Added fSwallowRows for calpont.caltrace(16) which is TRACE_FLAGS::TRACE_NO_ROWS4.  
 	// 	      Running with this one will swallow rows at projection.
 	bool fSwallowRows;
+	SPJL fLogger;
 	ResourceManager& fRm;
 	friend class PassThruCommandJL;
 	friend class RTSCommandJL;
 	friend class BatchPrimitiveStep;
 	friend class TupleBPS;
-};
-
-class PseudoColStep : public pColStep
-{
-public:
-    /** @brief PseudoColStep constructor
-     */
-    PseudoColStep(
-		execplan::CalpontSystemCatalog::OID oid,
-		execplan::CalpontSystemCatalog::OID tableOid,
-		uint32_t pId,
-		const execplan::CalpontSystemCatalog::ColType& ct,
-		const JobInfo& jobInfo) :
-		pColStep(oid, tableOid, ct, jobInfo),
-		fPseudoColumnId(pId)
-    {}
-
-    PseudoColStep(const PassThruStep& rhs) :
-		pColStep(rhs),
-		fPseudoColumnId(rhs.pseudoType())
-	{}
-
-	virtual ~PseudoColStep() {}
-
-	uint32_t pseudoColumnId() const   { return fPseudoColumnId; }
-	void pseudoColumnId(uint32_t pId) { fPseudoColumnId = pId;  }
-
-protected:
-	uint32_t fPseudoColumnId;
-
-private:
-	/** @brief disabled constuctor
-	 */
-    PseudoColStep(const pColScanStep&);
-    PseudoColStep(const pColStep&);
 };
 
 

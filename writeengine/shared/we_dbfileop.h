@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: we_dbfileop.h 4726 2013-08-07 03:38:36Z bwilkinson $
+//  $Id: we_dbfileop.h 3720 2012-04-04 18:18:49Z rdempsey $
 
 /** @file */
 
@@ -28,7 +28,7 @@
 #include "we_cache.h"
 
 
-#if defined(_MSC_VER) && defined(WRITEENGINE_DLLEXPORT)
+#if defined(_MSC_VER) && defined(WRITEENGINEDBFILEOP_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
@@ -80,30 +80,30 @@ public:
    /**
     * @brief Read DB file to a buffer
     */
-    EXPORT virtual int   readDBFile(       IDBDataFile* pFile,
+    EXPORT virtual int   readDBFile(       FILE* pFile,
                                            unsigned char* readBuf,
-                                           const uint64_t lbid,
+                                           const i64 lbid,
                                            const bool isFbo = false );
     EXPORT int           readDBFile(       CommBlock& cb,
                                            unsigned char* readBuf,
-                                           const uint64_t lbid );
+                                           const i64 lbid );
 
-    EXPORT int           readDBFile(       IDBDataFile* pFile,
+    EXPORT int           readDBFile(       FILE* pFile,
                                            DataBlock* block,
-                                           const uint64_t lbid,
+                                           const i64 lbid,
                                            const bool isFbo = false );
     int                  readDBFile(       CommBlock& cb,
                                            DataBlock* block,
-                                           const uint64_t lbid )
+                                           const i64 lbid )
     { return readDBFile( cb, block->data, lbid );}
 
    /**
     * @brief Get an entry within a subblock and also populate block buffer
     *
     */
-    EXPORT const int     readSubBlockEntry(IDBDataFile* pFile,
+    EXPORT const int     readSubBlockEntry(FILE* pFile,
                                            DataBlock* block,
-                                           const uint64_t lbid,
+                                           const i64 lbid,
                                            const int sbid,
                                            const int entryNo,
                                            const int width,
@@ -111,7 +111,7 @@ public:
 
     EXPORT const int     readSubBlockEntry(CommBlock& cb,
                                            DataBlock* block,
-                                           const uint64_t lbid,
+                                           const i64 lbid,
                                            const int sbid,
                                            const int entryNo,
                                            const int width,
@@ -140,13 +140,13 @@ public:
    /**
     * @brief Lbid Write a buffer to a DB file
     */
-    EXPORT virtual int   writeDBFile(      IDBDataFile* pFile,
+    EXPORT virtual int   writeDBFile(      FILE* pFile,
                                            const unsigned char* writeBuf,
-                                           const uint64_t lbid,
+                                           const i64 lbid,
                                            const int numOfBlock = 1 );
     EXPORT int           writeDBFile(      CommBlock& cb,
                                            const unsigned char* writeBuf,
-                                           const uint64_t lbid,
+                                           const i64 lbid,
                                            const int numOfBlock = 1 );
 
    /**
@@ -156,23 +156,23 @@ public:
                                            const unsigned char * writeBuf,
                                            const int fbo,
                                            const int numOfBlock = 1);
-    EXPORT virtual int   writeDBFileNoVBCache(IDBDataFile *pFile,
+    EXPORT virtual int   writeDBFileNoVBCache(FILE *pFile,
                                            const unsigned char * writeBuf,
                                            const int fbo,
                                            const int numOfBlock = 1);
 
-    int                  writeDBFile(      IDBDataFile* pFile,
+    int                  writeDBFile(      FILE* pFile,
                                            DataBlock* block,
-                                           const uint64_t lbid )
+                                           const i64 lbid )
     { block->dirty=false; return writeDBFile( pFile, block->data, lbid ); }
     int                  writeDBFile(      CommBlock& cb,
                                            DataBlock* block,
-                                           const uint64_t lbid )
+                                           const i64 lbid )
     { return writeDBFile( cb, block->data, lbid ); }
 
-    EXPORT virtual int   writeDBFileFbo(   IDBDataFile* pFile,
+    EXPORT virtual int   writeDBFileFbo(   FILE* pFile,
                                            const unsigned char* writeBuf,
-                                           const uint64_t fbo,
+                                           const i64 fbo,
                                            const int numOfBlock  );
 
     int                  writeDBFileNoVBCache(CommBlock & cb,
@@ -183,9 +183,9 @@ public:
    /**
     * @brief Write a sub block entry directly to a DB file
     */
-    EXPORT const int     writeSubBlockEntry(IDBDataFile* pFile,
+    EXPORT const int     writeSubBlockEntry(FILE* pFile,
                                            DataBlock* block,
-                                           const uint64_t lbid,
+                                           const i64 lbid,
                                            const int sbid,
                                            const int entryNo,
                                            const int width,
@@ -193,7 +193,7 @@ public:
 
     EXPORT const int     writeSubBlockEntry(CommBlock& cb,
                                            DataBlock* block,
-                                           const uint64_t lbid,
+                                           const i64 lbid,
                                            const int sbid,
                                            const int entryNo,
                                            const int width,
@@ -202,21 +202,20 @@ public:
    /**
     * @brief Write to version buffer
     */
-    EXPORT const int     writeVB(          IDBDataFile* pFile,
+    EXPORT const int     writeVB(          FILE* pFile,
                                            const OID oid,
-                                           const uint64_t lbid );
+                                           const i64 lbid );
 
-    EXPORT virtual int   readDbBlocks(     IDBDataFile* pFile,
+    EXPORT virtual int   readDbBlocks(     FILE* pFile,
                                            unsigned char* readBuf,
-                                           uint64_t fbo,
+                                           i64 fbo,
                                            size_t n);
 
-    EXPORT virtual int   restoreBlock(     IDBDataFile* pFile,
+    EXPORT virtual int   restoreBlock(     FILE* pFile,
                                            const unsigned char* writeBuf,
-                                           uint64_t fbo);
+                                           i64 fbo);
 
-    EXPORT virtual IDBDataFile* getFilePtr(const Column& column,
-                                           bool useTmpSuffix);
+    EXPORT virtual FILE* getFilePtr(       const Column& column);
 
     virtual void chunkManager(ChunkManager* ptr) { m_chunkManager = ptr;  }
     virtual ChunkManager* chunkManager()         { return m_chunkManager; }

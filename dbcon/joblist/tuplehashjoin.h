@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: tuplehashjoin.h 9655 2013-06-25 23:08:13Z xlou $
+//  $Id: tuplehashjoin.h 8526 2012-05-17 02:28:10Z xlou $
 
 
 #ifndef TUPLEHASHJOIN_H_
@@ -36,16 +36,19 @@ namespace joblist
 class BatchPrimitive;
 class ResourceManager;
 class TupleBPS;
-struct FunctionJoinInfo;
-class DiskJoinStep;
 
 class TupleHashJoinStep : public JobStep, public TupleDeliveryStep
 {
 public:
 	/**
-	 * @param
+	 * @param  
+	 * @param sessionId 
+	 * @param statementId 
+	 * @param txnId 
+	 * @param resourceManager
 	 */
-	TupleHashJoinStep(const JobInfo& jobInfo);
+	TupleHashJoinStep(uint32_t sessionId, uint32_t statementId, uint32_t txnId, ResourceManager *,
+		bool isExeMgr = true);
 	virtual ~TupleHashJoinStep();
 
 	void setLargeSideBPS(BatchPrimitive*);
@@ -55,7 +58,17 @@ public:
 	/* mandatory JobStep interface */
 	void run();
 	void join();
+	const JobStepAssociation& inputAssociation() const;
+	void inputAssociation(const JobStepAssociation& inputAssociation);
+	const JobStepAssociation& outputAssociation() const;
+	void outputAssociation(const JobStepAssociation& outputAssociation);
 	const std::string toString() const;
+	void stepId(uint16_t stepId);
+	uint16_t stepId() const;
+	uint32_t sessionId() const;
+	uint32_t txnId() const;
+	uint32_t statementId() const;
+	void logger(const SPJL& logger);
 
 	/* These tableOID accessors can go away soon */
 	execplan::CalpontSystemCatalog::OID tableOid() const { return fTableOID2; }
@@ -104,8 +117,8 @@ public:
 						const std::vector<std::string> &tableNames);
 	void addJoinKeyIndex(const std::vector<JoinType>& jt,
 						 const std::vector<bool>& typeless,
-						 const std::vector<std::vector<uint32_t> >& smallkeys,
-						 const std::vector<std::vector<uint32_t> >& largekeys);
+						 const std::vector<std::vector<uint> >& smallkeys,
+						 const std::vector<std::vector<uint> >& largekeys);
 
 	void configSmallSideRG(const std::vector<rowgroup::RowGroup>& rgs,
 						   const std::vector<std::string> &tableNames);
@@ -113,20 +126,22 @@ public:
 
 	void configJoinKeyIndex(const std::vector<JoinType>& jt,
 							const std::vector<bool>& typeless,
-							const std::vector<std::vector<uint32_t> >& smallkeys,
-							const std::vector<std::vector<uint32_t> >& largekeys);
+							const std::vector<std::vector<uint> >& smallkeys,
+							const std::vector<std::vector<uint> >& largekeys);
 
 	void setOutputRowGroup(const rowgroup::RowGroup &rg);
 
-	uint32_t nextBand(messageqcpp::ByteStream &bs);
+	uint nextBand(messageqcpp::ByteStream &bs);
+
+	void setIsDelivery(bool b) { isDelivery = b; }
 
 	const rowgroup::RowGroup& getOutputRowGroup() const { return outputRG; }
 	const rowgroup::RowGroup &getSmallRowGroup() const { return smallRGs[0]; }
 	const std::vector<rowgroup::RowGroup> &getSmallRowGroups() const { return smallRGs; }
 	const rowgroup::RowGroup& getLargeRowGroup() const { return largeRG; }
-	const uint32_t getSmallKey() const { return smallSideKeys[0][0]; }
-	const std::vector<std::vector<uint32_t> >& getSmallKeys() const { return smallSideKeys; }
-	const std::vector<std::vector<uint32_t> >& getLargeKeys() const { return largeSideKeys; }
+	const uint getSmallKey() const { return smallSideKeys[0][0]; }
+	const std::vector<std::vector<uint> >& getSmallKeys() const { return smallSideKeys; }
+	const std::vector<std::vector<uint> >& getLargeKeys() const { return largeSideKeys; }
 
 	/* Some compat fcns to get rid of later */
 	void oid1(execplan::CalpontSystemCatalog::OID oid) { fOid1 = oid; }
@@ -141,13 +156,13 @@ public:
 	/* The replacements.  I don't think there's a need for setters or vars.
 		OIDs are already in the rowgroups. */
 	// s - sth table pair; k - kth key in compound join, 0 for non-compand join
-	execplan::CalpontSystemCatalog::OID smallSideKeyOID(uint32_t s, uint32_t k) const;
-	execplan::CalpontSystemCatalog::OID largeSideKeyOID(uint32_t s, uint32_t k) const;
+	execplan::CalpontSystemCatalog::OID smallSideKeyOID(uint s, uint k) const;
+	execplan::CalpontSystemCatalog::OID largeSideKeyOID(uint s, uint k) const;
 
 	void deliveryStep(const SJSTEP& ds) { fDeliveryStep = ds; }
 
 	/* Iteration 18 mods */
-	void setLargeSideDLIndex(uint32_t i) { largeSideIndex = i; }
+	void setLargeSideDLIndex(uint i) { largeSideIndex = i; }
 
 	/* obsolete, need to update JLF */
 	void setJoinType(JoinType jt) { joinType = jt; }
@@ -165,47 +180,43 @@ public:
 
 	/* result rowgroup */
 	const rowgroup::RowGroup& getDeliveredRowGroup() const;
-	void  deliverStringTableRowGroup(bool b);
-	bool  deliverStringTableRowGroup() const;
 
 	// joinId
 	void joinId(int64_t id) { fJoinId = id; }
 	int64_t joinId() const { return fJoinId; }
 
 	/* semi-join support */
-	void addJoinFilter(boost::shared_ptr<execplan::ParseTree>, uint32_t index);
+	void addJoinFilter(boost::shared_ptr<execplan::ParseTree>, uint index);
 	bool hasJoinFilter() const { return (fe.size() > 0); }
-	bool hasJoinFilter(uint32_t index) const;
-	boost::shared_ptr<funcexp::FuncExpWrapper> getJoinFilter(uint32_t index) const;
+	bool hasJoinFilter(uint index) const;
 	void setJoinFilterInputRG(const rowgroup::RowGroup &rg);
 
-	virtual bool stringTableFriendly() { return true; }
+	/* UM Join logic */
+	boost::shared_array<uint8_t> joinOneRG(boost::shared_array<uint8_t> input);
 
-	uint32_t tokenJoin() const { return fTokenJoin; }
-	void tokenJoin(uint32_t k) { fTokenJoin = k;    }
-
-	//@bug3683 function join
-	boost::shared_ptr<FunctionJoinInfo>& funcJoinInfo()               { return fFunctionJoinInfo; }
-	void funcJoinInfo(const boost::shared_ptr<FunctionJoinInfo>& fji) { fFunctionJoinInfo = fji;  }
-
-	void abort();
 private:
 	TupleHashJoinStep();
 	TupleHashJoinStep(const TupleHashJoinStep &);
 	TupleHashJoinStep & operator=(const TupleHashJoinStep &);
 
-	void errorLogging(const std::string& msg, int err) const;
+	void errorLogging(const std::string& msg) const;
 	void startAdjoiningSteps();
 
-	void formatMiniStats(uint32_t index);
+	void formatMiniStats(uint index);
 
+	JobStepAssociation inJSA;
+	JobStepAssociation outJSA;
 	RowGroupDL *largeDL, *outputDL;
 	std::vector<RowGroupDL *> smallDLs;
-	std::vector<uint32_t> smallIts;
-	uint32_t largeIt;
+	std::vector<uint> smallIts;
+	uint largeIt;
 
 	JoinType joinType;   // deprecated
 	std::vector<JoinType> joinTypes;
+	uint32_t sessionID;
+	uint32_t stepID;
+	uint32_t statementID;
+	uint32_t txnID;
 	execplan::CalpontSystemCatalog::OID fTableOID1;
 	execplan::CalpontSystemCatalog::OID fTableOID2;
 	execplan::CalpontSystemCatalog::OID fOid1;
@@ -241,11 +252,16 @@ private:
 	int fCorrelatedSide;
 
 	std::vector<bool> typelessJoin;     // the size of the vector is # of small side
-	std::vector<std::vector<uint32_t> > largeSideKeys;
-	std::vector<std::vector<uint32_t> > smallSideKeys;
+	std::vector<std::vector<uint> > largeSideKeys;
+	std::vector<std::vector<uint> > smallSideKeys;
 
-	ResourceManager& resourceManager;
-	volatile uint64_t totalUMMemoryUsage;
+	ResourceManager *resourceManager;
+#ifdef _MSC_VER
+	volatile LONGLONG totalUMMemoryUsage;
+#else
+	uint64_t totalUMMemoryUsage;
+#endif
+	SPJL fLogger;
 
 	struct JoinerSorter {
 		inline bool operator()(const boost::shared_ptr<joiner::TupleJoiner> &j1,
@@ -254,15 +270,17 @@ private:
 	};
 	std::vector<boost::shared_ptr<joiner::TupleJoiner> > joiners;
 
-	boost::scoped_array<std::vector<rowgroup::RGData> > rgData;
+	boost::scoped_array<std::vector<boost::shared_array<uint8_t> > > rgData;
+	std::vector<uint8_t *> rows;  // for PM join.  Points into rgData.
 	TupleBPS* largeBPS;
 	rowgroup::RowGroup largeRG, outputRG;
 	std::vector<rowgroup::RowGroup> smallRGs;
-	uint64_t pmMemLimit;
-	uint64_t rgDataSize;
+	uint PMRowLimit;
+
+	bool isDelivery;
 
 	void hjRunner();
-	void smallRunnerFcn(uint32_t index);
+	void smallRunnerFcn(uint index);
 
 	struct HJRunner {
 		HJRunner(TupleHashJoinStep *hj) : HJ(hj) { }
@@ -270,10 +288,10 @@ private:
 		TupleHashJoinStep *HJ;
 	};
 	struct SmallRunner {
-		SmallRunner(TupleHashJoinStep *hj, uint32_t i) :HJ(hj), index(i) { }
+		SmallRunner(TupleHashJoinStep *hj, uint i) :HJ(hj), index(i) { }
 		void operator()() { HJ->smallRunnerFcn(index); }
 		TupleHashJoinStep *HJ;
-		uint32_t index;
+		uint index;
 	};
 
 	boost::shared_ptr<boost::thread> mainRunner;
@@ -291,129 +309,70 @@ private:
 	bool runRan, joinRan;
 
 	/* Iteration 18 mods */
-	uint32_t largeSideIndex;
+	uint largeSideIndex;
 	bool joinIsTooBig;
 
 	/* Functions & Expressions support */
 	boost::shared_ptr<funcexp::FuncExpWrapper> fe2;
-	std::vector<uint32_t> fe2TableDeps;
+	std::vector<uint> fe2TableDeps;
 	rowgroup::RowGroup fe2Output;
 	bool runFE2onPM;
 
 	// Support Mixed Join Type
 	int64_t fJoinId;
-
+	
 	/* Semi-join support */
 	std::vector<int> feIndexes;
 	std::vector<boost::shared_ptr<funcexp::FuncExpWrapper> > fe;
 	rowgroup::RowGroup joinFilterRG;
-
+	
 	/* Casual Partitioning forwarding */
 	void forwardCPData();
-	uint32_t uniqueLimit;
+	uint uniqueLimit;
 
 	/* UM Join support.  Most of this code is ported from the UM join code in tuple-bps.cpp.
 	 * They should be kept in sync as much as possible. */
 	struct JoinRunner {
-		JoinRunner(TupleHashJoinStep *hj, uint32_t i) : HJ(hj), index(i) { }
+		JoinRunner(TupleHashJoinStep *hj, uint i) : HJ(hj), index(i) { }
 		void operator()() { HJ->joinRunnerFcn(index); }
 		TupleHashJoinStep *HJ;
-		uint32_t index;
+		uint index;
 	};
-	void joinRunnerFcn(uint32_t index);
+	void joinRunnerFcn(uint index);
 	void startJoinThreads();
-	void generateJoinResultSet(const std::vector<std::vector<rowgroup::Row::Pointer> > &joinerOutput,
+	void generateJoinResultSet(const std::vector<std::vector<uint8_t *> > &joinerOutput,
 	  rowgroup::Row &baseRow, const boost::shared_array<boost::shared_array<int> > &mappings,
-	  const uint32_t depth, rowgroup::RowGroup &outputRG, rowgroup::RGData &rgData,
-	  std::vector<rowgroup::RGData> *outputData,
+	  const uint depth, rowgroup::RowGroup &outputRG, boost::shared_array<uint8_t> &rgData,
+	  std::vector<boost::shared_array<uint8_t> > *outputData,
 	  const boost::shared_array<rowgroup::Row> &smallRows, rowgroup::Row &joinedRow);
-	void grabSomeWork(std::vector<rowgroup::RGData> *work);
-	void sendResult(const std::vector<rowgroup::RGData> &res);
+	void grabSomeWork(std::vector<boost::shared_array<uint8_t> > *work);
+	void sendResult(const std::vector<boost::shared_array<uint8_t> > &res);
 	void processFE2(rowgroup::RowGroup &input, rowgroup::RowGroup &output, rowgroup::Row &inRow,
-	  rowgroup::Row &outRow, std::vector<rowgroup::RGData> *rgData,
+	  rowgroup::Row &outRow, std::vector<boost::shared_array<uint8_t> > *rgData,
 	  funcexp::FuncExpWrapper* local_fe);
-	void joinOneRG(uint32_t threadID, std::vector<rowgroup::RGData> *out,
+	void joinOneRG(uint threadID, std::vector<boost::shared_array<uint8_t> > *out,
 	  rowgroup::RowGroup &inputRG, rowgroup::RowGroup &joinOutput, rowgroup::Row &largeSideRow,
 	  rowgroup::Row &joinFERow, rowgroup::Row &joinedRow, rowgroup::Row &baseRow,
-	  std::vector<std::vector<rowgroup::Row::Pointer> > &joinMatches,
-	  boost::shared_array<rowgroup::Row> &smallRowTemplates,
-	  std::vector<boost::shared_ptr<joiner::TupleJoiner> > *joiners = NULL,
-	  boost::shared_array<boost::shared_array<int> > *rgMappings = NULL,
-	  boost::shared_array<boost::shared_array<int> > *feMappings = NULL,
-	  boost::scoped_array<boost::scoped_array<uint8_t> > *smallNullMem = NULL
-	  );
+	  std::vector<std::vector<uint8_t *> > &joinMatches,
+	  boost::shared_array<rowgroup::Row> &smallRowTemplates);
 	void finishSmallOuterJoin();
 	void makeDupList(const rowgroup::RowGroup &rg);
-	void processDupList(uint32_t threadID, rowgroup::RowGroup &ingrp,
-		std::vector<rowgroup::RGData> *rowData);
+	void processDupList(uint threadID, rowgroup::RowGroup &ingrp,
+		std::vector<boost::shared_array<uint8_t> > *rowData);
 
 	boost::scoped_array<boost::shared_ptr<boost::thread> > joinRunners;
 	boost::mutex inputDLLock, outputDLLock;
 	boost::shared_array<boost::shared_array<int> > columnMappings, fergMappings;
 	boost::shared_array<int> fe2Mapping;
-	uint32_t joinThreadCount;
+	uint joinThreadCount;
 	boost::scoped_array<boost::scoped_array<uint8_t> > smallNullMemory;
 	uint64_t outputIt;
 	bool moreInput;
-	std::vector<std::pair<uint32_t, uint32_t> > dupList;
+	std::vector<std::pair<uint, uint> > dupList;
 	boost::scoped_array<rowgroup::Row> dupRows;
 	std::vector<std::string> smallTableNames;
 	bool isExeMgr;
-	uint32_t lastSmallOuterJoiner;
-
-	//@bug5958 & 6117, stores the table key for identify token join
-	uint32_t fTokenJoin;
-
-	// moved from base class JobStep
-	boost::mutex* fStatsMutexPtr;
-
-	//@bug3683 function join
-	boost::shared_ptr<FunctionJoinInfo> fFunctionJoinInfo;
-	std::set<uint32_t> fFunctionJoinKeys;  // for skipping CP forward
-
-	/* Disk-based join support */
-	boost::scoped_array<DiskJoinStep> djs;
-	boost::scoped_array<boost::shared_ptr<RowGroupDL> > fifos;
-	void djsReaderFcn(int index);
-	boost::thread djsReader;
-	struct DJSReader {
-		DJSReader(TupleHashJoinStep *hj, uint32_t i) : HJ(hj), index(i) { }
-		void operator()() { HJ->djsReaderFcn(index); }
-		TupleHashJoinStep *HJ;
-		uint32_t index;
-	};
-
-	boost::thread djsRelay;
-	void djsRelayFcn();
-	struct DJSRelay {
-		DJSRelay(TupleHashJoinStep *hj) : HJ(hj) { }
-		void operator()() { HJ->djsRelayFcn(); }
-		TupleHashJoinStep *HJ;
-	};
-
-	boost::shared_ptr<int64_t> djsSmallUsage;
-	int64_t djsSmallLimit;
-	int64_t djsLargeLimit;
-	uint64_t djsPartitionSize;
-	bool isDML;
-	bool allowDJS;
-
-	// hacky mechanism to prevent nextBand from starting before the final
-	// THJS configuration is settled.  Debatable whether to use a bool and poll instead;
-	// once the config is settled it stays settled, technically no need to
-	// keep grabbing locks after that.
-	boost::mutex deliverMutex;
-	bool ownsOutputDL;
-
-	void segregateJoiners();
-	std::vector<boost::shared_ptr<joiner::TupleJoiner> > tbpsJoiners;
-	std::vector<boost::shared_ptr<joiner::TupleJoiner> > djsJoiners;
-	std::vector<int> djsJoinerMap;
-	boost::scoped_array<uint64_t> memUsedByEachJoin;
-	boost::mutex djsLock;
-	boost::shared_ptr<int64_t> sessionMemLimit;
-
-	friend class DiskJoinStep;
+	uint lastSmallOuterJoiner;
 };
 
 }

@@ -16,11 +16,13 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_xmlgendata.cpp 4450 2013-01-21 14:13:24Z rdempsey $
+* $Id: we_xmlgendata.cpp 3720 2012-04-04 18:18:49Z rdempsey $
 *
 *******************************************************************************/
 
+#define WRITEENGINEXMLGENDATA_DLLEXPORT
 #include "we_xmlgendata.h"
+#undef WRITEENGINEXMLGENDATA_DLLEXPORT
 
 #include <iostream>
 #include <boost/filesystem/path.hpp>

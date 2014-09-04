@@ -117,9 +117,9 @@ public:
     /** @brief queue size accessor
       *
       */
-    inline uint32_t getWaiting() const { return fWaitingFunctorsSize; }
+    inline uint getWaiting() const { return fWaitingFunctorsSize; }
 
-    inline uint32_t getWeight() const { return fWaitingFunctorsWeight; }
+    inline uint getWeight() const { return fWaitingFunctorsWeight; }
 
     void removeJobs(uint32_t id);
 

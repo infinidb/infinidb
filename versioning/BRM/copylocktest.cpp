@@ -1,6 +1,5 @@
 #include <iostream>
 #include "dbrm.h"
-#include "IDBPolicy.h"
 
 using namespace std;
 using namespace BRM;
@@ -76,8 +75,6 @@ int main(int argc, char **argv)
 		goto usage;
 
 	cmd = argv[1][0];
-
-	idbdatafile::IDBPolicy::configIDBPolicy();
 
 	switch(cmd) {
 		case 'l': lockRange(); break;

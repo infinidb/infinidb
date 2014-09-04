@@ -55,10 +55,10 @@ int64_t Func_find_in_set::getIntVal(rowgroup::Row& row,
 						bool& isNull,
 						CalpontSystemCatalog::ColType& op_ct)
 {
-	const string& searchStr = parm[0]->data()->getStrVal(row, isNull);
+	string searchStr = parm[0]->data()->getStrVal(row, isNull);
 	if (isNull)
 		return 0;
-	const string& setString = parm[1]->data()->getStrVal(row, isNull);
+	string setString = parm[1]->data()->getStrVal(row, isNull);
 	if (isNull)
 		return 0;
 	
@@ -99,7 +99,9 @@ string Func_find_in_set::getStrVal(rowgroup::Row& row,
 							bool& isNull,
 							CalpontSystemCatalog::ColType& ct)
 {
-	return intToString(getIntVal(row, parm, isNull, ct));
+	ostringstream oss;
+	oss << getIntVal(row, parm, isNull, ct);
+	return oss.str();
 }
 
 execplan::IDB_Decimal Func_find_in_set::getDecimalVal(rowgroup::Row& row,

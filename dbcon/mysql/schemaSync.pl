@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 #
-# $Id: schemaSync.pl 9731 2013-08-01 16:58:35Z rdempsey $
+# $Id: schemaSync.pl 7431 2011-02-15 14:21:52Z rdempsey $
 
 use DBI;
 use DBD::mysql;
@@ -116,47 +116,11 @@ sub datatype2name
 	}
 	elsif ($dt == 13)
 	{
-		$dts = 'varbinary';
+		$dts = 'clob';
 	}
 	elsif ($dt == 14)
 	{
-		$dts = 'clob';
-	}
-	elsif ($dt == 15)
-	{
 		$dts = 'blob';
-	}
-	elsif ($dt == 16)
-	{
-		$dts = 'tinyint unsigned';
-	}
-	elsif ($dt == 17)
-	{
-		$dts = 'smallint unsigned';
-	}
-	elsif ($dt == 18)
-	{
-		$dts = 'decimal unsigned';
-	}
-	elsif ($dt == 19)
-	{
-		$dts = 'medint unsigned';
-	}
-	elsif ($dt == 20)
-	{
-		$dts = 'int unsigned';
-	}
-	elsif ($dt == 21)
-	{
-		$dts = 'float unsigned';
-	}
-	elsif ($dt == 22)
-	{
-		$dts = 'bigint unsigned';
-	}
-	elsif ($dt == 23)
-	{
-		$dts = 'double unsigned';
 	}
 	else
 	{
@@ -216,7 +180,7 @@ foreach $schema (keys %schemas)
 				print ", ";
 			}
 			print "$@$co->[2] $nm";
-			if ($nm eq 'char' || $nm eq 'varchar' || $nm eq 'varbinary')
+			if ($nm eq 'char' || $nm eq 'varchar')
 			{
 				print "($@$co->[8])";
 			}

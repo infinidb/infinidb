@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: we_xmlgendata.h 4450 2013-01-21 14:13:24Z rdempsey $
+ *   $Id: we_xmlgendata.h 3720 2012-04-04 18:18:49Z rdempsey $
  *
  ***********************************************************************/
 /** @file */
@@ -29,7 +29,7 @@
 #include <map>
 #include "calpontsystemcatalog.h"
 
-#if defined(_MSC_VER) && defined(WRITEENGINE_DLLEXPORT)
+#if defined(_MSC_VER) && defined(WRITEENGINEXMLGENDATA_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
@@ -54,22 +54,22 @@ class XMLGenData
     // Valid parms that can be stored and retrieved from XMLGenData
     EXPORT const static std::string DELIMITER;
     EXPORT const static std::string DESCRIPTION;
-#if defined(_MSC_VER) && !defined(WRITEENGINE_DLLEXPORT)
+#if defined(_MSC_VER) && !defined(WRITEENGINEXMLGENDATA_DLLEXPORT)
     __declspec(dllimport)
 #endif
     EXPORT const static std::string ENCLOSED_BY_CHAR;
-#if defined(_MSC_VER) && !defined(WRITEENGINE_DLLEXPORT)
+#if defined(_MSC_VER) && !defined(WRITEENGINEXMLGENDATA_DLLEXPORT)
     __declspec(dllimport)
 #endif
     EXPORT const static std::string ESCAPE_CHAR;
-#if defined(_MSC_VER) && !defined(WRITEENGINE_DLLEXPORT)
+#if defined(_MSC_VER) && !defined(WRITEENGINEXMLGENDATA_DLLEXPORT)
     __declspec(dllimport)
 #endif
     EXPORT const static std::string JOBID;
     EXPORT const static std::string MAXERROR;
     EXPORT const static std::string NAME;
     EXPORT const static std::string PATH;
-#if defined(_MSC_VER) && !defined(WRITEENGINE_DLLEXPORT)
+#if defined(_MSC_VER) && !defined(WRITEENGINEXMLGENDATA_DLLEXPORT)
     __declspec(dllimport)
 #endif
     EXPORT const static std::string RPT_DEBUG;

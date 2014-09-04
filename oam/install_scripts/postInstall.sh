@@ -78,8 +78,8 @@ send_user "Stop Calpont System                             "
 expect -re "# "
 send "$INSTALLDIR/bin/calpontConsole stopSystem INSTALL y\n"
 expect {
-	-re "# "                  	{ send_user "DONE" }
-	-re "**** stopSystem Failed" { send_user "INFO: System not running" }
+	-re "# "                  	{ send_user "DONE" } abort
+	-re "**** stopSystem Failed" { send_user "INFO: System not running" } abort
 }
 send_user "\n"
 # 
@@ -89,10 +89,10 @@ send_user "Erase Calpont Package on Module                 "
 expect -re "# "
 send "rpm -e --nodeps calpont\n"
 expect {
-	-re "# "                  { send_user "DONE" }
-	-re "uninstall completed" { send_user "DONE" }
+	-re "# "                  { send_user "DONE" } abort
+	-re "uninstall completed" { send_user "DONE" } abort
 	-re "ERROR dependencies" { send_user "ERROR: ERROR dependencies\n" ; exit -1 }
-	-re "not installed"       { send_user "INFO: Package not installed" }
+	-re "not installed"       { send_user "INFO: Package not installed" } abort
 }
 send_user "\n"
 
@@ -103,7 +103,7 @@ set timeout 60
 send_user "Install Calpont Package on Module               "
 send "rpm -ivh $RPMPACKAGE\n"
 expect {
-	-re "completed" 		  { send_user "DONE" }
+	-re "completed" 		  { send_user "DONE" } abort
 	-re "ERROR dependencies" { send_user "ERROR: ERROR dependencies\n" ; 
 								send_user "\n*** Installation ERROR\n" ; 
 									exit -1 }
@@ -124,7 +124,7 @@ set timeout 380
 send_user "Run System Installer                            "
 send "$INSTALLDIR/bin/installer $RPMPACKAGE initial $PASSWORD n 0\n"
 expect {
-	-re "reboot request successful" 			{ }
+	-re "reboot request successful" 			{ } abort
 	-re "error"   								{ send_user "FAILED" ; exit -1 }
 }
 

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
- * $Id: jl_logger.h 9210 2013-01-21 14:10:42Z rdempsey $
+ * $Id: jl_logger.h 8436 2012-04-04 18:18:21Z rdempsey $
  */
 
 /** @file */
@@ -32,7 +32,6 @@
 #include "errorids.h"
 #include "logger.h"
 #include "errorcodes.h"
-#include "errorinfo.h"
 #include "exceptclasses.h"
 
 namespace joblist
@@ -82,7 +81,7 @@ private:
 };
 
 typedef boost::shared_ptr<Logger> SPJL;
-void catchHandler(const std::string& s, int c, SErrorInfo& errorInfo, unsigned sid = 0,
+void catchHandler(const std::string& s, unsigned sid = 0,
 	logging::LOG_TYPE = logging::LOG_TYPE_CRITICAL);
 
 }

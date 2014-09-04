@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: objectidmanager.cpp 9210 2013-01-21 14:10:42Z rdempsey $
+ * $Id: objectidmanager.cpp 8436 2012-04-04 18:18:21Z rdempsey $
  *
  ****************************************************************************/
 
@@ -121,12 +121,12 @@ int ObjectIDManager::allocOID()
 	return allocOIDs(1);
 }
 
-int ObjectIDManager::allocVBOID(uint32_t dbroot)
+int ObjectIDManager::allocVBOID(uint dbroot)
 {
 	return dbrm.allocVBOID(dbroot);
 }
 
-int ObjectIDManager::getDBRootOfVBOID(uint32_t vboid)
+int ObjectIDManager::getDBRootOfVBOID(uint vboid)
 {
 	return dbrm.getDBRootOfVBOID(vboid);
 }

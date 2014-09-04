@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: functor_str.h 3923 2013-06-19 21:43:06Z bwilkinson $
+//  $Id: functor_str.h 3048 2012-04-04 15:33:45Z rdempsey $
 
 /** @file */
 
@@ -50,7 +50,7 @@ public:
 						FunctionParm& fp,
 						bool& isNull,
 						execplan::CalpontSystemCatalog::ColType& op_ct)
-	{   return strtod(getStrVal(row, fp, isNull, op_ct).c_str(), NULL); }
+	{ return atof(getStrVal(row, fp, isNull, op_ct).c_str()); }
 
 #if 0
 	std::string getStrVal(rowgroup::Row& row,
@@ -85,7 +85,7 @@ public:
 
 
 protected:
-	const std::string& stringValue(execplan::SPTP& fp, rowgroup::Row& row, bool& isNull)
+	std::string stringValue(execplan::SPTP& fp, rowgroup::Row& row, bool& isNull)
 	{
 		// Bug3788, use the shorter of fixed or scientific notation for floating point values.
 		// [ the default format in treenode.h is fixed-point notation ]
@@ -105,11 +105,9 @@ protected:
 			break;
 		}
 
-		fFloatStr = std::string(buf);
-        return fFloatStr;
+		return std::string(buf);
 	}
 
-	std::string fFloatStr;
 };
 
 
@@ -758,22 +756,6 @@ public:
 						execplan::CalpontSystemCatalog::ColType& op_ct);	
 };
 
-
-/** @brief Func_idbpartition class
-  */
-class Func_idbpartition : public Func_Str
-{
-public:
-        Func_idbpartition() : Func_Str("idbpartition") {}
-        virtual ~Func_idbpartition() {}
-
-        execplan::CalpontSystemCatalog::ColType operationType(FunctionParm& fp, execplan::CalpontSystemCatalog::ColType& resultType);
-
-        std::string getStrVal(rowgroup::Row& row,
-                                                FunctionParm& fp,
-                                                bool& isNull,
-                                                execplan::CalpontSystemCatalog::ColType& op_ct);
-};
 
 }
 

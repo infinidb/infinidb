@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_messages.h 4609 2013-04-19 15:32:02Z chao $
+* $Id: we_messages.h 4216 2012-09-28 23:08:21Z xlou $
 *
 *******************************************************************************/
 #ifndef WE_MESSAGES_H__
@@ -74,12 +74,6 @@ enum ServerMessages
 	WE_SVR_REMOVE_TABLEDATA,
 	WE_SVR_UPDATE_SYSCOLUMN_DEFAULTVAL,
 	WE_SVR_REDISTRIBUTE,
-	WE_SVR_CLOSE_CONNECTION,
-	WE_SVR_GET_FILESIZES,
-	WE_SVR_PURGEFD,
-	WE_END_TRANSACTION,
-	WE_SRV_FIX_ROWS,
-	WE_SVR_WRITE_CREATE_SYSCOLUMN,
 
 	WE_CLT_SRV_DATA=100,
 	WE_CLT_SRV_EOD,

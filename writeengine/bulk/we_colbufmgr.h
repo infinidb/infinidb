@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: we_colbufmgr.h 4726 2013-08-07 03:38:36Z bwilkinson $
+ * $Id: we_colbufmgr.h 3720 2012-04-04 18:18:49Z rdempsey $
  *
  *****************************************************************************/
 
@@ -89,8 +89,8 @@ class ColumnBufferManager {
      * @param lastRIDInExtent (out) last RID in relevant extent.
      * @return success or fail status
      */
-    int reserveSection(RID startRowId, uint32_t nRows,
-                       uint32_t& secRowCnt,
+    int reserveSection(RID startRowId, uint nRows,
+                       uint& secRowCnt,
                        ColumnBufferSection** cbs,
                        RID&  lastRIDInExtent);
 
@@ -129,13 +129,13 @@ class ColumnBufferManager {
      */
     int intermediateFlush();
 
-    /** @brief Set the IDBDataFile** destination for the applicable col segment file.
+    /** @brief Set the FILE* destination for the applicable col segment file.
      *
-     * @param cFile IDBDataFile* of the output column segment file.
+     * @param cFile FILE* of the output column segment file.
      * @param hwm Starting HWM for the file.
      * @param hdrs with ptr information (only applies to compressed files)
      */
-    int setDbFile(IDBDataFile* const cFile, HWM hwm, const char* hdrs)
+    int setDbFile(FILE* const cFile, HWM hwm, const char* hdrs)
     { return fCBuf->setDbFile(cFile, hwm, hdrs); }
 
     /** @brief Reset the ColBuf to-be-compressed buffer prior to importing the
@@ -186,7 +186,7 @@ class ColumnBufferManager {
      * @param writeSize   The number of bytes to be written to the file
      * @return success or fail status
      */
-    virtual int writeToFileExtentCheck(uint32_t startOffset, uint32_t writeSize);
+    virtual int writeToFileExtentCheck(uint startOffset, uint writeSize);
 
     //-------------------------------------------------------------------------
     // Protected Data Members
@@ -259,7 +259,7 @@ class ColumnBufferManagerDctnry : public ColumnBufferManager {
     virtual ~ColumnBufferManagerDctnry();
 
     virtual int rowsExtentCheck( int nRows, int& nRows2 );
-    virtual int writeToFileExtentCheck(uint32_t startOffset, uint32_t writeSize);
+    virtual int writeToFileExtentCheck(uint startOffset, uint writeSize);
 };
 
 }

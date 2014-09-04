@@ -16,10 +16,10 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: bpp.h 2035 2013-01-21 14:12:19Z rdempsey $
+// $Id: bpp.h 1855 2012-04-04 18:20:09Z rdempsey $
 // C++ Interface: bpp
 //
-// Description:
+// Description: 
 //
 //
 // Author: Patrick LeBlanc <pleblanc@calpont.com>, (C) 2008
@@ -41,5 +41,3 @@
 #include "filtercommand.h"
 #include "passthrucommand.h"
 #include "rtscommand.h"
-#include "pseudocc.h"
-

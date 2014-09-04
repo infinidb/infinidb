@@ -27,8 +27,8 @@ send "scp $FILE $USERNAME$SERVER:$FILE\n"
 expect {
 	-re "authenticity" { send "yes\n" 
 						expect {
-							-re "word: " { send "$PASSWORD\n" }
-							-re "passphrase" { send "$PASSWORD\n" }
+							-re "word: " { send "$PASSWORD\n" } abort
+							-re "passphrase" { send "$PASSWORD\n" } abort
 							}
 						}
 	-re "service not known" { send_user "FAILED: Invalid Host\n" ; exit 1 }
@@ -36,12 +36,12 @@ expect {
 	-re "Connection timed out" { send_user "FAILED: Connection timed out\n" ; exit 1 }
 	-re "lost connection" { send_user "FAILED: Connection refused\n" ; exit 1 }
 	-re "closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
-	-re "word: " { send "$PASSWORD\n" }
-	-re "passphrase" { send "$PASSWORD\n" }
+	-re "word: " { send "$PASSWORD\n" } abort
+	-re "passphrase" { send "$PASSWORD\n" } abort
 	-re "WARNING:" { send "rm -f /root/.ssh/known_hosts" ; exit 1 }
 }
 expect {
-	-re "100%" 						{ send_user "DONE\n" }
+	-re "100%" 						{ send_user "DONE\n" } abort
 	-re "scp:"  					{ send_user "FAILED\n" ; exit 1 }
 	-re "Permission denied"         { send_user "FAILED: Invalid password\n" ; exit 1 }
 	-re "No such file or directory" { send_user "FAILED: Invalid file\n" ; exit 1 }

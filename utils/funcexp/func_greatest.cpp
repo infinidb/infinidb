@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_greatest.cpp 3954 2013-07-08 16:30:15Z bpaul $
+* $Id: func_greatest.cpp 3956 2013-07-08 19:17:26Z bpaul $
 *
 *
 ****************************************************************************/
@@ -68,26 +68,7 @@ int64_t Func_greatest::getIntVal(rowgroup::Row& row,
 	double str = fp[0]->data()->getDoubleVal(row, isNull);
 
 	double greatestStr = str;
-	for (uint32_t i = 1; i < fp.size(); i++)
-	{
-		double str1 = fp[i]->data()->getDoubleVal(row, isNull);
-
-		if ( greatestStr < str1 )
-			greatestStr = str1;
-	}
-    uint64_t tmp = (uint64_t)greatestStr;
-	return (int64_t) tmp;
-}
-
-uint64_t Func_greatest::getUintVal(rowgroup::Row& row,
-						FunctionParm& fp,
-						bool& isNull,
-						execplan::CalpontSystemCatalog::ColType& op_ct)
-{
-	double str = fp[0]->data()->getDoubleVal(row, isNull);
-
-	double greatestStr = str;
-	for (uint32_t i = 1; i < fp.size(); i++)
+	for (uint i = 1; i < fp.size(); i++)
 	{
 		double str1 = fp[i]->data()->getDoubleVal(row, isNull);
 
@@ -95,7 +76,7 @@ uint64_t Func_greatest::getUintVal(rowgroup::Row& row,
 			greatestStr = str1;
 	}
 
-	return (uint64_t) greatestStr;
+	return (int64_t) greatestStr;
 }
 
 double Func_greatest::getDoubleVal(rowgroup::Row& row,
@@ -106,7 +87,7 @@ double Func_greatest::getDoubleVal(rowgroup::Row& row,
 	double str = fp[0]->data()->getDoubleVal(row, isNull);
 
 	double greatestStr = str;
-	for (uint32_t i = 1; i < fp.size(); i++)
+	for (uint i = 1; i < fp.size(); i++)
 	{
 		double str1 = fp[i]->data()->getDoubleVal(row, isNull);
 
@@ -122,12 +103,12 @@ std::string Func_greatest::getStrVal(rowgroup::Row& row,
 						bool& isNull,
 						execplan::CalpontSystemCatalog::ColType& op_ct)
 {
-	const string& str = fp[0]->data()->getStrVal(row, isNull);
+	string str = fp[0]->data()->getStrVal(row, isNull);
 
 	string greatestStr = str;
-	for (uint32_t i = 1; i < fp.size(); i++)
+	for (uint i = 1; i < fp.size(); i++)
 	{
-		const string& str1 = fp[i]->data()->getStrVal(row, isNull);
+		string str1 = fp[i]->data()->getStrVal(row, isNull);
 
 		int tmp = utf8::idb_strcoll(greatestStr.c_str(), str1.c_str());
 		if ( tmp < 0 )
@@ -148,7 +129,7 @@ IDB_Decimal Func_greatest::getDecimalVal(Row& row,
 	IDB_Decimal str = fp[0]->data()->getDecimalVal(row, isNull);
 
 	IDB_Decimal greatestStr = str;
-	for (uint32_t i = 1; i < fp.size(); i++)
+	for (uint i = 1; i < fp.size(); i++)
 	{
 		IDB_Decimal str1 = fp[i]->data()->getDecimalVal(row, isNull);
 

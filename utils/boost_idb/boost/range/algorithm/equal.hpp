@@ -31,7 +31,7 @@ namespace boost
                                 IteratorCategoryTag1,
                                 IteratorCategoryTag2 )
         {
-            while (true)
+            do
             {
                 // If we have reached the end of the left range then this is
                 // the end of the loop. They are equal if and only if we have
@@ -46,12 +46,7 @@ namespace boost
                     return false;
 
                 // continue looping if and only if the values are equal
-                if (*first1 != *first2)
-                    break;
-
-                ++first1;
-                ++first2;
-            }
+            } while(*first1++ == *first2++);
 
             // Reaching this line in the algorithm indicates that a value
             // inequality has been detected.
@@ -71,7 +66,7 @@ namespace boost
                                 IteratorCategoryTag1,
                                 IteratorCategoryTag2 )
         {
-            while (true)
+            do
             {
                 // If we have reached the end of the left range then this is
                 // the end of the loop. They are equal if and only if we have
@@ -86,12 +81,7 @@ namespace boost
                     return false;
 
                 // continue looping if and only if the values are equal
-                if (!pred(*first1, *first2))
-                    break;
-
-                ++first1;
-                ++first2;
-            }
+            } while(pred(*first1++, *first2++));
 
             // Reaching this line in the algorithm indicates that a value
             // inequality has been detected.
@@ -192,7 +182,7 @@ namespace boost
         }
 
     } // namespace range
-    using ::boost::range::equal;
+    using range::equal;
 } // namespace boost
 
 #endif // include guard

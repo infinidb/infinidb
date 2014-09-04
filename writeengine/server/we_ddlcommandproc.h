@@ -31,13 +31,11 @@
 #include <boost/date_time/gregorian/gregorian.hpp>
 #include "dataconvert.h"
 #include "writeengine.h"
-
-#if defined(_MSC_VER) && defined(xxxDDLPKGPROC_DLLEXPORT)
+#if defined(_MSC_VER) && defined(DDLPKGPROC_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
 #endif
-
 namespace WriteEngine
 {
 
@@ -58,7 +56,6 @@ class WE_DDLCommandProc
 		EXPORT uint8_t updateSyscolumnNextval(messageqcpp::ByteStream& bs, std::string & err);
 		EXPORT uint8_t writeSystable(messageqcpp::ByteStream& bs, std::string & err);
 		EXPORT uint8_t writeSyscolumn(messageqcpp::ByteStream& bs, std::string & err);
-		EXPORT uint8_t writeCreateSyscolumn(messageqcpp::ByteStream& bs, std::string & err);
 		EXPORT uint8_t createtablefiles(messageqcpp::ByteStream& bs, std::string & err);
 		EXPORT uint8_t commitVersion(messageqcpp::ByteStream& bs, std::string & err);
 		EXPORT uint8_t rollbackBlocks(messageqcpp::ByteStream& bs, std::string & err);
@@ -84,7 +81,6 @@ class WE_DDLCommandProc
 		EXPORT uint8_t writeDropTableLog(messageqcpp::ByteStream& bs, std::string & err);
 		EXPORT uint8_t deleteDDLLog(messageqcpp::ByteStream& bs, std::string & err);
 		EXPORT uint8_t fetchDDLLog(messageqcpp::ByteStream& bs, std::string & err);
-		void purgeFDCache();
 		/** @brief drop a set of partitions
 		 *
 		 * Do many VSS lookups under one lock.
@@ -93,7 +89,7 @@ class WE_DDLCommandProc
 		 * @return 0 on success, otherwise error.
 		 */
 		EXPORT uint8_t dropPartitions(messageqcpp::ByteStream& bs, std::string& err);
-		inline void convertRidToColumn (uint64_t& rid, uint16_t& dbRoot, uint32_t& partition, uint16_t& segment, const int32_t oid )
+		inline void convertRidToColumn (u_int64_t& rid, uint16_t& dbRoot, uint32_t& partition, uint16_t& segment, const int32_t oid )
 		{
 			fDbrm.getSysCatDBRoot(oid, dbRoot);
 			partition = rid / ( filesPerColumnPartition * extentsPerSegmentFile * extentRows );
@@ -101,11 +97,11 @@ class WE_DDLCommandProc
 			segment =( ( ( rid % ( filesPerColumnPartition * extentsPerSegmentFile * extentRows )) / extentRows ) ) % filesPerColumnPartition;
 		
 			//Calculate the relative rid for this segment file
-			uint64_t relRidInPartition = rid - ((uint64_t)partition * (uint64_t)filesPerColumnPartition * (uint64_t)extentsPerSegmentFile * (uint64_t)extentRows);
-			assert ( relRidInPartition <= (uint64_t)filesPerColumnPartition * (uint64_t)extentsPerSegmentFile * (uint64_t)extentRows );
+			u_int64_t relRidInPartition = rid - ((u_int64_t)partition * (u_int64_t)filesPerColumnPartition * (u_int64_t)extentsPerSegmentFile * (u_int64_t)extentRows);
+			assert ( relRidInPartition <= (u_int64_t)filesPerColumnPartition * (u_int64_t)extentsPerSegmentFile * (u_int64_t)extentRows );
 			uint32_t numExtentsInThisPart = relRidInPartition / extentRows;
 			unsigned numExtentsInThisSegPart = numExtentsInThisPart / filesPerColumnPartition;
-			uint64_t relRidInThisExtent = relRidInPartition - numExtentsInThisPart * extentRows;
+			u_int64_t relRidInThisExtent = relRidInPartition - numExtentsInThisPart * extentRows;
 			rid = relRidInThisExtent +  numExtentsInThisSegPart * extentRows;
 		}
 

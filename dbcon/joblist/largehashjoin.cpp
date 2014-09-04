@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-// $Id: largehashjoin.cpp 9655 2013-06-25 23:08:13Z xlou $
+// $Id: largehashjoin.cpp 8476 2012-04-25 22:28:15Z xlou $
 #include <string>
 #include <sstream>
 #include <cassert>
@@ -92,7 +92,7 @@ void logDiskIoInfo(uint64_t stepId, const AnyDataListSPtr& spdl)
 		{
 			boost::posix_time::time_duration td = j->fEnd - j->fStart;
 			umDiskIoFile << setfill('0')
-				<< "st" << setw(2) << stepId << "oid" << oid << bkt << setw(3) << i
+				<< "st" << setw(2) << stepId << "oid" << oid << bkt << setw(3) << i 
 				<< (j->fWrite ? " writes " : " reads  ") << setw(7) << setfill(' ')
 				<< j->fBytes << " bytes, at " << j->fStart << " duration "
 				<< td.total_microseconds() << " mcs @ "
@@ -180,7 +180,7 @@ void* HashJoinByBucket_thr(void* arg)
 	bool sendAllSearchSet = false;
 try
 {
-	for (uint32_t idx=0, bucketIdx=params->startBucket;
+	for (uint idx=0, bucketIdx=params->startBucket;
 		idx<params->numBuckets;
 		idx++, bucketIdx++) {
 
@@ -210,7 +210,7 @@ try
 			sendAllHashSet = (joinType == RIGHTOUTER);
 			sendAllSearchSet = (joinType == LEFTOUTER);
 		}
-		else
+		else 
 		{
 			hjPtr->setHashSet(hjPtr->Set1()->getBDL(), thrIdx);
 			hjPtr->setSearchSet(hjPtr->Set2()->getBDL(), thrIdx);
@@ -222,10 +222,10 @@ try
 
 	} // if set1Size <=0 . . .
 	params->timeset.setTimer(createHashStr);
-	hjPtr->createHash(hjPtr->HashSet(thrIdx),
-			  hjPtr->HashTable(thrIdx),
-			  bucketIdx,
-			  sendAllHashSet,
+	hjPtr->createHash(hjPtr->HashSet(thrIdx), 
+			  hjPtr->HashTable(thrIdx), 
+			  bucketIdx, 
+			  sendAllHashSet, 
 			  hjPtr->HashResult(thrIdx),
 			  params->dlTimes, params->die);
 	params->timeset.holdTimer(createHashStr);
@@ -233,10 +233,10 @@ try
 #ifdef DEBUG
 	long hashSetTotal = 0;
 	long searchSetTotal = 0;
-	for (uint32_t j=0;j<hjPtr->HashSet(thrIdx)->bucketCount();j++)
+	for (uint j=0;j<hjPtr->HashSet(thrIdx)->bucketCount();j++)
 		hashSetTotal+=hjPtr->HashSet(thrIdx)->bucketCount(); // are bucketDL
 
-	for (uint32_t j=0;j<hjPtr->HashSet(thrIdx)->bucketCount();j++)
+	for (uint j=0;j<hjPtr->HashSet(thrIdx)->bucketCount();j++)
 		searchSetTotal+=hjPtr->SearchSet(thrIdx)->size(j); // can be any datalist
 
 	cout << "\t\tJoinByBucket() thr " << dec << thrIdx
@@ -247,15 +247,15 @@ try
 
 	bool more;
 	e_t e;
-	e_t e2;
+	e_t e2; 
 	const uint64_t InvalidRID = static_cast<uint64_t>(-1);
 	int iter = hjPtr->SearchSet(thrIdx)->getIterator(bucketIdx);
-
-	ZonedDL* zdl1 = dynamic_cast<ZonedDL*>(hjPtr->SearchResult(thrIdx));
-	ZonedDL* zdl2 = dynamic_cast<ZonedDL*>(hjPtr->HashResult(thrIdx));
-	vector <e_t> vec1;
-	vector <e_t> vec2;
-
+	
+    	ZonedDL* zdl1 = dynamic_cast<ZonedDL*>(hjPtr->SearchResult(thrIdx));
+    	ZonedDL* zdl2 = dynamic_cast<ZonedDL*>(hjPtr->HashResult(thrIdx));
+    	vector <e_t> vec1;
+    	vector <e_t> vec2;	
+	
 	std::pair<typename HashJoin<e_t>::hashIter_t, typename HashJoin<e_t>::hashIter_t> hashItPair;
 	typename HashJoin<e_t>::hashIter_t hashIt;
 	typename HashJoin<e_t>::hash_t* ht = hjPtr->HashTable(thrIdx);
@@ -266,7 +266,7 @@ try
 	{
 
 		// If sendAllSearchSet=true, keep all of the search set.  If this is
-		// a right outer, we are dealing with a join such as
+		// a right outer, we are dealing with a join such as  
 		// col1 = col2 (+)
 		// where col1 is the SearchSet and col2 is the HashSet.  We want to include
 		// all of col1 in this case regardless of whether there is a matching col2.
@@ -294,10 +294,10 @@ try
 			if(hjPtr->SearchResult(thrIdx)->OID() >= 3000)
 			cout << "JoinByBucket() SearchResult add " << bucketIdx
 				<< " [" << e.first << "][" << e.second << "]" << endl;
-			uint32_t a=0;
+			uint a=0;
 			e_t b=e_t();
 #endif
-
+			
 			// If sendAllSearchSet=false, we already added the search result
 			// before the if condition above.
 			if (!sendAllSearchSet)
@@ -327,7 +327,7 @@ try
 				// so no reason to add it to the output datalist or keep searching for more matching values.
 				if(hashIt->second != InvalidRID)
 				{
-
+				
 					// If the matching pair has it's RID set to invalid, it's already been encountered,
 					hashItPair = ht->equal_range(e.second);
 					for(hashIt = hashItPair.first; hashIt != hashItPair.second; hashIt++)
@@ -348,19 +348,19 @@ try
 						}
 						else
 							hjPtr->HashResult(thrIdx)->insert(e2);
-
+	
 #ifdef DEBUG
 						a++;
 						b=v.second;
 #endif
-
+					
 						// Set the RID to invalid rid now that it's been matched and added to the output datalist.
-						// This will keep us from duplicating it if it is matched again.
-						hashIt->second = InvalidRID;
+						// This will keep us from duplicating it if it is matched again.	
+						hashIt->second = InvalidRID; 
 
-					}
-
-#ifdef DEBUG
+					} 
+					
+#ifdef DEBUG	
 					cout << "\t\tadded " << b << " " << a << " times" << endl << endl;
 #endif
 				}
@@ -372,14 +372,14 @@ try
 	} // for ( hjPtr...
 	params->timeset.holdTimer(hashJoinStr);
 
-	params->timeset.setTimer(insertLastResultsStr);
+	params->timeset.setTimer(insertLastResultsStr);	
 	if (vec1.size() != 0) {
 	    hjPtr->SearchResult(thrIdx)->insert(vec1);
 	    vec1.clear();
 	}
 	if (vec2.size() != 0) {
 	    hjPtr->HashResult(thrIdx)->insert(vec2);
-	    vec2.clear();
+	    vec2.clear();	    
 	}
 	params->timeset.holdTimer(insertLastResultsStr);
 
@@ -432,7 +432,7 @@ catch (...)
 	}
 	cerr << errMsg.str() << endl;
 	catchHandler(errMsg.str(),hjPtr->sessionId());
-}
+}	
 
 	return NULL;
 } // HashJoinByBucket_thr
@@ -577,7 +577,7 @@ void LargeHashJoin::doHashJoin()
 	BDLWrapper< ElementType > setB(Bp);
 
 	hj = new HashJoin<ElementType>(setA, setB, resultA, resultB, fJoinType, &dlTimes, fOutputJobStepAssociation.statusPtr(), sessionId(), &die);
-	if (fTableOID2 >= 3000)
+	if (fTableOID2 >= 3000)	
 	{
 		ostringstream logStr2;
    		logStr2 << "LargeHashJoin::run: ses:" << fSessionId <<
@@ -886,12 +886,12 @@ void StringHashJoinStep::doStringHashJoin()
 	StringElementType se;
 	ElementType       e;
 	int id = dlA->getIterator();
-
+	
 	bdl1 = dynamic_cast<ZonedDL*>(resultA);
 	bdl2 = dynamic_cast<ZonedDL*>(resultB);
 	vector <ElementType> v;
 	v.reserve(ZDL_VEC_SIZE);
-	if (bdl1)
+	if (bdl1) 
 	{
 	    while (dlA->next(id, &se))
     	{
@@ -908,12 +908,12 @@ void StringHashJoinStep::doStringHashJoin()
     	}
     	if (v.size() > 0)
     	    resultA->insert(v);
-
+    	
     	resultA->endOfInput();
 	}
-
-	else
-	{
+	
+	else 
+	{	      
     	while (dlA->next(id, &se))
     	{
     		if (se.second != CPNULLSTRMARK)
@@ -926,8 +926,8 @@ void StringHashJoinStep::doStringHashJoin()
     }
 
 	id = dlB->getIterator();
-
-	if (bdl2)
+	
+	if (bdl2) 
 	{
 	    v.clear();
 	    while (dlB->next(id, &se))
@@ -945,7 +945,7 @@ void StringHashJoinStep::doStringHashJoin()
     	}
     	if (v.size() > 0)
     	    resultB->insert(v);
-
+    	
     	resultB->endOfInput();
 	}
 	else

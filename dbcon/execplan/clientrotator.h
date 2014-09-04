@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
  /*********************************************************************
- * $Id: clientrotator.h 9210 2013-01-21 14:10:42Z rdempsey $
+ * $Id: clientrotator.h 8908 2012-09-18 18:50:03Z zzhu $
  *
  *
  ***********************************************************************/
@@ -43,13 +43,13 @@ namespace execplan
 class ClientRotator
 {
 public:
-	/** @brief ctor
+    /** @brief ctor
 	*/
-	ClientRotator(uint32_t sid, const std::string& name, bool localQuery=false);
+     ClientRotator(uint32_t sid, const std::string& name);
 
-	/** @brief dtor
+    /** @brief dtor
 	*/
-	~ClientRotator()
+	~ClientRotator() 
 	{
 		if (fClient)
 		{
@@ -58,22 +58,22 @@ public:
 		}
 	}
 
-	/** @brief connnect
-	 *
-	 * Try connecting to client based on session id.  If no connection,
-	 * try connectList.
-	 * @param timeout  in seconds.
-	*/
-	void connect(double timeout=50);
+    /** @brief connnect 
+     *
+     * Try connecting to client based on session id.  If no connection, 
+     * try connectList.
+     * @param timeout  in seconds.
+    */   
+    void connect(double timeout=50);
 
-	/** @brief write
-	 *
-	 * Write msg to fClient.  If unsuccessful, get new connection with
-	 * connectList and write.
-	*/
-	void write(const messageqcpp::ByteStream& msg);
+    /** @brief write 
+     *
+     * Write msg to fClient.  If unsuccessful, get new connection with 
+     * connectList and write.
+    */   
+    void write(const messageqcpp::ByteStream& msg);
 
-	/** @brief shutdown
+    /** @brief shutdown
 	*/
 	void shutdown()
 	{
@@ -85,76 +85,72 @@ public:
 		}
 	}
 
-	/** @brief read
+    /** @brief read
 	*/
-	messageqcpp::ByteStream read();
+    messageqcpp::ByteStream read();
 
-	/** @brief getClient
+    /** @brief getClient
 	*/
-	messageqcpp::MessageQueueClient* getClient() const { return fClient; }
+    messageqcpp::MessageQueueClient* getClient() const { return fClient; }
 
-	/** @brief getSessionId
+    /** @brief getSessionId
 	*/
-	uint32_t getSessionId() const { return fSessionId; }
+    uint32_t   getSessionId() const { return fSessionId; }
 
-	/** @brief setSessionId
+    /** @brief setSessionId
 	*/
-	void setSessionId(uint32_t sid) { fSessionId = sid; }
+    void 	setSessionId(uint32_t sid) { fSessionId = sid; }
 
-	friend std::ostream& operator<<(std::ostream& output, const ClientRotator& rhs);
+    friend std::ostream& operator<<(std::ostream& output, const ClientRotator& rhs);
+    
+    /** @brief reset fClient */
+    void resetClient();
+     
 
-	/** @brief reset fClient */
-	void resetClient();
+ private:
+ 
+    //Not copyable
+    ClientRotator(const ClientRotator& );
+    ClientRotator& operator=(const ClientRotator& );
 
-	bool localQuery() { return fLocalQuery; }
-	void localQuery(bool localQuery) { fLocalQuery = localQuery; }
-	static std::string getModule();
+   /** @brief load Clients 
+     *
+     * Put all entries for client name tag from config file into client list
+     */  	
+    void loadClients();
+ 
+    /** @brief execute connect 
+     *
+     * Make connection and return success.
+     */  
+    bool exeConnect(const std::string& clientName );
 
-private:
+    /** @brief connnect to list
+     *
+     * Try connecting to next client on list
+     * until timeout lapses. Then throw exception.
+     */   
+    void connectList(size_t idx = 0, double timeout=0.005);
 
-	//Not copyable
-	ClientRotator(const ClientRotator& );
-	ClientRotator& operator=(const ClientRotator& );
-
-	/** @brief load Clients
-	 *
-	 * Put all entries for client name tag from config file into client list
-	 */
-	void loadClients();
-
-	/** @brief execute connect
-	 *
-	 * Make connection and return success.
-	 */
-	bool exeConnect(const std::string& clientName );
-
-	/** @brief connnect to list
-	 *
-	 * Try connecting to next client on list
-	 * until timeout lapses. Then throw exception.
-	 */
-	void connectList(double timeout=0.005);
-
-	/** @brief write to message log
-	 *
-	 * writes message with file name to debug or
-	 * critical log.
-	 */
-	void writeToLog(int line, const std::string& msg, bool critical) const;
-
-	const std::string fName;
-	uint32_t fSessionId;
-	messageqcpp::MessageQueueClient* fClient;
-	typedef std::vector<std::string> ClientList;
-	ClientList fClients;
-	config::Config* fCf;
-	int fDebug;
-	boost::mutex fClientLock;
-	bool fLocalQuery;
+    /** @brief write to message log
+     *
+     * writes message with file name to debug or 
+     * critical log.
+     */   
+    void  writeToLog(int line, const std::string& msg, bool critical) const;
+	
+    const std::string fName;
+    uint32_t	fSessionId;
+    messageqcpp::MessageQueueClient* fClient;
+    typedef std::vector<std::string> ClientList;
+    ClientList 	fClients;
+    config::Config* fCf;
+    int		fDebug;
+    boost::mutex fClientLock;
 };
 
 
-} // namespace
-#endif
+}   // namespace
+#endif 
 // vim:ts=4 sw=4:
 

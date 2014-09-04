@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: vbbm.h 1926 2013-06-30 21:18:14Z wweeks $
+ * $Id: vbbm.h 1928 2013-06-30 21:20:52Z wweeks $
  *
  *****************************************************************************/
 
@@ -57,11 +57,6 @@
 #define EXPORT
 #endif
 
-
-namespace idbdatafile {
-class IDBDataFile;
-}
-
 namespace BRM {
 
 class VSS;
@@ -76,7 +71,7 @@ struct VBBMEntry {
 	LBID_t lbid;
 	VER_t verID;
 	OID_t vbOID;
-	uint32_t vbFBO;
+	u_int32_t vbFBO;
 	int next;
 	EXPORT VBBMEntry();
 };
@@ -166,8 +161,8 @@ class VBBM : public Undoable {
 		
 		EXPORT void lock(OPS op);
 		EXPORT void release(OPS op);
-		EXPORT int lookup(LBID_t lbid, VER_t ver, OID_t &oid, uint32_t &fbo) const;
-		EXPORT void insert(LBID_t lbid, VER_t ver, OID_t oid, uint32_t fbo);
+		EXPORT int lookup(LBID_t lbid, VER_t ver, OID_t &oid, u_int32_t &fbo) const;
+		EXPORT void insert(LBID_t lbid, VER_t ver, OID_t oid, u_int32_t fbo);
 		EXPORT void getBlocks(int num, OID_t vbOID, std::vector<VBRange> &vbRanges, VSS& vss,
 				bool flushPMCache);
 		EXPORT void removeEntry(LBID_t, VER_t ver);
@@ -178,9 +173,11 @@ class VBBM : public Undoable {
 		EXPORT void setReadOnly();
 
 		EXPORT void clear();
+		EXPORT void writeData(int fd, u_int8_t *buf, off_t offset, int size) const;
+		EXPORT void readData(int fd, u_int8_t *buf, off_t offset, int size);
 		EXPORT void load(std::string filename);
-		EXPORT void loadVersion1(idbdatafile::IDBDataFile* in);
-		EXPORT void loadVersion2(idbdatafile::IDBDataFile* in);
+		EXPORT void loadVersion1(std::ifstream &in);
+		EXPORT void loadVersion2(std::ifstream &in);
 		EXPORT void save(std::string filename);
 
 #ifdef BRM_DEBUG
@@ -218,7 +215,7 @@ class VBBM : public Undoable {
 		/* Shared nothing mods */
 		uint64_t currentFileSize;
 		void setCurrentFileSize();
-		uint32_t addVBFileIfNotExists(OID_t vbOID);
+		uint addVBFileIfNotExists(OID_t vbOID);
 };
 
 }

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: deletedmlpackage.cpp 9210 2013-01-21 14:10:42Z rdempsey $
+ *   $Id: deletedmlpackage.cpp 8436 2012-04-04 18:18:21Z rdempsey $
  *
  *
  ***********************************************************************/
@@ -62,8 +62,6 @@ int DeleteDMLPackage::write(messageqcpp::ByteStream& bytestream)
     messageqcpp::ByteStream::quadbyte hasFilter = fHasFilter;
     bytestream << hasFilter;
 
-    bytestream << fUuid;
-
     bytestream << fDMLStatement;
     bytestream << fSQLStatement;
     bytestream << fSchemaName;
@@ -93,8 +91,6 @@ int DeleteDMLPackage::read(messageqcpp::ByteStream& bytestream)
 
     bytestream >> hasFilter;
     fHasFilter = (hasFilter != 0);
-
-    bytestream >> fUuid;
 
     std::string dmlStatement;
     bytestream >> fDMLStatement;
@@ -191,26 +187,26 @@ int DeleteDMLPackage::buildFromBuffer(std::string& buffer, int columns, int rows
 
 int DeleteDMLPackage::buildFromMysqlBuffer(ColNameList& colNameList, TableValuesMap& tableValuesMap, int columns, int rows )
 {
-    int retval = 1;
+	int retval = 1;
 
     initializeTable();
-    //The row already built from MySql parser.
-/*  Row *aRowPtr = new Row();
-    std::string colName;
-    std::vector<std::string> colValList;
-    for (int j = 0; j < columns; j++)
+	//The row already built from MySql parser.
+/*	Row *aRowPtr = new Row();
+	std::string colName;
+	std::vector<std::string> colValList;
+	for (int j = 0; j < columns; j++)
     {
       //Build a column list
       colName = colNameList[j];
-
+      
       colValList = tableValuesMap[j];
 
       DMLColumn* aColumn = new DMLColumn(colName, colValList, false);
       (aRowPtr->get_ColumnList()).push_back(aColumn);
     }
-    //build a row list for a table
+	//build a row list for a table
     fTable->get_RowList().push_back(aRowPtr); */
-    return retval;
+	return retval;
 }
 
 }                                                 // namespace dmlpackage

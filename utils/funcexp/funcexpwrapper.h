@@ -17,7 +17,7 @@
 
 //
 //
-// $Id: funcexpwrapper.h 3495 2013-01-21 14:09:51Z rdempsey $
+// $Id: funcexpwrapper.h 3048 2012-04-04 15:33:45Z rdempsey $
 //
 // C++ Interface: funcexpwrapper
 //
@@ -56,8 +56,8 @@ class FuncExpWrapper : public messageqcpp::Serializeable
 		void deserialize(messageqcpp::ByteStream &);
 
 		bool evaluate(rowgroup::Row *);
-		inline bool evaluateFilter(uint32_t num, rowgroup::Row *r);
-		inline uint32_t getFilterCount() const;
+		inline bool evaluateFilter(uint num, rowgroup::Row *r);
+		inline uint getFilterCount() const;
 
 		void addFilter(const boost::shared_ptr<execplan::ParseTree>&);
 		void addReturnedColumn(const boost::shared_ptr<execplan::ReturnedColumn>&);
@@ -68,12 +68,12 @@ class FuncExpWrapper : public messageqcpp::Serializeable
 		FuncExp *fe;
 };
 
-inline bool FuncExpWrapper::evaluateFilter(uint32_t num, rowgroup::Row *r)
+inline bool FuncExpWrapper::evaluateFilter(uint num, rowgroup::Row *r)
 {
 	return fe->evaluate(*r, filters[num].get());
 }
 
-inline uint32_t FuncExpWrapper::getFilterCount() const
+inline uint FuncExpWrapper::getFilterCount() const
 {
 	return filters.size();
 }

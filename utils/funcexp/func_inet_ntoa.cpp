@@ -16,18 +16,10 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_inet_ntoa.cpp 3495 2013-01-21 14:09:51Z rdempsey $
+* $Id: func_inet_ntoa.cpp 3048 2012-04-04 15:33:45Z rdempsey $
 *
 *
 ****************************************************************************/
-
-#ifndef _MSC_VER
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#endif
-#include <iostream> // included when debugging
-#include <sstream>
-#include <climits>
 
 #include "functor_str.h"
 
@@ -35,6 +27,9 @@
 #include "functioncolumn.h"
 #include "joblisttypes.h"
 #include "rowgroup.h"
+#include <iostream> // included when debugging
+#include <sstream>
+#include <climits>
 
 namespace funcexp
 {
@@ -256,16 +251,38 @@ void Func_inet_ntoa::convertNtoa(
 	int64_t      ipNum,
 	std::string& ipString )
 {
-    struct sockaddr_in sa;
-    sa.sin_addr.s_addr = htonl(ipNum);
+	unsigned char* buf = (unsigned char*)&ipNum;
+	unsigned char* p;
 
-    // now get it back and print it
-#ifdef _MSC_VER
-    ipString = inet_ntoa(sa.sin_addr);
-#else
-    char str[INET_ADDRSTRLEN];
-    ipString = inet_ntop(AF_INET, &(sa.sin_addr), str, INET_ADDRSTRLEN);
-#endif
+	char num[4];
+	num[3]='.';
+
+	ipString.clear();
+
+	// Loop through the 4 bytes of the integer IP address.
+	// Keep in mind our data is stored in little-endian format and not the
+	// true big-endian format used to represent network IP addresses.
+	for (p=buf+4 ; p-- > buf ; )
+	{
+		uint c = *p;
+		uint n1,n2;                 // Try to avoid divisions
+		n1= c / 100;                // 100 digits
+		c-= n1*100;
+		n2= c / 10;                 // 10 digits
+		c-=n2*10;                   // last digit
+		num[0]=(char) n1+'0';
+		num[1]=(char) n2+'0';
+		num[2]=(char) c+'0';
+		uint length=(n1 ? 4 : n2 ? 3 : 2);      // Remove leading-zero's
+
+//		std::cout << "convertNtoa adding " <<
+//			num[0] << num[1] << num[2] << num[3] << std::endl;
+		if (p == buf)
+			ipString.append(num+4-length, length-1); // omit last trailing '.'
+		else
+			ipString.append(num+4-length, length);
+	}
+//	std::cout << "convertNtoa returning ip string: " << ipString << std::endl;
 }
 
 }

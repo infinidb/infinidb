@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
-* $Id: we_bulkrollbackfile.h 4675 2013-06-13 15:20:37Z dcathey $
+* $Id: we_bulkrollbackfile.h 4195 2012-09-19 18:12:27Z dcathey $
 */
 
 /** @file
@@ -57,7 +57,7 @@ public:
      */
     virtual     ~BulkRollbackFile();
 
-    /** @brief Construct the relevant db filename.
+    /** @brief Construct the relevant db filename and determine its existence
      * Warning: This function may throw a WeException.
      *
      * @param columnOID OID of the segment file to be deleted
@@ -65,13 +65,15 @@ public:
      * @param dbRoot DBRoot of the segment file to be deleted
      * @param partNum Partition number of the segment file to be deleted
      * @param segNum Segment number of the segment file to be deleted
+     * @param segFileExists (out) Does specified segment file exist
      * @param segFileName (out) Name of segment file
      */
-    void buildSegmentFileName(OID columnOID,
+    void findSegmentFile(OID      columnOID,
                         bool      fileTypeFlag,
-                        uint32_t dbRoot,
-                        uint32_t partNum,
-                        uint32_t segNum,
+                        u_int32_t dbRoot,
+                        u_int32_t partNum,
+                        u_int32_t segNum,
+                        bool&     segFileExists,
                         std::string& segFileName);
 
     /** @brief Delete a segment file.
@@ -86,9 +88,9 @@ public:
      */
     void deleteSegmentFile(OID    columnOID,
                         bool      fileTypeFlag,
-                        uint32_t dbRoot,
-                        uint32_t partNum,
-                        uint32_t segNum,
+                        u_int32_t dbRoot,
+                        u_int32_t partNum,
+                        u_int32_t segNum,
                         const std::string& segFileName );
 
     /** @brief Construct a directory path.
@@ -117,9 +119,9 @@ public:
      * @param segNum Segment number for the segment file in question
      */
     virtual bool doWeReInitExtent( OID columnOID,
-                        uint32_t   dbRoot,
-                        uint32_t   partNum,
-                        uint32_t   segNum) const;
+                        u_int32_t   dbRoot,
+                        u_int32_t   partNum,
+                        u_int32_t   segNum) const;
 
     /** @brief Reinitialize the specified column segment file starting at
      * startOffsetBlk, and truncate trailing extents.
@@ -137,13 +139,13 @@ public:
      * @param restoreHwmChk Restore HWM chunk (n/a to uncompressed)
      */
     virtual void reInitTruncColumnExtent(OID columnOID,
-                        uint32_t   dbRoot,
-                        uint32_t   partNum,
-                        uint32_t   segNum,
+                        u_int32_t   dbRoot,
+                        u_int32_t   partNum,
+                        u_int32_t   segNum,
                         long long   startOffsetBlk,
                         int         nBlocks,
-                        execplan::CalpontSystemCatalog::ColDataType colType,
-                        uint32_t   colWidth,
+                        ColDataType colType,
+                        u_int32_t   colWidth,
                         bool        restoreHwmChk );
 
     /** @brief Reinitialize the specified dictionary store segment file starting
@@ -159,9 +161,9 @@ public:
      * @param nBlocks Number of blocks to be reinitialized
      */
     virtual void reInitTruncDctnryExtent(OID columnOID,
-                        uint32_t   dbRoot,
-                        uint32_t   partNum,
-                        uint32_t   segNum,
+                        u_int32_t   dbRoot,
+                        u_int32_t   partNum,
+                        u_int32_t   segNum,
                         long long   startOffsetBlk,
                         int         nBlocks );
 
@@ -175,9 +177,9 @@ public:
      * @param fileSizeBlocks Number of blocks to retain in the file
      */
     virtual void truncateSegmentFile( OID    columnOID,
-                        uint32_t   dbRoot,
-                        uint32_t   partNum,
-                        uint32_t   segNum,
+                        u_int32_t   dbRoot,
+                        u_int32_t   partNum,
+                        u_int32_t   segNum,
                         long long   filesSizeBlocks );
 
 protected:
@@ -199,7 +201,7 @@ inline int BulkRollbackFile::buildDirName( OID oid,
     uint32_t partition,
     std::string& dirName)
 {
-    return fDbFile.getDirName( oid, dbRoot, partition, dirName );
+    return fDbFile.getDirName2( oid, dbRoot, partition, dirName );
 }
 
 } //end of namespace

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************************
- * $Id: resourcemanager.cpp 9655 2013-06-25 23:08:13Z xlou $
+ * $Id: resourcemanager.cpp 9491 2013-05-06 20:57:41Z pleblanc $
  *
  ******************************************************************************************/
 
@@ -32,13 +32,51 @@ using namespace std;
 #include <boost/regex.hpp>
 using namespace boost;
 
+#define RESOURCEMANAGER_DLLEXPORT
 #include "resourcemanager.h"
-
-#include "jl_logger.h"
-#include "cgroupconfigurator.h"
-#include "liboamcpp.h"
+#undef RESOURCEMANAGER_DLLEXPORT
 
 using namespace config;
+
+namespace
+{
+
+unsigned getNumCores()
+{
+#ifdef _MSC_VER
+	SYSTEM_INFO siSysInfo;
+	GetSystemInfo(&siSysInfo);
+	return siSysInfo.dwNumberOfProcessors;
+#else
+	ifstream cpuinfo("/proc/cpuinfo");
+
+	if (!cpuinfo.good())
+		return 0;
+
+	unsigned nc = 0;
+
+	regex re("Processor\\s*:\\s*[0-9]+", regex::normal|regex::icase);
+
+	string line;
+
+	getline(cpuinfo, line);
+
+	unsigned i = 0;
+	while (i < 10000 && cpuinfo.good() && !cpuinfo.eof())
+	{
+		if (regex_match(line, re))
+			nc++;
+
+		getline(cpuinfo, line);
+
+		++i;
+	}
+
+	return nc;
+#endif
+}
+
+}
 
 namespace joblist {
 
@@ -65,12 +103,12 @@ namespace joblist {
 	fHjNumThreads(defaultNumThreads),
 	fJlProcessorThreadsPerScan(defaultProcessorThreadsPerScan),
 	fJlNumScanReceiveThreads(defaultScanReceiveThreads),
-	fTwNumThreads(defaultNumThreads),
+	fTwNumThreads(defaultNumThreads),	
 	fHJUmMaxMemorySmallSideDistributor(fHashJoinStr,
 		"UmMaxMemorySmallSide",
 		getUintVal(fHashJoinStr, "TotalUmMaxMemorySmallSide", defaultTotalUmMemory),
 		getUintVal(fHashJoinStr, "UmMaxMemorySmallSide", defaultHJUmMaxMemorySmallSide),
-		0),
+		0),  
 	fHJPmMaxMemorySmallSideSessionMap(
 		getUintVal(fHashJoinStr, "PmMaxMemorySmallSide", defaultHJPmMaxMemorySmallSide)),
 	isExeMgr(runningInExeMgr)
@@ -87,8 +125,7 @@ namespace joblist {
 	if (configNumCores <= 0)
 	{
 		//count the actual #cores
-		utils::CGroupConfigurator cg;
-		fNumCores = cg.getNumCores();
+		fNumCores = getNumCores();
 		if (fNumCores <= 0)
 			fNumCores = 8;
 	}
@@ -116,50 +153,15 @@ namespace joblist {
 	temp = getIntVal(fTupleWSDLStr, "NumThreads", -1);
 	if (temp > 0)
 		fTwNumThreads = temp;
-
+	
 	pmJoinMemLimit = getIntVal(fHashJoinStr, "PmMaxMemorySmallSide",
 	  defaultHJPmMaxMemorySmallSide);
-	// Need to use different limits if this instance isn't running on the UM,
-	// or if it's an ExeMgr running on a PM node
+	// Need to use different limits if this instance isn't running on the UM
 	if (!isExeMgr)
 		totalUmMemLimit = pmJoinMemLimit;
-	else {
-        string whichLimit = "TotalUmMemory";
-        string pmWithUM = fConfig->getConfig("Installation", "PMwithUM");
-        if (pmWithUM == "y" || pmWithUM == "Y") {
-            oam::Oam OAM;
-            oam::oamModuleInfo_t moduleInfo = OAM.getModuleInfo();
-            string &moduleType = boost::get<1>(moduleInfo);
-
-            if (moduleType == "pm" || moduleType == "PM") {
-                string doesItExist = fConfig->getConfig(fHashJoinStr, "TotalPmUmMemory");
-                if (!doesItExist.empty())
-                    whichLimit = "TotalPmUmMemory";
-            }
-        }
-
-        string umtxt = fConfig->getConfig(fHashJoinStr, whichLimit);
-        if (umtxt.empty())
-            totalUmMemLimit = defaultTotalUmMemory;
-        else {
-            // is it an absolute or a percentage?
-            if (umtxt.find('%') != string::npos) {
-                utils::CGroupConfigurator cg;
-                uint64_t totalMem = cg.getTotalMemory();
-                totalUmMemLimit = atoll(umtxt.c_str())/100.0 * (double) totalMem;
-
-                if (totalUmMemLimit == 0 || totalUmMemLimit == LLONG_MIN ||
-                  totalUmMemLimit == LLONG_MAX)  // some garbage in the xml entry
-                    totalUmMemLimit = defaultTotalUmMemory;
-            }
-            else {  // an absolute; use the existing converter
-                totalUmMemLimit = getIntVal(fHashJoinStr, whichLimit,
-                    defaultTotalUmMemory);
-            }
-        }
-	}
-	configuredUmMemLimit = totalUmMemLimit;
-	//cout << "RM: total UM memory = " << totalUmMemLimit << endl;
+	else
+		totalUmMemLimit = getIntVal(fHashJoinStr, "TotalUmMemory",
+		  defaultTotalUmMemory);
 
 	// multi-thread aggregate
 	string nt, nb, nr;
@@ -167,34 +169,19 @@ namespace joblist {
 	if (nt.empty())
 		fAggNumThreads = numCores();
 	else
-		fAggNumThreads = fConfig->uFromText(nt);
-
+		fAggNumThreads = fConfig->uFromText(nt);	
+	
 	nb = fConfig->getConfig("RowAggregation","RowAggrBuckets");
 	if (nb.empty())
 		fAggNumBuckets = fAggNumThreads * 4;
 	else
 		fAggNumBuckets = fConfig->uFromText(nb);
-
+		
 	nr = fConfig->getConfig("RowAggregation", "RowAggrRowGroupsPerThread");
 	if (nr.empty())
 		fAggNumRowGroups = 20;
 	else
 		fAggNumRowGroups = fConfig->uFromText(nr);
-
-	// window function
-	string wt = fConfig->getConfig("WindowFunction", "WorkThreads");
-	if (wt.empty())
-		fWindowFunctionThreads = numCores();
-	else
-		fWindowFunctionThreads = fConfig->uFromText(wt);
-
-	// hdfs info
-	string hdfs = fConfig->getConfig("SystemConfig", "DataFilePlugin");
-
-	if ( hdfs.find("hdfs") != string::npos)
-		fUseHdfs = true;
-	else
-		fUseHdfs = false;
   }
 
   int ResourceManager::getEmPriority() const
@@ -214,8 +201,9 @@ namespace joblist {
     return val;
   }
 
-  void ResourceManager::addHJPmMaxSmallSideMap(uint32_t sessionID, uint64_t mem)
-  {
+
+  void ResourceManager::addHJPmMaxSmallSideMap(uint32_t sessionID, uint64_t mem) 
+  { 
 	if (fHJPmMaxMemorySmallSideSessionMap.addSession(sessionID, mem,
 		fHJUmMaxMemorySmallSideDistributor.getTotalResource()))
 		logResourceChangeMessage(logging::LOG_TYPE_INFO, sessionID, mem, defaultHJPmMaxMemorySmallSide,
@@ -231,9 +219,9 @@ namespace joblist {
 			LogRMResourceChangeError);
 	}
   }
-
-  void ResourceManager::addHJUmMaxSmallSideMap(uint32_t sessionID, uint64_t mem)
-  {
+ 
+  void ResourceManager::addHJUmMaxSmallSideMap(uint32_t sessionID, uint64_t mem) 
+  { 
 	if (fHJUmMaxMemorySmallSideDistributor.addSession(sessionID, mem))
 		logResourceChangeMessage(logging::LOG_TYPE_INFO, sessionID, mem, defaultHJUmMaxMemorySmallSide,
 			"UmMaxMemorySmallSide", LogRMResourceChange);
@@ -263,7 +251,7 @@ namespace joblist {
   }
 
   void	ResourceManager::emServerThreads() {  }
-  void	ResourceManager::emServerQueueSize() {  }
+  void	ResourceManager::emServerQueueSize() {  }	
   void	ResourceManager::emSecondsBetweenMemChecks() {  }
   void	ResourceManager::emMaxPct()  	{  }
   void	ResourceManager::emPriority() 	{  }
@@ -272,11 +260,11 @@ namespace joblist {
   void  ResourceManager::hjNumThreads() { }
   void	ResourceManager::hjMaxBuckets() { }
   void	ResourceManager::hjMaxElems()  { }
-  void	ResourceManager::hjFifoSizeLargeSide() { }
+  void	ResourceManager::hjFifoSizeLargeSide() { }	
   void	ResourceManager::hjPmMaxMemorySmallSide() { }
 
   void	ResourceManager::jlFlushInterval() { }
-  void	ResourceManager::jlFifoSize() { }
+  void	ResourceManager::jlFifoSize() { }	
   void	ResourceManager::jlScanLbidReqLimit() { }
   void	ResourceManager::jlScanLbidReqThreshold(){ }
   void	ResourceManager::jlProjectBlockReqLimit(){ }
@@ -318,37 +306,21 @@ namespace joblist {
 
 	return rc;
   }
-
+  
 bool ResourceManager::queryStatsEnabled() const
 {
-	std::string val(getStringVal("QueryStats", "Enabled", "N" ));
-	boost::to_upper(val);
-	return "Y" == val;
+	std::string val(getStringVal("QueryStats", "Enabled", "N" ));  
+	boost::to_upper(val); 
+	return "Y" == val; 
 }
 
 bool ResourceManager::userPriorityEnabled() const
 {
-	std::string val(getStringVal("UserPriority", "Enabled", "N" ));
-	boost::to_upper(val);
-	return "Y" == val;
-}
-
-bool ResourceManager::getMemory(int64_t amount, boost::shared_ptr<int64_t> sessionLimit, bool patience)
-{
-	bool ret1 = (atomicops::atomicSub(&totalUmMemLimit, amount) >= 0);
-	bool ret2 = (atomicops::atomicSub(sessionLimit.get(), amount) >= 0);
-
-	uint32_t retryCounter = 0, maxRetries = 20;   // 10s delay
-	while (patience && !(ret1 && ret2) && retryCounter++ < maxRetries) {
-		atomicops::atomicAdd(&totalUmMemLimit, amount);
-		atomicops::atomicAdd(sessionLimit.get(), amount);
-		usleep(500000);
-		ret1 = (atomicops::atomicSub(&totalUmMemLimit, amount) >= 0);
-		ret2 = (atomicops::atomicSub(sessionLimit.get(), amount) >= 0);
-	}
-	return (ret1 && ret2);
+	std::string val(getStringVal("UserPriority", "Enabled", "N" ));  
+	boost::to_upper(val); 
+	return "Y" == val; 
 }
 
 
-} //namespace
+} //namespace 
 

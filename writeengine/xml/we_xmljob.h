@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_xmljob.h 4450 2013-01-21 14:13:24Z rdempsey $
+* $Id: we_xmljob.h 3806 2012-05-01 12:23:02Z dcathey $
 *
 *******************************************************************************/
 /** @file */
@@ -81,8 +81,7 @@ public:
         const std::string& schemaName,
         const std::string& tableName,
         boost::filesystem::path& xmlDirPath,
-        std::string&       errMsg,
-        std::string&	   tableOIDStr );
+        std::string&       errMsg );
 
     /**
      * @brief Get job structure

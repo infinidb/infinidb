@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: commandpackageprocessor.cpp 9613 2013-06-12 15:44:24Z dhall $
+ *   $Id: commandpackageprocessor.cpp 8923 2012-09-19 18:14:01Z dcathey $
  *
  *
  ***********************************************************************/
@@ -27,7 +27,9 @@
 #include <vector>
 #include <boost/scoped_ptr.hpp>
 
+#define COMMANDPKGPROC_DLLEXPORT
 #include "commandpackageprocessor.h"
+#undef COMMANDPKGPROC_DLLEXPORT
 #include "messagelog.h"
 #include "dbrm.h"
 #include "sqllogger.h"
@@ -45,6 +47,30 @@ using namespace execplan;
 using namespace logging;
 using namespace boost;
 using namespace BRM;
+
+namespace
+{
+void invalidateCPData(CalpontSystemCatalog::SCN txnid)
+{
+	scoped_ptr<DBRM> dbrmp(new DBRM());
+	vector<LBID_t> lbidList;
+	dbrmp->getUncommittedExtentLBIDs(static_cast<VER_t>(txnid), lbidList);
+	vector<LBID_t>::const_iterator iter = lbidList.begin();
+	vector<LBID_t>::const_iterator end = lbidList.end();
+	CPInfoList_t cpInfos;
+	CPInfo aInfo;
+	while (iter != end)
+	{
+		aInfo.firstLbid = *iter;
+		aInfo.max = numeric_limits<int64_t>::min();
+		aInfo.min = numeric_limits<int64_t>::max();
+		aInfo.seqNum = -1;
+		cpInfos.push_back(aInfo);
+		++iter;
+	}
+	dbrmp->setExtentsMaxMin(cpInfos);
+}
+}
 
 namespace dmlpackageprocessor
 {
@@ -67,37 +93,10 @@ CommandPackageProcessor::processPackage(dmlpackage::CalpontDMLPackage& cpackage)
 	boost::algorithm::to_upper(stmt);
 	trim(stmt);
 	fSessionID = cpackage.get_SessionID();
-	BRM::TxnID txnid = fSessionManager.getTxnID(cpackage.get_SessionID());
-	uint64_t uniqueId = 0;
-	//Bug 5070. Added exception handling
-	try {
-		uniqueId = fDbrm->getUnique64();
-	}
-	catch (std::exception& ex)
-	{
-		logging::Message::Args args;
-		logging::Message message(9);
-		args.add(ex.what());
-		message.format(args);
-		result.result = COMMAND_ERROR;	
-		result.message = message;
-		fSessionManager.rolledback(txnid);
-		return result;
-	}
-	catch ( ... )
-	{
-		logging::Message::Args args;
-		logging::Message message(9);
-		args.add("Unknown error occured while getting unique number.");
-		message.format(args);
-		result.result = COMMAND_ERROR;	
-		result.message = message;
-		fSessionManager.rolledback(txnid);
-		return result;
-	}
-	
+	uint64_t uniqueId = fDbrm.getUnique64();
 	string errorMsg;
 	bool queRemoved = false;
+	BRM::TxnID txnid = fSessionManager.getTxnID(cpackage.get_SessionID());
 	logging::LoggingID lid(20);
     logging::MessageLog ml(lid);
 	LoggingID logid( DMLLoggingId, fSessionID, txnid.id);
@@ -122,7 +121,7 @@ CommandPackageProcessor::processPackage(dmlpackage::CalpontDMLPackage& cpackage)
 			if ((txnid.valid))
 			{
 				vector<LBID_t> lbidList;
-				fDbrm->getUncommittedExtentLBIDs(static_cast<VER_t>(txnid.id), lbidList);
+				fDbrm.getUncommittedExtentLBIDs(static_cast<VER_t>(txnid.id), lbidList);
 				bool cpInvalidated = false;
 				//cout << "get a valid txnid " << txnid.id << " and stmt is " << stmt << " and isBachinsert is " << cpackage.get_isBatchInsert() << endl;
 				if ((stmt == "COMMIT") && (cpackage.get_isBatchInsert()))
@@ -131,57 +130,50 @@ CommandPackageProcessor::processPackage(dmlpackage::CalpontDMLPackage& cpackage)
 					boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(fSessionID);
 					CalpontSystemCatalog::TableName tableName;
 					tableName = systemCatalogPtr->tableName(cpackage.getTableOid());
-                    try
-                    {
-                        uint64_t nextVal = systemCatalogPtr->nextAutoIncrValue(tableName);
-                        if (nextVal != AUTOINCR_SATURATED) //need to update syscolumn
-                        {
-                            //get autoincrement column oid
-                            int32_t columnOid = systemCatalogPtr->autoColumOid(tableName);
-                            //get the current nextVal from controller
-							scoped_ptr<DBRM> aDbrm(new DBRM());
-                            uint64_t nextValInController = 0;
-                            bool validNextVal = false;
-                            aDbrm->getAILock(columnOid);
-                            nextVal = systemCatalogPtr->nextAutoIncrValue(tableName); //in case it has changed
-                            validNextVal = aDbrm->getAIValue(columnOid, &nextValInController);
-                            if ((validNextVal) && (nextValInController > nextVal))
-                            {
-                                fWEClient->removeQueue(uniqueId);
-                                queRemoved = true;
-                                WE_DDLCommandClient ddlClient;
-                                uint8_t rc = ddlClient.UpdateSyscolumnNextval(columnOid, nextValInController);
-                                //@bug 5894. Need release lock.
-                                aDbrm->releaseAILock(columnOid);
-                                if (rc != 0)
-                                    throw std::runtime_error("Error in UpdateSyscolumnNextval");
-                            }
-                            else
-								aDbrm->releaseAILock(columnOid);
-                        }
-                    }
-                    catch (std::exception& ex)
-                    {
-                        //Rollback transaction
-                        rollBackTransaction(uniqueId, txnid, fSessionID, errorMsg);
-                        fSessionManager.rolledback( txnid );
-                        throw std::runtime_error(ex.what());
-                    }
+					long long nextVal = systemCatalogPtr->nextAutoIncrValue(tableName);
+					if (nextVal > 0) //neet to update syscolumn
+					{
+						//get autoincrement column oid
+						int32_t columnOid = systemCatalogPtr->autoColumOid(tableName);
+						//get the current nextVal from controller
+						DBRM aDbrm;
+						uint64_t nextValInController = 0;
+						bool validNextVal = false;
+						try {
+							aDbrm.getAILock(columnOid);
+							nextVal = systemCatalogPtr->nextAutoIncrValue(tableName); //in case it has changed
+							validNextVal = aDbrm.getAIValue(columnOid, &nextValInController);
+						}
+						catch (std::exception& ex)
+						{
+							//Rollback transaction
+							rollBackTransaction(uniqueId, txnid, fSessionID, errorMsg);
+							fSessionManager.rolledback( txnid );
+							throw std::runtime_error(ex.what());
+						}
+						if ((validNextVal) && (nextValInController > (uint64_t)nextVal))
+						{
+							fWEClient->removeQueue(uniqueId);
+							queRemoved = true;
+							WE_DDLCommandClient ddlClient;
+							uint8_t rc = ddlClient.UpdateSyscolumnNextval(columnOid, nextValInController);
+							if (rc != 0)
+								throw std::runtime_error("Error in UpdateSyscolumnNextval");
+						}
+					}
 					//systemCatalogPtr->updateColinfoCache(nextValMap);
 					int weRc = 0;
 					if (cpackage.get_isAutocommitOn())
 					{
 						weRc = commitBatchAutoOnTransaction(uniqueId, txnid, cpackage.getTableOid(), errorMsg);
-						if (weRc != 0)
-							BRM::errString(weRc, errorMsg);
 						cpInvalidated = true;
 					}
 					else
 					{
-						weRc = fDbrm->vbCommit(txnid.id);
+						weRc = fDbrm.vbCommit(txnid.id);
 						if (weRc != 0)
 							BRM::errString(weRc, errorMsg);
-						//weRc = commitBatchAutoOffTransaction(uniqueId, txnid, cpackage.getTableOid(), errorMsg);
+						weRc = commitBatchAutoOffTransaction(uniqueId, txnid, cpackage.getTableOid(), errorMsg);
 					}
 					
 					if (weRc != 0)
@@ -199,7 +191,7 @@ CommandPackageProcessor::processPackage(dmlpackage::CalpontDMLPackage& cpackage)
 					boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(fSessionID);
 					CalpontSystemCatalog::TableName tableName;
 					uint32_t tableOid = cpackage.getTableOid();
-					std::vector<TableLockInfo> tableLocks = fDbrm->getAllTableLocks();
+					std::vector<TableLockInfo> tableLocks = fDbrm.getAllTableLocks();
 					if (tableOid == 0) //special case: transaction commit for autocommit off and not following a dml statement immediately
 					{
 						TablelockData * tablelockData = TablelockData::makeTablelockData(fSessionID);
@@ -213,49 +205,48 @@ CommandPackageProcessor::processPackage(dmlpackage::CalpontDMLPackage& cpackage)
 								if ( iter != tablelockMap.end() )
 								{
 									tableName = systemCatalogPtr->tableName(tableLocks[k].tableOID);
-                                    try 
-                                    {
-    									uint64_t nextVal = systemCatalogPtr->nextAutoIncrValue(tableName);
-    									if (nextVal != AUTOINCR_SATURATED) //neet to update syscolumn
-    									{
-    										//get autoincrement column oid
-    										int32_t columnOid = systemCatalogPtr->autoColumOid(tableName);
-    										//get the current nextVal from controller
-											scoped_ptr<DBRM> aDbrm(new DBRM());
-    										uint64_t nextValInController = 0;
-    										bool validNextVal = false;
-											aDbrm->getAILock(columnOid);
+									long long nextVal = systemCatalogPtr->nextAutoIncrValue(tableName);
+									if (nextVal > 0) //neet to update syscolumn
+									{
+										//get autoincrement column oid
+										int32_t columnOid = systemCatalogPtr->autoColumOid(tableName);
+										//get the current nextVal from controller
+										DBRM aDbrm;
+										uint64_t nextValInController = 0;
+										bool validNextVal = false;
+										try {
+											aDbrm.getAILock(columnOid);
 											nextVal = systemCatalogPtr->nextAutoIncrValue(tableName); //in case it has changed
-											validNextVal = aDbrm->getAIValue(columnOid, &nextValInController);
+											validNextVal = aDbrm.getAIValue(columnOid, &nextValInController);
+										}
+										catch (std::exception& ex)
+										{
+											//Rollback transaction, release tablelock
+											rollBackTransaction(uniqueId, txnid, fSessionID, errorMsg);
+											fDbrm.releaseTableLock(iter->second);
+											fSessionManager.rolledback( txnid );
+											throw std::runtime_error(ex.what());
+										}
 										
-    										if ((validNextVal) && (nextValInController > (uint64_t)nextVal))
-    										{
-    											fWEClient->removeQueue(uniqueId);
-    							
-    											queRemoved = true;
-    											WE_DDLCommandClient ddlClient;
-    											uint8_t rc = ddlClient.UpdateSyscolumnNextval(columnOid, nextValInController,fSessionID);
-    											aDbrm->releaseAILock(columnOid);
-    											if (rc != 0)
-    											{
-    												//for now 
-    												fSessionManager.committed( txnid );
-    												throw std::runtime_error("Error in UpdateSyscolumnNextval");
-    											}
-    										}
-    										else
-    											aDbrm->releaseAILock(columnOid);
-                                        }
+										if ((validNextVal) && (nextValInController > (uint64_t)nextVal))
+										{
+											fWEClient->removeQueue(uniqueId);
+							
+											queRemoved = true;
+											WE_DDLCommandClient ddlClient;
+											uint8_t rc = ddlClient.UpdateSyscolumnNextval(columnOid, nextValInController,fSessionID);
+											aDbrm.releaseAILock(columnOid);
+											if (rc != 0)
+											{
+												//for now 
+												fSessionManager.committed( txnid );
+												throw std::runtime_error("Error in UpdateSyscolumnNextval");
+											}
+										}
+										else
+											aDbrm.releaseAILock(columnOid);
 						
 									}
-                                    catch (std::exception& ex)
-                                    {
-                                        //Rollback transaction, release tablelock
-                                        rollBackTransaction(uniqueId, txnid, fSessionID, errorMsg);
-                                        fDbrm->releaseTableLock(iter->second);
-                                        fSessionManager.rolledback( txnid );
-                                        throw std::runtime_error(ex.what());
-                                    }
 								}
 							}	
 						}												
@@ -265,57 +256,56 @@ CommandPackageProcessor::processPackage(dmlpackage::CalpontDMLPackage& cpackage)
 						if (tableOid >= 3000)
 						{
 							tableName = systemCatalogPtr->tableName(tableOid);
-                            try 
-                            {
-                                uint64_t nextVal = systemCatalogPtr->nextAutoIncrValue(tableName);
-    							if (nextVal != AUTOINCR_SATURATED) //need to update syscolumn
-    							{
-    								//get autoincrement column oid
-    								int32_t columnOid = systemCatalogPtr->autoColumOid(tableName);
-    								//get the current nextVal from controller
-    								scoped_ptr<DBRM> aDbrm(new DBRM());
-    								uint64_t nextValInController = 0;
-    								bool validNextVal = false;
-                                    aDbrm->getAILock(columnOid);
-                                    nextVal = systemCatalogPtr->nextAutoIncrValue(tableName); //in case it has changed
-                                    validNextVal = aDbrm->getAIValue(columnOid, &nextValInController);
-    								if ((validNextVal) && (nextValInController > (uint64_t)nextVal))
-    								{
-    									fWEClient->removeQueue(uniqueId);
-    							
-    									queRemoved = true;
-    									WE_DDLCommandClient ddlClient;
-    									uint8_t rc = ddlClient.UpdateSyscolumnNextval(columnOid, nextValInController,fSessionID);
-    									aDbrm->releaseAILock(columnOid);
-    									if (rc != 0)
-    									{
-    										//for now 
-    										fSessionManager.committed( txnid );
-    										throw std::runtime_error("Error in UpdateSyscolumnNextval");
-    									}
-    								}
-    								else
-    									aDbrm->releaseAILock(columnOid);		
-                                }
+							long long nextVal = systemCatalogPtr->nextAutoIncrValue(tableName);
+							if (nextVal > 0) //neet to update syscolumn
+							{
+								//get autoincrement column oid
+								int32_t columnOid = systemCatalogPtr->autoColumOid(tableName);
+								//get the current nextVal from controller
+								DBRM aDbrm;
+								uint64_t nextValInController = 0;
+								bool validNextVal = false;
+								try {
+									aDbrm.getAILock(columnOid);
+									nextVal = systemCatalogPtr->nextAutoIncrValue(tableName); //in case it has changed
+									validNextVal = aDbrm.getAIValue(columnOid, &nextValInController);
+								}
+								catch (std::exception& ex)
+								{
+									//Rollback transaction, release tablelock
+									rollBackTransaction(uniqueId, txnid, fSessionID, errorMsg);
+									for ( unsigned k=0; k < tableLocks.size(); k++)
+									{
+										if ( tableLocks[k].tableOID == tableOid )
+										{	
+											try {
+												fDbrm.releaseTableLock(tableLocks[k].id);
+											}
+											catch (std::exception&)
+											{}
+										}
+									}
+									fSessionManager.rolledback( txnid );
+									throw std::runtime_error(ex.what());
+								}
+								if ((validNextVal) && (nextValInController > (uint64_t)nextVal))
+								{
+									fWEClient->removeQueue(uniqueId);
+							
+									queRemoved = true;
+									WE_DDLCommandClient ddlClient;
+									uint8_t rc = ddlClient.UpdateSyscolumnNextval(columnOid, nextValInController,fSessionID);
+									aDbrm.releaseAILock(columnOid);
+									if (rc != 0)
+									{
+										//for now 
+										fSessionManager.committed( txnid );
+										throw std::runtime_error("Error in UpdateSyscolumnNextval");
+									}
+								}
+								else
+									aDbrm.releaseAILock(columnOid);		
 							}
-                            catch (std::exception& ex)
-                            {
-                                //Rollback transaction, release tablelock
-                                rollBackTransaction(uniqueId, txnid, fSessionID, errorMsg);
-                                for ( unsigned k=0; k < tableLocks.size(); k++)
-                                {
-                                    if ( tableLocks[k].tableOID == tableOid )
-                                    {	
-                                        try {
-                                            fDbrm->releaseTableLock(tableLocks[k].id);
-                                        }
-                                        catch (std::exception&)
-                                        {}
-                                    }
-                                }
-                                fSessionManager.rolledback( txnid );
-                                throw std::runtime_error(ex.what());
-                            }
 						}
 					}
 					int weRc = commitTransaction(uniqueId, txnid );
@@ -342,7 +332,28 @@ CommandPackageProcessor::processPackage(dmlpackage::CalpontDMLPackage& cpackage)
 					if (weRc == 0)
 					{
 						//@Bug 4560 invalidate cp first as bulkrollback will truncate the newly added lbids.
-						fDbrm->invalidateUncommittedExtentLBIDs(0, &lbidList);
+						vector<LBID_t>::const_iterator iter = lbidList.begin();
+						vector<LBID_t>::const_iterator end = lbidList.end();
+						CPInfoList_t cpInfos;
+						CPInfo aInfo;
+						while (iter != end)
+						{
+							aInfo.firstLbid = *iter;
+							aInfo.max = numeric_limits<int64_t>::min();
+							aInfo.min = numeric_limits<int64_t>::max();
+							aInfo.seqNum = -1;
+							cpInfos.push_back(aInfo);
+							++iter;
+						}
+						std::vector<BRM::BulkSetHWMArg> allHwm;
+						std::vector<CPInfoMerge>  mergeCPDataArgs;
+						int brmRc = fDbrm.bulkSetHWMAndCP(allHwm, cpInfos, mergeCPDataArgs, 0);
+						if (brmRc != 0)
+						{
+							string errMsg;
+							BRM::errString(brmRc, errMsg);
+							throw std::runtime_error(errMsg);
+						}
 						cpInvalidated = true;
 						weRc = rollBackBatchAutoOnTransaction(uniqueId, txnid, fSessionID, cpackage.getTableOid(), errorMsg);
 							
@@ -358,7 +369,7 @@ CommandPackageProcessor::processPackage(dmlpackage::CalpontDMLPackage& cpackage)
 						//@Bug 4524. Don't set to readonly. Just error out.
 						WErrorCodes   ec;
 						ostringstream oss;
-						oss << "ROLLBACK batch insert failed due to: " << "(" << weRc << ")" << ec.errorString(weRc);
+						oss << "ROLLBACK failed due to: " << ec.errorString(weRc);
 						//Log to error log
 						logging::Message::Args args1;
 						logging::Message message1(2);
@@ -395,7 +406,28 @@ CommandPackageProcessor::processPackage(dmlpackage::CalpontDMLPackage& cpackage)
 				
 				if (!cpInvalidated)
 				{
-					fDbrm->invalidateUncommittedExtentLBIDs(0, &lbidList);
+					vector<LBID_t>::const_iterator iter = lbidList.begin();
+					vector<LBID_t>::const_iterator end = lbidList.end();
+					CPInfoList_t cpInfos;
+					CPInfo aInfo;
+					while (iter != end)
+					{
+						aInfo.firstLbid = *iter;
+						aInfo.max = numeric_limits<int64_t>::min();
+						aInfo.min = numeric_limits<int64_t>::max();
+						aInfo.seqNum = -1;
+						cpInfos.push_back(aInfo);
+						++iter;
+					}
+					std::vector<BRM::BulkSetHWMArg> allHwm;
+					std::vector<CPInfoMerge>  mergeCPDataArgs;
+					int brmRc = fDbrm.bulkSetHWMAndCP(allHwm, cpInfos, mergeCPDataArgs, 0);
+					if (brmRc != 0)
+					{
+						string errMsg;
+						BRM::errString(brmRc, errMsg);
+						throw std::runtime_error(errMsg);
+					}
 				}
 			}
 		}
@@ -481,7 +513,7 @@ CommandPackageProcessor::processPackage(dmlpackage::CalpontDMLPackage& cpackage)
 			{
 		
 				try {
-					lockReleased = fDbrm->releaseTableLock(it->second);
+					lockReleased = fDbrm.releaseTableLock(it->second);
 					//cout << "releasing tablelock " << it->second << endl;
 				}
 				catch (std::exception& ex)
@@ -555,7 +587,7 @@ void CommandPackageProcessor::viewTableLock(
 
 	// Get list of table locks for the requested table
 	std::vector<BRM::TableLockInfo> tableLocks;
-	tableLocks = fDbrm->getAllTableLocks();
+	tableLocks = fDbrm.getAllTableLocks();
 
 	// Make preliminary pass through the table locks in order to determine our
 	// output column widths based on the data.  Min column widths are based on
@@ -760,7 +792,7 @@ void CommandPackageProcessor::clearTableLock( uint64_t uniqueId,
 
 	try {
 		// Make sure BRM is in READ-WRITE state before starting
-		int brmRc = fDbrm->isReadWrite( );
+		int brmRc = fDbrm.isReadWrite( );
 		if (brmRc != BRM::ERR_OK)
 		{
 			std::string brmErrMsg;
@@ -887,7 +919,7 @@ void CommandPackageProcessor::clearTableLock( uint64_t uniqueId,
 			// We ignore the return stateChange flag.
 			if (!bErrFlag)
 			{
-				fDbrm->changeState( tableLockID, BRM::CLEANUP );
+				fDbrm.changeState( tableLockID, BRM::CLEANUP );
 			}
 		} // end of (lockInfo.state == BRM::LOADING)
 
@@ -956,7 +988,7 @@ void CommandPackageProcessor::clearTableLock( uint64_t uniqueId,
 			// We ignore return release flag from releaseTableLock().
 			if (!bErrFlag)
 			{
-				fDbrm->releaseTableLock( tableLockID );
+				fDbrm.releaseTableLock( tableLockID );
 			}
 		}
 	}
@@ -1031,7 +1063,7 @@ void CommandPackageProcessor::establishTableLockToClear( uint64_t tableLockID,
 	boost::mutex::scoped_lock lock( fActiveClearTableLockCmdMutex );
 
 	// Get current table lock info
-	bool getLockInfo = fDbrm->getTableLockInfo(tableLockID, &lockInfo);
+	bool getLockInfo = fDbrm.getTableLockInfo(tableLockID, &lockInfo);
 
 	if (!getLockInfo)
 	{
@@ -1039,7 +1071,7 @@ void CommandPackageProcessor::establishTableLockToClear( uint64_t tableLockID,
 	}
 
 	std::string processName("DMLProc clearTableLock");
-	uint32_t processID = ::getpid();
+	u_int32_t processID = ::getpid();
 
 	// See if another thread is executing a cleartablelock cmd for this table
 	if ((lockInfo.ownerName == processName) &&
@@ -1060,7 +1092,7 @@ void CommandPackageProcessor::establishTableLockToClear( uint64_t tableLockID,
 		// from a DMLProc lock used for inserts, updates, etc.
 		int32_t sessionID = fSessionID;
 		int32_t txnid     = -1;
-		bool ownerChanged = fDbrm->changeOwner(
+		bool ownerChanged = fDbrm.changeOwner(
 			tableLockID, processName, processID, sessionID, txnid);
 		if (!ownerChanged)
 		{

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************************
-* $Id: configcpp.h 3495 2013-01-21 14:09:51Z rdempsey $
+* $Id: configcpp.h 3280 2012-09-13 16:27:28Z rdempsey $
 *
 ******************************************************************************************/
 /**
@@ -35,14 +35,6 @@
 #include <libxml/parser.h>
 
 #include "xmlparser.h"
-
-namespace messageqcpp
-
-{
-
-class ByteStream;
-
-}
 
 #if defined(_MSC_VER) && defined(LIBCONFIG_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
@@ -127,18 +119,11 @@ public:
 	*/
 	EXPORT void write(const std::string& fileName) const;
 
-	/** @brief write a stream copy of config file to disk
-	*
-	* write a stream copy of config file to disk. used to distributed mass updates to system nodes
-	* 
-	*/
-	EXPORT void writeConfigFile(messageqcpp::ByteStream msg) const;
-
 	/** @brief return the name of this config file
 	*
 	* return the name of this config file.
 	*/
-	EXPORT inline const std::string& configFile() const { return fConfigFile; }
+	inline const std::string& configFile() const { return fConfigFile; }
 
 	/** @brief delete all config file instances
 	*
@@ -160,7 +145,7 @@ public:
 	*
 	* Return an unsigned numeric value.
 	*/
-	EXPORT static inline uint64_t uFromText(const std::string& text) { return static_cast<uint64_t>(fromText(text)); }
+	static inline uint64_t uFromText(const std::string& text) { return static_cast<uint64_t>(fromText(text)); }
 
 	/** @brief Used externally to check whether there has been a config change without loading everything
 	 *
@@ -172,16 +157,6 @@ public:
 	 */
 	EXPORT time_t getCurrentMTime();
 
-	/** @brief Enumerate all the sections in the config file
-	 *
-	 */
-	EXPORT const std::vector<std::string> enumConfig();
-
-	/** @brief Enumerate all the names in a section in the config file
-	 *
-	 */
-	EXPORT const std::vector<std::string> enumSection(const std::string& section);
-
 protected:
 	/** @brief parse the XML file
 	*
@@ -191,7 +166,7 @@ protected:
 	/** @brief write the XML tree to disk
 	*
 	*/
-	EXPORT void writeConfig(const std::string& fileName) const;
+	void writeConfig(const std::string& fileName) const;
 
 	/** @brief stop processing this XML file
 	*
@@ -214,13 +189,11 @@ private:
 
 	static configMap_t fInstanceMap;
 	static boost::mutex fInstanceMapMutex;
-	static boost::mutex fXmlLock;
-	static boost::mutex fWriteXmlLock;
 
 	xmlDocPtr fDoc;
 	const std::string fConfigFile;
 	time_t fMtime;
-	mutable boost::mutex fLock;
+	boost::mutex fLock;
 	const std::string fInstallDir;
 	XMLParser fParser;
 

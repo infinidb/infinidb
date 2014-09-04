@@ -69,8 +69,8 @@ string Func_elt::getStrVal(rowgroup::Row& row,
 		case CalpontSystemCatalog::DECIMAL:
 		{
 			IDB_Decimal d = parm[0]->data()->getDecimalVal(row, isNull);
-			number = d.value / helpers::power(d.scale);
-			int lefto = (d.value - number * helpers::power(d.scale)) / helpers::power(d.scale-1);
+			number = d.value / power(d.scale);
+			int lefto = (d.value - number * power(d.scale)) / power(d.scale-1);
 			if ( number >= 0 && lefto > 4 )
 				number++;
 			if ( number < 0 && lefto < -4 )

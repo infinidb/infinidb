@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: we_define.h 4726 2013-08-07 03:38:36Z bwilkinson $
+//  $Id: we_define.h 4681 2013-06-18 17:31:02Z dcathey $
 
 /** @file */
 
@@ -27,7 +27,7 @@
 #include <map>
 #include <stdint.h>
 
-#if defined(_MSC_VER) && defined(WRITEENGINE_DLLEXPORT)
+#if defined(_MSC_VER) && defined(WRITEENGINEERRORCODES_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
@@ -74,7 +74,6 @@ namespace WriteEngine
     const unsigned int SUBSYSTEM_ID_WE      = 19;
     const unsigned int SUBSYSTEM_ID_WE_SRV  = 32;
     const unsigned int SUBSYSTEM_ID_WE_SPLIT= 33;
-    const unsigned int SUBSYSTEM_ID_WE_BULK = 34;
 
     //--------------------------------------------------------------------------
     // Default definitions
@@ -83,7 +82,6 @@ namespace WriteEngine
     const int   DEFAULT_CHK_INTERVAL    = 3;        // Checkpoint in seconds
     const int   DEFAULT_CACHE_PCT_FREE  = 25;       // Min % of free cache
     const int   DEFAULT_BUFSIZ          = 1*1024*1024;  // setvbuf buffer size
-    const int   DEFAULT_COLSIZ          = 8;        // col size for hdfs rdwr buf
 
     const int   BLK_INIT                = 0;
     const int   BLK_READ                = 1;
@@ -125,9 +123,6 @@ namespace WriteEngine
     const int   ERR_VALUE_OUTOFRANGE    = ERR_CODEBASE + 4; // Val out of range
     const int   ERR_PARSING             = ERR_CODEBASE + 5; // Parsing error
     const int   ERR_NO_MEM              = ERR_CODEBASE + 6; // Mem alloc error
-    const int   ERR_DML_LOG_NAME        = ERR_CODEBASE + 7; // DML log filename error
-    const int   ERR_OPEN_DML_LOG        = ERR_CODEBASE + 8; // Open DML log file error
-    const int   ERR_HDFS_BACKUP         = ERR_CODEBASE + 9; // HDFS backup error
 
     //--------------------------------------------------------------------------
     // File level error
@@ -253,8 +248,6 @@ namespace WriteEngine
     const int   ERR_BULK_DBROOT_CHANGE      = ERR_BULKBASE + 7; // Local DBRoot settings changed during an import
     const int   ERR_BULK_ROLLBACK_MISS_ROOT = ERR_BULKBASE + 8; // Mode3 automatic rollback skipped with missing DBRoot
     const int   ERR_BULK_ROLLBACK_SEG_LIST  = ERR_BULKBASE + 9; // Error building segment file list in a directory
-    const int   ERR_BULK_BINARY_PARTIAL_REC = ERR_BULKBASE + 10;// Binary input did not end on fixed length record boundary
-    const int   ERR_BULK_BINARY_IGNORE_FLD  = ERR_BULKBASE + 11;// <IgnoreField> tag not supported for binary import
 
     //--------------------------------------------------------------------------
     // BRM error
@@ -289,7 +282,7 @@ namespace WriteEngine
     const int   ERR_BRM_TAKE_SNAPSHOT   = ERR_BRMBASE + 28;// Taking snapshot of BRM state
     const int   ERR_BRM_LOOKUP_START_LBID=ERR_BRMBASE + 29;// Lookup starting LBID error
     const int   ERR_BRM_BULK_UPDATE     = ERR_BRMBASE + 30;// Error with bulk update of HWM and CP
-    const int   ERR_BRM_GET_EXT_STATE   = ERR_BRMBASE + 31;// Error getting extent state
+    const int   ERR_BRM_FLUSH_INODE_CACHE=ERR_BRMBASE + 31;// Error flushing inode cache
     const int   ERR_EXTENTMAP_LOOKUP    = ERR_BRMBASE + 32;// Lookup extent map error
     const int   ERR_BRM_LOOKUP_VERSION  = ERR_BRMBASE + 33;// Lookup version error
     const int   ERR_BRM_LOOKUP_LBID_RANGES  = ERR_BRMBASE + 34;// Lookup LBID Ranges error

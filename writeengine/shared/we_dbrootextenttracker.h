@@ -16,20 +16,12 @@
    MA 02110-1301, USA. */
 
 /*
-* $Id: we_dbrootextenttracker.h 4631 2013-05-02 15:21:09Z dcathey $
+* $Id: we_dbrootextenttracker.h 4195 2012-09-19 18:12:27Z dcathey $
 */
 
 /** @file we_dbrootextenttracker.h
  * Contains classes to track the order of placement (rotation) of extents as
  * they are filled in and/or added to the DBRoots for the local PM.
- *
- * DBRootExtentTracker did select the next DBRoot and segment number when-
- * ever either selectFirstSegFile() or nextSegFile() were called.  The logic
- * for selecting a "new" segment file number previously in nextSegFile() has
- * been moved to the DBRM extent allocation function.  The segment number
- * argument returned by nextSegFile() is now only applicable if the return
- * value is false, indicating that a partially filled extent has been en-
- * countered.
  */
 
 #ifndef WE_DBROOTEXTENTTRACKER_H_
@@ -41,7 +33,7 @@
 #include "we_type.h"
 #include "brmtypes.h"
 
-#if defined(_MSC_VER) && defined(WRITEENGINE_DLLEXPORT)
+#if defined(_MSC_VER) && defined(WRITEENGINEDBEXTTRK_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
@@ -55,17 +47,12 @@ namespace WriteEngine
 // PARTIAL_EXTENT - Extent is partially filled
 // EMPTY_DBROOT   - DRoot is empty (has no extents)
 // EXTENT_BOUNDARY- Encountered extent boundary, add next extent
-// OUT_OF_SERVICE - Extent is disabled or out-of-service
-//
-// Changes to this enum should be reflected in stateStrings array in
-// we_dbrootextenttracker.cpp.
 //
 enum DBRootExtentInfoState
 {
     DBROOT_EXTENT_PARTIAL_EXTENT  = 1,
     DBROOT_EXTENT_EMPTY_DBROOT    = 2,
-    DBROOT_EXTENT_EXTENT_BOUNDARY = 3,
-    DBROOT_EXTENT_OUT_OF_SERVICE  = 4
+    DBROOT_EXTENT_EXTENT_BOUNDARY = 3
 };
 
 //------------------------------------------------------------------------------
@@ -91,14 +78,13 @@ struct DBRootExtentInfo
         fDBRootTotalBlocks(0),
         fState(DBROOT_EXTENT_PARTIAL_EXTENT) { }
 
-    DBRootExtentInfo(
+    DBRootExtentInfo(int colWidth,
         uint16_t    dbRoot,
         uint32_t    partition,
         uint16_t    segment,
         BRM::LBID_t startLbid,
         HWM         localHwm,
-        uint64_t    dbrootTotalBlocks,
-        DBRootExtentInfoState state);
+        uint64_t    dbrootTotalBlocks);
 
     bool operator<(const DBRootExtentInfo& entry) const;
 };
@@ -114,48 +100,43 @@ public:
 
     /** @brief DBRootExtentTracker constructor
      * @param oid Column OID of interest.
-     * @param colWidths Widths (in bytes) of all the columns in the table.
-     * @param dbRootHWMInfoColVec Column HWM, DBRoots, etc for this table.
-     * @param columnIdx Index (into colWidths and dbRootHWMInfoColVec)
-     *        referencing the column that applies to this ExtentTracker.
+     * @param colWidth Width (in bytes) of the relevant column.
      * @param logger Logger to be used for logging messages.
+     * @param vector Collection of DBRoots to be tracked or rotated through.
      */
     EXPORT DBRootExtentTracker ( OID oid,
-        const std::vector<int>& colWidths,
-        const std::vector<BRM::EmDbRootHWMInfo_v>& dbRootHWMInfoColVec,
-        unsigned int columnIdx,
-        Log* logger );
+        int  colWidth,
+        Log* logger,
+        const BRM::EmDbRootHWMInfo_v& emDbRootHWMInfo );
 
-    /** @brief Select the first DBRoot/segment file to add rows to, for this PM.
+    /** @brief Select the first DBRoot/segment file to add rows to for this PM.
      * @param dbRootExtent Dbroot/segment file selected for first set of rows.
-     * @param bNoStartExtentOnThisPM Is starting HWM extent missing or disabled.
-     *        If HWM extent is missing or disabled, the app will have to allo-
-     *        cate a new extent (at the DBRoot returned in dbRootExtent)) in
-     *        order to add any rows.
-     * @param bEmptyPM  Is this PM void of any available extents
+     * @param bFirstExtentOnThisPM Indicate if this is the 1st extent on this PM
      * @return Returns NO_ERROR if success, else returns error code.
      */
     EXPORT int selectFirstSegFile ( DBRootExtentInfo& dbRootExtent,
-                             bool& bNoStartExtentOnThisPM,
-                             bool& bEmptyPM,
+                             bool& bFirstExtentOnThisPM,
                              std::string& errMsg );
 
     /** @brief Set up this Tracker to select the same first DBRoot/segment file
-     * as the reference DBRootExtentTracker that is specified from a ref column.
+     * as the reference DBRootExtentTracker that is specified.
      *
      * Application code should call selectFirstSegFile for a reference column,
      * and assignFirstSegFile for all other columns in the same table.
      * @param refTracker Tracker object used to assign first DBRoot/segment.
      * @param dbRootExtent Dbroot/segment file selected for first set of rows.
+     * @param bFirstExtentOnThisPM Indicate if this is the 1st extent on this PM
      */
     EXPORT void assignFirstSegFile( const DBRootExtentTracker& refTracker,
-                             DBRootExtentInfo& dbRootExtent );
+                             DBRootExtentInfo& dbRootExtent,
+                             bool& bFirstExtentOnThisPM );
 
     /** @brief Iterate/return next DBRoot to be used for the next extent.
      *
      * Case 1)
      * If it is the "very" first extent for the specified DBRoot, then the
-     * applicable partition to be used for the first extent is also returned.
+     * applicable partition and segment number to be used for the first extent,
+     * are also returned.
      *
      * Case 2)
      * If the user moves a DBRoot to a different PM, then the next cpimport.bin
@@ -174,17 +155,16 @@ public:
      * Case 3)
      * If we are just finishing one extent and adding the next extent, then
      * only the DBRoot argument is relevant, telling us where to create the
-     * next extent.  Return value will be true.  This case also applies to
-     * the instance where the HWM extent for the next DBRoot is disabled.
+     * next extent.
      *
      * @param dbRoot DBRoot for the next extent
      * @param partition If first extent on dbRoot (or partial extent), then
      *        this is the partition #
-     * @param segment If partially full extent, then this is the segment #
+     * @param segment If first extent on dbRoot (or partial extent), then
+     *        this is the segment #
      * @param localHwm If partially full extent, then this is current HWM.
      * @param startLbid If partially full extent, then this is starting LBID of
      *         the current HWM extent.
-     *
      * @return Returns true if new extent needs to be allocated, returns false
      *         if extent is partially full, and has room for more rows.
      */
@@ -207,10 +187,6 @@ public:
     }
 
 private:
-    DBRootExtentInfoState determineState(int colWidth,
-        HWM      localHwm,
-        uint64_t dbRootTotalBlocks,
-        int16_t  status);
     // Select First DBRoot/segment file on a PM having no extents for fOID
     int  selectFirstSegFileForEmptyPM ( std::string& errMsg );
     void initEmptyDBRoots();                // init ExtentList for empty DBRoots
@@ -226,11 +202,9 @@ private:
     std::vector<DBRootExtentInfo> fDBRootExtentList; // List of current pending
                                             //   DBRoot/extents for each DBRoot
                                             //   assigned to the local PM.
-    bool            fEmptyOrDisabledPM;     // true if PM has no extents or all
-                                            //   extents are disabled
-    bool            fEmptyPM;               // true if PM has no available or
-                                            //   disabled extents
-    bool            fDisabledHWM;           // Did job start with disabled HWM 
+    bool            fStartedWithEmptyPM;    // Did this job start with empty PM
+    uint16_t        fEmptyPMFirstDbRoot;    // If Empty PM, this is the first
+                                            //   DBRoot for first segment file.
 };
 
 } //end of namespace

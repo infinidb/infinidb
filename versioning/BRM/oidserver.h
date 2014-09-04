@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: oidserver.h 7409 2011-02-08 14:38:50Z rdempsey $
+ * $Id: objectidmanager.h 7409 2011-02-08 14:38:50Z rdempsey $
  *
  *****************************************************************************/
 
@@ -30,20 +30,12 @@
 #include <string>
 #include <stdint.h>
 #include <vector>
-#include <sys/types.h>
-
-#include <boost/thread/mutex.hpp>
 
 #if defined(_MSC_VER) && defined(xxxBRMOIDSVR_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
 #endif
-
-namespace idbdatafile {
-class IDBDataFile;
-}
-
 
 namespace BRM {
 
@@ -123,8 +115,6 @@ private:
 	static const int HeaderSize = FreeListEntries * sizeof(FEntry);
 	static const int StartOfVBOidSection = HeaderSize + 2097152;  // (2^24/8)
 	static const int MaxRetries = 10;   /// max number of retries on file operations
-	static boost::mutex fMutex;
-	idbdatafile::IDBDataFile* fFp;
 	int fFd;  /// file descriptor referencing the bitmap file
 	std::vector<uint16_t> vbOidDBRootMap;
 
@@ -133,7 +123,7 @@ private:
 	 * Grab the file lock.
 	 * @note Throws ios::failure after MaxRetries hard errors
 	 */
-	//void lockFile() const;
+	void lockFile() const;
 
 	/** @brief Reliably reads data from the bitmap file
 	 *
@@ -203,6 +193,7 @@ private:
 	void patchFreelist(struct FEntry* freelist, int start, int num) const;
 
 	void loadVBOIDs();
+
 };
 
 }	// namespace

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: constantcolumn.h 9679 2013-07-11 22:32:03Z zzhu $
+*   $Id: constantcolumn.h 8436 2012-04-04 18:18:21Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -35,10 +35,11 @@ class ByteStream;
 /**
  * Namespace
  */
-namespace execplan {
+namespace execplan { 
+class CalpontSystemCatalog;
 /**
  * @brief A class to represent a constant return column
- *
+ * 
  * This class is a specialization of class ReturnedColumn that
  * handles a constant column such as number and literal string.
  */
@@ -52,208 +53,114 @@ public:
 	    NULLDATA
 	};
 
-	/**
-	 * ctor
-	 */
 	ConstantColumn();
-	/**
-	 * ctor
-	 */
 	ConstantColumn(const std::string& sql, TYPE type = LITERAL);
-	/**
-	 * ctor
-	 */
 	ConstantColumn(const int64_t val, TYPE type = NUM); //deprecate
-	/**
-	 * ctor
-	 */
-	ConstantColumn(const uint64_t val, TYPE type = NUM); // deprecate
-	//There are more ctors below...
-
-	/**
-	 * dtor
-	 */
+	
 	virtual ~ConstantColumn();
-
-	/*
+	
+	/**
 	 * Accessor Methods
 	 */
-	/**
-	 * accessor
-	 */
 	inline unsigned int type() const { return fType; }
-	/**
-	 * accessor
-	 */
 	inline void type (unsigned int type) { fType = type; }
-	/**
-	 * accessor
-	 */
 	inline const std::string& constval() const { return fConstval; }
-	/**
-	 * accessor
-	 */
 	inline void constval(const std::string& constval) { fConstval = constval; }
-	/**
-	 * accessor
-	 */
 	virtual const std::string data() const;
-	/**
-	 * accessor
-	 */
 	virtual void data(const std::string data) { fData = data; }
-	/**
-	 * accessor
-	 */
 	virtual const std::string toString() const;
-
-	/** return a copy of this pointer
+	
+  /** return a copy of this pointer
 	 *
 	 * deep copy of this pointer and return the copy
-	 */
+	 */	
 	inline virtual ConstantColumn* clone() const {return new ConstantColumn (*this);}
-
-	/*
+		
+	/**
 	 * The serialization interface
 	 */
-	/**
-	 * serialize
-	 */
 	virtual void serialize(messageqcpp::ByteStream&) const;
-	/**
-	 * unserialize
-	 */
 	virtual void unserialize(messageqcpp::ByteStream&);
-
+	
 	/** @brief Do a deep, strict (as opposed to semantic) equivalence test
 	 *
 	 * Do a deep, strict (as opposed to semantic) equivalence test.
 	 * @return true iff every member of t is a duplicate copy of every member of this; false otherwise
-	 */
+		 */
 	virtual bool operator==(const TreeNode* t) const;
-
+	
 	/** @brief Do a deep, strict (as opposed to semantic) equivalence test
 	 *
 	 * Do a deep, strict (as opposed to semantic) equivalence test.
 	 * @return true iff every member of t is a duplicate copy of every member of this; false otherwise
 	 */
 	bool operator==(const ConstantColumn& t) const;
-
+	
 	/** @brief Do a deep, strict (as opposed to semantic) equivalence test
 	 *
 	 * Do a deep, strict (as opposed to semantic) equivalence test.
 	 * @return false iff every member of t is a duplicate copy of every member of this; true otherwise
 	 */
 	virtual bool operator!=(const TreeNode* t) const;
-
+	 
 	/** @brief Do a deep, strict (as opposed to semantic) equivalence test
 	 *
 	 * Do a deep, strict (as opposed to semantic) equivalence test.
 	 * @return false iff every member of t is a duplicate copy of every member of this; true otherwise
 	 */
 	bool operator!=(const ConstantColumn& t) const;
-
-	virtual bool hasWindowFunc() {return false;}
-
-	/** Constant column on the filte can always be moved into derived table */
-	virtual void setDerivedTable() { fDerivedTable = "*"; }
-
+	
 private:
 	std::string fConstval;
-	int fType;
-	std::string fData;
-
+	int fType; 
+	std::string fData;		
+	
 	/***********************************************************
 	 *                  F&E framework                          *
 	 ***********************************************************/
-public:
-	/**
-	 * ctor
-	 */
+public:	
 	ConstantColumn(const std::string& sql, const double val);
-	/**
-	 * ctor
-	 */
 	ConstantColumn(const std::string& sql, const int64_t val, TYPE type = NUM);
-	/**
-	 * ctor
-	 */
-	ConstantColumn(const std::string& sql, const uint64_t val, TYPE type = NUM);
-	/**
-	 * ctor
-	 */
 	ConstantColumn(const std::string& sql, const IDB_Decimal& val);
-	/**
-	 * copy ctor
-	 */
 	ConstantColumn(const ConstantColumn& rhs);
-	/**
-	 * F&E
-	 */
 	virtual void evaluate(rowgroup::Row& row) {}
-	/**
-	 * F&E
-	 */
 	virtual void constructRegex();
-	/**
-	 * F&E
-	 */
+	
 	virtual bool getBoolVal(rowgroup::Row& row, bool& isNull)
 	{
 		isNull = isNull || (fType == NULLDATA);
-		return TreeNode::getBoolVal();
+		return TreeNode::getBoolVal();		
 	}
-	/**
-	 * F&E
-	 */
-	virtual const std::string& getStrVal(rowgroup::Row& row, bool& isNull)
-	{
+	virtual std::string getStrVal(rowgroup::Row& row, bool& isNull) 
+	{ 
 		isNull = isNull || (fType == NULLDATA);
-		return fResult.strVal;
+		return fResult.strVal; 
 	}
-	/**
-	 * F&E
-	 */
-	virtual int64_t getIntVal(rowgroup::Row& row, bool& isNull)
-	{
+	
+	virtual int64_t getIntVal(rowgroup::Row& row, bool& isNull) 
+	{ 
 		isNull = isNull || (fType == NULLDATA);
 		return fResult.intVal;
 	}
-	/**
-	 * F&E
-	 */
-	virtual uint64_t getUintVal(rowgroup::Row& row, bool& isNull)
-	{
-    		isNull = isNull || (fType == NULLDATA);
-		return fResult.uintVal;
-	}
-	/**
-	 * F&E
-	 */
+	
 	virtual float getFloatVal(rowgroup::Row& row, bool& isNull)
 	{
 		isNull = isNull || (fType == NULLDATA);
 		return fResult.floatVal;
 	}
-	/**
-	 * F&E
-	 */
-	virtual double getDoubleVal(rowgroup::Row& row, bool& isNull)
+	
+	virtual double getDoubleVal(rowgroup::Row& row, bool& isNull) 
 	{
 		isNull = isNull || (fType == NULLDATA);
-		return fResult.doubleVal;
+		return fResult.doubleVal; 
 	}
-	/**
-	 * F&E
-	 */
+	
 	virtual IDB_Decimal getDecimalVal(rowgroup::Row& row, bool& isNull)
 	{
 		isNull = isNull || (fType == NULLDATA);
 		return fResult.decimalVal;
 	}
-	/**
-	 * F&E
-	 */
+	
 	virtual int32_t getDateIntVal(rowgroup::Row& row, bool& isNull)
 	{
 		isNull = isNull || (fType == NULLDATA);
@@ -264,9 +171,7 @@ public:
 		}
 		return fResult.intVal;
 	}
-	/**
-	 * F&E
-	 */
+	
 	virtual int64_t getDatetimeIntVal(rowgroup::Row& row, bool& isNull)
 	{
 		isNull = isNull || (fType == NULLDATA);
@@ -277,13 +182,9 @@ public:
 		}
 		return fResult.intVal;
 	}
-	/**
-	 * F&E
-	 */
+		
 	inline float getFloatVal() const { return fResult.floatVal; }
-	/**
-	 * F&E
-	 */
+
 	inline  double getDoubleVal() const { return fResult.doubleVal; }
 
 };
@@ -293,6 +194,6 @@ public:
  */
 std::ostream& operator<<(std::ostream& output, const ConstantColumn& rhs);
 
-}
+} 
 #endif //CONSTANTCOLUMN_H
 

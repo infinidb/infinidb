@@ -15,15 +15,26 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
+//
+// $Id: command.h 1855 2012-04-04 18:20:09Z rdempsey $
+// C++ Interface: command
+//
+// Description: 
+//
+//
+// Author: Patrick LeBlanc <pleblanc@calpont.com>, (C) 2008
+//
+// Copyright: See COPYING file that comes with this distribution
+//
+//
+
 #ifndef COMMAND_H
 #define COMMAND_H
-
-#include <boost/shared_ptr.hpp>
-#include <boost/uuid/uuid.hpp>
 
 #include "serializeable.h"
 #include "bytestream.h"
 #include "rowgroup.h"
+#include <boost/shared_ptr.hpp>
 
 namespace primitiveprocessor
 {
@@ -34,78 +45,76 @@ typedef boost::shared_ptr<Command> SCommand;
 
 class Command
 {
-public:
-	enum CommandType {
-		NONE,
-		COLUMN_COMMAND,
-		DICT_STEP,
-		DICT_SCAN,
-		PASS_THRU,
-		RID_TO_STRING,
-		FILTER_COMMAND,
-        PSEUDOCOLUMN
-	};
+// #warning got Command definition
+	public:
+		enum CommandType {
+			NONE,
+			COLUMN_COMMAND,
+			DICT_STEP,
+			DICT_SCAN,
+			PASS_THRU,
+			RID_TO_STRING,
+			FILTER_COMMAND
+		};
 
-	static const uint8_t NOT_FEEDER = 0;
-	static const uint8_t FILT_FEEDER = 1;
-	static const uint8_t LEFT_FEEDER = 3;
-	static const uint8_t RIGHT_FEEDER = 5;
+		static const uint8_t NOT_FEEDER = 0;
+		static const uint8_t FILT_FEEDER = 1;
+		static const uint8_t LEFT_FEEDER = 3;
+		static const uint8_t RIGHT_FEEDER = 5;
 
-	Command(CommandType c);
-	virtual ~Command();
+		Command(CommandType c);
+		virtual ~Command();
 
-	virtual void execute() = 0;
-	virtual void project() = 0;
-	virtual void projectIntoRowGroup(rowgroup::RowGroup &rg, uint32_t columnPosition) = 0;
-	virtual uint64_t getLBID() = 0;
-	virtual void getLBIDList(uint32_t loopCount, std::vector<int64_t> *out) {}  // the default fcn returns 0 lbids
-	virtual void nextLBID() = 0;
-	virtual void createCommand(messageqcpp::ByteStream &);
-	virtual void resetCommand(messageqcpp::ByteStream &);
+		virtual void execute() = 0;
+		virtual void project() = 0;
+		virtual void projectIntoRowGroup(rowgroup::RowGroup &rg, uint columnPosition) = 0;
+		virtual uint64_t getLBID() = 0;
+		virtual void getLBIDList(uint loopCount, std::vector<int64_t> *out);  // the default fcn returns 0 lbids
+		virtual void nextLBID() = 0;
+		virtual void createCommand(messageqcpp::ByteStream &);
+		virtual void resetCommand(messageqcpp::ByteStream &);
 
-	/* Duplicate() makes a copy of this object as constructed by createCommand().
-		It's thread-safe */
-	virtual SCommand duplicate() = 0;
-	bool operator==(const Command &) const;
-	bool operator!=(const Command& c) const { return !(*this == c); }
+		/* Duplicate() makes a copy of this object as constructed by createCommand().
+			It's thread-safe */
+		virtual SCommand duplicate() = 0;
+		bool operator==(const Command &) const;
+		bool operator!=(const Command &) const;
 
-	/* Put bootstrap code here (ie, build the template primitive msg) */
-	virtual void prep(int8_t outputType, bool makeAbsRids) = 0;
-	virtual void setBatchPrimitiveProcessor(BatchPrimitiveProcessor *);
-	virtual void setMakeAbsRids(bool);
+		/* Put bootstrap code here (ie, build the template primitive msg) */
+		virtual void prep(int8_t outputType, bool makeAbsRids) = 0;
+		virtual void setBatchPrimitiveProcessor(BatchPrimitiveProcessor *);
+		virtual void setMakeAbsRids(bool);
 
-	CommandType getCommandType() const { return cmdType; }
+		CommandType getCommandType() const { return cmdType; }
 
-	// if feeding a filtercommand
-	// note: a filtercommand itself can feed another filtercommand
-	uint8_t filterFeeder()       { return fFilterFeeder; }
-	void filterFeeder(uint8_t f) { fFilterFeeder = f; }
-	virtual void copyRidsForFilterCmd();
+		// if feeding a filtercommand
+		// note: a filtercommand itself can feed another filtercommand
+		uint8_t filterFeeder()       { return fFilterFeeder; }
+		void filterFeeder(uint8_t f) { fFilterFeeder = f; }
+		virtual void copyRidsForFilterCmd();
 
-	static Command* makeCommand(messageqcpp::ByteStream&, CommandType*, std::vector<SCommand>&);
+		static Command* makeCommand(messageqcpp::ByteStream&, CommandType*, std::vector<SCommand>&);
 
-	uint32_t getOID() const { return OID; }
-	uint32_t getTupleKey() const { return tupleKey; }
+		uint32_t getOID() const;
+		uint32_t getTupleKey() const;
 
-	virtual int getCompType() const=0;
+		virtual int getCompType() const=0;
 
-protected:
-	BatchPrimitiveProcessor *bpp;
-	CommandType cmdType;
-	uint8_t fFilterFeeder;
-	uint32_t OID;
-	uint32_t tupleKey;
-	boost::uuids::uuid queryUuid;
-	boost::uuids::uuid stepUuid;
+	protected:
+		BatchPrimitiveProcessor *bpp;
+		CommandType cmdType;
+		uint8_t fFilterFeeder;
+		uint32_t OID;
+		uint32_t tupleKey;
 
-	void duplicate(Command *);
+		void duplicate(Command *);
 
-private:
-	Command();
-	Command(const Command &);
+	private:
+		Command();
+		Command(const Command &);
 
 };
 
-}
+};
 
 #endif

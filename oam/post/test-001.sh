@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: test-001.sh 3704 2013-08-07 03:33:20Z bwilkinson $
+# $Id: test-001.sh 2937 2012-05-30 18:17:09Z rdempsey $
 
 if [ -z "$INFINIDB_INSTALL_DIR" ]; then
 	test -f /etc/default/infinidb && . /etc/default/infinidb
@@ -10,7 +10,7 @@ if [ -z "$INFINIDB_INSTALL_DIR" ]; then
 	INFINIDB_INSTALL_DIR=/usr/local/Calpont
 fi
 
-export INFINIDB_INSTALL_DIR=$INFINIDB_INSTALL_DIR
+declare -x INFINIDB_INSTALL_DIR=$INFINIDB_INSTALL_DIR
 
 test -f $INFINIDB_INSTALL_DIR/post/functions && . $INFINIDB_INSTALL_DIR/post/functions
 
@@ -52,13 +52,12 @@ catoids="$catoids 2001 2004"
 catoids="$catoids 1021 1022 1023 1024 1025 1026 1027 1028 1029 1030 1031 1032 1033 1034 1035 1036 1037 1038 1039 1040"
 catoids="$catoids 2061 2064 2067 2070 2073 2076"
 
-# TODO-this doesn't work with HDFS file system
-#for oid in $catoids; do
-#	if [ ! -s `oid2file $oid` ]; then
-#		cplogger -c 50 $scrname "$tname" "could not find file for OID $oid"
-#		exit 1
-#	fi
-#done
+for oid in $catoids; do
+	if [ ! -s `oid2file $oid` ]; then
+		cplogger -c 50 $scrname "$tname" "could not find file for OID $oid"
+		exit 1
+	fi
+done
 
 cplogger -i 52 $scrname "$tname"
 

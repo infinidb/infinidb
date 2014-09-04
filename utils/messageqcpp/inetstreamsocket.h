@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: inetstreamsocket.h 3632 2013-03-13 18:08:46Z pleblanc $
+*   $Id: inetstreamsocket.h 3048 2012-04-04 15:33:45Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -35,6 +35,8 @@
 #include "socketparms.h"
 #include "bytestream.h"
 
+//#define MQ_SYNC_PROTO 1
+
 #if defined(_MSC_VER) && defined(xxxINETSTREAMSOCKET_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
@@ -48,7 +50,6 @@ class IOSocket;
 
 /// random # marking the beginning of a ByteStream in the stream
 const uint32_t BYTESTREAM_MAGIC = 0x14fbc137;
-const uint32_t COMPRESSED_BYTESTREAM_MAGIC = 0x14fbc138;
 
 /** An Inet Stream Socket
  *
@@ -120,18 +121,26 @@ public:
 	 * The behavior will be unpredictable and possibly fatal.
 	 * @note A fix is being reviewed but this is low-priority.
 	 */
-	virtual const SBS read(const struct timespec* timeout=0, bool* isTimeOut = NULL, Stats *stats = NULL) const;
+	virtual const SBS read(const struct timespec* timeout=0, bool* isTimeOut = NULL) const;
+
+	/** Empty the stream up to the beginning of the next ByteStream.
+	 *
+	 * Reads until the beginning of the next ByteStream is found.
+	 * @param msecs An optional timeout value.
+	 * @param residual Pass in an array of at least 8 bytes, on return it will contain
+	 * the first bytes of the stream.
+	 * @param reslen On return, it will contain the # of bytes in residual.
+	 * @return true if the next byte in the stream is the beginning of a ByteStream,
+	 * false otherwise.
+	 */
+	virtual bool readToMagic(long msecs, bool* isTimeOut) const;
 
 	/** write a message to the socket
 	 * 
 	 * write a message to the socket
 	 */
-	virtual void write(const ByteStream& msg, Stats *stats = NULL);
-	virtual void write_raw(const ByteStream& msg, Stats *stats = NULL) const;
-
-	/** this version of write takes ownership of the bytestream
-	 */
-	virtual void write(SBS msg, Stats *stats = NULL);
+	virtual void write(const ByteStream& msg) const;
+	virtual void write_raw(const ByteStream& msg) const;
 
 	/** bind to a port
 	 *
@@ -206,23 +215,12 @@ protected:
 
 	void logIoError(const char* errMsg, int errNum) const;
 
-	/** Empty the stream up to the beginning of the next ByteStream.
-	 *
-	 * Reads until the beginning of the next ByteStream is found.
-	 * @param msecs An optional timeout value.
-	 * @param residual Pass in an array of at least 8 bytes, on return it will contain
-	 * the first bytes of the stream.
-	 * @param reslen On return, it will contain the # of bytes in residual.
-	 * @return true if the next byte in the stream is the beginning of a ByteStream,
-	 * false otherwise.
-	 */
-	virtual bool readToMagic(long msecs, bool* isTimeOut, Stats *stats) const;
-
-	void do_write(const ByteStream &msg, uint32_t magic, Stats *stats = NULL) const;
-	ssize_t written(int fd, const uint8_t* ptr, size_t nbytes) const;
+	ssize_t writen(int fd, const ByteStream::byte* ptr, size_t nbytes) const;
 
 	SocketParms fSocketParms;	/// The socket parms
+
 	size_t fBlocksize;
+
 	sockaddr_in fSa;
 
 	// how long to wait for a connect() call to complete (in ms)
@@ -231,11 +229,12 @@ protected:
 	// use sync proto
 	bool fSyncProto;
 
+private:
+	void doCopy(const InetStreamSocket& rhs);
+
 	/// The buffer used to scan for the ByteStream magic in the stream.
 	mutable uint32_t fMagicBuffer;
 
-private:
-	void doCopy(const InetStreamSocket& rhs);
 };
 
 inline const bool InetStreamSocket::isOpen() const { return (fSocketParms.sd() >= 0); }

@@ -1,5 +1,5 @@
 /******************************************************************************************
-* $Id: trapHandler.cpp 3151 2013-07-17 14:54:10Z rdempsey $
+* $Id: trapHandler.cpp 1969 2011-08-19 17:36:32Z dhill $
 *
 * Author: Zhixuan Zhu
 ******************************************************************************************/
@@ -10,24 +10,17 @@
 #include <cerrno>
 #include <exception>
 #include <stdexcept>
-using namespace std;
-
 #include "snmpmanager.h"
 #include "alarm.h"
-using namespace snmpmanager;
 #include "liboamcpp.h"
-using namespace oam;
 #include "messagelog.h"
 #include "messageobj.h"
 #include "loggingid.h"
+
+using namespace std;
+using namespace snmpmanager;
+using namespace oam;
 using namespace logging;
-
-#include "IDBDataFile.h"
-#include "IDBPolicy.h"
-using namespace idbdatafile;
-
-
-namespace {
 
 /**
  * constants define
@@ -37,6 +30,280 @@ const string errMsg = "Not valid alarm data";
 const char* DELIM = "|";
 const char* AGENT_TRAP = "agentTrap";
 const unsigned int CTN_INTERVAL = 30*60;
+
+/**
+ * @brief get next token of alarm data from input stream
+ */  
+char* getNextToken ();
+
+/**
+ * @brief set alarm data from alarm configuration file
+ */ 
+void configAlarm (Alarm &);
+
+/**
+ * @brief process alarm
+ */
+void processAlarm (Alarm &);
+
+/**
+ * @brief log alarm to historical alarm file
+ */
+void logAlarm (const Alarm &, string fileName);
+
+/**
+ * @brief rewrite active alarm file after removing alarm
+ */
+void rewriteActiveLog (AlarmList &);
+
+/*****************************************************************************************
+* @brief	main function
+*
+* purpose:	Parse incoming ALARM statement into calAlarm class
+*
+*****************************************************************************************/
+int main (int argc, char *argv[]) {
+
+	if (argc != 2)
+  		exit (0);
+  
+  	Alarm calAlarm;
+
+  	char buf[100];
+  	char* alarmData;
+  	char* token;
+  	bool successFlag = false;
+
+  	if (::DEBUG) {
+		LoggingID lid(11);
+		MessageLog ml(lid);
+		Message msg;
+		Message::Args args;
+		args.add("trapHandler Launched");
+		msg.format(args);
+		ml.logDebugMessage(msg);
+	}
+
+	// read alarm data
+	while (cin.getline(buf,100))
+  	{
+		// Alarm data
+		if (::DEBUG) {
+			LoggingID lid(11);
+        		MessageLog ml(lid);
+        		Message msg;
+        		Message::Args args;
+        		args.add("Alarm Data:");
+			args.add(buf);
+        		msg.format(args);
+        		ml.logDebugMessage(msg);
+		}
+  		// search for CALALARM
+  		if ((alarmData = strstr(buf, "CALALARM")) == NULL)
+  			continue;
+  		
+  		successFlag = true;
+  		token = strtok (alarmData, DELIM);
+  		
+  		// alarmData format: CALALARM|alarmID|componentID|1(set)/0(clear)|server|process
+  		// alarmID
+		try {
+  			token = getNextToken();
+		} catch (runtime_error e)
+		{
+			if (::DEBUG) {                                
+				LoggingID lid(11);                                
+				MessageLog ml(lid);                                
+				Message msg;                                
+				Message::Args args;                                
+				args.add("getNextToken error:");                                
+				args.add(e.what());                                
+				msg.format(args);                                
+				ml.logDebugMessage(msg);                                
+			}
+			exit(1);
+		}
+
+  		calAlarm.setAlarmID (atoi(token));
+  		
+  		// componentID
+		try {
+  			token = getNextToken();
+		} catch (runtime_error e)
+		{
+			if (::DEBUG) {                                
+				LoggingID lid(11);                                
+				MessageLog ml(lid);                                
+				Message msg;                                
+				Message::Args args;                                
+				args.add("getNextToken error:");                                
+				args.add(e.what());                                
+				msg.format(args);                                
+				ml.logDebugMessage(msg);                                
+			}
+			exit(1);
+		}
+  		calAlarm.setComponentID (token);
+  		
+  		// state
+		try {
+  			token = getNextToken();
+		} catch (runtime_error e)
+		{
+			if (::DEBUG) {                                
+				LoggingID lid(11);                                
+				MessageLog ml(lid);                                
+				Message msg;                                
+				Message::Args args;                                
+				args.add("getNextToken error:");                                
+				args.add(e.what());                                
+				msg.format(args);                                
+				ml.logDebugMessage(msg);                                
+			}
+			exit(1);
+		}
+  		calAlarm.setState (atoi(token));
+  		
+		// sname
+		try {
+  			token = getNextToken();
+		} catch (runtime_error e)
+		{
+			if (::DEBUG) {                                
+				LoggingID lid(11);                                
+				MessageLog ml(lid);                                
+				Message msg;                                
+				Message::Args args;                                
+				args.add("getNextToken error:");                                
+				args.add(e.what());                                
+				msg.format(args);                                
+				ml.logDebugMessage(msg);                                
+			}
+			exit(1);
+		}
+		calAlarm.setSname (token);
+
+		// pname
+		try {
+  			token = getNextToken();
+		} catch (runtime_error e)
+		{
+			if (::DEBUG) {                                
+				LoggingID lid(11);                                
+				MessageLog ml(lid);                                
+				Message msg;                                
+				Message::Args args;                                
+				args.add("getNextToken error:");                                
+				args.add(e.what());                                
+				msg.format(args);                                
+				ml.logDebugMessage(msg);                                
+			}
+			exit(1);
+		}
+		calAlarm.setPname (token);
+
+  		// distinguish agent trap and process trap.
+  		// agent trap set pid and tid 0.
+  		if (strcmp (argv[1], AGENT_TRAP) == 0)
+  		{
+  			calAlarm.setPid (0);
+  			calAlarm.setTid (0);
+  		}
+  		// process trap continues to get pid from alarm data
+  		else
+  		{
+  			// pid
+			try {
+				token = getNextToken();
+			} catch (runtime_error e)
+			{
+				if (::DEBUG) {                                
+					LoggingID lid(11);                                
+					MessageLog ml(lid);                                
+					Message msg;                                
+					Message::Args args;                                
+					args.add("getNextToken error:");                                
+					args.add(e.what());                                
+					msg.format(args);                                
+					ml.logDebugMessage(msg);                                
+				}
+				exit(1);
+			}
+			calAlarm.setPid (atoi(token));
+
+  			// tid
+			try {
+				token = getNextToken();
+			} catch (runtime_error e)
+			{
+				if (::DEBUG) {                                
+					LoggingID lid(11);                                
+					MessageLog ml(lid);                                
+					Message msg;                                
+					Message::Args args;                                
+					args.add("getNextToken error:");                                
+					args.add(e.what());                                
+					msg.format(args);                                
+					ml.logDebugMessage(msg);                                
+				}
+				exit(1);
+			}
+  			calAlarm.setTid (atoi(token)); 
+  		}
+
+  		if (::DEBUG){
+        		LoggingID lid(11);
+        		MessageLog ml(lid);
+        		Message msg;
+        		Message::Args args;
+        		args.add("Alarm Info:");
+			args.add(calAlarm.getAlarmID());
+			args.add(calAlarm.getComponentID());
+			args.add(calAlarm.getState());
+        		msg.format(args);
+        		ml.logDebugMessage(msg);
+
+  			cout << calAlarm.getAlarmID() << ":" 
+  				 << calAlarm.getComponentID() << ":"
+  				 << calAlarm.getState() << endl;
+		}
+  		// break while loop. ignore the other info carried by
+  		// the trap. May need to retrieve more info in the future.
+  		break;
+	}
+  
+  // not valid alarm data if no "CALALARM" found
+  if (!successFlag){
+	LoggingID lid(11);                
+	MessageLog ml(lid);                
+	Message msg;                
+	Message::Args args;                
+	args.add("Error: not valid alarm data if no 'CALALARM' found");                
+	msg.format(args);                
+	ml.logDebugMessage(msg); 
+	exit(1);
+  }
+
+  // Get alarm configuration
+	try {
+  		configAlarm (calAlarm);
+	} catch (runtime_error e)
+	{
+		if (::DEBUG) {                                
+			LoggingID lid(11);                                
+			MessageLog ml(lid);                                
+			Message msg;                                
+			Message::Args args;                                
+			args.add("configAlarm error:");                                
+			args.add(e.what());                                
+			msg.format(args);                                
+			ml.logDebugMessage(msg);                                
+		}
+		exit(1);
+	}
+
+  return 0;
+}
 
 /*****************************************************************************************
 * @brief	getNextToken
@@ -56,214 +323,12 @@ char* getNextToken()
 }
 
 /*****************************************************************************************
-* @brief	rewriteActiveLog
-*
-* purpose:	Update Active Alarm file, called to remove Cleared alarm
-*
-*****************************************************************************************/
-void rewriteActiveLog (const AlarmList& alarmList)
-{
-	if (::DEBUG) {                                        
-		LoggingID lid(11);                                        
-		MessageLog ml(lid);                                        
-		Message msg;                                        
-		Message::Args args;                                        
-		args.add("rewriteAlarmLog Called");                                 
-		msg.format(args);                                        
-		ml.logDebugMessage(msg);                        
-	}
-
-	// delete the old file
-	unlink (ACTIVE_ALARM_FILE.c_str());
-	
-	// create new file
-	int fd = open(ACTIVE_ALARM_FILE.c_str(), O_RDWR|O_CREAT, 0666);
-	
-	// Aquire an exclusive lock
-   	if (flock(fd,LOCK_EX) == -1) {
-		throw runtime_error ("Lock active alarm log file error");
-   	}
-
-   	ofstream activeAlarmFile (ACTIVE_ALARM_FILE.c_str());
-   	
-   	AlarmList::const_iterator i;
-   	for (i = alarmList.begin(); i != alarmList.end(); ++i)
-   	{
-   		activeAlarmFile << i->second;
-   	}
-
-   	activeAlarmFile.close();
-
-   	// Release lock
-	if (flock(fd,LOCK_UN)==-1)
-	{
-		throw runtime_error ("Release lock active alarm log file error");		
-	}
-	close(fd);
-}
-
-/*****************************************************************************************
-* @brief	logAlarm
-*
-* purpose:	Log Alarm in Active Alarm or Historical Alarm file
-*
-*****************************************************************************************/
-void logAlarm (const Alarm& calAlarm, const string& fileName)
-{
-        if (::DEBUG) {                                        
-		LoggingID lid(11);                                        
-		MessageLog ml(lid);                                        
-		Message msg;                                        
-		Message::Args args;                                        
-		args.add("logAlarm Called");                                 
-		msg.format(args);                                        
-		ml.logDebugMessage(msg);                        
-	}
-
-	int fd = open(fileName.c_str(), O_RDWR|O_CREAT, 0666);
-	ofstream AlarmFile (fileName.c_str(), ios::app);
-
-	// Aquire an exclusive lock
-   	if (flock(fd,LOCK_EX) == -1) {
-		throw runtime_error ("Lock file error: " + fileName);
-   	}
-
-	AlarmFile << calAlarm;
-	AlarmFile.close();
-	
-	// Release lock
-	if (flock(fd,LOCK_UN)==-1)
-	{
-		throw runtime_error ("Release lock file error: " + fileName);		
-	}
-
-	close(fd);
-}
-
-/*****************************************************************************************
-* @brief	processAlarm
-*
-* purpose:	Process Alarm by updating Active Alarm  and Historical Alarm files
-*
-*****************************************************************************************/
-void processAlarm(const Alarm& calAlarm)
-{
-	bool logActiveFlag = (calAlarm.getState() == CLEAR ? false: true);
-	bool logHistFlag = true;
-	if (calAlarm.getState() == CLEAR )
-		logHistFlag = false;
-
-	// get active alarms
-	AlarmList alarmList;
-	SNMPManager sm;
-	sm.getActiveAlarm (alarmList);
-	
-        if (::DEBUG) {                                        
-		LoggingID lid(11);                                        
-		MessageLog ml(lid);                                        
-		Message msg;                                        
-		Message::Args args;                                        
-		args.add("processAlarm Called");                                 
-		msg.format(args);                                        
-		ml.logDebugMessage(msg);                        
-	}
-	
-	AlarmList::iterator i;
-   	for (i = alarmList.begin(); i != alarmList.end(); ++i)
-   	{
-		// check if matching ID
-  		if (calAlarm.getAlarmID() != (i->second).getAlarmID() ) {
-			continue;
-		}
-
-   		// check if the same fault component on same server
-   		if (calAlarm.getComponentID().compare((i->second).getComponentID()) == 0 &&
-			calAlarm.getSname().compare((i->second).getSname()) == 0)
-        {
-   			// for set alarm, don't log
-           	if (calAlarm.getState() == SET )
-           	{
-           		logActiveFlag = false;
-				logHistFlag = false;
-           		break;
-           	}
-
-           	// for clear alarm, remove the set by rewritting the file
-           	else if (calAlarm.getState() == CLEAR )
-           	{
-           		logActiveFlag = false;
-				logHistFlag = true;
-           		//cout << "size before: " << alarmList.size();
-           		alarmList.erase (i);
-           		//cout << " size after: " << alarmList.size() << endl;
-				try {
-           			rewriteActiveLog (alarmList);
-				} catch (runtime_error& e)
-				{
-					if (::DEBUG) {                                
-						LoggingID lid(11);                                
-						MessageLog ml(lid);                                
-						Message msg;                                
-						Message::Args args;                                
-						args.add("rewriteActiveLog error:");                                
-						args.add(e.what());                                
-						msg.format(args);                                
-						ml.logDebugMessage(msg);                                
-					}
-					exit(1);
-				}
-           		break;
-           	}
-        }
-   	} // end of for loop
-
-   	if (logActiveFlag) {
-		try {
-   			logAlarm (calAlarm, ACTIVE_ALARM_FILE);
-		} catch (runtime_error& e)
-		{
-			if (::DEBUG) {                                
-				LoggingID lid(11);                                
-				MessageLog ml(lid);                                
-				Message msg;                                
-				Message::Args args;                                
-				args.add("logAlarm error:");                                
-				args.add(e.what());                                
-				msg.format(args);                                
-				ml.logDebugMessage(msg);                                
-			}
-			exit(1);
-		}
-	}
-	
-   	if (logHistFlag) {
-		// log historical alarm
-		try {
-			logAlarm (calAlarm, ALARM_FILE);
-		} catch (runtime_error& e)
-		{
-			if (::DEBUG) {                                
-				LoggingID lid(11);                                
-				MessageLog ml(lid);                                
-				Message msg;                                
-				Message::Args args;                                
-				args.add("logAlarm error:");                                
-				args.add(e.what());                                
-				msg.format(args);                                
-				ml.logDebugMessage(msg);                                
-			}
-			exit(1);
-		}
-	}
-}
-
-/*****************************************************************************************
 * @brief	configAlarm
 *
 * purpose:	Get Config Data for Incoming alarm
 *
 *****************************************************************************************/
-void configAlarm (Alarm& calAlarm)
+void configAlarm (Alarm &calAlarm)
 {
 	int alarmID = calAlarm.getAlarmID();
 	Oam oam;
@@ -326,7 +391,7 @@ void configAlarm (Alarm& calAlarm)
   				return;
   			}
   		}
-  	} catch (runtime_error& e)
+  	} catch (runtime_error e)
   	{
   		if (::DEBUG) {                                
 			LoggingID lid(11);                                
@@ -338,254 +403,114 @@ void configAlarm (Alarm& calAlarm)
 			msg.format(args);                                
 			ml.logDebugMessage(msg);                                
 		}
-		throw;
+		throw e;
   	}
   	  		
 	// process alarm
 	processAlarm (calAlarm);
 }
 
-} //anon namespace
-
 /*****************************************************************************************
-* @brief	main function
+* @brief	processAlarm
 *
-* purpose:	Parse incoming ALARM statement into calAlarm class
+* purpose:	Process Alarm by updating Active Alarm  and Historical Alarm files
 *
 *****************************************************************************************/
-int main (int argc, char *argv[]) {
-
-	if (argc != 2)
-  		exit (0);
-  
-  	Alarm calAlarm;
-
-  	char buf[100];
-  	char* alarmData;
-  	char* token;
-  	bool successFlag = false;
-
-  	if (::DEBUG) {
-		LoggingID lid(11);
-		MessageLog ml(lid);
-		Message msg;
-		Message::Args args;
-		args.add("trapHandler Launched");
-		msg.format(args);
-		ml.logDebugMessage(msg);
+void processAlarm (Alarm &calAlarm)
+{
+	bool logFlag = (calAlarm.getState() == CLEAR ? false: true);
+	
+	// get active alarms
+	AlarmList alarmList;
+	SNMPManager sm;
+	sm.getActiveAlarm (alarmList);
+	
+        if (::DEBUG) {                                        
+		LoggingID lid(11);                                        
+		MessageLog ml(lid);                                        
+		Message msg;                                        
+		Message::Args args;                                        
+		args.add("processAlarm Called");                                 
+		msg.format(args);                                        
+		ml.logDebugMessage(msg);                        
 	}
+	
+	AlarmList::iterator i;
+   	for (i = alarmList.begin(); i != alarmList.end(); ++i)
+   	{
+		// check if matching ID
+  		if (calAlarm.getAlarmID() != (i->second).getAlarmID() ) {
+			continue;
+		}
+   		// check if the same fault component on same server
+   		if (calAlarm.getComponentID().compare((i->second).getComponentID()) == 0 &&
+			calAlarm.getSname().compare((i->second).getSname()) == 0)
+        {
+   			// for set alarm, don't log to active
+           	if (calAlarm.getState() == SET )
+           	{
+           		logFlag = false;
+           		break;
+           	}
 
-	// read alarm data
-	while (cin.getline(buf,100))
-  	{
-		// Alarm data
-		if (::DEBUG) {
-			LoggingID lid(11);
-        		MessageLog ml(lid);
-        		Message msg;
-        		Message::Args args;
-        		args.add("Alarm Data:");
-			args.add(buf);
-        		msg.format(args);
-        		ml.logDebugMessage(msg);
-		}
-  		// search for CALALARM
-  		if ((alarmData = strstr(buf, "CALALARM")) == NULL)
-  			continue;
-  		
-  		successFlag = true;
-  		token = strtok (alarmData, DELIM);
-  		
-  		// alarmData format: CALALARM|alarmID|componentID|1(set)/0(clear)|server|process
-  		// alarmID
-		try {
-  			token = getNextToken();
-		} catch (runtime_error& e)
-		{
-			if (::DEBUG) {                                
-				LoggingID lid(11);                                
-				MessageLog ml(lid);                                
-				Message msg;                                
-				Message::Args args;                                
-				args.add("getNextToken error:");                                
-				args.add(e.what());                                
-				msg.format(args);                                
-				ml.logDebugMessage(msg);                                
-			}
-			exit(1);
-		}
-
-  		calAlarm.setAlarmID (atoi(token));
-  		
-  		// componentID
-		try {
-  			token = getNextToken();
-		} catch (runtime_error& e)
-		{
-			if (::DEBUG) {                                
-				LoggingID lid(11);                                
-				MessageLog ml(lid);                                
-				Message msg;                                
-				Message::Args args;                                
-				args.add("getNextToken error:");                                
-				args.add(e.what());                                
-				msg.format(args);                                
-				ml.logDebugMessage(msg);                                
-			}
-			exit(1);
-		}
-  		calAlarm.setComponentID (token);
-  		
-  		// state
-		try {
-  			token = getNextToken();
-		} catch (runtime_error& e)
-		{
-			if (::DEBUG) {                                
-				LoggingID lid(11);                                
-				MessageLog ml(lid);                                
-				Message msg;                                
-				Message::Args args;                                
-				args.add("getNextToken error:");                                
-				args.add(e.what());                                
-				msg.format(args);                                
-				ml.logDebugMessage(msg);                                
-			}
-			exit(1);
-		}
-  		calAlarm.setState (atoi(token));
-  		
-		// sname
-		try {
-  			token = getNextToken();
-		} catch (runtime_error& e)
-		{
-			if (::DEBUG) {                                
-				LoggingID lid(11);                                
-				MessageLog ml(lid);                                
-				Message msg;                                
-				Message::Args args;                                
-				args.add("getNextToken error:");                                
-				args.add(e.what());                                
-				msg.format(args);                                
-				ml.logDebugMessage(msg);                                
-			}
-			exit(1);
-		}
-		calAlarm.setSname (token);
-
-		// pname
-		try {
-  			token = getNextToken();
-		} catch (runtime_error& e)
-		{
-			if (::DEBUG) {                                
-				LoggingID lid(11);                                
-				MessageLog ml(lid);                                
-				Message msg;                                
-				Message::Args args;                                
-				args.add("getNextToken error:");                                
-				args.add(e.what());                                
-				msg.format(args);                                
-				ml.logDebugMessage(msg);                                
-			}
-			exit(1);
-		}
-		calAlarm.setPname (token);
-
-  		// distinguish agent trap and process trap.
-  		// agent trap set pid and tid 0.
-  		if (strcmp (argv[1], AGENT_TRAP) == 0)
-  		{
-  			calAlarm.setPid (0);
-  			calAlarm.setTid (0);
-  		}
-  		// process trap continues to get pid from alarm data
-  		else
-  		{
-  			// pid
-			try {
-				token = getNextToken();
-			} catch (runtime_error& e)
-			{
-				if (::DEBUG) {                                
-					LoggingID lid(11);                                
-					MessageLog ml(lid);                                
-					Message msg;                                
-					Message::Args args;                                
-					args.add("getNextToken error:");                                
-					args.add(e.what());                                
-					msg.format(args);                                
-					ml.logDebugMessage(msg);                                
+           	// for clear alarm, remove the set by rewritting the file
+           	else if (calAlarm.getState() == CLEAR )
+           	{
+           		logFlag = false;
+           		//cout << "size before: " << alarmList.size();
+           		alarmList.erase (i);
+           		//cout << " size after: " << alarmList.size() << endl;
+				try {
+           			rewriteActiveLog (alarmList);
+				} catch (runtime_error e)
+				{
+					if (::DEBUG) {                                
+						LoggingID lid(11);                                
+						MessageLog ml(lid);                                
+						Message msg;                                
+						Message::Args args;                                
+						args.add("rewriteActiveLog error:");                                
+						args.add(e.what());                                
+						msg.format(args);                                
+						ml.logDebugMessage(msg);                                
+					}
+					exit(1);
 				}
-				exit(1);
+           		break;
+           	}
+        }
+   	} // end of for loop
+
+   	if (logFlag) {
+		try {
+   			logAlarm (calAlarm, ACTIVE_ALARM_FILE);
+		} catch (runtime_error e)
+		{
+			if (::DEBUG) {                                
+				LoggingID lid(11);                                
+				MessageLog ml(lid);                                
+				Message msg;                                
+				Message::Args args;                                
+				args.add("logAlarm error:");                                
+				args.add(e.what());                                
+				msg.format(args);                                
+				ml.logDebugMessage(msg);                                
 			}
-			calAlarm.setPid (atoi(token));
-
-  			// tid
-			try {
-				token = getNextToken();
-			} catch (runtime_error& e)
-			{
-				if (::DEBUG) {                                
-					LoggingID lid(11);                                
-					MessageLog ml(lid);                                
-					Message msg;                                
-					Message::Args args;                                
-					args.add("getNextToken error:");                                
-					args.add(e.what());                                
-					msg.format(args);                                
-					ml.logDebugMessage(msg);                                
-				}
-				exit(1);
-			}
-  			calAlarm.setTid (atoi(token)); 
-  		}
-
-  		if (::DEBUG){
-        		LoggingID lid(11);
-        		MessageLog ml(lid);
-        		Message msg;
-        		Message::Args args;
-        		args.add("Alarm Info:");
-			args.add(calAlarm.getAlarmID());
-			args.add(calAlarm.getComponentID());
-			args.add(calAlarm.getState());
-        		msg.format(args);
-        		ml.logDebugMessage(msg);
-
-  			cout << calAlarm.getAlarmID() << ":" 
-  				 << calAlarm.getComponentID() << ":"
-  				 << calAlarm.getState() << endl;
+			exit(1);
 		}
-  		// break while loop. ignore the other info carried by
-  		// the trap. May need to retrieve more info in the future.
-  		break;
 	}
-  
-  // not valid alarm data if no "CALALARM" found
-  if (!successFlag){
-	LoggingID lid(11);                
-	MessageLog ml(lid);                
-	Message msg;                
-	Message::Args args;                
-	args.add("Error: not valid alarm data if no 'CALALARM' found");                
-	msg.format(args);                
-	ml.logDebugMessage(msg); 
-	exit(1);
-  }
-
-  // Get alarm configuration
+	
+	// log historical alarm
 	try {
-  		configAlarm (calAlarm);
-	} catch (runtime_error& e)
+		logAlarm (calAlarm, ALARM_FILE);
+	} catch (runtime_error e)
 	{
 		if (::DEBUG) {                                
 			LoggingID lid(11);                                
 			MessageLog ml(lid);                                
 			Message msg;                                
 			Message::Args args;                                
-			args.add("configAlarm error:");                                
+			args.add("logAlarm error:");                                
 			args.add(e.what());                                
 			msg.format(args);                                
 			ml.logDebugMessage(msg);                                
@@ -593,7 +518,89 @@ int main (int argc, char *argv[]) {
 		exit(1);
 	}
 
-  return 0;
 }
-// vim:ts=4 sw=4:
 
+/*****************************************************************************************
+* @brief	logAlarm
+*
+* purpose:	Log Alarm in Active Alarm or Historical Alarm file
+*
+*****************************************************************************************/
+void logAlarm (const Alarm &calAlarm, string fileName)
+{
+        if (::DEBUG) {                                        
+		LoggingID lid(11);                                        
+		MessageLog ml(lid);                                        
+		Message msg;                                        
+		Message::Args args;                                        
+		args.add("logAlarm Called");                                 
+		msg.format(args);                                        
+		ml.logDebugMessage(msg);                        
+	}
+
+	int fd = open(fileName.c_str(), O_RDWR|O_CREAT, 0666);
+	ofstream AlarmFile (fileName.c_str(), ios::app);
+
+	// Aquire an exclusive lock
+   	if (flock(fd,LOCK_EX) == -1) {
+    	throw runtime_error ("Lock file error: " + fileName);
+   	}
+
+	AlarmFile << calAlarm;
+	AlarmFile.close();
+	
+	// Release lock
+	if (flock(fd,LOCK_UN)==-1)
+	{
+    	throw runtime_error ("Release lock file error: " + fileName);		
+	}
+
+	close(fd);
+}
+
+/*****************************************************************************************
+* @brief	rewriteActiveLog
+*
+* purpose:	Update Active Alarm file, called to remove Cleared alarm
+*
+*****************************************************************************************/
+void rewriteActiveLog (AlarmList &alarmList)
+{
+	if (::DEBUG) {                                        
+		LoggingID lid(11);                                        
+		MessageLog ml(lid);                                        
+		Message msg;                                        
+		Message::Args args;                                        
+		args.add("rewriteAlarmLog Called");                                 
+		msg.format(args);                                        
+		ml.logDebugMessage(msg);                        
+	}
+
+	// delete the old file
+	unlink (ACTIVE_ALARM_FILE.c_str());
+	
+	// create new file
+	int fd = open(ACTIVE_ALARM_FILE.c_str(), O_RDWR|O_CREAT, 0666);
+	
+	// Aquire an exclusive lock
+   	if (flock(fd,LOCK_EX) == -1) {
+    	throw runtime_error ("Lock active alarm log file error");
+   	}
+
+   	ofstream activeAlarmFile (ACTIVE_ALARM_FILE.c_str());
+   	
+   	AlarmList::iterator i;
+   	for (i = alarmList.begin(); i != alarmList.end(); ++i)
+   	{
+   		activeAlarmFile << i->second;
+   	}
+
+   	activeAlarmFile.close();
+
+   	// Release lock
+	if (flock(fd,LOCK_UN)==-1)
+	{
+    	throw runtime_error ("Release lock active alarm log file error");		
+	}
+	close(fd);
+}

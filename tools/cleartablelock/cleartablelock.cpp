@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
-* $Id: cleartablelock.cpp 2336 2013-06-25 19:11:36Z rdempsey $
+* $Id: cleartablelock.cpp 1872 2012-08-01 16:58:23Z dhall $
 */
 
 #include <cstdlib>
@@ -51,7 +51,8 @@ namespace {
 void usage()
 {
 	std::cout << "Usage: cleartablelock lockID" << std::endl
-		<< " -h to display this menu" << std::endl;
+		<< " -h to display this menu" << std::endl
+		<< " -d to enable debug"      << std::endl;
 }
 
 //------------------------------------------------------------------------------
@@ -214,18 +215,18 @@ int createMsgQueClts(
 {
 	errMsg.clear();
 
-	std::string srvName;
+	std::ostringstream weServerName;
 	try {
 		// Send bulk rollback request to each specified PM.
 		for (unsigned k=0; k<pmList.size(); k++)
 		{
 			std::ostringstream weServerName;
 			weServerName << "pm" << pmList[k] << "_WriteEngineServer";
-			srvName = weServerName.str();
-			//std::cout << "Connecting to " << srvName << std::endl;
+//			std::cout << "Connecting to " << weServerName.str() << " on " <<
+//				devName << std::endl;
 
 			messageqcpp::MessageQueueClient* cl =
-				new messageqcpp::MessageQueueClient( srvName );
+				new messageqcpp::MessageQueueClient( weServerName.str() );
 			msgQueClts.push_back(
 				boost::shared_ptr<messageqcpp::MessageQueueClient>(cl) );
 		}
@@ -234,14 +235,14 @@ int createMsgQueClts(
 	{
 		std::ostringstream ossStatus;
 		ossStatus << "Error creating connection to " <<
-			srvName << ": " << ex.what();
+			weServerName.str() << ex.what();
 		errMsg = ossStatus.str();
 		return 3;
 	}
 	catch (...)
 	{
 		std::ostringstream ossStatus;
-		ossStatus << "Error creating connection to " << srvName;
+		ossStatus << "Error creating connection to " << weServerName.str();
 		errMsg = ossStatus.str();
 		return 3;
 	}
@@ -348,7 +349,7 @@ int execBulkRollbackReq(
 		{
 			// Take over ownership of stale lock.
 			std::string processName("clearTableLock");
-			uint32_t processID    = ::getpid();
+			u_int32_t processID    = ::getpid();
 			int32_t   sessionID    = -1;
 			int32_t   transID      = -1;
 			bool      ownerChanged = brm->changeOwner(
@@ -432,12 +433,16 @@ int main(int argc, char** argv)
 	int c;
 	bool clearLockOnly = false;
 	bool rollbackOnly  = false;
+	bool debugFlag     = false;
 	uint32_t tableOID  = 0;
 
-	while ((c = getopt(argc, argv, "hlr:")) != EOF)
+	while ((c = getopt(argc, argv, "dhlr:")) != EOF)
 	{
 		switch (c)
 		{
+			case 'd':
+				debugFlag = true;
+				break;
 			case 'l':
 				clearLockOnly = true;
 				break;

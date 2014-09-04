@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_char.cpp 3931 2013-06-21 20:17:28Z bwilkinson $
+* $Id: func_char.cpp 3651 2013-03-19 22:55:43Z bpaul $
 *
 *
 ****************************************************************************/
@@ -38,37 +38,38 @@ using namespace rowgroup;
 #include "errorids.h"
 using namespace logging;
 
-namespace
+
+inline bool getChar( int64_t value, ostringstream& oss )
 {
+	ostringstream oss1;
 
-// buf must be at least 9 characters since given 64-bit input
-// we will convert at most 8 characters and then add the null
-inline bool getChar( uint64_t value, char* buf )
-{
-    uint32_t cur_offset = 0; // current index into buf
-    int  cur_bitpos = 56; // 8th octet in input val
-
-    while( cur_bitpos >= 0 )
- 	{
-		if( ( ( value >> cur_bitpos ) & 0xff ) != 0 )
-		{
-			buf[cur_offset++] = char( ( value >> cur_bitpos ) & 0xff );
-		}
-		cur_bitpos -= 8;
-	}
-	buf[cur_offset] = '\0';
-
-	return true;
-}
-
-// see comment above regarding buf assumptions
-inline bool getChar( int64_t value, char* buf )
-{
 	if ( value < 0 )
 		return false;
-	else
-		return getChar( (uint64_t) value, buf );
-}
+
+	if ( value < 256 ) {
+		oss << char(value);
+		return true;
+	}
+
+	int num = 256;
+	while ( num > 255 ) {
+		num = value / 256;
+		int newValue = value - (num*256);
+		oss1 << char(newValue);
+		value = num;
+	}
+	oss1 << char(num);
+
+	//reverse order
+	string s = oss1.str();
+
+	for ( int i = s.size() ; i > 0 ; i--)
+	{
+		oss << s[i-1];
+	} 
+	oss << s[s.size()];
+
+	return true;
 }
 
 namespace funcexp
@@ -84,8 +85,7 @@ string Func_char::getStrVal(Row& row,
 							bool& isNull,
 							CalpontSystemCatalog::ColType& ct)
 {
-	const int BUF_SIZE = 9; // see comment above for size requirement
-    char buf[BUF_SIZE];
+	ostringstream oss;
 
 	switch (ct.colDataType)
 	{
@@ -94,78 +94,61 @@ string Func_char::getStrVal(Row& row,
 		case execplan::CalpontSystemCatalog::MEDINT:
 		case execplan::CalpontSystemCatalog::TINYINT:
 		case execplan::CalpontSystemCatalog::SMALLINT:
-		{
-			int64_t value = parm[0]->data()->getIntVal(row, isNull);
+			{
+				int64_t value = parm[0]->data()->getIntVal(row, isNull);
 
-			if ( !getChar(value, buf) ) {
-				isNull = true;
-				return "";
+				if ( !getChar(value, oss) ) {
+					isNull = true;
+					return "";
+				}
+
 			}
-		}
-		break;
-	
-        case execplan::CalpontSystemCatalog::UBIGINT:
-        case execplan::CalpontSystemCatalog::UINT:
-        case execplan::CalpontSystemCatalog::UMEDINT:
-        case execplan::CalpontSystemCatalog::UTINYINT:
-        case execplan::CalpontSystemCatalog::USMALLINT:
-        {
-            uint64_t value = parm[0]->data()->getUintVal(row, isNull);
+			break;
 
-            if ( !getChar(value, buf) ) {
-                isNull = true;
-                return "";
-            }
-        }
-        break;
-
-        case execplan::CalpontSystemCatalog::VARCHAR: // including CHAR'
+		case execplan::CalpontSystemCatalog::VARCHAR: // including CHAR'
 		case execplan::CalpontSystemCatalog::CHAR:
 		case execplan::CalpontSystemCatalog::DOUBLE:
-        case execplan::CalpontSystemCatalog::UDOUBLE:
-		{
-			double value = parm[0]->data()->getDoubleVal(row, isNull);
-			if ( !getChar((int64_t)value, buf) ) {
-				isNull = true;
-				return "";
+			{
+				double value = parm[0]->data()->getDoubleVal(row, isNull);
+				if ( !getChar((int64_t)value, oss) ) {
+					isNull = true;
+					return "";
+				}
 			}
-		}
-		break;
-	
-        case execplan::CalpontSystemCatalog::FLOAT:
-		case execplan::CalpontSystemCatalog::UFLOAT:
-		{
-			float value = parm[0]->data()->getFloatVal(row, isNull);
-			if ( !getChar((int64_t)value, buf) ) {
-				isNull = true;
-				return "";
-			}
-		}
-		break;
+			break;
 
-        case execplan::CalpontSystemCatalog::DECIMAL:
-		case execplan::CalpontSystemCatalog::UDECIMAL:
-		{
-			IDB_Decimal d = parm[0]->data()->getDecimalVal(row, isNull);
-			// get decimal and round up
-			int value = d.value / helpers::power(d.scale);
-			int lefto = (d.value - value * helpers::power(d.scale)) / helpers::power(d.scale-1);
-			if ( lefto > 4 )
-				value++;
-			if ( !getChar((int64_t)value, buf) ) {
-				isNull = true;
-				return "";
+		case execplan::CalpontSystemCatalog::FLOAT:
+			{
+				float value = parm[0]->data()->getFloatVal(row, isNull);
+				if ( !getChar((int64_t)value, oss) ) {
+					isNull = true;
+					return "";
+				}
 			}
-		}
-		break;
+			break;
+
+		case execplan::CalpontSystemCatalog::DECIMAL:
+			{
+				IDB_Decimal d = parm[0]->data()->getDecimalVal(row, isNull);
+				// get decimal and round up
+				int value = d.value / power(d.scale);
+				int lefto = (d.value - value * power(d.scale)) / power(d.scale-1);
+				if ( lefto > 4 )
+					value++;
+				if ( !getChar((int64_t)value, oss) ) {
+					isNull = true;
+					return "";
+				}
+			}
+			break;
 
 		case execplan::CalpontSystemCatalog::DATE:
 		case execplan::CalpontSystemCatalog::DATETIME:
-		{
-			isNull = true;
-			return "";
-		}
-		break;
+			{
+				isNull = true;
+				return "";
+			}
+			break;
 
 		default:
 		{
@@ -184,7 +167,8 @@ string Func_char::getStrVal(Row& row,
 		return "";
 	}
 
-	return buf;
+	return oss.str();
+	
 }
 
 

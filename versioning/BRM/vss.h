@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: vss.h 1926 2013-06-30 21:18:14Z wweeks $
+ * $Id: vss.h 1928 2013-06-30 21:20:52Z wweeks $
  *
  *****************************************************************************/
 
@@ -94,17 +94,6 @@ struct VSSShmsegHeader {
 //  the rest of the overlay looks like this
 // 	int hashBuckets[numHashBuckets];
 // 	VSSEntry storage[capacity];
-};
-
-class QueryContext_vss {
-public:
-	QueryContext_vss() : currentScn(0)
-	{
-		txns.reset(new std::set<VER_t>());
-	}
-	QueryContext_vss(const QueryContext &qc);
-	VER_t currentScn;
-	boost::shared_ptr<std::set<VER_t> > txns;
 };
 
 class VSSImpl
@@ -188,18 +177,7 @@ class VSS : public Undoable {
 		
 		// Note, the use_vbbm switch should be used for unit testing the VSS only
 		EXPORT void removeEntriesFromDB(const LBIDRange& range, VBBM& vbbm, bool use_vbbm = true);
-		EXPORT int lookup(LBID_t lbid, const QueryContext_vss &, VER_t txnID, VER_t *outVer,
-						  bool *vbFlag, bool vbOnly = false) const;
-
-		/// Returns the version in the main DB files
-		EXPORT VER_t getCurrentVersion(LBID_t lbid, bool *isLocked) const;  // returns the ver in the main DB files
-
-		/// Returns the highest version in the version buffer, less than max
-		EXPORT VER_t getHighestVerInVB(LBID_t lbid, VER_t max) const;
-
-		/// returns true if that block is in the version buffer, false otherwise
-		EXPORT bool isVersioned(LBID_t lbid, VER_t version) const;
-
+		EXPORT int lookup(LBID_t lbid, VER_t &verID, VER_t txnID, bool &vbFlag, bool vbOnly = false) const;
 		EXPORT void setVBFlag(LBID_t lbid, VER_t verID, bool vbFlag);
 		EXPORT void insert(LBID_t, VER_t, bool vbFlag, bool locked);
 		EXPORT void commit(VER_t txnID);
@@ -216,6 +194,8 @@ class VSS : public Undoable {
 		EXPORT void getCurrentTxnIDs(std::set<VER_t> &txnList) const;
 
 		EXPORT void clear();
+		EXPORT void writeData(int fd, u_int8_t *buf, off_t offset, int size) const;
+		EXPORT void readData(int fd, u_int8_t *buf, off_t offset, int size);
 		EXPORT void load(std::string filename);
 #ifndef __LP64__
 		//This method is OBE now that the structs are padded correctly

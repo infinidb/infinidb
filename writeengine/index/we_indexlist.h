@@ -57,20 +57,20 @@ public:
    /**
     * @brief Add a 4 bytes header for a rowid, key in the index list
     */
-   const int  addIndexListHdr( FILE* pFile, const RID& listRid, const uint64_t& key, 
+   const int  addIndexListHdr( FILE* pFile, const RID& listRid, const i64& key, 
                                    IdxEmptyListEntry* newHeaderListPtr  );
                                                   
-   const int  addIndexListHdr( CommBlock& cbList, const RID& listRid, const uint64_t& key, 
+   const int  addIndexListHdr( CommBlock& cbList, const RID& listRid, const i64& key, 
                                    IdxEmptyListEntry* newHeaderListPtr  )
       {  
          m_oid = cbList.file.oid;   m_pFile = cbList.file.pFile;       
          int rc = addIndexListHdr( m_pFile, listRid, key, newHeaderListPtr);
          return rc;
       }
-    const int  addIndexListHdr( FILE* pFile, const RID* ridList, const int size, const uint64_t& key, 
+    const int  addIndexListHdr( FILE* pFile, const RID* ridList, const int size, const i64& key, 
                                    IdxEmptyListEntry* newHeaderListPtr  );
                                    
-    const int  addIndexListHdr( CommBlock& cbList, RID* ridList, int& size, const uint64_t& key, 
+    const int  addIndexListHdr( CommBlock& cbList, RID* ridList, int& size, const i64& key, 
                                    IdxEmptyListEntry* newHeaderListPtr  )
     {  
          m_oid = cbList.file.oid;   m_pFile = cbList.file.pFile;       
@@ -78,7 +78,7 @@ public:
          return rc;
     }
     const int  addIndexListHdr( CommBlock& cbList, const IdxMultiRid& multiRids,
-                                const uint64_t& key, IdxEmptyListEntry* newHeaderListPtr)
+                                const i64& key, IdxEmptyListEntry* newHeaderListPtr)
     {
                 m_oid = cbList.file.oid;   m_pFile = cbList.file.pFile;
                 int size =  multiRids.totalRid;
@@ -90,10 +90,10 @@ public:
    /**
     * @brief Update the indexlist when a new rowid an key inserted
     */
-   const int  updateIndexList( FILE* pFile, const RID& listRid, const uint64_t& key, 
+   const int  updateIndexList( FILE* pFile, const RID& listRid, const i64& key, 
                                    IdxEmptyListEntry* oldHeaderListPtr  );
                
-   const int  updateIndexList( CommBlock& cbList, const RID& listRid, const uint64_t& key, 
+   const int  updateIndexList( CommBlock& cbList, const RID& listRid, const i64& key, 
                                    IdxEmptyListEntry* oldHeaderListPtr  )
               {       
                 m_oid = cbList.file.oid; m_pFile = cbList.file.pFile;                          
@@ -102,9 +102,9 @@ public:
                 return rc;
               };
                 
-   const int  updateIndexList( FILE* pFile, const RID* ridList, const int size,const uint64_t& key, 
+   const int  updateIndexList( FILE* pFile, const RID* ridList, const int size,const i64& key, 
                                    IdxEmptyListEntry* oldHeaderListPtr  );
-   const int  updateIndexList( CommBlock& cbList, const RID* ridList, const int size,const uint64_t& key, 
+   const int  updateIndexList( CommBlock& cbList, const RID* ridList, const int size,const i64& key, 
                                    IdxEmptyListEntry* oldHeaderListPtr  )
               {
                  m_oid = cbList.file.oid; m_pFile = cbList.file.pFile;                          
@@ -113,7 +113,7 @@ public:
                  return rc;
               }
    const int  updateIndexList( CommBlock& cbList, const IdxMultiRid& multiRids,
-                               const uint64_t& key, IdxEmptyListEntry* oldHeaderListPtr)
+                               const i64& key, IdxEmptyListEntry* oldHeaderListPtr)
               {
                 return updateIndexList( cbList, multiRids.ridArray, multiRids.totalRid,
                                         key, oldHeaderListPtr  );
@@ -122,10 +122,10 @@ public:
    /**
     * @brief Delete the rowid in the key indexlist
     */
-   const int  deleteIndexList( FILE* pFile, const RID& listRid, const uint64_t& key, 
+   const int  deleteIndexList( FILE* pFile, const RID& listRid, const i64& key, 
                                IdxEmptyListEntry* oldHeaderListPtr  );
                
-   const int  deleteIndexList( CommBlock& cbList, const RID& listRid, const uint64_t& key, 
+   const int  deleteIndexList( CommBlock& cbList, const RID& listRid, const i64& key, 
                                IdxEmptyListEntry* oldHeaderListPtr  )
               {
                 m_oid = cbList.file.oid ; m_pFile = cbList.file.pFile;
@@ -137,14 +137,14 @@ public:
    /**
     * @brief delete a row id from the key index list and return the location
     */  
-    const int  deleteIndexList( FILE* pFile, const RID& listRid, const uint64_t& key, 
+    const int  deleteIndexList( FILE* pFile, const RID& listRid, const i64& key, 
                                IdxEmptyListEntry* oldHeaderListPtr,
-                               uint64_t& lbid, int& sbid, int& entry  );                              
+                               i64& lbid, int& sbid, int& entry  );                              
                                 
     const int  deleteIndexList( CommBlock& cbList, const RID& listRid, 
-                                const uint64_t& key, 
+                                const i64& key, 
                                 IdxEmptyListEntry* oldHeaderListPtr,
-                                uint64_t& lbid, int& sbid, int& entry  )
+                                i64& lbid, int& sbid, int& entry  )
                {
                 m_oid = cbList.file.oid ; m_pFile = cbList.file.pFile;                 
                 int rc = deleteIndexList( m_pFile, listRid, key, 
@@ -156,13 +156,13 @@ public:
    /**
     * @brief find a row id from the key index list and return the location
     */     
-    bool       findRowId(FILE* pFile, const RID& rid, const uint64_t& key,
+    bool       findRowId(FILE* pFile, const RID& rid, const i64& key,
                          IdxEmptyListEntry* oldIdxRidListHdrPtr,
-                         uint64_t& lbid, int& sbid, int& entry);
+                         i64& lbid, int& sbid, int& entry);
                           
-    bool       findRowId(CommBlock& cbList, const RID& rid, const uint64_t& key,
+    bool       findRowId(CommBlock& cbList, const RID& rid, const i64& key,
                         IdxEmptyListEntry* oldIdxRidListHdrPtr,
-                        uint64_t& lbid, int& sbid, int& entry)
+                        i64& lbid, int& sbid, int& entry)
                {      m_oid = cbList.file.oid ; m_pFile = cbList.file.pFile;
                                     
                       bool found =findRowId(m_pFile, rid, key, 
@@ -173,11 +173,11 @@ public:
    /**
     * @brief get the total row ids or tokens from the index list header
     */                          
-   const int       getRIDArrayFromListHdr(FILE* pFile, uint64_t& key,
+   const int       getRIDArrayFromListHdr(FILE* pFile, i64& key,
                                      IdxEmptyListEntry* oldHeaderListPtr,
                                      RID* ridArrary, int& size); 
                                      
-   const int       getRIDArrayFromListHdr(CommBlock& cbList, uint64_t& key,
+   const int       getRIDArrayFromListHdr(CommBlock& cbList, i64& key,
                                      IdxEmptyListEntry* oldHeaderListPtr,
                                      RID* ridArrary, int& size)
                    { m_oid = cbList.file.oid ; m_pFile = cbList.file.pFile;
@@ -186,10 +186,10 @@ public:
                                      ridArrary, size);
                      return rc;
                    };
-  const int        getRIDArrayFromListHdrNarray(FILE* pFile, uint64_t& key,
+  const int        getRIDArrayFromListHdrNarray(FILE* pFile, i64& key,
                                     IdxEmptyListEntry* curIdxRidListHdrPtr,
                                     RID* ridArray, int& size, bool flag);
-  const int        getRIDArrayFromListHdrNarray(CommBlock& cbList, uint64_t& key,
+  const int       getRIDArrayFromListHdrNarray(CommBlock& cbList, i64& key,
                                      IdxEmptyListEntry* oldHeaderListPtr,
                                      RID* ridArrary, int& size, bool flag)
                    { m_oid = cbList.file.oid ; m_pFile = cbList.file.pFile;
@@ -236,12 +236,12 @@ public:
    const int  updateIndexListWrite();
    const int  init();
    const int  initBlksGetHdrBlk();
-   const int  initGetHdr(const uint64_t &key, IdxEmptyListEntry* curIdxRidListHdrPtr);
+   const int  initGetHdr(const i64 &key, IdxEmptyListEntry* curIdxRidListHdrPtr);
    const int  resetBlk(DataBlock* dataBlk) ;
-   const int  resetBlkZero(uint64_t& lbid0);
-   const int  writeBlkZero(uint64_t& lbid0);
+   const int  resetBlkZero(i64& lbid0);
+   const int  writeBlkZero(i64& lbid0);
 
-   const int  setLastLbid( uint64_t& lastLbid);
+   const int  setLastLbid( i64& lastLbid);
    const int  getLastLbid();
    
    const int  findLastBlk(int& count);
@@ -253,18 +253,18 @@ public:
    const int  getNextInfo(int& count);
    const int  getNextInfoFromBlk( IdxRidListPtr& idxRidListPtr);
    const int  getNextInfoFromBlk(){return getNextInfoFromBlk(m_lastIdxRidListPtr); };
-   const int  getLastFboPtr(uint64_t& lbid, int& sbid, IdxRidListPtr& lastFboListPtr);
-   const int  setLastFboPtr(uint64_t& lbid, int& sbid, IdxRidListPtr& lastFboListPtr);
+   const int  getLastFboPtr(i64& lbid, int& sbid, IdxRidListPtr& lastFboListPtr);
+   const int  setLastFboPtr(i64& lbid, int& sbid, IdxRidListPtr& lastFboListPtr);
    const int  setNextInfoFromBlk( IdxRidListPtr& idxRidListPtr);
    const int  setNarray(bool flag){m_useNarray= flag; return NO_ERROR;};
-   const int  findFirstBlk(FILE* pFile, const uint64_t& key,
+   const int  findFirstBlk(FILE* pFile, const i64& key,
                               IdxEmptyListEntry* curIdxRidListHdrPtr,
-                              uint64_t& lbid);
+                              i64& lbid);
    bool       getUseNarray(){return m_useNarray;};
-   const int  printBlocks(uint64_t& lbid);
-   const int  getBlk(uint64_t& lbid);
+   const int  printBlocks(i64& lbid);
+   const int  getBlk(i64& lbid);
    const int  getSubBlk();
-   const int  getSubBlk(uint64_t& lbid, int& sbid, int& entry);
+   const int  getSubBlk(i64& lbid, int& sbid, int& entry);
 
    
 private:
@@ -280,15 +280,15 @@ private:
    /**
     * @brief insert a rowid into the key index list
     */ 
-    const int  updateIndexList( const RID& listRid, const uint64_t& key, 
-                                uint64_t& startLbid, int& startSbid, int& startEntry,
-                                uint64_t& endLbid, int& endSbid, int& endEntry
+    const int  updateIndexList( const RID& listRid, const i64& key, 
+                                i64& startLbid, int& startSbid, int& startEntry,
+                                i64& endLbid, int& endSbid, int& endEntry
                                 ); 
    
    /**
     * @brief insert a rowid into the key index list
     */  
-    const int  updateIndexList( const RID& listRid, const uint64_t& key); 
+    const int  updateIndexList( const RID& listRid, const i64& key); 
     const int  updateIndexList( const RID* ridList, const int size, int& startPos);
     const int  addRid(const RID& newRid, IdxRidListPtr& lastIdxRidListPtr);
     const int  addRidList(const RID* ridList, const int size, int& startPos);
@@ -304,18 +304,18 @@ private:
    /**
     * @brief find a row id from the key index list and return the location
     */
-    bool findRowId( const RID& rowId,const uint64_t& key, uint64_t& lbid, int& sbid, int& entry);
+    bool findRowId( const RID& rowId,const i64& key, i64& lbid, int& sbid, int& entry);
    /**
     * @brief delete a row id from the key index list 
     */
-    const int  deleteIndexList( const RID& rowId, const uint64_t& key);
+    const int  deleteIndexList( const RID& rowId, const i64& key);
    /**
     * @brief delete a row id from the key index list and return a location
     */
     
     const int  deleteIndexList(const RID& rowId, 
-                              const uint64_t& key, 
-                              uint64_t& lbid, int&sbid, int& entry);
+                              const i64& key, 
+                              i64& lbid, int&sbid, int& entry);
    /**
     * @brief insert a new row id to the key index list 
     */
@@ -328,10 +328,10 @@ private:
    const int  releaseSegment() ;
          void setListOid(const OID& listOid){m_oid = listOid;}
    const OID  getListOid(){return m_oid;}
-   const int  insertRowId( uint64_t& curLbid, int& pos, uint64_t& parentLbid);
-   const int  setupBlock ( uint64_t& curLbid, int& pos, uint64_t& parentLbid);
+   const int  insertRowId( i64& curLbid, int& pos, i64& parentLbid);
+   const int  setupBlock ( i64& curLbid, int& pos, i64& parentLbid);
 
-   const int  updateHdrSub(const RID& newRid, const uint64_t &key);
+   const int  updateHdrSub(const RID& newRid, const i64 &key);
    const int  addRidInSub(const RID& newRid, 
                                     IdxRidListPtr& lastIdxRidListPtr);
    const int  moveRidsToNewSub(FILE* pFile, const RID& oldRid, 
@@ -339,15 +339,15 @@ private:
                                          IdxEmptyListEntry* newIdxListEntryPtr);
    const int  updateHdrCount();
 
-   const int  setParentStatus(uint64_t& pLbid);
-   const int  setCurBlkNextPtr(uint64_t& nextLbid, int count);
-   const int  initNewBlock(int64_t& lbid, DataBlock* dataBlock, uint64_t& pLbid);
-   const int  initNewBlock(DataBlock* dataBlock, uint64_t& pLbid);
+   const int  setParentStatus(i64& pLbid);
+   const int  setCurBlkNextPtr(i64& nextLbid, int count);
+   const int  initNewBlock(i64& lbid, DataBlock* dataBlock, i64& pLbid);
+   const int  initNewBlock(DataBlock* dataBlock, i64& pLbid);
    const int  initCurBlock();
    const int  getNextInfoFromArray(IdxRidNextListPtr& nextIdxListPtr);
    const int  getParentInfoFromArray(IdxRidParentListPtr& parentIdxListPtr);
    const int  updateCurCountInArray(int insCnt=1);
-   const int  updateParentStatus(uint64_t& childLbid);
+   const int  updateParentStatus(i64& childLbid);
 
    const int  updateLastPtrAndParent(const int lastCount);
    const int  updateLastPtr(const int lastCount);
@@ -362,27 +362,27 @@ private:
     DataBlock m_parentBlock;
     DataBlock m_nextBlock;
 
-    uint64_t m_hdrLbid;                      /**@brief the header block number */
+    i64 m_hdrLbid;                      /**@brief the header block number */
     int m_hdrSbid;                     /**@brief the header subblock number */
     int m_hdrEntry;                    /**@brief the header entry number */
     
-    uint64_t m_lbid;                         /**@brief the current block number */
+    i64 m_lbid;                         /**@brief the current block number */
     int m_sbid;                        /**@brief the current subblock number */
     int m_entry;                       /**@brief the current entry number */
     
-    uint64_t m_newLbid;
+    i64 m_newLbid;
     int m_newSbid;
     int m_newEntry;
     
-    uint64_t m_parentLbid;
+    i64 m_parentLbid;
     int m_parentSbid;
     int m_parentEntry;
     
-    uint64_t m_nextLbid;                     /**@brief the next block number */
+    i64 m_nextLbid;                     /**@brief the next block number */
     int m_nextSbid;                    /**@brief the next subblock number */
     int m_nextEntry;                   /**@brief the next entry number */
     
-    uint64_t m_dLbid;                     /**@brief the next block number */
+    i64 m_dLbid;                     /**@brief the next block number */
     int m_dSbid;                    /**@brief the next subblock number */
     int m_dEntry;                   /**@brief the next entry number */   
      
@@ -396,8 +396,8 @@ private:
     int     m_curType;
     int     m_nextType;
     int     m_totalbytes;
-	int     m_lastFbo;
-	uint64_t m_lastLbid;
+	   int     m_lastFbo;
+	   i64     m_lastLbid;
     FreeMgr m_freemgr;
     time_t         m_startTime;               // start time
     time_t         m_endTime;                 // end time

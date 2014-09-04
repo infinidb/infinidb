@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: make_src_tar 1932 2013-06-20 18:26:27Z dhill $
+# $Id: make_src_tar 1836 2013-02-15 15:11:15Z dhill $
 #
 
 # basedir is the working dir for all the activity
@@ -9,8 +9,12 @@ basedir=$HOME
 vname=
 # ofile is the output tar file name and is relative to a hidden dir, so it should be absolute
 ofile=
-# branch is the branch to checkout (develop by default)
+# branch is the branch to checkout (trunk by default)
 branch=
+# normally we make a community src dist
+enterprise=0
+# where to get the MySQL code from
+mysqltar=/net/srvengcm1/Calpont/exports/MySQL/mysql-5.1.39.tar.gz
 for arg in "$@"; do
        if [ $(expr -- "$arg" : '--basedir=') -eq 10 ]; then
                basedir="$(echo $arg | awk -F= '{print $2}')"
@@ -20,10 +24,24 @@ for arg in "$@"; do
                ofile="$(echo $arg | awk -F= '{print $2}')"
        elif [ $(expr -- "$arg" : '--branch=') -eq 9 ]; then
                branch="$(echo $arg | awk -F= '{print $2}')"
+       elif [ $(expr -- "$arg" : '--enterprise') -eq 12 ]; then
+               enterprise=1
+       elif [ $(expr -- "$arg" : '--mysqltar=') -eq 11 ]; then
+               mysqltar="$(echo $arg | awk -F= '{print $2}')"
        else
                echo "ignoring unknown argument: $arg" 1>&2
        fi
 done
+
+if [ ! -x /usr/local/bin/updateGenii.pl ]; then
+	echo "Did not find updateGenii.pl!" 1>&2
+	exit 1
+fi
+
+if [ ! -f $mysqltar ]; then
+	echo "Did not find $mysqltar!" 1>&2
+	exit 1
+fi
 
 if [ -f releasenum ]; then
 	. releasenum
@@ -34,9 +52,9 @@ else
 fi
 
 if [ -z "$version" ]; then
-	echo "Version defaulting to 4.0-develop"
-	version=4.0
-	release=develop
+	echo "Version defaulting to 2.3-trunk"
+	version=2.3
+	release=trunk
 fi
 
 if [ -z "$release" ]; then
@@ -45,7 +63,11 @@ fi
 
 blddir=bld.$$
 if [ -z "$vname" ]; then
-	       vname=infinidb-${version}
+	if [ $enterprise -eq 0 ]; then
+	       vname=calpont-infinidb-${version}
+	else
+	       vname=calpont-infinidb-ent-${version}
+	fi
 fi
 if [ -z "$ofile" ]; then
 	       ofile=${basedir}/${vname}-${release}.src.tar.gz
@@ -64,55 +86,104 @@ branch_arg=
 if [ ! -z "$branch" ]; then
 	branch_arg="-b $branch"
 else
-	branch=develop
+	branch=trunk
 fi
 
-echo -n "getting git source from $branch..."
-git clone http://srvengcm1.calpont.com/repos/infinidb.git infinidb
-cd infinidb
-git checkout $branch
+echo -n "getting SVN source from $branch..."
+updateGenii.pl -r $co_dir $branch_arg >/dev/null 2>&1
 echo "done."
 
 test -d build || exit 1
 
-echo -n "cleaning git source for "
+echo -n "cleaning SVN source for "
+if [ $enterprise -eq 0 ]; then
+	echo -n "open source "
+else
+	echo -n "enterprise "
+fi
 echo -n "release..."
-rm -rf .git .gitignore
+rm -rf .git*
 rm -rf qa export
 rm -f rules.mak
 find . -name Makefile | xargs rm -f
 find . -name \*.xmi | xargs rm -f
 rm -f dbcon/joblist/bandeddl.h.set dbcon/joblist/bandeddl.h.vector primitives/blockcache/iomanager.cpp.single-read \
 	primitives/udf/Makefile.sdk
+if [ $enterprise -eq 0 ]; then
+	for file in $(find . -name \*.os); do
+		mv -f ${file} ${file%.os}
+	done
+else
+	find . -name \*.os | xargs rm -f
+fi
 rm -rf utils/scenarios
+if [ $enterprise -eq 0 ]; then
+	rm -rf procmgr
+	rm -rf procmon
+	cd oamapps
+	rm -rf calpont-console hardwareMonitor postConfigure resourceMonitor sessionWalker calpontDB \
+		logUtils serverMonitor traphandler sendtrap glusterconf
+	cd ..
+fi
 cd mysql
 rm -rf scripts queries storage/maria
 cd ..
 rm -rf writeengine/test/*
 rm -rf utils/net-snmp-built-libs
-rm -rf utils/multicast
+cd utils/multicast
+rm -f config.h impl.h participants.h socklib.h threads.h udpc-protoc.h util.h impl.cpp mc_fifo.h produconsum.h statistics.h udp-sender.h udpcast.h
+cd ../..
 rm -rf utils/openpgm
 rm -rf tools/reserveStacks
-rm -rf dbcon/doc dbcon/ingres dbcon/plsql
-cd tools
-rm -rf brmtest dataPump evalidx fixdate nettest pgm pingproc rebuildEM snconvert updateGenii valprint
-rm -rf cfread dbgen dbgen-ssb ddldriver dmldriver idb_comp sendPlan vbgen
-cd ..
-rm -rf utils/libstatgrab utils/libxml utils/testbc utils/configcpp/md5
-echo "done."
+if [ $enterprise -eq 0 ]; then
+	cp oam/etc/Calpont.xml oam/etc/Calpont.xml.singleserver
+	cd tools
+	for dir in sendPlan cfread ddldriver calpontSupport prat configMgt idb_comp vbgen; do
+		rm -rf $dir
+	done
+	cd ..
+	cd build
+	for file in README bChanges.sh bb_fix_rules.sh branchIt.pl branchMerge.pl build_rpms checkForMods.sh \
+		copyBranch.pl deleteBranch.pl makeBranch.pl makeTag.pl make_src_tar svndiff.pl svnmerge.pl tagIt.pl; do
+		rm -f $file
+	done
+	cd ..
+	cd oam/install_scripts
+	for file in calpont calpontInstall.sh calpontUninstall.sh crontab director_installer.sh install-calpont.sh \
+		module_installer.sh oracle patch_installer.sh performance_installer.sh postInstall.sh \
+		remote_command.sh remote_installer.sh remote_scp_get.sh system_installer.sh user_installer.sh \
+		xm_installer.sh displayJobGraph.sh S99Infinidb binary_installer.sh; do
+		rm -f $file
+	done
+	cd ../..
+	rm -rf net-snmp utils/net-snmp utils/libstatgrab utils/boost_thread utils/libxml
+	rm -f build/mini-tests.sh build/nightly-mini-tester.sh
+	rm -f oam/oamcpp/license.*
+	rm -f dbcon/mysql/ha_calpont_partition.cpp dbcon/mysql/ha_view.* dbcon/mysql/ha_autoi.*
+	rm -rf utils/udfsdk
+	cd utils/compress
+	for file in *; do
+		if [ $file != idbcompress.h -a $file != Makefile.am ]; then
+			rm -f $file
+		fi
+	done
+	cd ../..
+	cd tools
+	rm -rf brmtest dataPump evalidx fixdate nettest pgm pingproc rebuildEM snconvert updateGenii valprint
+	cd ..
+	rm -f utils/winport/idb_64_enterprise.nsi
+	rm -f utils/winport/win_setup_mysql_part4.sql
+	rm -rf tools/notificationTester
+fi
 
-cd ..
+echo "done."
 
 echo -n "getting MySQL..."
-git clone https://github.com/infinidb/mysql mysql
-cd mysql
-git checkout $branch
+tar -zxf $mysqltar
+rm -f mysql-5.1.*/config.h.in~
 echo "done."
 
-cd ..
-
 echo -n "building tarball..."
-cd infinidb
 cp -r utils/autoconf/* .
 cp INSTALL INSTALL.keep
 cp install-sh install-sh.keep
@@ -121,9 +192,6 @@ autoreconf --force --install
 rm -f INSTALL install-sh
 mv INSTALL.keep INSTALL
 mv install-sh.keep install-sh
-cd ..
-ln -s infinidb/INSTALL
-ln -s infinidb/README
 cd ..
 tar -zcf $ofile $vname
 echo "done."

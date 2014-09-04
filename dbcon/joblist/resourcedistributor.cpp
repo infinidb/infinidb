@@ -26,7 +26,6 @@
 #include <sys/time.h>
 using namespace std;
 
-#include "jl_logger.h"
 #include "resourcedistributor.h"
 
 namespace joblist {
@@ -36,7 +35,7 @@ const unsigned maxSessionsDefault = 100;
 uint64_t ResourceDistributor::requestResource(uint32_t sessionID)
 {
 	uint64_t resource = getSessionResource(sessionID);
-
+	
 	return requestResource(sessionID, resource);
 }
 
@@ -50,7 +49,7 @@ uint64_t ResourceDistributor::requestResource(uint32_t sessionID, uint64_t resou
 	{
 		if (fTraceOn)
 			logMessage(logging::LOG_TYPE_DEBUG, LogRDRequestWait, resource, sessionID);
-
+		
 		fResourceAvailable.wait(lk);
 
 		if (fTraceOn)
@@ -86,8 +85,8 @@ void ResourceDistributor::logMessage(logging::LOG_TYPE logLevel, logging::Messag
 	log.logMessage(logLevel, mid, args, logging::LoggingID(5, sessionID));
 }
 
-void  LockedSessionMap::updateAging(uint32_t sessionID)
-{
+void  LockedSessionMap::updateAging(uint32_t sessionID) 
+{ 
 	boost::mutex::scoped_lock lock(fSessionLock);
 	SessionList::iterator pos = find(fSessionAgingList.begin(), fSessionAgingList.end(), sessionID);
 	if (fSessionAgingList.end() != pos)
@@ -96,15 +95,15 @@ void  LockedSessionMap::updateAging(uint32_t sessionID)
 		fSessionAgingList.push_back(sessionID);
 }
 
-uint64_t  LockedSessionMap::getSessionResource(uint32_t sessionID)
-{
+uint64_t  LockedSessionMap::getSessionResource(uint32_t sessionID) 
+{ 
 	SessionMap::const_iterator it = fSessionMap.find(sessionID);
 	if (fSessionMap.end() != it)
 	{
 		updateAging(sessionID);
-		return it->second;
+		return it->second;		
 	}
-	return fResourceBlock;
+	return fResourceBlock; 
 }
 
 bool LockedSessionMap::addSession(uint32_t sessionID, uint64_t resource, uint64_t limit)
@@ -117,7 +116,7 @@ bool LockedSessionMap::addSession(uint32_t sessionID, uint64_t resource, uint64_
     }
 
 	boost::mutex::scoped_lock maplock(fMapLock);
-	fSessionMap[sessionID] = resource;
+	fSessionMap[sessionID] = resource; 
 	updateAging(sessionID);
 	if (fMaxSessions < fSessionMap.size())
 	{
@@ -130,10 +129,10 @@ bool LockedSessionMap::addSession(uint32_t sessionID, uint64_t resource, uint64_
 
 }
 
-void LockedSessionMap::removeSession(uint32_t sessionID)
+void LockedSessionMap::removeSession(u_int32_t sessionID)
 {
     boost::mutex::scoped_lock maplock(fMapLock);
-    fSessionMap.erase(sessionID);
+    fSessionMap.erase(sessionID); 
     boost::mutex::scoped_lock listlock(fSessionLock);
     fSessionAgingList.erase(find(fSessionAgingList.begin(), fSessionAgingList.end(), sessionID));
 }
@@ -150,5 +149,5 @@ ostream& operator<<(ostream& os, const LockedSessionMap&  lsm)
 	os << endl;
 	return os;
 }
-} //namespace
+} //namespace 
 

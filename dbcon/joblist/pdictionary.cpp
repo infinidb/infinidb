@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: pdictionary.cpp 9655 2013-06-25 23:08:13Z xlou $
+*   $Id: pdictionary.cpp 8526 2012-05-17 02:28:10Z xlou $
 *
 *
 ***********************************************************************/
@@ -26,6 +26,11 @@
 #include <boost/thread.hpp>
 #include <boost/thread/condition.hpp>
 using namespace std;
+
+#include "distributedenginecomm.h"
+#include "elementtype.h"
+#include "unique32generator.h"
+#include "primitivestep.h"
 
 #include "messagequeue.h"
 using namespace messageqcpp;
@@ -43,11 +48,6 @@ using namespace execplan;
 #include "brm.h"
 using namespace BRM;
 
-#include "distributedenginecomm.h"
-#include "elementtype.h"
-#include "unique32generator.h"
-#include "jlf_common.h"
-#include "primitivestep.h"
 
 namespace joblist
 {
@@ -91,33 +91,50 @@ namespace joblist
 
 
 pDictionaryStep::pDictionaryStep(
+	const JobStepAssociation& inputJobStepAssociation,
+	const JobStepAssociation& outputJobStepAssociation,
+	DistributedEngineComm* dec,
+	boost::shared_ptr<CalpontSystemCatalog> cat,
 	CalpontSystemCatalog::OID o,
+	int ct,
 	CalpontSystemCatalog::OID t,
-	const CalpontSystemCatalog::ColType& ct,
-	const JobInfo& jobInfo) :
-	JobStep(jobInfo),
+	uint32_t session,
+	uint32_t txn,
+	uint32_t verID,
+	uint16_t step,
+	uint32_t statementId,
+	ResourceManager& rm,
+	uint32_t interval) :
+	fInputJobStepAssociation(inputJobStepAssociation),
+	fOutputJobStepAssociation(outputJobStepAssociation),
+	fDec(dec),
+	sysCat(cat),
 	fOid(o),
 	fTableOid(t),
+	fSessionId(session),
+	fTxnId(txn),
+	fVerId(verID),
+	fStepId(step),
+	fStatementId(statementId),
 	fBOP(BOP_NONE),
 	msgsSent(0),
 	msgsRecvd(0),
 	finishedSending(false),
 	recvWaiting(false),
 	ridCount(0),
-	fColType(ct),
 	fFilterCount(0),
 	requestList(0),
-	fInterval(jobInfo.flushInterval),
+	fInterval(interval),
 	fPhysicalIO(0),
 	fCacheIO(0),
 	fMsgBytesIn(0),
 	fMsgBytesOut(0),
-	fRm(jobInfo.rm),
+	fRm(rm),
 	hasEqualityFilter(false)
 {
 //	uniqueID = UniqueNumberGenerator::instance()->getUnique32();
 
-//	fColType.compressionType = fColType.ddn.compressionType = ct;
+	fColType.compressionType = fColType.ddn.compressionType = ct;
 }
 
 pDictionaryStep::~pDictionaryStep()
@@ -208,7 +225,7 @@ void pDictionaryStep::sendPrimitiveMessages()
 //
 //	if (fifo == 0)
 //		throw logic_error("Use p_colscanrange instead here");
-//
+//	
 //	try{
 //		it = fifo->getIterator();
 //	}catch(exception& ex) {
@@ -218,7 +235,7 @@ void pDictionaryStep::sendPrimitiveMessages()
 //	}
 //
 //	more = fifo->next(it, &rw);
-//
+//		
 //	sigToken = rw.et[0].second;
 //	msgLBID = sigToken >> 10;
 //	while (more || msgRidCount > 0) {
@@ -265,11 +282,11 @@ void pDictionaryStep::sendPrimitiveMessages()
 //				hdr.Hdr.StepID = fStepId;
 //				hdr.Hdr.UniqueID = uniqueID;
 //
-//				hdr.LBID = msgLBID;
+//				hdr.LBID = msgLBID; 
 //				idbassert(msgRidCount <= 8000);
 //				hdr.NVALS = msgRidCount;
 //				hdr.CompType = fColType.ddn.compressionType;
-//
+//				
 //				primMsg.load((const uint8_t *) &ism, sizeof(ism));
 //				primMsg.append((const uint8_t *) &hdr, sizeof(DictSignatureRequestHeader));
 //				primMsg += msgRidList;
@@ -316,7 +333,7 @@ void pDictionaryStep::receivePrimitiveMessages()
 //	StrDataList* dlp = dl->stringDataList();
 //	StringFifoDataList *fifo = fOutputJobStepAssociation.outAt(0)->stringDL();
 //	StringRowGroup rw;
-//
+//	
 //	while (1) {
 //
 //		// sync with the send side
@@ -336,7 +353,7 @@ void pDictionaryStep::receivePrimitiveMessages()
 //			goto junk;
 //		}
 //		mutex.unlock();
-//
+//	
 //		// do the recv
 //
 //		ByteStream bs = fDec->read(uniqueID);
@@ -344,16 +361,16 @@ void pDictionaryStep::receivePrimitiveMessages()
 //		if (fOid>=3000 && dlTimes.FirstReadTime().tv_sec==0)
 //			dlTimes.setFirstReadTime();
 //		if (fOid>=3000) dlTimes.setLastReadTime();
-//
+//	
 //		msgsRecvd++;
-//		if (bs.length() == 0)
+//		if (bs.length() == 0) 
 //			 break;
 //
 //		const ByteStream::byte* bsp = bs.buf();
 //
 //		// get the ResultHeader out of the bytestream
 //		const DictOutput* drh = reinterpret_cast<const DictOutput*>(bsp);
-//
+//		
 //		bsp += sizeof(DictOutput);
 //
 //		fCacheIO    += drh->CacheIO;
@@ -462,10 +479,10 @@ void pDictionaryStep::receivePrimitiveMessages()
 //			msgBytesInKB++;
 //		if (fMsgBytesOut & 512)
 //			msgBytesOutKB++;
-//
+//        
 //        // @bug 807
 //        if (fifo)
-//            fifo->totalSize(ridResults);
+//            fifo->totalSize(ridResults);  
 //
 //		if (traceOn())
 //		{
@@ -477,7 +494,7 @@ void pDictionaryStep::receivePrimitiveMessages()
 //				fCacheIO << "; MsgsRcvd-" << msgsRecvd <<
 //				"; BlockedFifoIn/Out-" << totalBlockedReadCount <<
 //				"/" << totalBlockedWriteCount <<
-//				"; output size-" << ridResults << endl <<
+//				"; output size-" << ridResults << endl << 
 //				"\tMsgBytesIn-"  << msgBytesInKB  << "KB" <<
 //				"; MsgBytesOut-" << msgBytesOutKB << "KB" << endl <<
 //				"\t1st read " << dlTimes.FirstReadTimeString() <<
@@ -486,7 +503,7 @@ void pDictionaryStep::receivePrimitiveMessages()
 //				"s" << endl;
 //
 //			logEnd(logStr.str().c_str());
-//
+//		
 //			syslogReadBlockCounts(16,    // exemgr subsystem
 //				fPhysicalIO,             // # blocks read from disk
 //				fCacheIO,                // # blocks read from cache

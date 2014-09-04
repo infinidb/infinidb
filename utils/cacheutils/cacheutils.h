@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-// $Id: cacheutils.h 4051 2013-08-09 22:38:47Z wweeks $
+// $Id: cacheutils.h 3518 2013-01-31 19:13:17Z pleblanc $
 //
 /** @file */
 
@@ -66,11 +66,6 @@ namespace cacheutils
 	 * Use the config file and messaging to signal all PrimProc's to drop the fd cache
 	 */
 	int dropPrimProcFdCache();
-	/** @brief drop the files from file descriptor cache
-	 *
-	 * Use the config file and messaging to signal all PrimProc's to drop the fd cache
-	 */
-	int purgePrimProcFdCache(const std::vector<BRM::FileInfo> files, const int pmId);
 
 }
 // vim:ts=4 sw=4:

@@ -16,11 +16,11 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: bucketdl.h 9655 2013-06-25 23:08:13Z xlou $
+ * $Id: bucketdl.h 8436 2012-04-04 18:18:21Z rdempsey $
  *
  *****************************************************************************/
 
-/** @file
+/** @file 
  * class XXX interface
  */
 
@@ -47,12 +47,12 @@ class BucketDL : public DataList<element_t>
     typedef DataList<element_t> base;
     typedef boost::shared_ptr< TupleWSDL > TWSSP;
     typedef std::vector<TWSSP> TWSVec;
-
+        
     enum ElementMode {
         RID_MODE,
         RID_VALUE
     };
-
+    
     public:
         /** Main constuctor.
          * @param numBuckets The number of buckets to create
@@ -60,52 +60,52 @@ class BucketDL : public DataList<element_t>
          * @param maxElementsPerBucket The maximum # of elements each bucket should keep in memory.
          * @param hash The function object that calculates which bucket an elements goes into on insertion.
          */
-
-        BucketDL(uint32_t numBuckets, uint32_t numConsumers, uint32_t maxElementsPerBucket, ResourceManager& rm,
-            boost::function<uint32_t (const char *data, uint32_t len)> hash = utils::Hasher());
-
+        
+        BucketDL(uint numBuckets, uint numConsumers, uint maxElementsPerBucket, ResourceManager& rm,
+            boost::function<uint32_t (const char *data, uint len)> hash = utils::Hasher());
+        
         virtual ~BucketDL();
-
-        // datalist interface.  insert() and endOfInput() are the only
+        
+        // datalist interface.  insert() and endOfInput() are the only 
         // datalist function that makes sense.  The consumer side functions
         // are stubs.  Consumers know they're consuming a BucketDL.
         void insert(const element_t &e);
         void insert(const std::vector<element_t> &e);
 		void insert(const element_t* array, uint64_t arrayCount);
-
+            
         void insert(TupleType &e);
         void insert(std::vector<TupleType> &e);
-
+        
         void endOfInput();
         uint64_t getIterator();
         bool next(uint64_t it, element_t *e);
         void setMultipleProducers(bool);
-
+        
         // BucketDL consumer fcns
         uint64_t getIterator(uint64_t bucket);
         bool next(uint64_t bucket, uint64_t it, element_t *e);
-
+        
         /** Returns the size of the specified bucket */
         uint64_t size(uint64_t bucket);
-
+        
         /** Returns the total number of elements stored */
         uint64_t totalSize();
-
+        
         /** Returns the number of buckets */
         uint64_t bucketCount();
-
+        
         /** Sets the value to pass down to element_t::getHashString() */
         void setHashMode(uint64_t mode);
-
+        
         /** Sets the value to RID_only or rid_value mode */
         void setElementMode(uint64_t mode);
-
+        
 		/** Total number of files and filespace used for temp files */
 		void totalFileCounts(uint64_t& numFiles, uint64_t& numBytes) const;
-
+		
 		const uint32_t hashLen() const {return fHashLen;}
 		void hashLen (const uint32_t hashLen) {fHashLen = hashLen;}
-
+		
     	const uint32_t elementLen() const {return fElementLen;}
 		void elementLen (const uint64_t ridSize, const uint64_t dataSize);
 
@@ -114,17 +114,17 @@ class BucketDL : public DataList<element_t>
 
 		/** Sets the size of the element components that are saved to disk */
 		virtual void setDiskElemSize(uint32_t size1st,uint32_t size2nd);
-
+    
 		/** Accessor and mutator to the BucketReuseControlEntry */
 		void reuseControl(BucketReuseControlEntry* control, bool readonly);
 		BucketReuseControlEntry* reuseControl() { return fReuseControl; }
-
+    
 		/** Restores the buckets' set number and start positions */
 		void restoreBucketInformation();
-
+		
 		/** @brief return tuple rid size */
         const uint64_t ridSize() const {return fRidSize;}
-
+        
         /** @brief return tuple data size */
         const uint64_t dataSize() const {return fDataSize;}
 
@@ -138,8 +138,8 @@ class BucketDL : public DataList<element_t>
 		std::list<DiskIoInfo>& diskIoInfoList(uint64_t bucket);
 
     protected:
-
-
+    
+    
     private:
 		// Declare default constructors but don't define to disable their use
         explicit BucketDL();
@@ -153,7 +153,7 @@ class BucketDL : public DataList<element_t>
         uint64_t numBuckets;
         uint64_t numConsumers;
         uint64_t maxElements;
-        boost::function<uint32_t (const char *data, uint32_t len)> hashFcn;
+        boost::function<uint32_t (const char *data, uint len)> hashFcn;
         uint64_t hashMode;
         uint64_t bucketMask;
         bool multiProducer;
@@ -169,14 +169,14 @@ class BucketDL : public DataList<element_t>
 };
 
 template<typename element_t>
-BucketDL<element_t>::BucketDL(uint32_t nb, uint32_t nc, uint32_t me, ResourceManager& rm,
-    boost::function<uint32_t (const char *data, uint32_t len)> hash)
+BucketDL<element_t>::BucketDL(uint nb, uint nc, uint me, ResourceManager& rm,
+    boost::function<uint32_t (const char *data, uint len)> hash)
     : base(), fRm(rm), buckets(0), rbuckets(0), fTraceOn(false), fHashLen(0), fElementLen(0),
       bucketDoneCount(0), fReuseControl(NULL)
 {
-    uint32_t i;
+    uint i;
     uint64_t mask;
-
+    
     numBuckets = nb;
     numConsumers = nc;
     maxElements = me;
@@ -185,11 +185,11 @@ BucketDL<element_t>::BucketDL(uint32_t nb, uint32_t nc, uint32_t me, ResourceMan
     elementMode = RID_MODE;
     multiProducer = false;
 
-    // initialize buckets
+    // initialize buckets    
     if (typeid (element_t) == typeid(TupleType))
     {
-        for (i = 0; i < numBuckets; i++)
-            fTBuckets.push_back(TWSSP(new TupleWSDL(numConsumers, maxElements, fRm)));
+        for (i = 0; i < numBuckets; i++) 
+            fTBuckets.push_back(TWSSP(new TupleWSDL(numConsumers, maxElements, fRm)));        
     }
     else
     {
@@ -198,7 +198,7 @@ BucketDL<element_t>::BucketDL(uint32_t nb, uint32_t nc, uint32_t me, ResourceMan
           rbuckets[i] = new WSDL<RIDElementType>
     		(numConsumers, maxElements, rm);
     }
-
+    
     for (i = 1, mask = 1, bucketMask = 0; i <= 64; i++) {
         mask <<= 1;
         bucketMask = (bucketMask << 1) | 1;
@@ -208,8 +208,8 @@ BucketDL<element_t>::BucketDL(uint32_t nb, uint32_t nc, uint32_t me, ResourceMan
 
     for (i++, mask <<= 1; i <= 64; i++, mask <<= 1)
         if (numBuckets & mask)
-            throw std::runtime_error("BucketDL: The number of buckets should be a power of 2.");
-}
+            throw std::runtime_error("BucketDL: The number of buckets should be a power of 2.");        
+}	
 
 template<typename element_t>
 BucketDL<element_t>::~BucketDL()
@@ -230,7 +230,7 @@ BucketDL<element_t>::~BucketDL()
 }
 
 template<typename element_t>
-void BucketDL<element_t>::setMultipleProducers(bool b)
+void BucketDL<element_t>::setMultipleProducers(bool b) 
 {
     multiProducer = b;
     uint64_t i;
@@ -245,7 +245,7 @@ void BucketDL<element_t>::setMultipleProducers(bool b)
             for (i = 0; i < numBuckets; i++)
                 rbuckets[i]->setMultipleProducers(b);
         }
-        else {
+        else {	    
             for (i = 0; i < numBuckets; i++)
                 buckets[i]->setMultipleProducers(b);
         }
@@ -258,13 +258,13 @@ void BucketDL<element_t>::insert(const element_t &e)
 /*	Need the element type to provide what to hash, which conflicts
     with the standard meaning of "<<".  For our currently-defined element types,
     this would be the rid field only, not the entire contents of the structure */
-
+    
     uint64_t bucket, len = fHashLen;
     const char *hashStr;
-
+    
     hashStr = e.getHashString(hashMode, &len);
     bucket = hashFcn(hashStr, len) & bucketMask;
-
+ 
     if (elementMode == RID_MODE)
     {
         RIDElementType rid(e.first);
@@ -280,12 +280,12 @@ void BucketDL<element_t>::insert(TupleType &e)
 {
     uint64_t bucket, len = fHashLen;
     const char *hashStr;
-
+    
     hashStr = e.getHashString(hashMode, &len);
-
+    
     bucket = hashFcn(hashStr, len) & bucketMask;
     fTBuckets[bucket]->insert(e);
-}
+}       
 
 template<typename element_t>
 void BucketDL<element_t>::insert(std::vector<TupleType> &v)
@@ -297,7 +297,7 @@ void BucketDL<element_t>::insert(std::vector<TupleType> &v)
    try
    {
     end = v.end();
-    for (it = v.begin(); it != end; ++it)
+    for (it = v.begin(); it != end; ++it) 
         fTBuckets[hashFcn(it->second, fHashLen) & bucketMask]->insert_nolock(*it);
    }
    catch( ... )
@@ -315,7 +315,7 @@ void BucketDL<element_t>::insert(const std::vector<element_t> &v)
     typename std::vector<element_t>::const_iterator it, end;
     const char *hashStr;
     uint64_t len = fHashLen;
-
+    
     if (multiProducer)
     	base::lock();
     try
@@ -349,7 +349,7 @@ void BucketDL<element_t>::insert(const element_t* array, uint64_t arrayCount)
 {
     const char *hashStr;
     uint64_t len = fHashLen;
-
+    
     if (multiProducer)
     	base::lock();
     try
@@ -382,7 +382,7 @@ void BucketDL<element_t>::insert(const element_t* array, uint64_t arrayCount)
 template<typename element_t>
 uint64_t BucketDL<element_t>::getIterator()
 {
-    throw std::logic_error("don't call BucketDL::getIterator(), call getIterator(uint32_t)");
+    throw std::logic_error("don't call BucketDL::getIterator(), call getIterator(uint)");
 }
 
 template<typename element_t>
@@ -390,7 +390,7 @@ void BucketDL<element_t>::endOfInput()
 {
 	uint64_t i;
 	uint64_t saveSize = 0; //debug
-
+    
     if (typeid(element_t) == typeid(TupleType))
     {
         for (i = 0; i < numBuckets; i++) {
@@ -399,14 +399,14 @@ void BucketDL<element_t>::endOfInput()
 		}
 		//std::cout << "bucketdl-" << this << " saveSize=" << saveSize << std::endl;
 	}
-    else
+    else        
     	if (elementMode == RID_MODE) {
     		for (i = 0; i < numBuckets; i++)
-    			rbuckets[i]->endOfInput();
+    			rbuckets[i]->endOfInput();    		
     	}
     	else {
     		for (i = 0; i < numBuckets; i++)
-    			buckets[i]->endOfInput();
+    			buckets[i]->endOfInput();     		
     	}
 
 	if (fReuseControl != NULL && fReuseControl->userNotified() == false)
@@ -417,7 +417,7 @@ void BucketDL<element_t>::endOfInput()
 template<typename element_t>
 bool BucketDL<element_t>::next(uint64_t it, element_t *e)
 {
-    throw std::logic_error("don't call BucketDL::next(uint32_t, element_t), call next(uint32_t, uint32_t, element_t");
+    throw std::logic_error("don't call BucketDL::next(uint, element_t), call next(uint, uint, element_t");
 }
 
 template<typename element_t>
@@ -433,11 +433,11 @@ uint64_t BucketDL<element_t>::getIterator(uint64_t bucket)
 
 template<typename element_t>
 bool BucketDL<element_t>::next(uint64_t bucket, uint64_t it, element_t *e)
-{
+{    
     if (typeid(element_t) == typeid(TupleType))
         return fTBuckets[bucket]->next(it, reinterpret_cast<TupleType*>(e));
-
-  	bool ret;
+  	
+  	bool ret; 
   	if (elementMode == RID_MODE)
    	{
    		RIDElementType rid;
@@ -502,19 +502,19 @@ uint64_t BucketDL<element_t>::totalSize()
 }
 
 template<typename element_t>
-void BucketDL<element_t>::setHashMode(uint64_t mode)
+void BucketDL<element_t>::setHashMode(uint64_t mode) 
 {
     hashMode = mode;
-    // Make elementMode the same as hashMode unless setElementMode
+    // Make elementMode the same as hashMode unless setElementMode 
     // is explicitly called by the caller, like filterstep.
     setElementMode (mode);
 }
 
 template<typename element_t>
-void BucketDL<element_t>::setElementMode(uint64_t mode)
-{
+void BucketDL<element_t>::setElementMode(uint64_t mode) 
+{	  
     uint64_t i;
-
+    
     if (typeid(element_t) == typeid(TupleType))
         return;
     if (elementMode != mode) {
@@ -553,7 +553,7 @@ void BucketDL<element_t>::setElementMode(uint64_t mode)
         }
     }
 //    std::cout << "bucketdl-" << this << " setElementMode " << hashMode << std::endl;
-
+    
 }
 
 //
@@ -567,7 +567,7 @@ void BucketDL<element_t>::totalFileCounts(
 {
 	numFiles = 0;
 	numBytes = 0;
-
+    
     if (typeid(element_t) == typeid(TupleType))
     {
 		for (uint64_t i = 0; i < numBuckets; i++)
@@ -581,18 +581,18 @@ void BucketDL<element_t>::totalFileCounts(
 			}
 		}
 	}
-	else
+	else    
     	if (elementMode == RID_MODE)
     	{
     		for (uint64_t i = 0; i < numBuckets; i++)
     		{
     			uint64_t setCnt = rbuckets[i]->initialSetCount();
-
+    
     			if (setCnt > 1)
     			{
     				//std::cout << "BDL: bucket " << i << " has " << setCnt <<
     				//	" sets" << std::endl;
-
+    
     				numFiles += rbuckets[i]->numberOfTempFiles();
     				numBytes += rbuckets[i]->saveSize;
     			}
@@ -603,12 +603,12 @@ void BucketDL<element_t>::totalFileCounts(
     		for (uint64_t i = 0; i < numBuckets; i++)
     		{
     			uint64_t setCnt = buckets[i]->initialSetCount();
-
+    
     			if (setCnt > 1)
     			{
     				//std::cout << "BDL: bucket " << i << " has " << setCnt <<
     				//	" sets" << std::endl;
-
+    
     				numFiles += buckets[i]->numberOfTempFiles();
     				numBytes += buckets[i]->saveSize;
     			}
@@ -671,7 +671,7 @@ void BucketDL<element_t>::reuseControl(BucketReuseControlEntry* control, bool re
     // @todo reuse for tuplewsdl
     if (typeid(element_t) == typeid(TupleType))
         return;
-
+        
 	if (control == NULL)
 		return;
 
@@ -695,7 +695,7 @@ void BucketDL<element_t>::restoreBucketInformation()
 {
     if (typeid(element_t) == typeid(TupleType))
         return;
-
+        
 	std::vector<SetRestoreInfo>& infoVec = fReuseControl->restoreInfoVec();
 	if (elementMode == RID_MODE)
 		for (uint64_t i = 0; i < numBuckets; i++)

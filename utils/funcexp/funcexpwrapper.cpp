@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: funcexpwrapper.cpp 3495 2013-01-21 14:09:51Z rdempsey $
+// $Id: funcexpwrapper.cpp 3048 2012-04-04 15:33:45Z rdempsey $
 //
 // C++ Implementation: funcexpwrapper
 //
@@ -46,7 +46,7 @@ FuncExpWrapper::FuncExpWrapper()
 
 FuncExpWrapper::FuncExpWrapper(const FuncExpWrapper &f)
 {
-	uint32_t i;
+	uint i;
 
 	fe = FuncExp::instance();
 
@@ -64,7 +64,7 @@ FuncExpWrapper::~FuncExpWrapper()
 
 void FuncExpWrapper::operator=(const FuncExpWrapper &f)
 {
-	uint32_t i;
+	uint i;
 
 	filters.resize(f.filters.size());
 	for (i = 0; i < f.filters.size(); i++)
@@ -78,7 +78,7 @@ void FuncExpWrapper::operator=(const FuncExpWrapper &f)
 
 void FuncExpWrapper::serialize(ByteStream &bs) const
 {
-	uint32_t i;
+	uint i;
 
 	bs << (uint32_t) filters.size();
 	bs << (uint32_t) rcs.size();
@@ -104,7 +104,7 @@ void FuncExpWrapper::deserialize(ByteStream &bs)
 
 bool FuncExpWrapper::evaluate(Row *r)
 {
-	uint32_t i;
+	uint i;
 
 	for (i = 0; i < filters.size(); i++)
 		if (!fe->evaluate(*r, filters[i].get()))

@@ -90,7 +90,7 @@ typedef int int32_t
 
 #ifndef HAVE_UINT32_T
 #ifdef HAVE_U_INT32_T
-typedef uint32_t        uint32_t
+typedef u_int32_t        uint32_t
 #else
 typedef unsigned int32_t uint32_t
 #endif
@@ -171,9 +171,9 @@ typedef unsigned int64_t uint64_t
        u_int val;
     } netsnmp_ref_int;
 
-    typedef struct netsnmp_ref_uint32_t_s {
-       uint32_t val;
-    } netsnmp_ref_uint32_t;
+    typedef struct netsnmp_ref_u_long_s {
+       u_long val;
+    } netsnmp_ref_u_long;
 #endif
 
     typedef struct netsnmp_ref_size_t_s {

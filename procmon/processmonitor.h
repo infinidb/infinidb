@@ -1,22 +1,5 @@
-/* Copyright (C) 2014 InfiniDB, Inc.
-
-   This program is free software; you can redistribute it and/or
-   modify it under the terms of the GNU General Public License
-   as published by the Free Software Foundation; version 2 of
-   the License.
-
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-   MA 02110-1301, USA. */
-
 /***************************************************************************
-* $Id: processmonitor.h 1993 2013-04-04 18:33:48Z rdempsey $
+* $Id: processmonitor.h 1918 2012-11-29 21:09:52Z dhill $
 *
  ***************************************************************************/
 
@@ -462,11 +445,6 @@ public:
      */
 	int runStartupTest();
 
-    /**
-     *@brief Runs HDFS sanity test
-     */
-	int runHDFSTest();
-
      /**
      *@brief Update Calpont Config File
      */
@@ -488,26 +466,6 @@ public:
      *@brief run upgrade script
      */
 	int runUpgrade(std::string mysqlpw);
-
-    /**
-     *@brief change my.cnf
-     */
-	int changeMyCnf(std::string type);
-
-    /**
-     *@brief run Master Replication script
-     */
-	int runMasterRep(std::string& mysqlpw, std::string& masterLogFile, std::string& masterLogPos);
-
-    /**
-     *@brief run Master Distribution
-     */
-	int runMasterDist(std::string& password, std::string& slaveModule);
-
-    /**
-     *@brief run Slave Replication script
-     */
-	int runSlaveRep(std::string& mysqlpw, std::string& masterLogFile, std::string& masterLogPos, std::string& port);
 
     /**
      *@brief Amazon Instance and IP check

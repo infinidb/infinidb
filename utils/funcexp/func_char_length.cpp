@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_char_length.cpp 3923 2013-06-19 21:43:06Z bwilkinson $
+* $Id: func_char_length.cpp 3716 2013-04-18 16:35:52Z bpaul $
 *
 *
 ****************************************************************************/
@@ -62,21 +62,13 @@ int64_t Func_char_length::getIntVal(rowgroup::Row& row,
 		case execplan::CalpontSystemCatalog::MEDINT:
 		case execplan::CalpontSystemCatalog::TINYINT:
 		case execplan::CalpontSystemCatalog::SMALLINT:
-        case execplan::CalpontSystemCatalog::UBIGINT:
-        case execplan::CalpontSystemCatalog::UINT:
-        case execplan::CalpontSystemCatalog::UMEDINT:
-        case execplan::CalpontSystemCatalog::UTINYINT:
-        case execplan::CalpontSystemCatalog::USMALLINT:
 		case execplan::CalpontSystemCatalog::DOUBLE:
-        case execplan::CalpontSystemCatalog::UDOUBLE:
 		case execplan::CalpontSystemCatalog::FLOAT:
-        case execplan::CalpontSystemCatalog::UFLOAT:
 		case execplan::CalpontSystemCatalog::VARCHAR: // including CHAR
 		case execplan::CalpontSystemCatalog::CHAR:
 		case execplan::CalpontSystemCatalog::DECIMAL:
-        case execplan::CalpontSystemCatalog::UDECIMAL:
 		{
-			const string& tstr = parm[0]->data()->getStrVal(row, isNull);
+			string tstr = parm[0]->data()->getStrVal(row, isNull);
 			if (isNull)
 				return 0;
 

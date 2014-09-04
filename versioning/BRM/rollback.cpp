@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: rollback.cpp 1825 2013-01-24 18:41:00Z pleblanc $
+ * $Id: rollback.cpp 1837 2013-01-31 19:13:18Z pleblanc $
  *
  ****************************************************************************/
 
@@ -34,7 +34,6 @@
 #include <iostream>
 #include <stdlib.h>
 
-#include "IDBPolicy.h"
 
 using namespace std;
 using namespace BRM;
@@ -96,7 +95,6 @@ int main(int argc, char **argv) {
 					help(progname);
 					exit(0);
 				}
-				idbdatafile::IDBPolicy::configIDBPolicy();
 				rollbackTxn(txnID);
 				exit(0);
 			case 'p':

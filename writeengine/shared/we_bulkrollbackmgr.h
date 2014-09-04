@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
-* $Id: we_bulkrollbackmgr.h 4726 2013-08-07 03:38:36Z bwilkinson $
+* $Id: we_bulkrollbackmgr.h 4496 2013-01-31 19:13:20Z pleblanc $
 */
 
 /** @file
@@ -33,16 +33,15 @@
 #include <windows.h>
 #include <boost/thread/mutex.hpp>
 #endif
-#include <set>
 #include <string>
-#include <sstream>
+#include <fstream>
 #include <vector>
 
 #include "we_type.h"
 #include "messagelog.h"
 #include "messageobj.h"
 
-#if defined(_MSC_VER) && defined(WRITEENGINE_DLLEXPORT)
+#if defined(_MSC_VER) && defined(WRITEENGINEBULKROLLMGR_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
@@ -51,7 +50,6 @@
 namespace WriteEngine
 {
     class Log;
-    class BulkRollbackFile;
 
 //------------------------------------------------------------------------------
 /** @brief Class to clear a database table lock, and rolls back extents
@@ -79,15 +77,10 @@ public:
      *        Currently used for logging only.
      */
     EXPORT BulkRollbackMgr(OID tableOID,
-                           uint64_t lockID,
+                           u_int64_t lockID,
                            const std::string& tableName,
                            const std::string& applName,
                            Log* logger=0);
-
-    /**
-     * @brief BulkRollbackMgr destructor
-     */
-    EXPORT ~BulkRollbackMgr( ) { closeMetaDataFile ( ); }
 
     /**
      * @brief Clear table lock and rollback extents for fTableOID
@@ -133,13 +126,11 @@ public:
     /*
      * @brief Get list of segment file numbers found in dirName directory
      * @param dirName Directory path to be searched
-     * @param bIncludeAlternateSegFileNames Include *.orig and *.tmp in search
      * @param segList List of segment files found in dirName
      * @param errMsg Error msg if return code is not NO_ERROR
      */
     EXPORT static int getSegFileList( const std::string& dirName,
-                                bool bIncludeAlternateSegFileNames,
-                                std::vector<uint32_t>& segList,
+                                std::vector<u_int32_t>& segList,
                                 std::string& errMsg );
 
 private:
@@ -151,18 +142,18 @@ private:
     // segment files in the last partition.
     struct RollbackData
     {
-        uint32_t    fDbRoot;
-        uint32_t    fPartNum;
-        uint32_t    fSegNum;
+        u_int32_t    fDbRoot;
+        u_int32_t    fPartNum;
+        u_int32_t    fSegNum;
         HWM          fHwm;
         bool         fWithHwm;
     };
 
     void createFileDeletionEntry( OID     columnOID,
                                 bool      fileTypeFlag,
-                                uint32_t dbRoot,
-                                uint32_t partNum,
-                                uint32_t segNum,
+                                u_int32_t dbRoot,
+                                u_int32_t partNum,
+                                u_int32_t segNum,
                                 const std::string& segFileName );
     void deleteColumn1Extents ( const char* inBuf ); // delete col extents
     void deleteColumn1ExtentsV3(const char* inBuf );
@@ -174,27 +165,24 @@ private:
     void deleteDctnryExtents  ( ); // delete dictionary store extents
     void deleteDctnryExtentsV3( );
     void deleteDctnryExtentsV4( );
-    void deleteExtents        ( std::istringstream& metaDataStream );
-                                   // function that drives extent deletion
+    void deleteExtents        ( ); // function that drives extent deletion ver3
     void readMetaDataRecDctnry(const char* inBuf );//read meta-data dct rec
 
     void deleteSubDir         ( const std::string& metaFileName ); // delete
                                    // subdirectory used for backup chunks
-    EXPORT void closeMetaDataFile    ( ); // close a metafile
+    void closeMetaDataFile    ( ); // close a metafile
     void deleteMetaDataFiles  ( ); // delete metafiles
     int  metaDataFileExists   ( bool& exists ); // does meta-data file exists
-    BulkRollbackFile* makeFileRestorer(int compressionType);
-    bool openMetaDataFile     ( uint16_t dbRoot,    //  open a metadata file
-                                std::istringstream& metaDataStream );
-    void validateAllMetaFilesExist(const std::vector<uint16_t>& dbRoots) const;
+    bool openMetaDataFile     ( u_int16_t dbRoot );  //  open a metadata file
+    void validateAllMetaFilesExist(const std::vector<u_int16_t>& dbRoots) const;
 
     // Data members
     OID           fTableOID;    // table to be rolled back
-    uint64_t     fLockID;      // unique lock ID associated with table lock
+    u_int64_t     fLockID;      // unique lock ID associated with table lock
     std::string   fTableName;   // name of table associated with fTableOID
-    uint32_t     fProcessId;   // pid associated with current table lock
+    u_int32_t     fProcessId;   // pid associated with current table lock
     std::string   fProcessName; // processName associated with fProcessId
-    IDBDataFile*  fMetaFile;    // current meta data file we are reading
+    std::ifstream fMetaFile;    // current meta data file we are reading
     std::string   fMetaFileName;// name of current meta data file
     std::vector<std::string> fMetaFileNames; // all relevant meta data files
     std::string   fErrorMsg;
@@ -203,12 +191,11 @@ private:
     // Dictionary store extents for an OID are read in and managed as a
     // group.  The following data members are used to collect this info.
     OID           fPendingDctnryStoreOID;// Dctnry OID of pending dctnry extents
-    uint32_t     fPendingDctnryStoreDbRoot; // DbRoot of pending dctnry extents
+    u_int32_t     fPendingDctnryStoreDbRoot; // DbRoot of pending dctnry extents
     int           fPendingDctnryStoreCompressionType; // Dctnry compression type
     std::vector<RollbackData> fPendingDctnryExtents;
-    std::set<OID> fAllColDctOIDs;   // List of all affected col and dctnry OIDS
 
-    // List of DB Files to be deleted.  Files are deleted in reverse order.
+	// List of DB Files to be deleted.  Files are deleted in reverse order.
     std::vector<File>         fPendingFilesToDelete;
 
     logging::MessageLog fSysLogger; // Used for syslogging

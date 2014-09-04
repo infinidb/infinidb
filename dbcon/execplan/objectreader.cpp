@@ -17,17 +17,13 @@
 
 /*****************************************************************************
  *
- * $Id: objectreader.cpp 9559 2013-05-22 17:58:13Z xlou $
+ * $Id: objectreader.cpp 8436 2012-04-04 18:18:21Z rdempsey $
  *
  ****************************************************************************/
 
 /*
  * Implements ObjectReader
  */
-
-#include <unistd.h>
-#include <string>
-#include <sstream>
 
 #include "treenode.h"
 #include "returnedcolumn.h"
@@ -38,7 +34,6 @@
 #include "rowcolumn.h"
 #include "simplecolumn.h"
 #include "simplecolumn_int.h"
-#include "simplecolumn_uint.h"
 #include "simplecolumn_decimal.h"
 #include "filter.h"
 #include "existsfilter.h"
@@ -48,10 +43,8 @@
 #include "simplescalarfilter.h"
 #include "operator.h"
 #include "arithmeticoperator.h"
-#include "windowfunctioncolumn.h"
 #include "logicoperator.h"
 #include "predicateoperator.h"
-#include "pseudocolumn.h"
 #include "treenodeimpl.h"
 #include "calpontexecutionplan.h"
 #include "calpontselectexecutionplan.h"
@@ -71,11 +64,14 @@ TreeNode* ObjectReader::createTreeNode(messageqcpp::ByteStream& b) {
 	CLASSID id = ZERO;
 	TreeNode* ret;
 
-    b.peek(reinterpret_cast<messageqcpp::ByteStream::byte&>(id));
+        b.peek(reinterpret_cast<messageqcpp::ByteStream::byte&>(id));
 	switch(id) {
 		case TREENODEIMPL:
 			ret = new TreeNodeImpl();
 			break;
+//		case RETURNEDCOLUMN:
+//			ret = new ReturnedColumn();
+//			break;
 		case SIMPLECOLUMN:
 			ret = new SimpleColumn();
 			break;
@@ -90,18 +86,6 @@ TreeNode* ObjectReader::createTreeNode(messageqcpp::ByteStream& b) {
 			break;
 		case SIMPLECOLUMN_INT1:
 			ret = new SimpleColumn_INT<1>();
-			break;
-		case SIMPLECOLUMN_UINT2:
-			ret = new SimpleColumn_UINT<2>();
-			break;
-		case SIMPLECOLUMN_UINT4:
-			ret = new SimpleColumn_UINT<4>();
-			break;
-		case SIMPLECOLUMN_UINT8:
-			ret = new SimpleColumn_UINT<8>();
-			break;
-		case SIMPLECOLUMN_UINT1:
-			ret = new SimpleColumn_UINT<1>();
 			break;
 		case SIMPLECOLUMN_DECIMAL2:
 			ret = new SimpleColumn_Decimal<2>();
@@ -132,12 +116,6 @@ TreeNode* ObjectReader::createTreeNode(messageqcpp::ByteStream& b) {
 			break;
 		case ROWCOLUMN:
 			ret = new RowColumn();
-			break;
-		case WINDOWFUNCTIONCOLUMN:
-			ret = new WindowFunctionColumn();
-			break;
-		case PSEUDOCOLUMN:
-			ret = new PseudoColumn();
 			break;
 		case FILTER:
 			ret = new Filter();
@@ -176,13 +154,8 @@ TreeNode* ObjectReader::createTreeNode(messageqcpp::ByteStream& b) {
 			b >> (id_t&) id;   //eat the ID
 			return NULL;
 		default:
-		{
-			ostringstream oss;
-			oss << "Bad type: " << (int)id << ". Stream out of sync? (1)";
-			throw UnserializeException(oss.str());
-			break;
-		}
-	}
+			throw UnserializeException("Bad type.  Stream out of sync?");
+	};
 
 	ret->unserialize(b);
 	return ret;
@@ -202,12 +175,7 @@ CalpontExecutionPlan* ObjectReader::createExecutionPlan(messageqcpp::ByteStream&
 			b >> reinterpret_cast<id_t&>(id);
 			return NULL;
 		default:
-		{
-			ostringstream oss;
-			oss << "Bad type: " << (int)id << ". Stream out of sync? (2)";
-			throw UnserializeException(oss.str());
-			break;
-		}
+			throw UnserializeException("Bad type.  Stream out of sync?");
 	}
 	ret->unserialize(b);
 	return ret;
@@ -269,10 +237,6 @@ void ObjectReader::checkType(messageqcpp::ByteStream& b, const CLASSID id)
 				throw UnserializeException("Not a FunctionColumn");
 			case ROWCOLUMN:
 				throw UnserializeException("Not a RowColumn");
-			case WINDOWFUNCTIONCOLUMN:
-				throw UnserializeException("Not a WindowFunctionColumn");
-			case PSEUDOCOLUMN:
-				throw UnserializeException("Not a PseudoColumn");
 			case FILTER:
 				throw UnserializeException("Not a Filter");
 			case CONDITIONFILTER:
@@ -299,7 +263,7 @@ void ObjectReader::checkType(messageqcpp::ByteStream& b, const CLASSID id)
 	return;
 }
 	
-ObjectReader::UnserializeException::UnserializeException(string msg)
+ObjectReader::UnserializeException::UnserializeException(std::string msg)
     throw() : fWhat(msg)
 {
 }

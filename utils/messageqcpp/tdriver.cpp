@@ -44,16 +44,12 @@ CPPUNIT_TEST_SUITE( ByteStreamTestSuite );
 
 CPPUNIT_TEST( bs_1 );
 CPPUNIT_TEST( bs_1_1 );
-CPPUNIT_TEST( bs_1_2 );
 CPPUNIT_TEST( bs_2 );
 CPPUNIT_TEST( bs_3 );
 CPPUNIT_TEST( bs_4 );
 CPPUNIT_TEST_EXCEPTION( bs_5_1, std::underflow_error );
 CPPUNIT_TEST_EXCEPTION( bs_5_2, std::underflow_error );
 CPPUNIT_TEST_EXCEPTION( bs_5_3, std::underflow_error );
-CPPUNIT_TEST_EXCEPTION( bs_5_4, std::underflow_error );
-CPPUNIT_TEST_EXCEPTION( bs_5_5, std::underflow_error );
-CPPUNIT_TEST_EXCEPTION( bs_5_6, std::underflow_error );
 CPPUNIT_TEST( bs_6 );
 CPPUNIT_TEST( bs_7 );
 CPPUNIT_TEST( bs_8 );
@@ -72,15 +68,6 @@ private:
 	ByteStream::doublebyte d;
 	ByteStream::quadbyte q;
 	ByteStream::octbyte o;
-
-    uint8_t     u8;
-    uint16_t    u16;
-    uint32_t    u32;
-    uint64_t    u64;
-    int8_t      i8;
-    int16_t     i16;
-    int32_t     i32;
-    int64_t     i64;
 
 	ByteStream bs;
 	ByteStream bs1;
@@ -223,47 +210,6 @@ void bs_1_1() {
 	CPPUNIT_ASSERT(bs.length() == 0);
 }
 
-void bs_1_2() {
-
-	bs.reset();
-
-    i64 = -2401053089477160962;
-	bs << i64;
-	CPPUNIT_ASSERT(bs.length() == 8);
-	i64 = 0;
-
-	i32 = -559038737;
-	bs << i32;
-	CPPUNIT_ASSERT(bs.length() == 12);
-    i32 = 0;
-
-	i16 = -4081;
-	bs << i16;
-	CPPUNIT_ASSERT(bs.length() == 14);
-	i16 = 0;
-
-	i8 = 15;
-	bs << i8;
-	CPPUNIT_ASSERT(bs.length() == 15);
-	i8 = 0;
-
-	bs >> i64;
-	CPPUNIT_ASSERT(i64 == -2401053089477160962);
-	CPPUNIT_ASSERT(bs.length() == 7);
-
-    bs >> i32;
-	CPPUNIT_ASSERT(i32 == -559038737);
-	CPPUNIT_ASSERT(bs.length() == 3);
-
-    bs >> i16;
-	CPPUNIT_ASSERT(i16 == -4081);
-	CPPUNIT_ASSERT(bs.length() == 1);
-
-    bs >> i8;
-	CPPUNIT_ASSERT(i8 == 15);
-	CPPUNIT_ASSERT(bs.length() == 0);
-}
-
 void bs_2() {
 	int i;
 
@@ -272,17 +218,17 @@ void bs_2() {
 
 	for (i = 0; i < 10240; i++)
 	{
-		bs << (uint32_t)rand();
+		bs << (ByteStream::quadbyte)rand();
 	}
 	bs1 = bs;
 
-	uint32_t q1;
+	ByteStream::quadbyte q1;
 
 	for (i = 0; i < 10240; i++)
 	{
-		bs >> u32;
+		bs >> q;
 		bs1 >> q1;
-		CPPUNIT_ASSERT(u32 == q1);
+		CPPUNIT_ASSERT(q == q1);
 	}
 	bs.reset();
 	bs1.reset();
@@ -290,15 +236,15 @@ void bs_2() {
 
 void bs_3() {
 
-	uint8_t ba[1024] = { 0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0, };
+	ByteStream::byte ba[1024] = { 0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0, };
 
 	bs.load(ba, 8);
 	CPPUNIT_ASSERT(bs.length() == 8);
-	bs >> u8;
+	bs >> b;
 	CPPUNIT_ASSERT(b == 0x12);
-	bs >> u16;
+	bs >> d;
 	CPPUNIT_ASSERT(d == 0x5634);
-	bs >> u32;
+	bs >> q;
 	CPPUNIT_ASSERT(q == 0xdebc9a78);
 
 	CPPUNIT_ASSERT(bs.length() == 1);
@@ -317,21 +263,21 @@ void bs_3() {
 	bap = 0;
 
 	bs.reset();
-	for (u32 = 0; u32 < 20480; u32++)
+	for (q = 0; q < 20480; q++)
 	{
-		bs << u32;
+		bs << q;
 	}
 
 	len = bs.length();
-	CPPUNIT_ASSERT(len == (20480 * sizeof(u32)));
+	CPPUNIT_ASSERT(len == (20480 * sizeof(q)));
 	bap = new ByteStream::byte[len];
 	//bs >> bap;
 	memcpy(bap, bs.buf(), len);
 
 	bs.reset();
-	for (u32 = 0; u32 < 20480; u32++)
+	for (q = 0; q < 20480; q++)
 	{
-		bs << u32;
+		bs << q;
 	}
 	len = bs.length();
 	CPPUNIT_ASSERT(len == (20480 * sizeof(q)));
@@ -349,21 +295,21 @@ void bs_3() {
 }
 void bs_4() {
 
-	for (i32 = 0; i32 < 20480; i32++)
+	for (q = 0; q < 20480; q++)
 	{
-		bs << i32;
+		bs << q;
 	}
 
 	ByteStream bs2(bs);
 	len = bs2.length();
-	CPPUNIT_ASSERT(len == (20480 * sizeof(i32)));
+	CPPUNIT_ASSERT(len == (20480 * sizeof(q)));
 	bap = new ByteStream::byte[len];
 	//bs2 >> bap;
 	memcpy(bap, bs2.buf(), len);
 
 	bs1 = bs2;
 	len = bs1.length();
-	CPPUNIT_ASSERT(len == (20480 * sizeof(i32)));
+	CPPUNIT_ASSERT(len == (20480 * sizeof(q)));
 	bap1 = new ByteStream::byte[len];
 	//bs1 >> bap1;
 	memcpy(bap1, bs1.buf(), len);
@@ -381,94 +327,67 @@ void bs_4() {
 void bs_5_1() {
 	bs.reset();
 
-	u8 = 0x0f;
-	bs << u8;
+	b = 0x0f;
+	bs << b;
 
-	for (;;) bs >> u32;
+	for (;;) bs >> q;
 }
 
 void bs_5_2() {
 	bs.reset();
 
-	u8 = 0x0f;
-	bs << u8;
+	b = 0x0f;
+	bs << b;
 
-	for (;;) bs >> u16;
+	for (;;) bs >> d;
 }
 
 void bs_5_3() {
 	bs.reset();
 
-	u8 = 0x0f;
-	bs << u8;
+	b = 0x0f;
+	bs << b;
 
-	for (;;) bs >> u8;
-}
-
-void bs_5_4() {
-	bs.reset();
-
-	i8 = 0x0f;
-	bs << i8;
-
-	for (;;) bs >> i32;
-}
-
-void bs_5_5() {
-	bs.reset();
-
-	i8 = 0x0f;
-	bs << i8;
-
-	for (;;) bs >> i16;
-}
-
-void bs_5_6() {
-	bs.reset();
-
-	i8 = 0x0f;
-	bs << i8;
-
-	for (;;) bs >> i8;
+	for (;;) bs >> b;
 }
 
 void bs_6()
 {
-	u8 = 0x1a;
-	bs << u8;
-	u8 = 0x2b;
-	bs << u8;
-	u8 = 0x3c;
-	bs << u8;
+	b = 0x1a;
+	bs << b;
+	b = 0x2b;
+	bs << b;
+	b = 0x3c;
+	bs << b;
 
-	bs >> u8;
-	CPPUNIT_ASSERT(u8 == 0x1a);
-	bs >> u8;
-	CPPUNIT_ASSERT(u8 == 0x2b);
-	bs >> u8;
-	CPPUNIT_ASSERT(u8 == 0x3c);
+	bs >> b;
+	CPPUNIT_ASSERT(b == 0x1a);
+	bs >> b;
+	CPPUNIT_ASSERT(b == 0x2b);
+	bs >> b;
+	CPPUNIT_ASSERT(b == 0x3c);
 
 	bs.reset();
 
-	u8 = 12;
-	bs << u8;
-	u8 = 3;
-	bs << u8;
-	u8 = 0;
-	bs << u8;
-	u8 = 2;
-	bs << u8;
+	b = 12;
+	bs << b;
+	b = 3;
+	bs << b;
+	b = 0;
+	bs << b;
+	b = 2;
+	bs << b;
 
 	ByteStream bs3(bs);
 
-	bs3 >> u8;
-	CPPUNIT_ASSERT(u8 == 12);
-	bs3 >> u8;
-	CPPUNIT_ASSERT(u8 == 3);
-	bs3 >> u8;
-	CPPUNIT_ASSERT(u8 == 0);
-	bs3 >> u8;
-	CPPUNIT_ASSERT(u8 == 2);
+	bs3 >> b;
+	CPPUNIT_ASSERT(b == 12);
+	bs3 >> b;
+	CPPUNIT_ASSERT(b == 3);
+	bs3 >> b;
+	CPPUNIT_ASSERT(b == 0);
+	bs3 >> b;
+	CPPUNIT_ASSERT(b == 2);
 
 }
 
@@ -533,27 +452,27 @@ void bs_8()
 	CPPUNIT_ASSERT(s == s1);
 	CPPUNIT_ASSERT(bs.length() == 0);
 
-	u8 = 0xa5;
-	bs << u8;
-	u16 = 0x5aa5;
-	bs << u16;
-	u32 = 0xdeadbeef;
-	bs << u32;
+	b = 0xa5;
+	bs << b;
+	d = 0x5aa5;
+	bs << d;
+	q = 0xdeadbeef;
+	bs << q;
 	bs << s;
 	s += s1;
 	bs << s;
 	s += s1;
 	bs << s;
-	bs << u32;
-	bs << u16;
-	bs << u8;
+	bs << q;
+	bs << d;
+	bs << b;
 
-	bs >> u8;
-	CPPUNIT_ASSERT(u8 == 0xa5);
-	bs >> u16;
-	CPPUNIT_ASSERT(u16 == 0x5aa5);
-	bs >> u32;
-	CPPUNIT_ASSERT(u32 == 0xdeadbeef);
+	bs >> b;
+	CPPUNIT_ASSERT(b == 0xa5);
+	bs >> d;
+	CPPUNIT_ASSERT(d == 0x5aa5);
+	bs >> q;
+	CPPUNIT_ASSERT(q == 0xdeadbeef);
 	bs >> s;
 	CPPUNIT_ASSERT(s == s1);
 	CPPUNIT_ASSERT(s.length() == (s1.length() * 1));
@@ -561,12 +480,12 @@ void bs_8()
 	CPPUNIT_ASSERT(s.length() == (s1.length() * 2));
 	bs >> s;
 	CPPUNIT_ASSERT(s.length() == (s1.length() * 3));
-	bs >> u32;
-	CPPUNIT_ASSERT(u32 == 0xdeadbeef);
-	bs >> u16;
-	CPPUNIT_ASSERT(u16 == 0x5aa5);
-	bs >> u8;
-	CPPUNIT_ASSERT(u8 == 0xa5);
+	bs >> q;
+	CPPUNIT_ASSERT(q == 0xdeadbeef);
+	bs >> d;
+	CPPUNIT_ASSERT(d == 0x5aa5);
+	bs >> b;
+	CPPUNIT_ASSERT(b == 0xa5);
 	CPPUNIT_ASSERT(bs.length() == 0);
 
 }
@@ -575,8 +494,8 @@ void bs_9()
 {
 	bs.reset();
 	// Load up a bogus string (too short)
-	u32 = 100;
-	bs << u32;
+	q = 100;
+	bs << q;
 	bs.append(reinterpret_cast<const ByteStream::byte*>("This is a test"), 14);
 	string s;
 	// Should throw underflow
@@ -587,40 +506,40 @@ void bs_10()
 {
 	bs.reset();
 	bs1.reset();
-	u32 = 0xdeadbeef;
-	bs << u32;
+	q = 0xdeadbeef;
+	bs << q;
 	CPPUNIT_ASSERT(bs.length() == 4);
 	CPPUNIT_ASSERT(bs1.length() == 0);
 	bs.swap(bs1);
 	CPPUNIT_ASSERT(bs1.length() == 4);
 	CPPUNIT_ASSERT(bs.length() == 0);
-	bs1 >> u32;
-	CPPUNIT_ASSERT(u32 == 0xdeadbeef);
+	bs1 >> q;
+	CPPUNIT_ASSERT(q == 0xdeadbeef);
 
 	bs.reset();
 	bs1.reset();
-	u32 = 0xdeadbeef;
-	bs << u32;
-	bs1 << u32;
+	q = 0xdeadbeef;
+	bs << q;
+	bs1 << q;
 	bs += bs1;
 	CPPUNIT_ASSERT(bs.length() == 8);
-	bs >> u32;
-	CPPUNIT_ASSERT(u32 == 0xdeadbeef);
-	bs >> u32;
-	CPPUNIT_ASSERT(u32 == 0xdeadbeef);
+	bs >> q;
+	CPPUNIT_ASSERT(q == 0xdeadbeef);
+	bs >> q;
+	CPPUNIT_ASSERT(q == 0xdeadbeef);
 
 	bs.reset();
 	bs1.reset();
 	ByteStream bs2;
-	u32 = 0xdeadbeef;
-	bs1 << u32;
-	bs2 << u32;
+	q = 0xdeadbeef;
+	bs1 << q;
+	bs2 << q;
 	bs = bs1 + bs2;
 	CPPUNIT_ASSERT(bs.length() == 8);
-	bs >> u32;
-	CPPUNIT_ASSERT(u32 == 0xdeadbeef);
-	bs >> u32;
-	CPPUNIT_ASSERT(u32 == 0xdeadbeef);
+	bs >> q;
+	CPPUNIT_ASSERT(q == 0xdeadbeef);
+	bs >> q;
+	CPPUNIT_ASSERT(q == 0xdeadbeef);
 
 }
 
@@ -628,9 +547,9 @@ void bs_11()
 {
 	bs.reset();
 	bs1.reset();
-	u32 = 0xdeadbeef;
-	bs << u32;
-	bs1 << u32;
+	q = 0xdeadbeef;
+	bs << q;
+	bs1 << q;
 
 	// save bs1 state
 	ByteStream::byte* bs1_fBuf = bs1.fBuf;
@@ -673,79 +592,79 @@ void bs_12() {
 
 	bs.reset();
 
-	u64 = 0xdeadbeefbadc0ffeLL;
-	bs << u64;
+	o = 0xdeadbeefbadc0ffeLL;
+	bs << o;
 	CPPUNIT_ASSERT(bs.length() == 8);
-	u64 = 0;
-	bs.peek(u64);
-	CPPUNIT_ASSERT(u64 == 0xdeadbeefbadc0ffeLL);
+	o = 0;
+	bs.peek(o);
+	CPPUNIT_ASSERT(o == 0xdeadbeefbadc0ffeLL);
 	CPPUNIT_ASSERT(bs.length() == 8);
-	u64 = 0;
-	bs >> u64;
-	CPPUNIT_ASSERT(u64 == 0xdeadbeefbadc0ffeLL);
+	o = 0;
+	bs >> o;
+	CPPUNIT_ASSERT(o == 0xdeadbeefbadc0ffeLL);
 	CPPUNIT_ASSERT(bs.length() == 0);
 
-	u16 = 0xf00f;
-	bs << u16;
+	d = 0xf00f;
+	bs << d;
 	CPPUNIT_ASSERT(bs.length() == 2);
-	u16 = 0;
-	bs.peek(u16);
-	CPPUNIT_ASSERT(u16 == 0xf00f);
+	d = 0;
+	bs.peek(d);
+	CPPUNIT_ASSERT(d == 0xf00f);
 	CPPUNIT_ASSERT(bs.length() == 2);
-	u16 = 0;
-	bs >> u16;
-	CPPUNIT_ASSERT(u16 == 0xf00f);
+	d = 0;
+	bs >> d;
+	CPPUNIT_ASSERT(d == 0xf00f);
 	CPPUNIT_ASSERT(bs.length() == 0);
 
-	u8 = 0x0f;
-	bs << u8;
+	b = 0x0f;
+	bs << b;
 	CPPUNIT_ASSERT(bs.length() == 1);
-	u8 = 0;
-	bs.peek(u8);
-	CPPUNIT_ASSERT(u8 == 0x0f);
+	b = 0;
+	bs.peek(b);
+	CPPUNIT_ASSERT(b == 0x0f);
 	CPPUNIT_ASSERT(bs.length() == 1);
-	u8 = 0;
-	bs >> u8;
-	CPPUNIT_ASSERT(u8 == 0x0f);
+	b = 0;
+	bs >> b;
+	CPPUNIT_ASSERT(b == 0x0f);
 	CPPUNIT_ASSERT(bs.length() == 0);
 
-	u32 = 0xdeadbeef;
-	bs << u32;
+	q = 0xdeadbeef;
+	bs << q;
 	CPPUNIT_ASSERT(bs.length() == 4);
-	u32 = 0;
+	q = 0;
 
-	u16 = 0xf00f;
-	bs << u16;
+	d = 0xf00f;
+	bs << d;
 	CPPUNIT_ASSERT(bs.length() == 6);
-	u16 = 0;
+	d = 0;
 
-	u8 = 0x0f;
-	bs << u8;
+	b = 0x0f;
+	bs << b;
 	CPPUNIT_ASSERT(bs.length() == 7);
-	u8 = 0;
+	b = 0;
 
-	bs.peek(u32);
-	CPPUNIT_ASSERT(u32 == 0xdeadbeef);
+	bs.peek(q);
+	CPPUNIT_ASSERT(q == 0xdeadbeef);
 	CPPUNIT_ASSERT(bs.length() == 7);
-	u32 = 0;
-	bs >> u32;
-	CPPUNIT_ASSERT(u32 == 0xdeadbeef);
+	q = 0;
+	bs >> q;
+	CPPUNIT_ASSERT(q == 0xdeadbeef);
 	CPPUNIT_ASSERT(bs.length() == 3);
-	u16 = 0;
-	bs.peek(u16);
-	CPPUNIT_ASSERT(u16 == 0xf00f);
+	d = 0;
+	bs.peek(d);
+	CPPUNIT_ASSERT(d == 0xf00f);
 	CPPUNIT_ASSERT(bs.length() == 3);
-	u16 = 0;
-	bs >> u16;
-	CPPUNIT_ASSERT(u16 == 0xf00f);
+	d = 0;
+	bs >> d;
+	CPPUNIT_ASSERT(d == 0xf00f);
 	CPPUNIT_ASSERT(bs.length() == 1);
-	u8 = 0;
-	bs.peek(u8);
-	CPPUNIT_ASSERT(u8 == 0x0f);
+	b = 0;
+	bs.peek(b);
+	CPPUNIT_ASSERT(b == 0x0f);
 	CPPUNIT_ASSERT(bs.length() == 1);
-	u8 = 0;
-	bs >> u8;
-	CPPUNIT_ASSERT(u8 == 0x0f);
+	b = 0;
+	bs >> b;
+	CPPUNIT_ASSERT(b == 0x0f);
 	CPPUNIT_ASSERT(bs.length() == 0);
 
 	string s;
@@ -810,7 +729,7 @@ void bs_14()
 void bs_15()
 {
 	ByteStream b1, b2, empty;
-	uint8_t u8;
+	uint8_t b;
 
 	CPPUNIT_ASSERT(b1 == b2);
 	CPPUNIT_ASSERT(b2 == b1);
@@ -839,22 +758,22 @@ void bs_15()
 	CPPUNIT_ASSERT(!(b1 != b2));
 	CPPUNIT_ASSERT(!(b2 != b1));
 
-	b1 >> u8;
+	b1 >> b;
 
 	CPPUNIT_ASSERT(b1 != b2);
 	CPPUNIT_ASSERT(b2 != b1);
 	CPPUNIT_ASSERT(!(b1 == b2));
 	CPPUNIT_ASSERT(!(b2 == b1));
 
-	b1 << u8;
+	b1 << b;
 
 	CPPUNIT_ASSERT(b1 != b2);
 	CPPUNIT_ASSERT(b2 != b1);
 	CPPUNIT_ASSERT(!(b1 == b2));
 	CPPUNIT_ASSERT(!(b2 == b1));
 
-	b2 >> u8;
-	b2 << u8;
+	b2 >> b;
+	b2 << b;
 
 	CPPUNIT_ASSERT(b1 == b2);
 	CPPUNIT_ASSERT(b2 == b1);
@@ -866,7 +785,7 @@ void bs_15()
 void bs_16()
 {
 	int i;
-	uint32_t len;
+	u_int32_t len;
 
 	bs.reset();
 	srand(time(0));
@@ -1235,11 +1154,11 @@ void mq_1()
 	CPPUNIT_ASSERT(memcmp(outBs.buf(), inBs.buf(), outBs.length()) == 0);
 
 	int i;
-	ByteStream::byte u8;
+	ByteStream::byte b;
 
-	u8 = 0xa5;
+	b = 0xa5;
 	for (i = 0; i < 2048; i++)
-		bs << u8;
+		bs << b;
 
 	//cerr << endl << "mq_1: write " << bs.length() << " bytes" << endl;
 	outMq.write(bs);
@@ -1252,13 +1171,13 @@ void mq_1()
 	CPPUNIT_ASSERT(memcmp(bs.buf(), bs1.buf(), bs.length()) == 0);
 
 	bs.reset();
-	u8 = 0x5a;
+	b = 0x5a;
 	for (i = 0; i < 2048; i++)
-		bs << u8;
+		bs << b;
 
-	bs << u8;
-	bs << u8;
-	bs << u8;
+	bs << b;
+	bs << b;
+	bs << b;
 
 	//cerr << endl << "mq_1: write " << bs.length() << " bytes" << endl;
 	outMq.write(bs);
@@ -1272,12 +1191,12 @@ void mq_1()
 
 	// Now write a really big message and see what happens...
 
-	ByteStream::quadbyte u32;
+	ByteStream::quadbyte q;
 
 	bs.reset();
-	u32 = 0xdeadbeef;
+	q = 0xdeadbeef;
 	for (i = 0; i < (1048576 / 4); i++)
-		bs << u32;
+		bs << q;
 
 	//cerr << endl << "mq_1: write " << bs.length() << " bytes" << endl;
 	outMq.write(bs);

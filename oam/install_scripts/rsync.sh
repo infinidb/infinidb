@@ -21,12 +21,12 @@ if { $PASSWORD == "ssh" } {
 	set PASSWORD ""
 }
 
-set COMMAND "rsync -vopgr -e ssh --exclude=mysql/ --exclude=test/ --exclude=infinidb_vtable/ --exclude=infinidb_querystats/ --exclude=calpontsys/ --include=*/ --include=*/* --exclude=* $installdir/mysql/db/ $USERNAME$SERVER:/usr/local/Calpont/mysql/db/"
+set COMMAND "rsync -vuopg -e ssh --delete --exclude=*err --exclude=*pid -r $installdir/mysql/db $USERNAME$SERVER:/usr/local/Calpont/mysql/"
 
 #
 # run command
 #
-set timeout 60
+set timeout 600
 send "$COMMAND\n"
 expect {
 	-re "Host key verification failed" { send_user "FAILED: Host key verification failed\n" ; exit -1}
@@ -34,19 +34,18 @@ expect {
 	-re "ssh: connect to host" { send_user "           FAILED: Invalid Host\n" ; exit -1 }
 	-re "authenticity" { send "yes\n" 
 						 expect {
-						 	-re "word: " { send "$PASSWORD\n" }
-							-re "passphrase" { send "$PASSWORD\n" }
+						 	-re "word: " { send "$PASSWORD\n" } abort
+							-re "passphrase" { send "$PASSWORD\n" } abort
 						 }
 						}
-	-re "word: " { send "$PASSWORD\n" }
-	-re "passphrase" { send "$PASSWORD\n" }
-	-re "total size" { exit 0 }
+	-re "word: " { send "$PASSWORD\n" } abort
+	-re "passphrase" { send "$PASSWORD\n" } abort
 }
 expect {
-	-re "total size" { exit 0 }
+	-re "# " { exit 0 }
 	-re "Permission denied" { send_user "           FAILED: Invalid password\n" ; exit 1 }
 	-re "(y or n)"  { send "y\n" 
-					  expect -re "total size" { exit 0 }
+					  expect -re "# " { exit 0 }
 					}
 }
 

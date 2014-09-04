@@ -122,13 +122,6 @@ const unsigned M0092 = 92;
 const unsigned M0093 = 93;
 const unsigned M0094 = 94;
 const unsigned M0095 = 95;
-const unsigned M0096 = 96;
-const unsigned M0097 = 97;
-const unsigned M0098 = 98;
-const unsigned M0099 = 99;
-const unsigned M0100 = 100;
-const unsigned M0101 = 101;
-const unsigned M0102 = 102;
 const unsigned M0103 = 103;
 
 }//namespace logging

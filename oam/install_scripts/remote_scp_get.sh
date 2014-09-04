@@ -22,30 +22,30 @@ if { $PASSWORD == "ssh" } {
 # 
 # send command
 #
-expect -re {[$#] }
+expect -re "# "
 send "scp $USERNAME$SERVER:$FILE .\n"
 expect {
-	"authenticity" { send "yes\n" 
+	-re "authenticity" { send "yes\n" 
 						expect {
-							"word: " { send "$PASSWORD\n" }
-							"passphrase" { send "$PASSWORD\n" }
+							-re "word: " { send "$PASSWORD\n" } abort
+							-re "passphrase" { send "$PASSWORD\n" } abort
 							}
 						}
-	"service not known" { send_user "FAILED: Invalid Host\n" ; exit 1 }
-	"Connection refused"   { send_user "ERROR: Connection refused\n" ; exit 1 }
-	"Connection timed out" { send_user "FAILED: Connection timed out\n" ; exit 1 }
-	"lost connection" { send_user "FAILED: Connection refused\n" ; exit 1 }
-	"closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
-	"word: " { send "$PASSWORD\n" }
-	"passphrase" { send "$PASSWORD\n" }
+	-re "service not known" { send_user "FAILED: Invalid Host\n" ; exit 1 }
+	-re "Connection refused"   { send_user "ERROR: Connection refused\n" ; exit 1 }
+	-re "Connection timed out" { send_user "FAILED: Connection timed out\n" ; exit 1 }
+	-re "lost connection" { send_user "FAILED: Connection refused\n" ; exit 1 }
+	-re "closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
+	-re "word: " { send "$PASSWORD\n" } abort
+	-re "passphrase" { send "$PASSWORD\n" } abort
 }
 expect {
-	"100%" 						{ send_user "DONE\n" }
-	"scp:"  					{ send_user "FAILED\n" ; exit 1 }
-	"Permission denied"         { send_user "FAILED: Invalid password\n" ; exit 1 }
-	"No such file or directory" { send_user "FAILED: No such file or directory\n" ; exit 1 }
-	"Connection refused"   { send_user "ERROR: Connection refused\n" ; exit 1 }
-	"closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
+	-re "100%" 						{ send_user "DONE\n" } abort
+	-re "scp:"  					{ send_user "FAILED\n" ; exit 1 }
+	-re "Permission denied"         { send_user "FAILED: Invalid password\n" ; exit 1 }
+	-re "No such file or directory" { send_user "FAILED: Invalid package\n" ; exit 1 }
+	-re "Connection refused"   { send_user "ERROR: Connection refused\n" ; exit 1 }
+	-re "closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
 }
 #sleep to make sure it's finished
 sleep 5

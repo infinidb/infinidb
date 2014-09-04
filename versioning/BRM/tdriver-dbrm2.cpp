@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: tdriver-dbrm2.cpp 1823 2013-01-21 14:13:09Z rdempsey $
+ * $Id: tdriver-dbrm2.cpp 1547 2012-04-04 18:19:01Z rdempsey $
  *
  ****************************************************************************/
 
@@ -35,7 +35,6 @@
 #include <cppunit/extensions/HelperMacros.h>
 
 #include "brm.h"
-#include "IDBPolicy.h"
 
 using namespace BRM;
 using namespace std;
@@ -64,13 +63,13 @@ static void *BRMRunner_2(void *arg)
 	
 	pthread_mutex_t listMutex;
 	int op;
-	uint32_t randstate;
+	uint randstate;
 	DBRM *brm;
 	struct timeval tv;
 	
 	pthread_mutex_init(&listMutex, NULL);
 	gettimeofday(&tv, NULL);
-	randstate = static_cast<uint32_t>(tv.tv_usec);
+	randstate = static_cast<uint>(tv.tv_usec);
 	brm = new DBRM();
 	
 	while (!threadStop) {
@@ -148,12 +147,12 @@ static void* BRMRunner_1(void *arg)
 	
 	struct EMEntries {
 		u_int64_t LBIDstart;
-		uint32_t size;
+		u_int32_t size;
 		int OID;
-		uint32_t FBO;
-		uint32_t HWM;
-		uint32_t secondHWM;
-		uint32_t txnID;
+		u_int32_t FBO;
+		u_int32_t HWM;
+		u_int32_t secondHWM;
+		u_int32_t txnID;
 		struct EMEntries *next;
 		EMEntries() { next = NULL; HWM = 0; secondHWM = 0; txnID = 0; }
 	};
@@ -162,7 +161,7 @@ static void* BRMRunner_1(void *arg)
 	int threadNum = reinterpret_cast<int>(arg);
 #endif
 	int op, listSize = 0, i;
-	uint32_t randstate;
+	uint randstate;
 	struct EMEntries *head = NULL, *tmp;
 	struct timeval tv;
 	DBRM *brm;
@@ -174,7 +173,7 @@ static void* BRMRunner_1(void *arg)
 #endif
 	
 	gettimeofday(&tv, NULL);
-	randstate = static_cast<uint32_t>(tv.tv_usec);
+	randstate = static_cast<uint>(tv.tv_usec);
 	brm = new DBRM();
 	
 	while (!threadStop) {
@@ -201,10 +200,10 @@ static void* BRMRunner_1(void *arg)
 		if ((size % brm->getExtentSize()) != 0)
 			entries++;
 		
-		if ((uint32_t)entries != lbids.size()) 
+		if ((uint)entries != lbids.size()) 
 			cerr << "entries = " << entries << " lbids.size = " << lbids.size() << endl;
 
-		CPPUNIT_ASSERT((uint32_t)entries == lbids.size());
+		CPPUNIT_ASSERT((uint)entries == lbids.size());
 				
 		for (i = 0 ; i < entries; i++) {
 				
@@ -261,7 +260,7 @@ static void* BRMRunner_1(void *arg)
 		if ((size % brm->getExtentSize()) != 0)
 			entries++;
 				
-		CPPUNIT_ASSERT((uint32_t)entries == lbids.size());
+		CPPUNIT_ASSERT((uint)entries == lbids.size());
 		for (i = 0; i < entries; i++) {
 				
 			newEm = new EMEntries();
@@ -337,7 +336,7 @@ static void* BRMRunner_1(void *arg)
 		int i, err, offset, oid;
 		struct EMEntries *tmp;
 		LBID_t target;
-		uint32_t fbo;
+		u_int32_t fbo;
 				
 		for (i = 0, tmp = head; i < entryRand; i++)
 			tmp = tmp->next;
@@ -395,7 +394,7 @@ static void* BRMRunner_1(void *arg)
 		int entryRand = rand_r(&randstate) % listSize;
 		int i, err;
 		struct EMEntries *tmp;
-		uint32_t hwm;
+		u_int32_t hwm;
 				
 		for (i = 0, tmp = head; i < entryRand; i++)
 			tmp = tmp->next;
@@ -529,12 +528,12 @@ static void* BRMRunner_si(void *arg)
 	
 	struct EMEntries {
 		u_int64_t LBIDstart;
-		uint32_t size;
+		u_int32_t size;
 		int OID;
-		uint32_t FBO;
-		uint32_t HWM;
-		uint32_t secondHWM;
-		uint32_t txnID;
+		u_int32_t FBO;
+		u_int32_t HWM;
+		u_int32_t secondHWM;
+		u_int32_t txnID;
 		struct EMEntries *next;
 		EMEntries() { next = NULL; HWM = 0; secondHWM = 0; txnID = 0; }
 	};
@@ -543,7 +542,7 @@ static void* BRMRunner_si(void *arg)
 	int threadNum = reinterpret_cast<int>(arg);
 #endif
 	int op, listSize = 0, i;
-	uint32_t randstate;
+	uint randstate;
 	struct EMEntries *head = NULL, *tmp;
 	struct timeval tv;
 	ExtentMap em;
@@ -554,7 +553,7 @@ static void* BRMRunner_si(void *arg)
 #endif
 	
 	gettimeofday(&tv, NULL);
-	randstate = static_cast<uint32_t>(tv.tv_usec);
+	randstate = static_cast<uint>(tv.tv_usec);
 	
 	while (!threadStop) {
 		op = rand_r(&randstate) % 10;
@@ -580,7 +579,7 @@ static void* BRMRunner_si(void *arg)
 		if ((size % brm_si.getExtentSize()) != 0)
 			entries++;
 				
-		CPPUNIT_ASSERT((uint32_t)entries == lbids.size());
+		CPPUNIT_ASSERT((uint)entries == lbids.size());
 				
 		for (i = 0 ; i < entries; i++) {
 				
@@ -637,7 +636,7 @@ static void* BRMRunner_si(void *arg)
 		if ((size % brm_si.getExtentSize()) != 0)
 			entries++;
 				
-		CPPUNIT_ASSERT((uint32_t)entries == lbids.size());
+		CPPUNIT_ASSERT((uint)entries == lbids.size());
 		for (i = 0; i < entries; i++) {
 				
 			newEm = new EMEntries();
@@ -713,7 +712,7 @@ static void* BRMRunner_si(void *arg)
 		int i, err, offset, oid;
 		struct EMEntries *tmp;
 		LBID_t target;
-		uint32_t fbo;
+		u_int32_t fbo;
 				
 		for (i = 0, tmp = head; i < entryRand; i++)
 			tmp = tmp->next;
@@ -771,7 +770,7 @@ static void* BRMRunner_si(void *arg)
 		int entryRand = rand_r(&randstate) % listSize;
 		int i, err;
 		struct EMEntries *tmp;
-		uint32_t hwm;
+		u_int32_t hwm;
 				
 		for (i = 0, tmp = head; i < entryRand; i++)
 			tmp = tmp->next;
@@ -892,12 +891,12 @@ static void* EMRunner(void *arg)
 	
 	struct EMEntries {
 		u_int64_t LBIDstart;
-		uint32_t size;
+		u_int32_t size;
 		int OID;
-		uint32_t FBO;
-		uint32_t HWM;
-		uint32_t secondHWM;
-		uint32_t txnID;
+		u_int32_t FBO;
+		u_int32_t HWM;
+		u_int32_t secondHWM;
+		u_int32_t txnID;
 		struct EMEntries *next;
 		EMEntries() { next = NULL; HWM = 0; secondHWM = 0; txnID = 0; }
 	};
@@ -906,7 +905,7 @@ static void* EMRunner(void *arg)
 	int threadNum = reinterpret_cast<int>(arg);
 #endif
 	int op, listSize = 0, i;
-	uint32_t randstate;
+	uint randstate;
 	struct EMEntries *head = NULL, *tmp;
 	struct timeval tv;
 	ExtentMap *em;
@@ -917,7 +916,7 @@ static void* EMRunner(void *arg)
 #endif
 	
 	gettimeofday(&tv, NULL);
-	randstate = static_cast<uint32_t>(tv.tv_usec);
+	randstate = static_cast<uint>(tv.tv_usec);
 	em = new ExtentMap();
 	
 	while (!threadStop) {
@@ -943,7 +942,7 @@ static void* EMRunner(void *arg)
 				if ((size % em->getExtentSize()) != 0)
 					entries++;
 				
-				CPPUNIT_ASSERT((uint32_t)entries == lbids.size());
+				CPPUNIT_ASSERT((uint)entries == lbids.size());
 				
 				for (i = 0 ; i < entries; i++) {
 				
@@ -997,7 +996,7 @@ static void* EMRunner(void *arg)
 				if ((size % em->getExtentSize()) != 0)
 					entries++;
 				
-				CPPUNIT_ASSERT((uint32_t)entries == lbids.size());
+				CPPUNIT_ASSERT((uint)entries == lbids.size());
 				for (i = 0; i < entries; i++) {
 				
 					newEm = new EMEntries();
@@ -1070,7 +1069,7 @@ static void* EMRunner(void *arg)
 				int i, err, offset, oid;
 				struct EMEntries *tmp;
 				LBID_t target;
-				uint32_t fbo;
+				u_int32_t fbo;
 				
 				for (i = 0, tmp = head; i < entryRand; i++)
 					tmp = tmp->next;
@@ -1122,7 +1121,7 @@ static void* EMRunner(void *arg)
 				int entryRand = rand_r(&randstate) % listSize;
 				int i;
 				struct EMEntries *tmp;
-				uint32_t hwm;
+				u_int32_t hwm;
 				
 				for (i = 0, tmp = head; i < entryRand; i++)
 					tmp = tmp->next;
@@ -1243,12 +1242,12 @@ static void* EMRunner_si(void *arg)
 	
 	struct EMEntries {
 		u_int64_t LBIDstart;
-		uint32_t size;
+		u_int32_t size;
 		int OID;
-		uint32_t FBO;
-		uint32_t HWM;
-		uint32_t secondHWM;
-		uint32_t txnID;
+		u_int32_t FBO;
+		u_int32_t HWM;
+		u_int32_t secondHWM;
+		u_int32_t txnID;
 		struct EMEntries *next;
 		EMEntries() { next = NULL; HWM = 0; secondHWM = 0; txnID = 0; }
 	};
@@ -1257,7 +1256,7 @@ static void* EMRunner_si(void *arg)
 	int threadNum = reinterpret_cast<int>(arg);
 #endif
 	int op, listSize = 0, i;
-	uint32_t randstate;
+	uint randstate;
 	struct EMEntries *head = NULL, *tmp;
 	struct timeval tv;
 	vector<LBID_t> lbids;
@@ -1267,7 +1266,7 @@ static void* EMRunner_si(void *arg)
 #endif
 	
 	gettimeofday(&tv, NULL);
-	randstate = static_cast<uint32_t>(tv.tv_usec);
+	randstate = static_cast<uint>(tv.tv_usec);
 	
 	while (!threadStop) {
 		op = rand_r(&randstate) % 9;
@@ -1292,7 +1291,7 @@ static void* EMRunner_si(void *arg)
 				if ((size % em_si.getExtentSize()) != 0)
 					entries++;
 				
-				CPPUNIT_ASSERT((uint32_t)entries == lbids.size());
+				CPPUNIT_ASSERT((uint)entries == lbids.size());
 				
 				for (i = 0 ; i < entries; i++) {
 				
@@ -1346,7 +1345,7 @@ static void* EMRunner_si(void *arg)
 				if ((size % em_si.getExtentSize()) != 0)
 					entries++;
 				
-				CPPUNIT_ASSERT((uint32_t)entries == lbids.size());
+				CPPUNIT_ASSERT((uint)entries == lbids.size());
 				for (i = 0; i < entries; i++) {
 				
 					newEm = new EMEntries();
@@ -1419,7 +1418,7 @@ static void* EMRunner_si(void *arg)
 				int i, err, offset, oid;
 				struct EMEntries *tmp;
 				LBID_t target;
-				uint32_t fbo;
+				u_int32_t fbo;
 				
 				for (i = 0, tmp = head; i < entryRand; i++)
 					tmp = tmp->next;
@@ -1471,7 +1470,7 @@ static void* EMRunner_si(void *arg)
 				int entryRand = rand_r(&randstate) % listSize;
 				int i;
 				struct EMEntries *tmp;
-				uint32_t hwm;
+				u_int32_t hwm;
 				
 				for (i = 0, tmp = head; i < entryRand; i++)
 					tmp = tmp->next;
@@ -1712,7 +1711,6 @@ int main( int argc, char **argv)
 	CppUnit::TextUi::TestRunner runner;
 	CppUnit::TestFactoryRegistry &registry = CppUnit::TestFactoryRegistry::getRegistry();
 	runner.addTest( registry.makeTest() );
-	idbdatafile::IDBPolicy::configIDBPolicy();
 	bool wasSuccessful = runner.run( "", false );
 	return (wasSuccessful ? 0 : 1);
 }

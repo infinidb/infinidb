@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: copylocks.cpp 1936 2013-07-09 22:10:29Z dhall $
+ * $Id: copylocks.cpp 1938 2013-07-11 17:06:49Z dhall $
  *
  ****************************************************************************/
 
@@ -27,7 +27,6 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <boost/thread.hpp>
-#include <boost/scoped_ptr.hpp>
 #include <string>
 #ifdef _MSC_VER
 #include <io.h>
@@ -61,12 +60,7 @@ namespace bi=boost::interprocess;
 #endif
 
 using namespace std;
-using namespace boost;
 using namespace logging;
-
-#include "IDBDataFile.h"
-#include "IDBPolicy.h"
-using namespace idbdatafile;
 
 namespace BRM {
 
@@ -93,7 +87,7 @@ CopyLocksImpl* CopyLocksImpl::makeCopyLocksImpl(unsigned key, off_t size, bool r
 	{
 		if (key != fInstance->fCopyLocks.key())
 		{
-			BRMShmImpl newShm(key, size, readOnly);
+			BRMShmImpl newShm(key, size);
 			fInstance->swapout(newShm);
 		}
 		idbassert(key == fInstance->fCopyLocks.key());
@@ -151,7 +145,9 @@ void CopyLocks::lock(OPS op)
 				growCL();
 		else {
 			currentShmkey = shminfo->tableShmkey;
-			fCopyLocksImpl = CopyLocksImpl::makeCopyLocksImpl(currentShmkey, 0, r_only);
+			fCopyLocksImpl = CopyLocksImpl::makeCopyLocksImpl(currentShmkey, 0);
+			if (r_only)
+				fCopyLocksImpl->makeReadOnly();
 			entries = fCopyLocksImpl->get();
 			if (entries == NULL) {
 				log_errno(string("CopyLocks::lock(): shmat failed"));
@@ -358,5 +354,151 @@ void CopyLocks::getCurrentTxnIDs(std::set<VER_t> &list) const
 }
 
 
-}  // namespace
+/* Deprecated...  No need to load/save copylocks */
+void CopyLocks::writeData(int fd, u_int8_t *buf, off_t offset, int size) const
+{
+	int errCount, err, progress;
+	off_t seekerr = -1;
+	
+	for (errCount = 0; errCount < MAX_IO_RETRIES && seekerr != offset; errCount++) {
+		seekerr = lseek(fd, offset, SEEK_SET);
+		if (seekerr < 0)
+			perror("CopyLocks::writeData(): lseek");
+	}
+	if (errCount == MAX_IO_RETRIES)
+		throw std::ios_base::failure("CopyLocks::writeData(): lseek failed "
+				"too many times");
+	
+	for (progress = 0, errCount = 0; progress < size && errCount < MAX_IO_RETRIES;) {
+		err = write(fd, &buf[progress], size - progress);
+		if (err < 0) {
+			if (errno != EINTR) {  // EINTR isn't really an error
+				errCount++;
+				perror("CopyLocks::writeData(): write (retrying)");
+			}
+		}
+		else 
+			progress += err;		
+	}
+	if (errCount == MAX_IO_RETRIES) 
+		throw std::ios_base::failure("CopyLocks::writeData(): write error");	
+}
 
+void CopyLocks::readData(int fd, u_int8_t *buf, off_t offset, int size)
+{
+	int errCount, err, progress;
+	off_t seekerr = -1;
+	
+	for (errCount = 0; errCount < MAX_IO_RETRIES && seekerr != offset; errCount++) {
+		seekerr = lseek(fd, offset, SEEK_SET);
+		if (seekerr < 0)
+			perror("CopyLocks::readData(): lseek");
+	}
+	if (errCount == MAX_IO_RETRIES)
+		throw std::ios_base::failure("CopyLocks::readData(): lseek failed "
+				"too many times");
+	
+	for (progress = 0, errCount = 0; progress < size && errCount < MAX_IO_RETRIES;) {
+		err = read(fd, &buf[progress], size - progress);
+		if (err <= 0) {
+			if (errno != EINTR) {  // EINTR isn't really an error
+				errCount++;
+				perror("CopyLocks::readData(): read (retrying)");
+			}
+		}
+		else
+			progress += err;		
+	}
+	if (errCount == MAX_IO_RETRIES) 
+		throw std::ios_base::failure("CopyLocks::readData(): read error");	
+}
+
+struct Header {
+	int magic;
+	int entries;
+};
+
+void CopyLocks::load(string filename)
+{	
+	int i, fd, offset, numEntries;
+	struct Header header;
+	struct CopyLockEntry entry;
+	LBIDRange range;
+
+	fd = open(filename.c_str(), O_RDONLY |O_BINARY);
+	if (fd < 0)
+		throw runtime_error("CopyLocks::load(): Failed to open the file");
+
+	try {
+		readData(fd, (u_int8_t *) &header, 0, sizeof(header));
+	}
+	catch (...) {
+		close(fd);
+		throw;
+	}
+	if (header.magic != CL_MAGIC_V1) {
+		close(fd);
+		throw runtime_error("CopyLocks::load(): Bad magic.  Not a CopyLocks file?");
+	}
+	if (header.entries < 0) {
+		close(fd);
+		throw runtime_error("CopyLocks::load(): Bad size.  Not a CopyLocks file?");
+	}
+	
+	numEntries = shminfo->allocdSize/sizeof(CopyLockEntry);
+	for (i = 0; i < numEntries; i++) 
+		entries[i].size = 0;
+	shminfo->currentSize = 0;
+
+	try {
+		for (i = 0, offset = sizeof(header); i < header.entries; 
+			i++, offset += sizeof(CopyLockEntry)) {
+			readData(fd, (u_int8_t *) &entry, offset, sizeof(CopyLockEntry));
+			range.start = entry.start;
+			range.size = entry.size;
+			lockRange(range, entry.txnID);
+		}
+	}
+	catch (...) {
+		close(fd);
+		throw;
+	}
+	close(fd);
+}
+		
+
+// read lock
+void CopyLocks::save(string filename)
+{
+	int i, numEntries, fd, offset;
+	struct Header header;
+	
+	fd = open(filename.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_BINARY, 0666);
+	if (fd < 0) {
+		cerr << "CopyLocks: filename is " << filename << endl;
+		throw runtime_error("CopyLocks::save(): Failed to open the file");
+	}
+
+	header.magic = CL_MAGIC_V1;
+	header.entries = shminfo->currentSize/sizeof(CopyLockEntry); 
+
+	numEntries = shminfo->allocdSize/sizeof(CopyLockEntry);
+	try {
+		writeData(fd, (u_int8_t *) &header, 0, sizeof(header));
+		offset = sizeof(header);
+
+		for (i = 0; i < numEntries; i++) 
+			if (entries[i].size != 0) {
+				writeData(fd, (u_int8_t *) &entries[i], offset, sizeof(CopyLockEntry));
+				offset += sizeof(CopyLockEntry);
+			}
+	}
+	catch (...) {
+		close(fd);
+		throw;
+	}
+	close(fd);
+}
+
+}  // namespace
+		

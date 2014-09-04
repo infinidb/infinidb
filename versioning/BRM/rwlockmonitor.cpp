@@ -35,7 +35,7 @@ using namespace logging;
 
 namespace BRM {
 
-RWLockMonitor::RWLockMonitor(const bool *d, const bool *ls, const uint32_t k) :
+RWLockMonitor::RWLockMonitor(const bool *d, const bool *ls, const uint k) :
 		die(d), lockStatus(ls), key(k)
 {
 	ts.tv_sec = 210;   // 3:30 timer

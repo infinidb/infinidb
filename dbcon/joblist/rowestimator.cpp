@@ -49,7 +49,7 @@ namespace joblist
 // This is used for converting a Calpont date to an integer representing the day number since the year 0 for use in
 // calculating the number of distinct days in a range.  It doesn't account for leap years as these are rough estimates
 // and only need to be accurate within an order of magnitude.
-uint32_t RowEstimator::daysThroughMonth(uint32_t mth)
+uint RowEstimator::daysThroughMonth(uint mth)
 {
 	switch(mth)
 	{
@@ -91,36 +91,36 @@ uint64_t RowEstimator::adjustValue(const execplan::CalpontSystemCatalog::ColType
 	{
 		// Use day precision for dates.  We'll use day relative to the year 0 without worrying about leap
 		// years.  This is for row count estimation and we are close enough for hand grenades.
-		case CalpontSystemCatalog::DATE:
+		case WriteEngine::DATE:
 		{
 			dataconvert::Date dt(value);
 			return dt.year * 365 + daysThroughMonth(dt.month - 1) + dt.day;
-		}
+		}	
 
 		// Use second precision for datetime estimates.  We'll use number of seconds since the year 0
 		// without worrying about leap years.
-		case CalpontSystemCatalog::DATETIME:
+		case WriteEngine::DATETIME:
 		{
 			dataconvert::DateTime dtm(value);
 			// 86,400 seconds in a day.
-			return (dtm.year * 365 + daysThroughMonth(dtm.month - 1) + dtm.day - 1) * 86400 +
+			return (dtm.year * 365 + daysThroughMonth(dtm.month - 1) + dtm.day - 1) * 86400 + 
 					dtm.hour * 3600 + dtm.minute * 60 + dtm.second;
 		}
 
 		// Use the first character only for estimating chars and varchar ranges.
         	// TODO:  Use dictionary column HWM for dictionary columns.
-		case CalpontSystemCatalog::CHAR:
-		case CalpontSystemCatalog::VARCHAR:
+		case WriteEngine::CHAR:
+		case WriteEngine::VARCHAR:
 			// Last byte is the first character in the string.
-			return (0xFF & value);
+			return (0xFF & value); 		
 		default:
 			return value;
 	}
 }
 
-// Estimates the number of distinct values given a min/max range.  When the range has not been set,
-// rules from the requirements are used based on the column type.
-uint32_t RowEstimator::estimateDistinctValues(const execplan::CalpontSystemCatalog::ColType& ct,
+// Estimates the number of distinct values given a min / max range.  When the range has not been set, rules from 
+// the requirements are used based on the column type.
+uint32_t RowEstimator::estimateDistinctValues(const execplan::CalpontSystemCatalog::ColType& ct, 
 					      const uint64_t& min,
 					      const uint64_t& max,
 					      const char cpStatus)
@@ -133,35 +133,26 @@ uint32_t RowEstimator::estimateDistinctValues(const execplan::CalpontSystemCatal
         switch(ct.colDataType)
         {
 
-            case CalpontSystemCatalog::BIT:
+            case WriteEngine::BIT:
                 return 2;
 
             // Return limit/2 for integers where limit is number of possible values.
-            case CalpontSystemCatalog::TINYINT:
-				return (2^8)/2;
-			case CalpontSystemCatalog::UTINYINT:
-				return (2^8);
-            case CalpontSystemCatalog::SMALLINT:
-				return (2^16)/2;
-			case CalpontSystemCatalog::USMALLINT:
-                return (2^16);
+            case WriteEngine::TINYINT:
+                return (2^8)/2;
+            case WriteEngine::SMALLINT:
+                return (2^16)/2;
 
             // Next group all have range greater than 8M (# of rows in an extent), use 8M/2 as the estimate.
-            case CalpontSystemCatalog::MEDINT:
-			case CalpontSystemCatalog::UMEDINT:
-			case CalpontSystemCatalog::INT:
-			case CalpontSystemCatalog::UINT:
-            case CalpontSystemCatalog::BIGINT:
-			case CalpontSystemCatalog::UBIGINT:
-            case CalpontSystemCatalog::FLOAT:
-			case CalpontSystemCatalog::UFLOAT:
-            case CalpontSystemCatalog::DOUBLE:
-			case CalpontSystemCatalog::UDOUBLE:
+            case WriteEngine::MEDINT:
+            case WriteEngine::INT:
+            case WriteEngine::BIGINT:
+            case WriteEngine::FLOAT:
+            case WriteEngine::DOUBLE:
                 return fRowsPerExtent / 2;
 
             // Use 1000 for dates.
-            case CalpontSystemCatalog::DATE:
-            case CalpontSystemCatalog::DATETIME:
+            case WriteEngine::DATE:
+            case WriteEngine::DATETIME:
                 return 1000;
 
             // Use 10 for CHARs and VARCHARs.  We'll use 10 for whatever else.
@@ -172,22 +163,21 @@ uint32_t RowEstimator::estimateDistinctValues(const execplan::CalpontSystemCatal
     }
     else
     {
-		ret = max - min + 1;
+	ret = max - min + 1;
     }
     if(ret > fRowsPerExtent)
     {
-		ret = fRowsPerExtent;
+	ret = fRowsPerExtent;
     }
     return ret;
 }
 
 // Returns a floating point number between 0 and 1 representing the percentage of matching rows for the given predicate against
 // the given range.  This function is used for estimating an individual operation such as col1 = 2.
-template<class T>
-float RowEstimator::estimateOpFactor(const T& min, const T& max, const T& value, char op, uint8_t lcf, uint32_t distinctValues, char cpStatus)
+float RowEstimator::estimateOpFactor(const int64_t& min, const int64_t& max, const int64_t& value, char op, uint8_t lcf, uint32_t distinctValues, char cpStatus)
 {
 	float factor = 1.0;
-	switch(op)
+	switch(op) 
 	{
 	       	case COMPARE_LT:
 	        case COMPARE_NGE:
@@ -201,7 +191,7 @@ float RowEstimator::estimateOpFactor(const T& min, const T& max, const T& value,
 			if(cpStatus == BRM::CP_VALID)
 			{
 				factor = (1.0 * value - min + 1) / (max - min + 1);
-           	}
+	            	}
 			break;
 	        case COMPARE_GT:
 	        case COMPARE_NLE:
@@ -225,7 +215,7 @@ float RowEstimator::estimateOpFactor(const T& min, const T& max, const T& value,
 			factor = 1.0 - (1.0 / distinctValues);
 			break;
 	}
-	if(factor < 0.0)
+	if(factor < 0.0) 
 	{
 		factor = 0.0;
 	}
@@ -245,15 +235,13 @@ float RowEstimator::estimateRowReturnFactor(const BRM::EMEntry& emEntry,
                                    const uint8_t BOP,
 				   const uint32_t& rowsInExtent)
 {
-    bool bIsUnsigned = execplan::isUnsigned(ct.colDataType);
 	float factor = 1.0;
 	float tempFactor = 1.0;
 
-	// Adjust values based on column type and estimate the
+	// Adjust values based on column type and estimate the 
 	uint64_t adjustedMin = adjustValue(ct, emEntry.partition.cprange.lo_val);
 	uint64_t adjustedMax = adjustValue(ct, emEntry.partition.cprange.hi_val);
-    uint32_t distinctValuesEstimate = estimateDistinctValues(
-				ct, adjustedMin, adjustedMax, emEntry.partition.cprange.isValid);
+    	uint32_t distinctValuesEstimate = estimateDistinctValues(ct, adjustedMin, adjustedMax, emEntry.partition.cprange.isValid); 
 
 	// Loop through the operations and estimate the percentage of rows that will qualify.
 	// For example, there are two operations for "col1 > 5 and col1 < 10":
@@ -267,8 +255,7 @@ float RowEstimator::estimateRowReturnFactor(const BRM::EMEntry& emEntry,
 	for (int i = 0; i < comparisonLimit; i++) {
 		pos += ct.colWidth + 2;  // predicate + op + lcf
 
-		// TODO:  Stole this condition from lbidlist.
-		// Investigate whether this can happen / should throw an error.
+		// TODO:  Stole this condition from lbidlist.  Investigate whether this can happen / should throw an error.
 		if (pos > length) {
 			return factor;
 		}
@@ -276,68 +263,34 @@ float RowEstimator::estimateRowReturnFactor(const BRM::EMEntry& emEntry,
 		// Get the comparison value for the condition.
 		char op = *msgDataPtr++;
 		uint8_t lcf = *(uint8_t*)msgDataPtr++;
-        if (bIsUnsigned)
-        {
-            switch (ct.colWidth)
-            {
-                case 1:
-                {
-                    uint8_t val = *(uint8_t*)msgDataPtr;
-                    value = val;
-                    break;
-                }
-                case 2:
-                {
-                    uint16_t val = *(uint16_t*)msgDataPtr;
-                    value = val;
-                    break;
-                }
-                case 4:
-                {
-                    uint32_t val = *(uint32_t*)msgDataPtr;
-                    value = val;
-                    break;
-                }
-                case 8:
-                default:
-                {
-                    uint64_t val = *(uint64_t*)msgDataPtr;
-                    value = static_cast<int64_t>(val);
-                    break;
-                }
-            }
-        }
-        else
-        {
-            switch (ct.colWidth)
-            {
-                case 1:
-                {
-                    int8_t val = *(int8_t*)msgDataPtr;
-                    value = val;
-                    break;
-                }
-                case 2:
-                {
-                    int16_t val = *(int16_t*)msgDataPtr;
-                    value = val;
-                    break;
-                }
-                case 4:
-                {
-                    int32_t val = *(int32_t*)msgDataPtr;
-                    value = val;
-                    break;
-                }
-                case 8:
-                default:
-                {
-                    int64_t val = *(int64_t*)msgDataPtr;
-                    value = val;
-                    break;
-                }
-            }
-        }
+		switch (ct.colWidth)
+		{
+			case 1: 
+			{
+				int8_t val = *(int8_t*)msgDataPtr;
+				value = val;
+				break;
+			} 
+			case 2: 
+			{
+				int16_t val = *(int16_t*)msgDataPtr;
+				value = val;
+				break;
+			} 
+			case 4: 
+			{
+				int32_t val = *(int32_t*)msgDataPtr;
+				value = val;
+				break;
+			} 
+			case 8:
+			default:
+			{
+				int64_t val = *(int64_t*)msgDataPtr;
+				value = val;
+				break;
+			}
+		}
 
 		// TODO:  Investigate whether condition below should throw an error.
 		msgDataPtr += ct.colWidth;
@@ -352,18 +305,8 @@ float RowEstimator::estimateRowReturnFactor(const BRM::EMEntry& emEntry,
 #endif
 
 		// Get the factor for the individual operation.
-        if (bIsUnsigned)
-        {
-            tempFactor = estimateOpFactor<uint64_t>(
-				adjustedMin, adjustedMax, adjustValue(ct, value), op, lcf,
-                distinctValuesEstimate, emEntry.partition.cprange.isValid);
-        }
-        else
-        {
-            tempFactor = estimateOpFactor<int64_t>(
-				adjustedMin, adjustedMax, adjustValue(ct, value), op, lcf,
-                distinctValuesEstimate, emEntry.partition.cprange.isValid);
-        }
+		tempFactor = estimateOpFactor(adjustedMin, adjustedMax, adjustValue(ct, value), op, lcf, 
+			distinctValuesEstimate, emEntry.partition.cprange.isValid);
 
 #if ROW_EST_DEBUG
 		cout << ", OperatorFactor-" << tempFactor << ", DistinctValsEst-" << distinctValuesEstimate << endl;
@@ -373,7 +316,7 @@ float RowEstimator::estimateRowReturnFactor(const BRM::EMEntry& emEntry,
 		if (BOP == BOP_AND) {
 			// TODO:  Handle betweens correctly (same as a >= 5 and a <= 10)
 			factor *= tempFactor;
-		}
+		} 
 		else if (BOP == BOP_OR) {
 			if (firstQualifyingOrCondition) {
 				factor = tempFactor;
@@ -403,7 +346,7 @@ float RowEstimator::estimateRowReturnFactor(const BRM::EMEntry& emEntry,
 
 // This function returns the estimated row count for the entire TupleBPS.  It samples the last 20 (configurable) extents to
 // calculate the estimate.
-uint64_t RowEstimator::estimateRows(const vector<ColumnCommandJL*>& cpColVec,
+uint64_t RowEstimator::estimateRows(const vector<ColumnCommandJL*>& cpColVec, 
 				    const std::vector<bool>& scanFlags,
                                     BRM::DBRM& dbrm,
                                     const execplan::CalpontSystemCatalog::OID oid)
@@ -455,7 +398,7 @@ uint64_t RowEstimator::estimateRows(const vector<ColumnCommandJL*>& cpColVec,
 			cout << "Ext-" << idx << ", rowsToScan-" << extentRows << endl;
 #endif
 			factor = 1.0;
-			for (uint32_t j = 0; j < cpColVec.size(); j++)
+			for (uint j = 0; j < cpColVec.size(); j++)
 			{
 				colCmd = cpColVec[j];
 				//RowEstimator rowEstimator;
@@ -496,8 +439,8 @@ uint64_t RowEstimator::estimateRows(const vector<ColumnCommandJL*>& cpColVec,
 		}
 	}
 
-	// If there are more extents than we sampled, add the row counts for the qualifying extents
-	// that we didn't sample to the count of rows that will be scanned.
+	// If there are more extents than we sampled, add the row counts for the qualifying extents that we didn't sample
+	// to the count of rows that will be scanned.
 	if((extentsSampled >= fExtentsToSample) && (idx > 0))
 	{
 		factor = (1.0 * estimatedRowCount) / (1.0 * totalRowsToBeScanned);
@@ -508,10 +451,10 @@ uint64_t RowEstimator::estimateRows(const vector<ColumnCommandJL*>& cpColVec,
 		{
 			if(scanFlags[i])
 			{
-				// Don't take the expense of checking to see if the last extent was one that wasn't
-				// sampled.  It will more than likely have been the first extent sampled since we
-				// are doing them in reverse order.  If not, the amount of rows not populated isn't
-				// that significant since there are many qualifying extents.
+				// Don't take the expense of checking to see if the last extent was one that wasn't sampled.
+				// It will more than likely have been the first extent sampled since we are doing them in 
+				// reverse order.  If not, the amount of rows not populated isn't that significant since there
+				// are many qualifying extents.
 				totalRowsToBeScanned += fRowsPerExtent;
 			}
 		}
@@ -526,9 +469,8 @@ uint64_t RowEstimator::estimateRows(const vector<ColumnCommandJL*>& cpColVec,
 	return estimatedRowCount;
 }
 
-// @Bug 3503.  Fix to use the number of extents to estimate the number of rows in queries that do
-// joins on dictionaries or other column types that do not use casual partitioning.
-// We use an estimate of 100% of the rows regardless of any dictionary filters.
+// @Bug 3503.  Fix to use the number of extents to estimate the number of rows in queries that do joins on dictionaries or other column types
+// that do not use casual partitioning.  We use an estimate of 100% of the rows regardless of any dictionary filters.  
 uint64_t RowEstimator::estimateRowsForNonCPColumn(ColumnCommandJL& colCmd)
 {
 	uint64_t estimatedRows = 0;
@@ -536,8 +478,7 @@ uint64_t RowEstimator::estimateRowsForNonCPColumn(ColumnCommandJL& colCmd)
 	if (numExtents > 0)
 	{
 		HWM_t hwm = colCmd.getExtents()[numExtents - 1].HWM;
-		uint32_t rowsInLastExtent =
-					((hwm+1) * fBlockSize/ colCmd.getColType().colWidth)%fRowsPerExtent;
+		uint32_t rowsInLastExtent = ((hwm+1) * fBlockSize/ colCmd.getColType().colWidth)%fRowsPerExtent;
 		estimatedRows = fRowsPerExtent * (numExtents - 1) + rowsInLastExtent;
 	}
 	return estimatedRows;

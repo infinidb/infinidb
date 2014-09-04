@@ -16,11 +16,13 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_simplesyslog.cpp 4607 2013-04-11 21:38:09Z rdempsey $
+* $Id: we_simplesyslog.cpp 3720 2012-04-04 18:18:49Z rdempsey $
 *
 *******************************************************************************/
 
+#define WELOG_DLLEXPORT
 #include "we_simplesyslog.h"
+#undef WELOG_DLLEXPORT
 
 #include "we_define.h"
 #include "messagelog.h"
@@ -79,7 +81,6 @@ void SimpleSysLog::logMsg( const logging::Message::Args& msgArgs,
             break;
         }
         case logging::LOG_TYPE_INFO:
-        default:
         {
             ml.logInfoMessage(m);
             break;
@@ -95,6 +96,7 @@ void SimpleSysLog::logMsg( const logging::Message::Args& msgArgs,
             break;
         }
         case logging::LOG_TYPE_CRITICAL:
+        default:
         {
             ml.logCriticalMessage(m);
             break;

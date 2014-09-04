@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: tablecolumn.cpp 9655 2013-06-25 23:08:13Z xlou $
+ * $Id: tablecolumn.cpp 8436 2012-04-04 18:18:21Z rdempsey $
  *
  *****************************************************************************/
 
@@ -29,25 +29,27 @@ using namespace messageqcpp;
 
 #include "columnresult.h"
 
+#define TABLECOLUMN_DLLEXPORT
 #include "tablecolumn.h"
+#undef TABLECOLUMN_DLLEXPORT
 
 namespace joblist
 {
 
-/** @brief constructor
+/** @brief constructor 
 */
 TableColumn::TableColumn(const execplan::CalpontSystemCatalog::OID columnOID, const supportedType columnType) :
-	fColumnOID(columnOID), fIsNullColumn(true), fColumnType(columnType)
+	fColumnOID(columnOID), fIsNullColumn(true), fColumnType(columnType) 
 {
 	preserialized.reset(new ByteStream());
 }
 
-TableColumn::TableColumn() : fColumnOID(0), fIsNullColumn(true), fColumnType(UNDEFINED)
+TableColumn::TableColumn() : fColumnOID(0), fIsNullColumn(true), fColumnType(UNDEFINED) 
 {
 	preserialized.reset(new ByteStream());
 };
 
-void TableColumn::serialize()
+void TableColumn::serialize() 
 {
 // 	cerr << "pre-serializing" << endl;
 	messageqcpp::ByteStream::octbyte rowCount;
@@ -76,7 +78,7 @@ void TableColumn::serialize()
 		else if(fColumnType == STRING) {
 			rowCount = fStrValues->size();
 			*preserialized << rowCount;
-			for(uint32_t i = 0; i < rowCount; i++)
+			for(uint i = 0; i < rowCount; i++)
 				*preserialized << (*fStrValues)[i];
 		}
 	}
@@ -84,7 +86,7 @@ void TableColumn::serialize()
 
 /** @brief serializes the object into the passed byte stream.
 */
-void TableColumn::serialize(messageqcpp::ByteStream& b)
+void TableColumn::serialize(messageqcpp::ByteStream& b) 
 {
 	if (preserialized->length() != 0) {
 		b += *preserialized;
@@ -119,7 +121,7 @@ void TableColumn::serialize(messageqcpp::ByteStream& b)
 		else if(fColumnType == STRING) {
 			rowCount = fStrValues->size();
 			b << rowCount;
-			for(uint32_t i = 0; i < rowCount; i++)
+			for(uint i = 0; i < rowCount; i++) 
 				b << (*fStrValues)[i];
 		}
 	}
@@ -160,13 +162,13 @@ void TableColumn::unserialize(messageqcpp::ByteStream& b) {
 		if (columnType != STRING)
 			fIntValues.reset(new std::vector<uint64_t>());
 
-		/* XXXPAT: A switch on fColumnType is more concise, but I suspect this is
+		/* XXXPAT: A switch on fColumnType is more concise, but I suspect this is 
 		   a little faster b/c of fewer jumps in the loop.  Since it's a row-by-row operation, it
 		   has to scream. */
 		if (columnType == UINT8) {
 // 			cout << "UN (" << oid << "): is an 8\n";
 			fIntValues->reserve(rowCount);
-			for (uint32_t i = 0; i < rowCount; ++i) {
+			for (uint i = 0; i < rowCount; ++i) {
 				b >> val8;
 // 				cout << "UN (" << oid << "): " << (int) val8 << " at " << i << endl;
 				fIntValues->push_back(val8);
@@ -175,7 +177,7 @@ void TableColumn::unserialize(messageqcpp::ByteStream& b) {
 		else if (columnType == UINT16) {
 // 			cout << "UN (" << oid << "): is a 16\n";
 			fIntValues->reserve(rowCount);
-			for (uint32_t i = 0; i < rowCount; ++i) {
+			for (uint i = 0; i < rowCount; ++i) {
 				b >> val16;
 // 				cout << "UN (" << oid << "): " << val16 << " at " << i << endl;
 				fIntValues->push_back(val16);
@@ -184,7 +186,7 @@ void TableColumn::unserialize(messageqcpp::ByteStream& b) {
 		else if (columnType == UINT32) {
 // 			cout << "UN (" << oid << "): is a 32\n";
 			fIntValues->reserve(rowCount);
-			for (uint32_t i = 0; i < rowCount; ++i) {
+			for (uint i = 0; i < rowCount; ++i) {
 				b >> val32;
 // 				cout << "UN (" << oid << "): " << val32 << " at " << i << endl;
 				fIntValues->push_back(val32);
@@ -199,7 +201,7 @@ void TableColumn::unserialize(messageqcpp::ByteStream& b) {
 			fStrValues.reset(new std::vector<std::string>());
 			fStrValues->reserve(rowCount);
 			std::string value;
-			for(uint32_t i = 0; i < rowCount; i++) {
+			for(uint i = 0; i < rowCount; i++) {
 				b >> value;
 // 				cout << "UN: " << value << endl;
 				fStrValues->push_back(value);
@@ -223,9 +225,9 @@ void TableColumn::addToSysDataList(execplan::CalpontSystemCatalog::NJLSysDataLis
 		sysDataList.push_back(cr);
 	}
 	if(fColumnType == UINT64) {
-		uint32_t vsize = fIntValues->size();
+		uint vsize = fIntValues->size();
 		bool putRids = (rids.size() == vsize);
- 		for(uint32_t i = 0; i < vsize; i++) {
+ 		for(uint i = 0; i < vsize; i++) {
 			cr->PutData((*fIntValues)[i]);
 			if(putRids) {
 				cr->PutRid(rids[i]);
@@ -236,9 +238,9 @@ void TableColumn::addToSysDataList(execplan::CalpontSystemCatalog::NJLSysDataLis
 		}
 	}
 	else {
-		uint32_t vsize = fStrValues->size();
+		uint vsize = fStrValues->size();
 		bool putRids = (rids.size() == vsize);
-		for(uint32_t i = 0; i < vsize; i++) {
+		for(uint i = 0; i < vsize; i++) {
 			cr->PutStringData((*fStrValues)[i]);
 			if(putRids) {
 				cr->PutRid(rids[i]);
@@ -250,7 +252,7 @@ void TableColumn::addToSysDataList(execplan::CalpontSystemCatalog::NJLSysDataLis
 	}
 }
 #if 0
-void TableColumn::addToSysDataRids(execplan::CalpontSystemCatalog::NJLSysDataList& sysDataList, const std::vector<uint64_t>& rids)
+void TableColumn::addToSysDataRids(execplan::CalpontSystemCatalog::NJLSysDataList& sysDataList, const std::vector<uint64_t>& rids) 
 {
 
 	execplan::ColumnResult *cr;
@@ -264,10 +266,10 @@ void TableColumn::addToSysDataRids(execplan::CalpontSystemCatalog::NJLSysDataLis
 		sysDataList.push_back(cr);
 	}
 
-	uint32_t vsize = (fIntValues) ? fIntValues->size() : fStrValues->size();
+	uint vsize = (fIntValues) ? fIntValues->size() : fStrValues->size();
 
 	bool putRids = (rids.size() == vsize);
-	for(uint32_t i = 0; i < vsize; i++) {
+	for(uint i = 0; i < vsize; i++) {
 		if(putRids) {
 			cr->PutRidOnly(rids[i]);
 		}
@@ -275,7 +277,7 @@ void TableColumn::addToSysDataRids(execplan::CalpontSystemCatalog::NJLSysDataLis
 			cr->PutRidOnly(0);
 		}
 	}
-
+	
 }
 #endif
 

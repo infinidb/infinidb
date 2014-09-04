@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_md5.cpp 3923 2013-06-19 21:43:06Z bwilkinson $
+* $Id: func_md5.cpp 3048 2012-04-04 15:33:45Z rdempsey $
 *
 *
 ****************************************************************************/
@@ -480,7 +480,7 @@ string Func_md5::getStrVal(rowgroup::Row& row,
 							bool& isNull,
 							CalpontSystemCatalog::ColType& op_ct)
 {
-	const string& arg = parm[0]->data()->getStrVal(row, isNull);
+	string arg = parm[0]->data()->getStrVal(row, isNull);
 	return MD5String(arg.c_str());
 	
 	//return str;

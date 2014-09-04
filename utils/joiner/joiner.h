@@ -15,6 +15,18 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
+//
+// C++ Interface: joiner
+//
+// Description: 
+//
+//
+// Author: Patrick <pleblanc@localhost.localdomain>, (C) 2008
+//
+// Copyright: See COPYING file that comes with this distribution
+//
+//
+
 #ifndef JOINER_H_
 #define JOINER_H_
 

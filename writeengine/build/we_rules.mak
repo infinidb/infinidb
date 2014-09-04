@@ -15,11 +15,9 @@ LOBJS_SHARED= \
 	$(LIBDIR)/we_bulkrollbackmgr.o \
 	$(LIBDIR)/we_bulkrollbackfile.o \
 	$(LIBDIR)/we_bulkrollbackfilecompressed.o \
-	$(LIBDIR)/we_bulkrollbackfilecompressedhdfs.o \
 	$(LIBDIR)/we_cache.o \
 	$(LIBDIR)/we_chunkmanager.o \
 	$(LIBDIR)/we_config.o \
-	$(LIBDIR)/we_confirmhdfsdbfile.o \
 	$(LIBDIR)/we_convertor.o \
 	$(LIBDIR)/we_dbfileop.o \
 	$(LIBDIR)/we_dbrootextenttracker.o \

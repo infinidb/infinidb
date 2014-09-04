@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: arithmeticcolumn.cpp 9679 2013-07-11 22:32:03Z zzhu $
+*   $Id: arithmeticcolumn.cpp 8436 2012-04-04 18:18:21Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -32,14 +32,12 @@ using namespace std;
 #include "operator.h"
 #include "bytestream.h"
 using namespace messageqcpp;
-
 #include "objectreader.h"
 #include "expressionparser.h"
 #include "calpontselectexecutionplan.h"
 #include "treenodeimpl.h"
 #include "functioncolumn.h"
 #include "aggregatecolumn.h"
-#include "windowfunctioncolumn.h"
 
 namespace {
 /** print the tree
@@ -63,7 +61,7 @@ ArithmeticColumn::ArithmeticColumn():
     fExpression (0)
 {}
 
-ArithmeticColumn::ArithmeticColumn(const string& sql, const uint32_t sessionID):
+ArithmeticColumn::ArithmeticColumn(const string& sql, const u_int32_t sessionID):
     ReturnedColumn(sessionID),
     fData(sql),
     fExpression(0)
@@ -71,7 +69,7 @@ ArithmeticColumn::ArithmeticColumn(const string& sql, const uint32_t sessionID):
 	buildTree();
 }
 
-ArithmeticColumn::ArithmeticColumn(const ArithmeticColumn& rhs, const uint32_t sessionID):
+ArithmeticColumn::ArithmeticColumn(const ArithmeticColumn& rhs, const u_int32_t sessionID):
     ReturnedColumn(rhs, sessionID),
     fTableAlias (rhs.fTableAlias),
     fAsc (rhs.fAsc),
@@ -83,8 +81,6 @@ ArithmeticColumn::ArithmeticColumn(const ArithmeticColumn& rhs, const uint32_t s
 	fExpression->walk(getSimpleCols, &fSimpleColumnList);
 	fAggColumnList.clear();
 	fExpression->walk(getAggCols, &fAggColumnList);
-	fWindowFunctionColumnList.clear();
-	fExpression->walk(getWindowFunctionCols, &fWindowFunctionColumnList);
 }
 
 ArithmeticColumn::~ArithmeticColumn()
@@ -296,9 +292,7 @@ const string ArithmeticColumn::toString() const
 	if (fAlias.length() > 0) oss << "Alias: " << fAlias << endl;
 	if (fExpression != 0) fExpression->walk(walkfn, oss);
 	oss << "expressionId=" << fExpressionId << endl;
-	oss << "joinInfo=" << fJoinInfo << " returnAll=" << fReturnAll << " sequence#=" << fSequence << endl;
-	oss << "resultType=" << colDataTypeToString(fResultType.colDataType) << "|" << fResultType.colWidth << 
-endl;
+	oss << "resultType=" << fResultType.colDataType << "|" << fResultType.colWidth << endl;
 	return oss.str();
 }
 
@@ -324,11 +318,10 @@ void ArithmeticColumn::unserialize(messageqcpp::ByteStream& b)
 	b >> reinterpret_cast< ByteStream::doublebyte&>(fAsc);
 
 	fSimpleColumnList.clear();
+	fAggColumnList.clear();
 	fExpression->walk(getSimpleCols, &fSimpleColumnList);
 	fAggColumnList.clear();
 	fExpression->walk(getAggCols, &fAggColumnList);
-	fWindowFunctionColumnList.clear();
-	fExpression->walk(getWindowFunctionCols, &fWindowFunctionColumnList);
 }
 
 bool ArithmeticColumn::operator==(const ArithmeticColumn& t) const
@@ -372,69 +365,6 @@ bool ArithmeticColumn::operator!=(const ArithmeticColumn& t) const
 bool ArithmeticColumn::operator!=(const TreeNode* t) const
 {
 	return (!(*this == t));
-}
-
-bool ArithmeticColumn::hasAggregate()
-{
-	if (fHasAggregate) return true;
-	fAggColumnList.clear();
-	fExpression->walk(getAggCols, &fAggColumnList);
-	if (!fAggColumnList.empty())
-		fHasAggregate = true;
-	return fHasAggregate;
-}
-
-bool ArithmeticColumn::hasWindowFunc()
-{
-	fWindowFunctionColumnList.clear();
-	fExpression->walk(getWindowFunctionCols, &fWindowFunctionColumnList);
-	if (fWindowFunctionColumnList.empty())
-		return false;
-	return true;
-}
-
-void ArithmeticColumn::setDerivedTable()
-{
-	if (hasAggregate())
-	{
-		fDerivedTable = "";
-		return;
-	}
-	if (fExpression)
-	{
-		fExpression->setDerivedTable();
-		fDerivedTable = fExpression->derivedTable();
-	}
-}
-
-void ArithmeticColumn::replaceRealCol(std::vector<SRCP>& derivedColList)
-{
-	if (fExpression)
-		replaceRefCol(fExpression, derivedColList);
-}
-
-void ArithmeticColumn::setSimpleColumnList()
-{
-	fSimpleColumnList.clear();
-	fExpression->walk(getSimpleCols, &fSimpleColumnList);
-}
-
-bool ArithmeticColumn::singleTable(CalpontSystemCatalog::TableAliasName& tan)
-{
-	tan.clear();
-	setSimpleColumnList();
-	for (uint32_t i = 0; i < fSimpleColumnList.size(); i++)
-	{
-		CalpontSystemCatalog::TableAliasName stan(fSimpleColumnList[i]->schemaName(),
-		                    fSimpleColumnList[i]->tableName(),
-		                    fSimpleColumnList[i]->tableAlias(),
-		                    fSimpleColumnList[i]->viewName());
-		if (tan.table.empty())
-			tan = stan;
-		else if (stan != tan)
-			return false;
-	}
-	return true;
 }
 
 } // namespace

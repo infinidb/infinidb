@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_replace.cpp 3923 2013-06-19 21:43:06Z bwilkinson $
+* $Id: func_replace.cpp 3048 2012-04-04 15:33:45Z rdempsey $
 *
 *
 ****************************************************************************/
@@ -49,11 +49,11 @@ std::string Func_replace::getStrVal(rowgroup::Row& row,
 						bool& isNull,
 						execplan::CalpontSystemCatalog::ColType&)
 {
-	const string& str = fp[0]->data()->getStrVal(row, isNull);
+	string str = fp[0]->data()->getStrVal(row, isNull);
 
-	const string& fromstr = fp[1]->data()->getStrVal(row, isNull);
+	string fromstr = fp[1]->data()->getStrVal(row, isNull);
 
-	const string& tostr = fp[2]->data()->getStrVal(row, isNull);
+	string tostr = fp[2]->data()->getStrVal(row, isNull);
 
 	string newstr;
 	unsigned int i = 0;

@@ -1,31 +1,27 @@
 #!/bin/bash
 #
-# $Id: build_rpms 1734 2012-10-25 18:07:16Z dhill $
+# $Id: build_rpms 1735 2012-10-25 18:07:50Z dhill $
 #
 
-verbose=0
-mysqldir=/usr/local/Calpont/mysql
+usage="build_rpms [-vgh]"
+vflg=0
+gflg=0
 
-usage()
-{
-cat <<EOD
-usage: build_rpms [--verbose] [--local-mysql] [--help]
-   --local-mysql use local (relative) mysql binary tree
-EOD
-}
-
-for arg in "$@"; do
-	if [ `expr -- "$arg" : '--verbose'` -eq 9 ]; then
-		((verbose++))
-	elif [ `expr -- "$arg" : '--local-mysql'` -eq 13 ]; then
-		mysqldir=../Calpont/mysql
-	elif [ `expr -- "$arg" : '--help'` -eq 6 ]; then
-		usage
+while getopts "vgh" flag; do
+	case $flag in
+	v) ((vflg++))
+		;;
+	g) ((gflg++))
+		;;
+	h) echo $usage
 		exit 0
-	else
-		echo "ignoring unknown argument: $arg" 1>&2
-	fi
+		;;
+	\? | *) echo $usage
+		exit 1
+		;;
+	esac
 done
+shift $((OPTIND - 1))
 
 #try to find project root
 while [ ! -d dbcon ]; do
@@ -45,7 +41,7 @@ fi
 . ./build/releasenum
 
 # make the install package
-buildroot=$HOME/rpm/BUILD/infinidb-$version-$release
+buildroot=$HOME/rpm/BUILD/calpont-$version-$release
 
 rm -rf $buildroot
 mkdir -p $buildroot
@@ -54,15 +50,7 @@ tar -cf - --exclude 'export/include' --exclude 'export/*.tar' export | tar -C $b
 mv $buildroot/export $buildroot/Calpont
 
 #get mysql server files
-if [ ! -d $mysqldir ]; then
-	echo -e "\nDidn't find MySQL install: $mysqldir!" 1>&2
-	exit 1
-fi
-pushd $mysqldir > /dev/null
-if [ ! -f files.lst ]; then
-	echo -e "\nDidn't find files.lst in $mysqldir!" 1>&2
-	exit 1
-fi
+pushd /usr/local/Calpont/mysql > /dev/null
 mkdir -p $buildroot/Calpont/mysql
 cpio -pdmu --quiet $buildroot/Calpont/mysql < files.lst
 popd >/dev/null
@@ -86,7 +74,7 @@ for file in bulkload.sh cleanup.sh dbbuilder.sh dbload.sh cpimport.sh bulkloadp.
 done
 
 rm -f $buildroot/Calpont/lib/libidbboot.a
-rm -f $buildroot/Calpont/lib/libiberty.a
+rm -f $buildroot/Calpont/bin/amazonInstaller
 
 mkdir -p $HOME/rpm/BUILD $HOME/rpm/RPMS $HOME/rpm/SRPMS $HOME/rpm/SPECS $HOME/rpm/tmp
 
@@ -96,6 +84,20 @@ if [ ! -f $HOME/.rpmmacros ]; then
 %_tmppath $HOME/rpm/tmp
 # Change to 1 if you want to abort on unpackaged files
 %_unpackaged_files_terminate_build 0
+# Don't build debuginfo packages
+%debug_package %{nil}
+# Turn off post install step that strips symbols
+%__os_install_post %{nil}
+# Turn off perl module probes
+%__perl_requires %{nil}
+EOD
+fi
+
+egrep -qs __perl_requires $HOME/.rpmmacros
+if [ $? -ne 0 ]; then
+	cat >> $HOME/.rpmmacros <<EOD
+# Turn off perl module probes
+%__perl_requires %{nil}
 EOD
 fi
 
@@ -111,29 +113,44 @@ b="$b\\n$l"
 done
 echo $b )`
 
-cp ./build/infinidb.spec.in $HOME/rpm/SPECS/infinidb.spec
+cp ./build/calpont.spec.in $HOME/rpm/SPECS/calpont.spec
 sed -i  -e "s/@@PACKAGER@@/Packager: $packager/" \
 	-e "s/@@VERSION@@/Version: $version/" \
 	-e "s/@@RELEASE@@/Release: $release/" \
-	-e "s?@@BUILDINFO@@?$buildinfo?" $HOME/rpm/SPECS/infinidb.spec
+	-e "s/@@BUILDINFO@@/$buildinfo/" $HOME/rpm/SPECS/calpont.spec
 
 echo done.
 
+arch=$(uname -m)
+target=
+if [ x$arch = xi686 ]; then
+	target="--target i686"
+elif [ x$arch = xx86_64 ]; then
+	egrep -qs Opteron /proc/cpuinfo
+	if [ $? -eq 0 ]; then
+		target="--target opteron"
+	else
+		:
+	fi
+else
+	:
+fi
 if [ -d /usr/local/gcc45/lib64 ]; then
 	cp /usr/local/gcc45/lib64/libgcc_s.so.1 $buildroot/Calpont/lib
 	cp /usr/local/gcc45/lib64/libstdc++.so.6.0.14 $buildroot/Calpont/lib
 	cp /usr/local/gdb71/bin/gdb $buildroot/Calpont/bin
 fi
-
 echo -n "Building rpms..."
-rpmbuild -ba $HOME/rpm/SPECS/infinidb.spec >/tmp/rpmbuild.out.$$ 2>&1
+rpmbuild $target -ba $HOME/rpm/SPECS/calpont.spec >/tmp/rpmbuild.out.$$ 2>&1
 rc=$?
 echo done.
-if [ $verbose -gt 0 -o $rc -ne 0 ]; then
+if [ $vflg -gt 0 -o $rc -ne 0 ]; then
 	cat /tmp/rpmbuild.out.$$
 fi
 
-grep Wrote: /tmp/rpmbuild.out.$$
+if [ $gflg -eq 0 ]; then
+	rm -f $HOME/rpm/RPMS/x86_64/calpont-datdup-*.x86_64.rpm
+fi
 
 rm -f /tmp/*.$$
 

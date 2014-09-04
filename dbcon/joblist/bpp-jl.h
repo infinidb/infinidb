@@ -16,10 +16,10 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: bpp-jl.h 9655 2013-06-25 23:08:13Z xlou $
+// $Id: bpp-jl.h 8436 2012-04-04 18:18:21Z rdempsey $
 // C++ Interface: bpp
 //
-// Description:
+// Description: 
 //
 //
 // Author: Patrick LeBlanc <pleblanc@calpont.com>, (C) 2008
@@ -42,5 +42,3 @@
 #include "passthrucommand-jl.h"
 #include "rtscommand-jl.h"
 #include "filtercommand-jl.h"
-#include "pseudocc-jl.h"
-

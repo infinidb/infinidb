@@ -70,10 +70,10 @@ void testDctnryInsertLarge() {
        int                     largeSize=2724;
        int                     smallSize=2032;
        
-       uint16_t freeSpace;
-       uint64_t nextPtr;
-       uint16_t offSet0;
-       uint16_t endHeader;
+       i16 freeSpace;
+       i64 nextPtr;
+       i16 offSet0;
+       i16 endHeader;
        unsigned char dctnryHeader[14];
        m_Dctnry.setUseSmallSize(false);
        m_Dctnry.setDebugLevel( DEBUG_3 );
@@ -248,10 +248,10 @@ void testDctnryInsertDelete() {
        int                     smallSize=1000;
 
        unsigned char dctnryHeader[14];        
-       uint16_t freeSpace;
-       uint64_t nextPtr;
-       uint16_t offSet0;
-       uint16_t endHeader;
+       i16 freeSpace;
+       i64 nextPtr;
+       i16 offSet0;
+       i16 endHeader;
        
        m_Dctnry.setDebugLevel( DEBUG_3 );  
        m_Dctnry.setUseSmallSize(true);
@@ -399,7 +399,7 @@ void testDctnryInsertStress() {
        int                     rc =0;
        DataBlock               curBlock;
        int                     smallSize=1000;       
-       uint16_t                freeSpace;
+       i16                     freeSpace;
        Offset                  hdrOffsets[4039];
        int                     opCount = 0;
 

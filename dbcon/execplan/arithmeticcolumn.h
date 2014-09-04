@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: arithmeticcolumn.h 9679 2013-07-11 22:32:03Z zzhu $
+*   $Id: arithmeticcolumn.h 8436 2012-04-04 18:18:21Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -34,24 +34,24 @@
 /**
  * Namespace
  */
-namespace execplan {
+namespace execplan { 
 	class SimpleColumn;
 	class AggregateColumn;
 
 /**
  * @brief A class to represent a arithmetic expression return column
- *
+ * 
  * This class is a specialization of class ReturnedColumn that
  * handles an arithmetic expression.
  */
 class ArithmeticColumn : public ReturnedColumn {
 public:
 	ArithmeticColumn();
-	ArithmeticColumn( const std::string& sql, const uint32_t sessionID=0 );
-	ArithmeticColumn( const ArithmeticColumn& rhs, const uint32_t sessionID=0 );
+	ArithmeticColumn( const std::string& sql, const u_int32_t sessionID=0 );
+	ArithmeticColumn( const ArithmeticColumn& rhs, const u_int32_t sessionID=0 );
 	virtual ~ArithmeticColumn();
 
-	inline ParseTree* expression() const
+	inline const ParseTree* expression() const
 	{
 	    return fExpression;
 	}
@@ -81,22 +81,22 @@ public:
 	 */
 	void expression (ParseTree*& expression);
 
-	/**
+	/** 
 	 * get asc flag
 	 */
 	inline const bool asc() const { return fAsc; }
 
-	/**
+	/** 
 	 * set asc flag
 	 */
 	inline void asc(const bool asc) { fAsc = asc; }
 
-	/**
+	/** 
 	 * get SQL representation of this object
 	 */
 	virtual const std::string data() const { return fData; }
 
-	/**
+	/** 
 	 * set SQL representation of this object
 	 */
 	virtual void data(const std::string data) { fData = data; }
@@ -141,7 +141,7 @@ public:
 	 * @return false iff every member of t is a duplicate copy of every member of this; true otherwise
 	 */
 	virtual bool operator!=(const TreeNode* t) const;
-
+	 
 	/** @brief Do a deep, strict (as opposed to semantic) equivalence test
 	 *
 	 * Do a deep, strict (as opposed to semantic) equivalence test.
@@ -149,30 +149,13 @@ public:
 	 */
 	bool operator!=(const ArithmeticColumn& t) const;
 
-	virtual bool hasAggregate();
-	virtual bool hasWindowFunc();
-
-	virtual void setDerivedTable();
-	virtual void replaceRealCol(std::vector<SRCP>&);
-	virtual const std::vector<SimpleColumn*>& simpleColumnList() const
-	{ return fSimpleColumnList; }
-	virtual void setSimpleColumnList();
-
-	/**
-	 * Return the table that the column arguments belong to.
-	 * 
-	 * @return tablename, if all arguments belong to one table
-	 *         empty string "", if multiple tables are involved in this func
-	 */
-	virtual bool singleTable(CalpontSystemCatalog::TableAliasName& tan);
-
 private:
 	std::string fTableAlias;   // table alias for this column
 	bool fAsc;                 // asc flag for order by column
 	std::string fData;
 
 	/** build expression tree
-	 *
+	 * 
 	 * this function is called by the constructor. the incomming
 	 * sql string is parsed and tokenized and built into a
 	 * parse tree.
@@ -180,7 +163,7 @@ private:
 	void buildTree();
 
 	/** get next token from expression
-	 *
+	 * 
 	 * this is a util function used by buildTree(). next token string
 	 * is retrived from expression from curPos, until end char.
 	 * return the retrived token. curPos reference is updated to the
@@ -191,30 +174,25 @@ private:
 	/***********************************************************
 	 *                 F&E framework                           *
 	 ***********************************************************/
-public:
-	virtual const std::string& getStrVal(rowgroup::Row& row, bool& isNull)
-	{
-		return fExpression->getStrVal(row, isNull);
+public:	 
+	virtual std::string getStrVal(rowgroup::Row& row, bool& isNull) 
+	{ 
+		return fExpression->getStrVal(row, isNull); 
 	}
 
-	virtual int64_t getIntVal(rowgroup::Row& row, bool& isNull)
-	{
+	virtual int64_t getIntVal(rowgroup::Row& row, bool& isNull) 
+	{ 
 		return fExpression->getIntVal(row, isNull);
 	}
-
-    virtual uint64_t getUintVal(rowgroup::Row& row, bool& isNull)
-    {
-        return fExpression->getUintVal(row, isNull);
-    }
 
 	virtual float getFloatVal(rowgroup::Row& row, bool& isNull)
 	{
 		return fExpression->getFloatVal(row, isNull);
 	}
 
-	virtual double getDoubleVal(rowgroup::Row& row, bool& isNull)
+	virtual double getDoubleVal(rowgroup::Row& row, bool& isNull) 
 	{
-		return fExpression->getDoubleVal(row, isNull);
+		return fExpression->getDoubleVal(row, isNull); 
 	}
 
 	virtual IDB_Decimal getDecimalVal(rowgroup::Row& row, bool& isNull)
@@ -248,6 +226,6 @@ private:
 */
 std::ostream& operator<<(std::ostream& output, const ArithmeticColumn& rhs);
 
-}
+} 
 #endif //ARITHMETICCOLUMN_H
 

@@ -208,7 +208,7 @@ namespace boost {
 
             // array traits ( no partial specialization )
             /*
-                without partial specialization we are able to
+                without parial specialization we are able to
                 provide support only for a limited number of
                 types. Currently the primitive numeric types 
                 are supported
@@ -324,14 +324,14 @@ namespace boost {
 
 #endif // BOOST_NO_TEMPLATE_PARTIAL_SPECIALIZATION
             
-            // array length resolving
+            // array lenght resolving
             /*
                 Lenght of string contained in a static array could
                 be different from the size of the array.
-                For string processing we need the length without
+                For string processing we need the lenght without
                 terminating 0.
 
-                Therefore, the length is calculated for char and wchar_t
+                Therefore, the lenght is calulated for char and wchar_t
                 using char_traits, rather then simply returning
                 the array size.
             */

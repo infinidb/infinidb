@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: serialize.cpp 9210 2013-01-21 14:10:42Z rdempsey $
+*   $Id: serialize.cpp 8926 2012-09-25 21:56:32Z zzhu $
 *
 *
 ***********************************************************************/
@@ -489,7 +489,7 @@ int MarkPartitionStatement::unserialize(ByteStream& bytestream)
 	uint32_t size = 0;
 	bytestream >> size;
 	BRM::LogicalPartition part;
-	for (uint32_t i = 0; i < size; i++)
+	for (uint i = 0; i < size; i++)
 	{
 		part.unserialize(bytestream);
 		fPartitions.insert(part);
@@ -550,7 +550,7 @@ int DropPartitionStatement::unserialize(ByteStream& bytestream)
 	uint32_t size = 0;
 	bytestream >> size;
 	BRM::LogicalPartition part;
-	for (uint32_t i = 0; i < size; i++)
+	for (uint i = 0; i < size; i++)
 	{
 		part.unserialize(bytestream);
 		fPartitions.insert(part);
@@ -609,7 +609,7 @@ int RestorePartitionStatement::unserialize(ByteStream& bytestream)
 	uint32_t size = 0;
 	bytestream >> size;
 	BRM::LogicalPartition part;
-	for (uint32_t i = 0; i < size; i++)
+	for (uint i = 0; i < size; i++)
 	{
 		part.unserialize(bytestream);
 		fPartitions.insert(part);

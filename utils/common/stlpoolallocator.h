@@ -59,7 +59,7 @@ class STLPoolAllocator
 
 		STLPoolAllocator() throw();
 		STLPoolAllocator(const STLPoolAllocator &) throw();
-		STLPoolAllocator(uint32_t capacity) throw();
+		STLPoolAllocator(uint capacity) throw();
 		template<class U> STLPoolAllocator(const STLPoolAllocator<U> &) throw();
 		~STLPoolAllocator();
 
@@ -76,7 +76,7 @@ class STLPoolAllocator
 		void construct(pointer p, const T& val);
 		void destroy(pointer p);
 
-		static const uint32_t DEFAULT_SIZE = 4096*sizeof(T);
+		static const uint DEFAULT_SIZE = 4096*sizeof(T);
 
 		boost::shared_ptr<utils::PoolAllocator> pa;
 };
@@ -94,7 +94,7 @@ STLPoolAllocator<T>::STLPoolAllocator(const STLPoolAllocator<T> &s) throw()
 }
 
 template<class T>
-STLPoolAllocator<T>::STLPoolAllocator(uint32_t capacity) throw()
+STLPoolAllocator<T>::STLPoolAllocator(uint capacity) throw()
 {
 	pa.reset(new PoolAllocator(capacity));
 }
@@ -140,7 +140,7 @@ void STLPoolAllocator<T>::deallocate(typename STLPoolAllocator<T>::pointer p,
 template<class T>
 typename STLPoolAllocator<T>::size_type STLPoolAllocator<T>::max_size() const throw()
 {
-	return std::numeric_limits<uint64_t>::max()/sizeof(T);
+	return std::numeric_limits<uint>::max()/sizeof(T);
 }
 
 template<class T>

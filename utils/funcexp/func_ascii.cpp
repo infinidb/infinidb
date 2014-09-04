@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_ascii.cpp 3923 2013-06-19 21:43:06Z bwilkinson $
+* $Id: func_ascii.cpp 3048 2012-04-04 15:33:45Z rdempsey $
 *
 *
 ****************************************************************************/
@@ -48,7 +48,7 @@ int64_t Func_ascii::getIntVal(rowgroup::Row& row,
 						bool& isNull,
 						CalpontSystemCatalog::ColType& op_ct)
 {
-	const string& str = parm[0]->data()->getStrVal(row, isNull);
+	string str = parm[0]->data()->getStrVal(row, isNull);
 	if (str.empty())
 		return 0;
 	return (unsigned char)str[0];

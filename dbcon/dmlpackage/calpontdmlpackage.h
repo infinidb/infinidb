@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: calpontdmlpackage.h 9210 2013-01-21 14:10:42Z rdempsey $
+ *   $Id: calpontdmlpackage.h 8817 2012-08-15 18:52:12Z dhall $
  *
  *
  ***********************************************************************/
@@ -25,8 +25,6 @@
 #ifndef CALPONTDMLPACKAGE_H
 #define CALPONTDMLPACKAGE_H
 #include <string>
-#include <boost/uuid/uuid.hpp>
-
 #include "bytestream.h"
 #include "dmlpackage.h"
 #include "dmltable.h"
@@ -86,152 +84,160 @@ namespace dmlpackage
              * @param sqlStatement the parsed SqlStatement
              */
             virtual int buildFromSqlStatement( SqlStatement& sqlStatement ) = 0;
-
-            /** @brief build a CalpontDMLPackage from valuelist built from mysql table fields
+			
+			/** @brief build a CalpontDMLPackage from valuelist built from mysql table fields
              *
              * @param tableValuesMap  the value list for each column in the table
-             * @param colNameList the column name for each column
-             * @param columns number of columns in the table
-             * @param rows  number of rows to be touched
+			 * @param colNameList the column name for each column
+			 * @param columns number of columns in the table
+			 * @param rows  number of rows to be touched
              */
-            virtual int buildFromMysqlBuffer(ColNameList& colNameList, TableValuesMap& tableValuesMap, int columns, int rows) = 0;
+			virtual int buildFromMysqlBuffer(ColNameList& colNameList, TableValuesMap& tableValuesMap, int columns, int rows) = 0;
 
             /** @brief get the table object
              */
-             DMLTable* get_Table() { return fTable; }
+            inline  DMLTable* get_Table() { return fTable; }
 
             /** @brief set the DML statement (the parsed statement)
              *
              * @param statement the dml statement to set
              */
-            void set_DMLStatement( const std::string& statement ) { fDMLStatement = statement; }
+            inline void set_DMLStatement( const std::string& statement )
+                { fDMLStatement = statement; }
 
             /** @brief get the DML statement (the parsed statement)
              */
-            const std::string get_DMLStatement() const { return fDMLStatement; }
+            inline const std::string get_DMLStatement() const { return fDMLStatement; }
 
             /** @brief set the SQL statement (the original SQL statement)
              *
              * @param statement the SQL statement to set (the original SQL statement with quotes)
              */
-            void set_SQLStatement( const std::string& statement ) { fSQLStatement = statement; }
+            inline void set_SQLStatement( const std::string& statement )
+                { fSQLStatement = statement; }
 
             /** @brief get the SQL statement (the original SQL statement)
              */
-            const std::string get_SQLStatement() const { return fSQLStatement; }
-
-            /** @brief get the logging flag
-             */
-            const bool get_Logging() const { return fLogging; }
-
-            /** @brief set the logging flag
+            inline const std::string get_SQLStatement() const { return fSQLStatement; }
+			
+            /** @brief get the logging flag 
+             */			
+			inline const bool get_Logging() const { return fLogging; }
+			
+			/** @brief set the logging flag 
              *
              * @param logging the logging flag to set
              */
-            void set_Logging( bool logging ) { fLogging = logging; }
-
-            /** @brief get the logending flag
-             */
-            const bool get_Logending() const { return fLogending; }
-
-            /** @brief set the logending flag
+			inline void set_Logging( bool logging )
+			{
+				fLogging = logging;
+			}
+			
+			/** @brief get the logending flag 
+             */			
+			inline const bool get_Logending() const { return fLogending; }
+			
+			/** @brief set the logending flag 
              *
              * @param logending the logending flag to set
              */
-            void set_Logending( bool logending ) { fLogending = logending; }
-
-             /** @brief get the isFromCol flag
-             */
-            const bool get_IsFromCol() const { return fIsFromCol; }
-
-            /** @brief set the update column from column flag
+			inline void set_Logending( bool logending )
+			{
+				fLogending = logending;
+			}
+			
+			 /** @brief get the isFromCol flag 
+             */			
+			inline const bool get_IsFromCol() const { return fIsFromCol; }
+			
+			/** @brief set the update column from column flag 
              *
              * @param logging the logging flag to set
              */
-            void set_IsFromCol ( bool isFromCol ) { fIsFromCol = isFromCol; }
+			inline void set_IsFromCol ( bool isFromCol )
+			{
+				fIsFromCol = isFromCol;
+			}
             /** @brief set the Table name
              *
              * @param tableName the name to set
              */
-            void set_TableName( std::string& tableName )
-            {
-                fTableName = tableName;
-                if(fTable != 0)
-                fTable->set_TableName(tableName);
-            }
+            inline void set_TableName( std::string& tableName )
+                { 
+		    fTableName = tableName; 
+		    if(fTable != 0) 
+			fTable->set_TableName(tableName); 
+		}
 
             /** @brief get the Table name
              */
-            const std::string get_TableName() const { return fTableName; }
+            inline const std::string get_TableName() const { return fTableName; }
 
             /** @brief set the Schema name
              *
              * @param the schema to set
              */
-            void set_SchemaName( std::string& schemaName )
-            {
-                fSchemaName = schemaName;
-                if(fTable != 0)
-                fTable->set_SchemaName(schemaName);
-            }
+            inline void set_SchemaName( std::string& schemaName )
+                { 
+		    fSchemaName = schemaName;
+		if(fTable != 0) 
+		    fTable->set_SchemaName(schemaName); 
+		}
 
             /** @brief get the Schema name
              */
-            const std::string get_SchemaName() const { return fSchemaName; }
+            inline const std::string get_SchemaName() const { return fSchemaName; }
 
             /** @brief does this dml statement have a filter
              */
-            bool HasFilter() const { return fHasFilter; }
-            void HasFilter( bool hasFilter) { fHasFilter = hasFilter; }
+            inline bool HasFilter() const { return fHasFilter; }
+            inline void HasFilter( bool hasFilter) { fHasFilter = hasFilter; }
 
             /** @brief get the filter  statement
              */
-            const std::string get_QueryString() const { return fQueryString; }
+            inline const std::string get_QueryString() const { return fQueryString; }
 
             /** @brief set the sessionID associated with this package
              */
-            void set_SessionID( int sessionID ) { fSessionID = sessionID; }
+            inline void set_SessionID( int sessionID ) { fSessionID = sessionID; }
 
             /** @brief get the sessionID associated with this package
              */
-            int get_SessionID() const { return fSessionID; }
-
-            /** @brief set the transaction ID associated with this package
+            inline int get_SessionID() const { return fSessionID; }
+	    
+			/** @brief set the transaction ID associated with this package
              */
-            void set_TxnID( execplan::CalpontSystemCatalog::SCN txnID ) { fTxnId = txnID; }
+            inline void set_TxnID( execplan::CalpontSystemCatalog::SCN txnID ) { fTxnId = txnID; }
 
             /** @brief get the transaction ID associated with this package
              */
-            execplan::CalpontSystemCatalog::SCN get_TxnID() const { return fTxnId; }
-            /** @brief set the chunkmanager associated with this package
+            inline execplan::CalpontSystemCatalog::SCN get_TxnID() const { return fTxnId; }
+			/** @brief set the chunkmanager associated with this package
              */
-            void set_ChunkManager( WriteEngine::ChunkManager* cm ) { fCM = cm; }
+            inline void set_ChunkManager( WriteEngine::ChunkManager* cm ) { fCM = cm; }
 
             /** @brief get the chunkmanager associated with this package
              */
-            WriteEngine::ChunkManager* get_ChunkManager() const { return fCM; }
+            inline WriteEngine::ChunkManager* get_ChunkManager() const { return fCM; }
+	    /** @brief get the ExecutionPlan associated with this package
+	     */
+	    inline boost::shared_ptr<messageqcpp::ByteStream> get_ExecutionPlan()
+	    { 
+			return fPlan;
+	    }
+	    
+    inline bool get_isInsertSelect() { return fIsInsertSelect; }
+    inline void set_isInsertSelect( const bool isInsertSelect ) { fIsInsertSelect = isInsertSelect; }
 
-            /** @brief get the ExecutionPlan associated with this package
-             */
-            boost::shared_ptr<messageqcpp::ByteStream> get_ExecutionPlan()
-            {
-                return fPlan;
-            }
+	inline bool get_isBatchInsert() { return fIsBatchInsert; }
+    inline void set_isBatchInsert( const bool isBatchInsert ) { fIsBatchInsert = isBatchInsert; }
+	
+	inline bool get_isAutocommitOn() { return fIsAutocommitOn; }
+    inline void set_isAutocommitOn( const bool isAutocommitOn ) { fIsAutocommitOn = isAutocommitOn; }
 
-            bool get_isInsertSelect() { return fIsInsertSelect; }
-            void set_isInsertSelect( const bool isInsertSelect ) { fIsInsertSelect = isInsertSelect; }
-
-            bool get_isBatchInsert() { return fIsBatchInsert; }
-            void set_isBatchInsert( const bool isBatchInsert ) { fIsBatchInsert = isBatchInsert; }
-
-            bool get_isAutocommitOn() { return fIsAutocommitOn; }
-            void set_isAutocommitOn( const bool isAutocommitOn ) { fIsAutocommitOn = isAutocommitOn; }
-            uint32_t getTableOid() { return fTableOid; }
-            void setTableOid( const uint32_t tableOid ) { fTableOid = tableOid; }
-
-            void uuid(const boost::uuids::uuid& uuid) { fUuid = uuid; }
-            const boost::uuids::uuid& uuid() const    { return fUuid; }
-
+	inline uint32_t getTableOid() { return fTableOid; }
+    inline void setTableOid( const uint32_t tableOid ) { fTableOid = tableOid; }
+	
         protected:
 
             void initializeTable();
@@ -242,20 +248,19 @@ namespace dmlpackage
             std::string fSQLStatement;
             std::string fQueryString;
             int fSessionID;
-            boost::uuids::uuid fUuid;
-            execplan::CalpontSystemCatalog::SCN        fTxnId;
-            boost::shared_ptr<messageqcpp::ByteStream> fPlan;
+			execplan::CalpontSystemCatalog::SCN		fTxnId;
+	    	boost::shared_ptr<messageqcpp::ByteStream> fPlan;
             DMLTable    *fTable;
             bool fHasFilter;
-            bool fLogging;
-            bool fLogending;
-            bool fIsFromCol;
+			bool fLogging;
+			bool fLogending;
+			bool fIsFromCol;
             std::string StripLeadingWhitespace( std::string value );
-            bool fIsInsertSelect;
-            bool fIsBatchInsert;
-            bool fIsAutocommitOn;
-            uint32_t fTableOid;
-            WriteEngine::ChunkManager* fCM;
+      bool fIsInsertSelect;
+	  bool fIsBatchInsert;
+	  bool fIsAutocommitOn;
+	  uint32_t fTableOid;
+	  WriteEngine::ChunkManager* fCM;
     };
 }
 #endif                                            //CALPONTDMLPACKAGE_H

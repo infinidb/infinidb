@@ -44,7 +44,7 @@ public:
 	EXPORT uint64_t lock(TableLockInfo *);
 	EXPORT bool unlock(uint64_t id);
 	EXPORT bool changeState(uint64_t id, LockState state);
-	EXPORT bool changeOwner(uint64_t id, const std::string &ownerName, uint32_t pid, int32_t sessionID,
+	EXPORT bool changeOwner(uint64_t id, const std::string &ownerName, uint pid, int32_t sessionID,
 			int32_t txnID);
 	EXPORT std::vector<TableLockInfo> getAllLocks() const;
 	EXPORT void releaseAllLocks();

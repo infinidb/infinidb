@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: we_colbufcompressed.h 4726 2013-08-07 03:38:36Z bwilkinson $
+ * $Id: we_colbufcompressed.h 3720 2012-04-04 18:18:49Z rdempsey $
  *
  *****************************************************************************/
 
@@ -75,7 +75,7 @@ class ColumnBufferCompressed : public ColumnBuffer {
      * @param startHwm Starting HWM for cFile
      * @param hdrs     Headers with ptr information.
      */
-    virtual int setDbFile(IDBDataFile * const cFile, HWM startHwm, const char* hdrs);
+    virtual int setDbFile(FILE * const cFile, HWM startHwm, const char* hdrs);
 
     /** @brief Write data to FILE
      *

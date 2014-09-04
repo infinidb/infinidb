@@ -344,10 +344,7 @@ struct recursion_info
 
 #ifdef BOOST_MSVC
 #pragma warning(push)
-#pragma warning(disable : 4251 4231)
-#  if BOOST_MSVC < 1600
-#     pragma warning(disable : 4660)
-#  endif
+#pragma warning(disable : 4251 4231 4660)
 #endif
 
 template <class BidiIterator, class Allocator, class traits>

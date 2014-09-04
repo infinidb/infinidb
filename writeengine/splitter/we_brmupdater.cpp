@@ -1,19 +1,34 @@
-/* Copyright (C) 2014 InfiniDB, Inc.
+/*
 
-   This program is free software; you can redistribute it and/or
-   modify it under the terms of the GNU General Public License
-   as published by the Free Software Foundation; version 2 of
-   the License.
+   Copyright (C) 2009-2012 Calpont Corporation.
 
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   Use of and access to the Calpont InfiniDB Community software is subject to the
+   terms and conditions of the Calpont Open Source License Agreement. Use of and
+   access to the Calpont InfiniDB Enterprise software is subject to the terms and
+   conditions of the Calpont End User License Agreement.
 
-   You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-   MA 02110-1301, USA. */
+   This program is distributed in the hope that it will be useful, and unless
+   otherwise noted on your license agreement, WITHOUT ANY WARRANTY; without even
+   the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+   Please refer to the Calpont Open Source License Agreement and the Calpont End
+   User License Agreement for more details.
+
+   You should have received a copy of either the Calpont Open Source License
+   Agreement or the Calpont End User License Agreement along with this program; if
+   not, it is your responsibility to review the terms and conditions of the proper
+   Calpont license agreement by visiting http://www.calpont.com for the Calpont
+   InfiniDB Enterprise End User License Agreement or http://www.infinidb.org for
+   the Calpont InfiniDB Community Calpont Open Source License Agreement.
+
+   Calpont may make changes to these license agreements from time to time. When
+   these changes are made, Calpont will make a new copy of the Calpont End User
+   License Agreement available at http://www.calpont.com and a new copy of the
+   Calpont Open Source License Agreement available at http:///www.infinidb.org.
+   You understand and agree that if you use the Program after the date on which
+   the license agreement authorizing your use has changed, Calpont will treat your
+   use as acceptance of the updated License.
+
+*/
 
 /*******************************************************************************
 * $Id$
@@ -271,7 +286,7 @@ bool WEBrmUpdater::prepareCasualPartitionInfo()
 {
 	//cout << "Started prepareCasualPartitionInfo()!!" << endl;
 	//CP: 275456 6000000 4776193 -1 0 1
-    WESDHandler::StrVec::iterator aIt = fRef.fBrmRptVec.begin();
+	WESDHandler::StrVec::iterator aIt = fRef.fBrmRptVec.begin();
 	while (aIt != fRef.fBrmRptVec.end())
 	{
 		std::string aEntry = *aIt;
@@ -328,11 +343,11 @@ bool WEBrmUpdater::prepareCasualPartitionInfo()
 
 			pTok = strtok(NULL, " ");
 			if (pTok)
-				cpInfoMerge.type = (execplan::CalpontSystemCatalog::ColDataType)atoi(pTok);
+				cpInfoMerge.isChar = (atoi(pTok) != 0);
 			else
 			{
 				//cout << "CP Entry : " << aEntry << endl;
-				throw(runtime_error("Bad type in CP entry string"));
+				throw(runtime_error("Bad isChar in CP entry string"));
 			}
 
 			pTok = strtok(NULL, " ");
@@ -433,7 +448,7 @@ bool WEBrmUpdater::prepareHighWaterMarkInfo()
 //#ROWS: numRowsRead numRowsInserted
 
 bool WEBrmUpdater::prepareRowsInsertedInfo(std::string Entry,
-													int64_t& TotRows, int64_t& InsRows)
+													int& TotRows, int& InsRows)
 {
 	bool aFound=false;
 	//ROWS: 3 1
@@ -454,7 +469,7 @@ bool WEBrmUpdater::prepareRowsInsertedInfo(std::string Entry,
 
 		pTok = strtok(NULL, " ");
 		if (pTok)
-			TotRows = strtol(pTok, NULL, 10);
+			TotRows = atoi(pTok);
 		else {
 			//cout << "HWM Entry : " << aEntry << endl;
 			throw(runtime_error("Bad Tot ROWS entry string"));
@@ -462,7 +477,7 @@ bool WEBrmUpdater::prepareRowsInsertedInfo(std::string Entry,
 
 		pTok = strtok(NULL, " ");
 		if (pTok)
-			InsRows = strtol(pTok, NULL, 10);
+			InsRows = atoi(pTok);
 		else {
 			//cout << "HWM Entry : " << aEntry << endl;
 			throw(runtime_error("Bad inserted ROWS in entry string"));
@@ -479,13 +494,11 @@ bool WEBrmUpdater::prepareRowsInsertedInfo(std::string Entry,
 
 bool WEBrmUpdater::prepareColumnOutOfRangeInfo(std::string Entry,
 											   int& ColNum, 
-											   CalpontSystemCatalog::ColDataType& ColType, 
+											   ColDataType& ColType, 
 											   std::string& ColName, 
 											   int& OorValues)
 {
 	bool aFound=false;
-	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr =
-		CalpontSystemCatalog::makeCalpontSystemCatalog();
 	//DATA: 3 1
 	if ((!Entry.empty()) && (Entry.at(0) == 'D'))
 	{
@@ -516,7 +529,7 @@ bool WEBrmUpdater::prepareColumnOutOfRangeInfo(std::string Entry,
 		pTok = strtok(NULL, " ");
 		if (pTok)
 		{
-			ColType = (CalpontSystemCatalog::ColDataType)atoi(pTok);
+			ColType = (ColDataType)atoi(pTok);
 		}
 		else
 		{
@@ -527,9 +540,7 @@ bool WEBrmUpdater::prepareColumnOutOfRangeInfo(std::string Entry,
 		pTok = strtok(NULL, " ");
 		if (pTok)
 		{
-			uint64_t columnOid = strtol(pTok, NULL, 10);
-			CalpontSystemCatalog::TableColName colname = systemCatalogPtr->colName(columnOid);
-			ColName = colname.schema + "." + colname.table + "." + colname.column;
+			ColName = pTok;
 		}
 		else
 		{

@@ -16,11 +16,13 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_log.cpp 4504 2013-02-02 00:07:43Z bpaul $
+* $Id: we_log.cpp 4506 2013-02-02 00:11:15Z bpaul $
 *
 *******************************************************************************/
 
+#define WELOG_DLLEXPORT
 #include "we_log.h"
+#undef WELOG_DLLEXPORT
 
 #include "messageids.h"
 #include "we_define.h"

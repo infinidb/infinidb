@@ -28,7 +28,6 @@ using namespace std;
 #include "functor_dtm.h"
 #include "funchelpers.h"
 #include "functioncolumn.h"
-#include "intervalcolumn.h"
 #include "rowgroup.h"
 using namespace execplan;
 
@@ -66,8 +65,8 @@ uint64_t makedate(rowgroup::Row& row,
 		case CalpontSystemCatalog::DECIMAL:
 		{
 			IDB_Decimal d = parm[0]->data()->getDecimalVal(row, isNull);
-			year = d.value / helpers::power(d.scale);
-			int lefto = (d.value - year * helpers::power(d.scale)) / helpers::power(d.scale-1);
+			year = d.value / power(d.scale);
+			int lefto = (d.value - year * power(d.scale)) / power(d.scale-1);
 			if ( year >= 0 && lefto > 4 )
 				year++;
 			if ( year < 0 && lefto < -4 )
@@ -110,8 +109,8 @@ uint64_t makedate(rowgroup::Row& row,
 		case CalpontSystemCatalog::DECIMAL:
 		{
 			IDB_Decimal d = parm[1]->data()->getDecimalVal(row, isNull);
-			int64_t tmp = d.value / helpers::power(d.scale);
-			int lefto = (d.value - tmp * helpers::power(d.scale)) / helpers::power(d.scale-1);
+			int64_t tmp = d.value / power(d.scale);
+			int lefto = (d.value - tmp * power(d.scale)) / power(d.scale-1);
 			if ( tmp >= 0 && lefto > 4 )
 				tmp++;
 			if ( tmp < 0 && lefto < -4 )
@@ -123,7 +122,9 @@ uint64_t makedate(rowgroup::Row& row,
 				return 0;
 			}
 
-            dayofyear = helpers::intToString(tmp);
+			ostringstream oss;
+			oss << tmp;
+			dayofyear = oss.str();
 			break;
 		}
 		default:
@@ -131,15 +132,13 @@ uint64_t makedate(rowgroup::Row& row,
 			return 0;
 	}
 
-    // convert the year to a date in our internal format, then subtract
-    // one since we are about to add the day of year back in
-    Date d(year,1,1);
-    //@Bug 5232. spare bit is set, cannot use regular substraction
-    d.day -= 1;
-    //uint64_t intDate = ((*(reinterpret_cast<uint32_t *> (&d))) & 0xFFFFFFC) - 1;
-    uint64_t intDate = *(reinterpret_cast<uint32_t *> (&d));
+	//convert year into date-format
+	ostringstream oss;
+	oss << year << "-01-01";
 
-	uint64_t value = helpers::dateAdd( intDate, dayofyear, IntervalColumn::INTERVAL_DAY, true, OP_ADD );
+	uint64_t intDate = dataconvert::DataConvert::stringToDate(oss.str()) - 1;
+
+	uint64_t value = dateAdd( intDate, dayofyear, "DAY", true, "add" );
 
 	if ( value == 0 ) {
 		isNull = true;

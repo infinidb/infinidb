@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: objectidmanager.h 9744 2013-08-07 03:32:19Z bwilkinson $
+ * $Id: objectidmanager.h 8436 2012-04-04 18:18:21Z rdempsey $
  *
  *****************************************************************************/
 
@@ -67,10 +67,10 @@ public:
 	 *
 	 * @return Returns -1 on all errors.
 	 */
-	int allocVBOID(uint32_t dbroot);
+	int allocVBOID(uint dbroot);
 
 	/** @brief Returns the DBRoot of the given version buffer OID, or -1 on error. */
-	int getDBRootOfVBOID(uint32_t vboid);
+	int getDBRootOfVBOID(uint vboid);
 
 	/** @brief Returns the VB OID -> DB Root mapping.  ret[0] = dbroot of VB OID 0
 	 *
@@ -130,7 +130,7 @@ private:
 	 * @param offset the offset to start reading at
 	 * @param size the number of bytes to read into buf
 	 */
-	void readData(uint8_t* buf, off64_t offset, int size) const;
+	void readData(uint8_t* buf, off_t offset, int size) const;
 
 	/** @brief Reliably writes data to the bitmap file
 	 *
@@ -141,7 +141,7 @@ private:
 	 * @param offset the offset to start writing at
 	 * @param size the number of bytes to write
 	 */
-	void writeData(uint8_t* buf, off64_t offset, int size) const;
+	void writeData(uint8_t* buf, off_t offset, int size) const;
 
 	/** @brief If there is no bitmap file yet, this is used to make one
 	 * 

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************************
-* $Id: messagelog.cpp 3658 2013-03-22 20:26:02Z chao $
+* $Id: messagelog.cpp 3048 2012-04-04 15:33:45Z rdempsey $
 *
 ******************************************************************************************/
 #include <sstream>
@@ -45,31 +45,31 @@ using namespace logging;
  * This list matches SubsystemIDs.txt, but has names matching Process Config DB
  */
 const vector<string> SubsystemID = ba::list_of
-	("Calpont")		    // id =  0 default
+	("Calpont")		// id =  0 default
 	("ddljoblist")		// id =  1
 	("ddlpackage")		// id =  2
 	("dmlpackage")		// id =  3
 	("execplan")		// id =  4
-	("joblist")		    // id =  5
+	("joblist")		// id =  5
 	("resultset")		// id =  6
 	("calpontConsole")	// id =  7
-	("oamcpp")		    // id =  8
+	("oamcpp")		// id =  8
 	("ServerMonitor")	// id =  9
 	("traphandler")		// id = 10
 	("snmpmanager")		// id = 11
 	("configcpp")		// id = 12
 	("loggingcpp")		// id = 13
 	("messageqcpp")		// id = 14
-	("DDLProc")		    // id = 15
-	("ExeMgr")		    // id = 16
+	("DDLProc")		// id = 15
+	("ExeMgr")		// id = 16
 	("ProcessManager")	// id = 17
 	("ProcessMonitor")	// id = 18
 	("writeengine")		// id = 19
-	("DMLProc")		    // id = 20
+	("DMLProc")		// id = 20
 	("dmlpackageproc")	// id = 21
 	("threadpool")		// id = 22
 	("ddlpackageproc")	// id = 23
-	("dbcon")		    // id = 24
+	("dbcon")		// id = 24
 	("DiskManager")		// id = 25
 	("RouteMsg")		// id = 26
 	("SQLBuffMgr")		// id = 27
@@ -79,8 +79,6 @@ const vector<string> SubsystemID = ba::list_of
 	("messagequeue")	// id = 31
 	("writeengineserver")//id = 32
 	("writeenginesplit")// id = 33
-	("cpimport.bin")    // id = 34
-	("IDBFile")         // id = 35
 	;
 
 string timestr()
@@ -204,11 +202,10 @@ void MessageLog::logCriticalMessage(const Message& msg)
 	::syslog(LOG_CRIT, format(msg, 'C').c_str());
 	::closelog();
 }
-//Bug 5218. comment out the following functions to alleviate issue where dml messages show up in crit.log. This
-// will turn off data_mods.log. 
+
 void logDML(unsigned sessionId, unsigned txnId, const string& statement, const string& owner) 
 { 
-/*	logging::Message::Args args;
+	logging::Message::Args args;
 
 	unsigned subsystemId = 20; // DMLProc
 	unsigned threadId = 0; // 0 for now
@@ -218,12 +215,11 @@ void logDML(unsigned sessionId, unsigned txnId, const string& statement, const s
 	logging::Message m(M0017);
 	args.add("|" + owner + "|" + statement);
 	m.format(args);
-	messageLog.logCriticalMessage(m); */
+	messageLog.logCriticalMessage(m);
 } 
 
 void logDDL(unsigned sessionId, unsigned txnId, const string& statement, const string& owner) 
 {
-/*
 	logging::Message::Args args;
 
 	unsigned subsystemId = 15; // DDLProc
@@ -234,11 +230,11 @@ void logDDL(unsigned sessionId, unsigned txnId, const string& statement, const s
 	logging::Message m(M0018);
 	args.add("|" + owner + "|" + statement);
 	m.format(args);
-	messageLog.logCriticalMessage(m); */
+	messageLog.logCriticalMessage(m);
 }
 
 void logCommand(unsigned sessionId, unsigned txnId, const string& statement) {
-/*	logging::Message::Args args;
+	logging::Message::Args args;
 
 	unsigned subsystemId = 20; // DMLProc
 	unsigned threadId = 0; // 0 for now
@@ -248,11 +244,11 @@ void logCommand(unsigned sessionId, unsigned txnId, const string& statement) {
 	logging::Message m(M0019);
 	args.add("|" + statement);
 	m.format(args);
-	messageLog.logCriticalMessage(m); */
+	messageLog.logCriticalMessage(m);
 }
 
 void logEventToDataLog(unsigned messageId, const string& messageText) {
-/*	logging::Message::Args args;
+	logging::Message::Args args;
 
 	unsigned subsystemId = 20; // DMLProc
 	unsigned threadId = 0; // 0 for now
@@ -262,7 +258,7 @@ void logEventToDataLog(unsigned messageId, const string& messageText) {
 	logging::Message m(messageId);
 	args.add(messageText);
 	m.format(args);
-	messageLog.logCriticalMessage(m); */
+	messageLog.logCriticalMessage(m);
 }
 
 } //namespace logging

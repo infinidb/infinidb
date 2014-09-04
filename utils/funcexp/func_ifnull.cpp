@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_ifnull.cpp 3923 2013-06-19 21:43:06Z bwilkinson $
+* $Id: func_ifnull.cpp 3048 2012-04-04 15:33:45Z rdempsey $
 *
 *
 ****************************************************************************/
@@ -77,7 +77,7 @@ string Func_ifnull::getStrVal(Row& row,
 	if (isNull)
 		return string();
 
-	const string& r = parm[0]->data()->getStrVal(row, isNull);
+	string r = parm[0]->data()->getStrVal(row, isNull);
 	if (isNull)
 	{
 		isNull = false;

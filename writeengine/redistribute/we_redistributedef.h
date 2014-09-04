@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
-* $Id: we_redistributedef.h 4450 2013-01-21 14:13:24Z rdempsey $
+* $Id: we_redistributedef.h 4299 2012-11-02 06:00:33Z xlou $
 */
 
 #ifndef WE_REDISTRIBUTEDEF_H
@@ -26,9 +26,6 @@
 
 namespace redistribute
 {
-
-// version number for parsing the info and plan files
-const uint32_t RED_VERSION_NUM   = 1;
 
 // state values
 const uint32_t RED_STATE_UNDEF   = 0;  // indication of failed to retrieve redistribute status.
@@ -115,10 +112,6 @@ const uint32_t RED_DATA_COMMIT  = 55;
 const uint32_t RED_DATA_ABORT   = 56;
 const uint32_t RED_DATA_ACK     = 57;
 
-// options for start message
-const uint32_t RED_OPTN_REMOVE  = 0x00000001;
-
-
 
 // file transfer chunk size
 const size_t CHUNK_SIZE = 1024 * 1024;
@@ -186,7 +179,6 @@ struct RedistributePlanEntry
 // RedistributeInfo
 struct RedistributeInfo
 {
-	uint64_t version;
 	uint64_t state;
 	uint64_t planned;
 	uint64_t success;
@@ -196,8 +188,7 @@ struct RedistributeInfo
 	time_t   endTime;
 
 	RedistributeInfo() :
-		version(RED_VERSION_NUM), state(RED_STATE_UNDEF),
-		planned(0), success(0), skipped(0), failed(0),
+		state(RED_STATE_UNDEF), planned(0), success(0), skipped(0), failed(0),
 		startTime(0), endTime(0) {}
 };
 

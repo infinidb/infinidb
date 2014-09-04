@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
-* $Id: we_redistributecontrol.h 4450 2013-01-21 14:13:24Z rdempsey $
+* $Id: we_redistributecontrol.h 4216 2012-09-28 23:08:21Z xlou $
 */
 
 #ifndef WE_REDISTRIBUTECONTROL_H
@@ -96,7 +96,6 @@ class RedistributeControl
 	std::string         fPlanFilePath;
 	std::string         fUIResponse;
 
-	uint32_t            fOptions;
 	std::vector<int>    fSourceList;
 	std::vector<int>    fDestinationList;
 	std::vector<RedistributePlanEntry> fRedistributePlan;

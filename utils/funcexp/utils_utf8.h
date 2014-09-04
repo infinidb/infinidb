@@ -36,20 +36,18 @@
 
 #include <clocale>
 
-#include "snmpmanager.h"
-using namespace snmpmanager;
-
 #include "liboamcpp.h"
 using namespace oam;
 
 
 /** @file */
 
+extern bool cPo;		// code point ordering (Japanese UTF) flag, used in idb_strcoll
+
 namespace funcexp
 {
 namespace utf8
 {
-extern bool JPcodePoint;		// code point ordering (Japanese UTF) flag, used in idb_strcoll
 
 const int MAX_UTF8_BYTES_PER_CHAR=4;
 
@@ -71,45 +69,12 @@ std::string idb_setlocale()
 	{
 		systemLang = "C";
 	}
-	
-	char*pLoc = setlocale(LC_ALL, systemLang.c_str());
-	if(pLoc == NULL)
-	{
-		try
-		{
-			//send alarm
-			SNMPManager alarmMgr;
-			std::string alarmItem = "system";
-			alarmMgr.sendAlarmReport(alarmItem.c_str(), oam::INVALID_LOCALE, SET);
-			printf("Failed to set locale : %s, Critical alarm generated\n", systemLang.c_str());
-		}
-		catch(...)
-		{
-			// Ignoring for time being.
-		}
-	}
-	else
-	{
-		try
-		{
-			//send alarm
-			SNMPManager alarmMgr;
-			std::string alarmItem = "system";
-			alarmMgr.sendAlarmReport(alarmItem.c_str(), oam::INVALID_LOCALE, CLEAR);
-		}
-		catch(...)
-		{
-			// Ignoring for time being.
-		}
-
-	}
-
+	setlocale(LC_ALL, systemLang.c_str());
 	printf ("Locale is : %s\n", systemLang.c_str() );
-
 	//BUG 2991
 	setlocale(LC_NUMERIC, "C");
 	if(systemLang.find("ja_JP") != std::string::npos)
-		JPcodePoint = true;
+		cPo = true;
 	return systemLang;	
 }
 
@@ -119,7 +84,7 @@ std::string idb_setlocale()
 inline
 int idb_strcoll(const char* str1, const char* str2)
 {
-	if (JPcodePoint)
+	if(cPo)
 		return strcmp(str1, str2);
 	else
 		return strcoll(str1, str2);
@@ -135,7 +100,7 @@ size_t idb_mbstowcs(wchar_t* dest, const char* src, size_t max)
 #ifdef _MSC_VER
 	// 4th param (-1) denotes to convert till hit NULL char
 	// if 6th param max = 0, will return the required buffer size
-	size_t strwclen = MultiByteToWideChar(CP_UTF8, 0, src, -1, dest, (int)max);
+	size_t strwclen = MultiByteToWideChar(CP_UTF8, 0, src, -1, dest, max);
 	// decrement the count of NULL; will become -1 on failure
 	return --strwclen;
 
@@ -153,7 +118,7 @@ size_t idb_wcstombs(char* dest, const wchar_t* src, size_t max)
 #ifdef _MSC_VER
 	// 4th param (-1) denotes to convert till hit NULL char
 	//if 6th param max = 0, will return the required buffer size 
-	size_t strmblen = WideCharToMultiByte( CP_UTF8, 0, src, -1, dest, (int)max, NULL, NULL);
+	size_t strmblen = WideCharToMultiByte( CP_UTF8, 0, src, -1, dest, max, NULL, NULL);
 	// decrement the count of NULL; will become -1 on failure
 	return --strmblen;
 #else
@@ -165,7 +130,7 @@ size_t idb_wcstombs(char* dest, const wchar_t* src, size_t max)
 inline
 std::wstring utf8_to_wstring (const std::string& str)
 {
-    int bufsize = (int)((str.length()+1) * sizeof(wchar_t));
+    int bufsize = (str.length()+1) * sizeof(wchar_t);
 
     // Convert to wide characters. Do all further work in wide characters
     wchar_t* wcbuf = (wchar_t*)alloca(bufsize);

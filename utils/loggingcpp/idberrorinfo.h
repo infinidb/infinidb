@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************************
-* $Id: idberrorinfo.h 3626 2013-03-11 15:36:08Z xlou $
+* $Id: idberrorinfo.h 3048 2012-04-04 15:33:45Z rdempsey $
 *
 ******************************************************************************************/
 /**
@@ -25,9 +25,10 @@
 #ifndef LOGGING_IDBERRORINFO_H
 #define LOGGING_IDBERRORINFO_H
 
+#include <iosfwd>
 #include <string>
 #include <map>
-
+#include <boost/any.hpp>
 #include "messageobj.h"
 #include "messagelog.h"
 
@@ -46,8 +47,6 @@ public:
 	static IDBErrorInfo* instance();
 	std::string errorMsg(const unsigned eid, const Message::Args& args);
 	std::string errorMsg(const unsigned eid);
-	std::string errorMsg(const unsigned eid, int i);
-	std::string errorMsg(const unsigned eid, const std::string& s);
 	std::string logError(const logging::LOG_TYPE logLevel,
 		                   const LoggingID logid,
 		                   const unsigned eid,

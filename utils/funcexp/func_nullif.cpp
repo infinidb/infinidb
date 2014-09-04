@@ -70,7 +70,6 @@ int64_t Func_nullif::getIntVal(rowgroup::Row& row,
 		case execplan::CalpontSystemCatalog::DOUBLE:
 		case execplan::CalpontSystemCatalog::FLOAT:
 		case execplan::CalpontSystemCatalog::DECIMAL:
-        case execplan::CalpontSystemCatalog::UDECIMAL:
 		case execplan::CalpontSystemCatalog::VARCHAR:
 		case execplan::CalpontSystemCatalog::CHAR:
 		{
@@ -81,92 +80,7 @@ int64_t Func_nullif::getIntVal(rowgroup::Row& row,
 			}
 			break;
 		}
-        case execplan::CalpontSystemCatalog::UBIGINT:
-        case execplan::CalpontSystemCatalog::UINT:
-        case execplan::CalpontSystemCatalog::UMEDINT:
-        case execplan::CalpontSystemCatalog::UTINYINT:
-        case execplan::CalpontSystemCatalog::USMALLINT:
-        {
-            exp2 = parm[1]->data()->getUintVal(row, isNull);
-            break;
-        }
 		case execplan::CalpontSystemCatalog::DATE:
-		{
-			exp2 = parm[1]->data()->getDateIntVal(row, isNull);
-			if (isNull) {
-				isNull = false;
-				return exp1;
-			}
-			break;
-		}
-		break;
-
-		case execplan::CalpontSystemCatalog::DATETIME:
-		{
-			exp2 = parm[1]->data()->getDatetimeIntVal(row, isNull);
-			if (isNull) {
-				isNull = false;
-				return exp1;
-			}
-			break;
-		}
-		default:
-		{
-			isNull = true;
-		}
-	}
-
-	if ( exp1 == exp2 ) {
-		isNull = true;
-		return 0;
-	}
-
-	return exp1;
-}
-
-uint64_t Func_nullif::getUintVal(rowgroup::Row& row,
-						FunctionParm& parm,
-						bool& isNull,
-						execplan::CalpontSystemCatalog::ColType& op_ct)
-{
-	uint64_t exp1 = parm[0]->data()->getUintVal(row, isNull);
-	uint64_t exp2 = 0;
-
-	switch (parm[1]->data()->resultType().colDataType)
-	{
-		case execplan::CalpontSystemCatalog::BIGINT:
-		case execplan::CalpontSystemCatalog::INT:
-		case execplan::CalpontSystemCatalog::MEDINT:
-		case execplan::CalpontSystemCatalog::TINYINT:
-		case execplan::CalpontSystemCatalog::SMALLINT:
-		case execplan::CalpontSystemCatalog::DOUBLE:
-        case execplan::CalpontSystemCatalog::UDOUBLE:
-		case execplan::CalpontSystemCatalog::FLOAT:
-        case execplan::CalpontSystemCatalog::UFLOAT:
-		case execplan::CalpontSystemCatalog::DECIMAL:
-        case execplan::CalpontSystemCatalog::UDECIMAL:
-		case execplan::CalpontSystemCatalog::VARCHAR:
-		case execplan::CalpontSystemCatalog::CHAR:
-		{
-			int64_t iexp2 = parm[1]->data()->getIntVal(row, isNull);
-			if (isNull || iexp2 < 0) {
-				isNull = false;
-				return exp1;
-			}
-            exp2 = iexp2;
-			break;
-		}
-        case execplan::CalpontSystemCatalog::UBIGINT:
-        case execplan::CalpontSystemCatalog::UINT:
-        case execplan::CalpontSystemCatalog::UMEDINT:
-        case execplan::CalpontSystemCatalog::UTINYINT:
-        case execplan::CalpontSystemCatalog::USMALLINT:
-        {
-            exp2 = parm[1]->data()->getUintVal(row, isNull);
-            break;
-        }
-
-        case execplan::CalpontSystemCatalog::DATE:
 		{
 			exp2 = parm[1]->data()->getDateIntVal(row, isNull);
 			if (isNull) {
@@ -442,13 +356,7 @@ execplan::IDB_Decimal Func_nullif::getDecimalVal(rowgroup::Row& row,
 		case execplan::CalpontSystemCatalog::MEDINT:
 		case execplan::CalpontSystemCatalog::TINYINT:
 		case execplan::CalpontSystemCatalog::SMALLINT:
-        case execplan::CalpontSystemCatalog::UBIGINT:
-        case execplan::CalpontSystemCatalog::UINT:
-        case execplan::CalpontSystemCatalog::UMEDINT:
-        case execplan::CalpontSystemCatalog::UTINYINT:
-        case execplan::CalpontSystemCatalog::USMALLINT:
-        case execplan::CalpontSystemCatalog::DECIMAL:
-        case execplan::CalpontSystemCatalog::UDECIMAL:
+		case execplan::CalpontSystemCatalog::DECIMAL:
 		{
 			exp2 = parm[1]->data()->getDecimalVal(row, isNull);
 			if (isNull) {
@@ -472,9 +380,7 @@ execplan::IDB_Decimal Func_nullif::getDecimalVal(rowgroup::Row& row,
 		}
 
 		case execplan::CalpontSystemCatalog::DOUBLE:
-        case execplan::CalpontSystemCatalog::UDOUBLE:
 		case execplan::CalpontSystemCatalog::FLOAT:
-        case execplan::CalpontSystemCatalog::UFLOAT:
 		{
 			double value = parm[1]->data()->getDoubleVal(row, isNull);
 			if (isNull) {
@@ -501,7 +407,7 @@ execplan::IDB_Decimal Func_nullif::getDecimalVal(rowgroup::Row& row,
 					s = 0;
 				if ( s > 0 )
 				{
-					x *= helpers::powerOf10_c[s];
+					x *= powerOf10_c[s];
 				}
 				else if (s < 0)
 				{
@@ -512,8 +418,8 @@ execplan::IDB_Decimal Func_nullif::getDecimalVal(rowgroup::Row& row,
 					}
 					else
 					{
-						x /= helpers::powerOf10_c[s];
-						x *= helpers::powerOf10_c[s];
+						x /= powerOf10_c[s];
+						x *= powerOf10_c[s];
 					}
 
 					s = 0;
@@ -547,7 +453,7 @@ execplan::IDB_Decimal Func_nullif::getDecimalVal(rowgroup::Row& row,
 					s = 0;
 				if ( s > 0 )
 				{
-					x *= helpers::powerOf10_c[s];
+					x *= powerOf10_c[s];
 				}
 				else if (s < 0)
 				{
@@ -558,8 +464,8 @@ execplan::IDB_Decimal Func_nullif::getDecimalVal(rowgroup::Row& row,
 					}
 					else
 					{
-						x /= helpers::powerOf10_c[s];
-						x *= helpers::powerOf10_c[s];
+						x /= powerOf10_c[s];
+						x *= powerOf10_c[s];
 					}
 
 					s = 0;

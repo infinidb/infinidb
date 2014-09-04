@@ -48,9 +48,12 @@ int64_t Func_yearweek::getIntVal(rowgroup::Row& row,
 						bool& isNull,
 						CalpontSystemCatalog::ColType& op_ct)
 {
+	// assume 256 is enough. assume not allowing incomplete date
+	char buf[256];
 	uint32_t year = 0, 
 	         month = 0, 
-	         day = 0;
+	         day = 0, 
+	         lyear = 0;
 
 	int64_t val = 0;
 	int16_t mode = 0;	// default to 2
@@ -128,11 +131,11 @@ int64_t Func_yearweek::getIntVal(rowgroup::Row& row,
 			isNull = true;
 			return -1;
 	}
+	char* ptr = buf;
 
-	uint32_t lyear=0;
-	int week = helpers::calc_mysql_week(year, month, day,
-			  	  	  	  	  	  	    (helpers::convert_mysql_mode_to_modeflags(mode) | helpers::WEEK_NO_ZERO),
-			  	  	  	  	  	  	    &lyear);
+	sprintf(ptr, "%02d", funcexp::calc_week(year, month, day, (week_mode(mode) | week_Year) , &lyear));
+
+	int week = atoi(ptr);
 
 	return (lyear*100)+week;
 }

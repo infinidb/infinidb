@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//   $Id: ddlpackageprocessor.cpp 9627 2013-06-18 13:59:21Z rdempsey $
+//   $Id: ddlpackageprocessor.cpp 9058 2012-11-07 15:35:08Z chao $
 
 #include <fstream>
 #include <iomanip>
@@ -24,7 +24,9 @@
 #include <cassert>
 using namespace std;
 
+#define DDLPKGPROC_DLLEXPORT
 #include "ddlpackageprocessor.h"
+#undef DDLPKGPROC_DLLEXPORT
 
 #include "dataconvert.h"
 using namespace dataconvert;
@@ -82,12 +84,9 @@ namespace ddlpackageprocessor
 {
 
 DDLPackageProcessor::~DDLPackageProcessor()
-{
-	//cout << "in DDLPackageProcessor destructor " << this << endl;
-	delete fWEClient;
-}
+{}
 
-void  DDLPackageProcessor::getColumnsForTable(uint32_t sessionID, std::string schema,std::string table,
+void  DDLPackageProcessor::getColumnsForTable(u_int32_t sessionID, std::string schema,std::string table,
 		ColumnList& colList)
 {
 
@@ -132,111 +131,78 @@ void  DDLPackageProcessor::getColumnsForTable(uint32_t sessionID, std::string sc
 
 }
 
-execplan::CalpontSystemCatalog::ColDataType DDLPackageProcessor::convertDataType(int dataType)
+int DDLPackageProcessor::convertDataType(int dataType)
 {
-	execplan::CalpontSystemCatalog::ColDataType colDataType;
+	int calpontDataType;
 
 	switch (dataType)
 	{
 		case ddlpackage::DDL_CHAR:
-			colDataType = CalpontSystemCatalog::CHAR;
+			calpontDataType = CalpontSystemCatalog::CHAR;
 			break;
 
 		case ddlpackage::DDL_VARCHAR:
-			colDataType = CalpontSystemCatalog::VARCHAR;
+			calpontDataType = CalpontSystemCatalog::VARCHAR;
 			break;
 
 		case ddlpackage::DDL_VARBINARY:
-			colDataType = CalpontSystemCatalog::VARBINARY;
+			calpontDataType = CalpontSystemCatalog::VARBINARY;
 			break;
 
 		case ddlpackage::DDL_BIT:
-			colDataType = CalpontSystemCatalog::BIT;
+			calpontDataType = CalpontSystemCatalog::BIT;
 			break;
 
 		case ddlpackage::DDL_REAL:
 		case ddlpackage::DDL_DECIMAL:
 		case ddlpackage::DDL_NUMERIC:
 		case ddlpackage::DDL_NUMBER:
-			colDataType = CalpontSystemCatalog::DECIMAL;
+			calpontDataType = CalpontSystemCatalog::DECIMAL;
 			break;
 
 		case ddlpackage::DDL_FLOAT:
-			colDataType = CalpontSystemCatalog::FLOAT;
+			calpontDataType = CalpontSystemCatalog::FLOAT;
 			break;
 
 		case ddlpackage::DDL_DOUBLE:
-			colDataType = CalpontSystemCatalog::DOUBLE;
+			calpontDataType = CalpontSystemCatalog::DOUBLE;
 			break;
 
 		case ddlpackage::DDL_INT:
 		case ddlpackage::DDL_INTEGER:
-			colDataType = CalpontSystemCatalog::INT;
+			calpontDataType = CalpontSystemCatalog::INT;
 			break;
 
 		case ddlpackage::DDL_BIGINT:
-			colDataType = CalpontSystemCatalog::BIGINT;
+			calpontDataType = CalpontSystemCatalog::BIGINT;
 			break;
 
 		case ddlpackage::DDL_MEDINT:
-			colDataType = CalpontSystemCatalog::MEDINT;
+			calpontDataType = CalpontSystemCatalog::MEDINT;
 			break;
 
 		case ddlpackage::DDL_SMALLINT:
-			colDataType = CalpontSystemCatalog::SMALLINT;
+			calpontDataType = CalpontSystemCatalog::SMALLINT;
 			break;
 
 		case ddlpackage::DDL_TINYINT:
-			colDataType = CalpontSystemCatalog::TINYINT;
+			calpontDataType = CalpontSystemCatalog::TINYINT;
 			break;
 
-        case ddlpackage::DDL_UNSIGNED_DECIMAL:
-        case ddlpackage::DDL_UNSIGNED_NUMERIC:
-            colDataType = CalpontSystemCatalog::UDECIMAL;
-            break;
-
-        case ddlpackage::DDL_UNSIGNED_FLOAT:
-            colDataType = CalpontSystemCatalog::UFLOAT;
-            break;
-
-        case ddlpackage::DDL_UNSIGNED_DOUBLE:
-            colDataType = CalpontSystemCatalog::UDOUBLE;
-            break;
-
-        case ddlpackage::DDL_UNSIGNED_INT:
-            colDataType = CalpontSystemCatalog::UINT;
-            break;
-
-        case ddlpackage::DDL_UNSIGNED_BIGINT:
-            colDataType = CalpontSystemCatalog::UBIGINT;
-            break;
-
-        case ddlpackage::DDL_UNSIGNED_MEDINT:
-            colDataType = CalpontSystemCatalog::UMEDINT;
-            break;
-
-        case ddlpackage::DDL_UNSIGNED_SMALLINT:
-            colDataType = CalpontSystemCatalog::USMALLINT;
-            break;
-
-        case ddlpackage::DDL_UNSIGNED_TINYINT:
-            colDataType = CalpontSystemCatalog::UTINYINT;
-            break;
-
 		case ddlpackage::DDL_DATE:
-			colDataType = CalpontSystemCatalog::DATE;
+			calpontDataType = CalpontSystemCatalog::DATE;
 			break;
 
 		case ddlpackage::DDL_DATETIME:
-			colDataType = CalpontSystemCatalog::DATETIME;
+			calpontDataType = CalpontSystemCatalog::DATETIME;
 			break;
 
 		case ddlpackage::DDL_CLOB:
-			colDataType = CalpontSystemCatalog::CLOB;
+			calpontDataType = CalpontSystemCatalog::CLOB;
 			break;
 
 		case ddlpackage::DDL_BLOB:
-			colDataType = CalpontSystemCatalog::BLOB;
+			calpontDataType = CalpontSystemCatalog::BLOB;
 			break;
 
 		default:
@@ -244,7 +210,7 @@ execplan::CalpontSystemCatalog::ColDataType DDLPackageProcessor::convertDataType
 
 	}
 
-	return colDataType;
+	return calpontDataType;
 }
 
 std::string DDLPackageProcessor::buildTableConstraintName(const int oid,
@@ -404,9 +370,8 @@ DDLPackageProcessor::getNullValueForType(const execplan::CalpontSystemCatalog::C
 			break;
 
 		case execplan::CalpontSystemCatalog::DECIMAL:
-        case execplan::CalpontSystemCatalog::UDECIMAL:
 			{
-				if (colType.colWidth <= 4)
+				if (colType.colWidth <= execplan::CalpontSystemCatalog::FOUR_BYTE)
 				{
 					short smallintvalue = joblist::SMALLINTNULL;
 					value = smallintvalue;
@@ -429,7 +394,6 @@ DDLPackageProcessor::getNullValueForType(const execplan::CalpontSystemCatalog::C
 			}
 			break;
 		case execplan::CalpontSystemCatalog::FLOAT:
-        case execplan::CalpontSystemCatalog::UFLOAT:
 			{
 				uint32_t jlfloatnull = joblist::FLOATNULL;
 				float* fp = reinterpret_cast<float*>(&jlfloatnull);
@@ -438,7 +402,6 @@ DDLPackageProcessor::getNullValueForType(const execplan::CalpontSystemCatalog::C
 			break;
 
 		case execplan::CalpontSystemCatalog::DOUBLE:
-        case execplan::CalpontSystemCatalog::UDOUBLE:
 			{
 				uint64_t jldoublenull = joblist::DOUBLENULL;
 				double* dp = reinterpret_cast<double*>(&jldoublenull);
@@ -489,8 +452,30 @@ DDLPackageProcessor::getNullValueForType(const execplan::CalpontSystemCatalog::C
 
 			}
 			break;
+		case execplan::CalpontSystemCatalog::VARCHAR:
+			{
+				std::string charnull;
+				if (colType.colWidth == execplan::CalpontSystemCatalog::ONE_BYTE)
+				{
+					//charnull = joblist::CHAR2NULL;
+					charnull = "\377\376";
+					value = charnull;
+				}
+				else if (colType.colWidth < execplan::CalpontSystemCatalog::FOUR_BYTE)
+				{
+					//charnull = joblist::CHAR4NULL;
+					charnull = "\377\377\377\376";
+					value = charnull;
+				}
+				else
+				{
+					WriteEngine::Token nullToken;
+					value = nullToken;
+				}
 
-        case execplan::CalpontSystemCatalog::VARCHAR:
+			}
+			break;
+		case execplan::CalpontSystemCatalog::VARBINARY:
 			{
 				std::string charnull;
 				if (colType.colWidth == execplan::CalpontSystemCatalog::ONE_BYTE)
@@ -514,59 +499,6 @@ DDLPackageProcessor::getNullValueForType(const execplan::CalpontSystemCatalog::C
 			}
 			break;
 
-        case execplan::CalpontSystemCatalog::VARBINARY:
-			{
-				std::string charnull;
-				if (colType.colWidth == execplan::CalpontSystemCatalog::ONE_BYTE)
-				{
-					//charnull = joblist::CHAR2NULL;
-					charnull = "\377\376";
-					value = charnull;
-				}
-				else if (colType.colWidth < execplan::CalpontSystemCatalog::FOUR_BYTE)
-				{
-					//charnull = joblist::CHAR4NULL;
-					charnull = "\377\377\377\376";
-					value = charnull;
-				}
-				else
-				{
-					WriteEngine::Token nullToken;
-					value = nullToken;
-				}
-
-			}
-			break;
-
-        case execplan::CalpontSystemCatalog::UTINYINT:
-            {
-                uint8_t utinyintvalue = joblist::UTINYINTNULL;
-                value = utinyintvalue;
-
-            }
-            break;
-
-        case execplan::CalpontSystemCatalog::USMALLINT:
-            {
-                uint16_t usmallintvalue = joblist::USMALLINTNULL;
-                value = usmallintvalue;
-            }
-            break;
-
-        case execplan::CalpontSystemCatalog::UMEDINT:
-        case execplan::CalpontSystemCatalog::UINT:
-            {
-                uint32_t uintvalue = joblist::UINTNULL;
-                value = uintvalue;
-            }
-            break;
-
-        case execplan::CalpontSystemCatalog::UBIGINT:
-            {
-                uint64_t ubigint = joblist::UBIGINTNULL;
-                value = ubigint;
-            }
-            break;
 
 		default:
 			throw std::runtime_error("getNullValueForType: unkown column data type");
@@ -677,7 +609,7 @@ boost::any DDLPackageProcessor::tokenizeData(execplan::CalpontSystemCatalog::SCN
 			memcpy(dictTuple.sigValue, str.c_str(), str.length());
 			dictTuple.sigSize = str.length();
 			int error = NO_ERROR;
-			if (NO_ERROR != (error = fWriteEngine.tokenize(txnID, dictStruct, dictTuple, false))) // @bug 5572 HDFS tmp file
+			if (NO_ERROR != (error = fWriteEngine.tokenize(txnID, dictStruct, dictTuple)))
 			{
 		WErrorCodes ec;
 				throw std::runtime_error("WE: Tokenization failed " + ec.errorString(error));
@@ -701,6 +633,960 @@ boost::any DDLPackageProcessor::tokenizeData(execplan::CalpontSystemCatalog::SCN
 	}
 	return value;
 }
+
+void DDLPackageProcessor::writeSysTableMetaData(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, const DDLResult& result,
+		ddlpackage::TableDef& tableDef, uint32_t tableWithAutoi)
+{
+	std::string err("DDLPackageProcessor::writeSysTableMetaData ");
+	SUMMARY_INFO(err);
+
+	if (result.result != NO_ERROR)
+		return;
+
+	WriteEngine::ColTuple colTuple;
+	WriteEngine::ColStruct colStruct;
+	WriteEngine::ColStructList colStructs;
+	WriteEngine::ColTupleList colTuples;
+	WriteEngine::dictStr dctColTuples;
+	WriteEngine::DctnryStruct dctnryStruct;
+	WriteEngine::ColValueList colValuesList;
+	WriteEngine::DctnryStructList dctnryStructList;
+	WriteEngine::DictStrList dctnryValueList;
+	WriteEngine::RIDList ridList;
+	CalpontSystemCatalog::TableName tableName;
+	CalpontSystemCatalog::ROPair sysTableROPair;
+	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr;
+	ColumnList columns;
+	ColumnList::const_iterator column_iterator;
+	DDLColumn column;
+	int error = 0;
+	bool isNull = false;
+
+	tableName.schema = CALPONT_SCHEMA;
+	tableName.table  = SYSTABLE_TABLE;
+
+	systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
+
+	try
+	{
+		sysTableROPair = systemCatalogPtr->tableRID(tableName);
+
+		getColumnsForTable(sessionID, tableName.schema,tableName.table, columns);
+
+			column_iterator = columns.begin();
+			std::string tmpStr("");
+		while (column_iterator != columns.end())
+		{
+
+			column = *column_iterator;
+			boost::to_lower(column.tableColName.column);
+			isNull = false;
+
+			if (TABLENAME_COL == column.tableColName.column)
+			{
+				std::string tablename = tableDef.fQualifiedName->fName;
+				boost::to_lower(tablename);
+				colTuple.data = tablename;
+				tmpStr = tablename;
+			}
+			else if (SCHEMA_COL == column.tableColName.column)
+			{
+				std::string schema =  tableDef.fQualifiedName->fSchema;
+				boost::to_lower(schema);
+				colTuple.data = schema;
+				tmpStr = schema;
+			}
+			else if (OBJECTID_COL == column.tableColName.column)
+			{
+				colTuple.data = fTableOID;
+			}
+			else if (CREATEDATE_COL == column.tableColName.column)
+			{
+				date d(day_clock::universal_day());
+				std::string date = to_iso_string(d);
+				Date aDay;
+				int intvalue;
+				std::string s = date.substr(0, 4);
+				if (from_string<int>(intvalue, s, std::dec))
+				{
+					aDay.year = intvalue;
+				}
+				s = date.substr(4, 2);
+				if (from_string<int>(intvalue, s, std::dec))
+				{
+					aDay.month = intvalue;
+				}
+				s = date.substr(6, 2);
+				if (from_string<int>(intvalue, s, std::dec))
+				{
+					aDay.day = intvalue;
+				}
+
+				colTuple.data = *(reinterpret_cast<int *> (&aDay));
+
+			}
+			else if (INIT_COL == column.tableColName.column)
+			{
+				TableOptionMap::const_iterator options_iter = tableDef.fOptions.find("initial");
+				if (options_iter != tableDef.fOptions.end())
+				{
+					colTuple.data = options_iter->second;
+				}
+				else
+				{
+					colTuple.data = getNullValueForType(column.colType);
+					isNull = true;
+				}
+			}
+			else if (NEXT_COL == column.tableColName.column)
+			{
+				TableOptionMap::const_iterator options_iter = tableDef.fOptions.find("next");
+				if (options_iter != tableDef.fOptions.end())
+				{
+					colTuple.data = options_iter->second;
+				}
+				else
+				{
+					colTuple.data = getNullValueForType(column.colType);
+					isNull = true;
+				}
+			}
+			else if (AUTOINC_COL == column.tableColName.column)
+			{
+				colTuple.data = tableWithAutoi;
+			}
+			else
+			{
+				colTuple.data = getNullValueForType(column.colType);
+				isNull = true;
+			}
+
+			colStruct.dataOid = column.oid;
+			colStruct.colWidth = column.colType.colWidth > 8 ? 8 : column.colType.colWidth;
+			colStruct.tokenFlag = false;
+			colStruct.tokenFlag = column.colType.colWidth > 8 ? true : false;
+			colStruct.colDataType = (WriteEngine::ColDataType)column.colType.colDataType;
+			if (colStruct.tokenFlag)
+			{
+				dctnryStruct.dctnryOid = column.colType.ddn.dictOID;
+				dctnryStruct.columnOid = column.oid;
+			}
+			else
+			{
+				dctnryStruct.dctnryOid = 0;
+				dctnryStruct.columnOid = column.oid;
+			}
+
+			colStructs.push_back(colStruct);
+
+			colTuples.push_back(colTuple);
+
+			dctColTuples.push_back (tmpStr);
+
+			colValuesList.push_back(colTuples);
+
+			dctnryStructList.push_back (dctnryStruct);
+
+			dctnryValueList.push_back (dctColTuples);
+
+
+			colTuples.pop_back();
+			dctColTuples.pop_back();
+
+			++column_iterator;
+		}
+		//fWriteEngine.setDebugLevel(WriteEngine::DEBUG_3);
+		if (0 != colStructs.size())
+		{
+			error = fWriteEngine.insertColumnRec_SYS(txnID, colStructs, colValuesList,
+											dctnryStructList, dctnryValueList);
+
+			if (error != WriteEngine::NO_ERROR)
+			{
+			if (error == ERR_BRM_WR_VB_ENTRY)
+			{
+				throw std::runtime_error("WE: Error writing to BRM.");
+			}
+			else
+			{
+				WErrorCodes ec;
+				throw std::runtime_error("WE: Error updating calpont.systable:" + ec.errorString(error));
+			}
+			}
+		 }
+	 }
+	catch (std::exception& ex)
+	{
+		err += ex.what();
+		throw std::runtime_error(err);
+	}
+	catch (...)
+	{
+		err += "Unknown exception caught";
+		throw std::runtime_error(err);
+	}
+}
+
+void  DDLPackageProcessor::writeSysColumnMetaData(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, const DDLResult& result,
+		ColumnDefList& tableDefCols, ddlpackage::QualifiedName& qualifiedName,
+		int colpos, bool alterFlag)
+{
+	std::string err("DDLPackageProcessor::writeSysColumnMetaData ");
+	SUMMARY_INFO(err);
+
+	if (result.result != NO_ERROR)
+		return;
+
+	WriteEngine::ColStruct colStruct;
+	WriteEngine::ColTuple colTuple;
+	WriteEngine::ColStructList colStructs;
+	WriteEngine::ColTupleList colTuples;
+	WriteEngine::DctColTupleList dctColTuples;
+	WriteEngine::ColValueList colValuesList;
+	WriteEngine::RIDList ridList;
+	WriteEngine::DctnryStruct dctnryStruct;
+	WriteEngine::dictStr dctnryTuple;
+	WriteEngine::DctnryStructList dctnryStructList;
+	WriteEngine::DictStrList dctnryValueList;
+
+	CalpontSystemCatalog::TableName tableName;
+
+	ColumnList columns;
+	ColumnList::const_iterator column_iterator;
+	ColumnDef* colDefPtr = 0;
+	ColumnDefList::const_iterator iter;
+	DDLColumn column;
+	int error = 0;
+	int startPos = colpos;
+	bool isNull = false;
+
+	tableName.schema = CALPONT_SCHEMA;
+	tableName.table  = SYSCOLUMN_TABLE;
+
+	getColumnsForTable(sessionID, tableName.schema,tableName.table, columns);
+	unsigned int numCols = columns.size();
+	//WriteEngine::ColTupleList colList[numCols];
+	//ColTupleList is NOT POD, so let's try this:
+	std::vector<WriteEngine::ColTupleList> colList;
+	//WriteEngine::dictStr dctColList[numCols];
+	std::vector<WriteEngine::dictStr> dctColList;
+	iter = tableDefCols.begin();
+	//colpos = 0;
+	std::string tmpStr("");
+	for (unsigned int ii = 0; ii < numCols; ii++)
+	{
+		colList.push_back(WriteEngine::ColTupleList());
+		dctColList.push_back(WriteEngine::dictStr());
+	}
+	try
+	{
+		while (iter != tableDefCols.end())
+		{
+			colDefPtr = *iter;
+
+			DictOID dictOID;
+
+
+			   int dataType;
+			dataType = convertDataType(colDefPtr->fType->fType);
+			if (dataType == CalpontSystemCatalog::DECIMAL)
+			{
+				if	 (colDefPtr->fType->fPrecision < colDefPtr->fType->fScale)
+				{
+			ostringstream os;
+			os << "Syntax error: scale should be less than precision, precision: " << colDefPtr->fType->fPrecision << " scale: " << colDefPtr->fType->fScale;
+			throw std::runtime_error(os.str());
+
+/*					logging::Message::Args args;
+					logging::Message message(9);
+					result.result = CREATE_ERROR;
+
+					args.add("Syntax error: ");
+					args.add("scale should be less than precision");
+					message.format(args);
+					result.message = message;
+					return;*/
+				}
+			}
+			if (dataType == CalpontSystemCatalog::DECIMAL)
+			{
+				//@Bug 2089 decimal precision default to 10 if 0 is used.
+				if (colDefPtr->fType->fPrecision <= 0)
+					colDefPtr->fType->fPrecision = 10;
+
+				if (colDefPtr->fType->fPrecision == -1 || colDefPtr->fType->fPrecision == 0)
+				{
+					//dataType = CalpontSystemCatalog::BIGINT;
+					colDefPtr->fType->fType = DDL_BIGINT;
+					colDefPtr->fType->fLength = 8;
+					colDefPtr->fType->fScale = 0;
+				}
+				else if ((colDefPtr->fType->fPrecision > 0) && (colDefPtr->fType->fPrecision < 3))
+				{
+					//dataType = CalpontSystemCatalog::TINYINT;
+					colDefPtr->fType->fType = DDL_TINYINT;
+					colDefPtr->fType->fLength = 1;
+				}
+
+				else if (colDefPtr->fType->fPrecision < 5 && (colDefPtr->fType->fPrecision > 2))
+				{
+					//dataType = CalpontSystemCatalog::SMALLINT;
+					colDefPtr->fType->fType = DDL_SMALLINT;
+					colDefPtr->fType->fLength = 2;
+				}
+				else if (colDefPtr->fType->fPrecision > 4 && colDefPtr->fType->fPrecision < 10)
+				{
+					//dataType = CalpontSystemCatalog::INT;
+					colDefPtr->fType->fType = DDL_INT;
+					colDefPtr->fType->fLength = 4;
+				}
+				else if (colDefPtr->fType->fPrecision > 9 && colDefPtr->fType->fPrecision < 19)
+				{
+					//dataType = CalpontSystemCatalog::BIGINT;
+					colDefPtr->fType->fType = DDL_BIGINT;
+					colDefPtr->fType->fLength = 8;
+				}
+				else
+				{
+					/*@Bug 1959 InfiniDB does not support DECIMAL and NUMERIC column that is
+					greater than 8 bytes. */
+					ostringstream os;
+					os << "DECIMAL and NUMERIC column precision greater than 18 is not supported by InfiniDB.";
+					throw std::runtime_error(os.str());
+				}
+
+			}
+
+			bool hasDict = false;
+			if ( (dataType == CalpontSystemCatalog::CHAR && colDefPtr->fType->fLength > 8) ||
+				 (dataType == CalpontSystemCatalog::VARCHAR && colDefPtr->fType->fLength > 7) ||
+				 (dataType == CalpontSystemCatalog::VARBINARY && colDefPtr->fType->fLength > 7) )
+			{
+				hasDict = true;
+				dictOID.compressionType = colDefPtr->fType->fCompressiontype;
+				dictOID.colWidth = colDefPtr->fType->fLength;
+
+				//@Bug 2534. Take away the limit of 255 and set the limit to 8000.
+				if (colDefPtr->fType->fLength > 8000)
+				{
+					ostringstream os;
+					os << "char, varchar and varbinary length may not exceed 8000";
+					throw std::runtime_error(os.str());
+				}
+			}
+			else if (dataType == CalpontSystemCatalog::VARBINARY && colDefPtr->fType->fLength <= 7)
+			{
+				ostringstream os;
+				os << "varbinary length may not be less than 8";
+				throw std::runtime_error(os.str());
+			}
+
+
+			if (hasDict)
+			{
+				execplan::ObjectIDManager fObjectIDManager;
+				int startOID = fObjectIDManager.allocOIDs(1);
+				dictOID.dictOID = startOID;
+				dictOID.listOID = 0;
+				dictOID.treeOID = 0;
+				
+				fDictionaryOIDList.push_back(dictOID);
+			  }
+			unsigned int i = 0;
+			column_iterator = columns.begin();
+			while (column_iterator != columns.end())
+			{
+				column = *column_iterator;
+				boost::to_lower(column.tableColName.column);
+
+				isNull = false;
+
+				if (SCHEMA_COL == column.tableColName.column)
+				{
+					boost::to_lower(qualifiedName.fSchema);
+					colTuple.data = qualifiedName.fSchema;
+					tmpStr = qualifiedName.fSchema;
+				}
+				else if (TABLENAME_COL == column.tableColName.column)
+				{
+					boost::to_lower(qualifiedName.fName);
+					colTuple.data = qualifiedName.fName;
+					tmpStr = qualifiedName.fName;
+				}
+				else if (COLNAME_COL == column.tableColName.column)
+				{
+					boost::to_lower(colDefPtr->fName);
+					colTuple.data = colDefPtr->fName;
+					tmpStr = colDefPtr->fName;
+				}
+				else if (OBJECTID_COL == column.tableColName.column)
+				{
+					if (alterFlag)
+						colTuple.data = fStartingColOID;
+					else
+						colTuple.data = fStartingColOID + colpos;
+				}
+				else if (DATATYPE_COL == column.tableColName.column)
+				{
+					colTuple.data = dataType;
+				}
+				else if (COLUMNLEN_COL == column.tableColName.column)
+				{
+					//@Bug 2089 Disallow zero length char and varch column to be created
+					if (dataType == CalpontSystemCatalog::CHAR ||
+						dataType == CalpontSystemCatalog::VARCHAR ||
+						dataType == CalpontSystemCatalog::VARBINARY)
+					{
+						if (colDefPtr->fType->fLength <= 0)
+						{
+							ostringstream os;
+							os << "char, varchar and varbinary length must be greater than zero";
+							throw std::runtime_error(os.str());
+						}
+					}
+					colTuple.data = colDefPtr->fType->fLength;
+				}
+				else if (COLUMNPOS_COL == column.tableColName.column)
+				{
+					colTuple.data = colpos;
+				}
+				else if (DEFAULTVAL_COL == column.tableColName.column)
+				{
+					if (colDefPtr->fDefaultValue)
+					{
+						colTuple.data = colDefPtr->fDefaultValue->fValue;
+						tmpStr = colDefPtr->fDefaultValue->fValue;
+					}
+					else
+					{
+						tmpStr="";
+						//colTuple.data = getNullValueForType(column.colType);
+						isNull = true;
+					}
+
+				}
+				else if (NULLABLE_COL == column.tableColName.column)
+				{
+					int nullable = 1;
+					ColumnConstraintList& colConstraints = colDefPtr->fConstraints;
+					ColumnConstraintList::const_iterator constraint_iter = colConstraints.begin();
+					while (constraint_iter != colConstraints.end())
+					{
+						ColumnConstraintDef* consDefPtr = *constraint_iter;
+						if (consDefPtr->fConstraintType == ddlpackage::DDL_NOT_NULL)
+						{
+							nullable = 0;
+							break;
+						}
+						++constraint_iter;
+					}
+					colTuple.data = nullable;
+				}
+				else if (SCALE_COL == column.tableColName.column)
+				{
+					colTuple.data = colDefPtr->fType->fScale;
+				}
+				else if (PRECISION_COL == column.tableColName.column)
+				{
+					colTuple.data = colDefPtr->fType->fPrecision;
+				}
+				else if (DICTOID_COL == column.tableColName.column)
+				{
+					if (hasDict)
+					{
+						colTuple.data = dictOID.dictOID;
+					}
+					else
+					{
+						colTuple.data = getNullValueForType(column.colType);
+						isNull = true;
+					}
+				}
+				else if (LISTOBJID_COL == column.tableColName.column)
+				{
+					colTuple.data = getNullValueForType(column.colType);
+					isNull = true;
+				}
+				else if (TREEOBJID_COL == column.tableColName.column)
+				{
+					colTuple.data = getNullValueForType(column.colType);
+					isNull = true;
+				}
+				else if (MINVAL_COL == column.tableColName.column)
+				{
+						tmpStr="";
+						isNull = true;
+				}
+				else if (MAXVAL_COL == column.tableColName.column)
+				{
+						tmpStr="";
+						isNull = true;
+				}
+				else if (COMPRESSIONTYPE_COL == column.tableColName.column)
+				{
+					colTuple.data = colDefPtr->fType->fCompressiontype;
+				}
+				else if (AUTOINC_COL == column.tableColName.column)
+				{
+					//cout << "autoincrement= " << colDefPtr->fType->fAutoincrement << endl; 
+					colTuple.data = colDefPtr->fType->fAutoincrement;
+					
+				}
+				else if (NEXTVALUE_COL == column.tableColName.column)
+				{
+					colTuple.data = colDefPtr->fType->fNextvalue;
+				}
+				else
+				{
+					colTuple.data = getNullValueForType(column.colType);
+					isNull = true;
+				}
+
+				colStruct.dataOid = column.oid;
+				colStruct.colWidth = column.colType.colWidth > 8 ? 8 : column.colType.colWidth;
+				colStruct.tokenFlag = false;
+				colStruct.tokenFlag = column.colType.colWidth > 8 ? true : false;
+				colStruct.colDataType = static_cast<WriteEngine::ColDataType>(column.colType.colDataType);
+
+				if (colStruct.tokenFlag)
+				{
+					dctnryStruct.dctnryOid = column.colType.ddn.dictOID;
+					dctnryStruct.columnOid = column.oid;
+				}
+				else
+				{
+					dctnryStruct.dctnryOid = 0;
+					dctnryStruct.columnOid = column.oid;
+				}
+
+
+				if (colpos == startPos)
+				{
+					colStructs.push_back(colStruct);
+					dctnryStructList.push_back (dctnryStruct);
+				}
+				colList[i].push_back(colTuple);
+				//colList.push_back(WriteEngine::ColTupleList());
+				//colList.back().push_back(colTuple);
+				dctColList[i].push_back(tmpStr);
+				//dctColList.push_back(WriteEngine::dictStr());
+				//dctColList.back().push_back(tmpStr);
+				++i;
+				++column_iterator;
+			}
+
+			++colpos;
+			++iter;
+		}
+
+		idbassert(colList.size() >= numCols);
+		idbassert(dctColList.size() >= numCols);
+
+		if (0 != colStructs.size())
+		{
+			//FIXME: Is there a cleaner way to do this? Isn't colValuesList the same as colList after this?
+			for (unsigned int n = 0; n < numCols; n++)
+			{
+				colValuesList.push_back(colList[n]);
+				dctnryValueList.push_back(dctColList[n]);
+			}
+			//fWriteEngine.setDebugLevel(WriteEngine::DEBUG_3);
+			error = fWriteEngine.insertColumnRec_SYS(txnID, colStructs, colValuesList,
+								dctnryStructList, dctnryValueList);
+
+			if (error != WriteEngine::NO_ERROR)
+			{
+				if (error == ERR_BRM_WR_VB_ENTRY)
+				{
+					throw std::runtime_error(
+						"writeSysColumnMetaData WE: Error writing to BRM.");
+				}
+				else
+				{
+					WErrorCodes ec;
+					throw std::runtime_error(
+						"WE: Error updating calpont.syscolumn. " + ec.errorString(error));
+//					 err = "Error updating calpont.syscolumn. error number = " + error;
+				}
+			}
+		}
+
+	}
+	catch (std::exception& ex)
+	{
+		err += ex.what();
+		throw std::runtime_error(err);
+	}
+	catch (...)
+	{
+		err += "Unknown exception caught";
+		throw std::runtime_error(err);
+	}
+}
+
+void DDLPackageProcessor::removeSysTableMetaData(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID,
+		DDLResult& result,
+		ddlpackage::QualifiedName& tableName)
+{
+
+	SUMMARY_INFO("DDLPackageProcessor::removeSysTableMetaData");
+
+	if (result.result != NO_ERROR)
+		return;
+	std::string err;
+	ddlpackage::QualifiedName sysCatalogTableName;
+	sysCatalogTableName.fSchema = CALPONT_SCHEMA;
+	sysCatalogTableName.fName = SYSTABLE_TABLE;
+
+	CalpontSystemCatalog::TableName userTableName;
+	userTableName.schema = tableName.fSchema;
+	userTableName.table = tableName.fName;
+
+	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr;
+	systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
+	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
+	try
+	{
+		CalpontSystemCatalog::ROPair userTableROPair = systemCatalogPtr->tableRID(userTableName);
+		if (userTableROPair.rid == std::numeric_limits<WriteEngine::RID>::max())
+		{
+			err = "RowID is not valid ";
+			throw std::runtime_error(err);
+		}
+	//	cout << "RID for table " << userTableName.schema << "." << userTableName.table << " = " << userTableROPair.rid << endl;
+		removeRowFromSysCatalog(sessionID, txnID, result, sysCatalogTableName, userTableROPair.rid);
+	}
+	catch (std::exception& ex)
+	{
+		err = ex.what();
+		throw std::runtime_error(err);
+	}
+	catch (...)
+	{
+		err = "Unknown exception caught";
+		throw std::runtime_error(err);
+	}
+}
+
+void DDLPackageProcessor::removeSysColMetaData(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID,
+		DDLResult& result,
+		ddlpackage::QualifiedName& tableName)
+{
+	SUMMARY_INFO("DDLPackageProcessor::removeSysColMetaData");
+
+	if (result.result != NO_ERROR)
+		return;
+
+	ddlpackage::QualifiedName sysCatalogTableName;
+	sysCatalogTableName.fSchema = CALPONT_SCHEMA;
+	sysCatalogTableName.fName  = SYSCOLUMN_TABLE;
+
+	CalpontSystemCatalog::TableName userTableName;
+	userTableName.schema = tableName.fSchema;
+	userTableName.table = tableName.fName;
+
+	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr;
+	systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
+	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
+	std::string err;
+	try
+	{
+		execplan::CalpontSystemCatalog::RIDList colRidList = systemCatalogPtr->columnRIDs(userTableName);
+
+		removeRowsFromSysCatalog(sessionID, txnID, result, sysCatalogTableName, colRidList);
+	}
+	catch (std::exception& ex)
+	{
+		err = ex.what();
+		throw std::runtime_error(err);
+	}
+	catch (...)
+	{
+		err = "Unknown exception caught";
+		throw std::runtime_error(err);
+	}
+
+}
+
+void DDLPackageProcessor::removeColSysColMetaData(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID,
+		DDLResult& result,
+		ddlpackage::QualifiedName& columnInfo)
+{
+	SUMMARY_INFO("DDLPackageProcessor::removeColSysColMetaData");
+
+	if (result.result != NO_ERROR)
+		return;
+
+	ddlpackage::QualifiedName sysCatalogTableName;
+	sysCatalogTableName.fSchema = CALPONT_SCHEMA;
+	sysCatalogTableName.fName  = SYSCOLUMN_TABLE;
+
+	CalpontSystemCatalog::TableColName userColName;
+	userColName.schema = columnInfo.fSchema;
+	userColName.table = columnInfo.fCatalog;
+	userColName.column = columnInfo.fName;
+
+	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr;
+	systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
+	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
+	std::string err;
+	try
+	{
+		execplan::CalpontSystemCatalog::ROPair colRO = systemCatalogPtr->columnRID(userColName);
+		execplan::CalpontSystemCatalog::RIDList colRidList;
+		colRidList.push_back(colRO);
+		removeRowsFromSysCatalog(sessionID, txnID, result, sysCatalogTableName, colRidList);
+	}
+	catch (std::exception& ex)
+	{
+		err = ex.what();
+		throw std::runtime_error(err);
+	}
+	catch (...)
+	{
+		err = "Unknown exception caught";
+		throw std::runtime_error(err);
+	}
+}
+
+void DDLPackageProcessor::removeRowFromSysCatalog(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID,
+		const DDLResult& result,
+		ddlpackage::QualifiedName& sysCatalogTableName,
+		WriteEngine::RID& rid)
+{
+
+	SUMMARY_INFO("DDLPackageProcessor::removeRowFromSysCatalog");
+
+	if (result.result != NO_ERROR)
+		return;
+
+	CalpontSystemCatalog::RIDList colRidList;
+	CalpontSystemCatalog::ROPair roPair;
+	std::string err;
+	roPair.objnum = 0;
+	roPair.rid = rid;
+	colRidList.push_back(roPair);
+	try
+	{
+		removeRowsFromSysCatalog(sessionID, txnID, result,sysCatalogTableName,colRidList);
+	}
+	catch (std::exception& ex)
+	{
+		err = ex.what();
+		throw std::runtime_error(err);
+	}
+	catch (...)
+	{
+		err = "Unknown exception caught";
+		throw std::runtime_error(err);
+	}
+
+}
+
+void DDLPackageProcessor::removeRowsFromSysCatalog(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID,
+		const DDLResult& result,
+		ddlpackage::QualifiedName& sysCatalogTableName,
+		execplan::CalpontSystemCatalog::RIDList& colRidList)
+{
+
+	SUMMARY_INFO("DDLPackageProcessor::removeRowsFromSysCatalog");
+
+	if (result.result != NO_ERROR)
+		return;
+
+	WriteEngine::ColStruct colStruct;
+	WriteEngine::ColStructList colStructs;
+	std::vector<WriteEngine::ColStructList> colExtentsStruct;
+	std::vector<void *> colValuesList;
+	WriteEngine::RIDList ridList;
+	std::vector<WriteEngine::RIDList> ridLists;
+	DDLColumn column;
+
+	execplan::CalpontSystemCatalog::RIDList::const_iterator colrid_iterator = colRidList.begin();
+	while (colrid_iterator != colRidList.end())
+	{
+		WriteEngine::RID rid = (*colrid_iterator).rid;
+		ridList.push_back(rid);
+		++colrid_iterator;
+	}
+
+	ColumnList columns;
+	getColumnsForTable(sessionID, sysCatalogTableName.fSchema, sysCatalogTableName.fName, columns);
+
+	ColumnList::const_iterator column_iterator = columns.begin();
+	while (column_iterator != columns.end())
+	{
+		column = *column_iterator;
+		colStruct.dataOid = column.oid;
+		colStruct.colWidth = column.colType.colWidth > 8 ? 8 : column.colType.colWidth;
+		colStruct.colDataType = static_cast<WriteEngine::ColDataType>(column.colType.colDataType);
+
+		colStructs.push_back(colStruct);
+
+		++column_iterator;
+	}
+	colExtentsStruct.push_back(colStructs);
+	ridLists.push_back(ridList);
+	std::string err;
+	try
+	{
+		if (0 != colStructs.size() && 0 != ridLists[0].size())
+		{
+			int error = fWriteEngine.deleteRow(txnID, colExtentsStruct, colValuesList, ridLists);
+			if (error != WriteEngine::NO_ERROR)
+			{
+				err = "WE:Error removing rows from " + sysCatalogTableName.fName ;
+				throw std::runtime_error(err);
+			}
+		}
+	}
+	catch (std::exception& ex)
+	{
+		err = ex.what();
+		throw std::runtime_error(err);
+	}
+	catch (...)
+	{
+		err = "Unknown exception caught";
+		throw std::runtime_error(err);
+	}
+
+}
+
+void DDLPackageProcessor::createDictionaryFiles(execplan::CalpontSystemCatalog::SCN txnID, const DDLResult& result, const int useDBRoot)
+{
+	std::string err("DDLPackageProcessor::createDictionaryFiles ");
+	SUMMARY_INFO(err);
+
+	if (result.result != NO_ERROR)
+		return;
+
+	int error = NO_ERROR;
+
+	DictionaryOIDList::const_iterator iter = fDictionaryOIDList.begin();
+	try
+	{
+		while (iter != fDictionaryOIDList.end())
+		{
+			DictOID dictOID = *iter;
+			error = fWriteEngine.createDctnry(txnID, dictOID.dictOID,
+                    dictOID.colWidth, useDBRoot, 0, 0, dictOID.compressionType);
+			if (error != WriteEngine::NO_ERROR)
+			{
+				WErrorCodes ec;
+				ostringstream oss;
+				oss << "WE: Error creating dictionary file for oid "  << dictOID.dictOID
+                    <<  "; " << ec.errorString(error) << endl;
+				throw std::runtime_error (oss.str());
+			}
+			++iter;
+		}
+	}
+	catch (std::exception& ex)
+	{
+		err += ex.what();
+		throw std::runtime_error(err);
+	}
+	catch (...)
+	{
+		err += "Unknown exception caught";
+		throw std::runtime_error(err);
+	}
+
+}
+
+
+void DDLPackageProcessor::createColumnFiles(execplan::CalpontSystemCatalog::SCN txnID,
+		const DDLResult& result,
+		ddlpackage::ColumnDefList& tableDefCols,
+		const int useDBRoot, const uint32_t partitionNum)
+{
+	std::string err("DDLPackageProcessor::createColumnFiles ");
+	SUMMARY_INFO(err);
+
+	if (result.result != NO_ERROR)
+		return;
+
+	//ColumnDefList& tableDefCols = tableDef.fColumns;
+	ColumnDefList::const_iterator iter = tableDefCols.begin();
+	int colpos = 0, error = NO_ERROR;
+	ColumnDef* colDefPtr;
+	try
+	{
+		while (iter != tableDefCols.end())
+		{
+			colDefPtr = *iter;
+
+			WriteEngine::ColDataType dataType = static_cast<WriteEngine::ColDataType>(
+			   convertDataType(colDefPtr->fType->fType));
+
+			error = fWriteEngine.createColumn(txnID, fStartingColOID + colpos, dataType,
+			   colDefPtr->fType->fLength, useDBRoot, partitionNum,
+			   colDefPtr->fType->fCompressiontype);
+
+			if (error != WriteEngine::NO_ERROR)
+			{
+				WErrorCodes ec;
+				ostringstream oss;
+				oss << "WE: Error creating column file for oid "  << (fStartingColOID + colpos) <<  "; " << ec.errorString(error) << endl;
+				throw std::runtime_error (oss.str());
+			}
+			++colpos;
+			++iter;
+		}
+	}
+	catch (std::exception& ex)
+	{
+		err += ex.what();
+		throw std::runtime_error(err);
+	}
+	catch (...)
+	{
+		err += "Unknown exception caught";
+		throw std::runtime_error(err);
+	}
+}
+
+
+void DDLPackageProcessor::createIndexFiles(execplan::CalpontSystemCatalog::SCN txnID, const DDLResult& result)
+{
+/*	std::string err("DDLPackageProcessor::createIndexFiles ");
+	SUMMARY_INFO(err);
+
+	if (result.result != NO_ERROR)
+		return;
+
+	int error = NO_ERROR;
+
+	IndexOIDList::const_iterator iter = fIndexOIDList.begin();
+	try
+	{
+		while (iter != fIndexOIDList.end())
+		{
+			IndexOID idxOID = *iter;
+
+			error = -1;
+			if (error != WriteEngine::NO_ERROR)
+			{
+		WErrorCodes ec;
+				throw std::runtime_error("WE: Error creating index files: tree file " + getFileName(idxOID.treeOID) + " list file " + getFileName(idxOID.listOID) + ". " + ec.errorString(error));
+			}
+			++iter;
+		}
+	}
+	catch (std::exception& ex)
+	{
+		err += ex.what();
+		throw std::runtime_error(err);
+	}
+	catch (...)
+	{
+		err += "Unknown exception caught";
+		throw std::runtime_error(err);
+	}
+	*/
+}
+
 
 void DDLPackageProcessor::flushPrimprocCache(std::vector<execplan::CalpontSystemCatalog::OID>& oidList)
 {
@@ -743,8 +1629,12 @@ void DDLPackageProcessor::flushPrimprocCache(std::vector<execplan::CalpontSystem
 			//Need find a more efficient way to do this.
 			err = cacheutils::flushPrimProcBlocks (blockList);
 			//No need to handle this error as the error comes from timeout, not real error
-			(void)err;
-
+ /*		   if (err)
+			{
+				error = "flushPrimProcBlocks failed.";
+				throw std::runtime_error(error);
+			}
+*/
 			++iter;
 		}
 	}
@@ -776,7 +1666,7 @@ void DDLPackageProcessor::removeFiles(const uint64_t uniqueId, std::vector<execp
 		bytestream << (uint32_t) oidList[i];
 	}
 		
-	uint32_t msgRecived = 0;
+	uint msgRecived = 0;
 	ByteStream::byte rc = 0;
 	ByteStream::byte tmp8;
 	string errorMsg;
@@ -828,7 +1718,7 @@ void DDLPackageProcessor::removeFiles(const uint64_t uniqueId, std::vector<execp
 }
 
 void DDLPackageProcessor::createFiles(CalpontSystemCatalog::TableName aTableName, const int useDBRoot, 
-	const uint64_t uniqueId, const uint32_t numOids)
+	const u_int64_t uniqueId, const u_int32_t numOids)
 {
 	SUMMARY_INFO("DDLPackageProcessor::createFiles");
 	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(1);
@@ -838,25 +1728,24 @@ void DDLPackageProcessor::createFiles(CalpontSystemCatalog::TableName aTableName
 	ByteStream bytestream;
 	boost::shared_ptr<messageqcpp::ByteStream> bsIn;
 	bytestream << (ByteStream::byte)WE_SVR_WRITE_CREATETABLEFILES;
-	bytestream << (uint32_t)1;
 	bytestream << uniqueId;
 	bytestream << numOids;
 	for (unsigned col  = 0; col < ridList.size(); col++)
 	{						
 		colType = systemCatalogPtr->colType(ridList[col].objnum);
 		bytestream << (uint32_t) ridList[col].objnum;
-		bytestream << (uint8_t) colType.colDataType;
-		bytestream << (uint8_t) false;
+		bytestream << (u_int8_t) colType.colDataType;
+		bytestream << (u_int8_t) false;
 		bytestream << (uint32_t) colType.colWidth;
-		bytestream << (uint16_t) useDBRoot;
+		bytestream << (u_int16_t) useDBRoot;
 		bytestream << (uint32_t) colType.compressionType;
 		if (colType.ddn.dictOID > 3000)
 		{
 			bytestream << (uint32_t) colType.ddn.dictOID;
-			bytestream << (uint8_t) colType.colDataType;
-			bytestream << (uint8_t) true;
+			bytestream << (u_int8_t) colType.colDataType;
+			bytestream << (u_int8_t) true;
 			bytestream << (uint32_t) colType.colWidth;
-			bytestream << (uint16_t) useDBRoot;
+			bytestream << (u_int16_t) useDBRoot;
 			bytestream << (uint32_t) colType.compressionType;
 		}
 	}
@@ -868,7 +1757,7 @@ void DDLPackageProcessor::createFiles(CalpontSystemCatalog::TableName aTableName
 		boost::shared_ptr<std::map<int, int> > dbRootPMMap = oamcache->getDBRootToPMMap();
 		int pmNum = (*dbRootPMMap)[useDBRoot];
 			
-		fWEClient->write(bytestream, (uint32_t)pmNum);
+		fWEClient->write(bytestream, (uint)pmNum);
 		bsIn.reset(new ByteStream());
 				
 		while (1)
@@ -926,7 +1815,7 @@ void DDLPackageProcessor::removePartitionFiles(std::vector<execplan::CalpontSyst
 	PartitionNums::const_iterator partIt;
 	vector<BRM::PartitionInfo> partInfos;
 
-	for (uint32_t i = 0; i <  oidList.size(); i++)
+	for (uint i = 0; i <  oidList.size(); i++)
 	{
 		bs << (uint32_t)oidList[i];
 		// add oid to LogicalPartition to form PartitionInfo
@@ -940,11 +1829,11 @@ void DDLPackageProcessor::removePartitionFiles(std::vector<execplan::CalpontSyst
 	}
 
 	bs << (uint32_t)partInfos.size();
-	for (uint32_t i = 0; i < partInfos.size(); i++)
+	for (uint i = 0; i < partInfos.size(); i++)
 		partInfos[i].serialize(bs);
 
 	fWEClient->write_to_all(bs);
-	uint32_t pmCount = fWEClient->getPmCount();
+	uint pmCount = fWEClient->getPmCount();
 	boost::shared_ptr<messageqcpp::ByteStream> bsIn;
 	bsIn.reset(new ByteStream());
 
@@ -987,7 +1876,7 @@ void DDLPackageProcessor::removeExtents(std::vector<execplan::CalpontSystemCatal
 {
 	SUMMARY_INFO("DDLPackageProcessor::removeExtents");
 	int err = 0;
-	err = fDbrm->deleteOIDs(oidList);
+	err = fDbrm.deleteOIDs(oidList);
 	if (err)
 	{
 		string errMsg;
@@ -998,7 +1887,7 @@ void DDLPackageProcessor::removeExtents(std::vector<execplan::CalpontSystemCatal
 }
 
 void DDLPackageProcessor::createWriteDropLogFile(execplan::CalpontSystemCatalog::OID tableOid,  
-	uint64_t uniqueId, std::vector<execplan::CalpontSystemCatalog::OID>& oidList)
+	u_int64_t uniqueId, std::vector<execplan::CalpontSystemCatalog::OID>& oidList)
 {
 	SUMMARY_INFO("DDLPackageProcessor::createWriteDropLogFile");
 	//For shared nothing, the meta files are created under data1 with controllernode.
@@ -1007,19 +1896,19 @@ void DDLPackageProcessor::createWriteDropLogFile(execplan::CalpontSystemCatalog:
 	OAMParentModuleName = OAMParentModuleName.substr(2, OAMParentModuleName.length());
 	int parentId = atoi(OAMParentModuleName.c_str());
 	ByteStream bytestream;
-	uint8_t rc = 0;
+	u_int8_t rc = 0;
 	std::string errorMsg;
 	boost::shared_ptr<messageqcpp::ByteStream> bsIn;
 	bytestream << (ByteStream::byte)WE_SVR_WRITE_DROPTABLE;
 	bytestream << uniqueId;
-	bytestream << (uint32_t)tableOid;
-	bytestream << (uint32_t) oidList.size();
-	for (uint32_t i=0; i < oidList.size(); i++)
+	bytestream << (u_int32_t)tableOid;
+	bytestream << (u_int32_t) oidList.size();
+	for (u_int32_t i=0; i < oidList.size(); i++)
 	{
-		bytestream << (uint32_t)oidList[i];
+		bytestream << (u_int32_t)oidList[i];
 	}
 	try {
-		fWEClient->write(bytestream, (uint32_t)parentId);
+		fWEClient->write(bytestream, (uint)parentId);
 		while (1)
 		{
 			bsIn.reset(new ByteStream());
@@ -1054,7 +1943,7 @@ void DDLPackageProcessor::createWriteDropLogFile(execplan::CalpontSystemCatalog:
 		throw std::runtime_error(errorMsg);
 }
 
-void DDLPackageProcessor::deleteLogFile(LogFileType fileType, execplan::CalpontSystemCatalog::OID tableOid, uint64_t uniqueId)
+void DDLPackageProcessor::deleteLogFile(LogFileType fileType, execplan::CalpontSystemCatalog::OID tableOid, u_int64_t uniqueId)
 {
 	SUMMARY_INFO("DDLPackageProcessor::deleteLogFile");
 	OamCache * oamcache = OamCache::makeOamCache();
@@ -1062,16 +1951,16 @@ void DDLPackageProcessor::deleteLogFile(LogFileType fileType, execplan::CalpontS
 	OAMParentModuleName = OAMParentModuleName.substr(2, OAMParentModuleName.length());
 	int parentId = atoi(OAMParentModuleName.c_str());
 	ByteStream bytestream;
-	uint8_t rc = 0;
+	u_int8_t rc = 0;
 	std::string errorMsg;
 	fWEClient->addQueue(uniqueId);
 	boost::shared_ptr<messageqcpp::ByteStream> bsIn;
 	bytestream << (ByteStream::byte)WE_SVR_DELETE_DDLLOG;
 	bytestream << uniqueId;
-	bytestream << (uint32_t) fileType;
-	bytestream << (uint32_t)tableOid;
+	bytestream << (u_int32_t) fileType;
+	bytestream << (u_int32_t)tableOid;
 	try {
-		fWEClient->write(bytestream, (uint32_t)parentId);
+		fWEClient->write(bytestream, (uint)parentId);
 		while (1)
 		{
 			bsIn.reset(new ByteStream());
@@ -1108,18 +1997,16 @@ void DDLPackageProcessor::deleteLogFile(LogFileType fileType, execplan::CalpontS
 	}
 }
 
-void DDLPackageProcessor::fetchLogFile(TableLogInfo & tableLogInfos, uint64_t uniqueId)
+void DDLPackageProcessor::fetchLogFile(TableLogInfo & tableLogInfos, u_int64_t uniqueId)
 {
 	SUMMARY_INFO("DDLPackageProcessor::fetchLogFile");
 	OamCache * oamcache = OamCache::makeOamCache();
 	std::string OAMParentModuleName = oamcache->getOAMParentModuleName();
-	//Use a sensible default so that substr doesn't throw...
-	if (OAMParentModuleName.empty())
-		OAMParentModuleName = "pm1";
-	int parentId = atoi(OAMParentModuleName.substr(2, OAMParentModuleName.length()).c_str());
+	OAMParentModuleName = OAMParentModuleName.substr(2, OAMParentModuleName.length());
+	int parentId = atoi(OAMParentModuleName.c_str());
 	ByteStream bytestream;
-	uint8_t rc = 0;
-	uint32_t tmp32, tableOid, numOids, numPartitions;
+	u_int8_t rc = 0;
+	u_int32_t tmp32, tableOid, numOids, numPartitions;
 	LogFileType logFileType;
 	std::string errorMsg;
 	fWEClient->addQueue(uniqueId);
@@ -1127,7 +2014,7 @@ void DDLPackageProcessor::fetchLogFile(TableLogInfo & tableLogInfos, uint64_t un
 	bytestream << (ByteStream::byte)WE_SVR_FETCH_DDL_LOGS;
 	bytestream << uniqueId;
 	try {
-		fWEClient->write(bytestream, (uint32_t)parentId);
+		fWEClient->write(bytestream, (uint)parentId);
 		while (1)
 		{
 			bsIn.reset(new ByteStream());
@@ -1193,7 +2080,7 @@ void DDLPackageProcessor::fetchLogFile(TableLogInfo & tableLogInfos, uint64_t un
 
 void DDLPackageProcessor::createWritePartitionLogFile(execplan::CalpontSystemCatalog::OID tableOid,  
 	                                                   const PartitionNums& partitionNums,
-	                                                   std::vector<execplan::CalpontSystemCatalog::OID>& oidList, uint64_t uniqueId)
+	                                                   std::vector<execplan::CalpontSystemCatalog::OID>& oidList, u_int64_t uniqueId)
 {
 	SUMMARY_INFO("DDLPackageProcessor::createWritePartitionLogFile");
 	fWEClient->addQueue(uniqueId);
@@ -1204,23 +2091,23 @@ void DDLPackageProcessor::createWritePartitionLogFile(execplan::CalpontSystemCat
 	boost::shared_ptr<messageqcpp::ByteStream> bsIn;
 	ByteStream bytestream;
 	std::string errorMsg;
-	uint8_t rc = 0;
+	u_int8_t rc = 0;
 	bytestream << (ByteStream::byte)WE_SVR_WRITE_DROPPARTITION;
 	bytestream << uniqueId;
-	bytestream << (uint32_t)tableOid;
+	bytestream << (u_int32_t)tableOid;
 	bytestream << (uint32_t) partitionNums.size();
 	PartitionNums::const_iterator it;
 	
 	for (it = partitionNums.begin(); it != partitionNums.end(); ++it)
 		(*it).serialize(bytestream);
 		
-	bytestream << (uint32_t) oidList.size();
-	for (uint32_t i=0; i < oidList.size(); i++)
+	bytestream << (u_int32_t) oidList.size();
+	for (u_int32_t i=0; i < oidList.size(); i++)
 	{
-		bytestream << (uint32_t)oidList[i];
+		bytestream << (u_int32_t)oidList[i];
 	}
 	try {
-		fWEClient->write(bytestream, (uint32_t)parentId);
+		fWEClient->write(bytestream, (uint)parentId);
 		while (1)
 		{
 			bsIn.reset(new ByteStream());
@@ -1255,7 +2142,7 @@ void DDLPackageProcessor::createWritePartitionLogFile(execplan::CalpontSystemCat
 		throw std::runtime_error(errorMsg);
 }
 
-void DDLPackageProcessor::createWriteTruncateTableLogFile(execplan::CalpontSystemCatalog::OID tableOid,  uint64_t uniqueId, std::vector<execplan::CalpontSystemCatalog::OID>& oidList)
+void DDLPackageProcessor::createWriteTruncateTableLogFile(execplan::CalpontSystemCatalog::OID tableOid,  u_int64_t uniqueId, std::vector<execplan::CalpontSystemCatalog::OID>& oidList)
 {
 	SUMMARY_INFO("DDLPackageProcessor::createWriteTruncateTableLogFile");
 	//For shared nothing, the meta files are created under data1 with controllernode.
@@ -1264,19 +2151,19 @@ void DDLPackageProcessor::createWriteTruncateTableLogFile(execplan::CalpontSyste
 	OAMParentModuleName = OAMParentModuleName.substr(2, OAMParentModuleName.length());
 	int parentId = atoi(OAMParentModuleName.c_str());
 	ByteStream bytestream;
-	uint8_t rc = 0;
+	u_int8_t rc = 0;
 	std::string errorMsg;
 	boost::shared_ptr<messageqcpp::ByteStream> bsIn;
 	bytestream << (ByteStream::byte)WE_SVR_WRITE_TRUNCATE;
 	bytestream << uniqueId;
-	bytestream << (uint32_t)tableOid;
-	bytestream << (uint32_t) oidList.size();
-	for (uint32_t i=0; i < oidList.size(); i++)
+	bytestream << (u_int32_t)tableOid;
+	bytestream << (u_int32_t) oidList.size();
+	for (u_int32_t i=0; i < oidList.size(); i++)
 	{
-		bytestream << (uint32_t)oidList[i];
+		bytestream << (u_int32_t)oidList[i];
 	}
 	try {
-		fWEClient->write(bytestream, (uint32_t)parentId);
+		fWEClient->write(bytestream, (uint)parentId);
 		while (1)
 		{
 			bsIn.reset(new ByteStream());
@@ -1311,7 +2198,6 @@ void DDLPackageProcessor::createWriteTruncateTableLogFile(execplan::CalpontSyste
 		throw std::runtime_error(errorMsg);
 }
 
-#if 0
 void DDLPackageProcessor::createOpenTruncateTableLogFile(execplan::CalpontSystemCatalog::OID tableOid, execplan::CalpontSystemCatalog::TableName tableName)
 {
 	SUMMARY_INFO("DDLPackageProcessor::createOpenTruncateTableLogFile");
@@ -1415,7 +2301,7 @@ void DDLPackageProcessor::updateSyscolumns(execplan::CalpontSystemCatalog::SCN t
 	colStruct.dataOid = OID_SYSCOLUMN_COLUMNPOS;
 	colStruct.colWidth = 4;
 	colStruct.tokenFlag = false;
-	colStruct.colDataType = CalpontSystemCatalog::INT;
+	colStruct.colDataType = WriteEngine::INT;
 	colStructs.push_back(colStruct);
 	int error;
 	std::string err;
@@ -1444,8 +2330,6 @@ void DDLPackageProcessor::updateSyscolumns(execplan::CalpontSystemCatalog::SCN t
 	}
 
 }
-
-#endif
 void DDLPackageProcessor::returnOIDs(execplan::CalpontSystemCatalog::RIDList& ridList,
 									 execplan::CalpontSystemCatalog::DictOIDList& dictOIDList)
 {
@@ -1494,7 +2378,7 @@ void DDLPackageProcessor::returnOIDs(execplan::CalpontSystemCatalog::RIDList& ri
 	}
 }
 
-void DDLPackageProcessor::findColumnData(uint32_t sessionID, execplan::CalpontSystemCatalog::TableName& systableName,
+void DDLPackageProcessor::findColumnData(u_int32_t sessionID, execplan::CalpontSystemCatalog::TableName& systableName,
 		const std::string& colName,
 		DDLColumn& sysCol)
 {
@@ -1570,14 +2454,14 @@ void DDLPackageProcessor::convertRidToColumn(uint64_t& rid, unsigned& dbRoot, un
 	rid = relRidInThisExtent +  numExtentsInThisSegPart * extentRows;
 }
 
-int DDLPackageProcessor::rollBackTransaction(uint64_t uniqueId, BRM::TxnID txnID, uint32_t sessionID)
+int DDLPackageProcessor::rollBackTransaction(u_int64_t uniqueId, BRM::TxnID txnID, u_int32_t sessionID)
 {
 	ByteStream bytestream;
 	bytestream << (ByteStream::byte) WE_SVR_ROLLBACK_BLOCKS;
 	bytestream << uniqueId;
 	bytestream << sessionID;
-	bytestream << (uint32_t)txnID.id;
-	uint32_t msgRecived = 0;
+	bytestream << (u_int32_t)txnID.id;
+	uint msgRecived = 0;
 	fWEClient->write_to_all(bytestream);
 	boost::shared_ptr<messageqcpp::ByteStream> bsIn;
 	bsIn.reset(new ByteStream());
@@ -1614,7 +2498,7 @@ int DDLPackageProcessor::rollBackTransaction(uint64_t uniqueId, BRM::TxnID txnID
 		bytestream << (ByteStream::byte) WE_SVR_ROLLBACK_VERSION;
 		bytestream << uniqueId;
 		bytestream << sessionID;
-		bytestream << (uint32_t) txnID.id;
+		bytestream << (u_int32_t) txnID.id;
 		fWEClient->write_to_all(bytestream);
 		bsIn.reset(new ByteStream());
 		msgRecived = 0;
@@ -1645,12 +2529,50 @@ int DDLPackageProcessor::rollBackTransaction(uint64_t uniqueId, BRM::TxnID txnID
 	return rc;
 }
 
-int DDLPackageProcessor::commitTransaction(uint64_t uniqueId, BRM::TxnID txnID)
+int DDLPackageProcessor::commitTransaction(u_int64_t uniqueId, BRM::TxnID txnID)
 {
-	int rc = fDbrm->vbCommit(txnID.id);
+	int rc = fDbrm.vbCommit(txnID.id);
 	return rc;	
 }
 
+void DDLPackageProcessor::convertDecimal (ColumnDef* colDefPtr)
+{		
+	//@Bug 2089 decimal precision default to 10 if 0 is used.
+	if (colDefPtr->fType->fPrecision <= 0)
+		colDefPtr->fType->fPrecision = 10;
+
+	if (colDefPtr->fType->fPrecision == -1 || colDefPtr->fType->fPrecision == 0)
+	{
+		colDefPtr->fType->fType = DDL_BIGINT;
+		colDefPtr->fType->fLength = 8;
+		colDefPtr->fType->fScale = 0;
+	}
+	else if ((colDefPtr->fType->fPrecision > 0) && (colDefPtr->fType->fPrecision < 3))
+	{
+					//dataType = CalpontSystemCatalog::TINYINT;
+		colDefPtr->fType->fType = DDL_TINYINT;
+		colDefPtr->fType->fLength = 1;
+	}
+
+	else if (colDefPtr->fType->fPrecision < 5 && (colDefPtr->fType->fPrecision > 2))
+	{
+					//dataType = CalpontSystemCatalog::SMALLINT;
+		colDefPtr->fType->fType = DDL_SMALLINT;
+		colDefPtr->fType->fLength = 2;
+	}
+	else if (colDefPtr->fType->fPrecision > 4 && colDefPtr->fType->fPrecision < 10)
+	{
+					//dataType = CalpontSystemCatalog::INT;
+		colDefPtr->fType->fType = DDL_INT;
+		colDefPtr->fType->fLength = 4;
+	}
+	else if (colDefPtr->fType->fPrecision > 9 && colDefPtr->fType->fPrecision < 19)
+	{
+					//dataType = CalpontSystemCatalog::BIGINT;
+		colDefPtr->fType->fType = DDL_BIGINT;
+		colDefPtr->fType->fLength = 8;
+	}				
+}
 } // namespace
 // vim:ts=4 sw=4:
 

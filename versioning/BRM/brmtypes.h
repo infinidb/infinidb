@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: brmtypes.h 1956 2013-08-09 22:39:36Z wweeks $
+ * $Id: brmtypes.h 1736 2012-10-29 22:15:26Z zzhu $
  *
  *****************************************************************************/
 
@@ -70,23 +70,21 @@ namespace tr1
 #include "messagelog.h"
 #include "loggingid.h"
 
+#ifdef UNDO
+#undef UNDO
+#endif
+
 #if defined(_MSC_VER) && defined(xxxBRMTYPES_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
 #endif
 
-namespace idbdatafile
-{
-class IDBDataFile;
-}
-
-
 namespace BRM {
 
 /* these types should be defined in the system catalog header */
 typedef int64_t LBID_t; /// The LBID space is currently 36 bits.  We use 64 here.
-typedef uint32_t HWM_t;
+typedef u_int32_t HWM_t;
 typedef int32_t VER_t;
 /// Object ID type.  Currently a 32-bit number.  24 for Object number, 8 for partition number.
 typedef execplan::CalpontSystemCatalog::OID OID_t;  
@@ -101,7 +99,7 @@ to inherit Serializeable, hence the all-public definitions */
 /// The InlineLBIDRange struct is for use internally by the ExtentMap
 struct InlineLBIDRange {
 		LBID_t start;
-		uint32_t size;
+		u_int32_t size;
 #ifndef __LP64__
 		int32_t pad1;
 #endif
@@ -110,7 +108,7 @@ struct InlineLBIDRange {
 #define MAX_PROCNAME 16
 
 		/** @brief SID = Session ID */
-		typedef uint32_t SID;
+		typedef u_int32_t SID;
 		/** @brief A type describing a single transaction ID */
 		struct _TxnID {
 			/// The TransactionID number
@@ -162,8 +160,8 @@ struct CPInfoMerge {
 	int64_t max;       // max value to be merged with current max value
 	int64_t min;       // min value to be merged with current min value
 	int32_t seqNum;    // sequence number (not currently used)
-    execplan::CalpontSystemCatalog::ColDataType type;
-    bool	newExtent; // is this to be treated as a new extent
+	bool    isChar;    // does this extent carry non-dictionary string data
+	bool	newExtent; // is this to be treated as a new extent
 };
 typedef std::vector<CPInfoMerge> CPInfoMergeList_t;
 
@@ -173,7 +171,7 @@ struct CPMaxMinMerge {
 	int64_t max;
 	int64_t min;
 	int32_t seqNum;
-	execplan::CalpontSystemCatalog::ColDataType type;
+	bool    isChar;
 	bool    newExtent;
 };
 typedef std::tr1::unordered_map<LBID_t, CPMaxMinMerge> CPMaxMinMergeMap_t;
@@ -191,15 +189,6 @@ struct ExtentInfo {
 	HWM_t		hwm;
 	bool 		newFile;
 };
-
-struct FileInfo {
-	execplan::CalpontSystemCatalog::OID oid;
-	uint32_t	partitionNum; // starts at 0
-	uint16_t	segmentNum;   // starts at 0
-	uint16_t	dbRoot;       // starts at 1 to match Calpont.xml
-	uint16_t	compType;	  // compression type
-};
-
 typedef std::tr1::unordered_map<execplan::CalpontSystemCatalog::OID, ExtentInfo> ExtentsInfoMap_t;
 
 enum LockState {
@@ -220,11 +209,9 @@ struct TableLockInfo : public messageqcpp::Serializeable {
 
 	bool overlaps(const TableLockInfo &, const std::set<uint32_t> &sPMList) const;
 	EXPORT void serialize(messageqcpp::ByteStream &bs) const;
+	EXPORT void deserialize(messageqcpp::ByteStream &bs);
 	EXPORT void serialize(std::ostream &) const;
 	EXPORT void deserialize(std::istream &);
-	EXPORT void deserialize(messageqcpp::ByteStream &bs);
-	EXPORT void serialize(idbdatafile::IDBDataFile*) const;
-	EXPORT void deserialize(idbdatafile::IDBDataFile*);
 	bool operator<(const TableLockInfo &) const;
 };
 
@@ -233,7 +220,7 @@ class LBIDRange : public messageqcpp::Serializeable {
 
 	public:
 		LBID_t start;
-		uint32_t size;
+		u_int32_t size;
 
 		EXPORT LBIDRange();
 		EXPORT LBIDRange(const LBIDRange& l);
@@ -277,7 +264,6 @@ struct BulkUpdateDBRootArg {
 struct CreateStripeColumnExtentsArgIn {
 	OID_t    oid;	// column OID
 	uint32_t width; // column width in bytes
-    execplan::CalpontSystemCatalog::ColDataType colDataType;
 };
 
 /* Output Arg type for DBRM:createStripeColumnExtents() */
@@ -295,8 +281,8 @@ class VBRange : public messageqcpp::Serializeable {
 
 	public:
 		OID_t vbOID;
-		uint32_t vbFBO;
-		uint32_t size;
+		u_int32_t vbFBO;
+		u_int32_t size;
 
 		EXPORT VBRange();
 		EXPORT VBRange(const VBRange& v);
@@ -314,12 +300,9 @@ struct EmDbRootHWMInfo {
 	HWM_t		localHWM;     // local HWM in last file for this dbRoot
 	uint32_t	fbo;          // starting block offset to HWM extent
 	LBID_t		startLbid;    // starting LBID for HWM extent
-	uint64_t	totalBlocks;  // cumulative non-outOfService blks for this dbRoot.
-                              //   0 block count means no extents in this dbRoot,
-                              //   unless status is OutOfService; in which case
-                              //   the dbRoot has blocks that are all OutOfService
+	uint64_t	totalBlocks;  // cumulative block count for this dbRoot
+                              //   0 block count means no extents in this dbRoot
 	int			hwmExtentIndex;//Internal use (idx to HWM extent in extent map)
-	int16_t     status;       // Avail, unAvail, outOfService
 	EmDbRootHWMInfo()              { init(0); }
 	EmDbRootHWMInfo(uint16_t root) { init(root); }
 	void init (uint16_t root) {
@@ -330,8 +313,20 @@ struct EmDbRootHWMInfo {
 		fbo         = 0;
 		startLbid   = 0;
 		hwmExtentIndex = -1;
-		totalBlocks = 0;
-		status      = 0; }
+		totalBlocks = 0; }
+	bool operator> (const EmDbRootHWMInfo& rhs) const
+	{
+		if (partitionNum > rhs.partitionNum)
+			return true;
+		if (partitionNum == rhs.partitionNum && segmentNum > rhs.segmentNum)
+			return true;
+		if (partitionNum == rhs.partitionNum && segmentNum == rhs.segmentNum && localHWM > rhs.localHWM)
+			return true;
+		if (partitionNum == rhs.partitionNum && segmentNum == rhs.segmentNum && localHWM == rhs.localHWM && totalBlocks > rhs.totalBlocks)
+			return true;
+			
+		return false;
+	}
 };
 
 typedef std::vector<EmDbRootHWMInfo> EmDbRootHWMInfo_v;  
@@ -390,7 +385,7 @@ const uint8_t END_VB_COPY = 5;
 const uint8_t VB_ROLLBACK1 = 6;
 const uint8_t VB_ROLLBACK2 = 7;
 const uint8_t VB_COMMIT = 8;
-const uint8_t BRM_UNDO = 9;
+const uint8_t UNDO = 9;
 const uint8_t CONFIRM = 10;
 const uint8_t HALT = 11;
 const uint8_t RESUME = 12;
@@ -398,7 +393,7 @@ const uint8_t RELOAD = 13;
 const uint8_t SETREADONLY = 14;
 const uint8_t SETREADWRITE = 15;
 const uint8_t FLUSH_INODE_CACHES = 16;
-const uint8_t BRM_CLEAR = 17;
+const uint8_t CLEAR = 17;
 const uint8_t MARKEXTENTINVALID = 18;
 const uint8_t MARKMANYEXTENTSINVALID = 19;
 const uint8_t GETREADONLY = 20;
@@ -512,9 +507,6 @@ const int8_t ERR_TABLE_NOT_LOCKED = 14;
 const int8_t ERR_SNAPSHOT_TOO_OLD = 15;
 const int8_t ERR_NO_PARTITION_PERFORMED = 16;
 
-/// This error code is returned by writeVBEntry when a session with a low txnid attempts to write to a block with a higher verid
-const int8_t ERR_OLDTXN_OVERWRITING_NEWTXN = 17;
-
 // structure used to hold the information to identify a partition for shared-nothing
 struct PartitionInfo 
 {
@@ -533,38 +525,6 @@ struct PartitionInfo
 		b >> (uint32_t&)oid;
 	}
 };
-
-// Note: Copies share the currentTxns array
-class QueryContext : public messageqcpp::Serializeable {
-public:
-	explicit QueryContext(VER_t scn=0)
-	: currentScn(scn)
-	{
-		currentTxns.reset(new std::vector<VER_t>());
-	}
-
-	void serialize(messageqcpp::ByteStream& bs) const
-	{
-		bs << currentScn;
-		serializeInlineVector(bs, *currentTxns);
-	}
-
-	void deserialize(messageqcpp::ByteStream& bs)
-	{
-		bs >> currentScn;
-		deserializeInlineVector(bs, *currentTxns);
-	}
-
-	execplan::CalpontSystemCatalog::SCN currentScn;
-	boost::shared_ptr<std::vector<execplan::CalpontSystemCatalog::SCN> > currentTxns;
-
-private:
-	//defaults okay?
-	//QueryContext(const QueryContext& rhs);
-	//QueryContext& operator=(const QueryContext& rhs);
-};
-
-std::ostream & operator<<(std::ostream &, const QueryContext &);
 
 }
 

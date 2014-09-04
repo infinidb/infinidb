@@ -16,10 +16,10 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: passthrucommand-jl.cpp 9655 2013-06-25 23:08:13Z xlou $
+// $Id: passthrucommand-jl.cpp 8476 2012-04-25 22:28:15Z xlou $
 // C++ Implementation: passthrucommand-jl
 //
-// Description:
+// Description: 
 //
 //
 // Author: Patrick <pleblanc@localhost.localdomain>, (C) 2008
@@ -40,7 +40,7 @@ using namespace messageqcpp;
 #include "command-jl.h"
 #include "passthrucommand-jl.h"
 
-namespace joblist
+namespace joblist 
 {
 
 /* I think this class literally does nothing */
@@ -54,7 +54,7 @@ PassThruCommandJL::PassThruCommandJL(const PassThruStep &p)
 	/* Is this ever a dictionary column? */
 	if (p.isDictColumn)
 		tableColumnType = TableColumn::STRING;
-	else
+	else	
 		switch (colWidth) {
 			case 1: tableColumnType = TableColumn::UINT8; break;
 			case 2: tableColumnType = TableColumn::UINT16; break;
@@ -69,7 +69,7 @@ PassThruCommandJL::~PassThruCommandJL()
 {
 }
 
-void PassThruCommandJL::setLBID(uint64_t l, uint32_t dbroot)
+void PassThruCommandJL::setLBID(uint64_t l, uint dbroot)
 {
 }
 
@@ -92,7 +92,7 @@ uint8_t PassThruCommandJL::getTableColumnType()
 string PassThruCommandJL::toString()
 {
 	ostringstream oss;
-	oss << "PassThruCommandJL: colwidth=" << static_cast<uint32_t>(colWidth) << " oid=" << OID
+	oss << "PassThruCommandJL: colwidth=" << static_cast<uint>(colWidth) << " oid=" << OID
 		<< " colName=" << colName;
 	return oss.str();
 }

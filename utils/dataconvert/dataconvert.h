@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: dataconvert.h 3693 2013-04-05 16:11:30Z chao $
+* $Id: dataconvert.h 3277 2012-09-13 12:34:45Z rdempsey $
 *
 *
 ****************************************************************************/
@@ -40,7 +40,6 @@
 
 #include "calpontsystemcatalog.h"
 #include "columnresult.h"
-#include "exceptclasses.h"
 
 // remove this block if the htonll is defined in library
 #ifdef __linux__
@@ -58,13 +57,11 @@ inline uint64_t htonll(uint64_t n);
 // don't know 34127856 or 78563412, hope never be required to support this byte order.
 #endif
 #else //!__linux__
-#if _MSC_VER < 1600
 //Assume we're on little-endian
 inline uint64_t htonll(uint64_t n)
 {
 return ((((uint64_t) htonl(n & 0xFFFFFFFFULL)) << 32) | (htonl((n & 0xFFFFFFFF00000000ULL) >> 32)));
 }
-#endif //_MSC_VER
 #endif //__linux__
 
 // this method evalutes the uint64 that stores a char[] to expected value
@@ -100,9 +97,9 @@ struct Date
     	spare(0x3E), day(0x3F), month(0xF), year(0xFFFF) {}
     // Construct a Date from a 64 bit integer Calpont date.
     Date(uint64_t val) :
-    	spare(0x3E), day((val >> 6) & 077), month((val >> 12) & 0xF), year((val >> 16)) {}
+    	spare(0), day((val >> 6) & 077), month((val >> 12) & 0xF), year((val >> 16)) {}
     // Construct using passed in parameters, no value checking
-    Date(unsigned y, unsigned m, unsigned d) : spare(0x3E), day(d), month(m), year(y) {}
+    Date(unsigned y, unsigned m, unsigned d) : spare(0), day(d), month(m), year(y) {}
 
     int32_t convertToMySQLint() const;
 };
@@ -137,25 +134,12 @@ struct DateTime
     	msecond(msec), second(sec), minute(min), hour(h), day(d), month(m), year(y) {}
 
     int64_t convertToMySQLint() const;
-    void    reset();
 };
 
 inline
 int64_t DateTime::convertToMySQLint() const
 {
 	return (int64_t) (year*10000000000LL)+(month*100000000)+(day*1000000)+(hour*10000)+(minute*100)+second;
-}
-
-inline
-void    DateTime::reset()
-{
-	msecond = 0xFFFFE;
-	second  = 0x3F;
-	minute  = 0x3F;
-	hour    = 0x3F;
-	day     = 0x3F;
-	month   = 0xF;
-	year    = 0xFFFF;
 }
 
 /** @brief a structure to hold a time
@@ -186,103 +170,6 @@ struct Time
 		{}
 };
 
-static uint32_t daysInMonth[13] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 0};
-
-inline uint32_t getDaysInMonth(uint32_t month)
-{ return ( (month < 1 || month > 12) ? 0 : daysInMonth[month-1]);}
-
-inline bool isLeapYear ( int year)
-{
-    if( year % 400 == 0 )
-    	return true;
-    if( ( year % 4 == 0 ) && ( year % 100 != 0 ) )
-    	return true;
-    return false;
-}
-
-inline
-bool isDateValid ( int day, int month, int year)
-{
-	bool valid = true;
-	int daycheck = getDaysInMonth( month );
-	if( month == 2 && isLeapYear( year ) )
-	    //  29 days in February in a leap year
-		daycheck = 29;
-	if ( ( year < 1400 ) || ( year > 9999 ) )
-		valid = false;
-	else if ( month < 1 || month > 12 )
-		valid = false;
-	else if ( day < 1 || day > daycheck )
-		valid = false;
-	return ( valid );
-}
-
-inline
-bool isDateTimeValid ( int hour, int minute, int second, int microSecond)
-{
-	bool valid = false;
-	if ( hour >= 0 && hour <= 24 )
-	{
-		if ( minute >= 0 && minute < 60 )
-		{
-			if ( second >= 0 && second < 60 )
-			{
-				if ( microSecond >= 0 && microSecond <= 999999 )
-				{
-					valid = true;
-				}
-			}
-		}
-	}
-	return valid;
-}
-
-inline
-int64_t string_to_ll( const std::string& data, bool& bSaturate )
-{
-    // This function doesn't take into consideration our special values
-    // for NULL and EMPTY when setting the saturation point. Should it?
-	char *ep = NULL;
-	const char *str = data.c_str();
-	errno = 0;
-	int64_t value = strtoll(str, &ep, 10);
-
-	//  (no digits) || (more chars)  || (other errors & value = 0)
-	if ((ep == str) || (*ep != '\0') || (errno != 0 && value == 0))
-		throw logging::QueryDataExcept("value is not numerical.", logging::formatErr);
-
-	if (errno == ERANGE && (value == std::numeric_limits<int64_t>::max() || value == std::numeric_limits<int64_t>::min()))
-		bSaturate = true;
-
-	return value;
-}
-
-inline
-uint64_t string_to_ull( const std::string& data, bool& bSaturate )
-{
-    // This function doesn't take into consideration our special values
-    // for NULL and EMPTY when setting the saturation point. Should it?
-	char *ep = NULL;
-	const char *str = data.c_str();
-	errno = 0;
-
-    // check for negative number. saturate to 0;
-    if (data.find('-') != data.npos)
-    {
-        bSaturate = true;
-        return 0;
-    }
-	uint64_t value = strtoull(str, &ep, 10);
-	//  (no digits) || (more chars)  || (other errors & value = 0)
-	if ((ep == str) || (*ep != '\0') || (errno != 0 && value == 0))
-		throw logging::QueryDataExcept("value is not numerical.", logging::formatErr);
-
-	if (errno == ERANGE && (value == std::numeric_limits<uint64_t>::max()))
-		bSaturate = true;
-
-	return value;
-}
-
 /** @brief DataConvert is a component for converting string data to Calpont format
   */
 class DataConvert
@@ -296,9 +183,9 @@ public:
      * @param type the columns data type
      * @param data the columns string representation of it's data
      */
-    EXPORT static boost::any convertColumnData( const execplan::CalpontSystemCatalog::ColType& colType,
-                                  				const std::string& dataOrig, bool& bSaturate,
-												bool nulFlag = false, bool noRoundup = false, bool isUpdate = false);
+    EXPORT static boost::any convertColumnData( execplan::CalpontSystemCatalog::ColType colType,
+                                  				const std::string& dataOrig, bool& pushWarning,
+												bool nulFlag = false, bool noRoundup = false );
 
    /**
      * @brief convert a columns data from native format to a string
@@ -346,14 +233,9 @@ public:
      * @param status 0 - success, -1 - fail
      * @param dataOrgLen length specification of dataOrg
      */
-    EXPORT static int32_t convertColumnDate( const char* dataOrg,
+    EXPORT static u_int32_t convertColumnDate( const char* dataOrg,
                                   CalpontDateTimeFormat dateFormat,
                                   int& status, unsigned int dataOrgLen );
-
-    /**
-     * @brief Is specified date valid; used by binary bulk load
-     */
-    EXPORT static bool      isColumnDateValid( int32_t date );
                                                                  
     /**
      * @brief convert a datetime column data, represented as a string,
@@ -365,17 +247,12 @@ public:
      * @param status 0 - success, -1 - fail
      * @param dataOrgLen length specification of dataOrg
      */
-    EXPORT static int64_t convertColumnDatetime( const char* dataOrg,
+    EXPORT static u_int64_t convertColumnDatetime( const char* dataOrg,
                                   CalpontDateTimeFormat datetimeFormat,
                                   int& status, unsigned int dataOrgLen );  
 
-    /**
-     * @brief Is specified datetime valid; used by binary bulk load
-     */
-    EXPORT static bool      isColumnDateTimeValid( int64_t dateTime );
-
     EXPORT static bool isNullData(execplan::ColumnResult* cr, int rownum, execplan::CalpontSystemCatalog::ColType colType);
-    static inline void decimalToString( int64_t value, uint8_t scale, char* buf, unsigned int buflen, execplan::CalpontSystemCatalog::ColDataType colDataType);
+    static inline void decimalToString( int64_t value, uint8_t scale, char* buf, unsigned int buflen );                          
     static inline std::string constructRegexp(const std::string& str);
     static inline bool isEscapedChar(char c) { return ('%' == c || '_' == c); }
     
@@ -395,6 +272,7 @@ public:
     EXPORT static int64_t stringToTime (const std::string& data);
     // bug4388, union type conversion
     EXPORT static execplan::CalpontSystemCatalog::ColType convertUnionColType(std::vector<execplan::CalpontSystemCatalog::ColType>&);
+
 };
 
 inline void DataConvert::dateToString( int datevalue, char* buf, unsigned int buflen)
@@ -439,8 +317,7 @@ inline void DataConvert::datetimeToString1( long long datetimevalue, char* buf, 
 				);
 }
 
-inline void DataConvert::decimalToString(int64_t int_val, uint8_t scale, char* buf, unsigned int buflen,
-                                         execplan::CalpontSystemCatalog::ColDataType colDataType)
+inline void DataConvert::decimalToString( int64_t int_val, uint8_t scale, char* buf, unsigned int buflen )
 {
 	// Need to convert a string with a binary unsigned number in it to a 64-bit signed int
 	
@@ -449,22 +326,11 @@ inline void DataConvert::decimalToString(int64_t int_val, uint8_t scale, char* b
 	
 	//biggest Calpont supports is DECIMAL(18,x), or 18 total digits+dp+sign for column
 	// Need 19 digits maxium to hold a sum result of 18 digits decimal column.
-    if (isUnsigned(colDataType))
-    {
 #ifndef __LP64__
-        snprintf(buf, buflen, "%llu", static_cast<uint64_t>(int_val));
+	snprintf(buf, buflen, "%lld", int_val);
 #else
-        snprintf(buf, buflen, "%lu", static_cast<uint64_t>(int_val));
+	snprintf(buf, buflen, "%ld", int_val);
 #endif
-    }
-    else
-    {
-#ifndef __LP64__
-        snprintf(buf, buflen, "%lld", int_val);
-#else
-        snprintf(buf, buflen, "%ld", int_val);
-#endif
-    }
 	//we want to move the last dt_scale chars right by one spot to insert the dp
 	//we want to move the trailing null as well, so it's really dt_scale+1 chars
 	size_t l1 = strlen(buf);
@@ -479,7 +345,7 @@ inline void DataConvert::decimalToString(int64_t int_val, uint8_t scale, char* b
 	//at this point scale is always > 0
 	if ((unsigned)scale > l1)
 	{
-		const char* zeros = "00000000000000000000"; //20 0's
+		const char* zeros = "0000000000000000000"; //19 0's
 		size_t diff=0;
 		if (int_val != 0)
 			diff = scale - l1; //this will always be > 0
@@ -506,7 +372,7 @@ inline std::string DataConvert::constructRegexp(const std::string& str)
 	//In the worst case, every char is quadrupled, plus some leading/trailing cruft...
 	char* cBuf = (char*)alloca(((4 * str.length()) + 3) * sizeof(char));
 	char c;
-	uint32_t i, cBufIdx = 0;
+	uint i, cBufIdx = 0;
 	// translate to regexp symbols
 	cBuf[cBufIdx++] = '^';  // implicit leading anchor
 	for (i = 0; i < str.length(); i++) {

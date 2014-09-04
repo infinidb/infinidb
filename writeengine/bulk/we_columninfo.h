@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_columninfo.h 4726 2013-08-07 03:38:36Z bwilkinson $
+* $Id: we_columninfo.h 4496 2013-01-31 19:13:20Z pleblanc $
 *
 *******************************************************************************/
 
@@ -39,7 +39,12 @@
 #include <sys/time.h>
 #include <vector>
 
-#include "atomicops.h"
+#if defined(_MSC_VER) && !defined(_WIN64)
+#  ifndef InterlockedAdd
+#    define InterlockedAdd64 InterlockedAdd
+#    define InterlockedAdd(x, y) ((x) + (y))
+#  endif
+#endif
 
 namespace WriteEngine
 {
@@ -48,7 +53,6 @@ class ColumnAutoInc;
 class DBRootExtentTracker;
 class BRMReporter;
 class TableInfo;
-struct DBRootExtentInfo;
 
 enum Status 
 {
@@ -59,17 +63,11 @@ enum Status
     ERR
 };
 
-// State of starting db file:
-//   CREATE_FILE_ON_EMPTY - empty PM; create starting seg file
-//   CREATE_FILE_ON_DISABLED - HWM extent is disabled; create starting seg file
-//   FILE_EXISTS - target seg file exists; will add more rows
-//   ERROR_STATE - error has occurred executing delayed file creation
 enum InitialDBFileStat
 {
-    INITIAL_DBFILE_STAT_CREATE_FILE_ON_EMPTY    = 1,
-    INITIAL_DBFILE_STAT_CREATE_FILE_ON_DISABLED = 2,
-    INITIAL_DBFILE_STAT_FILE_EXISTS = 3,
-    INITIAL_DBFILE_STAT_ERROR_STATE = 4
+    INITIAL_DBFILE_STAT_CREATE_FILE = 1,
+    INITIAL_DBFILE_STAT_FILE_EXISTS = 2,
+    INITIAL_DBFILE_STAT_ERROR_STATE = 3
 };
 
 struct LockInfo
@@ -163,13 +161,21 @@ struct ColumnInfo
      *   For compressed data files, this is the "raw" data byte count,
      *   not the compressed byte count.
      */
+#ifdef _MSC_VER
+    __int64 availFileSize;
+#else
     long long availFileSize;
+#endif
 
     /** @brief Total size capacity of current db column segment file.
      *   For compressed data files, this is the "raw" data byte count,
      *   not the compressed byte count.
      */
+#ifdef _MSC_VER
+    __int64 fileSize;
+#else
     long long fileSize;
+#endif
 
     //--------------------------------------------------------------------------
     // Public Functions
@@ -254,7 +260,7 @@ struct ColumnInfo
 
     /** @brief Get current dbroot, partition, segment and HWM for this column.
      */
-    void getSegFileInfo( DBRootExtentInfo& fileInfo );
+    void getSegFileInfo( File& fileInfo );
 
     /** @brief Initialize autoincrement value from the current "next" value
      *  taken from the system catalog.
@@ -285,7 +291,7 @@ struct ColumnInfo
 
     /** @brief Print extent CP information
      */
-    void printCPInfo( JobColumn column );
+    void printCPInfo( );
 
     /** @brief Set width factor relative to other columns in the same table.
      */
@@ -295,8 +301,7 @@ struct ColumnInfo
      */
     void updateCPInfo( RID     lastInputRow,
                        int64_t minVal,
-                       int64_t maxVal,
-                       ColDataType colDataType );
+                       int64_t maxVal );
 
     /** @brief Setup initial extent we will begin loading at start of import.
      *  @param dbRoot    DBRoot of starting extent
@@ -310,9 +315,9 @@ struct ColumnInfo
      *  @param bSkippedtoNewExtent Did block skipping advance to next extent
      *  @param bIsNewExtent Treat as new extent when updating CP min/max
      */
-    int setupInitialColumnExtent( uint16_t dbRoot,
-                       uint32_t partition,
-                       uint16_t segment,
+    int setupInitialColumnExtent( u_int16_t dbRoot,
+                       u_int32_t partition,
+                       u_int16_t segment,
                        const std::string& tblName,
                        BRM::LBID_t lbid,
                        HWM     oldHwm,
@@ -324,16 +329,13 @@ struct ColumnInfo
     *  @param dbRoot     DBRoot of starting extent
     *  @param partition  Partition number of starting extent
     *  @param segment    Segment file number of starting extent
-    *  @param hwm        Starting HWM for new start extent
-    *  @param bEmptyPM   Are we setting up delayed file creation because a PM
-    *                    has no extents (or is the HWM extent just disabled)
+    *  @param hwm        Staring HWM for new starting extent
     */
     void setupDelayedFileCreation(
-                       uint16_t dbRoot,
-                       uint32_t partition,
-                       uint16_t segment,
-                       HWM       hwm,
-                       bool      bEmptyPM );
+                       u_int16_t dbRoot,
+                       u_int32_t partition,
+                       u_int16_t segment,
+                       HWM hwm );
 
    /** @brief Belatedly create a starting DB file for a PM that has none.
     *  @param tableName Name of table for which this column belongs
@@ -362,7 +364,7 @@ struct ColumnInfo
      *  @param autoIncCount The number of autoincrement numbers to be reserved.
      *  @param nextValue    Value of the first reserved auto inc number.
      */
-    int reserveAutoIncNums(uint32_t autoIncCount, uint64_t& nextValue );
+    int reserveAutoIncNums(uint autoIncCount, long long& nextValue );
 
     /** @brief Truncate specified dictionary file.  Only applies if compressed.
      * @param dctnryOid Dictionary store OID
@@ -376,7 +378,7 @@ struct ColumnInfo
     /** @brief Increment saturated row count for this column in current import
      * @param satIncCnt Increment count to add to the total saturation count.
      */
-    void incSaturatedCnt( int64_t satIncCnt );
+    void incSaturatedCnt( long long satIncCnt );
 
     /** @brief Get saturated row count for this column.
      */
@@ -392,10 +394,6 @@ struct ColumnInfo
      * that precede this class definition for more information.
      */
     boost::mutex& colMutex();
-
-    /** @brief Get number of rows per extent
-     */
-    unsigned rowsPerExtent( );
 
   protected:
 
@@ -427,7 +425,7 @@ struct ColumnInfo
     virtual int setupInitialColumnFile( HWM oldHWM,   // original HWM 
                                         HWM newHWM ); // new HWM to start from
 
-    virtual int saveDctnryStoreHWMChunk(bool& needBackup);//Backup Dct HWM Chunk
+    virtual int saveDctnryStoreHWMChunk();  // Backup dctnry HWM chunk
     int extendColumnNewExtent(              // extend column; new extent
         bool saveLBIDForCP,
         uint16_t dbRootNew,
@@ -448,9 +446,10 @@ struct ColumnInfo
     boost::mutex fDelayedFileCreateMutex;   // Manage delayed file check/create
     Log* fLog;                              // Object used for logging
 
-    // Blocks to skip at start of bulk load, if starting file has to be created
-    // by createDelayedFileIfNeeded()
-    HWM fDelayedFileStartBlksSkipped;
+    // Initial High Water Mark before we start adding data to the
+    // current column segment file.  For the first segment file of the
+    // import, saveHWM takes into account any block(s) that are skipped.
+    HWM fSavedHWM;
 
     // LBID corresponding to initial HWM saved in fSavedHWM at start of import.
     //
@@ -463,12 +462,20 @@ struct ColumnInfo
     // to add the next extent.
     // For compressed data files, this is the "raw" data byte count,
     // not the compressed byte count.
+#ifdef _MSC_VER
+    __int64 fSizeWrittenStart;
+#else
     long long fSizeWrittenStart;
+#endif
 
     // Tracks the size of a segment file (in bytes) as rows are added.
     // For compressed data files, this is the "raw" data byte count,
     // not the compressed byte count.
+#ifdef _MSC_VER
+    __int64 fSizeWritten;
+#else
     long long fSizeWritten;
+#endif
 
     // Tracks last input Row number in the current "logical" extent,
     // where Row number is 0-based, with Row 0 being the first row in the
@@ -486,7 +493,11 @@ struct ColumnInfo
     // For autoincrement column only... Tracks latest autoincrement value used
     long long fAutoIncLastValue;
 
-    volatile int64_t fSaturatedRowCnt;    // No. of rows with saturated values
+#ifdef _MSC_VER
+    volatile LONGLONG  fSaturatedRowCnt;    // No. of rows with saturated values
+#else
+    volatile long long fSaturatedRowCnt;    // No. of rows with saturated values
+#endif
 
     // List of segment files updated during an import; used to track infor-
     // mation necessary to update the ExtentMap at the "end" of the import.
@@ -500,8 +511,6 @@ struct ColumnInfo
 
     InitialDBFileStat fDelayedFileCreation; // Denotes when initial DB file is
                                             // to be created after preprocessing
-
-    unsigned     fRowsPerExtent;            // Number of rows per column extent
 };
 
 //------------------------------------------------------------------------------
@@ -522,9 +531,13 @@ inline int64_t ColumnInfo::getFileSize( ) const
     return fileSize;
 }
 
-inline void ColumnInfo::incSaturatedCnt( int64_t satIncCnt )
+inline void ColumnInfo::incSaturatedCnt( long long satIncCnt )
 {
-	(void)atomicops::atomicAdd(&fSaturatedRowCnt, satIncCnt);
+#ifdef _MSC_VER
+    InterlockedAdd64    (&fSaturatedRowCnt, satIncCnt);
+#else
+    __sync_fetch_and_add(&fSaturatedRowCnt, satIncCnt);
+#endif
 }
 
 inline bool ColumnInfo::isAbbrevExtent( )
@@ -537,9 +550,10 @@ inline RID ColumnInfo::lastInputRowInExtent( ) const
     return fLastInputRowInCurrentExtent;
 }
 
-inline void ColumnInfo::printCPInfo( JobColumn column )
+inline void ColumnInfo::printCPInfo( )
 {
-    fColExtInf->print( column );
+    fColExtInf->print( ((column.weType  == WriteEngine::WR_CHAR) &&
+                        (column.colType != COL_TYPE_DICT)) );
 }
 
 inline long long ColumnInfo::saturatedCnt( )
@@ -552,18 +566,12 @@ inline void ColumnInfo::relativeColWidthFactor( int colWidFactor )
     fColWidthFactor = colWidFactor;
 }
 
-inline unsigned ColumnInfo::rowsPerExtent()
-{
-    return fRowsPerExtent;
-}
-
 inline void ColumnInfo::updateCPInfo(
     RID     lastInputRow,
     int64_t minVal,
-    int64_t maxVal,
-    ColDataType colDataType )
+    int64_t maxVal )
 {
-    fColExtInf->addOrUpdateEntry( lastInputRow, minVal, maxVal, colDataType );
+    fColExtInf->addOrUpdateEntry( lastInputRow, minVal, maxVal );
 }
 
 } // end of namespace

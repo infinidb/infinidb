@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: we_chunkmanager.h 4726 2013-08-07 03:38:36Z bwilkinson $
+//  $Id: we_chunkmanager.h 4395 2012-12-13 21:10:31Z chao $
 
 
 /** @file */
@@ -33,9 +33,8 @@
 #include "we_typeext.h"
 #include "we_define.h"
 #include "idbcompress.h"
-#include "IDBFileSystem.h"
 
-#if defined(_MSC_VER) && defined(WRITEENGINE_DLLEXPORT)
+#if defined(_MSC_VER) && defined(WRITEENGINECHUNKMGR_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
@@ -66,10 +65,9 @@ class FileOp;
 
 const int UNCOMPRESSED_CHUNK_SIZE = compress::IDBCompressInterface::UNCOMPRESSED_INBUF_LEN;
 const int COMPRESSED_FILE_HEADER_UNIT = compress::IDBCompressInterface::HDR_BUF_LEN;
-
 // assume UNCOMPRESSED_CHUNK_SIZE > 0xBFFF (49151), 8 * 1024 bytes padding
-const int COMPRESSED_CHUNK_SIZE = compress::IDBCompressInterface::maxCompressedSize(UNCOMPRESSED_CHUNK_SIZE) + 64+3 + 8*1024;
-
+const int COMPRESS_OVERHEADER = (UNCOMPRESSED_CHUNK_SIZE / 6) + (64 + 3) + (8 * 1024) + 9;
+const int COMPRESSED_CHUNK_SIZE = UNCOMPRESSED_CHUNK_SIZE + COMPRESS_OVERHEADER;
 const int BLOCKS_IN_CHUNK = UNCOMPRESSED_CHUNK_SIZE / BYTE_PER_BLOCK;
 const int MAXOFFSET_PER_CHUNK = 511*BYTE_PER_BLOCK;
 
@@ -128,7 +126,7 @@ struct FileID
 class CompFileData
 {
 public:
-    CompFileData(const FileID& id, const FID& fid, const execplan::CalpontSystemCatalog::ColDataType colDataType, int colWidth) :
+    CompFileData(const FileID& id, const FID& fid, const ColDataType& colDataType, int colWidth) :
        fFileID(id), fFid(fid), fColDataType(colDataType), fColWidth(colWidth), fDctnryCol(false),
        fFilePtr(NULL), fIoBSize(0) {}
 
@@ -137,12 +135,12 @@ public:
 protected:
     FileID          fFileID;
     FID             fFid;
-    execplan::CalpontSystemCatalog::ColDataType fColDataType;
+    ColDataType     fColDataType;
     int             fColWidth;
     bool            fDctnryCol;
-    IDBDataFile*    fFilePtr;
+    FILE*           fFilePtr;
     std::string     fFileName;
-    CompFileHeader  fFileHeader;
+    CompFileHeader  fFileHeader;               
     std::list<ChunkData*>   fChunkList;
     boost::scoped_array<char> fIoBuffer;
     size_t          fIoBSize;
@@ -163,28 +161,26 @@ public:
 
     // @brief Retrieve a file pointer in the chunk manager.
     //        for column file
-    IDBDataFile* getFilePtr(const Column& column,
+    FILE* getFilePtr(const Column& column,
                     uint16_t root,
                     uint32_t partition,
                     uint16_t segment,
                     std::string& filename,
                     const char* mode,
-                    int size,
-                    bool useTmpSuffix) const;
+                    int size) const;
 
     // @brief Retrieve a file pointer in the chunk manager.
     //        for dictionary file
-    IDBDataFile* getFilePtr(const FID& fid,
+    FILE* getFilePtr(const FID& fid,
                     uint16_t root,
                     uint32_t partition,
                     uint16_t segment,
                     std::string& filename,
                     const char* mode,
-                    int size,
-                    bool useTmpSuffix) const;
+                    int size) const;
 
     // @brief Create a compressed dictionary file with an appropriate header.
-    IDBDataFile* createDctnryFile(const FID& fid,
+    FILE* createDctnryFile(const FID& fid,
                     int64_t  width,
                     uint16_t root,
                     uint32_t partition,
@@ -195,11 +191,11 @@ public:
 
     // @brief Read a block from pFile at offset fbo.
     //        The data may copied from memory if the chunk it belongs to is already available.
-    int  readBlock(IDBDataFile* pFile, unsigned char* readBuf, uint64_t fbo);
+    int  readBlock(FILE* pFile, unsigned char* readBuf, i64 fbo);
 
     // @brief Save a block to a chunk in pFile.
     //        The block is not written to disk immediately, will be delayed until flush.
-    int  saveBlock(IDBDataFile* pFile, const unsigned char* writeBuf, uint64_t fbo);
+    int  saveBlock(FILE* pFile, const unsigned char* writeBuf, i64 fbo);
 
     // @brief Write all active chunks to disk, and reset all repository.
     EXPORT int  flushChunks(int rc, const std::map<FID, FID> & columOids);
@@ -208,28 +204,28 @@ public:
     void cleanUp(const std::map<FID, FID> & columOids);
 
     // @brief Expand an initial column, not dictionary, extent to a full extent.
-    int expandAbbrevColumnExtent(IDBDataFile* pFile, uint64_t emptyVal, int width);
+    int expandAbbrevColumnExtent(FILE* pFile, i64 emptyVal, int width);
 
     // @brief Update column extent
-    int updateColumnExtent(IDBDataFile* pFile, int addBlockCount);
+    int updateColumnExtent(FILE* pFile, int addBlockCount);
 
     // @brief Update dictionary extent
-    int updateDctnryExtent(IDBDataFile* pFile, int addBlockCount);
+    int updateDctnryExtent(FILE* pFile, int addBlockCount);
 
     // @brief Read in n continuous blocks to read buffer.
     //        for backing up blocks to version buffer
-    int readBlocks(IDBDataFile* pFile, unsigned char* readBuf, uint64_t fbo, size_t n);
+    int readBlocks(FILE* pFile, unsigned char* readBuf, i64 fbo, size_t n);
 
     // @brief Restore the data block at offset fbo from version buffer
     //        for rollback
-    int restoreBlock(IDBDataFile* pFile, const unsigned char* writeBuf, uint64_t fbo);
+    int restoreBlock(FILE* pFile, const unsigned char* writeBuf, i64 fbo);
 
     // @brief Retrieve the total block count of a DB file.
-    int getBlockCount(IDBDataFile* pFile);
+    int getBlockCount(FILE* pFile);
 
     // @brief Set FileOp pointer (for compression type, empty value, txnId, etc.)
     void fileOp(FileOp* fileOp);
-
+	
     // @brief Control the number of active chunks being stored in memory
     void setMaxActiveChunkNum(unsigned int maxActiveChunkNum)
     { fMaxActiveChunkNum = maxActiveChunkNum; }
@@ -238,24 +234,11 @@ public:
     void setBulkFlag(bool isBulkLoad)
     { fIsBulkLoad = isBulkLoad; }
 
-    // @brief Use this flag to flush chunk when is full.
+	// @brief Use this flag to flush chunk when is full.
     void setIsInsert(bool isInsert) { fIsInsert = isInsert; }
     bool getIsInsert() { return fIsInsert; }
-
+	
     void setTransId(const TxnID& transId) { fTransId = transId; }
-
-    // @brief bug5504, Use non transactional DML for InfiniDB with HDFS
-    EXPORT int startTransaction(const TxnID& transId) const;
-    EXPORT int confirmTransaction(const TxnID& transId) const;
-    EXPORT int endTransaction(const TxnID& transId, bool success) const;
-	// @brief Use this flag to fix bad chunk.
-    void setFixFlag(bool isFix)
-    { fIsFix = isFix; }
-
-	EXPORT int checkFixLastDictChunk(const FID& fid,
-                    uint16_t root,
-                    uint32_t partition,
-                    uint16_t segment);
 
 protected:
     // @brief Retrieve pointer to a compressed DB file.
@@ -266,13 +249,12 @@ protected:
                     std::string& filename,
                     const char* mode,
                     int size,
-                    const execplan::CalpontSystemCatalog::ColDataType colDataType,
+                    const ColDataType& colDataType,
                     int colWidth,
-                    bool useTmpSuffix,
                     bool dictnry = false) const;
 
     // @brief Retrieve a chunk of pFile from disk.
-    int fetchChunkFromFile(IDBDataFile* pFile, int64_t id, ChunkData*& chunkData);
+    int fetchChunkFromFile(FILE* pFile, int64_t id, ChunkData*& chunkData);
 
     // @brief Compress a chunk and write it to file.
     int writeChunkToFile(CompFileData* fileData, int64_t id);
@@ -287,17 +269,16 @@ protected:
     inline int writeHeader_(CompFileData* fileData, int ptrSecSize);
 
     // @brief open a compressed DB file.
-    int openFile(CompFileData* fileData, const char* mode, int colWidth,
-        bool useTmpSuffix, int ln) const;
+    int openFile(CompFileData* fileData, const char* mode, int ln) const;
 
     // @brief set offset in a compressed DB file from beginning.
-    int setFileOffset(IDBDataFile* pFile, const std::string& fileName, off64_t offset, int ln) const;
+    int setFileOffset(FILE* pFile, const std::string& fileName, size_t offset, int ln) const;
 
     // @brief read from a compressed DB file.
-    int readFile(IDBDataFile* pFile, const std::string& fileName, void* buf, size_t size, int ln) const;
+    int readFile(FILE* pFile, const std::string& fileName, void* buf, size_t size, int ln) const;
 
     // @brief write to a compressed DB file.
-    int writeFile(IDBDataFile* pFile, const std::string& fileName, void* buf, size_t size, int ln) const;
+    int writeFile(FILE* pFile, const std::string& fileName, void* buf, size_t size, int ln) const;
 
     // @brief Close a compressed DB file.
     int closeFile(CompFileData* fileData);
@@ -321,19 +302,13 @@ protected:
 
     // @brief Write a DML recovery log
     int writeLog(TxnID txnId, std::string backUpFileType, std::string filename,
-                 std::string &aDMLLogFileName, int64_t size=0, int64_t offset=0) const;
-
-    // @brief remove DML recovery logs
-    int removeBackups(TxnID txnId);
-
-    // @brief swap the src file to dest file
-    int swapTmpFile(const std::string& src, const std::string& dest);
-
-    // @brief construnct a DML log file name
-    int getDMLLogFileName(std::string& aDMLLogFileName, const TxnID& txnId) const;
+                 std::string &aDMLLogFileName, int64_t size=0, int64_t offset=0);
+				 
+	// @brief remove DML recovery logs
+	int removeBackups(TxnID txnId);
 
     mutable std::map<FileID, CompFileData*>     fFileMap;
-    mutable std::map<IDBDataFile*, CompFileData*> fFilePtrMap;
+    mutable std::map<FILE*, CompFileData*>      fFilePtrMap;
     std::list<std::pair<FileID, ChunkData*> >   fActiveChunks;
     unsigned int                                fMaxActiveChunkNum;  // max active chunks per file
     char*                                       fBufCompressed;
@@ -341,17 +316,15 @@ protected:
     unsigned int                                fMaxCompressedBufSize;
     unsigned int                                fUserPaddings;
     bool                                        fIsBulkLoad;
-    bool                                        fDropFdCache;
-    bool                                        fIsInsert;
-    bool                                        fIsHdfs;
+	bool                                        fDropFdCache;
+	bool 										fIsInsert;
     FileOp*                                     fFileOp;
     compress::IDBCompressInterface              fCompressor;
+
     logging::Logger*                            fSysLogger;
-    TxnID                                       fTransId;
-    int                                         fLocalModuleId;
-    idbdatafile::IDBFileSystem&                 fFs;
-	bool 										fIsFix;
 	
+	TxnID                                       fTransId;
+
 private:
 };
 

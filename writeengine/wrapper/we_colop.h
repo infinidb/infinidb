@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: we_colop.h 4728 2013-08-08 19:26:10Z chao $
+//  $Id: we_colop.h 4496 2013-01-31 19:13:20Z pleblanc $
 
 
 /** @file */
@@ -29,8 +29,8 @@
 #include "brmtypes.h"
 #include "we_dbrootextenttracker.h"
 #include "we_tablemetadata.h"
-#include "we_dctnry.h"
-#if defined(_MSC_VER) && defined(WRITEENGINE_DLLEXPORT)
+
+#if defined(_MSC_VER) && defined(WRITEENGINECOLUMNOP_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
@@ -61,7 +61,6 @@ public:
    EXPORT virtual ~ColumnOp();
 
    EXPORT virtual int allocRowId(const TxnID& txnid,
-								bool    useStartingExtent,
 								Column& column,
                                 uint64_t totalRow,
                                 RID* rowIdArray,
@@ -72,10 +71,10 @@ public:
                                 bool& newFile,
 								ColStructList& newColStructList,
                                 DctnryStructList& newDctnryStructList,
-								std::vector<boost::shared_ptr<DBRootExtentTracker> >  & dbRootExtentTrackers,
+								std::vector<DBRootExtentTracker*> & dbRootExtentTrackers,
                                 bool insertSelect = false,
 								bool isBatchInsert = false,
-								OID tableOid = 0, bool isFirstBatchPm = false);
+								OID tableOid = 0);
 
    /**
     * @brief Create column file(s)
@@ -83,7 +82,7 @@ public:
    EXPORT virtual int createColumn(Column& column,
                                   int colNo,
                                   int colWidth,
-                                  execplan::CalpontSystemCatalog::ColDataType colDataType,
+                                  ColDataType colDataType,
                                   ColType colType,
                                   FID dataFid,
                                   uint16_t dbRoot,
@@ -104,8 +103,6 @@ public:
 								Column& column,
                                 Column& refCol,
                                 void* defaultVal,
-								Dctnry* dctnry,
-								ColumnOp* refColOp,
                                 const OID dictOid = 0,
 								const int dictColWidth = 0,
 								const std::string defaultValStr = "", 
@@ -153,6 +150,10 @@ public:
     *
     * @param column Column struct with input column attributes.
     * @param leaveFileOpen Leave the db file open when leaving this function
+    * @param firstFileOnPM If first file on a PM, then first empty chunk is
+    *        written out (if compressed), to give us a startup file on this PM,
+    *        much like MySQL "create table" creates the very "first" file on a
+    *        selected PM.
     * @param hwm The fbo of the column segment file where the new extent begins
     * @param startLbid The starting LBID for the new extent.
     * @param allocSize Number of blocks to be written for an extent
@@ -167,6 +168,7 @@ public:
     */
    EXPORT int extendColumn(const Column& column,
                            bool          leaveFileOpen,
+                           bool          firstFileOnPM,
                            HWM           hwm,
                            BRM::LBID_t   startLbid,
                            int           allocSize,
@@ -174,7 +176,7 @@ public:
                            uint32_t      partition,
                            uint16_t      segment,
                            std::string&  segFile,
-                           IDBDataFile*&        pFile,
+                           FILE*&        pFile,
                            bool&         newFile,
                            char*         hdrs = NULL);
 
@@ -207,7 +209,7 @@ public:
    /**
     * @brief Get columne data type
     */
-   EXPORT virtual bool getColDataType(const char* name, execplan::CalpontSystemCatalog::ColDataType& colDataType) const;
+   EXPORT virtual bool getColDataType(const char* name, ColDataType& colDataType) const;
 
    /**
     * @brief Initialize the column
@@ -230,7 +232,6 @@ public:
     */
    EXPORT virtual int openColumnFile(Column& column,
                               std::string& segFile,
-                              bool useTmpSuffix,
                               int ioBuffSize=DEFAULT_BUFSIZ) const;
 
    /**
@@ -243,13 +244,13 @@ public:
     */
    EXPORT virtual void setColParam(Column& column, int colNo = 0,
                                   int colWidth = 0,
-                                  execplan::CalpontSystemCatalog::ColDataType colDataType = execplan::CalpontSystemCatalog::INT,
+                                  ColDataType colDataType = INT,
                                   ColType colType = WR_INT,
                                   FID dataFid = 0,
                                   int comppre = 0,
-                                  uint16_t dbRoot = 0,
-                                  uint32_t partition = 0,
-                                  uint16_t segment = 0) const;
+                                  u_int16_t dbRoot = 0,
+                                  u_int32_t partition = 0,
+                                  u_int16_t segment = 0) const;
 
    /**
     * @brief Write row(s)
@@ -258,6 +259,7 @@ public:
                               uint64_t totalRow,
                               const RID* rowIdArray,
                               const void* valArray,
+                              const void* oldValArray,
                               bool bDelete = false);
 
    /**
@@ -281,12 +283,12 @@ public:
    /**
     * @brief Test if the pFile is an abbreviated extent.
     */
-   virtual bool abbreviatedExtent(IDBDataFile* pFile, int colWidth) const = 0;
+   virtual bool abbreviatedExtent(FILE* pFile, int colWidth) const = 0;
 
    /**
     * @brief Caculate the number of blocks in file.
     */
-   virtual int blocksInFile(IDBDataFile* pFile) const = 0;
+   virtual int blocksInFile(FILE* pFile) const = 0;
 
    /**
     * @brief Clear a column
@@ -296,22 +298,22 @@ public:
    /**
     * @brief open a data file of column
     */
-   virtual IDBDataFile*  openFile(const Column& column, uint16_t dbRoot, uint32_t partition,
-      uint16_t segment, std::string& segFile, bool useTmpSuffix, const char* mode = "r+b",
+   virtual FILE*  openFile(const Column& column, uint16_t dbRoot, uint32_t partition,
+      uint16_t segment, std::string& segFile, const char* mode = "r+b",
       int ioBuffSize = DEFAULT_BUFSIZ) const = 0;
 
 
    /**
     * @brief backup blocks to version buffer
     */
-   int writeVB(IDBDataFile* pSource, const OID sourceOid, IDBDataFile* pTarget, const OID targetOid,
-              const std::vector<uint32_t>& fboList, const BRM::VBRange& freeList,
+   int writeVB(FILE* pSource, const OID sourceOid, FILE* pTarget, const OID targetOid,
+              const std::vector<i32>& fboList, const BRM::VBRange& freeList,
               size_t& nBlocksProcessed, const size_t fboCurrentOffset);
 
    /**
     * @brief restore blocks from version buffer
     */
-   int copyVB(IDBDataFile* pSource, const BRM::VER_t txnD, const OID oid, std::vector<uint32_t>& fboList,
+   int copyVB(FILE* pSource, const BRM::VER_t txnD, const OID oid, std::vector<i32>& fboList,
                std::vector<BRM::LBIDRange>& rangeList);
 protected:
 
@@ -323,12 +325,12 @@ protected:
    /**
     * @brief populate readBuf with data in block #lbid
     */
-   virtual int readBlock(IDBDataFile* pFile, unsigned char* readBuf, const uint64_t fbo) = 0;
+   virtual int readBlock(FILE* pFile, unsigned char* readBuf, const i64 fbo) = 0;
 
    /**
     * @brief output writeBuf to pFile starting at position fbo
     */
-   virtual int saveBlock(IDBDataFile* pFile, const unsigned char* writeBuf, const uint64_t fbo) = 0;
+   virtual int saveBlock(FILE* pFile, const unsigned char* writeBuf, const i64 fbo) = 0;
 
 private:
 };

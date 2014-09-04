@@ -23,6 +23,16 @@
 #ifndef LIBOAMCPP_H
 #define LIBOAMCPP_H
 
+//Major hack to get oam and brm to play nice.
+#ifdef OAM_BRM_LEAN_AND_MEAN
+#include <boost/tuple/tuple.hpp>
+#include <string>
+#include <vector>
+#include "bytestream.h"
+#include "alarm.h"
+#include "snmpmanager.h"
+#include "messagequeue.h"
+#else
 #include <exception>
 #include <stdexcept>
 #include <string>
@@ -43,8 +53,12 @@
 #include "boost/tuple/tuple.hpp"
 #include "snmpmanager.h"
 #include "dbrm.h"
+#ifndef SKIP_SNMP
+#include "license.h"
+#endif
 
 #include "messagequeue.h"
+#endif
 
 #if defined(_MSC_VER) && defined(xxxLIBOAM_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
@@ -269,39 +283,9 @@ namespace oam
         ENABLED,                                  // 16 = Enabled mode
         INITIAL,                                  // 17 = Initial mode
 		STANDBY_INIT,							  // 18 = Standby init
-		BUSY_INIT, 							  	  // 19 = Busy init
-		ROLLBACK_INIT,  					  	  // 20 = Rollback during DML init
-		STATE_MAX								  // 21 = Max value
+		BUSY_INIT 							  	  // 19 = Busy init
     };
 
-    /** @brief String State
-     */
-    const std::string oamState[] =
-    {
-		"MAN_OFFLINE",
-    	"AUTO_OFFLINE",
-    	"MAN_INIT",
-    	"AUTO_INIT",
-    	"ACTIVE",
-		"LEAVE_BLANK",
-    	"HOT_STANDBY",
-    	"FAILED",
-    	"UP",
-    	"DOWN",
-    	"COLD_STANDBY",
-        "UNEQUIP",
-        "EQUIP",
-    	"DEGRADED",
-    	"MAN_DISABLED",
-    	"AUTO_DISABLED",
-    	"ENABLED",
-    	"INITIAL",
-    	"STANDBY_INIT",
-    	"BUSY_INIT",
-		"ROLLBACK_INIT",
-		"PID_UPDATE"
-        ""
-    };
     /** @brief Process and Hardware String States
      */
 
@@ -357,12 +341,12 @@ namespace oam
      */
     const std::string LogFile[] =
     {
-        "local1.=crit -/var/log/Calpont/crit.log",
-        "local1.=err -/var/log/Calpont/err.log",
-        "local1.=warning -/var/log/Calpont/warning.log",
-        "local1.=info -/var/log/Calpont/info.log",
-        "local1.=debug -/var/log/Calpont/debug.log",
-        "local2.=crit -/var/log/Calpont/data/data_mods.log",
+        "local1.=crit /var/log/Calpont/crit.log",
+        "local1.=err /var/log/Calpont/err.log",
+        "local1.=warning /var/log/Calpont/warning.log",
+        "local1.=info /var/log/Calpont/info.log",
+        "local1.=debug /var/log/Calpont/debug.log",
+        "local2.=crit /var/log/Calpont/data/data_mods.log",
         ""
     };
 
@@ -430,7 +414,6 @@ namespace oam
         MODULE_SWITCH_ACTIVE,                     // 33 = PM Failover / Switchover
         ROLLBACK_FAILURE,                     	  // 34 = DB Rollback Failure
         GLUSTER_DISK_FAILURE,                     // 35 = Gluster Disk Copy Failure
-		INVALID_LOCALE,                           // 36 = Locale invalid
         MAX_ALARM_ID
     };
 
@@ -535,32 +518,29 @@ namespace oam
         PROCUPDATELOG,
         PROCGETCONFIGLOG,
         CHECKPOWERON,
-	PROCUPDATECONFIG,
+		PROCUPDATECONFIG,
         HEARTBEAT_REGISTER,
         HEARTBEAT_DEREGISTER,
         HEARTBEAT_SEND,
-	PROCBUILDSYSTEMTABLES,
-	LOCALHEARTBEAT,
-	RECONFIGURE,
-	PROCESSRESTART,
-	GETSOFTWAREINFO,
-	UPDATEEXPORTS,
-	UPDATEPARENTNFS,
-	OAMPARENTACTIVE,
-	UPDATECONFIGFILE,
-	GETDBRMDATA,
-	GETPARENTOAMMODULE,
-	OAMPARENTCOLD,
-	UPDATESNMPD,
-	GETALARMDATA,
-	GETACTIVEALARMDATA,
-	RUNUPGRADE,
-	PROCUNMOUNT,
-	PROCMOUNT,
-	PROCFSTABUPDATE,
-	MASTERREP,
-	SLAVEREP,
-	MASTERDIST
+		PROCBUILDSYSTEMTABLES,
+		LOCALHEARTBEAT,
+		RECONFIGURE,
+		PROCESSRESTART,
+		GETSOFTWAREINFO,
+		UPDATEEXPORTS,
+		UPDATEPARENTNFS,
+		OAMPARENTACTIVE,
+		UPDATECONFIGFILE,
+		GETDBRMDATA,
+		GETPARENTOAMMODULE,
+		OAMPARENTCOLD,
+		UPDATESNMPD,
+		GETALARMDATA,
+		GETACTIVEALARMDATA,
+		RUNUPGRADE,
+		PROCUNMOUNT,
+		PROCMOUNT,
+		PROCFSTABUPDATE
     };
 
 
@@ -621,9 +601,7 @@ namespace oam
 		ADD_EXT_DEVICE,
 		REMOVE_EXT_DEVICE,
 		GET_SHARED_MEM,
-		SET_DBROOT_STATUS,
-		ADD_DBROOT,
-		REMOVE_DBROOT
+		SET_DBROOT_STATUS
     };
 
     /** @brief System Software Package Structure
@@ -1226,8 +1204,8 @@ namespace oam
     struct DiskUsage_s
     {
         std::string DeviceName;              	//!< Device Name
-		uint64_t TotalBlocks;					//!< Total Blocks
-		uint64_t UsedBlocks;					//!< Used Blocks
+		uint32_t TotalBlocks;					//!< Total Blocks
+		uint32_t UsedBlocks;					//!< Used Blocks
         uint16_t DiskUsage;               		//!< Disk Usage %
     };	
     typedef struct DiskUsage_s DiskUsage;
@@ -1905,6 +1883,7 @@ namespace oam
              * Get's the Active Alarm list for the Calpont Database Appliance
              * @param activealarm Returned Active Alarm list Structure
              */
+
             EXPORT void getActiveAlarms(snmpmanager::AlarmList& activealarm);
 
             /** @brief Get Historical Alarms
@@ -1913,6 +1892,7 @@ namespace oam
 			 * @param date date of alarms, "today" or date in YYYYMMDD
              * @param activealarm Returned Alarm list Structure
              */
+
             EXPORT void getAlarms(std::string date, snmpmanager::AlarmList& alarm);
 
             /** @brief check Active Alarm
@@ -1923,13 +1903,6 @@ namespace oam
              * @param deviceName the Alarm device Name
              */
             EXPORT bool checkActiveAlarm(const int alarmid, const std::string moduleName, const std::string deviceName);
-
-            /** @brief Read Active Alarms in HDFS
-             *
-             * Read the Active Alarm list from the HDFS image of activeAlarms
-             * @param activealarm Returned Active Alarm list Structure
-             */
-            EXPORT int readHdfsActiveAlarms(snmpmanager::AlarmList& activealarm);
 
             /** @brief update Log
              *
@@ -2149,135 +2122,124 @@ namespace oam
              */
 			EXPORT bool isValidIP(const std::string ipAddress);
 
-            /** @brief Increment IP Address
-             *
-             * Increment IP Address
-             */
-		EXPORT std::string incrementIPAddress(const std::string ipAddress);
+			/**
+			*@brief Check for a phrase in a log file and return status
+			*/
+			EXPORT bool checkLogStatus(std::string filename, std::string phase);
 
-		/**
-		*@brief Check for a phrase in a log file and return status
-		*/
-		EXPORT bool checkLogStatus(std::string filename, std::string phase);
+			/**
+			*@brief Get PM with read-write mount
+			*/
+			EXPORT std::string getWritablePM();
 
-		/**
-		*@brief  Fix RSA key
-		*/
-		EXPORT void fixRSAkey(std::string logFile);
+			/**
+			*@brief Get PM with read-write mount
+			*/
+			EXPORT std::string getHotStandbyPM();
 
-		/**
-		*@brief Get PM with read-write mount
-		*/
-		EXPORT std::string getWritablePM();
+			/**
+			*@brief Get PM with read-write mount
+			*/
+			EXPORT void setHotStandbyPM(std::string moduleName);
 
-		/**
-		*@brief Get PM with read-write mount
-		*/
-		EXPORT std::string getHotStandbyPM();
+			/**
+			*@brief Distribute Calpont Configure File
+			*/
+			EXPORT void distributeConfigFile(std::string name = "system", std::string file = "Calpont.xml");
 
-		/**
-		*@brief Get PM with read-write mount
-		*/
-		EXPORT void setHotStandbyPM(std::string moduleName);
+			/**
+			*@brief Switch Parent OAM Module 
+			*  Return true if we need to wait for systme restart 
+			*/
+			EXPORT bool switchParentOAMModule(std::string moduleName, GRACEFUL_FLAG gracefulflag);
 
-		/**
-		*@brief Distribute Calpont Configure File
-		*/
-		EXPORT void distributeConfigFile(std::string name = "system", std::string file = "Calpont.xml");
+			/**
+			*@brief Get Storage Config Data
+			*/
+			EXPORT systemStorageInfo_t getStorageConfig();
 
-		/**
-		*@brief Switch Parent OAM Module 
-		*  Return true if we need to wait for systme restart 
-		*/
-		EXPORT bool switchParentOAMModule(std::string moduleName, GRACEFUL_FLAG gracefulflag);
+			/**
+			*@brief Get PM - DBRoot Config data
+			*/
+			EXPORT void getPmDbrootConfig(const int pmid, DBRootConfigList& dbrootconfiglist);
 
-		/**
-		*@brief Get Storage Config Data
-		*/
-		EXPORT systemStorageInfo_t getStorageConfig();
+			/**
+			*@brief Get DBRoot - PM Config data
+			*/
+			EXPORT void getDbrootPmConfig(const int dbrootid, int& pmid);
 
-		/**
-		*@brief Get PM - DBRoot Config data
-		*/
-		EXPORT void getPmDbrootConfig(const int pmid, DBRootConfigList& dbrootconfiglist);
+			EXPORT void getDbrootPmConfig(const int dbrootid, std::string& pmid);
 
-		/**
-		*@brief Get DBRoot - PM Config data
-		*/
-		EXPORT void getDbrootPmConfig(const int dbrootid, int& pmid);
+			/**
+			*@brief Get System DBRoot Config data
+			*/
+			EXPORT void getSystemDbrootConfig(DBRootConfigList& dbrootconfiglist);
 
-		EXPORT void getDbrootPmConfig(const int dbrootid, std::string& pmid);
+			/**
+			*@brief Set PM - DBRoot Config data
+			*/
+			EXPORT void setPmDbrootConfig(const int pmid, DBRootConfigList& dbrootconfiglist);
 
-		/**
-		*@brief Get System DBRoot Config data
-		*/
-		EXPORT void getSystemDbrootConfig(DBRootConfigList& dbrootconfiglist);
+			/**
+			*@brief Manual Move PM - DBRoot data
+			*/
+			EXPORT void manualMovePmDbroot(std::string residePM, std::string dbrootIDs, std::string toPM);
 
-		/**
-		*@brief Set PM - DBRoot Config data
-		*/
-		EXPORT void setPmDbrootConfig(const int pmid, DBRootConfigList& dbrootconfiglist);
+			/**
+			*@brief Auto Move PM - DBRoot data
+			*/
+			EXPORT bool autoMovePmDbroot(std::string residePM);
 
-		/**
-		*@brief Manual Move PM - DBRoot data
-		*/
-		EXPORT void manualMovePmDbroot(std::string residePM, std::string dbrootIDs, std::string toPM);
+			/**
+			*@brief Auto Un-Move PM - DBRoot data
+			*/
+			EXPORT bool autoUnMovePmDbroot(std::string toPM);
 
-		/**
-		*@brief Auto Move PM - DBRoot data
-		*/
-		EXPORT bool autoMovePmDbroot(std::string residePM);
+			/**
+			*@brief add DBRoot
+			*/
+			EXPORT void addDbroot(const int dbrootNumber, DBRootConfigList& dbrootlist);
 
-		/**
-		*@brief Auto Un-Move PM - DBRoot data
-		*/
-		EXPORT bool autoUnMovePmDbroot(std::string toPM);
+			/**
+			*@brief distribute Fstab Updates
+			*/
+			EXPORT void distributeFstabUpdates(std::string entry, std::string toPM = "system" );
 
-		/**
-		*@brief add DBRoot
-		*/
-		EXPORT void addDbroot(const int dbrootNumber, DBRootConfigList& dbrootlist);
+			/**
+			*@brief assign DBRoot
+			*/
+			EXPORT void assignDbroot(std::string toPM, DBRootConfigList& dbrootlist);
 
-		/**
-		*@brief distribute Fstab Updates
-		*/
-		EXPORT void distributeFstabUpdates(std::string entry, std::string toPM = "system" );
+			/**
+			*@brief unassign DBRoot
+			*/
+			EXPORT void unassignDbroot(std::string residePM, DBRootConfigList& dbrootlist);
 
-		/**
-		*@brief assign DBRoot
-		*/
-		EXPORT void assignDbroot(std::string toPM, DBRootConfigList& dbrootlist);
+			/**
+			*@brief get unassigned DBRoot list
+			*/
+			EXPORT void getUnassignedDbroot(DBRootConfigList& dbrootlist);
 
-		/**
-		*@brief unassign DBRoot
-		*/
-		EXPORT void unassignDbroot(std::string residePM, DBRootConfigList& dbrootlist);
+			/**
+			*@brief remove DBRoot
+			*/
+			EXPORT void removeDbroot(DBRootConfigList& dbrootlist);
 
-		/**
-		*@brief get unassigned DBRoot list
-		*/
-		EXPORT void getUnassignedDbroot(DBRootConfigList& dbrootlist);
+			/**
+			*@brief get AWS Device Name for DBRoot ID
+			*/
+			EXPORT std::string getAWSdeviceName( const int dbrootid);
 
-		/**
-		*@brief remove DBRoot
-		*/
-		EXPORT void removeDbroot(DBRootConfigList& dbrootlist);
+			/**
+			*@brief set System DBRoot Count
+			*/
+			EXPORT void setSystemDBrootCount();
 
-		/**
-		*@brief get AWS Device Name for DBRoot ID
-		*/
-		EXPORT std::string getAWSdeviceName( const int dbrootid);
-
-		/**
-		*@brief set System DBRoot Count
-		*/
-		EXPORT void setSystemDBrootCount();
-
-		/**
-		*@brief set FilesPerColumnPartition based on value of old
-		* FilePerColumnPartition and old DbRootCount that is given
-		*/
-		EXPORT void setFilesPerColumnPartition( int oldDbRootCount );
+			/**
+			*@brief set FilesPerColumnPartition based on value of old
+			* FilePerColumnPartition and old DbRootCount that is given
+			*/
+			EXPORT void setFilesPerColumnPartition( int oldDbRootCount );
 
             /** @brief send Device Notification Msg
              */
@@ -2305,7 +2267,7 @@ namespace oam
 
             /** @brief launchEC2Instance
              */
-            EXPORT std::string launchEC2Instance(const std::string name = "dummy", const std::string IPAddress = oam::UnassignedName, const std::string type = oam::UnassignedName, const std::string group = oam::UnassignedName);
+            EXPORT std::string launchEC2Instance(const std::string name = "dummy", const std::string type = oam::UnassignedName, const std::string group = oam::UnassignedName);
 
             /** @brief getEC2InstanceIpAddress
              */
@@ -2355,15 +2317,15 @@ namespace oam
              */
             EXPORT bool createEC2tag(std::string resourceName, std::string tagName, std::string tagValue);
 
-		/**
-		*@brief  take action on Syslog process
-		*/
-		EXPORT void syslogAction( std::string action);
+			/**
+			*@brief  take action on Syslog process
+			*/
+			EXPORT void syslogAction( std::string action);
 
-		/**
-		*@brief  call dbrm control
-		*/
-		EXPORT void dbrmctl(std::string command);
+			/**
+			*@brief  call dbrm control
+			*/
+			EXPORT void dbrmctl(std::string command);
 
             /** @brief Wait for system to close transactions
              *  
@@ -2377,18 +2339,11 @@ namespace oam
     		void amazonReattach(std::string toPM, dbrootList dbrootConfigList, bool attach = false);
             void mountDBRoot(dbrootList dbrootConfigList, bool mount = true);
 
-		/**
-		*@brief  gluster control
-		*/
-		EXPORT int glusterctl(GLUSTER_COMMANDS command, std::string argument1, std::string& argument2, std::string& errmsg);
+			/**
+			*@brief  gluster control
+			*/
+			EXPORT int glusterctl(GLUSTER_COMMANDS command, std::string argument1, std::string& argument2, std::string& errmsg);
 
-	/**
-	* @brief	changeMyCnf
-	*
-	* purpose:	change my.cnf
-	*
-	**/
-	EXPORT bool changeMyCnf( std::string paramater, std::string value );
 
         private:
 
@@ -2396,8 +2351,11 @@ namespace oam
              */
             int checkGlusterLog(std::string logFile, std::string& errmsg);
 
+            /** @brief copy database files from src to dst
+             */
+            void copyDatabaseFiles(std::string src, std::string dst);
 
-	    int sendMsgToProcMgr3(messageqcpp::ByteStream::byte requestType, snmpmanager::AlarmList& alarmlist, const std::string date);
+		    int sendMsgToProcMgr3(messageqcpp::ByteStream::byte requestType, snmpmanager::AlarmList& alarmlist, const std::string date);
 
             /** @brief build and send request message to Process Manager
              */
@@ -2437,7 +2395,6 @@ namespace oam
 			std::string AlarmConfigFile;
 			std::string ProcessConfigFile;
 			std::string InstallDir;
-			static int  UseHdfs;
 
     };	// end of class
 

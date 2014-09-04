@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: blockresolutionmanager.cpp 1910 2013-06-18 15:19:15Z rdempsey $
+ * $Id: blockresolutionmanager.cpp 1837 2013-01-31 19:13:18Z pleblanc $
  *
  ****************************************************************************/
 
@@ -41,11 +41,13 @@
 #define BLOCKRESOLUTIONMANAGER_DLLEXPORT
 #include "blockresolutionmanager.h"
 #undef BLOCKRESOLUTIONMANAGER_DLLEXPORT
-#include "IDBDataFile.h"
-#include "IDBPolicy.h"
 
-using namespace idbdatafile;
+#ifdef _MSC_VER
+#define umask _umask
+#endif
+
 using namespace logging;
+
 using namespace std;
 
 namespace BRM {
@@ -94,6 +96,7 @@ int BlockResolutionManager::saveState(string filename) throw()
 	string journalFilename = filename + "_journal";
 
 	bool locked[2] = { false, false };
+	ofstream journal;	
 
 	try {
 		vbbm.lock(VBBM::READ);
@@ -102,22 +105,10 @@ int BlockResolutionManager::saveState(string filename) throw()
 		locked[1] = true;
 
 		saveExtentMap(emFilename);
-
-		// truncate teh file if already exists since no truncate in HDFS.
-		const char* filename = journalFilename.c_str();
-		if (IDBPolicy::useHdfs()) {
-			IDBDataFile* journal = IDBDataFile::open(
-					IDBPolicy::getType(filename, IDBPolicy::WRITEENG), filename, "wb", 0);
-			delete journal;
-		}
-		else {
-			ofstream journal;
-			uint32_t utmp = ::umask(0);
-			journal.open(filename, ios_base::out | ios_base::trunc | ios_base::binary);
-			journal.close();
-			::umask(utmp);
-		}
-
+		uint utmp = ::umask(0);
+		journal.open(journalFilename.c_str(), ios_base::out | ios_base::trunc | ios_base::binary);
+		journal.close();
+		::umask(utmp);
 		vbbm.save(vbbmFilename);
 		vss.save(vssFilename);
 

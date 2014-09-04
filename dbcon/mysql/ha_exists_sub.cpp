@@ -51,7 +51,7 @@ void checkCorrelation(const ParseTree* n, void* obj)
 		return;
 	uint64_t lJoinInfo = sf->lhs()->joinInfo();
 	uint64_t rJoinInfo = sf->rhs()->joinInfo();
-
+	
 	if (lJoinInfo & JOIN_CORRELATED)
 	{
 		ConstantColumn *cc = dynamic_cast<ConstantColumn*>(sf->rhs());
@@ -66,7 +66,7 @@ void checkCorrelation(const ParseTree* n, void* obj)
 	}
 }
 
-ExistsSub::ExistsSub(gp_walk_info& gwip) : WhereSubQuery(gwip)
+ExistsSub::ExistsSub(gp_walk_info& gwip) : WhereSubQuery(gwip) 
 {}
 
 ExistsSub::ExistsSub(gp_walk_info& gwip, Item_subselect* sub) :
@@ -79,21 +79,21 @@ ExistsSub::~ExistsSub()
 execplan::ParseTree* ExistsSub::transform()
 {
 	idbassert(fSub);
-
+	
 	SCSEP csep(new CalpontSelectExecutionPlan());
-	csep->sessionID(fGwip.sessionid);
+	csep->sessionID(fGwip.sessionid);	
 	csep->location(CalpontSelectExecutionPlan::WHERE);
 	csep->subType (CalpontSelectExecutionPlan::EXISTS_SUBS);
-
+	
 	// gwi for the sub query
 	gp_walk_info gwi;
 	gwi.thd = fGwip.thd;
 	gwi.subQuery = this;
-
+	
 	// @4827 merge table list to gwi in case there is FROM sub to be referenced
 	// in the FROM sub
-	gwi.derivedTbCnt = fGwip.derivedTbList.size();
-	uint32_t tbCnt = fGwip.tbList.size();
+	uint derivedTbCnt = fGwip.derivedTbList.size();
+	uint tbCnt = fGwip.tbList.size();
 
 	gwi.tbList.insert(gwi.tbList.begin(), fGwip.tbList.begin(), fGwip.tbList.end());
 	gwi.derivedTbList.insert(gwi.derivedTbList.begin(), fGwip.derivedTbList.begin(), fGwip.derivedTbList.end());
@@ -104,7 +104,7 @@ execplan::ParseTree* ExistsSub::transform()
 		fGwip.parseErrorText = logging::IDBErrorInfo::instance()->errorMsg(logging::ERR_AGG_EXISTS);
 		return NULL;
 	}
-
+	
 	if (getSelectPlan(gwi, *(fSub->get_select_lex()), csep) != 0)
 	{
 		fGwip.fatalParseError = true;
@@ -114,15 +114,15 @@ execplan::ParseTree* ExistsSub::transform()
 			fGwip.parseErrorText = "Error occured in ExistsSub::transform()";
 		return NULL;
 	}
-
+	
 	// remove outer query tables
 	CalpontSelectExecutionPlan::TableList tblist;
 	if (csep->tableList().size() >= tbCnt)
 		tblist.insert(tblist.begin(),csep->tableList().begin()+tbCnt, csep->tableList().end());
 	CalpontSelectExecutionPlan::SelectList derivedTbList;
-	if (csep->derivedTableList().size() >= gwi.derivedTbCnt)
-		derivedTbList.insert(derivedTbList.begin(), csep->derivedTableList().begin()+gwi.derivedTbCnt, csep->derivedTableList().end());
-
+	if (csep->derivedTableList().size() >= derivedTbCnt)
+		derivedTbList.insert(derivedTbList.begin(), csep->derivedTableList().begin()+derivedTbCnt, csep->derivedTableList().end());
+	
 	csep->tableList(tblist);
 	csep->derivedTableList(derivedTbList);
 
@@ -132,9 +132,7 @@ execplan::ParseTree* ExistsSub::transform()
 	const ParseTree* pt = csep->filters();
 	if (pt)
 		pt->walk(checkCorrelation, subFilter);
-
-	fGwip.subselectList.push_back(csep);
-	return new ParseTree(subFilter);
+	return new ParseTree(subFilter);	
 }
 
 /**

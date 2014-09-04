@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: querystats.h 4028 2013-08-02 18:49:00Z zzhu $
+*   $Id: querystats.h 4026 2013-08-02 16:41:23Z zzhu $
 *
 *
 ***********************************************************************/
@@ -24,7 +24,7 @@
 #ifndef QUERYSTATS_H_
 #define QUERYSTATS_H_
 
-#include <ctime>
+#include <sys/time.h>
 #include <string>
 #include <vector>
 #include <map>
@@ -35,7 +35,7 @@
 
 namespace querystats
 {
-const uint32_t DEFAULT_USER_PRIORITY_LEVEL = 33; //Low
+const uint DEFAULT_USER_PRIORITY_LEVEL = 33; //Low
 const std::string DEFAULT_USER_PRIORITY = "LOW";
 
 struct QueryStats
@@ -62,7 +62,7 @@ struct QueryStats
 	std::string fUser;             // user
 	std::string fHost;             // host
 	std::string fPriority;         // priority
-	uint32_t fPriorityLevel;           // priority level
+	uint fPriorityLevel;           // priority level
 	
 	
 	QueryStats();
@@ -93,9 +93,9 @@ struct QueryStats
 	{ 
 		time(&fStartTime);
 		char buffer [80];
-		struct tm timeinfo;
-		localtime_r(&fStartTime, &timeinfo);
-		strftime(buffer,80,"%Y-%m-%d %H:%M:%S", &timeinfo);
+		struct tm * timeinfo;
+		timeinfo = localtime ( &fStartTime );  
+		strftime (buffer,80,"%Y-%m-%d %H:%M:%S",timeinfo);
 		fStartTimeStr = buffer;
 	}
 	
@@ -103,9 +103,9 @@ struct QueryStats
 	{ 
 		time(&fEndTime);
 		char buffer [80];
-		struct tm timeinfo;
-		localtime_r(&fEndTime, &timeinfo);
-		strftime(buffer,80,"%Y-%m-%d %H:%M:%S", &timeinfo);
+		struct tm * timeinfo;
+		timeinfo = localtime ( &fEndTime );  
+		strftime (buffer,80,"%Y-%m-%d %H:%M:%S",timeinfo);
 		fEndTimeStr = buffer;
 	}
 	
@@ -127,10 +127,10 @@ struct QueryStats
 	 modified accordingly.
 	*/
 	void insert();
-	void handleMySqlError(const char*, unsigned int);
+	void handleMySqlError(const char* errStr, unsigned int errCode);
 	
 	/* User mysql API to query priority table and get this user's assigned priority */
-	uint32_t userPriority(std::string host, const std::string user);
+	uint userPriority(std::string host, const std::string user);
 
 private:
 //	default okay

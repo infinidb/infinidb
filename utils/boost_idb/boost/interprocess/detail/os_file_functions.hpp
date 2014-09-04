@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////////////////
 //
-// (C) Copyright Ion Gaztanaga 2005-2012. Distributed under the Boost
+// (C) Copyright Ion Gaztanaga 2005-2009. Distributed under the Boost
 // Software License, Version 1.0. (See accompanying file
 // LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 //
@@ -17,9 +17,6 @@
 #include <boost/interprocess/permissions.hpp>
 
 #include <string>
-#include <limits>
-#include <climits>
-#include <boost/type_traits/make_unsigned.hpp>
 
 #if (defined BOOST_INTERPROCESS_WINDOWS)
 #  include <boost/interprocess/detail/win32_api.hpp>
@@ -33,7 +30,7 @@
 #     include <cstdio>
 #     include <dirent.h>
 #     if 0
-#        include <sys/file.h>
+#        include <sys/file.h> 
 #     endif
 #  else
 #    error Unknown platform
@@ -59,7 +56,7 @@ typedef enum { read_only      = winapi::generic_read
              , read_write     = winapi::generic_read | winapi::generic_write
              , copy_on_write
              , read_private
-             , invalid_mode   = 0xffff
+             , invalid_mode   = 0xffff 
              } mode_t;
 
 typedef enum { file_begin     = winapi::file_begin
@@ -67,10 +64,7 @@ typedef enum { file_begin     = winapi::file_begin
              , file_current   = winapi::file_current
              } file_pos_t;
 
-typedef unsigned long      map_options_t;
-static const map_options_t default_map_options = map_options_t(-1);
-
-namespace ipcdetail{
+namespace detail{
 
 inline mapping_handle_t mapping_handle_from_file_handle(file_handle_t hnd)
 {
@@ -99,29 +93,29 @@ inline const char *get_temporary_path()
 
 
 inline file_handle_t create_new_file
-   (const char *name, mode_t mode, const permissions & perm = permissions(), bool temporary = false)
-{
+   (const char *name, mode_t mode, const permissions & perm, bool temporary = false)
+{  
    unsigned long attr = temporary ? winapi::file_attribute_temporary : 0;
    return winapi::create_file
       ( name, (unsigned int)mode, winapi::create_new, attr
-      , (winapi::interprocess_security_attributes*)perm.get_permissions());
+      , (winapi::interprocess_security_attributes*)perm.get_permissions());  
 }
 
 inline file_handle_t create_or_open_file
-   (const char *name, mode_t mode, const permissions & perm = permissions(), bool temporary = false)
-{
+   (const char *name, mode_t mode, const permissions & perm, bool temporary = false)
+{  
    unsigned long attr = temporary ? winapi::file_attribute_temporary : 0;
    return winapi::create_file
       ( name, (unsigned int)mode, winapi::open_always, attr
-      , (winapi::interprocess_security_attributes*)perm.get_permissions());
+      , (winapi::interprocess_security_attributes*)perm.get_permissions());  
 }
 
 inline file_handle_t open_existing_file
    (const char *name, mode_t mode, bool temporary = false)
-{
+{  
    unsigned long attr = temporary ? winapi::file_attribute_temporary : 0;
    return winapi::create_file
-      (name, (unsigned int)mode, winapi::open_existing, attr, 0);
+      (name, (unsigned int)mode, winapi::open_existing, attr, 0);  
 }
 
 inline bool delete_file(const char *name)
@@ -133,18 +127,10 @@ inline bool truncate_file (file_handle_t hnd, std::size_t size)
    if(!winapi::get_file_size(hnd, filesize))
       return false;
 
-   typedef boost::make_unsigned<offset_t>::type uoffset_t;
-   const uoffset_t max_filesize = uoffset_t((std::numeric_limits<offset_t>::max)());
-   //Avoid unused variable warnings in 32 bit systems
-   if(size > max_filesize){
-      winapi::set_last_error(winapi::error_file_too_large);
-      return false;
-   }
-
-   if(offset_t(size) > filesize){
+   if(size > (unsigned long long)filesize){
       if(!winapi::set_file_pointer_ex(hnd, filesize, 0, winapi::file_begin)){
          return false;
-      }
+      }      
       //We will write zeros in the end of the file
       //since set_end_of_file does not guarantee this
       for(std::size_t remaining = size - filesize, write_size = 0
@@ -181,7 +167,7 @@ inline bool get_file_pointer(file_handle_t hnd, offset_t &off)
 {  return winapi::set_file_pointer_ex(hnd, 0, &off, winapi::file_current); }
 
 inline bool write_file(file_handle_t hnd, const void *data, std::size_t numdata)
-{
+{  
    unsigned long written;
    return 0 != winapi::write_file(hnd, data, (unsigned long)numdata, &written, 0);
 }
@@ -193,9 +179,9 @@ inline bool close_file(file_handle_t hnd)
 {  return 0 != winapi::close_handle(hnd);   }
 
 inline bool acquire_file_lock(file_handle_t hnd)
-{
+{  
    static winapi::interprocess_overlapped overlapped;
-   const unsigned long len = ((unsigned long)-1);
+   const unsigned long len = 0xffffffff;
 //   winapi::interprocess_overlapped overlapped;
 //   std::memset(&overlapped, 0, sizeof(overlapped));
    return winapi::lock_file_ex
@@ -203,44 +189,44 @@ inline bool acquire_file_lock(file_handle_t hnd)
 }
 
 inline bool try_acquire_file_lock(file_handle_t hnd, bool &acquired)
-{
-   const unsigned long len = ((unsigned long)-1);
+{  
+   const unsigned long len = 0xffffffff;
    winapi::interprocess_overlapped overlapped;
    std::memset(&overlapped, 0, sizeof(overlapped));
    if(!winapi::lock_file_ex
-      (hnd, winapi::lockfile_exclusive_lock | winapi::lockfile_fail_immediately,
+      (hnd, winapi::lockfile_exclusive_lock | winapi::lockfile_fail_immediately, 
        0, len, len, &overlapped)){
-      return winapi::get_last_error() == winapi::error_lock_violation ?
+      return winapi::get_last_error() == winapi::error_lock_violation ? 
                acquired = false, true : false;
-
+   
    }
    return (acquired = true);
 }
 
 inline bool release_file_lock(file_handle_t hnd)
-{
-   const unsigned long len = ((unsigned long)-1);
+{  
+   const unsigned long len = 0xffffffff;
    winapi::interprocess_overlapped overlapped;
    std::memset(&overlapped, 0, sizeof(overlapped));
    return winapi::unlock_file_ex(hnd, 0, len, len, &overlapped);
 }
 
 inline bool acquire_file_lock_sharable(file_handle_t hnd)
-{
-   const unsigned long len = ((unsigned long)-1);
+{  
+   const unsigned long len = 0xffffffff;
    winapi::interprocess_overlapped overlapped;
    std::memset(&overlapped, 0, sizeof(overlapped));
    return winapi::lock_file_ex(hnd, 0, 0, len, len, &overlapped);
 }
 
 inline bool try_acquire_file_lock_sharable(file_handle_t hnd, bool &acquired)
-{
-   const unsigned long len = ((unsigned long)-1);
+{  
+   const unsigned long len = 0xffffffff;
    winapi::interprocess_overlapped overlapped;
    std::memset(&overlapped, 0, sizeof(overlapped));
    if(!winapi::lock_file_ex
       (hnd, winapi::lockfile_fail_immediately, 0, len, len, &overlapped)){
-      return winapi::get_last_error() == winapi::error_lock_violation ?
+      return winapi::get_last_error() == winapi::error_lock_violation ? 
                acquired = false, true : false;
    }
    return (acquired = true);
@@ -282,7 +268,7 @@ inline bool delete_subdirectories_recursive
                //if(::SetFileAttributes(strFilePath.c_str(), winapi::file_attribute_normal) == 0)
                //return winapi::get_last_error();
                // Delete file
-               winapi::unlink_file(strFilePath.c_str());
+               winapi::delete_file(strFilePath.c_str());
             }
          }
       //Go to the next file
@@ -371,7 +357,7 @@ typedef enum { read_only      = O_RDONLY
              , read_write     = O_RDWR
              , copy_on_write
              , read_private
-             , invalid_mode   = 0xffff
+             , invalid_mode   = 0xffff 
              } mode_t;
 
 typedef enum { file_begin     = SEEK_SET
@@ -379,10 +365,7 @@ typedef enum { file_begin     = SEEK_SET
              , file_current   = SEEK_CUR
              } file_pos_t;
 
-typedef int map_options_t;
-static const map_options_t default_map_options = map_options_t(-1);
-
-namespace ipcdetail{
+namespace detail{
 
 inline mapping_handle_t mapping_handle_from_file_handle(file_handle_t hnd)
 {
@@ -412,8 +395,8 @@ inline const char *get_temporary_path()
 }
 
 inline file_handle_t create_new_file
-   (const char *name, mode_t mode, const permissions & perm = permissions(), bool temporary = false)
-{
+   (const char *name, mode_t mode, const permissions & perm, bool temporary = false)
+{  
    (void)temporary;
    int ret = ::open(name, ((int)mode) | O_EXCL | O_CREAT, perm.get_permissions());
    if(ret >= 0){
@@ -423,49 +406,31 @@ inline file_handle_t create_new_file
 }
 
 inline file_handle_t create_or_open_file
-   (const char *name, mode_t mode, const permissions & perm = permissions(), bool temporary = false)
-{
+   (const char *name, mode_t mode, const permissions & perm, bool temporary = false)
+{  
    (void)temporary;
-   int ret = -1;
-   //We need a loop to change permissions correctly using fchmod, since
-   //with "O_CREAT only" ::open we don't know if we've created or opened the file.
-   while(1){
-      ret = ::open(name, ((int)mode) | O_EXCL | O_CREAT, perm.get_permissions());
-      if(ret >= 0){
-         ::fchmod(ret, perm.get_permissions());
-         break;
-      }
-      else if(errno == EEXIST){
-         if((ret = ::open(name, (int)mode)) >= 0 || errno != ENOENT){
-            break;
-         }
-      }
+   int ret = ::open(name, ((int)mode) | O_CREAT, perm.get_permissions());
+   if(ret >= 0){
+      ::fchmod(ret, perm.get_permissions());
    }
    return ret;
 }
 
 inline file_handle_t open_existing_file
    (const char *name, mode_t mode, bool temporary = false)
-{
+{  
    (void)temporary;
-   return ::open(name, (int)mode);
+   return ::open(name, (int)mode, 0666);
 }
 
 inline bool delete_file(const char *name)
 {  return ::unlink(name) == 0;   }
 
 inline bool truncate_file (file_handle_t hnd, std::size_t size)
-{
-   typedef boost::make_unsigned<off_t>::type uoff_t;
-   if(uoff_t((std::numeric_limits<off_t>::max)()) < size){
-      errno = EINVAL;
-      return false;
-   }
-   return 0 == ::ftruncate(hnd, off_t(size));
-}
+{  return 0 == ::ftruncate(hnd, size);   }
 
 inline bool get_file_size(file_handle_t hnd, offset_t &size)
-{
+{  
    struct stat data;
    bool ret = 0 == ::fstat(hnd, &data);
    if(ret){
@@ -478,7 +443,7 @@ inline bool set_file_pointer(file_handle_t hnd, offset_t off, file_pos_t pos)
 {  return ((off_t)(-1)) != ::lseek(hnd, off, (int)pos); }
 
 inline bool get_file_pointer(file_handle_t hnd, offset_t &off)
-{
+{  
    off = ::lseek(hnd, 0, SEEK_CUR);
    return off != ((off_t)-1);
 }
@@ -528,7 +493,7 @@ inline bool release_file_lock(file_handle_t hnd)
 }
 
 inline bool acquire_file_lock_sharable(file_handle_t hnd)
-{
+{  
    struct ::flock lock;
    lock.l_type    = F_RDLCK;
    lock.l_whence  = SEEK_SET;
@@ -538,7 +503,7 @@ inline bool acquire_file_lock_sharable(file_handle_t hnd)
 }
 
 inline bool try_acquire_file_lock_sharable(file_handle_t hnd, bool &acquired)
-{
+{  
    struct flock lock;
    lock.l_type    = F_RDLCK;
    lock.l_whence  = SEEK_SET;
@@ -546,7 +511,7 @@ inline bool try_acquire_file_lock_sharable(file_handle_t hnd, bool &acquired)
    lock.l_len     = 0;
    int ret = ::fcntl(hnd, F_SETLK, &lock);
    if(ret == -1){
-      return (errno == EAGAIN || errno == EACCES) ?
+      return (errno == EAGAIN || errno == EACCES) ? 
                acquired = false, true : false;
    }
    return (acquired = true);
@@ -607,7 +572,7 @@ inline bool delete_subdirectories_recursive
             || (de->d_name[1] == '.' && de->d_name[2] == '\0' )) ){
          continue;
       }
-      if(dont_delete_this && std::strcmp(dont_delete_this, de->d_name) == 0){
+      if(dont_delete_this && std::strcmp(dont_delete_this, de->d_name) == 0){  
          continue;
       }
       fn = refcstrRootDirectory;
@@ -693,7 +658,7 @@ inline bool open_or_create_directory(const char *dir_name)
 }
 
 
-}  //namespace ipcdetail{
+}  //namespace detail{
 }  //namespace interprocess {
 }  //namespace boost {
 

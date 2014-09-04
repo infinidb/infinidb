@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: tuplehavingstep.cpp 9709 2013-07-20 06:08:46Z xlou $
+//  $Id: tuplehavingstep.cpp 8476 2012-04-25 22:28:15Z xlou $
 
 
 //#define NDEBUG
@@ -26,7 +26,6 @@ using namespace std;
 
 #include <boost/shared_ptr.hpp>
 #include <boost/shared_array.hpp>
-#include <boost/uuid/uuid_io.hpp>
 using namespace boost;
 
 #include "messagequeue.h"
@@ -46,9 +45,6 @@ using namespace execplan;
 #include "rowgroup.h"
 using namespace rowgroup;
 
-#include "querytele.h"
-using namespace querytele;
-
 #include "funcexp.h"
 
 #include "jlf_common.h"
@@ -58,17 +54,21 @@ using namespace querytele;
 namespace joblist
 {
 
-TupleHavingStep::TupleHavingStep(const JobInfo& jobInfo) :
-		ExpressionStep(jobInfo),
+TupleHavingStep::TupleHavingStep(
+	uint32_t sessionId,
+	uint32_t txnId,
+	uint32_t verId,
+	uint32_t statementId) :
+		ExpressionStep(sessionId, txnId, verId, statementId),
 		fInputDL(NULL),
 		fOutputDL(NULL),
 		fInputIterator(0),
 		fRowsReturned(0),
 		fEndOfResult(false),
+		fDelivery(false),
 		fFeInstance(funcexp::FuncExp::instance())
 {
-	fExtendedInfo = "HVS: ";
-	fQtc.stepParms().stepType = StepTeleStats::T_HVS;
+	fExtendedInfo = "THS: ";
 }
 
 
@@ -88,21 +88,21 @@ void TupleHavingStep::initialize(const RowGroup& rgIn, const JobInfo& jobInfo)
 	fRowGroupIn = rgIn;
 	fRowGroupIn.initRow(&fRowIn);
 
-	map<uint32_t, uint32_t> keyToIndexMap;
+	map<uint, uint> keyToIndexMap;
 	for (uint64_t i = 0; i < fRowGroupIn.getKeys().size(); ++i)
 		if (keyToIndexMap.find(fRowGroupIn.getKeys()[i]) == keyToIndexMap.end())
 			keyToIndexMap.insert(make_pair(fRowGroupIn.getKeys()[i], i));
 	updateInputIndex(keyToIndexMap, jobInfo);
 
-	vector<uint32_t> oids, oidsIn = fRowGroupIn.getOIDs();
-	vector<uint32_t> keys, keysIn = fRowGroupIn.getKeys();
-	vector<uint32_t> scale, scaleIn = fRowGroupIn.getScale();
-	vector<uint32_t> precision, precisionIn = fRowGroupIn.getPrecision();
+	vector<uint> oids, oidsIn = fRowGroupIn.getOIDs();
+	vector<uint> keys, keysIn = fRowGroupIn.getKeys();
+	vector<uint> scale, scaleIn = fRowGroupIn.getScale();
+	vector<uint> precision, precisionIn = fRowGroupIn.getPrecision();
 	vector<CalpontSystemCatalog::ColDataType> types, typesIn = fRowGroupIn.getColTypes();
-	vector<uint32_t> pos, posIn = fRowGroupIn.getOffsets();
+	vector<uint> pos, posIn = fRowGroupIn.getOffsets();
 
 	size_t n = 0;
-	RetColsVector::const_iterator i = jobInfo.deliveredCols.begin();
+	RetColsVector::const_iterator i = jobInfo.deliveredCols.begin(); 
 	while (i != jobInfo.deliveredCols.end())
 		if (NULL == dynamic_cast<const ConstantColumn*>(i++->get()))
 			n++;
@@ -114,7 +114,7 @@ void TupleHavingStep::initialize(const RowGroup& rgIn, const JobInfo& jobInfo)
 	types.insert(types.end(), typesIn.begin(), typesIn.begin() + n);
 	pos.insert(pos.end(), posIn.begin(), posIn.begin() + n + 1);
 
-	fRowGroupOut = RowGroup(oids.size(), pos, oids, keys, types, scale, precision, jobInfo.stringTableThreshold);
+	fRowGroupOut = RowGroup(oids.size(), pos, oids, keys, types, scale, precision);
 	fRowGroupOut.initRow(&fRowOut);
 }
 
@@ -163,12 +163,12 @@ void TupleHavingStep::join()
 }
 
 
-uint32_t TupleHavingStep::nextBand(messageqcpp::ByteStream &bs)
+uint TupleHavingStep::nextBand(messageqcpp::ByteStream &bs)
 {
-	RGData rgDataIn;
-	RGData rgDataOut;
+	shared_array<uint8_t> rgDataIn;
+	shared_array<uint8_t> rgDataOut;
 	bool more = false;
-	uint32_t rowCount = 0;
+	uint rowCount = 0;
 
 	try
 	{
@@ -178,7 +178,7 @@ uint32_t TupleHavingStep::nextBand(messageqcpp::ByteStream &bs)
 		if (dlTimes.FirstReadTime().tv_sec ==0)
             dlTimes.setFirstReadTime();
 
-		if (!more || cancelled())
+		if (!more || (0 < fInputJobStepAssociation.status()))
 		{
 			fEndOfResult = true;
 		}
@@ -186,23 +186,22 @@ uint32_t TupleHavingStep::nextBand(messageqcpp::ByteStream &bs)
 		bool emptyRowGroup = true;
 		while (more && !fEndOfResult && emptyRowGroup)
 		{
-			if (cancelled())
+			if (0 < fInputJobStepAssociation.status())
 			{
-				while (more)
-					more = fInputDL->next(fInputIterator, &rgDataIn);
+				while (more) more = fInputDL->next(fInputIterator, &rgDataIn);
 				break;
 			}
 
-			fRowGroupIn.setData(&rgDataIn);
-			rgDataOut.reinit(fRowGroupOut, fRowGroupIn.getRowCount());
-			fRowGroupOut.setData(&rgDataOut);
+			fRowGroupIn.setData(rgDataIn.get());
+			rgDataOut.reset(new uint8_t[fRowGroupOut.getDataSize(fRowGroupIn.getRowCount())]);
+			fRowGroupOut.setData(rgDataOut.get());
 
 			doHavingFilters();
 
 			if (fRowGroupOut.getRowCount() > 0)
 			{
 				emptyRowGroup = false;
-				fRowGroupOut.serializeRGData(bs);
+				bs.load(fRowGroupOut.getData(), fRowGroupOut.getDataSize());
 				rowCount = fRowGroupOut.getRowCount();
 			}
 			else
@@ -218,28 +217,29 @@ uint32_t TupleHavingStep::nextBand(messageqcpp::ByteStream &bs)
 	}
 	catch(const std::exception& ex)
 	{
-		catchHandler(ex.what(), tupleHavingStepErr, fErrorInfo, fSessionId);
-		while (more)
-			more = fInputDL->next(fInputIterator, &rgDataIn);
+		catchHandler(ex.what(), fSessionId);
+		if (fOutputJobStepAssociation.status() == 0)
+			fOutputJobStepAssociation.status(tupleHavingStepErr);
+		while (more) more = fInputDL->next(fInputIterator, &rgDataIn);
 		fEndOfResult = true;
 	}
 	catch(...)
 	{
-		catchHandler("TupleHavingStep next band caught an unknown exception",
-					 tupleHavingStepErr, fErrorInfo, fSessionId);
-		while (more)
-			more = fInputDL->next(fInputIterator, &rgDataIn);
+		catchHandler("TupleHavingStep next band caught an unknown exception", fSessionId);
+		if (fOutputJobStepAssociation.status() == 0)
+			fOutputJobStepAssociation.status(tupleHavingStepErr);
+		while (more) more = fInputDL->next(fInputIterator, &rgDataIn);
 		fEndOfResult = true;
 	}
 
 	if (fEndOfResult)
 	{
 		// send an empty / error band
-		rgDataOut.reinit(fRowGroupOut, 0);
-		fRowGroupOut.setData(&rgDataOut);
+		rgDataOut.reset(new uint8_t[fRowGroupOut.getEmptySize()]);
+		fRowGroupOut.setData(rgDataOut.get());
 		fRowGroupOut.resetRowGroup(0);
-		fRowGroupOut.setStatus(status());
-		fRowGroupOut.serializeRGData(bs);
+		fRowGroupOut.setStatus(fOutputJobStepAssociation.status());
+		bs.load(rgDataOut.get(), fRowGroupOut.getDataSize());
 
 		dlTimes.setLastReadTime();
 		dlTimes.setEndOfInputTime();
@@ -254,37 +254,30 @@ uint32_t TupleHavingStep::nextBand(messageqcpp::ByteStream &bs)
 
 void TupleHavingStep::execute()
 {
-	RGData rgDataIn;
-	RGData rgDataOut;
+	shared_array<uint8_t> rgDataIn;
+	shared_array<uint8_t> rgDataOut;
 	bool more = false;
-	StepTeleStats sts;
-	sts.query_uuid = fQueryUuid;
-	sts.step_uuid = fStepUuid;
 
 	try
 	{
 		more = fInputDL->next(fInputIterator, &rgDataIn);
 		dlTimes.setFirstReadTime();
 
-		sts.msg_type = StepTeleStats::ST_START;
-		sts.total_units_of_work = 1;
-		postStepStartTele(sts);
-
-		if (!more && cancelled())
+		if (!more && (0 < fInputJobStepAssociation.status()))
 		{
 			fEndOfResult = true;
 		}
 
 		while (more && !fEndOfResult)
 		{
-			fRowGroupIn.setData(&rgDataIn);
-			rgDataOut.reinit(fRowGroupOut, fRowGroupIn.getRowCount());
-			fRowGroupOut.setData(&rgDataOut);
+			fRowGroupIn.setData(rgDataIn.get());
+			rgDataOut.reset(new uint8_t[fRowGroupOut.getDataSize(fRowGroupIn.getRowCount())]);
+			fRowGroupOut.setData(rgDataOut.get());
 
 			doHavingFilters();
 
 			more = fInputDL->next(fInputIterator, &rgDataIn);
-			if (cancelled())
+			if (0 < fInputJobStepAssociation.status())
 			{
 				fEndOfResult = true;
 			}
@@ -296,12 +289,15 @@ void TupleHavingStep::execute()
 	}
 	catch(const std::exception& ex)
 	{
-		catchHandler(ex.what(), tupleHavingStepErr, fErrorInfo, fSessionId);
+		catchHandler(ex.what(), fSessionId);
+		if (fOutputJobStepAssociation.status() == 0)
+			fOutputJobStepAssociation.status(tupleHavingStepErr);
 	}
 	catch(...)
 	{
-		catchHandler("TupleHavingStep execute caught an unknown exception",
-					 tupleHavingStepErr, fErrorInfo, fSessionId);
+		catchHandler("TupleHavingStep execute caught an unknown exception", fSessionId);
+		if (fOutputJobStepAssociation.status() == 0)
+			fOutputJobStepAssociation.status(tupleHavingStepErr);
 	}
 
 	while (more)
@@ -309,11 +305,6 @@ void TupleHavingStep::execute()
 
 	fEndOfResult = true;
 	fOutputDL->endOfInput();
-
-	sts.msg_type = StepTeleStats::ST_SUMMARY;
-	sts.total_units_of_work = sts.units_of_work_completed = 1;
-	sts.rows = fRowsReturned;
-	postStepSummaryTele(sts);
 
 	dlTimes.setLastReadTime();
 	dlTimes.setEndOfInputTime();
@@ -333,7 +324,7 @@ void TupleHavingStep::doHavingFilters()
 	{
 		if(fFeInstance->evaluate(fRowIn, fExpressionFilter))
 		{
-			copyRow(fRowIn, &fRowOut);
+			memcpy(fRowOut.getData(), fRowIn.getData(), fRowOut.getSize());
 			fRowGroupOut.incRowCount();
 			fRowOut.nextRow();
 		}
@@ -354,18 +345,6 @@ const RowGroup& TupleHavingStep::getOutputRowGroup() const
 const RowGroup& TupleHavingStep::getDeliveredRowGroup() const
 {
 	return fRowGroupOut;
-}
-
-
-void TupleHavingStep::deliverStringTableRowGroup(bool b)
-{
-	fRowGroupOut.setUseStringTable(b);
-}
-
-
-bool TupleHavingStep::deliverStringTableRowGroup() const
-{
-	return fRowGroupOut.usesStringTable();
 }
 
 
@@ -400,8 +379,7 @@ void TupleHavingStep::printCalTrace()
 			<< "\t1st read " << dlTimes.FirstReadTimeString()
 			<< "; EOI " << dlTimes.EndOfInputTimeString() << "; runtime-"
 			<< JSTimeStamp::tsdiffstr(dlTimes.EndOfInputTime(), dlTimes.FirstReadTime())
-			<< "s;\n\tUUID " << uuids::to_string(fStepUuid) << endl
-			<< "\tJob completion status " << status() << endl;
+			<< "s;\n\tJob completion status " << fOutputJobStepAssociation.status() << endl;
 	logEnd(logStr.str().c_str());
 	fExtendedInfo += logStr.str();
 	formatMiniStats();

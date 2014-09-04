@@ -1,8 +1,0 @@
-#! /bin/sh
-#
-# $Id: mysql-build 421 2007-04-05 15:46:55Z dhill $
-#
-# build calpont mysql
-
-su - mysql -c "scripts/build-branch $1"
-

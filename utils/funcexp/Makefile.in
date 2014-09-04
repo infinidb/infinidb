@@ -14,22 +14,22 @@
 
 @SET_MAKE@
 
-# Copyright (C) 2014 InfiniDB, Inc.
+#  Copyright (C) 2014 InfiniDB, Inc.
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; version 2 of
-# the License.
+#  This program is free software; you can redistribute it and/or
+#  modify it under the terms of the GNU General Public License
+#  as published by the Free Software Foundation; version 2 of
+#  the License.
 #
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
 #
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-# MA 02110-1301, USA.
+#  You should have received a copy of the GNU General Public License
+#  along with this program; if not, write to the Free Software
+#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+#  MA 02110-1301, USA.
 
 # $Id$
 
@@ -60,9 +60,8 @@ subdir = utils/funcexp
 DIST_COMMON = $(include_HEADERS) $(srcdir)/Makefile.am \
 	$(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
-am__aclocal_m4_deps = $(top_srcdir)/m4/compilerflags.m4 \
-	$(top_srcdir)/m4/functions.m4 $(top_srcdir)/m4/install.m4 \
-	$(top_srcdir)/configure.ac
+am__aclocal_m4_deps = $(top_srcdir)/m4/functions.m4 \
+	$(top_srcdir)/m4/install.m4 $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 mkinstalldirs = $(install_sh) -d
@@ -88,22 +87,22 @@ am_libfuncexp_la_OBJECTS = functor.lo funcexp.lo funcexpwrapper.lo \
 	func_div.lo func_elt.lo func_exp.lo func_extract.lo \
 	func_find_in_set.lo func_floor.lo func_from_days.lo \
 	func_from_unixtime.lo func_get_format.lo func_greatest.lo \
-	func_hex.lo func_hour.lo func_idbpartition.lo func_if.lo \
-	func_ifnull.lo func_in.lo func_inet_aton.lo func_inet_ntoa.lo \
-	func_insert.lo func_instr.lo func_isnull.lo func_last_day.lo \
-	func_lcase.lo func_least.lo func_left.lo func_length.lo \
-	func_lpad.lo func_ltrim.lo func_makedate.lo func_maketime.lo \
-	func_math.lo func_microsecond.lo func_md5.lo func_minute.lo \
-	func_mod.lo func_month.lo func_monthname.lo func_nullif.lo \
-	func_pow.lo func_period_add.lo func_period_diff.lo \
-	func_quarter.lo func_rand.lo func_regexp.lo func_repeat.lo \
-	func_replace.lo func_reverse.lo func_right.lo func_round.lo \
-	func_rpad.lo func_rtrim.lo func_second.lo func_sec_to_time.lo \
-	func_sha.lo func_sign.lo func_str_to_date.lo func_strcmp.lo \
-	func_substr.lo func_substring_index.lo func_sysdate.lo \
-	func_time.lo func_time_format.lo func_time_to_sec.lo \
-	func_timediff.lo func_timestampdiff.lo func_to_days.lo \
-	func_trim.lo func_truncate.lo func_ucase.lo func_unhex.lo \
+	func_hex.lo func_hour.lo func_if.lo func_ifnull.lo func_in.lo \
+	func_inet_aton.lo func_inet_ntoa.lo func_insert.lo \
+	func_instr.lo func_isnull.lo func_last_day.lo func_lcase.lo \
+	func_least.lo func_left.lo func_length.lo func_lpad.lo \
+	func_ltrim.lo func_makedate.lo func_maketime.lo func_math.lo \
+	func_microsecond.lo func_md5.lo func_minute.lo func_mod.lo \
+	func_month.lo func_monthname.lo func_nullif.lo func_pow.lo \
+	func_period_add.lo func_period_diff.lo func_quarter.lo \
+	func_rand.lo func_regexp.lo func_repeat.lo func_replace.lo \
+	func_reverse.lo func_right.lo func_round.lo func_rpad.lo \
+	func_rtrim.lo func_second.lo func_sec_to_time.lo func_sha.lo \
+	func_sign.lo func_str_to_date.lo func_strcmp.lo func_substr.lo \
+	func_substring_index.lo func_sysdate.lo func_time.lo \
+	func_time_format.lo func_time_to_sec.lo func_timediff.lo \
+	func_timestampdiff.lo func_to_days.lo func_trim.lo \
+	func_truncate.lo func_ucase.lo func_unhex.lo \
 	func_unix_timestamp.lo func_week.lo func_weekday.lo \
 	func_year.lo func_yearweek.lo
 libfuncexp_la_OBJECTS = $(am_libfuncexp_la_OBJECTS)
@@ -184,9 +183,6 @@ SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
 STRIP = @STRIP@
 VERSION = @VERSION@
-XML2_CONFIG = @XML2_CONFIG@
-XML_CPPFLAGS = @XML_CPPFLAGS@
-XML_LIBS = @XML_LIBS@
 YACC = @YACC@
 ac_ct_AR = @ac_ct_AR@
 ac_ct_CC = @ac_ct_CC@
@@ -228,7 +224,6 @@ idb_exec_libs = @idb_exec_libs@
 idb_ldflags = @idb_ldflags@
 idb_oam_libs = @idb_oam_libs@
 idb_write_libs = @idb_write_libs@
-idbinstall = @idbinstall@
 includedir = @includedir@
 infodir = @infodir@
 install_sh = @install_sh@
@@ -242,11 +237,6 @@ mibdir = @mibdir@
 mkdir_p = @mkdir_p@
 mysqldir = @mysqldir@
 netsnmp_libs = @netsnmp_libs@
-netsnmpagntdir = @netsnmpagntdir@
-netsnmpdir = @netsnmpdir@
-netsnmplibrdir = @netsnmplibrdir@
-netsnmpmachdir = @netsnmpmachdir@
-netsnmpsysdir = @netsnmpsysdir@
 oldincludedir = @oldincludedir@
 postdir = @postdir@
 prefix = @prefix@
@@ -300,7 +290,6 @@ libfuncexp_la_SOURCES = \
 	func_greatest.cpp \
 	func_hex.cpp \
 	func_hour.cpp \
-	func_idbpartition.cpp \
 	func_if.cpp \
 	func_ifnull.cpp \
 	func_in.cpp \
@@ -368,7 +357,6 @@ include_HEADERS = \
 	funcexp.h \
 	funcexpwrapper.h \
 	functor.h \
-	functor_str.h \
 	functor_export.h \
 	utils_utf8.h
 
@@ -475,7 +463,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/func_greatest.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/func_hex.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/func_hour.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/func_idbpartition.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/func_if.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/func_ifnull.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/func_in.Plo@am__quote@

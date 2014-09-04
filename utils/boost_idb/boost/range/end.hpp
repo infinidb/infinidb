@@ -88,9 +88,6 @@ namespace range_detail
 } // namespace 'range_detail'
 #endif
 
-namespace range_adl_barrier
-{
-
 template< class T >
 inline BOOST_DEDUCED_TYPENAME range_iterator<T>::type end( T& r )
 {
@@ -113,24 +110,22 @@ inline BOOST_DEDUCED_TYPENAME range_iterator<const T>::type end( const T& r )
     return range_end( r );
 }
 
-    } // namespace range_adl_barrier
 } // namespace 'boost'
+
+
 
 #endif // BOOST_NO_FUNCTION_TEMPLATE_ORDERING
 
+
 namespace boost
 {
-    namespace range_adl_barrier
+    template< class T >
+    inline BOOST_DEDUCED_TYPENAME range_iterator<const T>::type
+    const_end( const T& r )
     {
-        template< class T >
-        inline BOOST_DEDUCED_TYPENAME range_iterator<const T>::type
-        const_end( const T& r )
-        {
-            return boost::range_adl_barrier::end( r );
-        }
-    } // namespace range_adl_barrier
-    using namespace range_adl_barrier;
-} // namespace boost
+        return boost::end( r );
+    }
+}
 
 #endif
 

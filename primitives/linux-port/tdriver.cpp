@@ -127,6 +127,22 @@ CPPUNIT_TEST(p_Col_neg_float_1);
 // negative double column test
 CPPUNIT_TEST(p_Col_neg_double_1);
 
+// whole block tests
+CPPUNIT_TEST(p_ColAggregate_1);
+CPPUNIT_TEST(p_ColAggregate_2);
+CPPUNIT_TEST(p_ColAggregate_3);
+CPPUNIT_TEST(p_ColAggregate_4);
+
+// whole block tests with negative numbers
+CPPUNIT_TEST(p_ColAggregate_5);
+
+// whole block test with sum overflow
+CPPUNIT_TEST(p_ColAggregate_6);
+
+// whole block test with sum overflow and negative numbers
+/* XXXPAT: We need new block data for this one b/c of the null values*/
+// CPPUNIT_TEST(p_ColAggregate_7);
+
 // some ports of TokenByScan tests to validate similar & shared code
 CPPUNIT_TEST(p_Dictionary_1);
 CPPUNIT_TEST(p_Dictionary_2);
@@ -172,7 +188,7 @@ void p_IdxWalk_1_eq_1()
 	char block[BLOCK_SIZE];
 	u_int64_t searchKey;
 	int fd;
-	uint32_t err;
+	uint err;
 	string filename("FILE_990.dat");
 	IndexWalkHeader *params;
 	vector<IndexWalkHeader *> results;
@@ -229,7 +245,7 @@ void p_IdxWalk_1_lt_1()
 	char block[BLOCK_SIZE];
 	u_int64_t searchKey;
 	int fd;
-	uint32_t err;
+	uint err;
 	string filename("FILE_990.dat");
 	IndexWalkHeader *params;
 	vector<IndexWalkHeader *> results;
@@ -296,7 +312,7 @@ void p_IdxWalk_1_lte_1()
 	char block[BLOCK_SIZE];
 	u_int64_t searchKey;
 	int fd;
-	uint32_t err;
+	uint err;
 	string filename("FILE_990.dat");
 	IndexWalkHeader *params;
 	vector<IndexWalkHeader *> results;
@@ -363,7 +379,7 @@ void p_IdxWalk_1_gt_1()
 	char block[BLOCK_SIZE];
 	u_int64_t searchKey;
 	int fd;
-	uint32_t err;
+	uint err;
 	string filename("FILE_990.dat");
 	IndexWalkHeader *params;
 	vector<IndexWalkHeader *> results;
@@ -430,7 +446,7 @@ void p_IdxWalk_1_gte_1()
 	char block[BLOCK_SIZE];
 	u_int64_t searchKey;
 	int fd;
-	uint32_t err;
+	uint err;
 	string filename("FILE_990.dat");
 	IndexWalkHeader *params;
 	vector<IndexWalkHeader *> results;
@@ -497,7 +513,7 @@ void p_IdxWalk_1_neq_1()
 	char block[BLOCK_SIZE];
 	u_int64_t searchKey;
 	int fd;
-	uint32_t err;
+	uint err;
 	string filename("FILE_990.dat");
 	IndexWalkHeader *params;
 	vector<IndexWalkHeader *> results;
@@ -564,7 +580,7 @@ void p_IdxWalk_1_eq_2()
 	char block[BLOCK_SIZE];
 	u_int64_t searchKey;
 	int fd;
-	uint32_t err;
+	uint err;
 	string filename("FILE_990.dat");
 	IndexWalkHeader *params;
 	vector<IndexWalkHeader *> results;
@@ -616,7 +632,7 @@ void p_IdxWalk_2_eq_or_1()
 	char block[BLOCK_SIZE];
 	u_int64_t searchKey[2];
 	int fd;
-	uint32_t err;
+	uint err;
 	string filename("FILE_990.dat");
 	IndexWalkHeader *params;
 	vector<IndexWalkHeader *> results;
@@ -691,7 +707,7 @@ void p_IdxWalk_2_range_1()
 	char block[BLOCK_SIZE];
 	u_int64_t searchKey[2];
 	int fd;
-	uint32_t err;
+	uint err;
 	string filename("FILE_990.dat");
 	IndexWalkHeader *params;
 	vector<IndexWalkHeader *> results;
@@ -766,7 +782,7 @@ void p_IdxWalk_2_range_2()
 	char block[BLOCK_SIZE];
 	u_int64_t searchKey[2];
 	int fd;
-	uint32_t err;
+	uint err;
 	string filename("FILE_990.dat");
 	IndexWalkHeader *params;
 	vector<IndexWalkHeader *> results;
@@ -840,7 +856,7 @@ void p_IdxWalk_2_range_3()
 	char block[BLOCK_SIZE];
 	u_int64_t searchKey[2];
 	int fd;
-	uint32_t err;
+	uint err;
 	string filename("FILE_990.dat");
 	IndexWalkHeader *params;
 	vector<IndexWalkHeader *> results;
@@ -914,7 +930,7 @@ void p_IdxWalk_40_eq_or_1()
 	char block[BLOCK_SIZE];
 	u_int64_t searchKey;
 	int fd;
-	uint32_t err, i;
+	uint err, i;
 	string filename("FILE_990.dat");
 	IndexWalkHeader *params;
 	vector<IndexWalkHeader *> results;
@@ -989,7 +1005,7 @@ void p_IdxWalk_40_neq_and_1()
 	char block[BLOCK_SIZE];
 	u_int64_t searchKey;
 	int fd;
-	uint32_t err, i;
+	uint err, i;
 	string filename("FILE_990.dat");
 	IndexWalkHeader *params;
 	vector<IndexWalkHeader *> results;
@@ -1063,14 +1079,14 @@ void p_AggregateSignature_1()
 {
 
 	PrimitiveProcessor pp;
-	uint8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE];
+	u_int8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE];
 	string filename("dictblock.cdf");
 	AggregateSignatureRequestHeader *cmd;
 	AggregateSignatureResultHeader *results;
 	DataValue *dvPtr;
 	char minmax[BLOCK_SIZE];
 	int fd;
-	uint32_t err;
+	uint err;
 
 	fd = open(filename.c_str(), O_RDONLY);
 	if (fd < 0) {
@@ -1115,14 +1131,14 @@ void p_AggregateSignature_2()
 {
 
 	PrimitiveProcessor pp;
-	uint8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE];
+	u_int8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE];
 	string filename("dictblock.cdf");
 	AggregateSignatureRequestHeader *cmd;
 	AggregateSignatureResultHeader *results;
 	DataValue *dvPtr;
 	char minmax[BLOCK_SIZE];
 	int fd;
-	uint32_t err;
+	uint err;
 
 	fd = open(filename.c_str(), O_RDONLY);
 	if (fd < 0) {
@@ -1182,13 +1198,13 @@ void p_AggregateSignature_2()
 void p_TokenByScan_1()
 {
 	PrimitiveProcessor pp;
-	uint8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE];
+	u_int8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE];
 	string filename("dictblock.cdf");
 	TokenByScanRequestHeader *cmd;
 	TokenByScanResultHeader *results;
 	DataValue *args;
 	int fd;
-	uint32_t err;
+	uint err;
 
 	fd = open(filename.c_str(), O_RDONLY);
 	if (fd < 0) {
@@ -1230,13 +1246,13 @@ void p_TokenByScan_1()
 void p_TokenByScan_2()
 {
 	PrimitiveProcessor pp;
-	uint8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE], tmp[BLOCK_SIZE];
+	u_int8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE], tmp[BLOCK_SIZE];
 	string filename("dictblock.cdf");
 	TokenByScanRequestHeader *cmd;
 	TokenByScanResultHeader *results;
 	DataValue *args;
 	int fd;	
-	uint32_t err;
+	uint err;
 
 	fd = open(filename.c_str(), O_RDONLY);
 	if (fd < 0) {
@@ -1293,13 +1309,13 @@ void p_TokenByScan_2()
 void p_TokenByScan_3()
 {
 	PrimitiveProcessor pp;
-	uint8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE], tmp[BLOCK_SIZE];
+	u_int8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE], tmp[BLOCK_SIZE];
 	string filename("dictblock.cdf");
 	TokenByScanRequestHeader *cmd;
 	TokenByScanResultHeader *results;
 	DataValue *args;
 	int fd, argsOffset, i;
-	uint32_t err;
+	uint err;
 
 	fd = open(filename.c_str(), O_RDONLY);
 	if (fd < 0) {
@@ -1345,13 +1361,13 @@ void p_TokenByScan_3()
 void p_TokenByScan_gt_1()
 {
 	PrimitiveProcessor pp;
-	uint8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE], tmp[BLOCK_SIZE];
+	u_int8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE], tmp[BLOCK_SIZE];
 	string filename("dictblock.cdf");
 	TokenByScanRequestHeader *cmd;
 	TokenByScanResultHeader *results;
 	DataValue *args;
 	int fd, argsOffset, i;
-	uint32_t err;
+	uint err;
 
 	fd = open(filename.c_str(), O_RDONLY);
 	if (fd < 0) {
@@ -1400,13 +1416,13 @@ void p_TokenByScan_gt_1()
 void p_TokenByScan_gte_1()
 {
 	PrimitiveProcessor pp;
-	uint8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE], tmp[BLOCK_SIZE];
+	u_int8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE], tmp[BLOCK_SIZE];
 	string filename("dictblock.cdf");
 	TokenByScanRequestHeader *cmd;
 	TokenByScanResultHeader *results;
 	DataValue *args;
 	int fd, argsOffset, i;
-	uint32_t err;
+	uint err;
 
 	fd = open(filename.c_str(), O_RDONLY);
 	if (fd < 0) {
@@ -1455,13 +1471,13 @@ void p_TokenByScan_gte_1()
 void p_TokenByScan_lt_1()
 {
 	PrimitiveProcessor pp;
-	uint8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE], tmp[BLOCK_SIZE];
+	u_int8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE], tmp[BLOCK_SIZE];
 	string filename("dictblock.cdf");
 	TokenByScanRequestHeader *cmd;
 	TokenByScanResultHeader *results;
 	DataValue *args;
 	int fd, argsOffset, i;
-	uint32_t err;
+	uint err;
 
 	fd = open(filename.c_str(), O_RDONLY);
 	if (fd < 0) {
@@ -1510,13 +1526,13 @@ void p_TokenByScan_lt_1()
 void p_TokenByScan_lte_1()
 {
 	PrimitiveProcessor pp;
-	uint8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE], tmp[BLOCK_SIZE];
+	u_int8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE], tmp[BLOCK_SIZE];
 	string filename("dictblock.cdf");
 	TokenByScanRequestHeader *cmd;
 	TokenByScanResultHeader *results;
 	DataValue *args;
 	int fd, argsOffset, i;
-	uint32_t err;
+	uint err;
 
 	fd = open(filename.c_str(), O_RDONLY);
 	if (fd < 0) {
@@ -1565,13 +1581,13 @@ void p_TokenByScan_lte_1()
 void p_TokenByScan_neq_1()
 {
 	PrimitiveProcessor pp;
-	uint8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE], tmp[BLOCK_SIZE];
+	u_int8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE], tmp[BLOCK_SIZE];
 	string filename("dictblock.cdf");
 	TokenByScanRequestHeader *cmd;
 	TokenByScanResultHeader *results;
 	DataValue *args;
 	int fd, argsOffset, i;
-	uint32_t err;
+	uint err;
 
 	fd = open(filename.c_str(), O_RDONLY);
 	if (fd < 0) {
@@ -1620,13 +1636,13 @@ void p_TokenByScan_neq_1()
 void p_TokenByScan_range_1()
 {
 	PrimitiveProcessor pp;
-	uint8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE], tmp[BLOCK_SIZE];
+	u_int8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE], tmp[BLOCK_SIZE];
 	string filename("dictblock.cdf");
 	TokenByScanRequestHeader *cmd;
 	TokenByScanResultHeader *results;
 	DataValue *args;
 	int fd, argsOffset, i;
-	uint32_t err;
+	uint err;
 
 	fd = open(filename.c_str(), O_RDONLY);
 	if (fd < 0) {
@@ -1684,13 +1700,13 @@ void p_TokenByScan_range_1()
 void p_TokenByScan_eq_6()
 {
 	PrimitiveProcessor pp;
-	uint8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE], tmp[BLOCK_SIZE];
+	u_int8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE], tmp[BLOCK_SIZE];
 	string filename("dictblock.cdf");
 	TokenByScanRequestHeader *cmd;
 	TokenByScanResultHeader *results;
 	DataValue *args;
 	int fd, argsOffset, i;
-	uint32_t err;
+	uint err;
 
 	fd = open(filename.c_str(), O_RDONLY);
 	if (fd < 0) {
@@ -1767,13 +1783,13 @@ void p_TokenByScan_eq_6()
 void p_TokenByScan_neq_6()
 {
 	PrimitiveProcessor pp;
-	uint8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE], tmp[BLOCK_SIZE];
+	u_int8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE], tmp[BLOCK_SIZE];
 	string filename("dictblock.cdf");
 	TokenByScanRequestHeader *cmd;
 	TokenByScanResultHeader *results;
 	DataValue *args;
 	int fd, argsOffset, i;
-	uint32_t err;
+	uint err;
 
 	fd = open(filename.c_str(), O_RDONLY);
 	if (fd < 0) {
@@ -1850,13 +1866,13 @@ void p_TokenByScan_neq_6()
 void p_TokenByScan_like_1()
 {
 	PrimitiveProcessor pp;
-	uint8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE], tmp[BLOCK_SIZE];
+	u_int8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE], tmp[BLOCK_SIZE];
 	string filename("dictblock.cdf");
 	TokenByScanRequestHeader *cmd;
 	TokenByScanResultHeader *results;
 	DataValue *args;
 	int fd, argsOffset, i;
-	uint32_t err;
+	uint err;
 
 	fd = open(filename.c_str(), O_RDONLY);
 	if (fd < 0) {
@@ -1908,14 +1924,14 @@ void p_TokenByScan_like_1()
 void p_TokenByScan_token_eq_1()
 {
 	PrimitiveProcessor pp;
-	uint8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE];
+	u_int8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE];
 	string filename("dictblock.cdf");
 	TokenByScanRequestHeader *cmd;
 	TokenByScanResultHeader *results;
 	DataValue *args;
 	PrimToken *result;
 	int fd;
-	uint32_t err;
+	uint err;
 
 	fd = open(filename.c_str(), O_RDONLY);
 	if (fd < 0) {
@@ -1963,7 +1979,7 @@ void p_IdxList_1()
 	// index list file is 10000
 
 	PrimitiveProcessor pp;
-	uint8_t block[BLOCK_SIZE], input[BLOCK_SIZE], output[BLOCK_SIZE];
+	u_int8_t block[BLOCK_SIZE], input[BLOCK_SIZE], output[BLOCK_SIZE];
 	string filename("FILE_991.dat");
 	IndexListHeader *hdr, *resultHdr;
 	IndexListParam *params;
@@ -1971,7 +1987,7 @@ void p_IdxList_1()
 	vector<IndexListEntry> bigResults;
 	vector<IndexListEntry>::iterator it;
 	int fd;
-	uint32_t err, i;
+	uint err, i;
 	bool continuationPtr;
 
 	fd = open(filename.c_str(), O_RDONLY);
@@ -2063,7 +2079,7 @@ void p_IdxList_2()
 	// index list file is 10000
 
 	PrimitiveProcessor pp;
-	uint8_t block[BLOCK_SIZE], input[BLOCK_SIZE], output[BLOCK_SIZE];
+	u_int8_t block[BLOCK_SIZE], input[BLOCK_SIZE], output[BLOCK_SIZE];
 	string filename("FILE233.cdf");
 	IndexListHeader *hdr, *resultHdr;
 	IndexListParam *params;
@@ -2071,7 +2087,7 @@ void p_IdxList_2()
 	vector<IndexListEntry> bigResults;
 	vector<IndexListEntry>::iterator it;
 	int fd;
-	uint32_t err, i;
+	uint err, i;
 	bool continuationPtr;
 
 	fd = open(filename.c_str(), O_RDONLY);
@@ -2155,19 +2171,19 @@ void p_IdxList_2()
 	for (i = 1, it = bigResults.begin(); it != bigResults.end(); it++, i++) {
 //  		cout << "  " << i << ": type=" << (*it).type << " rid=" << (*it).value << endl;
  		CPPUNIT_ASSERT((*it).type == RID);
- 		CPPUNIT_ASSERT((*it).value == (uint32_t) i-1);
+ 		CPPUNIT_ASSERT((*it).value == (uint) i-1);
 	}
 }
 
 void p_Col_1() 
 {
 	PrimitiveProcessor pp;
-	uint8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
+	u_int8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
 	NewColRequestHeader *in;
 	NewColResultHeader *out;
-	uint8_t *results;
+	u_int8_t *results;
 	int fd;
-	uint32_t i, written;
+	uint i, written;
 	string filename("col1block.cdf");
 
 	fd = open(filename.c_str(), O_RDONLY);
@@ -2195,7 +2211,7 @@ void p_Col_1()
 	out = reinterpret_cast<NewColResultHeader *>(output);
 	
 	in->DataSize = 1;
-	in->DataType = CalpontSystemCatalog::CHAR;
+	in->DataType = WriteEngine::CHAR;
 	in->OutputType = OT_DATAVALUE;
 	in->NOPS = 0;
 	in->NVALS = 0;
@@ -2218,11 +2234,11 @@ void p_Col_1()
 void p_Col_2()
 {
 	PrimitiveProcessor pp;
-	uint8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
+	u_int8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
 	NewColRequestHeader *in;
 	NewColResultHeader *out;
-	uint16_t *results;
-	uint32_t written, i;
+	u_int16_t *results;
+	uint written, i;
 	int fd;
 	string filename("col2block.cdf");
 
@@ -2251,7 +2267,7 @@ void p_Col_2()
 	out = reinterpret_cast<NewColResultHeader *>(output);
 	
 	in->DataSize = 2;
-	in->DataType = CalpontSystemCatalog::INT;
+	in->DataType = WriteEngine::INT;
 	in->OutputType = OT_DATAVALUE;
 	in->NOPS = 0;
 	in->NVALS = 0;
@@ -2260,7 +2276,7 @@ void p_Col_2()
 	pp.setBlockPtr((int*) block);
 	pp.p_Col(in, out, 4*BLOCK_SIZE, &written);
 
-	results = reinterpret_cast<uint16_t *>(&output[sizeof(NewColResultHeader)]);
+	results = reinterpret_cast<u_int16_t *>(&output[sizeof(NewColResultHeader)]);
 //  	cout << "NVALS = " << out->NVALS << endl;
  	CPPUNIT_ASSERT(out->NVALS == 4096);
 	for (i = 0; i < out->NVALS; i++) {
@@ -2274,11 +2290,11 @@ void p_Col_2()
 void p_Col_3()
 {
 	PrimitiveProcessor pp;
-	uint8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
+	u_int8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
 	NewColRequestHeader *in;
 	NewColResultHeader *out;
-	uint32_t *results;
-	uint32_t written, i;
+	u_int32_t *results;
+	uint written, i;
 	int fd;
 	string filename("col4block.cdf");
 
@@ -2307,7 +2323,7 @@ void p_Col_3()
 	out = reinterpret_cast<NewColResultHeader *>(output);
 	
 	in->DataSize = 4;
-	in->DataType = CalpontSystemCatalog::INT;
+	in->DataType = WriteEngine::INT;
 	in->OutputType = OT_DATAVALUE;
 	in->NOPS = 0;
 	in->NVALS = 0;
@@ -2316,12 +2332,12 @@ void p_Col_3()
 	pp.setBlockPtr((int*) block);
 	pp.p_Col(in, out, 4*BLOCK_SIZE, &written);
 
-	results = reinterpret_cast<uint32_t *>(&output[sizeof(NewColResultHeader)]);
+	results = reinterpret_cast<u_int32_t *>(&output[sizeof(NewColResultHeader)]);
 //  	cout << "NVALS = " << out->NVALS << endl;
  	CPPUNIT_ASSERT(out->NVALS == 2048);
 	for (i = 0; i < out->NVALS; i++) {
 //  		cout << i << ": " << hex << (int)results[i] << dec << endl;
- 		CPPUNIT_ASSERT(results[i] == (uint32_t) i);
+ 		CPPUNIT_ASSERT(results[i] == (uint) i);
 	}
 
 	close(fd);
@@ -2330,11 +2346,11 @@ void p_Col_3()
 void p_Col_4()
 {
 	PrimitiveProcessor pp;
-	uint8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
+	u_int8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
 	NewColRequestHeader *in;
 	NewColResultHeader *out;
 	u_int64_t *results;
-	uint32_t written, i;
+	uint written, i;
 	int fd;
 	string filename("col8block.cdf");
 
@@ -2363,7 +2379,7 @@ void p_Col_4()
 	out = reinterpret_cast<NewColResultHeader *>(output);
 	
 	in->DataSize = 8;
-	in->DataType = CalpontSystemCatalog::INT;
+	in->DataType = WriteEngine::INT;
 	in->OutputType = OT_DATAVALUE;
 	in->NOPS = 0;
 	in->NVALS = 0;
@@ -2377,7 +2393,7 @@ void p_Col_4()
  	CPPUNIT_ASSERT(out->NVALS == 1024);
 	for (i = 0; i < out->NVALS; i++) {
 //   		cout << i << ": " << hex << (int)results[i] << dec << endl;
- 		CPPUNIT_ASSERT(results[i] == (uint32_t) i);
+ 		CPPUNIT_ASSERT(results[i] == (uint) i);
 	}
 
 	close(fd);
@@ -2386,12 +2402,12 @@ void p_Col_4()
 void p_Col_5()
 {
 	PrimitiveProcessor pp;
-	uint8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
+	u_int8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
 	NewColRequestHeader *in;
 	NewColResultHeader *out;
-	uint8_t *results;
-	uint16_t *rids;
-	uint32_t written, i;
+	u_int8_t *results;
+	u_int16_t *rids;
+	uint written, i;
 	int fd;
 	string filename("col1block.cdf");
 
@@ -2418,10 +2434,10 @@ void p_Col_5()
 
 	in = reinterpret_cast<NewColRequestHeader *>(input);
 	out = reinterpret_cast<NewColResultHeader *>(output);
-	rids = reinterpret_cast<uint16_t *>(&in[1]);	
+	rids = reinterpret_cast<u_int16_t *>(&in[1]);	
 
 	in->DataSize = 1;
-	in->DataType = CalpontSystemCatalog::INT;
+	in->DataType = WriteEngine::INT;
 	in->OutputType = OT_DATAVALUE;
 	in->NOPS = 0;
 	in->NVALS = 2;
@@ -2432,7 +2448,7 @@ void p_Col_5()
 	pp.setBlockPtr((int*) block);
 	pp.p_Col(in, out, 4*BLOCK_SIZE, &written);
 
-	results = reinterpret_cast<uint8_t *>(&output[sizeof(NewColResultHeader)]);
+	results = reinterpret_cast<u_int8_t *>(&output[sizeof(NewColResultHeader)]);
 //    	cout << "NVALS = " << out->NVALS << endl;
   	CPPUNIT_ASSERT(out->NVALS == 2);
 	for (i = 0; i < out->NVALS; i++) {
@@ -2446,12 +2462,12 @@ void p_Col_5()
 void p_Col_6()
 {
 	PrimitiveProcessor pp;
-	uint8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
+	u_int8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
 	NewColRequestHeader *in;
 	NewColResultHeader *out;
 	ColArgs *args;
-	uint32_t *results;
-	uint32_t written, i;
+	u_int32_t *results;
+	uint written, i;
 	int fd, tmp;
 	string filename("col4block.cdf");
 
@@ -2481,7 +2497,7 @@ void p_Col_6()
 	args = reinterpret_cast<ColArgs *>(&in[1]);	
 
 	in->DataSize = 4;
-	in->DataType = CalpontSystemCatalog::INT;
+	in->DataType = WriteEngine::INT;
 	in->OutputType = OT_DATAVALUE;
 	in->NOPS = 2;
 	in->BOP = BOP_AND;
@@ -2500,12 +2516,12 @@ void p_Col_6()
 	pp.setBlockPtr((int*) block);
 	pp.p_Col(in, out, 4*BLOCK_SIZE, &written);
 
-	results = reinterpret_cast<uint32_t *>(&output[sizeof(NewColResultHeader)]);
+	results = reinterpret_cast<u_int32_t *>(&output[sizeof(NewColResultHeader)]);
 //    	cout << "NVALS = " << out->NVALS << endl;
    	CPPUNIT_ASSERT(out->NVALS == 9);
 	for (i = 0; i < out->NVALS; i++) {
 //    		cout << i << ": " << hex << (int)results[i] << dec << endl;
-   		CPPUNIT_ASSERT(results[i] == 11 + (uint32_t)i);
+   		CPPUNIT_ASSERT(results[i] == 11 + (uint)i);
 	}
 
 	close(fd);
@@ -2514,12 +2530,12 @@ void p_Col_6()
 void p_Col_7()
 {
 	PrimitiveProcessor pp;
-	uint8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
+	u_int8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
 	NewColRequestHeader *in;
 	NewColResultHeader *out;
 	ColArgs *args;
 	u_int64_t *results;
-	uint32_t written, i;
+	uint written, i;
 	int fd;
 	int64_t tmp;
 	string filename("col8block.cdf");
@@ -2550,7 +2566,7 @@ void p_Col_7()
 	args = reinterpret_cast<ColArgs *>(&input[sizeof(NewColRequestHeader)]);	
 
 	in->DataSize = 8;
-	in->DataType = CalpontSystemCatalog::INT;
+	in->DataType = WriteEngine::INT;
 	in->OutputType = OT_DATAVALUE;
 	in->NOPS = 2;
 	in->BOP = BOP_OR;
@@ -2574,7 +2590,7 @@ void p_Col_7()
 	CPPUNIT_ASSERT(out->NVALS == 33);
 	for (i = 0; i < out->NVALS; i++) {
 //    		cout << i << ": " << hex << (int)results[i] << dec << endl;
-     	CPPUNIT_ASSERT(results[i] == (uint32_t) (i < 10 ? i : i - 10 + 1001));
+     	CPPUNIT_ASSERT(results[i] == (uint) (i < 10 ? i : i - 10 + 1001));
 	}
 
 	close(fd);
@@ -2583,12 +2599,12 @@ void p_Col_7()
 void p_Col_8()
 {
 	PrimitiveProcessor pp;
-	uint8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
+	u_int8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
 	NewColRequestHeader *in;
 	NewColResultHeader *out;
 	ColArgs *args;
 	u_int64_t *results;
-	uint32_t written, i;
+	uint written, i;
 	int fd;
 	int64_t tmp;
 	string filename("col8block.cdf");
@@ -2619,7 +2635,7 @@ void p_Col_8()
 	args = reinterpret_cast<ColArgs *>(&input[sizeof(NewColRequestHeader)]);	
 
 	in->DataSize = 8;
-	in->DataType = CalpontSystemCatalog::INT;
+	in->DataType = WriteEngine::INT;
 	in->OutputType = OT_DATAVALUE;
 	in->NOPS = 2;
 	in->BOP = BOP_OR;
@@ -2645,7 +2661,7 @@ void p_Col_8()
 	CPPUNIT_ASSERT(results[1] == 1000);
 // 	for (i = 0; i < out->NVALS; i++) {
 //    		cout << i << ": " << hex << (int)results[i] << dec << endl;
-//      	CPPUNIT_ASSERT(results[i] == (uint32_t) (i < 10 ? i : i - 10 + 1001));
+//      	CPPUNIT_ASSERT(results[i] == (uint) (i < 10 ? i : i - 10 + 1001));
 // 	}
 
 	close(fd);
@@ -2654,13 +2670,13 @@ void p_Col_8()
 void p_Col_9()
 {
 	PrimitiveProcessor pp;
-	uint8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
+	u_int8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
 	NewColRequestHeader *in;
 	NewColResultHeader *out;
 	ColArgs *args;
-	uint16_t *rids;
+	u_int16_t *rids;
 	u_int64_t *results;
-	uint32_t written, i;
+	uint written, i;
 	int fd;
 	int64_t tmp;
 	string filename("col8block.cdf");
@@ -2691,7 +2707,7 @@ void p_Col_9()
 	args = reinterpret_cast<ColArgs *>(&input[sizeof(NewColRequestHeader)]);	
 
 	in->DataSize = 8;
-	in->DataType = CalpontSystemCatalog::INT;
+	in->DataType = WriteEngine::INT;
 	in->OutputType = OT_DATAVALUE;
 	in->NOPS = 2;
 	in->BOP = BOP_OR;
@@ -2707,7 +2723,7 @@ void p_Col_9()
 	tmp = 1000;
 	memcpy(args->val, &tmp, in->DataSize);
 
-	rids = reinterpret_cast<uint16_t *>(&input[sizeof(NewColRequestHeader) + 
+	rids = reinterpret_cast<u_int16_t *>(&input[sizeof(NewColRequestHeader) + 
 	    2*(sizeof(ColArgs) + in->DataSize)]);
 
 	rids[0] = 10;
@@ -2722,8 +2738,572 @@ void p_Col_9()
 	CPPUNIT_ASSERT(results[0] == 10);
 // 	for (i = 0; i < out->NVALS; i++) {
 //    		cout << i << ": " << hex << (int)results[i] << dec << endl;
-//      	CPPUNIT_ASSERT(results[i] == (uint32_t) (i < 10 ? i : i - 10 + 1001));
+//      	CPPUNIT_ASSERT(results[i] == (uint) (i < 10 ? i : i - 10 + 1001));
 // 	}
+
+	close(fd);
+}
+
+void p_ColAggregate_1()
+{
+	PrimitiveProcessor pp;
+	u_int8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
+	NewColAggRequestHeader *in;
+	NewColAggResultHeader *out;
+	uint i;
+	int fd, sum;
+	uint8_t j;
+	string filename("col1block.cdf");
+
+	fd = open(filename.c_str(), O_RDONLY);
+	if (fd < 0) {
+		cerr << "p_ColAggregate_1: skipping this test; needs the index list file " 
+			<< filename << endl;
+// 		throw runtime_error("p_Col_1: file not found...");
+		return;
+	}
+
+	i = read(fd, block, BLOCK_SIZE);
+	if (i <= 0) {
+		cerr << "p_ColAggregate_1: Couldn't read the file " << filename << endl;
+		throw runtime_error("p_ColAggregate_1: Couldn't read the file");
+	}
+	if (i != BLOCK_SIZE) {
+		cerr << "p_ColAggregate_1: could not read a whole block" << endl;
+		throw runtime_error("p_ColAggregate_1: could not read a whole block");
+	}
+
+	memset(input, 0, BLOCK_SIZE);
+	memset(output, 0, 4*BLOCK_SIZE);
+
+	in = reinterpret_cast<NewColAggRequestHeader *>(input);
+	out = reinterpret_cast<NewColAggResultHeader *>(output);	
+
+	in->DataSize = 1;
+	in->DataType = WriteEngine::INT;
+	in->NVALS = 0;
+
+	pp.setBlockPtr((int*) block);
+	pp.p_ColAggregate(in, out);
+
+//  cout << "Sum: " << out->Sum << endl;
+// 	cout << "SumOverflow: " << out->SumOverflow << endl;
+// 	cout << "SumSign: " << out->SumSign << endl;
+// 	cout << "Min: " << out->Min << endl;
+// 	cout << "Max: " << out->Max << endl;
+// 	cout << "NVALS: " << out->NVALS << endl;
+
+	for (sum = 0, i = 0, j = 0; i < 8192; i++, j++)
+		if (j != 0x81 && j != 0x80)
+			sum += (int8_t) j;
+
+ 	CPPUNIT_ASSERT(out->Sum == sum);
+	CPPUNIT_ASSERT(out->SumOverflow == 0);
+	CPPUNIT_ASSERT(out->SumSign == 0);
+ 	CPPUNIT_ASSERT(out->Min == -126);
+	CPPUNIT_ASSERT(out->Max == 127);
+	CPPUNIT_ASSERT(out->NVALS == 8128);
+
+	close(fd);
+}
+
+void p_ColAggregate_2()
+{
+	PrimitiveProcessor pp;
+	u_int8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
+	NewColAggRequestHeader *in;
+	NewColAggResultHeader *out;
+	uint i;
+	int fd, sum;
+	string filename("col2block.cdf");
+
+	fd = open(filename.c_str(), O_RDONLY);
+	if (fd < 0) {
+		cerr << "p_ColAggregate_2: skipping this test; needs the index list file " 
+			<< filename << endl;
+// 		throw runtime_error("p_Col_1: file not found...");
+		return;
+	}
+
+	i = read(fd, block, BLOCK_SIZE);
+	if (i <= 0) {
+		cerr << "p_ColAggregate_2: Couldn't read the file " << filename << endl;
+		throw runtime_error("p_ColAggregate_2: Couldn't read the file");
+	}
+	if (i != BLOCK_SIZE) {
+		cerr << "p_ColAggregate_2: could not read a whole block" << endl;
+		throw runtime_error("p_ColAggregate_2: could not read a whole block");
+	}
+
+	memset(input, 0, BLOCK_SIZE);
+	memset(output, 0, 4*BLOCK_SIZE);
+
+	in = reinterpret_cast<NewColAggRequestHeader *>(input);
+	out = reinterpret_cast<NewColAggResultHeader *>(output);	
+
+	in->DataSize = 2;
+	in->DataType = WriteEngine::INT;
+	in->NVALS = 0;
+
+	pp.setBlockPtr((int*) block);
+	pp.p_ColAggregate(in, out);
+
+// 	cout << "Sum: " << out->Sum << endl;
+// 	cout << "SumOverflow: " << out->SumOverflow << endl;
+// 	cout << "SumSign: " << out->SumSign << endl;
+// 	cout << "Min: " << out->Min << endl;
+// 	cout << "Max: " << out->Max << endl;
+// 	cout << "NVALS: " << out->NVALS << endl;
+
+	for (sum = 0, i = 0; i < 4096; i++)
+		sum += i;
+
+ 	CPPUNIT_ASSERT(out->Sum == sum);
+	CPPUNIT_ASSERT(out->SumOverflow == 0);
+	CPPUNIT_ASSERT(out->SumSign == 0);
+	CPPUNIT_ASSERT(out->Min == 0);
+	CPPUNIT_ASSERT(out->Max == 4095);
+	CPPUNIT_ASSERT(out->NVALS == 4096);
+
+	close(fd);
+}
+
+void p_ColAggregate_3()
+{
+	PrimitiveProcessor pp;
+	u_int8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
+	NewColAggRequestHeader *in;
+	NewColAggResultHeader *out;
+	uint i;
+	int fd, sum;
+	string filename("col4block.cdf");
+
+	fd = open(filename.c_str(), O_RDONLY);
+	if (fd < 0) {
+		cerr << "p_ColAggregate_3: skipping this test; needs the index list file " 
+			<< filename << endl;
+// 		throw runtime_error("p_Col_1: file not found...");
+		return;
+	}
+
+	i = read(fd, block, BLOCK_SIZE);
+	if (i <= 0) {
+		cerr << "p_ColAggregate_3: Couldn't read the file " << filename << endl;
+		throw runtime_error("p_ColAggregate_3: Couldn't read the file");
+	}
+	if (i != BLOCK_SIZE) {
+		cerr << "p_ColAggregate_3: could not read a whole block" << endl;
+		throw runtime_error("p_ColAggregate_3: could not read a whole block");
+	}
+
+	memset(input, 0, BLOCK_SIZE);
+	memset(output, 0, 4*BLOCK_SIZE);
+
+	in = reinterpret_cast<NewColAggRequestHeader *>(input);
+	out = reinterpret_cast<NewColAggResultHeader *>(output);	
+
+	in->DataSize = 4;
+	in->DataType = WriteEngine::INT;
+	in->NVALS = 0;
+
+	pp.setBlockPtr((int*) block);
+	pp.p_ColAggregate(in, out);
+
+// 	cout << "Sum: " << out->Sum << endl;
+// 	cout << "SumOverflow: " << out->SumOverflow << endl;
+// 	cout << "SumSign: " << (int) out->SumSign << endl;
+// 	cout << "Min: " << out->Min << endl;
+// 	cout << "Max: " << out->Max << endl;
+// 	cout << "NVALS: " << out->NVALS << endl;
+
+	for (sum = 0, i = 0; i < 2048; i++)
+		sum += i;
+
+ 	CPPUNIT_ASSERT(out->Sum == sum);
+	CPPUNIT_ASSERT(out->SumOverflow == 0);
+	CPPUNIT_ASSERT(out->SumSign == 0);
+	CPPUNIT_ASSERT(out->Min == 0);
+	CPPUNIT_ASSERT(out->Max == 2047);
+	CPPUNIT_ASSERT(out->NVALS == 2048);
+
+	close(fd);
+}
+
+void p_ColAggregate_4()
+{
+	PrimitiveProcessor pp;
+	u_int8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
+	NewColAggRequestHeader *in;
+	NewColAggResultHeader *out;
+	uint i;
+	int fd, sum;
+	string filename("col8block.cdf");
+
+	fd = open(filename.c_str(), O_RDONLY);
+	if (fd < 0) {
+		cerr << "p_ColAggregate_4: skipping this test; needs the index list file " 
+			<< filename << endl;
+// 		throw runtime_error("p_Col_1: file not found...");
+		return;
+	}
+
+	i = read(fd, block, BLOCK_SIZE);
+	if (i <= 0) {
+		cerr << "p_ColAggregate_4: Couldn't read the file " << filename << endl;
+		throw runtime_error("p_ColAggregate_4: Couldn't read the file");
+	}
+	if (i != BLOCK_SIZE) {
+		cerr << "p_ColAggregate_4: could not read a whole block" << endl;
+		throw runtime_error("p_ColAggregate_4: could not read a whole block");
+	}
+
+	memset(input, 0, BLOCK_SIZE);
+	memset(output, 0, 4*BLOCK_SIZE);
+
+	in = reinterpret_cast<NewColAggRequestHeader *>(input);
+	out = reinterpret_cast<NewColAggResultHeader *>(output);	
+
+	in->DataSize = 8;
+	in->DataType = WriteEngine::INT;
+	in->NVALS = 0;
+
+	pp.setBlockPtr((int*) block);
+	pp.p_ColAggregate(in, out);
+
+// 	cout << "Sum: " << out->Sum << endl;
+// 	cout << "SumOverflow: " << out->SumOverflow << endl;
+// 	cout << "SumSign: " << (int) out->SumSign << endl;
+// 	cout << "Min: " << out->Min << endl;
+// 	cout << "Max: " << out->Max << endl;
+// 	cout << "NVALS: " << out->NVALS << endl;
+
+	for (sum = 0, i = 0; i < 1024; i++)
+		sum += i;
+
+ 	CPPUNIT_ASSERT(out->Sum == sum);
+	CPPUNIT_ASSERT(out->SumOverflow == 0);
+	CPPUNIT_ASSERT(out->SumSign == 0);
+	CPPUNIT_ASSERT(out->Min == 0);
+	CPPUNIT_ASSERT(out->Max == 1023);
+	CPPUNIT_ASSERT(out->NVALS == 1024);
+
+	close(fd);
+}
+
+void p_ColAggregate_5()
+{
+	PrimitiveProcessor pp;
+	u_int8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
+	NewColAggRequestHeader *in;
+	NewColAggResultHeader *out;
+	uint i;
+	int fd;
+	string filename("col8block_neg.cdf");
+
+	fd = open(filename.c_str(), O_RDONLY);
+	if (fd < 0) {
+		cerr << "p_ColAggregate_5: skipping this test; needs the index list file " 
+			<< filename << endl;
+// 		throw runtime_error("p_Col_1: file not found...");
+		return;
+	}
+
+	i = read(fd, block, BLOCK_SIZE);
+	if (i <= 0) {
+		cerr << "p_ColAggregate_5: Couldn't read the file " << filename << endl;
+		throw runtime_error("p_ColAggregate_5: Couldn't read the file");
+	}
+	if (i != BLOCK_SIZE) {
+		cerr << "p_ColAggregate_5: could not read a whole block" << endl;
+		throw runtime_error("p_ColAggregate_5: could not read a whole block");
+	}
+
+	memset(input, 0, BLOCK_SIZE);
+	memset(output, 0, 4*BLOCK_SIZE);
+
+	in = reinterpret_cast<NewColAggRequestHeader *>(input);
+	out = reinterpret_cast<NewColAggResultHeader *>(output);	
+
+	in->DataSize = 8;
+	in->DataType = WriteEngine::INT;
+	in->NVALS = 0;
+
+	pp.setBlockPtr((int*) block);
+	pp.p_ColAggregate(in, out);
+
+// 	cout << "Sum: " << out->Sum << endl;
+// 	cout << "SumOverflow: " << out->SumOverflow << endl;
+// 	cout << "SumSign: " << (int) out->SumSign << endl;
+// 	cout << "Min: " << out->Min << endl;
+// 	cout << "Max: " << out->Max << endl;
+// 	cout << "NVALS: " << out->NVALS << endl;
+
+	CPPUNIT_ASSERT(out->Sum == 512);
+	CPPUNIT_ASSERT(out->SumOverflow == 0);
+	CPPUNIT_ASSERT(out->SumSign == 1);
+	CPPUNIT_ASSERT(out->Min == -512);
+	CPPUNIT_ASSERT(out->Max == 511);
+	CPPUNIT_ASSERT(out->NVALS == 1024);
+
+	close(fd);
+}
+
+void p_ColAggregate_6()
+{
+	PrimitiveProcessor pp;
+	u_int8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
+	NewColAggRequestHeader *in;
+	NewColAggResultHeader *out;
+	uint i;
+	int fd;
+	string filename("col8block_overflow.cdf");
+
+	fd = open(filename.c_str(), O_RDONLY);
+	if (fd < 0) {
+		cerr << "p_ColAggregate_6: skipping this test; needs the index list file " 
+			<< filename << endl;
+// 		throw runtime_error("p_Col_1: file not found...");
+		return;
+	}
+
+	i = read(fd, block, BLOCK_SIZE);
+	if (i <= 0) {
+		cerr << "p_ColAggregate_6: Couldn't read the file " << filename << endl;
+		throw runtime_error("p_ColAggregate_6: Couldn't read the file");
+	}
+	if (i != BLOCK_SIZE) {
+		cerr << "p_ColAggregate_6: could not read a whole block" << endl;
+		throw runtime_error("p_ColAggregate_6: could not read a whole block");
+	}
+
+	memset(input, 0, BLOCK_SIZE);
+	memset(output, 0, 4*BLOCK_SIZE);
+
+	in = reinterpret_cast<NewColAggRequestHeader *>(input);
+	out = reinterpret_cast<NewColAggResultHeader *>(output);	
+
+	in->DataSize = 8;
+	in->DataType = WriteEngine::INT;
+	in->NVALS = 0;
+
+	pp.setBlockPtr((int*) block);
+	pp.p_ColAggregate(in, out);
+
+//  	cout << "Sum: " << out->Sum << endl;
+//  	cout << "SumOverflow: " << out->SumOverflow << endl;
+//  	cout << "SumSign: " << (int) out->SumSign << endl;
+//  	cout << "Min: " << out->Min << endl;
+//  	cout << "Max: " << out->Max << endl;
+//  	cout << "NVALS: " << out->NVALS << endl;
+
+	/* These numbers were verified using 'bc' */
+ 	CPPUNIT_ASSERT(out->Sum == 9223372036854774784LL);
+	CPPUNIT_ASSERT(out->SumOverflow == 1023);
+	CPPUNIT_ASSERT(out->SumSign == 0);
+	CPPUNIT_ASSERT(out->Min == 9223372036854775807LL);
+	CPPUNIT_ASSERT(out->Max == 9223372036854775807LL);
+	CPPUNIT_ASSERT(out->NVALS == 1024);
+
+	close(fd);
+}
+
+void p_ColAggregate_7()
+{
+	PrimitiveProcessor pp;
+	u_int8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
+	NewColAggRequestHeader *in;
+	NewColAggResultHeader *out;
+	uint i;
+	int fd;
+	string filename("col8block_overflow_neg.cdf");
+
+	fd = open(filename.c_str(), O_RDONLY);
+	if (fd < 0) {
+		cerr << "p_ColAggregate_7: skipping this test; needs the index list file " 
+			<< filename << endl;
+// 		throw runtime_error("p_Col_1: file not found...");
+		return;
+	}
+
+	i = read(fd, block, BLOCK_SIZE);
+	if (i <= 0) {
+		cerr << "p_ColAggregate_7: Couldn't read the file " << filename << endl;
+		throw runtime_error("p_ColAggregate_7: Couldn't read the file");
+	}
+	if (i != BLOCK_SIZE) {
+		cerr << "p_ColAggregate_7: could not read a whole block" << endl;
+		throw runtime_error("p_ColAggregate_7: could not read a whole block");
+	}
+
+	memset(input, 0, BLOCK_SIZE);
+	memset(output, 0, 4*BLOCK_SIZE);
+
+	in = reinterpret_cast<NewColAggRequestHeader *>(input);
+	out = reinterpret_cast<NewColAggResultHeader *>(output);	
+
+	in->DataSize = 8;
+	in->DataType = WriteEngine::INT;
+	in->NVALS = 0;
+
+	pp.setBlockPtr((int*) block);
+	pp.p_ColAggregate(in, out);
+
+//  	cout << "Sum: " << out->Sum << endl;
+//  	cout << "SumOverflow: " << out->SumOverflow << endl;
+//  	cout << "SumSign: " << (int) out->SumSign << endl;
+//  	cout << "Min: " << out->Min << endl;
+//  	cout << "Max: " << out->Max << endl;
+//  	cout << "NVALS: " << out->NVALS << endl;
+
+	/* These numbers were verified using 'bc' */
+//   	CPPUNIT_ASSERT(out->Sum == 401);
+//  	CPPUNIT_ASSERT(out->SumOverflow == 222);
+//  	CPPUNIT_ASSERT(out->SumSign == 1);
+//   	CPPUNIT_ASSERT(out->Min == -9223372036854775808LL);
+//  	CPPUNIT_ASSERT(out->Max == 9223372036854775807LL);
+//  	CPPUNIT_ASSERT(out->NVALS == 1024);
+
+	close(fd);
+}
+
+void p_ColAggregate_8()
+{
+	PrimitiveProcessor pp;
+	u_int8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
+	NewColAggRequestHeader *in;
+	NewColAggResultHeader *out;
+	uint i, j;
+	int fd, sum;
+	string filename("col1block.cdf");
+
+	fd = open(filename.c_str(), O_RDONLY);
+	if (fd < 0) {
+		cerr << "p_ColAggregate_8: skipping this test; needs the index list file " 
+			<< filename << endl;
+		return;
+	}
+
+	i = read(fd, block, BLOCK_SIZE);
+	if (i <= 0) {
+		cerr << "p_ColAggregate_8: Couldn't read the file " << filename << endl;
+		throw runtime_error("p_ColAggregate_8: Couldn't read the file");
+	}
+	if (i != BLOCK_SIZE) {
+		cerr << "p_ColAggregate_8: could not read a whole block" << endl;
+		throw runtime_error("p_ColAggregate_8: could not read a whole block");
+	}
+
+	memset(input, 0, BLOCK_SIZE);
+	memset(output, 0, 4*BLOCK_SIZE);
+
+	in = reinterpret_cast<NewColAggRequestHeader *>(input);
+	out = reinterpret_cast<NewColAggResultHeader *>(output);	
+
+	in->DataSize = 1;
+	in->DataType = WriteEngine::INT;
+	in->NVALS = 0;
+	
+
+/*
+	typedef struct
+	{
+		ISMPacketHeader ism;
+		PrimitiveHeader hdr;
+		Int64 LBID;
+		Int64 PBID;
+		Int8 DataSize;
+		Int8 DataType;
+		Int8 OutputType;
+		Int8 BOP;
+		Int8 ExtraNotUsed;
+		Int16 NOPS;
+		Int16 NVALS;
+		// this follows the header
+		// ColArgs ArgList[NOPS] (where the val field is DataSize bytes long)
+		// Int16 Rids[NVALS] (each rid is relative to the given block)
+	} NewColAggRequestHeader;
+*/
+
+	pp.setBlockPtr((int*) block);
+	pp.p_ColAggregate(in, out);
+
+// 	cout << "Sum: " << out->Sum << endl;
+// 	cout << "SumOverflow: " << out->SumOverflow << endl;
+// 	cout << "SumSign: " << out->SumSign << endl;
+// 	cout << "Min: " << out->Min << endl;
+// 	cout << "Max: " << out->Max << endl;
+// 	cout << "NVALS: " << out->NVALS << endl;
+
+	for (sum = 0, i = 0, j = 0; i < 8192; i++, j = i % 256)
+		if (j != 129)
+			sum += j;
+
+ 	CPPUNIT_ASSERT(out->Sum == sum);
+	CPPUNIT_ASSERT(out->SumOverflow == 0);
+	CPPUNIT_ASSERT(out->SumSign == 0);
+	CPPUNIT_ASSERT(out->Min == 0);
+	CPPUNIT_ASSERT(out->Max == 255);
+	CPPUNIT_ASSERT(out->NVALS == 8160);
+
+	close(fd);
+}
+
+void p_ColAggregate_9()
+{
+	PrimitiveProcessor pp;
+	u_int8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
+	NewColAggRequestHeader *in;
+	NewColAggResultHeader *out;
+	uint i;
+	int fd, sum;
+	string filename("col2block.cdf");
+
+	fd = open(filename.c_str(), O_RDONLY);
+	if (fd < 0) {
+		cerr << "p_ColAggregate_9: skipping this test; needs the index list file " 
+			<< filename << endl;
+		return;
+	}
+
+	i = read(fd, block, BLOCK_SIZE);
+	if (i <= 0) {
+		cerr << "p_ColAggregate_9: Couldn't read the file " << filename << endl;
+		throw runtime_error("p_ColAggregate_9: Couldn't read the file");
+	}
+	if (i != BLOCK_SIZE) {
+		cerr << "p_ColAggregate_9: could not read a whole block" << endl;
+		throw runtime_error("p_ColAggregate_9: could not read a whole block");
+	}
+
+	memset(input, 0, BLOCK_SIZE);
+	memset(output, 0, 4*BLOCK_SIZE);
+
+	in = reinterpret_cast<NewColAggRequestHeader *>(input);
+	out = reinterpret_cast<NewColAggResultHeader *>(output);	
+
+	in->DataSize = 2;
+	in->DataType = WriteEngine::INT;
+	in->NVALS = 0;
+
+	pp.setBlockPtr((int*) block);
+	pp.p_ColAggregate(in, out);
+
+// 	cout << "Sum: " << out->Sum << endl;
+// 	cout << "SumOverflow: " << out->SumOverflow << endl;
+// 	cout << "SumSign: " << out->SumSign << endl;
+// 	cout << "Min: " << out->Min << endl;
+// 	cout << "Max: " << out->Max << endl;
+// 	cout << "NVALS: " << out->NVALS << endl;
+
+	for (sum = 0, i = 0; i < 4096; i++)
+		sum += i;
+
+ 	CPPUNIT_ASSERT(out->Sum == sum);
+	CPPUNIT_ASSERT(out->SumOverflow == 0);
+	CPPUNIT_ASSERT(out->SumSign == 0);
+	CPPUNIT_ASSERT(out->Min == 0);
+	CPPUNIT_ASSERT(out->Max = 4096);
+	CPPUNIT_ASSERT(out->NVALS == 4096);
 
 	close(fd);
 }
@@ -2731,12 +3311,12 @@ void p_Col_9()
 void p_Col_10()
 {
 	PrimitiveProcessor pp;
-	uint8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
+	u_int8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
 	NewColRequestHeader *in;
 	NewColResultHeader *out;
 	ColArgs *args;
 	int16_t *results;
-	uint32_t written, i;
+	uint written, i;
 	int fd;
 	int64_t tmp;
 	string filename("col8block.cdf");
@@ -2767,7 +3347,7 @@ void p_Col_10()
 	args = reinterpret_cast<ColArgs *>(&input[sizeof(NewColRequestHeader)]);	
 
 	in->DataSize = 8;
-	in->DataType = CalpontSystemCatalog::INT;
+	in->DataType = WriteEngine::INT;
 	in->OutputType = OT_RID;
 	in->NOPS = 2;
 	in->BOP = BOP_OR;
@@ -2800,13 +3380,13 @@ void p_Col_10()
 void p_Col_11()
 {
 	PrimitiveProcessor pp;
-	uint8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
+	u_int8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
 	NewColRequestHeader *in;
 	NewColResultHeader *out;
 	ColArgs *args;
 	int16_t *resultRid;
 	int64_t *resultVal;
-	uint32_t written, i;
+	uint written, i;
 	int fd;
 	int64_t tmp;
 	string filename("col8block.cdf");
@@ -2837,7 +3417,7 @@ void p_Col_11()
 	args = reinterpret_cast<ColArgs *>(&input[sizeof(NewColRequestHeader)]);	
 
 	in->DataSize = 8;
-	in->DataType = CalpontSystemCatalog::INT;
+	in->DataType = WriteEngine::INT;
 	in->OutputType = OT_BOTH;
 	in->NOPS = 2;
 	in->BOP = BOP_OR;
@@ -2874,12 +3454,12 @@ void p_Col_11()
 void p_Col_12() 
 {
 	PrimitiveProcessor pp;
-	uint8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
+	u_int8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
 	NewColRequestHeader *in;
 	NewColResultHeader *out;
 	ColArgs *args;
-	uint8_t *results;
-	uint32_t written, i;
+	u_int8_t *results;
+	uint written, i;
 	int fd;
 	string filename("col1block.cdf");
 
@@ -2908,7 +3488,7 @@ void p_Col_12()
 	out = reinterpret_cast<NewColResultHeader *>(output);
 	
 	in->DataSize = 1;
-	in->DataType = CalpontSystemCatalog::CHAR;
+	in->DataType = WriteEngine::CHAR;
 	in->OutputType = OT_DATAVALUE;
  	in->BOP = BOP_AND;
 	in->NOPS = 2;
@@ -2944,12 +3524,12 @@ void p_Col_12()
 void p_Col_13()
 {
 	PrimitiveProcessor pp;
-	uint8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
+	u_int8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
 	NewColRequestHeader *in;
 	NewColResultHeader *out;
 	ColArgs *args;
 	int16_t *results;
-	uint32_t written, i;
+	uint written, i;
 	int fd;
 	int32_t tmp;
 	int16_t ridTmp;
@@ -2981,7 +3561,7 @@ void p_Col_13()
 	args = reinterpret_cast<ColArgs *>(&input[sizeof(NewColRequestHeader)]);	
 
 	in->DataSize = 4;
-	in->DataType = CalpontSystemCatalog::INT;
+	in->DataType = WriteEngine::INT;
 	in->OutputType = OT_RID;
 	in->NOPS = 3;
 	in->BOP = BOP_OR;
@@ -3030,12 +3610,12 @@ void p_Col_13()
 void p_Col_double_1()
 {
 	PrimitiveProcessor pp;
-	uint8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
+	u_int8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
 	NewColRequestHeader *in;
 	NewColResultHeader *out;
 	ColArgs *args;
 	double *results;
-	uint32_t written, i;
+	uint written, i;
 	int fd;
 	string filename("col_double_block.cdf");
 	double tmp;
@@ -3065,7 +3645,7 @@ void p_Col_double_1()
 	out = reinterpret_cast<NewColResultHeader *>(output);
 	
 	in->DataSize = 8;
-	in->DataType = CalpontSystemCatalog::DOUBLE;
+	in->DataType = WriteEngine::DOUBLE;
 	in->OutputType = OT_DATAVALUE;
  	in->BOP = BOP_AND;
 	in->NOPS = 2;
@@ -3098,12 +3678,12 @@ void p_Col_double_1()
 void p_Col_float_1()
 {
 	PrimitiveProcessor pp;
-	uint8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
+	u_int8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
 	NewColRequestHeader *in;
 	NewColResultHeader *out;
 	ColArgs *args;
 	float *resultVal;
-	uint32_t written, i;
+	uint written, i;
 	int fd;
 	string filename("col_float_block.cdf");
 	float tmp;
@@ -3134,7 +3714,7 @@ void p_Col_float_1()
 	out = reinterpret_cast<NewColResultHeader *>(output);
 	
 	in->DataSize = 4;
-	in->DataType = CalpontSystemCatalog::FLOAT;
+	in->DataType = WriteEngine::FLOAT;
 	in->OutputType = OT_BOTH;
  	in->BOP = BOP_AND;
 	in->NOPS = 2;
@@ -3171,13 +3751,13 @@ void p_Col_float_1()
 void p_Col_neg_float_1()
 {
 	PrimitiveProcessor pp;
-	uint8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
+	u_int8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
 	NewColRequestHeader *in;
 	NewColResultHeader *out;
 	ColArgs *args;
 	float *resultVal;
 	int16_t *resultRid;
-	uint32_t written, i;
+	uint written, i;
 	int fd;
 	string filename("col_neg_float.cdf");
 	float tmp;
@@ -3207,7 +3787,7 @@ void p_Col_neg_float_1()
 	out = reinterpret_cast<NewColResultHeader *>(output);
 	
 	in->DataSize = 4;
-	in->DataType = CalpontSystemCatalog::FLOAT;
+	in->DataType = WriteEngine::FLOAT;
 	in->OutputType = OT_BOTH;
  	in->BOP = BOP_AND;
  	in->NOPS = 2;
@@ -3245,12 +3825,12 @@ void p_Col_neg_float_1()
 void p_Col_neg_double_1()
 {
 	PrimitiveProcessor pp;
-	uint8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
+	u_int8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
 	NewColRequestHeader *in;
 	NewColResultHeader *out;
 	ColArgs *args;
 	double *results;
-	uint32_t written, i;
+	uint written, i;
 	int fd;
 	string filename("col_neg_double.cdf");
 	double tmp;
@@ -3280,7 +3860,7 @@ void p_Col_neg_double_1()
 	out = reinterpret_cast<NewColResultHeader *>(output);
 	
 	in->DataSize = 8;
-	in->DataType = CalpontSystemCatalog::DOUBLE;
+	in->DataType = WriteEngine::DOUBLE;
 	in->OutputType = OT_DATAVALUE;
  	in->BOP = BOP_AND;
 	in->NOPS = 2;
@@ -3313,14 +3893,14 @@ void p_Col_neg_double_1()
 void p_Dictionary_1()
 {
 	PrimitiveProcessor pp;
-	uint8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE];
+	u_int8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE];
 	string filename("dictblock.cdf");
 	DictInput *cmd;
 	DictOutput *results;
 	DictFilterElement *args;
 	DataValue *outValue;
 	int fd;
-	uint32_t err;
+	uint err;
 
 	fd = open(filename.c_str(), O_RDONLY);
 	if (fd < 0) {
@@ -3365,14 +3945,14 @@ void p_Dictionary_1()
 void p_Dictionary_2()
 {
 	PrimitiveProcessor pp;
-	uint8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE];
+	u_int8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE];
 	string filename("dictblock.cdf");
 	DictInput *cmd;
 	DictOutput *results;
 	DictFilterElement *args;
 	DataValue *outValue;
 	int fd;
-	uint32_t err;
+	uint err;
 
 	fd = open(filename.c_str(), O_RDONLY);
 	if (fd < 0) {
@@ -3426,14 +4006,14 @@ void p_Dictionary_2()
 void p_Dictionary_3()
 {
 	PrimitiveProcessor pp;
-	uint8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE];
+	u_int8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE];
 	string filename("dictblock.cdf");
 	DictInput *cmd;
 	DictOutput *results;
 	DictFilterElement *args;
 	DataValue *outValue;
 	int fd, argsOffset;
-	uint32_t err, i;
+	uint err, i;
 	char tmp[BLOCK_SIZE];
 
 	fd = open(filename.c_str(), O_RDONLY);
@@ -3482,14 +4062,14 @@ void p_Dictionary_3()
 void p_Dictionary_gt_1()
 {
 	PrimitiveProcessor pp;
-	uint8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE];
+	u_int8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE];
 	string filename("dictblock.cdf");
 	DictInput *cmd;
 	DictOutput *results;
 	DictFilterElement *args;
 	DataValue *outValue;
 	int fd, argsOffset;
-	uint32_t err, i;
+	uint err, i;
 	char tmp[BLOCK_SIZE];
 
 	fd = open(filename.c_str(), O_RDONLY);
@@ -3541,14 +4121,14 @@ void p_Dictionary_gt_1()
 void p_Dictionary_token_1()
 {
 	PrimitiveProcessor pp;
-	uint8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE];
+	u_int8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE];
 	string filename("dictblock.cdf");
 	DictInput *cmd;
 	DictOutput *results;
 	DictFilterElement *args;
 	PrimToken *outToken;
 	int fd;
-	uint32_t err;
+	uint err;
 
 	fd = open(filename.c_str(), O_RDONLY);
 	if (fd < 0) {
@@ -3604,14 +4184,14 @@ void p_Dictionary_token_1()
 void p_Dictionary_inputArg_1()
 {
 	PrimitiveProcessor pp;
-	uint8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE];
+	u_int8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE];
 	string filename("dictblock.cdf");
 	DictInput *cmd;
 	DictOutput *results;
 	DictFilterElement *args;
 	DataValue *outValue;
 	int fd;
-	uint32_t err;
+	uint err;
 
 	fd = open(filename.c_str(), O_RDONLY);
 	if (fd < 0) {
@@ -3668,7 +4248,7 @@ void p_Dictionary_inputArg_1()
 void p_Dictionary_token_agg_1()
 {
 	PrimitiveProcessor pp;
-	uint8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE];
+	u_int8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE];
 	string filename("dictblock.cdf");
 	DictInput *cmd;
 	DictOutput *results;
@@ -3677,7 +4257,7 @@ void p_Dictionary_token_agg_1()
 	DictAggregate *agg;
 	DataValue *outValue;
 	int fd;
-	uint32_t err;
+	uint err;
 
 	fd = open(filename.c_str(), O_RDONLY);
 	if (fd < 0) {
@@ -3746,7 +4326,7 @@ void p_Dictionary_token_agg_1()
 void p_Dictionary_inToken_1()
 {
 	PrimitiveProcessor pp;
-	uint8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE];
+	u_int8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE];
 	string filename("dictblock.cdf");
 	DictInput *cmd;
 	DictOutput *results;
@@ -3755,7 +4335,7 @@ void p_Dictionary_inToken_1()
 	PrimToken *outToken;
 	DataValue *outValue;
 	int fd;
-	uint32_t err;
+	uint err;
 
 	fd = open(filename.c_str(), O_RDONLY);
 	if (fd < 0) {
@@ -3834,7 +4414,7 @@ void p_Dictionary_inToken_1()
 void p_Dictionary_oldgetsig_1()
 {
 	PrimitiveProcessor pp;
-	uint8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE];
+	u_int8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE];
 	string filename("dictblock.cdf");
 	DictInput *cmd;
 	DictOutput *results;
@@ -3852,7 +4432,7 @@ void p_Dictionary_oldgetsig_1()
 	} *oldResults;
 
 	int fd, argsOffset;
-	uint32_t err;
+	uint err;
 // 	char tmp[BLOCK_SIZE];
 
 	fd = open(filename.c_str(), O_RDONLY);
@@ -3918,14 +4498,14 @@ void p_Dictionary_oldgetsig_1()
 void p_Dictionary_like_1()
 {
 	PrimitiveProcessor pp;
-	uint8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE];
+	u_int8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE];
 	string filename("dictblock.cdf");
 	DictInput *cmd;
 	DictOutput *results;
 	DictFilterElement *args;
 	DataValue *outValue;
 	int fd, argsOffset;
-	uint32_t err, i;
+	uint err, i;
 	char tmp[BLOCK_SIZE];
 
 	fd = open(filename.c_str(), O_RDONLY);
@@ -3981,14 +4561,14 @@ void p_Dictionary_like_1()
 void p_Dictionary_like_2()
 {
 	PrimitiveProcessor pp;
-	uint8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE];
+	u_int8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE];
 	string filename("dictblock.cdf");
 	DictInput *cmd;
 	DictOutput *results;
 	DictFilterElement *args;
 	DataValue *outValue;
 	int fd, argsOffset;
-	uint32_t err, i;
+	uint err, i;
 	char tmp[BLOCK_SIZE];
 
 	fd = open(filename.c_str(), O_RDONLY);
@@ -4044,14 +4624,14 @@ void p_Dictionary_like_2()
 void p_Dictionary_like_3()
 {
 	PrimitiveProcessor pp;
-	uint8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE];
+	u_int8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE];
 	string filename("dictblock.cdf");
 	DictInput *cmd;
 	DictOutput *results;
 	DictFilterElement *args;
 	DataValue *outValue;
 	int fd, argsOffset;
-	uint32_t err, i;
+	uint err, i;
 	char tmp[BLOCK_SIZE];
 
 	fd = open(filename.c_str(), O_RDONLY);
@@ -4103,14 +4683,14 @@ void p_Dictionary_like_3()
 void p_Dictionary_like_4()
 {
 	PrimitiveProcessor pp;
-	uint8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE];
+	u_int8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE];
 	string filename("dictblock.cdf");
 	DictInput *cmd;
 	DictOutput *results;
 	DictFilterElement *args;
 	DataValue *outValue;
 	int fd, argsOffset;
-	uint32_t err, i;
+	uint err, i;
 	char tmp[BLOCK_SIZE];
 
 	fd = open(filename.c_str(), O_RDONLY);
@@ -4162,14 +4742,14 @@ void p_Dictionary_like_4()
 void p_Dictionary_like_5()
 {
 	PrimitiveProcessor pp;
-	uint8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE];
+	u_int8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE];
 	string filename("dictblock.cdf");
 	DictInput *cmd;
 	DictOutput *results;
 	DictFilterElement *args;
 	DataValue *outValue;
 	int fd, argsOffset;
-	uint32_t err, i;
+	uint err, i;
 	char tmp[BLOCK_SIZE];
 
 	fd = open(filename.c_str(), O_RDONLY);
@@ -4225,14 +4805,14 @@ void p_Dictionary_like_5()
 void p_Dictionary_like_6()
 {
 	PrimitiveProcessor pp;
-	uint8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE];
+	u_int8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE];
 	string filename("dictblock.cdf");
 	DictInput *cmd;
 	DictOutput *results;
 	DictFilterElement *args;
 	DataValue *outValue;
 	int fd, argsOffset;
-	uint32_t err, i;
+	uint err, i;
 	char tmp[BLOCK_SIZE];
 
 	fd = open(filename.c_str(), O_RDONLY);
@@ -4288,14 +4868,14 @@ void p_Dictionary_like_6()
 void p_Dictionary_like_7()
 {
 	PrimitiveProcessor pp;
-	uint8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE];
+	u_int8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE];
 	string filename("dictblock.cdf");
 	DictInput *cmd;
 	DictOutput *results;
 	DictFilterElement *args;
 	DataValue *outValue;
 	int fd, argsOffset;
-	uint32_t err, i;
+	uint err, i;
 	char tmp[BLOCK_SIZE];
 
 	fd = open(filename.c_str(), O_RDONLY);
@@ -4348,14 +4928,14 @@ void p_Dictionary_like_7()
 void p_Dictionary_like_8()
 {
 	PrimitiveProcessor pp;
-	uint8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE];
+	u_int8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE];
 	string filename("dictblock.cdf");
 	DictInput *cmd;
 	DictOutput *results;
 	DictFilterElement *args;
 	DataValue *outValue;
 	int fd, argsOffset;
-	uint32_t err, i;
+	uint err, i;
 	char tmp[BLOCK_SIZE];
 
 	fd = open(filename.c_str(), O_RDONLY);
@@ -4411,13 +4991,13 @@ void p_Dictionary_like_8()
 void p_Dictionary_like_prefixbench_1()
 {
 	PrimitiveProcessor pp;
-	uint8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE];
+	u_int8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE];
 	string filename("dictblock.cdf");
 	DictInput *cmd;
 	DictOutput *results;
 	DictFilterElement *args;
 	int fd;
-	uint32_t err;
+	uint err;
 	uint64_t count;
 
 	fd = open(filename.c_str(), O_RDONLY);
@@ -4466,13 +5046,13 @@ void p_Dictionary_like_prefixbench_1()
 void p_Dictionary_like_substrbench_1()
 {
 	PrimitiveProcessor pp;
-	uint8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE];
+	u_int8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE];
 	string filename("dictblock.cdf");
 	DictInput *cmd;
 	DictOutput *results;
 	DictFilterElement *args;
  	int fd;
-	uint32_t err;
+	uint err;
 	uint64_t count;
 
 	fd = open(filename.c_str(), O_RDONLY);

@@ -46,11 +46,11 @@
 		<ModuleHeartbeatPeriod>10</ModuleHeartbeatPeriod>
 		<ModuleHeartbeatCount>3</ModuleHeartbeatCount>
 		<DBRootCount>1</DBRootCount>
-		<DBRoot1>$INSTALLDIR/data1</DBRoot1>
-		<DBRMRoot>$INSTALLDIR/dbrm/BRM_saves</DBRMRoot>
-		<TempDiskPath>$INSTALLDIR/tmp</TempDiskPath>
-		<WorkingDir>$INSTALLDIR</WorkingDir>
-		<TableLockSaveFile>$INSTALLDIR/dbrm/tablelocks</TableLockSaveFile>
+		<DBRoot1>##INSTDIR##/data1</DBRoot1>
+		<DBRMRoot>##INSTDIR##/dbrm/BRM_saves</DBRMRoot>
+		<TempDiskPath>##INSTDIR##/tmp</TempDiskPath>
+		<WorkingDir>##INSTDIR##</WorkingDir>
+		<TableLockSaveFile>##INSTDIR##/dbrm/tablelocks</TableLockSaveFile>
 		<TransactionArchivePeriod>10</TransactionArchivePeriod>
 		<TempSaveSize>128M</TempSaveSize>
 		<WaitPeriod>10</WaitPeriod>
@@ -134,23 +134,23 @@
 	</SystemExtDeviceConfig>
 	<SessionManager>
 		<MaxConcurrentTransactions>1000</MaxConcurrentTransactions>
-		<SharedMemoryTmpFile>$INSTALLDIR/dbrm/CalpontShm</SharedMemoryTmpFile>
-		<TxnIDFile>$INSTALLDIR/dbrm/SMTxnID</TxnIDFile>
+		<SharedMemoryTmpFile>##INSTDIR##/dbrm/CalpontShm</SharedMemoryTmpFile>
+		<TxnIDFile>##INSTDIR##/dbrm/SMTxnID</TxnIDFile>
 	</SessionManager>
 	<SessionMonitor>
-		<SharedMemoryTmpFile>$INSTALLDIR/dbrm/CalpontSessionMonitorShm</SharedMemoryTmpFile>
+		<SharedMemoryTmpFile>##INSTDIR##/dbrm/CalpontSessionMonitorShm</SharedMemoryTmpFile>
 		<TransactionAgeLimit>10</TransactionAgeLimit>
 	</SessionMonitor>
 	<VersionBuffer>
 		<VersionBufferFileSize>1GB</VersionBufferFileSize>
 	</VersionBuffer>
 	<OIDManager>
-		<OIDBitmapFile>$INSTALLDIR/dbrm/oidbitmap</OIDBitmapFile>
+		<OIDBitmapFile>##INSTDIR##/dbrm/oidbitmap</OIDBitmapFile>
 		<FirstOID>3000</FirstOID>
 	</OIDManager>
 	<WriteEngine>
-		<BulkRoot>$INSTALLDIR/bulk</BulkRoot>
-		<BulkRollbackDir>$INSTALLDIR/bulk/rollback</BulkRollbackDir>
+		<BulkRoot>##INSTDIR##/bulk</BulkRoot>
+		<BulkRollbackDir>##INSTDIR##/bulk/rollback</BulkRollbackDir>
 	</WriteEngine>
 	<DBRM_Controller>
 		<NumWorkers>1</NumWorkers>
@@ -189,9 +189,6 @@
 		<FifoSizeLargeSide>128</FifoSizeLargeSide>
 		<PmMaxMemorySmallSide>64M</PmMaxMemorySmallSide>
 		<TotalUmMemory>8G</TotalUmMemory>
-		<AllowDiskBasedJoin>N</AllowDiskBasedJoin>
-		<TempFilePath>$INSTALLDIR/tmp</TempFilePath>
-		<TempFileCompression>Y</TempFileCompression>
 	</HashJoin>
 	<JobList>
 		<FlushInterval>16K</FlushInterval>

@@ -110,29 +110,19 @@ namespace rwlock
 #endif
 
 /*static*/
-RWLockShmImpl* RWLockShmImpl::makeRWLockShmImpl(int key, bool* excl)
+RWLockShmImpl* RWLockShmImpl::makeRWLockShmImpl(int key, bool excl)
 {
 	boost::mutex::scoped_lock lk(instanceMapMutex);
-    LockMap_t::iterator iter;
 
 	if (!lockMapPtr)
 		lockMapPtr = new LockMap_t();
 
-    iter = lockMapPtr->find(key);
-    if (iter == lockMapPtr->end())
-    {
-		RWLockShmImpl* ptr=0;
-        bool bExcl = excl ? *excl : false;
-        ptr = new RWLockShmImpl(key, bExcl);
-        lockMapPtr->insert(make_pair(key, ptr));
-        return ptr;
-    }
-    else if (excl)
-    {
-        *excl = false;   // This isn't the first time for this lock.
-    }
+	if (lockMapPtr->find(key) == lockMapPtr->end())
+		lockMapPtr->insert(make_pair(key, new RWLockShmImpl(key, excl)));
+	else if (excl)
+		throw not_excl();
 
-	return iter->second;
+	return lockMapPtr->find(key)->second;
 }
 
 RWLockShmImpl::RWLockShmImpl(int key, bool excl)
@@ -190,7 +180,7 @@ RWLockShmImpl::RWLockShmImpl(int key, bool excl)
 	}
 }
 
-RWLock::RWLock(int key, bool* excl)
+RWLock::RWLock(int key, bool excl)
 {
 	fPImpl = RWLockShmImpl::makeRWLockShmImpl(key, excl);
 }
@@ -292,6 +282,7 @@ again:
 			":" << __LINE__ << ": caught an exception" << endl;
 		throw runtime_error("RWLock::timed_down(): caught an exception");
 	}
+
 	return gotTheLock;
 }
 
@@ -343,42 +334,16 @@ void RWLock::read_lock(bool block)
 	}
 }
 	
-void RWLock::read_lock_priority(bool block)
-{
-	down(MUTEX, true);
-	CHECKSAFETY();
-	CHECKLIVENESS();
-	
-	if (fPImpl->fState->writing > 0) {
-		if (!block) {
-			up(MUTEX);
-			throw wouldblock();
-		}
-
-		fPImpl->fState->readerswaiting++;
-		CHECKSAFETY();
-		CHECKLIVENESS();
-		up(MUTEX);
-		down(READERS);			//unblocked by write_unlock();
-#ifdef RWLOCK_DEBUG
-		down(MUTEX, true);
-		CHECKSAFETY();
-		CHECKLIVENESS();
-		up(MUTEX);
-#endif
-	}
-	else {
-		fPImpl->fState->reading++;
-
-		CHECKSAFETY();
-		CHECKLIVENESS();
-		up(MUTEX);
-	}
-}
-
 void RWLock::read_unlock()
 {
 	down(MUTEX, true);
+#ifdef RWLOCK_DEBUG
+	if (fPImpl->fState->reading <= 0)
+	{
+		cerr << __PRETTY_FUNCTION__ << ":" << __LINE__ << ": had to reset reading (it was " << fPImpl->fState->reading << ")" << endl;
+		fPImpl->fState->reading = 1;
+	}
+#endif
 	CHECKSAFETY();
 	CHECKLIVENESS();
 
@@ -455,6 +420,7 @@ bool RWLock::timed_write_lock(const struct timespec &ts, struct LockState *state
 		RETURN_STATE(true, state)
 		return false;
 	}
+
 	CHECKSAFETY();
 	CHECKLIVENESS();
 	if (fPImpl->fState->writing > 0 || fPImpl->fState->reading > 0) {
@@ -558,6 +524,13 @@ void RWLock::upgrade_to_write()
 {
 	
 	down(MUTEX, true);
+#ifdef RWLOCK_DEBUG
+	if (fPImpl->fState->reading <= 0)
+	{
+		cerr << __PRETTY_FUNCTION__ << ":" << __LINE__ << ": had to reset reading (it was " << fPImpl->fState->reading << ")" << endl;
+		fPImpl->fState->reading = 1;
+	}
+#endif
 	CHECKSAFETY();
 	CHECKLIVENESS();
 
@@ -643,23 +616,6 @@ void RWLock::reset()
 		}
 	}
 	fPImpl->fState->sems[MUTEX].post();
-}
-
-LockState RWLock::getLockState()
-{
-	bool gotIt;
-	LockState ret;
-
-	gotIt = fPImpl->fState->sems[MUTEX].try_wait();
-	ret.reading = fPImpl->fState->reading;
-	ret.writing = fPImpl->fState->writing;
-	ret.readerswaiting = fPImpl->fState->readerswaiting;
-	ret.writerswaiting = fPImpl->fState->writerswaiting;
-	ret.mutexLocked = !gotIt;
-	if (gotIt)
-		fPImpl->fState->sems[MUTEX].post();
-
-	return ret;
 }
 
 } //namespace rwlock

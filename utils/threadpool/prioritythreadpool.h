@@ -35,7 +35,6 @@
 #include <boost/thread/condition.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/function.hpp>
-#include "winport.h"
 
 namespace threadpool
 {
@@ -47,8 +46,6 @@ public:
 	class Functor {
 	public:
 		virtual ~Functor() { };
-		// as of 12/3/13, all implementors return 0 and -1.  -1 will cause
-        // this thread pool to reschedule the job, 0 will throw it away on return.
 		virtual int operator()() = 0;
 	};
 
@@ -57,9 +54,9 @@ public:
 	struct Job {
 		Job() : weight(1), priority(0), id(0) { }
 		boost::shared_ptr<Functor> functor;
-		uint32_t weight;
-		uint32_t priority;
-		uint32_t id;
+		uint weight;
+		uint priority;
+		uint id;
 	};
 
 	enum Priority {
@@ -71,17 +68,17 @@ public:
 
     /*********************************************
      *  ctor/dtor
-     *
+     * 
      *********************************************/
 
     /** @brief ctor
       */
 
     PriorityThreadPool(uint targetWeightPerRun, uint highThreads, uint midThreads,
-    		uint lowThreads, uint id = 0);
+    		uint lowThreads);
     virtual ~PriorityThreadPool();
 
-    void removeJobs(uint32_t id);
+    void removeJobs(uint id);
     void addJob(const Job &job, bool useLock = true);
     void stop();
 
@@ -107,13 +104,12 @@ private:
     void threadFcn(const Priority preferredQueue) throw();
 
     std::list<Job> jobQueues[3];  // higher indexes = higher priority
-    uint32_t threadCounts[3];
+    uint threadCounts[3];
     boost::mutex mutex;
     boost::condition newJob;
     boost::thread_group threads;
     bool _stop;
-    uint32_t weightPerRun;
-    volatile uint id;   // prevent it from being optimized out
+    uint weightPerRun;
 };
 
 } // namespace threadpool

@@ -1,20 +1,3 @@
-/* Copyright (C) 2014 InfiniDB, Inc.
-
-   This program is free software; you can redistribute it and/or
-   modify it under the terms of the GNU General Public License
-   as published by the Free Software Foundation; version 2 of
-   the License.
-
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-   MA 02110-1301, USA. */
-
 /***************************************************************************
  * $Id: msgProcessor.cpp 34 2006-09-29 21:13:54Z dhill $
  *
@@ -312,12 +295,9 @@ void msgProcessor()
 								while(p != sdl.end())
 								{
 									ackmsg << (*p).deviceName;
-									//ackmsg << (ByteStream::quadbyte) ((*p).totalBlocks / 1024) ;
-									//ackmsg << (ByteStream::quadbyte) ((*p).usedBlocks / 1024);
-									//ackmsg << (ByteStream::byte) (*p).usedPercent;
-									ackmsg << (uint64_t) ((*p).totalBlocks / 1024) ;
-									ackmsg << (uint64_t) ((*p).usedBlocks / 1024);
-									ackmsg << (uint8_t) (*p).usedPercent;
+									ackmsg << (ByteStream::quadbyte) ((*p).totalBlocks / 1024) ;
+									ackmsg << (ByteStream::quadbyte) ((*p).usedBlocks / 1024);
+									ackmsg << (ByteStream::byte) (*p).usedPercent;
 									p++;
 								}
 
@@ -367,25 +347,10 @@ void msgProcessor()
 									ifstream file (fileName.c_str());
 									if (!file)
 									{
-										try {
-											LoggingID lid(SERVER_MONITOR_LOG_ID);
-											MessageLog ml(lid);
-											Message msg;
-											Message::Args args;
-											args.add("File open error: ");
-											args.add(fileName);
-											msg.format(args);
-											ml.logErrorMessage(msg);
-										}
-										catch (...)
-										{}
-
-										ackmsg << (ByteStream::byte) oam::API_FILE_OPEN_ERROR;
+										ackmsg << (ByteStream::byte) API_FILE_OPEN_ERROR;
 										fIos.write(ackmsg);
 										break;
 									}
-
-									ackmsg << (ByteStream::byte) oam::API_SUCCESS;
 
 									// Read the file. Filter out anything we don't care about. Store
 									// each SQL Start statement. When a SQL End statement is found, remove the

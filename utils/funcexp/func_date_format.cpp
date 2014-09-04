@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_date_format.cpp 3923 2013-06-19 21:43:06Z bwilkinson $
+* $Id: func_date_format.cpp 3048 2012-04-04 15:33:45Z rdempsey $
 *
 *
 ****************************************************************************/
@@ -36,57 +36,53 @@ using namespace dataconvert;
 
 namespace funcexp
 {
-namespace helpers
-{
 const string IDB_date_format(const DateTime& dt, const string& format)
 {
 	// assume 256 is enough. assume not allowing incomplete date
 	char buf[256];
 	char* ptr = buf;
-	uint32_t weekday = 0;
-	uint32_t dayval = 0;
-	uint32_t weekval = 0;
-	uint32_t weekyear = 0;
-
-	for (uint32_t i = 0; i < format.length(); i++)
+	uint32_t weekday = 0,
+	         lyear = 0;
+	
+	for (uint i = 0; i < format.length(); i++)
 	{
 		if (format[i] != '%')
 			*ptr++ = format[i];
 		else
 		{
 			i++;
-			switch (format[i])
+			switch (format[i]) 
 			{
 			case 'M':
-				sprintf(ptr, "%s", helpers::monthFullNames[dt.month].c_str());
-				ptr += helpers::monthFullNames[dt.month].length();
+				sprintf(ptr, "%s", monthFullNames[dt.month].c_str());
+				ptr += monthFullNames[dt.month].length();
 				break;
 			case 'b':
-				sprintf(ptr, "%s", helpers::monthAbNames[dt.month].c_str());
-				ptr += helpers::monthAbNames[dt.month].length();
+				sprintf(ptr, "%s", monthAbNames[dt.month].c_str());
+				ptr += monthAbNames[dt.month].length();
 				break;
 			case 'W':
-				weekday= helpers::calc_mysql_weekday( dt.year, dt.month, dt.day, false);
-				sprintf(ptr, "%s", helpers::weekdayFullNames[weekday].c_str());
-				ptr += helpers::weekdayFullNames[weekday].length();
+			  weekday= calc_weekday(calc_daynr(dt.year, dt.month, dt.day), 0);
+			  sprintf(ptr, "%s", weekdayFullNames[weekday].c_str());
+				ptr += weekdayFullNames[weekday].length();
 				break;
 			case 'w':
-				weekday= helpers::calc_mysql_weekday( dt.year, dt.month, dt.day, true);
+			  	weekday= calc_weekday(calc_daynr(dt.year, dt.month, dt.day), 1);
 				sprintf(ptr, "%01d", weekday);
 				ptr += 1;
 				break;
 			case 'a':
-				weekday= helpers::calc_mysql_weekday( dt.year, dt.month, dt.day, false);
-				sprintf(ptr, "%s", helpers::weekdayAbNames[weekday].c_str());
-				ptr += helpers::weekdayAbNames[weekday].length();
+				weekday=calc_weekday(calc_daynr(dt.year, dt.month, dt.day), 0);
+				sprintf(ptr, "%s", weekdayAbNames[weekday].c_str());
+				ptr += weekdayAbNames[weekday].length();
 				break;
 			case 'D':
-				sprintf(ptr, "%s", helpers::dayOfMonth[dt.day].c_str());
-				ptr += helpers::dayOfMonth[dt.day].length();
+				sprintf(ptr, "%s", dayOfMonth[dt.day].c_str());
+				ptr += dayOfMonth[dt.day].length();
 			break;
 			case 'Y':
 				sprintf(ptr, "%04d", dt.year);
-				ptr += 4;
+				ptr += 4; 
 				break;
 			case 'y':
 				sprintf(ptr, "%02d", dt.year % 100);
@@ -126,9 +122,7 @@ const string IDB_date_format(const DateTime& dt, const string& format)
 				ptr += 2;
 				break;
 			case 'j':
-				dayval = helpers::calc_mysql_daynr( dt.year, dt.month, dt.day ) -
-				         helpers::calc_mysql_daynr( dt.year, 1, 1 ) + 1;
-				sprintf(ptr, "%03d", dayval);
+				sprintf(ptr, "%03d", calc_daynr(dt.year, dt.month, dt.day) - calc_daynr(dt.year,1,1) + 1);
 				ptr += 3;
 				break;
 			case 'k':
@@ -144,7 +138,7 @@ const string IDB_date_format(const DateTime& dt, const string& format)
 				ptr += 2;
 				break;
 			case 'r':
-				sprintf(ptr, (dt.hour % 24 < 12 ? "%02d:%02d:%02d AM" : "%02d:%02d:%02d PM"),
+				sprintf(ptr, (dt.hour % 24 < 12 ? "%02d:%02d:%02d AM" : "%02d:%02d:%02d PM"), 
 	             (dt.hour + 11) % 12 + 1, dt.minute, dt.second);
 				ptr += 11;
 				break;
@@ -158,38 +152,29 @@ const string IDB_date_format(const DateTime& dt, const string& format)
 				ptr += 8;
 				break;
 			case 'U':
-				weekval = helpers::calc_mysql_week( dt.year, dt.month, dt.day, 0);
-				sprintf(ptr, "%02d", weekval);
+				sprintf(ptr, "%02d", calc_week(dt.year, dt.month, dt.day, week_first_weekday, &lyear));
 				ptr += 2;
 				break;
 			case 'V':
-				weekval = helpers::calc_mysql_week( dt.year, dt.month, dt.day,
-													helpers::WEEK_NO_ZERO );
-				sprintf(ptr, "%02d", weekval);
+				sprintf(ptr, "%02d", calc_week(dt.year, dt.month, dt.day, week_Year | week_first_weekday, &lyear));
 				ptr += 2;
 				break;
 			case 'u':
-				weekval = helpers::calc_mysql_week( dt.year, dt.month, dt.day,
-													helpers::WEEK_MONDAY_FIRST | helpers::WEEK_GT_THREE_DAYS);
-				sprintf(ptr, "%02d", weekval);
+				sprintf(ptr, "%02d", calc_week(dt.year, dt.month, dt.day, week_monday_first, &lyear));
 				ptr += 2;
 				break;
 			case 'v':
-				weekval = helpers::calc_mysql_week( dt.year, dt.month, dt.day,
-												    helpers::WEEK_NO_ZERO | helpers::WEEK_MONDAY_FIRST| helpers::WEEK_GT_THREE_DAYS);
-				sprintf(ptr, "%02d", weekval);
+				sprintf(ptr, "%02d", calc_week(dt.year, dt.month, dt.day, week_Year | week_monday_first, &lyear));
 				ptr += 2;
 				break;
 			case 'x':
-                helpers::calc_mysql_week( dt.year, dt.month, dt.day,
-                                          helpers::WEEK_NO_ZERO | helpers::WEEK_MONDAY_FIRST | helpers::WEEK_GT_THREE_DAYS, &weekyear);
-				sprintf(ptr, "%04d", weekyear);
-                ptr += 4;
+				(void) calc_week(dt.year, dt.month, dt.day, week_Year | week_monday_first, &lyear);
+				sprintf(ptr, "%04d", lyear);
+				ptr += 4;
 				break;
 			case 'X':
-			    helpers::calc_mysql_week( dt.year, dt.month, dt.day,
-                                          helpers::WEEK_NO_ZERO, &weekyear);
-				sprintf(ptr, "%04d", weekyear);
+				(void) calc_week(dt.year, dt.month, dt.day, week_Year | week_first_weekday, &lyear);
+				sprintf(ptr, "%04d", lyear);
 				ptr += 4;
 				break;
 			default:
@@ -199,7 +184,6 @@ const string IDB_date_format(const DateTime& dt, const string& format)
 	}
 	*ptr = 0;
 	return string(buf);
-}
 }
 
 CalpontSystemCatalog::ColType Func_date_format::operationType( FunctionParm& fp, CalpontSystemCatalog::ColType& resultType )
@@ -276,7 +260,7 @@ string Func_date_format::getStrVal(rowgroup::Row& row,
 				dt.second = (uint32_t)((val >> 20) & 0x3f);
 				dt.msecond = (uint32_t)((val & 0xfffff));
 			}
-			break;
+			break;	
 		case CalpontSystemCatalog::DECIMAL:
 			if (parm[0]->data()->resultType().scale == 0)
 			{
@@ -302,10 +286,10 @@ string Func_date_format::getStrVal(rowgroup::Row& row,
 			isNull = true;
 			return "";
 	}
+	
+	string format = parm[1]->data()->getStrVal(row, isNull);
 
-	const string& format = parm[1]->data()->getStrVal(row, isNull);
-
-	return helpers::IDB_date_format(dt, format);
+	return IDB_date_format(dt, format);
 }
 
 
@@ -315,7 +299,7 @@ int32_t Func_date_format::getDateIntVal(rowgroup::Row& row,
 							CalpontSystemCatalog::ColType& ct)
 {
 	return dataconvert::DataConvert::dateToInt(getStrVal(row, parm, isNull, ct));
-}
+}		
 
 
 int64_t Func_date_format::getDatetimeIntVal(rowgroup::Row& row,

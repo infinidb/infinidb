@@ -21,10 +21,6 @@
 #ifndef IDB_MYSQL_H__
 #define IDB_MYSQL_H__
 
-#ifdef _MSC_VER
-#include <stdint.h>
-#endif
-
 #define MYSQL_SERVER 1 //needed for definition of struct THD in mysql_priv.h
 #define USE_CALPONT_REGEX
 
@@ -39,9 +35,6 @@
 #endif
 #define MYSQL_DYNAMIC_PLUGIN
 #define DONT_DEFINE_VOID
-#ifdef ETIMEDOUT
-#undef ETIMEDOUT
-#endif
 #endif
 
 #include "mysql_priv.h"
@@ -71,18 +64,6 @@
 #undef PACKAGE_NAME
 #undef PACKAGE_BUGREPORT
 #undef DEBUG
-#undef set_bits
-
-namespace {
-inline char* idb_mysql_query_str(THD* thd)
-{
-#if MYSQL_VERSION_ID >= 50172
-	return thd->query();
-#else
-	return thd->query;
-#endif
-}
-}
 
 #endif
 // vim:ts=4 sw=4:

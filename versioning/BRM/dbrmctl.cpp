@@ -16,15 +16,13 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: dbrmctl.cpp 1823 2013-01-21 14:13:09Z rdempsey $
+ * $Id: dbrmctl.cpp 1632 2012-08-01 16:54:48Z dhall $
  *
  ****************************************************************************/
 
 #include <unistd.h>
 #include <iostream>
 using namespace std;
-
-#include "IDBPolicy.h"
 
 #include "brm.h"
 
@@ -158,8 +156,6 @@ int main(int argc, char **argv)
 
 	if ((argc - optind) < 1)
 		usage(argv[0]);
-
-	idbdatafile::IDBPolicy::configIDBPolicy();
 
 	cmd = argv[optind++];
 

@@ -1,19 +1,19 @@
-# Copyright (C) 2014 InfiniDB, Inc.
+#  Copyright (C) 2014 InfiniDB, Inc.
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; version 2 of
-# the License.
+#  This program is free software; you can redistribute it and/or
+#  modify it under the terms of the GNU General Public License
+#  as published by the Free Software Foundation; version 2 of
+#  the License.
 #
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
 #
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-# MA 02110-1301, USA.
+#  You should have received a copy of the GNU General Public License
+#  along with this program; if not, write to the Free Software
+#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+#  MA 02110-1301, USA.
 
 # $Id$
 
@@ -39,13 +39,12 @@ all-local: bootstrap
 		$(MAKE) -C ddlpackage install; \
 		$(MAKE) -C ddlpackageproc install; \
 		$(MAKE) -C dmlpackage install; \
-		$(MAKE) -C dmlpackageproc install
+		$(MAKE) -C dmlpackageproc install; \
+		$(MAKE) -C sm install
 	cd dbcon && $(MAKE) && $(MAKE) install
 	cd exemgr && $(MAKE) && $(MAKE) install
 	cd ddlproc && $(MAKE) && $(MAKE) install
 	cd dmlproc && $(MAKE) && $(MAKE) install
-	cd procmon && $(MAKE) && $(MAKE) install
-	cd procmgr && $(MAKE) && $(MAKE) install
 	cd oamapps && $(MAKE) && $(MAKE) install
 	cd decomsvr && $(MAKE) && $(MAKE) install
 	cd primitives && $(MAKE) && $(MAKE) install
@@ -68,18 +67,24 @@ leakcheck:
 docs:
 
 bootstrap:
-	./build/genVersion.sh --prefix=$(prefix)
+	./build/genVersion.sh --prefix=@prefix@/Calpont
 	for subdir in dbcon ddlproc dmlproc exemgr mysql net-snmp oam \
-		oamapps decomsvr primitives procmgr procmon qa snmpd tools utils versioning \
+		oamapps decomsvr primitives snmpd tools utils versioning \
 		writeengine ; do \
 		if test -f $$subdir/Makefile; then \
 			$(MAKE) BOOTSTRAP=1 -C $$subdir bootstrap || exit $$?; \
 		fi; \
 	done
 
+install: install-data-am
+	$(INSTALL) -m0644 COPYING @prefix@/Calpont
+	$(INSTALL) -m0644 INSTALL @prefix@/Calpont
+	$(INSTALL) -m0644 README @prefix@/Calpont
+	$(INSTALL) -m0644 build/releasenum @prefix@/Calpont 
+
 clean: clean-am
 	for subdir in dbcon ddlproc dmlproc exemgr mysql net-snmp oam \
-		oamapps decomsvr primitives procmgr procmon qa snmpd tools utils versioning \
+		oamapps decomsvr primitives snmpd tools utils versioning \
 		writeengine ; do \
 		if test -f $$subdir/Makefile; then \
 			$(MAKE) BOOTSTRAP=1 -C $$subdir clean || exit $$?; \

@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: we_colop.cpp 4740 2013-08-15 22:26:46Z chao $
+//  $Id: we_colop.cpp 4734 2013-08-13 13:25:43Z chao $
 
 /** @file */
 
@@ -27,23 +27,15 @@
 
 using namespace std;
 
+#define WRITEENGINECOLUMNOP_DLLEXPORT
 #include "we_colop.h"
+#undef WRITEENGINECOLUMNOP_DLLEXPORT
 #include "we_log.h"
 #include "we_dbfileop.h"
 #include "we_dctnrycompress.h"
 #include "we_colopcompress.h"
 #include "idbcompress.h"
 #include "writeengine.h"
-#include "cacheutils.h"
-
-using namespace execplan;
-
-#include "IDBDataFile.h"
-#include "IDBPolicy.h"
-
-using namespace idbdatafile;
-
-
 namespace WriteEngine
 {
 	struct RefcolInfo
@@ -77,124 +69,104 @@ namespace WriteEngine
     * PARAMETERS:
     *    tableFid - the file id for table bitmap file
     *    totalRow - the total number of rows need to be allocated
-    *    useStartingExtent - Indicates whether rows can be added to an existing
-	*               starting extent
     * RETURN:
     *    NO_ERROR if success
     *    rowIdArray - allocation of the row id left here
     ***********************************************************/
-int ColumnOp::allocRowId(const TxnID& txnid, bool useStartingExtent,
-	Column& column, uint64_t totalRow, RID* rowIdArray, HWM& hwm, bool& newExtent, uint64_t& rowsLeft, HWM& newHwm, 
-	bool& newFile, ColStructList& newColStructList, DctnryStructList& newDctnryStructList, std::vector<boost::shared_ptr<DBRootExtentTracker> >  & dbRootExtentTrackers, 
-	bool insertSelect, bool isBatchInsert, OID tableOid, bool isFirstBatchPm)
-{
-	//MultiFiles per OID: always append the rows to the end for now.
-	// See if the current HWM block might be in an abbreviated extent that
-	// needs to be expanded, if we end up adding enough rows.
-	bool bCheckAbbrevExtent      = false;
-	uint64_t  numBlksPerInitialExtent = INITIAL_EXTENT_ROWS_TO_DISK/BYTE_PER_BLOCK * column.colWidth;
-	int counter = 0;
-	uint64_t totalRowPerBlock = BYTE_PER_BLOCK/column.colWidth;
-	uint64_t extentRows = BRMWrapper::getInstance()->getExtentRows();
+   int ColumnOp::allocRowId(const TxnID& txnid, Column& column, uint64_t totalRow, RID* rowIdArray, HWM& hwm, bool& newExtent, uint64_t& rowsLeft, HWM& newHwm, 
+			bool& newFile, ColStructList& newColStructList, DctnryStructList& newDctnryStructList, std::vector<DBRootExtentTracker*> & dbRootExtentTrackers, 
+			bool insertSelect, bool isBatchInsert, OID tableOid)
+   {
+   	//MultiFiles per OID: always append the rows to the end for now.
+	  // See if the current HWM block might be in an abbreviated extent that
+	  // needs to be expanded, if we end up adding enough rows.
+	  bool bCheckAbbrevExtent      = false;
+	  uint64_t  numBlksPerInitialExtent = INITIAL_EXTENT_ROWS_TO_DISK/BYTE_PER_BLOCK * column.colWidth;
+// DMC-SHARED_NOTHING_NOTE: Is it safe to assume only part0 seg0 is abbreviated?
+	  if ((column.dataFile.fPartition == 0) &&
+          (column.dataFile.fSegment   == 0) &&
+	      ((hwm+1) <= numBlksPerInitialExtent))
+              bCheckAbbrevExtent = abbreviatedExtent(column.dataFile.pFile, column.colWidth);
 
-	if (useStartingExtent)
-	{
-		// DMC-SHARED_NOTHING_NOTE: Is it safe to assume only part0 seg0 is abbreviated?
-		if ((column.dataFile.fPartition == 0) &&
-			(column.dataFile.fSegment   == 0) &&
-			((hwm+1) <= numBlksPerInitialExtent))
-			bCheckAbbrevExtent = abbreviatedExtent(column.dataFile.pFile, column.colWidth);
-
-		//The current existed rows upto hwm
-		uint64_t currentRows = totalRowPerBlock * hwm;
-		uint64_t numExtentsFilled = currentRows / extentRows;
-		uint64_t rowsAvailable = extentRows - (numExtentsFilled * extentRows);
-		rowsLeft = totalRow < rowsAvailable ? 0 : totalRow - rowsAvailable;
-	}
-	else
-	{
-		rowsLeft = totalRow;
-	}
-
-	newExtent = false;
-	uint32_t j = 0, i=0, rowsallocated = 0;
-	int rc = 0;
-	newFile = false;
-	Column newCol;
-	unsigned char  buf[BYTE_PER_BLOCK];
+	  //The current existed rows upto hwm
+	  int counter = 0;
+	  uint64_t totalRowPerBlock = BYTE_PER_BLOCK/column.colWidth;
+	  uint64_t currentRows = totalRowPerBlock * hwm;
+	  uint64_t extentRows = BRMWrapper::getInstance()->getExtentRows();
+	  uint64_t numExtentsFilled = currentRows / extentRows;
+	  uint64_t rowsAvailable = extentRows - (numExtentsFilled * extentRows);
+	  rowsLeft = totalRow < rowsAvailable ? 0 : totalRow - rowsAvailable;
+	  newExtent = false;
+	  uint j = 0, i=0, rowsallocated = 0;
+	  int rc = 0;
+	  newFile = false;
+	  Column newCol;
+	  unsigned char  buf[BYTE_PER_BLOCK];
 		
-	if (useStartingExtent)
-	{
 		// ZZ. For insert select, skip the hwm block and start inserting from the next block
 		// to avoid self insert issue.
 		//For batch insert: if not first batch, use the saved last rid to start adding rows.
 		
-		if (!insertSelect || !isFirstBatchPm)
+		if (!insertSelect)
 		{
-			//..Search the HWM block for empty rows
-			rc = readBlock(column.dataFile.pFile, buf, hwm);
-			if ( rc != NO_ERROR)
-				return rc;
-			 for(j = 0; j < totalRowPerBlock; j++) {
+		  //..Search the HWM block for empty rows
+		  rc = readBlock(column.dataFile.pFile, buf, hwm);
+		  if ( rc != NO_ERROR)
+			return rc;
+		  for(j = 0; j < totalRowPerBlock; j++) {
+	         if (isEmptyRow(buf, j, column)) {
+	            rowIdArray[counter] = getRowId(hwm, column.colWidth, j);
+	            rowsallocated++;
+	            counter++;
+	         if (rowsallocated >= totalRow)
+	         	break;	  		                
+		  	}
+		 }
+		}
+	  
+	if (rowsallocated < totalRow)
+	{
+	  	 //..Search remaining blks in current extent (after HWM) for empty rows
+	  	 //Need go to next block
+		 //need check whether this block is the last block for this extent
+		 while (((totalRowPerBlock * (hwm+1)) % extentRows) > 0)
+		 {
+			hwm++;
+
+			// Expand abbreviated initial extent on disk if needed.
+			if (bCheckAbbrevExtent) {
+				if ((hwm+1) > numBlksPerInitialExtent) {
+					RETURN_ON_ERROR(expandAbbrevExtent(column));
+					bCheckAbbrevExtent = false;
+				}
+			}
+			
+			RETURN_ON_ERROR(readBlock(column.dataFile.pFile, buf, hwm));
+			for(j = 0; j < totalRowPerBlock; j++) {
 				if (isEmptyRow(buf, j, column)) {
 					rowIdArray[counter] = getRowId(hwm, column.colWidth, j);
 					rowsallocated++;
 					counter++;
 					if (rowsallocated >= totalRow)
-						break;	  		                
+					break;	  		                
 				}
 			}
-		}
-	}
-	  
-	if (rowsallocated < totalRow)
-	{
-		if (useStartingExtent)
-		{
-			//..Search remaining blks in current extent (after HWM) for empty rows
-			//Need go to next block
-			//need check whether this block is the last block for this extent
-			while (((totalRowPerBlock * (hwm+1)) % extentRows) > 0)
-			{
-				hwm++;
+			if (rowsallocated >= totalRow)
+				break;
+		 }
+/*		 RETURN_ON_ERROR(BRMWrapper::getInstance()->setLocalHWM_int(column.dataFile.fid,
+                                                                column.dataFile.fPartition,
+                                                                column.dataFile.fSegment,
+                                                                hwm)); */
 
-				// Expand abbreviated initial extent on disk if needed.
-				if (bCheckAbbrevExtent) {
-					if ((hwm+1) > numBlksPerInitialExtent) {
-						RETURN_ON_ERROR(expandAbbrevExtent(column));
-						bCheckAbbrevExtent = false;
-					}
-				}
-			
-				RETURN_ON_ERROR(readBlock(column.dataFile.pFile, buf, hwm));
-				for(j = 0; j < totalRowPerBlock; j++) {
-					if (isEmptyRow(buf, j, column)) {
-						rowIdArray[counter] = getRowId(hwm, column.colWidth, j);
-						rowsallocated++;
-						counter++;
-						if (rowsallocated >= totalRow)
-							break;	  		                
-					}
-				}
-				if (rowsallocated >= totalRow)
-					break;
-			}
-		}
-		
-		if ((rowsallocated == 0) && isFirstBatchPm)
-		{
-			TableMetaData::removeTableMetaData(tableOid);
-			//TableMetaData* tableMetaData= TableMetaData::makeTableMetaData(tableOid);
-
-		} 
 	    //Check if a new extent is needed  		
         if (rowsallocated < totalRow)
 		 {
 			 //Create another extent
-			 uint16_t  dbRoot;
-			 uint32_t  partition = 0;
-			 uint16_t  segment;
-			 IDBDataFile* pFile = NULL;
+			 u_int16_t  dbRoot;
+			 u_int32_t  partition = 0;
+			 u_int16_t  segment;
+			 FILE*      pFile = NULL;
 			 std::string segFile;
 			 rowsLeft = 0;
 			 int		allocSize = 0;
@@ -230,10 +202,7 @@ int ColumnOp::allocRowId(const TxnID& txnid, bool useStartingExtent,
 						BLKS_PER_EXTENT =(BRMWrapper::getInstance()->getExtentRows() * newColStructList[i].colWidth)/BYTE_PER_BLOCK;
 						nBlks = newHwm + 1;
 						nRem  = nBlks % BLKS_PER_EXTENT;
-						if (nRem > 0)
-							newHwm = nBlks - nRem + BLKS_PER_EXTENT - 1;
-						else
-							newHwm = nBlks - 1;
+						newHwm = nBlks - nRem + BLKS_PER_EXTENT - 1;
 						//save it to set in the end
 						ColExtsInfo aColExtsInfo = tableMetaData->getColExtsInfo(newColStructList[i].dataOid);
 						ColExtInfo aExt;
@@ -246,7 +215,7 @@ int ColumnOp::allocRowId(const TxnID& txnid, bool useStartingExtent,
 						aColExtsInfo.push_back(aExt);
 						if (newColStructList[i].fCompressionType > 0)
 						{
-							uint64_t emptyVal = getEmptyRowValue(newColStructList[i].colDataType, newColStructList[i].colWidth);
+							i64 emptyVal = getEmptyRowValue(newColStructList[i].colDataType, newColStructList[i].colWidth);
 							string errorInfo;
 							rc = fileOp.fillCompColumnExtentEmptyChunks(newColStructList[i].dataOid, newColStructList[i].colWidth, 
 								emptyVal, dbRoot, partition, segment, newHwm, segFile, errorInfo);
@@ -256,19 +225,19 @@ int ColumnOp::allocRowId(const TxnID& txnid, bool useStartingExtent,
 						//@Bug 4758. Check whether this is a abbreviated extent
 						else if (newColStructList[i].fCompressionType == 0)
 						{
-							rc = fileOp.getFileSize(newColStructList[i].dataOid, dbRoot, partition, segment, fileSizeBytes);
+							rc = fileOp.getFileSize3(newColStructList[i].dataOid, dbRoot, partition, segment, fileSizeBytes);
 							if (rc != NO_ERROR)
 								return rc;
 						
 							if (fileSizeBytes == (long long)  INITIAL_EXTENT_ROWS_TO_DISK * newColStructList[i].colWidth)
 							{
-								 IDBDataFile* pFile = fileOp.openFile( newColStructList[i].dataOid, dbRoot, partition, segment, segFile );
+								 FILE* pFile = fileOp.openFile( newColStructList[i].dataOid, dbRoot, partition, segment, segFile );
 								 if ( !pFile )
 								 {
 									rc = ERR_FILE_OPEN;
 									return rc;
 								 }
-								 uint64_t emptyVal = getEmptyRowValue(newColStructList[i].colDataType, newColStructList[i].colWidth);
+								 i64 emptyVal = getEmptyRowValue(newColStructList[i].colDataType, newColStructList[i].colWidth);
 								 rc = fileOp.expandAbbrevColumnExtent( pFile, dbRoot, emptyVal, newColStructList[i].colWidth);
 								 //set hwm for this extent.
 								 fileOp.closeFile(pFile);
@@ -292,7 +261,6 @@ int ColumnOp::allocRowId(const TxnID& txnid, bool useStartingExtent,
 				{
 					createStripeColumnExtentsArgIn.oid = newColStructList[i].dataOid;
 					createStripeColumnExtentsArgIn.width = newColStructList[i].colWidth;
-                    createStripeColumnExtentsArgIn.colDataType = newColStructList[i].colDataType;
 					cols.push_back(createStripeColumnExtentsArgIn);
 				}
 				
@@ -303,7 +271,6 @@ int ColumnOp::allocRowId(const TxnID& txnid, bool useStartingExtent,
 					
 				//Create column files
 				vector<BRM::LBID_t> lbids;
-                vector<CalpontSystemCatalog::ColDataType> colDataTypes;
 				//BRM::CPInfoList_t cpinfoList;
 				//BRM::CPInfo cpInfo;
 				//cpInfo.max = numeric_limits<int64_t>::min();
@@ -313,9 +280,7 @@ int ColumnOp::allocRowId(const TxnID& txnid, bool useStartingExtent,
 				{
 					setColParam(newCol, 0, newColStructList[i].colWidth, newColStructList[i].colDataType, newColStructList[i].colType, 
 						newColStructList[i].dataOid, newColStructList[i].fCompressionType, dbRoot, partition, segment);
-						
-					compressionType(newColStructList[i].fCompressionType);
-					rc = extendColumn(newCol, false, extents[i].startBlkOffset, extents[i].startLbid, extents[i].allocSize, 
+					rc = extendColumn(newCol, false, false, extents[i].startBlkOffset, extents[i].startLbid, extents[i].allocSize, 
 						dbRoot, partition, segment, segFile, pFile, newFile);
 					if (rc != NO_ERROR)
 						return rc;
@@ -329,21 +294,17 @@ int ColumnOp::allocRowId(const TxnID& txnid, bool useStartingExtent,
 					newDctnryStructList[i].fColSegment = segment;
 					newDctnryStructList[i].fColDbRoot = dbRoot;
 					lbids.push_back(extents[i].startLbid);
-                    colDataTypes.push_back(newColStructList[i].colDataType);
 				}
 				
 				//mark the extents to updating
 //rc = BRMWrapper::getInstance()->setExtentsMaxMin(cpinfoList);
-				rc = BRMWrapper::getInstance()->markExtentsInvalid(lbids, colDataTypes);
+				rc = BRMWrapper::getInstance()->markExtentsInvalid(lbids);
 				if (rc != NO_ERROR)
 					return rc;
 				//create corresponding dictionary files
 				if (newFile )
 				{
 					boost::scoped_ptr<WriteEngineWrapper> we (new WriteEngineWrapper());
-					we->setTransId(txnid);
-					we->setBulkFlag(true);
-					std::map<FID,FID>  columnOids;
 					for (i=0; i < newDctnryStructList.size(); i++)
 					{
 						if (newDctnryStructList[i].dctnryOid > 0)
@@ -352,10 +313,8 @@ int ColumnOp::allocRowId(const TxnID& txnid, bool useStartingExtent,
                                  segment, newDctnryStructList[i].fCompressionType);
 							if ( rc != NO_ERROR)
 								return rc;
-							columnOids[newDctnryStructList[i].dctnryOid] = newDctnryStructList[i].dctnryOid ;
 						}	
 					}
-					we->flushDataFiles(rc, txnid, columnOids );
 				}
 			 }
 			 
@@ -363,7 +322,6 @@ int ColumnOp::allocRowId(const TxnID& txnid, bool useStartingExtent,
 			if (isBatchInsert && newExtent)
 			{
 			  TableMetaData* tableMetaData= TableMetaData::makeTableMetaData(tableOid);	
-				
 			  for (i=0; i < newColStructList.size(); i++)
 			  {		
 				ColExtsInfo aColExtsInfo = tableMetaData->getColExtsInfo(newColStructList[i].dataOid);
@@ -381,42 +339,14 @@ int ColumnOp::allocRowId(const TxnID& txnid, bool useStartingExtent,
 				aExt.hwm = extents[i].startBlkOffset;
 				aExt.isNewExt = true;
 				aExt.current = true;
-				aExt.isDict = false;
 				aColExtsInfo.push_back(aExt);
 				tableMetaData->setColExtsInfo(newColStructList[i].dataOid, aColExtsInfo);
-			  }	
-			  
-			  for (i=0; i < newDctnryStructList.size(); i++)
-			  {	
-				if (newDctnryStructList[i].dctnryOid > 0)
-				{
-					ColExtsInfo aColExtsInfo = tableMetaData->getColExtsInfo(newDctnryStructList[i].dctnryOid);
-					ColExtsInfo::iterator it = aColExtsInfo.begin();
-					while (it != aColExtsInfo.end())
-					{
-						if ((it->dbRoot == newDctnryStructList[i].fColDbRoot) && (it->partNum == newDctnryStructList[i].fColPartition) && (it->segNum == newDctnryStructList[i].fColSegment))
-							break;
-						it++;
-					}
-
-					if (it == aColExtsInfo.end()) //add this one to the list
-					{
-						ColExtInfo aExt;
-						aExt.dbRoot = newDctnryStructList[i].fColDbRoot;
-						aExt.partNum = newDctnryStructList[i].fColPartition;
-						aExt.segNum = newDctnryStructList[i].fColSegment;
-						aExt.compType = newDctnryStructList[i].fCompressionType;
-						aExt.isDict = true;	
-						aColExtsInfo.push_back(aExt);
-					}
-					tableMetaData->setColExtsInfo(newDctnryStructList[i].dctnryOid, aColExtsInfo);
-				}
-			  }
+			  }	 		
 			}
 			
 			 setColParam(newCol, 0, column.colWidth,column.colDataType, column.colType, 
 					 column.dataFile.fid, column.compressionType, dbRoot, partition, segment);
-			 rc = openColumnFile(newCol, segFile, false); // @bug 5572 HDFS tmp file
+			 rc = openColumnFile(newCol, segFile);
 			 if (rc != NO_ERROR)
 				 return rc;
 			//@Bug 3164 update compressed extent
@@ -476,7 +406,7 @@ int ColumnOp::allocRowId(const TxnID& txnid, bool useStartingExtent,
 	  	
 
       return NO_ERROR;
-}
+   }
 
    /***********************************************************
     * DESCRIPTION:
@@ -489,13 +419,10 @@ int ColumnOp::allocRowId(const TxnID& txnid, bool useStartingExtent,
    void ColumnOp::clearColumn(Column& column) const
    {
 	  if (column.dataFile.pFile)
-	  {
-		  column.dataFile.pFile->flush();
-	  }
+		  fflush(column.dataFile.pFile);
 
-      //setColParam(column);
+      setColParam(column);
       closeColumnFile(column);
-	  setColParam(column);
    }
 
    /***********************************************************
@@ -533,15 +460,15 @@ int ColumnOp::allocRowId(const TxnID& txnid, bool useStartingExtent,
    int ColumnOp::createColumn(Column& column,
 		int colNo,
 		int colWidth,
-		CalpontSystemCatalog::ColDataType colDataType,
+		ColDataType colDataType,
 		ColType colType,
 		FID dataFid,
 		uint16_t dbRoot,
         uint32_t partition)
    {
       int rc, newWidth, allocSize;
-      uint64_t emptyVal = 0;
-      int compressionType = column.compressionType;
+      i64 emptyVal = 0;
+	  int compressionType = column.compressionType;
       setColParam(column, colNo, colWidth, colDataType, colType);
       emptyVal = getEmptyRowValue(colDataType, colWidth);
       newWidth = getCorrectRowWidth(colDataType, colWidth);
@@ -550,7 +477,7 @@ int ColumnOp::allocRowId(const TxnID& txnid, bool useStartingExtent,
       column.dataFile.fPartition = partition;
       column.dataFile.fSegment   = 0;
 	  column.compressionType = compressionType;
-      rc = createFile(column.dataFile.fid, allocSize, dbRoot, partition, colDataType, emptyVal, newWidth);
+      rc = createFile(column.dataFile.fid, allocSize, dbRoot, partition, emptyVal, newWidth);
       if (rc != NO_ERROR)
          return rc;
 
@@ -565,8 +492,7 @@ int ColumnOp::allocRowId(const TxnID& txnid, bool useStartingExtent,
     *
     * @return
     */
-int ColumnOp::fillColumn(const TxnID& txnid, Column& column, Column& refCol, void * defaultVal, Dctnry* dctnry, 
-						ColumnOp* refColOp,const OID dictOid, 
+int ColumnOp::fillColumn(const TxnID& txnid, Column& column, Column& refCol, void * defaultVal, const OID dictOid, 
 						const int dictColWidth, const string defaultValStr, bool autoincrement)
 {
     unsigned char refColBuf[BYTE_PER_BLOCK]; //Refernce column buffer
@@ -575,25 +501,25 @@ int ColumnOp::fillColumn(const TxnID& txnid, Column& column, Column& refCol, voi
     HWM colHwm = 0;
     RID maxRowId = 0;
 	int size = sizeof(Token);
-    uint64_t emptyVal;
-    uint64_t refEmptyVal;
+    i64 emptyVal;
+    i64 refEmptyVal;
 
     long long startColFbo = 0;
     long long startRefColFbo = 0;
 
-    int        refBufOffset = 0;
-    int        colBufOffset = 0;
-	uint64_t   nexValNeeded = 0;
-	uint64_t   nextVal;
-    uint32_t   partition;
-    uint16_t   segment;
+    int refBufOffset = 0;
+    int colBufOffset = 0;
+	unsigned currentnumExtent = 0; 
+	u_int32_t nexValNeeded = 0;
+	u_int64_t nextVal;
+    u_int32_t  partition;
+    u_int16_t  segment;
     HWM        lastRefHwm;
     int        rc = 0;
 	std::string segFile, errorMsg;
 	BRM::LBID_t    startLbid;
 	bool        newFile = true;
 	int		 allocSize = 0;
-/*
 	boost::scoped_ptr<Dctnry> dctnry;
     if (m_compressionType == 0)
       dctnry.reset(new DctnryCompress0);
@@ -605,12 +531,12 @@ int ColumnOp::fillColumn(const TxnID& txnid, Column& column, Column& refCol, voi
         refColOp.reset(new ColumnOpCompress1);
     else
         refColOp.reset(new ColumnOpCompress0);
-*/
 	//get dbroots from config
 	Config config;
 	config.initConfigCache();
-	std::vector<uint16_t> rootList;
+	std::vector<u_int16_t> rootList;
 	config.getRootIdList( rootList );
+	unsigned extentRows = BRMWrapper::getInstance()->getExtentRows();
 	emptyVal = getEmptyRowValue(column.colDataType, column.colWidth);
     refEmptyVal = getEmptyRowValue(refCol.colDataType, refCol.colWidth);
 	//find the dbroots which have rows for refrence column
@@ -674,12 +600,6 @@ int ColumnOp::fillColumn(const TxnID& txnid, Column& column, Column& refCol, voi
 							rootList[i], partition, segment, startLbid, newFile);
 						if (rc != NO_ERROR)
 							return rc;
-						//@Bug 5652.
-						std::map<FID,FID> oids1;
-						oids1[dictOid] = dictOid;						
-						dctnry->flushFile(rc, oids1);
-						dctnry->closeDctnry();
-							
 						//tokenize default value if needed
 						if (defaultValStr.length() > 0)
 						{
@@ -694,25 +614,12 @@ int ColumnOp::fillColumn(const TxnID& txnid, Column& column, Column& refCol, voi
 							DctnryTuple dctnryTuple;
 							memcpy(dctnryTuple.sigValue, defaultValStr.c_str(), defaultValStr.length());
 							dctnryTuple.sigSize = defaultValStr.length();
-								
-							rc = dctnry->openDctnry(dctnryStruct.dctnryOid,
-                              dctnryStruct.fColDbRoot, dctnryStruct.fColPartition,
-                              dctnryStruct.fColSegment,
-                              false); // @bug 5572 HDFS tmp file
-							rc = dctnry->updateDctnry(dctnryTuple.sigValue, dctnryTuple.sigSize, dctnryTuple.token);
-							if (dctnryStruct.fCompressionType > 0)	
-								dctnry->closeDctnry(false);	
-							else
-								dctnry->closeDctnry(true);	
-							
+							WriteEngineWrapper wrapper;
+							rc = wrapper.tokenize(txnid, dctnryStruct, dctnryTuple);
 							if (rc != NO_ERROR)
 								return rc;
 							memcpy(defaultVal, &dctnryTuple.token, size); 
-							//@Bug 5652.
-							std::map<FID,FID> oids1;
-							oids1[dictOid] = dictOid;						
-							dctnry->flushFile(rc, oids1);
-						}			
+						}
 					}
                 }
             }
@@ -743,12 +650,6 @@ int ColumnOp::fillColumn(const TxnID& txnid, Column& column, Column& refCol, voi
 								rootList[i], partition, segment, startLbid, newFile);
 							if (rc != NO_ERROR)
 								return rc;
-								
-							//@Bug 5652.
-							std::map<FID,FID> oids1;
-							oids1[dictOid] = dictOid;						
-							dctnry->flushFile(rc, oids1);
-							dctnry->closeDctnry();
 							//tokenize default value if needed
 							if (defaultValStr.length() > 0)
 							{
@@ -762,27 +663,13 @@ int ColumnOp::fillColumn(const TxnID& txnid, Column& column, Column& refCol, voi
 								dctnryStruct.fCompressionType = column.compressionType;
 								DctnryTuple dctnryTuple;
 								memcpy(dctnryTuple.sigValue, defaultValStr.c_str(), defaultValStr.length());
-								//WriteEngineWrapper wrapper;
+								WriteEngineWrapper wrapper;
 								dctnryTuple.sigSize = defaultValStr.length();
-								//rc = wrapper.tokenize(txnid, dctnryStruct, dctnryTuple);
-								rc = dctnry->openDctnry(dctnryStruct.dctnryOid,
-                              dctnryStruct.fColDbRoot, dctnryStruct.fColPartition,
-                              dctnryStruct.fColSegment,
-                              false); // @bug 5572 HDFS tmp file
-								rc = dctnry->updateDctnry(dctnryTuple.sigValue, dctnryTuple.sigSize, dctnryTuple.token);
-								if (dctnryStruct.fCompressionType > 0)	
-									dctnry->closeDctnry(false);	
-								else
-									dctnry->closeDctnry(true);			
+								rc = wrapper.tokenize(txnid, dctnryStruct, dctnryTuple);
 								if (rc != NO_ERROR)
 									return rc;
 								memcpy(defaultVal, &dctnryTuple.token, size); 
-								//@Bug 5652.
-								std::map<FID,FID> oids1;
-								oids1[dictOid] = dictOid;						
-								dctnry->flushFile(rc, oids1);
-									
-							}
+							}	
 						}
 					}
 					else //just add a extent to the file
@@ -799,13 +686,13 @@ int ColumnOp::fillColumn(const TxnID& txnid, Column& column, Column& refCol, voi
 			column.dataFile.fDbRoot = rootList[i];
             column.dataFile.fPartition = newEntries[0].partitionNum;
             column.dataFile.fSegment = newEntries[0].segmentNum;
-            RETURN_ON_ERROR(openColumnFile(column, segFile, false)); // @bug 5572 HDFS tmp file
+            RETURN_ON_ERROR(openColumnFile(column, segFile));
 			//cout << "Processing new col file " << segFile << endl;
 			refCol.dataFile.fDbRoot = rootList[i];
 			refCol.dataFile.fPartition = newEntries[0].partitionNum;
             refCol.dataFile.fSegment = newEntries[0].segmentNum;
             std::string segFileRef;
-            RETURN_ON_ERROR(refColOp->openColumnFile(refCol, segFileRef, false)); // @bug 5572 HDFS tmp file
+            RETURN_ON_ERROR(refColOp->openColumnFile(refCol, segFileRef));
 			//cout << "Processing ref file " << segFileRef << " and hwm is " << lastRefHwm << endl;
 			RETURN_ON_ERROR(refColOp->readBlock(refCol.dataFile.pFile, refColBuf, lastRefHwm));
 			
@@ -825,8 +712,11 @@ int ColumnOp::fillColumn(const TxnID& txnid, Column& column, Column& refCol, voi
             //Compute local hwm for the new column
             colHwm = (maxRowId * column.colWidth) / BYTE_PER_BLOCK;
 			//cout << " new col hwm is " << colHwm << endl;
+			currentnumExtent = (colHwm+1) * (BYTE_PER_BLOCK /column.colWidth) / extentRows;
 			startRefColFbo = 0;
 			startColFbo = 0;
+            //startRefColFbo = currentnumExtent * extentRows * refCol.colWidth / BYTE_PER_BLOCK;
+            //startColFbo = currentnumExtent * extentRows * column.colWidth / BYTE_PER_BLOCK;
             //Initizliaing to BYTE_PER_BLOCK to force read the first time
 			refBufOffset = BYTE_PER_BLOCK;
             colBufOffset = BYTE_PER_BLOCK;
@@ -834,7 +724,7 @@ int ColumnOp::fillColumn(const TxnID& txnid, Column& column, Column& refCol, voi
 			BRM::CPInfo cpInfo;
 			if (autoincrement)
 			{
-				uint64_t nextValStart = 0;
+				u_int64_t nextValStart = 0;
 				while(startRefColFbo <= lastRefHwm || startColFbo <= colHwm)
 				{
 					//nexValNeeded = 0;
@@ -890,7 +780,7 @@ int ColumnOp::fillColumn(const TxnID& txnid, Column& column, Column& refCol, voi
 					//write the values to column
 					
 					
-					//colBufOffset = 0; @Bug 5436 ref column coud have different column width
+					//colBufOffset = 0; @Bug 5436. Need to handle the new column width is different from reference column
 					while(((refBufOffset + refCol.colWidth) <= BYTE_PER_BLOCK) &&
                            ((colBufOffset + column.colWidth) <= BYTE_PER_BLOCK))
 					{
@@ -958,16 +848,8 @@ int ColumnOp::fillColumn(const TxnID& txnid, Column& column, Column& refCol, voi
 						colBufOffset += column.colWidth;
 					}
 				}
-                if (isUnsigned(column.colDataType))
-                {
-                    cpInfo.max = 0;
-                    cpInfo.min = static_cast<int64_t>(numeric_limits<uint64_t>::max());
-                }
-                else
-                {
-                    cpInfo.max = numeric_limits<int64_t>::min();
-                    cpInfo.min = numeric_limits<int64_t>::max();
-                }
+				cpInfo.max = numeric_limits<int64_t>::min();
+				cpInfo.min = numeric_limits<int64_t>::max();
 				cpInfo.seqNum = -1;
             }
             
@@ -976,13 +858,11 @@ int ColumnOp::fillColumn(const TxnID& txnid, Column& column, Column& refCol, voi
                 RETURN_ON_ERROR(saveBlock(column.dataFile.pFile, colBuf, startColFbo - 1));
                 dirty = false;
             }
-			std::map<FID,FID> oids;
-			oids[column.dataFile.fid] = column.dataFile.fid;
-			oids[refCol.dataFile.fid] = refCol.dataFile.fid;
-            rc = flushFile(rc, oids);
+
             closeColumnFile(column);
             refColOp->closeColumnFile(refCol);
-			oids.clear();
+			std::map<FID,FID> oids;
+            rc = flushFile(rc, oids);
 			
 			//Mark extents invalid first
 			BRM::LBID_t    startLbid;
@@ -990,16 +870,8 @@ int ColumnOp::fillColumn(const TxnID& txnid, Column& column, Column& refCol, voi
 			if (autoincrement) //@Bug 4074. Mark it invalid first to set later
 			{
 				BRM::CPInfo cpInfo1;
-                if (isUnsigned(column.colDataType))
-                {
-                    cpInfo1.max = 0;
-                    cpInfo1.min = static_cast<int64_t>(numeric_limits<int64_t>::max());
-                }
-                else
-                {
-                    cpInfo1.max = numeric_limits<int64_t>::min();
-                    cpInfo1.min = numeric_limits<int64_t>::max();
-                }
+				cpInfo1.max = numeric_limits<int64_t>::min();
+				cpInfo1.min = numeric_limits<int64_t>::max();
 				cpInfo1.seqNum = -1;
 				cpInfo1.firstLbid = startLbid;
 				BRM::CPInfoList_t cpinfoList1;
@@ -1024,7 +896,7 @@ int ColumnOp::fillColumn(const TxnID& txnid, Column& column, Column& refCol, voi
 				return rc;
 			//erase the entries from this dbroot.
 			std::vector<struct BRM::EMEntry> refEntriesTrimed;
-			for (uint32_t m=0; m<refEntries.size(); m++)
+			for (uint m=0; m<refEntries.size(); m++)
 			{
 				if ((refEntries[0].partitionNum != refEntries[m].partitionNum) || (refEntries[0].segmentNum != refEntries[m].segmentNum))
 					refEntriesTrimed.push_back(refEntries[m]);
@@ -1105,6 +977,10 @@ int ColumnOp::fillColumn(const TxnID& txnid, Column& column, Column& refCol, voi
  * PARAMETERS:
  *    column    - input column attributes like OID and column width.
  *    leaveFileOpen - indicates whether db file is to be left open upon return
+ *    firstFileOnPM - If first file on a PM, then first empty chunk is
+ *        written out (if compressed), to give us a startup file on this PM,
+ *        much like MySQL "create table" creates the very "first" file on a
+ *        selected PM.
  *    hwm       - The HWM (or fbo) of the column segment file where the
  *                new extent begins.
  *    startLbid - The starting LBID for the new extent.
@@ -1123,6 +999,7 @@ int ColumnOp::fillColumn(const TxnID& txnid, Column& column, Column& refCol, voi
 int ColumnOp::extendColumn(
     const Column& column,
     bool         leaveFileOpen,
+    bool         firstFileOnPM,
     HWM          hwm,
     BRM::LBID_t  startLbid,
     int          allocSize,
@@ -1130,11 +1007,11 @@ int ColumnOp::extendColumn(
     uint32_t     partition,
     uint16_t     segment,
     std::string& segFile,
-    IDBDataFile*& pFile,
+    FILE*&       pFile,
     bool&        newFile,
     char*        hdrs)
 {
-    uint64_t emptyVal = 0;
+    i64 emptyVal = 0;
 
     emptyVal = getEmptyRowValue(column.colDataType, column.colWidth);
     int rc = extendFile(column.dataFile.fid,
@@ -1157,9 +1034,40 @@ int ColumnOp::extendColumn(
         return rc;
     }
 
-    // Only close file for DML/DDL; leave file open for bulkload
-    if (!leaveFileOpen)
-        closeFile( pFile );
+    // If application code specifies this is the first file for this PM, then
+    // we write out an empty chunk to initialize the "startup" file on each PM.
+    if (firstFileOnPM)
+    {
+        // DMC_TEMP
+        // If firstFileOnPM is true, then newFile should have been set to true
+        // by extendFile().  We might add validation for this at some point.
+        if ((newFile) && (m_compressionType))
+        {
+            int nRows = compress::IDBCompressInterface::UNCOMPRESSED_INBUF_LEN /
+                column.colWidth;
+            if (hdrs)
+            {
+                rc = writeInitialCompColumnChunk( pFile,
+                    allocSize, nRows, emptyVal, column.colWidth, hdrs );
+            }
+            else
+            {
+                char localHdrs[compress::IDBCompressInterface::HDR_BUF_LEN*2];
+                rc = writeInitialCompColumnChunk( pFile,
+                    allocSize, nRows, emptyVal, column.colWidth, localHdrs );
+            }
+        }
+
+        // Only close file for DML/DDL; leave file open for bulkload
+        if (!leaveFileOpen)
+            closeFile( pFile );
+    }
+    else
+    {
+        // Only close file for DML/DDL; leave file open for bulkload
+        if (!leaveFileOpen)
+            closeFile( pFile );
+    }
 
     return rc;
 }
@@ -1175,7 +1083,7 @@ int ColumnOp::addExtent(
     int&         allocSize,
     char*        hdrs)
 {
-    uint64_t emptyVal = 0;
+    i64 emptyVal = 0;
 
     emptyVal = getEmptyRowValue(column.colDataType, column.colWidth);
     int rc = addExtentExactFile(column.dataFile.fid,
@@ -1185,7 +1093,6 @@ int ColumnOp::addExtent(
                         dbRoot,
                         partition,
                         segment,
-                        column.colDataType,
                         segFile,
                         startLbid,
                         newFile,
@@ -1205,7 +1112,7 @@ int ColumnOp::addExtent(
     ***********************************************************/
    int ColumnOp::expandAbbrevExtent(const Column& column)
    {
-      uint64_t emptyVal = getEmptyRowValue(column.colDataType, column.colWidth);
+      i64 emptyVal = getEmptyRowValue(column.colDataType, column.colWidth);
 	  int rc = expandAbbrevColumnExtent(column.dataFile.pFile,
                                          column.dataFile.fDbRoot,
                                          emptyVal,
@@ -1222,12 +1129,12 @@ int ColumnOp::addExtent(
     * RETURN:
     *    true if success, false otherwise
     ***********************************************************/
-   bool ColumnOp::getColDataType(const char* name, CalpontSystemCatalog::ColDataType& colDataType) const
+   bool ColumnOp::getColDataType(const char* name, ColDataType& colDataType) const
    {
       bool bFound = false;
-      for(int i = 0; i < CalpontSystemCatalog::NUM_OF_COL_DATA_TYPE; i++)
-         if (strcmp(name, ColDataTypeStr[i]) == 0) {
-            colDataType = static_cast<CalpontSystemCatalog::ColDataType>(i);
+      for(int i = 0; i < NUM_OF_COL_DATA_TYPE; i++)
+         if (!strcmp(name, ColDataTypeStr[i])) {
+            colDataType = (ColDataType) i ;
             bFound = true;
             break;
          }
@@ -1262,7 +1169,7 @@ int ColumnOp::addExtent(
    bool ColumnOp::isEmptyRow(unsigned char* buf, int offset, const Column& column)
    {
       bool emptyFlag = true;
-      uint64_t  curVal, emptyVal;
+      i64  curVal, emptyVal;
 
       memcpy(&curVal, buf + offset*column.colWidth, column.colWidth);
       emptyVal = getEmptyRowValue(column.colDataType, column.colWidth);
@@ -1297,10 +1204,8 @@ int ColumnOp::addExtent(
     *    NO_ERROR if success
     *    ERR_FILE_READ if something wrong in reading the file
     ***********************************************************/
-// @bug 5572 - HDFS usage: add *.tmp file backup flag
    int ColumnOp::openColumnFile(Column& column,
       std::string& segFile,
-      bool useTmpSuffix,
       int ioBuffSize) const
    {
       if (!isValid(column))
@@ -1312,7 +1217,6 @@ int ColumnOp::addExtent(
          column.dataFile.fPartition,
          column.dataFile.fSegment,
          column.dataFile.fSegFileName,
-         useTmpSuffix,
          "r+b", ioBuffSize);
       segFile = column.dataFile.fSegFileName;
       if (column.dataFile.pFile == NULL)
@@ -1374,13 +1278,13 @@ int ColumnOp::addExtent(
    void ColumnOp::setColParam(Column& column,
       int       colNo,
       int       colWidth,
-      CalpontSystemCatalog::ColDataType colDataType,
+      ColDataType colDataType,
       ColType   colType,
       FID       dataFid,
       int       compressionType,
-      uint16_t dbRoot,
-      uint32_t partition,
-      uint16_t segment) const
+      u_int16_t dbRoot,
+      u_int32_t partition,
+      u_int16_t segment) const
    {
       column.colNo = colNo;
       column.colWidth = colWidth;
@@ -1408,16 +1312,16 @@ int ColumnOp::addExtent(
     * RETURN:
     *    NO_ERROR if success, other number otherwise
     ***********************************************************/
-   int ColumnOp::writeRow(Column& curCol, uint64_t totalRow, const RID* rowIdArray, const void* valArray, bool bDelete )
+   int ColumnOp::writeRow(Column& curCol, uint64_t totalRow, const RID* rowIdArray, const void* valArray, const void* oldValArray, bool bDelete )
    {
       uint64_t i = 0, curRowId;
       int      dataFbo, dataBio, curDataFbo = -1;
       unsigned char  dataBuf[BYTE_PER_BLOCK]; 
       bool     bExit = false, bDataDirty = false; 
       void*    pVal = 0;
-//      void*    pOldVal;
+      void*    pOldVal;
       char     charTmpBuf[8];
-      uint64_t  emptyVal;
+      i64      emptyVal;
 	  int rc = NO_ERROR;
 	  
       while(!bExit) {
@@ -1441,72 +1345,44 @@ int ColumnOp::addExtent(
          }
 
          // This is a awkward way to convert void* and get ith element, I just don't have a good solution for that
-         // How about pVal = valArray + i*curCol.colWidth?
-        switch (curCol.colType)
-        {
+         switch(curCol.colType)
+         {
 //               case WriteEngine::WR_LONG :   pVal = &((long *) valArray)[i]; break;
-            case WriteEngine::WR_FLOAT :
-                if (!bDelete) pVal = &((float *) valArray)[i];
-                //pOldVal = &((float *) oldValArray)[i];
-                break;
-            case WriteEngine::WR_DOUBLE : 
-                if (!bDelete) pVal = &((double *) valArray)[i];
-                //pOldVal = &((double *) oldValArray)[i]; 
-                break;
+            case WriteEngine::WR_FLOAT :  if (!bDelete) pVal = &((float *) valArray)[i]; 
+                                          pOldVal = &((float *) oldValArray)[i];
+                                          break;
+            case WriteEngine::WR_DOUBLE : if (!bDelete) pVal = &((double *) valArray)[i]; 
+                                          pOldVal = &((double *) oldValArray)[i]; 
+                                          break;
             case WriteEngine::WR_VARBINARY :   // treat same as char for now
-            case WriteEngine::WR_CHAR :   
-                if (!bDelete)
-                {
-                    memcpy(charTmpBuf, (char*)valArray + i*8, 8);
-                    pVal = charTmpBuf;
-                }
-                //pOldVal = (char*)oldValArray + i*8;
-                break;
+            case WriteEngine::WR_CHAR :   if (!bDelete) 
+										  {
+												memcpy(charTmpBuf, (char*)valArray + i*8, 8);
+                                          		pVal = charTmpBuf;
+										  }
+                                          pOldVal = (char*)oldValArray + i*8;
+                                          break;
 //            case WriteEngine::WR_BIT :    pVal = &((bool *) valArray)[i]; break;
-            case WriteEngine::WR_SHORT :  
-                if (!bDelete) pVal = &((short *) valArray)[i];
-                //pOldVal = &((short *) oldValArray)[i]; 
-                break;
-            case WriteEngine::WR_BYTE :   
-                if (!bDelete) pVal = &((char *) valArray)[i];
-                //pOldVal = &((char *) oldValArray)[i]; 
-                break;
-            case WriteEngine::WR_LONGLONG:
-                if (!bDelete) pVal = &((long long *) valArray)[i];
-                //pOldVal = &((long long *) oldValArray)[i]; 
-                break;
-            case WriteEngine::WR_TOKEN:   
-                if (!bDelete) pVal = &((Token *) valArray)[i];
-                //pOldVal = &((Token *) oldValArray)[i];
-                break;
+            case WriteEngine::WR_SHORT :  if (!bDelete) pVal = &((short *) valArray)[i]; 
+                                          pOldVal = &((short *) oldValArray)[i]; 
+                                          break;
+            case WriteEngine::WR_BYTE :   if (!bDelete) pVal = &((char *) valArray)[i]; 
+                                          pOldVal = &((char *) oldValArray)[i]; 
+                                          break;
+            case WriteEngine::WR_LONGLONG:if (!bDelete) pVal = &((long long *) valArray)[i]; 
+                                          pOldVal = &((long long *) oldValArray)[i]; 
+                                          break;
+            case WriteEngine::WR_TOKEN:   if (!bDelete) pVal = &((Token *) valArray)[i];
+                                          pOldVal = &((Token *) oldValArray)[i];
+                                          break;
             case WriteEngine::WR_INT :
-                if (!bDelete) pVal = &((int *) valArray)[i];
-                //pOldVal = &((int *) oldValArray)[i];
-                break;
-            case WriteEngine::WR_USHORT:  
-                if (!bDelete) pVal = &((uint16_t *) valArray)[i];
-                //pOldVal = &((uint16_t *) oldValArray)[i]; 
-                break;
-            case WriteEngine::WR_UBYTE :  
-                if (!bDelete) pVal = &((uint8_t *) valArray)[i];
-                //pOldVal = &((uint8_t *) oldValArray)[i]; 
-                break;
-            case WriteEngine::WR_UINT :  
-                if (!bDelete) pVal = &((uint32_t *) valArray)[i];
-                //pOldVal = &((uint8_t *) oldValArray)[i]; 
-                break;
-            case WriteEngine::WR_ULONGLONG:
-                if (!bDelete) pVal = &((uint64_t *) valArray)[i];
-                //pOldVal = &((uint64_t *) oldValArray)[i]; 
-                break;
-            default  :
-                if (!bDelete) pVal = &((int *) valArray)[i];
-                //pOldVal = &((int *) oldValArray)[i];
-                break;
-        }
+            default  :                    if (!bDelete) pVal = &((int *) valArray)[i]; 
+                                          pOldVal = &((int *) oldValArray)[i];
+                                          break;
+         }
          
          // This is the stuff to retrieve old value
-         //memcpy(pOldVal, dataBuf + dataBio, curCol.colWidth);
+         memcpy(pOldVal, dataBuf + dataBio, curCol.colWidth);
 
          if (bDelete) {
             emptyVal = getEmptyRowValue(curCol.colDataType, curCol.colWidth);
@@ -1549,7 +1425,7 @@ int ColumnOp::addExtent(
       void*    pVal = 0;
       //void*    pOldVal;
       char     charTmpBuf[8];
-      uint64_t  emptyVal;
+      i64      emptyVal;
 	  int rc = NO_ERROR;
 	 
       while(!bExit) {
@@ -1562,7 +1438,7 @@ int ColumnOp::addExtent(
                rc = saveBlock(curCol.dataFile.pFile, dataBuf, curDataFbo);
 			   if ( rc != NO_ERROR)
 					return rc;
-               curCol.dataFile.pFile->flush();
+               fflush(curCol.dataFile.pFile);
                bDataDirty = false;
             }
 
@@ -1575,68 +1451,41 @@ int ColumnOp::addExtent(
          }
 
          // This is a awkward way to convert void* and get ith element, I just don't have a good solution for that
-         // How about pVal = valArray? You're always getting the 0'th element here anyways.
-        switch (curCol.colType)
-        {
+         switch(curCol.colType)
+         {
 //               case WriteEngine::WR_LONG :   pVal = &((long *) valArray)[i]; break;
-            case WriteEngine::WR_FLOAT :  
-                if (!bDelete) pVal = &((float *) valArray)[0];
-                //pOldVal = &((float *) oldValArray)[i];
-                break;
-            case WriteEngine::WR_DOUBLE : 
-                if (!bDelete) pVal = &((double *) valArray)[0];
-                //pOldVal = &((double *) oldValArray)[i]; 
-                break;
+            case WriteEngine::WR_FLOAT :  if (!bDelete) pVal = &((float *) valArray)[0]; 
+                                          //pOldVal = &((float *) oldValArray)[i];
+                                          break;
+            case WriteEngine::WR_DOUBLE : if (!bDelete) pVal = &((double *) valArray)[0]; 
+                                          //pOldVal = &((double *) oldValArray)[i]; 
+                                          break;
             case WriteEngine::WR_VARBINARY :   // treat same as char for now
-            case WriteEngine::WR_CHAR :   
-                if (!bDelete)
-                {
-                    memcpy(charTmpBuf, (char*)valArray, 8);
-                    pVal = charTmpBuf;
-                }
-                //pOldVal = (char*)oldValArray + i*8;
-                break;
-//          case WriteEngine::WR_BIT :    pVal = &((bool *) valArray)[i]; break;
-            case WriteEngine::WR_SHORT :  
-                if (!bDelete) pVal = &((short *) valArray)[0];
-                //pOldVal = &((short *) oldValArray)[i]; 
-                break;
-            case WriteEngine::WR_BYTE :   
-                if (!bDelete) pVal = &((char *) valArray)[0];
-                //pOldVal = &((char *) oldValArray)[i]; 
-                break;
-            case WriteEngine::WR_LONGLONG:
-                if (!bDelete) pVal = &((long long *) valArray)[0];
-                //pOldVal = &((long long *) oldValArray)[i]; 
-                break;
-            case WriteEngine::WR_TOKEN:    if (!bDelete) pVal = &((Token *) valArray)[0];
-                //pOldVal = &((Token *) oldValArray)[i];
-                break;
+            case WriteEngine::WR_CHAR :   if (!bDelete) 
+										  {
+												memcpy(charTmpBuf, (char*)valArray, 8);
+                                          		pVal = charTmpBuf;
+										  }
+                                          //pOldVal = (char*)oldValArray + i*8;
+                                          break;
+//            case WriteEngine::WR_BIT :    pVal = &((bool *) valArray)[i]; break;
+            case WriteEngine::WR_SHORT :  if (!bDelete) pVal = &((short *) valArray)[0]; 
+                                          //pOldVal = &((short *) oldValArray)[i]; 
+                                          break;
+            case WriteEngine::WR_BYTE :   if (!bDelete) pVal = &((char *) valArray)[0]; 
+                                          //pOldVal = &((char *) oldValArray)[i]; 
+                                          break;
+            case WriteEngine::WR_LONGLONG:if (!bDelete) pVal = &((long long *) valArray)[0]; 
+                                          //pOldVal = &((long long *) oldValArray)[i]; 
+                                          break;
+            case WriteEngine::WR_TOKEN:   if (!bDelete) pVal = &((Token *) valArray)[0];
+                                          //pOldVal = &((Token *) oldValArray)[i];
+                                          break;
             case WriteEngine::WR_INT :
-                if (!bDelete) pVal = &((int *) valArray)[0];
-                //pOldVal = &((int *) oldValArray)[i];
-                break;
-            case WriteEngine::WR_USHORT :  
-                if (!bDelete) pVal = &((uint16_t *) valArray)[0];
-                //pOldVal = &((uint16_t *) oldValArray)[i]; 
-                break;
-            case WriteEngine::WR_UBYTE :   
-                if (!bDelete) pVal = &((uint8_t *) valArray)[0];
-                //pOldVal = &((uint8_t *) oldValArray)[i]; 
-                break;
-            case WriteEngine::WR_ULONGLONG:
-                if (!bDelete) pVal = &((uint64_t *) valArray)[0];
-                //pOldVal = &((uint64_t *) oldValArray)[i]; 
-                break;
-            case WriteEngine::WR_UINT :
-                if (!bDelete) pVal = &((uint32_t *) valArray)[0];
-                //pOldVal = &((uint32_t *) oldValArray)[i];
-                break;
-            default  :                    
-                if (!bDelete) pVal = &((int *) valArray)[0];
-                //pOldVal = &((int *) oldValArray)[i];
-                break;
-        }
+            default  :                    if (!bDelete) pVal = &((int *) valArray)[0]; 
+                                          //pOldVal = &((int *) oldValArray)[i];
+                                          break;
+         }
          
          // This is the stuff to retrieve old value
          //memcpy(pOldVal, dataBuf + dataBio, curCol.colWidth);
@@ -1660,7 +1509,7 @@ int ColumnOp::addExtent(
 		//@Bug 4849. need to check error code to prevent disk error
         rc = saveBlock(curCol.dataFile.pFile, dataBuf, curDataFbo);	
 	  }
-      curCol.dataFile.pFile->flush();
+      fflush(curCol.dataFile.pFile);
 
       return rc;
    }
@@ -1708,52 +1557,31 @@ int ColumnOp::addExtent(
          }
 
          // This is a awkward way to convert void* and get ith element, I just don't have a good solution for that
-        switch (curCol.colType)
-        {
-            case WriteEngine::WR_FLOAT :  
-                pVal = &((float *) valArray)[i]; 
-                break;
-            case WriteEngine::WR_DOUBLE : 
-                pVal = &((double *) valArray)[i]; 
-                break;
+         switch(curCol.colType)
+         {
+//               case WriteEngine::WR_LONG :   pVal = &((long *) valArray)[i]; break;
+            case WriteEngine::WR_FLOAT :  pVal = &((float *) valArray)[i]; 
+                                          break;
+            case WriteEngine::WR_DOUBLE : pVal = &((double *) valArray)[i]; 
+                                          break;
             case WriteEngine::WR_VARBINARY :   // treat same as char for now
-            case WriteEngine::WR_CHAR :   
-                {
-                    memcpy(charTmpBuf, (char*)valArray+i*8, 8);
-                    pVal = charTmpBuf;
-                }
-                break;
-            case WriteEngine::WR_SHORT :  
-                pVal = &((short *) valArray)[i]; 
-                break;
-            case WriteEngine::WR_BYTE :   
-                pVal = &((char *) valArray)[i];  
-                break;
-            case WriteEngine::WR_LONGLONG:
-                pVal = &((long long *) valArray)[i]; 
-                break;
-            case WriteEngine::WR_TOKEN:   
-                pVal = &((Token *) valArray)[i];
-                break;
+            case WriteEngine::WR_CHAR :   {
+												memcpy(charTmpBuf, (char*)valArray+i*8, 8);
+                                          		pVal = charTmpBuf;
+										  }
+                                          break;
+            case WriteEngine::WR_SHORT :  pVal = &((short *) valArray)[i]; 
+                                          break;
+            case WriteEngine::WR_BYTE :   pVal = &((char *) valArray)[i];  
+                                          break;
+            case WriteEngine::WR_LONGLONG:pVal = &((long long *) valArray)[i]; 
+                                          break;
+            case WriteEngine::WR_TOKEN:   pVal = &((Token *) valArray)[i];
+                                          break;
             case WriteEngine::WR_INT :
-                pVal = &((int *) valArray)[i]; 
-                break;
-            case WriteEngine::WR_USHORT :  
-                pVal = &((uint16_t *) valArray)[i]; 
-                break;
-            case WriteEngine::WR_UBYTE :   
-                pVal = &((uint8_t *) valArray)[i];  
-                break;
-            case WriteEngine::WR_ULONGLONG:
-                pVal = &((uint64_t *) valArray)[i]; 
-                break;
-            case WriteEngine::WR_UINT :
-                pVal = &((uint32_t *) valArray)[i]; 
-                break;
-            default  :                    
-                pVal = &((int *) valArray)[i]; 
-                break;
-        }         
+            default  :                    pVal = &((int *) valArray)[i]; 
+                                          break;
+         }         
 
          // This is the write stuff
          writeBufValue(dataBuf + dataBio, pVal, curCol.colWidth);
@@ -1774,5 +1602,4 @@ int ColumnOp::addExtent(
 
 
 } //end of namespace
-// vim:ts=4 sw=4:
 

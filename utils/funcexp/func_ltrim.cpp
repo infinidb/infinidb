@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_ltrim.cpp 3923 2013-06-19 21:43:06Z bwilkinson $
+* $Id: func_ltrim.cpp 3741 2013-04-25 20:36:44Z bpaul $
 *
 *
 ****************************************************************************/
@@ -34,7 +34,6 @@ using namespace rowgroup;
 
 #include "joblisttypes.h"
 using namespace joblist;
-
 
 namespace funcexp
 {
@@ -59,10 +58,10 @@ std::string Func_ltrim::getStrVal(rowgroup::Row& row,
     size_t trimwclen;
 
     // The original string
-    const string& tstr = fp[0]->data()->getStrVal(row, isNull);
+    string tstr = fp[0]->data()->getStrVal(row, isNull);
 
     // The trim characters.
-    const string& trim = (fp.size() > 1 ? fp[1]->data()->getStrVal(row, isNull) : " ");
+    string trim = (fp.size() > 1 ? fp[1]->data()->getStrVal(row, isNull) : " ");
 
     if (isNull)
         return "";

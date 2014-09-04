@@ -66,7 +66,7 @@ template <typename R, typename T>
 
 template <bool>
 struct is_member_pointer_select
-    : public ::boost::type_traits::false_result
+    : ::boost::type_traits::false_result
 {
 };
 
@@ -87,7 +87,7 @@ struct is_member_pointer_select<false>
 
 template <typename T>
 struct is_member_pointer_impl
-    : public is_member_pointer_select<
+    : is_member_pointer_select<
           ::boost::type_traits::ice_or<
               ::boost::is_reference<T>::value
             , ::boost::is_array<T>::value

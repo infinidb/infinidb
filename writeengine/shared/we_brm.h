@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_brm.h 4726 2013-08-07 03:38:36Z bwilkinson $
+* $Id: we_brm.h 4496 2013-01-31 19:13:20Z pleblanc $
 *
 *******************************************************************************/
 /** @file */
@@ -26,17 +26,14 @@
 
 #include <iostream>
 #include <vector>
-#include <boost/thread.hpp>
 #include <boost/thread/tss.hpp>
 
 #include "brm.h"
 #include "we_obj.h"
 #include<sys/time.h>
 #include "brmtypes.h"
-#include "IDBDataFile.h"
-#include "IDBPolicy.h"
 
-#if defined(_MSC_VER) && defined(WRITEENGINE_DLLEXPORT)
+#if defined(_MSC_VER) && defined(WRITEENGINEBRM_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
@@ -53,6 +50,11 @@ class BRMWrapper : public WEObj
 {
 public:
     /**
+     * @brief Constructor
+     */
+    BRMWrapper();
+
+    /**
      * @brief Initialize an Auto Increment sequence for the specified OID
      * @param colOID   Column OID of interest
      * @param startNextValue Starting next value for the AI sequence
@@ -60,9 +62,8 @@ public:
      * @param errMsg   Applicable error message.
      */
     EXPORT int startAutoIncrementSequence( OID colOID,
-                     uint64_t    startNextValue, 
-                     uint32_t    colWidth,
-                     execplan::CalpontSystemCatalog::ColDataType colDataType,
+                     u_int64_t    startNextValue, 
+                     u_int32_t    colWidth,
                      std::string& errMsg);
 
     /**
@@ -73,8 +74,8 @@ public:
      * @param errMsg   Applicable error message.
      */
     EXPORT int getAutoIncrementRange( OID colOID,
-                     uint64_t    count,
-                     uint64_t&   firstNum,
+                     u_int64_t    count,
+                     u_int64_t&   firstNum,
                      std::string& errMsg);
 
     /**
@@ -90,32 +91,31 @@ public:
      */
     EXPORT int allocateStripeColExtents(
                  const std::vector<BRM::CreateStripeColumnExtentsArgIn>& cols,
-                     uint16_t    dbRoot,
-                     uint32_t&   partition,
-                     uint16_t&   segmentNum,
+                     u_int16_t    dbRoot,
+                     u_int32_t&   partition,
+                     u_int16_t&   segmentNum,
                  std::vector<BRM::CreateStripeColumnExtentsArgOut>& extents);
 
-    /**
+	/**
      * @brief Inform BRM to add extent to the exact segment file specified by
      * OID, DBRoot, partition, and segment.
      */
     EXPORT int allocateColExtentExactFile( const OID oid,
-                     const uint32_t colWidth,
-                     uint16_t   dbRoot,
-                     uint32_t   partition,
-                     uint16_t   segment,
-                     execplan::CalpontSystemCatalog::ColDataType colDataType,
+                     const u_int32_t colWidth,
+                     u_int16_t   dbRoot,
+                     u_int32_t   partition,
+                     u_int16_t   segment,
                      BRM::LBID_t& startLbid,
                      int&        allocSize,
-                     uint32_t&  startBlock);
-
+                     u_int32_t&  startBlock);
+					 
     /**
      * @brief Inform BRM to add a dictionary store extent to the specified OID
      */
     EXPORT int allocateDictStoreExtent( const OID oid,
-                     uint16_t   dbRoot,
-                     uint32_t   partition,
-                     uint16_t   segment,
+                     u_int16_t   dbRoot,
+                     u_int32_t   partition,
+                     u_int16_t   segment,
                      BRM::LBID_t& startLbid,
                      int&        allocSize );
 
@@ -134,8 +134,8 @@ public:
      * and segment
      */
     EXPORT int getBrmInfo( const OID oid,
-                      const uint32_t partition,
-                      const uint16_t segment,
+                      const u_int32_t partition,
+                      const u_int16_t segment,
                       const int       fbo,
                       BRM::LBID_t&    lbid );
 
@@ -144,44 +144,41 @@ public:
      * segment, and block offset.
      */
     EXPORT int getStartLbid( const OID oid,
-                      const uint32_t partition,
-                      const uint16_t segment,
+                      const u_int32_t partition,
+                      const u_int16_t segment,
                       const int       fbo,
                       BRM::LBID_t&    startLbid );
 
     /**
      * @brief Get the real physical offset based on the LBID
      */
-    EXPORT int getFboOffset( const uint64_t lbid, 
-                      uint16_t& dbRoot,
-                      uint32_t& partition,
-                      uint16_t& segment,
+    EXPORT int getFboOffset( const i64 lbid, 
+                      u_int16_t& dbRoot,
+                      u_int32_t& partition,
+                      u_int16_t& segment,
                       int&       fbo );
-    EXPORT int getFboOffset( const uint64_t lbid, int& oid,
-                      uint16_t& dbRoot,
-                      uint32_t& partition,
-                      uint16_t& segment,
+    EXPORT int getFboOffset( const i64 lbid, int& oid,
+                      u_int16_t& dbRoot,
+                      u_int32_t& partition,
+                      u_int16_t& segment,
                       int&       fbo );
 
     /**
      * @brief Get last "local" HWM, partition, and segment for an OID and DBRoot
      */
     EXPORT int getLastHWM_DBroot( OID oid,
-                      uint16_t   dbRoot,
-                      uint32_t&  partition,
-                      uint16_t&  segment,
-                      HWM&        hwm,
-                      int&        status,
-                      bool&       bFound);
+                      u_int16_t   dbRoot,
+                      u_int32_t&  partition,
+                      u_int16_t&  segment,
+                      HWM& hwm);
 
     /**
      * @brief Get HWM for a specific OID, partition, and segment
      */
     int getLocalHWM( OID       oid ,
-                     uint32_t partition,
-                     uint16_t segment,
-                     HWM&      hwm,
-                     int&      status);
+                     u_int32_t partition,
+                     u_int16_t segment,
+                     HWM&      hwm);
 
     /**
      * @brief Get HWM info for a specific OID and PM
@@ -190,19 +187,10 @@ public:
                      BRM::EmDbRootHWMInfo_v& emDbRootHwmInfos);
 
     /**
-     * @brief Get status or state of the extents in the specified segment file.
-     * bFound flag indicates whether an extent was found or not.
-     */
-    int getExtentState( OID       oid,
-                        uint32_t partition,
-                        uint16_t segment,
-                        bool&     bFound,
-                        int&      status);
-
-    /**
      * @brief Get extentRows
      */
     unsigned getExtentRows();
+
 
    /**
      * @brief Return the extents info for specified OID
@@ -244,20 +232,17 @@ public:
     /**
      * @brief Lookup LBID ranges for column specified OID
      */
-    int lookupLbidRanges(OID oid, BRM::LBIDRange_v& lbidRanges);
+    int lookupLbidRanges( OID oid, BRM::LBIDRange_v& lbidRanges);
 
     /**
      * @brief Mark extent invalid for causal partioning
      */
-    int markExtentInvalid(const uint64_t lbid,
-        const execplan::CalpontSystemCatalog::ColDataType colDataType);
+    int markExtentInvalid( const i64 lbid );
 
     /**
      * @brief Mark multiple extents invalid for causal partioning
      */
-    int markExtentsInvalid(std::vector<BRM::LBID_t>& lbids,
-        const std::vector<execplan::CalpontSystemCatalog::ColDataType>&
-            colDataTypes);
+    int markExtentsInvalid(const std::vector<BRM::LBID_t>& lbids);
 
     /**
      * @brief set extents CP min/max info into extent map
@@ -273,9 +258,9 @@ public:
      */
     int rollbackColumnExtents_DBroot( const OID oid,
                      bool        bDeleteAll,
-                     uint16_t   dbRoot,
-                     uint32_t   partition,
-                     uint16_t   segment,
+                     u_int16_t   dbRoot,
+                     u_int32_t   partition,
+                     u_int16_t   segment,
                      BRM::HWM_t  hwm );
 
     /**
@@ -288,9 +273,9 @@ public:
      * oid and dbroot are deleted.
      */
     int rollbackDictStoreExtents_DBroot( OID oid,
-                     uint16_t   dbRoot,
-                     uint32_t   partition,
-                     const std::vector<uint16_t>&  segNums,
+                     u_int16_t   dbRoot,
+                     u_int32_t   partition,
+                     const std::vector<u_int16_t>&  segNums,
                      const std::vector<BRM::HWM_t>& hwms );
 
     /**
@@ -308,8 +293,8 @@ public:
      * @brief Set HWM for a specific OID, partition, and segment
      */
     int setLocalHWM( OID       oid,
-                     uint32_t partition,
-                     uint16_t segment,
+                     u_int32_t partition,
+                     u_int16_t segment,
                      const HWM hwm );
 
     //Set hwm for all columns in a table
@@ -338,10 +323,10 @@ public:
      */
     EXPORT int getTableLock (    OID tableOid,
                                  std::string& ownerName,
-                                 uint32_t&   processID,
+                                 u_int32_t&   processID,
                                  int32_t&     sessionID,
                                  int32_t&     transID,
-                                 uint64_t&   lockID,
+                                 u_int64_t&   lockID,
                                  std::string& errMsg);
 
     /**
@@ -351,7 +336,7 @@ public:
      * @param bChanged  Indicates whether lock state was changed.
      * @param errMsg    Applicable error message.
      */
-    EXPORT int changeTableLockState ( uint64_t lockID,
+    EXPORT int changeTableLockState ( u_int64_t lockID,
                                  BRM::LockState lockState,
                                  bool&        bChanged,
                                  std::string& errMsg);
@@ -362,7 +347,7 @@ public:
      * @param bReleased Indicates whether lock was released.
      * @param errMsg    Applicable error message.
      */
-    EXPORT int releaseTableLock( uint64_t    lockID,
+    EXPORT int releaseTableLock( u_int64_t    lockID,
                                  bool&        bReleased,
                                  std::string& errMsg);
 
@@ -373,7 +358,7 @@ public:
      * @param blockExists Indicates whether lock was found.
      * @param errMsg      Applicable error message.
      */
-    EXPORT int getTableLockInfo( uint64_t    lockID,
+    EXPORT int getTableLockInfo( u_int64_t    lockID,
                                  BRM::TableLockInfo* lockInfo,
                                  bool&        bLockExists,
                                  std::string& errMsg);
@@ -399,17 +384,17 @@ public:
     /**
      * @brief Copy blocks between write engine and version buffer
      */
-    EXPORT int copyVBBlock( IDBDataFile* pSourceFile,
-                               IDBDataFile* pTargetFile,
-                               const uint64_t sourceFbo,
-                               const uint64_t targetFbo,
+    EXPORT int copyVBBlock( FILE* pSourceFile,
+                               FILE* pTargetFile,
+                               const i64 sourceFbo,
+                               const i64 targetFbo,
                                DbFileOp* fileOp,
                                const Column& column );
-    EXPORT int copyVBBlock( IDBDataFile* pSourceFile,
+    EXPORT int copyVBBlock( FILE* pSourceFile,
                                const OID sourceOid,
-                               IDBDataFile* pTargetFile,
+                               FILE* pTargetFile,
                                const OID targetOid,
-                               const std::vector<uint32_t>& fboList,
+                               const std::vector<i32>& fboList,
                                const BRM::VBRange& freeList,
                                size_t& nBlocksProcessed,
                                DbFileOp* pFileOp,
@@ -433,27 +418,25 @@ public:
     /**
      * @brief Write specified LBID to version buffer
      */
-    EXPORT int writeVB( IDBDataFile* pFile,
+    EXPORT int writeVB( FILE* pFile,
                               const BRM::VER_t transID,
                               const OID oid,
-                              const uint64_t lbid,
+                              const i64 lbid,
                               DbFileOp* pFileOp );
-    int        writeVB( IDBDataFile* pFile,
+    int        writeVB( FILE* pFile,
                               const BRM::VER_t transID,
                               const OID weOid,
-                              std::vector<uint32_t>& fboList,
+                              std::vector<i32>& fboList,
                               std::vector<BRM::LBIDRange>& rangeList,
-                              DbFileOp* pFileOp,
-							  std::vector<BRM::VBRange>& freeList,
-							  uint16_t dbRoot,
-							  bool skipBeginVBCopy = false);
-    void       writeVBEnd(const BRM::VER_t transID,
+                              DbFileOp* pFileOp );
+ 
+    int        writeBatchVBs( const BRM::VER_t transID,
+                              const std::vector<Column> columns,
+                              std::vector<BRM::LBIDRange>& rangeList,
+                              std::vector<DbFileOp*>& fileOps);
+
+    void        writeVBEnd(const BRM::VER_t transID,
                               std::vector<BRM::LBIDRange>& rangeList);
-							  
-	BRM::DBRM*   getDbrmObject();
-	void pruneLBIDList(BRM::VER_t transID,
-            std::vector<BRM::LBIDRange> *rangeList,
-            std::vector<uint32_t> *fboList) const;
 
     //--------------------------------------------------------------------------
     // Non-inline Versioning Functions End Here
@@ -463,6 +446,7 @@ public:
      * @brief static functions
      */
     EXPORT static BRMWrapper* getInstance();
+    EXPORT static void        deleteInstance();
     EXPORT static int         getBrmRc(bool reset=true);
     static bool   getUseVb()                 { return m_useVb; }
     static void   setUseVb( const bool val ) { m_useVb = val;  }
@@ -471,22 +455,25 @@ private:
     //--------------------------------------------------------------------------
     // Private methods
     //--------------------------------------------------------------------------
-    BRMWrapper();
-    ~BRMWrapper();
 
     // disable copy constructor and assignment operator
     BRMWrapper(const BRMWrapper&);
     BRMWrapper& operator= ( const BRMWrapper& wrapper );
+
+    ~BRMWrapper();
 
     // Convert BRM return code to WE return code
     int getRC( int brmRc, int errRc );
 
     EXPORT void saveBrmRc( int brmRc );
 
-    IDBDataFile* openFile( const File& fileInfo,
+    FILE* openFile( const File& fileInfo,
                      const char* mode,
                      const bool bCache = false );
 
+    void pruneLBIDList(BRM::VER_t transID,
+            std::vector<BRM::LBIDRange> *rangeList,
+            std::vector<uint32_t> *fboList) const;
 
 
 
@@ -494,17 +481,16 @@ private:
     // Private data members
     //--------------------------------------------------------------------------
 
-    static BRMWrapper* volatile m_instance;
+    static BRMWrapper*  m_instance;
     static boost::thread_specific_ptr<int> m_ThreadDataPtr;
-    static boost::mutex m_instanceCreateMutex;
 
-#if defined(_MSC_VER) && !defined(WRITEENGINE_DLLEXPORT)
+#if defined(_MSC_VER) && !defined(WRITEENGINEBRM_DLLEXPORT)
     __declspec(dllimport)
 #endif
     EXPORT static bool  m_useVb;
 
     static OID          m_curVBOid;
-    static IDBDataFile* m_curVBFile;
+    static FILE*        m_curVBFile;
 
     BRM::DBRM*          blockRsltnMgrPtr;
 };
@@ -524,10 +510,6 @@ inline BRMWrapper::~BRMWrapper()
     blockRsltnMgrPtr = 0;
 }
 
-inline BRM::DBRM*   BRMWrapper::getDbrmObject()
-{
-	return blockRsltnMgrPtr;
-}
 inline int BRMWrapper::getRC( int brmRc, int errRc )
 {
     if (brmRc == BRM::ERR_OK)
@@ -537,39 +519,24 @@ inline int BRMWrapper::getRC( int brmRc, int errRc )
 }
 
 inline int BRMWrapper::getLastHWM_DBroot( OID oid,
-    uint16_t   dbRoot,
-    uint32_t&  partition,
-    uint16_t&  segment,
-    HWM&        hwm,
-    int&        status,
-    bool&       bFound)
+    u_int16_t   dbRoot,
+    u_int32_t&  partition,
+    u_int16_t&  segment,
+    HWM& hwm)
 {
     int rc = blockRsltnMgrPtr->getLastHWM_DBroot(
-        (BRM::OID_t)oid, dbRoot, partition, segment, hwm,
-        status, bFound);
+        (BRM::OID_t)oid, dbRoot, partition, segment, hwm);
     return getRC( rc, ERR_BRM_GET_HWM );
 }
 
 inline int BRMWrapper::getLocalHWM( OID oid ,
-    uint32_t   partition,
-    uint16_t   segment,
-    HWM&        hwm,
-    int&        status)
+    u_int32_t   partition,
+    u_int16_t   segment,
+    HWM&        hwm)
 {
     int rc = blockRsltnMgrPtr->getLocalHWM(
-        (BRM::OID_t)oid, partition, segment, hwm, status);
+        (BRM::OID_t)oid, partition, segment, hwm);
     return getRC( rc, ERR_BRM_GET_HWM );
-}
-
-inline int BRMWrapper::getExtentState( OID oid,
-    uint32_t partition,
-    uint16_t segment,
-    bool&     bFound,
-    int&      status)
-{
-    int rc = blockRsltnMgrPtr->getExtentState(
-        (BRM::OID_t)oid, partition, segment, bFound, status);
-    return getRC( rc, ERR_BRM_GET_EXT_STATE );
 }
 
 inline unsigned BRMWrapper::getExtentRows()
@@ -607,21 +574,15 @@ inline int BRMWrapper::lookupLbidRanges( OID oid, BRM::LBIDRange_v& lbidRanges)
     return getRC( rc, ERR_BRM_LOOKUP_LBID_RANGES );
 }
 
-inline int BRMWrapper::markExtentInvalid( const uint64_t lbid,
-    const execplan::CalpontSystemCatalog::ColDataType colDataType )
+inline int BRMWrapper::markExtentInvalid( const i64 lbid )
 {
-    int rc = blockRsltnMgrPtr->markExtentInvalid( lbid, colDataType );
+    int rc = blockRsltnMgrPtr->markExtentInvalid( lbid );
     return getRC( rc, ERR_BRM_MARK_INVALID );
 }
 
-inline int BRMWrapper::markExtentsInvalid(std::vector<BRM::LBID_t>& lbids,
-    const std::vector<execplan::CalpontSystemCatalog::ColDataType>&
-        colDataTypes)
+inline int BRMWrapper::markExtentsInvalid(const std::vector<BRM::LBID_t>& lbids)
 {
-	int rc = 0;
-	if (idbdatafile::IDBPolicy::useHdfs())
-		return rc;
-	rc = blockRsltnMgrPtr->markExtentsInvalid(lbids, colDataTypes); 
+    int rc = blockRsltnMgrPtr->markExtentsInvalid( lbids ); 
     return getRC( rc, ERR_BRM_MARK_INVALID );
 }
 
@@ -645,9 +606,9 @@ inline int BRMWrapper::setExtentsMaxMin(const BRM::CPInfoList_t& cpinfoList)
 
 inline int BRMWrapper::rollbackColumnExtents_DBroot( const OID oid,
     bool        bDeleteAll,
-    uint16_t   dbRoot,
-    uint32_t   partition,
-    uint16_t   segment,
+    u_int16_t   dbRoot,
+    u_int32_t   partition,
+    u_int16_t   segment,
     BRM::HWM_t  hwm )
 {
     int rc = blockRsltnMgrPtr->rollbackColumnExtents_DBroot (
@@ -656,9 +617,9 @@ inline int BRMWrapper::rollbackColumnExtents_DBroot( const OID oid,
 }
 
 inline int BRMWrapper::rollbackDictStoreExtents_DBroot( OID oid,
-    uint16_t   dbRoot,
-    uint32_t   partition,
-    const std::vector<uint16_t>&  segNums,
+    u_int16_t   dbRoot,
+    u_int32_t   partition,
+    const std::vector<u_int16_t>&  segNums,
     const std::vector<BRM::HWM_t>& hwms )
 {
     int rc = blockRsltnMgrPtr->rollbackDictStoreExtents_DBroot (
@@ -681,8 +642,8 @@ inline int BRMWrapper::deleteEmptyDictStoreExtents(
 }
 
 inline int BRMWrapper::setLocalHWM( OID oid,
-    uint32_t   partition,
-    uint16_t   segment,
+    u_int32_t   partition,
+    u_int16_t   segment,
     const HWM   hwm )
 {
     int rc = blockRsltnMgrPtr->setLocalHWM(
@@ -690,8 +651,7 @@ inline int BRMWrapper::setLocalHWM( OID oid,
     return getRC( rc, ERR_BRM_SET_HWM );
 }
 
-inline int BRMWrapper::bulkSetHWM( const std::vector<BRM::BulkSetHWMArg> & vec,
-    BRM::VER_t transID = 0)
+inline int BRMWrapper::bulkSetHWM( const std::vector<BRM::BulkSetHWMArg> & vec, BRM::VER_t transID = 0)
 {
     int rc = blockRsltnMgrPtr->bulkSetHWM( vec, transID);
     return getRC( rc, ERR_BRM_SET_HWM );

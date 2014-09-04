@@ -14,6 +14,25 @@
 
 @SET_MAKE@
 
+#  Copyright (C) 2014 InfiniDB, Inc.
+#
+#  This program is free software; you can redistribute it and/or
+#  modify it under the terms of the GNU General Public License
+#  as published by the Free Software Foundation; version 2 of
+#  the License.
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#
+#  You should have received a copy of the GNU General Public License
+#  along with this program; if not, write to the Free Software
+#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+#  MA 02110-1301, USA.
+
+# $Id: Makefile.am 864 2009-04-02 19:22:49Z rdempsey $
+
 
 
 
@@ -43,9 +62,8 @@ subdir = dbcon/mysql
 DIST_COMMON = $(dist_mysql_DATA) $(dist_mysql_SCRIPTS) \
 	$(include_HEADERS) $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
-am__aclocal_m4_deps = $(top_srcdir)/m4/compilerflags.m4 \
-	$(top_srcdir)/m4/functions.m4 $(top_srcdir)/m4/install.m4 \
-	$(top_srcdir)/configure.ac
+am__aclocal_m4_deps = $(top_srcdir)/m4/functions.m4 \
+	$(top_srcdir)/m4/install.m4 $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 mkinstalldirs = $(install_sh) -d
@@ -66,13 +84,11 @@ am_libcalmysql_la_OBJECTS = libcalmysql_la-ha_calpont.lo \
 	libcalmysql_la-ha_calpont_impl.lo \
 	libcalmysql_la-ha_calpont_dml.lo \
 	libcalmysql_la-ha_calpont_ddl.lo \
+	libcalmysql_la-ha_calpont_udf.lo \
 	libcalmysql_la-ha_calpont_execplan.lo \
 	libcalmysql_la-ha_scalar_sub.lo libcalmysql_la-ha_in_sub.lo \
 	libcalmysql_la-ha_exists_sub.lo libcalmysql_la-ha_from_sub.lo \
-	libcalmysql_la-ha_select_sub.lo libcalmysql_la-ha_view.lo \
-	libcalmysql_la-sm.lo libcalmysql_la-ha_window_function.lo \
-	libcalmysql_la-ha_calpont_partition.lo \
-	libcalmysql_la-ha_pseudocolumn.lo
+	libcalmysql_la-ha_select_sub.lo
 libcalmysql_la_OBJECTS = $(am_libcalmysql_la_OBJECTS)
 dist_mysqlSCRIPT_INSTALL = $(INSTALL_SCRIPT)
 SCRIPTS = $(dist_mysql_SCRIPTS)
@@ -155,9 +171,6 @@ SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
 STRIP = @STRIP@
 VERSION = @VERSION@
-XML2_CONFIG = @XML2_CONFIG@
-XML_CPPFLAGS = @XML_CPPFLAGS@
-XML_LIBS = @XML_LIBS@
 YACC = @YACC@
 ac_ct_AR = @ac_ct_AR@
 ac_ct_CC = @ac_ct_CC@
@@ -199,7 +212,6 @@ idb_exec_libs = @idb_exec_libs@
 idb_ldflags = @idb_ldflags@
 idb_oam_libs = @idb_oam_libs@
 idb_write_libs = @idb_write_libs@
-idbinstall = @idbinstall@
 includedir = @includedir@
 infodir = @infodir@
 install_sh = @install_sh@
@@ -213,11 +225,6 @@ mibdir = @mibdir@
 mkdir_p = @mkdir_p@
 mysqldir = @mysqldir@
 netsnmp_libs = @netsnmp_libs@
-netsnmpagntdir = @netsnmpagntdir@
-netsnmpdir = @netsnmpdir@
-netsnmplibrdir = @netsnmplibrdir@
-netsnmpmachdir = @netsnmpmachdir@
-netsnmpsysdir = @netsnmpsysdir@
 oldincludedir = @oldincludedir@
 postdir = @postdir@
 prefix = @prefix@
@@ -228,33 +235,16 @@ sharedstatedir = @sharedstatedir@
 sysconfdir = @sysconfdir@
 target_alias = @target_alias@
 toolsdir = @toolsdir@
-
-#  Copyright (C) 2014 InfiniDB, Inc.
-#
-#  This program is free software; you can redistribute it and/or
-#  modify it under the terms of the GNU General Public License
-#  as published by the Free Software Foundation; version 2 of
-#  the License.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software
-#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-#  MA 02110-1301, USA.
 AM_CPPFLAGS = $(idb_common_includes) $(idb_cppflags)
 AM_CFLAGS = $(idb_cflags)
 AM_CXXFLAGS = $(idb_cxxflags)
 AM_LDFLAGS = $(idb_ldflags)
 lib_LTLIBRARIES = libcalmysql.la
-libcalmysql_la_SOURCES = ha_calpont.cpp ha_calpont_impl.cpp ha_calpont_dml.cpp ha_calpont_ddl.cpp ha_calpont_execplan.cpp ha_scalar_sub.cpp ha_in_sub.cpp ha_exists_sub.cpp ha_from_sub.cpp ha_select_sub.cpp ha_view.cpp sm.cpp ha_window_function.cpp ha_calpont_partition.cpp ha_pseudocolumn.cpp
-libcalmysql_la_LDFLAGS = -version-info 1:0:0 $(idb_common_ldflags) $(idb_common_libs) $(idb_write_libs) $(AM_LDFLAGS)
-libcalmysql_la_CPPFLAGS = -I/usr/include/libxml2 -I../../../mysql/include -I../../../mysql/sql -I../../../mysql/regex -DMYSQL_DYNAMIC_PLUGIN $(AM_CPPFLAGS)
-include_HEADERS = idb_mysql.h
-dist_mysql_DATA = syscatalog_mysql.sql dumpcat_mysql.sql calsetuserpriority.sql calremoveuserpriority.sql calshowprocesslist.sql my.cnf
+libcalmysql_la_SOURCES = ha_calpont.cpp ha_calpont_impl.cpp ha_calpont_dml.cpp ha_calpont_ddl.cpp ha_calpont_udf.cpp ha_calpont_execplan.cpp ha_scalar_sub.cpp ha_in_sub.cpp ha_exists_sub.cpp ha_from_sub.cpp ha_select_sub.cpp
+libcalmysql_la_LDFLAGS = -version-info 1:0:0 $(idb_common_ldflags) $(idb_common_libs) $(idb_write_libs) -lsm $(AM_LDFLAGS)
+libcalmysql_la_CPPFLAGS = -I/usr/include/libxml2 -I../../mysql/include -I../../mysql/sql -I../../mysql/regex -DMYSQL_DYNAMIC_PLUGIN $(AM_CPPFLAGS)
+include_HEADERS = 
+dist_mysql_DATA = syscatalog_mysql.sql dumpcat_mysql.sql calsetuserpriority.sql calremoveuserpriority.sql calshowprocesslist.sql
 dist_mysql_SCRIPTS = install_calpont_mysql.sh mysql-Calpont dumpcat.pl
 all: all-am
 
@@ -349,16 +339,12 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcalmysql_la-ha_calpont_dml.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcalmysql_la-ha_calpont_execplan.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcalmysql_la-ha_calpont_impl.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcalmysql_la-ha_calpont_partition.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcalmysql_la-ha_calpont_udf.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcalmysql_la-ha_exists_sub.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcalmysql_la-ha_from_sub.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcalmysql_la-ha_in_sub.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcalmysql_la-ha_pseudocolumn.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcalmysql_la-ha_scalar_sub.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcalmysql_la-ha_select_sub.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcalmysql_la-ha_view.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcalmysql_la-ha_window_function.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcalmysql_la-sm.Plo@am__quote@
 
 .cpp.o:
 @am__fastdepCXX_TRUE@	if $(CXXCOMPILE) -MT $@ -MD -MP -MF "$(DEPDIR)/$*.Tpo" -c -o $@ $<; \
@@ -402,6 +388,13 @@ libcalmysql_la-ha_calpont_ddl.lo: ha_calpont_ddl.cpp
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcalmysql_la_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o libcalmysql_la-ha_calpont_ddl.lo `test -f 'ha_calpont_ddl.cpp' || echo '$(srcdir)/'`ha_calpont_ddl.cpp
 
+libcalmysql_la-ha_calpont_udf.lo: ha_calpont_udf.cpp
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcalmysql_la_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT libcalmysql_la-ha_calpont_udf.lo -MD -MP -MF "$(DEPDIR)/libcalmysql_la-ha_calpont_udf.Tpo" -c -o libcalmysql_la-ha_calpont_udf.lo `test -f 'ha_calpont_udf.cpp' || echo '$(srcdir)/'`ha_calpont_udf.cpp; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libcalmysql_la-ha_calpont_udf.Tpo" "$(DEPDIR)/libcalmysql_la-ha_calpont_udf.Plo"; else rm -f "$(DEPDIR)/libcalmysql_la-ha_calpont_udf.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='ha_calpont_udf.cpp' object='libcalmysql_la-ha_calpont_udf.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcalmysql_la_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o libcalmysql_la-ha_calpont_udf.lo `test -f 'ha_calpont_udf.cpp' || echo '$(srcdir)/'`ha_calpont_udf.cpp
+
 libcalmysql_la-ha_calpont_execplan.lo: ha_calpont_execplan.cpp
 @am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcalmysql_la_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT libcalmysql_la-ha_calpont_execplan.lo -MD -MP -MF "$(DEPDIR)/libcalmysql_la-ha_calpont_execplan.Tpo" -c -o libcalmysql_la-ha_calpont_execplan.lo `test -f 'ha_calpont_execplan.cpp' || echo '$(srcdir)/'`ha_calpont_execplan.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libcalmysql_la-ha_calpont_execplan.Tpo" "$(DEPDIR)/libcalmysql_la-ha_calpont_execplan.Plo"; else rm -f "$(DEPDIR)/libcalmysql_la-ha_calpont_execplan.Tpo"; exit 1; fi
@@ -443,41 +436,6 @@ libcalmysql_la-ha_select_sub.lo: ha_select_sub.cpp
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='ha_select_sub.cpp' object='libcalmysql_la-ha_select_sub.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcalmysql_la_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o libcalmysql_la-ha_select_sub.lo `test -f 'ha_select_sub.cpp' || echo '$(srcdir)/'`ha_select_sub.cpp
-
-libcalmysql_la-ha_view.lo: ha_view.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcalmysql_la_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT libcalmysql_la-ha_view.lo -MD -MP -MF "$(DEPDIR)/libcalmysql_la-ha_view.Tpo" -c -o libcalmysql_la-ha_view.lo `test -f 'ha_view.cpp' || echo '$(srcdir)/'`ha_view.cpp; \
-@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libcalmysql_la-ha_view.Tpo" "$(DEPDIR)/libcalmysql_la-ha_view.Plo"; else rm -f "$(DEPDIR)/libcalmysql_la-ha_view.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='ha_view.cpp' object='libcalmysql_la-ha_view.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcalmysql_la_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o libcalmysql_la-ha_view.lo `test -f 'ha_view.cpp' || echo '$(srcdir)/'`ha_view.cpp
-
-libcalmysql_la-sm.lo: sm.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcalmysql_la_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT libcalmysql_la-sm.lo -MD -MP -MF "$(DEPDIR)/libcalmysql_la-sm.Tpo" -c -o libcalmysql_la-sm.lo `test -f 'sm.cpp' || echo '$(srcdir)/'`sm.cpp; \
-@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libcalmysql_la-sm.Tpo" "$(DEPDIR)/libcalmysql_la-sm.Plo"; else rm -f "$(DEPDIR)/libcalmysql_la-sm.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='sm.cpp' object='libcalmysql_la-sm.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcalmysql_la_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o libcalmysql_la-sm.lo `test -f 'sm.cpp' || echo '$(srcdir)/'`sm.cpp
-
-libcalmysql_la-ha_window_function.lo: ha_window_function.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcalmysql_la_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT libcalmysql_la-ha_window_function.lo -MD -MP -MF "$(DEPDIR)/libcalmysql_la-ha_window_function.Tpo" -c -o libcalmysql_la-ha_window_function.lo `test -f 'ha_window_function.cpp' || echo '$(srcdir)/'`ha_window_function.cpp; \
-@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libcalmysql_la-ha_window_function.Tpo" "$(DEPDIR)/libcalmysql_la-ha_window_function.Plo"; else rm -f "$(DEPDIR)/libcalmysql_la-ha_window_function.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='ha_window_function.cpp' object='libcalmysql_la-ha_window_function.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcalmysql_la_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o libcalmysql_la-ha_window_function.lo `test -f 'ha_window_function.cpp' || echo '$(srcdir)/'`ha_window_function.cpp
-
-libcalmysql_la-ha_calpont_partition.lo: ha_calpont_partition.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcalmysql_la_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT libcalmysql_la-ha_calpont_partition.lo -MD -MP -MF "$(DEPDIR)/libcalmysql_la-ha_calpont_partition.Tpo" -c -o libcalmysql_la-ha_calpont_partition.lo `test -f 'ha_calpont_partition.cpp' || echo '$(srcdir)/'`ha_calpont_partition.cpp; \
-@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libcalmysql_la-ha_calpont_partition.Tpo" "$(DEPDIR)/libcalmysql_la-ha_calpont_partition.Plo"; else rm -f "$(DEPDIR)/libcalmysql_la-ha_calpont_partition.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='ha_calpont_partition.cpp' object='libcalmysql_la-ha_calpont_partition.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcalmysql_la_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o libcalmysql_la-ha_calpont_partition.lo `test -f 'ha_calpont_partition.cpp' || echo '$(srcdir)/'`ha_calpont_partition.cpp
-
-libcalmysql_la-ha_pseudocolumn.lo: ha_pseudocolumn.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcalmysql_la_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT libcalmysql_la-ha_pseudocolumn.lo -MD -MP -MF "$(DEPDIR)/libcalmysql_la-ha_pseudocolumn.Tpo" -c -o libcalmysql_la-ha_pseudocolumn.lo `test -f 'ha_pseudocolumn.cpp' || echo '$(srcdir)/'`ha_pseudocolumn.cpp; \
-@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libcalmysql_la-ha_pseudocolumn.Tpo" "$(DEPDIR)/libcalmysql_la-ha_pseudocolumn.Plo"; else rm -f "$(DEPDIR)/libcalmysql_la-ha_pseudocolumn.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='ha_pseudocolumn.cpp' object='libcalmysql_la-ha_pseudocolumn.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcalmysql_la_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o libcalmysql_la-ha_pseudocolumn.lo `test -f 'ha_pseudocolumn.cpp' || echo '$(srcdir)/'`ha_pseudocolumn.cpp
 
 mostlyclean-libtool:
 	-rm -f *.lo

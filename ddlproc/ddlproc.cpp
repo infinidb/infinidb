@@ -57,7 +57,7 @@ using namespace execplan;
 #include "cacheutils.h"
 #include "we_clients.h"
 #include "dbrm.h"
-#include "IDBPolicy.h"
+
 #include "utils_utf8.h"
 
 
@@ -87,6 +87,7 @@ namespace
         logging::Logger logger(logid.fSubsysID);
         logger.logMessage(LOG_TYPE_DEBUG, msg, logid);
 		Dec->Setup();
+        WriteEngine::WEClients::instance(WriteEngine::WEClients::DDLPROC)->Setup();
 	}
 }
 
@@ -99,11 +100,6 @@ int main(int argc, char* argv[])
     setupCwd();
 
     WriteEngine::WriteEngineWrapper::init( WriteEngine::SUBSYSTEM_ID_DDLPROC );
-#ifdef _MSC_VER
-    // In windows, initializing the wrapper (A dll) does not set the static variables
-    // in the main program
-    idbdatafile::IDBPolicy::configIDBPolicy();
-#endif
 
 	ResourceManager rm;
 	Dec = DistributedEngineComm::instance(rm);

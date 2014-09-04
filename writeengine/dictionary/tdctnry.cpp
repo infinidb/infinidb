@@ -73,10 +73,10 @@ void testDctnryInsertDelete() {
        int                     smallSize=1000;
 
        unsigned char dctnryHeader[DCTNRY_HEADER_SIZE];        
-       uint16_t freeSpace;
-       uint64_t nextPtr;
-       uint16_t offSet0;
-       uint16_t endHeader;
+       i16 freeSpace;
+       i64 nextPtr;
+       i16 offSet0;
+       i16 endHeader;
         
        m_Dctnry.setDebugLevel( DEBUG_3 );  
        m_Dctnry.setUseSmallSize(true);
@@ -95,7 +95,7 @@ void testDctnryInsertDelete() {
        dFile = m_Dctnry.getDctnryFile();
        CPPUNIT_ASSERT( dFile != NULL );     
        //12 for 6 bytes and 14 for 8 bytes  
-       uint64_t lbid =0; 
+       i64 lbid =0; 
        BRMWrapper::getInstance()->getBrmInfo( oId, 0, lbid ); 
        printf("passed brm above \n");
        rc =m_Dctnry.readSubBlockEntry( dFile, &curBlock, lbid, 0, 0, DCTNRY_HEADER_SIZE, &dctnryHeader); 

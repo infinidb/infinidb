@@ -16,11 +16,11 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: timeset.h 9655 2013-06-25 23:08:13Z xlou $
+ * $Id: timeset.h 8436 2012-04-04 18:18:21Z rdempsey $
  *
  *****************************************************************************/
 
-/** @file timeset.h
+/** @file timeset.h 
  * Used to maintain collection of timers tracking elapsed times for set of tasks
  */
 
@@ -80,7 +80,7 @@ class TimeSet
 inline
 void TimeSet::displayAll() const
 {
-	ElapsedMap::const_iterator itend = fElapsed.end();
+	ElapsedMap::const_iterator itend = fElapsed.end(); 
 	for (ElapsedMap::const_iterator it = fElapsed.begin(); it != itend; ++it)
 	{
 		double t;
@@ -106,7 +106,7 @@ void TimeSet::displayAll() const
 inline
 void TimeSet::display(const std::string& key) const
 {
-	ElapsedMap::const_iterator em = fElapsed.find(key);
+	ElapsedMap::const_iterator em = fElapsed.find(key); 
 	if (fElapsed.end() != em)
 	{
 		double t;
@@ -143,7 +143,7 @@ inline
 double TimeSet::totalTime() const
 {
 	struct timespec tSum               = {0,0};
-	ElapsedMap::const_iterator itend   = fElapsed.end();
+	ElapsedMap::const_iterator itend   = fElapsed.end(); 
 	for (ElapsedMap::const_iterator it = fElapsed.begin(); it != itend; ++it)
 	{
 #if defined(_MSC_VER) && !defined(_my_pthread_h)
@@ -169,7 +169,7 @@ inline
 double TimeSet::totalTime(const std::string& key) const
 {
 	ElapsedMap::const_iterator el = fElapsed.find(key);
-	if (fElapsed.end() != el)
+	if (fElapsed.end() != el) 
 	{
 		double totSeconds;
 #if defined(_MSC_VER) && defined(_my_pthread_h)
@@ -181,7 +181,7 @@ double TimeSet::totalTime(const std::string& key) const
 #endif
 		return totSeconds;
 	}
-	else
+	else 
 	{
 		return 0;
 	}
@@ -267,7 +267,7 @@ void TimeSet::stopTimer(const std::string& key)
 // start (in) - boolean indicating whether to start or stop the timer.
 //------------------------------------------------------------------------------
 inline
-void TimeSet::setTimer(const std::string& key, bool start /*= true*/)
+void TimeSet::setTimer(const std::string& key, bool start /*= true*/) 
 {
 	if (start)
 		startTimer(key);

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: dmlproc.cpp 1029 2013-07-31 19:17:42Z dhall $
+*   $Id: dmlproc.cpp 1009 2013-07-08 20:10:44Z bpaul $
 *
 *
 ***********************************************************************/
@@ -64,7 +64,6 @@ using namespace logging;
 using namespace oam;
 
 #include "writeengine.h"
-#include "IDBPolicy.h"
 
 #undef READ //someone has polluted the namespace!
 #include "vss.h"
@@ -101,7 +100,7 @@ void added_a_pm(int)
 	Dec->Setup();
 	logger.logMessage(LOG_TYPE_DEBUG, msg, logid);
 
-	//WriteEngine::WEClients::instance(WriteEngine::WEClients::DMLPROC)->Setup();
+	WriteEngine::WEClients::instance(WriteEngine::WEClients::DMLPROC)->Setup();
 	logger.logMessage(LOG_TYPE_DEBUG, msg, logid);
 }
 
@@ -125,7 +124,7 @@ class CleanUpThread
 };
 
 // This function rolls back any active transactions in case of an abnormal shutdown.
-void rollbackAll(DBRM* dbrm) 
+void rollbackAll() 
 {
     Oam oam;
 	try {
@@ -146,40 +145,39 @@ void rollbackAll(DBRM* dbrm)
 	boost::shared_array<BRM::SIDTIDEntry> activeTxns;
 	BRM::TxnID txnID;
 	SessionManager sessionManager;
+	DBRM dbrm;
 	int rc = 0;
-	rc = dbrm->isReadWrite();
+	rc = dbrm.isReadWrite();
 	if (rc != 0 )
 		throw std::runtime_error("Rollback will be deferred due to DBRM is in read only state.");
 	
-	dbrm->setSystemReady(false);
+	dbrm.setSystemReady(false);
 	//DDL clean up thread
 	thread_group tg; 
     tg.create_thread(CleanUpThread()); 
 	
 	std::vector<TableLockInfo> tableLocks;
-	try 
-	{
-		tableLocks = dbrm->getAllTableLocks();
+	try {
+		tableLocks = dbrm.getAllTableLocks();
 	}
 	catch (std::exception&)
 	{
 		throw std::runtime_error(IDBErrorInfo::instance()->errorMsg(ERR_HARD_FAILURE));
 	}
-	// If there are tables to rollback, set to ROLLBACK_INIT.
-	// This tells ProcMgr that we are rolling back and will be
-	// a while. A message to this effect should be printed.
-	if (tableLocks.size() > 0)
-	{
-		oam.processInitComplete("DMLProc", oam::ROLLBACK_INIT);
-	}
-
-	uint64_t uniqueId = dbrm->getUnique64();
-	RollbackTransactionProcessor rollbackProcessor(dbrm);
+	uint64_t uniqueId = dbrm.getUnique64();
+	RollbackTransactionProcessor rollbackProcessor;
 	std::string errorMsg;
 	unsigned int i = 0;
 	BRM::TxnID txnId;
 	ostringstream oss;
 	
+    // If there are tables to rollback, set to BUSY_INIT.
+    // This tells ProcMgr that we are rolling back and will be
+    // a while. A message to this effect should be printed.
+    if (tableLocks.size() > 0)
+    {
+        oam.processInitComplete("DMLProc", oam::BUSY_INIT);
+    }
     oss << "DMLProc will rollback " << tableLocks.size() << " tables.";
 	//cout << oss.str() << endl;
 	logging::Message::Args args5;
@@ -202,8 +200,16 @@ void rollbackAll(DBRM* dbrm)
 			args1.add(oss.str());
 			message2.format( args1 );
 			ml.logInfoMessage( message2 );
-			dbrm->invalidateUncommittedExtentLBIDs(tableLocks[i].ownerTxnID);
-			uint32_t sessionid = 0;
+			vector<LBID_t> lbidList;
+			dbrm.getUncommittedExtentLBIDs(static_cast<VER_t>(tableLocks[i].ownerTxnID), lbidList);
+			vector<LBID_t>::const_iterator iter = lbidList.begin();
+			vector<LBID_t>::const_iterator end = lbidList.end();
+			while (iter != end)
+			{
+				dbrm.setExtentMaxMin(*iter, numeric_limits<int64_t>::min(), numeric_limits<int64_t>::max(), -1);
+				++iter;
+			}
+			u_int32_t sessionid = 0;
 			txnId.id = tableLocks[i].ownerTxnID;
 			txnId.valid = true;
 			rc = rollbackProcessor.rollBackTransaction(uniqueId, txnId, sessionid, errorMsg);
@@ -216,12 +222,8 @@ void rollbackAll(DBRM* dbrm)
 				args3.add(oss.str());
 				message3.format( args3 );
 				ml.logInfoMessage( message3 );
-		
-				//@Bug 5285 get the process name to see whether calling bulkrollback is necessary.
-				string::size_type namelen = tableLocks[i].ownerName.find_first_of(" ");
-				if (namelen != string::npos) {
-					rollbackProcessor.rollBackBatchAutoOnTransaction(uniqueId, txnId, sessionid, tableLocks[i].tableOID, errorMsg);
-				}
+				//@Bug 4524. In case it is batchinsert, call bulkrollback.
+				rollbackProcessor.rollBackBatchAutoOnTransaction(uniqueId, txnId, sessionid, tableLocks[i].tableOID, errorMsg);
 				logging::logCommand(0, tableLocks[i].ownerTxnID, "ROLLBACK;");
 				//release table lock if not DDLProc
 				if (tableLocks[i].ownerName == "DDLProc")
@@ -229,7 +231,7 @@ void rollbackAll(DBRM* dbrm)
 					
 				bool lockReleased = true;
 				try {
-					lockReleased = dbrm->releaseTableLock(tableLocks[i].id);
+					lockReleased = dbrm.releaseTableLock(tableLocks[i].id);
 				}
 				catch (std::exception&)
 				{
@@ -250,7 +252,7 @@ void rollbackAll(DBRM* dbrm)
 				else
 				{
 					ostringstream oss;
-					oss << "DMLProc rolled back transaction " <<tableLocks[i].ownerTxnID << " and table lock id " << tableLocks[i].id << " is not released.";
+					oss << "DMLProc rolled back transaction " <<tableLocks[i].ownerTxnID << " and tble lock id " << tableLocks[i].id << " is not released.";
 					//cout << oss.str() << endl;
 					logging::Message::Args args2;
 					logging::Message message2(2);
@@ -264,7 +266,7 @@ void rollbackAll(DBRM* dbrm)
 				//@Bug 4524 still need to set readonly as transaction information is lost during system restart.
 				ostringstream oss;
 				oss << " problem with rollback transaction " << tableLocks[i].ownerTxnID << "and DBRM is setting to readonly and table lock is not released: " << errorMsg;
-				rc = dbrm->setReadOnly(true);
+				rc = dbrm.setReadOnly(true);
 				//Raise an alarm
 				try { 
                     snmpmanager::SNMPManager alarmMgr; 
@@ -286,7 +288,7 @@ void rollbackAll(DBRM* dbrm)
 			//Just release the table lock
 			bool lockReleased = true;
 			try {
-				lockReleased = dbrm->releaseTableLock(tableLocks[i].id);
+				lockReleased = dbrm.releaseTableLock(tableLocks[i].id);
 			}
 			catch (std::exception& ex)
 			{
@@ -347,9 +349,8 @@ void rollbackAll(DBRM* dbrm)
 	// Clear out the session manager session list of sessions / transactions.
 	//Take care of any transaction left from create table as there is no table lock information
 	set<VER_t> txnList;
-	rc = dbrm->getCurrentTxnIDs(txnList);
+	rc = dbrm.getCurrentTxnIDs(txnList);
 	if(txnList.size() > 0) {
-		oam.processInitComplete("DMLProc", oam::ROLLBACK_INIT);
 		ostringstream oss;
 		oss << "DMLProc will rollback " << txnList.size() << " transactions.";
 		logging::Message::Args args2;
@@ -359,10 +360,19 @@ void rollbackAll(DBRM* dbrm)
 		ml.logInfoMessage( message2 );
 		set<VER_t>::const_iterator curTxnID;
 		for(curTxnID = txnList.begin(); curTxnID != txnList.end(); ++curTxnID) {
-            dbrm->invalidateUncommittedExtentLBIDs(*curTxnID);
+			//@Bug 2299 check write engine error.
+			vector<LBID_t> lbidList;
+			dbrm.getUncommittedExtentLBIDs(static_cast<VER_t>(*curTxnID), lbidList);
+			vector<LBID_t>::const_iterator iter = lbidList.begin();
+			vector<LBID_t>::const_iterator end = lbidList.end();
+			while (iter != end)
+			{
+				dbrm.setExtentMaxMin(*iter, numeric_limits<int64_t>::min()+1, numeric_limits<int64_t>::max()-1, -1);
+				++iter;
+			}
 			txnId.id = *curTxnID;
 			txnId.valid = true;
-			uint32_t sessionid = 0;
+			u_int32_t sessionid = 0;
 			ostringstream oss;
 			oss << "DMLProc will roll back transaction " <<*curTxnID;
 			logging::Message::Args args2;
@@ -390,7 +400,7 @@ void rollbackAll(DBRM* dbrm)
 				//@Bug 4524 still need to set readonly as transaction information is lost during system restart.
 				ostringstream oss;
 				oss << " problem with rollback transaction " << txnId.id << "and DBRM is setting to readonly and table lock is not released: " << errorMsg;
-				rc = dbrm->setReadOnly(true);
+				rc = dbrm.setReadOnly(true);
 				//Raise an alarm
 				try { 
                     snmpmanager::SNMPManager alarmMgr; 
@@ -434,7 +444,7 @@ void rollbackAll(DBRM* dbrm)
 
 	// Clear out the DBRM.
 	
-	dbrm->clear();
+	dbrm.clear();
 
 	//Flush the cache
 	cacheutils::flushPrimProcCache();
@@ -446,7 +456,7 @@ void rollbackAll(DBRM* dbrm)
     message1.format( args1 );
     ml.logInfoMessage( message1 );
 	
-	dbrm->setSystemReady(true);
+	dbrm.setSystemReady(true);
 }
 	
 void setupCwd()
@@ -465,7 +475,7 @@ int main(int argc, char* argv[])
     // get and set locale language
 	string systemLang = "C";
 
-	BRM::DBRM dbrm;
+	BRM::DBRM dbrm(true);
     Oam oam;
 	//BUG 5362
 	systemLang = funcexp::utf8::idb_setlocale();
@@ -475,25 +485,20 @@ int main(int argc, char* argv[])
     setupCwd();
 
     WriteEngine::WriteEngineWrapper::init( WriteEngine::SUBSYSTEM_ID_DMLPROC );
-#ifdef _MSC_VER
-    // In windows, initializing the wrapper (A dll) does not set the static variables
-    // in the main program
-    idbdatafile::IDBPolicy::configIDBPolicy();
-#endif
-	
-    try
-    {
-		// At first we set to BUSY_INIT
-		oam.processInitComplete("DMLProc", oam::BUSY_INIT);
-    }
-    catch (...)
-    {
+        try
+        {
+        // At first we set to MAN_INIT, which tells ProcMgr that we
+        // are starting up. If rollbacks are needed, we'll the set to
+        // BUSY_INIT to indicate we are rolling back.
+        oam.processInitComplete("DMLProc", oam::MAN_INIT);
+        }
+        catch (...)
+        {
     }
 	
 	//@Bug 1627
-	try 
-	{
-    	rollbackAll(&dbrm); // Rollback any 
+	try {
+    	rollbackAll(); // Rollback any 
 	}
 	catch ( std::exception &e )
 	{
@@ -520,8 +525,8 @@ int main(int argc, char* argv[])
 	}
 
 	int temp;
-	int serverThreads = 10;
-	int serverQueueSize = 50;
+	int serverThreads = 100;
+	int serverQueueSize = 200;
 	const string DMLProc("DMLProc");
 	
 	temp = toInt(cf->getConfig(DMLProc, "ServerThreads"));
@@ -533,37 +538,16 @@ int main(int argc, char* argv[])
 			serverQueueSize = temp;
 
 
-    bool rootUser = true;
-#ifndef _MSC_VER
-    //check if root-user
-    int user;
-    user = getuid();
-    if (user != 0)
-        rootUser = false;
-#endif
-    //read and cleanup port before trying to use
-    try {
-        string port = cf->getConfig(DMLProc, "Port");
-        string cmd = "fuser -k " + port + "/tcp >/dev/null 2>&1";
-        if ( !rootUser)
-            cmd = "sudo fuser -k " + port + "/tcp >/dev/null 2>&1";
-
-        (void)::system(cmd.c_str());
-    }
-    catch(...)
-    {
-    }
-
-	DMLServer dmlserver(serverThreads, serverQueueSize,&dbrm);
+    DMLServer dmlserver(serverThreads, serverQueueSize);
 
 	//set ACTIVE state
     try
-    {
-        oam.processInitComplete("DMLProc", ACTIVE);
-    }
-    catch (...)
-    {
-    }
+        {
+			oam.processInitComplete("DMLProc", ACTIVE);
+        }
+        catch (...)
+        {
+    } 
 	ResourceManager rm;
 	Dec = DistributedEngineComm::instance(rm);
 

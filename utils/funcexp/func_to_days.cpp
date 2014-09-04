@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_to_days.cpp 3923 2013-06-19 21:43:06Z bwilkinson $
+* $Id: func_to_days.cpp 3048 2012-04-04 15:33:45Z rdempsey $
 *
 *
 ****************************************************************************/
@@ -67,7 +67,7 @@ int64_t Func_to_days::getIntVal(rowgroup::Row& row,
 			year = (uint32_t)((val >> 16) & 0xffff);
 			month = (uint32_t)((val >> 12) & 0xf);
 			day = (uint32_t)((val >> 6) & 0x3f);
-			return helpers::calc_mysql_daynr(year, month, day);
+			return calc_daynr(year, month, day);
 			break;
 		}
 
@@ -78,14 +78,14 @@ int64_t Func_to_days::getIntVal(rowgroup::Row& row,
 			month = (uint32_t)((val >> 44) & 0xf);
 			day = (uint32_t)((val >> 38) & 0x3f);
 
-			return helpers::calc_mysql_daynr(year, month, day);
+			return calc_daynr(year, month, day);
 			break;
 		}
 
 		case execplan::CalpontSystemCatalog::VARCHAR: // including CHAR'
 		case execplan::CalpontSystemCatalog::CHAR:
 		{
-			const string& value = parm[0]->data()->getStrVal(row, isNull);
+			string value = parm[0]->data()->getStrVal(row, isNull);
 			int64_t val = 0;
 			if ( value.size() == 10 ) {
 				// date type
@@ -102,7 +102,7 @@ int64_t Func_to_days::getIntVal(rowgroup::Row& row,
 				day = (uint32_t)((val >> 38) & 0x3f);
 			}
 
-			return helpers::calc_mysql_daynr(year, month, day);
+			return calc_daynr(year, month, day);
 			break;
 		}
 

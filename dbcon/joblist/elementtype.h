@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
- * $Id: elementtype.h 9655 2013-06-25 23:08:13Z xlou $
+ * $Id: elementtype.h 8476 2012-04-25 22:28:15Z xlou $
  */
 /** @file */
 
@@ -29,7 +29,6 @@
 #include <stdexcept>
 #include <boost/shared_array.hpp>
 #include <stdint.h>
-#include <rowgroup.h>
 
 #ifndef __GNUC__
 #  ifndef __attribute__
@@ -43,7 +42,7 @@ namespace joblist
 /** @brief struct ElementType
  *
  */
-
+ 
 struct ElementType
 {
 	typedef uint64_t first_type;
@@ -56,7 +55,7 @@ struct ElementType
 		{ };
 	ElementType(uint64_t f, uint64_t s) : first(f), second(s) { };
 
-	const char * getHashString(uint64_t mode, uint64_t *len) const {
+	const char * getHashString(uint64_t mode, uint64_t *len) const { 
 		switch (mode) {
 			case 0:
 				*len = 8;
@@ -86,12 +85,12 @@ struct StringElementType
 	StringElementType();
 	StringElementType(uint64_t f, const std::string &s);
 
-	const char * getHashString(uint64_t mode, uint64_t *len) const {
+	const char * getHashString(uint64_t mode, uint64_t *len) const { 
 		switch (mode) {
 			case 0:
 				*len = sizeof(first);
 				return (char *) &first;
-			case 1:
+			case 1: 
 				*len = second.size();
 				return (char *) second.data();
 			default:
@@ -115,9 +114,9 @@ struct DoubleElementType
 	DoubleElementType(uint64_t f, double s);
 
 	typedef double second_type;
-	const char * getHashString(uint64_t mode, uint64_t *len) const {
+	const char * getHashString(uint64_t mode, uint64_t *len) const { 
 		switch (mode) {
-			case 0:
+			case 0:	
 				*len = sizeof(first);
 				return (char *) &first;
 			case 1:
@@ -126,7 +125,7 @@ struct DoubleElementType
 			default:
 				throw std::logic_error("StringElementType: invalid mode in getHashString().");
 		}
-	}
+	}	
 	inline bool operator<(const DoubleElementType &e) const { return (first < e.first); }
 };
 
@@ -143,7 +142,7 @@ struct RowWrapper
 
 	inline RowWrapper(const RowWrapper &rg) : count(rg.count)
 	{
-		for (uint32_t i = 0; i < count; ++i)
+		for (uint i = 0; i < count; ++i)
 			et[i] = rg.et[i];
 	}
 
@@ -154,7 +153,7 @@ struct RowWrapper
 	inline RowWrapper & operator=(const RowWrapper &rg)
 	{
 		count = rg.count;
-		for (uint32_t i = 0; i < count; ++i)
+		for (uint i = 0; i < count; ++i)
 			et[i] = rg.et[i];
 		return *this;
 	}
@@ -169,8 +168,8 @@ struct RIDElementType
 
 	RIDElementType();
 	RIDElementType(uint64_t f);
-
-	const char * getHashString(uint64_t mode, uint64_t *len) const {
+	
+	const char * getHashString(uint64_t mode, uint64_t *len) const { 
 		*len = 8;
 		return (char *) &first;
 	}
@@ -183,33 +182,33 @@ struct RIDElementType
  * first: rid
  * second: data value in unstructured format
  */
-
+ 
 struct TupleType
 {
-    uint64_t first;
+    uint64_t first; 
     char* second;
     TupleType() {}
     TupleType (uint64_t f, char* s):first(f), second(s){}
-
+    
     /** @brief delete a tuple
      *
-     * this function should be called by the tuple user outside
+     * this function should be called by the tuple user outside 
      * the datalist if necessary
      */
     void deleter()
     {
         delete [] second;
     }
-
-    /** @brief get hash string
+    
+    /** @brief get hash string 
      * @note params mode and len are ignored here. they are carried
      * just to keep a consistent interface with the other element type
      */
-    const char * getHashString(uint64_t mode, uint64_t *len) const
-    {
-        return (char*)second;
+    const char * getHashString(uint64_t mode, uint64_t *len) const 
+    { 
+        return (char*)second;		
     }
-
+    
     bool operator<(const TupleType &e) const { return (first < e.first); }
 };
 
@@ -318,7 +317,7 @@ typedef DataList<StringElementType> StrDataList;
 // */
 //typedef BucketDL<TupleType> TupleBucketDataList;
 
-typedef FIFO<rowgroup::RGData> RowGroupDL;
+typedef FIFO<boost::shared_array<uint8_t> > RowGroupDL;
 
 }
 
@@ -333,8 +332,8 @@ namespace joblist
 class AnyDataList
 {
 public:
-	AnyDataList() : fDl3(0), fDl6(0), fDl9(0), fDisown(false) { }
-	~AnyDataList() { if (!fDisown) { delete fDl3; delete fDl6; delete fDl9; } }
+	AnyDataList() : fDl3(0), fDl6(0), fDl9(0), fDl20(0), fDisown(false) { }
+	~AnyDataList() { if (!fDisown) { delete fDl3; delete fDl6; delete fDl9; delete fDl20; } }
 
 //	AnyDataList() : fDl1(0), fDl2(0), fDl3(0), fDl4(0), fDl5(0), fDl6(0), fDl7(0), fDl8(0), fDl9(0),
 //		fDl10(0), fDl11(0), fDl12(0), fDl13(0), fDl14(0), fDl15(0), fDl16(0), fDl17(0), fDl18(0),
@@ -344,10 +343,10 @@ public:
 //		delete fDl12; delete fDl13; delete fDl14; delete fDl15; delete fDl16; delete fDl17;
 //		delete fDl18; delete fDl19; delete fDl20; } }
 
-	// disown() fixes the problem of multiple ownership of a single DL,
+	// disown() fixes the problem of multiple ownership of a single DL, 
 	// or one on the stack
 
-	//In the world of bad ideas these are at the top. The whole point of this class is to manage
+	//In the world of bad ideas these are at the top. The whole point of this class is to manage 
 	// dynamically allocated data in an automatic way. These 2 methods circumvent this, and they
 	// are not necessary in any event, because you can safely share AnyDataList's via a AnyDataListSPtr.
 	inline void disown() __attribute__ ((deprecated)) { fDisown = true; }
@@ -376,7 +375,7 @@ public:
 //	inline void sortedWSDL(SortedWSDL* dl) { fDl13 = dl; }
 //	inline SortedWSDL* sortedWSDL() { return fDl13; }
 //	inline const SortedWSDL* sortedWSDL() const { return fDl13; }
-//
+//	
 //	inline void zonedDL(ZonedDL* dl) { fDl15 = dl; }
 //	inline ZonedDL* zonedDL() { return fDl15; }
 //	inline const ZonedDL* zonedDL() const { return fDl15; }
@@ -400,28 +399,27 @@ public:
 //	inline void stringSortedWSDL(StringSortedWSDL* dl) { fDl14 = dl; }
 //	inline StringSortedWSDL* stringSortedWSDL() { return fDl14; }
 //	inline const StringSortedWSDL* stringSortedWSDL() const { return fDl14; }
-//
+//	
 //	inline void stringZonedDL(StringZonedDL* dl) { fDl16 = dl; }
 //	inline StringZonedDL* stringZonedDL() { return fDl16; }
 //	inline const StringZonedDL* stringZonedDL() const { return fDl16; }
-//
+//	
 //	inline void tupleBucketDL(TupleBucketDataList* dl) { fDl18 = dl; }
 //	inline TupleBucketDataList* tupleBucketDL() { return fDl18; }
 //	inline const TupleBucketDataList* tupleBucketDL() const { return fDl18; }
-//
+//	
 //	inline void deliveryWSDL(DeliveryWSDL *dl) { fDl19 = dl; }
 //	inline DeliveryWSDL * deliveryWSDL() { return fDl19; }
 //	inline const DeliveryWSDL * deliveryWSDL() const { return fDl19; }
 
-	inline void rowGroupDL(boost::shared_ptr<RowGroupDL> dl) { fDl20 = dl; }
-	inline void rowGroupDL(RowGroupDL *dl) { fDl20.reset(dl); }
-	inline RowGroupDL * rowGroupDL() { return fDl20.get(); }
-	inline const RowGroupDL * rowGroupDL() const { return fDl20.get(); }
+	inline void rowGroupDL(RowGroupDL *dl) { fDl20 = dl; }
+	inline RowGroupDL * rowGroupDL() { return fDl20; }
+	inline const RowGroupDL * rowGroupDL() const { return fDl20; }
 
 	DataList_t* dataList() {
 		if (fDl3 != NULL) return reinterpret_cast<DataList_t*>(fDl3);
 		else if (fDl9 != NULL) return fDl9;
-		return reinterpret_cast<DataList_t*>(fDl20.get());
+		return reinterpret_cast<DataList_t*>(fDl20);
 //		if (fDl1 != NULL) return fDl1;
 //		else if (fDl2 != NULL) return fDl2;
 //		else if (fDl3 != NULL) return reinterpret_cast<DataList_t*>(fDl3);
@@ -444,7 +442,7 @@ public:
 //		return fDl8;
 		return reinterpret_cast<StrDataList*>(fDl6);
 	}
-//
+//	
 //	TupleDataList* tupleDataList() {
 //		if (fDl18 != NULL) return fDl18;
 //		return fDl17;
@@ -452,7 +450,7 @@ public:
 //
 //	/* fDl{7,8} store base class pointers.  For consistency, maybe strDataList
 //	   should consider fDl6 also. */
-//	inline StrDataList * strDataList()
+//	inline StrDataList * strDataList() 
 //	{ return fDl8; }
 //
 //	inline void strDataList(StrDataList *d)
@@ -463,35 +461,35 @@ public:
 //
 //	inline void doubleDL(DoubleDataList *d)
 //	{ fDl7 = d; }
-
+	
 	enum DataListTypes
 	{
-		UNKNOWN_DATALIST,                   /*!<  0 Unknown DataList */
-		BANDED_DATALIST,                    /*!<  1 Banded DataList */
-		WORKING_SET_DATALIST,               /*!<  2 WSDL */
-		FIFO_DATALIST,                      /*!<  3 FIFO */
-		BUCKET_DATALIST,                    /*!<  4 Bucket */
-		CONSTANT_DATALIST,                  /*!<  5 Constant */
-		STRING_DATALIST,                    /*!<  6 String */
-		DOUBLE_DATALIST,                    /*!<  7 Double */
-		STRINGFIFO_DATALIST,                /*!<  8 String FIFO */
-		STRINGBANDED_DATALIST,              /*!<  9 String Banded */
-		STRINGBUCKET_DATALIST,              /*!< 10 String Bucket */
-		STRINGCONSTANT_DATALIST,            /*!< 11 String Constant */
-		SORTED_WORKING_SET_DATALIST,        /*!< 12 Sorted WSDL */
-		STRINGSORTED_WORKING_SET_DATALIST,  /*!< 13 String Sorted WSDL */
-		ZONED_DATALIST,                     /*!< 14 Zoned Datalist */
-		STRINGZONED_DATALIST,               /*!< 15 String Zoned Datalist */
-		TUPLEBUCKET_DATALIST,               /*!< 16 Tuple Bucket Datalist */
-		TUPLE_DATALIST,                     /*!< 17 Tuple Datalist */
-		DELIVERYWSDL,                       /*!< 18 Delivery WSDL */
-		ROWGROUP_DATALIST
+        UNKNOWN_DATALIST,            /*!<  0 Unknown DataList */ 
+        BANDED_DATALIST,            /*!<  1 Banded DataList */ 
+        WORKING_SET_DATALIST,            /*!<  2 WSDL */ 
+        FIFO_DATALIST,                /*!<  3 FIFO */ 
+        BUCKET_DATALIST,            /*!<  4 Bucket */ 
+        CONSTANT_DATALIST,            /*!<  5 Constant */ 
+        STRING_DATALIST,            /*!<  6 String */ 
+        DOUBLE_DATALIST,            /*!<  7 Double */ 
+        STRINGFIFO_DATALIST,            /*!<  8 String FIFO */ 
+        STRINGBANDED_DATALIST,            /*!<  9 String Banded */ 
+        STRINGBUCKET_DATALIST,            /*!< 10 String Bucket */ 
+        STRINGCONSTANT_DATALIST,        /*!< 11 String Constant */ 
+        SORTED_WORKING_SET_DATALIST,        /*!< 12 Sorted WSDL */ 
+        STRINGSORTED_WORKING_SET_DATALIST,    /*!< 13 String Sorted WSDL */ 
+        ZONED_DATALIST,                 /*!< 14 Zoned Datalist */
+        STRINGZONED_DATALIST,            /*!< 15 String Zoned Datalist */
+        TUPLEBUCKET_DATALIST,            /*!< 16 Tuple Bucket Datalist */
+        TUPLE_DATALIST,				/*!< 17 Tuple Datalist */
+        DELIVERYWSDL,			/*!< 18 Delivery WSDL */
+        ROWGROUP_DATALIST
 	};
 
 	static DataListTypes dlType(const DataList_t* dl);
 	static DataListTypes strDlType(const StrDataList* dl);
 //	static DataListTypes tupleDlType(const TupleDataList* dl);
-	uint32_t getNumConsumers()
+	uint getNumConsumers()
 	{
 //	    if (fDl1 != NULL) return fDl1->getNumConsumers();
 //		else if (fDl2 != NULL) return fDl2->getNumConsumers();
@@ -509,7 +507,7 @@ public:
 //		else if (fDl20 != NULL) return 1;
 //		else return 0;
 
-		if (fDl20) return 1;
+		if (fDl20 != NULL) return 1;
 		else if (fDl3 != NULL) return fDl3->getNumConsumers();
 		else if (fDl6 != NULL) return fDl6->getNumConsumers();
 		return 0;
@@ -544,7 +542,7 @@ private:
 //	TupleDataList* fDl17;
 //	TupleBucketDataList *fDl18;
 //	DeliveryWSDL *fDl19;
-	boost::shared_ptr<RowGroupDL> fDl20;
+	RowGroupDL *fDl20;
 	bool fDisown;
 
 };

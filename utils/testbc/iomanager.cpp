@@ -90,7 +90,7 @@ void* thr_popper(void* arg) {
 	char* fileNamePtr=fileName;
 	uint64_t longSeekOffset=0;
 	int err;
-	uint32_t dlen = 0, acc, readSize, blocksThisRead, j;
+	uint dlen = 0, acc, readSize, blocksThisRead, j;
 	uint32_t blocksRequested=0;
 	ssize_t i;
 	uint32_t sz=0;
@@ -145,7 +145,7 @@ void* thr_popper(void* arg) {
 
 		uint32_t readCount=0;
 		uint32_t bytesRead=0;
-		uint32_t jend = blocksRequested/iom->blocksPerRead;
+		uint jend = blocksRequested/iom->blocksPerRead;
 		for (j = 0; j <= jend; j++) {
 
 			blocksThisRead = std::min(dlen, iom->blocksPerRead);

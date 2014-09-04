@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*********************************************************************
- *   $Id: we_bulkloadbuffer.cpp 4661 2013-06-04 12:59:50Z dcathey $
+ *   $Id: we_bulkloadbuffer.cpp 4496 2013-01-31 19:13:20Z pleblanc $
  *
  ********************************************************************/
 
@@ -28,9 +28,7 @@
 #include <cstring>
 #include <cstdlib> // includes <alloca.h> on linux
 #include <cmath>
-#include <ctype.h>
-#include <cfloat>
-#include "we_bulkload.h"
+
 #include "we_bulkloadbuffer.h"
 #include "we_brm.h"
 #include "we_convertor.h"
@@ -43,30 +41,16 @@
 
 using namespace std;
 using namespace boost;
-using namespace execplan;
-
-#if defined(_MSC_VER) && !defined(isnan)
-#define isnan _isnan
-namespace
-{
-    inline int __signbitf(float __x)
-    {
-        union { float __f; int __i; } __u;
-        __u.__f = __x;
-        return __u.__i < 0;
-    }
-    inline int __signbit(double __x)
-    {
-        union { double __d; int __i[2]; } __u;
-        __u.__d = __x;
-        return __u.__i[1] < 0;
-    }
-}
-#define signbit(x) (sizeof(x) == sizeof(float) ? __signbitf(x) : __signbit(x))
-#endif
 
 namespace
 {
+const long long MIN_BIGINT = numeric_limits<int64_t>::min() + 2;
+const long long MAX_BIGINT = numeric_limits<int64_t>::max();
+const float MAX_FLOAT      = numeric_limits<float>::max();
+const float MIN_FLOAT      = -numeric_limits<float>::max();
+const double MAX_DOUBLE    = numeric_limits<double>::max();
+const double MIN_DOUBLE    = -numeric_limits<double>::max();
+
     const std::string INPUT_ERROR_WRONG_NO_COLUMNS =
                       "Data contains wrong number of columns";
     const std::string INPUT_ERROR_TOO_LONG =
@@ -77,10 +61,9 @@ namespace
                       "VarBinary column is incomplete; odd number of bytes; ";
     const std::string INPUT_ERROR_STRING_TOO_LONG =
                       "Character data exceeds max field length; ";
-    const char        NULL_CHAR            = 'N';   
+    const char*       NULL_ESCAPE_SEQUENCE = "\\N";
     const char*       NULL_VALUE_STRING    = "NULL";
     const char        NULL_AUTO_INC_0      = '0';
-    const unsigned long long NULL_AUTO_INC_0_BINARY = 0;
     const char        NEWLINE_CHAR         = '\n';
 
     // Enumeration states related to parsing a column value
@@ -113,7 +96,6 @@ inline void resizeRowDataArray( char** pRowData,
 
 namespace WriteEngine 
 {
-
 //------------------------------------------------------------------------------
 // BulkLoadBuffer constructor
 //------------------------------------------------------------------------------
@@ -125,10 +107,8 @@ BulkLoadBuffer::BulkLoadBuffer(
         fStartRowForLogging(0), fAutoIncGenCount(0),
         fAutoIncNextValue(0),
         fReadSize(0), fLog(logger), fNullStringMode(false),
-        fEnclosedByChar('\0'), fEscapeChar('\\'),
-        fBufferId(bufferId), fTableName(tableName),
-        fbTruncationAsError(false), fImportDataMode(IMPORT_DATA_TEXT),
-        fFixedBinaryRecLen(0)
+        fEnclosedByChar('\0'), fEscapeChar('\0'),
+        fBufferId(bufferId), fTableName(tableName)
 {
     fData            = new char[bufferSize];
     fOverflowBuf     = NULL;
@@ -190,7 +170,7 @@ BulkLoadBuffer::BulkLoadBuffer(
         }
     }
 }
-
+
 //------------------------------------------------------------------------------
 // BulkLoadBuffer destructor
 //------------------------------------------------------------------------------
@@ -214,7 +194,7 @@ BulkLoadBuffer::~BulkLoadBuffer()
     fRowStatus.clear();
     fErrRows.clear();
 }
-
+
 //------------------------------------------------------------------------------
 // Resets state of buffer.
 //------------------------------------------------------------------------------
@@ -253,7 +233,7 @@ void BulkLoadBuffer::copyOverflow(const BulkLoadBuffer & buffer)
         memcpy( fOverflowBuf, buffer.fOverflowBuf, buffer.fOverflowSize );
     }
 }
-
+
 //------------------------------------------------------------------------------
 // Parse/convert the given "field" value based on the specified length and type.
 // field        (in)     - the input field value to be parsed
@@ -268,24 +248,19 @@ void BulkLoadBuffer::copyOverflow(const BulkLoadBuffer & buffer)
 // satCount     (in/out) - ongoing saturation row count for buffer being parsed
 //------------------------------------------------------------------------------
 void BulkLoadBuffer::convert(char *field, int fieldLength,
-     bool nullFlag, unsigned char *output,const JobColumn &column,
+     bool nullFlag, unsigned char *output,const JobColumn & column,
      BLBufferStats& bufStats)
 {
-    char        biVal;
-    int         iVal;
-    float       fVal;
-    double      dVal;
-    short       siVal;
-    void*       pVal;
-    int32_t     iDate;
-    char        charTmpBuf[MAX_COLUMN_BOUNDARY+1] = {0};
+    int      iVal;
+    float    fVal;
+    double   dVal;
+    short    siVal;
+    void     *pVal;
+    i32      iDate;
+    char     charTmpBuf[MAX_COLUMN_BOUNDARY+1] = {0};
     long long   llVal=0, llDate=0;
-    uint64_t    tmp64;
-    uint32_t    tmp32;
-    uint8_t     ubiVal;
-    uint16_t    usiVal;
-    uint32_t    uiVal;
-    uint64_t    ullVal;
+    i64      tmp64;
+    i32      tmp32;
       
     int width = column.width;
       
@@ -314,72 +289,28 @@ void BulkLoadBuffer::convert(char *field, int fieldLength,
             }
             else
             {
-                float minFltSat = column.fMinDblSat;
-                float maxFltSat = column.fMaxDblSat;
-
-                if (fImportDataMode != IMPORT_DATA_TEXT)
+                errno = 0;
+#ifdef _MSC_VER
+                fVal = (float)strtod( field, 0 );
+#else
+                fVal = strtof( field, 0 );
+#endif
+                if (errno == ERANGE)
                 {
-                    memcpy(&fVal,field,sizeof(fVal));
-                    if ( isnan(fVal) )
+#ifdef _MSC_VER
+                    if ( abs(fVal) == HUGE_VAL )
+#else
+                    if ( abs(fVal) == HUGE_VALF )
+#endif
                     {
-                        if (signbit(fVal))
-                            fVal = minFltSat;
+                        if ( fVal > 0 )
+                            fVal = MAX_FLOAT;
                         else
-                            fVal = maxFltSat;
+                            fVal = MIN_FLOAT;
                         bufStats.satCount++;
                     }
                     else
-                    {
-                        if ( fVal > maxFltSat )
-                        {
-                            fVal = maxFltSat;
-                            bufStats.satCount++;
-                        }
-                        else if ( fVal < minFltSat )
-                        {
-                            fVal = minFltSat;
-                            bufStats.satCount++;
-                        }
-                    }
-                }
-                else
-                {
-                    errno = 0;
-#ifdef _MSC_VER
-                    fVal = (float)strtod( field, 0 );
-#else
-                    fVal = strtof( field, 0 );
-#endif
-                    if (errno == ERANGE)
-                    {
-#ifdef _MSC_VER
-                        if ( abs(fVal) == HUGE_VAL )
-#else
-                        if ( abs(fVal) == HUGE_VALF )
-#endif
-                        {
-                            if ( fVal > 0 )
-                                fVal = maxFltSat;
-                            else
-                                fVal = minFltSat;
-                            bufStats.satCount++;
-                        }
-                        else
-                            fVal = 0;
-                    }
-                    else
-                    {
-                        if ( fVal > maxFltSat )
-                        {
-                            fVal = maxFltSat;
-                            bufStats.satCount++;
-                        }
-                        else if ( fVal < minFltSat )
-                        {
-                            fVal = minFltSat;
-                            bufStats.satCount++;
-                        }
-                    }
+                        fVal = 0;
                 }
 
                 pVal = &fVal;
@@ -407,65 +338,24 @@ void BulkLoadBuffer::convert(char *field, int fieldLength,
             }
             else
             {
-                if (fImportDataMode != IMPORT_DATA_TEXT)
+                errno = 0;
+                dVal = strtod(field, 0);
+                if (errno == ERANGE)
                 {
-                    memcpy(&dVal,field,sizeof(dVal));
-                    if ( isnan(dVal) )
+#ifdef _MSC_VER
+                    if ( abs(dVal) == HUGE_VAL )
+#else
+                    if ( abs(dVal) == HUGE_VALL )
+#endif
                     {
-                        if (signbit(dVal))
-                            dVal = column.fMinDblSat;
+                        if ( dVal > 0 )
+                            dVal = MAX_DOUBLE;
                         else
-                            dVal = column.fMaxDblSat;
+                            dVal = MIN_DOUBLE;
                         bufStats.satCount++;
                     }
                     else
-                    {
-                        if ( dVal > column.fMaxDblSat )
-                        {
-                            dVal = column.fMaxDblSat;
-                            bufStats.satCount++;
-                        }
-                        else if ( dVal < column.fMinDblSat )
-                        {
-                            dVal = column.fMinDblSat;
-                            bufStats.satCount++;
-                        }
-                    }
-                }
-                else
-                {
-                    errno = 0;
-                    dVal = strtod(field, 0);
-                    if (errno == ERANGE)
-                    {
-#ifdef _MSC_VER
-                        if ( abs(dVal) == HUGE_VAL )
-#else
-                        if ( abs(dVal) == HUGE_VALL )
-#endif
-                        {
-                            if ( dVal > 0 )
-                                dVal = column.fMaxDblSat;
-                            else
-                                dVal = column.fMinDblSat;
-                            bufStats.satCount++;
-                        }
-                        else
-                            dVal = 0;
-                    }
-                    else
-                    {
-                        if ( dVal > column.fMaxDblSat )
-                        {
-                            dVal = column.fMaxDblSat;
-                            bufStats.satCount++;
-                        }
-                        else if ( dVal < column.fMinDblSat )
-                        {
-                            dVal = column.fMinDblSat;
-                            bufStats.satCount++;
-                        }
-                    }
+                        dVal = 0;
                 }
 
                 pVal = &dVal;
@@ -531,7 +421,6 @@ void BulkLoadBuffer::convert(char *field, int fieldLength,
                 bufStats.maxBufferVal = binChar;
 
             pVal = charTmpBuf;
-           // cout << "In convert: fieldLength = " << fieldLength <<endl;
             break;
         }
 
@@ -566,29 +455,19 @@ void BulkLoadBuffer::convert(char *field, int fieldLength,
             }
             else
             {
-                if (fImportDataMode != IMPORT_DATA_TEXT)
+                if( column.dataType != DECIMAL )
                 {
-                    short int siVal2;
-                    memcpy(&siVal2,field,sizeof(siVal2));
-                    origVal = siVal2;
+                    errno   = 0;
+                    origVal = strtol( field, 0, 10 );
                 }
                 else
                 {
-                    if( (column.dataType == CalpontSystemCatalog::DECIMAL ) ||
-                        (column.dataType == CalpontSystemCatalog::UDECIMAL) )
-                    {
-                        // errno is initialized and set in convertDecimalString
-                        origVal = Convertor::convertDecimalString(
-                            field, fieldLength, column.scale );
-                    }
-                    else
-                    {
-                        errno   = 0;
-                        origVal = strtol( field, 0, 10 );
-                    }
-                    if (errno == ERANGE)
-                        bSatVal = true;
+                    // errno is initialized and set in convertDecimalString
+                    origVal = Convertor::convertDecimalString(
+                        field, fieldLength, column.scale );
                 }
+                if (errno == ERANGE)
+                    bSatVal = true;
             }
 
             // Saturate the value
@@ -597,9 +476,9 @@ void BulkLoadBuffer::convert(char *field, int fieldLength,
                 origVal = column.fMinIntSat;
                 bSatVal = true;
             }
-            else if ( origVal > static_cast<int64_t>(column.fMaxIntSat) )
+            else if ( origVal > column.fMaxIntSat )
             {
-                origVal = static_cast<int64_t>(column.fMaxIntSat);
+                origVal = column.fMaxIntSat;
                 bSatVal = true;
             }
             if (bSatVal)
@@ -611,82 +490,8 @@ void BulkLoadBuffer::convert(char *field, int fieldLength,
             if (origVal > bufStats.maxBufferVal)
                 bufStats.maxBufferVal = origVal;
 
-            siVal = origVal;
+            siVal = (i16)origVal;
             pVal = &siVal;
-
-            break;
-        }
-
-        //----------------------------------------------------------------------
-        // UNSIGNED SHORT INT
-        //----------------------------------------------------------------------
-        case WriteEngine::WR_USHORT :
-        {
-            int64_t origVal=0;
-            bool bSatVal = false;
-
-            if (nullFlag)
-            {
-                if (!column.autoIncFlag)
-                {
-                    if (column.fWithDefault)
-                    {
-                        origVal = static_cast<int64_t>(column.fDefaultUInt);
-                        // fall through to update saturation and min/max
-                    }
-                    else
-                    {
-                        usiVal = joblist::USMALLINTNULL;
-                        pVal  = &usiVal;
-                        break;
-                    }
-                }
-                else
-                {
-                    origVal = fAutoIncNextValue++;
-                }
-            }
-            else
-            {
-                if (fImportDataMode != IMPORT_DATA_TEXT)
-                {
-                    unsigned short int siVal2;
-                    memcpy(&siVal2,field,sizeof(siVal2));
-                    origVal = siVal2;
-                }
-                else
-                {
-                    errno   = 0;
-                    origVal = strtoll(field, 0, 10);
-                    if (errno == ERANGE)
-                        bSatVal = true;
-                }
-            }
-
-            // Saturate the value (saturates any negative value to 0)
-            if ( origVal < column.fMinIntSat )
-            {
-                origVal = column.fMinIntSat;
-                bSatVal = true;
-            }
-            else
-            if ( origVal > static_cast<int64_t>(column.fMaxIntSat) )
-            {
-                origVal = static_cast<int64_t>(column.fMaxIntSat);
-                bSatVal = true;
-            }
-            if (bSatVal)
-                bufStats.satCount++;
-
-            // Update min/max range
-            uint64_t uVal = origVal;
-            if (uVal < static_cast<uint64_t>(bufStats.minBufferVal))
-                bufStats.minBufferVal = origVal;
-            if (uVal > static_cast<uint64_t>(bufStats.maxBufferVal))
-                bufStats.maxBufferVal = origVal;
-
-            usiVal = origVal;
-            pVal = &usiVal;
 
             break;
         }
@@ -710,8 +515,8 @@ void BulkLoadBuffer::convert(char *field, int fieldLength,
                     }
                     else
                     {
-                        biVal = joblist::TINYINTNULL;
-                        pVal = &biVal;
+                        iVal = joblist::TINYINTNULL;
+                        pVal = &iVal;
                         break;
                     }
                 }
@@ -722,29 +527,19 @@ void BulkLoadBuffer::convert(char *field, int fieldLength,
             }
             else
             {
-                if (fImportDataMode != IMPORT_DATA_TEXT)
+                if( column.dataType != DECIMAL )
                 {
-                    char biVal2;
-                    memcpy(&biVal2,field,sizeof(biVal2));
-                    origVal = biVal2;
+                    errno   = 0;
+                    origVal = strtol( field, 0, 10 );
                 }
                 else
                 {
-                    if( (column.dataType == CalpontSystemCatalog::DECIMAL ) ||
-                        (column.dataType == CalpontSystemCatalog::UDECIMAL))
-                    {
-                        // errno is initialized and set in convertDecimalString
-                        origVal = Convertor::convertDecimalString(
-                            field, fieldLength, column.scale );
-                    }
-                    else
-                    {
-                        errno   = 0;
-                        origVal = strtol( field, 0, 10 );
-                    }
-                    if (errno == ERANGE)
-                        bSatVal = true;
+                    // errno is initialized and set in convertDecimalString
+                    origVal = Convertor::convertDecimalString(
+                        field, fieldLength, column.scale );
                 }
+                if (errno == ERANGE)
+                    bSatVal = true;
             }
 
             // Saturate the value
@@ -753,9 +548,9 @@ void BulkLoadBuffer::convert(char *field, int fieldLength,
                 origVal = column.fMinIntSat;
                 bSatVal = true;
             }
-            else if ( origVal > static_cast<int64_t>(column.fMaxIntSat) )
+            else if ( origVal > column.fMaxIntSat )
             {
-                origVal = static_cast<int64_t>(column.fMaxIntSat);
+                origVal = column.fMaxIntSat;
                 bSatVal = true;
             }
             if (bSatVal)
@@ -767,82 +562,8 @@ void BulkLoadBuffer::convert(char *field, int fieldLength,
             if (origVal > bufStats.maxBufferVal)
                 bufStats.maxBufferVal = origVal;
 
-            biVal = origVal;
-            pVal = &biVal;
-
-            break;
-        }
-
-        //----------------------------------------------------------------------
-        // UNSIGNED TINY INT
-        //----------------------------------------------------------------------
-        case WriteEngine::WR_UBYTE :   
-        {
-            int64_t origVal=0;
-            bool bSatVal = false;
-
-            if (nullFlag)
-            {
-                if (!column.autoIncFlag)
-                {
-                    if (column.fWithDefault)
-                    {
-                        origVal = static_cast<int64_t>(column.fDefaultUInt);
-                        // fall through to update saturation and min/max
-                    }
-                    else
-                    {
-                        ubiVal = joblist::UTINYINTNULL;
-                        pVal = &ubiVal;
-                        break;
-                    }
-                }
-                else
-                {
-                    origVal = fAutoIncNextValue++;
-                }
-            }
-            else
-            {
-                if (fImportDataMode != IMPORT_DATA_TEXT)
-                {
-                    uint8_t biVal2;
-                    memcpy(&biVal2,field,sizeof(biVal2));
-                    origVal = biVal2;
-                }
-                else
-                {
-                    errno   = 0;
-                    origVal = strtoll(field, 0, 10);
-                    if (errno == ERANGE)
-                        bSatVal = true;
-                }
-            }
-
-            // Saturate the value (saturates any negative value to 0)
-            if ( origVal < column.fMinIntSat )
-            {
-                origVal = column.fMinIntSat;
-                bSatVal = true;
-            }
-            else
-            if ( origVal > static_cast<int64_t>(column.fMaxIntSat) )
-            {
-                origVal = static_cast<int64_t>(column.fMaxIntSat);
-                bSatVal = true;
-            }
-            if (bSatVal)
-                bufStats.satCount++;
-
-            // Update min/max range
-            uint64_t uVal = origVal;
-            if (uVal < static_cast<uint64_t>(bufStats.minBufferVal))
-                bufStats.minBufferVal = origVal;
-            if (uVal > static_cast<uint64_t>(bufStats.maxBufferVal))
-                bufStats.maxBufferVal = origVal;
-
-            ubiVal = origVal;
-            pVal = &ubiVal;
+            iVal = origVal;
+            pVal = &iVal;
 
             break;
         }
@@ -854,7 +575,7 @@ void BulkLoadBuffer::convert(char *field, int fieldLength,
         {
             bool bSatVal = false;
 
-            if( column.dataType != CalpontSystemCatalog::DATETIME )
+            if( column.dataType != DATETIME )
             {
                 if (nullFlag)
                 {
@@ -879,24 +600,16 @@ void BulkLoadBuffer::convert(char *field, int fieldLength,
                 }
                 else
                 {
-                    if (fImportDataMode != IMPORT_DATA_TEXT)
+                    if( column.dataType != DECIMAL )
                     {
-                        memcpy(&llVal,field,sizeof(llVal));
+                        errno = 0;
+                        llVal = strtoll( field, 0, 10 );
                     }
                     else
                     {
-                        if( (column.dataType == CalpontSystemCatalog::DECIMAL)||
-                            (column.dataType == CalpontSystemCatalog::UDECIMAL))
-                        {
                         // errno is initialized and set in convertDecimalString
-                            llVal = Convertor::convertDecimalString(
-                                field, fieldLength, column.scale );
-                        }
-                        else
-                        {
-                            errno = 0;
-                            llVal = strtoll( field, 0, 10 );
-                        }
+                        llVal = Convertor::convertDecimalString(
+                            field, fieldLength, column.scale );
                     }
                     if (errno == ERANGE)
                         bSatVal = true;
@@ -906,11 +619,6 @@ void BulkLoadBuffer::convert(char *field, int fieldLength,
                 if ( llVal < column.fMinIntSat )
                 {
                     llVal   = column.fMinIntSat;
-                    bSatVal = true;
-                }
-                else if ( llVal > static_cast<int64_t>(column.fMaxIntSat) )
-                {   // llVal can be > fMaxIntSat if this is a decimal column
-                    llVal   = static_cast<int64_t>(column.fMaxIntSat);
                     bSatVal = true;
                 }
                 if (bSatVal)
@@ -943,19 +651,9 @@ void BulkLoadBuffer::convert(char *field, int fieldLength,
                 }
                 else
                 {
-                    if (fImportDataMode != IMPORT_DATA_TEXT)
-                    {
-                        memcpy(&llDate,field,sizeof(llDate));
-                        if (!dataconvert::DataConvert::isColumnDateTimeValid(
-                            llDate))
-                            rc = -1;
-                    }
-                    else
-                    {
-                        llDate =dataconvert::DataConvert::convertColumnDatetime(
-                            field, dataconvert::CALPONTDATETIME_ENUM,
-                            rc, fieldLength );
-                    }
+                    llDate = dataconvert::DataConvert::convertColumnDatetime(
+                        field, dataconvert::CALPONTDATETIME_ENUM,
+                        rc, fieldLength );
                 }
 
                 if (rc == 0) {
@@ -965,18 +663,17 @@ void BulkLoadBuffer::convert(char *field, int fieldLength,
                         bufStats.maxBufferVal = llDate;
                 }
                 else {
-					if(!column.fNotNull)
-					{
+					//bug 5383
+					if(!column.fNotNull) {
                     	// @bug 3375: reset invalid date/time to NULL,
                     	//            and track as a saturated value.
                     	llDate = joblist::DATETIMENULL;
                     	bufStats.satCount++;
 					}
-					else
-					{
-						//Bug5383 - 4.0@1400-01-01 00:00:00 Below it is 0000-01-01 00:00:00
-						llDate = 0x578104000000000;	//394082834458869760
-                    	bufStats.satCount++;
+					else {
+						//@bug 5383 : Not null column set with min val
+						llDate = 0x104000000000;    //0000-01-01 00:00:00 
+						bufStats.satCount++;
 					}
                 }
 
@@ -986,167 +683,12 @@ void BulkLoadBuffer::convert(char *field, int fieldLength,
         }
 
         //----------------------------------------------------------------------
-        // UNSIGNED BIG INT
-        //----------------------------------------------------------------------
-        case WriteEngine::WR_ULONGLONG:
-        {
-            bool bSatVal = false;
-
-            if (nullFlag)
-            {
-                if (!column.autoIncFlag)
-                {
-                    if (column.fWithDefault)
-                    {
-                        ullVal = column.fDefaultUInt;
-                        // fall through to update saturation and min/max
-                    }
-                    else
-                    {
-                        ullVal = joblist::UBIGINTNULL;
-                        pVal  = &ullVal;
-                        break;
-                    }
-                }
-                else
-                {
-                    ullVal = fAutoIncNextValue++;
-                }
-            }
-            else
-            {
-                if (fImportDataMode != IMPORT_DATA_TEXT)
-                {
-                    memcpy(&ullVal,field,sizeof(ullVal));
-                }
-                else
-                {
-                    // Check for negative. strtoull doesn't do this for us.
-                    // I considered using boost::trim_left here, but part of the
-                    // exercise is to minimize cpu cycles, so I do it the old
-                    // fashioned way.  isspace() uses more cycles than direct
-                    // compare to ' ', '\t', etc.  but the payoff is that it
-                    // works with Locale, so it ought to work well with utf-8
-                    // input.
-                    int idx1;
-                    for (idx1=0; idx1<fieldLength; idx1++)
-                    {
-                        if (!isspace(field[idx1]))
-                            break;
-                    }
-                    if ((idx1 < fieldLength) && (field[idx1] == '-'))
-                    {
-                        ullVal = static_cast<uint64_t>(column.fMinIntSat);
-                        bSatVal = true;
-                    }
-                    else
-                    {
-                        errno = 0;
-                        ullVal = strtoull(field, 0, 10);
-                        if (errno == ERANGE)
-                            bSatVal = true;
-                    }
-                }
-            }
-
-            // Saturate the value
-            if ( ullVal > column.fMaxIntSat )
-            {
-                ullVal = column.fMaxIntSat;
-                bSatVal = true;
-            }
-            if (bSatVal)
-                bufStats.satCount++;
-
-            // Update min/max range
-            if (ullVal < static_cast<uint64_t>(bufStats.minBufferVal))
-                bufStats.minBufferVal = static_cast<int64_t>(ullVal);
-            if (ullVal > static_cast<uint64_t>(bufStats.maxBufferVal))
-                bufStats.maxBufferVal = static_cast<int64_t>(ullVal);
-
-            pVal = &ullVal;
-            break;
-        }
-
-        //----------------------------------------------------------------------
-        // UNSIGNED INTEGER
-        //----------------------------------------------------------------------
-        case WriteEngine::WR_UINT :
-        {
-            int64_t origVal;
-            bool bSatVal = false;
-
-            if (nullFlag)
-            {
-                if (!column.autoIncFlag)
-                {
-                    if (column.fWithDefault)
-                    {
-                        origVal = static_cast<int64_t>(column.fDefaultUInt);
-                        // fall through to update saturation and min/max
-                    }
-                    else
-                    {
-                        uiVal = joblist::UINTNULL;
-                        pVal = &uiVal;
-                        break;
-                    }
-                }
-                else
-                {
-                    origVal = fAutoIncNextValue++;
-                }
-            }
-            else
-            {
-                if (fImportDataMode != IMPORT_DATA_TEXT)
-                {
-                    unsigned int iVal2;
-                    memcpy(&iVal2,field,sizeof(iVal2));
-                    origVal = iVal2;
-                }
-                else
-                {
-                    errno   = 0;
-                    origVal = strtoll(field, 0, 10);
-                    if (errno == ERANGE)
-                        bSatVal = true;
-                }
-            }
-
-            // Saturate the value (saturates any negative value to 0)
-            if ( origVal < column.fMinIntSat)
-            {
-                origVal = column.fMinIntSat;
-                bSatVal = true;
-            }
-            else
-            if ( origVal > static_cast<int64_t>(column.fMaxIntSat) )
-            {
-                origVal = static_cast<int64_t>(column.fMaxIntSat);
-                bSatVal = true;
-            }
-            if (bSatVal)
-                bufStats.satCount++;
-
-            // Update min/max range
-            uint64_t uVal = origVal;
-            if (uVal < static_cast<uint64_t>(bufStats.minBufferVal))
-                bufStats.minBufferVal = origVal;
-            if (uVal > static_cast<uint64_t>(bufStats.maxBufferVal))
-                bufStats.maxBufferVal = origVal;
-
-            uiVal = origVal;
-            pVal = &uiVal;
-            break;
-        }
-        //----------------------------------------------------------------------
         // INTEGER
         //----------------------------------------------------------------------
         case WriteEngine::WR_INT :
         default  :
         {
-            if( column.dataType != CalpontSystemCatalog::DATE ) 
+            if( column.dataType != DATE ) 
             {
                 long long origVal;
                 bool bSatVal = false;
@@ -1174,29 +716,19 @@ void BulkLoadBuffer::convert(char *field, int fieldLength,
                 }
                 else
                 {
-                    if (fImportDataMode != IMPORT_DATA_TEXT)
+                    if( column.dataType != DECIMAL )
                     {
-                        int iVal2;
-                        memcpy(&iVal2,field,sizeof(iVal2));
-                        origVal = iVal2;
+                        errno   = 0;
+                        origVal = strtol( field, 0, 10 );
                     }
-                    else
+                    else 
                     {
-                        if( (column.dataType == CalpontSystemCatalog::DECIMAL)||
-                            (column.dataType == CalpontSystemCatalog::UDECIMAL))
-                        {
                         // errno is initialized and set in convertDecimalString
-                            origVal = Convertor::convertDecimalString(
-                                field, fieldLength, column.scale );
-                        }
-                        else
-                        {
-                            errno   = 0;
-                            origVal = strtol( field, 0, 10 );
-                        }
-                        if (errno == ERANGE)
-                            bSatVal = true;
+                        origVal = Convertor::convertDecimalString(
+                            field, fieldLength, column.scale );
                     }
+                    if (errno == ERANGE)
+                        bSatVal = true;
                 }
 
                 // Saturate the value
@@ -1205,9 +737,9 @@ void BulkLoadBuffer::convert(char *field, int fieldLength,
                     origVal = column.fMinIntSat;
                     bSatVal = true;
                 }
-                else if ( origVal > static_cast<int64_t>(column.fMaxIntSat) )
+                else if ( origVal > column.fMaxIntSat )
                 {
-                    origVal = static_cast<int64_t>(column.fMaxIntSat);
+                    origVal = column.fMaxIntSat;
                     bSatVal = true;
                 }
                 if (bSatVal)
@@ -1241,18 +773,9 @@ void BulkLoadBuffer::convert(char *field, int fieldLength,
                 }
                 else
                 {
-                    if (fImportDataMode != IMPORT_DATA_TEXT)
-                    {
-                        memcpy(&iDate,field,sizeof(iDate));
-                        if (!dataconvert::DataConvert::isColumnDateValid(iDate))
-                            rc = -1;
-                    }
-                    else
-                    {
-                        iDate = dataconvert::DataConvert::convertColumnDate(
-                            field, dataconvert::CALPONTDATE_ENUM,
-                            rc, fieldLength );
-                    }
+                    iDate = dataconvert::DataConvert::convertColumnDate(
+                        field, dataconvert::CALPONTDATE_ENUM,
+                        rc, fieldLength );
                 }
 
                 if (rc == 0) {
@@ -1262,21 +785,17 @@ void BulkLoadBuffer::convert(char *field, int fieldLength,
                         bufStats.maxBufferVal = iDate;
                 }
                 else {
-
-
-                	if (!column.fNotNull)
-					{
+					 if(!column.fNotNull) {
                     	// @bug 3375: reset invalid date to NULL,
                     	//            and track as a saturated value.
                     	iDate = joblist::DATENULL;
                     	bufStats.satCount++;
-					}
-					else
-					{
-						// Bug5383 - 1400-01-01 
-                        iDate = 0x5781068;		// for versions below 4.0 it is 0x1068
-						bufStats.satCount++; 	
-					}
+					 }
+					 else {
+						 // Bug5383 - 0000-01-01 
+						 iDate = 0x1068;  // for versions below 4.0 it is 0x5781068
+						 bufStats.satCount++;
+					 }
                 }
 
                 pVal = &iDate;
@@ -1287,7 +806,7 @@ void BulkLoadBuffer::convert(char *field, int fieldLength,
 
     memcpy(output, pVal, width);
 }
-
+
 //------------------------------------------------------------------------------
 // Parse the contents of the Read buffer based on whether it is a dictionary
 // column or not.
@@ -1326,7 +845,7 @@ int  BulkLoadBuffer::parse(ColumnInfo &columnInfo)
 
     return rc;
 }
-
+
 //------------------------------------------------------------------------------
 // Parse nonDictionary column Read buffer.  Parsed row values are added to
 // fColBufferMgr, which stores them into an output buffer before writing them
@@ -1337,7 +856,7 @@ int  BulkLoadBuffer::parseCol(ColumnInfo &columnInfo)
     int     rc = NO_ERROR;
 
     // Parse the data and fill up a buffer; which is written to output file
-    uint32_t nRowsParsed;
+    uint nRowsParsed;
 
     if (fLog->isDebug( DEBUG_2 ))
     {
@@ -1375,7 +894,6 @@ int  BulkLoadBuffer::parseCol(ColumnInfo &columnInfo)
                     "; OID-" << columnInfo.column.mapOid <<
                     "; " << ec.errorString(rc);
                 fLog->logMsg( oss.str(), rc, MSGLVL_ERROR );
-				BulkLoad::addErrorMsg2BrmUpdater(fTableName, oss);
                 return rc;
             }
         }
@@ -1389,12 +907,12 @@ int  BulkLoadBuffer::parseCol(ColumnInfo &columnInfo)
         // range to force the first value to automatically update the range.
         // If we are managing char data, minBufferVal and maxBufferVal are
         // maintained in reverse byte order to facilitate string comparisons
-        BLBufferStats bufStats(columnInfo.column.dataType);
+        BLBufferStats bufStats;
         bool    updateCPInfoPendingFlag = false;
 
         int  tokenLength   = 0;
         bool tokenNullFlag = false;
-        for(uint32_t i=0; i<fTotalReadRowsParser; ++i)
+        for(uint i=0; i<fTotalReadRowsParser; ++i)
         {
             char *p = fDataParser + fTokensParser[i][columnInfo.id].start;
 
@@ -1423,8 +941,7 @@ int  BulkLoadBuffer::parseCol(ColumnInfo &columnInfo)
             {
                 columnInfo.updateCPInfo( lastInputRowInExtent,
                                          bufStats.minBufferVal,
-                                         bufStats.maxBufferVal,
-                                         columnInfo.column.dataType );
+                                         bufStats.maxBufferVal );
 
                 if (fLog->isDebug( DEBUG_2 ))
                 {
@@ -1434,26 +951,18 @@ int  BulkLoadBuffer::parseCol(ColumnInfo &columnInfo)
                         << " " << i+1
                         << "; lastExtentRow: "  << lastInputRowInExtent;
                     parseColLogMinMax( oss,
-                                       columnInfo.column.dataType,
+                                       columnInfo.column.weType,
                                        bufStats.minBufferVal,
                                        bufStats.maxBufferVal );
 
                     fLog->logMsg( oss.str(), MSGLVL_INFO2 );
                 }
  
-                lastInputRowInExtent += columnInfo.rowsPerExtent();
-                if (isUnsigned(columnInfo.column.dataType))
-                {
-                    bufStats.minBufferVal = static_cast<int64_t>(MAX_UBIGINT);
-                    bufStats.maxBufferVal = static_cast<int64_t>(MIN_UBIGINT);
-                    updateCPInfoPendingFlag = false;
-                }
-                else
-                {
-                    bufStats.minBufferVal = MAX_BIGINT;
-                    bufStats.maxBufferVal = MIN_BIGINT;
-                    updateCPInfoPendingFlag = false;
-                }
+                lastInputRowInExtent +=
+                    BRMWrapper::getInstance()->getExtentRows();
+                bufStats.minBufferVal = MAX_BIGINT;
+                bufStats.maxBufferVal = MIN_BIGINT;
+                updateCPInfoPendingFlag = false;
             }
         }
 
@@ -1461,8 +970,7 @@ int  BulkLoadBuffer::parseCol(ColumnInfo &columnInfo)
         {
             columnInfo.updateCPInfo( lastInputRowInExtent,
                                      bufStats.minBufferVal,
-                                     bufStats.maxBufferVal,
-                                     columnInfo.column.dataType );
+                                     bufStats.maxBufferVal );
         }
 
         if (bufStats.satCount) // @bug 3504: increment row saturation count
@@ -1503,7 +1011,7 @@ int  BulkLoadBuffer::parseCol(ColumnInfo &columnInfo)
                 "; startOffset: "       << section->getStartOffset()    <<
                 "; lastExtentRow: "     << lastInputRowInExtent;
             parseColLogMinMax( oss,
-                               columnInfo.column.dataType,
+                               columnInfo.column.weType,
                                bufStats.minBufferVal,
                                bufStats.maxBufferVal );
 
@@ -1515,7 +1023,7 @@ int  BulkLoadBuffer::parseCol(ColumnInfo &columnInfo)
 
     return rc;
 }
-
+
 //------------------------------------------------------------------------------
 // Log the specified min/max buffer values to the log file.  This is straight
 // forward for numeric types, but for character data, we have to reverse the
@@ -1524,11 +1032,11 @@ int  BulkLoadBuffer::parseCol(ColumnInfo &columnInfo)
 //------------------------------------------------------------------------------
 void BulkLoadBuffer::parseColLogMinMax(
     ostringstream&             oss,
-    ColDataType                colDataType,
+    ColType                    weType,
     int64_t                    minBufferVal,
     int64_t                    maxBufferVal ) const
 {
-    if (isCharType(colDataType))
+    if (weType == WriteEngine::WR_CHAR)
     {
         // Swap/restore byte order before printing character string
         int64_t minVal = static_cast<int64_t>( uint64ToStr(
@@ -1544,19 +1052,13 @@ void BulkLoadBuffer::parseColLogMinMax(
         oss << "; minVal: " << minVal << "; (" << minValStr << ")"
             << "; maxVal: " << maxVal << "; (" << maxValStr << ")";
     }
-    else 
-    if (isUnsigned(colDataType))
-    {
-        oss << "; minVal: " << static_cast<uint64_t>(minBufferVal) <<
-               "; maxVal: " << static_cast<uint64_t>(maxBufferVal);
-    }
     else
     {
         oss << "; minVal: " << minBufferVal <<
                "; maxVal: " << maxBufferVal;
     }
 }
-
+
 //------------------------------------------------------------------------------
 // Parse Dictionary column Read buffer.  Parsed row values are added to
 // fColBufferMgr, which stores them into an output buffer before writing them
@@ -1570,7 +1072,7 @@ int  BulkLoadBuffer::parseDict(ColumnInfo &columnInfo)
 {
     int rc = NO_ERROR;
 
-    uint32_t nRowsParsed1;
+    uint nRowsParsed1;
     rc = parseDictSection( columnInfo,
                            0,
                            fStartRowParser,
@@ -1684,7 +1186,7 @@ int  BulkLoadBuffer::parseDict(ColumnInfo &columnInfo)
 
         //..Now we can add the remaining rows in the current Read buffer to
         //  to the output buffer destined for the next extent we just added.
-        uint32_t nRowsParsed2;
+        uint nRowsParsed2;
         rc = parseDictSection( columnInfo,
                                nRowsParsed1,
                               (fStartRowParser+nRowsParsed1),
@@ -1716,7 +1218,7 @@ int  BulkLoadBuffer::parseDict(ColumnInfo &columnInfo)
 
     return rc;
 }
-
+
 //------------------------------------------------------------------------------
 // Parses all or part of a Dictionary Read buffer into a ColumnBufferSection,
 // depending on whether the buffer crosses an extent boundary or not.  If it
@@ -1727,8 +1229,8 @@ int  BulkLoadBuffer::parseDict(ColumnInfo &columnInfo)
 int  BulkLoadBuffer::parseDictSection(ColumnInfo& columnInfo,
                                       int         tokenPos,
                                       RID         startRow,
-                                      uint32_t        totalReadRows,
-                                      uint32_t&       nRowsParsed)
+                                      uint        totalReadRows,
+                                      uint&       nRowsParsed)
 {
     int rc = NO_ERROR;
 
@@ -1799,7 +1301,7 @@ int  BulkLoadBuffer::parseDictSection(ColumnInfo& columnInfo,
 
     return rc;
 }
-
+
 //------------------------------------------------------------------------------
 // Read the next set of rows from the input import file (for the specified
 // table), into "this" BulkLoadBuffer.
@@ -1835,12 +1337,7 @@ int  BulkLoadBuffer::fillFromFile(
     {
         return ERR_FILE_READ_IMPORT;
     }
-
-    bool bEndOfData = false;
-    if (feof(handle))
-        bEndOfData = true;
-    if ( bEndOfData && // @bug 3516: Add '\n' if missing from last record
-       (fImportDataMode == IMPORT_DATA_TEXT) ) // Only applies to ascii mode
+    if ( feof(handle) ) // @bug 3516: Add '\n' if missing from last record
     {
         if ( (fOverflowSize > 0) | (readSize > 0) )
         {
@@ -1873,17 +1370,7 @@ int  BulkLoadBuffer::fillFromFile(
         fStartRow = correctTotalRows;
         fStartRowForLogging = totalReadRows;
 
-        if (fImportDataMode == IMPORT_DATA_TEXT)
-        {
-            tokenize( columnsInfo, allowedErrCntThisCall );
-        }
-        else
-        {
-            int rc = tokenizeBinary( columnsInfo, allowedErrCntThisCall,
-                bEndOfData );
-            if (rc != NO_ERROR)
-                return rc;
-        }
+        tokenize( columnsInfo, allowedErrCntThisCall );
 
         // If we read a full buffer without hitting any new lines, then
         // terminate import because row size is greater than read buffer size.
@@ -1898,7 +1385,7 @@ int  BulkLoadBuffer::fillFromFile(
 
     return NO_ERROR;
 }
-
+
 //------------------------------------------------------------------------------
 // Parse the rows of data in "fData", saving the meta information that describes
 // the parsed data, in fTokens.  If the number of read parsing errors for a
@@ -1949,14 +1436,14 @@ void BulkLoadBuffer::tokenize(
     unsigned errorCount             = 0;
     const char FIELD_DELIM_CHAR     = fColDelim;
     const char STRING_ENCLOSED_CHAR = fEnclosedByChar;
-    const char ESCAPE_CHAR          = fEscapeChar;
+    const char ESCAPE_ENCLOSED_CHAR = fEscapeChar;
 
     // Variables used to store raw data read for a row; needed if we strip out
     // enclosed char(s) and later have to print original data in a *.bad file
     char* pRawDataRow = 0;
     unsigned rawDataRowCapacity = 0;
     unsigned rawDataRowLength   = 0;
-    const unsigned MIN_RAW_DATA_CAP = 1024;
+    const unsigned INIT_RAW_DATA_CAP = 1024;
 
     // Enable "enclosed by" checking if user specified an "enclosed by" char
     FieldParsingState initialState = FLD_PARSE_NORMAL_STATE;
@@ -2085,20 +1572,19 @@ void BulkLoadBuffer::tokenize(
             case FLD_PARSE_ENCLOSED_STATE:
             {
                 if ( (p+1 < pEndOfData) &&
-                    (((c == ESCAPE_CHAR) &&
+                    (((c == ESCAPE_ENCLOSED_CHAR) &&
                        ( *(p+1) == STRING_ENCLOSED_CHAR)) ||
                      ((c == STRING_ENCLOSED_CHAR ) &&
-                       ( *(p+1) == STRING_ENCLOSED_CHAR)) ||
-                     ((c == ESCAPE_CHAR) &&
-                       ( *(p+1) == ESCAPE_CHAR))) )
+                       ( *(p+1) == STRING_ENCLOSED_CHAR))) )
                 {
                     // Create/save original data before stripping out bytes
                     if (rawDataRowLength == 0)
                     {
                         rawDataRowLength = (p+1) - lastRowHead + 1;
-                        rawDataRowCapacity = rawDataRowLength*2;
-                        if (rawDataRowCapacity < MIN_RAW_DATA_CAP)
-                            rawDataRowCapacity = MIN_RAW_DATA_CAP;
+                        if (rawDataRowLength > INIT_RAW_DATA_CAP)
+                            rawDataRowCapacity = rawDataRowLength*2;
+                        else
+                            rawDataRowCapacity = INIT_RAW_DATA_CAP;
                         pRawDataRow = new char[rawDataRowCapacity];
                         memcpy(pRawDataRow,
                                lastRowHead,
@@ -2117,7 +1603,7 @@ void BulkLoadBuffer::tokenize(
                         rawDataRowLength++;
                     }
 
-                    fData[ idxTo ] = *(p+1);
+                    fData[ idxTo ] = STRING_ENCLOSED_CHAR;
                     idxFrom += 2;
                     idxTo++;
                     offset++;
@@ -2165,7 +1651,6 @@ void BulkLoadBuffer::tokenize(
         } // end of switch on fieldState
 
         //----------------------------------------------------------------------
-        // Finished reading the bytes in the next source field.
         // See if source field is to be included (or ignored)
         //----------------------------------------------------------------------
         if ((curFld < fNumFieldsInFile) &&
@@ -2177,20 +1662,6 @@ void BulkLoadBuffer::tokenize(
             //------------------------------------------------------------------
             if (curCol < fNumColsInFile)
             {
-				const JobColumn& jobCol = columnsInfo[curCol].column;
-				//tmp code to test trailing space
-                if (jobCol.dataType ==CalpontSystemCatalog::CHAR) 
-                {
-					//cout << "triming ... " << endl;
-					char * tmp = p;
-					
-					while (*(--tmp) == ' ')
-					{
-						//cout << "offset is " << offset <<endl;
-						offset--;
-						
-					}
-				}
                 fTokens[curRowNum1][curCol].start  = start;
                 fTokens[curRowNum1][curCol].offset = offset;
 #ifdef DEBUG_TOKEN_PARSING
@@ -2201,6 +1672,7 @@ void BulkLoadBuffer::tokenize(
                 // inline function, but code may be too long for compiler
                 // to inline.  And factoring out into a non-inline function
                 // slows down the read thread by 10%.  So left code here.
+                const JobColumn& jobCol = columnsInfo[curCol].column;
                 if (offset)
                 {
                     switch (fTokens[curRowNum1][curCol].offset)
@@ -2216,8 +1688,8 @@ void BulkLoadBuffer::tokenize(
                                     COLPOSPAIR_NULL_TOKEN_OFFSET;
                                 bRowGenAutoInc = true;
                             }
-                            else if (jobCol.dataType ==
-                                     CalpontSystemCatalog::VARBINARY)
+                            else if (jobCol.dataType == VARBINARY &&
+                                (bValidRow))
                             {
                                 bValidRow = false;
 
@@ -2233,9 +1705,9 @@ void BulkLoadBuffer::tokenize(
                         case 2:
                         {
                             if((*(fData+fTokens[curRowNum1][curCol].start)  == 
-                                ESCAPE_CHAR) &&
+                                NULL_ESCAPE_SEQUENCE[0]) &&
                               (*(fData+fTokens[curRowNum1][curCol].start+1) ==
-                                NULL_CHAR))
+                                NULL_ESCAPE_SEQUENCE[1]))
                             {
                                 fTokens[curRowNum1][curCol].offset =
                                     COLPOSPAIR_NULL_TOKEN_OFFSET;
@@ -2272,8 +1744,7 @@ void BulkLoadBuffer::tokenize(
                                 
                         default:
                         {
-                            if ((jobCol.dataType ==
-                                 CalpontSystemCatalog::VARBINARY) &&
+                            if ((jobCol.dataType == VARBINARY) &&
                                 ((offset & 1) == 1) &&
                                 (bValidRow))
                             {
@@ -2286,27 +1757,6 @@ void BulkLoadBuffer::tokenize(
                                 validationErrMsg = ossErrMsg.str();
                             }
 
-                            // @bug 4037: When cmd line option set, treat char
-                            // and varchar fields that are too long as errors
-                            else if (getTruncationAsError())
-                            {
-                                if ((jobCol.dataType ==
-                                     CalpontSystemCatalog::VARCHAR ||
-                                     jobCol.dataType ==
-                                     CalpontSystemCatalog::CHAR)   
-                                 && (fTokens[curRowNum1][curCol].offset >
-                                     jobCol.definedWidth))
-                                {
-                                    bValidRow = false;
-                                    ostringstream ossErrMsg;
-                                    ossErrMsg << INPUT_ERROR_STRING_TOO_LONG <<
-                                        "field " << (curFld+1) <<
-                                        " longer than " << jobCol.definedWidth<<
-                                        " bytes";
-                                    validationErrMsg = ossErrMsg.str();
-                                }
-                            }
-                             
                             // @bug 3478: Truncate instead of rejecting dctnry
                             // strings>8000. Only reject numeric cols>1000 bytes
                             else if ((fTokens[curRowNum1][curCol].offset >
@@ -2326,6 +1776,29 @@ void BulkLoadBuffer::tokenize(
                             break;
                         }
                     } // end of switch on offset
+
+                    // @bug 4037: When cmd line option set, treat char
+                    // and varchar fields that are too long as errors
+                    if (getTruncationAsError() && bValidRow &&
+                        (fTokens[curRowNum1][curCol].offset !=
+                            COLPOSPAIR_NULL_TOKEN_OFFSET))
+                    {
+                        if ((jobCol.dataType == VARCHAR ||
+                             jobCol.dataType == CHAR)   &&
+                            (fTokens[curRowNum1][curCol].offset >
+                             jobCol.definedWidth))
+                        {
+                            bValidRow = false;
+
+                            ostringstream ossErrMsg;
+                            ossErrMsg << INPUT_ERROR_STRING_TOO_LONG <<
+                                "field " << (curFld+1) <<
+                                " longer than " << jobCol.definedWidth<<
+                                " bytes";
+                            validationErrMsg = ossErrMsg.str();
+                        }
+                    }
+
                 } // end of "if (offset)"
                 else
                 {
@@ -2335,23 +1808,19 @@ void BulkLoadBuffer::tokenize(
                         bRowGenAutoInc = true;
                 }
 
-                // For non-autoincrement column,
                 // Validate a NotNull column is supplied a value or a default
-                if (!bRowGenAutoInc)
+                if ((jobCol.fNotNull) &&
+                    (fTokens[curRowNum1][curCol].offset ==
+                      COLPOSPAIR_NULL_TOKEN_OFFSET) &&
+                    (!jobCol.fWithDefault) &&
+                    (bValidRow))
                 {
-                    if ((jobCol.fNotNull) &&
-                        (fTokens[curRowNum1][curCol].offset ==
-                          COLPOSPAIR_NULL_TOKEN_OFFSET) &&
-                        (!jobCol.fWithDefault) &&
-                        (bValidRow))
-                    {
-                        bValidRow = false;
+                    bValidRow = false;
   
-                        ostringstream ossErrMsg;
-                        ossErrMsg << INPUT_ERROR_NULL_CONSTRAINT <<
-                            "; field " << (curFld+1);
-                        validationErrMsg = ossErrMsg.str();
-                    }
+                    ostringstream ossErrMsg;
+                    ossErrMsg << INPUT_ERROR_NULL_CONSTRAINT <<
+                        "; field " << (curFld+1);
+                    validationErrMsg = ossErrMsg.str();
                 }
             } // end if curCol < fNumberOfColumns
 
@@ -2454,15 +1923,9 @@ void BulkLoadBuffer::tokenize(
 
                 errorCount++;
 
-                // Quit if we exceed max allowable errors for this call.
-                // We set lastRowHead = p, so that the code that follows this
-                // loop won't try to save any data in fOverflowBuf.
+                // Quit if we exceed max allowable errors for this call
                 if (errorCount > allowedErrCntThisCall)
-                {
-                    lastRowHead = p + 1;
-                    p++;
                     break;
-                }
             }
 
             curCol      = 0;
@@ -2479,6 +1942,7 @@ void BulkLoadBuffer::tokenize(
             bNewLine  = false;
             bValidRow = true;
             bRowGenAutoInc = false;
+            enclosedFieldFlag = 0;
 #ifdef DEBUG_TOKEN_PARSING
             if (initialState == FLD_PARSE_LEADING_CHAR_STATE)
                 memset (enclosedFieldFlags,0,sizeof(unsigned)*fNumberOfColumns);
@@ -2487,7 +1951,6 @@ void BulkLoadBuffer::tokenize(
 
         offset     = 0;
         fieldState = initialState;
-        enclosedFieldFlag = 0;
 
         p++;
     } // end of (p < pEndOfData) loop to step thru the read buffer
@@ -2516,7 +1979,7 @@ void BulkLoadBuffer::tokenize(
     if (pRawDataRow)
         delete []pRawDataRow;
 }
-
+
 //------------------------------------------------------------------------------
 // Resize the fTokens array used to store meta data about the input read buffer.
 // Used for initial allocation as well.
@@ -2580,347 +2043,7 @@ void BulkLoadBuffer::resizeTokenArray()
 
     fTotalRows = tmpTotalRows;
 }
-
-//@bug 5027: Add tokenizeBinary() and isBinaryFieldNull() for binary imports
-//------------------------------------------------------------------------------
-// Alternatve version of tokenize() uesd to import fixed length records in
-// binary mode.
-// Parse the rows of data in "fData", saving the meta information that describes
-// the parsed data, in fTokens.  If the number of read parsing errors for a
-// given call to tokenize() should exceed the value of "allowedErrCntThisCall",
-// then tokenize() will stop reading data and exit.
-//------------------------------------------------------------------------------
-int BulkLoadBuffer::tokenizeBinary(
-    const boost::ptr_vector<ColumnInfo>& columnsInfo,
-    unsigned int allowedErrCntThisCall,
-    bool bEndOfData )
-{
-    unsigned curCol=0;      // dest db column counter within a row
-    unsigned curRowNum=0;   // "total" number of rows read during this call
-    unsigned curRowNum1=0;  // number of "valid" rows inserted into fTokens
-    char* p;                // iterates thru each field in the input buffer
-    char* lastRowHead = 0;  // start of latest row being processed
-    bool bValidRow = true;  // track whether current row is valid
-    bool bRowGenAutoInc=false;//track whether row uses generated auto-inc
-    std::string validationErrMsg;//validation error msg (if any) for current row
-    unsigned errorCount = 0;
-    int rc = NO_ERROR;
 
-    p = lastRowHead = fData;
-
-    ldiv_t rowcnt = ldiv(fReadSize,fFixedBinaryRecLen);
-
-    //--------------------------------------------------------------------------
-    // Loop through all the bytes in the read buffer in order to construct
-    // the meta data stored in fTokens.
-    //--------------------------------------------------------------------------
-    for (long kRow=0; kRow<rowcnt.quot; kRow++)
-    {
-        //----------------------------------------------------------------------
-        // Manage all the fields in a row
-        //----------------------------------------------------------------------
-        for (unsigned int curFld=0; curFld<fNumFieldsInFile; curFld++)
-        {
-            if (fFieldList[curFld].fFldColType == BULK_FLDCOL_COLUMN_FIELD)
-            {
-                const JobColumn& jobCol = columnsInfo[curCol].column;
-
-                if (curCol < fNumColsInFile)
-                {
-                    fTokens[curRowNum1][curCol].start  = p - fData;
-                    fTokens[curRowNum1][curCol].offset = jobCol.definedWidth;
-
-                    // Special auto-increment case; treat 0 as null value
-                    if (jobCol.autoIncFlag)
-                    {
-                        if (memcmp(p,&NULL_AUTO_INC_0_BINARY,
-                            jobCol.definedWidth) == 0)
-                        {
-                            fTokens[curRowNum1][curCol].offset =
-                                COLPOSPAIR_NULL_TOKEN_OFFSET;
-                            bRowGenAutoInc = true;
-                        }
-                    }
-
-                    switch (jobCol.weType)
-                    {
-                        case WR_CHAR:
-                        {
-                            // Detect empty string for CHAR and VARCHAR
-                            if (*p == '\0')
-                                fTokens[curRowNum1][curCol].offset =
-                                    COLPOSPAIR_NULL_TOKEN_OFFSET;
-                            break;
-                        }
-                        case WR_VARBINARY:
-                        {
-                            // Detect empty VARBINARY field
-                            int kk;
-                            for (kk=0; kk<jobCol.definedWidth; kk++)
-                            {
-                                if (p[kk] != '\0')
-                                    break;
-                            }
-                            if (kk >= jobCol.definedWidth)
-                                fTokens[curRowNum1][curCol].offset =
-                                    COLPOSPAIR_NULL_TOKEN_OFFSET;
-                            break;
-                        }
-                        default:
-                        {
-                            // In BinaryAcceptNULL mode, check for NULL value
-                            if ((fTokens[curRowNum1][curCol].offset !=
-                                COLPOSPAIR_NULL_TOKEN_OFFSET) &&
-                                (fImportDataMode==IMPORT_DATA_BIN_ACCEPT_NULL))
-                            {
-                                if (isBinaryFieldNull(p,
-                                    jobCol.weType,
-                                    jobCol.dataType))
-                                {
-                                    fTokens[curRowNum1][curCol].offset =
-                                        COLPOSPAIR_NULL_TOKEN_OFFSET;
-                                    if (jobCol.autoIncFlag)
-                                        bRowGenAutoInc = true;
-                                }
-                            }
-                            break;
-                        }
-                    } // end of switch (jobCol.weType)
-
-                    // Validate NotNull column is supplied a value or a default
-                    if ((jobCol.fNotNull) &&
-                        (fTokens[curRowNum1][curCol].offset ==
-                         COLPOSPAIR_NULL_TOKEN_OFFSET) &&
-                        (!jobCol.fWithDefault) &&
-                        (bValidRow))
-                    {
-                        bValidRow = false;
-  
-                        ostringstream ossErrMsg;
-                        ossErrMsg << INPUT_ERROR_NULL_CONSTRAINT <<
-                            "; field " << (curFld+1);
-                        validationErrMsg = ossErrMsg.str();
-                    }
-                } // end "if (curCol < fNumColsInFile)"
-
-                p += jobCol.definedWidth;
-                curCol++;
-            }
-            else
-            {
-                // This is where we would handle <IgnoreField> fields
-                // if they were supported in Binary Import mode
-                //p += ?
-            }
-        } // end of loop through fields in a row
-
-        //----------------------------------------------------------------------
-        // End-of-row processing
-        //----------------------------------------------------------------------
-
-        curRowNum++; // increment total number of rows read
-
-        if (bValidRow)
-        {
-            // Initialize fTokens for <DefaultColumn> tags not in input file
-            if (fNumColsInFile < fNumberOfColumns)
-            {
-                for (unsigned int n=fNumColsInFile; n<fNumberOfColumns; n++)
-                {
-                    fTokens[curRowNum1][n].start  = 0;
-                    fTokens[curRowNum1][n].offset =
-                        COLPOSPAIR_NULL_TOKEN_OFFSET;
-                    if (columnsInfo[n].column.autoIncFlag)
-                        bRowGenAutoInc = true;
-                }
-            }
-            curRowNum1++; // increment valid row count
-            if (bRowGenAutoInc)
-                fAutoIncGenCount++; // update number of generated auto-incs
-        }
-        else
-        {
-            // Store validation error message to be logged
-            string tmp(lastRowHead,fFixedBinaryRecLen);
-            fErrRows.push_back( tmp );
-
-            fRowStatus.push_back(std::pair<RID,std::string>(
-                fStartRowForLogging + curRowNum,
-                validationErrMsg));
-
-            errorCount++;
-
-            // Quit if we exceed max allowable errors for this call
-            if (errorCount > allowedErrCntThisCall)
-                break;
-        }
-
-        curCol      = 0;
-        lastRowHead+= fFixedBinaryRecLen;
-
-        // Resize fTokens array if we are about to fill it up
-        if ( curRowNum1 >= fTotalRows )
-        {
-            resizeTokenArray();
-        }
-
-        bValidRow      = true;
-        bRowGenAutoInc = false;
-    } // end of loop through the rows in the read buffer
-
-    // Save any leftover data that we did not yet parse, into fOverflowBuf
-    if (rowcnt.rem > 0)
-    {
-        if (bEndOfData)
-        {
-            rc = ERR_BULK_BINARY_PARTIAL_REC;
-            ostringstream oss;
-            oss << "Incomplete record (" << rowcnt.rem << " bytes) at end "
-                "of import data; expected fixed length records of length " <<
-                fFixedBinaryRecLen << " bytes";
-            fLog->logMsg(oss.str(), rc, MSGLVL_ERROR);
-        }
-        else
-        {
-            fOverflowSize  = rowcnt.rem;
-            fOverflowBuf   = new char[fOverflowSize];
-
-            memcpy( fOverflowBuf, (fData+fReadSize-rowcnt.rem),
-                fOverflowSize );
-        }
-    }
-    else
-    {
-        fOverflowSize = 0;
-        fOverflowBuf  = NULL;
-    }
-
-    fTotalReadRows       = curRowNum1; // number of valid rows read
-    fTotalReadRowsForLog = curRowNum;  // total number of rows read
-
-    return rc;
-}
-
-//------------------------------------------------------------------------------
-// Compare the numeric value (val) against the relevant NULL value, based on
-// column type (ct and dt), to see whether the specified value is NULL.
-//------------------------------------------------------------------------------
-bool BulkLoadBuffer::isBinaryFieldNull(void* val,
-    WriteEngine::ColType ct,
-    execplan::CalpontSystemCatalog::ColDataType dt)
-{
-    bool isNullFlag = false;
-    switch (ct)
-    {
-        case WriteEngine::WR_BYTE:
-        {
-            if ((*(uint8_t*)val)  == joblist::TINYINTNULL)
-                isNullFlag = true;
-            break;
-        }
-
-        case WriteEngine::WR_SHORT:
-        {
-            if ((*(uint16_t*)val) == joblist::SMALLINTNULL)
-                isNullFlag = true;
-            break;
-        }
-
-        case WriteEngine::WR_INT:
-        {
-            if (dt == execplan::CalpontSystemCatalog::DATE)
-            {
-                if ((*(uint32_t*)val) == joblist::DATENULL)
-                    isNullFlag = true;
-            }
-            else
-            {
-                if ((*(uint32_t*)val) == joblist::INTNULL)
-                    isNullFlag = true;
-            }
-            break;
-        }
-
-        case WriteEngine::WR_LONGLONG:
-        {
-            if (dt == execplan::CalpontSystemCatalog::DATETIME)
-            {
-                if ((*(uint64_t*)val) == joblist::DATETIMENULL)
-                    isNullFlag = true;
-            }
-            else
-            {
-                if ((*(uint64_t*)val) == joblist::BIGINTNULL)
-                    isNullFlag = true;
-            }
-            break;
-        }
-
-        case WriteEngine::WR_FLOAT:
-        {
-            if ((*(uint32_t*)val) == joblist::FLOATNULL)
-                isNullFlag = true;
-            break;
-        }
-
-        case WriteEngine::WR_DOUBLE:
-        {
-            if ((*(uint64_t*)val) == joblist::DOUBLENULL)
-                isNullFlag = true;
-            break;
-        }
-
-        // Detect empty string for CHAR and VARCHAR
-        case WriteEngine::WR_CHAR:
-        {
-            // not applicable
-            break;
-        }
-
-        // Detect empty VARBINARY field
-        case WriteEngine::WR_VARBINARY:
-        {
-            // not applicable
-            break;
-        }
-
-        case WriteEngine::WR_UBYTE:
-        {
-            if ((*(uint8_t*)val)  == joblist::UTINYINTNULL)
-                isNullFlag = true;
-            break;
-        }
-
-        case WriteEngine::WR_USHORT:
-        {
-            if ((*(uint16_t*)val) == joblist::USMALLINTNULL)
-                isNullFlag = true;
-            break;
-        }
-
-        case WriteEngine::WR_UINT:
-        {
-            if ((*(uint32_t*)val) == joblist::UINTNULL)
-                isNullFlag = true;
-            break;
-        }
-
-        case WriteEngine::WR_ULONGLONG:
-        {
-            if ((*(uint64_t*)val) == joblist::UBIGINTNULL)
-                isNullFlag = true;
-            break;
-        }
-
-        default:
-        {
-            break;
-        }
-    }
-
-    return isNullFlag;
-}
-
 //------------------------------------------------------------------------------
 // Sets the column status.
 // returns TRUE if all columns in the buffer are complete.

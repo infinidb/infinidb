@@ -64,7 +64,7 @@ void FixedAllocator::newBlock()
 {
 	shared_array<uint8_t> next;
 
-	capacityRemaining = elementCount * elementSize;
+	capacityRemaining = elementCount;
 	if (!tmpSpace || mem.size() == 0) {
 		next.reset(new uint8_t[elementCount * elementSize]);
 		mem.push_back(next);
@@ -79,32 +79,13 @@ void FixedAllocator::newBlock()
 void * FixedAllocator::allocate()
 {
 	void *ret;
-	if (capacityRemaining < elementSize)
+	if (capacityRemaining == 0)
 		newBlock();
 	ret = nextAlloc;
 	nextAlloc += elementSize;
-	capacityRemaining -= elementSize;
-	currentlyStored += elementSize;
+	capacityRemaining--;
+	currentlyStored++;
 	return ret;
-}
-
-void * FixedAllocator::allocate(uint32_t len)
-{
-	void *ret;
-	if (capacityRemaining < len)
-		newBlock();
-	ret = nextAlloc;
-	nextAlloc += len;
-	capacityRemaining -= len;
-	currentlyStored += len;
-	return ret;
-}
-
-void FixedAllocator::truncateBy(uint32_t amt)
-{
-	nextAlloc -= amt;
-	capacityRemaining += amt;
-	currentlyStored -= amt;
 }
 
 void FixedAllocator::deallocateAll()
@@ -112,11 +93,6 @@ void FixedAllocator::deallocateAll()
 	mem.clear();
 	currentlyStored = 0;
 	capacityRemaining = 0;
-}
-
-uint64_t FixedAllocator::getMemUsage() const 
-{
-	return (mem.size() * elementCount * elementSize);
 }
 
 }

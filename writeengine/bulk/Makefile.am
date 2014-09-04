@@ -1,19 +1,19 @@
-# Copyright (C) 2014 InfiniDB, Inc.
+#  Copyright (C) 2014 InfiniDB, Inc.
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; version 2 of
-# the License.
+#  This program is free software; you can redistribute it and/or
+#  modify it under the terms of the GNU General Public License
+#  as published by the Free Software Foundation; version 2 of
+#  the License.
 #
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
 #
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-# MA 02110-1301, USA.
+#  You should have received a copy of the GNU General Public License
+#  along with this program; if not, write to the Free Software
+#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+#  MA 02110-1301, USA.
 
 # $Id: Makefile.am 864 2009-04-02 19:22:49Z rdempsey $
 ## Process this file with automake to produce Makefile.in
@@ -46,7 +46,7 @@ libwe_bulk_a_CPPFLAGS = $(march_flags) -D_FILE_OFFSET_BITS=64 $(AM_CPPFLAGS)
 
 bin_PROGRAMS = cpimport.bin
 cpimport_bin_SOURCES = cpimport.cpp
-cpimport_bin_LDFLAGS = $(idb_common_ldflags) $(idb_write_libs) $(AM_LDFLAGS)
+cpimport_bin_LDFLAGS = $(idb_common_ldflags) -lwriteengine -lwriteengineclient -lcacheutils $(idb_exec_libs) $(AM_LDFLAGS)
 cpimport_bin_LDADD = libwe_bulk.a ../xml/libwe_xml.a
 cpimport_bin_CXXFLAGS = $(march_flags) $(AM_CXXFLAGS)
 

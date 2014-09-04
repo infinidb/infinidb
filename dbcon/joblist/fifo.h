@@ -16,12 +16,12 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: fifo.h 9655 2013-06-25 23:08:13Z xlou $
+ * $Id: fifo.h 8436 2012-04-04 18:18:21Z rdempsey $
  *
  *****************************************************************************/
 
 
-/** @file
+/** @file 
  * class XXX interface
  */
 
@@ -44,7 +44,7 @@ namespace joblist {
 
 /* This derives from DataListImpl<vector<element_t> > but it manages its own data */
 template<typename element_t>
-class FIFO : public DataListImpl<std::vector<element_t>, element_t>
+class FIFO : public DataListImpl<std::vector<element_t>, element_t> 
 {
 private:
 	typedef DataListImpl<std::vector<element_t>, element_t> base;
@@ -55,7 +55,7 @@ public:
 		RID_VALUE
 	};
 
-	FIFO(uint32_t numConsumers, uint32_t maxElements);
+	FIFO(uint numConsumers, uint maxElements);
 	virtual ~FIFO();
 
 	/* DataList<element_t> interface */
@@ -78,14 +78,14 @@ public:
 	execplan::CalpontSystemCatalog::OID OID() const { return base::OID(); }
 
 	inline void dropToken() { };
-	inline void dropToken(uint32_t) { };
+	inline void dropToken(uint) { };
 
 	// Counters that reflect how many many times this FIFO blocked on reads/writes
 	uint64_t blockedWriteCount() const;
 	uint64_t blockedReadCount()  const;
-
+	
 	// @bug 653 set number of consumers when it is empty.
-	void setNumConsumers( uint32_t nc );
+	void setNumConsumers( uint nc );
 
 	void inOrder(bool order) { fInOrder = order; }
 	bool inOrder() const { return fInOrder; }
@@ -106,17 +106,13 @@ public:
 	// a FIFO is converted to another datalist, this enum should be copied
 	// over to the datalist, as a ZDL for example can use the element mode
 	// for other reasons.
-	void setElementMode(uint32_t mode)     { fElementMode = mode; }
-	uint32_t getElementMode() const        { return fElementMode; }
+	void setElementMode(uint mode)     { fElementMode = mode; }
+	uint getElementMode() const        { return fElementMode; }
 
 	// Total number of files and filespace used for temp files
 	void setTotalFileCounts(uint64_t numFiles, uint64_t numBytes);
 	void totalFileCounts(uint64_t& numFiles, uint64_t& numBytes) const;
 
-	// returns true if there might be more data to read,
-	// false if there is no more data.  Similar to next(), but
-	// does not return data.
-	bool more(uint64_t id);
 protected:
 
 private:
@@ -133,10 +129,10 @@ private:
 	bool     fInOrder;
 	uint64_t fConsumerFinishedCount;
 	volatile bool fConsumptionStarted;
-	uint32_t     fElementMode;
+	uint     fElementMode;
 	uint64_t fNumFiles;
 	uint64_t fNumBytes;
-
+	
 	// Counters that reflect how many many times this FIFO blocked
 	// on reads and writes due to the FIFO being empty or full.
 	uint64_t blockedInsertWriteCount;
@@ -149,17 +145,16 @@ private:
 	void signalPs();
 	bool swapBuffers(bool waitIfBlocked=true);
 	bool waitForSwap(uint64_t id);
-
 };
 
 // #define FIFO_DEBUG
 
 // toggles consumer behavior st it only has one critical section.
-// Need to bench both ways before changing it.
+// Need to bench both ways before changing it.  
 // #define ONE_CS
 
 template<typename element_t>
-FIFO<element_t>::FIFO(uint32_t con, uint32_t max) : DataListImpl<std::vector<element_t>, element_t>(con)
+FIFO<element_t>::FIFO(uint con, uint max) : DataListImpl<std::vector<element_t>, element_t>(con)
 {
 	fMaxElements = max;
 	pBuffer = 0;
@@ -190,7 +185,7 @@ FIFO<element_t>::FIFO()
 }
 
 template<typename element_t>
-FIFO<element_t>::FIFO(const FIFO<element_t> &f)
+FIFO<element_t>::FIFO(const FIFO<element_t> &f) 
 {
 	throw std::logic_error("don't use FIFO(FIFO &)");
 }
@@ -305,7 +300,7 @@ bool FIFO<element_t>::waitForSwap(uint64_t id)
 
 #ifdef ONE_CS
 	if (cpos[id] == fMaxElements)
-		if (++cDone == base::numConsumers)
+		if (++cDone == base::numConsumers) 
 			finishedConsuming.notify_all()
 #endif
  	while (cpos[id] == fMaxElements && !base::noMoreInput) {
@@ -328,17 +323,10 @@ bool FIFO<element_t>::waitForSwap(uint64_t id)
 }
 
 template<typename element_t>
-bool FIFO<element_t>::more(uint64_t id)
-{
-	boost::mutex::scoped_lock scoped(base::mutex);
-	return !(cpos[id] == fMaxElements && base::noMoreInput);
-}
-
-template<typename element_t>
 void FIFO<element_t>::signalPs()
 {
 	boost::mutex::scoped_lock scoped(base::mutex);
-	if (++cDone == base::numConsumers)
+	if (++cDone == base::numConsumers) 
 		finishedConsuming.notify_all();
 }
 
@@ -376,7 +364,7 @@ void FIFO<element_t>::endOfInput()
  		memset(cpos, 0, sizeof(*cpos) * base::numConsumers);
 	}
 	base::endOfInput();
- 	if (cWaiting)
+ 	if (cWaiting) 
 		moreData.notify_all();
 }
 
@@ -411,7 +399,7 @@ void FIFO<element_t>::setMultipleProducers(bool b)
 
 //@bug 653
 template<typename element_t>
-void FIFO<element_t>::setNumConsumers( uint32_t nc )
+void FIFO<element_t>::setNumConsumers( uint nc )
 {
 	delete [] cpos;
 	base::setNumConsumers(nc);

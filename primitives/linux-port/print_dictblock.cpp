@@ -45,15 +45,15 @@ void usage(char *name)
 void parseDictBlock(char *block) 
 {
 
-	uint16_t *offsets;
-	uint16_t *freeBytes;
+	u_int16_t *offsets;
+	u_int16_t *freeBytes;
 	u_int64_t *contPtr;
 	int offsetIndex, size;
 	char sig[BLOCK_SIZE+1];
 
-	freeBytes = reinterpret_cast<uint16_t *>(&block[0]);
+	freeBytes = reinterpret_cast<u_int16_t *>(&block[0]);
 	contPtr = reinterpret_cast<u_int64_t *>(&block[2]);
-	offsets = reinterpret_cast<uint16_t *>(&block[10]);
+	offsets = reinterpret_cast<u_int16_t *>(&block[10]);
 
 	cout << "Free Bytes: " << *freeBytes << endl;
 	cout << "Continuation Pointer: 0x" << hex << *contPtr << dec << endl;

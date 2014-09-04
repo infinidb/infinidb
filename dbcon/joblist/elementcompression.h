@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: elementcompression.h 9655 2013-06-25 23:08:13Z xlou $
+ * $Id: elementcompression.h 8436 2012-04-04 18:18:21Z rdempsey $
  *
  *****************************************************************************/
 
@@ -61,7 +61,7 @@ struct CompElement32Rid64Val
 
 struct CompElement32Rid32Val
 {
-    uint32_t first;
+    uint32_t first; 
     uint32_t second;
 };
 
@@ -153,7 +153,7 @@ class ElementCompression
 		static void compress(
 			std::vector<RIDElementType>&          vIn,
 			std::vector<CompElement32RidOnly>&    vOut);
-
+	   
 	    static void compress(
 			std::vector<TupleType>&          vIn,
 			std::vector<CompElement64Rid32Val>&   vOut)
@@ -248,7 +248,7 @@ class ElementCompression
 		static void expand(
 			std::vector<CompElement32RidOnly>&    vIn,
 			RIDElementType*                       vOut);
-
+		
 		static void expand(
 			std::vector<CompElement64Rid32Val>&   vIn,
 			TupleType*                       vOut)
@@ -289,7 +289,7 @@ class ElementCompression
 			std::fstream&         fFile);
 	    static void writeWith32Rid(
 			const TupleType& e,
-		    std::fstream&         fFile)
+		    std::fstream&         fFile) 
 		{throw std::logic_error(
 				"Compress/Write of 32 RID TupleType not supported");}
 
@@ -312,7 +312,7 @@ class ElementCompression
 			std::fstream&   fFile);
 	    static void readWith32Rid(
 			TupleType& e,
-		    std::fstream&   fFile)
+		    std::fstream&   fFile) 
 		    {throw std::logic_error(
 				"Read/Expand of 32 RID TupleType not supported");}
 };

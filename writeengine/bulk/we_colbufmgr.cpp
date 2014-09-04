@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: we_colbufmgr.cpp 4726 2013-08-07 03:38:36Z bwilkinson $
+ * $Id: we_colbufmgr.cpp 3720 2012-04-04 18:18:49Z rdempsey $
  *
  ****************************************************************************/
 
@@ -114,8 +114,8 @@ ColumnBufferManager::~ColumnBufferManager() {
 //------------------------------------------------------------------------------
 int ColumnBufferManager::reserveSection(
     RID startRowId,
-    uint32_t  nRowsIn,
-    uint32_t& secRowCnt,
+    uint  nRowsIn,
+    uint& secRowCnt,
     ColumnBufferSection** cbs,
     RID&  lastInputRowInExtent) {
 #ifdef PROFILE
@@ -482,7 +482,7 @@ int ColumnBufferManager::writeToFile(int endOffset) {
 //          internal buffer, or if an abbreviated extent is expanded.
 //------------------------------------------------------------------------------
 int ColumnBufferManager::writeToFileExtentCheck(
-    uint32_t startOffset, uint32_t writeSize) {
+    uint startOffset, uint writeSize) {
 
     if (fLog->isDebug( DEBUG_3 )) {
         std::ostringstream oss;
@@ -501,7 +501,11 @@ int ColumnBufferManager::writeToFileExtentCheck(
     // all parsing is complete, so we should have no thread contention.
 
     // If extent out of space, see if this is an abbrev extent we can expand
-    long long availableFileSize = fColInfo->availFileSize;
+#ifdef _MSC_VER
+    __int64 availableFileSize = fColInfo->availFileSize;
+#else
+    unsigned long availableFileSize = fColInfo->availFileSize;
+#endif
     if ((availableFileSize < writeSize) && (fColInfo->isAbbrevExtent())) {
         int rc = fColInfo->expandAbbrevExtent(true);
         if (rc != NO_ERROR) {

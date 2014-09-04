@@ -1,20 +1,3 @@
-/* Copyright (C) 2014 InfiniDB, Inc.
-
-   This program is free software; you can redistribute it and/or
-   modify it under the terms of the GNU General Public License
-   as published by the Free Software Foundation; version 2 of
-   the License.
-
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-   MA 02110-1301, USA. */
-
 /******************************************************************************************
 * $Id: amazonInstaller.cpp 64 2006-10-12 22:21:51Z dhill $
 *
@@ -78,22 +61,21 @@ typedef struct Volume_struct
 
 typedef std::vector<Volume> VolumeList;
 
-typedef struct ModuleIP_struct
+typedef struct ElasticIP_struct
 {
 	std::string     IPaddress;
 	std::string     moduleName;
-} ModuleIP;
+} ElasticIP;
 
-typedef std::vector<ModuleIP> ModuleIPList;
+typedef std::vector<ElasticIP> ElasticIPList;
 
-typedef std::vector<std::string> PrivateIPList;
 
 string getIPAddress(string instance);
 void cleanupSystem(bool terminate = true);
 void setSystemName();
 void snmpAppCheck();
 void setRootPassword();
-void launchInstanceThread(ModuleIP moduleip);
+void launchInstanceThread(string module);
 int launchInstanceCount = 0;
 void createVolumeThread(string module);
 int createVolumeCount = 0;
@@ -121,11 +103,10 @@ VolumeList PMvolumelist;
 VolumeList UMvolumelist;
 string rootPassword = "Calpont1";
 string AMIrootPassword = "Calpont1";
-ModuleIPList elasticiplist;
-ModuleIPList moduleiplist;
+ElasticIPList elasticiplist;
 
-char* pcommand1 = 0;
-string prompt1;
+char* pcommand = 0;
+string prompt;
 string NMSIPAddress = "0.0.0.0";
 string systemName = "calpont-1";
 string UserModuleInstanceType = oam::UnassignedName;
@@ -140,13 +121,6 @@ string region = "us-east-1";
 string autoTagging = "y";
 string elasticIPs = oam::UnassignedName;
 string systemType = "";
-string subnetID = oam::UnassignedName;
-string VPCStartPrivateIP = oam::UnassignedName;
-string localQuery = "n";
-string MySQLRep = "n";
-
-bool noPrompting;
-string mysqlpw = " ";
 
 bool PMEBS = true;
 
@@ -167,13 +141,14 @@ int main(int argc, char *argv[])
 	bool postConfigureDebug = false;
 	string TotalUmMemory = oam::UnassignedName;
 	string NumBlocksPct = oam::UnassignedName;
+	string LicenseKey = oam::UnassignedName;
 	bool postConfigureCleanup = false;
 	bool systemCleanup = false;
 	bool systemStop = false;
 	string existingPMInstances = oam::UnassignedName;
 	string existingUMInstances = oam::UnassignedName;
-	string UMprivateIPS = oam::UnassignedName;
-	string PMprivateIPS = oam::UnassignedName;
+	string UserModuleAutoSync = "n";
+	int UserModuleSyncTime = 10;
 	string instanceType;
 
 	string amazonConfigFile = "/root/amazonConfig.xml";
@@ -285,14 +260,14 @@ int main(int argc, char *argv[])
 		while(true) {
 			string ready = "n";
 			if ( systemCleanup )
-				prompt1 = "WARNING - You are about the delete '" + systemName + "' cluster.  Are you sure you want to do this?  [y,n] (n) > ";
+				prompt = "WARNING - You are about the delete '" + systemName + "' cluster.  Are you sure you want to do this?  [y,n] (n) > ";
 			else
-				prompt1 = "WARNING - You are about the stop the instances on '" + systemName + "' cluster.  Are you sure you want to do this?  [y,n] (n) > ";
-			pcommand1 = readline(prompt1.c_str());
-			if (pcommand1) {
-				if (strlen(pcommand1) > 0) ready = pcommand1;
-				free(pcommand1);
-				pcommand1 = 0;
+				prompt = "WARNING - You are about the stop the instances on '" + systemName + "' cluster.  Are you sure you want to do this?  [y,n] (n) > ";
+			pcommand = readline(prompt.c_str());
+			if (pcommand) {
+				if (strlen(pcommand) > 0) ready = pcommand;
+				free(pcommand);
+				pcommand = 0;
 				if (ready == "n")
 					exit(0);
 			}
@@ -482,12 +457,12 @@ int main(int argc, char *argv[])
 	
 			while(true) {
 				string ready = "y";
-				prompt1 = "Are these files installed and ready to continue [y,n] (y) > ";
-				pcommand1 = readline(prompt1.c_str());
-				if (pcommand1) {
-					if (strlen(pcommand1) > 0) ready = pcommand1;
-					free(pcommand1);
-					pcommand1 = 0;
+				prompt = "Are these files installed and ready to continue [y,n] (y) > ";
+				pcommand = readline(prompt.c_str());
+				if (pcommand) {
+					if (strlen(pcommand) > 0) ready = pcommand;
+					free(pcommand);
+					pcommand = 0;
 					if (ready == "n") {
 						cout << endl << "Please Install these files and re-run amazonInstaller. exiting..." << endl;
 						exit(0);
@@ -512,12 +487,12 @@ int main(int argc, char *argv[])
 	
 			while(true)
 			{
-				prompt1 = "Enter name with directory of the X.509 Certificate file (" + x509Cert + ") > ";
-				pcommand1 = readline(prompt1.c_str());
-				if (pcommand1) {
-					if (strlen(pcommand1) > 0) x509Cert = pcommand1;
-					free(pcommand1);
-					pcommand1 = 0;
+				prompt = "Enter name with directory of the X.509 Certificate file (" + x509Cert + ") > ";
+				pcommand = readline(prompt.c_str());
+				if (pcommand) {
+					if (strlen(pcommand) > 0) x509Cert = pcommand;
+					free(pcommand);
+					pcommand = 0;
 				}
 				ifstream File (x509Cert.c_str());
 				if (!File)
@@ -528,12 +503,12 @@ int main(int argc, char *argv[])
 	
 			while(true)
 			{
-				prompt1 = "Enter name with directory of the X.509 Private Key file (" + x509PriKey + ") > ";
-				pcommand1 = readline(prompt1.c_str());
-				if (pcommand1) {
-					if (strlen(pcommand1) > 0) x509PriKey = pcommand1;
-					free(pcommand1);
-					pcommand1 = 0;
+				prompt = "Enter name with directory of the X.509 Private Key file (" + x509PriKey + ") > ";
+				pcommand = readline(prompt.c_str());
+				if (pcommand) {
+					if (strlen(pcommand) > 0) x509PriKey = pcommand;
+					free(pcommand);
+					pcommand = 0;
 				}
 				ifstream File (x509PriKey.c_str());
 				if (!File)
@@ -544,12 +519,12 @@ int main(int argc, char *argv[])
 
 			while(true)
 			{
-				prompt1 = "Enter the Amazon Region you are running in (" + region + ") > ";
-				pcommand1 = readline(prompt1.c_str());
-				if (pcommand1) {
-					if (strlen(pcommand1) > 0) region = pcommand1;
-					free(pcommand1);
-					pcommand1 = 0;
+				prompt = "Enter the Amazon Region you are running in (" + region + ") > ";
+				pcommand = readline(prompt.c_str());
+				if (pcommand) {
+					if (strlen(pcommand) > 0) region = pcommand;
+					free(pcommand);
+					pcommand = 0;
 				}
 				break;
 			}
@@ -578,12 +553,12 @@ int main(int argc, char *argv[])
 		cout << endl << "===== Setup System Configuration =====" << endl << endl;
 	
 		//system Name
-		prompt1 = "Enter System Name (" + systemName + ") > ";
-		pcommand1 = readline(prompt1.c_str());
-		if (pcommand1) {
-			if (strlen(pcommand1) > 0) systemName = pcommand1;
-			free(pcommand1);
-			pcommand1 = 0;
+		prompt = "Enter System Name (" + systemName + ") > ";
+		pcommand = readline(prompt.c_str());
+		if (pcommand) {
+			if (strlen(pcommand) > 0) systemName = pcommand;
+			free(pcommand);
+			pcommand = 0;
 		}
 
 		cout << endl << "There are 2 options when configuring the System Module Type: separate and combined" << endl << endl;
@@ -593,14 +568,14 @@ int main(int argc, char *argv[])
 		string serverTypeInstall = "2";
 		while(true)
 		{
-			prompt1 =  "Select the type of System Module Install [1=separate, 2=combined] (2) > ";
-			pcommand1 = readline(prompt1.c_str());
+			prompt =  "Select the type of System Module Install [1=separate, 2=combined] (2) > ";
+			pcommand = readline(prompt.c_str());
 			cout << endl;
-			if (pcommand1)
+			if (pcommand)
 			{
-				if (strlen(pcommand1) > 0) serverTypeInstall = pcommand1;
-				free(pcommand1);
-				pcommand1 = 0;
+				if (strlen(pcommand) > 0) serverTypeInstall = pcommand;
+				free(pcommand);
+				pcommand = 0;
 			}
 	
 			if ( serverTypeInstall != "1" && serverTypeInstall != "2" ) {
@@ -625,12 +600,12 @@ int main(int argc, char *argv[])
 				while(true)
 				{
 					umNumber = 1;
-					prompt1 = "Enter number of User Modules [1,1024] (" + oam.itoa(umNumber) + ") > ";
-					pcommand1 = readline(prompt1.c_str());
-					if (pcommand1) {
-						if (strlen(pcommand1) > 0) umNumber = atoi(pcommand1);
-						free(pcommand1);
-						pcommand1 = 0;
+					prompt = "Enter number of User Modules [1,1024] (" + oam.itoa(umNumber) + ") > ";
+					pcommand = readline(prompt.c_str());
+					if (pcommand) {
+						if (strlen(pcommand) > 0) umNumber = atoi(pcommand);
+						free(pcommand);
+						pcommand = 0;
 					}
 		
 					if ( umNumber < 1 || umNumber > oam::MAX_MODULE ) {
@@ -642,12 +617,12 @@ int main(int argc, char *argv[])
 
 				cout << endl;
 				//get exist um imstance list
-				prompt1 = "Enter List of Existing User Modules Instances (id1,id2,id3) or hit enter for none > ";
-				pcommand1 = readline(prompt1.c_str());
-				if (pcommand1) {
-					if (strlen(pcommand1) > 0) existingPMInstances = pcommand1;
-					free(pcommand1);
-					pcommand1 = 0;
+				prompt = "Enter List of Existing User Modules Instances (id1,id2,id3) or hit enter for none > ";
+				pcommand = readline(prompt.c_str());
+				if (pcommand) {
+					if (strlen(pcommand) > 0) existingPMInstances = pcommand;
+					free(pcommand);
+					pcommand = 0;
 				}
 
 				instanceType = oam.getEC2LocalInstanceType();
@@ -662,12 +637,13 @@ int main(int argc, char *argv[])
 				//get UserModuleInstanceType
 				while(true)
 				{
-					prompt1 = "Enter User Module Instance Type or hit enter to default to current type (" + instanceType + ") > ";
-					pcommand1 = readline(prompt1.c_str());
-					if (pcommand1) {
-						if (strlen(pcommand1) > 0) UserModuleInstanceType = pcommand1;
-						free(pcommand1);
-						pcommand1 = 0;
+					UserModuleInstanceType = instanceType;
+					prompt = "Enter User Module Instance Type or hit enter to default to current type (" + instanceType + ") > ";
+					pcommand = readline(prompt.c_str());
+					if (pcommand) {
+						if (strlen(pcommand) > 0) UserModuleInstanceType = pcommand;
+						free(pcommand);
+						pcommand = 0;
 					}
 				}
 
@@ -675,28 +651,65 @@ int main(int argc, char *argv[])
 				//get UserModuleSecurityGroup
 				while(true)
 				{
-					prompt1 = "Enter User Module Security Group or hit enter to default to current Security Group > ";
-					pcommand1 = readline(prompt1.c_str());
-					if (pcommand1) {
-						if (strlen(pcommand1) > 0) UserModuleSecurityGroup = pcommand1;
-						free(pcommand1);
-						pcommand1 = 0;
+					prompt = "Enter User Module Security Group or hit enter to default to current Security Group > ";
+					pcommand = readline(prompt.c_str());
+					if (pcommand) {
+						if (strlen(pcommand) > 0) UserModuleSecurityGroup = pcommand;
+						free(pcommand);
+						pcommand = 0;
 					}
 					break;
 				}
 
 				cout << endl;
+				//get UM auto sync info
+				while(true) {
+					prompt = "We recommend enabling User Module Auto Syncing if using multiple User Modules, you want to enable? [y,n] (y) > ";
+					pcommand = readline(prompt.c_str());
+					if (pcommand) {
+						if (strlen(pcommand) > 0) UserModuleAutoSync = pcommand;
+						free(pcommand);
+						pcommand = 0;
+					}
+			
+					if ( UserModuleAutoSync == "n" ) {
+						break;
+					}
+			
+					if ( UserModuleAutoSync == "y") {
+						while (true)
+						{
+							prompt = "Default sync time is 10 minutes, change if you like [1,1440] (10) > ";
+							pcommand = readline(prompt.c_str());
+							if (pcommand) {
+								if (strlen(pcommand) > 0) UserModuleSyncTime = atoi(pcommand);
+								free(pcommand);
+								pcommand = 0;
+							}
+				
+							if ( UserModuleSyncTime < 1 || UserModuleSyncTime > 1441 ) {
+								cout << endl << "ERROR: Invalid Sync Time '" + oam.itoa(UserModuleSyncTime) + "', please re-enter" << endl << endl;
+								continue;
+							}
+							break;
+						}
+			
+						break;
+					}
+			
+					cout << "Invalid Entry, please enter 'y' for yes or 'n' for no" << endl;
+				}
 
 				cout << endl;
 				//get UMEBS volume info
 				while(true) {
 					string answer = "y";
-					prompt1 = "We recommend using EBS Volumes for User Module storage, you want to use EBS Volume? [y,n] (y) > ";
-					pcommand1 = readline(prompt1.c_str());
-					if (pcommand1) {
-						if (strlen(pcommand1) > 0) answer = pcommand1;
-						free(pcommand1);
-						pcommand1 = 0;
+					prompt = "We recommend using EBS Volumes for User Module storage, you want to use EBS Volume? [y,n] (y) > ";
+					pcommand = readline(prompt.c_str());
+					if (pcommand) {
+						if (strlen(pcommand) > 0) answer = pcommand;
+						free(pcommand);
+						pcommand = 0;
 					}
 			
 					if ( answer == "n" ) {
@@ -709,12 +722,12 @@ int main(int argc, char *argv[])
 					if ( answer == "y") {
 						while (true)
 						{
-							prompt1 = "Default Volume size is 10gbs, change if you like [1,1024] (100) > ";
-							pcommand1 = readline(prompt1.c_str());
-							if (pcommand1) {
-								if (strlen(pcommand1) > 0) UMvolumeSize = atoi(pcommand1);
-								free(pcommand1);
-								pcommand1 = 0;
+							prompt = "Default Volume size is 10gbs, change if you like [1,1024] (100) > ";
+							pcommand = readline(prompt.c_str());
+							if (pcommand) {
+								if (strlen(pcommand) > 0) UMvolumeSize = atoi(pcommand);
+								free(pcommand);
+								pcommand = 0;
 							}
 				
 							if ( UMvolumeSize < 1 || UMvolumeSize > 1024 ) {
@@ -742,12 +755,12 @@ int main(int argc, char *argv[])
 		while(true)
 		{
 			pmNumber = 1;
-			prompt1 = "Enter number of Performance Modules [1,1024] (" + oam.itoa(pmNumber) + ") > ";
-			pcommand1 = readline(prompt1.c_str());
-			if (pcommand1) {
-				if (strlen(pcommand1) > 0) pmNumber = atoi(pcommand1);
-				free(pcommand1);
-				pcommand1 = 0;
+			prompt = "Enter number of Performance Modules [1,1024] (" + oam.itoa(pmNumber) + ") > ";
+			pcommand = readline(prompt.c_str());
+			if (pcommand) {
+				if (strlen(pcommand) > 0) pmNumber = atoi(pcommand);
+				free(pcommand);
+				pcommand = 0;
 			}
 	
 			if ( pmNumber < 1 || pmNumber > oam::MAX_MODULE ) {
@@ -759,24 +772,24 @@ int main(int argc, char *argv[])
 
 		cout << endl;
 		//get exist pm imstance list
-		prompt1 = "Enter List of Existing Performance Modules Instances (id1,id2,id3) or hit enter for none > ";
-		pcommand1 = readline(prompt1.c_str());
-		if (pcommand1) {
-			if (strlen(pcommand1) > 0) existingPMInstances = pcommand1;
-			free(pcommand1);
-			pcommand1 = 0;
+		prompt = "Enter List of Existing Performance Modules Instances (id1,id2,id3) or hit enter for none > ";
+		pcommand = readline(prompt.c_str());
+		if (pcommand) {
+			if (strlen(pcommand) > 0) existingPMInstances = pcommand;
+			free(pcommand);
+			pcommand = 0;
 		}
 
 		cout << endl;
 		//get EBS Volume info
 		while(true) {
 			string answer = "y";
-			prompt1 = "We recommend using EBS Volumes for Performance Module storage, you want to use EBS Volumes? [y,n] (y) > ";
-			pcommand1 = readline(prompt1.c_str());
-			if (pcommand1) {
-				if (strlen(pcommand1) > 0) answer = pcommand1;
-				free(pcommand1);
-				pcommand1 = 0;
+			prompt = "We recommend using EBS Volumes for Performance Module storage, you want to use EBS Volumes? [y,n] (y) > ";
+			pcommand = readline(prompt.c_str());
+			if (pcommand) {
+				if (strlen(pcommand) > 0) answer = pcommand;
+				free(pcommand);
+				pcommand = 0;
 			}
 	
 			if ( answer == "n" ) {
@@ -790,12 +803,12 @@ int main(int argc, char *argv[])
 				while (true)
 				{
 					cout << "The default setting is 1 EBS Volume (dbroot) per Performance Module." << endl;
-					prompt1 = "How many EBS Volumes do you want to assign to each Performance Module (1) > ";
-					pcommand1 = readline(prompt1.c_str());
-					if (pcommand1) {
-						if (strlen(pcommand1) > 0) dbrootPer = atoi(pcommand1);
-						free(pcommand1);
-						pcommand1 = 0;
+					prompt = "How many EBS Volumes do you want to assign to each Performance Module (1) > ";
+					pcommand = readline(prompt.c_str());
+					if (pcommand) {
+						if (strlen(pcommand) > 0) dbrootPer = atoi(pcommand);
+						free(pcommand);
+						pcommand = 0;
 					}
 		
 					if ( dbrootPer > 0  )
@@ -806,12 +819,12 @@ int main(int argc, char *argv[])
 		
 				while (true)
 				{
-					prompt1 = "Default Volume size is 100gbs, change if you like [1,1024] (100) > ";
-					pcommand1 = readline(prompt1.c_str());
-					if (pcommand1) {
-						if (strlen(pcommand1) > 0) PMvolumeSize = atoi(pcommand1);
-						free(pcommand1);
-						pcommand1 = 0;
+					prompt = "Default Volume size is 100gbs, change if you like [1,1024] (100) > ";
+					pcommand = readline(prompt.c_str());
+					if (pcommand) {
+						if (strlen(pcommand) > 0) PMvolumeSize = atoi(pcommand);
+						free(pcommand);
+						pcommand = 0;
 					}
 		
 					if ( PMvolumeSize < 1 || PMvolumeSize > 1024 ) {
@@ -829,12 +842,12 @@ int main(int argc, char *argv[])
 
 		cout << endl;
 		//get Elasitic UP list
-		prompt1 = "Enter List of Elastic IPs with Assigned ModuleName (x.x.x.x,um1,y.y.y.y,pm1) or hit enter for none > ";
-		pcommand1 = readline(prompt1.c_str());
-		if (pcommand1) {
-			if (strlen(pcommand1) > 0) elasticIPs = pcommand1;
-			free(pcommand1);
-			pcommand1 = 0;
+		prompt = "Enter List of Elastic IPs with Assigned ModuleName (x.x.x.x,um1,y.y.y.y,pm1) or hit enter for none > ";
+		pcommand = readline(prompt.c_str());
+		if (pcommand) {
+			if (strlen(pcommand) > 0) elasticIPs = pcommand;
+			free(pcommand);
+			pcommand = 0;
 		}
 
 		cout << endl;
@@ -842,12 +855,12 @@ int main(int argc, char *argv[])
 		//get auto tagging
 		while(true) {
 			string answer = "n";
-			prompt1 = "Instance and Volume Name Auto tagging is enabled, do you want to disable it? [y,n] (n) > ";
-			pcommand1 = readline(prompt1.c_str());
-			if (pcommand1) {
-				if (strlen(pcommand1) > 0) answer = pcommand1;
-				free(pcommand1);
-				pcommand1 = 0;
+			prompt = "Instance and Volume Name Auto tagging is enabled, do you want to disable it? [y,n] (n) > ";
+			pcommand = readline(prompt.c_str());
+			if (pcommand) {
+				if (strlen(pcommand) > 0) answer = pcommand;
+				free(pcommand);
+				pcommand = 0;
 			}
 	
 			if ( answer == "n" ) {
@@ -865,24 +878,24 @@ int main(int argc, char *argv[])
 
 		cout << endl;
 		//get TotalUmMemory
-		prompt1 = "Enter TotalUmMemory size or hit enter to default standard size > ";
-		pcommand1 = readline(prompt1.c_str());
-		if (pcommand1) {
-			if (strlen(pcommand1) > 0) TotalUmMemory = pcommand1;
-			free(pcommand1);
-			pcommand1 = 0;
+		prompt = "Enter TotalUmMemory size or hit enter to default standard size > ";
+		pcommand = readline(prompt.c_str());
+		if (pcommand) {
+			if (strlen(pcommand) > 0) TotalUmMemory = pcommand;
+			free(pcommand);
+			pcommand = 0;
 		}
 
 		cout << endl;
 		//get NumBlocksPct
 		while(true)
 		{
-			prompt1 = "Enter NumBlocksPct size or hit enter to default standard size [1,100] > ";
-			pcommand1 = readline(prompt1.c_str());
-			if (pcommand1) {
-				if (strlen(pcommand1) > 0) NumBlocksPct = pcommand1;
-				free(pcommand1);
-				pcommand1 = 0;
+			prompt = "Enter NumBlocksPct size or hit enter to default standard size [1,100] > ";
+			pcommand = readline(prompt.c_str());
+			if (pcommand) {
+				if (strlen(pcommand) > 0) NumBlocksPct = pcommand;
+				free(pcommand);
+				pcommand = 0;
 			}
 			if ( ( atoi(NumBlocksPct.c_str()) < 0 || atoi(NumBlocksPct.c_str()) > 100)
 					&&  NumBlocksPct != oam::UnassignedName)
@@ -892,16 +905,25 @@ int main(int argc, char *argv[])
 		}
 
 		cout << endl;
+		//get LicenseKey
+		prompt = "Enter License Key or hit enter to default to standard 30 days > ";
+		pcommand = readline(prompt.c_str());
+		if (pcommand) {
+			if (strlen(pcommand) > 0) LicenseKey = pcommand;
+			free(pcommand);
+			pcommand = 0;
+		}
+
 		//check snmp Apps disable option
 		snmpAppCheck();
 
 		//get root password
-		prompt1 = "Enter Root-Password used to access the Instances or hit enter to default to 'Calpont1' > ";
-		pcommand1 = readline(prompt1.c_str());
-		if (pcommand1) {
-			if (strlen(pcommand1) > 0) rootPassword = pcommand1;
-			free(pcommand1);
-			pcommand1 = 0;
+		prompt = "Enter Root-Password used to access the Instances or hit enter to default to 'Calpont1' > ";
+		pcommand = readline(prompt.c_str());
+		if (pcommand) {
+			if (strlen(pcommand) > 0) rootPassword = pcommand;
+			free(pcommand);
+			pcommand = 0;
 		}
 
 		cout << endl;
@@ -954,8 +976,7 @@ int main(int argc, char *argv[])
 			cout << "Error: x509PrivateFile and x509CertificationFile are the same file name in the config file, exiting" << endl;
 			exit (1);
 		}
-
-		//standard config parmeters
+	
 		try {
 			systemName = amazonConfig->getConfig("SystemConfig", "SystemName");
 			systemType = amazonConfig->getConfig("SystemConfig", "SystemType");
@@ -973,36 +994,16 @@ int main(int argc, char *argv[])
 			UserModuleSecurityGroup = amazonConfig->getConfig("SystemConfig", "UserModuleSecurityGroup");
 			TotalUmMemory = amazonConfig->getConfig("SystemConfig", "TotalUmMemory");
 			NumBlocksPct = amazonConfig->getConfig("SystemConfig", "NumBlocksPct");
+			LicenseKey = amazonConfig->getConfig("SystemConfig", "LicenseKey");
 			existingPMInstances = amazonConfig->getConfig("SystemConfig", "PerformanceModuleInstances");
 			existingUMInstances = amazonConfig->getConfig("SystemConfig", "UserModuleInstances");
+			UserModuleAutoSync = amazonConfig->getConfig("SystemConfig", "UserModuleAutoSync");
+			UserModuleSyncTime = atoi(amazonConfig->getConfig("SystemConfig", "UserModuleSyncTime").c_str());
 			autoTagging = amazonConfig->getConfig("SystemConfig", "AutoTagging");
 			region = amazonConfig->getConfig("SystemConfig", "Region");
-			subnetID = amazonConfig->getConfig("SystemConfig", "SubNetID");
-			VPCStartPrivateIP = amazonConfig->getConfig("SystemConfig", "VPCStartPrivateIP");
-			UMprivateIPS = amazonConfig->getConfig("SystemConfig", "UserModulePrivateIP");
-			PMprivateIPS = amazonConfig->getConfig("SystemConfig", "PerformanceModulePrivateIP");
 		}
 		catch(...)
 		{}
-
-		//hidden config paremeters
-		try {
-			localQuery = amazonConfig->getConfig("SystemConfig", "LocalQuery");
-		}
-		catch(...)
-		{}
-
-		if ( localQuery.empty() )
-			localQuery = "n";
-
-		try {
-			MySQLRep = amazonConfig->getConfig("SystemConfig", "MySQLRep");
-		}
-		catch(...)
-		{}
-
-		if ( MySQLRep.empty() )
-			MySQLRep = "n";
 	}
 
 	// validate config paramaters
@@ -1072,7 +1073,7 @@ int main(int argc, char *argv[])
 				it != tokens.end();
 				++it)
 		{
-			ModuleIP elasticip;
+			ElasticIP elasticip;
 			elasticip.IPaddress = *it;
 			++it;
 			elasticip.moduleName = *it;
@@ -1113,163 +1114,11 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	//get Private IPs if VPC subNet configured
-	vector <string> umprivateip;
-	vector <string> pmprivateip;
-	if ( subnetID != oam::UnassignedName )
-	{
-		//set subnetID
-		try {
-			sysConfig->setConfig(InstallSection, "AmazonSubNetID", subnetID);
-		}
-		catch(...)
-		{}
-
-		if ( VPCStartPrivateIP == "autoassign" )
-		{
-			for ( int um = 0 ; um < umNumber ; um++ )
-			{
-				umprivateip.push_back("autoassign");
-			}
-
-			for ( int pm = 0 ; pm < pmNumber ; pm++ )
-			{
-				pmprivateip.push_back("autoassign");
-			}
-
-			//set VPCNextPrivateIP
-			try {
-				sysConfig->setConfig(InstallSection, "AmazonVPCNextPrivateIP", "autoassign");
-			}
-			catch(...)
-			{}
-		}
-		else
-		{
-			if ( VPCStartPrivateIP == oam::UnassignedName )
-			{
-				if ( UMprivateIPS == oam::UnassignedName )
-				{
-					cout << endl << "ERROR: Invalid UM Private IP Address List / VPCStartPrivateIP" << endl;
-					exit(1);
-				}
-				else
-				{
-					boost::char_separator<char> sep(",");
-					boost::tokenizer< boost::char_separator<char> > tokens(UMprivateIPS, sep);
-					for ( boost::tokenizer< boost::char_separator<char> >::iterator it = tokens.begin();
-							it != tokens.end();
-							++it)
-					{
-						if (!oam.isValidIP(*it))
-						{
-							cout << endl << "ERROR: Invalid UM Private IP Address: " << *it << endl;
-							exit(1);
-						}
-		
-						umprivateip.push_back(*it);
-					}
-	
-					if ( umNumber != (int) umprivateip.size() )
-					{
-						cout << endl << "ERROR: Number of UMs doesn't match number of UM Private IPs Provided" << endl;
-						exit(1);
-					}
-				}
-		
-				if ( PMprivateIPS == oam::UnassignedName )
-				{
-					cout << endl << "ERROR: Invalid PM Private IP Address List / VPCStartPrivateIP" << endl;
-					exit(1);
-				}
-				else
-				{
-					boost::char_separator<char> sep(",");
-					boost::tokenizer< boost::char_separator<char> > tokens1(PMprivateIPS, sep);
-					for ( boost::tokenizer< boost::char_separator<char> >::iterator it = tokens1.begin();
-							it != tokens1.end();
-							++it)
-					{
-						if (!oam.isValidIP(*it))
-						{
-							cout << endl << "ERROR: Invalid PM Private IP Address: " << *it << endl;
-							exit(1);
-						}
-		
-						pmprivateip.push_back(*it);
-					}
-			
-					if ( pmNumber != (int) pmprivateip.size() )
-					{
-						cout << endl << "ERROR: Number of PMs doesn't match number of PM Private IPs Provided" << endl;
-						exit(1);
-					}
-				}
-			}
-			else
-			{
-				if (!oam.isValidIP(VPCStartPrivateIP))
-				{
-					cout << endl << "ERROR: Invalid Starting VPC Private IP Address: " << VPCStartPrivateIP << endl;
-					exit(1);
-				}
-	
-				string VPCNextPrivateIP = VPCStartPrivateIP;
-	
-				for ( int um = 0 ; um < umNumber ; um++ )
-				{
-					umprivateip.push_back(VPCNextPrivateIP);
-	
-					try
-					{
-						VPCNextPrivateIP = oam.incrementIPAddress(VPCNextPrivateIP);
-					}
-					catch(...)
-					{
-						cout << endl << "ERROR: incrementIPAddress API error, check logs" << endl;
-						exit(1);
-					}
-				}
-	
-				for ( int pm = 0 ; pm < pmNumber ; pm++ )
-				{
-					pmprivateip.push_back(VPCNextPrivateIP);
-	
-					try
-					{
-						VPCNextPrivateIP = oam.incrementIPAddress(VPCNextPrivateIP);
-					}
-					catch(...)
-					{
-						cout << endl << "ERROR: incrementIPAddress API error, check logs" << endl;
-						exit(1);
-					}
-				}
-	
-				//set VPCNextPrivateIP
-				try {
-					sysConfig->setConfig(InstallSection, "AmazonVPCNextPrivateIP", VPCNextPrivateIP);
-				}
-				catch(...)
-				{}
-			}
-		}
-	}
-
-	try {
-		sysConfig->write();
-	}
-	catch(...)
-	{
-		cout << "ERROR: Failed trying to update InfiniDB System Configuration file" << endl;
-		exit(1);
-	}
-
 	//get local instance name (pm1)
 	localInstance = oam.getEC2LocalInstance();
 	if ( localInstance == "failed" || localInstance.empty() || localInstance == "") 
 	{
-		cout << endl << "ERROR: Failed to get Instance ID, check configuration settings like region. exiting..." << endl;
+		cout << endl << "ERROR: Failed to get Instance ID, double check configuration setting. exiting..." << endl;
 		exit (1);
 	}
 
@@ -1277,10 +1126,13 @@ int main(int argc, char *argv[])
 
 	if (instanceType.empty() || instanceType == "" || instanceType == "failed")
 	{
-		cout << endl << "ERROR: Failed to get Instance ID, check configuration settings like region. exiting..." << endl;
+		cout << endl << "ERROR: Failed to get Instance Type, double check configuration setting. exiting..." << endl;
 		exit (1);
 	}
 	
+	if ( UserModuleInstanceType == oam::UnassignedName )
+		UserModuleInstanceType = instanceType;
+
 	cout << "===== Setting up system '" + systemName + "' based on these settings ===== " << endl << endl;
 
 	SystemSoftware systemsoftware;
@@ -1288,25 +1140,8 @@ int main(int argc, char *argv[])
 
 	cout << "InfiniDB Version = " << systemsoftware.Version << "-" << systemsoftware.Release << endl;
 	cout << "System Type = " << systemType << endl;
-
-	if ( subnetID != oam::UnassignedName ) {
-		cout << "SubNet ID = " << subnetID << endl;
-		if ( VPCStartPrivateIP == oam::UnassignedName )
-		{
-			if ( systemType == "separate" )
-				cout << "User Modules VPC Private IPs = " << UMprivateIPS << endl;
-
-			cout << "Performance Modules VPC Private IPs = " << PMprivateIPS << endl;
-		}
-		else
-			cout << "Starting VPC Private IP = " << VPCStartPrivateIP << endl;
-	}
-
 	if ( systemType == "separate" ) {
-		if ( UserModuleInstanceType == oam::UnassignedName )
-			cout << "Number of User Modules = " << umNumber << " (" + instanceType + ")" << endl;
-		else
-			cout << "Number of User Modules = " << umNumber << " (" + UserModuleInstanceType + ")" << endl;
+		cout << "Number of User Modules = " << umNumber << " (" + UserModuleInstanceType + ")" << endl;
 		if ( UserModuleSecurityGroup != oam::UnassignedName )
 			cout << "User Modules Instances Security Group = " << UserModuleSecurityGroup << endl;
 		if ( existingUMInstances != oam::UnassignedName )
@@ -1320,25 +1155,6 @@ int main(int argc, char *argv[])
 
 	if ( existingPMInstances != oam::UnassignedName )
 		cout << "Using Performance Modules Instances = " << existingPMInstances << endl;
-
-	if ( localQuery == "y" ) {
-		cout << "Local Query Feature = enabled"  << endl;
-		if ( systemType == "combined" && localQuery == "y" ) {
-			cout << "NOTE: Local Query Feature is not valid on a 'combined' system, turning off feature" << endl;
-			localQuery == "n";
-		}
-		else
-		{
-			if ( MySQLRep == "n" ) 
-			{
-				cout << "NOTE: Local Query Feature is enabled and requires MySQL Replication, enabling MySQL Replication Feature" << endl;
-				MySQLRep = "y";
-			}
-		}
-	}
-
-	if ( MySQLRep == "y" )
-		cout << "MySQL Replication Feature = enabled" <<  endl;
 
 	cout << "Number of DBRoots per Performance Modules = " << dbrootPer << endl;
 
@@ -1356,7 +1172,7 @@ int main(int argc, char *argv[])
 
 	if ( elasticiplist.size() > 0 )
 	{
-		ModuleIPList::iterator list9 = elasticiplist.begin();
+		ElasticIPList::iterator list9 = elasticiplist.begin();
 		for (; list9 != elasticiplist.end() ; list9++)
 		{
 			cout << "Elastic IP Address " << (*list9).IPaddress << " assigned to " << (*list9).moduleName << endl;
@@ -1395,6 +1211,15 @@ int main(int argc, char *argv[])
 			cout << endl << "ERROR: Problem setting SystemName from the InfiniDB System Configuration file" << endl;
 			exit(1);
 		}
+	}
+
+	if ( LicenseKey != oam::UnassignedName ) {
+		cout << "LicenseKey = " << LicenseKey << endl;
+		try {
+			sysConfig->setConfig(SystemSection, "Flags", LicenseKey);
+		}
+		catch(...)
+		{}
 	}
 
 	if ( systemType == "separate" ) {
@@ -1476,6 +1301,26 @@ int main(int argc, char *argv[])
 	// set root password
 	try {
 		sysConfig->setConfig(InstallSection, "rpw", rootPassword);
+	}
+	catch(...)
+	{}
+
+	// set rsync paramaters
+	if ( UserModuleAutoSync == "y" || UserModuleAutoSync == "n" ) {
+		if ( UserModuleSyncTime < 1 ) {
+			cout << "Error: UserModuleSyncTime is invalid (enter a value greater than 0), exiting" << endl;
+			exit (1);
+		}
+	}
+	else
+	{
+		cout << "Error: UserModuleAutoSync is invalid (enter 'y' or 'n'), exiting" << endl;
+		exit (1);
+	}
+
+	try {
+		sysConfig->setConfig(InstallSection, "UMAutoSync", UserModuleAutoSync);
+		sysConfig->setConfig(InstallSection, "UMSyncTime", oam.itoa(UserModuleSyncTime));
 	}
 	catch(...)
 	{}
@@ -1610,21 +1455,9 @@ int main(int argc, char *argv[])
 		}
 	
 		//launch um Instances
-		std::vector<std::string>::iterator umprivatelist = umprivateip.begin();
 		for ( ; um < umNumber+1 ; um ++ )
 		{
 			string module = "um" + oam.itoa(um);
-
-			ModuleIP moduleip;
-			moduleip.moduleName = module;
-
-			if ( umprivateip.size() == 0 )
-				moduleip.IPaddress = oam::UnassignedName;
-			else
-			{
-				moduleip.IPaddress = *umprivatelist;
-				umprivatelist++;
-			}
 
 			while(true)
 			{
@@ -1632,7 +1465,7 @@ int main(int argc, char *argv[])
 				{
 					launchInstanceCount++;
 					pthread_t launchinstancethread;
-					int status = pthread_create (&launchinstancethread, NULL, (void*(*)(void*)) &launchInstanceThread, &moduleip);
+					int status = pthread_create (&launchinstancethread, NULL, (void*(*)(void*)) &launchInstanceThread, &module);
 					if ( status != 0 )
 					{
 						cout << "launchInstanceThread failed for " + module << endl;
@@ -1680,21 +1513,9 @@ int main(int argc, char *argv[])
 	}
 
 	//launch pm Instances
-	std::vector<std::string>::iterator pmprivatelist = pmprivateip.begin();
 	for ( ; pm < pmNumber+1 ; pm ++ )
 	{
 		string module = "pm" + oam.itoa(pm);
-
-		ModuleIP moduleip;
-		moduleip.moduleName = module;
-
-		if ( pmprivateip.size() == 0 )
-			moduleip.IPaddress = oam::UnassignedName;
-		else
-		{
-			moduleip.IPaddress = *pmprivatelist;
-			pmprivatelist++;
-		}
 
 		while(true)
 		{
@@ -1702,7 +1523,7 @@ int main(int argc, char *argv[])
 			{
 				launchInstanceCount++;
 				pthread_t launchinstancethread;
-				int status = pthread_create (&launchinstancethread, NULL, (void*(*)(void*)) &launchInstanceThread, &moduleip);
+				int status = pthread_create (&launchinstancethread, NULL, (void*(*)(void*)) &launchInstanceThread, &module);
 				if ( status != 0 )
 				{
 					cout << "launchInstanceThread failed for " + module << endl;
@@ -1862,7 +1683,7 @@ int main(int argc, char *argv[])
 		}
 
 		//install rpms
-		system("rpm -ivh /root/infinidb-mysql*rpm /root/infinidb-storage-engine*rpm");
+		system("rpm -ivh /root/calpont-mysql*rpm");
 		cout << endl;
 	}
 
@@ -1880,12 +1701,8 @@ int main(int argc, char *argv[])
 	{}
 
 	//set for amazon cloud
-	string cloud = "amazon-ec2";
-	if ( subnetID != oam::UnassignedName )
-		cloud = "amazon-vpc";
-
 	try {
-		 sysConfig->setConfig(InstallSection, "Cloud", cloud);
+		 sysConfig->setConfig(InstallSection, "Cloud", "amazon");
 	}
 	catch(...)
 	{}
@@ -1903,7 +1720,7 @@ int main(int argc, char *argv[])
 		}
 	
 		int id = 1;
-		ModuleIPList::iterator list9 = elasticiplist.begin();
+		ElasticIPList::iterator list9 = elasticiplist.begin();
 		for (; list9 != elasticiplist.end() ; list9++)
 		{
 			string moduleName = (*list9).moduleName;
@@ -2158,7 +1975,7 @@ int main(int argc, char *argv[])
 	system(cmd.c_str());
 	cmd = "cp " + installDir + "/etc/Calpont.xml " + installDir + "/etc/Calpont.xml.rpmsave";
 	int rtnCode = system(cmd.c_str());
-	if (WEXITSTATUS(rtnCode) != 0) {
+	if (rtnCode != 0) {
 		cout << "Error copying Calpont.xml to Calpont.xml.rpmsave" << endl;
 		cleanupSystem();
 	}
@@ -2170,10 +1987,6 @@ int main(int argc, char *argv[])
 	string postConfigureCMD = installDir + "/bin/postConfigure -n -p " + rootPassword;
 	if ( postConfigureDebug )
 		postConfigureCMD = postConfigureCMD + " -d";
-	if ( localQuery == "y" )
-		postConfigureCMD = postConfigureCMD + " -lq";
-	if ( MySQLRep == "y" )
-		postConfigureCMD = postConfigureCMD + " -rep";
 
 	cout << endl << " Running command: " << postConfigureCMD << endl;
 
@@ -2181,7 +1994,7 @@ int main(int argc, char *argv[])
 		cout << "Outputting to log file " + postConfigureOutFile << ", please wait..." << endl;
 		string cmd = postConfigureCMD + " > " + postConfigureOutFile;
 		int ret = system(cmd.c_str());
-		if (WEXITSTATUS(ret) == 0 )
+		if (ret == 0 )
 			cout << "postConfigure Successfully Completed, system is ready to use" << endl << endl;
 		else {
 			cout << "ERROR : postConfigure install error, check " <<  postConfigureOutFile << endl << endl;
@@ -2198,7 +2011,7 @@ int main(int argc, char *argv[])
 	else
 	{
 		int ret = system(postConfigureCMD.c_str());
-		if (WEXITSTATUS(ret) == 0 )
+		if (ret == 0 )
 			cout << "postConfigure Successfully Completed, system is ready to use" << endl << endl;
 		else {
 			cout << endl << "ERROR : postConfigure install failure" << endl << endl;
@@ -2236,13 +2049,13 @@ void snmpAppCheck()
 
 	cout << "This would be used to receive SNMP Traps from InfiniDB, like a Network Control Center" << endl;
 	cout << "Default to 0.0.0.0 to not enable snmptrap forwarding" << endl << endl;
-	prompt1 = "Enter IP Address(es) of NMS Server (0.0.0.0) > ";
-	pcommand1 = readline(prompt1.c_str());
-	if (pcommand1)
+	prompt = "Enter IP Address(es) of NMS Server (0.0.0.0) > ";
+	pcommand = readline(prompt.c_str());
+	if (pcommand)
 	{
-		if (strlen(pcommand1) > 0) NMSIPAddress = pcommand1;
-		free(pcommand1);
-		pcommand1 = 0;
+		if (strlen(pcommand) > 0) NMSIPAddress = pcommand;
+		free(pcommand);
+		pcommand = 0;
 	}
 
 	return;
@@ -2251,13 +2064,13 @@ void snmpAppCheck()
 void setSystemName()
 {
 
-	prompt1 = "Enter System Name (" + systemName + ") > ";
-	pcommand1 = readline(prompt1.c_str());
-	if (pcommand1)
+	prompt = "Enter System Name (" + systemName + ") > ";
+	pcommand = readline(prompt.c_str());
+	if (pcommand)
 	{
-		if (strlen(pcommand1) > 0) systemName = pcommand1;
-		free(pcommand1);
-		pcommand1 = 0;
+		if (strlen(pcommand) > 0) systemName = pcommand;
+		free(pcommand);
+		pcommand = 0;
 	}
 }
 
@@ -2283,7 +2096,7 @@ void setRootPassword()
 
 		string cmd = installDir + "/bin/remote_command.sh " + ipAddress + " " + AMIrootPassword + "  '/root/updatePassword.sh " + rootPassword + "' > /dev/null 2>&1";
 		int rtnCode = system(cmd.c_str());
-		if (WEXITSTATUS(rtnCode) != 0) {
+		if (rtnCode != 0) {
 			cout << "ERROR: failed update of root password on " + module << endl;
 			cleanupSystem();
 		}
@@ -2298,7 +2111,7 @@ void setRootPassword()
 		if ( module == "pm1" ) {
 			string cmd = "/root/updatePassword.sh " + rootPassword + " > /dev/null 2>&1";
 			int rtnCode = system(cmd.c_str());
-			if (WEXITSTATUS(rtnCode) != 0) {
+			if (rtnCode != 0) {
 				cout << "ERROR: failed update root of password on " + module << endl;
 				cleanupSystem();
 			}
@@ -2315,20 +2128,19 @@ void setRootPassword()
 
 		string cmd = installDir + "/bin/remote_command.sh " + ipAddress + " " + AMIrootPassword + "  '/root/updatePassword.sh " + rootPassword + "' > /dev/null 2>&1";
 		int rtnCode = system(cmd.c_str());
-		if (WEXITSTATUS(rtnCode) != 0) {
+		if (rtnCode != 0) {
 			cout << "ERROR: failed update root of password on " + module << endl;
 			cleanupSystem();
 		}
 	}
 }
 
-void launchInstanceThread(ModuleIP moduleip)
+void launchInstanceThread(string module)
 {
 	Oam oam;
 
-	//get module info
-	string moduleName = moduleip.moduleName;
-	string IPAddress = moduleip.IPaddress;
+	//local copies
+	string moduleName = module;
 
 	//due to bad instances getting launched causing scp failures
 	//have retry login around fail scp command where a instance will be relaunched
@@ -2340,9 +2152,9 @@ void launchInstanceThread(ModuleIP moduleip)
 
 		string instanceName;
 		if ( moduleName.find("um") == 0 )
-			instanceName = oam.launchEC2Instance(moduleName, IPAddress, UserModuleInstanceType, UserModuleSecurityGroup);
+			instanceName = oam.launchEC2Instance(moduleName, UserModuleInstanceType, UserModuleSecurityGroup);
 		else
-			instanceName = oam.launchEC2Instance(moduleName, IPAddress);
+			instanceName = oam.launchEC2Instance(moduleName);
 	
 		if ( instanceName == "failed" ) {
 			cout << " *** Failed to Launch an Instance for " + moduleName << ", will retry up to 5 times" << endl;
@@ -2377,7 +2189,7 @@ void launchInstanceThread(ModuleIP moduleip)
 	
 			string cmd = installDir + "/bin/remote_scp_put.sh " + ipAddress + " " + AMIrootPassword + " "  + x509Cert + " > /tmp/scp.log_" + instanceName;
 			int rtnCode = system(cmd.c_str());
-			if (WEXITSTATUS(rtnCode) == 0) {
+			if (rtnCode == 0) {
 				pass = true;
 				break;
 			}
@@ -2400,7 +2212,7 @@ void launchInstanceThread(ModuleIP moduleip)
 
 			string cmd = installDir + "/bin/remote_scp_put.sh " + ipAddress + " " + AMIrootPassword + " "  + x509PriKey + " > /tmp/scp.log_" + instanceName;
 			int rtnCode = system(cmd.c_str());
-			if (WEXITSTATUS(rtnCode) == 0) {
+			if (rtnCode == 0) {
 				pass = true;
 				break;
 			}
@@ -2437,7 +2249,7 @@ void launchInstanceThread(ModuleIP moduleip)
 
 		if ( elasticiplist.size() > 0 )
 		{
-			ModuleIPList::iterator list9 = elasticiplist.begin();
+			ElasticIPList::iterator list9 = elasticiplist.begin();
 			for (; list9 != elasticiplist.end() ; list9++)
 			{
 				if ( moduleName == (*list9).moduleName )
@@ -2851,7 +2663,7 @@ void cleanupSystem(bool terminate)
 	if ( systemType == "combined" ) {
 		cout << "----- Combined System Type Uninstall Calpont-MySQL Packages -----" << endl << endl;
 
-		system("rpm -e infinidb-mysql infinidb-storage-engine");
+		system("rpm -e calpont-mysql calpont-mysql");
 	}
 
 	cout << endl << "Cleanup finished, exiting" << endl << endl;

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: iosocket.h 3632 2013-03-13 18:08:46Z pleblanc $
+*   $Id: iosocket.h 3234 2012-08-15 21:02:43Z dhall $
 *
 *
 ***********************************************************************/
@@ -86,17 +86,16 @@ public:
 	 * This socket needs to be connected first. Will throw runtime_error on I/O error. Caller should
 	 * call close() method if exception is thrown.
 	 */
-	virtual const SBS read(const struct timespec* timeout=0, bool* isTimeOut = NULL, Stats *stats = NULL) const;
+	virtual const SBS read(const struct timespec* timeout=0, bool* isTimeOut = NULL) const;
 
 	/** write a ByteStream to this socket
 	 *
 	 * This socket needs to be connected first. Will throw runtime_error on I/O error. Caller should
 	 * call close() method if exception is thrown.
 	 */
-	EXPORT virtual void write(const ByteStream& msg, Stats *stats = NULL) const;
-	EXPORT virtual void write_raw(const ByteStream& msg, Stats *stats = NULL) const;
-	EXPORT virtual void write(SBS msg, Stats *stats = NULL) const;
-	
+	EXPORT virtual void write(const ByteStream& msg) const;
+	EXPORT virtual void write_raw(const ByteStream& msg) const;
+
 	/** access the sockaddr member
 	 */
 	inline virtual const sockaddr sa() const;
@@ -154,16 +153,9 @@ public:
 	/*
 	 * allow test suite access to private data for OOB test
 	 */
-	/**
-	 * @brief return the address as a string
-	 */
-	virtual const std::string addr2String() const { return fSocket->addr2String(); }
+	friend class ::MessageQTestSuite;
 
-	/**
-	 * @brief compare 2 addresses
-	 */
-	virtual const bool isSameAddr(const IOSocket *rhs) const { return fSocket->isSameAddr(rhs->fSocket); }
-	
+protected:
 	/** connect() forwarder for inherited classes
 	 *
 	 */
@@ -173,12 +165,16 @@ public:
 	 *
 	 */
 	virtual void connectionTimeout(const struct timespec* timeout) { fSocket->connectionTimeout(timeout); }
-	
-	
-	friend class ::MessageQTestSuite;
 
-protected:
+	/**
+	 * @brief return the address as a string
+	 */
+	virtual const std::string addr2String() const { return fSocket->addr2String(); }
 
+	/**
+	 * @brief compare 2 addresses
+	 */
+	virtual const bool isSameAddr(const IOSocket* rhs) const { return fSocket->isSameAddr(rhs->fSocket); }
 
 private:
 	void doCopy(const IOSocket& rhs);
@@ -199,11 +195,8 @@ inline void IOSocket::open() { idbassert(fSocket); fSocket->open(); }
 //   better that asserting...
 inline void IOSocket::close() { if (fSocket) fSocket->close(); }
 inline const bool IOSocket::isOpen() const { return (fSocket && fSocket->isOpen()); }
-inline const SBS IOSocket::read(const struct timespec* timeout, bool* isTimeOut, Stats *stats) const
-	{ idbassert(fSocket); return fSocket->read(timeout, isTimeOut, stats); }
-inline void IOSocket::write(const ByteStream& msg, Stats *stats) const { idbassert(fSocket); fSocket->write(msg, stats); }
-inline void IOSocket::write_raw(const ByteStream& msg, Stats *stats) const { idbassert(fSocket); fSocket->write_raw(msg, stats); }
-inline void IOSocket::write(SBS msg, Stats *stats) const { idbassert(fSocket); fSocket->write(msg, stats); }
+inline void IOSocket::write(const ByteStream& msg) const { idbassert(fSocket); fSocket->write(msg); }
+inline void IOSocket::write_raw(const ByteStream& msg) const { idbassert(fSocket); fSocket->write_raw(msg); }
 inline const SocketParms IOSocket::socketParms() const { idbassert(fSocket); return fSocket->socketParms(); }
 inline void IOSocket::socketParms(const SocketParms& socketParms) { idbassert(fSocket); fSocket->socketParms(socketParms); }
 inline void IOSocket::setSocketImpl(Socket* socket) { delete fSocket; fSocket = socket; }

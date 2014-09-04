@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_timediff.cpp 3696 2013-04-05 18:07:21Z dhall $
+* $Id: func_timediff.cpp 3614 2013-02-28 16:45:09Z dhall $
 *
 *
 ****************************************************************************/
@@ -41,10 +41,13 @@ using namespace logging;
 
 namespace funcexp
 {
-namespace helpers
-{
 
-const string timediff( int64_t time1, int64_t time2)
+CalpontSystemCatalog::ColType Func_timediff::operationType( FunctionParm& fp, CalpontSystemCatalog::ColType& resultType )
+{
+	return resultType;
+}
+
+string timediff( int64_t time1, int64_t time2)
 {
 	long long seconds;
 	long long microseconds;
@@ -55,15 +58,16 @@ const string timediff( int64_t time1, int64_t time2)
 		l_sign = -l_sign;
 
 	if ( time1 > time2 )
-		helpers::calc_time_diff(time1, time2, l_sign, &seconds, &microseconds);
+		calc_time_diff(time1, time2, l_sign, &seconds, &microseconds);
 	else
-		helpers::calc_time_diff(time2, time1, l_sign, &seconds, &microseconds);
+		calc_time_diff(time2, time1, l_sign, &seconds, &microseconds);
 
 	long t_seconds;
 	int hour= seconds/3600L;
 	t_seconds= seconds%3600L;
 	int minute= t_seconds/60L;
 	int second= t_seconds%60L;
+
     // Bug 5099: Standardize to mysql behavior. No timediff may be > 838:59:59
     if (hour > 838)
     {
@@ -86,12 +90,6 @@ const string timediff( int64_t time1, int64_t time2)
 	time3 = ptr;
 
 	return time3;
-}
-}
-
-CalpontSystemCatalog::ColType Func_timediff::operationType( FunctionParm& fp, CalpontSystemCatalog::ColType& resultType )
-{
-	return resultType;
 }
 
 string Func_timediff::getStrVal(rowgroup::Row& row,
@@ -183,7 +181,7 @@ string Func_timediff::getStrVal(rowgroup::Row& row,
 	
 	// both date format or both datetime format
 	if ((isDate1 && isDate2) || (!isDate1 && !isDate2))
-		return helpers::timediff( val1, val2);
+		return timediff( val1, val2);
 	isNull = true;
 	return "";
 }
@@ -203,7 +201,7 @@ int64_t Func_timediff::getIntVal(rowgroup::Row& row,
 {
 	// @bug 3585
 	//return dataconvert::DataConvert::datetimeToInt(getStrVal(row, parm, isNull, ct));
-	return strtoll(getStrVal(row, parm, isNull, ct).c_str(), 0, 10);
+	return atol(getStrVal(row, parm, isNull, ct).c_str());
 }
 
 double Func_timediff::getDoubleVal(rowgroup::Row& row,

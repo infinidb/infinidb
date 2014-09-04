@@ -26,7 +26,7 @@
 
 #include "ddlpackageprocessor.h"
 
-#if defined(_MSC_VER) && defined(DDLPKGPROC_DLLEXPORT)
+#if defined(_MSC_VER) && defined(DROPPARTITIONPROC_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
@@ -41,7 +41,6 @@ namespace ddlpackageprocessor
     class DropPartitionProcessor : public DDLPackageProcessor
     {
         public:
-			DropPartitionProcessor(BRM::DBRM* aDbrm) : DDLPackageProcessor(aDbrm){}
             /** @brief process a drop table statement
              *
              *  @param dropTableStmt the drop table statement

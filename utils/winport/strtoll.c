@@ -21,7 +21,25 @@
 
 #include "unistd.h"
 
+long long llabs(const long long in)
+{
+	if (in < 0) return -in;
+	return in;
+}
+
 long long atoll(const char* nptr)
 {
 	return strtoll(nptr, 0, 0);
+}
+
+unsigned long long strtoull(const char *nptr, char **endptr, int base)
+{
+	return (unsigned long long)strtoll(nptr, endptr, base);
+}
+
+long long idb_strtoll(const char *nptr, char **endptr, int base)
+{
+	long long out;
+	out = (long long)_strtoi64(nptr, endptr, base);
+	return out;
 }

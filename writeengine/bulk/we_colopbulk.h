@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: we_colopbulk.h 4726 2013-08-07 03:38:36Z bwilkinson $
+ * $Id: we_colopbulk.h 3720 2012-04-04 18:18:49Z rdempsey $
  *
  *****************************************************************************/
 
@@ -47,14 +47,14 @@ class ColumnOpBulk : public ColumnOp
                   ColumnOpBulk(Log* logger, int compressionType);
     virtual      ~ColumnOpBulk();
 
-    virtual bool  abbreviatedExtent(IDBDataFile*, int) const;
-    virtual int   blocksInFile(IDBDataFile*) const;
-    virtual IDBDataFile* openFile(const WriteEngine::Column& column,
+    virtual bool  abbreviatedExtent(FILE*, int) const;
+    virtual int   blocksInFile(FILE*) const;
+    virtual FILE* openFile(const WriteEngine::Column& column,
         uint16_t dbRoot, uint32_t partition, uint16_t segment,
-        std::string& segFile, bool useTmpSuffix, const char* mode = "r+b",
+        std::string& segFile, const char* mode = "r+b",
         int ioBuffSize = DEFAULT_BUFSIZ) const;
-    virtual int   readBlock(IDBDataFile*, unsigned char*, const uint64_t);
-    virtual int   saveBlock(IDBDataFile*, const unsigned char*, const uint64_t);
+    virtual int   readBlock(FILE*, unsigned char*, const i64);
+    virtual int   saveBlock(FILE*, const unsigned char*, const i64);
 };
 
 } //end of namespace

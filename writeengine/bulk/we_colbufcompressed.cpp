@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: we_colbufcompressed.cpp 4737 2013-08-14 20:45:46Z bwilkinson $
+ * $Id: we_colbufcompressed.cpp 4380 2012-12-06 13:29:54Z rdempsey $
  *
  ****************************************************************************/
 
@@ -42,10 +42,7 @@
 #include "we_fileop.h"
 #include "we_log.h"
 #include "we_stats.h"
-#include "IDBDataFile.h"
-using namespace idbdatafile;
 
-#include "idbcompress.h"
 using namespace compress;
 
 namespace WriteEngine {
@@ -84,7 +81,7 @@ ColumnBufferCompressed::~ColumnBufferCompressed()
 // Reset "this" ColumnBufferCompressed object to read a different file, by
 // resetting the FILE*, starting HWM, and the chunk pointers.
 //------------------------------------------------------------------------------
-int ColumnBufferCompressed::setDbFile(IDBDataFile* f, HWM startHwm, const char* hdrs)
+int ColumnBufferCompressed::setDbFile(FILE* f, HWM startHwm, const char* hdrs)
 {
     fFile        = f;
     fStartingHwm = startHwm;
@@ -355,7 +352,7 @@ int ColumnBufferCompressed::writeToFile(int startOffset, int writeSize)
 //------------------------------------------------------------------------------
 int ColumnBufferCompressed::compressAndFlush( bool bFinishingFile )
 {
-    const int OUTPUT_BUFFER_SIZE = IDBCompressInterface::maxCompressedSize(fToBeCompressedCapacity) +
+    const int OUTPUT_BUFFER_SIZE = int( (double)fToBeCompressedCapacity * 1.17 )+
         fUserPaddingBytes;
     unsigned char* compressedOutBuf = new unsigned char[ OUTPUT_BUFFER_SIZE ];
     boost::scoped_array<unsigned char> compressedOutBufPtr(compressedOutBuf);
@@ -388,8 +385,12 @@ int ColumnBufferCompressed::compressAndFlush( bool bFinishingFile )
     Stats::startParseEvent(WE_STATS_WRITE_COL);
 #endif
 
-    off64_t   fileOffset = fFile->tell();
-    size_t nitems =  fFile->write(compressedOutBuf, outputLen) / outputLen;
+#ifdef _MSC_VER
+    __int64 fileOffset = _ftelli64(fFile);
+#else
+    off_t   fileOffset = ftello(fFile);
+#endif
+    size_t nitems =  fwrite(compressedOutBuf, outputLen, 1, fFile);
     if (nitems != 1)
         return ERR_FILE_WRITE;
     CompChunkPtr compChunk(
@@ -414,7 +415,12 @@ int ColumnBufferCompressed::compressAndFlush( bool bFinishingFile )
     // See the description that precedes this function for more details.
     if ( bFinishingFile || !fFlushedStartHwmChunk )
     {
-        fileOffset = fFile->tell();
+#ifdef _MSC_VER
+        fileOffset = _ftelli64(fFile);
+#else
+        fileOffset = ftello(fFile);
+#endif
+
         RETURN_ON_ERROR( saveCompressionHeaders() );
 
         // If we just updated the chunk header for the starting HWM chunk,
@@ -424,7 +430,7 @@ int ColumnBufferCompressed::compressAndFlush( bool bFinishingFile )
             //char resp;
             //std::cout << "dbg: before fflush of hdrs" << std::endl;
             //std::cin  >> resp;
-        	if (fFile->flush() != 0)
+            if (fflush( fFile ) != 0)
                 return ERR_FILE_FLUSH;
             //std::cout << "dbg: after fflush of hdrs" << std::endl;
             //std::cin  >> resp;
@@ -479,49 +485,34 @@ int ColumnBufferCompressed::finishFile(bool bTruncFile)
         long long truncateFileSize = fChunkPtrs[fChunkPtrs.size()-1].first +
             fChunkPtrs[fChunkPtrs.size()-1].second;
 
-        // @bug5769 Don't initialize extents or truncate db files on HDFS
-        if (idbdatafile::IDBPolicy::useHdfs())
-        {
-            std::ostringstream oss1;
-            oss1 << "Finished writing column file"
-                ": OID-"    << fColInfo->curCol.dataFile.fid        <<
-                "; DBRoot-" << fColInfo->curCol.dataFile.fDbRoot    <<
-                "; part-"   << fColInfo->curCol.dataFile.fPartition <<
-                "; seg-"    << fColInfo->curCol.dataFile.fSegment   <<
-                "; size-"   << truncateFileSize;
-            fLog->logMsg( oss1.str(), MSGLVL_INFO2 );
-        }
+        std::ostringstream oss1;
+        oss1 << "Truncating column file"
+            ": OID-"    << fColInfo->curCol.dataFile.fid        <<
+            "; DBRoot-" << fColInfo->curCol.dataFile.fDbRoot    <<
+            "; part-"   << fColInfo->curCol.dataFile.fPartition <<
+            "; seg-"    << fColInfo->curCol.dataFile.fSegment   <<
+            "; size-"   << truncateFileSize;
+        fLog->logMsg( oss1.str(), MSGLVL_INFO2 );
+
+        int rc = NO_ERROR;
+        if (truncateFileSize > 0)
+            rc = fColInfo->colOp->truncateFile( fFile, truncateFileSize );
         else
+            rc = ERR_COMP_TRUNCATE_ZERO; //@bug 3913 - Catch truncate to 0 bytes
+        if (rc != NO_ERROR)
         {
-            std::ostringstream oss1;
-            oss1 << "Truncating column file"
-                ": OID-"    << fColInfo->curCol.dataFile.fid        <<
+            WErrorCodes ec;
+            std::ostringstream oss2;
+            oss2 << "finishFile: error truncating file for "        <<
+                "OID "      << fColInfo->curCol.dataFile.fid        <<
                 "; DBRoot-" << fColInfo->curCol.dataFile.fDbRoot    <<
                 "; part-"   << fColInfo->curCol.dataFile.fPartition <<
                 "; seg-"    << fColInfo->curCol.dataFile.fSegment   <<
-                "; size-"   << truncateFileSize;
-            fLog->logMsg( oss1.str(), MSGLVL_INFO2 );
+                "; size-"   << truncateFileSize                     <<
+                "; "        << ec.errorString(rc);
+            fLog->logMsg( oss2.str(), rc, MSGLVL_ERROR );
 
-            int rc = NO_ERROR;
-            if (truncateFileSize > 0)
-                rc = fColInfo->colOp->truncateFile( fFile, truncateFileSize );
-            else
-                rc = ERR_COMP_TRUNCATE_ZERO;//@bug3913-Catch truncate to 0 bytes
-            if (rc != NO_ERROR)
-            {
-                WErrorCodes ec;
-                std::ostringstream oss2;
-                oss2 << "finishFile: error truncating file for "        <<
-                    "OID "      << fColInfo->curCol.dataFile.fid        <<
-                    "; DBRoot-" << fColInfo->curCol.dataFile.fDbRoot    <<
-                    "; part-"   << fColInfo->curCol.dataFile.fPartition <<
-                    "; seg-"    << fColInfo->curCol.dataFile.fSegment   <<
-                    "; size-"   << truncateFileSize                     <<
-                    "; "        << ec.errorString(rc);
-                fLog->logMsg( oss2.str(), rc, MSGLVL_ERROR );
-
-                return rc;
-            }
+            return rc;
         }
     }
 
@@ -606,27 +597,18 @@ int ColumnBufferCompressed::initToBeCompressedBuffer(long long& startFileOffset)
     // case we start a new empty chunk.
     unsigned int chunkIndex             = 0;
     unsigned int blockOffsetWithinChunk = 0;
-    bool         bSkipStartingBlks      = false;
-    if (fPreLoadHWMChunk)
+    if (fPreLoadHWMChunk && (fChunkPtrs.size() > 0))
     {
-        if (fChunkPtrs.size() > 0)
-        {
-            fCompressor->locateBlock(fStartingHwm,
-                chunkIndex, blockOffsetWithinChunk);
-            if (chunkIndex < fChunkPtrs.size())
-                startFileOffset  = fChunkPtrs[chunkIndex].first;
-            else
-                fPreLoadHWMChunk = false;
-        }
-        // If we are at the start of the job, fPreLoadHWMChunk will be true,
-        // to preload the old HWM chunk.  But if we have no chunk ptrs, then
-        // we are starting on an empty PM.  In this case, we skip starting
-        // blks if fStartingHwm has been set.
+        fCompressor->locateBlock(fStartingHwm,
+            chunkIndex, blockOffsetWithinChunk);
+        if (chunkIndex < fChunkPtrs.size())
+            startFileOffset  = fChunkPtrs[chunkIndex].first;
         else
-        {
-            fPreLoadHWMChunk  = false;
-            bSkipStartingBlks = true;
-        }
+            fPreLoadHWMChunk = false;
+    }
+    else
+    {
+        fPreLoadHWMChunk = false;
     }
 
     // Preload (read and uncompress) the chunk for the starting HWM extent only
@@ -651,7 +633,8 @@ int ColumnBufferCompressed::initToBeCompressedBuffer(long long& startFileOffset)
 
         char* compressedOutBuf = new char[ fChunkPtrs[chunkIndex].second ];
         boost::scoped_array<char> compressedOutBufPtr(compressedOutBuf);
-        size_t itemsRead = fFile->read(compressedOutBuf, fChunkPtrs[chunkIndex].second) / fChunkPtrs[chunkIndex].second;
+        size_t itemsRead = fread(compressedOutBuf,
+                                 fChunkPtrs[chunkIndex].second, 1, fFile);
         if (itemsRead != 1)
         {
             std::ostringstream oss;
@@ -730,14 +713,8 @@ int ColumnBufferCompressed::initToBeCompressedBuffer(long long& startFileOffset)
             startFileOffset = fChunkPtrs[ fChunkPtrs.size()-1 ].first +
                               fChunkPtrs[ fChunkPtrs.size()-1 ].second;
 
-        // Position ourselves to start of empty to-be-compressed buffer.
-        // If we are starting the first extent on a PM, we may employ blk
-        // skipping at start of import; adjust fNumBytes accordingly.
-        // (see ColumnInfo::createDelayedFileIfNeeded() for discussion)
-        if (bSkipStartingBlks)
-            fNumBytes = fStartingHwm * BYTE_PER_BLOCK;
-        else
-            fNumBytes = 0;
+        // Positition ourselves to start of empty to-be-compressed buffer
+        fNumBytes           = 0;
     }
 
     return NO_ERROR;

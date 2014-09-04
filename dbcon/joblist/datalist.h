@@ -16,11 +16,11 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: datalist.h 9655 2013-06-25 23:08:13Z xlou $
+ * $Id: datalist.h 8436 2012-04-04 18:18:21Z rdempsey $
  *
  *****************************************************************************/
 
-/** @file
+/** @file 
  * DataList interface definition
  */
 
@@ -34,7 +34,7 @@
 namespace joblist
 {
 
-/*
+/* 
 	Need to implement the following members in element_t:
 	copy constructor
 	= operator
@@ -45,20 +45,20 @@ namespace joblist
  *
  *  DataList is an abstract interface that defines container-like methods.
  *  A producer adds elements using insert(e).  When it's done, it calls
- *  endOfInput().
- *
+ *  endOfInput().  
+ *  
  *  To retrieve elements, a
  *  consumer calls getIterator() once, then next(iterator, &e) for every
  *  element in the DataList.  next returns true when there was data to
  *  consume, false when there was no data (e will not be changed in this case).
  *
- *  The exact semantics of these calls depends on the derived class's
- *  implementation.
- *
+ *  The exact semantics of these calls depends on the derived class's 
+ *  implementation.  
+ * 
  *  - ConstantDataList is the simplest DataList.  All it does is return
  *  the same value over and over again.  It simplifies things upstream
  *  significantly for that behavior to be packaged as a DataList.
- *
+ * 
  *  - FIFO is made for simultaneous access by readers
  *  and writers and have a maximum size, so it's basically an implementation
  *  of the producer-consumer problem right out of the algorithm textbooks,
@@ -72,7 +72,7 @@ namespace joblist
  *  very large amounts of data.  Simultaneous access doesn't make sense here,
  *  so next() blocks until the producer calls endOfInput().
  *
- *  - BucketDL is used to cluster data according to some function provided
+ *  - BucketDL is used to cluster data according to some function provided 
  *  by the caller.  This DataList is used by the Hash join jobstep to reduce
  *  the too-large-for-memory hash problem into a set of subhashes.  It is
  *  also used as the intermediate step between a large random dataset
@@ -82,11 +82,11 @@ namespace joblist
  *  difference between this and the WSDL class is that the underlying container
  *  is an STL set, so it has some notion of order.  It also exposes an interface
  *  for loading and saving sets because band boundaries are only known at a higher
- *  level.  To use this class, be sure you have the \< operator defined for
+ *  level.  To use this class, be sure you have the \< operator defined for 
  *  whatever element type you're storing.
  */
 template<typename element_t>
-class DataList
+class DataList 
 {
 	public:
 		typedef element_t value_type;
@@ -123,7 +123,7 @@ class DataList
 
 		boost::mutex& getMutex() { return mutex; }   // why in the world is this necessary in FIFO?
 
-		boost::mutex mutex;
+		boost::mutex mutex;		
 		bool noMoreInput;
 		uint64_t consumersFinished;
 		uint32_t fElemDiskFirstSize; //byte size of element.first saved to disk

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_columninfocompressed.h 4450 2013-01-21 14:13:24Z rdempsey $
+* $Id: we_columninfocompressed.h 4250 2012-10-12 17:57:53Z dcathey $
 *
 *******************************************************************************/
 
@@ -84,7 +84,7 @@ class ColumnInfoCompressed : public ColumnInfo
     // newHWM - Starting point for adding data after initial blockskipping
     virtual int setupInitialColumnFile( HWM oldHWM, HWM newHWM );
 
-    virtual int saveDctnryStoreHWMChunk(bool& needBackup);
+    virtual int saveDctnryStoreHWMChunk();
     virtual int extendColumnOldExtent(
         uint16_t dbRootNext,
         uint32_t partitionNext,

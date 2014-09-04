@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: slavenode.cpp 1931 2013-07-08 16:53:02Z bpaul $
+ * $Id: slavenode.cpp 1933 2013-07-08 20:16:28Z bpaul $
  *
  ****************************************************************************/
 
@@ -35,7 +35,6 @@
 #include "rwlockmonitor.h"
 
 #include "utils_utf8.h"
-#include "IDBPolicy.h"
 
 using namespace BRM;
 using namespace std;
@@ -93,8 +92,6 @@ int main(int argc, char **argv)
 		fail();
 		exit(1);
 	}
-
-	idbdatafile::IDBPolicy::configIDBPolicy();
 
 	nodeName = argv[1];	
 	try {

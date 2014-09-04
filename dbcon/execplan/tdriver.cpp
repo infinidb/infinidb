@@ -1350,7 +1350,7 @@ int createTxns(const int& start, const int& end) {
 	verifyLen=manager->verifySize();
 	for (int idx = first; idx<last && verifyLen<maxNewTxns; idx++)
 	{
-		managerTxns[idx] = manager->newTxnID((uint32_t)idx+1000);
+		managerTxns[idx] = manager->newTxnID((u_int32_t)idx+1000);
 		CPPUNIT_ASSERT(managerTxns[idx].id>0);
 		CPPUNIT_ASSERT(managerTxns[idx].valid==true);
 		verifyLen=manager->verifySize();
@@ -1426,7 +1426,7 @@ void MonitorTestPlan_1() {
 			monitor = new SessionMonitor(); // read Monitor data
     		toTxns.clear();
 			toTxns = monitor->timedOutTxns(); // get timed out txns
-			CPPUNIT_ASSERT(toTxns.size()==(uint32_t)txnCntIncr*idx);
+			CPPUNIT_ASSERT(toTxns.size()==(uint)txnCntIncr*idx);
 
 			delete monitor;
 		}

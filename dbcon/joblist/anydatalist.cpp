@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-// $Id: anydatalist.cpp 9655 2013-06-25 23:08:13Z xlou $
+// $Id: anydatalist.cpp 8476 2012-04-25 22:28:15Z xlou $
 
 #include "elementtype.h"
 
@@ -58,7 +58,7 @@ AnyDataList::DataListTypes AnyDataList::strDlType(const StrDataList* dl)
 
 //AnyDataList::DataListTypes AnyDataList::tupleDlType(const TupleDataList* dl)
 //{
-//    if (dl == 0) return UNKNOWN_DATALIST;
+//    if (dl == 0) return UNKNOWN_DATALIST; 
 //    if (typeid(*dl) == typeid(TupleBucketDataList)) return TUPLEBUCKET_DATALIST;
 //    return UNKNOWN_DATALIST;
 //}

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: createindexprocessor.cpp 9210 2013-01-21 14:10:42Z rdempsey $
+ *   $Id: createindexprocessor.cpp 8436 2012-04-04 18:18:21Z rdempsey $
  *
  *
  ***********************************************************************/
@@ -240,9 +240,9 @@ try
                 colStruct.dataOid = column.oid;
 		
                 colStruct.colWidth = column.colType.colWidth > 8 ? 8 : column.colType.colWidth;
-                colStruct.tokenFlag = false;
-                colStruct.tokenFlag = column.colType.colWidth > 8 ? true : false;
-                colStruct.colDataType = column.colType.colDataType;
+		colStruct.tokenFlag = false;
+		colStruct.tokenFlag = column.colType.colWidth > 8 ? true : false;
+                colStruct.colDataType = static_cast<WriteEngine::ColDataType>(column.colType.colDataType);
 
                 if (column.colType.colWidth > 8 && !isNull)
                 {
@@ -343,9 +343,9 @@ try
 
                 colStructCol.dataOid = column.oid;
                 colStructCol.colWidth = column.colType.colWidth > 8 ? 8 : column.colType.colWidth;
-                colStructCol.tokenFlag = false;
-                colStructCol.tokenFlag = column.colType.colWidth > 8 ? true : false;
-                colStructCol.colDataType = column.colType.colDataType;
+		colStructCol.tokenFlag = false;
+		colStructCol.tokenFlag = column.colType.colWidth > 8 ? true : false;
+                colStructCol.colDataType = static_cast<WriteEngine::ColDataType>(column.colType.colDataType);
 
                 if (column.colType.colWidth > 8 && !isNull)
                 {

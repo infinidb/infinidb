@@ -1,27 +1,9 @@
-/* Copyright (C) 2014 InfiniDB, Inc.
-
-   This program is free software; you can redistribute it and/or
-   modify it under the terms of the GNU General Public License
-   as published by the Free Software Foundation; version 2 of
-   the License.
-
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-   MA 02110-1301, USA. */
-
 /***************************************************************************
  * $Id: memoryMonitor.cpp 34 2006-09-29 21:13:54Z dhill $
  *
  *   Author: Zhixuan Zhu
  ***************************************************************************/
 
-#include "cgroupconfigurator.h"
 #include "serverMonitor.h"
 
 using namespace std;
@@ -33,7 +15,6 @@ using namespace servermonitor;
 
 unsigned long totalMem;
 ProcessMemoryList pml;
-int swapFlag = 0;
 
 pthread_mutex_t MEMORY_LOCK;
 
@@ -49,53 +30,80 @@ void memoryMonitor()
 
 	int swapUsagePercent = 0;
 
+  	struct sysinfo myinfo; 
+
 	// set defaults
-	int memoryCritical = 90,
-				 memoryMajor = 0,
+	int memoryCritical = 90, 
+				 memoryMajor = 0, 
 				 memoryMinor = 0,
-				 swapCritical = 90,
-				 swapMajor = 80,
+				 swapCritical = 90, 
+				 swapMajor = 80, 
 				 swapMinor = 70;
 
 	int day = 0;
 
-	//set monitoring period to 60 seconds
-	int monitorPeriod = MONITOR_PERIOD;
-    utils::CGroupConfigurator cg;
+	//set monitoring period to 10 seconds
+	int monitorPeriod = 10;
 
 	while(true)
 	{
 		// Get MEMORY usage water mark from server configuration and compare
 		ModuleTypeConfig moduleTypeConfig;
 		Oam oam;
-
+		
 		try {
 			oam.getSystemConfig (moduleTypeConfig);
-			memoryCritical = moduleTypeConfig.ModuleMemCriticalThreshold;
-			memoryMajor = moduleTypeConfig.ModuleMemMajorThreshold;
+			memoryCritical = moduleTypeConfig.ModuleMemCriticalThreshold; 
+			memoryMajor = moduleTypeConfig.ModuleMemMajorThreshold; 
 			memoryMinor = moduleTypeConfig.ModuleMemMinorThreshold;
-			swapCritical = moduleTypeConfig.ModuleSwapCriticalThreshold;
-			swapMajor = moduleTypeConfig.ModuleSwapMajorThreshold;
+			swapCritical = moduleTypeConfig.ModuleSwapCriticalThreshold; 
+			swapMajor = moduleTypeConfig.ModuleSwapMajorThreshold; 
 			swapMinor = moduleTypeConfig.ModuleSwapMinorThreshold;
-		} catch (...)
+		} catch (runtime_error e)
 		{
-			sleep(5);
-			continue;
+			throw e;
 		}
+		
+		// get cache MEMORY stats
+		system("cat /proc/meminfo | grep Cached -m 1 | awk '{print $2}' > /tmp/cached");
+
+		ifstream oldFile ("/tmp/cached");
+
+		string strCache;
+		long long cache;
+
+		char line[400];
+		while (oldFile.getline(line, 400))
+		{
+			strCache = line;
+			break;
+		}
+		oldFile.close();
+
+		if (strCache.empty() )
+			cache = 0;
+		else
+			cache = atol(strCache.c_str()) * 1024;
+
+		try{
+	  		sysinfo(&myinfo);
+		}
+		catch (...) {}
 
 		//get memory stats
-		totalMem = cg.getTotalMemory();
-		uint64_t freeMem = cg.getFreeMemory();
-        uint64_t usedMem = totalMem - freeMem;
+		totalMem = myinfo.totalram ; 
+		unsigned long freeMem = myinfo.freeram ;
+
+		// adjust for cache, which is available memory
+		unsigned long usedMem = totalMem - freeMem - cache;
 
 		//get swap stats
-        uint64_t totalSwap = cg.getTotalSwapSpace();
-        uint64_t usedSwap = cg.getSwapInUse();
-
+		unsigned long totalSwap = myinfo.totalswap ;
+		unsigned long freeswap = myinfo.freeswap ;
+		unsigned long usedSwap = totalSwap - freeswap ;
 
 		if ( totalSwap == 0 ) {
 			swapUsagePercent = 0;
-			swapFlag = 2;
 
 			//get current day, log warning only once a day
 			time_t now;
@@ -106,7 +114,7 @@ void memoryMonitor()
 			if ( day != tm.tm_mday) {
 				day = tm.tm_mday;
 
-				//Log this event
+				//Log this event 
 				LoggingID lid(SERVER_MONITOR_LOG_ID);
 				MessageLog ml(lid);
 				Message msg;
@@ -123,7 +131,7 @@ void memoryMonitor()
 		if ( totalMem == 0 ) {
 			memoryUsagePercent = 0;
 
-			//Log this event
+			//Log this event 
 			LoggingID lid(SERVER_MONITOR_LOG_ID);
 			MessageLog ml(lid);
 			Message msg;
@@ -137,7 +145,7 @@ void memoryMonitor()
 
 		// check for Memory alarms
 		if (memoryUsagePercent >= memoryCritical && memoryCritical > 0 ) {
-			if ( monitorPeriod == MONITOR_PERIOD ) {
+			if ( monitorPeriod == 10 ) {
 				//first time called, log
 				//adjust if over 100%
 				if ( memoryUsagePercent > 100 )
@@ -163,7 +171,7 @@ void memoryMonitor()
 			monitorPeriod = 1;
 		}
 		else if (memoryUsagePercent >= memoryMajor && memoryMajor > 0 ) {
-			monitorPeriod = MONITOR_PERIOD;
+			monitorPeriod = 10;
 			LoggingID lid(SERVER_MONITOR_LOG_ID);
 			MessageLog ml(lid);
 			Message msg;
@@ -175,7 +183,7 @@ void memoryMonitor()
 			serverMonitor.sendResourceAlarm("Local-Memory", MEMORY_USAGE_MED, SET, memoryUsagePercent);
 		}
 		else if (memoryUsagePercent >= memoryMinor && memoryMinor > 0 ) {
-			monitorPeriod = MONITOR_PERIOD;
+			monitorPeriod = 10;
 			LoggingID lid(SERVER_MONITOR_LOG_ID);
 			MessageLog ml(lid);
 			Message msg;
@@ -187,7 +195,7 @@ void memoryMonitor()
 			serverMonitor.sendResourceAlarm("Local-Memory", MEMORY_USAGE_LOW, SET, memoryUsagePercent);
 		}
 		else {
-			monitorPeriod = MONITOR_PERIOD;
+			monitorPeriod = 10;
 			serverMonitor.checkMemoryAlarm("Local-Memory");
 		}
 
@@ -220,7 +228,6 @@ void memoryMonitor()
 			serverMonitor.checkSwapAction();
 		}
 		else if (swapUsagePercent >= swapMinor && swapMinor > 0 ) {
-			swapFlag = 2;
 			LoggingID lid(SERVER_MONITOR_LOG_ID);
 			MessageLog ml(lid);
 			Message msg;
@@ -232,12 +239,9 @@ void memoryMonitor()
 			serverMonitor.sendResourceAlarm("Swap", SWAP_USAGE_LOW, SET, swapUsagePercent);
 		}
 		else
-		{
-			swapFlag = 2;
 			serverMonitor.checkSwapAlarm("Swap");
-		}
 
-		// sleep, 1 minute
+		// sleep
 		sleep(monitorPeriod);
 
 	} // end of while loop
@@ -358,27 +362,14 @@ void ServerMonitor::checkSwapAlarm(string alarmItem, ALARMS alarmID)
 void ServerMonitor::checkSwapAction()
 {
 	Oam oam;
-
-	if ( swapFlag == 0 ) {
-		LoggingID lid(SERVER_MONITOR_LOG_ID);
-		MessageLog ml(lid);
-		Message msg;
-		Message::Args args;
-		args.add("Swap Space usage over Major threashold, startSystem failure");
-		msg.format(args);
-		ml.logCriticalMessage(msg);
-
-		swapFlag = 1;
-		sleep(5);
-		return;
-	}
-
-	string swapAction = "restartSystem";
-
+	string swapAction = "stopSystem";
+	
 	try {
 		oam.getSystemConfig ("SwapAction", swapAction);
-	} catch (...)
-	{}
+	} catch (runtime_error e)
+	{
+		throw e;
+	}
 
 	if (swapAction == "none")
 		return;

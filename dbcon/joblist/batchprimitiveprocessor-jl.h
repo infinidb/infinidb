@@ -16,10 +16,10 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: batchprimitiveprocessor-jl.h 9705 2013-07-17 20:06:07Z pleblanc $
+// $Id: batchprimitiveprocessor-jl.h 8774 2012-07-31 21:00:09Z pleblanc $
 // C++ Interface: batchprimitiveprocessor
 //
-// Description:
+// Description: 
 //
 //
 // Author: Patrick LeBlanc <pleblanc@calpont.com>, (C) 2008
@@ -35,7 +35,6 @@
 #include <boost/scoped_array.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/scoped_ptr.hpp>
-#include <boost/uuid/uuid.hpp>
 
 #include "primitivemsg.h"
 #include "serializeable.h"
@@ -47,7 +46,7 @@
 
 namespace joblist
 {
-const uint32_t LOGICAL_BLOCKS_CONVERTER = 23;  		// 10 + 13.  13 to convert to logical blocks,
+const uint LOGICAL_BLOCKS_CONVERTER = 23;  		// 10 + 13.  13 to convert to logical blocks,
 												// 10 to convert to groups of 1024 logical blocks
 
 // forward reference
@@ -61,31 +60,29 @@ public:
 	~BatchPrimitiveProcessorJL();
 
 	/* Interface used by the JobStep */
-
+	
 	/* Some accessors */
 	inline bool hasScan() { return _hasScan; }
 
 	/* For initializing the object */
-	inline void setSessionID(uint32_t num) { sessionID = num; }
-	inline void setStepID(uint32_t num) { stepID = num; }
+	inline void setSessionID(uint num) { sessionID = num; }
+	inline void setStepID(uint num) { stepID = num; }
 	inline void setUniqueID(uint32_t id) { uniqueID = id; }
-	inline void setQueryContext(const BRM::QueryContext &qc) { versionInfo = qc; }
-	inline void setTxnID(uint32_t num) { txnID = num; }
+	inline void setVersionNum(uint num) { versionNum = num; }
+	inline void setTxnID(uint num) { txnID = num; }
 	inline void setOutputType(BPSOutputType o) { ot = o;
 		if (ot == TUPLE || ot == ROW_GROUP) needRidsAtDelivery = true; }
 	inline void setNeedRidsAtDelivery(bool b) { needRidsAtDelivery = b; }
 	inline void setTraceFlags(uint32_t flags) {
 		LBIDTrace = ((flags & execplan::CalpontSelectExecutionPlan::TRACE_LBIDS) != 0);
 	}
-	inline uint32_t getRidCount() { return ridCount; }
-	inline void setThreadCount(uint32_t tc) { threadCount = tc; }
+	inline uint getRidCount() { return ridCount; }
 
+	void addFilterStep(const pColScanStep &);
 	void addFilterStep(const pColScanStep &, std::vector<BRM::LBID_t> lastScannedLBID);
-	void addFilterStep(const PseudoColStep &);
 	void addFilterStep(const pColStep &);
 	void addFilterStep(const pDictionaryStep &);
 	void addFilterStep(const FilterStep &);
-    void addProjectStep(const PseudoColStep &);
 	void addProjectStep(const pColStep &);
 	void addProjectStep(const PassThruStep &);
 	void addProjectStep(const pColStep &, const pDictionaryStep &);
@@ -101,9 +98,9 @@ public:
 	// void addDeliveryStep(const DeliveryStep &);
 
 	/* At runtime, feed input here */
-	void addElementType(const ElementType &, uint32_t dbroot);
-	void addElementType(const StringElementType &, uint32_t dbroot);
-	//void setRowGroupData(const rowgroup::RowGroup &);
+	void addElementType(const ElementType &, uint dbroot);
+	void addElementType(const StringElementType &, uint dbroot);
+	void setRowGroupData(const rowgroup::RowGroup &);
 
 	void runBPP(messageqcpp::ByteStream &, uint32_t pmNum);
 	void abortProcessing(messageqcpp::ByteStream *);
@@ -112,46 +109,41 @@ public:
 	void reset();
 
 	/* The JobStep calls these to initialize a BPP that starts with a column scan */
-	void setLBID(uint64_t lbid, const BRM::EMEntry &scannedExtent);
+	void setLBID(uint64_t lbid, uint dbroot = 1);
 	inline void setCount(uint16_t c) { idbassert(c > 0); count = c; }
 
 	/* Turn a ByteStream into ElementTypes or StringElementTypes */
 	void getElementTypes(messageqcpp::ByteStream &in, std::vector<ElementType> *out,
 		bool *validCPData, uint64_t *lbid, int64_t *min, int64_t *max, uint32_t *cachedIO, uint32_t *physIO,
-		uint32_t *touchedBlocks,
+		uint32_t *touchedBlocks, 
 		uint16_t *preJoinRidCount) const;
 	void getStringElementTypes(messageqcpp::ByteStream &in,
-		std::vector<StringElementType> *out, bool *validCPData, uint64_t *lbid,
-		int64_t *min, int64_t *max, uint32_t *cachedIO, uint32_t *physIO,
+		std::vector<StringElementType> *out, bool *validCPData, uint64_t *lbid, 
+		int64_t *min, int64_t *max, uint32_t *cachedIO, uint32_t *physIO, 
 		uint32_t *touchedBlocks) const;
 	/* (returns the row count) */
-//	uint32_t getTableBand(messageqcpp::ByteStream &in, messageqcpp::ByteStream *out,
+//	uint getTableBand(messageqcpp::ByteStream &in, messageqcpp::ByteStream *out,
 //		bool *validCPData, uint64_t *lbid, int64_t *min, int64_t *max,
 //		uint32_t *cachedIO, uint32_t *physIO, uint32_t *touchedBlocks) const;
 	void getTuples(messageqcpp::ByteStream &in, std::vector<TupleType> *out,
 		bool *validCPData, uint64_t *lbid, int64_t *min, int64_t *max,
 		uint32_t *cachedIO,	uint32_t *physIO, uint32_t *touchedBlocks) const;
-	void deserializeAggregateResults(messageqcpp::ByteStream *in,
-		std::vector<rowgroup::RGData> *out) const;
-	void getRowGroupData(messageqcpp::ByteStream &in, std::vector<rowgroup::RGData> *out,
+	boost::shared_array<uint8_t> getRowGroupData(messageqcpp::ByteStream &in,
 		bool *validCPData, uint64_t *lbid, int64_t *min, int64_t *max,
 		uint32_t *cachedIO,	uint32_t *physIO, uint32_t *touchedBlocks, bool *countThis,
-		uint32_t threadID) const;
-	void deserializeAggregateResult(messageqcpp::ByteStream *in,
-		std::vector<rowgroup::RGData> *out) const;
+		uint threadID) const;
 	bool countThisMsg(messageqcpp::ByteStream &in) const;
 
 	void setStatus(uint16_t s) {  status = s; }
 	uint16_t  getStatus() const { return status; }
 	void runErrorBPP(messageqcpp::ByteStream &);
-//	uint32_t getErrorTableBand(uint16_t error, messageqcpp::ByteStream *out);
-//	boost::shared_array<uint8_t> getErrorRowGroupData(uint16_t error) const;
-	rowgroup::RGData getErrorRowGroupData(uint16_t error) const;
+//	uint getErrorTableBand(uint16_t error, messageqcpp::ByteStream *out);
+	boost::shared_array<uint8_t> getErrorRowGroupData(uint16_t error) const;
 
 	// @bug 1098
 	std::vector<SCommand>& getFilterSteps() { return filterSteps; }
 	std::vector<SCommand>& getProjectSteps() { return projectSteps; }
-
+	
 	std::string toString() const;
 
 	/* RowGroup additions */
@@ -165,10 +157,10 @@ public:
 	/* Tuple hashjoin */
 	void useJoiners(const std::vector<boost::shared_ptr<joiner::TupleJoiner> > &);
 	bool nextTupleJoinerMsg(messageqcpp::ByteStream &);
-// 	void setSmallSideKeyColumn(uint32_t col);
+// 	void setSmallSideKeyColumn(uint col);
 
 	/* OR hacks */
-	void setBOP(uint32_t op);   // BOP_AND or BOP_OR, default is BOP_AND
+	void setBOP(uint op);   // BOP_AND or BOP_OR, default is BOP_AND
 	void setForHJ(bool b);  // default is false
 
 	/* self-join */
@@ -190,24 +182,20 @@ public:
 	}
 	const std::string toMiniString() const;
 
-	void priority(uint32_t p) { _priority = p; };
-	uint32_t priority() { return _priority; }
-
-	void deliverStringTableRowGroup(bool b);
-
-	void setUuid(const boost::uuids::uuid& u) { uuid = u; }
+	void priority(uint p) { _priority = p; };
+	uint priority() { return _priority; }
 
 private:
-	//void setLBIDForScan(uint64_t rid, uint32_t dbroot);
+	void setLBIDForScan(uint64_t rid, uint dbroot);
 
 	BPSOutputType ot;
 
 	bool needToSetLBID;
 
-	BRM::QueryContext versionInfo;
-	uint32_t txnID;
-	uint32_t sessionID;
-	uint32_t stepID;
+	uint versionNum;
+	uint txnID;
+	uint sessionID;
+	uint stepID;
 	uint32_t uniqueID;
 
 	// # of times to loop over the command arrays
@@ -238,7 +226,7 @@ private:
 //	TableBand templateTB;
 	uint32_t tableOID;
 	boost::scoped_array<int> tablePositions;
-	uint32_t tableColumnCount;
+	uint tableColumnCount;
 	bool sendValues;
 	bool sendAbsRids;
 	bool _hasScan;
@@ -246,9 +234,9 @@ private:
 
 	/* for tuple return type */
 	std::vector<uint16_t> colWidths;
-	uint32_t tupleLength;
-// 		uint32_t rowCounter;    // for debugging
-// 		uint32_t rowsProcessed;
+	uint tupleLength;
+// 		uint rowCounter;    // for debugging
+// 		uint rowsProcessed;
 	uint16_t status;
 
 	/* for Joiner serialization */
@@ -268,12 +256,13 @@ private:
 
 	/* UM portion of the PM join alg */
 	std::vector<boost::shared_ptr<joiner::TupleJoiner> > tJoiners;
+	std::vector<std::vector<uint8_t *> *> tSmallSides;
 	std::vector<rowgroup::RowGroup> smallSideRGs;
 	rowgroup::RowGroup largeSideRG;
-	std::vector<std::vector<uint32_t> > smallSideKeys;
-	boost::scoped_array<uint32_t> tlKeyLens;
+	std::vector<std::vector<uint> > smallSideKeys;
+	boost::scoped_array<uint> tlKeyLens;
 	bool sendTupleJoinRowGroupData;
-	uint32_t PMJoinerCount;
+	uint PMJoinerCount;
 
 	/* OR hack */
 	uint8_t bop;   // BOP_AND or BOP_OR
@@ -287,16 +276,11 @@ private:
 	rowgroup::RowGroup fe1Input, fe2Output;
 	rowgroup::RowGroup joinFERG;
 
-	mutable boost::scoped_array<rowgroup::RowGroup> primprocRG;   // the format of the data received from PrimProc
-	uint32_t threadCount;
-
 	unsigned fJoinerChunkSize;
-	uint32_t dbRoot;
+	uint dbRoot;
 	bool hasSmallOuterJoin;
 
-	uint32_t _priority;
-
-	boost::uuids::uuid uuid;
+	uint _priority;
 
 	friend class CommandJL;
 	friend class ColumnCommandJL;

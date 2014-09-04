@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_from_days.cpp 3921 2013-06-19 18:59:56Z bwilkinson $
+* $Id: func_from_days.cpp 3048 2012-04-04 15:33:45Z rdempsey $
 *
 *
 ****************************************************************************/
@@ -56,7 +56,9 @@ string Func_from_days::getStrVal(rowgroup::Row& row,
 							bool& isNull,
 							CalpontSystemCatalog::ColType& ct)
 {
-	return intToString(getIntVal(row, parm, isNull, ct));
+	ostringstream oss;
+	oss << getIntVal(row, parm, isNull, ct);
+	return oss.str();
 }
 
 int32_t Func_from_days::getDateIntVal(rowgroup::Row& row,
@@ -64,7 +66,7 @@ int32_t Func_from_days::getDateIntVal(rowgroup::Row& row,
 							bool& isNull,
 							CalpontSystemCatalog::ColType& ct)
 {
-	return (((getDatetimeIntVal(row, parm, isNull, ct) >> 32) & 0xFFFFFFC0) | 0x3E);
+	return (getDatetimeIntVal(row, parm, isNull, ct) >> 32) & 0xFFFFFFC0;
 }
 
 int64_t Func_from_days::getDatetimeIntVal(rowgroup::Row& row,
@@ -72,18 +74,53 @@ int64_t Func_from_days::getDatetimeIntVal(rowgroup::Row& row,
 							bool& isNull,
 							CalpontSystemCatalog::ColType& ct)
 {
+	uint ret_year, ret_month, ret_day;
+	uint year, temp, leap_day, day_of_year, days_in_year;
+	uint month_pos;
+	
 	double val1 = parm[0]->data()->getDoubleVal(row, isNull);
 	int64_t daynr = (int64_t)(val1 > 0 ? val1 + 0.5 : val1 - 0.5);
 
-	DateTime aDaytime;
-	helpers::get_date_from_mysql_daynr( daynr, aDaytime );
+	if (daynr <= 365 || daynr >= 3652500)
+	{
+		return 0;
+	}
+	else
+	{
+		year = daynr * 100 / 36525;
+		temp =(((year-1)/100+1)*3)/4;
+		day_of_year = (daynr - (long) year * 365) - (year-1)/4 + temp;
+		while (day_of_year > (days_in_year= funcexp::calc_days_in_year(year)))
+		{
+			day_of_year-=days_in_year;
+			year++;
+		}
+		leap_day=0;
+		if (days_in_year == 366)
+		{
+			if (day_of_year > 31+28)
+			{
+				day_of_year--;
+				if (day_of_year == 31+28)
+				leap_day=1;		/* Handle leapyears leapday */
+			}
+		}
+
+		for (month_pos = 0, ret_month = 1 ; day_of_year > daysInMonth[month_pos]; month_pos++, ret_month++)
+			day_of_year-= daysInMonth[month_pos];
+
+		ret_year=year;
+		ret_day=day_of_year+leap_day;
+	}
 	
-	// to be safe
+	DateTime aDaytime;
+	aDaytime.year = ret_year;
+	aDaytime.month = ret_month;
+	aDaytime.day = ret_day;
 	aDaytime.hour = 0;
 	aDaytime.minute = 0;
 	aDaytime.second = 0;
 	aDaytime.msecond = 0;
-
 	return (*(reinterpret_cast<uint64_t *> (&aDaytime)));
 }
 

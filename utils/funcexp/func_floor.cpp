@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: func_floor.cpp 3923 2013-06-19 21:43:06Z bwilkinson $
+//  $Id: func_floor.cpp 3048 2012-04-04 15:33:45Z rdempsey $
 
 
 #include <cstdlib>
@@ -62,13 +62,7 @@ int64_t Func_floor::getIntVal(Row& row,
 		case execplan::CalpontSystemCatalog::TINYINT:
 		case execplan::CalpontSystemCatalog::SMALLINT:
 		case execplan::CalpontSystemCatalog::DECIMAL:
-        case execplan::CalpontSystemCatalog::UDECIMAL:
 		{
-            if (op_ct.scale == 0)
-            {
-                ret = parm[0]->data()->getIntVal(row, isNull);
-                break;
-            }
 			IDB_Decimal decimal = parm[0]->data()->getDecimalVal(row, isNull);
 
 			if (isNull)
@@ -88,7 +82,7 @@ int64_t Func_floor::getIntVal(Row& row,
 				}
 
 				int64_t tmp = ret;
-				ret /= helpers::powerOf10_c[decimal.scale];
+				ret /= powerOf10_c[decimal.scale];
 
 				// Largest integer value not greater than X.
 				if (tmp < 0 && tmp < ret)
@@ -97,20 +91,8 @@ int64_t Func_floor::getIntVal(Row& row,
 		}
 		break;
 	
-        case execplan::CalpontSystemCatalog::UBIGINT:
-        case execplan::CalpontSystemCatalog::UINT:
-        case execplan::CalpontSystemCatalog::UMEDINT:
-        case execplan::CalpontSystemCatalog::UTINYINT:
-        case execplan::CalpontSystemCatalog::USMALLINT:
-        {
-            ret = (int64_t)parm[0]->data()->getUintVal(row, isNull);
-        }
-        break;
-
-        case execplan::CalpontSystemCatalog::DOUBLE:
-        case execplan::CalpontSystemCatalog::UDOUBLE:
+		case execplan::CalpontSystemCatalog::DOUBLE:
 		case execplan::CalpontSystemCatalog::FLOAT:
-        case execplan::CalpontSystemCatalog::UFLOAT:
 		{
 			ret = (int64_t) floor(parm[0]->data()->getDoubleVal(row, isNull));
 		}
@@ -119,7 +101,7 @@ int64_t Func_floor::getIntVal(Row& row,
 		case execplan::CalpontSystemCatalog::VARCHAR:
 		case execplan::CalpontSystemCatalog::CHAR:
 		{
-			const string& str = parm[0]->data()->getStrVal(row, isNull);
+			string str = parm[0]->data()->getStrVal(row, isNull);
 			if (!isNull)
 				ret = (int64_t) floor(strtod(str.c_str(), 0));
 		}
@@ -158,88 +140,6 @@ int64_t Func_floor::getIntVal(Row& row,
 }
 
 
-uint64_t Func_floor::getUintVal(Row& row,
-							FunctionParm& parm,
-							bool& isNull,
-							CalpontSystemCatalog::ColType& op_ct)
-{
-	int64_t ret = 0;
-
-	switch (op_ct.colDataType)
-	{
-		case execplan::CalpontSystemCatalog::BIGINT:
-		case execplan::CalpontSystemCatalog::INT:
-		case execplan::CalpontSystemCatalog::MEDINT:
-		case execplan::CalpontSystemCatalog::TINYINT:
-		case execplan::CalpontSystemCatalog::SMALLINT:
-		case execplan::CalpontSystemCatalog::DECIMAL:
-        case execplan::CalpontSystemCatalog::UDECIMAL:
-		{
-                ret = parm[0]->data()->getIntVal(row, isNull);
-		}
-		break;
-	
-        case execplan::CalpontSystemCatalog::UBIGINT:
-        case execplan::CalpontSystemCatalog::UINT:
-        case execplan::CalpontSystemCatalog::UMEDINT:
-        case execplan::CalpontSystemCatalog::UTINYINT:
-        case execplan::CalpontSystemCatalog::USMALLINT:
-        {
-            ret = (int64_t)parm[0]->data()->getUintVal(row, isNull);
-        }
-        break;
-
-        case execplan::CalpontSystemCatalog::DOUBLE:
-        case execplan::CalpontSystemCatalog::UDOUBLE:
-		case execplan::CalpontSystemCatalog::FLOAT:
-        case execplan::CalpontSystemCatalog::UFLOAT:
-		{
-			ret = (uint64_t)floor(parm[0]->data()->getDoubleVal(row, isNull));
-		}
-		break;
-
-		case execplan::CalpontSystemCatalog::VARCHAR:
-		case execplan::CalpontSystemCatalog::CHAR:
-		{
-			const string& str = parm[0]->data()->getStrVal(row, isNull);
-			if (!isNull)
-				ret = (uint64_t)floor(strtod(str.c_str(), 0));
-		}
-		break;
-
-		case execplan::CalpontSystemCatalog::DATE:
-		{
-			string str = DataConvert::dateToString1(parm[0]->data()->getDateIntVal(row, isNull));
-			if (!isNull)
-				ret = strtoull(str.c_str(), NULL, 10);
-		}
-		break;
-
-		case execplan::CalpontSystemCatalog::DATETIME:
-		{
-			string str =
-				DataConvert::datetimeToString1(parm[0]->data()->getDatetimeIntVal(row, isNull));
-
-			// strip off micro seconds
-			str = str.substr(0,14);
-
-			if (!isNull)
-                ret = strtoull(str.c_str(), NULL, 10);
-		}
-		break;
-
-		default:
-		{
-			std::ostringstream oss;
-			oss << "floor: datatype of " << execplan::colDataTypeToString(op_ct.colDataType);
-			throw logging::IDBExcept(oss.str(), ERR_DATATYPE_NOT_SUPPORT);
-		}
-	}
-
-	return ret;
-}
-
-
 double Func_floor::getDoubleVal(Row& row,
 							FunctionParm& parm,
 							bool& isNull,
@@ -254,7 +154,7 @@ double Func_floor::getDoubleVal(Row& row,
 	else if (op_ct.colDataType == CalpontSystemCatalog::VARCHAR ||
 			 op_ct.colDataType == CalpontSystemCatalog::CHAR)
 	{
-		const string& str = parm[0]->data()->getStrVal(row, isNull);
+		string str = parm[0]->data()->getStrVal(row, isNull);
 		if (!isNull)
 			ret = floor(strtod(str.c_str(), 0));
 	}
@@ -272,40 +172,28 @@ string Func_floor::getStrVal(Row& row,
 							bool& isNull,
 							CalpontSystemCatalog::ColType& op_ct)
 {
-	char tmp[512] = {'\0'};
+	string ret;
 	if (op_ct.colDataType == CalpontSystemCatalog::DOUBLE ||
-		op_ct.colDataType == CalpontSystemCatalog::UDOUBLE ||
 		op_ct.colDataType == CalpontSystemCatalog::FLOAT ||
-		op_ct.colDataType == CalpontSystemCatalog::UFLOAT ||
 		op_ct.colDataType == CalpontSystemCatalog::VARCHAR ||
 		op_ct.colDataType == CalpontSystemCatalog::CHAR)
 	{
-		snprintf(tmp, 511, "%f", getDoubleVal(row, parm, isNull, op_ct));
+		ostringstream oss;
+		oss << fixed << getDoubleVal(row, parm, isNull, op_ct);
 
 		// remove the decimals in the oss string.
-		char *d = tmp;
-		while ((*d != '.') && (*d != '\0'))
-			d++;
-		*d = '\0';
+		ret = oss.str();
+		size_t d = ret.find('.');
+		ret = ret.substr(0, d);
 	}
-	else if (isUnsigned(op_ct.colDataType))
-	{
-#ifndef __LP64__
-        snprintf(tmp, 511, "%llu", getUintVal(row, parm, isNull, op_ct));
-#else
-        snprintf(tmp, 511, "%lu", getUintVal(row, parm, isNull, op_ct));
-#endif
-    }
 	else
 	{
-#ifndef __LP64__
-        snprintf(tmp, 511, "%lld", getIntVal(row, parm, isNull, op_ct));
-#else
-        snprintf(tmp, 511, "%ld", getIntVal(row, parm, isNull, op_ct));
-#endif
+		ostringstream oss;
+		oss << getIntVal(row, parm, isNull, op_ct);
+		ret = oss.str();
 	}
 
-	return string(tmp);
+	return ret;
 }
 
 

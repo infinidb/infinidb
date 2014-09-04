@@ -105,7 +105,7 @@ const uint8_t CHUNK_MAGIC1 = 0xff;
 const int SIG_OFFSET = 0;
 const int CHECKSUM_OFFSET = 1;
 const int LEN_OFFSET = 5;
-const uint32_t HEADER_SIZE = 9;
+const uint HEADER_SIZE = 9;
 
 const int ERR_OK = 0;
 const int ERR_CHECKSUM = -1;
@@ -137,6 +137,15 @@ void log(const string &s)
 {
 	cerr << s << endl;
 }
+
+struct CompressedDBFileHeader
+{
+	uint64_t fMagicNumber;
+	uint64_t fVersionNum;
+	uint64_t fCompressionType;
+	uint64_t fHeaderSize;
+	uint64_t fBlockCount;
+};
 
 struct DecomMessage
 {
@@ -280,9 +289,6 @@ void readn(int fd, void* buf, const size_t wanted)
 	ssize_t rrc = -1;
 	pollfd fds[1];
 	int en = 0;
-	int prc = 0;
-	ostringstream oss;
-	unsigned zerocount=0;
 
 	fds[0].fd = fd;
 	fds[0].events = POLLIN;
@@ -290,22 +296,7 @@ void readn(int fd, void* buf, const size_t wanted)
 	while (wanted > sofar)
 	{
 		fds[0].revents = 0;
-		errno = 0;
-		prc = poll(fds, 1, -1);
-		en = errno;
-		if (prc <= 0)
-		{
-			if (en == EAGAIN || en == EINTR || en == 512)
-				continue;
-			oss << "decomsvr::readn: poll() returned " << prc << " (" << strerror(en) << ")";
-			idbassert_s(0, oss.str());
-		}
-		//no data on fd
-		if ((fds[0].revents & POLLIN) == 0)
-		{
-			oss << "decomsvr::readn: revents for fd " << fds[0].fd << " was " << fds[0].revents;
-			idbassert_s(0, oss.str());
-		}
+		poll(fds, 1, -1);
 		errno = 0;
 		rrc = read(fd, (p + sofar), needed);
 		en = errno;
@@ -313,24 +304,10 @@ void readn(int fd, void* buf, const size_t wanted)
 		{
 			if (en == EAGAIN || en == EINTR || en == 512)
 				continue;
-			oss << "decomsvr::readn: read() returned " << rrc << " (" << strerror(en) << ")";
+			ostringstream oss;
+			oss << "decomsrv: read() returned " << rrc << " (" << strerror(en) << ")";
 			idbassert_s(0, oss.str());
 		}
-		if (rrc == 0)
-		{
-			ostringstream os;
-			zerocount++;
-			if (zerocount >= 10)
-			{
-				os << "decomsvr::readn(): too many zero-length reads!";
-				idbassert_s(0, oss.str());
-			}
-			os << "decomsvr::readn(): zero-length read on fd " << fd;
-			log(os.str());
-			sleep(1);
-		}
-		else
-			zerocount = 0;
 		needed -= rrc;
 		sofar += rrc;
 	}
@@ -653,30 +630,21 @@ void ThreadFunc::operator()()
 	CloseHandle(h);
 	cleaner.handle = INVALID_HANDLE_VALUE;
 #else
-	scoped_array<char> in;
-	int fd=-1;
-	try
-	{
-		fd = open(cfifo.c_str(), O_RDONLY);
-		idbassert_s(fd >= 0, "when opening data fifo for input");
+	int fd = open(cfifo.c_str(), O_RDONLY);
+	idbassert_s(fd >= 0, "when opening data fifo for input");
+//	if (fd < 0)
+//		throw runtime_error("when opening data fifo for input");
 
-		cleaner.fd = fd;
+	cleaner.fd = fd;
 
-		readn(fd, &ccount, 8);
+	readn(fd, &ccount, 8);
 
-		in.reset(new char[ccount]);
+	scoped_array<char> in(new char[ccount]);
 
-		readn(fd, in.get(), ccount);
+	readn(fd, in.get(), ccount);
 
-		close(fd);
-		cleaner.fd = -1;
-	}
-	catch (std::exception& )
-	{
-		//This is a protocol error and returning here will clean up resources on
-		//the stack unwind.
-		return;
-	}
+	close(fd);
+	cleaner.fd = -1;
 #endif
 #ifdef _MSC_VER
 	h = CreateFile(ufifo.c_str(), GENERIC_WRITE, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
@@ -712,42 +680,39 @@ void ThreadFunc::operator()()
 	CloseHandle(h);
 	cleaner.handle = INVALID_HANDLE_VALUE;
 #else
-	scoped_array<char> out;
-	try
-	{
-		fd = open(ufifo.c_str(), O_WRONLY);
-		idbassert_s(fd >= 0, "when opening data fifo for output");
-		//if (fd < 0)
-		//	throw runtime_error("when opening data fifo for output");
+	fd = open(ufifo.c_str(), O_WRONLY);
+	idbassert_s(fd >= 0, "when opening data fifo for output");
+	//if (fd < 0)
+	//	throw runtime_error("when opening data fifo for output");
 
-		cleaner.fd = fd;
+	cleaner.fd = fd;
 
-		uint64_t outlen = 512 * 1024 * 8;
-		unsigned int ol = outlen;
+	uint64_t outlen = 512 * 1024 * 8;
+	unsigned int ol = outlen;
 
-		out.reset(new char[outlen]);
+	scoped_array<char> out(new char[outlen]);
 
-		int crc = uncompressBlock(in.get(), ccount, reinterpret_cast<unsigned char*>(out.get()), ol);
-		if (crc != ERR_OK)
-			outlen = 0;
-		else
-			outlen = ol;
+	int crc = uncompressBlock(in.get(), ccount, reinterpret_cast<unsigned char*>(out.get()), ol);
+	if (crc != ERR_OK)
+		outlen = 0;
+	else
+		outlen = ol;
 
-		rrc = writen(fd, &outlen, 8);
-		idbassert_s(rrc == 8, "when writing len to data fifo");
+	rrc = writen(fd, &outlen, 8);
+	idbassert_s(rrc == 8, "when writing len to data fifo");
+	//if (rrc != 8)
+	//{
+	//	throw runtime_error("when writing len to data fifo");
+	//}
+	rrc = writen(fd, out.get(), outlen);
+	idbassert_s(rrc == (ssize_t)outlen, "when writing data to data fifo");
+	//if (rrc != (ssize_t)outlen)
+	//{
+	//	throw runtime_error("when writing data to data fifo");
+	//}
 
-		rrc = writen(fd, out.get(), outlen);
-		idbassert_s(rrc == (ssize_t)outlen, "when writing data to data fifo");
-
-		close(fd);
-		cleaner.fd = -1;
-	}
-	catch (std::exception& )
-	{
-		//There was an error writing the uncompressed data back to PrimProc. Cleanup by
-		//unwinding the stack
-		return;
-	}
+	close(fd);
+	cleaner.fd = -1;
 #endif
 }
 

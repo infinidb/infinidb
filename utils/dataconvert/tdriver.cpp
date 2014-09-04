@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /**
-* $Id: tdriver.cpp 3495 2013-01-21 14:09:51Z rdempsey $
+* $Id: tdriver.cpp 3273 2012-09-12 21:40:12Z bwilkinson $
 */
 
 #include <iostream>
@@ -24,7 +24,6 @@
 using namespace std;
 
 #include <boost/any.hpp>
-#include <boost/date_time/gregorian/gregorian.hpp>
 using namespace boost;
 
 #include <cppunit/extensions/HelperMacros.h>
@@ -57,7 +56,6 @@ CPPUNIT_TEST( dc_datetimetostrtest );
 CPPUNIT_TEST( dc_datetimetostr1test );
 CPPUNIT_TEST( dc_datetimetest_perf );
 CPPUNIT_TEST( dc_datetimetomysqlinttest );
-CPPUNIT_TEST( dc_datevalidtest );
 CPPUNIT_TEST( dc9 );
 CPPUNIT_TEST( dc10 );
 CPPUNIT_TEST_SUITE_END();
@@ -748,7 +746,7 @@ void dc8()
 {
 	data = "2007-05-11";
 	int status = 0;
-	uint32_t anyval;
+	u_int32_t anyval;
 	anyval = converter.convertColumnDate( data.c_str(), CALPONTDATE_ENUM, status, data.length());
 	CPPUNIT_ASSERT(anyval == 131551998);
 	std::string backToString = converter.dateToString(anyval);
@@ -885,9 +883,9 @@ void dc_datetest()
 			{ "200001", Date() },                 // no day
 			{ "000101", Date(2000,1,1) },
 			{ "01-01-2000", Date() },             // can not swap field order
-			//{ "100-10-1", Date(100,10,1) },     // boost min date is 1400-1-1
+			{ "100-10-1", Date(100,10,1) },
 			{ "10-100-1", Date() },               // invalid month=100
-			//{ "5-02-28", Date(5,2,28) },        // boost min date is 1400-1-1
+			{ "5-02-28", Date(5,2,28) },
 			{ "2000-02-28", Date(2000,2,28) },
 			{ "2000-02-29", Date(2000,2,29) },
 			{ "2004-02-29", Date(2004,2,29) },
@@ -900,13 +898,11 @@ void dc_datetest()
 			{ "2005-06-23tomorrow ", Date() },    // no trailing text
 			{ "2006-011-29 ", Date(2006,11,29) },
 			{ "2006-11-029 ", Date(2006,11,29) },
-			{ "10000-01-02 ", Date() },
-			{ "1999-0102 ", Date() },
 	};
 
 	for (unsigned i = 0; i < sizeof(date_tests)/sizeof(DateCheck); i++)
 	{
-		uint32_t val = converter.stringToDate(date_tests[i].str);
+		u_int32_t val = converter.stringToDate(date_tests[i].str);
 		bool check = (((uint32_t)(val & 0xFFFFFFC0)) == ((*(reinterpret_cast<uint32_t *> (&date_tests[i].date))) & 0xFFFFFFC0));
 		if (!check)
 		{
@@ -1057,7 +1053,7 @@ void dc_datetimetest()
 			{ "2008-01-01 10", DateTime(2008,1,1,10,0,0,0) },
 			{ "200903311030", DateTime() },                // Interprets as YYMMDDHHMMSS so hour(31) is invalid
 			{ "20090331103017", DateTime(2009,03,31,10,30,17,0) },
-			// { "2009-04-28 11.34.55", DateTime(2009,4,28,11,34,55,0) }, // no more support for arbitrary separators
+			{ "2009-04-28 11.34.55", DateTime(2009,4,28,11,34,55,0) },
 			{ "20100228T134501", DateTime(2010,02,28,13,45,1,0)  },
 			{ "10:45:00 2010-01-31", DateTime() },         // can't switch time/date order
 			{ "0000-00-00 00:00:00", DateTime() },          // invalid date/time
@@ -1184,72 +1180,6 @@ void dc_datetimetomysqlinttest()
 		}
 
 		CPPUNIT_ASSERT( check );
-	}
-}
-
-void check_date( int year, int month, int day, bool valid, bool boost_only = false )
-{
-	bool idbval = isDateValid( day, month, year );
-
-	bool boostval;
-	try
-	{
-		boost::gregorian::date d( year, month, day );
-		boostval = true;
-	}
-	catch (...)
-	{
-		boostval = false;
-	}
-
-	bool check = boost_only ? (idbval == boostval) :
-					(idbval == valid && ((boostval == idbval) || boostval));
-	if (!check)
-	{
-		cout << "(" << year << "," << month << "," << day << "), expected:"
-				<< valid << ", idb=" << idbval << ", boost=" << boostval << endl;
-	}
-
-	CPPUNIT_ASSERT( check );
-}
-
-void dc_datevalidtest()
-{
-	struct Check {
-		int         year;
-		int         month;
-		int         day;
-		bool        valid;
-	};
-
-	Check tests[] =
-	{
-		{ 2000, 2, 29, true },
-		{ 2001, 2, 29, false },
-		{ 1900, 2, 29, false },
-		{ 1900, 2, 28, true },
-		{ 1399, 12, 31, false },
-		{ 10000, 1, 1, false },
-		{ 2000, 0, 29, false },
-		{ 2000, 13, 29, false },
-		{ 2000, 1, 0, false },
-		{ 2000, 1, 32, false },
-	};
-
-	// predefined tests shown above
-	for (unsigned i = 0; i < sizeof(tests)/sizeof(Check); i++)
-	{
-		check_date( tests[i].year, tests[i].month, tests[i].day, tests[i].valid );
-	}
-	// randomly generated date tests
-	for (unsigned i = 0; i < 1000000; i++)
-	{
-		int year = random() % 9000 + 1200; // some spillage on either side
-		if( year == 10000 )
-			--year; // year 10000 is not good because boost calls it good but we don't want to
-		int month = random() % 14; // some spillage on either side
-		int day = random() % 33; // some spillage on either side
-		check_date( year, month, day, true, true );
 	}
 }
 

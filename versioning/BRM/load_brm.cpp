@@ -16,13 +16,12 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: load_brm.cpp 1905 2013-06-14 18:42:28Z rdempsey $
+ * $Id: load_brm.cpp 1941 2013-07-15 15:54:10Z rdempsey $
  *
  ****************************************************************************/
 #include <unistd.h>
 #include <iostream>
 #include <string>
-#include <stdexcept>
 using namespace std;
 
 #include <boost/interprocess/shared_memory_object.hpp>
@@ -30,7 +29,6 @@ using namespace std;
 #include <boost/interprocess/sync/interprocess_mutex.hpp>
 namespace bi=boost::interprocess;
 
-#include "IDBPolicy.h"
 #include "blockresolutionmanager.h"
 #include "shmkeys.h"
 using namespace BRM;
@@ -78,13 +76,12 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	idbdatafile::IDBPolicy::configIDBPolicy();
-
 	BlockResolutionManager brm;
 	int err;
 	string prefix;
 
 	prefix = argv[optind];
+
 	err = brm.loadState(prefix, fflg);
 	if (err != 0) {
 		cout << "Loading BRM snapshot failed (" << prefix << ")\n";
@@ -100,16 +97,18 @@ int main(int argc, char **argv)
 	ShmKeys shmkeys;
 	string key_name = ShmKeys::keyToName(shmkeys.DECOMSVRMUTEX_SYSVKEY);
 	bi::shared_memory_object::remove(key_name.c_str());
-	bi::permissions perms;
-	perms.set_unrestricted();
 	try {
+#if BOOST_VERSION < 104500
+		bi::shared_memory_object shm(bi::create_only, key_name.c_str(), bi::read_write);
+#else
+		bi::permissions perms;
+		perms.set_unrestricted();
 		bi::shared_memory_object shm(bi::create_only, key_name.c_str(), bi::read_write, perms);
+#endif
 		shm.truncate(sizeof(CtlShmImage));
 		bi::mapped_region region(shm, bi::read_write);
 		(void)new (region.get_address()) CtlShmImage;
 	} catch (...) {
-		//Hmm...we just deleted it above, but the create failed...just bail out
-		throw runtime_error("couldn't create DecomSvr shm");
 	}
 
 	/* An OAM friendly success msg */

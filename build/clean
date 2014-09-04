@@ -1,12 +1,13 @@
 #!/bin/sh
 #
-# $Id: clean 1843 2013-03-14 21:43:13Z pleblanc $
+# $Id: clean 1844 2013-03-15 14:25:45Z pleblanc $
 #
 
 for x in \
 dbcon \
 ddlproc \
 decomsvr \
+dmlib \
 dmlproc \
 exemgr \
 mysql \

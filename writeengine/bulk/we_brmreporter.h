@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: we_brmreporter.h 4731 2013-08-09 22:37:44Z wweeks $
+ * $Id: we_brmreporter.h 3983 2012-07-02 16:11:06Z bpaul $
  *
  *****************************************************************************/
 
@@ -27,8 +27,7 @@
 #include "boost/tuple/tuple.hpp"
 
 #include "brmtypes.h"
-#include "calpontsystemcatalog.h"
-using namespace execplan;
+
 /** @file
  * class BRMReporter
  */
@@ -69,16 +68,6 @@ class BRMReporter
      */
     void addToHWMInfo(const BRM::BulkSetHWMArg& hwmEntry);
 
-    /** @brief Add a Column FileInfo entry to the output list
-     *  @param fileEntry file information to be be added to output list
-     */
-    void addToFileInfo(const BRM::FileInfo& fileEntry);
-
-    /** @brief Add a Dictionary FileInfo entry to the output list
-     *  @param fileEntry file information to be be added to output list
-     */
-    void addToDctnryFileInfo(const BRM::FileInfo& fileEntry);
-
     /** @brief Add a ErrMsg entry to the output list
      *  @param Critical Error Message
      */
@@ -87,7 +76,7 @@ class BRMReporter
     /* @brief Save Critical error messages to the BRM report file
      * @param rptFileName Name of file to save info, else info is dropped
      */
-    void sendErrMsgToFile ( const std::string& rptFileName );
+	void sendErrMsgToFile ( const std::string& rptFileName );
 
     /** @brief Send HWM and Casual Partition Data to the applicable destination
      *  @param rptFileName Name of file to save info, else info is sent to BRM.
@@ -102,12 +91,11 @@ class BRMReporter
      *  @param totalReadRows Total number of rows read
      *  @param totalInsertedRows Total number of rows inserted
      *  @param satCounts Number of out-of-range values for each column,
-     *                   Vector is vector of column oid, count pairs.
+     *                   Vector is vector of column name, count pairs.
      */
-    void reportTotals(uint64_t totalReadRows,
-                      uint64_t totalInsertedRows,
-               const std::vector<boost::tuple<CalpontSystemCatalog::ColDataType,
-                                 uint64_t,uint64_t> >& satCounts);
+    void reportTotals(u_int64_t totalReadRows,
+                      u_int64_t totalInsertedRows,
+               const std::vector<boost::tuple<ColDataType,std::string,u_int64_t> >& satCounts);
 
     /** @brief Generate report for job that exceeds error limit
      *  @param rptFileName Name of file to save info, else info is dropped
@@ -135,11 +123,9 @@ class BRMReporter
     std::string       fTableName;   // Name of db table we are saving info for
     BRM::CPInfoMergeList_t          fCPInfo;  // Collection of CP info to send
     std::vector<BRM::BulkSetHWMArg> fHWMInfo; // Collection of HWM info to send
-    std::vector<std::string>        fCritErrMsgs; //Collection of CRIT ERRs
+	std::vector<std::string>		fCritErrMsgs;	//Collection of CRIT ERRs
     std::string       fRptFileName; // Name of BRM report file
     std::ofstream     fRptFile;     // BRM report file that is generated
-    std::vector<BRM::FileInfo> fFileInfo;  // Column files to flush from FDcache
-    std::vector<BRM::FileInfo> fDctnryFileInfo;//Dct files to flush from FDcache
 };
 
 } // end of namespace

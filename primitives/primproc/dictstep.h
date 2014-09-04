@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: dictstep.h 2110 2013-06-19 15:51:38Z bwilkinson $
+// $Id: dictstep.h 1855 2012-04-04 18:20:09Z rdempsey $
 // C++ Interface: dictstep
 //
 // Description: 
@@ -46,8 +46,8 @@ class DictStep : public Command
 		void execute();
 		void project();
 		void project(int64_t *vals);		//used by RTSCommand to redirect input
-		void projectIntoRowGroup(rowgroup::RowGroup &rg, uint32_t row);
-		void projectIntoRowGroup(rowgroup::RowGroup &rg, int64_t *vals, uint32_t col);
+		void projectIntoRowGroup(rowgroup::RowGroup &rg, uint row);
+		void projectIntoRowGroup(rowgroup::RowGroup &rg, int64_t *vals, uint col);
 		uint64_t getLBID();
 
 		/* This doesn't do anything for this class...  make it column-specific or not? */
@@ -69,21 +69,12 @@ class DictStep : public Command
 		DictStep(const DictStep &);
  		DictStep& operator=(const DictStep &);
 
- 		struct StringPtr {
- 			const uint8_t* ptr;
- 			unsigned    len;
-
- 			StringPtr() : ptr(NULL), len(0) {;}
-			StringPtr(const uint8_t* p, unsigned l) : ptr(p), len(l) {;}
- 		};
-
 		void _execute();
 		void issuePrimitive(bool isProjection);
 		void processResult();
-		void projectResult(std::string* tmpStrings);
-		void projectResult(StringPtr *tmpStrings);
+		void projectResult(std::string *tmpStrings);
 		void _project();
-		void _projectToRG(rowgroup::RowGroup &rg, uint32_t col);
+		void _projectToRG(rowgroup::RowGroup &rg, uint col);
 
 		// struct used for scratch space
 		struct OrderedToken {
@@ -111,8 +102,8 @@ class DictStep : public Command
 
 		// Worst case, 8192 tokens in the msg.  Each is 10 bytes. */
 		boost::scoped_array<uint8_t> inputMsg;
-		uint32_t tmpResultCounter;
-		uint32_t totalResultLength;
+		uint tmpResultCounter;
+		uint totalResultLength;
 		DictInput *primMsg;
 		std::vector<uint8_t> result;
 

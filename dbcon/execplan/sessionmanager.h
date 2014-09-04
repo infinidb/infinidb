@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: sessionmanager.h 9215 2013-01-24 18:40:12Z pleblanc $
+ * $Id: sessionmanager.h 8924 2012-09-19 18:25:54Z pleblanc $
  *
  *****************************************************************************/
 
@@ -29,6 +29,7 @@
 
 #include "calpontsystemcatalog.h"
 #include "brm.h"
+#include "brmtypes.h"
 #include "boost/shared_array.hpp"
 
 namespace execplan {
@@ -76,6 +77,34 @@ public:
 	
 	/** @brief SID = Session ID */
 	typedef uint32_t SID;
+	/** @brief A type describing a single transaction ID */
+//	struct _TxnID {
+		/// The TransactionID number
+//		CalpontSystemCatalog::SCN		id;
+		/// True iff the id is valid.
+//		bool							valid;   
+//		_TxnID();
+//	};
+	/** @brief A type describing a single transaction ID */
+//	typedef struct _TxnID TxnID;
+	
+	/** @brief A type associating a session with a transaction */
+//		struct _SIDTIDEntry {
+		/// The Transaction ID.  txnid.valid determines whether or not this SIDTIDEntry is valid
+//			TxnID			txnid;
+		/// The session doing the transaction
+//			SID				sessionid;	
+		/// tableOID the table OID involved in the transaction or cpimport
+//			CalpontSystemCatalog::OID   tableOID;
+		/// processID the process ID which locked the table, only valid when table is locked.
+//			u_int32_t  processID;
+		///processName the process name which locked the table, only valid when table is locked.
+//			std::string   processName;
+		
+//			_SIDTIDEntry();
+//		};
+	/** @brief A type associating a session with a transaction */
+//		typedef struct _SIDTIDEntry SIDTIDEntry;
 	
 	/** @brief Constructor
 	 *
@@ -111,13 +140,13 @@ public:
 	 *
 	 * Gets the current version ID.
 	 */
-	const BRM::QueryContext verID();
+	const CalpontSystemCatalog::SCN verID(void);
 	
 	/** @brief Gets the current systemcatalog version ID
 	 *
 	 * Gets the current systemcatalog version ID.
 	 */
-	const BRM::QueryContext sysCatVerID();
+	const CalpontSystemCatalog::SCN sysCatVerID(void);
 	
 	/** @brief Gets a new Transaction ID
 	 *

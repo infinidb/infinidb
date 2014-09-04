@@ -128,11 +128,11 @@ string Func_time_format::getStrVal(rowgroup::Row& row,
 			return "";
 	}
 	
-	const string& format = parm[1]->data()->getStrVal(row, isNull);
+	string format = parm[1]->data()->getStrVal(row, isNull);
 
 	char* ptr = buf;
 	
-	for (uint32_t i = 0; i < format.length(); i++)
+	for (uint i = 0; i < format.length(); i++)
 	{
 		if (format[i] != '%')
 			*ptr++ = format[i];

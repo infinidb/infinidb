@@ -39,7 +39,7 @@ expect -re "word: "
 send "$PASSWORD\n"
 # check return
 expect {
-	-re "# "                 { send_user "                 DONE" }
+	-re "# "                 { send_user "                 DONE" } abort
 	-re "Permission denied"  { send_user "                 FAILED: Invalid password\n" } exit; 
 	-re "mv"                 { send_user "                 FAILED: copy filed\n" ; exit}
 }
@@ -55,7 +55,7 @@ expect -re "word: "
 send "$PASSWORD\n"
 # check return
 expect {
-	-re "100%" 				        { send_user "      DONE" }
+	-re "100%" 				        { send_user "      DONE" } abort
 	-re "scp"  				        { send_user "      FAILED\n" ; 
 				 			send_user "\n*** Installation Failed\n" ; 
 							exit }

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: sqlstatement.cpp 9210 2013-01-21 14:10:42Z rdempsey $
+*   $Id: sqlstatement.cpp 8436 2012-04-04 18:18:21Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -28,7 +28,7 @@
 namespace ddlpackage {
 	using namespace std;
 	
-	static uint32_t sessionID = 1;
+	static u_int32_t sessionID = 1;
 	
 	SqlStatement::SqlStatement()
 	{

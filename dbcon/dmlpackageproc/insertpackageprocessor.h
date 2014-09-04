@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: insertpackageprocessor.h 9473 2013-05-02 15:15:44Z dcathey $
+*   $Id: insertpackageprocessor.h 8436 2012-04-04 18:18:21Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -32,7 +32,7 @@
 #include "dataconvert.h"
 #include "we_chunkmanager.h"
 
-#if defined(_MSC_VER) && defined(DMLPKGPROC_DLLEXPORT)
+#if defined(_MSC_VER) && defined(INSERTPKGPROC_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
@@ -48,8 +48,6 @@ class InsertPackageProcessor : public DMLPackageProcessor
 {
 
 public:
-	InsertPackageProcessor(BRM::DBRM* aDbrm, uint32_t sid) : DMLPackageProcessor(aDbrm, sid) {
-	}
     /** @brief process an InsertDMLPackage
       *
       * @param cpackage the InsertDMLPackage to process
@@ -59,6 +57,32 @@ public:
 protected:
 
 private:
+    /** @brief insert one or more rows
+      *
+      * @param txnID the transaction ID
+      * @param schema the schema name
+      * @param table  the table name
+      * @param rows the list of rows
+      * @param ridList upon return contains the list of inserted Row id(s)
+      * @param colValuesList upon return contains the updated values
+      * @param result the result of the operation
+      */
+    bool insertRows( u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, const std::string& schema, const std::string& table,
+                     const dmlpackage::RowList& rows, DMLResult& result, long long & nextVal, long long & originalNextVal, execplan::CalpontSystemCatalog::ColType & autoColType,
+                     bool insertSelect = false );
+
+
+
+    /**	@brief add any columns that were not supplied in the insert statement
+      *
+      * @param schema the schema name
+      * @param table  the table name
+      * @param rows the lists of rows add any missing columns
+      * @param result the result of the operation
+      */
+    bool fixupColumns( u_int32_t sessionID, const std::string& schema, const std::string& table,
+                       const dmlpackage::RowList& rows, DMLResult& result );
+    //u_int32_t fSessionID;
 
 };
 

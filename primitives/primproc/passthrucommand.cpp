@@ -16,10 +16,10 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: passthrucommand.cpp 2093 2013-05-08 19:23:58Z pleblanc $
+// $Id: passthrucommand.cpp 1855 2012-04-04 18:20:09Z rdempsey $
 // C++ Implementation: passthrucommand
 //
-// Description:
+// Description: 
 //
 //
 // Author: Patrick <pleblanc@localhost.localdomain>, (C) 2008
@@ -62,7 +62,7 @@ void PassThruCommand::execute()
 
 void PassThruCommand::project()
 {
-	uint32_t i;
+	uint i;
 
 	*bpp->serialized << (uint32_t) (bpp->ridCount * colWidth);
 #if 0
@@ -92,15 +92,13 @@ void PassThruCommand::project()
 	}
 }
 
-void PassThruCommand::projectIntoRowGroup(RowGroup &rg, uint32_t col)
+void PassThruCommand::projectIntoRowGroup(RowGroup &rg, uint col)
 {
-	uint32_t i;
+	uint i;
+	uint offset = r.getOffset(col);
 
 	rg.initRow(&r);
 	rg.getRow(0, &r);
-	uint32_t offset = r.getOffset(col);
-	rowSize = r.getSize();
-
 	switch (colWidth) {
 		case 1:
 			for (i = 0; i < bpp->ridCount; i++) {
@@ -118,6 +116,7 @@ void PassThruCommand::projectIntoRowGroup(RowGroup &rg, uint32_t col)
 			break;
 		case 4:
 			for (i = 0; i < bpp->ridCount; i++) {
+// 				cout << "PTC: " << bpp->values[i] << endl;
 				r.setUintField_offset<4>(bpp->values[i], offset);
 				r.nextRow(rowSize);
 			}
@@ -143,7 +142,7 @@ void PassThruCommand::nextLBID()
 
 void PassThruCommand::createCommand(ByteStream &bs)
 {
-    bs.advance(1);
+	bs.advance(1);
 	bs >> colWidth;
 	Command::createCommand(bs);
 }

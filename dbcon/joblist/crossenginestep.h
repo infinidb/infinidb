@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: crossenginestep.h 9620 2013-06-13 15:51:52Z pleblanc $
+//  $Id: crossenginestep.h 8866 2012-09-07 15:58:05Z xlou $
 
 
 #ifndef JOBLIST_CROSSENGINESTEP_H
@@ -50,6 +50,9 @@ public:
     /** @brief CrossEngineStep constructor
      */
     CrossEngineStep(
+			const JobStepAssociation& inputJobStepAssociation,
+			const JobStepAssociation& outputJobStepAssociation,
+			uint32_t statementId,
 			const string& schema,
 			const string& table,
 			const string& alias,
@@ -62,23 +65,50 @@ public:
     /** @brief virtual void Run method
      */
     void run();
-
-    /** @brief virtual void join method
-     */
     void join();
 
-    /** @brief virtual string toString method
+    /** @brief virtual JobStepAssociation * inputAssociation
+     * 
+     * @returns JobStepAssociation *
      */
+    const JobStepAssociation& inputAssociation() const
+    {
+        return fInputJobStepAssociation;
+    }
+    void inputAssociation(const JobStepAssociation& inputAssociation)
+    {
+        fInputJobStepAssociation = inputAssociation;
+    }
+    /** @brief virtual JobStepAssociation * outputAssociation
+     * 
+     * @returns JobStepAssocation *
+     */
+    const JobStepAssociation& outputAssociation() const
+    {
+        return fOutputJobStepAssociation;
+    }
+    void outputAssociation(const JobStepAssociation& outputAssociation)
+    {
+        fOutputJobStepAssociation = outputAssociation;
+    }
+
+    void stepId(uint16_t stepId) { fStepId = stepId; }
+    uint16_t stepId() const { return fStepId; }
+    uint32_t sessionId()   const { return fSessionId; }
+    uint32_t txnId()   const { return fTxnId; }
+    uint32_t verId()   const { return fVerId; }
+    uint32_t statementId() const { return fStatementId; }
+
     const std::string toString() const;
 
-	// from BatchPrimitive
+	// from BatchPrimitive 
 	bool getFeederFlag() const { return false; }
-	uint64_t getLastTupleId() const { return 0; }
-	uint32_t getStepCount () const { return 1; }
+	execplan::CalpontSystemCatalog::OID getLastOid() const { return 0; }
+	uint getStepCount () const { return 1; }
 	void setBPP(JobStep* jobStep);
 	void setFirstStepType(PrimitiveStepType firstStepType) {}
 	void setIsProjectionOnly() {}
-	void setLastTupleId(uint64_t id) {}
+	void setLastOid(execplan::CalpontSystemCatalog::OID colOid) {}
 	void setOutputType(BPSOutputType outputType) {}
 	void setProjectBPP(JobStep* jobStep1, JobStep* jobStep2);
 	void setStepCount() {}
@@ -90,6 +120,7 @@ public:
 	bool wasStepRun() const { return fRunExecuted; }
 	BPSOutputType getOutputType() const { return ROW_GROUP; }
 	uint64_t getRows() const { return fRowsReturned; }
+//	const execplan::CalpontSystemCatalog::TableName& tableName() const { return fTableName; }
 	const string& schemaName() const { return fSchema; }
 	const string& tableName() const { return fTable; }
 	const string& tableAlias() const { return fAlias; }
@@ -99,22 +130,22 @@ public:
 	const rowgroup::RowGroup& getOutputRowGroup() const;
 
 	// from DECEventListener
-	void newPMOnline(uint32_t) {}
-
+	void newPMOnline(uint) {}
+	
 	const rowgroup::RowGroup& getDeliveredRowGroup() const;
-	void  deliverStringTableRowGroup(bool b);
-	bool  deliverStringTableRowGroup() const;
-	uint32_t nextBand(messageqcpp::ByteStream &bs);
+	uint nextBand(messageqcpp::ByteStream &bs);
+	void logger(const SPJL& logger) { fLogger = logger; }
+	void setIsDelivery(bool b) { fDelivery = b; }
 
-	void addFcnJoinExp(const vector<execplan::SRCP>&);
 	void addFcnExpGroup1(const boost::shared_ptr<execplan::ParseTree>&);
 	void setFE1Input(const rowgroup::RowGroup&);
-	void setFcnExpGroup3(const vector<execplan::SRCP>&);
+	void setFcnExpGroup3(const vector<boost::shared_ptr<execplan::ReturnedColumn> >&);
 	void setFE23Output(const rowgroup::RowGroup&);
 
 	void addFilter(JobStep* jobStep);
 	void addProject(JobStep* jobStep);
 
+	static void init_mysqlcl_idb();
 
 protected:
 	virtual void execute();
@@ -123,16 +154,24 @@ protected:
 	virtual void addFilterStr(const std::vector<const execplan::Filter*>&, const std::string&);
 	virtual std::string makeQuery();
 	virtual void setField(int, const char*, rowgroup::Row&);
-	inline void addRow(rowgroup::RGData &);
-	//inline  void addRow(boost::shared_array<uint8_t>&);
+	inline  void addRow(boost::shared_array<uint8_t>&);
 	virtual int64_t convertValueNum(
 						const char*, const execplan::CalpontSystemCatalog::ColType&, int64_t);
 	virtual void formatMiniStats();
 	virtual void printCalTrace();
 	virtual void handleMySqlError(const char*, unsigned int);
 
+	// for base
+    JobStepAssociation fInputJobStepAssociation;
+    JobStepAssociation fOutputJobStepAssociation;
+	uint32_t fSessionId;
+	uint32_t fTxnId;
+	uint32_t fVerId;
+    uint16_t fStepId;
+	uint32_t fStatementId;
 	uint64_t fRowsRetrieved;
 	uint64_t fRowsReturned;
+	SPJL     fLogger;
 	uint64_t fRowsPerGroup;
 
 	// output rowgroup and row
@@ -156,6 +195,7 @@ protected:
 	boost::scoped_ptr<boost::thread> fRunner;
 	OIDVector fOIDVector;
 	bool fEndOfResult;
+	bool fDelivery;
 	bool fRunExecuted;
 
 	// MySQL server info
@@ -174,8 +214,7 @@ protected:
 	// Function & Expression columns
 	boost::shared_ptr<execplan::ParseTree> fFeFilters;
 	std::vector<boost::shared_ptr<execplan::ReturnedColumn> > fFeSelects;
-	std::vector<boost::shared_ptr<execplan::ReturnedColumn> > fFeFcnJoin;
-	std::map<uint32_t, uint32_t> fColumnMap;   // projected key position (k->p)
+	std::map<uint, uint> fColumnMap;   // projected key position (k->p)
 	uint64_t fColumnCount;
 	boost::scoped_array<int> fFe1Column;
 	boost::shared_array<int> fFeMapping1;

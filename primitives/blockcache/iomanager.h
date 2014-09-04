@@ -17,7 +17,7 @@
 
 #ifndef IOMANAGER_H
 #define IOMANAGER_H
-// $Id: iomanager.h 2145 2013-08-09 22:38:19Z wweeks $
+// $Id: iomanager.h 2089 2013-05-06 17:56:34Z pleblanc $
 //
 // C++ Interface: iomanager
 //
@@ -79,7 +79,7 @@ public:
 
 	const uint32_t getExtentRows() { return fdbrm.getExtentRows(); }
 
-	uint32_t blocksPerRead;
+	uint blocksPerRead;
 
 	bool IOTrace() const { return fIOTrace;}
 
@@ -96,9 +96,10 @@ public:
 
 	BRM::DBRM* dbrm() { return &fdbrm;}
 	
+	void dropFDCache();
 	
 #ifdef SHARED_NOTHING_DEMO_2
-	uint32_t pmCount;
+	uint pmCount;
 #endif
 
 private:
@@ -129,7 +130,7 @@ private:
 void setReadLock();
 void releaseReadLock();
 void dropFDCache();
-void purgeFDCache(std::vector<BRM::FileInfo>& files);
+
 
 }
 #endif

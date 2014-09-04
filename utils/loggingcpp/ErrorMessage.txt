@@ -1,4 +1,4 @@
-# $Id: ErrorMessage.txt 3830 2013-05-23 22:28:07Z xlou $
+# $Id: ErrorMessage.txt 3701 2013-04-09 18:48:00Z xlou $
 #
 # This file maps error ID's to error texts.
 #
@@ -35,7 +35,6 @@
 1015	ERR_OUTER_JOIN_SUBSELECT	Subquery on OUTER JOIN ON clause is currently not supported.
 1016	ERR_PARTITION_BY_RANGE	The column type %1% is currently  not supported in %2% function.
 1017	ERR_SP_FUNCTION_NOT_SUPPORT	Stored function is currently not supported in InfiniDB.
-1018	ERR_DBJ_ANTI_NULL	Cannot currently process a disk-based antijoin with a function filter and a NULL join column in the large-side table.
 
 # Other errors ...
 2001	ERR_JOIN_TOO_BIG	Join or subselect exceeds memory limit.
@@ -88,15 +87,6 @@
 2044	ERR_TUPLE_BPS	An internal error occurred.  Check the error log file & contact support.
 2045	ERR_PRIMPROC_DOWN	At least one PrimProc closed the connection unexpectedly.
 
-2046	ERR_READ_INPUT_DATALIST	Input datalist read error.
-2047	ERR_LOCAL_QUERY_UM	Query attempted on UM (no PM) with infinidb_local_query set.
-
-# disk-based join runtime errors from supported queries
-2048	ERR_DBJ_FILE_IO_ERROR	There was an IO error doing a disk-based join.
-2049	ERR_DBJ_UNKNOWN_ERROR	An unknown error error occured doing a disk-based join.  Check the error log & contact support.
-2050	ERR_DBJ_DISK_USAGE_LIMIT	This query exceeded the temp disk usage limit.  Raise infinidb_diskjoin_smallsidelimit if possible and try again.
-2051	ERR_DBJ_DATA_DISTRIBUTION	The data distribution in this query overflowed a disk-based join bucket.  If possible, raise infinidb_diskjoin_bucketsize and try again.
-2052	INFO_SWITCHING_TO_DJS	Out of UM memory, switching to disk-based join.
 
 # Sub-query errors
 3001	ERR_NON_SUPPORT_SUB_QUERY_TYPE	This subquery type is not supported yet.
@@ -141,14 +131,9 @@
 4013	ERR_INVALID_VARBINARYVALUE	The value is not varbinary.
 4014	ERR_CONSTRAINTS	Constraints are currently not supported in InfiniDB.
 4015	ERR_NOT_NULL_CONSTRAINTS	Column '%1%' cannot be null.
-4016	ERR_DML_DDL_SLAVE	DML and DDL statements for InfiniDB tables can only be run from the replication master.
-4017	ERR_DML_DDL_LOCAL	DML and DDL statements are not allowed when infinidb_local_query is greater than 0.
-4018	ERR_NON_SUPPORT_SYNTAX	The statement is not supported in InfiniDB.
 
 # UDF
 5001	ERR_FUNC_NON_IMPLEMENT	%1%:%2% is not implemented.
-5002	ERR_PSEUDOCOL_IDB_ONLY	Pseudo column function '%1%' is only supported in InfiniDB.
-5003	ERR_PSEUDOCOL_WRONG_ARG	Argument of pseudo column function '%1%' is invalid.
 
 # DBRM Errors
 6001	ERR_NETWORK DBRM encountered a network error, check the controllernode.
@@ -164,36 +149,3 @@
 # Cross Engine Errors
 8001	ERR_CROSS_ENGINE_CONFIG	CrossEngineSupport section in Calpont.xml is not properly configured.
 8002	ERR_CROSS_ENGINE_CONNECT	Error: %1%.
-
-# Window Function Errors
-#9001 is generic unknown error. should not be thrown when feature gets stable.
-9001	ERR_WF_NON_SUPPORT	Non supported item in window function.
-9002	ERR_WF_WINDOW_WITHOUT_ORDER	Missing ORDER BY expression in the window specification.
-9003	ERR_WF_FUNCTION_NOT_EXISTS	Window function '%1%' does not exist.
-9004	ERR_WF_INVALID_WINDOW	Invalid window aggregation group in the window specification.
-9005	ERR_WF_ORDER_BY_DISTINCT	Order By is not allowed when DISTINCT is specified for window function.
-9006	ERR_WF_INVALID_BOUND	Bound is out of range in the Window specification.
-9007	ERR_WF_INVALID_ORDER_KEY	Only one sort key is allowed for the RANGE window specified.
-9008	ERR_WF_BOUND_OUT_OF_RANGE	Bound '%1%' is out of range in the window specification.
-9009	ERR_WF_WINDOW_FUNC_NOT_ALLOWED	Window functions are not allowed here.
-9010	ERR_WF_INVALID_ORDER_TYPE	Invalid datatype for order by column in window function: '%1%'.
-9011	ERR_WF_INVALID_BOUND_TYPE	Invalid datatype for window frame bound: '%1%'.
-9012	ERR_WF_WRONG_ARGS	Incorrect parameter count or type in the call to window function '%1%'
-9013	ERR_WF_ORDER_MISSING	Order By clause is missing for window function '%1%'.
-9014	ERR_WF_WINDOW_CLAUSE	Window clause is not allowed for window function '%1%'.
-9015	ERR_WF_UPDATE	Can not use window function in UPDATE.
-9016	ERR_WF_ORDER_BY	OrderBy is not allowed for window function '%1%'.
-9017	ERR_WF_INVALID_ORDER_KEY_WITHIN	Only one sort key is allowed for WITHIN GROUP clause.
-9018	ERR_WF_NOT_SUPPORT	Window Function '%1%' is currently not supported in InfiniDB.
-9019	ERR_WF_UNKNOWN_COL_TYPE	Unknown column type encountered: '%1%'.
-9020	ERR_EXECUTE_WINDOW_FUNCTION	Exception caught when process window function.
-9021	ERR_WINDOW_FUNCTION_WRAPPER	Exception caught by window function wrapper.
-9022	ERR_WF_INVALID_PARM_TYPE	Invalid datatype for window function: '%1%'.
-9023	ERR_WF_OVERFLOW	'%1%' overflow.
-9024	ERR_WF_COLUMN_MISSING	'%1%' is not in tuple.
-9025	ERR_WF_UNKNOWN_BOUND	Unknown window frame start/bound type: '%1%'.
-9026	ERR_WF_NOT_IN_COL_MAP	Returned column not in intermediate result set. 
-9027	ERR_WF_ARG_OUT_OF_RANGE	Argument '%1%' is out of range.
-9028	ERR_WF_NOT_ALLOWED	Window functions are not allowed in %1%.
-9029	ERR_WF_IDB_ONLY	Window function are only supported for InfiniDB tables.
-9030	ERR_WF_DATA_SET_TOO_BIG	Window function data set exceeds memory limit.

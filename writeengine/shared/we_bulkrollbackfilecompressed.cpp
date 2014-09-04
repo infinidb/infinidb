@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
-* $Id: we_bulkrollbackfilecompressed.cpp 4737 2013-08-14 20:45:46Z bwilkinson $
+* $Id: we_bulkrollbackfilecompressed.cpp 3911 2012-06-10 19:12:14Z dcathey $
 */
 
 #include "we_bulkrollbackfilecompressed.h"
@@ -31,11 +31,7 @@
 #include "we_bulkrollbackmgr.h"
 #include "we_convertor.h"
 #include "messageids.h"
-#include "IDBDataFile.h"
-#include "IDBPolicy.h"
-using namespace idbdatafile;
 using namespace compress;
-using namespace execplan;
 
 namespace
 {
@@ -73,9 +69,9 @@ BulkRollbackFileCompressed::~BulkRollbackFileCompressed()
 //------------------------------------------------------------------------------
 void BulkRollbackFileCompressed::truncateSegmentFile(
     OID       columnOID,
-    uint32_t dbRoot,
-    uint32_t partNum,
-    uint32_t segNum,
+    u_int32_t dbRoot,
+    u_int32_t partNum,
+    u_int32_t segNum,
     long long fileSizeBlocks )
 {
     std::ostringstream msgText1;
@@ -88,7 +84,7 @@ void BulkRollbackFileCompressed::truncateSegmentFile(
         logging::M0075, columnOID, msgText1.str() );
 
     std::string segFile;
-    IDBDataFile* pFile = fDbFile.openFile(columnOID, dbRoot, partNum, segNum, segFile);
+    FILE* pFile = fDbFile.openFile(columnOID, dbRoot, partNum, segNum, segFile);
     if (pFile == 0)
     {
         std::ostringstream oss;
@@ -208,13 +204,13 @@ void BulkRollbackFileCompressed::truncateSegmentFile(
 //------------------------------------------------------------------------------
 void BulkRollbackFileCompressed::reInitTruncColumnExtent(
     OID         columnOID,
-    uint32_t   dbRoot,
-    uint32_t   partNum,
-    uint32_t   segNum,
+    u_int32_t   dbRoot,
+    u_int32_t   partNum,
+    u_int32_t   segNum,
     long long   startOffsetBlk,
     int         nBlocks,
-    CalpontSystemCatalog::ColDataType colType,
-    uint32_t   colWidth,
+    ColDataType colType,
+    u_int32_t   colWidth,
     bool        restoreHwmChk )
 {
     long long startOffset = startOffsetBlk * BYTE_PER_BLOCK;
@@ -230,7 +226,7 @@ void BulkRollbackFileCompressed::reInitTruncColumnExtent(
         logging::M0075, columnOID, msgText1.str() );
 
     std::string segFile;
-    IDBDataFile* pFile = fDbFile.openFile(columnOID, dbRoot, partNum, segNum, segFile);
+    FILE* pFile = fDbFile.openFile(columnOID, dbRoot, partNum, segNum, segFile);
     if (pFile == 0)
     {
         std::ostringstream oss;
@@ -356,7 +352,7 @@ void BulkRollbackFileCompressed::reInitTruncColumnExtent(
             nBlocksToInit = BLKS_PER_EXTENT; // don't init > 1 full extent
         if (nBlocksToInit > 0)
         {
-            uint64_t emptyVal = fDbFile.getEmptyRowValue( colType, colWidth );
+            i64 emptyVal = fDbFile.getEmptyRowValue( colType, colWidth );
             rc = fDbFile.reInitPartialColumnExtent( pFile,
                 (chunkPtrs[chunkIndex].first + restoredChunkLen),
                 nBlocksToInit,
@@ -440,7 +436,7 @@ void BulkRollbackFileCompressed::reInitTruncColumnExtent(
 // errMsg    - (out) Error message if applicable.
 //------------------------------------------------------------------------------
 int BulkRollbackFileCompressed::loadColumnHdrPtrs(
-    IDBDataFile* pFile,
+    FILE*        pFile,
     char*        hdrs,
     CompChunkPtrList& chunkPtrs,
     std::string& errMsg) const
@@ -489,9 +485,9 @@ int BulkRollbackFileCompressed::loadColumnHdrPtrs(
 //------------------------------------------------------------------------------
 void BulkRollbackFileCompressed::reInitTruncDctnryExtent(
     OID         dStoreOID,
-    uint32_t   dbRoot,
-    uint32_t   partNum,
-    uint32_t   segNum,
+    u_int32_t   dbRoot,
+    u_int32_t   partNum,
+    u_int32_t   segNum,
     long long   startOffsetBlk,
     int         nBlocks )
 {
@@ -508,7 +504,7 @@ void BulkRollbackFileCompressed::reInitTruncDctnryExtent(
         logging::M0075, dStoreOID, msgText1.str() );
 
     std::string segFile;
-    IDBDataFile* pFile = fDbFile.openFile(dStoreOID, dbRoot, partNum, segNum, segFile);
+    FILE* pFile = fDbFile.openFile(dStoreOID, dbRoot, partNum, segNum, segFile);
     if (pFile == 0)
     {
         std::ostringstream oss;
@@ -589,7 +585,7 @@ void BulkRollbackFileCompressed::reInitTruncDctnryExtent(
         // (Unlike column files which only employ an abbreviated extent for the
         // 1st extent in part0, seg0, all store files start with abbrev extent)
         bool bAbbreviatedExtent          = false;
-        const uint32_t PSEUDO_COL_WIDTH = 8; // simulated col width for dctnry
+        const u_int32_t PSEUDO_COL_WIDTH = 8; // simulated col width for dctnry
         long long nBytesInAbbrevExtent   = INITIAL_EXTENT_ROWS_TO_DISK *
                                      PSEUDO_COL_WIDTH;
         if (startOffset <= nBytesInAbbrevExtent)
@@ -714,7 +710,7 @@ void BulkRollbackFileCompressed::reInitTruncDctnryExtent(
 // errMsg    - (out) Error message if applicable.
 //------------------------------------------------------------------------------
 int BulkRollbackFileCompressed::loadDctnryHdrPtrs(
-    IDBDataFile* pFile,
+    FILE*        pFile,
     char*        controlHdr,
     CompChunkPtrList& chunkPtrs,
     uint64_t&    ptrHdrSize,
@@ -795,10 +791,10 @@ int BulkRollbackFileCompressed::loadDctnryHdrPtrs(
 // errMsg (out)                   - Error msg if error returned
 //------------------------------------------------------------------------------
 int BulkRollbackFileCompressed::restoreHWMChunk(
-    IDBDataFile* pFile,
+    FILE*        pFile,
     OID          columnOID,
-    uint32_t    partNum,
-    uint32_t    segNum,
+    u_int32_t    partNum,
+    u_int32_t    segNum,
     uint64_t     fileOffsetByteForRestoredChunk,
     uint64_t&    restoredChunkLen,
     uint64_t&    restoredFileSize,
@@ -814,7 +810,8 @@ int BulkRollbackFileCompressed::restoreHWMChunk(
     bulkRollbackSubPath += DATA_DIR_SUFFIX;
     bulkRollbackSubPath += oss.str();
 
-    if ( !IDBPolicy::exists( bulkRollbackSubPath.c_str() ) )
+    boost::filesystem::path pathFile(bulkRollbackSubPath);
+    if ( !boost::filesystem::exists( pathFile ) )
     {
         std::ostringstream oss;
         oss << "Backup file does not exist: " << bulkRollbackSubPath;
@@ -823,12 +820,7 @@ int BulkRollbackFileCompressed::restoreHWMChunk(
         return ERR_FILE_NOT_EXIST;
     }
 
-    IDBDataFile* backupFile = IDBDataFile::open(
-    							IDBPolicy::getType( bulkRollbackSubPath.c_str(), IDBPolicy::WRITEENG ),
-    							bulkRollbackSubPath.c_str(),
-    							"rb",
-    							0,
-                                pFile->colWidth() );
+    FILE* backupFile = fopen( bulkRollbackSubPath.c_str(), "rb" );
     if (!backupFile)
     {
         int errrc = errno;
@@ -845,9 +837,9 @@ int BulkRollbackFileCompressed::restoreHWMChunk(
 
     // Read the chunk length and file size
     uint64_t sizeHdr[2];
-    size_t bytesRead = readFillBuffer(backupFile, (char*)sizeHdr,
-        sizeof(uint64_t)*2);
-    if (bytesRead != sizeof(uint64_t)*2)
+    size_t itemsRead = fread(sizeHdr,
+                             sizeof(uint64_t)*2, 1, backupFile);
+    if (itemsRead != 1)
     {
         int errrc = errno;
 
@@ -858,7 +850,7 @@ int BulkRollbackFileCompressed::restoreHWMChunk(
             bulkRollbackSubPath << "; " << eMsg;
         errMsg = oss.str();
 
-        delete backupFile;
+        fclose( backupFile );
         return ERR_METADATABKUP_COMP_READ_BULK_BKUP;
     }
     restoredChunkLen = sizeHdr[0];
@@ -876,7 +868,7 @@ int BulkRollbackFileCompressed::restoreHWMChunk(
             "; "       << ec.errorString(rc);
         errMsg = oss.str();
 
-        delete backupFile;
+        fclose( backupFile );
         return rc;
     }
 
@@ -887,8 +879,8 @@ int BulkRollbackFileCompressed::restoreHWMChunk(
         // Read the HWM chunk to be restored
         unsigned char* chunk = new unsigned char[restoredChunkLen];
         boost::scoped_array<unsigned char> scopedChunk( chunk );
-        bytesRead = readFillBuffer(backupFile, (char*)chunk, restoredChunkLen);
-        if (bytesRead != restoredChunkLen)
+        itemsRead = fread(chunk, restoredChunkLen, 1, backupFile);
+        if (itemsRead != 1)
         {
             int errrc = errno;
 
@@ -901,7 +893,7 @@ int BulkRollbackFileCompressed::restoreHWMChunk(
                 ": "      << eMsg;
             errMsg = oss.str();
 
-            delete backupFile;
+            fclose( backupFile );
             return ERR_METADATABKUP_COMP_READ_BULK_BKUP;
         }
 
@@ -917,12 +909,12 @@ int BulkRollbackFileCompressed::restoreHWMChunk(
                 "; "        << ec.errorString(rc);
             errMsg = oss.str();
 
-            delete backupFile;
+            fclose( backupFile );
             return rc;
         }
     }
 
-    delete backupFile;
+    fclose( backupFile );
 
     return NO_ERROR;
 }
@@ -934,9 +926,9 @@ int BulkRollbackFileCompressed::restoreHWMChunk(
 // and thus not needed.
 //------------------------------------------------------------------------------
 bool BulkRollbackFileCompressed::doWeReInitExtent( OID columnOID,
-    uint32_t dbRoot,
-    uint32_t partNum,
-    uint32_t segNum) const
+    u_int32_t dbRoot,
+    u_int32_t partNum,
+    u_int32_t segNum) const
 {
     std::ostringstream oss;
     oss << "/" << columnOID << ".p" << partNum << ".s" << segNum;
@@ -944,45 +936,13 @@ bool BulkRollbackFileCompressed::doWeReInitExtent( OID columnOID,
     bulkRollbackSubPath += DATA_DIR_SUFFIX;
     bulkRollbackSubPath += oss.str();
 
-    if ( !IDBPolicy::exists( bulkRollbackSubPath.c_str() ) )
+    boost::filesystem::path pathFile(bulkRollbackSubPath);
+    if ( !boost::filesystem::exists( pathFile ) )
     {
         return false;
     }
 
     return true;
-}
-
-//------------------------------------------------------------------------------
-// Read requested number of bytes from the specified pFile into "buffer".
-// Added this function as part of hdfs port, because IDBDataFile::read()
-// may not return all the requested data in the first call to read().
-//------------------------------------------------------------------------------
-size_t BulkRollbackFileCompressed::readFillBuffer(
-    IDBDataFile* pFile,
-    char*        buffer,
-    size_t       bytesReq) const
-{
-    char*   pBuf = buffer;
-    ssize_t nBytes;
-    size_t  bytesToRead = bytesReq;
-    size_t  totalBytesRead = 0;
-
-    while (1)
-    {
-        nBytes = pFile->read(pBuf, bytesToRead);
-        if (nBytes > 0)
-            totalBytesRead += nBytes;
-        else
-            break;
-
-        if ((size_t)nBytes == bytesToRead)
-            break;
-
-        pBuf        += nBytes;
-        bytesToRead  =  bytesToRead - (size_t)nBytes;
-    }
-
-    return totalBytesRead;
 }
 
 } //end of namespace

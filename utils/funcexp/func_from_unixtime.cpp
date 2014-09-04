@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_from_unixtime.cpp 3923 2013-06-19 21:43:06Z bwilkinson $
+* $Id: func_from_unixtime.cpp 3048 2012-04-04 15:33:45Z rdempsey $
 *
 *
 ****************************************************************************/
@@ -35,10 +35,9 @@ using namespace execplan;
 #include "dataconvert.h"
 using namespace dataconvert;
 
-
-namespace
+namespace funcexp
 {
-using namespace funcexp;
+extern const string IDB_date_format(const DateTime& dt, const string& format);	
 
 DateTime getDateTime(rowgroup::Row& row,
 							FunctionParm& parm,
@@ -63,7 +62,7 @@ DateTime getDateTime(rowgroup::Row& row,
 			val = parm[0]->data()->getIntVal(row, isNull);
 	}
 	
-	if (val < 0 || val > helpers::TIMESTAMP_MAX_VALUE)
+	if (val < 0 || val > TIMESTAMP_MAX_VALUE)
 		return 0;
 
 	DateTime dt;
@@ -82,10 +81,6 @@ DateTime getDateTime(rowgroup::Row& row,
 	dt.msecond = 0;
 	return dt;
 }
-}
-
-namespace funcexp
-{
 
 CalpontSystemCatalog::ColType Func_from_unixtime::operationType( FunctionParm& fp, CalpontSystemCatalog::ColType& resultType )
 {
@@ -109,8 +104,8 @@ string Func_from_unixtime::getStrVal(rowgroup::Row& row,
 
 	if (parm.size() == 2)
 	{
-		const string& format = parm[1]->data()->getStrVal(row, isNull);
-		return helpers::IDB_date_format(dt, format);
+		string format = parm[1]->data()->getStrVal(row, isNull);
+		return IDB_date_format(dt, format);
 	}
 	
 	char buf[256] = {0};
@@ -123,7 +118,7 @@ int32_t Func_from_unixtime::getDateIntVal(rowgroup::Row& row,
 							bool& isNull,
 							CalpontSystemCatalog::ColType& ct)
 {
-	return (((getDatetimeIntVal(row, parm, isNull, ct) >> 32) & 0xFFFFFFC0) | 0x3E);
+	return (getDatetimeIntVal(row, parm, isNull, ct) >> 32) & 0xFFFFFFC0;
 }		
 
 int64_t Func_from_unixtime::getDatetimeIntVal(rowgroup::Row& row,
@@ -155,17 +150,21 @@ double Func_from_unixtime::getDoubleVal(rowgroup::Row& row,
 {
 	if (parm.size() == 1)
 	{
+		ostringstream oss;
 		DateTime dt = getDateTime(row, parm, isNull);
 		if (*reinterpret_cast<int64_t*>(&dt) == 0)
 		{
 			isNull = true;
 			return 0;
 		}
-        char buf[32];  // actual string guaranteed to be 22
-        snprintf( buf, 32, "%04d%02d%02d%02d%02d%02d.%06d",
-                  dt.year, dt.month, dt.day, dt.hour,
-				  dt.minute, dt.second, dt.msecond ); 
-		return atof(buf);
+		oss << dt.year 
+		    << setw(2) << setfill('0') << dt.month 
+		    << setw(2) << setfill('0') << dt.day 
+		    << setw(2) << setfill('0') << dt.hour 
+		    << setw(2) << setfill('0') << dt.minute
+		    << setw(2) << setfill('0') << dt.second 
+		    << "." << setw(6) << setfill('0') << dt.msecond;
+		return atof(oss.str().c_str());
 	}
 	
 	return (double) atoi(getStrVal(row, parm, isNull, ct).c_str());

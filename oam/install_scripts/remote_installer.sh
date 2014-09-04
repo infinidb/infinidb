@@ -31,9 +31,9 @@ expect -re "word: "
 send "$PASSWORD\n"
 # check return
 expect {
-	-re "uninstall completed" { send_user "           DONE" }
-	-re "# "                  { send_user "           DONE" }
-	-re "not installed"       { send_user "           FAILED: Package not installed" }
+	-re "uninstall completed" { send_user "           DONE" } abort
+	-re "# "                  { send_user "           DONE" } abort
+	-re "not installed"       { send_user "           FAILED: Package not installed" } abort
 	-re "Failed dependencies" { send_user "           FAILED: Failed dependencies\n" ; exit }
 	-re "Permission denied"   { send_user "           FAILED: Invalid password\n" ; exit }
 }
@@ -48,8 +48,8 @@ expect -re "word: "
 send "$PASSWORD\n"
 # check return
 expect {
-	-re "100%" 				{ send_user "                       DONE" }
-	-re "# " 				{ send_user "                       DONE" }
+	-re "100%" 				{ send_user "                       DONE" } abort
+	-re "# " 				{ send_user "                       DONE" } abort
 	-re "scp"  				{ send_user "                       FAILED\n" ; 
 				 			send_user "\n*** Installation Failed\n" ; 
 							exit }
@@ -70,8 +70,8 @@ expect -re "word: "
 send "$PASSWORD\n"
 # check return
 expect {
-	-re "completed" 		  { send_user "            DONE" }
-	-re "# " 				  { send_user "            DONE" }
+	-re "completed" 		  { send_user "            DONE" } abort
+	-re "# " 				  { send_user "            DONE" } abort
 	-re "Failed dependencies" { send_user "            FAILED: Failed dependencies\n" ; 
 								send_user "\n*** Installation Failed\n" ; 
 									exit }
@@ -91,7 +91,7 @@ expect -re "word: "
 # send the password
 send "$PASSWORD\n"
 expect {
-	-re "# " 		  		  { send_user "            DONE" }
+	-re "# " 		  		  { send_user "            DONE" } abort
 	-re "Permission denied"   { send_user "            FAILED: Invalid password\n" ; exit }
 }
 #

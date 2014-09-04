@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
-* $Id: we_redistributecontrol.cpp 4450 2013-01-21 14:13:24Z rdempsey $
+* $Id: we_redistributecontrol.cpp 4299 2012-11-02 06:00:33Z xlou $
 */
 
 #include <iostream>
@@ -404,13 +404,11 @@ uint32_t RedistributeControl::getCurrentState()
 bool RedistributeControl::getStartOptions(messageqcpp::ByteStream& bs)
 {
 	bool ret = true;
-	uint32_t n = 0;
-	uint32_t d = 0;
 
 	try
 	{
-		bs >> fOptions;
-
+		uint32_t n = 0;
+		uint32_t d = 0;
 		bs >> n;
 		fSourceList.reserve(n);
 		for (uint32_t i = 0; i < n; i++)

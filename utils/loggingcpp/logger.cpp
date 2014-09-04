@@ -16,13 +16,17 @@
    MA 02110-1301, USA. */
 
 /*
- * $Id: logger.cpp 4037 2013-08-07 03:37:31Z bwilkinson $
+ * $Id: logger.cpp 3048 2012-04-04 15:33:45Z rdempsey $
  */
 
 #include <string>
 using namespace std;
 #include <boost/thread.hpp>
 using namespace boost;
+
+#include "messageobj.h"
+#include "messageids.h"
+#include "loggingid.h"
 
 #include "logger.h"
 

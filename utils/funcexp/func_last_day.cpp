@@ -33,7 +33,6 @@ using namespace std;
 using namespace execplan;
 
 #include "dataconvert.h"
-using namespace dataconvert;
 
 namespace funcexp
 {

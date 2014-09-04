@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
-* $Id: we_redistributecontrolthread.h 4450 2013-01-21 14:13:24Z rdempsey $
+* $Id: we_redistributecontrolthread.h 4299 2012-11-02 06:00:33Z xlou $
 */
 
 #ifndef WE_REDISTRIBUTECONTROLTHREAD_H

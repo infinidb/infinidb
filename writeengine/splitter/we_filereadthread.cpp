@@ -1,19 +1,34 @@
-/* Copyright (C) 2014 InfiniDB, Inc.
+/*
 
-   This program is free software; you can redistribute it and/or
-   modify it under the terms of the GNU General Public License
-   as published by the Free Software Foundation; version 2 of
-   the License.
+   Copyright (C) 2009-2012 Calpont Corporation.
 
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   Use of and access to the Calpont InfiniDB Community software is subject to the
+   terms and conditions of the Calpont Open Source License Agreement. Use of and
+   access to the Calpont InfiniDB Enterprise software is subject to the terms and
+   conditions of the Calpont End User License Agreement.
 
-   You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-   MA 02110-1301, USA. */
+   This program is distributed in the hope that it will be useful, and unless
+   otherwise noted on your license agreement, WITHOUT ANY WARRANTY; without even
+   the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+   Please refer to the Calpont Open Source License Agreement and the Calpont End
+   User License Agreement for more details.
+
+   You should have received a copy of either the Calpont Open Source License
+   Agreement or the Calpont End User License Agreement along with this program; if
+   not, it is your responsibility to review the terms and conditions of the proper
+   Calpont license agreement by visiting http://www.calpont.com for the Calpont
+   InfiniDB Enterprise End User License Agreement or http://www.infinidb.org for
+   the Calpont InfiniDB Community Calpont Open Source License Agreement.
+
+   Calpont may make changes to these license agreements from time to time. When
+   these changes are made, Calpont will make a new copy of the Calpont End User
+   License Agreement available at http://www.calpont.com and a new copy of the
+   Calpont Open Source License Agreement available at http:///www.infinidb.org.
+   You understand and agree that if you use the Program after the date on which
+   the license agreement authorizing your use has changed, Calpont will treat your
+   use as acceptance of the updated License.
+
+*/
 
 /*******************************************************************************
 * $Id$
@@ -43,9 +58,6 @@ using namespace messageqcpp;
 #include <fstream>
 #include <istream>
 #include <list>
-#ifdef _MSC_VER
-#include <io.h>
-#endif
 using namespace std;
 
 #include "we_filereadthread.h"
@@ -82,7 +94,7 @@ WEFileReadThread::WEFileReadThread(WESDHandler& aSdh):fSdh(aSdh),
 		fBatchQty(0),
 		fEnclEsc(false),
 		fEncl('\0'),
-		fEsc('\\'),
+		fEsc('\0'),
 		fDelim('|')
 {
 	//TODO batch qty to get from config
@@ -143,7 +155,7 @@ void WEFileReadThread::setup(std::string FileName)
 		if(aEsc) fEsc = aEsc;
 		if(aDelim) fDelim = aDelim;
 
-		if(aEncl != 0) fEnclEsc = true;
+		if((aEncl != 0)||(aEsc != 0)) fEnclEsc = true;
 
 		//BUG 4342 - Need to support "list of infiles"
 		//chkForListOfFiles(FileName); - List prepared in sdhandler.
@@ -262,11 +274,7 @@ void WEFileReadThread::feedData()
 			try
 			{
 				messageqcpp::SBS aSbs(new messageqcpp::ByteStream);
-				if (fSdh.getImportDataMode() == IMPORT_DATA_TEXT)
-					aRowCnt = readDataFile(aSbs);
-				else
-					aRowCnt = readBinaryDataFile(aSbs,
-						fSdh.getTableRecLen() );
+				aRowCnt = readDataFile(aSbs);
 				//cout << "Length " << aSbs->length() <<endl;    - for debug
 				fSdh.updateRowTx(aRowCnt, TgtPmId);
 				mutex::scoped_lock aLock(fSdh.fSendMutex);
@@ -309,8 +317,7 @@ void WEFileReadThread::feedData()
 
 
 //------------------------------------------------------------------------------
-// Read input data as ASCII text
-//------------------------------------------------------------------------------
+
 unsigned int WEFileReadThread::readDataFile(messageqcpp::SBS& Sbs)
 {
 	mutex::scoped_lock aLock(fFileMutex);
@@ -361,47 +368,6 @@ unsigned int WEFileReadThread::readDataFile(messageqcpp::SBS& Sbs)
 	}// if
 	return 0;
 }
-
-//------------------------------------------------------------------------------
-// Read input data as binary data
-//------------------------------------------------------------------------------
-unsigned int WEFileReadThread::readBinaryDataFile(messageqcpp::SBS& Sbs,
-	unsigned int recLen)
-{
-	mutex::scoped_lock aLock(fFileMutex);
-	if((fInFile.good()) && (!fInFile.eof()))
-	{
-		unsigned int aIdx=0;
-		unsigned int aLen=0;
-		*Sbs << (ByteStream::byte)(WE_CLT_SRV_DATA);
-
-		while( (!fInFile.eof()) && (aIdx<getBatchQty()) )
-		{
-			fInFile.read(fBuff, recLen);
-			aLen = fInFile.gcount();
-
-			if (aLen > 0)
-			{
-				(*Sbs).append(reinterpret_cast<ByteStream::byte*>(fBuff), aLen);
-				aIdx++;
-				if(fSdh.getDebugLvl()>2)
-					cout << "Binary input data line = " << aIdx << endl;
-
-				if (aLen != recLen)
-				{
-					cout << "Binary input data does not end on record boundary;"
-						" Last record is " << aLen << " bytes long." <<
-						" Expected record length is: " << recLen << endl;
-				}
-			}
-		} // while
-
-		return aIdx;
-	} // if
-
-	return 0;
-}
-
 //------------------------------------------------------------------------------
 
 void WEFileReadThread::openInFile()
@@ -424,30 +390,11 @@ void WEFileReadThread::openInFile()
 		//@BUG 4326
 		if(fInFileName != "/dev/stdin")
 		{
-			if (!fIfFile.is_open())
-			{
-				if (fSdh.getImportDataMode() == IMPORT_DATA_TEXT)
-					fIfFile.open(fInFileName.c_str());
-				else // @bug 5193: binary import
-					fIfFile.open(fInFileName.c_str(),
-						std::ios_base::in | std::ios_base::binary);
-			}
+			if (!fIfFile.is_open()) fIfFile.open(fInFileName.c_str());
 			if (!fIfFile.good())
 				throw runtime_error("Could not open Input file "+fInFileName);
 			fInFile.rdbuf(fIfFile.rdbuf()); //@BUG 4326
 		}
-#ifdef _MSC_VER
-		else // @bug 5193: binary import
-		{
-			if (fSdh.getImportDataMode() != IMPORT_DATA_TEXT)
-			{
-				if (_setmode(_fileno(stdin), _O_BINARY) == -1)
-				{
-					throw runtime_error("Could not change stdin to binary");
-				}
-			}
-		}
-#endif
 		//@BUG 4326  -below three lines commented out
 		//		if (!fInFile.is_open()) fInFile.open(fInFileName.c_str());
 		//		if (!fInFile.good())

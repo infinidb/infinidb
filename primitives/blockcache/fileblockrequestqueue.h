@@ -20,7 +20,7 @@
 
 /***************************************************************************
  *
- *   $Id: fileblockrequestqueue.h 2035 2013-01-21 14:12:19Z rdempsey $
+ *   $Id: fileblockrequestqueue.h 1855 2012-04-04 18:20:09Z rdempsey $
  *
  *   jrodriguez@calpont.com   *
  *                                                                         *
@@ -93,8 +93,8 @@ protected:
 	boost::mutex mutex;
 	boost::condition notEmpty;
 	fileBlockRequestQueue_t fbQueue;
-	uint32_t queueSize;
-	uint32_t readersWaiting;
+	uint queueSize;
+	uint readersWaiting;
 
 private:
 	// do not implement

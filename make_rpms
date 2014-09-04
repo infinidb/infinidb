@@ -1,0 +1,140 @@
+#! /bin/bash
+#
+# $Id$
+#
+
+if [ ! -f ./build/releasenum ]; then
+	echo "I could not find the file 'releasesum' in the ./build directory: I can't continue!" 1>&2
+	echo "Maybe you're not in the right directory?" 1>&2
+	exit 1
+fi
+
+. ./build/releasenum
+
+prefix="`awk '/^prefix = / {print $3}' ./Makefile 2>/dev/null`"
+if [ "x$prefix" = x ]; then
+	echo "I could not determine the prefix from ./Makefile: I can't continue!" 1>&2
+	echo "Maybe you're not in the right directory?" 1>&2
+	exit 1
+fi
+
+if [ ! -d "$prefix/Calpont" ]; then
+	echo "$prefix/Calpont doesn't seem to be a directory: I can't continue!" 1>&2
+	echo "Maybe you're not in the right directory?" 1>&2
+	exit 1
+fi
+
+buildroot=$HOME/rpm/BUILD/calpont-$version-$release
+
+mkdir -p $buildroot/Calpont
+pushd "$prefix/Calpont" > /dev/null
+tar -cf - . | tar -C $buildroot/Calpont -xf -
+popd >/dev/null
+
+#clean up some files from buildroot
+rm -f $buildroot/Calpont/bin/emulator
+rm -f $buildroot/Calpont/etc/Doxyfile
+rm -rf $buildroot/Calpont/include
+for file in $buildroot/Calpont/lib/*; do
+	if [ -h $file ]; then
+		rm -f $file
+	fi
+done
+rm -f $buildroot/Calpont/lib/libdbbc.a
+
+#temporarily clean up these BRM thingies
+for file in dbrm script-fcns; do
+	rm -f $buildroot/Calpont/bin/$file
+done
+
+#clean up these bulkload scripts
+for file in bulkload.sh cleanup.sh dbbuilder.sh dbload.sh cleanup.pl; do
+	rm -f $buildroot/Calpont/bin/$file
+done
+
+rm -rf $buildroot/Calpont/mysql/mysql-test
+rm -rf $buildroot/Calpont/mysql/sql-bench
+rm -rf $buildroot/Calpont/mysql/include
+
+rm -rf $buildroot/Calpont/man
+
+rm -rf $buildroot/Calpont/share/snmp/snmpconf-data
+rm -f $buildroot/Calpont/share/snmp/mib2c.*.conf
+
+rm -f $buildroot/Calpont/etc/snmpd.*
+rm -f $buildroot/Calpont/etc/snmptrapd.*
+rm -f $buildroot/Calpont/local/snmpdx.*
+
+rm -rf $buildroot/Calpont/share
+
+rm -f $buildroot/Calpont/lib/*.a
+rm -f $buildroot/Calpont/lib/*.la
+
+for plugin in ha_archive ha_blackhole ha_example ha_federated ha_innodb ha_innodb_plugin; do
+	rm -f $buildroot/Calpont/mysql/lib/mysql/plugin/${plugin}.a
+	rm -f $buildroot/Calpont/mysql/lib/mysql/plugin/${plugin}.la
+	rm -f $buildroot/Calpont/mysql/lib/mysql/plugin/${plugin}.so
+	rm -f $buildroot/Calpont/mysql/lib/mysql/plugin/${plugin}.so.0
+done
+rm -f $buildroot/Calpont/mysql/lib/mysql/plugin/ha_example.so.0.0.0
+
+for lib in libdbug libheap libmyisam libmyisammrg libmysqlclient libmysqlclient_r libmystrings libmysys libvio; do
+	rm -f $buildroot/Calpont/mysql/lib/mysql/${lib}.a
+	rm -f $buildroot/Calpont/mysql/lib/mysql/${lib}.la
+	rm -f $buildroot/Calpont/mysql/lib/mysql/${lib}.so
+	rm -f $buildroot/Calpont/mysql/lib/mysql/${lib}.so.16
+done
+
+rm -rf $buildroot/Calpont/mysql/share/aclocal
+rm -rf $buildroot/Calpont/mysql/share/man
+
+mkdir -p ~/rpm/BUILD ~/rpm/RPMS ~/rpm/SRPMS ~/rpm/SPECS ~/rpm/tmp
+
+if [ ! -f $HOME/.rpmmacros ]; then
+cat > $HOME/.rpmmacros <<EOD
+%_topdir $HOME/rpm
+%_tmppath $HOME/rpm/tmp
+# Change to 1 if you want to abort on unpackaged files
+%_unpackaged_files_terminate_build 0
+# Don't build debuginfo packages
+%debug_package %{nil}
+# Turn off post install step that strips symbols
+%__os_install_post %{nil}
+# Turn off perl module probes
+%__perl_requires %{nil}
+EOD
+fi
+
+egrep -qs __perl_requires $HOME/.rpmmacros
+if [ $? -ne 0 ]; then
+	cat >> $HOME/.rpmmacros <<EOD
+# Turn off perl module probes
+%__perl_requires %{nil}
+EOD
+fi
+
+#twiddle with the spec file
+packager="$USER"
+buildinfo="Built from open source"
+cp ./build/calpont.spec.in ~/rpm/SPECS/calpont.spec
+sed -ri \
+	-e "s/@@PACKAGER@@/Packager: $packager/" \
+	-e "s/@@VERSION@@/Version: $version/" \
+	-e "s/@@RELEASE@@/Release: $release/" \
+	-e "s/@@BUILDINFO@@/$buildinfo/" \
+	~/rpm/SPECS/calpont.spec
+
+target=
+uname=$(uname -m)
+expr=$(expr "$uname" : 'i.86')
+if [ $expr -gt 0 ]; then
+	target="--target=i686"
+fi
+
+rpmbuild $target -bb ~/rpm/SPECS/calpont.spec
+rc=$?
+
+rm -f /tmp/*.$$
+
+exit $rc
+

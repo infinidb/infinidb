@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: index.cpp 2035 2013-01-21 14:12:19Z rdempsey $
+ * $Id: index.cpp 1855 2012-04-04 18:20:09Z rdempsey $
  *
  ****************************************************************************/
 
@@ -61,7 +61,7 @@ using namespace logging;
 #endif
 
 #define IDXWALK_INIT() \
-	niceBlock = reinterpret_cast<uint8_t *>(block); \
+	niceBlock = reinterpret_cast<u_int8_t *>(block); \
 	blockOffset = (in->SubBlock * WriteEngine::SUBBLOCK_TOTAL_BYTES) + \
 		(in->SBEntry * 8); \
 	treePtr = reinterpret_cast<WriteEngine::IdxBitTestEntry *>(&niceBlock[blockOffset]);
@@ -181,8 +181,8 @@ namespace primitives
 void PrimitiveProcessor::indexWalk_1(const IndexWalkHeader *in, 
 	vector<IndexWalkHeader *> *out) throw()
 {
-	uint16_t bitTest;
-	uint8_t *niceBlock;
+	u_int16_t bitTest;
+	u_int8_t *niceBlock;
 	int blockOffset, bitTestGroupSize, i;
 	WriteEngine::IdxBitTestEntry *treePtr;
 	IndexWalkHeader *element;
@@ -241,6 +241,7 @@ void PrimitiveProcessor::indexWalk_1(const IndexWalkHeader *in,
 	// This is the general case where we're working within a bit test group
 	else {
 		GET_GROUP_SIZE();
+
 #ifdef VERBOSE
  		cerr << "  search string is 0x" << hex << in->SearchString[0] << dec << endl;
 #endif 
@@ -322,8 +323,8 @@ inline int PrimitiveProcessor::compare(int val1, int val2, uint8_t COP,
 void PrimitiveProcessor::indexWalk_2(const IndexWalkHeader *in, 
 	vector<IndexWalkHeader *> *out) throw()
 {
-	uint16_t bitTest1, bitTest2;
-	uint8_t *niceBlock;
+	u_int16_t bitTest1, bitTest2;
+	u_int8_t *niceBlock;
 	int blockOffset, bitTestGroupSize, cmp[2], i;
 	WriteEngine::IdxBitTestEntry *treePtr;
 	IndexWalkHeader *element;
@@ -519,8 +520,8 @@ skip3: 		;
 void PrimitiveProcessor::indexWalk_many(const IndexWalkHeader *in, 
 	vector<IndexWalkHeader *> *out) throw()
 {
-	uint16_t bitTest;
-	uint8_t *niceBlock;
+	u_int16_t bitTest;
+	u_int8_t *niceBlock;
 	int blockOffset, bitTestGroupSize, i;
 	WriteEngine::IdxBitTestEntry *treePtr;
 	IndexWalkHeader *element;
@@ -766,7 +767,7 @@ void PrimitiveProcessor::indexWalk_many(const IndexWalkHeader *in,
 void PrimitiveProcessor::grabSubTree(const IndexWalkHeader *in, 
 	vector<IndexWalkHeader *> *out) throw()
 {
-	uint8_t *niceBlock;
+	u_int8_t *niceBlock;
 	int blockOffset, bitTestGroupSize, i;
 	WriteEngine::IdxBitTestEntry *treePtr;
 	IndexWalkHeader *element;
@@ -833,7 +834,7 @@ void PrimitiveProcessor::p_IdxWalk(const IndexWalkHeader *in,
 void PrimitiveProcessor::p_IdxList(const IndexListHeader *rqst,
 				   IndexListHeader *rslt, int mode)
 {
-    uint8_t *listPtr;
+    u_int8_t *listPtr;
     IndexListParam *linkList;
     IndexListEntry *listEntry, *rsltList, *sizeEntry=0;
     int listOfst, listType, ridCt, i, j, originalRidCt;
@@ -849,7 +850,7 @@ void PrimitiveProcessor::p_IdxList(const IndexListHeader *rqst,
 	rslt->ism.Command = INDEX_LIST_RESULTS;
 	rslt->NVALS = 0;
 
-    listPtr  = (uint8_t *)block;
+    listPtr  = (u_int8_t *)block;
     linkList = (IndexListParam *)(rqst + 1);
     rsltList = (IndexListEntry *)(rslt + 1);
 
@@ -879,7 +880,7 @@ void PrimitiveProcessor::p_IdxList(const IndexListHeader *rqst,
 		    ridCt      = listEntry->value;
 			originalRidCt = ridCt;
 #ifdef VERBOSE
-			uint64_t *tmp = (uint64_t *) &listEntry[1];
+			u_int64_t *tmp = (u_int64_t *) &listEntry[1];
 			cerr << "    ridCount=" << ridCt << " key value=0x" << hex << *tmp << 
 				dec << endl;
 #endif

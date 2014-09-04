@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- $Id: ProcessConfig.xml 3651 2013-06-18 17:55:27Z dhill $ -->
+<!-- $Id: ProcessConfig.xml 3649 2013-06-18 17:54:58Z dhill $ -->
 <Calpont Version="V1.0.0">
 	<PROCESSCONFIG1>
 		<ProcessName>ProcessMonitor</ProcessName>
@@ -102,7 +102,7 @@
 	<PROCESSCONFIG8>
 		<ProcessName>DecomSvr</ProcessName>
 		<ModuleType>pm</ModuleType>
-		<ProcessLocation>/$INSTALLDIR/bin/DecomSvr</ProcessLocation>
+		<ProcessLocation>$INSTALLDIR/bin/DecomSvr</ProcessLocation>
 		<BootLaunch>2</BootLaunch>
 		<LaunchID>15</LaunchID>
 		<DepProcessName/>
@@ -140,9 +140,9 @@
 		<LogFile>off</LogFile>
 	</PROCESSCONFIG11>
 	<PROCESSCONFIG12>
-		<ProcessName>DDLProc</ProcessName>
+		<ProcessName>DMLProc</ProcessName>
 		<ModuleType>um</ModuleType>
-		<ProcessLocation>$INSTALLDIR/bin/DDLProc</ProcessLocation>
+		<ProcessLocation>$INSTALLDIR/bin/DMLProc</ProcessLocation>
 		<BootLaunch>2</BootLaunch>
 		<LaunchID>50</LaunchID>
 		<DepProcessName1>WriteEngineServer</DepProcessName1>
@@ -150,22 +150,20 @@
 		<DepProcessName2>DBRMWorkerNode</DepProcessName2>
 		<DepModuleName2>*</DepModuleName2>
 		<DepProcessName3>ExeMgr</DepProcessName3>
-		<DepModuleName3>*</DepModuleName3>
+		<DepModuleName3>um*</DepModuleName3>
 		<RunType>SIMPLEX</RunType>
 		<LogFile>off</LogFile>
 	</PROCESSCONFIG12>
 	<PROCESSCONFIG13>
-		<ProcessName>DMLProc</ProcessName>
+		<ProcessName>DDLProc</ProcessName>
 		<ModuleType>um</ModuleType>
-		<ProcessLocation>$INSTALLDIR/bin/DMLProc</ProcessLocation>
+		<ProcessLocation>$INSTALLDIR/bin/DDLProc</ProcessLocation>
 		<BootLaunch>2</BootLaunch>
 		<LaunchID>51</LaunchID>
 		<DepProcessName1>WriteEngineServer</DepProcessName1>
 		<DepModuleName1>pm*</DepModuleName1>
 		<DepProcessName2>DBRMWorkerNode</DepProcessName2>
 		<DepModuleName2>*</DepModuleName2>
-		<DepProcessName3>DDLProc</DepProcessName3>
-		<DepModuleName3>@</DepModuleName3>
 		<RunType>SIMPLEX</RunType>
 		<LogFile>off</LogFile>
 	</PROCESSCONFIG13>

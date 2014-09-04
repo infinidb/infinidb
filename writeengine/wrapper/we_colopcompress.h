@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: we_colopcompress.h 4726 2013-08-07 03:38:36Z bwilkinson $
+//  $Id: we_colopcompress.h 4096 2012-08-07 20:06:09Z dhall $
 
 
 /** @file */
@@ -28,7 +28,7 @@
 #include "we_colop.h"
 #include "we_chunkmanager.h"
 
-#if defined(_MSC_VER) && defined(WRITEENGINE_DLLEXPORT)
+#if defined(_MSC_VER) && defined(WRITEENGINECOLUMNOPCOMPRESS_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
@@ -56,19 +56,19 @@ public:
    /**
    * @brief virtual method in ColumnOp
    */
-   IDBDataFile*  openFile(const Column& column, uint16_t dbRoot, uint32_t partition,
-      uint16_t segment, std::string& segFile, bool useTmpSuffix, const char* mode = "r+b",
+   FILE*  openFile(const Column& column, uint16_t dbRoot, uint32_t partition,
+      uint16_t segment, std::string& segFile, const char* mode = "r+b",
       int ioBuffSize = DEFAULT_BUFSIZ) const;
 
    /**
    * @brief virtual method in ColumnOp
    */
-   bool abbreviatedExtent(IDBDataFile* pFile, int colWidth) const;
+   bool abbreviatedExtent(FILE* pFile, int colWidth) const;
 
    /**
    * @brief virtual method in ColumnOp
    */
-   int blocksInFile(IDBDataFile* pFile) const;
+   int blocksInFile(FILE* pFile) const;
 
 
 protected:
@@ -76,12 +76,12 @@ protected:
    /**
    * @brief virtual method in ColumnOp
    */
-   int readBlock(IDBDataFile* pFile, unsigned char* readBuf, const uint64_t fbo);
+   int readBlock(FILE* pFile, unsigned char* readBuf, const i64 fbo);
 
    /**
    * @brief virtual method in ColumnOp
    */
-   int saveBlock(IDBDataFile* pFile, const unsigned char* writeBuf, const uint64_t fbo);
+   int saveBlock(FILE* pFile, const unsigned char* writeBuf, const i64 fbo);
 
 
 private:
@@ -111,24 +111,24 @@ public:
    /**
    * @brief virtual method in FileOp
    */
-   int expandAbbrevColumnExtent(IDBDataFile* pFile, uint16_t dbRoot, uint64_t emptyVal, int width);
+   int expandAbbrevColumnExtent(FILE* pFile, uint16_t dbRoot, i64 emptyVal, int width);
 
    /**
    * @brief virtual method in ColumnOp
    */
-   IDBDataFile*  openFile(const Column& column, uint16_t dbRoot, uint32_t partition,
-      uint16_t segment, std::string& segFile, bool useTmpSuffix, const char* mode = "r+b",
+   FILE*  openFile(const Column& column, uint16_t dbRoot, uint32_t partition,
+      uint16_t segment, std::string& segFile, const char* mode = "r+b",
       int ioBuffSize = DEFAULT_BUFSIZ) const;
 
    /**
    * @brief virtual method in ColumnOp
    */
-   bool abbreviatedExtent(IDBDataFile* pFile, int colWidth) const;
+   bool abbreviatedExtent(FILE* pFile, int colWidth) const;
 
    /**
    * @brief virtual method in ColumnOp
    */
-   int blocksInFile(IDBDataFile* pFile) const;
+   int blocksInFile(FILE* pFile) const;
 
 //   void chunkManager(ChunkManager* cm);
 
@@ -137,16 +137,12 @@ public:
    */
    void setTransId(const TxnID& transId) {ColumnOp::setTransId(transId); if (m_chunkManager) m_chunkManager->setTransId(transId);}
    
-   void setBulkFlag(bool isBulkLoad) {m_chunkManager->setBulkFlag(isBulkLoad);};
-   
-   void setFixFlag(bool isFix) {m_chunkManager->setFixFlag(isFix);};
-   
 protected:
 
    /**
    * @brief virtual method in FileOp
    */
-   int updateColumnExtent(IDBDataFile* pFile, int nBlocks);
+   int updateColumnExtent(FILE* pFile, int nBlocks);
 
    /**
    * @brief virtual method in ColumnOp
@@ -156,12 +152,12 @@ protected:
    /**
    * @brief virtual method in ColumnOp
    */
-   int readBlock(IDBDataFile* pFile, unsigned char* readBuf, const uint64_t fbo);
+   int readBlock(FILE* pFile, unsigned char* readBuf, const i64 fbo);
 
    /**
    * @brief virtual method in ColumnOp
    */
-   int saveBlock(IDBDataFile* pFile, const unsigned char* writeBuf, const uint64_t fbo);
+   int saveBlock(FILE* pFile, const unsigned char* writeBuf, const i64 fbo);
 
    /**
    * @brief Set the IsInsert flag in the ChunkManager. 

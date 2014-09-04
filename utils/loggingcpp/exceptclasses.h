@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: exceptclasses.h 3857 2013-06-04 18:19:28Z pleblanc $
+ * $Id: exceptclasses.h 3678 2013-04-02 15:45:49Z rdempsey $
  *
  *****************************************************************************/
 
@@ -35,19 +35,19 @@
 #include "idberrorinfo.h"
 #include "logger.h"
 
-namespace logging
+namespace logging 
 {
 
 /** @brief specific error exception class
 *
-*
+*  
 */
 class IDBExcept : public std::runtime_error
 {
 public:
-	IDBExcept(uint16_t code) :
+	IDBExcept(uint16_t code) : 
 		std::runtime_error(IDBErrorInfo::instance()->errorMsg(code)), fErrCode(code) {}
-	IDBExcept(uint16_t code, const Message::Args& args) :
+	IDBExcept(uint16_t code, const Message::Args& args) : 
 		std::runtime_error(IDBErrorInfo::instance()->errorMsg(code, args)), fErrCode(code){}
 	IDBExcept(const std::string& msg, uint16_t code) :
 		std::runtime_error(msg), fErrCode(code){ }
@@ -64,7 +64,7 @@ public:
 	{ }
 };
 
-class LargeDataListExcept : public std::runtime_error
+class LargeDataListExcept : public std::runtime_error 
 {
 public:
 	/** Takes a character string describing the error.  */
@@ -76,27 +76,34 @@ public:
 
 /** @brief specific error exception class for query data
 *   @bug 1155
-*
+*  
 */
-class QueryDataExcept : public IDBExcept
+class QueryDataExcept : public std::runtime_error 
 {
 public:
 	/** Takes a character string describing the error.  */
 	QueryDataExcept(const std::string& msg, uint16_t code) :
-		IDBExcept(msg, code)  { }
+		std::runtime_error(msg), fErrorCode(code) { }
 
 	virtual	~QueryDataExcept() throw() { }
+
+	void errorCode(uint16_t code) { fErrorCode = code; }
+	uint16_t errorCode() const    { return fErrorCode; }
+
 private:
 	//defaults okay
 	//QueryDataExcept(const QueryDataExcept& rhs);
 	//QueryDataExcept& operator=(const QueryDataExcept& rhs);
+
+	//why is this only 16 bits?
+	uint16_t fErrorCode;
 };
 
 /** @brief specific error exception class for VBBM Version Buffer overflow
 *   @bug 1949
-*
+*  
 */
-class VBBMBufferOverFlowExcept : public std::runtime_error
+class VBBMBufferOverFlowExcept : public std::runtime_error 
 {
 public:
 	/** Takes a character string describing the error.  */
@@ -111,7 +118,7 @@ private:
 
 /** @brief specific error exception class for VBBM Version Buffer overflow
 *   @bug 1949
-*
+*  
 */
 class PrimitiveColumnProjectResultExcept : public QueryDataExcept
 {
@@ -123,9 +130,9 @@ public:
 
 /** @brief specific error exception class for PrimProc invalid HWM
 *   @bug 2173
-*
+*  
 */
-class InvalidRangeHWMExcept : public QueryDataExcept
+class InvalidRangeHWMExcept : public QueryDataExcept 
 {
 public:
 	/** Takes a character string describing the error.  */
@@ -133,6 +140,25 @@ public:
 		QueryDataExcept(msg, hwmRangeSizeErr){ }
 };
 
+
+/** @brief specific error exception class for Multicast exceptions
+*   @bug 2065
+*  
+*/
+class MulticastException : public std::runtime_error 
+{
+public:
+	/** Takes a character string describing the error.  */
+	MulticastException(const std::string& msg, int err = 0) :
+		std::runtime_error(std::string("MulticastException: ") + msg), fErrorCode(err)  { }
+
+	void errorCode(int code) { fErrorCode = code; }
+	int errorCode() const    { return fErrorCode; }
+
+private:
+	int fErrorCode;
+
+};
 
 /** @brief Exception for F&E framework to throw
  *  Invalid Operation Exception
@@ -180,7 +206,7 @@ public:
 
 /** @brief specific error exception class for getSysData in Calpontsystemcatalog.
 *   @bug 2574
-*
+*  
 */
 class NoTableExcept : public std::runtime_error
 {
@@ -213,12 +239,8 @@ public:
 	std::runtime_error(emsg) {}
 };
 
-class ProtocolError : public std::logic_error
-{
-public:
-	ProtocolError(const std::string &emsg) : std::logic_error(emsg) { }
-};
-
+//XXXPAT: I'm told this all works in windows now.  Skeptical.  If it must be changed,
+//it should still throw on error to preserve the control flow...
 #ifndef __STRING
 #define __STRING(x) #x
 #endif

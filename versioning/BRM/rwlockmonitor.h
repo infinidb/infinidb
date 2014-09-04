@@ -41,7 +41,7 @@ namespace BRM {
 class RWLockMonitor {
 public:
 	// d = die, ls = lock status, k = key
-	EXPORT RWLockMonitor(const bool *d, const bool *ls, const uint32_t k);
+	EXPORT RWLockMonitor(const bool *d, const bool *ls, const uint k);
 
 	EXPORT virtual ~RWLockMonitor();
 
@@ -55,11 +55,11 @@ private:
 	/* Some of these vars are only useful once we implement write_lock checking. */
 	const bool *die;
 	const bool *lockStatus;
-	uint32_t key;
+	uint key;
 	boost::shared_ptr<rwlock::RWLock> lock;
 
 	struct timespec ts;   // 3:30 timer
-	uint32_t secsBetweenAttempts;  // :30
+	uint secsBetweenAttempts;  // :30
 };
 
 } /* namespace BRM */

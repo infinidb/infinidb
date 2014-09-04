@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: arithmeticoperator.cpp 9210 2013-01-21 14:10:42Z rdempsey $
+*   $Id: arithmeticoperator.cpp 8436 2012-04-04 18:18:21Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -29,11 +29,11 @@
 using namespace std;
 
 namespace {
-
+    
 /**@brief util struct for converting string to lower case */
 struct to_lower
 {
-	char operator() (char c) const { return tolower(c); }
+    char operator() (char c) const { return tolower(c); }
 };
 
 //Trim any leading/trailing ws
@@ -51,7 +51,7 @@ const string lrtrim(const string& in)
 }
 
 namespace execplan {
-
+    
 /**
  * Constructors/Destructors
  */
@@ -61,7 +61,7 @@ ArithmeticOperator::ArithmeticOperator() : Operator()
 
 ArithmeticOperator::ArithmeticOperator(const string& operatorName):Operator(operatorName)
 {
-}
+}					
 
 ArithmeticOperator::ArithmeticOperator(const ArithmeticOperator& rhs):Operator(rhs)
 {
@@ -78,12 +78,12 @@ ArithmeticOperator:: ~ArithmeticOperator()
 /**
  * friend function
  */
-ostream& operator<<(ostream &output, const ArithmeticOperator& rhs)
+ostream& operator<<(ostream &output, const ArithmeticOperator& rhs) 
 {
 	output << rhs.toString();
 	output << "opType=" << rhs.operationType().colDataType << endl;
 	return output;
-}
+} 
 
 /**
  * The serialization interface
@@ -148,7 +148,7 @@ void ArithmeticOperator::operationType(const Type& l, const Type& r)
 				fOperationType.scale = l.scale;
 				break;
 			default:
-				fOperationType.colDataType = execplan::CalpontSystemCatalog::DOUBLE;
+				fOperationType.colDataType = execplan::CalpontSystemCatalog::DOUBLE;							
 		}
 	}
 	else if (r.colDataType == execplan::CalpontSystemCatalog::DECIMAL)
@@ -170,38 +170,20 @@ void ArithmeticOperator::operationType(const Type& l, const Type& r)
 				fOperationType.scale = r.scale;
 				break;
 			default:
-				fOperationType.colDataType = execplan::CalpontSystemCatalog::DOUBLE;
+				fOperationType.colDataType = execplan::CalpontSystemCatalog::DOUBLE;							
 		}
 	}
 	else if ((l.colDataType == execplan::CalpontSystemCatalog::INT ||
-				l.colDataType == execplan::CalpontSystemCatalog::MEDINT ||
-				l.colDataType == execplan::CalpontSystemCatalog::TINYINT ||
-				l.colDataType == execplan::CalpontSystemCatalog::BIGINT) &&
-			   (r.colDataType == execplan::CalpontSystemCatalog::INT ||
-				r.colDataType == execplan::CalpontSystemCatalog::MEDINT ||
-				r.colDataType == execplan::CalpontSystemCatalog::TINYINT ||
-				r.colDataType == execplan::CalpontSystemCatalog::BIGINT))
+		        l.colDataType == execplan::CalpontSystemCatalog::MEDINT ||
+		        l.colDataType == execplan::CalpontSystemCatalog::TINYINT ||
+		        l.colDataType == execplan::CalpontSystemCatalog::BIGINT) &&
+		       (r.colDataType == execplan::CalpontSystemCatalog::INT ||
+		        r.colDataType == execplan::CalpontSystemCatalog::MEDINT ||
+		        r.colDataType == execplan::CalpontSystemCatalog::TINYINT ||
+		        r.colDataType == execplan::CalpontSystemCatalog::BIGINT))
 		fOperationType.colDataType = execplan::CalpontSystemCatalog::BIGINT;
 	else
-		fOperationType.colDataType = execplan::CalpontSystemCatalog::DOUBLE;
+		fOperationType.colDataType = execplan::CalpontSystemCatalog::DOUBLE;	
 }
 #endif
-
-void ArithmeticOperator::adjustResultType(const CalpontSystemCatalog::ColType& m)
-{
-	if (m.colDataType != CalpontSystemCatalog::DECIMAL)
-	{
-		fResultType = m;
-	}
-	else
-	{
-		CalpontSystemCatalog::ColType n;
-		n.colDataType = CalpontSystemCatalog::DOUBLE;
-		n.scale = m.scale; // @bug5736, save the original decimal scale
-		n.precision = -1;  // @bug5736, indicate this double is for decimal math
-		n.colWidth = 8;
-		fResultType = n;
-	}
-}
-
 }  // namespace

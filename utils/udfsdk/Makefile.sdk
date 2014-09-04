@@ -1,0 +1,32 @@
+# This needs to point to your top-level directory
+SDKROOT=$(HOME)/idbudfsdk
+
+# This needs to point to the InfiniDB source directory
+IDBSRCROOT=$(SDKROOT)/calpont-infinidb-2.0
+
+CPPFLAGS=-I. -I/usr/include/libxml2 \
+-I$(IDBSRCROOT)/dbcon/execplan \
+-I$(IDBSRCROOT)/writeengine/shared \
+-I$(IDBSRCROOT)/utils/messageqcpp \
+-I$(IDBSRCROOT)/utils/loggingcpp \
+-I$(IDBSRCROOT)/utils/dataconvert \
+-I$(IDBSRCROOT)/utils/configcpp \
+-I$(IDBSRCROOT)/dbcon/mysql \
+-I$(IDBSRCROOT)/mysql/include \
+-I$(IDBSRCROOT)/mysql-5.1.39/include \
+-I$(IDBSRCROOT)/mysql-5.1.39/sql \
+-I$(IDBSRCROOT)/utils/funcexp \
+-I$(IDBSRCROOT)/utils/rowgroup \
+-I$(IDBSRCROOT)/dbcon/joblist
+
+CXXFLAGS=-g0 -O3 -fno-strict-aliasing -fPIC
+LDFLAGS=-L/usr/local/Calpont/lib -lloggingcpp -lfuncexp
+
+libudfsdk.so.1.0.0: udfsdk.o
+	$(LINK.cpp) -shared -o libudfsdk.so.1.0.0 udfsdk.o
+
+udfsdk.o: udfsdk.cpp udfsdk.h
+
+clean:
+	rm -f udfsdk.o libudfsdk.so.1.0.0
+

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_if.cpp 3871 2013-06-07 16:25:01Z bpaul $
+* $Id: func_if.cpp 3048 2012-04-04 15:33:45Z rdempsey $
 *
 *
 ****************************************************************************/
@@ -49,23 +49,16 @@ bool boolVal(SPTP& parm, Row& row, bool& isNull)
 			case CalpontSystemCatalog::CHAR:
 			case CalpontSystemCatalog::VARCHAR:
 				ret = (atoi((char*)(parm->data()->getStrVal().c_str())) != 0);
-            case CalpontSystemCatalog::FLOAT:
-			case CalpontSystemCatalog::UFLOAT:
+			case CalpontSystemCatalog::FLOAT:
 				ret = (parm->data()->getFloatVal(row, isNull) != 0);
 			case CalpontSystemCatalog::DOUBLE:
-            case CalpontSystemCatalog::UDOUBLE:
 				ret = (parm->data()->getDoubleVal(row, isNull) != 0);
-            case CalpontSystemCatalog::DECIMAL:
-            case CalpontSystemCatalog::UDECIMAL:
+			case CalpontSystemCatalog::DECIMAL:
 				ret = (parm->data()->getDecimalVal(row, isNull).value != 0);
 			case CalpontSystemCatalog::BIGINT:
 			case CalpontSystemCatalog::SMALLINT:
 			case CalpontSystemCatalog::MEDINT:
 			case CalpontSystemCatalog::INT:
-            case CalpontSystemCatalog::UBIGINT:
-            case CalpontSystemCatalog::USMALLINT:
-            case CalpontSystemCatalog::UMEDINT:
-            case CalpontSystemCatalog::UINT:
 			case CalpontSystemCatalog::DATE:
 			case CalpontSystemCatalog::DATETIME:
 			default:
@@ -199,7 +192,7 @@ int32_t Func_if::getDateIntVal(Row& row,
 	else
 	{
 		isNull = false;
-		return parm[2]->data()->getDateIntVal(row, isNull);
+		return parm[2]->data()->getDatetimeIntVal(row, isNull);
 	}
 }
 

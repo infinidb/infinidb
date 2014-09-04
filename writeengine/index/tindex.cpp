@@ -151,7 +151,7 @@ public:
       CPPUNIT_ASSERT( rc == NO_ERROR );
 //       m_index.m_freeMgr.setDebugLevel( DEBUG_1 );
       FILE* pFile;
-      uint64_t   key, curkey, lastkey;
+      i64   key, curkey, lastkey;
       RID   rid, ridArray[5000];
       int   counter = 0, ridCounter = 0;
 
@@ -259,7 +259,7 @@ exit(-1);
         // generate an index with 200K entries, each unique
 
         int   rc;
-        uint64_t i;
+        i64 i;
         printf("\nUT: Beginning Space Hog\n");
         m_index.setUseFreeMgr( true );
         m_index.setUseListMgr( true );
@@ -317,7 +317,7 @@ exit(-1);
 //       m_index.m_freeMgr.setDebugLevel( DEBUG_1 );
       DataBlock curBlock;
       char   buf[20];
-      uint64_t key;
+      i64    key;
       timer t1, t2;
         for( i = 0; i < 100000; i++ ) {
             sprintf( buf, "%dSuccess", i );
@@ -459,7 +459,7 @@ exit(-1);
 
       CPPUNIT_ASSERT( m_index.isAddrPtrEmpty( &bitmapPtr, BITMAP_PTR/*EMPTY_PTR*/ ) == false );
 
-      uint64_t i;
+      i64 i;
 
       for( i = 0; i < 15; i++ ) {
          bitmapPtr.type = i%8;
@@ -485,7 +485,7 @@ exit(-1);
    }
 
    void testAddTreeNode() {
-      uint64_t          key = 123, rid = 1900, width = 8, testbitVal = 3;
+      i64               key = 123, rid = 1900, width = 8, testbitVal = 3;
       IdxTree           myTree;
       IdxBitmapPointerEntry bitmapEntry;
 
@@ -512,9 +512,9 @@ exit(-1);
    void testSetupBittestArray() {
       char              charVal[] = "abcde";
       short             i8Val = 21;
-      uint16_t          i16Val = 1098, curPos = 0;
-      uint32_t          i32Val = 0x0A6E6D8E, compareVal;
-      uint64_t          i64Val = 0xDE1B4213;
+      i16               i16Val = 1098, curPos = 0;
+      i32               i32Val = 0x0A6E6D8E, compareVal;
+      i64               i64Val = 0xDE1B4213;
       int               width, testbitVal, rc, i, shiftPos;
 
       // compare with old code to make sure we can still be consistent
@@ -731,7 +731,7 @@ exit(-1);
       CPPUNIT_ASSERT( rc == NO_ERROR );
 
       char   buf[20];
-      uint64_t key;
+      i64    key;
 
       for( i = 0; i < 10000; i++ ) {
          sprintf( buf, "%dSuccess", i );
@@ -771,9 +771,9 @@ exit(-1);
    }
 
    void testUpdateMutiColIndex() {
-      uint16_t i16Val;
-      uint32_t i32Val;
-      uint64_t key;
+      i16 i16Val;
+      i32 i32Val;
+      i64 key;
       int rc, width = 64, i, pos = 0, totalWidth = 0;
       char charVal[50];
 
@@ -856,7 +856,7 @@ exit(-1);
 
    void testIntegrationVolume() {
       int   rc, width = 8, count = 3, i, j;
-      uint64_t   key = 123;
+      i64   key = 123;
       RID   rid = 1;
       IdxTree   myTree;
 BRMWrapper::setUseBrm(false);
@@ -905,7 +905,7 @@ BRMWrapper::setUseBrm(false);
 
 
    void testTreeGetTestbitValue() {
-      uint64_t    key;
+      i64         key;
       int         width, bittestVal;
       bool        bStatus;
 BRMWrapper::setUseBrm(false);
@@ -1190,8 +1190,8 @@ BRMWrapper::setUseBrm(false);
       m_index.closeFile( treeFile );
    }
 
-   void testTreeNodeAssert( IdxTree myTree, int curLevel, uint64_t curBitTest, uint16_t curGroup,
-                            uint64_t curFbo, uint64_t curSbid, uint64_t curEntry, uint64_t nextFbo, uint64_t nextSbid, uint64_t nextEntry )
+   void testTreeNodeAssert( IdxTree myTree, int curLevel, i64 curBitTest, i16 curGroup,
+                            i64 curFbo, i64 curSbid, i64 curEntry, i64 nextFbo, i64 nextSbid, i64 nextEntry )
    {
       CPPUNIT_ASSERT( myTree.node[curLevel].current.bitTest == curBitTest );
       CPPUNIT_ASSERT( myTree.node[curLevel].current.group == curGroup );
@@ -1218,7 +1218,7 @@ BRMWrapper::setUseBrm(false);
 
    void testTreeBuildEmptyTree() {
       int  rc, width = 8, rid = 3;
-      uint64_t key = 123;
+      i64  key = 123;
       IdxTree myTree;
 BRMWrapper::setUseBrm(false);
       rc = m_index.dropIndex( 990, 991 );
@@ -1301,7 +1301,7 @@ BRMWrapper::setUseBrm(false);
 
    void testTreeBuildExistTree1() {
       int  rc, width = 8, rid = 3;
-      uint64_t key = 123;
+      i64  key = 123;
       IdxTree myTree;
 BRMWrapper::setUseBrm(false);
       rc = m_index.dropIndex( 990, 991 );
@@ -1399,7 +1399,7 @@ BRMWrapper::setUseBrm(false);
 
    void testTreeBuildExistTree2() {
       int  rc, width = 16, rid = 3;
-      uint64_t key = 0xA1C9;
+      i64  key = 0xA1C9;
       IdxTree myTree;
 BRMWrapper::setUseBrm(false);
       rc = m_index.dropIndex( 990, 991 );
@@ -1553,8 +1553,8 @@ BRMWrapper::setUseBrm(false);
        int rc;
        int allocSize;
        CommBlock cb;
-       uint64_t lbid;
-       uint64_t fbo;
+       i64 lbid;
+       i64 fbo;
        m_freeMgr.setDebugLevel( DEBUG_0 );
        printf("\nUT: Begin testFreeMgrBRM\n");
 
@@ -1608,7 +1608,7 @@ BRMWrapper::setUseBrm(false);
        IdxEmptyListEntry emptyMap, assignPtr;
        CommBlock cb;
        int allocSize, rc;
-       uint64_t lbid;
+       i64 lbid;
 
        m_freeMgr.setDebugLevel( DEBUG_1 );
        printf("\nUT: Begin testFreeMgrInit\n");
@@ -1774,7 +1774,7 @@ BRMWrapper::setUseBrm(false);
        DataBlock   blockZero;
        IdxEmptyListEntry emptyMap, assignPtr;
        int allocSize, rc;
-       uint64_t lbid;
+       i64 lbid;
 
        m_freeMgr.setDebugLevel( DEBUG_0 );
        printf("\nUT: Begin testFreeMgrInit2\n");
@@ -1896,7 +1896,7 @@ BRMWrapper::setUseBrm(false);
        CPPUNIT_ASSERT( m_freeMgr.init( cb, TREE )  == NO_ERROR );
 /*       m_freeMgr.readDBFile( indexFile, blockZero.data, 0  );
        m_index.printMemSubBlock(  &blockZero , 0 );*/
-       uint64_t lbid = m_freeMgr.mapLBID( cb, 0, rc);
+       i64 lbid = m_freeMgr.mapLBID( cb, 0, rc);
        CPPUNIT_ASSERT_MESSAGE( "Error using mapLBID", rc == NO_ERROR );
 
        m_freeMgr.readDBFile( indexFile, blockZero.data, lbid );
@@ -2073,7 +2073,7 @@ BRMWrapper::setUseBrm(false);
        int rc;
        int allocSize;
        CommBlock cb;
-       uint64_t lbid;
+       i64 lbid;
 
        m_freeMgr.setDebugLevel( DEBUG_0 );
        printf("UT: Begin testFreeMgrAssignList\n");
@@ -2249,7 +2249,7 @@ BRMWrapper::setUseBrm(false);
        DataBlock   blockZero;
        int idx;
        IdxEmptyListEntry entries[100];
-       uint64_t lbid;
+       i64 lbid;
 
        m_freeMgr.setDebugLevel( DEBUG_0 );
        printf("UT: Begin testFreeMgrAssignListCk\n");
@@ -2314,7 +2314,7 @@ BRMWrapper::setUseBrm(false);
        IdxEmptyListEntry entries[4000];
        IdxEmptyListEntry map;
        CommBlock cb;
-       uint64_t lbid;
+       i64 lbid;
 
        m_freeMgr.setDebugLevel( DEBUG_0 );
        printf("UT: Begin testFreeMgrAssignListLots\n");
@@ -2402,7 +2402,7 @@ BRMWrapper::setUseBrm(false);
        CommBlock cb;
        int idx;
        IdxEmptyListEntry entries[8000];
-       uint64_t lbid;
+       i64 lbid;
 
        m_freeMgr.setDebugLevel( DEBUG_0 );
        printf("UT: Begin testFreeMgrAssignListBlocks\n");
@@ -2471,7 +2471,7 @@ BRMWrapper::setUseBrm(false);
        DataBlock   blockZero;
        int rc, allocSize;
        CommBlock cb;
-       uint64_t lbid;
+       i64 lbid;
 
        m_freeMgr.setDebugLevel( DEBUG_0 );
        printf("UT: Begin testFreeMgrAssignListCk2\n");
@@ -2550,7 +2550,7 @@ BRMWrapper::setUseBrm(false);
        int rc;
        DataBlock   blockZero;
        CommBlock cb;
-       uint64_t lbid;
+       i64 lbid;
        DbFileOp db;
        
        printf("UT: Begin testFreeMgrAssignExtend\n");
@@ -2589,7 +2589,7 @@ BRMWrapper::setUseBrm(false);
        int idx, rc;
        DataBlock   blockZero;
        CommBlock cb;
-       uint64_t lbid;
+       i64 lbid;
        DbFileOp db;
        
        printf("UT: Begin testFreeMgrExtendLots\n");
@@ -2629,7 +2629,7 @@ BRMWrapper::setUseBrm(false);
        IdxEmptyListEntry assignPtr, emptyMap;
        CommBlock cb;
        int rc, allocSize;
-       uint64_t lbid;
+       i64 lbid;
 
        m_freeMgr.setDebugLevel( DEBUG_0 );
        printf("UT: Begin testFreeMgrRelease\n");
@@ -2823,7 +2823,7 @@ BRMWrapper::setUseBrm(false);
        IdxEmptyListEntry assignPtr, emptyMap;
        int         rc, allocSize;
        CommBlock   cb;
-       uint64_t lbid;
+       i64 lbid;
 
        // test if possible to split a list of segments and populate smaller lists
        m_freeMgr.setDebugLevel( DEBUG_0 );
@@ -2899,7 +2899,7 @@ BRMWrapper::setUseBrm(false);
 //        DataBlock   blockZero, workBlock;
 //        IdxEmptyListEntry assignPtr, emptyPtr, emptyEntry;
 //        CommBlock cb;
-//        uint64_t lbid;
+//        i64 lbid;
 //
 //        /**
 //         * Forget Google.. be evil
@@ -3033,7 +3033,7 @@ void testIndexListMultiKey() {
        DataBlock               curBlock;
        FILE*                   pFile =NULL;
        int                     rc, allocSize;
-       uint64_t                key=0x123;
+       i64                     key=0x123;
        int                     rowId;
        int                     file_number=20000;
        int                     fbo , sbid , entry ;
@@ -3093,7 +3093,7 @@ void testIndexListUpdate() {
       DataBlock               curBlock;
       FILE*                   pFile =NULL;
       int                     rc, fbo , sbid , entry ;
-      uint64_t                key=123;
+      i64                     key=123;
       int                     count =40000;
       int                     rowId;
       int                     i;
@@ -3103,7 +3103,7 @@ void testIndexListUpdate() {
       IdxRidListHdr     newIdxRidListHdr;
       //bool found = false;
       //int  p_sbid, p_entry, 
-      //uint64_t  p_fbo;
+      //i64  p_fbo;
       int allocSize;
       
         BRMWrapper::setUseBrm(true);
@@ -3167,19 +3167,19 @@ void testIndexListUpdate() {
                                       &newIdxRidListHdr );
         //cout<< " key->" << key << " size->" << 
                             //newIdxRidListHdr.idxRidListSize.size << endl;
-        CPPUNIT_ASSERT( newIdxRidListHdr.idxRidListSize.size == (uint64_t)(count+1));
+        CPPUNIT_ASSERT( newIdxRidListHdr.idxRidListSize.size == (i64)(count+1));
         RID ridArray[count+1];
         int size;
         m_indexlist.getRIDArrayFromListHdr(pFile, key,
                                            &newIdxListHdrPtr,
                                            ridArray, size);
-        CPPUNIT_ASSERT( newIdxRidListHdr.idxRidListSize.size == (uint64_t)size);
+        CPPUNIT_ASSERT( newIdxRidListHdr.idxRidListSize.size == (i64)size);
         //cout << "size=" << size << endl;
         //cout << " newIdxRidListHdr.idxRidListSize.size=" << newIdxRidListHdr.idxRidListSize.size << endl;
         //for (int i=0; i< size ; i++)
          ////cout<< " ridArray[i]->" <<  ridArray[i] << " i->" << i << endl;
         
-        uint64_t firstLbid;
+        i64 firstLbid;
         rc = m_indexlist.findFirstBlk(pFile, key, &newIdxListHdrPtr, firstLbid);
         //cout << " Single RID insert->FirstLbid is ->" << firstLbid << endl;
         //cout << " This will print level and counts for Children " << endl;
@@ -3194,18 +3194,18 @@ void testIndexListDelete() {
       DataBlock               curBlock;
       FILE*                   pFile =NULL;
       int                     rc, fbo , sbid , entry , width = 32, allocSize;
-      uint64_t                key=123;
+      i64                     key=123;
       int                     count =2890;
       int                     rowId;
       int                     i;
       int                     k=count+1;
       int                     delete_count;
       int                     file_number=8002;
-      IdxEmptyListEntry       newIdxListHdrPtr;
-      IdxRidListHdr           newIdxRidListHdr;
-      bool                    found = false;
-      int                     p_sbid, p_entry;
-      uint64_t                p_fbo;
+      IdxEmptyListEntry newIdxListHdrPtr;
+      IdxRidListHdr     newIdxRidListHdr;
+      bool found = false;
+      int  p_sbid, p_entry;
+      i64 p_fbo;
 
       //Initialize first rowId to 0
       //Then increment the rowId as it goes
@@ -3336,7 +3336,7 @@ void testIndexListDelete() {
          rc = m_indexlist.readDBFile( pFile, curBlock.data, fbo );
          m_indexlist.getSubBlockEntry( curBlock.data, sbid, entry, width, &newIdxRidListHdr );
 
-         CPPUNIT_ASSERT( newIdxRidListHdr.idxRidListSize.size == (uint64_t)k );
+         CPPUNIT_ASSERT( newIdxRidListHdr.idxRidListSize.size == (i64)k );
          CPPUNIT_ASSERT( newIdxRidListHdr.idxRidListSize.type == 0 );
          CPPUNIT_ASSERT( newIdxRidListHdr.key == key );
          CPPUNIT_ASSERT( newIdxRidListHdr.firstIdxRidListEntry.rid == (RID)0 );
@@ -3400,7 +3400,7 @@ void testIndexListDelete() {
       width =32;
       m_indexlist.getSubBlockEntry( curBlock.data, sbid, entry, width, &newIdxRidListHdr );
       k=k-delete_count;
-      CPPUNIT_ASSERT( newIdxRidListHdr.idxRidListSize.size == (uint64_t)k );
+      CPPUNIT_ASSERT( newIdxRidListHdr.idxRidListSize.size == (i64)k );
       CPPUNIT_ASSERT( newIdxRidListHdr.idxRidListSize.type == 0 );
       CPPUNIT_ASSERT( newIdxRidListHdr.key == key );
 
@@ -3551,10 +3551,10 @@ void testIndexListReleaseMgrBack() {
       int                     fbo2, sbid2, entry2;
       int                     fbo3, sbid3, entry3;
       int                     fbo4, sbid4, entry4;
-      uint64_t                key  = 1;
-      uint64_t                key2 = 2;
-      uint64_t                key3 = 3;
-      uint64_t                key4 = 4;
+      i64                     key  = 1;
+      i64                     key2 = 2;
+      i64                     key3 = 3;
+      i64                     key4 = 4;
       int                     count =2000;
       int                     i =0;
       int                     delete_count;
@@ -3577,7 +3577,7 @@ void testIndexListReleaseMgrBack() {
       
       bool found = false;
       int  p_sbid, p_entry, allocSize;
-      uint64_t  p_fbo;
+      i64  p_fbo;
       BRMWrapper::setUseBrm(true);
       m_indexlist.setUseSortFlag(false);
       printf("\nRunning testIndexListMultipleAddHdr\n");
@@ -3705,10 +3705,10 @@ void testIndexListReleaseMgrBack() {
 
         ////cout << " Total used time (sec) " << m_indexlist.getTotalRunTime() << endl;
         
-        uint64_t firstLbid;
-        uint64_t firstLbid2;
-        uint64_t firstLbid3;
-        uint64_t firstLbid4;
+        i64 firstLbid;
+        i64 firstLbid2;
+        i64 firstLbid3;
+        i64 firstLbid4;
         rc = m_indexlist.findFirstBlk(pFile, key,&newIdxListHdrPtr, firstLbid);
         
         rc = m_indexlist.findFirstBlk(pFile, key2,&newIdxListHdrPtr2, firstLbid2);
@@ -3742,7 +3742,7 @@ void testIndexListReleaseMgrBack() {
         /*
         rc = m_indexlist.readDBFile( pFile, curBlock.data, fbo );
         m_indexlist.getSubBlockEntry( curBlock.data, sbid, entry, 32, &newIdxRidListHdr );
-        CPPUNIT_ASSERT( newIdxRidListHdr.idxRidListSize.size == (uint64_t)(count+1));
+        CPPUNIT_ASSERT( newIdxRidListHdr.idxRidListSize.size == (i64)(count+1));
         int arraySize=0;
         arraySize = newIdxRidListHdr.idxRidListSize.size;
         if (arraySize >0)
@@ -3763,7 +3763,7 @@ void testIndexListReleaseMgrBack() {
          }
         }
  */          
-        //uint64_t p2_fbo ;
+        //i64 p2_fbo ;
         //int p2_sbid, p2_entry;
         rowId =0;
         int rowId2=count+1;
@@ -3867,7 +3867,7 @@ void testIndexListMultipleUpdate() {
       DataBlock               curBlock;
       FILE*                   pFile =NULL;
       int                     rc, fbo , sbid , entry ;
-      uint64_t                key=123;
+      i64                     key=123;
       int                     count =10000;
       int                     rowId;
       int                     i;
@@ -3879,7 +3879,7 @@ void testIndexListMultipleUpdate() {
       IdxRidListHdr     newIdxRidListHdr;
       bool found = false;
       int  p_sbid, p_entry, allocSize;
-      uint64_t  p_fbo;
+      i64  p_fbo;
 BRMWrapper::setUseBrm(true);
 m_indexlist.setUseSortFlag(false);
        printf("\nRunning testIndexListMultipleUpdate\n");
@@ -3952,8 +3952,8 @@ m_indexlist.setUseSortFlag(false);
         rc = m_indexlist.readDBFile( pFile, curBlock.data, fbo );
         m_indexlist.getSubBlockEntry( curBlock.data, sbid, entry, 32, &newIdxRidListHdr );
         //cout << "newIdxRidListHdr.idxRidListSize.size->" << newIdxRidListHdr.idxRidListSize.size << endl;
-        CPPUNIT_ASSERT( newIdxRidListHdr.idxRidListSize.size == (uint64_t)(count+1));
-        //CPPUNIT_ASSERT( newIdxRidListHdr.idxRidListSize.size == (int64_t)ridSize2);
+        CPPUNIT_ASSERT( newIdxRidListHdr.idxRidListSize.size == (i64)(count+1));
+        //CPPUNIT_ASSERT( newIdxRidListHdr.idxRidListSize.size == (i64)ridSize2);
 
        int arraySize=0;
        rowId =0;
@@ -3977,7 +3977,7 @@ m_indexlist.setUseSortFlag(false);
          //for (int i=0; i< ridSize ; i++)
          //  //cout<< " line 3591->ridArray[i]->" <<  ridArray[i] << " i->" << i << endl;
         }
-        uint64_t firstLbid;
+        i64 firstLbid;
         rc = m_indexlist.findFirstBlk(pFile, key, &newIdxListHdrPtr, firstLbid);
         //cout << " Multiple RIDS  insert->FirstLbid is ->" << firstLbid << endl;
         //cout << " This will print level and counts for Children " << endl;
@@ -3986,7 +3986,7 @@ m_indexlist.setUseSortFlag(false);
           m_indexlist.printBlocks(firstLbid);        
         */
          
-        uint64_t p2_fbo ;
+        i64 p2_fbo ;
         int p2_sbid, p2_entry;
         rowId =0;
         for (i=0; i<count+1; i++)

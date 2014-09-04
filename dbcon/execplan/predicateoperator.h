@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: predicateoperator.h 9667 2013-07-08 16:37:10Z bpaul $
+*   $Id: predicateoperator.h 9669 2013-07-08 19:49:36Z bpaul $
 *
 *
 ***********************************************************************/
@@ -108,7 +108,7 @@ public:
 private:
 	template <typename result_t>
 	inline bool numericCompare(result_t op1, result_t op2);
-	inline bool strCompare(const std::string& op1, const std::string& op2);
+	inline bool strCompare(std::string op1, std::string op2);
 };
 
 inline bool PredicateOperator::getBoolVal(rowgroup::Row& row, bool& isNull, ReturnedColumn* lop, ReturnedColumn* rop)
@@ -121,7 +121,7 @@ inline bool PredicateOperator::getBoolVal(rowgroup::Row& row, bool& isNull, Retu
 		// Ugh. The strings returned by getStrVal have null padding out to the col width. boost::regex
 		//  considers these nulls significant, but they're not in the pattern, so we need to strip
 		//   them off...
-		const std::string& v = lop->getStrVal(row, isNull);
+		std::string v = lop->getStrVal(row, isNull);
 		char* c = (char*)alloca(v.length() + 1);
 		memcpy(c, v.c_str(), v.length());
 		c[v.length()] = 0;
@@ -187,42 +187,8 @@ inline bool PredicateOperator::getBoolVal(rowgroup::Row& row, bool& isNull, Retu
 			return numericCompare(val1,  rop->getIntVal(row, isNull)) && !isNull;
 		}
 
-        case execplan::CalpontSystemCatalog::UBIGINT:
-        case execplan::CalpontSystemCatalog::UINT:
-        case execplan::CalpontSystemCatalog::UMEDINT:
-        case execplan::CalpontSystemCatalog::UTINYINT:
-        case execplan::CalpontSystemCatalog::USMALLINT:
-        {
-            if (fOp == OP_ISNULL)
-            {
-                lop->getUintVal(row, isNull);
-                bool ret = isNull;
-                isNull = false;
-                return ret;
-            }
-
-            if (fOp == OP_ISNOTNULL)
-            {
-                lop->getUintVal(row, isNull);
-                bool ret = isNull;
-                isNull = false;
-                return !ret;
-            }
-
-            if (isNull)
-                return false;
-
-            uint64_t val1 = lop->getUintVal(row, isNull);
-            if (isNull)
-                return false;
-
-            return numericCompare(val1,  rop->getUintVal(row, isNull)) && !isNull;
-        }
-
-        case execplan::CalpontSystemCatalog::FLOAT:
-        case execplan::CalpontSystemCatalog::UFLOAT:
 		case execplan::CalpontSystemCatalog::DOUBLE:
-        case execplan::CalpontSystemCatalog::UDOUBLE:
+		case execplan::CalpontSystemCatalog::FLOAT:
 		{
 			if (fOp == OP_ISNULL)
 			{
@@ -251,7 +217,6 @@ inline bool PredicateOperator::getBoolVal(rowgroup::Row& row, bool& isNull, Retu
 		}
 
 		case execplan::CalpontSystemCatalog::DECIMAL:
-        case execplan::CalpontSystemCatalog::UDECIMAL:
 		{
 			if (fOp == OP_ISNULL)
 			{
@@ -357,7 +322,7 @@ inline bool PredicateOperator::getBoolVal(rowgroup::Row& row, bool& isNull, Retu
 			if (isNull)
 				return false;
 
-			const std::string& val1 = lop->getStrVal(row, isNull);
+			std::string val1 = lop->getStrVal(row, isNull);
 			if (isNull)
 				return false;
 
@@ -407,7 +372,7 @@ inline bool PredicateOperator::numericCompare(result_t op1, result_t op2)
 	}
 }
 
-inline bool PredicateOperator::strCompare(const std::string& op1, const std::string& op2)
+inline bool PredicateOperator::strCompare(std::string op1, std::string op2)
 {
 	switch (fOp)
 	{

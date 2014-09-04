@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: pcolstep.cpp 9655 2013-06-25 23:08:13Z xlou $
+*   $Id: pcolstep.cpp 8531 2012-05-18 22:18:04Z xlou $
 *
 *
 ***********************************************************************/
@@ -32,6 +32,7 @@ using namespace std;
 #include "distributedenginecomm.h"
 #include "elementtype.h"
 #include "unique32generator.h"
+#include "primitivestep.h"
 
 #include "messagequeue.h"
 using namespace messageqcpp;
@@ -51,8 +52,6 @@ using namespace execplan;
 using namespace BRM;
 
 #include "idbcompress.h"
-#include "jlf_common.h"
-#include "primitivestep.h"
 
 // #define DEBUG 1
 
@@ -74,7 +73,7 @@ struct pColStepPrimitive
         }
         catch(exception& re)
         {
-			cerr << "pColStep: send thread threw an exception: " << re.what() <<
+			cerr << "pColStep: send thread threw an exception: " << re.what() << 
 				"\t" << this << endl;
 		}
     }
@@ -99,17 +98,34 @@ struct pColStepAggregator
 };
 #endif
 
-pColStep::pColStep(
+pColStep::pColStep(const JobStepAssociation& inputJobStepAssociation,
+	const JobStepAssociation& outputJobStepAssociation,
+	DistributedEngineComm* dec,
+	boost::shared_ptr<CalpontSystemCatalog> cat,
 	CalpontSystemCatalog::OID o,
 	CalpontSystemCatalog::OID t,
 	const CalpontSystemCatalog::ColType& ct,
-	const JobInfo& jobInfo) :
-	JobStep(jobInfo),
-	fRm(jobInfo.rm),
-	sysCat(jobInfo.csc),
+	uint32_t session,
+	uint32_t txn,
+	uint32_t verID,
+	uint16_t step,
+	uint32_t statementId,
+	ResourceManager& rm,
+	uint32_t fInterval,
+	bool isEMgr) :
+	fRm(rm),
+	fInputJobStepAssociation(inputJobStepAssociation),
+	fOutputJobStepAssociation(outputJobStepAssociation),
+	fDec(dec),
+	sysCat(cat),
 	fOid(o),
 	fTableOid(t),
 	fColType(ct),
+	fSessionId(session),
+	fTxnId(txn),
+	fVerId(verID),
+	fStepId(step),
+	fStatementId(statementId),
 	fFilterCount(0),
 	fBOP(BOP_NONE),
 	ridList(0),
@@ -118,12 +134,12 @@ pColStep::pColStep(
 	finishedSending(false),
 	recvWaiting(false),
 	fIsDict(false),
-	isEM(jobInfo.isExeMgr),
+	isEM(isEMgr),
 	ridCount(0),
-	fFlushInterval(jobInfo.flushInterval),
+	fFlushInterval(fInterval),
 	fSwallowRows(false),
-	fProjectBlockReqLimit(fRm.getJlProjectBlockReqLimit()),
-	fProjectBlockReqThreshold(fRm.getJlProjectBlockReqThreshold()),
+	fProjectBlockReqLimit(rm.getJlProjectBlockReqLimit()),
+	fProjectBlockReqThreshold(rm.getJlProjectBlockReqThreshold()),
 	fStopSending(false),
 	isFilterFeeder(false),
 	fPhysicalIO(0),
@@ -136,9 +152,9 @@ pColStep::pColStep(
 		return;
 
 	int err, i;
-	uint32_t mask;
-
-	if (fFlushInterval == 0 || !isEM)
+	uint mask;
+	
+	if (fInterval == 0 || !isEM)
 		fOutputType = OT_BOTH;
 	else
 		fOutputType = OT_TOKEN;
@@ -162,10 +178,8 @@ pColStep::pColStep(
 
 	if ( fColType.colDataType == CalpontSystemCatalog::VARCHAR )
 	{
-		if (8 > fColType.colWidth && 4 <= fColType.colWidth )
-			fColType.colDataType = CalpontSystemCatalog::CHAR;
-
-		fColType.colWidth++;
+		if (8 > fColType.colWidth && 4 <= fColType.colWidth ) fColType.colDataType = CalpontSystemCatalog::CHAR;
+		fColType.colWidth++; 
 	}
 
 	//If this is a dictionary column, fudge the numbers...
@@ -181,7 +195,7 @@ pColStep::pColStep(
 		//TODO: is this right?
 		fColType.colDataType = CalpontSystemCatalog::VARCHAR;
 	}
-
+	
 	//Round colWidth up
 	if (fColType.colWidth == 3)
 		fColType.colWidth = 4;
@@ -247,11 +261,18 @@ pColStep::pColStep(
 }
 
 pColStep::pColStep(const pColScanStep& rhs) :
-	JobStep(rhs),
 	fRm(rhs.resourceManager()),
+	fInputJobStepAssociation(rhs.inputAssociation()),
+	fOutputJobStepAssociation(rhs.outputAssociation()),
+	fDec(0),
 	fOid(rhs.oid()),
 	fTableOid(rhs.tableOid()),
 	fColType(rhs.colType()),
+	fSessionId(rhs.sessionId()),
+	fTxnId(rhs.txnId()),
+	fVerId(rhs.verId()),
+	fStepId(rhs.stepId()),
+	fStatementId(rhs.statementId()),
 	fFilterCount(rhs.filterCount()),
 	fBOP(rhs.BOP()),
 	ridList(0),
@@ -273,10 +294,18 @@ pColStep::pColStep(const pColScanStep& rhs) :
 	fNumBlksSkipped(0),
 	fMsgBytesIn(0),
 	fMsgBytesOut(0),
+	fLogger(rhs.logger()),
+	fUdfName(rhs.udfName()),
 	fFilters(rhs.getFilters())
 {
+    fCardinality = rhs.cardinality();
+    fAlias = rhs.alias();
+    fView = rhs.view();
+    fName = rhs.name();
+	fTupleId = rhs.tupleId();
+
 	int err, i;
-	uint32_t mask;
+	uint mask;
 	if (fTableOid == 0)  // cross engine support
 		return;
 
@@ -328,7 +357,7 @@ pColStep::pColStep(const pColScanStep& rhs) :
 		os << "pColStep: BRM lookup error. Could not get extents for OID " << fOid;
 		throw runtime_error(os.str());
 	}
-
+	
 	lbidList=rhs.getlbidList();
 
 	sort(extents.begin(), extents.end(), ExtentSorter());
@@ -343,11 +372,18 @@ pColStep::pColStep(const pColScanStep& rhs) :
 }
 
 pColStep::pColStep(const PassThruStep& rhs) :
-	JobStep(rhs),
 	fRm(rhs.resourceManager()),
+	fInputJobStepAssociation(rhs.inputAssociation()),
+	fOutputJobStepAssociation(rhs.outputAssociation()),
+	fDec(0),
 	fOid(rhs.oid()),
 	fTableOid(rhs.tableOid()),
 	fColType(rhs.colType()),
+	fSessionId(rhs.sessionId()),
+	fTxnId(rhs.txnId()),
+	fVerId(rhs.verId()),
+	fStepId(rhs.stepId()),
+	fStatementId(rhs.statementId()),
 	fFilterCount(0),
 	fBOP(BOP_NONE),
 	ridList(0),
@@ -367,10 +403,16 @@ pColStep::pColStep(const PassThruStep& rhs) :
 	fCacheIO(0),
 	fNumBlksSkipped(0),
 	fMsgBytesIn(0),
-	fMsgBytesOut(0)
+	fMsgBytesOut(0),
+	fLogger(rhs.logger())
 {
+    fCardinality = rhs.cardinality();
+    fAlias = rhs.alias();
+    fView = rhs.view();
+    fName = rhs.name();
+	fTupleId = rhs.tupleId();
 	int err, i;
-	uint32_t mask;
+	uint mask;
 
 	if (fTableOid == 0)  // cross engine support
 		return;
@@ -450,7 +492,7 @@ void pColStep::initializeConfigParms()
 // 	const string sendLimitName     ( "ProjectBlockReqLimit" );
 // 	const string sendThresholdName ( "ProjectBlockReqThreshold" );
 // 	Config* cf = Config::makeConfig();
-//
+// 
 // 	string        strVal;
 // 	uint64_t numVal;
 
@@ -469,16 +511,16 @@ void pColStep::initializeConfigParms()
 // 		errno  = 0;
 // 		numVal = Config::uFromText(strVal);
 // 		if ( errno == 0 )
-// 			fProjectBlockReqLimit     = (uint32_t)numVal;
+// 			fProjectBlockReqLimit     = (u_int32_t)numVal;
 // 	}
-//
+// 
 // 	strVal = cf->getConfig(section, sendThresholdName);
 // 	if (strVal.size() > 0)
 // 	{
 // 		errno  = 0;
 // 		numVal = Config::uFromText(strVal);
 // 		if ( errno == 0 )
-// 			fProjectBlockReqThreshold = (uint32_t)numVal;
+// 			fProjectBlockReqThreshold = (u_int32_t)numVal; 
 // 	}
 }
 
@@ -536,7 +578,7 @@ void pColStep::addFilter(int8_t COP, float value)
 	fFilterString << (uint8_t) 0;
 	fFilterString << *((uint32_t *) &value);
 	fFilterCount++;
-}
+} 
 
 void pColStep::addFilter(int8_t COP, int64_t value, uint8_t roundFlag)
 {
@@ -550,25 +592,25 @@ void pColStep::addFilter(int8_t COP, int64_t value, uint8_t roundFlag)
 	// converts to a type of the appropriate width, then bitwise
 	// copies into the filter ByteStream
 	switch(fColType.colWidth) {
-		case 1:
-			tmp8 = value;
-			fFilterString << *((uint8_t *) &tmp8);
+		case 1:	
+			tmp8 = value;	
+			fFilterString << *((uint8_t *) &tmp8); 
 			break;
-		case 2:
+		case 2: 
 			tmp16 = value;
-			fFilterString << *((uint16_t *) &tmp16);
+			fFilterString << *((uint16_t *) &tmp16); 
 			break;
-		case 4:
+		case 4: 
 			tmp32 = value;
-			fFilterString << *((uint32_t *) &tmp32);
+			fFilterString << *((uint32_t *) &tmp32); 
 			break;
-		case 8:
-			fFilterString << *((uint64_t *) &value);
+		case 8: 
+			fFilterString << *((uint64_t *) &value); 
 			break;
 		default:
 			ostringstream o;
 
-			o << "pColStep: CalpontSystemCatalog says OID " << fOid <<
+			o << "pColStep: CalpontSystemCatalog says OID " << fOid << 
 				" has a width of " << fColType.colWidth;
 			throw runtime_error(o.str());
 	}
@@ -613,8 +655,8 @@ void pColStep::sendPrimitiveMessages()
 //	int64_t msgLargeBlock = -1;
 //	int64_t nextLargeBlock = -1;
 //	uint16_t blockRelativeRID;
-//	uint32_t msgCount = 0;
-//	uint32_t sentBlockCount = 0;
+//	uint msgCount = 0;
+//	uint sentBlockCount = 0;
 //	int msgsSkip=0;
 //	bool scan=false;
 //	bool scanThisBlock=false;
@@ -622,7 +664,7 @@ void pColStep::sendPrimitiveMessages()
 //	UintRowGroup rw;
 //	StringElementType strE;
 //	StringRowGroup strRw;
-//
+//	
 //	ByteStream msgRidList;
 //	ByteStream primMsg(MAX_BUFFER_SIZE);   //the MAX_BUFFER_SIZE as of 8/20
 //
@@ -660,7 +702,7 @@ void pColStep::sendPrimitiveMessages()
 //
 //	scanFlags.resize(numExtents);
 //
-//	for (uint32_t idx=0; idx <numExtents; idx++)
+//	for (uint idx=0; idx <numExtents; idx++)
 //	{
 //		if (extents[idx].partition.cprange.isValid != BRM::CP_VALID) {
 //			scanFlags[idx]=1;
@@ -688,7 +730,7 @@ void pColStep::sendPrimitiveMessages()
 ////		if (fOid>=3000)
 ////		cout << " " << scanFlags[idx];
 //	}
-////	if (scanFlags.size()>0)
+////	if (scanFlags.size()>0)	
 ////		cout << endl;
 //
 //	// If there was more than 1 input DL, the first is a list of filters and the second is a list of rids,
@@ -700,7 +742,7 @@ void pColStep::sendPrimitiveMessages()
 //
 //	dl = fInputJobStepAssociation.outAt(ridListIdx);
 //	ridList = dl->dataList();
-//	if ( ridList )
+//	if ( ridList ) 
 //	{
 //		fifo = dl->fifoDL();
 //
@@ -717,7 +759,7 @@ void pColStep::sendPrimitiveMessages()
 //		if (strFifo)
 //			it = strFifo->getIterator();
 //		else
-//			it = strRidList->getIterator();
+//			it = strRidList->getIterator();		
 //	}
 //
 //	if (ridList)
@@ -765,14 +807,14 @@ void pColStep::sendPrimitiveMessages()
 //		msgLBID = getLBID(absoluteRID, scan);
 //	scanThisBlock = scan;
 //	msgLargeBlock = absoluteRID >> blockSizeShift;
-//
+//			
 //	while (more || msgRidCount > 0) {
 //		uint64_t rwCount;
 //		if ( ridList)
 //			rwCount = rw.count;
 //		else
 //			rwCount = strRw.count;
-//
+//			
 //		for (uint64_t i = 0; ((i < rwCount) || (!more && msgRidCount > 0)); )
 //		{
 //			if ( ridList)
@@ -789,7 +831,7 @@ void pColStep::sendPrimitiveMessages()
 //				else
 //					absoluteRID = strE.first;
 //			}
-//
+//			
 //			if (more) {
 //			    nextLBID = getLBID(absoluteRID, scan);
 //			    nextLargeBlock = absoluteRID >> blockSizeShift;
@@ -831,13 +873,13 @@ void pColStep::sendPrimitiveMessages()
 //					hdr.NOPS = fFilterCount;
 //					hdr.NVALS = msgRidCount;
 //					hdr.sort = fToSort;
-//
+//					
 //					primMsg.append((const uint8_t *) &hdr, sizeof(NewColRequestHeader));
 //					primMsg += fFilterString;
 //					primMsg += msgRidList;
 //					ridCount += msgRidCount;
 //					++sentBlockCount;
-//
+//					
 //#ifdef DEBUG
 //					if (flushInterval == 0 && fOid >= 3000)
 //						cout << "sending a prim msg for LBID " << msgLBID << endl;
@@ -852,24 +894,24 @@ void pColStep::sendPrimitiveMessages()
 //						msgCount = 0;
 //						primMsg.restart();
 //						msgLargeBlock = nextLargeBlock;
-//
-//						// @bug 769 - Added "&& !fSwallowRows" condition below to fix problem with
-//						// caltraceon(16) not working for tpch01 and some other queries. If a query
-//                      // ever held off requesting more blocks, it would lock and never finish.
+//						
+//						// @bug 769 - Added "&& !fSwallowRows" condition below to fix problem with 
+//						// caltraceon(16) not working for tpch01 and some other queries.  If a query ever held 
+//						// off requesting more blocks, it would lock and never finish.  
 //						//Bug 815
-//						if (( sentBlockCount >= fProjectBlockReqLimit) && !fSwallowRows &&
+//						if (( sentBlockCount >= fProjectBlockReqLimit) && !fSwallowRows && 
 //						   (( msgsSent - msgsRecvd) >  fProjectBlockReqThreshold))
 //						{
 //							mutex.lock(); //pthread_mutex_lock(&mutex);
-//							fStopSending = true;
-//
+//							fStopSending = true;						
+//			
 //							// @bug 836.  Wake up the receiver if he's sleeping.
 //							if (recvWaiting)
 //								condvar.notify_one(); //pthread_cond_signal(&condvar);
 //							flushed.wait(mutex); //pthread_cond_wait(&flushed, &mutex);
 //							fStopSending = false;
 //							mutex.unlock(); //pthread_mutex_unlock(&mutex);
-//							sentBlockCount = 0;
+//							sentBlockCount = 0;	
 //						}
 //					}
 //				}
@@ -891,7 +933,7 @@ void pColStep::sendPrimitiveMessages()
 //					#endif
 //				}
 //				scanThisBlock = scan;
-//				mutex.unlock(); //pthread_mutex_unlock(&mutex);
+//				mutex.unlock(); //pthread_mutex_unlock(&mutex);	
 //
 //				// break the for loop
 //				if (!more)
@@ -960,8 +1002,8 @@ void pColStep::receivePrimitiveMessages()
 //	UintRowGroup rw;
 //	uint64_t ridBase;
 //	boost::shared_ptr<ByteStream> bs;
-//	uint32_t i = 0, length;
-//
+//	uint i = 0, length;
+//	
 //	while (1) {
 //		// sync with the send side
 //		mutex.lock(); //pthread_mutex_lock(&mutex);
@@ -984,7 +1026,7 @@ void pColStep::receivePrimitiveMessages()
 //			break;
 //		}
 //		mutex.unlock(); //pthread_mutex_unlock(&mutex);
-//
+//			
 //		// do the recv
 //		fDec->read(uniqueID, bs);
 //		fMsgBytesIn += bs->lengthWithHdrOverhead();
@@ -998,7 +1040,7 @@ void pColStep::receivePrimitiveMessages()
 //		#endif
 //
 //		const ByteStream::byte* bsp = bs->buf();
-//
+//		
 //		// get the ISMPacketHeader out of the bytestream
 // 		//const ISMPacketHeader* ism = reinterpret_cast<const ISMPacketHeader*>(bsp);
 //
@@ -1008,9 +1050,9 @@ void pColStep::receivePrimitiveMessages()
 //
 //		bool firstRead = true;
 //		length = bs->length();
-//
+//	
 //		i = 0;
-//		uint32_t msgCount = 0;
+//		uint msgCount = 0;
 //		while (i < length) {
 //			++msgCount;
 //
@@ -1024,7 +1066,7 @@ void pColStep::receivePrimitiveMessages()
 //
 //			// From this point on the rest of the bytestream is the data that comes back from the primitive server
 //			// This needs to be fed to a datalist that is retrieved from the outputassociation object.
-//
+// 
 //			fbo = getFBO(crh->LBID);
 //			ridBase = fbo << rpbShift;
 //
@@ -1038,9 +1080,10 @@ void pColStep::receivePrimitiveMessages()
 //				ridResults += crh->NVALS;
 //			}
 //
-//			/* XXXPAT: This clause is executed when ExeMgr calls the new nextBand(BS) fcn.
+//			/* XXXPAT: This clause is executed when ExeMgr calls the
+//			   new nextBand(BS) fcn.  
 //
-//			   TODO: both classes have to agree
+//			   TODO: both classes have to agree 
 //			   on which nextBand() variant will be called.  pColStep
 //			   currently has to infer that from flushInterval and the
 //			   Table OID.  It would be better to have a more explicit form
@@ -1052,7 +1095,7 @@ void pColStep::receivePrimitiveMessages()
 //			   the memory used for the ElementType array.  DeliveryStep
 //			   will also treat the ElementType array as raw memory and
 //			   serialize that.  TableColumn now parses the packed data
-//			   instead of whole ElementTypes.
+//			   instead of whole ElementTypes. 
 //			*/
 //			else if (fOutputType == OT_TOKEN && fFlushInterval > 0 && !fIsDict) {
 //
@@ -1061,7 +1104,7 @@ void pColStep::receivePrimitiveMessages()
 //				ridResults += crh->NVALS;
 //
 //				/* memcpy the bytestream into the output set */
-//				uint32_t toCopy, bsPos = 0;
+//				uint toCopy, bsPos = 0;
 //				uint8_t *pos;
 //				while (bsPos < crh->NVALS) {
 //					toCopy = (crh->NVALS - bsPos > rw.ElementsPerGroup - rw.count ?
@@ -1099,7 +1142,7 @@ void pColStep::receivePrimitiveMessages()
 //						case 1: dv = *((const uint8_t *) &bsp[i]); ++i; break;
 //						default:
 //							throw runtime_error("pColStep: invalid column width!");
-//					}
+//					}	
 //
 //						// @bug 663 - Don't output any rows if fSwallowRows (caltraceon(16)) is on.
 //						// 	      This options swallows rows in the project steps.
@@ -1119,7 +1162,7 @@ void pColStep::receivePrimitiveMessages()
 //							{
 //								dlp->insert(ElementType(rid, dv));
 //							}
-//				#ifdef DEBUG
+//				#ifdef DEBUG	
 //					//cout << "  -- inserting <" << rid << ", " << dv << "> " << *prid << endl;
 //				#endif
 //						}
@@ -1171,16 +1214,16 @@ void pColStep::receivePrimitiveMessages()
 //					}
 //				}
 //			}	// unpacking the BS
-//
+//			
 //			//Bug 815: Check whether we have enough to process
 //			//++lockCount;
 //			mutex.lock(); //pthread_mutex_lock(&mutex);
 //			if  ( fStopSending && ((msgsSent - msgsRecvd ) <=  fProjectBlockReqThreshold) )
-//			{
+//			{					
 //					flushed.notify_one(); //pthread_cond_signal(&flushed);
-//			}
+//			}		
 //			mutex.unlock(); //pthread_mutex_unlock(&mutex);
-//
+//			
 //			firstRead = false;
 //			msgsRecvd += msgCount;
 //	}	// read loop
@@ -1249,10 +1292,10 @@ void pColStep::receivePrimitiveMessages()
 //			msgBytesInKB++;
 //		if (fMsgBytesOut & 512)
 //			msgBytesOutKB++;
-//
+//             
 //        // @bug 828
 //        if (fifo)
-//            fifo->totalSize(ridResults);
+//            fifo->totalSize(ridResults);     
 //
 //		if (traceOn())
 //		{
@@ -1268,13 +1311,13 @@ void pColStep::receivePrimitiveMessages()
 //				"\tPartitionBlocksEliminated-" << fNumBlksSkipped <<
 //				"; MsgBytesIn-"  << msgBytesInKB  << "KB" <<
 //				"; MsgBytesOut-" << msgBytesOutKB << "KB" << endl  <<
-//				"\t1st read " << dlTimes.FirstReadTimeString() <<
+//				"\t1st read " << dlTimes.FirstReadTimeString() << 
 //				"; EOI " << dlTimes.EndOfInputTimeString() << "; runtime-" <<
 //				JSTimeStamp::tsdiffstr(dlTimes.EndOfInputTime(),dlTimes.FirstReadTime()) <<
 //				"s" << endl;
-//
+//					 	
 //			logEnd(logStr.str().c_str());
-//
+//		
 //			syslogReadBlockCounts(16,    // exemgr sybsystem
 //				fPhysicalIO,             // # blocks read from disk
 //				fCacheIO,                // # blocks read from cache
@@ -1380,7 +1423,7 @@ void pColStep::addFilters()
 /* This exists to avoid a DBRM lookup for every rid. */
 inline uint64_t pColStep::getLBID(uint64_t rid, bool& scan)
 {
-	uint32_t extentIndex, extentOffset;
+	uint extentIndex, extentOffset;
 	uint64_t fbo;
 	fbo = rid >> rpbShift;
 	extentIndex = fbo >> divShift;
@@ -1391,7 +1434,7 @@ inline uint64_t pColStep::getLBID(uint64_t rid, bool& scan)
 
 inline uint64_t pColStep::getFBO(uint64_t lbid)
 {
-	uint32_t i;
+	uint i;
 	uint64_t lastLBID;
 
 	for (i = 0; i < numExtents; i++) {
@@ -1402,7 +1445,7 @@ inline uint64_t pColStep::getFBO(uint64_t lbid)
 	cerr << "pColStep: didn't find the FBO?\n";
 	throw logic_error("pColStep: didn't find the FBO?");
 }
-
+		
 
 void pColStep::appendFilter(const messageqcpp::ByteStream& filter, unsigned count)
 {

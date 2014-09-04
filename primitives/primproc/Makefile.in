@@ -14,22 +14,22 @@
 
 @SET_MAKE@
 
-# Copyright (C) 2014 InfiniDB, Inc.
+#  Copyright (C) 2014 InfiniDB, Inc.
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; version 2 of
-# the License.
+#  This program is free software; you can redistribute it and/or
+#  modify it under the terms of the GNU General Public License
+#  as published by the Free Software Foundation; version 2 of
+#  the License.
 #
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
 #
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-# MA 02110-1301, USA.
+#  You should have received a copy of the GNU General Public License
+#  along with this program; if not, write to the Free Software
+#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+#  MA 02110-1301, USA.
 
 # $Id: Makefile.am 333 2009-04-03 20:35:04Z rdempsey $
 
@@ -59,9 +59,8 @@ bin_PROGRAMS = PrimProc$(EXEEXT)
 subdir = primitives/primproc
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
-am__aclocal_m4_deps = $(top_srcdir)/m4/compilerflags.m4 \
-	$(top_srcdir)/m4/functions.m4 $(top_srcdir)/m4/install.m4 \
-	$(top_srcdir)/configure.ac
+am__aclocal_m4_deps = $(top_srcdir)/m4/functions.m4 \
+	$(top_srcdir)/m4/install.m4 $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 mkinstalldirs = $(install_sh) -d
@@ -75,10 +74,11 @@ am_PrimProc_OBJECTS = PrimProc-primproc.$(OBJEXT) \
 	PrimProc-bppseeder.$(OBJEXT) PrimProc-bppsendthread.$(OBJEXT) \
 	PrimProc-columncommand.$(OBJEXT) PrimProc-command.$(OBJEXT) \
 	PrimProc-dictstep.$(OBJEXT) PrimProc-filtercommand.$(OBJEXT) \
-	PrimProc-logger.$(OBJEXT) PrimProc-passthrucommand.$(OBJEXT) \
-	PrimProc-primitiveserver.$(OBJEXT) PrimProc-pseudocc.$(OBJEXT) \
+	PrimProc-logger.$(OBJEXT) PrimProc-monitorprocmem.$(OBJEXT) \
+	PrimProc-passthrucommand.$(OBJEXT) \
+	PrimProc-primitiveserver.$(OBJEXT) \
 	PrimProc-rtscommand.$(OBJEXT) \
-	PrimProc-umsocketselector.$(OBJEXT)
+	PrimProc-umsocketselector.$(OBJEXT) PrimProc-udf.$(OBJEXT)
 PrimProc_OBJECTS = $(am_PrimProc_OBJECTS)
 PrimProc_DEPENDENCIES = ../blockcache/libdbbc.a \
 	../linux-port/libprocessor.a
@@ -157,9 +157,6 @@ SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
 STRIP = @STRIP@
 VERSION = @VERSION@
-XML2_CONFIG = @XML2_CONFIG@
-XML_CPPFLAGS = @XML_CPPFLAGS@
-XML_LIBS = @XML_LIBS@
 YACC = @YACC@
 ac_ct_AR = @ac_ct_AR@
 ac_ct_CC = @ac_ct_CC@
@@ -201,7 +198,6 @@ idb_exec_libs = @idb_exec_libs@
 idb_ldflags = @idb_ldflags@
 idb_oam_libs = @idb_oam_libs@
 idb_write_libs = @idb_write_libs@
-idbinstall = @idbinstall@
 includedir = @includedir@
 infodir = @infodir@
 install_sh = @install_sh@
@@ -215,11 +211,6 @@ mibdir = @mibdir@
 mkdir_p = @mkdir_p@
 mysqldir = @mysqldir@
 netsnmp_libs = @netsnmp_libs@
-netsnmpagntdir = @netsnmpagntdir@
-netsnmpdir = @netsnmpdir@
-netsnmplibrdir = @netsnmplibrdir@
-netsnmpmachdir = @netsnmpmachdir@
-netsnmpsysdir = @netsnmpsysdir@
 oldincludedir = @oldincludedir@
 postdir = @postdir@
 prefix = @prefix@
@@ -243,11 +234,12 @@ PrimProc_SOURCES = primproc.cpp \
         dictstep.cpp \
         filtercommand.cpp \
         logger.cpp \
+        monitorprocmem.cpp \
         passthrucommand.cpp \
         primitiveserver.cpp \
-	pseudocc.cpp \
         rtscommand.cpp \
-        umsocketselector.cpp
+        umsocketselector.cpp \
+        udf.cpp
 
 PrimProc_CPPFLAGS = -I../blockcache -I../linux-port $(AM_CPPFLAGS)
 PrimProc_CXXFLAGS = $(march_flags) $(AM_CXXFLAGS)
@@ -332,11 +324,12 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/PrimProc-dictstep.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/PrimProc-filtercommand.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/PrimProc-logger.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/PrimProc-monitorprocmem.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/PrimProc-passthrucommand.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/PrimProc-primitiveserver.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/PrimProc-primproc.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/PrimProc-pseudocc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/PrimProc-rtscommand.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/PrimProc-udf.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/PrimProc-umsocketselector.Po@am__quote@
 
 .cpp.o:
@@ -486,6 +479,20 @@ PrimProc-logger.obj: logger.cpp
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(PrimProc_CPPFLAGS) $(CPPFLAGS) $(PrimProc_CXXFLAGS) $(CXXFLAGS) -c -o PrimProc-logger.obj `if test -f 'logger.cpp'; then $(CYGPATH_W) 'logger.cpp'; else $(CYGPATH_W) '$(srcdir)/logger.cpp'; fi`
 
+PrimProc-monitorprocmem.o: monitorprocmem.cpp
+@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(PrimProc_CPPFLAGS) $(CPPFLAGS) $(PrimProc_CXXFLAGS) $(CXXFLAGS) -MT PrimProc-monitorprocmem.o -MD -MP -MF "$(DEPDIR)/PrimProc-monitorprocmem.Tpo" -c -o PrimProc-monitorprocmem.o `test -f 'monitorprocmem.cpp' || echo '$(srcdir)/'`monitorprocmem.cpp; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/PrimProc-monitorprocmem.Tpo" "$(DEPDIR)/PrimProc-monitorprocmem.Po"; else rm -f "$(DEPDIR)/PrimProc-monitorprocmem.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='monitorprocmem.cpp' object='PrimProc-monitorprocmem.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(PrimProc_CPPFLAGS) $(CPPFLAGS) $(PrimProc_CXXFLAGS) $(CXXFLAGS) -c -o PrimProc-monitorprocmem.o `test -f 'monitorprocmem.cpp' || echo '$(srcdir)/'`monitorprocmem.cpp
+
+PrimProc-monitorprocmem.obj: monitorprocmem.cpp
+@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(PrimProc_CPPFLAGS) $(CPPFLAGS) $(PrimProc_CXXFLAGS) $(CXXFLAGS) -MT PrimProc-monitorprocmem.obj -MD -MP -MF "$(DEPDIR)/PrimProc-monitorprocmem.Tpo" -c -o PrimProc-monitorprocmem.obj `if test -f 'monitorprocmem.cpp'; then $(CYGPATH_W) 'monitorprocmem.cpp'; else $(CYGPATH_W) '$(srcdir)/monitorprocmem.cpp'; fi`; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/PrimProc-monitorprocmem.Tpo" "$(DEPDIR)/PrimProc-monitorprocmem.Po"; else rm -f "$(DEPDIR)/PrimProc-monitorprocmem.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='monitorprocmem.cpp' object='PrimProc-monitorprocmem.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(PrimProc_CPPFLAGS) $(CPPFLAGS) $(PrimProc_CXXFLAGS) $(CXXFLAGS) -c -o PrimProc-monitorprocmem.obj `if test -f 'monitorprocmem.cpp'; then $(CYGPATH_W) 'monitorprocmem.cpp'; else $(CYGPATH_W) '$(srcdir)/monitorprocmem.cpp'; fi`
+
 PrimProc-passthrucommand.o: passthrucommand.cpp
 @am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(PrimProc_CPPFLAGS) $(CPPFLAGS) $(PrimProc_CXXFLAGS) $(CXXFLAGS) -MT PrimProc-passthrucommand.o -MD -MP -MF "$(DEPDIR)/PrimProc-passthrucommand.Tpo" -c -o PrimProc-passthrucommand.o `test -f 'passthrucommand.cpp' || echo '$(srcdir)/'`passthrucommand.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/PrimProc-passthrucommand.Tpo" "$(DEPDIR)/PrimProc-passthrucommand.Po"; else rm -f "$(DEPDIR)/PrimProc-passthrucommand.Tpo"; exit 1; fi
@@ -514,20 +521,6 @@ PrimProc-primitiveserver.obj: primitiveserver.cpp
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(PrimProc_CPPFLAGS) $(CPPFLAGS) $(PrimProc_CXXFLAGS) $(CXXFLAGS) -c -o PrimProc-primitiveserver.obj `if test -f 'primitiveserver.cpp'; then $(CYGPATH_W) 'primitiveserver.cpp'; else $(CYGPATH_W) '$(srcdir)/primitiveserver.cpp'; fi`
 
-PrimProc-pseudocc.o: pseudocc.cpp
-@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(PrimProc_CPPFLAGS) $(CPPFLAGS) $(PrimProc_CXXFLAGS) $(CXXFLAGS) -MT PrimProc-pseudocc.o -MD -MP -MF "$(DEPDIR)/PrimProc-pseudocc.Tpo" -c -o PrimProc-pseudocc.o `test -f 'pseudocc.cpp' || echo '$(srcdir)/'`pseudocc.cpp; \
-@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/PrimProc-pseudocc.Tpo" "$(DEPDIR)/PrimProc-pseudocc.Po"; else rm -f "$(DEPDIR)/PrimProc-pseudocc.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='pseudocc.cpp' object='PrimProc-pseudocc.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(PrimProc_CPPFLAGS) $(CPPFLAGS) $(PrimProc_CXXFLAGS) $(CXXFLAGS) -c -o PrimProc-pseudocc.o `test -f 'pseudocc.cpp' || echo '$(srcdir)/'`pseudocc.cpp
-
-PrimProc-pseudocc.obj: pseudocc.cpp
-@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(PrimProc_CPPFLAGS) $(CPPFLAGS) $(PrimProc_CXXFLAGS) $(CXXFLAGS) -MT PrimProc-pseudocc.obj -MD -MP -MF "$(DEPDIR)/PrimProc-pseudocc.Tpo" -c -o PrimProc-pseudocc.obj `if test -f 'pseudocc.cpp'; then $(CYGPATH_W) 'pseudocc.cpp'; else $(CYGPATH_W) '$(srcdir)/pseudocc.cpp'; fi`; \
-@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/PrimProc-pseudocc.Tpo" "$(DEPDIR)/PrimProc-pseudocc.Po"; else rm -f "$(DEPDIR)/PrimProc-pseudocc.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='pseudocc.cpp' object='PrimProc-pseudocc.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(PrimProc_CPPFLAGS) $(CPPFLAGS) $(PrimProc_CXXFLAGS) $(CXXFLAGS) -c -o PrimProc-pseudocc.obj `if test -f 'pseudocc.cpp'; then $(CYGPATH_W) 'pseudocc.cpp'; else $(CYGPATH_W) '$(srcdir)/pseudocc.cpp'; fi`
-
 PrimProc-rtscommand.o: rtscommand.cpp
 @am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(PrimProc_CPPFLAGS) $(CPPFLAGS) $(PrimProc_CXXFLAGS) $(CXXFLAGS) -MT PrimProc-rtscommand.o -MD -MP -MF "$(DEPDIR)/PrimProc-rtscommand.Tpo" -c -o PrimProc-rtscommand.o `test -f 'rtscommand.cpp' || echo '$(srcdir)/'`rtscommand.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/PrimProc-rtscommand.Tpo" "$(DEPDIR)/PrimProc-rtscommand.Po"; else rm -f "$(DEPDIR)/PrimProc-rtscommand.Tpo"; exit 1; fi
@@ -555,6 +548,20 @@ PrimProc-umsocketselector.obj: umsocketselector.cpp
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='umsocketselector.cpp' object='PrimProc-umsocketselector.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(PrimProc_CPPFLAGS) $(CPPFLAGS) $(PrimProc_CXXFLAGS) $(CXXFLAGS) -c -o PrimProc-umsocketselector.obj `if test -f 'umsocketselector.cpp'; then $(CYGPATH_W) 'umsocketselector.cpp'; else $(CYGPATH_W) '$(srcdir)/umsocketselector.cpp'; fi`
+
+PrimProc-udf.o: udf.cpp
+@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(PrimProc_CPPFLAGS) $(CPPFLAGS) $(PrimProc_CXXFLAGS) $(CXXFLAGS) -MT PrimProc-udf.o -MD -MP -MF "$(DEPDIR)/PrimProc-udf.Tpo" -c -o PrimProc-udf.o `test -f 'udf.cpp' || echo '$(srcdir)/'`udf.cpp; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/PrimProc-udf.Tpo" "$(DEPDIR)/PrimProc-udf.Po"; else rm -f "$(DEPDIR)/PrimProc-udf.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='udf.cpp' object='PrimProc-udf.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(PrimProc_CPPFLAGS) $(CPPFLAGS) $(PrimProc_CXXFLAGS) $(CXXFLAGS) -c -o PrimProc-udf.o `test -f 'udf.cpp' || echo '$(srcdir)/'`udf.cpp
+
+PrimProc-udf.obj: udf.cpp
+@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(PrimProc_CPPFLAGS) $(CPPFLAGS) $(PrimProc_CXXFLAGS) $(CXXFLAGS) -MT PrimProc-udf.obj -MD -MP -MF "$(DEPDIR)/PrimProc-udf.Tpo" -c -o PrimProc-udf.obj `if test -f 'udf.cpp'; then $(CYGPATH_W) 'udf.cpp'; else $(CYGPATH_W) '$(srcdir)/udf.cpp'; fi`; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/PrimProc-udf.Tpo" "$(DEPDIR)/PrimProc-udf.Po"; else rm -f "$(DEPDIR)/PrimProc-udf.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='udf.cpp' object='PrimProc-udf.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(PrimProc_CPPFLAGS) $(CPPFLAGS) $(PrimProc_CXXFLAGS) $(CXXFLAGS) -c -o PrimProc-udf.obj `if test -f 'udf.cpp'; then $(CYGPATH_W) 'udf.cpp'; else $(CYGPATH_W) '$(srcdir)/udf.cpp'; fi`
 
 mostlyclean-libtool:
 	-rm -f *.lo

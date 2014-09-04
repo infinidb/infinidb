@@ -1,8 +1,7 @@
 //////////////////////////////////////////////////////////////////////////////
 //
-// (C) Copyright Ion Gaztanaga 2006-2012
+// (C) Copyright Ion Gaztanaga 2006-2009
 // (C) Copyright Markus Schoepflin 2007
-// (C) Copyright Bryce Lelbach 2010
 //
 // Distributed under the Boost Software License, Version 1.0. (See
 // accompanying file LICENSE_1_0.txt or copy at
@@ -21,7 +20,7 @@
 
 namespace boost{
 namespace interprocess{
-namespace ipcdetail{
+namespace detail{
 
 //! Atomically increment an boost::uint32_t by 1
 //! "mem": pointer to the object
@@ -45,7 +44,7 @@ inline void atomic_write32(volatile boost::uint32_t *mem, boost::uint32_t val);
 inline boost::uint32_t atomic_cas32
    (volatile boost::uint32_t *mem, boost::uint32_t with, boost::uint32_t cmp);
 
-}  //namespace ipcdetail{
+}  //namespace detail{
 }  //namespace interprocess{
 }  //namespace boost{
 
@@ -55,7 +54,7 @@ inline boost::uint32_t atomic_cas32
 
 namespace boost{
 namespace interprocess{
-namespace ipcdetail{
+namespace detail{
 
 //! Atomically decrement an boost::uint32_t by 1
 //! "mem": pointer to the atomic value
@@ -89,7 +88,7 @@ inline boost::uint32_t atomic_cas32
    (volatile boost::uint32_t *mem, boost::uint32_t with, boost::uint32_t cmp)
 {  return winapi::interlocked_compare_exchange(reinterpret_cast<volatile long*>(mem), with, cmp);  }
 
-}  //namespace ipcdetail{
+}  //namespace detail{
 }  //namespace interprocess{
 }  //namespace boost{
 
@@ -97,7 +96,7 @@ inline boost::uint32_t atomic_cas32
 
 namespace boost {
 namespace interprocess {
-namespace ipcdetail{
+namespace detail{
 
 //! Compare an boost::uint32_t's value with "cmp".
 //! If they are the same swap the value with "with"
@@ -109,14 +108,22 @@ inline boost::uint32_t atomic_cas32
    (volatile boost::uint32_t *mem, boost::uint32_t with, boost::uint32_t cmp)
 {
    boost::uint32_t prev = cmp;
-   // This version by Mans Rullgard of Pathscale
-   __asm__ __volatile__ ( "lock\n\t"
-                          "cmpxchg %2,%0"
-                        : "+m"(*mem), "+a"(prev)
-                        : "r"(with)
-                        : "cc");
+   asm volatile( "lock\n\t"
+                 "cmpxchg %3,%1"
+               : "=a" (prev), "=m" (*(mem))
+               : "0" (prev), "r" (with)
+               : "memory", "cc");
+   return prev;
+/*
+   boost::uint32_t prev;
+
+   asm volatile ("lock; cmpxchgl %1, %2"             
+               : "=a" (prev)               
+               : "r" (with), "m" (*(mem)), "0"(cmp));
+   asm volatile("" : : : "memory");
 
    return prev;
+*/
 }
 
 //! Atomically add 'val' to an boost::uint32_t
@@ -141,6 +148,14 @@ inline boost::uint32_t atomic_add32
    );
 
    return r;
+/*
+   asm volatile( "lock\n\t; xaddl %0,%1"
+               : "=r"(val), "=m"(*mem)
+               : "0"(val), "m"(*mem));
+   asm volatile("" : : : "memory");
+
+   return val;
+*/
 }
 
 //! Atomically increment an apr_uint32_t by 1
@@ -165,7 +180,7 @@ inline boost::uint32_t atomic_read32(volatile boost::uint32_t *mem)
 inline void atomic_write32(volatile boost::uint32_t *mem, boost::uint32_t val)
 {  *mem = val; }
 
-}  //namespace ipcdetail{
+}  //namespace detail{
 }  //namespace interprocess{
 }  //namespace boost{
 
@@ -173,7 +188,7 @@ inline void atomic_write32(volatile boost::uint32_t *mem, boost::uint32_t val)
 
 namespace boost {
 namespace interprocess {
-namespace ipcdetail{
+namespace detail{
 
 //! Atomically add 'val' to an boost::uint32_t
 //! "mem": pointer to the object
@@ -183,14 +198,17 @@ inline boost::uint32_t atomic_add32(volatile boost::uint32_t *mem, boost::uint32
 {
    boost::uint32_t prev, temp;
 
-   asm volatile ("1:\n\t"
-                 "lwarx  %0,0,%2\n\t"
-                 "add    %1,%0,%3\n\t"
-                 "stwcx. %1,0,%2\n\t"
-                 "bne-   1b"
-                 : "=&r" (prev), "=&r" (temp)
-                 : "b" (mem), "r" (val)
-                 : "cc", "memory");
+   asm volatile ("0:\n\t"                 // retry local label     
+               "lwarx  %0,0,%2\n\t"       // load prev and reserve 
+               "add    %1,%0,%3\n\t"      // temp = prev + val   
+               "stwcx. %1,0,%2\n\t"       // conditionally store   
+               "bne-   0b"                // start over if we lost
+                                          // the reservation
+               //XXX find a cleaner way to define the temp         
+               //it's not an output
+               : "=&r" (prev), "=&r" (temp)        // output, temp 
+               : "b" (mem), "r" (val)              // inputs       
+               : "memory", "cc");                  // clobbered    
    return prev;
 }
 
@@ -205,16 +223,19 @@ inline boost::uint32_t atomic_cas32
 {
    boost::uint32_t prev;
 
-   asm volatile ("1:\n\t"
-                 "lwarx  %0,0,%1\n\t"
-                 "cmpw   %0,%3\n\t"
-                 "bne-   2f\n\t"
-                 "stwcx. %2,0,%1\n\t"
-                 "bne-   1b\n\t"
-                 "2:"
-                 : "=&r"(prev)
-                 : "b" (mem), "r" (with), "r" (cmp)
-                 : "cc", "memory");
+   asm volatile ("0:\n\t"                 // retry local label     
+               "lwarx  %0,0,%1\n\t"       // load prev and reserve 
+               "cmpw   %0,%3\n\t"         // does it match cmp?    
+               "bne-   1f\n\t"            // ...no, bail out       
+               "stwcx. %2,0,%1\n\t"       // ...yes, conditionally
+                                          //   store with            
+               "bne-   0b\n\t"            // start over if we lost
+                                          //   the reservation       
+               "1:"                       // exit local label      
+
+               : "=&r"(prev)                        // output      
+               : "b" (mem), "r" (with), "r"(cmp)    // inputs      
+               : "memory", "cc");                   // clobbered   
    return prev;
 }
 
@@ -240,7 +261,57 @@ inline boost::uint32_t atomic_read32(volatile boost::uint32_t *mem)
 inline void atomic_write32(volatile boost::uint32_t *mem, boost::uint32_t val)
 {  *mem = val; }
 
-}  //namespace ipcdetail{
+}  //namespace detail{
+}  //namespace interprocess{
+}  //namespace boost{
+
+#elif defined(__GNUC__) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )
+
+namespace boost {
+namespace interprocess {
+namespace detail{
+
+//! Atomically add 'val' to an boost::uint32_t
+//! "mem": pointer to the object
+//! "val": amount to add
+//! Returns the old value pointed to by mem
+inline boost::uint32_t atomic_add32
+   (volatile boost::uint32_t *mem, boost::uint32_t val)
+{  return __sync_fetch_and_add(const_cast<boost::uint32_t *>(mem), val);   }
+
+//! Atomically increment an apr_uint32_t by 1
+//! "mem": pointer to the object
+//! Returns the old value pointed to by mem
+inline boost::uint32_t atomic_inc32(volatile boost::uint32_t *mem)
+{  return atomic_add32(mem, 1);  }
+
+//! Atomically decrement an boost::uint32_t by 1
+//! "mem": pointer to the atomic value
+//! Returns the old value pointed to by mem
+inline boost::uint32_t atomic_dec32(volatile boost::uint32_t *mem)
+{  return atomic_add32(mem, (boost::uint32_t)-1);   }
+
+//! Atomically read an boost::uint32_t from memory
+inline boost::uint32_t atomic_read32(volatile boost::uint32_t *mem)
+{  return *mem;   }
+
+//! Compare an boost::uint32_t's value with "cmp".
+//! If they are the same swap the value with "with"
+//! "mem": pointer to the value
+//! "with" what to swap it with
+//! "cmp": the value to compare it to
+//! Returns the old value of *mem
+inline boost::uint32_t atomic_cas32
+   (volatile boost::uint32_t *mem, boost::uint32_t with, boost::uint32_t cmp)
+{  return __sync_val_compare_and_swap(const_cast<boost::uint32_t *>(mem), cmp, with);   }
+
+//! Atomically set an boost::uint32_t in memory
+//! "mem": pointer to the object
+//! "param": val value that the object will assume
+inline void atomic_write32(volatile boost::uint32_t *mem, boost::uint32_t val)
+{  *mem = val; }
+
+}  //namespace detail{
 }  //namespace interprocess{
 }  //namespace boost{
 
@@ -250,7 +321,7 @@ inline void atomic_write32(volatile boost::uint32_t *mem, boost::uint32_t val)
 
 namespace boost{
 namespace interprocess{
-namespace ipcdetail{
+namespace detail{
 
 //! Atomically add 'val' to an boost::uint32_t
 //! "mem": pointer to the object
@@ -291,7 +362,7 @@ inline boost::uint32_t atomic_read32(volatile boost::uint32_t *mem)
 inline void atomic_write32(volatile boost::uint32_t *mem, boost::uint32_t val)
 {  *mem = val; }
 
-}  //namespace ipcdetail{
+}  //namespace detail{
 }  //namespace interprocess{
 }  //namespace boost{
 
@@ -302,7 +373,7 @@ inline void atomic_write32(volatile boost::uint32_t *mem, boost::uint32_t val)
 
 namespace boost{
 namespace interprocess{
-namespace ipcdetail{
+namespace detail{
 
 //! Atomically decrement a uint32_t by 1
 //! "mem": pointer to the atomic value
@@ -386,151 +457,101 @@ inline boost::uint32_t atomic_cas32(
     mem, with, cmp);
 }
 
-}  //namespace ipcdetail{
+}  //namespace detail{
 }  //namespace interprocess{
 }  //namespace boost{
 
-#elif defined(__IBMCPP__) && (__IBMCPP__ >= 800) && defined(_AIX)
+#elif defined(__IBMCPP__) && (__IBMCPP__ >= 800) && defined(_AIX)  
 
-#include <builtins.h>
+#include <builtins.h>  
 
-namespace boost {
-namespace interprocess {
-namespace ipcdetail{
+namespace boost {  
+namespace interprocess {  
+namespace detail{  
 
-//first define boost::uint32_t versions of __lwarx and __stwcx to avoid poluting
-//all the functions with casts
+//first define boost::uint32_t versions of __lwarx and __stwcx to avoid poluting  
+//all the functions with casts  
 
-//! From XLC documenation :
-//! This function can be used with a subsequent stwcxu call to implement a
-//! read-modify-write on a specified memory location. The two functions work
-//! together to ensure that if the store is successfully performed, no other
-//! processor or mechanism can modify the target doubleword between the time
-//! lwarxu function is executed and the time the stwcxu functio ncompletes.
-//! "mem" : pointer to the object
-//! Returns the value at pointed to by mem
-inline boost::uint32_t lwarxu(volatile boost::uint32_t *mem)
-{
-   return static_cast<boost::uint32_t>(__lwarx(reinterpret_cast<volatile int*>(mem)));
-}
+//! From XLC documenation :  
+//! This function can be used with a subsequent stwcxu call to implement a  
+//! read-modify-write on a specified memory location. The two functions work  
+//! together to ensure that if the store is successfully performed, no other  
+//! processor or mechanism can modify the target doubleword between the time  
+//! lwarxu function is executed and the time the stwcxu functio ncompletes.  
+//! "mem" : pointer to the object  
+//! Returns the value at pointed to by mem  
+inline boost::uint32_t lwarxu(volatile boost::uint32_t *mem)  
+{  
+   return static_cast<boost::uint32_t>(__lwarx(reinterpret_cast<volatile int*>(mem)));  
+}  
 
-//! "mem" : pointer to the object
-//! "val" : the value to store
-//! Returns true if the update of mem is successful and false if it is
-//!unsuccessful
-inline bool stwcxu(volatile boost::uint32_t* mem, boost::uint32_t val)
-{
-   return (__stwcx(reinterpret_cast<volatile int*>(mem), static_cast<int>(val)) != 0);
-}
+//! "mem" : pointer to the object  
+//! "val" : the value to store  
+//! Returns true if the update of mem is successful and false if it is  
+//!unsuccessful  
+inline bool stwcxu(volatile boost::uint32_t* mem, boost::uint32_t val)  
+{  
+   return (__stwcx(reinterpret_cast<volatile int*>(mem), static_cast<int>(val)) != 0);  
+}  
 
-//! "mem": pointer to the object
-//! "val": amount to add
-//! Returns the old value pointed to by mem
-inline boost::uint32_t atomic_add32
-   (volatile boost::uint32_t *mem, boost::uint32_t val)
-{
-   boost::uint32_t oldValue;
-   do
-   {
-      oldValue = lwarxu(mem);
-   }while (!stwcxu(mem, oldValue+val));
-   return oldValue;
-}
+//! "mem": pointer to the object  
+//! "val": amount to add  
+//! Returns the old value pointed to by mem  
+inline boost::uint32_t atomic_add32  
+   (volatile boost::uint32_t *mem, boost::uint32_t val)  
+{  
+   boost::uint32_t oldValue;  
+   do  
+   {  
+      oldValue = lwarxu(mem);  
+   }while (!stwcxu(mem, oldValue+val));  
+   return oldValue;  
+}  
 
-//! Atomically increment an apr_uint32_t by 1
-//! "mem": pointer to the object
-//! Returns the old value pointed to by mem
-inline boost::uint32_t atomic_inc32(volatile boost::uint32_t *mem)
-{  return atomic_add32(mem, 1);  }
+//! Atomically increment an apr_uint32_t by 1  
+//! "mem": pointer to the object  
+//! Returns the old value pointed to by mem  
+inline boost::uint32_t atomic_inc32(volatile boost::uint32_t *mem)  
+{  return atomic_add32(mem, 1);  }  
 
-//! Atomically decrement an boost::uint32_t by 1
-//! "mem": pointer to the atomic value
-//! Returns the old value pointed to by mem
-inline boost::uint32_t atomic_dec32(volatile boost::uint32_t *mem)
-{  return atomic_add32(mem, (boost::uint32_t)-1);   }
+//! Atomically decrement an boost::uint32_t by 1  
+//! "mem": pointer to the atomic value  
+//! Returns the old value pointed to by mem  
+inline boost::uint32_t atomic_dec32(volatile boost::uint32_t *mem)  
+{  return atomic_add32(mem, (boost::uint32_t)-1);   }  
 
-//! Atomically read an boost::uint32_t from memory
-inline boost::uint32_t atomic_read32(volatile boost::uint32_t *mem)
-{  return *mem;   }
+//! Atomically read an boost::uint32_t from memory  
+inline boost::uint32_t atomic_read32(volatile boost::uint32_t *mem)  
+{  return *mem;   }  
 
-//! Compare an boost::uint32_t's value with "cmp".
-//! If they are the same swap the value with "with"
-//! "mem": pointer to the value
-//! "with" what to swap it with
-//! "cmp": the value to compare it to
-//! Returns the old value of *mem
-inline boost::uint32_t atomic_cas32
-   (volatile boost::uint32_t *mem, boost::uint32_t with, boost::uint32_t cmp)
-{
-   boost::uint32_t oldValue;
-   boost::uint32_t valueToStore;
-   do
-   {
-      oldValue = lwarxu(mem);
-   } while (!stwcxu(mem, (oldValue == with) ? cmp : oldValue));
+//! Compare an boost::uint32_t's value with "cmp".  
+//! If they are the same swap the value with "with"  
+//! "mem": pointer to the value  
+//! "with" what to swap it with  
+//! "cmp": the value to compare it to  
+//! Returns the old value of *mem  
+inline boost::uint32_t atomic_cas32  
+   (volatile boost::uint32_t *mem, boost::uint32_t with, boost::uint32_t cmp)  
+{  
+   boost::uint32_t oldValue;  
+   boost::uint32_t valueToStore;  
+   do  
+   {  
+      oldValue = lwarxu(mem);  
+   } while (!stwcxu(mem, (oldValue == with) ? cmp : oldValue));  
 
-   return oldValue;
-}
+   return oldValue;  
+}  
 
-//! Atomically set an boost::uint32_t in memory
-//! "mem": pointer to the object
-//! "param": val value that the object will assume
-inline void atomic_write32(volatile boost::uint32_t *mem, boost::uint32_t val)
-{  *mem = val; }
+//! Atomically set an boost::uint32_t in memory  
+//! "mem": pointer to the object  
+//! "param": val value that the object will assume  
+inline void atomic_write32(volatile boost::uint32_t *mem, boost::uint32_t val)  
+{  *mem = val; }  
 
-}  //namespace ipcdetail
-}  //namespace interprocess
-}  //namespace boost
-
-#elif defined(__GNUC__) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )
-
-namespace boost {
-namespace interprocess {
-namespace ipcdetail{
-
-//! Atomically add 'val' to an boost::uint32_t
-//! "mem": pointer to the object
-//! "val": amount to add
-//! Returns the old value pointed to by mem
-inline boost::uint32_t atomic_add32
-   (volatile boost::uint32_t *mem, boost::uint32_t val)
-{  return __sync_fetch_and_add(const_cast<boost::uint32_t *>(mem), val);   }
-
-//! Atomically increment an apr_uint32_t by 1
-//! "mem": pointer to the object
-//! Returns the old value pointed to by mem
-inline boost::uint32_t atomic_inc32(volatile boost::uint32_t *mem)
-{  return atomic_add32(mem, 1);  }
-
-//! Atomically decrement an boost::uint32_t by 1
-//! "mem": pointer to the atomic value
-//! Returns the old value pointed to by mem
-inline boost::uint32_t atomic_dec32(volatile boost::uint32_t *mem)
-{  return atomic_add32(mem, (boost::uint32_t)-1);   }
-
-//! Atomically read an boost::uint32_t from memory
-inline boost::uint32_t atomic_read32(volatile boost::uint32_t *mem)
-{  return *mem;   }
-
-//! Compare an boost::uint32_t's value with "cmp".
-//! If they are the same swap the value with "with"
-//! "mem": pointer to the value
-//! "with" what to swap it with
-//! "cmp": the value to compare it to
-//! Returns the old value of *mem
-inline boost::uint32_t atomic_cas32
-   (volatile boost::uint32_t *mem, boost::uint32_t with, boost::uint32_t cmp)
-{  return __sync_val_compare_and_swap(const_cast<boost::uint32_t *>(mem), cmp, with);   }
-
-//! Atomically set an boost::uint32_t in memory
-//! "mem": pointer to the object
-//! "param": val value that the object will assume
-inline void atomic_write32(volatile boost::uint32_t *mem, boost::uint32_t val)
-{  *mem = val; }
-
-}  //namespace ipcdetail{
-}  //namespace interprocess{
-}  //namespace boost{
+}  //namespace detail  
+}  //namespace interprocess  
+}  //namespace boost  
 
 #else
 
@@ -540,7 +561,7 @@ inline void atomic_write32(volatile boost::uint32_t *mem, boost::uint32_t val)
 
 namespace boost{
 namespace interprocess{
-namespace ipcdetail{
+namespace detail{
 
 inline bool atomic_add_unless32
    (volatile boost::uint32_t *mem, boost::uint32_t value, boost::uint32_t unless_this)
@@ -552,9 +573,9 @@ inline bool atomic_add_unless32
    return c != unless_this;
 }
 
-}  //namespace ipcdetail
-}  //namespace interprocess
-}  //namespace boost
+}  //namespace detail  
+}  //namespace interprocess  
+}  //namespace boost  
 
 
 #include <boost/interprocess/detail/config_end.hpp>

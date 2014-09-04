@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-// $Id: udf.cpp 2035 2013-01-21 14:12:19Z rdempsey $
+// $Id: udf.cpp 1855 2012-04-04 18:20:09Z rdempsey $
 
 #ifndef _MSC_VER
 #include <dlfcn.h>

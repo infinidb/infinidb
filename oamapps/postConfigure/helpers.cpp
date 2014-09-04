@@ -1,20 +1,3 @@
-/* Copyright (C) 2014 InfiniDB, Inc.
-
-   This program is free software; you can redistribute it and/or
-   modify it under the terms of the GNU General Public License
-   as published by the Free Software Foundation; version 2 of
-   the License.
-
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-   MA 02110-1301, USA. */
-
 #include <string>
 #include <vector>
 #include <unistd.h>
@@ -35,45 +18,13 @@ using namespace oam;
 
 #include "helpers.h"
 
-extern string mysqlpw;
+string mysqlpw = " ";
 string pwprompt = " ";
 
-string masterLogFile = oam::UnassignedName;
-string masterLogPos = oam::UnassignedName;
-string prompt;
-
-const char* pcommand = 0;
-
 extern string installDir;
-extern bool noPrompting;
 
 namespace installer
 {
-
-const char* callReadline(string prompt)
-{
-    	if ( !noPrompting )
-	{
-	        const char* ret = readline(prompt.c_str());
-	        if( ret == 0 )
-	            exit(1);
-        	return ret;
-	}
-    	else 
-	{
-        	cout << prompt << endl;
-        	return "";
-    	}
-}
-
-void callFree(const char* )
-{
-	if ( !noPrompting )
-		free((void*)pcommand);
-	pcommand = 0;
-}
-
-
 
 bool waitForActive() 
 {
@@ -106,6 +57,8 @@ void dbrmDirCheck()
 	string SystemSection = "SystemConfig";
 	Config* sysConfig = Config::makeConfig();
 	Config* sysConfigPrev = Config::makeConfig(fname);
+
+	char* pcommand = 0;
 
 	string dbrmroot = "";
 	string dbrmrootPrev = "";
@@ -209,12 +162,11 @@ void dbrmDirCheck()
 		while(true)
 		{
 			string answer = "n";
-			prompt = "Enter 'y' when you are ready to continue > ";
-			pcommand = callReadline(prompt.c_str());
+			pcommand = readline("Enter 'y' when you are ready to continue > ");
 			if (pcommand)
 			{
 				if (strlen(pcommand) > 0) answer = pcommand;
-				callFree(pcommand);
+				free(pcommand);
 				pcommand = 0;
 			}
 			if ( answer == "y" )
@@ -230,13 +182,13 @@ void dbrmDirCheck()
 	return;
 }
 
-void mysqlSetup(bool EM) 
+void mysqlSetup() 
 {
 	Oam oam;
 	string cmd;
 	cmd = installDir + "/bin/post-mysqld-install --installdir=" + installDir;
 	int rtnCode = system(cmd.c_str());
-	if (WEXITSTATUS(rtnCode) != 0)
+	if (rtnCode != 0)
 		cout << "Error running post-mysqld-install" << endl;
 
 	//check for password set
@@ -258,15 +210,7 @@ void mysqlSetup(bool EM)
 		system(cmd.c_str());
 
 		if (oam.checkLogStatus("/tmp/idbmysql.log", "ERROR 1045") ) {
-			if ( mysqlpw == " " ) {
-				if ( noPrompting || EM ) {
-					cout << " *** MySQL password required, enter on command line, exiting..." << endl;
-					exit(1);
-				}
-
-				mysqlpw = getpass(prompt.c_str());
-			}
-
+			mysqlpw = getpass(prompt.c_str());
 			mysqlpw = "'" + mysqlpw + "'";
 			pwprompt = "--password=" + mysqlpw;
 			prompt = " *** Password incorrect, please re-enter MySQL password > ";
@@ -293,7 +237,7 @@ void mysqlSetup(bool EM)
 	
 	cmd = installDir + "/bin/post-mysql-install " + pwprompt + " --installdir=" + installDir;
 	rtnCode = system(cmd.c_str());
-	if (WEXITSTATUS(rtnCode) != 0)
+	if (rtnCode != 0)
 		cout << "Error running post-mysql-install" << endl;
 
 	return;
@@ -306,7 +250,7 @@ void mysqlSetup(bool EM)
 *
 *
 ******************************************************************************************/
-int sendUpgradeRequest(int IserverTypeInstall, bool pmwithum)
+int sendUpgradeRequest(int IserverTypeInstall)
 {
 	Oam oam;
 
@@ -346,8 +290,7 @@ int sendUpgradeRequest(int IserverTypeInstall, bool pmwithum)
 
 		string moduleType = systemmoduletypeconfig.moduletypeconfig[i].ModuleType;
 		if ( moduleType == "um" ||
-			( moduleType == "pm" && IserverTypeInstall == oam::INSTALL_COMBINE_DM_UM_PM ) || 
-			( moduleType == "pm" && pmwithum ) ) {
+			( moduleType == "pm" && IserverTypeInstall == oam::INSTALL_COMBINE_DM_UM_PM ) ) {
 
 			DeviceNetworkList::iterator pt = systemmoduletypeconfig.moduletypeconfig[i].ModuleNetworkList.begin();
 			for ( ; pt != systemmoduletypeconfig.moduletypeconfig[i].ModuleNetworkList.end(); pt++)
@@ -357,14 +300,11 @@ int sendUpgradeRequest(int IserverTypeInstall, bool pmwithum)
 				try {
 					oam.getModuleStatus((*pt).DeviceName, opState, degraded);
 
-					if (opState == oam::ACTIVE ||
-						opState == oam::DEGRADED) {
+					if (opState == oam::ACTIVE) {
 						returnStatus = sendMsgProcMon( (*pt).DeviceName, msg, requestID, 30 );
 		
-						if ( returnStatus != API_SUCCESS) {
-							cout << "ERROR: Error return in running the InfiniDB Upgrade, check /tmp/upgrade*.logs on " << (*pt).DeviceName << endl;
+						if ( returnStatus != API_SUCCESS)
 							return returnStatus;
-						}
 					}
 				}
 				catch (exception& ex)
@@ -374,141 +314,6 @@ int sendUpgradeRequest(int IserverTypeInstall, bool pmwithum)
 	}
 	return returnStatus;
 }
-
-/******************************************************************************************
-* @brief	sendReplicationRequest
-*
-* purpose:	send Upgrade Request Msg to all ACTIVE UMs
-*
-*
-******************************************************************************************/
-int sendReplicationRequest(int IserverTypeInstall, std::string password, std::string port)
-{
-	Oam oam;
-
-	SystemModuleTypeConfig systemmoduletypeconfig;
-
-	try{
-		oam.getSystemConfig(systemmoduletypeconfig);
-	}
-	catch (exception& ex)
-	{}
-
-	//get Primary (Master) UM
-	string masterModule = oam::UnassignedName;
-	try {
-		oam.getSystemConfig("PrimaryUMModuleName", masterModule);
-	}
-	catch(...) {
-		masterModule = oam::UnassignedName;
-	}
-
-	if ( masterModule == oam::UnassignedName )
-	{
-		// use default setting
-		masterModule = "um1";
-		if ( IserverTypeInstall == oam::INSTALL_COMBINE_DM_UM_PM )
-			masterModule = "pm1";
-	}
-
-	int returnStatus = oam::API_SUCCESS;
-
-	bool masterDone = false;
-	for( unsigned int i = 0; i < systemmoduletypeconfig.moduletypeconfig.size(); i++)
-	{
-		int moduleCount = systemmoduletypeconfig.moduletypeconfig[i].ModuleCount;
-		if( moduleCount == 0)
-			continue;
-
-		string moduleType = systemmoduletypeconfig.moduletypeconfig[i].ModuleType;
-
-		DeviceNetworkList::iterator pt = systemmoduletypeconfig.moduletypeconfig[i].ModuleNetworkList.begin();
-		for ( ; pt != systemmoduletypeconfig.moduletypeconfig[i].ModuleNetworkList.end(); )
-		{
-			// we want to do master first
-			if ( ( (*pt).DeviceName == masterModule && !masterDone ) || 
-				( (*pt).DeviceName != masterModule && masterDone ) )
-			{
-				int opState;
-				bool degraded;
-				try {
-					oam.getModuleStatus((*pt).DeviceName, opState, degraded);
-	
-					if (opState == oam::ACTIVE ||
-						opState == oam::DEGRADED) {
-						if ( (*pt).DeviceName == masterModule )
-						{	
-							// set for Master MySQL DB distrubution to slaves
-							ByteStream msg1;
-							ByteStream::byte requestID = oam::MASTERDIST;
-							msg1 << requestID;
-							msg1 << password;
-							msg1 << "all";	// dist to all slave modules
-
-							returnStatus = sendMsgProcMon( (*pt).DeviceName, msg1, requestID, 600 );
-			
-							if ( returnStatus != API_SUCCESS) {
-								cout << "ERROR: Error return in running the MySQL Master DB Distribute, check /tmp/master-dist.logs on " << masterModule << endl;
-								return returnStatus;
-							}
-
-							// set for master repl request
-							ByteStream msg;
-							requestID = oam::MASTERREP;
-							msg << requestID;
-							msg << mysqlpw;
-	
-							returnStatus = sendMsgProcMon( (*pt).DeviceName, msg, requestID, 30 );
-			
-							if ( returnStatus != API_SUCCESS) {
-								cout << "ERROR: Error return in running the MySQL Master replication, check /tmp/master-rep*.logs on " << masterModule << endl;
-								return returnStatus;
-							}
-
-							masterDone = true;
-							pt = systemmoduletypeconfig.moduletypeconfig[i].ModuleNetworkList.begin();
-						}
-						else
-						{ // set for slave repl request
-							ByteStream msg;
-							ByteStream::byte requestID = oam::SLAVEREP;
-							msg << requestID;
-							msg << mysqlpw;
-	
-							if ( masterLogFile == oam::UnassignedName || 
-								masterLogPos == oam::UnassignedName )
-								return API_FAILURE;
-	
-							msg << masterLogFile;
-							msg << masterLogPos;
-							msg << port;
-
-							returnStatus = sendMsgProcMon( (*pt).DeviceName, msg, requestID, 30 );
-			
-							if ( returnStatus != API_SUCCESS) {
-								cout << "ERROR: Error return in running the MySQL Slave replication, check /tmp/slave-rep*.logs on " << (*pt).DeviceName << endl;
-								return returnStatus;
-							}
-
-							pt++;
-						}
-					}
-					else
-					{
-						cout << "ERROR: Module not Active, replication not done on " << (*pt).DeviceName << endl;
-						pt++;
-					}
-				}
-				catch (exception& ex)
-				{}
-			}
-			else
-				pt++;
-		}
-	}
-	return returnStatus;
-}
-
 
 /******************************************************************************************
 * @brief	sendMsgProcMon
@@ -570,17 +375,11 @@ int sendMsgProcMon( std::string module, ByteStream msg, int requestID, int timeo
 					receivedMSG >> returnACK;
 					receivedMSG >> returnRequestID;
 					receivedMSG >> requestStatus;
-
-					if ( requestID == oam::MASTERREP )
-					{
-						receivedMSG >> masterLogFile;
-						receivedMSG >> masterLogPos;
-					}
 		
 					if ( returnACK == oam::ACK &&  returnRequestID == requestID) {
 						// ACK for this request
 						returnStatus = requestStatus;
-						break;	
+					break;	
 					}	
 				}
 				else
@@ -604,6 +403,7 @@ int sendMsgProcMon( std::string module, ByteStream msg, int requestID, int timeo
 
 	return returnStatus;
 }
+
 
 void checkFilesPerPartion(int DBRootCount, Config* sysConfig)
 {
@@ -655,214 +455,9 @@ void checkFilesPerPartion(int DBRootCount, Config* sysConfig)
 		}
 	}
 
-	return;
-}
-
-void checkMysqlPort( std::string& mysqlPort, Config* sysConfig, bool EM )
-{
-	Oam oam;
-
-	while(true)
-	{
-		string cmd = "netstat -na | grep -e :" + mysqlPort + "[[:space:]] | grep LISTEN > /tmp/mysqlport";
-
-		system(cmd.c_str());
-		string fileName = "/tmp/mysqlport";
-		ifstream oldFile (fileName.c_str());
-		if (oldFile) {
-			oldFile.seekg(0, std::ios::end);
-			int size = oldFile.tellg();
-			if ( size != 0 ) {
-				if ( noPrompting || EM ) {
-					cout << endl << "The mysqld port of '" + mysqlPort + "' is already in-use" << endl;
-					cout << "For No-prompt install, use the command line argument of 'port' to enter a different number" << endl;
-					exit(1);
-				}
-
-				cout << "The mysqld port of '" + mysqlPort + "' is already in-use" << endl;
-
-				while(true)
-				{
-					prompt = "Enter a different port number > ";
-					pcommand = callReadline(prompt.c_str());
-					if (pcommand)
-					{
-						if (strlen(pcommand) > 0) mysqlPort = pcommand;
-						callFree(pcommand);
-						pcommand = 0;
-					}
-	
-					if ( atoi(mysqlPort.c_str()) < 1000 || atoi(mysqlPort.c_str()) > 9999)
-					{
-						cout << "   ERROR: Invalid MySQL Port ID supplied, must be between 1000-9999" << endl;
-					}
-					else
-						break;
-				}
-			}
-			else
-			{
-				cout << endl;
-
-				try {
-					sysConfig->setConfig("Installation", "MySQLPort", mysqlPort);
-				}
-				catch(...)
-				{}
-		
-				if ( !writeConfig(sysConfig) ) {
-					cout << "ERROR: Failed trying to update InfiniDB System Configuration file" << endl;
-					exit(1);
-				}
-
-				break;	
-			}
-		}
-		else
-			break;
-	}
-
-	// set mysql password
-	oam.changeMyCnf( "port", mysqlPort );
-}
-
-void checkSystemMySQLPort(std::string& mysqlPort, Config* sysConfig, std::string USER, std::string password, ChildModuleList childmodulelist, int IserverTypeInstall, bool pmwithum, bool EM)
-{
-	Oam oam;
-
-	bool inUse = false;
-
-	while(true)
-	{
-		string localnetstat = "netstat -na | grep -e :" + mysqlPort + "[[:space:]] | grep LISTEN > /tmp/mysqlport";
-		string remotenetstat = "netstat -na | grep -e :" + mysqlPort + "[[:space:]] | grep LISTEN";
-
-		//first check local mysql, if needed
-		if ( ( IserverTypeInstall == oam::INSTALL_COMBINE_DM_UM_PM ) ||
-			( ( IserverTypeInstall != oam::INSTALL_COMBINE_DM_UM_PM ) && pmwithum ) )
-		{
-			system(localnetstat.c_str());
-			string fileName = "/tmp/mysqlport";
-			ifstream oldFile (fileName.c_str());
-
-			if (oldFile) {
-				oldFile.seekg(0, std::ios::end);
-				int size = oldFile.tellg();
-				if ( size != 0 ) {
-					if ( noPrompting || EM ) {
-						cout << endl << "The mysqld port of '" + mysqlPort + "' is already in-use" << endl;
-						cout << "For No-prompt install, use the command line argument of 'port' to enter a different number" << endl;
-						exit(1);
-					}
-					else
-						inUse = true;
-				}
-			}
-		}
-
-		// if not inuse by local, go check remote servers
-		if ( !inUse )
-		{
-			ChildModuleList::iterator list1 = childmodulelist.begin();
-			for (; list1 != childmodulelist.end() ; list1++)
-			{
-				string remoteModuleName = (*list1).moduleName;
-				string remoteModuleIP = (*list1).moduleIP;
-				string remoteHostName = (*list1).hostName;
-				string remoteModuleType = remoteModuleName.substr(0,MAX_MODULE_TYPE_SIZE);
-		
-				if ( remoteModuleType == "um" ||
-					(remoteModuleType == "pm" && IserverTypeInstall == oam::INSTALL_COMBINE_DM_UM_PM) ||
-					(remoteModuleType == "pm" && pmwithum) )
-				{
-
-					string cmd = installDir + "/bin/remote_command_verify.sh " + remoteModuleIP + " " + " " + USER + " " + password + " '" + remotenetstat + "' tcp error 5 0 > /dev/null 2>&1";
-					int rtnCode = system(cmd.c_str());
-					if (WEXITSTATUS(rtnCode) == 0) {
-						if ( noPrompting || EM ) {
-							cout << endl << "The mysqld port of '" + mysqlPort + "' is already in-use on " << remoteModuleName << endl;
-							cout << "For No-prompt install, use the command line argument of 'port' to enter a different number" << endl;
-							cout << "exiting..." << endl;
-							exit(1);
-						}
-						else
-						{
-							inUse = true;
-							break;
-						}
-					}
-				}
-			}
-		}
-
-		if ( inUse )
-		{
-			cout << endl << "The mysqld port of '" + mysqlPort + "' is already in-use" << endl;
-
-			while(true)
-			{
-				prompt = "Enter a different port number > ";
-				pcommand = callReadline(prompt.c_str());
-				if (pcommand)
-				{
-					if (strlen(pcommand) > 0) mysqlPort = pcommand;
-					callFree(pcommand);
-					pcommand = 0;
-				}
-
-				if ( atoi(mysqlPort.c_str()) < 1000 || atoi(mysqlPort.c_str()) > 9999)
-				{
-					cout << "   ERROR: Invalid MySQL Port ID supplied, must be between 1000-9999" << endl;
-				}
-				else
-					break;
-			}
-
-			inUse = false;
-		}
-		else
-		{
-			cout << endl;
-
-			try {
-				sysConfig->setConfig("Installation", "MySQLPort", mysqlPort);
-			}
-			catch(...)
-			{}
-	
-			if ( !writeConfig(sysConfig) ) {
-				cout << "ERROR: Failed trying to update InfiniDB System Configuration file" << endl;
-				exit(1);
-			}
-
-			break;
-		}
-	}
-
-	// set mysql password
-	oam.changeMyCnf( "port", mysqlPort );
 
 	return;
 }
-
-/*
- * writeConfig 
- */
-bool writeConfig( Config* sysConfig ) 
-{
-	for ( int i = 0 ; i < 3 ; i++ )
-	{
-		try {
-			sysConfig->write();
-			return true;
-		}
-		catch(...)
-		{}
-	}
-
-	return false;
-}
-	
 
 
 }

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: ddlpkg.h 9210 2013-01-21 14:10:42Z rdempsey $
+*   $Id: ddlpkg.h 8926 2012-09-25 21:56:32Z zzhu $
 *
 *
 ***********************************************************************/
@@ -65,6 +65,7 @@ struct ColumnDef;
 struct ColumnDefaultValue;
 struct ColumnType;
 struct QualifiedName;
+struct TableDef;
 struct CreateTableStatement;
 struct SqlStatementList;
 struct SqlStatement;
@@ -72,7 +73,6 @@ struct ColumnConstraintDef;
 struct TableConstraintDef;
 struct SchemaObject;
 struct ReferentialAction;
-struct TableDef;
 
 typedef SqlStatement DDLPkg;
 
@@ -220,15 +220,6 @@ enum DDL_DATATYPES {
     DDL_NUMERIC,
     DDL_NUMBER,
     DDL_INTEGER,
-    DDL_UNSIGNED_TINYINT,
-    DDL_UNSIGNED_SMALLINT,
-    DDL_UNSIGNED_MEDINT,
-    DDL_UNSIGNED_INT,
-    DDL_UNSIGNED_BIGINT,
-    DDL_UNSIGNED_DECIMAL,
-    DDL_UNSIGNED_FLOAT,
-    DDL_UNSIGNED_DOUBLE,
-    DDL_UNSIGNED_NUMERIC,
     DDL_INVALID_DATATYPE
 };
 
@@ -256,15 +247,6 @@ const std::string DDLDatatypeString[] =
         "numeric",
         "number",
         "integer",
-        "unsigned-tinyint",
-        "unsigned-smallint",
-        "unsigned-medint",
-        "unsigned-int",
-        "unsigned-bigint",
-        "unsigned-decimal",
-        "unsigned-float",
-        "unsigned-double",
-        "unsigned-numeric",
         ""
     };
 
@@ -289,35 +271,26 @@ const std::string AlterActionString[] =
  */
 const int  DDLDatatypeLength[] =
     {
-        1,		// BIT                
-        1,		// TINYINT       
-        1,		// CHAR          
-        2,		// SMALLINT      
-        2,		// DECIMAL       
-        4,		// MEDINT        
-        4,		// INT           
-        4,		// FLOAT         
-        4,		// DATE          
-        8,		// BIGINT        
-        8,		// DOUBLE        
-        8,		// DATETIME      
-        8, 		// VARCHAR       
-        8, 		// VARBINAR      
-        8,		// CLOB          
-        8,		// BLOB          
-        4,		// REAL          
-        2,		// NUMERIC       
-        4,		// NUMBER        
-        4,		// INTEGER       
-        1,      // UNSIGNED_TINYINT, 
-        2,      // UNSIGNED_SMALLINT,
-        4,      // UNSIGNED_MEDINT,  
-        4,      // UNSIGNED_INT,     
-        8,      // UNSIGNED_BIGINT,  
-        2,      // UNSIGNED_DECIMAL, 
-        4,      // UNSIGNED_FLOAT,   
-        8,      // UNSIGNED_DOUBLE,  
-        2,      // UNSIGNED_NUMERIC, 
+        1,		// BIT
+        1,		// TINYINT
+        1,		// CHAR
+        2,		// SMALLINT
+        2,		// DECIMAL
+        4,		// MEDINT
+        4,		// INT
+        4,		// FLOAT
+        4,		// DATE
+        8,		// BIGINT
+        8,		// DOUBLE
+        8,		// DATETIME
+        8, 		// VARCHAR
+        8, 		// VARBINARY
+        8,		// CLOB
+        8,		// BLOB
+        4,		// REAL
+        2,		// NUMERIC
+        4,		// NUMBER
+        4,		// INTEGER
         -1		// INVALID LENGTH
     };
 
@@ -425,7 +398,7 @@ struct SqlStatement
      * Right now this var is initialized from a counter.  At some point we need
      * to serialize/unserialize it from a byte stream.
      */
-    uint32_t fSessionID;
+    u_int32_t fSessionID;
     
     /** @brief The original sql string
     */
@@ -475,78 +448,6 @@ private:
 
 
 
-/** @brief Stores catalog, schema, object names.
- *
- * ddl.y does not yet support catalog.  So, expect catalog
- * qualified names to fail parsing for the moment.
- */
-struct QualifiedName
-{
-    /** @brief Deserialize from ByteStream */
-    EXPORT virtual int unserialize(messageqcpp::ByteStream& bs);
-
-    /** @brief Serialize to ByteStream */
-    EXPORT virtual int serialize(messageqcpp::ByteStream& bs);
-
-
-    QualifiedName()
-    {}
-
-    EXPORT QualifiedName(const char* name);
-    EXPORT QualifiedName(const char* name, const char* schema);
-    EXPORT QualifiedName(const char* name, const char* schema, const char* catalog);
-
-    virtual ~QualifiedName()
-    {}
-
-    std::string fCatalog;
-    std::string fName;
-    std::string fSchema;
-};
-
-
-
-/** TableDef represents a table definition.
- */
-struct TableDef : public SchemaObject
-{
-    /** @brief Deserialize from ByteStream */
-    EXPORT virtual int unserialize(messageqcpp::ByteStream& bs);
-
-    /** @brief Serialize to ByteStream */
-    EXPORT virtual int serialize(messageqcpp::ByteStream& bs);
-
-
-	TableDef() : fQualifiedName(0)
-    {}
-
-    EXPORT TableDef(QualifiedName* name, TableElementList* elements, TableOptionMap* options);
-
-    /** @brief TableDef ctor.
-    * ctor
-    */
-    TableDef( QualifiedName *name,
-              ColumnDefList columns,
-              TableConstraintDefList constraints, int tableWithAutoinc) :
-            fQualifiedName (name),
-            fColumns (columns),
-            fConstraints (constraints)
-			
-			
-    {}
-
-    EXPORT virtual ~TableDef();
-
-    QualifiedName* fQualifiedName;
-
-    ColumnDefList fColumns;
-    TableConstraintDefList fConstraints;
-
-    TableOptionMap fOptions;
-};
-
-
-
 /** @brief Represents the create table statement
  *
  * @note It takes possession of the TableDef given to it.
@@ -570,12 +471,6 @@ struct CreateTableStatement : public SqlStatement
 
     /** @brief Dump to stdout. */
     EXPORT virtual std::ostream& put(std::ostream& os) const;
-
-    std::string schemaName() const
-        {
-            if (!fTableDef || !fTableDef->fQualifiedName) return "UNKNOWN";
-            return fTableDef->fQualifiedName->fSchema;
-        }
 
     TableDef* fTableDef; ///< The table defintion.
 
@@ -977,6 +872,11 @@ struct ColumnType
 
     EXPORT ColumnType(int type);
 
+    /** @brief This constructor is used by Dharma interface to
+        create a ColumnType object easily */
+
+    EXPORT ColumnType(int type, int length, int precision, int scale, int compressiontype, const char* autoIncrement, int64_t nextValue, bool withTimezone = false);
+
     virtual ~ColumnType()
     {}
 
@@ -1000,7 +900,7 @@ struct ColumnType
 	
 	std::string fAutoincrement;
 	
-	uint64_t fNextvalue;
+	long long fNextvalue;
 	
 };
 
@@ -1102,7 +1002,7 @@ struct ColumnDef : public SchemaObject
               ColumnDefaultValue *defaultValue, const char * comment=NULL);
 
     /** @brief ColumnDef ctor.
-     * ctor */
+     * Convenient ctor for Dharma use */
     ColumnDef(const char *name,
               ColumnType* type,
               ColumnConstraintList constraints,
@@ -1112,8 +1012,6 @@ struct ColumnDef : public SchemaObject
             fConstraints (constraints),
             fDefaultValue (defaultValue)		
     {}
-
-    void convertDecimal();
 
     /** @brief Never NULL since all Columns must have a type. */
     ColumnType* fType;
@@ -1322,6 +1220,78 @@ struct TableCheckConstraintDef : public TableConstraintDef
 
 
 
+/** TableDef represents a table definition.
+ */
+struct TableDef : public SchemaObject
+{
+    /** @brief Deserialize from ByteStream */
+    EXPORT virtual int unserialize(messageqcpp::ByteStream& bs);
+
+    /** @brief Serialize to ByteStream */
+    EXPORT virtual int serialize(messageqcpp::ByteStream& bs);
+
+
+	TableDef() : fQualifiedName(0)
+    {}
+
+    EXPORT TableDef(QualifiedName* name, TableElementList* elements, TableOptionMap* options);
+
+    /** @brief TableDef ctor.
+    * Convenient ctor for Dharma use 
+    */
+    TableDef( QualifiedName *name,
+              ColumnDefList columns,
+              TableConstraintDefList constraints, int tableWithAutoinc) :
+            fQualifiedName (name),
+            fColumns (columns),
+            fConstraints (constraints)
+			
+			
+    {}
+
+    EXPORT virtual ~TableDef();
+
+    QualifiedName* fQualifiedName;
+
+    ColumnDefList fColumns;
+    TableConstraintDefList fConstraints;
+
+    TableOptionMap fOptions;
+};
+
+
+
+/** @brief Stores catalog, schema, object names.
+ *
+ * ddl.y does not yet support catalog.  So, expect catalog
+ * qualified names to fail parsing for the moment.
+ */
+struct QualifiedName
+{
+    /** @brief Deserialize from ByteStream */
+    EXPORT virtual int unserialize(messageqcpp::ByteStream& bs);
+
+    /** @brief Serialize to ByteStream */
+    EXPORT virtual int serialize(messageqcpp::ByteStream& bs);
+
+
+    QualifiedName()
+    {}
+
+    EXPORT QualifiedName(const char* name);
+    EXPORT QualifiedName(const char* name, const char* schema);
+    EXPORT QualifiedName(const char* name, const char* schema, const char* catalog);
+
+    virtual ~QualifiedName()
+    {}
+
+    std::string fCatalog;
+    std::string fName;
+    std::string fSchema;
+};
+
+
+
 /** @brief Represents the alter table command.
  *
  * All forms of alter_table_statements are represented as
@@ -1347,12 +1317,6 @@ struct AlterTableStatement : public SqlStatement
 
     /** @brief Delete members. */
     EXPORT virtual ~AlterTableStatement();
-
-    std::string schemaName() const
-        {
-            if (!fTableName) return "UNKNOWN";
-            return fTableName->fSchema;
-        }
 
     QualifiedName* fTableName;
     AlterTableActionList fActions;
@@ -1464,13 +1428,6 @@ struct DropTableStatement : public SqlStatement
     {
         delete fTableName;
     }
-
-    std::string schemaName() const
-        {
-            if (!fTableName) return "UNKNOWN";
-            return fTableName->fSchema;
-        }
-
     QualifiedName *fTableName;
     bool fCascade;
 };
@@ -1497,16 +1454,8 @@ struct TruncTableStatement : public SqlStatement
     {
         delete fTableName;
     }
-
-    std::string schemaName() const
-        {
-            if (!fTableName) return "UNKNOWN";
-            return fTableName->fSchema;
-        }
-
     QualifiedName *fTableName;
 };
-
 /** @brief Represents the mark partition out of service statement
  *
  */

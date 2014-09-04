@@ -17,7 +17,7 @@
 
 /***************************************************************************
  *
- *   $Id: filebuffermgr.h 2042 2013-01-30 16:12:54Z pleblanc $
+ *   $Id: filebuffermgr.h 2046 2013-01-31 19:13:16Z pleblanc $
  *
  *                                                                         *
  ***************************************************************************/
@@ -57,10 +57,10 @@ namespace dbbc {
 
 struct FileBufferIndex
 {
-	FileBufferIndex(BRM::LBID_t l, BRM::VER_t v, uint32_t p) : lbid(l), ver(v), poolIdx(p) {}
+	FileBufferIndex(BRM::LBID_t l, BRM::VER_t v, u_int32_t p) : lbid(l), ver(v), poolIdx(p) {}
 	BRM::LBID_t lbid;
 	BRM::VER_t ver;
-	uint32_t poolIdx;	
+	u_int32_t poolIdx;	
 };
 
 struct CacheInsert_t {
@@ -176,8 +176,8 @@ public:
 	 **/
 
 	bool find(const HashObject_t& keyFb, void* bufferPtr);
-	uint32_t bulkFind(const BRM::LBID_t *lbids, const BRM::VER_t *vers, uint8_t **buffers,
-		bool *wasCached, uint32_t blockCount);
+	uint bulkFind(const BRM::LBID_t *lbids, const BRM::VER_t *vers, uint8_t **buffers,
+		bool *wasCached, uint blockCount);
 	
 	uint32_t maxCacheSize() const {return fMaxNumBlocks;}
 

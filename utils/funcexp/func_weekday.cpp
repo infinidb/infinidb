@@ -52,6 +52,8 @@ int64_t Func_weekday::getIntVal(rowgroup::Row& row,
 	uint32_t month = 0;
 	uint32_t day = 0;
 	int64_t val = 0;
+	int32_t dayofweek= 0;
+	uint32_t weekday = 0;
 	switch (parm[0]->data()->resultType().colDataType)
 	{
 		case CalpontSystemCatalog::DATE:
@@ -120,7 +122,9 @@ int64_t Func_weekday::getIntVal(rowgroup::Row& row,
 			isNull = true;
 			return -1;
 	}
-	return helpers::calc_mysql_weekday(year, month, day, false);
+	dayofweek= calc_weekday(calc_daynr(year, month, day), 1) + 1;
+	weekday = ((dayofweek-2)>=0) ? (dayofweek-2) : (dayofweek+5);
+	return weekday;
 }
 
 

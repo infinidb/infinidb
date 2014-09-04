@@ -1,14 +1,13 @@
 #include <iostream>
 
 #include "dbrm.h"
-#include "IDBPolicy.h"
 
 
 using namespace std;
 using namespace BRM;
 
 /*
-EXPORT void startAISequence(uint32_t OID, uint64_t firstNum, uint32_t colWidth);
+EXPORT void startAISequence(uint32_t OID, uint64_t firstNum, uint colWidth);
 EXPORT bool getAIRange(uint32_t OID, uint32_t count, uint64_t *firstNum);
 EXPORT bool getAIValue(uint32_t OID, uint64_t *value);
 EXPORT void resetAISequence(uint32_t OID, uint64_t value);
@@ -22,7 +21,7 @@ void doStartSeq()
 {
 
 	try {
-		dbrm.startAISequence(12345, 67890, 1, execplan::CalpontSystemCatalog::INT);
+		dbrm.startAISequence(12345, 67890, 1);
 	}
 	catch (exception &e) {
 		cout << "got exception: " << e.what() << endl;
@@ -115,8 +114,6 @@ int main(int argc, char **argv)
 	}
 
 	char cmd = argv[1][0];
-
-	idbdatafile::IDBPolicy::configIDBPolicy();
 
 	switch(cmd) {
 		case 's': doStartSeq(); break;

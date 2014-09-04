@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: exp_templates.h 9210 2013-01-21 14:10:42Z rdempsey $
+*   $Id: exp_templates.h 8436 2012-04-04 18:18:21Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -569,11 +569,7 @@ namespace expression {
     Operand parse(InputIterator first, InputIterator last)
     {
         try {
-#if _MSC_VER > 1600 
-            return std::_Copy_impl(first, last, start());}
-#else
             return std::copy(first, last, start());}
-#endif
         catch (const std::runtime_error&) {
             m_policy.cleanup(operandStack, operatorStack);
             throw;

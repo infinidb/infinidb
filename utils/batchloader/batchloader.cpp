@@ -43,7 +43,7 @@ namespace batchloader
 //------------------------------------------------------------------------------
 BatchLoader::BatchLoader ( uint32_t tableOid,
 		execplan::CalpontSystemCatalog::SCN sessionId,
-		std::vector<uint32_t>& PMs )
+		std::vector<uint>& PMs )
 {
 	fFirstPm=0;
 	fNextIdx=0;
@@ -56,7 +56,7 @@ BatchLoader::BatchLoader ( uint32_t tableOid,
 	//cout << "fPMs size is " << fPMs.size() << endl;
 	fPmDbrootMap.reset(new OamCache::PMDbrootsMap_t::element_type());
 	fDbrootPMmap.reset(new map<int, int>());
-	for (uint32_t i=0; i < fPMs.size(); i++)
+	for (uint i=0; i < fPMs.size(); i++)
 	{
 		iter = systemPmDbrootMap->find(fPMs[i]);
 		if (iter != systemPmDbrootMap->end())
@@ -68,7 +68,7 @@ BatchLoader::BatchLoader ( uint32_t tableOid,
 	//Build dbroot to PM map
 	for (iter = fPmDbrootMap->begin(); iter != fPmDbrootMap->end(); iter++)
 	{
-		for ( uint32_t i = 0; i < iter->second.size(); i++)
+		for ( uint i = 0; i < iter->second.size(); i++)
 		{
 			(*fDbrootPMmap)[iter->second[i]] = iter->first;
 		}
@@ -79,15 +79,14 @@ BatchLoader::BatchLoader ( uint32_t tableOid,
 /*Look up extent map to decide which dbroot to start
 	1. If newly created table, starts from the pm where the abbreviated extent created.
 	2. If the abbreviated extent has hwm > 0, and other PMs don't have any extent, start from next PM on the list.
-	2.5If some DBRoots have extents and some don't the DBRoot with the fewest extents or blocks is chosen,
-		"unless" the partition 0, segment 0 extent is one of the HWM extents.  In that case the partition 0,
-		segment 0 extent still takes precedence.
 	3. If all PMs have extents, count the number of extents under each dbroot, find the dbroot which has the least extents to start
-	4. If all dbroots have same number of extents, starts from the dbroot which has least number of blocks
+	4. If all dbroots have same number of extents, starts from the dbroot which has least number of blocks on the last partition.
 */
 //------------------------------------------------------------------------------
-void BatchLoader::selectFirstPM ( uint32_t& PMId)
+int BatchLoader::selectFirstPM ( uint& PMId, bool& startFromNextPM)
 {
+    startFromNextPM = false;
+	int rc = 0;
 	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(fSessionId);
 	//cout << "calling tableName for oid " << fTableOid << endl;
 	CalpontSystemCatalog::TableName aTableName = systemCatalogPtr->tableName(fTableOid);
@@ -99,7 +98,7 @@ void BatchLoader::selectFirstPM ( uint32_t& PMId)
 	
 	//Build distVec, start from the PM where the table is created. If not in the PM list, 0 will be used.
 	uint16_t createdDbroot = 0;
-	int rc = 0;
+	
 	std::vector<BRM::EmDbRootHWMInfo_v> allInfo (fPMs.size());
 	for (unsigned i = 0; i < fPMs.size(); i++)
 	{
@@ -112,32 +111,21 @@ void BatchLoader::selectFirstPM ( uint32_t& PMId)
 		ostringstream oss;
 		oss << "There is no extent information for table " << aTableName.table;
 		throw std::runtime_error(oss.str());
+	
 	}
 		
-	uint32_t numDbroot = fDbRoots.size();
-    if (numDbroot == 0)
-    {
-		throw std::runtime_error("There are no dbroots found during selectFirstPM");
-    }
-	uint64_t* rootExtents = (uint64_t*)alloca((numDbroot + 1) * sizeof(uint64_t));	//array of number extents for each dbroot
+	std::vector<BRM::EMEntry>	entries;
+	uint numDbroot = fDbRoots.size();
+	int* rootExtents = (int*)alloca((numDbroot + 1) * sizeof(int));	//array of number extents for each dbroot
 	for (unsigned i = 0; i < fDbRoots.size(); i++)
 	{
-		uint64_t numExtents;
-		dbrmp->getExtentCount_dbroot((ridList[0].objnum), fDbRoots[i],
-			false, numExtents);
-		rootExtents[fDbRoots[i]] = numExtents;
+		dbrmp->getExtents_dbroot((ridList[0].objnum), entries, fDbRoots[i]);
+		rootExtents[fDbRoots[i]] = entries.size();
 	}
 		
 	bool startDBRootSet = false;
-	uint64_t* rootBlocks = (uint64_t*)alloca((numDbroot + 1) * sizeof(uint64_t));	//array of number of blocks for the last partition for each dbroot
+	int* rootBlocks = (int*)alloca((numDbroot + 1) * sizeof(int));	//array of number of blocks for the last partition for each dbroot
 	//cout << "allInfo size is " << allInfo.size() << endl;
-
-	//--------------------------------------------------------------------------
-	// Load rootBlocks to carry total blocks for each DBRoot
-	// Set startDBRootSet if the partition 0 segment 0 extent is empty
-	// Set createdDbroot for the DBRoot that carries the partition 0 
-	//     segment 0 extent (used to set the default PMId)
-	//--------------------------------------------------------------------------
 	for (unsigned i=0; i < allInfo.size(); i++) //All PMs
 	{
 		BRM::EmDbRootHWMInfo_v emDbRootHWMInfos = allInfo[i]; //one pm
@@ -147,13 +135,8 @@ void BatchLoader::selectFirstPM ( uint32_t& PMId)
 			if (emDbRootHWMInfos[j].totalBlocks == 0) {
 				//cout << "totalBlocks is 0" << endl;
 				continue; }
-
-			//------------------------------------------------------------------
-			// Ignore partition 0, segment 0 HWM extent if it is disabled
-			//------------------------------------------------------------------
-			if ((emDbRootHWMInfos[j].partitionNum == 0) &&
-				(emDbRootHWMInfos[j].segmentNum ==0)    &&
-				(emDbRootHWMInfos[j].status != BRM::EXTENTOUTOFSERVICE))
+				
+			if ((emDbRootHWMInfos[j].partitionNum == 0) && (emDbRootHWMInfos[j].segmentNum ==0))
 			{
 				if (emDbRootHWMInfos[j].localHWM == 0)
 				{
@@ -179,9 +162,6 @@ void BatchLoader::selectFirstPM ( uint32_t& PMId)
 			break;
 	}
 	
-	//--------------------------------------------------------------------------
-	// Set the default PMId to the PM with the partition 0 segment 0 extent 
-	//--------------------------------------------------------------------------
 	PMId = 0;
 	if ( createdDbroot != 0)
 	{
@@ -191,29 +171,17 @@ void BatchLoader::selectFirstPM ( uint32_t& PMId)
 		if (iter != fDbrootPMmap->end())
 			PMId = iter->second;
 	}
-
 	// This will build the batch distribution sequence	
 	//cout << "Building BatchDistSeqVector with PMId " << PMId << endl;
 	buildBatchDistSeqVector(PMId);	
 
 	//cout << "startDBRootSet = " << startDBRootSet << endl;	
 	bool allEqual = true;
-	bool allOtherDbrootEmpty = true;
-
-	//--------------------------------------------------------------------------
-	// startDBRootSet == false
-	// We don't have an empty partition 0, segment 0 extent to load;
-	// so evaluate more selection criteria.
-	//--------------------------------------------------------------------------
 	if (!startDBRootSet)
 	{
+	
 		std::vector<PMRootInfo> rootsExtentsBlocks;
 		std::map<int, OamCache::dbRoots>::iterator iter;
-
-		//----------------------------------------------------------------------
-		// Load rootsExtentsBlocks to carry the number of extents and blocks
-		// for each DBRoot.
-		//----------------------------------------------------------------------
 		for (unsigned j=0; j < fPmDistSeq.size(); j++)
 		{
 			PMRootInfo aEntry;
@@ -230,16 +198,12 @@ void BatchLoader::selectFirstPM ( uint32_t& PMId)
 			}			
 			rootsExtentsBlocks.push_back(aEntry);		
 		}
-		//cout << "rootsExtentsBlocks size is " << rootsExtentsBlocks.size() << " and allOtherDbrootEmpty is " << allOtherDbrootEmpty<< endl;
-
-		//----------------------------------------------------------------------
-		// See if all other DBRoots other than the createdDbroot have 0 extents
-		//----------------------------------------------------------------------
+		//cout << "rootsExtentsBlocks size is " << rootsExtentsBlocks.size() << endl;
+		bool allOtherDbrootEmpty = true;
 		for (unsigned i=1; i < rootsExtentsBlocks.size(); i++)
 		{
 			if (!allOtherDbrootEmpty)
 				break;
-			//cout << "createdDbroot is " << createdDbroot << endl;
 			if (i != createdDbroot)
 			{
 				for ( unsigned j=0; j < rootsExtentsBlocks[i].rootInfo.size(); j++)
@@ -255,32 +219,19 @@ void BatchLoader::selectFirstPM ( uint32_t& PMId)
 			}
 		}
 		//cout << "allOtherDbrootEmpty is " << allOtherDbrootEmpty << endl;	
-
-		//----------------------------------------------------------------------
-		// allOtherDbrootEmpty == true
-		// No DBRoots (other than the DBRoot having the partition 0,
-		// segment 0 extent) have extents
-		//----------------------------------------------------------------------
 		if (allOtherDbrootEmpty)
 		{
 			//find the next PM id on the list
 			startDBRootSet = true;
+			startFromNextPM = true;
 			buildBatchDistSeqVector();
 			
 			allEqual = false;	
 		}
-		//----------------------------------------------------------------------
-		// allOtherDbrootEmpty == false
-		// Some DBRoots (other than the DBRoot having the partition 0,
-		// segment 0 extent) have extents.  More evaluation necessary.
-		//----------------------------------------------------------------------
 		else //find the dbroot which has the least extents to start
 		{
 			//cout << "finding least dbroot to start." << endl;
-			//------------------------------------------------------------------
-			// Select PM with DBRoot having the fewest extents.
-			//------------------------------------------------------------------
-			uint32_t tmpLeastExtents = rootsExtentsBlocks[0].rootInfo[0].numExtents;
+			uint tmpLeastExtents = rootsExtentsBlocks[0].rootInfo[0].numExtents;
 			PMId = rootsExtentsBlocks[0].PMId; //@Bug 4809.
 			for ( unsigned j=1; j < rootsExtentsBlocks[0].rootInfo.size(); j++)
 			{
@@ -290,7 +241,7 @@ void BatchLoader::selectFirstPM ( uint32_t& PMId)
 			
 			for (unsigned i=1; i < rootsExtentsBlocks.size(); i++)
 			{
-				uint32_t leastExtents = rootsExtentsBlocks[i].rootInfo[0].numExtents;
+				uint leastExtents = rootsExtentsBlocks[i].rootInfo[0].numExtents;
 				for ( unsigned j=0; j < rootsExtentsBlocks[i].rootInfo.size(); j++)
 				{
 					if (leastExtents > rootsExtentsBlocks[i].rootInfo[j].numExtents)
@@ -308,15 +259,10 @@ void BatchLoader::selectFirstPM ( uint32_t& PMId)
 				
 			}
 			//cout << "allEqual is " << allEqual << endl;	
-
-			//------------------------------------------------------------------
-			// All DBRoots have the same number of extents.
-			// Select PM with DBRoot having the fewest number of blocks.
-			//------------------------------------------------------------------
-			if (allEqual) //Find the dbroot which has least number of blocks
+			if (allEqual) //Find the dbroot which has least number of blocks on the last partition.
 			{
 				//cout << "All PMs have equal # of least extents" << endl;
-				uint32_t tmpBloks = rootsExtentsBlocks[0].rootInfo[0].numBlocks;
+				uint tmpBloks = rootsExtentsBlocks[0].rootInfo[0].numBlocks;
 				
 				PMId = rootsExtentsBlocks[0].PMId;
 				//cout << "tmpBloks:PMId = " << tmpBloks <<":"<<PMId<<endl;
@@ -328,7 +274,7 @@ void BatchLoader::selectFirstPM ( uint32_t& PMId)
 				
 				for (unsigned i=1; i < rootsExtentsBlocks.size(); i++)
 				{
-					uint32_t leastBlocks = rootsExtentsBlocks[i].rootInfo[0].numBlocks;
+					uint leastBlocks = rootsExtentsBlocks[i].rootInfo[0].numBlocks;
 					//cout << "leastBlocks = " << leastBlocks << endl;
 					for ( unsigned j=0; j < rootsExtentsBlocks[i].rootInfo.size(); j++)
 					{
@@ -348,28 +294,15 @@ void BatchLoader::selectFirstPM ( uint32_t& PMId)
 			}
 		}
 	}
-	//--------------------------------------------------------------------------
-	// startDBRootSet == true
-	// We select the empty partition 0, segment 0 extent to load
-	//--------------------------------------------------------------------------
 	else
-	{
 		allEqual = false;
-	}
 	
 	fFirstPm = PMId;
-	
-	if (!allOtherDbrootEmpty || (PMId == 0))	  
-	{
-		prepareForSecondPM();		
-		//cout << "prepareForSecondPM is called. " << endl;
-	}
-	if ((allEqual && (PMId == 0)) || allOtherDbrootEmpty)
-	{
-		PMId = selectNextPM();	
-		fFirstPm = PMId;
-		//cout << "PMId is now " << PMId << endl;
-	}
+	if (allEqual && (PMId == 0))
+		startFromNextPM = true;
+	//cout << "selectFirstPM returns PMId:rc = " << PMId <<":"<<rc<<
+	//		" and startFromNextPM is set to " << startFromNextPM << endl;
+    return rc;
 }
 
 //------------------------------------------------------------------------------
@@ -384,7 +317,7 @@ void BatchLoader::buildBatchDistSeqVector()
 	BlIntVec aDbCntVec(fPMs.size());
 
 	std::map<int, OamCache::dbRoots>::iterator iter = fPmDbrootMap->begin();
-	for (uint32_t i=0; i < fPMs.size(); i++)
+	for (uint i=0; i < fPMs.size(); i++)
 	{
 		iter = fPmDbrootMap->find(fPMs[i]);
 		if ((iter != fPmDbrootMap->end()) && ((iter->second).begin()!=(iter->second).end()))
@@ -404,15 +337,15 @@ void BatchLoader::buildBatchDistSeqVector()
 	}
 
 	int aTotDbRoots = 0;
-	for (uint32_t i=0; i<aDbCntVec.size(); i++) aTotDbRoots+=aDbCntVec[i];
+	for (uint i=0; i<aDbCntVec.size(); i++) aTotDbRoots+=aDbCntVec[i];
 
 	int aIdx=0;
 	while(aIdx < aTotDbRoots)
 	{
-		uint32_t aMax=0;
-		uint32_t aPmId=0;
-		uint32_t aRefIdx=0;
-		for (uint32_t i=0; i<aDbCntVec.size(); i++)
+		uint aMax=0;
+		uint aPmId=0;
+		uint aRefIdx=0;
+		for (uint i=0; i<aDbCntVec.size(); i++)
 		{
 			if(aDbCntVec[i] > aMax)
 			{
@@ -438,7 +371,7 @@ void BatchLoader::buildBatchDistSeqVector()
  */
 
 //------------------------------------------------------------------------------
-void BatchLoader::buildBatchDistSeqVector(uint32_t StartPm)
+void BatchLoader::buildBatchDistSeqVector(uint StartPm)
 {
 	fPmDistSeq.clear();
 	BlIntVec aDbCntVec(fPMs.size());
@@ -447,7 +380,7 @@ void BatchLoader::buildBatchDistSeqVector(uint32_t StartPm)
 	if((fPMs.size()==0)&&(StartPm!=0))
 		throw runtime_error("ERROR : PM list empty while Start != 0");
 
-	//for (uint32_t i=0; i<fPMs.size(); i++)
+	//for (uint i=0; i<fPMs.size(); i++)
 	//	cout <<"fPM list  "<<i <<" = " << fPMs[i] << endl;
 	//cout << "StartPm = "<< StartPm << endl;
 
@@ -456,15 +389,15 @@ void BatchLoader::buildBatchDistSeqVector(uint32_t StartPm)
 	else
 	{
 		aPms.push_back(StartPm);
-		uint32_t aLast = fPMs.back();
-		uint32_t aFirst = fPMs.front();
+		uint aLast = fPMs.back();
+		uint aFirst = fPMs.front();
 		// Add all the PMs with index more than "StartPm"
-		for(uint32_t i=0; i<fPMs.size(); i++)
+		for(uint i=0; i<fPMs.size(); i++)
 		{
 			if((fPMs[i]>StartPm)&&(fPMs[i]<=aLast)) aPms.push_back(fPMs[i]);
 		}
 		// Add all the PMs with index less than "StartPm"
-		for(uint32_t i=0; i<fPMs.size(); i++)
+		for(uint i=0; i<fPMs.size(); i++)
 		{
 			if((fPMs[i]<StartPm)&&(fPMs[i]>=aFirst)) aPms.push_back(fPMs[i]);
 		}
@@ -472,7 +405,7 @@ void BatchLoader::buildBatchDistSeqVector(uint32_t StartPm)
 
 
 	std::map<int, OamCache::dbRoots>::iterator iter = fPmDbrootMap->begin();
-	for (uint32_t i=0; i < aPms.size(); i++)
+	for (uint i=0; i < aPms.size(); i++)
 	{
 		iter = fPmDbrootMap->find(aPms[i]);
 		if ((iter != fPmDbrootMap->end()) && ((iter->second).begin()!=(iter->second).end()))
@@ -485,17 +418,17 @@ void BatchLoader::buildBatchDistSeqVector(uint32_t StartPm)
 	}
 
 	int aTotDbRoots = 0;
-	for (uint32_t i=0; i<aDbCntVec.size(); i++) aTotDbRoots+=aDbCntVec[i];
+	for (uint i=0; i<aDbCntVec.size(); i++) aTotDbRoots+=aDbCntVec[i];
 
 	//cout << "DbCntVec Size = " << aDbCntVec.size() << " TotDbRoots = "<<aTotDbRoots << endl;
 
 	int aIdx=0;
 	while(aIdx < aTotDbRoots)
 	{
-		uint32_t aMax=0;
-		uint32_t aPmId=0;
-		uint32_t aRefIdx=0;
-		for (uint32_t i=0; i<aDbCntVec.size(); i++)
+		uint aMax=0;
+		uint aPmId=0;
+		uint aRefIdx=0;
+		for (uint i=0; i<aDbCntVec.size(); i++)
 		{
 			if(aDbCntVec[i] > aMax)
 			{
@@ -513,23 +446,27 @@ void BatchLoader::buildBatchDistSeqVector(uint32_t StartPm)
 	}
 
 	//cout <<"PM Distribution vector size "<< fPmDistSeq.size() << endl;
-	//for (uint32_t i=0; i<fPmDistSeq.size(); i++)
+	//for (uint i=0; i<fPmDistSeq.size(); i++)
 	//	cout <<"PM Distribution vector "<<i <<" = " << fPmDistSeq[i] << endl;
 
 }
 
 //------------------------------------------------------------------------------
+/*
+ *  Return the sequence distribution vector.
+ */
 
-uint32_t BatchLoader::selectNextPM()
+std::vector<uint> BatchLoader::getBatchDistributionVector()
 {
-	if(0 == fPmDistSeq.size()) //Dist sequence not ready. First time the function is called
-	{
-		uint32_t PMId = 0;
-		//cout << "selectNextPM: size is 0. " << endl;
-		selectFirstPM(PMId);
-		return 	PMId;
-	}
-	
+	if(0==fPmDistSeq.size()) this->buildBatchDistSeqVector();
+	return fPmDistSeq;
+}
+
+//------------------------------------------------------------------------------
+
+uint BatchLoader::selectNextPM()
+{
+	if(0 == fPmDistSeq.size()) return 0;	//Dist sequence not ready.
 	if(fNextIdx >= fPmDistSeq.size()) fNextIdx=0;	//reset it
 	return fPmDistSeq[fNextIdx++];
 }

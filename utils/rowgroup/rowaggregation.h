@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: rowaggregation.h 4017 2013-07-26 16:20:29Z pleblanc $
+//  $Id: rowaggregation.h 3449 2012-12-10 21:08:06Z xlou $
 
 
 #ifndef ROWAGGREGATION_H
@@ -34,10 +34,8 @@
 #include <vector>
 #ifdef _MSC_VER
 #include <unordered_map>
-#include <unordered_set>
 #else
 #include <tr1/unordered_map>
-#include <tr1/unordered_set>
 #endif
 #include <boost/shared_ptr.hpp>
 #include <boost/shared_array.hpp>
@@ -59,15 +57,8 @@ class ResourceManager;
 namespace rowgroup
 {
 
-
-struct RowPosition
-{
-	uint64_t group:48;
-	uint64_t row:16;
-	static const uint64_t MSB = 0x800000000000ULL;   //48th bit is set
-	inline RowPosition(uint64_t g, uint64_t r) : group(g), row(r) { }
-	inline RowPosition() { }
-};
+typedef std::tr1::unordered_map<uint8_t*, uint8_t*, utils::TupleHasher, utils::TupleComparator,
+            utils::STLPoolAllocator<std::pair<uint8_t* const, uint8_t*> > > RowAggMap_t;
 
 /** @brief Enumerates aggregate functions supported by RowAggregation
  */
@@ -191,7 +182,8 @@ inline messageqcpp::ByteStream& operator<<(messageqcpp::ByteStream& b, RowAggFun
 inline messageqcpp::ByteStream& operator>>(messageqcpp::ByteStream& b, RowAggFunctionCol& o)
 { return (b >> (uint8_t&)o.fAggFunction >> o.fInputColumnIndex >> o.fOutputColumnIndex); }
 
-
+typedef boost::shared_ptr<RowAggGroupByCol>  SP_ROWAGG_GRPBY_t;
+typedef boost::shared_ptr<RowAggFunctionCol> SP_ROWAGG_FUNC_t;
 
 struct ConstantAggData
 {
@@ -207,102 +199,14 @@ struct ConstantAggData
 	{}
 };
 
-typedef boost::shared_ptr<RowAggGroupByCol>  SP_ROWAGG_GRPBY_t;
-typedef boost::shared_ptr<RowAggFunctionCol> SP_ROWAGG_FUNC_t;
-
-class RowAggregation;
-
-class AggHasher
-{
-public:
-	AggHasher(const Row &row, Row **tRow, uint32_t keyCount, RowAggregation *ra);
-	inline uint64_t operator()(const RowPosition &p) const;
-
-private:
-	explicit AggHasher();
-	RowAggregation *agg;
-	Row **tmpRow;
-	mutable Row r;
-	uint32_t lastKeyCol;
-};
-
-class AggComparator
-{
-public:
-	AggComparator(const Row &row, Row **tRow, uint32_t keyCount, RowAggregation *ra);
-	inline bool operator()(const RowPosition &, const RowPosition &) const;
-
-private:
-	explicit AggComparator();
-	RowAggregation *agg;
-	Row **tmpRow;
-	mutable Row r1, r2;
-	uint32_t lastKeyCol;
-};
-
-class KeyStorage
-{
-public:
-	KeyStorage(const RowGroup &keyRG, Row **tRow);
-
-	inline RowPosition addKey();
-	inline uint64_t getMemUsage();
-
-private:
-	Row row;
-	Row **tmpRow;
-	RowGroup rg;
-	std::vector<RGData> storage;
-	uint64_t memUsage;
-
-	friend class ExternalKeyEq;
-	friend class ExternalKeyHasher;
-};
-
-class ExternalKeyHasher
-{
-public:
-	ExternalKeyHasher(const RowGroup &keyRG, KeyStorage *ks, uint32_t keyColCount, Row **tRow);
-	inline uint64_t operator()(const RowPosition &pos) const;
-
-private:
-	mutable Row row;
-	mutable Row **tmpRow;
-	uint32_t lastKeyCol;
-	KeyStorage *ks;
-};
-
-class ExternalKeyEq
-{
-public:
-	ExternalKeyEq(const RowGroup &keyRG, KeyStorage *ks, uint32_t keyColCount, Row **tRow);
-	inline bool operator()(const RowPosition &pos1, const RowPosition &pos2) const;
-
-private:
-	mutable Row row1, row2;
-	mutable Row **tmpRow;
-	uint32_t lastKeyCol;
-	KeyStorage *ks;
-};
-
-typedef std::tr1::unordered_set<RowPosition, AggHasher, AggComparator, utils::STLPoolAllocator<RowPosition> >
-	RowAggMap_t;
-
-#if defined(__GNUC__) && (__GNUC__ == 4 && __GNUC_MINOR__ < 5)
-typedef std::tr1::unordered_map<RowPosition, RowPosition, ExternalKeyHasher, ExternalKeyEq,
-	utils::STLPoolAllocator<std::pair<const RowPosition, RowPosition> > > ExtKeyMap_t;
-#else
-typedef std::tr1::unordered_map<RowPosition, RowPosition, ExternalKeyHasher, ExternalKeyEq,
-	utils::STLPoolAllocator<std::pair<RowPosition, RowPosition> > > ExtKeyMap_t;
-#endif
 
 struct GroupConcat
 {
 	// GROUP_CONCAT(DISTINCT col1, 'const', col2 ORDER BY col3 desc SEPARATOR 'sep')
-	std::vector<std::pair<uint32_t, uint32_t> > fGroupCols;    // columns to concatenate, and position
-	std::vector<std::pair<uint32_t, bool> > fOrderCols;    // columns to order by [asc/desc]
+	std::vector<std::pair<uint, uint> > fGroupCols;    // columns to concatenate, and position
+	std::vector<std::pair<uint, bool> > fOrderCols;    // columns to order by [asc/desc]
 	std::string                         fSeparator;
-	std::vector<std::pair<std::string, uint32_t> >  fConstCols; // constant columns in group
+	std::vector<std::pair<std::string, uint> >  fConstCols; // constant columns in group
 	bool                                fDistinct;
 	uint64_t                            fSize;
 
@@ -310,7 +214,6 @@ struct GroupConcat
 	boost::shared_array<int>            fMapping;
 	std::vector<std::pair<int, bool> >  fOrderCond;    // position to order by [asc/desc]
 	joblist::ResourceManager*           fRm;           // resource manager
-	boost::shared_ptr<int64_t>			fSessionMemLimit;
 
 	GroupConcat() : fRm(NULL) {}
 };
@@ -329,16 +232,12 @@ public:
 	virtual void merge(const rowgroup::Row&, uint64_t) {};
 
 	void getResult(uint8_t*) {};
-	uint8_t *getResult() { return NULL; }
 
 protected:
 	rowgroup::SP_GroupConcat              fGroupConcat;
 };
 
 typedef boost::shared_ptr<GroupConcatAg>  SP_GroupConcatAg;
-
-
-
 
 
 //------------------------------------------------------------------------------
@@ -377,7 +276,7 @@ class RowAggregation : public messageqcpp::Serializeable
 
 		/** @brief reset RowAggregation outputRowGroup and hashMap
 		 */
-		virtual void reset();
+		void reset();
 
 		/** @brief Define content of data to be aggregated and its aggregated output.
 		 *
@@ -420,7 +319,19 @@ class RowAggregation : public messageqcpp::Serializeable
 		 * @parm pRowGroupIn(in) RowGroup to be added to aggregation.
 		 */
 		virtual void addRowGroup(const RowGroup* pRowGroupIn);
-		virtual void addRowGroup(const RowGroup* pRowGroupIn, std::vector<Row::Pointer>& inRows);
+		virtual void addRowGroup(const RowGroup* pRowGroupIn, std::vector<uint8_t*>& inRows);
+
+		/** @brief Apply the hashjoin result and perform aggregation.
+		 *
+		 * This function avoids the creation of the hashjoin results set.
+		 * Called on PM after the joiner has built the match table.
+		 *
+		 * @parm pRowGroupProj(in)  Partially filled project RowGroup.
+		 * @parm matches(in)        Hashjoin matched entries
+		 */
+// 		void addHashJoinRowGroup(const RowGroup &pRowGroupLarge,
+// 			const boost::shared_array<std::vector<std::vector<uint32_t> > >& matches,
+// 			const boost::shared_array<boost::shared_array<uint8_t> > &rowData);
 
 		/** @brief Serialize RowAggregation object into a ByteStream.
 		 *
@@ -454,14 +365,16 @@ class RowAggregation : public messageqcpp::Serializeable
 		const RowGroup* getOutputRowGroup() const { return fRowGroupOut; }
 		RowGroup* getOutputRowGroup() { return fRowGroupOut; }
 
+		uint32_t aggMapKeyLength() { return fAggMapKeyLength; }
 		RowAggMap_t* mapPtr() {return fAggMapPtr;}
-		std::vector<RGData *>& resultDataVec() { return fResultDataVec; }
+		std::vector<uint8_t*>& resultDataVec() { return fResultDataVec; }
 
-		virtual void aggregateRow(Row& row);
-		inline uint32_t aggMapKeyLength() { return fAggMapKeyCount; }
+		void aggregateRow(Row& row);
 
 	protected:
 		virtual void initialize();
+		virtual void calculateMapKeyLength();
+		virtual uint8_t* makeMapKey(const uint8_t* key) { return (fRow.getData() + 2); }
 		virtual void initMapData(const Row& row);
 		virtual void attachGroupConcatAg();
 
@@ -478,7 +391,8 @@ class RowAggregation : public messageqcpp::Serializeable
 
 		inline bool isNull(const RowGroup* pRowGroup, const Row& row, int64_t col);
 		inline void makeAggFieldsNull(Row& row);
-		inline void copyNullRow(Row& row) {	copyRow(fNullRow, &row); }
+		inline void copyNullRow(Row& row)
+			{ memcpy(row.getData(), fNullRowData.get(), row.getSize()); }
 
 		inline void updateIntMinMax(int64_t val1, int64_t val2, int64_t col, int func);
 		inline void updateUintMinMax(uint64_t val1, uint64_t val2, int64_t col, int func);
@@ -487,54 +401,46 @@ class RowAggregation : public messageqcpp::Serializeable
 		inline void updateFloatMinMax(float val1, float val2, int64_t col, int func);
 		inline void updateStringMinMax(std::string val1, std::string val2, int64_t col, int func);
 		inline void updateIntSum(int64_t val1, int64_t val2, int64_t col);
-        inline void updateUintSum(uint64_t val1, uint64_t val2, int64_t col);
 		inline void updateDoubleSum(double val1, double val2, int64_t col);
 		inline void updateFloatSum(float val1, float val2, int64_t col);
 
 		std::vector<SP_ROWAGG_GRPBY_t>                  fGroupByCols;
 		std::vector<SP_ROWAGG_FUNC_t>                   fFunctionCols;
 		RowAggMap_t*                                    fAggMapPtr;
-		uint32_t                                        fAggMapKeyCount;   // the number of columns that make up the key
+		uint32_t                                        fAggMapKeyLength;
 		RowGroup                                        fRowGroupIn;
 		RowGroup*                                       fRowGroupOut;
 
 		Row                                             fRow;
-		Row                                             fNullRow;
-		Row 											*tmpRow;   // used by the hashers & eq functors
 		boost::scoped_array<uint8_t>                    fNullRowData;
-		std::vector<RGData *>                           fResultDataVec;
+		std::vector<uint8_t*>                           fResultDataVec;
 
 		uint64_t                                        fTotalRowCount;
 		uint64_t                                        fMaxTotalRowCount;
 		uint64_t                                        fMaxMemory;
 
-		RGData *                                        fPrimaryRowData;
+		uint8_t*                                        fPrimaryRowData;
 
-		std::vector<boost::shared_ptr<RGData> >         fSecondaryRowDataVec;
+		boost::shared_array<uint8_t>                    fSecondaryRowData;
+		std::vector<boost::shared_array<uint8_t> >      fSecondaryRowDataVec;
 
 		// for support PM aggregation after PM hashjoin
 		std::vector<RowGroup>*                          fSmallSideRGs;
 		RowGroup*                                       fLargeSideRG;
 		boost::shared_array<boost::shared_array<int> >  fSmallMappings;
 		boost::shared_array<int>                        fLargeMapping;
-		uint32_t                                            fSmallSideCount;
+		uint                                            fSmallSideCount;
 		boost::scoped_array<Row> rowSmalls;
 
 		// for hashmap
-		boost::shared_ptr<utils::STLPoolAllocator<RowPosition> > fAlloc;
+		boost::shared_ptr<utils::STLPoolAllocator<std::pair<uint8_t* const, uint8_t*> > > fAlloc;
+		// for keys in the map if they are allocated seperately
+		boost::shared_ptr<utils::STLPoolAllocator<uint8_t> > fKeyAlloc;
 
 		// for 8k poc
 		RowGroup                                        fEmptyRowGroup;
-		RGData                                          fEmptyRowData;
+		boost::scoped_array<uint8_t>                    fEmptyRowData;
 		Row                                             fEmptyRow;
-
-		boost::scoped_ptr<AggHasher> fHasher;
-		boost::scoped_ptr<AggComparator> fEq;
-
-		//TODO: try to get rid of these friend decl's.  AggHasher & Comparator
-		//need access to rowgroup storage holding the rows to hash & ==.
-		friend class AggHasher;
-		friend class AggComparator;
 };
 
 
@@ -552,8 +458,7 @@ class RowAggregationUM : public RowAggregation
 		RowAggregationUM(
 			const std::vector<SP_ROWAGG_GRPBY_t>& rowAggGroupByCols,
 			const std::vector<SP_ROWAGG_FUNC_t>&  rowAggFunctionCols,
-			joblist::ResourceManager *,
-			boost::shared_ptr<int64_t> sessionMemLimit);
+			joblist::ResourceManager *);
 		RowAggregationUM(const RowAggregationUM& rhs);
 
 		/** @brief RowAggregationUM default destructor
@@ -600,17 +505,10 @@ class RowAggregationUM : public RowAggregation
 		void groupConcat(const std::vector<SP_GroupConcat>& v) { fGroupConcat = v; }
 		const std::vector<SP_GroupConcat>& groupConcat() const { return fGroupConcat; }
 
-		void aggregateRow(Row &);
-		//void initialize();
-		virtual void reset();
-
-		void setInputOutput(const RowGroup& pRowGroupIn, RowGroup* pRowGroupOut);
-
 	protected:
 		// virtual methods from base
 		void initialize();
-		void aggregateRowWithRemap(Row &);
-
+		uint8_t* makeMapKey(const uint8_t* key);
 		void attachGroupConcatAg();
 		void updateEntry(const Row& row);
 		bool countSpecial(const RowGroup* pRG)
@@ -666,18 +564,9 @@ class RowAggregationUM : public RowAggregation
 		std::vector<SP_GroupConcatAg>     fGroupConcatAg;
 		std::vector<SP_ROWAGG_FUNC_t>     fFunctionColGc;
 
-		// for when the group by & distinct keys are not stored in the output rows
-		rowgroup::RowGroup fKeyRG;
-		boost::scoped_ptr<ExternalKeyEq> fExtEq;
-		boost::scoped_ptr<ExternalKeyHasher> fExtHash;
-		boost::scoped_ptr<KeyStorage> fKeyStore;
-		boost::scoped_ptr<utils::STLPoolAllocator<std::pair<RowPosition, RowPosition> > > fExtKeyMapAlloc;
-		boost::scoped_ptr<ExtKeyMap_t> fExtKeyMap;
 
-		boost::shared_ptr<int64_t> fSessionMemLimit;
 	private:
 		uint64_t fLastMemUsage;
-		uint32_t fNextRGIndex;
 };
 
 
@@ -699,8 +588,7 @@ class RowAggregationUMP2 : public RowAggregationUM
 		RowAggregationUMP2(
 			const std::vector<SP_ROWAGG_GRPBY_t>& rowAggGroupByCols,
 			const std::vector<SP_ROWAGG_FUNC_t>&  rowAggFunctionCols,
-			joblist::ResourceManager *,
-			boost::shared_ptr<int64_t> sessionMemLimit);
+			joblist::ResourceManager *);
 		RowAggregationUMP2(const RowAggregationUMP2& rhs);
 
 		/** @brief RowAggregationUMP2 default destructor
@@ -734,8 +622,7 @@ class RowAggregationDistinct : public RowAggregationUMP2
 		RowAggregationDistinct(
 			const std::vector<SP_ROWAGG_GRPBY_t>& rowAggGroupByCols,
 			const std::vector<SP_ROWAGG_FUNC_t>&  rowAggFunctionCols,
-			joblist::ResourceManager *,
-			boost::shared_ptr<int64_t> sessionMemLimit);
+			joblist::ResourceManager *);
 
 		/** @brief Copy Constructor for multi-threaded aggregation
 		 */
@@ -752,9 +639,9 @@ class RowAggregationDistinct : public RowAggregationUMP2
 		void setInputOutput(const RowGroup& pRowGroupIn, RowGroup* pRowGroupOut);
 
 		virtual void doDistinctAggregation();
-		virtual void doDistinctAggregation_rowVec(std::vector<Row::Pointer>& inRows);
+		virtual void doDistinctAggregation_rowVec(std::vector<uint8_t*>& inRows);
 		void addRowGroup(const RowGroup* pRowGroupIn);
-		void addRowGroup(const RowGroup* pRowGroupIn, std::vector<Row::Pointer>& inRows);
+		void addRowGroup(const RowGroup* pRowGroupIn, std::vector<uint8_t*>& inRows);
 
 		// multi-threade debug
 		boost::shared_ptr<RowAggregation>& aggregator() { return fAggregator; }
@@ -769,7 +656,7 @@ class RowAggregationDistinct : public RowAggregationUMP2
 
 		boost::shared_ptr<RowAggregation>   fAggregator;
 		RowGroup                            fRowGroupDist;
-		RGData                              fDataForDist;
+		boost::scoped_array<uint8_t>        fDataForDist;
 };
 
 
@@ -787,8 +674,7 @@ class RowAggregationSubDistinct : public RowAggregationUM
 		RowAggregationSubDistinct(
 			const std::vector<SP_ROWAGG_GRPBY_t>& rowAggGroupByCols,
 			const std::vector<SP_ROWAGG_FUNC_t>&  rowAggFunctionCols,
-			joblist::ResourceManager *,
-			boost::shared_ptr<int64_t> sessionMemLimit);
+			joblist::ResourceManager *);
 		RowAggregationSubDistinct(const RowAggregationSubDistinct& rhs);
 
 		/** @brief RowAggregationSubDistinct default destructor
@@ -802,7 +688,7 @@ class RowAggregationSubDistinct : public RowAggregationUM
 			return new RowAggregationSubDistinct (*this);
 		}
 
-		void addRowGroup(const RowGroup* pRowGroupIn, std::vector<Row::Pointer>& inRow);
+		void addRowGroup(const RowGroup* pRowGroupIn, std::vector<uint8_t*>& inRow);
 
 	protected:
 		// virtual methods from RowAggregationUM
@@ -828,8 +714,7 @@ class RowAggregationMultiDistinct : public RowAggregationDistinct
 		RowAggregationMultiDistinct(
 			const std::vector<SP_ROWAGG_GRPBY_t>& rowAggGroupByCols,
 			const std::vector<SP_ROWAGG_FUNC_t>&  rowAggFunctionCols,
-			joblist::ResourceManager *,
-			boost::shared_ptr<int64_t> sessionMemLimit);
+			joblist::ResourceManager *);
 		RowAggregationMultiDistinct(const RowAggregationMultiDistinct& rhs);
 
 		/** @brief RowAggregationMultiDistinct default destructor
@@ -846,14 +731,14 @@ class RowAggregationMultiDistinct : public RowAggregationDistinct
 		void addRowGroup(const RowGroup* pRowGroupIn);
 
 		virtual void doDistinctAggregation();
-		virtual void doDistinctAggregation_rowVec(std::vector<std::vector<Row::Pointer> >& inRows);
+		virtual void doDistinctAggregation_rowVec(std::vector<std::vector<uint8_t*> >& inRows);
 
 		inline virtual RowAggregationMultiDistinct* clone() const
 		{
 			return new RowAggregationMultiDistinct (*this);
 		}
 
-		void addRowGroup(const RowGroup* pRowGroupIn, std::vector<std::vector<Row::Pointer> >& inRows);
+		void addRowGroup(const RowGroup* pRowGroupIn, std::vector<std::vector<uint8_t*> >& inRows);
 
 		std::vector<boost::shared_ptr<RowAggregationUM> >& subAggregators()
 		{
@@ -869,7 +754,7 @@ class RowAggregationMultiDistinct : public RowAggregationDistinct
 		// virtual methods from base
 		std::vector<boost::shared_ptr<RowAggregationUM> > fSubAggregators;
 		std::vector<RowGroup>                             fSubRowGroups;
-		std::vector<boost::shared_ptr<RGData> >           fSubRowData;
+		std::vector<boost::shared_array<uint8_t> >        fSubRowData;
 		std::vector<std::vector<SP_ROWAGG_FUNC_t> >       fSubFunctions;
 };
 
@@ -879,8 +764,6 @@ typedef boost::shared_ptr<RowAggregation>           SP_ROWAGG_t;
 typedef boost::shared_ptr<RowAggregation>           SP_ROWAGG_PM_t;
 typedef boost::shared_ptr<RowAggregationUM>         SP_ROWAGG_UM_t;
 typedef boost::shared_ptr<RowAggregationDistinct>   SP_ROWAGG_DIST;
-
-
 
 } // end of rowgroup namespace
 

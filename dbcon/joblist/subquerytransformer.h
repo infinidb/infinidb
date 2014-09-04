@@ -50,25 +50,16 @@ class SubQueryTransformer
 public:
     /** @brief SubQueryTransformer constructor
      *  @param jobInfo
-     *  @param errorInfo
+     *  @param status
      */
     SubQueryTransformer(JobInfo*, SErrorInfo&);
 
     /** @brief SubQueryTransformer constructor
      *  @param jobInfo
-     *  @param errorInfo
-     *  @param view
+     *  @param status
+     *  @param alias
      */
     SubQueryTransformer(JobInfo*, SErrorInfo&, const std::string&);
-
-    /** @brief SubQueryTransformer constructor
-     *  @param jobInfo
-     *  @param errorInfo
-     *  @param alias
-     *  @param view
-     */
-    SubQueryTransformer(
-		JobInfo*, SErrorInfo&, const std::string&, const std::string&);
 
     /** @brief SubQueryTransformer destructor
      */
@@ -104,7 +95,7 @@ public:
     /** @brief virtual error info pointer
      *  @returns SErrorInfo&
      */
-    virtual SErrorInfo& errorInfo() const { return fErrorInfo; }
+    virtual SErrorInfo& status() const { return fStatus; }
 
     /** @brief virtual joblist
      *  @returns STJLP&
@@ -137,7 +128,7 @@ protected:
 
     JobInfo*      fOutJobInfo;
     JobInfo*      fSubJobInfo;
-    SErrorInfo&   fErrorInfo;
+    SErrorInfo&   fStatus;
     JobStepVector fCorrelatedSteps;
 	RetColsVector fSubReturnedCols;
 	STJLP         fSubJobList;
@@ -157,10 +148,10 @@ class SimpleScalarTransformer : public SubQueryTransformer
 public:
     /** @brief SimpleScalarTransformer constructor
      *  @param jobInfo
-     *  @param errorInfo for error info
+     *  @param status for error status
      *  @param existFilter indicate if exist filter
      */
-    SimpleScalarTransformer(JobInfo* jobInfo, SErrorInfo& errInfo, bool existFilter);
+    SimpleScalarTransformer(JobInfo* jobInfo, SErrorInfo& status, bool existFilter);
 
     /** @brief SimpleScalarTransformer constructor
      *  @param SubQueryTransformer

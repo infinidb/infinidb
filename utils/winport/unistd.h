@@ -26,18 +26,15 @@
 #include <winsock2.h>
 #include <inaddr.h>
 #include <stdint.h>
-#include <time.h>
-#include "inttypes.h"
+
 #ifdef __cplusplus
-#include <string>
 extern "C" {
 #endif
 
 extern unsigned long long strtoull(const char*, char**, int);
 extern long long atoll(const char*);
-#if _MSC_VER < 1600
+extern long long llabs(const long long);
 extern lldiv_t lldiv(const long long, const long long);
-#endif
 extern unsigned int sleep(unsigned int);
 
 #define strerror_r(e, b, l) strerror_s((b), (l), (e))
@@ -94,8 +91,8 @@ extern int gettimeofday(struct timeval*, struct timezone*);
 #ifndef _my_pthread_h
 #define localtime_r idb_localtime_r
 extern struct tm* idb_localtime_r(const time_t*, struct tm*);
-#define strtoll _strtoi64
-#define strtoull _strtoui64
+#define strtoll idb_strtoll
+extern long long idb_strtoll(const char*, char**, int);
 #define crc32 idb_crc32
 extern unsigned int idb_crc32(const unsigned int, const unsigned char*, const size_t);
 #endif
@@ -104,6 +101,14 @@ extern unsigned int idb_crc32(const unsigned int, const unsigned char*, const si
 #define CLOCK_MONOTONIC 2
 extern long clock_gettime(clockid_t, struct timespec*);
 
+#define LOG_CONS 1
+#define LOG_PID 2
+#define LOG_DEBUG 3
+#define LOG_INFO 4
+#define LOG_WARNING 5
+#define LOG_ERR 6
+#define LOG_CRIT 7
+#define LOG_LOCAL2 8
 extern int syslog(int, const char*, ...);
 #ifdef __cplusplus
 extern int closelog(...);
@@ -123,8 +128,6 @@ extern pid_t waitpid(pid_t, int*, int);
 
 #define WIFEXITED(x) 0
 #define WEXITSTATUS(x) 0
-#define WIFSIGNALED(x) 0
-#define WTERMSIG(x) 0
 
 #define WNOHANG 0x01
 #define WUNTRACED 0x02
@@ -143,8 +146,6 @@ extern char* optarg;
 extern int optind;
 extern int opterr;
 extern int optopt;
-
-extern std::string IDBSysErrorStr(DWORD err);
 
 #endif
 

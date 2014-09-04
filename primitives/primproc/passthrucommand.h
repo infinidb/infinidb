@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: passthrucommand.h 2035 2013-01-21 14:12:19Z rdempsey $
+// $Id: passthrucommand.h 1855 2012-04-04 18:20:09Z rdempsey $
 // C++ Interface: passthrucommand
 //
 // Description: 
@@ -45,7 +45,7 @@ class PassThruCommand : public Command
 		void prep(int8_t outputType, bool makeAbsRids);
 		void execute();
 		void project();
-		void projectIntoRowGroup(rowgroup::RowGroup &rg, uint32_t col);
+		void projectIntoRowGroup(rowgroup::RowGroup &rg, uint col);
 		uint64_t getLBID();
 		void nextLBID();
 		void createCommand(messageqcpp::ByteStream &);
@@ -62,7 +62,7 @@ class PassThruCommand : public Command
 
 		/* Minor optimization for projectIntoRowGroup() */
 		rowgroup::Row r;
-		uint32_t rowSize;
+		uint rowSize;
 };
 
 }

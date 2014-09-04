@@ -71,7 +71,7 @@ public:
    /**
     * @brief Map an FBO to LBID
      */
-   const uint64_t  mapLBID( CommBlock &cb, const uint64_t fbo, int &rc );
+   const i64      mapLBID( CommBlock &cb, const i64 fbo, int &rc );
    
    /**
     * extendFreespace - ran out of space in one of the chains? 

@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-// $Id: writeengine.cpp 4737 2013-08-14 20:45:46Z bwilkinson $
+// $Id: writeengine.cpp 4669 2013-06-07 14:58:06Z dcathey $
 
 /** @writeengine.cpp
  *   A wrapper class for the write engine to write information to files
@@ -24,7 +24,6 @@
 #include <cstdlib>
 #include <unistd.h>
 #include <boost/scoped_array.hpp>
-#include <boost/scoped_ptr.hpp>
 using namespace std;
 
 #include "joblisttypes.h"
@@ -53,10 +52,6 @@ using namespace cacheutils;
 using namespace logging;
 using namespace BRM;
 using namespace execplan;
-#include "IDBDataFile.h"
-#include "IDBPolicy.h"
-#include "MonitorProcMem.h"
-using namespace idbdatafile;
 
 #ifdef _MSC_VER
 #define isnan _isnan
@@ -102,40 +97,8 @@ WriteEngineWrapper::~WriteEngineWrapper()
 */
 /* static */ void WriteEngineWrapper::init(unsigned subSystemID)
 {
-    SimpleSysLog::instance()->setLoggingID(logging::LoggingID(subSystemID));
-    Config::initConfigCache(); 
-    BRMWrapper::getInstance();
-
-    // Bug 5415 Add HDFS MemBuffer vs. FileBuffer decision logic.
-    config::Config* cf = config::Config::makeConfig();
-    //--------------------------------------------------------------------------
-    // Memory overload protection. This setting will cause the process to die should 
-    // it, by itself, consume maxPct of total memory. Monitored in MonitorProcMem.
-    // Only used at the express direction of Field Support.
-    //--------------------------------------------------------------------------
-    int maxPct = 0; //disable by default
-    string strMaxPct = cf->getConfig("WriteEngine", "MaxPct");
-    if ( strMaxPct.length() != 0 )
-        maxPct = cf->uFromText(strMaxPct);
-
-    //--------------------------------------------------------------------------
-    // MemoryCheckPercent. This controls at what percent of total memory be consumed
-    // by all processes before we switch from HdfsRdwrMemBuffer to HdfsRdwrFileBuffer.
-    // This is only used in Hdfs installations.
-    //--------------------------------------------------------------------------
-    int checkPct = 95;
-    string strCheckPct = cf->getConfig("SystemConfig", "MemoryCheckPercent");
-    if ( strCheckPct.length() != 0 )
-        checkPct = cf->uFromText(strCheckPct);
-
-    //--------------------------------------------------------------------------
-    // If we're either HDFS, or maxPct is turned on, start the monitor thread.
-    // Otherwise, we don't need it, so don't waste the resources.
-    //--------------------------------------------------------------------------
-    if (maxPct > 0 || IDBPolicy::useHdfs())
-    {
-        new boost::thread(utils::MonitorProcMem(maxPct, checkPct, subSystemID));
-    }
+   SimpleSysLog::instance()->setLoggingID(logging::LoggingID(subSystemID));
+   Config::initConfigCache(); 
 }
 
 /*@brief checkValid --Check input parameters are valid
@@ -223,24 +186,15 @@ void WriteEngineWrapper::convertValue(const ColType colType, void* value, boost:
    {
       case WriteEngine::WR_INT :    if (data.type() == typeid(int))
                                     {
-                                       int val = boost::any_cast<int>(data); 
-                                       size = sizeof(int);
+                                       int val = boost::any_cast<int>(data); size = sizeof(int);
                                        memcpy(value, &val, size);
                                     }
                                     else
                                     {
-                                       uint32_t val = boost::any_cast<uint32_t>(data); 
-                                       size = sizeof(uint32_t);
+                                       i32 val = boost::any_cast<i32>(data); size = sizeof(i32);
                                        memcpy(value, &val, size);
                                     }
                                     break;
-      case WriteEngine::WR_UINT :   {
-                                       uint32_t val = boost::any_cast<uint32_t>(data); 
-                                       size = sizeof(uint32_t);
-                                       memcpy(value, &val, size);
-                                    }
-                                    break;
-
       case WriteEngine::WR_VARBINARY : // treat same as char for now
       case WriteEngine::WR_CHAR :
       case WriteEngine::WR_BLOB :
@@ -250,7 +204,7 @@ void WriteEngineWrapper::convertValue(const ColType colType, void* value, boost:
                                        memcpy(value, curStr.c_str(), curStr.length());
                                     break;
 
-      case WriteEngine::WR_FLOAT:  {
+      case WriteEngine::WR_FLOAT:   {
                                        float val = boost::any_cast<float>(data);
 //N.B.There is a bug in boost::any or in gcc where, if you store a nan, you will get back a nan,
 // but not necessarily the same bits that you put in. This only seems to be for float (double seems
@@ -280,23 +234,9 @@ void WriteEngineWrapper::convertValue(const ColType colType, void* value, boost:
                                     }
                                     break;
 
-      case WriteEngine::WR_USHORT:  {
-                                       uint16_t val = boost::any_cast<uint16_t>(data);
-                                       size = sizeof(uint16_t);
-                                       memcpy(value, &val, size);
-                                    }
-                                    break;
-
       case WriteEngine::WR_BYTE:    {
                                        char val = boost::any_cast<char>(data);
                                        size = sizeof(char);
-                                       memcpy(value, &val, size);
-                                    }
-                                    break;
-
-      case WriteEngine::WR_UBYTE:   {
-                                       uint8_t val = boost::any_cast<uint8_t>(data);
-                                       size = sizeof(uint8_t);
                                        memcpy(value, &val, size);
                                     }
                                     break;
@@ -310,16 +250,8 @@ void WriteEngineWrapper::convertValue(const ColType colType, void* value, boost:
                                     }
                                     else
                                     {
-                                       uint64_t val = boost::any_cast<uint64_t>(data);
-                                       size = sizeof(uint64_t);
-                                       memcpy(value, &val, size);
-                                    }
-                                    break;
-
-      case WriteEngine::WR_ULONGLONG:
-                                    {
-                                       uint64_t val = boost::any_cast<uint64_t>(data);
-                                       size = sizeof(uint64_t);
+                                       i64 val = boost::any_cast<i64>(data);
+                                       size = sizeof(i64);
                                        memcpy(value, &val, size);
                                     }
                                     break;
@@ -357,13 +289,12 @@ void WriteEngineWrapper::convertValue(const ColType colType, void* valArray, con
                                        else if (data.type() == typeid(int))
                                           ((int*)valArray)[pos] = boost::any_cast<int>(data);
                                        else
-                                          ((int*)valArray)[pos] = boost::any_cast<uint32_t>(data);
-                                       break;
-         case WriteEngine::WR_UINT :   ((uint32_t*)valArray)[pos] = boost::any_cast<uint32_t>(data);
+                                          ((int*)valArray)[pos] = boost::any_cast<i32>(data);
                                        break;
          case WriteEngine::WR_VARBINARY : // treat same as char for now
          case WriteEngine::WR_CHAR :
-         case WriteEngine::WR_BLOB :   curStr = boost::any_cast<string>(data);
+         case WriteEngine::WR_BLOB :
+                                       curStr = boost::any_cast<string>(data);
                                        if ((int) curStr.length() > MAX_COLUMN_BOUNDARY)
                                           curStr = curStr.substr(0, MAX_COLUMN_BOUNDARY);
                                        memcpy((char*)valArray + pos * MAX_COLUMN_BOUNDARY, curStr.c_str(), curStr.length());
@@ -371,7 +302,7 @@ void WriteEngineWrapper::convertValue(const ColType colType, void* valArray, con
 
 //            case WriteEngine::WR_LONG :   ((long*)valArray)[pos] = boost::any_cast<long>(curTuple.data);
 //                                          break;
-         case WriteEngine::WR_FLOAT:    ((float*)valArray)[pos] = boost::any_cast<float>(data);
+         case WriteEngine::WR_FLOAT:   ((float*)valArray)[pos] = boost::any_cast<float>(data);
                                            if (isnan(((float*)valArray)[pos]))
                                            {
                                               uint32_t ti = joblist::FLOATNULL;
@@ -383,24 +314,17 @@ void WriteEngineWrapper::convertValue(const ColType colType, void* valArray, con
                                        break;
          case WriteEngine::WR_SHORT:   ((short*)valArray)[pos] = boost::any_cast<short>(data);
                                        break;
-         case WriteEngine::WR_USHORT:  ((uint16_t*)valArray)[pos] = boost::any_cast<uint16_t>(data);
-                                       break;
 //            case WriteEngine::WR_BIT:     ((bool*)valArray)[pos] = boost::any_cast<bool>(data);
 //                                          break;
          case WriteEngine::WR_BYTE:    ((char*)valArray)[pos] = boost::any_cast<char>(data);
-                                       break;
-         case WriteEngine::WR_UBYTE:   ((uint8_t*)valArray)[pos] = boost::any_cast<uint8_t>(data);
                                        break;
          case WriteEngine::WR_LONGLONG:
                                        if (data.type() == typeid(long long))
                                           ((long long*)valArray)[pos] = boost::any_cast<long long>(data);
                                        else
-                                          ((long long*)valArray)[pos] = boost::any_cast<uint64_t>(data);
+                                          ((long long*)valArray)[pos] = boost::any_cast<i64>(data);
                                        break;
-         case WriteEngine::WR_ULONGLONG:
-                                       ((uint64_t*)valArray)[pos] = boost::any_cast<uint64_t>(data);
-                                       break;
-         case WriteEngine::WR_TOKEN:   ((Token*)valArray)[pos] = boost::any_cast<Token>(data);
+         case WriteEngine::WR_TOKEN: ((Token*)valArray)[pos] = boost::any_cast<Token>(data);
                                        break;
       } // end of switch (colType)
    }
@@ -408,8 +332,6 @@ void WriteEngineWrapper::convertValue(const ColType colType, void* valArray, con
       switch (colType)
       {
          case WriteEngine::WR_INT :    data = ((int*)valArray)[pos];
-                                       break;
-         case WriteEngine::WR_UINT :   data = ((uint64_t*)valArray)[pos];
                                        break;
          case WriteEngine::WR_VARBINARY : // treat same as char for now
          case WriteEngine::WR_CHAR :
@@ -427,18 +349,11 @@ void WriteEngineWrapper::convertValue(const ColType colType, void* valArray, con
                                        break;
          case WriteEngine::WR_SHORT:   data = ((short*)valArray)[pos];
                                        break;
-         case WriteEngine::WR_USHORT:  data = ((uint16_t*)valArray)[pos];
-                                       break;
 //            case WriteEngine::WR_BIT:     data = ((bool*)valArray)[pos];
 //                                          break;
          case WriteEngine::WR_BYTE:    data = ((char*)valArray)[pos];
                                        break;
-         case WriteEngine::WR_UBYTE:   data = ((uint8_t*)valArray)[pos];
-                                       break;
          case WriteEngine::WR_LONGLONG:data = ((long long*)valArray)[pos];
-                                       break;
-         case WriteEngine::WR_ULONGLONG:
-                                       data = ((uint64_t*)valArray)[pos];
                                        break;
          case WriteEngine::WR_TOKEN:   data = ((Token*)valArray)[pos];
                                        break;
@@ -466,7 +381,7 @@ void WriteEngineWrapper::convertValue(const ColType colType, void* valArray, con
 int WriteEngineWrapper::createColumn(
    const TxnID& txnid,
    const OID& dataOid,
-   const CalpontSystemCatalog::ColDataType dataType,
+   const ColDataType dataType,
    int dataWidth,
    uint16_t dbRoot,
    uint32_t partition,
@@ -504,9 +419,9 @@ int WriteEngineWrapper::createColumn(
  * @brief Fill column with default values
  */
 int WriteEngineWrapper::fillColumn(const TxnID& txnid, const OID& dataOid,
-                                   const CalpontSystemCatalog::ColDataType dataType, int dataWidth,
+                                   const ColDataType dataType, int dataWidth,
                                    ColTuple defaultVal, const OID& refColOID,
-                                   const CalpontSystemCatalog::ColDataType refColDataType,
+                                   const ColDataType refColDataType,
                                    int refColWidth, int refCompressionType,
                                    bool isNULL, int compressionType,
                                    const string& defaultValStr, 
@@ -517,59 +432,52 @@ int WriteEngineWrapper::fillColumn(const TxnID& txnid, const OID& dataOid,
    Column   refCol;
    ColType  newColType;
    ColType  refColType;
-   boost::scoped_array<char> defVal(new char[MAX_COLUMN_BOUNDARY]);
+   void *defVal = new char[MAX_COLUMN_BOUNDARY];
    ColumnOp* colOpNewCol = m_colOp[op(compressionType)];
-   ColumnOp* refColOp = m_colOp[op(refCompressionType)];
-   Dctnry*   dctnry  = m_dctnry[op(compressionType)]; 
+   ColumnOp* colOpRefCol = m_colOp[op(refCompressionType)];
    colOpNewCol->initColumn(newCol);
-   refColOp->initColumn(refCol);
-   //boost::shared_ptr<Dctnry> dctnry;
-  // boost::shared_ptr<ColumnOp> refColOp;
-  // refColOp.reset(colOpRefCol);
-  // dctnry.reset(dctOp);
+   colOpRefCol->initColumn(refCol);
    uint16_t dbRoot = 1;	//not to be used
    //Convert HWM of the reference column for the new column
    //Bug 1703,1705
    bool isToken = false;
-   if (((dataType == CalpontSystemCatalog::VARCHAR) && (dataWidth > 7)) ||
-      ((dataType == CalpontSystemCatalog::CHAR) && (dataWidth > 8)) || (dataType == CalpontSystemCatalog::VARBINARY) )
+   if (((dataType == WriteEngine::VARCHAR) && (dataWidth > 7)) ||
+      ((dataType == WriteEngine::CHAR) && (dataWidth > 8)) || (dataType == WriteEngine::VARBINARY) )
    {
       isToken = true;
    }
    Convertor::convertColType(dataType, newColType, isToken);
 
-   if (((refColDataType == CalpontSystemCatalog::VARCHAR) && (refColWidth > 7)) ||
-      ((refColDataType == CalpontSystemCatalog::CHAR) && (refColWidth > 8)) || (refColDataType == CalpontSystemCatalog::VARBINARY))
+   if (((refColDataType == WriteEngine::VARCHAR) && (refColWidth > 7)) ||
+      ((refColDataType == WriteEngine::CHAR) && (refColWidth > 8)) || (refColDataType == WriteEngine::VARBINARY))
    {
       isToken = true;
    }
 
    Convertor::convertColType(refColDataType, refColType, isToken);
-   refColOp->setColParam(refCol, 0, refColOp->getCorrectRowWidth(refColDataType, refColWidth),
+   colOpRefCol->setColParam(refCol, 0, colOpRefCol->getCorrectRowWidth(refColDataType, refColWidth),
                       refColDataType, refColType, (FID)refColOID, refCompressionType, dbRoot);
    colOpNewCol->setColParam(newCol, 0, colOpNewCol->getCorrectRowWidth(dataType, dataWidth),
                       dataType, newColType, (FID)dataOid, compressionType, dbRoot);
-
    int size = sizeof(Token);
    if (newColType == WriteEngine::WR_TOKEN) 
    {
       if (isNULL)
       {
          Token nullToken;
-         memcpy(defVal.get(), &nullToken, size);
+         memcpy(defVal, &nullToken, size);
       }
-	  //Tokenization is done when we create dictionary file
+	  //Tpkenization is done when crate dictionary file
    }
    else
-      convertValue(newColType, defVal.get(), defaultVal.data);
+      convertValue(newColType, defVal, defaultVal.data);
 
    if (rc == NO_ERROR)
-      rc = colOpNewCol->fillColumn(txnid, newCol, refCol, defVal.get(), dctnry, refColOp, dictOid, dataWidth, defaultValStr, autoincrement);
+      rc = colOpNewCol->fillColumn(txnid, newCol, refCol, defVal, dictOid, dataWidth, defaultValStr, autoincrement);
 
-//   colOpNewCol->clearColumn(newCol);
-//   colOpRefCol->clearColumn(refCol);
-  
-//   free(defVal);
+   colOpNewCol->clearColumn(newCol);
+   colOpRefCol->clearColumn(refCol);
+   free(defVal);
 
 // flushing files is in colOp->fillColumn()
 // if (rc == NO_ERROR)
@@ -578,8 +486,7 @@ int WriteEngineWrapper::fillColumn(const TxnID& txnid, const OID& dataOid,
    return rc;
 }
 
- int WriteEngineWrapper::deleteRow(const TxnID& txnid, vector<ColStructList>& colExtentsStruct, vector<void *>& colOldValueList, 
-									vector<RIDList>& ridLists, const int32_t tableOid)
+ int WriteEngineWrapper::deleteRow(const TxnID& txnid, vector<ColStructList>& colExtentsStruct, vector<void *>& colOldValueList, vector<RIDList>& ridLists)
 {
    ColTuple         curTuple;
    ColStruct        curColStruct;
@@ -589,7 +496,7 @@ int WriteEngineWrapper::fillColumn(const TxnID& txnid, const OID& dataOid,
    DctnryStructList dctnryStructList;
    DctnryValueList  dctnryValueList;
    ColStructList    colStructList;
-   uint64_t         emptyVal;
+   i64              emptyVal;
    int              rc;
    string           tmpStr("");
    vector<DctnryStructList> dctnryExtentsStruct;
@@ -634,122 +541,12 @@ int WriteEngineWrapper::fillColumn(const TxnID& txnid, const OID& dataOid,
    }
    // unfortunately I don't have a better way to instruct without passing too many parameters
    m_opType = DELETE;
-   rc = updateColumnRec(txnid, colExtentsStruct, colValueList, colOldValueList, ridLists, dctnryExtentsStruct, dctnryValueList, tableOid);
+   rc = updateColumnRec(txnid, colExtentsStruct, colValueList, colOldValueList, ridLists, dctnryExtentsStruct, dctnryValueList);
    m_opType = NOOP;
 
    return rc;
 }
 
-int WriteEngineWrapper::deleteBadRows(const TxnID& txnid, ColStructList& colStructs,
-                         RIDList& ridList, DctnryStructList& dctnryStructList)
-{
-	/*  Need to scan all files including dictionary store files to check whether there is any bad chunks
-	 * 
-	 */ 
-	int rc = 0;
-	Column         curCol;
-	void*          valArray = NULL;
-	for (unsigned i = 0; i < colStructs.size(); i++)
-	{
-		ColumnOp* colOp = m_colOp[op(colStructs[i].fCompressionType)];
-		unsigned needFixFiles = colStructs[i].tokenFlag? 2:1;
-		colOp->initColumn(curCol);
-		for (unsigned j=0; j < needFixFiles; j++)
-		{
-			if (j == 0)
-			{
-				colOp->setColParam(curCol, 0, colStructs[i].colWidth,
-					colStructs[i].colDataType, colStructs[i].colType, colStructs[i].dataOid,
-					colStructs[i].fCompressionType, colStructs[i].fColDbRoot,
-					colStructs[i].fColPartition, colStructs[i].fColSegment);
-		
-				string segFile;
-				rc = colOp->openColumnFile(curCol, segFile, true, IO_BUFF_SIZE); // @bug 5572 HDFS tmp file
-				if (rc != NO_ERROR) //If openFile fails, disk error or header error is assumed.
-				{
-					//report error and return.
-					std::ostringstream oss;
-					WErrorCodes ec;
-					string err = ec.errorString(rc);
-					oss << "Error opening file oid:dbroot:partition:segment = " << colStructs[i].dataOid << ":" <<colStructs[i].fColDbRoot
-						<<":"<<colStructs[i].fColPartition<<":"<<colStructs[i].fColSegment << " and error code is " << rc << " with message " << err;
-					throw std::runtime_error(oss.str());	
-				}
-
-				switch (colStructs[i].colType)
-				{
-				case WriteEngine::WR_INT:
-					valArray = (int*) calloc(sizeof(int), 1);
-					break;
-				case WriteEngine::WR_UINT:
-					valArray = (uint32_t*) calloc(sizeof(uint32_t), 1);
-					break;
-				case WriteEngine::WR_VARBINARY : // treat same as char for now
-				case WriteEngine::WR_CHAR:
-				case WriteEngine::WR_BLOB:
-					valArray = (char*) calloc(sizeof(char), 1 * MAX_COLUMN_BOUNDARY);
-					break;
-				case WriteEngine::WR_FLOAT:
-					valArray = (float*) calloc(sizeof(float), 1);
-					break;
-				case WriteEngine::WR_DOUBLE:
-					valArray = (double*) calloc(sizeof(double), 1);
-					break;
-				case WriteEngine::WR_BYTE:
-				valArray = (char*) calloc(sizeof(char), 1);
-				break;
-				case WriteEngine::WR_UBYTE:
-					valArray = (uint8_t*) calloc(sizeof(uint8_t), 1);
-					break;
-				case WriteEngine::WR_SHORT:
-					valArray = (short*) calloc(sizeof(short), 1);
-					break;
-				case WriteEngine::WR_USHORT:
-					valArray = (uint16_t*) calloc(sizeof(uint16_t), 1);
-					break;
-				case WriteEngine::WR_LONGLONG:
-					valArray = (long long*) calloc(sizeof(long long), 1);
-					break;
-				case WriteEngine::WR_ULONGLONG:
-					valArray = (uint64_t*) calloc(sizeof(uint64_t), 1);
-					break;
-				case WriteEngine::WR_TOKEN:
-					valArray = (Token*) calloc(sizeof(Token), 1);
-					break;
-				}
-				rc = colOp->writeRows(curCol, ridList.size(), ridList, valArray, 0, true);
-				if ( rc != NO_ERROR)
-				{
-					//read error is fixed in place
-					if (rc == ERR_COMP_COMPRESS) //write error
-					{
-				
-					}
-			
-				}
-				//flush files will be done in the end of fix.
-				colOp->clearColumn(curCol);
-
-				if (valArray != NULL)
-					free(valArray);
-			}
-			else //dictionary file. How to fix
-			{
-				//read headers out, uncompress the last chunk, if error, replace it with empty chunk.
-				Dctnry* dctnry = m_dctnry[op(dctnryStructList[i].fCompressionType)];
-				rc = dctnry->openDctnry(dctnryStructList[i].dctnryOid,
-                     dctnryStructList[i].fColDbRoot, dctnryStructList[i].fColPartition,
-                     dctnryStructList[i].fColSegment,
-                     false);
-               
-                rc =  dctnry->checkFixLastDictChunk();
-                rc = dctnry->closeDctnry(true);
-                
-			}
-		}
-	}
-	return rc;
-}
 
  /*@flushVMCache - Flush VM cache
  */
@@ -787,7 +584,7 @@ int WriteEngineWrapper::insertColumnRecs(const TxnID& txnid,
                                         ColValueList& colValueList,
                                         DctnryStructList& dctnryStructList,
                                         DictStrList& dictStrList,
-                                        std::vector<boost::shared_ptr<DBRootExtentTracker> > & dbRootExtentTrackers,
+                                        std::vector<DBRootExtentTracker*> & dbRootExtentTrackers,
 										RBMetaWriter* fRBMetaWriter,
 										bool bFirstExtentOnThisPM,
 										bool insertSelect, 
@@ -814,14 +611,6 @@ int WriteEngineWrapper::insertColumnRecs(const TxnID& txnid,
    RIDList ridList;
    ColumnOp* colOp = NULL;
 
-   // Set tmp file suffix to modify HDFS db file
-   bool           useTmpSuffix = false;
-   if (idbdatafile::IDBPolicy::useHdfs())
-   {
-      if (!bFirstExtentOnThisPM)
-         useTmpSuffix = true;
-   }  
-   
    unsigned i=0;
 #ifdef PROFILE
  StopWatch timer;
@@ -837,9 +626,9 @@ int WriteEngineWrapper::insertColumnRecs(const TxnID& txnid,
    for (i = 0; i < colStructList.size(); i++)
       Convertor::convertColType(&colStructList[i]);
 
-  // rc = checkValid(txnid, colStructList, colValueList, ridList);
-  // if (rc != NO_ERROR)
-   //   return rc;
+   rc = checkValid(txnid, colStructList, colValueList, ridList);
+   if (rc != NO_ERROR)
+      return rc;
 
 	setTransId(txnid);
 	uint16_t  dbRoot, segmentNum;
@@ -848,29 +637,17 @@ int WriteEngineWrapper::insertColumnRecs(const TxnID& txnid,
     bool newFile;
 	TableMetaData* tableMetaData= TableMetaData::makeTableMetaData(tableOid);
 	//populate colStructList with file information
-	IDBDataFile* pFile = NULL;
+	FILE* pFile = NULL;
 	std::vector<DBRootExtentInfo> extentInfo;
 	int currentDBrootIdx = 0;
 	std::vector<BRM::CreateStripeColumnExtentsArgOut> extents;
-
-	//--------------------------------------------------------------------------
-	// For first batch on this PM:
-	//   o get starting extent from ExtentTracker, and allocate extent if needed
-	//   o construct colStructList and dctnryStructList accordingly
-	//   o save extent information in tableMetaData for future use
-	// If not first batch on this PM:
-	//   o construct colStructList and dctnryStructList from tableMetaData
-	//--------------------------------------------------------------------------
 	if (isFirstBatchPm)
 	{
 		currentDBrootIdx = dbRootExtentTrackers[0]->getCurrentDBRootIdx();
 		extentInfo = dbRootExtentTrackers[0]->getDBRootExtentList();
 		dbRoot = extentInfo[currentDBrootIdx].fDbRoot;
 		partitionNum = extentInfo[currentDBrootIdx].fPartition;
-
-		//----------------------------------------------------------------------
-		// check whether this extent is the first on this PM
-		//----------------------------------------------------------------------
+		//check whether this extent is the first on this PM
 		if (bFirstExtentOnThisPM)
 		{
 			//cout << "bFirstExtentOnThisPM is " << bFirstExtentOnThisPM << endl;
@@ -880,7 +657,6 @@ int WriteEngineWrapper::insertColumnRecs(const TxnID& txnid,
 			{
 				createStripeColumnExtentsArgIn.oid = colStructList[i].dataOid;
 				createStripeColumnExtentsArgIn.width = colStructList[i].colWidth;
-                createStripeColumnExtentsArgIn.colDataType = colStructList[i].colDataType;
 				cols.push_back(createStripeColumnExtentsArgIn);
 			}
 			rc = BRMWrapper::getInstance()->allocateStripeColExtents(cols, dbRoot, partitionNum, segmentNum, extents);
@@ -889,16 +665,8 @@ int WriteEngineWrapper::insertColumnRecs(const TxnID& txnid,
 			//Create column files
 			BRM::CPInfoList_t cpinfoList;
 			BRM::CPInfo cpInfo;
-            if (isUnsigned(colStructList[i].colDataType))
-            {
-                cpInfo.max = 0;
-                cpInfo.min = static_cast<int64_t>(numeric_limits<uint64_t>::max());
-            }
-            else
-            {
-                cpInfo.max = numeric_limits<int64_t>::min();
-                cpInfo.min = numeric_limits<int64_t>::max();
-            }
+			cpInfo.max = numeric_limits<int64_t>::min();
+			cpInfo.min = numeric_limits<int64_t>::max();
 			cpInfo.seqNum = -1;	
 			for ( i=0; i < extents.size(); i++)
 			{
@@ -907,7 +675,7 @@ int WriteEngineWrapper::insertColumnRecs(const TxnID& txnid,
 				colOp->setColParam(curCol, 0, colStructList[i].colWidth, colStructList[i].colDataType,
 				colStructList[i].colType, colStructList[i].dataOid, colStructList[i].fCompressionType,
 					dbRoot, partitionNum, segmentNum);
-				rc = colOp->extendColumn(curCol, false, extents[i].startBlkOffset, extents[i].startLbid, extents[i].allocSize, dbRoot,  
+				rc = colOp->extendColumn(curCol, false, true, extents[i].startBlkOffset, extents[i].startLbid, extents[i].allocSize, dbRoot,  
 					partitionNum, segmentNum, segFile, pFile, newFile);
 				if (rc != NO_ERROR)
 					return rc;
@@ -922,7 +690,6 @@ int WriteEngineWrapper::insertColumnRecs(const TxnID& txnid,
 				dctnryStructList[i].fColSegment = segmentNum;
 				dctnryStructList[i].fColDbRoot = dbRoot;
 			}
-
 			//mark the extents to invalid
 			rc = BRMWrapper::getInstance()->setExtentsMaxMin(cpinfoList);
 			if (rc != NO_ERROR)
@@ -938,8 +705,8 @@ int WriteEngineWrapper::insertColumnRecs(const TxnID& txnid,
 						return rc;
 				}	
 			}	
-		}    // if ( bFirstExtentOnThisPM)
-		else // if (!bFirstExtentOnThisPM)
+		}
+		else
 		{
 			std::vector<DBRootExtentInfo> tmpExtentInfo;
 			for (i=0; i < dbRootExtentTrackers.size(); i++)
@@ -956,9 +723,7 @@ int WriteEngineWrapper::insertColumnRecs(const TxnID& txnid,
 			}
 		}	
 		
-		//----------------------------------------------------------------------
-		// Save the extents info in tableMetaData 
-		//----------------------------------------------------------------------
+		//Save the extents info
 		for (i=0; i < colStructList.size(); i++)
 		{		
 			ColExtsInfo aColExtsInfo = tableMetaData->getColExtsInfo(colStructList[i].dataOid);
@@ -969,15 +734,12 @@ int WriteEngineWrapper::insertColumnRecs(const TxnID& txnid,
 					break;
 				it++;
 			}
-
 			if (it == aColExtsInfo.end()) //add this one to the list
 			{
 				ColExtInfo aExt;
 				aExt.dbRoot = colStructList[i].fColDbRoot;
 				aExt.partNum = colStructList[i].fColPartition;
 				aExt.segNum = colStructList[i].fColSegment;
-				aExt.compType = colStructList[i].fCompressionType;
-				aExt.isDict = false;
 				if (bFirstExtentOnThisPM)
 				{
 					aExt.hwm = extents[i].startBlkOffset;
@@ -996,38 +758,9 @@ int WriteEngineWrapper::insertColumnRecs(const TxnID& txnid,
 				aColExtsInfo.push_back(aExt);
 				//cout << "get from extentinfo oid:hwm = " << colStructList[i].dataOid << ":" << aExt.hwm << endl;
 			}
-
 			tableMetaData->setColExtsInfo(colStructList[i].dataOid, aColExtsInfo);
-		}
-		
-		for (i=0; i < dctnryStructList.size(); i++)
-		{	
-			if (dctnryStructList[i].dctnryOid > 0)
-			{
-				ColExtsInfo aColExtsInfo = tableMetaData->getColExtsInfo(dctnryStructList[i].dctnryOid);
-				ColExtsInfo::iterator it = aColExtsInfo.begin();
-				while (it != aColExtsInfo.end())
-				{
-					if ((it->dbRoot == dctnryStructList[i].fColDbRoot) && (it->partNum == dctnryStructList[i].fColPartition) && (it->segNum == dctnryStructList[i].fColSegment))
-						break;
-					it++;
-				}
-
-				if (it == aColExtsInfo.end()) //add this one to the list
-				{
-					ColExtInfo aExt;
-					aExt.dbRoot = dctnryStructList[i].fColDbRoot;
-					aExt.partNum = dctnryStructList[i].fColPartition;
-					aExt.segNum = dctnryStructList[i].fColSegment;
-					aExt.compType = dctnryStructList[i].fCompressionType;
-					aExt.isDict = true;	
-					aColExtsInfo.push_back(aExt);
-				}
-				tableMetaData->setColExtsInfo(dctnryStructList[i].dctnryOid, aColExtsInfo);
-			}
-		}
-		
-	} // if (isFirstBatchPm)
+		}		
+	}
 	else //get the extent info from tableMetaData
 	{
 		ColExtsInfo aColExtsInfo = tableMetaData->getColExtsInfo(colStructList[0].dataOid);
@@ -1051,7 +784,6 @@ int WriteEngineWrapper::insertColumnRecs(const TxnID& txnid,
 			dctnryStructList[i].fColDbRoot = it->dbRoot;
 		}
 	}
-
    curTupleList = static_cast<ColTupleList>(colValueList[0]);
    totalRow = curTupleList.size();
    totalColumns = colStructList.size();
@@ -1060,9 +792,7 @@ int WriteEngineWrapper::insertColumnRecs(const TxnID& txnid,
    boost::scoped_array<RID> rowIdArrayPtr(rowIdArray);
    memset(rowIdArray, 0, (sizeof(RID)*totalRow));
 
-	//--------------------------------------------------------------------------
-	// allocate row id(s)
-	//--------------------------------------------------------------------------
+   // allocate row id(s)
    curColStruct = colStructList[0];
    colOp = m_colOp[op(curColStruct.fCompressionType)];
 
@@ -1085,7 +815,7 @@ int WriteEngineWrapper::insertColumnRecs(const TxnID& txnid,
 	if (it != aColExtsInfo.end()) 
 	{
 		hwm = it->hwm;
-		//cout << "Got from colextinfo hwm for oid " << colStructList[0].dataOid << " is " << hwm << " and seg is " << colStructList[0].fColSegment << endl;
+		//cout << "Got from colextinfo hwm for oid " << colStructList[0].dataOid << " is " << hwm << endl;
 	}
    
    oldHwm = hwm; //Save this info for rollback
@@ -1093,7 +823,8 @@ int WriteEngineWrapper::insertColumnRecs(const TxnID& txnid,
    colOp->setColParam(curCol, 0, curColStruct.colWidth, curColStruct.colDataType,
        curColStruct.colType, curColStruct.dataOid, curColStruct.fCompressionType,
        curColStruct.fColDbRoot, curColStruct.fColPartition, curColStruct.fColSegment);
-   rc = colOp->openColumnFile(curCol, segFile, useTmpSuffix); // @bug 5572 HDFS tmp file
+
+   rc = colOp->openColumnFile(curCol, segFile);
    if (rc != NO_ERROR) {
       return rc;
    }
@@ -1102,6 +833,11 @@ int WriteEngineWrapper::insertColumnRecs(const TxnID& txnid,
    // @bug 286 : fix for bug 286 - correct the typo in getHWM
    //RETURN_ON_ERROR(BRMWrapper::getInstance()->getHWM(curColStruct.dataOid, hwm));
 
+   //...Note that we are casting totalRow to int to be in sync with
+   //...allocRowId().  So we are assuming that totalRow
+   //...(curTupleList.size()) will fit into an int.  We arleady made
+   //...that assumption earlier in this method when we used totalRow
+   //...in the call to calloc() to allocate rowIdArray.
    Column newCol;
 
 #ifdef PROFILE
@@ -1109,27 +845,18 @@ timer.start("allocRowId");
 #endif
 	newColStructList = colStructList;
 	newDctnryStructList = dctnryStructList;
-    bool bUseStartExtent = true;
-	if (idbdatafile::IDBPolicy::useHdfs())
-		insertSelect = true;
-		
-   rc = colOp->allocRowId(txnid, bUseStartExtent,
-	   curCol, (uint64_t)totalRow, rowIdArray, hwm, newExtent, rowsLeft, newHwm, newFile, 
-	   newColStructList, newDctnryStructList, dbRootExtentTrackers, insertSelect, true, tableOid, isFirstBatchPm);
+   rc = colOp->allocRowId(txnid, curCol, (uint64_t)totalRow, rowIdArray, hwm, newExtent, rowsLeft, newHwm, newFile, 
+	   newColStructList, newDctnryStructList, dbRootExtentTrackers, insertSelect, true, tableOid);
    
    //cout << "after allocrowid, total row = " <<totalRow << " newExtent is " << newExtent << endl; 
   // cout << "column oid " << curColStruct.dataOid << " has hwm:newHwm = " << hwm <<":" << newHwm<< endl;
-   if (rc != NO_ERROR) //Clean up is already done
+   if (rc != NO_ERROR) //Clean up will be done by bulkrollback
 	  return rc;
 	
 #ifdef PROFILE
 timer.stop("allocRowId");
 #endif
-	//--------------------------------------------------------------------------
-	// Expand initial abbreviated extent if any RID in 1st extent is > 256K.
-	// if totalRow == rowsLeft, then not adding rows to 1st extent, so skip it.
-	//--------------------------------------------------------------------------
-// DMC-SHARED_NOTHING_NOTE: Is it safe to assume only part0 seg0 is abbreviated?
+   //..Expand initial abbreviated extent if any RID in 1st extent is > 256K
     if ((curCol.dataFile.fPartition == 0) &&
        (curCol.dataFile.fSegment   == 0) &&
        ((totalRow-rowsLeft) > 0) &&
@@ -1148,7 +875,7 @@ timer.stop("allocRowId");
                colStructList[k].fColDbRoot,
                colStructList[k].fColPartition,
                colStructList[k].fColSegment);
-           rc = colOp->openColumnFile(expandCol, segFile, true); // @bug 5572 HDFS tmp file
+           rc = colOp->openColumnFile(expandCol, segFile);
            if (rc == NO_ERROR)
            {
                if (colOp->abbreviatedExtent(expandCol.dataFile.pFile, colStructList[k].colWidth))
@@ -1160,13 +887,11 @@ timer.stop("allocRowId");
            {
 				return rc;
            }
-           colOp->clearColumn(expandCol); // closes the file (if uncompressed)
+           colOp->clearColumn(expandCol); // closes the file
        }
     }
 	
-	//--------------------------------------------------------------------------
-	// Tokenize data if needed
-	//--------------------------------------------------------------------------
+   //Tokenize data if needed
    BRMWrapper::setUseVb( true );
    dictStr::iterator dctStr_iter;
    ColTupleList::iterator col_iter;
@@ -1179,8 +904,7 @@ timer.stop("allocRowId");
          Dctnry* dctnry = m_dctnry[op(dctnryStructList[i].fCompressionType)];
          rc = dctnry->openDctnry(dctnryStructList[i].dctnryOid,
                      dctnryStructList[i].fColDbRoot, dctnryStructList[i].fColPartition,
-                     dctnryStructList[i].fColSegment,
-                     useTmpSuffix); // @bug 5572 HDFS tmp file
+                     dctnryStructList[i].fColSegment);
          if (rc !=NO_ERROR)
 		 {
 			cout << "Error opening dctnry file " << dctnryStructList[i].dctnryOid<< endl;
@@ -1219,7 +943,7 @@ timer.stop("tokenize");
 
          }
          //close dictionary files
-         rc = dctnry->closeDctnry(false);
+         rc = dctnry->closeDctnry();
          if (rc != NO_ERROR)
              return rc;
 
@@ -1229,9 +953,9 @@ timer.stop("tokenize");
 			if (fRBMetaWriter)
 				fRBMetaWriter->backupDctnryHWMChunk(newDctnryStructList[i].dctnryOid, newDctnryStructList[i].fColDbRoot, newDctnryStructList[i].fColPartition, newDctnryStructList[i].fColSegment);
              rc = dctnry->openDctnry(newDctnryStructList[i].dctnryOid,
+             //            dctnryStructList[i].treeOid, dctnryStructList[i].listOid,
                            newDctnryStructList[i].fColDbRoot, newDctnryStructList[i].fColPartition,
-                           newDctnryStructList[i].fColSegment,
-                           false); // @bug 5572 HDFS tmp file
+                           newDctnryStructList[i].fColSegment);
              if (rc !=NO_ERROR)
                  return rc;
 
@@ -1266,7 +990,7 @@ timer.stop("tokenize");
                  col_iter++;
              }
              //close dictionary files
-             rc = dctnry->closeDctnry(false);
+             rc = dctnry->closeDctnry();
              if (rc != NO_ERROR)
                  return rc;
          }
@@ -1274,10 +998,7 @@ timer.stop("tokenize");
    }
 	BRMWrapper::setUseVb( true );
 
-	//--------------------------------------------------------------------------
-	// Update column info structure @Bug 1862 set hwm, and
-	// Prepare ValueList for new extent (if applicable)
-	//--------------------------------------------------------------------------
+   //Update column info structure @Bug 1862 set hwm
    //@Bug 2205 Check whether all rows go to the new extent
    RID lastRid = 0;
    RID lastRidNew = 0;
@@ -1295,7 +1016,7 @@ timer.stop("tokenize");
    //if a new extent is created, all the columns in this table should have their own new extent
    //First column already processed
 
-   //@Bug 1701. Close the file (if uncompressed)
+   //@Bug 1701. Close the file
    m_colOp[op(curCol.compressionType)]->clearColumn(curCol);
    //cout << "Saving hwm info for new ext batch" << endl;
    //Update hwm to set them in the end
@@ -1322,7 +1043,7 @@ timer.stop("tokenize");
          // save hwm for the old extent
          colWidth = colStructList[i].colWidth;
          succFlag = colOp->calculateRowId(lastRid, BYTE_PER_BLOCK/colWidth, colWidth, curFbo, curBio);
-		//cout << "insertcolumnrec   oid:rid:fbo:oldhwm = " << colStructList[i].dataOid << ":" << lastRid << ":" << curFbo << ":" << oldHwm << endl;
+        // cout << "insertcolumnrec   oid:rid:fbo:hwm = " << colStructList[i].dataOid << ":" << lastRid << ":" << curFbo << ":" << hwm << endl;
          if (succFlag)
          {
             if ((HWM)curFbo >= oldHwm)
@@ -1333,8 +1054,8 @@ timer.stop("tokenize");
 			if (newExtent)
 			{
 					it->current = false;
-			}		
-			
+			}
+						
 			//cout << "updated old ext info for oid " << colStructList[i].dataOid << " dbroot:part:seg:hwm:current = " 
 	  //<< it->dbRoot<<":"<<it->partNum<<":"<<it->segNum<<":"<<it->hwm<<":"<< it->current<< " and newExtent is " << newExtent << endl;
          }
@@ -1368,9 +1089,7 @@ timer.stop("tokenize");
 	  tableMetaData->setColExtsInfo(colStructList[i].dataOid, aColExtsInfo);
     }
 		
-	//--------------------------------------------------------------------------
-	//Prepare the valuelist for the new extent
-	//--------------------------------------------------------------------------
+      //Prepare the valuelist for the new extent
       ColTupleList colTupleList;
       ColTupleList newColTupleList;
       ColTupleList firstPartTupleList;
@@ -1401,18 +1120,12 @@ timer.start("writeColumnRec");
 
 	if (rc == NO_ERROR)
 	{
-		//----------------------------------------------------------------------
 		//Mark extents invalid
-		//----------------------------------------------------------------------
 		vector<BRM::LBID_t> lbids;
-        vector<CalpontSystemCatalog::ColDataType> colDataTypes;
 		bool successFlag = true;
 		unsigned width = 0;
 		int         curFbo = 0, curBio, lastFbo = -1;
-		
-		if (isFirstBatchPm && (totalRow == rowsLeft))
-		{}
-		else {
+			
 		for (unsigned i = 0; i < colStructList.size(); i++)
 		{
 			colOp = m_colOp[op(colStructList[i].fCompressionType)];
@@ -1421,22 +1134,19 @@ timer.start("writeColumnRec");
 			if (successFlag) {
 				if (curFbo != lastFbo) {
 					RETURN_ON_ERROR(AddLBIDtoList(txnid,
-												  lbids,
-                                                  colDataTypes,
-                                                  colStructList[i],
-												  curFbo));
+													  lbids,
+													  colStructList[i].dataOid,
+													  colStructList[i].fColPartition,
+													  colStructList[i].fColSegment,
+													  curFbo));
 				}
 			}
 		}
-		}
   
 		if (lbids.size() > 0)
-				rc = BRMWrapper::getInstance()->markExtentsInvalid(lbids, colDataTypes);
-
-		//----------------------------------------------------------------------
-		// Write row(s) to database file(s)
-		//----------------------------------------------------------------------
-		rc = writeColumnRec(txnid, colStructList, colOldValueList, rowIdArray, newColStructList, colNewValueList, tableOid, useTmpSuffix); // @bug 5572 HDFS tmp file
+				rc = BRMWrapper::getInstance()->markExtentsInvalid(lbids);
+		colValueList.clear();
+		rc = writeColumnRec(txnid, colStructList, colOldValueList, colValueList, rowIdArray, newColStructList, colNewValueList);
 	}
    return rc;
 }
@@ -1445,8 +1155,7 @@ int WriteEngineWrapper::insertColumnRec_SYS(const TxnID& txnid,
                                         ColStructList& colStructList,
                                         ColValueList& colValueList,
                                         DctnryStructList& dctnryStructList,
-                                        DictStrList& dictStrList,
-										const int32_t tableOid)
+                                        DictStrList& dictStrList)
 {
    int            rc;
    RID*           rowIdArray = NULL;
@@ -1466,7 +1175,7 @@ int WriteEngineWrapper::insertColumnRec_SYS(const TxnID& txnid,
    bool newExtent = false;
    RIDList ridList;
    ColumnOp* colOp = NULL;
-   uint32_t i = 0;
+   uint i = 0;
 #ifdef PROFILE
  StopWatch timer;
 #endif
@@ -1510,11 +1219,8 @@ int WriteEngineWrapper::insertColumnRec_SYS(const TxnID& txnid,
    ExtentInfo info;
    //Don't search for empty space, always append to the end. May need to revisit this part
    dbRoot = curColStruct.fColDbRoot;
-   int  extState;
-   bool extFound;
    RETURN_ON_ERROR(BRMWrapper::getInstance()->getLastHWM_DBroot(
-      curColStruct.dataOid, dbRoot, partitionNum, segmentNum, hwm,
-      extState, extFound));
+      curColStruct.dataOid, dbRoot, partitionNum, segmentNum, hwm));
 	  
    for (i = 0; i < colStructList.size(); i++)
 	{
@@ -1529,7 +1235,7 @@ int WriteEngineWrapper::insertColumnRec_SYS(const TxnID& txnid,
        dbRoot, partitionNum, segmentNum);
 
    string segFile;
-   rc = colOp->openColumnFile(curCol, segFile, false); // @bug 5572 HDFS tmp file
+   rc = colOp->openColumnFile(curCol, segFile);
    if (rc != NO_ERROR) {
       return rc;
    }
@@ -1552,9 +1258,8 @@ timer.start("allocRowId");
 
 	newColStructList = colStructList;
 	newDctnryStructList = dctnryStructList;
-	std::vector<boost::shared_ptr<DBRootExtentTracker> >   dbRootExtentTrackers;
-	bool bUseStartExtent = true;
-	rc = colOp->allocRowId(txnid, bUseStartExtent,
+	std::vector<DBRootExtentTracker*>  dbRootExtentTrackers;
+   rc = colOp->allocRowId(txnid,
       curCol, (uint64_t)totalRow, rowIdArray, hwm, newExtent, rowsLeft, newHwm, newFile, newColStructList, newDctnryStructList, 
 	  dbRootExtentTrackers, false, false, 0);
 	
@@ -1605,7 +1310,6 @@ timer.start("allocRowId");
         }
    }
 
-   TableMetaData* aTableMetaData = TableMetaData::makeTableMetaData(tableOid);
    //..Expand initial abbreviated extent if any RID in 1st extent is > 256K
 // DMC-SHARED_NOTHING_NOTE: Is it safe to assume only part0 seg0 is abbreviated?
    if ((partitionNum == 0) &&
@@ -1626,7 +1330,7 @@ timer.start("allocRowId");
                dbRoot,
                partitionNum,
                segmentNum);
-           rc = colOp->openColumnFile(expandCol, segFile, false); // @bug 5572 HDFS tmp file
+           rc = colOp->openColumnFile(expandCol, segFile);
            if (rc == NO_ERROR)
            {
                if (colOp->abbreviatedExtent(expandCol.dataFile.pFile, colStructList[k].colWidth))
@@ -1671,32 +1375,12 @@ timer.start("allocRowId");
          dctnryStructList[i].fColSegment = segmentNum;
          dctnryStructList[i].fColDbRoot = dbRoot;
          rc = dctnry->openDctnry(dctnryStructList[i].dctnryOid,
+         //          dctnryStructList[i].treeOid, dctnryStructList[i].listOid,
                      dctnryStructList[i].fColDbRoot, dctnryStructList[i].fColPartition,
-                     dctnryStructList[i].fColSegment,
-                     false); // @bug 5572 HDFS tmp file
+                     dctnryStructList[i].fColSegment);
          if (rc !=NO_ERROR)
              return rc;
 
-		ColExtsInfo aColExtsInfo = aTableMetaData->getColExtsInfo(dctnryStructList[i].dctnryOid);
-		ColExtsInfo::iterator it = aColExtsInfo.begin();
-		while (it != aColExtsInfo.end())
-		{
-			if ((it->dbRoot == dctnryStructList[i].fColDbRoot) && (it->partNum == dctnryStructList[i].fColPartition) && (it->segNum == dctnryStructList[i].fColSegment))
-				break;
-			it++;
-		}
-
-		if (it == aColExtsInfo.end()) //add this one to the list
-		{
-			ColExtInfo aExt;
-			aExt.dbRoot =dctnryStructList[i].fColDbRoot;
-			aExt.partNum = dctnryStructList[i].fColPartition;
-			aExt.segNum = dctnryStructList[i].fColSegment;
-			aExt.compType = dctnryStructList[i].fCompressionType;	
-			aExt.isDict = true;			
-			aColExtsInfo.push_back(aExt);
-			aTableMetaData->setColExtsInfo(dctnryStructList[i].dctnryOid, aColExtsInfo);
-		}
          for (uint32_t     rows = 0; rows < (totalRow - rowsLeft); rows++)
          {
              if (dctStr_iter->length() == 0)
@@ -1736,33 +1420,12 @@ timer.stop("tokenize");
          if (newExtent)
          {
              rc = dctnry->openDctnry(newDctnryStructList[i].dctnryOid,
+             //            dctnryStructList[i].treeOid, dctnryStructList[i].listOid,
                            newDctnryStructList[i].fColDbRoot, newDctnryStructList[i].fColPartition,
-                           newDctnryStructList[i].fColSegment,
-                           false); // @bug 5572 HDFS tmp file
+                           newDctnryStructList[i].fColSegment);
              if (rc !=NO_ERROR)
                  return rc;
 
-			aColExtsInfo = aTableMetaData->getColExtsInfo(newDctnryStructList[i].dctnryOid);
-			it = aColExtsInfo.begin();
-			while (it != aColExtsInfo.end())
-			{
-				if ((it->dbRoot == newDctnryStructList[i].fColDbRoot) && (it->partNum == newDctnryStructList[i].fColPartition) && (it->segNum == newDctnryStructList[i].fColSegment))
-					break;
-				it++;
-			}
-
-			if (it == aColExtsInfo.end()) //add this one to the list
-			{
-				ColExtInfo aExt;
-				aExt.dbRoot =newDctnryStructList[i].fColDbRoot;
-				aExt.partNum = newDctnryStructList[i].fColPartition;
-				aExt.segNum = newDctnryStructList[i].fColSegment;
-				aExt.compType = newDctnryStructList[i].fCompressionType;	
-				aExt.isDict = true;			
-				aColExtsInfo.push_back(aExt);
-				aTableMetaData->setColExtsInfo(newDctnryStructList[i].dctnryOid, aColExtsInfo);
-			}	 
-			
              for (uint32_t     rows = 0; rows < rowsLeft; rows++)
              {
              if (dctStr_iter->length() == 0)
@@ -1829,8 +1492,6 @@ timer.stop("tokenize");
 	  BulkSetHWMArg aHwmEntryOld;
       bool succFlag = false;
       unsigned colWidth = 0;
-      int  extState;
-      bool extFound;
       int      curFbo = 0, curBio;
       for (i=0; i < totalColumns; i++)
       {
@@ -1844,8 +1505,7 @@ timer.stop("tokenize");
             newColStructList[i].fCompressionType, dbRoot, partitionNum, segmentNum);
 
          rc = BRMWrapper::getInstance()->getLastHWM_DBroot(
-            curColLocal.dataFile.fid, dbRoot, partitionNum, segmentNum, oldHwm,
-            extState, extFound);
+            curColLocal.dataFile.fid, dbRoot, partitionNum, segmentNum, oldHwm);
 
          info.oid = curColLocal.dataFile.fid;
          info.partitionNum = partitionNum;
@@ -1909,7 +1569,6 @@ timer.stop("tokenize");
 
 //Mark extents invalid
    vector<BRM::LBID_t> lbids;
-   vector<CalpontSystemCatalog::ColDataType> colDataTypes;
    bool successFlag = true;
    unsigned width = 0;
    BRM::LBID_t lbid;
@@ -1927,7 +1586,6 @@ timer.stop("tokenize");
                    colStructList[i].dataOid, colStructList[i].fColPartition,
                    colStructList[i].fColSegment, curFbo, lbid));
                lbids.push_back((BRM::LBID_t)lbid);
-               colDataTypes.push_back(colStructList[i].colDataType);
             }
          }
       }
@@ -1944,25 +1602,27 @@ timer.stop("tokenize");
          {
              RETURN_ON_ERROR(AddLBIDtoList(txnid,
                                            lbids,
-                                           colDataTypes,
-                                           newColStructList[i],
+                                           newColStructList[i].dataOid,
+                                           newColStructList[i].fColPartition,
+                                           newColStructList[i].fColSegment,
                                            curFbo));
          }
       }
    }
    //cout << "lbids size = " << lbids.size()<< endl;
    if (lbids.size() > 0)
-       rc = BRMWrapper::getInstance()->markExtentsInvalid(lbids, colDataTypes);
+       rc = BRMWrapper::getInstance()->markExtentsInvalid(lbids);
 
    if (rc == NO_ERROR)
    {
       if (newExtent)
       {
-         rc = writeColumnRec(txnid, colStructList, colOldValueList, rowIdArray, newColStructList, colNewValueList, tableOid, false); // @bug 5572 HDFS tmp file
+         colValueList.clear();
+         rc = writeColumnRec(txnid, colStructList, colOldValueList, colValueList, rowIdArray, newColStructList, colNewValueList);
       }
       else
       {
-         rc = writeColumnRec(txnid, colStructList, colValueList, rowIdArray, newColStructList, colNewValueList, tableOid, false); // @bug 5572 HDFS tmp file
+         rc = writeColumnRec(txnid, colStructList, colValueList, colOldValueList, rowIdArray, newColStructList, colNewValueList);
       }
    }
 #ifdef PROFILE
@@ -1979,8 +1639,6 @@ timer.stop("writeColumnRec");
 		//flushVMCache();
 	  bool succFlag = false;
       unsigned colWidth = 0;
-      int  extState;
-      bool extFound;
       int curFbo = 0, curBio;
 	  std::vector<BulkSetHWMArg> hwmVec;
       for (unsigned i=0; i < totalColumns; i++)
@@ -1988,8 +1646,7 @@ timer.stop("writeColumnRec");
          //colOp = m_colOp[op(colStructList[i].fCompressionType)];
 		 //Set all columns hwm together
 		 BulkSetHWMArg aHwmEntry;
-         RETURN_ON_ERROR(BRMWrapper::getInstance()->getLastHWM_DBroot(colStructList[i].dataOid, dbRoot, partitionNum, segmentNum, hwm,
-            extState, extFound));
+         RETURN_ON_ERROR(BRMWrapper::getInstance()->getLastHWM_DBroot(colStructList[i].dataOid, dbRoot, partitionNum, segmentNum, hwm));
          colWidth = colStructList[i].colWidth;
          succFlag = colOp->calculateRowId(lastRid, BYTE_PER_BLOCK/colWidth, colWidth, curFbo, curBio);
          //cout << "insertcolumnrec   oid:rid:fbo:hwm = " << colStructList[i].dataOid << ":" << lastRid << ":" << curFbo << ":" << hwm << endl;
@@ -2037,682 +1694,525 @@ int WriteEngineWrapper::insertColumnRec_Single(const TxnID& txnid,
                                         ColStructList& colStructList,
                                         ColValueList& colValueList,
                                         DctnryStructList& dctnryStructList,
-                                        DictStrList& dictStrList,
-										const int32_t tableOid)
+                                        DictStrList& dictStrList)
 {
-	int            rc;
-	RID*           rowIdArray = NULL;
-	ColTupleList   curTupleList;
-	Column         curCol;
-	ColStruct      curColStruct;
-	ColValueList   colOldValueList;
-	ColValueList   colNewValueList;
-	ColStructList  newColStructList;
-	DctnryStructList newDctnryStructList;
-	HWM            hwm = 0;
-	HWM            newHwm = 0;
-	HWM            oldHwm = 0;
-	ColTupleList::size_type totalRow;
-	ColStructList::size_type totalColumns;
-	uint64_t rowsLeft = 0;
-	bool newExtent = false;
-	RIDList ridList;
-	ColumnOp* colOp = NULL;
-	uint32_t i = 0;
+   int            rc;
+   RID*           rowIdArray = NULL;
+   ColTupleList   curTupleList;
+   Column         curCol;
+   ColStruct      curColStruct;
+   ColValueList   colOldValueList;
+   ColValueList   colNewValueList;
+   ColStructList  newColStructList;
+   DctnryStructList newDctnryStructList;
+   HWM            hwm = 0;
+   HWM            newHwm = 0;
+   HWM            oldHwm = 0;
+   ColTupleList::size_type totalRow;
+   ColStructList::size_type totalColumns;
+   uint64_t rowsLeft = 0;
+   bool newExtent = false;
+   RIDList ridList;
+   ColumnOp* colOp = NULL;
+   uint i = 0;
 
 #ifdef PROFILE
-StopWatch timer;
+ StopWatch timer;
 #endif
-	// debug information for testing
-	if (isDebug(DEBUG_2)) {
-		printf("\nIn wrapper insert\n");
-		printInputValue(colStructList, colValueList, ridList);
-	}
-	// end
+   // debug information for testing
+   if (isDebug(DEBUG_2)) {
+      printf("\nIn wrapper insert\n");
+      printInputValue(colStructList, colValueList, ridList);
+   }
+   // end
 
-	//Convert data type and column width to write engine specific
-	for (i = 0; i < colStructList.size(); i++)
-		Convertor::convertColType(&colStructList[i]);
+   //Convert data type and column width to write engine specific
+   for (i = 0; i < colStructList.size(); i++)
+      Convertor::convertColType(&colStructList[i]);
 
-	rc = checkValid(txnid, colStructList, colValueList, ridList);
-	if (rc != NO_ERROR)
-		return rc;
+   rc = checkValid(txnid, colStructList, colValueList, ridList);
+   if (rc != NO_ERROR)
+      return rc;
 
-	setTransId(txnid);
+   setTransId(txnid);
 
-	curTupleList = static_cast<ColTupleList>(colValueList[0]);
-	totalRow = curTupleList.size();
-	totalColumns = colStructList.size();
-	rowIdArray = new RID[totalRow];
-	// use scoped_array to ensure ptr deletion regardless of where we return
-	boost::scoped_array<RID> rowIdArrayPtr(rowIdArray);
-	memset(rowIdArray, 0, (sizeof(RID)*totalRow));
+   curTupleList = static_cast<ColTupleList>(colValueList[0]);
+   totalRow = curTupleList.size();
+   totalColumns = colStructList.size();
+   rowIdArray = new RID[totalRow];
+   // use scoped_array to ensure ptr deletion regardless of where we return
+   boost::scoped_array<RID> rowIdArrayPtr(rowIdArray);
+   memset(rowIdArray, 0, (sizeof(RID)*totalRow));
 
-	//--------------------------------------------------------------------------
-	// allocate row id(s)
-	//--------------------------------------------------------------------------
-	curColStruct = colStructList[0];
-	colOp = m_colOp[op(curColStruct.fCompressionType)];
+   // allocate row id(s)
+   curColStruct = colStructList[0];
+   colOp = m_colOp[op(curColStruct.fCompressionType)];
 
-	colOp->initColumn(curCol);
+   colOp->initColumn(curCol);
 
-	//Get the correct segment, partition, column file
-	uint16_t dbRoot;
-	uint16_t segmentNum   = 0;
-	uint32_t partitionNum = 0;
-	//Don't search for empty space, always append to the end. May revisit later
-	dbRoot = curColStruct.fColDbRoot;
-	int  extState;
-	bool bStartExtFound;
-	bool bUseStartExtent = false;
-	RETURN_ON_ERROR(BRMWrapper::getInstance()->getLastHWM_DBroot(
-		curColStruct.dataOid, dbRoot, partitionNum, segmentNum, hwm,
-		extState, bStartExtFound));
-	if ((bStartExtFound) && (extState == BRM::EXTENTAVAILABLE))
-		bUseStartExtent = true;
+   //Get the correct segment, partition, column file
+   uint16_t dbRoot, segmentNum;
+   uint32_t partitionNum;
+   vector<ExtentInfo> colExtentInfo; //Save those empty extents in case of failure to rollback
+   vector<ExtentInfo> dictExtentInfo; //Save those empty extents in case of failure to rollback
+   vector<ExtentInfo> fileInfo;
+   ExtentInfo info;
+   //Don't search for empty space, always append to the end. May need to revisit this part
+   dbRoot = curColStruct.fColDbRoot;
+   RETURN_ON_ERROR(BRMWrapper::getInstance()->getLastHWM_DBroot(
+      curColStruct.dataOid, dbRoot, partitionNum, segmentNum, hwm));
 	
-	for (i = 0; i < colStructList.size(); i++)
+    for (i = 0; i < colStructList.size(); i++)
 	{
 		colStructList[i].fColPartition = partitionNum;
-		colStructList[i].fColSegment   = segmentNum;
-		colStructList[i].fColDbRoot    = dbRoot;
+		colStructList[i].fColSegment = segmentNum;
+		colStructList[i].fColDbRoot = dbRoot;
 	}
-	for (i = 0; i < dctnryStructList.size(); i++)
-	{
-		dctnryStructList[i].fColPartition = partitionNum;
-		dctnryStructList[i].fColSegment   = segmentNum;
-		dctnryStructList[i].fColDbRoot    = dbRoot;
-	}
+   oldHwm = hwm; //Save this info for rollback
+   //need to pass real dbRoot, partition, and segment to setColParam
+   colOp->setColParam(curCol, 0, curColStruct.colWidth, curColStruct.colDataType,
+       curColStruct.colType, curColStruct.dataOid, curColStruct.fCompressionType,
+       dbRoot, partitionNum, segmentNum);
 
-	oldHwm = hwm; //Save this info for rollback
-	//need to pass real dbRoot, partition, and segment to setColParam
-	colOp->setColParam(curCol, 0, curColStruct.colWidth, curColStruct.colDataType,
-		curColStruct.colType, curColStruct.dataOid, curColStruct.fCompressionType,
-		dbRoot, partitionNum, segmentNum);
+   string segFile;
+   rc = colOp->openColumnFile(curCol, segFile);
+   if (rc != NO_ERROR) {
+      return rc;
+   }
 
-	string segFile;
-	if (bUseStartExtent)
-	{
-		rc = colOp->openColumnFile(curCol, segFile, true); // @bug 5572 HDFS tmp file
-		if (rc != NO_ERROR) {
-			return rc;
-		}
-	}
+   //get hwm first
+   // @bug 286 : fix for bug 286 - correct the typo in getHWM
+   //RETURN_ON_ERROR(BRMWrapper::getInstance()->getHWM(curColStruct.dataOid, hwm));
 
-	bool newFile;
+   //...Note that we are casting totalRow to int to be in sync with
+   //...allocRowId().  So we are assuming that totalRow
+   //...(curTupleList.size()) will fit into an int.  We arleady made
+   //...that assumption earlier in this method when we used totalRow
+   //...in the call to calloc() to allocate rowIdArray.
+   bool newFile;
 
 #ifdef PROFILE
 timer.start("allocRowId");
 #endif
 	newColStructList = colStructList;
 	newDctnryStructList = dctnryStructList;
-	std::vector<boost::shared_ptr<DBRootExtentTracker> >  dbRootExtentTrackers;
-	rc = colOp->allocRowId(txnid, bUseStartExtent,
-		curCol, (uint64_t)totalRow, rowIdArray, hwm, newExtent,
-		rowsLeft, newHwm, newFile, newColStructList, newDctnryStructList, 
-		dbRootExtentTrackers, false, false, 0);
+	std::vector<DBRootExtentTracker*>  dbRootExtentTrackers;
+   rc = colOp->allocRowId(txnid,
+      curCol, (uint64_t)totalRow, rowIdArray, hwm, newExtent, rowsLeft, newHwm, newFile, newColStructList, newDctnryStructList, 
+	  dbRootExtentTrackers, false, false, 0);
 	 
-	//--------------------------------------------------------------------------
-	// Handle case where we ran out of disk space allocating a new extent.
-	// Rollback extentmap and delete any db files that were created.
-	//--------------------------------------------------------------------------
-	if (rc != NO_ERROR)
+	if ((rc == ERR_FILE_DISK_SPACE) && newExtent) 
 	{
-		if ((rc == ERR_FILE_DISK_SPACE) && newExtent) 
+		for (i = 0; i < newColStructList.size(); i++)
 		{
-			vector<ExtentInfo> colExtentInfo;
-			vector<ExtentInfo> dictExtentInfo;
-			vector<ExtentInfo> fileInfo;
-			ExtentInfo info;
-
-			for (i = 0; i < newColStructList.size(); i++)
-			{
-				info.oid          = newColStructList[i].dataOid;
+				info.oid = newColStructList[i].dataOid;
 				info.partitionNum = newColStructList[i].fColPartition;
-				info.segmentNum   = newColStructList[i].fColSegment;
-				info.dbRoot       = newColStructList[i].fColDbRoot;
+				info.segmentNum = newColStructList[i].fColSegment;
+				info.dbRoot = newColStructList[i].fColDbRoot;
 				if (newFile)
 					fileInfo.push_back (info);
 					
 				colExtentInfo.push_back (info);
-			}
-
-			int rc1 = BRMWrapper::getInstance()->deleteEmptyColExtents(colExtentInfo);
-
-			// Only rollback dictionary extents "if" store file is new
-			if ((rc1 == 0) && newFile)
-        	{
-				for (unsigned int j = 0; j < fileInfo.size(); j++)
-				{
-					// ignore return code and delete what we can
-					rc1 = colOp->deleteFile(fileInfo[j].oid,
-						fileInfo[j].dbRoot,
-						fileInfo[j].partitionNum,
-						fileInfo[j].segmentNum);
-				}
-				fileInfo.clear();
-
-				for (i = 0; i < newDctnryStructList.size(); i++)
-				{
-					if (newDctnryStructList[i].dctnryOid > 0)
-					{
-						info.oid          = newDctnryStructList[i].dctnryOid;
-						info.partitionNum = newDctnryStructList[i].fColPartition;
-						info.segmentNum   = newDctnryStructList[i].fColSegment;
-						info.dbRoot       = newDctnryStructList[i].fColDbRoot;
-						info.newFile      = true;
-						fileInfo.push_back (info);
-						dictExtentInfo.push_back (info);
-					}
-				}
-
-				if (dictExtentInfo.size() > 0)
-				{
-					FileOp fileOp;
-					rc1 = BRMWrapper::getInstance()->deleteEmptyDictStoreExtents(dictExtentInfo);
-					if ( rc1 != NO_ERROR)
-						return rc;
-					for (unsigned j = 0; j < fileInfo.size(); j++)
-					{
-						rc1 = fileOp.deleteFile(fileInfo[j].oid,
-							fileInfo[j].dbRoot,
-							fileInfo[j].partitionNum,
-							fileInfo[j].segmentNum);
-					}
+		}
+		int rc1 = BRMWrapper::getInstance()->deleteEmptyColExtents(colExtentInfo);
+		if ((rc1 == 0) &&  newFile)
+        {
+			FileOp fileOp;
+           rc1 = colOp->deleteFile(fileInfo[0].oid, fileInfo[0].dbRoot, fileInfo[0].partitionNum, fileInfo[0].segmentNum);
+		   if ( rc1 != NO_ERROR)
+				return rc;
+		   for (i = 0; i < newDctnryStructList.size(); i++)
+		   {
+				if (newDctnryStructList[i].dctnryOid > 0)
+				{    
+					info.oid = newDctnryStructList[i].dctnryOid;
+					info.partitionNum = newDctnryStructList[i].fColPartition;
+					info.segmentNum = newDctnryStructList[i].fColSegment;
+					info.dbRoot = newDctnryStructList[i].fColDbRoot;
+					info.newFile = true;
+					fileInfo.push_back (info);
+					dictExtentInfo.push_back (info);
 				}
 			}
-		} // disk space error allocating new extent
-
-		return rc;
-	}     // rc != NO_ERROR from call to allocRowID()
+			if (dictExtentInfo.size() > 0)
+			{
+				rc1 = BRMWrapper::getInstance()->deleteEmptyDictStoreExtents(dictExtentInfo);
+				if ( rc1 != NO_ERROR)
+					return rc;
+				for (unsigned j = 0; j < fileInfo.size(); j++)
+				{
+					rc1 = fileOp.deleteFile(fileInfo[j].oid, fileInfo[j].dbRoot,
+                                             fileInfo[j].partitionNum, fileInfo[j].segmentNum);
+				}
+			}
+        }
+   }
    
 #ifdef PROFILE
 timer.stop("allocRowId");
 #endif
 
-	TableMetaData* aTableMetaData= TableMetaData::makeTableMetaData(tableOid);
-	//--------------------------------------------------------------------------
-	// Expand initial abbreviated extent if any RID in 1st extent is > 256K.
-	// if totalRow == rowsLeft, then not adding rows to 1st extent, so skip it.
-	//--------------------------------------------------------------------------
+   //..Expand initial abbreviated extent if any RID in 1st extent is > 256K
 // DMC-SHARED_NOTHING_NOTE: Is it safe to assume only part0 seg0 is abbreviated?
-	if ((colStructList[0].fColPartition == 0) &&
-		(colStructList[0].fColSegment   == 0) &&
-		((totalRow-rowsLeft) > 0) &&
-		(rowIdArray[totalRow-rowsLeft-1] >= (RID)INITIAL_EXTENT_ROWS_TO_DISK))
-	{
-		for (unsigned k=1; k<colStructList.size(); k++)
-		{
-			Column expandCol;
-			colOp = m_colOp[op(colStructList[k].fCompressionType)];
-			colOp->setColParam(expandCol, 0,
-				colStructList[k].colWidth,
-				colStructList[k].colDataType,
-				colStructList[k].colType,
-				colStructList[k].dataOid,
-				colStructList[k].fCompressionType,
-				colStructList[k].fColDbRoot,
-				colStructList[k].fColPartition,
-				colStructList[k].fColSegment);
-			rc = colOp->openColumnFile(expandCol, segFile, true); // @bug 5572 HDFS tmp file
-			if (rc == NO_ERROR)
-			{
-				if (colOp->abbreviatedExtent(
-					expandCol.dataFile.pFile, colStructList[k].colWidth))
-				{
-					rc = colOp->expandAbbrevExtent(expandCol);
-				}
-			}
-
-			colOp->clearColumn(expandCol); // closes the file
-			if (rc != NO_ERROR)
-			{
-				return rc;
-			}
-		} // loop through columns
-	}     // if starting extent needs to be expanded
+   if ((partitionNum == 0) &&
+       (segmentNum   == 0) &&
+       ((totalRow-rowsLeft) > 0) &&
+       (rowIdArray[totalRow-rowsLeft-1] >= (RID)INITIAL_EXTENT_ROWS_TO_DISK))
+   {
+       for (unsigned k=1; k<colStructList.size(); k++)
+       {
+           Column expandCol;
+           colOp = m_colOp[op(colStructList[k].fCompressionType)];
+           colOp->setColParam(expandCol, 0,
+               colStructList[k].colWidth,
+               colStructList[k].colDataType,
+               colStructList[k].colType,
+               colStructList[k].dataOid,
+               colStructList[k].fCompressionType,
+               dbRoot,
+               partitionNum,
+               segmentNum);
+           rc = colOp->openColumnFile(expandCol, segFile);
+           if (rc == NO_ERROR)
+           {
+               if (colOp->abbreviatedExtent(expandCol.dataFile.pFile, colStructList[k].colWidth))
+               {
+                   rc = colOp->expandAbbrevExtent(expandCol);
+               }
+           }
+           if (rc != NO_ERROR)
+           {
+               if (newExtent)
+               {
+                   //Remove the empty extent added to the first column
+                   int rc1 = BRMWrapper::getInstance()->
+                                 deleteEmptyColExtents(colExtentInfo);
+                   if ((rc1 == 0) && newFile)
+                   {
+                       rc1 = colOp->deleteFile(fileInfo[0].oid,
+                                                fileInfo[0].dbRoot,
+                                                fileInfo[0].partitionNum,
+                                                fileInfo[0].segmentNum);
+                   }
+               }
+               colOp->clearColumn(expandCol); // closes the file
+               return rc;
+           }
+           colOp->clearColumn(expandCol); // closes the file
+       }
+   }
 	
-	//--------------------------------------------------------------------------
-	// Tokenize data if needed
-	//--------------------------------------------------------------------------
-	dictStr::iterator dctStr_iter;
-	ColTupleList::iterator col_iter;
-	for (unsigned i = 0; i < colStructList.size(); i++)
-	{
-		if (colStructList[i].tokenFlag)
-		{
-			dctStr_iter = dictStrList[i].begin();
-			col_iter = colValueList[i].begin();
-			Dctnry* dctnry = m_dctnry[op(dctnryStructList[i].fCompressionType)];
+   //Tokenize data if needed
+   dictStr::iterator dctStr_iter;
+   ColTupleList::iterator col_iter;
+   for (unsigned i = 0; i < colStructList.size(); i++)
+   {
+      if (colStructList[i].tokenFlag)
+      {
+         dctStr_iter = dictStrList[i].begin();
+         col_iter = colValueList[i].begin();
+         Dctnry* dctnry = m_dctnry[op(dctnryStructList[i].fCompressionType)];
 
-			ColExtsInfo aColExtsInfo = aTableMetaData->getColExtsInfo(dctnryStructList[i].dctnryOid);
-			ColExtsInfo::iterator it = aColExtsInfo.begin();
-			if (bUseStartExtent)
-			{
-				rc = dctnry->openDctnry(dctnryStructList[i].dctnryOid,
-					dctnryStructList[i].fColDbRoot,
-					dctnryStructList[i].fColPartition,
-					dctnryStructList[i].fColSegment,
-					true); // @bug 5572 HDFS tmp file
-				if (rc !=NO_ERROR)
-					return rc;
+         dctnryStructList[i].fColPartition = partitionNum;
+         dctnryStructList[i].fColSegment = segmentNum;
+         dctnryStructList[i].fColDbRoot = dbRoot;
+         rc = dctnry->openDctnry(dctnryStructList[i].dctnryOid,
+                     dctnryStructList[i].fColDbRoot,
+                     dctnryStructList[i].fColPartition,
+                     dctnryStructList[i].fColSegment);
+         if (rc !=NO_ERROR)
+             return rc;
 
-				while (it != aColExtsInfo.end())
-				{
-					if ((it->dbRoot == dctnryStructList[i].fColDbRoot) && (it->partNum == dctnryStructList[i].fColPartition) && (it->segNum == dctnryStructList[i].fColSegment))
-						break;
-					it++;
-				}
-
-				if (it == aColExtsInfo.end()) //add this one to the list
-				{
-					ColExtInfo aExt;
-					aExt.dbRoot =dctnryStructList[i].fColDbRoot;
-					aExt.partNum = dctnryStructList[i].fColPartition;
-					aExt.segNum = dctnryStructList[i].fColSegment;
-					aExt.compType = dctnryStructList[i].fCompressionType;	
-					aExt.isDict = true;			
-					aColExtsInfo.push_back(aExt);
-					aTableMetaData->setColExtsInfo(dctnryStructList[i].dctnryOid, aColExtsInfo);
-				}
-				
-				
-				for (uint32_t rows = 0; rows < (totalRow - rowsLeft); rows++)
-				{
-					if (dctStr_iter->length() == 0)
-					{
-						Token nullToken;
-						col_iter->data = nullToken;
-					}
-					else
-					{
+         for (uint32_t     rows = 0; rows < (totalRow - rowsLeft); rows++)
+         {
+             if (dctStr_iter->length() == 0)
+               {
+                   Token nullToken;
+                 col_iter->data = nullToken;
+               }
+             else
+               {
 #ifdef PROFILE
 timer.start("tokenize");
 #endif
-						DctnryTuple dctTuple;
-						memcpy(dctTuple.sigValue, dctStr_iter->c_str(), dctStr_iter->length());
-						dctTuple.sigSize = dctStr_iter->length();
-						dctTuple.isNull = false;
-						rc = tokenize(txnid,
-							dctTuple,
-							dctnryStructList[i].fCompressionType);
-						if (rc != NO_ERROR)
-						{
-							dctnry->closeDctnry();
-							return rc;
-						}
+                 DctnryTuple dctTuple;
+                 memcpy(dctTuple.sigValue, dctStr_iter->c_str(), dctStr_iter->length());
+                 dctTuple.sigSize = dctStr_iter->length();
+                 dctTuple.isNull = false;
+                   rc = tokenize(txnid, dctTuple, dctnryStructList[i].fCompressionType);
+                 if (rc != NO_ERROR)
+                 {
+                     dctnry->closeDctnry();
+                     return rc;
+                 }
 #ifdef PROFILE
 timer.stop("tokenize");
 #endif
-						col_iter->data = dctTuple.token;
-					}
-					dctStr_iter++;
-					col_iter++;
-				}
+                   col_iter->data = dctTuple.token;
+               }
+               dctStr_iter++;
+               col_iter++;
 
-				//close dictionary files
-				rc = dctnry->closeDctnry();
-				if (rc != NO_ERROR)
-					return rc;
-			} // tokenize dictionary rows in 1st extent
+         }
+         //close dictionary files
+         rc = dctnry->closeDctnry();
+         if (rc != NO_ERROR)
+             return rc;
 
-			if (newExtent)
-			{
-				rc = dctnry->openDctnry(newDctnryStructList[i].dctnryOid,
-					newDctnryStructList[i].fColDbRoot,
-					newDctnryStructList[i].fColPartition,
-					newDctnryStructList[i].fColSegment,
-					false); // @bug 5572 HDFS tmp file
-				if (rc !=NO_ERROR)
-					return rc;
+         if (newExtent)
+         {
+             rc = dctnry->openDctnry(newDctnryStructList[i].dctnryOid,
+                           newDctnryStructList[i].fColDbRoot,
+                           newDctnryStructList[i].fColPartition,
+                           newDctnryStructList[i].fColSegment);
+             if (rc !=NO_ERROR)
+                 return rc;
 
-				aColExtsInfo = aTableMetaData->getColExtsInfo(newDctnryStructList[i].dctnryOid);
-				it = aColExtsInfo.begin();
-				while (it != aColExtsInfo.end())
-				{
-					if ((it->dbRoot == newDctnryStructList[i].fColDbRoot) && (it->partNum == newDctnryStructList[i].fColPartition) && (it->segNum == newDctnryStructList[i].fColSegment))
-						break;
-					it++;
-				}
-
-				if (it == aColExtsInfo.end()) //add this one to the list
-				{
-					ColExtInfo aExt;
-					aExt.dbRoot =newDctnryStructList[i].fColDbRoot;
-					aExt.partNum = newDctnryStructList[i].fColPartition;
-					aExt.segNum = newDctnryStructList[i].fColSegment;
-					aExt.compType = newDctnryStructList[i].fCompressionType;	
-					aExt.isDict = true;			
-					aColExtsInfo.push_back(aExt);
-					aTableMetaData->setColExtsInfo(newDctnryStructList[i].dctnryOid, aColExtsInfo);
-				}
-				
-				for (uint32_t rows = 0; rows < rowsLeft; rows++)
-				{
-					if (dctStr_iter->length() == 0)
-					{
-						Token nullToken;
-						col_iter->data = nullToken;
-					}
-					else
-					{
+             for (uint32_t     rows = 0; rows < rowsLeft; rows++)
+             {
+             if (dctStr_iter->length() == 0)
+               {
+                   Token nullToken;
+                 col_iter->data = nullToken;
+               }
+             else
+               {
 #ifdef PROFILE
 timer.start("tokenize");
 #endif
-						DctnryTuple dctTuple;
-						memcpy(dctTuple.sigValue, dctStr_iter->c_str(), dctStr_iter->length());
-						dctTuple.sigSize = dctStr_iter->length();
-						dctTuple.isNull = false;
-						rc = tokenize(txnid,
-							dctTuple,
-							newDctnryStructList[i].fCompressionType);
-						if (rc != NO_ERROR)
-						{
-							dctnry->closeDctnry();
-							return rc;
-						}
+                 DctnryTuple dctTuple;
+                 memcpy(dctTuple.sigValue, dctStr_iter->c_str(), dctStr_iter->length());
+                 dctTuple.sigSize = dctStr_iter->length();
+                 dctTuple.isNull = false;
+                 rc = tokenize(txnid, dctTuple, newDctnryStructList[i].fCompressionType);
+                 if (rc != NO_ERROR)
+                 {
+                     dctnry->closeDctnry();
+                     return rc;
+                 }
 #ifdef PROFILE
 timer.stop("tokenize");
 #endif
-						col_iter->data = dctTuple.token;
-					}
-					dctStr_iter++;
-					col_iter++;
-				}
+                     col_iter->data = dctTuple.token;
+                 }
+                 dctStr_iter++;
+                 col_iter++;
+             }
+             //close dictionary files
+             rc = dctnry->closeDctnry();
+             if (rc != NO_ERROR)
+                 return rc;
+         }
+      }
+   }
 
-				//close dictionary files
-				rc = dctnry->closeDctnry();
-				if (rc != NO_ERROR)
-					return rc;
-			} // tokenize dictionary rows in second extent
-		}     // tokenize dictionary columns
-	}         // loop through columns to see which ones need tokenizing
 
-	//----------------------------------------------------------------------
-	// Update column info structure @Bug 1862 set hwm, and
-	// Prepare ValueList for new extent (if applicable)
-	//----------------------------------------------------------------------
-	//@Bug 2205 Check whether all rows go to the new extent
-	RID lastRid = 0;
-	RID lastRidNew = 0;
-	if (totalRow-rowsLeft > 0)
-	{
-		lastRid = rowIdArray[totalRow-rowsLeft-1];
-		lastRidNew = rowIdArray[totalRow-1];
-	}
-	else
-	{
-		lastRid = 0;
-		lastRidNew = rowIdArray[totalRow-1];
-	}
-	//cout << "rowid allocated is "  << lastRid << endl;
-	//if a new extent is created, all the columns in this table should
-	//have their own new extent
+   //Update column info structure @Bug 1862 set hwm
+   //@Bug 2205 Check whether all rows go to the new extent
+   RID lastRid = 0;
+   RID lastRidNew = 0;
+   if (totalRow-rowsLeft > 0)
+   {
+     lastRid = rowIdArray[totalRow-rowsLeft-1];
+     lastRidNew = rowIdArray[totalRow-1];
+   }
+   else
+   {
+     lastRid = 0;
+     lastRidNew = rowIdArray[totalRow-1];
+   }
+   //cout << "rowid allocated is "  << lastRid << endl;
+   //if a new extent is created, all the columns in this table should have their own new extent
 
-	//@Bug 1701. Close the file
-	if (bUseStartExtent)
-	{
-		m_colOp[op(curCol.compressionType)]->clearColumn(curCol);
-	}
-
-	std::vector<BulkSetHWMArg> hwmVecNewext;
-	std::vector<BulkSetHWMArg> hwmVecOldext;
-	if (newExtent) //Save all hwms to set them later.
-	{
-		BulkSetHWMArg aHwmEntryNew;
-		BulkSetHWMArg aHwmEntryOld;
+   //@Bug 1701. Close the file
+   m_colOp[op(curCol.compressionType)]->clearColumn(curCol);
+   std::vector<BulkSetHWMArg> hwmVecNewext;
+   std::vector<BulkSetHWMArg> hwmVecOldext;
+   if (newExtent) //Save all hwms to set them later.
+   {
+	  BulkSetHWMArg aHwmEntryNew;
+	  BulkSetHWMArg aHwmEntryOld;
       
-		bool succFlag = false;
-		unsigned colWidth = 0;
-		int curFbo = 0, curBio;
+      bool succFlag = false;
+      unsigned colWidth = 0;
+      int      curFbo = 0, curBio;
+      for (i=0; i < totalColumns; i++)
+      {
+         colOp = m_colOp[op(newColStructList[i].fCompressionType)];
 
-		for (i=0; i < totalColumns; i++)
-		{
-			colOp = m_colOp[op(newColStructList[i].fCompressionType)];
-
-			// @Bug 2714 need to set hwm for the old extent
-			colWidth = colStructList[i].colWidth;
-			succFlag = colOp->calculateRowId(lastRid,
-				BYTE_PER_BLOCK/colWidth, colWidth, curFbo, curBio);
-			//cout << "insertcolumnrec   oid:rid:fbo:hwm = " <<
-			//colStructList[i].dataOid << ":" << lastRid << ":" <<
-			//curFbo << ":" << hwm << endl;
-			if (succFlag)
+         // @Bug 2714 need to set hwm for the old extent
+         colWidth = colStructList[i].colWidth;
+         succFlag = colOp->calculateRowId(lastRid, BYTE_PER_BLOCK/colWidth, colWidth, curFbo, curBio);
+         //cout << "insertcolumnrec   oid:rid:fbo:hwm = " << colStructList[i].dataOid << ":" << lastRid << ":" << curFbo << ":" << hwm << endl;
+         if (succFlag)
+         {
+            if ((HWM)curFbo > oldHwm)
 			{
-				if ((HWM)curFbo > oldHwm)
-				{
-					aHwmEntryOld.oid     = colStructList[i].dataOid;
-					aHwmEntryOld.partNum = colStructList[i].fColPartition;
-					aHwmEntryOld.segNum  = colStructList[i].fColSegment;
-					aHwmEntryOld.hwm     = curFbo;
-					hwmVecOldext.push_back(aHwmEntryOld);
-				}
+				aHwmEntryOld.oid = colStructList[i].dataOid;
+				aHwmEntryOld.partNum = partitionNum;
+				aHwmEntryOld.segNum = segmentNum;
+				aHwmEntryOld.hwm = curFbo;
+				hwmVecOldext.push_back(aHwmEntryOld);
 			}
-			else
-				return ERR_INVALID_PARAM;
+         }
+         else
+            return ERR_INVALID_PARAM;
 
-			colWidth = newColStructList[i].colWidth;
-			succFlag = colOp->calculateRowId(lastRidNew,
-				BYTE_PER_BLOCK/colWidth, colWidth, curFbo, curBio);
-			if (succFlag)
-			{
-				aHwmEntryNew.oid     = newColStructList[i].dataOid;
-				aHwmEntryNew.partNum = newColStructList[i].fColPartition;
-				aHwmEntryNew.segNum  = newColStructList[i].fColSegment;
-				aHwmEntryNew.hwm     = curFbo;
-				hwmVecNewext.push_back(aHwmEntryNew); 
-			}
-		}
+         colWidth = newColStructList[i].colWidth;
+         succFlag = colOp->calculateRowId(lastRidNew, BYTE_PER_BLOCK/colWidth, colWidth, curFbo, curBio);
+         if (succFlag)
+         {
+			aHwmEntryNew.oid = newColStructList[i].dataOid;
+			aHwmEntryNew.partNum = newColStructList[i].fColPartition;
+			aHwmEntryNew.segNum = newColStructList[i].fColSegment;
+			aHwmEntryNew.hwm = curFbo;
+			hwmVecNewext.push_back(aHwmEntryNew); 
+         }
+      }
 
-		//----------------------------------------------------------------------
-		// Prepare the valuelist for the new extent
-		//----------------------------------------------------------------------
-		ColTupleList colTupleList;
-		ColTupleList newColTupleList;
-		ColTupleList firstPartTupleList;
-		for (unsigned i=0; i < totalColumns; i++)
-		{
-			colTupleList = static_cast<ColTupleList>(colValueList[i]);
-			for (uint64_t j=rowsLeft; j > 0; j--)
-			{
-				newColTupleList.push_back(colTupleList[totalRow-j]);
-			}
-			colNewValueList.push_back(newColTupleList);
+      //Prepare the valuelist for the new extent
+      ColTupleList colTupleList;
+      ColTupleList newColTupleList;
+      ColTupleList firstPartTupleList;
+      for (unsigned i=0; i < totalColumns; i++)
+      {
+         colTupleList = static_cast<ColTupleList>(colValueList[i]);
+         for (uint64_t j=rowsLeft; j > 0; j--)
+         {
+            newColTupleList.push_back(colTupleList[totalRow-j]);
+         }
+         colNewValueList.push_back(newColTupleList);
+         newColTupleList.clear();
+         //upate the oldvalue list for the old extent
+         for (uint64_t j=0; j < (totalRow-rowsLeft); j++)
+         {
+            firstPartTupleList.push_back(colTupleList[j]);
+         }
+         colOldValueList.push_back(firstPartTupleList);
+         firstPartTupleList.clear();
+      }
+   }
 
-			newColTupleList.clear();
-			//upate the oldvalue list for the old extent
-			for (uint64_t j=0; j < (totalRow-rowsLeft); j++)
-			{
-				firstPartTupleList.push_back(colTupleList[j]);
-			}
-			colOldValueList.push_back(firstPartTupleList);
-			firstPartTupleList.clear();
-		}
-	}
-
-	//--------------------------------------------------------------------------
-	//Mark extents invalid
-	//--------------------------------------------------------------------------
-	vector<BRM::LBID_t> lbids;
-	vector<CalpontSystemCatalog::ColDataType> colDataTypes;
-	bool successFlag = true;
-	unsigned width = 0;
-	//BRM::LBID_t lbid;
-	int curFbo = 0, curBio, lastFbo = -1;
-/*	if (totalRow-rowsLeft > 0)
-	{
-		for (unsigned i = 0; i < colStructList.size(); i++)
-		{
-			colOp = m_colOp[op(colStructList[i].fCompressionType)];
-			width = colStructList[i].colWidth;
-			successFlag = colOp->calculateRowId(lastRid ,
-				BYTE_PER_BLOCK/width, width, curFbo, curBio);
-			if (successFlag) {
-				if (curFbo != lastFbo) {
-					RETURN_ON_ERROR(BRMWrapper::getInstance()->getBrmInfo(
-						colStructList[i].dataOid,
-						colStructList[i].fColPartition,
-						colStructList[i].fColSegment, curFbo, lbid));
-					lbids.push_back((BRM::LBID_t)lbid);
-					colDataTypes.push_back(colStructList[i].colDataType);
-				}
-			}
-		}
-	}
-*/
-	lastRid = rowIdArray[totalRow-1];
-	for (unsigned i = 0; i < colStructList.size(); i++)
-	{
-		colOp = m_colOp[op(colStructList[i].fCompressionType)];
-		width = colStructList[i].colWidth;
-		successFlag = colOp->calculateRowId(lastRid ,
-			BYTE_PER_BLOCK/width, width, curFbo, curBio);
-		if (successFlag) 
-		{
-			if (curFbo != lastFbo) 
-			{
-				colDataTypes.push_back(colStructList[i].colDataType);
-				RETURN_ON_ERROR(AddLBIDtoList(txnid,
-					lbids,
-					colDataTypes,
-					colStructList[i],
-					curFbo));
-			}
-		}
-	}
-
-	//cout << "lbids size = " << lbids.size()<< endl;
-	if (lbids.size() > 0)
-		rc = BRMWrapper::getInstance()->markExtentsInvalid(lbids, colDataTypes);
-
-	//--------------------------------------------------------------------------
-	// Write row(s) to database file(s)
-	//--------------------------------------------------------------------------
+   //Mark extents invalid
+   vector<BRM::LBID_t> lbids;
+   bool successFlag = true;
+   unsigned width = 0;
+   BRM::LBID_t lbid;
+   int         curFbo = 0, curBio, lastFbo = -1;
+   if (totalRow-rowsLeft > 0)
+   {
+      for (unsigned i = 0; i < colStructList.size(); i++)
+      {
+         colOp = m_colOp[op(colStructList[i].fCompressionType)];
+         width = colStructList[i].colWidth;
+         successFlag = colOp->calculateRowId(lastRid , BYTE_PER_BLOCK/width, width, curFbo, curBio);
+         if (successFlag) {
+            if (curFbo != lastFbo) {
+               RETURN_ON_ERROR(BRMWrapper::getInstance()->getBrmInfo(
+                   colStructList[i].dataOid, colStructList[i].fColPartition,
+                   colStructList[i].fColSegment, curFbo, lbid));
+               lbids.push_back((BRM::LBID_t)lbid);
+            }
+         }
+      }
+   }
+   lastRid = rowIdArray[totalRow-1];
+   for (unsigned i = 0; i < newColStructList.size(); i++)
+   {
+      colOp = m_colOp[op(newColStructList[i].fCompressionType)];
+      width = newColStructList[i].colWidth;
+      successFlag = colOp->calculateRowId(lastRid , BYTE_PER_BLOCK/width, width, curFbo, curBio);
+      if (successFlag) 
+      {
+         if (curFbo != lastFbo) 
+         {
+             RETURN_ON_ERROR(AddLBIDtoList(txnid,
+                                           lbids,
+                                           newColStructList[i].dataOid,
+                                           newColStructList[i].fColPartition,
+                                           newColStructList[i].fColSegment,
+                                           curFbo));
+         }
+      }
+   }
+   //cout << "lbids size = " << lbids.size()<< endl;
+   if (lbids.size() > 0)
+       rc = BRMWrapper::getInstance()->markExtentsInvalid(lbids);
 #ifdef PROFILE
 timer.start("writeColumnRec");
 #endif
-	if (rc == NO_ERROR)
-	{
-		if (newExtent)
-		{
-			rc = writeColumnRec(txnid, colStructList, colOldValueList,
-				rowIdArray, newColStructList, colNewValueList, tableOid,
-				false); // @bug 5572 HDFS tmp file
-		}
-		else
-		{
-			rc = writeColumnRec(txnid, colStructList, colValueList,
-				rowIdArray, newColStructList, colNewValueList, tableOid,
-				true); // @bug 5572 HDFS tmp file
-		}
-	}
+   if (rc == NO_ERROR)
+   {
+      if (newExtent)
+      {
+         colValueList.clear();
+         rc = writeColumnRec(txnid, colStructList, colOldValueList, colValueList, rowIdArray, newColStructList, colNewValueList);
+      }
+      else
+      {
+         rc = writeColumnRec(txnid, colStructList, colValueList, colOldValueList, rowIdArray, newColStructList, colNewValueList);
+      }
+   }
 #ifdef PROFILE
 timer.stop("writeColumnRec");
 #endif
-//  for (ColTupleList::size_type  i = 0; i < totalRow; i++)
+//   for (ColTupleList::size_type  i = 0; i < totalRow; i++)
 //      ridList.push_back((RID) rowIdArray[i]);
 
-//  if (rc == NO_ERROR)
-//  rc = flushDataFiles(NO_ERROR);
+  // if (rc == NO_ERROR)
+   //   rc = flushDataFiles(NO_ERROR);
 
-	//--------------------------------------------------------------------------
-	// Update BRM
-	//--------------------------------------------------------------------------
 	if ( !newExtent )
 	{
 		//flushVMCache();
-		bool succFlag = false;
-		unsigned colWidth = 0;
-		int  extState;
-		bool extFound;
-		int curFbo = 0, curBio;
-		std::vector<BulkSetHWMArg> hwmVec;
-		for (unsigned i=0; i < totalColumns; i++)
-		{
-			//colOp = m_colOp[op(colStructList[i].fCompressionType)];
-			//Set all columns hwm together
-			BulkSetHWMArg aHwmEntry;
-			RETURN_ON_ERROR(BRMWrapper::getInstance()->getLastHWM_DBroot(
-				colStructList[i].dataOid,
-				colStructList[i].fColDbRoot,
-				colStructList[i].fColPartition,
-				colStructList[i].fColSegment,
-				hwm,
-				extState, extFound));
-			colWidth = colStructList[i].colWidth;
-			succFlag = colOp->calculateRowId(lastRid,
-				BYTE_PER_BLOCK/colWidth, colWidth, curFbo, curBio);
-			//cout << "insertcolumnrec   oid:rid:fbo:hwm = " <<
-			//colStructList[i].dataOid << ":" << lastRid << ":" <<
-			//curFbo << ":" << hwm << endl;
-			if (succFlag)
+	  bool succFlag = false;
+      unsigned colWidth = 0;
+      int curFbo = 0, curBio;
+	  std::vector<BulkSetHWMArg> hwmVec;
+      for (unsigned i=0; i < totalColumns; i++)
+      {
+         //colOp = m_colOp[op(colStructList[i].fCompressionType)];
+		 //Set all columns hwm together
+		 BulkSetHWMArg aHwmEntry;
+         RETURN_ON_ERROR(BRMWrapper::getInstance()->getLastHWM_DBroot(colStructList[i].dataOid, dbRoot, partitionNum, segmentNum, hwm));
+         colWidth = colStructList[i].colWidth;
+         succFlag = colOp->calculateRowId(lastRid, BYTE_PER_BLOCK/colWidth, colWidth, curFbo, curBio);
+         //cout << "insertcolumnrec   oid:rid:fbo:hwm = " << colStructList[i].dataOid << ":" << lastRid << ":" << curFbo << ":" << hwm << endl;
+         if (succFlag)
+         {
+            if ((HWM)curFbo > hwm)
 			{
-				if ((HWM)curFbo > hwm)
-				{
-					aHwmEntry.oid     = colStructList[i].dataOid;
-					aHwmEntry.partNum = colStructList[i].fColPartition;
-					aHwmEntry.segNum  = colStructList[i].fColSegment;
-					aHwmEntry.hwm     = curFbo;
-					hwmVec.push_back(aHwmEntry); 
-				}
+				aHwmEntry.oid = colStructList[i].dataOid;
+				aHwmEntry.partNum = partitionNum;
+				aHwmEntry.segNum = segmentNum;
+				aHwmEntry.hwm = curFbo;
+				hwmVec.push_back(aHwmEntry); 
 			}
-			else
-				return ERR_INVALID_PARAM;
-		}
-
-		std::vector<BRM::CPInfoMerge> mergeCPDataArgs;
-		RETURN_ON_ERROR(BRMWrapper::getInstance()->bulkSetHWMAndCP(
-			hwmVec, mergeCPDataArgs));
+         }
+         else
+            return ERR_INVALID_PARAM;
+       }
+	   std::vector<BRM::CPInfoMerge> mergeCPDataArgs;
+	   RETURN_ON_ERROR(BRMWrapper::getInstance()->bulkSetHWMAndCP( hwmVec, mergeCPDataArgs));
 	}
-	else // if (newExtent)
+	if (newExtent)
 	{
 #ifdef PROFILE
 timer.start("flushVMCache");
 #endif
 		std::vector<BRM::CPInfoMerge> mergeCPDataArgs;
-		if (hwmVecNewext.size() > 0)
-			RETURN_ON_ERROR(BRMWrapper::getInstance()->bulkSetHWMAndCP(
-				hwmVecNewext, mergeCPDataArgs));
-		if (hwmVecOldext.size() > 0)
-			RETURN_ON_ERROR(BRMWrapper::getInstance()->bulkSetHWMAndCP(
-				hwmVecOldext, mergeCPDataArgs));
-		//flushVMCache();
+		RETURN_ON_ERROR(BRMWrapper::getInstance()->bulkSetHWMAndCP( hwmVecNewext, mergeCPDataArgs));
+		RETURN_ON_ERROR(BRMWrapper::getInstance()->bulkSetHWMAndCP( hwmVecOldext, mergeCPDataArgs));
+      //flushVMCache();
 #ifdef PROFILE
 timer.stop("flushVMCache");
 #endif
-	}
+   }
 
 #ifdef PROFILE
 timer.finish();
 #endif
-	//flush PrimProc FD cache moved to we_dmlcommandproc.cpp
-/*	ColsExtsInfoMap colsExtsInfoMap = aTableMetaData->getColsExtsInfoMap();
-	ColsExtsInfoMap::iterator it = colsExtsInfoMap.begin();
-	ColExtsInfo::iterator aIt;
-	std::vector<BRM::FileInfo> files;
-	BRM::FileInfo aFile;
-	while (it != colsExtsInfoMap.end())
-	{
-		aIt = (it->second).begin();
-		aFile.oid = it->first;
-		//cout << "OID:" << aArg.oid; 
-		while (aIt != (it->second).end())
-		{
-			aFile.partitionNum = aIt->partNum;
-			aFile.dbRoot =aIt->dbRoot;
-			aFile.segmentNum = aIt->segNum;
-			aFile.compType = aIt->compType;
-			files.push_back(aFile);
-			//cout <<"Added to files oid:dbroot:part:seg:compType = " << aFile.oid<<":"<<aFile.dbRoot<<":"<<aFile.partitionNum<<":"<<aFile.segmentNum
-			//<<":"<<aFile.compType <<endl;
-			aIt++;
-		}
-		it++;
-	}
-	if ((idbdatafile::IDBPolicy::useHdfs()) && (files.size() > 0))
-		cacheutils::purgePrimProcFdCache(files, Config::getLocalModuleID());
-	TableMetaData::removeTableMetaData(tableOid);	*/
-	return rc;
+   return rc;
 }
 
 /*@brief printInputValue - Print input value
@@ -2808,20 +2308,17 @@ void WriteEngineWrapper::printInputValue(const ColStructList& colStructList,
  *    NO_ERROR if success
  *    others if something wrong in inserting the value
  ***********************************************************/
-int WriteEngineWrapper::processVersionBuffer(IDBDataFile* pFile, const TxnID& txnid,
+int WriteEngineWrapper::processVersionBuffer(FILE* pFile, const TxnID& txnid,
                                              const ColStruct& colStruct, int width,
                                              int totalRow, const RID* rowIdArray, vector<LBIDRange> &  rangeList)
 {
-   if (idbdatafile::IDBPolicy::useHdfs())
-      return 0;
-
    RID         curRowId;
    int         rc = NO_ERROR;
    int         curFbo = 0, curBio, lastFbo = -1;
    bool        successFlag;
    BRM::LBID_t lbid;
    BRM::VER_t  verId = (BRM::VER_t) txnid;
-   vector<uint32_t> fboList;
+   vector<i32> fboList;
    LBIDRange   range;
    ColumnOp* colOp = m_colOp[op(colStruct.fCompressionType)];
 
@@ -2835,7 +2332,7 @@ int WriteEngineWrapper::processVersionBuffer(IDBDataFile* pFile, const TxnID& tx
             RETURN_ON_ERROR(BRMWrapper::getInstance()->getBrmInfo(
                colStruct.dataOid, colStruct.fColPartition, colStruct.fColSegment, curFbo, lbid));
              //cout << "processVersionBuffer is processing lbid  " << lbid << endl;
-             fboList.push_back((uint32_t)curFbo);
+             fboList.push_back((i32)curFbo);
              range.start = lbid;
              range.size = 1;
              rangeList.push_back(range);
@@ -2843,21 +2340,18 @@ int WriteEngineWrapper::processVersionBuffer(IDBDataFile* pFile, const TxnID& tx
          lastFbo = curFbo;
       }
    }
-   std::vector<VBRange> freeList;
+
+
    rc = BRMWrapper::getInstance()->
-                        writeVB(pFile, verId, colStruct.dataOid,fboList, rangeList, colOp, freeList, colStruct.fColDbRoot);
+                        writeVB(pFile, verId, colStruct.dataOid,fboList, rangeList, colOp);
 
    return rc;
 }
 
-int WriteEngineWrapper::processVersionBuffers(IDBDataFile* pFile, const TxnID& txnid,
+int WriteEngineWrapper::processVersionBuffers(FILE* pFile, const TxnID& txnid,
                                               const ColStruct& colStruct, int width,
-                                              int totalRow, const RIDList& ridList,
-                                              vector<LBIDRange> &   rangeList)
+                                              int totalRow, const RIDList& ridList, vector<LBIDRange> &   rangeList)
 {
-   if (idbdatafile::IDBPolicy::useHdfs())
-      return 0;
-
    RID         curRowId;
    int         rc = NO_ERROR;
    int         curFbo = 0, curBio, lastFbo = -1;
@@ -2865,7 +2359,7 @@ int WriteEngineWrapper::processVersionBuffers(IDBDataFile* pFile, const TxnID& t
    BRM::LBID_t lbid;
    BRM::VER_t  verId = (BRM::VER_t) txnid;
    LBIDRange   range;
-   vector<uint32_t> fboList;
+   vector<i32>    fboList;
    //vector<LBIDRange>   rangeList;
    ColumnOp* colOp = m_colOp[op(colStruct.fCompressionType)];
    for (int i = 0; i < totalRow; i++) {
@@ -2878,7 +2372,7 @@ int WriteEngineWrapper::processVersionBuffers(IDBDataFile* pFile, const TxnID& t
             RETURN_ON_ERROR(BRMWrapper::getInstance()->getBrmInfo(
                colStruct.dataOid, colStruct.fColPartition, colStruct.fColSegment, curFbo, lbid));
              //cout << "processVersionBuffer is processing lbid  " << lbid << endl;
-             fboList.push_back((uint32_t)curFbo);
+             fboList.push_back((i32)curFbo);
              range.start = lbid;
              range.size = 1;
              rangeList.push_back(range);
@@ -2888,76 +2382,15 @@ int WriteEngineWrapper::processVersionBuffers(IDBDataFile* pFile, const TxnID& t
    }
 
 //cout << "calling writeVB with blocks " << rangeList.size() << endl;
-	std::vector<VBRange> freeList;
    rc = BRMWrapper::getInstance()->
-                        writeVB(pFile, verId, colStruct.dataOid, fboList, rangeList, colOp, freeList, colStruct.fColDbRoot);
+                        writeVB(pFile, verId, colStruct.dataOid, fboList, rangeList, colOp);
 
-   return rc;
-}
-
-int WriteEngineWrapper::processBeginVBCopy(const TxnID& txnid, const vector<ColStruct>& colStructList, const RIDList& ridList,  
-			std::vector<VBRange>& freeList, vector<vector<uint32_t> >& fboLists, vector<vector<LBIDRange> >& rangeLists,
-			vector<LBIDRange>&   rangeListTot)
-{
-   if (idbdatafile::IDBPolicy::useHdfs())
-      return 0;
-
-   RID         curRowId;
-   int         rc = NO_ERROR;
-   int         curFbo = 0, curBio, lastFbo = -1;
-   bool        successFlag;
-   BRM::LBID_t lbid;
-   LBIDRange   range;
-  
- //StopWatch timer;
-// timer.start("calculation");
-   for (uint32_t j=0; j < colStructList.size(); j++)
-   {
-	vector<uint32_t> fboList;
-   vector<LBIDRange>    rangeList;
-   lastFbo = -1;
-	ColumnOp* colOp = m_colOp[op(colStructList[j].fCompressionType)];
-	
-	ColStruct curColStruct = colStructList[j];	
-	Convertor::convertColType(&curColStruct);
-	
-	for (uint32_t i = 0; i < ridList.size(); i++) {
-      curRowId = ridList[i];
-      //cout << "processVersionBuffer got rid " << curRowId << endl;
-      successFlag = colOp->calculateRowId(curRowId, BYTE_PER_BLOCK/curColStruct.colWidth, curColStruct.colWidth, curFbo, curBio);
-      if (successFlag) {
-         if (curFbo != lastFbo) {
-            //cout << "processVersionBuffer is processing curFbo  " << curFbo << endl;
-            RETURN_ON_ERROR(BRMWrapper::getInstance()->getBrmInfo(
-               colStructList[j].dataOid, colStructList[j].fColPartition, colStructList[j].fColSegment, curFbo, lbid));
-             //cout << "beginVBCopy is processing lbid:transaction  " << lbid <<":"<<txnid<< endl;
-             fboList.push_back((uint32_t)curFbo);
-             range.start = lbid;
-             range.size = 1;
-             rangeList.push_back(range);
-         }
-         lastFbo = curFbo;
-      }
-	}
-
-	BRMWrapper::getInstance()->pruneLBIDList(txnid, &rangeList, &fboList);
-	rangeLists.push_back(rangeList);
-	
-	fboLists.push_back(fboList);
-	rangeListTot.insert(rangeListTot.end(), rangeList.begin(), rangeList.end());
-   }
-
-	if (rangeListTot.size() > 0)
-		rc = BRMWrapper::getInstance()->getDbrmObject()->beginVBCopy(txnid, colStructList[0].fColDbRoot, rangeListTot, freeList);
-//timer.stop("beginVBCopy");
-//timer.finish();
    return rc;
 }
 
 	/**
     * @brief Process versioning for batch insert - only version the hwm block.
     */
-#if 0
  int WriteEngineWrapper::processBatchVersions(const TxnID& txnid, std::vector<Column> columns, std::vector<BRM::LBIDRange> &  rangeList)
  {
 	int rc = 0;
@@ -3007,23 +2440,18 @@ int WriteEngineWrapper::processBeginVBCopy(const TxnID& txnid, const vector<ColS
 	}
 	return rc;
  }
-#endif
+ 
  void WriteEngineWrapper::writeVBEnd(const TxnID& txnid, std::vector<BRM::LBIDRange> &  rangeList)
  {
-	if (idbdatafile::IDBPolicy::useHdfs())
-		return;
-
 	BRMWrapper::getInstance()->writeVBEnd(txnid, rangeList);
  }
-
  int WriteEngineWrapper::updateColumnRec(const TxnID& txnid,
                                       vector<ColStructList>& colExtentsStruct,
                                       ColValueList& colValueList,
                                       vector<void *>& colOldValueList,
                                       vector<RIDList>& ridLists,
                                       vector<DctnryStructList>& dctnryExtentsStruct,
-                                      DctnryValueList& dctnryValueList,
-									  const int32_t tableOid)
+                                      DctnryValueList& dctnryValueList)
 {
    int            rc = 0;
    //RID*           rowIdArray = NULL;
@@ -3034,7 +2462,7 @@ int WriteEngineWrapper::processBeginVBCopy(const TxnID& txnid, const vector<ColS
    ColStructList colStructList;
    DctnryStructList dctnryStructList;
    ColumnOp* colOp = NULL;
-   
+
    for (unsigned extent = 0; extent < numExtents; extent++)
    {
       ridsIter = ridLists[extent].begin();
@@ -3075,7 +2503,7 @@ int WriteEngineWrapper::processBeginVBCopy(const TxnID& txnid, const vector<ColS
                if (!dctCol_iter->isNull)
                {
                   RETURN_ON_ERROR(tokenize(
-                     txnid, dctnryStructList[i], *dctCol_iter, true)); // @bug 5572 HDFS tmp file
+                     txnid, dctnryStructList[i], *dctCol_iter));
                   token = dctCol_iter->token;
 
 #ifdef PROFILE
@@ -3121,12 +2549,11 @@ int WriteEngineWrapper::processBeginVBCopy(const TxnID& txnid, const vector<ColS
       //Mark extents invalid
 	//if (colStructList[0].dataOid < 3000) {
       vector<BRM::LBID_t> lbids;
-      vector<CalpontSystemCatalog::ColDataType> colDataTypes;
       bool successFlag = true;
       unsigned width = 0;
-      int      curFbo = 0, curBio, lastFbo = -1;
+      int         curFbo = 0, curBio, lastFbo = -1;
       rid_iter = ridLists[extent].begin();
-      RID aRid = *rid_iter;
+      i64 aRid = *rid_iter;
       for (unsigned j = 0; j< colStructList.size(); j++)
       {
          colOp = m_colOp[op(colStructList[j].fCompressionType)];
@@ -3141,8 +2568,9 @@ int WriteEngineWrapper::processBeginVBCopy(const TxnID& txnid, const vector<ColS
             {
                 RETURN_ON_ERROR(AddLBIDtoList(txnid,
                                               lbids,
-                                              colDataTypes,
-                                              colStructList[j],
+                                              colStructList[j].dataOid,
+                                              colStructList[j].fColPartition,
+                                              colStructList[j].fColSegment,
                                               curFbo));
             }
          }
@@ -3152,18 +2580,13 @@ int WriteEngineWrapper::processBeginVBCopy(const TxnID& txnid, const vector<ColS
 //timer.start("markExtentsInvalid");
 //#endif
       if (lbids.size() > 0)
-         rc = BRMWrapper::getInstance()->markExtentsInvalid(lbids, colDataTypes);
+         rc = BRMWrapper::getInstance()->markExtentsInvalid(lbids);
 	//}
-	
-	  if ( m_opType != DELETE)
-		m_opType = UPDATE;
       rc = writeColumnRec(txnid, colStructList, colValueList, colOldValueList,
-                          ridLists[extent], tableOid, true, ridLists[extent].size());
+                          ridLists[extent], true, ridLists[extent].size());
 
 //    if (rowIdArray)
 //       free(rowIdArray);
-	
-	m_opType = NOOP;
 	if (rc != NO_ERROR)
 		break;
    }
@@ -3174,20 +2597,18 @@ int WriteEngineWrapper::processBeginVBCopy(const TxnID& txnid, const vector<ColS
 int WriteEngineWrapper::updateColumnRecs(const TxnID& txnid,
                                          vector<ColStruct>& colExtentsStruct,
                                          ColValueList& colValueList,
-                                         const RIDList& ridLists,
-										 const int32_t tableOid)
+                                         const RIDList& ridLists)
 {
     //Mark extents invalid
     //int rc = 0;
     //if (colExtentsStruct[0].dataOid < 3000) 
     //{
     vector<BRM::LBID_t> lbids;
-    vector<CalpontSystemCatalog::ColDataType> colDataTypes;
     ColumnOp* colOp = NULL;
     bool successFlag = true;
     unsigned width = 0;\
-    int curFbo = 0, curBio, lastFbo = -1; 
-    RID aRid = ridLists[0];
+    int         curFbo = 0, curBio, lastFbo = -1; 
+    i64 aRid = ridLists[0];
     int rc = 0;
 
     for (unsigned j = 0; j< colExtentsStruct.size(); j++)
@@ -3204,8 +2625,9 @@ int WriteEngineWrapper::updateColumnRecs(const TxnID& txnid,
             {
                 RETURN_ON_ERROR(AddLBIDtoList(txnid,
                                               lbids,
-                                              colDataTypes,
-                                              colExtentsStruct[j],
+                                              colExtentsStruct[j].dataOid,
+                                              colExtentsStruct[j].fColPartition,
+                                              colExtentsStruct[j].fColSegment,
                                               curFbo));
             }
         }
@@ -3213,21 +2635,19 @@ int WriteEngineWrapper::updateColumnRecs(const TxnID& txnid,
 
     if (lbids.size() > 0)
     {
-//        cout << "BRMWrapper::getInstance()->markExtentsInvalid(lbids); " << lbids.size() << " lbids" << endl;
-        rc = BRMWrapper::getInstance()->markExtentsInvalid(lbids, colDataTypes);
+        cout << "BRMWrapper::getInstance()->markExtentsInvalid(lbids); " << lbids.size() << " lbids" << endl;
+        rc = BRMWrapper::getInstance()->markExtentsInvalid(lbids);
     }
     //}	 
-	if ( m_opType != DELETE)
-		m_opType = UPDATE;
-    rc = writeColumnRecords (txnid, colExtentsStruct, colValueList, ridLists, tableOid);
-	m_opType = NOOP;
+    rc = writeColumnRecords (txnid, colExtentsStruct, colValueList, ridLists);
+
     return rc;
 }
 
 int WriteEngineWrapper::writeColumnRecords(const TxnID& txnid,
                                            vector<ColStruct>& colStructList,
                                            ColValueList& colValueList,
-                                           const RIDList& ridLists, const int32_t tableOid, bool versioning)
+                                           const RIDList& ridLists, bool versioning)
 {
    bool           bExcp;
    int            rc = 0;
@@ -3242,7 +2662,6 @@ int WriteEngineWrapper::writeColumnRecords(const TxnID& txnid,
    totalColumn = colStructList.size();
    totalRow = ridLists.size();
 
-   TableMetaData* aTbaleMetaData = TableMetaData::makeTableMetaData(tableOid);
    for (i = 0; i < totalColumn; i++)
    {
       valArray = NULL;
@@ -3259,43 +2678,18 @@ int WriteEngineWrapper::writeColumnRecords(const TxnID& txnid,
          curColStruct.colDataType, curColStruct.colType, curColStruct.dataOid,
          curColStruct.fCompressionType,
          curColStruct.fColDbRoot, curColStruct.fColPartition, curColStruct.fColSegment);
-		 
-	  ColExtsInfo aColExtsInfo = aTbaleMetaData->getColExtsInfo(curColStruct.dataOid);
-	  ColExtsInfo::iterator it = aColExtsInfo.begin();
-	  while (it != aColExtsInfo.end())
-	  {
-		if ((it->dbRoot == curColStruct.fColDbRoot) && (it->partNum == curColStruct.fColPartition) && (it->segNum == curColStruct.fColSegment))
-			break;
-		it++;
-	  }
-
-	  if (it == aColExtsInfo.end()) //add this one to the list
-	  {
-		ColExtInfo aExt;
-		aExt.dbRoot =curColStruct.fColDbRoot;
-		aExt.partNum = curColStruct.fColPartition;
-		aExt.segNum = curColStruct.fColSegment;
-		aExt.compType = curColStruct.fCompressionType;	
-		aExt.isDict = false;		
-		aColExtsInfo.push_back(aExt);
-		aTbaleMetaData->setColExtsInfo(colStructList[i].dataOid, aColExtsInfo);
-	  }
-	
       string segFile;
-      rc = colOp->openColumnFile(curCol, segFile, true); // @bug 5572 HDFS tmp file
+      rc = colOp->openColumnFile(curCol, segFile, IO_BUFF_SIZE);
       if (rc != NO_ERROR)
          break;
 	  vector<LBIDRange>   rangeList;
-	  if (versioning) {
+	  if (versioning)
 			rc = processVersionBuffers(curCol.dataFile.pFile, txnid, curColStruct,
                                  curColStruct.colWidth, totalRow, ridLists, rangeList);
-	  }
 
       if (rc != NO_ERROR) {
 		if (curColStruct.fCompressionType == 0)
-		{
-			curCol.dataFile.pFile->flush();
-		}
+			fflush(curCol.dataFile.pFile);
     	BRMWrapper::getInstance()->writeVBEnd(txnid, rangeList);
         break;
       }
@@ -3304,9 +2698,6 @@ int WriteEngineWrapper::writeColumnRecords(const TxnID& txnid,
       {
          case WriteEngine::WR_INT:
             valArray = (int*) calloc(sizeof(int), totalRow);
-            break;
-         case WriteEngine::WR_UINT:
-            valArray = (uint32_t*) calloc(sizeof(uint32_t), totalRow);
             break;
          case WriteEngine::WR_VARBINARY : // treat same as char for now
          case WriteEngine::WR_CHAR:
@@ -3322,20 +2713,11 @@ int WriteEngineWrapper::writeColumnRecords(const TxnID& txnid,
          case WriteEngine::WR_BYTE:
             valArray = (char*) calloc(sizeof(char), totalRow);
             break;
-         case WriteEngine::WR_UBYTE:
-            valArray = (uint8_t*) calloc(sizeof(uint8_t), totalRow);
-            break;
          case WriteEngine::WR_SHORT:
             valArray = (short*) calloc(sizeof(short), totalRow);
             break;
-         case WriteEngine::WR_USHORT:
-            valArray = (uint16_t*) calloc(sizeof(uint16_t), totalRow);
-            break;
          case WriteEngine::WR_LONGLONG:
             valArray = (long long*) calloc(sizeof(long long), totalRow);
-            break;
-         case WriteEngine::WR_ULONGLONG:
-            valArray = (uint64_t*) calloc(sizeof(uint64_t), totalRow);
             break;
          case WriteEngine::WR_TOKEN:
             valArray = (Token*) calloc(sizeof(Token), totalRow);
@@ -3362,18 +2744,6 @@ timer.start("writeRow ");
 timer.stop("writeRow ");
 #endif
       colOp->clearColumn(curCol);
-	  if (curColStruct.fCompressionType == 0)
-	  {
-		std::vector<BRM::FileInfo> files;
-		BRM::FileInfo aFile;			
-		aFile.partitionNum = curColStruct.fColPartition;
-		aFile.dbRoot =curColStruct.fColDbRoot;;
-		aFile.segmentNum = curColStruct.fColSegment;
-		aFile.compType = curColStruct.fCompressionType;
-		files.push_back(aFile);
-		if (idbdatafile::IDBPolicy::useHdfs())
-			cacheutils::purgePrimProcFdCache(files, Config::getLocalModuleID());
-	  }
 	  BRMWrapper::getInstance()->writeVBEnd(txnid, rangeList);
       if (valArray != NULL)
          free(valArray);
@@ -3398,49 +2768,52 @@ timer.stop("writeRow ");
  *    colNewStructList - the new extent struct list
  *    colNewValueList - column value list for the new extent
  *    rowIdArray -  row id list
- *    useTmpSuffix - use temp suffix for db output file
  * RETURN:
  *    NO_ERROR if success
  *    others if something wrong in inserting the value
  ***********************************************************/
 int WriteEngineWrapper::writeColumnRec(const TxnID& txnid,
                                        const ColStructList& colStructList,
-                                       ColValueList& colValueList,
+                                       const ColValueList& colValueList,
+                                       ColValueList& colOldValueList,
                                        RID* rowIdArray,
                                        const ColStructList& newColStructList,
-                                       ColValueList& newColValueList,
-									   const int32_t tableOid,
-									   bool useTmpSuffix,
+                                       const ColValueList& newColValueList,
 									   bool versioning)
 {
    bool           bExcp;
    int            rc = 0;
    void*          valArray;
+   void*          oldValArray = NULL;
    string         segFile;
    Column         curCol;
-   ColTupleList   oldTupleList;
+   ColStruct      curColStruct;
+   ColTupleList   curTupleList, oldTupleList;
    ColStructList::size_type  totalColumn;
    ColStructList::size_type  i;
    ColTupleList::size_type   totalRow1, totalRow2;
 
    setTransId(txnid);
 
+   colOldValueList.clear();
    totalColumn = colStructList.size();
 #ifdef PROFILE
 StopWatch timer;
 #endif
    if (newColValueList.size() > 0)
-   { 
-       totalRow1 = colValueList[0].size();
-       totalRow2 = newColValueList[0].size();
+   {
+       curTupleList = static_cast<ColTupleList>(colValueList[0]);
+       totalRow1 = curTupleList.size();
+       curTupleList = static_cast<ColTupleList>(newColValueList[0]);
+       totalRow2 = curTupleList.size();
    }
    else
    {
-       totalRow1 = colValueList[0].size();
+       curTupleList = static_cast<ColTupleList>(colValueList[0]);
+       totalRow1 = curTupleList.size();
        totalRow2 = 0;
    }
 
-	TableMetaData* aTbaleMetaData = TableMetaData::makeTableMetaData(tableOid);
    for (i = 0; i < totalColumn; i++) {
       if (totalRow2 > 0)
       {
@@ -3451,37 +2824,19 @@ StopWatch timer;
             //Write the first batch
             valArray = NULL;
             RID * firstPart = rowIdArray;
-            ColumnOp* colOp = m_colOp[op(colStructList[i].fCompressionType)];
+            curColStruct = colStructList[i];
+            curTupleList = colValueList[i];
+            ColumnOp* colOp = m_colOp[op(curColStruct.fCompressionType)];
 
             // set params
             colOp->initColumn(curCol);
             // need to pass real dbRoot, partition, and segment to setColParam
-            colOp->setColParam(curCol, 0, colStructList[i].colWidth,
-            colStructList[i].colDataType, colStructList[i].colType, colStructList[i].dataOid,
-            colStructList[i].fCompressionType, colStructList[i].fColDbRoot,
-            colStructList[i].fColPartition, colStructList[i].fColSegment);
-			
-			ColExtsInfo aColExtsInfo = aTbaleMetaData->getColExtsInfo(colStructList[i].dataOid);
-			ColExtsInfo::iterator it = aColExtsInfo.begin();
-			while (it != aColExtsInfo.end())
-			{
-				if ((it->dbRoot == colStructList[i].fColDbRoot) && (it->partNum == colStructList[i].fColPartition) && (it->segNum == colStructList[i].fColSegment))
-					break;
-				it++;
-			}
+            colOp->setColParam(curCol, 0, curColStruct.colWidth,
+            curColStruct.colDataType, curColStruct.colType, curColStruct.dataOid,
+            curColStruct.fCompressionType, curColStruct.fColDbRoot,
+            curColStruct.fColPartition, curColStruct.fColSegment);
 
-			if (it == aColExtsInfo.end()) //add this one to the list
-			{
-				ColExtInfo aExt;
-				aExt.dbRoot =colStructList[i].fColDbRoot;
-				aExt.partNum = colStructList[i].fColPartition;
-				aExt.segNum = colStructList[i].fColSegment;
-				aExt.compType = colStructList[i].fCompressionType;		
-				aColExtsInfo.push_back(aExt);
-				aTbaleMetaData->setColExtsInfo(colStructList[i].dataOid, aColExtsInfo);
-			}
-
-            rc = colOp->openColumnFile(curCol, segFile, useTmpSuffix, IO_BUFF_SIZE); // @bug 5572 HDFS tmp file
+            rc = colOp->openColumnFile(curCol, segFile, IO_BUFF_SIZE);
             if (rc != NO_ERROR)
                break;
 
@@ -3489,13 +2844,11 @@ StopWatch timer;
 			vector<LBIDRange>   rangeList;
 			if (versioning)
 			{
-					rc = processVersionBuffer(curCol.dataFile.pFile, txnid, colStructList[i],
-                                      colStructList[i].colWidth, totalRow1, firstPart, rangeList);
+					rc = processVersionBuffer(curCol.dataFile.pFile, txnid, curColStruct,
+                                      curColStruct.colWidth, totalRow1, firstPart, rangeList);
 				if (rc != NO_ERROR) {
-					if (colStructList[i].fCompressionType == 0)
-					{
-						curCol.dataFile.pFile->flush();
-					}
+					if (curColStruct.fCompressionType == 0)
+						fflush(curCol.dataFile.pFile);
 	
 					BRMWrapper::getInstance()->writeVBEnd(txnid, rangeList);
 					break;
@@ -3505,45 +2858,47 @@ StopWatch timer;
             //totalRow1 -= totalRow2;
             // have to init the size here
             // nullArray = (bool*) malloc(sizeof(bool) * totalRow);
-            switch (colStructList[i].colType)
+            switch (curColStruct.colType)
             {
                case WriteEngine::WR_INT:
                   valArray = (int*) calloc(sizeof(int), totalRow1);
-                  break;
-               case WriteEngine::WR_UINT:
-                  valArray = (uint32_t*) calloc(sizeof(uint32_t), totalRow1);
+                  oldValArray = (int*) calloc(sizeof(int), totalRow1);
                   break;
                case WriteEngine::WR_VARBINARY : // treat same as char for now
                case WriteEngine::WR_CHAR:
                case WriteEngine::WR_BLOB:
                   valArray = (char*) calloc(sizeof(char), totalRow1 * MAX_COLUMN_BOUNDARY);
+                  oldValArray = (char*) calloc(sizeof(char), totalRow1 * MAX_COLUMN_BOUNDARY);
                   break;
+//             case WriteEngine::WR_LONG:
+//                valArray = (long*) calloc(sizeof(long), totalRow1);
+//                break;
                case WriteEngine::WR_FLOAT:
                   valArray = (float*) calloc(sizeof(float), totalRow1);
+                  oldValArray = (float*) calloc(sizeof(float), totalRow1);
                   break;
                case WriteEngine::WR_DOUBLE:
                   valArray = (double*) calloc(sizeof(double), totalRow1);
+                  oldValArray = (double*) calloc(sizeof(double), totalRow1);
                   break;
+//             case WriteEngine::WR_BIT:
+//                valArray = (bool*) calloc(sizeof(bool), totalRow1);
+//                break;
                case WriteEngine::WR_BYTE:
                   valArray = (char*) calloc(sizeof(char), totalRow1);
-                  break;
-               case WriteEngine::WR_UBYTE:
-                  valArray = (uint8_t*) calloc(sizeof(uint8_t), totalRow1);
+                  oldValArray = (char*) calloc(sizeof(char), totalRow1);
                   break;
                case WriteEngine::WR_SHORT:
                   valArray = (short*) calloc(sizeof(short), totalRow1);
-                  break;
-               case WriteEngine::WR_USHORT:
-                  valArray = (uint16_t*) calloc(sizeof(uint16_t), totalRow1);
+                  oldValArray = (short*) calloc(sizeof(short), totalRow1);
                   break;
                case WriteEngine::WR_LONGLONG:
                   valArray = (long long*) calloc(sizeof(long long), totalRow1);
-                  break;
-               case WriteEngine::WR_ULONGLONG:
-                  valArray = (uint64_t*) calloc(sizeof(uint64_t), totalRow1);
+                  oldValArray = (long long*) calloc(sizeof(long long), totalRow1);
                   break;
                case WriteEngine::WR_TOKEN:
                   valArray = (Token*) calloc(sizeof(Token), totalRow1);
+                  oldValArray = (Token*) calloc(sizeof(Token), totalRow1);
                   break;
             }
 
@@ -3551,7 +2906,7 @@ StopWatch timer;
             if (m_opType != DELETE) {
                bExcp = false;
                try {
-                 convertValArray(totalRow1, colStructList[i].colType, colValueList[i], valArray);
+                  convertValArray(totalRow1, curColStruct.colType, curTupleList, valArray);
                }
                catch(...) {
                   bExcp = true;
@@ -3564,7 +2919,7 @@ StopWatch timer;
 #ifdef PROFILE
 timer.start("writeRow ");
 #endif
-               rc = colOp->writeRow(curCol, totalRow1, firstPart, valArray);
+               rc = colOp->writeRow(curCol, totalRow1, firstPart, valArray, oldValArray);
 #ifdef PROFILE
 timer.stop("writeRow ");
 #endif
@@ -3574,11 +2929,19 @@ timer.stop("writeRow ");
 #ifdef PROFILE
 timer.start("writeRow ");
 #endif
-               rc = colOp->writeRow(curCol, totalRow1, rowIdArray, valArray, true);
+               rc = colOp->writeRow(curCol, totalRow1, rowIdArray, valArray, oldValArray, true);
 #ifdef PROFILE
 timer.stop("writeRow ");
 #endif
             }
+
+            // convert values to old value list
+            oldTupleList.clear();
+            convertValArray(totalRow1, curColStruct.colType, oldTupleList, oldValArray, false);
+            colOldValueList.push_back(oldTupleList);
+
+            // clean
+            curTupleList.clear();
 
             colOp->clearColumn(curCol);
 			
@@ -3588,6 +2951,9 @@ timer.stop("writeRow ");
             if (valArray != NULL)
                free(valArray);
 
+            if (oldValArray != NULL)
+               free(oldValArray);
+
             // check error
             if (rc != NO_ERROR)
                break;
@@ -3595,39 +2961,18 @@ timer.stop("writeRow ");
          //Process the second batch
          valArray = NULL;
 
-         ColumnOp* colOp = m_colOp[op(newColStructList[i].fCompressionType)];
+         curColStruct = newColStructList[i];
+         curTupleList = newColValueList[i];
+         ColumnOp* colOp = m_colOp[op(curColStruct.fCompressionType)];
 
          // set params
          colOp->initColumn(curCol);
-         colOp->setColParam(curCol, 0, newColStructList[i].colWidth,
-            newColStructList[i].colDataType, newColStructList[i].colType, newColStructList[i].dataOid,
-            newColStructList[i].fCompressionType, newColStructList[i].fColDbRoot,
-            newColStructList[i].fColPartition, newColStructList[i].fColSegment);
+         colOp->setColParam(curCol, 0, curColStruct.colWidth,
+            curColStruct.colDataType, curColStruct.colType, curColStruct.dataOid,
+            curColStruct.fCompressionType, curColStruct.fColDbRoot,
+            curColStruct.fColPartition, curColStruct.fColSegment);
 
-		ColExtsInfo aColExtsInfo = aTbaleMetaData->getColExtsInfo(newColStructList[i].dataOid);
-		ColExtsInfo::iterator it = aColExtsInfo.begin();
-		while (it != aColExtsInfo.end())
-		{
-			if ((it->dbRoot == newColStructList[i].fColDbRoot) && (it->partNum == newColStructList[i].fColPartition) && (it->segNum == newColStructList[i].fColSegment))
-				break;
-			it++;
-		}
-
-		if (it == aColExtsInfo.end()) //add this one to the list
-		{
-			ColExtInfo aExt;
-			aExt.dbRoot =newColStructList[i].fColDbRoot;
-			aExt.partNum = newColStructList[i].fColPartition;
-			aExt.segNum = newColStructList[i].fColSegment;
-			aExt.compType = newColStructList[i].fCompressionType;		
-			aColExtsInfo.push_back(aExt);
-			aTbaleMetaData->setColExtsInfo(newColStructList[i].dataOid, aColExtsInfo);
-		}
-
-         // Pass "false" for hdfs tmp file flag.  Since we only allow 1
-         // extent per segment file (with HDFS), we can assume a second
-         // extent is going to a new file (and won't need tmp file).
-         rc = colOp->openColumnFile(curCol, segFile, false, IO_BUFF_SIZE); // @bug 5572 HDFS tmp file
+         rc = colOp->openColumnFile(curCol, segFile, IO_BUFF_SIZE);
          if (rc != NO_ERROR)
              break;
 
@@ -3635,13 +2980,11 @@ timer.stop("writeRow ");
 		 vector<LBIDRange>   rangeList;
 		 if (versioning)
 		 {
-			rc = processVersionBuffer(curCol.dataFile.pFile, txnid, newColStructList[i],
-                                   newColStructList[i].colWidth, totalRow2, secondPart, rangeList);
+			rc = processVersionBuffer(curCol.dataFile.pFile, txnid, curColStruct,
+                                   curColStruct.colWidth, totalRow2, secondPart, rangeList);
 			if (rc != NO_ERROR) {
-				if (newColStructList[i].fCompressionType == 0)
-				{
-					curCol.dataFile.pFile->flush();
-				}
+				if (curColStruct.fCompressionType == 0)
+					fflush(curCol.dataFile.pFile);
 				BRMWrapper::getInstance()->writeVBEnd(txnid, rangeList);
 				break;
 			}
@@ -3650,45 +2993,47 @@ timer.stop("writeRow ");
          //totalRow1 -= totalRow2;
          // have to init the size here
 //       nullArray = (bool*) malloc(sizeof(bool) * totalRow);
-         switch (newColStructList[i].colType)
+         switch (curColStruct.colType)
          {
             case WriteEngine::WR_INT:
                valArray = (int*) calloc(sizeof(int), totalRow2);
-               break;
-            case WriteEngine::WR_UINT:
-               valArray = (uint32_t*) calloc(sizeof(uint32_t), totalRow2);
+               oldValArray = (int*) calloc(sizeof(int), totalRow2);
                break;
             case WriteEngine::WR_VARBINARY : // treat same as char for now
             case WriteEngine::WR_CHAR:
             case WriteEngine::WR_BLOB:
                valArray = (char*) calloc(sizeof(char), totalRow2 * MAX_COLUMN_BOUNDARY);
+               oldValArray = (char*) calloc(sizeof(char), totalRow2 * MAX_COLUMN_BOUNDARY);
                break;
+//          case WriteEngine::WR_LONG:
+//             valArray = (long*) calloc(sizeof(long), totalRow);
+//             break;
             case WriteEngine::WR_FLOAT:
                valArray = (float*) calloc(sizeof(float), totalRow2);
+               oldValArray = (float*) calloc(sizeof(float), totalRow2);
                break;
             case WriteEngine::WR_DOUBLE:
                valArray = (double*) calloc(sizeof(double), totalRow2);
+               oldValArray = (double*) calloc(sizeof(double), totalRow2);
                break;
+//          case WriteEngine::WR_BIT:
+//             valArray = (bool*) calloc(sizeof(bool), totalRow);
+//             break;
             case WriteEngine::WR_BYTE:
                valArray = (char*) calloc(sizeof(char), totalRow2);
-               break;
-            case WriteEngine::WR_UBYTE:
-               valArray = (uint8_t*) calloc(sizeof(uint8_t), totalRow2);
+               oldValArray = (char*) calloc(sizeof(char), totalRow2);
                break;
             case WriteEngine::WR_SHORT:
                valArray = (short*) calloc(sizeof(short), totalRow2);
-               break;
-            case WriteEngine::WR_USHORT:
-               valArray = (uint16_t*) calloc(sizeof(uint16_t), totalRow2);
+               oldValArray = (short*) calloc(sizeof(short), totalRow2);
                break;
             case WriteEngine::WR_LONGLONG:
                valArray = (long long*) calloc(sizeof(long long), totalRow2);
-               break;
-            case WriteEngine::WR_ULONGLONG:
-               valArray = (uint64_t*) calloc(sizeof(uint64_t), totalRow2);
+               oldValArray = (long long*) calloc(sizeof(long long), totalRow2);
                break;
             case WriteEngine::WR_TOKEN:
                valArray = (Token*) calloc(sizeof(Token), totalRow2);
+               oldValArray = (Token*) calloc(sizeof(Token), totalRow2);
                break;
          }
 
@@ -3696,7 +3041,7 @@ timer.stop("writeRow ");
          if (m_opType != DELETE) {
             bExcp = false;
             try {
-               convertValArray(totalRow2, newColStructList[i].colType, newColValueList[i], valArray);
+               convertValArray(totalRow2, curColStruct.colType, curTupleList, valArray);
             }
             catch(...) {
                bExcp = true;
@@ -3709,7 +3054,7 @@ timer.stop("writeRow ");
 #ifdef PROFILE
 timer.start("writeRow ");
 #endif
-            rc = colOp->writeRow(curCol, totalRow2, secondPart, valArray);
+            rc = colOp->writeRow(curCol, totalRow2, secondPart, valArray, oldValArray);
 #ifdef PROFILE
 timer.stop("writeRow ");
 #endif
@@ -3719,12 +3064,18 @@ timer.stop("writeRow ");
 #ifdef PROFILE
 timer.start("writeRow ");
 #endif
-            rc = colOp->writeRow(curCol, totalRow2, rowIdArray, valArray, true);
+            rc = colOp->writeRow(curCol, totalRow2, rowIdArray, valArray, oldValArray, true);
 #ifdef PROFILE
 timer.stop("writeRow ");
 #endif
          }
 
+         // convert values to old value list
+         convertValArray(totalRow2, curColStruct.colType, oldTupleList, oldValArray, false);
+         colOldValueList.push_back(oldTupleList);
+
+         // clean
+         curTupleList.clear();
 
          colOp->clearColumn(curCol);
 		 if (versioning)
@@ -3732,6 +3083,9 @@ timer.stop("writeRow ");
 			
          if (valArray != NULL)
             free(valArray);
+
+         if (oldValArray != NULL)
+            free(oldValArray);
 
          // check error
          if (rc != NO_ERROR)
@@ -3741,50 +3095,31 @@ timer.stop("writeRow ");
       {
          valArray = NULL;
 
-         ColumnOp* colOp = m_colOp[op(colStructList[i].fCompressionType)];
+         curColStruct = colStructList[i];
+         curTupleList = colValueList[i];
+         ColumnOp* colOp = m_colOp[op(curColStruct.fCompressionType)];
 
          // set params
          colOp->initColumn(curCol);
-         colOp->setColParam(curCol, 0, colStructList[i].colWidth,
-            colStructList[i].colDataType, colStructList[i].colType, colStructList[i].dataOid,
-            colStructList[i].fCompressionType, colStructList[i].fColDbRoot,
-            colStructList[i].fColPartition, colStructList[i].fColSegment);
+         colOp->setColParam(curCol, 0, curColStruct.colWidth,
+            curColStruct.colDataType, curColStruct.colType, curColStruct.dataOid,
+            curColStruct.fCompressionType, curColStruct.fColDbRoot,
+            curColStruct.fColPartition, curColStruct.fColSegment);
 
-         rc = colOp->openColumnFile(curCol, segFile, useTmpSuffix, IO_BUFF_SIZE); // @bug 5572 HDFS tmp file
+         rc = colOp->openColumnFile(curCol, segFile, IO_BUFF_SIZE);
 		  //cout << " Opened file oid " << curCol.dataFile.pFile << endl;
          if (rc != NO_ERROR)
             break;
 
-		ColExtsInfo aColExtsInfo = aTbaleMetaData->getColExtsInfo(colStructList[i].dataOid);
-			ColExtsInfo::iterator it = aColExtsInfo.begin();
-			while (it != aColExtsInfo.end())
-			{
-				if ((it->dbRoot == colStructList[i].fColDbRoot) && (it->partNum == colStructList[i].fColPartition) && (it->segNum == colStructList[i].fColSegment))
-					break;
-				it++;
-			}
-
-			if (it == aColExtsInfo.end()) //add this one to the list
-			{
-				ColExtInfo aExt;
-				aExt.dbRoot =colStructList[i].fColDbRoot;
-				aExt.partNum = colStructList[i].fColPartition;
-				aExt.segNum = colStructList[i].fColSegment;
-				aExt.compType = colStructList[i].fCompressionType;		
-				aColExtsInfo.push_back(aExt);
-				aTbaleMetaData->setColExtsInfo(colStructList[i].dataOid, aColExtsInfo);
-			}
          // handling versioning
 		 vector<LBIDRange>   rangeList;
 		 if (versioning)
 		 {
-			rc = processVersionBuffer(curCol.dataFile.pFile, txnid, colStructList[i],
-                                   colStructList[i].colWidth, totalRow1, rowIdArray, rangeList);
+			rc = processVersionBuffer(curCol.dataFile.pFile, txnid, curColStruct,
+                                   curColStruct.colWidth, totalRow1, rowIdArray, rangeList);
 				if (rc != NO_ERROR) {
-					if (colStructList[i].fCompressionType == 0)
-					{
-						curCol.dataFile.pFile->flush();
-					}
+					if (curColStruct.fCompressionType == 0)
+						fflush(curCol.dataFile.pFile);
 					BRMWrapper::getInstance()->writeVBEnd(txnid, rangeList);
 				break;
 			}
@@ -3792,45 +3127,47 @@ timer.stop("writeRow ");
 
          // have to init the size here
 //       nullArray = (bool*) malloc(sizeof(bool) * totalRow);
-         switch (colStructList[i].colType)
+         switch (curColStruct.colType)
          {
             case WriteEngine::WR_INT:
                valArray = (int*) calloc(sizeof(int), totalRow1);
-               break;
-            case WriteEngine::WR_UINT:
-               valArray = (uint32_t*) calloc(sizeof(uint32_t), totalRow1);
+               oldValArray = (int*) calloc(sizeof(int), totalRow1);
                break;
             case WriteEngine::WR_VARBINARY : // treat same as char for now
             case WriteEngine::WR_CHAR:
             case WriteEngine::WR_BLOB:
                valArray = (char*) calloc(sizeof(char), totalRow1 * MAX_COLUMN_BOUNDARY);
+               oldValArray = (char*) calloc(sizeof(char), totalRow1 * MAX_COLUMN_BOUNDARY);
                break;
+//          case WriteEngine::WR_LONG:
+//             valArray = (long*) calloc(sizeof(long), totalRow1);
+//             break;
             case WriteEngine::WR_FLOAT:
                valArray = (float*) calloc(sizeof(float), totalRow1);
+               oldValArray = (float*) calloc(sizeof(float), totalRow1);
                break;
             case WriteEngine::WR_DOUBLE:
                valArray = (double*) calloc(sizeof(double), totalRow1);
+               oldValArray = (double*) calloc(sizeof(double), totalRow1);
                break;
+//          case WriteEngine::WR_BIT:
+//             valArray = (bool*) calloc(sizeof(bool), totalRow1);
+//             break;
             case WriteEngine::WR_BYTE:
                valArray = (char*) calloc(sizeof(char), totalRow1);
-               break;
-            case WriteEngine::WR_UBYTE:
-               valArray = (uint8_t*) calloc(sizeof(uint8_t), totalRow1);
+               oldValArray = (char*) calloc(sizeof(char), totalRow1);
                break;
             case WriteEngine::WR_SHORT:
                valArray = (short*) calloc(sizeof(short), totalRow1);
-               break;
-            case WriteEngine::WR_USHORT:
-               valArray = (uint16_t*) calloc(sizeof(uint16_t), totalRow1);
-               break;
+               oldValArray = (short*) calloc(sizeof(short), totalRow1);
+                                              break;
             case WriteEngine::WR_LONGLONG:
                valArray = (long long*) calloc(sizeof(long long), totalRow1);
-               break;
-            case WriteEngine::WR_ULONGLONG:
-               valArray = (uint64_t*) calloc(sizeof(uint64_t), totalRow1);
-               break;
+               oldValArray = (long long*) calloc(sizeof(long long), totalRow1);
+                                              break;
             case WriteEngine::WR_TOKEN:
                valArray = (Token*) calloc(sizeof(Token), totalRow1);
+               oldValArray = (Token*) calloc(sizeof(Token), totalRow1);
                break;
          }
 
@@ -3838,7 +3175,7 @@ timer.stop("writeRow ");
          if (m_opType != DELETE) {
             bExcp = false;
             try {
-              convertValArray(totalRow1, colStructList[i].colType, colValueList[i], valArray);
+              convertValArray(totalRow1, curColStruct.colType, curTupleList, valArray);
             }
             catch(...) {
                bExcp = true;
@@ -3851,7 +3188,7 @@ timer.stop("writeRow ");
 #ifdef PROFILE
 timer.start("writeRow ");
 #endif
-            rc = colOp->writeRow(curCol, totalRow1, rowIdArray, valArray);
+            rc = colOp->writeRow(curCol, totalRow1, rowIdArray, valArray, oldValArray);
 #ifdef PROFILE
 timer.stop("writeRow ");
 #endif
@@ -3861,18 +3198,28 @@ timer.stop("writeRow ");
 #ifdef PROFILE
 timer.start("writeRow ");
 #endif
-         rc = colOp->writeRow(curCol, totalRow1, rowIdArray, valArray, true);
+         rc = colOp->writeRow(curCol, totalRow1, rowIdArray, valArray, oldValArray, true);
 #ifdef PROFILE
 timer.stop("writeRow ");
 #endif
          }
+         // convert values to old value list
+         oldTupleList.clear();
+         convertValArray(totalRow1, curColStruct.colType, oldTupleList, oldValArray, false);
+         colOldValueList.push_back(oldTupleList);
 
+         // clean
+         curTupleList.clear();
+		//cout << " close file oid " << curCol.dataFile.pFile << endl;
          colOp->clearColumn(curCol);
 		 
 		 if (versioning)
 			BRMWrapper::getInstance()->writeVBEnd(txnid, rangeList);
          if (valArray != NULL)
             free(valArray);
+
+         if (oldValArray != NULL)
+            free(oldValArray);
 
          // check error
          if (rc != NO_ERROR)
@@ -3891,7 +3238,6 @@ int WriteEngineWrapper::writeColumnRec(const TxnID& txnid,
                                        const ColValueList& colValueList,
                                        vector<void *>& colOldValueList,
                                        const RIDList& ridList,
-									   const int32_t tableOid,
                                        bool convertStructFlag,
                                        ColTupleList::size_type nRows)
 {
@@ -3914,30 +3260,6 @@ int WriteEngineWrapper::writeColumnRec(const TxnID& txnid,
 StopWatch timer;
 #endif
 
-    vector<LBIDRange>   rangeListTot;
-	std::vector<VBRange> freeList;
-	vector<vector<uint32_t> > fboLists;
-	vector<vector<LBIDRange> > rangeLists;
-	rc = processBeginVBCopy(txnid, colStructList, ridList, freeList, fboLists, rangeLists, rangeListTot);
-	if (rc != NO_ERROR) 
-	{
-		if (rangeListTot.size() > 0)
-			BRMWrapper::getInstance()->writeVBEnd(txnid, rangeListTot);
-		switch (rc)
-		{
-			case BRM::ERR_DEADLOCK: return ERR_BRM_DEAD_LOCK;
-			case BRM::ERR_VBBM_OVERFLOW: return ERR_BRM_VB_OVERFLOW;
-			case BRM::ERR_NETWORK: return ERR_BRM_NETWORK;
-			case BRM::ERR_READONLY: return ERR_BRM_READONLY;
-			default: return ERR_BRM_BEGIN_COPY;
-		}
-	}
-	
-	VBRange aRange;
-	uint32_t blocksProcessedThisOid = 0;
-	uint32_t blocksProcessed = 0;
-	std::vector<BRM::FileInfo> files;
-	TableMetaData* aTbaleMetaData = TableMetaData::makeTableMetaData(tableOid);
    for (i = 0; i < totalColumn; i++)
    {
       valArray = NULL;
@@ -3954,103 +3276,23 @@ StopWatch timer;
          curColStruct.colDataType, curColStruct.colType, curColStruct.dataOid,
          curColStruct.fCompressionType, curColStruct.fColDbRoot,
          curColStruct.fColPartition, curColStruct.fColSegment);
-		
-	  
-		ColExtsInfo aColExtsInfo = aTbaleMetaData->getColExtsInfo(curColStruct.dataOid);
-		ColExtsInfo::iterator it = aColExtsInfo.begin();
-		while (it != aColExtsInfo.end())
-		{
-			if ((it->dbRoot == curColStruct.fColDbRoot) && (it->partNum == curColStruct.fColPartition) && (it->segNum == curColStruct.fColSegment))
-				break;
-			it++;
-		}
-
-		if (it == aColExtsInfo.end()) //add this one to the list
-		{
-			ColExtInfo aExt;
-			aExt.dbRoot =curColStruct.fColDbRoot;
-			aExt.partNum = curColStruct.fColPartition;
-			aExt.segNum = curColStruct.fColSegment;
-			aExt.compType = curColStruct.fCompressionType;		
-			aColExtsInfo.push_back(aExt);
-			aTbaleMetaData->setColExtsInfo(colStructList[i].dataOid, aColExtsInfo);
-		}
-	 
       string segFile;
-      rc = colOp->openColumnFile(curCol, segFile, true, IO_BUFF_SIZE); // @bug 5572 HDFS tmp file
+      rc = colOp->openColumnFile(curCol, segFile, IO_BUFF_SIZE);
       if (rc != NO_ERROR)
          break;
-	  if (curColStruct.fCompressionType == 0)
-	  {
-		BRM::FileInfo aFile;	
-		aFile.oid = curColStruct.dataOid;		
-		aFile.partitionNum = curColStruct.fColPartition;
-		aFile.dbRoot =curColStruct.fColDbRoot;;
-		aFile.segmentNum = curColStruct.fColSegment;
-		aFile.compType = curColStruct.fCompressionType;
-		files.push_back(aFile); 
-	  }
+
       // handling versioning
       //cout << " pass to processVersionBuffer rid " << rowIdArray[0] << endl;
       //cout << "dataOid:fColPartition = " << curColStruct.dataOid << ":" << curColStruct.fColPartition << endl;
 //timer.start("processVersionBuffers");
-	  //vector<LBIDRange>   rangeList;
-     // rc = processVersionBuffers(curCol.dataFile.pFile, txnid, curColStruct, curColStruct.colWidth, totalRow, ridList, rangeList);
-	 std::vector<VBRange> curFreeList;
-	 uint32_t blockUsed = 0;
-	 if (!idbdatafile::IDBPolicy::useHdfs()) {
-	if (rangeListTot.size() > 0) {	
-		if (freeList[0].size >= (blocksProcessed + rangeLists[i].size()))
-		{
-		aRange.vbOID = freeList[0].vbOID;
-		aRange.vbFBO = freeList[0].vbFBO + blocksProcessed;
-		aRange.size = rangeLists[i].size();
-		curFreeList.push_back(aRange);
-		//cout << "range size = " << aRange.size <<" and blocksProcessed = " << blocksProcessed<< endl;
-		}
-		else
-		{
-		aRange.vbOID = freeList[0].vbOID;
-		aRange.vbFBO = freeList[0].vbFBO + blocksProcessed;
-		aRange.size = freeList[0].size - blocksProcessed;
-		blockUsed = aRange.size;
-		curFreeList.push_back(aRange);
-		if (freeList.size() > 1)
-		{
-			aRange.vbOID = freeList[1].vbOID;
-			aRange.vbFBO = freeList[1].vbFBO + blocksProcessedThisOid;
-			aRange.size = rangeLists[i].size()-blockUsed;
-			curFreeList.push_back(aRange);
-			blocksProcessedThisOid += aRange.size;
-		}
-		else
-		{
-			rc = 1;
-			break;
-		}
-		//cout << "curFreeList size = " << curFreeList.size() << endl;
-		
-		}
-	 
-		blocksProcessed += rangeLists[i].size();
-
-        //timer.start("Delete:writeVB");
-        rc = BRMWrapper::getInstance()->
-                       writeVB(curCol.dataFile.pFile, (BRM::VER_t)txnid,
-                       curColStruct.dataOid, fboLists[i], rangeLists[i],
-                       colOp, curFreeList, curColStruct.fColDbRoot, true);
-	    }
-	}
-	 //timer.stop("Delete:writeVB");	
+	  vector<LBIDRange>   rangeList;
+      rc = processVersionBuffers(curCol.dataFile.pFile, txnid, curColStruct, curColStruct.colWidth, totalRow, ridList, rangeList);
 //timer.stop("processVersionBuffers");
       // cout << " rc for processVersionBuffer is " << rc << endl;
       if (rc != NO_ERROR) {
-    	  if (curColStruct.fCompressionType == 0)
-    	  {
-    		  curCol.dataFile.pFile->flush();
-    	  }
-		 if (rangeListTot.size() > 0)
-			BRMWrapper::getInstance()->writeVBEnd(txnid, rangeListTot);
+		if (curColStruct.fCompressionType == 0)
+			fflush(curCol.dataFile.pFile);
+    	 BRMWrapper::getInstance()->writeVBEnd(txnid, rangeList);
          break;
       }
 
@@ -4058,9 +3300,6 @@ StopWatch timer;
       {
          case WriteEngine::WR_INT:
             valArray = (int*) calloc(sizeof(int), 1);
-            break;
-         case WriteEngine::WR_UINT:
-            valArray = (uint32_t*) calloc(sizeof(uint32_t), 1);
             break;
          case WriteEngine::WR_VARBINARY : // treat same as char for now
          case WriteEngine::WR_CHAR:
@@ -4076,20 +3315,11 @@ StopWatch timer;
          case WriteEngine::WR_BYTE:
             valArray = (char*) calloc(sizeof(char), 1);
             break;
-         case WriteEngine::WR_UBYTE:
-            valArray = (uint8_t*) calloc(sizeof(uint8_t), 1);
-            break;
          case WriteEngine::WR_SHORT:
             valArray = (short*) calloc(sizeof(short), 1);
             break;
-         case WriteEngine::WR_USHORT:
-            valArray = (uint16_t*) calloc(sizeof(uint16_t), 1);
-            break;
          case WriteEngine::WR_LONGLONG:
             valArray = (long long*) calloc(sizeof(long long), 1);
-            break;
-         case WriteEngine::WR_ULONGLONG:
-            valArray = (uint64_t*) calloc(sizeof(uint64_t), 1);
             break;
          case WriteEngine::WR_TOKEN:
             valArray = (Token*) calloc(sizeof(Token), 1);
@@ -4109,8 +3339,7 @@ StopWatch timer;
              bExcp = true;
          }
          if (bExcp) {
-			if (rangeListTot.size() > 0)
-				BRMWrapper::getInstance()->writeVBEnd(txnid, rangeListTot);
+        	BRMWrapper::getInstance()->writeVBEnd(txnid, rangeList);
             return ERR_PARSING;
          }
 #ifdef PROFILE
@@ -4133,9 +3362,9 @@ timer.stop("writeRows ");
       }
 
  //     colOldValueList.push_back(oldValArray);
- //timer.start("Delete:closefile");	
+
       colOp->clearColumn(curCol);
-//timer.stop("Delete:closefile");	  
+	  BRMWrapper::getInstance()->writeVBEnd(txnid, rangeList);
       if (valArray != NULL)
          free(valArray);
 
@@ -4144,18 +3373,10 @@ timer.stop("writeRows ");
          break;
 
    } // end of for (i = 0)
-// timer.start("Delete:purgePrimProcFdCache");	
-if ((idbdatafile::IDBPolicy::useHdfs()) && (files.size() > 0))
-	cacheutils::purgePrimProcFdCache(files, Config::getLocalModuleID());
-//if (idbdatafile::IDBPolicy::useHdfs())
-//			cacheutils::dropPrimProcFdCache();
-//timer.stop("Delete:purgePrimProcFdCache");
-if (rangeListTot.size() > 0)	
-	BRMWrapper::getInstance()->writeVBEnd(txnid, rangeListTot);
-//timer.stop("Delete:writecolrec");	
-//#ifdef PROFILE
-//timer.finish();
-//#endif
+
+#ifdef PROFILE
+timer.finish();
+#endif
    return rc;
 }
 
@@ -4204,22 +3425,20 @@ int WriteEngineWrapper::tokenize(const TxnID& txnid, DctnryTuple& dctnryTuple, i
  ***********************************************************/
 int WriteEngineWrapper::tokenize(const TxnID& txnid,
                                  DctnryStruct& dctnryStruct,
-                                 DctnryTuple& dctnryTuple,
-                                 bool useTmpSuffix) // @bug 5572 HDFS tmp file
+                                 DctnryTuple& dctnryTuple)
 {
   //find the corresponding column segment file the token is going to be inserted.
 
   Dctnry* dctnry = m_dctnry[op(dctnryStruct.fCompressionType)];
   int rc = dctnry->openDctnry(dctnryStruct.dctnryOid,
+  //                          dctnryStruct.treeOid, dctnryStruct.listOid,
                               dctnryStruct.fColDbRoot, dctnryStruct.fColPartition,
-                              dctnryStruct.fColSegment,
-                              useTmpSuffix); // @bug 5572 TBD
+                              dctnryStruct.fColSegment);
   if (rc !=NO_ERROR)
     return rc;
 
   rc = tokenize(txnid, dctnryTuple, dctnryStruct.fCompressionType);
-					
-  int rc2 = dctnry->closeDctnry(true); // close file, even if tokenize() fails
+  int rc2 = dctnry->closeDctnry(); // close file, even if tokenize() fails
   if ((rc == NO_ERROR) && (rc2 != NO_ERROR))
     rc = rc2;
   return rc;
@@ -4339,7 +3558,109 @@ int WriteEngineWrapper::bulkRollback(OID   tableOid,
     return rc;
 }
 
-int WriteEngineWrapper::rollbackCommon(const TxnID& txnid, int sessionId)
+int WriteEngineWrapper::rollbackTran(const TxnID& txnid, int sessionId)
+{ 
+	//Remove the unwanted tmp files and recover compressed chunks.
+	string prefix;
+
+    // BUG 4312
+    RemoveTxnFromLBIDMap(txnid);
+
+    config::Config *config = config::Config::makeConfig();
+	prefix = config->getConfig("SystemConfig", "DBRMRoot");
+	if (prefix.length() == 0) {
+		cerr << "Need a valid DBRMRoot entry in Calpont configuation file";
+		return -1;
+	}
+	
+	uint64_t pos =  prefix.find_last_of ("/") ;
+	std::string aDMLLogFileName;
+	if (pos != string::npos)
+	{
+		aDMLLogFileName = prefix.substr(0, pos+1); //Get the file path
+	}
+	else
+	{
+		cerr << "Cannot find the dbrm directory for the DML log file";
+		return -1;
+
+	}
+	std::ostringstream oss;
+	oss << txnid;
+	aDMLLogFileName += "DMLLog_" + oss.str();
+	
+	struct stat stFileInfo; 
+	int intStat = stat(aDMLLogFileName.c_str(),&stFileInfo); 
+	if ( intStat == 0 ) //File exists
+	{
+		std::ifstream	       aDMLLogFile; 
+		aDMLLogFile.open(aDMLLogFileName.c_str(), ios::in);
+
+		if (aDMLLogFile) //need recover
+		{
+			std::string backUpFileType;
+			std::string filename;
+			int64_t size;
+			int64_t offset;
+			while (aDMLLogFile >> backUpFileType >> filename >> size >> offset)
+			{
+				//cout << "Found: " <<  backUpFileType << " name " << filename << "size: " << size << " offset: " << offset << endl;
+				if (backUpFileType.compare("tmp") == 0 )
+				{
+					//remove the tmp file
+					filename += ".tmp";
+					//cout << " File removed: " << filename << endl;
+					remove(filename.c_str());
+				}
+				else
+				{
+					//copy back to the data file
+					std::string backFileName(filename);
+					if (backUpFileType.compare("chk") == 0 )
+						backFileName += ".chk";
+					else
+						backFileName += ".hdr";
+						
+					FILE * sourceFile = fopen(backFileName.c_str(), "rb");
+					FILE * targetFile = fopen(filename.c_str(), "r+b");
+					size_t byteRead;
+					unsigned char* readBuf = new unsigned char[size];
+					boost::scoped_array<unsigned char> readBufPtr( readBuf );
+					if( sourceFile != NULL ) {
+#ifdef _MSC_VER
+						int rc = _fseeki64( sourceFile, offset, 0 );
+#else
+						int rc = fseeko( sourceFile, offset, 0 );
+#endif
+						if (rc)
+							return ERR_FILE_SEEK;
+						byteRead = fread( readBuf, 1, size, sourceFile );
+						if( (int) byteRead != size )
+							return ERR_FILE_READ;
+					}
+					else
+						return ERR_FILE_NULL;
+					size_t byteWrite;
+
+					if( targetFile != NULL ) {
+						byteWrite = fwrite( readBuf, 1, size, targetFile );
+					if( (int) byteWrite != size )
+						return ERR_FILE_WRITE;
+					}
+					else
+						return ERR_FILE_NULL;
+					fclose(targetFile);
+					fclose(sourceFile);
+					remove(backFileName.c_str());
+				}
+			}
+		}
+	}
+	return BRMWrapper::getInstance()->rollBack(txnid, sessionId); 
+	
+}
+
+int WriteEngineWrapper::rollbackBlocks(const TxnID& txnid, int sessionId)
 { 
 	//Remove the unwanted tmp files and recover compressed chunks.
 	string prefix;
@@ -4369,95 +3690,41 @@ int WriteEngineWrapper::rollbackCommon(const TxnID& txnid, int sessionId)
 
 	}
 	std::ostringstream oss;
-	oss << txnid << "_" << Config::getLocalModuleID();
+	oss << txnid;
 	aDMLLogFileName += "DMLLog_" + oss.str();
-
-	if (IDBPolicy::exists(aDMLLogFileName.c_str()))
+	
+	struct stat stFileInfo; 
+	int intStat = stat(aDMLLogFileName.c_str(),&stFileInfo); 
+	if ( intStat == 0 ) //File exists
 	{
-		// TODO-for now the DML log file will always be in a local
-		// filesystem since IDBDataFile doesn't have any support for
-		// a cpp iostream interface.  need to decide if this is ok.
-		boost::scoped_ptr<IDBDataFile> aDMLLogFile(IDBDataFile::open(
-											IDBPolicy::getType(aDMLLogFileName.c_str(),
-											IDBPolicy::WRITEENG),
-											aDMLLogFileName.c_str(), "r", 0));
+		std::ifstream	       aDMLLogFile; 
+		aDMLLogFile.open(aDMLLogFileName.c_str(), ios::in);
 
 		if (aDMLLogFile) //need recover
 		{
-			ssize_t fileSize = aDMLLogFile->size();
-			boost::scoped_array<char> buf(new char[fileSize]);
-			if (aDMLLogFile->read(buf.get(), fileSize) != fileSize)
-				return ERR_FILE_READ;
-
-			std::istringstream strstream(string(buf.get(), fileSize));
 			std::string backUpFileType;
 			std::string filename;
 			int64_t size;
 			int64_t offset;
-			while (strstream >> backUpFileType >> filename >> size >> offset)
+			while (aDMLLogFile >> backUpFileType >> filename >> size >> offset)
 			{
+
 				//cout << "Found: " <<  backUpFileType << " name " << filename << "size: " << size << " offset: " << offset << endl;
 				std::ostringstream oss;
 				oss << "RollbackTran found " <<  backUpFileType << " name " << filename << " size: " << size << " offset: " << offset;
 				logging::Message::Args args;
 				args.add(oss.str());
 				SimpleSysLog::instance()->logMsg(args, logging::LOG_TYPE_INFO, logging::M0007);	
-				if (backUpFileType.compare("rlc") == 0)
+				if (backUpFileType.compare("tmp") == 0 )
 				{
-					//remove the rlc file
-					filename += ".rlc";
+					//remove the tmp file
+					filename += ".tmp";
 					//cout << " File removed: " << filename << endl;
-					IDBPolicy::remove(filename.c_str());
+					remove(filename.c_str());
 					logging::Message::Args args1;
 					args1.add(filename);
 					args1.add(" is removed.");
-					SimpleSysLog::instance()->logMsg(args1, logging::LOG_TYPE_INFO, logging::M0007);
-				}
-				else if (backUpFileType.compare("tmp") == 0)
-				{
-					int rc = NO_ERROR;
-					string orig(filename + ".orig");
-					// restore the orig file
-   					if (IDBPolicy::exists(orig.c_str()))
-					{
-						// not likely both cdf and tmp exist
-						if (IDBPolicy::exists(filename.c_str()) &&
-							IDBPolicy::remove(filename.c_str()) != 0)
-							rc = ERR_COMP_REMOVE_FILE;
-
-						if (rc==NO_ERROR && IDBPolicy::rename(orig.c_str(), filename.c_str())!=0)
-							rc = ERR_COMP_RENAME_FILE;
-					}
-
-   					// remove the tmp file
-					string tmp(filename + ".tmp");
-					if (rc == NO_ERROR && IDBPolicy::exists(tmp.c_str()) &&
-						IDBPolicy::remove(tmp.c_str()) != 0)
-						rc = ERR_COMP_REMOVE_FILE;
-
-   					// remove the chunk shifting helper
-					string rlc(filename + ".rlc");
-					if (rc == NO_ERROR && IDBPolicy::exists(rlc.c_str()) &&
-						IDBPolicy::remove(rlc.c_str()) != 0)
-						rc = ERR_COMP_REMOVE_FILE;
-
-					logging::Message::Args args1;
-					args1.add(filename);
-					if (rc == NO_ERROR)
-					{
-						args1.add(" is restored.");
-						SimpleSysLog::instance()->logMsg(args1,
-														logging::LOG_TYPE_INFO, logging::M0007);
-					}
-					else
-					{
-						args1.add(" may not restored: ");
-						args1.add(rc);
-						SimpleSysLog::instance()->logMsg(args1,
-														logging::LOG_TYPE_CRITICAL, logging::M0007);
-
-						return rc;
-					}
+					SimpleSysLog::instance()->logMsg(args1, logging::LOG_TYPE_INFO, logging::M0007);	
 				}
 				else
 				{
@@ -4468,21 +3735,20 @@ int WriteEngineWrapper::rollbackCommon(const TxnID& txnid, int sessionId)
 					else
 						backFileName += ".hdr";
 					//cout << "Rollback found file " << backFileName << endl;	
-					IDBDataFile* sourceFile = IDBDataFile::open(
-									IDBPolicy::getType(backFileName.c_str(), IDBPolicy::WRITEENG),
-									backFileName.c_str(), "r", 0);
-					IDBDataFile* targetFile = IDBDataFile::open(
-									IDBPolicy::getType(filename.c_str(), IDBPolicy::WRITEENG),
-									filename.c_str(), "r+", 0);
-
+					FILE * sourceFile = fopen(backFileName.c_str(), "rb");
+					FILE * targetFile = fopen(filename.c_str(), "r+b");
 					size_t byteRead;
 					unsigned char* readBuf = new unsigned char[size];
 					boost::scoped_array<unsigned char> readBufPtr( readBuf );
 					if( sourceFile != NULL ) {
-						int rc = sourceFile->seek( 0, 0 );
+#ifdef _MSC_VER
+						int rc = _fseeki64( sourceFile, 0, 0 );
+#else
+						int rc = fseeko( sourceFile, 0, 0 );
+#endif
 						if (rc)
 							return ERR_FILE_SEEK;
-						byteRead = sourceFile->read( readBuf, size );
+						byteRead = fread( readBuf, 1, size, sourceFile );
 						if( (int) byteRead != size )
 						{
 							logging::Message::Args args6;
@@ -4503,18 +3769,20 @@ int WriteEngineWrapper::rollbackCommon(const TxnID& txnid, int sessionId)
 					size_t byteWrite;
 
 					if( targetFile != NULL ) {
-						int rc = targetFile->seek( offset, 0 );
-						if (rc)
-							return ERR_FILE_SEEK;
-						byteWrite = targetFile->write( readBuf, size );
+#ifdef _MSC_VER
+						int rc = _fseeki64( targetFile, offset, 0 );
+#else
+						int rc = fseeko( targetFile, offset, 0 );
+#endif					
+						byteWrite = fwrite( readBuf, 1, size, targetFile );
 						if( (int) byteWrite != size )
 						{
-							logging::Message::Args args3;
-							args3.add("Rollback cannot copy to file ");
-							args3.add(filename);
-							args3.add( "from file ");
-							args3.add(backFileName);
-							SimpleSysLog::instance()->logMsg(args3, logging::LOG_TYPE_ERROR, logging::M0007);	
+							logging::Message::Args arg3;
+							arg3.add("Rollback cannot copy to file ");
+							arg3.add(filename);
+							arg3.add( "from file ");
+							arg3.add(backFileName);
+							SimpleSysLog::instance()->logMsg(arg3, logging::LOG_TYPE_ERROR, logging::M0007);	
 							
 							return ERR_FILE_WRITE;
 						}
@@ -4530,9 +3798,9 @@ int WriteEngineWrapper::rollbackCommon(const TxnID& txnid, int sessionId)
 						
 					//cout << "Rollback copied to file " << filename << " from file " << backFileName << endl;
 					
-					delete targetFile;
-					delete sourceFile;
-					IDBPolicy::remove( backFileName.c_str() );
+					fclose(targetFile);
+					fclose(sourceFile);
+					remove(backFileName.c_str());
 					logging::Message::Args arg1;
 					arg1.add("Rollback copied to file ");
 					arg1.add(filename);
@@ -4542,28 +3810,11 @@ int WriteEngineWrapper::rollbackCommon(const TxnID& txnid, int sessionId)
 				}
 			}
 		}
-
-		IDBPolicy::remove(aDMLLogFileName.c_str());
+		remove (aDMLLogFileName.c_str());	
 	}
-
-	return 0;
-
-}
-
-int WriteEngineWrapper::rollbackTran(const TxnID& txnid, int sessionId)
-{
-	if( rollbackCommon( txnid, sessionId ) != 0 )
-		return -1;
-
-	return BRMWrapper::getInstance()->rollBack(txnid, sessionId);
-}
-
-int WriteEngineWrapper::rollbackBlocks(const TxnID& txnid, int sessionId)
-{ 
-	if( rollbackCommon( txnid, sessionId ) != 0 )
-		return -1;
-
-	return BRMWrapper::getInstance()->rollBackBlocks(txnid, sessionId);
+	
+	return BRMWrapper::getInstance()->rollBackBlocks(txnid, sessionId); 
+	
 }
 
 int WriteEngineWrapper::rollbackVersion(const TxnID& txnid, int sessionId)
@@ -4574,7 +3825,7 @@ int WriteEngineWrapper::rollbackVersion(const TxnID& txnid, int sessionId)
     return BRMWrapper::getInstance()->rollBackVersion(txnid, sessionId); 
 }
 
-int WriteEngineWrapper::updateNextValue(const TxnID txnId, const OID& columnoid, const uint64_t nextVal, const uint32_t sessionID, const uint16_t dbRoot)
+int WriteEngineWrapper::updateNextValue(const OID& columnoid, const long long nextVal, const uint32_t sessionID)
 {
 	int rc = NO_ERROR;
 	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr;
@@ -4586,11 +3837,7 @@ int WriteEngineWrapper::updateNextValue(const TxnID txnId, const OID& columnoid,
 	colStruct.dataOid = OID_SYSCOLUMN_NEXTVALUE;
 	colStruct.colWidth = 8;
 	colStruct.tokenFlag = false;
-	colStruct.colDataType =  CalpontSystemCatalog::UBIGINT;
-	colStruct.fColDbRoot = dbRoot;
-	if (idbdatafile::IDBPolicy::useHdfs())	
-		colStruct.fCompressionType = 2;
-		
+	colStruct.colDataType =  static_cast<WriteEngine::ColDataType>(WriteEngine::BIGINT);
 	colStructList.push_back(colStruct);
 	ColTuple colTuple;
 	systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
@@ -4611,13 +3858,14 @@ int WriteEngineWrapper::updateNextValue(const TxnID txnId, const OID& columnoid,
 	colTuple.data = nextVal;
 	colTuples.push_back(colTuple);		
 	colValueList.push_back(colTuples);
-	//TxnID txnid;
-	rc = writeColumnRecords(txnId, colStructList, colValueList, ridList, SYSCOLUMN_BASE, false);
+	TxnID txnid;
+	rc = writeColumnRecords(txnid, colStructList, colValueList, ridList, false);
 	if (rc != NO_ERROR)
 		return rc;
 		
 	//flush PrimProc cache
 	vector<LBID_t> blockList;
+	execplan::CalpontSystemCatalog::SCN verID = 0;
 	BRM::LBIDRange_v lbidRanges;
 	rc = BRMWrapper::getInstance()->lookupLbidRanges(OID_SYSCOLUMN_NEXTVALUE,
                                                      lbidRanges);
@@ -4632,17 +3880,6 @@ int WriteEngineWrapper::updateNextValue(const TxnID txnId, const OID& columnoid,
 			blockList.push_back(lbid);
 		}
 	}
-	//Bug 5459 Flush FD cache
-	std::vector<BRM::FileInfo> files;
-	BRM::FileInfo aFile;	
-	aFile.oid = colStruct.dataOid;		
-	aFile.partitionNum = colStruct.fColPartition;
-	aFile.dbRoot =colStruct.fColDbRoot;;
-	aFile.segmentNum = colStruct.fColSegment;
-	aFile.compType = colStruct.fCompressionType;
-	files.push_back(aFile);
-	if (idbdatafile::IDBPolicy::useHdfs())
-		cacheutils::purgePrimProcFdCache(files, Config::getLocalModuleID()); 
 	rc = cacheutils::flushPrimProcAllverBlocks (blockList);
 	if (rc != 0)
 		rc = ERR_BLKCACHE_FLUSH_LIST; // translate to WE error
@@ -4666,6 +3903,7 @@ int WriteEngineWrapper::flushDataFiles(int rc, const TxnID txnId, std::map<FID,F
    {
       int rc1 = m_colOp[i]->flushFile(rc, columnOids);
       int rc2 = m_dctnry[i]->flushFile(rc, columnOids);
+
       if (rc == NO_ERROR)
       {
          rc = (rc1 != NO_ERROR) ? rc1 : rc2;
@@ -4694,9 +3932,10 @@ int WriteEngineWrapper::flushDataFiles(int rc, const TxnID txnId, std::map<FID,F
  * RETURN: 0 => OK. -1 => error
  ***********************************************************/
 int WriteEngineWrapper::AddLBIDtoList(const TxnID     txnid,
-                                      std::vector<BRM::LBID_t>& lbids,
-                                      std::vector<CalpontSystemCatalog::ColDataType>& colDataTypes,
-                                      const ColStruct& colStruct,
+                                      vector<BRM::LBID_t>& lbids,
+                                      const OID       oid,
+                                      const u_int32_t colPartition,
+                                      const u_int16_t segment,
                                       const int       fbo)
 {
     int rtn = 0;
@@ -4721,8 +3960,7 @@ int WriteEngineWrapper::AddLBIDtoList(const TxnID     txnid,
     }
     
     // Get the extent starting lbid given all these values (startingLBID is an out parameter).
-    rtn = BRMWrapper::getInstance()->getStartLbid(colStruct.dataOid, colStruct.fColPartition, 
-                                                  colStruct.fColSegment, fbo, startingLBID);
+    rtn = BRMWrapper::getInstance()->getStartLbid(oid, colPartition, segment, fbo, startingLBID);
     if (rtn != 0)
         return -1;
 
@@ -4732,7 +3970,6 @@ int WriteEngineWrapper::AddLBIDtoList(const TxnID     txnid,
 //        cout << "Adding lbid " << startingLBID << " to txn " << txnid << endl;
         spTxnLBIDRec->AddLBID(startingLBID);
         lbids.push_back((BRM::LBID_t)startingLBID);
-        colDataTypes.push_back(colStruct.colDataType);
     }
     else
     {
@@ -4806,5 +4043,4 @@ int WriteEngineWrapper::RemoveTxnFromLBIDMap(const TxnID txnid)
 
 
 } //end of namespace
-// vim:ts=4 sw=4:
 

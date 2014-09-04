@@ -85,8 +85,8 @@ bool StopWatch::stop(const string& message, const int limit) {
 	gettimeofday(&fTvLast, 0);
 	fOpenCalls--;
 	bool found = false;
-	uint32_t idx = 0;
-	for(uint32_t i = 0; i < fProcessStats.size(); i++) {
+	uint idx = 0;
+	for(uint i = 0; i < fProcessStats.size(); i++) {
 		if(fProcessStats[i].fProcess == message) {
 			idx = i;
 			found = true;
@@ -108,13 +108,13 @@ void StopWatch::start(const string& message) {
 	fOpenCalls++;
 	gettimeofday(&fTvLast, 0);
 	bool found = false;
-	uint32_t idx = 0;
+	uint idx = 0;
 	ProcessStats processStats;
 	if(!fStarted) {
 		fStarted = true;
 		gettimeofday(&fTvStart, 0);
 	}
-	for(uint32_t i = 0; i < fProcessStats.size(); i++) {
+	for(uint i = 0; i < fProcessStats.size(); i++) {
 		if(fProcessStats[i].fProcess == message) {
 			idx = i;
 			found = true;
@@ -157,7 +157,7 @@ void StopWatch::finish() {
 	}
 	fProcessStats.push_back(total);
 
-	for(uint32_t i = 0; i < fProcessStats.size(); i++) {
+	for(uint i = 0; i < fProcessStats.size(); i++) {
 
 		if(i == (fProcessStats.size() - 1)) {
 			oss << endl;

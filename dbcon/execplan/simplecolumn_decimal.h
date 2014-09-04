@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: simplecolumn_decimal.h 9635 2013-06-19 21:42:30Z bwilkinson $
+*   $Id: simplecolumn_decimal.h 8536 2012-05-21 21:27:17Z zzhu $
 *
 *
 ***********************************************************************/
@@ -53,13 +53,13 @@ public:
  
 	/** Constructors */ 
 	SimpleColumn_Decimal();
-	SimpleColumn_Decimal(const std::string& token, const uint32_t sessionID = 0);
+	SimpleColumn_Decimal(const std::string& token, const u_int32_t sessionID = 0);
 	SimpleColumn_Decimal(const std::string& schema, 
 		               const std::string& table, 
 		               const std::string& col, 
 		               const bool isInfiniDB,
-		               const uint32_t sessionID = 0);
-	SimpleColumn_Decimal(const SimpleColumn& rhs, const uint32_t sessionID = 0);
+		               const u_int32_t sessionID = 0);
+	SimpleColumn_Decimal(const SimpleColumn& rhs, const u_int32_t sessionID = 0);
 	
 	/** Destructor */
 	virtual ~SimpleColumn_Decimal(){}
@@ -70,7 +70,7 @@ public:
 	}	
 	
 	/** Evaluate methods */
-	virtual inline const std::string& getStrVal(rowgroup::Row& row, bool& isNull);
+	virtual inline std::string getStrVal(rowgroup::Row& row, bool& isNull);
 	virtual inline int64_t getIntVal(rowgroup::Row& row, bool& isNull);
 	virtual inline float getFloatVal(rowgroup::Row& row, bool& isNull);
 	virtual inline double getDoubleVal(rowgroup::Row& row, bool& isNull);	
@@ -93,7 +93,7 @@ SimpleColumn_Decimal<len>::SimpleColumn_Decimal():SimpleColumn()
 }
 
 template<int len>
-SimpleColumn_Decimal<len>::SimpleColumn_Decimal(const std::string& token, const uint32_t sessionID):
+SimpleColumn_Decimal<len>::SimpleColumn_Decimal(const std::string& token, const u_int32_t sessionID):
 		SimpleColumn(token, sessionID) 
 {
 	setNullVal();
@@ -104,14 +104,14 @@ SimpleColumn_Decimal<len>::SimpleColumn_Decimal(const std::string& schema,
 		           const std::string& table, 
 		           const std::string& col, 
 		           const bool isInfiniDB,
-		           const uint32_t sessionID) :
+		           const u_int32_t sessionID) :
 		           SimpleColumn(schema, table, col, isInfiniDB, sessionID) 
 {
 	setNullVal();
 }
 
 template<int len>
-SimpleColumn_Decimal<len>::SimpleColumn_Decimal(const SimpleColumn& rhs, const uint32_t sessionID):
+SimpleColumn_Decimal<len>::SimpleColumn_Decimal(const SimpleColumn& rhs, const u_int32_t sessionID):
 		SimpleColumn(rhs,sessionID) 
 {
 	setNullVal();
@@ -140,11 +140,10 @@ void SimpleColumn_Decimal<len>::setNullVal()
 }
 
 template<int len>
-inline const std::string& SimpleColumn_Decimal<len>:: getStrVal(rowgroup::Row& row, bool& isNull)
+inline std::string SimpleColumn_Decimal<len>:: getStrVal(rowgroup::Row& row, bool& isNull)
 { 
-	dataconvert::DataConvert::decimalToString((int64_t)row.getIntField<len>(fInputIndex), fResultType.scale, tmp, 22, fResultType.colDataType);
-	fResult.strVal = std::string(tmp);
-    return fResult.strVal;
+	dataconvert::DataConvert::decimalToString((int64_t)row.getIntField<len>(fInputIndex), fResultType.scale, tmp, 22);
+	return std::string(tmp);
 }
 
 template<int len>

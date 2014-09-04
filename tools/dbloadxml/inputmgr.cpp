@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: inputmgr.cpp 2258 2013-05-08 17:33:40Z dcathey $
+* $Id: inputmgr.cpp 2011 2012-10-30 14:16:20Z dcathey $
 *
 *******************************************************************************/
 
@@ -91,7 +91,7 @@ bool InputMgr::input(int argc, char **argv)
     std::vector<std::string> l_tableList;
     int ch;
 
-    while( (ch=getopt(argc,argv,"b:d:s:j:l:e:n:p:t:u:r:c:w:x:hE:C:")) != EOF )
+    while( (ch=getopt(argc,argv,"b:d:s:f:j:l:e:n:p:t:u:r:c:w:x:hE:C:")) != EOF )
     {
         switch(ch)
         {
@@ -259,14 +259,28 @@ std::ostream& operator<<(std::ostream& os, const InputMgr& m)
           i != m.fLoadNames.end(); ++i)
         os << *i << "  ";
 
+    // Don't report the enclosedBy or escape characters if not enabled by user
+    bool bEnclosedByEnabled = false;
     for (InputMgr::ParmList::const_iterator i  = m.fParms.begin();
         i != m.fParms.end(); ++i)
     {
-        // Don't report the enclosedBy if not enabled by user
-        if ((i->first == XMLGenData::ENCLOSED_BY_CHAR) &&
-            (i->second.length() < 1))
-                continue;
+        if (i->first == XMLGenData::ENCLOSED_BY_CHAR)
+        {
+            if (i->second.length() > 0)
+                bEnclosedByEnabled = true;
+            break;
+        }
+    }
 
+    for (InputMgr::ParmList::const_iterator i  = m.fParms.begin();
+        i != m.fParms.end(); ++i)
+    {
+        if (!bEnclosedByEnabled)
+        {
+            if ((i->first == XMLGenData::ENCLOSED_BY_CHAR) ||
+                (i->first == XMLGenData::ESCAPE_CHAR))
+                continue;
+        }
         os << "\n\t" << i->first << "\t" << i->second;
     }
 

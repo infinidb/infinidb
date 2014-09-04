@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
-* $Id: viewtablelock.cpp 2101 2013-01-21 14:12:52Z rdempsey $
+* $Id: viewtablelock.cpp 1854 2012-07-09 18:11:39Z dcathey $
 */
 
 #include <ctime>

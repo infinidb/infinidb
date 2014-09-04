@@ -25,7 +25,6 @@
 #include <unistd.h>
 #include <boost/thread.hpp>
 #include <map>
-#include "calpontsystemcatalog.h"
 
 #ifndef AUTOINCREMENTMANAGER_H_
 #define AUTOINCREMENTMANAGER_H_
@@ -43,8 +42,7 @@ public:
 	EXPORT AutoincrementManager();
 	EXPORT virtual ~AutoincrementManager();
 
-	EXPORT void startSequence(uint32_t OID, uint64_t firstNum, uint32_t colWidth,
-                              execplan::CalpontSystemCatalog::ColDataType colDataType);
+	EXPORT void startSequence(uint32_t OID, uint64_t firstNum, uint colWidth);
 	EXPORT bool getAIRange(uint32_t OID, uint64_t count, uint64_t *firstNum);
 	EXPORT void resetSequence(uint32_t OID, uint64_t value);
 	EXPORT void getLock(uint32_t OID);
@@ -52,7 +50,7 @@ public:
 	EXPORT void deleteSequence(uint32_t OID);
 
 private:
-	static const uint32_t lockTime = 30;   // 30 seconds
+	static const uint lockTime = 30;   // 30 seconds
 	struct sequence {
 		sequence() : value(0), overflow(0) { }
 		sequence(const sequence &s) : value(s.value), overflow(s.overflow) { }

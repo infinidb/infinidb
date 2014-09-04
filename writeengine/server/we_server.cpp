@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_server.cpp 4700 2013-07-08 16:43:49Z bpaul $
+* $Id: we_server.cpp 4702 2013-07-08 20:06:14Z bpaul $
 *
 *******************************************************************************/
 
@@ -47,9 +47,8 @@ using namespace WriteEngine;
 using namespace oam;
 
 #include "distributedenginecomm.h"
-#include "IDBPolicy.h"
+
 #include "utils_utf8.h"
-#include "dbrm.h"
 
 namespace
 {
@@ -124,13 +123,9 @@ int main(int argc, char** argv)
 	// Init WriteEngine Wrapper (including Config Calpont.xml cache)
 	WriteEngine::WriteEngineWrapper::init( WriteEngine::SUBSYSTEM_ID_WE_SRV );
 
-#ifdef _MSC_VER
-    // In windows, initializing the wrapper (A dll) does not set the static variables
-    // in the main program
-    idbdatafile::IDBPolicy::configIDBPolicy();
-#endif
 	Config weConfig;
-	setupResources();
+	int rc;
+	rc = setupResources();
 	
 	ostringstream serverParms;
 	serverParms << "pm" << weConfig.getLocalModuleID() << "_WriteEngineServer";
@@ -203,23 +198,22 @@ int main(int argc, char** argv)
 		}
 	}
 	cout << "WriteEngineServer is ready" << endl;
-	BRM::DBRM dbrm;
 	for (;;)
 	{
 		try // BUG 4834 -
 		{
 			ios = mqs->accept();
 			//tp.invoke(ReadThread(ios));
-			ReadThreadFactory::CreateReadThread(tp,ios, dbrm);
+			ReadThreadFactory::CreateReadThread(tp,ios);
 			{
-/*				logging::Message::Args args;
+				logging::Message::Args args;
 				logging::Message message;
 				string aMsg("WriteEngineServer : New incoming connection");
 				args.add(aMsg);
 				message.format(args);
 				logging::LoggingID lid(SUBSYSTEM_ID_WE_SRV);
 				logging::MessageLog ml(lid);
-				ml.logInfoMessage( message ); */
+				ml.logInfoMessage( message );
 			}
 		}
 		catch(std::exception& ex) // BUG 4834 - log the exception

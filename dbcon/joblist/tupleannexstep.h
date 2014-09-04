@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: tupleannexstep.h 9596 2013-06-04 19:59:04Z xlou $
+//  $Id: tupleannexstep.h 9219 2013-01-25 18:48:19Z xlou $
 
 
 #ifndef JOBLIST_TUPLEANNEXSTEP_H
@@ -47,8 +47,14 @@ class TupleAnnexStep : public JobStep, public TupleDeliveryStep
 {
 public:
     /** @brief TupleAnnexStep constructor
+     * @param in the inputAssociation pointer
+     * @param out the outputAssociation pointer
      */
-    TupleAnnexStep(const JobInfo& jobInfo);
+    TupleAnnexStep( uint32_t sessionId,
+					uint32_t txnId,
+					uint32_t verId,
+					uint32_t statementId,
+					const JobInfo& jobInfo);
 
     /** @brief TupleAnnexStep destructor
      */
@@ -57,7 +63,20 @@ public:
 	// inherited methods
 	void run();
 	void join();
+	const JobStepAssociation& inputAssociation() const { return fInputJobStepAssociation; }
+	void inputAssociation(const JobStepAssociation& in) { fInputJobStepAssociation = in; }
+	const JobStepAssociation& outputAssociation() const { return fOutputJobStepAssociation; }
+	void outputAssociation(const JobStepAssociation& out) { fOutputJobStepAssociation = out; }
+	JobStepAssociation& outputAssociation() { return fOutputJobStepAssociation; }
+
 	const std::string toString() const;
+	void stepId(uint16_t sId) { fStepId = sId; }
+	uint16_t stepId() const { return fStepId; }
+	uint32_t sessionId()   const { return fSessionId; }
+	uint32_t txnId()	   const { return fTxnId; }
+	uint32_t verId()	   const { return fVerId; }
+	uint32_t statementId() const { return fStatementId; }
+	void logger(const SPJL& logger) { fLogger = logger; }
 
 	/** @brief TupleJobStep's pure virtual methods
 	 */
@@ -66,21 +85,16 @@ public:
 
 	/** @brief TupleDeliveryStep's pure virtual methods
 	 */
-	uint32_t nextBand(messageqcpp::ByteStream &bs);
+	uint nextBand(messageqcpp::ByteStream &bs);
 	const rowgroup::RowGroup& getDeliveredRowGroup() const;
-	void  deliverStringTableRowGroup(bool b);
-	bool  deliverStringTableRowGroup() const;
+	void setIsDelivery(bool b) { fDelivery = b; }
 
 	void initialize(const rowgroup::RowGroup& rgIn, const JobInfo& jobInfo);
 
 	void addOrderBy(LimitedOrderBy* lob)     { fOrderBy = lob; }
 	void addConstant(TupleConstantStep* tcs) { fConstant = tcs; }
 	void setDistinct()                       { fDistinct = true; }
-	void setLimit(uint64_t s, uint64_t c)    { fLimitStart = s; fLimitCount = c; }
-	
-	virtual bool stringTableFriendly() { return true; }
-	
-	rowgroup::Row row1, row2;  // scratch space for distinct comparisons todo: make them private
+	void setLimit(uint64_t l)                { fLimit = l; }
 
 protected:
 	void execute();
@@ -89,6 +103,16 @@ protected:
 	void executeNoOrderByWithDistinct();
 	void formatMiniStats();
 	void printCalTrace();
+
+	// for virtual function
+	JobStepAssociation      fInputJobStepAssociation;
+	JobStepAssociation      fOutputJobStepAssociation;
+	uint32_t                fSessionId;
+	uint32_t                fTxnId;
+	uint32_t                fVerId;
+	uint16_t                fStepId;
+	uint32_t                fStatementId;
+	SPJL                    fLogger;
 
 	// input/output rowgroup and row
 	rowgroup::RowGroup      fRowGroupIn;
@@ -113,12 +137,10 @@ protected:
 	};
 	boost::scoped_ptr<boost::thread> fRunner;
 
-	uint64_t                fRowsProcessed;
 	uint64_t                fRowsReturned;
-	uint64_t                fLimitStart;
-	uint64_t                fLimitCount;
-	bool                    fLimitHit;
+	uint64_t                fLimit;
 	bool                    fEndOfResult;
+	bool                    fDelivery;
 	bool                    fDistinct;
 
 	LimitedOrderBy*         fOrderBy;
@@ -126,7 +148,6 @@ protected:
 
 	funcexp::FuncExp*       fFeInstance;
 	JobList*                fJobList;
-	
 };
 
 

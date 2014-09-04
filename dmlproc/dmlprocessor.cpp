@@ -16,22 +16,19 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: dmlprocessor.cpp 1024 2013-07-26 16:23:59Z chao $
+*   $Id: dmlprocessor.cpp 1003 2013-06-26 15:04:55Z dcathey $
 *
 *
 ***********************************************************************/
 /** @file */
 #include "configcpp.h"
 #include <signal.h>
-#include <ctime>
 
-//#define      SERIALIZE_DDL_DML_CPIMPORT    1
+#define      SERIALIZE_DDL_DML_CPIMPORT    1
 #include <boost/thread/mutex.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/scoped_array.hpp>
-#include <boost/shared_ptr.hpp>
 using namespace boost;
-
 #include "cacheutils.h"
 #include "vss.h"
 #include "dbrm.h"
@@ -57,9 +54,6 @@ using namespace logging;
 using namespace oam;
 using namespace WriteEngine;
 
-#include "querytele.h"
-using namespace querytele;
-
 extern boost::mutex mute;
 extern boost::condition_variable cond;
 
@@ -72,12 +66,8 @@ namespace dmlprocessor
 {
 // Map to store the package handler objects so we can set flags during execution
 // for things like ctrl+c
-DMLProcessor::PackageHandlerMap_t DMLProcessor::packageHandlerMap;
+std::map<uint32_t, PackageHandler*> DMLProcessor::packageHandlerMap;
 boost::mutex DMLProcessor::packageHandlerMapLock;
-
-//Map to store the BatchInsertProc object
-std::map<uint32_t, BatchInsertProc*> DMLProcessor::batchinsertProcessorMap;
-boost::mutex DMLProcessor::batchinsertProcessorMapLock;
 
 //------------------------------------------------------------------------------
 // A thread to periodically call dbrm to see if a user is
@@ -91,17 +81,19 @@ boost::mutex DMLProcessor::batchinsertProcessorMapLock;
 // If FORCE is set, we can't rollback.
 struct CancellationThread
 {
-    CancellationThread(DBRM * aDbrm) : fDbrm(aDbrm)
+    CancellationThread()
     {}
     void operator()()
     {
         bool bDoingRollback = false;
         bool bRollback = false;
         bool bForce = false;
+        int  iShutdown;
         ostringstream oss;
+        DBRM dbrm;
         std::vector<BRM::TableLockInfo> tableLocks;
         BRM::TxnID txnId;
-        DMLProcessor::PackageHandlerMap_t::iterator phIter;
+        std::map<uint32_t, PackageHandler*>::iterator phIter;
         uint32_t sessionID;
         int rc = 0;
 
@@ -109,7 +101,7 @@ struct CancellationThread
         {
             usleep(1000000);    // 1 seconds
             // Check to see if someone has ordered a shutdown or suspend with rollback.
-            (void)fDbrm->getSystemShutdownPending(bRollback, bForce);
+            iShutdown = dbrm.getSystemShutdownPending(bRollback, bForce);
             if (bDoingRollback && bRollback)
             {
                 continue;
@@ -118,9 +110,9 @@ struct CancellationThread
             bDoingRollback = false;
             if (bRollback)
             {
-                RollbackTransactionProcessor rollbackProcessor(fDbrm);
+                RollbackTransactionProcessor rollbackProcessor;
                 SessionManager sessionManager;
-                uint64_t uniqueId = fDbrm->getUnique64();
+                uint64_t uniqueId = dbrm.getUnique64();
                 std::string errorMsg;
                 int activeTransCount = 0;
                 int idleTransCount = 0;
@@ -131,7 +123,7 @@ struct CancellationThread
                 // Tell any active processors to stop working and return an error
                 // The front end will respond with a ROLLBACK command.
                 // Mark all active processors to rollback
-				boost::mutex::scoped_lock lk2(DMLProcessor::packageHandlerMapLock);
+                DMLProcessor::packageHandlerMapLock.lock();
                 for (phIter = DMLProcessor::packageHandlerMap.begin();
                     phIter != DMLProcessor::packageHandlerMap.end();
                     ++phIter)
@@ -149,14 +141,14 @@ struct CancellationThread
                     oss1 << "DMLProc is rolling back back " << activeTransCount << " active transactions.";
                     DMLProcessor::log(oss1.str(), logging::LOG_TYPE_INFO);
                 }
-                if (fDbrm->isReadWrite())
+                if (dbrm.isReadWrite())
                 {
                     continue;
                 }
 
                 // Check for any open DML transactions that don't currently have
                 // a processor
-                tableLocks = fDbrm->getAllTableLocks();
+                tableLocks = dbrm.getAllTableLocks();
                 if (tableLocks.size() > 0)
                 {
                     for (uint32_t i = 0; i < tableLocks.size(); ++i)
@@ -179,7 +171,15 @@ struct CancellationThread
                                 rc = rollbackProcessor.rollBackTransaction(uniqueId, txnId, sessionID, errorMsg);
                                 if ( rc == 0 )
                                 {
-                                    fDbrm->invalidateUncommittedExtentLBIDs(txnId.id);
+                                    vector<LBID_t> lbidList;
+                                    dbrm.getUncommittedExtentLBIDs(static_cast<VER_t>(txnId.id), lbidList);
+                                    vector<LBID_t>::const_iterator iter = lbidList.begin();
+                                    vector<LBID_t>::const_iterator end = lbidList.end();
+                                    while (iter != end)
+                                    {
+                                        dbrm.setExtentMaxMin(*iter, numeric_limits<int64_t>::min(), numeric_limits<int64_t>::max(), -1);
+                                        ++iter;
+                                    }
 
                                     //@Bug 4524. In case it is batchinsert, call bulkrollback.
                                     rc = rollbackProcessor.rollBackBatchAutoOnTransaction(uniqueId, txnId, sessionID, tableLocks[i].tableOID, errorMsg);
@@ -190,7 +190,7 @@ struct CancellationThread
                                         bool lockReleased = true;
                                         try
                                         {
-                                            lockReleased = fDbrm->releaseTableLock(tableLocks[i].id);
+                                            lockReleased = dbrm.releaseTableLock(tableLocks[i].id);
                                             TablelockData::removeTablelockData(sessionID);
                                         }
                                         catch (std::exception&)
@@ -216,7 +216,7 @@ struct CancellationThread
                                         ostringstream oss;
                                         oss << " problem with bulk rollback of idle transaction " << tableLocks[i].ownerTxnID << "and DBRM is setting to readonly and table lock is not released: " << errorMsg;
                                         DMLProcessor::log(oss.str(), logging::LOG_TYPE_CRITICAL);
-                                        rc = fDbrm->setReadOnly(true);
+                                        rc = dbrm.setReadOnly(true);
                                     }
                                 }
                                 else
@@ -224,12 +224,13 @@ struct CancellationThread
                                     ostringstream oss;
                                     oss << " problem with rollback of idle transaction " << tableLocks[i].ownerTxnID << "and DBRM is setting to readonly and table lock is not released: " << errorMsg;
                                     DMLProcessor::log(oss.str(), logging::LOG_TYPE_CRITICAL);
-                                    rc = fDbrm->setReadOnly(true);
+                                    rc = dbrm.setReadOnly(true);
                                 }   
                             }
                         }
                     }
                 }
+                DMLProcessor::packageHandlerMapLock.unlock();
 
                 // If there are any abandonded transactions without locks
                 // release them.
@@ -269,33 +270,22 @@ struct CancellationThread
             }
         }
     }
-	DBRM* fDbrm;
 };
 
 PackageHandler::PackageHandler(const messageqcpp::IOSocket& ios, 
 							   boost::shared_ptr<messageqcpp::ByteStream> bs, 
-							   uint8_t packageType,
+							   messageqcpp::ByteStream::quadbyte packageType,
 							   joblist::DistributedEngineComm *ec, 
 							   uint64_t maxDeleteRows,
 							   uint32_t sessionID, 
-							   execplan::CalpontSystemCatalog::SCN txnId,
-							   DBRM * aDbrm,
-							   const QueryTeleClient& qtc) : 
-		fIos(ios),
-		fByteStream(bs),
-		fPackageType(packageType),
-		fEC(ec),
-		fMaxDeleteRows(maxDeleteRows),
-		fSessionID(sessionID),
-		fTxnid(txnId),
-		fDbrm(aDbrm),
-		fQtc(qtc)
+							   execplan::CalpontSystemCatalog::SCN txnId) : 
+		fIos(ios), fPackageType(packageType), fEC(ec), fMaxDeleteRows(maxDeleteRows), fSessionID(sessionID), fTxnid(txnId)
 {
+	fByteStream = bs;
 }
 
 PackageHandler::~PackageHandler()
 {
-	//cout << "In destructor" << endl;
 }
 
 void PackageHandler::run()
@@ -306,8 +296,6 @@ void PackageHandler::run()
 	//cout << "PackageHandler handling ";
 	std::string stmt;
 	unsigned DMLLoggingId = 21;
-	oam::OamCache* oamCache = oam::OamCache::makeOamCache();
-
 	try
 	{
 
@@ -321,99 +309,132 @@ void PackageHandler::run()
 					//boost::shared_ptr<messageqcpp::ByteStream> insertBs (new messageqcpp::ByteStream);
 					messageqcpp::ByteStream bsSave = *(fByteStream.get());
 					insertPkg.read(*(fByteStream.get()));
-					QueryTeleStats qts;
-					qts.query_uuid = QueryTeleClient::genUUID();
-					qts.msg_type = QueryTeleStats::QT_START;
-					qts.start_time = QueryTeleClient::timeNowms();
-					qts.session_id = fSessionID;
-					qts.query_type = "INSERT";
-					qts.query = insertPkg.get_SQLStatement();
-					qts.system_name = oamCache->getSystemName();
-					qts.module_name = oamCache->getModuleName();
-					qts.schema_name = insertPkg.get_SchemaName();
-					fQtc.postQueryTele(qts);
 					//cout << "This is batch insert " << insertPkg->get_isBatchInsert() << endl;
+					BatchInsertProc* batchInsertProcessor;
 					if (insertPkg.get_isBatchInsert())
 					{
 						//cout << "This is batch insert " << endl;
 						//boost::shared_ptr<messageqcpp::ByteStream> insertBs (new messageqcpp::ByteStream(fByteStream));
-						BatchInsertProc* batchProcessor = NULL;
-						{
-							boost::mutex::scoped_lock lk(DMLProcessor::batchinsertProcessorMapLock);
-						
-							std::map<uint32_t, BatchInsertProc*>::iterator batchIter = DMLProcessor::batchinsertProcessorMap.find(fSessionID);
-	
-							if (batchIter == DMLProcessor::batchinsertProcessorMap.end())
-							{
-								batchProcessor = new BatchInsertProc(insertPkg.get_isAutocommitOn(), insertPkg.getTableOid(), fTxnid, fDbrm);
-								DMLProcessor::batchinsertProcessorMap[fSessionID] = batchProcessor;
-							//cout << "batchProcessor is created " << batchProcessor << endl;
-							}
-							else
-							{
-								batchProcessor = batchIter->second;
-							//cout << "Found batchProcessor " << batchProcessor << endl;
-							}
-						}
-						
 						if ( insertPkg.get_Logging() )
 						{
 							LoggingID logid( DMLLoggingId, insertPkg.get_SessionID(), fTxnid);
 							logging::Message::Args args1;
 							logging::Message msg(1);
 							args1.add("Start SQL statement: ");
-							ostringstream oss;
-							oss << insertPkg.get_SQLStatement() << "; |" << insertPkg.get_SchemaName() <<"|";
-							args1.add(oss.str());
+							args1.add(insertPkg.get_SQLStatement());
 							msg.format( args1 );
 							logging::Logger logger(logid.fSubsysID);
 							logger.logMessage(LOG_TYPE_DEBUG, msg, logid);
 							TablelockData * tablelockData = TablelockData::makeTablelockData(insertPkg.get_SessionID());
 							uint64_t tableLockId = tablelockData->getTablelockId(insertPkg.getTableOid());
-							//cout << "Processing table oid " << insertPkg.getTableOid() << " for transaction "<< (int)fTxnid << endl;
 							if (tableLockId == 0)
 							{
-								//cout << "Grabing tablelock for batchProcessor " << batchProcessor << endl;
-								tableLockId = batchProcessor->grabTableLock(insertPkg.get_SessionID());
-								if (tableLockId == 0)
+								//cout << "tablelock is not found in cache " << endl;
+								DBRM dbrm;
+								uint32_t  processID = ::getpid();
+								int32_t txnId = fTxnid;
+								std::string  processName("DMLProc");
+								int32_t sessionId = insertPkg.get_SessionID();
+								uint32_t tableOid = insertPkg.getTableOid();
+								int i = 0;
+								OamCache * oamcache = OamCache::makeOamCache();
+								std::vector<int> pmList = oamcache->getModuleIds();
+								//cout << "PMList size is " << pmList.size() << endl;
+								std::vector<uint> pms;
+								for (unsigned i=0; i < pmList.size(); i++)
 								{
-									BRM::TxnID brmTxnID;
-									brmTxnID.id = fTxnid;
-									brmTxnID.valid = true;
-									sessionManager.rolledback(brmTxnID);
-									string errMsg;
-									int rc = 0;
-									batchProcessor->getError(rc, errMsg);
-									result.result = DMLPackageProcessor::TABLE_LOCK_ERROR;
-									logging::Message::Args args;
-									logging::Message message(1);
-									args.add("Insert Failed: ");
-									args.add(errMsg);
-									args.add("");
-									args.add("");
-									message.format(args);
-									result.message = message;
+									pms.push_back((uint)pmList[i]);
+								}
+			
+								try {
+									tableLockId = dbrm.getTableLock(pms, tableOid, &processName, &processID, &sessionId, &txnId, BRM::LOADING );
+								}
+								catch (std::exception&)
+								{
+									result.result = dmlpackageprocessor::DMLPackageProcessor::INSERT_ERROR;
+									result.message = Message(IDBErrorInfo::instance()->errorMsg(ERR_HARD_FAILURE));
 									break;
+								}
+		
+								if ( tableLockId  == 0 )
+								{
+									int waitPeriod = 10;
+									int sleepTime = 100; // sleep 100 milliseconds between checks
+									int numTries = 10;  // try 10 times per second
+									string waitPeriodStr = config::Config::makeConfig()->getConfig("SystemConfig", "WaitPeriod");
+									if ( waitPeriodStr.length() != 0 )
+										waitPeriod = static_cast<int>(config::Config::fromText(waitPeriodStr));
+								
+									numTries = 	waitPeriod * 10;
+									struct timespec rm_ts;
+
+									rm_ts.tv_sec = sleepTime/1000;
+									rm_ts.tv_nsec = sleepTime%1000 *1000000;
+
+									for (; i < numTries; i++)
+									{
+#ifdef _MSC_VER
+										Sleep(rm_ts.tv_sec * 1000);
+#else
+										struct timespec abs_ts;
+										do
+										{
+											abs_ts.tv_sec = rm_ts.tv_sec;
+											abs_ts.tv_nsec = rm_ts.tv_nsec;
+										}
+										while(nanosleep(&abs_ts,&rm_ts) < 0);
+#endif
+										try 
+										{
+											processID = ::getpid();
+											txnId = fTxnid;
+											sessionId = insertPkg.get_SessionID();;
+											processName = "DMLProc";
+											tableLockId = dbrm.getTableLock(pms, tableOid, &processName, &processID, &sessionId, &txnId, BRM::LOADING );
+										}
+										catch (std::exception&)
+										{
+											result.result = dmlpackageprocessor::DMLPackageProcessor::INSERT_ERROR;
+											result.message = Message(IDBErrorInfo::instance()->errorMsg(ERR_HARD_FAILURE));
+											break;
+										}
+
+										if (tableLockId > 0)
+											break;
+									}
+
+									if (i >= numTries) //error out
+									{
+										result.result = dmlpackageprocessor::DMLPackageProcessor::TABLE_LOCK_ERROR;
+										logging::Message::Args args;
+										args.add(processName);
+										args.add((uint64_t)processID);
+										args.add(sessionId);
+										BRM::TxnID brmTxnID;
+										brmTxnID.id = txnId;
+										brmTxnID.valid = true;
+										sessionManager.rolledback(brmTxnID);
+										result.message = Message(IDBErrorInfo::instance()->errorMsg(ERR_TABLE_LOCKED,args));
+										break;
+									}
 								}
 							
 								if (tableLockId > 0)
-									tablelockData->setTablelock(insertPkg.getTableOid(), tableLockId);	
-							}			
-						}	
-						if (insertPkg.get_Logending() && insertPkg.get_Logging()) //only one batch need to be processed.
-						{
-							//cout << "dmlprocessor add last pkg" << endl; 
-							//need to add error handling.
-							batchProcessor->addPkg(bsSave);
-							batchProcessor->sendFirstBatch();
-							batchProcessor->receiveOutstandingMsg();
-							//@Bug 5162. Get the correct error message before the last message.
-							string errMsg;
-							int rc = 0;
-							batchProcessor->getError(rc, errMsg);
-							batchProcessor->sendlastBatch();
-							batchProcessor->receiveAllMsg();
+									tablelockData->setTablelock(tableOid, tableLockId);	
+							}
 						
+							if ((tableLockId == 0) || (result.result != dmlpackageprocessor::DMLPackageProcessor::NO_ERROR))
+								break;
+						}	
+						if (insertPkg.get_Logending() && insertPkg.get_Logging())
+						{
+							batchInsertProcessor = BatchInsertProc::makeBatchInsertProc(fTxnid, insertPkg.getTableOid());
+							//cout << "dmlprocessor add last pkg" << endl; 
+							batchInsertProcessor->addPkg(bsSave, true, insertPkg.get_isAutocommitOn(), insertPkg.getTableOid());
+							cond.notify_one();
+							int rc = 0;
+							string errMsg;
+							BatchInsertProc::removeBatchInsertProc(rc, errMsg);
 							if (rc == DMLPackageProcessor::IDBRANGE_WARNING)
 							{
 								result.result = dmlpackageprocessor::DMLPackageProcessor::IDBRANGE_WARNING;
@@ -425,20 +446,12 @@ void PackageHandler::run()
 								logging::Logger logger(logid.fSubsysID);
 								logger.logMessage(LOG_TYPE_DEBUG, msg, logid); 
 								logging::logDML(insertPkg.get_SessionID(), fTxnid, insertPkg.get_SQLStatement()+ ";", insertPkg.get_SchemaName());
-								logging::Message::Args args;
-								logging::Message message(1);
-								args.add(errMsg);
-								args.add("");
-								args.add("");
-								message.format(args);
-								result.message = message;
 							}
 							else if ( rc != 0)
 							{
 								result.result = dmlpackageprocessor::DMLPackageProcessor::INSERT_ERROR;
 								logging::Message::Args args;
 								logging::Message message(1);
-								cout << "Got error in the end of one batchinsert." << endl;
 								args.add("Insert Failed: ");
 								args.add(errMsg);
 								args.add("");
@@ -456,10 +469,6 @@ void PackageHandler::run()
 							}
 							else
 							{
-							//	if (!insertPkg.get_isAutocommitOn())
-							//	{
-							//		batchProcessor->setHwm();
-							//	}
 								LoggingID logid( DMLLoggingId, insertPkg.get_SessionID(), fTxnid);
 								logging::Message::Args args1;
 								logging::Message msg(1);
@@ -469,35 +478,22 @@ void PackageHandler::run()
 								logger.logMessage(LOG_TYPE_DEBUG, msg, logid); 
 								logging::logDML(insertPkg.get_SessionID(), fTxnid, insertPkg.get_SQLStatement()+ ";", insertPkg.get_SchemaName());
 							}
-							//remove the batch insert object
-							{
-								boost::mutex::scoped_lock lk(DMLProcessor::batchinsertProcessorMapLock);
-							
-								std::map<uint32_t, BatchInsertProc*>::iterator batchIter = DMLProcessor::batchinsertProcessorMap.find(fSessionID);
-								if (batchIter != DMLProcessor::batchinsertProcessorMap.end())
-								{
-									delete batchIter->second;
-									DMLProcessor::batchinsertProcessorMap.erase(fSessionID);
-								}
-							}
 						}
-						else if (insertPkg.get_Logending()) //Last batch
+						else if (insertPkg.get_Logending())
 						{
+							batchInsertProcessor = BatchInsertProc::makeBatchInsertProc(fTxnid, insertPkg.getTableOid());
 							int rc = 0;
 							string errMsg;
-							batchProcessor->getError(rc, errMsg);
+							batchInsertProcessor->getError(rc, errMsg);
 							//cout <<"dmlprocessor received last pkg from mysql rc == " << rc << endl;
-							if (( rc == 0) || (rc == DMLPackageProcessor::IDBRANGE_WARNING))
+							if ( rc == 0)
 							{
 								//cout << " rc = " << rc << endl;
-								batchProcessor->addPkg(bsSave);
-								batchProcessor->sendNextBatch();
-								batchProcessor->receiveOutstandingMsg();
-								//@Bug 5162. Get the correct error message before the last message.
-								batchProcessor->getError(rc, errMsg);
-								batchProcessor->sendlastBatch();
-								batchProcessor->receiveAllMsg();
-								
+								batchInsertProcessor->addPkg(bsSave, true, insertPkg.get_isAutocommitOn(), insertPkg.getTableOid());
+								//cout << " added last pkg to queue" << endl;
+								cond.notify_one();
+								//cout << "Going to remove batchinsertproc " << endl;
+								BatchInsertProc::removeBatchInsertProc(rc, errMsg);
 								if (rc == DMLPackageProcessor::IDBRANGE_WARNING)
 								{
 									result.result = dmlpackageprocessor::DMLPackageProcessor::IDBRANGE_WARNING;
@@ -509,17 +505,9 @@ void PackageHandler::run()
 									logging::Logger logger(logid.fSubsysID);
 									logger.logMessage(LOG_TYPE_DEBUG, msg, logid); 
 									logging::logDML(insertPkg.get_SessionID(), fTxnid, insertPkg.get_SQLStatement()+ ";", insertPkg.get_SchemaName());
-									logging::Message::Args args;
-									logging::Message message(1);
-									args.add(errMsg);
-									args.add("");
-									args.add("");
-									message.format(args);
-									result.message = message;
 								}
 								else if ( rc != 0)
 								{
-									//cout << "Got error in the end of last batchinsert. error message is " << errMsg << endl;
 									result.result = dmlpackageprocessor::DMLPackageProcessor::INSERT_ERROR;
 									logging::Message::Args args;
 									logging::Message message(1);
@@ -551,14 +539,23 @@ void PackageHandler::run()
 								}
 								//cout << "finished batch insert" << endl;
 							}
+							else if (rc == DMLPackageProcessor::IDBRANGE_WARNING)
+							{
+								BatchInsertProc::removeBatchInsertProc(rc, errMsg);
+								result.result = dmlpackageprocessor::DMLPackageProcessor::IDBRANGE_WARNING;
+								LoggingID logid( DMLLoggingId, insertPkg.get_SessionID(), fTxnid);
+								logging::Message::Args args1;
+								logging::Message msg(1);
+								args1.add("End SQL statement with warnings");
+								msg.format( args1 );
+								logging::Logger logger(logid.fSubsysID);
+								logger.logMessage(LOG_TYPE_DEBUG, msg, logid); 
+								logging::logDML(insertPkg.get_SessionID(), fTxnid, insertPkg.get_SQLStatement()+ ";", insertPkg.get_SchemaName());
+							}
 							else
 							{
-								//error occured. Receive all outstanding messages nefore erroring out.
-								batchProcessor->receiveOutstandingMsg();
-								batchProcessor->sendlastBatch(); //needs to flush files
-								batchProcessor->receiveAllMsg();
+								BatchInsertProc::removeBatchInsertProc(rc, errMsg);
 								result.result = dmlpackageprocessor::DMLPackageProcessor::INSERT_ERROR;
-								//cout << "Got error in the end of batchinsert2. error msg is " << errMsg<< endl;
 								logging::Message::Args args;
 								logging::Message message(1);
 								args.add("Insert Failed: ");
@@ -576,88 +573,44 @@ void PackageHandler::run()
 								logger.logMessage(LOG_TYPE_DEBUG, msg, logid); 
 								logging::logDML(insertPkg.get_SessionID(), fTxnid, insertPkg.get_SQLStatement()+ ";", insertPkg.get_SchemaName());
 							}
-							//remove from map
-							{
-								boost::mutex::scoped_lock lk(DMLProcessor::batchinsertProcessorMapLock);
-								std::map<uint32_t, BatchInsertProc*>::iterator batchIter = DMLProcessor::batchinsertProcessorMap.find(fSessionID);
-								if (batchIter != DMLProcessor::batchinsertProcessorMap.end())
-								{
-								//cout << "Batchinsertprcessor is deleted. " << batchIter->second << endl;
-									delete batchIter->second;
-									DMLProcessor::batchinsertProcessorMap.erase(fSessionID);
-								}
-							}
-							
 						}
 						else
 						{
+							batchInsertProcessor = BatchInsertProc::makeBatchInsertProc(fTxnid, insertPkg.getTableOid());
+							boost::unique_lock<boost::mutex> lock(mute);
+							while (batchInsertProcessor->getInsertQueue()->size() >= batchInsertProcessor->getNumDBRoots() )
+							{
+								cond.wait(lock);
+							}
 							int rc = 0;
 							string errMsg;
-							batchProcessor->getError(rc, errMsg);
+							batchInsertProcessor->getError(rc, errMsg);
 							if (rc == DMLPackageProcessor::IDBRANGE_WARNING)
 							{
 								result.result = dmlpackageprocessor::DMLPackageProcessor::IDBRANGE_WARNING;
 							}
 							else if ( rc !=0) 
 							{
-								result.result = dmlpackageprocessor::DMLPackageProcessor::INSERT_ERROR;
-								//@Bug 
-								//cout << "Got error during batchinsert. with message " << errMsg << endl;
+								result.result = dmlpackageprocessor::DMLPackageProcessor::VB_OVERFLOW_ERROR;
 								logging::Message::Args args;
-								logging::Message message(6);
-								args.add( errMsg );
-								message.format( args );
+								logging::Message message(1);
+								args.add(errMsg);
+								message.format(args);
 								result.message = message;
-								batchProcessor->receiveOutstandingMsg();
-								batchProcessor->sendlastBatch(); //needs to flush files
-								//cout << "Last batch is sent to WES." << endl;
-								batchProcessor->receiveAllMsg();
-								LoggingID logid( DMLLoggingId, insertPkg.get_SessionID(), fTxnid);
-								logging::Message::Args args1;
-								logging::Message msg(1);
-								args1.add("End SQL statement with error");
-								msg.format( args1 );
-								logging::Logger logger(logid.fSubsysID);
-								logger.logMessage(LOG_TYPE_DEBUG, msg, logid); 
-								//remove from map
-								{
-									boost::mutex::scoped_lock lk(DMLProcessor::batchinsertProcessorMapLock);
-									std::map<uint32_t, BatchInsertProc*>::iterator batchIter = DMLProcessor::batchinsertProcessorMap.find(fSessionID);
-									if (batchIter != DMLProcessor::batchinsertProcessorMap.end())
-									{
-									//cout << "Batchinsertprcessor is deleted. " << batchIter->second << endl;
-										delete batchIter->second;
-										DMLProcessor::batchinsertProcessorMap.erase(fSessionID);
-									}
-								}
 								break;
 							}
 							
-							batchProcessor->addPkg(bsSave);	
-							batchProcessor->sendNextBatch();
+							batchInsertProcessor->addPkg(bsSave, false, insertPkg.get_isAutocommitOn());	
+							cond.notify_one();
                             break;
 						}
 					}
 					else
 					{
-						//insertPkg.readTable(*(fByteStream.get()));
 						insertPkg.set_TxnID(fTxnid);
-						fProcessor.reset(new dmlpackageprocessor::InsertPackageProcessor(fDbrm, insertPkg.get_SessionID()));
+						fProcessor.reset(new dmlpackageprocessor::InsertPackageProcessor);
 						result = fProcessor->processPackage(insertPkg);
 					}
-					qts.msg_type = QueryTeleStats::QT_SUMMARY;
-					qts.max_mem_pct = result.stats.fMaxMemPct;
-					qts.num_files = result.stats.fNumFiles;
-					qts.phy_io = result.stats.fPhyIO;
-					qts.cache_io = result.stats.fCacheIO;
-					qts.msg_rcv_cnt = result.stats.fMsgRcvCnt;
-					qts.cp_blocks_skipped = result.stats.fCPBlocksSkipped;
-					qts.msg_bytes_in = result.stats.fMsgBytesIn;
-					qts.msg_bytes_out = result.stats.fMsgBytesOut;
-					qts.rows = result.stats.fRows;
-					qts.end_time = QueryTeleClient::timeNowms();
-					qts.blocks_changed = result.stats.fBlocksChanged;
-					fQtc.postQueryTele(qts);
 				}
 				break;
 
@@ -668,38 +621,14 @@ void PackageHandler::run()
 					boost::scoped_ptr<dmlpackage::UpdateDMLPackage> updatePkg(new dmlpackage::UpdateDMLPackage());
 					updatePkg->read(*(fByteStream.get()));
 					updatePkg->set_TxnID(fTxnid);
-					QueryTeleStats qts;
-					qts.query_uuid = updatePkg->uuid();
-					qts.msg_type = QueryTeleStats::QT_START;
-					qts.start_time = QueryTeleClient::timeNowms();
-					qts.session_id = fSessionID;
-					qts.query_type = "UPDATE";
-					qts.query = updatePkg->get_SQLStatement();
-					qts.system_name = oamCache->getSystemName();
-					qts.module_name = oamCache->getModuleName();
-					qts.schema_name = updatePkg->get_SchemaName();
-					fQtc.postQueryTele(qts);
 					// process it
 					//@Bug 1341. Don't remove calpontsystemcatalog from this 
 					//session to take advantage of cache. 
-					fProcessor.reset(new dmlpackageprocessor::UpdatePackageProcessor(fDbrm, updatePkg->get_SessionID()));
+					fProcessor.reset(new dmlpackageprocessor::UpdatePackageProcessor());
 					fProcessor->setEngineComm(fEC);
 					fProcessor->setRM( &frm);
 					idbassert( fTxnid != 0);
 					result = fProcessor->processPackage(*(updatePkg.get())) ;
-					qts.msg_type = QueryTeleStats::QT_SUMMARY;
-					qts.max_mem_pct = result.stats.fMaxMemPct;
-					qts.num_files = result.stats.fNumFiles;
-					qts.phy_io = result.stats.fPhyIO;
-					qts.cache_io = result.stats.fCacheIO;
-					qts.msg_rcv_cnt = result.stats.fMsgRcvCnt;
-					qts.cp_blocks_skipped = result.stats.fCPBlocksSkipped;
-					qts.msg_bytes_in = result.stats.fMsgBytesIn;
-					qts.msg_bytes_out = result.stats.fMsgBytesOut;
-					qts.rows = result.stats.fRows;
-					qts.end_time = QueryTeleClient::timeNowms();
-					qts.blocks_changed = result.stats.fBlocksChanged;
-					fQtc.postQueryTele(qts);
 				}
 				break;
 
@@ -708,37 +637,13 @@ void PackageHandler::run()
 					boost::scoped_ptr<dmlpackage::DeleteDMLPackage> deletePkg(new dmlpackage::DeleteDMLPackage());
 					deletePkg->read(*(fByteStream.get()));
 					deletePkg->set_TxnID(fTxnid);
-					QueryTeleStats qts;
-					qts.query_uuid = deletePkg->uuid();
-					qts.msg_type = QueryTeleStats::QT_START;
-					qts.start_time = QueryTeleClient::timeNowms();
-					qts.session_id = fSessionID;
-					qts.query_type = "DELETE";
-					qts.query = deletePkg->get_SQLStatement();
-					qts.system_name = oamCache->getSystemName();
-					qts.module_name = oamCache->getModuleName();
-					qts.schema_name = deletePkg->get_SchemaName();
-					fQtc.postQueryTele(qts);
 					// process it
 					//@Bug 1341. Don't remove calpontsystemcatalog from this session to take advantage of cache.
-					fProcessor.reset(new dmlpackageprocessor::DeletePackageProcessor(fDbrm, deletePkg->get_SessionID()));
+					fProcessor.reset(new dmlpackageprocessor::DeletePackageProcessor());
 					fProcessor->setEngineComm(fEC);
 					fProcessor->setRM( &frm);
 					idbassert( fTxnid != 0);
 					result = fProcessor->processPackage(*(deletePkg.get())) ;
-					qts.msg_type = QueryTeleStats::QT_SUMMARY;
-					qts.max_mem_pct = result.stats.fMaxMemPct;
-					qts.num_files = result.stats.fNumFiles;
-					qts.phy_io = result.stats.fPhyIO;
-					qts.cache_io = result.stats.fCacheIO;
-					qts.msg_rcv_cnt = result.stats.fMsgRcvCnt;
-					qts.cp_blocks_skipped = result.stats.fCPBlocksSkipped;
-					qts.msg_bytes_in = result.stats.fMsgBytesIn;
-					qts.msg_bytes_out = result.stats.fMsgBytesOut;
-					qts.rows = result.stats.fRows;
-					qts.end_time = QueryTeleClient::timeNowms();
-					qts.blocks_changed = result.stats.fBlocksChanged;
-					fQtc.postQueryTele(qts);
 				}
 				break;
 			case dmlpackage::DML_COMMAND:
@@ -747,23 +652,14 @@ void PackageHandler::run()
 					//cout << "a COMMAND package" << endl;
 					dmlpackage::CommandDMLPackage commandPkg;
 					commandPkg.read(*(fByteStream.get()));
+					// process it
+					//@Bug 1341. Don't remove calpontsystemcatalog from this session to take advantage of cache.
+					fProcessor.reset(new dmlpackageprocessor::CommandPackageProcessor);
 					stmt = commandPkg.get_DMLStatement();
 					boost::algorithm::to_upper(stmt);
 					trim(stmt);
-					if (stmt == "CLEANUP")
-					{
-						execplan::CalpontSystemCatalog::removeCalpontSystemCatalog(commandPkg.get_SessionID());
-						execplan::CalpontSystemCatalog::removeCalpontSystemCatalog(commandPkg.get_SessionID() | 0x80000000);
-					}				
-					else
-					{
-						// process it
-						//@Bug 1341. Don't remove calpontsystemcatalog from this session to take advantage of cache.
-						fProcessor.reset(new dmlpackageprocessor::CommandPackageProcessor(fDbrm, commandPkg.get_SessionID()));
-					
-						//cout << "got command " << stmt << " for session " << commandPkg.get_SessionID() << endl;
-						result = fProcessor->processPackage(commandPkg);
-					}
+					//cout << "got command " << stmt << " for session " << commandPkg.get_SessionID() << endl;
+					result = fProcessor->processPackage(commandPkg);
 				}
 				break;
 		}
@@ -800,9 +696,8 @@ void PackageHandler::run()
 		results << result.miniStats;
 		result.stats.serialize(results);
 		fIos.write(results);
-		//Bug 5226. dmlprocessor thread will close the socket to mysqld.
-		//if (stmt == "CLEANUP")
-		//	fIos.close();
+		if (stmt == "CLEANUP")
+			fIos.close();
 	}
 	catch(...)
 	{
@@ -821,7 +716,7 @@ void PackageHandler::rollbackPending()
 	fProcessor->setRollbackPending(true);
 
     ostringstream oss;
-    oss << "PackageHandler::rollbackPending: Processing DMLPackage.";
+    oss << "PackageHandler::rollbackPending: rocessing DMLPackage.";
     DMLProcessor::log(oss.str(), logging::LOG_TYPE_DEBUG);
 }
 
@@ -833,8 +728,8 @@ void added_a_pm(int)
 	dec->Setup();
 }
 
-DMLServer::DMLServer(int packageMaxThreads, int packageWorkQueueSize, DBRM* dbrm) :
-	fPackageMaxThreads(packageMaxThreads), fPackageWorkQueueSize(packageWorkQueueSize), fDbrm(dbrm)
+DMLServer::DMLServer(int packageMaxThreads, int packageWorkQueueSize) :
+	fPackageMaxThreads(packageMaxThreads), fPackageWorkQueueSize(packageWorkQueueSize)
 {
 	fMqServer.reset(new MessageQueueServer("DMLProc"));
 
@@ -852,7 +747,7 @@ void DMLServer::start()
 		// CancellationThread is for telling all active transactions
 		// to quit working because the system is either going down
 		// or going into write suspend mode
-		CancellationThread cancelObject(fDbrm);
+		CancellationThread cancelObject;
 		boost::thread cancelThread(cancelObject);
 
 		cout << "DMLProc is ready..." << endl;
@@ -860,7 +755,7 @@ void DMLServer::start()
 		{
 			ios = fMqServer->accept();
 			ios.setSockID(nextID++);
-			fDmlPackagepool.invoke(DMLProcessor(ios, fDbrm));
+			fDmlPackagepool.invoke(DMLProcessor(ios));
 		}
 		cancelThread.join();
 	}
@@ -869,45 +764,29 @@ void DMLServer::start()
 	}
 }
 
-DMLProcessor::DMLProcessor(messageqcpp::IOSocket ios, BRM::DBRM* aDbrm) :
-	fIos(ios), fDbrm(aDbrm)
+DMLProcessor::DMLProcessor(messageqcpp::IOSocket ios) :
+	fIos(ios)
 {
 	csc = CalpontSystemCatalog::makeCalpontSystemCatalog();
 	csc->identity(CalpontSystemCatalog::EC);
-	string teleServerHost(config::Config::makeConfig()->getConfig("QueryTele", "Host"));
-	if (!teleServerHost.empty())
-	{
-		int teleServerPort = config::Config::fromText(config::Config::makeConfig()->getConfig("QueryTele", "Port"));
-		if (teleServerPort > 0)
-		{
-			fQtc.serverParms(QueryTeleServerParms(teleServerHost, teleServerPort));
-		}
-	}
 }
 
 void DMLProcessor::operator()()
 {
+	DBRM dbrm;
 	bool bIsDbrmUp = true;
 
 	try
     {
         boost::shared_ptr<messageqcpp::ByteStream> bs1	(new messageqcpp::ByteStream());
 		//messageqcpp::ByteStream bs;
-        uint8_t packageType;
+        messageqcpp::ByteStream::byte packageType;
 
 		ResourceManager rm;
 		DistributedEngineComm* fEC = DistributedEngineComm::instance(rm);
+		boost::scoped_ptr<WriteEngine::ChunkManager> fCM(NULL);
 		
 		uint64_t maxDeleteRows = rm.getDMLMaxDeleteRows();
-		
-		bool concurrentSupport = true;
-		string concurrentTranStr = config::Config::makeConfig()->getConfig("SystemConfig", "ConcurrentTransactions");
-		if ( concurrentTranStr.length() != 0 )
-		{
-			if ((concurrentTranStr.compare("N") == 0) || (concurrentTranStr.compare("n") == 0))
-				concurrentSupport = false;
-		}
-		
 #ifndef _MSC_VER
 		struct sigaction ign;
 		memset(&ign, 0, sizeof(ign));
@@ -915,7 +794,7 @@ void DMLProcessor::operator()()
 		sigaction(SIGHUP, &ign, 0);
 #endif
 		fEC->Open();
-	
+
         for (;;)
         {
 			//cout << "DMLProc is waiting for a Calpont DML Package on " << fIos.getSockID() << endl;
@@ -924,7 +803,7 @@ void DMLProcessor::operator()()
 				bs1.reset(new messageqcpp::ByteStream(fIos.read()));
 				//cout << "received from mysql socket " << fIos.getSockID() << endl;
 			}
-			catch (std::exception&)
+			catch (runtime_error&)
 			{
 				//This is an I/O error from InetStreamSocket::read(), just close and move on...
 				//cout << "runtime error during read on " << fIos.getSockID() << " " << ex.what() << endl;
@@ -933,26 +812,22 @@ void DMLProcessor::operator()()
 			catch (...)
 			{
 				//cout << "... error during read " << fIos.getSockID() << endl;
-				// all this throw does is cause this thread to silently go away. I doubt this is the right
-				//  thing to do...
 				throw;
 			}
-
-			if (!bs1 || bs1->length() == 0)
+			if (bs1->length() == 0)
 			{
 				//cout << "Read 0 bytes. Closing connection " << fIos.getSockID() << endl;
 				fIos.close();
 				break;
 			}
-
             uint32_t sessionID;
-            *bs1 >> sessionID;
-            *bs1 >> packageType;
-//cout << "DMLProc received pkg. sessionid:type = " << sessionID <<":"<<(int)packageType << endl;
+            *(bs1.get()) >> sessionID;
+            *(bs1.get()) >> packageType;
+
 			uint32_t stateFlags;
 			messageqcpp::ByteStream::byte status=255;
 			messageqcpp::ByteStream::octbyte rowCount = 0;
-			if (fDbrm->getSystemState(stateFlags) > 0)		// > 0 implies succesful retrieval. It doesn't imply anything about the contents
+			if (dbrm.getSystemState(stateFlags) > 0)		// > 0 implies succesful retrieval. It doesn't imply anything about the contents
 			{
 				messageqcpp::ByteStream results;
 				const char* responseMsg=0;
@@ -1011,34 +886,20 @@ void DMLProcessor::operator()()
 							dmlpackage::InsertDMLPackage insertPkg;
 							messageqcpp::ByteStream bsSave = *(bs1.get());
 							insertPkg.read(*(bs1.get()));
-							BatchInsertProc* batchInsertProcessor = NULL;
+							BatchInsertProc* batchInsertProcessor;
 							if (insertPkg.get_isBatchInsert() && insertPkg.get_Logending())
 							{
+								// No need to send lastpkg msg "if" this is a single msg
+								// transaction (both get_Logging() and get_Logending() are true)
+								if (!insertPkg.get_Logging())
 								{
-									boost::mutex::scoped_lock lk(DMLProcessor::batchinsertProcessorMapLock);
-									std::map<uint32_t, BatchInsertProc*>::iterator batchIter = DMLProcessor::batchinsertProcessorMap.find(sessionID);
-	
-									if (batchIter != DMLProcessor::batchinsertProcessorMap.end()) //The first batch, no need to do anything
-									{
-									
-										batchInsertProcessor = batchIter->second;
-										batchInsertProcessor->addPkg(bsSave);
-								
-										batchInsertProcessor->sendlastBatch();
-										batchInsertProcessor->receiveAllMsg();
-								
-								
-										if (!insertPkg.get_isAutocommitOn())
-										{
-											batchInsertProcessor->setHwm();
-										}
-									
-										batchIter = DMLProcessor::batchinsertProcessorMap.find(sessionID);
-										if (batchIter != DMLProcessor::batchinsertProcessorMap.end())
-										{
-										DMLProcessor::batchinsertProcessorMap.erase(sessionID);
-										}
-									}
+									int rc;
+									string errMsg;
+									BRM::TxnID txnid = sessionManager.getTxnID(sessionID);
+									batchInsertProcessor = BatchInsertProc::makeBatchInsertProc(txnid.id, insertPkg.getTableOid());
+									batchInsertProcessor->addPkg(bsSave, true);
+									cond.notify_one();
+									BatchInsertProc::removeBatchInsertProc(rc, errMsg); // Causes a join. That is, we'll wait for BatchInsertProc to finish doing its thing.
 								}
 							}
 						}
@@ -1062,53 +923,58 @@ void DMLProcessor::operator()()
 			// find our own sessionID in the map.
 			// This mechanism may prove useful for other things, so the above
 			// comment may change.
+			packageHandlerMapLock.lock();
+			std::map<uint32_t, PackageHandler*>::iterator phIter = packageHandlerMap.find(sessionID);
+			packageHandlerMapLock.unlock();
+			if (phIter != packageHandlerMap.end())
 			{
-				boost::mutex::scoped_lock lk2(DMLProcessor::packageHandlerMapLock);
-				DMLProcessor::PackageHandlerMap_t::iterator phIter = packageHandlerMap.find(sessionID);
-				if (phIter != packageHandlerMap.end())
+				if (packageType == dmlpackage::DML_COMMAND)
 				{
-					if (packageType == dmlpackage::DML_COMMAND)
+					dmlpackage::CommandDMLPackage commandPkg;
+					commandPkg.read(*(bs1.get()));
+					std::string stmt = commandPkg.get_DMLStatement();
+					boost::algorithm::to_upper(stmt);
+					trim(stmt);
+					if (stmt == "CTRL+C")
 					{
-						dmlpackage::CommandDMLPackage commandPkg;
-						commandPkg.read(*(bs1.get()));
-						std::string stmt = commandPkg.get_DMLStatement();
-						boost::algorithm::to_upper(stmt);
-						trim(stmt);
-						if (stmt == "CTRL+C")
-						{
-							phIter->second->rollbackPending();
-							fIos.close();
-							break;
-						}
-					}
-					else
-					{
-						// If there's a PackageHandler already working for this 
-						// sessionID, we have a problem. Reject this package
-						messageqcpp::ByteStream results;
-						ostringstream oss;
-						oss << "Received a DML command for session " << sessionID <<
-						" while still processing a command for the same sessionID";
-						results << static_cast<messageqcpp::ByteStream::byte>(DMLPackageProcessor::DEAD_LOCK_ERROR);
-						results << static_cast<messageqcpp::ByteStream::octbyte>(0);	// rowcount
-						logging::Message::Args args;
-						logging::Message message(2);
-						args.add(oss.str());
-						message.format( args );
-						logging::LoggingID lid(20);
-						logging::MessageLog ml(lid);
-						ml.logErrorMessage(message);
-						results << message.msg();
-						fIos.write(results);
-						continue;
+						phIter->second->rollbackPending();
+						fIos.close();
+						break;
 					}
 				}
+				else
+				{
+					// If there's a PackageHandler already working for this 
+					// sessionID, we have a problem. Reject this package
+					messageqcpp::ByteStream results;
+					ostringstream oss;
+					oss << "Received a DML command for session " << sessionID <<
+						" while still processing a command for the same sessionID";
+					results << static_cast<messageqcpp::ByteStream::byte>(DMLPackageProcessor::DEAD_LOCK_ERROR);
+					results << static_cast<messageqcpp::ByteStream::octbyte>(0);	// rowcount
+					logging::Message::Args args;
+					logging::Message message(2);
+					args.add(oss.str());
+					message.format( args );
+					logging::LoggingID lid(20);
+					logging::MessageLog ml(lid);
+					ml.logErrorMessage(message);
+					results << message.msg();
+					fIos.write(results);
+					continue;
+				}
 			}
+
 			//cout << "   got a ";
 			switch (packageType)
 			{
 			case dmlpackage::DML_INSERT:
 			   //cout << "DML_INSERT";
+			   if (fCM.get() == NULL)
+			   {
+					fCM.reset(new WriteEngine::ChunkManager());
+			   }
+			   fCM->setIsInsert(true);
 			   break;
 			case dmlpackage::DML_UPDATE:
 			   //cout << "DML_UPDATE";
@@ -1117,7 +983,20 @@ void DMLProcessor::operator()()
 			   //cout << "DML_DELETE";
 			   break;
 			case dmlpackage::DML_COMMAND:
-			   //cout << "DML_COMMAND";		
+			   //cout << "DML_COMMAND";
+			   //@Bug 3851. Delete the chunkmanager for insert.
+			   if ( fCM.get() != NULL )
+				{
+					std::map<uint32_t,uint32_t> oids;
+					fCM->setIsInsert(false);
+					BRM::TxnID txnid = sessionManager.getTxnID(sessionID);
+					if (txnid.valid)
+					{
+						fCM->setTransId(txnid.id);
+						fCM->flushChunks(0, oids);
+						fCM.reset();
+					}
+				}
 			   break;
 			case dmlpackage::DML_INVALID_TYPE:
 			   //cout << "DML_INVALID_TYPE";
@@ -1128,196 +1007,159 @@ void DMLProcessor::operator()()
 			}
 		    //cout << " package" << endl;
 			
+#ifdef SERIALIZE_DDL_DML_CPIMPORT                
+			//Check if any other active transaction
+			bool anyOtherActiveTransaction = true;
 			BRM::TxnID txnid;
-			if (!concurrentSupport) 
+			BRM::SIDTIDEntry blockingsid;
+
+			//For logout commit trigger
+			if ( packageType == dmlpackage::DML_COMMAND )
 			{
-				//Check if any other active transaction
-				bool anyOtherActiveTransaction = true;
-				BRM::SIDTIDEntry blockingsid;
+				anyOtherActiveTransaction = false;
+			}
+#endif            		
+			int i = 0;
+			int waitPeriod = 10;
+			//@Bug 2487 Check transaction map every 1/10 second
 
-				//For logout commit trigger
-				if ( packageType == dmlpackage::DML_COMMAND )
-				{
-					anyOtherActiveTransaction = false;
-				}           		
-				int i = 0;
-				int waitPeriod = 10;
-				//@Bug 2487 Check transaction map every 1/10 second
-
-				int sleepTime = 100; // sleep 100 milliseconds between checks
-				int numTries = 10;  // try 10 times per second
+			int sleepTime = 100; // sleep 100 milliseconds between checks
+			int numTries = 10;  // try 10 times per second
 			
-
-				string waitPeriodStr = config::Config::makeConfig()->getConfig("SystemConfig", "WaitPeriod");
-				if ( waitPeriodStr.length() != 0 )
-					waitPeriod = static_cast<int>(config::Config::fromText(waitPeriodStr));
+#ifdef SERIALIZE_DDL_DML_CPIMPORT 
+			string waitPeriodStr = config::Config::makeConfig()->getConfig("SystemConfig", "WaitPeriod");
+			if ( waitPeriodStr.length() != 0 )
+				waitPeriod = static_cast<int>(config::Config::fromText(waitPeriodStr));
 				
-				numTries = 	waitPeriod * 10;
-				struct timespec rm_ts;
+			numTries = 	waitPeriod * 10;
+			struct timespec rm_ts;
 
-				rm_ts.tv_sec = sleepTime/1000; 
-				rm_ts.tv_nsec = sleepTime%1000 *1000000;
-				//cout << "starting i = " << i << endl;
-				//txnid = sessionManager.getTxnID(sessionID);	
-				while (anyOtherActiveTransaction)
+			rm_ts.tv_sec = sleepTime/1000; 
+			rm_ts.tv_nsec = sleepTime%1000 *1000000;
+			//cout << "starting i = " << i << endl;
+			//txnid = sessionManager.getTxnID(sessionID);	
+			while (anyOtherActiveTransaction)
+			{
+				anyOtherActiveTransaction = sessionManager.checkActiveTransaction( sessionID, bIsDbrmUp,
+					blockingsid );
+				//cout << "session " << sessionID << " with package type " << (int)packageType << " got anyOtherActiveTransaction " << anyOtherActiveTransaction << endl;
+				if (anyOtherActiveTransaction) 
 				{
-					anyOtherActiveTransaction = sessionManager.checkActiveTransaction( sessionID, bIsDbrmUp,
-						blockingsid );
-					//cout << "session " << sessionID << " with package type " << (int)packageType << " got anyOtherActiveTransaction " << anyOtherActiveTransaction << endl;
-					if (anyOtherActiveTransaction) 
+					for ( ; i < numTries; i++ )
 					{
-						for ( ; i < numTries; i++ )
-						{
 #ifdef _MSC_VER
-							Sleep(rm_ts.tv_sec * 1000);
+						Sleep(rm_ts.tv_sec * 1000);
 #else
-							struct timespec abs_ts;
-							//cout << "session " << sessionID << " nanosleep on package type " << (int)packageType << endl;
-							do
-							{
-								abs_ts.tv_sec = rm_ts.tv_sec; 
-								abs_ts.tv_nsec = rm_ts.tv_nsec;
-							} 
-							while(nanosleep(&abs_ts,&rm_ts) < 0);
+						struct timespec abs_ts;
+						//cout << "session " << sessionID << " nanosleep on package type " << (int)packageType << endl;
+						do
+						{
+							abs_ts.tv_sec = rm_ts.tv_sec; 
+							abs_ts.tv_nsec = rm_ts.tv_nsec;
+						} 
+						while(nanosleep(&abs_ts,&rm_ts) < 0);
 #endif
-							anyOtherActiveTransaction = sessionManager.checkActiveTransaction( sessionID, bIsDbrmUp,
-								blockingsid );
-							if ( !anyOtherActiveTransaction )
+						anyOtherActiveTransaction = sessionManager.checkActiveTransaction( sessionID, bIsDbrmUp,
+							blockingsid );
+						if ( !anyOtherActiveTransaction )
+						{
+							txnid = sessionManager.getTxnID(sessionID);
+							//cout << "Ready to process type " << (int)packageType << " with txd " << txnid << endl;
+							if ( !txnid.valid )
 							{
-								txnid = sessionManager.getTxnID(sessionID);
-								//cout << "Ready to process type " << (int)packageType << " with txd " << txnid << endl;
-								if ( !txnid.valid )
-								{
-									txnid = sessionManager.newTxnID(sessionID, true);
-									if (txnid.valid) {
-										//cout << "Ready to process type " << (int)packageType << " for session "<< sessionID << " with new txnid " << txnid.id << endl;
-										anyOtherActiveTransaction = false;
-										break;
-									}
-									else
-									{
-										anyOtherActiveTransaction = true;
-									}
+								txnid = sessionManager.newTxnID(sessionID, true);
+								if (txnid.valid) {
+									//cout << "Ready to process type " << (int)packageType << " for session "<< sessionID << " with new txnid " << txnid.id << endl;
+									anyOtherActiveTransaction = false;
+									break;
 								}
 								else
 								{
-									anyOtherActiveTransaction = false;
-									//cout << "already have transaction to process type " << (int)packageType << " for session "<< sessionID <<" with existing txnid " << txnid.id << endl;
-									break;
+									anyOtherActiveTransaction = true;
 								}
-							}
-						}
-						//cout << "ending i = " << i << endl;
-					}
-					else
-					{
-						//cout << "Ready to process type " << (int)packageType << endl;
-						txnid = sessionManager.getTxnID(sessionID);
-						if ( !txnid.valid )
-						{
-							txnid = sessionManager.newTxnID(sessionID, true);
-							if (txnid.valid) {
-							//cout << "later Ready to process type " << (int)packageType << " for session "<< sessionID << " with new txnid " << txnid.id << endl;
-								anyOtherActiveTransaction = false;
 							}
 							else
 							{
-								anyOtherActiveTransaction = true;
-							//cout << "Cannot get txnid for  process type " << (int)packageType << " for session "<< sessionID << endl;
+								anyOtherActiveTransaction = false;
+								//cout << "already have transaction to process type " << (int)packageType << " for session "<< sessionID <<" with existing txnid " << txnid.id << endl;
+								break;
 							}
 						}
-						else
-						{
-							anyOtherActiveTransaction = false;
-							//cout << "already have transaction to process type " << (int)packageType << " for session "<< sessionID <<" with txnid " << txnid.id << endl;
-							break;
-						}
 					}
-					
-					if ((anyOtherActiveTransaction) && (i >= numTries))
-					{
-						//cout << " Erroring out on package type " << (int)packageType << " for session " << sessionID << endl;
-						break;  
-					}
-				}
-
-				if (anyOtherActiveTransaction && (i >= numTries))
-				{
-					//cout << " again Erroring out on package type " << (int)packageType << endl;
-					messageqcpp::ByteStream results;
-					//@Bug 2681 set error code for active transaction
-					status =  DMLPackageProcessor::ACTIVE_TRANSACTION_ERROR;
-					rowCount = 0;
-					results << status;
-					results << rowCount;
-					Message::Args args;
-					args.add(static_cast<uint64_t>(blockingsid.sessionid));
-					results << IDBErrorInfo::instance()->errorMsg(ERR_ACTIVE_TRANSACTION, args);
-					//@Bug 3854 Log to debug.log
-					LoggingID logid(20, 0, 0);
-					logging::Message::Args args1;
-					logging::Message msg(1);
-					args1.add(IDBErrorInfo::instance()->errorMsg(ERR_ACTIVE_TRANSACTION, args));
-					msg.format( args1 );
-					logging::Logger logger(logid.fSubsysID);
-					logger.logMessage(LOG_TYPE_DEBUG, msg, logid);
-				
-					fIos.write(results);
+						//cout << "ending i = " << i << endl;
 				}
 				else
 				{
-					//cout << "starting processing package type " << (int) packageType << " for session " << sessionID << " with id " << txnid.id << endl;
-					boost::shared_ptr<PackageHandler> php(new PackageHandler(fIos, bs1, packageType, fEC,
-						maxDeleteRows, sessionID, txnid.id, fDbrm, fQtc));
-					// We put the packageHandler into a map so that if we receive a
-					// message to affect the previous command, we can find it.
-					boost::mutex::scoped_lock lk2(DMLProcessor::packageHandlerMapLock, defer_lock);
-
-					lk2.lock();
-					packageHandlerMap[sessionID] = php;
-					lk2.unlock();
-
-					php->run();		// Operates in this thread.
-
-					lk2.lock();
-					packageHandlerMap.erase(sessionID);
-					lk2.unlock();
-				}
-			}
-			else
-			{
-				if (packageType != dmlpackage::DML_COMMAND)
-				{
+					//cout << "Ready to process type " << (int)packageType << endl;
 					txnid = sessionManager.getTxnID(sessionID);
 					if ( !txnid.valid )
 					{
 						txnid = sessionManager.newTxnID(sessionID, true);
-						if (!txnid.valid) {
-							throw std::runtime_error( std::string("Unable to start a transaction. Check critical log.") );
+						if (txnid.valid) {
+							//cout << "later Ready to process type " << (int)packageType << " for session "<< sessionID << " with new txnid " << txnid.id << endl;
+							anyOtherActiveTransaction = false;
+						}
+						else
+						{
+							anyOtherActiveTransaction = true;
+							//cout << "Cannot get txnid for  process type " << (int)packageType << " for session "<< sessionID << endl;
 						}
 					}
+					else
+					{
+						anyOtherActiveTransaction = false;
+						//cout << "already have transaction to process type " << (int)packageType << " for session "<< sessionID <<" with txnid " << txnid.id << endl;
+						break;
+					}
 				}
-				else
+					
+				if ((anyOtherActiveTransaction) && (i >= numTries))
 				{
-					txnid = sessionManager.getTxnID(sessionID);
+					//cout << " Erroring out on package type " << (int)packageType << " for session " << sessionID << endl;
+					break;  
 				}
-
-				boost::shared_ptr<PackageHandler> php(new PackageHandler(fIos, bs1, packageType, fEC,
-					maxDeleteRows, sessionID, txnid.id, fDbrm, fQtc));
+			}
+#endif
+			
+#ifdef SERIALIZE_DDL_DML_CPIMPORT
+			if (anyOtherActiveTransaction && (i >= numTries))
+			{
+				//cout << " again Erroring out on package type " << (int)packageType << endl;
+				messageqcpp::ByteStream results;
+				//@Bug 2681 set error code for active transaction
+				status =  DMLPackageProcessor::ACTIVE_TRANSACTION_ERROR;
+				rowCount = 0;
+				results << status;
+				results << rowCount;
+				Message::Args args;
+				args.add(static_cast<uint64_t>(blockingsid.sessionid));
+				results << IDBErrorInfo::instance()->errorMsg(ERR_ACTIVE_TRANSACTION, args);
+				//@Bug 3854 Log to debug.log
+				LoggingID logid(20, 0, 0);
+				logging::Message::Args args1;
+				logging::Message msg(1);
+				args1.add(IDBErrorInfo::instance()->errorMsg(ERR_ACTIVE_TRANSACTION, args));
+				msg.format( args1 );
+				logging::Logger logger(logid.fSubsysID);
+				logger.logMessage(LOG_TYPE_DEBUG, msg, logid);
+				
+				fIos.write(results);
+			}
+			else
+			{
+				//cout << "starting processing package type " << (int) packageType << " for session " << sessionID << " with id " << txnid.id << endl;
+				PackageHandler ph(fIos, bs1, packageType, fEC, maxDeleteRows, sessionID, txnid.id);
 				// We put the packageHandler into a map so that if we receive a
 				// message to affect the previous command, we can find it.
-				boost::mutex::scoped_lock lk2(DMLProcessor::packageHandlerMapLock, defer_lock);
-
-				lk2.lock();
-				packageHandlerMap[sessionID] = php;
-				lk2.unlock();
-
-				php->run();		// Operates in this thread.
-
-				lk2.lock();
+				packageHandlerMapLock.lock();
+				packageHandlerMap[sessionID] = &ph;
+				packageHandlerMapLock.unlock();
+				ph.run();		// Operates in this thread.
+				packageHandlerMapLock.lock();
 				packageHandlerMap.erase(sessionID);
-				lk2.unlock();
+				packageHandlerMapLock.unlock();
 			}
+#endif
 		}
     }
     catch (std::exception& ex)
@@ -1337,7 +1179,7 @@ void DMLProcessor::operator()()
     }
 }
 
-void RollbackTransactionProcessor::processBulkRollback (BRM::TableLockInfo lockInfo, BRM::DBRM * dbrm, uint64_t uniqueId, 
+void RollbackTransactionProcessor::processBulkRollback (BRM::TableLockInfo lockInfo, BRM::DBRM & dbrm, uint64_t uniqueId, 
 						OamCache::dbRootPMMap_t& dbRootPMMap, bool & lockReleased)
 {
 	// Take over ownership of stale lock.
@@ -1349,7 +1191,7 @@ void RollbackTransactionProcessor::processBulkRollback (BRM::TableLockInfo lockI
 	bool ownerChanged = true;
 	lockReleased = true;
 	try {
-		ownerChanged = dbrm->changeOwner(lockInfo.id, processName, processID, sessionID, txnid);
+		ownerChanged = dbrm.changeOwner(lockInfo.id, processName, processID, sessionID, txnid);
 	}
 	catch (std::exception&)
 	{
@@ -1371,7 +1213,7 @@ void RollbackTransactionProcessor::processBulkRollback (BRM::TableLockInfo lockI
 	//find the PMs need to send the message to
 	std::set<int> pmSet;
 	int pmId;
-	for (uint32_t i=0; i<lockInfo.dbrootList.size(); i++)
+	for (uint i=0; i<lockInfo.dbrootList.size(); i++)
 	{	
 		pmId = (*dbRootPMMap)[lockInfo.dbrootList[i]]; 
 		pmSet.insert(pmId);
@@ -1425,7 +1267,7 @@ void RollbackTransactionProcessor::processBulkRollback (BRM::TableLockInfo lockI
 
 		// If no errors so far, then change state to CLEANUP state.
 		// We ignore the return stateChange flag.
-		dbrm->changeState( lockInfo.id, BRM::CLEANUP );	
+		dbrm.changeState( lockInfo.id, BRM::CLEANUP );	
 	} // end of (lockInfo.state == BRM::LOADING)
 	
 	//delete meta data backup rollback files
@@ -1444,7 +1286,7 @@ void RollbackTransactionProcessor::processBulkRollback (BRM::TableLockInfo lockI
 	// Wait for "all" the responses, and accumulate any/all errors
 	unsigned int pmMsgCnt = 0;
 	//@Bug 4517 Release tablelock when it is in CLEANUP state
-	uint32_t rcCleanup = 0;
+	uint rcCleanup = 0;
 	std::string fileDeleteErrMsg;
 	while (pmMsgCnt < pmSet.size())
 	{
@@ -1474,7 +1316,7 @@ void RollbackTransactionProcessor::processBulkRollback (BRM::TableLockInfo lockI
 	} // end of while loop to process all responses to rollback cleanup
 	fWEClient->removeQueue(uniqueId);
 	// We ignore return release flag from releaseTableLock().	
-	dbrm->releaseTableLock( lockInfo.id );
+	dbrm.releaseTableLock( lockInfo.id );
 	
 	if (rcCleanup != 0)
 		throw  std::runtime_error(fileDeleteErrMsg);
@@ -1510,4 +1352,5 @@ void DMLProcessor::log(const std::string& msg, logging::LOG_TYPE level)
 
 } //namespace dmlprocessor
 // vim:ts=4 sw=4:
+
 

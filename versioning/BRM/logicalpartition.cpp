@@ -16,27 +16,37 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: logicalpartition.cpp 1823 2013-01-21 14:13:09Z rdempsey $
+ * $Id: logicalpartition.cpp 1729 2012-10-25 17:07:59Z zzhu $
  *
  *****************************************************************************/
 
-/** @file
+/** @file 
  * Put LogicalPartition define here to avoid header file include confilct.
  * This struct will be used in connector, brm and writeengine
  */
 
-#include <cstdio>
 #include <sstream>
 #include "bytestream.h"
 #include "logicalpartition.h"
 
-namespace BRM
+namespace BRM 
 {
 std::string LogicalPartition::toString() const
 {
-	char buf[256] = {0};
-	std::sprintf(buf, "%d.%d.%d", pp, seg, dbroot);
-	return std::string(buf);
+	std::ostringstream oss;
+	if (pp != (uint32_t)-1)
+	{
+		oss << pp;
+	}
+	if (seg != (uint16_t)-1)
+	{
+		oss << "." << seg;
+	}
+	if (dbroot != (uint16_t)-1)
+	{
+		oss << "." << dbroot;
+	}
+	return oss.str();
 }
 
 /**

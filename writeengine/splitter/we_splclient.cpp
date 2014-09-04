@@ -1,19 +1,34 @@
-/* Copyright (C) 2014 InfiniDB, Inc.
+/*
 
-   This program is free software; you can redistribute it and/or
-   modify it under the terms of the GNU General Public License
-   as published by the Free Software Foundation; version 2 of
-   the License.
+   Copyright (C) 2009-2012 Calpont Corporation.
 
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   Use of and access to the Calpont InfiniDB Community software is subject to the
+   terms and conditions of the Calpont Open Source License Agreement. Use of and
+   access to the Calpont InfiniDB Enterprise software is subject to the terms and
+   conditions of the Calpont End User License Agreement.
 
-   You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-   MA 02110-1301, USA. */
+   This program is distributed in the hope that it will be useful, and unless
+   otherwise noted on your license agreement, WITHOUT ANY WARRANTY; without even
+   the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+   Please refer to the Calpont Open Source License Agreement and the Calpont End
+   User License Agreement for more details.
+
+   You should have received a copy of either the Calpont Open Source License
+   Agreement or the Calpont End User License Agreement along with this program; if
+   not, it is your responsibility to review the terms and conditions of the proper
+   Calpont license agreement by visiting http://www.calpont.com for the Calpont
+   InfiniDB Enterprise End User License Agreement or http://www.infinidb.org for
+   the Calpont InfiniDB Community Calpont Open Source License Agreement.
+
+   Calpont may make changes to these license agreements from time to time. When
+   these changes are made, Calpont will make a new copy of the Calpont End User
+   License Agreement available at http://www.calpont.com and a new copy of the
+   Calpont Open Source License Agreement available at http:///www.infinidb.org.
+   You understand and agree that if you use the Program after the date on which
+   the license agreement authorizing your use has changed, Calpont will treat your
+   use as acceptance of the updated License.
+
+*/
 
 /*******************************************************************************
 * $Id$
@@ -27,10 +42,23 @@
  *      Author: bpaul
  */
 
+#include <iosfwd>
+#ifndef _MSC_VER
+#include <arpa/inet.h>
+#else
+#include <intrin.h>
+#endif
+#if __FreeBSD__
+#include <sys/socket.h>
+#endif
+
+
 #include <cstdio>
 #include <iostream>
 #include <string>
 using namespace std;
+
+//using namespace std;
 
 #include "errorids.h"
 #include "exceptclasses.h"
@@ -39,7 +67,9 @@ using namespace std;
 #include "loggingid.h"
 using namespace logging;
 
-#include <boost/thread/mutex.hpp>
+#include <boost/thread/condition.hpp>
+#include <boost/scoped_array.hpp>
+#include <boost/thread.hpp>
 using namespace boost;
 
 #include "messagequeue.h"
@@ -54,6 +84,34 @@ using namespace snmpmanager;
 
 #include "we_sdhandler.h"
 #include "we_splclient.h"
+
+//------------------------------------------------------------------------------
+/*
+void  writeToLog(const char* file, int line, const string& msg, LOG_TYPE logto = LOG_TYPE_INFO)
+{
+       LoggingID lid(05);
+       MessageLog ml(lid);
+       Message::Args args;
+       Message m(0);
+       args.add(file);
+       args.add("@");
+       args.add(line);
+       args.add(msg);
+       m.format(args);
+	switch (logto)
+	{
+       	case LOG_TYPE_DEBUG:	ml.logDebugMessage(m); break;
+       	case LOG_TYPE_INFO: 	ml.logInfoMessage(m); break;
+       	case LOG_TYPE_WARNING:	ml.logWarningMessage(m); break;
+       	case LOG_TYPE_ERROR:	ml.logWarningMessage(m); break;
+       	case LOG_TYPE_CRITICAL:	ml.logCriticalMessage(m); break;
+	}
+}
+*/
+#ifdef _MSC_VER
+mutex inet_ntoa_mutex;
+#endif
+
 
 namespace WriteEngine
 {
@@ -134,7 +192,6 @@ void WESplClient::setup()
 	} catch (std::exception& ex)
 	{
 		cerr << "Could not connect to " << fServer << ": " << ex.what() << endl;
-		throw runtime_error("Problem in connecting to PM");
 	} catch (...)
 	{
 		cerr << "Could not connect to " << fServer  << endl;
@@ -201,12 +258,19 @@ void WESplClient::sendAndRecv()
 //------------------------------------------------------------------------------
 void WESplClient::send()
 {
+	//TODO - may have to move the aLock here.
+	//if ((!fSendQueue.empty())&&(getSendFlag()))
+
+	//if (!fSendQueue.empty())
+	// Check enough DataRqst to send Data
+
 
 	if ((!fSendQueue.empty())&&(getDataRqstCount()>0))
 	{
 		if(fOwner.getDebugLvl()>2)
 			cout << "DataRqstCnt [" << getPmId() << "] = "
 									<< getDataRqstCount() << endl;
+		//setSendFlag(false);
 		mutex::scoped_lock aLock(fSentQMutex);
 		messageqcpp::SBS aSbs = fSendQueue.front();
 		fSendQueue.pop();
@@ -216,14 +280,7 @@ void WESplClient::send()
 		{
 			mutex::scoped_lock aLock(fWriteMutex);
 			setBytesTx(getBytesTx() + aLen);
-			try
-			{
-				if(isConnected())
-					fClnt->write(aSbs);
-			}
-			catch(...)
-			{
-			}
+			fClnt->write(aSbs);
 			aLock.unlock();
 		}
 
@@ -241,12 +298,10 @@ void WESplClient::recv()
     rm_ts.tv_sec = fRdSecTo;			//0 when data sending otherwise 1- second
     rm_ts.tv_nsec = 20000000;			// 20 milliSec
     bool isTimeOut = false;
-	int aLen = 0;
 
     try
     {
-		if(isConnected())
-    		aSbs = fClnt->read(&rm_ts, &isTimeOut);
+    	aSbs = fClnt->read(&rm_ts, &isTimeOut);
     }
     catch (std::exception& ex)
     {
@@ -256,19 +311,12 @@ void WESplClient::recv()
     	throw runtime_error("fClnt read error");
     }
 	// - aSbs->length()>0 add to the sdh.fWesMsgQueue
-	try
-	{
-		if(aSbs)
-			aLen = aSbs->length();
-	}
-	catch(...)
-	{
-		aLen = 0;
-	}
+	int aLen = aSbs->length();
 
 	if(aLen > 0)
 	{
-		setLastInTime(time(0));  //added back for BUG 4535 / BUG 4195
+		//setLastInTime(time(0));	BUG 4195
+		setLastInTime(time(0));  //added back for BUG 4535
 		setBytesRcv( getBytesRcv()+ aLen);
 		fOwner.add2RespQueue(aSbs);
 	}
@@ -282,16 +330,10 @@ void WESplClient::recv()
 //------------------------------------------------------------------------------
 void WESplClient::write(const messageqcpp::ByteStream& Msg)
 {
+	//mutex::scoped_lock aLock(fWriteMutex);
 	setBytesTx(getBytesTx() + Msg.length());
-	try
-	{
-		if(Msg.length()>0)
-			fClnt->write(Msg);
-	}
-	catch(...)
-	{
-			//ignore it
-	}
+	fClnt->write(Msg);
+	//aLock.unlock();
 }
 //------------------------------------------------------------------------------
 void WESplClient::read(messageqcpp::SBS& Sbs)
@@ -303,7 +345,9 @@ void WESplClient::read(messageqcpp::SBS& Sbs)
 //TODO - We may need to make it much more efficient by incorporating file read
 void WESplClient::add2SendQueue(const messageqcpp::SBS& Sbs)
 {
+	//mutex::scoped_lock aLock(fSentQMutex);
 	this->fSendQueue.push(Sbs);
+	//aLock.unlock();
 }
 
 
@@ -361,23 +405,10 @@ void WESplClient::onConnect()
 	// alert data can be send now
 	// do not allow to connect back again.
 
-	// when reconnect happens, reset the variables
-	setRollbackRslt(0);
-	setCleanupRslt(0);
-	setCpiPassed(false);
-    setCpiFailed(false);
-
-    setContinue(true);
 	setConnected(true);
 	ByteStream bsWrite;
 	bsWrite << (ByteStream::byte) WE_CLT_SRV_KEEPALIVE;
-	try
-	{
-		this->write(bsWrite);				// send the keep init keep alive
-	}
-	catch(...)
-	{
-	}
+	this->write(bsWrite);				// send the keep init keep alive
 
 	// need to send Alarm
 	fIpAddress = fClnt->addr2String();
@@ -394,10 +425,7 @@ void WESplClient::onDisconnect()
 	setCleanupRslt(-1);
 
 	if((!fCpiPassed)&&(!fCpiFailed))	//a hard disconnection
-	{
 		fOwner.onCpimportFail(fPmId);
-		fOwner.setDisconnectFailure(true);
-	}
 
 	// update all the flags of disconnect.
 	// alert on roll back
@@ -420,7 +448,7 @@ void WESplClient::onDisconnect()
 
 //------------------------------------------------------------------------------
 
-void WESplClient::setRowsUploadInfo(int64_t RowsRead, int64_t RowsInserted)
+void WESplClient::setRowsUploadInfo(int RowsRead, int RowsInserted)
 {
 	fRowsUploadInfo.fRowsRead = RowsRead;
 	fRowsUploadInfo.fRowsInserted = RowsInserted;
@@ -429,8 +457,7 @@ void WESplClient::setRowsUploadInfo(int64_t RowsRead, int64_t RowsInserted)
 
 //------------------------------------------------------------------------------
 
-void WESplClient::add2ColOutOfRangeInfo(int ColNum, 
-                                        CalpontSystemCatalog::ColDataType ColType, 
+void WESplClient::add2ColOutOfRangeInfo(int ColNum, ColDataType ColType, 
                                         std::string&  ColName, int NoOfOors)
 {
 	WEColOORInfo aColOorInfo;

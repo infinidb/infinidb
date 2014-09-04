@@ -1,21 +1,21 @@
-/* Copyright (C) 2014 InfiniDB, Inc.
+/*
+  Copyright (C) 2009-2012 Calpont Corporation.
 
-   This program is free software; you can redistribute it and/or
-   modify it under the terms of the GNU General Public License
-   as published by the Free Software Foundation; version 2 of
-   the License.
+  This program is free software; you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation; version 2 of the License.
 
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
 
-   You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-   MA 02110-1301, USA. */
+  You should have received a copy of the GNU General Public License along
+  with this program; if not, write to the Free Software Foundation, Inc.,
+  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+*/
 
-// $Id$
+// $Id: activestatementcounter.h 525 2010-01-19 23:18:05Z xlou $
 //
 /** @file */
 
@@ -28,7 +28,7 @@
 #include <map>
 #include <vector>
 
-#if defined(_MSC_VER) && defined(WRITEENGINE_DLLEXPORT)
+#if defined(_MSC_VER) && defined(WETBLMETADAT_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
@@ -47,8 +47,6 @@ struct ColExtInfo {
 	int64_t min;
 	bool isNewExt;
 	bool current;
-	uint16_t	compType;
-	bool isDict;
 	
 	ColExtInfo() :
 	dbRoot(0),
@@ -59,10 +57,7 @@ struct ColExtInfo {
 	max(0),
 	min(0),
 	isNewExt(false),
-	current(true),
-	compType(2),
-	isDict(false)
-	{}
+	current(true){}
 };
 
 typedef std::vector<ColExtInfo> ColExtsInfo;
@@ -79,8 +74,8 @@ public:
      */ 
     EXPORT static void removeTableMetaData(uint32_t tableOid);
 	
-	EXPORT ColExtsInfo & getColExtsInfo (OID columnOid);
-	EXPORT void setColExtsInfo (OID columnOid, ColExtsInfo colExtsInfo);
+	ColExtsInfo & getColExtsInfo (OID columnOid);
+	void setColExtsInfo (OID columnOid, ColExtsInfo colExtsInfo);
 	EXPORT ColsExtsInfoMap& getColsExtsInfoMap();
 
 private:
@@ -100,4 +95,3 @@ private:
 
 #endif
 // vim:ts=4 sw=4:
-

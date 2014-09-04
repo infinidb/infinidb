@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: dbrm.h 1878 2013-05-02 15:17:12Z dcathey $
+ * $Id: dbrm.h 1716 2012-09-28 23:08:26Z xlou $
  *
  *****************************************************************************/
 
@@ -117,7 +117,7 @@ public:
 	 * @param fileBlockOffset (out) The file block offset of the LBID
 	 * @param dbRoot (out) The DBRoot number that contains the file.
 	 * @param partitionNum (out) The partition number for the file.
-	 * @param segmentNum (out) The segment number for the file.
+	 * @param segmentNum (out) The segement number for the file.
 	 * 
 	 * @return 0 on success, non-0 on error (see brmtypes.h)
 	 */
@@ -165,10 +165,10 @@ public:
 	 * Do a VSS lookup.  Gets the version ID of the block the caller should use
 	 * and determines whether it is in the version buffer or the main database.
 	 * @param lbid (in) The block number
-	 * @param qc (in) The SCN & txn list provided by SessionManager::verID().
+	 * @param verID (in/out) The input value is the version requested, 
+	 * the output value is the value the caller should use.
 	 * @param txnID (in) If the caller has a transaction ID, put it here.  
 	 * Otherwise use 0.
-	 * @param outVer (out) The version the caller should use.
 	 * @param vbFlag (out) If true, the block is in the version buffer; 
 	 * false, the block is in the main database.
 	 * @param vbOnly (in) If true, it will only consider entries in the Version Buffer
@@ -176,34 +176,21 @@ public:
 	 * entries.  This defaults to false.
 	 * @return 0 on success, non-0 on error (see brmtypes.h)
 	 */
-	EXPORT int vssLookup(LBID_t lbid, const QueryContext &qc, VER_t txnID, VER_t *outVer,
-		bool *vbFlag, bool vbOnly = false) throw();
+	EXPORT int vssLookup(LBID_t lbid, VER_t& verID, VER_t txnID, bool& vbFlag, 
+				  bool vbOnly = false) throw();
 
 	/** @brief Do many VSS lookups under one lock
 	 *
 	 * Do many VSS lookups under one lock.
 	 * @param lbids (in) The LBIDs to look up
-	 * @param qc (in) The input version info, equivalent to the verID param in vssLookup()
+	 * @param verID (in) The input version number, equivalent to the verID param in vssLookup()
 	 * @param txnID (in) The input transaction number, equivalent to the txnID param in vssLookup()
 	 * @param out (out) The values equivalent to the out parameters in vssLookup() including the individual return codes, ordered as the lbid list.
 	 * @return 0 on success, -1 on a fatal error.
 	 */
-	EXPORT int bulkVSSLookup(const std::vector<LBID_t> &lbids, const QueryContext_vss &qc, VER_t txnID,
-		std::vector<VSSData> *out);
+	EXPORT int bulkVSSLookup(const std::vector<LBID_t> &lbids, VER_t verID, VER_t txnID,
+		std::vector<VSSData> *out) throw();
 	
-	/// returns the version in the main DB files or 0 if none exist
-	EXPORT VER_t getCurrentVersion(LBID_t lbid, bool *isLocked = NULL) const;
-
-	/// returns the highest version # in the version buffer, or -1 if none exist
-	EXPORT VER_t getHighestVerInVB(LBID_t lbid, VER_t max=std::numeric_limits<VER_t>::max()) const;  // returns
-
-	/// returns true if that block is in the version buffer, false otherwise including on error
-	EXPORT bool isVersioned(LBID_t lbid, VER_t version) const;
-
-	/// Do many getCurrentVersion lookups under one lock grab
-	EXPORT int bulkGetCurrentVersion(const std::vector<LBID_t> &lbids, std::vector<VER_t> *versions,
-			std::vector<bool> *isLocked = NULL) const;
-
 	/** @brief Get a complete list of LBIDs assigned to an OID
 	 *
 	 * Get a complete list of LBIDs assigned to an OID.
@@ -224,9 +211,9 @@ public:
 	 */
 	 EXPORT int createStripeColumnExtents(
 					const std::vector<CreateStripeColumnExtentsArgIn>& cols,
-					uint16_t  dbRoot,
-					uint32_t& partitionNum,
-					uint16_t& segmentNum,
+					u_int16_t  dbRoot,
+					u_int32_t& partitionNum,
+					u_int16_t& segmentNum,
 			std::vector<CreateStripeColumnExtentsArgOut>& extents) DBRM_THROW;
 
 	/** @brief Allocate an extent for a column file
@@ -239,7 +226,6 @@ public:
 	 *        If allocating OID's first extent for this DBRoot, then
 	 *        partitionNum is input, else it is an output arg.
 	 * @param segmentNum (out) Segment number in file path.
-     * @param colDataType (in) the column type
 	 * @param lbid (out) The first LBID of the extent created.
 	 * @param allocdSize (out) The total number of LBIDs allocated.
 	 * @param startBlockOffset (out) The first block of the extent created.
@@ -247,14 +233,13 @@ public:
 	 */
 	 // @bug 4091: To be deprecated.  Replaced by createStripeColumnExtents().
 	 EXPORT int createColumnExtent_DBroot(OID_t oid,
-					uint32_t  colWidth,
-					uint16_t  dbRoot,
-					uint32_t& partitionNum,
-					uint16_t& segmentNum,
-					execplan::CalpontSystemCatalog::ColDataType colDataType,
+					u_int32_t  colWidth,
+					u_int16_t  dbRoot,
+					u_int32_t& partitionNum,
+					u_int16_t& segmentNum,
 					LBID_t&    lbid,
 					int&       allocdSize,
-					uint32_t& startBlockOffset) DBRM_THROW;
+					u_int32_t& startBlockOffset) DBRM_THROW;
 
 	/** @brief Allocate extent for specified segment file
 	 *
@@ -271,14 +256,13 @@ public:
 	 * @return 0 on success, -1 on error
 	 */
 	 EXPORT int createColumnExtentExactFile(OID_t oid,
-					uint32_t  colWidth,
-					uint16_t  dbRoot,
-					uint32_t  partitionNum,
-					uint16_t  segmentNum,
-					execplan::CalpontSystemCatalog::ColDataType colDataType,
+					u_int32_t  colWidth,
+					u_int16_t  dbRoot,
+					u_int32_t  partitionNum,
+					u_int16_t  segmentNum,
 					LBID_t&    lbid,
 					int&       allocdSize,
-					uint32_t& startBlockOffset) DBRM_THROW;
+					u_int32_t& startBlockOffset) DBRM_THROW;
 					
 	/** @brief Allocate an extent for a dictionary store file
 	 *
@@ -288,15 +272,14 @@ public:
 	 * @param dbRoot (in) DBRoot to assign to the extent.
 	 * @param partitionNum (in) Partition number to assign to the extent.
 	 * @param segmentNum (in) Segment number to assign to the extent.
-     * @param colDataType (in) the column type
 	 * @param lbid (out) The first LBID of the extent created.
 	 * @param allocdSize (out) The total number of LBIDs allocated.
 	 * @return 0 on success, -1 on error
 	 */
 	 EXPORT int createDictStoreExtent(OID_t oid,
-					 uint16_t  dbRoot,
-					 uint32_t  partitionNum,
-					 uint16_t  segmentNum,
+					 u_int16_t  dbRoot,
+					 u_int32_t  partitionNum,
+					 u_int16_t  segmentNum,
 					 LBID_t&    lbid,
 					 int&       allocdSize) DBRM_THROW;
 
@@ -315,9 +298,9 @@ public:
 	 */
 	EXPORT int rollbackColumnExtents_DBroot(OID_t oid,
 					bool      bDeleteAll,
-					uint16_t dbRoot,
-					uint32_t partitionNum,
-					uint16_t segmentNum,
+					u_int16_t dbRoot,
+					u_int32_t partitionNum,
+					u_int16_t segmentNum,
 					HWM_t     hwm) DBRM_THROW;
 
 	/** @brief Rollback (delete) a set of dict store extents for an OID & DBRoot
@@ -336,9 +319,9 @@ public:
 	 * @return 0 on success
 	 */
 	EXPORT int rollbackDictStoreExtents_DBroot(OID_t oid,
-					 uint16_t dbRoot,
-					 uint32_t partitionNum,
-					 const std::vector<uint16_t>& segNums,
+					 u_int16_t dbRoot,
+					 u_int32_t partitionNum,
+					 const std::vector<u_int16_t>& segNums,
 					 const std::vector<HWM_t>& hwms) DBRM_THROW;
 					 
 	/** @brief delete of column extents for the specified extents.
@@ -380,7 +363,34 @@ public:
 	 */
 	EXPORT int deleteOIDs( const std::vector<OID_t>& oids) DBRM_THROW;
 	
-	/** @brief Gets the last local high water mark for an OID and dbRoot
+	/** @brief Get the "high water mark" of an OID
+	 * 
+	 * Get the absolute high water mark (aka, the highest numbered written
+	 * block offset) of an OID.  This only applies to column OIDs.
+	 * @param oid (in) The OID
+	 * @param hwm (out) The high water mark of oid
+	 * @return 0 on success, non-0 on error (see brmtypes.h)
+	 */
+	EXPORT int getHWM(OID_t oid, HWM_t& hwm) throw();
+
+	/** @brief Get the last local "high water mark" of an OID
+	 * 
+	 * Get local high water mark (aka, the highest numbered written block
+	 * offset) for an OID, relative to a segment file.  The DBRoot, parti-
+	 * tion, and segment numbers for the pertinent segment file are also re-
+	 * turned.  This function could be called to get the last local HWM for
+	 * a dictionary store OID, but it's intended use is for column OIDs.
+	 * @param oid (in) The OID
+	 * @param dbRoot (out) Relevant DBRoot.
+	 * @param partitionNum (out) Relevant partition number.
+	 * @param segmentNum (out) Relevant segment number.
+	 * @param hwm (out) The last local high water mark of oid
+	 * @return 0 on success, non-0 on error (see brmtypes.h)
+	 */
+	EXPORT int getLastLocalHWM(OID_t oid, uint16_t& dbRoot,
+	       uint32_t& partitionNum, uint16_t& segmentNum, HWM_t& hwm) throw();
+	
+	/** @brief Gets the last local high water mark of an OID for a given dbRoot
 	 *
 	 * Get last local high water mark of an OID for a given dbRoot, relative to 
 	 * a segment file. The partition and segment numbers for the pertinent
@@ -389,14 +399,12 @@ public:
 	 * @param dbRoot (in) The relevant DBRoot
 	 * @param partitionNum (out) The relevant partition number
 	 * @param segmentNum (out) The relevant segment number
-	 * @param hwm (out) Last local high water mark for specified input
-	 * @param status (out) State of the extent (Available, OutOfService, etc)
-	 * @param bFound (out) Indicates whether an extent was found on the dbRoot
-	 * @return 0 on success, non-0 on error (see brmtypes.h)
+	 * @partitionNotExists (out) Is any partition in the set not exists
+	 * @return The last file block number written to in the last
+	 * partition/segment file for the given OID.
 	 */
 	EXPORT int getLastHWM_DBroot(int OID, uint16_t dbRoot,
-			uint32_t& partitionNum, uint16_t& segmentNum, HWM_t& hwm,
-			int& status, bool& bFound) throw();
+			uint32_t& partitionNum, uint16_t& segmentNum, HWM_t& hwm) throw();
 
 	/** @brief Get the "high water mark" of an OID, partition, and segment
 	 * 
@@ -407,11 +415,10 @@ public:
 	 * @param partitionNum (in) Relevant partition number.
 	 * @param segmentNum (in) Relevant segment number.
 	 * @param hwm (out) The high water mark of oid
-	 * @param status (out) State of the extent (Available, OutOfService, etc)
 	 * @return 0 on success, non-0 on error (see brmtypes.h)
 	 */
 	EXPORT int getLocalHWM(OID_t oid, uint32_t partitionNum,
-	       uint16_t segmentNum, HWM_t& hwm, int& status) throw();
+	       uint16_t segmentNum, HWM_t& hwm) throw();
 	
 	/** @brief Set the "high water mark" of an OID, partition, and segment
 	 * 
@@ -458,24 +465,6 @@ public:
 	EXPORT int getDbRootHWMInfo(OID_t oid, uint16_t pmNumber,
 	       EmDbRootHWMInfo_v& emDbRootHwmInfos) throw();
 
-	/** @brief Get the status (AVAILABLE, OUTOFSERVICE, etc) for the
-	 * segment file represented by the specified OID, part# and seg#.
-	 *
-	 * Unlike many of the other DBRM functions, this function does
-	 * not return a bad return code if no extent is found; the "found"
-	 * flag indicates whether an extent was found or not.
-	 *
-	 * @param oid (in) The OID of interest
-	 * @param partitionNum (in) The partition number of interest
-	 * @param segmentNum (in) The segment number of interest
-	 * @param bFound (out) Indicates if extent was found or not
-	 * @param status (out) The state of the extents in the specified
-	 *        segment file.
-	 * @return 0 on success, non-0 on error (see brmtypes.h)
-	 */
-	EXPORT int getExtentState(OID_t oid, uint32_t partitionNum,
-			uint16_t segmentNum, bool& bFound, int& status) throw();
-
 	/** @brief Gets the extents of a given OID
 	 *
 	 * Gets the extents of a given OID.
@@ -493,7 +482,6 @@ public:
 	EXPORT int getExtents(int OID, std::vector<struct EMEntry>& entries,
 		bool sorted=true, bool notFoundErr=true,
 		bool incOutOfService=false) throw();
-
 	/** @brief Gets the extents of a given OID under specified dbroot
 	 *
 	 * Gets the extents of a given OID under specified dbroot.
@@ -504,18 +492,6 @@ public:
 	 */
 	EXPORT int getExtents_dbroot(int OID, std::vector<struct EMEntry>& entries,
 		const uint16_t dbroot) throw();
-
-	/** @brief Gets the number of extents for the specified OID and DBRoot
-	 *
-	 * @param OID (in) The OID of interest
-	 * @param dbroot (in) The DBRoot of interest
-	 * @param incOutOfService (in) include/exclude out of service extents
-	 * @param numExtents (out) number of extents found for OID and dbroot
-	 * @return 0 on success, non-0 on error (see brmtypes.h)
-	 */
-	EXPORT int getExtentCount_dbroot(int OID, uint16_t dbroot,
-		bool incOutOfService, uint64_t& numExtents) throw();
-
 	/** @brief Gets the number of rows in an extent
 	 * 
 	 * Gets the number of rows in an extent.
@@ -603,7 +579,7 @@ public:
 	 * @return 0 on success, non-0 on error (see brmtypes.h)
 	 */
 	EXPORT int writeVBEntry(VER_t transID, LBID_t lbid, OID_t vbOID, 
-					 uint32_t vbFBO) DBRM_THROW;
+					 u_int32_t vbFBO) DBRM_THROW;
 	
 	/** @brief Retrieves a list of uncommitted LBIDs.
 	 * 
@@ -762,13 +738,14 @@ public:
 	EXPORT int takeSnapshot() throw();
 
 	/* SessionManager interface */
-	EXPORT const QueryContext verID();
-	EXPORT const QueryContext sysCatVerID();
-	EXPORT const TxnID newTxnID(const SessionManagerServer::SID session, bool block,
-			bool isDDL = false);
+	EXPORT const execplan::CalpontSystemCatalog::SCN verID(void);
+	EXPORT const execplan::CalpontSystemCatalog::SCN sysCatVerID(void);
+	EXPORT const TxnID 
+		newTxnID(const SessionManagerServer::SID session, bool block, bool isDDL = false);
 	EXPORT void committed(BRM::TxnID& txnid);
 	EXPORT void rolledback(BRM::TxnID& txnid);
-	EXPORT const BRM::TxnID getTxnID(const SessionManagerServer::SID session);
+	EXPORT const BRM::TxnID getTxnID
+		(const SessionManagerServer::SID session);
 	EXPORT boost::shared_array<SIDTIDEntry> SIDTIDMap(int& len);
 	EXPORT void sessionmanager_reset();
 
@@ -781,12 +758,12 @@ public:
 	/* returns a unique ID (> 0) for the lock on success, 0 on failure.
 	 * Also, on failure, the ownerName, pid, and session ID parameters will be set
 	 * to the owner of one of the overlapping locks. */
-	EXPORT uint64_t getTableLock(const std::vector<uint32_t> &pmList, uint32_t tableOID,
+	EXPORT uint64_t getTableLock(const std::vector<uint> &pmList, uint32_t tableOID,
 			std::string *ownerName, uint32_t *ownerPID, int32_t *ownerSessionID,
 			int32_t *ownerTxnID, LockState state);
 	EXPORT bool releaseTableLock(uint64_t id);
 	EXPORT bool changeState(uint64_t id, LockState state);
-	EXPORT bool changeOwner(uint64_t id, const std::string &ownerName, uint32_t ownerPID,
+	EXPORT bool changeOwner(uint64_t id, const std::string &ownerName, uint ownerPID,
 			int32_t ownerSessionID, int32_t ownerTxnID);
 	EXPORT bool checkOwner(uint64_t id);
 	EXPORT std::vector<TableLockInfo> getAllTableLocks();
@@ -794,10 +771,8 @@ public:
 	EXPORT bool getTableLockInfo(uint64_t id, TableLockInfo *out);
 
 	/** Casual partitioning support **/
-	EXPORT int markExtentInvalid(const LBID_t lbid,
-								 execplan::CalpontSystemCatalog::ColDataType colDataType) DBRM_THROW;
-	EXPORT int markExtentsInvalid(const std::vector<LBID_t> &lbids,
-								  const std::vector<execplan::CalpontSystemCatalog::ColDataType>& colDataTypes) DBRM_THROW;
+	EXPORT int markExtentInvalid(const LBID_t lbid) DBRM_THROW;
+	EXPORT int markExtentsInvalid(const std::vector<LBID_t> &lbids) DBRM_THROW;
 	EXPORT int getExtentMaxMin(const LBID_t lbid, int64_t& max, int64_t& min, int32_t& seqNum) throw();
 
 	EXPORT int setExtentMaxMin(const LBID_t lbid, const int64_t max, const int64_t min, const int32_t seqNum) DBRM_THROW;
@@ -821,8 +796,8 @@ public:
 	EXPORT int mergeExtentsMaxMin(const CPInfoMergeList_t &cpInfos) DBRM_THROW;
 
 	/* read-side interface for locking LBID ranges (used by PrimProc) */
-	EXPORT void lockLBIDRange(LBID_t start, uint32_t count);
-	EXPORT void releaseLBIDRange(LBID_t start, uint32_t count);
+	EXPORT void lockLBIDRange(LBID_t start, uint count);
+	EXPORT void releaseLBIDRange(LBID_t start, uint count);
 
 	/* write-side interface for locking LBID ranges (used by DML) */
 	EXPORT int dmlLockLBIDRanges(const std::vector<LBIDRange> &ranges, int txnID);
@@ -953,35 +928,18 @@ public:
 	EXPORT int allocOIDs(int num);
 	EXPORT void returnOIDs(int start, int end);
 	EXPORT int oidm_size();
-	EXPORT int allocVBOID(uint32_t dbroot);
-	EXPORT int getDBRootOfVBOID(uint32_t vbOID);
+	EXPORT int allocVBOID(uint dbroot);
+	EXPORT int getDBRootOfVBOID(uint vbOID);
 	EXPORT std::vector<uint16_t> getVBOIDToDBRootMap();
 
 	/* Autoincrement interface */
-	EXPORT void startAISequence(uint32_t OID, uint64_t firstNum, uint32_t colWidth,
-								execplan::CalpontSystemCatalog::ColDataType colDataType);
+	EXPORT void startAISequence(uint32_t OID, uint64_t firstNum, uint colWidth);
 	EXPORT bool getAIRange(uint32_t OID, uint32_t count, uint64_t *firstNum);
 	EXPORT bool getAIValue(uint32_t OID, uint64_t *value);
 	EXPORT void resetAISequence(uint32_t OID, uint64_t value);
 	EXPORT void getAILock(uint32_t OID);
 	EXPORT void releaseAILock(uint32_t OID);
 
-    /* Added to support unsigned */
-    /** @brief Invalidate the casual partitioning for all uncommited
-     *         extents.
-     *  
-     * Either txnid or plbidList can be passed . Only one will be 
-     * used.
-     * @param txnid (in) - The transaction for which to get the lbid 
-     *              list.
-     * @param plbidList (in) - a list of lbids whose extents are to 
-     *               be invalidated. Only one lbid per extent should
-     *               be in this list, such as returned in
-     *               getUncommittedExtentLBIDs().
-     * @return nothing.
-    */ 
-    EXPORT void invalidateUncommittedExtentLBIDs(execplan::CalpontSystemCatalog::SCN txnid,
-                                                 std::vector<LBID_t>* plbidList = NULL);
 private:
 	DBRM(const DBRM& brm);
 	DBRM& operator=(const DBRM& brm);

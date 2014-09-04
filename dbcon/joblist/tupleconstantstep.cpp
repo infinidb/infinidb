@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: tupleconstantstep.cpp 9649 2013-06-25 16:08:05Z xlou $
+//  $Id: tupleconstantstep.cpp 8526 2012-05-17 02:28:10Z xlou $
 
 
 //#define NDEBUG
@@ -26,7 +26,6 @@ using namespace std;
 
 #include <boost/shared_ptr.hpp>
 #include <boost/shared_array.hpp>
-#include <boost/uuid/uuid_io.hpp>
 using namespace boost;
 
 #include "messagequeue.h"
@@ -46,9 +45,6 @@ using namespace execplan;
 #include "rowgroup.h"
 using namespace rowgroup;
 
-#include "querytele.h"
-using namespace querytele;
-
 #include "jlf_common.h"
 #include "tupleconstantstep.h"
 
@@ -62,11 +58,22 @@ SJSTEP TupleConstantStep::addConstantStep(const JobInfo& jobInfo, const rowgroup
 
 	if (jobInfo.constantCol != CONST_COL_ONLY)
 	{
-		tcs = new TupleConstantStep(jobInfo);
+		
+		tcs = new TupleConstantStep(JobStepAssociation(jobInfo.status),
+									JobStepAssociation(jobInfo.status),
+									jobInfo.sessionId,
+									jobInfo.txnId,
+									jobInfo.verId,
+									jobInfo.statementId);
 	}
 	else
 	{
-		tcs = new TupleConstantOnlyStep(jobInfo);
+		tcs = new TupleConstantOnlyStep(JobStepAssociation(jobInfo.status),
+										JobStepAssociation(jobInfo.status),
+										jobInfo.sessionId,
+										jobInfo.txnId,
+										jobInfo.verId,
+										jobInfo.statementId);
 	}
 
 	tcs->initialize(jobInfo, rg);
@@ -75,16 +82,28 @@ SJSTEP TupleConstantStep::addConstantStep(const JobInfo& jobInfo, const rowgroup
 }
 
 
-TupleConstantStep::TupleConstantStep(const JobInfo& jobInfo) :
-		JobStep(jobInfo),
+TupleConstantStep::TupleConstantStep(
+	const JobStepAssociation& inputJobStepAssociation,
+	const JobStepAssociation& outputJobStepAssociation,
+	uint32_t sessionId,
+	uint32_t txnId,
+	uint32_t verId,
+	uint32_t statementId) :
+		fInputJobStepAssociation(inputJobStepAssociation),
+		fOutputJobStepAssociation(outputJobStepAssociation),
+		fSessionId(sessionId),
+		fTxnId(txnId),
+		fVerId(verId),
+		fStepId(0),
+		fStatementId(statementId),
 		fRowsReturned(0),
 		fInputDL(NULL),
 		fOutputDL(NULL),
 		fInputIterator(0),
-		fEndOfResult(false)
+		fEndOfResult(false),
+		fDelivery(false)
 {
 	fExtendedInfo = "TCS: ";
-	fQtc.stepParms().stepType = StepTeleStats::T_TCS;
 }
 
 
@@ -101,12 +120,12 @@ void TupleConstantStep::setOutputRowGroup(const rowgroup::RowGroup& rg)
 
 void TupleConstantStep::initialize(const JobInfo& jobInfo, const RowGroup* rgIn)
 {
-	vector<uint32_t> oids, oidsIn = fRowGroupIn.getOIDs();
-	vector<uint32_t> keys, keysIn = fRowGroupIn.getKeys();
-	vector<uint32_t> scale, scaleIn = fRowGroupIn.getScale();
-	vector<uint32_t> precision, precisionIn = fRowGroupIn.getPrecision();
+	vector<uint> oids, oidsIn = fRowGroupIn.getOIDs();
+	vector<uint> keys, keysIn = fRowGroupIn.getKeys();
+	vector<uint> scale, scaleIn = fRowGroupIn.getScale();
+	vector<uint> precision, precisionIn = fRowGroupIn.getPrecision();
 	vector<CalpontSystemCatalog::ColDataType> types, typesIn = fRowGroupIn.getColTypes();
-	vector<uint32_t> pos;
+	vector<uint> pos;
 	pos.push_back(2);
 
 	if (rgIn)
@@ -166,10 +185,9 @@ void TupleConstantStep::initialize(const JobInfo& jobInfo, const RowGroup* rgIn)
 		}
 	}
 
-	fRowGroupOut = RowGroup(oids.size(), pos, oids, keys, types, scale, precision,
-		jobInfo.stringTableThreshold);
+	fRowGroupOut = RowGroup(oids.size(), pos, oids, keys, types, scale, precision);
 	fRowGroupOut.initRow(&fRowOut);
-	fRowGroupOut.initRow(&fRowConst, true);
+	fRowGroupOut.initRow(&fRowConst);
 
 	constructContanstRow(jobInfo);
 }
@@ -180,7 +198,6 @@ void TupleConstantStep::constructContanstRow(const JobInfo& jobInfo)
 	// construct a row with only the constant values
 	fConstRowData.reset(new uint8_t[fRowConst.getSize()]);
 	fRowConst.setData(fConstRowData.get());
-	fRowConst.initToNull(); // make sure every col is init'd to something, because later we copy the whole row
 	const vector<CalpontSystemCatalog::ColDataType>& types = fRowGroupOut.getColTypes();
 	for (vector<uint64_t>::iterator i = fIndexConst.begin(); i != fIndexConst.end(); i++)
 	{
@@ -192,17 +209,9 @@ void TupleConstantStep::constructContanstRow(const JobInfo& jobInfo)
 		{
 			if (types[*i] == CalpontSystemCatalog::CHAR ||
 				types[*i] == CalpontSystemCatalog::VARCHAR)
-			{
 				fRowConst.setStringField("", *i);
-			}
-			else if (isUnsigned(types[*i]))
-			{
-				fRowConst.setUintField(fRowConst.getNullValue(*i), *i);
-			}
 			else
-			{
 				fRowConst.setIntField(fRowConst.getSignedNullValue(*i), *i);
-			}
 
 			continue;
 		}
@@ -223,21 +232,18 @@ void TupleConstantStep::constructContanstRow(const JobInfo& jobInfo)
 			}
 
 			case CalpontSystemCatalog::DECIMAL:
-			case CalpontSystemCatalog::UDECIMAL:
 			{
 				fRowConst.setIntField(c.decimalVal.value, *i);
 				break;
 			}
 
 			case CalpontSystemCatalog::FLOAT:
-			case CalpontSystemCatalog::UFLOAT:
 			{
 				fRowConst.setFloatField(c.floatVal, *i);
 				break;
 			}
 
 			case CalpontSystemCatalog::DOUBLE:
-			case CalpontSystemCatalog::UDOUBLE:
 			{
 				fRowConst.setDoubleField(c.doubleVal, *i);
 				break;
@@ -247,16 +253,6 @@ void TupleConstantStep::constructContanstRow(const JobInfo& jobInfo)
 			case CalpontSystemCatalog::VARCHAR:
 			{
 				fRowConst.setStringField(c.strVal, *i);
-				break;
-			}
-
-			case CalpontSystemCatalog::UTINYINT:
-			case CalpontSystemCatalog::USMALLINT:
-			case CalpontSystemCatalog::UMEDINT:
-			case CalpontSystemCatalog::UINT:
-			case CalpontSystemCatalog::UBIGINT:
-			{
-				fRowConst.setUintField(c.uintVal, *i);
 				break;
 			}
 
@@ -302,12 +298,12 @@ void TupleConstantStep::join()
 }
 
 
-uint32_t TupleConstantStep::nextBand(messageqcpp::ByteStream &bs)
+uint TupleConstantStep::nextBand(messageqcpp::ByteStream &bs)
 {
-	RGData rgDataIn;
-	RGData rgDataOut;
+	shared_array<uint8_t> rgDataIn;
+	shared_array<uint8_t> rgDataOut;
 	bool more = false;
-	uint32_t rowCount = 0;
+	uint rowCount = 0;
 
 	try
 	{
@@ -317,19 +313,19 @@ uint32_t TupleConstantStep::nextBand(messageqcpp::ByteStream &bs)
 		if (traceOn() && dlTimes.FirstReadTime().tv_sec == 0)
 			dlTimes.setFirstReadTime();
 
-		if (!more && cancelled())
+		if (!more && (0 < fInputJobStepAssociation.status() || die))
 		{
 			fEndOfResult = true;
 		}
 
 		if (more && !fEndOfResult)
 		{
-			fRowGroupIn.setData(&rgDataIn);
-			rgDataOut.reinit(fRowGroupOut, fRowGroupIn.getRowCount());
-			fRowGroupOut.setData(&rgDataOut);
+			fRowGroupIn.setData(rgDataIn.get());
+			rgDataOut.reset(new uint8_t[fRowGroupOut.getDataSize(fRowGroupIn.getRowCount())]);
+			fRowGroupOut.setData(rgDataOut.get());
 
 			fillInConstants();
-			fRowGroupOut.serializeRGData(bs);
+			bs.load(fRowGroupOut.getData(), fRowGroupOut.getDataSize());
 			rowCount = fRowGroupOut.getRowCount();
 		}
 		else
@@ -339,28 +335,29 @@ uint32_t TupleConstantStep::nextBand(messageqcpp::ByteStream &bs)
 	}
 	catch(const std::exception& ex)
 	{
-		catchHandler(ex.what(), tupleConstantStepErr, fErrorInfo, fSessionId);
-		while (more)
-			more = fInputDL->next(fInputIterator, &rgDataIn);
+		catchHandler(ex.what(), fSessionId);
+		if (fOutputJobStepAssociation.status() == 0)
+			fOutputJobStepAssociation.status(tupleConstantStepErr);
+		while (more) more = fInputDL->next(fInputIterator, &rgDataIn);
 		fEndOfResult = true;
 	}
 	catch(...)
 	{
-		catchHandler("TupleConstantStep next band caught an unknown exception",
-					 tupleConstantStepErr, fErrorInfo, fSessionId);
-		while (more)
-			more = fInputDL->next(fInputIterator, &rgDataIn);
+		catchHandler("TupleConstantStep next band caught an unknown exception", fSessionId);
+		if (fOutputJobStepAssociation.status() == 0)
+			fOutputJobStepAssociation.status(tupleConstantStepErr);
+		while (more) more = fInputDL->next(fInputIterator, &rgDataIn);
 		fEndOfResult = true;
 	}
 
 	if (fEndOfResult)
 	{
 		// send an empty / error band
-		RGData rgData(fRowGroupOut, 0);
-		fRowGroupOut.setData(&rgData);
+		shared_array<uint8_t> rgData(new uint8_t[fRowGroupOut.getEmptySize()]);
+		fRowGroupOut.setData(rgData.get());
 		fRowGroupOut.resetRowGroup(0);
-		fRowGroupOut.setStatus(status());
-		fRowGroupOut.serializeRGData(bs);
+		fRowGroupOut.setStatus(fOutputJobStepAssociation.status());
+		bs.load(rgData.get(), fRowGroupOut.getDataSize());
 
 		if (traceOn())
 		{
@@ -376,37 +373,30 @@ uint32_t TupleConstantStep::nextBand(messageqcpp::ByteStream &bs)
 
 void TupleConstantStep::execute()
 {
-	RGData rgDataIn;
-	RGData rgDataOut;
+	shared_array<uint8_t> rgDataIn;
+	shared_array<uint8_t> rgDataOut;
 	bool more = false;
-	StepTeleStats sts;
-	sts.query_uuid = fQueryUuid;
-	sts.step_uuid = fStepUuid;
 
 	try
 	{
 		more = fInputDL->next(fInputIterator, &rgDataIn);
 		if (traceOn()) dlTimes.setFirstReadTime();
 
-		sts.msg_type = StepTeleStats::ST_START;
-		sts.total_units_of_work = 1;
-		postStepStartTele(sts);
-
-		if (!more && cancelled())
+		if (!more && (0 < fInputJobStepAssociation.status() || die))
 		{
 			fEndOfResult = true;
 		}
 
 		while (more && !fEndOfResult)
 		{
-			fRowGroupIn.setData(&rgDataIn);
-			rgDataOut.reinit(fRowGroupOut, fRowGroupIn.getRowCount());
-			fRowGroupOut.setData(&rgDataOut);
+			fRowGroupIn.setData(rgDataIn.get());
+			rgDataOut.reset(new uint8_t[fRowGroupOut.getDataSize(fRowGroupIn.getRowCount())]);
+			fRowGroupOut.setData(rgDataOut.get());
 
 			fillInConstants();
 
 			more = fInputDL->next(fInputIterator, &rgDataIn);
-			if (cancelled())
+			if (0 < fInputJobStepAssociation.status() || die)
 			{
 				fEndOfResult = true;
 			}
@@ -418,22 +408,20 @@ void TupleConstantStep::execute()
 	}
 	catch(const std::exception& ex)
 	{
-		catchHandler(ex.what(), tupleConstantStepErr, fErrorInfo, fSessionId);
+		catchHandler(ex.what(), fSessionId);
+		if (fOutputJobStepAssociation.status() == 0)
+			fOutputJobStepAssociation.status(tupleConstantStepErr);
 	}
 	catch(...)
 	{
-		catchHandler("TupleConstantStep execute caught an unknown exception",
-					 tupleConstantStepErr, fErrorInfo, fSessionId);
+		catchHandler("TupleConstantStep execute caught an unknown exception", fSessionId);
+		if (fOutputJobStepAssociation.status() == 0)
+			fOutputJobStepAssociation.status(tupleConstantStepErr);
 	}
 
 //	if (!fEndOfResult)
 		while (more)
 			more = fInputDL->next(fInputIterator, &rgDataIn);
-
-	sts.msg_type = StepTeleStats::ST_SUMMARY;
-	sts.total_units_of_work = sts.units_of_work_completed = 1;
-	sts.rows = fRowsReturned;
-	postStepSummaryTele(sts);
 
 	// Bug 3136, let mini stats to be formatted if traceOn.
 	if (traceOn())
@@ -457,11 +445,11 @@ void TupleConstantStep::fillInConstants()
 	{
 		for (uint64_t i = 0; i < fRowGroupIn.getRowCount(); ++i)
 		{
-			copyRow(fRowConst, &fRowOut);
+			memcpy(fRowOut.getData(), fRowConst.getData(), fRowConst.getSize());
 
-			fRowOut.setRid(fRowIn.getRelRid());
+			fRowOut.setRid(fRowIn.getRid());
 			for (uint64_t j = 0; j < fIndexMapping.size(); ++j)
-				fRowIn.copyField(fRowOut, fIndexMapping[j], j);
+				fRowIn.copyField(fRowOut.getData() + fRowOut.getOffset(fIndexMapping[j]), j);
 
 			fRowIn.nextRow();
 			fRowOut.nextRow();
@@ -469,13 +457,12 @@ void TupleConstantStep::fillInConstants()
 	}
 	else // only first column is constant
 	{
-		//size_t n = fRowOut.getOffset(fRowOut.getColumnCount()) - fRowOut.getOffset(1);
+		size_t n = fRowOut.getOffset(fRowOut.getColumnCount()) - fRowOut.getOffset(1);
 		for (uint64_t i = 0; i < fRowGroupIn.getRowCount(); ++i)
 		{
-			fRowOut.setRid(fRowIn.getRelRid());
-			fRowConst.copyField(fRowOut, 0, 0);
-			for (uint32_t i = 1; i < fRowOut.getColumnCount(); i++)
-				fRowIn.copyField(fRowOut, i, i-1);
+			fRowOut.setRid(fRowIn.getRid());
+			fRowConst.copyField(fRowOut.getData()+2, 0); // hardcoded 2 for rid length
+			memcpy(fRowOut.getData()+fRowOut.getOffset(1), fRowIn.getData()+2, n);
 
 			fRowIn.nextRow();
 			fRowOut.nextRow();
@@ -492,22 +479,17 @@ void TupleConstantStep::fillInConstants(const rowgroup::Row& rowIn, rowgroup::Ro
 {
 	if (fIndexConst.size() > 1 || fIndexConst[0] != 0)
 	{
-		copyRow(fRowConst, &rowOut);
-		//memcpy(rowOut.getData(), fRowConst.getData(), fRowConst.getSize());
-		rowOut.setRid(rowIn.getRelRid());
+		memcpy(rowOut.getData(), fRowConst.getData(), fRowConst.getSize());
+		rowOut.setRid(rowIn.getRid());
 		for (uint64_t j = 0; j < fIndexMapping.size(); ++j)
-			rowIn.copyField(rowOut, fIndexMapping[j], j);
-			//rowIn.copyField(rowOut.getData() + rowOut.getOffset(fIndexMapping[j]), j);
+			rowIn.copyField(rowOut.getData() + rowOut.getOffset(fIndexMapping[j]), j);
 	}
 	else // only first column is constant
 	{
-		//size_t n = rowOut.getOffset(rowOut.getColumnCount()) - rowOut.getOffset(1);
-		rowOut.setRid(rowIn.getRelRid());
-		fRowConst.copyField(rowOut, 0, 0);
-		//fRowConst.copyField(rowOut.getData()+2, 0); // hardcoded 2 for rid length
-		for (uint32_t i = 1; i < rowOut.getColumnCount(); i++)
-			rowIn.copyField(rowOut, i, i-1);
-		//memcpy(rowOut.getData()+rowOut.getOffset(1), rowIn.getData()+2, n);
+		size_t n = rowOut.getOffset(rowOut.getColumnCount()) - rowOut.getOffset(1);
+		rowOut.setRid(rowIn.getRid());
+		fRowConst.copyField(rowOut.getData()+2, 0); // hardcoded 2 for rid length
+		memcpy(rowOut.getData()+rowOut.getOffset(1), rowIn.getData()+2, n);
 	}
 }
 
@@ -521,18 +503,6 @@ const RowGroup& TupleConstantStep::getOutputRowGroup() const
 const RowGroup& TupleConstantStep::getDeliveredRowGroup() const
 {
 	return fRowGroupOut;
-}
-
-
-void TupleConstantStep::deliverStringTableRowGroup(bool b)
-{
-	fRowGroupOut.setUseStringTable(b);
-}
-
-
-bool TupleConstantStep::deliverStringTableRowGroup() const
-{
-	return fRowGroupOut.usesStringTable();
 }
 
 
@@ -567,8 +537,7 @@ void TupleConstantStep::printCalTrace()
 			<< "\t1st read " << dlTimes.FirstReadTimeString()
 			<< "; EOI " << dlTimes.EndOfInputTimeString() << "; runtime-"
 			<< JSTimeStamp::tsdiffstr(dlTimes.EndOfInputTime(), dlTimes.FirstReadTime())
-			<< "s;\n\tUUID " << uuids::to_string(fStepUuid) << endl
-			<< "\tJob completion status " << status() << endl;
+			<< "s;\n\tJob completion status " << fOutputJobStepAssociation.status() << endl;
 	logEnd(logStr.str().c_str());
 	fExtendedInfo += logStr.str();
 	formatMiniStats();
@@ -593,7 +562,18 @@ void TupleConstantStep::formatMiniStats()
 
 
 // class TupleConstantOnlyStep
-TupleConstantOnlyStep::TupleConstantOnlyStep(const JobInfo& jobInfo) : TupleConstantStep(jobInfo)
+TupleConstantOnlyStep::TupleConstantOnlyStep(
+	const JobStepAssociation& inputJobStepAssociation,
+	const JobStepAssociation& outputJobStepAssociation,
+	uint32_t sessionId,
+	uint32_t txnId,
+	uint32_t verId,
+	uint32_t statementId)  :  TupleConstantStep(inputJobStepAssociation,
+												outputJobStepAssociation,
+												sessionId,
+												txnId,
+												verId,
+												statementId)
 {
 //	fExtendedInfo = "TCOS: ";
 }
@@ -606,12 +586,12 @@ TupleConstantOnlyStep::~TupleConstantOnlyStep()
 
 void TupleConstantOnlyStep::initialize(const RowGroup& rgIn, const JobInfo& jobInfo)
 {
-	vector<uint32_t> oids;
-	vector<uint32_t> keys;
-	vector<uint32_t> scale;
-	vector<uint32_t> precision;
+	vector<uint> oids;
+	vector<uint> keys;
+	vector<uint> scale;
+	vector<uint> precision;
 	vector<CalpontSystemCatalog::ColDataType> types;
-	vector<uint32_t> pos;
+	vector<uint> pos;
 	pos.push_back(2);
 
 	for (uint64_t i = 0; i < jobInfo.deliveredCols.size(); i++)
@@ -620,7 +600,7 @@ void TupleConstantOnlyStep::initialize(const RowGroup& rgIn, const JobInfo& jobI
 						dynamic_cast<const ConstantColumn*>(jobInfo.deliveredCols[i].get());
 		if (cc == NULL)
 			throw runtime_error("none constant column found.");
-
+		
 		CalpontSystemCatalog::ColType ct = cc->resultType();
 		if (ct.colDataType == CalpontSystemCatalog::VARCHAR)
 			ct.colWidth++;
@@ -641,9 +621,9 @@ void TupleConstantOnlyStep::initialize(const RowGroup& rgIn, const JobInfo& jobI
 		fIndexConst.push_back(i);
 	}
 
-	fRowGroupOut = RowGroup(oids.size(), pos, oids, keys, types, scale, precision, jobInfo.stringTableThreshold);
+	fRowGroupOut = RowGroup(oids.size(), pos, oids, keys, types, scale, precision);
 	fRowGroupOut.initRow(&fRowOut);
-	fRowGroupOut.initRow(&fRowConst, true);
+	fRowGroupOut.initRow(&fRowConst);
 
 	constructContanstRow(jobInfo);
 }
@@ -662,8 +642,9 @@ void TupleConstantOnlyStep::run()
 
 		try
 		{
-			RGData rgDataOut(fRowGroupOut, 1);
-			fRowGroupOut.setData(&rgDataOut);
+			shared_array<uint8_t> rgDataOut;
+			rgDataOut.reset(new uint8_t[fRowGroupOut.getDataSize(1)]);
+			fRowGroupOut.setData(rgDataOut.get());
 
 			if (traceOn()) dlTimes.setFirstReadTime();
 			fillInConstants();
@@ -672,8 +653,9 @@ void TupleConstantOnlyStep::run()
 		}
 		catch(...)
 		{
-			catchHandler("TupleConstantOnlyStep run caught an unknown exception",
-						 tupleConstantStepErr, fErrorInfo, fSessionId);
+			catchHandler("TupleConstantOnlyStep run caught an unknown exception", fSessionId);
+			if (fOutputJobStepAssociation.status() == 0)
+				fOutputJobStepAssociation.status(tupleConstantStepErr);
 		}
 
 		if (traceOn())
@@ -690,10 +672,10 @@ void TupleConstantOnlyStep::run()
 }
 
 
-uint32_t TupleConstantOnlyStep::nextBand(messageqcpp::ByteStream &bs)
+uint TupleConstantOnlyStep::nextBand(messageqcpp::ByteStream &bs)
 {
-	RGData rgDataOut;
-	uint32_t rowCount = 0;
+	shared_array<uint8_t> rgDataOut;
+	uint rowCount = 0;
 
 	if (!fEndOfResult)
 	{
@@ -704,21 +686,24 @@ uint32_t TupleConstantOnlyStep::nextBand(messageqcpp::ByteStream &bs)
 			if (traceOn() && dlTimes.FirstReadTime().tv_sec == 0)
 				dlTimes.setFirstReadTime();
 
-			rgDataOut.reinit(fRowGroupOut, 1);
-			fRowGroupOut.setData(&rgDataOut);
+			rgDataOut.reset(new uint8_t[fRowGroupOut.getDataSize(1)]);
+			fRowGroupOut.setData(rgDataOut.get());
 
 			fillInConstants();
-			fRowGroupOut.serializeRGData(bs);
+			bs.load(fRowGroupOut.getData(), fRowGroupOut.getDataSize());
 			rowCount = fRowGroupOut.getRowCount();
 		}
 		catch(const std::exception& ex)
 		{
-			catchHandler(ex.what(), tupleConstantStepErr, fErrorInfo, fSessionId);
+			catchHandler(ex.what(), fSessionId);
+			if (fOutputJobStepAssociation.status() == 0)
+				fOutputJobStepAssociation.status(tupleConstantStepErr);
 		}
 		catch(...)
 		{
-			catchHandler("TupleConstantStep next band caught an unknown exception",
-						 tupleConstantStepErr, fErrorInfo, fSessionId);
+			catchHandler("TupleConstantStep next band caught an unknown exception", fSessionId);
+			if (fOutputJobStepAssociation.status() == 0)
+				fOutputJobStepAssociation.status(tupleConstantStepErr);
 		}
 
 		fEndOfResult = true;
@@ -726,11 +711,11 @@ uint32_t TupleConstantOnlyStep::nextBand(messageqcpp::ByteStream &bs)
 	else
 	{
 		// send an empty / error band
-		RGData rgData(fRowGroupOut, 0);
-		fRowGroupOut.setData(&rgData);
+		shared_array<uint8_t> rgData(new uint8_t[fRowGroupOut.getEmptySize()]);
+		fRowGroupOut.setData(rgData.get());
 		fRowGroupOut.resetRowGroup(0);
-		fRowGroupOut.setStatus(status());
-		fRowGroupOut.serializeRGData(bs);
+		fRowGroupOut.setStatus(fOutputJobStepAssociation.status());
+		bs.load(rgData.get(), fRowGroupOut.getDataSize());
 
 		if (traceOn())
 		{
@@ -747,8 +732,7 @@ uint32_t TupleConstantOnlyStep::nextBand(messageqcpp::ByteStream &bs)
 void TupleConstantOnlyStep::fillInConstants()
 {
 	fRowGroupOut.getRow(0, &fRowOut);
-	idbassert(fRowConst.getColumnCount() == fRowOut.getColumnCount());
-	copyRow(fRowConst, &fRowOut);
+	memcpy(fRowOut.getData(), fRowConst.getData(), fRowConst.getSize());
 	fRowGroupOut.resetRowGroup(0);
 	fRowGroupOut.setRowCount(1);
 	fRowsReturned = 1;
@@ -771,9 +755,20 @@ const string TupleConstantOnlyStep::toString() const
 
 
 // class TupleConstantBooleanStep
-TupleConstantBooleanStep::TupleConstantBooleanStep(const JobInfo& jobInfo, bool value) :
-	TupleConstantStep(jobInfo),
-	fValue(value)
+TupleConstantBooleanStep::TupleConstantBooleanStep(
+	const JobStepAssociation& inputJobStepAssociation,
+	const JobStepAssociation& outputJobStepAssociation,
+	uint32_t sessionId,
+	uint32_t txnId,
+	uint32_t verId,
+	uint32_t statementId,
+	bool value) : TupleConstantStep(inputJobStepAssociation,
+									outputJobStepAssociation,
+									sessionId,
+									txnId,
+									verId,
+									statementId),
+					fValue(value)
 {
 //	fExtendedInfo = "TCBS: ";
 }
@@ -788,7 +783,7 @@ void TupleConstantBooleanStep::initialize(const RowGroup& rgIn, const JobInfo&)
 {
 	fRowGroupOut = rgIn;
 	fRowGroupOut.initRow(&fRowOut);
-	fRowGroupOut.initRow(&fRowConst, true);
+	fRowGroupOut.initRow(&fRowConst);
 }
 
 
@@ -817,14 +812,14 @@ void TupleConstantBooleanStep::run()
 }
 
 
-uint32_t TupleConstantBooleanStep::nextBand(messageqcpp::ByteStream &bs)
+uint TupleConstantBooleanStep::nextBand(messageqcpp::ByteStream &bs)
 {
 	// send an empty band
-	RGData rgData(fRowGroupOut, 0);
-	fRowGroupOut.setData(&rgData);
+	shared_array<uint8_t> rgData(new uint8_t[fRowGroupOut.getEmptySize()]);
+	fRowGroupOut.setData(rgData.get());
 	fRowGroupOut.resetRowGroup(0);
-	fRowGroupOut.setStatus(status());
-	fRowGroupOut.serializeRGData(bs);
+	fRowGroupOut.setStatus(fOutputJobStepAssociation.status());
+	bs.load(rgData.get(), fRowGroupOut.getDataSize());
 
 	if (traceOn())
 	{

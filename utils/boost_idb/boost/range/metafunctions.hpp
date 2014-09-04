@@ -16,7 +16,6 @@
 #endif
 
 #include <boost/range/iterator.hpp>
-#include <boost/range/has_range_iterator.hpp>
 #include <boost/range/result_iterator.hpp>
 #include <boost/range/reverse_iterator.hpp>
 #include <boost/range/const_reverse_iterator.hpp>

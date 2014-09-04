@@ -59,8 +59,8 @@
 // 0.30553  100  %      1          Total
 // 
 // Note that you can have overlapping timers which will make your percentages add up to more than 100%.
-#ifndef LOGGING_STOPWATCH_H
-#define LOGGING_STOPWATCH_H
+#ifndef STOPWATCH_H
+#define STOPWATCH_H
 #include <iostream>
 #include <fstream>
 #include <list>

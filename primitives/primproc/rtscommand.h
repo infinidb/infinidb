@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: rtscommand.h 2035 2013-01-21 14:12:19Z rdempsey $
+// $Id: rtscommand.h 1855 2012-04-04 18:20:09Z rdempsey $
 // C++ Interface: rtscommand
 //
 // Description: 
@@ -45,7 +45,7 @@ class RTSCommand : public Command
 
 		void execute();
 		void project();
-		void projectIntoRowGroup(rowgroup::RowGroup &rg, uint32_t col);
+		void projectIntoRowGroup(rowgroup::RowGroup &rg, uint col);
 		uint64_t getLBID();
 		void nextLBID();
 		void createCommand(messageqcpp::ByteStream &);
@@ -60,7 +60,7 @@ class RTSCommand : public Command
 		void prep(int8_t outputType, bool makeAbsRids);
 		uint8_t isPassThru() { return passThru; }
 		void setAbsNull(bool a = true) { absNull = a; }
-		void getLBIDList(uint32_t loopCount, std::vector<int64_t> *lbids);
+		void getLBIDList(uint loopCount, std::vector<int64_t> *lbids);
 
 		//TODO: do we need to reference either col or dict?
 		int getCompType() const { return dict.getCompType(); }

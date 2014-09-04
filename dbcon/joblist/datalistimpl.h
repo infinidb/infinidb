@@ -16,11 +16,11 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: datalistimpl.h 9655 2013-06-25 23:08:13Z xlou $
+ * $Id: datalistimpl.h 8436 2012-04-04 18:18:21Z rdempsey $
  *
  *****************************************************************************/
 
-/** @file
+/** @file 
  * class XXX interface
  */
 
@@ -46,7 +46,7 @@ class DataListImpl : public DataList<element_t>
 {
 
 	public:
-		DataListImpl(uint32_t numConsumers);
+		DataListImpl(uint numConsumers);
 		DataListImpl(const DataListImpl &dl);
 		virtual ~DataListImpl();
 
@@ -58,9 +58,9 @@ class DataListImpl : public DataList<element_t>
 		virtual uint64_t getIterator();
 		virtual bool next(uint64_t it, element_t *e);
 
-		virtual void setNumConsumers(uint32_t);
-		virtual uint32_t getNumConsumers() const;
-		void resetNumConsumers(uint32_t numConsumers);
+		virtual void setNumConsumers(uint);
+		virtual uint getNumConsumers() const;
+		void resetNumConsumers(uint numConsumers);
 
 	protected:
 		bool endOfData(uint64_t id) const;
@@ -84,25 +84,25 @@ DataListImpl<container_t, element_t>::DataListImpl() : DataList<element_t>(), c(
 { }
 
 template<typename container_t, typename element_t>
-void DataListImpl<container_t, element_t>::setNumConsumers(uint32_t nc)
+void DataListImpl<container_t, element_t>::setNumConsumers(uint nc)
 {
 	resetNumConsumers(nc);
 }
 
 template<typename container_t, typename element_t>
-uint32_t DataListImpl<container_t, element_t>::getNumConsumers() const
+uint DataListImpl<container_t, element_t>::getNumConsumers() const
 {
 	return numConsumers;
 }
 
 template<typename container_t, typename element_t>
-void DataListImpl<container_t, element_t>::resetNumConsumers(uint32_t nc)
+void DataListImpl<container_t, element_t>::resetNumConsumers(uint nc)
 {
 	if (itIndex != 0)
 		throw std::logic_error("DataListImpl::resetNumConsumers(): attempt to change numConsumers "
 			"after iterators have been issued");
 
-	uint32_t i;
+	uint i;
 
 	numConsumers = nc;
 	delete [] cIterators;
@@ -112,9 +112,9 @@ void DataListImpl<container_t, element_t>::resetNumConsumers(uint32_t nc)
 }
 
 template<typename container_t, typename element_t>
-DataListImpl<container_t, element_t>::DataListImpl(uint32_t nc) : DataList<element_t>()
+DataListImpl<container_t, element_t>::DataListImpl(uint nc) : DataList<element_t>()
 {
-	uint32_t i;
+	uint i;
 
 	numConsumers = nc;
 	itIndex = 0;
@@ -126,15 +126,15 @@ DataListImpl<container_t, element_t>::DataListImpl(uint32_t nc) : DataList<eleme
 
 template<typename container_t, typename element_t>
 DataListImpl<container_t, element_t>::DataListImpl
-	(const DataListImpl<container_t, element_t> &dl)
+	(const DataListImpl<container_t, element_t> &dl) 
 	: DataList<element_t>(dl)
-{
+{ 
 	int i;
 
 	c = dl.c;
 	numConsumers = dl.numConsumers;
 	itIndex = dl.itIndex;
-
+	
 	//delete [] cIterators;
 	cIterators = new typename container_t::iterator[numConsumers];
 	for (i = 0; i < numConsumers; i++)
@@ -143,7 +143,7 @@ DataListImpl<container_t, element_t>::DataListImpl
 
 template<typename container_t, typename element_t>
 DataListImpl<container_t, element_t>::~DataListImpl()
-{
+{ 
 	delete c;
 	delete [] cIterators;
 };
@@ -155,7 +155,7 @@ DataListImpl<container_t, element_t> & DataListImpl<container_t, element_t>::ope
 {
 	uint64_t i;
 
-	static_cast<DataList<element_t> >(*this) =
+	static_cast<DataList<element_t> >(*this) = 
 		static_cast<DataList<element_t> >(dl);
 	delete c;
 	c = dl.c;
@@ -185,8 +185,8 @@ uint64_t DataListImpl<container_t, element_t>::getIterator()
 }
 
 template<typename container_t, typename element_t>
-inline void DataListImpl<container_t, element_t>::insert(const element_t &e)
-{
+inline void DataListImpl<container_t, element_t>::insert(const element_t &e) 
+{ 
 	c->insert(c->end(), e);
 }
 
@@ -199,11 +199,11 @@ inline void DataListImpl<container_t, element_t>::insert(const std::vector<eleme
 	}
 	else
 		throw std::logic_error("insert(vector) isn't supported for non-vector-based DLs yet");
-}
+}		
 
 template<typename container_t, typename element_t>
-inline typename container_t::iterator DataListImpl<container_t, element_t>::iInsert(const element_t &e)
-{
+inline typename container_t::iterator DataListImpl<container_t, element_t>::iInsert(const element_t &e) 
+{ 
 	return c->insert(c->end(), e);
 }
 

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_simplesyslog.h 4450 2013-01-21 14:13:24Z rdempsey $
+* $Id: we_simplesyslog.h 3720 2012-04-04 18:18:49Z rdempsey $
 *
 *******************************************************************************/
 /** @file */
@@ -29,7 +29,7 @@
 #include "messagelog.h"
 #include "messageobj.h"
 
-#if defined(_MSC_VER) && defined(WRITEENGINE_DLLEXPORT)
+#if defined(_MSC_VER) && defined(WELOG_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT

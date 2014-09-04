@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: joblistfactory.h 9655 2013-06-25 23:08:13Z xlou $
+*   $Id: joblistfactory.h 8268 2012-01-18 20:57:55Z xlou $
 *
 *
 ***********************************************************************/
@@ -29,7 +29,7 @@
 
 #include "joblist.h"
 
-#if defined(_MSC_VER) && defined(JOBLIST_DLLEXPORT)
+#if defined(_MSC_VER) && defined(JOBLISTFACTORY_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
@@ -40,8 +40,8 @@ namespace execplan
 class CalpontExecutionPlan;
 }
 
-namespace joblist
-{
+namespace joblist 
+{ 
 
 class ResourceManager;
 /** @brief create a JobList object from a CalpontExecutionPlan object
@@ -55,12 +55,12 @@ class ResourceManager;
  * can't inherit from this class). This class can be easily enough converted into
  * a singleton if necessary later.
  */
-class JobListFactory
+class JobListFactory 
 {
 
 public:
 	/** @brief static JobList constructor method
-	 *
+	 * 
 	 * @param cplan the CalpontExecutionPlan from which the JobList is constructed
 	 */
 	EXPORT static SJLP makeJobList(
@@ -73,7 +73,7 @@ private:
 
 };
 
-}
+} 
 
 #undef EXPORT
 

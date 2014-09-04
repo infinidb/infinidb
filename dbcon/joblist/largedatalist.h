@@ -16,11 +16,11 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: largedatalist.h 9655 2013-06-25 23:08:13Z xlou $
+ * $Id: largedatalist.h 8476 2012-04-25 22:28:15Z xlou $
  *
  *****************************************************************************/
 
-/** @file
+/** @file 
  * class XXX interface
  */
 
@@ -49,7 +49,7 @@
 #include "resourcemanager.h"
 
 #include "exceptclasses.h"
-
+ 
 #ifndef O_BINARY
 #  define O_BINARY 0
 #endif
@@ -105,7 +105,7 @@ class LargeDataList : public DataListImpl<container_t, element_t>
 	typedef DataListImpl<container_t, element_t> base;
 
 	public:
-		LargeDataList(uint32_t numConsumers,
+		LargeDataList(uint numConsumers,
 			uint32_t elementSaveSize1,
 			uint32_t elementSaveSize2,
 			const ResourceManager& rm);
@@ -113,7 +113,7 @@ class LargeDataList : public DataListImpl<container_t, element_t>
 
 		virtual void endOfInput();
 		virtual void insert(const element_t& e);
-		virtual uint64_t totalSize();
+		virtual uint64_t totalSize(); 
 		virtual void setMultipleProducers(bool);
 		virtual uint64_t numberOfTempFiles() const;
 		virtual void setDiskElemSize(uint32_t size1st,uint32_t size2nd);
@@ -121,7 +121,7 @@ class LargeDataList : public DataListImpl<container_t, element_t>
 		virtual void restoreSetForReuse(const struct SetRestoreInfo& info);
 		virtual void traceOn(bool b) { fTraceOn = b; }
         std::list<DiskIoInfo>& diskIoList() { return fDiskIoList; }
-
+        
 	protected:
 		// @bug 721. add append option
 		virtual void load(uint64_t setNumber, bool append = false);
@@ -137,7 +137,7 @@ class LargeDataList : public DataListImpl<container_t, element_t>
 		virtual uint64_t save(container_t *c);
 		virtual uint64_t save_contiguous();
 		virtual uint64_t save_contiguous(container_t *c);
-
+		
 		virtual void registerNewSet();
 		virtual std::string getFilename();
 
@@ -191,7 +191,7 @@ class LargeDataList : public DataListImpl<container_t, element_t>
 };
 
 template<typename container_t, typename element_t>
-LargeDataList<container_t, element_t>::LargeDataList(uint32_t nc, uint32_t elementSaveSize1st, uint32_t elementSaveSize2nd, const ResourceManager& rm):
+LargeDataList<container_t, element_t>::LargeDataList(uint nc, uint32_t elementSaveSize1st, uint32_t elementSaveSize2nd, const ResourceManager& rm):
 		base(nc), path(rm.getScTempDiskPath()), fTraceOn(false), fReUse(false), fSaveForReuse(false), fRestoreInfo(NULL)
 {
 // 	config::Config *config = config::Config::makeConfig();
@@ -314,7 +314,7 @@ uint64_t LargeDataList<container_t, element_t>::numberOfTempFiles() const
 // 	uint64_t nFiles = 0;
 // 	if ( !fFilename.empty() )
 // 		nFiles = 1;
-//
+// 
 // 	return nFiles;
 	return  ((!fSetStartPositions.empty() && !fReUse) ? 1 : 0);
 }
@@ -359,7 +359,7 @@ void LargeDataList<container_t, element_t>::createTempFile()
 
 // Need to grab the mutex at a higher level
 
-/*
+/* 
 	File format:
 	int: # of elements
 	element_t[# of elements] stored according to ostream& element_t::operator<<
@@ -373,7 +373,7 @@ uint64_t LargeDataList<container_t, element_t>::save()
 
 // Need to grab the mutex at a higher level
 
-/*
+/* 
 	File format:
 	int: # of elements
 	element_t[# of elements] stored according to ostream& element_t::operator<<
@@ -411,7 +411,7 @@ uint64_t LargeDataList<container_t, element_t>::save(container_t *c )
 			std::copy(c->begin(),
 					  c->end(),
 					  std::ostream_iterator<element_t>(fFile));
-		}
+		} 
 		else {
 			save_noncontiguousCompressed ( c );
 		}
@@ -426,16 +426,16 @@ uint64_t LargeDataList<container_t, element_t>::save(container_t *c )
 	catch(const std::runtime_error& e) {
 		if (fFile.is_open())
 			fFile.close();
-		std::string msg("Error occurred saving non-contiguous container into file " + fFilename + " ");
+		std::string msg("Error occurred saving non-contiguous container into file " + fFilename + " "); 
 		std::cerr << msg << std::endl;
 		throw logging::LargeDataListExcept(msg + e.what());
 	}
 	catch(...) {
 		if (fFile.is_open())
 			fFile.close();
-		std::string msg("Error occurred saving non-contiguous container into file " + fFilename + " ");
+		std::string msg("Error occurred saving non-contiguous container into file " + fFilename + " "); 
 		std::cerr << msg << std::endl;
-		throw logging::LargeDataListExcept(msg);
+		throw logging::LargeDataListExcept(msg);		
 	}
 
 #ifdef PROFILE
@@ -447,14 +447,14 @@ uint64_t LargeDataList<container_t, element_t>::save(container_t *c )
 }
 
 template<typename container_t, typename element_t>
-uint64_t LargeDataList<container_t, element_t>::save_contiguous()
+uint64_t LargeDataList<container_t, element_t>::save_contiguous() 
 {
 	std::vector<element_t> *c = reinterpret_cast<std::vector<element_t> *>(base::c);
 	return save_contiguous(c);
 }
 
 template<typename container_t, typename element_t>
-uint64_t LargeDataList<container_t, element_t>::save_contiguous(container_t *c)
+uint64_t LargeDataList<container_t, element_t>::save_contiguous(container_t *c) 
 {
 	uint64_t count, nBytesWritten=0;
 	typename container_t::iterator it;
@@ -501,14 +501,14 @@ uint64_t LargeDataList<container_t, element_t>::save_contiguous(container_t *c)
 	catch(const std::runtime_error& e) {
 		if (fFile.is_open())
 			fFile.close();
-		std::string msg("Error occurred saving contiguous container into file " + fFilename + " ");
+		std::string msg("Error occurred saving contiguous container into file " + fFilename + " "); 
 		std::cerr << msg << std::endl;
 		throw logging::LargeDataListExcept(msg + e.what());
 	}
 	catch(...) {
 		if (fFile.is_open())
 			fFile.close();
-		std::string msg("Error occurred saving contiguous container into file " + fFilename + " ");
+		std::string msg("Error occurred saving contiguous container into file " + fFilename + " "); 
 		std::cerr << msg << std::endl;
 		throw logging::LargeDataListExcept(msg);
 	}
@@ -527,7 +527,7 @@ uint64_t LargeDataList<container_t, element_t>::save_contiguous(container_t *c)
 //------------------------------------------------------------------------------
 template<typename container_t, typename element_t>
 void LargeDataList<container_t, element_t>::save_contiguousCompressed(
-	container_t *c)
+	container_t *c) 
 {
 	//...Compress and write out the elements based on the compression mode
 	switch (fCompressMode)
@@ -593,7 +593,7 @@ void LargeDataList<container_t, element_t>::writeContiguousCompressed(
 //------------------------------------------------------------------------------
 template<typename container_t, typename element_t>
 void LargeDataList<container_t, element_t>::save_noncontiguousCompressed(
-	container_t *c)
+	container_t *c) 
 {
 	//...Compress and write out the elements based on the compression mode.
 	//...The only compression currently supported here is compression of the
@@ -641,7 +641,7 @@ void LargeDataList<container_t, element_t>::load(uint64_t setNumber, bool append
 	}
 
 	/* XXXPAT: How to handle errors here?  Specifically, unless the entire load
-	is successful, things will be left in a relatively undefined state.  Do we
+	is successful, things will be left in a relatively undefined state.  Do we 
 	have to care about things like that here?  Initial guess: no. */
 	try {
 		DiskIoInfo info;
@@ -650,7 +650,7 @@ void LargeDataList<container_t, element_t>::load(uint64_t setNumber, bool append
 		// Position the file to the correct file offset for this set.
 		fFile.seekg( fSetStartPositions.at(setNumber) );
 		//std::cout << "Loading filename-" << fFilename <<
-		//	"; set-" << setNumber << "; fPos-" <<
+		//	"; set-" << setNumber << "; fPos-" << 
 		//	fSetStartPositions.at(setNumber) << std::endl;
 
 		std::streampos startPos = fFile.tellg();
@@ -663,7 +663,7 @@ void LargeDataList<container_t, element_t>::load(uint64_t setNumber, bool append
 			// @bug 721. merge all saving sets to current loaded set 0 and sort
 			if (!append)
 				v->resize(0);
-			if (count > v->size())
+			if (count > v->size()) 
 				v->reserve( count );
 
 			switch (fCompressMode)
@@ -737,7 +737,7 @@ void LargeDataList<container_t, element_t>::load(uint64_t setNumber, bool append
 				delete base::c;
 				base::c = new container_t();
 			}
-
+			
 			switch (fCompressMode)
 			{
 				case COMPRESS_TO_32_64:
@@ -783,14 +783,14 @@ void LargeDataList<container_t, element_t>::load(uint64_t setNumber, bool append
 	catch(const std::runtime_error& e) {
 		if (fFile.is_open())
 			fFile.close();
-		std::string msg("Error occurred loading non-contiguous container from file " + fFilename + " ");
+		std::string msg("Error occurred loading non-contiguous container from file " + fFilename + " "); 
 		std::cerr << msg << std::endl;
 		throw logging::LargeDataListExcept(msg + e.what());
 	}
 	catch(...) {
 		if (fFile.is_open())
 			fFile.close();
-		std::string msg("Error occurred loading non-contiguous container from file " + fFilename + " ");
+		std::string msg("Error occurred loading non-contiguous container from file " + fFilename + " "); 
 		std::cerr << msg << std::endl;
 		throw logging::LargeDataListExcept(msg);
 	}
@@ -831,18 +831,18 @@ void LargeDataList<container_t, element_t>::load_contiguous(uint64_t setNumber, 
 	}
 
 	/* XXXPAT: How to handle errors here?  Specifically, unless the entire load
-	is successful, things will be left in a relatively undefined state.  Do we
+	is successful, things will be left in a relatively undefined state.  Do we 
 	have to care about things like that here?  Initial guess: no. */
 
 	try {
 		DiskIoInfo info;
 		if (fTraceOn) info.fStart = boost::posix_time::microsec_clock::local_time();
 
-		v = reinterpret_cast<std::vector<element_t> *>(base::c);
+		v = reinterpret_cast<std::vector<element_t> *>(base::c); 
 		// Position the file to the correct file offset for this set.
 		fFile.seekg( fSetStartPositions.at(setNumber) );
 		//std::cout << "LoadingC filename-" << fFilename <<
-		//	"; set-" << setNumber << "; fPos-" <<
+		//	"; set-" << setNumber << "; fPos-" << 
 		//	fSetStartPositions.at(setNumber) << std::endl;
 
 		std::streampos startPos = fFile.tellg();
@@ -877,14 +877,14 @@ void LargeDataList<container_t, element_t>::load_contiguous(uint64_t setNumber, 
 	catch(const std::runtime_error& e) {
 		if (fFile.is_open())
 			fFile.close();
-		std::string msg("Error occurred loading contiguous container from file " + fFilename + " ");
+		std::string msg("Error occurred loading contiguous container from file " + fFilename + " "); 
 		std::cerr << msg << std::endl;
 		throw logging::LargeDataListExcept(msg + e.what());
 	}
 	catch(...) {
 		if (fFile.is_open())
 			fFile.close();
-		std::string msg("Error occurred loading contiguous container from file " + fFilename + " ");
+		std::string msg("Error occurred loading contiguous container from file " + fFilename + " "); 
 		std::cerr << msg << std::endl;
 		throw logging::LargeDataListExcept(msg);
 	}
@@ -917,7 +917,7 @@ template<typename container_t, typename element_t>
 void LargeDataList<container_t, element_t>::load_contiguousCompressed(bool append, uint64_t count)
 {
 	std::vector<element_t>*	v =
-		reinterpret_cast<std::vector<element_t> *>(base::c);
+		reinterpret_cast<std::vector<element_t> *>(base::c); 
 	element_t*	  pElementData = 0;
 
 	if (append){
@@ -1004,7 +1004,7 @@ inline bool LargeDataList<container_t, element_t>::next(uint64_t it, element_t *
 
 template<typename container_t, typename element_t>
 inline bool LargeDataList<container_t, element_t>::next_nowait(uint64_t it, element_t *e)
-{
+{	
 	bool ret;
 	ret = base::next(it, e);
 	return ret;
@@ -1028,9 +1028,9 @@ void LargeDataList<container_t, element_t>::registerNewSet()
 
 template<typename container_t, typename element_t>
 uint64_t LargeDataList<container_t, element_t>::totalSize()
-{
+{ 
 	waitForConsumePhase();
-	return totSize;
+	return totSize; 
 }
 
 template<typename container_t, typename element_t>
@@ -1041,7 +1041,7 @@ inline void LargeDataList<container_t, element_t>::insert(const element_t& e)
 }
 
 template<typename container_t, typename element_t>
-void LargeDataList<container_t, element_t>::resetIterators()
+void LargeDataList<container_t, element_t>::resetIterators() 
 {
 	waitForConsumePhase();
 	for (int i = 0; i < (int) base::numConsumers; ++i)
@@ -1049,7 +1049,7 @@ void LargeDataList<container_t, element_t>::resetIterators()
 }
 
 template<typename container_t, typename element_t>
-void LargeDataList<container_t, element_t>::resetIterators_nowait()
+void LargeDataList<container_t, element_t>::resetIterators_nowait() 
 {
 	for (uint64_t i = 0; i < base::numConsumers; ++i)
 	{

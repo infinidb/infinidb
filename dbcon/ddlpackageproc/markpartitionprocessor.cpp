@@ -20,7 +20,9 @@
  *
  *
  ***********************************************************************/
+#define DDLPKGMARKPARTITIONPROC_DLLEXPORT
 #include "markpartitionprocessor.h"
+#undef DDLPKGMARKPARTITIONPROC_DLLEXPORT
 
 #include "messagelog.h"
 #include "sqllogger.h"
@@ -49,7 +51,7 @@ MarkPartitionProcessor::DDLResult MarkPartitionProcessor::processPackage(ddlpack
 	txnID.valid= fTxnid.valid;
 	
 	int rc = 0;
-	rc = fDbrm->isReadWrite();
+	rc = fDbrm.isReadWrite();
 	if (rc != 0 )
 	{
 		logging::Message::Args args;
@@ -65,9 +67,7 @@ MarkPartitionProcessor::DDLResult MarkPartitionProcessor::processPackage(ddlpack
 	CalpontSystemCatalog::RIDList tableColRidList;
 	CalpontSystemCatalog::DictOIDList dictOIDList;
 	std::string  processName("DDLProc");
-	
-	string stmt = markPartitionStmt.fSql + "|" + markPartitionStmt.fTableName->fSchema +"|";
-	SQLLogger logger(stmt, fDDLLoggingId, markPartitionStmt.fSessionID, txnID.id);
+	SQLLogger logger(markPartitionStmt.fSql, fDDLLoggingId, markPartitionStmt.fSessionID, txnID.id);
 	
 	uint32_t processID = 0;
 	uint64_t uniqueID = 0;
@@ -93,14 +93,14 @@ MarkPartitionProcessor::DDLResult MarkPartitionProcessor::processPackage(ddlpack
 		processID = ::getpid();
 		oam::OamCache * oamcache = OamCache::makeOamCache();
 		std::vector<int> pmList = oamcache->getModuleIds();
-		std::vector<uint32_t> pms;
+		std::vector<uint> pms;
 		for (unsigned i=0; i < pmList.size(); i++)
 		{
-			pms.push_back((uint32_t)pmList[i]);
+			pms.push_back((uint)pmList[i]);
 		}
 			
 		try {
-			uniqueID = fDbrm->getTableLock(pms, roPair.objnum, &processName, &processID, (int32_t*)&sessionID, (int32_t*)&txnID.id, BRM::LOADING );
+			uniqueID = fDbrm.getTableLock(pms, roPair.objnum, &processName, &processID, (int32_t*)&sessionID, (int32_t*)&txnID.id, BRM::LOADING );
 		}
 		catch (std::exception&)
 		{
@@ -143,7 +143,7 @@ MarkPartitionProcessor::DDLResult MarkPartitionProcessor::processPackage(ddlpack
 				processName = "DDLProc";
 
 				try {
-					uniqueID = fDbrm->getTableLock(pms, roPair.objnum, &processName, &processID, (int32_t*)&sessionID, (int32_t*)&txnID.id, BRM::LOADING );
+					uniqueID = fDbrm.getTableLock(pms, roPair.objnum, &processName, &processID, (int32_t*)&sessionID, (int32_t*)&txnID.id, BRM::LOADING );
 				}
 				catch (std::exception&)
 				{
@@ -199,7 +199,7 @@ MarkPartitionProcessor::DDLResult MarkPartitionProcessor::processPackage(ddlpack
 
 		//Remove the partition from extent map
 		string emsg;
-		rc = fDbrm->markPartitionForDeletion( oidList, markPartitionStmt.fPartitions, emsg);
+		rc = fDbrm.markPartitionForDeletion( oidList, markPartitionStmt.fPartitions, emsg);
 		if ( rc != 0 )
 		{
 			throw std::runtime_error(emsg);
@@ -222,7 +222,7 @@ MarkPartitionProcessor::DDLResult MarkPartitionProcessor::processPackage(ddlpack
 			
 		result.message = message;
 		try {
-			fDbrm->releaseTableLock(uniqueID);
+			fDbrm.releaseTableLock(uniqueID);
 		} catch (std::exception&)
 		{
 			result.result = DROP_ERROR;
@@ -246,7 +246,7 @@ MarkPartitionProcessor::DDLResult MarkPartitionProcessor::processPackage(ddlpack
 		result.result = DROP_ERROR;
 		result.message = message;
 		try {
-			fDbrm->releaseTableLock(uniqueID);
+			fDbrm.releaseTableLock(uniqueID);
 		} catch (std::exception&)
 		{
 			result.result = DROP_ERROR;
@@ -258,7 +258,7 @@ MarkPartitionProcessor::DDLResult MarkPartitionProcessor::processPackage(ddlpack
 	// Log the DDL statement
 	logging::logDDL(markPartitionStmt.fSessionID, 0, markPartitionStmt.fSql, markPartitionStmt.fOwner);
 	try {
-			fDbrm->releaseTableLock(uniqueID);
+			fDbrm.releaseTableLock(uniqueID);
 	} catch (std::exception&)
 	{
 		result.result = DROP_ERROR;

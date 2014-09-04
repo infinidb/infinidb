@@ -833,7 +833,7 @@ xmlNanoHTTPConnectAttempt(struct sockaddr *addr)
     
 #ifdef _WINSOCKAPI_
     {
-	uint32_t one = 1;
+	u_long one = 1;
 
 	status = ioctlsocket(s, FIONBIO, &one) == SOCKET_ERROR ? -1 : 0;
     }

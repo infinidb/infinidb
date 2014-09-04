@@ -1,6 +1,6 @@
 #!/usr/bin/expect
 #
-# $Id$
+# $Id: system_installer.sh 421 2007-04-05 15:46:55Z dhill $
 #
 # Install custom OS files on External Module
 # Argument 1 - Remote Module Name
@@ -29,13 +29,13 @@ expect {
 	-re "service not known" { send_user "FAILED: Invalid Host\n" ; exit }
 	-re "authenticity" { send "yes\n" 
 						expect {
-							-re "word: " { send "$PASSWORD\n" }
+							-re "word: " { send "$PASSWORD\n" } abort
 						}
 						}
-	-re "word: " { send "$PASSWORD\n" }
+	-re "word: " { send "$PASSWORD\n" } abort
 }
 expect {
-	-re "tools " 			  { send_user "DONE" }
+	-re "tools " 			  { send_user "DONE" } abort
 	-re "Permission denied"   { send_user "ERROR: Invalid password\n" ; exit -1 }
 	-re "package calpont"     { send_user "ERROR: Calpont RPM not installed on External Module\n" ; exit -1 }
 }
@@ -50,7 +50,7 @@ expect -re "word: "
 # send the password
 send "$PASSWORD\n"
 expect {
-	-re "# " 				  { send_user "DONE" }
+	-re "# " 				  { send_user "DONE" } abort
 	-re "Permission denied"   { send_user "ERROR: Invalid password\n" ; exit -1 }
 	-re "mkdir: cannot"       { send_user "DONE: already installed\n" 
 								send_user "\nInstallation Successfully Completed on '$MODULE'\n"; exit 0 }
@@ -62,7 +62,7 @@ expect -re "word: "
 # send the password
 send "$PASSWORD\n"
 expect {
-	-re "# " 				  { send_user "DONE" }
+	-re "# " 				  { send_user "DONE" } abort
 	-re "Permission denied"   { send_user "ERROR: Invalid password\n" ; exit -1 }
 	-re "mkdir: cannot"       { send_user "DONE: already installed\n" 
 								send_user "\nInstallation Successfully Completed on '$MODULE'\n"; exit 0 }
@@ -77,7 +77,7 @@ expect -re "word: "
 # send the password
 send "$PASSWORD\n"
 expect {
-	-re "100%" 				{ send_user "DONE" }
+	-re "100%" 				{ send_user "DONE" } abort
 	-re "scp"  				{ send_user "ERROR\n" ; 
 				 			send_user "\n*** Installation ERROR\n" ; 
 							exit -1 }
@@ -92,7 +92,7 @@ expect -re "word: "
 # send the password
 send "$PASSWORD\n"
 expect {
-	-re "100%" 				{ send_user "DONE" }
+	-re "100%" 				{ send_user "DONE" } abort
 	-re "scp"  				{ send_user "ERROR\n" ; 
 				 			send_user "\n*** Installation ERROR\n" ; 
 							exit -1 }
@@ -107,7 +107,7 @@ expect -re "word: "
 # send the password
 send "$PASSWORD\n"
 expect {
-	-re "100%" 				{ send_user "DONE" }
+	-re "100%" 				{ send_user "DONE" } abort
 	-re "scp"  				{ send_user "ERROR\n" ; 
 				 			send_user "\n*** Installation ERROR\n" ; 
 							exit -1 }
@@ -124,7 +124,7 @@ expect -re "word: "
 # send the password
 send "$PASSWORD\n"
 expect {
-	-re "# " 				  { send_user "DONE" }
+	-re "# " 				  { send_user "DONE" } abort
 	-re "Permission denied"   { send_user "ERROR: Invalid password\n" ; exit -1 }
 }
 #
@@ -137,7 +137,7 @@ expect -re "word: "
 # send the password
 send "$PASSWORD\n"
 expect {
-	-re "# " 				  { send_user "DONE" }
+	-re "# " 				  { send_user "DONE" } abort
 	-re "Permission denied"   { send_user "ERROR: Invalid password\n" ; exit -1 }
 }
 #
@@ -150,7 +150,7 @@ expect -re "word: "
 # send the password
 send "$PASSWORD\n"
 expect {
-	-re "# " 				  { send_user "DONE" }
+	-re "# " 				  { send_user "DONE" } abort
 	-re "Permission denied"   { send_user "ERROR: Invalid password\n" ; exit -1 }
 }
 #
@@ -163,7 +163,7 @@ expect -re "word: "
 # send the password
 send "$PASSWORD\n"
 expect {
-	-re "# " 				  { send_user "DONE" }
+	-re "# " 				  { send_user "DONE" } abort
 	-re "Permission denied"   { send_user "ERROR: Invalid password\n" ; exit -1 }
 }
 send_user "\n"

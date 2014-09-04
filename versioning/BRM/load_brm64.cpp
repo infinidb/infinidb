@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: load_brm64.cpp 1823 2013-01-21 14:13:09Z rdempsey $
+ * $Id: load_brm64.cpp 1547 2012-04-04 18:19:01Z rdempsey $
  *
  ****************************************************************************/
 
@@ -34,7 +34,6 @@
 #include "vss.h"
 #include "vbbm.h"
 #include "blockresolutionmanager.h"
-#include "IDBPolicy.h"
 #include <iostream>
 
 using namespace BRM;
@@ -60,8 +59,6 @@ int main(int argc, char **argv)
 		prefix = argv[1];
 	else
 		prefix = "BRM_state";
-
-	idbdatafile::IDBPolicy::configIDBPolicy();
 
 	err = brm.loadState(prefix);
 	if (err == 0)

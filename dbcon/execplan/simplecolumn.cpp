@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: simplecolumn.cpp 9576 2013-05-29 21:02:11Z zzhu $
+*   $Id: simplecolumn.cpp 8565 2012-05-28 20:48:07Z xlou $
 *
 *
 ***********************************************************************/
@@ -49,7 +49,6 @@ using namespace joblist;
 #include "simplefilter.h"
 #include "aggregatecolumn.h"
 #include "constantfilter.h"
-#include "windowfunction.h"
 
 namespace execplan
 {
@@ -64,84 +63,33 @@ void getSimpleCols(execplan::ParseTree* n, void* obj)
 	SimpleFilter *sf = dynamic_cast<SimpleFilter*>(tn);
 	ConstantFilter *cf = dynamic_cast<ConstantFilter*>(tn);
 	if (sc)
-	{
 		list->push_back(sc);
-	}
 	else if (fc)
-	{
-		fc->setSimpleColumnList();
 		list->insert(list->end(), fc->simpleColumnList().begin(), fc->simpleColumnList().end());
-	}
 	else if (ac)
-	{
-		ac->setSimpleColumnList();
 		list->insert(list->end(), ac->simpleColumnList().begin(), ac->simpleColumnList().end());
-	}
 	else if (sf)
-	{
-		sf->setSimpleColumnList();
 		list->insert(list->end(), sf->simpleColumnList().begin(), sf->simpleColumnList().end());
-	}
 	else if (cf)
-	{
-		cf->setSimpleColumnList();
 		list->insert(list->end(), cf->simpleColumnList().begin(), cf->simpleColumnList().end());
-	}
-}
-
-ParseTree* replaceRefCol(ParseTree*& n, CalpontSelectExecutionPlan::ReturnedColumnList& derivedColList)
-{
-	ParseTree *lhs = n->left();
-	ParseTree *rhs = n->right();
-
-	if (lhs)
-		n->left(replaceRefCol(lhs, derivedColList));
-	if (rhs)
-		n->right(replaceRefCol(rhs, derivedColList));
-	SimpleFilter *sf = dynamic_cast<SimpleFilter*>(n->data());
-	ConstantFilter *cf = dynamic_cast<ConstantFilter*>(n->data());
-	ReturnedColumn *rc = dynamic_cast<ReturnedColumn*>(n->data());
-	if (sf)
-	{
-		sf->replaceRealCol(derivedColList);
-	}
-	else if (cf)
-	{
-		cf->replaceRealCol(derivedColList);
-	}
-	else if (rc)
-	{
-		SimpleColumn* sc = dynamic_cast<SimpleColumn*>(rc);
-		if (sc)
-		{
-			ReturnedColumn* tmp = derivedColList[sc->colPosition()]->clone();
-			delete sc;
-			n->data(tmp);
-		}
-		else
-		{
-			rc->replaceRealCol(derivedColList);
-		}
-	}
-	return n;
 }
 
 /**
  * Constructors/Destructors
  */
 SimpleColumn::SimpleColumn():
-	ReturnedColumn(),
-	fOid (0),
-	fIsInfiniDB (true)
+    ReturnedColumn(),
+    fOid (0),
+    fIsInfiniDB (true)
 {
 	fDistinct=false;
 }
 
-SimpleColumn::SimpleColumn(const string& token, const uint32_t sessionID):
-	ReturnedColumn(sessionID),
-	fOid (0),
-	fData(token),
-	fIsInfiniDB (true)
+SimpleColumn::SimpleColumn(const string& token, const u_int32_t sessionID):
+    ReturnedColumn(sessionID),
+    fOid (0),
+    fData(token),
+    fIsInfiniDB (true)
 {
 	parse (token);
 	setOID();
@@ -149,38 +97,40 @@ SimpleColumn::SimpleColumn(const string& token, const uint32_t sessionID):
 }
 
 SimpleColumn::SimpleColumn(const string& schemaName,
-						   const string& tableName,
-						   const string& columnName,
-						   const uint32_t sessionID):
-	ReturnedColumn(sessionID),
-	fSchemaName (schemaName),
-	fTableName (tableName),
-	fColumnName (columnName),
-	fIsInfiniDB (true)
+                           const string& tableName,
+                           const string& columnName,
+                           const u_int32_t sessionID):
+    ReturnedColumn(sessionID),
+    fSchemaName (schemaName),
+    fTableName (tableName),
+    fColumnName (columnName),
+    fIsInfiniDB (true)
 {
 	setOID();
 	fDistinct=false;
+	fAsc=false;
 }
 
 SimpleColumn::SimpleColumn(const string& schemaName,
-						   const string& tableName,
-						   const string& columnName,
-						   const bool isInfiniDB,
-						   const uint32_t sessionID):
-	ReturnedColumn(sessionID),
-	fSchemaName (schemaName),
-	fTableName (tableName),
-	fColumnName (columnName),
-	fIsInfiniDB (isInfiniDB)
+                           const string& tableName,
+                           const string& columnName,
+                           const bool isInfiniDB,
+                           const u_int32_t sessionID):
+    ReturnedColumn(sessionID),
+    fSchemaName (schemaName),
+    fTableName (tableName),
+    fColumnName (columnName),
+    fIsInfiniDB (isInfiniDB)
 {
 	if (isInfiniDB)
 		setOID();
 	fDistinct=false;
+	fAsc=false;
 }
 
-SimpleColumn::SimpleColumn (const SimpleColumn& rhs,const uint32_t sessionID):
-				ReturnedColumn(rhs, sessionID),
-				fSchemaName (rhs.schemaName()),
+SimpleColumn::SimpleColumn (const SimpleColumn& rhs,const u_int32_t sessionID):
+                ReturnedColumn(rhs, sessionID),
+                fSchemaName (rhs.schemaName()),
 				fTableName (rhs.tableName()),
 				fColumnName (rhs.columnName()),
 				fOid (rhs.oid()),
@@ -194,6 +144,7 @@ SimpleColumn::SimpleColumn (const SimpleColumn& rhs,const uint32_t sessionID):
 
 SimpleColumn::~SimpleColumn()
 {}
+
 /**
  * Methods
  */
@@ -240,86 +191,94 @@ const string SimpleColumn::toString() const
 {
 	ostringstream output;
 	output << "SimpleColumn " << data() << endl;
-	output << "  s/t/c/v/o/ct/TA/CA/RA/#/card/join/source/engine/colPos: " << schemaName() << '/'
-	       << tableName() << '/'
-	       << columnName() << '/'
-	       << viewName() << '/'
-	       << oid() << '/'
-	       << colDataTypeToString(fResultType.colDataType) << '/'
-	       << tableAlias() << '/'
-	       << alias() << '/'
-	       << returnAll() << '/'
-	       << sequence() << '/'
-	       << cardinality() << '/'
-	       << joinInfo() << '/'
-	       << colSource() << '/'
-	       << (isInfiniDB()? "InfiniDB" : "ForeignEngine") << '/'
-	       << colPosition() << endl;
+	output << "  s/t/c/v/o/TA/CA/RA/#/card/join/source/engine: " << schemaName() << '/'
+	                          << tableName() << '/'
+	                          << columnName() << '/'
+	                          << viewName() << '/'
+	                          << oid() << '/'
+	                          << tableAlias() << '/'
+	                          << alias() << '/'
+	                          << returnAll() << '/'
+	                          << (int32_t)sequence() << '/'
+	                          << cardinality() << '/'
+	                          << joinInfo() << '/'
+	                          << colSource() << '/'
+	                          << (isInfiniDB()? "InfiniDB" : "ForeignEngine") << endl;
 
 	return output.str();
 }
 
 void SimpleColumn::parse(const string& token)
 {
-	// get schema name, table name and column name for token.
-	string::size_type pos = token.find_first_of(".", 0);
+    // get schema name, table name and column name for token.
+    string::size_type pos = token.find_first_of(".", 0);
 
-	// if no '.' in column name, consider it a function name;
-	if (pos == string::npos)
-	{
-		fData = token;
-		fColumnName = token;
-		return;
-	}
-	fSchemaName = token.substr(0, pos);
+    // if no '.' in column name, consider it a function name;
+    if (pos == string::npos)
+    {
+        fData = token;
+        fColumnName = token;
+        return;
+    }
+    fSchemaName = token.substr(0, pos);
 
-	string::size_type newPos = token.find_first_of(".", pos+1);
-	if (newPos == string::npos)
-	{
-		// only one '.' in column name, consider table.col pattern
-		fTableName = fSchemaName;
-		fColumnName = token.substr(pos+1, token.length());
-		return;
-	}
+    string::size_type newPos = token.find_first_of(".", pos+1);
+    if (newPos == string::npos)
+    {
+        // only one '.' in column name, consider table.col pattern
+        fTableName = fSchemaName;
+        fColumnName = token.substr(pos+1, token.length());
+        return;
+    }
 
-	fTableName = token.substr(pos+1, newPos-pos-1);
-	fColumnName = token.substr(newPos+1, token.length());
+    fTableName = token.substr(pos+1, newPos-pos-1);
+    fColumnName = token.substr(newPos+1, token.length());
 }
 
 void SimpleColumn::setOID()
 {
-	boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(fSessionID);
-	CalpontSystemCatalog::TableColName tcn;
-	tcn = make_tcn(fSchemaName, fTableName, fColumnName);
+    boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(fSessionID);
+    CalpontSystemCatalog::TableColName tcn;
+    // @bug #393
+    if (fSchemaName.length() == 0 || fTableName.length() == 0)
+        tcn = make_tcn(CalpontSelectExecutionPlan::schemaName(), CalpontSelectExecutionPlan::tableName(), fColumnName);
+    else
+        tcn = make_tcn(fSchemaName, fTableName, fColumnName);
 
-	fOid = csc->lookupOID (tcn);
-	if (fOid == -1)
-	{
-		// get colMap from CalpontSelectExecutionPlan
-		// and try to map the schema and table name
-		CalpontSelectExecutionPlan::ColumnMap::iterator iter;
-		CalpontSelectExecutionPlan::ColumnMap colMap = CalpontSelectExecutionPlan::colMap();
+    fOid = csc->lookupOID (tcn);
+    if (fOid != -1)
+    {
+        if (fSchemaName.length() == 0 || fTableName.length() == 0)
+        {
+            fSchemaName = CalpontSelectExecutionPlan::schemaName();
+            fTableName = CalpontSelectExecutionPlan::tableName();
+        }
+    }
+    else
+    {
+        // get colMap from CalpontSelectExecutionPlan
+        // and try to map the schema and table name
+        CalpontSelectExecutionPlan::ColumnMap::iterator iter;
+        CalpontSelectExecutionPlan::ColumnMap colMap = CalpontSelectExecutionPlan::colMap();
 
-		// if this is the only column name exist in the map, return it ??
-		for (iter = colMap.find(fColumnName); iter != colMap.end(); ++iter)
-		{
-			SRCP srcp = iter->second;
-			SimpleColumn* scp = dynamic_cast<SimpleColumn*>(srcp.get());
-			if (colMap.count(fColumnName) == 1 ||
-			    scp->tableName().compare(fTableName) == 0)
-			{
-				fOid = scp->oid();
-				//@bug 221 fix
-				fTableName = scp->tableName();
-				fSchemaName = scp->schemaName();
-				//@info assign tableAlias also. watch for other conflict
-				fTableAlias = scp->tableAlias();
-				fResultType = scp->resultType();
-				return;
-			}
-		}
-	}
-	fResultType = csc->colType(fOid);
+        // if this is the only column name exist in the map, return it ??
+        for (iter = colMap.find(fColumnName); iter != colMap.end(); ++iter)
+        {
+            SRCP srcp = iter->second;
+            SimpleColumn* scp = dynamic_cast<SimpleColumn*>(srcp.get());
+            if (colMap.count(fColumnName) == 1 ||
+                scp->tableName().compare(fTableName) == 0)
+            {
+                fOid = scp->oid();
+                //@bug 221 fix
+                fTableName = scp->tableName();
+                fSchemaName = scp->schemaName();
+                //@info assign tableAlias also. watch for other conflict
+                fTableAlias = scp->tableAlias();
+                return;
+            }
+        }
+    }
 }
 
 void SimpleColumn::serialize(messageqcpp::ByteStream& b) const
@@ -335,6 +294,7 @@ void SimpleColumn::serialize(messageqcpp::ByteStream& b) const
 	b << fData;
 	//b << fAlias;
 	b << fTableAlias;
+	b << static_cast<const ByteStream::doublebyte>(fReturnAll);
 	b << (uint32_t) fSequence;
 	b << static_cast<const ByteStream::doublebyte>(fIsInfiniDB);
 }
@@ -352,6 +312,7 @@ void SimpleColumn::unserialize(messageqcpp::ByteStream& b)
 	b >> fData;
 	//b >> fAlias;
 	b >> fTableAlias;
+	b >> reinterpret_cast< ByteStream::doublebyte&>(fReturnAll);
 	b >> (uint32_t&) fSequence;
 	b >> reinterpret_cast< ByteStream::doublebyte&>(fIsInfiniDB);
 }
@@ -371,9 +332,9 @@ bool SimpleColumn::operator==(const SimpleColumn& t) const
 	if (fColumnName != t.fColumnName)
 		return false;
 	if (fIndexName != t.fIndexName)
-		return false;
+	    return false;
 	if (fViewName != t.fViewName)
-		return false;
+	    return false;
 	if (fOid != t.fOid)
 		return false;
 	if (fData != t.fData)
@@ -381,11 +342,11 @@ bool SimpleColumn::operator==(const SimpleColumn& t) const
 	if (fAlias != t.fAlias)
 		return false;
 	if (fTableAlias != t.fTableAlias)
-		return false;
+	    return false;
 	if (fAsc != t.fAsc)
 		return false;
 	if (fReturnAll != t.fReturnAll)
-		return false;
+	    return false;
 	if (fIsInfiniDB != t.fIsInfiniDB)
 		return false;
 	return true;
@@ -413,64 +374,36 @@ bool SimpleColumn::operator!=(const TreeNode* t) const
 
 bool SimpleColumn::sameColumn(const ReturnedColumn* rc) const
 {
-	/** NOTE: Operations can still be merged on different table alias */
-	const SimpleColumn *sc = dynamic_cast<const SimpleColumn*>(rc);
-	if (!sc) return false;
-	return (fSchemaName.compare(sc->schemaName()) == 0 &&
-			fTableName.compare(sc->tableName()) == 0 &&
-			fColumnName.compare(sc->columnName()) == 0 &&
-			fTableAlias.compare(sc->tableAlias()) == 0 &&
-			fViewName.compare(sc->viewName()) == 0 &&
-			fIsInfiniDB == sc->isInfiniDB());
+    /** NOTE: Operations can still be merged on different table alias */
+    const SimpleColumn *sc = dynamic_cast<const SimpleColumn*>(rc);
+    if (!sc) return false;
+    return (fSchemaName.compare(sc->schemaName()) == 0 &&
+            fTableName.compare(sc->tableName()) == 0 &&
+            fColumnName.compare(sc->columnName()) == 0 &&
+            fTableAlias.compare(sc->tableAlias()) == 0 &&
+            fViewName.compare(sc->viewName()) == 0 &&
+            fIsInfiniDB == sc->isInfiniDB());
 }
-
-void SimpleColumn::setDerivedTable()
-{
-	if (hasAggregate())
-	{
-		fDerivedTable = "";
-		return;
-	}
-
-	// fDerivedTable is set at the parsing phase
-	if (!fSchemaName.empty())
-		fDerivedTable = "";
-	// @todo make aggregate filter to having clause. not optimize it for now
-	if (fDerivedRefCol &&
-	    (dynamic_cast<AggregateColumn*>(fDerivedRefCol) ||
-	     dynamic_cast<WindowFunctionColumn*>(fDerivedRefCol)))
-		fDerivedTable = "";
-}
-
-bool SimpleColumn::singleTable(CalpontSystemCatalog::TableAliasName& tan)
-{
-	tan.table = fTableName;
-	tan.schema = fSchemaName;
-	tan.view = fViewName;
-	tan.alias = fTableAlias;
-	return true;
-}
-
 
 // @todo move to inline
 void SimpleColumn::evaluate(Row& row, bool& isNull)
 {
-	bool isNull2 = row.isNullValue(fInputIndex);
-	if (isNull2) {
-		isNull = true;
-		return;
-	}
-
 	switch (fResultType.colDataType)
 	{
 		case CalpontSystemCatalog::DATE:
 		{
-			fResult.intVal = row.getUintField<4>(fInputIndex);
+			if (row.equals<4>(DATENULL, fInputIndex))
+				isNull = true;
+			else
+				fResult.intVal = row.getUintField<4>(fInputIndex);
 			break;
 		}
 		case CalpontSystemCatalog::DATETIME:
 		{
-			fResult.intVal = row.getUintField<8>(fInputIndex);
+			if (row.equals<8>(DATETIMENULL, fInputIndex))
+				isNull = true;
+			else
+				fResult.intVal = row.getUintField<8>(fInputIndex);
 			break;
 		}
 		case CalpontSystemCatalog::CHAR:
@@ -480,34 +413,42 @@ void SimpleColumn::evaluate(Row& row, bool& isNull)
 			switch (row.getColumnWidth(fInputIndex))
 			{
 				case 1:
-				{
-					fResult.origIntVal = row.getUintField<1>(fInputIndex);
+					if (row.equals<1>(CHAR1NULL, fInputIndex))
+						isNull = true;
+					else
+						fResult.origIntVal = row.getUintField<1>(fInputIndex);
 					break;
-				}
 				case 2:
-				{
-					fResult.origIntVal = row.getUintField<2>(fInputIndex);
+					if (row.equals<2>(CHAR2NULL, fInputIndex))
+						isNull = true;
+					else
+						fResult.origIntVal = row.getUintField<2>(fInputIndex);
 					break;
-				}
 				case 3:
 				case 4:
-				{
-					fResult.origIntVal = row.getUintField<4>(fInputIndex);
+					if (row.equals<4>(CHAR4NULL, fInputIndex))
+						isNull = true;
+					else
+						fResult.origIntVal = row.getUintField<4>(fInputIndex);
 					break;
-				}
 				case 5:
 				case 6:
 				case 7:
 				case 8:
-				{
-					fResult.origIntVal = row.getUintField<8>(fInputIndex);
+					if (row.equals<8>(CHAR8NULL, fInputIndex))
+						isNull = true;
+					else
+						fResult.origIntVal = row.getUintField<8>(fInputIndex);
 					break;
-				}
 				default:
-				{
-					fResult.strVal = row.getStringField(fInputIndex);
+					if (row.equals(CPNULLSTRMARK, fInputIndex))
+						isNull = true;
+					else
+						fResult.strVal = row.getStringField(fInputIndex);
+					// stringColVal is padded with '\0' to colWidth so can't use str.length()
+					if (strlen(fResult.strVal.c_str()) == 0)
+						isNull = true;
 					break;
-				}
 			}
 			if (fResultType.colDataType == CalpontSystemCatalog::STRINT)
 				fResult.intVal = uint64ToStr(fResult.origIntVal);
@@ -517,100 +458,118 @@ void SimpleColumn::evaluate(Row& row, bool& isNull)
 		}
 		case CalpontSystemCatalog::BIGINT:
 		{
-			fResult.intVal = row.getIntField<8>(fInputIndex);
+			if (row.equals<8>(BIGINTNULL, fInputIndex))
+				isNull = true;
+			else
+				fResult.intVal = row.getIntField<8>(fInputIndex);
 			break;
 		}
 		case CalpontSystemCatalog::INT:
 		case CalpontSystemCatalog::MEDINT:
 		{
-			fResult.intVal = row.getIntField<4>(fInputIndex);
+			if (row.equals<4>(INTNULL, fInputIndex))
+				isNull = true;
+			else
+				fResult.intVal = row.getIntField<4>(fInputIndex);
 			break;
 		}
 		case CalpontSystemCatalog::SMALLINT:
 		{
-			fResult.intVal = row.getIntField<2>(fInputIndex);
+			if (row.equals<2>(SMALLINTNULL, fInputIndex))
+				isNull = true;
+			else
+				fResult.intVal = row.getIntField<2>(fInputIndex);
 			break;
 		}
 		case CalpontSystemCatalog::TINYINT:
 		{
-			fResult.intVal = row.getIntField<1>(fInputIndex);
+			if (row.equals<1>(TINYINTNULL, fInputIndex))
+				isNull = true;
+			else
+				fResult.intVal = row.getIntField<1>(fInputIndex);
 			break;
 		}
 		//In this case, we're trying to load a double output column with float data. This is the
 		// case when you do sum(floatcol), e.g.
 		case CalpontSystemCatalog::FLOAT:
-		case CalpontSystemCatalog::UFLOAT:
 		{
-			fResult.floatVal = row.getFloatField(fInputIndex);
+			if (row.equals<4>(FLOATNULL, fInputIndex))
+				isNull = true;
+			else
+				fResult.floatVal = row.getFloatField(fInputIndex);
 			break;
 		}
 		case CalpontSystemCatalog::DOUBLE:
-		case CalpontSystemCatalog::UDOUBLE:
 		{
-			fResult.doubleVal = row.getDoubleField(fInputIndex);
+			if (row.equals<8>(DOUBLENULL, fInputIndex))
+				isNull = true;
+			else
+				fResult.doubleVal = row.getDoubleField(fInputIndex);
 			break;
 		}
 		case CalpontSystemCatalog::DECIMAL:
-		case CalpontSystemCatalog::UDECIMAL:
 		{
-			switch (fResultType.colWidth)
-			{
-				case 1:
+				switch (fResultType.colWidth)
 				{
-					fResult.decimalVal.value = row.getIntField<1>(fInputIndex);
-					fResult.decimalVal.scale = (unsigned)fResultType.scale;
-					break;
+					case 1:
+					{
+						if (row.equals<1>(TINYINTNULL, fInputIndex))
+							isNull = true;
+						else
+						{
+							fResult.decimalVal.value = row.getIntField<1>(fInputIndex);
+							fResult.decimalVal.scale = (unsigned)fResultType.scale;
+						}
+						break;
+					}
+					case 2:
+					{
+						if (row.equals<2>(SMALLINTNULL, fInputIndex))
+							isNull = true;
+						else
+						{
+							fResult.decimalVal.value = row.getIntField<2>(fInputIndex);
+							fResult.decimalVal.scale = (unsigned)fResultType.scale;
+						}
+						break;
+					}
+					case 4:
+					{
+						if (row.equals<4>(INTNULL, fInputIndex))
+							isNull = true;
+						else
+						{
+							fResult.decimalVal.value = row.getIntField<4>(fInputIndex);
+							fResult.decimalVal.scale = (unsigned)fResultType.scale;
+						}
+						break;
+					}
+					default:
+					{
+						if (row.equals<8>(BIGINTNULL, fInputIndex))
+						isNull = true;
+						else
+						{
+							fResult.decimalVal.value = (int64_t)row.getUintField<8>(fInputIndex);
+							fResult.decimalVal.scale = (unsigned)fResultType.scale;
+						}
+						break;
+					}
 				}
-				case 2:
-				{
-					fResult.decimalVal.value = row.getIntField<2>(fInputIndex);
-					fResult.decimalVal.scale = (unsigned)fResultType.scale;
-					break;
-				}
-				case 4:
-				{
-					fResult.decimalVal.value = row.getIntField<4>(fInputIndex);
-					fResult.decimalVal.scale = (unsigned)fResultType.scale;
-					break;
-				}
-				default:
-				{
-					fResult.decimalVal.value = (int64_t)row.getUintField<8>(fInputIndex);
-					fResult.decimalVal.scale = (unsigned)fResultType.scale;
-					break;
-				}
-			}
 			break;
 		}
 		case CalpontSystemCatalog::VARBINARY:
-		{
-			fResult.strVal = row.getVarBinaryStringField(fInputIndex);
+			if (row.isNullValue(fInputIndex))
+				isNull = true;
+			else
+				fResult.strVal = row.getVarBinaryStringField(fInputIndex);
 			break;
-		}
-		case CalpontSystemCatalog::UBIGINT:
-		{
-			fResult.uintVal = row.getUintField<8>(fInputIndex);
-			break;
-		}
-		case CalpontSystemCatalog::UINT:
-		case CalpontSystemCatalog::UMEDINT:
-		{
-			fResult.uintVal = row.getUintField<4>(fInputIndex);
-			break;
-		}
-		case CalpontSystemCatalog::USMALLINT:
-		{
-			fResult.uintVal = row.getUintField<2>(fInputIndex);
-			break;
-		}
-		case CalpontSystemCatalog::UTINYINT:
-		{
-			fResult.uintVal = row.getUintField<1>(fInputIndex);
-			break;
-		}
 		default:	// treat as int64
 		{
-			fResult.intVal = row.getUintField<8>(fInputIndex);
+			if (row.equals<8>(BIGINTNULL, fInputIndex))
+				isNull = true;
+			else
+				fResult.intVal = row.getUintField<8>(fInputIndex);
 			break;
 		}
 	}

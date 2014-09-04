@@ -37,14 +37,14 @@ namespace threadpool
 {
 
 PriorityThreadPool::PriorityThreadPool(uint targetWeightPerRun, uint highThreads,
-		uint midThreads, uint lowThreads, uint ID) :
-		_stop(false), weightPerRun(targetWeightPerRun), id(ID)
+		uint midThreads, uint lowThreads) :
+		_stop(false), weightPerRun(targetWeightPerRun)
 {
-	for (uint32_t i = 0; i < highThreads; i++)
+	for (uint i = 0; i < highThreads; i++)
 		threads.create_thread(ThreadHelper(this, HIGH));
-	for (uint32_t i = 0; i < midThreads; i++)
+	for (uint i = 0; i < midThreads; i++)
 		threads.create_thread(ThreadHelper(this, MEDIUM));
-	for (uint32_t i = 0; i < lowThreads; i++)
+	for (uint i = 0; i < lowThreads; i++)
 		threads.create_thread(ThreadHelper(this, LOW));
 	cout << "started " << highThreads << " high, " << midThreads << " med, " << lowThreads
 			<< " low.\n";
@@ -76,13 +76,13 @@ void PriorityThreadPool::addJob(const Job &job, bool useLock)
 		newJob.notify_one();
 }
 
-void PriorityThreadPool::removeJobs(uint32_t id)
+void PriorityThreadPool::removeJobs(uint id)
 {
 	list<Job>::iterator it;
 
 	mutex::scoped_lock lk(mutex);
 
-	for (uint32_t i = 0; i < _COUNT; i++)
+	for (uint i = 0; i < _COUNT; i++)
 		for (it = jobQueues[i].begin(); it != jobQueues[i].end();)
 			if (it->id == id)
 				it = jobQueues[i].erase(it);
@@ -105,11 +105,11 @@ PriorityThreadPool::Priority PriorityThreadPool::pickAQueue(Priority preference)
 void PriorityThreadPool::threadFcn(const Priority preferredQueue) throw()
 {
 	Priority queue;
-	uint32_t weight, i;
+	uint weight, i;
 	vector<Job> runList;
 	vector<bool> reschedule;
-	uint32_t rescheduleCount;
-	uint32_t queueSize;
+	uint rescheduleCount;
+	uint queueSize;
 
 	while (!_stop) {
 
@@ -148,6 +148,7 @@ void PriorityThreadPool::threadFcn(const Priority preferredQueue) throw()
 					rescheduleCount++;
 			}
 			catch (std::exception &e) {
+				i++;
 				cerr << e.what() << endl;
 			}
 		}
@@ -178,4 +179,3 @@ void PriorityThreadPool::stop()
 }
 
 } // namespace threadpool
-// vim:ts=4 sw=4:

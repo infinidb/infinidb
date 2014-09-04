@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*********************************************************************
- *   $Id: tdriver-load.cpp 1823 2013-01-21 14:13:09Z rdempsey $
+ *   $Id: tdriver-load.cpp 1547 2012-04-04 18:19:01Z rdempsey $
  *
  ********************************************************************/
 
@@ -38,7 +38,6 @@ snapshot was taken. */
 #include <cppunit/extensions/HelperMacros.h>
 
 #include "brm.h"
-#include "IDBPolicy.h"
 
 #ifdef NO_TESTS
 #undef CPPUNIT_ASSERT
@@ -134,11 +133,11 @@ public:
 		ExtentMap em;
 		int i, err, oid, iterations = 1300;  // (EM_INITIAL_SIZE + 3*EM_INCREMENT)
 		int caughtException = 0, allocdSize;
-		uint32_t fbo, hwm;
+		u_int32_t fbo, hwm;
 		BRM::HWM_t hwm2;
 		BRM::VER_t txnID;
 		vector<LBID_t> lbids;
-		const uint32_t extentSize = em.getExtentSize();
+		const uint extentSize = em.getExtentSize();
 
 		em.load(string("EMImage"));
 		em.checkConsistency();
@@ -188,7 +187,7 @@ public:
 			em.setHWM(i, (i > (extentSize - 1) ? extentSize - 1 : i));
 			em.confirmChanges();
 			hwm = em.getHWM(i);
-			CPPUNIT_ASSERT(hwm == static_cast<uint32_t>(i > extentSize-1 ? extentSize-1 : i));
+			CPPUNIT_ASSERT(hwm == static_cast<u_int32_t>(i > extentSize-1 ? extentSize-1 : i));
 		}
 
 		em.checkConsistency();
@@ -346,11 +345,11 @@ public:
 		BlockResolutionManager brm;
 		int i, err, oid, allocdSize, 
 			iterations = 1300;  // (EM_INITIAL_SIZE + 3*EM_INCREMENT)
-		uint32_t fbo, hwm;
+		u_int32_t fbo, hwm;
 		vector<LBID_t> lbids;
 		HWM_t hwm2;
 		VER_t txnID;
-		const uint32_t extentSize = brm.getExtentSize();
+		const uint extentSize = brm.getExtentSize();
 		
 		for (i = 0; i < iterations; i++) {
 			brm.createExtent(extentSize, i, lbids, allocdSize);
@@ -408,7 +407,7 @@ public:
 			CPPUNIT_ASSERT(err == 0);
 			err = brm.getHWM(i, hwm);
 			CPPUNIT_ASSERT(err == 0);
-			CPPUNIT_ASSERT(hwm == static_cast<uint32_t>(i > extentSize - 1 ? extentSize - 1 : i));
+			CPPUNIT_ASSERT(hwm == static_cast<u_int32_t>(i > extentSize - 1 ? extentSize - 1 : i));
 		}
 		
  		CPPUNIT_ASSERT(brm.checkConsistency() == 0);
@@ -445,7 +444,7 @@ public:
 		VBRange_v::iterator vbRangesIT;
 		EMEntry em;
 		OID_t oid;
-		uint32_t fbo;
+		u_int32_t fbo;
 		LBIDRange range;
 		VBRange vbRange;
 		VER_t verID;
@@ -477,7 +476,7 @@ public:
 		
 		em = *(extents.begin());
 // 		CPPUNIT_ASSERT(em.range.start == 0);
- 		CPPUNIT_ASSERT(em.range.size*1024 == static_cast<uint32_t>(brm.getExtentSize()));
+ 		CPPUNIT_ASSERT(em.range.size*1024 == static_cast<u_int32_t>(brm.getExtentSize()));
 		CPPUNIT_ASSERT(em.HWM == 0);
 		CPPUNIT_ASSERT(em.blockOffset == 0);
 		
@@ -573,7 +572,7 @@ public:
 			err = brm.lookup(i, verID, vbFlag, oid, fbo);
 			CPPUNIT_ASSERT(err == 0);
 			CPPUNIT_ASSERT(oid == vbRange.vbOID);
-			CPPUNIT_ASSERT(fbo == static_cast<uint32_t>(i + vbRange.vbFBO));
+			CPPUNIT_ASSERT(fbo == static_cast<u_int32_t>(i + vbRange.vbFBO));
 			
 			vbbm.lock(VBBM::WRITE);
 			vss.lock(VSS::WRITE);
@@ -619,7 +618,7 @@ public:
 		LBIDRange_v tmp;
 		EMEntry em;
 		OID_t oid;
-		uint32_t fbo;
+		u_int32_t fbo;
 		LBIDRange range;
 		VBRange vbRange;
 		VER_t verID;
@@ -650,7 +649,7 @@ public:
 		
 		em = *(extents.begin());
  		CPPUNIT_ASSERT(em.range.start == 0);
-		CPPUNIT_ASSERT(em.range.size*1024 == static_cast<uint32_t>(brm.getExtentSize()));
+		CPPUNIT_ASSERT(em.range.size*1024 == static_cast<u_int32_t>(brm.getExtentSize()));
 		CPPUNIT_ASSERT(em.HWM == 0);
 		CPPUNIT_ASSERT(em.blockOffset == 0);
 		
@@ -755,7 +754,7 @@ public:
 			err = brm.lookup(i, verID, vbFlag, oid, fbo);
 			CPPUNIT_ASSERT(err == 0);
 			CPPUNIT_ASSERT(oid == 0);
-			CPPUNIT_ASSERT(fbo == static_cast<uint32_t>(i));
+			CPPUNIT_ASSERT(fbo == static_cast<u_int32_t>(i));
 			
 			vbbm.lock(VBBM::WRITE);
 			vss.lock(VSS::WRITE);
@@ -854,7 +853,7 @@ public:
 		ExtentMap **ems;
 		int i, allocdSize, iterations = 1400;  // (EM_INITIAL_SIZE + 4*EM_INCREMENT)
 		vector<LBID_t> lbids;
-		uint32_t extentSize;
+		uint extentSize;
 		
 // 		cerr << endl << "Extent Map instance test" << endl;
 		
@@ -917,7 +916,6 @@ int main( int argc, char **argv)
   CppUnit::TextUi::TestRunner runner;
   CppUnit::TestFactoryRegistry &registry = CppUnit::TestFactoryRegistry::getRegistry();
   runner.addTest( registry.makeTest() );
-  idbdatafile::IDBPolicy::configIDBPolicy();
   bool wasSuccessful = runner.run( "", false );
   return (wasSuccessful ? 0 : 1);
 }

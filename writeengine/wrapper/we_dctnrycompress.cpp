@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: we_dctnrycompress.cpp 4726 2013-08-07 03:38:36Z bwilkinson $
+//  $Id: we_dctnrycompress.cpp 4096 2012-08-07 20:06:09Z dhall $
 
 
 /** @file */
@@ -29,7 +29,9 @@ using namespace std;
 #include "we_brm.h"
 #include "we_chunkmanager.h"
 
+#define WRITEENGINEDCTNRYCOMPRESS_DLLEXPORT
 #include "we_dctnrycompress.h"
+#undef WRITEENGINEDCTNRYCOMPRESS_DLLEXPORT
 
 
 namespace WriteEngine
@@ -89,24 +91,23 @@ DctnryCompress1::~DctnryCompress1()
 		delete m_chunkManager;
 }
 
-int DctnryCompress1::updateDctnryExtent(IDBDataFile* pFile, int nBlocks)
+int DctnryCompress1::updateDctnryExtent(FILE* pFile, int nBlocks)
 {
 	return m_chunkManager->updateDctnryExtent(pFile, nBlocks);
 }
 
 
-IDBDataFile* DctnryCompress1::createDctnryFile(const char *name,int width,const char *mode,int ioBuffSize)
+FILE* DctnryCompress1::createDctnryFile(const char *name,int width,const char *mode,int ioBuffSize)
 {
    return m_chunkManager->createDctnryFile(
        m_dctnryOID, width, m_dbRoot, m_partition, m_segment, name, mode, ioBuffSize);
 }
 
 
-// @bug 5572 - HDFS usage: add *.tmp file backup flag
-IDBDataFile* DctnryCompress1::openDctnryFile(bool useTmpSuffix)
+FILE* DctnryCompress1::openDctnryFile()
 {
    return m_chunkManager->getFilePtr(
-       m_dctnryOID, m_dbRoot, m_partition, m_segment, m_segFileName, "r+b", DEFAULT_BUFSIZ, useTmpSuffix);
+       m_dctnryOID, m_dbRoot, m_partition, m_segment, m_segFileName, "r+b", DEFAULT_BUFSIZ);
 }
 
 
@@ -126,7 +127,7 @@ int DctnryCompress1::numOfBlocksInFile()
 }
 
 
-int DctnryCompress1::readDBFile(IDBDataFile* pFile, unsigned char* readBuf, const uint64_t lbid,
+int DctnryCompress1::readDBFile(FILE* pFile, unsigned char* readBuf, const i64 lbid,
                                 const bool isFbo)
 {
     int fbo = lbid;
@@ -137,7 +138,7 @@ int DctnryCompress1::readDBFile(IDBDataFile* pFile, unsigned char* readBuf, cons
 }
 
 
-int DctnryCompress1::writeDBFile(IDBDataFile* pFile, const unsigned char* writeBuf, const uint64_t lbid,
+int DctnryCompress1::writeDBFile(FILE* pFile, const unsigned char* writeBuf, const i64 lbid,
                                  const int numOfBlock)
 {
     int fbo = 0;
@@ -149,7 +150,7 @@ int DctnryCompress1::writeDBFile(IDBDataFile* pFile, const unsigned char* writeB
     return NO_ERROR;
 }
 
-int DctnryCompress1::writeDBFileNoVBCache(IDBDataFile* pFile,
+int DctnryCompress1::writeDBFileNoVBCache(FILE *pFile,
                                            const unsigned char * writeBuf, const int fbo,
                                            const int numOfBlock)
 {
@@ -168,11 +169,11 @@ int DctnryCompress1::flushFile(int rc, std::map<FID,FID> & columnOids)
 }
 
 
-int DctnryCompress1::lbidToFbo(const uint64_t lbid, int& fbo)
+int DctnryCompress1::lbidToFbo(const i64 lbid, int& fbo)
 {
-    uint16_t dbRoot;
-    uint16_t segment;
-    uint32_t partition;
+    u_int16_t dbRoot;
+    u_int16_t segment;
+    u_int32_t partition;
     return BRMWrapper::getInstance()->getFboOffset(lbid, dbRoot, partition, segment, fbo);
 }
 

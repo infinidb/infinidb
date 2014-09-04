@@ -52,13 +52,13 @@ static void* SMRunner(void* arg)
 {
 	SessionManager *sm;
 	int op;
-	uint32_t seed, sessionnum;
+	u_int32_t seed, sessionnum;
 	SessionManager::TxnID tmp;
 	int tNum = reinterpret_cast<int>(arg);
 			
 	struct entry {
 		SessionManager::TxnID tid;
-		uint32_t sessionnum;
+		u_int32_t sessionnum;
 		struct entry *next;
 	};
 		

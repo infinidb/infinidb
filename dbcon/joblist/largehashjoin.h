@@ -17,13 +17,13 @@
 
 #ifndef LARGEHASHJOIN_H
 #define LARGEHASHJOIN_H
-// $Id: largehashjoin.h 9655 2013-06-25 23:08:13Z xlou $
+// $Id: largehashjoin.h 8436 2012-04-04 18:18:21Z rdempsey $
 //
 // C++ Implementation: hashjoin
 //
 // Author: Jason Rodriguez <jrodriguez@calpont.com>
 //
-// Description:
+// Description: 
 //
 //
 //
@@ -118,7 +118,7 @@ private:
 public:
 	uint32_t operator()(const std::string& v) const
 	{
-		return hasher(v.c_str(), (uint32_t) v.length());
+		return hasher(v.c_str(), (uint) v.length());
 	}
 };
 
@@ -155,7 +155,7 @@ public:
 		uint32_t startBucket;
 		uint32_t numBuckets;
 		uint32_t thrIdx;
-		TimeSet timeset;
+		TimeSet timeset;		
 		JSTimeStamp dlTimes;
 		volatile bool *die;
 	} thrParams_t;
@@ -169,14 +169,14 @@ public:
 			const SErrorInfo& status,
 			uint32_t sessionId,
 			volatile bool *die);
-
+	
 	HashJoin();
 	HashJoin(const HashJoin& hj);
 	JoinType getJoinType() { return fJoinType; }
     virtual ~HashJoin();
-	virtual int performJoin(const uint32_t thrCount=1);
+	virtual int performJoin(const uint thrCount=1);
 	virtual int performThreadedJoin(const uint32_t numThreads);
-
+	
 	joblist::BDLWrapper<element_t>* Set1() { return & fSet1;}
 	joblist::BDLWrapper<element_t>* Set2() { return & fSet2;}
 	joblist::DataList<element_t>* Result1() { return fResult1;}
@@ -217,7 +217,7 @@ private:
 	joblist::DataList<element_t>* fResult1;
 	joblist::DataList<element_t>* fResult2;
 
-	// convenience pointers
+	// convenience pointers 
 	BucketDL<element_t> *fSearchSet;
 	BucketDL<element_t> *fHashSet;
 	joblist::DataList<element_t>* fSearchResult;
@@ -242,7 +242,7 @@ HashJoin<element_t>::HashJoin(joblist::BDLWrapper<element_t>& set1,
 				joblist::DataList<element_t>* result1,
 				joblist::DataList<element_t>* result2,
 				JoinType joinType,
-				JSTimeStamp *dlt,
+				JSTimeStamp *dlt,	
 				const SErrorInfo& status,
 				uint32_t sessionId, volatile bool *d) :
 					fTimeSet(),fStatus(status), fSessionId(sessionId)
@@ -287,8 +287,8 @@ int HashJoin<element_t>::performThreadedJoin(const uint32_t numThreads)
 	boost::scoped_array<typename HashJoin<element_t>::thrParams_t> params(new typename HashJoin<element_t>::thrParams_t[numThreads]);
 	uint32_t maxThreads=numThreads;
 	int realCnt=0;
-	uint32_t bucketsPerThr=0;
-	uint32_t totalBuckets=0;
+	uint bucketsPerThr=0;
+	uint totalBuckets=0;
 
 	// TODO: maybe this should throw an exception
 	if (maxThreads<=0 || maxThreads >32) {
@@ -302,10 +302,10 @@ int HashJoin<element_t>::performThreadedJoin(const uint32_t numThreads)
 		maxThreads=Set1()->bucketCount();
 	}
 
-	bucketsPerThr=(uint32_t)(Set1()->bucketCount()/maxThreads);
-	uint32_t idx=0;
+	bucketsPerThr=(uint)(Set1()->bucketCount()/maxThreads);
+	uint idx=0;
 	for(idx=0; idx<maxThreads && totalBuckets<Set1()->bucketCount(); idx++)
-	{
+	{		
 		params[idx].hjptr = this;
 		params[idx].startBucket=totalBuckets;
 		params[idx].numBuckets=bucketsPerThr;
@@ -405,7 +405,7 @@ int HashJoin<element_t>::performThreadedJoin(const uint32_t numThreads)
 		// Select earliest read time as overall firstReadTime
 		if ( params[i].dlTimes.FirstReadTime().tv_sec < dlTimes->FirstReadTime().tv_sec )
 			dlTimes->setFirstReadTime( params[i].dlTimes.FirstReadTime() );
-	}
+	} 
 	controls.reset();
 
     return realCnt;
@@ -413,7 +413,7 @@ int HashJoin<element_t>::performThreadedJoin(const uint32_t numThreads)
 
 // defaults to 1 thread
 template <typename element_t>
-int HashJoin<element_t>::performJoin(const uint32_t thrCount)
+int HashJoin<element_t>::performJoin(const uint thrCount)
 {
 	return performThreadedJoin(thrCount);
 }
@@ -438,7 +438,7 @@ void HashJoin<element_t>::createHash(BucketDL<element_t> *srcBucketDL,
 	timespec ts1, ts2, diff;
 	clock_gettime(CLOCK_REALTIME, &ts1);
 #endif
-	uint32_t bucketIter = srcBucketDL->getIterator((int)bucketNum);
+	uint bucketIter = srcBucketDL->getIterator((int)bucketNum);
     // @bug 828. catch hashjoin starting time
 	more = srcBucketDL->next(bucketNum, bucketIter, &e);
 	if (thrDlTimes.FirstReadTime().tv_sec == 0) {
@@ -456,7 +456,7 @@ void HashJoin<element_t>::createHash(BucketDL<element_t> *srcBucketDL,
 		// and the passed bucket datalist contains colb, we will go ahead and populate the output datalist here
 		// because all of colB should be returned regardless of whether there is a matching colA.
 		if(populateResult)
-		{
+		{		    
 			result->insert(e);
 		}
 
@@ -490,7 +490,7 @@ void HashJoin<element_t>::createHash(BucketDL<element_t> *srcBucketDL,
 		<< bucketNum << ": "
 		<< diff.tv_sec << "s "
 		<< diff.tv_nsec << "ns"
-		<< std::endl;
+		<< std::endl; 
 #endif
 } // createHash
 

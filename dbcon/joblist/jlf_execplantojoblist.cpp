@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: jlf_execplantojoblist.cpp 9702 2013-07-17 19:08:07Z xlou $
+//  $Id: jlf_execplantojoblist.cpp 9704 2013-07-17 19:18:23Z xlou $
 
 
 #include "jlf_execplantojoblist.h"
@@ -33,9 +33,7 @@
 using namespace std;
 
 #include <boost/shared_ptr.hpp>
-#include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/case_conv.hpp>
-#include <boost/algorithm/string/split.hpp>
 namespace ba=boost::algorithm;
 
 #include "calpontexecutionplan.h"
@@ -47,15 +45,12 @@ namespace ba=boost::algorithm;
 #include "constantfilter.h"
 #include "existsfilter.h"
 #include "selectfilter.h"
-#include "windowfunctioncolumn.h"
 #include "aggregatecolumn.h"
 #include "arithmeticcolumn.h"
 #include "constantcolumn.h"
 #include "functioncolumn.h"
-#include "pseudocolumn.h"
 #include "simplecolumn.h"
 #include "simplecolumn_int.h"
-#include "simplecolumn_uint.h"
 #include "simplecolumn_decimal.h"
 #include "returnedcolumn.h"
 #include "treenodeimpl.h"
@@ -87,7 +82,6 @@ using namespace logging;
 
 #include "jlf_common.h"
 #include "jlf_subquery.h"
-#include "jlf_tuplejoblist.h"
 
 
 namespace
@@ -124,12 +118,6 @@ const Operator opNOTLIKE("NOT LIKE");
 const Operator opisnotnull("isnotnull");
 const Operator opisnull("isnull");
 
-
-const JobStepVector doSimpleFilter(SimpleFilter* sf, JobInfo& jobInfo);
-
-
-/* This looks like an inefficient way to get NULL values. Much easier ways
-   to do it. */
 int64_t valueNullNum(const CalpontSystemCatalog::ColType& ct)
 {
 	int64_t n = 0;
@@ -144,31 +132,17 @@ int64_t valueNullNum(const CalpontSystemCatalog::ColType& ct)
 	case CalpontSystemCatalog::TINYINT:
 		n = boost::any_cast<char>(anyVal);
 		break;
-	case CalpontSystemCatalog::UTINYINT:
-		n = boost::any_cast<uint8_t>(anyVal);
-		break;
 	case CalpontSystemCatalog::SMALLINT:
 		n = boost::any_cast<short>(anyVal);
 		break;
-    case CalpontSystemCatalog::USMALLINT:
-        n = boost::any_cast<uint16_t>(anyVal);
-        break;
 	case CalpontSystemCatalog::MEDINT:
 	case CalpontSystemCatalog::INT:
 		n = boost::any_cast<int>(anyVal);
 		break;
-    case CalpontSystemCatalog::UMEDINT:
-    case CalpontSystemCatalog::UINT:
-        n = boost::any_cast<uint32_t>(anyVal);
-        break;
 	case CalpontSystemCatalog::BIGINT:
 		n = boost::any_cast<long long>(anyVal);
 		break;
-    case CalpontSystemCatalog::UBIGINT:
-        n = boost::any_cast<uint64_t>(anyVal);
-        break;
 	case CalpontSystemCatalog::FLOAT:
-    case CalpontSystemCatalog::UFLOAT:
 		{
 			float f = boost::any_cast<float>(anyVal);
 			//N.B. There is a bug in boost::any or in gcc where, if you store a nan, you will get back a nan,
@@ -186,7 +160,6 @@ int64_t valueNullNum(const CalpontSystemCatalog::ColType& ct)
 		}
 		break;
 	case CalpontSystemCatalog::DOUBLE:
-    case CalpontSystemCatalog::UDOUBLE:
 		{
 			double d = boost::any_cast<double>(anyVal);
 			double* dp = &d;
@@ -206,6 +179,7 @@ int64_t valueNullNum(const CalpontSystemCatalog::ColType& ct)
 			(ct.colDataType == CalpontSystemCatalog::VARBINARY && ct.colWidth <= 7) ||
 			(ct.colDataType == CalpontSystemCatalog::CHAR && ct.colWidth <= 8) )
 		{
+
 			const string &i = boost::any_cast<string>(anyVal);
 			//n = *((uint64_t *) i.c_str());
 			/* this matches what dataconvert is returning; not valid to copy
@@ -226,7 +200,7 @@ int64_t valueNullNum(const CalpontSystemCatalog::ColType& ct)
 					default: n = *((uint64_t *) i.data()); break;
 				}
 			}
-			
+
 		}
 		else
 		{
@@ -242,7 +216,6 @@ int64_t valueNullNum(const CalpontSystemCatalog::ColType& ct)
 		n = boost::any_cast<uint64_t>(anyVal);
 		break;
 	case CalpontSystemCatalog::DECIMAL:
-    case CalpontSystemCatalog::UDECIMAL:
 		if (ct.colWidth == execplan::CalpontSystemCatalog::ONE_BYTE)
 			n = boost::any_cast<char>(anyVal);
 		else if (ct.colWidth == execplan::CalpontSystemCatalog::TWO_BYTE)
@@ -276,21 +249,11 @@ int64_t convertValueNum(const string& str, const CalpontSystemCatalog::ColType& 
 		v = boost::any_cast<bool>(anyVal);
 		break;
 	case CalpontSystemCatalog::TINYINT:
-#if BOOST_VERSION >= 105200
 		v = boost::any_cast<char>(anyVal);
-#else
-		v = boost::any_cast<int8_t>(anyVal);
-#endif
 		break;
-    case CalpontSystemCatalog::UTINYINT:
-        v = boost::any_cast<uint8_t>(anyVal);
-        break;
 	case CalpontSystemCatalog::SMALLINT:
 		v = boost::any_cast<int16_t>(anyVal);
 		break;
-    case CalpontSystemCatalog::USMALLINT:
-        v = boost::any_cast<uint16_t>(anyVal);
-        break;
 	case CalpontSystemCatalog::MEDINT:
 	case CalpontSystemCatalog::INT:
 #ifdef _MSC_VER
@@ -299,22 +262,10 @@ int64_t convertValueNum(const string& str, const CalpontSystemCatalog::ColType& 
 		v = boost::any_cast<int32_t>(anyVal);
 #endif
 		break;
-    case CalpontSystemCatalog::UMEDINT:
-    case CalpontSystemCatalog::UINT:
-#ifdef _MSC_VER
-        v = boost::any_cast<unsigned int>(anyVal);
-#else
-        v = boost::any_cast<uint32_t>(anyVal);
-#endif
-        break;
 	case CalpontSystemCatalog::BIGINT:
 		v = boost::any_cast<long long>(anyVal);
 		break;
-    case CalpontSystemCatalog::UBIGINT:
-        v = boost::any_cast<uint64_t>(anyVal);
-        break;
 	case CalpontSystemCatalog::FLOAT:
-    case CalpontSystemCatalog::UFLOAT:
 		{
 			float f = boost::any_cast<float>(anyVal);
 			//N.B. There is a bug in boost::any or in gcc where, if you store a nan,
@@ -332,7 +283,6 @@ int64_t convertValueNum(const string& str, const CalpontSystemCatalog::ColType& 
 		}
 		break;
 	case CalpontSystemCatalog::DOUBLE:
-    case CalpontSystemCatalog::UDOUBLE:
 		{
 			double d = boost::any_cast<double>(anyVal);
 			double* dp = &d;
@@ -361,7 +311,6 @@ int64_t convertValueNum(const string& str, const CalpontSystemCatalog::ColType& 
 		v = boost::any_cast<uint64_t>(anyVal);
 		break;
 	case CalpontSystemCatalog::DECIMAL:
-	case CalpontSystemCatalog::UDECIMAL:
 		if (ct.colWidth == execplan::CalpontSystemCatalog::ONE_BYTE)
 			v = boost::any_cast<char>(anyVal);
 		else if (ct.colWidth == execplan::CalpontSystemCatalog::TWO_BYTE)
@@ -384,13 +333,7 @@ int64_t convertValueNum(const string& str, const CalpontSystemCatalog::ColType& 
 		 ct.colDataType == CalpontSystemCatalog::MEDINT ||
 		 ct.colDataType == CalpontSystemCatalog::INT ||
 		 ct.colDataType == CalpontSystemCatalog::BIGINT ||
-		 ct.colDataType == CalpontSystemCatalog::DECIMAL ||
-         ct.colDataType == CalpontSystemCatalog::UTINYINT ||
-		 ct.colDataType == CalpontSystemCatalog::USMALLINT ||
-		 ct.colDataType == CalpontSystemCatalog::UMEDINT ||
-		 ct.colDataType == CalpontSystemCatalog::UINT ||
-		 ct.colDataType == CalpontSystemCatalog::UBIGINT ||
-		 ct.colDataType == CalpontSystemCatalog::UDECIMAL) &&
+		 ct.colDataType == CalpontSystemCatalog::DECIMAL) &&
 		pushWarning)
 	{
 		// get rid of leading white spaces and parentheses
@@ -462,7 +405,6 @@ enum TreeNodeType
 	OPERATOR,
 	RETURNEDCOLUMN,
 	AGGREGATECOLUMN,
-	WINDOWFUNCTIONCOLUMN,
 	ARITHMETICCOLUMN,
 	CONSTANTCOLUMN,
 	FUNCTIONCOLUMN,
@@ -497,8 +439,6 @@ TreeNodeType TreeNode2Type(const TreeNode* tn)
 		return RETURNEDCOLUMN;
 	if (typeid(*tn) == typeid(AggregateColumn))
 		return AGGREGATECOLUMN;
-	if (typeid(*tn) == typeid(WindowFunctionColumn))
-		return WINDOWFUNCTIONCOLUMN;
 	if (typeid(*tn) == typeid(ArithmeticColumn))
 		return ARITHMETICCOLUMN;
 	if (typeid(*tn) == typeid(ConstantColumn))
@@ -510,18 +450,12 @@ TreeNodeType TreeNode2Type(const TreeNode* tn)
 	if (typeid(*tn) == typeid(SimpleColumn_INT<1>) ||
 		typeid(*tn) == typeid(SimpleColumn_INT<2>) ||
 		typeid(*tn) == typeid(SimpleColumn_INT<4>) ||
-		typeid(*tn) == typeid(SimpleColumn_INT<8>) ||
-	    typeid(*tn) == typeid(SimpleColumn_UINT<1>) ||
-		typeid(*tn) == typeid(SimpleColumn_UINT<2>) ||
-		typeid(*tn) == typeid(SimpleColumn_UINT<4>) ||
-		typeid(*tn) == typeid(SimpleColumn_UINT<8>))
+		typeid(*tn) == typeid(SimpleColumn_INT<8>))
 		return SIMPLECOLUMN;
 	if (typeid(*tn) == typeid(SimpleColumn_Decimal<1>) ||
 		typeid(*tn) == typeid(SimpleColumn_Decimal<2>) ||
 		typeid(*tn) == typeid(SimpleColumn_Decimal<4>) ||
 		typeid(*tn) == typeid(SimpleColumn_Decimal<8>))
-		return SIMPLECOLUMN;
-	if (typeid(*tn) == typeid(PseudoColumn))
 		return SIMPLECOLUMN;
 	if (typeid(*tn) == typeid(TreeNodeImpl))
 		return TREENODEIMPL;
@@ -597,6 +531,60 @@ boost::shared_ptr<pColStep> doWhereFcn(const SimpleColumn* sc, const SOP& sop, c
 	return ret;
 }
 
+// @Bug 1955
+// Don't allow filter on "incompatible" cols
+// Compatible columns:
+// any 1,2,4,8-byte int/decimal to any 1,2,4,8-byte int/decimal
+// date to date
+// datetime to datetime
+// string to string
+bool compatibleFilterColumns(const SimpleColumn* sc1, const CalpontSystemCatalog::ColType& ct1,
+	const SimpleColumn* sc2, const CalpontSystemCatalog::ColType& ct2)
+{
+	switch (ct1.colDataType)
+	{
+	case CalpontSystemCatalog::BIT:
+		if (ct2.colDataType != CalpontSystemCatalog::BIT) return false;
+		break;
+	case CalpontSystemCatalog::TINYINT:
+	case CalpontSystemCatalog::SMALLINT:
+	case CalpontSystemCatalog::MEDINT:
+	case CalpontSystemCatalog::INT:
+	case CalpontSystemCatalog::BIGINT:
+	case CalpontSystemCatalog::DECIMAL:
+		if (ct2.colDataType != CalpontSystemCatalog::TINYINT &&
+			ct2.colDataType != CalpontSystemCatalog::SMALLINT &&
+			ct2.colDataType != CalpontSystemCatalog::MEDINT &&
+			ct2.colDataType != CalpontSystemCatalog::INT &&
+			ct2.colDataType != CalpontSystemCatalog::BIGINT &&
+			ct2.colDataType != CalpontSystemCatalog::DECIMAL) return false;
+		break;
+	case CalpontSystemCatalog::DATE:
+		if (ct2.colDataType != CalpontSystemCatalog::DATE) return false;
+		break;
+	case CalpontSystemCatalog::DATETIME:
+		if (ct2.colDataType != CalpontSystemCatalog::DATETIME) return false;
+		break;
+	case CalpontSystemCatalog::VARCHAR:
+	case CalpontSystemCatalog::CHAR:
+		if (ct2.colDataType != CalpontSystemCatalog::VARCHAR &&
+			ct2.colDataType != CalpontSystemCatalog::CHAR) return false;
+		break;
+	case CalpontSystemCatalog::VARBINARY:
+		if (ct2.colDataType != CalpontSystemCatalog::VARBINARY) return false;
+		break;
+	case CalpontSystemCatalog::FLOAT:
+	case CalpontSystemCatalog::DOUBLE:
+		if (ct2.colDataType != CalpontSystemCatalog::FLOAT &&
+			ct2.colDataType != CalpontSystemCatalog::DOUBLE) return false;
+		break;
+	default:
+		return false;
+		break;
+	}
+
+	return true;
+}
 
 const JobStepVector doColFilter(const SimpleColumn* sc1, const SimpleColumn* sc2, JobInfo& jobInfo,
 								const SOP& sop, SimpleFilter* sf)
@@ -609,50 +597,45 @@ const JobStepVector doColFilter(const SimpleColumn* sc1, const SimpleColumn* sc2
 	string alias2(extractTableAlias(sc2));
 	CalpontSystemCatalog::ColType ct1 = sc1->colType();
 	CalpontSystemCatalog::ColType ct2 = sc2->colType();
-	const PseudoColumn* pc1 = dynamic_cast<const PseudoColumn*>(sc1);
-	const PseudoColumn* pc2 = dynamic_cast<const PseudoColumn*>(sc2);
 //XXX use this before connector sets colType in sc correctly.
-//    type of pseudo column is set by connector
-			if (!sc1->schemaName().empty() && sc1->isInfiniDB() && !pc1)
+			if (!sc1->schemaName().empty() && sc1->isInfiniDB())
 				ct1 = jobInfo.csc->colType(sc1->oid());
-			if (!sc2->schemaName().empty() && sc2->isInfiniDB() && !pc2)
+			if (!sc2->schemaName().empty() && sc2->isInfiniDB())
 				ct2 = jobInfo.csc->colType(sc2->oid());
 //X
 	int8_t op = op2num(sop);
 
-	pColStep* pcs1 = NULL;
-	if (pc1 == NULL)
-		pcs1 = new pColStep(sc1->oid(), tableOid1, ct1, jobInfo);
-	else
-		pcs1 = new PseudoColStep(sc1->oid(), tableOid1, pc1->pseudoType(), ct1, jobInfo);
+	pColStep* pcss1 = new pColStep(JobStepAssociation(jobInfo.status),
+			JobStepAssociation(jobInfo.status), 0, jobInfo.csc, sc1->oid(), tableOid1, ct1,
+			jobInfo.sessionId, jobInfo.txnId, jobInfo.verId, 0, jobInfo.statementId, jobInfo.rm);
 	CalpontSystemCatalog::OID dictOid1 = isDictCol(ct1);
-	pcs1->alias(alias1);
-	pcs1->view(sc1->viewName());
-	pcs1->name(sc1->columnName());
-	pcs1->schema(sc1->schemaName());
-	pcs1->cardinality(sc1->cardinality());
-	pcs1->setFeederFlag(true);
+	pcss1->logger(jobInfo.logger);
+	pcss1->alias(alias1);
+	pcss1->view(sc1->viewName());
+	pcss1->name(sc1->columnName());
+	pcss1->schema(sc1->schemaName());
+	pcss1->cardinality(sc1->cardinality());
+	pcss1->setFeederFlag(true);
 
-	pColStep* pcs2 = NULL;
-	if (pc2 == NULL)
-		pcs2 = new pColStep(sc2->oid(), tableOid2, ct2, jobInfo);
-	else
-		pcs2 = new PseudoColStep(sc2->oid(), tableOid2, pc2->pseudoType(), ct2, jobInfo);
+	pColStep* pcss2 = new pColStep(JobStepAssociation(jobInfo.status),
+			JobStepAssociation(jobInfo.status), 0, jobInfo.csc, sc2->oid(), tableOid2, ct2,
+			jobInfo.sessionId, jobInfo.txnId, jobInfo.verId, 0, jobInfo.statementId, jobInfo.rm);
 	CalpontSystemCatalog::OID dictOid2 = isDictCol(ct2);
-	pcs2->alias(alias2);
-	pcs2->view(sc2->viewName());
-	pcs2->name(sc2->columnName());
-	pcs2->schema(sc2->schemaName());
-	pcs2->cardinality(sc2->cardinality());
-	pcs2->setFeederFlag(true);
+	pcss2->logger(jobInfo.logger);
+	pcss2->alias(alias2);
+	pcss2->view(sc2->viewName());
+	pcss2->name(sc2->columnName());
+	pcss2->schema(sc2->schemaName());
+	pcss2->cardinality(sc2->cardinality());
+	pcss2->setFeederFlag(true);
 
 	//Associate the steps
 	JobStepVector jsv;
 
 	TupleInfo ti1(setTupleInfo(ct1, sc1->oid(), jobInfo, tableOid1, sc1, alias1));
-	pcs1->tupleId(ti1.key);
+	pcss1->tupleId(ti1.key);
 	TupleInfo ti2(setTupleInfo(ct2, sc2->oid(), jobInfo, tableOid2, sc2, alias2));
-	pcs2->tupleId(ti2.key);
+	pcss2->tupleId(ti2.key);
 
 	// check if they are string columns greater than 8 bytes.
 	if ((!isDictCol(ct1)) && (!isDictCol(ct2)))
@@ -663,40 +646,41 @@ const JobStepVector doColFilter(const SimpleColumn* sc1, const SimpleColumn* sc2
 		spdl1->fifoDL(dl1);
 		dl1->OID(sc1->oid());
 
-		JobStepAssociation outJs1;
+		JobStepAssociation outJs1(jobInfo.status);
 		outJs1.outAdd(spdl1);
-		pcs1->outputAssociation(outJs1);
+		pcss1->outputAssociation(outJs1);
 
 		AnyDataListSPtr spdl2(new AnyDataList());
 		FifoDataList* dl2 = new FifoDataList(1, jobInfo.fifoSize);
 		spdl2->fifoDL(dl2);
 		dl2->OID(sc2->oid());
 
-		JobStepAssociation outJs2;
+		JobStepAssociation outJs2(jobInfo.status);
 		outJs2.outAdd(spdl2);
-		pcs2->outputAssociation(outJs2);
-		pcs2->inputAssociation(outJs1);
+		pcss2->outputAssociation(outJs2);
+		pcss2->inputAssociation(outJs1);
 
 
-		FilterStep* filt=new FilterStep(ct1, jobInfo);
+		FilterStep* filt=new FilterStep(jobInfo.sessionId, jobInfo.txnId, jobInfo.statementId, ct1);
+		filt->logger(jobInfo.logger);
 		filt->alias(extractTableAlias(sc1));
 		filt->tableOid(tableOid1);
-		filt->name(pcs1->name()+","+pcs2->name());
-		filt->view(pcs1->view());
-		filt->schema(pcs1->schema());
+		filt->name(pcss1->name()+","+pcss2->name());
+		filt->view(pcss1->view());
+		filt->schema(pcss1->schema());
 		filt->addFilter(sf);
 		if (op)
 			filt->setBOP(op);
 
-		JobStepAssociation outJs3;
+		JobStepAssociation outJs3(jobInfo.status);
 		outJs3.outAdd(spdl1);
 		outJs3.outAdd(spdl2);
 		filt->inputAssociation(outJs3);
 
 		SJSTEP step;
-		step.reset(pcs1);
+		step.reset(pcss1);
 		jsv.push_back(step);
-		step.reset(pcs2);
+		step.reset(pcss2);
 		jsv.push_back(step);
 		step.reset(filt);
 		jsv.push_back(step);
@@ -707,7 +691,11 @@ const JobStepVector doColFilter(const SimpleColumn* sc1, const SimpleColumn* sc2
 		if ((isDictCol(ct1) != 0 ) && (isDictCol(ct2) !=0 ))
 		{
 			// extra steps for string column greater than eight bytes -- from token to string
-			pDictionaryStep* pdss1 = new pDictionaryStep(dictOid1, tableOid1, ct1, jobInfo);
+			pDictionaryStep* pdss1 = new pDictionaryStep(JobStepAssociation(jobInfo.status),
+				JobStepAssociation(jobInfo.status), 0,
+				jobInfo.csc, dictOid1, ct1.ddn.compressionType, tableOid1, jobInfo.sessionId,
+				jobInfo.txnId, jobInfo.verId, 0, jobInfo.statementId, jobInfo.rm);
+			pdss1->logger(jobInfo.logger);
 			jobInfo.keyInfo->dictOidToColOid[dictOid1] = sc1->oid();
 			pdss1->alias(extractTableAlias(sc1));
 			pdss1->view(sc1->viewName());
@@ -721,9 +709,9 @@ const JobStepVector doColFilter(const SimpleColumn* sc1, const SimpleColumn* sc2
 			spdl11->fifoDL(dl11);
 			dl11->OID(sc1->oid());
 
-			JobStepAssociation outJs1;
+			JobStepAssociation outJs1(jobInfo.status);
 			outJs1.outAdd(spdl11);
-			pcs1->outputAssociation(outJs1);
+			pcss1->outputAssociation(outJs1);
 
 			// data list for column 1 step 2 (pdictionarystep) output
 			AnyDataListSPtr spdl12(new AnyDataList());
@@ -731,17 +719,21 @@ const JobStepVector doColFilter(const SimpleColumn* sc1, const SimpleColumn* sc2
 			spdl12->stringDL(dl12);
 			dl12->OID(sc1->oid());
 
-			JobStepAssociation outJs2;
+			JobStepAssociation outJs2(jobInfo.status);
 			outJs2.outAdd(spdl12);
 			pdss1->outputAssociation(outJs2);
 
-			//Associate pcs1 with pdss1
-			JobStepAssociation outJs11;
+			//Associate pcss1 with pdss1
+			JobStepAssociation outJs11(jobInfo.status);
 			outJs11.outAdd(spdl11);
 			pdss1->inputAssociation(outJs11);
 
 
-			pDictionaryStep* pdss2 = new pDictionaryStep(dictOid2, tableOid2, ct2, jobInfo);
+			pDictionaryStep* pdss2 = new pDictionaryStep(JobStepAssociation(jobInfo.status),
+				JobStepAssociation(jobInfo.status), 0,
+				jobInfo.csc, dictOid2, ct2.ddn.compressionType, tableOid2, jobInfo.sessionId, jobInfo.txnId,
+				jobInfo.verId, 0, jobInfo.statementId, jobInfo.rm);
+			pdss2->logger(jobInfo.logger);
 			jobInfo.keyInfo->dictOidToColOid[dictOid2] = sc2->oid();
 			pdss2->alias(extractTableAlias(sc2));
 			pdss2->view(sc2->viewName());
@@ -756,12 +748,12 @@ const JobStepVector doColFilter(const SimpleColumn* sc1, const SimpleColumn* sc2
 			spdl21->fifoDL(dl21);
 			dl21->OID(sc2->oid());
 
-			JobStepAssociation outJs3;
+			JobStepAssociation outJs3(jobInfo.status);
 			outJs3.outAdd(spdl21);
-			pcs2->outputAssociation(outJs3);
-			pcs2->inputAssociation(outJs2);
-			//Associate pcs2 with pdss2
-			JobStepAssociation outJs22;
+			pcss2->outputAssociation(outJs3);
+			pcss2->inputAssociation(outJs2);
+			//Associate pcss2 with pdss2
+			JobStepAssociation outJs22(jobInfo.status);
 			outJs22.outAdd(spdl21);
 			pdss2->inputAssociation(outJs22);
 
@@ -771,31 +763,33 @@ const JobStepVector doColFilter(const SimpleColumn* sc1, const SimpleColumn* sc2
 			spdl22->stringDL(dl22);
 			dl22->OID(sc2->oid());
 
-			JobStepAssociation outJs4;
+			JobStepAssociation outJs4(jobInfo.status);
 			outJs4.outAdd(spdl22);
 			pdss2->outputAssociation(outJs4);
 
-			FilterStep* filt = new FilterStep(ct1, jobInfo);
+			FilterStep* filt = new FilterStep(jobInfo.sessionId, jobInfo.txnId,
+				jobInfo.statementId, ct1);
+			filt->logger(jobInfo.logger);
 			filt->alias(extractTableAlias(sc1));
 			filt->tableOid(tableOid1);
-			filt->name(pcs1->name()+","+pcs2->name());
-			filt->view(pcs1->view());
-			filt->schema(pcs1->schema());
+			filt->name(pcss1->name()+","+pcss2->name());
+			filt->view(pcss1->view());
+			filt->schema(pcss1->schema());
 			filt->addFilter(sf);
 			if (op)
 				filt->setBOP((op));
 
-			JobStepAssociation outJs5;
+			JobStepAssociation outJs5(jobInfo.status);
 			outJs5.outAdd(spdl12);
 			outJs5.outAdd(spdl22);
 			filt->inputAssociation(outJs5);
 
 			SJSTEP step;
-			step.reset(pcs1);
+			step.reset(pcss1);
 			jsv.push_back(step);
 			step.reset(pdss1);
 			jsv.push_back(step);
-			step.reset(pcs2);
+			step.reset(pcss2);
 			jsv.push_back(step);
 			step.reset(pdss2);
 			jsv.push_back(step);
@@ -804,18 +798,21 @@ const JobStepVector doColFilter(const SimpleColumn* sc1, const SimpleColumn* sc2
 
 			TupleInfo ti1(setTupleInfo(ct1, dictOid1, jobInfo, tableOid1, sc1, alias1));
 			pdss1->tupleId(ti1.key);
-			jobInfo.keyInfo->dictKeyMap[pcs1->tupleId()] = ti1.key;
-			jobInfo.tokenOnly[pcs1->tupleId()] = false;
+			jobInfo.keyInfo->dictKeyMap[pcss1->tupleId()] = ti1.key;
+			jobInfo.tokenOnly[pcss1->tupleId()] = false;
 
 			TupleInfo ti2(setTupleInfo(ct2, dictOid2, jobInfo, tableOid2, sc2, alias2));
 			pdss2->tupleId(ti2.key);
-			jobInfo.keyInfo->dictKeyMap[pcs2->tupleId()] = ti2.key;
-			jobInfo.tokenOnly[pcs2->tupleId()] = false;
+			jobInfo.keyInfo->dictKeyMap[pcss2->tupleId()] = ti2.key;
+			jobInfo.tokenOnly[pcss2->tupleId()] = false;
 		}
 		else if ((isDictCol(ct1) != 0 ) && (isDictCol(ct2) ==0 )) //col1 is dictionary column
 		{
 			// extra steps for string column greater than eight bytes -- from token to string
-			pDictionaryStep* pdss1 = new pDictionaryStep(dictOid1, tableOid1, ct1, jobInfo);
+			pDictionaryStep* pdss1 = new pDictionaryStep(JobStepAssociation(jobInfo.status),
+				JobStepAssociation(jobInfo.status), 0, jobInfo.csc, dictOid1, ct1.ddn.compressionType, tableOid1,
+				jobInfo.sessionId, jobInfo.txnId, jobInfo.verId, 0, jobInfo.statementId, jobInfo.rm);
+			pdss1->logger(jobInfo.logger);
 			jobInfo.keyInfo->dictOidToColOid[dictOid1] = sc1->oid();
 			pdss1->alias(extractTableAlias(sc1));
 			pdss1->view(sc1->viewName());
@@ -829,9 +826,9 @@ const JobStepVector doColFilter(const SimpleColumn* sc1, const SimpleColumn* sc2
 			spdl11->fifoDL(dl11);
 			dl11->OID(sc1->oid());
 
-			JobStepAssociation outJs1;
+			JobStepAssociation outJs1(jobInfo.status);
 			outJs1.outAdd(spdl11);
-			pcs1->outputAssociation(outJs1);
+			pcss1->outputAssociation(outJs1);
 
 			// data list for column 1 step 2 (pdictionarystep) output
 			AnyDataListSPtr spdl12(new AnyDataList());
@@ -839,12 +836,12 @@ const JobStepVector doColFilter(const SimpleColumn* sc1, const SimpleColumn* sc2
 			spdl12->stringDL(dl12);
 			dl12->OID(sc1->oid());
 
-			JobStepAssociation outJs2;
+			JobStepAssociation outJs2(jobInfo.status);
 			outJs2.outAdd(spdl12);
 			pdss1->outputAssociation(outJs2);
 
-			//Associate pcs1 with pdss1
-			JobStepAssociation outJs11;
+			//Associate pcss1 with pdss1
+			JobStepAssociation outJs11(jobInfo.status);
 			outJs11.outAdd(spdl11);
 			pdss1->inputAssociation(outJs11);
 
@@ -854,39 +851,41 @@ const JobStepVector doColFilter(const SimpleColumn* sc1, const SimpleColumn* sc2
 			spdl21->fifoDL(dl21);
 			dl21->OID(sc2->oid());
 
-			JobStepAssociation outJs3;
+			JobStepAssociation outJs3(jobInfo.status);
 			outJs3.outAdd(spdl21);
-			pcs2->outputAssociation(outJs3);
-			pcs2->inputAssociation(outJs2);
+			pcss2->outputAssociation(outJs3);
+			pcss2->inputAssociation(outJs2);
 
-			FilterStep* filt = new FilterStep(ct1, jobInfo);
+			FilterStep* filt = new FilterStep(jobInfo.sessionId, jobInfo.txnId,
+				jobInfo.statementId, ct1);
+			filt->logger(jobInfo.logger);
 			filt->alias(extractTableAlias(sc1));
 			filt->tableOid(tableOid1);
-			filt->view(pcs1->view());
-			filt->schema(pcs1->schema());
+			filt->view(pcss1->view());
+			filt->schema(pcss1->schema());
 			filt->addFilter(sf);
 			if (op)
 				filt->setBOP((op));
 
-			JobStepAssociation outJs5;
+			JobStepAssociation outJs5(jobInfo.status);
 			outJs5.outAdd(spdl12);
 			outJs5.outAdd(spdl21);
 			filt->inputAssociation(outJs5);
 
 			SJSTEP step;
-			step.reset(pcs1);
+			step.reset(pcss1);
 			jsv.push_back(step);
 			step.reset(pdss1);
 			jsv.push_back(step);
-			step.reset(pcs2);
+			step.reset(pcss2);
 			jsv.push_back(step);
 			step.reset(filt);
 			jsv.push_back(step);
 
 			TupleInfo ti1(setTupleInfo(ct1, dictOid1, jobInfo, tableOid1, sc1, alias1));
 			pdss1->tupleId(ti1.key);
-			jobInfo.keyInfo->dictKeyMap[pcs1->tupleId()] = ti1.key;
-			jobInfo.tokenOnly[pcs1->tupleId()] = false;
+			jobInfo.keyInfo->dictKeyMap[pcss1->tupleId()] = ti1.key;
+			jobInfo.tokenOnly[pcss1->tupleId()] = false;
 		}
 		else // if ((isDictCol(ct1) == 0 ) && (isDictCol(ct2) !=0 )) //col2 is dictionary column
 		{
@@ -897,9 +896,9 @@ const JobStepVector doColFilter(const SimpleColumn* sc1, const SimpleColumn* sc2
 			spdl11->fifoDL(dl11);
 			dl11->OID(sc1->oid());
 
-			JobStepAssociation outJs1;
+			JobStepAssociation outJs1(jobInfo.status);
 			outJs1.outAdd(spdl11);
-			pcs1->outputAssociation(outJs1);
+			pcss1->outputAssociation(outJs1);
 
 			// data list for column 1 step 2 (pdictionarystep) output
 			AnyDataListSPtr spdl12(new AnyDataList());
@@ -908,7 +907,10 @@ const JobStepVector doColFilter(const SimpleColumn* sc1, const SimpleColumn* sc2
 			dl12->OID(sc1->oid());
 
 
-			pDictionaryStep* pdss2 = new pDictionaryStep(dictOid2, tableOid2, ct2, jobInfo);
+			pDictionaryStep* pdss2 = new pDictionaryStep(JobStepAssociation(jobInfo.status),
+				JobStepAssociation(jobInfo.status), 0, jobInfo.csc, dictOid2, ct2.ddn.compressionType, tableOid2,
+				jobInfo.sessionId, jobInfo.txnId, jobInfo.verId, 0, jobInfo.statementId, jobInfo.rm);
+			pdss2->logger(jobInfo.logger);
 			jobInfo.keyInfo->dictOidToColOid[dictOid2] = sc2->oid();
 			pdss2->alias(extractTableAlias(sc2));
 			pdss2->view(sc2->viewName());
@@ -923,12 +925,12 @@ const JobStepVector doColFilter(const SimpleColumn* sc1, const SimpleColumn* sc2
 			spdl21->fifoDL(dl21);
 			dl21->OID(sc2->oid());
 
-			JobStepAssociation outJs3;
+			JobStepAssociation outJs3(jobInfo.status);
 			outJs3.outAdd(spdl21);
-			pcs2->outputAssociation(outJs3);
-			pcs2->inputAssociation(outJs1);
-			//Associate pcs2 with pdss2
-			JobStepAssociation outJs22;
+			pcss2->outputAssociation(outJs3);
+			pcss2->inputAssociation(outJs1);
+			//Associate pcss2 with pdss2
+			JobStepAssociation outJs22(jobInfo.status);
 			outJs22.outAdd(spdl21);
 			pdss2->inputAssociation(outJs22);
 
@@ -938,28 +940,32 @@ const JobStepVector doColFilter(const SimpleColumn* sc1, const SimpleColumn* sc2
 			spdl22->stringDL(dl22);
 			dl22->OID(sc2->oid());
 
-			JobStepAssociation outJs4;
+			JobStepAssociation outJs4(jobInfo.status);
 			outJs4.outAdd(spdl22);
 			pdss2->outputAssociation(outJs4);
 
-			FilterStep* filt = new FilterStep(ct1, jobInfo);
+			FilterStep* filt = new FilterStep(
+				jobInfo.sessionId,
+				jobInfo.txnId,
+				jobInfo.statementId, ct1);
+			filt->logger(jobInfo.logger);
 			filt->alias(extractTableAlias(sc1));
 			filt->tableOid(tableOid1);
-			filt->view(pcs1->view());
-			filt->schema(pcs1->schema());
+			filt->view(pcss1->view());
+			filt->schema(pcss1->schema());
 			filt->addFilter(sf);
 			if (op)
 				filt->setBOP((op));
 
-			JobStepAssociation outJs5;
+			JobStepAssociation outJs5(jobInfo.status);
 			outJs5.outAdd(spdl11);
 			outJs5.outAdd(spdl22);
 			filt->inputAssociation(outJs5);
 
 			SJSTEP step;
-			step.reset(pcs1);
+			step.reset(pcss1);
 			jsv.push_back(step);
-			step.reset(pcs2);
+			step.reset(pcss2);
 			jsv.push_back(step);
 			step.reset(pdss2);
 			jsv.push_back(step);
@@ -968,8 +974,8 @@ const JobStepVector doColFilter(const SimpleColumn* sc1, const SimpleColumn* sc2
 
 			TupleInfo ti2(setTupleInfo(ct2, dictOid2, jobInfo, tableOid2, sc2, alias2));
 			pdss2->tupleId(ti2.key);
-			jobInfo.keyInfo->dictKeyMap[pcs2->tupleId()] = ti2.key;
-			jobInfo.tokenOnly[pcs2->tupleId()] = false;
+			jobInfo.keyInfo->dictKeyMap[pcss2->tupleId()] = ti2.key;
+			jobInfo.tokenOnly[pcss2->tupleId()] = false;
 		}
 	}
 	else
@@ -981,14 +987,107 @@ const JobStepVector doColFilter(const SimpleColumn* sc1, const SimpleColumn* sc2
 	return jsv;
 }
 
+bool sameTable(const SimpleColumn* sc1, const SimpleColumn* sc2)
+{
+	if (sc1->schemaName() != sc2->schemaName()) return false;
+	if (sc1->tableName() != sc2->tableName()) return false;
+	return true;
+}
+
+// @Bug 1230
+// Don't allow join on "incompatible" cols
+// Compatible columns:
+// any 1,2,4,8-byte int to any 1,2,4,8-byte int
+// decimal w/scale x to decimal w/scale x
+// date to date
+// datetime to datetime
+// string to string
+bool compatibleJoinColumns(const SimpleColumn* sc1, const CalpontSystemCatalog::ColType& ct1,
+	const SimpleColumn* sc2, const CalpontSystemCatalog::ColType& ct2)
+{
+	// disable VARBINARY used in join
+	if (ct1.colDataType == CalpontSystemCatalog::VARBINARY ||
+		ct2.colDataType == CalpontSystemCatalog::VARBINARY)
+		throw runtime_error("VARBINARY in join is not supported.");
+
+	switch (ct1.colDataType)
+	{
+	case CalpontSystemCatalog::BIT:
+		if (ct2.colDataType != CalpontSystemCatalog::BIT) return false;
+		break;
+	case CalpontSystemCatalog::TINYINT:
+	case CalpontSystemCatalog::SMALLINT:
+	case CalpontSystemCatalog::MEDINT:
+	case CalpontSystemCatalog::INT:
+	case CalpontSystemCatalog::BIGINT:
+	case CalpontSystemCatalog::DECIMAL:
+		if (ct2.colDataType != CalpontSystemCatalog::TINYINT &&
+			ct2.colDataType != CalpontSystemCatalog::SMALLINT &&
+			ct2.colDataType != CalpontSystemCatalog::MEDINT &&
+			ct2.colDataType != CalpontSystemCatalog::INT &&
+			ct2.colDataType != CalpontSystemCatalog::BIGINT &&
+			ct2.colDataType != CalpontSystemCatalog::DECIMAL) return false;
+			if (ct2.scale != ct1.scale) return false;
+		break;
+	case CalpontSystemCatalog::DATE:
+		if (ct2.colDataType != CalpontSystemCatalog::DATE) return false;
+		break;
+	case CalpontSystemCatalog::DATETIME:
+		if (ct2.colDataType != CalpontSystemCatalog::DATETIME) return false;
+		break;
+	case CalpontSystemCatalog::VARCHAR:
+		// @bug 1495 compound/string join
+		if (ct2.colDataType == CalpontSystemCatalog::VARCHAR ||
+			ct2.colDataType == CalpontSystemCatalog::CHAR)
+			break;
+		// @bug 1920. disable joins on dictionary column
+		if (ct1.colWidth > 7 ) return false;
+		if (ct2.colDataType != CalpontSystemCatalog::VARCHAR && ct2.colDataType != CalpontSystemCatalog::CHAR) return false;
+		if (ct2.colDataType == CalpontSystemCatalog::VARCHAR && ct2.colWidth > 7) return false;
+		if (ct2.colDataType == CalpontSystemCatalog::CHAR && ct2.colWidth > 8) return false;
+		break;
+	case CalpontSystemCatalog::CHAR:
+		// @bug 1495 compound/string join
+		if (ct2.colDataType == CalpontSystemCatalog::VARCHAR ||
+			ct2.colDataType == CalpontSystemCatalog::CHAR)
+			break;
+		// @bug 1920. disable joins on dictionary column
+		if (ct1.colWidth > 8 ) return false;
+		if (ct2.colDataType != CalpontSystemCatalog::VARCHAR && ct2.colDataType != CalpontSystemCatalog::CHAR) return false;
+		if (ct2.colDataType == CalpontSystemCatalog::VARCHAR && ct2.colWidth > 7) return false;
+		if (ct2.colDataType == CalpontSystemCatalog::CHAR && ct2.colWidth > 8) return false;
+		break;
+	case CalpontSystemCatalog::VARBINARY:
+		if (ct2.colDataType != CalpontSystemCatalog::VARBINARY) return false;
+		break;
+
+	case CalpontSystemCatalog::FLOAT:
+		if (ct2.colDataType != CalpontSystemCatalog::FLOAT) return false;
+		break;
+	case CalpontSystemCatalog::DOUBLE:
+		if (ct2.colDataType != CalpontSystemCatalog::DOUBLE) return false;
+		break;
+	default:
+		return false;
+		break;
+	}
+
+	return true;
+}
 
 const JobStepVector doFilterExpression(const SimpleColumn* sc1, const SimpleColumn* sc2, JobInfo& jobInfo, const SOP& sop)
 {
 	JobStepVector jsv;
 	SJSTEP sjstep;
-	ExpressionStep* es = new ExpressionStep(jobInfo);
+	ExpressionStep* es = new ExpressionStep(jobInfo.sessionId,
+											jobInfo.txnId,
+											jobInfo.verId,
+											jobInfo.statementId);
+
 	if (es == NULL)
 		throw runtime_error("Failed to create ExpressionStep 2");
+
+	es->logger(jobInfo.logger);
 
 	SimpleFilter sf;
 	sf.op(sop);
@@ -1018,13 +1117,10 @@ const JobStepVector doJoin(
 
 	CalpontSystemCatalog::ColType ct1 = sc1->colType();
 	CalpontSystemCatalog::ColType ct2 = sc2->colType();
-	PseudoColumn* pc1 = dynamic_cast<PseudoColumn*>(sc1);
-	PseudoColumn* pc2 = dynamic_cast<PseudoColumn*>(sc2);
 //XXX use this before connector sets colType in sc correctly.
-//    type of pseudo column is set by connector
-			if (!sc1->schemaName().empty() && sc1->isInfiniDB() && !pc1)
+			if (!sc1->schemaName().empty() && sc1->isInfiniDB())
 				ct1 = jobInfo.csc->colType(sc1->oid());
-			if (!sc2->schemaName().empty() && sc2->isInfiniDB() && !pc2)
+			if (!sc2->schemaName().empty() && sc2->isInfiniDB())
 				ct2 = jobInfo.csc->colType(sc2->oid());
 //X
 	uint64_t joinInfo = sc1->joinInfo() | sc2->joinInfo();
@@ -1045,7 +1141,7 @@ const JobStepVector doJoin(
 	//Bug 590
 	if (tableOid1 == tableOid2 && alias1 == alias2 && view1 == view2 && joinInfo == 0)
 	{
-		if (sc1->schemaName().empty() || !compatibleColumnTypes(ct1, ct2, false))
+		if (sc1->schemaName().empty() || !compatibleFilterColumns(sc1, ct1, sc2, ct2))
 		{
 			return doFilterExpression(sc1, sc2, jobInfo, sop);
 		}
@@ -1056,12 +1152,12 @@ const JobStepVector doJoin(
 	}
 
 	// different tables
-	if (!compatibleColumnTypes(ct1, ct2, true))
+	if (!compatibleJoinColumns(sc1, ct1, sc2, ct2))
 	{
 		JobStepVector jsv;
 		jsv = doFilterExpression(sc1, sc2, jobInfo, sop);
-		uint32_t t1 = makeTableKey(jobInfo, sc1);
-		uint32_t t2 = makeTableKey(jobInfo, sc2);
+		uint t1 = makeTableKey(jobInfo, sc1);
+		uint t2 = makeTableKey(jobInfo, sc2);
 		jobInfo.incompatibleJoinMap[t1] = t2;
 		jobInfo.incompatibleJoinMap[t2] = t1;
 
@@ -1073,10 +1169,10 @@ const JobStepVector doJoin(
 	CalpontSystemCatalog::OID dictOid1 = isDictCol(ct1);
 	if (sc1->schemaName().empty() == false)
 	{
-		if (pc1 == NULL)
-			pcs1 = new pColStep(oid1, tableOid1, ct1, jobInfo);
-		else
-			pcs1 = new PseudoColStep(oid1, tableOid1, pc1->pseudoType(), ct1, jobInfo);
+		pcs1 = new pColStep(JobStepAssociation(jobInfo.status),
+			JobStepAssociation(jobInfo.status), 0, jobInfo.csc, oid1, tableOid1, ct1,
+			jobInfo.sessionId, jobInfo.txnId, jobInfo.verId, 0, jobInfo.statementId, jobInfo.rm);
+		pcs1->logger(jobInfo.logger);
 		pcs1->alias(alias1);
 		pcs1->view(view1);
 		pcs1->name(sc1->columnName());
@@ -1089,10 +1185,10 @@ const JobStepVector doJoin(
 	CalpontSystemCatalog::OID dictOid2 = isDictCol(ct2);
 	if (sc2->schemaName().empty() == false)
 	{
-		if (pc2 == NULL)
-			pcs2 = new pColStep(oid2, tableOid2, ct2, jobInfo);
-		else
-			pcs2 = new PseudoColStep(oid2, tableOid2, pc2->pseudoType(), ct2, jobInfo);
+		pcs2 = new pColStep(JobStepAssociation(jobInfo.status),
+			JobStepAssociation(jobInfo.status), 0, jobInfo.csc, oid2, tableOid2, ct2,
+			jobInfo.sessionId, jobInfo.txnId, jobInfo.verId, 0, jobInfo.statementId, jobInfo.rm);
+		pcs2->logger(jobInfo.logger);
 		pcs2->alias(alias2);
 		pcs2->view(view2);
 		pcs2->name(sc2->columnName());
@@ -1128,7 +1224,7 @@ const JobStepVector doJoin(
 
 	if (pcs1)
 	{
-		JobStepAssociation outJs1;
+		JobStepAssociation outJs1(jobInfo.status);
 		outJs1.outAdd(spdl1);
 		pcs1->outputAssociation(outJs1);
 
@@ -1143,7 +1239,7 @@ const JobStepVector doJoin(
 
 	if (pcs2)
 	{
-		JobStepAssociation outJs2;
+		JobStepAssociation outJs2(jobInfo.status);
 		outJs2.outAdd(spdl2);
 		pcs2->outputAssociation(outJs2);
 
@@ -1151,7 +1247,12 @@ const JobStepVector doJoin(
 		jsv.push_back(step);
 	}
 
-	TupleHashJoinStep* thj = new TupleHashJoinStep(jobInfo);
+	TupleHashJoinStep* thj = new TupleHashJoinStep(
+		jobInfo.sessionId,
+		jobInfo.txnId,
+		jobInfo.statementId,
+		&jobInfo.rm);
+	thj->logger(jobInfo.logger);
 	thj->tableOid1(tableOid1);
 	thj->tableOid2(tableOid2);
 	thj->alias1(alias1);
@@ -1168,6 +1269,7 @@ const JobStepVector doJoin(
 	thj->sequence2(sc2->sequence());
 	thj->column1(sc1);
 	thj->column2(sc2);
+//	thj->joinId(jobInfo.joinNum++);
 	thj->joinId((joinInfo == 0) ? (++jobInfo.joinNum) : 0);
 
 	// Check if SEMI/ANTI join.
@@ -1202,7 +1304,7 @@ const JobStepVector doJoin(
 	}
 	thj->setJoinType(jt);
 
-	JobStepAssociation outJs3;
+	JobStepAssociation outJs3(jobInfo.status);
 	outJs3.outAdd(spdl1);
 	outJs3.outAdd(spdl2);
 	thj->inputAssociation(outJs3);
@@ -1257,13 +1359,11 @@ const JobStepVector doSemiJoin(const SimpleColumn* sc, const ReturnedColumn* rc,
 	CalpontSystemCatalog::OID tableOid1 = tableOid(sc, jobInfo.csc);
 	CalpontSystemCatalog::OID tableOid2 = execplan::CNX_VTABLE_ID;
 	string alias1(extractTableAlias(sc));
-	string alias2(jobInfo.subAlias);
 	CalpontSystemCatalog::ColType ct1 = sc->colType();
 	CalpontSystemCatalog::ColType ct2 = rc->resultType();
-	const PseudoColumn* pc1 = dynamic_cast<const PseudoColumn*>(sc);
+
 //XXX use this before connector sets colType in sc correctly.
-//    type of pseudo column is set by connector
-			if (!sc->schemaName().empty() && sc->isInfiniDB() && !pc1)
+			if (!sc->schemaName().empty() && sc->isInfiniDB())
 				ct1 = jobInfo.csc->colType(sc->oid());
 //X
 	JobStepVector jsv;
@@ -1274,12 +1374,11 @@ const JobStepVector doSemiJoin(const SimpleColumn* sc, const ReturnedColumn* rc,
 	uint64_t tupleId2 = -1;
 	if (sc->schemaName().empty() == false)
 	{
-		pColStep* pcs1 = NULL;
-		if (pc1 == NULL)
-			pcs1 = new pColStep(sc->oid(), tableOid1, ct1, jobInfo);
-		else
-			pcs1 = new PseudoColStep(sc->oid(), tableOid1, pc1->pseudoType(), ct1, jobInfo);
+		pColStep* pcs1 = new pColStep(JobStepAssociation(jobInfo.status),
+			JobStepAssociation(jobInfo.status), 0, jobInfo.csc, sc->oid(), tableOid1, ct1,
+			jobInfo.sessionId, jobInfo.txnId, jobInfo.verId, 0, jobInfo.statementId, jobInfo.rm);
 		dictOid1 = isDictCol(ct1);
+		pcs1->logger(jobInfo.logger);
 		pcs1->alias(alias1);
 		pcs1->view(sc->viewName());
 		pcs1->name(sc->columnName());
@@ -1301,7 +1400,12 @@ const JobStepVector doSemiJoin(const SimpleColumn* sc, const ReturnedColumn* rc,
 		}
 	}
 
-	TupleHashJoinStep* thj = new TupleHashJoinStep(jobInfo);
+	TupleHashJoinStep* thj = new TupleHashJoinStep(
+		jobInfo.sessionId,
+		jobInfo.txnId,
+		jobInfo.statementId,
+		&jobInfo.rm);
+	thj->logger(jobInfo.logger);
 	thj->tableOid1(tableOid1);
 	thj->tableOid2(tableOid2);
 	thj->alias1(alias1);
@@ -1309,13 +1413,13 @@ const JobStepVector doSemiJoin(const SimpleColumn* sc, const ReturnedColumn* rc,
 	thj->schema1(sc->schemaName());
 	thj->oid1(sc->oid());
 	thj->oid2(tableOid2 + 1 + rc->sequence());
-	thj->alias2(alias2);
 	thj->dictOid1(dictOid1);
 	thj->dictOid2(0);
 	thj->sequence1(sc->sequence());
 	thj->sequence2(rc->sequence());
 	thj->column1(sc);
 	thj->column2(rc);
+//	thj->joinId(jobInfo.joinNum++);
 	thj->joinId(0);
 	thj->tupleId1(tupleId1);
 	thj->tupleId2(tupleId2);
@@ -1352,47 +1456,54 @@ const JobStepVector doSemiJoin(const SimpleColumn* sc, const ReturnedColumn* rc,
 }
 
 
-SJSTEP expressionToFuncJoin(ExpressionStep* es, JobInfo& jobInfo)
+const JobStepVector doFunctionColumn(const FunctionColumn* fc, JobInfo& jobInfo)
 {
-	idbassert(es);
-	boost::shared_ptr<FunctionJoinInfo> fji = es->functionJoinInfo();
-	es->functionJoin(true);
-	TupleHashJoinStep* thjs= new TupleHashJoinStep(jobInfo);
-	thjs->tableOid1(fji->fTableOid[0]);
-	thjs->tableOid2(fji->fTableOid[1]);
-	thjs->oid1(fji->fOid[0]);
-	thjs->oid2(fji->fOid[1]);
-	thjs->alias1(fji->fAlias[0]);
-	thjs->alias2(fji->fAlias[1]);
-	thjs->view1(fji->fView[0]);
-	thjs->view2(fji->fView[1]);
-	thjs->schema1(fji->fSchema[0]);
-	thjs->schema2(fji->fSchema[1]);
-	thjs->column1(fji->fExpression[0]);
-	thjs->column2(fji->fExpression[1]);
-	thjs->sequence1(fji->fSequence[0]);
-	thjs->sequence2(fji->fSequence[1]);
-	thjs->joinId(fji->fJoinId);
-	thjs->setJoinType(fji->fJoinType);
-	thjs->correlatedSide(fji->fCorrelatedSide);
-	thjs->funcJoinInfo(fji);
-	thjs->tupleId1(fji->fJoinKey[0]);
-	thjs->tupleId2(fji->fJoinKey[1]);
+	throw logic_error("jlf_execplantojoblist.cpp:doFunctionColumn(): Not implemented");
+}
 
-	updateTableKey(fji->fJoinKey[0], fji->fTableKey[0], jobInfo);
-	updateTableKey(fji->fJoinKey[1], fji->fTableKey[1], jobInfo);
+// This function returns a JobStepVector with the steps necessary to evaluate the passed Arithmetic column.
+// It recurses directly and indirectly through calls to doFunctionColumn.
+const JobStepVector doArithmeticColumn(const ArithmeticColumn* ac, JobInfo& jobInfo)
+{
+	JobStepVector jsv;
 
-	return SJSTEP(thjs);
+
+	TreeNodeStack stack;
+	ac->expression()->walk(walkTreeNode, &stack);
+
+	const TreeNode* tnop;
+
+	tnop = stack.top();
+	stack.pop();
+
+	// Only handling ArithmeticColumns that contain FunctionColumn for now.
+	if(TreeNode2Type(tnop) == FUNCTIONCOLUMN)
+	{
+		const FunctionColumn* fc = static_cast<const FunctionColumn*>(tnop);
+		jsv = doFunctionColumn(fc, jobInfo);
+	}
+	else
+	{
+		cerr << boldStart << "doArithmeticColumn: Unhandled Type." << boldStop << endl;
+	}
+
+	return jsv;
+
 }
 
 
 const JobStepVector doExpressionFilter(const ParseTree* n, JobInfo& jobInfo)
 {
 	JobStepVector jsv;
-	ExpressionStep* es = new ExpressionStep(jobInfo);
+	ExpressionStep* es = new ExpressionStep(jobInfo.sessionId,
+											jobInfo.txnId,
+											jobInfo.verId,
+											jobInfo.statementId);
+
 	if (es == NULL)
 		throw runtime_error("Failed to create ExpressionStep 1");
 
+	es->logger(jobInfo.logger);
 	es->expressionFilter(n, jobInfo);
 	SJSTEP sjstep(es);
 	jsv.push_back(sjstep);
@@ -1404,37 +1515,18 @@ const JobStepVector doExpressionFilter(const ParseTree* n, JobInfo& jobInfo)
 const JobStepVector doExpressionFilter(const Filter* f, JobInfo& jobInfo)
 {
 	JobStepVector jsv;
-	ExpressionStep* es = new ExpressionStep(jobInfo);
+	ExpressionStep* es = new ExpressionStep(jobInfo.sessionId,
+											jobInfo.txnId,
+											jobInfo.verId,
+											jobInfo.statementId);
+
 	if (es == NULL)
 		throw runtime_error("Failed to create ExpressionStep 2");
 
+	es->logger(jobInfo.logger);
 	es->expressionFilter(f, jobInfo);
 	SJSTEP sjstep(es);
 	jsv.push_back(sjstep);
-
-	// @bug3683, support in/exists suquery function join
-	const SimpleFilter* sf = dynamic_cast<const SimpleFilter*>(f);
-	if (sf != NULL)
-	{
-		const ReturnedColumn* lrc =  static_cast<const ReturnedColumn*>(sf->lhs());
-		const ReturnedColumn* rrc =  static_cast<const ReturnedColumn*>(sf->rhs());
-		if (lrc->joinInfo())
-		{
-			const ReturnedColumn* lac = dynamic_cast<const ArithmeticColumn*>(lrc);
-			const ReturnedColumn* lfc = dynamic_cast<const FunctionColumn*>(lrc);
-			const ReturnedColumn* lsc = dynamic_cast<const SimpleColumn*>(lrc);
-			if ((lac || lfc || lsc) && es->functionJoinInfo())
-				jsv.push_back(expressionToFuncJoin(es, jobInfo));
-		}
-		else if (rrc->joinInfo())
-		{
-			const ReturnedColumn* rac = dynamic_cast<const ArithmeticColumn*>(lrc);
-			const ReturnedColumn* rfc = dynamic_cast<const FunctionColumn*>(lrc);
-			const ReturnedColumn* rsc = dynamic_cast<const SimpleColumn*>(lrc);
-			if ((rac || rfc || rsc) && es->functionJoinInfo())
-				jsv.push_back(expressionToFuncJoin(es, jobInfo));
-		}
-	}
 
 	return jsv;
 }
@@ -1444,7 +1536,13 @@ const JobStepVector doConstantBooleanFilter(const ParseTree* n, JobInfo& jobInfo
 {
 	JobStepVector jsv;
 	TupleConstantBooleanStep* tcbs = new
-		TupleConstantBooleanStep(jobInfo, n->data()->getBoolVal());
+		TupleConstantBooleanStep(JobStepAssociation(),
+								 JobStepAssociation(),
+								 jobInfo.sessionId,
+								 jobInfo.txnId,
+								 jobInfo.verId,
+								 jobInfo.statementId,
+								 n->data()->getBoolVal());
 
 	if (tcbs == NULL)
 		throw runtime_error("Failed to create Constant Boolean Step");
@@ -1453,50 +1551,6 @@ const JobStepVector doConstantBooleanFilter(const ParseTree* n, JobInfo& jobInfo
 	jsv.push_back(sjstep);
 
 	return jsv;
-}
-
-
-bool optimizeIdbPatitionSimpleFilter(SimpleFilter* sf, JobStepVector& jsv, JobInfo& jobInfo)
-{
-	//@bug5848, not equal filter is not optimized.
-	if (sf->op()->op() != opeq.op())
-		return false;
-
-	const FunctionColumn* fc = static_cast<const FunctionColumn*>(sf->lhs());
-	const ConstantColumn* cc = static_cast<const ConstantColumn*>(sf->rhs());
-	if (fc == NULL)
-	{
-		cc = static_cast<const ConstantColumn*>(sf->lhs());
-		fc = static_cast<const FunctionColumn*>(sf->rhs());
-	}
-
-	// not a function or not idbparttition
-	if (fc == NULL || cc == NULL || fc->functionName().compare("idbpartition") != 0)
-		return false;
-
-	// make sure the cc has 3 tokens
-	vector<string> cv;
-	boost::split(cv, cc->constval(), boost::is_any_of("."));
-	if (cv.size() != 3)
-		return false;
-
-	// construct separate filters, then make job steps
-	JobStepVector v;
-	SOP sop = sf->op();
-	const funcexp::FunctionParm& parms = fc->functionParms();
-	
-	for (uint64_t i = 0; i < 3; i++)
-	{
-		// very weird parms order is: db root, physical partition, segment
-		// logical partition string : physical partition, segment, db root
-		ReturnedColumn* lhs = dynamic_cast<ReturnedColumn*>(parms[(i+1)%3]->data());
-		ConstantColumn* rhs = new ConstantColumn(cv[i]);
-		SimpleFilter* f = new SimpleFilter(sop, lhs->clone(), rhs);
-		v = doSimpleFilter(f, jobInfo); 
-		jsv.insert(jsv.end(), v.begin(), v.end());
-	}
-
-	return true;
 }
 
 
@@ -1533,7 +1587,7 @@ const JobStepVector doSimpleFilter(SimpleFilter* sf, JobInfo& jobInfo)
 		string schema(sc->schemaName());
 		tbl_oid = tableOid(sc, jobInfo.csc);
 
-		if (sc->joinInfo() != 0 && cc->sequence() != -1)
+		if (sc->joinInfo() != 0 && (int32_t)cc->sequence() != -1)
 		{
 			// correlated, like in 'c1 in select 1' type sub queries.
 			return doSemiJoin(sc, cc, jobInfo);
@@ -1552,12 +1606,12 @@ const JobStepVector doSimpleFilter(SimpleFilter* sf, JobInfo& jobInfo)
 		size_t spos = constval.find_last_not_of(" ");
 		if (spos != string::npos) constval = constval.substr(0, spos+1);
 
+		if (!sc->schemaName().empty())
+			jobInfo.tables.insert(make_table(sc->schemaName(), sc->tableName()));
 		CalpontSystemCatalog::OID dictOid = 0;
 		CalpontSystemCatalog::ColType ct = sc->colType();
-		const PseudoColumn* pc = dynamic_cast<const PseudoColumn*>(sc);
 //XXX use this before connector sets colType in sc correctly.
-//    type of pseudo column is set by connector
-		if (!sc->schemaName().empty() && sc->isInfiniDB() && !pc)
+		if (!sc->schemaName().empty() && sc->isInfiniDB())
 			ct = jobInfo.csc->colType(sc->oid());
 //X
 		//@bug 339 nulls are not stored in dictionary
@@ -1566,8 +1620,11 @@ const JobStepVector doSimpleFilter(SimpleFilter* sf, JobInfo& jobInfo)
 			if (jobInfo.trace)
 				cout << "Emit pTokenByScan/pCol for SimpleColumn op ConstantColumn" << endl;
 
-			// dictionary, cannot be pseudo column
-			pColStep* pcs = new pColStep(sc->oid(), tbl_oid, ct, jobInfo);
+			pColStep* pcs = new pColStep(JobStepAssociation(jobInfo.status),
+				JobStepAssociation(jobInfo.status), 0, jobInfo.csc, sc->oid(),
+				tbl_oid, ct, jobInfo.sessionId, jobInfo.txnId, jobInfo.verId, 0,
+				jobInfo.statementId, jobInfo.rm);
+			pcs->logger(jobInfo.logger);
 			pcs->alias(alias);
 			pcs->view(view);
 			pcs->name(sc->columnName());
@@ -1576,7 +1633,11 @@ const JobStepVector doSimpleFilter(SimpleFilter* sf, JobInfo& jobInfo)
 
 			if (filterWithDictionary(dictOid, jobInfo.stringScanThreshold))
 			{
-				pDictionaryStep* pds = new pDictionaryStep(dictOid, tbl_oid, ct, jobInfo);
+				pDictionaryStep* pds = new pDictionaryStep(JobStepAssociation(jobInfo.status),
+					JobStepAssociation(jobInfo.status), 0, jobInfo.csc, dictOid,
+					ct.ddn.compressionType, tbl_oid, jobInfo.sessionId, jobInfo.txnId,
+					jobInfo.verId, 0, jobInfo.statementId, jobInfo.rm);
+				pds->logger(jobInfo.logger);
 				jobInfo.keyInfo->dictOidToColOid[dictOid] = sc->oid();
 				pds->alias(alias);
 				pds->view(view);
@@ -1593,7 +1654,7 @@ const JobStepVector doSimpleFilter(SimpleFilter* sf, JobInfo& jobInfo)
 				spdl1->fifoDL(dl1);
 				dl1->OID(sc->oid());
 
-				JobStepAssociation outJs1;
+				JobStepAssociation outJs1(jobInfo.status);
 				outJs1.outAdd(spdl1);
 				pcs->outputAssociation(outJs1);
 
@@ -1603,12 +1664,12 @@ const JobStepVector doSimpleFilter(SimpleFilter* sf, JobInfo& jobInfo)
 				spdl2->stringDL(dl2);
 				dl2->OID(sc->oid());
 
-				JobStepAssociation outJs2;
+				JobStepAssociation outJs2(jobInfo.status);
 				outJs2.outAdd(spdl2);
 				pds->outputAssociation(outJs2);
 
 				//Associate pcs with pds
-				JobStepAssociation outJs;
+				JobStepAssociation outJs(jobInfo.status);
 				outJs.outAdd(spdl1);
 				pds->inputAssociation(outJs);
 
@@ -1639,7 +1700,11 @@ const JobStepVector doSimpleFilter(SimpleFilter* sf, JobInfo& jobInfo)
 			}
 			else
 			{
-				pDictionaryScan* pds = new pDictionaryScan(dictOid, tbl_oid, ct, jobInfo);
+				pDictionaryScan* pds = new pDictionaryScan(JobStepAssociation(jobInfo.status),
+					JobStepAssociation(jobInfo.status), 0, jobInfo.csc, dictOid,
+					ct.ddn.compressionType, tbl_oid, jobInfo.sessionId, jobInfo.txnId,
+					jobInfo.verId, 0, jobInfo.statementId, jobInfo.rm);
+				pds->logger(jobInfo.logger);
 				jobInfo.keyInfo->dictOidToColOid[dictOid] = sc->oid();
 				pds->alias(alias);
 				pds->view(view);
@@ -1653,7 +1718,12 @@ const JobStepVector doSimpleFilter(SimpleFilter* sf, JobInfo& jobInfo)
 				// save for expression transformation
 				pds->addFilter(sf);
 
-				TupleHashJoinStep* thj = new TupleHashJoinStep(jobInfo);
+				TupleHashJoinStep* thj = new TupleHashJoinStep(
+					jobInfo.sessionId,
+					jobInfo.txnId,
+					jobInfo.statementId,
+					&jobInfo.rm);
+				thj->logger(jobInfo.logger);
 				thj->tableOid1(0);
 				thj->tableOid2(tbl_oid);
 				thj->alias1(alias);
@@ -1664,6 +1734,7 @@ const JobStepVector doSimpleFilter(SimpleFilter* sf, JobInfo& jobInfo)
 				thj->schema2(schema);
 				thj->oid1(sc->oid());
 				thj->oid2(sc->oid());
+//				thj->joinId(jobInfo.joinNum++);
 				thj->joinId(0);
 				thj->setJoinType(INNER);
 
@@ -1691,7 +1762,7 @@ const JobStepVector doSimpleFilter(SimpleFilter* sf, JobInfo& jobInfo)
 				spdl1->rowGroupDL(dl1);
 				dl1->OID(dictOid);
 
-				JobStepAssociation outJs1;
+				JobStepAssociation outJs1(jobInfo.status);
 				outJs1.outAdd(spdl1);
 				pds->outputAssociation(outJs1);
 
@@ -1701,11 +1772,11 @@ const JobStepVector doSimpleFilter(SimpleFilter* sf, JobInfo& jobInfo)
 				spdl2->rowGroupDL(dl2);
 				dl2->OID(sc->oid());
 
-				JobStepAssociation outJs2;
+				JobStepAssociation outJs2(jobInfo.status);
 				outJs2.outAdd(spdl2);
 				pcs->outputAssociation(outJs2);
 
-				JobStepAssociation outJs3;
+				JobStepAssociation outJs3(jobInfo.status);
 				outJs3.outAdd(spdl1);
 				outJs3.outAdd(spdl2);
 				sjstep.reset(pds);
@@ -1763,11 +1834,6 @@ const JobStepVector doSimpleFilter(SimpleFilter* sf, JobInfo& jobInfo)
 				case CalpontSystemCatalog::MEDINT:
 				case CalpontSystemCatalog::INT:
 				case CalpontSystemCatalog::BIGINT:
-				case CalpontSystemCatalog::UTINYINT:
-				case CalpontSystemCatalog::USMALLINT:
-				case CalpontSystemCatalog::UMEDINT:
-				case CalpontSystemCatalog::UINT:
-				case CalpontSystemCatalog::UBIGINT:
 					value = 0;
 					rf = 0;
 					break;
@@ -1805,27 +1871,27 @@ const JobStepVector doSimpleFilter(SimpleFilter* sf, JobInfo& jobInfo)
 					" (" << cc->constval() << ')' << endl;
 			if (sf->indexFlag() == 0)
 			{
-				pColStep* pcs = NULL;
-				if (pc == NULL)
-					pcs = new pColStep(sc->oid(), tbl_oid, ct, jobInfo);
-				else
-					pcs = new PseudoColStep(sc->oid(), tbl_oid, pc->pseudoType(), ct, jobInfo);
+				pColStep* pcss = new pColStep(JobStepAssociation(jobInfo.status),
+					JobStepAssociation(jobInfo.status), 0, jobInfo.csc,
+					sc->oid(), tbl_oid, ct, jobInfo.sessionId, jobInfo.txnId,
+					jobInfo.verId, 0, jobInfo.statementId, jobInfo.rm);
+				pcss->logger(jobInfo.logger);
 				if (sc->isInfiniDB())
-					pcs->addFilter(cop, value, rf);
-				pcs->alias(alias);
-				pcs->view(view);
-				pcs->name(sc->columnName());
-				pcs->schema(sc->schemaName());
-				pcs->cardinality(sf->cardinality());
+					pcss->addFilter(cop, value, rf);
+				pcss->alias(alias);
+				pcss->view(view);
+				pcss->name(sc->columnName());
+				pcss->schema(sc->schemaName());
+				pcss->cardinality(sf->cardinality());
 
-				sjstep.reset(pcs);
+				sjstep.reset(pcss);
 				jsv.push_back(sjstep);
 
 				// save for expression transformation
-				pcs->addFilter(sf);
+				pcss->addFilter(sf);
 
 				TupleInfo ti(setTupleInfo(ct, sc->oid(), jobInfo, tbl_oid, sc, alias));
-				pcs->tupleId(ti.key);
+				pcss->tupleId(ti.key);
 
 				if (dictOid > 0) // cc->type() == ConstantColumn::NULLDATA
 				{
@@ -1847,18 +1913,19 @@ const JobStepVector doSimpleFilter(SimpleFilter* sf, JobInfo& jobInfo)
 				indexName.table = sc->tableName();
 				indexName.index = sc->indexName();
 				CalpontSystemCatalog::IndexOID indexOID = jobInfo.csc->lookupIndexNbr(indexName);
-				pIdxWalk* pidxw = new pIdxWalk(JobStepAssociation(), JobStepAssociation(), 0,
+				pIdxWalk* pidxw = new pIdxWalk(JobStepAssociation(jobInfo.status), JobStepAssociation(jobInfo.status), 0,
 					jobInfo.csc, indexOID.objnum, sc->oid(), tbl_oid,
 					jobInfo.sessionId, jobInfo.txnId, jobInfo.verId, 0,
 					jobInfo.statementId);
 
+				pidxw->logger(jobInfo.logger);
 				pidxw->addSearchStr(cop, value);
 				pidxw->cardinality(sf->cardinality());
 
 				sjstep.reset(pidxw);
 				jsv.push_back(sjstep);
-				pIdxList* pidxL = new pIdxList(JobStepAssociation(),
-					JobStepAssociation(), 0, jobInfo.csc,
+				pIdxList* pidxL = new pIdxList(JobStepAssociation(jobInfo.status),
+					JobStepAssociation(jobInfo.status), 0, jobInfo.csc,
 					indexOID.listOID, tbl_oid, jobInfo.sessionId, jobInfo.txnId,
 					jobInfo.verId, 0, jobInfo.statementId);
 
@@ -1867,7 +1934,7 @@ const JobStepVector doSimpleFilter(SimpleFilter* sf, JobInfo& jobInfo)
 				ZonedDL* dl1 = new ZonedDL(1, jobInfo.rm);
 				dl1->OID(indexOID.objnum);
 				spdl1->zonedDL(dl1);
-				JobStepAssociation outJs1;
+				JobStepAssociation outJs1(jobInfo.status);
 				outJs1.outAdd(spdl1);
 				pidxw->outputAssociation(outJs1);
 
@@ -1879,10 +1946,11 @@ const JobStepVector doSimpleFilter(SimpleFilter* sf, JobInfo& jobInfo)
 				ZonedDL* dl2 = new ZonedDL(1, jobInfo.rm);
 				dl2->OID(indexOID.listOID);
 				spdl2->zonedDL(dl2);
-				JobStepAssociation outJs2;
+				JobStepAssociation outJs2(jobInfo.status);
 				outJs2.outAdd(spdl2);
 				pidxL->outputAssociation(outJs2);
 
+				pidxL->logger(jobInfo.logger);
 				sjstep.reset(pidxL);
 				jsv.push_back(sjstep);
 #endif
@@ -1895,6 +1963,13 @@ const JobStepVector doSimpleFilter(SimpleFilter* sf, JobInfo& jobInfo)
 		SimpleColumn* sc1 = static_cast<SimpleColumn*>(lhs);
 		SimpleColumn* sc2 = static_cast<SimpleColumn*>(rhs);
 
+		// @bug 1349. no-op rules:
+		// 1. If two columns of a simple filter are of the two different tables, and the
+		//    filter operator is not "=", no-op this simple filter,
+		// 2. If a join filter has "ANTI" option, no op this filter before ANTI hashjoin
+		//    is supported in ExeMgr.
+		// @bug 1933. Throw exception instead of no-op for MySQL virtual table
+        //            (no connector re-filter).
 		// @bug 1496. handle non equal operator as expression in v-table mode
 		if ((sc1->tableName() != sc2->tableName() ||
 			 sc1->tableAlias() != sc2->tableAlias() ||
@@ -1904,20 +1979,16 @@ const JobStepVector doSimpleFilter(SimpleFilter* sf, JobInfo& jobInfo)
 			return doExpressionFilter(sf, jobInfo);
 		}
 
-		// @bug 1349. no-op rules:
-		// 1. If two columns of a simple filter are of the two different tables, and the
-		//    filter operator is not "=", no-op this simple filter,
-		// 2. If a join filter has "ANTI" option, no op this filter before ANTI hashjoin
-		//    is supported in ExeMgr.
-		// @bug 1933. Throw exception instead of no-op for MySQL virtual table
-        //            (no connector re-filter).
 		if (sf->joinFlag() == SimpleFilter::ANTI)
 			throw runtime_error("Anti join is not currently supported");
 
-		// Do a simple column join
+		if (!sc1->schemaName().empty())
+			jobInfo.tables.insert(make_table(sc1->schemaName(), sc1->tableName()));
+		if (!sc2->schemaName().empty())
+			jobInfo.tables.insert(make_table(sc2->schemaName(), sc2->tableName()));
 		JobStepVector join = doJoin(sc1, sc2, jobInfo, sop, sf);
 		// set cardinality for the hashjoin step. hj result card <= larger input card
-		uint32_t card = 0;
+		uint card = 0;
 		if (sf->cardinality() > sc1->cardinality() && sf->cardinality() > sc2->cardinality())
 			card = (sc1->cardinality() > sc2->cardinality() ? sc1->cardinality() : sc2->cardinality());
 		else
@@ -1940,16 +2011,7 @@ const JobStepVector doSimpleFilter(SimpleFilter* sf, JobInfo& jobInfo)
 	else if (lhsType == ARITHMETICCOLUMN || rhsType == ARITHMETICCOLUMN ||
 			 lhsType == FUNCTIONCOLUMN || rhsType == FUNCTIONCOLUMN)
 	{
-		const ReturnedColumn* rc = static_cast<const ReturnedColumn*>(lhs);
-		if (rc && (!rc->joinInfo()) && rhsType == AGGREGATECOLUMN)
-			throw IDBExcept(ERR_AGG_IN_WHERE);
-
-		// @bug5848, CP elimination for idbPartition(col)
-		JobStepVector sv;
-		if (optimizeIdbPatitionSimpleFilter(sf, sv, jobInfo))
-			jsv.swap(sv);
-		else
-			jsv = doExpressionFilter(sf, jobInfo);
+		jsv = doExpressionFilter(sf, jobInfo);
 	}
 	else if (lhsType == SIMPLECOLUMN &&
 			(rhsType == AGGREGATECOLUMN || rhsType == ARITHMETICCOLUMN || rhsType == FUNCTIONCOLUMN))
@@ -1977,16 +2039,6 @@ const JobStepVector doSimpleFilter(SimpleFilter* sf, JobInfo& jobInfo)
 		else
 			throw logic_error("doSimpleFilter: Unhandled SimpleFilter.");
 	}
-	else if (rhsType == WINDOWFUNCTIONCOLUMN)
-	{
-		// workaroud for IN subquery with window function
-		// window function as arguments of a function is not covered !!
-		jsv = doExpressionFilter(sf, jobInfo);
-	}
-	else if (lhsType == CONSTANTCOLUMN && rhsType == CONSTANTCOLUMN)
-	{
-		jsv = doExpressionFilter(sf, jobInfo);
-	}
 	else
 	{
 		cerr << boldStart << "doSimpleFilter: Unhandled SimpleFilter: left = " << lhsType <<
@@ -2009,7 +2061,7 @@ const JobStepVector doOuterJoinOnFilter(OuterJoinOnFilter* oj, JobInfo& jobInfo)
 
 	// Parse the join on filter to join steps and an expression step, if any.
 	stack<ParseTree*> nodeStack;        // stack used for pre-order traverse
-	set<ParseTree*> doneNodes;          // solved joins and simple filters
+	vector<ParseTree*> doneNodes;       // vector of joins and simple filters solved
 	map<ParseTree*, ParseTree*> cpMap;  // <child, parent> link for node removal
 	JobStepVector join;                 // join step with its projection steps
 	set<ParseTree*> nodesToRemove;      // nodes to be removed after converted to steps
@@ -2024,9 +2076,6 @@ const JobStepVector doOuterJoinOnFilter(OuterJoinOnFilter* oj, JobInfo& jobInfo)
 
 	// @bug5311, optimization for outer join on clause
 	set<uint64_t> tablesInJoin;
-
-	// @bug3683, function join
-	vector<pair<ParseTree*, SJSTEP> > fjCandidates;
 
 	// while stack is not empty
 	while(!nodeStack.empty())
@@ -2056,6 +2105,11 @@ const JobStepVector doOuterJoinOnFilter(OuterJoinOnFilter* oj, JobInfo& jobInfo)
 				 sc1->tableAlias() != sc2->tableAlias() ||
 				 sc1->viewName() != sc2->viewName()))
 			{
+				if (!sc1->schemaName().empty())
+					jobInfo.tables.insert(make_table(sc1->schemaName(), sc1->tableName()));
+				if (!sc2->schemaName().empty())
+					jobInfo.tables.insert(make_table(sc2->schemaName(), sc2->tableName()));
+
 				// @bug3037, workaround on join order, wish this can be corrected soon,
 				// cascade outer table attribute.
 				CalpontSystemCatalog::OID tableOid1 = tableOid(sc1, jobInfo.csc);
@@ -2080,7 +2134,7 @@ const JobStepVector doOuterJoinOnFilter(OuterJoinOnFilter* oj, JobInfo& jobInfo)
 
 				join = doJoin(sc1, sc2, jobInfo, sop, sf);
 				// set cardinality for the hashjoin step.
-				uint32_t card = sf->cardinality();
+				uint card = sf->cardinality();
 				if (sf->cardinality() > sc1->cardinality() &&
 					sf->cardinality() > sc2->cardinality())
 					card = ((sc1->cardinality() > sc2->cardinality()) ?
@@ -2088,19 +2142,7 @@ const JobStepVector doOuterJoinOnFilter(OuterJoinOnFilter* oj, JobInfo& jobInfo)
 				join[join.size()-1].get()->cardinality(card);
 
 				jsv.insert(jsv.end(), join.begin(), join.end());
-				doneNodes.insert(cn);
-			}
-			else
-			{
-				ExpressionStep* es = new ExpressionStep(jobInfo);
-				if (es == NULL)
-					throw runtime_error("Failed to create ExpressionStep 2");
-
-				SJSTEP sjstep;
-				es->expressionFilter(sf, jobInfo);
-				sjstep.reset(es);
-				if (es->functionJoinInfo())
-					fjCandidates.push_back(make_pair(cn, sjstep));
+				doneNodes.push_back(cn);
 			}
 		}
 
@@ -2129,31 +2171,6 @@ const JobStepVector doOuterJoinOnFilter(OuterJoinOnFilter* oj, JobInfo& jobInfo)
 			thjs = dynamic_cast<TupleHashJoinStep*>(i->get());
 	}
 
-	// no simple column join found, try function join
-	if (thjs == NULL)
-	{
-		// check any expressions can be converted to function joins.
-		vector<pair<ParseTree*, SJSTEP> >::iterator i = fjCandidates.begin();
-		while (i != fjCandidates.end())
-		{
-			ExpressionStep* es = dynamic_cast<ExpressionStep*>((i->second).get());
-			SJSTEP sjstep = expressionToFuncJoin(es, jobInfo);
-			idbassert(sjstep.get());
-			jsv.push_back(sjstep);
-
-			doneNodes.insert(i->first);
-
-			i++;
-		}
-	}
-
-	// check again if we got a join step.
-	for (JobStepVector::iterator i = jsv.begin(); i != jsv.end(); i++)
-	{
-		if (dynamic_cast<TupleHashJoinStep*>(i->get()) != thjs)
-			thjs = dynamic_cast<TupleHashJoinStep*>(i->get());
-	}
-
 	if (thjs != NULL)
 	{
 		// @bug5311, optimization for outer join on clause, move out small side simple filters.
@@ -2172,7 +2189,7 @@ const JobStepVector doOuterJoinOnFilter(OuterJoinOnFilter* oj, JobInfo& jobInfo)
 				continue;
 
 			SimpleFilter* sf = dynamic_cast<SimpleFilter*>(tn);
-			if ((sf != NULL) && (doneNodes.find(cn) == doneNodes.end()))
+			if (sf != NULL)
 			{
 				// joins are done, this is not a join.
 				ReturnedColumn* lhs = sf->lhs();
@@ -2201,6 +2218,9 @@ const JobStepVector doOuterJoinOnFilter(OuterJoinOnFilter* oj, JobInfo& jobInfo)
 
 				if (sc != NULL)
 				{
+					if (!sc->schemaName().empty())
+						jobInfo.tables.insert(make_table(sc->schemaName(), sc->tableName()));
+
 					CalpontSystemCatalog::OID tblOid = tableOid(sc, jobInfo.csc);
 					uint64_t tid = getTableKey(
 						jobInfo, tblOid, sc->tableAlias(), sc->schemaName(), sc->viewName());
@@ -2221,7 +2241,7 @@ const JobStepVector doOuterJoinOnFilter(OuterJoinOnFilter* oj, JobInfo& jobInfo)
 
 					jsv.insert(jsv.end(), sfv.begin(), sfv.end());
 
-					doneNodes.insert(cn);
+					doneNodes.push_back(cn);
 				}
 			}
 
@@ -2243,7 +2263,7 @@ const JobStepVector doOuterJoinOnFilter(OuterJoinOnFilter* oj, JobInfo& jobInfo)
 
 		// remove joins from the original filters
 		ParseTree* nullTree = NULL;
-		for (set<ParseTree*>::iterator i = doneNodes.begin(); i != doneNodes.end() && isOk; i++)
+		for (vector<ParseTree*>::iterator i = doneNodes.begin(); i != doneNodes.end() && isOk; i++)
 		{
 			ParseTree* c = *i;
 			map<ParseTree*, ParseTree*>::iterator j = cpMap.find(c);
@@ -2307,10 +2327,15 @@ const JobStepVector doOuterJoinOnFilter(OuterJoinOnFilter* oj, JobInfo& jobInfo)
 		// construct an expression step, if additional comparison exists.
 		if (isOk && filters != NULL && filters->data() != NULL)
 		{
-			ExpressionStep* es = new ExpressionStep(jobInfo);
+			ExpressionStep* es = new ExpressionStep(jobInfo.sessionId,
+													jobInfo.txnId,
+													jobInfo.verId,
+													jobInfo.statementId);
+
 			if (es == NULL)
 				throw runtime_error("Failed to create ExpressionStep 1");
 
+			es->logger(jobInfo.logger);
 			es->expressionFilter(filters, jobInfo);
 			es->associatedJoinId(thjs->joinId());
 			SJSTEP sjstep(es);
@@ -2320,10 +2345,15 @@ const JobStepVector doOuterJoinOnFilter(OuterJoinOnFilter* oj, JobInfo& jobInfo)
 	else
 	{
 		// Due to Calpont view handling, some joins may treated as expressions.
-		ExpressionStep* es = new ExpressionStep(jobInfo);
+		ExpressionStep* es = new ExpressionStep(jobInfo.sessionId,
+												jobInfo.txnId,
+												jobInfo.verId,
+												jobInfo.statementId);
+
 		if (es == NULL)
 			throw runtime_error("Failed to create ExpressionStep 1");
 
+		es->logger(jobInfo.logger);
 		es->expressionFilter(filters, jobInfo);
 		SJSTEP sjstep(es);
 		jsv.push_back(sjstep);
@@ -2371,10 +2401,12 @@ bool tryCombineDictionary(JobStepVector& jsv1, JobStepVector& jsv2, int8_t bop)
 		pDictionaryStep* pdsp = dynamic_cast<pDictionaryStep*>(iter->get());
 		if (pdsp != NULL && pdsp->onClauseFilter() == onClauseFilter)
 		{
+			pDictionaryStep* pdsp = dynamic_cast<pDictionaryStep*>((*iter).get());
+
 			// If the OID's match and the BOP's match and the previous step is pcolstep,
 			// then append the filters.
 			if ((ipdsp->tupleId() == pdsp->tupleId()) &&
-				(dynamic_cast<pColStep*>((iter-1)->get()) != NULL))
+				(typeid(*((iter-1)->get())) == typeid(pColStep)))
 			{
 				if (pdsp->BOP() == BOP_NONE)
 				{
@@ -2484,6 +2516,7 @@ bool tryCombineFilters(JobStepVector& jsv1, JobStepVector& jsv2, int8_t bop)
 
 	// non-dictionary filters
 	if (jsv2.size() != 1) return false;
+	if (typeid(*jsv2.back().get()) != typeid(pColStep)) return false;
 
 	pColStep* ipcsp = dynamic_cast<pColStep*>(jsv2.back().get());
 	if (ipcsp == NULL)
@@ -2505,6 +2538,7 @@ bool tryCombineFilters(JobStepVector& jsv1, JobStepVector& jsv2, int8_t bop)
 		pColStep* pcsp = dynamic_cast<pColStep*>(iter->get());
 		if (pcsp != NULL && pcsp->onClauseFilter() == onClauseFilter)
 		{
+			pColStep* pcsp = dynamic_cast<pColStep*>((*iter).get());
 			idbassert(pcsp);
 			// If the OID's match and the BOP's match then append the filters
 			if (ipcsp->tupleId() == pcsp->tupleId())
@@ -2536,7 +2570,6 @@ bool tryCombineFilters(JobStepVector& jsv1, JobStepVector& jsv2, int8_t bop)
 	return false;
 }
 
-
 const JobStepVector doConstantFilter(const ConstantFilter* cf, JobInfo& jobInfo)
 {
 	JobStepVector jsv;
@@ -2551,20 +2584,19 @@ const JobStepVector doConstantFilter(const ConstantFilter* cf, JobInfo& jobInfo)
 	{
 		SOP sop;
 
-		const SSC sc = boost::dynamic_pointer_cast<SimpleColumn>(cf->col());
+		const SSC sc = cf->col();
 		// if column from subquery
-		if (!sc || sc->schemaName().empty())
+		if (sc->schemaName().empty())
 		{
 			return doExpressionFilter(cf, jobInfo);
 		}
 
+		jobInfo.tables.insert(make_table(sc->schemaName(), sc->tableName()));
 		ConstantFilter::FilterList fl = cf->filterList();
 		CalpontSystemCatalog::OID dictOid = 0;
 		CalpontSystemCatalog::ColType ct = sc.get()->colType();
-		PseudoColumn* pc = dynamic_cast<PseudoColumn*>(sc.get());
 //XXX use this before connector sets colType in sc correctly.
-//    type of pseudo column is set by connector
-		if (!sc->schemaName().empty() && sc->isInfiniDB() && !pc)
+		if (!sc->schemaName().empty() && sc->isInfiniDB())
 			ct = jobInfo.csc->colType(sc->oid());
 //X
 		CalpontSystemCatalog::OID tbOID = tableOid(sc.get(), jobInfo.csc);
@@ -2577,7 +2609,11 @@ const JobStepVector doConstantFilter(const ConstantFilter* cf, JobInfo& jobInfo)
 				cout << "Emit pTokenByScan/pCol for SimpleColumn op ConstantColumn "
 					"[op ConstantColumn]" << endl;
 
-			pColStep* pcs = new pColStep(sc->oid(), tbOID, ct, jobInfo);
+			pColStep* pcs = new pColStep(JobStepAssociation(jobInfo.status),
+				JobStepAssociation(jobInfo.status), 0,
+				jobInfo.csc, sc->oid(), tbOID, ct, jobInfo.sessionId, jobInfo.txnId,
+				jobInfo.verId, 0, jobInfo.statementId, jobInfo.rm);
+			pcs->logger(jobInfo.logger);
 			pcs->alias(alias);
 			pcs->view(view);
 			pcs->name(sc->columnName());
@@ -2586,7 +2622,11 @@ const JobStepVector doConstantFilter(const ConstantFilter* cf, JobInfo& jobInfo)
 
 			if (filterWithDictionary(dictOid, jobInfo.stringScanThreshold))
 			{
-				pDictionaryStep* pds = new pDictionaryStep(dictOid, tbOID, ct, jobInfo);
+				pDictionaryStep* pds = new pDictionaryStep(JobStepAssociation(jobInfo.status),
+					JobStepAssociation(jobInfo.status), 0, jobInfo.csc, dictOid,
+					ct.ddn.compressionType, tbOID, jobInfo.sessionId, jobInfo.txnId,
+					jobInfo.verId, 0, jobInfo.statementId, jobInfo.rm);
+				pds->logger(jobInfo.logger);
 				jobInfo.keyInfo->dictOidToColOid[dictOid] = sc->oid();
 				pds->alias(alias);
 				pds->view(view);
@@ -2597,6 +2637,7 @@ const JobStepVector doConstantFilter(const ConstantFilter* cf, JobInfo& jobInfo)
 					pds->setBOP(bop2num(op));
 
 				//Add the filter(s)
+				uint64_t card = 0;
 				for (unsigned i = 0; i < fl.size(); i++)
 				{
 					const SSFP sf = fl[i];
@@ -2616,6 +2657,7 @@ const JobStepVector doConstantFilter(const ConstantFilter* cf, JobInfo& jobInfo)
 					size_t spos = value.find_last_not_of(" ");
 					if (spos != string::npos) value = value.substr(0, spos+1);
 					pds->addFilter(cop, value);
+					card = sf->cardinality();
 				}
 
 				// data list for pcolstep output
@@ -2624,7 +2666,7 @@ const JobStepVector doConstantFilter(const ConstantFilter* cf, JobInfo& jobInfo)
 				spdl1->fifoDL(dl1);
 				dl1->OID(sc->oid());
 
-				JobStepAssociation outJs1;
+				JobStepAssociation outJs1(jobInfo.status);
 				outJs1.outAdd(spdl1);
 				pcs->outputAssociation(outJs1);
 
@@ -2634,12 +2676,12 @@ const JobStepVector doConstantFilter(const ConstantFilter* cf, JobInfo& jobInfo)
 				spdl2->stringDL(dl2);
 				dl2->OID(sc->oid());
 
-				JobStepAssociation outJs2;
+				JobStepAssociation outJs2(jobInfo.status);
 				outJs2.outAdd(spdl2);
 				pds->outputAssociation(outJs2);
 
 				//Associate pcs with pds
-				JobStepAssociation outJs;
+				JobStepAssociation outJs(jobInfo.status);
 				outJs.outAdd(spdl1);
 				pds->inputAssociation(outJs);
 
@@ -2670,7 +2712,11 @@ const JobStepVector doConstantFilter(const ConstantFilter* cf, JobInfo& jobInfo)
 			}
 			else
 			{
-				pDictionaryScan* pds = new pDictionaryScan(dictOid, tbOID, ct,  jobInfo);
+				pDictionaryScan* pds = new pDictionaryScan(JobStepAssociation(jobInfo.status),
+					JobStepAssociation(jobInfo.status), 0, jobInfo.csc, dictOid,
+					ct.ddn.compressionType, tbOID, jobInfo.sessionId, jobInfo.txnId,
+					jobInfo.verId, 0, jobInfo.statementId, jobInfo.rm);
+				pds->logger(jobInfo.logger);
 				jobInfo.keyInfo->dictOidToColOid[dictOid] = sc.get()->oid();
 				pds->alias(alias);
 				pds->view(view);
@@ -2680,6 +2726,7 @@ const JobStepVector doConstantFilter(const ConstantFilter* cf, JobInfo& jobInfo)
 					pds->setBOP(bop2num(op));
 
 				//Add the filter(s)
+				uint64_t card = 0;
 				for (unsigned i = 0; i < fl.size(); i++)
 				{
 					const SSFP sf = fl[i];
@@ -2699,12 +2746,18 @@ const JobStepVector doConstantFilter(const ConstantFilter* cf, JobInfo& jobInfo)
 					size_t spos = value.find_last_not_of(" ");
 					if (spos != string::npos) value = value.substr(0, spos+1);
 					pds->addFilter(cop, value);
+					card = sf->cardinality();
 				}
 
 				// save for expression transformation
 				pds->addFilter(cf);
 
-				TupleHashJoinStep* thj = new TupleHashJoinStep(jobInfo);
+				TupleHashJoinStep* thj = new TupleHashJoinStep(
+					jobInfo.sessionId,
+					jobInfo.txnId,
+					jobInfo.statementId,
+					&jobInfo.rm);
+				thj->logger(jobInfo.logger);
 				thj->tableOid1(0);
 				thj->tableOid2(tbOID);
 				thj->alias1(alias);
@@ -2715,6 +2768,7 @@ const JobStepVector doConstantFilter(const ConstantFilter* cf, JobInfo& jobInfo)
 				thj->schema2(schema);
 				thj->oid1(sc->oid());
 				thj->oid2(sc->oid());
+//				thj->joinId(jobInfo.joinNum++);
 				thj->joinId(0);
 				thj->setJoinType(INNER);
 
@@ -2724,7 +2778,7 @@ const JobStepVector doConstantFilter(const ConstantFilter* cf, JobInfo& jobInfo)
 				spdl1->rowGroupDL(dl1);
 				dl1->OID(dictOid);
 
-				JobStepAssociation outJs1;
+				JobStepAssociation outJs1(jobInfo.status);
 				outJs1.outAdd(spdl1);
 				pds->outputAssociation(outJs1);
 
@@ -2733,11 +2787,11 @@ const JobStepVector doConstantFilter(const ConstantFilter* cf, JobInfo& jobInfo)
 				spdl2->rowGroupDL(dl2);
 				dl2->OID(sc->oid());
 
-				JobStepAssociation outJs2;
+				JobStepAssociation outJs2(jobInfo.status);
 				outJs2.outAdd(spdl2);
 				pcs->outputAssociation(outJs2);
 
-				JobStepAssociation outJs3;
+				JobStepAssociation outJs3(jobInfo.status);
 				outJs3.outAdd(spdl1);
 				outJs3.outAdd(spdl2);
 				thj->inputAssociation(outJs3);
@@ -2774,21 +2828,20 @@ const JobStepVector doConstantFilter(const ConstantFilter* cf, JobInfo& jobInfo)
 
 			CalpontSystemCatalog::OID tblOid = tableOid(sc.get(), jobInfo.csc);
 			string alias(extractTableAlias(sc));
-			pColStep* pcs = NULL;
-			if (pc == NULL)
-				pcs = new pColStep(sc->oid(), tblOid, ct, jobInfo);
-			else
-				pcs = new PseudoColStep(sc->oid(), tblOid, pc->pseudoType(), ct, jobInfo);
-
-			pcs->alias(extractTableAlias(sc));
-			pcs->view(sc->viewName());
-			pcs->name(sc->columnName());
-			pcs->schema(sc->schemaName());
+			pColStep* pcss = new pColStep(JobStepAssociation(jobInfo.status),
+				JobStepAssociation(jobInfo.status), 0, jobInfo.csc, sc->oid(), tblOid, ct,
+				jobInfo.sessionId, jobInfo.txnId, jobInfo.verId, 0, jobInfo.statementId,
+				jobInfo.rm);
+			pcss->logger(jobInfo.logger);
+			pcss->alias(extractTableAlias(sc));
+			pcss->view(sc->viewName());
+			pcss->name(sc->columnName());
+			pcss->schema(sc->schemaName());
 
 			if (sc->isInfiniDB())
 			{
 				if (op)
-					pcs->setBOP(bop2num(op));
+					pcss->setBOP(bop2num(op));
 
 				for (unsigned i = 0; i < fl.size(); i++)
 				{
@@ -2824,23 +2877,42 @@ const JobStepVector doConstantFilter(const ConstantFilter* cf, JobInfo& jobInfo)
 					if (ConstantColumn::NULLDATA == cc->type() && (opeq == *sop || opne == *sop))
 						cop = COMPARE_NIL;
 
-					pcs->addFilter(cop, value, rf);
+					pcss->addFilter(cop, value, rf);
+				}
+				if (!cf->functionName().empty())
+				{
+					//This is one of the CNX UDF functions. We want to make this look like
+					//SimpleColumn op ConstantColumn, but mark the SimpleColumn as using a distributed UDF
+					string fPfx(cf->functionName(), 0, 6);
+					if (fPfx != "cpfunc")
+					{
+						string fn = cf->functionName();
+						if (fn == "abs" || fn == "acos" || fn == "asin" || fn == "atan" || fn == "cos" || fn == "cot" ||
+							fn == "exp" || fn == "ln" || fn == "log" || fn == "log2" || fn == "log10" || fn == "sin" ||
+							fn == "sqrt" || fn == "tan")
+							;
+						else
+							throw runtime_error("Unhandled distributed UDF");
+					}
+					//set the func on pColStep here...
+					pcss->udfName(cf->functionName());
 				}
 			}
 
-			// save for expression transformation
-			pcs->addFilter(cf);
 
-			sjstep.reset(pcs);
+			// save for expression transformation
+			pcss->addFilter(cf);
+
+			sjstep.reset(pcss);
 			jsv.push_back(sjstep);
 
 //XXX use this before connector sets colType in sc correctly.
 			CalpontSystemCatalog::ColType ct = sc->colType();
-			if (!sc->schemaName().empty() && sc->isInfiniDB() && !pc)
+			if (!sc->schemaName().empty() && sc->isInfiniDB())
 				ct = jobInfo.csc->colType(sc->oid());
 			TupleInfo ti(setTupleInfo(ct, sc->oid(), jobInfo, tblOid, sc.get(), alias));
 //X			TupleInfo ti(setTupleInfo(sc->colType(), sc->oid(), jobInfo, tblOid, sc.get(), alias));
-			pcs->tupleId(ti.key);
+			pcss->tupleId(ti.key);
 		}
 	}
 	else
@@ -2849,112 +2921,6 @@ const JobStepVector doConstantFilter(const ConstantFilter* cf, JobInfo& jobInfo)
 			 << opStr << "'" << boldStop << endl;
 		throw logic_error("doConstantFilter: Not handled operation type.");
 	}
-
-	return jsv;
-}
-
-
-const JobStepVector doFunctionFilter(const ParseTree* n, JobInfo& jobInfo)
-{
-	FunctionColumn* fc = dynamic_cast<FunctionColumn*>(n->data());
-	idbassert(fc);
-
-	JobStepVector jsv;
-	string functionName = ba::to_lower_copy(fc->functionName());
-	if (functionName.compare("in") == 0 || functionName.compare(" in ") == 0)
-	{
-		const funcexp::FunctionParm& parms = fc->functionParms();
-		FunctionColumn* parm0Fc = dynamic_cast<FunctionColumn*>(parms[0]->data());
-		PseudoColumn*   parm0Pc = dynamic_cast<PseudoColumn*>(parms[0]->data());
-		vector<vector<string> > constParms(3);
-		uint64_t constParmsCount = 0;
-		if (parm0Fc && parm0Fc->functionName().compare("idbpartition") == 0)
-		{
-			for (uint64_t i = 1; i < parms.size(); i++)
-			{
-				ConstantColumn* cc = dynamic_cast<ConstantColumn*>(parms[i]->data());
-				if (cc)
-				{
-					vector<string> cv;
-					boost::split(cv, cc->constval(), boost::is_any_of("."));
-					if (cv.size() == 3)
-					{
-						constParms[1].push_back(cv[0]);
-						constParms[2].push_back(cv[1]);
-						constParms[0].push_back(cv[2]);
-						constParmsCount++;
-					}
-				}
-			}
-
-			if (constParmsCount == (parms.size() - 1))
-			{
-				const funcexp::FunctionParm& pcs = parm0Fc->functionParms();
-				for (uint64_t i = 0; i < 3; i++)
-				{
-					ConstantFilter* cf = new ConstantFilter();
-					SOP sop(new LogicOperator("or"));
-					PseudoColumn* pc = dynamic_cast<PseudoColumn*>(pcs[i]->data());
-					idbassert(pc);
-					SSC col(pc->clone());
-					cf->op(sop);
-					cf->col(col);
-					sop.reset(new PredicateOperator("="));
-					for (uint64_t j = 0; j < constParmsCount; j++)
-					{
-						SimpleFilter* f = new SimpleFilter(sop, col->clone(),
-						                                   new ConstantColumn(constParms[i][j]));
-						cf->pushFilter(f);
-					}
-
-					JobStepVector sv = doConstantFilter(cf, jobInfo);
-					delete cf;
-
-					jsv.insert(jsv.end(), sv.begin(), sv.end());
-				}
-			}
-
-			// put the separate filtered resulted together
-			JobStepVector sv = doExpressionFilter(n, jobInfo);
-			jsv.insert(jsv.end(), sv.begin(), sv.end());
-		}
-		else if (parm0Pc != NULL)
-		{
-			for (uint64_t i = 1; i < parms.size(); i++)
-			{
-				ConstantColumn* cc = dynamic_cast<ConstantColumn*>(parms[i]->data());
-				if (cc)
-				{
-					constParms[0].push_back(cc->constval());
-					constParmsCount++;
-				}
-			}
-
-			if (constParmsCount == (parms.size() - 1))
-			{
-				ConstantFilter* cf = new ConstantFilter();
-				SOP sop(new LogicOperator("or"));
-				SSC col(parm0Pc->clone());
-				cf->op(sop);
-				cf->col(col);
-				sop.reset(new PredicateOperator("="));
-				for (uint64_t j = 0; j < constParmsCount; j++)
-				{
-					SimpleFilter* f = new SimpleFilter(sop, col->clone(),
-					                                   new ConstantColumn(constParms[0][j]));
-					cf->pushFilter(f);
-				}
-
-				JobStepVector sv = doConstantFilter(cf, jobInfo);
-				delete cf;
-
-				jsv.insert(jsv.end(), sv.begin(), sv.end());
-			}
-		}
-	}
-
-	if (jsv.empty())
-		jsv = doExpressionFilter(n, jobInfo);
 
 	return jsv;
 }
@@ -3009,9 +2975,9 @@ void doOR(const ParseTree* n, JobStepVector& jsv, JobInfo& jobInfo, bool tryComb
 	jobInfo.stack.pop();
 
 	// @bug3570, attempt to combine only if there is one column involved.
-	if (tryCombine && ((jsv.size() == 1 && dynamic_cast<pColStep*>(jsv.begin()->get()) != NULL) ||
-		 (jsv.size() == 2 && dynamic_cast<pDictionaryStep*>((jsv.end()-1)->get()) != NULL) ||
-		 (jsv.size() == 3 && dynamic_cast<pDictionaryScan*>(jsv.begin()->get()) != NULL)) &&
+	if (tryCombine && ((jsv.size() == 1 && (typeid(*(jsv.begin()->get())) == typeid(pColStep))) ||
+		 (jsv.size() == 2 && (typeid(*((jsv.end()-1)->get())) == typeid(pDictionaryStep))) ||
+		 (jsv.size() == 3 && (typeid(*(jsv.begin()->get())) == typeid(pDictionaryScan)))) &&
  		tryCombineFilters(jsv, rhv, BOP_OR))
 	{
 		jobInfo.stack.push(jsv);
@@ -3076,9 +3042,6 @@ JLF_ExecPlanToJobList::walkTree(ParseTree* n, void* obj)
 		jobInfo->stack.push(jsv);
 		break;
 	case FUNCTIONCOLUMN:
-		jsv = doFunctionFilter(n, *jobInfo);
-		jobInfo->stack.push(jsv);
-		break;
 	case ARITHMETICCOLUMN:
 		jsv = doExpressionFilter(n, *jobInfo);
 		jobInfo->stack.push(jsv);

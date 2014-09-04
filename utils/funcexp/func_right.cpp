@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_right.cpp 3923 2013-06-19 21:43:06Z bwilkinson $
+* $Id: func_right.cpp 3716 2013-04-18 16:35:52Z bpaul $
 *
 *
 ****************************************************************************/
@@ -50,7 +50,7 @@ std::string Func_right::getStrVal(rowgroup::Row& row,
 						bool& isNull,
 						execplan::CalpontSystemCatalog::ColType&)
 {
-	const string& tstr = fp[0]->data()->getStrVal(row, isNull);
+	string tstr = fp[0]->data()->getStrVal(row, isNull);
 	if (isNull)
 		return "";
 

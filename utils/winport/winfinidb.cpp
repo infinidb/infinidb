@@ -34,14 +34,12 @@
 #include <sstream>
 //#define NDEBUG
 #include <cassert>
-#include <unistd.h>
 using namespace std;
 
 #include <boost/algorithm/string/predicate.hpp>
 namespace ba=boost::algorithm;
 
 #include "idbregistry.h"
-#include "syslog.h"
 
 namespace
 {
@@ -63,7 +61,6 @@ struct ProcInfo
 	{
 	}
 	string pName;
-    string pCmdLine;
 };
 
 typedef vector<ProcInfo> ProcInfoVec;
@@ -85,15 +82,9 @@ int runIt(const string& pName)
 	STARTUPINFO sInfo;
 	ZeroMemory(&sInfo, sizeof(sInfo));
 
-	try
-	{
-		if (CreateProcess(0, cmdLine, 0, 0, false, 0, 0, 0, &sInfo, &pInfo) == 0)
-			return -1;
-	}
-	catch (exception& e)
-	{
-        cout << e.what() << endl;
-	}
+	if (CreateProcess(0, cmdLine, 0, 0, false, 0, 0, 0, &sInfo, &pInfo) == 0)
+		return -1;
+
 	if (WaitForSingleObject(pInfo.hProcess, INFINITE) != WAIT_OBJECT_0)
 	{
 		rc = -1;
@@ -135,7 +126,7 @@ int loadBRM()
 		return 0;
 
 	// run load_brm and wait for it to finish
-	string brmCmd = "load_brm \"" + saveFilePfx +"\"";
+	string brmCmd = "load_brm " + saveFilePfx;
 	if (runIt(brmCmd))
 		return -1;
 	return 0;
@@ -168,8 +159,6 @@ int startUp()
 {
 	int rc;
 
-	syslog(LOG_INFO, "System is starting");
-
 	if (runIt("clearShm"))
 		return -1;
 
@@ -192,6 +181,7 @@ int startUp()
 
 	const ProcInfoVec::size_type numProcs = procInfo.size();
 
+	char* cmdLine = (char*)alloca(cmdLineLen);
 	for (unsigned pidx = 0; pidx < numProcs; pidx++)
 	{
 		cout << "Starting " << procInfo[pidx].pName << "...";
@@ -206,15 +196,11 @@ int startUp()
 			DWORD fmRes = FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER|FORMAT_MESSAGE_FROM_SYSTEM,
 				0, GetLastError(), 0, (LPSTR)lppBuffer, 0, 0);
 
-			cerr << endl;
-			ostringstream ostr;
-			ostr << "Failed to start process runner thread for " << procInfo[pidx].pName << ": ";
+			cerr << endl << "Failed to start process runner thread for " << procInfo[pidx].pName << ": ";
 			if (fmRes > 0)
-				ostr << lpBuffer;
+				cerr << lpBuffer << endl;
 			else
-				ostr << "Unknown error";
-			cerr << ostr.str() << endl; 
-			syslog(LOG_ERR, ostr.str().c_str());
+				cerr << "Unknown error" << endl;
 			return -1;
 		}
 
@@ -248,38 +234,15 @@ DWORD WINAPI procRunner(LPVOID parms)
 			LPTSTR* lppBuffer = &lpBuffer;
 			DWORD fmRes = FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER|FORMAT_MESSAGE_FROM_SYSTEM,
 				0, GetLastError(), 0, (LPSTR)lppBuffer, 0, 0);
-			ostringstream ostr;
-			cerr << endl;
-			ostr << "Failed to start process " << pi.pName << ": ";
+
+			cerr << endl << "Failed to start process " << pip->pName << ": ";
 			if (fmRes > 0)
-				ostr << lpBuffer;
+				cerr << lpBuffer << endl;
 			else
-				ostr << "Unknown error";
-			cerr << ostr.str() << endl; 
-			syslog(LOG_ERR, ostr.str().c_str());
+				cerr << "Unknown error" << endl;
 			return -1;
 		}
-		else
-		{
-			ostringstream ostr;
-			ostr << pi.pName << " started ";
-			cerr << ostr.str() << endl; 
-			syslog(LOG_INFO, ostr.str().c_str());
-		}
 		WaitForSingleObject(pInfo.hProcess, INFINITE);
-		ostringstream ostr;
-		ostr << pi.pName;
-		if (shuttingDown)
-		{
-			ostr << " shut down";
-			syslog(LOG_INFO, ostr.str().c_str());
-		}
-		else
-		{
-			ostr << " has died unexpectedly";
-			syslog(LOG_ERR, ostr.str().c_str());
-		}
-		cerr << ostr.str() << endl; 
 		CloseHandle(pInfo.hProcess);
 		if (shuttingDown)
 			return 0;
@@ -334,6 +297,7 @@ int killProcByName(const string& pname)
 			HANDLE hProcess = OpenProcess( PROCESS_QUERY_INFORMATION |
 										   PROCESS_VM_READ,
 										   FALSE, pids[i] );
+
 			// Get the process name.
 			if (NULL != hProcess )
 			{
@@ -365,7 +329,6 @@ int killProcByName(const string& pname)
 int shutDown()
 {
 	shuttingDown = true;
-	syslog(LOG_INFO, "System is shutting down");
 
 	vector<string> pList;
 

@@ -18,7 +18,7 @@
 //
 // C++ Interface: TupleUnion
 //
-// Description:
+// Description: 
 //
 //
 // Author: Patrick <pleblanc@localhost.localdomain>, (C) 2009
@@ -42,19 +42,35 @@
 namespace joblist
 {
 
-
-
 class TupleUnion : public JobStep, public TupleDeliveryStep
 {
 public:
-	TupleUnion(execplan::CalpontSystemCatalog::OID tableOID, const JobInfo& jobInfo);
+	TupleUnion(const JobStepAssociation &in, 
+		const JobStepAssociation &out,
+		execplan::CalpontSystemCatalog::OID tableOID,
+		uint32_t sessionID,
+		uint32_t txnId,
+		uint32_t verId,
+		uint16_t stepID,
+		uint32_t statementID,
+		ResourceManager& r);
 	~TupleUnion();
 
 	void run();
 	void join();
 
 	const std::string toString() const;
+	void stepId(uint16_t);
+	uint16_t stepId() const;
+	uint32_t sessionId()   const;
+	uint32_t txnId()       const;
+	uint32_t statementId() const;
 	execplan::CalpontSystemCatalog::OID tableOid() const;
+	void logger(const SPJL& logger) { fLogger = logger; }
+	const JobStepAssociation & inputAssociation() const;
+	void inputAssociation(const JobStepAssociation &in);
+	const JobStepAssociation & outputAssociation() const;
+	void outputAssociation(const JobStepAssociation &out);
 
 	void setInputRowGroups(const std::vector<rowgroup::RowGroup> &);
 	void setOutputRowGroup(const rowgroup::RowGroup &);
@@ -62,8 +78,6 @@ public:
 
 	const rowgroup::RowGroup& getOutputRowGroup() const { return outputRG; }
 	const rowgroup::RowGroup& getDeliveredRowGroup() const { return outputRG; }
-	void  deliverStringTableRowGroup(bool b)  { outputRG.setUseStringTable(b); }
-	bool  deliverStringTableRowGroup() const  { return outputRG.usesStringTable(); }
 
 	// @bug 598 for self-join
 	std::string alias1() const { return fAlias1; }
@@ -76,29 +90,26 @@ public:
 	std::string view2() const { return fView2; }
 	void view2(const std::string& vw) { fView2 = vw; }
 
-	uint32_t nextBand(messageqcpp::ByteStream &bs);
-
+	uint nextBand(messageqcpp::ByteStream &bs);
+	void setIsDelivery(bool);
 
 private:
 
-	struct RowPosition
-	{
-		uint64_t group : 48;
-		uint64_t row   : 16;
-
-		inline RowPosition(uint64_t i = 0, uint64_t j = 0) : group(i), row(j) {};
-		static const uint64_t normalizedFlag = 0x800000000000ULL;   // 48th bit is set
-	};
-
-	void getOutput(rowgroup::RowGroup *rg, rowgroup::Row *row, rowgroup::RGData *data);
 	void addToOutput(rowgroup::Row *r, rowgroup::RowGroup *rg, bool keepit,
-		rowgroup::RGData &data);
+		boost::shared_array<uint8_t> *data);
 	void normalize(const rowgroup::Row &in, rowgroup::Row *out);
-	void writeNull(rowgroup::Row *out, uint32_t col);
-	void readInput(uint32_t);
-	void formatMiniStats();
+	void writeNull(rowgroup::Row *out, uint col);
+	void readInput(uint);
 
+	JobStepAssociation inJSA;
+	JobStepAssociation outJSA;
 	execplan::CalpontSystemCatalog::OID fTableOID;
+	uint32_t sessionID;
+	uint32_t txnID;
+	uint32_t verID;
+	uint16_t stepID;
+	uint32_t statementID;
+	SPJL fLogger;
 	// @bug 598 for self-join
 	std::string fAlias1;
 	std::string fAlias2;
@@ -106,57 +117,50 @@ private:
 	std::string fView1;
 	std::string fView2;
 
+	bool isDelivery;
+
 	rowgroup::RowGroup outputRG;
 	std::vector<rowgroup::RowGroup> inputRGs;
 	std::vector<RowGroupDL *> inputs;
 	RowGroupDL *output;
-	uint32_t outputIt;
+	uint outputIt;
 
 	struct Runner {
 		TupleUnion *tu;
-		uint32_t index;
-		Runner(TupleUnion *t, uint32_t in) : tu(t), index(in) { }
+		uint index;
+		Runner(TupleUnion *t, uint in) : tu(t), index(in) { }
 		void operator()() { tu->readInput(index); }
 	};
 	std::vector<boost::shared_ptr<boost::thread> > runners;
 
 	struct Hasher {
 		TupleUnion *ts;
-		utils::Hasher_r h;
+		utils::Hasher h;
 		Hasher(TupleUnion *t) : ts(t) { }
-		uint64_t operator()(const RowPosition &) const;
+		uint64_t operator()(const uint8_t *) const;
 	};
 	struct Eq {
 		TupleUnion *ts;
 		Eq(TupleUnion *t) : ts(t) { }
-		bool operator()(const RowPosition &, const RowPosition &) const;
+		bool operator()(const uint8_t *, const uint8_t *) const;
 	};
-
-	typedef std::tr1::unordered_set<RowPosition, Hasher, Eq,
-		utils::STLPoolAllocator<RowPosition> > Uniquer_t;
+	typedef std::tr1::unordered_set<uint8_t *, Hasher, Eq,
+		utils::STLPoolAllocator<uint8_t *> > Uniquer_t;
 
 	boost::scoped_ptr<Uniquer_t> uniquer;
-	std::vector<rowgroup::RGData> rowMemory;
+	std::vector<boost::shared_array<uint8_t> > rowMemory;
 	boost::mutex sMutex, uniquerMutex;
 	uint64_t memUsage;
-	uint32_t rowLength;
-	rowgroup::Row row, row2;
+	uint rowLength;
 	std::vector<bool> distinctFlags;
 	ResourceManager& rm;
-	utils::STLPoolAllocator<RowPosition> allocator;
-	boost::scoped_array<rowgroup::RGData> normalizedData;
+	utils::STLPoolAllocator<uint8_t *> allocator;
 
-	uint32_t runnersDone;
-	uint32_t distinctCount;
-	uint32_t distinctDone;
-
-	uint64_t fRowsReturned;
+	uint runnersDone;
 
 	// temporary hack to make sure JobList only calls run, join once
 	boost::mutex jlLock;
 	bool runRan, joinRan;
-
-	boost::shared_ptr<int64_t> sessionMemLimit;
 };
 
 }

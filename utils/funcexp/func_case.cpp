@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_case.cpp 3954 2013-07-08 16:30:15Z bpaul $
+* $Id: func_case.cpp 3956 2013-07-08 19:17:26Z bpaul $
 *
 *
 ****************************************************************************/
@@ -80,30 +80,10 @@ inline uint64_t simple_case_cmp(Row& row,
 			break;
 		}
 
-        case execplan::CalpontSystemCatalog::UBIGINT:
-        case execplan::CalpontSystemCatalog::UINT:
-        case execplan::CalpontSystemCatalog::UMEDINT:
-        case execplan::CalpontSystemCatalog::UTINYINT:
-        case execplan::CalpontSystemCatalog::USMALLINT:
-        {
-            uint64_t ev = parm[n]->data()->getUintVal(row, isNull);
-            if (isNull)
-                break;
-
-            for (; i < n; i += 2)
-            {
-                if (ev == parm[i]->data()->getUintVal(row, isNull) && !isNull)
-                    break;
-                else
-                    isNull = false;
-            }
-            break;
-        }
-
 		case execplan::CalpontSystemCatalog::CHAR:
 		case execplan::CalpontSystemCatalog::VARCHAR:
 		{
-   			const string& ev = parm[n]->data()->getStrVal(row, isNull);
+   			string ev = parm[n]->data()->getStrVal(row, isNull);
 			if (isNull)
 				break;
 
@@ -119,7 +99,6 @@ inline uint64_t simple_case_cmp(Row& row,
 		}
 
 		case execplan::CalpontSystemCatalog::DECIMAL:
-        case execplan::CalpontSystemCatalog::UDECIMAL:
 		{
    			IDB_Decimal ev = parm[n]->data()->getDecimalVal(row, isNull);
 			if (isNull)
@@ -136,7 +115,6 @@ inline uint64_t simple_case_cmp(Row& row,
 		}
 
 		case execplan::CalpontSystemCatalog::DOUBLE:
-        case execplan::CalpontSystemCatalog::UDOUBLE:
 		{
    			double ev = parm[n]->data()->getDoubleVal(row, isNull);
 			if (isNull)
@@ -152,8 +130,7 @@ inline uint64_t simple_case_cmp(Row& row,
 			break;
 		}
 
-        case execplan::CalpontSystemCatalog::FLOAT:
-		case execplan::CalpontSystemCatalog::UFLOAT:
+		case execplan::CalpontSystemCatalog::FLOAT:
 		{
    			float ev = parm[n]->data()->getFloatVal(row, isNull);
 			if (isNull)

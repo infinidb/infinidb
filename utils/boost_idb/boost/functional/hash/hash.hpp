@@ -15,23 +15,13 @@
 #include <boost/functional/hash/detail/hash_float.hpp>
 #include <string>
 #include <boost/limits.hpp>
-#include <boost/type_traits/is_enum.hpp>
-#include <boost/type_traits/is_integral.hpp>
-#include <boost/utility/enable_if.hpp>
+
+#if defined(BOOST_HASH_NO_IMPLICIT_CASTS)
+#include <boost/static_assert.hpp>
+#endif
 
 #if defined(BOOST_NO_TEMPLATE_PARTIAL_SPECIALIZATION)
 #include <boost/type_traits/is_pointer.hpp>
-#endif
-
-#if !defined(BOOST_NO_CXX11_HDR_TYPEINDEX)
-#include <typeindex>
-#endif
-
-#if defined(BOOST_MSVC)
-#pragma warning(push)
-#pragma warning(disable:6295) // Ill-defined for-loop : 'unsigned int' values
-                              // are always of range '0' to '4294967295'.
-                              // Loop executes infinitely.
 #endif
 
 #if BOOST_WORKAROUND(__GNUC__, < 3) \
@@ -43,81 +33,37 @@
 
 namespace boost
 {
-    namespace hash_detail
-    {
-        struct enable_hash_value { typedef std::size_t type; };
+#if defined(BOOST_HASH_NO_IMPLICIT_CASTS)
 
-        template <typename T> struct basic_numbers {};
-        template <typename T> struct long_numbers;
-        template <typename T> struct ulong_numbers;
-        template <typename T> struct float_numbers {};
-
-        template <> struct basic_numbers<bool> :
-            boost::hash_detail::enable_hash_value {};
-        template <> struct basic_numbers<char> :
-            boost::hash_detail::enable_hash_value {};
-        template <> struct basic_numbers<unsigned char> :
-            boost::hash_detail::enable_hash_value {};
-        template <> struct basic_numbers<signed char> :
-            boost::hash_detail::enable_hash_value {};
-        template <> struct basic_numbers<short> :
-            boost::hash_detail::enable_hash_value {};
-        template <> struct basic_numbers<unsigned short> :
-            boost::hash_detail::enable_hash_value {};
-        template <> struct basic_numbers<int> :
-            boost::hash_detail::enable_hash_value {};
-        template <> struct basic_numbers<unsigned int> :
-            boost::hash_detail::enable_hash_value {};
-        template <> struct basic_numbers<long> :
-            boost::hash_detail::enable_hash_value {};
-        template <> struct basic_numbers<unsigned long> :
-            boost::hash_detail::enable_hash_value {};
-
-#if !defined(BOOST_NO_INTRINSIC_WCHAR_T)
-        template <> struct basic_numbers<wchar_t> :
-            boost::hash_detail::enable_hash_value {};
-#endif
-
-        // long_numbers is defined like this to allow for separate
-        // specialization for long_long and int128_type, in case
-        // they conflict.
-        template <typename T> struct long_numbers2 {};
-        template <typename T> struct ulong_numbers2 {};
-        template <typename T> struct long_numbers : long_numbers2<T> {};
-        template <typename T> struct ulong_numbers : ulong_numbers2<T> {};
-
-#if !defined(BOOST_NO_LONG_LONG)
-        template <> struct long_numbers<boost::long_long_type> :
-            boost::hash_detail::enable_hash_value {};
-        template <> struct ulong_numbers<boost::ulong_long_type> :
-            boost::hash_detail::enable_hash_value {};
-#endif
-
-#if defined(BOOST_HAS_INT128)
-        template <> struct long_numbers2<boost::int128_type> :
-            boost::hash_detail::enable_hash_value {};
-        template <> struct ulong_numbers2<boost::uint128_type> :
-            boost::hash_detail::enable_hash_value {};
-#endif
-
-        template <> struct float_numbers<float> :
-            boost::hash_detail::enable_hash_value {};
-        template <> struct float_numbers<double> :
-            boost::hash_detail::enable_hash_value {};
-        template <> struct float_numbers<long double> :
-            boost::hash_detail::enable_hash_value {};
+    // If you get a static assertion here, it's because hash_value
+    // isn't declared for your type.
+    template <typename T>
+    std::size_t hash_value(T const&) {
+        BOOST_STATIC_ASSERT((T*) 0 && false);
+        return 0;
     }
 
-    template <typename T>
-    typename boost::hash_detail::basic_numbers<T>::type hash_value(T);
-    template <typename T>
-    typename boost::hash_detail::long_numbers<T>::type hash_value(T);
-    template <typename T>
-    typename boost::hash_detail::ulong_numbers<T>::type hash_value(T);
+#endif
 
-    template <typename T>
-    typename boost::enable_if<boost::is_enum<T>, std::size_t>::type
-        hash_value(T);
+    std::size_t hash_value(bool);
+    std::size_t hash_value(char);
+    std::size_t hash_value(unsigned char);
+    std::size_t hash_value(signed char);
+    std::size_t hash_value(short);
+    std::size_t hash_value(unsigned short);
+    std::size_t hash_value(int);
+    std::size_t hash_value(unsigned int);
+    std::size_t hash_value(long);
+    std::size_t hash_value(unsigned long);
+
+#if !defined(BOOST_NO_INTRINSIC_WCHAR_T)
+    std::size_t hash_value(wchar_t);
+#endif
+    
+#if !defined(BOOST_NO_LONG_LONG)
+    std::size_t hash_value(boost::long_long_type);
+    std::size_t hash_value(boost::ulong_long_type);
+#endif
 
 #if !BOOST_WORKAROUND(__DMC__, <= 0x848)
     template <class T> std::size_t hash_value(T* const&);
@@ -133,16 +79,13 @@ namespace boost
     std::size_t hash_value(T (&x)[N]);
 #endif
 
+    std::size_t hash_value(float v);
+    std::size_t hash_value(double v);
+    std::size_t hash_value(long double v);
+
     template <class Ch, class A>
     std::size_t hash_value(
         std::basic_string<Ch, std::BOOST_HASH_CHAR_TRAITS<Ch>, A> const&);
-
-    template <typename T>
-    typename boost::hash_detail::float_numbers<T>::type hash_value(T);
-
-#if !defined(BOOST_NO_CXX11_HDR_TYPEINDEX)
-    std::size_t hash_value(std::type_index);
-#endif
 
     // Implementation
 
@@ -190,30 +133,74 @@ namespace boost
         }
     }
 
-    template <typename T>
-    typename boost::hash_detail::basic_numbers<T>::type hash_value(T v)
+    inline std::size_t hash_value(bool v)
     {
         return static_cast<std::size_t>(v);
     }
 
-    template <typename T>
-    typename boost::hash_detail::long_numbers<T>::type hash_value(T v)
+    inline std::size_t hash_value(char v)
+    {
+        return static_cast<std::size_t>(v);
+    }
+
+    inline std::size_t hash_value(unsigned char v)
+    {
+        return static_cast<std::size_t>(v);
+    }
+
+    inline std::size_t hash_value(signed char v)
+    {
+        return static_cast<std::size_t>(v);
+    }
+
+    inline std::size_t hash_value(short v)
+    {
+        return static_cast<std::size_t>(v);
+    }
+
+    inline std::size_t hash_value(unsigned short v)
+    {
+        return static_cast<std::size_t>(v);
+    }
+
+    inline std::size_t hash_value(int v)
+    {
+        return static_cast<std::size_t>(v);
+    }
+
+    inline std::size_t hash_value(unsigned int v)
+    {
+        return static_cast<std::size_t>(v);
+    }
+
+    inline std::size_t hash_value(long v)
+    {
+        return static_cast<std::size_t>(v);
+    }
+
+    inline std::size_t hash_value(unsigned long v)
+    {
+        return static_cast<std::size_t>(v);
+    }
+
+#if !defined(BOOST_NO_INTRINSIC_WCHAR_T)
+    inline std::size_t hash_value(wchar_t v)
+    {
+        return static_cast<std::size_t>(v);
+    }
+#endif
+
+#if !defined(BOOST_NO_LONG_LONG)
+    inline std::size_t hash_value(boost::long_long_type v)
     {
         return hash_detail::hash_value_signed(v);
     }
 
-    template <typename T>
-    typename boost::hash_detail::ulong_numbers<T>::type hash_value(T v)
+    inline std::size_t hash_value(boost::ulong_long_type v)
     {
         return hash_detail::hash_value_unsigned(v);
     }
-
-    template <typename T>
-    typename boost::enable_if<boost::is_enum<T>, std::size_t>::type
-        hash_value(T v)
-    {
-        return static_cast<std::size_t>(v);
-    }
+#endif
 
     // Implementation by Alberto Barbati and Dave Harris.
 #if !BOOST_WORKAROUND(__DMC__, <= 0x848)
@@ -223,8 +210,8 @@ namespace boost
 #endif
     {
 #if defined(__VMS) && __INITIAL_POINTER_SIZE == 64
-    // for some reason ptrdiff_t on OpenVMS compiler with
-    // 64 bit is not 64 bit !!!
+	// for some reason ptrdiff_t on OpenVMS compiler with
+	// 64 bit is not 64 bit !!!
         std::size_t x = static_cast<std::size_t>(
            reinterpret_cast<long long int>(v));
 #else
@@ -329,18 +316,20 @@ namespace boost
         return hash_range(v.begin(), v.end());
     }
 
-    template <typename T>
-    typename boost::hash_detail::float_numbers<T>::type hash_value(T v)
+    inline std::size_t hash_value(float v)
     {
         return boost::hash_detail::float_hash_value(v);
     }
 
-#if !defined(BOOST_NO_CXX11_HDR_TYPEINDEX)
-    inline std::size_t hash_value(std::type_index v)
+    inline std::size_t hash_value(double v)
     {
-        return v.hash_code();
+        return boost::hash_detail::float_hash_value(v);
     }
-#endif
+
+    inline std::size_t hash_value(long double v)
+    {
+        return boost::hash_detail::float_hash_value(v);
+    }
 
     //
     // boost::hash
@@ -446,15 +435,6 @@ namespace boost
     BOOST_HASH_SPECIALIZE(boost::ulong_long_type)
 #endif
 
-#if defined(BOOST_HAS_INT128)
-    BOOST_HASH_SPECIALIZE(boost::int128_type)
-    BOOST_HASH_SPECIALIZE(boost::uint128_type)
-#endif
-
-#if !defined(BOOST_NO_CXX11_HDR_TYPEINDEX)
-    BOOST_HASH_SPECIALIZE(std::type_index)
-#endif
-
 #undef BOOST_HASH_SPECIALIZE
 #undef BOOST_HASH_SPECIALIZE_REF
 
@@ -524,10 +504,6 @@ namespace boost
 }
 
 #undef BOOST_HASH_CHAR_TRAITS
-
-#if defined(BOOST_MSVC)
-#pragma warning(pop)
-#endif
 
 #endif // BOOST_FUNCTIONAL_HASH_HASH_HPP
 

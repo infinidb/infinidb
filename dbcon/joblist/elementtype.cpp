@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
- * $Id: elementtype.cpp 9655 2013-06-25 23:08:13Z xlou $
+ * $Id: elementtype.cpp 8436 2012-04-04 18:18:21Z rdempsey $
  */
 
 #include <iostream>
@@ -38,10 +38,10 @@ StringElementType::StringElementType(uint64_t f, const std::string &s) : first(f
 DoubleElementType::DoubleElementType() { };
 
 DoubleElementType::DoubleElementType(uint64_t f, double s) : first(f), second(s) { };
-
+    
 RIDElementType::RIDElementType() {first = static_cast<uint64_t>(-1); };
 
-RIDElementType::RIDElementType(uint64_t f) : first(f) { };
+RIDElementType::RIDElementType(uint64_t f) : first(f) { };      
 
 const string ElementType::toString() const
 {
@@ -57,7 +57,7 @@ istream& operator>>(istream& in, ElementType& rhs)
 }
 
 ostream& operator<<(ostream& out, const ElementType& rhs)
-{
+{	
 	out.write((char *) &rhs, sizeof(ElementType));
 	return out;
 }
@@ -65,11 +65,11 @@ ostream& operator<<(ostream& out, const ElementType& rhs)
 ostream& operator<<(std::ostream& out, const StringElementType& rhs)
 {
     uint64_t r = rhs.first;
-	int16_t dlen = rhs.second.length();
+	int16_t dlen = rhs.second.length();	
 
-	out.write((char*)&r, sizeof(r));
-	out.write( (char*)&dlen, sizeof(dlen));
-	out.write( rhs.second.c_str(), dlen);
+	out.write((char*)&r, sizeof(r));	
+	out.write( (char*)&dlen, sizeof(dlen));	
+	out.write( rhs.second.c_str(), dlen);	
 
 	return out;
 }
@@ -80,9 +80,9 @@ istream& operator>>(std::istream& out, StringElementType& rhs)
 	int16_t dlen;
 	char d[32768];   // atm 32k is the largest possible val for the length of strings stored
 
-	out.read((char*)&r, sizeof(r));
-	out.read( (char*)&dlen, sizeof(dlen));
-	out.read( (char*)&d, dlen);
+	out.read((char*)&r, sizeof(r));	
+	out.read( (char*)&dlen, sizeof(dlen));	
+	out.read( (char*)&d, dlen);	
 
 	rhs.first = r;
 	rhs.second = string(d, dlen);
@@ -102,26 +102,26 @@ ostream& operator<<(ostream& out, const DoubleElementType& rhs)
 	return out;
 }
 
-istream& operator>>(istream &is, RIDElementType &dl)
-{
-    is.read((char *)&dl, sizeof(RIDElementType));
-    return is;
+istream& operator>>(istream &is, RIDElementType &dl) 
+{ 
+    is.read((char *)&dl, sizeof(RIDElementType)); 
+    return is; 
 }
 
-ostream& operator<<(ostream &os, const RIDElementType &dl)
-{
-    os.write((char *)&dl, sizeof(RIDElementType));
-    return os;
+ostream& operator<<(ostream &os, const RIDElementType &dl) 
+{ 
+    os.write((char *)&dl, sizeof(RIDElementType)); 
+    return os; 
 }
 
-istream& operator>>(istream &is, TupleType &dl)
-{
-    throw std::logic_error("TupleType >> not implemented");
+istream& operator>>(istream &is, TupleType &dl) 
+{ 
+    throw std::logic_error("TupleType >> not implemented"); 
 }
 
-ostream& operator<<(ostream &os, const TupleType &dl)
-{
-    throw std::logic_error("TupleType << not implemented");
+ostream& operator<<(ostream &os, const TupleType &dl) 
+{ 
+    throw std::logic_error("TupleType << not implemented"); 
 }
 
 } // namespace joblist

@@ -26,7 +26,7 @@
 
 #include "ddlpackageprocessor.h"
 
-#if defined(_MSC_VER) && defined(DDLPKGPROC_DLLEXPORT)
+#if defined(_MSC_VER) && defined(DDLPKGMARKPARTITIONPROC_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
@@ -42,7 +42,7 @@ namespace ddlpackageprocessor
 class MarkPartitionProcessor : public DDLPackageProcessor
 {
 public:
-	MarkPartitionProcessor(BRM::DBRM* aDbrm) : DDLPackageProcessor(aDbrm){}
+
     /** @brief process a create table statement
      *
      * @param createTableStmt the CreateTableStatement

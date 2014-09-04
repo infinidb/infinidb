@@ -1,21 +1,11 @@
-/* Copyright (C) 2014 InfiniDB, Inc.
+/***************************************************************************
+ * $Id: main.cpp 34 2006-09-29 21:13:54Z dhill $
+ *
+ *   Copyright (C) 2009-2012 Calpont Corporationoration
+ *   All rights reserved
+ *   Author: David Hill
+ ***************************************************************************/
 
-   This program is free software; you can redistribute it and/or
-   modify it under the terms of the GNU General Public License
-   as published by the Free Software Foundation; version 2 of
-   the License.
-
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-   MA 02110-1301, USA. */
-
-#include "IDBPolicy.h"
 #include "serverMonitor.h"
 
 using namespace std;
@@ -23,7 +13,6 @@ using namespace servermonitor;
 using namespace oam;
 using namespace logging;
 
-extern int swapFlag;
 
 /*****************************************************************************
 * @brief	main
@@ -38,95 +27,37 @@ int main (int argc, char** argv)
 	ServerMonitor serverMonitor;
 	Oam oam;
 
-	//Launch Memory Monitor Thread and check if swap is in critical condition
-	pthread_t memoryMonitorThread;
-	pthread_create (&memoryMonitorThread, NULL, (void*(*)(void*)) &memoryMonitor, NULL);
-
-
-	// initialize IDBPolicy while waiting swap flag being set.
-	idbdatafile::IDBPolicy::configIDBPolicy();
-
-	// wait until swap flag is set.
-	while ( swapFlag == 0 )
-	{
-		sleep(1);
+	try {
+		oam.processInitComplete("ServerMonitor");
+		LoggingID lid(SERVER_MONITOR_LOG_ID);
+		MessageLog ml(lid);
+		Message msg;
+		Message::Args args;
+		args.add("processInitComplete Successfully Called");
+		msg.format(args);
+		ml.logInfoMessage(msg);
 	}
-
-	if ( swapFlag == 1 )
+	catch (exception& ex)
 	{
-		try {
-			oam.processInitFailure();
-			LoggingID lid(SERVER_MONITOR_LOG_ID);
-			MessageLog ml(lid);
-			Message msg;
-			Message::Args args;
-			args.add("processInitFailure Called");
-			msg.format(args);
-			ml.logInfoMessage(msg);
-			sleep(5);
-			exit(1);
-		}
-		catch (exception& ex)
-		{
-			string error = ex.what();
-			LoggingID lid(SERVER_MONITOR_LOG_ID);
-			MessageLog ml(lid);
-			Message msg;
-			Message::Args args;
-			args.add("EXCEPTION ERROR on processInitComplete: ");
-			args.add(error);
-			msg.format(args);
-			ml.logErrorMessage(msg);
-			sleep(5);
-			exit(1);
-		}
-		catch(...)
-		{
-			LoggingID lid(SERVER_MONITOR_LOG_ID);
-			MessageLog ml(lid);
-			Message msg;
-			Message::Args args;
-			args.add("EXCEPTION ERROR on processInitComplete: Caught unknown exception!");
-			msg.format(args);
-			ml.logErrorMessage(msg);
-			sleep(5);
-			exit(1);
-		}
+		string error = ex.what();
+		LoggingID lid(SERVER_MONITOR_LOG_ID);
+		MessageLog ml(lid);
+		Message msg;
+		Message::Args args;
+		args.add("EXCEPTION ERROR on processInitComplete: ");
+		args.add(error);
+		msg.format(args);
+		ml.logErrorMessage(msg);
 	}
-	else
+	catch(...)
 	{
-		try {
-			oam.processInitComplete("ServerMonitor");
-			LoggingID lid(SERVER_MONITOR_LOG_ID);
-			MessageLog ml(lid);
-			Message msg;
-			Message::Args args;
-			args.add("processInitComplete Successfully Called");
-			msg.format(args);
-			ml.logInfoMessage(msg);
-		}
-		catch (exception& ex)
-		{
-			string error = ex.what();
-			LoggingID lid(SERVER_MONITOR_LOG_ID);
-			MessageLog ml(lid);
-			Message msg;
-			Message::Args args;
-			args.add("EXCEPTION ERROR on processInitComplete: ");
-			args.add(error);
-			msg.format(args);
-			ml.logErrorMessage(msg);
-		}
-		catch(...)
-		{
-			LoggingID lid(SERVER_MONITOR_LOG_ID);
-			MessageLog ml(lid);
-			Message msg;
-			Message::Args args;
-			args.add("EXCEPTION ERROR on processInitComplete: Caught unknown exception!");
-			msg.format(args);
-			ml.logErrorMessage(msg);
-		}
+		LoggingID lid(SERVER_MONITOR_LOG_ID);
+		MessageLog ml(lid);
+		Message msg;
+		Message::Args args;
+		args.add("EXCEPTION ERROR on processInitComplete: Caught unknown exception!");
+		msg.format(args);
+		ml.logErrorMessage(msg);
 	}
 
 	//Ignore SIGPIPE signals
@@ -272,6 +203,10 @@ int main (int argc, char** argv)
 			pthread_t cpuMonitorThread;
 			pthread_create (&cpuMonitorThread, NULL, (void*(*)(void*)) &cpuMonitor, NULL);
 		
+			//Launch Memory Monitor Thread
+			pthread_t memoryMonitorThread;
+			pthread_create (&memoryMonitorThread, NULL, (void*(*)(void*)) &memoryMonitor, NULL);
+		
 			//Launch Disk Monitor Thread
 			pthread_t diskMonitorThread;
 			pthread_create (&diskMonitorThread, NULL, (void*(*)(void*)) &diskMonitor, NULL);
@@ -290,4 +225,3 @@ int main (int argc, char** argv)
 
 	return 0;
 }
-

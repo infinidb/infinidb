@@ -26,20 +26,16 @@ INSTALL_MIB=$(INSTALL_ROOT)/share/snmp/mibs
 CALPONT_LIBRARY_PATH=$(EXPORT_ROOT)/lib
 CALPONT_INCLUDE_PATH=$(EXPORT_ROOT)/include
 
-IDB_COMMON_LIBS=-lwindowfunction -ljoblist -lexecplan -ljoiner -lrowgroup -lfuncexp -ludfsdk \
--loamcpp -lsnmpmanager -ldataconvert -lbrm -lcacheutils -lmessageqcpp -lloggingcpp -lconfigcpp -lrwlock \
--lcommon -lcompress -lxml2 -lidbboot -lboost_idb -lmysqlcl_idb -lquerystats -lidbdatafile -lquerytele \
--lthrift -lpthread -lrt
+IDB_COMMON_LIBS=-ljoblist -lexecplan -ljoiner -lrowgroup -lmulticast -lfuncexp -ludfsdk -loamcpp -lsnmpmanager \
+-ldataconvert -lbrm -lcacheutils -lmessageqcpp -lloggingcpp -lconfigcpp -lrwlock -lcommon -lcompress -lxml2 -lidbboot \
+-lboost_idb -lmysqlcl_idb -lquerystats
 IDB_WRITE_LIBS=-lddlpackageproc -lddlpackage -ldmlpackageproc -ldmlpackage -lwriteengine -lwriteengineclient -lcompress -lcacheutils
 IDB_SNMP_LIBS=-lnetsnmpagent -lnetsnmp -lnetsnmpmibs -lnetsnmphelpers
 
 LDFLAGS=-Wl,--no-as-needed 
 
-#DEBUG_FLAGS=-ggdb3 -fno-tree-vectorize
-DEBUG_FLAGS=-g0 -O3 -fno-strict-aliasing -fno-tree-vectorize
-
-#DEBUG_FLAGS+=-DVALGRIND
-#DEBUG_FLAGS+=-DSKIP_OAM_INIT
+#DEBUG_FLAGS=-ggdb3
+DEBUG_FLAGS=-g0 -O3 -fno-strict-aliasing
 
 ifeq (i686,$(shell uname -m))
 	DEBUG_FLAGS+=-march=pentium4
@@ -59,8 +55,7 @@ ifeq (4.5,$(shell test -x /usr/local/gcc45/bin/gcc && /usr/local/gcc45/bin/gcc -
 	endif
 endif
 
-#Use only the last, non-comment line from MyDebugFlags file
-LOCAL_DEBUG_FLAGS=$(shell test -f $(TOP)/MyDebugFlags && awk '/^[^\#]/ {last=$$0}END{print last}' $(TOP)/MyDebugFlags)
+LOCAL_DEBUG_FLAGS=$(shell test -f $(TOP)/MyDebugFlags && cat $(TOP)/MyDebugFlags)
 ifneq (,$(LOCAL_DEBUG_FLAGS))
 	DEBUG_FLAGS=$(LOCAL_DEBUG_FLAGS)
 endif

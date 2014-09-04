@@ -16,16 +16,11 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: functor.cpp 3898 2013-06-17 20:41:05Z rdempsey $
+* $Id: functor.cpp 3048 2012-04-04 15:33:45Z rdempsey $
 *
 *
 ****************************************************************************/
-#ifndef _MSC_VER
-#ifndef __STDC_FORMAT_MACROS
-#define __STDC_FORMAT_MACROS
-#endif
-#endif
-#include <inttypes.h>
+
 #include <string>
 #include <sstream>
 using namespace std;
@@ -41,8 +36,6 @@ using namespace dataconvert;
 using namespace logging;
 
 #include "functor.h"
-#include "funchelpers.h"
-
 using namespace funcexp;
 
 namespace funcexp
@@ -108,7 +101,7 @@ uint64_t Func::stringToDatetime(const string str)
 uint32_t Func::intToDate(int64_t i)
 {
 	if ((uint64_t) i > 0xFFFFFFFFL)
-		return ((((uint32_t) (i >> 32)) & 0xFFFFFFC0L) | 0x3E);
+		return ((uint32_t) (i >> 32)) & 0xFFFFFFC0L;
 
 	return i;
 }
@@ -125,13 +118,17 @@ uint64_t Func::intToDatetime(int64_t i)
 
 string Func::intToString(int64_t i)
 {
-    return helpers::intToString(i);
+	ostringstream oss;
+	oss << i;
+	return oss.str();
 }
 
 
 string Func::doubleToString(double d)
 {
-    return helpers::doubleToString(d);
+	ostringstream oss;
+	oss << d;
+	return oss.str();
 }
 
 

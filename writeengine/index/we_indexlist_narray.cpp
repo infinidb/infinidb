@@ -42,7 +42,7 @@ namespace WriteEngine
     * Private Function for print the block trees
     * 
     ***************************************************************/ 
-    const int  IndexList::printBlocks(uint64_t& lbid)
+    const int  IndexList::printBlocks(i64& lbid)
     {
         int rc;
         IdxRidListArrayPtr idxRidListArrayPtr;
@@ -65,9 +65,9 @@ namespace WriteEngine
                                   << " curCount->" << curCount << endl;
         for (int i=0; i<TOTAL_NUM_ARRAY_PTR; i++)
         {
-          uint64_t lbid;
+          i64 lbid;
           lbid = idxRidListArrayPtr.childIdxRidListPtr[i].childLbid;
-          if (lbid != (uint64_t)INVALID_LBID)
+          if (lbid != (i64)INVALID_LBID)
               printBlocks(lbid);
         }
         return rc;
@@ -78,14 +78,14 @@ namespace WriteEngine
      * Private Function for getting the last Fbo on header
      * 
      ***************************************************************/ 
-     const int  IndexList::setCurBlkNextPtr(uint64_t& nextLbid, int count)
+     const int  IndexList::setCurBlkNextPtr(i64& nextLbid, int count)
      {
         int rc ;
         CommBlock cb;
         
         cb.file.oid = m_oid;     
         cb.file.pFile = m_pFile; 
-        if (nextLbid== (uint64_t)INVALID_LBID)
+        if (nextLbid== (i64)INVALID_LBID)
          return ERR_IDX_LIST_SET_NEXT_LBID;
          
         m_idxRidListArrayPtr.nextIdxListPtr.type       = (int)LIST_BLOCK_TYPE;
@@ -184,7 +184,7 @@ namespace WriteEngine
         m_curLevelPos   = parentIdxListPtr.curLevelPos;
         m_curBlkPos     = parentIdxListPtr.curBlkPos;
         m_parentLbid    = parentIdxListPtr.parentLbid;
-        if (m_parentLbid == (uint64_t)INVALID_LBID)
+        if (m_parentLbid == (i64)INVALID_LBID)
          return NO_ERROR;
         memset( m_parentBlock.data, 0, sizeof(m_parentBlock.data));
         rc = readDBFile(cb, &m_parentBlock, m_parentLbid );
@@ -225,7 +225,7 @@ namespace WriteEngine
     * Private Function for getting the header
     * 
     ***************************************************************/ 
-   const int IndexList::updateParentStatus(uint64_t& childLbid)                                      
+   const int IndexList::updateParentStatus(i64& childLbid)                                      
    {
       int rc;
       CommBlock cb;

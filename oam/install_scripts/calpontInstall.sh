@@ -72,7 +72,7 @@ log_user $DEBUG
 set timeout 2
 send "$INSTALLDIR/bin/infinidb status\n"
 expect {
-        "is running"	{ puts "InfiniDB is running, can't run calpontInstall.sh while InfiniDB is running. Exiting..\n";
+        -re "is running"	{ puts "InfiniDB is running, can't run calpontInstall.sh while InfiniDB is running. Exiting..\n";
 						exit 1
 					}
 }
@@ -93,9 +93,9 @@ set timeout 2
 set INSTALL 2
 send "$INSTALLDIR/bin/getConfig DBRM_Controller NumWorkers\n"
 expect {
-        1                         { set INSTALL 1
+        -re 1                         { set INSTALL 1
 										set PASSWORD "dummy"
-										set RPMVERSION "rpm" }
+										set RPMVERSION "rpm" } abort
 }
 
 
@@ -107,34 +107,32 @@ send_user "\n"
 
 if { $INSTALL == "2" } {
 	if { $PACKAGE == "rpm" } {
-		set CALPONTPACKAGE1 /root/infinidb-libs-$RPMVERSION*.rpm
-		set CALPONTPACKAGE2 /root/infinidb-platform-$RPMVERSION*.rpm
-		set CALPONTPACKAGE3 /root/infinidb-enterprise-$RPMVERSION*.rpm
-		set CONNECTORPACKAGE1 /root/infinidb-mysql-$RPMVERSION*.rpm
-		set CONNECTORPACKAGE2 /root/infinidb-storage-engine-$RPMVERSION*.rpm
-		send_user "Installing InfiniDB Packages: $CALPONTPACKAGE1, $CALPONTPACKAGE2, $CALPONTPACKAGE3, $CONNECTORPACKAGE1, $CONNECTORPACKAGE2\n\n"
+		set CALPONTPACKAGE /root/calpont-$RPMVERSION*.rpm
+		set CONNECTORPACKAGE1 /root/calpont-mysql-$RPMVERSION*.rpm
+		set CONNECTORPACKAGE2 /root/calpont-mysqld-$RPMVERSION*.rpm
+		send_user "Installing InfiniDB Packages: $CALPONTPACKAGE, $CONNECTORPACKAGE1, $CONNECTORPACKAGE2\n\n"
 		set EEPKG "rpm"
-	} elseif { $PACKAGE == "deb" } {
-		set CALPONTPACKAGE1 /root/infinidb-libs_$RPMVERSION*.deb
-		set CALPONTPACKAGE2 /root/infinidb-platform_$RPMVERSION*.deb
-		set CALPONTPACKAGE3 /root/infinidb-enterprise_$RPMVERSION*.deb
-		set CONNECTORPACKAGE1 /root/infinidb-mysql_$RPMVERSION*.deb
-		set CONNECTORPACKAGE2 /root/infinidb-storage-engine_$RPMVERSION*.deb
-		send_user "Installing InfiniDB Packages: $CALPONTPACKAGE1, $CALPONTPACKAGE2, $CALPONTPACKAGE3, $CONNECTORPACKAGE1, $CONNECTORPACKAGE2\n\n"
-		set EEPKG "deb"
-	} elseif { $PACKAGE == "binary" } {
-		set CALPONTPACKAGE /root/infinidb-ent-$RPMVERSION*bin.tar.gz
-		set CONNECTORPACKAGE1 "nopkg"
-		set CONNECTORPACKAGE2 "nopkg"
-		send_user "Installing InfiniDB Package: $CALPONTPACKAGE\n\n"
-		set EEPKG "binary"
-	} else {
-		puts "please enter Valid Package Type, enter ./calpontInstaller.sh -h for additional info"; exit 1
+		} else {
+		if { $PACKAGE == "deb" } {
+			set CALPONTPACKAGE /root/calpont_$RPMVERSION*.deb
+			set CONNECTORPACKAGE1 /root/calpont-mysql_$RPMVERSION*.deb
+			set CONNECTORPACKAGE2 /root/calpont-mysqld_$RPMVERSION*.deb
+			send_user "Installing InfiniDB Packages: $CALPONTPACKAGE, $CONNECTORPACKAGE1, $CONNECTORPACKAGE2\n\n"
+			set EEPKG "deb"
+		} else {
+			if { $PACKAGE == "binary" } {
+			set CALPONTPACKAGE /root/calpont-infinidb-ent-$RPMVERSION*bin.tar.gz
+			set CONNECTORPACKAGE1 "nopkg"
+			set CONNECTORPACKAGE2 "nopkg"
+			send_user "Installing InfiniDB Package: $CALPONTPACKAGE\n\n"
+			set EEPKG "binary"
+			} else {
+				puts "please enter Valid Package Type, enter ./calpontInstaller.sh -h for additional info"; exit 1
+			}
+		}
 	}
 } else {
-	set CALPONTPACKAGE1 "dummy.rpm"
-	set CALPONTPACKAGE2 "dummy.rpm"
-	set CALPONTPACKAGE3 "dummy.rpm"
+	set CALPONTPACKAGE "dummy.rpm"
 	set CONNECTORPACKAGE1 "dummy.rpm"
 	set CONNECTORPACKAGE2 "dummy.rpm"
 	set EEPKG "rpm"
@@ -144,7 +142,7 @@ send_user "Performing InfiniDB System Install, please wait...\n"
 
 send "$INSTALLDIR/bin/setConfig -d Installation EEPackageType $EEPKG\n" 
 expect {
-	-re {[$#] }                  {  }
+	-re "# "                  {  } abort
 }
 
 send_user "\n"
@@ -152,16 +150,14 @@ set timeout 600
 #
 # Run installer
 #
-send "$INSTALLDIR/bin/installer $CALPONTPACKAGE1 $CALPONTPACKAGE2 $CALPONTPACKAGE3 $CONNECTORPACKAGE1 $CONNECTORPACKAGE2 initial $PASSWORD n $NODEPS  $MYSQLPASSWORD $DEBUG\n"
+send "$INSTALLDIR/bin/installer $CALPONTPACKAGE $CONNECTORPACKAGE1 $CONNECTORPACKAGE2 initial $PASSWORD n $NODEPS  $MYSQLPASSWORD $DEBUG\n"
 expect {
-	"InfiniDB Install Successfully Completed" 	{ }
-	"ERROR"   { send_user "FAILED: error returned from installer, execute with debug mode on to determine error\n" ; exit 1 }
-	"Enter MySQL password"   { send_user "FAILED: a MySQL password is set\n" ; exit 1 }	
+	-re "InfiniDB Install Successfully Completed" 	{ } abort
+	-re "ERROR"   { send_user "FAILED: error returned from installer, execute with debug mode on to determine error\n" ; exit 1 }
+	-re "Enter MySQL password"   { send_user "FAILED: a MySQL password is set\n" ; exit 1 }	
 	timeout	{ send_user "FAILED: Timeout while running installer, execute with debug mode on to determine error\n" ; exit 1 }
 }
 
 send_user "\nCalpont Package System Install Completed\n\n"
 
 exit 0
-# vim:ts=4 sw=4:
-

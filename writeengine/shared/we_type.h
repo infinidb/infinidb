@@ -15,19 +15,20 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: we_type.h 4737 2013-08-14 20:45:46Z bwilkinson $
+//  $Id: we_type.h 4496 2013-01-31 19:13:20Z pleblanc $
 
 /** @file */
-
-
-#ifndef _WE_TYPE_H_
-#define _WE_TYPE_H_
 
 #undef EXPORT
 #undef DELETE
 #undef NO_ERROR
 
+#ifndef _WE_TYPE_H_
+#define _WE_TYPE_H_
 #include <sys/types.h>
+
+//#include <fstream>
+//#include <iostream>
 #include <string>
 #include <vector>
 #include <boost/any.hpp>
@@ -36,27 +37,20 @@
 
 #include "we_define.h"
 #include "we_typeext.h"
-#include "calpontsystemcatalog.h"
-#include "IDBDataFile.h"
-#include "IDBPolicy.h"
-
-#undef EXPORT
-#undef DELETE
-#undef NO_ERROR
-
 /** Namespace WriteEngine */
 namespace WriteEngine
 {
-	typedef idbdatafile::IDBDataFile IDBDataFile;
-
    /************************************************************************
     * Type definitions
     ************************************************************************/
-    typedef uint32_t        OID;            /** @brief Object ID */
-    typedef uint32_t        FID;            /** @brief File ID */
-    typedef uint64_t        RID;            /** @brief Row ID */
-    typedef uint32_t        TxnID;          /** @brief Transaction ID (New)*/
-    typedef uint32_t        HWM;            /** @brief high water mark */
+    typedef u_int16_t       i16;            /** @brief 2 byte value */
+    typedef u_int32_t       i32;            /** @brief 4 byte value */
+
+    typedef i32             OID;            /** @brief Object ID */
+    typedef i32             FID;            /** @brief File ID */
+    typedef i64             RID;            /** @brief Row ID */
+    typedef i32             TxnID;          /** @brief Transaction ID (New)*/
+    typedef i32             HWM;            /** @brief high water mark */
 
    /************************************************************************
     * Type enumerations
@@ -100,10 +94,6 @@ namespace WriteEngine
         WR_TOKEN            = 10,           /** @brief Token */
         WR_BLOB             = 11,           /** @brief BLOB */
         WR_VARBINARY        = 12,           /** @brief VARBINARY */
-        WR_UBYTE            = 13,           /** @brief Unsigned Byte */
-        WR_USHORT           = 14,           /** @brief Unsigned Short */
-        WR_UINT             = 15,           /** @brief Unsigned Int */
-        WR_ULONGLONG        = 16,           /** @brief Unsigned Long long*/
     };
 
     // Describes relation of field to column for a bulk load
@@ -116,18 +106,11 @@ namespace WriteEngine
                          BULK_MODE_REMOTE_MULTIPLE_SRC = 2,
                          BULK_MODE_LOCAL               = 3 };
 
-    // Import Mode 0-text Import (default)
-    //             1-Binary Import with NULL values
-    //             2-Binary Import with saturated NULL values
-    enum ImportDataMode { IMPORT_DATA_TEXT            = 0,
-                          IMPORT_DATA_BIN_ACCEPT_NULL = 1,
-                          IMPORT_DATA_BIN_SAT_NULL    = 2 };
-
    /**
     * the set of Calpont column data type names; MUST match ColDataType in
-    * calpontsystemcatalog.h.
+    * we_typeext.h.
     */
-    const char  ColDataTypeStr[execplan::CalpontSystemCatalog::NUM_OF_COL_DATA_TYPE][20] = {
+    const char  ColDataTypeStr[NUM_OF_COL_DATA_TYPE][20] = {
                 "bit",
                 "tinyint",
                 "char",
@@ -143,16 +126,7 @@ namespace WriteEngine
                 "varchar",
                 "varbinary",
                 "clob",
-                "blob",
-                "unsigned-tinyint",
-                "unsigned-smallint",
-                "unsigned-decimal",
-                "unsigned-med int",
-                "unsigned-int",
-                "unsigned-float",
-                "unsigned-bigint",
-                "unsigned-double"
-         };
+                "blob" };
 
     enum FuncType { FUNC_WRITE_ENGINE, FUNC_INDEX, FUNC_DICTIONARY };
 
@@ -163,10 +137,10 @@ namespace WriteEngine
     ************************************************************************/
     struct DataBlock                        /** @brief Data block structure */
     {
-        long     no;                         /** @brief block number */
-        uint64_t lbid;                       /** @brief lbid */
-        bool     dirty;                      /** @brief block dirty flag */
-        int      state;                      /** @brief initialized 0, read 1 , modified 2 */
+        long    no;                         /** @brief block number */
+        i64     lbid;                       /** @brief lbid */
+        bool    dirty;                      /** @brief block dirty flag */
+        int     state;                      /** @brief initialized 0, read 1 , modified 2 */
         unsigned char  data[BYTE_PER_BLOCK];/** @brief data buffer */
         DataBlock()    { dirty = false;     /** @brief constructor */
                          memset( data, 0, BYTE_PER_BLOCK ); }
@@ -192,10 +166,10 @@ namespace WriteEngine
         OID            oid;                 /** @brief Oid */
         FID            fid;                 /** @brief File id */
         HWM            hwm;                 /** @brief High water mark */
-        IDBDataFile*   pFile;               /** @brief File handle */
-        uint32_t      fPartition;          /** @brief Partition for pFile*/
-        uint16_t      fSegment;            /** @brief Segment for pFile */
-        uint16_t      fDbRoot;             /** @brief DbRoot for pFile */
+        FILE*          pFile;               /** @brief File handle */
+        u_int32_t      fPartition;          /** @brief Partition for pFile*/
+        u_int16_t      fSegment;            /** @brief Segment for pFile */
+        u_int16_t      fDbRoot;             /** @brief DbRoot for pFile */
         std::string    fSegFileName;        /** @brief Current seg file path */
         File()         { clear(); } /** @brief constructor */
         void clear()   { pFile = NULL; oid = fid = hwm = 0;
@@ -220,12 +194,11 @@ namespace WriteEngine
         int            colNo;               /** @brief column number */
         int            colWidth;            /** @brief column width */
         ColType        colType;             /** @brief column type (internal use)*/
-        execplan::CalpontSystemCatalog::ColDataType colDataType; /** @brief column data type (from interface)*/
+        ColDataType    colDataType;         /** @brief column data type (from interface)*/
         File           dataFile;            /** @brief column data file */
         int            compressionType;     /** @brief column compression type*/
         Column() : colNo(0), colWidth(0), colType(WR_INT),
-                   colDataType(execplan::CalpontSystemCatalog::INT), 
-                   compressionType(idbdatafile::IDBPolicy::useHdfs()?2:0) { }
+                   colDataType(INT), compressionType(0) { }
     };
 
    /************************************************************************
@@ -235,7 +208,7 @@ namespace WriteEngine
     typedef struct offset_                  /** @brief Offset structure */
     {
         int hdrLoc;                         /** @brief offset postion in hdr */
-        uint16_t offset;                         /** @brief offset in block */
+        i16 offset;                         /** @brief offset in block */
     } Offset;    
 
    /************************************************************************
@@ -253,16 +226,16 @@ namespace WriteEngine
         OID            dataOid;             /** @brief column data file object id */
         int            colWidth;            /** @brief column width */
         bool           tokenFlag;           /** @brief column token flag, must be set to true if it is a token column */
-        execplan::CalpontSystemCatalog::ColDataType    colDataType;         /** @brief column data type (for interface)*/
+        ColDataType    colDataType;         /** @brief column data type (for interface)*/
         ColType        colType;             /** @brief column type (internal use for write engine)*/
-        uint32_t      fColPartition;       /** @brief Partition for column file */
-        uint16_t      fColSegment;         /** @brief Segment for column file*/
-        uint16_t      fColDbRoot;          /** @brief DBRoot for column file */
+        u_int32_t      fColPartition;       /** @brief Partition for column file */
+        u_int16_t      fColSegment;         /** @brief Segment for column file*/
+        u_int16_t      fColDbRoot;          /** @brief DBRoot for column file */
         int            fCompressionType;    /** @brief Compression tpye for column file */
         ColStruct() : dataOid(0), colWidth(0),  /** @brief constructor */
-                    tokenFlag(false), colDataType(execplan::CalpontSystemCatalog::INT), colType(WR_INT),
+                    tokenFlag(false), colDataType(INT), colType(WR_INT),
                     fColPartition(0), fColSegment(0), fColDbRoot(0),
-                    fCompressionType(idbdatafile::IDBPolicy::useHdfs()?2:0) { }
+                    fCompressionType(0) { }
     };
 
     typedef std::vector<ColStruct>      ColStructList; /** @brief column struct list */
@@ -278,14 +251,14 @@ namespace WriteEngine
         OID            dctnryOid;           /** @brief dictionary signature file */
         OID            columnOid;           /** @brief corresponding column file */
         int            colWidth;            /** @brief string width for the dictionary column*/
-        uint32_t      fColPartition;       /** @brief Partition for column file */
-        uint16_t      fColSegment;         /** @brief Segment for column file */
-        uint16_t      fColDbRoot;          /** @brief DBRoot for column file */
+        u_int32_t      fColPartition;       /** @brief Partition for column file */
+        u_int16_t      fColSegment;         /** @brief Segment for column file */
+        u_int16_t      fColDbRoot;          /** @brief DBRoot for column file */
         int            fCompressionType;    /** @brief Compression tpye for column file */
         DctnryStruct() : dctnryOid(0), columnOid(0),   /** @brief constructor */
                        colWidth(0),
                        fColPartition(0), fColSegment(0),
-                       fColDbRoot(0), fCompressionType(idbdatafile::IDBPolicy::useHdfs()?2:0) { }
+                       fColDbRoot(0), fCompressionType(0) { }
     };
 
     struct DctnryTuple                      /** @brief Dictionary Tuple struct*/
@@ -309,10 +282,10 @@ namespace WriteEngine
     {
         std::string    colName;             /** @brief column name */
         OID            mapOid;              /** @brief column OID */
-        execplan::CalpontSystemCatalog::ColDataType    dataType;            /** @brief column data type */
+        ColDataType    dataType;            /** @brief column data type */
         ColType        weType;              /** @brief write engine data type */
         std::string    typeName;            /** @brief data type name */
-        uint64_t       emptyVal;            /** @brief default empty value */
+        i64            emptyVal;            /** @brief default empty value */
         int            width;               /** @brief column width; for a dictionary column, this is "eventually" the token width */
         int            definedWidth;        /** @brief column width as defined in the table, used for non-dictionary strings */
         int            dctnryWidth;         /** @brief dictionary width */
@@ -324,24 +297,20 @@ namespace WriteEngine
         int            compressionType;     /** @brief compression type */
         bool           autoIncFlag;         /** @brief auto increment flag */
         DctnryStruct   dctnry;              /** @brief dictionary structure */
-        int64_t        fMinIntSat;          /** @brief For integer type, the min saturation value */
-        uint64_t       fMaxIntSat;          /** @brief For integer type, the max saturation value */
-        double         fMinDblSat;          /** @brief for float/double, the min saturation value */
-        double         fMaxDblSat;          /** @brief for float/double, the max saturation value */
+        long long      fMinIntSat;          /** @brief For integer type, the min saturation value */
+        long long      fMaxIntSat;          /** @brief For integer type, the max saturation value */
         bool           fWithDefault;        /** @brief With default */
         long long      fDefaultInt;         /** @brief Integer column default */
-        unsigned long long fDefaultUInt;    /** @brief UnsignedInt col default*/
         double         fDefaultDbl;         /** @brief Dbl/Flt column default */
         std::string    fDefaultChr;         /** @brief Char column default */
-        JobColumn() : mapOid(0), dataType(execplan::CalpontSystemCatalog::INT), weType(WR_INT),
+        JobColumn() : mapOid(0), dataType(INT), weType(WR_INT),
                     typeName("integer"), emptyVal(0),
                     width(0), definedWidth(0), dctnryWidth(0),
                     precision(0), scale(0), fNotNull(false),
                     fFldColRelation(BULK_FLDCOL_COLUMN_FIELD), colType(' '),
                     compressionType(0),autoIncFlag(false),
                     fMinIntSat(0), fMaxIntSat(0),
-                    fMinDblSat(0), fMaxDblSat(0), fWithDefault(false),
-                    fDefaultInt(0), fDefaultUInt(0), fDefaultDbl(0.0)
+                    fWithDefault(false), fDefaultInt(0), fDefaultDbl(0.0)
                     { }
     };
 
@@ -363,7 +332,7 @@ namespace WriteEngine
         std::string    tblName;             /** @brief table name */
         OID            mapOid;              /** @brief table OID */
         std::string    loadFileName;        /** @brief table load file name */
-        uint64_t       maxErrNum;           /** @brief max number of error rows before abort */
+        i64            maxErrNum;           /** @brief max number of error rows before abort */
         JobColList     colList;             /** @brief list of columns to be loaded; followed by default columns to be loaded */
         JobColList     fIgnoredFields;      /** @brief list of fields in input file to be ignored */
         JobFieldRefList fFldRefs;           /** @brief Combined list of refs to entries in colList and fIgnoredFields */
@@ -400,8 +369,8 @@ namespace WriteEngine
     ************************************************************************/
     struct CacheBlock                       /** @brief Cache block structure */
     {
-        uint64_t       fbo;                 /** @brief file fbo */
-        uint64_t       lbid;                /** @brief lbid */
+        i64            fbo;                 /** @brief file fbo */
+        i64            lbid;                /** @brief lbid */
         bool           dirty;               /** @brief dirty flag */
         int            hitCount;            /** @brief hit count */
         unsigned char* data;                /** @brief block buffer */

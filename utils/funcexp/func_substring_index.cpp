@@ -51,11 +51,11 @@ std::string Func_substring_index::getStrVal(rowgroup::Row& row,
 						bool& isNull,
 						execplan::CalpontSystemCatalog::ColType&)
 {
-	const string& str = fp[0]->data()->getStrVal(row, isNull);
+	string str = fp[0]->data()->getStrVal(row, isNull);
 	if (isNull)
 		return "";
 
-	const string& delim = fp[1]->data()->getStrVal(row, isNull);
+	string delim = fp[1]->data()->getStrVal(row, isNull);
 	if (isNull)
 		return "";
 

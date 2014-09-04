@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-// $Id: jlf_graphics.cpp 9550 2013-05-17 23:58:07Z xlou $
+// $Id: jlf_graphics.cpp 8526 2012-05-17 02:28:10Z xlou $
 
 #include <iostream>
 using namespace std;
@@ -24,9 +24,6 @@ using namespace std;
 #include "primitivestep.h"
 #include "crossenginestep.h"
 #include "subquerystep.h"
-#include "windowfunctionstep.h"
-#include "tupleaggregatestep.h"
-#include "tupleannexstep.h"
 #include "tuplehashjoin.h"
 #include "tupleunion.h"
 using namespace joblist;
@@ -148,22 +145,6 @@ ostream& writeDotCmds(ostream& dotFile, const JobStepVector& query, const JobSte
 			dotFile << " shape=box style=bold";
 			dotFile << " peripheries=2";
 		}
-		else if (typeid(*(qsi->get())) == typeid(TupleAggregateStep))
-		{
-			dotFile << "\"";
-			dotFile << " shape=triangle orientation=180";
-		}
-		else if (typeid(*(qsi->get())) == typeid(TupleAnnexStep))
-		{
-			dotFile << "\"";
-			dotFile << " shape=star";
-		}
-		else if (typeid(*(qsi->get())) == typeid(WindowFunctionStep))
-		{
-			dotFile << "\"";
-			dotFile << " shape=triangle orientation=180";
-			dotFile << " peripheries=2";
-		}
 //		else if (typeid(*(qsi->get())) == typeid(AggregateFilterStep))
 //		{
 //			dotFile << "\"";
@@ -181,7 +162,7 @@ ostream& writeDotCmds(ostream& dotFile, const JobStepVector& query, const JobSte
 		{
 			ptrdiff_t dloutptr;
 			DataList_t* dlout = qsi->get()->outputAssociation().outAt(i)->dataList();
-			uint32_t numConsumers = qsi->get()->outputAssociation().outAt(i)->getNumConsumers();
+			uint numConsumers = qsi->get()->outputAssociation().outAt(i)->getNumConsumers();
 
 			if (dlout)
 			{
@@ -321,7 +302,7 @@ ostream& writeDotCmds(ostream& dotFile, const JobStepVector& query, const JobSte
 		{
 			ptrdiff_t dloutptr;
 			DataList_t* dlout = psi->get()->outputAssociation().outAt(i)->dataList();
-			uint32_t numConsumers = psi->get()->outputAssociation().outAt(i)->getNumConsumers();
+			uint numConsumers = psi->get()->outputAssociation().outAt(i)->getNumConsumers();
 
 			if (dlout)
 			{

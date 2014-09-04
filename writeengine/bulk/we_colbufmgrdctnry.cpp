@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: we_colbufmgrdctnry.cpp 4726 2013-08-07 03:38:36Z bwilkinson $
+ * $Id: we_colbufmgrdctnry.cpp 3720 2012-04-04 18:18:49Z rdempsey $
  *
  ****************************************************************************/
 
@@ -56,7 +56,7 @@ ColumnBufferManagerDctnry::~ColumnBufferManagerDctnry()
 // is "writeSize" bytes long.
 //------------------------------------------------------------------------------
 int ColumnBufferManagerDctnry::writeToFileExtentCheck(
-    uint32_t startOffset, uint32_t writeSize)
+    uint startOffset, uint writeSize)
 {
     if (fLog->isDebug( DEBUG_3 ))
     {
@@ -104,7 +104,11 @@ int ColumnBufferManagerDctnry::rowsExtentCheck( int nRows, int& nRows2 )
     nRows2 = nRows;
 
     int bufferSize    = fCBuf->getSize();
-    long long spaceRequired = nRows * fColWidth;
+#ifdef _MSC_VER
+    __int64 spaceRequired = nRows * fColWidth;
+#else
+    long spaceRequired = nRows * fColWidth;
+#endif
     long dataInBuffer  = 0;
     if (bufferSize > 0)
         dataInBuffer = (fBufFreeOffset - fBufWriteOffset + bufferSize) % bufferSize;

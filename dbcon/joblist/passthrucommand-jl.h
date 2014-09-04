@@ -16,10 +16,10 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: passthrucommand-jl.h 9655 2013-06-25 23:08:13Z xlou $
+// $Id: passthrucommand-jl.h 8436 2012-04-04 18:18:21Z rdempsey $
 // C++ Interface: passthrucommand-jl
 //
-// Description:
+// Description: 
 //
 //
 // Author: Patrick <pleblanc@localhost.localdomain>, (C) 2008
@@ -43,7 +43,7 @@ class PassThruCommandJL : public CommandJL
 		PassThruCommandJL(const PassThruStep &);
 		virtual ~PassThruCommandJL();
 
-		void setLBID(uint64_t data, uint32_t dbroot);		// converts a rid or dictionary token to an LBID.  For ColumnCommandJL it's a RID, for a DictStep it's a token.
+		void setLBID(uint64_t data, uint dbroot);		// converts a rid or dictionary token to an LBID.  For ColumnCommandJL it's a RID, for a DictStep it's a token.
 		uint8_t getTableColumnType();
 		std::string toString();
 
@@ -55,7 +55,7 @@ class PassThruCommandJL : public CommandJL
 	private:
 		PassThruCommandJL();
 		PassThruCommandJL(const PassThruCommandJL &);
-
+		
 		uint8_t colWidth;
 		uint8_t tableColumnType;
 };

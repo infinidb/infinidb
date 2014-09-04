@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************************
-* $Id: idberrorinfo.cpp 3626 2013-03-11 15:36:08Z xlou $
+* $Id: idberrorinfo.cpp 3280 2012-09-13 16:27:28Z rdempsey $
 *
 ******************************************************************************************/
 #include <iostream>
@@ -111,24 +111,6 @@ string IDBErrorInfo::errorMsg(const unsigned eid)
 {
 	string errMsg = lookupError(eid);
 	Message::Args args; // empty args
-	format(errMsg, args);
-	return errMsg;
-}
-
-string IDBErrorInfo::errorMsg(const unsigned eid, int i)
-{
-	string errMsg = lookupError(eid);
-	Message::Args args;
-	args.add(i);
-	format(errMsg, args);
-	return errMsg;
-}
-
-string IDBErrorInfo::errorMsg(const unsigned eid, const string& s)
-{
-	string errMsg = lookupError(eid);
-	Message::Args args;
-	args.add(s);
 	format(errMsg, args);
 	return errMsg;
 }

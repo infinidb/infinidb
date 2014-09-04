@@ -34,11 +34,9 @@ using namespace boost;
 #include "constantcolumn.h"
 #include "existsfilter.h"
 #include "predicateoperator.h"
-#include "pseudocolumn.h"
 #include "selectfilter.h"
 #include "simplefilter.h"
 #include "simplescalarfilter.h"
-#include "windowfunctioncolumn.h"
 using namespace execplan;
 
 #include "rowgroup.h"
@@ -86,7 +84,6 @@ void getColumnValue(ConstantColumn** cc, uint64_t i, const Row& row)
 			// else > 0; fall through
 
 		case CalpontSystemCatalog::DECIMAL:
-		case CalpontSystemCatalog::UDECIMAL:
 			data = row.getIntField(i);
 			oss << (data / IDB_pow[row.getScale(i)]);
 			if (row.getScale(i) > 0)
@@ -100,17 +97,7 @@ void getColumnValue(ConstantColumn** cc, uint64_t i, const Row& row)
 									IDB_Decimal(data, row.getScale(i), row.getPrecision(i)));
 			break;
 
-        case CalpontSystemCatalog::UTINYINT:
-        case CalpontSystemCatalog::USMALLINT:
-        case CalpontSystemCatalog::UMEDINT:
-        case CalpontSystemCatalog::UINT:
-        case CalpontSystemCatalog::UBIGINT:
-            oss << row.getUintField(i);
-            *cc = new ConstantColumn(oss.str(), row.getUintField(i));
-            break;
-
 		case CalpontSystemCatalog::FLOAT:
-        case CalpontSystemCatalog::UFLOAT:
 			oss << fixed << row.getFloatField(i);
 			*cc = new ConstantColumn(oss.str(), (double) row.getFloatField(i));
 			break;
@@ -157,24 +144,25 @@ bool simpleScalarFilterToParseTree(SimpleScalarFilter* sf, ParseTree*& pt, JobIn
 		lop = "or";
 
 	// Transformer sub to a scalar result.
-	SErrorInfo errorInfo(jobInfo.errorInfo);
-	SimpleScalarTransformer transformer(&jobInfo, errorInfo, false);
+	SErrorInfo status(jobInfo.status);
+	SimpleScalarTransformer transformer(&jobInfo, status, false);
 	transformer.makeSubQueryStep(csep);
 
 	// Do not catch exceptions here, let caller handle them.
 	transformer.run();
 
 	// if subquery errored out
-	if (errorInfo->errCode)
+	if (status->errCode)
 	{
 		ostringstream oss;
 		oss << "Sub-query failed: ";
-		if (errorInfo->errMsg.empty())
-		{
-			oss << "error code " << errorInfo->errCode;
-			errorInfo->errMsg = oss.str();
-		}
-		throw runtime_error(errorInfo->errMsg);
+		if (status->errMsg.empty())
+			oss << "error code " << status->errCode;
+		else
+			oss << status->errMsg;
+
+		status->errMsg = oss.str();
+		throw runtime_error(status->errMsg);
 	}
 
 	// Construct simple filters based on the scalar result.
@@ -256,35 +244,35 @@ void ssfInHaving(ParseTree* pt, void* obj)
 }
 
 
-void getCorrelatedFilters(ParseTree* pt, void* obj)
+void getSemiJoins(ParseTree* pt, void* obj)
 {
 	SimpleFilter* sf = dynamic_cast<SimpleFilter*>(pt->data());
 
 	if (sf != NULL)
 	{
-		ReturnedColumn* rc1  = dynamic_cast<ReturnedColumn*>(sf->lhs());
-		ReturnedColumn* rc2  = dynamic_cast<ReturnedColumn*>(sf->rhs());
+		SimpleColumn* sc1  = dynamic_cast<SimpleColumn*>(sf->lhs());
+		SimpleColumn* sc2  = dynamic_cast<SimpleColumn*>(sf->rhs());
 
-		bool correlated = false;
-		if (rc1 != NULL && rc1->joinInfo() != 0)
-			correlated = true;
+		bool semijoin = false;
+		if (sc1 != NULL && sc1->joinInfo() != 0)
+			semijoin = true;
 
-		if (rc2 != NULL && rc2->joinInfo() != 0)
-			correlated = true;
+		if (sc2 != NULL && sc2->joinInfo() != 0)
+			semijoin = true;
 
-		if (correlated)
+		if (semijoin)
 		{
-			ParseTree** correlatedFilters = reinterpret_cast<ParseTree**>(obj);
-			if (*correlatedFilters == NULL)
+			ParseTree** semiJoins = reinterpret_cast<ParseTree**>(obj);
+			if (*semiJoins == NULL)
 			{
-				*correlatedFilters = new ParseTree(sf);
+				*semiJoins = new ParseTree(sf);
 			}
 			else
 			{
-				ParseTree* left = *correlatedFilters;
-				*correlatedFilters = new ParseTree(new LogicOperator("and"));
-				(*correlatedFilters)->left(left);
-				(*correlatedFilters)->right(new ParseTree(sf));
+				ParseTree* left = *semiJoins;
+				*semiJoins = new ParseTree(new LogicOperator("and"));
+				(*semiJoins)->left(left);
+				(*semiJoins)->right(new ParseTree(sf));
 			}
 
 			pt->data(NULL);
@@ -347,12 +335,16 @@ void handleNotIn(JobStepVector& jsv, JobInfo* jobInfo)
 		sop->resultType(sop->operationType());
 		SimpleFilter* sf = new SimpleFilter(sop, lhs, rhs);
 
-		ExpressionStep* es = new ExpressionStep(*jobInfo);
+		ExpressionStep* es = new ExpressionStep(jobInfo->sessionId,
+												jobInfo->txnId,
+												jobInfo->verId,
+												jobInfo->statementId);
+
 		if (es == NULL)
 			throw runtime_error("Failed to create ExpressionStep 2");
 
+		es->logger(jobInfo->logger);
 		es->expressionFilter(sf, *jobInfo);
-		es->resetJoinInfo();  // Not to be done as join
 		i->reset(es);
 
 		delete sf;
@@ -382,40 +374,12 @@ bool isNotInSubquery(JobStepVector& jsv)
 }
 
 
-void alterCsepInExistsFilter(CalpontSelectExecutionPlan* csep, JobInfo& jobInfo)
-{
-	// This is for window function in IN/EXISTS sub-query.
-	// Replace an expression of window functions with indivisual window functions.
-	RetColsVector& retCols = csep->returnedCols();
-	RetColsVector wcs;
-	for (RetColsVector::iterator i = retCols.begin(); i < retCols.end(); i++)
-	{
-		const vector<WindowFunctionColumn*>& wcList = (*i)->windowfunctionColumnList();
-		if (!wcList.empty())
-		{
-			vector<WindowFunctionColumn*>::const_iterator j = wcList.begin();
-			while (j != wcList.end())
-				wcs.push_back(SRCP((*j++)->clone()));
-
-			// a little optimization, eliminate the expression in select clause
-			// replace the window function expression with the 1st windowfunction
-			(*i) = wcs[0];
-		}
-	}
-
-	if (wcs.size() > 1)
-		retCols.insert(retCols.end(), wcs.begin()+1, wcs.end());
-}
-
-
 void doCorrelatedExists(const ExistsFilter* ef, JobInfo& jobInfo)
 {
 	// Transformer sub to a subquery step.
-	SErrorInfo errorInfo(jobInfo.errorInfo);
-	SubQueryTransformer transformer(&jobInfo, errorInfo);
-	CalpontSelectExecutionPlan* csep = ef->sub().get();
-	//alterCsepInExistsFilter(csep, jobInfo);
-	SJSTEP subQueryStep = transformer.makeSubQueryStep(csep);
+	SErrorInfo status(jobInfo.status);
+	SubQueryTransformer transformer(&jobInfo, status);
+	SJSTEP subQueryStep = transformer.makeSubQueryStep(ef->sub().get());
 
 	// @bug3524, special handling of not in.
 	JobStepVector& jsv = transformer.correlatedSteps();
@@ -438,8 +402,8 @@ void doNonCorrelatedExists(const ExistsFilter* ef, JobInfo& jobInfo)
 	if (!noFrom)
 	{
 		// Transformer sub to a scalar result set.
-		SErrorInfo errorInfo(new ErrorInfo());
-		SimpleScalarTransformer transformer(&jobInfo, errorInfo, true);
+		SErrorInfo status(new ErrorInfo());
+		SimpleScalarTransformer transformer(&jobInfo, status, true);
 		transformer.makeSubQueryStep(ef->sub().get());
 
 		// @bug 2839. error out in-relelvant correlated column case
@@ -489,7 +453,13 @@ void doNonCorrelatedExists(const ExistsFilter* ef, JobInfo& jobInfo)
 	}
 
 	JobStepVector jsv;
-	SJSTEP tcs(new TupleConstantBooleanStep(jobInfo, exists));
+	SJSTEP tcs(new TupleConstantBooleanStep(JobStepAssociation(),
+											JobStepAssociation(),
+											jobInfo.sessionId,
+											jobInfo.txnId,
+											jobInfo.verId,
+											jobInfo.statementId,
+											exists));
 	jsv.push_back(tcs);
 	jobInfo.stack.push(jsv);
 }
@@ -499,9 +469,9 @@ const SRCP doSelectSubquery(CalpontExecutionPlan* ep, SRCP& sc, JobInfo& jobInfo
 {
 	CalpontSelectExecutionPlan* csep = dynamic_cast<CalpontSelectExecutionPlan*>(ep);
 	SRCP rc;
-	SErrorInfo errorInfo(jobInfo.errorInfo);
-	string subView = dynamic_cast<SimpleColumn*>(sc.get())->viewName();
-	SubQueryTransformer transformer(&jobInfo, errorInfo, subView);
+	SErrorInfo status(jobInfo.status);
+	jobInfo.subView = dynamic_cast<SimpleColumn*>(sc.get())->viewName();
+	SubQueryTransformer transformer(&jobInfo, status);
 	transformer.setVarbinaryOK();
 	SJSTEP subQueryStep = transformer.makeSubQueryStep(csep);
 	if (transformer.correlatedSteps().size() > 0)
@@ -584,7 +554,13 @@ void doSimpleScalarFilter(ParseTree* p, JobInfo& jobInfo)
 		// not a scalar result
 		delete parseTree;
 		JobStepVector jsv;
-		SJSTEP tcs(new TupleConstantBooleanStep(jobInfo, false));
+		SJSTEP tcs(new TupleConstantBooleanStep(JobStepAssociation(),
+												JobStepAssociation(),
+												jobInfo.sessionId,
+												jobInfo.txnId,
+												jobInfo.verId,
+												jobInfo.statementId,
+												false));
 		jsv.push_back(tcs);
 		jobInfo.stack.push(jsv);
 	}
@@ -607,8 +583,8 @@ void doSelectFilter(const ParseTree* p, JobInfo& jobInfo)
 	const SelectFilter* sf = dynamic_cast<const SelectFilter*>(p->data());
 	idbassert(sf != NULL);
 
-	SErrorInfo errorInfo(jobInfo.errorInfo);
-	SubQueryTransformer transformer(&jobInfo, errorInfo);
+	SErrorInfo status(jobInfo.status);
+	SubQueryTransformer transformer(&jobInfo, status);
 	SJSTEP subQueryStep = transformer.makeSubQueryStep(sf->sub().get());
 	transformer.updateCorrelateInfo();
 	JobStepVector jsv = transformer.correlatedSteps();
@@ -650,7 +626,11 @@ void doSelectFilter(const ParseTree* p, JobInfo& jobInfo)
 
 	if (pt != NULL)
 	{
-		ExpressionStep* es = new ExpressionStep(jobInfo);
+		ExpressionStep* es = new ExpressionStep(jobInfo.sessionId,
+												jobInfo.txnId,
+												jobInfo.verId,
+												jobInfo.statementId);
+		es->logger(jobInfo.logger);
 		es->expressionFilter(pt, jobInfo);
 		es->selectFilter(true);
 		delete pt;
@@ -659,6 +639,7 @@ void doSelectFilter(const ParseTree* p, JobInfo& jobInfo)
 	}
 
 	jobInfo.stack.push(jsv);
+
 }
 
 
@@ -674,15 +655,15 @@ void preprocessHavingClause(CalpontSelectExecutionPlan* csep, JobInfo& jobInfo)
 	havings->walk(ssfInHaving, &jobInfo);
 
 	// check correlated columns in having
-	ParseTree* correlatedFilters = NULL;
-	havings->walk(getCorrelatedFilters, &correlatedFilters);
+	ParseTree* semiJoins = NULL;
+	havings->walk(getSemiJoins, &semiJoins);
 	trim(havings);
 
-	if (correlatedFilters != NULL)
+	if (semiJoins != NULL)
 	{
 		ParseTree* newFilters = new ParseTree(new LogicOperator("and"));
 		newFilters->left(csep->filters());
-		newFilters->right(correlatedFilters);
+		newFilters->right(semiJoins);
 
 		csep->filters(newFilters);
 		csep->having(havings);
@@ -693,12 +674,16 @@ void preprocessHavingClause(CalpontSelectExecutionPlan* csep, JobInfo& jobInfo)
 int doFromSubquery(CalpontExecutionPlan* ep, const string& alias, const string& view, JobInfo& jobInfo)
 {
 	CalpontSelectExecutionPlan* csep = dynamic_cast<CalpontSelectExecutionPlan*>(ep);
-	SErrorInfo errorInfo(jobInfo.errorInfo);
-	SubQueryTransformer transformer(&jobInfo, errorInfo, alias, view);
+	SErrorInfo status(jobInfo.status);
+	jobInfo.subView = view;
+	SubQueryTransformer transformer(&jobInfo, status, alias);
 	transformer.setVarbinaryOK();
 	SJSTEP subQueryStep = transformer.makeSubQueryStep(csep, true);
 	subQueryStep->view(view);
-	SJSTEP subAd(new SubAdapterStep(subQueryStep, jobInfo));
+	SJSTEP subAd(new SubAdapterStep(jobInfo.sessionId,
+									jobInfo.txnId,
+									jobInfo.statementId,
+									subQueryStep));
 	jobInfo.selectAndFromSubs.push_back(subAd);
 
 	return CNX_VTABLE_ID;
@@ -721,7 +706,7 @@ void addOrderByAndLimit(CalpontSelectExecutionPlan* csep, JobInfo& jobInfo)
 		if (dynamic_cast<ConstantColumn*>(orderByCols[i].get()) != NULL)
 			continue;
 
-		uint32_t tupleKey = -1;
+		uint tupleKey = -1;
 		SimpleColumn* sc = dynamic_cast<SimpleColumn*>(orderByCols[i].get());
 		if (sc != NULL)
 		{
@@ -737,15 +722,14 @@ void addOrderByAndLimit(CalpontSelectExecutionPlan* csep, JobInfo& jobInfo)
 			{
 				ct = sc->colType();
 //XXX use this before connector sets colType in sc correctly.
-//    type of pseudo column is set by connector
-				if (sc->isInfiniDB() && !(dynamic_cast<PseudoColumn*>(sc)))
+				if (sc->isInfiniDB())
 					ct = jobInfo.csc->colType(sc->oid());
 //X
 				dictOid = isDictCol(ct);
 			}
 			else
 			{
-				if (sc->colPosition() == -1)
+				if (sc->colPosition() == (uint64_t) -1)
 				{
 					sc = dynamic_cast<SimpleColumn*>(jobInfo.deliveredCols[sc->orderPos()].get());
 				}
@@ -754,7 +738,7 @@ void addOrderByAndLimit(CalpontSelectExecutionPlan* csep, JobInfo& jobInfo)
 					sc->oid((tblOid+1) + sc->colPosition());
 				}
 				oid = sc->oid();
-				ct = jobInfo.vtableColTypes[UniqId(oid, alias, "", "")];
+				ct = jobInfo.vtableColTypes[UniqId(oid, alias, schema, view)];
 			}
 
 			tupleKey = getTupleKey(jobInfo, sc);
@@ -796,14 +780,16 @@ void preprocessSelectSubquery(CalpontSelectExecutionPlan* csep, JobInfo& jobInfo
 SJSTEP doUnionSub(CalpontExecutionPlan* ep, JobInfo& jobInfo)
 {
 	CalpontSelectExecutionPlan* csep = dynamic_cast<CalpontSelectExecutionPlan*>(ep);
-	SErrorInfo errorInfo(jobInfo.errorInfo);
-	SubQueryTransformer transformer(&jobInfo, errorInfo);
+	SErrorInfo status(jobInfo.status);
+	SubQueryTransformer transformer(&jobInfo, status);
 	transformer.setVarbinaryOK();
 	SJSTEP subQueryStep = transformer.makeSubQueryStep(csep, false);
-	SJSTEP subAd(new SubAdapterStep(subQueryStep, jobInfo));
+	SJSTEP subAd(new SubAdapterStep(jobInfo.sessionId,
+									jobInfo.txnId,
+									jobInfo.statementId,
+									subQueryStep));
 	return subAd;
 }
-
 
 }
 // vim:ts=4 sw=4:

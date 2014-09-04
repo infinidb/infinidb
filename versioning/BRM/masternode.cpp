@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: masternode.cpp 1931 2013-07-08 16:53:02Z bpaul $
+ * $Id: masternode.cpp 1933 2013-07-08 20:16:28Z bpaul $
  *
  ****************************************************************************/
 
@@ -31,7 +31,6 @@
 #include <exception>
 #include <string>
 #include <clocale>
-#include "IDBPolicy.h"
 #include "brmtypes.h"
 #include "utils_utf8.h"
 
@@ -120,7 +119,6 @@ int main(int argc, char **argv)
 	(void)config::Config::makeConfig();
 
 	/* XXXPAT: we might want to install signal handlers for every signal */
-
 	signal(SIGINT, stop);
 	signal(SIGTERM, stop);
 #ifndef _MSC_VER
@@ -128,8 +126,6 @@ int main(int argc, char **argv)
 	signal(SIGUSR1, restart);
 	signal(SIGPIPE, SIG_IGN);
 #endif
-
-	idbdatafile::IDBPolicy::configIDBPolicy();
 
 	m = NULL;
 	while (retries < MAX_RETRIES && !die) {

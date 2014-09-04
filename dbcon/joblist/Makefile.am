@@ -14,6 +14,10 @@
 #  along with this program; if not, write to the Free Software
 #  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 #  MA 02110-1301, USA.
+
+# $Id: Makefile.am 864 2009-04-02 19:22:49Z rdempsey $
+## Process this file with automake to produce Makefile.in
+
 AM_CPPFLAGS = $(idb_common_includes) $(idb_cppflags)
 AM_CFLAGS = $(idb_cflags)
 AM_CXXFLAGS = $(idb_cxxflags)
@@ -28,7 +32,6 @@ libjoblist_la_SOURCES = \
         command-jl.cpp \
         crossenginestep.cpp \
         dictstep-jl.cpp \
-        diskjoinstep.cpp \
         distributedenginecomm.cpp \
         elementtype.cpp \
         expressionstep.cpp \
@@ -54,7 +57,6 @@ libjoblist_la_SOURCES = \
         pdictionary.cpp \
         pdictionaryscan.cpp \
         primitivemsg.cpp \
-	pseudocc-jl.cpp \
         resourcedistributor.cpp \
         resourcemanager.cpp \
         rowestimator.cpp \
@@ -71,8 +73,7 @@ libjoblist_la_SOURCES = \
         tuplehavingstep.cpp \
         tupleunion.cpp \
         unique32generator.cpp \
-        virtualtable.cpp \
-		windowfunctionstep.cpp
+        virtualtable.cpp
 
 include_HEADERS = \
         bpp-jl.h \
@@ -81,7 +82,6 @@ include_HEADERS = \
         distributedenginecomm.h \
         elementcompression.h \
         elementtype.h \
-        errorinfo.h \
         fifo.h \
         groupconcat.h \
         jl_logger.h \
@@ -99,8 +99,7 @@ include_HEADERS = \
         threadsafequeue.h \
         timeset.h \
         timestamp.h \
-        unique32generator.h \
-		windowfunctionstep.h
+        unique32generator.h
 
 test:
 

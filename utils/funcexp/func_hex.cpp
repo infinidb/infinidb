@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_hex.cpp 3923 2013-06-19 21:43:06Z bwilkinson $
+* $Id: func_hex.cpp 3551 2013-02-05 22:14:40Z rdempsey $
 *
 *
 ****************************************************************************/
@@ -24,7 +24,6 @@
 #include <cstdlib>
 #include <string>
 #include <sstream>
-#include <limits>
 using namespace std;
 
 #include <boost/scoped_array.hpp>
@@ -35,13 +34,15 @@ using namespace boost;
 #include "rowgroup.h"
 using namespace execplan;
 
-#include "funchelpers.h"
+#include <limits>
 
-namespace
+namespace funcexp
 {
-char digit_upper[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
-void octet2hex(char *to, const char *str, uint32_t len)
+extern const char* convNumToStr(int64_t val,char *dst,int radix);
+extern char digit_upper[];
+
+void octet2hex(char *to, const char *str, uint len)
 {
   const char *str_end= str + len;
   for (; str != str_end; ++str)
@@ -51,10 +52,7 @@ void octet2hex(char *to, const char *str, uint32_t len)
   }
   *to = '\0';
 }
-}
 
-namespace funcexp
-{
 CalpontSystemCatalog::ColType Func_hex::operationType( FunctionParm& fp, CalpontSystemCatalog::ColType& resultType )
 {
 	return resultType;
@@ -65,7 +63,7 @@ string Func_hex::getStrVal(rowgroup::Row& row,
 							bool& isNull,
 							CalpontSystemCatalog::ColType& ct)
 {
-    string retval;
+	string arg, retval;
 	uint64_t dec;
 	char ans[65];
 
@@ -76,7 +74,7 @@ string Func_hex::getStrVal(rowgroup::Row& row,
 		case CalpontSystemCatalog::DATETIME:
 		case CalpontSystemCatalog::DATE:
 		{
-			const string& arg= parm[0]->data()->getStrVal(row, isNull);
+			arg= parm[0]->data()->getStrVal(row, isNull);
 			scoped_array<char> hexPtr(new char[strlen(arg.c_str())*2+1]);
 			octet2hex(hexPtr.get(), arg.c_str(), strlen(arg.c_str()));
 			return string(hexPtr.get(), strlen(arg.c_str())*2);
@@ -92,12 +90,12 @@ string Func_hex::getStrVal(rowgroup::Row& row,
 				dec=  ~(int64_t) 0;
 			else
 				dec= (uint64_t) (val + (val > 0 ? 0.5 : -0.5));
-			retval = helpers::convNumToStr(dec, ans, 16);
+			retval = convNumToStr(dec, ans, 16);
 			break;
 		}
 		case CalpontSystemCatalog::VARBINARY:
 		{
-			const string& arg = parm[0]->data()->getStrVal(row, isNull);
+			arg = parm[0]->data()->getStrVal(row, isNull);
 			uint64_t hexLen = arg.size() * 2;
 			scoped_array<char> hexPtr(new char[hexLen + 1]);  // "+ 1" for the last \0
 			octet2hex(hexPtr.get(), arg.data(), arg.size());
@@ -106,8 +104,8 @@ string Func_hex::getStrVal(rowgroup::Row& row,
 		default:
 		{
 			dec= (uint64_t)parm[0]->data()->getIntVal(row, isNull);
-			retval = helpers::convNumToStr(dec, ans, 16);
-			if (retval.length() > (uint32_t)ct.colWidth)
+			retval = convNumToStr(dec, ans, 16);
+			if (retval.length() > (uint)ct.colWidth)
 				retval = retval.substr(retval.length()-ct.colWidth, ct.colWidth);
 		}
 	}

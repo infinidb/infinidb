@@ -26,16 +26,15 @@
 #define JOBLIST_RESOURCEMANAGER_H
 
 #include <unistd.h>
+#include "jl_logger.h"
 #include <list>
 #include <limits>
 #include <boost/thread/condition.hpp>
 
-#include "logger.h"
-
 #undef min
 #undef max
 
-namespace joblist
+namespace joblist 
 {
 
   /** @brief ResourceDistributor
@@ -49,10 +48,10 @@ namespace joblist
    *	The aging logic is needed because exemgr gets a close message after every query, not
    *	for a session, so it does not know when a session is ended.  Therefore LockedSessionMap
    *	must keep all its sessions.  To prevent the map from becoming too large, after it reaches
-   *  	fMaxSessions, it removes the oldest used session.  fMaxSessions is defined in
+   *  	fMaxSessions, it removes the oldest used session.  fMaxSessions is defined in 
    *	resourcedistributor.cpp.  UpdateAging keeps the last accessed session at the end of the
    *    aging list.  The oldest is at the front.
-   *
+   *   
    */
 
 extern const unsigned maxSessionsDefault;
@@ -72,7 +71,7 @@ private:
 	void updateAging(uint32_t sessionID);
 	boost::mutex 		fMapLock;
 	SessionMap 		fSessionMap;
-	uint64_t 		fResourceBlock;
+	uint64_t 		fResourceBlock;	
 	boost::mutex 		fSessionLock;
 	SessionList	 	fSessionAgingList;
 	const unsigned  	fMaxSessions;
@@ -85,44 +84,44 @@ class ResourceDistributor
 {
 public:
 
-	ResourceDistributor(const std::string& job, const std::string& identity, uint64_t totalResource, uint64_t resourceBlock, bool trace) :
+	ResourceDistributor(const std::string& job, const std::string& identity, uint64_t totalResource, uint64_t resourceBlock, bool trace) : 
 		fJob(job), fIdentity(identity), fTotalResource(totalResource), fSessionMap(resourceBlock), fTraceOn(trace)
 		{}
-
+	
 	virtual ~ResourceDistributor(){}
-
+	
 	typedef std::map <uint32_t, uint64_t> SessionMap;
-
+		
 	uint64_t requestResource(uint32_t sessionID);
 	uint64_t requestResource(uint32_t sessionID, uint64_t resource);
 	void returnResource(uint64_t resource);
 
-
-	uint64_t  getSessionResource(uint32_t sessionID)
-	{
+	
+	uint64_t  getSessionResource(uint32_t sessionID) 
+	{ 
 		return fSessionMap.getSessionResource(sessionID);
 	}
 
 	uint64_t  getTotalResource() const { return fTotalResource; }
 
-
+	
 	void setTrace(bool trace) { fTraceOn = trace; }
-
+	
 	bool addSession(uint32_t sessionID, uint64_t resource) {return fSessionMap.addSession(sessionID, resource, fTotalResource);}
 	void removeSession(uint32_t sessionID) {fSessionMap.removeSession(sessionID); }
 
 private:
 
 	void logMessage(logging::LOG_TYPE logLevel, logging::Message::MessageID mid, uint64_t value = 0, uint32_t sessionId = 0);
-
+	
 	std::string 	fJob;
 	std::string	fIdentity;
 	uint64_t   	fTotalResource;
 	uint64_t   	fResourceBlock;
 	boost::mutex 	fResourceLock;
 	boost::condition fResourceAvailable;
-
-	LockedSessionMap fSessionMap;
+	
+	LockedSessionMap fSessionMap;	
 	uint32_t 	fTraceOn;
 
 };
