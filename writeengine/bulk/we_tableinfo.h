@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_tableinfo.h 4195 2012-09-19 18:12:27Z dcathey $
+* $Id: we_tableinfo.h 4489 2013-01-30 18:47:53Z dcathey $
 *
 *******************************************************************************/
 #ifndef _WE_TABLEINFO_H
@@ -124,6 +124,7 @@ private:
     bool fKeepRbMetaFile;               // Keep or delete bulk rollback meta
                                         //   data file
     bool fbTruncationAsError;           // Treat string truncation as error
+    ImportDataMode fImportDataMode;     // Import data in text or binary mode
 
 #ifdef _MSC_VER
     volatile LONG fTableLocked;         // Do we have db table lock
@@ -152,7 +153,6 @@ private:
     unsigned int  fRejectErrCnt;        // Running count in current err msg file
 
     ExtentStripeAlloc fExtentStrAlloc;  // Extent stripe allocator for this tbl
-    std::vector<BRM::LBID_t> fDictFlushBlks;//dict blks to be flushed from cache
 
     //--------------------------------------------------------------------------
     // Private Functions
@@ -241,6 +241,10 @@ public:
      */
     void deleteMetaDataRollbackFile( );
 
+    /** @brief Get binary import mode.
+     */
+    ImportDataMode getImportDataMode( ) const;
+
     /** @brief Get number of buffers
      */
     int getNumberOfBuffers() const;
@@ -294,6 +298,10 @@ public:
      */
     void setNullStringMode( bool bMode );
 
+    /** @brief Set binary import data mode (text or binary).
+     */
+    void setImportDataMode( ImportDataMode importMode );
+
     /** @brief Enable distributed mode, saving BRM updates in rptFileName
      */
     void setBulkLoadMode(BulkModeType bulkMode, const std::string& rptFileName);
@@ -333,9 +341,12 @@ public:
     /** @brief Initialize the buffer list
      *  @param noOfBuffers Number of buffers to create for this table
      *  @param jobFieldRefList List of fields in this import
+     *  @param fixedBinaryRecLen In binary mode, this is the fixed record length
+     *         used to read the buffer; in text mode, this value is not used.
      */
-    void initializeBuffers(const int &noOfBuffers,
-                           const JobFieldRefList& jobFieldRefList);
+    void initializeBuffers(int   noOfBuffers,
+                           const JobFieldRefList& jobFieldRefList,
+                           unsigned int fixedBinaryRecLen);
 
     /** @brief Read the table data into the read buffer
      */
@@ -446,6 +457,9 @@ inline int TableInfo::getCurrentParseBuffer() const {
 inline std::string TableInfo::getFileName() const {
     return fFileName; }
 
+inline ImportDataMode TableInfo::getImportDataMode() const {
+    return fImportDataMode; }
+
 inline int TableInfo::getNumberOfBuffers() const {
     return fReadBufCount; }
 
@@ -507,6 +521,9 @@ inline void TableInfo::setEscapeChar ( char esChar ) {
 
 inline void TableInfo::setFileBufferSize(const int fileBufSize) {
     fFileBufSize    = fileBufSize; }
+
+inline void TableInfo::setImportDataMode( ImportDataMode importMode ) {
+    fImportDataMode = importMode; }
 
 inline void TableInfo::setJobFileName(const std::string & jobFileName) {
     fjobFileName    = jobFileName; }

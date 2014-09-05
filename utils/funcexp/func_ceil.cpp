@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_ceil.cpp 3048 2012-04-04 15:33:45Z rdempsey $
+* $Id: func_ceil.cpp 3616 2013-03-04 14:56:29Z rdempsey $
 *
 *
 ****************************************************************************/
@@ -65,7 +65,14 @@ int64_t Func_ceil::getIntVal(Row& row,
 		case CalpontSystemCatalog::TINYINT:
 		case CalpontSystemCatalog::SMALLINT:
 		case CalpontSystemCatalog::DECIMAL:
+        case CalpontSystemCatalog::UDECIMAL:
 		{
+            if (op_ct.scale == 0)
+            {
+                ret = parm[0]->data()->getIntVal(row, isNull);
+                break;
+            }
+
 			IDB_Decimal decimal = parm[0]->data()->getDecimalVal(row, isNull);
 
 			if (isNull)
@@ -86,18 +93,28 @@ int64_t Func_ceil::getIntVal(Row& row,
 
 				// Adjust to an int based on the scale.
 				int64_t tmp = ret;
-				ret /= powerOf10_c[decimal.scale];
+				ret /= helpers::powerOf10_c[decimal.scale];
 
 				// Add 1 if this is a positive number and there were values to the right of the
 				// decimal point so that we return the largest integer value not less than X.
-				if ((tmp - (ret * powerOf10_c[decimal.scale]) > 0))
+				if ((tmp - (ret * helpers::powerOf10_c[decimal.scale]) > 0))
 				ret += 1;
 			}
 		}
 		break;
-
+        case CalpontSystemCatalog::UBIGINT:
+        case CalpontSystemCatalog::UINT:
+        case CalpontSystemCatalog::UMEDINT:
+        case CalpontSystemCatalog::UTINYINT:
+        case CalpontSystemCatalog::USMALLINT:
+        {
+            ret = (int64_t)(parm[0]->data()->getUintVal(row, isNull));
+        }
+        break;
 		case CalpontSystemCatalog::DOUBLE:
+        case CalpontSystemCatalog::UDOUBLE:
 		case CalpontSystemCatalog::FLOAT:
+        case CalpontSystemCatalog::UFLOAT:
 		{
 			ret = (int64_t) ceil(parm[0]->data()->getDoubleVal(row, isNull));
 		}
@@ -144,6 +161,85 @@ int64_t Func_ceil::getIntVal(Row& row,
 	return ret;
 }
 
+uint64_t Func_ceil::getUintVal(Row& row,
+							FunctionParm& parm,
+							bool& isNull,
+							CalpontSystemCatalog::ColType& op_ct)
+{
+	uint64_t ret = 0;
+
+	switch (op_ct.colDataType)
+	{
+		case CalpontSystemCatalog::BIGINT:
+		case CalpontSystemCatalog::INT:
+		case CalpontSystemCatalog::MEDINT:
+		case CalpontSystemCatalog::TINYINT:
+		case CalpontSystemCatalog::SMALLINT:
+		case CalpontSystemCatalog::DECIMAL:
+        case CalpontSystemCatalog::UDECIMAL:
+		{
+            ret = (uint64_t)parm[0]->data()->getIntVal(row, isNull);
+        }
+		break;
+        case CalpontSystemCatalog::UBIGINT:
+        case CalpontSystemCatalog::UINT:
+        case CalpontSystemCatalog::UMEDINT:
+        case CalpontSystemCatalog::UTINYINT:
+        case CalpontSystemCatalog::USMALLINT:
+        {
+            ret = (parm[0]->data()->getUintVal(row, isNull));
+        }
+        break;
+		case CalpontSystemCatalog::DOUBLE:
+        case CalpontSystemCatalog::UDOUBLE:
+		case CalpontSystemCatalog::FLOAT:
+        case CalpontSystemCatalog::UFLOAT:
+		{
+			ret = (uint64_t) ceil(parm[0]->data()->getDoubleVal(row, isNull));
+		}
+		break;
+
+		case CalpontSystemCatalog::VARCHAR:
+		case CalpontSystemCatalog::CHAR:
+		{
+			string str = parm[0]->data()->getStrVal(row, isNull);
+			if (!isNull)
+				ret = (uint64_t) ceil(strtod(str.c_str(), 0));
+		}
+		break;
+
+		case CalpontSystemCatalog::DATE:
+		{
+			string str = DataConvert::dateToString1(parm[0]->data()->getDateIntVal(row, isNull));
+			if (!isNull)
+				ret = strtoull(str.c_str(), NULL, 10);
+		}
+		break;
+
+		case CalpontSystemCatalog::DATETIME:
+		{
+			string str =
+				DataConvert::datetimeToString1(parm[0]->data()->getDatetimeIntVal(row, isNull));
+
+			// strip off micro seconds
+			str = str.substr(0,14);
+
+			if (!isNull)
+				ret = strtoull(str.c_str(), NULL, 10);
+		}
+		break;
+
+		default:
+		{
+			std::ostringstream oss;
+			oss << "ceil: datatype of " << colDataTypeToString(op_ct.colDataType)
+				<< " is not supported";
+			throw logging::IDBExcept(oss.str(), ERR_DATATYPE_NOT_SUPPORT);
+		}
+	}
+	return ret;
+}
+
 
 double Func_ceil::getDoubleVal(Row& row,
 							FunctionParm& parm,
@@ -152,7 +248,9 @@ double Func_ceil::getDoubleVal(Row& row,
 {
 	double ret = 0.0;
 	if (op_ct.colDataType == CalpontSystemCatalog::DOUBLE ||
-		op_ct.colDataType == CalpontSystemCatalog::FLOAT)
+        op_ct.colDataType == CalpontSystemCatalog::UDOUBLE ||
+        op_ct.colDataType == CalpontSystemCatalog::FLOAT ||
+		op_ct.colDataType == CalpontSystemCatalog::UFLOAT)
 	{
 		ret = ceil(parm[0]->data()->getDoubleVal(row, isNull));
 	}
@@ -165,7 +263,14 @@ double Func_ceil::getDoubleVal(Row& row,
 	}
 	else
 	{
-		ret = (double) getIntVal(row, parm, isNull, op_ct);
+        if (isUnsigned(op_ct.colDataType))
+        {
+            ret = (double) getUintVal(row, parm, isNull, op_ct);
+        }
+        else
+        {
+            ret = (double) getIntVal(row, parm, isNull, op_ct);
+        }
 	}
 
 	return ret;
@@ -179,7 +284,9 @@ string Func_ceil::getStrVal(Row& row,
 {
 	string ret;
 	if (op_ct.colDataType == CalpontSystemCatalog::DOUBLE ||
+        op_ct.colDataType == CalpontSystemCatalog::UDOUBLE ||
 		op_ct.colDataType == CalpontSystemCatalog::FLOAT ||
+        op_ct.colDataType == CalpontSystemCatalog::UFLOAT ||
 		op_ct.colDataType == CalpontSystemCatalog::VARCHAR ||
 		op_ct.colDataType == CalpontSystemCatalog::CHAR)
 	{
@@ -191,8 +298,15 @@ string Func_ceil::getStrVal(Row& row,
 		size_t d = ret.find('.');
 		ret = ret.substr(0, d);
 	}
+    else if (isUnsigned(op_ct.colDataType))
+    {
+        ostringstream oss;
+        oss << getUintVal(row, parm, isNull, op_ct);
+        ret = oss.str();
+    }
 	else
 	{
+
 		ostringstream oss;
 		oss << getIntVal(row, parm, isNull, op_ct);
 		ret = oss.str();

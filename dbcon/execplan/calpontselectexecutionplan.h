@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: calpontselectexecutionplan.h 8731 2012-07-23 18:47:07Z pleblanc $
+*   $Id: calpontselectexecutionplan.h 9215 2013-01-24 18:40:12Z pleblanc $
 *
 *
 ***********************************************************************/
@@ -34,6 +34,7 @@
 #include "filter.h"
 #include "expressionparser.h"
 #include "calpontsystemcatalog.h"
+#include "brmtypes.h"
 
 #ifndef __GNUC__
 #  ifndef __attribute__
@@ -292,8 +293,8 @@ public:
 	/** version id
 	 *
 	 */
-	const CalpontSystemCatalog::SCN verID() const { return fVerID; }
-	void verID ( const CalpontSystemCatalog::SCN verID ) { fVerID = verID; }
+	const BRM::QueryContext verID() const { return fVerID; }
+	void verID ( const BRM::QueryContext verID ) { fVerID = verID; }
 	
 	inline static ColumnMap& colMap() {return fColMap;}
 	
@@ -483,7 +484,7 @@ private:
 	 
 	uint32_t fSessionID;
 	int fTxnID;    // SQLEngine only needs the ID value
-	CalpontSystemCatalog::SCN fVerID;          
+	BRM::QueryContext fVerID;
 	static std::string fSchemaName;   /// @bug #393. table access schema and table name
 	static std::string fTableName;    /// @bug #393
 	uint32_t fTraceFlags;

@@ -19,7 +19,7 @@
  * $Id$
  */
 
-bool parseAutoincrementTableComment ( std::string comment, int64_t& startValue, std::string& columnName )
+bool parseAutoincrementTableComment ( std::string comment, uint64_t& startValue, std::string& columnName )
 {
 	algorithm::to_upper(comment);
 	regex compat("[[:space:]]*AUTOINCREMENT[[:space:]]*=[[:space:]]*", regex_constants::extended);
@@ -70,7 +70,7 @@ bool parseAutoincrementTableComment ( std::string comment, int64_t& startValue, 
 					errno = 0;
 					char *ep = NULL;
 					const char *str = startVal.c_str();
-					startValue = strtoll(str, &ep, 10);
+					startValue = strtoull(str, &ep, 10);
 					//  (no digits) || (more chars)  || (other errors & value = 0)
 					if ((ep == str) || (*ep != '\0') || (errno != 0))
 					{
@@ -98,7 +98,7 @@ bool parseAutoincrementTableComment ( std::string comment, int64_t& startValue, 
 	return autoincrement;
 }
 
-bool parseAutoincrementColumnComment ( std::string comment, int64_t& startValue )
+bool parseAutoincrementColumnComment ( std::string comment, uint64_t& startValue )
 {
 	algorithm::to_upper(comment);
 	regex compat("[[:space:]]*AUTOINCREMENT[[:space:]]*", regex_constants::extended);

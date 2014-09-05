@@ -1,5 +1,5 @@
 /******************************************************************************************
- * $Id: calpontConsole.h 2641 2012-09-05 21:45:28Z dhill $
+ * $Id: calpontConsole.h 2924 2012-11-20 18:35:23Z dhall $
  *
  ******************************************************************************************/
 /**
@@ -52,7 +52,7 @@ void    writeLog(std::string command);
  */
 const std::string ConsoleCmdsFile= "ConsoleCmds.xml";
 
-void getFlags(const std::string* arguments, oam::GRACEFUL_FLAG& gracefulTemp, oam::ACK_FLAG& ackTemp, oam::CC_SUSPEND_ANSWER& suspendAnswer);
+void getFlags(const std::string* arguments, oam::GRACEFUL_FLAG& gracefulTemp, oam::ACK_FLAG& ackTemp, oam::CC_SUSPEND_ANSWER& suspendAnswer, bool& bNeedsConfirm, std::string* password = NULL);
 int confirmPrompt(std::string warningCommand);
 std::string dataPrompt(std::string promptCommand);
 int processCommand(std::string*);

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_timestampdiff.cpp 3048 2012-04-04 15:33:45Z rdempsey $
+* $Id: func_timestampdiff.cpp 3616 2013-03-04 14:56:29Z rdempsey $
 *
 *
 ****************************************************************************/
@@ -38,7 +38,6 @@ using namespace dataconvert;
 
 namespace funcexp
 {
-extern string timediff( int64_t time1, int64_t time2);
 
 CalpontSystemCatalog::ColType Func_timestampdiff::operationType( FunctionParm& fp, CalpontSystemCatalog::ColType& resultType )
 {
@@ -105,7 +104,7 @@ int64_t Func_timestampdiff::getIntVal(rowgroup::Row& row,
 		int l_sign = 1;
 		int l_sign3;
 
-		l_sign3 = calc_time_diff(val2, val1, l_sign, (long long*)&seconds, (long long*)&mseconds);
+		l_sign3 = helpers::calc_time_diff(val2, val1, l_sign, (long long*)&seconds, (long long*)&mseconds);
 		l_sign3 = (l_sign3 == 0 ? 1 : -1);
 		if (unit == "SECOND")
 			diff = l_sign3 * seconds;

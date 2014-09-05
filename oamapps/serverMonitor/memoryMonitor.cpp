@@ -42,8 +42,8 @@ void memoryMonitor()
 
 	int day = 0;
 
-	//set monitoring period to 10 seconds
-	int monitorPeriod = 10;
+	//set monitoring period to 60 seconds
+	int monitorPeriod = MONITOR_PERIOD;
 
 	while(true)
 	{
@@ -59,9 +59,10 @@ void memoryMonitor()
 			swapCritical = moduleTypeConfig.ModuleSwapCriticalThreshold; 
 			swapMajor = moduleTypeConfig.ModuleSwapMajorThreshold; 
 			swapMinor = moduleTypeConfig.ModuleSwapMinorThreshold;
-		} catch (runtime_error e)
+		} catch (...)
 		{
-			throw e;
+			sleep(5);
+			continue;
 		}
 		
 		// get cache MEMORY stats
@@ -145,7 +146,7 @@ void memoryMonitor()
 
 		// check for Memory alarms
 		if (memoryUsagePercent >= memoryCritical && memoryCritical > 0 ) {
-			if ( monitorPeriod == 10 ) {
+			if ( monitorPeriod == MONITOR_PERIOD ) {
 				//first time called, log
 				//adjust if over 100%
 				if ( memoryUsagePercent > 100 )
@@ -171,7 +172,7 @@ void memoryMonitor()
 			monitorPeriod = 1;
 		}
 		else if (memoryUsagePercent >= memoryMajor && memoryMajor > 0 ) {
-			monitorPeriod = 10;
+			monitorPeriod = MONITOR_PERIOD;
 			LoggingID lid(SERVER_MONITOR_LOG_ID);
 			MessageLog ml(lid);
 			Message msg;
@@ -183,7 +184,7 @@ void memoryMonitor()
 			serverMonitor.sendResourceAlarm("Local-Memory", MEMORY_USAGE_MED, SET, memoryUsagePercent);
 		}
 		else if (memoryUsagePercent >= memoryMinor && memoryMinor > 0 ) {
-			monitorPeriod = 10;
+			monitorPeriod = MONITOR_PERIOD;
 			LoggingID lid(SERVER_MONITOR_LOG_ID);
 			MessageLog ml(lid);
 			Message msg;
@@ -195,7 +196,7 @@ void memoryMonitor()
 			serverMonitor.sendResourceAlarm("Local-Memory", MEMORY_USAGE_LOW, SET, memoryUsagePercent);
 		}
 		else {
-			monitorPeriod = 10;
+			monitorPeriod = MONITOR_PERIOD;
 			serverMonitor.checkMemoryAlarm("Local-Memory");
 		}
 
@@ -241,7 +242,7 @@ void memoryMonitor()
 		else
 			serverMonitor.checkSwapAlarm("Swap");
 
-		// sleep
+		// sleep, 1 minute
 		sleep(monitorPeriod);
 
 	} // end of while loop
@@ -362,14 +363,12 @@ void ServerMonitor::checkSwapAlarm(string alarmItem, ALARMS alarmID)
 void ServerMonitor::checkSwapAction()
 {
 	Oam oam;
-	string swapAction = "stopSystem";
+	string swapAction = "restartSystem";
 	
 	try {
 		oam.getSystemConfig ("SwapAction", swapAction);
-	} catch (runtime_error e)
-	{
-		throw e;
-	}
+	} catch (...)
+	{}
 
 	if (swapAction == "none")
 		return;

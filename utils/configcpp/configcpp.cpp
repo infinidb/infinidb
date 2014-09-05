@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************************
-* $Id: configcpp.cpp 3281 2012-09-13 18:38:27Z rdempsey $
+* $Id: configcpp.cpp 3495 2013-01-21 14:09:51Z rdempsey $
 *
 ******************************************************************************************/
 #include "config.h"
@@ -25,6 +25,7 @@
 #include <stdexcept>
 #include <iostream>
 #include <sstream>
+#include <fstream>
 using namespace std;
 
 #include <boost/thread.hpp>
@@ -57,6 +58,8 @@ namespace fs=boost::filesystem;
 #ifdef _MSC_VER
 #include "idbregistry.h"
 #endif
+
+#include "bytestream.h"
 
 namespace
 {
@@ -373,9 +376,7 @@ void Config::writeConfig(const string& configFile) const
 
 			//good read, save copy, copy temp file tp tmp then to Calpont.xml
 			//move to /tmp to get around a 'same file error' in mv command
-			unlink(scft.string().c_str());
 			fs::copy_file(dcf, scft, fs::copy_option::overwrite_if_exists);
-			chmod(scft.string().c_str(), 0666);
 
 			if (exists(tcft)) fs::remove(tcft);
 			fs::rename(dcft, tcft);
@@ -440,6 +441,44 @@ void Config::write(const string& configFile) const
 		writeConfig(configFile);
 	}
 }
+
+void Config::writeConfigFile(messageqcpp::ByteStream msg) const
+{
+	struct flock fl;
+	int fd;
+
+	//get config file name being udated
+	string fileName;
+	msg >> fileName;
+
+	fl.l_type   = F_WRLCK;  // write lock
+	fl.l_whence = SEEK_SET;
+	fl.l_start  = 0;
+	fl.l_len    = 0;
+	fl.l_pid    = getpid();
+
+	// lock file if it exists
+	if ((fd = open(fileName.c_str(), O_WRONLY)) >= 0)
+	{
+		if (fcntl(fd, F_SETLKW, &fl) == -1)
+			throw runtime_error("Config::write: file lock error " + fileName);
+
+		ofstream out(fileName.c_str());
+		out << msg;
+
+		fl.l_type   = F_UNLCK;	//unlock
+		if (fcntl(fd, F_SETLK, &fl) == -1)
+			throw runtime_error("Config::write: file unlock error " + fileName);
+
+		close(fd);
+	}
+	else
+	{
+		ofstream out(fileName.c_str());
+		out << msg;
+	}
+}
+
 
 /* static */
 void Config::deleteInstanceMap()
@@ -509,5 +548,4 @@ time_t Config::getCurrentMTime()
 }
 
 } //namespace config
-// vim:ts=4 sw=4:
 

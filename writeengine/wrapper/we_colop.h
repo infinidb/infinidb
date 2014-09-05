@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: we_colop.h 4496 2013-01-31 19:13:20Z pleblanc $
+//  $Id: we_colop.h 4450 2013-01-21 14:13:24Z rdempsey $
 
 
 /** @file */
@@ -82,7 +82,7 @@ public:
    EXPORT virtual int createColumn(Column& column,
                                   int colNo,
                                   int colWidth,
-                                  ColDataType colDataType,
+                                  execplan::CalpontSystemCatalog::ColDataType colDataType,
                                   ColType colType,
                                   FID dataFid,
                                   uint16_t dbRoot,
@@ -209,7 +209,7 @@ public:
    /**
     * @brief Get columne data type
     */
-   EXPORT virtual bool getColDataType(const char* name, ColDataType& colDataType) const;
+   EXPORT virtual bool getColDataType(const char* name, execplan::CalpontSystemCatalog::ColDataType& colDataType) const;
 
    /**
     * @brief Initialize the column
@@ -244,7 +244,7 @@ public:
     */
    EXPORT virtual void setColParam(Column& column, int colNo = 0,
                                   int colWidth = 0,
-                                  ColDataType colDataType = INT,
+                                  execplan::CalpontSystemCatalog::ColDataType colDataType = execplan::CalpontSystemCatalog::INT,
                                   ColType colType = WR_INT,
                                   FID dataFid = 0,
                                   int comppre = 0,
@@ -307,13 +307,13 @@ public:
     * @brief backup blocks to version buffer
     */
    int writeVB(FILE* pSource, const OID sourceOid, FILE* pTarget, const OID targetOid,
-              const std::vector<i32>& fboList, const BRM::VBRange& freeList,
+              const std::vector<uint32_t>& fboList, const BRM::VBRange& freeList,
               size_t& nBlocksProcessed, const size_t fboCurrentOffset);
 
    /**
     * @brief restore blocks from version buffer
     */
-   int copyVB(FILE* pSource, const BRM::VER_t txnD, const OID oid, std::vector<i32>& fboList,
+   int copyVB(FILE* pSource, const BRM::VER_t txnD, const OID oid, std::vector<uint32_t>& fboList,
                std::vector<BRM::LBIDRange>& rangeList);
 protected:
 
@@ -325,12 +325,12 @@ protected:
    /**
     * @brief populate readBuf with data in block #lbid
     */
-   virtual int readBlock(FILE* pFile, unsigned char* readBuf, const i64 fbo) = 0;
+   virtual int readBlock(FILE* pFile, unsigned char* readBuf, const uint64_t fbo) = 0;
 
    /**
     * @brief output writeBuf to pFile starting at position fbo
     */
-   virtual int saveBlock(FILE* pFile, const unsigned char* writeBuf, const i64 fbo) = 0;
+   virtual int saveBlock(FILE* pFile, const unsigned char* writeBuf, const uint64_t fbo) = 0;
 
 private:
 };

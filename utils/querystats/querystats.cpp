@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: querystats.cpp 4026 2013-08-02 16:41:23Z zzhu $
+*   $Id: querystats.cpp 4027 2013-08-02 18:47:28Z zzhu $
 *
 *
 ***********************************************************************/
@@ -44,6 +44,22 @@ namespace querystats
 {
 	
 const string SCHEMA = "infinidb_querystats";
+
+struct IDB_Drizzle
+{
+	IDB_Drizzle(): drzp(NULL), drzcp(NULL), drzrp(NULL) {}
+	~IDB_Drizzle() 
+	{
+		// The following API all checks NULL in the implementation.
+		drizzle_result_free(drzrp);
+		drizzle_con_close(drzcp);
+		drizzle_con_free(drzcp);
+		drizzle_free(drzp);
+	}
+	drizzle_st* drzp;
+	drizzle_con_st* drzcp;
+	drizzle_result_st* drzrp;
+};
 
 QueryStats::QueryStats()
 {
@@ -184,23 +200,25 @@ void QueryStats::insert()
 	// get configure for every query to allow only changing of connect info
 	string host, user, pwd;
 	uint port;
-	
+
 	if (rm.getMysqldInfo(host, user, pwd, port) == false)
 		throw IDBExcept(IDBErrorInfo::instance()->errorMsg(ERR_CROSS_ENGINE_CONFIG),
 			ERR_CROSS_ENGINE_CONFIG);
 
 	// insert stats to querystats table
-	drizzle_st* drzp = 0;
-	drzp = drizzle_create();
-	if (drzp == 0)
+	IDB_Drizzle drizzle;
+
+	drizzle.drzp = drizzle_create();
+	if (drizzle.drzp == 0)
 		handleMySqlError("fatal error initializing querystats lib", -1);
-	drizzle_con_st* drzcp = 0;
-	drzcp = drizzle_con_add_tcp(drzp, host.c_str(), port, user.c_str(), pwd.c_str(),
+
+	drizzle.drzcp = drizzle_con_add_tcp(drizzle.drzp, host.c_str(), port, user.c_str(), pwd.c_str(),
 		SCHEMA.c_str(), DRIZZLE_CON_MYSQL);
-	if (drzcp == 0)
+	if (drizzle.drzcp == 0)
 		handleMySqlError("fatal error setting up parms in querystats lib", -1);
+
 	drizzle_return_t drzret;
-	drzret = drizzle_con_connect(drzcp);
+	drzret = drizzle_con_connect(drizzle.drzcp);
 	if (drzret != 0)
 		handleMySqlError("fatal error connecting to InfiniDB in querystats lib", drzret);
 
@@ -231,21 +249,13 @@ void QueryStats::insert()
 	insert << fNumFiles << ", ";
 	insert << fFileBytes << ")"; // the last 2 fields are not populated yet
 	
-	drizzle_result_st* drzrp=0;
-	drizzle_return_t* drzretp = &drzret;
-	drzrp = drizzle_query_str(drzcp, drzrp, insert.str().c_str(), drzretp);
-	if (drzret != 0 || drzrp == 0)
+	drizzle.drzrp = drizzle_query_str(drizzle.drzcp, drizzle.drzrp, insert.str().c_str(), &drzret);
+	if (drzret != 0 || drizzle.drzrp == 0)
 		handleMySqlError("fatal error executing query in querystats lib", drzret);
-	drzret = drizzle_result_buffer(drzrp);
+
+	drzret = drizzle_result_buffer(drizzle.drzrp);
 	if (drzret != 0)
 		handleMySqlError("fatal error reading results from InfiniDB in querystats lib", drzret);
-	drizzle_result_free(drzrp);
-	drzrp = 0;
-	drizzle_con_close(drzcp);
-	drizzle_con_free(drzcp);
-	drzcp = 0;
-	drizzle_free(drzp);
-	drzp = 0;
 }
 
 void QueryStats::handleMySqlError(const char* errStr, unsigned int errCode)
@@ -253,7 +263,7 @@ void QueryStats::handleMySqlError(const char* errStr, unsigned int errCode)
 	ostringstream oss;
 	oss << errStr << " (" << errCode << ")";
 	Message::Args args;
-	args.add(oss.str());	
+	args.add(oss.str());
 	throw IDBExcept(ERR_CROSS_ENGINE_CONNECT, args);
 }
 
@@ -284,17 +294,17 @@ uint QueryStats::userPriority(string _host, const string _user)
 			ERR_CROSS_ENGINE_CONFIG);
 
 	// get user priority
-	drizzle_st* drzp = 0;
-	drzp = drizzle_create();
-	if (drzp == 0)
+	IDB_Drizzle drizzle;
+	drizzle.drzp = drizzle_create();
+	if (drizzle.drzp == 0)
 		handleMySqlError("fatal error initializing querystats lib", -1);
-	drizzle_con_st* drzcp = 0;
-	drzcp = drizzle_con_add_tcp(drzp, host.c_str(), port, user.c_str(), pwd.c_str(),
+
+	drizzle.drzcp = drizzle_con_add_tcp(drizzle.drzp, host.c_str(), port, user.c_str(), pwd.c_str(),
 		SCHEMA.c_str(), DRIZZLE_CON_MYSQL);
-	if (drzcp == 0)
+	if (drizzle.drzcp == 0)
 		handleMySqlError("fatal error setting up parms in querystats lib", -1);
 	drizzle_return_t drzret;
-	drzret = drizzle_con_connect(drzcp);
+	drzret = drizzle_con_connect(drizzle.drzcp);
 	if (drzret != 0)
 		handleMySqlError("fatal error connecting to InfiniDB in querystats lib", drzret);
 	
@@ -314,31 +324,21 @@ uint QueryStats::userPriority(string _host, const string _user)
 	      << _user 
 	      << "') and upper(a.priority) = upper(b.priority)";
 
-	drizzle_result_st* drzrp = 0;
-	drizzle_return_t* drzretp = &drzret;
-	drzrp = drizzle_query_str(drzcp, drzrp, query.str().c_str(), drzretp);
-	if (drzret != 0 || drzrp == 0)
+	drizzle.drzrp = drizzle_query_str(drizzle.drzcp, drizzle.drzrp, query.str().c_str(), &drzret);
+	if (drzret != 0 || drizzle.drzrp == 0)
 		handleMySqlError("fatal error executing query in querystats lib", drzret);
-	drzret = drizzle_result_buffer(drzrp);
+	drzret = drizzle_result_buffer(drizzle.drzrp);
 	if (drzret != 0)
 		handleMySqlError("fatal error reading results from InfiniDB in querystats lib", drzret);
 
 	// only fetch one row. if duplicate user name in the table, the first one will be got.
 	drizzle_row_t row;
-	row = drizzle_row_next(drzrp);
+	row = drizzle_row_next(drizzle.drzrp);
 	if (row)
 	{
 		fPriority = row[0];
 		fPriorityLevel = atoi(row[1]);
 	}
-
-	drizzle_result_free(drzrp);
-	drzrp = 0;
-	drizzle_con_close(drzcp);
-	drizzle_con_free(drzcp);
-	drzcp = 0;
-	drizzle_free(drzp);
-	drzp = 0;
 
 	return fPriorityLevel;
 }

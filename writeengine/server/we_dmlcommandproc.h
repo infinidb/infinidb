@@ -40,7 +40,6 @@
 #include "we_dbrootextenttracker.h"
 #include "we_rbmetawriter.h"
 #include "rowgroup.h"
-#include "we_log.h"
 #if defined(_MSC_VER) && defined(DDLPKGPROC_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
@@ -67,19 +66,10 @@ class WE_DMLCommandProc
 			return fIsFirstBatchPm;
 		}
 		
-		inline void convertRidToColumn (u_int64_t& rid, uint32_t& partition, uint16_t& segment)
+		//Convert rid from logical block rid to file relative rid
+		inline void convertToRelativeRid (u_int64_t& rid, const uint8_t extentNum, const uint16_t blockNum)
 		{
-			partition = rid / ( filesPerColumnPartition * extentsPerSegmentFile * extentRows );
-		
-			segment =( ( ( rid % ( filesPerColumnPartition * extentsPerSegmentFile * extentRows )) / extentRows ) ) % filesPerColumnPartition;
-		
-			//Calculate the relative rid for this segment file
-			u_int64_t relRidInPartition = rid - ((u_int64_t)partition * (u_int64_t)filesPerColumnPartition * (u_int64_t)extentsPerSegmentFile * (u_int64_t)extentRows);
-			assert ( relRidInPartition <= (u_int64_t)filesPerColumnPartition * (u_int64_t)extentsPerSegmentFile * (u_int64_t)extentRows );
-			uint32_t numExtentsInThisPart = relRidInPartition / extentRows;
-			unsigned numExtentsInThisSegPart = numExtentsInThisPart / filesPerColumnPartition;
-			u_int64_t relRidInThisExtent = relRidInPartition - numExtentsInThisPart * extentRows;
-			rid = relRidInThisExtent +  numExtentsInThisSegPart * extentRows;
+			rid = rid + extentNum*extentRows + blockNum * 8192;
 		}
 	
 		EXPORT uint8_t processSingleInsert(messageqcpp::ByteStream& bs, std::string & err);
@@ -100,11 +90,6 @@ class WE_DMLCommandProc
 		EXPORT uint8_t processBulkRollback(messageqcpp::ByteStream& bs, std::string & err);
 		EXPORT uint8_t processBulkRollbackCleanup(messageqcpp::ByteStream& bs, std::string & err);
 		EXPORT uint8_t updateSyscolumnNextval(ByteStream& bs, std::string & err);
-		int validateColumnHWMs(
-				execplan::CalpontSystemCatalog::RIDList& ridList,
-				boost::shared_ptr<execplan::CalpontSystemCatalog> systemCatalogPtr,
-				const std::vector<DBRootExtentInfo>& segFileInfo,
-				const char* stage );
 	private:	
 		WriteEngineWrapper fWEWrapper;
 		boost::scoped_ptr<RBMetaWriter> fRBMetaWriter;
@@ -114,6 +99,7 @@ class WE_DMLCommandProc
 			if (((colType.colDataType == execplan::CalpontSystemCatalog::CHAR) && (colType.colWidth > 8)) 
 				|| ((colType.colDataType == execplan::CalpontSystemCatalog::VARCHAR) && (colType.colWidth > 7)) 
 				|| ((colType.colDataType == execplan::CalpontSystemCatalog::DECIMAL) && (colType.precision > 18))
+				|| ((colType.colDataType == execplan::CalpontSystemCatalog::UDECIMAL) && (colType.precision > 18))
 				|| (colType.colDataType == execplan::CalpontSystemCatalog::VARBINARY)) 
 			{
 				return true;
@@ -127,7 +113,6 @@ class WE_DMLCommandProc
 		std::map<uint32_t, dmlpackage::UpdateDMLPackage> cpackages;
 		BRM::DBRM fDbrm;
 		unsigned  extentsPerSegmentFile, extentRows, filesPerColumnPartition, dbrootCnt;
-		Log fLog;
 	
 };
 }

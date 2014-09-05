@@ -23,8 +23,10 @@
 
 /** @file */
 
-#ifndef SQL_LOGGER_H_
-#define SQL_LOGGER_H_
+#ifndef LOGGING_SQLLOGGER_H_
+#define LOGGING_SQLLOGGER_H_
+
+#include <string>
 
 #include "messageids.h"
 #include "messageobj.h"

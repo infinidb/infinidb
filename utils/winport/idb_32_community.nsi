@@ -7,9 +7,9 @@ OutFile InfiniDB32.exe
 
 !define DISPLAY_URL http://www.infinidb.org/
 
-!define DISPLAY_VERSION 3.5
-VIAddVersionKey "FileVersion" "3.5.0-0 Final"
-VIProductVersion "3.5.0.0"
+!define DISPLAY_VERSION 2.2
+VIAddVersionKey "FileVersion" "2.2-trunk"
+VIProductVersion "2.2.0.0"
 
 VIAddVersionKey "ProductVersion" "${DISPLAY_VERSION} Final"
 VIAddVersionKey "CompanyName" "Calpont Corp."
@@ -119,6 +119,7 @@ File C:\InfiniDB\src\utils\winport\svcwait.bat
 File C:\InfiniDB\src\utils\winport\idbsvsta.bat
 File C:\InfiniDB\src\utils\winport\idbsvsto.bat
 File C:\InfiniDB\src\utils\winport\idbmysql.bat
+File C:\InfiniDB\src\tools\calpontSupport\calpontSupport.bat
 
 SetOutPath $INSTDIR\bulk\data\import
 SetOutPath $INSTDIR\bulk\job
@@ -303,6 +304,7 @@ Delete $INSTDIR\bin\svcwait.bat
 Delete $INSTDIR\bin\idbsvsta.bat
 Delete $INSTDIR\bin\idbsvsto.bat
 Delete $INSTDIR\bin\idbmysql.bat
+Delete $INSTDIR\bin\calpontSupport.bat
 Delete $INSTDIR\bin\ha_archive.dll
 Delete $INSTDIR\bin\ha_federated.dll
 Delete $INSTDIR\bin\ha_innodb_plugin.dll

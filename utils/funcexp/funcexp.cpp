@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: funcexp.cpp 3956 2013-07-08 19:17:26Z bpaul $
+* $Id: funcexp.cpp 3957 2013-07-08 21:20:36Z bpaul $
 *
 *
 ****************************************************************************/
@@ -79,6 +79,7 @@ FuncExp::FuncExp()
 	fFuncMap["case_searched"] = new Func_searched_case();
 	fFuncMap["case_simple"] = new Func_simple_case();
 	fFuncMap["cast_as_signed"] = new Func_cast_signed();	//dlh
+    fFuncMap["cast_as_unsigned"] = new Func_cast_unsigned();	//dch
 	fFuncMap["cast_as_char"] = new Func_cast_char();	//dlh
 	fFuncMap["cast_as_date"] = new Func_cast_date();	//dlh
 	fFuncMap["cast_as_datetime"] = new Func_cast_datetime();	//dlh
@@ -276,6 +277,15 @@ void FuncExp::evaluate(rowgroup::Row& row, std::vector<execplan::SRCP>& expressi
 					row.setIntField<8>(val, expression[i]->outputIndex());
 				break;								
 			}
+            case CalpontSystemCatalog::UBIGINT:
+            {
+                uint64_t val = expression[i]->getUintVal(row, isNull);
+                if (isNull)
+                    row.setUintField<8>(UBIGINTNULL, expression[i]->outputIndex());
+                else
+                    row.setUintField<8>(val, expression[i]->outputIndex());
+                break;								
+            }
 			case CalpontSystemCatalog::INT:
 			case CalpontSystemCatalog::MEDINT:
 			{
@@ -284,6 +294,16 @@ void FuncExp::evaluate(rowgroup::Row& row, std::vector<execplan::SRCP>& expressi
 					row.setIntField<4>(INTNULL, expression[i]->outputIndex());
 				else
 					row.setIntField<4>(val, expression[i]->outputIndex());
+				break;					
+			}
+			case CalpontSystemCatalog::UINT:
+			case CalpontSystemCatalog::UMEDINT:
+			{
+				uint64_t val = expression[i]->getUintVal(row, isNull);
+				if (isNull)
+					row.setUintField<4>(UINTNULL, expression[i]->outputIndex());
+				else
+					row.setUintField<4>(val, expression[i]->outputIndex());
 				break;					
 			}
 			case CalpontSystemCatalog::SMALLINT:
@@ -295,6 +315,15 @@ void FuncExp::evaluate(rowgroup::Row& row, std::vector<execplan::SRCP>& expressi
 					row.setIntField<2>(val, expression[i]->outputIndex());
 				break;	
 			}
+            case CalpontSystemCatalog::USMALLINT:
+            {
+                uint64_t val = expression[i]->getUintVal(row, isNull);
+                if (isNull)
+                    row.setUintField<2>(USMALLINTNULL, expression[i]->outputIndex());
+                else
+                    row.setUintField<2>(val, expression[i]->outputIndex());
+                break;	
+            }
 			case CalpontSystemCatalog::TINYINT:
 			{
 				int64_t val = expression[i]->getIntVal(row, isNull);
@@ -304,9 +333,19 @@ void FuncExp::evaluate(rowgroup::Row& row, std::vector<execplan::SRCP>& expressi
 					row.setIntField<1>(val, expression[i]->outputIndex());
 				break;	
 			}
+            case CalpontSystemCatalog::UTINYINT:
+            {
+                uint64_t val = expression[i]->getUintVal(row, isNull);
+                if (isNull)
+                    row.setUintField<1>(UTINYINTNULL, expression[i]->outputIndex());
+                else
+                    row.setUintField<1>(val, expression[i]->outputIndex());
+                break;	
+            }
 			//In this case, we're trying to load a double output column with float data. This is the
 			// case when you do sum(floatcol), e.g.
 			case CalpontSystemCatalog::DOUBLE:
+            case CalpontSystemCatalog::UDOUBLE:
 			{
 				double val = expression[i]->getDoubleVal(row, isNull);
 				if (isNull)
@@ -316,6 +355,7 @@ void FuncExp::evaluate(rowgroup::Row& row, std::vector<execplan::SRCP>& expressi
 				break;
 			}
 			case CalpontSystemCatalog::FLOAT:
+            case CalpontSystemCatalog::UFLOAT:
 			{
 				float val = expression[i]->getFloatVal(row, isNull);
 				if (isNull)
@@ -325,6 +365,7 @@ void FuncExp::evaluate(rowgroup::Row& row, std::vector<execplan::SRCP>& expressi
 				break;
 			}
 			case CalpontSystemCatalog::DECIMAL:
+            case CalpontSystemCatalog::UDECIMAL:
 			{
 				IDB_Decimal val = expression[i]->getDecimalVal(row, isNull);
 				if (isNull)

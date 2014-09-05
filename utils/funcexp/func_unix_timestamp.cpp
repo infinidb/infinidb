@@ -142,13 +142,13 @@ int64_t Func_unix_timestamp::getIntVal(rowgroup::Row& row,
 	struct tm *l_time,tm_tmp;
 	int64_t diff, my_time_zone = parm[1]->data()->getIntVal(row, isNull);
 
-	if ((year == TIMESTAMP_MAX_YEAR) && (month == 1) && (day > 4))
+	if ((year == helpers::TIMESTAMP_MAX_YEAR) && (month == 1) && (day > 4))
 	{
 		day-= 2;
 		shift= 2;
 	}
 
-	tmp_t= (time_t)(((calc_daynr((uint)year, (uint)month, (uint)day) -
+	tmp_t= (time_t)(((helpers::calc_daynr((uint)year, (uint)month, (uint)day) -
 	               719528)* 86400L + (int64_t)hour*3600L +
 	               (int64_t)(min*60 + sec)) - (time_t)my_time_zone);
 
@@ -191,7 +191,7 @@ int64_t Func_unix_timestamp::getIntVal(rowgroup::Row& row,
 	tmp_t += shift*86400L;
 
 	/* make sure we have legit timestamps (i.e. we didn't over/underflow anywhere above) */
-	if ((tmp_t < TIMESTAMP_MIN_VALUE) || (tmp_t > TIMESTAMP_MAX_VALUE))
+	if ((tmp_t < helpers::TIMESTAMP_MIN_VALUE) || (tmp_t > helpers::TIMESTAMP_MAX_VALUE))
 		tmp_t = 0;
 
 	return (int64_t)tmp_t;

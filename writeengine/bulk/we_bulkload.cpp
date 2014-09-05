@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_bulkload.cpp 4496 2013-01-31 19:13:20Z pleblanc $
+* $Id: we_bulkload.cpp 4543 2013-02-14 19:52:08Z dcathey $
 *
 *******************************************************************************/
 /** @file */
@@ -64,6 +64,7 @@ namespace
 //extern WriteEngine::BRMWrapper* brmWrapperPtr;
 namespace WriteEngine
 {
+	/* static */ boost::ptr_vector<TableInfo> BulkLoad::fTableInfo;
     /* static */ boost::mutex*       BulkLoad::fDDLMutex = 0;
 
     /* static */ const std::string   BulkLoad::DIR_BULK_JOB("job");
@@ -141,6 +142,7 @@ BulkLoad::BulkLoad() :
     fTotalTime(0.0),
     fBulkMode(BULK_MODE_LOCAL),
     fbTruncationAsError(false),
+    fImportDataMode(IMPORT_DATA_TEXT),
     fbContinue(false)
 {
     fTableInfo.clear();
@@ -280,6 +282,19 @@ int BulkLoad::loadJobInfo(
         fLog.logMsg( oss.str(), MSGLVL_INFO2 );
     }
 
+    // Validate that each table has 1 or more columns referenced in the xml file
+    for(unsigned i=0; i<curJob.jobTableList.size(); i++) 
+    {
+        if( curJob.jobTableList[i].colList.size() == 0)
+        {
+            rc = ERR_INVALID_PARAM;
+            fLog.logMsg( "No column definitions in job description file for "
+                "table " + curJob.jobTableList[i].tblName,
+                rc, MSGLVL_ERROR );
+            return rc;
+        }
+    }
+
     // Validate that the user's xml file has been regenerated since the
     // required tblOid attribute was added to the Table tag for table locking.
     for (unsigned i=0; i<curJob.jobTableList.size(); i++)
@@ -315,6 +330,25 @@ int BulkLoad::loadJobInfo(
                 fLog.logMsg( oss.str(), rc, MSGLVL_ERROR );
                 return rc;
             }
+        }
+    }
+
+    // If binary import, do not allow <IgnoreField> tags in the Job file
+    if ((fImportDataMode == IMPORT_DATA_BIN_ACCEPT_NULL) ||
+        (fImportDataMode == IMPORT_DATA_BIN_SAT_NULL))
+    {
+        for (unsigned kT=0; kT<curJob.jobTableList.size(); kT++)
+        {
+            if (curJob.jobTableList[kT].fIgnoredFields.size() > 0)
+            {
+                std::ostringstream oss;
+                oss << "<IgnoreField> tag present in Job file for table " <<
+                    curJob.jobTableList[kT].tblName <<
+                    "; this is not allowed for binary imports.";
+                rc = ERR_BULK_BINARY_IGNORE_FLD;
+                fLog.logMsg( oss.str(), rc, MSGLVL_ERROR );
+                return rc;
+            }       
         }
     }
 
@@ -401,10 +435,10 @@ void BulkLoad::spawnWorkers()
 int BulkLoad::preProcess( Job& job, int tableNo,
                           TableInfo* tableInfo )
 {
-    int         rc=NO_ERROR, maxWidth=0, minWidth=9999; // give a big number
+    int         rc=NO_ERROR, minWidth=9999; // give a big number
     HWM         minHWM = 999999;  // rp 9/25/07 Bug 473
     ColStruct   curColStruct;
-    ColDataType colDataType;
+    CalpontSystemCatalog::ColDataType colDataType;
 
     // Initialize portions of TableInfo object
     tableInfo->setBufferSize(fBufferSize);
@@ -416,6 +450,7 @@ int BulkLoad::preProcess( Job& job, int tableNo,
     tableInfo->setNullStringMode(fNullStringMode);
     tableInfo->setEnclosedByChar(fEnclosedByChar);
     tableInfo->setEscapeChar(fEscapeChar);
+    tableInfo->setImportDataMode(fImportDataMode);
 
     if (fMaxErrors != -1)
         tableInfo->setMaxErrorRows(fMaxErrors);
@@ -439,10 +474,9 @@ int BulkLoad::preProcess( Job& job, int tableNo,
 
     //------------------------------------------------------------------------
     // First loop thru the columns for the "tableNo" table in jobTableList[].
-    // and determine the HWM for the smallest width column(s), and save that
-    // as minHWM.  We save additional HWM information acquired from BRM, in
-    // segFileInfo, for later use.
+    // Get the HWM information for each column.
     //------------------------------------------------------------------------
+    std::vector<int>                    colWidths;
     std::vector<File> segFileInfo;
     std::vector<DBRootExtentTracker*>   dbRootExtTrackerVec;
     std::vector<BRM::EmDbRootHWMInfo_v> dbRootHWMInfoColVec(
@@ -450,12 +484,7 @@ int BulkLoad::preProcess( Job& job, int tableNo,
     DBRootExtentTracker* pRefDBRootExtentTracker = 0;
     for( size_t i = 0; i < job.jobTableList[tableNo].colList.size(); i++ ) 
     {
-        u_int16_t dbRoot;
-        u_int32_t partition;
-        u_int16_t segment;
-
-        JobColumn curJobCol = job.jobTableList[tableNo].colList[i];
-        OID segFileOid = curJobCol.mapOid;
+        const JobColumn& curJobCol = job.jobTableList[tableNo].colList[i];
 
         // convert column data type
         if( curJobCol.typeName.length() >0 &&
@@ -480,12 +509,8 @@ int BulkLoad::preProcess( Job& job, int tableNo,
         job.jobTableList[tableNo].colList[i].emptyVal = getEmptyRowValue(
             job.jobTableList[tableNo].colList[i].dataType,
             job.jobTableList[tableNo].colList[i].width );
-        if( job.jobTableList[tableNo].colList[i].width > maxWidth )
-            maxWidth = job.jobTableList[tableNo].colList[i].width;
 
         // check HWM for column file
-        HWM hwm;
-
         rc = BRMWrapper::getInstance()->getDbRootHWMInfo( curJobCol.mapOid,
             dbRootHWMInfoColVec[i]);
         if (rc != NO_ERROR)
@@ -498,17 +523,37 @@ int BulkLoad::preProcess( Job& job, int tableNo,
             return rc;
         }
 
+        colWidths.push_back( job.jobTableList[tableNo].colList[i].width );
+    } // end of 1st for-loop through the list of columns (get starting HWM)
+
+    //--------------------------------------------------------------------------
+    // Second loop thru the columns for the "tableNo" table in jobTableList[].
+    // Create DBRootExtentTracker, and select starting DBRoot.
+    // Determine the smallest width column(s), and save that as minHWM.
+    // We save additional HWM information acquired from BRM, in segFileInfo,
+    // for later use.
+    //--------------------------------------------------------------------------
+    for( size_t i = 0; i < job.jobTableList[tableNo].colList.size(); i++ ) 
+    {
+        u_int16_t dbRoot;
+        u_int32_t partition;
+        u_int16_t segment;
+        HWM hwm;
+
+        const JobColumn& curJobCol = job.jobTableList[tableNo].colList[i];
+        OID segFileOid = curJobCol.mapOid;
+
         // Find DBRoot/segment file where we want to start adding rows
-        BRM::EmDbRootHWMInfo_v& dbRootHWMInfo = dbRootHWMInfoColVec[i];
         DBRootExtentTracker* pDBRootExtentTracker = new DBRootExtentTracker(
             curJobCol.mapOid,
-            job.jobTableList[tableNo].colList[i].width,
-            &fLog,
-            dbRootHWMInfo );
+            colWidths,
+            dbRootHWMInfoColVec,
+            i,
+            &fLog );
         if (i == 0)
             pRefDBRootExtentTracker = pDBRootExtentTracker;
         dbRootExtTrackerVec.push_back( pDBRootExtentTracker );
-                
+
         // Start adding rows to DBRoot/segment file that is selected
         DBRootExtentInfo dbRootExtent;
         bool bFirstExtentOnThisPM;
@@ -527,8 +572,7 @@ int BulkLoad::preProcess( Job& job, int tableNo,
         {    // to ensure all columns start with the same DBRoot/segment
             pDBRootExtentTracker->assignFirstSegFile(
                 *pRefDBRootExtentTracker, // reference column[0] tracker
-                dbRootExtent,
-                bFirstExtentOnThisPM);
+                dbRootExtent);
         }
         dbRoot    = dbRootExtent.fDbRoot;
         partition = dbRootExtent.fPartition;
@@ -555,7 +599,7 @@ int BulkLoad::preProcess( Job& job, int tableNo,
         fInfo.hwm        = hwm;
         fInfo.oid        = segFileOid;
         segFileInfo.push_back( fInfo );
-    } // end of 1st for-loop through the list of columns (get starting HWM)
+    }
 
     //--------------------------------------------------------------------------
     // Validate that the starting HWMs for all the columns are in sync
@@ -583,11 +627,12 @@ int BulkLoad::preProcess( Job& job, int tableNo,
     }
 
     //--------------------------------------------------------------------------
-    // Second loop thru the columns for the "tableNo" table in jobTableList[].
+    // Third loop thru the columns for the "tableNo" table in jobTableList[].
     // In this pass through the columns we create the ColumnInfo object,
     // open the applicable column and dictionary store files, and seek to
     // the block where we will begin adding data.
     //--------------------------------------------------------------------------
+    unsigned int fixedBinaryRecLen = 0;
     for( size_t i = 0; i < job.jobTableList[tableNo].colList.size(); i++ ) 
     {
         u_int16_t dbRoot    = segFileInfo[i].fDbRoot;
@@ -620,6 +665,17 @@ int BulkLoad::preProcess( Job& job, int tableNo,
             if (rc != NO_ERROR)
             {
                return rc;
+            }
+        }
+
+        // For binary input mode, sum up the columns widths to get fixed rec len
+        if ((fImportDataMode == IMPORT_DATA_BIN_ACCEPT_NULL) ||
+            (fImportDataMode == IMPORT_DATA_BIN_SAT_NULL))
+        { 
+            if (job.jobTableList[tableNo].fFldRefs[i].fFldColType ==
+                BULK_FLDCOL_COLUMN_FIELD)
+            {
+                fixedBinaryRecLen += info->column.definedWidth;
             }
         }
 
@@ -673,9 +729,24 @@ int BulkLoad::preProcess( Job& job, int tableNo,
 
     } // end of 2nd for-loop through the list of columns
 
+    if ((fImportDataMode == IMPORT_DATA_BIN_ACCEPT_NULL) ||
+        (fImportDataMode == IMPORT_DATA_BIN_SAT_NULL))
+    {
+        ostringstream oss12;
+        oss12 << "Table " << job.jobTableList[tableNo].tblName << " will be "
+            "imported in binary mode with fixed record length: " <<
+            fixedBinaryRecLen << " bytes; ";
+        if (fImportDataMode == IMPORT_DATA_BIN_ACCEPT_NULL)
+            oss12 << "NULL values accepted";
+        else
+            oss12 << "NULL values saturated";
+        fLog.logMsg( oss12.str(), MSGLVL_INFO2 );
+    }
+
     // Initialize BulkLoadBuffers after we have added all the columns
     tableInfo->initializeBuffers(fNoOfBuffers, 
-                                 job.jobTableList[tableNo].fFldRefs);
+                                 job.jobTableList[tableNo].fFldRefs,
+                                 fixedBinaryRecLen);
 
     fTableInfo.push_back(tableInfo);
 
@@ -813,7 +884,6 @@ int BulkLoad::processJob( )
     Stats::enableProfiling( fNoOfReadThreads, fNoOfParseThreads );
 #endif
     int         rc = NO_ERROR;
-    bool        bHaveColumn = false;
     Job         curJob;
     size_t      i;
       
@@ -956,18 +1026,17 @@ int BulkLoad::processJob( )
     //--------------------------------------------------------------------------
     for( i = 0; i < curJob.jobTableList.size(); i++ ) 
     {
-        if( curJob.jobTableList[i].colList.size() > 0 )
-            bHaveColumn = true;
-
         // If table already marked as complete then we are skipping the
         // table because there were no input files to process.
         if( tables[i]->getStatusTI() == WriteEngine::PARSE_COMPLETE)
             continue;
 
         rc = preProcess( curJob, i, tables[i] );
+
         if( rc != NO_ERROR ) {
-        	std::string errMsg = "Error in pre-processing the job file for table " +
-                    curJob.jobTableList[i].tblName;
+        	std::string errMsg =
+                "Error in pre-processing the job file for table " +
+                curJob.jobTableList[i].tblName;
         	tables[i]->fBRMReporter.addToErrMsgEntry(errMsg);
             fLog.logMsg( errMsg, rc, MSGLVL_CRITICAL );
 
@@ -989,7 +1058,7 @@ int BulkLoad::processJob( )
             // Ignore the return code for now; more important to base rc on the
             // success or failure of the previous work
 
-            // BUG 4398: distributed cpimport now calls takeSnapshot for modes 1 & 2
+            // BUG 4398: distributed cpimport calls takeSnapshot for modes 1 & 2
             if ((fBulkMode != BULK_MODE_REMOTE_SINGLE_SRC) &&
                 (fBulkMode != BULK_MODE_REMOTE_MULTIPLE_SRC))
             {
@@ -1008,14 +1077,6 @@ int BulkLoad::processJob( )
         getTotalRunTime() << " seconds";
     fLog.logMsg( ossPrepTime.str(), MSGLVL_INFO1 );
     totalRunTime += getTotalRunTime();
-
-    if( !bHaveColumn )
-    {
-        rc = ERR_INVALID_PARAM;
-        fLog.logMsg( "No column definitions in job description file",
-            rc, MSGLVL_ERROR );
-        return rc;
-    }
 
     startTimer();
 
@@ -1418,7 +1479,7 @@ int BulkLoad::rollbackLockedTable( TableInfo& tableInfo )
 //    other if fail
 //------------------------------------------------------------------------------
 /* static */
-int BulkLoad::updateNextValue(OID columnOid, long long nextAutoIncVal)
+int BulkLoad::updateNextValue(OID columnOid, uint64_t nextAutoIncVal)
 {
     // The odds of us ever having 2 updateNextValue() calls going on in parallel
     // are slim and none.  But it's theoretically possible if we had an import
@@ -1427,12 +1488,30 @@ int BulkLoad::updateNextValue(OID columnOid, long long nextAutoIncVal)
     // process (ex: if there is any static data in WE_DDLCommandClient).
     boost::mutex::scoped_lock lock( *fDDLMutex );
     WE_DDLCommandClient ddlCommandClt;
-    uint64_t nextVal = nextAutoIncVal;
     unsigned int rc = ddlCommandClt.UpdateSyscolumnNextval(
-        columnOid, nextVal );
+        columnOid, nextAutoIncVal );
 
     return (int)rc;
 }
+
+//------------------------------------------------------------------------------
+
+bool BulkLoad::addErrorMsg2BrmUpdater(const std::string& tablename, const ostringstream& oss)
+{
+	int size = fTableInfo.size();
+	if(size == 0) return false;
+	
+	for(int tableId = 0; tableId < size; tableId++)
+	{
+		if(fTableInfo[tableId].getTableName() == tablename)
+		{
+			fTableInfo[tableId].fBRMReporter.addToErrMsgEntry(oss.str());	
+			return true;
+		}
+	}
+	return false;
+}
+
 
 } //end of namespace
 

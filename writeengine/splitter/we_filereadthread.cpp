@@ -1,6 +1,6 @@
 /*
 
-   Copyright (C) 2009-2012 Calpont Corporation.
+   Copyright (C) 2009-2013 Calpont Corporation.
 
    Use of and access to the Calpont InfiniDB Community software is subject to the
    terms and conditions of the Calpont Open Source License Agreement. Use of and
@@ -58,6 +58,9 @@ using namespace messageqcpp;
 #include <fstream>
 #include <istream>
 #include <list>
+#ifdef _MSC_VER
+#include <io.h>
+#endif
 using namespace std;
 
 #include "we_filereadthread.h"
@@ -274,7 +277,11 @@ void WEFileReadThread::feedData()
 			try
 			{
 				messageqcpp::SBS aSbs(new messageqcpp::ByteStream);
-				aRowCnt = readDataFile(aSbs);
+				if (fSdh.getImportDataMode() == IMPORT_DATA_TEXT)
+					aRowCnt = readDataFile(aSbs);
+				else
+					aRowCnt = readBinaryDataFile(aSbs,
+						fSdh.getTableRecLen() );
 				//cout << "Length " << aSbs->length() <<endl;    - for debug
 				fSdh.updateRowTx(aRowCnt, TgtPmId);
 				mutex::scoped_lock aLock(fSdh.fSendMutex);
@@ -317,7 +324,8 @@ void WEFileReadThread::feedData()
 
 
 //------------------------------------------------------------------------------
-
+// Read input data as ASCII text
+//------------------------------------------------------------------------------
 unsigned int WEFileReadThread::readDataFile(messageqcpp::SBS& Sbs)
 {
 	mutex::scoped_lock aLock(fFileMutex);
@@ -368,6 +376,47 @@ unsigned int WEFileReadThread::readDataFile(messageqcpp::SBS& Sbs)
 	}// if
 	return 0;
 }
+
+//------------------------------------------------------------------------------
+// Read input data as binary data
+//------------------------------------------------------------------------------
+unsigned int WEFileReadThread::readBinaryDataFile(messageqcpp::SBS& Sbs,
+	unsigned int recLen)
+{
+	mutex::scoped_lock aLock(fFileMutex);
+	if((fInFile.good()) && (!fInFile.eof()))
+	{
+		unsigned int aIdx=0;
+		unsigned int aLen=0;
+		*Sbs << (ByteStream::byte)(WE_CLT_SRV_DATA);
+
+		while( (!fInFile.eof()) && (aIdx<getBatchQty()) )
+		{
+			fInFile.read(fBuff, recLen);
+			aLen = fInFile.gcount();
+
+			if (aLen > 0)
+			{
+				(*Sbs).append(reinterpret_cast<ByteStream::byte*>(fBuff), aLen);
+				aIdx++;
+				if(fSdh.getDebugLvl()>2)
+					cout << "Binary input data line = " << aIdx << endl;
+
+				if (aLen != recLen)
+				{
+					cout << "Binary input data does not end on record boundary;"
+						" Last record is " << aLen << " bytes long." <<
+						" Expected record length is: " << recLen << endl;
+				}
+			}
+		} // while
+
+		return aIdx;
+	} // if
+
+	return 0;
+}
+
 //------------------------------------------------------------------------------
 
 void WEFileReadThread::openInFile()
@@ -390,11 +439,30 @@ void WEFileReadThread::openInFile()
 		//@BUG 4326
 		if(fInFileName != "/dev/stdin")
 		{
-			if (!fIfFile.is_open()) fIfFile.open(fInFileName.c_str());
+			if (!fIfFile.is_open())
+			{
+				if (fSdh.getImportDataMode() == IMPORT_DATA_TEXT)
+					fIfFile.open(fInFileName.c_str());
+				else // @bug 5193: binary import
+					fIfFile.open(fInFileName.c_str(),
+						std::ios_base::in | std::ios_base::binary);
+			}
 			if (!fIfFile.good())
 				throw runtime_error("Could not open Input file "+fInFileName);
 			fInFile.rdbuf(fIfFile.rdbuf()); //@BUG 4326
 		}
+#ifdef _MSC_VER
+		else // @bug 5193: binary import
+		{
+			if (fSdh.getImportDataMode() != IMPORT_DATA_TEXT)
+			{
+				if (_setmode(_fileno(stdin), _O_BINARY) == -1)
+				{
+					throw runtime_error("Could not change stdin to binary");
+				}
+			}
+		}
+#endif
 		//@BUG 4326  -below three lines commented out
 		//		if (!fInFile.is_open()) fInFile.open(fInFileName.c_str());
 		//		if (!fInFile.good())

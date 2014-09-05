@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_isnull.cpp 3048 2012-04-04 15:33:45Z rdempsey $
+* $Id: func_isnull.cpp 3648 2013-03-19 21:33:52Z dhall $
 *
 *
 ****************************************************************************/
@@ -63,7 +63,8 @@ bool Func_isnull::getBoolVal(Row& row,
 		// Please note that before this function returns, isNull should be set to 
 		// false, otherwise the result of the function would be considered NULL,
 		// which is not possible for idb_isnull().
-		case CalpontSystemCatalog::DECIMAL:
+        case CalpontSystemCatalog::DECIMAL:
+		case CalpontSystemCatalog::UDECIMAL:
 			parm[0]->data()->getDecimalVal(row, isNull);
 			break;
 		case CalpontSystemCatalog::CHAR:

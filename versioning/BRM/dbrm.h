@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: dbrm.h 1716 2012-09-28 23:08:26Z xlou $
+ * $Id: dbrm.h 1858 2013-03-18 22:31:05Z pleblanc $
  *
  *****************************************************************************/
 
@@ -117,7 +117,7 @@ public:
 	 * @param fileBlockOffset (out) The file block offset of the LBID
 	 * @param dbRoot (out) The DBRoot number that contains the file.
 	 * @param partitionNum (out) The partition number for the file.
-	 * @param segmentNum (out) The segement number for the file.
+	 * @param segmentNum (out) The segment number for the file.
 	 * 
 	 * @return 0 on success, non-0 on error (see brmtypes.h)
 	 */
@@ -165,10 +165,10 @@ public:
 	 * Do a VSS lookup.  Gets the version ID of the block the caller should use
 	 * and determines whether it is in the version buffer or the main database.
 	 * @param lbid (in) The block number
-	 * @param verID (in/out) The input value is the version requested, 
-	 * the output value is the value the caller should use.
+	 * @param qc (in) The SCN & txn list provided by SessionManager::verID().
 	 * @param txnID (in) If the caller has a transaction ID, put it here.  
 	 * Otherwise use 0.
+	 * @param outVer (out) The version the caller should use.
 	 * @param vbFlag (out) If true, the block is in the version buffer; 
 	 * false, the block is in the main database.
 	 * @param vbOnly (in) If true, it will only consider entries in the Version Buffer
@@ -176,21 +176,34 @@ public:
 	 * entries.  This defaults to false.
 	 * @return 0 on success, non-0 on error (see brmtypes.h)
 	 */
-	EXPORT int vssLookup(LBID_t lbid, VER_t& verID, VER_t txnID, bool& vbFlag, 
-				  bool vbOnly = false) throw();
+	EXPORT int vssLookup(LBID_t lbid, const QueryContext &qc, VER_t txnID, VER_t *outVer,
+		bool *vbFlag, bool vbOnly = false) throw();
 
 	/** @brief Do many VSS lookups under one lock
 	 *
 	 * Do many VSS lookups under one lock.
 	 * @param lbids (in) The LBIDs to look up
-	 * @param verID (in) The input version number, equivalent to the verID param in vssLookup()
+	 * @param qc (in) The input version info, equivalent to the verID param in vssLookup()
 	 * @param txnID (in) The input transaction number, equivalent to the txnID param in vssLookup()
 	 * @param out (out) The values equivalent to the out parameters in vssLookup() including the individual return codes, ordered as the lbid list.
 	 * @return 0 on success, -1 on a fatal error.
 	 */
-	EXPORT int bulkVSSLookup(const std::vector<LBID_t> &lbids, VER_t verID, VER_t txnID,
-		std::vector<VSSData> *out) throw();
+	EXPORT int bulkVSSLookup(const std::vector<LBID_t> &lbids, const QueryContext_vss &qc, VER_t txnID,
+		std::vector<VSSData> *out);
 	
+	/// returns the version in the main DB files or 0 if none exist
+	EXPORT VER_t getCurrentVersion(LBID_t lbid, bool *isLocked = NULL) const;
+
+	/// returns the highest version # in the version buffer, or -1 if none exist
+	EXPORT VER_t getHighestVerInVB(LBID_t lbid, VER_t max=std::numeric_limits<VER_t>::max()) const;  // returns
+
+	/// returns true if that block is in the version buffer, false otherwise including on error
+	EXPORT bool isVersioned(LBID_t lbid, VER_t version) const;
+
+	/// Do many getCurrentVersion lookups under one lock grab
+	EXPORT int bulkGetCurrentVersion(const std::vector<LBID_t> &lbids, std::vector<VER_t> *versions,
+			std::vector<bool> *isLocked = NULL) const;
+
 	/** @brief Get a complete list of LBIDs assigned to an OID
 	 *
 	 * Get a complete list of LBIDs assigned to an OID.
@@ -226,6 +239,7 @@ public:
 	 *        If allocating OID's first extent for this DBRoot, then
 	 *        partitionNum is input, else it is an output arg.
 	 * @param segmentNum (out) Segment number in file path.
+     * @param colDataType (in) the column type
 	 * @param lbid (out) The first LBID of the extent created.
 	 * @param allocdSize (out) The total number of LBIDs allocated.
 	 * @param startBlockOffset (out) The first block of the extent created.
@@ -237,6 +251,7 @@ public:
 					u_int16_t  dbRoot,
 					u_int32_t& partitionNum,
 					u_int16_t& segmentNum,
+					execplan::CalpontSystemCatalog::ColDataType colDataType,
 					LBID_t&    lbid,
 					int&       allocdSize,
 					u_int32_t& startBlockOffset) DBRM_THROW;
@@ -260,6 +275,7 @@ public:
 					u_int16_t  dbRoot,
 					u_int32_t  partitionNum,
 					u_int16_t  segmentNum,
+					execplan::CalpontSystemCatalog::ColDataType colDataType,
 					LBID_t&    lbid,
 					int&       allocdSize,
 					u_int32_t& startBlockOffset) DBRM_THROW;
@@ -272,6 +288,7 @@ public:
 	 * @param dbRoot (in) DBRoot to assign to the extent.
 	 * @param partitionNum (in) Partition number to assign to the extent.
 	 * @param segmentNum (in) Segment number to assign to the extent.
+     * @param colDataType (in) the column type
 	 * @param lbid (out) The first LBID of the extent created.
 	 * @param allocdSize (out) The total number of LBIDs allocated.
 	 * @return 0 on success, -1 on error
@@ -738,14 +755,13 @@ public:
 	EXPORT int takeSnapshot() throw();
 
 	/* SessionManager interface */
-	EXPORT const execplan::CalpontSystemCatalog::SCN verID(void);
-	EXPORT const execplan::CalpontSystemCatalog::SCN sysCatVerID(void);
-	EXPORT const TxnID 
-		newTxnID(const SessionManagerServer::SID session, bool block, bool isDDL = false);
+	EXPORT const QueryContext verID();
+	EXPORT const QueryContext sysCatVerID();
+	EXPORT const TxnID newTxnID(const SessionManagerServer::SID session, bool block,
+			bool isDDL = false);
 	EXPORT void committed(BRM::TxnID& txnid);
 	EXPORT void rolledback(BRM::TxnID& txnid);
-	EXPORT const BRM::TxnID getTxnID
-		(const SessionManagerServer::SID session);
+	EXPORT const BRM::TxnID getTxnID(const SessionManagerServer::SID session);
 	EXPORT boost::shared_array<SIDTIDEntry> SIDTIDMap(int& len);
 	EXPORT void sessionmanager_reset();
 
@@ -771,8 +787,10 @@ public:
 	EXPORT bool getTableLockInfo(uint64_t id, TableLockInfo *out);
 
 	/** Casual partitioning support **/
-	EXPORT int markExtentInvalid(const LBID_t lbid) DBRM_THROW;
-	EXPORT int markExtentsInvalid(const std::vector<LBID_t> &lbids) DBRM_THROW;
+	EXPORT int markExtentInvalid(const LBID_t lbid,
+								 execplan::CalpontSystemCatalog::ColDataType colDataType) DBRM_THROW;
+	EXPORT int markExtentsInvalid(const std::vector<LBID_t> &lbids,
+								  const std::vector<execplan::CalpontSystemCatalog::ColDataType>& colDataTypes) DBRM_THROW;
 	EXPORT int getExtentMaxMin(const LBID_t lbid, int64_t& max, int64_t& min, int32_t& seqNum) throw();
 
 	EXPORT int setExtentMaxMin(const LBID_t lbid, const int64_t max, const int64_t min, const int32_t seqNum) DBRM_THROW;
@@ -933,13 +951,30 @@ public:
 	EXPORT std::vector<uint16_t> getVBOIDToDBRootMap();
 
 	/* Autoincrement interface */
-	EXPORT void startAISequence(uint32_t OID, uint64_t firstNum, uint colWidth);
+	EXPORT void startAISequence(uint32_t OID, uint64_t firstNum, uint colWidth,
+								execplan::CalpontSystemCatalog::ColDataType colDataType);
 	EXPORT bool getAIRange(uint32_t OID, uint32_t count, uint64_t *firstNum);
 	EXPORT bool getAIValue(uint32_t OID, uint64_t *value);
 	EXPORT void resetAISequence(uint32_t OID, uint64_t value);
 	EXPORT void getAILock(uint32_t OID);
 	EXPORT void releaseAILock(uint32_t OID);
 
+    /* Added to support unsigned */
+    /** @brief Invalidate the casual partitioning for all uncommited
+     *         extents.
+     *  
+     * Either txnid or plbidList can be passed . Only one will be 
+     * used.
+     * @param txnid (in) - The transaction for which to get the lbid 
+     *              list.
+     * @param plbidList (in) - a list of lbids whose extents are to 
+     *               be invalidated. Only one lbid per extent should
+     *               be in this list, such as returned in
+     *               getUncommittedExtentLBIDs().
+     * @return nothing.
+    */ 
+    EXPORT void invalidateUncommittedExtentLBIDs(execplan::CalpontSystemCatalog::SCN txnid,
+                                                 std::vector<LBID_t>* plbidList = NULL);
 private:
 	DBRM(const DBRM& brm);
 	DBRM& operator=(const DBRM& brm);

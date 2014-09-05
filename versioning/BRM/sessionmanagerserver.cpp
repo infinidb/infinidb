@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: sessionmanagerserver.cpp 1706 2012-09-20 12:43:42Z rdempsey $
+ * $Id: sessionmanagerserver.cpp 1855 2013-03-07 14:37:54Z rdempsey $
  *
  ****************************************************************************/
 
@@ -214,26 +214,26 @@ void SessionManagerServer::saveSystemState()
 	}
 } 
 
-/* See bug 3330.  The SCN returned to queries has to be < the transaction ID.
- * This will have to be revised when we eventually support multiple
- * active transactions.
- */
-const CalpontSystemCatalog::SCN SessionManagerServer::verID()
+const QueryContext SessionManagerServer::verID()
 {
-	execplan::CalpontSystemCatalog::SCN ret;
+	QueryContext ret;
 
 	mutex::scoped_lock lk(mutex);
-	ret = _verID - activeTxns.size();
+	ret.currentScn = _verID;
+	for (iterator i = activeTxns.begin(); i != activeTxns.end(); ++i)
+		ret.currentTxns->push_back(i->second);
 	return ret;
 }
 
-const CalpontSystemCatalog::SCN SessionManagerServer::sysCatVerID()
+const QueryContext SessionManagerServer::sysCatVerID()
 {
-    execplan::CalpontSystemCatalog::SCN ret;
+	QueryContext ret;
 
-    mutex::scoped_lock lk(mutex);
-    ret = _sysCatVerID - activeTxns.size();
-    return ret;
+	mutex::scoped_lock lk(mutex);
+	ret.currentScn = _sysCatVerID;
+	for (iterator i = activeTxns.begin(); i != activeTxns.end(); ++i)
+		ret.currentTxns->push_back(i->second);
+	return ret;
 }
 
 const TxnID SessionManagerServer::newTxnID(const SID session, bool block, bool isDDL) 
@@ -284,19 +284,25 @@ void SessionManagerServer::finishTransaction(TxnID& txn)
 {
 	iterator it;
 	mutex::scoped_lock lk(mutex);
+	bool found=false;
 	
 	if (!txn.valid)
 		throw invalid_argument("SessionManagerServer::finishTransaction(): transaction is invalid");
 
-	for (it = activeTxns.begin(); it != activeTxns.end(); ++it) {
+	for (it = activeTxns.begin(); it != activeTxns.end(); ) {
 		if (it->second == txn.id) {
-			activeTxns.erase(it);
+			activeTxns.erase(it++);
 			txn.valid = false;
-			break;
+			found = true;
+			//we could probably break at this point, but there won't be that many active txns, and,
+			// even though it'd be an error to have multiple entries for the same txn, we might
+			// well just get rid of them...
 		}
+		else
+			++it;
 	}
 
-	if (it != activeTxns.end()) {
+	if (found) {
 		semValue++;
 		idbassert(semValue <= (uint)maxTxns);
 		condvar.notify_one();

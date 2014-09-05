@@ -23,16 +23,6 @@
 #ifndef LIBOAMCPP_H
 #define LIBOAMCPP_H
 
-//Major hack to get oam and brm to play nice.
-#ifdef OAM_BRM_LEAN_AND_MEAN
-#include <boost/tuple/tuple.hpp>
-#include <string>
-#include <vector>
-#include "bytestream.h"
-#include "alarm.h"
-#include "snmpmanager.h"
-#include "messagequeue.h"
-#else
 #include <exception>
 #include <stdexcept>
 #include <string>
@@ -58,7 +48,6 @@
 #endif
 
 #include "messagequeue.h"
-#endif
 
 #if defined(_MSC_VER) && defined(xxxLIBOAM_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
@@ -283,7 +272,8 @@ namespace oam
         ENABLED,                                  // 16 = Enabled mode
         INITIAL,                                  // 17 = Initial mode
 		STANDBY_INIT,							  // 18 = Standby init
-		BUSY_INIT 							  	  // 19 = Busy init
+		BUSY_INIT, 							  	  // 19 = Busy init
+		STATE_MAX								  // 20 = Max value
     };
 
     /** @brief Process and Hardware String States
@@ -601,7 +591,9 @@ namespace oam
 		ADD_EXT_DEVICE,
 		REMOVE_EXT_DEVICE,
 		GET_SHARED_MEM,
-		SET_DBROOT_STATUS
+		SET_DBROOT_STATUS,
+		ADD_DBROOT,
+		REMOVE_DBROOT
     };
 
     /** @brief System Software Package Structure
@@ -2350,10 +2342,6 @@ namespace oam
             /** @brief check Gluster Log after a Gluster control call
              */
             int checkGlusterLog(std::string logFile, std::string& errmsg);
-
-            /** @brief copy database files from src to dst
-             */
-            void copyDatabaseFiles(std::string src, std::string dst);
 
 		    int sendMsgToProcMgr3(messageqcpp::ByteStream::byte requestType, snmpmanager::AlarmList& alarmlist, const std::string date);
 

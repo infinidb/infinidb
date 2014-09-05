@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: tupleaggregatestep.cpp 9389 2013-04-09 15:53:35Z xlou $
+//  $Id: tupleaggregatestep.cpp 9733 2013-08-02 16:07:35Z pleblanc $
 
 
 //#define NDEBUG
@@ -131,6 +131,14 @@ inline string colTypeIdString(CalpontSystemCatalog::ColDataType type)
 		case CalpontSystemCatalog::VARCHAR:   return string("VARCHAR");
 		case CalpontSystemCatalog::CLOB:      return string("CLOB");
 		case CalpontSystemCatalog::BLOB:      return string("BLOB");
+        case CalpontSystemCatalog::UTINYINT:  return string("UTINYINT");
+        case CalpontSystemCatalog::USMALLINT: return string("USMALLINT");
+        case CalpontSystemCatalog::UDECIMAL:  return string("UDECIMAL");
+        case CalpontSystemCatalog::UMEDINT:   return string("UMEDINT");
+        case CalpontSystemCatalog::UINT:      return string("UINT");
+        case CalpontSystemCatalog::UFLOAT:    return string("UFLOAT");
+        case CalpontSystemCatalog::UBIGINT:   return string("UBIGINT");
+        case CalpontSystemCatalog::UDOUBLE:   return string("UDOUBLE");
 		default:                              return string("UNKNOWN");
 	}
 }
@@ -158,23 +166,12 @@ namespace joblist
 
 
 TupleAggregateStep::TupleAggregateStep(
-	const JobStepAssociation& inputJobStepAssociation,
-	const JobStepAssociation& outputJobStepAssociation,
-	boost::shared_ptr<execplan::CalpontSystemCatalog> syscat,
-	uint32_t sessionId,
-	uint32_t txnId,
-	uint32_t statementId,
 	const SP_ROWAGG_UM_t& agg,
 	const RowGroup& rgOut,
 	const RowGroup& rgIn,
-	ResourceManager *r) :
-		fInputJobStepAssociation(inputJobStepAssociation),
-		fOutputJobStepAssociation(outputJobStepAssociation),
-		fCatalog(syscat),
-		fSessionId(sessionId),
-		fTxnId(txnId),
-		fStepId(0),
-		fStatementId(statementId),
+	const JobInfo& jobInfo) :
+		JobStep(jobInfo),
+		fCatalog(jobInfo.csc),
 		fRowsReturned(0),
 		fDoneAggregate(false),
 		fEndOfResult(false),
@@ -183,8 +180,9 @@ TupleAggregateStep::TupleAggregateStep(
 		fRowGroupIn(rgIn),
 		fDelivery(false),
 		fUmOnly(false),
-		rm(r),
+		fRm(jobInfo.rm),
 		fBucketMask(0),
+		fBucketNum(0),
 		fInputIter(-1)
 {
 	fRowGroupData.reset(new uint8_t[fRowGroupOut.getMaxDataSize()]);
@@ -196,11 +194,11 @@ TupleAggregateStep::TupleAggregateStep(
 	fIsMultiThread = (multiAgg || fAggregator->aggMapKeyLength() > 0);	
 
 	// initialize multi-thread variables
-	fNumOfThreads = rm->aggNumThreads();
-	fNumOfBuckets = rm->aggNumBuckets();
-	fNumOfRowGroups = rm->aggNumRowGroups();
-	memUsage.reset(new uint64_t[fNumOfThreads]);
-	memset(memUsage.get(), 0, fNumOfThreads * sizeof(uint64_t));
+	fNumOfThreads = fRm.aggNumThreads();
+	fNumOfBuckets = fRm.aggNumBuckets();
+	fNumOfRowGroups = fRm.aggNumRowGroups();
+	fMemUsage.reset(new uint64_t[fNumOfThreads]);
+	memset(fMemUsage.get(), 0, fNumOfThreads * sizeof(uint64_t));
 
 	fExtendedInfo = "TAS: ";
 }
@@ -209,9 +207,9 @@ TupleAggregateStep::TupleAggregateStep(
 TupleAggregateStep::~TupleAggregateStep()
 {
 	for (uint i = 0; i < fNumOfThreads; i++)
-		rm->returnMemory(memUsage[i]);
-	for (uint i = 0; i < agg_mutex.size(); i++)
-		delete agg_mutex[i];
+		fRm.returnMemory(fMemUsage[i]);
+	for (uint i = 0; i < fAgg_mutex.size(); i++)
+		delete fAgg_mutex[i];
 }
 
 
@@ -253,7 +251,7 @@ void TupleAggregateStep::initializeMultiThread()
 	for (i = 0; i < fNumOfBuckets; i++)
 	{
 		boost::mutex *lock = new boost::mutex();
-		agg_mutex.push_back(lock);
+		fAgg_mutex.push_back(lock);
 		fRowGroupOuts[i] = fRowGroupOut;
 		rgData.reset(new uint8_t[fRowGroupOut.getMaxDataSize()]);
 		fRowGroupDatas.push_back(rgData);
@@ -286,6 +284,7 @@ void TupleAggregateStep::doThreadedSecondPhaseAggregate(uint8_t threadID)
 
 	uint32_t hashlen = fAggregator->aggMapKeyLength();
 	utils::TupleHasher hash(hashlen);
+	bool caughtException = false;
 
 	try
 	{
@@ -355,19 +354,19 @@ void TupleAggregateStep::doThreadedSecondPhaseAggregate(uint8_t threadID)
 		// reset bucketDone[] to be false
 		//memset(bucketDone, 0, sizeof(bucketDone));
 		fill(&bucketDone[0], &bucketDone[fNumOfBuckets], false);
-		while (!done && !(die || fInputJobStepAssociation.status()))
+		while (!done && !cancelled())
 		{
 			done = true;
-			for (uint c = 0; c < fNumOfBuckets && !(die || fInputJobStepAssociation.status()); c++)
+			for (uint c = 0; c < fNumOfBuckets && !cancelled(); c++)
 			{
-				if (!bucketDone[c] && agg_mutex[c]->try_lock())
+				if (!bucketDone[c] && fAgg_mutex[c]->try_lock())
 				{
 					//rgcount += rowBucketVecs[c][0].size();
 					if (multiDist)
 						dynamic_cast<RowAggregationMultiDistinct*>(fAggregators[c].get())->doDistinctAggregation_rowVec(rowBucketVecs[c]);
 					else
 						dynamic_cast<RowAggregationDistinct*>(fAggregators[c].get())->doDistinctAggregation_rowVec(rowBucketVecs[c][0]);
-					agg_mutex[c]->unlock();
+					fAgg_mutex[c]->unlock();
 					bucketDone[c] = true;
 					rowBucketVecs[c][0].clear();
 				}
@@ -378,9 +377,8 @@ void TupleAggregateStep::doThreadedSecondPhaseAggregate(uint8_t threadID)
 			}
 		}
 
-		if (0 < fInputJobStepAssociation.status())
+		if (cancelled())
 		{
-			fOutputJobStepAssociation.status(fInputJobStepAssociation.status());
 			fEndOfResult = true;
 		}
 
@@ -388,62 +386,37 @@ void TupleAggregateStep::doThreadedSecondPhaseAggregate(uint8_t threadID)
 	} // try
 	catch (IDBExcept& iex)
 	{
-		catchHandler(iex.what(), fSessionId, (iex.errorCode() == logging::ERR_AGGREGATION_TOO_BIG ? logging::LOG_TYPE_INFO :
-				logging::LOG_TYPE_CRITICAL));
-		if (0 == fOutputJobStepAssociation.status())
-			fOutputJobStepAssociation.status(iex.errorCode());
-
-		fEndOfResult = true;
-		fDoneAggregate = true;
-
-		dlTimes.setLastReadTime();
-		dlTimes.setEndOfInputTime();
-		return;
+		catchHandler(iex.what(), iex.errorCode(), fErrorInfo, fSessionId,
+			(iex.errorCode() == ERR_AGGREGATION_TOO_BIG ? LOG_TYPE_INFO : LOG_TYPE_CRITICAL));
+		caughtException = true;
 	}
 	catch (QueryDataExcept& qex)
 	{
-		catchHandler(qex.what(), fSessionId);
-		if (0 == fOutputJobStepAssociation.status())
-			fOutputJobStepAssociation.status(qex.errorCode());
-
-		fEndOfResult = true;
-		fDoneAggregate = true;
-
-		dlTimes.setLastReadTime();
-		dlTimes.setEndOfInputTime();
-		return;
+		catchHandler(qex.what(), qex.errorCode(), fErrorInfo, fSessionId);
+		caughtException = true;
 	}
 	catch(const std::exception& ex)
 	{
-		catchHandler(ex.what(), fSessionId);
-		if (0 == fOutputJobStepAssociation.status())
-			fOutputJobStepAssociation.status(tupleAggregateStepErr);
-
-		fEndOfResult = true;
-		fDoneAggregate = true;
-
-		dlTimes.setLastReadTime();
-		dlTimes.setEndOfInputTime();
-		return;
+		catchHandler(ex.what(), tupleAggregateStepErr, fErrorInfo, fSessionId);
+		caughtException = true;
 	}
 	catch(...)
 	{
-		catchHandler("TupleAggregateStep::aggregateRowGroups() caught an unknown exception", fSessionId);
-		if (0 == fOutputJobStepAssociation.status())
-			fOutputJobStepAssociation.status(tupleAggregateStepErr);
-
-		fEndOfResult = true;
-		fDoneAggregate = true;
-
-		dlTimes.setLastReadTime();
-		dlTimes.setEndOfInputTime();
-		return;
+		catchHandler("TupleAggregateStep::aggregateRowGroups() caught an unknown exception",
+						tupleAggregateStepErr, fErrorInfo, fSessionId);
+		caughtException = true;
 	}
 
-	dlTimes.setLastReadTime();
-	dlTimes.setEndOfInputTime();
+	if (caughtException)
+		fEndOfResult = true;
 
 	fDoneAggregate = true;
+
+	if (traceOn())
+	{
+		dlTimes.setLastReadTime();
+		dlTimes.setEndOfInputTime();
+	}
 }
 
 
@@ -484,31 +457,24 @@ uint TupleAggregateStep::nextBand_singleThread(messageqcpp::ByteStream &bs)
 	} // try
 	catch (IDBExcept& iex)
 	{
-		catchHandler(iex.what(), fSessionId, (iex.errorCode() == logging::ERR_AGGREGATION_TOO_BIG ? logging::LOG_TYPE_INFO :
-				logging::LOG_TYPE_CRITICAL));
-		if (0 == fOutputJobStepAssociation.status())
-			fOutputJobStepAssociation.status(iex.errorCode());
+		catchHandler(iex.what(), iex.errorCode(), fErrorInfo, fSessionId,
+			(iex.errorCode() == ERR_AGGREGATION_TOO_BIG ? LOG_TYPE_INFO : LOG_TYPE_CRITICAL));
 		fEndOfResult = true;
 	}
 	catch (QueryDataExcept& qex)
 	{
-		catchHandler(qex.what(), fSessionId);
-		if (0 == fOutputJobStepAssociation.status())
-			fOutputJobStepAssociation.status(qex.errorCode());
+		catchHandler(qex.what(), qex.errorCode(), fErrorInfo, fSessionId);
 		fEndOfResult = true;
 	}
 	catch(const std::exception& ex)
 	{
-		catchHandler(ex.what(), fSessionId);
-		if (0 == fOutputJobStepAssociation.status())
-			fOutputJobStepAssociation.status(tupleAggregateStepErr);
+		catchHandler(ex.what(), tupleAggregateStepErr, fErrorInfo, fSessionId);
 		fEndOfResult = true;
 	}
 	catch(...)
 	{
-		catchHandler("TupleAggregateStep next band caught an unknown exception", fSessionId);
-		if (0 == fOutputJobStepAssociation.status())
-			fOutputJobStepAssociation.status(tupleAggregateStepErr);
+		catchHandler("TupleAggregateStep next band caught an unknown exception",
+						tupleAggregateStepErr, fErrorInfo, fSessionId);
 		fEndOfResult = true;
 	}
 
@@ -518,7 +484,7 @@ uint TupleAggregateStep::nextBand_singleThread(messageqcpp::ByteStream &bs)
 		shared_array<uint8_t> rgData(new uint8_t[fRowGroupOut.getEmptySize()]);
 		fRowGroupOut.setData(rgData.get());
 		fRowGroupOut.resetRowGroup(0);
-		fRowGroupOut.setStatus(fOutputJobStepAssociation.status());
+		fRowGroupOut.setStatus(status());
 		bs.load(rgData.get(), fRowGroupOut.getDataSize());
 		rowCount = 0;
 
@@ -532,19 +498,17 @@ uint TupleAggregateStep::nextBand_singleThread(messageqcpp::ByteStream &bs)
 
 bool TupleAggregateStep::nextDeliveredRowGroup()
 {
-	static uint bucketNum = 0;
-
-	for (; bucketNum < fNumOfBuckets; bucketNum++)
+	for (; fBucketNum < fNumOfBuckets; fBucketNum++)
 	{
-		while (fAggregators[bucketNum]->nextRowGroup())
+		while (fAggregators[fBucketNum]->nextRowGroup())
 		{
-			fAggregators[bucketNum]->finalize();
-			fRowGroupDelivered.setData(fAggregators[bucketNum]->getOutputRowGroup()->getData());
-			fRowGroupOut.setData(fAggregators[bucketNum]->getOutputRowGroup()->getData());
+			fAggregators[fBucketNum]->finalize();
+			fRowGroupDelivered.setData(fAggregators[fBucketNum]->getOutputRowGroup()->getData());
+			fRowGroupOut.setData(fAggregators[fBucketNum]->getOutputRowGroup()->getData());
 			return true;
 		}
 	}
-	bucketNum = 0;
+	fBucketNum = 0;
 	return false;
 }
 
@@ -757,8 +721,8 @@ SJSTEP TupleAggregateStep::prepAggregate(SJSTEP& step, JobInfo& jobInfo)
 		}
 
 		// make sure connected by a RowGroupDL
-		JobStepAssociation dummyJsa(jobInfo.status);
-		JobStepAssociation tbpsJsa(jobInfo.status);
+		JobStepAssociation dummyJsa;
+		JobStepAssociation tbpsJsa;
 		AnyDataListSPtr spdl(new AnyDataList());
 		RowGroupDL* dl = new RowGroupDL(1, jobInfo.fifoSize);
 		dl->OID(execplan::CNX_VTABLE_ID);
@@ -767,8 +731,8 @@ SJSTEP TupleAggregateStep::prepAggregate(SJSTEP& step, JobInfo& jobInfo)
 
 		// create delivery step
 		aggUM = dynamic_pointer_cast<RowAggregationUM>(aggs[0]);
-		spjs.reset(new TupleAggregateStep(tbpsJsa, dummyJsa, jobInfo.csc,
-			step->sessionId(), step->txnId(), step->statementId(), aggUM, rgs[1], rgs[2], &jobInfo.rm));
+		spjs.reset(new TupleAggregateStep(aggUM, rgs[1], rgs[2], jobInfo));
+		spjs->inputAssociation(tbpsJsa);
 
 		// step id??
 		spjs->stepId(step->stepId()+1);
@@ -807,8 +771,8 @@ SJSTEP TupleAggregateStep::prepAggregate(SJSTEP& step, JobInfo& jobInfo)
 		}
 
 		// make sure connected by a RowGroupDL
-		JobStepAssociation dummyJsa(jobInfo.status);
-		JobStepAssociation thjsJsa(jobInfo.status);
+		JobStepAssociation dummyJsa;
+		JobStepAssociation thjsJsa;
 		AnyDataListSPtr spdl(new AnyDataList());
 		RowGroupDL* dl = new RowGroupDL(1, jobInfo.fifoSize);
 		dl->OID(execplan::CNX_VTABLE_ID);
@@ -817,8 +781,9 @@ SJSTEP TupleAggregateStep::prepAggregate(SJSTEP& step, JobInfo& jobInfo)
 
 		// create delivery step
 		aggUM = dynamic_pointer_cast<RowAggregationUM>(aggs[0]);
-		spjs.reset(new TupleAggregateStep(thjsJsa, dummyJsa, jobInfo.csc,
-			step->sessionId(), step->txnId(), step->statementId(), aggUM, rgs[1], rgs[0], &jobInfo.rm));
+		spjs.reset(new TupleAggregateStep(aggUM, rgs[1], rgs[0], jobInfo));
+		spjs->inputAssociation(thjsJsa);
+
 		if (doGroupConcat)
 			dynamic_cast<TupleAggregateStep*>(spjs.get())->umOnly(true);
 		else
@@ -844,8 +809,8 @@ SJSTEP TupleAggregateStep::prepAggregate(SJSTEP& step, JobInfo& jobInfo)
 			prep1PhaseAggregate(jobInfo, rgs, aggs);
 
 		// make sure connected by a RowGroupDL
-		JobStepAssociation dummyJsa(jobInfo.status);
-		JobStepAssociation sasJsa(jobInfo.status);
+		JobStepAssociation dummyJsa;
+		JobStepAssociation sasJsa;
 		AnyDataListSPtr spdl(new AnyDataList());
 		RowGroupDL* dl = new RowGroupDL(1, jobInfo.fifoSize);
 		dl->OID(execplan::CNX_VTABLE_ID);
@@ -854,8 +819,8 @@ SJSTEP TupleAggregateStep::prepAggregate(SJSTEP& step, JobInfo& jobInfo)
 
 		// create delivery step
 		aggUM = dynamic_pointer_cast<RowAggregationUM>(aggs[0]);
-		spjs.reset(new TupleAggregateStep(sasJsa, dummyJsa, jobInfo.csc,
-			step->sessionId(), step->txnId(), step->statementId(), aggUM, rgs[1], rgs[0], &jobInfo.rm));
+		spjs.reset(new TupleAggregateStep(aggUM, rgs[1], rgs[0], jobInfo));
+		spjs->inputAssociation(sasJsa);
 
 		// step id??
 		spjs->stepId(step->stepId()+1);
@@ -875,8 +840,8 @@ SJSTEP TupleAggregateStep::prepAggregate(SJSTEP& step, JobInfo& jobInfo)
 			prep1PhaseAggregate(jobInfo, rgs, aggs);
 
 		// make sure connected by a RowGroupDL
-		JobStepAssociation dummyJsa(jobInfo.status);
-		JobStepAssociation cesJsa(jobInfo.status);
+		JobStepAssociation dummyJsa;
+		JobStepAssociation cesJsa;
 		AnyDataListSPtr spdl(new AnyDataList());
 		RowGroupDL* dl = new RowGroupDL(1, jobInfo.fifoSize);
 		dl->OID(execplan::CNX_VTABLE_ID);
@@ -885,8 +850,8 @@ SJSTEP TupleAggregateStep::prepAggregate(SJSTEP& step, JobInfo& jobInfo)
 
 		// create delivery step
 		aggUM = dynamic_pointer_cast<RowAggregationUM>(aggs[0]);
-		spjs.reset(new TupleAggregateStep(cesJsa, dummyJsa, jobInfo.csc,
-			step->sessionId(), step->txnId(), step->statementId(), aggUM, rgs[1], rgs[0], &jobInfo.rm));
+		spjs.reset(new TupleAggregateStep(aggUM, rgs[1], rgs[0], jobInfo));
+		spjs->inputAssociation(cesJsa);
 
 		// step id??
 		spjs->stepId(step->stepId()+1);
@@ -954,6 +919,7 @@ void TupleAggregateStep::prep1PhaseAggregate(
 	vector<SP_ROWAGG_GRPBY_t> groupBy;
 	vector<SP_ROWAGG_FUNC_t> functionVec;
 	uint bigIntWidth = sizeof(int64_t);
+    uint bigUintWidth = sizeof(uint64_t);
 
 	// for count column of average function
 	map<uint32_t, SP_ROWAGG_FUNC_t> avgFuncMap;
@@ -1150,8 +1116,28 @@ void TupleAggregateStep::prep1PhaseAggregate(
 
 				oidsAgg.push_back(oidsProj[colProj]);
 				keysAgg.push_back(key);
-				if (typeProj[colProj] != CalpontSystemCatalog::DOUBLE &&
-					typeProj[colProj] != CalpontSystemCatalog::FLOAT)
+				if (typeProj[colProj] == CalpontSystemCatalog::DOUBLE ||
+                    typeProj[colProj] == CalpontSystemCatalog::UDOUBLE ||
+					typeProj[colProj] == CalpontSystemCatalog::FLOAT ||
+                    typeProj[colProj] == CalpontSystemCatalog::UFLOAT)
+                {
+                    typeAgg.push_back(typeProj[colProj]);
+                    scaleAgg.push_back(scaleProj[colProj]);
+                    precisionAgg.push_back(precisionProj[colProj]);
+                    widthAgg.push_back(width[colProj]);
+                }
+                else if (isUnsigned(typeProj[colProj]))
+                {
+                    typeAgg.push_back(CalpontSystemCatalog::UBIGINT);
+                    uint scale = scaleProj[colProj];
+                    // for int average, FE expects a decimal
+                    if (aggOp == ROWAGG_AVG)
+                        scale = jobInfo.scaleOfAvg[key]; // scale += 4;
+                    scaleAgg.push_back(scale);
+                    precisionAgg.push_back(20);
+                    widthAgg.push_back(bigUintWidth);
+                }
+                else
 				{
 					typeAgg.push_back(CalpontSystemCatalog::BIGINT);
 					uint scale = scaleProj[colProj];
@@ -1161,13 +1147,6 @@ void TupleAggregateStep::prep1PhaseAggregate(
 					scaleAgg.push_back(scale);
 					precisionAgg.push_back(19);
 					widthAgg.push_back(bigIntWidth);
-				}
-				else
-				{
-					typeAgg.push_back(typeProj[colProj]);
-					scaleAgg.push_back(scaleProj[colProj]);
-					precisionAgg.push_back(precisionProj[colProj]);
-					widthAgg.push_back(width[colProj]);
 				}
 			}
 			break;
@@ -2351,6 +2330,7 @@ void TupleAggregateStep::prep2PhasesAggregate(
 	vector<SP_ROWAGG_GRPBY_t> groupByPm, groupByUm;
 	vector<SP_ROWAGG_FUNC_t> functionVecPm, functionVecUm;
 	uint bigIntWidth = sizeof(int64_t);
+    uint bigUintWidth = sizeof(uint64_t);
 	map<pair<uint32_t, int>, uint64_t> aggFuncMap;
 
 	// associate the columns between projected RG and aggregate RG on PM
@@ -2512,8 +2492,28 @@ void TupleAggregateStep::prep2PhasesAggregate(
 
 					oidsAggPm.push_back(oidsProj[colProj]);
 					keysAggPm.push_back(aggKey);
-					if (typeProj[colProj] != CalpontSystemCatalog::DOUBLE &&
-						typeProj[colProj] != CalpontSystemCatalog::FLOAT)
+					if (typeProj[colProj] == CalpontSystemCatalog::DOUBLE ||
+                        typeProj[colProj] == CalpontSystemCatalog::UDOUBLE ||
+                        typeProj[colProj] == CalpontSystemCatalog::FLOAT ||
+						typeProj[colProj] == CalpontSystemCatalog::UFLOAT)
+                    {
+                        typeAggPm.push_back(typeProj[colProj]);
+                        scaleAggPm.push_back(scaleProj[colProj]);
+                        precisionAggPm.push_back(precisionProj[colProj]);
+                        widthAggPm.push_back(width[colProj]);
+                    }
+                    else if (isUnsigned(typeProj[colProj]))
+                    {
+                        typeAggPm.push_back(CalpontSystemCatalog::UBIGINT);
+                        uint scale = scaleProj[colProj];
+                        // for int average, FE expects a decimal
+                        if (aggOp == ROWAGG_AVG)
+                            scale = jobInfo.scaleOfAvg[aggKey]; // scale += 4;
+                        scaleAggPm.push_back(scale);
+                        precisionAggPm.push_back(20);
+                        widthAggPm.push_back(bigUintWidth);
+                    }
+                    else
 					{
 						typeAggPm.push_back(CalpontSystemCatalog::BIGINT);
 						uint scale = scaleProj[colProj];
@@ -2523,13 +2523,6 @@ void TupleAggregateStep::prep2PhasesAggregate(
 						scaleAggPm.push_back(scale);
 						precisionAggPm.push_back(19);
 						widthAggPm.push_back(bigIntWidth);
-					}
-					else
-					{
-						typeAggPm.push_back(typeProj[colProj]);
-						scaleAggPm.push_back(scaleProj[colProj]);
-						precisionAggPm.push_back(precisionProj[colProj]);
-						widthAggPm.push_back(width[colProj]);
 					}
 					colAggPm++;
 				}
@@ -3971,7 +3964,7 @@ void TupleAggregateStep::aggregateRowGroups()
 		try
 		{
 			// this check covers the no row case
-			if (!more && (0 < fInputJobStepAssociation.status() || die))
+			if (!more && cancelled())
 			{
 				fDoneAggregate = true;
 				fEndOfResult = true;
@@ -3985,9 +3978,8 @@ void TupleAggregateStep::aggregateRowGroups()
 				//timer.stop("insert");
 				more = dlIn->next(fInputIter, &rgData);
 				/* error checking */
-				if (0 < fInputJobStepAssociation.status() || die)
+				if (cancelled())
 				{
-					fOutputJobStepAssociation.status(fInputJobStepAssociation.status());
 					fEndOfResult = true;
 					while (more) more = dlIn->next(fInputIter, &rgData);
 				}
@@ -3995,91 +3987,38 @@ void TupleAggregateStep::aggregateRowGroups()
 		} // try
 		catch (IDBExcept& iex)
 		{
-			catchHandler(iex.what(), fSessionId, (iex.errorCode() == logging::ERR_AGGREGATION_TOO_BIG ? logging::LOG_TYPE_INFO :
-				logging::LOG_TYPE_CRITICAL));
-			if (0 == fOutputJobStepAssociation.status())
-				fOutputJobStepAssociation.status(iex.errorCode());
-
+			catchHandler(iex.what(), iex.errorCode(), fErrorInfo, fSessionId,
+				(iex.errorCode() == ERR_AGGREGATION_TOO_BIG ? LOG_TYPE_INFO : LOG_TYPE_CRITICAL));
 			fEndOfResult = true;
-			fDoneAggregate = true;
-			while (more) more = dlIn->next(fInputIter, &rgData);
-
-			if (traceOn())
-			{
-				dlTimes.setLastReadTime();
-				dlTimes.setEndOfInputTime();
-			}
-
-			throw;
 		}
 		catch (QueryDataExcept& qex)
 		{
-			catchHandler(qex.what(), fSessionId);
-			if (0 == fOutputJobStepAssociation.status())
-				fOutputJobStepAssociation.status(qex.errorCode());
-
+			catchHandler(qex.what(), qex.errorCode(), fErrorInfo, fSessionId);
 			fEndOfResult = true;
-			fDoneAggregate = true;
-			while (more) more = dlIn->next(fInputIter, &rgData);
-
-			if (traceOn())
-			{
-				dlTimes.setLastReadTime();
-				dlTimes.setEndOfInputTime();
-			}
-
-			throw;
 		}
 		catch(const std::exception& ex)
 		{
-			catchHandler(ex.what(), fSessionId);
-			if (0 == fOutputJobStepAssociation.status())
-				fOutputJobStepAssociation.status(tupleAggregateStepErr);
-
+			catchHandler(ex.what(), tupleAggregateStepErr, fErrorInfo, fSessionId);
 			fEndOfResult = true;
-			fDoneAggregate = true;
-			while (more) more = dlIn->next(fInputIter, &rgData);
-
-			if (traceOn())
-			{
-				dlTimes.setLastReadTime();
-				dlTimes.setEndOfInputTime();
-			}
-
-			throw;
 		}
 		catch(...)
 		{
-			catchHandler("TupleAggregateStep::aggregateRowGroups() caught an unknown exception", fSessionId);
-			if (0 == fOutputJobStepAssociation.status())
-				fOutputJobStepAssociation.status(tupleAggregateStepErr);
-
+			catchHandler("TupleAggregateStep::aggregateRowGroups() caught an unknown exception",
+							tupleAggregateStepErr, fErrorInfo, fSessionId);
 			fEndOfResult = true;
-			fDoneAggregate = true;
-			while (more) more = dlIn->next(fInputIter, &rgData);
-
-			if (traceOn())
-			{
-				dlTimes.setLastReadTime();
-				dlTimes.setEndOfInputTime();
-			}
-
-			throw;
 		}
-
-		if (traceOn())
-		{
-			dlTimes.setLastReadTime();
-			dlTimes.setEndOfInputTime();
-		}
-
-		fDoneAggregate = true;
 	}
-	/* Bug 5698.  A catch-all.  It seems that control can get here w/o having
-	   drained the input.  Prevents the feeding JobStep from exiting & hangs the session.
-	*/
+
+	fDoneAggregate = true;
+
 	while (more) 
 		more = dlIn->next(fInputIter, &rgData);
+
+	if (traceOn())
+	{
+		dlTimes.setLastReadTime();
+		dlTimes.setEndOfInputTime();
+	}
 }
 
 
@@ -4105,6 +4044,7 @@ void TupleAggregateStep::threadedAggregateRowGroups(uint8_t threadID)
 
 	bool more = true;
 	RowGroupDL *dlIn = NULL;
+	bool caughtException = false;
 	
 	RowAggregationMultiDistinct *multiDist = NULL;
 
@@ -4122,7 +4062,7 @@ void TupleAggregateStep::threadedAggregateRowGroups(uint8_t threadID)
 		try
 		{
 			// this check covers the no row case
-			if (!more && (0 < fInputJobStepAssociation.status()))
+			if (!more && cancelled())
 			{
 				fDoneAggregate = true;
 				fEndOfResult = true;
@@ -4133,10 +4073,10 @@ void TupleAggregateStep::threadedAggregateRowGroups(uint8_t threadID)
 			Row rowIn;
 			while (more && !fEndOfResult)
 			{
-				mutex.lock();
+				fMutex.lock();
 				locked = true;
 				//timer.start(readInput.str());
-				for (uint c = 0; c < fNumOfRowGroups && !die; c++)
+				for (uint c = 0; c < fNumOfRowGroups && !cancelled(); c++)
 				{
 					more = dlIn->next(fInputIter, &rgData);
 					if (firstRead)
@@ -4180,15 +4120,19 @@ void TupleAggregateStep::threadedAggregateRowGroups(uint8_t threadID)
 					if (more)
 					{
 						fRowGroupIns[threadID].setData(rgData.get());
-						memUsage[threadID] += fRowGroupIns[threadID].getDataSize();
-						if (!rm->getMemory(fRowGroupIns[threadID].getDataSize()))
+						fMemUsage[threadID] += fRowGroupIns[threadID].getDataSize();
+						if (!fRm.getMemory(fRowGroupIns[threadID].getDataSize()))
 						{
 							rgDatas.clear();    // to short-cut the rest of processing
 							abort();
 							more = false;
 							fEndOfResult = true;
-							if (fInputJobStepAssociation.status() == 0)
-								fInputJobStepAssociation.status(logging::ERR_AGGREGATION_TOO_BIG);
+							if (status() == 0)
+							{
+								errorMessage(IDBErrorInfo::instance()->errorMsg(
+									ERR_AGGREGATION_TOO_BIG));
+								status(ERR_AGGREGATION_TOO_BIG);
+							}
 							break;
 						}
 						else
@@ -4212,7 +4156,7 @@ void TupleAggregateStep::threadedAggregateRowGroups(uint8_t threadID)
 						fAggregators[i]->setInputOutput(fRowGroupIn, &fRowGroupOuts[i]);
 					}
 				}
-				mutex.unlock();
+				fMutex.unlock();
 				locked = false;
 				//timer.stop(readInput.str());
 
@@ -4267,13 +4211,13 @@ void TupleAggregateStep::threadedAggregateRowGroups(uint8_t threadID)
 				bool done = false;
 				//memset(bucketDone, 0, sizeof(bucketDone));
 				fill(&bucketDone[0], &bucketDone[fNumOfBuckets], false);
-				while (!fEndOfResult && !done && !die && !fInputJobStepAssociation.status())
+				while (!fEndOfResult && !done && !cancelled())
 				{
 					bool didWork = false;
 					done = true;
-					for (uint c = 0; c < fNumOfBuckets && !(die || fInputJobStepAssociation.status()); c++)
+					for (uint c = 0; c < fNumOfBuckets && !cancelled(); c++)
 					{
-						if (!fEndOfResult && !bucketDone[c] && agg_mutex[c]->try_lock())
+						if (!fEndOfResult && !bucketDone[c] && fAgg_mutex[c]->try_lock())
 						{
 							didWork = true;
 							//timer.start(buildMap.str());
@@ -4282,7 +4226,7 @@ void TupleAggregateStep::threadedAggregateRowGroups(uint8_t threadID)
 								dynamic_cast<RowAggregationMultiDistinct*>(fAggregators[c].get())->addRowGroup(&fRowGroupIns[threadID], rowBucketVecs[c]);
 							else
 								fAggregators[c]->addRowGroup(&fRowGroupIns[threadID], rowBucketVecs[c][0]);
-							agg_mutex[c]->unlock();
+							fAgg_mutex[c]->unlock();
 							rowBucketVecs[c][0].clear();
 							bucketDone[c] = true;
 							//timer.stop(buildMap.str());
@@ -4296,16 +4240,15 @@ void TupleAggregateStep::threadedAggregateRowGroups(uint8_t threadID)
 						usleep(1000);   // avoid using all CPU during busy wait
 				}
 				rgDatas.clear();
-				rm->returnMemory(memUsage[threadID]);
-				memUsage[threadID] = 0;
+				fRm.returnMemory(fMemUsage[threadID]);
+				fMemUsage[threadID] = 0;
 
-				if (0 < fInputJobStepAssociation.status() || die)
+				if (cancelled())
 				{
-					fOutputJobStepAssociation.status(fInputJobStepAssociation.status());
 					fEndOfResult = true;
-					mutex.lock();
+					fMutex.lock();
 					while (more) more = dlIn->next(fInputIter, &rgData);
-					mutex.unlock();
+					fMutex.unlock();
 				}
 			}
 			//cout << "thread " << (int)threadID << " rcount: " << rgcount << endl;
@@ -4313,94 +4256,44 @@ void TupleAggregateStep::threadedAggregateRowGroups(uint8_t threadID)
 		} // try
 		catch (IDBExcept& iex)
 		{
-			catchHandler(iex.what(), fSessionId,
-				(iex.errorCode() == logging::ERR_AGGREGATION_TOO_BIG ? logging::LOG_TYPE_INFO :
-				logging::LOG_TYPE_CRITICAL));
-			if (0 == fOutputJobStepAssociation.status())
-				fOutputJobStepAssociation.status(iex.errorCode());
-
-			fEndOfResult = true;
-			fDoneAggregate = true;
-			if (!locked)
-				mutex.lock();
-			while (more) more = dlIn->next(fInputIter, &rgData);
-			mutex.unlock();
-			locked = false;
-
-			dlTimes.setLastReadTime();
-			dlTimes.setEndOfInputTime();
-
-			return;
+			catchHandler(iex.what(), iex.errorCode(), fErrorInfo, fSessionId,
+				(iex.errorCode() == ERR_AGGREGATION_TOO_BIG ? LOG_TYPE_INFO : LOG_TYPE_CRITICAL));
+			caughtException = true;
 		}
 		catch (QueryDataExcept& qex)
 		{
-			catchHandler(qex.what(), fSessionId);
-			if (0 == fOutputJobStepAssociation.status())
-				fOutputJobStepAssociation.status(qex.errorCode());
-
-			fEndOfResult = true;
-			fDoneAggregate = true;
-			if (!locked)
-				mutex.lock();
-			while (more) more = dlIn->next(fInputIter, &rgData);
-			mutex.unlock();
-			locked = false;
-
-			dlTimes.setLastReadTime();
-			dlTimes.setEndOfInputTime();
-
-			return;
+			catchHandler(qex.what(), qex.errorCode(), fErrorInfo, fSessionId);
+			caughtException = true;
 		}
 		catch(const std::exception& ex)
 		{
-			catchHandler(ex.what(), fSessionId);
-			if (0 == fOutputJobStepAssociation.status())
-				fOutputJobStepAssociation.status(tupleAggregateStepErr);
-
-			fEndOfResult = true;
-			fDoneAggregate = true;
-			if (!locked)
-				mutex.lock();
-			while (more) more = dlIn->next(fInputIter, &rgData);
-			mutex.unlock();
-			locked = false;
-
-			dlTimes.setLastReadTime();
-			dlTimes.setEndOfInputTime();
-
-			return;
+			catchHandler(ex.what(), tupleAggregateStepErr, fErrorInfo, fSessionId);
+			caughtException = true;
 		}
 		catch(...)
 		{
-			catchHandler("TupleAggregateStep::aggregateRowGroups() caught an unknown exception", fSessionId);
-			if (0 == fOutputJobStepAssociation.status())
-				fOutputJobStepAssociation.status(tupleAggregateStepErr);
-
-			fEndOfResult = true;
-			fDoneAggregate = true;
-			if (!locked)
-				mutex.lock();
-			while (more) more = dlIn->next(fInputIter, &rgData);
-			mutex.unlock();
-			locked = false;
-
-			dlTimes.setLastReadTime();
-			dlTimes.setEndOfInputTime();
-
-			return;
+			catchHandler("TupleAggregateStep::aggregateRowGroups() caught an unknown exception",
+							tupleAggregateStepErr, fErrorInfo, fSessionId);
+			caughtException = true;
 		}
+	}
 
+	if (caughtException)
+	{
+		fEndOfResult = true;
+		fDoneAggregate = true;
+	}
+
+	if (!locked) fMutex.lock();
+	while (more) more = dlIn->next(fInputIter, &rgData);
+	fMutex.unlock();
+	locked = false;
+
+	if (traceOn())
+	{
 		dlTimes.setLastReadTime();
 		dlTimes.setEndOfInputTime();
 	}
-
-	/* Bug 5698.  A catch-all.  It seems that control can get here w/o
-	   having drained the input.  Prevents the feeding JobStep from exiting & hangs the session. 
-	*/
-	mutex.lock();
-	while (more) 
-		more = dlIn->next(fInputIter, &rgData);
-	mutex.unlock();
 }
 
 
@@ -4437,23 +4330,23 @@ void TupleAggregateStep::doAggregate_singleThread()
 			}
 		}
 	} // try
+	catch (IDBExcept& iex)
+	{
+		catchHandler(iex.what(), iex.errorCode(), fErrorInfo, fSessionId,
+			(iex.errorCode() == ERR_AGGREGATION_TOO_BIG ? LOG_TYPE_INFO : LOG_TYPE_CRITICAL));
+	}
 	catch (QueryDataExcept& qex)
 	{
-		catchHandler(qex.what(), fSessionId);
-		if (0 == fOutputJobStepAssociation.status())
-			fOutputJobStepAssociation.status(qex.errorCode());
+		catchHandler(qex.what(), qex.errorCode(), fErrorInfo, fSessionId);
 	}
 	catch(const std::exception& ex)
 	{
-		catchHandler(ex.what(), fSessionId);
-		if (0 == fOutputJobStepAssociation.status())
-			fOutputJobStepAssociation.status(tupleAggregateStepErr);
+		catchHandler(ex.what(), tupleAggregateStepErr, fErrorInfo, fSessionId);
 	}
 	catch(...)
 	{
-		catchHandler("TupleAggregateStep next band caught an unknown exception", fSessionId);
-		if (0 == fOutputJobStepAssociation.status())
-			fOutputJobStepAssociation.status(tupleAggregateStepErr);
+		catchHandler("TupleAggregateStep next band caught an unknown exception",
+						tupleAggregateStepErr, fErrorInfo, fSessionId);
 	}
 
 	if (traceOn())
@@ -4598,7 +4491,7 @@ uint64_t TupleAggregateStep::doThreadedAggregate(ByteStream& bs, RowGroupDL* dlp
 
 			bool done = true;
 			//@bug4459
-			while (fAggregator->nextRowGroup() && !die)
+			while (fAggregator->nextRowGroup() && !cancelled())
 			{
 				done = false;
 				fAggregator->finalize();
@@ -4634,51 +4527,42 @@ uint64_t TupleAggregateStep::doThreadedAggregate(ByteStream& bs, RowGroupDL* dlp
 		//timer.finish();
 	}	catch (IDBExcept& iex)
 	{
-		catchHandler(iex.what(), fSessionId, (iex.errorCode() == logging::ERR_AGGREGATION_TOO_BIG ? logging::LOG_TYPE_INFO :
-				logging::LOG_TYPE_CRITICAL));
-		if (0 == fOutputJobStepAssociation.status())
-		{
-			fOutputJobStepAssociation.status(iex.errorCode());
-			fOutputJobStepAssociation.errorMessage(iex.what());
-		}
+		catchHandler(iex.what(), iex.errorCode(), fErrorInfo, fSessionId,
+			(iex.errorCode() == ERR_AGGREGATION_TOO_BIG ? LOG_TYPE_INFO : LOG_TYPE_CRITICAL));
 		fEndOfResult = true;
 	}
 	catch (QueryDataExcept& qex)
 	{
-		catchHandler(qex.what(), fSessionId);
-		if (0 == fOutputJobStepAssociation.status())
-			fOutputJobStepAssociation.status(qex.errorCode());
+		catchHandler(qex.what(), qex.errorCode(), fErrorInfo, fSessionId);
 		fEndOfResult = true;
 	}
 	catch(const std::exception& ex)
 	{
-		catchHandler(ex.what(), fSessionId);
-		if (0 == fOutputJobStepAssociation.status())
-			fOutputJobStepAssociation.status(tupleAggregateStepErr);
+		catchHandler(ex.what(), tupleAggregateStepErr, fErrorInfo, fSessionId);
 		fEndOfResult = true;
 	}
 
-	if (dlp)
+	if (fEndOfResult)
 	{
-		if (fEndOfResult)
+		if (dlp)
+		{
 			dlp->endOfInput();
-	}
-	else
-	{
-		if (fEndOfResult)
+		}
+		else
 		{
 			// send an empty / error band
 			shared_array<uint8_t> rgData(new uint8_t[fRowGroupOut.getEmptySize()]);
 			fRowGroupOut.setData(rgData.get());
 			fRowGroupOut.resetRowGroup(0);
-			fRowGroupOut.setStatus(fOutputJobStepAssociation.status());
+			fRowGroupOut.setStatus(status());
 			bs.load(rgData.get(), fRowGroupOut.getDataSize());
 			rowCount = 0;
-
-			if (traceOn())
-				printCalTrace();
 		}
+
+		if (traceOn())
+			printCalTrace();
 	}
+
 	return rowCount;
 }
 
@@ -4715,7 +4599,7 @@ void TupleAggregateStep::printCalTrace()
 			<< "\t1st read " << dlTimes.FirstReadTimeString()
 			<< "; EOI " << dlTimes.EndOfInputTimeString() << "; runtime-"
 			<< JSTimeStamp::tsdiffstr(dlTimes.EndOfInputTime(), dlTimes.FirstReadTime())
-			<< "s;\n\tJob completion status " << fOutputJobStepAssociation.status() << endl;
+			<< "s;\n\tJob completion status " << status() << endl;
 	logEnd(logStr.str().c_str());
 	fExtendedInfo += logStr.str();
 	formatMiniStats();

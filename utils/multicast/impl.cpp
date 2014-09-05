@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-// $Id: impl.cpp 3048 2012-04-04 15:33:45Z rdempsey $
+// $Id: impl.cpp 3495 2013-01-21 14:09:51Z rdempsey $
 
 /* This code is based on udpcast-20090830. Most of the source code in that release
    contains no copyright or licensing notices at all. The exception is fec.c, which
@@ -2239,7 +2239,7 @@ int pc_consumeContiguousMinAmount(produconsum_t pc, int amount)
 
 #define BLOCKSIZE 4096
 
-void localReader(struct fifo* fifo, const ByteStream::byte* buf, uint32_t len)
+void localReader(struct fifo* fifo, const uint8_t* buf, uint32_t len)
 {
 //cerr << "starting to send " << len << " bytes" << endl;
     uint32_t offset = 0;
@@ -3185,7 +3185,7 @@ void MulticastImpl::startSender()
 	//doTransfer(fSock[0], fDb, &fNet_config, &fStat_config);
 }
 
-void MulticastImpl::doTransfer(const ByteStream::byte* buf, uint32_t len)
+void MulticastImpl::doTransfer(const uint8_t* buf, uint32_t len)
 {
     int i;
     int ret;

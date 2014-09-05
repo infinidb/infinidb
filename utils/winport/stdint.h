@@ -60,4 +60,6 @@ struct lldiv_t__
 };
 typedef struct lldiv_t__ lldiv_t;
 
+typedef long long off64_t;
+
 #endif

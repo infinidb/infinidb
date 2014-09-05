@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
-* $Id: ha_calpont_partition.cpp 9038 2012-10-29 22:13:24Z zzhu $
+* $Id: ha_calpont_partition.cpp 9319 2013-03-19 21:38:57Z dhall $
 */
 
 #include <iostream>
@@ -141,6 +141,22 @@ string name(CalpontSystemCatalog::ColType& ct)
 			return "BLOB";
 		case CalpontSystemCatalog::CLOB:
 			return "CLOB";
+        case CalpontSystemCatalog::UINT:
+            return "UINT";
+        case CalpontSystemCatalog::UTINYINT:
+            return "UTINYINT";
+        case CalpontSystemCatalog::UMEDINT:
+            return "UMEDINT";
+        case CalpontSystemCatalog::USMALLINT:
+            return "USMALLINT";
+        case CalpontSystemCatalog::UBIGINT:
+            return "UBIGINT";
+        case CalpontSystemCatalog::UDECIMAL:
+            return "UDECIMAL";
+        case CalpontSystemCatalog::UFLOAT:
+            return "UFLOAT";
+        case CalpontSystemCatalog::UDOUBLE:
+            return "UDOUBLE";
 		default:
 			return "Unknown Type";
 	}
@@ -149,15 +165,21 @@ string name(CalpontSystemCatalog::ColType& ct)
 bool CP_type(CalpontSystemCatalog::ColType& ct)
 {
 	if (ct.colDataType == CalpontSystemCatalog::INT ||
-			  ct.colDataType == CalpontSystemCatalog::TINYINT ||
-			  ct.colDataType == CalpontSystemCatalog::MEDINT ||
-			  ct.colDataType == CalpontSystemCatalog::SMALLINT ||
-			  ct.colDataType == CalpontSystemCatalog::BIGINT ||
-			  ct.colDataType == CalpontSystemCatalog::DATE ||
-			  ct.colDataType == CalpontSystemCatalog::DATETIME ||
-			  ct.colDataType == CalpontSystemCatalog::DECIMAL ||
-			  (ct.colDataType == CalpontSystemCatalog::CHAR && ct.colWidth <= 8) ||
-			  (ct.colDataType == CalpontSystemCatalog::VARCHAR && ct.colWidth <= 7))
+        ct.colDataType == CalpontSystemCatalog::TINYINT ||
+        ct.colDataType == CalpontSystemCatalog::MEDINT ||
+        ct.colDataType == CalpontSystemCatalog::SMALLINT ||
+        ct.colDataType == CalpontSystemCatalog::BIGINT ||
+        ct.colDataType == CalpontSystemCatalog::DATE ||
+        ct.colDataType == CalpontSystemCatalog::DATETIME ||
+        ct.colDataType == CalpontSystemCatalog::DECIMAL ||
+        ct.colDataType == CalpontSystemCatalog::UTINYINT ||
+        ct.colDataType == CalpontSystemCatalog::USMALLINT ||
+        ct.colDataType == CalpontSystemCatalog::UMEDINT ||
+        ct.colDataType == CalpontSystemCatalog::UINT ||
+        ct.colDataType == CalpontSystemCatalog::UBIGINT ||
+        ct.colDataType == CalpontSystemCatalog::UDECIMAL ||
+        (ct.colDataType == CalpontSystemCatalog::CHAR && ct.colWidth <= 8) ||
+        (ct.colDataType == CalpontSystemCatalog::VARCHAR && ct.colWidth <= 7))
 	{
 		return true;
 	}
@@ -210,7 +232,6 @@ const string format(int64_t v, CalpontSystemCatalog::ColType& ct)
 			// swap again to retain the string byte order
 			uint64_t tmp = uint64ToStr(v);
 			oss << (char*)(&tmp);
-
 			break;
 		}
 		case CalpontSystemCatalog::TINYINT:
@@ -219,6 +240,7 @@ const string format(int64_t v, CalpontSystemCatalog::ColType& ct)
 		case CalpontSystemCatalog::INT:
 		case CalpontSystemCatalog::BIGINT:
 		case CalpontSystemCatalog::DECIMAL:
+        case CalpontSystemCatalog::UDECIMAL:
 		{
 			if (ct.scale > 0)
 			{
@@ -231,7 +253,14 @@ const string format(int64_t v, CalpontSystemCatalog::ColType& ct)
 			}
 			break;
 		}
-		case CalpontSystemCatalog::VARBINARY:
+        case CalpontSystemCatalog::UTINYINT:
+        case CalpontSystemCatalog::USMALLINT:
+        case CalpontSystemCatalog::UMEDINT:
+        case CalpontSystemCatalog::UINT:
+        case CalpontSystemCatalog::UBIGINT:
+            oss << static_cast<uint64_t>(v);
+            break;
+        case CalpontSystemCatalog::VARBINARY:
 			oss << "N/A";
 			break;
 		default:
@@ -256,9 +285,15 @@ const int64_t IDB_format(char* str, CalpontSystemCatalog::ColType& ct, uint8_t& 
 	case CalpontSystemCatalog::TINYINT:
 		v = boost::any_cast<char>(anyVal);
 		break;
+    case CalpontSystemCatalog::UTINYINT:
+        v = boost::any_cast<uint8_t>(anyVal);
+        break;
 	case CalpontSystemCatalog::SMALLINT:
 		v = boost::any_cast<int16_t>(anyVal);
 		break;
+    case CalpontSystemCatalog::USMALLINT:
+        v = boost::any_cast<uint16_t>(anyVal);
+        break;
 	case CalpontSystemCatalog::MEDINT:
 	case CalpontSystemCatalog::INT:
 #ifdef _MSC_VER
@@ -267,9 +302,16 @@ const int64_t IDB_format(char* str, CalpontSystemCatalog::ColType& ct, uint8_t& 
 		v = boost::any_cast<int32_t>(anyVal);
 #endif
 		break;
+    case CalpontSystemCatalog::UMEDINT:
+    case CalpontSystemCatalog::UINT:
+        v = boost::any_cast<uint32_t>(anyVal);
+        break;
 	case CalpontSystemCatalog::BIGINT:
 		v = boost::any_cast<long long>(anyVal);
 		break;
+    case CalpontSystemCatalog::UBIGINT:
+        v = boost::any_cast<uint64_t>(anyVal);
+        break;
 	case CalpontSystemCatalog::CHAR:
 	case CalpontSystemCatalog::VARCHAR:
 	case CalpontSystemCatalog::VARBINARY:
@@ -291,6 +333,7 @@ const int64_t IDB_format(char* str, CalpontSystemCatalog::ColType& ct, uint8_t& 
 		v = boost::any_cast<uint64_t>(anyVal);
 		break;
 	case CalpontSystemCatalog::DECIMAL:
+    case CalpontSystemCatalog::UDECIMAL:
 		if (ct.colWidth == execplan::CalpontSystemCatalog::ONE_BYTE)
 			v = boost::any_cast<char>(anyVal);
 		else if (ct.colWidth == execplan::CalpontSystemCatalog::TWO_BYTE)
@@ -313,7 +356,8 @@ const int64_t IDB_format(char* str, CalpontSystemCatalog::ColType& ct, uint8_t& 
 		 ct.colDataType == CalpontSystemCatalog::MEDINT ||
 		 ct.colDataType == CalpontSystemCatalog::INT ||
 		 ct.colDataType == CalpontSystemCatalog::BIGINT ||
-		 ct.colDataType == CalpontSystemCatalog::DECIMAL) &&
+		 ct.colDataType == CalpontSystemCatalog::DECIMAL ||
+         ct.colDataType == CalpontSystemCatalog::UDECIMAL) &&
 		pushWarning)
 	{
 		// get rid of leading white spaces and parentheses
@@ -562,24 +606,68 @@ void partitionByValue_common(UDF_ARGS* args,                               // in
 		if (args->arg_count == 4)
 		{
 			if (!args->args[2])
-				startVal = numeric_limits<int64_t>::min();
+            {
+                if (isUnsigned(ct.colDataType))
+                {
+                    startVal = 0;
+                }
+                else
+                {
+                    startVal = numeric_limits<int64_t>::min();
+                }
+            }
 			else
+            {
 				startVal = IDB_format((char*) args->args[2], ct, rfMin);
+            }
 			if (!args->args[3])
-				endVal = numeric_limits<int64_t>::max();
+            {
+                if (isUnsigned(ct.colDataType))
+                {
+                    endVal = static_cast<int64_t>(numeric_limits<uint64_t>::max());
+                }
+                else
+                {
+                    endVal = numeric_limits<int64_t>::max();
+                }
+            }
 			else
+            {
 				endVal = IDB_format((char*) args->args[3], ct, rfMax);
+            }
 		}
 		else
 		{
 			if (!args->args[3])
-				startVal = numeric_limits<int64_t>::min();
+            {
+                if (isUnsigned(ct.colDataType))
+                {
+                    startVal = 0;
+                }
+                else
+                {
+                    startVal = numeric_limits<int64_t>::min();
+                }
+            }
 			else
+            {
 				startVal = IDB_format((char*) args->args[3], ct, rfMin);
+            }
 			if (!args->args[4])
-				endVal = numeric_limits<int64_t>::max();
+            {
+                if (isUnsigned(ct.colDataType))
+                {
+                    endVal = static_cast<int64_t>(numeric_limits<uint64_t>::max());
+                }
+                else
+                {
+                    endVal = numeric_limits<int64_t>::max();
+                }
+            }
 			else
+            {
 				endVal = IDB_format((char*) args->args[4], ct, rfMax);
+            }
 		}
 		
 		CHECK(em.getExtents(oid, entries, false, false, true));
@@ -618,8 +706,16 @@ void partitionByValue_common(UDF_ARGS* args,                               // in
 				{
 					if (mapit->second.status & CPINVALID)
 						continue;
-					mapit->second.min = (partInfo.min < mapit->second.min ? partInfo.min : mapit->second.min);
-					mapit->second.max = (partInfo.max > mapit->second.max ? partInfo.max : mapit->second.max);
+                    if (isUnsigned(ct.colDataType))
+                    {
+                        mapit->second.min = (static_cast<uint64_t>(partInfo.min) < static_cast<uint64_t>(mapit->second.min) ? partInfo.min : mapit->second.min);
+                        mapit->second.max = (static_cast<uint64_t>(partInfo.max) > static_cast<uint64_t>(mapit->second.max) ? partInfo.max : mapit->second.max);
+                    }
+                    else
+                    {
+                        mapit->second.min = (partInfo.min < mapit->second.min ? partInfo.min : mapit->second.min);
+                        mapit->second.max = (partInfo.max > mapit->second.max ? partInfo.max : mapit->second.max);
+                    }
 				}
 			}
 			
@@ -627,19 +723,37 @@ void partitionByValue_common(UDF_ARGS* args,                               // in
 			for (mapit = partMap.begin(); mapit != partMap.end(); ++mapit)
 			{
 				// @bug 4595. check empty/null case
-				if (!(mapit->second.status & CPINVALID) && mapit->second.min >= startVal && mapit->second.max <= endVal && 
-					 !(mapit->second.min == numeric_limits<int64_t>::max() && mapit->second.max == numeric_limits<int64_t>::min()))
-				{
-					if (rfMin == ROUND_POS && mapit->second.min == startVal)
-						continue;
-					if (rfMax == ROUND_NEG && mapit->second.max == endVal)
-						continue;
-					partSet.insert(mapit->first);
-				}
+                if (isUnsigned(ct.colDataType))
+                {
+                    if (!(mapit->second.status & CPINVALID) && 
+                        static_cast<uint64_t>(mapit->second.min) >= static_cast<uint64_t>(startVal) && 
+                        static_cast<uint64_t>(mapit->second.max) <= static_cast<uint64_t>(endVal) && 
+                        !(static_cast<uint64_t>(mapit->second.min) == numeric_limits<uint64_t>::max() && 
+                          static_cast<uint64_t>(mapit->second.max == 0)))
+                    {
+                        if (rfMin == ROUND_POS && mapit->second.min == startVal)
+                            continue;
+                        if (rfMax == ROUND_NEG && mapit->second.max == endVal)
+                            continue;
+                        partSet.insert(mapit->first);
+                    }
+                }
+                else
+                {
+                    if (!(mapit->second.status & CPINVALID) && mapit->second.min >= startVal && mapit->second.max <= endVal && 
+                         !(mapit->second.min == numeric_limits<int64_t>::max() && mapit->second.max == numeric_limits<int64_t>::min()))
+                    {
+                        if (rfMin == ROUND_POS && mapit->second.min == startVal)
+                            continue;
+                        if (rfMax == ROUND_NEG && mapit->second.max == endVal)
+                            continue;
+                        partSet.insert(mapit->first);
+                    }
+                }
 			}
-				
 		}	
-	} catch (IDBExcept& ex)
+	} 
+    catch (IDBExcept& ex)
 	{
 		errMsg = ex.what();
 		return;
@@ -1488,30 +1602,74 @@ const char* calshowpartitionsbyvalue(UDF_INIT* initid, UDF_ARGS* args,
 			throw IDBExcept(ERR_PARTITION_BY_RANGE, args);
 		}
 		
-		if (args->arg_count == 4)
-		{
-			if (!args->args[2])
-				startVal = numeric_limits<int64_t>::min();
-			else
-				startVal = IDB_format((char*) args->args[2], ct, rfMin);
-			if (!args->args[3])
-				endVal = numeric_limits<int64_t>::max();
-			else
-				endVal = IDB_format((char*) args->args[3], ct, rfMax);
-		}
-		else
-		{
-			if (!args->args[3])
-				startVal = numeric_limits<int64_t>::min();
-			else
-				startVal = IDB_format((char*) args->args[3], ct, rfMin);
-			if (!args->args[4])
-				endVal = numeric_limits<int64_t>::max();
-			else
-				endVal = IDB_format((char*) args->args[4], ct, rfMax);
-		}
-		
-		CHECK(em.getExtents(oid, entries, false, false, true));
+        if (args->arg_count == 4)
+        {
+            if (!args->args[2])
+            {
+                if (isUnsigned(ct.colDataType))
+                {
+                    startVal = 0;
+                }
+                else
+                {
+                    startVal = numeric_limits<int64_t>::min();
+                }
+            }
+            else
+            {
+                startVal = IDB_format((char*) args->args[2], ct, rfMin);
+            }
+            if (!args->args[3])
+            {
+                if (isUnsigned(ct.colDataType))
+                {
+                    endVal = static_cast<int64_t>(numeric_limits<uint64_t>::max());
+                }
+                else
+                {
+                    endVal = numeric_limits<int64_t>::max();
+                }
+            }
+            else
+            {
+                endVal = IDB_format((char*) args->args[3], ct, rfMax);
+            }
+        }
+        else
+        {
+            if (!args->args[3])
+            {
+                if (isUnsigned(ct.colDataType))
+                {
+                    startVal = 0;
+                }
+                else
+                {
+                    startVal = numeric_limits<int64_t>::min();
+                }
+            }
+            else
+            {
+                startVal = IDB_format((char*) args->args[3], ct, rfMin);
+            }
+            if (!args->args[4])
+            {
+                if (isUnsigned(ct.colDataType))
+                {
+                    endVal = static_cast<int64_t>(numeric_limits<uint64_t>::max());
+                }
+                else
+                {
+                    endVal = numeric_limits<int64_t>::max();
+                }
+            }
+            else
+            {
+                endVal = IDB_format((char*) args->args[4], ct, rfMax);
+            }
+        }
+
+        CHECK(em.getExtents(oid, entries, false, false, true));
 		if (entries.size() > 0)
 		{
 			header = false;
@@ -1547,8 +1705,16 @@ const char* calshowpartitionsbyvalue(UDF_INIT* initid, UDF_ARGS* args,
 				{
 					if (mapit->second.status & CPINVALID)
 						continue;
-					mapit->second.min = (partInfo.min < mapit->second.min ? partInfo.min : mapit->second.min);
-					mapit->second.max = (partInfo.max > mapit->second.max ? partInfo.max : mapit->second.max);
+                    if (isUnsigned(ct.colDataType))
+                    {
+                        mapit->second.min = (static_cast<uint64_t>(partInfo.min) < static_cast<uint64_t>(mapit->second.min) ? partInfo.min : mapit->second.min);
+                        mapit->second.max = (static_cast<uint64_t>(partInfo.max) > static_cast<uint64_t>(mapit->second.max) ? partInfo.max : mapit->second.max);
+                    }
+                    else
+                    {
+                        mapit->second.min = (partInfo.min < mapit->second.min ? partInfo.min : mapit->second.min);
+                        mapit->second.max = (partInfo.max > mapit->second.max ? partInfo.max : mapit->second.max);
+                    }
 				}
 			}
 		}
@@ -1593,8 +1759,8 @@ const char* calshowpartitionsbyvalue(UDF_INIT* initid, UDF_ARGS* args,
 			{
 				output.setf(ios::left, ios::adjustfield);
 				output << setw(10) << "Part#" 
-	       << setw(30) << "Min" 
-	       << setw(30) << "Max" << "Status";
+                    << setw(30) << "Min" 
+                    << setw(30) << "Max" << "Status";
 			}
 			noPartFound = false;
 			
@@ -1603,11 +1769,27 @@ const char* calshowpartitionsbyvalue(UDF_INIT* initid, UDF_ARGS* args,
 			oss << mapit->first;
 			output << "\n  " << setw(10) << oss.str();
 			if (mapit->second.status & CPINVALID)
+            {
 				output << setw(30) << "N/A" << setw(30) << "N/A";
-			else if (mapit->second.min > mapit->second.max)
-				output << setw(30) << "Empty/Null" << setw(30) << "Empty/Null";
-			else
-				output << setw(30) << format(mapit->second.min, ct) << setw(30) << format(mapit->second.max, ct);
+            }
+			else 
+            {
+                if ((isUnsigned(ct.colDataType)))
+                {
+                    if (static_cast<uint64_t>(mapit->second.min) > static_cast<uint64_t>(mapit->second.max))
+                        output << setw(30) << "Empty/Null" << setw(30) << "Empty/Null";
+                    else
+                        output << setw(30) << format(mapit->second.min, ct) << setw(30) << format(mapit->second.max, ct);
+                }
+                else
+                {
+                    if (mapit->second.min > mapit->second.max)
+                        output << setw(30) << "Empty/Null" << setw(30) << "Empty/Null";
+                    else
+                        output << setw(30) << format(mapit->second.min, ct) << setw(30) << format(mapit->second.max, ct);
+                }
+            }
+
 			if (mapit->second.status & ET_DISABLED)
 				output << "Disabled";
 			else

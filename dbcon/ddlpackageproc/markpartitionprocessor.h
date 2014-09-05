@@ -42,7 +42,7 @@ namespace ddlpackageprocessor
 class MarkPartitionProcessor : public DDLPackageProcessor
 {
 public:
-
+	MarkPartitionProcessor(BRM::DBRM* aDbrm) : DDLPackageProcessor(aDbrm){}
     /** @brief process a create table statement
      *
      * @param createTableStmt the CreateTableStatement

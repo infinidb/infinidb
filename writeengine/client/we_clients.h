@@ -50,10 +50,10 @@ public:
 	/**
 	 * Constructors
 	 */
-	EXPORT virtual ~WEClients();
+	EXPORT WEClients(int PrgmID);
+	EXPORT ~WEClients();
 	
-	EXPORT static WEClients* instance(int PrgmID);
-	static boost::mutex map_mutex;
+	//static boost::mutex map_mutex;
 	EXPORT void addQueue(uint32_t key);
 	EXPORT void removeQueue(uint32_t key);
 	EXPORT void shutdownQueue(uint32_t key);
@@ -106,6 +106,8 @@ public:
 	 */
 	uint getPmCount() { return pmCount; }
 private:
+	WEClients(const WEClients& weClient);
+	WEClients& operator=(const WEClients& weClient);
 	typedef std::vector<boost::thread*> ReaderList;
 	typedef std::map<unsigned, boost::shared_ptr<messageqcpp::MessageQueueClient> > ClientList;
 
@@ -136,8 +138,6 @@ private:
 	//The mapping of session ids to StepMsgQueueLists
 	typedef std::map<unsigned, boost::shared_ptr<MQE> > MessageQueueMap;
 
-	explicit WEClients(int PrgmID);
-
 	void StartClientListener(boost::shared_ptr<messageqcpp::MessageQueueClient> cl, uint connIndex);
 
 	/** @brief Add a message to the queue
@@ -145,7 +145,6 @@ private:
 	 */
 	void addDataToOutput(messageqcpp::SBS, uint connIndex);
 
-	static WEClients* fInstance;
 	int fPrgmID;
 	
 	ClientList fPmConnections; // all the Write Engine servers
@@ -154,6 +153,7 @@ private:
   	boost::mutex fMlock; //sessionMessages mutex
  	std::vector<boost::shared_ptr<boost::mutex> > fWlock; //WES socket write mutexes
 	bool fBusy;
+	volatile uint closingConnection;
 	uint pmCount;
 	boost::mutex fOnErrMutex;   // to lock function scope to reset pmconnections under error condition
 	

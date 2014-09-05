@@ -213,7 +213,7 @@ namespace WriteEngine
        int type, count;       
        IdxRidListPtr prevIdxRidListPtr;
        int  prevSbid, prevEntry, prevType;
-       i64 prevLbid;
+       uint64_t prevLbid;
        DataBlock prevDataBlock;       
        int pos =0, totalbytes=0;
        int preTotalBytes, prevPos ;
@@ -468,8 +468,8 @@ namespace WriteEngine
     *        Fail    -- ERR_IDX_LIST_INVALID_DELETE            
     ************************************************/        
     const int      IndexList::deleteIndexList( FILE* pFile, const RID& rowId, 
-                        const i64& key, IdxEmptyListEntry* curIdxRidListHdrPtr,
-                        i64& lbid, int&sbid, int& entry)
+                        const uint64_t& key, IdxEmptyListEntry* curIdxRidListHdrPtr,
+                        uint64_t& lbid, int&sbid, int& entry)
     {
       int rc =ERR_IDX_LIST_INVALID_DELETE;    
       bool found = false;
@@ -481,7 +481,7 @@ namespace WriteEngine
         return ERR_IDX_LIST_INVALID_KEY;
       }  
      
-      i64 dlbid =-1LL;
+      uint64_t dlbid =-1LL;
       int dsbid = -1;
       int dentry = -1;  
       rc = deleteIndexList(rowId,key,dlbid,dsbid,dentry);
@@ -522,8 +522,8 @@ namespace WriteEngine
     *        Fail    -- ERR_IDX_LIST_INVALID_DELETE            
     ************************************************/        
     const int      IndexList::deleteIndexList(const RID& rowId, 
-                                              const i64& key, 
-                                              i64& lbid, int&sbid, int& entry)
+                                              const uint64_t& key, 
+                                              uint64_t& lbid, int&sbid, int& entry)
     {
       int rc =ERR_IDX_LIST_INVALID_DELETE;    
       rc = deleteIndexList(rowId,key);
@@ -545,7 +545,7 @@ namespace WriteEngine
     *        Success -- 0
     *        Fail    -- ERR_IDX_LIST_INVALID_DELETE            
     ************************************************/ 
-     const int    IndexList::getRIDArrayFromListHdr(FILE* pFile, i64& key,
+     const int    IndexList::getRIDArrayFromListHdr(FILE* pFile, uint64_t& key,
                                     IdxEmptyListEntry* curIdxRidListHdrPtr,
                                     RID* ridArray, int& size)
      {
@@ -682,7 +682,7 @@ namespace WriteEngine
      return rc;       
     }//end getRIDArrayFromListHdr
   
-     const int    IndexList::getRIDArrayFromListHdrNarray(FILE* pFile, i64& key,
+     const int    IndexList::getRIDArrayFromListHdrNarray(FILE* pFile, uint64_t& key,
                                     IdxEmptyListEntry* curIdxRidListHdrPtr,
                                     RID* ridArray, int& size, bool flag)
      {
@@ -811,7 +811,7 @@ namespace WriteEngine
                 m_lbid = idxRidListArrayPtr.childIdxRidListPtr[i].childLbid;
                 int type = idxRidListArrayPtr.childIdxRidListPtr[i].type;
                 
-                if ((m_lbid != (i64)INVALID_LBID) &&(type == LIST_BLOCK_TYPE))
+                if ((m_lbid != (uint64_t)INVALID_LBID) &&(type == LIST_BLOCK_TYPE))
                 {
                      m_curType=LIST_BLOCK_TYPE;
                      getRIDArrayFromListHdrNarray(pFile,key,curIdxRidListHdrPtr,                                    
@@ -866,9 +866,9 @@ namespace WriteEngine
     *        true --found
     *        false--not found                 
     ************************************************/                
-    bool IndexList::findRowId(FILE* pFile, const RID& rowId, const i64& key,
+    bool IndexList::findRowId(FILE* pFile, const RID& rowId, const uint64_t& key,
                               IdxEmptyListEntry* curIdxRidListHdrPtr,
-                              i64& lbid, int& sbid, int& entry)
+                              uint64_t& lbid, int& sbid, int& entry)
     {
       bool found = false;
       int rc; 
@@ -901,15 +901,15 @@ namespace WriteEngine
     *        true --found
     *        false--not found                 
     ************************************************/                
-    bool IndexList::findRowId(const RID& rowId, const i64& key,                                  
-                                          i64& lbid, int& sbid, int& entry)
+    bool IndexList::findRowId(const RID& rowId, const int64_t& key,                                  
+                                          int64_t& lbid, int& sbid, int& entry)
     {
       bool found = false;
       int rc;
       RID savedRid;
       CommBlock cb;
       int count;
-      i64 prevLbid;
+      uint64_t prevLbid;
       int prevType;
 
       cb.file.oid = m_oid;

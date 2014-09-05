@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: systemcatalog.cpp 1763 2012-04-04 18:20:36Z rdempsey $
+//  $Id: systemcatalog.cpp 2101 2013-01-21 14:12:52Z rdempsey $
 
 #include <iostream>
 #include <assert.h>
@@ -67,7 +67,7 @@ void SystemCatalog::build()
   // TableName
   msg << "  Creating TableName column OID: "<< OID_SYSTABLE_TABLENAME;
   cout << msg.str() << endl;
-  rc = fWriteEngine.createColumn( txnID, OID_SYSTABLE_TABLENAME, WriteEngine::VARCHAR, 40, dbRoot );
+  rc = fWriteEngine.createColumn( txnID, OID_SYSTABLE_TABLENAME, CalpontSystemCatalog::VARCHAR, 40, dbRoot );
   if (rc) throw runtime_error(msg.str() + ec.errorString(rc));
   msg.str("");
 
@@ -81,7 +81,7 @@ void SystemCatalog::build()
   // Schema
   msg << "  Creating Schema column OID: "<<OID_SYSTABLE_SCHEMA;
   cout << msg.str() << endl;
-  rc = fWriteEngine.createColumn( txnID, OID_SYSTABLE_SCHEMA, WriteEngine::VARCHAR, 40, dbRoot );
+  rc = fWriteEngine.createColumn( txnID, OID_SYSTABLE_SCHEMA, CalpontSystemCatalog::VARCHAR, 40, dbRoot );
   if (rc) throw runtime_error(msg.str() + ec.errorString(rc));
 
 
@@ -95,63 +95,63 @@ void SystemCatalog::build()
   // ObjectId
   msg << "  Creating ObjectId column OID: " <<OID_SYSTABLE_OBJECTID;
   cout << msg.str() << endl;
-  rc = fWriteEngine.createColumn( txnID, OID_SYSTABLE_OBJECTID, WriteEngine::INT, 4, dbRoot );
+  rc = fWriteEngine.createColumn( txnID, OID_SYSTABLE_OBJECTID, CalpontSystemCatalog::INT, 4, dbRoot );
   if (rc) throw runtime_error(msg.str() + ec.errorString(rc));
   msg.str("");
     
   // CreateDate
   msg << "  Creating CreateDate column OID: "<<OID_SYSTABLE_CREATEDATE;
   cout << msg.str() << endl;
-  rc = fWriteEngine.createColumn( txnID, OID_SYSTABLE_CREATEDATE, WriteEngine::DATE, 4, dbRoot );
+  rc = fWriteEngine.createColumn( txnID, OID_SYSTABLE_CREATEDATE, CalpontSystemCatalog::DATE, 4, dbRoot );
   if (rc) throw runtime_error(msg.str() + ec.errorString(rc));
   msg.str("");
 
   // LastUpdateDate
   msg << "  Creating LastUpdate column OID: "<<OID_SYSTABLE_LASTUPDATE;
   cout << msg.str() << endl;
-  rc = fWriteEngine.createColumn( txnID, OID_SYSTABLE_LASTUPDATE, WriteEngine::DATE, 4, dbRoot );
+  rc = fWriteEngine.createColumn( txnID, OID_SYSTABLE_LASTUPDATE, CalpontSystemCatalog::DATE, 4, dbRoot );
   if (rc) throw runtime_error(msg.str() + ec.errorString(rc));
   msg.str("");
 
   // INIT
   msg << "  Creating INIT column OID: "<<OID_SYSTABLE_INIT;
   cout << msg.str() << endl;
-  rc = fWriteEngine.createColumn( txnID, OID_SYSTABLE_INIT, WriteEngine::INT, 4, dbRoot );
+  rc = fWriteEngine.createColumn( txnID, OID_SYSTABLE_INIT, CalpontSystemCatalog::INT, 4, dbRoot );
   if (rc) throw runtime_error(msg.str() + ec.errorString(rc));
   msg.str("");
 
   // NEXT
   msg << "  Creating NEXT column OID: "<<OID_SYSTABLE_NEXT;
   cout << msg.str() << endl;
-  rc = fWriteEngine.createColumn( txnID, OID_SYSTABLE_NEXT, WriteEngine::INT, 4, dbRoot );
+  rc = fWriteEngine.createColumn( txnID, OID_SYSTABLE_NEXT, CalpontSystemCatalog::INT, 4, dbRoot );
   if (rc) throw runtime_error(msg.str() + ec.errorString(rc));
   msg.str("");
     
   //NUMOFROWS
   msg << "  Creating NUMOFROWS column OID: "<<OID_SYSTABLE_NUMOFROWS;
   cout << msg.str() << endl;
-  rc = fWriteEngine.createColumn( txnID, OID_SYSTABLE_NUMOFROWS, WriteEngine::INT, 4, dbRoot );
+  rc = fWriteEngine.createColumn( txnID, OID_SYSTABLE_NUMOFROWS, CalpontSystemCatalog::INT, 4, dbRoot );
   if (rc) throw runtime_error(msg.str() + ec.errorString(rc));
   msg.str("");
 
   //AVGROWLEN
   msg << "  Creating AVGROWLEN column OID: "<<OID_SYSTABLE_AVGROWLEN;
   cout << msg.str() << endl;
-  rc = fWriteEngine.createColumn( txnID, OID_SYSTABLE_AVGROWLEN, WriteEngine::INT, 4, dbRoot );
+  rc = fWriteEngine.createColumn( txnID, OID_SYSTABLE_AVGROWLEN, CalpontSystemCatalog::INT, 4, dbRoot );
   if (rc) throw runtime_error(msg.str() + ec.errorString(rc));
   msg.str("");
 
   //NUMOFBLOCKS
   msg << "  Creating NUMOFBLOCKS column OID: "<<OID_SYSTABLE_NUMOFBLOCKS;
   cout << msg.str() << endl;
-  rc = fWriteEngine.createColumn( txnID, OID_SYSTABLE_NUMOFBLOCKS, WriteEngine::INT, 4, dbRoot );
+  rc = fWriteEngine.createColumn( txnID, OID_SYSTABLE_NUMOFBLOCKS, CalpontSystemCatalog::INT, 4, dbRoot );
   if (rc) throw runtime_error(msg.str() + ec.errorString(rc));
   msg.str("");
   
   //AUTOINCREMENT
   msg << "  Creating AUTOINCREMENT column OID: "<<OID_SYSTABLE_AUTOINCREMENT;
   cout << msg.str() << endl;
-  rc = fWriteEngine.createColumn( txnID, OID_SYSTABLE_AUTOINCREMENT, WriteEngine::INT, 4, dbRoot );
+  rc = fWriteEngine.createColumn( txnID, OID_SYSTABLE_AUTOINCREMENT, CalpontSystemCatalog::INT, 4, dbRoot );
   if (rc) throw runtime_error(msg.str() + ec.errorString(rc));
   msg.str("");
         
@@ -169,7 +169,7 @@ void SystemCatalog::build()
   cout << "---------------------------------------" << endl;
   msg << "  Creating Schema column OID: "<<OID_SYSCOLUMN_SCHEMA;
   cout << msg.str() << endl;
-  rc = fWriteEngine.createColumn( txnID, OID_SYSCOLUMN_SCHEMA, WriteEngine::VARCHAR, 40, dbRoot );
+  rc = fWriteEngine.createColumn( txnID, OID_SYSCOLUMN_SCHEMA, CalpontSystemCatalog::VARCHAR, 40, dbRoot );
   if (rc) throw runtime_error(msg.str() + ec.errorString(rc));
 
   msg.str("  Creating Schema column dictionary...");
@@ -182,7 +182,7 @@ void SystemCatalog::build()
   // TableName
   msg << "  Creating TableName column OID: "<<OID_SYSCOLUMN_TABLENAME;
   cout << msg.str() << endl;
-  rc = fWriteEngine.createColumn( txnID, OID_SYSCOLUMN_TABLENAME, WriteEngine::VARCHAR, 40, dbRoot );
+  rc = fWriteEngine.createColumn( txnID, OID_SYSCOLUMN_TABLENAME, CalpontSystemCatalog::VARCHAR, 40, dbRoot );
   if (rc) throw runtime_error(msg.str() + ec.errorString(rc));
 
   msg.str("  Creating TableName column dictionary...");
@@ -195,7 +195,7 @@ void SystemCatalog::build()
   // ColumnName
   msg << "  Creating ColumnName column OID: "<<OID_SYSCOLUMN_COLNAME;
   cout << msg.str() << endl;
-  rc = fWriteEngine.createColumn( txnID, OID_SYSCOLUMN_COLNAME, WriteEngine::VARCHAR, 40, dbRoot );
+  rc = fWriteEngine.createColumn( txnID, OID_SYSCOLUMN_COLNAME, CalpontSystemCatalog::VARCHAR, 40, dbRoot );
   if (rc) throw runtime_error(msg.str() + ec.errorString(rc));
 
   msg.str("  Creating ColumnName column dictionary...");
@@ -208,63 +208,63 @@ void SystemCatalog::build()
   // ObjectID
   msg << "  Creating ObjectID column OID: "<<OID_SYSCOLUMN_OBJECTID;
   cout << msg.str() << endl;
-  rc = fWriteEngine.createColumn( txnID, OID_SYSCOLUMN_OBJECTID, WriteEngine::INT, 4, dbRoot );
+  rc = fWriteEngine.createColumn( txnID, OID_SYSCOLUMN_OBJECTID, CalpontSystemCatalog::INT, 4, dbRoot );
   if (rc) throw runtime_error(msg.str() + ec.errorString(rc));
   msg.str("");
 
   // DictOID
   msg << "  Creating DictOID column OID: "<<OID_SYSCOLUMN_DICTOID;
   cout << msg.str() << endl;
-  rc = fWriteEngine.createColumn( txnID, OID_SYSCOLUMN_DICTOID, WriteEngine::INT, 4, dbRoot );
+  rc = fWriteEngine.createColumn( txnID, OID_SYSCOLUMN_DICTOID, CalpontSystemCatalog::INT, 4, dbRoot );
   if (rc) throw runtime_error(msg.str() + ec.errorString(rc));
   msg.str("");
 
   // ListOID
   msg << "  Creating ListOID column OID: "<< OID_SYSCOLUMN_LISTOBJID;
   cout << msg.str() << endl;
-  rc = fWriteEngine.createColumn( txnID, OID_SYSCOLUMN_LISTOBJID, WriteEngine::INT, 4, dbRoot );
+  rc = fWriteEngine.createColumn( txnID, OID_SYSCOLUMN_LISTOBJID, CalpontSystemCatalog::INT, 4, dbRoot );
   if (rc) throw runtime_error(msg.str() + ec.errorString(rc));
   msg.str("");
 
   // TreeOID
   msg << "  Creating TreeOID column OID: "<< OID_SYSCOLUMN_TREEOBJID;
   cout << msg.str() << endl;
-  rc = fWriteEngine.createColumn( txnID, OID_SYSCOLUMN_TREEOBJID, WriteEngine::INT, 4, dbRoot );
+  rc = fWriteEngine.createColumn( txnID, OID_SYSCOLUMN_TREEOBJID, CalpontSystemCatalog::INT, 4, dbRoot );
   if (rc) throw runtime_error(msg.str() + ec.errorString(rc));
   msg.str("");
 
   // DataType
   msg << "  Creating DataType column OID: "<< OID_SYSCOLUMN_DATATYPE;
   cout << msg.str() << endl;
-  rc = fWriteEngine.createColumn( txnID, OID_SYSCOLUMN_DATATYPE, WriteEngine::INT, 4, dbRoot );
+  rc = fWriteEngine.createColumn( txnID, OID_SYSCOLUMN_DATATYPE, CalpontSystemCatalog::INT, 4, dbRoot );
   if (rc) throw runtime_error(msg.str() + ec.errorString(rc));
   msg.str("");
 
   // ColumnLength
   msg << "  Creating ColumnLength column OID: "<< OID_SYSCOLUMN_COLUMNLEN;
   cout << msg.str() << endl;
-  rc = fWriteEngine.createColumn( txnID, OID_SYSCOLUMN_COLUMNLEN, WriteEngine::INT, 4, dbRoot );
+  rc = fWriteEngine.createColumn( txnID, OID_SYSCOLUMN_COLUMNLEN, CalpontSystemCatalog::INT, 4, dbRoot );
   if (rc) throw runtime_error(msg.str() + ec.errorString(rc));
   msg.str("");
 
   // ColumnPos
   msg << "  Creating ColumnPos column OID: "<<OID_SYSCOLUMN_COLUMNPOS;
   cout << msg.str() << endl;
-  rc = fWriteEngine.createColumn( txnID, OID_SYSCOLUMN_COLUMNPOS, WriteEngine::INT, 4, dbRoot );
+  rc = fWriteEngine.createColumn( txnID, OID_SYSCOLUMN_COLUMNPOS, CalpontSystemCatalog::INT, 4, dbRoot );
   if (rc) throw runtime_error(msg.str() + ec.errorString(rc));
   msg.str("");
   
   // LastUpdate
   msg << "  Creating LastUpdate column OID: "<< OID_SYSCOLUMN_LASTUPDATE;
   cout << msg.str() << endl;
-  rc = fWriteEngine.createColumn( txnID, OID_SYSCOLUMN_LASTUPDATE, WriteEngine::DATE, 4, dbRoot );
+  rc = fWriteEngine.createColumn( txnID, OID_SYSCOLUMN_LASTUPDATE, CalpontSystemCatalog::DATE, 4, dbRoot );
   if (rc) throw runtime_error(msg.str() + ec.errorString(rc));
   msg.str("");
 
   // DefaultValue
   msg << "  Creating DefaultValue column OID: "<< OID_SYSCOLUMN_DEFAULTVAL;
   cout << msg.str() << endl;
-  rc = fWriteEngine.createColumn( txnID, OID_SYSCOLUMN_DEFAULTVAL, WriteEngine::VARCHAR, 8, dbRoot );
+  rc = fWriteEngine.createColumn( txnID, OID_SYSCOLUMN_DEFAULTVAL, CalpontSystemCatalog::VARCHAR, 8, dbRoot );
   if (rc) throw runtime_error(msg.str() + ec.errorString(rc));
   msg.str("");
 
@@ -278,49 +278,49 @@ void SystemCatalog::build()
   // Nullable
   msg << "  Creating Nullable column OID: "<<OID_SYSCOLUMN_NULLABLE;
   cout << msg.str() << endl;
-  rc = fWriteEngine.createColumn( txnID, OID_SYSCOLUMN_NULLABLE, WriteEngine::INT, 4, dbRoot );
+  rc = fWriteEngine.createColumn( txnID, OID_SYSCOLUMN_NULLABLE, CalpontSystemCatalog::INT, 4, dbRoot );
   if (rc) throw runtime_error(msg.str() + ec.errorString(rc));
   msg.str("");
 
   // Scale
   msg << "  Creating Scale column OID: "<<OID_SYSCOLUMN_SCALE;
   cout << msg.str() << endl;
-  rc = fWriteEngine.createColumn( txnID, OID_SYSCOLUMN_SCALE, WriteEngine::INT, 4, dbRoot );
+  rc = fWriteEngine.createColumn( txnID, OID_SYSCOLUMN_SCALE, CalpontSystemCatalog::INT, 4, dbRoot );
   if (rc) throw runtime_error(msg.str() + ec.errorString(rc));
   msg.str("");
 
   // Precision
   msg << "  Creating Precision column OID: "<<OID_SYSCOLUMN_PRECISION;
   cout << msg.str() << endl;
-  rc = fWriteEngine.createColumn( txnID, OID_SYSCOLUMN_PRECISION, WriteEngine::INT, 4, dbRoot );
+  rc = fWriteEngine.createColumn( txnID, OID_SYSCOLUMN_PRECISION, CalpontSystemCatalog::INT, 4, dbRoot );
   if (rc) throw runtime_error(msg.str() + ec.errorString(rc));
   msg.str("");
 
   // AutoInc
   msg << "  Creating AutoInc column OID: "<<OID_SYSCOLUMN_AUTOINC;
   cout << msg.str() << endl;
-  rc = fWriteEngine.createColumn( txnID, OID_SYSCOLUMN_AUTOINC, WriteEngine::CHAR, 1, dbRoot );
+  rc = fWriteEngine.createColumn( txnID, OID_SYSCOLUMN_AUTOINC, CalpontSystemCatalog::CHAR, 1, dbRoot );
   if (rc) throw runtime_error(msg.str() + ec.errorString(rc));
   msg.str("");
 
   // DISTCOUNT
   msg << "  Creating DISTCOUNT column OID: "<<OID_SYSCOLUMN_DISTCOUNT;
   cout << msg.str() << endl;
-  rc = fWriteEngine.createColumn( txnID, OID_SYSCOLUMN_DISTCOUNT, WriteEngine::INT, 4, dbRoot );
+  rc = fWriteEngine.createColumn( txnID, OID_SYSCOLUMN_DISTCOUNT, CalpontSystemCatalog::INT, 4, dbRoot );
   if (rc) throw runtime_error(msg.str() + ec.errorString(rc));
   msg.str("");
    
   // NULLCOUNT
   msg << "  Creating NULLCOUNT column OID: "<<OID_SYSCOLUMN_NULLCOUNT;
   cout << msg.str() << endl;
-  rc = fWriteEngine.createColumn( txnID, OID_SYSCOLUMN_NULLCOUNT, WriteEngine::INT, 4, dbRoot );
+  rc = fWriteEngine.createColumn( txnID, OID_SYSCOLUMN_NULLCOUNT, CalpontSystemCatalog::INT, 4, dbRoot );
   if (rc) throw runtime_error(msg.str() + ec.errorString(rc));
   msg.str("");
     
   // MINVALUE
   msg << "  Creating MINVALUE column OID: "<<OID_SYSCOLUMN_MINVALUE;
   cout << msg.str() << endl;
-  rc = fWriteEngine.createColumn( txnID, OID_SYSCOLUMN_MINVALUE, WriteEngine::VARCHAR, 40, dbRoot );
+  rc = fWriteEngine.createColumn( txnID, OID_SYSCOLUMN_MINVALUE, CalpontSystemCatalog::VARCHAR, 40, dbRoot );
   if (rc) throw runtime_error(msg.str() + ec.errorString(rc));
 
   msg.str("  Creating MINVALUE column dictionary...");
@@ -333,7 +333,7 @@ void SystemCatalog::build()
   // MAXVALUE
   msg << "  Creating MAXVALUE column OID: "<<OID_SYSCOLUMN_MAXVALUE;
   cout << msg.str() << endl;
-  rc = fWriteEngine.createColumn( txnID, OID_SYSCOLUMN_MAXVALUE, WriteEngine::VARCHAR, 40, dbRoot );
+  rc = fWriteEngine.createColumn( txnID, OID_SYSCOLUMN_MAXVALUE, CalpontSystemCatalog::VARCHAR, 40, dbRoot );
   if (rc) throw runtime_error(msg.str() + ec.errorString(rc));
 
   msg.str("  Creating MAXVALUE column dictionary...");
@@ -345,14 +345,14 @@ void SystemCatalog::build()
   // CompressionType
   msg << "  Creating CompressionType column OID: "<<OID_SYSCOLUMN_COMPRESSIONTYPE;
   cout << msg.str() << endl;
-  rc = fWriteEngine.createColumn( txnID, OID_SYSCOLUMN_COMPRESSIONTYPE, WriteEngine::INT, 4, dbRoot );
+  rc = fWriteEngine.createColumn( txnID, OID_SYSCOLUMN_COMPRESSIONTYPE, CalpontSystemCatalog::INT, 4, dbRoot );
   if (rc) throw runtime_error(msg.str() + ec.errorString(rc));
   msg.str("");   
   
   // nextvalue
   msg << "  Creating NEXTVALUE column OID: "<<OID_SYSCOLUMN_NEXTVALUE;
   cout << msg.str() << endl;
-  rc = fWriteEngine.createColumn( txnID, OID_SYSCOLUMN_NEXTVALUE, WriteEngine::BIGINT, 8, dbRoot );
+  rc = fWriteEngine.createColumn( txnID, OID_SYSCOLUMN_NEXTVALUE, CalpontSystemCatalog::UBIGINT, 8, dbRoot );
   if (rc) throw runtime_error(msg.str() + ec.errorString(rc));
   msg.str("");   
   

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_extract.cpp 3283 2012-09-13 20:21:54Z zzhu $
+* $Id: func_extract.cpp 3616 2013-03-04 14:56:29Z rdempsey $
 *
 *
 ****************************************************************************/
@@ -33,36 +33,22 @@ using namespace execplan;
 
 #include "dataconvert.h"
 
-namespace funcexp
+namespace
 {
-
-CalpontSystemCatalog::ColType Func_extract::operationType( FunctionParm& fp, CalpontSystemCatalog::ColType& resultType )
-{
-	return resultType;
-}
-/*
-class to_lower
-{
-    public:
-        char operator() (char c) const            // notice the return type
-        {
-            return tolower(c);
-        }
-};
-*/
+using namespace funcexp;
 
 long long dateGet( uint64_t time, string unit, bool dateType )
 {
-	transform (unit.begin(), unit.end(), unit.begin(), to_lower());
+	transform (unit.begin(), unit.end(), unit.begin(), helpers::to_lower());
 
 	uint32_t year = 0, 
-	         month = 0, 
-	         day = 0, 
-	         hour = 0, 
-	         min = 0, 
-	         sec = 0, 
-	         msec = 0,
-		     lyear = 0;
+			 month = 0, 
+			 day = 0, 
+			 hour = 0, 
+			 min = 0, 
+			 sec = 0, 
+			 msec = 0,
+			 lyear = 0;
 
 	if (dateType)
 	{
@@ -108,7 +94,7 @@ long long dateGet( uint64_t time, string unit, bool dateType )
 	if ( unit == "week" ) {
 		char buf[256];
 		char* ptr = buf;
-		sprintf(ptr, "%02d", funcexp::calc_week(year, month, day, week_mode(0), &lyear));
+		sprintf(ptr, "%02d", helpers::calc_week(year, month, day, helpers::week_mode(0), &lyear));
 		return atoi(ptr);
 	}
 
@@ -147,7 +133,15 @@ long long dateGet( uint64_t time, string unit, bool dateType )
 
 	throw runtime_error("unit type is not supported: " + unit);
 }
+}
 
+namespace funcexp
+{
+
+CalpontSystemCatalog::ColType Func_extract::operationType( FunctionParm& fp, CalpontSystemCatalog::ColType& resultType )
+{
+	return resultType;
+}
 
 int64_t Func_extract::getIntVal(rowgroup::Row& row,
 							FunctionParm& parm,

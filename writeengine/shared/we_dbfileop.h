@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: we_dbfileop.h 3720 2012-04-04 18:18:49Z rdempsey $
+//  $Id: we_dbfileop.h 4450 2013-01-21 14:13:24Z rdempsey $
 
 /** @file */
 
@@ -82,19 +82,19 @@ public:
     */
     EXPORT virtual int   readDBFile(       FILE* pFile,
                                            unsigned char* readBuf,
-                                           const i64 lbid,
+                                           const uint64_t lbid,
                                            const bool isFbo = false );
     EXPORT int           readDBFile(       CommBlock& cb,
                                            unsigned char* readBuf,
-                                           const i64 lbid );
+                                           const uint64_t lbid );
 
     EXPORT int           readDBFile(       FILE* pFile,
                                            DataBlock* block,
-                                           const i64 lbid,
+                                           const uint64_t lbid,
                                            const bool isFbo = false );
     int                  readDBFile(       CommBlock& cb,
                                            DataBlock* block,
-                                           const i64 lbid )
+                                           const uint64_t lbid )
     { return readDBFile( cb, block->data, lbid );}
 
    /**
@@ -103,7 +103,7 @@ public:
     */
     EXPORT const int     readSubBlockEntry(FILE* pFile,
                                            DataBlock* block,
-                                           const i64 lbid,
+                                           const uint64_t lbid,
                                            const int sbid,
                                            const int entryNo,
                                            const int width,
@@ -111,7 +111,7 @@ public:
 
     EXPORT const int     readSubBlockEntry(CommBlock& cb,
                                            DataBlock* block,
-                                           const i64 lbid,
+                                           const uint64_t lbid,
                                            const int sbid,
                                            const int entryNo,
                                            const int width,
@@ -142,11 +142,11 @@ public:
     */
     EXPORT virtual int   writeDBFile(      FILE* pFile,
                                            const unsigned char* writeBuf,
-                                           const i64 lbid,
+                                           const uint64_t lbid,
                                            const int numOfBlock = 1 );
     EXPORT int           writeDBFile(      CommBlock& cb,
                                            const unsigned char* writeBuf,
-                                           const i64 lbid,
+                                           const uint64_t lbid,
                                            const int numOfBlock = 1 );
 
    /**
@@ -163,16 +163,16 @@ public:
 
     int                  writeDBFile(      FILE* pFile,
                                            DataBlock* block,
-                                           const i64 lbid )
+                                           const uint64_t lbid )
     { block->dirty=false; return writeDBFile( pFile, block->data, lbid ); }
     int                  writeDBFile(      CommBlock& cb,
                                            DataBlock* block,
-                                           const i64 lbid )
+                                           const uint64_t lbid )
     { return writeDBFile( cb, block->data, lbid ); }
 
     EXPORT virtual int   writeDBFileFbo(   FILE* pFile,
                                            const unsigned char* writeBuf,
-                                           const i64 fbo,
+                                           const uint64_t fbo,
                                            const int numOfBlock  );
 
     int                  writeDBFileNoVBCache(CommBlock & cb,
@@ -185,7 +185,7 @@ public:
     */
     EXPORT const int     writeSubBlockEntry(FILE* pFile,
                                            DataBlock* block,
-                                           const i64 lbid,
+                                           const uint64_t lbid,
                                            const int sbid,
                                            const int entryNo,
                                            const int width,
@@ -193,7 +193,7 @@ public:
 
     EXPORT const int     writeSubBlockEntry(CommBlock& cb,
                                            DataBlock* block,
-                                           const i64 lbid,
+                                           const uint64_t lbid,
                                            const int sbid,
                                            const int entryNo,
                                            const int width,
@@ -204,16 +204,16 @@ public:
     */
     EXPORT const int     writeVB(          FILE* pFile,
                                            const OID oid,
-                                           const i64 lbid );
+                                           const uint64_t lbid );
 
     EXPORT virtual int   readDbBlocks(     FILE* pFile,
                                            unsigned char* readBuf,
-                                           i64 fbo,
+                                           uint64_t fbo,
                                            size_t n);
 
     EXPORT virtual int   restoreBlock(     FILE* pFile,
                                            const unsigned char* writeBuf,
-                                           i64 fbo);
+                                           uint64_t fbo);
 
     EXPORT virtual FILE* getFilePtr(       const Column& column);
 

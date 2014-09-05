@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: groupconcat.cpp 8532 2012-05-21 14:58:07Z xlou $
+//  $Id: groupconcat.cpp 9210 2013-01-21 14:10:42Z rdempsey $
 
 
 #include <iostream>
@@ -405,6 +405,7 @@ void GroupConcator::outputRow(std::ostringstream& oss, const rowgroup::Row& row)
 			case CalpontSystemCatalog::INT:
 			case CalpontSystemCatalog::BIGINT:
 			case CalpontSystemCatalog::DECIMAL:
+            case CalpontSystemCatalog::UDECIMAL:
 			{
 				int64_t intVal = row.getIntField(*i);
 				int scale = (int) row.getScale(*i);
@@ -419,18 +420,39 @@ void GroupConcator::outputRow(std::ostringstream& oss, const rowgroup::Row& row)
 				}
 				break;
 			}
-			case CalpontSystemCatalog::CHAR:
+			case CalpontSystemCatalog::UTINYINT:
+			case CalpontSystemCatalog::USMALLINT:
+			case CalpontSystemCatalog::UMEDINT:
+			case CalpontSystemCatalog::UINT:
+			case CalpontSystemCatalog::UBIGINT:
+			{
+				uint64_t uintVal = row.getUintField(*i);
+				int scale = (int) row.getScale(*i);
+				if (scale == 0)
+				{
+					oss << uintVal;
+				}
+				else
+				{
+					long double dblVal = uintVal / pow(10.0, (double)scale);
+					oss << fixed << setprecision(scale) << dblVal;
+				}
+				break;
+			}
+            case CalpontSystemCatalog::CHAR:
 			case CalpontSystemCatalog::VARCHAR:
 			{
 				oss << row.getStringField(*i).c_str();
 				break;
 			}
 			case CalpontSystemCatalog::DOUBLE:
+            case CalpontSystemCatalog::UDOUBLE:
 			{
 				oss << setprecision(15) << row.getDoubleField(*i);
 				break;
 			}
 			case CalpontSystemCatalog::FLOAT:
+            case CalpontSystemCatalog::UFLOAT:
 			{
 				oss << row.getFloatField(*i);
 				break;
@@ -499,7 +521,19 @@ int64_t GroupConcator::lengthEstimate(const rowgroup::Row& row)
 				fieldLen += 1;
 				break;
 			}
+            case CalpontSystemCatalog::UTINYINT:
+            case CalpontSystemCatalog::USMALLINT:
+            case CalpontSystemCatalog::UMEDINT:
+            case CalpontSystemCatalog::UINT:
+            case CalpontSystemCatalog::UBIGINT:
+            {
+                uint64_t v = row.getUintField(*i);
+                while ((v /=10) != 0) fieldLen++;
+                fieldLen += 1;
+                break;
+            }
 			case CalpontSystemCatalog::DECIMAL:
+            case CalpontSystemCatalog::UDECIMAL:
 			{
 				int64_t v = row.getIntField(*i);
 				double scale = row.getScale(*i);
@@ -527,7 +561,9 @@ int64_t GroupConcator::lengthEstimate(const rowgroup::Row& row)
 				break;
 			}
 			case CalpontSystemCatalog::DOUBLE:
-			case CalpontSystemCatalog::FLOAT:
+            case CalpontSystemCatalog::UDOUBLE:
+            case CalpontSystemCatalog::FLOAT:
+            case CalpontSystemCatalog::UFLOAT:
 			{
 				fieldLen = 1; // minimum length
 				break;

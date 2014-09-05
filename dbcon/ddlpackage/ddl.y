@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-/* $Id: ddl.y 8706 2012-07-13 16:25:50Z rdempsey $ */
+/* $Id: ddl.y 9314 2013-03-19 17:39:25Z dhall $ */
 /* This describes a substantial subset of SQL92 DDL with some
    enhancements from various vendors.  Most of the nomenclature in the
    grammar is drawn from SQL92. 
@@ -113,7 +113,7 @@ DECIMAL DEFAULT DEFERRABLE DEFERRED IDB_DELETE DROP ENGINE
 FOREIGN FULL IMMEDIATE INDEX INITIALLY IDB_INT INTEGER KEY MATCH MAX_ROWS
 MIN_ROWS MODIFY NO NOT NULL_TOK NUMBER NUMERIC ON PARTIAL PRECISION PRIMARY
 REFERENCES RENAME RESTRICT SET SMALLINT TABLE TIME 
-TINYINT TO UNIQUE UPDATE USER SESSION_USER SYSTEM_USER VARCHAR VARBINARY
+TINYINT TO UNIQUE UNSIGNED UPDATE USER SESSION_USER SYSTEM_USER VARCHAR VARBINARY
 VARYING WITH ZONE DOUBLE IDB_FLOAT REAL CHARSET IF EXISTS CHANGE TRUNCATE
 
 %token <str> IDENT FCONST SCONST CP_SEARCH_CONDITION_TEXT ICONST DATE
@@ -865,10 +865,22 @@ exact_numeric_type:
 		$2->fLength = DDLDatatypeLength[DDL_NUMERIC];
 		$$ = $2;
 	}
+	| NUMERIC opt_precision_scale UNSIGNED
+	{
+		$2->fType = DDL_UNSIGNED_NUMERIC;
+		$2->fLength = DDLDatatypeLength[DDL_UNSIGNED_NUMERIC];
+		$$ = $2;
+	}
 	| DECIMAL opt_precision_scale
 	{
 		$2->fType = DDL_DECIMAL;
 /*	   	$2->fLength = DDLDatatypeLength[DDL_DECIMAL]; */
+		$$ = $2;
+	}
+	| DECIMAL opt_precision_scale UNSIGNED
+	{
+		$2->fType = DDL_UNSIGNED_DECIMAL;
+/*	   	$3->fLength = DDLDatatypeLength[DDL_DECIMAL]; */
 		$$ = $2;
 	}
 	| NUMBER opt_precision_scale
@@ -877,14 +889,20 @@ exact_numeric_type:
 		$2->fLength = DDLDatatypeLength[DDL_DECIMAL];
 		$$ = $2;
 	}
+	| NUMBER opt_precision_scale UNSIGNED
+	{
+		$2->fType = DDL_UNSIGNED_DECIMAL;
+		$2->fLength = DDLDatatypeLength[DDL_UNSIGNED_DECIMAL];
+		$$ = $2;
+	}
 	| INTEGER opt_display_width
 	{
-		$$ = new ColumnType(DDL_INTEGER);
+		$$ = new ColumnType(DDL_INT);
 		$$->fLength = DDLDatatypeLength[DDL_INT];
 	}
 	| IDB_INT opt_display_width
 	{
-		$$ = new ColumnType(DDL_INTEGER);
+		$$ = new ColumnType(DDL_INT);
 		$$->fLength = DDLDatatypeLength[DDL_INT];
 	}
 	| SMALLINT opt_display_width
@@ -900,6 +918,31 @@ exact_numeric_type:
 	| BIGINT opt_display_width
 	{
 		$$ = new ColumnType(DDL_BIGINT);
+		$$->fLength = DDLDatatypeLength[DDL_BIGINT];
+	}
+	| INTEGER opt_display_width UNSIGNED
+	{
+		$$ = new ColumnType(DDL_UNSIGNED_INT);
+		$$->fLength = DDLDatatypeLength[DDL_INT];
+	}
+	| IDB_INT opt_display_width UNSIGNED
+	{
+		$$ = new ColumnType(DDL_UNSIGNED_INT);
+		$$->fLength = DDLDatatypeLength[DDL_INT];
+	}
+	| SMALLINT opt_display_width UNSIGNED
+	{
+		$$ = new ColumnType(DDL_UNSIGNED_SMALLINT);
+		$$->fLength = DDLDatatypeLength[DDL_SMALLINT];
+	}
+	| TINYINT opt_display_width UNSIGNED
+	{
+		$$ = new ColumnType(DDL_UNSIGNED_TINYINT);
+		$$->fLength = DDLDatatypeLength[DDL_TINYINT];
+	}
+	| BIGINT opt_display_width UNSIGNED
+	{
+		$$ = new ColumnType(DDL_UNSIGNED_BIGINT);
 		$$->fLength = DDLDatatypeLength[DDL_BIGINT];
 	}
 	;
@@ -921,14 +964,29 @@ approximate_numeric_type:
 		$$ = new ColumnType(DDL_DOUBLE);
 		$$->fLength = DDLDatatypeLength[DDL_DOUBLE];
 	}
+	| DOUBLE opt_display_precision_scale_null UNSIGNED
+	{
+		$$ = new ColumnType(DDL_UNSIGNED_DOUBLE);
+		$$->fLength = DDLDatatypeLength[DDL_DOUBLE];
+	}
 	| REAL opt_display_precision_scale_null
 	{
 		$$ = new ColumnType(DDL_DOUBLE);
 		$$->fLength = DDLDatatypeLength[DDL_DOUBLE];
 	}
+	| REAL opt_display_precision_scale_null UNSIGNED
+	{
+		$$ = new ColumnType(DDL_UNSIGNED_DOUBLE);
+		$$->fLength = DDLDatatypeLength[DDL_DOUBLE];
+	}
 	| IDB_FLOAT opt_display_precision_scale_null
 	{
 		$$ = new ColumnType(DDL_FLOAT);
+		$$->fLength = DDLDatatypeLength[DDL_FLOAT];
+	}
+	| IDB_FLOAT opt_display_precision_scale_null UNSIGNED
+	{
+		$$ = new ColumnType(DDL_UNSIGNED_FLOAT);
 		$$->fLength = DDLDatatypeLength[DDL_FLOAT];
 	}
 	;

@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: rowaggregation.cpp 3956 2013-07-08 19:17:26Z bpaul $
+//  $Id: rowaggregation.cpp 3957 2013-07-08 21:20:36Z bpaul $
 
 
 /** @file rowaggregation.cpp
@@ -46,6 +46,7 @@
 #include "rowgroup.h"
 #include "funcexp.h"
 #include "rowaggregation.h"
+#include "calpontsystemcatalog.h"
 #include "utils_utf8.h"
 
 //..comment out NDEBUG to enable assertions, uncomment NDEBUG to disable
@@ -115,14 +116,50 @@ inline uint64_t getUintNullValue(int colType, int colWidth = 0)
 		{
 			return joblist::DATETIMENULL;
 		}
-		case execplan::CalpontSystemCatalog::DECIMAL:
-			if (colWidth == 1) return joblist::TINYINTNULL;
-			else if (colWidth == 2) return joblist::SMALLINTNULL;
-			else if (colWidth == 4) return joblist::INTNULL;
-			else  return joblist::BIGINTNULL;
-			break;
+        case execplan::CalpontSystemCatalog::DECIMAL:
+        case execplan::CalpontSystemCatalog::UDECIMAL:
+        {
+            switch (colWidth)
+            {
+                case 1:
+                {
+                    return joblist::TINYINTNULL;
+                }
+                case 2:
+                {
+                    return joblist::SMALLINTNULL;
+                }
+                case 4:
+                {
+                    return joblist::INTNULL;
+                }
+                default:
+                {
+                    return joblist::BIGINTNULL;
+                }
+            }
+        }
+        case execplan::CalpontSystemCatalog::UTINYINT:
+        {
+            return joblist::UTINYINTNULL;
+        }
+        case execplan::CalpontSystemCatalog::USMALLINT:
+        {
+            return joblist::USMALLINTNULL;
+        }
+        case execplan::CalpontSystemCatalog::UMEDINT:
+        case execplan::CalpontSystemCatalog::UINT:
+        {
+            return joblist::UINTNULL;
+        }
+        case execplan::CalpontSystemCatalog::UBIGINT:
+        {
+            return joblist::UBIGINTNULL;
+        }
 		default:
+        {
 			break;
+        }
 	}
 
 	return joblist::CHAR8NULL;
@@ -244,7 +281,8 @@ inline void RowAggregation::updateIntSum(int64_t val1, int64_t val2, int64_t col
 			((val2 <  0) && ((numeric_limits<int64_t>::min() - val2) <= val1)))
 			fRow.setIntField(val1 + val2, col);
 #else /* PROMOTE_AGGR_OVRFLW_TO_DBL */
-		if (fRow.getColTypes()[col] != execplan::CalpontSystemCatalog::DOUBLE)
+		if (fRow.getColTypes()[col] != execplan::CalpontSystemCatalog::DOUBLE &&
+            fRow.getColTypes()[col] != execplan::CalpontSystemCatalog::UDOUBLE)
 		{
 			if (((val2 >= 0) && ((numeric_limits<int64_t>::max() - val2) >= val1)) ||
 				((val2 <  0) && ((numeric_limits<int64_t>::min() - val2) <= val1)))
@@ -261,9 +299,53 @@ inline void RowAggregation::updateIntSum(int64_t val1, int64_t val2, int64_t col
 		}
 #endif /* PROMOTE_AGGR_OVRFLW_TO_DBL */
 		else
+        {
 #ifndef PROMOTE_AGGR_OVRFLW_TO_DBL
-			throw logging::QueryDataExcept(overflowMsg, logging::aggregateDataErr);
+            ostringstream oss;
+            oss << overflowMsg << ": " << val2 << "+" << val1 << " > " << numeric_limits<uint64_t>::max();
+            throw logging::QueryDataExcept(oss.str(), logging::aggregateDataErr);
 #else /* PROMOTE_AGGR_OVRFLW_TO_DBL */
+            double* dp2 = (double*)&val2;
+            updateDoubleSum((double)val1, *dp2, col);
+#endif /* PROMOTE_AGGR_OVRFLW_TO_DBL */
+        }
+	}
+}
+
+inline void RowAggregation::updateUintSum(uint64_t val1, uint64_t val2, int64_t col)
+{
+	if (isNull(fRowGroupOut, fRow, col))
+	{
+		fRow.setUintField(val1, col);
+	}
+	else
+	{
+#ifndef PROMOTE_AGGR_OVRFLW_TO_DBL
+		if ((numeric_limits<uint64_t>::max() - val2) >= val1) 
+			fRow.setUintField(val1 + val2, col);
+        else
+        {
+            ostringstream oss;
+            oss << overflowMsg << ": " << val2 << "+" << val1 << " > " << numeric_limits<uint64_t>::max();
+            throw logging::QueryDataExcept(oss.str(), logging::aggregateDataErr);
+        }
+#else /* PROMOTE_AGGR_OVRFLW_TO_DBL */
+		if (fRow.getColTypes()[col] != execplan::CalpontSystemCatalog::DOUBLE &&
+            fRow.getColTypes()[col] != execplan::CalpontSystemCatalog::UDOUBLE)
+		{
+			if ((numeric_limits<uint64_t>::max() - val2) >= val1)
+			{
+				fRow.setUintField(val1 + val2, col);
+			}
+			else
+			{
+				execplan::CalpontSystemCatalog::ColDataType* cdtp = fRow.getColTypes();
+				cdtp += col;
+				*cdtp = execplan::CalpontSystemCatalog::DOUBLE;
+				updateDoubleSum((double)val1, (double)val2, col);
+			}
+		}
+		else
 		{
 			double* dp2 = (double*)&val2;
 			updateDoubleSum((double)val1, *dp2, col);
@@ -271,7 +353,6 @@ inline void RowAggregation::updateIntSum(int64_t val1, int64_t val2, int64_t col
 #endif /* PROMOTE_AGGR_OVRFLW_TO_DBL */
 	}
 }
-
 
 inline void RowAggregation::updateDoubleSum(double val1, double val2, int64_t col)
 {
@@ -307,6 +388,11 @@ inline bool RowAggregation::isNull(const RowGroup* pRowGroup, const Row& row, in
 		case execplan::CalpontSystemCatalog::TINYINT:
 		{
 			ret = ((uint8_t)row.getIntField(col) == joblist::TINYINTNULL);
+			break;
+		}
+		case execplan::CalpontSystemCatalog::UTINYINT:
+		{
+			ret = ((uint8_t)row.getIntField(col) == joblist::UTINYINTNULL);
 			break;
 		}
 		case execplan::CalpontSystemCatalog::CHAR:
@@ -348,7 +434,13 @@ inline bool RowAggregation::isNull(const RowGroup* pRowGroup, const Row& row, in
 			ret = ((uint16_t)row.getIntField(col) == joblist::SMALLINTNULL);
 			break;
 		}
+        case execplan::CalpontSystemCatalog::USMALLINT:
+        {
+            ret = ((uint16_t)row.getIntField(col) == joblist::USMALLINTNULL);
+            break;
+        }
 		case execplan::CalpontSystemCatalog::DOUBLE:
+        case execplan::CalpontSystemCatalog::UDOUBLE:
 		{
 			ret = ((uint64_t)row.getUintField(col) == joblist::DOUBLENULL);
 			break;
@@ -359,7 +451,14 @@ inline bool RowAggregation::isNull(const RowGroup* pRowGroup, const Row& row, in
 			ret = ((uint32_t)row.getIntField(col) == joblist::INTNULL);
 			break;
 		}
+        case execplan::CalpontSystemCatalog::UMEDINT:
+        case execplan::CalpontSystemCatalog::UINT:
+        {
+            ret = ((uint32_t)row.getIntField(col) == joblist::UINTNULL);
+            break;
+        }
 		case execplan::CalpontSystemCatalog::FLOAT:
+        case execplan::CalpontSystemCatalog::UFLOAT:
 		{
 			ret = ((uint32_t)row.getUintField(col) == joblist::FLOATNULL);
 			break;
@@ -374,7 +473,13 @@ inline bool RowAggregation::isNull(const RowGroup* pRowGroup, const Row& row, in
 			ret = ((uint64_t)row.getIntField(col) == joblist::BIGINTNULL);
 			break;
 		}
+        case execplan::CalpontSystemCatalog::UBIGINT:
+        {
+            ret = ((uint64_t)row.getIntField(col) == joblist::UBIGINTNULL);
+            break;
+        }
 		case execplan::CalpontSystemCatalog::DECIMAL:
+        case execplan::CalpontSystemCatalog::UDECIMAL:
 		{
 			int colWidth = pRowGroup->getColumnWidth(col);
 			int64_t val = row.getIntField(col);
@@ -794,8 +899,18 @@ void RowAggregation::initMapData(const Row& rowIn)
 			case execplan::CalpontSystemCatalog::INT:
 			case execplan::CalpontSystemCatalog::BIGINT:
 			case execplan::CalpontSystemCatalog::DECIMAL:
+            case execplan::CalpontSystemCatalog::UDECIMAL:
 			{
 				fRow.setIntField(rowIn.getIntField(colIn), colOut);
+				break;
+			}
+			case execplan::CalpontSystemCatalog::UTINYINT:
+			case execplan::CalpontSystemCatalog::USMALLINT:
+			case execplan::CalpontSystemCatalog::UMEDINT:
+			case execplan::CalpontSystemCatalog::UINT:
+			case execplan::CalpontSystemCatalog::UBIGINT:
+			{
+				fRow.setUintField(rowIn.getUintField(colIn), colOut);
 				break;
 			}
 			case execplan::CalpontSystemCatalog::CHAR:
@@ -813,11 +928,13 @@ void RowAggregation::initMapData(const Row& rowIn)
 				break;
 			}
 			case execplan::CalpontSystemCatalog::DOUBLE:
+			case execplan::CalpontSystemCatalog::UDOUBLE:
 			{
 				fRow.setDoubleField(rowIn.getDoubleField(colIn), colOut);
 				break;
 			}
 			case execplan::CalpontSystemCatalog::FLOAT:
+            case execplan::CalpontSystemCatalog::UFLOAT:
 			{
 				fRow.setFloatField(rowIn.getFloatField(colIn), colOut);
 				break;
@@ -895,7 +1012,17 @@ void RowAggregation::makeAggFieldsNull(Row& row)
 				row.setIntField(getIntNullValue(colDataType), colOut);
 				break;
 			}
+            case execplan::CalpontSystemCatalog::UTINYINT:
+            case execplan::CalpontSystemCatalog::USMALLINT:
+            case execplan::CalpontSystemCatalog::UMEDINT:
+            case execplan::CalpontSystemCatalog::UINT:
+            case execplan::CalpontSystemCatalog::UBIGINT:
+            {
+                row.setUintField(getUintNullValue(colDataType), colOut);
+                break;
+            }
 			case execplan::CalpontSystemCatalog::DECIMAL:
+            case execplan::CalpontSystemCatalog::UDECIMAL:
 			{
 				int colWidth = fRowGroupOut->getColumnWidth(colOut);
 				row.setIntField(getUintNullValue(colDataType, colWidth), colOut);
@@ -916,11 +1043,13 @@ void RowAggregation::makeAggFieldsNull(Row& row)
 				break;
 			}
 			case execplan::CalpontSystemCatalog::DOUBLE:
+            case execplan::CalpontSystemCatalog::UDOUBLE:
 			{
 				row.setDoubleField(getDoubleNullValue(), colOut);
 				break;
 			}
 			case execplan::CalpontSystemCatalog::FLOAT:
+            case execplan::CalpontSystemCatalog::UFLOAT:
 			{
 				row.setFloatField(getFloatNullValue(), colOut);
 				break;
@@ -964,6 +1093,7 @@ void RowAggregation::doMinMaxSum(const Row& rowIn, int64_t colIn, int64_t colOut
 		case execplan::CalpontSystemCatalog::INT:
 		case execplan::CalpontSystemCatalog::BIGINT:
 		case execplan::CalpontSystemCatalog::DECIMAL:
+        case execplan::CalpontSystemCatalog::UDECIMAL:
 		{
 			int64_t valIn = rowIn.getIntField(colIn);
 			int64_t valOut = fRow.getIntField(colOut);
@@ -971,6 +1101,20 @@ void RowAggregation::doMinMaxSum(const Row& rowIn, int64_t colIn, int64_t colOut
 				updateIntSum(valIn, valOut, colOut);
 			else
 				updateIntMinMax(valIn, valOut, colOut, funcType);
+			break;
+		}
+		case execplan::CalpontSystemCatalog::UTINYINT:
+		case execplan::CalpontSystemCatalog::USMALLINT:
+		case execplan::CalpontSystemCatalog::UMEDINT:
+		case execplan::CalpontSystemCatalog::UINT:
+		case execplan::CalpontSystemCatalog::UBIGINT:
+		{
+			uint64_t valIn = rowIn.getUintField(colIn);
+			uint64_t valOut = fRow.getUintField(colOut);
+			if (funcType == ROWAGG_SUM || funcType == ROWAGG_DISTINCT_SUM)
+				updateUintSum(valIn, valOut, colOut);
+			else
+				updateUintMinMax(valIn, valOut, colOut, funcType);
 			break;
 		}
 		case execplan::CalpontSystemCatalog::CHAR:
@@ -1000,6 +1144,7 @@ void RowAggregation::doMinMaxSum(const Row& rowIn, int64_t colIn, int64_t colOut
 			break;
 		}
 		case execplan::CalpontSystemCatalog::DOUBLE:
+        case execplan::CalpontSystemCatalog::UDOUBLE:
 		{
 			double valIn = rowIn.getDoubleField(colIn);
 			double valOut = fRow.getDoubleField(colOut);
@@ -1010,6 +1155,7 @@ void RowAggregation::doMinMaxSum(const Row& rowIn, int64_t colIn, int64_t colOut
 			break;
 		}
 		case execplan::CalpontSystemCatalog::FLOAT:
+        case execplan::CalpontSystemCatalog::UFLOAT:
 		{
 			float valIn = rowIn.getFloatField(colIn);
 			float valOut = fRow.getFloatField(colOut);
@@ -1060,6 +1206,7 @@ void RowAggregation::doBitOp(const Row& rowIn, int64_t colIn, int64_t colOut, in
 		return;
 
 	int64_t valIn = 0;
+    uint64_t uvalIn = 0;
 	switch (colDataType)
 	{
 		case execplan::CalpontSystemCatalog::TINYINT:
@@ -1068,6 +1215,7 @@ void RowAggregation::doBitOp(const Row& rowIn, int64_t colIn, int64_t colOut, in
 		case execplan::CalpontSystemCatalog::INT:
 		case execplan::CalpontSystemCatalog::BIGINT:
 		case execplan::CalpontSystemCatalog::DECIMAL:
+        case execplan::CalpontSystemCatalog::UDECIMAL:
 		{
 			valIn = rowIn.getIntField(colIn);
 			if ((fRowGroupIn.getScale())[colIn] != 0)
@@ -1083,7 +1231,25 @@ void RowAggregation::doBitOp(const Row& rowIn, int64_t colIn, int64_t colOut, in
 			break;
 		}
 
-		case execplan::CalpontSystemCatalog::CHAR:
+        case execplan::CalpontSystemCatalog::UTINYINT:
+        case execplan::CalpontSystemCatalog::USMALLINT:
+        case execplan::CalpontSystemCatalog::UMEDINT:
+        case execplan::CalpontSystemCatalog::UINT:
+        case execplan::CalpontSystemCatalog::UBIGINT:
+        {
+            uvalIn = rowIn.getUintField(colIn);
+            uint64_t uvalOut = fRow.getUintField(colOut);
+            if (funcType == ROWAGG_BIT_AND)
+                fRow.setUintField(uvalIn & uvalOut, colOut);
+            else if (funcType == ROWAGG_BIT_OR)
+                fRow.setUintField(uvalIn | uvalOut, colOut);
+            else
+                fRow.setUintField(uvalIn ^ uvalOut, colOut);
+            return;
+            break;
+        }
+
+        case execplan::CalpontSystemCatalog::CHAR:
 		case execplan::CalpontSystemCatalog::VARCHAR:
 		{
 			string str = rowIn.getStringField(colIn);
@@ -1093,9 +1259,12 @@ void RowAggregation::doBitOp(const Row& rowIn, int64_t colIn, int64_t colOut, in
 
 		case execplan::CalpontSystemCatalog::DOUBLE:
 		case execplan::CalpontSystemCatalog::FLOAT:
+        case execplan::CalpontSystemCatalog::UDOUBLE:
+        case execplan::CalpontSystemCatalog::UFLOAT:
 		{
 			double dbl = 0.0;
-			if (colDataType == execplan::CalpontSystemCatalog::DOUBLE)
+			if (colDataType == execplan::CalpontSystemCatalog::DOUBLE || 
+                colDataType == execplan::CalpontSystemCatalog::UDOUBLE)
 				dbl = rowIn.getDoubleField(colIn);
 			else
 				dbl = rowIn.getFloatField(colIn);
@@ -1143,13 +1312,13 @@ void RowAggregation::doBitOp(const Row& rowIn, int64_t colIn, int64_t colOut, in
 		}
 	}
 
-	int64_t valOut = fRow.getIntField(colOut);
-	if (funcType == ROWAGG_BIT_AND)
-		fRow.setIntField(valIn & valOut, colOut);
-	else if (funcType == ROWAGG_BIT_OR)
-		fRow.setIntField(valIn | valOut, colOut);
-	else
-		fRow.setIntField(valIn ^ valOut, colOut);
+    int64_t valOut = fRow.getIntField(colOut);
+    if (funcType == ROWAGG_BIT_AND)
+        fRow.setIntField(valIn & valOut, colOut);
+    else if (funcType == ROWAGG_BIT_OR)
+        fRow.setIntField(valIn | valOut, colOut);
+    else
+        fRow.setIntField(valIn ^ valOut, colOut);
 }
 
 
@@ -1308,6 +1477,7 @@ void RowAggregation::doAvg(const Row& rowIn, int64_t colIn, int64_t colOut, int6
 		case execplan::CalpontSystemCatalog::INT:
 		case execplan::CalpontSystemCatalog::BIGINT:
 		case execplan::CalpontSystemCatalog::DECIMAL:
+        case execplan::CalpontSystemCatalog::UDECIMAL:
 		{
 			int64_t valIn = rowIn.getIntField(colIn);
 			if (fRow.getIntField(colAux) == 0)
@@ -1343,7 +1513,11 @@ void RowAggregation::doAvg(const Row& rowIn, int64_t colIn, int64_t colOut, int6
 #endif /* PROMOTE_AGGR_OVRFLW_TO_DBL */
 				else
 #ifndef PROMOTE_AGGR_OVRFLW_TO_DBL
-					throw logging::QueryDataExcept(overflowMsg, logging::aggregateDataErr);
+                {
+                    ostringstream oss;
+                    oss << overflowMsg << ": " << valOut << "+" << valIn << " > " << numeric_limits<uint64_t>::max();
+                    throw logging::QueryDataExcept(oss.str(), logging::aggregateDataErr);
+                }
 
 				fRow.setIntField(fRow.getIntField(colAux) + 1, colAux);
 #else /* PROMOTE_AGGR_OVRFLW_TO_DBL */
@@ -1356,7 +1530,62 @@ void RowAggregation::doAvg(const Row& rowIn, int64_t colIn, int64_t colOut, int6
 			}
 			break;
 		}
+        case execplan::CalpontSystemCatalog::UTINYINT:
+        case execplan::CalpontSystemCatalog::USMALLINT:
+        case execplan::CalpontSystemCatalog::UMEDINT:
+        case execplan::CalpontSystemCatalog::UINT:
+        case execplan::CalpontSystemCatalog::UBIGINT:
+        {
+            uint64_t valIn = rowIn.getUintField(colIn);
+            if (fRow.getUintField(colAux) == 0)
+            {
+                fRow.setUintField(valIn, colOut);
+                fRow.setUintField(1, colAux);
+            }
+            else
+            {
+                uint64_t valOut = fRow.getUintField(colOut);
+#ifndef PROMOTE_AGGR_OVRFLW_TO_DBL
+                if ((numeric_limits<uint64_t>::max() - valOut) >= valIn)
+                {
+                    fRow.setUintField(valIn + valOut, colOut);
+                    fRow.setUintField(fRow.getUintField(colAux) + 1, colAux);
+                }
+                else
+                {
+                    ostringstream oss;
+                    oss << overflowMsg << ": " << valOut << "+" << valIn << " > " << numeric_limits<uint64_t>::max();
+                    throw logging::QueryDataExcept(oss.str(), logging::aggregateDataErr);
+                }
+#else /* PROMOTE_AGGR_OVRFLW_TO_DBL */
+                if (fRow.getColTypes()[colOut] != execplan::CalpontSystemCatalog::DOUBLE)
+                {
+                    if ((numeric_limits<uint64_t>::max() - valOut) >= valIn)
+                    {
+                        fRow.setUintField(valIn + valOut, colOut);
+                        fRow.setUintField(fRow.getUintField(colAux) + 1, colAux);
+                    }
+                    else
+                    {
+                        execplan::CalpontSystemCatalog::ColDataType* cdtp = fRow.getColTypes();
+                        cdtp += colOut;
+                        *cdtp = execplan::CalpontSystemCatalog::DOUBLE;
+                        fRow.setDoubleField((double)valIn + (double)valOut, colOut);
+                        fRow.setUintField(fRow.getUintField(colAux) + 1, colAux);
+                    }
+                }
+                else
+                {
+                    double* dp = (double*)&valOut;
+                    fRow.setDoubleField((double)valIn + *dp, colOut);
+                    fRow.setUintField(fRow.getUintField(colAux) + 1, colAux);
+                }
+#endif /* PROMOTE_AGGR_OVRFLW_TO_DBL */
+            }
+            break;
+        }
 		case execplan::CalpontSystemCatalog::DOUBLE:
+        case execplan::CalpontSystemCatalog::UDOUBLE:
 		{
 			double valIn = rowIn.getDoubleField(colIn);
 			if (fRow.getIntField(colAux) == 0)
@@ -1373,6 +1602,7 @@ void RowAggregation::doAvg(const Row& rowIn, int64_t colIn, int64_t colOut, int6
 			break;
 		}
 		case execplan::CalpontSystemCatalog::FLOAT:
+        case execplan::CalpontSystemCatalog::UFLOAT:
 		{
 			float valIn = rowIn.getFloatField(colIn);
 			if (fRow.getIntField(colAux) == 0)
@@ -1424,14 +1654,25 @@ void RowAggregation::doStatistics(const Row& rowIn, int64_t colIn, int64_t colOu
 		case execplan::CalpontSystemCatalog::INT:
 		case execplan::CalpontSystemCatalog::BIGINT:
 		case execplan::CalpontSystemCatalog::DECIMAL:  // handle scale later
+        case execplan::CalpontSystemCatalog::UDECIMAL:  // handle scale later
 			valIn = (long double) rowIn.getIntField(colIn);
 			break;
 
+        case execplan::CalpontSystemCatalog::UTINYINT:
+        case execplan::CalpontSystemCatalog::USMALLINT:
+        case execplan::CalpontSystemCatalog::UMEDINT:
+        case execplan::CalpontSystemCatalog::UINT:
+        case execplan::CalpontSystemCatalog::UBIGINT:
+            valIn = (long double) rowIn.getUintField(colIn);
+            break;
+
 		case execplan::CalpontSystemCatalog::DOUBLE:
+        case execplan::CalpontSystemCatalog::UDOUBLE:
 			valIn = (long double) rowIn.getDoubleField(colIn);
 			break;
 
-		case execplan::CalpontSystemCatalog::FLOAT:
+        case execplan::CalpontSystemCatalog::FLOAT:
+		case execplan::CalpontSystemCatalog::UFLOAT:
 			valIn = (long double) rowIn.getFloatField(colIn);
 			break;
 
@@ -1488,7 +1729,7 @@ void RowAggregation::loadResult(messageqcpp::ByteStream& bs)
 
 	// add the header
 	uint64_t headerSize = fRowGroupOut->getEmptySize();
-	bs << (messageqcpp::ByteStream::quadbyte)(headerSize + rowCount * fRow.getSize());
+	bs << (uint32_t)(headerSize + rowCount * fRow.getSize());
 	// temporary change the row count to cover all rowgroups.
 	uint64_t origRowCount = fRowGroupOut->getRowCount();
 	fRowGroupOut->setRowCount(rowCount);
@@ -1800,42 +2041,83 @@ void RowAggregationUM::calculateAvgColumns()
 					continue;
 
 				long double sum = 0.0;
-				if (colDataType == execplan::CalpontSystemCatalog::DOUBLE)
-					sum = fRow.getDoubleField(colOut);
-				else if (colDataType == execplan::CalpontSystemCatalog::FLOAT)
-					sum = fRow.getFloatField(colOut);
-				else
-					sum = static_cast<long double>(fRow.getIntField(colOut));
-				long double avg = sum / cnt;
-				if (colDataType == execplan::CalpontSystemCatalog::DOUBLE)
-				{
-					fRow.setDoubleField(avg, colOut);
-				}
-				else if (colDataType == execplan::CalpontSystemCatalog::FLOAT)
-				{
-					fRow.setFloatField(avg, colOut);
-				}
-				else
-				{
-					avg *= factor;
-					avg += (avg < 0) ? (-0.5) : (0.5);
-					if (avg > (long double) numeric_limits<int64_t>::max() ||
-						avg < (long double) numeric_limits<int64_t>::min())
-#ifndef PROMOTE_AGGR_OVRFLW_TO_DBL
-						throw logging::QueryDataExcept(overflowMsg, logging::aggregateDataErr);
-					fRow.setIntField((int64_t) avg, colOut);
-#else /* PROMOTE_AGGR_OVRFLW_TO_DBL */
-					{
-						sum = fRow.getDoubleField(colOut);
-						avg = sum / cnt;
-						avg += (avg < 0) ? (-0.5) : (0.5);
-						fRow.getColTypes()[colOut] = execplan::CalpontSystemCatalog::DOUBLE;
-						fRow.setDoubleField(avg, colOut);
-					}
-					else
-						fRow.setIntField((int64_t)avg, colOut);
-#endif /* PROMOTE_AGGR_OVRFLW_TO_DBL */
-				}
+                long double avg = 0.0;
+                switch (colDataType)
+                {
+                    case execplan::CalpontSystemCatalog::DOUBLE:
+                    case execplan::CalpontSystemCatalog::UDOUBLE:
+                        sum = fRow.getDoubleField(colOut);
+                        avg = sum / cnt;
+                        fRow.setDoubleField(avg, colOut);
+                        break;
+                    case execplan::CalpontSystemCatalog::FLOAT:
+                    case execplan::CalpontSystemCatalog::UFLOAT:
+                        sum = fRow.getFloatField(colOut);
+                        avg = sum / cnt;
+                        fRow.setFloatField(avg, colOut);
+                        break;
+                    case execplan::CalpontSystemCatalog::TINYINT:
+                    case execplan::CalpontSystemCatalog::SMALLINT:
+                    case execplan::CalpontSystemCatalog::MEDINT:
+                    case execplan::CalpontSystemCatalog::INT:
+                    case execplan::CalpontSystemCatalog::BIGINT:
+                    case execplan::CalpontSystemCatalog::DECIMAL:
+                    case execplan::CalpontSystemCatalog::UDECIMAL:
+                        sum = static_cast<long double>(fRow.getIntField(colOut));
+                        avg = sum / cnt;
+                        avg *= factor;
+                        avg += (avg < 0) ? (-0.5) : (0.5);
+                        if (avg > (long double) numeric_limits<int64_t>::max() ||
+                            avg < (long double) numeric_limits<int64_t>::min())
+    #ifndef PROMOTE_AGGR_OVRFLW_TO_DBL
+                        {
+                            ostringstream oss;
+                            oss << overflowMsg << ": " << avg << "(incl factor " << factor << ") > " << numeric_limits<uint64_t>::max();
+                            throw logging::QueryDataExcept(oss.str(), logging::aggregateDataErr);
+                        }
+                        fRow.setIntField((int64_t) avg, colOut);
+    #else /* PROMOTE_AGGR_OVRFLW_TO_DBL */
+                        {
+                            sum = fRow.getDoubleField(colOut);
+                            avg = sum / cnt;
+                            avg += (avg < 0) ? (-0.5) : (0.5);
+                            fRow.getColTypes()[colOut] = execplan::CalpontSystemCatalog::DOUBLE;
+                            fRow.setDoubleField(avg, colOut);
+                        }
+                        else
+                            fRow.setIntField((int64_t)avg, colOut);
+    #endif /* PROMOTE_AGGR_OVRFLW_TO_DBL */
+                        break;
+                    case execplan::CalpontSystemCatalog::UTINYINT:
+                    case execplan::CalpontSystemCatalog::USMALLINT:
+                    case execplan::CalpontSystemCatalog::UMEDINT:
+                    case execplan::CalpontSystemCatalog::UINT:
+                    case execplan::CalpontSystemCatalog::UBIGINT:
+                        sum = static_cast<long double>(fRow.getUintField(colOut));
+                        avg = sum / cnt;
+                        avg *= factor;
+                        avg += (avg < 0) ? (-0.5) : (0.5);
+                        if (avg > (long double) numeric_limits<uint64_t>::max())
+    #ifndef PROMOTE_AGGR_OVRFLW_TO_DBL
+                        {
+                            ostringstream oss;
+                            oss << overflowMsg << ": " << avg << "(incl factor " << factor << ") > " << numeric_limits<uint64_t>::max();
+                            throw logging::QueryDataExcept(oss.str(), logging::aggregateDataErr);
+                        }
+                        fRow.setUintField((uint64_t) avg, colOut);
+    #else /* PROMOTE_AGGR_OVRFLW_TO_DBL */
+                        {
+                            sum = fRow.getDoubleField(colOut);
+                            avg = sum / cnt;
+                            avg += (avg < 0) ? (-0.5) : (0.5);
+                            fRow.getColTypes()[colOut] = execplan::CalpontSystemCatalog::DOUBLE;
+                            fRow.setDoubleField(avg, colOut);
+                        }
+                        else
+                            fRow.setUintField((uint64_t)avg, colOut);
+    #endif /* PROMOTE_AGGR_OVRFLW_TO_DBL */
+                        break;
+                }
 			}
 		}
 	}
@@ -2026,18 +2308,31 @@ void RowAggregationUM::doNullConstantAggregate(const ConstantAggData& aggData, u
 				case execplan::CalpontSystemCatalog::INT:
 				case execplan::CalpontSystemCatalog::BIGINT:
 				case execplan::CalpontSystemCatalog::DECIMAL:
+                case execplan::CalpontSystemCatalog::UDECIMAL:
 				{
 					fRow.setIntField(getIntNullValue(colDataType), colOut);
 				}
 				break;
 
-				case execplan::CalpontSystemCatalog::DOUBLE:
+                case execplan::CalpontSystemCatalog::UTINYINT:
+                case execplan::CalpontSystemCatalog::USMALLINT:
+                case execplan::CalpontSystemCatalog::UMEDINT:
+                case execplan::CalpontSystemCatalog::UINT:
+                case execplan::CalpontSystemCatalog::UBIGINT:
+                {
+                    fRow.setUintField(getUintNullValue(colDataType), colOut);
+                }
+                break;
+
+                case execplan::CalpontSystemCatalog::DOUBLE:
+                case execplan::CalpontSystemCatalog::UDOUBLE:
 				{
 					fRow.setDoubleField(getDoubleNullValue(), colOut);
 				}
 				break;
 
-				case execplan::CalpontSystemCatalog::FLOAT:
+                case execplan::CalpontSystemCatalog::FLOAT:
+				case execplan::CalpontSystemCatalog::UFLOAT:
 				{
 					fRow.setFloatField(getFloatNullValue(), colOut);
 				}
@@ -2057,6 +2352,7 @@ void RowAggregationUM::doNullConstantAggregate(const ConstantAggData& aggData, u
 					fRow.setStringField("", colOut);
 				}
 				break;
+
 			}
 		}
 		break;
@@ -2120,7 +2416,19 @@ void RowAggregationUM::doNotNullConstantAggregate(const ConstantAggData& aggData
 				}
 				break;
 
+                // AVG should not be uint result type.
+                case execplan::CalpontSystemCatalog::UTINYINT:
+                case execplan::CalpontSystemCatalog::USMALLINT:
+                case execplan::CalpontSystemCatalog::UMEDINT:
+                case execplan::CalpontSystemCatalog::UINT:
+                case execplan::CalpontSystemCatalog::UBIGINT:
+                {
+                    fRow.setUintField(strtoul(aggData.fConstValue.c_str(), 0, 10), colOut);
+                }
+                break;
+
 				case execplan::CalpontSystemCatalog::DECIMAL:
+                case execplan::CalpontSystemCatalog::UDECIMAL:
 				{
 					double dbl = strtod(aggData.fConstValue.c_str(), 0);
 					double scale = pow(10.0, (double) fRowGroupOut->getScale()[i]);
@@ -2129,12 +2437,14 @@ void RowAggregationUM::doNotNullConstantAggregate(const ConstantAggData& aggData
 				break;
 
 				case execplan::CalpontSystemCatalog::DOUBLE:
+                case execplan::CalpontSystemCatalog::UDOUBLE:
 				{
 					fRow.setDoubleField(strtod(aggData.fConstValue.c_str(), 0), colOut);
 				}
 				break;
 
 				case execplan::CalpontSystemCatalog::FLOAT:
+                case execplan::CalpontSystemCatalog::UFLOAT:
 				{
 #ifdef _MSC_VER
 					fRow.setFloatField(strtod(aggData.fConstValue.c_str(), 0), colOut);
@@ -2192,7 +2502,19 @@ void RowAggregationUM::doNotNullConstantAggregate(const ConstantAggData& aggData
 				}
 				break;
 
+                case execplan::CalpontSystemCatalog::UTINYINT:
+                case execplan::CalpontSystemCatalog::USMALLINT:
+                case execplan::CalpontSystemCatalog::UMEDINT:
+                case execplan::CalpontSystemCatalog::UINT:
+                case execplan::CalpontSystemCatalog::UBIGINT:
+                {
+                    uint64_t constVal = strtoul(aggData.fConstValue.c_str(), 0, 10);
+                    fRow.setUintField(constVal*rowCnt, colOut);
+                }
+                break;
+
 				case execplan::CalpontSystemCatalog::DECIMAL:
+                case execplan::CalpontSystemCatalog::UDECIMAL:
 				{
 					double dbl = strtod(aggData.fConstValue.c_str(), 0);
 					dbl *= pow(10.0, (double) fRowGroupOut->getScale()[i]);
@@ -2205,14 +2527,16 @@ void RowAggregationUM::doNotNullConstantAggregate(const ConstantAggData& aggData
 				}
 				break;
 
-				case execplan::CalpontSystemCatalog::DOUBLE:
+                case execplan::CalpontSystemCatalog::DOUBLE:
+                case execplan::CalpontSystemCatalog::UDOUBLE:
 				{
 					double dbl = strtod(aggData.fConstValue.c_str(), 0) * rowCnt;
 					fRow.setDoubleField(dbl, colOut);
 				}
 				break;
 
-				case execplan::CalpontSystemCatalog::FLOAT:
+                case execplan::CalpontSystemCatalog::FLOAT:
+				case execplan::CalpontSystemCatalog::UFLOAT:
 				{
 					double flt;
 #ifdef _MSC_VER
@@ -2248,18 +2572,31 @@ void RowAggregationUM::doNotNullConstantAggregate(const ConstantAggData& aggData
 				case execplan::CalpontSystemCatalog::INT:
 				case execplan::CalpontSystemCatalog::BIGINT:
 				case execplan::CalpontSystemCatalog::DECIMAL:
+                case execplan::CalpontSystemCatalog::UDECIMAL:
 				{
 					fRow.setIntField(0, colOut);
 				}
 				break;
 
-				case execplan::CalpontSystemCatalog::DOUBLE:
+                case execplan::CalpontSystemCatalog::UTINYINT:
+                case execplan::CalpontSystemCatalog::USMALLINT:
+                case execplan::CalpontSystemCatalog::UMEDINT:
+                case execplan::CalpontSystemCatalog::UINT:
+                case execplan::CalpontSystemCatalog::UBIGINT:
+                {
+                    fRow.setUintField(0, colOut);
+                }
+                break;
+
+                case execplan::CalpontSystemCatalog::DOUBLE:
+                case execplan::CalpontSystemCatalog::UDOUBLE:
 				{
 					fRow.setDoubleField(0.0, colOut);
 				}
 				break;
 
 				case execplan::CalpontSystemCatalog::FLOAT:
+                case execplan::CalpontSystemCatalog::UFLOAT:
 				{
 					fRow.setFloatField(0.0, colOut);
 				}
@@ -2540,6 +2877,7 @@ void RowAggregationUMP2::doAvg(const Row& rowIn, int64_t colIn, int64_t colOut, 
 		case execplan::CalpontSystemCatalog::INT:
 		case execplan::CalpontSystemCatalog::BIGINT:
 		case execplan::CalpontSystemCatalog::DECIMAL:
+        case execplan::CalpontSystemCatalog::UDECIMAL:
 		{
 			int64_t valIn = rowIn.getIntField(colIn);
 			if (fRow.getIntField(colAux) == 0)
@@ -2555,7 +2893,28 @@ void RowAggregationUMP2::doAvg(const Row& rowIn, int64_t colIn, int64_t colOut, 
 			}
 			break;
 		}
+        case execplan::CalpontSystemCatalog::UTINYINT:
+        case execplan::CalpontSystemCatalog::USMALLINT:
+        case execplan::CalpontSystemCatalog::UMEDINT:
+        case execplan::CalpontSystemCatalog::UINT:
+        case execplan::CalpontSystemCatalog::UBIGINT:
+        {
+            uint64_t valIn = rowIn.getUintField(colIn);
+            if (fRow.getUintField(colAux) == 0)
+            {
+                fRow.setUintField(valIn, colOut);
+                fRow.setUintField(rowIn.getUintField(colIn+1), colAux);
+            }
+            else
+            {
+                uint64_t valOut = fRow.getUintField(colOut);
+                fRow.setUintField(valIn + valOut, colOut);
+                fRow.setUintField(rowIn.getUintField(colIn+1)+fRow.getUintField(colAux), colAux);
+            }
+            break;
+        }
 		case execplan::CalpontSystemCatalog::DOUBLE:
+        case execplan::CalpontSystemCatalog::UDOUBLE:
 		{
 			double valIn = rowIn.getDoubleField(colIn);
 			if (fRow.getIntField(colAux) == 0)
@@ -2572,6 +2931,7 @@ void RowAggregationUMP2::doAvg(const Row& rowIn, int64_t colIn, int64_t colOut, 
 			break;
 		}
 		case execplan::CalpontSystemCatalog::FLOAT:
+        case execplan::CalpontSystemCatalog::UFLOAT:
 		{
 			float valIn = rowIn.getFloatField(colIn);
 			if (fRow.getIntField(colAux) == 0)
@@ -2643,14 +3003,14 @@ void RowAggregationUMP2::doGroupConcat(const Row& rowIn, int64_t i, int64_t o)
 //------------------------------------------------------------------------------
 void RowAggregationUMP2::doBitOp(const Row& rowIn, int64_t colIn, int64_t colOut, int funcType)
 {
-	int64_t valIn = rowIn.getIntField(colIn);
-	int64_t valOut = fRow.getIntField(colOut);
+	uint64_t valIn = rowIn.getUintField(colIn);
+	uint64_t valOut = fRow.getUintField(colOut);
 	if (funcType == ROWAGG_BIT_AND)
-		fRow.setIntField(valIn & valOut, colOut);
+		fRow.setUintField(valIn & valOut, colOut);
 	else if (funcType == ROWAGG_BIT_OR)
-		fRow.setIntField(valIn | valOut, colOut);
+		fRow.setUintField(valIn | valOut, colOut);
 	else
-		fRow.setIntField(valIn ^ valOut, colOut);
+		fRow.setUintField(valIn ^ valOut, colOut);
 }
 
 

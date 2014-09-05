@@ -24,15 +24,9 @@
 #ifndef SNMP_MANAGER_H
 #define SNMP_MANAGER_H
 
-//Major hack to get oam and brm to play nice.
-#ifdef OAM_BRM_LEAN_AND_MEAN
 #include <string>
 #include <map>
 #include "alarm.h"
-#else
-#include "alarm.h"
-#include "messageobj.h"
-#endif
 
 #if defined(_MSC_VER) && defined(xxxSNMPMANAGER_DLLEXPORT)
 #define EXPORT __declspec(dllexport)

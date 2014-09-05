@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-// $Id: reset_locks.cpp 1704 2012-09-19 18:26:16Z pleblanc $
+// $Id: reset_locks.cpp 1823 2013-01-21 14:13:09Z rdempsey $
 //
 #include <unistd.h>
 #include <iostream>

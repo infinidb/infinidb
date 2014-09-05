@@ -41,7 +41,7 @@ public:
       * @param packageWorkQueueSize the maximum number of ddl packages in the work queue 
       */
     DDLProcessor( int packageMaxThreads, int packageWorkQueueSize );
-
+	~DDLProcessor();
     /** @brief entry point for the DDLProcessor
       */
     void process();

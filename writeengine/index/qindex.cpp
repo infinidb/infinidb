@@ -112,7 +112,7 @@ public:
 
 	    IdxFreeSpaceStat mapInfo;
 
-	   	i64			idxKey = 1;
+	   	uint64_t  	idxKey = 1;
 		int			testCaseNo;
 		int			numOfRowID;
 		int			expSbCnt;
@@ -196,14 +196,14 @@ public:
 	============================================================= */
    void qaTSCIndexTestUpdate() {
     
-	i64		idxKey		= 1;
-    int		tokenLen	= 16;
-	int		testCaseNo;
-	int		startRowID	= 1;
-	int		numOfRowID;
-	int		expSbCnt;
-	int		expFullSbCnt;
-	char	testCaseDesc[256];
+	uint64_t idxKey		= 1;
+    int		 tokenLen	= 16;
+	int		 testCaseNo;
+	int		 startRowID	= 1;
+	int		 numOfRowID;
+	int		 expSbCnt;
+	int		 expFullSbCnt;
+	char	 testCaseDesc[256];
 
 		strcpy(testCaseDesc, "Create 1 index key with one row ID, expecting no sub block and no full sub block.");
 
@@ -270,17 +270,17 @@ public:
    void qaTSCIndexTestDelete() {
     
 
-		i64		idxKey = 1;
-		int		tokenLen	= 16;
-		int		testCaseNo;
-		int		startRowID	= 1;
-		int		numOfRowID;
-		int		expSbCnt;
-		int		expFullSbCnt;
-		char	testCaseDesc[256];
+		uint64_t idxKey = 1;
+		int		 tokenLen	= 16;
+		int		 testCaseNo;
+		int		 startRowID	= 1;
+		int		 numOfRowID;
+		int		 expSbCnt;
+		int		 expFullSbCnt;
+		char	 testCaseDesc[256];
 
-		int		i;
-		int		rc;
+		int		 i;
+		int		 rc;
 
 		//Create 1 row IDs, then remove it.
 		//Expecting 0 row IDs, 0 sub blocks and 0 full sub blocks.
@@ -385,14 +385,14 @@ public:
 void qaTSCFreeSpaceMapTest() {
 
 		IdxFreeSpaceStat mapInfo;
-		i64		idxKey = 1;
-		int		tokenLen = 16;
-		int		execMode = 0;
-		int		testCaseNo, startKey, numOfKey;
-		int		startRowID, numOfRowID;
-		int		i;
-		int		expMapSize, expEntryCnt;
-		char	testCaseDesc[256];
+		uint64_t idxKey = 1;
+		int		 tokenLen = 16;
+		int		 execMode = 0;
+		int		 testCaseNo, startKey, numOfKey;
+		int		 startRowID, numOfRowID;
+		int		 i;
+		int		 expMapSize, expEntryCnt;
+		char	 testCaseDesc[256];
 
 		strcpy(testCaseDesc, "No keys created.  There should not be a empty list for header record.");
 	    testCaseNo		= 10534;
@@ -509,7 +509,7 @@ if (maxKey > 160) maxKey = 120;
 	A driver function to execution test cases for the 
 	index list.
 	============================================================= */
-void qaTstIndexListDriver(int testCaseNo, char* testCaseDesc, i64 idxKey, int tokenLen, int numOfRowID, int expSbCnt, int expFullSbCnt) {
+void qaTstIndexListDriver(int testCaseNo, char* testCaseDesc, uint64_t idxKey, int tokenLen, int numOfRowID, int expSbCnt, int expFullSbCnt) {
 
 	bool	passed;
 	int		checkMode = 2;
@@ -544,7 +544,7 @@ void qaTstFreeMapDriver(int testCaseNo, char* testCaseDesc, int expMapSize, int 
 	Verify index list record with it's integral components
 	and expected values from the calling program.
 ============================================================= */
-	bool qaSupVerifyIndexByKey(i64 idxKey, int tokenLen, int checkMode, int expRowIDCnt, int expSbCnt, int expFullSbCnt) {
+	bool qaSupVerifyIndexByKey(uint64_t idxKey, int tokenLen, int checkMode, int expRowIDCnt, int expSbCnt, int expFullSbCnt) {
 	
    	IdxListStat	idxKeyInfo;
 
@@ -606,7 +606,7 @@ void qaTstFreeMapDriver(int testCaseNo, char* testCaseDesc, int expMapSize, int 
 	Display index record for a given key
 ============================================================= */
 
-   void qaGetListSubblockByKey(i64 idxKey, int tokenLen, int sbSeqNo, int& fbo, int& sbid, int& entry) {
+   void qaGetListSubblockByKey(uint64_t idxKey, int tokenLen, int sbSeqNo, int& fbo, int& sbid, int& entry) {
 
 	   int		p_fbo, p_sbid, p_entry;
 	   int		execMode = 1;
@@ -711,9 +711,9 @@ void qaTstFreeMapDriver(int testCaseNo, char* testCaseDesc, int expMapSize, int 
 	Show branch list for all keys for a given key length
 ============================================================= */
 
-      void qaDspTreePathAll(i64 idxKey, int tokenLen) {
+      void qaDspTreePathAll(uint64_t idxKey, int tokenLen) {
 
-		i64			i;
+		uint64_t	i;
 		int			maxKey;
 
 		maxKey = (1 << tokenLen);
@@ -725,7 +725,7 @@ void qaTstFreeMapDriver(int testCaseNo, char* testCaseDesc, int expMapSize, int 
 	/*******************************************************
 .   Display branch list for a key
 *******************************************************/
-	void qaDspTreePathByKey(i64 idxKey, int tokenLen) {
+	void qaDspTreePathByKey(uint64_t idxKey, int tokenLen) {
 
 		int		p_fbo, p_sbid, p_entry;
 		bool	exist;
@@ -737,7 +737,7 @@ void qaTstFreeMapDriver(int testCaseNo, char* testCaseDesc, int expMapSize, int 
 /* ==========================================================
 	Verfiy hdr records all keys for a given key length
 ============================================================= */
-void qaDspIndexListStatsByKey(i64 idxKey, int tokenLen) {
+void qaDspIndexListStatsByKey(uint64_t idxKey, int tokenLen) {
 
 	IdxListStat	idxKeyInfo;
 
@@ -771,8 +771,8 @@ void qaDspIndexListStatsByKey(i64 idxKey, int tokenLen) {
 	Display index record all keys for a given key length
 ============================================================= */
 
-  void qaDspIndexListAll(i64, int tokenLen) {
-		i64			i;
+  void qaDspIndexListAll(uint64_t, int tokenLen) {
+		uint64_t	i;
 		int			maxKey;
 
 		maxKey = (1 << tokenLen);
@@ -784,7 +784,7 @@ void qaDspIndexListStatsByKey(i64 idxKey, int tokenLen) {
 /* ==========================================================
 	Display index record for a given key
 ============================================================= */
-   void qaDspIndexListByKey(i64 idxKey, int tokenLen) {
+   void qaDspIndexListByKey(uint64_t idxKey, int tokenLen) {
 
 	   IdxListStat	idxKeyInfo;
 
@@ -821,7 +821,7 @@ void qaDspTestStatusFooter(int testCaseNo, bool passed) {
    Populate tree with max key for a given bit length
    Populate tree row ID for a given bitlength
 ============================================================= */
-   void qaSupCreateMaxRowID(i64 idxKey, int tokenLen) {
+   void qaSupCreateMaxRowID(uint64_t idxKey, int tokenLen) {
 
 	  int			maxKey;
 	  int			startRowID = 0;
@@ -835,7 +835,7 @@ void qaDspTestStatusFooter(int testCaseNo, bool passed) {
 /* ==========================================================
    Populate tree with a range of row IDs for a key.
 ============================================================= */
-   void qaSupCreateRangeRowID(i64 idxKey, int tokenLen, int startRowID, int numOfRowID) {
+   void qaSupCreateRangeRowID(uint64_t idxKey, int tokenLen, int startRowID, int numOfRowID) {
 
       int			rc;
 	  int			i;
@@ -869,7 +869,7 @@ void qaDspTestStatusFooter(int testCaseNo, bool passed) {
    void qaSupCreateMaxHdrRec(int tokenLen) {
 
       int			rc;
-	  i64			i;
+	  uint64_t		i;
 	  int			maxKey;
 
       rc = m_index.dropIndex( 990, 991 );
@@ -898,9 +898,9 @@ if (maxKey > 160) maxKey = 160;
    Populate tree with range of keys
 ============================================================= */
 
- void qaSupCreateRangeKey(i64 idxKey, int tokenLen, int startKey, int numOfKey) {
+ void qaSupCreateRangeKey(uint64_t idxKey, int tokenLen, int startKey, int numOfKey) {
       int			rc;
-	  i64			i;
+	  uint64_t   	i;
 	  int			maxKey;
 
       rc = m_index.dropIndex( 990, 991 );
@@ -927,7 +927,7 @@ if (maxKey > 160) maxKey = 160;
 .  This function navigate through the index list record.
 few global variables are set relating to index list.
 *******************************************************/
-   void qaSupWalkIndexList (i64 idxKey, int tokenLen, int execMode, IdxListStat& idxKeyInfo) {
+   void qaSupWalkIndexList (uint64_t idxKey, int tokenLen, int execMode, IdxListStat& idxKeyInfo) {
 
       DataBlock  indexBlock;
 	  FILE*			pFileIndexList=NULL;
@@ -1042,7 +1042,7 @@ few global variables are set relating to index list.
 bitmap entry to the leaf.  It can be used for many
 functions that require access to the hdr record also.
 *******************************************************/
-void qaSupWalkIndexTree(i64 idxKey, int tokenLen, int execMode, int& fbo, int& sbid, int& entry, bool& exist) {
+void qaSupWalkIndexTree(uint64_t idxKey, int tokenLen, int execMode, int& fbo, int& sbid, int& entry, bool& exist) {
 
       DataBlock               curBlock;
       FILE*                   pFile =NULL;

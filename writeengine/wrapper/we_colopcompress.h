@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: we_colopcompress.h 4096 2012-08-07 20:06:09Z dhall $
+//  $Id: we_colopcompress.h 4450 2013-01-21 14:13:24Z rdempsey $
 
 
 /** @file */
@@ -76,12 +76,12 @@ protected:
    /**
    * @brief virtual method in ColumnOp
    */
-   int readBlock(FILE* pFile, unsigned char* readBuf, const i64 fbo);
+   int readBlock(FILE* pFile, unsigned char* readBuf, const uint64_t fbo);
 
    /**
    * @brief virtual method in ColumnOp
    */
-   int saveBlock(FILE* pFile, const unsigned char* writeBuf, const i64 fbo);
+   int saveBlock(FILE* pFile, const unsigned char* writeBuf, const uint64_t fbo);
 
 
 private:
@@ -111,7 +111,7 @@ public:
    /**
    * @brief virtual method in FileOp
    */
-   int expandAbbrevColumnExtent(FILE* pFile, uint16_t dbRoot, i64 emptyVal, int width);
+   int expandAbbrevColumnExtent(FILE* pFile, uint16_t dbRoot, uint64_t emptyVal, int width);
 
    /**
    * @brief virtual method in ColumnOp
@@ -152,12 +152,12 @@ protected:
    /**
    * @brief virtual method in ColumnOp
    */
-   int readBlock(FILE* pFile, unsigned char* readBuf, const i64 fbo);
+   int readBlock(FILE* pFile, unsigned char* readBuf, const uint64_t fbo);
 
    /**
    * @brief virtual method in ColumnOp
    */
-   int saveBlock(FILE* pFile, const unsigned char* writeBuf, const i64 fbo);
+   int saveBlock(FILE* pFile, const unsigned char* writeBuf, const uint64_t fbo);
 
    /**
    * @brief Set the IsInsert flag in the ChunkManager. 

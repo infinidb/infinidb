@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: socket.h 3048 2012-04-04 15:33:45Z rdempsey $
+*   $Id: socket.h 3633 2013-03-13 20:50:23Z pleblanc $
 *
 *
 ***********************************************************************/
@@ -28,15 +28,32 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <boost/shared_ptr.hpp>
+#include "bytestream.h"
 
 class MessageQTestSuite;
 
-namespace messageqcpp { 
-class ByteStream;
+namespace messageqcpp 
+{
 class IOSocket;
 class SocketParms;
 
-typedef boost::shared_ptr<ByteStream> SBS;
+
+// Might want to expand on this / derive from it to include things like uncompressed 
+// data size, etc...
+class Stats
+{
+public: 
+	Stats() : data_sent(0), data_recvd(0)
+		{ }
+	virtual ~Stats() { }	
+	virtual uint64_t dataSent() { return data_sent; }
+	virtual uint64_t dataRecvd() { return data_recvd; }
+	virtual void dataSent(uint64_t amt) { data_sent += amt; }
+	virtual void dataRecvd(uint64_t amt) { data_recvd += amt; }
+private:
+	uint64_t data_sent;
+	uint64_t data_recvd;
+};
 
 /** an abstract socket class interface
  *
@@ -57,16 +74,17 @@ public:
 	/** read a message from the socket
 	 * 
 	 * wait for and return a message from the socket. The deafult timeout waits forever. Note that
-	 * eventhough struct timespec has nanosecond resolution, this method only has milisecond resolution.
+	 * eventhough struct timespec has nanosecond resolution, this method only has millisecond resolution.
 	 */
-	virtual const SBS read(const struct timespec* timeout=0, bool* isTimeOut = NULL) const = 0;
+	virtual const SBS read(const struct timespec* timeout=0, bool* isTimeOut = NULL, Stats *stats = NULL) const = 0;
 
 	/** write a message to the socket
 	 * 
 	 * write a message to the socket
 	 */
-	virtual void write(const ByteStream& msg) const = 0;
-	virtual void write_raw(const ByteStream& msg) const = 0;
+	virtual void write(const ByteStream& msg, Stats *stats = NULL) = 0;
+	virtual void write_raw(const ByteStream& msg, Stats *stats = NULL) const = 0;
+	virtual void write(SBS msg, Stats *stats = NULL) = 0;
 
 	/** close the socket
 	 *
@@ -146,6 +164,8 @@ public:
 	friend class ::MessageQTestSuite;
 
 };
+
+
 
 } //namespace messageqcpp
 

@@ -122,28 +122,18 @@ void WECpiFeederThread::add2MsgQueue(ByteStream& Ibs)
 
 void WECpiFeederThread::feedData2Cpi()
 {
-
 	while(isContinue())
 	{
 
 		mutex::scoped_lock aLock(fMsgQMutex);
-		//TODO create a wait signal here
-		//when continue is false we need to move and break out of loop
 		if(fMsgQueue.empty())
 		{
-			//cout << "Going to Lock MsgQMutex!!" << endl;
-			//fFeederCond.wait(aLock);
-			bool aTimeout = fFeederCond.timed_wait(aLock, boost::posix_time::milliseconds(3000));
+			bool aTimedOut = fFeederCond.timed_wait(aLock, boost::posix_time::milliseconds(3000));
 			if(!isContinue()) { aLock.unlock(); break; }
-			//mutex::scoped_lock aCondLock(fContMutex);
-			//if(!fContinue) break;
-			//aCondLock.unlock();
-			// to avoid spurious wake ups.
-			if((fMsgQueue.empty())||(!aTimeout)) {	aLock.unlock();	continue; }
+			// to handle spurious wake ups and timeout wake ups
+			if((fMsgQueue.empty())||(!aTimedOut)) {	aLock.unlock();	continue; }
 		}
 
-		//fPushing = true;	//make it false only when Q empty
-		//cout << "Poping from the MsgQueue" << endl;
 		messageqcpp::SBS aSbs = fMsgQueue.front();
 		fMsgQueue.pop();
 
@@ -162,46 +152,11 @@ void WECpiFeederThread::feedData2Cpi()
 
 		aSbs.reset();	//forcefully clearing it
 		// We start sending data request from here ONLY
-		//if(getQueueSize()< WEDataLoader::MAX_QSIZE) fOwner.sendDataRequest();
-		//fOwner.sendDataRequest();
-		//fPushing = false;
-		//usleep(1000);
 		if(getQueueSize() == WEDataLoader::MAX_QSIZE) fOwner.sendDataRequest();
 	}
 
 	cout << "CpiFeedThread Stopped!! " << endl;
 	fStopped = true;
-
-
-
-	/*
-	while(fContinue)
-	{
-
-		while(!fMsgQueue.empty())
-		{
-
-			fPushing = true;	//make it false only when Q empty
-			mutex::scoped_lock aLock(fMsgQMutex);
-			//when continue is false we need to move and break out of loop
-			//while((fMsgQueue.empty())&&(fContinue)) fFeederCond.wait(aLock);
-			//if(!fContinue) break;
-			//cout << "Poping from the MsgQueue" << endl;
-			messageqcpp::SBS aSbs = fMsgQueue.front();
-			fMsgQueue.pop();
-			aLock.unlock();
-
-			fOwner.pushData2Cpimport((*aSbs));
-			//cout << "Finished PUSHING data " << endl;
-		}
-		fPushing = false;
-		usleep(1000);
-	}
-	cout << "CpiFeedThread Stopped!! " << endl;
-	fStopped = true;
-	*/
-
-
 
 }
 

@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 2009-2012 Calpont Corporation.
+  Copyright (C) 2009-2013 Calpont Corporation.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -34,7 +34,9 @@
 #include "insertdmlpackage.h"
 #include "resourcemanager.h"
 #include "bytestream.h"
-
+#include "dbrm.h"
+#include "batchloader.h"
+#include "we_clients.h"
 namespace dmlprocessor 
 {
 class BatchInsertProc
@@ -42,31 +44,52 @@ class BatchInsertProc
 public:
 	typedef std::queue<messageqcpp::ByteStream > pkg_type;	
 	typedef boost::shared_ptr<pkg_type>  SP_PKG;
-	static BatchInsertProc* makeBatchInsertProc(execplan::CalpontSystemCatalog::SCN txnid, uint32_t tableOid);
-	static void removeBatchInsertProc(int & rc, std::string & errMsg);
+	typedef std::vector<BRM::BulkSetHWMArg> BulkSetHWMArgs;
+	BatchInsertProc(bool isAutocommitOn, uint32_t tableOid, execplan::CalpontSystemCatalog::SCN txnId, BRM::DBRM* aDbrm);
+	BatchInsertProc(const BatchInsertProc& rhs);
 	~BatchInsertProc();
-
+	uint64_t grabTableLock(int32_t sessionId);
 	SP_PKG  getInsertQueue ();
 	uint getNumDBRoots();
-	void addPkg(messageqcpp::ByteStream & insertBs, bool lastpkg = false, bool isAutocommitOn = true, uint32_t tableOid=0);
-	messageqcpp::ByteStream getPkg(bool & lastPkg, bool & isAutocommitOn, uint32_t  &tableOid);
+	void setLastPkg (bool lastPkg);
+	void addPkg(messageqcpp::ByteStream & insertBs);
+	messageqcpp::ByteStream getPkg();
 	void setError(int errorCode, std::string errMsg);
 	void getError(int & errorCode, std::string & errMsg);
+	int sendPkg(int pmId);
+	void buildPkg(messageqcpp::ByteStream& bs);
+	void buildLastPkg(messageqcpp::ByteStream& bs);
+	void sendFirstBatch();
+	void sendNextBatch();
+	void sendlastBatch();
+	void collectHwm();
+	void setHwm();
+	void receiveAllMsg();
+	void receiveOutstandingMsg();
 private:
-	/** Constuctors */
-    explicit BatchInsertProc();
-    explicit BatchInsertProc(const BatchInsertProc& rhs);
 	SP_PKG fInsertPkgQueue;
 	boost::condition condvar;
-	static BatchInsertProc* fInstance;
-	static uint fNumDBRoots;
-	static boost::thread* fProcessorThread;
-	static execplan::CalpontSystemCatalog::SCN fTxnid;
-	static int fErrorCode;
-	static std::string fErrMsg;
+	execplan::CalpontSystemCatalog::SCN fTxnid;
+	int fErrorCode;
+	std::string fErrMsg;
 	bool fLastpkg;
 	bool fIsAutocommitOn;
-	static uint32_t fTableOid;
+	uint32_t fTableOid;
+	uint64_t fUniqueId;
+	BRM::DBRM* fDbrm;
+	WriteEngine::WEClients* fWEClient;
+	oam::OamCache *fOamcache;
+	std::vector<uint> fPMs; //active PMs
+	batchloader::BatchLoader* fBatchLoader;
+	std::map<unsigned, bool> fPmState;
+	uint fCurrentPMid;
+	boost::shared_ptr<messageqcpp::ByteStream> bsIn;
+	messageqcpp::ByteStream::byte tmp8;
+	messageqcpp::ByteStream::quadbyte tmp32;
+	std::vector<BulkSetHWMArgs> fHwmArgsAllPms;
+	uint64_t fTableLockid;
+	
+	
 };
 
 } // namespace dmlprocessor

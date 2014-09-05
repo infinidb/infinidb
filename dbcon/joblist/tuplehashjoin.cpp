@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: tuplehashjoin.cpp 9171 2012-12-20 18:28:58Z xlou $
+//  $Id: tuplehashjoin.cpp 9228 2013-01-28 23:08:10Z xlou $
 
 
 #include <climits>
@@ -34,6 +34,7 @@
 #include <algorithm>
 using namespace std;
 
+#include "jlf_common.h"
 #include "primitivestep.h"
 #include "tuplehashjoin.h"
 #include "calpontsystemcatalog.h"
@@ -58,13 +59,30 @@ using namespace funcexp;
 namespace joblist
 {
 	
-TupleHashJoinStep::TupleHashJoinStep(uint32_t ses, uint32_t stmt, uint32_t txn, ResourceManager *rm,
-	bool exemgr)
-	: joinType(INIT), sessionID(ses), statementID(stmt), txnID(txn), fTableOID1(0), fTableOID2(0),
-	fOid1(0), fOid2(0), fDictOid1(0), fDictOid2(0), fSequence1(-1), fSequence2(-1),
-	fTupleId1(-1), fTupleId2(-1), fCorrelatedSide(0), resourceManager(rm), totalUMMemoryUsage(0),
-	isDelivery(false), runRan(false), joinRan(false), largeSideIndex(1), joinIsTooBig(false),
-	isExeMgr(exemgr), lastSmallOuterJoiner(-1)
+TupleHashJoinStep::TupleHashJoinStep(const JobInfo& jobInfo) :
+	JobStep(jobInfo),
+	joinType(INIT),
+	fTableOID1(0),
+	fTableOID2(0),
+	fOid1(0),
+	fOid2(0),
+	fDictOid1(0),
+	fDictOid2(0),
+	fSequence1(-1),
+	fSequence2(-1),
+	fTupleId1(-1),
+	fTupleId2(-1),
+	fCorrelatedSide(0),
+	resourceManager(jobInfo.rm),
+	totalUMMemoryUsage(0),
+	isDelivery(false),
+	runRan(false),
+	joinRan(false),
+	largeSideIndex(1),
+	joinIsTooBig(false),
+	isExeMgr(jobInfo.isExeMgr),
+	lastSmallOuterJoiner(-1),
+	fStatsMutexPtr(new boost::mutex())
 {
 	/* Need to figure out how much memory these use...
 		Overhead storing 16 byte elements is about 32 bytes.  That
@@ -73,17 +91,15 @@ TupleHashJoinStep::TupleHashJoinStep(uint32_t ses, uint32_t stmt, uint32_t txn, 
 
 	// PM stores uint32's unless there's PM aggregation or F & E cross-table processing
 	// @bug 3088
-	//uint64_t PMSmallSide = resourceManager->getPMJoinMemLimit();
-	uint64_t PMSmallSide = resourceManager->getHjPmMaxMemorySmallSide(sessionID);
+	//uint64_t PMSmallSide = resourceManager.getPMJoinMemLimit();
+	uint64_t PMSmallSide = resourceManager.getHjPmMaxMemorySmallSide(fSessionId);
 	PMRowLimit = PMSmallSide/44;   // 32 + 8 (key) + 4 (value)
 	totalUMMemoryUsage = 0;
-	uniqueLimit = resourceManager->getHjCPUniqueLimit();
+	uniqueLimit = resourceManager.getHjCPUniqueLimit();
 
-	fStatsMutexPtr = new boost::mutex();
 	fExtendedInfo = "THJS: ";
 	joinType = INIT;
-	stepID = 0;
-	joinThreadCount = resourceManager->getJlNumScanReceiveThreads();
+	joinThreadCount = resourceManager.getJlNumScanReceiveThreads();
 	largeBPS = NULL;
 	moreInput = true;
 }
@@ -94,58 +110,8 @@ TupleHashJoinStep::~TupleHashJoinStep()
 	if (!largeBPS && isDelivery)
 		delete outputDL;
 	if (totalUMMemoryUsage != 0)
-		resourceManager->returnMemory(totalUMMemoryUsage);
-	//cout << "deallocated THJS, UM memory available: " << resourceManager->availableMemory() << endl;
-}
-
-const JobStepAssociation & TupleHashJoinStep::inputAssociation() const
-{
-	return inJSA;
-}
-
-void TupleHashJoinStep::inputAssociation(const JobStepAssociation &in)
-{
-	inJSA = in;
-}
-
-const JobStepAssociation & TupleHashJoinStep::outputAssociation() const
-{
-	return outJSA;
-}
-
-void TupleHashJoinStep::outputAssociation(const JobStepAssociation &out)
-{
-	outJSA = out;
-}
-
-void TupleHashJoinStep::logger(const SPJL &logger)
-{
-	fLogger = logger;
-}
-
-void TupleHashJoinStep::stepId(uint16_t id)
-{
-	stepID = id;
-}
-
-uint16_t TupleHashJoinStep::stepId() const
-{
-	return stepID;
-}
-
-uint32_t TupleHashJoinStep::sessionId() const
-{
-	return sessionID;
-}
-
-uint32_t TupleHashJoinStep::statementId() const
-{
-	return statementID;
-}
-
-uint32_t TupleHashJoinStep::txnId() const
-{
-	return txnID;
+		resourceManager.returnMemory(totalUMMemoryUsage);
+	//cout << "deallocated THJS, UM memory available: " << resourceManager.availableMemory() << endl;
 }
 
 void TupleHashJoinStep::run()
@@ -157,20 +123,21 @@ void TupleHashJoinStep::run()
 		return;
 	runRan = true;
 
-// 	cout << "TupleHashJoinStep::run(): outJSA.outSize = " << outJSA.outSize() << ", isDelivery = " << boolalpha << isDelivery << endl;
-	idbassert((outJSA.outSize() == 1 && !isDelivery) || (outJSA.outSize() == 0 && isDelivery));
-	idbassert(inJSA.outSize() >= 2);
+// 	cout << "TupleHashJoinStep::run(): fOutputJobStepAssociation.outSize = " << fOutputJobStepAssociation.outSize() << ", isDelivery = " << boolalpha << isDelivery << endl;
+	idbassert((fOutputJobStepAssociation.outSize() == 1 && !isDelivery) ||
+				(fOutputJobStepAssociation.outSize() == 0 && isDelivery));
+	idbassert(fInputJobStepAssociation.outSize() >= 2);
 	
-	largeDL = inJSA.outAt(largeSideIndex)->rowGroupDL();
+	largeDL = fInputJobStepAssociation.outAt(largeSideIndex)->rowGroupDL();
 	largeIt = largeDL->getIterator();
-	for (i = 0; i < inJSA.outSize(); i++) {
+	for (i = 0; i < fInputJobStepAssociation.outSize(); i++) {
 		if (i != largeSideIndex) {
-			smallDLs.push_back(inJSA.outAt(i)->rowGroupDL());
+			smallDLs.push_back(fInputJobStepAssociation.outAt(i)->rowGroupDL());
 			smallIts.push_back(smallDLs.back()->getIterator());
 		}
 	}
 	if (!isDelivery)
-		outputDL = outJSA.outAt(0)->rowGroupDL();
+		outputDL = fOutputJobStepAssociation.outAt(0)->rowGroupDL();
 	else if (!largeBPS) {
 		outputDL = new RowGroupDL(1, 5);
 		outputIt = outputDL->getIterator();
@@ -254,13 +221,13 @@ void TupleHashJoinStep::smallRunnerFcn(uint index)
 		joiner->setInUM();
 	}
 	
-	resourceManager->getMemory(joiner->getMemUsage());
+	resourceManager.getMemory(joiner->getMemUsage());
 #ifdef _MSC_VER
 	InterlockedAdd64(&totalUMMemoryUsage, joiner->getMemUsage());
 #else
 	__sync_add_and_fetch(&totalUMMemoryUsage, joiner->getMemUsage());
 #endif
-	while (more && !die && inJSA.status() == 0) {
+	while (more && !cancelled()) {
 		int64_t memUseBefore, memUseAfter;
 
 		smallRG.setData(oneRG.get());
@@ -286,7 +253,7 @@ void TupleHashJoinStep::smallRunnerFcn(uint index)
 		}
 		memUseAfter = joiner->getMemUsage();
 		
-		gotMem = resourceManager->getMemory(memUseAfter - memUseBefore);
+		gotMem = resourceManager.getMemory(memUseAfter - memUseBefore);
 #ifdef _MSC_VER
 		InterlockedAdd64(&totalUMMemoryUsage, memUseAfter - memUseBefore);
 #else
@@ -295,9 +262,9 @@ void TupleHashJoinStep::smallRunnerFcn(uint index)
 		if (UNLIKELY(!gotMem)) {
 			/* bail out until we get an LHJ impl */
 			fLogger->logMessage(logging::LOG_TYPE_INFO, logging::ERR_JOIN_TOO_BIG);
-			inJSA.status(logging::ERR_JOIN_TOO_BIG);
-			inJSA.errorMessage(logging::IDBErrorInfo::instance()->errorMsg(logging::ERR_JOIN_TOO_BIG));
-			die = true;
+			errorMessage(logging::IDBErrorInfo::instance()->errorMsg(logging::ERR_JOIN_TOO_BIG));
+			status(logging::ERR_JOIN_TOO_BIG);
+			fDie = true;
 			joinIsTooBig = true;
 			oss << "join too big ";
 			cout << oss.str() << endl;
@@ -310,7 +277,7 @@ void TupleHashJoinStep::smallRunnerFcn(uint index)
 		more = smallDL->next(smallIt, &oneRG);
 	}
 	
-	if (!flippedUMSwitch && !die) {
+	if (!flippedUMSwitch && !cancelled()) {
 		oss << "PM join (" << index << ")";
 #ifdef JLF_DEBUG
 		cout << oss.str() << endl;
@@ -321,8 +288,8 @@ void TupleHashJoinStep::smallRunnerFcn(uint index)
 
 	/* If there was an error or an abort drain the input DL,
 		do endOfInput on the output */
-	if (die || inJSA.status() > 0) {
-		cout << "HJ stopping... status is " << inJSA.status() << endl;
+	if (cancelled()) {
+		cout << "HJ stopping... status is " << status() << endl;
 		if (largeBPS)
 			largeBPS->abort();
 		while (more)
@@ -364,9 +331,9 @@ void TupleHashJoinStep::hjRunner()
 {
 	uint i;
 
-	if (inJSA.status() > 0) {
-		if (outJSA.outSize() > 0)
-			outJSA.outAt(0)->rowGroupDL()->endOfInput();
+	if (cancelled()) {
+		if (fOutputJobStepAssociation.outSize() > 0)
+			fOutputJobStepAssociation.outAt(0)->rowGroupDL()->endOfInput();
 		startAdjoiningSteps();
 		return;
 	}
@@ -402,10 +369,10 @@ void TupleHashJoinStep::hjRunner()
 	}
 	catch (thread_resource_error&) {
 		string emsg = "TupleHashJoin caught a thread resource error, aborting...\n";
-		inJSA.status(logging::threadResourceErr);
-		inJSA.errorMessage(emsg);
-		errorLogging(emsg);		
-		die = true;
+		errorMessage("too many threads");
+		status(logging::threadResourceErr);
+		errorLogging(emsg, logging::threadResourceErr);
+		fDie = true;
 	}
 
 	for (i = 0; i < smallRunners.size(); i++)
@@ -416,14 +383,14 @@ void TupleHashJoinStep::hjRunner()
 	
 	forwardCPData(); 	// this fcn has its own exclusion list
 
-	if (die || inJSA.status() != 0) {
+	if (cancelled()) {
 		vector<shared_ptr<joiner::TupleJoiner> > empty_joiners;
 		if (joinIsTooBig)
 			cout << "Join is too big, raise the UM join limit for now\n";
 		//minor optimization: clear out mem as soon as it's not necessary
 		rgData.reset();
 		joiners.swap(empty_joiners);
-		resourceManager->returnMemory(totalUMMemoryUsage);
+		resourceManager.returnMemory(totalUMMemoryUsage);
 		totalUMMemoryUsage = 0;
 	}
 
@@ -498,8 +465,8 @@ void TupleHashJoinStep::hjRunner()
 
 		if (!isDelivery) {
 			/* connect the largeBPS directly to the next step */
-			JobStepAssociation newJsa(inJSA.statusPtr());
-			newJsa.outAdd(outJSA.outAt(0));
+			JobStepAssociation newJsa;
+			newJsa.outAdd(fOutputJobStepAssociation.outAt(0));
 			for (unsigned i = 1; i < largeBPS->outputAssociation().outSize(); i++)
 				newJsa.outAdd(largeBPS->outputAssociation().outAt(i));
 			largeBPS->outputAssociation(newJsa);
@@ -536,20 +503,20 @@ uint TupleHashJoinStep::nextBand(messageqcpp::ByteStream &bs)
 	}
 
 	while (ret == 0) {
-		if (inJSA.status() > 0 || die) {
+		if (cancelled()) {
 			oneRG.reset(new uint8_t[deliveredRG->getEmptySize()]);
 			deliveredRG->setData(oneRG.get());
 			deliveredRG->resetRowGroup(0);
-			deliveredRG->setStatus(inJSA.status());
+			deliveredRG->setStatus(status());
 			bs.load(oneRG.get(), deliveredRG->getEmptySize());
-			//cout << "got die. returning last band, error status " << inJSA.status()
+			//cout << "got die. returning last band, error status " << status()
 			//	<< endl;
 			more = true;
 			while (more)
 				more = dl->next(it, &oneRG);
 			joiners.clear();
 			rgData.reset();
-			resourceManager->returnMemory(totalUMMemoryUsage);
+			resourceManager.returnMemory(totalUMMemoryUsage);
 			totalUMMemoryUsage = 0;
 			return 0;
 		}
@@ -560,11 +527,11 @@ uint TupleHashJoinStep::nextBand(messageqcpp::ByteStream &bs)
 			oneRG.reset(new uint8_t[deliveredRG->getEmptySize()]);
 			deliveredRG->setData(oneRG.get());
 			deliveredRG->resetRowGroup(0);
-			deliveredRG->setStatus(inJSA.status());
-			if (inJSA.status() != 0)
+			deliveredRG->setStatus(status());
+			if (status() != 0)
 				cout << " -- returning error status " << deliveredRG->getStatus() << endl;
 			bs.load(oneRG.get(), deliveredRG->getEmptySize());
-			resourceManager->returnMemory(totalUMMemoryUsage);
+			resourceManager.returnMemory(totalUMMemoryUsage);
 			totalUMMemoryUsage = 0;
 			return 0;
 		}
@@ -590,30 +557,30 @@ void TupleHashJoinStep::startAdjoiningSteps()
 const string TupleHashJoinStep::toString() const
 {
 	ostringstream oss;
-	size_t idlsz = inJSA.outSize();
+	size_t idlsz = fInputJobStepAssociation.outSize();
 	idbassert(idlsz > 1);
-	oss << "TupleHashJoinStep    ses:" << sessionID << " st:" << stepID;
+	oss << "TupleHashJoinStep    ses:" << fSessionId << " st:" << fStepId;
 	oss << omitOidInDL;
 	for (size_t i = 0; i < idlsz; ++i)
 	{
-		RowGroupDL *idl = inJSA.outAt(i)->rowGroupDL();
+		RowGroupDL *idl = fInputJobStepAssociation.outAt(i)->rowGroupDL();
 		CalpontSystemCatalog::OID oidi = 0;
 		if (idl) oidi = idl->OID();
 		oss << " in ";
 		if (largeSideIndex == i)
 			oss << "*";
 		oss << "tb/col:" << fTableOID1 << "/" << oidi;
-		oss << " " << inJSA.outAt(i);
+		oss << " " << fInputJobStepAssociation.outAt(i);
 	}
 
-	idlsz = outJSA.outSize();
+	idlsz = fOutputJobStepAssociation.outSize();
 	if (idlsz > 0) {
 		oss << endl << "					";
-		RowGroupDL *dlo = outJSA.outAt(0)->rowGroupDL();
+		RowGroupDL *dlo = fOutputJobStepAssociation.outAt(0)->rowGroupDL();
 		CalpontSystemCatalog::OID oido = 0;
 		if (dlo) oido = dlo->OID();
 		oss << " out tb/col:" << fTableOID1 << "/" << oido;
-		oss << " " << outJSA.outAt(0);
+		oss << " " << fOutputJobStepAssociation.outAt(0);
 	}
 	oss << endl;
 
@@ -623,12 +590,13 @@ const string TupleHashJoinStep::toString() const
 //------------------------------------------------------------------------------
 // Log specified error to stderr and the critical log
 //------------------------------------------------------------------------------
-void TupleHashJoinStep::errorLogging(const string& msg) const
+void TupleHashJoinStep::errorLogging(const string& msg, int err) const
 {
 	ostringstream errMsg;
 	errMsg << "Step " << stepId() << "; " << msg;
 	cerr   << errMsg.str() << endl;
-	catchHandler( errMsg.str(), sessionId() );
+	SErrorInfo errorInfo(new ErrorInfo); // dummy, error info already set by caller.
+	catchHandler(msg, err, errorInfo, fSessionId);
 }
 
 void TupleHashJoinStep::addSmallSideRG(const vector<rowgroup::RowGroup>& rgs,
@@ -776,15 +744,15 @@ void TupleHashJoinStep::startJoinThreads()
 {
 	uint i;
 	uint smallSideCount = smallDLs.size();
-    bool more = true;
+ 	bool more = true;
 	shared_array<uint8_t> oneRG;
 
 	//@bug4836, in error case, stop process, and unblock the next step.
-	if (die || inJSA.status() != 0) {
+	if (cancelled()) {
 		outputDL->endOfInput();
-		//@bug5785, memory leak on canceling complex queries
+		 //@bug5785, memory leak on canceling complex queries
 		while (more)
-			more = largeDL->next(largeIt, &oneRG);
+	 		more = largeDL->next(largeIt, &oneRG);
 		return;
 	}
 
@@ -965,8 +933,8 @@ void TupleHashJoinStep::joinRunnerFcn(uint threadID)
 		smallRGs[i].initRow(&smallRowTemplates[i]);
 
 	grabSomeWork(&inputData);
-	while (!inputData.empty() && !die) {
-		for (i = 0; i < inputData.size() && !die; i++) {
+	while (!inputData.empty() && !cancelled()) {
+		for (i = 0; i < inputData.size() && !cancelled(); i++) {
 			local_inputRG.setData(inputData[i].get());
 			if (local_inputRG.getRowCount() == 0)
 				continue;
@@ -981,8 +949,6 @@ void TupleHashJoinStep::joinRunnerFcn(uint threadID)
 		joinedRowData.clear();
 		grabSomeWork(&inputData);
 	}
-	while (!inputData.empty())
-		grabSomeWork(&inputData);
 }
 
 void TupleHashJoinStep::makeDupList(const RowGroup &rg)
@@ -1114,7 +1080,7 @@ void TupleHashJoinStep::joinOneRG(uint threadID, vector<shared_array<uint8_t> > 
 	joinOutput.resetRowGroup(inputRG.getBaseRid());
 	joinOutput.setDBRoot(inputRG.getDBRoot());
 	inputRG.getRow(0, &largeSideRow);
-	for (k = 0; k < inputRG.getRowCount() && !die; k++, largeSideRow.nextRow()) {
+	for (k = 0; k < inputRG.getRowCount() && !cancelled(); k++, largeSideRow.nextRow()) {
 		//cout << "THJS: Large side row: " << largeSideRow.toString() << endl;
 		matchCount = 0;
 		for (j = 0; j < smallSideCount; j++) {
@@ -1174,8 +1140,8 @@ void TupleHashJoinStep::joinOneRG(uint threadID, vector<shared_array<uint8_t> > 
 				break;
 			
 			if (joiners[j]->scalar() && matchCount > 1) {
-				outJSA.status(logging::ERR_MORE_THAN_1_ROW);
-				outJSA.errorMessage(logging::IDBErrorInfo::instance()->errorMsg(logging::ERR_MORE_THAN_1_ROW));
+				errorMessage(logging::IDBErrorInfo::instance()->errorMsg(logging::ERR_MORE_THAN_1_ROW));
+				status(logging::ERR_MORE_THAN_1_ROW);
 				abort();
 			}
 			if (joiners[j]->smallOuterJoin())
@@ -1185,7 +1151,7 @@ void TupleHashJoinStep::joinOneRG(uint threadID, vector<shared_array<uint8_t> > 
 		if (matchCount > 0) {
 			/* TODO!!!  See TupleBPS for the fix for bug 3510! */
 			applyMapping(columnMappings[smallSideCount], largeSideRow, &baseRow);
-			baseRow.setRid(largeSideRow.getRid());
+			baseRow.setRid(largeSideRow.getRelRid());
 			generateJoinResultSet(joinMatches, baseRow, columnMappings,
 			  0, joinOutput, joinedData, out, smallRowTemplates, joinedRow);
 		}
@@ -1220,10 +1186,11 @@ void TupleHashJoinStep::generateJoinResultSet(const vector<vector<uint8_t *> > &
 			smallRow.setData(joinerOutput[depth][i]);
 			if (UNLIKELY(l_outputRG.getRowCount() == 8192)) {
 				uint dbRoot = l_outputRG.getDBRoot();
+				uint64_t baseRid = l_outputRG.getBaseRid();
 				outputData->push_back(rgData);
 				rgData.reset(new uint8_t[l_outputRG.getMaxDataSize()]);
 				l_outputRG.setData(rgData.get());
-				l_outputRG.resetRowGroup(baseRow.getRid());
+				l_outputRG.resetRowGroup(baseRid);
 				l_outputRG.setDBRoot(dbRoot);
 				l_outputRG.getRow(0, &joinedRow);
 			}

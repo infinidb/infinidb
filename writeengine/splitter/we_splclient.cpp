@@ -1,6 +1,6 @@
 /*
 
-   Copyright (C) 2009-2012 Calpont Corporation.
+   Copyright (C) 2009-2013 Calpont Corporation.
 
    Use of and access to the Calpont InfiniDB Community software is subject to the
    terms and conditions of the Calpont Open Source License Agreement. Use of and
@@ -457,7 +457,8 @@ void WESplClient::setRowsUploadInfo(int RowsRead, int RowsInserted)
 
 //------------------------------------------------------------------------------
 
-void WESplClient::add2ColOutOfRangeInfo(int ColNum, ColDataType ColType, 
+void WESplClient::add2ColOutOfRangeInfo(int ColNum, 
+                                        CalpontSystemCatalog::ColDataType ColType, 
                                         std::string&  ColName, int NoOfOors)
 {
 	WEColOORInfo aColOorInfo;

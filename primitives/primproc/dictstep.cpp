@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: dictstep.cpp 1855 2012-04-04 18:20:09Z rdempsey $
+// $Id: dictstep.cpp 2037 2013-01-24 18:41:11Z pleblanc $
 // C++ Implementation: dictstep
 //
 // Description: 
@@ -128,7 +128,7 @@ void DictStep::prep(int8_t outputType, bool makeAbsRids)
 	primMsg->hdr.SessionID = bpp->sessionID;
 	//primMsg->hdr.StatementID = 0;
 	primMsg->hdr.TransactionID = bpp->txnID;
-	primMsg->hdr.VerID = bpp->versionNum;
+	primMsg->hdr.VerID = bpp->versionInfo.currentScn;
 	primMsg->hdr.StepID = bpp->stepID;
 	primMsg->BOP = BOP;
 	primMsg->InputFlags = 1;		//TODO: Use the new p_Dict functionality
@@ -148,7 +148,7 @@ void DictStep::issuePrimitive(bool isFilter)
 	if (!(primMsg->LBID & 0x8000000000000000LL)) {
  		//cout << "DS issuePrimitive lbid: " << (uint64_t)primMsg->LBID << endl;
 		primitiveprocessor::loadBlock(primMsg->LBID,
-									bpp->versionNum, 
+									bpp->versionInfo,
 									bpp->txnID, 
 									compressionType,
 									bpp->blockData, 
@@ -201,7 +201,7 @@ void DictStep::copyResultToFinalPosition(OrderedToken *ot)
 	for (i = 0; i < inputRidCount; i++) {
 		if (ot[i].inResult) {
 			bpp->absRids[resultPos] = ot[i].rid;
-			bpp->relRids[resultPos] = ot[i].rid & 0x1fff;
+			bpp->relRids[resultPos] = ot[i].rid - bpp->baseRid;
 			if (primMsg->OutputType & OT_DATAVALUE)
 				(*strValues)[resultPos] = ot[i].str;
 			resultPos++;
@@ -223,7 +223,8 @@ void DictStep::processResult()
 	for (i = 0; i < header->NVALS; i++, tmpResultCounter++) {
 		if (primMsg->OutputType & OT_RID) {
 			bpp->absRids[tmpResultCounter] = *((uint64_t *) pos); pos += 8;
-			bpp->relRids[tmpResultCounter] = bpp->absRids[tmpResultCounter] & 0x1fff;
+			//bpp->relRids[tmpResultCounter] = bpp->absRids[tmpResultCounter] & 0x1fff;
+			bpp->relRids[tmpResultCounter] = bpp->absRids[tmpResultCounter] - bpp->baseRid;
 		}
 		if (primMsg->OutputType & OT_DATAVALUE) {
 			len = *((uint16_t *) pos); pos += 2;

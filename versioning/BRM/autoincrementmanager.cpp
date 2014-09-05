@@ -41,7 +41,8 @@ AutoincrementManager::~AutoincrementManager()
 {
 }
 
-void AutoincrementManager::startSequence(uint32_t oid, uint64_t firstNum, uint colWidth)
+void AutoincrementManager::startSequence(uint32_t oid, uint64_t firstNum, uint colWidth,
+                                         execplan::CalpontSystemCatalog::ColDataType colDataType)
 {
 	mutex::scoped_lock lk(lock);
 	map<uint64_t, sequence>::iterator it;
@@ -52,7 +53,14 @@ void AutoincrementManager::startSequence(uint32_t oid, uint64_t firstNum, uint c
 		return;
 
 	s.value = firstNum;
-	s.overflow = (1ULL << (colWidth*8-1));
+    if (isUnsigned(colDataType))
+    {
+        s.overflow = (0xFFFFFFFFFFFFFFFFUL >> (64-colWidth*8)) - 1;
+    }
+    else
+    {
+        s.overflow = (1ULL << (colWidth*8-1));
+    }
 	sequences[oid] = s;
 }
 

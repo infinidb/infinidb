@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: createtableprocessor.h 8436 2012-04-04 18:18:21Z rdempsey $
+ *   $Id: createtableprocessor.h 9303 2013-03-07 16:07:12Z chao $
  *
  *
  ***********************************************************************/
@@ -42,7 +42,8 @@ namespace ddlpackageprocessor
 class CreateTableProcessor : public DDLPackageProcessor
 {
 public:
-
+	
+	CreateTableProcessor(BRM::DBRM* aDbrm) : DDLPackageProcessor(aDbrm){}
     /** @brief process a create table statement
      *
      * @param createTableStmt the CreateTableStatement

@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: tuplehavingstep.cpp 8476 2012-04-25 22:28:15Z xlou $
+//  $Id: tuplehavingstep.cpp 9228 2013-01-28 23:08:10Z xlou $
 
 
 //#define NDEBUG
@@ -54,12 +54,8 @@ using namespace rowgroup;
 namespace joblist
 {
 
-TupleHavingStep::TupleHavingStep(
-	uint32_t sessionId,
-	uint32_t txnId,
-	uint32_t verId,
-	uint32_t statementId) :
-		ExpressionStep(sessionId, txnId, verId, statementId),
+TupleHavingStep::TupleHavingStep(const JobInfo& jobInfo) :
+		ExpressionStep(jobInfo),
 		fInputDL(NULL),
 		fOutputDL(NULL),
 		fInputIterator(0),
@@ -178,7 +174,7 @@ uint TupleHavingStep::nextBand(messageqcpp::ByteStream &bs)
 		if (dlTimes.FirstReadTime().tv_sec ==0)
             dlTimes.setFirstReadTime();
 
-		if (!more || (0 < fInputJobStepAssociation.status()))
+		if (!more || cancelled())
 		{
 			fEndOfResult = true;
 		}
@@ -186,7 +182,7 @@ uint TupleHavingStep::nextBand(messageqcpp::ByteStream &bs)
 		bool emptyRowGroup = true;
 		while (more && !fEndOfResult && emptyRowGroup)
 		{
-			if (0 < fInputJobStepAssociation.status())
+			if (cancelled())
 			{
 				while (more) more = fInputDL->next(fInputIterator, &rgDataIn);
 				break;
@@ -217,17 +213,14 @@ uint TupleHavingStep::nextBand(messageqcpp::ByteStream &bs)
 	}
 	catch(const std::exception& ex)
 	{
-		catchHandler(ex.what(), fSessionId);
-		if (fOutputJobStepAssociation.status() == 0)
-			fOutputJobStepAssociation.status(tupleHavingStepErr);
+		catchHandler(ex.what(), tupleHavingStepErr, fErrorInfo, fSessionId);
 		while (more) more = fInputDL->next(fInputIterator, &rgDataIn);
 		fEndOfResult = true;
 	}
 	catch(...)
 	{
-		catchHandler("TupleHavingStep next band caught an unknown exception", fSessionId);
-		if (fOutputJobStepAssociation.status() == 0)
-			fOutputJobStepAssociation.status(tupleHavingStepErr);
+		catchHandler("TupleHavingStep next band caught an unknown exception",
+					 tupleHavingStepErr, fErrorInfo, fSessionId);
 		while (more) more = fInputDL->next(fInputIterator, &rgDataIn);
 		fEndOfResult = true;
 	}
@@ -238,7 +231,7 @@ uint TupleHavingStep::nextBand(messageqcpp::ByteStream &bs)
 		rgDataOut.reset(new uint8_t[fRowGroupOut.getEmptySize()]);
 		fRowGroupOut.setData(rgDataOut.get());
 		fRowGroupOut.resetRowGroup(0);
-		fRowGroupOut.setStatus(fOutputJobStepAssociation.status());
+		fRowGroupOut.setStatus(status());
 		bs.load(rgDataOut.get(), fRowGroupOut.getDataSize());
 
 		dlTimes.setLastReadTime();
@@ -263,7 +256,7 @@ void TupleHavingStep::execute()
 		more = fInputDL->next(fInputIterator, &rgDataIn);
 		dlTimes.setFirstReadTime();
 
-		if (!more && (0 < fInputJobStepAssociation.status()))
+		if (!more && cancelled())
 		{
 			fEndOfResult = true;
 		}
@@ -277,7 +270,7 @@ void TupleHavingStep::execute()
 			doHavingFilters();
 
 			more = fInputDL->next(fInputIterator, &rgDataIn);
-			if (0 < fInputJobStepAssociation.status())
+			if (cancelled())
 			{
 				fEndOfResult = true;
 			}
@@ -289,19 +282,15 @@ void TupleHavingStep::execute()
 	}
 	catch(const std::exception& ex)
 	{
-		catchHandler(ex.what(), fSessionId);
-		if (fOutputJobStepAssociation.status() == 0)
-			fOutputJobStepAssociation.status(tupleHavingStepErr);
+		catchHandler(ex.what(), tupleHavingStepErr, fErrorInfo, fSessionId);
 	}
 	catch(...)
 	{
-		catchHandler("TupleHavingStep execute caught an unknown exception", fSessionId);
-		if (fOutputJobStepAssociation.status() == 0)
-			fOutputJobStepAssociation.status(tupleHavingStepErr);
+		catchHandler("TupleHavingStep execute caught an unknown exception",
+					 tupleHavingStepErr, fErrorInfo, fSessionId);
 	}
 
-	while (more)
-		more = fInputDL->next(fInputIterator, &rgDataIn);
+	while (more) more = fInputDL->next(fInputIterator, &rgDataIn);
 
 	fEndOfResult = true;
 	fOutputDL->endOfInput();
@@ -379,7 +368,7 @@ void TupleHavingStep::printCalTrace()
 			<< "\t1st read " << dlTimes.FirstReadTimeString()
 			<< "; EOI " << dlTimes.EndOfInputTimeString() << "; runtime-"
 			<< JSTimeStamp::tsdiffstr(dlTimes.EndOfInputTime(), dlTimes.FirstReadTime())
-			<< "s;\n\tJob completion status " << fOutputJobStepAssociation.status() << endl;
+			<< "s;\n\tJob completion status " << status() << endl;
 	logEnd(logStr.str().c_str());
 	fExtendedInfo += logStr.str();
 	formatMiniStats();

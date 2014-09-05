@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: sessionmanagerserver.h 1704 2012-09-19 18:26:16Z pleblanc $
+ * $Id: sessionmanagerserver.h 1825 2013-01-24 18:41:00Z pleblanc $
  *
  *****************************************************************************/
 
@@ -130,13 +130,13 @@ public:
 	 *
 	 * Gets the current version ID.
 	 */
-	EXPORT const execplan::CalpontSystemCatalog::SCN verID(void);
+	EXPORT const QueryContext verID();
 	
 	/** @brief Gets the current version ID
 	 *
 	 * Gets the current version ID.
 	 */
-	EXPORT const execplan::CalpontSystemCatalog::SCN sysCatVerID(void);
+	EXPORT const QueryContext sysCatVerID();
 	
 	/** @brief Gets a new Transaction ID
 	 *

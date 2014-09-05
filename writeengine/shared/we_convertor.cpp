@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_convertor.cpp 4496 2013-01-31 19:13:20Z pleblanc $
+* $Id: we_convertor.cpp 4450 2013-01-21 14:13:24Z rdempsey $
 *
 *******************************************************************************/
 /** @file */
@@ -34,7 +34,7 @@
 #undef WRITEENGINECONVERTOR_DLLEXPORT
 
 using namespace std;
-
+using namespace execplan;
 namespace
 {
     const char DATE_TIME_FORMAT[] = "%04d-%02d-%02d %02d:%02d:%02d";
@@ -116,7 +116,7 @@ struct Convertor::dmFilePathArgs_t
     int     Erc;    // < OUT -- result code for formatting DirE.
     int     FNrc;   // < OUT -- result code for formatting Filename.
 };
-
+
 /*******************************************************************************
  * DESCRIPTION:
  *    Get time string
@@ -264,7 +264,7 @@ long long Convertor::convertDecimalString(
 
     return llVal;
 }
-
+
 /*******************************************************************************
  * DESCRIPTION:
  *    Convert an oid to a filename (with partition and segment number
@@ -372,7 +372,7 @@ void Convertor::mapErrnoToString(int errNum, std::string& errString)
  *    none
  ******************************************************************************/
 /* static */
-void Convertor::convertColType(ColDataType dataType,
+void Convertor::convertColType(CalpontSystemCatalog::ColDataType dataType,
     ColType& internalType, bool isToken)
 {
     if (isToken)
@@ -383,48 +383,148 @@ void Convertor::convertColType(ColDataType dataType,
 
     switch(dataType) {
         // Map BIT and TINYINT to WR_BYTE
-        case WriteEngine::BIT :
-        case WriteEngine::TINYINT :
+        case CalpontSystemCatalog::BIT :
+        case CalpontSystemCatalog::TINYINT :
             internalType = WriteEngine::WR_BYTE; break;
 
         // Map SMALLINT to WR_SHORT
-        case WriteEngine::SMALLINT :
+        case CalpontSystemCatalog::SMALLINT :
             internalType = WriteEngine::WR_SHORT; break;
 
         // Map MEDINT, INT, and DATE to WR_INT
-        case WriteEngine::MEDINT :
-        case WriteEngine::INT :
-        case WriteEngine::DATE :
+        case CalpontSystemCatalog::MEDINT :
+        case CalpontSystemCatalog::INT :
+        case CalpontSystemCatalog::DATE :
             internalType = WriteEngine::WR_INT; break;
 
-        // Map FLOAT to WR_FLOAT
-        case WriteEngine::FLOAT :
+        // Map FLOAT and UFLOAT to WR_FLOAT
+        case CalpontSystemCatalog::FLOAT :
+        case CalpontSystemCatalog::UFLOAT:
             internalType = WriteEngine::WR_FLOAT; break;
 
         // Map BIGINT and DATETIME to WR_LONGLONG
-        case WriteEngine::BIGINT :
-        case WriteEngine::DATETIME :
+        case CalpontSystemCatalog::BIGINT :
+        case CalpontSystemCatalog::DATETIME :
             internalType = WriteEngine::WR_LONGLONG; break;
 
-        // Map DOUBLE to WR_DOUBLE
-        case WriteEngine::DOUBLE :
+        // Map DOUBLE and UDOUBLE to WR_DOUBLE
+        case CalpontSystemCatalog::DOUBLE :
+        case CalpontSystemCatalog::UDOUBLE:
             internalType = WriteEngine::WR_DOUBLE; break;
 
         // Map BLOB to WR_BLOB
-        case WriteEngine::BLOB :
+        case CalpontSystemCatalog::BLOB :
             internalType = WriteEngine::WR_BLOB; break;
 
         // Map VARBINARY to WR_VARBINARY
-        case WriteEngine::VARBINARY:
+        case CalpontSystemCatalog::VARBINARY:
             internalType = WriteEngine::WR_VARBINARY; break;
 
+        // Map DECIMAL to applicable WR_CHAR
+        // We can't map them to their proper int size, since in this version
+        // of convertColType(), we don't know what that is. Hopefully
+        // this is never used for DECIMAL. 
+        case CalpontSystemCatalog::DECIMAL :
+        case CalpontSystemCatalog::UDECIMAL:
+
         // Map CHAR, VARCHAR, and CLOB to WR_CHAR
-        case WriteEngine::DECIMAL :
-        case WriteEngine::CHAR :
-        case WriteEngine::VARCHAR :
-        case WriteEngine::CLOB :
+        case CalpontSystemCatalog::CHAR :
+        case CalpontSystemCatalog::VARCHAR :
+        case CalpontSystemCatalog::CLOB :
+            internalType = WriteEngine::WR_CHAR; break;
+
+        // Map UTINYINT to WR_UBYTE
+        case CalpontSystemCatalog::UTINYINT:
+            internalType = WriteEngine::WR_UBYTE; break;
+
+        // Map USMALLINT to WR_USHORT
+        case CalpontSystemCatalog::USMALLINT:
+            internalType = WriteEngine::WR_USHORT; break;
+
+        // Map UMEDINT and UINT to WR_UINT
+        case CalpontSystemCatalog::UMEDINT:
+        case CalpontSystemCatalog::UINT:
+            internalType = WriteEngine::WR_UINT; break;
+
+        // Map UBIGINT to WR_ULONGLONG
+        case CalpontSystemCatalog::UBIGINT:
+            internalType = WriteEngine::WR_ULONGLONG; break;
+
         default:
             internalType = WriteEngine::WR_CHAR; break;
+    }
+}
+
+/*******************************************************************************
+ * DESCRIPTION:
+ *    Convert specified internal storage type (ColType) to ColDataType. Since
+ *    there is a one to many relationship, we choose the most general.
+ * PARAMETERS:
+ *    internalType - Internal data-type used for storing
+ *    dataType     - Interface data-type
+ * RETURN:
+ *    none
+ ******************************************************************************/
+/* static */
+void Convertor::convertWEColType(ColType internalType, 
+    CalpontSystemCatalog::ColDataType& dataType)
+{
+    switch(internalType) 
+    {
+        // Map BIT and TINYINT to WR_BYTE
+        case WriteEngine::WR_BYTE :
+            dataType = CalpontSystemCatalog::TINYINT; break;
+
+        // Map SMALLINT to WR_SHORT
+        case WriteEngine::WR_SHORT :
+            dataType = CalpontSystemCatalog::SMALLINT; break;
+
+        // Map MEDINT, INT, and DATE to WR_INT
+        case WriteEngine::WR_INT :
+            dataType = CalpontSystemCatalog::INT; break;
+
+        // Map FLOAT and UFLOAT to WR_FLOAT
+        case WriteEngine::WR_FLOAT:
+            dataType = CalpontSystemCatalog::FLOAT; break;
+
+        // Map BIGINT and DATETIME to WR_LONGLONG
+        case WriteEngine::WR_LONGLONG :
+            dataType = CalpontSystemCatalog::BIGINT; break;
+
+        // Map DOUBLE and UDOUBLE to WR_DOUBLE
+        case WriteEngine::WR_DOUBLE :
+            dataType = CalpontSystemCatalog::DOUBLE; break;
+
+        // Map BLOB to WR_BLOB
+        case WriteEngine::WR_BLOB :
+            dataType = CalpontSystemCatalog::BLOB; break;
+
+        // Map VARBINARY to WR_VARBINARY
+        case WriteEngine::WR_VARBINARY:
+            dataType = CalpontSystemCatalog::VARBINARY; break;
+
+        // Map CHAR, VARCHAR, and CLOB to WR_CHAR
+        case WriteEngine::WR_CHAR :
+            dataType = CalpontSystemCatalog::CHAR; break;
+
+        // Map UTINYINT to WR_UBYTE
+        case WriteEngine::WR_UBYTE:
+            dataType = CalpontSystemCatalog::UTINYINT; break;
+
+        // Map USMALLINT to WR_USHORT
+        case WriteEngine::WR_USHORT:
+            dataType = CalpontSystemCatalog::USMALLINT; break;
+
+        // Map UMEDINT and UINT to WR_UINT
+        case WriteEngine::WR_UINT:
+            dataType = CalpontSystemCatalog::UINT; break;
+
+        // Map UBIGINT to WR_ULONGLONG
+        case WriteEngine::WR_ULONGLONG:
+            dataType = CalpontSystemCatalog::UBIGINT; break;
+
+        default:
+            dataType = CalpontSystemCatalog::CHAR; break;
     }
 }
 
@@ -440,8 +540,8 @@ void Convertor::convertColType(ColDataType dataType,
 /* static */
 void Convertor::convertColType(ColStruct* curStruct)
 {
-    ColDataType dataType     // This will be updated later,
-        = WriteEngine::CHAR; // CHAR used only for initialization.
+    CalpontSystemCatalog::ColDataType dataType     // This will be updated later,
+                              = CalpontSystemCatalog::CHAR; // CHAR used only for initialization.
     ColType*    internalType = NULL;
     bool        bTokenFlag = false;
     int*        width = NULL;
@@ -453,36 +553,39 @@ void Convertor::convertColType(ColStruct* curStruct)
 
     switch(dataType) {
         // Map BIT and TINYINT to WR_BYTE
-        case WriteEngine::BIT :
-        case WriteEngine::TINYINT :
+        case CalpontSystemCatalog::BIT :
+        case CalpontSystemCatalog::TINYINT :
             *internalType = WriteEngine::WR_BYTE; break;
 
         // Map SMALLINT to WR_SHORT
-        case WriteEngine::SMALLINT :
+        case CalpontSystemCatalog::SMALLINT :
             *internalType = WriteEngine::WR_SHORT; break;
 
         // Map MEDINT, INT, and DATE to WR_INT
-        case WriteEngine::MEDINT :
-        case WriteEngine::INT :
-        case WriteEngine::DATE :
+        case CalpontSystemCatalog::MEDINT :
+        case CalpontSystemCatalog::INT :
+        case CalpontSystemCatalog::DATE :
             *internalType = WriteEngine::WR_INT; break;
 
-        // Map FLOAT to WR_FLOAT
-        case WriteEngine::FLOAT :
+        // Map FLOAT and UFLOAT to WR_FLOAT
+        case CalpontSystemCatalog::FLOAT :
+        case CalpontSystemCatalog::UFLOAT :
             *internalType = WriteEngine::WR_FLOAT; break;
 
         // Map BIGINT and DATETIME to WR_LONGLONG
-        case WriteEngine::BIGINT :
-        case WriteEngine::DATETIME :
+        case CalpontSystemCatalog::BIGINT :
+        case CalpontSystemCatalog::DATETIME :
             *internalType = WriteEngine::WR_LONGLONG; break;
 
-        // Map DOUBLE to WR_DOUBLE
-        case WriteEngine::DOUBLE :
+        // Map DOUBLE and UDOUBLE to WR_DOUBLE
+        case CalpontSystemCatalog::DOUBLE :
+        case CalpontSystemCatalog::UDOUBLE :
             *internalType = WriteEngine::WR_DOUBLE; break;
 
         // Map DECIMAL to applicable integer type
-        case WriteEngine::DECIMAL :
-                {
+        case CalpontSystemCatalog::DECIMAL :
+        case CalpontSystemCatalog::UDECIMAL :
+        {
             switch (*width)
             {
                 case 1 : *internalType = WriteEngine::WR_BYTE; break;
@@ -494,17 +597,36 @@ void Convertor::convertColType(ColStruct* curStruct)
         }
 
         // Map BLOB to WR_BLOB
-        case WriteEngine::BLOB :
+        case CalpontSystemCatalog::BLOB :
             *internalType = WriteEngine::WR_BLOB; break;
 
         // Map VARBINARY to WR_VARBINARY
-        case WriteEngine::VARBINARY:
+        case CalpontSystemCatalog::VARBINARY:
             *internalType = WriteEngine::WR_VARBINARY; break;
 
         // Map CHAR, VARCHAR, and CLOB to WR_CHAR
-        case WriteEngine::CHAR :
-        case WriteEngine::VARCHAR :
-        case WriteEngine::CLOB :
+        case CalpontSystemCatalog::CHAR :
+        case CalpontSystemCatalog::VARCHAR :
+        case CalpontSystemCatalog::CLOB :
+            *internalType = WriteEngine::WR_CHAR; break;
+
+        // Map UTINYINT to WR_UBYTE
+        case CalpontSystemCatalog::UTINYINT:
+            *internalType = WriteEngine::WR_UBYTE; break;
+
+        // Map USMALLINT to WR_USHORT
+        case CalpontSystemCatalog::USMALLINT:
+            *internalType = WriteEngine::WR_USHORT; break;
+
+        // Map UMEDINT and UINT to WR_UINT
+        case CalpontSystemCatalog::UMEDINT:
+        case CalpontSystemCatalog::UINT:
+            *internalType = WriteEngine::WR_UINT; break;
+
+        // Map UBIGINT to WR_ULONGLONG
+        case CalpontSystemCatalog::UBIGINT:
+            *internalType = WriteEngine::WR_ULONGLONG; break;
+
         default:
             *internalType = WriteEngine::WR_CHAR; break;
     }
@@ -516,7 +638,7 @@ void Convertor::convertColType(ColStruct* curStruct)
     *width = getCorrectRowWidth(dataType, *width);
 
     // This is the patch for the decimal thing, override
-//  if (dataType == WriteEngine::DECIMAL)
+//  if (dataType == CalpontSystemCatalog::DECIMAL)
 //  {
 //      *internalType = *width <= 4 ?
 //                      WriteEngine::WR_INT : WriteEngine::WR_LONGLONG;
@@ -533,21 +655,33 @@ void Convertor::convertColType(ColStruct* curStruct)
  *    emptyVal - the value of empty row
  ******************************************************************************/
 /* static */
-int Convertor::getCorrectRowWidth(ColDataType dataType, int width)
+int Convertor::getCorrectRowWidth(CalpontSystemCatalog::ColDataType dataType, int width)
 {
     int offset, newWidth = 4;
 
-    offset = (dataType == VARCHAR)? -1 : 0;
     switch(dataType) {
-        case TINYINT : newWidth = 1; break;
-        case SMALLINT: newWidth = 2; break;
-        case MEDINT :
-        case INT :
-                       newWidth = 4; break;
-        case BIGINT :  newWidth = 8; break;
-        case FLOAT :   newWidth = 4; break;
-        case DOUBLE :  newWidth = 8; break;
-        case DECIMAL :
+        case CalpontSystemCatalog::TINYINT: 
+        case CalpontSystemCatalog::UTINYINT: 
+            newWidth = 1; break;
+        case CalpontSystemCatalog::SMALLINT: 
+        case CalpontSystemCatalog::USMALLINT: 
+            newWidth = 2; break;
+        case CalpontSystemCatalog::MEDINT:
+        case CalpontSystemCatalog::INT:
+        case CalpontSystemCatalog::UMEDINT:
+        case CalpontSystemCatalog::UINT:
+            newWidth = 4; break;
+        case CalpontSystemCatalog::BIGINT:
+        case CalpontSystemCatalog::UBIGINT:
+            newWidth = 8; break;
+        case CalpontSystemCatalog::FLOAT:
+        case CalpontSystemCatalog::UFLOAT:
+            newWidth = 4; break;
+        case CalpontSystemCatalog::DOUBLE:
+        case CalpontSystemCatalog::UDOUBLE:
+            newWidth = 8; break;
+        case CalpontSystemCatalog::DECIMAL:
+        case CalpontSystemCatalog::UDECIMAL:
             if (width == 1)
                 newWidth = 1;
             else if (width == 2)
@@ -557,13 +691,16 @@ int Convertor::getCorrectRowWidth(ColDataType dataType, int width)
             else
                 newWidth = 8;
             break;
-        case DATE : newWidth = 4; break;
-        case DATETIME : newWidth = 8; break;
+        case CalpontSystemCatalog::DATE: 
+            newWidth = 4; break;
+        case CalpontSystemCatalog::DATETIME:
+            newWidth = 8; break;
 
-        case CHAR :
-        case VARCHAR :
-        case VARBINARY : // treat same as varchar for now
+        case CalpontSystemCatalog::CHAR:
+        case CalpontSystemCatalog::VARCHAR:
+        case CalpontSystemCatalog::VARBINARY: // treat same as varchar for now
         default:
+            offset = (dataType == CalpontSystemCatalog::VARCHAR)? -1 : 0;
             newWidth = 1;
             if (width == (2 + offset))
                 newWidth = 2;
@@ -576,7 +713,7 @@ int Convertor::getCorrectRowWidth(ColDataType dataType, int width)
 
     return newWidth;
 }
-
+
 /*******************************************************************************
  * DESCRIPTION:
  * Converts an OID into a group if directories and a filename.
@@ -618,7 +755,7 @@ int Convertor::getCorrectRowWidth(ColDataType dataType, int width)
  *    or equal to the buffer's length argument, length is too small
  ******************************************************************************/
 /*static*/
-int Convertor::dmOid2FPath(i32 oid, i32 partition, i32 segment,
+int Convertor::dmOid2FPath(uint32_t oid, uint32_t partition, uint32_t segment,
     dmFilePathArgs_t* pArgs)
 {
     pArgs->Arc = _doDir(

@@ -1,6 +1,6 @@
 /*
 
-   Copyright (C) 2009-2012 Calpont Corporation.
+   Copyright (C) 2009-2013 Calpont Corporation.
 
    Use of and access to the Calpont InfiniDB Community software is subject to the
    terms and conditions of the Calpont Open Source License Agreement. Use of and
@@ -286,7 +286,7 @@ bool WEBrmUpdater::prepareCasualPartitionInfo()
 {
 	//cout << "Started prepareCasualPartitionInfo()!!" << endl;
 	//CP: 275456 6000000 4776193 -1 0 1
-	WESDHandler::StrVec::iterator aIt = fRef.fBrmRptVec.begin();
+    WESDHandler::StrVec::iterator aIt = fRef.fBrmRptVec.begin();
 	while (aIt != fRef.fBrmRptVec.end())
 	{
 		std::string aEntry = *aIt;
@@ -343,11 +343,11 @@ bool WEBrmUpdater::prepareCasualPartitionInfo()
 
 			pTok = strtok(NULL, " ");
 			if (pTok)
-				cpInfoMerge.isChar = (atoi(pTok) != 0);
+				cpInfoMerge.type = (execplan::CalpontSystemCatalog::ColDataType)atoi(pTok);
 			else
 			{
 				//cout << "CP Entry : " << aEntry << endl;
-				throw(runtime_error("Bad isChar in CP entry string"));
+				throw(runtime_error("Bad type in CP entry string"));
 			}
 
 			pTok = strtok(NULL, " ");
@@ -494,7 +494,7 @@ bool WEBrmUpdater::prepareRowsInsertedInfo(std::string Entry,
 
 bool WEBrmUpdater::prepareColumnOutOfRangeInfo(std::string Entry,
 											   int& ColNum, 
-											   ColDataType& ColType, 
+											   CalpontSystemCatalog::ColDataType& ColType, 
 											   std::string& ColName, 
 											   int& OorValues)
 {
@@ -529,7 +529,7 @@ bool WEBrmUpdater::prepareColumnOutOfRangeInfo(std::string Entry,
 		pTok = strtok(NULL, " ");
 		if (pTok)
 		{
-			ColType = (ColDataType)atoi(pTok);
+			ColType = (CalpontSystemCatalog::ColDataType)atoi(pTok);
 		}
 		else
 		{

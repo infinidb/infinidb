@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_bitand.cpp 3048 2012-04-04 15:33:45Z rdempsey $
+* $Id: func_bitand.cpp 3495 2013-01-21 14:09:51Z rdempsey $
 *
 *
 ****************************************************************************/
@@ -69,8 +69,15 @@ int64_t Func_bitand::getIntVal(Row& row,
 			case execplan::CalpontSystemCatalog::MEDINT:
 			case execplan::CalpontSystemCatalog::TINYINT:
 			case execplan::CalpontSystemCatalog::SMALLINT:
+            case execplan::CalpontSystemCatalog::UBIGINT:
+            case execplan::CalpontSystemCatalog::UINT:
+            case execplan::CalpontSystemCatalog::UMEDINT:
+            case execplan::CalpontSystemCatalog::UTINYINT:
+            case execplan::CalpontSystemCatalog::USMALLINT:
 			case execplan::CalpontSystemCatalog::DOUBLE:
 			case execplan::CalpontSystemCatalog::FLOAT:
+            case execplan::CalpontSystemCatalog::UDOUBLE:
+            case execplan::CalpontSystemCatalog::UFLOAT:
 			{
 				values.push_back(parm[i]->data()->getIntVal(row, isNull));
 			}

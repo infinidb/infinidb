@@ -127,22 +127,6 @@ CPPUNIT_TEST(p_Col_neg_float_1);
 // negative double column test
 CPPUNIT_TEST(p_Col_neg_double_1);
 
-// whole block tests
-CPPUNIT_TEST(p_ColAggregate_1);
-CPPUNIT_TEST(p_ColAggregate_2);
-CPPUNIT_TEST(p_ColAggregate_3);
-CPPUNIT_TEST(p_ColAggregate_4);
-
-// whole block tests with negative numbers
-CPPUNIT_TEST(p_ColAggregate_5);
-
-// whole block test with sum overflow
-CPPUNIT_TEST(p_ColAggregate_6);
-
-// whole block test with sum overflow and negative numbers
-/* XXXPAT: We need new block data for this one b/c of the null values*/
-// CPPUNIT_TEST(p_ColAggregate_7);
-
 // some ports of TokenByScan tests to validate similar & shared code
 CPPUNIT_TEST(p_Dictionary_1);
 CPPUNIT_TEST(p_Dictionary_2);
@@ -2211,7 +2195,7 @@ void p_Col_1()
 	out = reinterpret_cast<NewColResultHeader *>(output);
 	
 	in->DataSize = 1;
-	in->DataType = WriteEngine::CHAR;
+	in->DataType = CalpontSystemCatalog::CHAR;
 	in->OutputType = OT_DATAVALUE;
 	in->NOPS = 0;
 	in->NVALS = 0;
@@ -2267,7 +2251,7 @@ void p_Col_2()
 	out = reinterpret_cast<NewColResultHeader *>(output);
 	
 	in->DataSize = 2;
-	in->DataType = WriteEngine::INT;
+	in->DataType = CalpontSystemCatalog::INT;
 	in->OutputType = OT_DATAVALUE;
 	in->NOPS = 0;
 	in->NVALS = 0;
@@ -2323,7 +2307,7 @@ void p_Col_3()
 	out = reinterpret_cast<NewColResultHeader *>(output);
 	
 	in->DataSize = 4;
-	in->DataType = WriteEngine::INT;
+	in->DataType = CalpontSystemCatalog::INT;
 	in->OutputType = OT_DATAVALUE;
 	in->NOPS = 0;
 	in->NVALS = 0;
@@ -2379,7 +2363,7 @@ void p_Col_4()
 	out = reinterpret_cast<NewColResultHeader *>(output);
 	
 	in->DataSize = 8;
-	in->DataType = WriteEngine::INT;
+	in->DataType = CalpontSystemCatalog::INT;
 	in->OutputType = OT_DATAVALUE;
 	in->NOPS = 0;
 	in->NVALS = 0;
@@ -2437,7 +2421,7 @@ void p_Col_5()
 	rids = reinterpret_cast<u_int16_t *>(&in[1]);	
 
 	in->DataSize = 1;
-	in->DataType = WriteEngine::INT;
+	in->DataType = CalpontSystemCatalog::INT;
 	in->OutputType = OT_DATAVALUE;
 	in->NOPS = 0;
 	in->NVALS = 2;
@@ -2497,7 +2481,7 @@ void p_Col_6()
 	args = reinterpret_cast<ColArgs *>(&in[1]);	
 
 	in->DataSize = 4;
-	in->DataType = WriteEngine::INT;
+	in->DataType = CalpontSystemCatalog::INT;
 	in->OutputType = OT_DATAVALUE;
 	in->NOPS = 2;
 	in->BOP = BOP_AND;
@@ -2566,7 +2550,7 @@ void p_Col_7()
 	args = reinterpret_cast<ColArgs *>(&input[sizeof(NewColRequestHeader)]);	
 
 	in->DataSize = 8;
-	in->DataType = WriteEngine::INT;
+	in->DataType = CalpontSystemCatalog::INT;
 	in->OutputType = OT_DATAVALUE;
 	in->NOPS = 2;
 	in->BOP = BOP_OR;
@@ -2635,7 +2619,7 @@ void p_Col_8()
 	args = reinterpret_cast<ColArgs *>(&input[sizeof(NewColRequestHeader)]);	
 
 	in->DataSize = 8;
-	in->DataType = WriteEngine::INT;
+	in->DataType = CalpontSystemCatalog::INT;
 	in->OutputType = OT_DATAVALUE;
 	in->NOPS = 2;
 	in->BOP = BOP_OR;
@@ -2707,7 +2691,7 @@ void p_Col_9()
 	args = reinterpret_cast<ColArgs *>(&input[sizeof(NewColRequestHeader)]);	
 
 	in->DataSize = 8;
-	in->DataType = WriteEngine::INT;
+	in->DataType = CalpontSystemCatalog::INT;
 	in->OutputType = OT_DATAVALUE;
 	in->NOPS = 2;
 	in->BOP = BOP_OR;
@@ -2740,570 +2724,6 @@ void p_Col_9()
 //    		cout << i << ": " << hex << (int)results[i] << dec << endl;
 //      	CPPUNIT_ASSERT(results[i] == (uint) (i < 10 ? i : i - 10 + 1001));
 // 	}
-
-	close(fd);
-}
-
-void p_ColAggregate_1()
-{
-	PrimitiveProcessor pp;
-	u_int8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
-	NewColAggRequestHeader *in;
-	NewColAggResultHeader *out;
-	uint i;
-	int fd, sum;
-	uint8_t j;
-	string filename("col1block.cdf");
-
-	fd = open(filename.c_str(), O_RDONLY);
-	if (fd < 0) {
-		cerr << "p_ColAggregate_1: skipping this test; needs the index list file " 
-			<< filename << endl;
-// 		throw runtime_error("p_Col_1: file not found...");
-		return;
-	}
-
-	i = read(fd, block, BLOCK_SIZE);
-	if (i <= 0) {
-		cerr << "p_ColAggregate_1: Couldn't read the file " << filename << endl;
-		throw runtime_error("p_ColAggregate_1: Couldn't read the file");
-	}
-	if (i != BLOCK_SIZE) {
-		cerr << "p_ColAggregate_1: could not read a whole block" << endl;
-		throw runtime_error("p_ColAggregate_1: could not read a whole block");
-	}
-
-	memset(input, 0, BLOCK_SIZE);
-	memset(output, 0, 4*BLOCK_SIZE);
-
-	in = reinterpret_cast<NewColAggRequestHeader *>(input);
-	out = reinterpret_cast<NewColAggResultHeader *>(output);	
-
-	in->DataSize = 1;
-	in->DataType = WriteEngine::INT;
-	in->NVALS = 0;
-
-	pp.setBlockPtr((int*) block);
-	pp.p_ColAggregate(in, out);
-
-//  cout << "Sum: " << out->Sum << endl;
-// 	cout << "SumOverflow: " << out->SumOverflow << endl;
-// 	cout << "SumSign: " << out->SumSign << endl;
-// 	cout << "Min: " << out->Min << endl;
-// 	cout << "Max: " << out->Max << endl;
-// 	cout << "NVALS: " << out->NVALS << endl;
-
-	for (sum = 0, i = 0, j = 0; i < 8192; i++, j++)
-		if (j != 0x81 && j != 0x80)
-			sum += (int8_t) j;
-
- 	CPPUNIT_ASSERT(out->Sum == sum);
-	CPPUNIT_ASSERT(out->SumOverflow == 0);
-	CPPUNIT_ASSERT(out->SumSign == 0);
- 	CPPUNIT_ASSERT(out->Min == -126);
-	CPPUNIT_ASSERT(out->Max == 127);
-	CPPUNIT_ASSERT(out->NVALS == 8128);
-
-	close(fd);
-}
-
-void p_ColAggregate_2()
-{
-	PrimitiveProcessor pp;
-	u_int8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
-	NewColAggRequestHeader *in;
-	NewColAggResultHeader *out;
-	uint i;
-	int fd, sum;
-	string filename("col2block.cdf");
-
-	fd = open(filename.c_str(), O_RDONLY);
-	if (fd < 0) {
-		cerr << "p_ColAggregate_2: skipping this test; needs the index list file " 
-			<< filename << endl;
-// 		throw runtime_error("p_Col_1: file not found...");
-		return;
-	}
-
-	i = read(fd, block, BLOCK_SIZE);
-	if (i <= 0) {
-		cerr << "p_ColAggregate_2: Couldn't read the file " << filename << endl;
-		throw runtime_error("p_ColAggregate_2: Couldn't read the file");
-	}
-	if (i != BLOCK_SIZE) {
-		cerr << "p_ColAggregate_2: could not read a whole block" << endl;
-		throw runtime_error("p_ColAggregate_2: could not read a whole block");
-	}
-
-	memset(input, 0, BLOCK_SIZE);
-	memset(output, 0, 4*BLOCK_SIZE);
-
-	in = reinterpret_cast<NewColAggRequestHeader *>(input);
-	out = reinterpret_cast<NewColAggResultHeader *>(output);	
-
-	in->DataSize = 2;
-	in->DataType = WriteEngine::INT;
-	in->NVALS = 0;
-
-	pp.setBlockPtr((int*) block);
-	pp.p_ColAggregate(in, out);
-
-// 	cout << "Sum: " << out->Sum << endl;
-// 	cout << "SumOverflow: " << out->SumOverflow << endl;
-// 	cout << "SumSign: " << out->SumSign << endl;
-// 	cout << "Min: " << out->Min << endl;
-// 	cout << "Max: " << out->Max << endl;
-// 	cout << "NVALS: " << out->NVALS << endl;
-
-	for (sum = 0, i = 0; i < 4096; i++)
-		sum += i;
-
- 	CPPUNIT_ASSERT(out->Sum == sum);
-	CPPUNIT_ASSERT(out->SumOverflow == 0);
-	CPPUNIT_ASSERT(out->SumSign == 0);
-	CPPUNIT_ASSERT(out->Min == 0);
-	CPPUNIT_ASSERT(out->Max == 4095);
-	CPPUNIT_ASSERT(out->NVALS == 4096);
-
-	close(fd);
-}
-
-void p_ColAggregate_3()
-{
-	PrimitiveProcessor pp;
-	u_int8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
-	NewColAggRequestHeader *in;
-	NewColAggResultHeader *out;
-	uint i;
-	int fd, sum;
-	string filename("col4block.cdf");
-
-	fd = open(filename.c_str(), O_RDONLY);
-	if (fd < 0) {
-		cerr << "p_ColAggregate_3: skipping this test; needs the index list file " 
-			<< filename << endl;
-// 		throw runtime_error("p_Col_1: file not found...");
-		return;
-	}
-
-	i = read(fd, block, BLOCK_SIZE);
-	if (i <= 0) {
-		cerr << "p_ColAggregate_3: Couldn't read the file " << filename << endl;
-		throw runtime_error("p_ColAggregate_3: Couldn't read the file");
-	}
-	if (i != BLOCK_SIZE) {
-		cerr << "p_ColAggregate_3: could not read a whole block" << endl;
-		throw runtime_error("p_ColAggregate_3: could not read a whole block");
-	}
-
-	memset(input, 0, BLOCK_SIZE);
-	memset(output, 0, 4*BLOCK_SIZE);
-
-	in = reinterpret_cast<NewColAggRequestHeader *>(input);
-	out = reinterpret_cast<NewColAggResultHeader *>(output);	
-
-	in->DataSize = 4;
-	in->DataType = WriteEngine::INT;
-	in->NVALS = 0;
-
-	pp.setBlockPtr((int*) block);
-	pp.p_ColAggregate(in, out);
-
-// 	cout << "Sum: " << out->Sum << endl;
-// 	cout << "SumOverflow: " << out->SumOverflow << endl;
-// 	cout << "SumSign: " << (int) out->SumSign << endl;
-// 	cout << "Min: " << out->Min << endl;
-// 	cout << "Max: " << out->Max << endl;
-// 	cout << "NVALS: " << out->NVALS << endl;
-
-	for (sum = 0, i = 0; i < 2048; i++)
-		sum += i;
-
- 	CPPUNIT_ASSERT(out->Sum == sum);
-	CPPUNIT_ASSERT(out->SumOverflow == 0);
-	CPPUNIT_ASSERT(out->SumSign == 0);
-	CPPUNIT_ASSERT(out->Min == 0);
-	CPPUNIT_ASSERT(out->Max == 2047);
-	CPPUNIT_ASSERT(out->NVALS == 2048);
-
-	close(fd);
-}
-
-void p_ColAggregate_4()
-{
-	PrimitiveProcessor pp;
-	u_int8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
-	NewColAggRequestHeader *in;
-	NewColAggResultHeader *out;
-	uint i;
-	int fd, sum;
-	string filename("col8block.cdf");
-
-	fd = open(filename.c_str(), O_RDONLY);
-	if (fd < 0) {
-		cerr << "p_ColAggregate_4: skipping this test; needs the index list file " 
-			<< filename << endl;
-// 		throw runtime_error("p_Col_1: file not found...");
-		return;
-	}
-
-	i = read(fd, block, BLOCK_SIZE);
-	if (i <= 0) {
-		cerr << "p_ColAggregate_4: Couldn't read the file " << filename << endl;
-		throw runtime_error("p_ColAggregate_4: Couldn't read the file");
-	}
-	if (i != BLOCK_SIZE) {
-		cerr << "p_ColAggregate_4: could not read a whole block" << endl;
-		throw runtime_error("p_ColAggregate_4: could not read a whole block");
-	}
-
-	memset(input, 0, BLOCK_SIZE);
-	memset(output, 0, 4*BLOCK_SIZE);
-
-	in = reinterpret_cast<NewColAggRequestHeader *>(input);
-	out = reinterpret_cast<NewColAggResultHeader *>(output);	
-
-	in->DataSize = 8;
-	in->DataType = WriteEngine::INT;
-	in->NVALS = 0;
-
-	pp.setBlockPtr((int*) block);
-	pp.p_ColAggregate(in, out);
-
-// 	cout << "Sum: " << out->Sum << endl;
-// 	cout << "SumOverflow: " << out->SumOverflow << endl;
-// 	cout << "SumSign: " << (int) out->SumSign << endl;
-// 	cout << "Min: " << out->Min << endl;
-// 	cout << "Max: " << out->Max << endl;
-// 	cout << "NVALS: " << out->NVALS << endl;
-
-	for (sum = 0, i = 0; i < 1024; i++)
-		sum += i;
-
- 	CPPUNIT_ASSERT(out->Sum == sum);
-	CPPUNIT_ASSERT(out->SumOverflow == 0);
-	CPPUNIT_ASSERT(out->SumSign == 0);
-	CPPUNIT_ASSERT(out->Min == 0);
-	CPPUNIT_ASSERT(out->Max == 1023);
-	CPPUNIT_ASSERT(out->NVALS == 1024);
-
-	close(fd);
-}
-
-void p_ColAggregate_5()
-{
-	PrimitiveProcessor pp;
-	u_int8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
-	NewColAggRequestHeader *in;
-	NewColAggResultHeader *out;
-	uint i;
-	int fd;
-	string filename("col8block_neg.cdf");
-
-	fd = open(filename.c_str(), O_RDONLY);
-	if (fd < 0) {
-		cerr << "p_ColAggregate_5: skipping this test; needs the index list file " 
-			<< filename << endl;
-// 		throw runtime_error("p_Col_1: file not found...");
-		return;
-	}
-
-	i = read(fd, block, BLOCK_SIZE);
-	if (i <= 0) {
-		cerr << "p_ColAggregate_5: Couldn't read the file " << filename << endl;
-		throw runtime_error("p_ColAggregate_5: Couldn't read the file");
-	}
-	if (i != BLOCK_SIZE) {
-		cerr << "p_ColAggregate_5: could not read a whole block" << endl;
-		throw runtime_error("p_ColAggregate_5: could not read a whole block");
-	}
-
-	memset(input, 0, BLOCK_SIZE);
-	memset(output, 0, 4*BLOCK_SIZE);
-
-	in = reinterpret_cast<NewColAggRequestHeader *>(input);
-	out = reinterpret_cast<NewColAggResultHeader *>(output);	
-
-	in->DataSize = 8;
-	in->DataType = WriteEngine::INT;
-	in->NVALS = 0;
-
-	pp.setBlockPtr((int*) block);
-	pp.p_ColAggregate(in, out);
-
-// 	cout << "Sum: " << out->Sum << endl;
-// 	cout << "SumOverflow: " << out->SumOverflow << endl;
-// 	cout << "SumSign: " << (int) out->SumSign << endl;
-// 	cout << "Min: " << out->Min << endl;
-// 	cout << "Max: " << out->Max << endl;
-// 	cout << "NVALS: " << out->NVALS << endl;
-
-	CPPUNIT_ASSERT(out->Sum == 512);
-	CPPUNIT_ASSERT(out->SumOverflow == 0);
-	CPPUNIT_ASSERT(out->SumSign == 1);
-	CPPUNIT_ASSERT(out->Min == -512);
-	CPPUNIT_ASSERT(out->Max == 511);
-	CPPUNIT_ASSERT(out->NVALS == 1024);
-
-	close(fd);
-}
-
-void p_ColAggregate_6()
-{
-	PrimitiveProcessor pp;
-	u_int8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
-	NewColAggRequestHeader *in;
-	NewColAggResultHeader *out;
-	uint i;
-	int fd;
-	string filename("col8block_overflow.cdf");
-
-	fd = open(filename.c_str(), O_RDONLY);
-	if (fd < 0) {
-		cerr << "p_ColAggregate_6: skipping this test; needs the index list file " 
-			<< filename << endl;
-// 		throw runtime_error("p_Col_1: file not found...");
-		return;
-	}
-
-	i = read(fd, block, BLOCK_SIZE);
-	if (i <= 0) {
-		cerr << "p_ColAggregate_6: Couldn't read the file " << filename << endl;
-		throw runtime_error("p_ColAggregate_6: Couldn't read the file");
-	}
-	if (i != BLOCK_SIZE) {
-		cerr << "p_ColAggregate_6: could not read a whole block" << endl;
-		throw runtime_error("p_ColAggregate_6: could not read a whole block");
-	}
-
-	memset(input, 0, BLOCK_SIZE);
-	memset(output, 0, 4*BLOCK_SIZE);
-
-	in = reinterpret_cast<NewColAggRequestHeader *>(input);
-	out = reinterpret_cast<NewColAggResultHeader *>(output);	
-
-	in->DataSize = 8;
-	in->DataType = WriteEngine::INT;
-	in->NVALS = 0;
-
-	pp.setBlockPtr((int*) block);
-	pp.p_ColAggregate(in, out);
-
-//  	cout << "Sum: " << out->Sum << endl;
-//  	cout << "SumOverflow: " << out->SumOverflow << endl;
-//  	cout << "SumSign: " << (int) out->SumSign << endl;
-//  	cout << "Min: " << out->Min << endl;
-//  	cout << "Max: " << out->Max << endl;
-//  	cout << "NVALS: " << out->NVALS << endl;
-
-	/* These numbers were verified using 'bc' */
- 	CPPUNIT_ASSERT(out->Sum == 9223372036854774784LL);
-	CPPUNIT_ASSERT(out->SumOverflow == 1023);
-	CPPUNIT_ASSERT(out->SumSign == 0);
-	CPPUNIT_ASSERT(out->Min == 9223372036854775807LL);
-	CPPUNIT_ASSERT(out->Max == 9223372036854775807LL);
-	CPPUNIT_ASSERT(out->NVALS == 1024);
-
-	close(fd);
-}
-
-void p_ColAggregate_7()
-{
-	PrimitiveProcessor pp;
-	u_int8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
-	NewColAggRequestHeader *in;
-	NewColAggResultHeader *out;
-	uint i;
-	int fd;
-	string filename("col8block_overflow_neg.cdf");
-
-	fd = open(filename.c_str(), O_RDONLY);
-	if (fd < 0) {
-		cerr << "p_ColAggregate_7: skipping this test; needs the index list file " 
-			<< filename << endl;
-// 		throw runtime_error("p_Col_1: file not found...");
-		return;
-	}
-
-	i = read(fd, block, BLOCK_SIZE);
-	if (i <= 0) {
-		cerr << "p_ColAggregate_7: Couldn't read the file " << filename << endl;
-		throw runtime_error("p_ColAggregate_7: Couldn't read the file");
-	}
-	if (i != BLOCK_SIZE) {
-		cerr << "p_ColAggregate_7: could not read a whole block" << endl;
-		throw runtime_error("p_ColAggregate_7: could not read a whole block");
-	}
-
-	memset(input, 0, BLOCK_SIZE);
-	memset(output, 0, 4*BLOCK_SIZE);
-
-	in = reinterpret_cast<NewColAggRequestHeader *>(input);
-	out = reinterpret_cast<NewColAggResultHeader *>(output);	
-
-	in->DataSize = 8;
-	in->DataType = WriteEngine::INT;
-	in->NVALS = 0;
-
-	pp.setBlockPtr((int*) block);
-	pp.p_ColAggregate(in, out);
-
-//  	cout << "Sum: " << out->Sum << endl;
-//  	cout << "SumOverflow: " << out->SumOverflow << endl;
-//  	cout << "SumSign: " << (int) out->SumSign << endl;
-//  	cout << "Min: " << out->Min << endl;
-//  	cout << "Max: " << out->Max << endl;
-//  	cout << "NVALS: " << out->NVALS << endl;
-
-	/* These numbers were verified using 'bc' */
-//   	CPPUNIT_ASSERT(out->Sum == 401);
-//  	CPPUNIT_ASSERT(out->SumOverflow == 222);
-//  	CPPUNIT_ASSERT(out->SumSign == 1);
-//   	CPPUNIT_ASSERT(out->Min == -9223372036854775808LL);
-//  	CPPUNIT_ASSERT(out->Max == 9223372036854775807LL);
-//  	CPPUNIT_ASSERT(out->NVALS == 1024);
-
-	close(fd);
-}
-
-void p_ColAggregate_8()
-{
-	PrimitiveProcessor pp;
-	u_int8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
-	NewColAggRequestHeader *in;
-	NewColAggResultHeader *out;
-	uint i, j;
-	int fd, sum;
-	string filename("col1block.cdf");
-
-	fd = open(filename.c_str(), O_RDONLY);
-	if (fd < 0) {
-		cerr << "p_ColAggregate_8: skipping this test; needs the index list file " 
-			<< filename << endl;
-		return;
-	}
-
-	i = read(fd, block, BLOCK_SIZE);
-	if (i <= 0) {
-		cerr << "p_ColAggregate_8: Couldn't read the file " << filename << endl;
-		throw runtime_error("p_ColAggregate_8: Couldn't read the file");
-	}
-	if (i != BLOCK_SIZE) {
-		cerr << "p_ColAggregate_8: could not read a whole block" << endl;
-		throw runtime_error("p_ColAggregate_8: could not read a whole block");
-	}
-
-	memset(input, 0, BLOCK_SIZE);
-	memset(output, 0, 4*BLOCK_SIZE);
-
-	in = reinterpret_cast<NewColAggRequestHeader *>(input);
-	out = reinterpret_cast<NewColAggResultHeader *>(output);	
-
-	in->DataSize = 1;
-	in->DataType = WriteEngine::INT;
-	in->NVALS = 0;
-	
-
-/*
-	typedef struct
-	{
-		ISMPacketHeader ism;
-		PrimitiveHeader hdr;
-		Int64 LBID;
-		Int64 PBID;
-		Int8 DataSize;
-		Int8 DataType;
-		Int8 OutputType;
-		Int8 BOP;
-		Int8 ExtraNotUsed;
-		Int16 NOPS;
-		Int16 NVALS;
-		// this follows the header
-		// ColArgs ArgList[NOPS] (where the val field is DataSize bytes long)
-		// Int16 Rids[NVALS] (each rid is relative to the given block)
-	} NewColAggRequestHeader;
-*/
-
-	pp.setBlockPtr((int*) block);
-	pp.p_ColAggregate(in, out);
-
-// 	cout << "Sum: " << out->Sum << endl;
-// 	cout << "SumOverflow: " << out->SumOverflow << endl;
-// 	cout << "SumSign: " << out->SumSign << endl;
-// 	cout << "Min: " << out->Min << endl;
-// 	cout << "Max: " << out->Max << endl;
-// 	cout << "NVALS: " << out->NVALS << endl;
-
-	for (sum = 0, i = 0, j = 0; i < 8192; i++, j = i % 256)
-		if (j != 129)
-			sum += j;
-
- 	CPPUNIT_ASSERT(out->Sum == sum);
-	CPPUNIT_ASSERT(out->SumOverflow == 0);
-	CPPUNIT_ASSERT(out->SumSign == 0);
-	CPPUNIT_ASSERT(out->Min == 0);
-	CPPUNIT_ASSERT(out->Max == 255);
-	CPPUNIT_ASSERT(out->NVALS == 8160);
-
-	close(fd);
-}
-
-void p_ColAggregate_9()
-{
-	PrimitiveProcessor pp;
-	u_int8_t input[BLOCK_SIZE], output[4*BLOCK_SIZE], block[BLOCK_SIZE];
-	NewColAggRequestHeader *in;
-	NewColAggResultHeader *out;
-	uint i;
-	int fd, sum;
-	string filename("col2block.cdf");
-
-	fd = open(filename.c_str(), O_RDONLY);
-	if (fd < 0) {
-		cerr << "p_ColAggregate_9: skipping this test; needs the index list file " 
-			<< filename << endl;
-		return;
-	}
-
-	i = read(fd, block, BLOCK_SIZE);
-	if (i <= 0) {
-		cerr << "p_ColAggregate_9: Couldn't read the file " << filename << endl;
-		throw runtime_error("p_ColAggregate_9: Couldn't read the file");
-	}
-	if (i != BLOCK_SIZE) {
-		cerr << "p_ColAggregate_9: could not read a whole block" << endl;
-		throw runtime_error("p_ColAggregate_9: could not read a whole block");
-	}
-
-	memset(input, 0, BLOCK_SIZE);
-	memset(output, 0, 4*BLOCK_SIZE);
-
-	in = reinterpret_cast<NewColAggRequestHeader *>(input);
-	out = reinterpret_cast<NewColAggResultHeader *>(output);	
-
-	in->DataSize = 2;
-	in->DataType = WriteEngine::INT;
-	in->NVALS = 0;
-
-	pp.setBlockPtr((int*) block);
-	pp.p_ColAggregate(in, out);
-
-// 	cout << "Sum: " << out->Sum << endl;
-// 	cout << "SumOverflow: " << out->SumOverflow << endl;
-// 	cout << "SumSign: " << out->SumSign << endl;
-// 	cout << "Min: " << out->Min << endl;
-// 	cout << "Max: " << out->Max << endl;
-// 	cout << "NVALS: " << out->NVALS << endl;
-
-	for (sum = 0, i = 0; i < 4096; i++)
-		sum += i;
-
- 	CPPUNIT_ASSERT(out->Sum == sum);
-	CPPUNIT_ASSERT(out->SumOverflow == 0);
-	CPPUNIT_ASSERT(out->SumSign == 0);
-	CPPUNIT_ASSERT(out->Min == 0);
-	CPPUNIT_ASSERT(out->Max = 4096);
-	CPPUNIT_ASSERT(out->NVALS == 4096);
 
 	close(fd);
 }
@@ -3347,7 +2767,7 @@ void p_Col_10()
 	args = reinterpret_cast<ColArgs *>(&input[sizeof(NewColRequestHeader)]);	
 
 	in->DataSize = 8;
-	in->DataType = WriteEngine::INT;
+	in->DataType = CalpontSystemCatalog::INT;
 	in->OutputType = OT_RID;
 	in->NOPS = 2;
 	in->BOP = BOP_OR;
@@ -3417,7 +2837,7 @@ void p_Col_11()
 	args = reinterpret_cast<ColArgs *>(&input[sizeof(NewColRequestHeader)]);	
 
 	in->DataSize = 8;
-	in->DataType = WriteEngine::INT;
+	in->DataType = CalpontSystemCatalog::INT;
 	in->OutputType = OT_BOTH;
 	in->NOPS = 2;
 	in->BOP = BOP_OR;
@@ -3488,7 +2908,7 @@ void p_Col_12()
 	out = reinterpret_cast<NewColResultHeader *>(output);
 	
 	in->DataSize = 1;
-	in->DataType = WriteEngine::CHAR;
+	in->DataType = CalpontSystemCatalog::CHAR;
 	in->OutputType = OT_DATAVALUE;
  	in->BOP = BOP_AND;
 	in->NOPS = 2;
@@ -3561,7 +2981,7 @@ void p_Col_13()
 	args = reinterpret_cast<ColArgs *>(&input[sizeof(NewColRequestHeader)]);	
 
 	in->DataSize = 4;
-	in->DataType = WriteEngine::INT;
+	in->DataType = CalpontSystemCatalog::INT;
 	in->OutputType = OT_RID;
 	in->NOPS = 3;
 	in->BOP = BOP_OR;
@@ -3645,7 +3065,7 @@ void p_Col_double_1()
 	out = reinterpret_cast<NewColResultHeader *>(output);
 	
 	in->DataSize = 8;
-	in->DataType = WriteEngine::DOUBLE;
+	in->DataType = CalpontSystemCatalog::DOUBLE;
 	in->OutputType = OT_DATAVALUE;
  	in->BOP = BOP_AND;
 	in->NOPS = 2;
@@ -3714,7 +3134,7 @@ void p_Col_float_1()
 	out = reinterpret_cast<NewColResultHeader *>(output);
 	
 	in->DataSize = 4;
-	in->DataType = WriteEngine::FLOAT;
+	in->DataType = CalpontSystemCatalog::FLOAT;
 	in->OutputType = OT_BOTH;
  	in->BOP = BOP_AND;
 	in->NOPS = 2;
@@ -3787,7 +3207,7 @@ void p_Col_neg_float_1()
 	out = reinterpret_cast<NewColResultHeader *>(output);
 	
 	in->DataSize = 4;
-	in->DataType = WriteEngine::FLOAT;
+	in->DataType = CalpontSystemCatalog::FLOAT;
 	in->OutputType = OT_BOTH;
  	in->BOP = BOP_AND;
  	in->NOPS = 2;
@@ -3860,7 +3280,7 @@ void p_Col_neg_double_1()
 	out = reinterpret_cast<NewColResultHeader *>(output);
 	
 	in->DataSize = 8;
-	in->DataType = WriteEngine::DOUBLE;
+	in->DataType = CalpontSystemCatalog::DOUBLE;
 	in->OutputType = OT_DATAVALUE;
  	in->BOP = BOP_AND;
 	in->NOPS = 2;

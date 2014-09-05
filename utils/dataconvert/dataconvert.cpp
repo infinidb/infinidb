@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: dataconvert.cpp 3763 2013-05-07 13:06:00Z dcathey $
+* $Id: dataconvert.cpp 3764 2013-05-07 13:08:11Z dcathey $
 *
 *
 ****************************************************************************/
@@ -24,8 +24,9 @@
 #include <string>
 #include <cmath>
 #include <errno.h>
-#include <limits>
 #include <ctime>
+#include <stdlib.h>
+#include <string.h>
 using namespace std;
 #include <boost/algorithm/string/case_conv.hpp>
 using namespace boost::algorithm;
@@ -39,8 +40,6 @@ using namespace execplan;
 
 #include "joblisttypes.h"
 
-#include "errorcodes.h"
-#include "exceptclasses.h"
 #define DATACONVERT_DLLEXPORT
 #include "dataconvert.h"
 #undef DATACONVERT_DLLEXPORT
@@ -52,18 +51,6 @@ typedef u_long ulong;
 using namespace logging;
 
 namespace {
-
-const short MIN_TINYINT = numeric_limits<int8_t>::min() + 2; //-126;
-const short MAX_TINYINT = numeric_limits<int8_t>::max(); //127;
-const short MIN_SMALLINT = numeric_limits<int16_t>::min() + 2; //-32766;
-const short MAX_SMALLINT = numeric_limits<int16_t>::max(); //32767;
-const int MIN_INT = numeric_limits<int32_t>::min() + 2; //-2147483646;
-const int MAX_INT = numeric_limits<int32_t>::max(); //2147483647;
-const long long MIN_BIGINT = numeric_limits<int64_t>::min() + 2; //-9223372036854775806LL;
-const float MAX_FLOAT = numeric_limits<float>::max(); //3.402823466385289e+38
-const float MIN_FLOAT = -numeric_limits<float>::max();
-const double MAX_DOUBLE = numeric_limits<double>::max(); //1.797693134862316e+308
-const double MIN_DOUBLE = -numeric_limits<double>::max();
 
 const int64_t infinidb_precision[19] = {
 0,
@@ -121,24 +108,6 @@ bool number_value ( const string& data )
 	return true;
 }
 
-
-int64_t string_to_ll( const string& data, bool& pushwarning )
-{
-	char *ep = NULL;
-	const char *str = data.c_str();
-	errno = 0;
-	int64_t value = strtoll(str, &ep, 10);
-
-	//  (no digits) || (more chars)  || (other errors & value = 0)
-	if ((ep == str) || (*ep != '\0') || (errno != 0 && value == 0))
-		throw QueryDataExcept("value is not numerical.", formatErr);
-
-	if (errno == ERANGE && (value == numeric_limits<int64_t>::max() || value == numeric_limits<int64_t>::min()))
-		pushwarning = true;
-
-	return value;
-}
-
 int64_t number_int_value(const string& data,
 						 const CalpontSystemCatalog::ColType& ct,
 						 bool& pushwarning,
@@ -175,8 +144,8 @@ int64_t number_int_value(const string& data,
 		// get the exponent
 		string exp = valStr.substr(epos+1);
 		bool overflow = false;
-		int64_t exponent = string_to_ll(exp, overflow);
-		// if the exponent can not be hold in 64-bit, not supported or saturated.
+		int64_t exponent = dataconvert::string_to_ll(exp, overflow);
+		// if the exponent can not be held in 64-bit, not supported or saturated.
 		if (overflow)
 			throw QueryDataExcept("value is invalid.", formatErr);
 
@@ -184,7 +153,7 @@ int64_t number_int_value(const string& data,
 		size_t dpos = coef.find('.');
 		if (dpos != string::npos)
 		{
-			// move "." to the end by mutiply 10 ** (# of franction digits)
+			// move "." to the end by mutiply 10 ** (# of fraction digits)
 			coef.erase(dpos, 1);
 			exponent -= coef.length() - dpos;
 		}
@@ -277,7 +246,7 @@ int64_t number_int_value(const string& data,
 	if (dp != string::npos)
 	{
 		//Check if need round up
-		int frac1 = string_to_ll(valStr.substr(dp+1, 1), pushwarning);
+		int frac1 = dataconvert::string_to_ll(valStr.substr(dp+1, 1), pushwarning);
 		if ((!noRoundup) && frac1 >= 5)
 			roundup = 1;
 
@@ -291,11 +260,11 @@ int64_t number_int_value(const string& data,
 		}
 	}
 
-	int64_t intVal = string_to_ll(intStr, pushwarning);
+	int64_t intVal = dataconvert::string_to_ll(intStr, pushwarning);
 	//@Bug 3350 negative value round up.
 	intVal += intVal>=0?roundup:-roundup;
 	bool dummy = false;
-	int64_t frnVal = (frnStr.length() > 0) ? string_to_ll(frnStr, dummy) : 0;
+	int64_t frnVal = (frnStr.length() > 0) ? dataconvert::string_to_ll(frnStr, dummy) : 0;
 	if (frnVal != 0)
 		pushwarning = true;
 
@@ -346,18 +315,19 @@ int64_t number_int_value(const string& data,
 			}
 			break;
 		case CalpontSystemCatalog::DECIMAL:
+        case CalpontSystemCatalog::UDECIMAL:
 			if (ct.colWidth == 1)
 			{
-					if (intVal < MIN_TINYINT)
-					{
-						intVal = MIN_TINYINT;
-						pushwarning = true;
-					}
-					else if (intVal > MAX_TINYINT)
-					{
-						intVal = MAX_TINYINT;
-						pushwarning = true;
-					}
+                if (intVal < MIN_TINYINT)
+                {
+                    intVal = MIN_TINYINT;
+                    pushwarning = true;
+                }
+                else if (intVal > MAX_TINYINT)
+                {
+                    intVal = MAX_TINYINT;
+                    pushwarning = true;
+                }
 			}
 			else if (ct.colWidth == 2)
 			{
@@ -399,7 +369,9 @@ int64_t number_int_value(const string& data,
 	}
 
 	// @ bug 3285 make sure the value is in precision range for decimal data type
-	if ( (ct.colDataType == CalpontSystemCatalog::DECIMAL) || (ct.scale > 0))
+	if ( (ct.colDataType == CalpontSystemCatalog::DECIMAL) ||
+         (ct.colDataType == CalpontSystemCatalog::UDECIMAL) || 
+         (ct.scale > 0))
 	{
 		int64_t rangeUp = infinidb_precision[ct.precision];
 		int64_t rangeLow = -rangeUp;
@@ -416,6 +388,144 @@ int64_t number_int_value(const string& data,
 		}
 	}
 	return intVal;
+}
+
+uint64_t number_uint_value(const string& data,
+					 	   const CalpontSystemCatalog::ColType& ct,
+						   bool& pushwarning,
+						   bool  noRoundup)
+{
+	// copy of the original input
+	string valStr(data);
+
+	// in case, the values are in parentheses
+	string::size_type x = valStr.find('(');
+	string::size_type y = valStr.find(')');
+	while (x < string::npos)
+	{
+		// erase y first
+		if (y == string::npos)
+			throw QueryDataExcept("'(' is not matched.", formatErr);
+		valStr.erase(y, 1);
+		valStr.erase(x, 1);
+		x = valStr.find('(');
+		y = valStr.find(')');
+	}
+	if (y != string::npos)
+		throw QueryDataExcept("')' is not matched.", formatErr);
+
+	// convert to fixed-point notation if input is in scientific notation
+	if (valStr.find('E') < string::npos || valStr.find('e') < string::npos)
+	{
+		size_t epos = valStr.find('E');
+		if (epos == string::npos)
+			epos = valStr.find('e');
+
+		// get the coefficient
+		string coef = valStr.substr(0, epos);
+		// get the exponent
+		string exp = valStr.substr(epos+1);
+		bool overflow = false;
+		int64_t exponent = dataconvert::string_to_ll(exp, overflow);
+		// if the exponent can not be held in 64-bit, not supported or saturated.
+		if (overflow)
+			throw QueryDataExcept("value is invalid.", formatErr);
+
+		// find the optional "." point
+		size_t dpos = coef.find('.');
+		if (dpos != string::npos)
+		{
+			// move "." to the end by mutiply 10 ** (# of fraction digits)
+			coef.erase(dpos, 1);
+			exponent -= coef.length() - dpos;
+		}
+
+		if (exponent >= 0)
+		{
+			coef.resize(coef.length() + exponent, '0');
+		}
+		else
+		{
+			size_t bpos = coef.find_first_of("0123456789");
+			size_t epos = coef.length();
+			size_t mpos = -exponent;
+			dpos = epos - mpos;
+			int64_t padding = (int64_t)mpos - (int64_t)(epos-bpos);
+			if (padding > 0)
+			{
+				coef.insert(bpos, padding, '0');
+				dpos = bpos;
+			}
+			coef.insert(dpos, ".");
+		}
+
+		valStr = coef;
+	}
+
+	// now, convert to uint64_t
+	string intStr(valStr);
+	string frnStr = "";
+	size_t dp = valStr.find('.');
+	int    roundup = 0;
+	if (dp != string::npos)
+	{
+		//Check if need round up
+		int frac1 = dataconvert::string_to_ull(valStr.substr(dp+1, 1), pushwarning);
+		if ((!noRoundup) && frac1 >= 5)
+			roundup = 1;
+
+		intStr.erase(dp);
+		frnStr = valStr.substr(dp+1);
+		if ( intStr.length() == 0 )
+			intStr = "0";
+		else if (( intStr.length() == 1 ) && ( (intStr[0] == '+') || (intStr[0] == '-') ) )
+		{
+			intStr.insert( 1, 1, '0');
+		}
+	}
+
+	uint64_t uintVal = dataconvert::string_to_ull(intStr, pushwarning);
+
+    bool dummy = false;
+	uint64_t frnVal = (frnStr.length() > 0) ? dataconvert::string_to_ull(frnStr, dummy) : 0;
+	if (frnVal != 0)
+		pushwarning = true;
+
+	switch (ct.colDataType)
+	{
+		case CalpontSystemCatalog::UTINYINT:
+			if (uintVal > MAX_UTINYINT)
+			{
+				uintVal = MAX_UTINYINT;
+				pushwarning = true;
+			}
+			break;
+		case CalpontSystemCatalog::USMALLINT:
+			if (uintVal > MAX_USMALLINT)
+			{
+				uintVal = MAX_USMALLINT;
+				pushwarning = true;
+			}
+			break;
+		case CalpontSystemCatalog::UMEDINT:
+		case CalpontSystemCatalog::UINT:
+			if (uintVal > MAX_UINT)
+			{
+				uintVal = MAX_UINT;
+				pushwarning = true;
+			}
+			break;
+        case CalpontSystemCatalog::UBIGINT:
+            if (uintVal > MAX_UBIGINT)
+            {
+                uintVal = MAX_UBIGINT;
+                pushwarning = true;
+            }
+            break;
+		default:
+			break;
+	}
+	return uintVal;
 }
 
 bool isLeapYear ( int year)
@@ -1011,19 +1121,19 @@ bool stringToDatetimeStruct(const string& data, DateTime& dtime, bool* date)
 }
 
 boost::any
-	DataConvert::convertColumnData( execplan::CalpontSystemCatalog::ColType colType,
+	DataConvert::convertColumnData(const CalpontSystemCatalog::ColType& colType,
 	const std::string& dataOrig, bool& pushWarning, bool nulFlag, bool noRoundup )
 {
 	boost::any value;
 	std::string data( dataOrig );
 	pushWarning = false;
-	execplan::CalpontSystemCatalog::ColDataType type = colType.colDataType;
+	CalpontSystemCatalog::ColDataType type = colType.colDataType;
 	//if ( !data.empty() )
 	if (!nulFlag)
 	{
 		switch(type)
 		{
-			case execplan::CalpontSystemCatalog::BIT:
+			case CalpontSystemCatalog::BIT:
 			{
 				unsigned int x = data.find("(");
 				if (x <= data.length())
@@ -1037,7 +1147,7 @@ boost::any
 					data.replace (x, 1, " ");
 				}
 
-				if (number_int_value (data, colType, pushWarning, noRoundup))
+                if (number_int_value (data, colType, pushWarning, noRoundup))
 				{
 					bool bitvalue;
 					if (from_string<bool>(bitvalue, data, std::dec ))
@@ -1052,33 +1162,86 @@ boost::any
 			}
 			break;
 
-			case execplan::CalpontSystemCatalog::TINYINT:
+			case CalpontSystemCatalog::TINYINT:
 				value = (char) number_int_value(data, colType, pushWarning, noRoundup);
 			break;
 
-			case execplan::CalpontSystemCatalog::SMALLINT:
+			case CalpontSystemCatalog::SMALLINT:
 				value = (short) number_int_value(data, colType, pushWarning, noRoundup);
 			break;
 
-			case execplan::CalpontSystemCatalog::MEDINT:
-			case execplan::CalpontSystemCatalog::INT:
+			case CalpontSystemCatalog::MEDINT:
+			case CalpontSystemCatalog::INT:
 				value = (int) number_int_value(data, colType, pushWarning, noRoundup);
 			break;
 
-			case execplan::CalpontSystemCatalog::BIGINT:
+			case CalpontSystemCatalog::BIGINT:
 				value = (long long) number_int_value(data, colType, pushWarning, noRoundup);
 			break;
-			case execplan::CalpontSystemCatalog::DECIMAL:
+
+            case CalpontSystemCatalog::DECIMAL:
+                if (colType.colWidth == 1)
+                    value = (char) number_int_value(data, colType, pushWarning, noRoundup);
+                else if (colType.colWidth == 2)
+                    value = (short) number_int_value(data, colType, pushWarning, noRoundup);
+                else if (colType.colWidth == 4)
+                    value = (int) number_int_value(data, colType, pushWarning, noRoundup);
+                else if (colType.colWidth == 8)
+                    value = (long long) number_int_value(data, colType, pushWarning, noRoundup);
+            break;
+            case CalpontSystemCatalog::UDECIMAL:
+                // UDECIMAL numbers may not be negative
 				if (colType.colWidth == 1)
-					value = (char) number_int_value(data, colType, pushWarning, noRoundup);
+                {
+                    char ival = (char) number_int_value(data, colType, pushWarning, noRoundup);
+                    if (ival < 0 &&
+						ival != static_cast<int8_t>(joblist::TINYINTEMPTYROW) &&
+						ival != static_cast<int8_t>(joblist::TINYINTNULL))
+                    {
+                        ival = 0;
+                        pushWarning = true;
+                    }
+					value = ival;
+                }
 				else if (colType.colWidth == 2)
-					value = (short) number_int_value(data, colType, pushWarning, noRoundup);
-				else if (colType.colWidth == 4)
-					value = (int) number_int_value(data, colType, pushWarning, noRoundup);
-				else if (colType.colWidth == 8)
-					value = (long long) number_int_value(data, colType, pushWarning, noRoundup);
-			break;
-			case execplan::CalpontSystemCatalog::FLOAT:
+                {
+					short ival = (short) number_int_value(data, colType, pushWarning, noRoundup);
+                    if (ival < 0 &&
+						ival != static_cast<int16_t>(joblist::SMALLINTEMPTYROW) &&
+						ival != static_cast<int16_t>(joblist::SMALLINTNULL))
+                    {
+                        ival = 0;
+                        pushWarning = true;
+                    }
+                    value = ival;
+                }
+                else if (colType.colWidth == 4)
+                {
+                    int ival = static_cast<int>(number_int_value(data, colType, pushWarning, noRoundup));
+                    if (ival < 0 &&
+                        ival != static_cast<int>(joblist::INTEMPTYROW) &&
+                        ival != static_cast<int>(joblist::INTNULL))
+                    {
+                        ival = 0;
+                        pushWarning = true;
+                    }
+                    value = ival;
+                }
+                else if (colType.colWidth == 8)
+                {
+                    long long ival = static_cast<long long>(number_int_value(data, colType, pushWarning, noRoundup));
+                    if (ival < 0 &&
+                        ival != static_cast<long long>(joblist::BIGINTEMPTYROW) &&
+                        ival != static_cast<long long>(joblist::BIGINTNULL))
+                    {
+                        ival = 0;
+                        pushWarning = true;
+                    }
+                    value = ival;
+                }
+            break;
+			case CalpontSystemCatalog::FLOAT:
+            case CalpontSystemCatalog::UFLOAT:
 			{
 				string::size_type x = data.find('(');
 				if (x < string::npos)
@@ -1091,11 +1254,25 @@ boost::any
 					float floatvalue;
 					errno = 0;
 #ifdef _MSC_VER
-					floatvalue = (float)strtod(data.c_str(), 0);
+					double dval = strtod(data.c_str(), 0);
+					if (dval > MAX_FLOAT)
+					{
+						pushWarning = true;
+						floatvalue = MAX_FLOAT;
+					}
+					else if (dval < MIN_FLOAT)
+					{
+						pushWarning = true;
+						floatvalue = MIN_FLOAT;
+					}
+					else
+					{
+						floatvalue = (float)dval;
+					}
 #else
 					floatvalue = strtof(data.c_str(), 0);
 #endif
-					if (errno == ERANGE)
+                    if (errno == ERANGE)
 					{
 						pushWarning = true;
 #ifdef _MSC_VER
@@ -1106,12 +1283,18 @@ boost::any
 						{
 							if ( floatvalue > 0 )
 								floatvalue = MAX_FLOAT;
-							else
-								floatvalue = MIN_FLOAT;
+                            else
+                                floatvalue = MIN_FLOAT;
 						}
 						else
 							floatvalue = 0;
 					}
+                    if (floatvalue < 0.0 && type == CalpontSystemCatalog::UFLOAT &&
+                        floatvalue != joblist::FLOATEMPTYROW && floatvalue != joblist::FLOATNULL)
+                    {
+                        value = 0.0;
+                        pushWarning = true;
+                    }
 
 					value = floatvalue;
 				}
@@ -1120,7 +1303,8 @@ boost::any
 			}
 			break;
 
-			case execplan::CalpontSystemCatalog::DOUBLE:
+			case CalpontSystemCatalog::DOUBLE:
+            case CalpontSystemCatalog::UDOUBLE:
 			{
 				string::size_type x = data.find('(');
 				if (x < string::npos)
@@ -1144,7 +1328,7 @@ boost::any
 						{
 							if ( doublevalue > 0 )
 								value = MAX_DOUBLE;
-							else
+                            else
 								value = MIN_DOUBLE;
 						}
 						else
@@ -1152,6 +1336,13 @@ boost::any
 					}
 					else
 						value = doublevalue;
+
+                    if (doublevalue < 0.0 && type == CalpontSystemCatalog::UDOUBLE &&
+                        doublevalue != joblist::DOUBLEEMPTYROW && doublevalue != joblist::DOUBLENULL)
+                    {
+                        doublevalue = 0.0;
+                        pushWarning = true;
+                    }
 				}
 				else
 				{
@@ -1160,8 +1351,25 @@ boost::any
 			}
 			break;
 
-			case execplan::CalpontSystemCatalog::CHAR:
-			case execplan::CalpontSystemCatalog::VARCHAR:
+            case CalpontSystemCatalog::UTINYINT:
+                value = (uint8_t)number_uint_value(data, colType, pushWarning, noRoundup);
+            break;
+
+            case CalpontSystemCatalog::USMALLINT:
+                value = (uint16_t)number_uint_value(data, colType, pushWarning, noRoundup);
+            break;
+
+            case CalpontSystemCatalog::UMEDINT:
+            case CalpontSystemCatalog::UINT:
+                value = (uint32_t)number_uint_value(data, colType, pushWarning, noRoundup);
+            break;
+
+            case CalpontSystemCatalog::UBIGINT:
+                value = (uint64_t)number_uint_value(data, colType, pushWarning, noRoundup);
+            break;
+
+			case CalpontSystemCatalog::CHAR:
+			case CalpontSystemCatalog::VARCHAR:
 			{
 				//check data length
 				if ( data.length() > (unsigned int)colType.colWidth )
@@ -1181,7 +1389,7 @@ boost::any
 			}
 			break;
 
-			case execplan::CalpontSystemCatalog::DATE:
+			case CalpontSystemCatalog::DATE:
 			{
 				if (data == "0000-00-00")  //@Bug 3210 Treat blank date as null
 				{
@@ -1202,7 +1410,7 @@ boost::any
 			}
 			break;
 
-			case execplan::CalpontSystemCatalog::DATETIME:
+			case CalpontSystemCatalog::DATETIME:
 			{
 				if (data == "0000-00-00 00:00:00")  //@Bug 3210 Treat blank date as null
 				{
@@ -1222,31 +1430,16 @@ boost::any
 				}
 			}
 			break;
-			case execplan::CalpontSystemCatalog::BLOB:
-			case execplan::CalpontSystemCatalog::CLOB:
+
+			case CalpontSystemCatalog::BLOB:
+			case CalpontSystemCatalog::CLOB:
 				value = data;
 			break;
-			case execplan::CalpontSystemCatalog::VARBINARY:
-{
-//const char* p = dataOrig.data();
-//cerr << "dataOrig: ";
-//for (size_t i = 0; i < dataOrig.size(); i++, p++)
-//{
-//	if (isprint(*p)) cerr << *p << ' ';
-//	else {unsigned u = *p; u &= 0xff; cerr << "0x" << hex << u << dec << ' ';}
-//}
-//cerr << endl;
-//p = data.data();
-//cerr << "data: ";
-//for (size_t i = 0; i < data.size(); i++, p++)
-//{
-//	if (isprint(*p)) cerr << *p << ' ';
-//	else {unsigned u = *p; u &= 0xff; cerr << "0x" << hex << u << dec << ' ';}
-//}
-//cerr << endl;
+
+			case CalpontSystemCatalog::VARBINARY:
 				value = data;
-}
 			break;
+
 			default:
 				throw QueryDataExcept("convertColumnData: unknown column data type.", dataTypeErr);
 			break;
@@ -1254,167 +1447,194 @@ boost::any
 	}
 	else									//null
 	{
-			switch (type)
-			{
-				case execplan::CalpontSystemCatalog::BIT:
-				{
-					//TODO: How to communicate with write engine?
-				}
-				break;
-				case execplan::CalpontSystemCatalog::TINYINT:
-				{
-					char tinyintvalue = joblist::TINYINTNULL;
-					value = tinyintvalue;
-				}
-				break;
-				case execplan::CalpontSystemCatalog::SMALLINT:
-				{
-					short smallintvalue = joblist::SMALLINTNULL;
-					value = smallintvalue;
-				}
-				break;
-				case execplan::CalpontSystemCatalog::MEDINT:
-				case execplan::CalpontSystemCatalog::INT:
-				{
-					int intvalue = joblist::INTNULL;
-					value = intvalue;
-				}
-				break;
-				case execplan::CalpontSystemCatalog::BIGINT:
-				{
-					long long bigint = joblist::BIGINTNULL;
-					value = bigint;
-				}
-				break;
-				case execplan::CalpontSystemCatalog::DECIMAL:
-				{
-					if (colType.colWidth == execplan::CalpontSystemCatalog::ONE_BYTE)
-					{
-						char tinyintvalue = joblist::TINYINTNULL;
-						value = tinyintvalue;
-					}
-					else if (colType.colWidth ==execplan::CalpontSystemCatalog::TWO_BYTE)
-					{
-						short smallintvalue = joblist::SMALLINTNULL;
-						value = smallintvalue;
-					}
-					else if (colType.colWidth ==execplan::CalpontSystemCatalog::FOUR_BYTE)
-					{
-						int intvalue = joblist::INTNULL;
-						value = intvalue;
-					}
-					else if (colType.colWidth ==execplan::CalpontSystemCatalog::EIGHT_BYTE)
-					{
-						long long eightbyte = joblist::BIGINTNULL;
-						value = eightbyte;
-					}
-					else
-					{
-						WriteEngine::Token nullToken;
-						value = nullToken;
-					}
-				}
-				break;
-				case execplan::CalpontSystemCatalog::FLOAT:
-				{
-					uint32_t tmp = joblist::FLOATNULL;
-					float* floatvalue = (float*)&tmp;
-					value = *floatvalue;
-				}
-				break;
-				case execplan::CalpontSystemCatalog::DOUBLE:
-				{
-					uint64_t tmp = joblist::DOUBLENULL;
-					double* doublevalue = (double*)&tmp;
-					value = *doublevalue;
-				}
-				break;
-				case execplan::CalpontSystemCatalog::DATE:
-				{
-					uint32_t d = joblist::DATENULL;
-					value = d;
-				}
-				break;
-				case execplan::CalpontSystemCatalog::DATETIME:
-				{
-					uint64_t d = joblist::DATETIMENULL;
-					value = d;
-				}
-				break;
-				case execplan::CalpontSystemCatalog::CHAR:
-				{
-					std::string charnull;
-					if (colType.colWidth == 1)
-					{
-						//charnull = joblist::CHAR1NULL;
-						charnull = '\376';
-						value = charnull;
-					}
-					else if (colType.colWidth == 2)
-					{
-						//charnull = joblist::CHAR2NULL;
-						charnull = "\377\376";
-						value = charnull;
-					}
-					else if (( colType.colWidth < 5 ) && ( colType.colWidth > 2 ))
-					{
-						//charnull = joblist::CHAR4NULL;
-						charnull = "\377\377\377\376";
-						value = charnull;
-					}
-					else if (( colType.colWidth < 9 ) && ( colType.colWidth > 4 ))
-					{
-						//charnull = joblist::CHAR8NULL;
-						charnull = "\377\377\377\377\377\377\377\376";
-						value = charnull;
-					}
-					else
-					{
-						WriteEngine::Token nullToken;
-						value = nullToken;
-					}
-				}
-				break;
-				case execplan::CalpontSystemCatalog::VARCHAR:
-				{
-					std::string charnull;
-					if (colType.colWidth == 1 )
-					{
-						//charnull = joblist::CHAR2NULL;
-						charnull = "\377\376";
-						value = charnull;
-					}
-					else if ((colType.colWidth < 4)  && (colType.colWidth > 1))
-					{
-						//charnull = joblist::CHAR4NULL;
-						charnull = "\377\377\377\376";
-						value = charnull;
-					}
-					else if ((colType.colWidth < 8)  && (colType.colWidth > 3))
-					{
-						//charnull = joblist::CHAR8NULL;
-						charnull = "\377\377\377\377\377\377\377\376";
-						value = charnull;
-					}
-					else if ( colType.colWidth > 7 )
-					{
-						WriteEngine::Token nullToken;
-						value = nullToken;
-					}
-				}
-				break;
-				case execplan::CalpontSystemCatalog::VARBINARY:
-				{
-					WriteEngine::Token nullToken;
-					value = nullToken;
-				}
-				break;
-				default:
-					throw QueryDataExcept("convertColumnData: unknown column data type.", dataTypeErr);
-				break;
+        switch (type)
+        {
+            case CalpontSystemCatalog::BIT:
+            {
+                //TODO: How to communicate with write engine?
+            }
+            break;
+            case CalpontSystemCatalog::TINYINT:
+            {
+                char tinyintvalue = joblist::TINYINTNULL;
+                value = tinyintvalue;
+            }
+            break;
+            case CalpontSystemCatalog::SMALLINT:
+            {
+                short smallintvalue = joblist::SMALLINTNULL;
+                value = smallintvalue;
+            }
+            break;
+            case CalpontSystemCatalog::MEDINT:
+            case CalpontSystemCatalog::INT:
+            {
+                int intvalue = joblist::INTNULL;
+                value = intvalue;
+            }
+            break;
+            case CalpontSystemCatalog::BIGINT:
+            {
+                long long bigint = joblist::BIGINTNULL;
+                value = bigint;
+            }
+            break;
+            case CalpontSystemCatalog::DECIMAL:
+            case CalpontSystemCatalog::UDECIMAL:
+            {
+                if (colType.colWidth == CalpontSystemCatalog::ONE_BYTE)
+                {
+                    char tinyintvalue = joblist::TINYINTNULL;
+                    value = tinyintvalue;
+                }
+                else if (colType.colWidth ==CalpontSystemCatalog::TWO_BYTE)
+                {
+                    short smallintvalue = joblist::SMALLINTNULL;
+                    value = smallintvalue;
+                }
+                else if (colType.colWidth ==CalpontSystemCatalog::FOUR_BYTE)
+                {
+                    int intvalue = joblist::INTNULL;
+                    value = intvalue;
+                }
+                else if (colType.colWidth ==CalpontSystemCatalog::EIGHT_BYTE)
+                {
+                    long long eightbyte = joblist::BIGINTNULL;
+                    value = eightbyte;
+                }
+                else
+                {
+                    WriteEngine::Token nullToken;
+                    value = nullToken;
+                }
+            }
+            break;
+            case CalpontSystemCatalog::FLOAT:
+            case CalpontSystemCatalog::UFLOAT:
+            {
+                uint32_t tmp = joblist::FLOATNULL;
+                float* floatvalue = (float*)&tmp;
+                value = *floatvalue;
+            }
+            break;
+            case CalpontSystemCatalog::DOUBLE:
+            case CalpontSystemCatalog::UDOUBLE:
+            {
+                uint64_t tmp = joblist::DOUBLENULL;
+                double* doublevalue = (double*)&tmp;
+                value = *doublevalue;
+            }
+            break;
+            case CalpontSystemCatalog::DATE:
+            {
+                uint32_t d = joblist::DATENULL;
+                value = d;
+            }
+            break;
+            case CalpontSystemCatalog::DATETIME:
+            {
+                uint64_t d = joblist::DATETIMENULL;
+                value = d;
+            }
+            break;
+            case CalpontSystemCatalog::CHAR:
+            {
+                std::string charnull;
+                if (colType.colWidth == 1)
+                {
+                    //charnull = joblist::CHAR1NULL;
+                    charnull = '\376';
+                    value = charnull;
+                }
+                else if (colType.colWidth == 2)
+                {
+                    //charnull = joblist::CHAR2NULL;
+                    charnull = "\377\376";
+                    value = charnull;
+                }
+                else if (( colType.colWidth < 5 ) && ( colType.colWidth > 2 ))
+                {
+                    //charnull = joblist::CHAR4NULL;
+                    charnull = "\377\377\377\376";
+                    value = charnull;
+                }
+                else if (( colType.colWidth < 9 ) && ( colType.colWidth > 4 ))
+                {
+                    //charnull = joblist::CHAR8NULL;
+                    charnull = "\377\377\377\377\377\377\377\376";
+                    value = charnull;
+                }
+                else
+                {
+                    WriteEngine::Token nullToken;
+                    value = nullToken;
+                }
+            }
+            break;
+            case CalpontSystemCatalog::VARCHAR:
+            {
+                std::string charnull;
+                if (colType.colWidth == 1 )
+                {
+                    //charnull = joblist::CHAR2NULL;
+                    charnull = "\377\376";
+                    value = charnull;
+                }
+                else if ((colType.colWidth < 4)  && (colType.colWidth > 1))
+                {
+                    //charnull = joblist::CHAR4NULL;
+                    charnull = "\377\377\377\376";
+                    value = charnull;
+                }
+                else if ((colType.colWidth < 8)  && (colType.colWidth > 3))
+                {
+                    //charnull = joblist::CHAR8NULL;
+                    charnull = "\377\377\377\377\377\377\377\376";
+                    value = charnull;
+                }
+                else if ( colType.colWidth > 7 )
+                {
+                    WriteEngine::Token nullToken;
+                    value = nullToken;
+                }
+            }
+            break;
+            case CalpontSystemCatalog::VARBINARY:
+            {
+                WriteEngine::Token nullToken;
+                value = nullToken;
+            }
+            break;
+            case CalpontSystemCatalog::UTINYINT:
+            {
+                uint8_t utinyintvalue = joblist::UTINYINTNULL;
+                value = utinyintvalue;
+            }
+            break;
+            case CalpontSystemCatalog::USMALLINT:
+            {
+                uint16_t usmallintvalue = joblist::USMALLINTNULL;
+                value = usmallintvalue;
+            }
+            break;
+            case CalpontSystemCatalog::UMEDINT:
+            case CalpontSystemCatalog::UINT:
+            {
+                uint32_t uintvalue = joblist::UINTNULL;
+                value = uintvalue;
+            }
+            break;
+            case CalpontSystemCatalog::UBIGINT:
+            {
+                uint64_t ubigint = joblist::UBIGINTNULL;
+                value = ubigint;
+            }
+            break;
+            default:
+                throw QueryDataExcept("convertColumnData: unknown column data type.", dataTypeErr);
+            break;
 
-			}
-
+        }
 	}
 
 	return value;
@@ -1423,7 +1643,7 @@ boost::any
 //------------------------------------------------------------------------------
 // Convert date string to binary date.  Used by BulkLoad.
 //------------------------------------------------------------------------------
-uint32_t DataConvert::convertColumnDate(
+int32_t DataConvert::convertColumnDate(
 	const char* dataOrg,
 	CalpontDateTimeFormat dateFormat,
 	int& status,
@@ -1433,7 +1653,7 @@ uint32_t DataConvert::convertColumnDate(
 	const char* p;
 	p = dataOrg;
 	char fld[10];
-	uint32_t value = 0;
+	int32_t value = 0;
 	if ( dateFormat != CALPONTDATE_ENUM )
 	{
 		status = -1;
@@ -1479,9 +1699,19 @@ uint32_t DataConvert::convertColumnDate(
 }
 
 //------------------------------------------------------------------------------
+// Verify that specified date is valid
+//------------------------------------------------------------------------------
+bool DataConvert::isColumnDateValid( int32_t date )
+{
+    Date d;
+    memcpy(&d, &date, sizeof(int32_t));
+    return (isDateValid(d.day, d.month, d.year));
+}
+
+//------------------------------------------------------------------------------
 // Convert date/time string to binary date/time.  Used by BulkLoad.
 //------------------------------------------------------------------------------
-uint64_t DataConvert::convertColumnDatetime(
+int64_t DataConvert::convertColumnDatetime(
 	const char* dataOrg,
 	CalpontDateTimeFormat datetimeFormat,
 	int& status,
@@ -1491,7 +1721,7 @@ uint64_t DataConvert::convertColumnDatetime(
 	const char* p;
 	p = dataOrg;
 	char fld[10];
-	uint64_t value = 0;
+	int64_t value = 0;
 	if ( datetimeFormat != CALPONTDATETIME_ENUM )
 	{
 		status = -1;
@@ -1602,6 +1832,18 @@ uint64_t DataConvert::convertColumnDatetime(
 	return value;
 }
 
+//------------------------------------------------------------------------------
+// Verify that specified datetime is valid
+//------------------------------------------------------------------------------
+bool DataConvert::isColumnDateTimeValid( int64_t dateTime )
+{
+    DateTime dt;
+    memcpy(&dt, &dateTime, sizeof(u_int64_t));
+    if (isDateValid(dt.day, dt.month, dt.year))
+        return isDateTimeValid(dt.hour, dt.minute, dt.second, dt.msecond);
+    return false;
+}
+
 std::string DataConvert::dateToString( int  datevalue )
 {
 	// @bug 4703 abandon multiple ostringstream's for conversion
@@ -1645,31 +1887,32 @@ std::string DataConvert::datetimeToString1( long long  datetimevalue )
 	sprintf(buf,"%04d%02d%02d%02d%02d%02d%06d",dt.year,dt.month,dt.day,dt.hour,dt.minute,dt.second,dt.msecond);
 	return buf;
 }
-
+#if 0
 bool DataConvert::isNullData(ColumnResult* cr, int rownum, CalpontSystemCatalog::ColType colType)
 {
 	switch (colType.colDataType)
 	{
-		case execplan::CalpontSystemCatalog::TINYINT:
+		case CalpontSystemCatalog::TINYINT:
 			if (cr->GetData(rownum) == joblist::TINYINTNULL)
 				return true;
 			return false;
-		case execplan::CalpontSystemCatalog::SMALLINT:
+		case CalpontSystemCatalog::SMALLINT:
 			if (cr->GetData(rownum) == joblist::SMALLINTNULL)
 				return true;
 			return false;
-		case execplan::CalpontSystemCatalog::MEDINT:
-		case execplan::CalpontSystemCatalog::INT:
+		case CalpontSystemCatalog::MEDINT:
+		case CalpontSystemCatalog::INT:
 			if (cr->GetData(rownum) == joblist::INTNULL)
 				return true;
 			return false;
-		case execplan::CalpontSystemCatalog::BIGINT:
+		case CalpontSystemCatalog::BIGINT:
 			if (cr->GetData(rownum) == static_cast<int64_t>(joblist::BIGINTNULL))
 				return true;
 			return false;
-		case execplan::CalpontSystemCatalog::DECIMAL:
+		case CalpontSystemCatalog::DECIMAL:
+        case CalpontSystemCatalog::UDECIMAL:
 		{
-			if (colType.colWidth <= execplan::CalpontSystemCatalog::FOUR_BYTE)
+			if (colType.colWidth <= CalpontSystemCatalog::FOUR_BYTE)
 			{
 				if (cr->GetData(rownum) == joblist::SMALLINTNULL)
 					return true;
@@ -1694,25 +1937,27 @@ bool DataConvert::isNullData(ColumnResult* cr, int rownum, CalpontSystemCatalog:
 				return false;
 			}
 		}
-		case execplan::CalpontSystemCatalog::FLOAT:
+		case CalpontSystemCatalog::FLOAT:
+        case CalpontSystemCatalog::UFLOAT:
 			//if (cr->GetStringData(rownum) == joblist::FLOATNULL)
 			if (cr->GetStringData(rownum).compare("null") == 0 )
 				return true;
 			return false;
-		case execplan::CalpontSystemCatalog::DOUBLE:
+		case CalpontSystemCatalog::DOUBLE:
+        case CalpontSystemCatalog::UDOUBLE:
 			//if (cr->GetStringData(rownum) == joblist::DOUBLENULL)
 			if (cr->GetStringData(rownum).compare("null") == 0 )
 				return true;
 			return false;
-		case execplan::CalpontSystemCatalog::DATE:
+		case CalpontSystemCatalog::DATE:
 			if (cr->GetData(rownum) == joblist::DATENULL)
 				return true;
 			return false;
-		case execplan::CalpontSystemCatalog::DATETIME:
+		case CalpontSystemCatalog::DATETIME:
 			if (cr->GetData(rownum) == static_cast<int64_t>(joblist::DATETIMENULL))
 				return true;
 			return false;
-		case execplan::CalpontSystemCatalog::CHAR:
+		case CalpontSystemCatalog::CHAR:
 		{
 			std::string charnull;
 			if ( cr->GetStringData(rownum) == "")
@@ -1750,7 +1995,7 @@ bool DataConvert::isNullData(ColumnResult* cr, int rownum, CalpontSystemCatalog:
 				return false;
 			}
 		}
-		case execplan::CalpontSystemCatalog::VARCHAR:
+		case CalpontSystemCatalog::VARCHAR:
 		{
 			std::string charnull;
 			if ( cr->GetStringData(rownum) == "")
@@ -1784,11 +2029,28 @@ bool DataConvert::isNullData(ColumnResult* cr, int rownum, CalpontSystemCatalog:
 				return false;
 			}
 		}
+        case CalpontSystemCatalog::UTINYINT:
+            if (cr->GetData(rownum) == joblist::UTINYINTNULL)
+                return true;
+            return false;
+        case CalpontSystemCatalog::USMALLINT:
+            if (cr->GetData(rownum) == joblist::USMALLINTNULL)
+                return true;
+            return false;
+        case CalpontSystemCatalog::UMEDINT:
+        case CalpontSystemCatalog::UINT:
+            if (cr->GetData(rownum) == joblist::UINTNULL)
+                return true;
+            return false;
+        case CalpontSystemCatalog::UBIGINT:
+            if (cr->GetData(rownum) == joblist::UBIGINTNULL)
+                return true;
+            return false;
 		default:
 			throw QueryDataExcept("convertColumnData: unknown column data type.", dataTypeErr);
 	}
 }
-
+#endif
 int64_t DataConvert::dateToInt(const string& date)
 {
 	return stringToDate(date);
@@ -2111,6 +2373,12 @@ CalpontSystemCatalog::ColType DataConvert::convertUnionColType(vector<CalpontSys
 			case CalpontSystemCatalog::INT:
 			case CalpontSystemCatalog::BIGINT:
 			case CalpontSystemCatalog::DECIMAL:
+            case CalpontSystemCatalog::UTINYINT:
+            case CalpontSystemCatalog::USMALLINT:
+            case CalpontSystemCatalog::UMEDINT:
+            case CalpontSystemCatalog::UINT:
+            case CalpontSystemCatalog::UBIGINT:
+            case CalpontSystemCatalog::UDECIMAL:
 			{
 				switch (unionedType.colDataType)
 				{
@@ -2120,12 +2388,23 @@ CalpontSystemCatalog::ColType DataConvert::convertUnionColType(vector<CalpontSys
 					case CalpontSystemCatalog::INT:
 					case CalpontSystemCatalog::BIGINT:
 					case CalpontSystemCatalog::DECIMAL:
+                    case CalpontSystemCatalog::UTINYINT:
+                    case CalpontSystemCatalog::USMALLINT:
+                    case CalpontSystemCatalog::UMEDINT:
+                    case CalpontSystemCatalog::UINT:
+                    case CalpontSystemCatalog::UBIGINT:
+                    case CalpontSystemCatalog::UDECIMAL:
 						if (types[i].colWidth > unionedType.colWidth)
 						{
 							unionedType.colDataType = types[i].colDataType;
 							unionedType.colWidth = types[i].colWidth;
 						}
-						if (types[i].colDataType == CalpontSystemCatalog::DECIMAL)
+                        // If same size and result is signed but source is unsigned...
+                        if (types[i].colWidth == unionedType.colWidth && !isUnsigned(unionedType.colDataType) && isUnsigned(types[i].colDataType))
+                        {
+                            unionedType.colDataType = types[i].colDataType;
+                        }
+						if (types[i].colDataType == CalpontSystemCatalog::DECIMAL || types[i].colDataType == CalpontSystemCatalog::UDECIMAL)
 						{
 							unionedType.colDataType = CalpontSystemCatalog::DECIMAL;
 						}
@@ -2146,6 +2425,8 @@ CalpontSystemCatalog::ColType DataConvert::convertUnionColType(vector<CalpontSys
 						break;
 					case CalpontSystemCatalog::FLOAT:
 					case CalpontSystemCatalog::DOUBLE:
+                    case CalpontSystemCatalog::UFLOAT:
+                    case CalpontSystemCatalog::UDOUBLE:
 					default:
 						break;
 				}
@@ -2164,6 +2445,14 @@ CalpontSystemCatalog::ColType DataConvert::convertUnionColType(vector<CalpontSys
 					case CalpontSystemCatalog::DECIMAL:
 					case CalpontSystemCatalog::FLOAT:
 					case CalpontSystemCatalog::DOUBLE:
+                    case CalpontSystemCatalog::UTINYINT:
+                    case CalpontSystemCatalog::USMALLINT:
+                    case CalpontSystemCatalog::UMEDINT:
+                    case CalpontSystemCatalog::UINT:
+                    case CalpontSystemCatalog::UBIGINT:
+                    case CalpontSystemCatalog::UDECIMAL:
+                    case CalpontSystemCatalog::UFLOAT:
+                    case CalpontSystemCatalog::UDOUBLE:
 						unionedType.colDataType = CalpontSystemCatalog::CHAR;
 						unionedType.scale = 0;
 						unionedType.colWidth = 20;
@@ -2193,6 +2482,14 @@ CalpontSystemCatalog::ColType DataConvert::convertUnionColType(vector<CalpontSys
 					case CalpontSystemCatalog::DECIMAL:
 					case CalpontSystemCatalog::FLOAT:
 					case CalpontSystemCatalog::DOUBLE:
+                    case CalpontSystemCatalog::UTINYINT:
+                    case CalpontSystemCatalog::USMALLINT:
+                    case CalpontSystemCatalog::UMEDINT:
+                    case CalpontSystemCatalog::UINT:
+                    case CalpontSystemCatalog::UBIGINT:
+                    case CalpontSystemCatalog::UDECIMAL:
+                    case CalpontSystemCatalog::UFLOAT:
+                    case CalpontSystemCatalog::UDOUBLE:
 						unionedType.colDataType = CalpontSystemCatalog::CHAR;
 						unionedType.scale = 0;
 						unionedType.colWidth = 26;
@@ -2215,6 +2512,8 @@ CalpontSystemCatalog::ColType DataConvert::convertUnionColType(vector<CalpontSys
 
 			case CalpontSystemCatalog::FLOAT:
 			case CalpontSystemCatalog::DOUBLE:
+            case CalpontSystemCatalog::UFLOAT:
+            case CalpontSystemCatalog::UDOUBLE:
 			{
 				switch (unionedType.colDataType)
 				{
@@ -2241,6 +2540,14 @@ CalpontSystemCatalog::ColType DataConvert::convertUnionColType(vector<CalpontSys
 					case CalpontSystemCatalog::DECIMAL:
 					case CalpontSystemCatalog::FLOAT:
 					case CalpontSystemCatalog::DOUBLE:
+                    case CalpontSystemCatalog::UTINYINT:
+                    case CalpontSystemCatalog::USMALLINT:
+                    case CalpontSystemCatalog::UMEDINT:
+                    case CalpontSystemCatalog::UINT:
+                    case CalpontSystemCatalog::UBIGINT:
+                    case CalpontSystemCatalog::UDECIMAL:
+                    case CalpontSystemCatalog::UFLOAT:
+                    case CalpontSystemCatalog::UDOUBLE:
 						unionedType.colDataType = CalpontSystemCatalog::DOUBLE;
 						unionedType.scale = 0;
 						unionedType.colWidth = sizeof(double);
@@ -2264,6 +2571,14 @@ CalpontSystemCatalog::ColType DataConvert::convertUnionColType(vector<CalpontSys
 					case CalpontSystemCatalog::DECIMAL:
 					case CalpontSystemCatalog::FLOAT:
 					case CalpontSystemCatalog::DOUBLE:
+                    case CalpontSystemCatalog::UTINYINT:
+                    case CalpontSystemCatalog::USMALLINT:
+                    case CalpontSystemCatalog::UMEDINT:
+                    case CalpontSystemCatalog::UINT:
+                    case CalpontSystemCatalog::UBIGINT:
+                    case CalpontSystemCatalog::UDECIMAL:
+                    case CalpontSystemCatalog::UFLOAT:
+                    case CalpontSystemCatalog::UDOUBLE:
 						unionedType.scale = 0;
 						unionedType.colWidth = (types[i].colWidth > 20) ? types[i].colWidth : 20;
 						break;

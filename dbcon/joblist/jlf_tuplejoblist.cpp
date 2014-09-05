@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: jlf_tuplejoblist.cpp 9704 2013-07-17 19:18:23Z xlou $
+//  $Id: jlf_tuplejoblist.cpp 9703 2013-07-17 19:18:19Z xlou $
 
 
 #include <iostream>
@@ -100,33 +100,18 @@ void tupleKeyToProjectStep(uint key, JobStepVector& jsv, JobInfo& jobInfo)
 	}
 
 	CalpontSystemCatalog::OID tableOid = jobInfo.keyInfo->tupleKeyToTableOid.find(key)->second;
-	JobStepAssociation dummyJsa(jobInfo.status);
-	AnyDataListSPtr adl(new AnyDataList());
-	RowGroupDL* dl = new RowGroupDL(1, jobInfo.fifoSize);
-	dl->OID(oid);
-	adl->rowGroupDL(dl);
-	dummyJsa.outAdd(adl);
+//	JobStepAssociation dummyJsa;
+//	AnyDataListSPtr adl(new AnyDataList());
+//	RowGroupDL* dl = new RowGroupDL(1, jobInfo.fifoSize);
+//	dl->OID(oid);
+//	adl->rowGroupDL(dl);
+//	dummyJsa.outAdd(adl);
 
 	CalpontSystemCatalog::ColType ct = jobInfo.keyInfo->colType[key];
 	if (jobInfo.keyInfo->token2DictTypeMap.find(key) != jobInfo.keyInfo->token2DictTypeMap.end())
 		ct = jobInfo.keyInfo->token2DictTypeMap[key];
 
-	SJSTEP sjs(new pColStep(dummyJsa,
-							dummyJsa,
-							0,
-							jobInfo.csc,
-							oid,
-							tableOid,
-							ct,
-							jobInfo.sessionId,
-							jobInfo.txnId,
-							jobInfo.verId,
-							0,
-							jobInfo.statementId,
-							jobInfo.rm,
-							jobInfo.flushInterval,
-							jobInfo.isExeMgr));
-	sjs->logger(jobInfo.logger);
+	SJSTEP sjs(new pColStep(oid, tableOid, ct, jobInfo));
 	sjs->alias(jobInfo.keyInfo->tupleKeyVec[key].fTable);
 	sjs->view(jobInfo.keyInfo->tupleKeyVec[key].fView);
 	sjs->schema(jobInfo.keyInfo->tupleKeyVec[key].fSchema);
@@ -145,21 +130,7 @@ void tupleKeyToProjectStep(uint key, JobStepVector& jsv, JobInfo& jobInfo)
 		// Need a dictionary step
 		uint dictKey = jobInfo.keyInfo->dictKeyMap[key];
 		CalpontSystemCatalog::OID dictOid = jobInfo.keyInfo->tupleKeyVec[dictKey].fId;
-		sjs.reset(new pDictionaryStep(dummyJsa,
-									dummyJsa,
-									0,
-									jobInfo.csc,
-									dictOid,
-									ct.ddn.compressionType,
-									tableOid,
-									jobInfo.sessionId,
-									jobInfo.txnId,
-									jobInfo.verId,
-									0,
-									jobInfo.statementId,
-									jobInfo.rm,
-									jobInfo.flushInterval));
-		sjs->logger(jobInfo.logger);
+		sjs.reset(new pDictionaryStep(dictOid, tableOid, ct, jobInfo));
 		sjs->alias(jobInfo.keyInfo->tupleKeyVec[dictKey].fTable);
 		sjs->view(jobInfo.keyInfo->tupleKeyVec[dictKey].fView);
 		sjs->schema(jobInfo.keyInfo->tupleKeyVec[dictKey].fSchema);
@@ -429,7 +400,7 @@ void adjustLastStep(JobStepVector& querySteps, DeliveredTableMap& deliverySteps,
 	if (jobInfo.hasAggregation == false)
 	{
 		if (thjs != NULL) //setup a few things for the final thjs step...
-			thjs->outputAssociation(JobStepAssociation(jobInfo.status));
+			thjs->outputAssociation(JobStepAssociation());
 
 		deliverySteps[CNX_VTABLE_ID] = spjs;
 	}
@@ -452,7 +423,7 @@ void adjustLastStep(JobStepVector& querySteps, DeliveredTableMap& deliverySteps,
 		RowGroupDL* dlIn = new RowGroupDL(1, jobInfo.fifoSize);
 		dlIn->OID(CNX_VTABLE_ID);
 		spdlIn->rowGroupDL(dlIn);
-		JobStepAssociation jsaIn(jobInfo.status);
+		JobStepAssociation jsaIn;
 		jsaIn.outAdd(spdlIn);
 		dynamic_cast<JobStep*>(ds)->outputAssociation(jsaIn);
 		jobInfo.havingStep->inputAssociation(jsaIn);
@@ -461,7 +432,7 @@ void adjustLastStep(JobStepVector& querySteps, DeliveredTableMap& deliverySteps,
 		RowGroupDL* dlOut = new RowGroupDL(1, jobInfo.fifoSize);
 		dlOut->OID(CNX_VTABLE_ID);
 		spdlOut->rowGroupDL(dlOut);
-		JobStepAssociation jsaOut(jobInfo.status);
+		JobStepAssociation jsaOut;
 		jsaOut.outAdd(spdlOut);
 		jobInfo.havingStep->outputAssociation(jsaOut);
 
@@ -476,14 +447,10 @@ void adjustLastStep(JobStepVector& querySteps, DeliveredTableMap& deliverySteps,
 		(jobInfo.hasDistinct && jobInfo.hasImplicitGroupBy))
 	{
 		if (jobInfo.annexStep.get() == NULL)
-			jobInfo.annexStep.reset(new  TupleAnnexStep(jobInfo.sessionId,
-														jobInfo.txnId,
-														jobInfo.verId,
-														jobInfo.statementId,
-														jobInfo));
+			jobInfo.annexStep.reset(new TupleAnnexStep(jobInfo));
 
 		TupleAnnexStep* tas = dynamic_cast<TupleAnnexStep*>(jobInfo.annexStep.get());
-		tas->setLimit(jobInfo.limitCount);
+		tas->setLimit(jobInfo.limitStart, jobInfo.limitCount);
 
 		if (jobInfo.limitCount != (uint64_t) -1)
 		{
@@ -492,17 +459,10 @@ void adjustLastStep(JobStepVector& querySteps, DeliveredTableMap& deliverySteps,
 		}
 
 		if (jobInfo.constantCol == CONST_COL_EXIST)
-			tas->addConstant(new TupleConstantStep(JobStepAssociation(jobInfo.status),
-																JobStepAssociation(jobInfo.status),
-																jobInfo.sessionId,
-																jobInfo.txnId,
-																jobInfo.verId,
-																jobInfo.statementId));
+			tas->addConstant(new TupleConstantStep(jobInfo));
 
 		if (jobInfo.hasDistinct && jobInfo.hasImplicitGroupBy)
 			tas->setDistinct();
-
-		tas->logger(jobInfo.logger);
 	}
 
 	if (jobInfo.annexStep)
@@ -515,7 +475,7 @@ void adjustLastStep(JobStepVector& querySteps, DeliveredTableMap& deliverySteps,
 		RowGroupDL* dlIn = new RowGroupDL(1, jobInfo.fifoSize);
 		dlIn->OID(CNX_VTABLE_ID);
 		spdlIn->rowGroupDL(dlIn);
-		JobStepAssociation jsaIn(jobInfo.status);
+		JobStepAssociation jsaIn;
 		jsaIn.outAdd(spdlIn);
 		dynamic_cast<JobStep*>(ds)->outputAssociation(jsaIn);
 		jobInfo.annexStep->inputAssociation(jsaIn);
@@ -524,7 +484,7 @@ void adjustLastStep(JobStepVector& querySteps, DeliveredTableMap& deliverySteps,
 		RowGroupDL* dlOut = new RowGroupDL(1, jobInfo.fifoSize);
 		dlOut->OID(CNX_VTABLE_ID);
 		spdlOut->rowGroupDL(dlOut);
-		JobStepAssociation jsaOut(jobInfo.status);
+		JobStepAssociation jsaOut;
 		jsaOut.outAdd(spdlOut);
 		jobInfo.annexStep->outputAssociation(jsaOut);
 
@@ -536,14 +496,8 @@ void adjustLastStep(JobStepVector& querySteps, DeliveredTableMap& deliverySteps,
 	// Check if constant false
 	if (jobInfo.constantFalse)
 	{
-		TupleConstantBooleanStep* tcs = new
-			TupleConstantBooleanStep(JobStepAssociation(),
-									 querySteps.back().get()->outputAssociation(),
-									 jobInfo.sessionId,
-									 jobInfo.txnId,
-									 jobInfo.verId,
-									 jobInfo.statementId,
-									 false);
+		TupleConstantBooleanStep* tcs = new TupleConstantBooleanStep(jobInfo, false);
+		tcs->outputAssociation(querySteps.back().get()->outputAssociation());
 		TupleDeliveryStep* tds =
 			dynamic_cast<TupleDeliveryStep*>(deliverySteps[CNX_VTABLE_ID].get());
 		tcs->initialize(tds->getDeliveredRowGroup(), jobInfo);
@@ -641,7 +595,7 @@ void addProjectStepsToBps(TableInfoMap::iterator& mit, BatchPrimitive* bps, JobI
 		pColStep* pcol = dynamic_cast<pColStep*>(js);
 		if (pcol != NULL && js->oid() == lastOid)
 		{
-			PassThruStep* pts = new PassThruStep(*pcol, jobInfo.isExeMgr);
+			PassThruStep* pts = new PassThruStep(*pcol);
 			pts->alias(pcol->alias());
 			pts->view(pcol->view());
 			pts->name(pcol->name());
@@ -704,7 +658,7 @@ void addProjectStepsToBps(TableInfoMap::iterator& mit, BatchPrimitive* bps, JobI
 	RowGroupDL* dl = new RowGroupDL(1, jobInfo.fifoSize);
 	spdl->rowGroupDL(dl);
 	dl->OID(mit->first);
-	JobStepAssociation jsa(jobInfo.status);
+	JobStepAssociation jsa;
 	jsa.outAdd(spdl);
 	bps->outputAssociation(jsa);
 	bps->setOutputRowGroup(rg);
@@ -731,21 +685,9 @@ void addExpresssionStepsToBps(TableInfoMap::iterator& mit, SJSTEP& sjsp, JobInfo
 				ct = jobInfo.keyInfo->token2DictTypeMap[key0];
 
 			scoped_ptr<pColScanStep> pcss(
-					new pColScanStep(JobStepAssociation(jobInfo.status),
-									 JobStepAssociation(jobInfo.status),
-									 0,
-									 jobInfo.csc,
-									 exp0->oid(),
-									 tableOid,
-									 ct,
-									 jobInfo.sessionId,
-									 jobInfo.txnId,
-									 jobInfo.verId,
-									 0,
-									 jobInfo.statementId,
-									 jobInfo.rm));
+					new pColScanStep(exp0->oid(), tableOid, ct, jobInfo));
 
-			sjsp.reset(new TupleBPS(*pcss));
+			sjsp.reset(new TupleBPS(*pcss, jobInfo));
 			TupleBPS* tbps = dynamic_cast<TupleBPS*>(sjsp.get());
 			tbps->setJobInfo(&jobInfo);
 			tbps->setFirstStepType(SCAN);
@@ -757,18 +699,13 @@ void addExpresssionStepsToBps(TableInfoMap::iterator& mit, SJSTEP& sjsp, JobInfo
 		}
 		else
 		{
-			sjsp.reset(new  CrossEngineStep(JobStepAssociation(jobInfo.status),
-											JobStepAssociation(jobInfo.status),
-											jobInfo.statementId,
-											mit->second.fSchema,
+			sjsp.reset(new  CrossEngineStep(mit->second.fSchema,
 											mit->second.fName,
 											mit->second.fAlias,
 											jobInfo));
 
 			bps = dynamic_cast<CrossEngineStep*>(sjsp.get());
 		}
-
-		bps->logger(jobInfo.logger);
 	}
 
 	// rowgroup for evaluating the expression
@@ -854,7 +791,7 @@ bool combineJobStepsByTable(TableInfoMap::iterator& mit, JobInfo& jobInfo)
 
 			// construct a pcolscanstep to initialize the tbps
 			CalpontSystemCatalog::OID oid = jobInfo.keyInfo->tupleKeyVec[key].fId;
-			JobStepAssociation dummyJsa(jobInfo.status);
+			JobStepAssociation dummyJsa;
 			AnyDataListSPtr adl(new AnyDataList());
 			RowGroupDL* dl = new RowGroupDL(1, jobInfo.fifoSize);
 			dl->OID(oid);
@@ -866,20 +803,7 @@ bool combineJobStepsByTable(TableInfoMap::iterator& mit, JobInfo& jobInfo)
 				jobInfo.keyInfo->token2DictTypeMap.end())
 				ct = jobInfo.keyInfo->token2DictTypeMap[key];
 
-			SJSTEP sjs(new pColScanStep(dummyJsa,
-									dummyJsa,
-									0,
-									jobInfo.csc,
-									oid,
-									tableOid,
-									ct,
-									jobInfo.sessionId,
-									jobInfo.txnId,
-									jobInfo.verId,
-									0,
-									jobInfo.statementId,
-									jobInfo.rm));
-			sjs->logger(jobInfo.logger);
+			SJSTEP sjs(new pColScanStep(oid, tableOid, ct, jobInfo));
 			sjs->alias(jobInfo.keyInfo->tupleKeyVec[key].fTable);
 			sjs->view(jobInfo.keyInfo->tupleKeyVec[key].fView);
 			sjs->schema(jobInfo.keyInfo->tupleKeyVec[key].fSchema);
@@ -895,25 +819,8 @@ bool combineJobStepsByTable(TableInfoMap::iterator& mit, JobInfo& jobInfo)
 		JobStepVector::iterator end = qsv.end();
 		JobStepVector::iterator it = begin;
 
-		// make sure there is a pcolscan if there is a pcolstep
-		while (it != end)
-		{
-			if (typeid(*(it->get())) == typeid(pColScanStep))
-				break;
-
-			if (typeid(*(it->get())) == typeid(pColStep))
-			{
-				pColStep* pcs = dynamic_cast<pColStep*>(it->get());
-				(*it).reset(new pColScanStep(*pcs));
-				break;
-			}
-
-			it++;
-		}
-
 		// ---- predicates ----
 		// setup TBPS and dictionaryscan
-		it = begin;
 		while (it != end)
 		{
 			if (typeid(*(it->get())) == typeid(pColScanStep))
@@ -922,7 +829,7 @@ bool combineJobStepsByTable(TableInfoMap::iterator& mit, JobInfo& jobInfo)
 				{
 					if (tableOid > 0)
 					{
-						sjsp.reset(new TupleBPS(*(dynamic_cast<pColScanStep*>(it->get()))));
+						sjsp.reset(new TupleBPS(*(dynamic_cast<pColScanStep*>(it->get())),jobInfo));
 						TupleBPS* tbps = dynamic_cast<TupleBPS*>(sjsp.get());
 						tbps->setJobInfo(&jobInfo);
 						tbps->setFirstStepType(SCAN);
@@ -930,17 +837,12 @@ bool combineJobStepsByTable(TableInfoMap::iterator& mit, JobInfo& jobInfo)
 					}
 					else
 					{
-						sjsp.reset(new  CrossEngineStep(JobStepAssociation(jobInfo.status),
-														JobStepAssociation(jobInfo.status),
-														jobInfo.statementId,
-														mit->second.fSchema,
+						sjsp.reset(new  CrossEngineStep(mit->second.fSchema,
 														mit->second.fName,
 														mit->second.fAlias,
 														jobInfo));
 						bps = dynamic_cast<CrossEngineStep*>(sjsp.get());
 					}
-
-					bps->logger(jobInfo.logger);
 				}
 				else
 				{
@@ -1107,12 +1009,7 @@ bool combineJobStepsByTable(TableInfoMap::iterator& mit, JobInfo& jobInfo)
 			// ---- token joins ----
 			// construct a TupleHashJoinStep
 			TupleBPS* tbps = dynamic_cast<TupleBPS*>(bps);
-			TupleHashJoinStep* thjs= new TupleHashJoinStep(
-				jobInfo.sessionId,
-				jobInfo.txnId,
-				jobInfo.statementId,
-				&jobInfo.rm);
-			thjs->logger(jobInfo.logger);
+			TupleHashJoinStep* thjs= new TupleHashJoinStep(jobInfo);
 			thjs->tableOid1(0);
 			thjs->tableOid2(tableInfo.fTableOid);
 			thjs->alias1(tableInfo.fAlias);
@@ -1140,7 +1037,7 @@ bool combineJobStepsByTable(TableInfoMap::iterator& mit, JobInfo& jobInfo)
 			vector<vector<uint> > smallKeyIndices;
 			vector<vector<uint> > largeKeyIndices;
 			vector<string> tableNames;
-			JobStepAssociation inJsa(jobInfo.status);
+			JobStepAssociation inJsa;
 			for (vector<DictionaryScanInfo>::iterator i = pdsVec.begin(); i != pdsVec.end(); i++)
 			{
 				// add the token steps to the TBPS
@@ -1149,22 +1046,10 @@ bool combineJobStepsByTable(TableInfoMap::iterator& mit, JobInfo& jobInfo)
 				unsigned largeSideIndex = rgTbps.getColumnCount();
 				if (k == addedCol.end())
 				{
-					SJSTEP sjs(new pColStep(JobStepAssociation(jobInfo.status),
-											JobStepAssociation(jobInfo.status),
-											0,
-											jobInfo.csc,
-											jobInfo.keyInfo->tupleKeyVec[tupleKey].fId,
+					SJSTEP sjs(new pColStep(jobInfo.keyInfo->tupleKeyVec[tupleKey].fId,
 											tableInfo.fTableOid,
 											jobInfo.keyInfo->token2DictTypeMap[tupleKey],
-											jobInfo.sessionId,
-											jobInfo.txnId,
-											jobInfo.verId,
-											0,
-											jobInfo.statementId,
-											jobInfo.rm,
-											jobInfo.flushInterval,
-											jobInfo.isExeMgr));
-					sjs->logger(jobInfo.logger);
+											jobInfo));
 					sjs->alias(tableInfo.fAlias);
 					sjs->view(tableInfo.fView);
 					sjs->schema(tableInfo.fSchema);
@@ -1204,7 +1089,7 @@ bool combineJobStepsByTable(TableInfoMap::iterator& mit, JobInfo& jobInfo)
 			RowGroupDL* dl = new RowGroupDL(1, jobInfo.fifoSize);
 			spdl->rowGroupDL(dl);
 			dl->OID(mit->first);
-			JobStepAssociation jsaOut(jobInfo.status);
+			JobStepAssociation jsaOut;
 			jsaOut.outAdd(spdl);
 			thjs->outputAssociation(jsaOut);
 
@@ -1473,15 +1358,9 @@ void outjoinPredicateAdjust(TableInfoMap& tableInfoMap, JobInfo& jobInfo)
 		if (tblInfo.fTableOid != CNX_VTABLE_ID)
 		{
 			JobStepVector::iterator k = tblInfo.fQuerySteps.begin();
-			JobStepVector onClauseFilterSteps;  //@bug5887, 5311
+			bool isOnClauseFilter = false;  // bug5311
 			for (; k != tblInfo.fQuerySteps.end(); k++)
 			{
-				if ((*k)->onClauseFilter())
-				{
-					onClauseFilterSteps.push_back(*k);
-					continue;
-				}
-
 				uint colKey = -1;
 				pColStep* pcs = dynamic_cast<pColStep*>(k->get());
 				pColScanStep* pcss = dynamic_cast<pColScanStep*>(k->get());
@@ -1516,30 +1395,41 @@ void outjoinPredicateAdjust(TableInfoMap& tableInfoMap, JobInfo& jobInfo)
 
 				if (filters != NULL && filters->size() > 0)
 				{
+					for (size_t i = 0; i < filters->size() && !isOnClauseFilter; i++)
+					{
+						const TreeNode* tn = dynamic_cast<const TreeNode*>((*filters)[i]);
+						for (size_t j = 0; j < jobInfo.onClauseFilter.size(); j++)
+						{
+							// ok for small vector
+							if (tn == jobInfo.onClauseFilter[j]->data())
+							{
+								isOnClauseFilter = true;
+								break;
+							}
+						}
+					}
+
+					if (isOnClauseFilter)
+						continue;
+
 					ParseTree* pt = new ParseTree((*filters)[0]->clone());
 					for (size_t i = 1; i < filters->size(); i++)
 					{
 						ParseTree* left = pt;
-						ParseTree* right =
-							new ParseTree((*filters)[i]->clone());
+						ParseTree* right = new ParseTree((*filters)[i]->clone());
 						ParseTree* op = (BOP_OR == bop) ?
-							new ParseTree(new LogicOperator("or")) :
-							new ParseTree(new LogicOperator("and"));
+											new ParseTree(new LogicOperator("or")) :
+											new ParseTree(new LogicOperator("and"));
 						op->left(left);
 						op->right(right);
 
 						pt = op;
 					}
 
-					ExpressionStep* es = new ExpressionStep(jobInfo.sessionId,
-															jobInfo.txnId,
-															jobInfo.verId,
-															jobInfo.statementId);
-
+					ExpressionStep* es = new ExpressionStep(jobInfo);
 					if (es == NULL)
-						throw runtime_error ("Failed to new ExpressionStep 2");
+						throw runtime_error ("Failed to create ExpressionStep 2");
 
-					es->logger(jobInfo.logger);
 					es->expressionFilter(pt, jobInfo);
 					SJSTEP sjstep(es);
 					jobInfo.outerJoinExpressions.push_back(sjstep);
@@ -1550,8 +1440,9 @@ void outjoinPredicateAdjust(TableInfoMap& tableInfoMap, JobInfo& jobInfo)
 			}
 
 			// Do not apply the primitive filters if there is an "IS NULL" in where clause.
-			if (jobInfo.tableHasIsNull.find(*i) != jobInfo.tableHasIsNull.end())
-				tblInfo.fQuerySteps = onClauseFilterSteps;
+			if (!isOnClauseFilter &&
+				jobInfo.tableHasIsNull.find(*i) != jobInfo.tableHasIsNull.end())
+				tblInfo.fQuerySteps.clear();
 		}
 
 		jobInfo.outerJoinExpressions.insert(jobInfo.outerJoinExpressions.end(),
@@ -1698,19 +1589,16 @@ SP_JoinInfo joinToLargeTable(uint large, TableInfoMap& tableInfoMap,
 	vector<SP_JoinInfo> smallSides;
 	tableInfoMap[large].fVisited = true;
 	tableInfoMap[large].fJoinedTables.insert(large);
-	set<uint32_t>& tableSet = tableInfoMap[large].fJoinedTables;
-	vector<uint32_t>& adjList = tableInfoMap[large].fAdjacentList;
-	uint32_t prevLarge = (uint32_t) getPrevLarge(large, tableInfoMap);
-	bool root = (prevLarge == (uint32_t) -1) ? true : false;
-	uint32_t link = large;
-	uint32_t cId = -1;
+	set<uint>& tableSet = tableInfoMap[large].fJoinedTables;
+	vector<uint>& adjList = tableInfoMap[large].fAdjacentList;
+	uint prevLarge = (uint) getPrevLarge(large, tableInfoMap);
+	bool root = (prevLarge == (uint) -1) ? true : false;
 
 	// Get small sides ready.
 	for (vector<uint>::iterator i = adjList.begin(); i != adjList.end(); i++)
 	{
 		if (tableInfoMap[*i].fVisited == false)
 		{
-			cId = *i;
 			smallSides.push_back(joinToLargeTable(*i, tableInfoMap, jobInfo, joinOrder));
 
 			tableSet.insert(tableInfoMap[*i].fJoinedTables.begin(),
@@ -1726,41 +1614,6 @@ SP_JoinInfo joinToLargeTable(uint large, TableInfoMap& tableInfoMap,
 		BatchPrimitive* bps = dynamic_cast<BatchPrimitive*>(spjs.get());
 		SubAdapterStep* tsas = dynamic_cast<SubAdapterStep*>(spjs.get());
 		TupleHashJoinStep* thjs = dynamic_cast<TupleHashJoinStep*>(spjs.get());
-
-		// @bug6158, try to put BPS on large side if possible
-		if (tsas && smallSides.size() == 1)
-		{
-			SJSTEP sspjs = tableInfoMap[cId].fQuerySteps.back(),get();
-			BatchPrimitive* sbps = dynamic_cast<BatchPrimitive*>(sspjs.get());
-			TupleHashJoinStep* sthjs = dynamic_cast<TupleHashJoinStep*>(sspjs.get());
-			if (sbps || (sthjs && sthjs->tokenJoin() == cId))
-			{
-				SP_JoinInfo largeJoinInfo(new JoinInfo);
-				largeJoinInfo->fTableOid = tableInfoMap[large].fTableOid;
-				largeJoinInfo->fAlias = tableInfoMap[large].fAlias;
-				largeJoinInfo->fView = tableInfoMap[large].fView;
-				largeJoinInfo->fSchema = tableInfoMap[large].fSchema;
-
-				largeJoinInfo->fDl = tableInfoMap[large].fDl;
-				largeJoinInfo->fRowGroup = tableInfoMap[large].fRowGroup;
-
-				TableJoinMap::iterator mit = jobInfo.tableJoinMap.find(make_pair(large, cId));
-				if (mit == jobInfo.tableJoinMap.end())
-					throw runtime_error("Join step not found.");
-				largeJoinInfo->fJoinData = mit->second;
-
-				// switch large and small sides
-				joinOrder.back() = large;
-				large = cId;
-				smallSides[0] = largeJoinInfo;
-				tableInfoMap[large].fJoinedTables = tableSet;
-
-				bps = sbps;
-				thjs = sthjs;
-				tsas = NULL;
-			}
-		}
-
 		if (!bps && !thjs && !tsas)
 		{
 			if (dynamic_cast<SubQueryStep*>(spjs.get()))
@@ -1856,12 +1709,7 @@ SP_JoinInfo joinToLargeTable(uint large, TableInfoMap& tableInfoMap,
 
 		if (bps || tsas)
 		{
-			thjs= new TupleHashJoinStep(
-				jobInfo.sessionId,
-				jobInfo.txnId,
-				jobInfo.statementId,
-				&jobInfo.rm,jobInfo.isExeMgr);
-			thjs->logger(jobInfo.logger);
+			thjs= new TupleHashJoinStep(jobInfo);
 			thjs->tableOid1(smallSides[0]->fTableOid);
 			thjs->tableOid2(tableInfoMap[large].fTableOid);
 			thjs->alias1(smallSides[0]->fAlias);
@@ -1878,13 +1726,13 @@ SP_JoinInfo joinToLargeTable(uint large, TableInfoMap& tableInfoMap,
 
 			SJSTEP spjs(thjs);
 
-			JobStepAssociation inJsa(jobInfo.status);
+			JobStepAssociation inJsa;
 			inJsa.outAdd(smallSideDLs, 0);
 			inJsa.outAdd(tableInfoMap[large].fDl);
 			thjs->inputAssociation(inJsa);
 			thjs->setLargeSideDLIndex(inJsa.outSize() - 1);
 
-			JobStepAssociation outJsa(jobInfo.status);
+			JobStepAssociation outJsa;
 			AnyDataListSPtr spdl(new AnyDataList());
 			RowGroupDL* dl = new RowGroupDL(1, jobInfo.fifoSize);
 			spdl->rowGroupDL(dl);
@@ -1914,7 +1762,7 @@ SP_JoinInfo joinToLargeTable(uint large, TableInfoMap& tableInfoMap,
 		}
 
 		RowGroup rg;
-		constructJoinedRowGroup(rg, link, prevLarge, root, tableSet, tableInfoMap, jobInfo);
+		constructJoinedRowGroup(rg, large, prevLarge, root, tableSet, tableInfoMap, jobInfo);
 		thjs->setOutputRowGroup(rg);
 		tableInfoMap[large].fRowGroup = rg;
 		if (jobInfo.trace)
@@ -1938,7 +1786,8 @@ SP_JoinInfo joinToLargeTable(uint large, TableInfoMap& tableInfoMap,
 			uint64_t i = 0;
 			for (; i < tables.size(); i++)
 			{
-				if (tableSet.find(tables[i]) == tableSet.end())
+				if (tableInfoMap[large].fJoinedTables.find(tables[i]) ==
+						tableInfoMap[large].fJoinedTables.end())
 					break;
 			}
 
@@ -2090,7 +1939,7 @@ SP_JoinInfo joinToLargeTable(uint large, TableInfoMap& tableInfoMap,
 
 			// update the fColsInExp2 and construct the output RG
 			updateExp2Cols(readyExpSteps, tableInfoMap, jobInfo);
-			constructJoinedRowGroup(rg, link, prevLarge, root, tableSet, tableInfoMap, jobInfo);
+			constructJoinedRowGroup(rg, large, prevLarge, root, tableSet, tableInfoMap, jobInfo);
 			if (thjs->hasFcnExpGroup2())
 				thjs->setFE23Output(rg);
 			else
@@ -2117,7 +1966,7 @@ SP_JoinInfo joinToLargeTable(uint large, TableInfoMap& tableInfoMap,
 
 	if (root == false)  // not root
 	{
-		TableJoinMap::iterator mit = jobInfo.tableJoinMap.find(make_pair(link, prevLarge));
+		TableJoinMap::iterator mit = jobInfo.tableJoinMap.find(make_pair(large, prevLarge));
 		if (mit == jobInfo.tableJoinMap.end())
 			throw runtime_error("Join step not found.");
 
@@ -2253,10 +2102,7 @@ void joinTablesInOrder(uint largest, JobStepVector& joinSteps, TableInfoMap& tab
 
 	for (uint64_t js = 0; js < joins.size(); js++)
 	{
-		map<uint64_t, size_t> joinIdIndexMap;
 		set<uint> smallSideTid;
-		size_t index = 0;
-		joinIdIndexMap[joins[js].fJoinId] = index++;
 
 		if (joins[js].fJoinId != 0)
 			isSemijoin = false;
@@ -2294,7 +2140,7 @@ void joinTablesInOrder(uint largest, JobStepVector& joinSteps, TableInfoMap& tab
 		smallSideTid.insert(small);
 
 		// merge in the next step if the large side is the same
-		for (uint64_t ns  = js + 1; ns < joins.size(); ns++)
+		for (uint64_t ns  = js + 1; ns < joins.size(); js++, ns++)
 		{
 			uint tid1 = joins[ns].fTid1;
 			uint tid2 = joins[ns].fTid2;
@@ -2334,10 +2180,6 @@ void joinTablesInOrder(uint largest, JobStepVector& joinSteps, TableInfoMap& tab
 			lastJoinId = joins[ns].fJoinId;
 			if (find(joinedTable.begin(), joinedTable.end(), small) == joinedTable.end())
 				joinedTable.push_back(small);
-			smallSideTid.insert(small);
-
-			joinIdIndexMap[joins[ns].fJoinId] = index++;
-			js++;
 		}
 
 		joinedTable.push_back(large);
@@ -2365,54 +2207,51 @@ void joinTablesInOrder(uint largest, JobStepVector& joinSteps, TableInfoMap& tab
 		vector<vector<uint> > smallKeyIndices;
 		vector<vector<uint> > largeKeyIndices;
 
- 		// bug5764, make sure semi joins acting as filter is after outer join.
- 		{
- 			// the inner table filters have to be performed after outer join
- 			vector<uint64_t> semijoins;
- 			vector<uint64_t> smallouts;
- 			for (size_t i = 0; i < smallSides.size(); i++)
- 			{
- 				// find the the small-outer and semi-join joins
- 				JoinType jt = smallSides[i]->fJoinData.fTypes[0];
- 				if (jt & SMALLOUTER)
- 					smallouts.push_back(i);
- 				else if (jt & (SEMI | ANTI | SCALAR | CORRELATED))
- 					semijoins.push_back(i);
- 			}
- 
- 			// check the join order, re-arrange if necessary
- 			if (smallouts.size() > 0 && semijoins.size() > 0)
- 			{
- 				uint64_t lastSmallOut = smallouts.back();
- 				uint64_t lastSemijoin = semijoins.back();
- 				if (lastSmallOut > lastSemijoin)
- 				{
- 					vector<SP_JoinInfo> temp1;
- 					vector<SP_JoinInfo> temp2;
- 					size_t j = 0;
- 					for (size_t i = 0; i < smallSides.size(); i++)
- 					{
- 						if (j < semijoins.size() && i == semijoins[j])
- 						{
- 							temp1.push_back(smallSides[i]);
- 							j++;
- 						}
- 						else
- 						{
- 							temp2.push_back(smallSides[i]);
- 						}
- 
- 						if (i == lastSmallOut)
- 							temp2.insert(temp2.end(), temp1.begin(), temp1.end());
- 					}
- 
- 					smallSides = temp2;
- 
- 					for (size_t i = 0; i < smallSides.size(); i++)
- 						joinIdIndexMap[smallSides[i]->fJoinData.fJoinId] = i;
- 				}
- 			}
- 		}
+		// bug5764, make sure semi joins acting as filter is after outer join.
+		{
+			// the inner table filters have to be performed after outer join
+			vector<uint64_t> semijoins;
+			vector<uint64_t> smallouts;
+			for (size_t i = 0; i < smallSides.size(); i++)
+			{
+				// find the the small-outer and semi-join joins
+				JoinType jt = smallSides[i]->fJoinData.fTypes[0];
+				if (jt & SMALLOUTER)
+					smallouts.push_back(i);
+				else if (jt & (SEMI | ANTI | SCALAR | CORRELATED))
+					semijoins.push_back(i);
+			}
+
+			// check the join order, re-arrange if necessary
+			if (smallouts.size() > 0 && semijoins.size() > 0)
+			{
+				uint64_t lastSmallOut = smallouts.back();
+				uint64_t lastSemijoin = semijoins.back();
+				if (lastSmallOut > lastSemijoin)
+				{
+					vector<SP_JoinInfo> temp1;
+					vector<SP_JoinInfo> temp2;
+					size_t j = 0;
+					for (size_t i = 0; i < smallSides.size(); i++)
+					{
+						if (j < semijoins.size() && i == semijoins[j])
+						{
+							temp1.push_back(smallSides[i]);
+							j++;
+						}
+						else
+						{
+							temp2.push_back(smallSides[i]);
+						}
+
+						if (i == lastSmallOut)
+							temp2.insert(temp2.end(), temp1.begin(), temp1.end());
+					}
+
+					smallSides = temp2;
+				}
+			}
+		}
 
 		for (vector<SP_JoinInfo>::iterator i = smallSides.begin(); i != smallSides.end(); i++)
 		{
@@ -2484,12 +2323,7 @@ void joinTablesInOrder(uint largest, JobStepVector& joinSteps, TableInfoMap& tab
 
 		if (bps || tsas || umstream || (thjs && joinStepMap[large].second < 1))
 		{
-			thjs= new TupleHashJoinStep(
-				jobInfo.sessionId,
-				jobInfo.txnId,
-				jobInfo.statementId,
-				&jobInfo.rm,jobInfo.isExeMgr);
-			thjs->logger(jobInfo.logger);
+			thjs= new TupleHashJoinStep(jobInfo);
 			thjs->tableOid1(smallSides[0]->fTableOid);
 			thjs->tableOid2(tableInfoMap[large].fTableOid);
 			thjs->alias1(smallSides[0]->fAlias);
@@ -2506,13 +2340,13 @@ void joinTablesInOrder(uint largest, JobStepVector& joinSteps, TableInfoMap& tab
 
 			spjs.reset(thjs);
 
-			JobStepAssociation inJsa(jobInfo.status);
+			JobStepAssociation inJsa;
 			inJsa.outAdd(smallSideDLs, 0);
 			inJsa.outAdd(joinInfoMap[large]->fDl);
 			thjs->inputAssociation(inJsa);
 			thjs->setLargeSideDLIndex(inJsa.outSize() - 1);
 
-			JobStepAssociation outJsa(jobInfo.status);
+			JobStepAssociation outJsa;
 			AnyDataListSPtr spdl(new AnyDataList());
 			RowGroupDL* dl = new RowGroupDL(1, jobInfo.fifoSize);
 			spdl->rowGroupDL(dl);
@@ -2553,6 +2387,14 @@ void joinTablesInOrder(uint largest, JobStepVector& joinSteps, TableInfoMap& tab
 			for (vector<string>::iterator t = traces.begin(); t != traces.end(); ++t)
 				cout << *t;
 			cout << "RowGroup join result: " << endl << rg.toString() << endl << endl;
+		}
+
+		// on clause filter association
+		map<uint64_t, size_t> joinIdIndexMap;
+		for (size_t i = 0; i < smallSides.size(); i++)
+		{
+			if (smallSides[i]->fJoinData.fJoinId > 0)
+				joinIdIndexMap[smallSides[i]->fJoinData.fJoinId] = i;
 		}
 
 		// check if any cross-table expressions can be evaluated after the join
@@ -2708,7 +2550,7 @@ void joinTablesInOrder(uint largest, JobStepVector& joinSteps, TableInfoMap& tab
 
 					// short circuit on clause expressions
 					map<uint64_t, size_t>::iterator x = joinIdIndexMap.find(e->associatedJoinId());
-					if (e->associatedJoinId() > 0 && x != joinIdIndexMap.end())
+					if (x != joinIdIndexMap.end())
 					{
 						ParseTree* joinFilter = new ParseTree;
 						joinFilter->copyTree(*(e->expressionFilter()));
@@ -2959,7 +2801,7 @@ void associateTupleJobSteps(JobStepVector& querySteps, JobStepVector& projectSte
 
 		if (it->get()->outputAssociation().outSize() == 0)
 		{
-			JobStepAssociation jsa(jobInfo.status);
+			JobStepAssociation jsa;
 			AnyDataListSPtr adl(new AnyDataList());
 			RowGroupDL* dl = new RowGroupDL(1, jobInfo.fifoSize);
 			dl->OID(it->get()->oid());
@@ -3189,10 +3031,6 @@ void associateTupleJobSteps(JobStepVector& querySteps, JobStepVector& projectSte
 		it++;
 	}
 
-	// @bug2634, delay isNull filter on outerjoin key
-	// @bug5374, delay predicates for outerjoin
-	outjoinPredicateAdjust(tableInfoMap, jobInfo);
-
 	// @bug3767, error out scalar subquery with aggregation and correlated additional comparison.
 	if (jobInfo.hasAggregation && (jobInfo.correlateSteps.size() > 0))
 	{
@@ -3218,6 +3056,10 @@ void associateTupleJobSteps(JobStepVector& querySteps, JobStepVector& projectSte
 						IDBErrorInfo::instance()->errorMsg(ERR_NON_SUPPORT_NEQ_AGG_SUB),
 						ERR_NON_SUPPORT_NEQ_AGG_SUB);
 	}
+
+	// @bug2634, delay isNull filter on outerjoin key
+	// @bug5374, delay predicates for outerjoin
+	outjoinPredicateAdjust(tableInfoMap, jobInfo);
 
 	it = projectSteps.begin();
 	end = projectSteps.end();
@@ -3291,7 +3133,7 @@ SJSTEP unionQueries(JobStepVector& queries, uint64_t distinctUnionNum, JobInfo& 
 	vector<uint> precision;
 	vector<uint> width;
 	vector<CalpontSystemCatalog::ColDataType> types;
-	JobStepAssociation jsaToUnion(jobInfo.status);
+	JobStepAssociation jsaToUnion;
 
 	// bug4388, share code with connector for column type coversion
 	vector<vector<CalpontSystemCatalog::ColType> > queryColTypes;
@@ -3337,7 +3179,7 @@ SJSTEP unionQueries(JobStepVector& queries, uint64_t distinctUnionNum, JobInfo& 
 		RowGroupDL* dl = new RowGroupDL(1, jobInfo.fifoSize);
 		spdl->rowGroupDL(dl);
 		dl->OID(CNX_VTABLE_ID);
-		JobStepAssociation jsa(jobInfo.status);
+		JobStepAssociation jsa;
 		jsa.outAdd(spdl);
 		spjs->outputAssociation(jsa);
 		jsaToUnion.outAdd(spdl);
@@ -3347,18 +3189,11 @@ SJSTEP unionQueries(JobStepVector& queries, uint64_t distinctUnionNum, JobInfo& 
 	RowGroupDL* dl = new RowGroupDL(1, jobInfo.fifoSize);
 	spdl->rowGroupDL(dl);
 	dl->OID(CNX_VTABLE_ID);
-	JobStepAssociation jsa(jobInfo.status);
+	JobStepAssociation jsa;
 	jsa.outAdd(spdl);
-	TupleUnion *unionStep = new  TupleUnion(jsaToUnion,
-											jsa,
-											CNX_VTABLE_ID,
-											jobInfo.sessionId,
-											jobInfo.txnId,
-											jobInfo.verId,
-											0, // stepId
-											jobInfo.statementId,
-											jobInfo.rm);
-	unionStep->logger(jobInfo.logger);
+	TupleUnion *unionStep = new  TupleUnion(CNX_VTABLE_ID, jobInfo);
+	unionStep->inputAssociation(jsaToUnion);
+	unionStep->outputAssociation(jsa);
 
 	// get unioned column types
 	for (uint64_t j = 0; j < colCount; ++j)

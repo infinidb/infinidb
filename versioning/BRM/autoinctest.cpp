@@ -21,7 +21,7 @@ void doStartSeq()
 {
 
 	try {
-		dbrm.startAISequence(12345, 67890, 1);
+		dbrm.startAISequence(12345, 67890, 1, execplan::CalpontSystemCatalog::INT);
 	}
 	catch (exception &e) {
 		cout << "got exception: " << e.what() << endl;

@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: we_fileop.cpp 4681 2013-06-18 17:31:02Z dcathey $
+//  $Id: we_fileop.cpp 4684 2013-06-18 19:47:46Z dcathey $
 
 #include "config.h"
 
@@ -48,6 +48,7 @@ using namespace std;
 #include "we_stats.h"
 #include "we_simplesyslog.h"
 
+#include "idbcompress.h"
 using namespace compress;
 
 #include "messagelog.h"
@@ -159,7 +160,7 @@ int FileOp::createDir( const char* dirName, mode_t mode ) const
  *    ERR_FILE_CREATE if can not create the file
  ***********************************************************/
 int FileOp::createFile( const char* fileName, int numOfBlock,
-                              i64 emptyVal, int width,
+                              uint64_t emptyVal, int width,
                               uint16_t dbRoot )
 {
     FILE*          pFile;
@@ -211,6 +212,7 @@ int FileOp::createFile( const char* fileName, int numOfBlock,
  *    dbRoot   - DBRoot where file is to be located
  *    partition- Starting partition number for segment file path
  *    compressionType - Compression type
+ *    colDataType - the column data type
  *    emptyVal - designated "empty" value for this OID
  *    width    - width of column in bytes
  * RETURN:
@@ -222,7 +224,8 @@ int FileOp::createFile(FID fid,
     int&     allocSize,
     uint16_t dbRoot,
     uint32_t partition,
-    i64      emptyVal,
+    execplan::CalpontSystemCatalog::ColDataType colDataType,
+    uint64_t  emptyVal,
     int      width)
 {
     //std::cout << "Creating file oid: " << fid <<
@@ -249,7 +252,7 @@ int FileOp::createFile(FID fid,
     BRM::LBID_t startLbid;
     u_int32_t startBlock;
     RETURN_ON_ERROR( BRMWrapper::getInstance()->allocateColExtentExactFile(
-        (const OID)fid, (u_int32_t)width, dbRootx, partitionx, segment,
+        (const OID)fid, (u_int32_t)width, dbRootx, partitionx, segment, colDataType,
         startLbid, allocSize, startBlock) );
 
     // We allocate a full extent from BRM, but only write an abbreviated 256K
@@ -567,7 +570,7 @@ bool FileOp::existsOIDDir( FID fid ) const
  ***********************************************************/
 int FileOp::extendFile(
     OID          oid,
-    i64          emptyVal,
+    uint64_t     emptyVal,
     int          width,
     HWM          hwm,
     BRM::LBID_t  startLbid,
@@ -797,12 +800,13 @@ int FileOp::extendFile(
  ***********************************************************/
 int FileOp::addExtentExactFile(
     OID          oid,
-    i64          emptyVal,
+    uint64_t     emptyVal,
     int          width,
     int&         allocSize,
     uint16_t     dbRoot,
     uint32_t     partition,
     uint16_t     segment,
+    execplan::CalpontSystemCatalog::ColDataType colDataType,
     std::string& segFile,
     BRM::LBID_t& startLbid,
     bool&        newFile,
@@ -816,7 +820,7 @@ int FileOp::addExtentExactFile(
 
     // Allocate the new extent in the ExtentMap
     RETURN_ON_ERROR( BRMWrapper::getInstance()->allocateColExtentExactFile(
-        oid, width, dbRoot, partition, segment, startLbid, allocSize, hwm));
+        oid, width, dbRoot, partition, segment, colDataType, startLbid, allocSize, hwm));
 
     // Determine the existence of the "next" segment file, and either open
     // or create the segment file accordingly.
@@ -953,7 +957,7 @@ int FileOp::initColumnExtent(
     FILE*    pFile,
     uint16_t dbRoot,
     int      nBlocks,
-    i64      emptyVal,
+    uint64_t emptyVal,
     int      width,
     bool     bNewFile,
     bool     bExpandExtent,
@@ -1087,7 +1091,7 @@ int FileOp::initAbbrevCompColumnExtent(
     FILE*    pFile,
     uint16_t dbRoot,
     int      nBlocks,
-    i64      emptyVal,
+    uint64_t emptyVal,
     int      width) 
 {
     // Reserve disk space for full abbreviated extent
@@ -1145,7 +1149,7 @@ int FileOp::writeInitialCompColumnChunk(
     FILE*    pFile,
     int      nBlocksAllocated,
     int      nRows,
-    i64      emptyVal,
+    uint64_t emptyVal,
     int      width,
     char*    hdrs) 
 {
@@ -1153,7 +1157,7 @@ int FileOp::writeInitialCompColumnChunk(
     char* toBeCompressedInput       = new char[INPUT_BUFFER_SIZE];
     unsigned int userPaddingBytes   = Config::getNumCompressedPadBlks() *
                                       BYTE_PER_BLOCK;
-    const int OUTPUT_BUFFER_SIZE    = int( (double)INPUT_BUFFER_SIZE * 1.17 ) +
+    const int OUTPUT_BUFFER_SIZE    = IDBCompressInterface::maxCompressedSize(INPUT_BUFFER_SIZE) +
         userPaddingBytes;
     unsigned char* compressedOutput = new unsigned char[OUTPUT_BUFFER_SIZE];
     unsigned int outputLen          = OUTPUT_BUFFER_SIZE;
@@ -1224,7 +1228,7 @@ int FileOp::writeInitialCompColumnChunk(
  ***********************************************************/
 int FileOp::fillCompColumnExtentEmptyChunks(OID oid,
     int          colWidth,
-    i64          emptyVal,
+    uint64_t     emptyVal,
     uint16_t     dbRoot,   
     uint32_t     partition,
     uint16_t     segment,
@@ -1382,7 +1386,7 @@ int FileOp::fillCompColumnExtentEmptyChunks(OID oid,
     if (numChunksToFill > 0)
     {
         const int IN_BUF_LEN = IDBCompressInterface::UNCOMPRESSED_INBUF_LEN;
-        const int OUT_BUF_LEN= int( (double)IN_BUF_LEN * 1.17 ) + userPadBytes;
+        const int OUT_BUF_LEN= IDBCompressInterface::maxCompressedSize(IN_BUF_LEN) + userPadBytes;
     
         // Allocate buffer, and store in scoped_array to insure it's deletion.
         // Create scope {...} to manage deletion of buffers
@@ -1524,14 +1528,14 @@ int FileOp::fillCompColumnExtentEmptyChunks(OID oid,
  ***********************************************************/
 int FileOp::expandAbbrevColumnChunk(
     FILE* pFile,
-    i64   emptyVal,
+    uint64_t emptyVal,
     int   colWidth,
     const CompChunkPtr& chunkInPtr,
     CompChunkPtr& chunkOutPtr )
 {
     int userPadBytes = Config::getNumCompressedPadBlks() * BYTE_PER_BLOCK;
     const int IN_BUF_LEN = IDBCompressInterface::UNCOMPRESSED_INBUF_LEN;
-    const int OUT_BUF_LEN= int( (double)IN_BUF_LEN * 1.17 ) + userPadBytes;
+    const int OUT_BUF_LEN= IDBCompressInterface::maxCompressedSize(IN_BUF_LEN) + userPadBytes;
 
     char* toBeCompressedBuf = new char[ IN_BUF_LEN  ];
     boost::scoped_array<char> toBeCompressedPtr(toBeCompressedBuf);
@@ -1841,7 +1845,7 @@ int FileOp::reInitPartialColumnExtent(
     FILE*    pFile,
     long long startOffset,
     int      nBlocks,
-    i64      emptyVal,
+    uint64_t emptyVal,
     int      width )
 {
     int rc = setFileOffset( pFile, startOffset, SEEK_SET );
@@ -2490,7 +2494,7 @@ int FileOp::setFileOffset( FILE* pFile, long long offset, int origin ) const
  *    ERR_FILE_NULL if file handle is NULL
  *    ERR_FILE_SEEK if something wrong in setting the position
  ***********************************************************/
-int FileOp::setFileOffsetBlock( FILE* pFile, i64 lbid, int origin) const
+int FileOp::setFileOffsetBlock( FILE* pFile, uint64_t lbid, int origin) const
 {
     long long  fboOffset = 0;
     int fbo = 0;
@@ -2633,7 +2637,7 @@ bool FileOp::isDiskSpaceAvail(const std::string& fileName, int nBlocks) const
 int FileOp::expandAbbrevColumnExtent(
     FILE*    pFile,   // FILE ptr to file where abbrev extent is to be expanded
     uint16_t dbRoot,  // The DBRoot of the file with the abbreviated extent
-    i64      emptyVal,// Empty value to be used in expanding the extent
+    uint64_t emptyVal,// Empty value to be used in expanding the extent
     int      width )  // Width of the column (in bytes)
 {
     // Based on extent size, see how many blocks to add to fill the extent

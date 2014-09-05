@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: predicateoperator.cpp 8436 2012-04-04 18:18:21Z rdempsey $
+*   $Id: predicateoperator.cpp 9306 2013-03-12 15:49:11Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -225,11 +225,13 @@ void PredicateOperator::setOpType(Type& l, Type& r)
 				break;
 		} 
 	}
-	else if (l.colDataType == execplan::CalpontSystemCatalog::DECIMAL)
+	else if (l.colDataType == execplan::CalpontSystemCatalog::DECIMAL ||
+             l.colDataType == execplan::CalpontSystemCatalog::UDECIMAL)
 	{
 		switch (r.colDataType)
 		{			
 			case execplan::CalpontSystemCatalog::DECIMAL:
+            case execplan::CalpontSystemCatalog::UDECIMAL:
 			{
 				// should following the result type that MySQL gives
 				fOperationType = l;
@@ -240,6 +242,10 @@ void PredicateOperator::setOpType(Type& l, Type& r)
 			case execplan::CalpontSystemCatalog::MEDINT:
 			case execplan::CalpontSystemCatalog::TINYINT:
 			case execplan::CalpontSystemCatalog::BIGINT:
+            case execplan::CalpontSystemCatalog::UINT:
+            case execplan::CalpontSystemCatalog::UMEDINT:
+            case execplan::CalpontSystemCatalog::UTINYINT:
+            case execplan::CalpontSystemCatalog::UBIGINT:
 				fOperationType.colDataType = execplan::CalpontSystemCatalog::DECIMAL;
 				fOperationType.scale = l.scale;
 				fOperationType.colWidth = 8;
@@ -249,11 +255,13 @@ void PredicateOperator::setOpType(Type& l, Type& r)
 				fOperationType.colWidth = 8;							
 		}
 	}
-	else if (r.colDataType == execplan::CalpontSystemCatalog::DECIMAL)
+	else if (r.colDataType == execplan::CalpontSystemCatalog::DECIMAL ||
+             r.colDataType == execplan::CalpontSystemCatalog::UDECIMAL)
 	{
 		switch (l.colDataType)
 		{
 			case execplan::CalpontSystemCatalog::DECIMAL:
+            case execplan::CalpontSystemCatalog::UDECIMAL:
 			{
 				// should following the result type that MySQL gives based on the following logic?
 				// @NOTE is this trustable?
@@ -264,6 +272,10 @@ void PredicateOperator::setOpType(Type& l, Type& r)
 			case execplan::CalpontSystemCatalog::MEDINT:
 			case execplan::CalpontSystemCatalog::TINYINT:
 			case execplan::CalpontSystemCatalog::BIGINT:
+            case execplan::CalpontSystemCatalog::UINT:
+            case execplan::CalpontSystemCatalog::UMEDINT:
+            case execplan::CalpontSystemCatalog::UTINYINT:
+            case execplan::CalpontSystemCatalog::UBIGINT:
 				fOperationType.colDataType = execplan::CalpontSystemCatalog::DECIMAL;
 				fOperationType.scale = r.scale;
 				fOperationType.colWidth = 8;
@@ -273,20 +285,20 @@ void PredicateOperator::setOpType(Type& l, Type& r)
 				fOperationType.colWidth = 8;				
 		}
 	}
-	else if ((l.colDataType == execplan::CalpontSystemCatalog::INT ||
-		        l.colDataType == execplan::CalpontSystemCatalog::SMALLINT ||
-		        l.colDataType == execplan::CalpontSystemCatalog::MEDINT ||
-		        l.colDataType == execplan::CalpontSystemCatalog::TINYINT ||
-		        l.colDataType == execplan::CalpontSystemCatalog::BIGINT) &&
-		       (r.colDataType == execplan::CalpontSystemCatalog::INT ||
-		       	r.colDataType == execplan::CalpontSystemCatalog::SMALLINT ||
-		        r.colDataType == execplan::CalpontSystemCatalog::MEDINT ||
-		        r.colDataType == execplan::CalpontSystemCatalog::TINYINT ||
-		        r.colDataType == execplan::CalpontSystemCatalog::BIGINT))
-	{
-		fOperationType.colDataType = execplan::CalpontSystemCatalog::BIGINT;
-		fOperationType.colWidth = 8;
-	}
+    // If both sides are unsigned, use UBIGINT as result type, otherwise
+    // "promote" to BIGINT.
+    else if (isUnsigned(l.colDataType) && isUnsigned(r.colDataType))
+    {
+        fOperationType.colDataType = execplan::CalpontSystemCatalog::UBIGINT;
+        fOperationType.colWidth = 8;
+    }
+    else if ((isSignedInteger(l.colDataType) && isUnsigned(r.colDataType)) ||
+             (isUnsigned(l.colDataType) && isSignedInteger(r.colDataType)) ||
+             (isSignedInteger(l.colDataType) && isSignedInteger(r.colDataType)))
+    {
+        fOperationType.colDataType = execplan::CalpontSystemCatalog::BIGINT;
+        fOperationType.colWidth = 8;
+    }
 	else if ((l.colDataType == execplan::CalpontSystemCatalog::CHAR ||
 		       l.colDataType == execplan::CalpontSystemCatalog::VARCHAR) &&
 		       (r.colDataType == execplan::CalpontSystemCatalog::CHAR ||

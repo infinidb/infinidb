@@ -106,4 +106,11 @@
 93	Unrecoverable BRM lock state detected. Diagnostic values: r=%1% rwt=%2% w=%3% wwt=%4%. Please restart InfiniDB.
 94	Attempting to fix the BRM lock state. Diagnostic values: r=%1% rwt=%2% w=%3% wwt=%4%.
 95	BRM lock state appears to be functional again.
+96	Table %s%.%2% (OID-%3%) was NOT successfully loaded. %4%.
+97	%1%.%2% : ERROR : %3%.
+98	Received a Cpimport Pass from PM%1%.
+99	Received ErrReport from PM%1%.
+100	Received BadData Report from PM%1%.
+101	Rollback Failed on PM%1%.
+102	Cleanup Failed on PM%1%. 
 103	Starting FBO for new %1% extent too large for current db file; %2%

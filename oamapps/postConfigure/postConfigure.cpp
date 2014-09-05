@@ -1485,7 +1485,7 @@ int main(int argc, char *argv[])
 									string cmdOption = " -w 2 >> /dev/null";
 									string cmd = cmdLine + newModuleIPAddr + cmdOption;
 									int rtnCode = system(cmd.c_str());
-									if ( rtnCode != 0 ) {
+									if ( WEXITSTATUS(rtnCode) != 0 ) {
 										//NIC failed to respond to ping
 										string temp = "2";
 										while (true)
@@ -2668,7 +2668,7 @@ int main(int argc, char *argv[])
 						else
 						{
 							int rtnCode = system(cmd.c_str());
-							if (rtnCode != 0) {
+							if (WEXITSTATUS(rtnCode) != 0) {
 								cout << endl << "Error returned from user_installer.sh" << endl;
 								exit(1);
 							}
@@ -2677,7 +2677,7 @@ int main(int argc, char *argv[])
 							if ( pwprompt == " " ) {
 								cmd = installDir + "/bin/remote_command.sh " + remoteModuleIP + " " + password + " '/etc/init.d/mysql-Calpont start'";
 								int rtnCode = system(cmd.c_str());
-								if (rtnCode != 0) {
+								if (WEXITSTATUS(rtnCode) != 0) {
 									cout << endl << "Error returned from mysql-Calpont start" << endl;
 									exit(1);
 								}
@@ -2687,7 +2687,7 @@ int main(int argc, char *argv[])
 								{
 									cmd = installDir + "/bin/remote_command.sh " + remoteModuleIP + " " + password + " '" + installDir + "/mysql/bin/mysql --defaults-file=" + installDir + "/mysql/my.cnf -u root " + pwprompt + " -e status' 1 > /tmp/idbmysql.log 2>&1";
 									rtnCode = system(cmd.c_str());
-									if (rtnCode != 0) {
+									if (WEXITSTATUS(rtnCode) != 0) {
 										cout << endl << "Error returned from remote_command.sh" << endl;
 										exit(1);
 									}
@@ -2721,7 +2721,7 @@ int main(int argc, char *argv[])
 	
 											cmd = installDir + "/bin/remote_command.sh " + remoteModuleIP + " " + password + " '/etc/init.d/mysql-Calpont stop'";
 											int rtnCode = system(cmd.c_str());
-											if (rtnCode != 0) {
+											if (WEXITSTATUS(rtnCode) != 0) {
 												cout << endl << "Error returned from mysql-Calpont stop" << endl;
 												exit(1);
 											}
@@ -2734,7 +2734,7 @@ int main(int argc, char *argv[])
 								//re-run post-mysqld-install with password
 								cmd = installDir + "/bin/remote_command.sh " + remoteModuleIP + " " + password + " '" + installDir + "/bin/post-mysql-install " + pwprompt + "'";
 								rtnCode = system(cmd.c_str());
-								if (rtnCode != 0) {
+								if (WEXITSTATUS(rtnCode) != 0) {
 									cout << endl << "Error returned from post-mysql-install" << endl;
 									exit(1);
 								}
@@ -2764,7 +2764,7 @@ int main(int argc, char *argv[])
 						else
 						{
 							int rtnCode = system(cmd.c_str());
-							if (rtnCode != 0) {
+							if (WEXITSTATUS(rtnCode) != 0) {
 								cout << endl << "Error returned from user_installer.sh" << endl;
 								exit(1);
 							}
@@ -2800,7 +2800,7 @@ int main(int argc, char *argv[])
 							else
 							{
 								int rtnCode = system(cmd.c_str());
-								if (rtnCode != 0) {
+								if (WEXITSTATUS(rtnCode) != 0) {
 									cout << endl << "Error returned from performance_installer.sh" << endl;
 									exit(1);
 								}
@@ -2829,7 +2829,7 @@ int main(int argc, char *argv[])
 							else
 							{
 								int rtnCode = system(cmd.c_str());
-								if (rtnCode != 0) {
+								if (WEXITSTATUS(rtnCode) != 0) {
 									cout << endl << "Error returned from user_installer.sh" << endl;
 									exit(1);
 								}
@@ -2875,7 +2875,7 @@ int main(int argc, char *argv[])
 	{
 		cout << endl << "===== Configuring InfiniDB Data Redundancy Functionality =====" << endl << endl;
 		int ret = system(glusterconfig.c_str());
-		if ( ret != 0 )
+		if ( WEXITSTATUS(ret) != 0 )
 		{
 			cerr << endl << "There was an error in the Data Redundancy setup, exiting..." << endl;
 			exit(1);
@@ -2933,7 +2933,7 @@ int main(int argc, char *argv[])
 		cmd = "sudo " + installDir + "/bin/syslogSetup.sh --installdir=" + installDir + " status  > /dev/null 2>&1";
 
 	int ret = system(cmd.c_str());
-	if ( ret != 0)
+	if ( WEXITSTATUS(ret) != 0)
 		cerr << "WARNING: The InfiniDB system logging not correctly setup and working" << endl;
 	else
 		cout << "The InfiniDB system logging is setup and working on local server" << endl;
@@ -3028,7 +3028,7 @@ int main(int argc, char *argv[])
 				cmd = installDir + "/bin/remote_command.sh " + remoteModuleIP + " " + password +
 					" '" + installDir + "/bin/infinidb restart' " +  remote_installer_debug;
 				int rtnCode = system(cmd.c_str());
-				if (rtnCode != 0)
+				if (WEXITSTATUS(rtnCode) != 0)
 					cout << "Error with running remote_command.sh" << endl;
 				else
 					cout << "InfiniDB successfully started" << endl;
@@ -3038,7 +3038,7 @@ int main(int argc, char *argv[])
 			cout << endl << "----- Starting InfiniDB on local server -----" << endl << endl;
 			cmd = installDir + "/bin/infinidb start";
 			int rtnCode = system(cmd.c_str());
-			if (rtnCode != 0) {
+			if (WEXITSTATUS(rtnCode) != 0) {
 				cout << "Error Starting InfiniDB local module" << endl;
 				cout << "Installation Failed, exiting" << endl;
 				exit (1);
@@ -3082,7 +3082,7 @@ int main(int argc, char *argv[])
 			cout << endl << "----- Starting InfiniDB on local Server '" + parentOAMModuleName + "' -----" << endl << endl;
 			string cmd = installDir + "/bin/infinidb start";
 			int rtnCode = system(cmd.c_str());
-			if (rtnCode != 0) {
+			if (WEXITSTATUS(rtnCode) != 0) {
 				cout << "Error Starting InfiniDB local module" << endl;
 				cout << "Installation Failed, exiting" << endl;
 				exit (1);
@@ -3275,28 +3275,28 @@ bool checkSaveConfigFile()
 	{
 		string cmd = "mv -f " + rpmFileName + " " + newFileName;
 		int rtnCode = system(cmd.c_str());
-		if (rtnCode != 0) {
+		if (WEXITSTATUS(rtnCode) != 0) {
 			cout << "Error moving installed version of Calpont.xml" << endl;
 			return false;
 		}
 	
 		cmd = "cp " + oldFileName + " " + rpmFileName;
 		rtnCode = system(cmd.c_str());
-		if (rtnCode != 0) {
+		if (WEXITSTATUS(rtnCode) != 0) {
 			cout << "Error moving pkgsave file" << endl;
 			return false;
 		}
 	
 		cmd = "cd " + installDir + "/etc/;../bin/autoConfigure " + extentMapCheckOnly;
 		rtnCode = system(cmd.c_str());
-		if (rtnCode != 0) {
+		if (WEXITSTATUS(rtnCode) != 0) {
 			cout << "Error running autoConfigure" << endl;
 			return false;
 		}
 	
 		cmd = "mv -f " + newFileName + " " + rpmFileName;
 		rtnCode = system(cmd.c_str());
-		if (rtnCode != 0) {
+		if (WEXITSTATUS(rtnCode) != 0) {
 			cout << "Error moving pkgsave file" << endl;
 			return false;
 		}
@@ -3366,7 +3366,7 @@ bool setOSFiles(string parentOAMModuleName, int serverTypeInstall)
 			cmd = "sudo bash -c 'sudo cat " + installDir + "/local/etc/" + parentOAMModuleName + "/" + files[i] + ".calpont >> " + fileName + "'"; 
 
 		int rtnCode = system(cmd.c_str());
-		if (rtnCode != 0)
+		if (WEXITSTATUS(rtnCode) != 0)
 			cout << "Error Updating " + files[i] << endl;
 
 		cmd = "rm -f " + installDir + "/local/ " + files[i] + "*.calpont > /dev/null 2>&1";
@@ -3704,14 +3704,14 @@ bool createDbrootDirs(string DBRootStorageType)
 		// create system file directories
 		cmd = "mkdir -p " + installDir + "/data1/systemFiles/dbrm > /dev/null 2>&1";
 		rtnCode = system(cmd.c_str());
-		if (rtnCode != 0) {
+		if (WEXITSTATUS(rtnCode) != 0) {
 			cout << endl << "Error: failed to make mount dbrm dir" << endl;
 			return false;
 		}
 	
 		cmd = "mkdir -p " + installDir + "/data1/systemFiles/dataTransaction/archive > /dev/null 2>&1";
 		rtnCode = system(cmd.c_str());
-		if (rtnCode != 0) {
+		if (WEXITSTATUS(rtnCode) != 0) {
 			cout << endl << "Error: failed to make mount dataTransaction dir" << endl;
 			return false;
 		}
@@ -4530,7 +4530,7 @@ void remoteInstallThread(string cmd)
 	string command = cmd;
 
 	int rtnCode = system(command.c_str());
-	if (rtnCode != 0) {
+	if (WEXITSTATUS(rtnCode) != 0) {
 		cout << endl << "Failure with a remote module install, check install log files in /tmp" << endl;
 		exit(1);
 	}

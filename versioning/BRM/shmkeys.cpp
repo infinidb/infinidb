@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-// $Id: shmkeys.cpp 1753 2012-11-09 21:17:35Z rdempsey $
+// $Id: shmkeys.cpp 1823 2013-01-21 14:13:09Z rdempsey $
 
 #include <cstdlib>
 #include <string>
@@ -23,7 +23,9 @@
 #include <iomanip>
 using namespace std;
 
+#ifdef WANT_EM_BRM_UID
 #include "configcpp.h"
+#endif
 #define SHMKEYS_DLLEXPORT
 #include "shmkeys.h"
 #undef SHMKEYS_DLLEXPORT

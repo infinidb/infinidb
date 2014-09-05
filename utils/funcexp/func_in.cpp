@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_in.cpp 3956 2013-07-08 19:17:26Z bpaul $
+* $Id: func_in.cpp 3957 2013-07-08 21:20:36Z bpaul $
 *
 *
 ****************************************************************************/
@@ -84,6 +84,25 @@ namespace
 				}
 				return false;	
 			}
+            case execplan::CalpontSystemCatalog::UBIGINT:
+            case execplan::CalpontSystemCatalog::UINT:
+            case execplan::CalpontSystemCatalog::UMEDINT:
+            case execplan::CalpontSystemCatalog::UTINYINT:
+            case execplan::CalpontSystemCatalog::USMALLINT:	
+            {
+                uint64_t val = pm[0]->data()->getUintVal(row, isNull);
+                if (isNull)
+                    return false;
+                for (uint i = 1; i < pm.size(); i++)
+                {
+                    isNull = false;
+                    if (val == pm[i]->data()->getUintVal(row, isNull) && !isNull )
+                        return true;
+                    if (isNull && isNotIn)
+                        return true; // will be reversed to false by the caller
+                }
+                return false;	
+            }
 			case execplan::CalpontSystemCatalog::DATE:
 			{
 				int32_t val = pm[0]->data()->getDateIntVal(row, isNull);
@@ -115,7 +134,9 @@ namespace
 				return false;	
 			}
 			case execplan::CalpontSystemCatalog::DOUBLE:
+            case execplan::CalpontSystemCatalog::UDOUBLE:
 			case execplan::CalpontSystemCatalog::FLOAT:
+            case execplan::CalpontSystemCatalog::UFLOAT:
 			{
 				double val = pm[0]->data()->getDoubleVal(row, isNull);
 				if (isNull)
@@ -131,6 +152,7 @@ namespace
 				return false;	
 			}
 			case execplan::CalpontSystemCatalog::DECIMAL:
+            case execplan::CalpontSystemCatalog::UDECIMAL:
 			{				
 				IDB_Decimal val = pm[0]->data()->getDecimalVal(row, isNull);
 				if (isNull)

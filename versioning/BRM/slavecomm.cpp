@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: slavecomm.cpp 1837 2013-01-31 19:13:18Z pleblanc $
+ * $Id: slavecomm.cpp 1839 2013-02-01 17:42:03Z pleblanc $
  *
  ****************************************************************************/
 #include <unistd.h>
@@ -194,7 +194,7 @@ void SlaveComm::run()
 
 	while (!die) {
 #ifdef BRM_VERBOSE
-		cerr << "WorkerComm: waiting for a connection" << endl;
+//		cerr << "WorkerComm: waiting for a connection" << endl;
 #endif
 		master = server->accept(&MSG_TIMEOUT);
 		while (!die && master.isOpen()) {
@@ -255,7 +255,10 @@ void SlaveComm::processCommand(ByteStream &msg)
 			delta = msg;
 	}
 	msg >> cmd;
-	switch (cmd) {
+#ifdef BRM_VERBOSE
+    cerr << "WorkerComm: command " << (int) cmd << endl;
+#endif
+    switch (cmd) {
 		case CREATE_STRIPE_COLUMN_EXTENTS:
 			do_createStripeColumnExtents(msg); break;
 		case CREATE_COLUMN_EXTENT_DBROOT:
@@ -281,10 +284,10 @@ void SlaveComm::processCommand(ByteStream &msg)
 		case VB_ROLLBACK1: do_vbRollback1(msg); break;
 		case VB_ROLLBACK2: do_vbRollback2(msg); break;
 		case VB_COMMIT: do_vbCommit(msg); break;
-		case UNDO: do_undo(); break;
+		case BRM_UNDO: do_undo(); break;
 		case CONFIRM: do_confirm(); break;
 		case FLUSH_INODE_CACHES: do_flushInodeCache(); break;
-		case CLEAR: do_clear(); break;
+		case BRM_CLEAR: do_clear(); break;
 		case MARKEXTENTINVALID: do_markInvalid(msg); break;
 		case MARKMANYEXTENTSINVALID: do_markManyExtentsInvalid(msg); break;
 		case SETEXTENTMAXMIN: do_setExtentMaxMin(msg); break;
@@ -371,6 +374,7 @@ void SlaveComm::do_createStripeColumnExtents(ByteStream &msg)
 void SlaveComm::do_createColumnExtent_DBroot(ByteStream &msg)
 {
 	int allocdSize, err;
+	uint8_t    tmp8;
 	uint16_t   tmp16;
 	uint32_t   tmp32;
 	OID_t      oid;
@@ -381,7 +385,7 @@ void SlaveComm::do_createColumnExtent_DBroot(ByteStream &msg)
 	LBID_t     lbid;
 	uint32_t   startBlockOffset;
 	ByteStream reply;
-
+	execplan::CalpontSystemCatalog::ColDataType colDataType;
 #ifdef BRM_VERBOSE
 	cerr << "WorkerComm: do_createColumnExtent_DBroot()" << endl;
 #endif
@@ -396,6 +400,8 @@ void SlaveComm::do_createColumnExtent_DBroot(ByteStream &msg)
 	partitionNum = tmp32;
 	msg >> tmp16;
 	segmentNum = tmp16;
+	msg >> tmp8;
+	colDataType = (execplan::CalpontSystemCatalog::ColDataType)tmp8;
 
 	if (printOnly) {
 		cout << "createColumnExtent_DBroot: oid=" << oid <<
@@ -406,7 +412,7 @@ void SlaveComm::do_createColumnExtent_DBroot(ByteStream &msg)
 		return;
 	}
 
-	err = slave->createColumnExtent_DBroot(oid, colWidth, dbRoot,
+	err = slave->createColumnExtent_DBroot(oid, colWidth, dbRoot, colDataType,
 		partitionNum, segmentNum, lbid, allocdSize, startBlockOffset);
 	reply << (uint8_t) err;
 	if (err == ERR_OK) {
@@ -436,6 +442,7 @@ void SlaveComm::do_createColumnExtent_DBroot(ByteStream &msg)
 void SlaveComm::do_createColumnExtentExactFile(ByteStream &msg)
 {
 	int allocdSize, err;
+	uint8_t    tmp8;
 	uint16_t   tmp16;
 	uint32_t   tmp32;
 	OID_t      oid;
@@ -446,7 +453,7 @@ void SlaveComm::do_createColumnExtentExactFile(ByteStream &msg)
 	LBID_t     lbid;
 	uint32_t   startBlockOffset;
 	ByteStream reply;
-
+	execplan::CalpontSystemCatalog::ColDataType colDataType;
 #ifdef BRM_VERBOSE
 	cerr << "WorkerComm: do_createColumnExtentExactFile()" << endl;
 #endif
@@ -461,7 +468,8 @@ void SlaveComm::do_createColumnExtentExactFile(ByteStream &msg)
 	partitionNum = tmp32;
 	msg >> tmp16;
 	segmentNum = tmp16;
-
+	msg >> tmp8;
+	colDataType = (execplan::CalpontSystemCatalog::ColDataType)tmp8;
 	if (printOnly) {
 		cout << "createColumnExtentExactFile: oid=" << oid <<
 			" colWidth=" << colWidth <<
@@ -472,7 +480,7 @@ void SlaveComm::do_createColumnExtentExactFile(ByteStream &msg)
 	}
 
 	err = slave->createColumnExtentExactFile(oid, colWidth, dbRoot,
-		partitionNum, segmentNum, lbid, allocdSize, startBlockOffset);
+		partitionNum, segmentNum, colDataType, lbid, allocdSize, startBlockOffset);
 	reply << (uint8_t) err;
 	if (err == ERR_OK) {
 		reply << partitionNum;
@@ -508,7 +516,6 @@ void SlaveComm::do_createDictStoreExtent(ByteStream &msg)
 	uint16_t   segmentNum;
 	LBID_t     lbid;
 	ByteStream reply;
-
 #ifdef BRM_VERBOSE
 	cerr << "WorkerComm: do_createDictStoreExtent()" << endl;
 #endif
@@ -521,7 +528,6 @@ void SlaveComm::do_createDictStoreExtent(ByteStream &msg)
 	partitionNum = tmp32;
 	msg >> tmp16;
 	segmentNum = tmp16;
-
 	if (printOnly) {
 		cout << "createDictStoreExtent: oid=" << oid << " dbRoot=" << dbRoot << 
 			" partitionNum=" << partitionNum << " segmentNum=" << segmentNum << endl;
@@ -969,7 +975,7 @@ void SlaveComm::do_bulkUpdateDBRoot(ByteStream &msg)
 void SlaveComm::do_markInvalid(ByteStream &msg)
 {
 	LBID_t lbid;
-	uint64_t tmp64;
+	uint32_t colDataType;
 	int err;
 	ByteStream reply;
 
@@ -977,15 +983,15 @@ void SlaveComm::do_markInvalid(ByteStream &msg)
 	cerr << "WorkerComm: do_markInvalid()" << endl;
 #endif
 
-	msg >> tmp64;
-	lbid = tmp64;
+	msg >> lbid;
+	msg >> colDataType;
 	
 	if (printOnly) {
-		cout << "markExtentInvalid: lbid=" << lbid << endl;
+		cout << "markExtentInvalid: lbid=" << lbid << "colDataType=" << colDataType << endl;
 		return;
 	}
 	
-	err = slave->markExtentInvalid(lbid);
+	err = slave->markExtentInvalid(lbid, (execplan::CalpontSystemCatalog::ColDataType)colDataType);
 	reply << (uint8_t)err;
 #ifdef BRM_VERBOSE
 	cerr << "WorkerComm: do_markInvalid() err code is " << err << endl;
@@ -998,9 +1004,11 @@ void SlaveComm::do_markInvalid(ByteStream &msg)
 void SlaveComm::do_markManyExtentsInvalid(ByteStream &msg)
 {
 	uint64_t tmp64;
+	uint32_t colDataType;
 	int err;
 	ByteStream reply;
 	vector<LBID_t> lbids;
+	vector<execplan::CalpontSystemCatalog::ColDataType> colDataTypes;
 	uint32_t size, i;
 
 #ifdef BRM_VERBOSE
@@ -1014,15 +1022,17 @@ void SlaveComm::do_markManyExtentsInvalid(ByteStream &msg)
 	
 	for (i = 0; i < size; ++i) {
 		msg >> tmp64;
+		msg >> colDataType;
 		lbids.push_back(tmp64);
+		colDataTypes.push_back((execplan::CalpontSystemCatalog::ColDataType)colDataType);
 		if (printOnly)
-			cout << "   " << tmp64 << endl;
+			cout << "   " << tmp64 << " " << colDataType << endl;
 	}
 
 	if (printOnly)
 		return;
 		
-	err = slave->markExtentsInvalid(lbids);
+	err = slave->markExtentsInvalid(lbids, colDataTypes);
 	reply << (uint8_t)err;
 #ifdef BRM_VERBOSE
 	cerr << "WorkerComm: do_markManyExtentsInvalid() err code is " << err<<endl;
@@ -1171,7 +1181,7 @@ void SlaveComm::do_mergeExtentsMaxMin(ByteStream &msg)
 		cpMaxMin.seqNum = tmp32;	
 
 		msg >> tmp32;
-		cpMaxMin.isChar = tmp32;	
+		cpMaxMin.type = (execplan::CalpontSystemCatalog::ColDataType)tmp32;	
 
 		msg >> tmp32;
 		cpMaxMin.newExtent = tmp32;	
@@ -1179,8 +1189,8 @@ void SlaveComm::do_mergeExtentsMaxMin(ByteStream &msg)
 		cpMap[startLbid] = cpMaxMin;
 		if (printOnly)
 			cout << "   startLBID=" << startLbid << " max=" << cpMaxMin.max << " min=" <<
-				cpMaxMin.min << " sequenceNum=" << cpMaxMin.seqNum << " isChar=" << (int)
-				cpMaxMin.isChar << " newExtent=" << (int) cpMaxMin.newExtent << endl;
+				cpMaxMin.min << " sequenceNum=" << cpMaxMin.seqNum << " type=" << (int)
+				cpMaxMin.type << " newExtent=" << (int) cpMaxMin.newExtent << endl;
 	}
 
 	if (printOnly)
@@ -1469,14 +1479,8 @@ void SlaveComm::do_writeVBEntry(ByteStream &msg)
 			vbOID << " vbFBO=" << vbFBO << endl;
 		return;
 	}
-	
-	try {
-		err = slave->writeVBEntry(transID, lbid, vbOID, vbFBO);
-	}
-	catch (runtime_error &e) {
-		cerr << e.what() << endl;
-		err = -2;
-	}
+
+	err = slave->writeVBEntry(transID, lbid, vbOID, vbFBO);
 	reply << (uint8_t) err;
 #ifdef BRM_VERBOSE
 	cerr << "WorkerComm: do_writeVBEntry() err code is " << err << endl;
@@ -1747,7 +1751,6 @@ void SlaveComm::do_confirm()
 void SlaveComm::do_flushInodeCache()
 {
 	ByteStream reply;
-	int err;
 
 #ifdef BRM_VERBOSE
 	cerr << "WorkerComm: do_flushInodeCache()" << endl;
@@ -1800,7 +1803,7 @@ void SlaveComm::do_flushInodeCache()
 #else
 	int fd=-1;
 	if ((fd = open("/proc/sys/vm/drop_caches", O_WRONLY)) >= 0) {
-		err = write(fd, "3\n", 2);
+		write(fd, "3\n", 2);
 		close(fd);
 	}
 #endif

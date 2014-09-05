@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: extentmap.cpp 1938 2013-07-11 17:06:49Z dhall $
+ * $Id: extentmap.cpp 1937 2013-07-10 18:35:58Z dhall $
  *
  ****************************************************************************/
 
@@ -48,8 +48,7 @@
 namespace bi=boost::interprocess;
 
 #include "liboamcpp.h"
-#include "brmtypes.h"	// make sure brmtypes follows liboamcpp to correctly
-						// resolve duplicate definition of UNDO
+#include "brmtypes.h"
 #include "configcpp.h"
 #include "rwlock.h"
 #include "calpontsystemcatalog.h"
@@ -101,82 +100,6 @@ inline void incSeqNum(int32_t& seqNum)
 	seqNum++;
 	if (seqNum > EM_MAX_SEQNUM)
 		seqNum = 0;
-}
-
-//------------------------------------------------------------------------------
-//@bug5005 - new code to work around hi seg file numbers
-// Typedefs to track the high segfile in each "subsequent" partition.
-// Used if current HWM DBRoot/Partition is full.  We use HighSegPerPartMap
-// to find the next "available" partition with room for a segment file.
-//------------------------------------------------------------------------------
-typedef tr1::unordered_map<uint32_t,u_int16_t> HighSegPerPartMap;
-typedef HighSegPerPartMap::iterator            HighSegPerPartMapIter;
-typedef HighSegPerPartMap::const_iterator      HighSegPerPartMapConstIter;
-
-// Search Map for next partition that has room for another segment file
-void findNextPartitionWithAvailSegFileSpace( int oid, u_int16_t dbRoot,
-	const char* description,
-	const HighSegPerPartMap& highSegPerPart,
-	int        filesPerColPart,
-	u_int32_t& newPartitionNum,
-	u_int16_t& newSegmentNum)
-{
-	// Find next partition that has available space
-	bool foundCandidatePart = false;
-	u_int32_t maxPartNum    = 0;
-
-	u_int32_t newPartitionNumCandidate = 0;
-	u_int16_t newSegmentNumCandidate   = 0;
-#if 0
-	ostringstream os1;
-	os1 << "Partition Search" << description <<
-		" Input: oid-" << oid << "; dbroot-" << dbRoot;
-#endif
-	for (HighSegPerPartMapConstIter iter=highSegPerPart.begin();
-		iter!=highSegPerPart.end();
-		++iter) {
-#if 0
-		os1 << " p-" << iter->first << ", s-" << iter->second << ';';
-#endif
-		if (iter->first > maxPartNum)
-			maxPartNum = iter->first;
-		if ((iter->second+1) < filesPerColPart) {
-			if (!foundCandidatePart) {
-				foundCandidatePart       = true;
-				newPartitionNumCandidate = iter->first;
-				newSegmentNumCandidate   = iter->second+1;
-			}
-			else {
-				if (iter->first <= newPartitionNumCandidate) {
-					newPartitionNumCandidate = iter->first;	
-					newSegmentNumCandidate   = iter->second+1;
-				}
-			}
-		}
-	}
-#if 0
-	BRM::log(os1.str(), logging::LOG_TYPE_DEBUG); //DMC
-#endif
-
-	// No space in existing partitions, so create a new partition
-	if (!foundCandidatePart) {
-		newPartitionNum = maxPartNum + 1;
-		newSegmentNum   = 0;
-	}
-	else {
-		newPartitionNum = newPartitionNumCandidate;
-		newSegmentNum   = newSegmentNumCandidate;
-	}
-#if 0
-	ostringstream os2;
-	os2 << "Partition Search Output: foundCandidate-" << foundCandidatePart <<
-		"; newPartCandidate-" << newPartitionNumCandidate <<
-		"; newSegCandidate-" << newSegmentNumCandidate <<
-		"; maxPart-" << maxPartNum <<
-		"; p-" << newPartitionNum <<
-		"; s-" << newSegmentNum;
-	BRM::log(os2.str(), logging::LOG_TYPE_DEBUG); //DMC
-#endif
 }
 
 }
@@ -404,7 +327,6 @@ ExtentMap::ExtentMap()
 #ifdef BRM_INFO
 	fDebug = ("Y" == config::Config::makeConfig()->getConfig("DBRM", "Debug"));
 #endif
-
 }
 	
 ExtentMap::~ExtentMap()
@@ -432,7 +354,7 @@ ExtentMap::~ExtentMap()
 *
 **/
 
-int ExtentMap::_markInvalid(const LBID_t lbid)
+int ExtentMap::_markInvalid(const LBID_t lbid, const execplan::CalpontSystemCatalog::ColDataType colDataType)
 {
 	int entries;
 	int i;
@@ -446,9 +368,27 @@ int ExtentMap::_markInvalid(const LBID_t lbid)
 			if (lbid >= fExtentMap[i].range.start && lbid <= lastBlock) {
 				makeUndoRecord(&fExtentMap[i], sizeof(struct EMEntry));
 				fExtentMap[i].partition.cprange.isValid = CP_UPDATING;
-				fExtentMap[i].partition.cprange.lo_val=numeric_limits<int64_t>::max();
-				fExtentMap[i].partition.cprange.hi_val=numeric_limits<int64_t>::min();
+                if (isUnsigned(colDataType))
+                {
+                    fExtentMap[i].partition.cprange.lo_val=numeric_limits<uint64_t>::max();
+                    fExtentMap[i].partition.cprange.hi_val=0;
+                }
+                else
+                {
+                    fExtentMap[i].partition.cprange.lo_val=numeric_limits<int64_t>::max();
+                    fExtentMap[i].partition.cprange.hi_val=numeric_limits<int64_t>::min();
+                }
 				incSeqNum(fExtentMap[i].partition.cprange.sequenceNum);
+#ifdef BRM_DEBUG 
+                ostringstream os;
+                os << "ExtentMap::_markInvalid(): casual partitioning update: firstLBID=" <<
+                    fExtentMap[i].range.start << " lastLBID=" << fExtentMap[i].range.start +
+                    fExtentMap[i].range.size*1024 - 1 << " OID=" << fExtentMap[i].fileID <<
+                    " min=" << fExtentMap[i].partition.cprange.lo_val << 
+                    " max=" << fExtentMap[i].partition.cprange.hi_val << 
+                    "seq=" << fExtentMap[i].partition.cprange.sequenceNum;
+                log(os.str(), logging::LOG_TYPE_DEBUG);
+#endif
 				return 0;
 			}
 		}
@@ -456,7 +396,8 @@ int ExtentMap::_markInvalid(const LBID_t lbid)
 	throw logic_error("ExtentMap::markInvalid(): lbid isn't allocated");
 }
 
-int ExtentMap::markInvalid(const LBID_t lbid)
+int ExtentMap::markInvalid(const LBID_t lbid, 
+                           const execplan::CalpontSystemCatalog::ColDataType colDataType)
 {
 #ifdef BRM_DEBUG
 	if (lbid < 0)
@@ -471,8 +412,14 @@ int ExtentMap::markInvalid(const LBID_t lbid)
 	}	
 #endif
 	
-	grabEMEntryTable(WRITE);
-	return _markInvalid(lbid);
+#ifdef BRM_DEBUG 
+    ostringstream os;
+    os << "ExtentMap::markInvalid(" << lbid << "," << colDataType << ")";
+    log(os.str(), logging::LOG_TYPE_DEBUG);
+#endif
+
+    grabEMEntryTable(WRITE);
+	return _markInvalid(lbid, colDataType);
 }
 
 /**
@@ -480,7 +427,8 @@ int ExtentMap::markInvalid(const LBID_t lbid)
 *
 **/
 
-int ExtentMap::markInvalid(const vector<LBID_t>& lbids)
+int ExtentMap::markInvalid(const vector<LBID_t>& lbids,
+                           const std::vector<execplan::CalpontSystemCatalog::ColDataType>& colDataTypes)
 {
 	uint i, size = lbids.size();
 
@@ -501,9 +449,15 @@ int ExtentMap::markInvalid(const vector<LBID_t>& lbids)
 	grabEMEntryTable(WRITE);
 
 	// XXXPAT: what's the proper return code when one and only one fails?
-	for (i = 0; i < size; ++i) {
+    for (i = 0; i < size; ++i) {
+#ifdef BRM_DEBUG 
+        ostringstream os;
+        os << "ExtentMap::markInvalid() lbids[" << i << "]=" << lbids[i] <<
+            " colDataTypes[" << i << "]=" << colDataTypes[i];
+        log(os.str(), logging::LOG_TYPE_DEBUG);
+#endif
 		try {
-			_markInvalid(lbids[i]);
+			_markInvalid(lbids[i], colDataTypes[i]);
 		}
 		catch (std::exception &e) {
 			cerr << "ExtentMap::markInvalid(vector): warning!  lbid " << lbids[i] <<
@@ -521,7 +475,7 @@ int ExtentMap::markInvalid(const vector<LBID_t>& lbids)
 * the current sequenceNum value by 1. If the sequenceNum does not
 * match the seqNum value do not update the lbid's max/min values
 * or increment the sequenceNum value and return a -1.
-*
+
 **/
 
 int ExtentMap::setMaxMin(const LBID_t lbid,
@@ -561,24 +515,23 @@ int ExtentMap::setMaxMin(const LBID_t lbid,
 			curSequence = fExtentMap[i].partition.cprange.sequenceNum;
 			if (lbid >= fExtentMap[i].range.start && lbid <= lastBlock)
 			{
+#ifdef BRM_DEBUG
+                if (firstNode) {
+                    ostringstream os;
+                    os << "ExtentMap::setMaxMin(): casual partitioning update: firstLBID=" <<
+                        fExtentMap[i].range.start << " lastLBID=" << fExtentMap[i].range.start +
+                        fExtentMap[i].range.size*1024 - 1 << " OID=" << fExtentMap[i].fileID <<
+                        " min=" << min << " max=" << max << "seq=" << seqNum;
+                    log(os.str(), logging::LOG_TYPE_DEBUG);
+                }
+#endif
 				if (curSequence == seqNum)
 				{
-					ostringstream os;
-
 					makeUndoRecord(&fExtentMap[i], sizeof(struct EMEntry));
 					fExtentMap[i].partition.cprange.hi_val = max;
 					fExtentMap[i].partition.cprange.lo_val = min;
 					fExtentMap[i].partition.cprange.isValid = CP_VALID;
 					incSeqNum(fExtentMap[i].partition.cprange.sequenceNum);
-					if (firstNode) {
-						os << "ExtentMap::setMaxMin(): casual partitioning update: firstLBID=" <<
-							fExtentMap[i].range.start << " lastLBID=" << fExtentMap[i].range.start +
-							fExtentMap[i].range.size*1024 - 1 << " OID=" << fExtentMap[i].fileID <<
-							" min=" << fExtentMap[i].partition.cprange.lo_val << " max=" <<
-							fExtentMap[i].partition.cprange.hi_val << " seq=" <<
-							fExtentMap[i].partition.cprange.sequenceNum;
-						log(os.str(), logging::LOG_TYPE_DEBUG);
-					}
 					return 0;
 				}
 				//special val to indicate a reset--used by editem -c.
@@ -586,8 +539,10 @@ int ExtentMap::setMaxMin(const LBID_t lbid,
 				else if (seqNum == -1)
 				{
 					makeUndoRecord(&fExtentMap[i], sizeof(struct EMEntry));
-					fExtentMap[i].partition.cprange.hi_val = max;
-					fExtentMap[i].partition.cprange.lo_val = min;
+                    // We set hi_val and lo_val to correct values for signed or unsigned
+                    // during the markinvalid step, which sets the invalid variable to CP_UPDATING.
+                    // During this step (seqNum == -1), the min and max passed in are not reliable
+                    // and should not be used.
 					fExtentMap[i].partition.cprange.isValid = CP_INVALID;
 					incSeqNum(fExtentMap[i].partition.cprange.sequenceNum);
 					return 0;
@@ -610,6 +565,21 @@ int ExtentMap::setMaxMin(const LBID_t lbid,
 void ExtentMap::setExtentsMaxMin(const CPMaxMinMap_t &cpMap, bool firstNode, bool useLock)
 {
 	CPMaxMinMap_t::const_iterator it;	
+
+#ifdef BRM_DEBUG
+    log("ExtentMap::setExtentsMaxMin()", logging::LOG_TYPE_DEBUG);
+    for(it = cpMap.begin(); it != cpMap.end(); ++it)
+    {
+        ostringstream os;
+        os << "FirstLBID=" << it->first <<
+            " min=" << it->second.min << 
+            " max=" << it->second.max << 
+            " seq=" << it->second.seqNum;
+        log(os.str(), logging::LOG_TYPE_DEBUG);
+    }
+#endif
+
+
 #ifdef BRM_INFO
 	if (fDebug)
 	{
@@ -649,43 +619,57 @@ void ExtentMap::setExtentsMaxMin(const CPMaxMinMap_t &cpMap, bool firstNode, boo
 				if (curSequence == it->second.seqNum &&
 						fExtentMap[i].partition.cprange.isValid == CP_INVALID)
 				{
-					ostringstream os;
-
 					makeUndoRecord(&fExtentMap[i], sizeof(struct EMEntry));
 					fExtentMap[i].partition.cprange.hi_val = it->second.max;
 					fExtentMap[i].partition.cprange.lo_val = it->second.min;
 					fExtentMap[i].partition.cprange.isValid = CP_VALID;
 					incSeqNum(fExtentMap[i].partition.cprange.sequenceNum);
 					extentsUpdated++;
+#ifdef BRM_DEBUG
 					if (firstNode) {
+                        ostringstream os;
 						os << "ExtentMap::setExtentsMaxMin(): casual partitioning update: firstLBID=" <<
 							fExtentMap[i].range.start << " lastLBID=" << fExtentMap[i].range.start +
 							fExtentMap[i].range.size*1024 - 1 << " OID=" << fExtentMap[i].fileID <<
-							" min=" << fExtentMap[i].partition.cprange.lo_val << " max=" <<
-							fExtentMap[i].partition.cprange.hi_val << " seq=" <<
-							fExtentMap[i].partition.cprange.sequenceNum;
+                            " min=" << it->second.min << " max=" <<
+                            it->second.max << " seq=" <<
+                            it->second.seqNum;
 						log(os.str(), logging::LOG_TYPE_DEBUG);
 					}
+#endif
 				}
-				//special val to indicate a reset--used by editem -c
+				//special val to indicate a reset -- ignore the min/max
 				else if (it->second.seqNum == -1)
 				{
-					makeUndoRecord(&fExtentMap[i], sizeof(struct EMEntry));
-					fExtentMap[i].partition.cprange.hi_val = it->second.max;
-					fExtentMap[i].partition.cprange.lo_val = it->second.min;
+                    makeUndoRecord(&fExtentMap[i], sizeof(struct EMEntry));
+                    // We set hi_val and lo_val to correct values for signed or unsigned
+                    // during the markinvalid step, which sets the invalid variable to CP_UPDATING.
+                    // During this step (seqNum == -1), the min and max passed in are not reliable
+                    // and should not be used.
 					fExtentMap[i].partition.cprange.isValid = CP_INVALID;
 					incSeqNum(fExtentMap[i].partition.cprange.sequenceNum);
 					extentsUpdated++;
 				}
-				// else sequnce has changed since start of the query.  Don't update the EM entry.
+                //special val to indicate a reset -- assign the min/max
+                else if (it->second.seqNum == -2)
+                {
+                    makeUndoRecord(&fExtentMap[i], sizeof(struct EMEntry));
+                    fExtentMap[i].partition.cprange.hi_val = it->second.max;
+                    fExtentMap[i].partition.cprange.lo_val = it->second.min;
+                    fExtentMap[i].partition.cprange.isValid = CP_INVALID;
+                    incSeqNum(fExtentMap[i].partition.cprange.sequenceNum);
+                    extentsUpdated++;
+                }
+				// else sequence has changed since start of the query.  Don't update the EM entry.
 				else
+                {
 					extentsUpdated++;
+                }
 
 				if (extentsUpdated == extentsToUpdate)
 				{
 					return;
 				}
-				
 			}
 		}
 	}
@@ -713,6 +697,21 @@ void ExtentMap::mergeExtentsMaxMin(CPMaxMinMergeMap_t &cpMap, bool useLock)
 {
 	CPMaxMinMergeMap_t::const_iterator it;	
 
+#ifdef BRM_DEBUG
+    log("ExtentMap::mergeExtentsMaxMin()", logging::LOG_TYPE_DEBUG);
+    for(it = cpMap.begin(); it != cpMap.end(); ++it)
+    {
+        ostringstream os;
+        os << "FirstLBID=" << it->first <<
+            " min=" << it->second.min << 
+            " max=" << it->second.max << 
+            " seq=" << it->second.seqNum <<
+            " typ: " << (*it).second.type <<
+            " new: " << (*it).second.newExtent;
+        log(os.str(), logging::LOG_TYPE_DEBUG);
+    }
+#endif
+
 #ifdef BRM_INFO
 	if (fDebug)
 	{
@@ -726,7 +725,7 @@ void ExtentMap::mergeExtentsMaxMin(CPMaxMinMergeMap_t &cpMap, bool useLock)
 				"; max: " << (*it).second.max     <<
 				"; min: " << (*it).second.min     <<
 				"; seq: " << (*it).second.seqNum  <<
-				"; chr: " << (*it).second.isChar  <<
+				"; typ: " << (*it).second.type    <<
 				"; new: " << (*it).second.newExtent;
 			TRACER_WRITEDIRECT(oss.str());
 			count++;
@@ -752,13 +751,25 @@ void ExtentMap::mergeExtentsMaxMin(CPMaxMinMergeMap_t &cpMap, bool useLock)
 			it = cpMap.find(fExtentMap[i].range.start);
 			if(it != cpMap.end())
 			{
+#ifdef BRM_DEBUG
+                ostringstream os;
+                os << "ExtentMap::mergeExtentsMaxMin(): casual partitioning update: firstLBID=" <<
+                    fExtentMap[i].range.start << " lastLBID=" << fExtentMap[i].range.start +
+                    fExtentMap[i].range.size*1024 - 1 << " OID=" << fExtentMap[i].fileID <<
+                    " hi_val=" << fExtentMap[i].partition.cprange.hi_val <<
+                    " lo_val=" << fExtentMap[i].partition.cprange.lo_val <<
+                    " min=" << it->second.min << " max=" << it->second.max << 
+                    " seq=" << it->second.seqNum;
+                log(os.str(), logging::LOG_TYPE_DEBUG);
+#endif
 				switch (fExtentMap[i].partition.cprange.isValid)
 				{
 					// Merge input min/max with current min/max
 					case CP_VALID:
 					{
 						if (!isValidCPRange( it->second.max,
-											 it->second.min ))
+											 it->second.min,
+                                             it->second.type ))
 						{
 							break;
 						}
@@ -769,12 +780,14 @@ void ExtentMap::mergeExtentsMaxMin(CPMaxMinMergeMap_t &cpMap, bool useLock)
 						// because isValid could be CP_VALID for an extent
 						// having all NULL values, in which case the current
 						// min/max needs to be set instead of merged.
-						if (isValidCPRange(
+
+                        if (isValidCPRange(
 							fExtentMap[i].partition.cprange.hi_val,
-							fExtentMap[i].partition.cprange.lo_val))
+							fExtentMap[i].partition.cprange.lo_val,
+                            it->second.type))
 						{
 							// Swap byte order to do binary string comparison
-							if (it->second.isChar)
+							if (isCharType(it->second.type))
 							{
 								int64_t newMinVal =
 									static_cast<int64_t>( uint64ToStr(
@@ -799,11 +812,27 @@ void ExtentMap::mergeExtentsMaxMin(CPMaxMinMergeMap_t &cpMap, bool useLock)
 										it->second.max;
 							}
 							else
+                            if (isUnsigned(it->second.type))
 							{
+                                if (static_cast<uint64_t>(it->second.min) <
+                                    static_cast<uint64_t>(fExtentMap[i].partition.cprange.lo_val))
+                                {
+                                    fExtentMap[i].partition.cprange.lo_val =
+                                        it->second.min;
+                                }
+                                if (static_cast<uint64_t>(it->second.max) >
+                                    static_cast<uint64_t>(fExtentMap[i].partition.cprange.hi_val))
+                                {
+                                    fExtentMap[i].partition.cprange.hi_val =
+                                        it->second.max;
+                                }
+                            }
+                            else
+                            {
 								if (it->second.min <
-									fExtentMap[i].partition.cprange.lo_val)
-									fExtentMap[i].partition.cprange.lo_val =
-										it->second.min;
+                                    fExtentMap[i].partition.cprange.lo_val)
+                                    fExtentMap[i].partition.cprange.lo_val =
+                                        it->second.min;
 								if (it->second.max >
 									fExtentMap[i].partition.cprange.hi_val)
 									fExtentMap[i].partition.cprange.hi_val =
@@ -844,7 +873,8 @@ void ExtentMap::mergeExtentsMaxMin(CPMaxMinMergeMap_t &cpMap, bool useLock)
 						if (it->second.newExtent)
 						{
 							if (isValidCPRange( it->second.max,
-												it->second.min ))
+												it->second.min,
+                                                it->second.type ))
 							{
 								fExtentMap[i].partition.cprange.lo_val =
 									it->second.min;
@@ -880,15 +910,26 @@ void ExtentMap::mergeExtentsMaxMin(CPMaxMinMergeMap_t &cpMap, bool useLock)
 //------------------------------------------------------------------------------
 // Use this function to see if the range is a valid min/max range or not.
 // Range is considered invalid if min or max, are NULL (min()), or EMPTY
-// (min()+1).
+// (min()+1). For unsigned types NULL is max() and EMPTY is max()-1.
 //------------------------------------------------------------------------------
-bool ExtentMap::isValidCPRange(int64_t max, int64_t min) const
+bool ExtentMap::isValidCPRange(int64_t max, int64_t min, execplan::CalpontSystemCatalog::ColDataType type) const
 {
-	if ( (min <= (numeric_limits<int64_t>::min()+1)) ||
-		 (max <= (numeric_limits<int64_t>::min()+1)) )
-	{
-		return false;
-	}
+    if (isUnsigned(type))
+    {
+        if ( (static_cast<uint64_t>(min) >= (numeric_limits<uint64_t>::max()-1)) ||
+             (static_cast<uint64_t>(max) >= (numeric_limits<uint64_t>::max()-1)) )
+        {
+            return false;
+        }
+    }
+    else
+    {
+        if ( (min <= (numeric_limits<int64_t>::min()+1)) ||
+             (max <= (numeric_limits<int64_t>::min()+1)) )
+        {
+            return false;
+        }
+    }
 
 	return true;
 }
@@ -1894,7 +1935,7 @@ void ExtentMap::createStripeColumnExtents(
 	u_int16_t  dbRoot,
 	u_int32_t& partitionNum,
 	u_int16_t& segmentNum,
-	std::vector<CreateStripeColumnExtentsArgOut>& extents)
+    std::vector<CreateStripeColumnExtentsArgOut>& extents)
 {
 	LBID_t    startLbid;
 	int       allocSize;
@@ -1912,6 +1953,7 @@ void ExtentMap::createStripeColumnExtents(
 			cols[i].oid, 
 			cols[i].width,
 			dbRoot,
+            cols[i].colDataType,
 			partitionNum,
 			segmentNum,
 			startLbid,
@@ -1971,6 +2013,7 @@ void ExtentMap::createStripeColumnExtents(
 void ExtentMap::createColumnExtent_DBroot(int OID,
 	u_int32_t  colWidth,
 	u_int16_t  dbRoot,
+    execplan::CalpontSystemCatalog::ColDataType colDataType,
 	u_int32_t& partitionNum,
 	u_int16_t& segmentNum,
 	LBID_t&    lbid,
@@ -2022,7 +2065,7 @@ void ExtentMap::createColumnExtent_DBroot(int OID,
 	u_int32_t size = EXTENT_SIZE/1024;
 
 	lbid = _createColumnExtent_DBroot(size, OID, colWidth,
-		dbRoot, partitionNum, segmentNum, startBlockOffset);
+		dbRoot, colDataType, partitionNum, segmentNum, startBlockOffset);
 
 	allocdsize = EXTENT_SIZE;
 }
@@ -2050,6 +2093,7 @@ void ExtentMap::createColumnExtent_DBroot(int OID,
 LBID_t ExtentMap::_createColumnExtent_DBroot(u_int32_t size, int OID,
 	u_int32_t  colWidth,
 	u_int16_t  dbRoot,
+    execplan::CalpontSystemCatalog::ColDataType colDataType,
 	u_int32_t& partitionNum,
 	u_int16_t& segmentNum,
 	u_int32_t& startBlockOffset)
@@ -2070,11 +2114,6 @@ LBID_t ExtentMap::_createColumnExtent_DBroot(u_int32_t size, int OID,
 	typedef TargetDbRootSegsMap::iterator          TargetDbRootSegsMapIter;
 	typedef TargetDbRootSegsMap::const_iterator    TargetDbRootSegsMapConstIter;
 	TargetDbRootSegsMap targetDbRootSegs;
-
-	// Variable that tracks the high segfile in each "subsequent" partition.
-	// Used if current HWM DBRoot/Partition is full.  We use highSegPerPart
-	// to find the next "available" partition with room for a segment file.
-	HighSegPerPartMap   highSegPerPart;
 
 	u_int32_t highEmptySegNum = 0; // high seg num for user specified partition;
 	                               // only comes into play for empty DBRoot.
@@ -2146,7 +2185,7 @@ LBID_t ExtentMap::_createColumnExtent_DBroot(u_int32_t size, int OID,
 	// Second Step: Scan ExtentMap again after I know the last partition
 	// 4. track highest seg num for HWM+1 partition
 	// 5. track highest seg num for HWM   partition
-	// 6. save list of segment numbers present in target DBRoot and partition
+	// 6. save list of segment numbers and fbos in target DBRoot and partition
 	//
 	// Scanning the extentmap a second time is not a good thing to be doing.
 	// But the alternative isn't good either.  There is certain information
@@ -2159,10 +2198,7 @@ LBID_t ExtentMap::_createColumnExtent_DBroot(u_int32_t size, int OID,
 	// scan the extentmap.
 	//--------------------------------------------------------------------------
 	int partHighSeg     = -1; // hi seg num for last partition
-#if 0
-	//@bug5005 - temporarily disable, since not used
 	int partHighSegNext = -1; // hi seg num for next partition
-#endif
 
 	if (lastExtentIndex >= 0) {
 		u_int32_t targetDbRootPart = fExtentMap[lastExtentIndex].partitionNum;
@@ -2177,29 +2213,9 @@ LBID_t ExtentMap::_createColumnExtent_DBroot(u_int32_t size, int OID,
 				if (fExtentMap[i].fileID == OID) {
 
 					// 4. Track hi seg for hwm+1 partition
-#if 0
-					//@bug5005 - temporarily disable, since not used
 					if (fExtentMap[i].partitionNum == targetDbRootPartNext) {
 						if (fExtentMap[i].segmentNum > partHighSegNext) {
 							partHighSegNext = fExtentMap[i].segmentNum;
-						}
-					}
-#endif
-
-					//@bug5005 - new code to work around hi seg file numbers
-					if (fExtentMap[i].partitionNum >= targetDbRootPartNext) {
-						HighSegPerPartMapIter iter =
-							highSegPerPart.find(fExtentMap[i].partitionNum);
-						if (iter == highSegPerPart.end()) {
-							highSegPerPart.insert(
-								HighSegPerPartMap::value_type(
-									fExtentMap[i].partitionNum,
-									fExtentMap[i].segmentNum) );
-						}
-						else {
-							if (fExtentMap[i].segmentNum > iter->second) {
-								iter->second = fExtentMap[i].segmentNum;
-							}
 						}
 					}
 
@@ -2230,7 +2246,7 @@ LBID_t ExtentMap::_createColumnExtent_DBroot(u_int32_t size, int OID,
 				}   // found extentmap entry for specified OID
 			}       // found valid extentmap entry
 		}           // loop through extent map entries
-	}               // check (!bNoExtentsForOID)
+	}               // (lastExtentIndex >= 0)
 
 	//--------------------------------------------------------------------------
 	// Third Step: Select partition and segment number for new extent
@@ -2240,7 +2256,7 @@ LBID_t ExtentMap::_createColumnExtent_DBroot(u_int32_t size, int OID,
 	//    b. If HWM extent is in last file of DBRoot/Partition, see if next
 	//       extent goes in new partition, or if wrap-around within current
 	//       partition.
-	//    c. if extent needs to go in next partition, figure out the next
+	//    c. If extent needs to go in next partition, figure out the next
 	//       partition and the next available segment in that partition.
 	// 3. Set blockOffset of new extent based on where extent is being added
 	//--------------------------------------------------------------------------
@@ -2343,37 +2359,16 @@ LBID_t ExtentMap::_createColumnExtent_DBroot(u_int32_t size, int OID,
 		}
 		else { // Select next segment file in current HWM partition
 			newSegmentNum = partHighSeg + 1;
-
-			// @bug 5005: Don't create seg files >= FilesPerColumnPartition
-			// We may allow this at later time, but for now, we skip to next
-			// physical partition for this DBRoot.
-			if (newSegmentNum >= FILES_PER_COL_PART) {
-				startNewPartition = true;
-			}
 		}
 
 		// 2c. Find new partition and segment if we can't create
 		//     an extent for this DBRoot in the current HWM partition.
 		if (startNewPartition) {
-#if 0
-			//@bug5005 - temporarily disable, since not used
+			newPartitionNum++;
 			if (partHighSegNext == -1)
 				newSegmentNum = 0;
 			else
 				newSegmentNum = partHighSegNext + 1;
-#endif
-			//@bug5005 - new code to work around hi seg file numbers
-			newPartitionNum++;
-			newSegmentNum = 0;
-
-			// Find next partition that has available space
-			if (highSegPerPart.size() > 0) {
-				findNextPartitionWithAvailSegFileSpace( OID, dbRoot, "(1)",
-					highSegPerPart,
-					(int)FILES_PER_COL_PART,
-					newPartitionNum,
-					newSegmentNum);
-			}
 		}
 
 		// 3. Set blockOffset (fbo) for new extent relative to it's seg file
@@ -2417,42 +2412,6 @@ LBID_t ExtentMap::_createColumnExtent_DBroot(u_int32_t size, int OID,
 			newSegmentNum = highEmptySegNum + 1;
 		else
 			newSegmentNum = 0;
-
-		//@bug5005 - new code to work around hi seg file numbers
-		// Find next partition with room for another segment file
-		if (newSegmentNum >= FILES_PER_COL_PART) {
-			newPartitionNum++;
-			newSegmentNum = 0;
-
-			for (int i = 0; i < emEntries; i++) {
-				if ((fExtentMap[i].range.size != 0)   &&
-					 (fExtentMap[i].fileID    == OID) &&
-					 (fExtentMap[i].partitionNum >= newPartitionNum)) {
-					HighSegPerPartMapIter iter =
-						highSegPerPart.find(fExtentMap[i].partitionNum);
-					if (iter == highSegPerPart.end()) {
-						highSegPerPart.insert(
-							HighSegPerPartMap::value_type(
-								fExtentMap[i].partitionNum,
-								fExtentMap[i].segmentNum) );
-					}
-					else {
-						if (fExtentMap[i].segmentNum > iter->second) {
-							iter->second = fExtentMap[i].segmentNum;
-						}
-					}
-				}
-			}
-
-			// Find next partition that has available space
-			if (highSegPerPart.size() > 0) {
-				findNextPartitionWithAvailSegFileSpace( OID, dbRoot, "(2)",
-					highSegPerPart,
-					(int)FILES_PER_COL_PART,
-					newPartitionNum,
-					newSegmentNum);
-			}
-		}
 	}
 
 	//--------------------------------------------------------------------------
@@ -2465,8 +2424,16 @@ LBID_t ExtentMap::_createColumnExtent_DBroot(u_int32_t size, int OID,
 	e->range.start  = startLBID;
 	e->range.size   = size;
 	e->fileID       = OID;
-	e->partition.cprange.hi_val      = numeric_limits<int64_t>::min();
-	e->partition.cprange.lo_val      = numeric_limits<int64_t>::max();
+    if (isUnsigned(colDataType))
+    {
+        e->partition.cprange.lo_val=numeric_limits<uint64_t>::max();
+        e->partition.cprange.hi_val=0;
+    }
+    else
+    {
+        e->partition.cprange.lo_val=numeric_limits<int64_t>::max();
+        e->partition.cprange.hi_val=numeric_limits<int64_t>::min();
+    }
 	e->partition.cprange.sequenceNum = 0;
 	e->partition.cprange.isValid     = initialCPIsValid;
 	e->colWid       = colWidth;
@@ -2509,6 +2476,7 @@ void ExtentMap::createColumnExtentExactFile(int OID,
 	u_int16_t  dbRoot,
 	u_int32_t partitionNum,
 	u_int16_t segmentNum,
+    execplan::CalpontSystemCatalog::ColDataType colDataType,
 	LBID_t&    lbid,
 	int&       allocdsize,
 	u_int32_t& startBlockOffset)
@@ -2554,7 +2522,7 @@ void ExtentMap::createColumnExtentExactFile(int OID,
 	u_int32_t size = EXTENT_SIZE/1024;
 
 	lbid = _createColumnExtentExactFile(size, OID, colWidth,
-		dbRoot, partitionNum, segmentNum, startBlockOffset);
+		dbRoot, partitionNum, segmentNum, colDataType, startBlockOffset);
 
 	allocdsize = EXTENT_SIZE;
 }
@@ -2582,7 +2550,8 @@ LBID_t ExtentMap::_createColumnExtentExactFile(u_int32_t size, int OID,
 	u_int16_t  dbRoot,
 	u_int32_t  partitionNum,
 	u_int16_t  segmentNum,
-	u_int32_t& startBlockOffset)
+    execplan::CalpontSystemCatalog::ColDataType colDataType,
+    u_int32_t& startBlockOffset)
 {
 	int emptyEMEntry        = -1;
 	int lastExtentIndex     = -1;
@@ -2635,8 +2604,16 @@ LBID_t ExtentMap::_createColumnExtentExactFile(u_int32_t size, int OID,
 	e->range.start  = startLBID;
 	e->range.size   = size;
 	e->fileID       = OID;
-	e->partition.cprange.hi_val      = numeric_limits<int64_t>::min();
-	e->partition.cprange.lo_val      = numeric_limits<int64_t>::max();
+    if (isUnsigned(colDataType))
+    {
+        e->partition.cprange.lo_val=numeric_limits<uint64_t>::max();
+        e->partition.cprange.hi_val=0;
+    }
+    else
+    {
+        e->partition.cprange.lo_val=numeric_limits<int64_t>::max();
+        e->partition.cprange.hi_val=numeric_limits<int64_t>::min();
+    }
 	e->partition.cprange.sequenceNum = 0;
 	e->partition.cprange.isValid     = initialCPIsValid;
 	e->colWid       = colWidth;
@@ -2685,7 +2662,7 @@ void ExtentMap::createDictStoreExtent(int OID,
 	u_int16_t  dbRoot,
 	u_int32_t  partitionNum,
 	u_int16_t  segmentNum,
-	LBID_t&    lbid,
+ 	LBID_t&    lbid,
 	int&       allocdsize)
 {
 #ifdef BRM_INFO
@@ -2793,8 +2770,8 @@ LBID_t ExtentMap::_createDictStoreExtent(u_int32_t size, int OID,
 	e->range.size   = size;
 	e->fileID       = OID;
 	e->status       = EXTENTUNAVAILABLE;// @bug 1911 mark extent as in process
-	e->partition.cprange.hi_val      = numeric_limits<int64_t>::min();
-	e->partition.cprange.lo_val      = numeric_limits<int64_t>::max();
+    e->partition.cprange.lo_val=numeric_limits<int64_t>::max();
+    e->partition.cprange.hi_val=numeric_limits<int64_t>::min();
 	e->partition.cprange.sequenceNum = 0;
 	e->partition.cprange.isValid     = CP_INVALID;
 
@@ -4267,6 +4244,7 @@ void ExtentMap::setLocalHWM(int OID, uint32_t partitionNum,
 		addedAnExtent = true;
 	}
 
+#ifdef BRM_DEBUG 
 	if (firstNode) {
 		ostringstream os;
 		os << "ExtentMap::setLocalHWM(): firstLBID=" << fExtentMap[lastExtentIndex].range.start <<
@@ -4285,6 +4263,7 @@ void ExtentMap::setLocalHWM(int OID, uint32_t partitionNum,
 			os << "  Data extended into a new extent.";
 		log(os.str(), logging::LOG_TYPE_DEBUG);
 	}
+#endif
 }
 
 void ExtentMap::bulkSetHWM(const vector<BulkSetHWMArg> &v, bool firstNode)
@@ -5582,44 +5561,6 @@ void ExtentMap::dumpTo(ostream& os)
 	return 0;
 }
 */
-
-// @bug 5005: New function to allow us to renumber/rename segment files
-//            that match or exceed FilesPerColumnPartition
-//------------------------------------------------------------------------------
-// Update the segment number for the specified OID, partition number, and seg#.
-//
-// WARNING: Not for general purpose use.
-//          This function is only for limited exentmap cleanup.
-//------------------------------------------------------------------------------
-bool ExtentMap::updateSegNum( OID_t oid,
-	uint32_t partNum, uint16_t oldSegNum, uint16_t newSegNum )
-{
-	bool extentsFound = false;
-	grabEMEntryTable(WRITE);
-
-	int emEntries = fEMShminfo->allocdSize/sizeof(struct EMEntry);
-
-	for (int i = 0; i < emEntries; i++)
-	{
-		if (fExtentMap[i].range.size  != 0)
-		{
-			if ((fExtentMap[i].fileID == oid) &&
-				(fExtentMap[i].partitionNum == partNum) &&
-				(fExtentMap[i].segmentNum == oldSegNum))
-			{
-				// We can't exit out at this point after we find a match,
-				// because there could be more than 1 extent per segment file.
-				// So we stay in loop to keep looking for more extents.
-				fExtentMap[i].segmentNum = newSegNum;
-				extentsFound = true;
-			}
-		}
-	}
-
-	releaseEMEntryTable(WRITE);
-
-	return extentsFound;
-}
 
 }	//namespace
 // vim:ts=4 sw=4:

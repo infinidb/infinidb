@@ -1,5 +1,5 @@
 /*****************************************************************************************
-* $Id: main.cpp 2205 2013-07-08 20:14:08Z bpaul $
+* $Id: main.cpp 2206 2013-07-08 21:43:01Z bpaul $
 *
 *****************************************************************************************/
 
@@ -1076,6 +1076,7 @@ void pingDeviceThread()
 							// perform ping test
 							cmd = cmdLine + ipAddr + cmdOption;
 							rtnCode = system(cmd.c_str());
+							rtnCode = WEXITSTATUS(rtnCode);
 						}
 						else
 							rtnCode = 0;
@@ -1236,6 +1237,8 @@ void pingDeviceThread()
 								if (busy)
 									break;
 
+								processManager.setSystemState(oam::BUSY_INIT);
+
 								processManager.reinitProcessType("cpimport");
 
 								// halt the dbrm
@@ -1255,6 +1258,10 @@ void pingDeviceThread()
 								// if pm, move dbroots back to pm
 								if ( ( moduleName.find("pm") == 0 && cloud != "amazon" ) ||
 									( moduleName.find("pm") == 0 && cloud == "amazon" && downActiveOAMModule ) ) {
+
+									//restart to get the versionbuffer files closed so it can be unmounted
+									processManager.restartProcessType("WriteEngineServer");
+
 									downActiveOAMModule = false;
 									try {
 										log.writeLog(__LINE__, "Call autoUnMovePmDbroot", LOG_TYPE_DEBUG);
@@ -1290,6 +1297,7 @@ void pingDeviceThread()
 												//clear count
 												moduleInfoList[moduleName] = 0;
 	
+												processManager.setSystemState(oam::ACTIVE);
 												break;
 											}
 										}
@@ -1322,6 +1330,7 @@ void pingDeviceThread()
 										//clear count
 										moduleInfoList[moduleName] = 0;
 
+										processManager.setSystemState(oam::ACTIVE);
 										break;
 									}
 								}
@@ -1829,7 +1838,8 @@ system(cmd.c_str());
 
 											//set recycle process
 											processManager.recycleProcess(moduleName);
-		
+
+											sleep(2);
 											processManager.setSystemState(oam::ACTIVE);
 										}
 									}
@@ -1870,6 +1880,7 @@ system(cmd.c_str());
 									//set recycle process
 									processManager.recycleProcess(moduleName);
 
+									sleep(2);
 									processManager.setSystemState(oam::ACTIVE);
 
 									//check if down module was Standby OAM, if so find another one
@@ -2077,7 +2088,7 @@ system(cmd.c_str());
 			cmd = cmdLine + ipAddr + cmdOption;
 			rtnCode = system(cmd.c_str());
 
-			switch (rtnCode){
+			switch (WEXITSTATUS(rtnCode)){
 			case 0:
 				//Switch Ack ping, Check whether alarm have been issued 
 				if (extDeviceInfoList[extDeviceName] >= ModuleHeartbeatCount)

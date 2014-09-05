@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: simplecolumn_decimal.h 8536 2012-05-21 21:27:17Z zzhu $
+*   $Id: simplecolumn_decimal.h 9210 2013-01-21 14:10:42Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -142,7 +142,7 @@ void SimpleColumn_Decimal<len>::setNullVal()
 template<int len>
 inline std::string SimpleColumn_Decimal<len>:: getStrVal(rowgroup::Row& row, bool& isNull)
 { 
-	dataconvert::DataConvert::decimalToString((int64_t)row.getIntField<len>(fInputIndex), fResultType.scale, tmp, 22);
+	dataconvert::DataConvert::decimalToString((int64_t)row.getIntField<len>(fInputIndex), fResultType.scale, tmp, 22, fResultType.colDataType);
 	return std::string(tmp);
 }
 

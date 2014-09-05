@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_xmljob.cpp 4200 2012-09-24 15:28:27Z dcathey $
+* $Id: we_xmljob.cpp 4579 2013-03-19 23:16:54Z dhall $
 *
 *******************************************************************************/
 /** @file */
@@ -40,18 +40,10 @@
 #include <boost/filesystem/convenience.hpp>
 
 using namespace std;
+using namespace execplan;
 
 namespace WriteEngine
 {
-const long long MIN_TINYINT  = numeric_limits<int8_t>::min() + 2; //-126;
-const long long MAX_TINYINT  = numeric_limits<int8_t>::max(); //127;
-const long long MIN_SMALLINT = numeric_limits<int16_t>::min() + 2; //-32766;
-const long long MAX_SMALLINT = numeric_limits<int16_t>::max(); //32767;
-const long long MIN_INT      = numeric_limits<int32_t>::min() + 2;//-2147483646;
-const long long MAX_INT      = numeric_limits<int32_t>::max(); //2147483647;
-const long long MIN_BIGINT   = numeric_limits<int64_t>::min() + 2; //-9223372036854775806LL;
-const long long MAX_BIGINT   = numeric_limits<int64_t>::max(); //9223372036854775807LL;
-
 // Maximum saturation value for DECIMAL types based on precision
 const long long infinidb_precision[19] = {
 0,
@@ -205,7 +197,11 @@ void XMLJob::printJobInfo( Log& logger ) const
             oss3 << "\t\tColumn autoInc    : " << jobCol.autoIncFlag << endl;
 #endif
 
-            if( jobCol.typeName == ColDataTypeStr[DECIMAL] ) {
+            if( jobCol.typeName == ColDataTypeStr[CalpontSystemCatalog::DECIMAL] ) {
+                oss3 << "\t\tColumn Precision  : " << jobCol.precision << endl;
+                oss3 << "\t\tColumn Scale      : " << jobCol.scale << endl;
+            }
+            if( jobCol.typeName == ColDataTypeStr[CalpontSystemCatalog::UDECIMAL] ) {
                 oss3 << "\t\tColumn Precision  : " << jobCol.precision << endl;
                 oss3 << "\t\tColumn Scale      : " << jobCol.scale << endl;
             }
@@ -584,12 +580,12 @@ void XMLJob::setJobDataColumn( xmlNode* pNode, bool bDefaultCol )
     }
 
     // This is a workaround that DBBuilder can not pass decimal type to XML file
-    if( ( curColumn.typeName == ColDataTypeStr[INT] ||
-          curColumn.typeName == ColDataTypeStr[BIGINT] ||
-          curColumn.typeName == ColDataTypeStr[SMALLINT] ||
-          curColumn.typeName == ColDataTypeStr[TINYINT] ) &&
+    if( ( curColumn.typeName == ColDataTypeStr[CalpontSystemCatalog::INT] ||
+          curColumn.typeName == ColDataTypeStr[CalpontSystemCatalog::BIGINT] ||
+          curColumn.typeName == ColDataTypeStr[CalpontSystemCatalog::SMALLINT]||
+          curColumn.typeName == ColDataTypeStr[CalpontSystemCatalog::TINYINT])&&
           curColumn.scale > 0 ) 
-        curColumn.typeName = ColDataTypeStr[DECIMAL];
+        curColumn.typeName = ColDataTypeStr[CalpontSystemCatalog::DECIMAL];
     // end of workaround
 
     // Initialize the saturation limits for this column
@@ -636,7 +632,7 @@ void XMLJob::setJobDataIgnoreField( )
                           fJob.jobTableList[tableNo].fIgnoredFields.size()-1 );
     fJob.jobTableList[tableNo].fFldRefs.push_back      ( fieldRef  );
 }
-
+
 //------------------------------------------------------------------------------
 // Initialize the saturation limits for the specified column.
 //------------------------------------------------------------------------------
@@ -644,28 +640,78 @@ void XMLJob::initSatLimits( JobColumn& curColumn ) const
 {
     // If one of the integer types, we set the min/max saturation value.
     // For DECIMAL columns this will vary with the precision.
-    if      ( curColumn.typeName == ColDataTypeStr[INT] ) {
+    if      ( curColumn.typeName ==
+              ColDataTypeStr[CalpontSystemCatalog::INT] ) {
         curColumn.fMinIntSat = MIN_INT;
         curColumn.fMaxIntSat = MAX_INT;
     }
-    else if ( curColumn.typeName == ColDataTypeStr[BIGINT] ) {
+    else if ( curColumn.typeName ==
+              ColDataTypeStr[CalpontSystemCatalog::UINT] ) {
+        curColumn.fMinIntSat = MIN_UINT;
+        curColumn.fMaxIntSat = MAX_UINT;
+    }
+    else if ( curColumn.typeName ==
+              ColDataTypeStr[CalpontSystemCatalog::BIGINT] ) {
         curColumn.fMinIntSat = MIN_BIGINT;
         curColumn.fMaxIntSat = MAX_BIGINT;
     }
-    else if ( curColumn.typeName == ColDataTypeStr[SMALLINT] ) {
+    else if ( curColumn.typeName ==
+              ColDataTypeStr[CalpontSystemCatalog::UBIGINT] ) {
+        curColumn.fMinIntSat = MIN_UBIGINT;
+        curColumn.fMaxIntSat = MAX_UBIGINT;
+    }
+    else if ( curColumn.typeName ==
+              ColDataTypeStr[CalpontSystemCatalog::SMALLINT] ) {
         curColumn.fMinIntSat = MIN_SMALLINT;
         curColumn.fMaxIntSat = MAX_SMALLINT;
     }
-    else if ( curColumn.typeName == ColDataTypeStr[TINYINT] ) {
+    else if ( curColumn.typeName ==
+              ColDataTypeStr[CalpontSystemCatalog::USMALLINT] ) {
+        curColumn.fMinIntSat = MIN_USMALLINT;
+        curColumn.fMaxIntSat = MAX_USMALLINT;
+    }
+    else if ( curColumn.typeName ==
+              ColDataTypeStr[CalpontSystemCatalog::TINYINT] ) {
         curColumn.fMinIntSat = MIN_TINYINT;
         curColumn.fMaxIntSat = MAX_TINYINT;
     }
-    else if ( curColumn.typeName == ColDataTypeStr[DECIMAL] ) {
+    else if ( curColumn.typeName ==
+              ColDataTypeStr[CalpontSystemCatalog::UTINYINT] ) {
+        curColumn.fMinIntSat = MIN_UTINYINT;
+        curColumn.fMaxIntSat = MAX_UTINYINT;
+    }
+    else if ( curColumn.typeName ==
+              ColDataTypeStr[CalpontSystemCatalog::DECIMAL] ) {
         curColumn.fMinIntSat = -infinidb_precision[curColumn.precision];
         curColumn.fMaxIntSat = infinidb_precision[curColumn.precision];
     }
+    else if ( curColumn.typeName ==
+              ColDataTypeStr[CalpontSystemCatalog::UDECIMAL] ) {
+        curColumn.fMinIntSat = 0;
+        curColumn.fMaxIntSat = infinidb_precision[curColumn.precision];
+    }
+    else if ( curColumn.typeName ==
+              ColDataTypeStr[CalpontSystemCatalog::FLOAT] ) {
+        curColumn.fMinDblSat = MIN_FLOAT;
+        curColumn.fMaxDblSat = MAX_FLOAT;
+    }
+    else if ( curColumn.typeName ==
+              ColDataTypeStr[CalpontSystemCatalog::UFLOAT] ) {
+        curColumn.fMinDblSat = 0.0;
+        curColumn.fMaxDblSat = MAX_FLOAT;
+    }
+    else if ( curColumn.typeName ==
+              ColDataTypeStr[CalpontSystemCatalog::DOUBLE] ) {
+        curColumn.fMinDblSat = MIN_DOUBLE;
+        curColumn.fMaxDblSat = MAX_DOUBLE;
+    }
+    else if ( curColumn.typeName ==
+              ColDataTypeStr[CalpontSystemCatalog::UDOUBLE] ) {
+        curColumn.fMinDblSat = 0.0;
+        curColumn.fMaxDblSat = MAX_DOUBLE;
+    }
 }
-
+
 //------------------------------------------------------------------------------
 // Set Read Buffers attributes
 // pNode - current node
@@ -833,7 +879,9 @@ void XMLJob::fillInXMLDataAsLoaded(
             col.definedWidth            = colType.colWidth;
             if ((colType.scale > 0) ||
                 (colType.colDataType ==
-                 execplan::CalpontSystemCatalog::DECIMAL))
+                 execplan::CalpontSystemCatalog::DECIMAL) ||
+                (colType.colDataType ==
+                 execplan::CalpontSystemCatalog::UDECIMAL))
             {
                 col.precision           = colType.precision;
                 col.scale               = colType.scale;
@@ -861,13 +909,17 @@ void XMLJob::fillInXMLDataAsLoaded(
 
             // @bug3801: For backwards compatability, we treat
             // integer types with nonzero 0 scale as decimal if scale > 0
-            if( ((col.typeName == ColDataTypeStr[INT])      ||
-                 (col.typeName == ColDataTypeStr[BIGINT])   ||
-                 (col.typeName == ColDataTypeStr[SMALLINT]) ||
-                 (col.typeName == ColDataTypeStr[TINYINT])) &&
+            if( ((col.typeName ==
+                  ColDataTypeStr[CalpontSystemCatalog::INT])      ||
+                 (col.typeName ==
+                  ColDataTypeStr[CalpontSystemCatalog::BIGINT])   ||
+                 (col.typeName ==
+                  ColDataTypeStr[CalpontSystemCatalog::SMALLINT]) ||
+                 (col.typeName ==
+                  ColDataTypeStr[CalpontSystemCatalog::TINYINT])) &&
                  (col.scale > 0) )
             {
-                col.typeName = ColDataTypeStr[DECIMAL];
+                col.typeName = ColDataTypeStr[CalpontSystemCatalog::DECIMAL];
             }
 
             // Initialize the saturation limits for this column
@@ -925,7 +977,21 @@ void XMLJob::fillInXMLDataNotNullDefault(
                 break;
             }
 
+            case execplan::CalpontSystemCatalog::UTINYINT:
+            case execplan::CalpontSystemCatalog::USMALLINT:
+            case execplan::CalpontSystemCatalog::UMEDINT:
+            case execplan::CalpontSystemCatalog::UINT:
+            case execplan::CalpontSystemCatalog::UBIGINT:
+            {
+                errno = 0;
+                col.fDefaultUInt = strtoull(col_defaultValue.c_str(),0,10);
+                if (errno == ERANGE)
+                    bDefaultConvertError = true;
+                break;
+            }
+
             case execplan::CalpontSystemCatalog::DECIMAL:
+            case execplan::CalpontSystemCatalog::UDECIMAL:
             {
                 col.fDefaultInt = Convertor::convertDecimalString(
                     col_defaultValue.c_str(),
@@ -939,7 +1005,7 @@ void XMLJob::fillInXMLDataNotNullDefault(
             case execplan::CalpontSystemCatalog::DATE:
             {
                 int convertStatus;
-                u_int32_t dt =
+                int32_t dt =
                     dataconvert::DataConvert::convertColumnDate(
                     col_defaultValue.c_str(),
                     dataconvert::CALPONTDATE_ENUM, convertStatus,
@@ -953,7 +1019,7 @@ void XMLJob::fillInXMLDataNotNullDefault(
             case execplan::CalpontSystemCatalog::DATETIME:
             {
                 int convertStatus;
-                u_int64_t dt =
+                int64_t dt =
                     dataconvert::DataConvert::convertColumnDatetime(
                     col_defaultValue.c_str(),
                     dataconvert::CALPONTDATETIME_ENUM, convertStatus,
@@ -966,6 +1032,8 @@ void XMLJob::fillInXMLDataNotNullDefault(
 
             case execplan::CalpontSystemCatalog::FLOAT:
             case execplan::CalpontSystemCatalog::DOUBLE:
+            case execplan::CalpontSystemCatalog::UFLOAT:
+            case execplan::CalpontSystemCatalog::UDOUBLE:
             {
                 errno = 0;
                 col.fDefaultDbl = strtod(col_defaultValue.c_str(),0);

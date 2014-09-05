@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: cpimport.cpp 4702 2013-07-08 20:06:14Z bpaul $
+* $Id: cpimport.cpp 4703 2013-07-08 21:34:14Z bpaul $
 *
 *******************************************************************************/
 
@@ -95,24 +95,24 @@ namespace
 //------------------------------------------------------------------------------
 void printUsage()
 {
-    cerr << endl << "Simple usage using positional parameters "
+    cout << endl << "Simple usage using positional parameters "
       "(no XML job file):" << endl <<
-      "    cpimport.bin dbName tblName [loadFile] [-j jobID] " << endl <<
-      "    [-h] [-r readers] [-w parsers] [-s c] [-f path] " << endl <<
-      "    [-b readBufs] [-c readBufSize] [-e maxErrs] [-B libBufSize]" <<endl<<
-      "    [-n NullOption] [-E encloseChar] [-C escapeChar] [-S]" << 
-      "[-d debugLevel] [-i]" << endl;
+  "    cpimport.bin dbName tblName [loadFile] [-j jobID] " << endl <<
+  "    [-h] [-r readers] [-w parsers] [-s c] [-f path] [-b readBufs] " << endl<<
+  "    [-c readBufSize] [-e maxErrs] [-B libBufSize] [-n NullOption] " << endl<<
+  "    [-E encloseChar] [-C escapeChar] [-I binaryOpt] [-S] "
+  "[-d debugLevel] [-i] " << endl;
 
-    cerr << endl << "Traditional usage without positional parameters "
+    cout << endl << "Traditional usage without positional parameters "
       "(XML job file required):" << endl <<
-      "    cpimport.bin -j jobID " << endl <<
-      "    [-h] [-r readers] [-w parsers] [-s c] [-f path]" << endl <<
-      "    [-b readBufs] [-c readBufSize] [-e maxErrs] [-B libBufSize]" <<endl<<
-      "    [-n NullOption] [-E encloseChar] [-C escapeChar] [-S]" <<
-      "[-d debugLevel] [-i]" << endl <<
-      "    [-p path] [-l loadFile]" << endl << endl;
+  "    cpimport.bin -j jobID " << endl <<
+  "    [-h] [-r readers] [-w parsers] [-s c] [-f path] [-b readBufs] " << endl<<
+  "    [-c readBufSize] [-e maxErrs] [-B libBufSize] [-n NullOption] " << endl<<
+  "    [-E encloseChar] [-C escapeChar] [-I binaryOpt] [-S] "
+  "[-d debugLevel] [-i] "                                              << endl<<
+  "    [-p path] [-l loadFile]" << endl << endl;
 
-    cerr << "    Positional parameters:" << endl <<
+    cout << "    Positional parameters:" << endl <<
         "        dbName    Name of database to load" << endl <<
         "        tblName   Name of table to load"   << endl <<
         "        loadFile  Optional input file name in current directory, " <<
@@ -120,7 +120,7 @@ void printUsage()
         "                  qualified name is given.  If not given, " << 
         "input read from stdin." << endl << endl;
 
-    cerr << "    Options:" << endl <<
+    cout << "    Options:" << endl <<
         "        -b Number of read buffers" << endl <<
         "        -c Application read buffer size (in bytes)" << endl <<
         "        -d Print different level (1-3) debug message " << endl <<
@@ -152,9 +152,11 @@ void printUsage()
         "        -C Escape character used in conjunction with 'enclosed by'" <<
         endl <<
         "           character (default is '\\')" << endl << 
+        "        -I Binary import; binaryOpt 1-import NULL values"   << endl <<
+        "                                    2-saturate NULL values" << endl <<
         "        -S Treat string truncations as errors" << endl << endl;
 
-    cerr << "    Example1:" << endl <<
+    cout << "    Example1:" << endl <<
         "        cpimport.bin -j 1234" << endl <<
         "    Example2: Some column values are enclosed within double quotes." <<
         endl <<
@@ -280,7 +282,7 @@ void parseCmdLineArgs(
     BulkModeType bulkMode = BULK_MODE_LOCAL;
 
     while( (option=getopt(
-        argc,argv,"b:c:d:e:f:hij:kl:m:n:p:r:w:s:B:C:DE:P:R:X:S")) != EOF )
+        argc,argv,"b:c:d:e:f:hij:kl:m:n:p:r:w:s:B:C:E:I:P:R:SX:")) != EOF )
     {
         switch(option)
         {
@@ -376,6 +378,15 @@ void parseCmdLineArgs(
 
             case 'j':                                // -j: jobID
             {
+                errno = 0;
+                long lValue = strtol(optarg, 0, 10);
+                if ((errno != 0) ||
+                    (lValue < 0) || (lValue > INT_MAX))
+                {
+                    startupError ( std::string(
+                        "Option -j is invalid or out of range."), true );
+                }
+
                 sJobIdStr = optarg;
                 break;
             }
@@ -525,6 +536,21 @@ void parseCmdLineArgs(
             {
                 curJob.setEnclosedByChar( optarg[0] );
                 cout << "Enclosed by Character : " << optarg[0] << endl;
+                break;
+            }
+
+            case 'I':                                // -I: Binary import mode
+            {
+                ImportDataMode importMode = (ImportDataMode)atoi( optarg );
+                if ((importMode != IMPORT_DATA_BIN_ACCEPT_NULL) &&
+                    (importMode != IMPORT_DATA_BIN_SAT_NULL))
+                {
+                    startupError ( std::string(
+                        "Invalid binary import option; value can be 1"
+                        "(accept NULL values) or 2(saturate NULL values)"),
+                        true );
+                }
+                curJob.setImportDataMode( importMode );
                 break;
             }
 
@@ -873,7 +899,8 @@ int main(int argc, char **argv)
     if (argc > 0)
         pgmName = argv[0];
     logging::IDBErrorInfo::instance();
-    SimpleSysLog::instance();
+    SimpleSysLog::instance()->setLoggingID(
+        logging::LoggingID(SUBSYSTEM_ID_WE_BULK) );
 
     // Log job initiation unless user is asking for help
     std::ostringstream ossArgList;
@@ -964,12 +991,14 @@ int main(int argc, char **argv)
     // Make sure DMLProc startup has completed before running a cpimport.bin job
     //--------------------------------------------------------------------------
     task = TASK_BRM_STATE_READY;
+
     if (!BRMWrapper::getInstance()->isSystemReady())
     {
         startupError( std::string(
             "System is not ready.  Verify that InfiniDB is up and ready "
             "before running cpimport."), false );
     }
+
     if (bDebug)
         logInitiateMsg( "BRM state verified: state is Ready" );
 
@@ -1159,9 +1188,9 @@ int main(int argc, char **argv)
         endMsgArgs.add("SUCCESS");
     }
     SimpleSysLog::instance()->logMsg(
-        endMsgArgs,
-        logging::LOG_TYPE_INFO,
-        logging::M0082);
+    endMsgArgs,
+    logging::LOG_TYPE_INFO,
+    logging::M0082);
     
     if (rc != NO_ERROR)
         return ( EXIT_FAILURE );

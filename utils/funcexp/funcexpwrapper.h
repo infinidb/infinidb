@@ -17,7 +17,7 @@
 
 //
 //
-// $Id: funcexpwrapper.h 3048 2012-04-04 15:33:45Z rdempsey $
+// $Id: funcexpwrapper.h 3495 2013-01-21 14:09:51Z rdempsey $
 //
 // C++ Interface: funcexpwrapper
 //

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: primitiveprocessor.h 1855 2012-04-04 18:20:09Z rdempsey $
+ * $Id: primitiveprocessor.h 2035 2013-01-21 14:12:19Z rdempsey $
  *
  *****************************************************************************/
 
@@ -129,7 +129,10 @@ public:
 	 * The primitive processing functions operate on one block at a time.  The caller
 	 * sets which block to operate on next with this function.
 	 */
-	void setBlockPtr(int *data);
+	void setBlockPtr(int *data)
+    {
+    	block = data;
+    }
 	void setPMStatsPtr(dbbc::Stats* p)
 	{
 		fStatsPtr=p;	
@@ -257,7 +260,7 @@ public:
 	 * NewCollAggResultHeader.
 	 * @note See PrimitiveMsg.h for the type definitions.
 	 */
-	void p_ColAggregate(const NewColAggRequestHeader *in, NewColAggResultHeader *out);
+//	void p_ColAggregate(const NewColAggRequestHeader *in, NewColAggResultHeader *out);
 
 	void p_Dictionary(const DictInput *in, std::vector<uint8_t> *out, bool utf8,
 			bool skipNulls, boost::shared_ptr<DictEqualityFilter> eqFilter,
@@ -294,7 +297,8 @@ private:
 		uint8_t outputFlags = 0, bool oldGetSigBehavior = false, bool skipNulls = false) throw();
 	bool isLike(const p_DataValue *dict, const idb_regex_t *arg) throw();
 
-	void do_sum8(NewColAggResultHeader *out, int64_t val);
+//	void do_sum8(NewColAggResultHeader *out, int64_t val);
+//    void do_unsignedsum8(NewColAggResultHeader *out, int64_t val);
 
 	uint64_t masks[11];
 	int dict_OffsetIndex, currentOffsetIndex;		// used by p_dictionary

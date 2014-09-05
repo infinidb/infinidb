@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
-* $Id: we_bulkrollbackfile.cpp 4213 2012-09-28 13:04:51Z dcathey $
+* $Id: we_bulkrollbackfile.cpp 4450 2013-01-21 14:13:24Z rdempsey $
 */
 
 #include "we_bulkrollbackfile.h"
@@ -28,9 +28,11 @@
 #include "we_fileop.h"
 #include "messageids.h"
 
+using namespace execplan;
+
 namespace WriteEngine
 {
-
+
 //------------------------------------------------------------------------------
 // BulkRollbackFile constructor
 //------------------------------------------------------------------------------
@@ -38,11 +40,11 @@ BulkRollbackFile::BulkRollbackFile(BulkRollbackMgr* mgr) : fMgr(mgr)
 {
     // Initialize empty dictionary header block used when reinitializing
     // dictionary store extents.
-    const i16 freeSpace  = BYTE_PER_BLOCK -
+    const uint16_t freeSpace  = BYTE_PER_BLOCK -
         (HDR_UNIT_SIZE + NEXT_PTR_BYTES + HDR_UNIT_SIZE + HDR_UNIT_SIZE);
-    const i64 nextPtr    = NOT_USED_PTR;
-    const i16 offSetZero = BYTE_PER_BLOCK;
-    const i16 endHeader  = DCTNRY_END_HEADER;
+    const uint64_t nextPtr    = NOT_USED_PTR;
+    const uint16_t offSetZero = BYTE_PER_BLOCK;
+    const uint16_t endHeader  = DCTNRY_END_HEADER;
 
     memcpy(fDctnryHdr,                &freeSpace,  HDR_UNIT_SIZE);
     memcpy(fDctnryHdr+ HDR_UNIT_SIZE, &nextPtr,   NEXT_PTR_BYTES);
@@ -58,7 +60,7 @@ BulkRollbackFile::BulkRollbackFile(BulkRollbackMgr* mgr) : fMgr(mgr)
 BulkRollbackFile::~BulkRollbackFile()
 {
 }
-
+
 //------------------------------------------------------------------------------
 // Find the specified database segment file.
 //
@@ -104,7 +106,7 @@ void BulkRollbackFile::findSegmentFile(
 
     segFileExists = fDbFile.exists( fileName );
 }
-
+
 //------------------------------------------------------------------------------
 // Delete the specified database segment file.
 //
@@ -150,7 +152,7 @@ void BulkRollbackFile::deleteSegmentFile(
         }
     }
 }
-
+
 //------------------------------------------------------------------------------
 // Truncate the specified database segment file to the given file offset.
 //
@@ -213,7 +215,7 @@ void BulkRollbackFile::truncateSegmentFile(
 
     fDbFile.closeFile( pFile );
 }
-
+
 //------------------------------------------------------------------------------
 // Reinitialize a column segment extent (in the db file) to empty values,
 // following the HWM.  Remaining extents in the file are truncated.
@@ -233,13 +235,13 @@ void BulkRollbackFile::truncateSegmentFile(
 //------------------------------------------------------------------------------
 void BulkRollbackFile::reInitTruncColumnExtent(
     OID         columnOID,
-    u_int32_t   dbRoot,
-    u_int32_t   partNum,
-    u_int32_t   segNum,
+    uint32_t    dbRoot,
+    uint32_t    partNum,
+    uint32_t    segNum,
     long long   startOffsetBlk,
     int         nBlocks,
-    ColDataType colType,
-    u_int32_t   colWidth,
+    CalpontSystemCatalog::ColDataType colType,
+    uint32_t  colWidth,
     bool        /*restoreHwmChk*/ )
 {
     long long startOffset = startOffsetBlk * BYTE_PER_BLOCK;
@@ -302,7 +304,7 @@ void BulkRollbackFile::reInitTruncColumnExtent(
     }
 
     // Initialize the remainder of the extent after the HWM block
-    i64 emptyVal = fDbFile.getEmptyRowValue( colType, colWidth );
+    uint64_t emptyVal = fDbFile.getEmptyRowValue( colType, colWidth );
 
     int rc = fDbFile.reInitPartialColumnExtent( pFile,
         startOffset,
@@ -348,7 +350,7 @@ void BulkRollbackFile::reInitTruncColumnExtent(
 
     fDbFile.closeFile( pFile );
 }
-
+
 //------------------------------------------------------------------------------
 // Reinitialize a dictionary segment extent (in the db file) to empty blocks,
 // following the HWM.  Remaining extents in the file are truncated.
@@ -472,7 +474,7 @@ void BulkRollbackFile::reInitTruncDctnryExtent(
 
     fDbFile.closeFile( pFile );
 }
-
+
 //------------------------------------------------------------------------------
 // For uncompressed data...
 // Always return true, in order to always reInit the post-HWM blocks for the

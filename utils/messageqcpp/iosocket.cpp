@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: iosocket.cpp 3234 2012-08-15 21:02:43Z dhall $
+*   $Id: iosocket.cpp 3632 2013-03-13 18:08:46Z pleblanc $
 *
 *
 ***********************************************************************/
@@ -92,13 +92,6 @@ const string IOSocket::toString() const
 	       " port: " << ntohs(sinp->sin_port);
 	return oss.str();
 #endif
-}
-
-const SBS IOSocket::read(const struct timespec* timeout, bool* isTimeOut) const
-{
-	if (!fSocket)
-		throw runtime_error("IOSocket::read(): no fSocket?");
-	return fSocket->read(timeout, isTimeOut);
 }
 
 } //namespace messageqcpp

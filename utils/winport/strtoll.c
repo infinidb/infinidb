@@ -29,12 +29,14 @@ long long llabs(const long long in)
 
 long long atoll(const char* nptr)
 {
-	return strtoll(nptr, 0, 0);
+	return idb_strtoll(nptr, 0, 0);
 }
 
-unsigned long long strtoull(const char *nptr, char **endptr, int base)
+unsigned long long idb_strtoull(const char *nptr, char **endptr, int base)
 {
-	return (unsigned long long)strtoll(nptr, endptr, base);
+	long long out;
+	out = (long long)_strtoui64(nptr, endptr, base);
+	return out;
 }
 
 long long idb_strtoll(const char *nptr, char **endptr, int base)

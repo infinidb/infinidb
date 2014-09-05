@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: we_colbufcompressed.cpp 4380 2012-12-06 13:29:54Z rdempsey $
+ * $Id: we_colbufcompressed.cpp 4450 2013-01-21 14:13:24Z rdempsey $
  *
  ****************************************************************************/
 
@@ -43,6 +43,7 @@
 #include "we_log.h"
 #include "we_stats.h"
 
+#include "idbcompress.h"
 using namespace compress;
 
 namespace WriteEngine {
@@ -352,7 +353,7 @@ int ColumnBufferCompressed::writeToFile(int startOffset, int writeSize)
 //------------------------------------------------------------------------------
 int ColumnBufferCompressed::compressAndFlush( bool bFinishingFile )
 {
-    const int OUTPUT_BUFFER_SIZE = int( (double)fToBeCompressedCapacity * 1.17 )+
+    const int OUTPUT_BUFFER_SIZE = IDBCompressInterface::maxCompressedSize(fToBeCompressedCapacity) +
         fUserPaddingBytes;
     unsigned char* compressedOutBuf = new unsigned char[ OUTPUT_BUFFER_SIZE ];
     boost::scoped_array<unsigned char> compressedOutBufPtr(compressedOutBuf);

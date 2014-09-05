@@ -188,7 +188,7 @@ void mysqlSetup()
 	string cmd;
 	cmd = installDir + "/bin/post-mysqld-install --installdir=" + installDir;
 	int rtnCode = system(cmd.c_str());
-	if (rtnCode != 0)
+	if (WEXITSTATUS(rtnCode) != 0)
 		cout << "Error running post-mysqld-install" << endl;
 
 	//check for password set
@@ -237,7 +237,7 @@ void mysqlSetup()
 	
 	cmd = installDir + "/bin/post-mysql-install " + pwprompt + " --installdir=" + installDir;
 	rtnCode = system(cmd.c_str());
-	if (rtnCode != 0)
+	if (WEXITSTATUS(rtnCode) != 0)
 		cout << "Error running post-mysql-install" << endl;
 
 	return;

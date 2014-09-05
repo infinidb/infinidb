@@ -5671,6 +5671,7 @@ enum options_mysqld
   OPT_INFINIDB_STRING_SCAN_THRESHOLD,
   OPT_INFINIDB_COMPRESSION_TYPE,
   OPT_INFINIDB_VARBIN_ALWAYS_HEX,
+  OPT_INFINIDB_DOUBLE_FOR_DECIMAL_MATH,
   /* InfiniDB */
 };
 
@@ -6910,8 +6911,8 @@ The minimum value for this variable is 4096.",
   {"infinidb_use_decimal_scale", OPT_INFINIDB_USE_DECIMAL_SCALE,
    "Enable/disable the InfiniDB decimal scale to be used internally",
    (uchar**)&global_system_variables.infinidb_use_decimal_scale,
-   (uchar**)&max_system_variables.infinidb_use_decimal_scale,
-        0, GET_BOOL, NO_ARG,
+   (uchar**)&max_system_variables.infinidb_use_decimal_scale, 0,
+   GET_BOOL, NO_ARG,
 	0, /* Default value */
 	0, /* Min allowed value */
 	1, /* Max allowed value */
@@ -6958,8 +6959,21 @@ The minimum value for this variable is 4096.",
   {"infinidb_varbin_always_hex", OPT_INFINIDB_VARBIN_ALWAYS_HEX,
    "Always display/process varbinary columns as if they have been hexified.",
    (uchar**)&global_system_variables.infinidb_varbin_always_hex,
-   (uchar**)&max_system_variables.infinidb_varbin_always_hex,
-        0, GET_BOOL, NO_ARG,
+   (uchar**)&max_system_variables.infinidb_varbin_always_hex, 0,
+   GET_BOOL, NO_ARG,
+	0, /* Default value */
+	0, /* Min allowed value */
+	1, /* Max allowed value */
+	0, /* Subtract this overhead from given value before setting var */
+	1, /* Value should be a mult. of this */
+	0},
+
+	// InfiniDB boolean variable
+  {"infinidb_double_for_decimal_math", OPT_INFINIDB_DOUBLE_FOR_DECIMAL_MATH,
+   "Enable/disable the InfiniDB to replace DECIMAL with DOUBLE in arithmetic operation.",
+   (uchar**)&global_system_variables.infinidb_double_for_decimal_math,
+   (uchar**)&max_system_variables.infinidb_double_for_decimal_math, 0,
+   GET_BOOL, NO_ARG,
 	0, /* Default value */
 	0, /* Min allowed value */
 	1, /* Max allowed value */

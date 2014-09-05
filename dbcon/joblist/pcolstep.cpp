@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: pcolstep.cpp 8531 2012-05-18 22:18:04Z xlou $
+*   $Id: pcolstep.cpp 9210 2013-01-21 14:10:42Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -32,7 +32,6 @@ using namespace std;
 #include "distributedenginecomm.h"
 #include "elementtype.h"
 #include "unique32generator.h"
-#include "primitivestep.h"
 
 #include "messagequeue.h"
 using namespace messageqcpp;
@@ -52,6 +51,8 @@ using namespace execplan;
 using namespace BRM;
 
 #include "idbcompress.h"
+#include "jlf_common.h"
+#include "primitivestep.h"
 
 // #define DEBUG 1
 
@@ -98,34 +99,17 @@ struct pColStepAggregator
 };
 #endif
 
-pColStep::pColStep(const JobStepAssociation& inputJobStepAssociation,
-	const JobStepAssociation& outputJobStepAssociation,
-	DistributedEngineComm* dec,
-	boost::shared_ptr<CalpontSystemCatalog> cat,
+pColStep::pColStep(
 	CalpontSystemCatalog::OID o,
 	CalpontSystemCatalog::OID t,
 	const CalpontSystemCatalog::ColType& ct,
-	uint32_t session,
-	uint32_t txn,
-	uint32_t verID,
-	uint16_t step,
-	uint32_t statementId,
-	ResourceManager& rm,
-	uint32_t fInterval,
-	bool isEMgr) :
-	fRm(rm),
-	fInputJobStepAssociation(inputJobStepAssociation),
-	fOutputJobStepAssociation(outputJobStepAssociation),
-	fDec(dec),
-	sysCat(cat),
+	const JobInfo& jobInfo) :
+	JobStep(jobInfo),
+	fRm(jobInfo.rm),
+	sysCat(jobInfo.csc),
 	fOid(o),
 	fTableOid(t),
 	fColType(ct),
-	fSessionId(session),
-	fTxnId(txn),
-	fVerId(verID),
-	fStepId(step),
-	fStatementId(statementId),
 	fFilterCount(0),
 	fBOP(BOP_NONE),
 	ridList(0),
@@ -134,12 +118,12 @@ pColStep::pColStep(const JobStepAssociation& inputJobStepAssociation,
 	finishedSending(false),
 	recvWaiting(false),
 	fIsDict(false),
-	isEM(isEMgr),
+	isEM(jobInfo.isExeMgr),
 	ridCount(0),
-	fFlushInterval(fInterval),
+	fFlushInterval(jobInfo.flushInterval),
 	fSwallowRows(false),
-	fProjectBlockReqLimit(rm.getJlProjectBlockReqLimit()),
-	fProjectBlockReqThreshold(rm.getJlProjectBlockReqThreshold()),
+	fProjectBlockReqLimit(fRm.getJlProjectBlockReqLimit()),
+	fProjectBlockReqThreshold(fRm.getJlProjectBlockReqThreshold()),
 	fStopSending(false),
 	isFilterFeeder(false),
 	fPhysicalIO(0),
@@ -154,7 +138,7 @@ pColStep::pColStep(const JobStepAssociation& inputJobStepAssociation,
 	int err, i;
 	uint mask;
 	
-	if (fInterval == 0 || !isEM)
+	if (fFlushInterval == 0 || !isEM)
 		fOutputType = OT_BOTH;
 	else
 		fOutputType = OT_TOKEN;
@@ -261,18 +245,11 @@ pColStep::pColStep(const JobStepAssociation& inputJobStepAssociation,
 }
 
 pColStep::pColStep(const pColScanStep& rhs) :
+	JobStep(rhs),
 	fRm(rhs.resourceManager()),
-	fInputJobStepAssociation(rhs.inputAssociation()),
-	fOutputJobStepAssociation(rhs.outputAssociation()),
-	fDec(0),
 	fOid(rhs.oid()),
 	fTableOid(rhs.tableOid()),
 	fColType(rhs.colType()),
-	fSessionId(rhs.sessionId()),
-	fTxnId(rhs.txnId()),
-	fVerId(rhs.verId()),
-	fStepId(rhs.stepId()),
-	fStatementId(rhs.statementId()),
 	fFilterCount(rhs.filterCount()),
 	fBOP(rhs.BOP()),
 	ridList(0),
@@ -294,16 +271,9 @@ pColStep::pColStep(const pColScanStep& rhs) :
 	fNumBlksSkipped(0),
 	fMsgBytesIn(0),
 	fMsgBytesOut(0),
-	fLogger(rhs.logger()),
 	fUdfName(rhs.udfName()),
 	fFilters(rhs.getFilters())
 {
-    fCardinality = rhs.cardinality();
-    fAlias = rhs.alias();
-    fView = rhs.view();
-    fName = rhs.name();
-	fTupleId = rhs.tupleId();
-
 	int err, i;
 	uint mask;
 	if (fTableOid == 0)  // cross engine support
@@ -362,9 +332,6 @@ pColStep::pColStep(const pColScanStep& rhs) :
 
 	sort(extents.begin(), extents.end(), ExtentSorter());
 	numExtents = extents.size();
-
-	fOnClauseFilter = rhs.onClauseFilter();
-
 //	uniqueID = UniqueNumberGenerator::instance()->getUnique32();
 //	if (fDec)
 //		fDec->addQueue(uniqueID);
@@ -372,18 +339,11 @@ pColStep::pColStep(const pColScanStep& rhs) :
 }
 
 pColStep::pColStep(const PassThruStep& rhs) :
+	JobStep(rhs),
 	fRm(rhs.resourceManager()),
-	fInputJobStepAssociation(rhs.inputAssociation()),
-	fOutputJobStepAssociation(rhs.outputAssociation()),
-	fDec(0),
 	fOid(rhs.oid()),
 	fTableOid(rhs.tableOid()),
 	fColType(rhs.colType()),
-	fSessionId(rhs.sessionId()),
-	fTxnId(rhs.txnId()),
-	fVerId(rhs.verId()),
-	fStepId(rhs.stepId()),
-	fStatementId(rhs.statementId()),
 	fFilterCount(0),
 	fBOP(BOP_NONE),
 	ridList(0),
@@ -403,14 +363,8 @@ pColStep::pColStep(const PassThruStep& rhs) :
 	fCacheIO(0),
 	fNumBlksSkipped(0),
 	fMsgBytesIn(0),
-	fMsgBytesOut(0),
-	fLogger(rhs.logger())
+	fMsgBytesOut(0)
 {
-    fCardinality = rhs.cardinality();
-    fAlias = rhs.alias();
-    fView = rhs.view();
-    fName = rhs.name();
-	fTupleId = rhs.tupleId();
 	int err, i;
 	uint mask;
 

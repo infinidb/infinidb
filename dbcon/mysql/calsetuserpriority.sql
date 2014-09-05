@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
- * $Id: calsetuserpriority.sql 9442 2013-04-24 21:09:27Z chao $
+ * $Id: calsetuserpriority.sql 9441 2013-04-24 21:08:28Z chao $
  */
 
 DELIMITER $$

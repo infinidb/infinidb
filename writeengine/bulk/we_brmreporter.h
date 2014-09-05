@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: we_brmreporter.h 3983 2012-07-02 16:11:06Z bpaul $
+ * $Id: we_brmreporter.h 4450 2013-01-21 14:13:24Z rdempsey $
  *
  *****************************************************************************/
 
@@ -27,7 +27,8 @@
 #include "boost/tuple/tuple.hpp"
 
 #include "brmtypes.h"
-
+#include "calpontsystemcatalog.h"
+using namespace execplan;
 /** @file
  * class BRMReporter
  */
@@ -95,7 +96,8 @@ class BRMReporter
      */
     void reportTotals(u_int64_t totalReadRows,
                       u_int64_t totalInsertedRows,
-               const std::vector<boost::tuple<ColDataType,std::string,u_int64_t> >& satCounts);
+               const std::vector<boost::tuple<CalpontSystemCatalog::ColDataType,
+                                 std::string,u_int64_t> >& satCounts);
 
     /** @brief Generate report for job that exceeds error limit
      *  @param rptFileName Name of file to save info, else info is dropped

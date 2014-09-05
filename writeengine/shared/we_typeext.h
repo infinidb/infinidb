@@ -37,37 +37,15 @@ namespace WriteEngine
    /************************************************************************
     * Type definitions
     ************************************************************************/
-    typedef u_int64_t          i64; // 8 byte value
-    typedef i64                RID; // Row ID
-
-   /************************************************************************
-    * the set of Calpont column data types (used for DDL/DML interface)
-    ************************************************************************/
-    enum ColDataType      { BIT,
-                            TINYINT,
-                            CHAR,
-                            SMALLINT,
-                            DECIMAL,
-                            MEDINT,
-                            INT,
-                            FLOAT,
-                            DATE,
-                            BIGINT,
-                            DOUBLE,
-                            DATETIME,
-                            VARCHAR,
-                            VARBINARY,
-                            CLOB,
-                            BLOB,
-                            NUM_OF_COL_DATA_TYPE };
+    typedef uint64_t           RID; // Row ID
 
    /************************************************************************
     * Dictionary related structure
     ************************************************************************/
     struct Token {
-        i64     op       :  10;   // ordinal position within a block
-        i64     fbo      :  36;   // file block number
-        i64     spare    :  18;   // spare
+        uint64_t op       :  10;   // ordinal position within a block
+        uint64_t fbo      :  36;   // file block number
+        uint64_t spare    :  18;   // spare
         Token()                   // constructor, set to null value
         {
             op  = 0x3FE;

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: we_colopbulk.cpp 3720 2012-04-04 18:18:49Z rdempsey $
+ * $Id: we_colopbulk.cpp 4450 2013-01-21 14:13:24Z rdempsey $
  *
  ****************************************************************************/
 
@@ -98,7 +98,7 @@ int   ColumnOpBulk::blocksInFile(FILE*) const
 //------------------------------------------------------------------------------
 // Stub for readBlock
 //------------------------------------------------------------------------------
-int   ColumnOpBulk::readBlock(FILE*, unsigned char*, const i64)
+int   ColumnOpBulk::readBlock(FILE*, unsigned char*, const uint64_t)
 {
     throw std::logic_error(
         "Unauthorized use of ColumnOpBulk::readBlock");
@@ -109,7 +109,7 @@ int   ColumnOpBulk::readBlock(FILE*, unsigned char*, const i64)
 //------------------------------------------------------------------------------
 // Stub for writeBlock
 //------------------------------------------------------------------------------
-int   ColumnOpBulk::saveBlock(FILE*, const unsigned char*, const i64)
+int   ColumnOpBulk::saveBlock(FILE*, const unsigned char*, const uint64_t)
 {
     throw std::logic_error(
         "Unauthorized use of ColumnOpBulk::saveBlock");

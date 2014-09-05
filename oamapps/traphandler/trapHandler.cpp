@@ -1,5 +1,5 @@
 /******************************************************************************************
-* $Id: trapHandler.cpp 1969 2011-08-19 17:36:32Z dhill $
+* $Id: trapHandler.cpp 3049 2013-02-21 20:25:14Z dhill $
 *
 * Author: Zhixuan Zhu
 ******************************************************************************************/
@@ -418,8 +418,11 @@ void configAlarm (Alarm &calAlarm)
 *****************************************************************************************/
 void processAlarm (Alarm &calAlarm)
 {
-	bool logFlag = (calAlarm.getState() == CLEAR ? false: true);
-	
+	bool logActiveFlag = (calAlarm.getState() == CLEAR ? false: true);
+	bool logHistFlag = true;
+	if (calAlarm.getState() == CLEAR )
+		logHistFlag = false;
+
 	// get active alarms
 	AlarmList alarmList;
 	SNMPManager sm;
@@ -442,21 +445,24 @@ void processAlarm (Alarm &calAlarm)
   		if (calAlarm.getAlarmID() != (i->second).getAlarmID() ) {
 			continue;
 		}
+
    		// check if the same fault component on same server
    		if (calAlarm.getComponentID().compare((i->second).getComponentID()) == 0 &&
 			calAlarm.getSname().compare((i->second).getSname()) == 0)
         {
-   			// for set alarm, don't log to active
+   			// for set alarm, don't log
            	if (calAlarm.getState() == SET )
            	{
-           		logFlag = false;
+           		logActiveFlag = false;
+				logHistFlag = false;
            		break;
            	}
 
            	// for clear alarm, remove the set by rewritting the file
            	else if (calAlarm.getState() == CLEAR )
            	{
-           		logFlag = false;
+           		logActiveFlag = false;
+				logHistFlag = true;
            		//cout << "size before: " << alarmList.size();
            		alarmList.erase (i);
            		//cout << " size after: " << alarmList.size() << endl;
@@ -481,7 +487,7 @@ void processAlarm (Alarm &calAlarm)
         }
    	} // end of for loop
 
-   	if (logFlag) {
+   	if (logActiveFlag) {
 		try {
    			logAlarm (calAlarm, ACTIVE_ALARM_FILE);
 		} catch (runtime_error e)
@@ -500,24 +506,25 @@ void processAlarm (Alarm &calAlarm)
 		}
 	}
 	
-	// log historical alarm
-	try {
-		logAlarm (calAlarm, ALARM_FILE);
-	} catch (runtime_error e)
-	{
-		if (::DEBUG) {                                
-			LoggingID lid(11);                                
-			MessageLog ml(lid);                                
-			Message msg;                                
-			Message::Args args;                                
-			args.add("logAlarm error:");                                
-			args.add(e.what());                                
-			msg.format(args);                                
-			ml.logDebugMessage(msg);                                
+   	if (logHistFlag) {
+		// log historical alarm
+		try {
+			logAlarm (calAlarm, ALARM_FILE);
+		} catch (runtime_error e)
+		{
+			if (::DEBUG) {                                
+				LoggingID lid(11);                                
+				MessageLog ml(lid);                                
+				Message msg;                                
+				Message::Args args;                                
+				args.add("logAlarm error:");                                
+				args.add(e.what());                                
+				msg.format(args);                                
+				ml.logDebugMessage(msg);                                
+			}
+			exit(1);
 		}
-		exit(1);
 	}
-
 }
 
 /*****************************************************************************************

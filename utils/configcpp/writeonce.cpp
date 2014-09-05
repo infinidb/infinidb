@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-// $Id: writeonce.cpp 3079 2012-05-07 18:18:20Z rdempsey $
+// $Id: writeonce.cpp 3495 2013-01-21 14:09:51Z rdempsey $
 
 #include "writeonce.h"
 

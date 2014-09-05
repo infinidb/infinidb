@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: load_brm.cpp 1941 2013-07-15 15:54:10Z rdempsey $
+ * $Id: load_brm.cpp 1919 2013-06-27 19:12:54Z rdempsey $
  *
  ****************************************************************************/
 #include <unistd.h>
@@ -97,14 +97,10 @@ int main(int argc, char **argv)
 	ShmKeys shmkeys;
 	string key_name = ShmKeys::keyToName(shmkeys.DECOMSVRMUTEX_SYSVKEY);
 	bi::shared_memory_object::remove(key_name.c_str());
+	bi::permissions perms;
+	perms.set_unrestricted();
 	try {
-#if BOOST_VERSION < 104500
-		bi::shared_memory_object shm(bi::create_only, key_name.c_str(), bi::read_write);
-#else
-		bi::permissions perms;
-		perms.set_unrestricted();
 		bi::shared_memory_object shm(bi::create_only, key_name.c_str(), bi::read_write, perms);
-#endif
 		shm.truncate(sizeof(CtlShmImage));
 		bi::mapped_region region(shm, bi::read_write);
 		(void)new (region.get_address()) CtlShmImage;

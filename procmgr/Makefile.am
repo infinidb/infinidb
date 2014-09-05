@@ -8,7 +8,7 @@ AM_LDFLAGS = $(idb_ldflags)
 bin_PROGRAMS = ProcMgr
 ProcMgr_SOURCES = main.cpp processmanager.cpp
 ProcMgr_CPPFLAGS = $(idb_common_includes) $(AM_CPPFLAGS)
-ProcMgr_LDFLAGS = $(idb_common_ldflags) $(idb_brm_libs) $(idb_oam_libs) $(idb_exec_libs) $(AM_LDFLAGS)
+ProcMgr_LDFLAGS = $(idb_common_ldflags) $(idb_brm_libs) $(idb_oam_libs) $(idb_exec_libs) -lcacheutils $(AM_LDFLAGS)
 
 test:
 

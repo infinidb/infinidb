@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: constantcolumn.h 8436 2012-04-04 18:18:21Z rdempsey $
+*   $Id: constantcolumn.h 9210 2013-01-21 14:10:42Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -56,7 +56,7 @@ public:
 	ConstantColumn();
 	ConstantColumn(const std::string& sql, TYPE type = LITERAL);
 	ConstantColumn(const int64_t val, TYPE type = NUM); //deprecate
-	
+    ConstantColumn(const uint64_t val, TYPE type = NUM); // deprecate
 	virtual ~ConstantColumn();
 	
 	/**
@@ -121,6 +121,7 @@ private:
 public:	
 	ConstantColumn(const std::string& sql, const double val);
 	ConstantColumn(const std::string& sql, const int64_t val, TYPE type = NUM);
+    ConstantColumn(const std::string& sql, const uint64_t val, TYPE type = NUM);
 	ConstantColumn(const std::string& sql, const IDB_Decimal& val);
 	ConstantColumn(const ConstantColumn& rhs);
 	virtual void evaluate(rowgroup::Row& row) {}
@@ -131,19 +132,26 @@ public:
 		isNull = isNull || (fType == NULLDATA);
 		return TreeNode::getBoolVal();		
 	}
-	virtual std::string getStrVal(rowgroup::Row& row, bool& isNull) 
+
+    virtual std::string getStrVal(rowgroup::Row& row, bool& isNull) 
 	{ 
 		isNull = isNull || (fType == NULLDATA);
 		return fResult.strVal; 
 	}
-	
+
 	virtual int64_t getIntVal(rowgroup::Row& row, bool& isNull) 
 	{ 
 		isNull = isNull || (fType == NULLDATA);
 		return fResult.intVal;
 	}
 	
-	virtual float getFloatVal(rowgroup::Row& row, bool& isNull)
+    virtual uint64_t getUintVal(rowgroup::Row& row, bool& isNull) 
+    { 
+        isNull = isNull || (fType == NULLDATA);
+        return fResult.uintVal;
+    }
+
+    virtual float getFloatVal(rowgroup::Row& row, bool& isNull)
 	{
 		isNull = isNull || (fType == NULLDATA);
 		return fResult.floatVal;

@@ -204,7 +204,7 @@ void initCtlShm()
 	STARTUPINFO sInfo;
 	ZeroMemory(&sInfo, sizeof(sInfo));
 
-	idbassert_s(CreateProcess(0, (LPSTR)srvrpath.c_str(), 0, 0, false, 0, 0, 0, &sInfo, &pInfo) != 0,
+	idbassert_s(CreateProcess(0, (LPSTR)srvrpath.c_str(), 0, 0, false, DETACHED_PROCESS, 0, 0, &sInfo, &pInfo) != 0,
 				"couldn't exec DecomSvr");
 	//if (CreateProcess(0, (LPSTR)srvrpath.c_str(), 0, 0, false, 0, 0, 0, &sInfo, &pInfo) == 0)
 	//	throw runtime_error("couldn't exec DecomSvr");

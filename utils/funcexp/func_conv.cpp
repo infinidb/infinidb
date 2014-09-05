@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_conv.cpp 3589 2013-02-14 13:23:49Z rdempsey $
+* $Id: func_conv.cpp 3695 2013-04-05 16:56:01Z dhall $
 *
 *
 ****************************************************************************/
@@ -34,10 +34,8 @@ using namespace execplan;
 #include "rowgroup.h"
 using namespace rowgroup;
 
-namespace funcexp
+namespace
 {
-char digit_upper[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-
 int64_t convStrToNum(const string& str, int base, bool unsignedFlag)
 {
 	int negative;
@@ -120,20 +118,25 @@ int64_t convStrToNum(const string& str, int base, bool unsignedFlag)
 
 	return (negative ? -((int64_t) j) : (int64_t) j);
 }
+}
 
+namespace funcexp
+{
+namespace helpers
+{
 const char *convNumToStr(int64_t val,char *dst,int radix)
 {
 	if (radix == 16 || radix == -16)
-		sprintf(dst, "%lX", val);
+		sprintf(dst, "%llX", val);
 	else if (radix == 8 || radix == -8)
-		sprintf(dst, "%lo", val);
+		sprintf(dst, "%llo", val);
 	else if (radix == 10)
 	{
 		uint64_t uval = static_cast<uint64_t>(val);
-		sprintf(dst, "%lu", uval);
+		sprintf(dst, "%llu", uval);
 	}
 	else if (radix == -10)
-		sprintf(dst, "%ld", val);
+		sprintf(dst, "%lld", val);
 	else if (radix == 2 || radix == -2)
 	{
 		char tmp[65];
@@ -231,6 +234,7 @@ const char *convNumToStr(int64_t val,char *dst,int radix)
 		*dst = 0;
 	return dst;
 }
+} //namespace funcexp::helpers
 
 CalpontSystemCatalog::ColType Func_conv::operationType(FunctionParm& fp, CalpontSystemCatalog::ColType& resultType)
 {
@@ -263,7 +267,7 @@ string Func_conv::getStrVal(rowgroup::Row& row,
 	else
 		dec= (int64_t) convStrToNum( res, from_base, true);
 
-	str = convNumToStr(dec, ans, to_base);
+	str = helpers::convNumToStr(dec, ans, to_base);
 
 	isNull = str.empty();
 

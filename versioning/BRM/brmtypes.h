@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: brmtypes.h 1736 2012-10-29 22:15:26Z zzhu $
+ * $Id: brmtypes.h 1849 2013-02-08 19:06:30Z pleblanc $
  *
  *****************************************************************************/
 
@@ -70,10 +70,6 @@ namespace tr1
 #include "messagelog.h"
 #include "loggingid.h"
 
-#ifdef UNDO
-#undef UNDO
-#endif
-
 #if defined(_MSC_VER) && defined(xxxBRMTYPES_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
@@ -99,7 +95,7 @@ to inherit Serializeable, hence the all-public definitions */
 /// The InlineLBIDRange struct is for use internally by the ExtentMap
 struct InlineLBIDRange {
 		LBID_t start;
-		u_int32_t size;
+		uint32_t size;
 #ifndef __LP64__
 		int32_t pad1;
 #endif
@@ -160,8 +156,8 @@ struct CPInfoMerge {
 	int64_t max;       // max value to be merged with current max value
 	int64_t min;       // min value to be merged with current min value
 	int32_t seqNum;    // sequence number (not currently used)
-	bool    isChar;    // does this extent carry non-dictionary string data
-	bool	newExtent; // is this to be treated as a new extent
+    execplan::CalpontSystemCatalog::ColDataType type;
+    bool	newExtent; // is this to be treated as a new extent
 };
 typedef std::vector<CPInfoMerge> CPInfoMergeList_t;
 
@@ -171,7 +167,7 @@ struct CPMaxMinMerge {
 	int64_t max;
 	int64_t min;
 	int32_t seqNum;
-	bool    isChar;
+	execplan::CalpontSystemCatalog::ColDataType type;
 	bool    newExtent;
 };
 typedef std::tr1::unordered_map<LBID_t, CPMaxMinMerge> CPMaxMinMergeMap_t;
@@ -264,6 +260,7 @@ struct BulkUpdateDBRootArg {
 struct CreateStripeColumnExtentsArgIn {
 	OID_t    oid;	// column OID
 	uint32_t width; // column width in bytes
+    execplan::CalpontSystemCatalog::ColDataType colDataType;
 };
 
 /* Output Arg type for DBRM:createStripeColumnExtents() */
@@ -385,7 +382,7 @@ const uint8_t END_VB_COPY = 5;
 const uint8_t VB_ROLLBACK1 = 6;
 const uint8_t VB_ROLLBACK2 = 7;
 const uint8_t VB_COMMIT = 8;
-const uint8_t UNDO = 9;
+const uint8_t BRM_UNDO = 9;
 const uint8_t CONFIRM = 10;
 const uint8_t HALT = 11;
 const uint8_t RESUME = 12;
@@ -393,7 +390,7 @@ const uint8_t RELOAD = 13;
 const uint8_t SETREADONLY = 14;
 const uint8_t SETREADWRITE = 15;
 const uint8_t FLUSH_INODE_CACHES = 16;
-const uint8_t CLEAR = 17;
+const uint8_t BRM_CLEAR = 17;
 const uint8_t MARKEXTENTINVALID = 18;
 const uint8_t MARKMANYEXTENTSINVALID = 19;
 const uint8_t GETREADONLY = 20;
@@ -507,6 +504,9 @@ const int8_t ERR_TABLE_NOT_LOCKED = 14;
 const int8_t ERR_SNAPSHOT_TOO_OLD = 15;
 const int8_t ERR_NO_PARTITION_PERFORMED = 16;
 
+/// This error code is returned by writeVBEntry when a session with a low txnid attempts to write to a block with a higher verid
+const int8_t ERR_OLDTXN_OVERWRITING_NEWTXN = 17;
+
 // structure used to hold the information to identify a partition for shared-nothing
 struct PartitionInfo 
 {
@@ -525,6 +525,19 @@ struct PartitionInfo
 		b >> (uint32_t&)oid;
 	}
 };
+
+// Note: Copies share the currentTxns array
+class QueryContext : public messageqcpp::Serializeable {
+public:
+	QueryContext();
+	explicit QueryContext(VER_t scn);
+	execplan::CalpontSystemCatalog::SCN currentScn;
+	boost::shared_ptr<std::vector<execplan::CalpontSystemCatalog::SCN> > currentTxns;
+	void serialize(messageqcpp::ByteStream &) const;
+	void deserialize(messageqcpp::ByteStream &);
+};
+
+std::ostream & operator<<(std::ostream &, const QueryContext &);
 
 }
 

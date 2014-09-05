@@ -1,7 +1,7 @@
 /***************************************************************************
  * $Id: main.cpp 34 2006-09-29 21:13:54Z dhill $
  *
- *   Copyright (C) 2009-2012 Calpont Corporationoration
+ *   Copyright (C) 2009-2013 Calpont Corporationoration
  *   All rights reserved
  *   Author: David Hill
  ***************************************************************************/

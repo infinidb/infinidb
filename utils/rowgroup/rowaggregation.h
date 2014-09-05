@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: rowaggregation.h 3449 2012-12-10 21:08:06Z xlou $
+//  $Id: rowaggregation.h 3495 2013-01-21 14:09:51Z rdempsey $
 
 
 #ifndef ROWAGGREGATION_H
@@ -401,6 +401,7 @@ class RowAggregation : public messageqcpp::Serializeable
 		inline void updateFloatMinMax(float val1, float val2, int64_t col, int func);
 		inline void updateStringMinMax(std::string val1, std::string val2, int64_t col, int func);
 		inline void updateIntSum(int64_t val1, int64_t val2, int64_t col);
+        inline void updateUintSum(uint64_t val1, uint64_t val2, int64_t col);
 		inline void updateDoubleSum(double val1, double val2, int64_t col);
 		inline void updateFloatSum(float val1, float val2, int64_t col);
 
@@ -512,11 +513,7 @@ class RowAggregationUM : public RowAggregation
 		void attachGroupConcatAg();
 		void updateEntry(const Row& row);
 		bool countSpecial(const RowGroup* pRG)
-		{ fRow.setIntField<8>(
-		    fRow.getIntField<8>(
-		        fFunctionCols[0]->fOutputColumnIndex) + pRG->getRowCount(),
-		        fFunctionCols[0]->fOutputColumnIndex);
-		  return true; }
+		{ fRow.setIntField<8>(fRow.getIntField<8>(0) + pRG->getRowCount(), 0); return true; }
 
 		bool newRowGroup();
 

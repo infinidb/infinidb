@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: ddlindexpopulator.cpp 8436 2012-04-04 18:18:21Z rdempsey $
+ *   $Id: ddlindexpopulator.cpp 9210 2013-01-21 14:10:42Z rdempsey $
  *
  *
  ***********************************************************************/
@@ -168,14 +168,14 @@ namespace ddlpackageprocessor
     idx.listOid = fIdxOID.listOID;
     idx.multiColFlag = cols > 1;
     CalpontSystemCatalog::ColType coltype = csc->colType(cr->ColumnOID());
-    idx.idxDataType = static_cast<WriteEngine::ColDataType>(coltype.colDataType);
+    idx.idxDataType = static_cast<CalpontSystemCatalog::ColDataType>(coltype.colDataType);
  
     if (isDictionaryType(coltype) )
     {
 	idx.idxWidth = fTOKENSIZE;
 	idx.idxType = WR_CHAR;
     }//@bug 410: index sizes are either 1, 4 or 8
-    else if (isCharType(coltype))
+    else if (exeplan::isCharType(coltype))
     {
 	if (1 == coltype.colWidth) idx.idxWidth = 1;
 	else idx.idxWidth = (coltype.colWidth > 4) ? 8 : 4;

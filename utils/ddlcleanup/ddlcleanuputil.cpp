@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
-* $Id: ddlcleanuputil.cpp 3235 2012-08-15 21:34:52Z dhall $
+* $Id: ddlcleanuputil.cpp 3622 2013-03-07 16:07:51Z chao $
 */
 
 #include <iostream>
@@ -70,10 +70,10 @@ namespace ddlcleanuputil
 {
 	int ddl_cleanup()
 	{
-		DDLPackageProcessor ddlpackageprocessor;
+		scoped_ptr<DBRM> dbrmp(new DBRM());
+		DDLPackageProcessor ddlpackageprocessor(dbrmp.get());
 		DDLPackageProcessor::TableLogInfo tableLogs;
 		int rc = 0;
-		scoped_ptr<DBRM> dbrmp(new DBRM());
 		uint64_t uniqueId = dbrmp->getUnique64();
 		logging::LoggingID lid(20);     // This is running in the DMLProc space, so we use DML's lid
 		logging::MessageLog ml(lid);

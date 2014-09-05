@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_columninfo.h 4496 2013-01-31 19:13:20Z pleblanc $
+* $Id: we_columninfo.h 4499 2013-01-31 20:24:13Z dhall $
 *
 *******************************************************************************/
 
@@ -291,7 +291,7 @@ struct ColumnInfo
 
     /** @brief Print extent CP information
      */
-    void printCPInfo( );
+    void printCPInfo( JobColumn column );
 
     /** @brief Set width factor relative to other columns in the same table.
      */
@@ -301,7 +301,8 @@ struct ColumnInfo
      */
     void updateCPInfo( RID     lastInputRow,
                        int64_t minVal,
-                       int64_t maxVal );
+                       int64_t maxVal,
+                       ColDataType colDataType );
 
     /** @brief Setup initial extent we will begin loading at start of import.
      *  @param dbRoot    DBRoot of starting extent
@@ -348,10 +349,6 @@ struct ColumnInfo
      */
     void updateBytesWrittenCounts( unsigned int numBytesWritten );
 
-    /** @brief Returns the list of HWM dictionary blks to be cached
-     */
-    void getDictFlushBlks( std::vector<BRM::LBID_t>& blks ) const;
-
     /** @brief Returns the current file size in bytes
      */
     int64_t getFileSize( ) const;
@@ -364,7 +361,7 @@ struct ColumnInfo
      *  @param autoIncCount The number of autoincrement numbers to be reserved.
      *  @param nextValue    Value of the first reserved auto inc number.
      */
-    int reserveAutoIncNums(uint autoIncCount, long long& nextValue );
+    int reserveAutoIncNums(uint autoIncCount, uint64_t& nextValue );
 
     /** @brief Truncate specified dictionary file.  Only applies if compressed.
      * @param dctnryOid Dictionary store OID
@@ -521,11 +518,6 @@ inline boost::mutex& ColumnInfo::colMutex()
     return fColMutex;
 }
 
-inline void ColumnInfo::getDictFlushBlks( std::vector<BRM::LBID_t>& blks ) const
-{
-    blks = fDictBlocks;
-}
-
 inline int64_t ColumnInfo::getFileSize( ) const
 {
     return fileSize;
@@ -550,10 +542,9 @@ inline RID ColumnInfo::lastInputRowInExtent( ) const
     return fLastInputRowInCurrentExtent;
 }
 
-inline void ColumnInfo::printCPInfo( )
+inline void ColumnInfo::printCPInfo( JobColumn column )
 {
-    fColExtInf->print( ((column.weType  == WriteEngine::WR_CHAR) &&
-                        (column.colType != COL_TYPE_DICT)) );
+    fColExtInf->print( column );
 }
 
 inline long long ColumnInfo::saturatedCnt( )
@@ -569,9 +560,10 @@ inline void ColumnInfo::relativeColWidthFactor( int colWidFactor )
 inline void ColumnInfo::updateCPInfo(
     RID     lastInputRow,
     int64_t minVal,
-    int64_t maxVal )
+    int64_t maxVal,
+    ColDataType colDataType )
 {
-    fColExtInf->addOrUpdateEntry( lastInputRow, minVal, maxVal );
+    fColExtInf->addOrUpdateEntry( lastInputRow, minVal, maxVal, colDataType );
 }
 
 } // end of namespace

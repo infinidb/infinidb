@@ -17,7 +17,7 @@
 
 /*****************************************************************************
  *
- * $Id: objectreader.cpp 8436 2012-04-04 18:18:21Z rdempsey $
+ * $Id: objectreader.cpp 9210 2013-01-21 14:10:42Z rdempsey $
  *
  ****************************************************************************/
 
@@ -34,6 +34,7 @@
 #include "rowcolumn.h"
 #include "simplecolumn.h"
 #include "simplecolumn_int.h"
+#include "simplecolumn_uint.h"
 #include "simplecolumn_decimal.h"
 #include "filter.h"
 #include "existsfilter.h"
@@ -64,7 +65,7 @@ TreeNode* ObjectReader::createTreeNode(messageqcpp::ByteStream& b) {
 	CLASSID id = ZERO;
 	TreeNode* ret;
 
-        b.peek(reinterpret_cast<messageqcpp::ByteStream::byte&>(id));
+    b.peek(reinterpret_cast<messageqcpp::ByteStream::byte&>(id));
 	switch(id) {
 		case TREENODEIMPL:
 			ret = new TreeNodeImpl();
@@ -87,6 +88,18 @@ TreeNode* ObjectReader::createTreeNode(messageqcpp::ByteStream& b) {
 		case SIMPLECOLUMN_INT1:
 			ret = new SimpleColumn_INT<1>();
 			break;
+        case SIMPLECOLUMN_UINT2:
+            ret = new SimpleColumn_UINT<2>();
+            break;
+        case SIMPLECOLUMN_UINT4:
+            ret = new SimpleColumn_UINT<4>();
+            break;
+        case SIMPLECOLUMN_UINT8:
+            ret = new SimpleColumn_UINT<8>();
+            break;
+        case SIMPLECOLUMN_UINT1:
+            ret = new SimpleColumn_UINT<1>();
+            break;
 		case SIMPLECOLUMN_DECIMAL2:
 			ret = new SimpleColumn_Decimal<2>();
 			break;

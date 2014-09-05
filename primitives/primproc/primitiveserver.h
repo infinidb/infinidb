@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: primitiveserver.h 2026 2013-01-04 20:16:36Z pleblanc $
+ *   $Id: primitiveserver.h 2055 2013-02-08 19:09:09Z pleblanc $
  *
  *
  ***********************************************************************/
@@ -79,15 +79,15 @@ namespace primitiveprocessor
 	typedef std::map<uint32_t, SBPPV> BPPMap;
 	extern BPPMap bppMap;
 
-	void prefetchBlocks(uint64_t lbid, uint32_t ver, uint32_t txn, uint32_t* rCount);
+	void prefetchBlocks(uint64_t lbid, uint32_t* rCount);
 	void prefetchExtent(uint64_t lbid, uint32_t ver, uint32_t txn, uint32_t* rCount);
-	void loadBlock(u_int64_t lbid, u_int32_t ver, u_int32_t txn, int compType, void* bufferPtr,
+	void loadBlock(u_int64_t lbid, BRM::QueryContext q, u_int32_t txn, int compType, void* bufferPtr,
 		bool* pWasBlockInCache, uint32_t* rCount=NULL, bool LBIDTrace = false,
 		uint32_t sessionID = 0, bool doPrefetch=true, VSSCache *vssCache = NULL);
-	void loadBlockAsync(uint64_t lbid, uint32_t ver, uint32_t txn, int CompType,
+	void loadBlockAsync(uint64_t lbid, const BRM::QueryContext &q, uint32_t txn, int CompType,
 		uint32_t *cCount, uint32_t *rCount, bool LBIDTrace, uint32_t sessionID,
 		boost::mutex *m, uint *busyLoaders, VSSCache* vssCache=0);
-	uint loadBlocks(BRM::LBID_t *lbids, BRM::VER_t *vers, BRM::VER_t txn, int compType,
+	uint loadBlocks(BRM::LBID_t *lbids, BRM::QueryContext q, BRM::VER_t txn, int compType,
 		uint8_t **bufferPtrs, uint32_t *rCount, bool LBIDTrace, uint32_t sessionID,
 		uint blockCount, bool *wasVersioned, bool doPrefetch = true, VSSCache *vssCache = NULL);
 	uint cacheNum(uint64_t lbid);

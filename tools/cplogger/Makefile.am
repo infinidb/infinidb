@@ -24,8 +24,8 @@ AM_CXXFLAGS = $(idb_cxxflags)
 AM_LDFLAGS = $(idb_ldflags)
 bin_PROGRAMS = cplogger
 cplogger_SOURCES = main.cpp
-cplogger_CPPFLAGS = @idb_common_includes@ $(AM_CPPFLAGS)
-cplogger_LDFLAGS = @idb_common_ldflags@ @idb_common_libs@ $(AM_LDFLAGS)
+cplogger_CPPFLAGS = $(idb_common_includes) $(AM_CPPFLAGS)
+cplogger_LDFLAGS = $(idb_common_ldflags) $(idb_exec_libs) $(idb_common_libs) $(AM_LDFLAGS)
 
 test:
 

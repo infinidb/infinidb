@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
-* $Id: we_columnautoinc.h 3720 2012-04-04 18:18:49Z rdempsey $
+* $Id: we_columnautoinc.h 4450 2013-01-21 14:13:24Z rdempsey $
 */
 
 /** @file we_columnautoinc.h
@@ -65,21 +65,21 @@ public:
      * @param nextValue Starting number of reserved range
      */
     virtual int reserveNextRange(uint autoIncCount,
-                        long long& nextValue) = 0;
+                        uint64_t& nextValue) = 0;
 
     /** @brief Finished with auto-incrementing; perform any applicable updates.
      */
     int finish( );
 
 protected:
-    void initNextAutoInc(long long nextValue);
-    long long getNextAutoIncToSave( );
-    int getNextValueFromSysCat(long long& nextValue);
+    void initNextAutoInc(uint64_t nextValue);
+    uint64_t getNextAutoIncToSave( );
+    int getNextValueFromSysCat(uint64_t& nextValue);
 
     Log*        fLog;           // import log file
     boost::mutex fAutoIncMutex; // Mutex to manage fAutoIncLastValue
-    long long   fAutoIncLastValue;// Tracks latest autoincrement value used
-    long long   fMaxIntSat;     // Maximum saturation value
+    uint64_t    fAutoIncLastValue;// Tracks latest autoincrement value used
+    uint64_t    fMaxIntSat;     // Maximum saturation value
     std::string fTableName;     // Full table name (schema.table) for AI column
     std::string fColumnName;    // Name of auto-increment column
     OID         fColumnOID;     // Column OID
@@ -103,7 +103,7 @@ public:
     virtual ~ColumnAutoIncJob();
 
     virtual int reserveNextRange(uint autoIncCount,
-                        long long& nextValue);
+                        uint64_t& nextValue);
 };
 
 //------------------------------------------------------------------------------
@@ -122,7 +122,7 @@ public:
     virtual ~ColumnAutoIncIncremental();
 
     virtual int reserveNextRange(uint autoIncCount,
-                        long long& nextValue);
+                        uint64_t& nextValue);
 };
 
 } //end of namespace

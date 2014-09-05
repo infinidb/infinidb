@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: brmtypes.cpp 1704 2012-09-19 18:26:16Z pleblanc $
+ * $Id: brmtypes.cpp 1849 2013-02-08 19:06:30Z pleblanc $
  *
  ****************************************************************************/
 
@@ -330,6 +330,11 @@ void errString(int rc, string& errMsg)
 			errMsg = IDBErrorInfo::instance()->errorMsg(ERR_PARTITION_ALREADY_ENABLED);
 			break;
 		}
+		case ERR_OLDTXN_OVERWRITING_NEWTXN:
+		{
+			errMsg = "A newer transaction has already written to the same block(s)";
+			break;
+		}
 		default:
 		{
 			ostringstream oss;
@@ -420,5 +425,35 @@ bool TableLockInfo::operator<(const TableLockInfo &tli) const
 	return (id < tli.id);
 }
 
+QueryContext::QueryContext() : currentScn(0)
+{
+	currentTxns.reset(new vector<VER_t>());
+}
+
+QueryContext::QueryContext(VER_t scn) : currentScn(scn)
+{
+	currentTxns.reset(new vector<VER_t>());
+}
+
+void QueryContext::serialize(ByteStream &bs) const
+{
+	bs << currentScn;
+	serializeInlineVector(bs, *currentTxns);
+}
+
+void QueryContext::deserialize(ByteStream &bs)
+{
+	bs >> currentScn;
+	deserializeInlineVector(bs, *currentTxns);
+}
+
+ostream & operator<<(ostream &os, const BRM::QueryContext &qc)
+{
+	os << "  SCN: " << qc.currentScn << endl;
+	os << "  Txns: ";
+	for (uint i = 0; i < qc.currentTxns->size(); i++)
+		os << (*qc.currentTxns)[i] << " ";
+	return os;
+}
 
 }  //namespace

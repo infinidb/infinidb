@@ -103,7 +103,8 @@ private:
 	* @parm cpStatus The status of the CP data (whether it's valid).
 	*
 	*/
-	float estimateOpFactor(const int64_t& min, const int64_t& max, const int64_t& value, char op, uint8_t lcf, 
+    template<class T>
+	float estimateOpFactor(const T& min, const T& max, const T& value, char op, uint8_t lcf, 
 			       uint32_t distinctValues, char cpStatus); 
 
 	/** @brief returns a factor between 0 and 1 for the estimate of rows that will qualify the given operation(s).

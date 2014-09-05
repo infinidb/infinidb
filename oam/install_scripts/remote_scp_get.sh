@@ -43,7 +43,7 @@ expect {
 	-re "100%" 						{ send_user "DONE\n" } abort
 	-re "scp:"  					{ send_user "FAILED\n" ; exit 1 }
 	-re "Permission denied"         { send_user "FAILED: Invalid password\n" ; exit 1 }
-	-re "No such file or directory" { send_user "FAILED: Invalid package\n" ; exit 1 }
+	-re "No such file or directory" { send_user "FAILED: No such file or directory\n" ; exit 1 }
 	-re "Connection refused"   { send_user "ERROR: Connection refused\n" ; exit 1 }
 	-re "closed"   { send_user "ERROR: Connection closed\n" ; exit 1 }
 }

@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: we_chunkmanager.cpp 4395 2012-12-13 21:10:31Z chao $
+//  $Id: we_chunkmanager.cpp 4450 2013-01-21 14:13:24Z rdempsey $
 
 #include <unistd.h>
 #include <sys/stat.h>
@@ -40,6 +40,7 @@ using namespace std;
 #include "we_fileop.h"
 #include "we_dctnry.h"
 #include "we_stats.h"
+using namespace execplan;
 
 namespace
 {
@@ -260,7 +261,7 @@ FILE* ChunkManager::getFilePtr(const FID& fid,
                                int size) const
 {
     CompFileData* fileData = getFileData(fid, root, partition, segment, filename, mode, size,
-        VARCHAR, 8, true);  // hard code (varchar, 8) are dummy values for dictionary file
+        CalpontSystemCatalog::VARCHAR, 8, true);  // hard code (varchar, 8) are dummy values for dictionary file
     return (fileData ? fileData->fFilePtr : NULL);
 }
 
@@ -279,7 +280,7 @@ CompFileData* ChunkManager::getFileData(const FID& fid,
                                         string& filename,
                                         const char* mode,
                                         int size,
-                                        const ColDataType& colDataType,
+                                        const CalpontSystemCatalog::ColDataType colDataType,
                                         int colWidth,
                                         bool dctnry) const
 {
@@ -373,7 +374,7 @@ FILE* ChunkManager::createDctnryFile(const FID& fid,
                                      int size)
 {
     FileID fileID(fid, root, partition, segment);
-    CompFileData* fileData = new CompFileData(fileID, fid, VARCHAR, width);
+    CompFileData* fileData = new CompFileData(fileID, fid, CalpontSystemCatalog::VARCHAR, width);
     fileData->fFileName = filename;
     if (openFile(fileData, mode, __LINE__) != NO_ERROR)
     {
@@ -414,7 +415,7 @@ FILE* ChunkManager::createDctnryFile(const FID& fid,
 // Read the block for the specified fbo, from pFile's applicable chunk, and
 // into readBuf.
 //------------------------------------------------------------------------------
-int ChunkManager::readBlock(FILE* pFile, unsigned char* readBuf, i64 fbo)
+int ChunkManager::readBlock(FILE* pFile, unsigned char* readBuf, uint64_t fbo)
 {
     map<FILE*, CompFileData*>::iterator fpIt = fFilePtrMap.find(pFile);
     if (fpIt == fFilePtrMap.end())
@@ -448,7 +449,7 @@ int ChunkManager::readBlock(FILE* pFile, unsigned char* readBuf, i64 fbo)
 // Write writeBuf to the block for the specified fbo, within pFile's applicable
 // chunk.
 //------------------------------------------------------------------------------
-int ChunkManager::saveBlock(FILE* pFile, const unsigned char* writeBuf, i64 fbo)
+int ChunkManager::saveBlock(FILE* pFile, const unsigned char* writeBuf, uint64_t fbo)
 {
     WE_COMP_DBG(cout << "save block fbo:" << fbo << endl;)
     map<FILE*, CompFileData*>::iterator fpIt = fFilePtrMap.find(pFile);
@@ -746,7 +747,7 @@ int ChunkManager::fetchChunkFromFile(FILE* pFile, int64_t id, ChunkData*& chunkD
 void ChunkManager::initializeColumnChunk(char* buf, CompFileData* fileData)
 {
     int size = UNCOMPRESSED_CHUNK_SIZE;
-    i64 emptyVal = fFileOp->getEmptyRowValue(fileData->fColDataType, fileData->fColWidth);
+    uint64_t emptyVal = fFileOp->getEmptyRowValue(fileData->fColDataType, fileData->fColWidth);
     fFileOp->setEmptyBuf((unsigned char*)buf, size, emptyVal, fileData->fColWidth);
 }
 
@@ -1200,7 +1201,7 @@ inline int ChunkManager::writeHeader_(CompFileData* fileData, int ptrSecSize)
 // For the specified segment file (pFile), read in an abbreviated/compressed
 // chunk extent, uncompress, and expand to a full chunk for a full extent.
 //------------------------------------------------------------------------------
-int ChunkManager::expandAbbrevColumnExtent(FILE* pFile, i64 emptyVal, int width)
+int ChunkManager::expandAbbrevColumnExtent(FILE* pFile, uint64_t emptyVal, int width)
 {
     map<FILE*, CompFileData*>::iterator i = fFilePtrMap.find(pFile);
     if (i == fFilePtrMap.end())
@@ -1240,20 +1241,31 @@ int ChunkManager::updateColumnExtent(FILE* pFile, int addBlockCount)
         return ERR_COMP_FILE_NOT_FOUND;
     }
 
+    CompFileData* pFileData = i->second;
+    if (!pFileData)
+    {
+        logMessage(ERR_COMP_FILE_NOT_FOUND, logging::LOG_TYPE_ERROR, __LINE__);
+        return ERR_COMP_FILE_NOT_FOUND;
+    }
     int rc = NO_ERROR;
-    char* hdr = i->second->fFileHeader.fControlData;
+    char* hdr = pFileData->fFileHeader.fControlData;
     fCompressor.setBlockCount(hdr, fCompressor.getBlockCount(hdr) + addBlockCount);
-    ChunkData* chunkData = (i->second)->findChunk(0);
+    ChunkData* chunkData = (pFileData)->findChunk(0);
     if (chunkData != NULL)
     {
-        if ((rc = writeChunkToFile(i->second, chunkData)) == NO_ERROR)
+        if ((rc = writeChunkToFile(pFileData, chunkData)) == NO_ERROR)
         {
-            rc = writeHeader(i->second, __LINE__);
+            rc = writeHeader(pFileData, __LINE__);
+			if ( rc == NO_ERROR)
+			{
+				//@Bug 4977 remove log files
+				 removeBackups(fTransId);
+			}
         }
         else
         {
             ostringstream oss;
-            oss << "write chunk to file failed when updateColumnExtent: " << i->second->fFileName;
+            oss << "write chunk to file failed when updateColumnExtent: " << pFileData->fFileName;
             logMessage(oss.str(), logging::LOG_TYPE_ERROR);
         }
     }
@@ -1376,7 +1388,7 @@ void ChunkManager::cleanUp(const std::map<FID, FID> & columOids)
 //------------------------------------------------------------------------------
 // Read "n" blocks from pFile starting at fbo, into readBuf.
 //------------------------------------------------------------------------------
-int ChunkManager::readBlocks(FILE* pFile, unsigned char* readBuf, i64 fbo, size_t n)
+int ChunkManager::readBlocks(FILE* pFile, unsigned char* readBuf, uint64_t fbo, size_t n)
 {
     WE_COMP_DBG(cout << "backup blocks fbo:" << fbo << "  num:" << n << " file:" << pFile << endl;)
 
@@ -1436,7 +1448,7 @@ int ChunkManager::readBlocks(FILE* pFile, unsigned char* readBuf, i64 fbo, size_
 // Updated chunk is not flushed to disk but left pending in the applicable
 // CompFileData object.
 //------------------------------------------------------------------------------
-int ChunkManager::restoreBlock(FILE* pFile, const unsigned char* writeBuf, i64 fbo)
+int ChunkManager::restoreBlock(FILE* pFile, const unsigned char* writeBuf, uint64_t fbo)
 {
     WE_COMP_DBG(cout << "restore blocks fbo:" << fbo << " file:" << pFile << endl;)
     // safety check

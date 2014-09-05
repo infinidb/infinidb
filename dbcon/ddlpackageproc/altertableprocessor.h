@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: altertableprocessor.h 9058 2012-11-07 15:35:08Z chao $
+ *   $Id: altertableprocessor.h 9303 2013-03-07 16:07:12Z chao $
  *
  *
  ***********************************************************************/
@@ -41,6 +41,7 @@ namespace ddlpackageprocessor
     class AlterTableProcessor : public DDLPackageProcessor
     {
         public:
+			AlterTableProcessor(BRM::DBRM* aDbrm) : DDLPackageProcessor(aDbrm){}
             /** @brief process an alter table statement
              *
              * @param alterTableStmt the AlterTableStatement

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_if.cpp 3048 2012-04-04 15:33:45Z rdempsey $
+* $Id: func_if.cpp 3648 2013-03-19 21:33:52Z dhall $
 *
 *
 ****************************************************************************/
@@ -49,16 +49,23 @@ bool boolVal(SPTP& parm, Row& row, bool& isNull)
 			case CalpontSystemCatalog::CHAR:
 			case CalpontSystemCatalog::VARCHAR:
 				ret = (atoi((char*)(parm->data()->getStrVal().c_str())) != 0);
-			case CalpontSystemCatalog::FLOAT:
+            case CalpontSystemCatalog::FLOAT:
+			case CalpontSystemCatalog::UFLOAT:
 				ret = (parm->data()->getFloatVal(row, isNull) != 0);
 			case CalpontSystemCatalog::DOUBLE:
+            case CalpontSystemCatalog::UDOUBLE:
 				ret = (parm->data()->getDoubleVal(row, isNull) != 0);
-			case CalpontSystemCatalog::DECIMAL:
+            case CalpontSystemCatalog::DECIMAL:
+            case CalpontSystemCatalog::UDECIMAL:
 				ret = (parm->data()->getDecimalVal(row, isNull).value != 0);
 			case CalpontSystemCatalog::BIGINT:
 			case CalpontSystemCatalog::SMALLINT:
 			case CalpontSystemCatalog::MEDINT:
 			case CalpontSystemCatalog::INT:
+            case CalpontSystemCatalog::UBIGINT:
+            case CalpontSystemCatalog::USMALLINT:
+            case CalpontSystemCatalog::UMEDINT:
+            case CalpontSystemCatalog::UINT:
 			case CalpontSystemCatalog::DATE:
 			case CalpontSystemCatalog::DATETIME:
 			default:

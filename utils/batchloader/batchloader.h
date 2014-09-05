@@ -55,7 +55,7 @@ public:
      * @param PMId - The PM id to send the first batch of rows if startFromNextPM is false.
      * @return Returns 0 if success, else returns error code.
      */
-    int selectFirstPM ( uint& PMId, bool& startFromNextPM);
+    void selectFirstPM ( uint& PMId);
 
    /** @brief build the batch distribution sequence in a vector
      * return void

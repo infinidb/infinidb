@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: we_fileop.h 4496 2013-01-31 19:13:20Z pleblanc $
+//  $Id: we_fileop.h 4450 2013-01-21 14:13:24Z rdempsey $
 
 /** @file */
 
@@ -87,7 +87,8 @@ public:
     EXPORT int          createFile( FID fid,
                             int & allocSize,
                             uint16_t dbRoot, uint32_t partition,
-                            i64 emptyVal = 0, int width = 1 ) ;
+                            execplan::CalpontSystemCatalog::ColDataType colDataType,
+                            uint64_t emptyVal = 0, int width = 1 ) ;
 
    /**
     * @brief Delete a file
@@ -149,7 +150,7 @@ public:
     EXPORT virtual int  expandAbbrevColumnExtent(
                             FILE*    pFile,
                             uint16_t dbRoot,
-                            i64      emptyVal,
+                            uint64_t      emptyVal,
                             int      width );
 
    /**
@@ -184,7 +185,7 @@ public:
     * @param hdrs (in/out) Contents of headers, if file is compressed.
     * @return returns NO_ERROR if success.
     */
-    EXPORT int          extendFile(OID oid, i64 emptyVal,
+    EXPORT int          extendFile(OID oid, uint64_t emptyVal,
                             int          width,
                             HWM          hwm,
                             BRM::LBID_t  startLbid,
@@ -212,12 +213,13 @@ public:
     * @param newFile (out) Indicates if a new file was created for the extent
     * @param hdrs (in/out) Contents of headers, if file is compressed.
     */
-    EXPORT int          addExtentExactFile(OID oid, i64 emptyVal,
+    EXPORT int          addExtentExactFile(OID oid, uint64_t emptyVal,
                             int          width,
                             int&         allocSize,
                             uint16_t     dbRoot,
                             uint32_t     partition,
                             uint16_t     segment,
+                            execplan::CalpontSystemCatalog::ColDataType colDataType,
                             std::string& segFile,
                             BRM::LBID_t& startLbid,
                             bool&        newFile,
@@ -238,7 +240,7 @@ public:
     */
     EXPORT int          fillCompColumnExtentEmptyChunks(OID oid,
                             int          colWidth,
-                            i64          emptyVal,
+                            uint64_t          emptyVal,
                             uint16_t     dbRoot,
                             uint32_t     partition,
                             uint16_t     segment,
@@ -334,7 +336,7 @@ public:
     EXPORT int          initColumnExtent( FILE*    pFile,
                             uint16_t dbRoot,
                             int      nBlocks,
-                            i64      emptyVal,
+                            uint64_t      emptyVal,
                             int      width,
                             bool     bNewFile,
                             bool     bExpandExtent,
@@ -434,7 +436,7 @@ public:
     EXPORT int          reInitPartialColumnExtent( FILE* pFile,
                             long long startOffset,
                             int       nBlocks,
-                            i64       emptyVal,
+                            uint64_t  emptyVal,
                             int       width );
 
    /**
@@ -458,7 +460,7 @@ public:
                             long long offset,
                             int origin = SEEK_SET  ) const;
     EXPORT int          setFileOffsetBlock( FILE* pFile,
-                            i64 lbid,
+                            uint64_t lbid,
                             int origin = SEEK_SET ) const;
 
    /**
@@ -491,7 +493,7 @@ protected:
     int                 writeInitialCompColumnChunk( FILE* pFile,
                             int      nBlocksAllocated,
                             int      nRows,
-                            i64      emptyVal,
+                            uint64_t emptyVal,
                             int      width,
                             char*    hdrs);
 
@@ -503,11 +505,11 @@ private:
     FileOp& operator=(const FileOp& rhs);
 
     int                 createFile( const char* fileName, int fileSize, 
-                            i64 emptyVal, int width,
+                            uint64_t emptyVal, int width,
                             uint16_t dbRoot );
 
     int                 expandAbbrevColumnChunk( FILE* pFile,
-                            i64   emptyVal,
+                            uint64_t   emptyVal,
                             int   colWidth,
                             const compress::CompChunkPtr& chunkInPtr,
                             compress::CompChunkPtr& chunkOutPt);
@@ -515,7 +517,7 @@ private:
     int                 initAbbrevCompColumnExtent( FILE* pFile,
                             uint16_t dbRoot,
                             int      nBlocks,
-                            i64      emptyVal,
+                            uint64_t      emptyVal,
                             int      width);
 
     static void         initDbRootExtentMutexes();

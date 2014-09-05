@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: joblist.cpp 9227 2013-01-28 22:58:06Z xlou $
+//  $Id: joblist.cpp 9228 2013-01-28 23:08:10Z xlou $
 
 
 #include "errorcodes.h"
@@ -65,7 +65,7 @@ JobList::JobList(bool isEM) :
 #else
 	fAborted(false),
 #endif
-	_priority(50)
+	fPriority(50)
 {
 }
 
@@ -128,9 +128,9 @@ int JobList::doQuery()
 
 	// Set the priority on the jobsteps
 	for (uint i = 0; i < fQuery.size(); i++)
-		fQuery[i]->priority(_priority);
+		fQuery[i]->priority(fPriority);
 	for (uint i = 0; i < fProject.size(); i++)
-		fProject[i]->priority(_priority);
+		fProject[i]->priority(fPriority);
 
 	// I put this logging in a separate loop rather than including it in the
 	// other loop that calls run(), to insure that these logging msgs would
@@ -1130,16 +1130,13 @@ void JobList::validate() const
 //
 //	/* Check that all JobSteps use the right status pointer */
 //	for (i = 0; i < fQuery.size(); i++) {
-//		idbassert(fQuery[i]->inputAssociation().statusPtr().get() == statusPtr().get());
-//		idbassert(fQuery[i]->outputAssociation().statusPtr().get() == statusPtr().get());
+//		idbassert(fQuery[i]->errorInfo().get() == errorInfo().get());
 //	}
 //	for (i = 0; i < fProject.size(); i++) {
-//		idbassert(fProject[i]->inputAssociation().statusPtr().get() == statusPtr().get());
-//		idbassert(fProject[i]->outputAssociation().statusPtr().get() == statusPtr().get());
+//		idbassert(fProject[i]->errorInfo().get() == errorInfo().get());
 //	}
 //	for (it = fDeliveredTables.begin(); it != fDeliveredTables.end(); ++it) {
-//		idbassert(it->second->inputAssociation().statusPtr().get() == statusPtr().get());
-//		idbassert(it->second->outputAssociation().statusPtr().get() == statusPtr().get());
+//		idbassert(it->second->errorInfo().get() == errorInfo().get());
 //	}
 }
 
@@ -1172,18 +1169,14 @@ void TupleJobList::validate() const
 	idbassert(dynamic_cast<TupleDeliveryStep *>(fDeliveredTables.begin()->second.get()));
 
 	/* Check that all JobSteps use the right status pointer */
-	for (i = 0; i < fQuery.size(); i++) {
-		idbassert(fQuery[i]->inputAssociation().statusPtr().get() == statusPtr().get());
-		idbassert(fQuery[i]->outputAssociation().statusPtr().get() == statusPtr().get());
-	}
-	for (i = 0; i < fProject.size(); i++) {
-		idbassert(fProject[i]->inputAssociation().statusPtr().get() == statusPtr().get());
-		idbassert(fProject[i]->outputAssociation().statusPtr().get() == statusPtr().get());
-	}
-	for (it = fDeliveredTables.begin(); it != fDeliveredTables.end(); ++it) {
-		idbassert(it->second->inputAssociation().statusPtr().get() == statusPtr().get());
-		idbassert(it->second->outputAssociation().statusPtr().get() == statusPtr().get());
-	}
+	for (i = 0; i < fQuery.size(); i++)
+		idbassert(fQuery[i]->errorInfo().get() == errorInfo().get());
+
+	for (i = 0; i < fProject.size(); i++)
+		idbassert(fProject[i]->errorInfo().get() == errorInfo().get());
+
+	for (it = fDeliveredTables.begin(); it != fDeliveredTables.end(); ++it)
+		idbassert(it->second->errorInfo().get() == errorInfo().get());
 }
 
 void JobList::abort()
@@ -1216,6 +1209,7 @@ void JobList::abortOnLimit(JobStep* js)
 	// do not change fAborted and return false
 	if (__sync_bool_compare_and_swap(&fAborted, false, true)) {
 #endif
+		// @bug4848, enhance and unify limit handling.
 		for (uint i = 0; i < fQuery.size(); i++) {
 			if (fQuery[i].get() == js)
 				break;

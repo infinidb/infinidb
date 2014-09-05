@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: func_floor.cpp 3048 2012-04-04 15:33:45Z rdempsey $
+//  $Id: func_floor.cpp 3648 2013-03-19 21:33:52Z dhall $
 
 
 #include <cstdlib>
@@ -62,7 +62,13 @@ int64_t Func_floor::getIntVal(Row& row,
 		case execplan::CalpontSystemCatalog::TINYINT:
 		case execplan::CalpontSystemCatalog::SMALLINT:
 		case execplan::CalpontSystemCatalog::DECIMAL:
+        case execplan::CalpontSystemCatalog::UDECIMAL:
 		{
+            if (op_ct.scale == 0)
+            {
+                ret = parm[0]->data()->getIntVal(row, isNull);
+                break;
+            }
 			IDB_Decimal decimal = parm[0]->data()->getDecimalVal(row, isNull);
 
 			if (isNull)
@@ -82,7 +88,7 @@ int64_t Func_floor::getIntVal(Row& row,
 				}
 
 				int64_t tmp = ret;
-				ret /= powerOf10_c[decimal.scale];
+				ret /= helpers::powerOf10_c[decimal.scale];
 
 				// Largest integer value not greater than X.
 				if (tmp < 0 && tmp < ret)
@@ -91,8 +97,20 @@ int64_t Func_floor::getIntVal(Row& row,
 		}
 		break;
 	
-		case execplan::CalpontSystemCatalog::DOUBLE:
+        case execplan::CalpontSystemCatalog::UBIGINT:
+        case execplan::CalpontSystemCatalog::UINT:
+        case execplan::CalpontSystemCatalog::UMEDINT:
+        case execplan::CalpontSystemCatalog::UTINYINT:
+        case execplan::CalpontSystemCatalog::USMALLINT:
+        {
+            ret = (int64_t)parm[0]->data()->getUintVal(row, isNull);
+        }
+        break;
+
+        case execplan::CalpontSystemCatalog::DOUBLE:
+        case execplan::CalpontSystemCatalog::UDOUBLE:
 		case execplan::CalpontSystemCatalog::FLOAT:
+        case execplan::CalpontSystemCatalog::UFLOAT:
 		{
 			ret = (int64_t) floor(parm[0]->data()->getDoubleVal(row, isNull));
 		}
@@ -125,6 +143,88 @@ int64_t Func_floor::getIntVal(Row& row,
 
 			if (!isNull)
 				ret = atoll(str.c_str());
+		}
+		break;
+
+		default:
+		{
+			std::ostringstream oss;
+			oss << "floor: datatype of " << execplan::colDataTypeToString(op_ct.colDataType);
+			throw logging::IDBExcept(oss.str(), ERR_DATATYPE_NOT_SUPPORT);
+		}
+	}
+
+	return ret;
+}
+
+
+uint64_t Func_floor::getUintVal(Row& row,
+							FunctionParm& parm,
+							bool& isNull,
+							CalpontSystemCatalog::ColType& op_ct)
+{
+	int64_t ret = 0;
+
+	switch (op_ct.colDataType)
+	{
+		case execplan::CalpontSystemCatalog::BIGINT:
+		case execplan::CalpontSystemCatalog::INT:
+		case execplan::CalpontSystemCatalog::MEDINT:
+		case execplan::CalpontSystemCatalog::TINYINT:
+		case execplan::CalpontSystemCatalog::SMALLINT:
+		case execplan::CalpontSystemCatalog::DECIMAL:
+        case execplan::CalpontSystemCatalog::UDECIMAL:
+		{
+                ret = parm[0]->data()->getIntVal(row, isNull);
+		}
+		break;
+	
+        case execplan::CalpontSystemCatalog::UBIGINT:
+        case execplan::CalpontSystemCatalog::UINT:
+        case execplan::CalpontSystemCatalog::UMEDINT:
+        case execplan::CalpontSystemCatalog::UTINYINT:
+        case execplan::CalpontSystemCatalog::USMALLINT:
+        {
+            ret = (int64_t)parm[0]->data()->getUintVal(row, isNull);
+        }
+        break;
+
+        case execplan::CalpontSystemCatalog::DOUBLE:
+        case execplan::CalpontSystemCatalog::UDOUBLE:
+		case execplan::CalpontSystemCatalog::FLOAT:
+        case execplan::CalpontSystemCatalog::UFLOAT:
+		{
+			ret = (uint64_t)floor(parm[0]->data()->getDoubleVal(row, isNull));
+		}
+		break;
+
+		case execplan::CalpontSystemCatalog::VARCHAR:
+		case execplan::CalpontSystemCatalog::CHAR:
+		{
+			string str = parm[0]->data()->getStrVal(row, isNull);
+			if (!isNull)
+				ret = (uint64_t)floor(strtod(str.c_str(), 0));
+		}
+		break;
+
+		case execplan::CalpontSystemCatalog::DATE:
+		{
+			string str = DataConvert::dateToString1(parm[0]->data()->getDateIntVal(row, isNull));
+			if (!isNull)
+				ret = strtoull(str.c_str(), NULL, 10);
+		}
+		break;
+
+		case execplan::CalpontSystemCatalog::DATETIME:
+		{
+			string str =
+				DataConvert::datetimeToString1(parm[0]->data()->getDatetimeIntVal(row, isNull));
+
+			// strip off micro seconds
+			str = str.substr(0,14);
+
+			if (!isNull)
+                ret = strtoull(str.c_str(), NULL, 10);
 		}
 		break;
 

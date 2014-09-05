@@ -33,12 +33,12 @@ using namespace std;
 using namespace execplan;
 
 #include "dataconvert.h"
-
+#define MAX_DAY_NUMBER 3652424L
 namespace
 {
 using namespace funcexp;
 
-// convert the base-10 number at nptr to a log long, but scan no further than endptr. Set
+// convert the base-10 number at nptr to a long long, but scan no further than endptr. Set
 //  endptr on return to one-past the last consumed char
 //  endptr MUST always be a valid pointer into nptr on entry
 inline long long infinidb_strtoll10(const char *nptr, char **endptr, int *error)
@@ -135,7 +135,7 @@ int extractTime (string valStr, string formatStr, dataconvert::DateTime & dateTi
 				strncpy(monthStr, val, strlen(val)-strlen(tmpPtr));
 				monthStr[strlen(val)-strlen(tmpPtr)]='\0';
 				
-				if ((dateTime.month= convertMonth(monthStr)) <= 0)
+				if ((dateTime.month= helpers::convertMonth(monthStr)) <= 0)
 					return -1;
 				tmp= (char*) val + strlen(monthStr);
 				val = tmp;	
@@ -147,7 +147,7 @@ int extractTime (string valStr, string formatStr, dataconvert::DateTime & dateTi
 				char monthName[4];
 				strncpy(monthName, val, 3);
 				 monthName[3] = '\0';
-				if ((dateTime.month= convertMonth(monthName)) <= 0)
+				if ((dateTime.month= helpers::convertMonth(monthName)) <= 0)
 						return -1;
 				val = tmp;
 				break;
@@ -238,7 +238,7 @@ int extractTime (string valStr, string formatStr, dataconvert::DateTime & dateTi
 				strncpy(weekStr, val, strlen(val)-strlen(tmpPtr));
 				weekStr[strlen(val)-strlen(tmpPtr)]='\0';
 				
-				if ((weekday = convertWeek(weekStr)) < 0)
+				if ((weekday = helpers::convertWeek(weekStr)) < 0)
 					return -1;
 				tmp= (char*) val + strlen(weekStr);
 				val = tmp;				
@@ -250,7 +250,7 @@ int extractTime (string valStr, string formatStr, dataconvert::DateTime & dateTi
 				char wkname[4];
 				strncpy(wkname, val, 3);
 				 wkname[3] = '\0';
-				if ((weekday = convertWeek(wkname)) < 0)
+				if ((weekday = helpers::convertWeek(wkname)) < 0)
 					return -1;
 				val = tmp;	
 				break;
@@ -261,7 +261,8 @@ int extractTime (string valStr, string formatStr, dataconvert::DateTime & dateTi
 				if ((weekday= infinidb_strtoll10(val, &tmp, &error)) < 0 ||
 					weekday >= 7)
 					return -1;
-					
+				if (!weekday)
+					weekday= 7;	
 				val= tmp;
 				break;
 			}
@@ -346,10 +347,10 @@ int extractTime (string valStr, string formatStr, dataconvert::DateTime & dateTi
 	if (yearday > 0)
 	{
 		uint days;
-		days= calc_daynr(dateTime.year,1,1) +  yearday - 1;
-		if (days <= 0 || days > 3652424L)
+		days= helpers::calc_daynr(dateTime.year,1,1) +  yearday - 1;
+		if (days <= 0 || days > MAX_DAY_NUMBER)
 			return -1;
-		get_date_from_daynr(days,dateTime);
+		helpers::get_date_from_daynr(days,dateTime);
 	}
 
 	if (week_number >= 0 && weekday)
@@ -364,9 +365,9 @@ int extractTime (string valStr, string formatStr, dataconvert::DateTime & dateTi
 			return -1;
 
 		/* Number of days up to 1/1 of this year */
-		days= calc_daynr((strict_week_number ? strict_week_number_year : dateTime.year), 1, 1);
+		days= helpers::calc_daynr((strict_week_number ? strict_week_number_year : dateTime.year), 1, 1);
 		/* Calc day of week for 1/1 */
-		jan1wday= calc_weekday(days, sunday_first_n_first_week_non_iso);
+		jan1wday= helpers::calc_weekday(days, sunday_first_n_first_week_non_iso);
 
 		/* add up number of days up to 1/1 of this year plus day of week for 1/1 plus this day */
 		if (sunday_first_n_first_week_non_iso)
@@ -387,10 +388,10 @@ int extractTime (string valStr, string formatStr, dataconvert::DateTime & dateTi
 		}
 
 		/* make sure we've got a sane day nr */
-		if (days <= 0 || days > 31)
+		if (days <= 0 || days > MAX_DAY_NUMBER)
 			return -1;
 
-		get_date_from_daynr(days,dateTime);
+		helpers::get_date_from_daynr(days,dateTime);
 	}
 
 	if (dateTime.month > 12 || dateTime.day > 31 || dateTime.hour > 23 || 
@@ -407,18 +408,8 @@ int extractTime (string valStr, string formatStr, dataconvert::DateTime & dateTi
 			}
 		} while (++val != val_end);
 	}
-	
+
 	return 0;
-}
-
-}
-
-namespace funcexp
-{
-
-CalpontSystemCatalog::ColType Func_str_to_date::operationType( FunctionParm& fp, CalpontSystemCatalog::ColType& resultType )
-{
-	return resultType;
 }
 
 dataconvert::DateTime getDateTime (rowgroup::Row& row,
@@ -523,6 +514,16 @@ dataconvert::DateTime getDateTime (rowgroup::Row& row,
 			return -1;
 	}
 	return dateTime;
+}
+
+}
+
+namespace funcexp
+{
+
+CalpontSystemCatalog::ColType Func_str_to_date::operationType( FunctionParm& fp, CalpontSystemCatalog::ColType& resultType )
+{
+	return resultType;
 }
 
 string Func_str_to_date::getStrVal(rowgroup::Row& row,

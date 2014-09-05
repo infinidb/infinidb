@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////////////////
 //
-// (C) Copyright Ion Gaztanaga 2005-2009. Distributed under the Boost
+// (C) Copyright Ion Gaztanaga 2005-2012. Distributed under the Boost
 // Software License, Version 1.0. (See accompanying file
 // LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 //
@@ -11,7 +11,9 @@
 #ifndef BOOST_INTERPROCESS_PERMISSIONS_HPP
 #define BOOST_INTERPROCESS_PERMISSIONS_HPP
 
-#if (defined _MSC_VER) && (_MSC_VER >= 1200)
+/// @cond
+
+#if defined (_MSC_VER) && (_MSC_VER >= 1200)
 #  pragma once
 #endif
 
@@ -25,15 +27,19 @@
 
 #endif
 
+/// @endcond
+
 //!\file
 //!Describes permissions class
 
 namespace boost {
 namespace interprocess {
 
+/// @cond
+
 #if defined(BOOST_INTERPROCESS_WINDOWS)
 
-namespace detail {
+namespace ipcdetail {
 
 template <int Dummy>
 struct unrestricted_permissions_holder
@@ -44,9 +50,11 @@ struct unrestricted_permissions_holder
 template<int Dummy>
 winapi::interprocess_all_access_security unrestricted_permissions_holder<Dummy>::unrestricted;
 
-}  //namespace detail {
+}  //namespace ipcdetail {
 
 #endif   //defined BOOST_INTERPROCESS_WINDOWS
+
+/// @endcond
 
 //!The permissions class represents permissions to be set to shared memory or
 //!files, that can be constructed form usual permission representations:
@@ -54,12 +62,14 @@ winapi::interprocess_all_access_security unrestricted_permissions_holder<Dummy>:
 class permissions
 {
    /// @cond
-   #if defined (BOOST_INTERPROCESS_WINDOWS)
+
+   #if defined(BOOST_INTERPROCESS_WINDOWS)
    typedef void*  os_permissions_type;
    #else
    typedef int    os_permissions_type;
-   #endif   //#if (defined BOOST_INTERPROCESS_WINDOWS)
+   #endif
    os_permissions_type  m_perm;
+
    /// @endcond
 
    public:
@@ -80,22 +90,26 @@ class permissions
    //!for UNIX.
    void set_default()
    {
-      #if (defined BOOST_INTERPROCESS_WINDOWS)
+      /// @cond
+      #if defined (BOOST_INTERPROCESS_WINDOWS)
       m_perm = 0;
       #else
       m_perm = 0644;
       #endif
+      /// @endcond
    }
 
    //!Sets permissions to unrestricted access:
    //!A null DACL for windows or 0666 for UNIX.
    void set_unrestricted()
    {
-      #if (defined BOOST_INTERPROCESS_WINDOWS)
-      m_perm = &detail::unrestricted_permissions_holder<0>::unrestricted;
+      /// @cond
+      #if defined (BOOST_INTERPROCESS_WINDOWS)
+      m_perm = &ipcdetail::unrestricted_permissions_holder<0>::unrestricted;
       #else
       m_perm = 0666;
       #endif
+      /// @endcond
    }
 
    //!Sets permissions from a user provided os-dependent
@@ -115,3 +129,4 @@ class permissions
 #include <boost/interprocess/detail/config_end.hpp>
 
 #endif   //BOOST_INTERPROCESS_PERMISSIONS_HPP
+

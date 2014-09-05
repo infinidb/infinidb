@@ -1975,7 +1975,7 @@ int main(int argc, char *argv[])
 	system(cmd.c_str());
 	cmd = "cp " + installDir + "/etc/Calpont.xml " + installDir + "/etc/Calpont.xml.rpmsave";
 	int rtnCode = system(cmd.c_str());
-	if (rtnCode != 0) {
+	if (WEXITSTATUS(rtnCode) != 0) {
 		cout << "Error copying Calpont.xml to Calpont.xml.rpmsave" << endl;
 		cleanupSystem();
 	}
@@ -1994,7 +1994,7 @@ int main(int argc, char *argv[])
 		cout << "Outputting to log file " + postConfigureOutFile << ", please wait..." << endl;
 		string cmd = postConfigureCMD + " > " + postConfigureOutFile;
 		int ret = system(cmd.c_str());
-		if (ret == 0 )
+		if (WEXITSTATUS(ret) == 0 )
 			cout << "postConfigure Successfully Completed, system is ready to use" << endl << endl;
 		else {
 			cout << "ERROR : postConfigure install error, check " <<  postConfigureOutFile << endl << endl;
@@ -2011,7 +2011,7 @@ int main(int argc, char *argv[])
 	else
 	{
 		int ret = system(postConfigureCMD.c_str());
-		if (ret == 0 )
+		if (WEXITSTATUS(ret) == 0 )
 			cout << "postConfigure Successfully Completed, system is ready to use" << endl << endl;
 		else {
 			cout << endl << "ERROR : postConfigure install failure" << endl << endl;
@@ -2096,7 +2096,7 @@ void setRootPassword()
 
 		string cmd = installDir + "/bin/remote_command.sh " + ipAddress + " " + AMIrootPassword + "  '/root/updatePassword.sh " + rootPassword + "' > /dev/null 2>&1";
 		int rtnCode = system(cmd.c_str());
-		if (rtnCode != 0) {
+		if (WEXITSTATUS(rtnCode) != 0) {
 			cout << "ERROR: failed update of root password on " + module << endl;
 			cleanupSystem();
 		}
@@ -2111,7 +2111,7 @@ void setRootPassword()
 		if ( module == "pm1" ) {
 			string cmd = "/root/updatePassword.sh " + rootPassword + " > /dev/null 2>&1";
 			int rtnCode = system(cmd.c_str());
-			if (rtnCode != 0) {
+			if (WEXITSTATUS(rtnCode) != 0) {
 				cout << "ERROR: failed update root of password on " + module << endl;
 				cleanupSystem();
 			}
@@ -2128,7 +2128,7 @@ void setRootPassword()
 
 		string cmd = installDir + "/bin/remote_command.sh " + ipAddress + " " + AMIrootPassword + "  '/root/updatePassword.sh " + rootPassword + "' > /dev/null 2>&1";
 		int rtnCode = system(cmd.c_str());
-		if (rtnCode != 0) {
+		if (WEXITSTATUS(rtnCode) != 0) {
 			cout << "ERROR: failed update root of password on " + module << endl;
 			cleanupSystem();
 		}
@@ -2189,7 +2189,7 @@ void launchInstanceThread(string module)
 	
 			string cmd = installDir + "/bin/remote_scp_put.sh " + ipAddress + " " + AMIrootPassword + " "  + x509Cert + " > /tmp/scp.log_" + instanceName;
 			int rtnCode = system(cmd.c_str());
-			if (rtnCode == 0) {
+			if (WEXITSTATUS(rtnCode) == 0) {
 				pass = true;
 				break;
 			}
@@ -2212,7 +2212,7 @@ void launchInstanceThread(string module)
 
 			string cmd = installDir + "/bin/remote_scp_put.sh " + ipAddress + " " + AMIrootPassword + " "  + x509PriKey + " > /tmp/scp.log_" + instanceName;
 			int rtnCode = system(cmd.c_str());
-			if (rtnCode == 0) {
+			if (WEXITSTATUS(rtnCode) == 0) {
 				pass = true;
 				break;
 			}

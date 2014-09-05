@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: dbrm.cpp 1941 2013-07-15 15:54:10Z rdempsey $
+ * $Id: dbrm.cpp 1858 2013-03-18 22:31:05Z pleblanc $
  *
  ****************************************************************************/
 
@@ -352,7 +352,8 @@ int DBRM::lookup(OID_t oid, LBIDRange_v& lbidList) throw()
 }
 
 // Casual Partitioning support
-int DBRM::markExtentInvalid(const LBID_t lbid) DBRM_THROW
+int DBRM::markExtentInvalid(const LBID_t lbid, 
+                            execplan::CalpontSystemCatalog::ColDataType colDataType) DBRM_THROW
 {
 #ifdef BRM_INFO
  	if (fDebug)
@@ -366,7 +367,7 @@ int DBRM::markExtentInvalid(const LBID_t lbid) DBRM_THROW
 	ByteStream command, response;
 	uint8_t err;
 
-	command << MARKEXTENTINVALID << (uint64_t)lbid;
+	command << MARKEXTENTINVALID << (uint64_t)lbid << (uint32_t)colDataType;
 	err = send_recv(command, response);
 	if (err != ERR_OK)
 		return err;
@@ -379,7 +380,8 @@ int DBRM::markExtentInvalid(const LBID_t lbid) DBRM_THROW
 	return err;
 }
 
-int DBRM::markExtentsInvalid(const vector<LBID_t> &lbids) DBRM_THROW
+int DBRM::markExtentsInvalid(const vector<LBID_t> &lbids,
+                             const std::vector<execplan::CalpontSystemCatalog::ColDataType>& colDataTypes) DBRM_THROW
 {
 #ifdef BRM_INFO
   	if (fDebug) TRACER_WRITENOW("markExtentsInvalid");
@@ -390,7 +392,10 @@ int DBRM::markExtentsInvalid(const vector<LBID_t> &lbids) DBRM_THROW
 
 	command << MARKMANYEXTENTSINVALID << size;
 	for (i = 0; i < size; i++)
+    {
 		command << (uint64_t) lbids[i];
+        command << (uint32_t) colDataTypes[i];
+    }
 	err = send_recv(command, response);
 	if (err != ERR_OK)
 		return err;
@@ -519,7 +524,7 @@ int DBRM::mergeExtentsMaxMin(const CPInfoMergeList_t &cpInfos) DBRM_THROW
 			TRACER_ADDINPUT(it->max);
 			TRACER_ADDINPUT(it->min);
 			TRACER_ADDINPUT(it->seqNum);
-			TRACER_ADDINPUT(it->isChar);
+			TRACER_ADDINPUT(it->type);
 			TRACER_ADDINPUT(it->newExtent);
 			TRACER_WRITE;
 		}
@@ -528,14 +533,14 @@ int DBRM::mergeExtentsMaxMin(const CPInfoMergeList_t &cpInfos) DBRM_THROW
 	ByteStream command, response;
 	uint8_t err;
 
-	command << MERGEMANYEXTENTSMAXMIN << (uint32_t)cpInfos.size();
+	command << MERGEMANYEXTENTSMAXMIN << (uint32_t)cpInfos.size(); 
 	for(it = cpInfos.begin(); it != cpInfos.end(); it++)
 	{
 		command << (uint64_t)it->startLbid <<
 				   (uint64_t)it->max       <<
 				   (uint64_t)it->min       <<
 				   (uint32_t)it->seqNum    <<
-				   (uint32_t)it->isChar    <<
+				   (uint32_t)it->type      <<
                    (uint32_t)it->newExtent;
 	}
 	err = send_recv(command, response);
@@ -550,17 +555,16 @@ int DBRM::mergeExtentsMaxMin(const CPInfoMergeList_t &cpInfos) DBRM_THROW
 	return err;
 }
 
-int DBRM::vssLookup(LBID_t lbid, VER_t& verID, VER_t txnID, 
-	bool& vbFlag, bool vbOnly) throw()
+int DBRM::vssLookup(LBID_t lbid, const QueryContext &verInfo, VER_t txnID, VER_t *outVer,
+	bool *vbFlag, bool vbOnly) throw()
 {
 #ifdef BRM_INFO
  	if (fDebug)
 	{
 	 	TRACER_WRITELATER("vssLookup");
 		TRACER_ADDINPUT(lbid);
-		TRACER_ADDINPUT(verID);
+		TRACER_ADDINPUT(verInfo);
 		TRACER_ADDINPUT(txnID);
-		TRACER_ADDBOOLOUTPUT(vbFlag);
 		TRACER_ADDBOOLINPUT(vbOnly);
 		TRACER_WRITE;
 	}
@@ -568,8 +572,8 @@ int DBRM::vssLookup(LBID_t lbid, VER_t& verID, VER_t txnID,
 #endif
 	if (!vbOnly && vss->isEmpty())
 	{
-		verID = 0;
-		vbFlag = false;
+		*outVer = 0;
+		*vbFlag = false;
 		return -1;
 	}
 
@@ -579,7 +583,7 @@ int DBRM::vssLookup(LBID_t lbid, VER_t& verID, VER_t txnID,
 		int rc = 0;
 		vss->lock(VSS::READ);
 		locked = true;
-		rc = vss->lookup(lbid, verID, txnID, vbFlag, vbOnly);
+		rc = vss->lookup(lbid, verInfo, txnID, outVer, vbFlag, vbOnly);
 		vss->release(VSS::READ);
 		return rc;
 	}
@@ -591,13 +595,11 @@ int DBRM::vssLookup(LBID_t lbid, VER_t& verID, VER_t txnID,
 	}
 }
 
-int DBRM::bulkVSSLookup(const std::vector<LBID_t> &lbids, VER_t verID, VER_t txnID,
-	std::vector<VSSData> *out) throw()
+int DBRM::bulkVSSLookup(const std::vector<LBID_t> &lbids, const QueryContext_vss &verInfo,
+	VER_t txnID, std::vector<VSSData> *out) 
 {
 	uint i;
 	bool locked = false;
-	//idbassert can throw an exception, but this method is marked nothrow...
-	//idbassert(out);
 	try {
 		out->resize(lbids.size());
 		vss->lock(VSS::READ);
@@ -613,8 +615,7 @@ int DBRM::bulkVSSLookup(const std::vector<LBID_t> &lbids, VER_t verID, VER_t txn
 		else {
 			for (i = 0; i < lbids.size(); i++) {
 				VSSData &vd = (*out)[i];
-				vd.verID = verID;
-				vd.returnCode = vss->lookup(lbids[i], vd.verID, txnID, vd.vbFlag, false);
+				vd.returnCode = vss->lookup(lbids[i], verInfo, txnID, &vd.verID, &vd.vbFlag, false);
 			}
 		}
 		vss->release(VSS::READ);
@@ -630,6 +631,104 @@ int DBRM::bulkVSSLookup(const std::vector<LBID_t> &lbids, VER_t verID, VER_t txn
 		vss->release(VSS::READ);
 	out->clear();
 	return -1;
+}
+
+VER_t DBRM::getCurrentVersion(LBID_t lbid, bool *isLocked) const
+{
+	bool locked = false;
+	VER_t ret = 0;
+
+	try {
+		vss->lock(VSS::READ);
+		locked = true;
+		ret = vss->getCurrentVersion(lbid, isLocked);
+		vss->release(VSS::READ);
+		locked = false;
+	}
+	catch(exception &e) {
+		cerr << e.what() << endl;
+		if (locked)
+			vss->release(VSS::READ);
+		throw;
+	}
+	return ret;
+}
+
+int DBRM::bulkGetCurrentVersion(const vector<LBID_t> &lbids, vector<VER_t> *versions,
+		vector<bool> *isLocked) const
+{
+	bool locked = false;
+
+	versions->resize(lbids.size());
+	if (isLocked != NULL)
+		isLocked->resize(lbids.size());
+	try {
+		vss->lock(VSS::READ);
+		locked = true;
+		if (isLocked != NULL) {
+			bool tmp=false;
+			for (uint i = 0; i < lbids.size(); i++) {
+				(*versions)[i] = vss->getCurrentVersion(lbids[i], &tmp);
+				(*isLocked)[i] = tmp;
+			}
+		}
+		else
+			for (uint i = 0; i < lbids.size(); i++)
+				(*versions)[i] = vss->getCurrentVersion(lbids[i], NULL);
+		vss->release(VSS::READ);
+		locked = false;
+		return 0;
+	}
+	catch (exception &e) {
+		versions->clear();
+		cerr << e.what() << endl;
+		if (locked)
+			vss->release(VSS::READ);
+		return -1;
+	}
+}
+
+
+VER_t DBRM::getHighestVerInVB(LBID_t lbid, VER_t max) const
+{
+	bool locked = false;
+	VER_t ret = -1;
+
+	try {
+		vss->lock(VSS::READ);
+		locked = true;
+		ret = vss->getHighestVerInVB(lbid, max);
+		vss->release(VSS::READ);
+		locked = false;
+	}
+	catch(exception &e) {
+		cerr << e.what() << endl;
+		if (locked)
+			vss->release(VSS::READ);
+		throw;
+	}
+	return ret;
+}
+
+bool DBRM::isVersioned(LBID_t lbid, VER_t ver) const
+{
+	bool ret = false;
+	bool locked = false;
+
+	try {
+		vss->lock(VSS::READ);
+		locked = true;
+		ret = vss->isVersioned(lbid, ver);
+		vss->release(VSS::READ);
+		locked = false;
+	}
+	catch(exception &e) {
+		cerr << e.what() << endl;
+		if (locked)
+			vss->release(VSS::READ);
+		throw;
+	}
+	return ret;
 }
 
 int8_t DBRM::send_recv(const ByteStream &in, ByteStream &out) throw()
@@ -753,6 +852,7 @@ int DBRM::createColumnExtent_DBroot(OID_t oid,
 	u_int16_t  dbRoot,
 	u_int32_t& partitionNum,
 	u_int16_t& segmentNum,
+    execplan::CalpontSystemCatalog::ColDataType colDataType,
 	LBID_t&    lbid,
 	int&       allocdSize,
 	u_int32_t& startBlockOffset) DBRM_THROW
@@ -775,12 +875,13 @@ int DBRM::createColumnExtent_DBroot(OID_t oid,
 
 	ByteStream command, response;
 	uint8_t  err;
+    uint tmp8 = (uint8_t)colDataType;
 	uint16_t tmp16;
 	uint32_t tmp32;
 	uint64_t tmp64;
 
 	command << CREATE_COLUMN_EXTENT_DBROOT << (ByteStream::quadbyte) oid <<
-		colWidth << dbRoot << partitionNum << segmentNum;
+		colWidth << dbRoot << partitionNum << segmentNum << tmp8;
 	err = send_recv(command, response);
 	if (err != ERR_OK)
 		return err;
@@ -822,7 +923,8 @@ int DBRM::createColumnExtentExactFile(OID_t oid,
 	u_int16_t  dbRoot,
 	u_int32_t partitionNum,
 	u_int16_t segmentNum,
-	LBID_t&    lbid,
+    execplan::CalpontSystemCatalog::ColDataType colDataType,
+    LBID_t&    lbid,
 	int&       allocdSize,
 	u_int32_t& startBlockOffset) DBRM_THROW
 {
@@ -844,12 +946,14 @@ int DBRM::createColumnExtentExactFile(OID_t oid,
 
 	ByteStream command, response;
 	uint8_t  err;
+    uint8_t  tmp8;
 	uint16_t tmp16;
 	uint32_t tmp32;
 	uint64_t tmp64;
 
+    tmp8 = (uint8_t)colDataType;
 	command << CREATE_COLUMN_EXTENT_EXACT_FILE << (ByteStream::quadbyte) oid <<
-		colWidth << dbRoot << partitionNum << segmentNum;
+		colWidth << dbRoot << partitionNum << segmentNum << tmp8;
 	err = send_recv(command, response);
 	if (err != ERR_OK)
 		return err;
@@ -2324,7 +2428,7 @@ int DBRM::clear() DBRM_THROW
 	ByteStream command, response;
 	uint8_t err;
 
-	command << CLEAR;
+	command << BRM_CLEAR;
 	err = send_recv(command, response);
 	if (err != ERR_OK)
 		return err;
@@ -2418,63 +2522,69 @@ int DBRM::getCurrentTxnIDs(set<VER_t> &txnList) throw()
 	return 0;
 }
 
-const execplan::CalpontSystemCatalog::SCN DBRM::verID(void)
+const QueryContext DBRM::verID()
 {
 #ifdef BRM_INFO
   	if (fDebug) TRACER_WRITENOW("verID");
 #endif
 	ByteStream command, response;
 	uint8_t err;
-	uint32_t ret;
+	QueryContext ret;
 
 	command << VER_ID;
 	err = send_recv(command, response);
 	if (err != ERR_OK) {
 		cerr << "DBRM: SessionManager::verID(): network error" << endl;
-		return -1;
-	}
-	
-	if (response.length() != 5) {
-		cerr << "DBRM: SessionManager::verID(): bad response" << endl;
-// 		log("DBRM: SessionManager::verID(): bad response", logging::LOG_TYPE_WARNING);
-		return -1;
+		ret.currentScn = -1;
+		return ret;
 	}
 
-	response >> err;
-	response >> ret;
-	CHECK_EMPTY(response);
+	try {
+		response >> err;
+		response >> ret;
+		CHECK_EMPTY(response);
+	}
+	catch (exception &e) {
+		cerr << "DBRM: SessionManager::verID(): bad response" << endl;
+ 		log("DBRM: SessionManager::verID(): bad response", logging::LOG_TYPE_WARNING);
+		ret.currentScn = -1;
+	}
 	return ret;
 }
 
-const execplan::CalpontSystemCatalog::SCN DBRM::sysCatVerID(void)
+const QueryContext DBRM::sysCatVerID()
 {
 #ifdef BRM_INFO
   	if (fDebug) TRACER_WRITENOW("sysCatVerID");
 #endif
 	ByteStream command, response;
 	uint8_t err;
-	uint32_t ret;
+	QueryContext ret;
 
 	command << SYSCAT_VER_ID;
 	err = send_recv(command, response);
 	if (err != ERR_OK) {
 		cerr << "DBRM: SessionManager::sysCatVerID(): network error" << endl;
-		return -1;
+		ret.currentScn = -1;
+		return ret;
 	}
 	
-	if (response.length() != 5) {
-		cerr << "DBRM: SessionManager::sysCatVerID(): bad response" << endl;
-// 		log("DBRM: SessionManager::verID(): bad response", logging::LOG_TYPE_WARNING);
-		return -1;
+	try {
+		response >> err;
+		response >> ret;
+		CHECK_EMPTY(response);
 	}
-
-	response >> err;
-	response >> ret;
-	CHECK_EMPTY(response);
+	catch (exception &e) {
+		cerr << "DBRM: SessionManager::sysCatVerID(): bad response" << endl;
+ 		log("DBRM: SessionManager::sysCatVerID(): bad response", logging::LOG_TYPE_WARNING);
+		ret.currentScn = -1;
+	}
 	return ret;
 }
-const TxnID 
-	DBRM::newTxnID(const SessionManagerServer::SID session, bool block, bool isDDL)
+
+
+const TxnID DBRM::newTxnID(const SessionManagerServer::SID session, bool block,
+		bool isDDL)
 {
 #ifdef BRM_INFO
  	if (fDebug)
@@ -2768,10 +2878,8 @@ const uint64_t DBRM::getUnique64()
 void DBRM::sessionmanager_reset()
 {
 	ByteStream command, response;
-	uint8_t err;
-
 	command << SM_RESET;
-	err = send_recv(command, response);
+	send_recv(command, response);
 }
 
 bool DBRM::isEMEmpty() throw()
@@ -3554,12 +3662,14 @@ bool DBRM::getTableLockInfo(uint64_t id, TableLockInfo *tli)
 	return (bool) err;
 }
 
-void DBRM::startAISequence(uint32_t OID, uint64_t firstNum, uint colWidth)
+void DBRM::startAISequence(uint32_t OID, uint64_t firstNum, uint colWidth,
+                           execplan::CalpontSystemCatalog::ColDataType colDataType)
 {
 	ByteStream command, response;
 	uint8_t err;
+    uint8_t tmp8 = colDataType;
 
-	command << START_AI_SEQUENCE << OID << firstNum << colWidth;
+	command << START_AI_SEQUENCE << OID << firstNum << colWidth << tmp8;
 	err = send_recv(command, response);
 	if (err != ERR_OK) {
 		log("DBRM: startAISequence(): network error", logging::LOG_TYPE_CRITICAL);
@@ -3676,6 +3786,82 @@ void DBRM::deleteAISequence(uint32_t OID)
 		log("DBRM: deleteAILock(): processing error", logging::LOG_TYPE_CRITICAL);
 		throw runtime_error("DBRM: deleteAILock(): processing error");
 	}
+}
+
+void DBRM::invalidateUncommittedExtentLBIDs(execplan::CalpontSystemCatalog::SCN txnid, vector<LBID_t>* plbidList)
+{
+    // Here we want to minimize the number of calls to dbrm
+    // Given that, and the fact that we need to know the column type
+    // in order to set the invalid min and max correctly in the extents,
+    // We do the following:
+    // 1) Maintain a vector of all extents we've looked at.
+    // 2) Get the list of uncommitted lbids for the transaction.
+    // 3) Look in that list to see if we've already looked at this extent.
+    // 4) If not, 
+    //    a) lookup the min and max lbid for the extent it belongs to
+    //    b) lookup the column oid for that lbid
+    //    c) add to the vector of extents
+    // 5) Create a list of CPInfo structures with the first lbid and col type of each extent
+    // 6) Lookup the column type for each retrieved oid.
+    // 7) mark each extent invalid, just like we would during update. This sets the proper
+    //    min and max (and set the state to CP_UPDATING.
+    // 6) Call setExtentsMaxMin to set the state to CP_INVALID.
+
+	vector<LBID_t> localLBIDList;
+
+    boost::shared_ptr<execplan::CalpontSystemCatalog> csc;
+    CPInfoList_t cpInfos;
+    CPInfo aInfo;
+    int oid;
+    uint16_t dbRoot;
+    uint32_t partitionNum;
+    uint16_t segmentNum;
+    u_int32_t fileBlockOffset;
+
+    // 2) Get the list of uncommitted lbids for the transaction, if we weren't given one.
+    if (plbidList == NULL)
+    {
+        getUncommittedExtentLBIDs(static_cast<VER_t>(txnid), localLBIDList);
+        plbidList = &localLBIDList;
+    }
+    if (plbidList->size() ==0)
+    {
+        return; // Nothing to do.
+    }
+	vector<LBID_t>::const_iterator iter = plbidList->begin();
+	vector<LBID_t>::const_iterator end = plbidList->end();
+    csc = execplan::CalpontSystemCatalog::makeCalpontSystemCatalog();
+
+    for (; iter != end; ++iter)
+    {
+        LBID_t lbid = *iter;
+        aInfo.firstLbid = lbid;
+        // lookup the column oid for that lbid (all we care about is oid here)
+        if (em->lookupLocal(lbid, oid, dbRoot, partitionNum, segmentNum, fileBlockOffset) == 0)
+        {
+            if (execplan::isUnsigned(csc->colType(oid).colDataType))
+            {
+                aInfo.max = 0;
+                aInfo.min = numeric_limits<uint64_t>::max();
+            }
+            else
+            {
+                aInfo.max = numeric_limits<int64_t>::min();
+                aInfo.min = numeric_limits<int64_t>::max();
+            }
+        }
+        else
+        {
+            // We have a problem, but we need to put something in. This should never happen.
+            aInfo.max = numeric_limits<int64_t>::min();
+            aInfo.min = numeric_limits<int64_t>::max();
+        }
+        aInfo.seqNum = -2;
+        cpInfos.push_back(aInfo);
+    }
+
+    // Call setExtentsMaxMin to invalidate and set the proper max/min in each extent
+    setExtentsMaxMin(cpInfos);
 }
 
 }   //namespace

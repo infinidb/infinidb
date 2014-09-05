@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: primitiveserver.cpp 2068 2013-03-28 21:03:39Z pleblanc $
+ *   $Id: primitiveserver.cpp 2069 2013-03-28 21:03:47Z pleblanc $
  *
  *
  ***********************************************************************/
@@ -106,28 +106,19 @@ typedef tr1::unordered_set<BRM::OID_t> USOID;
 // make global for blockcache
 //
 static const char* statsName ={"pm"};
-Stats* gPMStatsPtr=0;
+dbbc::Stats* gPMStatsPtr=0;
 bool gPMProfOn=false;
 uint32_t gSession=0;
 #ifndef _MSC_VER
-Stats pmstats(statsName);
+dbbc::Stats pmstats(statsName);
 #endif
 
 //FIXME: there is an anon ns burried later in between 2 named namespaces...
 namespace primitiveprocessor
 {
-#ifdef _MSC_VER
-	extern CRITICAL_SECTION preadCSObject;
-#else
-//#define IDB_COMP_POC_DEBUG
-#ifdef IDB_COMP_POC_DEBUG
-extern boost::mutex compDebugMutex;
-#endif
-#endif
-
 	BlockRequestProcessor **BRPp;
 #ifndef _MSC_VER
-	Stats stats;
+	dbbc::Stats stats;
 #endif
 	extern DebugLevel gDebugLevel;
 	BRM::DBRM* brm;
@@ -221,8 +212,6 @@ extern boost::mutex compDebugMutex;
 
 
 	void prefetchBlocks(const uint64_t lbid,
-						const uint32_t ver,
-						const uint32_t txn,
 						const int compType,
 						uint32_t* rCount)
 	{
@@ -258,7 +247,7 @@ extern boost::mutex compDebugMutex;
 		pfbMutex.unlock(); //pthread_mutex_unlock(&pfbMutex);
 
 		// loadBlock will catch a versioned block so vbflag can be set to false here
-		err = brm->lookupLocal(lbid, ver, false, oid, dbRoot, partNum, segNum, fbo); // need the oid
+		err = brm->lookupLocal(lbid, 0, false, oid, dbRoot, partNum, segNum, fbo); // need the oid
 		if (err < 0) {
 			cerr << "prefetchBlocks(): BRM lookupLocal failed! Expect more errors.\n";
 			goto cleanup;
@@ -291,7 +280,7 @@ extern boost::mutex compDebugMutex;
 
 			idbassert(range.size<=blocksReadAhead);
 
-			bc.check(range, numeric_limits<VER_t>::max(), 0, compType, *rCount);
+			bc.check(range, QueryContext(numeric_limits<VER_t>::max()), 0, compType, *rCount);
 		}
 		catch (...)
 		{
@@ -335,7 +324,7 @@ extern boost::mutex compDebugMutex;
 	// returns the # that were cached.
 	uint loadBlocks (
 		LBID_t *lbids,
-		VER_t *vers,
+		QueryContext qc,
 		VER_t txn,
 		int compType,
 		uint8_t **bufferPtrs,
@@ -366,7 +355,7 @@ extern boost::mutex compDebugMutex;
 			}
 		}
 #endif
-
+		VER_t *vers = (VER_t *) alloca(blockCount * sizeof(VER_t));
 		vbFlags = (bool *) alloca(blockCount);
 		vssRCs = (int *) alloca(blockCount * sizeof(int));
 		cacheThisBlock = (bool *) alloca(blockCount);
@@ -384,7 +373,7 @@ extern boost::mutex compDebugMutex;
 				}
 			}
 			if (!vssCache || it == vssCache->end())
-				vssRCs[i] = brm->vssLookup(lbids[i], vers[i], txn, vbFlags[i]);
+				vssRCs[i] = brm->vssLookup(lbids[i], qc, txn, &vers[i], &vbFlags[i]);
 			*blocksWereVersioned |= vbFlags[i];
 
 			// If the block is being modified by this txn, set the useCache flag to false
@@ -394,13 +383,21 @@ extern boost::mutex compDebugMutex;
 				cacheThisBlock[i] = true;
 		}
 
+		/*
+		cout << "  resolved ver #s: ";
+		for (uint i = 0; i < blockCount; i++)
+			cout << " <" << vers[i] << ", " << (int) vbFlags[i] << ", " << (int)
+				cacheThisBlock[i] << ">";
+		cout << endl;
+		*/
+
 		ret = bc.getCachedBlocks(lbids, vers, bufferPtrs, wasCached, blockCount);
 		
 		// Do we want to check any VB flags here?  Initial thought: no, because we have
 		// no idea whether any other blocks in the prefetch range are versioned,
 		// what's the difference if one in the visible range is?
 		if (ret != blockCount && doPrefetch) {
-			prefetchBlocks(lbids[0], vers[0], 0, compType, &blksRead);
+			prefetchBlocks(lbids[0], compType, &blksRead);
 
 #ifndef _MSC_VER
 			if (fPMProfOn)
@@ -422,15 +419,18 @@ extern boost::mutex compDebugMutex;
 			}
 			ret += bc.getCachedBlocks(lbids, vers, bufferPtrs, wasCached, l_blockCount);
 			
-			if (ret != blockCount)
+			if (ret != blockCount) {
 				for (i = 0; i < l_blockCount; i++)
 					if (!wasCached[i]) {
 						bool ver;
-						bc.getBlock(lbids[i], vers[i], txn, compType, (void *) bufferPtrs[i],
+
+						qc.currentScn = vers[i];
+						bc.getBlock(lbids[i], qc, txn, compType, (void *) bufferPtrs[i],
 							vbFlags[i], wasCached[i], &ver, cacheThisBlock[i], false);
 						*blocksWereVersioned |= ver;
 						blksRead++;
 					}
+			}
 		}
 		/* Some blocks weren't cached, prefetch is disabled -> issue single-block IO requests,
 		 * skip checking the cache again. */
@@ -439,7 +439,8 @@ extern boost::mutex compDebugMutex;
 				if (!wasCached[i]) {
 					bool ver;
 
-					bc.getBlock(lbids[i], vers[i], txn, compType, (void *) bufferPtrs[i], vbFlags[i],
+					qc.currentScn = vers[i];
+					bc.getBlock(lbids[i], qc, txn, compType, (void *) bufferPtrs[i], vbFlags[i],
 						wasCached[i], &ver, cacheThisBlock[i], false);
 					*blocksWereVersioned |= ver;
 					blksRead++;
@@ -456,7 +457,7 @@ extern boost::mutex compDebugMutex;
 
 	void loadBlock (
 		u_int64_t lbid,
-		u_int32_t v,
+		QueryContext v,
 		u_int32_t t,
 		int compType,
 		void* bufferPtr,
@@ -474,7 +475,7 @@ extern boost::mutex compDebugMutex;
 		uint32_t partitionNum=0;
 		uint16_t segmentNum=0;
 		int rc;
-		BRM::VER_t ver = (BRM::VER_t)v;
+		BRM::VER_t ver;
 		blockCacheClient bc(*BRPp[cacheNum(lbid)]);
 		char file_name[WriteEngine::FILE_NAME_SIZE]={0};
 		char* fileNamePtr = file_name;
@@ -496,7 +497,9 @@ extern boost::mutex compDebugMutex;
 			}
 		}
 		if (!vssCache || it == vssCache->end())
-			rc = brm->vssLookup((BRM::LBID_t)lbid, ver, txn, flg);
+			rc = brm->vssLookup((BRM::LBID_t)lbid, v, txn, &ver, &flg);
+
+		v.currentScn = ver;
 			//cout << "VSS l/u: l=" << lbid << " v=" << ver << " t=" << txn << " flg=" << flg << " rc: " << rc << endl;
 
 		// if this block is locked by this session, don't cache it, just read it directly from disk
@@ -880,10 +883,6 @@ blockReadRetry:
 				mlp->logInfoMessage(logging::M0006, args);
 			}
 
-			if (pWasBlockInCache)
-				*pWasBlockInCache = false;
-			if (rCount)
-				*rCount = 1; 
 			return;
 		}
 
@@ -897,18 +896,18 @@ blockReadRetry:
 		}
 
 		if (doPrefetch && !wasBlockInCache && !flg) {
-			prefetchBlocks(lbid, ver, txn, compType, &blksRead);
+			prefetchBlocks(lbid, compType, &blksRead);
 
 #ifndef _MSC_VER
 			if (fPMProfOn)
 				pmstats.markEvent(lbid, (pthread_t)-1, sessionID, 'M');
 #endif
-				bc.getBlock(lbid, ver, txn, compType, (uint8_t *) bufferPtr, flg, wasBlockInCache);
+				bc.getBlock(lbid, v, txn, compType, (uint8_t *) bufferPtr, flg, wasBlockInCache);
 				if (!wasBlockInCache)
 					blksRead++;
 		}
 		else if (!wasBlockInCache) {
-			bc.getBlock(lbid, ver, txn, compType, (uint8_t *) bufferPtr, flg, wasBlockInCache);
+			bc.getBlock(lbid, v, txn, compType, (uint8_t *) bufferPtr, flg, wasBlockInCache);
 			if (!wasBlockInCache)
 				blksRead++;
 		}
@@ -922,7 +921,7 @@ blockReadRetry:
 
 	struct AsynchLoader {
 		AsynchLoader(uint64_t l, 
-					uint32_t v, 
+					const QueryContext &v,
 					uint32_t t, 
 					int ct, 
 					uint32_t *cCount,
@@ -1006,7 +1005,7 @@ blockReadRetry:
 
 		private:
 			uint64_t lbid;
-			uint32_t ver;
+			QueryContext ver;
 			uint32_t txn;
 			int compType;
 			uint8_t dataWidth;
@@ -1020,7 +1019,7 @@ blockReadRetry:
 	};
 
 	void loadBlockAsync(uint64_t lbid, 
-						uint32_t v, 
+						const QueryContext &c,
 						uint32_t txn,
 						int compType,
 						uint32_t *cCount, 
@@ -1034,7 +1033,7 @@ blockReadRetry:
 		blockCacheClient bc(*BRPp[cacheNum(lbid)]);
 		bool vbFlag;
 		int vssret;
-		BRM::VER_t ver = (BRM::VER_t) v;
+		BRM::VER_t ver;
 		VSSCache::iterator it;
 	
 		if (vssCache) {
@@ -1048,7 +1047,7 @@ blockReadRetry:
 			}
 		}
 		if (!vssCache || it == vssCache->end())
-			vssret = brm->vssLookup((BRM::LBID_t) lbid, ver, txn, vbFlag);
+			vssret = brm->vssLookup((BRM::LBID_t) lbid, c, txn, &ver, &vbFlag);
 		
 		if (bc.exists(lbid, ver))
 			return;
@@ -1065,9 +1064,9 @@ blockReadRetry:
 
 		__sync_add_and_fetch(&asyncCounter, 1);
 #endif
-		m->lock(); //pthread_mutex_lock(m);
+		mutex::scoped_lock sl(*m);
 		try {
-			boost::thread thd(AsynchLoader(lbid, ver, txn, compType, cCount, rCount,
+			boost::thread thd(AsynchLoader(lbid, c, txn, compType, cCount, rCount,
 				LBIDTrace, sessionID, m, busyLoaders, vssCache));
 			(*busyLoaders)++;
 		}
@@ -1080,7 +1079,6 @@ blockReadRetry:
 			__sync_add_and_fetch(&asyncCounter, -1);
 #endif
 		}
-		m->unlock(); //pthread_mutex_unlock(m);
 	}
 
 } //namespace primitiveprocessor
@@ -1186,22 +1184,27 @@ int DictScanJob::operator()()
 	uint8_t data[DATA_BLOCK_SIZE];
 	uint output_buf_size = MAX_BUFFER_SIZE;
 	uint32_t session;
-	uint32_t uniqueId;
+	uint32_t uniqueId = 0;
 	bool wasBlockInCache;
 	uint32_t blocksRead = 0;
 	uint16_t runCount;
 
 	shared_ptr<DictEqualityFilter> eqFilter;
 	ByteStream results(output_buf_size);
-	TokenByScanRequestHeader *cmd = (TokenByScanRequestHeader *) fByteStream->buf();
+	TokenByScanRequestHeader *cmd;
 	PrimitiveProcessor pproc(gDebugLevel);
 	TokenByScanResultHeader *output;
-
+	QueryContext verInfo;
+	
 	try {
 #ifdef DCT_DEBUG
 		DebugLevel oldDebugLevel = gDebugLevel;
 		gDebugLevel = VERBOSE;
 #endif
+		fByteStream->advance(sizeof(TokenByScanRequestHeader));
+		*fByteStream >> verInfo;
+		cmd = (TokenByScanRequestHeader *) fByteStream->buf();
+
 		session = cmd->Hdr.SessionID;
 		uniqueId = cmd->Hdr.UniqueID;
 		runCount = cmd->Count;
@@ -1230,10 +1233,10 @@ int DictScanJob::operator()()
 				}
 			}
 		}
-
+	
 		for (uint16_t i = 0; i < runCount; ++i) {
 			loadBlock(cmd->LBID,
-				cmd->Hdr.VerID, 
+				verInfo,
 				cmd->Hdr.TransactionID,
 				cmd->CompType,
 				data, 

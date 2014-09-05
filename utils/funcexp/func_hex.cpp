@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_hex.cpp 3551 2013-02-05 22:14:40Z rdempsey $
+* $Id: func_hex.cpp 3616 2013-03-04 14:56:29Z rdempsey $
 *
 *
 ****************************************************************************/
@@ -24,6 +24,7 @@
 #include <cstdlib>
 #include <string>
 #include <sstream>
+#include <limits>
 using namespace std;
 
 #include <boost/scoped_array.hpp>
@@ -34,13 +35,11 @@ using namespace boost;
 #include "rowgroup.h"
 using namespace execplan;
 
-#include <limits>
+#include "funchelpers.h"
 
-namespace funcexp
+namespace
 {
-
-extern const char* convNumToStr(int64_t val,char *dst,int radix);
-extern char digit_upper[];
+char digit_upper[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
 void octet2hex(char *to, const char *str, uint len)
 {
@@ -52,7 +51,10 @@ void octet2hex(char *to, const char *str, uint len)
   }
   *to = '\0';
 }
+}
 
+namespace funcexp
+{
 CalpontSystemCatalog::ColType Func_hex::operationType( FunctionParm& fp, CalpontSystemCatalog::ColType& resultType )
 {
 	return resultType;
@@ -90,7 +92,7 @@ string Func_hex::getStrVal(rowgroup::Row& row,
 				dec=  ~(int64_t) 0;
 			else
 				dec= (uint64_t) (val + (val > 0 ? 0.5 : -0.5));
-			retval = convNumToStr(dec, ans, 16);
+			retval = helpers::convNumToStr(dec, ans, 16);
 			break;
 		}
 		case CalpontSystemCatalog::VARBINARY:
@@ -104,7 +106,7 @@ string Func_hex::getStrVal(rowgroup::Row& row,
 		default:
 		{
 			dec= (uint64_t)parm[0]->data()->getIntVal(row, isNull);
-			retval = convNumToStr(dec, ans, 16);
+			retval = helpers::convNumToStr(dec, ans, 16);
 			if (retval.length() > (uint)ct.colWidth)
 				retval = retval.substr(retval.length()-ct.colWidth, ct.colWidth);
 		}

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /**********************************************************************
-*   $Id: main.cpp 992 2013-07-08 20:08:38Z bpaul $
+*   $Id: main.cpp 993 2013-07-08 21:38:13Z bpaul $
 *
 *
 ***********************************************************************/
@@ -534,12 +534,6 @@ public:
 new_plan:
 				csep.unserialize(bs);
 				
-				// check limit clause and determin if ExeMgr needs to stop sending before finish
-				// @bug5176. Do limit only for select.
-				bool hasLimit = (csep.queryType() == "SELECT") &&
-				                (!csep.hasOrderBy()) && (csep.limitNum() != (uint64_t (-1)));
-				uint64_t requestRowCount = csep.limitStart() + csep.limitNum(); 
-
 				if (gDebug > 1 || (gDebug && (csep.sessionID()&0x80000000)==0))
 					cout << "### For session id " << csep.sessionID() << ", got a CSEP" << endl;
 
@@ -593,7 +587,7 @@ new_plan:
 				{
 					args.reset();
 					args.add((int)csep.statementID());
-					args.add((int)csep.verID());
+					args.add((int)csep.verID().currentScn);
 					args.add(sqlText);
 					msgLog.logMessage(LOG_TYPE_DEBUG,
 									  logDbProfStartStatement,
@@ -806,7 +800,6 @@ new_plan:
 							// send stats to connector for inserting to the querystats table
 							fStats.serialize(bs);
 							fIos.write(bs);
-
 							continue;
 						}
 						// for table mode handling
@@ -917,13 +910,7 @@ new_plan:
 						}
 						totalRowCount += rowCount;
 						totalBytesSent += bs.length();
-						
-						// send stats if finish fetching for limit query
-						if (hasLimit && totalRowCount >= requestRowCount)
-						{
-							break;
-						}
-						
+
 						if (rowCount == 0)
 						{
 							msgHandler.stop();
@@ -1327,14 +1314,14 @@ int main(int argc, char* argv[])
 		string tdp = rm.getScTempDiskPath();
 		ostringstream rmcmd;
 		rmcmd << "/usr/bin/find " << tdp << " -name LDL-\\* 2>/dev/null | /usr/bin/xargs /bin/rm -f >/dev/null 2>&1";
-		(void)system(rmcmd.str().c_str());
+		(void)::system(rmcmd.str().c_str());
 		// @bug 1041. remove stranded tuple dl.
 		rmcmd.str("");
 		rmcmd << "/usr/bin/find " << tdp << " -name Tuple-\\* 2>/dev/null | /usr/bin/xargs /bin/rm -f >/dev/null 2>&1";
-		(void)system(rmcmd.str().c_str());
+		(void)::system(rmcmd.str().c_str());
 		rmcmd.str("");
 		rmcmd << "/usr/bin/find " << tdp << " -name FIFO-\\* 2>/dev/null | /usr/bin/xargs /bin/rm -f >/dev/null 2>&1";
-		(void)system(rmcmd.str().c_str());
+		(void)::system(rmcmd.str().c_str());
 	}
 #endif
 	MsgMap msgMap;

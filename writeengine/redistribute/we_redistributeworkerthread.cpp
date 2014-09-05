@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
-* $Id: we_redistributeworkerthread.cpp 4299 2012-11-02 06:00:33Z xlou $
+* $Id: we_redistributeworkerthread.cpp 4450 2013-01-21 14:13:24Z rdempsey $
 */
 
 #include <iostream>
@@ -677,7 +677,11 @@ int RedistributeWorkerThread::sendData()
 				{
 					filesystem::copy_file(sourceName, destName);
 				}
-				catch(filesystem::basic_filesystem_error<filesystem::path> e)
+#if BOOST_VERSION >= 105200
+				catch(filesystem::filesystem_error& e)
+#else
+				catch(filesystem::basic_filesystem_error<filesystem::path>& e)
+#endif
 				{
 					fErrorCode = RED_EC_COPY_FILE_FAIL;
 					ostringstream oss;
@@ -883,7 +887,11 @@ void RedistributeWorkerThread::confirmToPeer()
 			{
 				filesystem::remove_all(*i);
 			}
-			catch(filesystem::basic_filesystem_error<filesystem::path> e)
+#if BOOST_VERSION >= 105200
+			catch(filesystem::filesystem_error& e)
+#else
+			catch(filesystem::basic_filesystem_error<filesystem::path>& e)
+#endif
 			{
 			}
 		}
@@ -898,7 +906,11 @@ void RedistributeWorkerThread::confirmToPeer()
 			{
 				filesystem::remove_all(*i);
 			}
-			catch(filesystem::basic_filesystem_error<filesystem::path> e)
+#if BOOST_VERSION >= 105200
+			catch(filesystem::filesystem_error& e)
+#else
+			catch(filesystem::basic_filesystem_error<filesystem::path>& e)
+#endif
 			{
 			}
 		}

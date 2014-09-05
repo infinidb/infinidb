@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: blockresolutionmanager.h 1837 2013-01-31 19:13:18Z pleblanc $
+ * $Id: blockresolutionmanager.h 1825 2013-01-24 18:41:00Z pleblanc $
  *
  *****************************************************************************/
 
@@ -62,7 +62,7 @@ class BlockResolutionManager {
 		/** @brief Persistence API.  Loads the local Extent Map from a file.
 		 *
 		 * Persistence API.  Loads the <b>local</b> Extent Map from a file.
-		 * 
+		 *
 		 * @warning The load must be done on each slave node atomically wrt
 		 * writing operations, otherwise nodes may be out of synch.
 		 * @param filename Relative or absolute path to a file saved with saveExtentMap.
@@ -71,14 +71,14 @@ class BlockResolutionManager {
 		EXPORT int loadExtentMap(const std::string& filename, bool fixFL);
 
 		/** @brief Persistence API.  Saves the local Extent Map to a file.
-		 * 
+		 *
 		 * Persistence API.  Saves the <b>local</b> Extent Map to a file.
 		 *
 		 * @param filename Relative or absolute path to save to.
 		 * @return 0 on success, throws if EM throws
 		 */
 		EXPORT int saveExtentMap(const std::string& filename);
-
+		
 		/** @brief Persistence API.  Loads all BRM snapshots.
 		 *
 		 * Loads all <b>local</b> BRM structures from files saved with saveState().
@@ -109,7 +109,7 @@ class BlockResolutionManager {
 		 * @return 0 on success, -1 on error
 		 */
 		EXPORT int saveState(std::string filename) throw();
-		
+
 	private:
 		explicit BlockResolutionManager(const BlockResolutionManager& brm);
 		BlockResolutionManager& operator=(const BlockResolutionManager& brm);

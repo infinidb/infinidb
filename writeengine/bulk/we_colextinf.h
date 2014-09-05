@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
- * $Id: we_colextinf.h 4496 2013-01-31 19:13:20Z pleblanc $
+ * $Id: we_colextinf.h 4501 2013-01-31 21:15:58Z dcathey $
  *
  ******************************************************************************/
 
@@ -45,7 +45,7 @@ namespace WriteEngine
 {
     class Log;
     class BRMReporter;
-
+    typedef execplan::CalpontSystemCatalog::ColDataType ColDataType;
 //------------------------------------------------------------------------------
 /** @brief Class to store min/max and LBID information for an extent.
  *  For character data, the min and max values are maintained in reverse
@@ -78,6 +78,13 @@ public:
                        fMaxVal(maxVal),
                        fNewExtent(true)   { }
 
+    // Used to create entry for a new extent, with LBID not yet allocated
+    ColExtInfEntry(uint64_t minVal, uint64_t maxVal) :
+                       fLbid(INVALID_LBID),
+                       fMinVal(static_cast<int64_t>(minVal)),
+                       fMaxVal(static_cast<int64_t>(maxVal)),
+                       fNewExtent(true)   { }
+
     BRM::LBID_t fLbid;     // LBID for an extent; should be the starting LBID
     int64_t     fMinVal;   // minimum value for extent associated with LBID
     int64_t     fMaxVal;   // maximum value for extent associated with LBID 
@@ -108,13 +115,16 @@ public:
 
     virtual void addFirstEntry   ( RID     lastInputRow,
                                    BRM::LBID_t lbid,
-                                   bool    bIsNewExtent )   { }
+                                   bool    bIsNewExtent)    { }
+
     virtual void addOrUpdateEntry( RID     lastInputRow,
                                    int64_t minVal,
-                                   int64_t maxVal )         { }
-    virtual void getCPInfoForBRM ( bool bIsChar,
+                                   int64_t maxVal,
+                                   ColDataType colDataType ){ }
+
+    virtual void getCPInfoForBRM ( JobColumn column,
                                    BRMReporter& brmReporter){ }
-    virtual void print( bool bIsChar )                      { }
+    virtual void print( const JobColumn& column )           { }
     virtual int updateEntryLbid( BRM::LBID_t startLbid )    { return NO_ERROR; }
 };
 
@@ -160,16 +170,17 @@ public:
      */
     virtual void addOrUpdateEntry( RID     lastInputRow,
                                    int64_t minVal,
-                                   int64_t maxVal );
+                                   int64_t maxVal,
+                                   ColDataType colDataType );
 
     /** @brief Send updated Casual Partition (CP) info to BRM.
      */
-    virtual void getCPInfoForBRM ( bool bIsChar,
+    virtual void getCPInfoForBRM ( JobColumn column,
                                    BRMReporter& brmReporter );
 
     /** @brief Debug print function.
      */
-    virtual void print( bool bIsChar );
+    virtual void print( const JobColumn& column );
 
     /** @brief Add extent's LBID to the oldest entry that is awaiting an LBID
      *  @param startLbid Starting LBID for a pending extent.

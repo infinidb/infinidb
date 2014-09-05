@@ -133,7 +133,7 @@ int64_t Func_yearweek::getIntVal(rowgroup::Row& row,
 	}
 	char* ptr = buf;
 
-	sprintf(ptr, "%02d", funcexp::calc_week(year, month, day, (week_mode(mode) | week_Year) , &lyear));
+	sprintf(ptr, "%02d", helpers::calc_week(year, month, day, (helpers::week_mode(mode) | helpers::week_Year) , &lyear));
 
 	int week = atoi(ptr);
 

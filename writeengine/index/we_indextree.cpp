@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************************
-* $Id: we_indextree.cpp 3720 2012-04-04 18:18:49Z rdempsey $
+* $Id: we_indextree.cpp 4450 2013-01-21 14:13:24Z rdempsey $
 *
 ******************************************************************************************/
 /** @file */
@@ -47,7 +47,7 @@ namespace WriteEngine
    {} 
 
 /*
-   const int IndexTree::getIndexTreeBitTestEntry( i64 entry, short* entryType, int* bitTest, int* group, i32* treePointer )
+   const int IndexTree::getIndexTreeBitTestEntry( uint64_t entry, short* entryType, int* bitTest, int* group, int32_t* treePointer )
    {
       *treePointer = entry & IDX_PTR_MASK;
       entry = entry >> IDX_PTR_SIZE + 2; // skip one spare bit and bit-compare bit
@@ -63,7 +63,7 @@ namespace WriteEngine
       return NO_ERROR;
    }
 
-   const void IndexTree::setIndexTreeBitTestEntry( i64* entry, short entryType, int bitTest, int group, i32 treePointer )
+   const void IndexTree::setIndexTreeBitTestEntry( uint64_t* entry, short entryType, int bitTest, int group, int32_t treePointer )
    {
       memset( entry, 0, ROW_PER_BYTE );
 
@@ -160,7 +160,7 @@ namespace WriteEngine
     *    NO_ERROR if success
     *    error no if fail
     ***********************************************************/
-   const int IndexTree::buildEmptyIndexTreeBranch( const i64 key, const int width, const RID rid, const int rootTestbitVal )
+   const int IndexTree::buildEmptyIndexTreeBranch( const uint64_t key, const int width, const RID rid, const int rootTestbitVal )
    {
       int                     rc;
       IdxBitmapPointerEntry   bitmapEntry = {0};
@@ -192,7 +192,7 @@ namespace WriteEngine
     *    NO_ERROR if success
     *    error no if fail
     ***********************************************************/
-   const int IndexTree::buildExistIndexTreeBranch( const i64 key, const int width, const RID rid, const int rootTestbitVal, IdxBitmapPointerEntry bitmapEntry )
+   const int IndexTree::buildExistIndexTreeBranch( const uint64_t key, const int width, const RID rid, const int rootTestbitVal, IdxBitmapPointerEntry bitmapEntry )
    {
       int                     rc = NO_ERROR, loopCount, testbitVal, i, j, allocCount, realCount, matchPos, moveCount, parentLevel = 0, curLevel, curOffset = 0;
       bool                    bSuccess;
@@ -374,7 +374,7 @@ namespace WriteEngine
     *    error no if fail
     *    retBitTestEntry - return address pointer
     ***********************************************************/
-   const int IndexTree::buildEmptyTreePart( const i64 key, const int width, const RID rid, const int startLevel, const int offset )
+   const int IndexTree::buildEmptyTreePart( const uint64_t key, const int width, const RID rid, const int startLevel, const int offset )
    {
       int                     rc, loopCount, testbitVal, i, parentLevel;
       bool                    bSuccess;
@@ -448,7 +448,7 @@ namespace WriteEngine
    
       if( m_rootBlock.dirty )
       {
-         i64 lbid0 = 0;
+         uint64_t lbid0 = 0;
 #ifdef BROKEN_BY_MULTIPLE_FILES_PER_OID
          BRMWrapper::getInstance()->getBrmInfo( m_cbTree.file.oid, 0, lbid0 );
 #endif
@@ -507,7 +507,7 @@ namespace WriteEngine
     *    NO_ERROR if success
     *    error no if fail
     ***********************************************************/
-   const int IndexTree::deleteIndex( const i64 key, const int width, const RID rid  )
+   const int IndexTree::deleteIndex( const uint64_t key, const int width, const RID rid  )
    {
       IdxEmptyListEntry listHdrAddr;
 
@@ -526,7 +526,7 @@ namespace WriteEngine
     *    True if success, otherwise if out of bound
     *    bittestVal - test bit value
     ***********************************************************/
-   const bool IndexTree::getTestbitValue( const i64 key, const int width, const int curTestNo, int* bittestVal )
+   const bool IndexTree::getTestbitValue( const uint64_t key, const int width, const int curTestNo, int* bittestVal )
    {
       int   shiftPos, maskPos = 0;
       bool  bSuccess = true;
@@ -566,7 +566,7 @@ namespace WriteEngine
     *    True if found, False otherwise
     *    checkEntry - if found the ptr got reset
     ***********************************************************/
-   const bool IndexTree::getTreeMatchEntry( DataBlock* block, const i64 sbid, const i64 entry, const int width,
+   const bool IndexTree::getTreeMatchEntry( DataBlock* block, const uint64_t sbid, const uint64_t entry, const int width,
                                            const int allocCount, const bool* entryMap, int* matchEntry, IdxBitTestEntry* checkEntry )
    {
       IdxBitTestEntry   curEntry;
@@ -602,7 +602,7 @@ namespace WriteEngine
     *    realCount - the total number of real entries
     *    entryMap - the entry availablibility map
     ***********************************************************/
-   const int IndexTree::getTreeNodeInfo( DataBlock* block, const i64 sbid, const i64 entry, const int width,
+   const int IndexTree::getTreeNodeInfo( DataBlock* block, const uint64_t sbid, const uint64_t entry, const int width,
                                           const IdxTreeGroupType group, int* allocCount, int* realCount, bool* entryMap )
    {
       IdxBitTestEntry   curEntry;
@@ -718,8 +718,8 @@ namespace WriteEngine
     *    NO_ERROR if success
     *    error no if fail
     ***********************************************************/
-   const int IndexTree::moveEntry( const i64 oldFbo, const i64 oldSbid, const i64 oldEntry, const int width, const i64 newFbo,
-                                   const i64 newSbid, const i64 newEntry, const int newGroup, const int allocCount, bool* entryMap, int* moveCount, const int newAllocCount )
+   const int IndexTree::moveEntry( const uint64_t oldFbo, const uint64_t oldSbid, const uint64_t oldEntry, const int width, const uint64_t newFbo,
+                                   const uint64_t newSbid, const uint64_t newEntry, const int newGroup, const int allocCount, bool* entryMap, int* moveCount, const int newAllocCount )
    {
       int               rc, i;
       DataBlock         oldBlock, newBlock;
@@ -799,7 +799,7 @@ namespace WriteEngine
       m_cbTree.file.oid = treeFid;
       m_cbList.file.oid = listFid;
 
-      i64 lbid0 = 0;
+      uint64_t lbid0 = 0;
 #ifdef BROKEN_BY_MULTIPLE_FILES_PER_OID
       rc = BRMWrapper::getInstance()->getBrmInfo( m_cbTree.file.oid, 0, lbid0 );
 #endif
@@ -828,7 +828,7 @@ namespace WriteEngine
     *    NO_ERROR if success
     *    error no if fail
     ***********************************************************/
-   const int IndexTree::processIndex( const i64 key, const int width, const RID rid, IdxEmptyListEntry& listHdrAddr, const bool bDelete  )
+   const int IndexTree::processIndex( const uint64_t key, const int width, const RID rid, IdxEmptyListEntry& listHdrAddr, const bool bDelete  )
    {
       int                     loopCount, testbitVal, i, allocCount, realCount, matchPos, curFbo, curSbid, curEntry;
       bool                    bSuccess;
@@ -1058,7 +1058,7 @@ namespace WriteEngine
 */
          case WriteEngine::WR_CHAR :   m_multiColKey.curBitset.reset();
                                        for( int i = 0; i < width/8; i++ ) {
-                                          i64 curChar = ((char*)val)[i];
+                                          uint64_t curChar = ((char*)val)[i];
                                           m_multiColKey.curBitset = m_multiColKey.curBitset << 8;
                                           m_multiColKey.curBitset |= curChar;
                                        } 
@@ -1096,7 +1096,7 @@ namespace WriteEngine
     * RETURN:
     *    none
     ***********************************************************/
-   void IndexTree::setBittestEntry( IdxBitTestEntry* bittestEntry, const i64 testbitVal, const i64 group, const i64 fbo, const i64 sbid, const i64 entry, const i64 entryType ) const
+   void IndexTree::setBittestEntry( IdxBitTestEntry* bittestEntry, const uint64_t testbitVal, const uint64_t group, const uint64_t fbo, const uint64_t sbid, const uint64_t entry, const uint64_t entryType ) const
    {
       bittestEntry->type = entryType;
       bittestEntry->bitTest = testbitVal;
@@ -1121,7 +1121,7 @@ namespace WriteEngine
     *    none
     ***********************************************************/
     // todo: need test case
-   void IndexTree::setEmptyListEntry( IdxEmptyListEntry* myEntry, const i64 group, const i64 fbo, const i64 sbid, const i64 entry ) const
+   void IndexTree::setEmptyListEntry( IdxEmptyListEntry* myEntry, const uint64_t group, const uint64_t fbo, const uint64_t sbid, const uint64_t entry ) const
    {
       myEntry->type = EMPTY_PTR;
       myEntry->group = group;
@@ -1145,7 +1145,7 @@ namespace WriteEngine
     * RETURN:
     *    none
     ***********************************************************/
-   void IndexTree::setTreeHeader( IdxTree* myTree, const i64 key, const RID rid, const int width,
+   void IndexTree::setTreeHeader( IdxTree* myTree, const uint64_t key, const RID rid, const int width,
                                   const int testbitVal, const IdxBitmapPointerEntry bitmapEntry )
    {
       IdxBitTestEntry nextEntry, curEntry;
@@ -1233,7 +1233,7 @@ namespace WriteEngine
     *    NO_ERROR if success
     *    rowIdArray - allocation of the row id left here
     ***********************************************************/
-   const int IndexTree::updateIndex( const i64 key, const int width, const RID rid )
+   const int IndexTree::updateIndex( const uint64_t key, const int width, const RID rid )
    {
       int                     rootTestbitVal, rc = NO_ERROR;
       IdxBitmapPointerEntry   curBitmapPointer;
@@ -1269,7 +1269,7 @@ namespace WriteEngine
     *    NO_ERROR if success
     *    error no if fail
     ***********************************************************/
-    const int IndexTree::updateIndexList( const i64 key, const int width, const RID rid, IdxEmptyListEntry* myEntry, const int no, const bool addFlag )
+    const int IndexTree::updateIndexList( const uint64_t key, const int width, const RID rid, IdxEmptyListEntry* myEntry, const int no, const bool addFlag )
    {
       int rc = NO_ERROR;
 
@@ -1315,7 +1315,7 @@ namespace WriteEngine
     *    NO_ERROR if success
     *    error no if fail
     ***********************************************************/
-   const int IndexTree::updateListFile( const i64 key, const int width, const RID rid, const int curLevel, const i64 group, const int allocCount, const int useCount, const int offset, const bool addFlag )
+   const int IndexTree::updateListFile( const uint64_t key, const int width, const RID rid, const int curLevel, const uint64_t group, const int allocCount, const int useCount, const int offset, const bool addFlag )
    {
       int                  rc, testbitVal, parentLevel = curLevel - 1;
       IdxEmptyListEntry    listEntry;

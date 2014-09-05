@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: tuplehashjoin.h 8526 2012-05-17 02:28:10Z xlou $
+//  $Id: tuplehashjoin.h 9210 2013-01-21 14:10:42Z rdempsey $
 
 
 #ifndef TUPLEHASHJOIN_H_
@@ -42,13 +42,8 @@ class TupleHashJoinStep : public JobStep, public TupleDeliveryStep
 public:
 	/**
 	 * @param  
-	 * @param sessionId 
-	 * @param statementId 
-	 * @param txnId 
-	 * @param resourceManager
 	 */
-	TupleHashJoinStep(uint32_t sessionId, uint32_t statementId, uint32_t txnId, ResourceManager *,
-		bool isExeMgr = true);
+	TupleHashJoinStep(const JobInfo& jobInfo);
 	virtual ~TupleHashJoinStep();
 
 	void setLargeSideBPS(BatchPrimitive*);
@@ -58,17 +53,7 @@ public:
 	/* mandatory JobStep interface */
 	void run();
 	void join();
-	const JobStepAssociation& inputAssociation() const;
-	void inputAssociation(const JobStepAssociation& inputAssociation);
-	const JobStepAssociation& outputAssociation() const;
-	void outputAssociation(const JobStepAssociation& outputAssociation);
 	const std::string toString() const;
-	void stepId(uint16_t stepId);
-	uint16_t stepId() const;
-	uint32_t sessionId() const;
-	uint32_t txnId() const;
-	uint32_t statementId() const;
-	void logger(const SPJL& logger);
 
 	/* These tableOID accessors can go away soon */
 	execplan::CalpontSystemCatalog::OID tableOid() const { return fTableOID2; }
@@ -199,13 +184,11 @@ private:
 	TupleHashJoinStep(const TupleHashJoinStep &);
 	TupleHashJoinStep & operator=(const TupleHashJoinStep &);
 
-	void errorLogging(const std::string& msg) const;
+	void errorLogging(const std::string& msg, int err) const;
 	void startAdjoiningSteps();
 
 	void formatMiniStats(uint index);
 
-	JobStepAssociation inJSA;
-	JobStepAssociation outJSA;
 	RowGroupDL *largeDL, *outputDL;
 	std::vector<RowGroupDL *> smallDLs;
 	std::vector<uint> smallIts;
@@ -213,10 +196,6 @@ private:
 
 	JoinType joinType;   // deprecated
 	std::vector<JoinType> joinTypes;
-	uint32_t sessionID;
-	uint32_t stepID;
-	uint32_t statementID;
-	uint32_t txnID;
 	execplan::CalpontSystemCatalog::OID fTableOID1;
 	execplan::CalpontSystemCatalog::OID fTableOID2;
 	execplan::CalpontSystemCatalog::OID fOid1;
@@ -255,13 +234,12 @@ private:
 	std::vector<std::vector<uint> > largeSideKeys;
 	std::vector<std::vector<uint> > smallSideKeys;
 
-	ResourceManager *resourceManager;
+	ResourceManager& resourceManager;
 #ifdef _MSC_VER
 	volatile LONGLONG totalUMMemoryUsage;
 #else
 	uint64_t totalUMMemoryUsage;
 #endif
-	SPJL fLogger;
 
 	struct JoinerSorter {
 		inline bool operator()(const boost::shared_ptr<joiner::TupleJoiner> &j1,
@@ -373,6 +351,9 @@ private:
 	std::vector<std::string> smallTableNames;
 	bool isExeMgr;
 	uint lastSmallOuterJoiner;
+
+	// moved from base class JobStep
+	boost::mutex* fStatsMutexPtr;
 };
 
 }

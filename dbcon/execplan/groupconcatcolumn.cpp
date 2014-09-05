@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 2009-2012 Calpont Corporation.
+  Copyright (C) 2009-2013 Calpont Corporation.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -16,9 +16,9 @@
 */
 
 /***********************************************************************
-*   $Id: groupconcatcolumn.cpp 8436 2012-04-04 18:18:21Z rdempsey $
+*   $Id: groupconcatcolumn.cpp 9210 2013-01-21 14:10:42Z rdempsey $
 *
-*   Copyright (C) 2009-2012 Calpont Corporation
+*   Copyright (C) 2009-2013 Calpont Corporation
 *   All Rights Reserved
 *
 ***********************************************************************/

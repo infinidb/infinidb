@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_case.cpp 3956 2013-07-08 19:17:26Z bpaul $
+* $Id: func_case.cpp 3957 2013-07-08 21:20:36Z bpaul $
 *
 *
 ****************************************************************************/
@@ -80,6 +80,26 @@ inline uint64_t simple_case_cmp(Row& row,
 			break;
 		}
 
+        case execplan::CalpontSystemCatalog::UBIGINT:
+        case execplan::CalpontSystemCatalog::UINT:
+        case execplan::CalpontSystemCatalog::UMEDINT:
+        case execplan::CalpontSystemCatalog::UTINYINT:
+        case execplan::CalpontSystemCatalog::USMALLINT:
+        {
+            uint64_t ev = parm[n]->data()->getUintVal(row, isNull);
+            if (isNull)
+                break;
+
+            for (; i < n; i += 2)
+            {
+                if (ev == parm[i]->data()->getUintVal(row, isNull) && !isNull)
+                    break;
+                else
+                    isNull = false;
+            }
+            break;
+        }
+
 		case execplan::CalpontSystemCatalog::CHAR:
 		case execplan::CalpontSystemCatalog::VARCHAR:
 		{
@@ -99,6 +119,7 @@ inline uint64_t simple_case_cmp(Row& row,
 		}
 
 		case execplan::CalpontSystemCatalog::DECIMAL:
+        case execplan::CalpontSystemCatalog::UDECIMAL:
 		{
    			IDB_Decimal ev = parm[n]->data()->getDecimalVal(row, isNull);
 			if (isNull)
@@ -115,6 +136,7 @@ inline uint64_t simple_case_cmp(Row& row,
 		}
 
 		case execplan::CalpontSystemCatalog::DOUBLE:
+        case execplan::CalpontSystemCatalog::UDOUBLE:
 		{
    			double ev = parm[n]->data()->getDoubleVal(row, isNull);
 			if (isNull)
@@ -130,7 +152,8 @@ inline uint64_t simple_case_cmp(Row& row,
 			break;
 		}
 
-		case execplan::CalpontSystemCatalog::FLOAT:
+        case execplan::CalpontSystemCatalog::FLOAT:
+		case execplan::CalpontSystemCatalog::UFLOAT:
 		{
    			float ev = parm[n]->data()->getFloatVal(row, isNull);
 			if (isNull)

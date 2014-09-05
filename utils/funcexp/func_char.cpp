@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_char.cpp 3651 2013-03-19 22:55:43Z bpaul $
+* $Id: func_char.cpp 3650 2013-03-19 22:52:19Z bpaul $
 *
 *
 ****************************************************************************/
@@ -38,7 +38,8 @@ using namespace rowgroup;
 #include "errorids.h"
 using namespace logging;
 
-
+namespace
+{
 inline bool getChar( int64_t value, ostringstream& oss )
 {
 	ostringstream oss1;
@@ -51,7 +52,7 @@ inline bool getChar( int64_t value, ostringstream& oss )
 		return true;
 	}
 
-	int num = 256;
+	int64_t num = 256;
 	while ( num > 255 ) {
 		num = value / 256;
 		int newValue = value - (num*256);
@@ -70,6 +71,37 @@ inline bool getChar( int64_t value, ostringstream& oss )
 	oss << s[s.size()];
 
 	return true;
+}
+
+inline bool getChar( uint64_t value, ostringstream& oss )
+{
+	ostringstream oss1;
+
+	if ( value < 256 ) {
+		oss << char(value);
+		return true;
+	}
+
+	uint64_t num = 256;
+	while ( num > 255 ) {
+		num = value / 256;
+		int newValue = value - (num*256);
+		oss1 << char(newValue);
+		value = num;
+	}
+	oss1 << char(num);
+
+	//reverse order
+	string s = oss1.str();
+
+	for ( int i = s.size() ; i > 0 ; i--)
+	{
+		oss << s[i-1];
+	} 
+	oss << s[s.size()];
+
+	return true;
+}
 }
 
 namespace funcexp
@@ -94,61 +126,78 @@ string Func_char::getStrVal(Row& row,
 		case execplan::CalpontSystemCatalog::MEDINT:
 		case execplan::CalpontSystemCatalog::TINYINT:
 		case execplan::CalpontSystemCatalog::SMALLINT:
-			{
-				int64_t value = parm[0]->data()->getIntVal(row, isNull);
+		{
+			int64_t value = parm[0]->data()->getIntVal(row, isNull);
 
-				if ( !getChar(value, oss) ) {
-					isNull = true;
-					return "";
-				}
-
-			}
-			break;
-
-		case execplan::CalpontSystemCatalog::VARCHAR: // including CHAR'
-		case execplan::CalpontSystemCatalog::CHAR:
-		case execplan::CalpontSystemCatalog::DOUBLE:
-			{
-				double value = parm[0]->data()->getDoubleVal(row, isNull);
-				if ( !getChar((int64_t)value, oss) ) {
-					isNull = true;
-					return "";
-				}
-			}
-			break;
-
-		case execplan::CalpontSystemCatalog::FLOAT:
-			{
-				float value = parm[0]->data()->getFloatVal(row, isNull);
-				if ( !getChar((int64_t)value, oss) ) {
-					isNull = true;
-					return "";
-				}
-			}
-			break;
-
-		case execplan::CalpontSystemCatalog::DECIMAL:
-			{
-				IDB_Decimal d = parm[0]->data()->getDecimalVal(row, isNull);
-				// get decimal and round up
-				int value = d.value / power(d.scale);
-				int lefto = (d.value - value * power(d.scale)) / power(d.scale-1);
-				if ( lefto > 4 )
-					value++;
-				if ( !getChar((int64_t)value, oss) ) {
-					isNull = true;
-					return "";
-				}
-			}
-			break;
-
-		case execplan::CalpontSystemCatalog::DATE:
-		case execplan::CalpontSystemCatalog::DATETIME:
-			{
+			if ( !getChar(value, oss) ) {
 				isNull = true;
 				return "";
 			}
-			break;
+		}
+		break;
+	
+        case execplan::CalpontSystemCatalog::UBIGINT:
+        case execplan::CalpontSystemCatalog::UINT:
+        case execplan::CalpontSystemCatalog::UMEDINT:
+        case execplan::CalpontSystemCatalog::UTINYINT:
+        case execplan::CalpontSystemCatalog::USMALLINT:
+        {
+            uint64_t value = parm[0]->data()->getUintVal(row, isNull);
+
+            if ( !getChar(value, oss) ) {
+                isNull = true;
+                return "";
+            }
+        }
+        break;
+
+        case execplan::CalpontSystemCatalog::VARCHAR: // including CHAR'
+		case execplan::CalpontSystemCatalog::CHAR:
+		case execplan::CalpontSystemCatalog::DOUBLE:
+        case execplan::CalpontSystemCatalog::UDOUBLE:
+		{
+			double value = parm[0]->data()->getDoubleVal(row, isNull);
+			if ( !getChar((int64_t)value, oss) ) {
+				isNull = true;
+				return "";
+			}
+		}
+		break;
+	
+        case execplan::CalpontSystemCatalog::FLOAT:
+		case execplan::CalpontSystemCatalog::UFLOAT:
+		{
+			float value = parm[0]->data()->getFloatVal(row, isNull);
+			if ( !getChar((int64_t)value, oss) ) {
+				isNull = true;
+				return "";
+			}
+		}
+		break;
+
+        case execplan::CalpontSystemCatalog::DECIMAL:
+		case execplan::CalpontSystemCatalog::UDECIMAL:
+		{
+			IDB_Decimal d = parm[0]->data()->getDecimalVal(row, isNull);
+			// get decimal and round up
+			int value = d.value / helpers::power(d.scale);
+			int lefto = (d.value - value * helpers::power(d.scale)) / helpers::power(d.scale-1);
+			if ( lefto > 4 )
+				value++;
+			if ( !getChar((int64_t)value, oss) ) {
+				isNull = true;
+				return "";
+			}
+		}
+		break;
+
+		case execplan::CalpontSystemCatalog::DATE:
+		case execplan::CalpontSystemCatalog::DATETIME:
+		{
+			isNull = true;
+			return "";
+		}
+		break;
 
 		default:
 		{

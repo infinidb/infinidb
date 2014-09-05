@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
- * $Id: we_colextinf.cpp 4496 2013-01-31 19:13:20Z pleblanc $
+ * $Id: we_colextinf.cpp 4495 2013-01-31 15:24:26Z dcathey $
  *
  ******************************************************************************/
 
@@ -35,6 +35,7 @@
 #include "we_brm.h"
 #include "we_log.h"
 #include "we_brmreporter.h"
+#include "we_convertor.h"
 
 namespace
 {
@@ -71,7 +72,8 @@ void ColExtInf::addFirstEntry( RID         lastInputRow,
 //------------------------------------------------------------------------------
 void ColExtInf::addOrUpdateEntry( RID     lastInputRow,
                                   int64_t minVal,
-                                  int64_t maxVal )
+                                  int64_t maxVal,
+                                  ColDataType colDataType )
 {
     boost::mutex::scoped_lock lock(fMapMutex);
 
@@ -95,10 +97,22 @@ void ColExtInf::addOrUpdateEntry( RID     lastInputRow,
         }
         else                // Update the range
         {
-            if (minVal < iter->second.fMinVal)
-                iter->second.fMinVal = minVal;
-            if (maxVal > iter->second.fMaxVal)
-                iter->second.fMaxVal = maxVal;
+            if (isUnsigned(colDataType))
+            {
+                if (static_cast<uint64_t>(minVal) 
+                    < static_cast<uint64_t>(iter->second.fMinVal))
+                    iter->second.fMinVal = minVal;
+                if (static_cast<uint64_t>(maxVal)
+                    > static_cast<uint64_t>(iter->second.fMaxVal))
+                    iter->second.fMaxVal = maxVal;
+            }
+            else
+            {
+                if (minVal < iter->second.fMinVal)
+                    iter->second.fMinVal = minVal;
+                if (maxVal > iter->second.fMaxVal)
+                    iter->second.fMaxVal = maxVal;
+            }
         }
     }
 }
@@ -141,8 +155,11 @@ int ColExtInf::updateEntryLbid( BRM::LBID_t startLbid )
 //------------------------------------------------------------------------------
 // Get updated Casual Partition (CP) information for BRM for this column at EOJ.
 //------------------------------------------------------------------------------
-void ColExtInf::getCPInfoForBRM( bool bIsChar, BRMReporter& brmReporter )
+void ColExtInf::getCPInfoForBRM( JobColumn column, BRMReporter& brmReporter )
 {
+    bool bIsChar = ((column.weType  == WriteEngine::WR_CHAR) &&
+         (column.colType != COL_TYPE_DICT));
+
     boost::mutex::scoped_lock lock(fMapMutex);
 
     RowExtMap::const_iterator iter = fMap.begin();
@@ -178,7 +195,7 @@ void ColExtInf::getCPInfoForBRM( bool bIsChar, BRMReporter& brmReporter )
             std::ostringstream oss;
             oss << "Saving CP  update for OID-" << fColOid <<
                    "; lbid-"   << iter->second.fLbid <<
-                   "; isChar-" << bIsChar            <<
+                   "; type-"   << bIsChar            <<
                    "; isNew-"  << iter->second.fNewExtent;
             if (bIsChar)
             {
@@ -191,9 +208,14 @@ void ColExtInf::getCPInfoForBRM( bool bIsChar, BRMReporter& brmReporter )
                 oss << "; minVal: " << minVal << "; (" << minValStr << ")"
                     << "; maxVal: " << maxVal << "; (" << maxValStr << ")";
             }
+            else if (isUnsigned(column.dataType))
+            {
+                oss << "; min: "    << static_cast<uint64_t>(minVal)  <<
+                       "; max: "    << static_cast<uint64_t>(maxVal);
+            }
             else
             {
-                oss << "; min: "    << minVal  <<
+                oss << "; min: "    << minVal <<
                        "; max: "    << maxVal;
             }
 
@@ -204,8 +226,8 @@ void ColExtInf::getCPInfoForBRM( bool bIsChar, BRMReporter& brmReporter )
         cpInfoMerge.startLbid = iter->second.fLbid;
         cpInfoMerge.max       = maxVal;
         cpInfoMerge.min       = minVal;
-        cpInfoMerge.seqNum    = -1;
-        cpInfoMerge.isChar    = bIsChar;
+        cpInfoMerge.seqNum    = -1;     // Not used by mergeExtentsMaxMin
+        cpInfoMerge.type      = column.dataType;
         cpInfoMerge.newExtent = iter->second.fNewExtent;
         brmReporter.addToCPInfo( cpInfoMerge );
 
@@ -217,10 +239,11 @@ void ColExtInf::getCPInfoForBRM( bool bIsChar, BRMReporter& brmReporter )
 //------------------------------------------------------------------------------
 // Print contents of this object to the log file.
 //------------------------------------------------------------------------------
-void ColExtInf::print( bool bIsChar )
+void ColExtInf::print( const JobColumn& column )
 {
     boost::mutex::scoped_lock lock(fMapMutex);
-
+    bool bIsChar = ((column.weType  == WriteEngine::WR_CHAR) &&
+                    (column.colType != COL_TYPE_DICT));
     std::ostringstream oss;
     oss << "ColExtInf Map for OID: " << fColOid;
     RowExtMap::const_iterator iter = fMap.begin();
@@ -247,6 +270,11 @@ void ColExtInf::print( bool bIsChar )
             maxValStr[sizeof(int64_t)] = '\0';
             oss << "; minVal: " << minVal << "; (" << minValStr << ")"
                 << "; maxVal: " << maxVal << "; (" << maxValStr << ")";
+        }
+        else if (isUnsigned(column.dataType))
+        {
+            oss << "; min: "    << static_cast<uint64_t>(iter->second.fMinVal)  <<
+                   "; max: "    << static_cast<uint64_t>(iter->second.fMaxVal);
         }
         else
         {

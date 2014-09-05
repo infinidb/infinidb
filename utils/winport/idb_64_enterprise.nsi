@@ -1,17 +1,18 @@
 !include "EnvVarUpdate.nsh"
 !include "WordFunc.nsh"
 !include nsDialogs.nsh
-
 Name InfiniDB
+InstallDir c:\Calpont
+InstallDirRegKey HKLM SOFTWARE\Calpont\InfiniDB ""
 OutFile InfiniDB64-ent.exe
 
 !define DISPLAY_URL http://www.calpont.com/
 
-!define DISPLAY_VERSION 3.5.3
-VIAddVersionKey "FileVersion" "3.5.3-1 GA"
-VIProductVersion "3.5.3.0"
+!define DISPLAY_VERSION 3.6
+VIAddVersionKey "FileVersion" "3.6 branch"
+VIProductVersion "3.6.0.0"
 
-VIAddVersionKey "ProductVersion" "${DISPLAY_VERSION} GA"
+VIAddVersionKey "ProductVersion" "${DISPLAY_VERSION} Final"
 VIAddVersionKey "CompanyName" "Calpont Corp."
 VIAddVersionKey "FileDescription" "Calpont InfiniDB Enterprise Windows 64-bit Installer"
 VIAddVersionKey "LegalCopyright" "Copyright (c) 2010-2013"
@@ -30,13 +31,6 @@ Var ApndSysPathChoice
 
 Section
 
-userInfo::getAccountType
-pop $0
-StrCmp $0 "Admin" AdminOK
-MessageBox MB_ICONSTOP "Administrator privileges are required to install InfiniDB"
-Abort
-AdminOK:
-
 ExecWait 'sc.exe stop InfiniDB'
 IfFileExists $INSTDIR\bin\svcwait.bat 0 PreInstStopped1
 ClearErrors
@@ -53,10 +47,10 @@ PreInstStopped2:
 SetOutPath $INSTDIR
 WriteUninstaller $INSTDIR\uninstall.exe
 IfFileExists $INSTDIR\my.ini 0 MyIniNotExists
-File /oname=$INSTDIR\my_dist.ini C:\InfiniDB\src\utils\winport\my.ini
+File /oname=$INSTDIR\my_dist.ini C:\InfiniDB\genii\utils\winport\my.ini
 Goto MyIniExists
 MyIniNotExists:
-File C:\InfiniDB\src\utils\winport\my.ini
+File C:\InfiniDB\genii\utils\winport\my.ini
 MyIniExists:
 SetOutPath $INSTDIR\bin
 File C:\InfiniDB\x64\EnterpriseRelease\clearShm.exe
@@ -118,10 +112,11 @@ File C:\InfiniDB\libxml2-2.7.6\libxml2.dll
 File C:\InfiniDB\vcredist_x64.exe
 
 File C:\InfiniDB\x64\EnterpriseRelease\bootstrap.exe
-File C:\InfiniDB\src\utils\winport\svcwait.bat
-File C:\InfiniDB\src\utils\winport\idbsvsta.bat
-File C:\InfiniDB\src\utils\winport\idbsvsto.bat
-File C:\InfiniDB\src\utils\winport\idbmysql.bat
+File C:\InfiniDB\genii\utils\winport\svcwait.bat
+File C:\InfiniDB\genii\utils\winport\idbsvsta.bat
+File C:\InfiniDB\genii\utils\winport\idbsvsto.bat
+File C:\InfiniDB\genii\utils\winport\idbmysql.bat
+File C:\InfiniDB\genii\tools\calpontSupport\calpontSupport.bat
 
 SetOutPath $INSTDIR\bulk\data\import
 SetOutPath $INSTDIR\bulk\job
@@ -129,20 +124,21 @@ SetOutPath $INSTDIR\bulk\log
 SetOutPath $INSTDIR\data1
 SetOutPath $INSTDIR\dbrm
 SetOutPath $INSTDIR\etc
-File C:\InfiniDB\src\utils\winport\win_setup_mysql_part1.sql
-File C:\InfiniDB\src\utils\winport\win_setup_mysql_part2.sql
-File C:\InfiniDB\src\utils\winport\win_setup_mysql_part3.sql
-File C:\InfiniDB\src\utils\winport\win_setup_mysql_part3.1.sql
-File C:\InfiniDB\src\utils\winport\win_setup_mysql_part4.sql
-File C:\InfiniDB\src\utils\winport\win_setup_mysql_part5.sql
+File C:\InfiniDB\genii\utils\winport\win_setup_mysql_part1.sql
+File C:\InfiniDB\genii\utils\winport\win_setup_mysql_part2.sql
+File C:\InfiniDB\genii\utils\winport\win_setup_mysql_part3.sql
+File C:\InfiniDB\genii\utils\winport\win_setup_mysql_part3.1.sql
+File C:\InfiniDB\genii\utils\winport\win_setup_mysql_part4.sql
+File C:\InfiniDB\genii\utils\winport\win_setup_mysql_part5.sql
+File C:\InfiniDB\genii\utils\winport\CalpontVersion.txt
 IfFileExists $INSTDIR\etc\Calpont.xml 0 CfgNotExists
-File /oname=$INSTDIR\etc\Calpont_dist.xml C:\InfiniDB\src\utils\winport\Calpont.xml
+File /oname=$INSTDIR\etc\Calpont_dist.xml C:\InfiniDB\genii\utils\winport\Calpont.xml
 Goto CfgExists
 CfgNotExists:
-File C:\InfiniDB\src\utils\winport\Calpont.xml
+File C:\InfiniDB\genii\utils\winport\Calpont.xml
 CfgExists:
-File C:\InfiniDB\src\utils\loggingcpp\ErrorMessage.txt
-File C:\InfiniDB\src\utils\loggingcpp\MessageFile.txt
+File C:\InfiniDB\genii\utils\loggingcpp\ErrorMessage.txt
+File C:\InfiniDB\genii\utils\loggingcpp\MessageFile.txt
 SetOutPath $INSTDIR\log
 SetOutPath $INSTDIR\local
 SetOutPath $INSTDIR\mysqldb
@@ -174,10 +170,10 @@ File /r C:\InfiniDB\mysql-5.1.39\sql\share\swedish
 File /r C:\InfiniDB\mysql-5.1.39\sql\share\ukrainian
 SetOutPath $INSTDIR\tmp
 SetOutPath $INSTDIR\sql
-File C:\InfiniDB\src\dbcon\mysql\dumpcat_mysql.sql
-File C:\InfiniDB\src\dbcon\mysql\calsetuserpriority.sql
-File C:\InfiniDB\src\dbcon\mysql\calremoveuserpriority.sql
-File C:\InfiniDB\src\dbcon\mysql\calshowprocesslist.sql
+File C:\InfiniDB\genii\dbcon\mysql\dumpcat_mysql.sql
+File C:\InfiniDB\genii\dbcon\mysql\calsetuserpriority.sql
+File C:\InfiniDB\genii\dbcon\mysql\calremoveuserpriority.sql
+File C:\InfiniDB\genii\dbcon\mysql\calshowprocesslist.sql
 
 WriteRegStr HKLM Software\Calpont\InfiniDB "" $INSTDIR
 WriteRegStr HKLM Software\Calpont\InfiniDB "CalpontHome" $INSTDIR\etc
@@ -311,6 +307,7 @@ Delete $INSTDIR\bin\svcwait.bat
 Delete $INSTDIR\bin\idbsvsta.bat
 Delete $INSTDIR\bin\idbsvsto.bat
 Delete $INSTDIR\bin\idbmysql.bat
+Delete $INSTDIR\bin\calpontSupport.bat
 Delete $INSTDIR\bin\ha_archive.dll
 Delete $INSTDIR\bin\ha_federated.dll
 Delete $INSTDIR\bin\ha_innodb_plugin.dll
@@ -370,9 +367,28 @@ SectionEnd
 Function .onInit
 SetRegView 64
 ClearErrors
-ReadRegStr $INSTDIR HKLM Software\Calpont\InfiniDB ""
-IfErrors 0 GotInstDir
-StrCpy $INSTDIR C:\Calpont
+userInfo::getAccountType
+pop $0
+StrCmp $0 "Admin" AdminOK
+MessageBox MB_ICONSTOP "Administrator privileges are required to install InfiniDB"
+Abort
+AdminOK:
+#set up defaults for these things we ask the user about.
+StrCpy $PortChoice "3306"
+StrCpy $SvcModeChoice "auto"
+StrCpy $ApndSysPathChoice "yes"
+# We need to run the 32 bit version of NSIS until the 8K string patch is available for
+# the 64 bit release.
+# Since we're running the 32 bit version, InstallDirRegKey looks in the wrong place
+# because Windows 64 silently puts all the 32 bit registry stuff in Wow6432Node, which
+# is where InstallDirRegKey looks. But we don't put our stuff there.
+# For some reason, NSIS won't let SetRegView (which would fix the problem) run until after
+# InstallDirRegKey is run. Hence this hack to get our install directory from the registry
+SetRegView 64
+ClearErrors
+ReadRegStr $0 HKLM Software\Calpont\InfiniDB ""
+IfErrors GotInstDir
+StrCpy $INSTDIR $0
 GotInstDir:
 FunctionEnd
 
@@ -406,12 +422,10 @@ FunctionEnd
 Function nsDialogsPageLeave
 
 	${NSD_GetText} $Port $PortChoice
-	StrCpy $SvcModeChoice "auto"
 	${NSD_GetState} $SvcMode $9
 	StrCmp $9 ${BST_UNCHECKED} 0 ModeChecked
 	StrCpy $SvcModeChoice "demand"
 ModeChecked:
-	StrCpy $ApndSysPathChoice "yes"
 	${NSD_GetState} $ApndSysPath $9
 	StrCmp $9 ${BST_UNCHECKED} 0 AppendChecked
 	StrCpy $ApndSysPathChoice "no"
@@ -419,7 +433,6 @@ AppendChecked:
 
 FunctionEnd
 
-InstallDir $INSTDIR
 Page directory
 Page custom nsDialogsPage nsDialogsPageLeave
 Page instfiles

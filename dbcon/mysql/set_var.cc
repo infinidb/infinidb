@@ -505,6 +505,9 @@ static sys_var_thd_ulong	sys_infinidb_compression_type(&vars, "infinidb_compress
 					       &SV::infinidb_compression_type);
 static sys_var_thd_bool sys_infinidb_varbin_always_hex(&vars, "infinidb_varbin_always_hex",
 					       &SV::infinidb_varbin_always_hex);
+static sys_var_thd_bool sys_infinidb_double_for_decimal_math(&vars,
+							"infinidb_double_for_decimal_math",
+						   &SV::infinidb_double_for_decimal_math);
 /* InfiniDB */
 static sys_var_thd_ulong	sys_div_precincrement(&vars, "div_precision_increment",
                                               &SV::div_precincrement);

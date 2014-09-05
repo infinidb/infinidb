@@ -25,17 +25,11 @@
 	copy
     olddir /usr/local/Calpont/etc/
 }
-/var/log/Calpont/prat/pslog {
-    missingok
-    rotate 7
-    daily
-    copytruncate
-}
 /usr/local/Calpont/mysql/db/*.err {
     missingok
     rotate 7
     daily
     dateext
 	copytruncate
-    olddir /usr/local/Calpont/mysql/db/archive
+    olddir /usr/local/Calpont/mysql/db
 }

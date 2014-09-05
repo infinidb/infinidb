@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: func_cast.cpp 3274 2012-09-12 21:40:47Z bwilkinson $
+//  $Id: func_cast.cpp 3616 2013-03-04 14:56:29Z rdempsey $
 
 
 #include <string>
@@ -44,7 +44,13 @@ using namespace dataconvert;
 namespace funcexp
 {
 
+// Why isn't "return resultType" the base default behavior? 
 CalpontSystemCatalog::ColType Func_cast_signed::operationType( FunctionParm& fp, CalpontSystemCatalog::ColType& resultType )
+{
+	return resultType;
+}
+
+CalpontSystemCatalog::ColType Func_cast_unsigned::operationType( FunctionParm& fp, CalpontSystemCatalog::ColType& resultType )
 {
 	return resultType;
 }
@@ -90,8 +96,20 @@ int64_t Func_cast_signed::getIntVal(Row& row,
 		}
 		break;
 
+        case execplan::CalpontSystemCatalog::UBIGINT:
+        case execplan::CalpontSystemCatalog::UINT:
+        case execplan::CalpontSystemCatalog::UMEDINT:
+        case execplan::CalpontSystemCatalog::UTINYINT:
+        case execplan::CalpontSystemCatalog::USMALLINT:
+        {
+            return (int64_t) parm[0]->data()->getUintVal(row, isNull);
+        }
+        break;
+
 		case execplan::CalpontSystemCatalog::FLOAT:
+        case execplan::CalpontSystemCatalog::UFLOAT:
 		case execplan::CalpontSystemCatalog::DOUBLE:
+        case execplan::CalpontSystemCatalog::UDOUBLE:
 		{
 			double value = parm[0]->data()->getDoubleVal(row, isNull);
 			if (value > 0)
@@ -123,14 +141,127 @@ int64_t Func_cast_signed::getIntVal(Row& row,
 		break;
 
 		case execplan::CalpontSystemCatalog::DECIMAL:
+        case execplan::CalpontSystemCatalog::UDECIMAL:
 		{
 			IDB_Decimal d = parm[0]->data()->getDecimalVal(row, isNull);
-			int64_t value = d.value / power(d.scale);
-			int lefto = (d.value - value * power(d.scale)) / power(d.scale-1);
+			int64_t value = d.value / helpers::power(d.scale);
+			int lefto = (d.value - value * helpers::power(d.scale)) / helpers::power(d.scale-1);
 			if ( value >= 0 && lefto > 4 )
 				value++;
 			if ( value < 0 && lefto < -4 )
 				value--;
+			return value;
+		}
+		break;
+
+		case execplan::CalpontSystemCatalog::DATE:
+		{
+			int64_t time = parm[0]->data()->getDateIntVal(row, isNull);
+
+			Date d(time);
+			return d.convertToMySQLint();
+		}
+		break;
+
+		case execplan::CalpontSystemCatalog::DATETIME:
+		{
+			int64_t time = parm[0]->data()->getDatetimeIntVal(row, isNull);
+
+			// @bug 4703 need to include year
+			DateTime dt(time);
+			return dt.convertToMySQLint();
+		}
+		break;
+
+		default:
+		{
+			std::ostringstream oss;
+			oss << "cast: datatype of " << execplan::colDataTypeToString(operationColType.colDataType);
+			throw logging::IDBExcept(oss.str(), ERR_DATATYPE_NOT_SUPPORT);
+		}
+	}
+	return 0;
+}
+
+
+//
+//	Func_cast_unsigned
+//
+uint64_t Func_cast_unsigned::getUintVal(Row& row,
+								  	  FunctionParm& parm,
+									  bool& isNull,
+									  CalpontSystemCatalog::ColType& operationColType)
+{
+
+	switch (parm[0]->data()->resultType().colDataType)
+	{
+		case execplan::CalpontSystemCatalog::BIGINT:
+		case execplan::CalpontSystemCatalog::INT:
+		case execplan::CalpontSystemCatalog::MEDINT:
+		case execplan::CalpontSystemCatalog::TINYINT:
+		case execplan::CalpontSystemCatalog::SMALLINT:
+		{
+			return (int64_t) parm[0]->data()->getUintVal(row, isNull);
+		}
+		break;
+
+        case execplan::CalpontSystemCatalog::UBIGINT:
+        case execplan::CalpontSystemCatalog::UINT:
+        case execplan::CalpontSystemCatalog::UMEDINT:
+        case execplan::CalpontSystemCatalog::UTINYINT:
+        case execplan::CalpontSystemCatalog::USMALLINT:
+        {
+            return parm[0]->data()->getUintVal(row, isNull);
+        }
+        break;
+
+		case execplan::CalpontSystemCatalog::FLOAT:
+        case execplan::CalpontSystemCatalog::UFLOAT:
+		case execplan::CalpontSystemCatalog::DOUBLE:
+        case execplan::CalpontSystemCatalog::UDOUBLE:
+		{
+			double value = parm[0]->data()->getDoubleVal(row, isNull);
+			if (value > 0)
+				value += 0.5;
+			else if (value < 0)
+				value -= 0.5;
+
+			uint64_t ret = (uint64_t) value;
+			if (value > (double) numeric_limits<uint64_t>::max()-2)
+				ret = numeric_limits<int64_t>::max();
+			else if (value < 0)
+				ret = 0;
+
+			return ret;
+		}
+		break;
+
+		case execplan::CalpontSystemCatalog::VARCHAR:
+		case execplan::CalpontSystemCatalog::CHAR:
+		{
+			string value = parm[0]->data()->getStrVal(row, isNull);
+			if (isNull)
+			{
+				isNull = true;
+				return 0;
+			}
+            uint64_t ret = strtoul(value.c_str(), 0, 0);
+			return ret;
+		}
+		break;
+
+		case execplan::CalpontSystemCatalog::DECIMAL:
+        case execplan::CalpontSystemCatalog::UDECIMAL:
+		{
+			IDB_Decimal d = parm[0]->data()->getDecimalVal(row, isNull);
+            if (d.value < 0)
+            {
+                return 0;
+            }
+			uint64_t value = d.value / helpers::power(d.scale);
+			int lefto = (d.value - value * helpers::power(d.scale)) / helpers::power(d.scale-1);
+			if ( value >= 0 && lefto > 4 )
+				value++;
 			return value;
 		}
 		break;
@@ -199,7 +330,21 @@ string Func_cast_char::getStrVal(Row& row,
 		}
 		break;
 
-		case execplan::CalpontSystemCatalog::DOUBLE:
+        case execplan::CalpontSystemCatalog::UBIGINT:
+        case execplan::CalpontSystemCatalog::UINT:
+        case execplan::CalpontSystemCatalog::UMEDINT:
+        case execplan::CalpontSystemCatalog::UTINYINT:
+        case execplan::CalpontSystemCatalog::USMALLINT:
+        {
+            ostringstream oss;
+            oss << parm[0]->data()->getUintVal(row, isNull);
+            string value = oss.str();
+            return value.substr(0,length);
+        }
+        break;
+
+        case execplan::CalpontSystemCatalog::DOUBLE:
+		case execplan::CalpontSystemCatalog::UDOUBLE:
 		{
 			ostringstream oss;
 			oss << parm[0]->data()->getDoubleVal(row, isNull);
@@ -209,6 +354,7 @@ string Func_cast_char::getStrVal(Row& row,
 		break;
 
 		case execplan::CalpontSystemCatalog::FLOAT:
+        case execplan::CalpontSystemCatalog::UFLOAT:
 		{
 			ostringstream oss;
 			oss << parm[0]->data()->getFloatVal(row, isNull);
@@ -231,12 +377,13 @@ string Func_cast_char::getStrVal(Row& row,
 		break;
 
 		case execplan::CalpontSystemCatalog::DECIMAL:
+        case execplan::CalpontSystemCatalog::UDECIMAL:
 		{
 			IDB_Decimal d = parm[0]->data()->getDecimalVal(row, isNull);
 
 			char buf[80];
 
-			dataconvert::DataConvert::decimalToString( d.value, d.scale, buf, 80);
+			dataconvert::DataConvert::decimalToString( d.value, d.scale, buf, 80, parm[0]->data()->resultType().colDataType);
 
 			string sbuf = buf;
 			return sbuf.substr(0,length);
@@ -354,6 +501,11 @@ int32_t Func_cast_date::getDateIntVal(rowgroup::Row& row,
 		case execplan::CalpontSystemCatalog::MEDINT:
 		case execplan::CalpontSystemCatalog::TINYINT:
 		case execplan::CalpontSystemCatalog::SMALLINT:
+        case execplan::CalpontSystemCatalog::UBIGINT:
+        case execplan::CalpontSystemCatalog::UINT:
+        case execplan::CalpontSystemCatalog::UMEDINT:
+        case execplan::CalpontSystemCatalog::UTINYINT:
+        case execplan::CalpontSystemCatalog::USMALLINT:
 		{
 			val = dataconvert::DataConvert::intToDate(parm[0]->data()->getIntVal(row, isNull));
 			if (val == -1)
@@ -363,6 +515,7 @@ int32_t Func_cast_date::getDateIntVal(rowgroup::Row& row,
 			break;
 		}
 		case execplan::CalpontSystemCatalog::DECIMAL:
+        case execplan::CalpontSystemCatalog::UDECIMAL:
 		{
 			if (parm[0]->data()->resultType().scale != 0)
 			{
@@ -417,6 +570,11 @@ int64_t Func_cast_date::getDatetimeIntVal(rowgroup::Row& row,
 		case execplan::CalpontSystemCatalog::MEDINT:
 		case execplan::CalpontSystemCatalog::TINYINT:
 		case execplan::CalpontSystemCatalog::SMALLINT:
+        case execplan::CalpontSystemCatalog::UBIGINT:
+        case execplan::CalpontSystemCatalog::UINT:
+        case execplan::CalpontSystemCatalog::UMEDINT:
+        case execplan::CalpontSystemCatalog::UTINYINT:
+        case execplan::CalpontSystemCatalog::USMALLINT:
 		{
 			val = dataconvert::DataConvert::intToDatetime(parm[0]->data()->getIntVal(row, isNull));
 			if (val == -1)
@@ -425,7 +583,8 @@ int64_t Func_cast_date::getDatetimeIntVal(rowgroup::Row& row,
 				return val;
 			break;
 		}
-		case execplan::CalpontSystemCatalog::DECIMAL:
+        case execplan::CalpontSystemCatalog::DECIMAL:
+		case execplan::CalpontSystemCatalog::UDECIMAL:
 		{
 			if (parm[0]->data()->resultType().scale != 0)
 			{
@@ -547,6 +706,11 @@ int64_t Func_cast_datetime::getDatetimeIntVal(rowgroup::Row& row,
 		case execplan::CalpontSystemCatalog::MEDINT:
 		case execplan::CalpontSystemCatalog::TINYINT:
 		case execplan::CalpontSystemCatalog::SMALLINT:
+        case execplan::CalpontSystemCatalog::UBIGINT:
+        case execplan::CalpontSystemCatalog::UINT:
+        case execplan::CalpontSystemCatalog::UMEDINT:
+        case execplan::CalpontSystemCatalog::UTINYINT:
+        case execplan::CalpontSystemCatalog::USMALLINT:
 		{
 			val = dataconvert::DataConvert::intToDatetime(parm[0]->data()->getIntVal(row, isNull));
 			if (val == -1)
@@ -556,6 +720,7 @@ int64_t Func_cast_datetime::getDatetimeIntVal(rowgroup::Row& row,
 			break;
 		}
 		case execplan::CalpontSystemCatalog::DECIMAL:
+        case execplan::CalpontSystemCatalog::UDECIMAL:
 		{
 			if (parm[0]->data()->resultType().scale)
 			{
@@ -613,7 +778,7 @@ int64_t Func_cast_decimal::getIntVal(Row& row,
 				isNull,
 				operationColType);
 
-	return (int64_t) decimal.value/powerOf10_c[decimal.scale];
+	return (int64_t) decimal.value/helpers::powerOf10_c[decimal.scale];
 }
 
 
@@ -629,7 +794,7 @@ string Func_cast_decimal::getStrVal(Row& row,
 
 	char buf[80];
 
-	dataconvert::DataConvert::decimalToString( decimal.value, decimal.scale, buf, 80);
+	dataconvert::DataConvert::decimalToString( decimal.value, decimal.scale, buf, 80, operationColType.colDataType);
 
 	string value = buf;
 	return value;
@@ -652,7 +817,7 @@ IDB_Decimal Func_cast_decimal::getDecimalVal(Row& row,
 	if (max_length > 18 || max_length <= 0)
 		max_length = 18;
 
-	int64_t max_number_decimal = maxNumber_c[max_length];
+	int64_t max_number_decimal = helpers::maxNumber_c[max_length];
 
 	switch (parm[0]->data()->resultType().colDataType)
 	{
@@ -664,7 +829,7 @@ IDB_Decimal Func_cast_decimal::getDecimalVal(Row& row,
 		{
 			decimal.value = parm[0]->data()->getIntVal(row, isNull);
 			decimal.scale = 0;
-			int64_t value = decimal.value * powerOf10_c[decimals];
+			int64_t value = decimal.value * helpers::powerOf10_c[decimals];
 
 			if ( value > max_number_decimal )
 			{
@@ -679,14 +844,39 @@ IDB_Decimal Func_cast_decimal::getDecimalVal(Row& row,
 		}
 		break;
 
-		case execplan::CalpontSystemCatalog::DOUBLE:
+        case execplan::CalpontSystemCatalog::UBIGINT:
+        case execplan::CalpontSystemCatalog::UINT:
+        case execplan::CalpontSystemCatalog::UMEDINT:
+        case execplan::CalpontSystemCatalog::UTINYINT:
+        case execplan::CalpontSystemCatalog::USMALLINT:
+        {
+            uint64_t uval = parm[0]->data()->getUintVal(row, isNull);
+            if (uval > (uint64_t)numeric_limits<int64_t>::max())
+            {
+                uval = numeric_limits<int64_t>::max();
+            }
+            decimal.value = uval;
+            decimal.scale = 0;
+            int64_t value = decimal.value * helpers::powerOf10_c[decimals];
+
+            if ( value > max_number_decimal )
+            {
+                decimal.value = max_number_decimal;
+                decimal.scale = decimals;
+            }
+        }
+        break;
+
+        case execplan::CalpontSystemCatalog::DOUBLE:
+        case execplan::CalpontSystemCatalog::UDOUBLE:
 		case execplan::CalpontSystemCatalog::FLOAT:
+		case execplan::CalpontSystemCatalog::UFLOAT:
 		{
 			double value = parm[0]->data()->getDoubleVal(row, isNull);
 			if (value > 0)
-				decimal.value = (int64_t) (value * powerOf10_c[decimals] + 0.5);
+				decimal.value = (int64_t) (value * helpers::powerOf10_c[decimals] + 0.5);
 			else if (value < 0)
-				decimal.value = (int64_t) (value * powerOf10_c[decimals] - 0.5);
+				decimal.value = (int64_t) (value * helpers::powerOf10_c[decimals] - 0.5);
 			else
 				decimal.value = 0;
 			decimal.scale = decimals;
@@ -699,16 +889,17 @@ IDB_Decimal Func_cast_decimal::getDecimalVal(Row& row,
 		break;
 
 		case execplan::CalpontSystemCatalog::DECIMAL:
+        case execplan::CalpontSystemCatalog::UDECIMAL:
 		{
 			decimal = parm[0]->data()->getDecimalVal(row, isNull);
 			
 			
 			if (decimals > decimal.scale)
-				decimal.value *= powerOf10_c[decimals-decimal.scale];
+				decimal.value *= helpers::powerOf10_c[decimals-decimal.scale];
 			else 
 				decimal.value = (int64_t)(decimal.value > 0 ? 
-				            (double)decimal.value/powerOf10_c[decimal.scale-decimals] + 0.5 :
-			              (double)decimal.value/powerOf10_c[decimal.scale-decimals] - 0.5);
+				            (double)decimal.value/helpers::powerOf10_c[decimal.scale-decimals] + 0.5 :
+			              (double)decimal.value/helpers::powerOf10_c[decimal.scale-decimals] - 0.5);
 			decimal.scale = decimals;
 
 
@@ -733,9 +924,9 @@ IDB_Decimal Func_cast_decimal::getDecimalVal(Row& row,
 
 			double value = strtod(strValue.c_str(), 0);
 			if (value > 0)
-				decimal.value = (int64_t) (value * powerOf10_c[decimals] + 0.5);
+				decimal.value = (int64_t) (value * helpers::powerOf10_c[decimals] + 0.5);
 			else if (value < 0)
-				decimal.value = (int64_t) (value * powerOf10_c[decimals] - 0.5);
+				decimal.value = (int64_t) (value * helpers::powerOf10_c[decimals] - 0.5);
 			else
 				decimal.value = 0;
 			decimal.scale = decimals;
@@ -800,7 +991,7 @@ double Func_cast_decimal::getDoubleVal(Row& row,
 				isNull,
 				operationColType);
 
-	return (double) decimal.value/powerOf10_c[decimal.scale];
+	return (double) decimal.value/helpers::powerOf10_c[decimal.scale];
 }
 
 

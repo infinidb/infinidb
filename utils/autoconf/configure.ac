@@ -131,7 +131,7 @@ AC_SUBST([netsnmp_libs], [' '])
 
 AC_SUBST([idb_common_libs], ['-lmessageqcpp -lloggingcpp -lconfigcpp -lidbboot -lboost_idb -lxml2 -lpthread -lrt'])
 AC_SUBST([idb_oam_libs], ['-loamcpp -lsnmpmanager ${netsnmp_libs}'])
-AC_SUBST([idb_brm_libs], ['-lbrm -lrwlock -lcacheutils ${idb_oam_libs} ${idb_common_libs}'])
+AC_SUBST([idb_brm_libs], ['-lbrm -lcacheutils -lrwlock ${idb_oam_libs} ${idb_common_libs}'])
 AC_SUBST([idb_exec_libs], ['-ljoblist -lexecplan -ljoiner -lrowgroup -lmulticast -lfuncexp -ldataconvert -lcommon -lmysqlcl_idb -lquerystats ${idb_brm_libs}'])
 AC_SUBST([idb_write_libs], ['-lddlpackageproc -lddlpackage -ldmlpackageproc -ldmlpackage -lwriteengine -lwriteengineclient -lcacheutils ${idb_exec_libs}'])
 AC_SUBST([idb_common_includes], ['-I${prefix}/Calpont/include -I/usr/local/include -I/usr/local/include/libxml2 -I/usr/include/libxml2'])
@@ -169,7 +169,6 @@ AC_CONFIG_FILES([
 	dbcon/execplan/Makefile
 	dbcon/joblist/Makefile
 	dbcon/mysql/Makefile
-	dbcon/sm/Makefile
 	dmlproc/Makefile
 	oam/Makefile
 	oam/etc/Makefile

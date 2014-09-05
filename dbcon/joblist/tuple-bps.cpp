@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: tuple-bps.cpp 9469 2013-05-01 18:38:43Z pleblanc $
+//  $Id: tuple-bps.cpp 9308 2013-03-13 18:08:40Z pleblanc $
 
 
 #include <unistd.h>
@@ -36,6 +36,7 @@ using namespace boost;
 #include "bpp-jl.h"
 #include "distributedenginecomm.h"
 #include "elementtype.h"
+#include "jlf_common.h"
 #include "primitivestep.h"
 #include "unique32generator.h"
 using namespace joblist;
@@ -110,11 +111,11 @@ struct TupleBPSPrimitive
 		catch(std::exception& re) {
 			cerr << "TupleBPS: send thread threw an exception: " << re.what() << 
 			  "\t" << this << endl;
-			catchHandler(re.what());
+			catchHandler(re.what(), ERR_TUPLE_BPS, fBatchPrimitiveStep->errorInfo());
 		}
 		catch(...) {
 			string msg("TupleBPS: send thread threw an unknown exception ");
-			catchHandler(msg);
+			catchHandler(msg, ERR_TUPLE_BPS, fBatchPrimitiveStep->errorInfo());
 			cerr << msg << this << endl;
 		}
 	}
@@ -135,12 +136,12 @@ struct TupleBPSAggregators
 		}
 		catch(std::exception& re) {
 			cerr << fBatchPrimitiveStepCols->toString() << ": receive thread threw an exception: " << re.what() << endl;
-			catchHandler(re.what());
+			catchHandler(re.what(), ERR_TUPLE_BPS, fBatchPrimitiveStepCols->errorInfo());
 		}
 		catch(...) {
 			string msg("TupleBPS: recv thread threw an unknown exception ");
 			cerr << fBatchPrimitiveStepCols->toString() << msg << endl;
-			catchHandler(msg);
+			catchHandler(msg, ERR_TUPLE_BPS, fBatchPrimitiveStepCols->errorInfo());
 		}
 	}
 };
@@ -174,16 +175,13 @@ void TupleBPS::initializeConfigParms()
 	fProducerThread.reset(new SPTHD[fNumThreads]);
 }
 
-TupleBPS::TupleBPS(const pColStep& rhs) : fRm(rhs.fRm)
+TupleBPS::TupleBPS(const pColStep& rhs, const JobInfo& jobInfo) :
+	BatchPrimitive(jobInfo), fRm(jobInfo.rm)
 {
 	fInputJobStepAssociation = rhs.inputAssociation();
 	fOutputJobStepAssociation = rhs.outputAssociation();
 	fDec = 0;
 	fSessionId = rhs.sessionId();
-	fTxnId = rhs.txnId();
-	fVerId = rhs.verId();
-	fStepId = rhs.stepId();
-	fStatementId = rhs.statementId();
 	fFilterCount = rhs.filterCount();
 	fFilterString = rhs.filterString();
 	isFilterFeeder = rhs.getFeederFlag();
@@ -225,7 +223,7 @@ TupleBPS::TupleBPS(const pColStep& rhs) : fRm(rhs.fRm)
 	initializeConfigParms();
 	fBPP->setSessionID(fSessionId);
 	fBPP->setStepID(fStepId);
-	fBPP->setVersionNum(fVerId);
+	fBPP->setQueryContext(fVerId);
 	fBPP->setTxnID(fTxnId);
 	fTraceFlags = rhs.fTraceFlags;
 	fBPP->setTraceFlags(fTraceFlags);
@@ -250,7 +248,6 @@ TupleBPS::TupleBPS(const pColStep& rhs) : fRm(rhs.fRm)
 	// @1098 initialize scanFlags to be true
 	scanFlags.assign(numExtents, true);
 	runtimeCPFlags.assign(numExtents, true);
-	die = false;
 	bop = BOP_AND;
 
 	runRan = joinRan = false;
@@ -259,16 +256,12 @@ TupleBPS::TupleBPS(const pColStep& rhs) : fRm(rhs.fRm)
 //	cout << "TBPSCount = " << ++TBPSCount << endl;
 }
 
-TupleBPS::TupleBPS(const pColScanStep& rhs) : fRm(rhs.fRm)
+TupleBPS::TupleBPS(const pColScanStep& rhs, const JobInfo& jobInfo) :
+	BatchPrimitive(jobInfo), fRm(jobInfo.rm)
 {
 	fInputJobStepAssociation = rhs.inputAssociation();
 	fOutputJobStepAssociation = rhs.outputAssociation();
 	fDec = 0;
-	fSessionId = rhs.sessionId();
-	fTxnId = rhs.txnId();
-	fVerId = rhs.verId();
-	fStepId = rhs.stepId();
-	fStatementId = rhs.statementId();
 	fFilterCount = rhs.filterCount();
 	fFilterString = rhs.filterString();
 	isFilterFeeder = rhs.getFeederFlag();
@@ -308,7 +301,6 @@ TupleBPS::TupleBPS(const pColScanStep& rhs) : fRm(rhs.fRm)
 	fColWidth = fColType.colWidth;
 	lbidList = rhs.lbidList;
 
-	fLogger = rhs.logger();
 	finishedSending = sendWaiting = false;
 	firstRead = true;
 	fSwallowRows = false;
@@ -316,7 +308,7 @@ TupleBPS::TupleBPS(const pColScanStep& rhs) : fRm(rhs.fRm)
 	fBPP.reset(new BatchPrimitiveProcessorJL(fRm));
 	initializeConfigParms();
 	fBPP->setSessionID(fSessionId);
-	fBPP->setVersionNum(fVerId);
+	fBPP->setQueryContext(fVerId);
 	fBPP->setTxnID(fTxnId);
 	fTraceFlags = rhs.fTraceFlags;
 	fBPP->setTraceFlags(fTraceFlags);
@@ -338,7 +330,6 @@ TupleBPS::TupleBPS(const pColScanStep& rhs) : fRm(rhs.fRm)
 	// @1098 initialize scanFlags to be true
 	//scanFlags.assign(numExtents, true);
 	//runtimeCPFlags.assign(numExtents, true);
-	die = false;
 	bop = BOP_AND;
 
 	runRan = joinRan = false;
@@ -348,16 +339,12 @@ TupleBPS::TupleBPS(const pColScanStep& rhs) : fRm(rhs.fRm)
 	initExtentMarkers();
 }
 
-TupleBPS::TupleBPS(const PassThruStep& rhs) : fRm(rhs.fRm)
+TupleBPS::TupleBPS(const PassThruStep& rhs, const JobInfo& jobInfo) :
+	BatchPrimitive(jobInfo), fRm(jobInfo.rm)
 {
 	fInputJobStepAssociation = rhs.inputAssociation();
 	fOutputJobStepAssociation = rhs.outputAssociation();
 	fDec = 0;
-	fSessionId = rhs.sessionId();
-	fTxnId = rhs.txnId();
-	fVerId = rhs.verId();
-	fStepId = rhs.stepId();
-	fStatementId = rhs.statementId();
 	fFilterCount = 0;
 	fOid = rhs.oid();
 	fTableOid = rhs.tableOid();
@@ -384,7 +371,7 @@ TupleBPS::TupleBPS(const PassThruStep& rhs) : fRm(rhs.fRm)
 	initializeConfigParms();
 	fBPP->setSessionID(fSessionId);
 	fBPP->setStepID(fStepId);
-	fBPP->setVersionNum(fVerId);
+	fBPP->setQueryContext(fVerId);
 	fBPP->setTxnID(fTxnId);
 	fTraceFlags = rhs.fTraceFlags;
 	fBPP->setTraceFlags(fTraceFlags);
@@ -410,7 +397,6 @@ TupleBPS::TupleBPS(const PassThruStep& rhs) : fRm(rhs.fRm)
 	// @1098 initialize scanFlags to be true
 	scanFlags.assign(numExtents, true);
 	runtimeCPFlags.assign(numExtents, true);
-	die = false;
 	bop = BOP_AND;
 
 	runRan = joinRan = false;
@@ -419,16 +405,12 @@ TupleBPS::TupleBPS(const PassThruStep& rhs) : fRm(rhs.fRm)
 //	cout << "TBPSCount = " << ++TBPSCount << endl;
 }
 
-TupleBPS::TupleBPS(const pDictionaryStep& rhs) : fRm(rhs.fRm)
+TupleBPS::TupleBPS(const pDictionaryStep& rhs, const JobInfo& jobInfo) :
+	BatchPrimitive(jobInfo), fRm(jobInfo.rm)
 {
 	fInputJobStepAssociation = rhs.inputAssociation();
 	fOutputJobStepAssociation = rhs.outputAssociation();
 	fDec = 0;
-	fSessionId = rhs.sessionId();
-	fTxnId = rhs.txnId();
-	fVerId = rhs.verId();
-	fStepId = rhs.stepId();
-	fStatementId = rhs.statementId();
 	fOid = rhs.oid();
 	fTableOid = rhs.tableOid();
 	msgsSent = 0;
@@ -450,8 +432,6 @@ TupleBPS::TupleBPS(const pDictionaryStep& rhs) : fRm(rhs.fRm)
 	alias(rhs.alias());
 	view(rhs.view());
 	name(rhs.name());
-
-	fLogger = rhs.logger();
 	finishedSending = sendWaiting = false;
 	recvExited = 0;
 	fBPP.reset(new BatchPrimitiveProcessorJL(fRm));
@@ -460,7 +440,7 @@ TupleBPS::TupleBPS(const pDictionaryStep& rhs) : fRm(rhs.fRm)
 //	if (fOid>=3000)
 //		cout << "BPS:initalized from DictionaryStep. fSessionId=" << fSessionId << endl;
 	fBPP->setStepID(fStepId);
-	fBPP->setVersionNum(fVerId);
+	fBPP->setQueryContext(fVerId);
 	fBPP->setTxnID(fTxnId);
 	fTraceFlags = rhs.fTraceFlags;
 	fBPP->setTraceFlags(fTraceFlags);
@@ -480,7 +460,6 @@ TupleBPS::TupleBPS(const pDictionaryStep& rhs) : fRm(rhs.fRm)
 	// @1098 initialize scanFlags to be true
 	scanFlags.assign(numExtents, true);
 	runtimeCPFlags.assign(numExtents, true);
-	die = false;
 	bop = BOP_AND;
 
 	runRan = joinRan = false;
@@ -497,19 +476,19 @@ TupleBPS::~TupleBPS()
 			ByteStream bs;
 			fBPP->destroyBPP(bs);
 			try {
-				fMsgBytesOut += bs.length() * fDec->getPmCount();
 				fDec->write(uniqueID, bs);
 			}
 			catch (const std::exception& e)
 			{
 				// log the exception
 				cerr << "~TupleBPS caught: " << e.what() << endl;
-				catchHandler(e.what());
+				catchHandler(e.what(), ERR_TUPLE_BPS, fErrorInfo, fSessionId);
 			}
 			catch (...)
 			{
 				cerr << "~TupleBPS caught unknown exception" << endl;
-				catchHandler("~TupleBPS caught unknown exception");
+				catchHandler("~TupleBPS caught unknown exception",
+							 ERR_TUPLE_BPS, fErrorInfo, fSessionId);
 			}
 		}
 		fDec->removeQueue(uniqueID);
@@ -776,7 +755,6 @@ void TupleBPS::serializeJoiner()
 #ifdef JLF_DEBUG
 		cout << "serializing joiner into " << bs.length() << " bytes" << endl;
 #endif
-		fMsgBytesOut += bs.length() * fDec->getPmCount();
 		fDec->write(uniqueID, bs);
 		bs.restart();
 	}
@@ -791,7 +769,6 @@ void TupleBPS::serializeJoiner(uint conn)
 		it's not exactly the exit condition*/
 	while (more) {
 		more = fBPP->nextTupleJoinerMsg(bs);
-		fMsgBytesOut += bs.length();
 		fDec->write(bs, conn);
 		bs.restart();
 	}
@@ -810,7 +787,8 @@ void TupleBPS::prepCasualPartitioning()
 			scanFlags[i] = scanFlags[i] && runtimeCPFlags[i];
 			if (scanFlags[i] && lbidList->CasualPartitionDataType(fColType.colDataType,
 					fColType.colWidth))
-				lbidList->GetMinMax(min, max, seq, (int64_t) scannedExtents[i].range.start, &scannedExtents);
+				lbidList->GetMinMax(min, max, seq, (int64_t) scannedExtents[i].range.start, 
+                                    &scannedExtents, fColType.colDataType);
 		}
 		else
 			scanFlags[i] = true;
@@ -967,18 +945,14 @@ void TupleBPS::run()
 		ostringstream os;
 		os << "TupleBPS: Could not get a consistent extent count for each column.  Got '"
 				<< e.what() << "'\n";
-		catchHandler(os.str());
-		if (fOutputJobStepAssociation.status() == 0)
-			fOutputJobStepAssociation.status(ERR_TUPLE_BPS);
+		catchHandler(os.str(), ERR_TUPLE_BPS, fErrorInfo, fSessionId);
 		fOutputJobStepAssociation.outAt(0)->rowGroupDL()->endOfInput();
 		return;
-
 	}
 
 	if (retryCounter == retryMax) {
-		catchHandler("TupleBPS: Could not get a consistent extent count for each column.");
-		if (fOutputJobStepAssociation.status() == 0)
-			fOutputJobStepAssociation.status(ERR_TUPLE_BPS);
+		catchHandler("TupleBPS: Could not get a consistent extent count for each column.",
+					 ERR_TUPLE_BPS, fErrorInfo, fSessionId);
 		fOutputJobStepAssociation.outAt(0)->rowGroupDL()->endOfInput();
 		return;
 	}
@@ -1023,7 +997,6 @@ void TupleBPS::run()
 		fDec->addDECEventListener(this);
 		fBPP->priority(priority());
 		fBPP->createBPP(bs);
-		fMsgBytesOut += bs.length() * fDec->getPmCount();
 		fDec->write(uniqueID, bs);
 		BPPIsAllocated = true;
 		if (doJoin && tjoiners[0]->inPM())
@@ -1038,17 +1011,14 @@ void TupleBPS::run()
 	{
 		// log the exception
 		cerr << "tuple-bps::run() caught: " << e.what() << endl;
-		catchHandler(e.what());
-		if (fOutputJobStepAssociation.status() == 0)
-			fOutputJobStepAssociation.status(ERR_TUPLE_BPS);
+		catchHandler(e.what(), ERR_TUPLE_BPS, fErrorInfo, fSessionId);
 		fOutputJobStepAssociation.outAt(0)->rowGroupDL()->endOfInput();
 	}
 	catch (...)
 	{
 		cerr << "tuple-bps::run() caught unknown exception" << endl;
-		catchHandler("tuple-bps::run() caught unknown exception");
-		if (fOutputJobStepAssociation.status() == 0)
-			fOutputJobStepAssociation.status(ERR_TUPLE_BPS);
+		catchHandler("tuple-bps::run() caught unknown exception",
+					 ERR_TUPLE_BPS, fErrorInfo, fSessionId);
 		fOutputJobStepAssociation.outAt(0)->rowGroupDL()->endOfInput();
 	}
 }
@@ -1085,19 +1055,19 @@ void TupleBPS::join()
 			fBPP->destroyBPP(bs);
 
 			try {
-				fMsgBytesOut += bs.length() * fDec->getPmCount();
 				fDec->write(uniqueID, bs);
 			}
 			catch (const std::exception& e)
 			{
 				// log the exception
 				cerr << "tuple-bps::join() write(bs) caught: " << e.what() << endl;
-				catchHandler(e.what());
+				catchHandler(e.what(), ERR_TUPLE_BPS, fErrorInfo, fSessionId);
 			}
 			catch (...)
 			{
 				cerr << "tuple-bps::join() write(bs) caught unknown exception" << endl;
-				catchHandler("tuple-bps::join() write(bs) caught unknown exception");
+				catchHandler("tuple-bps::join() write(bs) caught unknown exception",
+							 ERR_TUPLE_BPS, fErrorInfo, fSessionId);
 			}
 
 			BPPIsAllocated = false;
@@ -1113,13 +1083,12 @@ void TupleBPS::sendError(uint16_t status)
 	fBPP->setCount(1);
 	fBPP->setStatus(status);
 	fBPP->runErrorBPP(msgBpp);
-	fMsgBytesOut += msgBpp.lengthWithHdrOverhead();
 	try {
 		fDec->write(uniqueID, msgBpp);
 	}
 	catch(...) {
 		// this fcn is only called in exception handlers
-		// let the first error take precidence
+		// let the first error take precedence
 	}
 	fMsgBppsToPm++;
 	fBPP->reset();
@@ -1151,25 +1120,24 @@ uint TupleBPS::nextBand(messageqcpp::ByteStream &bs)
 again:
 try
 {
-	while (msgsRecvd == msgsSent && !finishedSending &&
-	  !fInputJobStepAssociation.status())
+	while (msgsRecvd == msgsSent && !finishedSending && !cancelled())
 		usleep(1000);
 
 	/* "If there are no more messages expected, or if there was an error somewhere else in the joblist..." */
-	if ((msgsRecvd == msgsSent && finishedSending) || fInputJobStepAssociation.status())
+	if ((msgsRecvd == msgsSent && finishedSending) || cancelled())
 	{
 		bsIn.reset(new ByteStream());
 		if (fOid>=3000 && traceOn()) dlTimes.setLastReadTime();
 		if (fOid>=3000 && traceOn()) dlTimes.setEndOfInputTime();
 		/* "If there was an error, make a response with the error code... */
-		if (die || fBPP->getStatus() || 0 < fInputJobStepAssociation.status())
+		if (fBPP->getStatus() || cancelled())
 		{
 			/* Note, doesn't matter which rowgroup is used here */
-			rgData = fBPP->getErrorRowGroupData(fInputJobStepAssociation.status());
-			//cout << "TBPS: returning error status " << fInputJobStepAssociation.status() << endl;
+			rgData = fBPP->getErrorRowGroupData(status());
+			//cout << "TBPS: returning error status " << status() << endl;
 			rows = 0;
-			if (!fInputJobStepAssociation.status())
-				fInputJobStepAssociation.status(fBPP->getStatus());
+			if (!status())
+				status(fBPP->getStatus());
 			bs.load(rgData.get(), primRowGroup.getEmptySize());
 		}
 		else
@@ -1194,7 +1162,6 @@ try
 			ByteStream dbs;
 			fDec->removeDECEventListener(this);
 			fBPP->destroyBPP(dbs);
-			fMsgBytesOut += bs.length() * fDec->getPmCount();
 			try {
 				fDec->write(uniqueID, dbs);
 			}
@@ -1203,6 +1170,11 @@ try
 				// completed instead of returning an error.
 			}
 			BPPIsAllocated = false;
+			
+			Stats stats = fDec->getNetworkStats(uniqueID);
+			fMsgBytesIn = stats.dataRecvd();
+			fMsgBytesOut = stats.dataSent();
+			
 			fDec->removeQueue(uniqueID);
 			tjoiners.clear();
 
@@ -1263,7 +1235,7 @@ try
 					"\t1st read " << dlTimes.FirstReadTimeString() << 
 					"; EOI " << dlTimes.EndOfInputTimeString() << "; runtime-" <<
 					JSTimeStamp::tsdiffstr(dlTimes.EndOfInputTime(),dlTimes.FirstReadTime())
-					<< "s\n\tJob completion status " << fOutputJobStepAssociation.status() << endl;
+					<< "s\n\tJob completion status " << status() << endl;
 					logEnd(logStr.str().c_str());
 					syslogReadBlockCounts(16,                   // exemgr sybsystem
 									fPhysicalIO,                // # blocks read from disk
@@ -1299,7 +1271,6 @@ try
 			dlTimes.setFirstReadTime();
 		fDec->read(uniqueID, bsIn);
 		firstRead = false;
-		fMsgBytesIn += bsIn->lengthWithHdrOverhead();
 		if (bsIn->length() != 0 && fBPP->countThisMsg(*bsIn)) {
 			mutex.lock(); //pthread_mutex_lock(&mutex);
 			msgsRecvd++;
@@ -1316,16 +1287,16 @@ try
 		ISMPacketHeader *hdr = (ISMPacketHeader*)bsIn->buf();
 
 		// Check for errors and abort
-		if (bsIn->length() == 0 || 0 < hdr->Status || 0 < fBPP->getStatus() || 0 < fOutputJobStepAssociation.status())
+		if (bsIn->length() == 0 || 0 < hdr->Status || 0 < fBPP->getStatus() || cancelled())
 		{
-			if (bsIn->length() == 0)
-				fOutputJobStepAssociation.status(ERR_PRIMPROC_DOWN);
+			if (bsIn->length() == 0) 
+				status(ERR_PRIMPROC_DOWN);
 			else if (hdr->Status) {
 				string errmsg;
 				bsIn->advance(sizeof(ISMPacketHeader) + sizeof(PrimitiveHeader));
 				*bsIn >> errmsg;
-				fOutputJobStepAssociation.status(hdr->Status);
-				fOutputJobStepAssociation.errorMessage(errmsg);
+				status(hdr->Status);
+				errorMessage(errmsg);
 			}
 			mutex.lock(); //pthread_mutex_lock(&mutex);
 
@@ -1398,8 +1369,7 @@ catch(const std::exception& ex)
 {
 	std::string errstr("TupleBPS next band caught exception: ");
 	errstr.append(ex.what());
-	catchHandler(errstr, fSessionId);
-	fOutputJobStepAssociation.status(ERR_TUPLE_BPS);
+	catchHandler(errstr, ERR_TUPLE_BPS, fErrorInfo, fSessionId);
 	bs.restart();
 	rgData = fBPP->getErrorRowGroupData(ERR_TUPLE_BPS);
 	primRowGroup.setData(rgData.get());
@@ -1408,8 +1378,8 @@ catch(const std::exception& ex)
 }
 catch(...)
 {
-	catchHandler("TupleBPS next band caught an unknown exception", fSessionId);
-	fOutputJobStepAssociation.status(ERR_TUPLE_BPS);
+	catchHandler("TupleBPS next band caught an unknown exception",
+		ERR_TUPLE_BPS, fErrorInfo, fSessionId);
 	bs.restart();
 	rgData = fBPP->getErrorRowGroupData(ERR_TUPLE_BPS);
 	primRowGroup.setData(rgData.get());
@@ -1487,16 +1457,15 @@ void TupleBPS::sendJobs(const vector<Job> &jobs)
 {
 	uint i;
 
-	for (i = 0; i < jobs.size() && !die && !fInputJobStepAssociation.status(); i++) {
+	for (i = 0; i < jobs.size() && !cancelled(); i++) {
 		//cout << "sending a job for dbroot " << jobs[i].dbroot << ", PM " << jobs[i].connectionNum << endl;
 		fDec->write(uniqueID, *(jobs[i].msg));
 		mutex.lock();
-		fMsgBytesOut += (jobs[i].msg)->length() * fDec->getPmCount();
 		msgsSent += jobs[i].expectedResponses;
 		if (recvWaiting)
 			condvar.notify_all();
 		while ((msgsSent - msgsRecvd > fMaxOutstandingRequests << LOGICAL_EXTENT_CONVERTER)
-				&& !die) {
+				&& !fDie) {
 			sendWaiting = true;
 			condvarWakeupProducer.wait(mutex);
 			sendWaiting = false;
@@ -1557,7 +1526,7 @@ void TupleBPS::makeJobs(vector<Job> *jobs)
 			blocksToScan = lbidsToScan/fColType.colWidth;
 
 		// how many logical blocks to process with a single job (& single thread on the PM)
-#ifdef _MSC_VER
+#if defined(_MSC_VER) && BOOST_VERSION < 105200
 		blocksPerJob = max(blocksToScan/fProcessorThreadsPerScan, 16UL);
 #else
 		blocksPerJob = max(blocksToScan/fProcessorThreadsPerScan, 16U);
@@ -1571,7 +1540,7 @@ void TupleBPS::makeJobs(vector<Job> *jobs)
 			//cout << "starting LBID = " << startingLBID << " count = " << blocksThisJob <<
 			//	" dbroot = " << scannedExtents[i].dbRoot << endl;
 
-			fBPP->setLBID(startingLBID, scannedExtents[i].dbRoot);
+			fBPP->setLBID(startingLBID, scannedExtents[i]);
 			fBPP->setCount(blocksThisJob);
 			bs.reset(new ByteStream());
 			fBPP->runBPP(*bs, (*dbRootConnectionMap)[scannedExtents[i].dbRoot]);
@@ -1593,7 +1562,7 @@ void TupleBPS::sendPrimitiveMessages()
 
 	idbassert(ffirstStepType == SCAN);
 
-	if (fInputJobStepAssociation.status() != 0)
+	if (cancelled())
 		goto abort;
 
 	try {
@@ -1648,7 +1617,6 @@ void TupleBPS::receiveMultiPrimitiveMessages(uint threadID)
 	uint32_t cachedIO;
 	uint32_t physIO;
 	uint32_t touchedBlocks;
-	uint64_t msgBytesIn_Thread = 0;
 	uint32_t cachedIO_Thread = 0;
 	uint32_t physIO_Thread = 0;
 	uint32_t touchedBlocks_Thread = 0;
@@ -1802,7 +1770,7 @@ try
 
 		/* If there's an error and the joblist is being aborted, don't
 			sit around forever waiting for responses.  */
-		if (fInputJobStepAssociation.status() != 0 || die) {
+		if (cancelled()) {
 			if (sendWaiting)
 				condvarWakeupProducer.notify_one();
 			break;
@@ -1838,7 +1806,7 @@ try
 		mutex.unlock();
 
 // 		cout << "thread " << threadID << " has " << size << " Bytestreams\n";
-		for (i = 0; i < size && !die; i++) {
+		for (i = 0; i < size && !cancelled(); i++) {
 			ByteStream* bs = bsv[i].get();
 
 			// @bug 488. when PrimProc node is down. error out
@@ -1850,7 +1818,8 @@ try
 				mutex.lock();
 				if (bs->length() == 0)
 				{
-					fOutputJobStepAssociation.status(ERR_PRIMPROC_DOWN);
+					errorMessage(IDBErrorInfo::instance()->errorMsg(ERR_PRIMPROC_DOWN));
+					status(ERR_PRIMPROC_DOWN);
 				}
 				else
 				{
@@ -1858,8 +1827,8 @@ try
 
 					bs->advance(sizeof(ISMPacketHeader) + sizeof(PrimitiveHeader));
 					*bs >> errMsg;
-					fOutputJobStepAssociation.status(hdr->Status);
-					fOutputJobStepAssociation.errorMessage(errMsg);
+					status(hdr->Status);
+					errorMessage(errMsg);
 				}
 
 				abort_nolock();
@@ -1869,8 +1838,6 @@ try
 				}
 				goto out;
 			}
-
-			msgBytesIn_Thread += bs->lengthWithHdrOverhead();
 
 			rgData = fBPP->getRowGroupData(*bs, &validCPData, &lbid, &min, &max,
 				&cachedIO, &physIO, &touchedBlocks, &unused, threadID);
@@ -1888,7 +1855,7 @@ try
 				local_outputRG.setDBRoot(local_primRG.getDBRoot());
 // 				local_outputRG.getRow(0, &joinedRow);
 				local_primRG.getRow(0, &largeSideRow);
-				for (k = 0; k < local_primRG.getRowCount() && !die; k++, largeSideRow.nextRow()) {
+				for (k = 0; k < local_primRG.getRowCount() && !fDie; k++, largeSideRow.nextRow()) {
 					//cout << "TBPS: Large side row: " << largeSideRow.toString() << endl;
 					matchCount = 0;
 					for (j = 0; j < smallSideCount; j++) {
@@ -1960,16 +1927,16 @@ try
 
 						/* Scalar check */
 						if (tjoiners[j]->scalar() && matchCount > 1) {
-							fOutputJobStepAssociation.status(ERR_MORE_THAN_1_ROW);
+							errorMessage(IDBErrorInfo::instance()->errorMsg(ERR_MORE_THAN_1_ROW));
+							status(ERR_MORE_THAN_1_ROW);
 							abort();
 						}
 						if (tjoiners[j]->smallOuterJoin())
 							tjoiners[j]->markMatches(threadID, joinerOutput[j]);
-
 					}
 					if (matchCount > 0) {
 						applyMapping(largeMapping, largeSideRow, &joinedBaseRow);
-						joinedBaseRow.setRid(largeSideRow.getRid());
+						joinedBaseRow.setRid(largeSideRow.getRelRid());
 						generateJoinResultSet(joinerOutput, joinedBaseRow, smallMappings,
 						  0, local_outputRG, joinedData, &rgDatav, smallSideRows, postJoinRow);
 						/* Bug 3510: Don't let the join results buffer get out of control.  Need
@@ -1998,7 +1965,7 @@ try
 			}
 
 			/* Execute UM F & E group 2 on rgDatav */
-			if (fe2 && !runFEonPM && rgDatav.size() > 0 && !die) {
+			if (fe2 && !runFEonPM && rgDatav.size() > 0 && !fDie) {
 				processFE2(local_outputRG, local_fe2Output, postJoinRow, local_fe2OutRow, &rgDatav, &local_fe2);
 				rgDataVecToDl(rgDatav, local_fe2Output, dlp);
 			}
@@ -2024,7 +1991,7 @@ try
 
 		//update casual partition
 		size = cpv.size();
-		if (size > 0 && fInputJobStepAssociation.status() == 0) {
+		if (size > 0 && !cancelled()) {
 			cpMutex.lock();
 			for (i = 0; i < size; i++) {
 				lbidList->UpdateMinMax(cpv[i].min, cpv[i].max, cpv[i].LBID, fColType.colDataType,
@@ -2049,9 +2016,8 @@ catch(...)
 out:
 	if (++recvExited == fNumThreads) {
 
-		if (doJoin && smallOuterJoiner != -1 &&
-		  fInputJobStepAssociation.status() == 0 && !die) {
-			mutex.unlock(); //Bug 5499
+		if (doJoin && smallOuterJoiner != -1 && !cancelled()) {
+			mutex.unlock(); //BUG 5499
 			/* If this was a left outer join, this needs to put the unmatched
 			   rows from the joiner into the output 
 			   XXXPAT: This might be a problem if later steps depend
@@ -2077,7 +2043,7 @@ out:
 				applyMapping(largeMapping, largeNull, &joinedBaseRow);
 				joinedBaseRow.setRid(0);
 //				cout << "outer row is " << joinedBaseRow.toString() << endl;
-//				joinedBaseRow.setRid(largeSideRow.getRid());
+//				joinedBaseRow.setRid(largeSideRow.getRelRid());
 				joinedBaseRow.nextRow();
 				local_outputRG.incRowCount();
 				if (local_outputRG.getRowCount() == 8192) {
@@ -2109,7 +2075,7 @@ out:
 				else
 					rgDataToDl(joinedData, local_outputRG, dlp);
 			}
-			mutex.lock(); //Bug 5499
+			mutex.lock(); // BUG 5499
 		}
 
 		if (fOid>=3000 && traceOn()) {
@@ -2125,14 +2091,12 @@ out:
 		}
 
 		ByteStream bs;
+
 		try {
 			fDec->removeDECEventListener(this);
 			fBPP->destroyBPP(bs);
-			fMsgBytesOut += bs.length() * fDec->getPmCount();
 			fDec->write(uniqueID, bs);
 			BPPIsAllocated = false;
-			fDec->removeQueue(uniqueID);
-			tjoiners.clear();
 		}
 		// catch and do nothing. Let it continues with the clean up and profiling
 		catch (const std::exception& e)
@@ -2143,6 +2107,12 @@ out:
 		{
 			cerr << "tuple-bps caught unknown exception" << endl;
 		}
+		
+		Stats stats = fDec->getNetworkStats(uniqueID);
+		fMsgBytesIn = stats.dataRecvd();
+		fMsgBytesOut = stats.dataSent();
+		fDec->removeQueue(uniqueID);
+		tjoiners.clear();
 
 		lastThread = true;
 	}
@@ -2151,7 +2121,6 @@ out:
 	fPhysicalIO += physIO_Thread;
 	fCacheIO += cachedIO_Thread;
 	fBlockTouched += touchedBlocks_Thread;
-	fMsgBytesIn += msgBytesIn_Thread;
 	mutex.unlock();
 
 	if (fTableOid >= 3000 && lastThread)
@@ -2211,7 +2180,7 @@ out:
 			"\t1st read " << dlTimes.FirstReadTimeString() << 
 			"; EOI " << dlTimes.EndOfInputTimeString() << "; runtime-" <<
 			JSTimeStamp::tsdiffstr(dlTimes.EndOfInputTime(),dlTimes.FirstReadTime())
-			<< "s\n\tJob completion status " << fOutputJobStepAssociation.status() << endl;
+			<< "s\n\tJob completion status " << status() << endl;
 			logEnd(logStr.str().c_str());
 
 			syslogReadBlockCounts(16,      // exemgr sybsystem
@@ -2232,7 +2201,7 @@ out:
 			formatMiniStats();
 		}
 
-		if (ffirstStepType == SCAN && bop == BOP_AND && !(fInputJobStepAssociation.status() != 0 || die))
+		if (ffirstStepType == SCAN && bop == BOP_AND)
 		{
 			cpMutex.lock(); //pthread_mutex_lock(&cpMutex);
  			lbidList->UpdateAllPartitionInfo();
@@ -2249,8 +2218,7 @@ void TupleBPS::processError(const string& ex, uint16_t err, const string& src)
 {
 	ostringstream oss;
 	oss << "st: " << fStepId << " " << src << " caught an exception: " << ex << endl;
-	catchHandler(oss.str(), fSessionId);
-	fOutputJobStepAssociation.status(err);
+	catchHandler(oss.str(), err, fErrorInfo, fSessionId);
 	abort_nolock();
 	cerr << oss.str();
 }
@@ -2274,7 +2242,7 @@ else
 	oss << " not del ";
 if (bop == BOP_OR)
 	oss << " BOP_OR ";
-if (die)
+if (fDie)
 	oss << " aborting " << msgsSent << "/" << msgsRecvd << " " << uniqueID << " ";
 if (fOutputJobStepAssociation.outSize() > 0)
 {
@@ -2367,7 +2335,6 @@ void TupleBPS::newPMOnline(uint connectionNumber)
 	ByteStream bs;
 
 	fBPP->createBPP(bs);
-	fMsgBytesOut += bs.length() * fDec->getPmCount();
 	try {
 		fDec->write(bs, connectionNumber);
 		if (hasPMJoin)
@@ -2375,9 +2342,7 @@ void TupleBPS::newPMOnline(uint connectionNumber)
 	}
 	catch (IDBExcept &e) {
 		abort();
-		catchHandler(e.what());
-		if (fOutputJobStepAssociation.status() == 0)
-			fOutputJobStepAssociation.status(e.errorCode());
+		catchHandler(e.what(), e.errorCode(), fErrorInfo, fSessionId);
 	}
 }
 
@@ -2432,11 +2397,12 @@ void TupleBPS::generateJoinResultSet(const vector<vector<uint8_t *> > &joinerOut
 			smallRow.setData(joinerOutput[depth][i]);
 			if (UNLIKELY(outputRG.getRowCount() == 8192)) {
 				uint dbRoot = outputRG.getDBRoot();
+				uint64_t baseRid = outputRG.getBaseRid();
 // 				cout << "GJRS adding data\n";
 				outputData->push_back(rgData);
 				rgData.reset(new uint8_t[outputRG.getMaxDataSize()]);
 				outputRG.setData(rgData.get());
-				outputRG.resetRowGroup(baseRow.getRid());
+				outputRG.resetRowGroup(baseRid);
 				outputRG.setDBRoot(dbRoot);
 				outputRG.getRow(0, &joinedRow);
 			}
@@ -2590,7 +2556,7 @@ void TupleBPS::processFE2_oneRG(RowGroup &input, RowGroup &output, Row &inRow,
 		if (ret) {
 			applyMapping(fe2Mapping, inRow, &outRow);
 			//cout << "fe2 passed row: " << outRow.toString() << endl;
-			outRow.setRid(inRow.getRid());
+			outRow.setRid(inRow.getRelRid());
 			output.incRowCount();
 			outRow.nextRow();
 		}
@@ -2621,7 +2587,7 @@ void TupleBPS::processFE2(RowGroup &input, RowGroup &output, Row &inRow, Row &ou
 			ret = local_fe->evaluate(&inRow);
 			if (ret) {
 				applyMapping(fe2Mapping, inRow, &outRow);
-				outRow.setRid(inRow.getRid());
+				outRow.setRid(inRow.getRelRid());
 				output.incRowCount();
 				outRow.nextRow();
 				if (output.getRowCount() == 8192 ||
@@ -2691,7 +2657,7 @@ void TupleBPS::rgDataToDl(shared_array<uint8_t>& rgData, RowGroup& rg, RowGroupD
 void TupleBPS::rgDataVecToDl(vector<shared_array<uint8_t> >& rgDatav, RowGroup& rg, RowGroupDL* dlp)
 {
 	uint64_t size = rgDatav.size();
-	if (size > 0 && fInputJobStepAssociation.status() == 0) {
+	if (size > 0 && !cancelled()) {
 		dlMutex.lock(); //pthread_mutex_lock(&dlMutex);
 		for (uint64_t i = 0; i < size; i++) {
 			rgDataToDl(rgDatav[i], rg, dlp);
@@ -2764,16 +2730,17 @@ void TupleBPS::addCPPredicates(uint32_t OID, const vector<int64_t> &vals, bool i
 			}
 
 			for (j = 0; j < extents.size(); j++) {
-				isValid = ll.GetMinMax(&min, &max, &seq, extents[j].range.start, *extentsPtr);
+				isValid = ll.GetMinMax(&min, &max, &seq, extents[j].range.start, *extentsPtr,
+                                       cmd->getColType().colDataType);
 				if (isValid) {
 					if (isRange)
 						runtimeCPFlags[j] = ll.checkRangeOverlap(min, max, vals[0], vals[1],
-						  cmd->isCharType()) && runtimeCPFlags[j];
+						  cmd->getColType().colDataType) && runtimeCPFlags[j];
 					else {
 						intersection = false;
 						for (k = 0; k < vals.size(); k++)
 							intersection = intersection ||
-							  ll.checkSingleValue(min, max, vals[k], cmd->isCharType());
+							  ll.checkSingleValue(min, max, vals[k], cmd->getColType().colDataType);
 						runtimeCPFlags[j] = intersection && runtimeCPFlags[j];
 					}
 				}
@@ -2794,13 +2761,12 @@ void TupleBPS::dec(DistributedEngineComm* dec)
 
 void TupleBPS::abort_nolock()
 {
-	if (die)
+	if (fDie)
 		return;
 	JobStep::abort();
 	if (fDec) {
 		ByteStream bs;
 		fBPP->abortProcessing(&bs);
-		fMsgBytesOut += bs.length() * fDec->getPmCount();
 		try {
 			fDec->write(uniqueID, bs);
 		}
@@ -2817,14 +2783,13 @@ void TupleBPS::abort_nolock()
 
 void TupleBPS::abort()
 {
-	boost::mutex::scoped_lock scoped(mutex, boost::defer_lock);
-	if (die)
+	boost::mutex::scoped_lock scoped(mutex);
+	if (fDie)
 		return;
 	JobStep::abort();
 	if (fDec) {
 		ByteStream bs;
 		fBPP->abortProcessing(&bs);
-		fMsgBytesOut += bs.length() * fDec->getPmCount();
 		try {
 			fDec->write(uniqueID, bs);
 		}
@@ -2835,10 +2800,8 @@ void TupleBPS::abort()
 		}
 		fDec->shutdownQueue(uniqueID);
 	}
-	scoped.lock();
 	condvarWakeupProducer.notify_all();
 	condvar.notify_all();
-	scoped.unlock();
 }
 
 }   //namespace

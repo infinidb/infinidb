@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: crossenginestep.cpp 9242 2013-02-01 13:31:57Z rdempsey $
+//  $Id: crossenginestep.cpp 9318 2013-03-19 21:38:25Z dhall $
 
 #include <unistd.h>
 //#define NDEBUG
@@ -56,20 +56,125 @@ using namespace dataconvert;
 #include "libdrizzle-2.0/drizzle.h"
 #include "libdrizzle-2.0/drizzle_client.h"
 
+// wrapper for drizzle
+namespace
+{
+class DrizzleMySQL
+{
+public:
+	DrizzleMySQL();
+	~DrizzleMySQL();
+
+	// init:   host          port        username      passwd         db
+	int init(const char*, unsigned int, const char*, const char*, const char*);
+
+	// run the query
+	int run(const char* q);
+
+	int getFieldCount()      { return drizzle_result_column_count(fDrzrp); }
+	int getRowCount()        { return drizzle_result_row_count(fDrzrp); }
+	char** nextRow()   { return drizzle_row_next(fDrzrp); }
+	const string& getError() { return fErrStr; }
+
+private:
+	drizzle_st*        fDrzp;
+	drizzle_con_st*    fDrzcp;
+	drizzle_result_st* fDrzrp;
+	string             fErrStr;
+};
+
+DrizzleMySQL::DrizzleMySQL() : fDrzp(NULL), fDrzcp(NULL), fDrzrp(NULL)
+{
+}
+
+
+DrizzleMySQL::~DrizzleMySQL()
+{
+	if (fDrzrp)
+	{
+		drizzle_result_free(fDrzrp);
+	}
+	fDrzrp = NULL;
+
+	if (fDrzcp)
+	{
+		drizzle_con_close(fDrzcp);
+		drizzle_con_free(fDrzcp);
+	}
+	fDrzcp = NULL;
+
+	if (fDrzp)
+	{
+		drizzle_free(fDrzp);
+	}
+	fDrzp = NULL;
+}
+
+
+int DrizzleMySQL::init(const char* h, unsigned int p, const char* u, const char* w, const char* d)
+{
+	int ret = -1;
+
+	fDrzp = drizzle_create();
+	if (fDrzp != NULL)
+	{
+		fDrzcp = drizzle_con_add_tcp(fDrzp, h, p, u, w, d, DRIZZLE_CON_MYSQL);
+		if (fDrzcp != NULL)
+		{
+			ret = drizzle_con_connect(fDrzcp);
+			if (ret != 0)
+				fErrStr = "fatal error in drizzle_con_connect()";
+		}
+		else
+		{
+			fErrStr = "fatal error in drizzle_con_add_tcp()";
+		}
+	}
+	else
+	{
+		fErrStr = "fatal error in drizzle_create()";
+	}
+
+	return ret;
+}
+
+
+int DrizzleMySQL::run(const char* query)
+{
+	int ret = 0;
+	drizzle_return_t drzret;
+	fDrzrp = drizzle_query_str(fDrzcp, fDrzrp, query, &drzret);
+	if (drzret == 0 && fDrzrp != NULL)
+	{
+		ret = drzret = drizzle_result_buffer(fDrzrp);
+		if (drzret != 0)
+			fErrStr = "fatal error reading result from crossengine client lib";
+	}
+	else
+	{
+		fErrStr = "fatal error executing query in crossengine client lib";
+		if (drzret != 0)
+			ret = drzret;
+		else
+			ret = -1;
+	}
+
+	return ret;
+}
+
+
+}
+
+
 namespace joblist
 {
 
 CrossEngineStep::CrossEngineStep(
-	const JobStepAssociation& inputJobStepAssociation,
-	const JobStepAssociation& outputJobStepAssociation,
-	uint32_t statementId,
 	const string& schema,
 	const string& table,
 	const string& alias,
 	const JobInfo& jobInfo) :
-		fInputJobStepAssociation(inputJobStepAssociation),
-		fOutputJobStepAssociation(outputJobStepAssociation),
-		fStepId(0),
+		BatchPrimitive(jobInfo),
 		fRowsRetrieved(0),
 		fRowsReturned(0),
 		fRowsPerGroup(256),
@@ -222,9 +327,15 @@ int64_t CrossEngineStep::convertValueNum(
 		case CalpontSystemCatalog::TINYINT:
 		rv = boost::any_cast<char>(anyVal);
 			break;
+        case CalpontSystemCatalog::UTINYINT:
+        rv = boost::any_cast<uint8_t>(anyVal);
+            break;
 		case CalpontSystemCatalog::SMALLINT:
 		rv = boost::any_cast<int16_t>(anyVal);
 			break;
+        case CalpontSystemCatalog::USMALLINT:
+        rv = boost::any_cast<uint16_t>(anyVal);
+            break;
 		case CalpontSystemCatalog::MEDINT:
 		case CalpontSystemCatalog::INT:
 #ifdef _MSC_VER
@@ -233,10 +344,18 @@ int64_t CrossEngineStep::convertValueNum(
 		rv = boost::any_cast<int32_t>(anyVal);
 #endif
 			break;
+        case CalpontSystemCatalog::UMEDINT:
+        case CalpontSystemCatalog::UINT:
+        rv = boost::any_cast<uint32_t>(anyVal);
+            break;
 		case CalpontSystemCatalog::BIGINT:
 		rv = boost::any_cast<long long>(anyVal);
 			break;
+        case CalpontSystemCatalog::UBIGINT:
+        rv = boost::any_cast<uint64_t>(anyVal);
+            break;
 		case CalpontSystemCatalog::FLOAT:
+        case CalpontSystemCatalog::UFLOAT:
 			{
 				float f = boost::any_cast<float>(anyVal);
 				//N.B. There is a bug in boost::any or in gcc where, if you store a nan,
@@ -254,6 +373,7 @@ int64_t CrossEngineStep::convertValueNum(
 			}
 			break;
 		case CalpontSystemCatalog::DOUBLE:
+        case CalpontSystemCatalog::UDOUBLE:
 			{
 				double d = boost::any_cast<double>(anyVal);
 				double* dp = &d;
@@ -280,6 +400,7 @@ int64_t CrossEngineStep::convertValueNum(
 		rv = boost::any_cast<uint64_t>(anyVal);
 			break;
 		case CalpontSystemCatalog::DECIMAL:
+        case CalpontSystemCatalog::UDECIMAL:
 			if (ct.colWidth == CalpontSystemCatalog::ONE_BYTE)
 			rv = boost::any_cast<char>(anyVal);
 			else if (ct.colWidth == CalpontSystemCatalog::TWO_BYTE)
@@ -338,40 +459,27 @@ void CrossEngineStep::join()
 
 void CrossEngineStep::execute()
 {
-	drizzle_st* drzp=0;
-	drzp = drizzle_create();
-	if (drzp == 0)
-		handleMySqlError("fatal error initializing crossengine client lib", -1);
+	DrizzleMySQL drizzle;
+	int ret = 0;
+
 	try
 	{
-		drizzle_con_st* drzcp=0;
-		drzcp = drizzle_con_add_tcp(drzp, fHost.c_str(), fPort, fUser.c_str(), fPasswd.c_str(),
-			fSchema.c_str(), DRIZZLE_CON_MYSQL);
-		if (drzcp == 0)
-			handleMySqlError("fatal error setting up parms in crossengine client lib", -1);
-		drizzle_return_t drzret;
-		drzret = drizzle_con_connect(drzcp);
-		if (drzret != 0)
-			handleMySqlError("fatal error connecting to InfiniDB in crossengine client lib", drzret);
+		ret = drizzle.init(fHost.c_str(), fPort, fUser.c_str(), fPasswd.c_str(), fSchema.c_str());
+		if (ret != 0)
+			handleMySqlError(drizzle.getError().c_str(), ret);
 
 		string query(makeQuery());
 		fLogger->logMessage(logging::LOG_TYPE_INFO, "QUERY to foreign engine: " + query);
 		if (traceOn())
 			cout << "QUERY: " << query << endl;
 
-		drizzle_return_t* drzretp = &drzret;
-		drizzle_result_st* drzrp=0;
-		drzrp = drizzle_query_str(drzcp, drzrp, query.c_str(), drzretp);
-		if (drzret != 0 || drzrp == 0)
-			handleMySqlError("fatal error executing query in crossengine client lib", drzret);
+		ret = drizzle.run(query.c_str());
+		if (ret != 0)
+			handleMySqlError(drizzle.getError().c_str(), ret);
 
-		drzret = drizzle_result_buffer(drzrp);
-		if (drzret != 0)
-			handleMySqlError("fatal error reading results from InfiniDB in crossengine client lib", drzret);
+		int num_fields = drizzle.getFieldCount();
 
-		int num_fields = drizzle_result_column_count(drzrp);
-
-		drizzle_row_t rowIn;                            // input
+		char** rowIn;                            // input
 		shared_array<uint8_t> rgDataDelivered;      // output
 		fRowGroupDelivered.initRow(&fRowDelivered);
 		// use getDataSize() i/o getMaxDataSize() to make sure there are fRowsPerGroup rows.
@@ -387,7 +495,7 @@ void CrossEngineStep::execute()
 		makeMappings();
 		if (fFeSelects.empty() && fFeFilters == NULL)
 		{
-			while ((rowIn = drizzle_row_next(drzrp)) && fInputJobStepAssociation.status() == 0)
+			while ((rowIn = drizzle.nextRow()) && !cancelled())
 			{
 				for(int i = 0; i < num_fields; i++)
 					setField(i, rowIn[i], fRowDelivered);
@@ -404,7 +512,7 @@ void CrossEngineStep::execute()
 			rgDataFe1.reset(new uint8_t[rowFe1.getSize()]);
 			rowFe1.setData(rgDataFe1.get());
 		
-			while ((rowIn = drizzle_row_next(drzrp)) && fInputJobStepAssociation.status() == 0)
+			while ((rowIn = drizzle.nextRow()) && !cancelled())
 			{
 				// Parse the columns used in FE1 first, the other column may not need be parsed.
 				for(int i = 0; i < num_fields; i++)
@@ -436,7 +544,7 @@ void CrossEngineStep::execute()
 			rgDataFe3.reset(new uint8_t[rowFe3.getSize()]);
 			rowFe3.setData(rgDataFe3.get());
 		
-			while ((rowIn = drizzle_row_next(drzrp)) && fInputJobStepAssociation.status() == 0)
+			while ((rowIn = drizzle.nextRow()) && !cancelled())
 			{
 				for(int i = 0; i < num_fields; i++)
 					setField(i, rowIn[i], rowFe3);
@@ -462,7 +570,7 @@ void CrossEngineStep::execute()
 			rgDataFe3.reset(new uint8_t[rowFe3.getSize()]);
 			rowFe3.setData(rgDataFe3.get());
 		
-			while ((rowIn = drizzle_row_next(drzrp)) && fInputJobStepAssociation.status() == 0)
+			while ((rowIn = drizzle.nextRow()) && !cancelled())
 			{
 				// Parse the columns used in FE1 first, the other column may not need be parsed.
 				for(int i = 0; i < num_fields; i++)
@@ -490,41 +598,20 @@ void CrossEngineStep::execute()
 		}
 
 		fOutputDL->insert(rgDataDelivered);
-		fRowsRetrieved = drizzle_result_row_count(drzrp);
-		drizzle_result_free(drzrp);
-		drzrp = 0;
-		drizzle_con_close(drzcp);
-		drizzle_con_free(drzcp);
-		drzcp = 0;
-		drizzle_free(drzp);
-		drzp = 0;
+		fRowsRetrieved = drizzle.getRowCount();
 	}
 	catch (IDBExcept& iex)
 	{
-		catchHandler(iex.what(), fSessionId);
-		if (fOutputJobStepAssociation.status() == 0)
-		{
-			fOutputJobStepAssociation.status(iex.errorCode());
-			fOutputJobStepAssociation.errorMessage(iex.what());
-		}
+		catchHandler(iex.what(), iex.errorCode(), fErrorInfo, fSessionId);
 	}
 	catch(const std::exception& ex)
 	{
-		catchHandler(ex.what(), fSessionId);
-		if (fOutputJobStepAssociation.status() == 0)
-		{
-			fOutputJobStepAssociation.status(ERR_CROSS_ENGINE_CONNECT);
-			fOutputJobStepAssociation.errorMessage(ex.what());
-		}
+		catchHandler(ex.what(), ERR_CROSS_ENGINE_CONNECT, fErrorInfo, fSessionId);
 	}
 	catch(...)
 	{
-		catchHandler("CrossEngineStep execute caught an unknown exception", fSessionId);
-		if (fOutputJobStepAssociation.status() == 0)
-		{
-			fOutputJobStepAssociation.status(ERR_CROSS_ENGINE_CONNECT);
-			fOutputJobStepAssociation.errorMessage("unknown exception");
-		}
+		catchHandler("CrossEngineStep execute caught an unknown exception",
+						ERR_CROSS_ENGINE_CONNECT, fErrorInfo, fSessionId);
 	}
 
 	fEndOfResult = true;
@@ -638,6 +725,11 @@ void CrossEngineStep::handleMySqlError(const char* errStr, unsigned int errCode)
 {
 	ostringstream oss;
 	oss << errStr << "(" << errCode << ")";
+	if (errCode == (unsigned int) -1)
+		oss << "(null pointer)";
+	else
+		oss << "(" << errCode << ")";
+
 	throw IDBExcept(oss.str(), ERR_CROSS_ENGINE_CONNECT);
 
 	return;
@@ -670,7 +762,7 @@ uint CrossEngineStep::nextBand(messageqcpp::ByteStream &bs)
 		if (traceOn() && dlTimes.FirstReadTime().tv_sec ==0)
 			dlTimes.setFirstReadTime();
 
-		if (more && (0 == fOutputJobStepAssociation.status()) && !die)
+		if (more && !cancelled())
 		{
 			fRowGroupDelivered.setData(rgDataOut.get());
 			bs.load(fRowGroupDelivered.getData(), fRowGroupDelivered.getDataSize());
@@ -684,17 +776,14 @@ uint CrossEngineStep::nextBand(messageqcpp::ByteStream &bs)
 	}
 	catch(const std::exception& ex)
 	{
-		catchHandler(ex.what(), fSessionId);
-		if (fOutputJobStepAssociation.status() == 0)
-			fOutputJobStepAssociation.status(ERR_IN_DELIVERY);
+		catchHandler(ex.what(), ERR_IN_DELIVERY, fErrorInfo, fSessionId);
 		while (more) more = fOutputDL->next(fOutputIterator, &rgDataOut);
 		fEndOfResult = true;
 	}
 	catch(...)
 	{
-		catchHandler("CrossEngineStep next band caught an unknown exception", fSessionId);
-		if (fOutputJobStepAssociation.status() == 0)
-			fOutputJobStepAssociation.status(ERR_IN_DELIVERY);
+		catchHandler("CrossEngineStep next band caught an unknown exception",
+						ERR_IN_DELIVERY, fErrorInfo, fSessionId);
 		while (more) more = fOutputDL->next(fOutputIterator, &rgDataOut);
 		fEndOfResult = true;
 	}
@@ -705,7 +794,7 @@ uint CrossEngineStep::nextBand(messageqcpp::ByteStream &bs)
 		rgDataOut.reset(new uint8_t[fRowGroupDelivered.getEmptySize()]);
 		fRowGroupDelivered.setData(rgDataOut.get());
 		fRowGroupDelivered.resetRowGroup(0);
-		fRowGroupDelivered.setStatus(fOutputJobStepAssociation.status());
+		fRowGroupDelivered.setStatus(status());
 		bs.load(rgDataOut.get(), fRowGroupDelivered.getDataSize());
 
 		if (traceOn())
@@ -754,7 +843,7 @@ void CrossEngineStep::printCalTrace()
 			<< "\t1st read " << dlTimes.FirstReadTimeString()
 			<< "; EOI " << dlTimes.EndOfInputTimeString() << "; runtime-"
 			<< JSTimeStamp::tsdiffstr(dlTimes.EndOfInputTime(), dlTimes.FirstReadTime())
-			<< "s;\n\tJob completion status " << fOutputJobStepAssociation.status() << endl;
+			<< "s;\n\tJob completion status " << status() << endl;
 	logEnd(logStr.str().c_str());
 	fExtendedInfo += logStr.str();
 	formatMiniStats();

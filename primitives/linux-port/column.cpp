@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: column.cpp 1855 2012-04-04 18:20:09Z rdempsey $
+ * $Id: column.cpp 2104 2013-06-04 17:57:22Z dcathey $
  *
  ****************************************************************************/
 #include <iostream>
@@ -43,12 +43,10 @@ using namespace logging;
 using namespace dbbc;
 using namespace primitives;
 using namespace primitiveprocessor;
+using namespace execplan;
 
 namespace
 {
-
-const long long MAX64=0x7fffffffffffffffLL;
-const long long MIN64=0x8000000000000000LL;
 
 inline uint64_t order_swap(uint64_t x)
 {
@@ -243,14 +241,17 @@ inline bool isEmptyVal<8>(uint8_t type, const uint8_t* ival)
 
 	switch (type)
 	{
-	case WriteEngine::DOUBLE:
+	case CalpontSystemCatalog::DOUBLE:
+    case CalpontSystemCatalog::UDOUBLE:
 		return (joblist::DOUBLEEMPTYROW == *val);
-	case WriteEngine::CHAR:
-	case WriteEngine::VARCHAR:
-	case WriteEngine::DATE:
-	case WriteEngine::DATETIME:
-	case WriteEngine::VARBINARY:
+	case CalpontSystemCatalog::CHAR:
+	case CalpontSystemCatalog::VARCHAR:
+	case CalpontSystemCatalog::DATE:
+	case CalpontSystemCatalog::DATETIME:
+	case CalpontSystemCatalog::VARBINARY:
 		return (*val == joblist::CHAR8EMPTYROW);
+    case CalpontSystemCatalog::UBIGINT:
+        return (joblist::UBIGINTEMPTYROW == *val);
 	default:
 		break;
 	}
@@ -265,13 +266,16 @@ inline bool isEmptyVal<4>(uint8_t type, const uint8_t* ival)
 
 	switch (type)
 	{
-	case WriteEngine::FLOAT:
+	case CalpontSystemCatalog::FLOAT:
+    case CalpontSystemCatalog::UFLOAT:
 		return (joblist::FLOATEMPTYROW == *val);
-	case WriteEngine::CHAR:
-	case WriteEngine::VARCHAR:
-	case WriteEngine::DATE:
-	case WriteEngine::DATETIME:
+	case CalpontSystemCatalog::CHAR:
+	case CalpontSystemCatalog::VARCHAR:
+	case CalpontSystemCatalog::DATE:
+	case CalpontSystemCatalog::DATETIME:
 		return (joblist::CHAR4EMPTYROW == *val);
+    case CalpontSystemCatalog::UINT:
+        return (joblist::UINTEMPTYROW == *val);
 	default:
 		break;
 	}
@@ -286,11 +290,13 @@ inline bool isEmptyVal<2>(uint8_t type, const uint8_t* ival)
 
 	switch (type)
 	{
-	case WriteEngine::CHAR:
-	case WriteEngine::VARCHAR:
-	case WriteEngine::DATE:
-	case WriteEngine::DATETIME:
+	case CalpontSystemCatalog::CHAR:
+	case CalpontSystemCatalog::VARCHAR:
+	case CalpontSystemCatalog::DATE:
+	case CalpontSystemCatalog::DATETIME:
 		return (joblist::CHAR2EMPTYROW == *val);
+    case CalpontSystemCatalog::USMALLINT:
+        return (joblist::USMALLINTEMPTYROW == *val);
 	default:
 		break;
 	}
@@ -305,11 +311,13 @@ inline bool isEmptyVal<1>(uint8_t type, const uint8_t* ival)
 
 	switch (type)
 	{
-	case WriteEngine::CHAR:
-	case WriteEngine::VARCHAR:
-	case WriteEngine::DATE:
-	case WriteEngine::DATETIME:
+	case CalpontSystemCatalog::CHAR:
+	case CalpontSystemCatalog::VARCHAR:
+	case CalpontSystemCatalog::DATE:
+	case CalpontSystemCatalog::DATETIME:
 		return (*val == joblist::CHAR1EMPTYROW);
+    case CalpontSystemCatalog::UTINYINT:
+        return (*val == joblist::UTINYINTEMPTYROW);
 	default:
 		break;
 	}
@@ -327,16 +335,19 @@ inline bool isNullVal<8>(uint8_t type, const uint8_t* ival)
 
 	switch (type)
 	{
-	case WriteEngine::DOUBLE:
+	case CalpontSystemCatalog::DOUBLE:
+	case CalpontSystemCatalog::UDOUBLE:
 		return (joblist::DOUBLENULL == *val);
-	case WriteEngine::CHAR:
-	case WriteEngine::VARCHAR:
-	case WriteEngine::DATE:
-	case WriteEngine::DATETIME:
-	case WriteEngine::VARBINARY:
+	case CalpontSystemCatalog::CHAR:
+	case CalpontSystemCatalog::VARCHAR:
+	case CalpontSystemCatalog::DATE:
+	case CalpontSystemCatalog::DATETIME:
+	case CalpontSystemCatalog::VARBINARY:
 		//@bug 339 might be a token here
 		//TODO: what's up with the second const here?
 		return (*val == joblist::CHAR8NULL || 0xFFFFFFFFFFFFFFFELL == *val);
+    case CalpontSystemCatalog::UBIGINT:
+        return (joblist::UBIGINTNULL == *val);
 	default:
 		break;
 	}
@@ -351,14 +362,17 @@ inline bool isNullVal<4>(uint8_t type, const uint8_t* ival)
 
 	switch (type)
 	{
-	case WriteEngine::FLOAT:
+	case CalpontSystemCatalog::FLOAT:
+	case CalpontSystemCatalog::UFLOAT:
 		return (joblist::FLOATNULL == *val);
-	case WriteEngine::CHAR:
-	case WriteEngine::VARCHAR:
+	case CalpontSystemCatalog::CHAR:
+	case CalpontSystemCatalog::VARCHAR:
 		return (joblist::CHAR4NULL == *val);
-	case WriteEngine::DATE:
-	case WriteEngine::DATETIME:
+	case CalpontSystemCatalog::DATE:
+	case CalpontSystemCatalog::DATETIME:
 		return (joblist::DATENULL == *val);
+    case CalpontSystemCatalog::UINT:
+        return (joblist::UINTNULL == *val);
 	default:
 		break;
 	}
@@ -373,11 +387,13 @@ inline bool isNullVal<2>(uint8_t type, const uint8_t* ival)
 
 	switch (type)
 	{
-	case WriteEngine::CHAR:
-	case WriteEngine::VARCHAR:
-	case WriteEngine::DATE:
-	case WriteEngine::DATETIME:
+	case CalpontSystemCatalog::CHAR:
+	case CalpontSystemCatalog::VARCHAR:
+	case CalpontSystemCatalog::DATE:
+	case CalpontSystemCatalog::DATETIME:
 		return (joblist::CHAR2NULL == *val);
+    case CalpontSystemCatalog::USMALLINT:
+        return (joblist::USMALLINTNULL == *val);
 	default:
 		break;
 	}
@@ -392,11 +408,13 @@ inline bool isNullVal<1>(uint8_t type, const uint8_t* ival)
 
 	switch (type)
 	{
-	case WriteEngine::CHAR:
-	case WriteEngine::VARCHAR:
-	case WriteEngine::DATE:
-	case WriteEngine::DATETIME:
+	case CalpontSystemCatalog::CHAR:
+	case CalpontSystemCatalog::VARCHAR:
+	case CalpontSystemCatalog::DATE:
+	case CalpontSystemCatalog::DATETIME:
 		return (*val == joblist::CHAR1NULL);
+    case CalpontSystemCatalog::UTINYINT:
+        return (joblist::UTINYINTNULL == *val);
 	default:
 		break;
 	}
@@ -426,18 +444,23 @@ inline bool isMinMaxValid(const NewColRequestHeader *in) {
 	else {
 		switch (in->DataType)
 		{
-		case WriteEngine::CHAR:
+		case CalpontSystemCatalog::CHAR:
 			return (in->DataSize<9);
-		case WriteEngine::VARCHAR:
+		case CalpontSystemCatalog::VARCHAR:
 			return (in->DataSize<8);
-		case WriteEngine::TINYINT:
-		case WriteEngine::SMALLINT:
-		case WriteEngine::INT:
-		case WriteEngine::DATE:
-		case WriteEngine::BIGINT:
-		case WriteEngine::DATETIME:
+		case CalpontSystemCatalog::TINYINT:
+		case CalpontSystemCatalog::SMALLINT:
+		case CalpontSystemCatalog::INT:
+		case CalpontSystemCatalog::DATE:
+		case CalpontSystemCatalog::BIGINT:
+        case CalpontSystemCatalog::DATETIME:
+        case CalpontSystemCatalog::UTINYINT:
+        case CalpontSystemCatalog::USMALLINT:
+        case CalpontSystemCatalog::UINT:
+        case CalpontSystemCatalog::UBIGINT:
 			return true;
-		case WriteEngine::DECIMAL:
+		case CalpontSystemCatalog::DECIMAL:
+        case CalpontSystemCatalog::UDECIMAL:
 			return (in->DataSize <= 8);
 		default:
 			return false;
@@ -463,9 +486,9 @@ inline bool colCompare(int64_t val1, int64_t val2, uint8_t COP, uint8_t rf, int 
 	if (COMPARE_NIL == COP) return false;
 
 	//@bug 425 added isNull condition
-	else if ( !isNull && (type == WriteEngine::FLOAT || type == WriteEngine::DOUBLE)) {
+	else if ( !isNull && (type == CalpontSystemCatalog::FLOAT || type == CalpontSystemCatalog::DOUBLE)) {
 		double dVal1, dVal2;
-		if (type == WriteEngine::FLOAT)
+		if (type == CalpontSystemCatalog::FLOAT)
 		{
 		   dVal1 = *((float *) &val1);
 		   dVal2 = *((float *) &val2);
@@ -478,7 +501,7 @@ inline bool colCompare(int64_t val1, int64_t val2, uint8_t COP, uint8_t rf, int 
 		return colCompare_(dVal1, dVal2, COP);
 	}
 
-	else if ( (type == WriteEngine::CHAR || type == WriteEngine::VARCHAR) && !isNull )
+	else if ( (type == CalpontSystemCatalog::CHAR || type == CalpontSystemCatalog::VARCHAR) && !isNull )
 	{
 		if (!regex.used && !rf)
 			return colCompare_(order_swap(val1), order_swap(val2), COP);
@@ -494,6 +517,20 @@ inline bool colCompare(int64_t val1, int64_t val2, uint8_t COP, uint8_t rf, int 
 		else
 			return false;
 	}
+}
+
+inline bool colCompareUnsigned(uint64_t val1, uint64_t val2, uint8_t COP, uint8_t rf, int type, uint8_t width, const idb_regex_t& regex, bool isNull=false)
+{
+// 	cout << "comparing unsigned" << hex << val1 << " to " << val2 << endl;
+
+	if (COMPARE_NIL == COP) return false;
+
+	/* isNullVal should work on the normalized value on little endian machines */
+    bool val2Null = isNullVal(width, type, (uint8_t *) &val2);
+    if (isNull == val2Null || (val2Null && COP == COMPARE_NE))
+        return colCompare_(val1, val2, COP, rf);
+    else
+        return false;
 }
 
 template<int N>
@@ -560,6 +597,77 @@ inline void store(const NewColRequestHeader *in,
 }
 
 template<int W>
+inline uint64_t nextUnsignedColValue(int type,
+				const uint16_t *ridArray,
+				int NVALS,
+				int *index,
+				bool *done,
+				bool *isNull,
+				bool *isEmpty,
+				uint16_t *rid,
+				uint8_t OutputType, uint8_t *val8, unsigned itemsPerBlk)
+{
+    const uint8_t* vp = 0;
+    if (ridArray == NULL) {
+        while (static_cast<unsigned>(*index) < itemsPerBlk &&
+            isEmptyVal<W>(type, &val8[*index*W]) &&
+            (OutputType & OT_RID))
+        {
+            (*index)++;
+        }
+
+        if (static_cast<unsigned>(*index) >= itemsPerBlk) {
+            *done = true;
+            return 0;
+        }
+
+        vp = &val8[*index*W];
+        *isNull = isNullVal<W>(type, vp);
+        *isEmpty = isEmptyVal<W>(type, vp);
+        *rid = (*index)++;
+    }
+    else {
+        while (*index < NVALS &&
+            isEmptyVal<W>(type, &val8[ridArray[*index] * W]))
+        {
+            (*index)++;
+        }
+
+        if (*index >= NVALS) {
+            *done = true;
+            return 0;
+        }
+
+        vp = &val8[ridArray[*index] * W];
+        *isNull = isNullVal<W>(type, vp);
+        *isEmpty = isEmptyVal<W>(type, vp);
+        *rid = ridArray[(*index)++];
+    }
+    // at this point, nextRid is the index to return, and index is...
+    //   if RIDs are not specified, nextRid + 1,
+    //	 if RIDs are specified, it's the next index in the rid array.
+    //Bug 838, tinyint null problem
+    switch (W)
+    {
+    case 1:
+        return reinterpret_cast<uint8_t *> (val8)[*rid];
+    case 2:
+        return reinterpret_cast<uint16_t *>(val8)[*rid];
+    case 4:
+        return reinterpret_cast<uint32_t *>(val8)[*rid];
+    case 8:
+        return reinterpret_cast<uint64_t *>(val8)[*rid];
+    default:
+        logIt(33, W);
+
+#ifdef PRIM_DEBUG
+        throw logic_error("PrimitiveProcessor::nextColValue() bad width");
+#endif
+        return -1;
+    }
+}
+
+template<int W>
 inline int64_t nextColValue(int type,
 				const uint16_t *ridArray,
 				int NVALS,
@@ -570,43 +678,45 @@ inline int64_t nextColValue(int type,
 				uint16_t *rid,
 				uint8_t OutputType, uint8_t *val8, unsigned itemsPerBlk)
 {
+    const uint8_t* vp = 0;
+    if (ridArray == NULL) 
+    {
+        while (static_cast<unsigned>(*index) < itemsPerBlk &&
+            isEmptyVal<W>(type, &val8[*index*W]) &&
+            (OutputType & OT_RID))
+        {
+            (*index)++;
+        }
 
-	const uint8_t* vp = 0;
-	if (ridArray == NULL) {
-		while (static_cast<unsigned>(*index) < itemsPerBlk &&
-			isEmptyVal<W>(type, &val8[*index*W]) &&
-			(OutputType & OT_RID))
-		{
-			(*index)++;
-		}
+        if (static_cast<unsigned>(*index) >= itemsPerBlk) {
+            *done = true;
+            return 0;
+        }
 
-		if (static_cast<unsigned>(*index) >= itemsPerBlk) {
-			*done = true;
-			return 0;
-		}
+        vp = &val8[*index*W];
+        *isNull = isNullVal<W>(type, vp);
+        *isEmpty = isEmptyVal<W>(type, vp);
+        *rid = (*index)++;
+    }
+    else 
+    {
+        while (*index < NVALS &&
+            isEmptyVal<W>(type, &val8[ridArray[*index] * W]))
+        {
+            (*index)++;
+        }
 
-		vp = &val8[*index*W];
-		*isNull = isNullVal<W>(type, vp);
-		*isEmpty = isEmptyVal<W>(type, vp);
-		*rid = (*index)++;
-	}
-	else {
-		while (*index < NVALS &&
-			isEmptyVal<W>(type, &val8[ridArray[*index] * W]))
-		{
-			(*index)++;
-		}
+        if (*index >= NVALS) 
+        {
+            *done = true;
+            return 0;
+        }
 
-		if (*index >= NVALS) {
-			*done = true;
-			return 0;
-		}
-
-		vp = &val8[ridArray[*index] * W];
-		*isNull = isNullVal<W>(type, vp);
-		*isEmpty = isEmptyVal<W>(type, vp);
-		*rid = ridArray[(*index)++];
-	}
+        vp = &val8[ridArray[*index] * W];
+        *isNull = isNullVal<W>(type, vp);
+        *isEmpty = isEmptyVal<W>(type, vp);
+        *rid = ridArray[(*index)++];
+    }
 
 	// at this point, nextRid is the index to return, and index is...
 	//   if RIDs are not specified, nextRid + 1,
@@ -620,7 +730,7 @@ inline int64_t nextColValue(int type,
 		return reinterpret_cast<int16_t *>(val8)[*rid];
 	case 4:
 #if 0
-		if (type == WriteEngine::FLOAT) {
+		if (type == CalpontSystemCatalog::FLOAT) {
 			// convert the float to a 64-bit type, return that w/o conversion
 			int32_t* val32 = reinterpret_cast<int32_t *>(val8);
 			double dTmp;
@@ -642,6 +752,42 @@ inline int64_t nextColValue(int type,
 #endif
 		return -1;
 	}
+}
+
+
+// done should be init'd to false and
+// index should be init'd to 0 on the first call
+// done == true when there are no more elements to return.
+inline uint64_t nextUnsignedColValueHelper(int type,
+				int width,
+				const uint16_t *ridArray,
+				int NVALS,
+				int *index,
+				bool *done,
+				bool *isNull,
+				bool *isEmpty,
+				uint16_t *rid,
+				uint8_t OutputType, uint8_t *val8, unsigned itemsPerBlk)
+{
+	switch (width)
+	{
+	case 8:
+		return nextUnsignedColValue<8>(type, ridArray, NVALS, index, done, isNull, isEmpty, rid, OutputType, val8,
+			itemsPerBlk);
+	case 4:
+		return nextUnsignedColValue<4>(type, ridArray, NVALS, index, done, isNull, isEmpty, rid, OutputType, val8,
+			itemsPerBlk);
+	case 2:
+		return nextUnsignedColValue<2>(type, ridArray, NVALS, index, done, isNull, isEmpty, rid, OutputType, val8,
+			itemsPerBlk);
+	case 1:
+		return nextUnsignedColValue<1>(type, ridArray, NVALS, index, done, isNull, isEmpty, rid, OutputType, val8,
+			itemsPerBlk);
+	default:
+		idbassert(0);
+	}
+	/*NOTREACHED*/
+	return 0;
 }
 
 // done should be init'd to false and
@@ -678,7 +824,7 @@ inline int64_t nextColValueHelper(int type,
 	/*NOTREACHED*/
 	return 0;
 }
-
+#if 0
 inline void p_Col_noprid(const NewColRequestHeader *in, NewColResultHeader *out,
 	unsigned outSize, unsigned *written, int* block)
 {
@@ -688,16 +834,16 @@ inline void p_Col_noprid(const NewColRequestHeader *in, NewColResultHeader *out,
 	const ColArgs *args;
 	const uint8_t *in8 = reinterpret_cast<const uint8_t *>(in);
 	int64_t argVal, colVal;
+    uint64_t uargVal, ucolVal;
 
 	int8_t *val8 = reinterpret_cast<int8_t *>(block);
 	int16_t *val16 = reinterpret_cast<int16_t *>(block);
 	int32_t *val32 = reinterpret_cast<int32_t *>(block);
 	int64_t *val64 = reinterpret_cast<int64_t *>(block);
-
-	// No Min/Max returned since this is not a full scan.
-	out->ValidMinMax = false;
-	out->Min = 0;
-	out->Max = 0;
+    uint8_t *uval8 = reinterpret_cast<uint8_t *>(block);
+    uint16_t *uval16 = reinterpret_cast<uint16_t *>(block);
+    uint32_t *uval32 = reinterpret_cast<uint32_t *>(block);
+    uint64_t *uval64 = reinterpret_cast<uint64_t *>(block);
 
 	placeholderRegex.used = false;
 
@@ -711,355 +857,538 @@ inline void p_Col_noprid(const NewColRequestHeader *in, NewColResultHeader *out,
 		rid = *reinterpret_cast<const uint16_t *>(&in8[argOffset + sizeof(ColArgs) +
 			in->DataSize]);
 
-		switch (in->DataSize) {
-		case 1: argVal = args->val[0]; colVal = val8[rid]; break;
-		case 2: argVal = *reinterpret_cast<const int16_t *>(args->val);
-			colVal = val16[rid];
-			break;
-		case 4:
-#if 0
-			if (in->DataType == WriteEngine::FLOAT) {
-				double dTmp;
+        if (isUnsigned((CalpontSystemCatalog::ColDataType)in->DataType))
+        {
+            switch (in->DataSize) 
+            {
+                case 1: 
+                    uargVal = *reinterpret_cast<const uint8_t *>(args->val[0]); 
+                    ucolVal = uval8[rid]; 
+                    break;
+                case 2: 
+                    uargVal = *reinterpret_cast<const uint16_t *>(args->val);
+                    ucolVal = uval16[rid];
+                    break;
+                case 4:
+                    uargVal = *reinterpret_cast<const uint32_t *>(args->val);
+                    ucolVal = uval32[rid];
+                    break;
+                case 8: 
+                    uargVal = *reinterpret_cast<const uint64_t *>(args->val);
+                    ucolVal = uval64[rid];
+                    break;
+                default:
+                    logIt(33, in->DataSize);
+        #ifdef PRIM_DEBUG
+                    throw logic_error("PrimitiveProcessor::p_Col_noprid(): bad width");
+        #endif
+                    return;
+            }
 
-				dTmp = (double) *((const float *) args->val);
-				argVal = *((int64_t *) &dTmp);
+            if (colCompare(ucolVal, uargVal, args->COP, args->rf, in->DataType, in->DataSize, placeholderRegex))
+                store(in, out, outSize, written, rid, reinterpret_cast<const uint8_t *>(block));
+        }
+        else
+        {
+            switch (in->DataSize) 
+            {
+                case 1: 
+                    argVal = args->val[0]; 
+                    colVal = val8[rid]; 
+                    break;
+                case 2: 
+                    argVal = *reinterpret_cast<const int16_t *>(args->val);
+                    colVal = val16[rid];
+                    break;
+                case 4:
+                    argVal = *reinterpret_cast<const int32_t *>(args->val);
+                    colVal = val32[rid];
+                    break;
+                case 8: argVal = *reinterpret_cast<const int64_t *>(args->val);
+                    colVal = val64[rid];
+                    break;
+                default:
+                    logIt(33, in->DataSize);
+        #ifdef PRIM_DEBUG
+                    throw logic_error("PrimitiveProcessor::p_Col_noprid(): bad width");
+        #endif
+                    return;
+            }
 
-				dTmp = (double) *((float *) val32[rid]);
-				colVal = *((int64_t *) &dTmp);
-			}
-			else {
-				argVal = *reinterpret_cast<const int32_t *>(args->val);
-				colVal = val32[rid];
-			}
-#else
-				argVal = *reinterpret_cast<const int32_t *>(args->val);
-				colVal = val32[rid];
-#endif
-			break;
-		case 8: argVal = *reinterpret_cast<const int64_t *>(args->val);
-			colVal = val64[rid];
-			break;
-		default:
-			logIt(33, in->DataSize);
-#ifdef PRIM_DEBUG
-			throw logic_error("PrimitiveProcessor::p_Col_noprid(): bad width");
-#endif
-			return;
-		}
-
-		if (colCompare(colVal, argVal, args->COP, args->rf, in->DataType, in->DataSize, placeholderRegex))
-			store(in, out, outSize, written, rid, reinterpret_cast<const uint8_t *>(block));
+            if (colCompare(colVal, argVal, args->COP, args->rf, in->DataType, in->DataSize, placeholderRegex))
+                store(in, out, outSize, written, rid, reinterpret_cast<const uint8_t *>(block));
+        }
 	}
 }
-
+#endif
 template<int W>
 inline void p_Col_ridArray(NewColRequestHeader *in,
-				NewColResultHeader *out,
-				unsigned outSize,
-				unsigned *written, int* block, Stats* fStatsPtr, unsigned itemsPerBlk,
-				boost::shared_ptr<ParsedColumnFilter> parsedColumnFilter,
-				UDFFcnPtr_t fp)
+                           NewColResultHeader *out,
+                           unsigned outSize,
+                           unsigned *written, int* block, Stats* fStatsPtr, unsigned itemsPerBlk,
+                           boost::shared_ptr<ParsedColumnFilter> parsedColumnFilter,
+                           UDFFcnPtr_t fp)
 {
-	uint16_t *ridArray=0;
-	uint8_t *in8 = reinterpret_cast<uint8_t *>(in);
-	const uint8_t filterSize = sizeof(uint8_t) + sizeof(uint8_t) + W;
+    uint16_t *ridArray=0;
+    uint8_t *in8 = reinterpret_cast<uint8_t *>(in);
+    const uint8_t filterSize = sizeof(uint8_t) + sizeof(uint8_t) + W;
 
-	placeholderRegex.used = false;
+    placeholderRegex.used = false;
 
-	if (in->NVALS>0)
-		ridArray = reinterpret_cast<uint16_t *>(&in8[sizeof(NewColRequestHeader) +
-			(in->NOPS * filterSize)]);
+    if (in->NVALS>0)
+        ridArray = reinterpret_cast<uint16_t *>(&in8[sizeof(NewColRequestHeader) +
+                                                     (in->NOPS * filterSize)]);
 
-	if (ridArray && 1 == in->sort )
-	{
-		qsort(ridArray, in->NVALS, sizeof(uint16_t), compareBlock<uint16_t>);
-		if (fStatsPtr)
+    if (ridArray && 1 == in->sort )
+    {
+        qsort(ridArray, in->NVALS, sizeof(uint16_t), compareBlock<uint16_t>);
+        if (fStatsPtr)
 #ifdef _MSC_VER
-			fStatsPtr->markEvent(in->LBID, GetCurrentThreadId(), in->hdr.SessionID, 'O');
+            fStatsPtr->markEvent(in->LBID, GetCurrentThreadId(), in->hdr.SessionID, 'O');
 #else
-			fStatsPtr->markEvent(in->LBID, pthread_self(), in->hdr.SessionID, 'O');
+            fStatsPtr->markEvent(in->LBID, pthread_self(), in->hdr.SessionID, 'O');
 #endif
-	}
+    }
 
-	// Set boolean indicating whether to capture the min and max values.
-	out->ValidMinMax = isMinMaxValid(in);
-	if(out->ValidMinMax) {
-		out->Min = MAX64;
-		out->Max = MIN64;
-	}
-	else {
-		out->Min = 0;
-		out->Max = 0;
-	}
+    // Set boolean indicating whether to capture the min and max values.
+    out->ValidMinMax = isMinMaxValid(in);
+    if (out->ValidMinMax)
+    {
+        if (isUnsigned((CalpontSystemCatalog::ColDataType)in->DataType))
+        {
+            out->Min = static_cast<int64_t>(numeric_limits<uint64_t>::max());
+            out->Max = 0;
+        }
+        else
+        {
+            out->Min = numeric_limits<int64_t>::max();
+            out->Max = numeric_limits<int64_t>::min();
+        }
+    }
+    else
+    {
+        out->Min = 0;
+        out->Max = 0;
+    }
 
-	const ColArgs *args=NULL;
-	int64_t val=0;
-	int nextRidIndex=0, argIndex=0;
-	bool done=false, cmp=false, isNull=false, isEmpty=false;
-	uint16_t rid=0;
-	prestored_set_t::const_iterator it;
+    const ColArgs *args=NULL;
+    int64_t val=0;
+    uint64_t uval=0;
+    int nextRidIndex=0, argIndex=0;
+    bool done=false, cmp=false, isNull=false, isEmpty=false;
+    uint16_t rid=0;
+    prestored_set_t::const_iterator it;
 
-	int64_t* std_argVals = (int64_t*)alloca(in->NOPS * sizeof(int64_t));
-	uint8_t* std_cops = (uint8_t*)alloca(in->NOPS * sizeof(uint8_t));
-	uint8_t* std_rfs = (uint8_t*)alloca(in->NOPS * sizeof(uint8_t));
-	int64_t *argVals;
-	uint8_t *cops;
-	uint8_t *rfs;
-	
-	scoped_array<idb_regex_t> std_regex;
-	idb_regex_t* regex;
-	uint8_t likeOps = 0;
+    int64_t* std_argVals = (int64_t*)alloca(in->NOPS * sizeof(int64_t));
+    uint8_t* std_cops = (uint8_t*)alloca(in->NOPS * sizeof(uint8_t));
+    uint8_t* std_rfs = (uint8_t*)alloca(in->NOPS * sizeof(uint8_t));
+    int64_t *argVals = NULL;
+    uint64_t *uargVals = NULL;
+    uint8_t *cops = NULL;
+    uint8_t *rfs = NULL;
 
-	// no pre-parsed column filter is set, parse the filter in the message
-	if (parsedColumnFilter.get() == NULL) {
-		argVals = std_argVals;
-		cops = std_cops;
-		rfs = std_rfs;
+    scoped_array<idb_regex_t> std_regex;
+    idb_regex_t* regex = NULL;
+    uint8_t likeOps = 0;
 
-		std_regex.reset(new idb_regex_t[in->NOPS]);
-		regex = &(std_regex[0]);
+    // no pre-parsed column filter is set, parse the filter in the message
+    if (parsedColumnFilter.get() == NULL)
+    {
+        std_regex.reset(new idb_regex_t[in->NOPS]);
+        regex = &(std_regex[0]);
 
-		for (argIndex = 0; argIndex < in->NOPS; argIndex++)
-		{
-			args = reinterpret_cast<const ColArgs *>(&in8[sizeof(NewColRequestHeader) +
-				(argIndex * filterSize)]);
-			cops[argIndex] = args->COP;
-			rfs[argIndex] = args->rf;
+        if (isUnsigned((CalpontSystemCatalog::ColDataType)in->DataType))
+        {
+            uargVals = reinterpret_cast<uint64_t*>(std_argVals);
+            cops = std_cops;
+            rfs = std_rfs;
 
-			switch (W) {
-			case 1: argVals[argIndex] = args->val[0]; break;
-			case 2: argVals[argIndex] = *reinterpret_cast<const int16_t *>(args->val); break;
-			case 4:
+            for (argIndex = 0; argIndex < in->NOPS; argIndex++)
+            {
+                args = reinterpret_cast<const ColArgs *>(&in8[sizeof(NewColRequestHeader) +
+                                                              (argIndex * filterSize)]);
+                cops[argIndex] = args->COP;
+                rfs[argIndex] = args->rf;
+
+                switch (W)
+                {
+                    case 1: uargVals[argIndex] = *reinterpret_cast<const uint8_t *>(args->val); break;
+                    case 2: uargVals[argIndex] = *reinterpret_cast<const uint16_t *>(args->val); break;
+                    case 4: uargVals[argIndex] = *reinterpret_cast<const uint32_t *>(args->val); break;
+                    case 8: uargVals[argIndex] = *reinterpret_cast<const uint64_t *>(args->val); break;
+                }
+                regex[argIndex].used = false;
+            }
+        }
+        else
+        {
+            argVals = std_argVals;
+            cops = std_cops;
+            rfs = std_rfs;
+
+            for (argIndex = 0; argIndex < in->NOPS; argIndex++)
+            {
+                args = reinterpret_cast<const ColArgs *>(&in8[sizeof(NewColRequestHeader) +
+                                                              (argIndex * filterSize)]);
+                cops[argIndex] = args->COP;
+                rfs[argIndex] = args->rf;
+
+                switch (W)
+                {
+                    case 1: argVals[argIndex] = args->val[0]; break;
+                    case 2: argVals[argIndex] = *reinterpret_cast<const int16_t *>(args->val); break;
+                    case 4:
 #if 0
-				if (in->DataType == WriteEngine::FLOAT) {
-					double dTmp;
+                        if (in->DataType == CalpontSystemCatalog::FLOAT)
+                        {
+                            double dTmp;
 
-					dTmp = (double) *((const float *) args->val);
-					argVals[argIndex] = *((int64_t *) &dTmp);
-				}
-				else
-					argVals[argIndex] = *reinterpret_cast<const int32_t *>(args->val);
+                            dTmp = (double) *((const float *) args->val);
+                            argVals[argIndex] = *((int64_t *) &dTmp);
+                        }
+                        else
+                            argVals[argIndex] = *reinterpret_cast<const int32_t *>(args->val);
 #else
-					argVals[argIndex] = *reinterpret_cast<const int32_t *>(args->val);
+                        argVals[argIndex] = *reinterpret_cast<const int32_t *>(args->val);
 #endif
-				break;
-			case 8: argVals[argIndex] = *reinterpret_cast<const int64_t *>(args->val); break;
-			}
-			if (COMPARE_LIKE & args->COP)
-			{
-                PrimitiveProcessor::p_DataValue dv = convertToPDataValue(&argVals[argIndex], W);
-				int err = PrimitiveProcessor::convertToRegexp(&regex[argIndex], &dv);
-				if (err) 
-				{
-					throw runtime_error("PrimitiveProcessor::p_Col_ridarray(): Could not create regular expression for LIKE operator");
-				}
-				++likeOps;
-			}
-			else
-				regex[argIndex].used = false;
-		}
-	}
-	// we have a pre-parsed filter, and it's in the form of op and value arrays
-	else if (parsedColumnFilter->columnFilterMode == TWO_ARRAYS) {
-		argVals = parsedColumnFilter->prestored_argVals.get();
-		cops = parsedColumnFilter->prestored_cops.get();
-		rfs = parsedColumnFilter->prestored_rfs.get();
-		regex = parsedColumnFilter->prestored_regex.get();
-		likeOps = parsedColumnFilter->likeOps;
-		
-	}
-	// we have a pre-parsed filter, and it's an unordered set for quick == comparisons
-	else {
-		argVals = NULL;
-		cops = NULL;
-		rfs = NULL;
-		regex = NULL;
-	}
+                        break;
+                    case 8: argVals[argIndex] = *reinterpret_cast<const int64_t *>(args->val); break;
+                }
+                if (COMPARE_LIKE & args->COP)
+                {
+                    PrimitiveProcessor::p_DataValue dv = convertToPDataValue(&argVals[argIndex], W);
+                    int err = PrimitiveProcessor::convertToRegexp(&regex[argIndex], &dv);
+                    if (err)
+                    {
+                        throw runtime_error("PrimitiveProcessor::p_Col_ridarray(): Could not create regular expression for LIKE operator");
+                    }
+                    ++likeOps;
+                }
+                else
+                    regex[argIndex].used = false;
+            }
+        }
+    }
+    // we have a pre-parsed filter, and it's in the form of op and value arrays
+    else if (parsedColumnFilter->columnFilterMode == TWO_ARRAYS)
+    {
+        argVals = parsedColumnFilter->prestored_argVals.get();
+        uargVals = reinterpret_cast<uint64_t*>(parsedColumnFilter->prestored_argVals.get());
+        cops = parsedColumnFilter->prestored_cops.get();
+        rfs = parsedColumnFilter->prestored_rfs.get();
+        regex = parsedColumnFilter->prestored_regex.get();
+        likeOps = parsedColumnFilter->likeOps;
 
-	val = nextColValue<W>(in->DataType, ridArray, in->NVALS, &nextRidIndex, &done, &isNull,
-		&isEmpty, &rid, in->OutputType, reinterpret_cast<uint8_t *>(block), itemsPerBlk);
+    }
+    // else we have a pre-parsed filter, and it's an unordered set for quick == comparisons
 
-	if (fp)
-	{
+    if (isUnsigned((CalpontSystemCatalog::ColDataType)in->DataType))
+    {
+        uval = nextUnsignedColValue<W>(in->DataType, ridArray, in->NVALS, &nextRidIndex, &done, &isNull,
+                               &isEmpty, &rid, in->OutputType, reinterpret_cast<uint8_t *>(block), itemsPerBlk);
+    }
+    else
+    {
+        val = nextColValue<W>(in->DataType, ridArray, in->NVALS, &nextRidIndex, &done, &isNull,
+                              &isEmpty, &rid, in->OutputType, reinterpret_cast<uint8_t *>(block), itemsPerBlk);
+    }
+
+    if (fp)
+    {
 #ifndef _MSC_VER
-		if ((void*)fp == (void*)::acos ||
-			(void*)fp == (void*)::asin ||
-			(void*)fp == (void*)::atan ||
-			(void*)fp == (void*)::cos ||
-			//(void*)fp == (void*):cotangent ||
-			(void*)fp == (void*)::exp ||
-			(void*)fp == (void*)::log ||
+        if ((void*)fp == (void*)::acos ||
+            (void*)fp == (void*)::asin ||
+            (void*)fp == (void*)::atan ||
+            (void*)fp == (void*)::cos ||
+            //(void*)fp == (void*):cotangent ||
+            (void*)fp == (void*)::exp ||
+            (void*)fp == (void*)::log ||
 #ifdef __linux__
-			(void*)fp == (void*)::log2 ||
+            (void*)fp == (void*)::log2 ||
 #else
-			(void*)fp == (void*)::log ||
+            (void*)fp == (void*)::log ||
 #endif
-			(void*)fp == (void*)::log10 ||
-			(void*)fp == (void*)::sin ||
-			(void*)fp == (void*)::sqrt ||
-			(void*)fp == (void*)::tan)
-		{
-			double (*dfp)(double) = (double (*)(double))fp;
-			switch (W)
-			{
-			case 4:
-				{
-					float fout;
-					float* finp = (float*)&val;
-					int32_t* valp = (int32_t*)&fout;
-					fout = (float)dfp((double)(*finp));
-					val = *valp;
-				}
-				break;
-			default:
-				{
-					double dout;
-					double* dinp = (double*)&val;
-					int64_t* valp = (int64_t*)&dout;
-					dout = dfp(*dinp);
-					val = *valp;
-				}
-				break;
-			}
-		}
-		else
-		{
-			val = fp(val);
-		}
+            (void*)fp == (void*)::log10 ||
+            (void*)fp == (void*)::sin ||
+            (void*)fp == (void*)::sqrt ||
+            (void*)fp == (void*)::tan)
+        {
+            double (*dfp)(double) = (double (*)(double))fp;
+            if (isUnsigned((CalpontSystemCatalog::ColDataType)in->DataType))
+            {
+                switch (W)
+                {
+                    case 4:
+                    {
+                        float fout;
+                        float* finp = (float*)&uval;
+                        uint32_t* valp = (uint32_t*)&fout;
+                        fout = (float)dfp((double)(*finp));
+                        uval = *valp;
+                    }
+                    break;
+                    default:
+                    {
+                        double dout;
+                        double* dinp = (double*)&uval;
+                        uint64_t* valp = (uint64_t*)&dout;
+                        dout = dfp(*dinp);
+                        uval = *valp;
+                    }
+                    break;
+                }
+            }
+            else
+            {
+                switch (W)
+                {
+                    case 4:
+                    {
+                        float fout;
+                        float* finp = (float*)&val;
+                        int32_t* valp = (int32_t*)&fout;
+                        fout = (float)dfp((double)(*finp));
+                        val = *valp;
+                    }
+                    break;
+                    default:
+                    {
+                        double dout;
+                        double* dinp = (double*)&val;
+                        int64_t* valp = (int64_t*)&dout;
+                        dout = dfp(*dinp);
+                        val = *valp;
+                    }
+                    break;
+                }
+            }
+        }
+        else
+        {
+            if (isUnsigned((CalpontSystemCatalog::ColDataType)in->DataType))
+            {
+                uval = fp(uval);
+            }
+            else
+            {
+                val = fp(val);
+            }
+        }
 #else
-		//FIXME: ???
-		val = 0;
+        //FIXME: ???
+        val = 0;
+        uval = 0;
 #endif
-	}
+    }
 
-	while (!done) {
-		if (cops == NULL) {  // implies parsedColumnFilter && columnFilterMode == SET
-			
-			/* bug 1920: ignore NULLs in the set and in the column data */
-			if (isNull && in->BOP == BOP_AND)
-				goto skipnulls;
-			it = parsedColumnFilter->prestored_set->find(val);
-			if (in->BOP == BOP_OR) {
-				// assume COP == COMPARE_EQ
-				if (it != parsedColumnFilter->prestored_set->end()) {
-					store(in, out, outSize, written, rid, reinterpret_cast<const uint8_t *>(block));
-				}
-			}
-			else if (in->BOP == BOP_AND) {
-				// assume COP == COMPARE_NE
-				if (it == parsedColumnFilter->prestored_set->end())
-					store(in, out, outSize, written, rid, reinterpret_cast<const uint8_t *>(block));
-			}
-skipnulls:	;
-		}
-		else {
-			for (argIndex = 0; argIndex < in->NOPS; argIndex++) {
+    while (!done)
+    {
+        if (cops == NULL)    // implies parsedColumnFilter && columnFilterMode == SET
+        {
+            /* bug 1920: ignore NULLs in the set and in the column data */
+            if (!(isNull && in->BOP == BOP_AND))
+            {
+                if (isUnsigned((CalpontSystemCatalog::ColDataType)in->DataType))
+                {
+                    it = parsedColumnFilter->prestored_set->find(*reinterpret_cast<int64_t*>(&uval));
+                }
+                else
+                {
+                    it = parsedColumnFilter->prestored_set->find(val);
+                }
+                if (in->BOP == BOP_OR)
+                {
+                    // assume COP == COMPARE_EQ
+                    if (it != parsedColumnFilter->prestored_set->end())
+                    {
+                        store(in, out, outSize, written, rid, reinterpret_cast<const uint8_t *>(block));
+                    }
+                }
+                else if (in->BOP == BOP_AND)
+                {
+                    // assume COP == COMPARE_NE
+                    if (it == parsedColumnFilter->prestored_set->end())
+                    {
+                        store(in, out, outSize, written, rid, reinterpret_cast<const uint8_t *>(block));
+                    }
+                }
+            }
+        }
+        else
+        {
+            for (argIndex = 0; argIndex < in->NOPS; argIndex++)
+            {
+                if (isUnsigned((CalpontSystemCatalog::ColDataType)in->DataType))
+                {
+                    cmp = colCompareUnsigned(uval, uargVals[argIndex], cops[argIndex],
+                                     rfs[argIndex], in->DataType, W, regex[argIndex], isNull);
+                }
+                else
+                {
+                    cmp = colCompare(val, argVals[argIndex], cops[argIndex],
+                                     rfs[argIndex], in->DataType, W, regex[argIndex], isNull);
+                }
 
-				cmp = colCompare(val, argVals[argIndex], cops[argIndex],
-						 rfs[argIndex], in->DataType, W, regex[argIndex], isNull);
+                if (in->NOPS == 1)
+                {
+                    if (cmp == true)
+                    {
+                        store(in, out, outSize, written, rid, reinterpret_cast<const uint8_t *>(block));
+                    }
+                    break;
+                }
+                else if (in->BOP == BOP_AND && cmp == false)
+                {
+                    break;
+                }
+                else if (in->BOP == BOP_OR && cmp == true)
+                {
+                    store(in, out, outSize, written, rid, reinterpret_cast<const uint8_t *>(block));
+                    break;
+                }
+            }
 
-				if (in->NOPS == 1) {
-					if (cmp == true) {
-						store(in, out, outSize, written, rid, reinterpret_cast<const uint8_t *>(block));
-					}
-					break;
-				}
-				else if (in->BOP == BOP_AND && cmp == false) {
-					break;
-				}
-				else if (in->BOP == BOP_OR && cmp == true) {
-					store(in, out, outSize, written, rid, reinterpret_cast<const uint8_t *>(block));
-					break;
-				}
-			}
+            if ((argIndex == in->NOPS && in->BOP == BOP_AND) || in->NOPS == 0)
+            {
+                store(in, out, outSize, written, rid, reinterpret_cast<const uint8_t *>(block));
+            }
+        }
 
-			if ((argIndex == in->NOPS && in->BOP == BOP_AND) || in->NOPS == 0) {
-				store(in, out, outSize, written, rid, reinterpret_cast<const uint8_t *>(block));
-			}
-		}
-	
-		// Set the min and max if necessary.  Ignore nulls.
-		if (out->ValidMinMax && !isNull && !isEmpty) {
+        // Set the min and max if necessary.  Ignore nulls.
+        if (out->ValidMinMax && !isNull && !isEmpty)
+        {
 
-			if ( (in->DataType == WriteEngine::CHAR || in->DataType == WriteEngine::VARCHAR ) && 1 < W)
-			{
-				if (colCompare(out->Min, val, COMPARE_GT, false, in->DataType, W, placeholderRegex))
-					out->Min = val;
-				if (colCompare(out->Max, val, COMPARE_LT, false, in->DataType, W, placeholderRegex))
-					out->Max = val;
-			}
-			else
-			{
-				if (out->Min > val)
-					out->Min = val;
-				if (out->Max < val)
-					out->Max = val;
-			}
-		}
+            if ((in->DataType == CalpontSystemCatalog::CHAR || in->DataType == CalpontSystemCatalog::VARCHAR ) && 1 < W)
+            {
+                if (colCompare(out->Min, val, COMPARE_GT, false, in->DataType, W, placeholderRegex))
+                    out->Min = val;
+                if (colCompare(out->Max, val, COMPARE_LT, false, in->DataType, W, placeholderRegex))
+                    out->Max = val;
+            }
+            else
+            if (isUnsigned((CalpontSystemCatalog::ColDataType)in->DataType))
+            {
+                if (static_cast<uint64_t>(out->Min) > uval)
+                    out->Min = static_cast<int64_t>(uval);
+                if (static_cast<uint64_t>(out->Max) < uval)
+                    out->Max = static_cast<int64_t>(uval);;
+            }
+            else
+            {
+                if (out->Min > val)
+                    out->Min = val;
+                if (out->Max < val)
+                    out->Max = val;
+            }
+        }
 
-		val = nextColValue<W>(in->DataType, ridArray, in->NVALS, &nextRidIndex, &done,
-			&isNull, &isEmpty, &rid, in->OutputType, reinterpret_cast<uint8_t *>(block),
-			itemsPerBlk);
+        if (isUnsigned((CalpontSystemCatalog::ColDataType)in->DataType))
+        {
+            uval = nextUnsignedColValue<W>(in->DataType, ridArray, in->NVALS, &nextRidIndex, &done,
+                                  &isNull, &isEmpty, &rid, in->OutputType, reinterpret_cast<uint8_t *>(block),
+                                  itemsPerBlk);
+        }
+        else
+        {
+            val = nextColValue<W>(in->DataType, ridArray, in->NVALS, &nextRidIndex, &done,
+                                  &isNull, &isEmpty, &rid, in->OutputType, reinterpret_cast<uint8_t *>(block),
+                                  itemsPerBlk);
+        }
 
-		if (fp)
-		{
+        if (fp)
+        {
 #ifndef _MSC_VER
-			if ((void*)fp == (void*)::acos ||
-				(void*)fp == (void*)::asin ||
-				(void*)fp == (void*)::atan ||
-				(void*)fp == (void*)::cos ||
-				//(void*)fp == (void*):cotangent ||
-				(void*)fp == (void*)::exp ||
-				(void*)fp == (void*)::log ||
+            if ((void*)fp == (void*)::acos ||
+                (void*)fp == (void*)::asin ||
+                (void*)fp == (void*)::atan ||
+                (void*)fp == (void*)::cos ||
+                //(void*)fp == (void*):cotangent ||
+                (void*)fp == (void*)::exp ||
+                (void*)fp == (void*)::log ||
 #ifdef __linux__
-				(void*)fp == (void*)::log2 ||
+                (void*)fp == (void*)::log2 ||
 #else
-				(void*)fp == (void*)::log ||
+                (void*)fp == (void*)::log ||
 #endif
-				(void*)fp == (void*)::log10 ||
-				(void*)fp == (void*)::sin ||
-				(void*)fp == (void*)::sqrt ||
-				(void*)fp == (void*)::tan)
-			{
-				double (*dfp)(double) = (double (*)(double))fp;
-				switch (W)
-				{
-				case 4:
-					{
-						float fout;
-						float* finp = (float*)&val;
-						int32_t* valp = (int32_t*)&fout;
-						fout = (float)dfp((double)(*finp));
-						val = *valp;
-					}
-					break;
-				default:
-					{
-						double dout;
-						double* dinp = (double*)&val;
-						int64_t* valp = (int64_t*)&dout;
-						dout = dfp(*dinp);
-						val = *valp;
-					}
-					break;
-				}
-			}
-			else
-			{
-				val = fp(val);
-			}
+                (void*)fp == (void*)::log10 ||
+                (void*)fp == (void*)::sin ||
+                (void*)fp == (void*)::sqrt ||
+                (void*)fp == (void*)::tan)
+            {
+                double (*dfp)(double) = (double (*)(double))fp;
+                if (isUnsigned((CalpontSystemCatalog::ColDataType)in->DataType))
+                {
+                    switch (W)
+                    {
+                        case 4:
+                        {
+                            float fout;
+                            float* finp = (float*)&uval;
+                            uint32_t* valp = (uint32_t*)&fout;
+                            fout = (float)dfp((double)(*finp));
+                            uval = *valp;
+                        }
+                        break;
+                        default:
+                        {
+                            double dout;
+                            double* dinp = (double*)&uval;
+                            uint64_t* valp = (uint64_t*)&dout;
+                            dout = dfp(*dinp);
+                            uval = *valp;
+                        }
+                        break;
+                    }
+                }
+                else
+                {
+                    switch (W)
+                    {
+                        case 4:
+                        {
+                            float fout;
+                            float* finp = (float*)&val;
+                            int32_t* valp = (int32_t*)&fout;
+                            fout = (float)dfp((double)(*finp));
+                            val = *valp;
+                        }
+                        break;
+                        default:
+                        {
+                            double dout;
+                            double* dinp = (double*)&val;
+                            int64_t* valp = (int64_t*)&dout;
+                            dout = dfp(*dinp);
+                            val = *valp;
+                        }
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                if (isUnsigned((CalpontSystemCatalog::ColDataType)in->DataType))
+                {
+                    uval = fp(val);
+                }
+                else
+                {
+                    val = fp(val);
+                }
+            }
 #else
-			val = 0;
+            val = 0;
+            uval = 0;
 #endif
-		}
+        }
 
-	}
+    }
 
-	if (fStatsPtr)
+    if (fStatsPtr)
 #ifdef _MSC_VER
-		fStatsPtr->markEvent(in->LBID, GetCurrentThreadId(), in->hdr.SessionID, 'K');
+        fStatsPtr->markEvent(in->LBID, GetCurrentThreadId(), in->hdr.SessionID, 'K');
 #else
-		fStatsPtr->markEvent(in->LBID, pthread_self(), in->hdr.SessionID, 'K');
+        fStatsPtr->markEvent(in->LBID, pthread_self(), in->hdr.SessionID, 'K');
 #endif
 }
 
@@ -1132,187 +1461,6 @@ void PrimitiveProcessor::p_Col(NewColRequestHeader *in, NewColResultHeader *out,
 #endif
 }
 
-// This needs to be tested more then condensed.
-void PrimitiveProcessor::do_sum8(NewColAggResultHeader *out, int64_t val)
-{
-
-	if (out->SumSign == 0) {
-		if (val > 0) {
-			out->Sum += val;
-			if (out->Sum < 0) {
-				out->SumOverflow++;
-				out->Sum -= (static_cast<unsigned long long>(MAX64) + 1);
-			}
-		}
-		else {
-			out->Sum += val;
-			if (out->Sum < 0) {
-				if (out->SumOverflow > 0) {
-					out->SumOverflow--;
-					out->Sum += (static_cast<unsigned long long>(MAX64) + 1);
-				}
-				else {
-					out->SumSign = 1;
-					out->Sum = abs((int)out->Sum);
-				}
-			}
-		}
-	}
-	else {
-		if (val < 0) {
-			out->Sum -= val;
-			if (out->Sum < 0) {
-				out->SumOverflow++;
-				out->Sum -= (static_cast<unsigned long long>(MAX64) + 1);
-			}
-		}
-		else {
-			out->Sum -= val;
-			if (out->Sum < 0) {
-				if (out->SumOverflow > 0) {
-					out->SumOverflow--;
-					out->Sum += (static_cast<unsigned long long>(MAX64) + 1);
-				}
-				else {
-					out->SumSign = 0;
-					out->Sum = abs((int)out->Sum);
-				}
-			}
-		}
-	}
-}
-
-void PrimitiveProcessor::p_ColAggregate(const NewColAggRequestHeader *in,
-	NewColAggResultHeader *out)
-{
-	const uint16_t *ridArray;
-	const u_int8_t *in8;
-	int ridIndex, argIndex;
-	uint16_t ridIndex2;
-	int64_t val; //, argVal=0;
-	bool done, cmp, isNull=true, isEmpty=true;
-	const ColArgs *args;
-	unsigned itemsPerBlk = 0;
-
-	placeholderRegex.used = false;
-
-	if (logicalBlockMode)
-		itemsPerBlk = BLOCK_SIZE;
-	else
-		itemsPerBlk = BLOCK_SIZE/in->DataSize;
-
-
-	memcpy(out, in, sizeof(ISMPacketHeader) + sizeof(PrimitiveHeader));
-	out->ism.Command = COL_AGG_RESULTS;
-	out->LBID = in->LBID;
-	out->Sum = 0;
-	out->SumOverflow = 0;
-	out->SumSign = 0;
-	out->Min = MAX64;
-	out->Max = MIN64;
-	out->NVALS = 0;
-
-	in8 = reinterpret_cast<const u_int8_t *>(in);
-	const uint8_t filterSize = sizeof(uint8_t) + sizeof(uint8_t) + in->DataSize;
-
-	if (in->NVALS == 0)
-		ridArray = NULL;
-	else
-		ridArray = reinterpret_cast<const uint16_t *>(&in8[sizeof(NewColAggRequestHeader) +
-			(in->NOPS * filterSize)]);
-
-	ridIndex = 0;
-	done = false;
-
-	int64_t* argVals = (int64_t*)alloca(in->NOPS * sizeof(int64_t));
-	uint8_t* cops = (uint8_t*)alloca(in->NOPS * sizeof(uint8_t));
-	uint8_t* rfs = (uint8_t*)alloca(in->NOPS * sizeof(uint8_t));
-	scoped_array<idb_regex_t> regex(new idb_regex_t[in->NOPS]);
-
-//@bug 1828 Need to compile the like reg expressions first.
-	for (argIndex = 0; argIndex < in->NOPS; argIndex++) 
-	{
-		args = reinterpret_cast<const ColArgs *>(&in8[sizeof(NewColAggRequestHeader) +
-			(argIndex * filterSize)]);
-		cops[argIndex] = args->COP;
-		rfs[argIndex] = args->rf;
-		switch (in->DataSize) 
-		{
-			case 1: argVals[argIndex] = args->val[0]; break;
-			case 2: argVals[argIndex] = *reinterpret_cast<const int16_t *>(args->val); break;
-			case 4: argVals[argIndex] = *reinterpret_cast<const int32_t *>(args->val); break;
-			case 8: argVals[argIndex] = *reinterpret_cast<const int64_t *>(args->val); break;
-		}
-
-		if (COMPARE_LIKE & args->COP)
-		{
-			PrimitiveProcessor::p_DataValue dv = convertToPDataValue(&argVals[argIndex], in->DataSize);
-			int err = PrimitiveProcessor::convertToRegexp(&regex[argIndex], &dv);
-			if (err) 
-			{
-				throw runtime_error("PrimitiveProcessor::p_colAggregate(): Could not create regular expression for LIKE operator");
-			}
-		}
-	}
-		
-
-
-	for (val = nextColValueHelper(in->DataType, in->DataSize, ridArray, in->NVALS, &ridIndex, &done, &isNull, &isEmpty, &ridIndex2, in->OutputType, reinterpret_cast<uint8_t *>(block), itemsPerBlk);
-		!done;
-		val = nextColValueHelper(in->DataType, in->DataSize, ridArray, in->NVALS, &ridIndex, &done, &isNull, &isEmpty, &ridIndex2, in->OutputType, reinterpret_cast<uint8_t *>(block), itemsPerBlk)) {
-
-		if (isNull)
-			continue;
-
-		for (argIndex = 0; argIndex < in->NOPS; argIndex++) {
-			
-			cmp = colCompare(val, argVals[argIndex], cops[argIndex], rfs[argIndex], in->DataType, in->DataSize, regex[argIndex]);
-			// This check is here b/c BOP has no sensible value when NOPS=1,
-			// shouldn't base a decision on that.
-			if (in->NOPS == 1) {
-				if (cmp == true)
-					goto count;
- 				else
- 					break;
-			}
-			else if (in->BOP == BOP_AND && cmp == false)
-				break;
-			else if (in->BOP == BOP_OR && cmp == true)
-				goto count;
-		}
-		if ((argIndex == in->NOPS && in->BOP == BOP_AND) || in->NOPS == 0) {
-count:
-			if (val != 0)
-			{
-				if (in->DataSize == 8)
-					do_sum8(out, val);
-				else
-					out->Sum += val;
-			}
-
-			if (!isEmpty && !isNull)
-			{
-				if ( (in->DataType == WriteEngine::CHAR || in->DataType == WriteEngine::VARCHAR ) && 1 < in->DataSize  )
-				{	
-				  if (colCompare(out->Min, val, COMPARE_GT, false, in->DataType, in->DataSize, placeholderRegex))
-						out->Min = val;
-				  if (colCompare(out->Max, val, COMPARE_LT, false, in->DataType, in->DataSize, placeholderRegex))
-						out->Max = val;
-				}
-				else
-				{
-					if (out->Min > val)
-						out->Min = val;
-					if (out->Max < val)
-						out->Max = val;
-				}
-
-			}
-			out->NVALS++;
-		}
-	}
-}
-
 boost::shared_ptr<ParsedColumnFilter> PrimitiveProcessor::parseColumnFilter
 	(const uint8_t *filterString, uint colWidth, uint colType, uint filterCount, 
 	uint BOP)
@@ -1366,30 +1514,52 @@ boost::shared_ptr<ParsedColumnFilter> PrimitiveProcessor::parseColumnFilter
 			 (args->COP == COMPARE_NIL))
 			convertToSet = false;
 
-		switch (colWidth) {
-			case 1: ret->prestored_argVals[argIndex] = args->val[0]; break;
-			case 2: ret->prestored_argVals[argIndex] =
-				*reinterpret_cast<const int16_t *>(args->val); break;
-			case 4:
-#if 0
-				if (colType == WriteEngine::FLOAT) {
-					double dTmp;
+        if (isUnsigned((CalpontSystemCatalog::ColDataType)colType))
+        {
+            switch (colWidth) {
+                case 1: 
+                    ret->prestored_argVals[argIndex] = *reinterpret_cast<const uint8_t*>(args->val); 
+                    break;
+                case 2: 
+                    ret->prestored_argVals[argIndex] = *reinterpret_cast<const uint16_t*>(args->val); 
+                    break;
+                case 4:
+                    ret->prestored_argVals[argIndex] = *reinterpret_cast<const uint32_t*>(args->val);
+                    break;
+                case 8: 
+                    ret->prestored_argVals[argIndex] = *reinterpret_cast<const uint64_t*>(args->val);
+                    break;
+            }
+        }
+        else
+        {
+            switch (colWidth) {
+                case 1: 
+                    ret->prestored_argVals[argIndex] = args->val[0]; 
+                    break;
+                case 2: 
+                    ret->prestored_argVals[argIndex] = *reinterpret_cast<const int16_t*>(args->val); 
+                    break;
+                case 4:
+    #if 0
+                    if (colType == CalpontSystemCatalog::FLOAT) {
+                        double dTmp;
 
-					dTmp = (double) *((const float *) args->val);
-					ret->prestored_argVals[argIndex] = *((int64_t *) &dTmp);
-				}
-				else
-					ret->prestored_argVals[argIndex] =
-						*reinterpret_cast<const int32_t *>(args->val);
-#else
-					ret->prestored_argVals[argIndex] =
-						*reinterpret_cast<const int32_t *>(args->val);
-#endif
-				break;
-			case 8: ret->prestored_argVals[argIndex] =
-					*reinterpret_cast<const int64_t *>(args->val);
-				break;
-		}
+                        dTmp = (double) *((const float *) args->val);
+                        ret->prestored_argVals[argIndex] = *((int64_t *) &dTmp);
+                    }
+                    else
+                        ret->prestored_argVals[argIndex] =
+                            *reinterpret_cast<const int32_t *>(args->val);
+    #else
+                    ret->prestored_argVals[argIndex] = *reinterpret_cast<const int32_t*>(args->val);
+    #endif
+                    break;
+                case 8: 
+                    ret->prestored_argVals[argIndex] = *reinterpret_cast<const int64_t*>(args->val);
+                    break;
+            }
+        }
 // 		cout << "inserted* " << hex << ret->prestored_argVals[argIndex] << dec <<
 // 		  " COP = " << (int) ret->prestored_cops[argIndex] << endl;
 
@@ -1419,11 +1589,6 @@ boost::shared_ptr<ParsedColumnFilter> PrimitiveProcessor::parseColumnFilter
 	}
 
 	return ret;
-}
-
-void PrimitiveProcessor::setParsedColumnFilter(boost::shared_ptr<ParsedColumnFilter> pcf)
-{
-	parsedColumnFilter = pcf;
 }
 
 } // namespace primitives

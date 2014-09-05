@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_tableinfo.cpp 4195 2012-09-19 18:12:27Z dcathey $
+* $Id: we_tableinfo.cpp 4571 2013-03-12 20:44:15Z rdempsey $
 *
 *******************************************************************************/
 /** @file */
@@ -43,8 +43,6 @@ using namespace boost;
 #include "we_config.h"
 #include "we_simplesyslog.h"
 #include "we_bulkrollbackmgr.h"
-
-#include "cacheutils.h"
 
 namespace
 {
@@ -98,6 +96,8 @@ TableInfo::TableInfo(Log* logger, const BRM::TxnID txnID,
     fRBMetaWriter(processName, logger),
     fProcessName(processName),
     fKeepRbMetaFile(bKeepRbMetaFile),
+    fbTruncationAsError(false),
+    fImportDataMode(IMPORT_DATA_TEXT),
 #ifdef _MSC_VER
     fTableLocked(0),
 #else
@@ -600,14 +600,6 @@ int TableInfo::setParseComplete(const int &columnId,
         // allBuffersDoneForAColumn==TRUE means we are finished parsing columnId
         if(allBuffersDoneForAColumn)
         {
-            // Accumulate list of HWM dictionary blocks to be flushed from cache
-            std::vector<BRM::LBID_t> dictBlksToFlush;
-            fColumns[columnId].getDictFlushBlks( dictBlksToFlush );
-            for (unsigned kk=0; kk<dictBlksToFlush.size(); kk++)
-            {
-                fDictFlushBlks.push_back( dictBlksToFlush[kk] );
-            }
-
             int rc = fColumns[columnId].finishParsing( );
             if (rc != NO_ERROR)
             {
@@ -628,20 +620,6 @@ int TableInfo::setParseComplete(const int &columnId,
             //
             if(fNumberOfColsParsed >= fNumberOfColumns)
             {
-                // After closing the column and dictionary store files,
-                // flush any updated dictionary blocks in PrimProc.
-                if (fDictFlushBlks.size() > 0)
-                {
-#ifdef PROFILE
-                    Stats::startParseEvent(WE_STATS_FLUSH_PRIMPROC_BLOCKS);
-#endif
-                    cacheutils::flushPrimProcAllverBlocks(fDictFlushBlks);
-#ifdef PROFILE
-                    Stats::stopParseEvent(WE_STATS_FLUSH_PRIMPROC_BLOCKS);
-#endif
-                    fDictFlushBlks.clear();
-                }
-
                 // Update auto-increment next value if applicable.
                 rc = synchronizeAutoInc( );
                 if (rc != NO_ERROR)
@@ -674,6 +652,21 @@ int TableInfo::setParseComplete(const int &columnId,
                         "; " << ec.errorString(rc);
                     fLog->logMsg(oss.str(), rc, MSGLVL_ERROR);
                     fStatusTI = WriteEngine::ERR;
+
+                    ostringstream oss2;
+                    oss2 << "Ending HWMs for table " << fTableName << ": ";
+                    for (unsigned int n=0; n<fColumns.size(); n++)
+                    {
+                        oss2 << std::endl;
+                        oss2 << "  " << fColumns[n].column.colName <<
+                            "; DBRoot/part/seg/hwm: "        <<
+                            segFileInfo[n].fDbRoot           <<
+                            "/" << segFileInfo[n].fPartition <<
+                            "/" << segFileInfo[n].fSegment   <<
+                            "/" << segFileInfo[n].hwm;
+                    }
+                    fLog->logMsg(oss2.str(), MSGLVL_INFO1);
+
                     return rc;
                 }
 
@@ -800,7 +793,7 @@ void TableInfo::reportTotals(double elapsedTime)
     fLog->logMsg(oss2.str(), MSGLVL_INFO2);
 
     // @bug 3504: Loop through columns to print saturation counts
-    std::vector<boost::tuple<ColDataType,std::string,u_int64_t> > satCounts;
+    std::vector<boost::tuple<CalpontSystemCatalog::ColDataType,std::string,u_int64_t> > satCounts;
     for (unsigned i=0; i < fColumns.size(); ++i)
     {
         std::string colName(fTableName);
@@ -812,30 +805,31 @@ void TableInfo::reportTotals(double elapsedTime)
                                               colName, 
                                               satCount));
 
-
         if (satCount > 0)
         {   // @bug 3375: report invalid dates/times set to null
             ostringstream ossSatCnt;
             ossSatCnt << "Column " << fTableName << '.' <<
                 fColumns[i].column.colName << "; Number of ";
-            if (fColumns[i].column.dataType == DATE)
+            if (fColumns[i].column.dataType == CalpontSystemCatalog::DATE)
 			{
 				if(!fColumns[i].column.fNotNull)
                 	ossSatCnt << "invalid dates replaced with null: ";
 				else
-                	ossSatCnt << "invalid dates replaced with minimum value: ";
+                	ossSatCnt << "invalid dates replaced with minimum value : ";
 			}
-            else if (fColumns[i].column.dataType == DATETIME)
+            else if (fColumns[i].column.dataType ==
+                     CalpontSystemCatalog::DATETIME)
 			{
 				if(!fColumns[i].column.fNotNull)
                 	ossSatCnt << "invalid date/times replaced with null: ";
 				else
-                	ossSatCnt << "invalid date/times replaced with minimum value: ";
+                	ossSatCnt << "invalid date/times replaced with minimum value : ";
 			}
-            else if (fColumns[i].column.dataType == CHAR)
+            else if (fColumns[i].column.dataType == CalpontSystemCatalog::CHAR)
                 ossSatCnt <<
                     "character strings truncated: ";
-            else if (fColumns[i].column.dataType == VARCHAR)
+            else if (fColumns[i].column.dataType ==
+                     CalpontSystemCatalog::VARCHAR)
                 ossSatCnt <<
                     "character strings truncated: ";
             else
@@ -1035,9 +1029,12 @@ bool TableInfo::bufferReadyForParse(const int &bufferId, bool report) const
 //------------------------------------------------------------------------------
 // Create the specified number (noOfBuffer) of BulkLoadBuffer objects and store
 // them in fBuffers.  jobFieldRefList lists the fields in this import.
+// fixedBinaryRecLen is fixed record length for binary imports (it is n/a
+// for text bulk loads).
 //------------------------------------------------------------------------------
-void TableInfo::initializeBuffers(const int & noOfBuffers,
-                                  const JobFieldRefList& jobFieldRefList)
+void TableInfo::initializeBuffers(int   noOfBuffers,
+                                  const JobFieldRefList& jobFieldRefList,
+                                  unsigned int fixedBinaryRecLen)
 {
 #ifdef _MSC_VER
     //@bug 3751
@@ -1048,6 +1045,7 @@ void TableInfo::initializeBuffers(const int & noOfBuffers,
         fBufferSize = std::min(10240, fBufferSize);
     }
 #endif
+
     fReadBufCount = noOfBuffers;
     // initialize and populate the buffer vector.
     for(int i=0; i<fReadBufCount; ++i)
@@ -1061,6 +1059,8 @@ void TableInfo::initializeBuffers(const int & noOfBuffers,
         buffer->setEnclosedByChar(fEnclosedByChar);
         buffer->setEscapeChar    (fEscapeChar    );
         buffer->setTruncationAsError(getTruncationAsError());
+        buffer->setImportDataMode(fImportDataMode,
+                                  fixedBinaryRecLen);
         fBuffers.push_back(buffer);
     }
 }
@@ -1092,6 +1092,10 @@ int TableInfo::openTableFile()
         fHandle = stdin;
 
 #ifdef _MSC_VER
+		// If this is a binary import from STDIN, then set stdin to binary
+		if (fImportDataMode != IMPORT_DATA_TEXT)
+			_setmode(_fileno(stdin), _O_BINARY);
+
         fFileBuffer = 0;
 #else
         // Not 100% sure that calling setvbuf on stdin does much, but in
@@ -1106,7 +1110,10 @@ int TableInfo::openTableFile()
     }
     else
     {
-        fHandle = fopen( fFileName.c_str() , "r" );
+        if (fImportDataMode == IMPORT_DATA_TEXT)
+            fHandle = fopen( fFileName.c_str() , "r" );
+        else
+            fHandle = fopen( fFileName.c_str() , "rb" );
         if(fHandle == NULL)
         {
             int errnum = errno;
@@ -1723,6 +1730,35 @@ int TableInfo::validateColumnHWMs(
                 "; segment-"   << segFileInfo[k1].fSegment     <<
                 "; hwm-"       << segFileInfo[k1].hwm          <<
                 "; width-"     << jobColK1.width << ':'<<std::endl<<
+                " and OID2-"   << jobColK.mapOid               <<
+                "; column-"    << jobColK.colName              <<
+                "; DBRoot-"    << segFileInfo[k].fDbRoot       <<
+                "; partition-" << segFileInfo[k].fPartition    <<
+                "; segment-"   << segFileInfo[k].fSegment      <<
+                "; hwm-"       << segFileInfo[k].hwm           <<
+                "; width-"     << jobColK.width;
+            fLog->logMsg( oss.str(), ERR_BRM_HWMS_NOT_EQUAL, MSGLVL_ERROR );
+            return ERR_BRM_HWMS_NOT_EQUAL;
+        }
+
+        // HWM DBRoot, partition, and segment number should match for all
+        // columns; so compare DBRoot, part#, and seg# with first column.
+        if ((segFileInfo[0].fDbRoot    != segFileInfo[k].fDbRoot)    ||
+            (segFileInfo[0].fPartition != segFileInfo[k].fPartition) ||
+            (segFileInfo[0].fSegment   != segFileInfo[k].fSegment))
+        {
+            const JobColumn& jobCol0 =
+            ( (jobTable != 0) ? jobTable->colList[0] : fColumns[0].column );
+
+            ostringstream oss;
+            oss << stage << " HWM DBRoot,Part#, or Seg# do not match for"
+                " OID1-"       << jobCol0.mapOid               <<
+                "; column-"    << jobCol0.colName              <<
+                "; DBRoot-"    << segFileInfo[0].fDbRoot       <<
+                "; partition-" << segFileInfo[0].fPartition    <<
+                "; segment-"   << segFileInfo[0].fSegment      <<
+                "; hwm-"       << segFileInfo[0].hwm           <<
+                "; width-"     << jobCol0.width << ':'<<std::endl<<
                 " and OID2-"   << jobColK.mapOid               <<
                 "; column-"    << jobColK.colName              <<
                 "; DBRoot-"    << segFileInfo[k].fDbRoot       <<

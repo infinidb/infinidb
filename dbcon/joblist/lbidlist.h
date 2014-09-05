@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: lbidlist.h 8729 2012-07-22 19:29:01Z dcathey $
+*   $Id: lbidlist.h 9210 2013-01-21 14:10:42Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -77,14 +77,17 @@ public:
 	void Dump(long Index, int Count) const;
 	u_int32_t GetRangeSize() const { return LBIDRanges.size() ? LBIDRanges.at(0).size : 0; }
 
-	// New functions to handle min/max values per lbid for casual partitioning;
+	// Functions to handle min/max values per lbid for casual partitioning;
 	// If pEMEntries is provided, then min/max will be extracted from that
-	// vector, else extents in BRM will be searched.
+	// vector, else extents in BRM will be searched. If type is unsigned, caller
+    // should static cast returned min and max to uint64_t
 	bool GetMinMax(int64_t& min, int64_t& max, int64_t& seq, int64_t lbid,
-			const std::vector<struct BRM::EMEntry>* pEMEntries);
+				   const std::vector<struct BRM::EMEntry>* pEMEntries,
+                   execplan::CalpontSystemCatalog::ColDataType type);
 
 	bool GetMinMax(int64_t *min, int64_t *max, int64_t *seq, int64_t lbid,
-			const std::tr1::unordered_map<int64_t, BRM::EMEntry> &entries);
+				   const std::tr1::unordered_map<int64_t, BRM::EMEntry> &entries,
+                   execplan::CalpontSystemCatalog::ColDataType type);
 
 	void UpdateMinMax(int64_t min, int64_t max, int64_t lbid,
 	  execplan::CalpontSystemCatalog::ColDataType type, bool validData = true);
@@ -100,13 +103,15 @@ public:
 				const execplan::CalpontSystemCatalog::ColType& ct, 
 				const uint8_t BOP);
 
-	bool checkSingleValue(int64_t min, int64_t max, int64_t value, bool isCharColumn);
+	bool checkSingleValue(int64_t min, int64_t max, int64_t value, 
+						  execplan::CalpontSystemCatalog::ColDataType type);
 	
-	bool checkRangeOverlap(int64_t min, int64_t max, int64_t tmin, int64_t tmax, bool isCharColumn);
+	bool checkRangeOverlap(int64_t min, int64_t max, int64_t tmin, int64_t tmax, 
+						   execplan::CalpontSystemCatalog::ColDataType type);
 
 	// check the column data type and the column size to determine if it
 	// is a data type  to apply casual paritioning.
-	bool CasualPartitionDataType(const uint8_t type, const uint8_t size) const;
+	bool CasualPartitionDataType(const execplan::CalpontSystemCatalog::ColDataType type, const uint8_t size) const;
 
 	LBIDList(const LBIDList& rhs) { copyLbidList(rhs); }
 
@@ -119,17 +124,6 @@ private:
 
 	template<class T>
 	inline bool compareVal(const T& Min, const T& Max, const T& value, char op, uint8_t lcf);
-
-	inline bool isChar(execplan::CalpontSystemCatalog::ColDataType type)
-	{
-		return (execplan::CalpontSystemCatalog::VARCHAR == type || execplan::CalpontSystemCatalog::CHAR == type);
-	}
-
-	template <class T>
-	inline bool checkNull(execplan::CalpontSystemCatalog::ColDataType type, T val, T nullVal, T nullCharVal);
-
-	inline bool checkNull32(execplan::CalpontSystemCatalog::ColDataType type, int32_t val);
-	inline bool checkNull64(execplan::CalpontSystemCatalog::ColDataType type, int64_t val);
 
 	int  getMinMaxFromEntries(int64_t& min, int64_t& max, int32_t& seq,
 			int64_t lbid, const std::vector<struct BRM::EMEntry>& EMEntries);

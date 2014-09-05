@@ -16,14 +16,16 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: aggregatecolumn.cpp 8436 2012-04-04 18:18:21Z rdempsey $
+*   $Id: aggregatecolumn.cpp 9585 2013-05-31 21:08:06Z rdempsey $
 *
 *
 ***********************************************************************/
 #include <sstream>
 #include <cstring>
-
 using namespace std;
+
+#include <boost/algorithm/string/case_conv.hpp>
+using namespace boost;
 
 #include "bytestream.h"
 using namespace messageqcpp;
@@ -68,17 +70,19 @@ void getAggCols(execplan::ParseTree* n, void* obj)
  * Constructors/Destructors
  */
 AggregateColumn::AggregateColumn():
-		fAsc(false)
+	fAggOp(NOOP),
+	fAsc(false)
 {
 }
 
-AggregateColumn::AggregateColumn(const u_int32_t sessionID):
-		ReturnedColumn(sessionID),
-		fAsc(false)
+AggregateColumn::AggregateColumn(const uint32_t sessionID):
+	ReturnedColumn(sessionID),
+	fAggOp(NOOP),
+	fAsc(false)
 {
 }
 
-AggregateColumn::AggregateColumn(const AggOp aggOp, ReturnedColumn* parm, const u_int32_t sessionID):
+AggregateColumn::AggregateColumn(const AggOp aggOp, ReturnedColumn* parm, const uint32_t sessionID):
     ReturnedColumn(sessionID),
     fAggOp(aggOp),
     fAsc(false),
@@ -87,7 +91,7 @@ AggregateColumn::AggregateColumn(const AggOp aggOp, ReturnedColumn* parm, const 
 	fFunctionParms.reset(parm);
 }
 
-AggregateColumn::AggregateColumn(const AggOp aggOp, const string& content, const u_int32_t sessionID):
+AggregateColumn::AggregateColumn(const AggOp aggOp, const string& content, const uint32_t sessionID):
     ReturnedColumn(sessionID),
     fAggOp(aggOp),
     fAsc(false),
@@ -98,61 +102,49 @@ AggregateColumn::AggregateColumn(const AggOp aggOp, const string& content, const
 }
 
 // deprecated constructor. use function name as string
-AggregateColumn::AggregateColumn(const std::string& functionName, ReturnedColumn* parm, const u_int32_t sessionID):
-    ReturnedColumn(sessionID),
-    fFunctionName(functionName),
-    fAsc(false),
-    fData(functionName + "(" + parm->data() + ")")
+AggregateColumn::AggregateColumn(const std::string& functionName, ReturnedColumn* parm, const uint32_t sessionID):
+	ReturnedColumn(sessionID),
+	fFunctionName(functionName),
+	fAggOp(NOOP),
+	fAsc(false),
+	fData(functionName + "(" + parm->data() + ")")
 {
 	fFunctionParms.reset(parm);
 }
-   
+
 // deprecated constructor. use function name as string
-AggregateColumn::AggregateColumn(const string& functionName, const string& content, const u_int32_t sessionID):
-    ReturnedColumn(sessionID),
-    fFunctionName (functionName),
-    fAsc(false),
-    fData(functionName + "(" + content + ")")
+AggregateColumn::AggregateColumn(const string& functionName, const string& content, const uint32_t sessionID):
+	ReturnedColumn(sessionID),
+	fFunctionName(functionName),
+	fAggOp(NOOP),
+	fAsc(false),
+	fData(functionName + "(" + content + ")")
 {
 	// TODO: need to handle distinct
 	fFunctionParms.reset(new ArithmeticColumn(content));
 }
 
-AggregateColumn::AggregateColumn( const AggregateColumn& rhs, const u_int32_t sessionID ):
+AggregateColumn::AggregateColumn( const AggregateColumn& rhs, const uint32_t sessionID ):
     ReturnedColumn(rhs, sessionID),
     fFunctionName (rhs.fFunctionName),
     fAggOp(rhs.fAggOp),
     fFunctionParms(rhs.fFunctionParms),
-    fTableAlias (rhs.tableAlias()),
-    fAsc (rhs.asc()),
-    fData (rhs.data()),
+    fTableAlias(rhs.tableAlias()),
+    fAsc(rhs.asc()),
+    fData(rhs.data()),
     fConstCol(rhs.fConstCol)
 {
 	fAlias = rhs.alias();
-}
-
-AggregateColumn::~AggregateColumn()
-{
 }
 
 /**
  * Methods
  */
 
-void AggregateColumn::functionName(const string& functionName)
-{
-	fFunctionName = functionName;
-}
-
-void AggregateColumn::functionParms(const SRCP& functionParms)
-{
-	fFunctionParms = functionParms;
-}
-
 const string AggregateColumn::toString() const
 {
 	ostringstream output;
-	output << "AggregateColumn " << data() << endl; 
+	output << "AggregateColumn " << data() << endl;
 	output << "func/distinct: " << (int)fAggOp << "/" << fDistinct << endl;
 	output << "expressionId=" << fExpressionId << endl;
 	if (fAlias.length() > 0) output << "/Alias: " << fAlias << endl;
@@ -172,18 +164,18 @@ ostream& operator<<(ostream& output, const AggregateColumn& rhs)
 void AggregateColumn::serialize(messageqcpp::ByteStream& b) const
 {
 	CalpontSelectExecutionPlan::ReturnedColumnList::const_iterator rcit;
-	b << (u_int8_t) ObjectReader::AGGREGATECOLUMN;
+	b << (uint8_t) ObjectReader::AGGREGATECOLUMN;
 	ReturnedColumn::serialize(b);
 	b << fFunctionName;
-	b << static_cast<u_int8_t>(fAggOp);
+	b << static_cast<uint8_t>(fAggOp);
 	if (fFunctionParms == 0)
-		b << (u_int8_t) ObjectReader::NULL_CLASS;
+		b << (uint8_t) ObjectReader::NULL_CLASS;
 	else
 		fFunctionParms->serialize(b);
-	b << static_cast<u_int32_t>(fGroupByColList.size());
+	b << static_cast<uint32_t>(fGroupByColList.size());
 	for (rcit = fGroupByColList.begin(); rcit != fGroupByColList.end(); ++rcit)
 		(*rcit)->serialize(b);
-	b << static_cast<u_int32_t>(fProjectColList.size());
+	b << static_cast<uint32_t>(fProjectColList.size());
 	for (rcit = fProjectColList.begin(); rcit != fProjectColList.end(); ++rcit)
 		(*rcit)->serialize(b);
 	b << fData;
@@ -191,9 +183,9 @@ void AggregateColumn::serialize(messageqcpp::ByteStream& b) const
 	b << fTableAlias;
 	b << static_cast<const ByteStream::doublebyte>(fAsc);
 	if (fConstCol.get() == 0)
-		b << (u_int8_t) ObjectReader::NULL_CLASS;
+		b << (uint8_t) ObjectReader::NULL_CLASS;
 	else
-		fConstCol->serialize(b); 
+		fConstCol->serialize(b);
 }
 
 void AggregateColumn::unserialize(messageqcpp::ByteStream& b)
@@ -209,8 +201,8 @@ void AggregateColumn::unserialize(messageqcpp::ByteStream& b)
 	    dynamic_cast<ReturnedColumn*>(ObjectReader::createTreeNode(b)));
 
 	messageqcpp::ByteStream::quadbyte size;
-    messageqcpp::ByteStream::quadbyte i;
-    ReturnedColumn *rc;
+	messageqcpp::ByteStream::quadbyte i;
+	ReturnedColumn *rc;
 
 	b >> size;
 	for (i = 0; i < size; i++) {
@@ -292,186 +284,239 @@ void AggregateColumn::evaluate(Row& row, bool& isNull)
 {
 	switch (fResultType.colDataType)
 	{
-		case CalpontSystemCatalog::DATE:
+	case CalpontSystemCatalog::DATE:
+		if (row.equals<4>(DATENULL, fInputIndex))
+			isNull = true;
+		else
+			fResult.intVal = row.getUintField<4>(fInputIndex);
+		break;
+	case CalpontSystemCatalog::DATETIME:
+		if (row.equals<8>(DATETIMENULL, fInputIndex))
+			isNull = true;
+		else
+			fResult.intVal = row.getUintField<8>(fInputIndex);
+		break;
+	case CalpontSystemCatalog::CHAR:
+	case CalpontSystemCatalog::VARCHAR:
+	case CalpontSystemCatalog::STRINT:
+		switch (row.getColumnWidth(fInputIndex))
 		{
-			if (row.equals<4>(DATENULL, fInputIndex))
+		case 1:
+			if (row.equals<1>(CHAR1NULL, fInputIndex))
 				isNull = true;
 			else
-				fResult.intVal = row.getUintField<4>(fInputIndex);
+				fResult.origIntVal = row.getUintField<1>(fInputIndex);
 			break;
-		}
-		case CalpontSystemCatalog::DATETIME:
-		{
-			if (row.equals<8>(DATETIMENULL, fInputIndex))
+		case 2:
+			if (row.equals<2>(CHAR2NULL, fInputIndex))
 				isNull = true;
 			else
-				fResult.intVal = row.getUintField<8>(fInputIndex);
+				fResult.origIntVal = row.getUintField<2>(fInputIndex);
 			break;
-		}
-		case CalpontSystemCatalog::CHAR:
-		case CalpontSystemCatalog::VARCHAR:
-		case CalpontSystemCatalog::STRINT:
-		{
-			switch (row.getColumnWidth(fInputIndex))
-			{
-				case 1:
-					if (row.equals<1>(CHAR1NULL, fInputIndex))
-						isNull = true;
-					else
-						fResult.origIntVal = row.getUintField<1>(fInputIndex);
-					break;
-				case 2:
-					if (row.equals<2>(CHAR2NULL, fInputIndex))
-						isNull = true;
-					else
-						fResult.origIntVal = row.getUintField<2>(fInputIndex);
-					break;
-				case 3:
-				case 4:
-					if (row.equals<4>(CHAR4NULL, fInputIndex))
-						isNull = true;
-					else
-						fResult.origIntVal = row.getUintField<4>(fInputIndex);
-					break;
-				case 5:
-				case 6:
-				case 7:
-				case 8:
-					if (row.equals<8>(CHAR8NULL, fInputIndex))
-						isNull = true;
-					else
-						fResult.origIntVal = row.getUintField<8>(fInputIndex);
-					break;
-				default:
-					if (row.equals(CPNULLSTRMARK, fInputIndex))
-						isNull = true;
-					else
-						fResult.strVal = row.getStringField(fInputIndex);
-					// stringColVal is padded with '\0' to colWidth so can't use str.length()
-					if (strlen(fResult.strVal.c_str()) == 0)
-						isNull = true;
-				break;
-			}
-			if (fResultType.colDataType == CalpontSystemCatalog::STRINT)
-				fResult.intVal = uint64ToStr(fResult.origIntVal);
-			else
-				fResult.intVal = atoll((char*)&fResult.origIntVal);
-			break;
-		}
-		case CalpontSystemCatalog::BIGINT:
-		{
-			if (row.equals<8>(BIGINTNULL, fInputIndex))
+		case 3:
+		case 4:
+			if (row.equals<4>(CHAR4NULL, fInputIndex))
 				isNull = true;
 			else
-				fResult.intVal = row.getIntField<8>(fInputIndex);
+				fResult.origIntVal = row.getUintField<4>(fInputIndex);
 			break;
-		}
-		case CalpontSystemCatalog::INT:
-		case CalpontSystemCatalog::MEDINT:
-		{
-			if (row.equals<4>(INTNULL, fInputIndex))
+		case 5:
+		case 6:
+		case 7:
+		case 8:
+			if (row.equals<8>(CHAR8NULL, fInputIndex))
 				isNull = true;
 			else
-				fResult.intVal = row.getIntField<4>(fInputIndex);
+				fResult.origIntVal = row.getUintField<8>(fInputIndex);
 			break;
-		}
-		case CalpontSystemCatalog::SMALLINT:
-		{
-			if (row.equals<2>(SMALLINTNULL, fInputIndex))
+		default:
+			if (row.equals(CPNULLSTRMARK, fInputIndex))
 				isNull = true;
 			else
-				fResult.intVal = row.getIntField<2>(fInputIndex);
+				fResult.strVal = row.getStringField(fInputIndex);
+			// stringColVal is padded with '\0' to colWidth so can't use str.length()
+			if (strlen(fResult.strVal.c_str()) == 0)
+				isNull = true;
 			break;
 		}
-		case CalpontSystemCatalog::TINYINT:
+		if (fResultType.colDataType == CalpontSystemCatalog::STRINT)
+			fResult.intVal = uint64ToStr(fResult.origIntVal);
+		else
+			fResult.intVal = atoll((char*)&fResult.origIntVal);
+		break;
+	case CalpontSystemCatalog::BIGINT:
+		if (row.equals<8>(BIGINTNULL, fInputIndex))
+			isNull = true;
+		else
+			fResult.intVal = row.getIntField<8>(fInputIndex);
+		break;
+	case CalpontSystemCatalog::UBIGINT:
+		if (row.equals<8>(UBIGINTNULL, fInputIndex))
+			isNull = true;
+		else
+			fResult.uintVal = row.getUintField<8>(fInputIndex);
+		break;
+	case CalpontSystemCatalog::INT:
+	case CalpontSystemCatalog::MEDINT:
+		if (row.equals<4>(INTNULL, fInputIndex))
+			isNull = true;
+		else
+			fResult.intVal = row.getIntField<4>(fInputIndex);
+		break;
+	case CalpontSystemCatalog::UINT:
+	case CalpontSystemCatalog::UMEDINT:
+		if (row.equals<4>(UINTNULL, fInputIndex))
+			isNull = true;
+		else
+			fResult.uintVal = row.getUintField<4>(fInputIndex);
+		break;
+	case CalpontSystemCatalog::SMALLINT:
+		if (row.equals<2>(SMALLINTNULL, fInputIndex))
+			isNull = true;
+		else
+			fResult.intVal = row.getIntField<2>(fInputIndex);
+		break;
+	case CalpontSystemCatalog::USMALLINT:
+		if (row.equals<2>(USMALLINTNULL, fInputIndex))
+			isNull = true;
+		else
+			fResult.uintVal = row.getUintField<2>(fInputIndex);
+		break;
+	case CalpontSystemCatalog::TINYINT:
+		if (row.equals<1>(TINYINTNULL, fInputIndex))
+			isNull = true;
+		else
+			fResult.intVal = row.getIntField<1>(fInputIndex);
+		break;
+	case CalpontSystemCatalog::UTINYINT:
+		if (row.equals<1>(UTINYINTNULL, fInputIndex))
+			isNull = true;
+		else
+			fResult.uintVal = row.getUintField<1>(fInputIndex);
+		break;
+	//In this case, we're trying to load a double output column with float data. This is the
+	// case when you do sum(floatcol), e.g.
+	case CalpontSystemCatalog::FLOAT:
+	case CalpontSystemCatalog::UFLOAT:
+		if (row.equals<4>(FLOATNULL, fInputIndex))
+			isNull = true;
+		else
+			fResult.floatVal = row.getFloatField(fInputIndex);
+		break;
+	case CalpontSystemCatalog::DOUBLE:
+	case CalpontSystemCatalog::UDOUBLE:
+		if (row.equals<8>(DOUBLENULL, fInputIndex))
+			isNull = true;
+		else
+			fResult.doubleVal = row.getDoubleField(fInputIndex);
+		break;
+	case CalpontSystemCatalog::DECIMAL:
+	case CalpontSystemCatalog::UDECIMAL:
+		switch (fResultType.colWidth)
 		{
+		case 1:
 			if (row.equals<1>(TINYINTNULL, fInputIndex))
 				isNull = true;
 			else
-				fResult.intVal = row.getIntField<1>(fInputIndex);
+			{
+				fResult.decimalVal.value = row.getIntField<1>(fInputIndex);
+				fResult.decimalVal.scale = (unsigned)fResultType.scale;
+			}
 			break;
-		}
-		//In this case, we're trying to load a double output column with float data. This is the
-		// case when you do sum(floatcol), e.g.
-		case CalpontSystemCatalog::FLOAT:
-		{
-			if (row.equals<4>(FLOATNULL, fInputIndex))
+		case 2:
+			if (row.equals<2>(SMALLINTNULL, fInputIndex))
 				isNull = true;
 			else
-				fResult.floatVal = row.getFloatField(fInputIndex);
+			{
+				fResult.decimalVal.value = row.getIntField<2>(fInputIndex);
+				fResult.decimalVal.scale = (unsigned)fResultType.scale;
+			}
 			break;
-		}
-		case CalpontSystemCatalog::DOUBLE:
-		{
-			if (row.equals<8>(DOUBLENULL, fInputIndex))
+		case 4:
+			if (row.equals<4>(INTNULL, fInputIndex))
 				isNull = true;
 			else
-				fResult.doubleVal = row.getDoubleField(fInputIndex);
+			{
+				fResult.decimalVal.value = row.getIntField<4>(fInputIndex);
+				fResult.decimalVal.scale = (unsigned)fResultType.scale;
+			}
 			break;
-		}
-		case CalpontSystemCatalog::DECIMAL:
-		{
-				switch (fResultType.colWidth)
-				{
-					case 1:
-					{
-						if (row.equals<1>(TINYINTNULL, fInputIndex))
-							isNull = true;
-						else
-						{
-							fResult.decimalVal.value = row.getIntField<1>(fInputIndex);
-							fResult.decimalVal.scale = (unsigned)fResultType.scale;
-						}
-						break;
-					}
-					case 2:
-					{
-						if (row.equals<2>(SMALLINTNULL, fInputIndex))
-							isNull = true;
-						else
-						{
-							fResult.decimalVal.value = row.getIntField<2>(fInputIndex);
-							fResult.decimalVal.scale = (unsigned)fResultType.scale;
-						}
-						break;
-					}
-					case 4:
-					{
-						if (row.equals<4>(INTNULL, fInputIndex))
-							isNull = true;
-						else
-						{
-							fResult.decimalVal.value = row.getIntField<4>(fInputIndex);
-							fResult.decimalVal.scale = (unsigned)fResultType.scale;
-						}
-						break;
-					}
-					default:
-					{
-						if (row.equals<8>(BIGINTNULL, fInputIndex))
-						isNull = true;
-						else
-						{
-							fResult.decimalVal.value = (int64_t)row.getUintField<8>(fInputIndex);
-							fResult.decimalVal.scale = (unsigned)fResultType.scale;
-						}
-						break;
-					}
-				}
-			break;
-		}
-		case CalpontSystemCatalog::VARBINARY:
-			isNull = true;
-			break;
-		default:	// treat as int64
-		{
+		default:
 			if (row.equals<8>(BIGINTNULL, fInputIndex))
 				isNull = true;
 			else
-				fResult.intVal = row.getUintField<8>(fInputIndex);
+			{
+				fResult.decimalVal.value = (int64_t)row.getUintField<8>(fInputIndex);
+				fResult.decimalVal.scale = (unsigned)fResultType.scale;
+			}
 			break;
 		}
+		break;
+	case CalpontSystemCatalog::VARBINARY:
+		isNull = true;
+		break;
+	default:	// treat as int64
+		if (row.equals<8>(BIGINTNULL, fInputIndex))
+			isNull = true;
+		else
+			fResult.intVal = row.getUintField<8>(fInputIndex);
+		break;
 	}
+}
+
+/*static*/
+AggregateColumn::AggOp AggregateColumn::agname2num(const string& agname)
+{
+/*
+		NOOP = 0,
+		COUNT_ASTERISK,
+		COUNT,
+		SUM,
+		AVG,
+		MIN,
+		MAX,
+		CONSTANT,
+		DISTINCT_COUNT,
+		DISTINCT_SUM,
+		DISTINCT_AVG,
+		STDDEV_POP,
+		STDDEV_SAMP,
+		VAR_POP,
+		VAR_SAMP,
+		BIT_AND,
+		BIT_OR,
+		BIT_XOR,
+		GROUP_CONCAT
+*/
+	string lfn(agname);
+	algorithm::to_lower(lfn);
+	if (lfn == "count(*)")
+		return COUNT_ASTERISK;
+	if (lfn == "count")
+		return COUNT;
+	if (lfn == "sum")
+		return SUM;
+	if (lfn == "avg")
+		return AVG;
+	if (lfn == "min")
+		return MIN;
+	if (lfn == "max")
+		return MAX;
+	if (lfn == "std")
+		return STDDEV_POP;
+	if (lfn == "stddev_pop")
+		return STDDEV_POP;
+	if (lfn == "stddev_samp")
+		return STDDEV_SAMP;
+	if (lfn == "stddev")
+		return STDDEV_POP;
+	if (lfn == "var_pop")
+		return VAR_POP;
+	if (lfn == "var_samp")
+		return VAR_SAMP;
+	if (lfn == "variance")
+		return VAR_POP;
+	return NOOP;
 }
 
 } // namespace execplan

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: objectreader.h 8436 2012-04-04 18:18:21Z rdempsey $
+ * $Id: objectreader.h 9210 2013-01-21 14:10:42Z rdempsey $
  *
  *****************************************************************************/
 
@@ -85,6 +85,10 @@ public:
 		SIMPLECOLUMN_INT2,
 		SIMPLECOLUMN_INT4,
 		SIMPLECOLUMN_INT8,
+		SIMPLECOLUMN_UINT1,
+		SIMPLECOLUMN_UINT2,
+		SIMPLECOLUMN_UINT4,
+		SIMPLECOLUMN_UINT8,
 		SIMPLECOLUMN_DECIMAL1,
 		SIMPLECOLUMN_DECIMAL2,
 		SIMPLECOLUMN_DECIMAL4,

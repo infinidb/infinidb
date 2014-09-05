@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-// $Id: ha_calpont_impl_if.h 8984 2012-10-12 21:16:32Z zzhu $
+// $Id: ha_calpont_impl_if.h 9700 2013-07-17 18:51:39Z zzhu $
 /** @file */
 #ifndef HA_CALPONT_IMPL_IF_H__
 #define HA_CALPONT_IMPL_IF_H__
@@ -118,6 +118,8 @@ struct gp_walk_info
 	ClauseType clauseType;
 	execplan::CalpontSystemCatalog::TableAliasName viewName;
 	bool aggOnSelect;
+	bool hasSubSelect;
+	SubQuery* lastSub;
 	std::vector<View*> viewList;
 
 	gp_walk_info() : sessionid(0), 
@@ -130,7 +132,9 @@ struct gp_walk_info
 		               subSelectType(uint64_t(-1)),
 		               subQuery(0),
 		               clauseType(INIT),
-		               aggOnSelect(false)
+		               aggOnSelect(false),
+	                       hasSubSelect(false),
+	                       lastSub(0)
 	{ }
 	
 	~gp_walk_info() {}

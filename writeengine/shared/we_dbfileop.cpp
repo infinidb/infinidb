@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: we_dbfileop.cpp 4004 2012-07-10 14:45:44Z rdempsey $
+//  $Id: we_dbfileop.cpp 4605 2013-04-09 15:43:03Z chao $
 
 /** @file */
 
@@ -115,7 +115,7 @@ void DbFileOp::getSubBlockEntry( unsigned char* blockBuf,
  ***********************************************************/
 int DbFileOp::readDBFile( FILE* pFile,
                           unsigned char* readBuf,
-                          const i64 lbid,
+                          const uint64_t lbid,
                           const bool isFbo )
 {
     long long  fboOffset = 0;
@@ -133,7 +133,7 @@ int DbFileOp::readDBFile( FILE* pFile,
 
 int DbFileOp::readDBFile( FILE* pFile,
                           DataBlock* block,
-                          const i64 lbid,
+                          const uint64_t lbid,
                           const bool isFbo )
 {
      block->dirty = false;
@@ -146,7 +146,7 @@ int DbFileOp::readDBFile( FILE* pFile,
 
 int DbFileOp::readDBFile( CommBlock& cb,
                           unsigned char* readBuf,
-                          const i64 lbid ) 
+                          const uint64_t lbid ) 
 { 
     CacheKey key;
 
@@ -208,7 +208,7 @@ int DbFileOp::readDBFile( CommBlock& cb,
  *    other number if something wrong
  ***********************************************************/
 const int DbFileOp::readSubBlockEntry( FILE* pFile, DataBlock* block, 
-                                       const i64 lbid, const int sbid, 
+                                       const uint64_t lbid, const int sbid, 
                                        const int entryNo, const int width, 
                                        void* pStruct )
 {
@@ -220,7 +220,7 @@ const int DbFileOp::readSubBlockEntry( FILE* pFile, DataBlock* block,
 
 
 const int DbFileOp::readSubBlockEntry( CommBlock& cb, DataBlock* block, 
-                                       const i64 lbid, const int sbid, 
+                                       const uint64_t lbid, const int sbid, 
                                        const int entryNo, const int width, 
                                        void* pStruct )
 {
@@ -269,7 +269,7 @@ void DbFileOp::setSubBlockEntry( unsigned char* blockBuf, const int sbid,
  *    other number if something wrong
  ***********************************************************/
 int DbFileOp::writeDBFile( CommBlock& cb, const unsigned char* writeBuf, 
-                           const i64 lbid, const int numOfBlock ) 
+                           const uint64_t lbid, const int numOfBlock ) 
 { 
     CacheKey key;
     int ret;
@@ -341,7 +341,7 @@ int DbFileOp::writeDBFileNoVBCache( FILE* pFile,
  *    Core function for writing data using VB cache
  ***********************************************************/
 int DbFileOp::writeDBFile( FILE* pFile, const unsigned char* writeBuf, 
-                           const i64 lbid, const int numOfBlock  )
+                           const uint64_t lbid, const int numOfBlock  )
 {
     RETURN_ON_ERROR( setFileOffsetBlock( pFile, lbid ) );
 
@@ -356,7 +356,7 @@ int DbFileOp::writeDBFile( FILE* pFile, const unsigned char* writeBuf,
 // just don't have a good solution to consolidate with above functions
 // Note: This is used with absolute FBO, no lbid involved
 int DbFileOp::writeDBFileFbo(FILE* pFile, const unsigned char* writeBuf, 
-                             const i64 fbo, const int numOfBlock  )
+                             const uint64_t fbo, const int numOfBlock  )
 {
     long long  fboOffset = 0;
 
@@ -390,7 +390,7 @@ int DbFileOp::writeDBFileFbo(FILE* pFile, const unsigned char* writeBuf,
  *    other number if something wrong
  ***********************************************************/
 const int DbFileOp::writeSubBlockEntry( FILE* pFile, DataBlock* block, 
-                                        const i64 lbid, const int sbid, 
+                                        const uint64_t lbid, const int sbid, 
                                         const int entryNo, const int width, 
                                         void* pStruct )
 {
@@ -401,7 +401,7 @@ const int DbFileOp::writeSubBlockEntry( FILE* pFile, DataBlock* block,
 }
 
 const int DbFileOp::writeSubBlockEntry( CommBlock& cb, DataBlock* block, 
-                                        const i64 lbid, const int sbid, 
+                                        const uint64_t lbid, const int sbid, 
                                         const int entryNo, const int width, 
                                         void* pStruct )
 {
@@ -421,7 +421,7 @@ const int DbFileOp::writeSubBlockEntry( CommBlock& cb, DataBlock* block,
  *    NO_ERROR if success
  *    other number if something wrong
  ***********************************************************/
-const int DbFileOp::writeVB( FILE* pFile, const OID oid, const i64 lbid )
+const int DbFileOp::writeVB( FILE* pFile, const OID oid, const uint64_t lbid )
 {
     if( !BRMWrapper::getUseVb() )
         return NO_ERROR;
@@ -434,7 +434,8 @@ const int DbFileOp::writeVB( FILE* pFile, const OID oid, const i64 lbid )
         rc= BRMWrapper::getInstance()->writeVB( pFile,
                                                 (const VER_t)transId,
                                                 oid, lbid, this );
-        if (rc != NO_ERROR) 
+//@Bug 4671. The error is already logged by worker node.
+/*        if (rc != NO_ERROR) 
         { 
             char msg[2048];
             snprintf(msg, 2048,
@@ -456,7 +457,8 @@ const int DbFileOp::writeVB( FILE* pFile, const OID oid, const i64 lbid )
                 ml.logCriticalMessage(m);
             }
             return rc;
-        }
+        } */
+		return rc;
     }
 
     return NO_ERROR;
@@ -464,7 +466,7 @@ const int DbFileOp::writeVB( FILE* pFile, const OID oid, const i64 lbid )
 
 int DbFileOp::readDbBlocks(FILE* pFile,
                            unsigned char* readBuf,
-                           i64 fbo,
+                           uint64_t fbo,
                            size_t n)
 {
     if (m_chunkManager) {
@@ -476,7 +478,7 @@ int DbFileOp::readDbBlocks(FILE* pFile,
     return fread(readBuf, BYTE_PER_BLOCK, n, pFile);
 }
 
-int DbFileOp::restoreBlock(FILE* pFile, const unsigned char* writeBuf, i64 fbo)
+int DbFileOp::restoreBlock(FILE* pFile, const unsigned char* writeBuf, uint64_t fbo)
 {
     if (m_chunkManager)
         return m_chunkManager->restoreBlock(pFile, writeBuf, fbo);

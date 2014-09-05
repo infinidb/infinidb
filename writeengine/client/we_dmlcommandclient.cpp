@@ -37,7 +37,7 @@ using namespace dmlpackage;
 namespace WriteEngine {
 	WE_DMLCommandClient::WE_DMLCommandClient()
 	{
-		fWEClient = WEClients::instance(WEClients::DDLPROC);
+		fWEClient = new WEClients(WEClients::DDLPROC);
 	}
 
 	WE_DMLCommandClient::~WE_DMLCommandClient()

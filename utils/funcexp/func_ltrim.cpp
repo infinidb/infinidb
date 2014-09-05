@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_ltrim.cpp 3741 2013-04-25 20:36:44Z bpaul $
+* $Id: func_ltrim.cpp 3742 2013-04-25 20:38:39Z bpaul $
 *
 *
 ****************************************************************************/
@@ -34,6 +34,7 @@ using namespace rowgroup;
 
 #include "joblisttypes.h"
 using namespace joblist;
+
 
 namespace funcexp
 {

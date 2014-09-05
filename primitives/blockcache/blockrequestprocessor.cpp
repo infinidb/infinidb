@@ -17,7 +17,7 @@
 
 /***************************************************************************
  *
- *   $Id: blockrequestprocessor.cpp 1965 2012-10-11 19:58:47Z xlou $
+ *   $Id: blockrequestprocessor.cpp 2055 2013-02-08 19:09:09Z pleblanc $
  *
  *   jrodriguez@calpont.com   *
  *                                                                         *
@@ -86,7 +86,7 @@ void BlockRequestProcessor::stop() {
 	fIOMgr.stop();	
 }
 
-int BlockRequestProcessor::check(const BRM::InlineLBIDRange& range, const BRM::VER_t ver, const BRM::VER_t txn, const int compType, uint32_t& lbidCount) {
+int BlockRequestProcessor::check(const BRM::InlineLBIDRange& range, const BRM::QueryContext &ver, const BRM::VER_t txn, const int compType, uint32_t& lbidCount) {
 	uint64_t maxLbid = range.start; // highest existent lbid
 	uint64_t rangeLen = range.size;
 	uint64_t idx;
@@ -97,7 +97,7 @@ int BlockRequestProcessor::check(const BRM::InlineLBIDRange& range, const BRM::V
 	if (fTrace)
 		clock_gettime(CLOCK_MONOTONIC, &start_tm);
 
-	for (idx = 0; fbMgr.exists(maxLbid, ver) == true && idx<rangeLen; maxLbid++, idx++)
+	for (idx = 0; fbMgr.exists(maxLbid, ver.currentScn) == true && idx<rangeLen; maxLbid++, idx++)
 		(void)0;
 
 	if (idx == rangeLen) { // range is already loaded
@@ -108,7 +108,7 @@ int BlockRequestProcessor::check(const BRM::InlineLBIDRange& range, const BRM::V
 			uint16_t segNum;
 			uint32_t fbo;
 			BRM::OID_t oid;
-			fdbrm.lookupLocal(maxLbid, ver, false, oid, dbroot, partNum, segNum, fbo);
+			fdbrm.lookupLocal(maxLbid, ver.currentScn, false, oid, dbroot, partNum, segNum, fbo);
 			fLogFile
 					<< oid << " " 
 					<< maxLbid << " "
@@ -147,7 +147,7 @@ int BlockRequestProcessor::check(const BRM::InlineLBIDRange& range, const BRM::V
 		uint16_t segNum;
 		uint32_t fbo;
 		BRM::OID_t oid;
-		fdbrm.lookupLocal(maxLbid, ver, false, oid, dbroot, partNum, segNum, fbo);
+		fdbrm.lookupLocal(maxLbid, ver.currentScn, false, oid, dbroot, partNum, segNum, fbo);
 		fLogFile
 				<< oid << " " 
 				<< maxLbid << " "
@@ -176,8 +176,8 @@ int BlockRequestProcessor::check(fileRequest& rqstBlk) {
 }
 
 // For future use.  Not currently used.
-int BlockRequestProcessor::check(BRM::LBID_t lbid, BRM::VER_t ver, BRM::VER_t txn, bool flg, int compType, bool& wasBlockInCache) {
-	if (fbMgr.exists(lbid, ver)==true) {
+int BlockRequestProcessor::check(BRM::LBID_t lbid, const BRM::QueryContext &ver, BRM::VER_t txn, bool flg, int compType, bool& wasBlockInCache) {
+	if (fbMgr.exists(lbid, ver.currentScn)==true) {
 		wasBlockInCache = true;
 		return 0;
 	} else {
@@ -191,31 +191,12 @@ int BlockRequestProcessor::check(BRM::LBID_t lbid, BRM::VER_t ver, BRM::VER_t tx
 	}
 }
 
-const int BlockRequestProcessor::read(const BRM::InlineLBIDRange& range, FileBufferList_t& readList, const BRM::VER_t ver)
-{
-	int blksLoaded=0;
-	HashObject_t fb(0, 0, 0);
-	for(int idx=0; (uint64_t)idx<range.size; idx++) {
-		fb.lbid=range.start+idx;
-		fb.ver=ver;
-		fb.poolIdx=0;
-		FileBuffer fbRet(-1, -1);
-		bool ret = false; //fbMgr.find(fb, fbRet);
-		if (ret) {
-			blksLoaded++;
-			readList.push_back(fbRet);
-		}
-	}
-	
-	return blksLoaded;
-}
-
-const int BlockRequestProcessor::getBlock(const BRM::LBID_t& lbid, const BRM::VER_t& ver, BRM::VER_t txn,
+const int BlockRequestProcessor::getBlock(const BRM::LBID_t& lbid, const BRM::QueryContext &ver, BRM::VER_t txn,
 	int compType, void* bufferPtr, bool vbFlg, bool &wasCached, bool *versioned, bool insertIntoCache,
 	bool readFromCache)
 {
 	if (readFromCache) {
-		HashObject_t hashObj(lbid, ver, 0);
+		HashObject_t hashObj(lbid, ver.currentScn, 0);
 		wasCached = fbMgr.find(hashObj, bufferPtr);
 		if (wasCached)
 			return 1;

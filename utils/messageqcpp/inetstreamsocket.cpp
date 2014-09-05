@@ -16,12 +16,13 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: inetstreamsocket.cpp 3292 2012-09-19 14:24:59Z rdempsey $
+*   $Id: inetstreamsocket.cpp 3632 2013-03-13 18:08:46Z pleblanc $
 *
 *
 ***********************************************************************/
 #include "config.h"
 
+#include <cstdio>
 #include <cerrno>
 #ifdef _MSC_VER
 #define WIN32_LEAN_AND_MEAN
@@ -67,6 +68,7 @@ using boost::scoped_array;
 #include "socketclosed.h"
 #include "logger.h"
 #include "loggingid.h"
+#include "idbcompress.h"
 
 // some static functions
 namespace {
@@ -289,17 +291,18 @@ retry:
 
 /* returns true when the next thing in the stream is the beginning of a new
 ByteStream object. */
-bool InetStreamSocket::readToMagic(long msecs, bool* isTimeOut) const
+bool InetStreamSocket::readToMagic(long msecs, bool* isTimeOut, Stats *stats) const
 {
 	int err;
 	struct pollfd pfd[1];
 	uint8_t *magicBuffer8;
 
+	fMagicBuffer = 0;
 	magicBuffer8 = reinterpret_cast<uint8_t*>(&fMagicBuffer);
 	pfd[0].fd = fSocketParms.sd();
 	pfd[0].events = POLLIN;
-
-	while (fMagicBuffer != BYTESTREAM_MAGIC) {
+	
+	while ((fMagicBuffer != BYTESTREAM_MAGIC) && (fMagicBuffer != COMPRESSED_BYTESTREAM_MAGIC)) {
 
 		if (msecs >= 0) {
 			pfd[0].revents = 0;
@@ -387,12 +390,13 @@ retry:
 			else 
 				throw SocketClosed("InetStreamSocket::readToMagic: Remote is closed");
 		}
+		if (stats)
+			stats->dataRecvd(1);
 	}
-	fMagicBuffer = 0;
 	return true;
 }
 
-const SBS InetStreamSocket::read(const struct ::timespec* timeout, bool* isTimeOut) const
+const SBS InetStreamSocket::read(const struct ::timespec* timeout, bool* isTimeOut, Stats *stats) const
 {
  	long msecs = -1;
 
@@ -405,10 +409,10 @@ const SBS InetStreamSocket::read(const struct ::timespec* timeout, bool* isTimeO
 
 	// we need to read the 4-byte message length first.
 	uint32_t msglen;
-	ByteStream::byte* msglenp = reinterpret_cast<ByteStream::byte*>(&msglen);
+	uint8_t* msglenp = reinterpret_cast<uint8_t*>(&msglen);
 	size_t mlread = 0;
 	
-	if (readToMagic(msecs, isTimeOut) == false)	//indicates a timeout or EOF
+	if (readToMagic(msecs, isTimeOut, stats) == false)	//indicates a timeout or EOF
 		return SBS(new ByteStream(0));
 
 	//FIXME: This seems like a lot of work to read 4 bytes...
@@ -463,9 +467,11 @@ const SBS InetStreamSocket::read(const struct ::timespec* timeout, bool* isTimeO
 		}
 		mlread += t;
 	}
+	if (stats)
+		stats->dataRecvd(sizeof(msglen));
 
 	SBS res(new ByteStream(msglen));
- 	ByteStream::byte* bufp = res->getInputPtr();
+ 	uint8_t* bufp = res->getInputPtr();
 
 	size_t nread = 0;
 
@@ -489,6 +495,8 @@ const SBS InetStreamSocket::read(const struct ::timespec* timeout, bool* isTimeO
 			{
 				if (isTimeOut)
 					*isTimeOut = true;
+				if (stats) 
+					stats->dataRecvd(nread);
 				return SBS(new ByteStream(0));
 			}
 		}
@@ -501,6 +509,8 @@ const SBS InetStreamSocket::read(const struct ::timespec* timeout, bool* isTimeO
 #endif
 		if (t == 0) 
 		{
+			if (stats) 
+				stats->dataRecvd(nread);
 			if (timeout == NULL)
 				return SBS(new ByteStream(0));	// don't return an incomplete message
 			else
@@ -524,12 +534,15 @@ const SBS InetStreamSocket::read(const struct ::timespec* timeout, bool* isTimeO
 			oss << "InetStreamSocket::read: I/O error4: " <<
 				strerror(e);
 #endif
+			if (stats) 
+				stats->dataRecvd(nread);
 			throw runtime_error(oss.str());
 		}
 		nread += t;
 	}
+	if (stats) 
+		stats->dataRecvd(msglen);
 	res->advanceInputPtr(msglen);
-
 	return res;
 }
 
@@ -538,10 +551,15 @@ const SBS InetStreamSocket::read(const struct ::timespec* timeout, bool* isTimeO
 * read side, we reverse it.
 */
 
-void InetStreamSocket::write(const ByteStream& msg) const
+void InetStreamSocket::write(SBS msg, Stats *stats)
+{
+	write(*msg, stats);
+}
+
+void InetStreamSocket::do_write(const ByteStream &msg, uint32_t whichMagic, Stats *stats) const
 {
 	uint32_t msglen = msg.length();
-	uint32_t magic = BYTESTREAM_MAGIC;
+	uint32_t magic = whichMagic;
 	uint32_t *realBuf;
 
 	if (msglen == 0) return;
@@ -554,29 +572,38 @@ void InetStreamSocket::write(const ByteStream& msg) const
 	realBuf[1] = msglen;
 
 	try {
-		writen(fSocketParms.sd(), (const uint8_t*)realBuf, msglen + sizeof(msglen) + sizeof(magic));
+		written(fSocketParms.sd(), (const uint8_t*)realBuf, msglen + sizeof(msglen) + sizeof(magic));
 	}
 	catch (std::exception& ex) {
 		string errorMsg(ex.what());
 		errorMsg += " -- write from " + toString();
 		throw runtime_error(errorMsg);
 	}
+	if (stats)
+		stats->dataSent(msglen + sizeof(msglen) + sizeof(magic));
 }
 
-void InetStreamSocket::write_raw(const ByteStream& msg) const
+void InetStreamSocket::write(const ByteStream& msg, Stats *stats)
+{
+	do_write(msg, BYTESTREAM_MAGIC, stats);
+}
+
+void InetStreamSocket::write_raw(const ByteStream& msg, Stats *stats) const
 {
 	uint32_t msglen = msg.length();
 
 	if (msglen == 0) return;
 
 	try {
-		writen(fSocketParms.sd(), msg.buf(), msglen);
+		written(fSocketParms.sd(), msg.buf(), msglen);
 	}
 	catch (std::exception& ex) {
 		string errorMsg(ex.what());
 		errorMsg += " -- write_raw from " + toString();
 		throw runtime_error(errorMsg);
 	}
+	if (stats)
+		stats->dataSent(msglen);
 }
 
 void InetStreamSocket::bind(const sockaddr* serv_addr)
@@ -829,7 +856,7 @@ void InetStreamSocket::logIoError(const char* errMsg, int errNum) const
 	logger.logMessage(logging::LOG_TYPE_WARNING, logging::M0071, args, li);
 }
 
-ssize_t InetStreamSocket::writen(int fd, const ByteStream::byte* ptr, size_t nbytes) const
+ssize_t InetStreamSocket::written(int fd, const uint8_t* ptr, size_t nbytes) const
 {
 	size_t nleft;
 	ssize_t nwritten;

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
- * $Id: dictionary.cpp 2124 2013-07-08 19:47:42Z bpaul $
+ * $Id: dictionary.cpp 2125 2013-07-08 21:25:08Z bpaul $
  */
 
 #include <iostream>

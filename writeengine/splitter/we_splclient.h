@@ -1,6 +1,6 @@
 /*
 
-   Copyright (C) 2009-2012 Calpont Corporation.
+   Copyright (C) 2009-2013 Calpont Corporation.
 
    Use of and access to the Calpont InfiniDB Community software is subject to the
    terms and conditions of the Calpont Open Source License Agreement. Use of and
@@ -49,7 +49,8 @@
 #include "resourcemanager.h"
 
 #include "we_messages.h"
-
+#include "calpontsystemcatalog.h"
+using namespace execplan;
 
 namespace WriteEngine
 {
@@ -61,11 +62,11 @@ class WESplClient;			//forward decleration
 class WEColOORInfo		// Column Out-Of-Range Info
 {
 public:
-    WEColOORInfo():fColNum(0),fColType(INT), fNoOfOORs(0){}
+    WEColOORInfo():fColNum(0),fColType(CalpontSystemCatalog::INT), fNoOfOORs(0){}
     ~WEColOORInfo(){}
 public:
     int fColNum;
-    ColDataType fColType;
+    CalpontSystemCatalog::ColDataType fColType;
     std::string fColName;
     int fNoOfOORs;
 };
@@ -292,7 +293,8 @@ private:
     std::string fErrInfoFile;
 
     void setRowsUploadInfo(int RowsRead, int RowsInserted);
-    void add2ColOutOfRangeInfo(int ColNum, ColDataType ColType, 
+    void add2ColOutOfRangeInfo(int ColNum, 
+                               CalpontSystemCatalog::ColDataType ColType, 
                                std::string&  ColName, int NoOfOors);
     void setBadDataFile(const std::string& BadDataFile);
     void setErrInfoFile(const std::string& ErrInfoFile);

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: expressiontree.h 8436 2012-04-04 18:18:21Z rdempsey $
+*   $Id: expressiontree.h 9210 2013-01-21 14:10:42Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -169,31 +169,36 @@ public:
     	evaluate(row);
     	return (reinterpret_cast<TreeNode*>(fData))->getStrVal(row); 
     }
-		int64_t getIntVal(rowgroup::Row& row) 
-		{ 
-			evaluate(row);
-			return (reinterpret_cast<TreeNode*>(fData))->getIntVal(row); 
-		}
-		float getFloatVal(rowgroup::Row& row) 
-		{ 
-			evaluate(row);
-			return (reinterpret_cast<TreeNode*>(fData))->getFloatVal(row); 
-		}
-		double getDoubleVal(rowgroup::Row& row)
-		{ 
-			evaluate(row);
-			return (reinterpret_cast<TreeNode*>(fData))->getDoubleVal(row); 
-		}
-		IDB_Decimal& getDecimalVal(rowgroup::Row& row) 
-		{ 
-			evaluate(row);
-			return (reinterpret_cast<TreeNode*>(fData))->getDecimalVal(row); 
-		}
-		bool getBoolVal(rowgroup::Row& row) 
-		{ 
-			evaluate(row);
-			return (reinterpret_cast<TreeNode*>(fData))->getBoolVal(row); 
-		}
+    int64_t getIntVal(rowgroup::Row& row) 
+    { 
+        evaluate(row);
+        return (reinterpret_cast<TreeNode*>(fData))->getIntVal(row); 
+    }
+    uint64_t getUintVal(rowgroup::Row& row) 
+    { 
+        evaluate(row);
+        return (reinterpret_cast<TreeNode*>(fData))->getUintVal(row); 
+    }
+    float getFloatVal(rowgroup::Row& row) 
+    { 
+        evaluate(row);
+        return (reinterpret_cast<TreeNode*>(fData))->getFloatVal(row); 
+    }
+    double getDoubleVal(rowgroup::Row& row)
+    { 
+        evaluate(row);
+        return (reinterpret_cast<TreeNode*>(fData))->getDoubleVal(row); 
+    }
+    IDB_Decimal& getDecimalVal(rowgroup::Row& row) 
+    { 
+        evaluate(row);
+        return (reinterpret_cast<TreeNode*>(fData))->getDecimalVal(row); 
+    }
+    bool getBoolVal(rowgroup::Row& row) 
+    { 
+        evaluate(row);
+        return (reinterpret_cast<TreeNode*>(fData))->getBoolVal(row); 
+    }
     
 private:
     T fData;

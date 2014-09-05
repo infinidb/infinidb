@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: build_rpms 1735 2012-10-25 18:07:50Z dhill $
+# $Id: build_rpms 1734 2012-10-25 18:07:16Z dhill $
 #
 
 usage="build_rpms [-vgh]"

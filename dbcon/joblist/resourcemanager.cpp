@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************************
- * $Id: resourcemanager.cpp 9491 2013-05-06 20:57:41Z pleblanc $
+ * $Id: resourcemanager.cpp 9492 2013-05-06 21:00:08Z pleblanc $
  *
  ******************************************************************************************/
 
@@ -35,6 +35,8 @@ using namespace boost;
 #define RESOURCEMANAGER_DLLEXPORT
 #include "resourcemanager.h"
 #undef RESOURCEMANAGER_DLLEXPORT
+
+#include "jl_logger.h"
 
 using namespace config;
 

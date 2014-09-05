@@ -1,5 +1,5 @@
 /******************************************************************************************
- * $Id: calpontConsole.cpp 3120 2013-06-25 21:29:28Z dhill $
+ * $Id: calpontConsole.cpp 3106 2013-06-17 21:06:23Z dhill $
  *
  ******************************************************************************************/
 
@@ -41,24 +41,24 @@ static void checkPromptThread();
 
 bool waitForActive() 
 {
-	Oam oam;
-	SystemStatus systemstatus;
+    Oam oam;
+    SystemStatus systemstatus;
     SystemProcessStatus systemprocessstatus;
     bool bfirst = true;
 
-    for ( int i = 0 ; i < 1200 ; i ++ )
-	{
-		sleep (3);
-		try
-		{
-			oam.getSystemStatus(systemstatus);
-			if (systemstatus.SystemOpState == ACTIVE)
-			{
-				return true;
-			}
-			if (systemstatus.SystemOpState == FAILED)
-			{
-				return false;
+    for (int i = 0 ; i < 1200 ; i ++)
+    {
+        sleep (3);
+        try
+        {
+            oam.getSystemStatus(systemstatus);
+            if (systemstatus.SystemOpState == ACTIVE)
+            {
+                return true;
+            }
+            if (systemstatus.SystemOpState == FAILED)
+            {
+                return false;
             }
             if (systemstatus.SystemOpState == MAN_OFFLINE)
             {
@@ -86,19 +86,20 @@ bool waitForActive()
                         break;
                     }
                 }
-		}
+            }
         }
-        catch(...)
-		{
+        catch (...)
+        {
 			// At some point, we need to give up, ProcMgr just isn't going to respond.
 			if (i > 60) // 3 minutes
 			{
 				cout << "ProcMgr not responding while waiting for system to start";
 				break;
 			}
-		}
-	}
-	return false;
+        }
+    }
+
+    return false;
 }
 
 //------------------------------------------------------------------------------
@@ -169,9 +170,10 @@ int main(int argc, char *argv[])
 		exit(-1);
 	}
 
-	// get Local Module Name and Single Server Install Indicator
+	//get parentModule Name
 	parentOAMModule = getParentOAMModule();
 
+	// get Local Module Name and Single Server Install Indicator
 	oamModuleInfo_t st;
 	try {
 		st = oam.getModuleInfo();
@@ -454,7 +456,8 @@ int processCommand(string* arguments)
 	GRACEFUL_FLAG gracefulTemp = GRACEFUL;
 	ACK_FLAG ackTemp = ACK_YES;
 	CC_SUSPEND_ANSWER suspendAnswer = CANCEL;
-
+	bool bNeedsConfirm = true;
+	string password;
 
     // get command info from Command config file
     CmdID = -1;
@@ -1679,36 +1682,22 @@ int processCommand(string* arguments)
 
         case 15: // removeDbroot parameters: dbroot-list
         {
+			string GlusterConfig = "n";
+			try {
+				oam.getSystemConfig( "GlusterConfig", GlusterConfig);
+			}
+			catch(...)
+			{}
+
+			if (GlusterConfig == "y") {
+				cout << endl << "**** removeDbroot Not Supported on Data Redundancy Configured System" << endl;
+				break;
+			}
+
 			if ( localModule != parentOAMModule ) {
 				// exit out since not on active module
 				cout << endl << "**** removeDbroot Failed : Can only run command on Active OAM Parent Module (" << parentOAMModule << ")." << endl;
 				break;
-			}
-
-			//check the system status / service status and only allow command when System is MAN_OFFLINE
-			string cmd = startup::StartUp::installDir() + "/bin/infinidb status > /tmp/status.log";
-			system(cmd.c_str());
-			if (oam.checkLogStatus("/tmp/status.log", "InfiniDB is running") ) 
-			{
-				SystemStatus systemstatus;
-				try {
-					oam.getSystemStatus(systemstatus);
-		
-					if (systemstatus.SystemOpState != oam::MAN_OFFLINE ) {
-					cout << endl << "**** removeDbroot Failed,  System has to be in a MAN_OFFLINE state, stop system first" << endl;
-						break;
-					}
-				}
-				catch (exception& e)
-				{
-					cout << endl << "**** removeDbroot Failed : " << e.what() << endl;
-					break;
-				}
-				catch(...)
-				{
-					cout << endl << "**** removeDbroot Failed,  Failed return from getSystemStatus API" << endl;
-					break;
-				}
 			}
 
             if (arguments[1] == "")
@@ -1718,18 +1707,49 @@ int processCommand(string* arguments)
                 break;
             }
 
+			systemStorageInfo_t t;
+            try
+            {
+                t = oam.getStorageConfig();
+			}
+			catch(...) {}
+
 			string dbrootIDs = arguments[1];
 
 			DBRootConfigList dbrootlist;
 
+			bool assign = false;
 			boost::char_separator<char> sep(", ");
 			boost::tokenizer< boost::char_separator<char> > tokens(dbrootIDs, sep);
 			for ( boost::tokenizer< boost::char_separator<char> >::iterator it = tokens.begin();
 					it != tokens.end();
 					++it)
 			{
+				//check if dbroot is assigned to a pm
+				DeviceDBRootList moduledbrootlist = boost::get<2>(t);
+	
+				DeviceDBRootList::iterator pt = moduledbrootlist.begin();
+				for( ; pt != moduledbrootlist.end() ; pt++)
+				{
+					DBRootConfigList::iterator pt1 = (*pt).dbrootConfigList.begin();
+					for( ; pt1 != (*pt).dbrootConfigList.end() ; pt1++)
+					{
+						if ( atoi((*it).c_str()) == *pt1 ) {
+							cout << endl << "**** removeDbroot Failed, dbroot " << *it << " is assigned to a module, unassign first before removing" << endl;
+							assign = true;
+							break;
+						}
+					}
+				}
+
+				if (assign)
+					break;
+
 				dbrootlist.push_back(atoi((*it).c_str()));
 			}
+
+			if (assign)
+				break;
 
 			cout << endl;
 
@@ -1751,19 +1771,13 @@ int processCommand(string* arguments)
         {
 			BRM::DBRM dbrm;
 			bool bDBRMReady = dbrm.isDBRMReady();
-			getFlags(arguments, gracefulTemp, ackTemp, suspendAnswer);
-			bool bNeedsConfirm = true;
+			getFlags(arguments, gracefulTemp, ackTemp, suspendAnswer, bNeedsConfirm);
 
 			if ( gracefulTemp == INSTALL ) 
 			{
 				cout << endl << "Invalid Parameter, INSTALL option not supported. Please use shutdownSystem Command" << endl << endl;
 				break;
             }
-
-			if (arguments[1] == "y") 
-			{
-				bNeedsConfirm = false;
-			}
 
 			cout << endl << "This command stops the processing of applications on all Modules within the Calpont System" << endl;
 
@@ -1861,13 +1875,8 @@ int processCommand(string* arguments)
         {
 			BRM::DBRM dbrm;
 			bool bDBRMReady = dbrm.isDBRMReady();
-            getFlags(arguments, gracefulTemp, ackTemp, suspendAnswer);
-			bool bNeedsConfirm = true;
+            getFlags(arguments, gracefulTemp, ackTemp, suspendAnswer, bNeedsConfirm);
 
-			if (arguments[1] == "y") 
-			{
-				bNeedsConfirm = false;
-			}
 			cout << endl << "This command stops the processing of applications on all Modules within the Calpont System" << endl;
 
 			if (gracefulTemp != GRACEFUL ||
@@ -1987,7 +1996,6 @@ int processCommand(string* arguments)
 				ModuleTypeConfig moduletypeconfig;
 				ModuleConfig moduleconfig;
 				systemmoduletypeconfig.moduletypeconfig.clear();
-				string password;
 				int systemModuleNumber = 0;
 				try
 				{
@@ -2008,7 +2016,8 @@ int processCommand(string* arguments)
 					break;
 				}
 
-				if ( systemModuleNumber > 1 ) {
+				if ( systemModuleNumber > 1 ) 
+				{
 					if (arguments[1] != "")
 						password = arguments[1];
 					else
@@ -2022,9 +2031,9 @@ int processCommand(string* arguments)
 					string modulename;
 					for( unsigned int i = 0 ; i < systemmoduletypeconfig.moduletypeconfig.size(); i++)
 					{
-						for(pt = systemmoduletypeconfig.moduletypeconfig[i].ModuleNetworkList.begin(); 
-							pt != systemmoduletypeconfig.moduletypeconfig[i].ModuleNetworkList.end(); 
-							++pt)
+						for (pt = systemmoduletypeconfig.moduletypeconfig[i].ModuleNetworkList.begin(); 
+							 pt != systemmoduletypeconfig.moduletypeconfig[i].ModuleNetworkList.end(); 
+							 ++pt)
 						{
 							modulename = (*pt).DeviceName;
 							if ( (*pt).DisableState == oam::MANDISABLEDSTATE ||
@@ -2050,20 +2059,23 @@ int processCommand(string* arguments)
 							continue;
 		
 						for (pt = systemmoduletypeconfig.moduletypeconfig[i].ModuleNetworkList.begin(); 
-							 pt != systemmoduletypeconfig.moduletypeconfig[i].ModuleNetworkList.end() ; 
+							 pt != systemmoduletypeconfig.moduletypeconfig[i].ModuleNetworkList.end(); 
 							 ++pt)
 						{
 							modulename = (*pt).DeviceName;
 
 							if ( (*pt).DisableState == oam::MANDISABLEDSTATE ||
-									(*pt).DisableState == oam::AUTODISABLEDSTATE ) {
+									(*pt).DisableState == oam::AUTODISABLEDSTATE ) 
+							{
 								continue;
 							}
 
-							if ( modulename == localModule ) {
+							if ( modulename == localModule ) 
+							{
 								cmd = startup::StartUp::installDir() + "/bin/infinidb restart >/dev/null 2>&1";
 								int rtnCode = system(cmd.c_str());
-								if (geteuid() == 0 && rtnCode != 0) {
+								if (geteuid() == 0 && WEXITSTATUS(rtnCode) != 0) 
+								{
 									cout << endl << "error with running 'infinidb restart' on local module " << endl;
 									cout << endl << "**** startSystem Failed" << endl;
 									break;
@@ -2078,7 +2090,7 @@ int processCommand(string* arguments)
 								//run remote command script
 								cmd = startup::StartUp::installDir() + "/bin/remote_command.sh " + (*pt1).IPAddr + " " + password + " '" + startup::StartUp::installDir() + "/bin/infinidb restart' 0";
 								int rtnCode = system(cmd.c_str());
-								if (rtnCode < 0) {
+								if (WEXITSTATUS(rtnCode) < 0) {
 									cout << endl << "error with running 'infinidb start' on module " + modulename << endl;
 									cout << endl << "**** startSystem Failed" << endl;
 									FAILED = true;
@@ -2111,7 +2123,7 @@ int processCommand(string* arguments)
 					cout.flush();
 					cmd = startup::StartUp::installDir() + "/bin/infinidb restart >/dev/null 2>&1";
 					int rtnCode = system(cmd.c_str());
-					if (geteuid() == 0 && rtnCode != 0) {
+					if (geteuid() == 0 && WEXITSTATUS(rtnCode) != 0) {
 						cout << endl << "error with running 'infinidb restart' on local module " << endl;
 						cout << endl << "**** startSystem Failed" << endl;
 						break;
@@ -2125,7 +2137,7 @@ int processCommand(string* arguments)
 			}
 			else
 			{
-				getFlags(arguments, gracefulTemp, ackTemp, suspendAnswer);
+				getFlags(arguments, gracefulTemp, ackTemp, suspendAnswer, bNeedsConfirm);
 	
 				try
 				{
@@ -2150,13 +2162,15 @@ int processCommand(string* arguments)
 
         case 19: // restartSystem - parameters: graceful flag, Ack flag
         {
-			// restartSystem Command
+			getFlags(arguments, gracefulTemp, ackTemp, suspendAnswer, bNeedsConfirm, &password);
 
 			//don't restart if a disable module has a dbroot assigned to it
 			if (!checkForDisabledModules()) {
 				cout << endl << "Error: restartSystem command can't be performed: disabled module has a dbroot assigned to it" << endl;
 				break;
 			}
+
+			cout << endl << "This command stops and restarts the processing of applications on all Modules within the Calpont System" << endl;
 
 			// if infinidb service is down, then restart system by starting all of the infinidb services
 			// this would be used after a shutdownSystem command
@@ -2165,6 +2179,11 @@ int processCommand(string* arguments)
 			system(cmd.c_str());
 			if (!oam.checkLogStatus("/tmp/status.log", "InfiniDB is running") ) 
 			{
+				if (bNeedsConfirm) 
+				{
+					if (confirmPrompt("")) // returns true if user wants to quit.
+						break;
+				}
 				cout << endl << "restartSystem command, 'infinidb' service is down, sending command to" << endl;
 				cout << "start the 'infinidb' service on all modules" << endl << endl;
 
@@ -2172,7 +2191,6 @@ int processCommand(string* arguments)
 				ModuleTypeConfig moduletypeconfig;
 				ModuleConfig moduleconfig;
 				systemmoduletypeconfig.moduletypeconfig.clear();
-				string password;
 				int systemModuleNumber = 0;
 				try
 				{
@@ -2193,12 +2211,8 @@ int processCommand(string* arguments)
 					break;
 				}
 
-				if ( systemModuleNumber > 1 ) {
-					if (arguments[2] != "")
-						password = arguments[2];
-					else
-						password = "ssh";
-
+				if ( systemModuleNumber > 1 ) 
+				{
 					//
 					// perform start of InfiniDB of other servers in the system
 					//
@@ -2222,7 +2236,7 @@ int processCommand(string* arguments)
 					cout.flush();
 					bool FAILED = false;
 	
-					for( unsigned int i = 0 ; i < systemmoduletypeconfig.moduletypeconfig.size(); i++)
+					for (unsigned int i = 0 ; i < systemmoduletypeconfig.moduletypeconfig.size(); i++)
 					{
 						if( systemmoduletypeconfig.moduletypeconfig[i].ModuleType.empty() )
 							// end of list
@@ -2233,7 +2247,8 @@ int processCommand(string* arguments)
 							// skip if no modules
 							continue;
 		
-						for(pt = systemmoduletypeconfig.moduletypeconfig[i].ModuleNetworkList.begin(); pt != systemmoduletypeconfig.moduletypeconfig[i].ModuleNetworkList.end() ; 
+						for(pt = systemmoduletypeconfig.moduletypeconfig[i].ModuleNetworkList.begin(); 
+							pt != systemmoduletypeconfig.moduletypeconfig[i].ModuleNetworkList.end(); 
 							++pt)
 						{
 							string modulename = (*pt).DeviceName;
@@ -2245,7 +2260,7 @@ int processCommand(string* arguments)
 							if ( modulename == localModule ) {
 								string cmd = startup::StartUp::installDir() + "/bin/infinidb start >/dev/null 2>&1";
 								int rtnCode = system(cmd.c_str());
-								if (rtnCode != 0) {
+								if (WEXITSTATUS(rtnCode) != 0) {
 									cout << endl << "error with running 'infinidb start' on local module " << endl;
 									cout << endl << "**** startSystem Failed" << endl;
 									break;
@@ -2260,7 +2275,7 @@ int processCommand(string* arguments)
 								//run remote command script
 								cmd = startup::StartUp::installDir() + "/bin/remote_command.sh " + (*pt1).IPAddr + " " + password + " '" + startup::StartUp::installDir() + "/bin/infinidb start' 0";
 								int rtnCode = system(cmd.c_str());
-								if (rtnCode < 0) {
+								if (WEXITSTATUS(rtnCode) < 0) {
 									cout << endl << "error with running 'infinidb start' on module " + modulename << endl;
 									cout << endl << "**** startSystem Failed" << endl;
 									FAILED = true;
@@ -2293,7 +2308,7 @@ int processCommand(string* arguments)
 					cout.flush();
 					string cmd = startup::StartUp::installDir() + "/bin/infinidb start > /tmp/status.log";
 					int rtnCode = system(cmd.c_str());
-					if (rtnCode != 0) {
+					if (WEXITSTATUS(rtnCode) != 0) {
 						cout << endl << "error with running 'infinidb start' on local module " << endl;
 						cout << endl << "**** restartSystem Failed" << endl;
 						break;
@@ -2309,14 +2324,6 @@ int processCommand(string* arguments)
 			{
 				BRM::DBRM dbrm;
 				bool bDBRMReady = dbrm.isDBRMReady();
-				getFlags(arguments, gracefulTemp, ackTemp, suspendAnswer);
-				bool bNeedsConfirm = true;
-
-				if (arguments[1] == "y") 
-				{
-					bNeedsConfirm = false;
-				}
-				cout << endl << "This command stops and restarts the processing of applications on all Modules within the Calpont System" << endl;
 
 				if (gracefulTemp != GRACEFUL ||
 					!bDBRMReady ||
@@ -2669,76 +2676,58 @@ int processCommand(string* arguments)
 			BRM::DBRM dbrm;
 			bool bDBRMReady = dbrm.isDBRMReady();
 			string module;
-			bool bConfirmAnswer = true;
 			bool bUseHotStandby = true;
-			suspendAnswer = CANCEL;
-			int i;
-			gracefulTemp = FORCEFUL;
-			// Command line Arguments can be "y", "Y", pmname, and suspendAnswer 
-			// No check is made for mutually exclusive command line arguments.
-			for (i = 1; i < ArgNum; i++)
+			// First get the values for the standard arguments
+			getFlags(arguments, gracefulTemp, ackTemp, suspendAnswer, bNeedsConfirm);
+			// Now check for arguments unique to this command. In this case, a valid
+			// module name.
+			for (int i = 1; i < ArgNum; i++)
 			{
-				if (arguments[i] == "y" || arguments[i] == "Y" )
-					bConfirmAnswer = false;
-				else
-				if (arguments[i] == "WAIT")
-					suspendAnswer = WAIT;
-				else
-//				if (arguments[i] == "ROLLBACK")
-//					suspendAnswer = ROLLBACK;
-//				else
-				if (arguments[i] == "FORCE")
-					suspendAnswer = FORCE;
-				else
 				if (arguments[i].size() > 0)
 				{
 					if (oam.validateModule(arguments[i]) == API_SUCCESS)
 					{
 						module = arguments[i];
 						bUseHotStandby = false;
-					}
-					else
-					{
-						cout << endl << "**** switchParentOAMModule Failed : Unknown paramater " << arguments[i] << endl;
 						break;
 					}
 				}
 			}
-			if (i < ArgNum)
-			{
-				// We had an invalid parameter
-				break;
-			}
 			//check if there are more than 1 pm modules to start with
 			ModuleTypeConfig moduletypeconfig;
 			oam.getSystemConfig("pm", moduletypeconfig);
-			if ( moduletypeconfig.ModuleCount < 2 ) {
+			if ( moduletypeconfig.ModuleCount < 2 ) 
+			{
 				cout << endl << "**** switchParentOAMModule Failed : Command only support on systems with Multiple Performance Modules" << endl;
-				break;
+//				break;
 			}
 
 			string DBRootStorageType;
-			try {
+			try 
+			{
 				oam.getSystemConfig("DBRootStorageType", DBRootStorageType);
 			}
 			catch(...) {}
 	
 			string GlusterConfig = "n";
-			try {
+			try 
+			{
 				oam.getSystemConfig( "GlusterConfig", GlusterConfig);
 			}
 			catch(...)
 			{}
 
-			if (DBRootStorageType == "internal" && GlusterConfig == "n"){
+			if (DBRootStorageType == "internal" && GlusterConfig == "n")
+			{
 				cout << endl << "**** switchParentOAMModule Failed : DBRoot Storage type = internal/non-data-replication" << endl;
-				break;
+//				break;
 			}
 
 			if (bUseHotStandby)
             {
 				oam.getSystemConfig("StandbyOAMModuleName", module);
-				if ( module.empty() || module == oam::UnassignedName ) {
+				if ( module.empty() || module == oam::UnassignedName ) 
+				{
                 	cout << endl << "**** switchParentOAMModule Failed : There's no hot standby defined" << endl << "     enter a Performance Module" << endl;
                 	break;
 				}
@@ -2748,7 +2737,8 @@ int processCommand(string* arguments)
 			else
 			{
 				parentOAMModule = getParentOAMModule();
-				if ( module == parentOAMModule ) {
+				if ( module == parentOAMModule ) 
+				{
 					cout << endl << "**** switchParentOAMModule Failed : " << module << " is already the Active Parent OAM Module" << endl;
 					break;
 				}
@@ -2756,7 +2746,8 @@ int processCommand(string* arguments)
 				cout << endl << "Switching to the Performance Module '" << module << "'" << endl;
 			}
 
-			if (bConfirmAnswer) {
+			if (bNeedsConfirm) 
+			{
 				// confirm request
 				if (confirmPrompt("This command switches the Active Parent OAM Module and should only be executed on an idle system."))
 					break;
@@ -2835,19 +2826,19 @@ int processCommand(string* arguments)
 			{
 				if (oam.switchParentOAMModule(module, gracefulTemp))
 				{
-					if ( waitForActive() ) {
+					if (waitForActive()) {
 						// give time for new ProcMgr to go active
 						sleep (5);
-                        cout << endl << "   Successful Switch Active Parent OAM Module" << endl << endl;
+						cout << endl << "   Successful Switch Active Parent OAM Module" << endl << endl;
 					}
-                    else
-                        cout << endl << "**** Switch Active Parent OAM Module failed : check log files" << endl;
+					else
+						cout << endl << "**** Switch Active Parent OAM Module failed : check log files" << endl;
 				}
                 else
                 {
 					// give time for new ProcMgr to go active
 					sleep (5);
-                    cout << endl << "   Successful Switch Active Parent OAM Module" << endl << endl;
+					cout << endl << "   Successful Switch Active Parent OAM Module" << endl << endl;
                 }
             }
             catch (exception& e)
@@ -2873,7 +2864,7 @@ int processCommand(string* arguments)
 
 				if ( systemstatus.systemdbrootstatus.dbrootstatus.size() == 0 )
 				{
-					cout << " No DBRoot Storage Configured" << endl;
+					cout << " No External DBRoot Storage Configured" << endl;
 					break;
 				}
 
@@ -3232,12 +3223,8 @@ int processCommand(string* arguments)
         case 32: // suspendDatabaseWrites
 		{
 			BRM::DBRM dbrm;
-			getFlags(arguments, gracefulTemp, ackTemp, suspendAnswer);
-			bool bNeedsConfirm = true;
-			if (arguments[1] == "y") 
-			{
-				bNeedsConfirm = false;
-			}
+			getFlags(arguments, gracefulTemp, ackTemp, suspendAnswer, bNeedsConfirm);
+
 			cout << endl << "This command suspends the DDL/DML writes to the Calpont Database" << endl;
 
 			if (!dbrm.isDBRMReady())
@@ -3417,6 +3404,11 @@ int processCommand(string* arguments)
 					cout << endl << "**** assignDbrootPmConfig Failed,  Failed return from getSystemStatus API" << endl;
 					break;
 				}
+			}
+			else
+			{
+				cout << endl << "**** assignDbrootPmConfig Failed,  System is shutdown. Needs to be stopped" << endl;
+				break;
 			}
 
            if (arguments[2] == "")
@@ -6100,6 +6092,7 @@ int ProcessSupportCommand(int CommandID, std::string arguments[])
 	GRACEFUL_FLAG gracefulTemp = GRACEFUL;
 	ACK_FLAG ackTemp = ACK_YES;
 	CC_SUSPEND_ANSWER suspendAnswer = WAIT;
+	bool bNeedsConfirm = true;
 
 	switch( CommandID )
     {
@@ -6143,7 +6136,7 @@ int ProcessSupportCommand(int CommandID, std::string arguments[])
 				else
 				{
 					if ( arguments[3] != "y" ) {
-						getFlags(arguments, gracefulTemp, ackTemp, suspendAnswer);
+						getFlags(arguments, gracefulTemp, ackTemp, suspendAnswer, bNeedsConfirm);
 						// confirm request
 						if (confirmPrompt("This command stops the processing of an application on a Module within the Calpont System"))
 							break;
@@ -6172,7 +6165,7 @@ int ProcessSupportCommand(int CommandID, std::string arguments[])
                 break;
             }
 
-			getFlags(arguments, gracefulTemp, ackTemp, suspendAnswer);
+			getFlags(arguments, gracefulTemp, ackTemp, suspendAnswer, bNeedsConfirm);
 
             try
             {
@@ -6195,7 +6188,7 @@ int ProcessSupportCommand(int CommandID, std::string arguments[])
                 break;
             }
 
-			getFlags(arguments, gracefulTemp, ackTemp, suspendAnswer);
+			getFlags(arguments, gracefulTemp, ackTemp, suspendAnswer, bNeedsConfirm);
 
             // confirm request
             if (confirmPrompt("This command restarts the processing of an application on a Module within the Calpont System"))
@@ -6326,7 +6319,7 @@ int ProcessSupportCommand(int CommandID, std::string arguments[])
 							HostConfigList::iterator pt1 = (*pt).hostConfigList.begin();
 							string cmd = startup::StartUp::installDir() + "/bin/remote_command.sh " + (*pt1).IPAddr + " " + password + " reboot " ;
 							int rtnCode = system(cmd.c_str());
-							if (rtnCode != 0) {
+							if (WEXITSTATUS(rtnCode) != 0) {
 								cout << "Failed with running remote_command.sh" << endl;
 								FAILED = true;
 							}
@@ -6341,7 +6334,7 @@ int ProcessSupportCommand(int CommandID, std::string arguments[])
 
 				//reboot local module
 				int rtnCode = system("reboot");
-				if (rtnCode != 0)
+				if (WEXITSTATUS(rtnCode) != 0)
 					cout << "Failed rebooting local module" << endl;
 				else
 				{
@@ -6411,7 +6404,7 @@ int ProcessSupportCommand(int CommandID, std::string arguments[])
 								if (inputModuleName == localModule ) {
 									//reboot local module
 									int rtnCode = system("reboot");
-									if (rtnCode != 0)
+									if (WEXITSTATUS(rtnCode) != 0)
 										cout << "Failed rebooting local node" << endl;
 									else
 									{
@@ -6430,7 +6423,7 @@ int ProcessSupportCommand(int CommandID, std::string arguments[])
 									//run remote command script
 									string cmd = startup::StartUp::installDir() + "/bin/remote_command.sh " + ipAddr + " " + password + " reboot " ;
 									int rtnCode = system(cmd.c_str());
-									if (rtnCode != 0)
+									if (WEXITSTATUS(rtnCode) != 0)
 										cout << "Failed with running remote_command.sh" << endl;
 									else
 										cout << endl << "   Successful reboot request of Node " << modulename << endl;
@@ -6812,29 +6805,46 @@ int ProcessSupportCommand(int CommandID, std::string arguments[])
  * purpose:	get and convert Graceful and Ack flags
  *
  ******************************************************************************************/
-void getFlags(const string* arguments, GRACEFUL_FLAG& gracefulTemp, ACK_FLAG& ackTemp, oam::CC_SUSPEND_ANSWER& suspendAnswer)
+void getFlags(const string* arguments, GRACEFUL_FLAG& gracefulTemp, ACK_FLAG& ackTemp, oam::CC_SUSPEND_ANSWER& suspendAnswer, bool& bNeedsConfirm, string* password)
 {
     gracefulTemp = GRACEFUL;                      // default
     ackTemp = ACK_YES;                             // default
 	suspendAnswer = CANCEL;
+	bNeedsConfirm = true;
     for( int i = 1; i < ArgNum; i++)
     {
-        if (arguments[i] == "GRACEFUL")
+		if (strcasecmp(arguments[i].c_str(), "Y") == 0)
+			bNeedsConfirm = false;
+		else
+		if (strcasecmp(arguments[i].c_str(), "N") == 0)
+			bNeedsConfirm = true;
+		else
+        if (strcasecmp(arguments[i].c_str(), "GRACEFUL") == 0)
             gracefulTemp = oam::GRACEFUL;
-        if (arguments[i] == "FORCEFUL")
+		else
+        if (strcasecmp(arguments[i].c_str(), "FORCEFUL") == 0)
             gracefulTemp = FORCEFUL;
-        if (arguments[i] == "INSTALL")
+		else
+        if (strcasecmp(arguments[i].c_str(), "INSTALL") == 0)
             gracefulTemp = INSTALL;
-        if (arguments[i] == "ACK_YES" || arguments[i] == "YES_ACK" )
+		else
+        if (strcasecmp(arguments[i].c_str(), "ACK_YES") == 0 || strcasecmp(arguments[i].c_str(), "YES_ACK") == 0)
             ackTemp = ACK_YES;
-        if (arguments[i] == "ACK_NO" || arguments[i] == "NO_ACK" )
+		else
+        if (strcasecmp(arguments[i].c_str(), "ACK_NO") == 0 || strcasecmp(arguments[i].c_str(), "NO_ACK") == 0)
             ackTemp = ACK_NO;
-		if (arguments[i] == "WAIT")
+		else
+		if (strcasecmp(arguments[i].c_str(), "WAIT") == 0)
 			suspendAnswer = WAIT;
-		if (arguments[i] == "ROLLBACK")
+		else
+		if (strcasecmp(arguments[i].c_str(), "ROLLBACK") == 0)
 			suspendAnswer = ROLLBACK;
-		if (arguments[i] == "FORCE")
+		else
+		if (strcasecmp(arguments[i].c_str(), "FORCE") == 0)
 			suspendAnswer = FORCE;
+		else
+		if (password && arguments[i].length() > 0)
+			*password = arguments[i];
     }
 }
 
@@ -6867,10 +6877,10 @@ int confirmPrompt(std::string warningCommand)
 			pcommand = 0;
 		}
 
-	if (pcommand) {
-		free(pcommand);
-		pcommand = 0;
-	}
+		if (pcommand) {
+			free(pcommand);
+			pcommand = 0;
+		}
 
         // covert argument into lowercase
         transform (argument.begin(), argument.end(), argument.begin(), to_lower());
@@ -7574,6 +7584,8 @@ bool checkForDisabledModules()
 		if( moduleCount == 0)
 			continue;
 
+		string moduleType = systemmoduletypeconfig.moduletypeconfig[i].ModuleType;
+
 		DeviceNetworkList::iterator pt = systemmoduletypeconfig.moduletypeconfig[i].ModuleNetworkList.begin();
 		for ( ; pt != systemmoduletypeconfig.moduletypeconfig[i].ModuleNetworkList.end(); pt++)
 		{
@@ -7591,6 +7603,9 @@ bool checkForDisabledModules()
 						found = true;
 					}
 					cout << moduleName << " ";
+
+					if ( moduleType == "um" )
+						continue;
 
 					//check if module has any dbroots assigned to it
 					string PMID = moduleName.substr(MAX_MODULE_TYPE_SIZE,MAX_MODULE_ID_SIZE);;

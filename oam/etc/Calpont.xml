@@ -180,6 +180,7 @@
 		<InitialInstallFlag>y</InitialInstallFlag>
 		<ServerTypeInstall>2</ServerTypeInstall>
 		<DBRootStorageType>internal</DBRootStorageType>
+		<UMStorageType>internal</UMStorageType>
 	</Installation>
 	<ExtentMap>
 		<FilesPerColumnPartition>4</FilesPerColumnPartition>
@@ -219,4 +220,7 @@
 		<User>unassigned</User>
 		<Password></Password>
 	</CrossEngineSupport>
+	<NetworkCompression>
+		<Enabled>Y</Enabled>
+	</NetworkCompression>
 </Calpont>

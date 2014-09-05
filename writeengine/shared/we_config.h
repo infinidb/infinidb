@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_config.h 4496 2013-01-31 19:13:20Z pleblanc $
+* $Id: we_config.h 4544 2013-02-14 20:13:51Z dcathey $
 *
 *******************************************************************************/
 /** @file */
@@ -96,11 +96,6 @@ public:
     EXPORT static size_t DBRootCount();
 
     /**
-     * @brief Total DBRoot count for all PMs
-     */
-    EXPORT static size_t totalDBRootCount();
-
-    /**
      * @brief Wait Period
      */
     EXPORT static int getWaitPeriod();
@@ -176,7 +171,6 @@ private:
     static void         checkReload();
 
     static int          m_dbRootCount;           // num DBRoots for local PM
-    static int          m_totalDbRootCount;      // total number of DBRoot paths
     static strvec_t     m_dbRootPath;            // root paths for open files
     static intstrmap_t  m_dbRootPathMap;         // map of root id to root paths
     static uint16vec_t  m_dbRootId;              // list of root ids

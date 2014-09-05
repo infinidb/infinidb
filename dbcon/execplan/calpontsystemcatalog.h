@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: calpontsystemcatalog.h 9056 2012-11-06 20:15:42Z rdempsey $
+ *   $Id: calpontsystemcatalog.h 9585 2013-05-31 21:08:06Z rdempsey $
  *
  *
  ***********************************************************************/
@@ -36,13 +36,49 @@
 #include <boost/shared_ptr.hpp>
 #include <limits>
 #include <iosfwd>
+#include <limits>
 
 #include "we_typeext.h"
 #include "columnresult.h"
 #include "bytestream.h"
+#include "joblisttypes.h"
+#include "stdexcept"
 
 #undef min
 #undef max
+
+#ifdef _MSC_VER
+#define __attribute__(x)
+#endif
+
+namespace 
+{
+    const int64_t MIN_TINYINT    __attribute__ ((unused)) = std::numeric_limits<int8_t>::min()+2;      //-126;
+    const int64_t MAX_TINYINT    __attribute__ ((unused)) = std::numeric_limits<int8_t>::max();        //127;
+    const int64_t MIN_SMALLINT   __attribute__ ((unused)) = std::numeric_limits<int16_t>::min()+2;     //-32766;
+    const int64_t MAX_SMALLINT   __attribute__ ((unused)) = std::numeric_limits<int16_t>::max();       //32767;
+    const int64_t MIN_INT        __attribute__ ((unused)) = std::numeric_limits<int32_t>::min()+2;     //-2147483646;
+    const int64_t MAX_INT        __attribute__ ((unused)) = std::numeric_limits<int32_t>::max();       //2147483647;
+    const int64_t MIN_BIGINT     __attribute__ ((unused)) = std::numeric_limits<int64_t>::min()+2;     //-9223372036854775806LL;
+    const int64_t MAX_BIGINT     __attribute__ ((unused)) = std::numeric_limits<int64_t>::max();       //9223372036854775807
+
+    const uint64_t MIN_UINT      __attribute__ ((unused)) = 0;
+    const uint64_t MIN_UTINYINT  __attribute__ ((unused)) = 0;
+    const uint64_t MIN_USMALLINT __attribute__ ((unused)) = 0;
+    const uint64_t MIN_UBIGINT   __attribute__ ((unused)) = 0;
+    const uint64_t MAX_UINT      __attribute__ ((unused)) = std::numeric_limits<uint32_t>::max()-2;    //4294967293
+    const uint64_t MAX_UTINYINT  __attribute__ ((unused)) = std::numeric_limits<uint8_t>::max()-2;     //253;
+    const uint64_t MAX_USMALLINT __attribute__ ((unused)) = std::numeric_limits<uint16_t>::max()-2;    //65533;
+    const uint64_t MAX_UBIGINT   __attribute__ ((unused)) = std::numeric_limits<uint64_t>::max()-2;    //18446744073709551613
+
+    const float MAX_FLOAT        __attribute__ ((unused)) = std::numeric_limits<float>::max();         //3.402823466385289e+38
+    const float MIN_FLOAT        __attribute__ ((unused)) = -std::numeric_limits<float>::max();
+    const double MAX_DOUBLE      __attribute__ ((unused)) = std::numeric_limits<double>::max();        //1.7976931348623157e+308
+    const double MIN_DOUBLE      __attribute__ ((unused)) = -std::numeric_limits<double>::max();
+
+
+    const uint64_t AUTOINCR_SATURATED __attribute__ ((unused)) = std::numeric_limits<uint64_t>::max();
+}
 
 class ExecPlanTest;
 namespace messageqcpp
@@ -92,24 +128,33 @@ public:
      */
     enum ColDataType
     {
-			BIT=WriteEngine::BIT,             /*!< BIT type */
-			TINYINT=WriteEngine::TINYINT,     /*!< TINYINT type */
-			CHAR=WriteEngine::CHAR,           /*!< CHAR type */
-			SMALLINT=WriteEngine::SMALLINT,   /*!< SMALLINT type */
-			DECIMAL=WriteEngine::DECIMAL,     /*!< DECIMAL type */
-			MEDINT=WriteEngine::MEDINT,       /*!< MEDINT type */
-			INT=WriteEngine::INT,             /*!< INT type */
-			FLOAT=WriteEngine::FLOAT,         /*!< FLOAT type */
-			DATE=WriteEngine::DATE,           /*!< DATE type */
-			BIGINT=WriteEngine::BIGINT,       /*!< BIGINT type */
-			DOUBLE=WriteEngine::DOUBLE,       /*!< DOUBLE type */
-			DATETIME=WriteEngine::DATETIME,   /*!< DATETIME type */
-			VARCHAR=WriteEngine::VARCHAR,     /*!< VARCHAR type */
-			VARBINARY=WriteEngine::VARBINARY, /*!< VARBINARY type */
-			CLOB=WriteEngine::CLOB,           /*!< CLOB type */
-			BLOB=WriteEngine::BLOB,           /*!< BLOB type */
-			LONGDOUBLE,                       /* @bug3241, dev and variance calculation only */
-			STRINT                            /* @bug3532, string as int for fast comparison */
+			BIT,              /*!< BIT type */
+			TINYINT,          /*!< TINYINT type */
+			CHAR,             /*!< CHAR type */
+			SMALLINT,         /*!< SMALLINT type */
+			DECIMAL,          /*!< DECIMAL type */
+			MEDINT,           /*!< MEDINT type */
+			INT,              /*!< INT type */
+			FLOAT,            /*!< FLOAT type */
+			DATE,             /*!< DATE type */
+			BIGINT,           /*!< BIGINT type */
+			DOUBLE,           /*!< DOUBLE type */
+			DATETIME,         /*!< DATETIME type */
+			VARCHAR,          /*!< VARCHAR type */
+			VARBINARY,        /*!< VARBINARY type */
+			CLOB,             /*!< CLOB type */
+			BLOB,             /*!< BLOB type */
+            UTINYINT,         /*!< Unsigned TINYINT type */
+            USMALLINT,        /*!< Unsigned SMALLINT type */
+            UDECIMAL,         /*!< Unsigned DECIMAL type */
+            UMEDINT,          /*!< Unsigned MEDINT type */
+            UINT,             /*!< Unsigned INT type */
+            UFLOAT,           /*!< Unsigned FLOAT */
+            UBIGINT,          /*!< Unsigned BIGINT type */
+            UDOUBLE,          /*!< Unsigned DOUBLE type */
+            NUM_OF_COL_DATA_TYPE,
+        	LONGDOUBLE,       /* @bug3241, dev and variance calculation only */
+			STRINT            /* @bug3532, string as int for fast comparison */
     };
 
     /** the set of column constraint types
@@ -178,6 +223,8 @@ public:
     typedef std::vector <ColumnResult*> NJLSysDataVector;
     struct NJLSysDataList
     {
+        // If we used an unorderedmap<OID, ColumnResult*>, we might improve performance.
+        // Maybe.
         NJLSysDataVector sysDataVec;
         NJLSysDataList(){};
         ~NJLSysDataList();
@@ -217,7 +264,7 @@ public:
 		int32_t compressionType;
         OID columnOID;
 		bool     autoincrement; //set to true if  SYSCOLUMN autoincrement is �y�
-		int64_t nextvalue; //next autoincrement value 
+		uint64_t nextvalue; //next autoincrement value 
 		
         ColType(const ColType& rhs)
 		{
@@ -411,7 +458,7 @@ public:
         std::string referenceTable;     // for foreign key constraint
         std::string referencePKName;    // for foreign key constraint
         std::string constraintStatus;
-    };    
+    };
 
     /** the structure passed into lookupOID
      *
@@ -422,6 +469,7 @@ public:
         std::string table;
         std::string column;
         bool operator<(const TableColName& rhs) const;
+        const std::string toString() const;
         friend std::ostream& operator<<(std::ostream& os, const TableColName& rhs);
     };
 
@@ -465,15 +513,15 @@ public:
 	/** returns the next value of autoincrement for the table
      *
      * return the next value of autoincrement for a given table:
-	 * -2: No such table found
-	 * <0: exceed limit
+	 * AUTOINCR_SATURATED: limit exceeded
 	 * 0: Autoincrement does not exist for this table
+     * Throws runtime_error if no such table found
      */
-	const int64_t nextAutoIncrValue ( TableName tableName);
+	const uint64_t nextAutoIncrValue ( TableName tableName);
 
 	/** returns the rid of next autoincrement value for the table oid
      *
-     * return the ird of next value of autoincrement for a given table:
+     * return the rid of next value of autoincrement for a given table:
      */
 	const ROPair nextAutoIncrRid ( const OID& oid);	
 
@@ -828,6 +876,181 @@ const CalpontSystemCatalog::TableAliasName make_aliastable(const std::string& s,
 	                     const bool fIsInfiniDB = true);
 const CalpontSystemCatalog::TableAliasName make_aliasview(const std::string& s, const std::string& t, const std::string& a, const std::string& v, const bool fIsInfiniDB = true);
 
+/** convenience function to determine if column type is a char
+ *  type
+ */
+inline bool isCharType(const execplan::CalpontSystemCatalog::ColDataType type)
+{
+	return (execplan::CalpontSystemCatalog::VARCHAR == type || execplan::CalpontSystemCatalog::CHAR == type);
+}
+
+/** convenience function to determine if column type is an
+ *  unsigned type
+ */
+inline bool isUnsigned(const execplan::CalpontSystemCatalog::ColDataType type)
+{
+   switch (type)
+   {
+	   case execplan::CalpontSystemCatalog::UTINYINT:
+	   case execplan::CalpontSystemCatalog::USMALLINT:
+	   case execplan::CalpontSystemCatalog::UMEDINT:
+	   case execplan::CalpontSystemCatalog::UINT:
+	   case execplan::CalpontSystemCatalog::UBIGINT:
+		   return true;
+	   default:
+		   return false;
+   }
+}
+
+inline bool isSignedInteger(const execplan::CalpontSystemCatalog::ColDataType type)
+{
+   switch (type)
+   {
+	   case execplan::CalpontSystemCatalog::TINYINT:
+	   case execplan::CalpontSystemCatalog::SMALLINT:
+	   case execplan::CalpontSystemCatalog::MEDINT:
+	   case execplan::CalpontSystemCatalog::INT:
+	   case execplan::CalpontSystemCatalog::BIGINT:
+		   return true;
+	   default:
+		   return false;
+   }
+}
+
+inline bool isNull(int64_t val, const execplan::CalpontSystemCatalog::ColType& ct)
+{
+	bool ret = false;
+
+	switch (ct.colDataType)
+	{
+		case execplan::CalpontSystemCatalog::TINYINT:
+		{
+			if ((int8_t) joblist::TINYINTNULL == val) ret = true;
+			break;
+		}
+		case execplan::CalpontSystemCatalog::CHAR:
+		{
+			int colWidth = ct.colWidth;
+			if (colWidth <= 8)
+			{
+				if ((colWidth == 1) && ((int8_t) joblist::CHAR1NULL == val)) ret = true ;
+				else if ((colWidth == 2) && ((int16_t) joblist::CHAR2NULL == val)) ret = true;
+				else if ((colWidth < 5) && ((int32_t) joblist::CHAR4NULL == val)) ret = true;
+				else if ((int64_t) joblist::CHAR8NULL == val) ret = true;
+			}
+			else
+			{
+				throw std::logic_error("Not a int column.");
+			}
+			break;
+		}
+		case execplan::CalpontSystemCatalog::SMALLINT:
+		{
+			if ((int16_t) joblist::SMALLINTNULL == val) ret = true;
+			break;
+		}
+		case execplan::CalpontSystemCatalog::DECIMAL:
+        case execplan::CalpontSystemCatalog::UDECIMAL:
+        {
+            switch (ct.colWidth)
+            {
+                case 1:
+                {
+                    if ((int8_t)joblist::TINYINTNULL == val) ret = true;
+                    break;
+                }
+                case 2:
+                {
+                    if ((int16_t)joblist::SMALLINTNULL == val) ret = true;
+                    break;
+                }
+                case 4:
+                {
+                    if ((int32_t)joblist::INTNULL == val) ret = true;
+                    break;
+                }
+                default:
+                {
+                    if ((int64_t)joblist::BIGINTNULL == val) ret = true;
+                    break;
+                }
+            }
+        }
+		case execplan::CalpontSystemCatalog::DOUBLE:
+        case execplan::CalpontSystemCatalog::UDOUBLE:
+		{
+			if ((int64_t)joblist::DOUBLENULL == val) ret = true;
+			break;
+		}
+		case execplan::CalpontSystemCatalog::MEDINT:
+		case execplan::CalpontSystemCatalog::INT:
+		{
+			if ((int32_t)joblist::INTNULL == val) ret = true;
+			break;
+		}
+		case execplan::CalpontSystemCatalog::FLOAT:
+        case execplan::CalpontSystemCatalog::UFLOAT:
+		{
+			if ((int32_t)joblist::FLOATNULL == val) ret = true;
+			break;
+		}
+		case execplan::CalpontSystemCatalog::DATE:
+		{
+			if ((int32_t) joblist::DATENULL == val) ret = true;
+			break;
+		}
+		case execplan::CalpontSystemCatalog::BIGINT:
+		{
+			if ((int64_t)joblist::BIGINTNULL == val) ret = true;
+			break;
+		}
+		case execplan::CalpontSystemCatalog::DATETIME:
+		{
+			if ((int64_t)joblist::DATETIMENULL == val) ret = true;
+			break;
+		}
+		case execplan::CalpontSystemCatalog::VARCHAR:
+		{
+			int colWidth = ct.colWidth;
+			if (colWidth <= 8)
+			{
+				if ((colWidth < 3) && ((int16_t) joblist::CHAR2NULL == val)) ret = true;
+				else if ((colWidth < 5) && ((int32_t) joblist::CHAR4NULL == val)) ret = true;
+				else if ((int64_t)joblist::CHAR8NULL == val) ret = true;
+			}
+			else
+			{
+				throw std::logic_error("Not a int column.");
+			}
+			break;
+		}
+        case execplan::CalpontSystemCatalog::UTINYINT:
+        {
+            if (joblist::UTINYINTNULL == (uint8_t)val) ret = true;
+            break;
+        }
+        case execplan::CalpontSystemCatalog::USMALLINT:
+        {
+            if (joblist::USMALLINTNULL == (uint16_t)val) ret = true;
+            break;
+        }
+        case execplan::CalpontSystemCatalog::UMEDINT:
+        case execplan::CalpontSystemCatalog::UINT:
+        {
+            if (joblist::UINTNULL == (uint32_t)val) ret = true;
+            break;
+        }
+        case execplan::CalpontSystemCatalog::UBIGINT:
+        {
+            if (joblist::UBIGINTNULL == (uint64_t)val) ret = true;
+            break;
+        }
+		default:
+			break;
+	}
+
+	return ret;
+}
 
 /** constants for system table names
  */

@@ -1,6 +1,6 @@
 /*
 
-   Copyright (C) 2009-2012 Calpont Corporation.
+   Copyright (C) 2009-2013 Calpont Corporation.
 
    Use of and access to the Calpont InfiniDB Community software is subject to the
    terms and conditions of the Calpont Open Source License Agreement. Use of and
@@ -57,12 +57,10 @@ public:
 	virtual ~WEXmlgetter();
 
 public:
-	bool getNodeAttribute(const xmlNode* pNode,
-								const char* pTag, char* pVal ) const;
-	bool getNodeContent( const xmlNode* pNode, char* pVal) const;
+	//..Public methods
 	std::string getValue(const vector<string>& section) const;
-	std::string getAttribute(const std::vector<string>& sections, const std::string& Tag) const;
-	std::string getConfig(const std::string& section, const std::string& name) const;
+	std::string getAttribute(const std::vector<string>& sections,
+		const std::string& Tag) const;
 	void getConfig(const std::string& section,
 		const std::string& name, std::vector<std::string>& values ) const;
 	void getAttributeListForAllChildren(
@@ -82,7 +80,6 @@ private:
     std::string 	fConfigName;				// xml filename
     xmlDocPtr      	fDoc;                    	// xml document pointer
     xmlNode*       	fpRoot;                   	// root element
-
 };
 
 } /* namespace WriteEngine */

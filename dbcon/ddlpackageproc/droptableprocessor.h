@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: droptableprocessor.h 8436 2012-04-04 18:18:21Z rdempsey $
+ *   $Id: droptableprocessor.h 9303 2013-03-07 16:07:12Z chao $
  *
  *
  ***********************************************************************/
@@ -41,6 +41,7 @@ namespace ddlpackageprocessor
     class DropTableProcessor : public DDLPackageProcessor
     {
         public:
+			DropTableProcessor(BRM::DBRM* aDbrm) : DDLPackageProcessor(aDbrm){}
             /** @brief process a drop table statement
              *
              *  @param dropTableStmt the drop table statement
@@ -60,6 +61,7 @@ namespace ddlpackageprocessor
     class TruncTableProcessor : public DDLPackageProcessor
     {
         public:
+			TruncTableProcessor(BRM::DBRM* aDbrm) : DDLPackageProcessor(aDbrm){}
             /** @brief process a truncate table statement
              *
              *  @param truncTableStmt the truncate table statement

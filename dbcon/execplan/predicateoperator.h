@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: predicateoperator.h 9669 2013-07-08 19:49:36Z bpaul $
+*   $Id: predicateoperator.h 9670 2013-07-08 21:28:03Z bpaul $
 *
 *
 ***********************************************************************/
@@ -187,8 +187,42 @@ inline bool PredicateOperator::getBoolVal(rowgroup::Row& row, bool& isNull, Retu
 			return numericCompare(val1,  rop->getIntVal(row, isNull)) && !isNull;
 		}
 
+        case execplan::CalpontSystemCatalog::UBIGINT:
+        case execplan::CalpontSystemCatalog::UINT:
+        case execplan::CalpontSystemCatalog::UMEDINT:
+        case execplan::CalpontSystemCatalog::UTINYINT:
+        case execplan::CalpontSystemCatalog::USMALLINT:
+        {
+            if (fOp == OP_ISNULL)
+            {
+                lop->getUintVal(row, isNull);
+                bool ret = isNull;
+                isNull = false;
+                return ret;
+            }
+
+            if (fOp == OP_ISNOTNULL)
+            {
+                lop->getUintVal(row, isNull);
+                bool ret = isNull;
+                isNull = false;
+                return !ret;
+            }
+
+            if (isNull)
+                return false;
+
+            uint64_t val1 = lop->getUintVal(row, isNull);
+            if (isNull)
+                return false;
+
+            return numericCompare(val1,  rop->getUintVal(row, isNull)) && !isNull;
+        }
+
+        case execplan::CalpontSystemCatalog::FLOAT:
+        case execplan::CalpontSystemCatalog::UFLOAT:
 		case execplan::CalpontSystemCatalog::DOUBLE:
-		case execplan::CalpontSystemCatalog::FLOAT:
+        case execplan::CalpontSystemCatalog::UDOUBLE:
 		{
 			if (fOp == OP_ISNULL)
 			{
@@ -217,6 +251,7 @@ inline bool PredicateOperator::getBoolVal(rowgroup::Row& row, bool& isNull, Retu
 		}
 
 		case execplan::CalpontSystemCatalog::DECIMAL:
+        case execplan::CalpontSystemCatalog::UDECIMAL:
 		{
 			if (fOp == OP_ISNULL)
 			{

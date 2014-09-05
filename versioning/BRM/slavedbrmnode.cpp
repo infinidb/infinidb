@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: slavedbrmnode.cpp 1837 2013-01-31 19:13:18Z pleblanc $
+ * $Id: slavedbrmnode.cpp 1891 2013-05-30 20:33:00Z dhall $
  *
  ****************************************************************************/
 
@@ -50,7 +50,6 @@ using namespace logging;
 
 namespace BRM {
 
-VBRange_v lastFreeList;
 
 SlaveDBRMNode::SlaveDBRMNode() throw()
 {
@@ -94,7 +93,7 @@ int SlaveDBRMNode::createStripeColumnExtents(
 	u_int16_t  dbRoot,
 	u_int32_t& partitionNum,
 	u_int16_t& segmentNum,
-	std::vector<CreateStripeColumnExtentsArgOut>& extents) throw()
+    std::vector<CreateStripeColumnExtentsArgOut>& extents) throw()
 {
 	try {
 		em.createStripeColumnExtents(cols, dbRoot,
@@ -114,15 +113,16 @@ int SlaveDBRMNode::createStripeColumnExtents(
 int SlaveDBRMNode::createColumnExtent_DBroot(OID_t oid,
 	u_int32_t  colWidth,
 	u_int16_t  dbRoot,
-	u_int32_t& partitionNum,
+    execplan::CalpontSystemCatalog::ColDataType colDataType,
+    u_int32_t& partitionNum,
 	u_int16_t& segmentNum,
 	LBID_t&    lbid,
 	int&       allocdSize,
 	u_int32_t& startBlockOffset) throw()
 {
 	try {
-		em.createColumnExtent_DBroot(oid, colWidth, dbRoot, partitionNum,
-			segmentNum, lbid, allocdSize, startBlockOffset );
+		em.createColumnExtent_DBroot(oid, colWidth, dbRoot, colDataType,
+            partitionNum, segmentNum, lbid, allocdSize, startBlockOffset);
 	}
 	catch (exception& e) {
 		cerr << e.what() << endl;
@@ -141,13 +141,14 @@ int SlaveDBRMNode::createColumnExtentExactFile(OID_t oid,
 	u_int16_t  dbRoot,
 	u_int32_t  partitionNum,
 	u_int16_t  segmentNum,
+    execplan::CalpontSystemCatalog::ColDataType colDataType,
 	LBID_t&    lbid,
 	int&       allocdSize,
 	u_int32_t& startBlockOffset) throw()
 {
 	try {
 		em.createColumnExtentExactFile(oid, colWidth, dbRoot, partitionNum,
-			segmentNum, lbid, allocdSize, startBlockOffset );
+			segmentNum, colDataType, lbid, allocdSize, startBlockOffset);
 	}
 	catch (exception& e) {
 		cerr << e.what() << endl;
@@ -361,7 +362,7 @@ int SlaveDBRMNode::bulkSetHWMAndCP(const vector<BulkSetHWMArg> &hwmArgs,
 	CPMaxMinMerge mergeCPEntry;
 	CPMaxMinMergeMap_t bulkMergeCPMap;
 
-	try {
+    try {
 		if (transID)
 			vbCommit(transID);
 		for (i = 0; i < hwmArgs.size(); i++) {
@@ -383,7 +384,7 @@ int SlaveDBRMNode::bulkSetHWMAndCP(const vector<BulkSetHWMArg> &hwmArgs,
 
 		if (mergeCPDataArgs.size() > 0) {
 			for (i = 0; i < mergeCPDataArgs.size(); i++) {
-				mergeCPEntry.isChar = mergeCPDataArgs[i].isChar;
+				mergeCPEntry.type = mergeCPDataArgs[i].type;
 				mergeCPEntry.max = mergeCPDataArgs[i].max;
 				mergeCPEntry.min = mergeCPDataArgs[i].min;
 				mergeCPEntry.newExtent = mergeCPDataArgs[i].newExtent;
@@ -417,40 +418,8 @@ int SlaveDBRMNode::bulkUpdateDBRoot(const vector<BulkUpdateDBRootArg> &args) thr
 int SlaveDBRMNode::writeVBEntry(VER_t transID, LBID_t lbid, OID_t vbOID,
 										 u_int32_t vbFBO) throw()
 {
-	bool vbFlag;
 	VER_t oldVerID;
-	int err;
-
-	if (transID == 0)
-	{
-		ostringstream msg;
-			
-		msg << "transID 0 is inserted into VSS with lbid " << lbid ;
-		log(msg.str(), logging::LOG_TYPE_CRITICAL);
-	}
 	
-#ifdef BRM_DEBUG
-	uint i;
-	for (i = 0; i < lastFreeList.size(); i++) {
-		if (lastFreeList[i].vbOID == vbOID) {
-			LBID_t lastLBID = lastFreeList[i].vbFBO + lastFreeList[i].size - 1;
-			if (vbFBO >= lastFreeList[i].vbFBO && vbFBO <= lastLBID)
-				break;
-		}
-	}
-	if (i == lastFreeList.size()) {
-		ostringstream os;
-		
-		os << "writeVBEntry: VB block written is out of bounds.  vbOID=" << vbOID <<
-			" vbFBO=" << vbFBO << ".  Last freelist returned:\n";
-		for (i = 0; i < lastFreeList.size(); i++) {
-			os << "   vbOID=" << lastFreeList[i].vbOID << "  vbFBO=" << lastFreeList[i].vbFBO
-				<< "  size=" << lastFreeList[i].size << endl;
-		}
-		log(os.str(), logging::LOG_TYPE_CRITICAL);
-		return -1;
-	}
-#endif
 /*
 	LBIDRange r;
 	r.start = lbid;
@@ -465,13 +434,13 @@ int SlaveDBRMNode::writeVBEntry(VER_t transID, LBID_t lbid, OID_t vbOID,
 		vss.lock(VSS::WRITE);
 		locked[1] = true;
 
-		//figure out the current version of the block
-		oldVerID = numeric_limits<VER_t>::max();
-		err = vss.lookup(lbid, oldVerID, transID, vbFlag);
+		// figure out the current version of the block
+		// NOTE!  This will currently error out to preserve the assumption that
+		// larger version numbers imply more recent changes.  If we ever change that
+		// assumption, we'll need to revise the vbRollback() fcns as well.
+		oldVerID = vss.getCurrentVersion(lbid, NULL);
 
-		if (err == -1)
-			oldVerID = 0;
-		else if (oldVerID == transID)
+		if (oldVerID == transID)
 			return 0;
 		else if (oldVerID > transID) {
 			ostringstream str;
@@ -479,29 +448,19 @@ int SlaveDBRMNode::writeVBEntry(VER_t transID, LBID_t lbid, OID_t vbOID,
 			str << "WorkerDBRMNode::writeVBEntry(): Overlapping transactions detected.  "
 				"Transaction " << transID << " cannot overwrite blocks written by "
 				"transaction " << oldVerID;
-			throw runtime_error(str.str());
+			log(str.str());
+			return ERR_OLDTXN_OVERWRITING_NEWTXN;
 		}
-#ifdef BRM_DEBUG		// this shouldn't be possible anymore.  Hopefully.
-		else if (vbFlag) {
-//			oldVerID = transID - 1;
-			cerr << "WorkerDBRMNode::writeVBEntry(): found the most recent version of LBID " << 
-				lbid << " in the version buffer not the main DB" << endl;
-			throw logic_error("WorkerDBRMNode::writeVBEntry(): VBBM contains the most recent version of an LBID");
-		}
-#endif
 	
 		vbbm.insert(lbid, oldVerID, vbOID, vbFBO);
-		if (err != -1)
+		if (oldVerID > 0)
 			vss.setVBFlag(lbid, oldVerID, true);
-		else {
-			//cout << "Inserted into vss unlocked lbid:transID = " << lbid <<":"<<oldVerID<< endl;
+		else
 			vss.insert(lbid, oldVerID, true, false);
-		}
 
 		// XXXPAT:  There's a problem if we use transID as the new version here.  
 		// Need to use at least oldVerID + 1.  OldverID can be > TransID
 		vss.insert(lbid, transID, false, true);
-		//cout << "Inserted into vss locked lbid:transID = " << lbid <<":"<<transID<< endl;
 	}
 	catch (exception &e) {
 		cerr << e.what() << endl;
@@ -522,7 +481,6 @@ int SlaveDBRMNode::beginVBCopy(VER_t transID, uint16_t vbOID,
 	bool allLocked;
 	uint i;
 
-	lastFreeList.clear();
 
 #ifdef BRM_DEBUG
 	if (transID < 1) {
@@ -611,7 +569,6 @@ int SlaveDBRMNode::beginVBCopy(VER_t transID, uint16_t vbOID,
 		}
 
 		vbbm.getBlocks(sum, vbOID, freeList, vss, flushPMCache);
-		lastFreeList = freeList;
 /*
 		for (i = 0; i < ranges.size(); i++)
 			assert(copylocks.isLocked(ranges[i]));
@@ -660,20 +617,7 @@ int SlaveDBRMNode::vbCommit(VER_t transID) throw()
 		vss.lock(VSS::WRITE);
 		locked[1] = true;
 		vss.commit(transID);
-		BlockList_t lbids;
-		vss.getLockedLBIDs(lbids);
-		if ( lbids.size() > 0 )
-		{
-			ostringstream ostr;
-			ostr << "SlaveDBRMNode::vbCommit: After commit for transaction " << transID <<
-				", " << lbids.size() << " entries are still locked!" << endl;
-		
-			
-			ostr << "The first locked lbid:verId = " << lbids[0].first <<":"<<lbids[0].second << endl;
-			
-			log(ostr.str(), logging::LOG_TYPE_CRITICAL);
-		}
-		return 0;
+		return 0; 
 	}
 	catch (exception &e) {
 		cerr << e.what() << endl;
@@ -687,8 +631,6 @@ int SlaveDBRMNode::vbRollback(VER_t transID, const LBIDRange_v& lbidList, bool f
 	LBIDRange_v::const_iterator it;
 	LBID_t lbid;
 	VER_t oldVerID;
-	int err;
-	bool vbFlag;
 	vector<LBID_t> flushList;
 
 #ifdef BRM_DEBUG
@@ -709,37 +651,25 @@ int SlaveDBRMNode::vbRollback(VER_t transID, const LBIDRange_v& lbidList, bool f
 		copylocks.rollback(transID);
 		for (it = lbidList.begin(); it != lbidList.end(); it++) {
 			for (lbid = (*it).start; lbid < (*it).start + (*it).size; lbid++) {
-// 				oldVerID = numeric_limits<VER_t>::max();
-				oldVerID = transID;
-				err = vss.lookup(lbid, oldVerID, 0, vbFlag, true);
-				if (err == -1)
-					oldVerID = 0;
-				
-				vss.removeEntry(lbid, transID, &flushList);
-				if (vbFlag)
+				oldVerID = vss.getHighestVerInVB(lbid, transID);
+				if (oldVerID != -1) {
 					vbbm.removeEntry(lbid, oldVerID);
-				vss.setVBFlag(lbid, oldVerID, false);
+					vss.setVBFlag(lbid, oldVerID, false);
+				}
+				vss.removeEntry(lbid, transID, &flushList);
 			}
 		}
 
 		if (flushPMCache && !flushList.empty())
 			cacheutils::flushPrimProcAllverBlocks(flushList);
 		
-		BlockList_t lbids;
-		vss.getLockedLBIDs(lbids);
-		if ( lbids.size() > 0 )
-		{
-			ostringstream ostr;
-			ostr << "SlaveDBRMNode::vbRollback: After rollback for transaction " << transID <<
-				", " << lbids.size() << " entries are still locked!" << endl;
-			ostr << "The first locked lbid:verId = " << lbids[0].first <<":"<<lbids[0].second << endl;
-			log(ostr.str(), logging::LOG_TYPE_CRITICAL);
-		}
-		
 		return 0;
 	}
 	catch (exception &e) {
 		cerr << e.what() << endl;
+        ostringstream ostr;
+        ostr << "SlaveDBRMNode::vbRollback error. " << e.what();
+        log(ostr.str());
 		return -1;
 	}
 }
@@ -749,8 +679,6 @@ int SlaveDBRMNode::vbRollback(VER_t transID, const vector<LBID_t>& lbidList, boo
 {
 	vector<LBID_t>::const_iterator it;
 	VER_t oldVerID;
-	int err;
-	bool vbFlag;
 	vector<LBID_t> flushList;
 
 #ifdef BRM_DEBUG
@@ -770,31 +698,17 @@ int SlaveDBRMNode::vbRollback(VER_t transID, const vector<LBID_t>& lbidList, boo
 	
 		copylocks.rollback(transID);
 		for (it = lbidList.begin(); it != lbidList.end(); it++) {
-// 			oldVerID = numeric_limits<VER_t>::max();
-			oldVerID = transID;
-			err = vss.lookup(*it, oldVerID, 0, vbFlag, true);
-			if (err == -1)
-				oldVerID = 0;
-			
-			vss.removeEntry(*it, transID, &flushList);
-			if (vbFlag)
+			oldVerID = vss.getHighestVerInVB(*it, transID);
+			if (oldVerID != -1) {
 				vbbm.removeEntry(*it, oldVerID);
-			vss.setVBFlag(*it, oldVerID, false);
+				vss.setVBFlag(*it, oldVerID, false);
+			}
+			vss.removeEntry(*it, transID, &flushList);
 		}
 
 		if (flushPMCache && !flushList.empty())
 			cacheutils::flushPrimProcAllverBlocks(flushList);
 		
-		BlockList_t lbids;
-		vss.getLockedLBIDs(lbids);
-		if ( lbids.size() > 0 )
-		{
-			ostringstream ostr;
-			ostr << "SlaveDBRMNode::vbRollback: After rollback for transaction " << transID <<
-				", " << lbids.size() << " entries are still locked!" << endl;
-			ostr << "The first locked lbid:verId = " << lbids[0].first <<":"<<lbids[0].second << endl;
-			log(ostr.str(), logging::LOG_TYPE_CRITICAL);
-		}
 		return 0;
 	}
 	catch (exception &e) {
@@ -858,6 +772,7 @@ void SlaveDBRMNode::undoChanges() throw()
 int SlaveDBRMNode::clear() throw()
 {
 	bool llocked[2] = {false, false};
+
 	try {
 		vbbm.lock(VBBM::WRITE);
 		llocked[0] = true;
@@ -866,7 +781,7 @@ int SlaveDBRMNode::clear() throw()
 
 		vbbm.clear();
 		vss.clear();
-		
+
 		vss.release(VSS::WRITE);
 		llocked[1] = false;
 		vbbm.release(VBBM::WRITE);
@@ -1009,12 +924,13 @@ int SlaveDBRMNode::saveExtentMap(const string &filename)
 
 // Casual partitioning support
 //
-int SlaveDBRMNode::markExtentInvalid(const LBID_t lbid)
+int SlaveDBRMNode::markExtentInvalid(const LBID_t lbid,
+     execplan::CalpontSystemCatalog::ColDataType colDataType)
 {
 	int err=0;
 
 	try {
-		err = em.markInvalid(lbid);
+		err = em.markInvalid(lbid, colDataType);
 		//em.confirmChanges();
 	}
 	catch (exception& e) {
@@ -1025,12 +941,13 @@ int SlaveDBRMNode::markExtentInvalid(const LBID_t lbid)
 	return err;
 }
 
-int SlaveDBRMNode::markExtentsInvalid(const vector<LBID_t> &lbids)
+int SlaveDBRMNode::markExtentsInvalid(const vector<LBID_t> &lbids,
+     const std::vector<execplan::CalpontSystemCatalog::ColDataType>& colDataTypes)
 {
 	int err=0;
 
 	try {
-		err = em.markInvalid(lbids);
+		err = em.markInvalid(lbids, colDataTypes);
 		//em.confirmChanges();
 	}
 	catch (exception& e) {
@@ -1063,15 +980,15 @@ int SlaveDBRMNode::setExtentMaxMin(const LBID_t lbid,
 // @bug 1970 - Added setExtentsMaxMin below.
 int SlaveDBRMNode::setExtentsMaxMin(const CPMaxMinMap_t &cpMap, bool firstNode)
 {
-        try {
-                em.setExtentsMaxMin(cpMap, firstNode);
-        }
-        catch ( exception& e) {
-                cerr << e.what() << endl;
-                return -1;
-        }
+    try {
+        em.setExtentsMaxMin(cpMap, firstNode);
+    }
+    catch ( exception& e) {
+        cerr << e.what() << endl;
+        return -1;
+    }
 
-        return 0;
+    return 0;
 }
 
 //------------------------------------------------------------------------------

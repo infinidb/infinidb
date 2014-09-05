@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: dataconvert.h 3277 2012-09-13 12:34:45Z rdempsey $
+* $Id: dataconvert.h 3653 2013-03-20 21:08:34Z dhall $
 *
 *
 ****************************************************************************/
@@ -40,6 +40,7 @@
 
 #include "calpontsystemcatalog.h"
 #include "columnresult.h"
+#include "exceptclasses.h"
 
 // remove this block if the htonll is defined in library
 #ifdef __linux__
@@ -170,6 +171,52 @@ struct Time
 		{}
 };
 
+inline
+int64_t string_to_ll( const std::string& data, bool& bSaturate )
+{
+    // This function doesn't take into consideration our special values
+    // for NULL and EMPTY when setting the saturation point. Should it?
+	char *ep = NULL;
+	const char *str = data.c_str();
+	errno = 0;
+	int64_t value = strtoll(str, &ep, 10);
+
+	//  (no digits) || (more chars)  || (other errors & value = 0)
+	if ((ep == str) || (*ep != '\0') || (errno != 0 && value == 0))
+		throw logging::QueryDataExcept("value is not numerical.", logging::formatErr);
+
+	if (errno == ERANGE && (value == std::numeric_limits<int64_t>::max() || value == std::numeric_limits<int64_t>::min()))
+		bSaturate = true;
+
+	return value;
+}
+
+inline
+uint64_t string_to_ull( const std::string& data, bool& bSaturate )
+{
+    // This function doesn't take into consideration our special values
+    // for NULL and EMPTY when setting the saturation point. Should it?
+	char *ep = NULL;
+	const char *str = data.c_str();
+	errno = 0;
+
+    // check for negative number. saturate to 0;
+    if (data.find('-') != data.npos)
+    {
+        bSaturate = true;
+        return 0;
+    }
+	uint64_t value = strtoull(str, &ep, 10);
+	//  (no digits) || (more chars)  || (other errors & value = 0)
+	if ((ep == str) || (*ep != '\0') || (errno != 0 && value == 0))
+		throw logging::QueryDataExcept("value is not numerical.", logging::formatErr);
+
+	if (errno == ERANGE && (value == std::numeric_limits<uint64_t>::max()))
+		bSaturate = true;
+
+	return value;
+}
+
 /** @brief DataConvert is a component for converting string data to Calpont format
   */
 class DataConvert
@@ -183,8 +230,8 @@ public:
      * @param type the columns data type
      * @param data the columns string representation of it's data
      */
-    EXPORT static boost::any convertColumnData( execplan::CalpontSystemCatalog::ColType colType,
-                                  				const std::string& dataOrig, bool& pushWarning,
+    EXPORT static boost::any convertColumnData( const execplan::CalpontSystemCatalog::ColType& colType,
+                                  				const std::string& dataOrig, bool& bSaturate,
 												bool nulFlag = false, bool noRoundup = false );
 
    /**
@@ -233,9 +280,14 @@ public:
      * @param status 0 - success, -1 - fail
      * @param dataOrgLen length specification of dataOrg
      */
-    EXPORT static u_int32_t convertColumnDate( const char* dataOrg,
+    EXPORT static int32_t convertColumnDate( const char* dataOrg,
                                   CalpontDateTimeFormat dateFormat,
                                   int& status, unsigned int dataOrgLen );
+
+    /**
+     * @brief Is specified date valid; used by binary bulk load
+     */
+    EXPORT static bool      isColumnDateValid( int32_t date );
                                                                  
     /**
      * @brief convert a datetime column data, represented as a string,
@@ -247,12 +299,17 @@ public:
      * @param status 0 - success, -1 - fail
      * @param dataOrgLen length specification of dataOrg
      */
-    EXPORT static u_int64_t convertColumnDatetime( const char* dataOrg,
+    EXPORT static int64_t convertColumnDatetime( const char* dataOrg,
                                   CalpontDateTimeFormat datetimeFormat,
                                   int& status, unsigned int dataOrgLen );  
 
+    /**
+     * @brief Is specified datetime valid; used by binary bulk load
+     */
+    EXPORT static bool      isColumnDateTimeValid( int64_t dateTime );
+
     EXPORT static bool isNullData(execplan::ColumnResult* cr, int rownum, execplan::CalpontSystemCatalog::ColType colType);
-    static inline void decimalToString( int64_t value, uint8_t scale, char* buf, unsigned int buflen );                          
+    static inline void decimalToString( int64_t value, uint8_t scale, char* buf, unsigned int buflen, execplan::CalpontSystemCatalog::ColDataType colDataType);
     static inline std::string constructRegexp(const std::string& str);
     static inline bool isEscapedChar(char c) { return ('%' == c || '_' == c); }
     
@@ -272,7 +329,6 @@ public:
     EXPORT static int64_t stringToTime (const std::string& data);
     // bug4388, union type conversion
     EXPORT static execplan::CalpontSystemCatalog::ColType convertUnionColType(std::vector<execplan::CalpontSystemCatalog::ColType>&);
-
 };
 
 inline void DataConvert::dateToString( int datevalue, char* buf, unsigned int buflen)
@@ -317,7 +373,8 @@ inline void DataConvert::datetimeToString1( long long datetimevalue, char* buf, 
 				);
 }
 
-inline void DataConvert::decimalToString( int64_t int_val, uint8_t scale, char* buf, unsigned int buflen )
+inline void DataConvert::decimalToString(int64_t int_val, uint8_t scale, char* buf, unsigned int buflen,
+                                         execplan::CalpontSystemCatalog::ColDataType colDataType)
 {
 	// Need to convert a string with a binary unsigned number in it to a 64-bit signed int
 	
@@ -326,11 +383,22 @@ inline void DataConvert::decimalToString( int64_t int_val, uint8_t scale, char* 
 	
 	//biggest Calpont supports is DECIMAL(18,x), or 18 total digits+dp+sign for column
 	// Need 19 digits maxium to hold a sum result of 18 digits decimal column.
+    if (isUnsigned(colDataType))
+    {
 #ifndef __LP64__
-	snprintf(buf, buflen, "%lld", int_val);
+        snprintf(buf, buflen, "%llu", static_cast<uint64_t>(int_val));
 #else
-	snprintf(buf, buflen, "%ld", int_val);
+        snprintf(buf, buflen, "%lu", static_cast<uint64_t>(int_val));
 #endif
+    }
+    else
+    {
+#ifndef __LP64__
+        snprintf(buf, buflen, "%lld", int_val);
+#else
+        snprintf(buf, buflen, "%ld", int_val);
+#endif
+    }
 	//we want to move the last dt_scale chars right by one spot to insert the dp
 	//we want to move the trailing null as well, so it's really dt_scale+1 chars
 	size_t l1 = strlen(buf);
@@ -345,7 +413,7 @@ inline void DataConvert::decimalToString( int64_t int_val, uint8_t scale, char* 
 	//at this point scale is always > 0
 	if ((unsigned)scale > l1)
 	{
-		const char* zeros = "0000000000000000000"; //19 0's
+		const char* zeros = "00000000000000000000"; //20 0's
 		size_t diff=0;
 		if (int_val != 0)
 			diff = scale - l1; //this will always be > 0

@@ -88,7 +88,7 @@ am_libcalmysql_la_OBJECTS = libcalmysql_la-ha_calpont.lo \
 	libcalmysql_la-ha_calpont_execplan.lo \
 	libcalmysql_la-ha_scalar_sub.lo libcalmysql_la-ha_in_sub.lo \
 	libcalmysql_la-ha_exists_sub.lo libcalmysql_la-ha_from_sub.lo \
-	libcalmysql_la-ha_select_sub.lo
+	libcalmysql_la-ha_select_sub.lo libcalmysql_la-sm.lo
 libcalmysql_la_OBJECTS = $(am_libcalmysql_la_OBJECTS)
 dist_mysqlSCRIPT_INSTALL = $(INSTALL_SCRIPT)
 SCRIPTS = $(dist_mysql_SCRIPTS)
@@ -240,8 +240,8 @@ AM_CFLAGS = $(idb_cflags)
 AM_CXXFLAGS = $(idb_cxxflags)
 AM_LDFLAGS = $(idb_ldflags)
 lib_LTLIBRARIES = libcalmysql.la
-libcalmysql_la_SOURCES = ha_calpont.cpp ha_calpont_impl.cpp ha_calpont_dml.cpp ha_calpont_ddl.cpp ha_calpont_udf.cpp ha_calpont_execplan.cpp ha_scalar_sub.cpp ha_in_sub.cpp ha_exists_sub.cpp ha_from_sub.cpp ha_select_sub.cpp
-libcalmysql_la_LDFLAGS = -version-info 1:0:0 $(idb_common_ldflags) $(idb_common_libs) $(idb_write_libs) -lsm $(AM_LDFLAGS)
+libcalmysql_la_SOURCES = ha_calpont.cpp ha_calpont_impl.cpp ha_calpont_dml.cpp ha_calpont_ddl.cpp ha_calpont_udf.cpp ha_calpont_execplan.cpp ha_scalar_sub.cpp ha_in_sub.cpp ha_exists_sub.cpp ha_from_sub.cpp ha_select_sub.cpp sm.cpp
+libcalmysql_la_LDFLAGS = -version-info 1:0:0 $(idb_common_ldflags) $(idb_common_libs) $(idb_write_libs) $(AM_LDFLAGS)
 libcalmysql_la_CPPFLAGS = -I/usr/include/libxml2 -I../../mysql/include -I../../mysql/sql -I../../mysql/regex -DMYSQL_DYNAMIC_PLUGIN $(AM_CPPFLAGS)
 include_HEADERS = 
 dist_mysql_DATA = syscatalog_mysql.sql dumpcat_mysql.sql calsetuserpriority.sql calremoveuserpriority.sql calshowprocesslist.sql
@@ -345,6 +345,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcalmysql_la-ha_in_sub.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcalmysql_la-ha_scalar_sub.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcalmysql_la-ha_select_sub.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcalmysql_la-sm.Plo@am__quote@
 
 .cpp.o:
 @am__fastdepCXX_TRUE@	if $(CXXCOMPILE) -MT $@ -MD -MP -MF "$(DEPDIR)/$*.Tpo" -c -o $@ $<; \
@@ -436,6 +437,13 @@ libcalmysql_la-ha_select_sub.lo: ha_select_sub.cpp
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='ha_select_sub.cpp' object='libcalmysql_la-ha_select_sub.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcalmysql_la_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o libcalmysql_la-ha_select_sub.lo `test -f 'ha_select_sub.cpp' || echo '$(srcdir)/'`ha_select_sub.cpp
+
+libcalmysql_la-sm.lo: sm.cpp
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcalmysql_la_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT libcalmysql_la-sm.lo -MD -MP -MF "$(DEPDIR)/libcalmysql_la-sm.Tpo" -c -o libcalmysql_la-sm.lo `test -f 'sm.cpp' || echo '$(srcdir)/'`sm.cpp; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libcalmysql_la-sm.Tpo" "$(DEPDIR)/libcalmysql_la-sm.Plo"; else rm -f "$(DEPDIR)/libcalmysql_la-sm.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='sm.cpp' object='libcalmysql_la-sm.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcalmysql_la_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o libcalmysql_la-sm.lo `test -f 'sm.cpp' || echo '$(srcdir)/'`sm.cpp
 
 mostlyclean-libtool:
 	-rm -f *.lo

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_config.cpp 4496 2013-01-31 19:13:20Z pleblanc $
+* $Id: we_config.cpp 4544 2013-02-14 20:13:51Z dcathey $
 *
 *******************************************************************************/
 /** @file */
@@ -49,7 +49,6 @@ namespace WriteEngine
     const char*    DEFAULT_LOCAL_MODULE_TYPE          = "pm";
 
     int              Config::m_dbRootCount = 0;
-    int              Config::m_totalDbRootCount = 0;
     Config::strvec_t Config::m_dbRootPath;
     Config::intstrmap_t Config::m_dbRootPathMap;
     Config::uint16vec_t Config::m_dbRootId;
@@ -236,8 +235,7 @@ void Config::checkReload( )
     }
 
     //--------------------------------------------------------------------------
-    // Initialize m_dbRootCount, m_dbRootPath, m_dbRootPathMap, m_dbRootId,
-    // and m_totalDbRootCount.
+    // Initialize m_dbRootCount, m_dbRootPath, m_dbRootPathMap, m_dbRootId.
     // Note this uses m_localModuleType and m_LocalModuleID, so this init
     // section must be after the section(s) that set m_localModuleType and
     // m_LocalModuleID.
@@ -289,10 +287,6 @@ void Config::checkReload( )
         }
     }
 
-    // Get/save the total dbroot count as well
-    m_totalDbRootCount =
-        cf->fromText( cf->getConfig("SystemConfig","DBRootCount") );
-
 //  for (unsigned int n=0; n<m_dbRootPath.size(); n++)
 //  {
 //      std::cout << "dbrootpath: " << n << ". " << m_dbRootPath[n] <<std::endl;
@@ -322,22 +316,6 @@ size_t Config::DBRootCount()
     checkReload( );
 
     return m_dbRootCount;
-}
-
-/*******************************************************************************
- * DESCRIPTION:
- *    Get total db root count for all PMs
- * PARAMETERS:
- *    none
- * RETURN:
- *    Number of DBRoot paths to be used for database files
- ******************************************************************************/
-size_t Config::totalDBRootCount()
-{
-    boost::mutex::scoped_lock lk(fCacheLock);
-    checkReload( );
-
-    return m_totalDbRootCount;
 }
 
 /*******************************************************************************

@@ -2172,13 +2172,6 @@ Item_func_ifnull::fix_length_and_dec()
   default:
     DBUG_ASSERT(0);
   }
-
-  //@bug6153, update max_length for utf8
-  if (strcmp((collation.collation)->csname, "utf8") == 0 && max_length < 60 &&
-     (INT_RESULT == args[0]->result_type() || INT_RESULT == args[1]->result_type() ||
-      REAL_RESULT == args[0]->result_type() || REAL_RESULT == args[1]->result_type() ||
-      DECIMAL_RESULT == args[0]->result_type() || DECIMAL_RESULT == args[1]->result_type()))
-      max_length *= (collation.collation)->mbmaxlen;
   cached_field_type= agg_field_type(args, 2);
 }
 

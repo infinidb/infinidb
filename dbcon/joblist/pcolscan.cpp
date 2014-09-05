@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: pcolscan.cpp 8526 2012-05-17 02:28:10Z xlou $
+*   $Id: pcolscan.cpp 9215 2013-01-24 18:40:12Z pleblanc $
 *
 *
 ***********************************************************************/
@@ -40,17 +40,16 @@ using namespace config;
 #include "messageobj.h"
 using namespace logging;
 
+#include "logicoperator.h"
+using namespace execplan;
+
+
 #include "distributedenginecomm.h"
 #include "primitivemsg.h"
 #include "timestamp.h"
 #include "unique32generator.h"
+#include "jlf_common.h"
 #include "primitivestep.h"
-using namespace joblist;
-
-#include "logicoperator.h"
-using namespace execplan;
-
-using namespace BRM;
 
 //#define DEBUG 1
 //#define DEBUG2 1
@@ -117,28 +116,13 @@ namespace
 namespace joblist
 {
 
-pColScanStep::pColScanStep(const JobStepAssociation& inputJobStepAssociation,
-	const JobStepAssociation& outputJobStepAssociation,
-	DistributedEngineComm* dec,
-	boost::shared_ptr<CalpontSystemCatalog> syscat,
+pColScanStep::pColScanStep(
 	CalpontSystemCatalog::OID o,
 	CalpontSystemCatalog::OID t,
 	const CalpontSystemCatalog::ColType& ct,
-	uint32_t sessionId,
-	uint32_t txnId,
-	uint32_t verId,
-	uint16_t stepId,
-	uint32_t statementId,
-	ResourceManager& rm) :
-		fRm(rm),
-		fInputJobStepAssociation(inputJobStepAssociation),
-		fOutputJobStepAssociation(outputJobStepAssociation),
-		fDec(dec),
-		fSessionId(sessionId),
-		fTxnId(txnId),
-		fVerId(verId),
-		fStepId(stepId),
-		fStatementId(statementId),
+	const JobInfo& jobInfo) :
+		JobStep(jobInfo),
+		fRm(jobInfo.rm),
 		fNumThreads(fRm.getJlNumScanReceiveThreads()),
 		fFilterCount(0),
 		fOid(o),
@@ -162,7 +146,7 @@ pColScanStep::pColScanStep(const JobStepAssociation& inputJobStepAssociation,
 		return;
 
 	int err, i, mask;
-	LBIDRange_v::iterator it;
+	BRM::LBIDRange_v::iterator it;
 
 	//pthread_mutex_init(&mutex, NULL);
 	//pthread_mutex_init(&dlMutex, NULL);
@@ -215,7 +199,7 @@ pColScanStep::pColScanStep(const JobStepAssociation& inputJobStepAssociation,
 	err = dbrm.getExtents(fOid, extents);
 	if (err)
 		throw runtime_error("pColScan: BRM HWM lookup failure (4)");
-	sort(extents.begin(), extents.end(), ExtentSorter());
+	sort(extents.begin(), extents.end(), BRM::ExtentSorter());
 	numExtents = extents.size();
 	extentSize = (fRm.getExtentRows()*fColType.colWidth)/BLOCK_SIZE;
 
@@ -246,15 +230,6 @@ pColScanStep::pColScanStep(const JobStepAssociation& inputJobStepAssociation,
 	for (i++, mask <<= 1; i <= 32; i++, mask <<= 1)
 		if (ridsPerBlock & mask)
 			throw runtime_error("pColScan: Block size and column width must be a power of 2");
-
-	// XXXPAT: how to handle BRM failures here?
-
-//	uniqueID = UniqueNumberGenerator::instance()->getUnique32();
-//	if (fDec)
-//		fDec->addQueue(uniqueID);
-
-// 	initializeConfigParms ( );
-//	fProducerThread = new SPTHD[fNumThreads];
 }
 
 pColScanStep::~pColScanStep()
@@ -381,7 +356,7 @@ void pColScanStep::sendPrimitiveMessages()
 //  
 //  //...Counter used to track the number of LBIDs we are requesting from
 //  //...primproc in the current set of msgs, till we reach fScanLbidReqLimit
-//  u_int32_t runningLbidCount = 0;
+//  uint32_t runningLbidCount = 0;
 //  bool exitLoop = false;
 //  const bool ignoreCP = ((fTraceFlags & CalpontSelectExecutionPlan::IGNORE_CP) != 0);
 //
@@ -435,9 +410,9 @@ void pColScanStep::sendPrimitiveMessages()
 //    }
 //
 //	LBID_t    msgLbidStart   = it->start;
-//	u_int32_t remainingLbids =
+//	uint32_t remainingLbids =
 //		( (hwm > (fbo + it->size - 1)) ? (it->size) : (hwm - fbo + 1) ); 
-//	u_int32_t msgLbidCount   = 0;
+//	uint32_t msgLbidCount   = 0;
 //	
 //	while ( remainingLbids > 0 )
 //	{
@@ -544,7 +519,7 @@ void pColScanStep::sendPrimitiveMessages()
 void pColScanStep::sendAPrimitiveMessage(
 	ISMPacketHeader& ism,
 	BRM::LBID_t      msgLbidStart,
-	u_int32_t        msgLbidCount
+	uint32_t        msgLbidCount
 	)
 {
 //	ByteStream bs;
@@ -1007,17 +982,10 @@ uint64_t pColScanStep::getFBO(uint64_t lbid)
 }
 
 pColScanStep::pColScanStep(const pColStep& rhs) :
+	JobStep(rhs),
 	fRm(rhs.resourceManager()),
 	fUdfName(rhs.udfName())
 {
-	fInputJobStepAssociation = rhs.inputAssociation();
-	fOutputJobStepAssociation = rhs.outputAssociation();
-	fDec = 0;
-	fSessionId = rhs.sessionId();
-	fTxnId = rhs.txnId();
-	fVerId = rhs.verId();
-	fStepId = rhs.stepId();
-	fStatementId = rhs.statementId();
 	fNumThreads = fRm.getJlNumScanReceiveThreads();
 	fFilterCount = rhs.filterCount();
 	fFilterString = rhs.filterString();
@@ -1030,10 +998,6 @@ pColScanStep::pColScanStep(const pColStep& rhs) :
 	sentCount = 0;
 	recvCount = 0;
 	ridsReturned = 0;
-	alias(rhs.alias());
-	view(rhs.view());
-	name(rhs.name());
-	fTupleId = rhs.tupleId();
 	fScanLbidReqLimit = fRm.getJlScanLbidReqLimit();
 	fScanLbidReqThreshold = fRm.getJlScanLbidReqThreshold();
 	fStopSending = false;
@@ -1046,7 +1010,6 @@ pColScanStep::pColScanStep(const pColStep& rhs) :
 	fMsgsToPm = 0;
 	fCardinality = rhs.cardinality();
 	fFilters = rhs.fFilters;
-	fOnClauseFilter = rhs.onClauseFilter();
 
 	if (fTableOid == 0)  // cross engine support
 		return;
@@ -1064,11 +1027,10 @@ pColScanStep::pColScanStep(const pColStep& rhs) :
 	err = dbrm.getExtents(fOid, extents);
 	if (err)
 		throw runtime_error("pColScan: BRM HWM lookup failure (4)");
-	sort(extents.begin(), extents.end(), ExtentSorter());
+	sort(extents.begin(), extents.end(), BRM::ExtentSorter());
 	numExtents = extents.size();
 	extentSize = (fRm.getExtentRows()*fColType.colWidth)/BLOCK_SIZE;
 	lbidList=rhs.lbidList;
-	fLogger = rhs.logger();
 	//pthread_mutex_init(&mutex, NULL);
 	//pthread_mutex_init(&dlMutex, NULL);
 	//pthread_mutex_init(&cpMutex, NULL);
@@ -1123,82 +1085,104 @@ void pColScanStep::addFilters()
 	return;
 }
 
-bool pColScanStep::isEmptyVal(const u_int8_t *val8) const
+bool pColScanStep::isEmptyVal(const uint8_t *val8) const
 {
-	const int type = fColType.colDataType;
-	const int width = fColType.colWidth;
+    const int width = fColType.colWidth;
 
-	// handle special types
-	switch(type) {
-		case WriteEngine::FLOAT:
-			{
-				const u_int32_t *val32 = reinterpret_cast<const u_int32_t *>(val8);
-			 	return (*val32 == joblist::FLOATEMPTYROW);
-			}
-		case WriteEngine::DOUBLE:
-			{
-				const u_int64_t *val64 = reinterpret_cast<const u_int64_t *>(val8);
-				return (*val64 == joblist::DOUBLEEMPTYROW);
-			}
-		case WriteEngine::CHAR: 
-		case WriteEngine::VARCHAR: 
- 		case WriteEngine::DATE:
-		case WriteEngine::DATETIME:
-			if (width == 1)
-				{
-				return (*val8 == joblist::CHAR1EMPTYROW);
-				}
-			else if (width == 2)
-				{
-				const u_int16_t *val16 = reinterpret_cast<const u_int16_t *>(val8);
-				return (*val16 == joblist::CHAR2EMPTYROW);
-				}
-			else if (width <= 4)
-				{
-				const u_int32_t *val32 = reinterpret_cast<const u_int32_t *>(val8);
-				return (*val32 == joblist::CHAR4EMPTYROW);
-				}
-			else if (width <= 8)
-				{
-				const u_int64_t *val64 = reinterpret_cast<const u_int64_t *>(val8);
-				return (*val64 == joblist::CHAR8EMPTYROW);
-				}
-		default:
-			break;
-	}
+    switch (fColType.colDataType)
+    {
+		case CalpontSystemCatalog::UTINYINT:
+		{
+			return(*val8 == joblist::UTINYINTEMPTYROW);
+		}
+		case CalpontSystemCatalog::USMALLINT:
+		{
+			const uint16_t *val16 = reinterpret_cast<const uint16_t *>(val8);
+			return(*val16 == joblist::USMALLINTEMPTYROW);
+		}
+		case CalpontSystemCatalog::UMEDINT:
+		case CalpontSystemCatalog::UINT:
+		{
+			const uint32_t *val32 = reinterpret_cast<const uint32_t *>(val8);
+			return(*val32 == joblist::UINTEMPTYROW);
+		}
+		case CalpontSystemCatalog::UBIGINT:
+		{
+			const uint64_t *val64 = reinterpret_cast<const uint64_t *>(val8);
+			return(*val64 == joblist::BIGINTEMPTYROW);
+		}
+        case CalpontSystemCatalog::FLOAT:
+		case CalpontSystemCatalog::UFLOAT:
+        {
+            const uint32_t *val32 = reinterpret_cast<const uint32_t *>(val8);
+            return(*val32 == joblist::FLOATEMPTYROW);
+        }
+        case CalpontSystemCatalog::DOUBLE:
+		case CalpontSystemCatalog::UDOUBLE:
+        {
+            const uint64_t *val64 = reinterpret_cast<const uint64_t *>(val8);
+            return(*val64 == joblist::DOUBLEEMPTYROW);
+        }
+        case CalpontSystemCatalog::CHAR: 
+        case CalpontSystemCatalog::VARCHAR: 
+        case CalpontSystemCatalog::DATE:
+        case CalpontSystemCatalog::DATETIME:
+            if (width == 1)
+            {
+                return(*val8 == joblist::CHAR1EMPTYROW);
+            } 
+            else if (width == 2)
+            {
+                const uint16_t *val16 = reinterpret_cast<const uint16_t *>(val8);
+                return(*val16 == joblist::CHAR2EMPTYROW);
+            } 
+            else if (width <= 4)
+            {
+                const uint32_t *val32 = reinterpret_cast<const uint32_t *>(val8);
+                return(*val32 == joblist::CHAR4EMPTYROW);
+            } 
+            else if (width <= 8)
+            {
+                const uint64_t *val64 = reinterpret_cast<const uint64_t *>(val8);
+                return(*val64 == joblist::CHAR8EMPTYROW);
+            }
+        default:
+            break;
+    }
 
-	switch(width) {
-		case 1:
-			{
-				return (*val8 == joblist::TINYINTEMPTYROW);
-			}
-		case 2:
-			{
-				const u_int16_t *val16 = reinterpret_cast<const u_int16_t *>(val8);
-				return (*val16 == joblist::SMALLINTEMPTYROW);
-			}
-		case 4:
-			{
-				const u_int32_t *val32 = reinterpret_cast<const u_int32_t *>(val8);
-				return (*val32 == joblist::INTEMPTYROW);
-			}
-		case 8:
-			{
-				const u_int64_t *val64 = reinterpret_cast<const u_int64_t *>(val8);
-				return (*val64 == joblist::BIGINTEMPTYROW);
-			}
-		default:
-			MessageLog logger(LoggingID(28));
-			logging::Message::Args colWidth;
-			Message msg(33);
+    switch (width)
+    {
+        case 1:
+        {
+            return(*val8 == joblist::TINYINTEMPTYROW);
+        }
+        case 2:
+        {
+            const uint16_t *val16 = reinterpret_cast<const uint16_t *>(val8);
+            return(*val16 == joblist::SMALLINTEMPTYROW);
+        }
+        case 4:
+        {
+            const uint32_t *val32 = reinterpret_cast<const uint32_t *>(val8);
+            return(*val32 == joblist::INTEMPTYROW);
+        }
+        case 8:
+        {
+                const uint64_t *val64 = reinterpret_cast<const uint64_t *>(val8);
+                return(*val64 == joblist::BIGINTEMPTYROW);
+        }
+        default:
+            MessageLog logger(LoggingID(28));
+            logging::Message::Args colWidth;
+            Message msg(33);
 
-			colWidth.add(width);
-			msg.format(colWidth);
-			logger.logErrorMessage(msg);
-			return false;
-	}
+            colWidth.add(width);
+            msg.format(colWidth);
+            logger.logErrorMessage(msg);
+            return false;
+    }
 
-	return false;
+    return false;
 }
 
 

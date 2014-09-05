@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: batchprimitiveprocessor-jl.h 8774 2012-07-31 21:00:09Z pleblanc $
+// $Id: batchprimitiveprocessor-jl.h 9215 2013-01-24 18:40:12Z pleblanc $
 // C++ Interface: batchprimitiveprocessor
 //
 // Description: 
@@ -68,7 +68,7 @@ public:
 	inline void setSessionID(uint num) { sessionID = num; }
 	inline void setStepID(uint num) { stepID = num; }
 	inline void setUniqueID(uint32_t id) { uniqueID = id; }
-	inline void setVersionNum(uint num) { versionNum = num; }
+	inline void setQueryContext(const BRM::QueryContext &qc) { versionInfo = qc; }
 	inline void setTxnID(uint num) { txnID = num; }
 	inline void setOutputType(BPSOutputType o) { ot = o;
 		if (ot == TUPLE || ot == ROW_GROUP) needRidsAtDelivery = true; }
@@ -100,7 +100,7 @@ public:
 	/* At runtime, feed input here */
 	void addElementType(const ElementType &, uint dbroot);
 	void addElementType(const StringElementType &, uint dbroot);
-	void setRowGroupData(const rowgroup::RowGroup &);
+	//void setRowGroupData(const rowgroup::RowGroup &);
 
 	void runBPP(messageqcpp::ByteStream &, uint32_t pmNum);
 	void abortProcessing(messageqcpp::ByteStream *);
@@ -109,7 +109,7 @@ public:
 	void reset();
 
 	/* The JobStep calls these to initialize a BPP that starts with a column scan */
-	void setLBID(uint64_t lbid, uint dbroot = 1);
+	void setLBID(uint64_t lbid, const BRM::EMEntry &scannedExtent);
 	inline void setCount(uint16_t c) { idbassert(c > 0); count = c; }
 
 	/* Turn a ByteStream into ElementTypes or StringElementTypes */
@@ -186,13 +186,13 @@ public:
 	uint priority() { return _priority; }
 
 private:
-	void setLBIDForScan(uint64_t rid, uint dbroot);
+	//void setLBIDForScan(uint64_t rid, uint dbroot);
 
 	BPSOutputType ot;
 
 	bool needToSetLBID;
 
-	uint versionNum;
+	BRM::QueryContext versionInfo;
 	uint txnID;
 	uint sessionID;
 	uint stepID;

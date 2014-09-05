@@ -53,7 +53,7 @@ namespace ddlpackageprocessor
 		VERBOSE_INFO("Getting current txnID");
 		
 		int rc = 0;
-		rc = fDbrm.isReadWrite();
+		rc = fDbrm->isReadWrite();
 		BRM::TxnID txnID;
 		txnID.id= fTxnid.id;
 		txnID.valid= fTxnid.valid;
@@ -78,7 +78,35 @@ namespace ddlpackageprocessor
 		u_int64_t uniqueID = 0;
 		uint32_t sessionID = dropPartitionStmt.fSessionID;
 		std::string  processName("DDLProc");
-		u_int64_t uniqueId = fDbrm.getUnique64();
+		u_int64_t uniqueId = 0;
+		
+		//Bug 5070. Added exception handling
+		try {
+			uniqueId = fDbrm->getUnique64();
+		}
+		catch (std::exception& ex)
+		{
+			logging::Message::Args args;
+			logging::Message message(9);
+			args.add(ex.what());
+			message.format(args);
+			result.result = ALTER_ERROR;	
+			result.message = message;
+			fSessionManager.rolledback(txnID);
+			return result;
+		}
+		catch ( ... )
+		{
+			logging::Message::Args args;
+			logging::Message message(9);
+			args.add("Unknown error occured while getting unique number.");
+			message.format(args);
+			result.result = ALTER_ERROR;	
+			result.message = message;
+			fSessionManager.rolledback(txnID);
+			return result;
+		}
+		
 		SQLLogger logger(dropPartitionStmt.fSql, fDDLLoggingId, sessionID, txnID.id);
 
 		try 
@@ -107,7 +135,7 @@ namespace ddlpackageprocessor
 			}
 				
 			try {
-				uniqueID = fDbrm.getTableLock(pms, roPair.objnum, &processName, &processID, (int32_t*)&sessionID, (int32_t*)&txnID.id, BRM::LOADING );
+				uniqueID = fDbrm->getTableLock(pms, roPair.objnum, &processName, &processID, (int32_t*)&sessionID, (int32_t*)&txnID.id, BRM::LOADING );
 			}
 			catch (std::exception&)
 			{
@@ -151,7 +179,7 @@ namespace ddlpackageprocessor
 					processName = "DDLProc";
 					try 
 					{
-						uniqueID = fDbrm.getTableLock(pms, roPair.objnum, &processName, &processID, (int32_t*)&sessionID, (int32_t*)&txnID.id, BRM::LOADING );
+						uniqueID = fDbrm->getTableLock(pms, roPair.objnum, &processName, &processID, (int32_t*)&sessionID, (int32_t*)&txnID.id, BRM::LOADING );
 					}
 					catch (std::exception&)
 					{
@@ -208,7 +236,7 @@ namespace ddlpackageprocessor
 		
 			//Mark the partition disabled from extent map
 			string emsg;
-			rc = fDbrm.markPartitionForDeletion( oidList, dropPartitionStmt.fPartitions, emsg);
+			rc = fDbrm->markPartitionForDeletion( oidList, dropPartitionStmt.fPartitions, emsg);
 			if (rc != 0 && rc !=BRM::ERR_PARTITION_DISABLED &&
 				  rc != BRM::ERR_INVALID_OP_LAST_PARTITION &&
 				  rc != BRM::ERR_NOT_EXIST_PARTITION)
@@ -220,7 +248,7 @@ namespace ddlpackageprocessor
 			set<BRM::LogicalPartition> outOfServicePartitions;
 			
 			// only log partitions that are successfully marked disabled.
-			rc = fDbrm.getOutOfServicePartitions(oidList[0], outOfServicePartitions);
+			rc = fDbrm->getOutOfServicePartitions(oidList[0], outOfServicePartitions);
 			
 			if (rc != 0)
 			{
@@ -248,7 +276,7 @@ namespace ddlpackageprocessor
 			
 			//Remove the partition from extent map
 			emsg.clear();
-			rc = fDbrm.deletePartition( oidList, dropPartitionStmt.fPartitions, emsg);
+			rc = fDbrm->deletePartition( oidList, dropPartitionStmt.fPartitions, emsg);
 			if ( rc != 0 )
 				throw std::runtime_error(emsg);
 		}
@@ -269,7 +297,7 @@ namespace ddlpackageprocessor
 				result.result = DROP_ERROR;
 			result.message = message;
 			try {
-				fDbrm.releaseTableLock(uniqueID);
+				fDbrm->releaseTableLock(uniqueID);
 			} catch (std::exception&)
 			{
 				result.result = DROP_ERROR;
@@ -293,7 +321,7 @@ namespace ddlpackageprocessor
 			result.result = DROP_ERROR;
 			result.message = message;
 			try {
-				fDbrm.releaseTableLock(uniqueID);
+				fDbrm->releaseTableLock(uniqueID);
 			} catch (std::exception&)
 			{
 				result.result = DROP_ERROR;
@@ -307,7 +335,7 @@ namespace ddlpackageprocessor
 		//Remove the log file
 		//release the transaction
 		try {
-			fDbrm.releaseTableLock(uniqueID);
+			fDbrm->releaseTableLock(uniqueID);
 			deleteLogFile(DROPPART_LOG, roPair.objnum, uniqueId);
 		} catch (std::exception&)
 		{

@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: writeengine.h 4374 2012-12-03 22:16:10Z xlou $
+//  $Id: writeengine.h 4450 2013-01-21 14:13:24Z rdempsey $
 
 
 /** @file */
@@ -116,16 +116,16 @@ public:
     * @brief Build a index from an oid file (NOTE: this is write engine internal used function, just for test purpose and not for generic use
     */
    int buildIndex(const OID& colOid, const OID& treeOid, const OID& listOid,
-                         ColDataType colDataType, int width, int hwm,
-                         bool resetFile, i64& totalRows, int maxRow = IDX_DEFAULT_READ_ROW)
+                         execplan::CalpontSystemCatalog::ColDataType colDataType, int width, int hwm,
+                         bool resetFile, uint64_t& totalRows, int maxRow = IDX_DEFAULT_READ_ROW)
    { return -1; }
 
    /**
     * @brief Build a index from a file
     */
    int buildIndex(const std::string& sourceFileName, const OID& treeOid, const OID& listOid,
-                         ColDataType colDataType, int width, int hwm, bool resetFile,
-                         i64& totalRows, const std::string& indexName, Log* pLogger,
+                         execplan::CalpontSystemCatalog::ColDataType colDataType, int width, int hwm, bool resetFile,
+                         uint64_t& totalRows, const std::string& indexName, Log* pLogger,
                          int maxRow = IDX_DEFAULT_READ_ROW)
    { return -1; }
 
@@ -162,7 +162,7 @@ public:
     * @param compressionType compression type
     */
    EXPORT int createColumn(const TxnID& txnid, const OID& dataOid,
-                           ColDataType dataType, int dataWidth,
+                           execplan::CalpontSystemCatalog::ColDataType dataType, int dataWidth,
                            uint16_t dbRoot, uint32_t partition=0, int compressionType = 0);
 
    //BUG931
@@ -178,9 +178,9 @@ public:
     * @param refColDataType Data-type of the referecne column
     * @param refColWidth Width of the reference column
     */
-   EXPORT int fillColumn(const TxnID& txnid, const OID& dataOid, ColDataType dataType,
+   EXPORT int fillColumn(const TxnID& txnid, const OID& dataOid, execplan::CalpontSystemCatalog::ColDataType dataType,
                          int dataWidth, ColTuple defaultVal,
-                         const OID& refColOID, ColDataType refColDataType,
+                         const OID& refColOID, execplan::CalpontSystemCatalog::ColDataType refColDataType,
                          int refColWidth, int refCompressionType, bool isNULL, int compressionType,
                          const std::string& defaultValStr, const OID& dictOid = 0, bool autoincrement = false);
 
@@ -463,7 +463,7 @@ public:
     * @brief update SYSCOLUMN next value
     * @param oidValueMap
     */
-   EXPORT int updateNextValue(const OID& columnoid, const long long nextVal,  const uint32_t sessionID);
+   EXPORT int updateNextValue(const OID& columnoid, const uint64_t nextVal,  const uint32_t sessionID);
 
    /**
     * @brief write active datafiles to disk
@@ -579,9 +579,8 @@ private:
     // list should be trimmed if it gets too big.
     int AddLBIDtoList(const TxnID     txnid,
                       std::vector<BRM::LBID_t>& lbids,
-                      const OID       oid,
-                      const u_int32_t colPartition,
-                      const u_int16_t segment,
+                      std::vector<execplan::CalpontSystemCatalog::ColDataType>& colDataTypes,
+                      const ColStruct& colStruct,
                       const int       fbo);
 
     int RemoveTxnFromLBIDMap(const TxnID txnid);

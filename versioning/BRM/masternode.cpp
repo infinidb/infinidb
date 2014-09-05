@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: masternode.cpp 1933 2013-07-08 20:16:28Z bpaul $
+ * $Id: masternode.cpp 1934 2013-07-08 21:44:52Z bpaul $
  *
  ****************************************************************************/
 
@@ -119,6 +119,7 @@ int main(int argc, char **argv)
 	(void)config::Config::makeConfig();
 
 	/* XXXPAT: we might want to install signal handlers for every signal */
+
 	signal(SIGINT, stop);
 	signal(SIGTERM, stop);
 #ifndef _MSC_VER

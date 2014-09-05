@@ -54,7 +54,7 @@ TupleJoiner::TupleJoiner(
 	uint largeJoinColumn,
 	JoinType jt) :
 	smallRG(smallInput), largeRG(largeInput), joinAlg(INSERTING), joinType(jt),
-	threadCount(1), typelessJoin(false), uniqueLimit(100)
+	threadCount(1), typelessJoin(false), bSignedUnsignedJoin(false), uniqueLimit(100)
 {
 	Row smallR;
 
@@ -73,8 +73,18 @@ TupleJoiner::TupleJoiner(
 	discreteValues.reset(new bool[1]);
 	cpValues.reset(new vector<int64_t>[1]);
 	discreteValues[0] = false;
-	cpValues[0].push_back(numeric_limits<int64_t>::max());
-	cpValues[0].push_back(numeric_limits<int64_t>::min());
+    if (smallRG.isUnsigned(0))
+    {
+        cpValues[0].push_back(numeric_limits<uint64_t>::max());
+        cpValues[0].push_back(0);
+    }
+    else
+    {
+        cpValues[0].push_back(numeric_limits<int64_t>::max());
+        cpValues[0].push_back(numeric_limits<int64_t>::min());
+    }
+    if (smallRG.isUnsigned(smallJoinColumn) != largeRG.isUnsigned(largeJoinColumn))
+       bSignedUnsignedJoin = true;
 	nullValueForJoinColumn = smallR.getSignedNullValue(smallJoinColumn);
 }
 
@@ -87,7 +97,7 @@ TupleJoiner::TupleJoiner(
 	smallRG(smallInput), largeRG(largeInput), joinAlg(INSERTING),
 	joinType(jt), threadCount(1), typelessJoin(true),
 	smallKeyColumns(smallJoinColumns), largeKeyColumns(largeJoinColumns),
-	uniqueLimit(100)
+	bSignedUnsignedJoin(false), uniqueLimit(100)
 {
 	Row smallR;
 
@@ -102,20 +112,33 @@ TupleJoiner::TupleJoiner(
 		smallR.initToNull();
 	}
 
-	for (uint i = keyLength = 0; i < smallKeyColumns.size(); i++)
+	for (uint i = keyLength = 0; i < smallKeyColumns.size(); i++) {
 		if (smallRG.getColTypes()[smallKeyColumns[i]] == CalpontSystemCatalog::CHAR ||
-		  smallRG.getColTypes()[smallKeyColumns[i]] == CalpontSystemCatalog::VARCHAR)
-			keyLength += smallRG.getColumnWidth(smallKeyColumns[i]) + 1;  // +1 null char
-		else
+          smallRG.getColTypes()[smallKeyColumns[i]] == CalpontSystemCatalog::VARCHAR)
+            keyLength += smallRG.getColumnWidth(smallKeyColumns[i]) + 1;  // +1 null char
+       else
 			keyLength += 8;
+       // Set bSignedUnsignedJoin if one or more join columns are signed to unsigned compares.
+       if (smallRG.isUnsigned(smallKeyColumns[i]) != largeRG.isUnsigned(largeKeyColumns[i])) {
+           bSignedUnsignedJoin = true;
+       }
+    }
 	storedKeyAlloc = FixedAllocator(keyLength);
 	
 	discreteValues.reset(new bool[smallKeyColumns.size()]);
 	cpValues.reset(new vector<int64_t>[smallKeyColumns.size()]);
 	for (uint i = 0; i < smallKeyColumns.size(); i++) {
 		discreteValues[i] = false;
-		cpValues[i].push_back(numeric_limits<int64_t>::max());
-		cpValues[i].push_back(numeric_limits<int64_t>::min());
+        if (isUnsigned(smallRG.getColType(i)))
+        {
+            cpValues[i].push_back(static_cast<int64_t>(numeric_limits<uint64_t>::max()));
+            cpValues[i].push_back(0);
+        }
+        else
+        {
+            cpValues[i].push_back(numeric_limits<int64_t>::max());
+            cpValues[i].push_back(numeric_limits<int64_t>::min());
+        }
 	}
 }
 
@@ -150,9 +173,15 @@ void TupleJoiner::insert(Row &r) {
 			  (makeTypelessKey(r, smallKeyColumns, keyLength, &storedKeyAlloc), 
 			  r.getData()));
 		else {
-			int64_t smallKey = r.getIntField(smallKeyColumns[0]);
+            int64_t smallKey;
+            if (r.isUnsigned(smallKeyColumns[0])) {
+                smallKey = (int64_t)(r.getUintField(smallKeyColumns[0]));
+            }
+            else {
+                smallKey = r.getIntField(smallKeyColumns[0]);
+            }
 			if (UNLIKELY(smallKey == nullValueForJoinColumn))
-				h->insert(pair<int64_t, uint8_t *>(getJoinNullValue(), r.getData()));
+				h->insert(pair<int64_t, uint8_t *>(getJoinNullValue(), r.getData()));   // TODO: how do we handle this mixed signed/unsigned
 			else
 				h->insert(pair<int64_t, uint8_t *>(smallKey, r.getData()));
 		}
@@ -195,14 +224,22 @@ void TupleJoiner::match(rowgroup::Row &largeSideRow, uint largeRowIndex, uint th
 			int64_t largeKey;
 			iterator it;
 			pair<iterator, iterator> range;
-
-			largeKey = largeSideRow.getIntField(largeKeyColumns[0]);
-			it = h->find(largeKey);
-			if (it == end() && !(joinType & (LARGEOUTER | MATCHNULLS)))
-				return;
-			range = h->equal_range(largeKey);
-			for (; range.first != range.second; ++range.first)
-				matches->push_back(range.first->second);
+            if (largeSideRow.isUnsigned(largeKeyColumns[0])) {
+                largeKey = (int64_t)largeSideRow.getUintField(largeKeyColumns[0]);
+            }
+            else {
+                largeKey = largeSideRow.getIntField(largeKeyColumns[0]);
+            }
+            it = h->find(largeKey);
+            if (it == end() && !(joinType & (LARGEOUTER | MATCHNULLS)))
+                return;
+            range = h->equal_range(largeKey);
+            //smallRG.initRow(&r);
+            for (; range.first != range.second; ++range.first) {
+                //r.setData(range.first->second);
+                //cerr << "matched small side row: " << r.toString() << endl;
+                matches->push_back(range.first->second);
+            }
 		}
 	}
 	if (UNLIKELY(largeOuterJoin() && matches->size() == 0))
@@ -258,7 +295,7 @@ void TupleJoiner::doneInserting()
 		Row smallRow;
 	
 		smallRG.initRow(&smallRow);
-		if (!smallRow.isNumeric(smallKeyColumns[col]))
+		if (smallRow.isCharType(smallKeyColumns[col]))
 			continue;
 		
 		rowCount = size();
@@ -280,8 +317,12 @@ void TupleJoiner::doneInserting()
 				smallRow.setData(hit->second);
 				++hit;
 			}
-			
-			uniquer.insert(smallRow.getIntField(smallKeyColumns[col]));
+            if (smallRow.isUnsigned(smallKeyColumns[col])) {
+                uniquer.insert((int64_t)smallRow.getUintField(smallKeyColumns[col]));
+            }
+            else {
+                uniquer.insert(smallRow.getIntField(smallKeyColumns[col]));
+            }
 			CHECKSIZE;
 		}
 
@@ -442,7 +483,6 @@ void TupleJoiner::setFcnExpFilter(boost::shared_ptr<funcexp::FuncExpWrapper> pt)
 
 void TupleJoiner::updateCPData(const Row &r)
 {
-	int64_t val;
 	uint col;
 
 	if (antiJoin() || largeOuterJoin())
@@ -453,21 +493,36 @@ void TupleJoiner::updateCPData(const Row &r)
 			continue;
 			
 		int64_t &min = cpValues[col][0], &max = cpValues[col][1];
-		val = r.getIntField(smallKeyColumns[col]);
-		if (r.isNumeric(smallKeyColumns[col])) {
-			if (val > max)
-				max = val;
-			if (val < min)
-				min = val;
-		}
-		else {
-			if (order_swap(val) < order_swap(min) ||
-			  min == numeric_limits<int64_t>::max())
-				min = val;
-			if (order_swap(val) > order_swap(max) ||
-			  max == numeric_limits<int64_t>::min())
-				max = val;
-		}
+        if (r.isCharType(smallKeyColumns[col])) 
+        {
+            int64_t val = r.getIntField(smallKeyColumns[col]);
+            if (order_swap(val) < order_swap(min) ||
+                min == numeric_limits<int64_t>::max())
+            {
+                min = val;
+            }
+            if (order_swap(val) > order_swap(max) ||
+                max == numeric_limits<int64_t>::min())
+            {
+                max = val;
+            }
+        }
+        else if (r.isUnsigned(smallKeyColumns[col]))
+        {
+            uint64_t uval = r.getUintField(smallKeyColumns[col]);
+            if (uval > static_cast<uint64_t>(max))
+                max = static_cast<int64_t>(uval);
+            if (uval < static_cast<uint64_t>(min))
+                min = static_cast<int64_t>(uval);
+        }
+        else
+        {
+            int64_t val = r.getIntField(smallKeyColumns[col]);
+            if (val > max)
+                max = val;
+            if (val < min)
+                min = val;
+        }
 	}
 }
 
@@ -497,7 +552,12 @@ TypelessData makeTypelessKey(const Row &r, const vector<uint> &keyCols,
 		else {
 			if (off + 8 > keylen)
 				goto toolong;
-			*((int64_t *) &ret.data[off]) = r.getIntField(keyCols[i]);
+            if (r.isUnsigned(keyCols[i])) {
+                *((uint64_t *) &ret.data[off]) = r.getUintField(keyCols[i]);
+            }
+            else {
+                *((int64_t *) &ret.data[off]) = r.getIntField(keyCols[i]);
+            }
 			off += 8;
 		}
 	}
@@ -535,15 +595,13 @@ string TypelessData::toString() const
 
 void TypelessData::serialize(messageqcpp::ByteStream &b) const
 {
-	b << (messageqcpp::ByteStream::quadbyte)len;
+	b << len;
 	b.append(data, len);
 }
 
 void TypelessData::deserialize(messageqcpp::ByteStream &b, utils::FixedAllocator &fa)
 {
-	messageqcpp::ByteStream::quadbyte qb;
-	b >> qb;
-	len = qb;
+	b >> len;
 	data = (uint8_t *) fa.allocate();
 	memcpy(data, b.buf(), len);
 	b.advance(len);
@@ -551,9 +609,25 @@ void TypelessData::deserialize(messageqcpp::ByteStream &b, utils::FixedAllocator
 
 bool TupleJoiner::hasNullJoinColumn(const Row &r) const
 {
-	for (uint i = 0; i < largeKeyColumns.size(); i++)
+	uint64_t key;
+	for (uint i = 0; i < largeKeyColumns.size(); i++) {
 		if (r.isNullValue(largeKeyColumns[i]))
 			return true;
+		if (UNLIKELY(bSignedUnsignedJoin)) {
+			// BUG 5628 If this is a signed/unsigned join column and the sign bit is set on either
+			// side, then this row should not compare. Treat as NULL to prevent compare, even if 
+			// the bit patterns match.
+			if (smallRG.isUnsigned(smallKeyColumns[i]) != largeRG.isUnsigned(largeKeyColumns[i])) {
+				if (r.isUnsigned(largeKeyColumns[i]))
+					key = r.getUintField(largeKeyColumns[i]); // Does not propogate sign bit
+				else
+					key = r.getIntField(largeKeyColumns[i]);  // Propogates sign bit
+				if (key & 0x8000000000000000ULL) {
+					return true;
+				}
+			}
+		}
+	}
 	return false;
 }
 

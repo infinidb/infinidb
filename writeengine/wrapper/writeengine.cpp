@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-// $Id: writeengine.cpp 4669 2013-06-07 14:58:06Z dcathey $
+// $Id: writeengine.cpp 4735 2013-08-13 18:20:47Z chao $
 
 /** @writeengine.cpp
  *   A wrapper class for the write engine to write information to files
@@ -186,15 +186,24 @@ void WriteEngineWrapper::convertValue(const ColType colType, void* value, boost:
    {
       case WriteEngine::WR_INT :    if (data.type() == typeid(int))
                                     {
-                                       int val = boost::any_cast<int>(data); size = sizeof(int);
+                                       int val = boost::any_cast<int>(data); 
+                                       size = sizeof(int);
                                        memcpy(value, &val, size);
                                     }
                                     else
                                     {
-                                       i32 val = boost::any_cast<i32>(data); size = sizeof(i32);
+                                       uint32_t val = boost::any_cast<uint32_t>(data); 
+                                       size = sizeof(uint32_t);
                                        memcpy(value, &val, size);
                                     }
                                     break;
+      case WriteEngine::WR_UINT :   {
+                                       uint32_t val = boost::any_cast<uint32_t>(data); 
+                                       size = sizeof(uint32_t);
+                                       memcpy(value, &val, size);
+                                    }
+                                    break;
+
       case WriteEngine::WR_VARBINARY : // treat same as char for now
       case WriteEngine::WR_CHAR :
       case WriteEngine::WR_BLOB :
@@ -204,7 +213,7 @@ void WriteEngineWrapper::convertValue(const ColType colType, void* value, boost:
                                        memcpy(value, curStr.c_str(), curStr.length());
                                     break;
 
-      case WriteEngine::WR_FLOAT:   {
+      case WriteEngine::WR_FLOAT:  {
                                        float val = boost::any_cast<float>(data);
 //N.B.There is a bug in boost::any or in gcc where, if you store a nan, you will get back a nan,
 // but not necessarily the same bits that you put in. This only seems to be for float (double seems
@@ -234,9 +243,23 @@ void WriteEngineWrapper::convertValue(const ColType colType, void* value, boost:
                                     }
                                     break;
 
+      case WriteEngine::WR_USHORT:  {
+                                       uint16_t val = boost::any_cast<uint16_t>(data);
+                                       size = sizeof(uint16_t);
+                                       memcpy(value, &val, size);
+                                    }
+                                    break;
+
       case WriteEngine::WR_BYTE:    {
                                        char val = boost::any_cast<char>(data);
                                        size = sizeof(char);
+                                       memcpy(value, &val, size);
+                                    }
+                                    break;
+
+      case WriteEngine::WR_UBYTE:   {
+                                       uint8_t val = boost::any_cast<uint8_t>(data);
+                                       size = sizeof(uint8_t);
                                        memcpy(value, &val, size);
                                     }
                                     break;
@@ -250,8 +273,16 @@ void WriteEngineWrapper::convertValue(const ColType colType, void* value, boost:
                                     }
                                     else
                                     {
-                                       i64 val = boost::any_cast<i64>(data);
-                                       size = sizeof(i64);
+                                       uint64_t val = boost::any_cast<uint64_t>(data);
+                                       size = sizeof(uint64_t);
+                                       memcpy(value, &val, size);
+                                    }
+                                    break;
+
+      case WriteEngine::WR_ULONGLONG:
+                                    {
+                                       uint64_t val = boost::any_cast<uint64_t>(data);
+                                       size = sizeof(uint64_t);
                                        memcpy(value, &val, size);
                                     }
                                     break;
@@ -289,12 +320,13 @@ void WriteEngineWrapper::convertValue(const ColType colType, void* valArray, con
                                        else if (data.type() == typeid(int))
                                           ((int*)valArray)[pos] = boost::any_cast<int>(data);
                                        else
-                                          ((int*)valArray)[pos] = boost::any_cast<i32>(data);
+                                          ((int*)valArray)[pos] = boost::any_cast<uint32_t>(data);
+                                       break;
+         case WriteEngine::WR_UINT :   ((uint32_t*)valArray)[pos] = boost::any_cast<uint32_t>(data);
                                        break;
          case WriteEngine::WR_VARBINARY : // treat same as char for now
          case WriteEngine::WR_CHAR :
-         case WriteEngine::WR_BLOB :
-                                       curStr = boost::any_cast<string>(data);
+         case WriteEngine::WR_BLOB :   curStr = boost::any_cast<string>(data);
                                        if ((int) curStr.length() > MAX_COLUMN_BOUNDARY)
                                           curStr = curStr.substr(0, MAX_COLUMN_BOUNDARY);
                                        memcpy((char*)valArray + pos * MAX_COLUMN_BOUNDARY, curStr.c_str(), curStr.length());
@@ -302,7 +334,7 @@ void WriteEngineWrapper::convertValue(const ColType colType, void* valArray, con
 
 //            case WriteEngine::WR_LONG :   ((long*)valArray)[pos] = boost::any_cast<long>(curTuple.data);
 //                                          break;
-         case WriteEngine::WR_FLOAT:   ((float*)valArray)[pos] = boost::any_cast<float>(data);
+         case WriteEngine::WR_FLOAT:    ((float*)valArray)[pos] = boost::any_cast<float>(data);
                                            if (isnan(((float*)valArray)[pos]))
                                            {
                                               uint32_t ti = joblist::FLOATNULL;
@@ -314,17 +346,24 @@ void WriteEngineWrapper::convertValue(const ColType colType, void* valArray, con
                                        break;
          case WriteEngine::WR_SHORT:   ((short*)valArray)[pos] = boost::any_cast<short>(data);
                                        break;
+         case WriteEngine::WR_USHORT:  ((uint16_t*)valArray)[pos] = boost::any_cast<uint16_t>(data);
+                                       break;
 //            case WriteEngine::WR_BIT:     ((bool*)valArray)[pos] = boost::any_cast<bool>(data);
 //                                          break;
          case WriteEngine::WR_BYTE:    ((char*)valArray)[pos] = boost::any_cast<char>(data);
+                                       break;
+         case WriteEngine::WR_UBYTE:   ((uint8_t*)valArray)[pos] = boost::any_cast<uint8_t>(data);
                                        break;
          case WriteEngine::WR_LONGLONG:
                                        if (data.type() == typeid(long long))
                                           ((long long*)valArray)[pos] = boost::any_cast<long long>(data);
                                        else
-                                          ((long long*)valArray)[pos] = boost::any_cast<i64>(data);
+                                          ((long long*)valArray)[pos] = boost::any_cast<uint64_t>(data);
                                        break;
-         case WriteEngine::WR_TOKEN: ((Token*)valArray)[pos] = boost::any_cast<Token>(data);
+         case WriteEngine::WR_ULONGLONG:
+                                       ((uint64_t*)valArray)[pos] = boost::any_cast<uint64_t>(data);
+                                       break;
+         case WriteEngine::WR_TOKEN:   ((Token*)valArray)[pos] = boost::any_cast<Token>(data);
                                        break;
       } // end of switch (colType)
    }
@@ -332,6 +371,8 @@ void WriteEngineWrapper::convertValue(const ColType colType, void* valArray, con
       switch (colType)
       {
          case WriteEngine::WR_INT :    data = ((int*)valArray)[pos];
+                                       break;
+         case WriteEngine::WR_UINT :   data = ((uint64_t*)valArray)[pos];
                                        break;
          case WriteEngine::WR_VARBINARY : // treat same as char for now
          case WriteEngine::WR_CHAR :
@@ -349,11 +390,18 @@ void WriteEngineWrapper::convertValue(const ColType colType, void* valArray, con
                                        break;
          case WriteEngine::WR_SHORT:   data = ((short*)valArray)[pos];
                                        break;
+         case WriteEngine::WR_USHORT:  data = ((uint16_t*)valArray)[pos];
+                                       break;
 //            case WriteEngine::WR_BIT:     data = ((bool*)valArray)[pos];
 //                                          break;
          case WriteEngine::WR_BYTE:    data = ((char*)valArray)[pos];
                                        break;
+         case WriteEngine::WR_UBYTE:   data = ((uint8_t*)valArray)[pos];
+                                       break;
          case WriteEngine::WR_LONGLONG:data = ((long long*)valArray)[pos];
+                                       break;
+         case WriteEngine::WR_ULONGLONG:
+                                       data = ((uint64_t*)valArray)[pos];
                                        break;
          case WriteEngine::WR_TOKEN:   data = ((Token*)valArray)[pos];
                                        break;
@@ -381,7 +429,7 @@ void WriteEngineWrapper::convertValue(const ColType colType, void* valArray, con
 int WriteEngineWrapper::createColumn(
    const TxnID& txnid,
    const OID& dataOid,
-   const ColDataType dataType,
+   const CalpontSystemCatalog::ColDataType dataType,
    int dataWidth,
    uint16_t dbRoot,
    uint32_t partition,
@@ -419,9 +467,9 @@ int WriteEngineWrapper::createColumn(
  * @brief Fill column with default values
  */
 int WriteEngineWrapper::fillColumn(const TxnID& txnid, const OID& dataOid,
-                                   const ColDataType dataType, int dataWidth,
+                                   const CalpontSystemCatalog::ColDataType dataType, int dataWidth,
                                    ColTuple defaultVal, const OID& refColOID,
-                                   const ColDataType refColDataType,
+                                   const CalpontSystemCatalog::ColDataType refColDataType,
                                    int refColWidth, int refCompressionType,
                                    bool isNULL, int compressionType,
                                    const string& defaultValStr, 
@@ -441,15 +489,15 @@ int WriteEngineWrapper::fillColumn(const TxnID& txnid, const OID& dataOid,
    //Convert HWM of the reference column for the new column
    //Bug 1703,1705
    bool isToken = false;
-   if (((dataType == WriteEngine::VARCHAR) && (dataWidth > 7)) ||
-      ((dataType == WriteEngine::CHAR) && (dataWidth > 8)) || (dataType == WriteEngine::VARBINARY) )
+   if (((dataType == CalpontSystemCatalog::VARCHAR) && (dataWidth > 7)) ||
+      ((dataType == CalpontSystemCatalog::CHAR) && (dataWidth > 8)) || (dataType == CalpontSystemCatalog::VARBINARY) )
    {
       isToken = true;
    }
    Convertor::convertColType(dataType, newColType, isToken);
 
-   if (((refColDataType == WriteEngine::VARCHAR) && (refColWidth > 7)) ||
-      ((refColDataType == WriteEngine::CHAR) && (refColWidth > 8)) || (refColDataType == WriteEngine::VARBINARY))
+   if (((refColDataType == CalpontSystemCatalog::VARCHAR) && (refColWidth > 7)) ||
+      ((refColDataType == CalpontSystemCatalog::CHAR) && (refColWidth > 8)) || (refColDataType == CalpontSystemCatalog::VARBINARY))
    {
       isToken = true;
    }
@@ -467,7 +515,7 @@ int WriteEngineWrapper::fillColumn(const TxnID& txnid, const OID& dataOid,
          Token nullToken;
          memcpy(defVal, &nullToken, size);
       }
-	  //Tpkenization is done when crate dictionary file
+	  //Tokenization is done when we create dictionary file
    }
    else
       convertValue(newColType, defVal, defaultVal.data);
@@ -496,7 +544,7 @@ int WriteEngineWrapper::fillColumn(const TxnID& txnid, const OID& dataOid,
    DctnryStructList dctnryStructList;
    DctnryValueList  dctnryValueList;
    ColStructList    colStructList;
-   i64              emptyVal;
+   uint64_t         emptyVal;
    int              rc;
    string           tmpStr("");
    vector<DctnryStructList> dctnryExtentsStruct;
@@ -657,6 +705,7 @@ int WriteEngineWrapper::insertColumnRecs(const TxnID& txnid,
 			{
 				createStripeColumnExtentsArgIn.oid = colStructList[i].dataOid;
 				createStripeColumnExtentsArgIn.width = colStructList[i].colWidth;
+                createStripeColumnExtentsArgIn.colDataType = colStructList[i].colDataType;
 				cols.push_back(createStripeColumnExtentsArgIn);
 			}
 			rc = BRMWrapper::getInstance()->allocateStripeColExtents(cols, dbRoot, partitionNum, segmentNum, extents);
@@ -665,8 +714,16 @@ int WriteEngineWrapper::insertColumnRecs(const TxnID& txnid,
 			//Create column files
 			BRM::CPInfoList_t cpinfoList;
 			BRM::CPInfo cpInfo;
-			cpInfo.max = numeric_limits<int64_t>::min();
-			cpInfo.min = numeric_limits<int64_t>::max();
+            if (isUnsigned(colStructList[i].colDataType))
+            {
+                cpInfo.max = 0;
+                cpInfo.min = static_cast<int64_t>(numeric_limits<uint64_t>::max());
+            }
+            else
+            {
+                cpInfo.max = numeric_limits<int64_t>::min();
+                cpInfo.min = numeric_limits<int64_t>::max();
+            }
 			cpInfo.seqNum = -1;	
 			for ( i=0; i < extents.size(); i++)
 			{
@@ -815,7 +872,7 @@ int WriteEngineWrapper::insertColumnRecs(const TxnID& txnid,
 	if (it != aColExtsInfo.end()) 
 	{
 		hwm = it->hwm;
-		//cout << "Got from colextinfo hwm for oid " << colStructList[0].dataOid << " is " << hwm << endl;
+		//cout << "Got from colextinfo hwm for oid " << colStructList[0].dataOid << " is " << hwm << " and seg is " << colStructList[0].fColSegment << endl;
 	}
    
    oldHwm = hwm; //Save this info for rollback
@@ -1043,7 +1100,7 @@ timer.stop("tokenize");
          // save hwm for the old extent
          colWidth = colStructList[i].colWidth;
          succFlag = colOp->calculateRowId(lastRid, BYTE_PER_BLOCK/colWidth, colWidth, curFbo, curBio);
-        // cout << "insertcolumnrec   oid:rid:fbo:hwm = " << colStructList[i].dataOid << ":" << lastRid << ":" << curFbo << ":" << hwm << endl;
+		//cout << "insertcolumnrec   oid:rid:fbo:oldhwm = " << colStructList[i].dataOid << ":" << lastRid << ":" << curFbo << ":" << oldHwm << endl;
          if (succFlag)
          {
             if ((HWM)curFbo >= oldHwm)
@@ -1054,8 +1111,8 @@ timer.stop("tokenize");
 			if (newExtent)
 			{
 					it->current = false;
-			}
-						
+			}		
+			
 			//cout << "updated old ext info for oid " << colStructList[i].dataOid << " dbroot:part:seg:hwm:current = " 
 	  //<< it->dbRoot<<":"<<it->partNum<<":"<<it->segNum<<":"<<it->hwm<<":"<< it->current<< " and newExtent is " << newExtent << endl;
          }
@@ -1122,6 +1179,7 @@ timer.start("writeColumnRec");
 	{
 		//Mark extents invalid
 		vector<BRM::LBID_t> lbids;
+        vector<CalpontSystemCatalog::ColDataType> colDataTypes;
 		bool successFlag = true;
 		unsigned width = 0;
 		int         curFbo = 0, curBio, lastFbo = -1;
@@ -1134,17 +1192,16 @@ timer.start("writeColumnRec");
 			if (successFlag) {
 				if (curFbo != lastFbo) {
 					RETURN_ON_ERROR(AddLBIDtoList(txnid,
-													  lbids,
-													  colStructList[i].dataOid,
-													  colStructList[i].fColPartition,
-													  colStructList[i].fColSegment,
-													  curFbo));
+												  lbids,
+                                                  colDataTypes,
+                                                  colStructList[i],
+												  curFbo));
 				}
 			}
 		}
   
 		if (lbids.size() > 0)
-				rc = BRMWrapper::getInstance()->markExtentsInvalid(lbids);
+				rc = BRMWrapper::getInstance()->markExtentsInvalid(lbids, colDataTypes);
 		colValueList.clear();
 		rc = writeColumnRec(txnid, colStructList, colOldValueList, colValueList, rowIdArray, newColStructList, colNewValueList);
 	}
@@ -1569,6 +1626,7 @@ timer.stop("tokenize");
 
 //Mark extents invalid
    vector<BRM::LBID_t> lbids;
+   vector<CalpontSystemCatalog::ColDataType> colDataTypes;
    bool successFlag = true;
    unsigned width = 0;
    BRM::LBID_t lbid;
@@ -1586,6 +1644,7 @@ timer.stop("tokenize");
                    colStructList[i].dataOid, colStructList[i].fColPartition,
                    colStructList[i].fColSegment, curFbo, lbid));
                lbids.push_back((BRM::LBID_t)lbid);
+               colDataTypes.push_back(colStructList[i].colDataType);
             }
          }
       }
@@ -1602,16 +1661,15 @@ timer.stop("tokenize");
          {
              RETURN_ON_ERROR(AddLBIDtoList(txnid,
                                            lbids,
-                                           newColStructList[i].dataOid,
-                                           newColStructList[i].fColPartition,
-                                           newColStructList[i].fColSegment,
+                                           colDataTypes,
+                                           newColStructList[i],
                                            curFbo));
          }
       }
    }
    //cout << "lbids size = " << lbids.size()<< endl;
    if (lbids.size() > 0)
-       rc = BRMWrapper::getInstance()->markExtentsInvalid(lbids);
+       rc = BRMWrapper::getInstance()->markExtentsInvalid(lbids, colDataTypes);
 
    if (rc == NO_ERROR)
    {
@@ -2095,6 +2153,7 @@ timer.stop("tokenize");
 
    //Mark extents invalid
    vector<BRM::LBID_t> lbids;
+   vector<CalpontSystemCatalog::ColDataType> colDataTypes;
    bool successFlag = true;
    unsigned width = 0;
    BRM::LBID_t lbid;
@@ -2112,6 +2171,7 @@ timer.stop("tokenize");
                    colStructList[i].dataOid, colStructList[i].fColPartition,
                    colStructList[i].fColSegment, curFbo, lbid));
                lbids.push_back((BRM::LBID_t)lbid);
+               colDataTypes.push_back(colStructList[i].colDataType);
             }
          }
       }
@@ -2128,16 +2188,15 @@ timer.stop("tokenize");
          {
              RETURN_ON_ERROR(AddLBIDtoList(txnid,
                                            lbids,
-                                           newColStructList[i].dataOid,
-                                           newColStructList[i].fColPartition,
-                                           newColStructList[i].fColSegment,
+                                           colDataTypes,
+                                           newColStructList[i],
                                            curFbo));
          }
       }
    }
    //cout << "lbids size = " << lbids.size()<< endl;
    if (lbids.size() > 0)
-       rc = BRMWrapper::getInstance()->markExtentsInvalid(lbids);
+       rc = BRMWrapper::getInstance()->markExtentsInvalid(lbids, colDataTypes);
 #ifdef PROFILE
 timer.start("writeColumnRec");
 #endif
@@ -2318,7 +2377,7 @@ int WriteEngineWrapper::processVersionBuffer(FILE* pFile, const TxnID& txnid,
    bool        successFlag;
    BRM::LBID_t lbid;
    BRM::VER_t  verId = (BRM::VER_t) txnid;
-   vector<i32> fboList;
+   vector<uint32_t> fboList;
    LBIDRange   range;
    ColumnOp* colOp = m_colOp[op(colStruct.fCompressionType)];
 
@@ -2332,7 +2391,7 @@ int WriteEngineWrapper::processVersionBuffer(FILE* pFile, const TxnID& txnid,
             RETURN_ON_ERROR(BRMWrapper::getInstance()->getBrmInfo(
                colStruct.dataOid, colStruct.fColPartition, colStruct.fColSegment, curFbo, lbid));
              //cout << "processVersionBuffer is processing lbid  " << lbid << endl;
-             fboList.push_back((i32)curFbo);
+             fboList.push_back((uint32_t)curFbo);
              range.start = lbid;
              range.size = 1;
              rangeList.push_back(range);
@@ -2359,7 +2418,7 @@ int WriteEngineWrapper::processVersionBuffers(FILE* pFile, const TxnID& txnid,
    BRM::LBID_t lbid;
    BRM::VER_t  verId = (BRM::VER_t) txnid;
    LBIDRange   range;
-   vector<i32>    fboList;
+   vector<uint32_t> fboList;
    //vector<LBIDRange>   rangeList;
    ColumnOp* colOp = m_colOp[op(colStruct.fCompressionType)];
    for (int i = 0; i < totalRow; i++) {
@@ -2372,7 +2431,7 @@ int WriteEngineWrapper::processVersionBuffers(FILE* pFile, const TxnID& txnid,
             RETURN_ON_ERROR(BRMWrapper::getInstance()->getBrmInfo(
                colStruct.dataOid, colStruct.fColPartition, colStruct.fColSegment, curFbo, lbid));
              //cout << "processVersionBuffer is processing lbid  " << lbid << endl;
-             fboList.push_back((i32)curFbo);
+             fboList.push_back((uint32_t)curFbo);
              range.start = lbid;
              range.size = 1;
              rangeList.push_back(range);
@@ -2391,6 +2450,7 @@ int WriteEngineWrapper::processVersionBuffers(FILE* pFile, const TxnID& txnid,
 	/**
     * @brief Process versioning for batch insert - only version the hwm block.
     */
+#if 0
  int WriteEngineWrapper::processBatchVersions(const TxnID& txnid, std::vector<Column> columns, std::vector<BRM::LBIDRange> &  rangeList)
  {
 	int rc = 0;
@@ -2440,7 +2500,7 @@ int WriteEngineWrapper::processVersionBuffers(FILE* pFile, const TxnID& txnid,
 	}
 	return rc;
  }
- 
+ #endif
  void WriteEngineWrapper::writeVBEnd(const TxnID& txnid, std::vector<BRM::LBIDRange> &  rangeList)
  {
 	BRMWrapper::getInstance()->writeVBEnd(txnid, rangeList);
@@ -2549,11 +2609,12 @@ int WriteEngineWrapper::processVersionBuffers(FILE* pFile, const TxnID& txnid,
       //Mark extents invalid
 	//if (colStructList[0].dataOid < 3000) {
       vector<BRM::LBID_t> lbids;
+      vector<CalpontSystemCatalog::ColDataType> colDataTypes;
       bool successFlag = true;
       unsigned width = 0;
-      int         curFbo = 0, curBio, lastFbo = -1;
+      int      curFbo = 0, curBio, lastFbo = -1;
       rid_iter = ridLists[extent].begin();
-      i64 aRid = *rid_iter;
+      RID aRid = *rid_iter;
       for (unsigned j = 0; j< colStructList.size(); j++)
       {
          colOp = m_colOp[op(colStructList[j].fCompressionType)];
@@ -2568,9 +2629,8 @@ int WriteEngineWrapper::processVersionBuffers(FILE* pFile, const TxnID& txnid,
             {
                 RETURN_ON_ERROR(AddLBIDtoList(txnid,
                                               lbids,
-                                              colStructList[j].dataOid,
-                                              colStructList[j].fColPartition,
-                                              colStructList[j].fColSegment,
+                                              colDataTypes,
+                                              colStructList[j],
                                               curFbo));
             }
          }
@@ -2580,7 +2640,7 @@ int WriteEngineWrapper::processVersionBuffers(FILE* pFile, const TxnID& txnid,
 //timer.start("markExtentsInvalid");
 //#endif
       if (lbids.size() > 0)
-         rc = BRMWrapper::getInstance()->markExtentsInvalid(lbids);
+         rc = BRMWrapper::getInstance()->markExtentsInvalid(lbids, colDataTypes);
 	//}
       rc = writeColumnRec(txnid, colStructList, colValueList, colOldValueList,
                           ridLists[extent], true, ridLists[extent].size());
@@ -2604,11 +2664,12 @@ int WriteEngineWrapper::updateColumnRecs(const TxnID& txnid,
     //if (colExtentsStruct[0].dataOid < 3000) 
     //{
     vector<BRM::LBID_t> lbids;
+    vector<CalpontSystemCatalog::ColDataType> colDataTypes;
     ColumnOp* colOp = NULL;
     bool successFlag = true;
     unsigned width = 0;\
-    int         curFbo = 0, curBio, lastFbo = -1; 
-    i64 aRid = ridLists[0];
+    int curFbo = 0, curBio, lastFbo = -1; 
+    RID aRid = ridLists[0];
     int rc = 0;
 
     for (unsigned j = 0; j< colExtentsStruct.size(); j++)
@@ -2625,9 +2686,8 @@ int WriteEngineWrapper::updateColumnRecs(const TxnID& txnid,
             {
                 RETURN_ON_ERROR(AddLBIDtoList(txnid,
                                               lbids,
-                                              colExtentsStruct[j].dataOid,
-                                              colExtentsStruct[j].fColPartition,
-                                              colExtentsStruct[j].fColSegment,
+                                              colDataTypes,
+                                              colExtentsStruct[j],
                                               curFbo));
             }
         }
@@ -2635,8 +2695,8 @@ int WriteEngineWrapper::updateColumnRecs(const TxnID& txnid,
 
     if (lbids.size() > 0)
     {
-        cout << "BRMWrapper::getInstance()->markExtentsInvalid(lbids); " << lbids.size() << " lbids" << endl;
-        rc = BRMWrapper::getInstance()->markExtentsInvalid(lbids);
+//        cout << "BRMWrapper::getInstance()->markExtentsInvalid(lbids); " << lbids.size() << " lbids" << endl;
+        rc = BRMWrapper::getInstance()->markExtentsInvalid(lbids, colDataTypes);
     }
     //}	 
     rc = writeColumnRecords (txnid, colExtentsStruct, colValueList, ridLists);
@@ -2699,6 +2759,9 @@ int WriteEngineWrapper::writeColumnRecords(const TxnID& txnid,
          case WriteEngine::WR_INT:
             valArray = (int*) calloc(sizeof(int), totalRow);
             break;
+         case WriteEngine::WR_UINT:
+            valArray = (uint32_t*) calloc(sizeof(uint32_t), totalRow);
+            break;
          case WriteEngine::WR_VARBINARY : // treat same as char for now
          case WriteEngine::WR_CHAR:
          case WriteEngine::WR_BLOB:
@@ -2713,11 +2776,20 @@ int WriteEngineWrapper::writeColumnRecords(const TxnID& txnid,
          case WriteEngine::WR_BYTE:
             valArray = (char*) calloc(sizeof(char), totalRow);
             break;
+         case WriteEngine::WR_UBYTE:
+            valArray = (uint8_t*) calloc(sizeof(uint8_t), totalRow);
+            break;
          case WriteEngine::WR_SHORT:
             valArray = (short*) calloc(sizeof(short), totalRow);
             break;
+         case WriteEngine::WR_USHORT:
+            valArray = (uint16_t*) calloc(sizeof(uint16_t), totalRow);
+            break;
          case WriteEngine::WR_LONGLONG:
             valArray = (long long*) calloc(sizeof(long long), totalRow);
+            break;
+         case WriteEngine::WR_ULONGLONG:
+            valArray = (uint64_t*) calloc(sizeof(uint64_t), totalRow);
             break;
          case WriteEngine::WR_TOKEN:
             valArray = (Token*) calloc(sizeof(Token), totalRow);
@@ -2864,6 +2936,10 @@ StopWatch timer;
                   valArray = (int*) calloc(sizeof(int), totalRow1);
                   oldValArray = (int*) calloc(sizeof(int), totalRow1);
                   break;
+               case WriteEngine::WR_UINT:
+                  valArray = (uint32_t*) calloc(sizeof(uint32_t), totalRow1);
+                  oldValArray = (uint32_t*) calloc(sizeof(uint32_t), totalRow1);
+                  break;
                case WriteEngine::WR_VARBINARY : // treat same as char for now
                case WriteEngine::WR_CHAR:
                case WriteEngine::WR_BLOB:
@@ -2888,13 +2964,25 @@ StopWatch timer;
                   valArray = (char*) calloc(sizeof(char), totalRow1);
                   oldValArray = (char*) calloc(sizeof(char), totalRow1);
                   break;
+               case WriteEngine::WR_UBYTE:
+                  valArray = (uint8_t*) calloc(sizeof(uint8_t), totalRow1);
+                  oldValArray = (uint8_t*) calloc(sizeof(uint8_t), totalRow1);
+                  break;
                case WriteEngine::WR_SHORT:
                   valArray = (short*) calloc(sizeof(short), totalRow1);
                   oldValArray = (short*) calloc(sizeof(short), totalRow1);
                   break;
+               case WriteEngine::WR_USHORT:
+                  valArray = (uint16_t*) calloc(sizeof(uint16_t), totalRow1);
+                  oldValArray = (uint16_t*) calloc(sizeof(uint16_t), totalRow1);
+                  break;
                case WriteEngine::WR_LONGLONG:
                   valArray = (long long*) calloc(sizeof(long long), totalRow1);
                   oldValArray = (long long*) calloc(sizeof(long long), totalRow1);
+                  break;
+               case WriteEngine::WR_ULONGLONG:
+                  valArray = (uint64_t*) calloc(sizeof(uint64_t), totalRow1);
+                  oldValArray = (uint64_t*) calloc(sizeof(uint64_t), totalRow1);
                   break;
                case WriteEngine::WR_TOKEN:
                   valArray = (Token*) calloc(sizeof(Token), totalRow1);
@@ -2999,6 +3087,10 @@ timer.stop("writeRow ");
                valArray = (int*) calloc(sizeof(int), totalRow2);
                oldValArray = (int*) calloc(sizeof(int), totalRow2);
                break;
+            case WriteEngine::WR_UINT:
+               valArray = (uint32_t*) calloc(sizeof(uint32_t), totalRow2);
+               oldValArray = (uint32_t*) calloc(sizeof(uint32_t), totalRow2);
+               break;
             case WriteEngine::WR_VARBINARY : // treat same as char for now
             case WriteEngine::WR_CHAR:
             case WriteEngine::WR_BLOB:
@@ -3023,13 +3115,25 @@ timer.stop("writeRow ");
                valArray = (char*) calloc(sizeof(char), totalRow2);
                oldValArray = (char*) calloc(sizeof(char), totalRow2);
                break;
+            case WriteEngine::WR_UBYTE:
+               valArray = (uint8_t*) calloc(sizeof(uint8_t), totalRow2);
+               oldValArray = (uint8_t*) calloc(sizeof(uint8_t), totalRow2);
+               break;
             case WriteEngine::WR_SHORT:
                valArray = (short*) calloc(sizeof(short), totalRow2);
                oldValArray = (short*) calloc(sizeof(short), totalRow2);
                break;
+            case WriteEngine::WR_USHORT:
+               valArray = (uint16_t*) calloc(sizeof(uint16_t), totalRow2);
+               oldValArray = (uint16_t*) calloc(sizeof(uint16_t), totalRow2);
+               break;
             case WriteEngine::WR_LONGLONG:
                valArray = (long long*) calloc(sizeof(long long), totalRow2);
                oldValArray = (long long*) calloc(sizeof(long long), totalRow2);
+               break;
+            case WriteEngine::WR_ULONGLONG:
+               valArray = (uint64_t*) calloc(sizeof(uint64_t), totalRow2);
+               oldValArray = (uint64_t*) calloc(sizeof(uint64_t), totalRow2);
                break;
             case WriteEngine::WR_TOKEN:
                valArray = (Token*) calloc(sizeof(Token), totalRow2);
@@ -3133,6 +3237,10 @@ timer.stop("writeRow ");
                valArray = (int*) calloc(sizeof(int), totalRow1);
                oldValArray = (int*) calloc(sizeof(int), totalRow1);
                break;
+            case WriteEngine::WR_UINT:
+               valArray = (uint32_t*) calloc(sizeof(uint32_t), totalRow1);
+               oldValArray = (uint32_t*) calloc(sizeof(uint32_t), totalRow1);
+               break;
             case WriteEngine::WR_VARBINARY : // treat same as char for now
             case WriteEngine::WR_CHAR:
             case WriteEngine::WR_BLOB:
@@ -3157,14 +3265,26 @@ timer.stop("writeRow ");
                valArray = (char*) calloc(sizeof(char), totalRow1);
                oldValArray = (char*) calloc(sizeof(char), totalRow1);
                break;
+            case WriteEngine::WR_UBYTE:
+               valArray = (uint8_t*) calloc(sizeof(uint8_t), totalRow1);
+               oldValArray = (uint8_t*) calloc(sizeof(uint8_t), totalRow1);
+               break;
             case WriteEngine::WR_SHORT:
                valArray = (short*) calloc(sizeof(short), totalRow1);
                oldValArray = (short*) calloc(sizeof(short), totalRow1);
-                                              break;
+               break;
+            case WriteEngine::WR_USHORT:
+               valArray = (uint16_t*) calloc(sizeof(uint16_t), totalRow1);
+               oldValArray = (uint16_t*) calloc(sizeof(uint16_t), totalRow1);
+               break;
             case WriteEngine::WR_LONGLONG:
                valArray = (long long*) calloc(sizeof(long long), totalRow1);
                oldValArray = (long long*) calloc(sizeof(long long), totalRow1);
-                                              break;
+               break;
+            case WriteEngine::WR_ULONGLONG:
+               valArray = (uint64_t*) calloc(sizeof(uint64_t), totalRow1);
+               oldValArray = (uint64_t*) calloc(sizeof(uint64_t), totalRow1);
+               break;
             case WriteEngine::WR_TOKEN:
                valArray = (Token*) calloc(sizeof(Token), totalRow1);
                oldValArray = (Token*) calloc(sizeof(Token), totalRow1);
@@ -3301,6 +3421,9 @@ StopWatch timer;
          case WriteEngine::WR_INT:
             valArray = (int*) calloc(sizeof(int), 1);
             break;
+         case WriteEngine::WR_UINT:
+            valArray = (uint32_t*) calloc(sizeof(uint32_t), 1);
+            break;
          case WriteEngine::WR_VARBINARY : // treat same as char for now
          case WriteEngine::WR_CHAR:
          case WriteEngine::WR_BLOB:
@@ -3315,11 +3438,20 @@ StopWatch timer;
          case WriteEngine::WR_BYTE:
             valArray = (char*) calloc(sizeof(char), 1);
             break;
+         case WriteEngine::WR_UBYTE:
+            valArray = (uint8_t*) calloc(sizeof(uint8_t), 1);
+            break;
          case WriteEngine::WR_SHORT:
             valArray = (short*) calloc(sizeof(short), 1);
             break;
+         case WriteEngine::WR_USHORT:
+            valArray = (uint16_t*) calloc(sizeof(uint16_t), 1);
+            break;
          case WriteEngine::WR_LONGLONG:
             valArray = (long long*) calloc(sizeof(long long), 1);
+            break;
+         case WriteEngine::WR_ULONGLONG:
+            valArray = (uint64_t*) calloc(sizeof(uint64_t), 1);
             break;
          case WriteEngine::WR_TOKEN:
             valArray = (Token*) calloc(sizeof(Token), 1);
@@ -3581,108 +3713,6 @@ int WriteEngineWrapper::rollbackTran(const TxnID& txnid, int sessionId)
 	}
 	else
 	{
-		cerr << "Cannot find the dbrm directory for the DML log file";
-		return -1;
-
-	}
-	std::ostringstream oss;
-	oss << txnid;
-	aDMLLogFileName += "DMLLog_" + oss.str();
-	
-	struct stat stFileInfo; 
-	int intStat = stat(aDMLLogFileName.c_str(),&stFileInfo); 
-	if ( intStat == 0 ) //File exists
-	{
-		std::ifstream	       aDMLLogFile; 
-		aDMLLogFile.open(aDMLLogFileName.c_str(), ios::in);
-
-		if (aDMLLogFile) //need recover
-		{
-			std::string backUpFileType;
-			std::string filename;
-			int64_t size;
-			int64_t offset;
-			while (aDMLLogFile >> backUpFileType >> filename >> size >> offset)
-			{
-				//cout << "Found: " <<  backUpFileType << " name " << filename << "size: " << size << " offset: " << offset << endl;
-				if (backUpFileType.compare("tmp") == 0 )
-				{
-					//remove the tmp file
-					filename += ".tmp";
-					//cout << " File removed: " << filename << endl;
-					remove(filename.c_str());
-				}
-				else
-				{
-					//copy back to the data file
-					std::string backFileName(filename);
-					if (backUpFileType.compare("chk") == 0 )
-						backFileName += ".chk";
-					else
-						backFileName += ".hdr";
-						
-					FILE * sourceFile = fopen(backFileName.c_str(), "rb");
-					FILE * targetFile = fopen(filename.c_str(), "r+b");
-					size_t byteRead;
-					unsigned char* readBuf = new unsigned char[size];
-					boost::scoped_array<unsigned char> readBufPtr( readBuf );
-					if( sourceFile != NULL ) {
-#ifdef _MSC_VER
-						int rc = _fseeki64( sourceFile, offset, 0 );
-#else
-						int rc = fseeko( sourceFile, offset, 0 );
-#endif
-						if (rc)
-							return ERR_FILE_SEEK;
-						byteRead = fread( readBuf, 1, size, sourceFile );
-						if( (int) byteRead != size )
-							return ERR_FILE_READ;
-					}
-					else
-						return ERR_FILE_NULL;
-					size_t byteWrite;
-
-					if( targetFile != NULL ) {
-						byteWrite = fwrite( readBuf, 1, size, targetFile );
-					if( (int) byteWrite != size )
-						return ERR_FILE_WRITE;
-					}
-					else
-						return ERR_FILE_NULL;
-					fclose(targetFile);
-					fclose(sourceFile);
-					remove(backFileName.c_str());
-				}
-			}
-		}
-	}
-	return BRMWrapper::getInstance()->rollBack(txnid, sessionId); 
-	
-}
-
-int WriteEngineWrapper::rollbackBlocks(const TxnID& txnid, int sessionId)
-{ 
-	//Remove the unwanted tmp files and recover compressed chunks.
-	string prefix;
-
-    // BUG 4312
-    RemoveTxnFromLBIDMap(txnid);
-
-    config::Config *config = config::Config::makeConfig();
-	prefix = config->getConfig("SystemConfig", "DBRMRoot");
-	if (prefix.length() == 0) {
-		cerr << "Need a valid DBRMRoot entry in Calpont configuation file";
-		return -1;
-	}
-	
-	uint64_t pos =  prefix.find_last_of ("/") ;
-	std::string aDMLLogFileName;
-	if (pos != string::npos)
-	{
-		aDMLLogFileName = prefix.substr(0, pos+1); //Get the file path
-	}
-	else
-	{
         logging::Message::Args args;
         args.add("RollbackTran cannot find the dbrm directory for the DML log file");
         SimpleSysLog::instance()->logMsg(args, logging::LOG_TYPE_CRITICAL, logging::M0007);	
@@ -3773,7 +3803,167 @@ int WriteEngineWrapper::rollbackBlocks(const TxnID& txnid, int sessionId)
 						int rc = _fseeki64( targetFile, offset, 0 );
 #else
 						int rc = fseeko( targetFile, offset, 0 );
+#endif
+						if (rc)
+							return ERR_FILE_SEEK;
+						byteWrite = fwrite( readBuf, 1, size, targetFile );
+						if( (int) byteWrite != size )
+						{
+							logging::Message::Args args3;
+							args3.add("Rollback cannot copy to file ");
+							args3.add(filename);
+							args3.add( "from file ");
+							args3.add(backFileName);
+							SimpleSysLog::instance()->logMsg(args3, logging::LOG_TYPE_ERROR, logging::M0007);	
+							
+							return ERR_FILE_WRITE;
+						}
+					}
+					else
+					{
+						logging::Message::Args args4;
+						args4.add("Rollback cannot open target file ");
+						args4.add(filename);					
+						SimpleSysLog::instance()->logMsg(args4, logging::LOG_TYPE_ERROR, logging::M0007);	
+						return ERR_FILE_NULL;
+					}
+						
+					//cout << "Rollback copied to file " << filename << " from file " << backFileName << endl;
+					
+					fclose(targetFile);
+					fclose(sourceFile);
+					remove(backFileName.c_str());
+					logging::Message::Args arg1;
+					arg1.add("Rollback copied to file ");
+					arg1.add(filename);
+					arg1.add( "from file ");
+					arg1.add(backFileName);
+					SimpleSysLog::instance()->logMsg(arg1, logging::LOG_TYPE_INFO, logging::M0007);	
+				}
+			}
+		}
+		remove (aDMLLogFileName.c_str());
+	}
+		
+	return BRMWrapper::getInstance()->rollBack(txnid, sessionId); 
+	
+}
+
+int WriteEngineWrapper::rollbackBlocks(const TxnID& txnid, int sessionId)
+{ 
+	//Remove the unwanted tmp files and recover compressed chunks.
+	string prefix;
+
+    // BUG 4312
+    RemoveTxnFromLBIDMap(txnid);
+
+    config::Config *config = config::Config::makeConfig();
+	prefix = config->getConfig("SystemConfig", "DBRMRoot");
+	if (prefix.length() == 0) {
+		cerr << "Need a valid DBRMRoot entry in Calpont configuation file";
+		return -1;
+	}
+	
+	uint64_t pos =  prefix.find_last_of ("/") ;
+	std::string aDMLLogFileName;
+	if (pos != string::npos)
+	{
+		aDMLLogFileName = prefix.substr(0, pos+1); //Get the file path
+	}
+	else
+	{
+        logging::Message::Args args;
+        args.add("RollbackTran cannot find the dbrm directory for the DML log file");
+        SimpleSysLog::instance()->logMsg(args, logging::LOG_TYPE_CRITICAL, logging::M0007);	
+		return -1;
+
+	}
+	std::ostringstream oss;
+	oss << txnid;
+	aDMLLogFileName += "DMLLog_" + oss.str();
+	
+	struct stat stFileInfo; 
+	int intStat = stat(aDMLLogFileName.c_str(),&stFileInfo); 
+	if ( intStat == 0 ) //File exists
+	{
+		std::ifstream	       aDMLLogFile; 
+		aDMLLogFile.open(aDMLLogFileName.c_str(), ios::in);
+
+		if (aDMLLogFile) //need recover
+		{
+			std::string backUpFileType;
+			std::string filename;
+			int64_t size;
+			int64_t offset;
+			while (aDMLLogFile >> backUpFileType >> filename >> size >> offset)
+			{
+				//cout << "Found: " <<  backUpFileType << " name " << filename << "size: " << size << " offset: " << offset << endl;
+				std::ostringstream oss;
+				oss << "RollbackTran found " <<  backUpFileType << " name " << filename << " size: " << size << " offset: " << offset;
+				logging::Message::Args args;
+				args.add(oss.str());
+				SimpleSysLog::instance()->logMsg(args, logging::LOG_TYPE_INFO, logging::M0007);	
+				if (backUpFileType.compare("tmp") == 0 )
+				{
+					//remove the tmp file
+					filename += ".tmp";
+					//cout << " File removed: " << filename << endl;
+					remove(filename.c_str());
+					logging::Message::Args args1;
+					args1.add(filename);
+					args1.add(" is ewmoved.");
+					SimpleSysLog::instance()->logMsg(args1, logging::LOG_TYPE_INFO, logging::M0007);	
+				}
+				else
+				{
+					//copy back to the data file
+					std::string backFileName(filename);
+					if (backUpFileType.compare("chk") == 0 )
+						backFileName += ".chk";
+					else
+						backFileName += ".hdr";
+					//cout << "Rollback found file " << backFileName << endl;	
+					FILE * sourceFile = fopen(backFileName.c_str(), "rb");
+					FILE * targetFile = fopen(filename.c_str(), "r+b");
+					size_t byteRead;
+					unsigned char* readBuf = new unsigned char[size];
+					boost::scoped_array<unsigned char> readBufPtr( readBuf );
+					if( sourceFile != NULL ) {
+#ifdef _MSC_VER
+						int rc = _fseeki64( sourceFile, 0, 0 );
+#else
+						int rc = fseeko( sourceFile, 0, 0 );
+#endif
+						if (rc)
+							return ERR_FILE_SEEK;
+						byteRead = fread( readBuf, 1, size, sourceFile );
+						if( (int) byteRead != size )
+						{
+							logging::Message::Args args6;
+							args6.add("Rollback cannot read backup file ");
+							args6.add(backFileName);
+							SimpleSysLog::instance()->logMsg(args6, logging::LOG_TYPE_ERROR, logging::M0007);	
+							return ERR_FILE_READ;
+						}
+					}
+					else
+					{
+						logging::Message::Args args5;
+						args5.add("Rollback cannot open backup file ");
+						args5.add(backFileName);					
+						SimpleSysLog::instance()->logMsg(args5, logging::LOG_TYPE_ERROR, logging::M0007);	
+						return ERR_FILE_NULL;
+					}
+					size_t byteWrite;
+
+					if( targetFile != NULL ) {
+#ifdef _MSC_VER
+						int rc = _fseeki64( targetFile, offset, 0 );
+#else
+						int rc = fseeko( targetFile, offset, 0 );
 #endif					
+						if (rc)
+							return ERR_FILE_SEEK;
 						byteWrite = fwrite( readBuf, 1, size, targetFile );
 						if( (int) byteWrite != size )
 						{
@@ -3825,7 +4015,7 @@ int WriteEngineWrapper::rollbackVersion(const TxnID& txnid, int sessionId)
     return BRMWrapper::getInstance()->rollBackVersion(txnid, sessionId); 
 }
 
-int WriteEngineWrapper::updateNextValue(const OID& columnoid, const long long nextVal, const uint32_t sessionID)
+int WriteEngineWrapper::updateNextValue(const OID& columnoid, const uint64_t nextVal, const uint32_t sessionID)
 {
 	int rc = NO_ERROR;
 	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr;
@@ -3837,7 +4027,7 @@ int WriteEngineWrapper::updateNextValue(const OID& columnoid, const long long ne
 	colStruct.dataOid = OID_SYSCOLUMN_NEXTVALUE;
 	colStruct.colWidth = 8;
 	colStruct.tokenFlag = false;
-	colStruct.colDataType =  static_cast<WriteEngine::ColDataType>(WriteEngine::BIGINT);
+	colStruct.colDataType =  CalpontSystemCatalog::UBIGINT;
 	colStructList.push_back(colStruct);
 	ColTuple colTuple;
 	systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
@@ -3865,7 +4055,6 @@ int WriteEngineWrapper::updateNextValue(const OID& columnoid, const long long ne
 		
 	//flush PrimProc cache
 	vector<LBID_t> blockList;
-	execplan::CalpontSystemCatalog::SCN verID = 0;
 	BRM::LBIDRange_v lbidRanges;
 	rc = BRMWrapper::getInstance()->lookupLbidRanges(OID_SYSCOLUMN_NEXTVALUE,
                                                      lbidRanges);
@@ -3932,10 +4121,9 @@ int WriteEngineWrapper::flushDataFiles(int rc, const TxnID txnId, std::map<FID,F
  * RETURN: 0 => OK. -1 => error
  ***********************************************************/
 int WriteEngineWrapper::AddLBIDtoList(const TxnID     txnid,
-                                      vector<BRM::LBID_t>& lbids,
-                                      const OID       oid,
-                                      const u_int32_t colPartition,
-                                      const u_int16_t segment,
+                                      std::vector<BRM::LBID_t>& lbids,
+                                      std::vector<CalpontSystemCatalog::ColDataType>& colDataTypes,
+                                      const ColStruct& colStruct,
                                       const int       fbo)
 {
     int rtn = 0;
@@ -3960,7 +4148,8 @@ int WriteEngineWrapper::AddLBIDtoList(const TxnID     txnid,
     }
     
     // Get the extent starting lbid given all these values (startingLBID is an out parameter).
-    rtn = BRMWrapper::getInstance()->getStartLbid(oid, colPartition, segment, fbo, startingLBID);
+    rtn = BRMWrapper::getInstance()->getStartLbid(colStruct.dataOid, colStruct.fColPartition, 
+                                                  colStruct.fColSegment, fbo, startingLBID);
     if (rtn != 0)
         return -1;
 
@@ -3970,6 +4159,7 @@ int WriteEngineWrapper::AddLBIDtoList(const TxnID     txnid,
 //        cout << "Adding lbid " << startingLBID << " to txn " << txnid << endl;
         spTxnLBIDRec->AddLBID(startingLBID);
         lbids.push_back((BRM::LBID_t)startingLBID);
+        colDataTypes.push_back(colStruct.colDataType);
     }
     else
     {
@@ -4043,4 +4233,5 @@ int WriteEngineWrapper::RemoveTxnFromLBIDMap(const TxnID txnid)
 
 
 } //end of namespace
+// vim:ts=4 sw=4:
 

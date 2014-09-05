@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: calpontsystemcatalog.cpp 8993 2012-10-16 15:59:46Z wweeks $
+ *   $Id: calpontsystemcatalog.cpp 9585 2013-05-31 21:08:06Z rdempsey $
  *
  *
  ***********************************************************************/
@@ -154,6 +154,30 @@ const string colDataTypeToString(CalpontSystemCatalog::ColDataType cdt)
 	case CalpontSystemCatalog::BLOB:
 		return "blob";
 		break;
+    case CalpontSystemCatalog::UTINYINT:
+        return "utinyint";
+        break;
+    case CalpontSystemCatalog::USMALLINT:
+        return "usmallint";
+        break;
+    case CalpontSystemCatalog::UDECIMAL:
+        return "udecimal";
+        break;
+    case CalpontSystemCatalog::UMEDINT:
+        return "umedint";
+        break;
+    case CalpontSystemCatalog::UINT:
+        return "uint";
+        break;
+    case CalpontSystemCatalog::UFLOAT:
+        return "ufloat";
+        break;
+    case CalpontSystemCatalog::UBIGINT:
+        return "ubigint";
+        break;
+    case CalpontSystemCatalog::UDOUBLE:
+        return "udouble";
+        break;
 	default:
 		break;
 	}
@@ -249,6 +273,13 @@ bool CalpontSystemCatalog::TableColName::operator<(const TableColName& rhs) cons
     }
 
     return false;
+}
+
+const string CalpontSystemCatalog::TableColName::toString() const
+{
+	string os;
+    os = schema + '.' + table + '.' + column;
+    return os;
 }
 
 bool CalpontSystemCatalog::TableName::operator<(const TableName& rhs) const
@@ -586,12 +617,12 @@ void CalpontSystemCatalog::getSysData (CalpontSelectExecutionPlan& csep,
         txnID.valid = true;
     }
 	
-    CalpontSystemCatalog::SCN verID, oldVerID;
+    BRM::QueryContext verID, oldVerID;
     verID = fSessionManager->verID();
     oldTxnID = csep.txnID();
     csep.txnID(txnID.id);
 	oldVerID = csep.verID();
-    csep.verID(verID);
+	csep.verID(verID);
     //We need to use a session ID that's separate from the actual query SID, because the dbcon runs queries
     //  in the middle of receiving data bands for the real query.
     //TODO: we really need a flag or something to identify this as a syscat query: there are assumptions made
@@ -943,7 +974,7 @@ const CalpontSystemCatalog::ColType CalpontSystemCatalog::colType(const OID& Oid
     // Filters
     SimpleFilter *f1 = new SimpleFilter (opeq,
                                          col[1]->clone(),
-                                         new ConstantColumn(Oid, ConstantColumn::NUM));
+                                         new ConstantColumn((int64_t)Oid, ConstantColumn::NUM));
     filterTokenList.push_back(f1);
     
 	csep.filterTokenList(filterTokenList);  
@@ -1090,7 +1121,7 @@ const CalpontSystemCatalog::ColType CalpontSystemCatalog::colTypeDct(const OID& 
     // Filters
     SimpleFilter *f1 = new SimpleFilter (opeq,
                                          col[1]->clone(),
-                                         new ConstantColumn(dictOid, ConstantColumn::NUM));
+                                         new ConstantColumn((int64_t)dictOid, ConstantColumn::NUM));
     filterTokenList.push_back(f1);
     
 	csep.filterTokenList(filterTokenList);  
@@ -1190,7 +1221,7 @@ const CalpontSystemCatalog::TableColName CalpontSystemCatalog::colName(const OID
     // Filters
     SimpleFilter *f1 = new SimpleFilter (opeq,
                                          c1->clone(),
-                                         new ConstantColumn(oid, ConstantColumn::NUM));
+                                         new ConstantColumn((int64_t)oid, ConstantColumn::NUM));
     filterTokenList.push_back(f1);
     csep.filterTokenList(filterTokenList); 
 
@@ -1226,7 +1257,7 @@ const CalpontSystemCatalog::TableColName CalpontSystemCatalog::colName(const OID
     return tableColName;
 }
 
-const int64_t CalpontSystemCatalog::nextAutoIncrValue ( TableName aTableName)
+const uint64_t CalpontSystemCatalog::nextAutoIncrValue ( TableName aTableName)
 {
 	transform( aTableName.schema.begin(), aTableName.schema.end(), aTableName.schema.begin(), to_lower() );
 	transform( aTableName.table.begin(), aTableName.table.end(), aTableName.table.begin(), to_lower() );
@@ -1237,11 +1268,11 @@ const int64_t CalpontSystemCatalog::nextAutoIncrValue ( TableName aTableName)
 	}
 	catch (runtime_error& /*ex*/)
 	{
-		return -2;
+		throw;
 	}
 	
 	if (tbInfo.tablewithautoincr == NO_AUTOINCRCOL)
-		return 0;
+		return AUTOINCR_SATURATED;
 
 	//Build a plan to get current nextvalue:  select nextvalue from syscolumn where schema = tableName.schema and tablename = tableName.table and autoincrement='y';
 	CalpontSelectExecutionPlan csep;          
@@ -1309,14 +1340,14 @@ const int64_t CalpontSystemCatalog::nextAutoIncrValue ( TableName aTableName)
 	{
 		throw runtime_error ( e.what() );
 	}
-	int64_t nextVal = 0;
+	uint64_t nextVal = AUTOINCR_SATURATED;
 	vector<ColumnResult*>::const_iterator it; 
     for (it = sysDataList.begin(); it != sysDataList.end(); it++)
     {
         
         if ((*it)->ColumnOID() == oid[3]) 
         {       
-            nextVal = ((*it)->GetData(0));   
+            nextVal = static_cast<uint64_t>(((*it)->GetData(0)));   
         }
 	}
 	
@@ -1455,7 +1486,7 @@ const CalpontSystemCatalog::ROPair CalpontSystemCatalog::nextAutoIncrRid ( const
     // Filters
     SimpleFilter *f1 = new SimpleFilter (opeq,
                                          col[0]->clone(),
-                                         new ConstantColumn(columnoid, ConstantColumn::LITERAL));
+                                         new ConstantColumn((int64_t)columnoid, ConstantColumn::LITERAL));
     filterTokenList.push_back(f1);
    
     csep.filterTokenList(filterTokenList); 
@@ -1611,7 +1642,7 @@ CalpontSystemCatalog::CalpontSystemCatalog():
     buildSysOIDmap();
     buildSysTablemap();
     buildSysDctmap();
-	fSyscatSCN = fSessionManager->sysCatVerID();
+	fSyscatSCN = fSessionManager->sysCatVerID().currentScn;
 }
 
 CalpontSystemCatalog::~CalpontSystemCatalog()
@@ -2931,7 +2962,7 @@ const CalpontSystemCatalog::TableName CalpontSystemCatalog::tableName(const OID&
 	// Filters
 	SimpleFilter *f1 = new SimpleFilter (opeq,
 	                                     c1->clone(),
-	                                     new ConstantColumn(tableoid, ConstantColumn::NUM));
+	                                     new ConstantColumn((int64_t)tableoid, ConstantColumn::NUM));
 	filterTokenList.push_back(f1);
 	csep.filterTokenList(filterTokenList); 
 	
@@ -5063,7 +5094,7 @@ ostream& operator<<(ostream& os, const CalpontSystemCatalog::TableAliasName& rhs
 
 ostream& operator<<(ostream& os, const CalpontSystemCatalog::TableColName& rhs)
 {
-    os << rhs.schema << '.' << rhs.table << '.' << rhs.column;
+    os << rhs.toString();
     return os;
 }
 
@@ -5091,7 +5122,7 @@ void CalpontSystemCatalog::flushCache()
 	buildSysDctmap();
 	lk4.unlock();
 
-	fSyscatSCN = fSessionManager->sysCatVerID();
+	fSyscatSCN = fSessionManager->sysCatVerID().currentScn;
 	//cout << "Cache flushed and current sysCatVerID is " << newScn << endl;
 }
 
@@ -5396,7 +5427,7 @@ void CalpontSystemCatalog::buildSysColinfomap()
 	
 	aCol.colWidth = 8;
     aCol.constraintType = NOTNULL_CONSTRAINT;
-    aCol.colDataType = BIGINT;
+    aCol.colDataType = UBIGINT;
     aCol.ddn = notDict;
     aCol.colPosition++;
 	aCol.columnOID = OID_SYSCOLUMN_NEXTVALUE;
@@ -5461,11 +5492,11 @@ void CalpontSystemCatalog::buildSysDctmap()
 
 void CalpontSystemCatalog::checkSysCatVer()
 {
-	SCN newScn = fSessionManager->sysCatVerID();
+	SCN newScn = fSessionManager->sysCatVerID().currentScn;
 	if (newScn < 0)
 	{
 		fSessionManager.reset(new SessionManager());
-		newScn = fSessionManager->sysCatVerID();
+		newScn = fSessionManager->sysCatVerID().currentScn;
 	}
 	boost::mutex::scoped_lock sysCatLk(fSyscatSCNLock);
 	if ( fSyscatSCN != newScn ) {

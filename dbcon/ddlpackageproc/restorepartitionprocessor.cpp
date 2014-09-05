@@ -50,7 +50,7 @@ namespace ddlpackageprocessor
 		txnID.valid= fTxnid.valid;
 		
 		int rc = 0;
-		rc = fDbrm.isReadWrite();
+		rc = fDbrm->isReadWrite();
 		if (rc != 0 )
 		{
 			logging::Message::Args args;
@@ -99,7 +99,7 @@ namespace ddlpackageprocessor
 			}
 				
 			try {
-				uniqueID = fDbrm.getTableLock(pms, roPair.objnum, &processName, &processID, (int32_t*)&sessionID, (int32_t*)&txnID.id, BRM::LOADING );
+				uniqueID = fDbrm->getTableLock(pms, roPair.objnum, &processName, &processID, (int32_t*)&sessionID, (int32_t*)&txnID.id, BRM::LOADING );
 			}
 			catch (std::exception&)
 			{
@@ -142,7 +142,7 @@ namespace ddlpackageprocessor
 					processName = "DDLProc";
 					
 					try {
-						uniqueID = fDbrm.getTableLock(pms, roPair.objnum, &processName, &processID, (int32_t*)&sessionID, (int32_t*)&txnID.id, BRM::LOADING );
+						uniqueID = fDbrm->getTableLock(pms, roPair.objnum, &processName, &processID, (int32_t*)&sessionID, (int32_t*)&txnID.id, BRM::LOADING );
 					}
 					catch (std::exception&)
 					{
@@ -198,7 +198,7 @@ namespace ddlpackageprocessor
 
 			//Remove the partition from extent map
 			string emsg;
-			rc = fDbrm.restorePartition( oidList, restorePartitionStmt.fPartitions, emsg);
+			rc = fDbrm->restorePartition( oidList, restorePartitionStmt.fPartitions, emsg);
 			if ( rc != 0 )
 			{
 				throw std::runtime_error(emsg);
@@ -219,7 +219,7 @@ namespace ddlpackageprocessor
 
 			result.message = message;
 			try {
-				fDbrm.releaseTableLock(uniqueID);
+				fDbrm->releaseTableLock(uniqueID);
 			} catch (std::exception&)
 			{
 				result.result = DROP_ERROR;
@@ -243,7 +243,7 @@ namespace ddlpackageprocessor
 			result.result = DROP_ERROR;
 			result.message = message;
 			try {
-				fDbrm.releaseTableLock(uniqueID);
+				fDbrm->releaseTableLock(uniqueID);
 			} catch (std::exception&)
 			{
 				result.result = DROP_ERROR;
@@ -255,7 +255,7 @@ namespace ddlpackageprocessor
 		// Log the DDL statement
 		logging::logDDL(restorePartitionStmt.fSessionID, txnID.id, restorePartitionStmt.fSql, restorePartitionStmt.fOwner);
 		try {
-			fDbrm.releaseTableLock(uniqueID);
+			fDbrm->releaseTableLock(uniqueID);
 		} catch (std::exception&)
 		{
 			result.result = DROP_ERROR;

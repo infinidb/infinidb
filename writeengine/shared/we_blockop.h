@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_blockop.h 3720 2012-04-04 18:18:49Z rdempsey $
+* $Id: we_blockop.h 4450 2013-01-21 14:13:24Z rdempsey $
 *
 *******************************************************************************/
 /** @file */
@@ -71,21 +71,21 @@ public:
    /**
     * @brief Get bit value after shift
     */
-    i64             getBitValue(    i64 val,
+    uint64_t        getBitValue(    uint64_t val,
                                     int shiftBit,
-                                    i64 mask ) const
+                                    uint64_t mask ) const
                     { return ( val >> shiftBit ) & mask ; }
 
    /**
     * @brief Get correct row width
     */
-    EXPORT int      getCorrectRowWidth( const ColDataType dataType,
+    EXPORT int      getCorrectRowWidth( const execplan::CalpontSystemCatalog::ColDataType colDataType,
                                     const int width ) const;
 
    /**
     * @brief Get an empty row value
     */
-    EXPORT i64      getEmptyRowValue(const ColDataType dataType,
+    EXPORT uint64_t getEmptyRowValue(const execplan::CalpontSystemCatalog::ColDataType colDataType,
                                     const int width ) const;
 
    /**
@@ -112,7 +112,7 @@ public:
     */
     EXPORT void static setEmptyBuf( unsigned char* buf,
                                     const int bufSize,
-                                    i64 emptyVal, const int width );
+                                    uint64_t emptyVal, const int width );
 
    /**
     * @brief Set a value in a buffer

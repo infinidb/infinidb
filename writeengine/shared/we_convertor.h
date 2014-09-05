@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_convertor.h 4496 2013-01-31 19:13:20Z pleblanc $
+* $Id: we_convertor.h 4450 2013-01-21 14:13:24Z rdempsey $
 *
 *******************************************************************************/
 /** @file */
@@ -35,7 +35,7 @@
 
 #include "we_obj.h"
 #include "we_config.h"
-
+#include "calpontsystemcatalog.h"
 #if defined(_MSC_VER) && defined(WRITEENGINECONVERTOR_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
@@ -97,8 +97,17 @@ public:
     * @param internalType Internal data-type used for storing
     */
     //BUG931
-    EXPORT static void convertColType(ColDataType dataType,
+    EXPORT static void convertColType(execplan::CalpontSystemCatalog::ColDataType dataType,
         ColType& internalType, bool isToken=false);
+   /**
+    * @brief Convert specified internal storage type (ColType) to 
+    *        ColDataType
+    *
+    * @param internalType Internal data-type used for storing
+    * @param dataType Interface data-type
+    */
+    EXPORT static void convertWEColType(ColType internalType, 
+        execplan::CalpontSystemCatalog::ColDataType& dataType);
 
    /**
     * @brief Convert interface column type to a internal column type.
@@ -109,7 +118,7 @@ public:
    /*
     * @brief Get the correct width for a row
     */
-    EXPORT static int getCorrectRowWidth( ColDataType dataType, int width );
+    EXPORT static int getCorrectRowWidth( execplan::CalpontSystemCatalog::ColDataType dataType, int width );
 
    /*
     * @brief Convert a Decimal string to it's equivalent integer value.
@@ -127,7 +136,7 @@ public:
 private:
 
    struct dmFilePathArgs_t;
-   static int dmOid2FPath(i32 oid, i32 partition, i32 segment,
+   static int dmOid2FPath(uint32_t oid, uint32_t partition, uint32_t segment,
        dmFilePathArgs_t* pArgs);
 
 };

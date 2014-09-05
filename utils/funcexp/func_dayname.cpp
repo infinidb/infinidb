@@ -122,7 +122,7 @@ int64_t Func_dayname::getIntVal(rowgroup::Row& row,
 			isNull = true;
 			return -1;
 	}
-	dayofweek= calc_weekday(calc_daynr(year, month, day), 1) + 1;
+	dayofweek= helpers::calc_weekday(helpers::calc_daynr(year, month, day), 1) + 1;
 	weekday = ((dayofweek-2)>=0) ? (dayofweek-2) : (dayofweek+5);
 	return weekday;
 }
@@ -134,7 +134,7 @@ string Func_dayname::getStrVal(rowgroup::Row& row,
 							CalpontSystemCatalog::ColType& op_ct)
 {
 	uint32_t weekday= getIntVal(row, parm, isNull, op_ct);
-	return weekdayFullNames[weekday];
+	return helpers::weekdayFullNames[weekday];
 }
 
 

@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: joblist.h 9227 2013-01-28 22:58:06Z xlou $
+//  $Id: joblist.h 9228 2013-01-28 23:08:10Z xlou $
 
 
 /** @file */
@@ -79,8 +79,8 @@ public:
 	virtual void querySummary(bool extendedStats);
 	virtual void graph(uint32_t sessionID);
 
-	virtual const SErrorInfo& statusPtr() const { return errInfo; }
-	virtual void statusPtr(SErrorInfo sp) { errInfo = sp; }
+	virtual const SErrorInfo& errorInfo() const { return errInfo; }
+	virtual void errorInfo(SErrorInfo sp) { errInfo = sp; }
 
 	virtual const uint32_t status() const { return errInfo->errCode; }
 	virtual void status(uint32_t ec) { errInfo->errCode = ec; }
@@ -121,8 +121,8 @@ public:
 
 	std::string toString() const;
 
-	void priority(uint p) { _priority = p; }
-	uint priority() { return _priority; }
+	void priority(uint p) { fPriority = p; }
+	uint priority() { return fPriority; }
 
 	// @bug4848, enhance and unify limit handling.
 	EXPORT virtual void abortOnLimit(JobStep* js);
@@ -153,7 +153,7 @@ protected:
 	volatile bool fAborted;
 #endif
 
-	uint _priority;   //higher #s = higher priority
+	uint fPriority;   //higher #s = higher priority
 };
 
 class TupleJobList : public JobList

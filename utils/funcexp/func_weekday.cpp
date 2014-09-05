@@ -122,7 +122,7 @@ int64_t Func_weekday::getIntVal(rowgroup::Row& row,
 			isNull = true;
 			return -1;
 	}
-	dayofweek= calc_weekday(calc_daynr(year, month, day), 1) + 1;
+	dayofweek= helpers::calc_weekday(helpers::calc_daynr(year, month, day), 1) + 1;
 	weekday = ((dayofweek-2)>=0) ? (dayofweek-2) : (dayofweek+5);
 	return weekday;
 }

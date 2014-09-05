@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: extentmap.h 1938 2013-07-11 17:06:49Z dhall $
+ * $Id: extentmap.h 1937 2013-07-10 18:35:58Z dhall $
  *
  *****************************************************************************/
 
@@ -93,7 +93,7 @@ const char CP_UPDATING=1;
 const char CP_VALID=2;
 
 struct EMCasualPartition_struct {
-	RangePartitionData_t hi_val;
+	RangePartitionData_t hi_val;	// This needs to be reinterpreted as unsigned for uint64_t column types.
 	RangePartitionData_t lo_val;
 	int32_t sequenceNum;
 	char isValid; //CP_INVALID - No min/max and no DML in progress. CP_UPDATING - Update in progress. CP_VALID- min/max is valid
@@ -120,9 +120,9 @@ typedef EMPartition_struct_V3 EMPartition_V3_t;
 
 struct EMEntry {
 	InlineLBIDRange range;
-	int fileID;
-	u_int32_t blockOffset;
-	HWM_t HWM;
+	int         fileID;
+	uint32_t    blockOffset;
+	HWM_t       HWM;
 	uint32_t	partitionNum; // starts at 0
 	uint16_t	segmentNum;   // starts at 0
 	uint16_t	dbRoot;       // starts at 1 to match Calpont.xml
@@ -368,7 +368,7 @@ public:
 					u_int16_t  dbRoot,
 					u_int32_t& partitionNum,
 					u_int16_t& segmentNum,
-					std::vector<CreateStripeColumnExtentsArgOut>& extents);
+                    std::vector<CreateStripeColumnExtentsArgOut>& extents);
 	
 	/** @brief Allocates an extent for a column file
 	 * 
@@ -383,6 +383,7 @@ public:
 	 * @param OID (in) The OID requesting the extent.
 	 * @param colWidth (in) Column width of the OID.
 	 * @param dbRoot (in) DBRoot where extent is to be added.
+     * @param colDataType (in) the column type
 	 * @param partitionNum (in/out) Partition number in file path.
 	 *        If allocating OID's first extent for this DBRoot, then
 	 *        partitionNum is input, else it is an output arg.
@@ -397,6 +398,7 @@ public:
 	EXPORT void createColumnExtent_DBroot(int OID,
 					u_int32_t  colWidth,
 					u_int16_t  dbRoot,
+                    execplan::CalpontSystemCatalog::ColDataType colDataType,
 					u_int32_t& partitionNum,
 					u_int16_t& segmentNum,
 					LBID_t&    lbid,
@@ -423,6 +425,7 @@ public:
 	 * @param segmentNum (in) Segment number in file path.
 	 *        If allocating OID's first extent for this DBRoot, then
 	 *        segmentNum is input, else it is an output arg.
+     * @param colDataType (in) the column type
 	 * @param lbid (out) The first LBID of the extent created. 
 	 * @param allocdSize (out) The total number of LBIDs allocated.
 	 * @param startBlockOffset (out) The first block of the extent created.
@@ -432,6 +435,7 @@ public:
 					u_int16_t  dbRoot,
 					u_int32_t  partitionNum,
 					u_int16_t  segmentNum,
+                    execplan::CalpontSystemCatalog::ColDataType colDataType,
 					LBID_t&    lbid,
 					int&       allocdsize,
 					u_int32_t& startBlockOffset);
@@ -457,7 +461,7 @@ public:
 					u_int16_t  dbRoot,
 					u_int32_t  partitionNum,
 					u_int16_t  segmentNum,
-					LBID_t&    lbid,
+                    LBID_t&    lbid,
 					int&       allocdsize);
 
 	/** @brief Rollback (delete) a set of extents for the specified OID.
@@ -771,8 +775,10 @@ public:
 
 	EXPORT virtual void confirmChanges();
 
-	EXPORT int markInvalid(const LBID_t lbid);
-	EXPORT int markInvalid(const std::vector<LBID_t> &lbids);
+	EXPORT int markInvalid(const LBID_t lbid, 
+                           const execplan::CalpontSystemCatalog::ColDataType colDataType);
+	EXPORT int markInvalid(const std::vector<LBID_t> &lbids, 
+                           const std::vector<execplan::CalpontSystemCatalog::ColDataType>& colDataTypes);
 
 	EXPORT int setMaxMin(const LBID_t lbidRange, const int64_t max, const int64_t min, const int32_t seqNum,
 			bool firstNode);
@@ -818,18 +824,6 @@ public:
 	EXPORT void printFL() const;
 #endif
 
-	
-	/** @brief Change segment number associated with an extent
-	 *
-	 * @param oid - OID of extent to be changed
-	 * @param partNum - partition number of extent to be changed
-	 * @param oldSegNum - old segment number of extent to be changed
-	 * @param newSegNum - new segment number to assign to the extent
-	 * @return Indicates if any matching extents were found or not
-	 */
-	EXPORT bool updateSegNum( OID_t oid,
-		uint32_t partNum, uint16_t oldSegNum, uint16_t newSegNum );
-
 private:
 	static const size_t EM_INCREMENT_ROWS = 100;
 	static const size_t EM_INITIAL_SIZE = EM_INCREMENT_ROWS * 10 * sizeof(EMEntry);
@@ -868,7 +862,8 @@ private:
 	LBID_t _createColumnExtent_DBroot(u_int32_t size, int OID,
 					u_int32_t colWidth,
 					u_int16_t  dbRoot,
-					u_int32_t& partitionNum,
+                    execplan::CalpontSystemCatalog::ColDataType colDataType,
+                    u_int32_t& partitionNum,
 					u_int16_t& segmentNum,
 					u_int32_t& startBlockOffset);
 	LBID_t _createColumnExtentExactFile(u_int32_t size, int OID,
@@ -876,12 +871,13 @@ private:
 					u_int16_t  dbRoot,
 					u_int32_t  partitionNum,
 					u_int16_t  segmentNum,
+                    execplan::CalpontSystemCatalog::ColDataType colDataType,
 					u_int32_t& startBlockOffset);
 	LBID_t _createDictStoreExtent(u_int32_t size, int OID,
 					u_int16_t  dbRoot,
 					u_int32_t  partitionNum,
 					u_int16_t  segmentNum);
-	bool isValidCPRange(int64_t max, int64_t min) const;
+	bool isValidCPRange(int64_t max, int64_t min, execplan::CalpontSystemCatalog::ColDataType type) const;
 	void deleteExtent(int emIndex);
 	LBID_t getLBIDsFromFreeList(u_int32_t size);
 	void v3Tov4(uint8_t* v3, uint8_t* v4, const uint32_t emNum);
@@ -906,7 +902,7 @@ private:
 
 	bool fDebug;
 
-	int _markInvalid(LBID_t lbid);
+	int _markInvalid(const LBID_t lbid, const execplan::CalpontSystemCatalog::ColDataType colDataType);
 
 	ExtentMapImpl* fPExtMapImpl;
 	FreeListImpl* fPFreeListImpl;

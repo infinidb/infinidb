@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: arithmeticcolumn.h 8436 2012-04-04 18:18:21Z rdempsey $
+*   $Id: arithmeticcolumn.h 9210 2013-01-21 14:10:42Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -184,6 +184,11 @@ public:
 	{ 
 		return fExpression->getIntVal(row, isNull);
 	}
+
+    virtual uint64_t getUintVal(rowgroup::Row& row, bool& isNull) 
+    { 
+        return fExpression->getUintVal(row, isNull);
+    }
 
 	virtual float getFloatVal(rowgroup::Row& row, bool& isNull)
 	{

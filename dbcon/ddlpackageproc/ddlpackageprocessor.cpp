@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//   $Id: ddlpackageprocessor.cpp 9058 2012-11-07 15:35:08Z chao $
+//   $Id: ddlpackageprocessor.cpp 9316 2013-03-19 21:36:43Z dhall $
 
 #include <fstream>
 #include <iomanip>
@@ -84,7 +84,10 @@ namespace ddlpackageprocessor
 {
 
 DDLPackageProcessor::~DDLPackageProcessor()
-{}
+{
+	//cout << "in DDLPackageProcessor destructor " << this << endl;
+	delete fWEClient;
+}
 
 void  DDLPackageProcessor::getColumnsForTable(u_int32_t sessionID, std::string schema,std::string table,
 		ColumnList& colList)
@@ -131,78 +134,111 @@ void  DDLPackageProcessor::getColumnsForTable(u_int32_t sessionID, std::string s
 
 }
 
-int DDLPackageProcessor::convertDataType(int dataType)
+execplan::CalpontSystemCatalog::ColDataType DDLPackageProcessor::convertDataType(int dataType)
 {
-	int calpontDataType;
+	execplan::CalpontSystemCatalog::ColDataType colDataType;
 
 	switch (dataType)
 	{
 		case ddlpackage::DDL_CHAR:
-			calpontDataType = CalpontSystemCatalog::CHAR;
+			colDataType = CalpontSystemCatalog::CHAR;
 			break;
 
 		case ddlpackage::DDL_VARCHAR:
-			calpontDataType = CalpontSystemCatalog::VARCHAR;
+			colDataType = CalpontSystemCatalog::VARCHAR;
 			break;
 
 		case ddlpackage::DDL_VARBINARY:
-			calpontDataType = CalpontSystemCatalog::VARBINARY;
+			colDataType = CalpontSystemCatalog::VARBINARY;
 			break;
 
 		case ddlpackage::DDL_BIT:
-			calpontDataType = CalpontSystemCatalog::BIT;
+			colDataType = CalpontSystemCatalog::BIT;
 			break;
 
 		case ddlpackage::DDL_REAL:
 		case ddlpackage::DDL_DECIMAL:
 		case ddlpackage::DDL_NUMERIC:
 		case ddlpackage::DDL_NUMBER:
-			calpontDataType = CalpontSystemCatalog::DECIMAL;
+			colDataType = CalpontSystemCatalog::DECIMAL;
 			break;
 
 		case ddlpackage::DDL_FLOAT:
-			calpontDataType = CalpontSystemCatalog::FLOAT;
+			colDataType = CalpontSystemCatalog::FLOAT;
 			break;
 
 		case ddlpackage::DDL_DOUBLE:
-			calpontDataType = CalpontSystemCatalog::DOUBLE;
+			colDataType = CalpontSystemCatalog::DOUBLE;
 			break;
 
 		case ddlpackage::DDL_INT:
 		case ddlpackage::DDL_INTEGER:
-			calpontDataType = CalpontSystemCatalog::INT;
+			colDataType = CalpontSystemCatalog::INT;
 			break;
 
 		case ddlpackage::DDL_BIGINT:
-			calpontDataType = CalpontSystemCatalog::BIGINT;
+			colDataType = CalpontSystemCatalog::BIGINT;
 			break;
 
 		case ddlpackage::DDL_MEDINT:
-			calpontDataType = CalpontSystemCatalog::MEDINT;
+			colDataType = CalpontSystemCatalog::MEDINT;
 			break;
 
 		case ddlpackage::DDL_SMALLINT:
-			calpontDataType = CalpontSystemCatalog::SMALLINT;
+			colDataType = CalpontSystemCatalog::SMALLINT;
 			break;
 
 		case ddlpackage::DDL_TINYINT:
-			calpontDataType = CalpontSystemCatalog::TINYINT;
+			colDataType = CalpontSystemCatalog::TINYINT;
 			break;
 
+        case ddlpackage::DDL_UNSIGNED_DECIMAL:
+        case ddlpackage::DDL_UNSIGNED_NUMERIC:
+            colDataType = CalpontSystemCatalog::UDECIMAL;
+            break;
+
+        case ddlpackage::DDL_UNSIGNED_FLOAT:
+            colDataType = CalpontSystemCatalog::UFLOAT;
+            break;
+
+        case ddlpackage::DDL_UNSIGNED_DOUBLE:
+            colDataType = CalpontSystemCatalog::UDOUBLE;
+            break;
+
+        case ddlpackage::DDL_UNSIGNED_INT:
+            colDataType = CalpontSystemCatalog::UINT;
+            break;
+
+        case ddlpackage::DDL_UNSIGNED_BIGINT:
+            colDataType = CalpontSystemCatalog::UBIGINT;
+            break;
+
+        case ddlpackage::DDL_UNSIGNED_MEDINT:
+            colDataType = CalpontSystemCatalog::UMEDINT;
+            break;
+
+        case ddlpackage::DDL_UNSIGNED_SMALLINT:
+            colDataType = CalpontSystemCatalog::USMALLINT;
+            break;
+
+        case ddlpackage::DDL_UNSIGNED_TINYINT:
+            colDataType = CalpontSystemCatalog::UTINYINT;
+            break;
+
 		case ddlpackage::DDL_DATE:
-			calpontDataType = CalpontSystemCatalog::DATE;
+			colDataType = CalpontSystemCatalog::DATE;
 			break;
 
 		case ddlpackage::DDL_DATETIME:
-			calpontDataType = CalpontSystemCatalog::DATETIME;
+			colDataType = CalpontSystemCatalog::DATETIME;
 			break;
 
 		case ddlpackage::DDL_CLOB:
-			calpontDataType = CalpontSystemCatalog::CLOB;
+			colDataType = CalpontSystemCatalog::CLOB;
 			break;
 
 		case ddlpackage::DDL_BLOB:
-			calpontDataType = CalpontSystemCatalog::BLOB;
+			colDataType = CalpontSystemCatalog::BLOB;
 			break;
 
 		default:
@@ -210,7 +246,7 @@ int DDLPackageProcessor::convertDataType(int dataType)
 
 	}
 
-	return calpontDataType;
+	return colDataType;
 }
 
 std::string DDLPackageProcessor::buildTableConstraintName(const int oid,
@@ -370,8 +406,9 @@ DDLPackageProcessor::getNullValueForType(const execplan::CalpontSystemCatalog::C
 			break;
 
 		case execplan::CalpontSystemCatalog::DECIMAL:
+        case execplan::CalpontSystemCatalog::UDECIMAL:
 			{
-				if (colType.colWidth <= execplan::CalpontSystemCatalog::FOUR_BYTE)
+				if (colType.colWidth <= 4)
 				{
 					short smallintvalue = joblist::SMALLINTNULL;
 					value = smallintvalue;
@@ -394,6 +431,7 @@ DDLPackageProcessor::getNullValueForType(const execplan::CalpontSystemCatalog::C
 			}
 			break;
 		case execplan::CalpontSystemCatalog::FLOAT:
+        case execplan::CalpontSystemCatalog::UFLOAT:
 			{
 				uint32_t jlfloatnull = joblist::FLOATNULL;
 				float* fp = reinterpret_cast<float*>(&jlfloatnull);
@@ -402,6 +440,7 @@ DDLPackageProcessor::getNullValueForType(const execplan::CalpontSystemCatalog::C
 			break;
 
 		case execplan::CalpontSystemCatalog::DOUBLE:
+        case execplan::CalpontSystemCatalog::UDOUBLE:
 			{
 				uint64_t jldoublenull = joblist::DOUBLENULL;
 				double* dp = reinterpret_cast<double*>(&jldoublenull);
@@ -452,7 +491,8 @@ DDLPackageProcessor::getNullValueForType(const execplan::CalpontSystemCatalog::C
 
 			}
 			break;
-		case execplan::CalpontSystemCatalog::VARCHAR:
+
+        case execplan::CalpontSystemCatalog::VARCHAR:
 			{
 				std::string charnull;
 				if (colType.colWidth == execplan::CalpontSystemCatalog::ONE_BYTE)
@@ -475,7 +515,8 @@ DDLPackageProcessor::getNullValueForType(const execplan::CalpontSystemCatalog::C
 
 			}
 			break;
-		case execplan::CalpontSystemCatalog::VARBINARY:
+
+        case execplan::CalpontSystemCatalog::VARBINARY:
 			{
 				std::string charnull;
 				if (colType.colWidth == execplan::CalpontSystemCatalog::ONE_BYTE)
@@ -499,6 +540,35 @@ DDLPackageProcessor::getNullValueForType(const execplan::CalpontSystemCatalog::C
 			}
 			break;
 
+        case execplan::CalpontSystemCatalog::UTINYINT:
+            {
+                uint8_t utinyintvalue = joblist::UTINYINTNULL;
+                value = utinyintvalue;
+
+            }
+            break;
+
+        case execplan::CalpontSystemCatalog::USMALLINT:
+            {
+                uint16_t usmallintvalue = joblist::USMALLINTNULL;
+                value = usmallintvalue;
+            }
+            break;
+
+        case execplan::CalpontSystemCatalog::UMEDINT:
+        case execplan::CalpontSystemCatalog::UINT:
+            {
+                uint32_t uintvalue = joblist::UINTNULL;
+                value = uintvalue;
+            }
+            break;
+
+        case execplan::CalpontSystemCatalog::UBIGINT:
+            {
+                uint64_t ubigint = joblist::UBIGINTNULL;
+                value = ubigint;
+            }
+            break;
 
 		default:
 			throw std::runtime_error("getNullValueForType: unkown column data type");
@@ -765,7 +835,7 @@ void DDLPackageProcessor::writeSysTableMetaData(u_int32_t sessionID, execplan::C
 			colStruct.colWidth = column.colType.colWidth > 8 ? 8 : column.colType.colWidth;
 			colStruct.tokenFlag = false;
 			colStruct.tokenFlag = column.colType.colWidth > 8 ? true : false;
-			colStruct.colDataType = (WriteEngine::ColDataType)column.colType.colDataType;
+			colStruct.colDataType = column.colType.colDataType;
 			if (colStruct.tokenFlag)
 			{
 				dctnryStruct.dctnryOid = column.colType.ddn.dictOID;
@@ -887,9 +957,10 @@ void  DDLPackageProcessor::writeSysColumnMetaData(u_int32_t sessionID, execplan:
 			DictOID dictOID;
 
 
-			   int dataType;
+			CalpontSystemCatalog::ColDataType dataType;
 			dataType = convertDataType(colDefPtr->fType->fType);
-			if (dataType == CalpontSystemCatalog::DECIMAL)
+			if (dataType == CalpontSystemCatalog::DECIMAL ||
+                dataType == CalpontSystemCatalog::UDECIMAL)
 			{
 				if	 (colDefPtr->fType->fPrecision < colDefPtr->fType->fScale)
 				{
@@ -908,54 +979,11 @@ void  DDLPackageProcessor::writeSysColumnMetaData(u_int32_t sessionID, execplan:
 					return;*/
 				}
 			}
-			if (dataType == CalpontSystemCatalog::DECIMAL)
+			if (dataType == CalpontSystemCatalog::DECIMAL ||
+                dataType == CalpontSystemCatalog::UDECIMAL) 
 			{
-				//@Bug 2089 decimal precision default to 10 if 0 is used.
-				if (colDefPtr->fType->fPrecision <= 0)
-					colDefPtr->fType->fPrecision = 10;
-
-				if (colDefPtr->fType->fPrecision == -1 || colDefPtr->fType->fPrecision == 0)
-				{
-					//dataType = CalpontSystemCatalog::BIGINT;
-					colDefPtr->fType->fType = DDL_BIGINT;
-					colDefPtr->fType->fLength = 8;
-					colDefPtr->fType->fScale = 0;
-				}
-				else if ((colDefPtr->fType->fPrecision > 0) && (colDefPtr->fType->fPrecision < 3))
-				{
-					//dataType = CalpontSystemCatalog::TINYINT;
-					colDefPtr->fType->fType = DDL_TINYINT;
-					colDefPtr->fType->fLength = 1;
-				}
-
-				else if (colDefPtr->fType->fPrecision < 5 && (colDefPtr->fType->fPrecision > 2))
-				{
-					//dataType = CalpontSystemCatalog::SMALLINT;
-					colDefPtr->fType->fType = DDL_SMALLINT;
-					colDefPtr->fType->fLength = 2;
-				}
-				else if (colDefPtr->fType->fPrecision > 4 && colDefPtr->fType->fPrecision < 10)
-				{
-					//dataType = CalpontSystemCatalog::INT;
-					colDefPtr->fType->fType = DDL_INT;
-					colDefPtr->fType->fLength = 4;
-				}
-				else if (colDefPtr->fType->fPrecision > 9 && colDefPtr->fType->fPrecision < 19)
-				{
-					//dataType = CalpontSystemCatalog::BIGINT;
-					colDefPtr->fType->fType = DDL_BIGINT;
-					colDefPtr->fType->fLength = 8;
-				}
-				else
-				{
-					/*@Bug 1959 InfiniDB does not support DECIMAL and NUMERIC column that is
-					greater than 8 bytes. */
-					ostringstream os;
-					os << "DECIMAL and NUMERIC column precision greater than 18 is not supported by InfiniDB.";
-					throw std::runtime_error(os.str());
-				}
-
-			}
+                colDefPtr->convertDecimal();
+            }
 
 			bool hasDict = false;
 			if ( (dataType == CalpontSystemCatalog::CHAR && colDefPtr->fType->fLength > 8) ||
@@ -1146,7 +1174,7 @@ void  DDLPackageProcessor::writeSysColumnMetaData(u_int32_t sessionID, execplan:
 				colStruct.colWidth = column.colType.colWidth > 8 ? 8 : column.colType.colWidth;
 				colStruct.tokenFlag = false;
 				colStruct.tokenFlag = column.colType.colWidth > 8 ? true : false;
-				colStruct.colDataType = static_cast<WriteEngine::ColDataType>(column.colType.colDataType);
+				colStruct.colDataType = column.colType.colDataType;
 
 				if (colStruct.tokenFlag)
 				{
@@ -1419,7 +1447,7 @@ void DDLPackageProcessor::removeRowsFromSysCatalog(u_int32_t sessionID, execplan
 		column = *column_iterator;
 		colStruct.dataOid = column.oid;
 		colStruct.colWidth = column.colType.colWidth > 8 ? 8 : column.colType.colWidth;
-		colStruct.colDataType = static_cast<WriteEngine::ColDataType>(column.colType.colDataType);
+		colStruct.colDataType = column.colType.colDataType;
 
 		colStructs.push_back(colStruct);
 
@@ -1517,8 +1545,7 @@ void DDLPackageProcessor::createColumnFiles(execplan::CalpontSystemCatalog::SCN 
 		{
 			colDefPtr = *iter;
 
-			WriteEngine::ColDataType dataType = static_cast<WriteEngine::ColDataType>(
-			   convertDataType(colDefPtr->fType->fType));
+			CalpontSystemCatalog::ColDataType dataType = convertDataType(colDefPtr->fType->fType);
 
 			error = fWriteEngine.createColumn(txnID, fStartingColOID + colpos, dataType,
 			   colDefPtr->fType->fLength, useDBRoot, partitionNum,
@@ -1876,7 +1903,7 @@ void DDLPackageProcessor::removeExtents(std::vector<execplan::CalpontSystemCatal
 {
 	SUMMARY_INFO("DDLPackageProcessor::removeExtents");
 	int err = 0;
-	err = fDbrm.deleteOIDs(oidList);
+	err = fDbrm->deleteOIDs(oidList);
 	if (err)
 	{
 		string errMsg;
@@ -2002,8 +2029,10 @@ void DDLPackageProcessor::fetchLogFile(TableLogInfo & tableLogInfos, u_int64_t u
 	SUMMARY_INFO("DDLPackageProcessor::fetchLogFile");
 	OamCache * oamcache = OamCache::makeOamCache();
 	std::string OAMParentModuleName = oamcache->getOAMParentModuleName();
-	OAMParentModuleName = OAMParentModuleName.substr(2, OAMParentModuleName.length());
-	int parentId = atoi(OAMParentModuleName.c_str());
+	//Use a sensible default so that substr doesn't throw...
+	if (OAMParentModuleName.empty())
+		OAMParentModuleName = "pm1";
+	int parentId = atoi(OAMParentModuleName.substr(2, OAMParentModuleName.length()).c_str());
 	ByteStream bytestream;
 	u_int8_t rc = 0;
 	u_int32_t tmp32, tableOid, numOids, numPartitions;
@@ -2301,7 +2330,7 @@ void DDLPackageProcessor::updateSyscolumns(execplan::CalpontSystemCatalog::SCN t
 	colStruct.dataOid = OID_SYSCOLUMN_COLUMNPOS;
 	colStruct.colWidth = 4;
 	colStruct.tokenFlag = false;
-	colStruct.colDataType = WriteEngine::INT;
+	colStruct.colDataType = CalpontSystemCatalog::INT;
 	colStructs.push_back(colStruct);
 	int error;
 	std::string err;
@@ -2531,48 +2560,10 @@ int DDLPackageProcessor::rollBackTransaction(u_int64_t uniqueId, BRM::TxnID txnI
 
 int DDLPackageProcessor::commitTransaction(u_int64_t uniqueId, BRM::TxnID txnID)
 {
-	int rc = fDbrm.vbCommit(txnID.id);
+	int rc = fDbrm->vbCommit(txnID.id);
 	return rc;	
 }
 
-void DDLPackageProcessor::convertDecimal (ColumnDef* colDefPtr)
-{		
-	//@Bug 2089 decimal precision default to 10 if 0 is used.
-	if (colDefPtr->fType->fPrecision <= 0)
-		colDefPtr->fType->fPrecision = 10;
-
-	if (colDefPtr->fType->fPrecision == -1 || colDefPtr->fType->fPrecision == 0)
-	{
-		colDefPtr->fType->fType = DDL_BIGINT;
-		colDefPtr->fType->fLength = 8;
-		colDefPtr->fType->fScale = 0;
-	}
-	else if ((colDefPtr->fType->fPrecision > 0) && (colDefPtr->fType->fPrecision < 3))
-	{
-					//dataType = CalpontSystemCatalog::TINYINT;
-		colDefPtr->fType->fType = DDL_TINYINT;
-		colDefPtr->fType->fLength = 1;
-	}
-
-	else if (colDefPtr->fType->fPrecision < 5 && (colDefPtr->fType->fPrecision > 2))
-	{
-					//dataType = CalpontSystemCatalog::SMALLINT;
-		colDefPtr->fType->fType = DDL_SMALLINT;
-		colDefPtr->fType->fLength = 2;
-	}
-	else if (colDefPtr->fType->fPrecision > 4 && colDefPtr->fType->fPrecision < 10)
-	{
-					//dataType = CalpontSystemCatalog::INT;
-		colDefPtr->fType->fType = DDL_INT;
-		colDefPtr->fType->fLength = 4;
-	}
-	else if (colDefPtr->fType->fPrecision > 9 && colDefPtr->fType->fPrecision < 19)
-	{
-					//dataType = CalpontSystemCatalog::BIGINT;
-		colDefPtr->fType->fType = DDL_BIGINT;
-		colDefPtr->fType->fLength = 8;
-	}				
-}
 } // namespace
 // vim:ts=4 sw=4:
 

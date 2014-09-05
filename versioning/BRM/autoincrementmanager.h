@@ -25,6 +25,7 @@
 #include <unistd.h>
 #include <boost/thread.hpp>
 #include <map>
+#include "calpontsystemcatalog.h"
 
 #ifndef AUTOINCREMENTMANAGER_H_
 #define AUTOINCREMENTMANAGER_H_
@@ -42,7 +43,8 @@ public:
 	EXPORT AutoincrementManager();
 	EXPORT virtual ~AutoincrementManager();
 
-	EXPORT void startSequence(uint32_t OID, uint64_t firstNum, uint colWidth);
+	EXPORT void startSequence(uint32_t OID, uint64_t firstNum, uint colWidth,
+                              execplan::CalpontSystemCatalog::ColDataType colDataType);
 	EXPORT bool getAIRange(uint32_t OID, uint64_t count, uint64_t *firstNum);
 	EXPORT void resetSequence(uint32_t OID, uint64_t value);
 	EXPORT void getLock(uint32_t OID);

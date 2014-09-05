@@ -62,6 +62,11 @@ string Func_sec_to_time::getStrVal(rowgroup::Row& row,
 		case execplan::CalpontSystemCatalog::MEDINT:
 		case execplan::CalpontSystemCatalog::TINYINT:
 		case execplan::CalpontSystemCatalog::SMALLINT:
+        case execplan::CalpontSystemCatalog::UBIGINT:
+        case execplan::CalpontSystemCatalog::UINT:
+        case execplan::CalpontSystemCatalog::UMEDINT:
+        case execplan::CalpontSystemCatalog::UTINYINT:
+        case execplan::CalpontSystemCatalog::USMALLINT:
 		{
 			val = parm[0]->data()->getIntVal(row, isNull);
 		}

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: insertpackageprocessor.h 8436 2012-04-04 18:18:21Z rdempsey $
+*   $Id: insertpackageprocessor.h 9302 2013-03-07 16:06:59Z chao $
 *
 *
 ***********************************************************************/
@@ -48,6 +48,8 @@ class InsertPackageProcessor : public DMLPackageProcessor
 {
 
 public:
+	InsertPackageProcessor(BRM::DBRM* aDbrm) : DMLPackageProcessor(aDbrm) {
+	}
     /** @brief process an InsertDMLPackage
       *
       * @param cpackage the InsertDMLPackage to process
@@ -57,22 +59,6 @@ public:
 protected:
 
 private:
-    /** @brief insert one or more rows
-      *
-      * @param txnID the transaction ID
-      * @param schema the schema name
-      * @param table  the table name
-      * @param rows the list of rows
-      * @param ridList upon return contains the list of inserted Row id(s)
-      * @param colValuesList upon return contains the updated values
-      * @param result the result of the operation
-      */
-    bool insertRows( u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, const std::string& schema, const std::string& table,
-                     const dmlpackage::RowList& rows, DMLResult& result, long long & nextVal, long long & originalNextVal, execplan::CalpontSystemCatalog::ColType & autoColType,
-                     bool insertSelect = false );
-
-
-
     /**	@brief add any columns that were not supplied in the insert statement
       *
       * @param schema the schema name

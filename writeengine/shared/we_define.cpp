@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_define.cpp 4681 2013-06-18 17:31:02Z dcathey $
+* $Id: we_define.cpp 4684 2013-06-18 19:47:46Z dcathey $
 *
 *******************************************************************************/
 /** @file" **/
@@ -153,6 +153,8 @@ WErrorCodes::WErrorCodes() : fErrorCodes()
     fErrorCodes[ERR_BULK_DBROOT_CHANGE] = " Local PM DBRoot settings changed during bulk load.";
     fErrorCodes[ERR_BULK_ROLLBACK_MISS_ROOT] = " Mode3 automatic rollback not performed. DBRoot missing.";
     fErrorCodes[ERR_BULK_ROLLBACK_SEG_LIST] = " Error building segment file list in a directory.";
+    fErrorCodes[ERR_BULK_BINARY_PARTIAL_REC] = " Binary import did not end on fixed length record boundary.";
+    fErrorCodes[ERR_BULK_BINARY_IGNORE_FLD] = " <IgnoreField> tag not supported for binary imports.";
 
     // BRM error
     fErrorCodes[ERR_BRM_LOOKUP_LBID] = " a BRM Lookup LBID error.";

@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: we_dctnry.h 4195 2012-09-19 18:12:27Z dcathey $
+//  $Id: we_dctnry.h 4489 2013-01-30 18:47:53Z dcathey $
 
 /** @we_dctnry.h
  *  Defines the Dctnry class
@@ -122,7 +122,7 @@ public:
     const std::string& getFileName() const { return m_segFileName; }
     HWM                getHWM()           const { return m_hwm; }
     EXPORT bool        getTokenFromArray(Signature& sig);
-    EXPORT i64         getCurLbid(){return m_curLbid;}
+    EXPORT uint64_t     getCurLbid(){return m_curLbid;}
 
     /**
      * @brief Insert a signature value to a file block and return token/pointer.
@@ -193,56 +193,8 @@ public:
      */
     void         setDefault(const std::string& defVal) { m_defVal = defVal; }
 
-#if 0
-    //--------------------------------------------------------------------------
-    // Obsolete delete-related functions.  Not currently used.  Will need to be
-    // reactiviated and retested if ever wish to revisit their use.
-    //--------------------------------------------------------------------------
-    /**
-     * @brief Delete a token/pointer from a file block.
-     *
-     * @param dFile    - dictionary file from which the token is to be deleted
-     * @param token    - token to be deleted
-     */
-    EXPORT int   deleteDctnryValue( FILE* dFile, Token& token);
-
-    /**
-     * @brief Delete a token/pointer from a file block.
-     *
-     * @param token    - token to be deleted
-     * @param sigSize  - (output) the deleted signature Size
-     * @param sigValue - (output) the deleted signature value
-     */
-    EXPORT int   deleteDctnryValue( Token& token,  int& sigSize,
-                                  unsigned char** sigValue);
-
-    //
-    // Support functions for deleting values.
-    //
-protected:
-    int   deleteMoveValues(unsigned char* blockBuf, i16& curOffset,
-                           int& size, i16& lastOffset);
-    int   deleteRecalHdr(unsigned char* blockBuf,int& loc,int& size);
-    int   deleteValue(unsigned char* blockBuf, i16& loc, int& size);
-public:
-#endif
-
-    //--------------------------------------------------------------------------
-    // Functions that should only be enabled and used by testdrivers
-    //--------------------------------------------------------------------------
-#if 0
-    int   findTokenValue ( FILE* dFile, Token& token,
-                           unsigned char* sigValue, int& sigSize );
-    FILE* getDctnryFile(){ return m_dFile;    }
-    int   getFree()      { return m_freeSpace;}
-    i64   getNextPtr()   { return m_nextPtr;  }
-    int   getNumBlocks() { return m_numBlocks;}
-    void  getBlockHdr    ( FILE* dFile, int fbo, int & op_count,
-                          Offset* offsetArray);//read blk specified by fbo
-    int   initDctnryHdr  ( FILE* dFile);
-    int   openDctnry()   { return openDctnry(m_dctnryOID,
-                           m_dbRoot, m_partition, m_segment); }
-#endif
+    void         setImportDataMode( ImportDataMode importMode )
+                 { m_importDataMode = importMode; }
 
 //------------------------------------------------------------------------------
 // Protected members
@@ -310,7 +262,7 @@ protected:
     unsigned char m_dctnryHeader[DCTNRY_HEADER_SIZE];  // first 14 bytes of hdr
     unsigned char m_dctnryHeader2[DCTNRY_HEADER_SIZE]; // first 14 bytes of hdr
 
-    i64          m_nextPtr;          // next pointer
+    uint64_t     m_nextPtr;          // next pointer
 
     //relate to different Dictionary file
     FID          m_dctnryOID;        // OID for the dctnry file
@@ -324,7 +276,7 @@ protected:
     HWM          m_hwm;
     //Need to be initialized for different Dictionary file
     int          m_newStartOffset;   // start offset
-    i16          m_freeSpace;        // free space (bytes) within current block
+    uint16_t     m_freeSpace;        // free space (bytes) within current block
     int          m_curOp;            // current ordinal pointer within m_curFbo
     int          m_curFbo;           // current "raw" (uncompressed) FBO
     BRM::LBID_t  m_curLbid;          // LBID associated with m_curFbo
@@ -332,6 +284,7 @@ protected:
     Log*         m_logger;           // logger, mainly for bulk load
     int          m_colWidth;         // width of this dictionary column
     std::string  m_defVal;           // optional default string value
+    ImportDataMode m_importDataMode; // Import data in text or binary mode
 
 };//end of class
 

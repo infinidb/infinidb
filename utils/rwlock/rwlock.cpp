@@ -282,7 +282,6 @@ again:
 			":" << __LINE__ << ": caught an exception" << endl;
 		throw runtime_error("RWLock::timed_down(): caught an exception");
 	}
-
 	return gotTheLock;
 }
 
@@ -337,13 +336,6 @@ void RWLock::read_lock(bool block)
 void RWLock::read_unlock()
 {
 	down(MUTEX, true);
-#ifdef RWLOCK_DEBUG
-	if (fPImpl->fState->reading <= 0)
-	{
-		cerr << __PRETTY_FUNCTION__ << ":" << __LINE__ << ": had to reset reading (it was " << fPImpl->fState->reading << ")" << endl;
-		fPImpl->fState->reading = 1;
-	}
-#endif
 	CHECKSAFETY();
 	CHECKLIVENESS();
 
@@ -420,7 +412,6 @@ bool RWLock::timed_write_lock(const struct timespec &ts, struct LockState *state
 		RETURN_STATE(true, state)
 		return false;
 	}
-
 	CHECKSAFETY();
 	CHECKLIVENESS();
 	if (fPImpl->fState->writing > 0 || fPImpl->fState->reading > 0) {
@@ -524,13 +515,6 @@ void RWLock::upgrade_to_write()
 {
 	
 	down(MUTEX, true);
-#ifdef RWLOCK_DEBUG
-	if (fPImpl->fState->reading <= 0)
-	{
-		cerr << __PRETTY_FUNCTION__ << ":" << __LINE__ << ": had to reset reading (it was " << fPImpl->fState->reading << ")" << endl;
-		fPImpl->fState->reading = 1;
-	}
-#endif
 	CHECKSAFETY();
 	CHECKLIVENESS();
 
@@ -616,6 +600,23 @@ void RWLock::reset()
 		}
 	}
 	fPImpl->fState->sems[MUTEX].post();
+}
+
+LockState RWLock::getLockState()
+{
+	bool gotIt;
+	LockState ret;
+
+	gotIt = fPImpl->fState->sems[MUTEX].try_wait();
+	ret.reading = fPImpl->fState->reading;
+	ret.writing = fPImpl->fState->writing;
+	ret.readerswaiting = fPImpl->fState->readerswaiting;
+	ret.writerswaiting = fPImpl->fState->writerswaiting;
+	ret.mutexLocked = !gotIt;
+	if (gotIt)
+		fPImpl->fState->sems[MUTEX].post();
+
+	return ret;
 }
 
 } //namespace rwlock

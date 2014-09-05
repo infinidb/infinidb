@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: batchprimitiveprocessor.cpp 2012 2012-12-10 21:08:03Z xlou $
+// $Id: batchprimitiveprocessor.cpp 2037 2013-01-24 18:41:11Z pleblanc $
 // C++ Implementation: batchprimitiveprocessor
 //
 // Description: 
@@ -75,7 +75,6 @@ extern uint connectionsPerUM;
 
 BatchPrimitiveProcessor::BatchPrimitiveProcessor() :
 	ot(BPS_ELEMENT_TYPE),
-	versionNum(0),
 	txnID(0),
 	sessionID(0),
 	stepID(0),
@@ -115,7 +114,6 @@ BatchPrimitiveProcessor::BatchPrimitiveProcessor() :
 BatchPrimitiveProcessor::BatchPrimitiveProcessor(ByteStream &b, double prefetch,
 	boost::shared_ptr<BPPSendThread> bppst) :
 	ot(BPS_ELEMENT_TYPE),
-	versionNum(0),
 	txnID(0),
 	sessionID(0),
 	stepID(0),
@@ -189,12 +187,11 @@ void BatchPrimitiveProcessor::initBPP(ByteStream &bs)
 	bs.advance(sizeof(ISMPacketHeader));  // skip the header
 	bs >> tmp8;
 	ot = static_cast<BPSOutputType>(tmp8);
-	bs >> versionNum;
 	bs >> txnID;
 	bs >> sessionID;
 	bs >> stepID;
 	bs >> uniqueID;
-//  	cerr << "init: sessionID=" << sessionID << " stepID=" << stepID << endl;
+	bs >> versionInfo;
 
 	bs >> tmp8;
 	needStrValues = tmp8 & NEED_STR_VALUES;
@@ -406,13 +403,14 @@ void BatchPrimitiveProcessor::resetBPP(ByteStream &bs, const SP_UM_MUTEX& w,
 		bs >> ridCount;
 
 		if (gotAbsRids) {
+			assert(0);
 			memcpy(absRids.get(), bs.buf(), ridCount << 3);
 			bs.advance(ridCount << 3);
 			/* TODO: this loop isn't always necessary or sensible */
 			ridMap = 0;
 			baseRid = absRids[0] & 0xffffffffffffe000ULL;
 			for (uint i = 0; i < ridCount; i++) {
-				relRids[i] = absRids[i] & 0x1fff;
+				relRids[i] = absRids[i] - baseRid;
 				ridMap |= 1 << (relRids[i] >> 10);
 			}
 		}
@@ -442,8 +440,9 @@ void BatchPrimitiveProcessor::resetBPP(ByteStream &bs, const SP_UM_MUTEX& w,
 	memset(relLBID.get(), 0, sizeof(uint64_t) * (projectCount + 1));
 	memset(asyncLoaded.get(), 0, sizeof(bool) * (projectCount + 1));
 	
-	if (hasRowGroup)
-		initFromRowGroup();
+// not used...
+//	if (hasRowGroup)
+//		initFromRowGroup();
 
 	buildVSSCache(count);
 #ifdef __FreeBSD__
@@ -807,10 +806,13 @@ void BatchPrimitiveProcessor::executeTupleJoin()
 			}
 			if (LIKELY(!typelessJoin[j])) {
 				bool isNull;
-				largeKey = oldRow.getIntField(largeSideKeyColumns[j]);
-				found = (tJoiners[j]->find(largeKey) != tJoiners[j]->end());
-				isNull = oldRow.isNullValue(largeSideKeyColumns[j]);
-
+                uint colIndex = largeSideKeyColumns[j];
+                if (oldRow.isUnsigned(colIndex)) 
+				    largeKey = oldRow.getUintField(colIndex);
+                else 
+                    largeKey = oldRow.getIntField(colIndex);
+                found = (tJoiners[j]->find(largeKey) != tJoiners[j]->end());
+				isNull = oldRow.isNullValue(colIndex);
 				/* These conditions define when the row is NOT in the result set:
 				 *    - if the key is not in the small side, and the join isn't a large-outer or anti join
 				 *    - if the key is NULL, and the join isn't anti- or large-outer
@@ -1014,10 +1016,6 @@ void BatchPrimitiveProcessor::executeTupleJoin()
 #endif
 			}
 
-
-
-
-
 			/* Finally, copy the row into the output */
 			if (j == joinerCount) {
 				if (i != newRowCount) {
@@ -1145,7 +1143,7 @@ stopwatch->start("BatchPrimitiveProcessor::execute first part");
 			relLBID[p] += col->getWidth();
 			if (!asyncLoaded[p] && col->willPrefetch()) {
 				loadBlockAsync(col->getLBID(),
-					versionNum,
+					versionInfo,
 					txnID,
 					col->getCompType(),
 					&cachedIO,
@@ -1308,7 +1306,7 @@ stopwatch->start("BatchPrimitiveProcessor::execute fourth part");
 			outputRG.initRow(&r);
 			outputRG.getRow(0, &r);
 			for (j = 0; j < ridCount; ++j) {
-				r.setRid(relRids[j] + baseRid);
+				r.setRid(relRids[j]);
 				r.nextRow();
 			}
 		}
@@ -1408,7 +1406,7 @@ stopwatch->start("BatchPrimitiveProcessor::execute fourth part");
 					for (j = 0; j < joinedRG.getRowCount(); j++, fe2In.nextRow())
 						if (fe2->evaluate(&fe2In)) {
 							applyMapping(fe2Mapping, fe2In, &fe2Out);
-							fe2Out.setRid(fe2In.getRid());
+							fe2Out.setRid(fe2In.getRelRid());
 							fe2Output.incRowCount();
 							fe2Out.nextRow();
 						}
@@ -1458,7 +1456,7 @@ stopwatch->start("BatchPrimitiveProcessor::execute fourth part");
 			for (j = 0; j < outputRG.getRowCount(); j++, fe2In.nextRow()) {
 				if (fe2->evaluate(&fe2In)) {
 					applyMapping(fe2Mapping, fe2In, &fe2Out);
-					fe2Out.setRid ( fe2In.getRid() );
+					fe2Out.setRid ( fe2In.getRelRid() );
 					fe2Output.incRowCount();
 					fe2Out.nextRow();
 				}
@@ -1791,6 +1789,7 @@ throw logic_error(oss.str());
 // 		" touchedBlocks=" << touchedBlocks << endl;
 }
 
+#if 0
 void BatchPrimitiveProcessor::initFromRowGroup()
 {
 	Row r;
@@ -1815,6 +1814,7 @@ void BatchPrimitiveProcessor::initFromRowGroup()
 			values[i] = r.getIntField(valueColumn);
 	}
 }
+#endif
 
 int BatchPrimitiveProcessor::operator()()
 {
@@ -1890,7 +1890,24 @@ int BatchPrimitiveProcessor::operator()()
 		sockIndex = (sockIndex + 1) % connectionsPerUM;
 
 		nextLBID();
-		baseRid += BLOCK_SIZE;
+
+		/* Base RIDs are now a combination of partition#, segment#, extent#, and block#. */
+		uint32_t partNum;
+		uint16_t segNum;
+		uint8_t extentNum;
+		uint16_t blockNum;
+		rowgroup::getLocationFromRid(baseRid, &partNum, &segNum, &extentNum, &blockNum);
+		/*
+		cout << "baseRid=" << baseRid << " partNum=" << partNum << " segNum=" << segNum <<
+				" extentNum=" << (int) extentNum
+				<< " blockNum=" << blockNum << endl;
+		*/
+		blockNum++;
+		baseRid = rowgroup::convertToRid(partNum, segNum, extentNum, blockNum);
+		/*
+		cout << "-- baseRid=" << baseRid << " partNum=" << partNum << " extentNum=" << (int) extentNum
+				<< " blockNum=" << blockNum << endl;
+		*/
 	}
 
 	vssCache.clear();
@@ -1958,7 +1975,7 @@ SBPP BatchPrimitiveProcessor::duplicate()
 
 	bpp.reset(new BatchPrimitiveProcessor());
 	bpp->ot = ot;
-	bpp->versionNum = versionNum;
+	bpp->versionInfo = versionInfo;
 	bpp->txnID = txnID;
 	bpp->sessionID = sessionID;
 	bpp->stepID = stepID;
@@ -2065,13 +2082,14 @@ SBPP BatchPrimitiveProcessor::duplicate()
 	return bpp;
 }
 
+#if 0
 bool BatchPrimitiveProcessor::operator==(const BatchPrimitiveProcessor &bpp) const
 {
 	uint i;
 
 	if (ot != bpp.ot)
 		return false;
-	if (versionNum != bpp.versionNum)
+	if (versionInfo != bpp.versionInfo)
 		return false;
 	if (txnID != bpp.txnID)
 		return false;
@@ -2113,6 +2131,8 @@ bool BatchPrimitiveProcessor::operator==(const BatchPrimitiveProcessor &bpp) con
 			return false;
 	return true;
 }
+#endif
+
 
 void BatchPrimitiveProcessor::asyncLoadProjectColumns()
 {
@@ -2130,7 +2150,7 @@ void BatchPrimitiveProcessor::asyncLoadProjectColumns()
 			relLBID[i] += col->getWidth();
 			if (!asyncLoaded[i] && col->willPrefetch()) {
 				loadBlockAsync(col->getLBID(), 
-							versionNum, 
+							versionInfo, 
 							txnID, 
 							col->getCompType(),
 							&cachedIO,
@@ -2164,7 +2184,7 @@ bool BatchPrimitiveProcessor::generateJoinedRowGroup(rowgroup::Row &baseRow, con
 		if (depth == 0) {
 			outputRG.getRow(gjrgRowNumber, &largeRow);
 			applyMapping(gjrgMappings[joinerCount], largeRow, &baseRow);
-			baseRow.setRid(largeRow.getRid());
+			baseRow.setRid(largeRow.getRelRid());
 		}
 
 // 		cout << "rowNum = " << gjrgRowNumber << " at depth " << depth << " size is " << size << endl;
@@ -2235,7 +2255,14 @@ inline void BatchPrimitiveProcessor::getJoinResults(const Row &r, uint jIndex, v
 			else
 				return;
 		}
-		uint64_t largeKey = r.getIntField(largeSideKeyColumns[jIndex]);
+        uint64_t largeKey;
+        uint colIndex = largeSideKeyColumns[jIndex];
+        if (r.isUnsigned(colIndex)) {
+		    largeKey = r.getUintField(colIndex);
+        }
+        else {
+		    largeKey = r.getIntField(colIndex);
+        }
 		pair<TJoiner::iterator, TJoiner::iterator> range = tJoiners[jIndex]->equal_range(largeKey);
 		for (; range.first != range.second; ++range.first)
 			v.push_back(range.first->second);
@@ -2283,7 +2310,7 @@ void BatchPrimitiveProcessor::buildVSSCache(uint loopCount)
 	for (i = 0; i < projectCount; i++)
 		projectSteps[i]->getLBIDList(loopCount, &lbidList);
 	
-	rc = brm->bulkVSSLookup(lbidList, (int) versionNum, (int) txnID, &vssData);
+	rc = brm->bulkVSSLookup(lbidList, versionInfo, (int) txnID, &vssData);
 	if (rc == 0)
 		for (i = 0; i < vssData.size(); i++)
 			vssCache.insert(make_pair(lbidList[i], vssData[i]));

@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: tupleannexstep.cpp 9662 2013-07-01 20:34:26Z pleblanc $
+//  $Id: tupleannexstep.cpp 9663 2013-07-01 20:46:50Z pleblanc $
 
 
 //#define NDEBUG
@@ -66,21 +66,17 @@ typedef tr1::unordered_map<uint8_t*, uint8_t*, TupleHasher, TupleComparator,
 namespace joblist
 {
 
-TupleAnnexStep::TupleAnnexStep(
-	uint32_t sessionId,
-	uint32_t txnId,
-	uint32_t verId,
-	uint32_t statementId,
-	const JobInfo& jobInfo) :
-		fSessionId(sessionId),
-		fTxnId(txnId),
-		fVerId(verId),
-		fStatementId(statementId),
+TupleAnnexStep::TupleAnnexStep(const JobInfo& jobInfo) :
+		JobStep(jobInfo),
 		fInputDL(NULL),
 		fOutputDL(NULL),
 		fInputIterator(0),
 		fOutputIterator(0),
+		fRowsProcessed(0),
 		fRowsReturned(0),
+		fLimitStart(0),
+		fLimitCount(-1),
+		fLimitHit(false),
 		fEndOfResult(false),
 		fDelivery(false),
 		fDistinct(false),
@@ -200,7 +196,7 @@ uint TupleAnnexStep::nextBand(messageqcpp::ByteStream &bs)
 		if (traceOn() && dlTimes.FirstReadTime().tv_sec ==0)
 			dlTimes.setFirstReadTime();
 
-		if (more && (0 == fOutputJobStepAssociation.status()) && !die)
+		if (more && !cancelled())
 		{
 			fRowGroupDeliver.setData(rgDataOut.get());
 			bs.load(fRowGroupDeliver.getData(), fRowGroupDeliver.getDataSize());
@@ -215,17 +211,14 @@ uint TupleAnnexStep::nextBand(messageqcpp::ByteStream &bs)
 	}
 	catch(const std::exception& ex)
 	{
-		catchHandler(ex.what(), fSessionId);
-		if (fOutputJobStepAssociation.status() == 0)
-			fOutputJobStepAssociation.status(ERR_IN_DELIVERY);
+		catchHandler(ex.what(), ERR_IN_DELIVERY, fErrorInfo, fSessionId);
 		while (more) more = fOutputDL->next(fOutputIterator, &rgDataOut);
 		fEndOfResult = true;
 	}
 	catch(...)
 	{
-		catchHandler("TupleAnnexStep next band caught an unknown exception", fSessionId);
-		if (fOutputJobStepAssociation.status() == 0)
-			fOutputJobStepAssociation.status(ERR_IN_DELIVERY);
+		catchHandler("TupleAnnexStep next band caught an unknown exception",
+					 ERR_IN_DELIVERY, fErrorInfo, fSessionId);
 		while (more) more = fOutputDL->next(fOutputIterator, &rgDataOut);
 		fEndOfResult = true;
 	}
@@ -236,7 +229,7 @@ uint TupleAnnexStep::nextBand(messageqcpp::ByteStream &bs)
 		rgDataOut.reset(new uint8_t[fRowGroupDeliver.getEmptySize()]);
 		fRowGroupDeliver.setData(rgDataOut.get());
 		fRowGroupDeliver.resetRowGroup(0);
-		fRowGroupDeliver.setStatus(fOutputJobStepAssociation.status());
+		fRowGroupDeliver.setStatus(status());
 		bs.load(rgDataOut.get(), fRowGroupDeliver.getDataSize());
 
 		if (traceOn())
@@ -269,14 +262,13 @@ void TupleAnnexStep::executeNoOrderBy()
 	shared_array<uint8_t> rgDataIn;
 	shared_array<uint8_t> rgDataOut;
 	bool more = false;
-	bool hitLimit = false;
 
 	try
 	{
 		more = fInputDL->next(fInputIterator, &rgDataIn);
 		if (traceOn()) dlTimes.setFirstReadTime();
 
-		while (more && (0 == fInputJobStepAssociation.status()) && !die && !hitLimit)
+		while (more && !cancelled() && !fLimitHit)
 		{
 			fRowGroupIn.setData(rgDataIn.get());
 			fRowGroupIn.getRow(0, &fRowIn);
@@ -288,23 +280,29 @@ void TupleAnnexStep::executeNoOrderBy()
 			fRowGroupOut.setDBRoot(fRowGroupIn.getDBRoot());
 			fRowGroupOut.getRow(0, &fRowOut);
 
-			for (uint64_t i = 0; i < fRowGroupIn.getRowCount() &&
-					(0 == fInputJobStepAssociation.status()) && !die && !hitLimit; ++i)
+			for (uint64_t i = 0; i < fRowGroupIn.getRowCount() && !cancelled() && !fLimitHit; ++i)
 			{
+				// skip first limit-start rows
+				if (fRowsProcessed++ < fLimitStart)
+				{
+					fRowIn.nextRow();
+					continue;
+				}
+
 				if (fConstant)
 					fConstant->fillInConstants(fRowIn, fRowOut);
 				else
 					memcpy(fRowOut.getData(), fRowIn.getData(), fRowOut.getSize());
 
 				fRowGroupOut.incRowCount();
-				if (++fRowsReturned < fLimit)
+				if (++fRowsReturned < fLimitCount)
 				{
 					fRowOut.nextRow();
 					fRowIn.nextRow();
 				}
 				else
 				{
-					hitLimit = true;
+					fLimitHit = true;
 					fJobList->abortOnLimit((JobStep*) this);
 				}
 			}
@@ -319,21 +317,17 @@ void TupleAnnexStep::executeNoOrderBy()
 	}
 	catch(const std::exception& ex)
 	{
-		catchHandler(ex.what(), fSessionId);
-		if (fOutputJobStepAssociation.status() == 0)
-			fOutputJobStepAssociation.status(ERR_IN_PROCESS);
+		catchHandler(ex.what(), ERR_IN_PROCESS, fErrorInfo, fSessionId);
 	}
 	catch(...)
 	{
-		catchHandler("TupleAnnexStep execute caught an unknown exception", fSessionId);
-		if (fOutputJobStepAssociation.status() == 0)
-			fOutputJobStepAssociation.status(ERR_IN_PROCESS);
+		catchHandler("TupleAnnexStep execute caught an unknown exception",
+					 ERR_IN_PROCESS, fErrorInfo, fSessionId);
 	}
 
 	while (more) more = fInputDL->next(fInputIterator, &rgDataIn);
 
-
-	if (traceOn() && !fDelivery)
+	if (traceOn())
 	{
 		dlTimes.setLastReadTime();
 		dlTimes.setEndOfInputTime();
@@ -357,7 +351,6 @@ void TupleAnnexStep::executeNoOrderByWithDistinct()
 	shared_array<uint8_t> rgDataIn;
 	shared_array<uint8_t> rgDataOut;
 	bool more = false;
-	bool hitLimit = false;
 
 	rgDataOut.reset(new uint8_t[fRowGroupOut.getDataSize(8192)]);
 	fRowGroupOut.setData(rgDataOut.get());
@@ -369,19 +362,19 @@ void TupleAnnexStep::executeNoOrderByWithDistinct()
 		more = fInputDL->next(fInputIterator, &rgDataIn);
 		if (traceOn()) dlTimes.setFirstReadTime();
 
-		while (more && (0 == fInputJobStepAssociation.status()) && !die && !hitLimit)
+		while (more && !cancelled() && !fLimitHit)
 		{
 			fRowGroupIn.setData(rgDataIn.get());
 			fRowGroupIn.getRow(0, &fRowIn);
 
-			for (uint64_t i = 0; i < fRowGroupIn.getRowCount() &&
-					(0 == fInputJobStepAssociation.status()) && !die && !hitLimit; ++i)
+			for (uint64_t i = 0; i < fRowGroupIn.getRowCount() && !cancelled() && !fLimitHit; ++i)
 			{
 				if (fConstant)
 					fConstant->fillInConstants(fRowIn, fRowOut);
 				else
 					memcpy(fRowOut.getData(), fRowIn.getData(), fRowOut.getSize());
 
+				++fRowsProcessed;
 				fRowIn.nextRow();
 
 				if (distinctMap->find(fRowOut.getData()+2) == distinctMap->end())
@@ -389,13 +382,13 @@ void TupleAnnexStep::executeNoOrderByWithDistinct()
 					distinctMap->insert(make_pair(fRowOut.getData()+2, fRowOut.getData()));
 
 					fRowGroupOut.incRowCount();
-					if (++fRowsReturned < fLimit)
+					if (++fRowsReturned < fLimitCount)
 					{
 						fRowOut.nextRow();
 					}
 					else
 					{
-						hitLimit = true;
+						fLimitHit = true;
 						fJobList->abortOnLimit((JobStep*) this);
 					}
 
@@ -425,15 +418,12 @@ void TupleAnnexStep::executeNoOrderByWithDistinct()
 	}
 	catch(const std::exception& ex)
 	{
-		catchHandler(ex.what(), fSessionId);
-		if (fOutputJobStepAssociation.status() == 0)
-			fOutputJobStepAssociation.status(ERR_IN_PROCESS);
+		catchHandler(ex.what(), ERR_IN_PROCESS, fErrorInfo, fSessionId);
 	}
 	catch(...)
 	{
-		catchHandler("TupleAnnexStep execute caught an unknown exception", fSessionId);
-		if (fOutputJobStepAssociation.status() == 0)
-			fOutputJobStepAssociation.status(ERR_IN_PROCESS);
+		catchHandler("TupleAnnexStep execute caught an unknown exception",
+					 ERR_IN_PROCESS, fErrorInfo, fSessionId);
 	}
 
 	while (more) more = fInputDL->next(fInputIterator, &rgDataIn);
@@ -461,14 +451,12 @@ void TupleAnnexStep::executeWithOrderBy()
 		more = fInputDL->next(fInputIterator, &rgDataIn);
 		if (traceOn()) dlTimes.setFirstReadTime();
 
-		while (more && (0 == fInputJobStepAssociation.status()) && !die)
+		while (more && !cancelled())
 		{
 			fRowGroupIn.setData(rgDataIn.get());
 			fRowGroupIn.getRow(0, &fRowIn);
 
-			for (uint64_t i = 0;
-				 i < fRowGroupIn.getRowCount() && (0 == fInputJobStepAssociation.status()) && !die;
-				 ++i)
+			for (uint64_t i = 0; i < fRowGroupIn.getRowCount() && !cancelled(); ++i)
 			{
 				fOrderBy->processRow(fRowIn);
 				fRowIn.nextRow();
@@ -479,7 +467,7 @@ void TupleAnnexStep::executeWithOrderBy()
 
 		fOrderBy->finalize();
 
-		if (fOutputJobStepAssociation.status() == 0 && !die)
+		if (!cancelled())
 		{
 			while (fOrderBy->getData(rgDataIn))
 			{
@@ -523,15 +511,12 @@ void TupleAnnexStep::executeWithOrderBy()
 	}
 	catch(const std::exception& ex)
 	{
-		catchHandler(ex.what(), fSessionId);
-		if (fOutputJobStepAssociation.status() == 0)
-			fOutputJobStepAssociation.status(ERR_IN_PROCESS);
+		catchHandler(ex.what(), ERR_IN_PROCESS, fErrorInfo, fSessionId);
 	}
 	catch(...)
 	{
-		catchHandler("TupleAnnexStep execute caught an unknown exception", fSessionId);
-		if (fOutputJobStepAssociation.status() == 0)
-			fOutputJobStepAssociation.status(ERR_IN_PROCESS);
+		catchHandler("TupleAnnexStep execute caught an unknown exception",
+					 ERR_IN_PROCESS, fErrorInfo, fSessionId);
 	}
 
 	while (more) more = fInputDL->next(fInputIterator, &rgDataIn);
@@ -595,7 +580,7 @@ void TupleAnnexStep::printCalTrace()
 			<< "\t1st read " << dlTimes.FirstReadTimeString()
 			<< "; EOI " << dlTimes.EndOfInputTimeString() << "; runtime-"
 			<< JSTimeStamp::tsdiffstr(dlTimes.EndOfInputTime(), dlTimes.FirstReadTime())
-			<< "s;\n\tJob completion status " << fOutputJobStepAssociation.status() << endl;
+			<< "s;\n\tJob completion status " << status() << endl;
 	logEnd(logStr.str().c_str());
 	fExtendedInfo += logStr.str();
 	formatMiniStats();

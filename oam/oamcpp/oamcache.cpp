@@ -94,6 +94,8 @@ void OamCache::checkReload()
 	moduleIds.clear();
 	uint i = 0;
 	map<int, int> pmToConnectionMap;
+#ifndef _MFC_VER
+    // Restore for Windows when we support multiple PMs
 	while (it != uniquePids.end())
 	{
 		moduleIds.push_back(*it);
@@ -111,7 +113,7 @@ void OamCache::checkReload()
 		catch (...) { /* doesn't get added to the connection map */ }
 		it++;
 	}
-
+#endif
 	dbRootConnectionMap.reset(new map<int, int>());
 	for (i = 0; i < dbroots.size(); i++)
 		(*dbRootConnectionMap)[dbroots[i]] = pmToConnectionMap[(*dbRootPMMap)[dbroots[i]]];

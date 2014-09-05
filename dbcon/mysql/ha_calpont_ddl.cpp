@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
- * $Id: ha_calpont_ddl.cpp 9079 2012-11-14 22:14:23Z rdempsey $
+ * $Id: ha_calpont_ddl.cpp 9215 2013-01-24 18:40:12Z pleblanc $
  */
 
 #include <string>
@@ -89,10 +89,6 @@ using namespace execplan;
 
 namespace
 {
-const int MAX_INT = numeric_limits<int32_t>::max();
-const short MAX_TINYINT = numeric_limits<int8_t>::max(); //127;
-const short MAX_SMALLINT = numeric_limits<int16_t>::max(); //32767;
-const long long MAX_BIGINT = numeric_limits<int64_t>::max();//9223372036854775807LL
 
 typedef CalpontSelectExecutionPlan::ColumnMap::value_type CMVT_;
 
@@ -181,6 +177,34 @@ uint convertDataType(int dataType)
 			calpontDataType = CalpontSystemCatalog::BLOB;
 			break;
 
+        case ddlpackage::DDL_UNSIGNED_TINYINT:
+            calpontDataType = CalpontSystemCatalog::UTINYINT;
+            break;
+
+        case ddlpackage::DDL_UNSIGNED_SMALLINT:
+            calpontDataType = CalpontSystemCatalog::USMALLINT;
+            break;
+
+        case ddlpackage::DDL_UNSIGNED_INT:
+            calpontDataType = CalpontSystemCatalog::UINT;
+            break;
+
+        case ddlpackage::DDL_UNSIGNED_BIGINT:
+            calpontDataType = CalpontSystemCatalog::UBIGINT;
+            break;
+
+        case ddlpackage::DDL_UNSIGNED_DECIMAL:
+        case ddlpackage::DDL_UNSIGNED_NUMERIC:
+            calpontDataType = CalpontSystemCatalog::UDECIMAL;
+            break;
+
+        case ddlpackage::DDL_UNSIGNED_FLOAT:
+            calpontDataType = CalpontSystemCatalog::UFLOAT;
+            break;
+
+        case ddlpackage::DDL_UNSIGNED_DOUBLE:
+            calpontDataType = CalpontSystemCatalog::UDOUBLE;
+            break;
 		default:
 			throw runtime_error("Unsupported datatype!");
 
@@ -188,6 +212,7 @@ uint convertDataType(int dataType)
 
 	return calpontDataType;
 }
+
 
 int parseCompressionComment ( std::string comment )
 {
@@ -243,6 +268,11 @@ bool validateAutoincrementDatatype ( int type )
 		case ddlpackage::DDL_MEDINT:
 		case ddlpackage::DDL_SMALLINT:
 		case ddlpackage::DDL_TINYINT:
+        case ddlpackage::DDL_UNSIGNED_INT:
+        case ddlpackage::DDL_UNSIGNED_BIGINT:
+        case ddlpackage::DDL_UNSIGNED_MEDINT:
+        case ddlpackage::DDL_UNSIGNED_SMALLINT:
+        case ddlpackage::DDL_UNSIGNED_TINYINT:
 			validAutoType = true;
 			break;
 	}
@@ -260,6 +290,12 @@ bool validateNextValue( int type, int64_t value )
 					validValue = false;
 			}
 			break;
+        case ddlpackage::DDL_UNSIGNED_BIGINT:
+            {
+                if (static_cast<uint64_t>(value) > MAX_UBIGINT)
+                    validValue = false;
+            }
+            break;
 		case ddlpackage::DDL_INT:
 		case ddlpackage::DDL_INTEGER:
 		case ddlpackage::DDL_MEDINT:
@@ -268,18 +304,37 @@ bool validateNextValue( int type, int64_t value )
 					validValue = false;
 			}
 			break;
+        case ddlpackage::DDL_UNSIGNED_INT:
+        case ddlpackage::DDL_UNSIGNED_MEDINT:
+            {
+                if (static_cast<uint64_t>(value) > MAX_UINT)
+                    validValue = false;
+            }
+            break;
 		case ddlpackage::DDL_SMALLINT:
 			{
 				if (value > MAX_SMALLINT)
 					validValue = false;
 			}
 			break;
+        case ddlpackage::DDL_UNSIGNED_SMALLINT:
+            {
+                if (static_cast<uint64_t>(value) > MAX_USMALLINT)
+                    validValue = false;
+            }
+            break;
 		case ddlpackage::DDL_TINYINT:
 			{
 				if (value > MAX_TINYINT)
 					validValue = false;
 			}
 			break;
+        case ddlpackage::DDL_UNSIGNED_TINYINT:
+            {
+                if (static_cast<uint64_t>(value) > MAX_UTINYINT)
+                    validValue = false;
+            }
+            break;
 	}
 	return validValue;
 }
@@ -288,7 +343,6 @@ bool anyRowInTable(string& schema, string& tableName, int sessionID)
 {
 	//find a column in the table
 	boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
-	csc->identity(execplan::CalpontSystemCatalog::FE);
 	CalpontSystemCatalog::TableName aTableName;
 	algorithm::to_lower(schema);
 	algorithm::to_lower(tableName);
@@ -309,7 +363,7 @@ bool anyRowInTable(string& schema, string& tableName, int sessionID)
 		txnID.id = 0;
 		txnID.valid = true;
 	}
-	CalpontSystemCatalog::SCN verID;
+	QueryContext verID;
 	verID = sm.verID();
 	csep.txnID(txnID.id);
 	csep.verID(verID);
@@ -430,7 +484,7 @@ bool anyNullInTheColumn (string& schema, string& table, string& columnName, int 
 		txnID.id = 0;
 		txnID.valid = true;
 	}
-	CalpontSystemCatalog::SCN verID;
+	QueryContext verID;
 	verID = sm.verID();
 	csep.txnID(txnID.id);
 	csep.verID(verID);
@@ -548,6 +602,9 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 {
   SqlParser parser;
   THD *thd = current_thd;
+#ifdef INFINIDB_DEBUG
+    cout << "ProcessDDLStatement: " << schema << "." << table << ":" << ddlStatement << endl;
+#endif
   
   parser.setDefaultSchema(schema);
   int rc = 0;
@@ -571,13 +628,25 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
     if ( typeid ( stmt ) == typeid ( CreateTableStatement ) )
     {
     	CreateTableStatement * createTable = dynamic_cast <CreateTableStatement *> ( &stmt );
+    	//@Bug 5767. To handle key words inside `` for a tablename.
+    	if (!(boost::iequals(schema, createTable->fTableDef->fQualifiedName->fSchema)) || !(boost::iequals(table,createTable->fTableDef->fQualifiedName->fName)))
+    	{
+			rc = 1;
+			thd->main_da.can_overwrite_status = true;
+
+			thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_CREATE_DATATYPE_NOT_SUPPORT)).c_str());
+			ci->alterTableState = cal_connection_info::NOT_ALTER;
+			ci->isAlter = false;
+			return rc;	
+		}
+		
     	bool matchedCol = false;
     	for ( unsigned i=0; i < createTable->fTableDef->fColumns.size(); i++ )
     	{
 			// if there are any constraints other than 'DEFAULT NULL' (which is the default in IDB), kill
 			//  the statement
 			bool autoIncre = false;
-			int64_t startValue = 1;
+			uint64_t startValue = 1;
     		if (createTable->fTableDef->fColumns[i]->fConstraints.size() > 0 )
     		{
 				//support default value and NOT NULL constraint			
@@ -891,7 +960,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 					ci->isAlter = false;					
 					return rc;	
 				}
-				int64_t startValue = 1;
+				uint64_t startValue = 1;
 				bool autoIncre  = false;
 				if ( (addColumnPtr->fColumnDef->fConstraints.size() > 0 ) || addColumnPtr->fColumnDef->fDefaultValue )
 				{
@@ -1085,7 +1154,6 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 					{
 						//Check if the table already has autoincrement column
 						boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
-						csc->identity(execplan::CalpontSystemCatalog::FE);
 						CalpontSystemCatalog::TableName tableName;
 						tableName.schema = alterTable->fTableName->fSchema;
 						tableName.table = alterTable->fTableName->fName;
@@ -1215,7 +1283,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 					ci->isAlter = false;
 					return rc;	
 				}
-				int64_t startValue = 1;
+				uint64_t startValue = 1;
 				bool autoIncre  = false;
     			if ( (addColumnsPtr->fColumns[0]->fConstraints.size() > 0 ) || addColumnsPtr->fColumns[0]->fDefaultValue )
     			{
@@ -1291,7 +1359,6 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 					{
 						//Check if the table already has autoincrement column
 						boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
-						csc->identity(execplan::CalpontSystemCatalog::FE);
 						CalpontSystemCatalog::TableName tableName;
 						tableName.schema = alterTable->fTableName->fSchema;
 						tableName.table = alterTable->fTableName->fName;
@@ -1357,7 +1424,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 			else if (ddlpackage::AtaRenameColumn* renameColumnsPtr = dynamic_cast<AtaRenameColumn*>(actionList[i]))
 			{
 				//cout << "Rename a column" << endl;
-				int64_t startValue = 1;
+				uint64_t startValue = 1;
 				bool autoIncre  = false;
     			//@Bug 3746 Handle compression type
 				string comment = renameColumnsPtr->fComment;
@@ -1428,7 +1495,6 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 					{
 						//Check if the table already has autoincrement column
 						boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
-						csc->identity(execplan::CalpontSystemCatalog::FE);
 						CalpontSystemCatalog::TableName tableName;
 						tableName.schema = alterTable->fTableName->fSchema;
 						tableName.table = alterTable->fTableName->fName;
@@ -1674,7 +1740,7 @@ int ha_calpont_impl_create_(const char *name, TABLE *table_arg, HA_CREATE_INFO *
 	string tablecomment;
 	bool isAnyAutoincreCol = false;
 	std::string columnName("");
-	int64_t startValue = 1;
+	uint64_t startValue = 1;
 	if (table_arg->s->comment.length > 0 )
 	{
 		tablecomment = table_arg->s->comment.str;

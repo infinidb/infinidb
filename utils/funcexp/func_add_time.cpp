@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_add_time.cpp 3048 2012-04-04 15:33:45Z rdempsey $
+* $Id: func_add_time.cpp 3616 2013-03-04 14:56:29Z rdempsey $
 *
 *
 ****************************************************************************/
@@ -36,8 +36,10 @@ using namespace dataconvert;
 #include "functor_dtm.h"
 #include "funchelpers.h"
 
-namespace funcexp
+namespace
 {
+using namespace funcexp;
+
 int64_t addTime(DateTime& dt1, Time& dt2)
 {
 	DateTime dt;
@@ -81,7 +83,7 @@ int64_t addTime(DateTime& dt1, Time& dt2)
 	}
 	day = (signed)(dt1.day + dt2.day + hour/24);
 	
-	if (isLeapYear(dt1.year) && dt1.month == 2)
+	if (helpers::isLeapYear(dt1.year) && dt1.month == 2)
 		day--;
 	
 	month = dt1.month;
@@ -93,7 +95,7 @@ int64_t addTime(DateTime& dt1, Time& dt2)
 		{
 			month = (month == 1? 12: month-1);
 			for (; day <= 0 && month > 0; month--)
-				day += getDaysInMonth(month);
+				day += helpers::getDaysInMonth(month);
 			month++;
 //			month=12;
 		}
@@ -103,10 +105,10 @@ int64_t addTime(DateTime& dt1, Time& dt2)
 	else
 	{
 		int monthSave = month;
-		while (day > getDaysInMonth(month))
+		while (day > helpers::getDaysInMonth(month))
 		{
-			for (; day > getDaysInMonth(month) && month <= 12; month++)
-				day -= getDaysInMonth(month);
+			for (; day > helpers::getDaysInMonth(month) && month <= 12; month++)
+				day -= helpers::getDaysInMonth(month);
 			if (month > 12)
 				month = 1;
 		}
@@ -119,6 +121,10 @@ int64_t addTime(DateTime& dt1, Time& dt2)
 	
 	return *(reinterpret_cast<int64_t*>(&dt));
 }
+}
+
+namespace funcexp
+{
 
 CalpontSystemCatalog::ColType Func_add_time::operationType( FunctionParm& fp, CalpontSystemCatalog::ColType& resultType )
 {

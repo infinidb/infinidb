@@ -37,12 +37,13 @@ using namespace ddlpackageprocessor;
 namespace WriteEngine {
 	WE_DDLCommandClient::WE_DDLCommandClient()
 	{
-		fWEClient = WEClients::instance(WEClients::DDLPROC);
+		fWEClient = new WEClients(WEClients::DDLPROC);
 	}
 
 	WE_DDLCommandClient::~WE_DDLCommandClient()
 	{
-	
+		delete fWEClient;
+		fWEClient = NULL;
 	}
 
 	uint8_t WE_DDLCommandClient::UpdateSyscolumnNextval(uint32_t columnOid, uint64_t nextVal, uint32_t sessionID) 

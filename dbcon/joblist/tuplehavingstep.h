@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: tuplehavingstep.h 8526 2012-05-17 02:28:10Z xlou $
+//  $Id: tuplehavingstep.h 9210 2013-01-21 14:10:42Z rdempsey $
 
 
 #ifndef JOBLIST_TUPLEHAVINGSTEP_H
@@ -40,10 +40,8 @@ class TupleHavingStep : public ExpressionStep, public TupleDeliveryStep
 {
 public:
     /** @brief TupleHavingStep constructor
-     * @param in the inputAssociation pointer
-     * @param out the outputAssociation pointer
      */
-    TupleHavingStep( uint32_t sessionId, uint32_t txnId, uint32_t verId, uint32_t statementId);
+    TupleHavingStep(const JobInfo& jobInfo);
 
     /** @brief TupleHavingStep destructor
      */

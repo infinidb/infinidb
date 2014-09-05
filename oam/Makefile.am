@@ -15,7 +15,7 @@
 #  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 #  MA 02110-1301, USA.
 
-# $Id: Makefile.am 878 2009-04-03 20:34:32Z rdempsey $
+# $Id$
 
 SUBDIRS = etc post oamcpp replaytxnlog install_scripts
 

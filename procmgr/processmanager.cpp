@@ -1,5 +1,5 @@
 /******************************************************************************************
-* $Id: processmanager.cpp 2200 2013-07-01 21:50:36Z dhill $
+* $Id: processmanager.cpp 2202 2013-07-01 21:51:02Z dhill $
 *
 ******************************************************************************************/
 
@@ -2380,7 +2380,7 @@ void processMSG(messageqcpp::IOSocket* cfIos)
 					if (access(logdir.c_str(), W_OK) != 0) logdir = "/tmp";
 					string cmd = startup::StartUp::installDir() + "/bin/save_brm  > " + logdir + "/save_brm.log1 2>&1";
 					int rtnCode = system(cmd.c_str());
-					if (rtnCode == 0)
+					if (WEXITSTATUS(rtnCode) == 0)
 					{
 						ackResponse = API_SUCCESS;
 					}
@@ -2670,7 +2670,13 @@ void processMSG(messageqcpp::IOSocket* cfIos)
 			{
 				log.writeLog(__LINE__,  "MSG RECEIVED: Get DBRM Data Files");
 
+				oam.dbrmctl("halt");
+				log.writeLog(__LINE__, "'dbrmctl halt' done", LOG_TYPE_DEBUG);
+
 				int ret = processManager.getDBRMData(fIos);
+
+				oam.dbrmctl("resume");
+				log.writeLog(__LINE__, "'dbrmctl resume' done", LOG_TYPE_DEBUG);
 
 				if ( ret == oam::API_SUCCESS )
 					log.writeLog(__LINE__, "Get DBRM Data Files Completed");
@@ -3437,9 +3443,11 @@ void ProcessManager::setSystemState(uint16_t state)
 
 	log.writeLog(__LINE__, "Set System State = " + oam.itoa(state), LOG_TYPE_DEBUG);
 
-	// if system state = ACTIVE, make sure DMLProc is ACTIVE first
 	int setState = state;
+
+	// if system state = ACTIVE, make sure DMLProc is ACTIVE first
 	if( state == oam::ACTIVE ) {
+		setState = -1;
 		// default to loal module
 		string PrimaryUMModuleName = config.moduleName();
 		try {
@@ -3472,51 +3480,50 @@ void ProcessManager::setSystemState(uint16_t state)
 				break;
 			}
 
-
 			if (DMLprocessstatus.ProcessOpState == oam::ACTIVE &&
 				DDLprocessstatus.ProcessOpState == oam::ACTIVE) {
 				setState = oam::ACTIVE;
 				break;
 			}
 
-			if ( setState != 0 )
-				break;
-
             sleep(2);
 			retry++;
         }
 	}
 
-	pthread_mutex_lock(&STATUS_LOCK);
-	try{
-		oam.setSystemStatus(setState);
-	}
-	catch (exception& ex)
+	if ( setState != -1 )
 	{
-		string error = ex.what();
-		log.writeLog(__LINE__, "EXCEPTION ERROR on MessageQueueClient: " + error, LOG_TYPE_ERROR);
-	}
-	catch(...)
-	{
-		log.writeLog(__LINE__, "EXCEPTION ERROR on MessageQueueClient: Caught unknown exception!", LOG_TYPE_ERROR);
-	}
-	pthread_mutex_unlock(&STATUS_LOCK);
-
-	// Process Alarms
-	string system = "System";
-	if( setState == oam::ACTIVE ) {
-		//clear alarms if set
-		if ( oam.checkActiveAlarm(SYSTEM_DOWN_AUTO, config.moduleName(), system) )
-			aManager.sendAlarmReport(system.c_str(), SYSTEM_DOWN_AUTO, CLEAR);
-		if ( oam.checkActiveAlarm(SYSTEM_DOWN_MANUAL, config.moduleName(), system) )
-			aManager.sendAlarmReport(system.c_str(), SYSTEM_DOWN_MANUAL, CLEAR);
-	}
-	else {
-		if( state == oam::MAN_OFFLINE )
-			aManager.sendAlarmReport(system.c_str(), SYSTEM_DOWN_MANUAL, SET);
-		else
-			if ( state == oam::AUTO_OFFLINE )
-				aManager.sendAlarmReport(system.c_str(), SYSTEM_DOWN_AUTO, SET);
+		pthread_mutex_lock(&STATUS_LOCK);
+		try{
+			oam.setSystemStatus(setState);
+		}
+		catch (exception& ex)
+		{
+			string error = ex.what();
+			log.writeLog(__LINE__, "EXCEPTION ERROR on MessageQueueClient: " + error, LOG_TYPE_ERROR);
+		}
+		catch(...)
+		{
+			log.writeLog(__LINE__, "EXCEPTION ERROR on MessageQueueClient: Caught unknown exception!", LOG_TYPE_ERROR);
+		}
+		pthread_mutex_unlock(&STATUS_LOCK);
+	
+		// Process Alarms
+		string system = "System";
+		if( setState == oam::ACTIVE ) {
+			//clear alarms if set
+			if ( oam.checkActiveAlarm(SYSTEM_DOWN_AUTO, config.moduleName(), system) )
+				aManager.sendAlarmReport(system.c_str(), SYSTEM_DOWN_AUTO, CLEAR);
+			if ( oam.checkActiveAlarm(SYSTEM_DOWN_MANUAL, config.moduleName(), system) )
+				aManager.sendAlarmReport(system.c_str(), SYSTEM_DOWN_MANUAL, CLEAR);
+		}
+		else {
+			if( state == oam::MAN_OFFLINE )
+				aManager.sendAlarmReport(system.c_str(), SYSTEM_DOWN_MANUAL, SET);
+			else
+				if ( state == oam::AUTO_OFFLINE )
+					aManager.sendAlarmReport(system.c_str(), SYSTEM_DOWN_AUTO, SET);
+		}
 	}
 }
 
@@ -4188,7 +4195,7 @@ int ProcessManager::addModule(oam::DeviceNetworkList devicenetworklist, std::str
 
 	string cmd = "ls " + calpontPackage + " > /dev/null 2>&1";
 	int rtnCode = system(cmd.c_str());
-	if (rtnCode != 0) {
+	if (WEXITSTATUS(rtnCode) != 0) {
 		log.writeLog(__LINE__, "addModule - ERROR: Package not found: " + calpontPackage, LOG_TYPE_ERROR);
 		pthread_mutex_unlock(&THREAD_LOCK);
 		return API_FILE_OPEN_ERROR;
@@ -4229,7 +4236,7 @@ int ProcessManager::addModule(oam::DeviceNetworkList devicenetworklist, std::str
 		string cmd = installDir + "/bin/remote_command.sh " + newIPAddr + " " + password + " ls";
 		log.writeLog(__LINE__, cmd, LOG_TYPE_DEBUG);
 		int rtnCode = system(cmd.c_str());
-		if (rtnCode != 0) {
+		if (WEXITSTATUS(rtnCode) != 0) {
 			log.writeLog(__LINE__, "addModule - ERROR: Remote login test failed, Invalid IP / Password " + newIPAddr, LOG_TYPE_ERROR);
 			pthread_mutex_unlock(&THREAD_LOCK);
 			return API_FAILURE;
@@ -4315,9 +4322,9 @@ int ProcessManager::addModule(oam::DeviceNetworkList devicenetworklist, std::str
 						sleep(10);
 						continue;
 					}
-					string cmd = installDir + "/bin/remote_command.sh " + IPAddr + " " + amazonDefaultPassword + " 'ls' > /tmp/login_test.log";
-					int rtnCode = system(cmd.c_str());
-					if (rtnCode != 0) {
+					string cmd = installDir + "/bin/remote_command.sh " + IPAddr + " " + amazonDefaultPassword + " 'ls' 1  > /tmp/login_test.log";
+					system(cmd.c_str());
+					if (!oam.checkLogStatus("/tmp/login_test.log", "README")) {
 						sleep(10);
 						continue;
 					}
@@ -4657,7 +4664,7 @@ int ProcessManager::addModule(oam::DeviceNetworkList devicenetworklist, std::str
 		string dir = installDir + "/local/etc/" + remoteModuleName;
 
 		string cmd = "mkdir " + dir + " > /dev/null 2>&1";
-		int rtnCode = system(cmd.c_str());
+		system(cmd.c_str());
 
 		if ( remoteModuleType == "um" ) {
 			cmd = "cp " + installDir + "/local/etc/um1/* " + dir + "/.";
@@ -4691,7 +4698,7 @@ int ProcessManager::addModule(oam::DeviceNetworkList devicenetworklist, std::str
 			cmd = startup::StartUp::installDir() + "/bin/remote_command.sh " + remoteModuleIP + " " + amazonDefaultPassword + " '/root/updatePassword.sh " + password + "' > /tmp/password_change.log";
 			//log.writeLog(__LINE__, "addModule - cmd: " + cmd, LOG_TYPE_DEBUG);
 			rtnCode = system(cmd.c_str());
-			if (rtnCode == 0)
+			if (WEXITSTATUS(rtnCode) == 0)
 				log.writeLog(__LINE__, "addModule - update root password: " + remoteModuleName, LOG_TYPE_DEBUG);
 			else
 				log.writeLog(__LINE__, "addModule - ERROR: update root password: " + remoteModuleName, LOG_TYPE_DEBUG);
@@ -4711,7 +4718,7 @@ int ProcessManager::addModule(oam::DeviceNetworkList devicenetworklist, std::str
 				log.writeLog(__LINE__, "addModule cmd: " + cmd, LOG_TYPE_DEBUG);
 
 				rtnCode = system(cmd.c_str());
-				if (rtnCode != 0) {
+				if (WEXITSTATUS(rtnCode) != 0) {
 					log.writeLog(__LINE__, "addModule - ERROR: user_installer.sh failed", LOG_TYPE_ERROR);
 					pthread_mutex_unlock(&THREAD_LOCK);
 					system(" cp /tmp/user_installer.log /tmp/user_installer.log.failed");
@@ -4726,7 +4733,7 @@ int ProcessManager::addModule(oam::DeviceNetworkList devicenetworklist, std::str
 
 				log.writeLog(__LINE__, "addModule - " + cmd, LOG_TYPE_DEBUG);
 				rtnCode = system(cmd.c_str());
-				if (rtnCode != 0) {
+				if (WEXITSTATUS(rtnCode) != 0) {
 					log.writeLog(__LINE__, "addModule - ERROR: binary_installer.sh failed", LOG_TYPE_ERROR);
 					system(" cp /tmp/binary_installer.log /tmp/binary_installer.log.failed");
 					pthread_mutex_unlock(&THREAD_LOCK);
@@ -4743,7 +4750,7 @@ int ProcessManager::addModule(oam::DeviceNetworkList devicenetworklist, std::str
 					log.writeLog(__LINE__, "addModule cmd: " + cmd, LOG_TYPE_DEBUG);
 
 					rtnCode = system(cmd.c_str());
-					if (rtnCode != 0) {
+					if (WEXITSTATUS(rtnCode) != 0) {
 						log.writeLog(__LINE__, "addModule - ERROR: performance_installer.sh failed", LOG_TYPE_ERROR);
 						system(" cp /tmp/performance_installer.log /tmp/performance_installer.log.failed");
 						pthread_mutex_unlock(&THREAD_LOCK);
@@ -4758,7 +4765,7 @@ int ProcessManager::addModule(oam::DeviceNetworkList devicenetworklist, std::str
 					log.writeLog(__LINE__, "addModule - " + cmd, LOG_TYPE_DEBUG);
 
 					rtnCode = system(cmd.c_str());
-					if (rtnCode != 0) {
+					if (WEXITSTATUS(rtnCode) != 0) {
 						log.writeLog(__LINE__, "addModule - ERROR: binary_installer.sh failed", LOG_TYPE_ERROR);
 						system(" cp /tmp/binary_installer.log /tmp/binary_installer.log.failed");
 						pthread_mutex_unlock(&THREAD_LOCK);
@@ -5673,7 +5680,7 @@ void ProcessManager::saveBRM()
 
 	string cmd = startup::StartUp::installDir() + "/bin/reset_locks > " + logdir + "/reset_locks.log1 2>&1";
 	int rtnCode = system(cmd.c_str());
-	if (rtnCode != 1) {
+	if (WEXITSTATUS(rtnCode) != 1) {
 		log.writeLog(__LINE__, "Successfully ran reset_locks", LOG_TYPE_DEBUG);
 	}
 	else
@@ -5683,7 +5690,7 @@ void ProcessManager::saveBRM()
 
 	cmd = startup::StartUp::installDir() + "/bin/save_brm > " + logdir + "/save_brm.log1 2>&1";
 	rtnCode = system(cmd.c_str());
-	if (rtnCode != 1) {
+	if (WEXITSTATUS(rtnCode) != 1) {
 		log.writeLog(__LINE__, "Successfully ran DBRM save_brm", LOG_TYPE_DEBUG);
 	}
 	else
@@ -7799,7 +7806,7 @@ int ProcessManager::OAMParentModuleChange()
 		string cmd = cmdLine + downOAMParentIPAddress + cmdOption;
 		int rtnCode = system(cmd.c_str());
 
-		switch (rtnCode) {
+		switch (WEXITSTATUS(rtnCode)) {
 			case 0:
 			{
 				//Ack ping
@@ -7894,7 +7901,7 @@ int ProcessManager::OAMParentModuleChange()
 									string cmd = cmdLine + *pt2 + cmdOption;
 									int rtnCode = system(cmd.c_str());
 							
-									switch (rtnCode) {
+									switch (WEXITSTATUS(rtnCode)) {
 										case 0:
 										{ //Ack ping
 											log.writeLog(__LINE__, *pt1 + " ping successful", LOG_TYPE_DEBUG);
@@ -8379,7 +8386,8 @@ int ProcessManager::OAMParentModuleChange()
 		processManager.restartProcessType("DMLProc");
 	}
 
-	processManager.setSystemState(oam::ACTIVE);
+// don't set to active, let procmon set to active when DMLProc is active
+//	processManager.setSystemState(oam::ACTIVE);
 
 	// clear alarm
 	aManager.sendAlarmReport(config.moduleName().c_str(), MODULE_SWITCH_ACTIVE, CLEAR);

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: we_brmreporter.cpp 3983 2012-07-02 16:11:06Z bpaul $
+ * $Id: we_brmreporter.cpp 4450 2013-01-21 14:13:24Z rdempsey $
  *
  ****************************************************************************/
 
@@ -230,7 +230,7 @@ void BRMReporter::sendCPToFile( )
                                   fCPInfo[i].max       << ' ' <<
                                   fCPInfo[i].min       << ' ' <<
                                   fCPInfo[i].seqNum    << ' ' <<
-                                  fCPInfo[i].isChar    << ' ' <<
+                                  fCPInfo[i].type      << ' ' <<
                                   fCPInfo[i].newExtent << std::endl;
         }
     }
@@ -242,7 +242,7 @@ void BRMReporter::sendCPToFile( )
 void BRMReporter::reportTotals(
     u_int64_t totalReadRows,
     u_int64_t totalInsertedRows,
-    const std::vector<boost::tuple<ColDataType, std::string, u_int64_t> >& satCounts)
+    const std::vector<boost::tuple<CalpontSystemCatalog::ColDataType, std::string, u_int64_t> >& satCounts)
 {
     if (fRptFile.is_open())
     {
@@ -314,13 +314,13 @@ int BRMReporter::openRptFile( )
         return rc;
     }
 
-    fRptFile << "#CP:   startLBID max min seqnum isChar newExtent" << std::endl;
-    fRptFile << "#HWM:  oid partition segment hwm"                 << std::endl;
-    fRptFile << "#ROWS: numRowsRead numRowsInserted"               << std::endl;
+    fRptFile << "#CP:   startLBID max min seqnum type newExtent" << std::endl;
+    fRptFile << "#HWM:  oid partition segment hwm"               << std::endl;
+    fRptFile << "#ROWS: numRowsRead numRowsInserted"             << std::endl;
     fRptFile << "#DATA: columNum columnType columnName numOutOfRangeValues"   << std::endl;
-    fRptFile << "#ERR:  error message file"                        << std::endl;
-    fRptFile << "#BAD:  bad data file, with rejected rows"         << std::endl;
-    fRptFile << "#MERR: critical error messages in cpimport.bin"   << std::endl;
+    fRptFile << "#ERR:  error message file"                      << std::endl;
+    fRptFile << "#BAD:  bad data file, with rejected rows"       << std::endl;
+    fRptFile << "#MERR: critical error messages in cpimport.bin" << std::endl;
 
     return NO_ERROR;
 }

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_dayofweek.cpp 3048 2012-04-04 15:33:45Z rdempsey $
+* $Id: func_dayofweek.cpp 3616 2013-03-04 14:56:29Z rdempsey $
 *
 *
 ****************************************************************************/
@@ -120,7 +120,7 @@ int64_t Func_dayofweek::getIntVal(rowgroup::Row& row,
 			isNull = true;
 			return -1;
 	}
-	return calc_weekday(calc_daynr(year, month, day), 1) + 1;
+	return helpers::calc_weekday(helpers::calc_daynr(year, month, day), 1) + 1;
 }		
 
 

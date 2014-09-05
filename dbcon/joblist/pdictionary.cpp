@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: pdictionary.cpp 8526 2012-05-17 02:28:10Z xlou $
+*   $Id: pdictionary.cpp 9210 2013-01-21 14:10:42Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -26,11 +26,6 @@
 #include <boost/thread.hpp>
 #include <boost/thread/condition.hpp>
 using namespace std;
-
-#include "distributedenginecomm.h"
-#include "elementtype.h"
-#include "unique32generator.h"
-#include "primitivestep.h"
 
 #include "messagequeue.h"
 using namespace messageqcpp;
@@ -48,6 +43,11 @@ using namespace execplan;
 #include "brm.h"
 using namespace BRM;
 
+#include "distributedenginecomm.h"
+#include "elementtype.h"
+#include "unique32generator.h"
+#include "jlf_common.h"
+#include "primitivestep.h"
 
 namespace joblist
 {
@@ -91,50 +91,33 @@ namespace joblist
 
 
 pDictionaryStep::pDictionaryStep(
-	const JobStepAssociation& inputJobStepAssociation,
-	const JobStepAssociation& outputJobStepAssociation,
-	DistributedEngineComm* dec,
-	boost::shared_ptr<CalpontSystemCatalog> cat,
 	CalpontSystemCatalog::OID o,
-	int ct,
 	CalpontSystemCatalog::OID t,
-	uint32_t session,
-	uint32_t txn,
-	uint32_t verID,
-	uint16_t step,
-	uint32_t statementId,
-	ResourceManager& rm,
-	uint32_t interval) :
-	fInputJobStepAssociation(inputJobStepAssociation),
-	fOutputJobStepAssociation(outputJobStepAssociation),
-	fDec(dec),
-	sysCat(cat),
+	const CalpontSystemCatalog::ColType& ct,
+	const JobInfo& jobInfo) :
+	JobStep(jobInfo),
 	fOid(o),
 	fTableOid(t),
-	fSessionId(session),
-	fTxnId(txn),
-	fVerId(verID),
-	fStepId(step),
-	fStatementId(statementId),
 	fBOP(BOP_NONE),
 	msgsSent(0),
 	msgsRecvd(0),
 	finishedSending(false),
 	recvWaiting(false),
 	ridCount(0),
+	fColType(ct),
 	fFilterCount(0),
 	requestList(0),
-	fInterval(interval),
+	fInterval(jobInfo.flushInterval),
 	fPhysicalIO(0),
 	fCacheIO(0),
 	fMsgBytesIn(0),
 	fMsgBytesOut(0),
-	fRm(rm),
+	fRm(jobInfo.rm),
 	hasEqualityFilter(false)
 {
 //	uniqueID = UniqueNumberGenerator::instance()->getUnique32();
 
-	fColType.compressionType = fColType.ddn.compressionType = ct;
+//	fColType.compressionType = fColType.ddn.compressionType = ct;
 }
 
 pDictionaryStep::~pDictionaryStep()

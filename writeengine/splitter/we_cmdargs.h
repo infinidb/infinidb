@@ -1,6 +1,6 @@
 /*
 
-   Copyright (C) 2009-2012 Calpont Corporation.
+   Copyright (C) 2009-2013 Calpont Corporation.
 
    Use of and access to the Calpont InfiniDB Community software is subject to the
    terms and conditions of the Calpont Open Source License Agreement. Use of and
@@ -39,7 +39,8 @@
 
 
 #include "we_xmlgetter.h"
-
+#include "we_type.h"
+#include <set>
 
 namespace WriteEngine
 {
@@ -55,14 +56,11 @@ class WECmdArgs
         std::string getCpImportCmdLine();
         void setSchemaAndTableFromJobFile(std::string& JobName);
         void setEnclByAndEscCharFromJobFile(std::string& JobName);
-        static void str2Argv(std::string CmdLine, std::vector<char*>& V1);
         void usage();
         void usageMode3();
         bool checkForCornerCases();
 
         void addJobFilesToVector(std::string& JobName);
-        void setSchemaAndTableFromTblNameAttribute(std::string& tblName);
-        void setInputFileNameFromLoadNameAttribute(std::string& loadName);
     	void splitConfigFilePerTable(std::string& ConfigName, int tblCount);
     	void write2ConfigFiles(std::vector<std::ofstream*>& Files,
     												char*pBuff, int FileIdx);
@@ -89,6 +87,7 @@ class WECmdArgs
 		char getEnclChar() { return fEnclosedChar; }
 		char getEscChar() { return fEscChar;	}
 		char getDelimChar() { return fColDelim; }
+		ImportDataMode getImportDataMode() const { return fImportDataMode; }
 		bool getConsoleLog() { return fConsoleLog; }
 
 		bool isCpimportInvokeMode(){return (fBlockMode3)? false : fCpiInvoke;}
@@ -118,6 +117,8 @@ class WECmdArgs
 
         VecArgs fVecJobFiles;		//JobFiles splitter from master JobFile
         int fMultiTableCount;		//MultiTable count
+        VecArgs fColFldsFromJobFile;//List of columns from any job file, that
+                                    // represent fields in the import data
 
     public:
 		bool getPmStatus(int Id);
@@ -136,6 +137,7 @@ class WECmdArgs
 		void setMultiTableCount(int Count) { fMultiTableCount = Count; }
 
 		std::string PrepMode2ListOfFiles(std::string& FileName); // Bug 4342
+		void getColumnList( std::set<std::string>& columnList ) const;
 
     private:	// variables for SplitterApp
         std::string fJobId;				// JobID
@@ -168,6 +170,7 @@ class WECmdArgs
         char fEscChar;			// esc char
         int fNoOfWriteThrds;	// No. of write threads
         bool fNullStrMode;		// set null string mode - treat null as null
+        ImportDataMode fImportDataMode; // Importing text or binary data		
         std::string fPrgmName;	// argv[0]
         std::string fSchema;	// Schema name - positional parmater
         std::string fTable;		// Table name - table name parameter

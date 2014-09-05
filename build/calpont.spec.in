@@ -12,9 +12,9 @@ Group: Applications
 License: GPL
 BuildRoot: %{_tmppath}/%{name}-%{release}-buildroot
 %ifarch x86_64
-Provides: libconfigcpp.so()(64bit), libddlpackage.so()(64bit), libddlpackageproc.so()(64bit), libdmlpackage.so()(64bit), libdmlpackageproc.so()(64bit), libexecplan.so()(64bit), libloggingcpp.so()(64bit), libmessageqcpp.so()(64bit), liboamcpp.so()(64bit), libsnmpmanager.so()(64bit), libthreadpool.so()(64bit), libwriteengine.so()(64bit), libbrm.so()(64bit), librwlock.so()(64bit), libfuncexp.so()(64bit), libjoblist.so()(64bit), libdataconvert.so()(64bit), libsm.so()(64bit), libjoiner.so()(64bit), librowgroup.so()(64bit), libcacheutils.so()(64bit), libreplaytxnlog.so()(64bit), libmulticast.so()(64bit), libcommon.so()(64bit), libboost_idb.so()(64bit), libwriteengineclient.so()(64bit), libddlcleanuputil.so()(64bit) libmysqlcl_idb.so()(64bit), libbatchloader.so()(64bit), libwriteengineredistribute.so()(64bit), libquerystats.so()(64bit)
+Provides: libconfigcpp.so()(64bit), libddlpackage.so()(64bit), libddlpackageproc.so()(64bit), libdmlpackage.so()(64bit), libdmlpackageproc.so()(64bit), libexecplan.so()(64bit), libloggingcpp.so()(64bit), libmessageqcpp.so()(64bit), liboamcpp.so()(64bit), libsnmpmanager.so()(64bit), libthreadpool.so()(64bit), libwriteengine.so()(64bit), libbrm.so()(64bit), librwlock.so()(64bit), libfuncexp.so()(64bit), libjoblist.so()(64bit), libdataconvert.so()(64bit), libjoiner.so()(64bit), librowgroup.so()(64bit), libcacheutils.so()(64bit), libreplaytxnlog.so()(64bit), libmulticast.so()(64bit), libcommon.so()(64bit), libboost_idb.so()(64bit), libwriteengineclient.so()(64bit), libddlcleanuputil.so()(64bit) libmysqlcl_idb.so()(64bit), libbatchloader.so()(64bit), libwriteengineredistribute.so()(64bit), libquerystats.so()(64bit)
 %else
-Provides: libconfigcpp.so, libddlpackage.so, libddlpackageproc.so, libdmlpackage.so, libdmlpackageproc.so, libexecplan.so, libloggingcpp.so, libmessageqcpp.so, liboamcpp.so, libsnmpmanager.so, libthreadpool.so, libwriteengine.so, libbrm.so, librwlock.so, libfuncexp.so, libjoblist.so, libdataconvert.so, libsm.so, libjoiner.so, librowgroup.so, libcacheutils.so, libreplaytxnlog.so, libmulticast.so, libcommon.so, libboost_idb.so, libddlcleanuputil.so, libwriteengineclient.so libmysqlcl_idb.so, libwriteengineredistribute.so, libquerystats.so
+Provides: libconfigcpp.so, libddlpackage.so, libddlpackageproc.so, libdmlpackage.so, libdmlpackageproc.so, libexecplan.so, libloggingcpp.so, libmessageqcpp.so, liboamcpp.so, libsnmpmanager.so, libthreadpool.so, libwriteengine.so, libbrm.so, librwlock.so, libfuncexp.so, libjoblist.so, libdataconvert.so, libjoiner.so, librowgroup.so, libcacheutils.so, libreplaytxnlog.so, libmulticast.so, libcommon.so, libboost_idb.so, libddlcleanuputil.so, libwriteengineclient.so libmysqlcl_idb.so, libwriteengineredistribute.so, libquerystats.so
 %endif
 
 %description
@@ -25,7 +25,7 @@ Calpont InfiniDB community binary files
 %package mysql
 Summary: Calpont InfiniDB community software MySQL connector
 Group: Applications
-Requires: calpont = %{version}, calpont-mysqld >= 3.5
+Requires: calpont = %{version}, calpont-mysqld >= 3.6
 %ifarch x86_64
 Provides: libcalmysql.so()(64bit)
 %else
@@ -122,6 +122,7 @@ rm -rf $RPM_BUILD_ROOT $RPM_BUILD_DIR/%{name}-%{version}-%{release}
 /usr/local/Calpont/bin/print_journal
 /usr/local/Calpont/bin/infinidb.def
 /usr/local/Calpont/bin/redistributeDB
+/usr/local/Calpont/bin/databaseSizeReport
 #
 %config /usr/local/Calpont/etc/Calpont.xml
 %config /usr/local/Calpont/etc/ConsoleCmds.xml
@@ -151,7 +152,6 @@ rm -rf $RPM_BUILD_ROOT $RPM_BUILD_DIR/%{name}-%{version}-%{release}
 /usr/local/Calpont/lib/libthreadpool.so.1.0.0
 /usr/local/Calpont/lib/libwriteengine.so.1.0.0
 /usr/local/Calpont/lib/libwriteengineclient.so.1.0.0
-/usr/local/Calpont/lib/libsm.so.1.0.0
 /usr/local/Calpont/lib/libbrm.so.1.0.0
 /usr/local/Calpont/lib/librwlock.so.1.0.0
 /usr/local/Calpont/lib/libdataconvert.so.1.0.0

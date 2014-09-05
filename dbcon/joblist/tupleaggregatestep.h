@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: tupleaggregatestep.h 8810 2012-08-13 17:01:37Z zzhu $
+//  $Id: tupleaggregatestep.h 9733 2013-08-02 16:07:35Z pleblanc $
 
 
 #ifndef JOBLIST_TUPLEAGGREGATESTEP_H
@@ -44,16 +44,10 @@ public:
 	 * @param out the outputAssociation pointer
 	 */
 	TupleAggregateStep(
-			const JobStepAssociation& inputJobStepAssociation,
-			const JobStepAssociation& outputJobStepAssociation,
-			boost::shared_ptr<execplan::CalpontSystemCatalog> syscat,
-			uint32_t sessionId,
-			uint32_t txnId,
-			uint32_t statementId,
 			const rowgroup::SP_ROWAGG_UM_t&,
 			const rowgroup::RowGroup&,
 			const rowgroup::RowGroup&,
-			ResourceManager *);
+			const JobInfo&);
 
 	/** @brief TupleAggregateStep destructor
 	 */
@@ -64,37 +58,6 @@ public:
 	void run();
 	void join();
 
-	/** @brief virtual JobStepAssociation * inputAssociation
-	 *
-	 * @returns JobStepAssociation *
-	 */
-	const JobStepAssociation& inputAssociation() const
-	{
-		return fInputJobStepAssociation;
-	}
-	void inputAssociation(const JobStepAssociation& inputAssociation)
-	{
-		fInputJobStepAssociation = inputAssociation;
-	}
-	/** @brief virtual JobStepAssociation * outputAssociation
-	 *
-	 * @returns JobStepAssocation *
-	 */
-	const JobStepAssociation& outputAssociation() const
-	{
-		return fOutputJobStepAssociation;
-	}
-	void outputAssociation(const JobStepAssociation& outputAssociation)
-	{
-		fOutputJobStepAssociation = outputAssociation;
-	}
-
-	void stepId(uint16_t stepId) { fStepId = stepId; }
-	uint16_t stepId() const { return fStepId; }
-	uint32_t sessionId()   const { return fSessionId; }
-	uint32_t txnId()       const { return fTxnId; }
-	uint32_t statementId() const { return fStatementId; }
-
 	const std::string toString() const;
 
 	void setOutputRowGroup(const rowgroup::RowGroup&);
@@ -104,7 +67,6 @@ public:
 	uint nextBand_singleThread(messageqcpp::ByteStream &bs);
 	bool setPmHJAggregation(JobStep* step);
 	void savePmHJData(rowgroup::SP_ROWAGG_t&, rowgroup::SP_ROWAGG_t&, rowgroup::RowGroup&);
-	void logger(const SPJL& logger) { fLogger = logger; }
 
 	bool umOnly() const { return fUmOnly; }
 	void umOnly(bool b) { fUmOnly = b; }
@@ -142,17 +104,10 @@ private:
 	void formatMiniStats();
 	void printCalTrace();
 
-	JobStepAssociation fInputJobStepAssociation;
-	JobStepAssociation fOutputJobStepAssociation;
 	boost::shared_ptr<execplan::CalpontSystemCatalog>fCatalog;
-	uint32_t fSessionId;
-	uint32_t fTxnId;
-	uint16_t fStepId;
-	uint32_t fStatementId;
 	uint64_t fRowsReturned;
 	bool     fDoneAggregate;
 	bool     fEndOfResult;
-	SPJL     fLogger;
 
 	rowgroup::SP_ROWAGG_UM_t fAggregator;
 	rowgroup::RowGroup fRowGroupOut;
@@ -210,16 +165,17 @@ private:
 	boost::scoped_ptr<boost::thread> fRunner;
 	bool fDelivery;
 	bool fUmOnly;
-	ResourceManager *rm;
+	ResourceManager& fRm;
 
 	// multi-threaded
 	uint fNumOfThreads;
 	uint fNumOfBuckets;
 	uint fNumOfRowGroups;
 	uint64_t fBucketMask;
+	uint fBucketNum;
 
-	boost::mutex mutex;
-	std::vector<boost::mutex*> agg_mutex;
+	boost::mutex fMutex;
+	std::vector<boost::mutex*> fAgg_mutex;
 	std::vector<boost::shared_array<uint8_t> > fRowGroupDatas;
 	std::vector<rowgroup::SP_ROWAGG_UM_t> fAggregators;
 	std::vector<rowgroup::RowGroup> fRowGroupIns;
@@ -227,7 +183,7 @@ private:
 	std::vector<std::vector<boost::shared_array<uint8_t> > > fRowGroupsDeliveredData;
 	bool fIsMultiThread;
 	int fInputIter; // iterator
-	boost::scoped_array<uint64_t> memUsage;
+	boost::scoped_array<uint64_t> fMemUsage;
 };
 
 

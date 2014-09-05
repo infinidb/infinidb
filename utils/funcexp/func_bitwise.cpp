@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_bitwise.cpp 3279 2012-09-13 15:28:57Z bwilkinson $
+* $Id: func_bitwise.cpp 3616 2013-03-04 14:56:29Z rdempsey $
 *
 *
 ****************************************************************************/
@@ -41,8 +41,9 @@ using namespace logging;
 #include "dataconvert.h"
 using namespace dataconvert;
 
-namespace funcexp
+namespace
 {
+using namespace funcexp;
 
 // @bug 4703 - the actual bug was only in the DATETIME case
 // part of this statement below, but instead of leaving 5 identical
@@ -65,12 +66,24 @@ bool getUIntValFromParm(
 		case execplan::CalpontSystemCatalog::SMALLINT:
 		case execplan::CalpontSystemCatalog::DOUBLE:
 		case execplan::CalpontSystemCatalog::FLOAT:
+        case execplan::CalpontSystemCatalog::UDOUBLE:
+        case execplan::CalpontSystemCatalog::UFLOAT:
 		{
 			value = parm->data()->getIntVal(row, isNull);
 		}
 		break;
 
-		case execplan::CalpontSystemCatalog::VARCHAR:
+        case execplan::CalpontSystemCatalog::UBIGINT:
+        case execplan::CalpontSystemCatalog::UINT:
+        case execplan::CalpontSystemCatalog::UMEDINT:
+        case execplan::CalpontSystemCatalog::UTINYINT:
+        case execplan::CalpontSystemCatalog::USMALLINT:
+        {
+            value = parm->data()->getUintVal(row, isNull);
+        }
+        break;
+
+        case execplan::CalpontSystemCatalog::VARCHAR:
 		case execplan::CalpontSystemCatalog::CHAR:
 		{
 			value = parm->data()->getIntVal(row, isNull);
@@ -86,10 +99,16 @@ bool getUIntValFromParm(
 		break;
 
 		case execplan::CalpontSystemCatalog::DECIMAL:
+		case execplan::CalpontSystemCatalog::UDECIMAL:
 		{
 			IDB_Decimal d = parm->data()->getDecimalVal(row, isNull);
-			int64_t tmpval = d.value / power(d.scale);
-			int lefto = (d.value - tmpval * power(d.scale)) / power(d.scale-1);
+			if (parm->data()->resultType().colDataType == execplan::CalpontSystemCatalog::UDECIMAL &&
+				d.value < 0)
+			{
+				d.value = 0;
+			}
+			int64_t tmpval = d.value / helpers::power(d.scale);
+			int lefto = (d.value - tmpval * helpers::power(d.scale)) / helpers::power(d.scale-1);
 			if ( tmpval >= 0 && lefto > 4 )
 				tmpval++;
 			if ( tmpval < 0 && lefto < -4 )
@@ -124,7 +143,10 @@ bool getUIntValFromParm(
 	}
 	return true;
 }
+}
 
+namespace funcexp
+{
 
 //
 // BITAND
@@ -239,9 +261,9 @@ CalpontSystemCatalog::ColType Func_bitor::operationType( FunctionParm& fp, Calpo
 }
 
 int64_t Func_bitor::getIntVal(Row& row,
-									FunctionParm& parm,
-									bool& isNull,
-									CalpontSystemCatalog::ColType& operationColType)
+                              FunctionParm& parm,
+                              bool& isNull,
+                              CalpontSystemCatalog::ColType& operationColType)
 {
 	if ( parm.size() < 2 ) {
 		isNull = true;
@@ -259,6 +281,14 @@ int64_t Func_bitor::getIntVal(Row& row,
 	}
 
 	return val1 | val2;
+}
+
+uint64_t Func_bitor::getUintVal(rowgroup::Row& row,
+                                FunctionParm& fp,
+                                bool& isNull,
+                                execplan::CalpontSystemCatalog::ColType& op_ct)
+{ 
+    return static_cast<uint64_t>(getIntVal(row,fp,isNull,op_ct)); 
 }
 
 

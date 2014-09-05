@@ -1,5 +1,5 @@
 /******************************************************************************************
-* $Id: main.cpp 1976 2013-02-08 16:50:01Z dhill $
+* $Id: main.cpp 2016 2013-06-17 21:06:40Z dhill $
 *
 * Copyright (C) 2009-2012 Calpont Corporation
 *
@@ -1839,9 +1839,6 @@ static void statusControlThread()
 	//
 	ModuleTypeConfig moduletypeconfig;
 
-	ByteStream msg;
-	IOSocket fIos;
-
 	//read and cleanup port before trying to use
 	try {
 		Config* sysConfig = Config::makeConfig();
@@ -1850,7 +1847,6 @@ static void statusControlThread()
 		if ( !rootUser)
 			cmd = "sudo fuser -k " + port + "/tcp >/dev/null 2>&1";
 
-		
 		system(cmd.c_str());
 	}
 	catch(...)
@@ -1859,11 +1855,16 @@ static void statusControlThread()
 
 	log.writeLog(__LINE__, "statusControlThread Thread reading " + portName + " port", LOG_TYPE_DEBUG);
 
+	ByteStream msg;
+	IOSocket fIos;
+	MessageQueueServer* mqs;
+
+	struct timespec ts = { 1, 0 };
+
 	for (;;)
 	{
 		try
 		{
-			MessageQueueServer* mqs;
 			mqs = new MessageQueueServer(portName);
 			mqs->syncProto(false);
 
@@ -1886,7 +1887,6 @@ static void statusControlThread()
 					log.writeLog(__LINE__, "statusControlThread Thread reading " + portName + " port", LOG_TYPE_DEBUG);
 				}
 
-				struct timespec ts = { 1, 0 };
 				try
 				{
 					fIos = mqs->accept(&ts);
@@ -1984,7 +1984,7 @@ static void statusControlThread()
 		
 								if (listPtr == aPtr->end()) {
 									// not in list
-									log.writeLog(__LINE__, "statusControl: SET_PROC_STATUS: Process not valid: " + processName + " / " + moduleName, LOG_TYPE_DEBUG);
+									log.writeLog(__LINE__, "statusControl: SET_PROC_STATUS: Process not valid: " + moduleName + "/" + processName, LOG_TYPE_DEBUG);
 									break;
 								}
 
@@ -2039,18 +2039,38 @@ static void statusControlThread()
 								// invalid state change ACTIVE TO MAN_INIT / AUTO_INIT
 								if ( fShmProcessStatus[shmIndex].ProcessOpState == oam::ACTIVE ) {
 									if ( state == oam::MAN_INIT || state == oam::AUTO_INIT ) {
-										log.writeLog(__LINE__, "statusControl: Process " + processName + " of module " + moduleName + " Current State = ACTIVE, invalid update request to " + oam.itoa(state), LOG_TYPE_DEBUG);
+										log.writeLog(__LINE__, "statusControl: " + moduleName + "/" + processName + " Current State = ACTIVE, invalid update request to " + oam.itoa(state), LOG_TYPE_DEBUG);
 										break;
 									}
 								}
 
-								log.writeLog(__LINE__, "statusControl: Set Process " + processName + " of module " + moduleName + " State = " + oam.itoa(state) + " PID = " + oam.itoa(PID), LOG_TYPE_DEBUG);
+								if (  PID < 0 )
+									PID = 0;
+
+								log.writeLog(__LINE__, "statusControl: Set Process " + moduleName + "/" + processName +  + " State = " + oam.itoa(state) + " PID = " + oam.itoa(PID), LOG_TYPE_DEBUG);
 
 								//update table
-								fShmProcessStatus[shmIndex].ProcessOpState = state;
+								if (  state < STATE_MAX )
+									fShmProcessStatus[shmIndex].ProcessOpState = state;
 								if (  PID != 1 )
 									fShmProcessStatus[shmIndex].ProcessID = PID;
 								memcpy(fShmProcessStatus[shmIndex].StateChangeDate, oam.getCurrentTime().c_str(), DATESIZE);
+
+								//if DMLProc set to ACTIVE, set system state to ACTIVE
+								if ( processName == "DMLProc" && state == oam::ACTIVE )
+								{
+									fShmSystemStatus[0].OpState = state;
+									memcpy(fShmSystemStatus[0].StateChangeDate, oam.getCurrentTime().c_str(), DATESIZE);
+									log.writeLog(__LINE__, "statusControl: REQUEST RECEIVED: Set System State = " + oam.itoa(state), LOG_TYPE_DEBUG);
+								}
+
+								//if DMLProc set to BUSY_INIT, set system state to BUSY_INIT
+								if ( processName == "DMLProc" && state == oam::BUSY_INIT )
+								{
+									fShmSystemStatus[0].OpState = state;
+									memcpy(fShmSystemStatus[0].StateChangeDate, oam.getCurrentTime().c_str(), DATESIZE);
+									log.writeLog(__LINE__, "statusControl: REQUEST RECEIVED: Set System State = " + oam.itoa(state), LOG_TYPE_DEBUG);
+								}
 							}
 							break;
 		
@@ -2757,9 +2777,9 @@ static void statusControlThread()
 
 								msg >> device;
 
-								for ( int j=0 ; j < fmoduleNumber ; j++ )
+								for ( int j=0 ; j < extDeviceNumber ; j++ )
 								{
-									memcpy(charName, fShmSystemStatus[j].Name, NAMESIZE);
+									memcpy(charName, fShmExtDeviceStatus[j].Name, NAMESIZE);
 									shmName = charName;
 									if ( device == shmName ) {
 										for ( int k=j+1 ; k < extDeviceNumber ; k++)
@@ -2778,6 +2798,65 @@ static void statusControlThread()
 
 								if (!runStandby) {
 									ackmsg << (ByteStream::byte) REMOVE_EXT_DEVICE;
+									fIos.write(ackmsg);
+								}
+							}
+							break;
+
+							case ADD_DBROOT:
+							{
+								ByteStream ackmsg;
+								string device;
+
+								log.writeLog(__LINE__, "statusControl: REQUEST RECEIVED: Add DBRoot");
+
+								msg >> device;
+
+								fShmDbrootStatus[dbrootNumber].OpState = oam::INITIAL;
+								memcpy(fShmDbrootStatus[dbrootNumber].Name, device.c_str(), NAMESIZE);
+								memcpy(fShmDbrootStatus[dbrootNumber].StateChangeDate, oam.getCurrentTime().c_str(), DATESIZE);
+
+								dbrootNumber++;
+
+								if (!runStandby) {
+									ackmsg << (ByteStream::byte) ADD_DBROOT;
+									fIos.write(ackmsg);
+								}
+							}
+							break;
+
+							case REMOVE_DBROOT:
+							{
+								ByteStream ackmsg;
+								string device;
+								std::string shmName;
+								char charName[NAMESIZE];
+
+								log.writeLog(__LINE__, "statusControl: REQUEST RECEIVED: Remove DBRoot");
+
+								msg >> device;
+
+								for ( int j=0 ; j < dbrootNumber ; j++ )
+								{
+									memcpy(charName, fShmDbrootStatus[j].Name, NAMESIZE);
+									shmName = charName;
+									if ( device == shmName ) {
+										for ( int k=j+1 ; k < dbrootNumber ; k++)
+										{
+											string name = fShmDbrootStatus[k].Name;
+											int state = fShmDbrootStatus[k].OpState;
+											string changeDate = fShmDbrootStatus[k].StateChangeDate;
+
+											memcpy(fShmDbrootStatus[j].Name, name.c_str(), NAMESIZE);
+											fShmDbrootStatus[j].OpState = state;
+											memcpy(fShmDbrootStatus[j].StateChangeDate, changeDate.c_str(), DATESIZE);
+										}
+										dbrootNumber--;
+									}
+								}
+
+								if (!runStandby) {
+									ackmsg << (ByteStream::byte) REMOVE_DBROOT;
 									fIos.write(ackmsg);
 								}
 							}
@@ -2822,7 +2901,6 @@ static void statusControlThread()
 		
 						} // end of switch
 					}
-
 				}
 				catch (exception& ex)
 				{
@@ -2866,6 +2944,8 @@ static void statusControlThread()
 			// takes 2 - 4 minites to free sockets, sleep and retry
 			sleep(1);
         }
+
+		delete mqs;
 	}
 }
 

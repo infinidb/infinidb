@@ -41,14 +41,8 @@ class SubQueryStep : public JobStep
 
 public:
     /** @brief SubQueryStep constructor
-     *  @param sessionId the session Id
-     *  @param txnId the transaction Id
-     *  @param statementId the statement Id
      */
-    SubQueryStep(
-			uint32_t sessionId,
-			uint32_t txnId,
-			uint32_t statementId);
+    SubQueryStep(const JobInfo&);
 
     /** @brief SubQueryStep destructor
      */
@@ -61,62 +55,10 @@ public:
     /** @brief virtual void join method
      */
     void join();
-	
+
+    /** @brief virtual void abort method
+     */
 	void abort();
-
-    /** @brief virtual const JobStepAssociation& inputAssociation
-     *  @returns const JobStepAssociation&
-     */
-    const JobStepAssociation& inputAssociation() const
-    {
-        return fInputJobStepAssociation;
-    }
-
-    /** @brief virtual JobStepAssociation& inputAssociation
-     */
-    void inputAssociation(const JobStepAssociation& inputAssociation)
-    {
-        fInputJobStepAssociation = inputAssociation;
-    }
-
-    /** @brief virtual const JobStepAssociation& outputAssociation
-     *  @returns const JobStepAssocation&
-     */
-    const JobStepAssociation& outputAssociation() const
-    {
-        return fOutputJobStepAssociation;
-    }
-
-    /** @brief virtual JobStepAssociation& outputAssociation
-     */
-    void outputAssociation(const JobStepAssociation& outputAssociation)
-    {
-        fOutputJobStepAssociation = outputAssociation;
-    }
-
-	/** @brief virtual set step Id
-	 */
-    void stepId(uint16_t stepId) { fStepId = stepId; }
-
-	/** @brief virtual get step Id
-     *  @returns uint16
-	 */
-    uint16_t stepId() const { return fStepId; }
-
-	/** @brief virtual get session Id
-     *  @returns uint32
-	 */
-    uint32_t sessionId()   const { return fSessionId; }
-
-	/** @brief virtual get transaction Id
-     *  @returns uint32
-	 */
-    uint32_t txnId()       const { return fTxnId; }
-
-	/** @brief virtual get statement Id
-     *  @returns uint32
-	 */
-    uint32_t statementId() const { return fStatementId; }
 
 	/** @brief virtual get table OID
      *  @returns OID
@@ -131,10 +73,6 @@ public:
      *  @returns string
 	 */
     const std::string toString() const;
-
-	/** @brief virtual set default logger
-	 */
-	void logger(const SPJL& logger) { fLogger = logger; }
 
 	/** @brief virtual set the output rowgroup
 	 */
@@ -156,14 +94,7 @@ public:
 
 
 protected:
-    JobStepAssociation                               fInputJobStepAssociation;
-    JobStepAssociation                               fOutputJobStepAssociation;
-	uint32_t                                         fSessionId;
-	uint32_t                                         fTxnId;
-    uint16_t                                         fStepId;
-	uint32_t                                         fStatementId;
 	uint64_t                                         fRowsReturned;
-    SPJL                                             fLogger;
 
 	execplan::CalpontSystemCatalog::OID              fTableOid;
 	std::vector<execplan::CalpontSystemCatalog::OID> fColumnOids;
@@ -179,15 +110,8 @@ class SubAdapterStep : public JobStep, public TupleDeliveryStep
 
 public:
     /** @brief SubAdapterStep constructor
-     *  @param sessionId the session Id
-     *  @param txnId the transaction Id
-     *  @param statementId the statement Id
      */
-    SubAdapterStep(
-			uint32_t sessionId,
-			uint32_t txnId,
-			uint32_t statementId,
-			SJSTEP& s);
+    SubAdapterStep(SJSTEP& s, const JobInfo&);
 
     /** @brief SubAdapterStep destructor
      */
@@ -200,62 +124,10 @@ public:
     /** @brief virtual void join method
      */
     void join();
-	
+
+    /** @brief virtual void abort method
+     */
 	void abort();
-
-    /** @brief virtual const JobStepAssociation& inputAssociation
-     *  @returns const JobStepAssociation&
-     */
-    const JobStepAssociation& inputAssociation() const
-    {
-        return fInputJobStepAssociation;
-    }
-
-    /** @brief virtual JobStepAssociation& inputAssociation
-     */
-    void inputAssociation(const JobStepAssociation& inputAssociation)
-    {
-        fInputJobStepAssociation = inputAssociation;
-    }
-
-    /** @brief virtual const JobStepAssociation& outputAssociation
-     *  @returns const JobStepAssocation&
-     */
-    const JobStepAssociation& outputAssociation() const
-    {
-        return fOutputJobStepAssociation;
-    }
-
-    /** @brief virtual JobStepAssociation& outputAssociation
-     */
-    void outputAssociation(const JobStepAssociation& outputAssociation)
-    {
-        fOutputJobStepAssociation = outputAssociation;
-    }
-
-	/** @brief virtual set step Id
-	 */
-    void stepId(uint16_t stepId) { fStepId = stepId; }
-
-	/** @brief virtual get step Id
-     *  @returns uint16
-	 */
-    uint16_t stepId() const { return fStepId; }
-
-	/** @brief virtual get session Id
-     *  @returns uint32
-	 */
-    uint32_t sessionId()   const { return fSessionId; }
-
-	/** @brief virtual get transaction Id
-     *  @returns uint32
-	 */
-    uint32_t txnId()       const { return fTxnId; }
-
-	/** @brief virtual get statement Id
-     *  @returns uint32
-	 */
-    uint32_t statementId() const { return fStatementId; }
 
 	/** @brief virtual get table OID
      *  @returns OID
@@ -270,10 +142,6 @@ public:
      *  @returns string
 	 */
     const std::string toString() const;
-
-	/** @brief virtual set default logger
-	 */
-	void logger(const SPJL& logger) { fLogger = logger; }
 
 	/** @brief virtual set the rowgroup for FE to work on
 	 */
@@ -322,14 +190,6 @@ protected:
 	void dupOutputColumns(rowgroup::Row&);
 	void printCalTrace();
 	void formatMiniStats();
-
-    JobStepAssociation                               fInputJobStepAssociation;
-    JobStepAssociation                               fOutputJobStepAssociation;
-	uint32_t                                         fSessionId;
-	uint32_t                                         fTxnId;
-    uint16_t                                         fStepId;
-	uint32_t                                         fStatementId;
-    SPJL                                             fLogger;
 
 	execplan::CalpontSystemCatalog::OID              fTableOid;
 	rowgroup::RowGroup                               fRowGroupIn;

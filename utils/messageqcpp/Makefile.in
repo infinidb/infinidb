@@ -31,7 +31,7 @@
 #  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 #  MA 02110-1301, USA.
 
-# $Id: Makefile.am 3048 2012-04-04 15:33:45Z rdempsey $
+# $Id: Makefile.am 3639 2013-03-18 12:36:37Z rdempsey $
 
 
 srcdir = @srcdir@
@@ -78,7 +78,8 @@ libLTLIBRARIES_INSTALL = $(INSTALL)
 LTLIBRARIES = $(lib_LTLIBRARIES)
 libmessageqcpp_la_LIBADD =
 am_libmessageqcpp_la_OBJECTS = messagequeue.lo bytestream.lo \
-	socketparms.lo inetstreamsocket.lo iosocket.lo
+	socketparms.lo inetstreamsocket.lo iosocket.lo \
+	compressed_iss.lo
 libmessageqcpp_la_OBJECTS = $(am_libmessageqcpp_la_OBJECTS)
 DEFAULT_INCLUDES = -I. -I$(srcdir) -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
@@ -226,9 +227,9 @@ AM_CFLAGS = $(idb_cflags)
 AM_CXXFLAGS = $(idb_cxxflags)
 AM_LDFLAGS = -version-info 1:0:0 $(idb_ldflags)
 lib_LTLIBRARIES = libmessageqcpp.la
-libmessageqcpp_la_SOURCES = messagequeue.cpp bytestream.cpp socketparms.cpp inetstreamsocket.cpp iosocket.cpp
+libmessageqcpp_la_SOURCES = messagequeue.cpp bytestream.cpp socketparms.cpp inetstreamsocket.cpp iosocket.cpp compressed_iss.cpp
 include_HEADERS = messagequeue.h bytestream.h socketparms.h inetstreamsocket.h iosocket.h \
-serversocket.h clientsocket.h socket.h serializeable.h socketclosed.h
+serversocket.h socket.h serializeable.h socketclosed.h
 
 all: all-am
 
@@ -300,6 +301,7 @@ distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bytestream.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/compressed_iss.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/inetstreamsocket.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/iosocket.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/messagequeue.Plo@am__quote@

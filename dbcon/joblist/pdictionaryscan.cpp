@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: pdictionaryscan.cpp 9469 2013-05-01 18:38:43Z pleblanc $
+*   $Id: pdictionaryscan.cpp 9308 2013-03-13 18:08:40Z pleblanc $
 *
 *
 ***********************************************************************/
@@ -34,6 +34,7 @@ using namespace std;
 #include "elementtype.h"
 #include "unique32generator.h"
 #include "oamcache.h"
+#include "jlf_common.h"
 #include "primitivestep.h"
 
 #include "messagequeue.h"
@@ -77,11 +78,12 @@ struct pDictionaryScanPrimitive
         }
         catch(runtime_error& re)
         {
-			catchHandler(re.what());
+			catchHandler(re.what(), ERR_DICTIONARY_SCAN, fPDictScan->errorInfo(), fPDictScan->sessionId());
 		}
         catch(...)
         {
-			catchHandler("pDictionaryScan send caught an unknown exception");
+			catchHandler("pDictionaryScan send caught an unknown exception",
+							ERR_DICTIONARY_SCAN, fPDictScan->errorInfo(), fPDictScan->sessionId());
 		}
 
     }
@@ -100,11 +102,12 @@ struct pDictionaryScanAggregator
         }
         catch(runtime_error& re)
         {
-			catchHandler(re.what());
+			catchHandler(re.what(), ERR_DICTIONARY_SCAN, fPDictScan->errorInfo(), fPDictScan->sessionId());
 		}
         catch(...)
         {
-			catchHandler("pDictionaryScan receive caught an unknown exception");
+			catchHandler("pDictionaryScan receive caught an unknown exception",
+							ERR_DICTIONARY_SCAN, fPDictScan->errorInfo(), fPDictScan->sessionId());
 		}
 
     }
@@ -112,30 +115,15 @@ struct pDictionaryScanAggregator
 
 
 pDictionaryScan::pDictionaryScan(
-	const JobStepAssociation& inputJobStepAssociation,
-	const JobStepAssociation& outputJobStepAssociation,
-	DistributedEngineComm* dec,
-	boost::shared_ptr<CalpontSystemCatalog> cat,
 	CalpontSystemCatalog::OID o,
-	int ct,
 	CalpontSystemCatalog::OID t,
-	uint32_t session,
-	uint32_t txn,
-	uint32_t verID,
-	uint16_t step,
-	uint32_t statement,
-	ResourceManager& rm) :
-	fInputJobStepAssociation(inputJobStepAssociation),
-	fOutputJobStepAssociation(outputJobStepAssociation),
-	fDec(dec),
-	sysCat(cat),
+	const CalpontSystemCatalog::ColType& ct,
+	const JobInfo& jobInfo) :
+	JobStep(jobInfo),
+	fDec(NULL),
+	sysCat(jobInfo.csc),
 	fOid(o),
 	fTableOid(t),
-	fSessionId(session),
-	fTxnId(txn),
-	fVerId(verID),
-	fStepId(step),
-	fStatementId(statement),
 	fFilterCount(0),
 	fBOP(BOP_NONE),
 	msgsSent(0),
@@ -145,8 +133,9 @@ pDictionaryScan::pDictionaryScan(
 	sendWaiting(false),
 	ridCount(0),
 	ridList(0),
-	fScanLbidReqLimit(rm.getJlScanLbidReqLimit()),
-	fScanLbidReqThreshold(rm.getJlScanLbidReqThreshold()),
+	colType(ct),
+	fScanLbidReqLimit(jobInfo.rm.getJlScanLbidReqLimit()),
+	fScanLbidReqThreshold(jobInfo.rm.getJlScanLbidReqThreshold()),
 	fStopSending(false),
 	fSingleThread(false),
 	fPhysicalIO(0),
@@ -154,7 +143,7 @@ pDictionaryScan::pDictionaryScan(
 	fMsgBytesIn(0),
 	fMsgBytesOut(0),
 	fMsgsToPm(0),
-	fRm(rm),
+	fRm(jobInfo.rm),
 	isEquality(false)
 {
 	int err;
@@ -210,11 +199,8 @@ pDictionaryScan::pDictionaryScan(
 	fCOP2 = COMPARE_NIL;
 
 	uniqueID = UniqueNumberGenerator::instance()->getUnique32();
-	if (fDec)
-		fDec->addQueue(uniqueID);
  	initializeConfigParms();
 	fExtendedInfo = "DSS: ";
-	colType.compressionType = colType.ddn.compressionType = ct;
 }
 
 pDictionaryScan::~pDictionaryScan()
@@ -344,11 +330,11 @@ void pDictionaryScan::sendPrimitiveMessages()
 		dbRootPMMap = oamCache->getDBRootToConnectionMap();
 
 		it = fDictlbids.begin();
-		for (; it != fDictlbids.end() && !die; it++)
+		for (; it != fDictlbids.end() && !cancelled(); it++)
 		{
 			LBID_t	msgLbidStart = it->start;
         	dbrm.lookupLocal(msgLbidStart,
-						(BRM::VER_t)fVerId, 
+						(BRM::VER_t)fVerId.currentScn, 
 						false, 
 						oid,
                         dbroot, 
@@ -363,7 +349,7 @@ void pDictionaryScan::sendPrimitiveMessages()
 
 			u_int32_t msgLbidCount   =  fLogicalBlocksPerScan;
 			
-			while ( remainingLbids && 0 == fInputJobStepAssociation.status() && !die)
+			while ( remainingLbids && !cancelled())
 			{		
 				if ( remainingLbids < msgLbidCount)					
 					msgLbidCount = remainingLbids;
@@ -393,12 +379,13 @@ void pDictionaryScan::sendPrimitiveMessages()
 	}//try
 	catch(const exception& e)
     {
-      catchHandler(e.what(), fSessionId);
+      catchHandler(e.what(), ERR_DICTIONARY_SCAN, fErrorInfo, fSessionId);
       sendError(ERR_DICTIONARY_SCAN);
     }
 	catch(...)
     {
-      catchHandler("pDictionaryScan caught an unknown exception.", fSessionId);
+      catchHandler("pDictionaryScan caught an unknown exception.",
+					ERR_DICTIONARY_SCAN, fErrorInfo, fSessionId);
       sendError(ERR_DICTIONARY_SCAN);
     }
 
@@ -425,9 +412,9 @@ void pDictionaryScan::sendPrimitiveMessages()
 
 }
 
-void pDictionaryScan::sendError(uint16_t status)
+void pDictionaryScan::sendError(uint16_t s)
 {
-	fOutputJobStepAssociation.status(status);
+	status(s);
 }
 
 //------------------------------------------------------------------------------
@@ -452,7 +439,7 @@ void pDictionaryScan::sendAPrimitiveMessage(
 
 	hdr.Hdr.SessionID     = fSessionId;
 	hdr.Hdr.TransactionID = fTxnId;
-	hdr.Hdr.VerID         = fVerId;
+	hdr.Hdr.VerID         = fVerId.currentScn;
 	hdr.Hdr.StepID        = fStepId;
 	hdr.Hdr.UniqueID	  = uniqueID;
 	hdr.Hdr.Priority	  = priority();
@@ -473,7 +460,20 @@ void pDictionaryScan::sendAPrimitiveMessage(
 	if (fSessionId & 0x80000000)
 		hdr.flags |= IS_SYSCAT;
 
-	primMsg.load((const uint8_t*) &hdr, sizeof(DictTokenByScanRequestHeader));
+
+	/* TODO: Need to figure out how to get the full fVerID into this msg.
+	 * XXXPAT: The way I did it is IMO the least kludgy, while requiring only a couple
+	 * changes.
+	 * The old msg was: TokenByScanRequestHeader + fFilterString
+	 * The new msg is: TokenByScanRequestHeader + fVerId + old message
+	 * Prepending verid wastes a few bytes that go over the network, but that is better
+	 * than putting it in the middle or at the end in terms of simplicity & memory usage,
+	 * given the current code.
+	 */
+	
+	primMsg.load((const uint8_t *) &hdr, sizeof(DictTokenByScanRequestHeader));
+	primMsg << fVerId;
+	primMsg.append((const uint8_t*) &hdr, sizeof(DictTokenByScanRequestHeader));
 	primMsg += fFilterString;
 
 	//cout << "Sending rqst LBIDS " << msgLbidStart
@@ -486,31 +486,26 @@ void pDictionaryScan::sendAPrimitiveMessage(
             "; lbid count " << msgLbidCount     << endl;
 #endif
 	
-	fMsgBytesOut += primMsg.lengthWithHdrOverhead();
 	try {
 		fDec->write(uniqueID, primMsg);
 	}
-	catch (const IDBExcept &e) {
+	catch (const IDBExcept& e) {
 		abort();
-		catchHandler(e.what());
-		if (fOutputJobStepAssociation.status() == 0)
-			fOutputJobStepAssociation.status(e.errorCode());
+		cerr << "pDictionaryScan::send() caught: " << e.what() << endl;
+		catchHandler(e.what(), e.errorCode(), fErrorInfo, fSessionId);
 	}
 	catch (const std::exception& e)
 	{
 		abort();
 		cerr << "pDictionaryScan::send() caught: " << e.what() << endl;
-		catchHandler(e.what());
-		if (fOutputJobStepAssociation.status() == 0)
-			fOutputJobStepAssociation.status(ERR_DICTIONARY_SCAN);
+		catchHandler(e.what(), ERR_DICTIONARY_SCAN, fErrorInfo, fSessionId);
 	}
 	catch (...)
 	{
 		abort();
 		cerr << "pDictionaryScan::send() caught unknown exception" << endl;
-		catchHandler("pDictionaryScan::send() caught unknown exception");
-		if (fOutputJobStepAssociation.status() == 0)
-			fOutputJobStepAssociation.status(ERR_DICTIONARY_SCAN);
+		catchHandler("pDictionaryScan::send() caught unknown exception",
+					ERR_DICTIONARY_SCAN, fErrorInfo, fSessionId);
 	}
 	fMsgsToPm++;
 }
@@ -537,7 +532,7 @@ void pDictionaryScan::receivePrimitiveMessages()
 		fOutputRowGroup.resetRowGroup(0);
 	}
 
-	uint16_t error = fOutputJobStepAssociation.status(); 
+	uint16_t error = status(); 
 	//...Be careful here.  Mutex is locked prior to entering the loop, so
 	//...any continue statement in the loop must be sure the mutex is locked.
 	//error condition will not go through loop
@@ -562,7 +557,6 @@ void pDictionaryScan::receivePrimitiveMessages()
 			mutex.unlock();
 
 			fDec->read(uniqueID, bs);
-			fMsgBytesIn += bs->lengthWithHdrOverhead();
 			if (fOid>=3000 && traceOn() && dlTimes.FirstReadTime().tv_sec==0)
 				dlTimes.setFirstReadTime();
 			if (fOid>=3000 && traceOn()) dlTimes.setLastReadTime();	
@@ -599,7 +593,7 @@ void pDictionaryScan::receivePrimitiveMessages()
 				if (fOid>=3000 && traceOn() && dlTimes.FirstInsertTime().tv_sec==0)
 					dlTimes.setFirstInsertTime();
 
-				for(int j = 0; j < crh->NVALS && !die; j++)
+				for(int j = 0; j < crh->NVALS && !cancelled(); j++)
 				{
 					memcpy(&pt, bsp, sizeof(pt));
 					bsp += sizeof(pt);
@@ -665,26 +659,37 @@ void pDictionaryScan::receivePrimitiveMessages()
 				fStopSending = true;
 				condvarWakeupProducer.notify_one();
 				mutex.unlock();
-				fOutputJobStepAssociation.status(error);
+				string errMsg;
+				//bs->advance(sizeof(ISMPacketHeader) + sizeof(PrimitiveHeader));
+				//*bs >> errMsg;
+				if (error < 1000)
+				{
+					logging::ErrorCodes errorcodes;
+					errMsg = errorcodes.errorString(error);
+				}
+				else
+				{
+					errMsg = IDBErrorInfo::instance()->errorMsg(error);
+				}
+				errorMessage(errMsg);
+				status(error);
 			}
 		} // end of loop to read LBID responses from primproc
 	}
 	catch(const LargeDataListExcept& ex)
     {
-		catchHandler(ex.what(), fSessionId);
-		fOutputJobStepAssociation.status(ERR_DICTIONARY_SCAN);
+		catchHandler(ex.what(), ERR_DICTIONARY_SCAN, fErrorInfo, fSessionId);
 		mutex.unlock();
     }
 	catch(const exception& e)
     {
-		catchHandler(e.what(), fSessionId);
-		fOutputJobStepAssociation.status(ERR_DICTIONARY_SCAN);
+		catchHandler(e.what(), ERR_DICTIONARY_SCAN, fErrorInfo, fSessionId);
 		mutex.unlock();
     }
 	catch(...)
     {
-		catchHandler("pDictionaryScan caught an unknown exception.", fSessionId);
-		fOutputJobStepAssociation.status(ERR_DICTIONARY_SCAN);
+		catchHandler("pDictionaryScan caught an unknown exception.",
+						ERR_DICTIONARY_SCAN, fErrorInfo, fSessionId);
 		mutex.unlock();
     }
 
@@ -699,6 +704,10 @@ void pDictionaryScan::receivePrimitiveMessages()
 	if (fifo && rw.count > 0)
 		fifo->insert(rw);
 
+	Stats stats = fDec->getNetworkStats(uniqueID);
+	fMsgBytesIn = stats.dataRecvd();
+	fMsgBytesOut = stats.dataSent();
+	
 	//@bug 699: Reset StepMsgQueue
 	fDec->removeQueue(uniqueID);
 
@@ -765,7 +774,7 @@ void pDictionaryScan::receivePrimitiveMessages()
 				"\t1st read " << dlTimes.FirstReadTimeString() <<
 				"; EOI " << dlTimes.EndOfInputTimeString() << "; runtime-" <<
 				JSTimeStamp::tsdiffstr(dlTimes.EndOfInputTime(),dlTimes.FirstReadTime())<< "s" << endl
-				<< "\tJob completion status " << fInputJobStepAssociation.status() << endl;
+				<< "\tJob completion status " << status() << endl;
 				
 			logEnd(logStr.str().c_str());
 
@@ -864,25 +873,21 @@ void pDictionaryScan::serializeEqualityFilter()
 	}
 	catch (const IDBExcept &e) {
 		abort();
-		catchHandler(e.what());
-		if (fOutputJobStepAssociation.status() == 0)
-			fOutputJobStepAssociation.status(e.errorCode());
+		cerr << "pDictionaryScan::serializeEqualityFilter() caught: " << e.what() << endl;
+		catchHandler(e.what(), e.errorCode(), fErrorInfo, fSessionId);
 	}
 	catch (const std::exception& e)
 	{
 		abort();
 		cerr << "pDictionaryScan::serializeEqualityFilter() caught: " << e.what() << endl;
-		catchHandler(e.what());
-		if (fOutputJobStepAssociation.status() == 0)
-			fOutputJobStepAssociation.status(ERR_DICTIONARY_SCAN);
+		catchHandler(e.what(), ERR_DICTIONARY_SCAN, fErrorInfo, fSessionId);
 	}
 	catch (...)
 	{
 		abort();
 		cerr << "pDictionaryScan::serializeEqualityFilter() caught unknown exception" << endl;
-		catchHandler("pDictionaryScan::serializeEqualityFilter() caught unknown exception");
-		if (fOutputJobStepAssociation.status() == 0)
-			fOutputJobStepAssociation.status(ERR_DICTIONARY_SCAN);
+		catchHandler("pDictionaryScan::serializeEqualityFilter() caught unknown exception",
+						ERR_DICTIONARY_SCAN, fErrorInfo, fSessionId);
 	}
 	empty.swap(equalityFilter);
 }
@@ -901,25 +906,20 @@ void pDictionaryScan::destroyEqualityFilter()
 	}
 	catch (const IDBExcept &e) {
 		abort();
-		catchHandler(e.what());
-		if (fOutputJobStepAssociation.status() == 0)
-			fOutputJobStepAssociation.status(e.errorCode());
+		catchHandler(e.what(), e.errorCode(), fErrorInfo, fSessionId);
 	}
 	catch (const std::exception& e)
 	{
 		abort();
 		cerr << "pDictionaryScan::destroyEqualityFilter() caught: " << e.what() << endl;
-		catchHandler(e.what());
-		if (fOutputJobStepAssociation.status() == 0)
-			fOutputJobStepAssociation.status(ERR_DICTIONARY_SCAN);
+		catchHandler(e.what(), ERR_DICTIONARY_SCAN, fErrorInfo, fSessionId);
 	}
 	catch (...)
 	{
 		abort();
 		cerr << "pDictionaryScan::destroyEqualityFilter() caught unknown exception" << endl;
-		catchHandler("pDictionaryScan::destroyEqualityFilter() caught unknown exception");
-		if (fOutputJobStepAssociation.status() == 0)
-			fOutputJobStepAssociation.status(ERR_DICTIONARY_SCAN);
+		catchHandler("pDictionaryScan::destroyEqualityFilter() caught unknown exception",
+						ERR_DICTIONARY_SCAN, fErrorInfo, fSessionId);
 	}
 }
 

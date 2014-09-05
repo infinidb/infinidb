@@ -1,6 +1,6 @@
 #!/usr/bin/expect
 #
-# $Id: remote_command.sh 3496 2012-12-17 22:51:51Z dhill $
+# $Id: remote_command.sh 3495 2012-12-17 22:51:40Z dhill $
 #
 # Remote command execution script to another server
 # Argument 1 - Remote Server Host Name or IP address
@@ -13,7 +13,13 @@ set SERVER [lindex $argv 0]
 set PASSWORD [lindex $argv 1]
 set COMMAND [lindex $argv 2]
 set DEBUG [lindex $argv 3]
-set USERNAME $env(USER)
+
+if {[info exists env(USER)]} {
+     set USERNAME $env(USER)
+} else {
+     set USERNAME "root"
+}
+
 set UNM [lindex $argv 4]
 if { $UNM != "" } {
 	set USERNAME "$UNM"

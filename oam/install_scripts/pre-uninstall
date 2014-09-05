@@ -59,6 +59,7 @@ fi
 #rm -f $installdir/mysql/db/*.err > /dev/null 2>&1
 rm -f /var/log/Calpont/activeAlarms > /dev/null 2>&1
 rm -f /var/log/Calpont/*.log1 > /dev/null 2>&1
+rm -rf $installdir/mysql/db/infinidb_log_archive > /dev/null 2>&1
 
 # remove Calpont Log Rotate File abd Transaction Log File
 rm -f /etc/logrotate.d/calpont > /dev/null 2>&1
@@ -88,7 +89,6 @@ rm -f /tmp/idb*
 rm -f $installdir/data/bulk/tmpjob/* >/dev/null 2>&1
 rm -rf /tmp/infinidb_tmp_files
 rm -f $installdir/local/moveDbrootTransactionLog
-
 
 # delete core files
 rm -f /var/log/Calpont/corefiles/* > /dev/null 2>&1

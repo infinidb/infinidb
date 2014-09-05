@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_greatest.cpp 3956 2013-07-08 19:17:26Z bpaul $
+* $Id: func_greatest.cpp 3957 2013-07-08 21:20:36Z bpaul $
 *
 *
 ****************************************************************************/
@@ -75,8 +75,27 @@ int64_t Func_greatest::getIntVal(rowgroup::Row& row,
 		if ( greatestStr < str1 )
 			greatestStr = str1;
 	}
+    uint64_t tmp = (uint64_t)greatestStr;
+	return (int64_t) tmp;
+}
 
-	return (int64_t) greatestStr;
+uint64_t Func_greatest::getUintVal(rowgroup::Row& row,
+						FunctionParm& fp,
+						bool& isNull,
+						execplan::CalpontSystemCatalog::ColType& op_ct)
+{
+	double str = fp[0]->data()->getDoubleVal(row, isNull);
+
+	double greatestStr = str;
+	for (uint i = 1; i < fp.size(); i++)
+	{
+		double str1 = fp[i]->data()->getDoubleVal(row, isNull);
+
+		if ( greatestStr < str1 )
+			greatestStr = str1;
+	}
+
+	return (uint64_t) greatestStr;
 }
 
 double Func_greatest::getDoubleVal(rowgroup::Row& row,

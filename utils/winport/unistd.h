@@ -93,6 +93,8 @@ extern int gettimeofday(struct timeval*, struct timezone*);
 extern struct tm* idb_localtime_r(const time_t*, struct tm*);
 #define strtoll idb_strtoll
 extern long long idb_strtoll(const char*, char**, int);
+#define strtoull idb_strtoull
+extern unsigned long long idb_strtoull(const char*, char**, int);
 #define crc32 idb_crc32
 extern unsigned int idb_crc32(const unsigned int, const unsigned char*, const size_t);
 #endif

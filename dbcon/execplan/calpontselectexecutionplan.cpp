@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: calpontselectexecutionplan.cpp 8777 2012-08-01 21:52:34Z zzhu $
+*   $Id: calpontselectexecutionplan.cpp 9215 2013-01-24 18:40:12Z pleblanc $
 *
 *
 ***********************************************************************/
@@ -367,7 +367,7 @@ void CalpontSelectExecutionPlan::serialize(messageqcpp::ByteStream& b) const
 	b << fData;
 	b << static_cast<uint32_t>(fSessionID);
 	b << static_cast<uint32_t>(fTxnID);
-	b << static_cast<uint32_t>(fVerID);
+	b << fVerID;
 	b << fTraceFlags;
 	b << fStatementID;
 	b << static_cast<const ByteStream::byte>(fDistinct);		
@@ -497,7 +497,7 @@ void CalpontSelectExecutionPlan::unserialize(messageqcpp::ByteStream& b)
 	b >> fData;
 	b >> reinterpret_cast<uint32_t&>(fSessionID);
 	b >> reinterpret_cast<uint32_t&>(fTxnID);
-	b >> reinterpret_cast<uint32_t&>(fVerID);
+	b >> fVerID;
 	b >> fTraceFlags;
 	b >> fStatementID;
 	b >> reinterpret_cast< ByteStream::byte&>(fDistinct);	

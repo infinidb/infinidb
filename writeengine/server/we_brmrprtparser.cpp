@@ -1,6 +1,6 @@
 /*
 
-   Copyright (C) 2009-2012 Calpont Corporation.
+   Copyright (C) 2009-2013 Calpont Corporation.
 
    Use of and access to the Calpont InfiniDB Community software is subject to the
    terms and conditions of the Calpont Open Source License Agreement. Use of and
@@ -61,7 +61,13 @@ BrmReportParser::~BrmReportParser()
 
 }
 
-
+//------------------------------------------------------------------------------
+// Serialize specified RptFileName into the ByteStream Bs.
+// Serialization is done one record at a time.  File should be an ASCII file
+// with newlines markers, because getline() is used.
+// Function is limited to records that are no longer than 255 bytes.
+// If a record is longer than 255 bytes, the function misbehaves.
+//------------------------------------------------------------------------------
 bool BrmReportParser::serialize(std::string RptFileName,
 									messageqcpp::ByteStream& Bs)
 {
@@ -112,7 +118,7 @@ bool BrmReportParser::serialize(std::string RptFileName,
 // so that this function will work for both character and binary files.
 //------------------------------------------------------------------------------
 bool BrmReportParser::serializeBlocks(std::string RptFileName,
-		    messageqcpp::ByteStream& Bs)
+	messageqcpp::ByteStream& Bs)
 {
 	try
 	{
@@ -148,7 +154,7 @@ bool BrmReportParser::serializeBlocks(std::string RptFileName,
 	}
 	else
 	{
-		std::ostringstream oss;
+        std::ostringstream oss;
 		oss << "Failed to open Report File " << RptFileName << endl;
 		cout << oss.str() << endl;
 		return false;
@@ -156,7 +162,6 @@ bool BrmReportParser::serializeBlocks(std::string RptFileName,
 
 	return true;
 }
-
 
 void BrmReportParser::unserialize(messageqcpp::ByteStream& Bs)
 {

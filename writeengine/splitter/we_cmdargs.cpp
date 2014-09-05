@@ -1,6 +1,6 @@
 /*
 
-   Copyright (C) 2009-2012 Calpont Corporation.
+   Copyright (C) 2009-2013 Calpont Corporation.
 
    Use of and access to the Calpont InfiniDB Community software is subject to the
    terms and conditions of the Calpont Open Source License Agreement. Use of and
@@ -89,6 +89,7 @@ WECmdArgs::WECmdArgs(int argc, char** argv) :
     fEnclosedChar=0;		// enclosed by char
     fEscChar = 0;			// esc char
     fNullStrMode = false;
+	fImportDataMode = IMPORT_DATA_TEXT;
     fDebugLvl = 0;
     fCpiInvoke = false;		// by default don't invoke CPI
     fBlockMode3 = false;	// to prevent blocking mode 3
@@ -188,6 +189,8 @@ std::string WECmdArgs::getCpImportCmdLine()
 		aSS << " -C " << fEscChar;
 	if(fNullStrMode)
 		aSS << " -n " << '1';
+	if(fImportDataMode != IMPORT_DATA_TEXT)
+		aSS << " -I " << fImportDataMode;
 	//if(fConfig.length()>0)
 	//	aSS << " -c " << fConfig;
 	if(fReadBufSize>0)
@@ -365,6 +368,12 @@ bool WECmdArgs::checkForCornerCases()
 			throw(runtime_error("Mismatched options."));
 		}
 
+		if (fImportDataMode != IMPORT_DATA_TEXT)
+		{
+			cout << "Invalid option -I with Mode 0" << endl;
+			throw(runtime_error("Mismatched options."));
+		}
+
 	}
 
 	if(fMode == 1)
@@ -420,6 +429,7 @@ bool WECmdArgs::checkForCornerCases()
 }
 
 //----------------------------------------------------------------------
+
 bool WECmdArgs::str2PmList(std::string& PmList, VecInts& V)
 {
     const int BUFLEN=512;
@@ -467,6 +477,7 @@ void WECmdArgs::usage()
 	cout << "\t\t [-r readers] [-j JobID] [-e maxErrs] [-B libBufSize] [-w parsers]\n";
 	cout << "\t\t [-s c] [-E enclosedChar] [-C escapeChar] [-n NullOption]\n";
 	cout << "\t\t [-q batchQty] [-p jobPath] [-P list of PMs] [-S] [-i] [-v verbose]\n";
+	cout << "\t\t [-I binaryOpt]\n";
 
 
 	cout << "Traditional usage without positional parameters (XML job file required):\n";
@@ -475,6 +486,7 @@ void WECmdArgs::usage()
 	cout << "\t\t [-b readBufs] [-p path] [-c readBufSize] [-e maxErrs] [-B libBufSize]\n";
 	cout << "\t\t [-n NullOption] [-E encloseChar] [-C escapeChar] [-i] [-v verbose]\n";
 	cout << "\t\t [-d debugLevel] [-q batchQty] [-l loadFile] [-P list of PMs] [-S]\n";
+	cout << "\t\t [-I binaryOpt]\n";
 
 	cout << "\n\nPositional parameters:\n";
 	cout << "\tdbName     Name of the database to load\n";
@@ -496,7 +508,7 @@ void WECmdArgs::usage()
 			<<"\t-l\tName of import file to be loaded, relative to -f path,\n"
 			<<"\t-h\tPrint this message.\n"
 			<<"\t-q\tBatch Quantity, Number of rows distributed per batch in Mode 1\n"
-			<<"\t-i\tPrint extended info to console.\n"
+			<<"\t-i\tPrint extended info to console in mode 3.\n"
 			<<"\t-j\tJob ID. In simple usage, default is the table OID.\n"
 			<<"\t\t\tunless a fully qualified input file name is given.\n"
 			<<"\t-n\tNullOption (0-treat the string NULL as data (default);\n"
@@ -509,6 +521,9 @@ void WECmdArgs::usage()
 			<<"\t-E\tEnclosed by character if field values are enclosed.\n"
 			<<"\t-C\tEscape character used in conjunction with 'enclosed by'\n"
 			<<"\t\t\tcharacter (default is '\\')\n"
+			<<"\t-I\tImport binary data; how to treat NULL values:\n"
+			<<"\t\t\t1 - import NULL values\n"
+			<<"\t\t\t2 - saturate NULL values\n"
 			<<"\t-P\tList of PMs ex: -P 1,2,3. Default is all PMs.\n"
 			<<"\t-S\tTreat string truncations as errors.\n"
 			<<"\t-m\tmode\n"
@@ -611,6 +626,10 @@ void WECmdArgs::parseCmdLineArgs(int argc, char** argv)
 		}
 		case 'j': // -j: jobID
 		{
+			errno = 0;
+			long lValue = strtol(optarg, 0, 10);
+			if ((errno != 0) || (lValue < 0) || (lValue > INT_MAX))
+				throw runtime_error("Option -j is invalid or out of range");
 			fJobId = optarg;
 			fOrigJobId = fJobId;	// in case if we need to split it.
 			if(0==fJobId.length()) throw runtime_error("Wrong JobID Value");
@@ -733,6 +752,24 @@ void WECmdArgs::parseCmdLineArgs(int argc, char** argv)
 		{
 			//usage(); // will exit(1) here
 			fHelp = true;
+			break;
+		}
+		case 'I': // -I: binary mode (null handling)
+		{ // default is text mode, unless -I option is specified
+			int binaryMode = atoi(optarg);
+			if (binaryMode == 1)
+			{
+				fImportDataMode = IMPORT_DATA_BIN_ACCEPT_NULL;
+			}
+			else if (binaryMode == 2)
+			{
+				fImportDataMode = IMPORT_DATA_BIN_SAT_NULL;
+			}
+			else
+			{
+				throw(runtime_error(
+					"Invalid Binary mode; value can be 1 or 2"));
+			}
 			break;
 		}
 		case 'S': // -S: Treat string truncations as errors
@@ -1126,69 +1163,88 @@ void WECmdArgs::addJobFilesToVector(std::string& JobName)
 }
 
 //------------------------------------------------------------------------------
-
+// Set the schema, table, and loadfile name from the xml job file.
+// If running in binary mode, we also get the list of columns for the table,
+// so that we can determine the exact fixed record length of the incoming data.
+//------------------------------------------------------------------------------
 void WECmdArgs::setSchemaAndTableFromJobFile(std::string& JobName)
 {
-	if((fVecJobFiles.size()==1)&&(!fSchema.empty())&&
-			(!fTable.empty())&&(!fLocFile.empty())) return;
+	if (((fVecJobFiles.size()==1)&&(!fSchema.empty())&&
+			(!fTable.empty())&&(!fLocFile.empty()))  &&
+		(fImportDataMode == IMPORT_DATA_TEXT)) return;
 
 	WEXmlgetter aXmlGetter(JobName);
 	vector<string> aSections;
 	aSections.push_back("BulkJob");
 	aSections.push_back("Schema");
 	aSections.push_back("Table");
-	std::string aSchemaTable;
-	std::string aInputFile;
 
-	aSchemaTable = aXmlGetter.getAttribute(aSections, "tblName");
-	if(getDebugLvl()>1) cout << "schema.table = " << aSchemaTable << endl;
-	aInputFile = aXmlGetter.getAttribute(aSections, "loadName");
-	if(getDebugLvl()>1) cout << "xml::InputFile = " << aInputFile << endl;
-
-	if(aSchemaTable.length()>0)
+	// Reset the fSchema, fTable, and FLocFile
+	if ((fVecJobFiles.size() > 1) ||
+		(fSchema.empty()) || (fTable.empty()) || (fLocFile.empty()))
 	{
-		char aSchema[64];
-		char aTable[64];
-		int aRet = aSchemaTable.find('.');
-		if(aRet>0)
+		std::string aSchemaTable;
+		std::string aInputFile;
+
+		aSchemaTable = aXmlGetter.getAttribute(aSections, "tblName");
+		if(getDebugLvl()>1) cout << "schema.table = " << aSchemaTable << endl;
+		aInputFile = aXmlGetter.getAttribute(aSections, "loadName");
+		if(getDebugLvl()>1) cout << "xml::InputFile = " << aInputFile << endl;
+
+		if(aSchemaTable.length()>0)
 		{
-			int aLen = aSchemaTable.copy(aSchema,aRet);
-			if(getDebugLvl()>1) cout << "Schema: " << aSchema << endl;
-			aSchema[aLen] = 0;
-			if(fSchema.empty()) fSchema = aSchema;
-			aLen = aSchemaTable.copy(aTable, aSchemaTable.length(),aRet+1 );
-			aTable[aLen]=0;
-			if(getDebugLvl()>1) cout << "Table: " << aTable << endl;
-			fTable = aTable;
+			char aSchema[64];
+			char aTable[64];
+			int aRet = aSchemaTable.find('.');
+			if(aRet>0)
+			{
+				int aLen = aSchemaTable.copy(aSchema,aRet);
+				if(getDebugLvl()>1) cout << "Schema: " << aSchema << endl;
+				aSchema[aLen] = 0;
+				if(fSchema.empty()) fSchema = aSchema;
+				aLen = aSchemaTable.copy(aTable, aSchemaTable.length(),aRet+1 );
+				aTable[aLen]=0;
+				if(getDebugLvl()>1) cout << "Table: " << aTable << endl;
+				fTable = aTable;
+			}
+			else
+				throw runtime_error(
+					"JobFile ERROR: Can't get Schema and Table Name");
+			}
+		else
+		{
+			throw runtime_error(
+				"JobFile ERROR: Can't get Schema and Table Name");
 		}
-		else
-			throw runtime_error("JobFile ERROR: Can't get Schema and Table Name");
+
+		if((fLocFile.empty())&&(!aInputFile.empty()))
+		{
+			string bulkRootPath = config::Config::makeConfig()->getConfig(
+									"WriteEngine", "BulkRoot");
+			if(aInputFile.at(0) == '/')
+				fLocFile = aInputFile;
+			else if ((!fPmFilePath.empty())&& (fMode==1))
+				fLocFile = fPmFilePath + "/" + aInputFile;
+			else if((!bulkRootPath.empty())&&(fPmFilePath.empty()))
+				fLocFile = bulkRootPath + "/data/import/"+ aInputFile;
+			else
+				fLocFile = aInputFile;
+			if(fArgMode==2) fPmFile = fLocFile;
+		}
+
+		if(getDebugLvl()>1) cout << "schema = " << fSchema << endl;
+		if(getDebugLvl()>1) cout << "TableName = " << fTable << endl;
+		if(getDebugLvl()>1) cout << "Input File = " << fLocFile << endl;
 	}
-	else
+
+	// Reset the list of columns we will be importing from the input data
+	fColFldsFromJobFile.clear();
+	if (fImportDataMode != IMPORT_DATA_TEXT)
 	{
-		throw runtime_error("JobFile ERROR: Can't get Schema and Table Name");
+		aSections.push_back("Column");
+		aXmlGetter.getAttributeListForAllChildren(
+			aSections, "colName", fColFldsFromJobFile);
 	}
-
-	if((fLocFile.empty())&&(!aInputFile.empty()))
-	{
-		string bulkRootPath = config::Config::makeConfig()->getConfig(
-														"WriteEngine", "BulkRoot");
-		if(aInputFile.at(0) == '/')
-			fLocFile = aInputFile;
-		else if ((!fPmFilePath.empty())&& (fMode==1))
-			fLocFile = fPmFilePath + "/" + aInputFile;
-		else if((!bulkRootPath.empty())&&(fPmFilePath.empty()))
-			fLocFile = bulkRootPath + "/data/import/"+ aInputFile;
-		else
-			fLocFile = aInputFile;
-		if(fArgMode==2) fPmFile = fLocFile;
-	}
-
-
-	if(getDebugLvl()>1) cout << "schema = " << fSchema << endl;
-	if(getDebugLvl()>1) cout << "TableName = " << fTable << endl;
-	if(getDebugLvl()>1) cout << "Input File = " << fLocFile << endl;
-
 }
 
 //------------------------------------------------------------------------------
@@ -1355,6 +1411,7 @@ std::string WECmdArgs::getModuleID()
 }
 
 //------------------------------------------------------------------------------
+
 
 void WECmdArgs::splitConfigFilePerTable(std::string& ConfigName, int tblCount)
 {
@@ -1581,6 +1638,19 @@ std::string WECmdArgs::PrepMode2ListOfFiles(std::string& FileName)
 	//cout << "File list are = " << aSS.str() << endl;
 
 	return aSS.str();
+}
+
+//------------------------------------------------------------------------------
+// Get set of column names in the "current" table being processed from the
+// Job xml file.
+//------------------------------------------------------------------------------
+void WECmdArgs::getColumnList( std::set<std::string>& columnList ) const
+{
+	columnList.clear();
+	for (unsigned k=0; k<fColFldsFromJobFile.size(); k++)
+	{
+		columnList.insert( fColFldsFromJobFile[k] );
+	}
 }
 
 

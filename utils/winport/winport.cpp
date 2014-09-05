@@ -17,6 +17,12 @@
 
 #include <time.h>
 #include <string>
+#include <sys/types.h>
+#include <map>
+#include "boost/filesystem/operations.hpp"
+#include "boost/filesystem/path.hpp"
+namespace fs = boost::filesystem;
+
 using namespace std;
 
 #include "unistd.h"
@@ -24,6 +30,7 @@ using namespace std;
 #include "sys/time.h"
 #include "syslog.h"
 #include "idbregistry.h"
+#include "WinSyslog.h"
 
 //This is the number of msecs between 1601 and 1970 (+/-)
 //#define DELTA_EPOCH_IN_MICROSECS  11644473600000000Ui64
@@ -83,19 +90,12 @@ int openlog(...)
 
 int syslog(int priority, const char* format, ...)
 {
-	char ctimebuf[30];
-	time_t t = time(0);
-	ctime_s(ctimebuf, 30, &t);
-	ctimebuf[24] = ' ';
-	string logFileName = IDBreadRegistry("") + "\\log\\InfiniDBLog.txt";
-	FILE* f;
-	f = fopen(logFileName.c_str(), "a+t");
-	if (f == 0) return -1;
-	fwrite(ctimebuf, 1, 25, f);
-	fwrite(format, 1, strlen(format), f);
-	fwrite("\r\n", 1, 2, f);
-	fclose(f);
-	return 0;
+    int rtn;
+    va_list args;
+    va_start(args, format);
+    rtn = WinSyslog::instance()->Log(priority, format, args);
+    va_end(args);
+    return rtn;
 }
 
 int fcntl(int i1, int i2, ...)
@@ -190,4 +190,31 @@ int kill(pid_t, int)
 int setuid(uid_t)
 {
 	return -1;
+}
+
+string IDBSysErrorStr(DWORD err) 
+{ 
+    // Retrieve the system error message for the last-error code
+
+	string errstr;
+
+    LPVOID lpMsgBuf;
+
+    FormatMessage(
+        FORMAT_MESSAGE_ALLOCATE_BUFFER | 
+        FORMAT_MESSAGE_FROM_SYSTEM |
+        FORMAT_MESSAGE_IGNORE_INSERTS,
+        NULL,
+        err,
+        MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+        (LPTSTR) &lpMsgBuf,
+        0, NULL );
+
+    // Display the error message and exit the process
+
+	errstr = (LPCTSTR)lpMsgBuf;
+
+    LocalFree(lpMsgBuf);
+
+	return errstr;
 }

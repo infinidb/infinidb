@@ -24,8 +24,8 @@ AM_CXXFLAGS = $(idb_cxxflags)
 AM_LDFLAGS = $(idb_ldflags)
 bin_PROGRAMS = getConfig
 getConfig_SOURCES = main.cpp
-getConfig_CPPFLAGS = @idb_common_includes@ $(AM_CPPFLAGS)
-getConfig_LDFLAGS = @idb_common_ldflags@ @idb_common_libs@ $(AM_LDFLAGS)
+getConfig_CPPFLAGS = $(idb_common_includes) $(AM_CPPFLAGS)
+getConfig_LDFLAGS = $(idb_common_ldflags) $(idb_exec_libs) $(idb_common_libs) $(AM_LDFLAGS)
 
 test:
 

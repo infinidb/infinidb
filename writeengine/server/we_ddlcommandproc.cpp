@@ -232,7 +232,7 @@ uint8_t WE_DDLCommandProc::writeSystable(ByteStream& bs, std::string &err)
 			colStruct.colWidth = column.colType.colWidth > 8 ? 8 : column.colType.colWidth;
 			colStruct.tokenFlag = false;
 			colStruct.tokenFlag = column.colType.colWidth > 8 ? true : false;
-			colStruct.colDataType = (WriteEngine::ColDataType)column.colType.colDataType;
+			colStruct.colDataType = column.colType.colDataType;
 			colStruct.fColDbRoot = dbroot;
 			dctnryStruct.fColDbRoot = dbroot;
 			if (colStruct.tokenFlag)
@@ -269,7 +269,6 @@ uint8_t WE_DDLCommandProc::writeSystable(ByteStream& bs, std::string &err)
 		{
 			error = fWEWrapper.insertColumnRec_SYS(txnID, colStructs, colValuesList,
 											dctnryStructList, dctnryValueList);
-			//std::cout << "insert to systable error code " << error << endl;
 
 			if (error != WriteEngine::NO_ERROR)
 			{
@@ -347,65 +346,24 @@ uint8_t WE_DDLCommandProc::writeSystable(ByteStream& bs, std::string &err)
 
 			DictOID dictOID = {0, 0, 0, 0, 0};
 
-			   int dataType;
+			int dataType;
 			dataType = convertDataType(colDefPtr->fType->fType);
-			if (dataType == CalpontSystemCatalog::DECIMAL)
+			if (dataType == CalpontSystemCatalog::DECIMAL ||
+                dataType == CalpontSystemCatalog::UDECIMAL)
 			{
-				if	 (colDefPtr->fType->fPrecision < colDefPtr->fType->fScale)
+				if (colDefPtr->fType->fPrecision > 18) //@Bug 5717 precision cannot be over 18.
 				{
-			ostringstream os;
-			os << "Syntax error: scale should be less than precision, precision: " << colDefPtr->fType->fPrecision << " scale: " << colDefPtr->fType->fScale;
-			throw std::runtime_error(os.str());
-
-				}
-			}
-			if (dataType == CalpontSystemCatalog::DECIMAL)
-			{
-				//@Bug 2089 decimal precision default to 10 if 0 is used.
-				if (colDefPtr->fType->fPrecision <= 0)
-					colDefPtr->fType->fPrecision = 10;
-
-				if (colDefPtr->fType->fPrecision == -1 || colDefPtr->fType->fPrecision == 0)
-				{
-					//dataType = CalpontSystemCatalog::BIGINT;
-					colDefPtr->fType->fType = DDL_BIGINT;
-					colDefPtr->fType->fLength = 8;
-					colDefPtr->fType->fScale = 0;
-				}
-				else if ((colDefPtr->fType->fPrecision > 0) && (colDefPtr->fType->fPrecision < 3))
-				{
-					//dataType = CalpontSystemCatalog::TINYINT;
-					colDefPtr->fType->fType = DDL_TINYINT;
-					colDefPtr->fType->fLength = 1;
-				}
-
-				else if (colDefPtr->fType->fPrecision < 5 && (colDefPtr->fType->fPrecision > 2))
-				{
-					//dataType = CalpontSystemCatalog::SMALLINT;
-					colDefPtr->fType->fType = DDL_SMALLINT;
-					colDefPtr->fType->fLength = 2;
-				}
-				else if (colDefPtr->fType->fPrecision > 4 && colDefPtr->fType->fPrecision < 10)
-				{
-					//dataType = CalpontSystemCatalog::INT;
-					colDefPtr->fType->fType = DDL_INT;
-					colDefPtr->fType->fLength = 4;
-				}
-				else if (colDefPtr->fType->fPrecision > 9 && colDefPtr->fType->fPrecision < 19)
-				{
-					//dataType = CalpontSystemCatalog::BIGINT;
-					colDefPtr->fType->fType = DDL_BIGINT;
-					colDefPtr->fType->fLength = 8;
-				}
-				else
-				{
-					/*@Bug 1959 InfiniDB does not support DECIMAL and NUMERIC column that is
-					greater than 8 bytes. */
 					ostringstream os;
-					os << "DECIMAL and NUMERIC column precision greater than 18 is not supported by InfiniDB.";
+					os << "Syntax error: The maximum precision (total number of digits) that can be specified is 18";
 					throw std::runtime_error(os.str());
 				}
-
+				else if	 (colDefPtr->fType->fPrecision < colDefPtr->fType->fScale)
+				{
+        			ostringstream os;
+        			os << "Syntax error: scale should be less than precision, precision: " << colDefPtr->fType->fPrecision << " scale: " << colDefPtr->fType->fScale;
+        			throw std::runtime_error(os.str());
+				}
+				colDefPtr->convertDecimal();
 			}
 
 			bool hasDict = false;
@@ -588,7 +546,7 @@ uint8_t WE_DDLCommandProc::writeSystable(ByteStream& bs, std::string &err)
 				colStruct.colWidth = column.colType.colWidth > 8 ? 8 : column.colType.colWidth;
 				colStruct.tokenFlag = false;
 				colStruct.tokenFlag = column.colType.colWidth > 8 ? true : false;
-				colStruct.colDataType = static_cast<WriteEngine::ColDataType>(column.colType.colDataType);
+				colStruct.colDataType = column.colType.colDataType;
 				colStruct.fColDbRoot = dbroot;
 				dctnryStruct.fColDbRoot = dbroot;
 				if (colStruct.tokenFlag)
@@ -737,60 +695,22 @@ uint8_t WE_DDLCommandProc::writeSyscolumn(ByteStream& bs, std::string & err)
 		DictOID dictOID = {0, 0, 0, 0, 0};
 
 		int dataType = convertDataType(colDefPtr->fType->fType);
-		if (dataType == CalpontSystemCatalog::DECIMAL)
+		if (dataType == CalpontSystemCatalog::DECIMAL ||
+            dataType == CalpontSystemCatalog::UDECIMAL)
 		{
-			if	 (colDefPtr->fType->fPrecision < colDefPtr->fType->fScale)
+			if (colDefPtr->fType->fPrecision > 18) //@Bug 5717 precision cannot be over 18.
+			{
+					ostringstream os;
+					os << "Syntax error: The maximum precision (total number of digits) that can be specified is 18";
+					throw std::runtime_error(os.str());
+			}
+			else if	 (colDefPtr->fType->fPrecision < colDefPtr->fType->fScale)
 			{
 				ostringstream os;
 				os << "Syntax error: scale should be less than precision, precision: " << colDefPtr->fType->fPrecision << " scale: " << colDefPtr->fType->fScale;
 				throw std::runtime_error(os.str());
 			}
-
-			//@Bug 2089 decimal precision default to 10 if 0 is used.
-			if (colDefPtr->fType->fPrecision <= 0)
-				colDefPtr->fType->fPrecision = 10;
-
-			if (colDefPtr->fType->fPrecision == -1 || colDefPtr->fType->fPrecision == 0)
-			{
-					//dataType = CalpontSystemCatalog::BIGINT;
-				colDefPtr->fType->fType = DDL_BIGINT;
-				colDefPtr->fType->fLength = 8;
-				colDefPtr->fType->fScale = 0;
-			}
-			else if ((colDefPtr->fType->fPrecision > 0) && (colDefPtr->fType->fPrecision < 3))
-			{
-					//dataType = CalpontSystemCatalog::TINYINT;
-				colDefPtr->fType->fType = DDL_TINYINT;
-				colDefPtr->fType->fLength = 1;
-			}
-
-			else if (colDefPtr->fType->fPrecision < 5 && (colDefPtr->fType->fPrecision > 2))
-			{
-					//dataType = CalpontSystemCatalog::SMALLINT;
-				colDefPtr->fType->fType = DDL_SMALLINT;
-				colDefPtr->fType->fLength = 2;
-			}
-			else if (colDefPtr->fType->fPrecision > 4 && colDefPtr->fType->fPrecision < 10)
-			{
-					//dataType = CalpontSystemCatalog::INT;
-				colDefPtr->fType->fType = DDL_INT;
-				colDefPtr->fType->fLength = 4;
-			}
-			else if (colDefPtr->fType->fPrecision > 9 && colDefPtr->fType->fPrecision < 19)
-			{
-					//dataType = CalpontSystemCatalog::BIGINT;
-				colDefPtr->fType->fType = DDL_BIGINT;
-				colDefPtr->fType->fLength = 8;
-			}
-			else
-			{
-				/*@Bug 1959 InfiniDB does not support DECIMAL and NUMERIC column that is
-				greater than 8 bytes. */
-				ostringstream os;
-				os << "DECIMAL and NUMERIC column precision greater than 18 is not supported by InfiniDB.";
-				throw std::runtime_error(os.str());
-			}
-
+			colDefPtr->convertDecimal();
 		}
 
 		if (dictoid > 0)
@@ -970,7 +890,7 @@ uint8_t WE_DDLCommandProc::writeSyscolumn(ByteStream& bs, std::string & err)
 				colStruct.tokenFlag = false;
 				colStruct.fColDbRoot = dbRoot;
 				colStruct.tokenFlag = column.colType.colWidth > 8 ? true : false;
-				colStruct.colDataType = static_cast<WriteEngine::ColDataType>(column.colType.colDataType);
+				colStruct.colDataType = column.colType.colDataType;
 				dctnryStruct.fColDbRoot = dbRoot;
 				if (colStruct.tokenFlag)
 				{
@@ -1053,7 +973,7 @@ uint8_t WE_DDLCommandProc::createtablefiles(ByteStream& bs, std::string & err)
 	OID     dataOid;                         
     int            colWidth;                        
     bool           tokenFlag;                      
-    ColDataType    colDataType;                 
+    CalpontSystemCatalog::ColDataType    colDataType;                 
     u_int16_t      colDbRoot;                    
     int            compressionType;     
 	bs >> size;
@@ -1062,7 +982,7 @@ uint8_t WE_DDLCommandProc::createtablefiles(ByteStream& bs, std::string & err)
 		bs >> tmp32;
 		dataOid = tmp32;
 		bs >> tmp8;
-		colDataType = (ColDataType)tmp8;
+		colDataType = (CalpontSystemCatalog::ColDataType)tmp8;
 		bs >> tmp8;
 		tokenFlag = (tmp8 != 0);
 		bs >> tmp32;
@@ -1209,7 +1129,7 @@ uint8_t WE_DDLCommandProc::deleteSyscolumn(ByteStream& bs, std::string & err)
 			column = *column_iterator;
 			colStruct.dataOid = column.oid;
 			colStruct.colWidth = column.colType.colWidth > 8 ? 8 : column.colType.colWidth;
-			colStruct.colDataType = static_cast<WriteEngine::ColDataType>(column.colType.colDataType);
+			colStruct.colDataType = column.colType.colDataType;
 			colStruct.fColDbRoot = dbRoot;
 			colStructs.push_back(colStruct);
 
@@ -1300,7 +1220,7 @@ uint8_t WE_DDLCommandProc::deleteSyscolumnRow(ByteStream& bs, std::string & err)
 			column = *column_iterator;
 			colStruct.dataOid = column.oid;
 			colStruct.colWidth = column.colType.colWidth > 8 ? 8 : column.colType.colWidth;
-			colStruct.colDataType = static_cast<WriteEngine::ColDataType>(column.colType.colDataType);
+			colStruct.colDataType = column.colType.colDataType;
 			colStruct.fColDbRoot = dbRoot;
 			colStructs.push_back(colStruct);
 
@@ -1389,7 +1309,7 @@ uint8_t WE_DDLCommandProc::deleteSystable(ByteStream& bs, std::string & err)
 			column = *column_iterator;
 			colStruct.dataOid = column.oid;
 			colStruct.colWidth = column.colType.colWidth > 8 ? 8 : column.colType.colWidth;
-			colStruct.colDataType = static_cast<WriteEngine::ColDataType>(column.colType.colDataType);
+			colStruct.colDataType = column.colType.colDataType;
 			colStruct.fColDbRoot = dbRoot;
 			colStructs.push_back(colStruct);
 
@@ -1478,7 +1398,7 @@ uint8_t WE_DDLCommandProc::deleteSystables(ByteStream& bs, std::string & err)
 			column = *column_iterator;
 			colStruct.dataOid = column.oid;
 			colStruct.colWidth = column.colType.colWidth > 8 ? 8 : column.colType.colWidth;
-			colStruct.colDataType = static_cast<WriteEngine::ColDataType>(column.colType.colDataType);
+			colStruct.colDataType = column.colType.colDataType;
 			colStruct.fColDbRoot = dbRoot;
 			colStructs.push_back(colStruct);
 
@@ -1547,7 +1467,7 @@ uint8_t WE_DDLCommandProc::deleteSystables(ByteStream& bs, std::string & err)
 			column = *column_iterator;
 			colStruct.dataOid = column.oid;
 			colStruct.colWidth = column.colType.colWidth > 8 ? 8 : column.colType.colWidth;
-			colStruct.colDataType = static_cast<WriteEngine::ColDataType>(column.colType.colDataType);
+			colStruct.colDataType = column.colType.colDataType;
 			colStruct.fColDbRoot = dbRoot;
 			colStructs.push_back(colStruct);
 
@@ -1662,7 +1582,7 @@ uint8_t WE_DDLCommandProc::updateSyscolumnAuto(ByteStream& bs, std::string & err
 	colStruct.dataOid = column.oid;
 	colStruct.colWidth = column.colType.colWidth > 8 ? 8 : column.colType.colWidth;
 	colStruct.tokenFlag = false;
-	colStruct.colDataType = static_cast<WriteEngine::ColDataType>(column.colType.colDataType);
+	colStruct.colDataType = column.colType.colDataType;
 	string s1("y"), s2("n");
 	boost::any datavalue1 = s1;
 	boost::any datavalue2 = s2;
@@ -1671,7 +1591,7 @@ uint8_t WE_DDLCommandProc::updateSyscolumnAuto(ByteStream& bs, std::string & err
 	else
 		colTuple.data = datavalue2;
 
-	colStruct.colDataType = (WriteEngine::ColDataType)column.colType.colDataType;
+	colStruct.colDataType = column.colType.colDataType;
 
 	dctnryStruct.dctnryOid = 0;
 	dctnryStruct.columnOid = colStruct.dataOid;
@@ -1792,7 +1712,7 @@ uint8_t WE_DDLCommandProc::updateSyscolumnNextvalCol(ByteStream& bs, std::string
 	colStruct.dataOid = column.oid;
 	colStruct.colWidth = column.colType.colWidth > 8 ? 8 : column.colType.colWidth;
 	colStruct.tokenFlag = false;
-	colStruct.colDataType = static_cast<WriteEngine::ColDataType>(column.colType.colDataType);
+	colStruct.colDataType = column.colType.colDataType;
 	string ystr("y");
 	string nstr("n");
 	if (autoIncrement)
@@ -1800,7 +1720,7 @@ uint8_t WE_DDLCommandProc::updateSyscolumnNextvalCol(ByteStream& bs, std::string
 	else
 		colTuple.data = nstr;
 
-	colStruct.colDataType = (WriteEngine::ColDataType)column.colType.colDataType;
+	colStruct.colDataType = column.colType.colDataType;
 
 	dctnryStruct.dctnryOid = 0;
 	dctnryStruct.columnOid = colStruct.dataOid;
@@ -1933,7 +1853,9 @@ uint8_t WE_DDLCommandProc::updateSyscolumnTablename(ByteStream& bs, std::string 
 			|| (column.colType.colDataType == execplan::CalpontSystemCatalog::VARBINARY
 				&& column.colType.colWidth > 7)
 			|| (column.colType.colDataType == execplan::CalpontSystemCatalog::DECIMAL
-				&& column.colType.precision > 18) )//token
+				&& column.colType.precision > 18)
+            || (column.colType.colDataType == execplan::CalpontSystemCatalog::UDECIMAL
+                && column.colType.precision > 18) )//token
 	{
 		colStruct.colWidth = 8;
 		colStruct.tokenFlag = true;
@@ -1942,7 +1864,7 @@ uint8_t WE_DDLCommandProc::updateSyscolumnTablename(ByteStream& bs, std::string 
 	{
 		colStruct.colWidth = column.colType.colWidth;
 	}
-	colStruct.colDataType = static_cast<WriteEngine::ColDataType>(column.colType.colDataType);
+	colStruct.colDataType = column.colType.colDataType;
 
 	//Tokenize the data value
 	WriteEngine::DctnryStruct dictStruct;
@@ -1960,7 +1882,7 @@ uint8_t WE_DDLCommandProc::updateSyscolumnTablename(ByteStream& bs, std::string 
 	WriteEngine::Token aToken = dictTuple.token;
 	colTuple.data = aToken;
 
-	colStruct.colDataType = (WriteEngine::ColDataType)column.colType.colDataType;
+	colStruct.colDataType = column.colType.colDataType;
 
 	if (colStruct.tokenFlag)
 	{
@@ -2110,7 +2032,7 @@ uint8_t WE_DDLCommandProc::updateSystableAuto(ByteStream& bs, std::string & err)
 	colStruct.colWidth = column.colType.colWidth > 8 ? 8 : column.colType.colWidth;
 	colStruct.tokenFlag = false;
 		
-	colStruct.colDataType = static_cast<WriteEngine::ColDataType>(column.colType.colDataType);
+	colStruct.colDataType = column.colType.colDataType;
 
 	colTuple.data = datavalue;
 			
@@ -2241,7 +2163,7 @@ uint8_t WE_DDLCommandProc::updateSystableTablename(ByteStream& bs, std::string &
 	colStruct.colWidth = column.colType.colWidth > 8 ? 8 : column.colType.colWidth;
 	colStruct.tokenFlag = true;
 		
-	colStruct.colDataType = static_cast<WriteEngine::ColDataType>(column.colType.colDataType);
+	colStruct.colDataType = column.colType.colDataType;
 	//Tokenize the data value
 	WriteEngine::DctnryStruct dictStruct;
 	dictStruct.dctnryOid = column.colType.ddn.dictOID;
@@ -2397,7 +2319,7 @@ uint8_t WE_DDLCommandProc::updateSystablesTablename(ByteStream& bs, std::string 
 	colStruct.colWidth = column.colType.colWidth > 8 ? 8 : column.colType.colWidth;
 	colStruct.tokenFlag = true;
 		
-	colStruct.colDataType = static_cast<WriteEngine::ColDataType>(column.colType.colDataType);
+	colStruct.colDataType = column.colType.colDataType;
 	//Tokenize the data value
 	WriteEngine::DctnryStruct dictStruct;
 	dictStruct.dctnryOid = column.colType.ddn.dictOID;
@@ -2517,7 +2439,9 @@ uint8_t WE_DDLCommandProc::updateSystablesTablename(ByteStream& bs, std::string 
 			|| (column.colType.colDataType == execplan::CalpontSystemCatalog::VARBINARY
 				&& column.colType.colWidth > 7)
 			|| (column.colType.colDataType == execplan::CalpontSystemCatalog::DECIMAL
-				&& column.colType.precision > 18) )//token
+				&& column.colType.precision > 18)
+            || (column.colType.colDataType == execplan::CalpontSystemCatalog::UDECIMAL
+                && column.colType.precision > 18) )//token
 	{
 		colStruct.colWidth = 8;
 		colStruct.tokenFlag = true;
@@ -2526,7 +2450,7 @@ uint8_t WE_DDLCommandProc::updateSystablesTablename(ByteStream& bs, std::string 
 	{
 		colStruct.colWidth = column.colType.colWidth;
 	}
-	colStruct.colDataType = static_cast<WriteEngine::ColDataType>(column.colType.colDataType);
+	colStruct.colDataType = column.colType.colDataType;
 
 	//Tokenize the data value
 	dictStruct.dctnryOid = column.colType.ddn.dictOID;
@@ -2543,7 +2467,7 @@ uint8_t WE_DDLCommandProc::updateSystablesTablename(ByteStream& bs, std::string 
 	aToken = dictTuple.token;
 	colTuple.data = aToken; */
 
-	colStruct.colDataType = (WriteEngine::ColDataType)column.colType.colDataType;
+	colStruct.colDataType = column.colType.colDataType;
 
 	if (colStruct.tokenFlag)
 	{
@@ -2704,7 +2628,7 @@ uint8_t WE_DDLCommandProc::updateSyscolumnColumnposCol(messageqcpp::ByteStream& 
 		colStruct.dataOid = OID_SYSCOLUMN_COLUMNPOS;
 		colStruct.colWidth = 4;
 		colStruct.tokenFlag = false;
-		colStruct.colDataType = WriteEngine::INT;
+		colStruct.colDataType = CalpontSystemCatalog::INT;
 		colStruct.fColDbRoot = dbRoot;
 		colStructs.push_back(colStruct); 
 		rc = fWEWrapper.updateColumnRecs( txnID, colStructs, colValuesList, ridList );
@@ -2720,9 +2644,9 @@ uint8_t WE_DDLCommandProc::fillNewColumn(ByteStream& bs, std::string& err)
 	u_int8_t tmp8;
 	int txnID;
 	OID dataOid, dictOid, refColOID;
-	ColDataType dataType, refColDataType;
+	CalpontSystemCatalog::ColDataType dataType, refColDataType;
 	bool autoincrement;
-	int dataWidth, compressionType, refColWidth, refCompressionType;
+	int dataWidth, scale, precision, compressionType, refColWidth, refCompressionType;
 	string defaultValStr;
 	ColTuple defaultVal;
 	
@@ -2733,18 +2657,22 @@ uint8_t WE_DDLCommandProc::fillNewColumn(ByteStream& bs, std::string& err)
 	bs >> tmp32;
 	dictOid = tmp32;
 	bs >> tmp8;
-	dataType = (ColDataType) tmp8;
+	dataType = (CalpontSystemCatalog::ColDataType) tmp8;
 	bs >> tmp8;
 	autoincrement = (tmp8 != 0);
 	bs >> tmp32;
 	dataWidth = tmp32;
+	bs >> tmp32;
+	scale = tmp32;
+	bs >> tmp32;
+	precision = tmp32;
 	bs >> defaultValStr;
 	bs >> tmp8;
 	compressionType = tmp8;
 	bs >> tmp32;
 	refColOID = tmp32;
 	bs >> tmp8;
-	refColDataType = (ColDataType) tmp8;
+	refColDataType = (CalpontSystemCatalog::ColDataType) tmp8;
 	bs >> tmp32;
 	refColWidth = tmp32;
 	bs >> tmp8;
@@ -2755,8 +2683,10 @@ uint8_t WE_DDLCommandProc::fillNewColumn(ByteStream& bs, std::string& err)
 		isNULL = true;
 	
 	execplan::CalpontSystemCatalog::ColType colType;
-	colType.colDataType = static_cast<execplan::CalpontSystemCatalog::ColDataType>(dataType);
+	colType.colDataType = static_cast<CalpontSystemCatalog::ColDataType>(dataType);
 	colType.colWidth = dataWidth;
+	colType.scale = scale;
+	colType.precision = precision;
 	bool pushWarning = false;
 	defaultVal.data = DataConvert::convertColumnData(colType, defaultValStr, pushWarning, isNULL);
 	
@@ -3054,7 +2984,11 @@ uint8_t WE_DDLCommandProc::fetchDDLLog(ByteStream& bs, std::string& err)
 			{			
 				if ( !fs::is_directory( *dir_itr ) )
 				{
+#if BOOST_VERSION >= 105200
+					fileNames.push_back ( dir_itr->path().generic_string() );
+#else
 					fileNames.push_back ( dir_itr->string() );
+#endif
 				}
 			}
 			catch (std::exception& ex)
@@ -3172,6 +3106,7 @@ uint8_t WE_DDLCommandProc::fetchDDLLog(ByteStream& bs, std::string& err)
 			}
 		}
 	}
+	
 	return rc;
 }
 
@@ -3261,7 +3196,9 @@ uint8_t WE_DDLCommandProc::updateSyscolumnSetDefault(messageqcpp::ByteStream& bs
 		|| (column.colType.colDataType == execplan::CalpontSystemCatalog::VARBINARY
 			&& column.colType.colWidth > 7)
 		|| (column.colType.colDataType == execplan::CalpontSystemCatalog::DECIMAL
-			&& column.colType.precision > 18) )//token
+			&& column.colType.precision > 18)
+        || (column.colType.colDataType == execplan::CalpontSystemCatalog::UDECIMAL
+            && column.colType.precision > 18) )//token
 	{
 		colStruct.colWidth = 8;
 		colStruct.tokenFlag = true;
@@ -3271,7 +3208,7 @@ uint8_t WE_DDLCommandProc::updateSyscolumnSetDefault(messageqcpp::ByteStream& bs
 		colStruct.colWidth = column.colType.colWidth;
 	}
 
-	colStruct.colDataType = static_cast<WriteEngine::ColDataType>(column.colType.colDataType);
+	colStruct.colDataType = column.colType.colDataType;
 
 	if (colStruct.tokenFlag)
 	{
@@ -3300,7 +3237,7 @@ uint8_t WE_DDLCommandProc::updateSyscolumnSetDefault(messageqcpp::ByteStream& bs
 		}
 	}
 
-	colStruct.colDataType = (WriteEngine::ColDataType)column.colType.colDataType;
+	colStruct.colDataType = column.colType.colDataType;
 
 	if (colStruct.tokenFlag)
 	{
@@ -3475,7 +3412,9 @@ uint8_t WE_DDLCommandProc::updateSyscolumnRenameColumn(messageqcpp::ByteStream& 
 		|| (column1.colType.colDataType == execplan::CalpontSystemCatalog::VARBINARY
 			&& column1.colType.colWidth > 7)
 		|| (column1.colType.colDataType == execplan::CalpontSystemCatalog::DECIMAL
-			&& column1.colType.precision > 18) )//token
+			&& column1.colType.precision > 18)
+        || (column1.colType.colDataType == execplan::CalpontSystemCatalog::UDECIMAL
+            && column1.colType.precision > 18) )//token
 	{
 		colStruct.colWidth = 8;
 		colStruct.tokenFlag = true;
@@ -3485,7 +3424,7 @@ uint8_t WE_DDLCommandProc::updateSyscolumnRenameColumn(messageqcpp::ByteStream& 
 		colStruct.colWidth = column1.colType.colWidth;
 	}
 
-	colStruct.colDataType = static_cast<WriteEngine::ColDataType>(column1.colType.colDataType);
+	colStruct.colDataType = column1.colType.colDataType;
 
 	if (colStruct.tokenFlag)
 	{
@@ -3508,7 +3447,7 @@ uint8_t WE_DDLCommandProc::updateSyscolumnRenameColumn(messageqcpp::ByteStream& 
 	else
 		colTuple.data = datavalue;
 
-	colStruct.colDataType = (WriteEngine::ColDataType)column1.colType.colDataType;
+	colStruct.colDataType = column1.colType.colDataType;
 
 	if (colStruct.tokenFlag)
 	{
@@ -3540,11 +3479,11 @@ uint8_t WE_DDLCommandProc::updateSyscolumnRenameColumn(messageqcpp::ByteStream& 
 	colStruct.dataOid = column2.oid;
 	colStruct.colWidth = column2.colType.colWidth > 8 ? 8 : column2.colType.colWidth;
 	colStruct.tokenFlag = false;
-	colStruct.colDataType = static_cast<WriteEngine::ColDataType>(column2.colType.colDataType);
+	colStruct.colDataType = column2.colType.colDataType;
 
 	colTuple.data = autoinc;
 
-	colStruct.colDataType = (WriteEngine::ColDataType)column2.colType.colDataType;
+	colStruct.colDataType = column2.colType.colDataType;
 
 	dctnryStruct.dctnryOid = 0;
 	dctnryStruct.columnOid = colStruct.dataOid;
@@ -3564,11 +3503,11 @@ uint8_t WE_DDLCommandProc::updateSyscolumnRenameColumn(messageqcpp::ByteStream& 
 	colStruct.dataOid = column3.oid;
 	colStruct.colWidth = column3.colType.colWidth > 8 ? 8 : column3.colType.colWidth;
 	colStruct.tokenFlag = false;
-	colStruct.colDataType = static_cast<WriteEngine::ColDataType>(column3.colType.colDataType);
+	colStruct.colDataType = column3.colType.colDataType;
 
 	colTuple.data = nextVal;
 
-	colStruct.colDataType = (WriteEngine::ColDataType)column3.colType.colDataType;
+	colStruct.colDataType = column3.colType.colDataType;
 
 	dctnryStruct.dctnryOid = 0;
 	dctnryStruct.columnOid = colStruct.dataOid;
@@ -3589,11 +3528,11 @@ uint8_t WE_DDLCommandProc::updateSyscolumnRenameColumn(messageqcpp::ByteStream& 
 	colStruct.dataOid = column4.oid;
 	colStruct.colWidth = column4.colType.colWidth > 8 ? 8 : column4.colType.colWidth;
 	colStruct.tokenFlag = false;
-	colStruct.colDataType = static_cast<WriteEngine::ColDataType>(column4.colType.colDataType);
+	colStruct.colDataType = column4.colType.colDataType;
 
 	colTuple.data = nullable;
 
-	colStruct.colDataType = (WriteEngine::ColDataType)column4.colType.colDataType;
+	colStruct.colDataType = column4.colType.colDataType;
 
 	dctnryStruct.dctnryOid = 0;
 	dctnryStruct.columnOid = colStruct.dataOid;
@@ -3620,7 +3559,9 @@ uint8_t WE_DDLCommandProc::updateSyscolumnRenameColumn(messageqcpp::ByteStream& 
 		|| (column5.colType.colDataType == execplan::CalpontSystemCatalog::VARBINARY
 			&& column5.colType.colWidth > 7)
 		|| (column5.colType.colDataType == execplan::CalpontSystemCatalog::DECIMAL
-			&& column5.colType.precision > 18) )//token
+			&& column5.colType.precision > 18)
+         || (column5.colType.colDataType == execplan::CalpontSystemCatalog::UDECIMAL
+             && column5.colType.precision > 18) )//token
 	{
 		colStruct.colWidth = 8;
 		colStruct.tokenFlag = true;
@@ -3630,7 +3571,7 @@ uint8_t WE_DDLCommandProc::updateSyscolumnRenameColumn(messageqcpp::ByteStream& 
 		colStruct.colWidth = column5.colType.colWidth;
 	}
 
-	colStruct.colDataType = static_cast<WriteEngine::ColDataType>(column5.colType.colDataType);
+	colStruct.colDataType = column5.colType.colDataType;
 
 	if (colStruct.tokenFlag)
 	{
@@ -3659,7 +3600,7 @@ uint8_t WE_DDLCommandProc::updateSyscolumnRenameColumn(messageqcpp::ByteStream& 
 		}
 	}
 
-	colStruct.colDataType = (WriteEngine::ColDataType)column5.colType.colDataType;
+	colStruct.colDataType = column5.colType.colDataType;
 
 	if (colStruct.tokenFlag)
 	{

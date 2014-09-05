@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
- *   $Id: we_xmlgenproc.cpp 3806 2012-05-01 12:23:02Z dcathey $
+ *   $Id: we_xmlgenproc.cpp 4579 2013-03-19 23:16:54Z dhall $
  *
  ******************************************************************************/
 #define WRITEENGINEXMLGENPROC_DLLEXPORT
@@ -295,7 +295,8 @@ bool XMLGenProc::makeColumnData(const CalpontSystemCatalog::TableName& table)
 
             // Old logic went by scale > 0; New logic checks for "decimal" type
             if ( (0 < col->colType.scale ) ||
-                (col->colType.colDataType == CalpontSystemCatalog::DECIMAL) )
+                (col->colType.colDataType == CalpontSystemCatalog::DECIMAL) ||
+                (col->colType.colDataType == CalpontSystemCatalog::UDECIMAL) )
             {
                 xmlTextWriterWriteFormatAttribute(fWriter,
                     BAD_CAST xmlTagTable[TAG_PRECISION], "%d",

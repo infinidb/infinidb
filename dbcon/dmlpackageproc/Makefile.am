@@ -25,7 +25,6 @@ AM_LDFLAGS = -version-info 1:0:0 $(idb_ldflags)
 lib_LTLIBRARIES = libdmlpackageproc.la
 libdmlpackageproc_la_SOURCES = deletepackageprocessor.cpp \
 dmlpackageprocessor.cpp \
-dmlpackageprocessorfactory.cpp \
 insertpackageprocessor.cpp \
 updatepackageprocessor.cpp \
 commandpackageprocessor.cpp \
@@ -33,7 +32,6 @@ autoincrementdata.cpp \
 tablelockdata.cpp
 include_HEADERS = deletepackageprocessor.h \
 dmlpackageprocessor.h \
-dmlpackageprocessorfactory.h \
 insertpackageprocessor.h \
 updatepackageprocessor.h \
 commandpackageprocessor.h\

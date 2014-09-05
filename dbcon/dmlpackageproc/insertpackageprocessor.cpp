@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: insertpackageprocessor.cpp 8943 2012-10-03 19:20:49Z chao $
+ *   $Id: insertpackageprocessor.cpp 9378 2013-04-04 14:20:11Z chao $
  *
  *
  ***********************************************************************/
@@ -59,7 +59,9 @@ namespace dmlpackageprocessor
 		DMLResult result;
 		result.result = NO_ERROR;
 		BRM::TxnID txnid;
-
+		// set-up the transaction
+		txnid.id  = cpackage.get_TxnID();	
+		txnid.valid = true;
 		fSessionID = cpackage.get_SessionID();
 		LoggingID logid( DMLLoggingId, fSessionID, txnid.id);
 		logging::Message::Args args1;
@@ -73,7 +75,33 @@ namespace dmlpackageprocessor
 		//fWriteEngine.setChunkManager(cm);
 		//std::map<u_int32_t,u_int32_t> oids;
 		VERBOSE_INFO("Processing Insert DML Package...");
-		uint64_t uniqueId = fDbrm.getUnique64();
+		uint64_t uniqueId = 0;
+		//Bug 5070. Added exception handling
+		try {
+			uniqueId = fDbrm->getUnique64();
+		}
+		catch (std::exception& ex)
+		{
+			logging::Message::Args args;
+			logging::Message message(9);
+			args.add(ex.what());
+			message.format(args);
+			result.result = INSERT_ERROR;	
+			result.message = message;
+			fSessionManager.rolledback(txnid);
+			return result;
+		}
+		catch ( ... )
+		{
+			logging::Message::Args args;
+			logging::Message message(9);
+			args.add("Unknown error occured while getting unique number.");
+			message.format(args);
+			result.result = INSERT_ERROR;	
+			result.message = message;
+			fSessionManager.rolledback(txnid);
+			return result;
+		}
 		uint64_t tableLockId = 0;
 		int rc = 0;
 		std::string errorMsg;
@@ -83,44 +111,12 @@ namespace dmlpackageprocessor
 			
 		try
 		{
-#if !defined(_MSC_VER) && !defined(SKIP_OAM_INIT)
-			//@Bug 4495 check PM status first
-			for (unsigned int i=0; i <moduleIds.size(); i++)
-			{
-				int opState = 0;
-				bool aDegraded = false;
-				ostringstream aOss;
-				aOss << "pm" << moduleIds[i];
-				std::string aModName = aOss.str();
-				try
-				{
-					fOam.getModuleStatus(aModName, opState, aDegraded);
-				}
-				catch(std::exception& ex)
-				{
-					ostringstream oss;
-					oss << "Exception on getModuleStatus on module ";
-					oss <<	aModName;
-					oss <<  ":  ";
-					oss <<  ex.what();
-					throw runtime_error( oss.str() );
-				}
 
-				if(opState == oam::ACTIVE )
-				{
-					pms.push_back((uint)moduleIds[i]);
-				}
-			}
-#else
 			for (unsigned int i=0; i <moduleIds.size(); i++)
 			{			
 				pms.push_back((uint)moduleIds[i]);
 			}
-#endif
 			
-			// set-up the transaction
-			txnid.id  = cpackage.get_TxnID();	
-			txnid.valid = true;
 			//cout << "single insert get transaction id " << txnid.id << endl;
 			// get the table object from the package
 			DMLTable *tablePtr = cpackage.get_Table();
@@ -150,7 +146,7 @@ namespace dmlpackageprocessor
 					int i = 0;
 				
 					try {
-						tableLockId = fDbrm.getTableLock(pms, roPair.objnum, &processName, &processID, &sessionId, &txnId, BRM::LOADING );
+						tableLockId = fDbrm->getTableLock(pms, roPair.objnum, &processName, &processID, &sessionId, &txnId, BRM::LOADING );
 					}
 					catch (std::exception&)
 					{
@@ -187,7 +183,7 @@ namespace dmlpackageprocessor
 								txnId = txnid.id;
 								sessionId = fSessionID;
 								processName = "DMLProc";
-								tableLockId = fDbrm.getTableLock(pms, roPair.objnum, &processName, &processID, &sessionId, &txnId, BRM::LOADING );
+								tableLockId = fDbrm->getTableLock(pms, roPair.objnum, &processName, &processID, &sessionId, &txnId, BRM::LOADING );
 							}
 							catch (std::exception&)
 							{
@@ -213,11 +209,13 @@ namespace dmlpackageprocessor
 				
 				int pmNum = 1;
 				//find the shortest dbroot to send the row
+                //How about we find the dbroot that would help casual partitioning most?
+                //Or at least hurt it the least.
 				CalpontSystemCatalog::RIDList ridList = systemCatalogPtr->columnRIDs(tableName, true);
 				std::vector<BRM::EmDbRootHWMInfo_v> allInfo (pms.size());
 				for (unsigned i = 0; i < pms.size(); i++)
 				{
-					rc = fDbrm.getDbRootHWMInfo((ridList[0].objnum), pms[i], allInfo[i]);
+					rc = fDbrm->getDbRootHWMInfo((ridList[0].objnum), pms[i], allInfo[i]);
 					if ( rc != 0)
 						break;
 				}
@@ -270,10 +268,10 @@ namespace dmlpackageprocessor
 				//cout << "fWEClient = " << fWEClient << endl;
 				fWEClient->addQueue(uniqueId);
 				ByteStream bytestream;
-				bytestream << (ByteStream::byte)WE_SVR_SINGLE_INSERT;
+				bytestream << (uint8_t)WE_SVR_SINGLE_INSERT;
 				bytestream << uniqueId;
-				bytestream << (ByteStream::quadbyte) txnid.id;
-				bytestream << (ByteStream::quadbyte)dbroot;
+				bytestream << (uint32_t)txnid.id;
+				bytestream << dbroot;
 				cpackage.write(bytestream);
 				boost::shared_ptr<messageqcpp::ByteStream> bsIn;
 				
@@ -317,7 +315,6 @@ cout << "Single insert got exception" << ex.what() << endl;
 cout << "Single insert got unknown exception" << endl;
 #endif
 				}
-				
 				// Log the insert statement.
 				LoggingID logid( DMLLoggingId, fSessionID, txnid.id);
 				logging::Message::Args args1;
@@ -374,284 +371,20 @@ cout << "Single insert got unknown exception" << endl;
 			result.result = INSERT_ERROR;
 			result.message = message;
 		}
+		else if (rc == IDBRANGE_WARNING)
+		{
+			logging::Message::Args args;
+			logging::Message message(1);
+			args.add(errorMsg);
+			args.add("");
+			args.add("");
+			message.format(args);
+			result.result = IDBRANGE_WARNING;
+			result.message = message;
+		}
 		fWEClient->removeQueue(uniqueId);
 		VERBOSE_INFO("Finished Processing Insert DML Package");
 		return result;
-	}
-
-	bool InsertPackageProcessor::insertRows(u_int32_t sessionID,
-											CalpontSystemCatalog::SCN txnID,
-											const std::string & schema,
-											const std::string & table,
-											const dmlpackage::RowList & rows,
-											DMLResult & result, long long & nextVal, long long & originalNextVal, CalpontSystemCatalog::ColType & autoColType,
-											bool insertSelect)
-	{
-		SUMMARY_INFO("InsertPackageProcessor::insertRows");
-
-		bool retval = true;
-		WriteEngine::ColStructList colStructs;
-		WriteEngine::DctnryStructList dctnryStructList;
-		WriteEngine::DctnryValueList dctnryValueList;
-		WriteEngine::ColValueList colValuesList;
-        WriteEngine::DictStrList dicStringList ;
-		CalpontSystemCatalog::TableName tableName;
-		CalpontSystemCatalog::TableColName tableColName;
-		tableName.table = tableColName.table = table;
-		tableName.schema = tableColName.schema = schema;
-
-		boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(fSessionID);
-		systemCatalogPtr->identity(CalpontSystemCatalog::EC);
-		
-		AutoincrementData *autoincrementData = AutoincrementData::makeAutoincrementData(fSessionID);
-		
-		VERBOSE_INFO("Inserting Row(s)...");
-
-		if (rows.size())
-		{
-			Row *rowPtr = rows.at(0);
-			ColumnList columns = rowPtr->get_ColumnList();
-			ColumnList::const_iterator column_iterator = columns.begin();
-			while (column_iterator != columns.end() && true == retval)
-			{
-				DMLColumn *columnPtr = *column_iterator;
-				tableColName.column = columnPtr->get_Name();
-				CalpontSystemCatalog::ROPair roPair = systemCatalogPtr->columnRID(tableColName);
-
-				CalpontSystemCatalog::OID oid = systemCatalogPtr->lookupOID(tableColName);
-
-				CalpontSystemCatalog::ColType colType;
-				colType = systemCatalogPtr->colType(oid);
-				if (colType.autoincrement)
-				{
-					nextVal = autoincrementData->getNextValue(oid);
-					if (nextVal <= 0)
-					{
-						//get from systables
-						nextVal= systemCatalogPtr->nextAutoIncrValue(tableName); 					
-					}
-					originalNextVal = nextVal;
-				}
-				
-				WriteEngine::ColStruct colStruct;
-				WriteEngine::DctnryStruct dctnryStruct;
-				colStruct.dataOid = roPair.objnum;
-				colStruct.tokenFlag = false;
-				colStruct.fCompressionType = colType.compressionType;
-				// Token
-				if ( isDictCol(colType) )
-				{
-					colStruct.colWidth = 8;
-					colStruct.tokenFlag = true;
-				}
-				else
-				{
-					colStruct.colWidth = colType.colWidth;
-				}
-				colStruct.colDataType = (WriteEngine::ColDataType) colType.colDataType;
-
-				if (colStruct.tokenFlag)
-				{
-					dctnryStruct.dctnryOid = colType.ddn.dictOID;
-					dctnryStruct.columnOid = colStruct.dataOid;
-					dctnryStruct.fCompressionType = colType.compressionType;
-					dctnryStruct.colWidth = colType.colWidth;
-				}
-				else
-				{
-					dctnryStruct.dctnryOid = 0;
-					dctnryStruct.columnOid = colStruct.dataOid;
-					dctnryStruct.fCompressionType = colType.compressionType;
-					dctnryStruct.colWidth = colType.colWidth;
-				}
-
-				colStructs.push_back(colStruct);
-				dctnryStructList.push_back(dctnryStruct);
-
-				++column_iterator;
-			}
-
-			unsigned int numcols = rowPtr->get_NumberOfColumns();
-			std::string tmpStr("");
-			for (unsigned int i = 0; i < numcols; i++)
-			{
-				
-				WriteEngine::ColTupleList colTuples;
-				WriteEngine::DctColTupleList dctColTuples;
-				RowList::const_iterator row_iterator = rows.begin();
-				while (row_iterator != rows.end())
-				{
-					Row *rowPtr = *row_iterator;
-					const DMLColumn *columnPtr = rowPtr->get_ColumnAt(i);
-					VERBOSE_INFO("Looking up OID for:");
-					VERBOSE_INFO(columnPtr->get_Name().c_str());
-
-					tableColName.column = columnPtr->get_Name();
-					CalpontSystemCatalog::OID oid = systemCatalogPtr->lookupOID(tableColName);
-
-					CalpontSystemCatalog::ColType colType;
-					colType = systemCatalogPtr->colType(oid);
-
-					boost::any datavalue;
-					bool isNULL = false;
-					bool pushWarning = false;
-					std::vector<std::string> origVals;
-					origVals = columnPtr->get_DataVector();
-					WriteEngine::dictStr dicStrings;
-					// token
-					if ( isDictCol(colType) )
-					{
-						for ( uint32_t i=0; i < origVals.size(); i++ )
-						{
-							tmpStr = origVals[i];
-							if ( tmpStr.length() == 0 )
-								isNULL = true;
-							else
-								isNULL = false;
-							
-/*							if ( isNULL && (colType.constraintType == NOTNULL_CONSTRAINT))
-							{
-								retval = false;
-								result.result = INSERT_ERROR;
-								Message::Args args;
-								args.add(tableColName.column);
-								result.message = Message(IDBErrorInfo::instance()->errorMsg(ERR_VIOLATE_NOT_NULL, args));
-								return retval;
-							}
-*/
-							if ( tmpStr.length() > (unsigned int)colType.colWidth )
-							{
-								tmpStr = tmpStr.substr(0, colType.colWidth);
-								if ( !pushWarning )
-									pushWarning = true;
-							}
-							WriteEngine::ColTuple colTuple;
-							colTuple.data = datavalue;
-
-							colTuples.push_back(colTuple);
-							//@Bug 2515. Only pass string values to write engine
-							dicStrings.push_back( tmpStr );
-						}
-							colValuesList.push_back(colTuples);
-							//@Bug 2515. Only pass string values to write engine
-							dicStringList.push_back( dicStrings );
-					}
-					else
-					{
-						string x;
-						std::string indata;
-						for ( uint32_t i=0; i < origVals.size(); i++ )
-						{
-							indata = origVals[i];
-							if ( indata.length() == 0 )
-								isNULL = true;
-							else
-								isNULL = false;
-							
-							//Error outon null value if the column has not null constraint.
-/*							if ( isNULL && (colType.constraintType == NOTNULL_CONSTRAINT))
-							{
-								retval = false;
-								result.result = INSERT_ERROR;
-								Message::Args args;
-								args.add(tableColName.column);
-								result.message = Message(IDBErrorInfo::instance()->errorMsg(ERR_VIOLATE_NOT_NULL, args));
-								return retval;
-							}
-*/							
-							//check if autoincrement column and value is 0 or null
-							if (colType.autoincrement && ( isNULL || (indata.compare("0")==0)))
-							{
-								if (nextVal <= 0)
-									throw std::runtime_error(IDBErrorInfo::instance()->errorMsg(ERR_EXCEED_LIMIT));
-									
-								ostringstream oss;
-								oss << nextVal++;
-								indata = oss.str();
-								isNULL = false;
-								autoColType = colType;
-							}
-							try
-							{                    
-								datavalue = DataConvert::convertColumnData(colType, indata, pushWarning, isNULL);
-							}
-							catch(exception & ex)
-							{
-								cerr << "InsertPackageProcessor::processPackage: " << ex.what() << endl;
-								//cout << "The value is " << indata << " and coltype is " << colType.colDataType<< endl;
-								logging::Message::Args args;
-								logging::Message message(1);
-								args.add("Insert Failed:");
-								args.add(ex.what());
-								args.add("");
-								args.add("");
-								message.format(args);
-								x = ex.what();
-								result.result = INSERT_ERROR;
-								result.message = message;
-							}
-							//@Bug 1806
-							if (result.result != NO_ERROR && result.result != IDBRANGE_WARNING)
-							{
-								//throw std::runtime_error("Invalid data");
-								throw std::runtime_error(x);
-							}
-							if ( pushWarning && ( result.result != IDBRANGE_WARNING ) )
-								result.result = IDBRANGE_WARNING;
-								
-							WriteEngine::ColTuple colTuple;
-							colTuple.data = datavalue;
-							
-							colTuples.push_back(colTuple);
-							//@Bug 2515. Only pass string values to write engine
-							dicStrings.push_back( tmpStr );
-						}
-						colValuesList.push_back(colTuples);
-						dicStringList.push_back( dicStrings );
-					}
-					++row_iterator;
-				}
-			}
-		}
-
-		VERBOSE_INFO("Invoking writeEngine.insertColumnRec");
-		// call the write engine to write all the rows
-		int error = NO_ERROR;
-		//fWriteEngine.setDebugLevel(WriteEngine::DEBUG_3);
-		if (colValuesList[0].size() > 0)
-		{
-			if (NO_ERROR != 
-			(error = fWriteEngine.insertColumnRec_Single(txnID, colStructs, colValuesList, dctnryStructList, dicStringList)))
-			{
-				retval = false;
-				// build the logging message
-				logging::Message::Args args;
-				logging::Message message(1);
-				args.add("Insert failed on the ");
-				args.add(tableName.table);
-				args.add("table. It was due to: ");
-				WErrorCodes ec;
-				args.add(ec.errorString(error));
-				message.format(args);
-				if (error == ERR_BRM_DEAD_LOCK)
-				{
-					result.result = DEAD_LOCK_ERROR;
-					result.message = message;
-				}
-				else if ( error == ERR_BRM_VB_OVERFLOW )
-				{
-					result.result = VB_OVERFLOW_ERROR;
-					result.message = Message(IDBErrorInfo::instance()->errorMsg(ERR_VERSIONBUFFER_OVERFLOW));
-				}
-				else
-				{
-					result.result = INSERT_ERROR;
-					result.message = message;
-				}
-			}
-		}
-
-		return retval;
 	}
 
 	bool InsertPackageProcessor::fixupColumns(u_int32_t sessionID,

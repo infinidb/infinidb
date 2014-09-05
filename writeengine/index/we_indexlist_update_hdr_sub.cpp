@@ -39,7 +39,7 @@ namespace WriteEngine
    *    success    - successfully created the index list header
    *    failure    - it did not create the index list header    
    ***********************************************************/
-    const int IndexList::updateHdrSub(const RID& newRid, const i64 &key)
+    const int IndexList::updateHdrSub(const RID& newRid, const uint64_t &key)
     {             
        int rc = ERR_IDX_LIST_INVALID_UP_HDR;
        CommBlock cb;
@@ -196,7 +196,7 @@ namespace WriteEngine
        {
            if (m_lastLbid != INVALID_LBID)
            {
-             i64 zlbid = INVALID_LBID;
+             uint64_t zlbid = INVALID_LBID;
              rc = setLastLbid(zlbid);  
            }
        } //endif count

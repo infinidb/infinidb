@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_week.cpp 3278 2012-09-13 13:17:18Z bwilkinson $
+* $Id: func_week.cpp 3616 2013-03-04 14:56:29Z rdempsey $
 *
 *
 ****************************************************************************/
@@ -130,7 +130,7 @@ int64_t Func_week::getIntVal(rowgroup::Row& row,
 	}
 	char* ptr = buf;
 
-	sprintf(ptr, "%02d", funcexp::calc_week(year, month, day, week_mode(mode), &lyear));
+	sprintf(ptr, "%02d", helpers::calc_week(year, month, day, helpers::week_mode(mode), &lyear));
 
 	int week = atoi(ptr);
 

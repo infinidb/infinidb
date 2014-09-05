@@ -1,6 +1,6 @@
 /*
 
- Copyright (C) 2009-2012 Calpont Corporation.
+ Copyright (C) 2009-2013 Calpont Corporation.
 
  Use of and access to the Calpont InfiniDB Community software is subject to the
  terms and conditions of the Calpont Open Source License Agreement. Use of and
@@ -133,10 +133,6 @@ WESplitterApp::~WESplitterApp()
 	usleep(1000); //1 millisec just checking
 
 	std::string aStr = "Calling WESplitterApp Destructor\n";
-	//logging::Message::Args errMsgArgs;
-	//errMsgArgs.add(aStr);
-	//fpSysLog->logMsg(errMsgArgs, logging::LOG_TYPE_INFO, logging::M0000);
-	//fDh.fLog.logMsg( aStr, MSGLVL_INFO2 );
 	if(fDh.getDebugLvl()) cout << aStr << endl;
 
 }
@@ -372,15 +368,17 @@ void WESplitterApp::processMessages()
 				oss << "Table "<<fCmdArgs.getSchemaName()<<".";
 				oss << fCmdArgs.getTableName() << ": (OID-";
 				oss << fDh.getTableOID() << ") was NOT successfully loaded.";
-				//fLog.logMsg( oss.str(), MSGLVL_INFO1 );
 				cout << oss.str() << endl;
 				logging::Message::Args errMsgArgs;
-				errMsgArgs.add(oss.str());
+				//BUG 4152
+				errMsgArgs.add(fCmdArgs.getSchemaName());
+				errMsgArgs.add(fCmdArgs.getTableName());
+				errMsgArgs.add(fDh.getTableOID());
 				std::string aStr = "Immediate system stop has been ordered, rollback deferred";
 				cout << aStr << endl;
 				SPLTR_EXIT_STATUS = 1;
 				errMsgArgs.add(aStr);
-				fpSysLog->logMsg(errMsgArgs, logging::LOG_TYPE_INFO, logging::M0000);
+				fpSysLog->logMsg(errMsgArgs, logging::LOG_TYPE_INFO, logging::M0096);
 				exit(SPLTR_EXIT_STATUS);
 				//BUG 5012  - commented out to avoid rollback
 				//cout << "Immediate system stop has been ordered. No rollback" << endl;

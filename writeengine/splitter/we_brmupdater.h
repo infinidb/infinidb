@@ -1,6 +1,6 @@
 /*
 
-   Copyright (C) 2009-2012 Calpont Corporation.
+   Copyright (C) 2009-2013 Calpont Corporation.
 
    Use of and access to the Calpont InfiniDB Community software is subject to the
    terms and conditions of the Calpont Open Source License Agreement. Use of and
@@ -81,7 +81,8 @@ public:
 
 public:
     static bool prepareRowsInsertedInfo(std::string Entry,	int& TotRows, int& InsRows);
-    static bool prepareColumnOutOfRangeInfo(std::string Entry, int& ColNum, ColDataType& ColType,
+    static bool prepareColumnOutOfRangeInfo(std::string Entry, int& ColNum, 
+                                            CalpontSystemCatalog::ColDataType& ColType,
                                             std::string& ColName, int& OorValues);
     static bool prepareErrorFileInfo(std::string Entry, std::string& ErrFileName);
     static bool prepareBadDataFileInfo(std::string Entry, std::string& BadFileName);

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
-* $Id: we_bulkrollbackfilecompressed.h 3911 2012-06-10 19:12:14Z dcathey $
+* $Id: we_bulkrollbackfilecompressed.h 4450 2013-01-21 14:13:24Z rdempsey $
 */
 
 /** @file
@@ -88,7 +88,7 @@ public:
                                 u_int32_t   segNum,
                                 long long   startOffsetBlk,
                                 int         nBlocks,
-                                ColDataType colType,
+                                execplan::CalpontSystemCatalog::ColDataType colType,
                                 u_int32_t   colWidth,
                                 bool        restoreHwmChk );
 

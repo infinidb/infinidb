@@ -65,6 +65,14 @@ rm -f $buildroot/Calpont/etc/snmpd.*
 rm -f $buildroot/Calpont/etc/snmptrapd.*
 rm -f $buildroot/Calpont/local/snmpdx.*
 
+for file in autoInstaller encode_keychange fixproc ipf-mod.pl mib2c mib2c-update net-snmp-config snmpbulkget \
+   snmpbulkwalk snmpcheck snmpconf snmpdelta snmpdf snmpget snmpgetnext snmpinform snmpnetstat snmpset \
+   snmpstatus snmptable snmptest snmptranslate snmptrap snmpusm snmpvacm snmpwalk svnQuery tkmib \
+   traptoemail; do
+	rm -f $buildroot/Calpont/bin/$file
+done
+
+
 rm -rf $buildroot/Calpont/share
 
 rm -f $buildroot/Calpont/lib/*.a

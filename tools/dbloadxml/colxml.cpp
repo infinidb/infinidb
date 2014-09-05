@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
- * $Id: colxml.cpp 1872 2012-08-01 16:58:23Z dhall $
+ * $Id: colxml.cpp 2238 2013-05-05 23:55:56Z dcathey $
  *
  ******************************************************************************/
 
@@ -51,7 +51,7 @@ int main(int argc, char **argv)
 
     InputMgr mgr("299"); //@bug 391
     if (! mgr.input(argc, argv))
-        return 0;
+        return 1;
 
     int debugLevel = atoi(mgr.getParm(
         WriteEngine::XMLGenData::RPT_DEBUG).c_str());

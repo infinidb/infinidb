@@ -14,9 +14,10 @@
    along with this program; if not, write to the Free Software
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
+*/
 
 /******************************************************************************************
-* $Id: configcpp.h 3280 2012-09-13 16:27:28Z rdempsey $
+* $Id: configcpp.h 3495 2013-01-21 14:09:51Z rdempsey $
 *
 ******************************************************************************************/
 /**
@@ -35,6 +36,14 @@
 #include <libxml/parser.h>
 
 #include "xmlparser.h"
+
+namespace messageqcpp
+
+{
+
+class ByteStream;
+
+}
 
 #if defined(_MSC_VER) && defined(LIBCONFIG_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
@@ -118,6 +127,13 @@ public:
 	* config filename.
 	*/
 	EXPORT void write(const std::string& fileName) const;
+
+	/** @brief write a stream copy of config file to disk
+	*
+	* write a stream copy of config file to disk. used to distributed mass updates to system nodes
+	* 
+	*/
+	EXPORT void writeConfigFile(messageqcpp::ByteStream msg) const;
 
 	/** @brief return the name of this config file
 	*

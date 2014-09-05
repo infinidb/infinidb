@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: vss.cpp 1928 2013-06-30 21:20:52Z wweeks $
+ * $Id: vss.cpp 1927 2013-06-30 21:20:32Z wweeks $
  *
  ****************************************************************************/
 
@@ -329,7 +329,7 @@ void VSS::insert(LBID_t lbid, VER_t verID, bool vbFlag, bool locked)
 	entry.verID = verID;
 	entry.vbFlag = vbFlag;
 	entry.locked = locked;
-	//cout << "Insert to vss lbid:verID:locked:vbFlag = " << entry.lbid <<":" <<entry.verID<<":"<< entry.locked <<":"<<entry.vbFlag<<endl;
+	//cerr << "Insert to vss lbid:verID:locked:vbFlag = " << entry.lbid <<":" <<entry.verID<<":"<< entry.locked <<":"<<entry.vbFlag<<endl;
 	// check for resize
 	if (vss->currentSize == vss->capacity)
 		growVSS();
@@ -374,8 +374,8 @@ void VSS::_insert(VSSEntry& e, VSSShmsegHeader *dest, int *destHash,
 }
 	
 //assumes read lock is held
-int VSS::lookup(LBID_t lbid, VER_t &verID, VER_t txnID, bool &vbFlag, 
-				bool vbOnly) const
+int VSS::lookup(LBID_t lbid, const QueryContext_vss &verInfo, VER_t txnID, VER_t *outVer,
+				bool *vbFlag, bool vbOnly) const
 {
 	int hashIndex, maxVersion = -1, minVersion = -1, currentIndex;
 	VSSEntry *listEntry, *maxEntry = NULL;
@@ -385,7 +385,7 @@ int VSS::lookup(LBID_t lbid, VER_t &verID, VER_t txnID, bool &vbFlag,
 		log("VSS::lookup(): lbid must be >= 0", logging::LOG_TYPE_DEBUG);
 		throw invalid_argument("VSS::lookup(): lbid must be >= 0");
 	}
-	if (verID < 0) {
+	if (verInfo.currentScn < 0) {
 		log("VSS::lookup(): verID must be >= 0", logging::LOG_TYPE_DEBUG);
 		throw invalid_argument("VSS::lookup(): verID must be >= 0");
 	}
@@ -395,57 +395,111 @@ int VSS::lookup(LBID_t lbid, VER_t &verID, VER_t txnID, bool &vbFlag,
 	}
 #endif
 
-    /* bug 3330.  SessionManager::verID() now returns the SCN - # of transactions.
-     * For the transaction, that means it gets a # too low to see its own
-     * uncommitted changes.  This change is the least invasive way to fix that.
-     */
-    if (txnID != 0)
-        verID = txnID;
-
 	hashIndex = lbid % vss->numHashBuckets;
 
 	currentIndex = hashBuckets[hashIndex];
 	while (currentIndex != -1) {
 		listEntry = &storage[currentIndex];
 		if (listEntry->lbid == lbid) {
+
+			if (vbOnly && !listEntry->vbFlag)
+				goto next;
 			
-			if (vbOnly && !listEntry->vbFlag) {
-				currentIndex = listEntry->next;
-				continue;
+			/* "if it is/was part of a different transaction, ignore it"
+			 */
+			if (txnID != listEntry->verID &&
+					(verInfo.txns->find(listEntry->verID) != verInfo.txns->end()))
+				goto next;
+
+			/* fast exit if the exact version is found */
+			if (verInfo.currentScn == listEntry->verID) {
+				*outVer = listEntry->verID;
+				*vbFlag = listEntry->vbFlag;
+				return 0;
 			}
-			
+
+			/* Track the min version of this LBID */
 			if (minVersion > listEntry->verID || minVersion == -1)
 				minVersion = listEntry->verID;
 
-			if (!listEntry->locked || txnID == listEntry->verID)
-			{
-				if (verID == listEntry->verID) {
-					vbFlag = listEntry->vbFlag;
-					return 0;
-				}
-				else if (verID > listEntry->verID && maxVersion < listEntry->verID) {
-					maxVersion = listEntry->verID;
-					maxEntry = listEntry;
-				}
+			/* Pick the highest version <= the SCN of the query */
+			if (verInfo.currentScn > listEntry->verID && maxVersion < listEntry->verID) {
+				maxVersion = listEntry->verID;
+				maxEntry = listEntry;
 			}
-		}	
+		}
+next:
 		currentIndex = listEntry->next;
 	}
-	
 	if (maxEntry != NULL) {
-		verID = maxVersion;
-		vbFlag = maxEntry->vbFlag;
+		*outVer = maxVersion;
+		*vbFlag = maxEntry->vbFlag;
 		return 0;
 	}
-	else if (minVersion > verID) {
-		verID = 0;
-		vbFlag = false;
+	else if (minVersion > verInfo.currentScn) {
+		*outVer = 0;
+		*vbFlag = false;
 		return ERR_SNAPSHOT_TOO_OLD;
 	}
-	
-	verID = 0;
-	vbFlag = false;
+
+	*outVer = 0;
+	*vbFlag = false;
 	return -1;
+}
+
+VER_t VSS::getCurrentVersion(LBID_t lbid, bool *isLocked) const
+{
+	int hashIndex, currentIndex;
+	VSSEntry *listEntry;
+
+	hashIndex = lbid % vss->numHashBuckets;
+	currentIndex = hashBuckets[hashIndex];
+	while (currentIndex != -1) {
+		listEntry = &storage[currentIndex];
+		if (listEntry->lbid == lbid && !listEntry->vbFlag) {
+			if (isLocked != NULL)
+				*isLocked = listEntry->locked;
+			return listEntry->verID;
+		}
+		currentIndex = listEntry->next;
+	}
+	if (isLocked != NULL)
+		*isLocked = false;
+	return 0;
+}
+
+VER_t VSS::getHighestVerInVB(LBID_t lbid, VER_t max) const
+{
+	int hashIndex, currentIndex;
+	VER_t ret = -1;
+	VSSEntry *listEntry;
+
+	hashIndex = lbid % vss->numHashBuckets;
+	currentIndex = hashBuckets[hashIndex];
+	while (currentIndex != -1) {
+		listEntry = &storage[currentIndex];
+		if ((listEntry->lbid == lbid && listEntry->vbFlag) &&
+				(listEntry->verID <= max && listEntry->verID > ret))
+			ret = listEntry->verID;
+		currentIndex = listEntry->next;
+	}
+	return ret;
+}
+
+bool VSS::isVersioned(LBID_t lbid, VER_t version) const
+{
+	int hashIndex, currentIndex;
+	VSSEntry *listEntry;
+
+	hashIndex = lbid % vss->numHashBuckets;
+	currentIndex = hashBuckets[hashIndex];
+	while (currentIndex != -1) {
+		listEntry = &storage[currentIndex];
+		if (listEntry->lbid == lbid && listEntry->verID == version)
+			return listEntry->vbFlag;
+		currentIndex = listEntry->next;
+	}
+	return false;
 }
 
 bool VSS::isLocked(const LBIDRange& range, VER_t transID) const
@@ -712,20 +766,6 @@ void VSS::commit(VER_t txnID)
 			// @ bug 1426 fix. Decrease the counter when an entry releases its lock.
 			if (vss->lockedEntryCount > 0)
 				vss->lockedEntryCount--;
-		}
-		
-		
-		BlockList_t lbids;
-		getLockedLBIDs(lbids);
-		if ( lbids.size() > 0 )
-		{
-				ostringstream ostr;
-				ostr << "VSS::commit(): After commit for transaction " << txnID << ", entries still locked with lbid:txnId : ";
-				log(ostr.str(), logging::LOG_TYPE_DEBUG);
-		}
-		else if ( vss->lockedEntryCount > 0 )
-		{
-			log("locked entry count does not match locked lbids", logging::LOG_TYPE_CRITICAL);
 		}
 }
 	
@@ -1258,5 +1298,13 @@ int VSS::getShmid() const
 	return vssShmid;
 }
 #endif
+
+QueryContext_vss::QueryContext_vss(const QueryContext &qc) :
+	currentScn(qc.currentScn)
+{
+	txns.reset(new set<VER_t>());
+	for (uint i = 0; i < qc.currentTxns->size(); i++)
+		txns->insert((*qc.currentTxns)[i]);
+}
 
 }   //namespace

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: tupleunion.cpp 8476 2012-04-25 22:28:15Z xlou $
+ * $Id: tupleunion.cpp 9674 2013-07-10 16:38:09Z dhall $
  *
  ****************************************************************************/
 
@@ -26,6 +26,7 @@
 
 #include "dataconvert.h"
 #include "hasher.h"
+#include "jlf_common.h"
 #include "resourcemanager.h"
 #include "tupleunion.h"
 
@@ -61,29 +62,14 @@ bool TupleUnion::Eq::operator()(const uint8_t *d1, const uint8_t *d2) const
 	return (memcmp(d1, d2, ts->rowLength) == 0);
 }
 
-TupleUnion::TupleUnion(const JobStepAssociation& in,
-	const JobStepAssociation& out,
-	CalpontSystemCatalog::OID tableOID,
-	uint32_t session,
-	uint32_t txn,
-	uint32_t ver,
-	uint16_t step,
-	uint32_t statement,
-	ResourceManager& r) :
-	JobStep(),
-	inJSA(in),
-	outJSA(out),
+TupleUnion::TupleUnion(CalpontSystemCatalog::OID tableOID, const JobInfo& jobInfo) :
+	JobStep(jobInfo),
 	fTableOID(tableOID),
-	sessionID(session),
-	txnID(txn),
-	verID(ver),
-	stepID(step),
-	statementID(statement),
 	isDelivery(false),
 	output(NULL),
 	outputIt(-1),
 	memUsage(0),
-	rm(r),
+	rm(jobInfo.rm),
 	allocator(64*1024*1024 + 1),
 	runnersDone(0),
 	runRan(false),
@@ -97,51 +83,6 @@ TupleUnion::~TupleUnion()
 	rm.returnMemory(memUsage);
 	if (!runRan && output)
 		output->endOfInput();
-}
-
-const JobStepAssociation & TupleUnion::inputAssociation() const
-{
-	return inJSA;
-}
-
-void TupleUnion::inputAssociation(const JobStepAssociation &in)
-{
-	inJSA = in;
-}
-
-const JobStepAssociation & TupleUnion::outputAssociation() const
-{
-	return outJSA;
-}
-
-void TupleUnion::outputAssociation(const JobStepAssociation &out)
-{
-	outJSA = out;
-}
-
-void TupleUnion::stepId(uint16_t id)
-{
-	stepID = id;
-}
-
-uint16_t TupleUnion::stepId() const
-{
-	return stepID;
-}
-
-uint32_t TupleUnion::sessionId() const
-{
-	return sessionID;
-}
-
-uint32_t TupleUnion::txnId() const
-{
-	return txnID;
-}
-
-uint32_t TupleUnion::statementId() const
-{
-	return statementID;
 }
 
 CalpontSystemCatalog::OID TupleUnion::tableOid() const
@@ -206,7 +147,7 @@ void TupleUnion::readInput(uint which)
 		it = dl->getIterator();
 		more = dl->next(it, &inRGData);
 
-		while (more && !die && inJSA.status() == 0) {
+		while (more && !cancelled()) {
 			/*
 				normalize each row
 				  if distinct flag is set insert into uniquer
@@ -232,8 +173,8 @@ void TupleUnion::readInput(uint which)
 						memcpy(outRow.getData(), tmpRow.getData(), tmpRow.getSize());
 						inserted = uniquer->insert(outRow.getData()).second;
 						if (inserted) {
-							addToOutput(&outRow, &l_outputRG, true, &outRGData);
 							memDiff += outRow.getSize();
+							addToOutput(&outRow, &l_outputRG, true, &outRGData);
 						}
 					}
 					memUsageAfter = allocator.getMemUsage();
@@ -242,7 +183,12 @@ void TupleUnion::readInput(uint which)
 				}
 				if (!rm.getMemory(memDiff)) {
 					fLogger->logMessage(logging::LOG_TYPE_INFO, logging::ERR_UNION_TOO_BIG);
-					inJSA.status(logging::ERR_UNION_TOO_BIG);
+					if (status() == 0) // preserve existing error code
+					{
+						errorMessage(logging::IDBErrorInfo::instance()->errorMsg(
+							logging::ERR_UNION_TOO_BIG));
+						status(logging::ERR_UNION_TOO_BIG);
+					}
 					abort();
 				}
 			}
@@ -257,9 +203,10 @@ void TupleUnion::readInput(uint which)
 	}
 	catch(...)
 	{
-		if (outJSA.status() == 0)
+		if (status() == 0)
 		{
-			outJSA.status(logging::unionStepErr);
+			errorMessage("Union step caught an unknown exception.");
+			status(logging::unionStepErr);
 			fLogger->logMessage(logging::LOG_TYPE_CRITICAL, "Union step caught an unknown exception.");
 		}
 		abort();
@@ -279,7 +226,7 @@ void TupleUnion::readInput(uint which)
 				rowMemory.push_back(outRGData);
 		}
 		runnersDone++;
-		if (runnersDone == inJSA.outSize())
+		if (runnersDone == fInputJobStepAssociation.outSize())
 			output->endOfInput();
 	}
 }
@@ -298,7 +245,7 @@ uint TupleUnion::nextBand(messageqcpp::ByteStream &bs)
 		mem.reset(new uint8_t[outputRG.getEmptySize()]);
 		outputRG.setData(mem.get());
 		outputRG.resetRowGroup(0);
-		outputRG.setStatus(inJSA.status());
+		outputRG.setStatus(status());
 	}
 
 	bs.load(mem.get(), outputRG.getDataSize());
@@ -351,6 +298,15 @@ void TupleUnion::normalize(const Row &in, Row *out)
 							goto dec1;
 						out->setIntField(in.getIntField(i), i);
 						break;
+                    case CalpontSystemCatalog::UTINYINT:
+                    case CalpontSystemCatalog::USMALLINT:
+                    case CalpontSystemCatalog::UMEDINT:
+                    case CalpontSystemCatalog::UINT:
+                    case CalpontSystemCatalog::UBIGINT:
+                        if (in.getScale(i))
+                            goto dec1;
+                        out->setUintField(in.getUintField(i), i);
+                        break;
 					case CalpontSystemCatalog::CHAR:
 					case CalpontSystemCatalog::VARCHAR: {
 						ostringstream os;
@@ -368,7 +324,8 @@ void TupleUnion::normalize(const Row &in, Row *out)
 					case CalpontSystemCatalog::DATE:
 					case CalpontSystemCatalog::DATETIME:
 						throw logic_error("TupleUnion::normalize(): tried to normalize an int to a date or datetime");
-					case CalpontSystemCatalog::FLOAT: {
+                    case CalpontSystemCatalog::FLOAT:
+					case CalpontSystemCatalog::UFLOAT: {
 						int scale = in.getScale(i);
 						if (scale != 0) {
 							float f = in.getIntField(i);
@@ -379,7 +336,8 @@ void TupleUnion::normalize(const Row &in, Row *out)
 							out->setFloatField(in.getIntField(i), i);
 						break;
 					}
-					case CalpontSystemCatalog::DOUBLE: {
+					case CalpontSystemCatalog::DOUBLE:
+					case CalpontSystemCatalog::UDOUBLE: {
 						int scale = in.getScale(i);
 						if (scale != 0) {
 							double d = in.getIntField(i);
@@ -390,7 +348,8 @@ void TupleUnion::normalize(const Row &in, Row *out)
 							out->setDoubleField(in.getIntField(i), i);
 						break;
 					}
-					case CalpontSystemCatalog::DECIMAL: {
+					case CalpontSystemCatalog::DECIMAL:
+					case CalpontSystemCatalog::UDECIMAL: {
 dec1:					uint64_t val = in.getIntField(i);
 						int diff = out->getScale(i) - in.getScale(i);
 						if (diff < 0)
@@ -407,6 +366,87 @@ dec1:					uint64_t val = in.getIntField(i);
 						throw logic_error(os.str());
 				}
 				break;
+            case CalpontSystemCatalog::UTINYINT:
+            case CalpontSystemCatalog::USMALLINT:
+            case CalpontSystemCatalog::UMEDINT:
+            case CalpontSystemCatalog::UINT:
+            case CalpontSystemCatalog::UBIGINT:
+                switch (out->getColTypes()[i]) {
+                    case CalpontSystemCatalog::TINYINT:
+                    case CalpontSystemCatalog::SMALLINT:
+                    case CalpontSystemCatalog::MEDINT:
+                    case CalpontSystemCatalog::INT:
+                    case CalpontSystemCatalog::BIGINT:
+                        if (out->getScale(i))
+                            goto dec2;
+                        out->setIntField(in.getUintField(i), i);
+                        break;
+                    case CalpontSystemCatalog::UTINYINT:
+                    case CalpontSystemCatalog::USMALLINT:
+                    case CalpontSystemCatalog::UMEDINT:
+                    case CalpontSystemCatalog::UINT:
+                    case CalpontSystemCatalog::UBIGINT:
+                        out->setUintField(in.getUintField(i), i);
+                        break;
+                    case CalpontSystemCatalog::CHAR:
+                    case CalpontSystemCatalog::VARCHAR: {
+                        ostringstream os;
+                        if (in.getScale(i)) {
+                            double d = in.getUintField(i);
+                            d /= pow10(in.getScale(i));
+                            os.precision(15);
+                            os << d;
+                        }
+                        else
+                            os << in.getUintField(i);
+                        out->setStringField(os.str(), i);
+                        break;
+                    }
+                    case CalpontSystemCatalog::DATE:
+                    case CalpontSystemCatalog::DATETIME:
+                        throw logic_error("TupleUnion::normalize(): tried to normalize an int to a date or datetime");
+                    case CalpontSystemCatalog::FLOAT:
+                    case CalpontSystemCatalog::UFLOAT: {
+                        int scale = in.getScale(i);
+                        if (scale != 0) {
+                            float f = in.getUintField(i);
+                            f /= (uint64_t) pow(10.0, scale);
+                            out->setFloatField(f, i);
+                        }
+                        else
+                            out->setFloatField(in.getUintField(i), i);
+                        break;
+                    }
+                    case CalpontSystemCatalog::DOUBLE:
+                    case CalpontSystemCatalog::UDOUBLE: {
+                        int scale = in.getScale(i);
+                        if (scale != 0) {
+                            double d = in.getUintField(i);
+                            d /= (uint64_t) pow(10.0, scale);
+                            out->setDoubleField(d, i);
+                        }
+                        else
+                            out->setDoubleField(in.getUintField(i), i);
+                        break;
+                    }
+                    case CalpontSystemCatalog::DECIMAL:
+                    case CalpontSystemCatalog::UDECIMAL: {
+dec2:					uint64_t val = in.getIntField(i);
+                        int diff = out->getScale(i) - in.getScale(i);
+                        if (diff < 0)
+                            val /= (uint64_t) pow((double) 10, (double) -diff);
+                        else
+                            val *= (uint64_t) pow((double) 10, (double) diff);
+                        out->setIntField(val, i);
+                        break;
+                    }
+                    default:
+                        ostringstream os;
+                        os << "TupleUnion::normalize(): tried an illegal conversion: integer to "
+                            << out->getColTypes()[i];
+                        throw logic_error(os.str());
+                }
+                break;
 			case CalpontSystemCatalog::CHAR:
 			case CalpontSystemCatalog::VARCHAR:
 				switch (out->getColTypes()[i]) {
@@ -474,7 +514,9 @@ dec1:					uint64_t val = in.getIntField(i);
 				}
 				break;
 			case CalpontSystemCatalog::FLOAT:
-			case CalpontSystemCatalog::DOUBLE: {
+            case CalpontSystemCatalog::UFLOAT:
+            case CalpontSystemCatalog::DOUBLE:
+			case CalpontSystemCatalog::UDOUBLE: {
 				double val = (in.getColTypes()[i] == CalpontSystemCatalog::FLOAT ?
 					in.getFloatField(i) : in.getDoubleField(i));
 
@@ -485,13 +527,22 @@ dec1:					uint64_t val = in.getIntField(i);
 					case CalpontSystemCatalog::INT:
 					case CalpontSystemCatalog::BIGINT:
 						if (out->getScale(i))
-							goto dec2;
+							goto dec3;
 						out->setIntField((int64_t) val, i);
 						break;
+                    case CalpontSystemCatalog::UTINYINT:
+                    case CalpontSystemCatalog::USMALLINT:
+                    case CalpontSystemCatalog::UMEDINT:
+                    case CalpontSystemCatalog::UINT:
+                    case CalpontSystemCatalog::UBIGINT:
+                        out->setUintField((uint64_t) val, i);
+                        break;
 					case CalpontSystemCatalog::FLOAT:
+                    case CalpontSystemCatalog::UFLOAT:
 						out->setFloatField(val, i);
 						break;
 					case CalpontSystemCatalog::DOUBLE:
+                    case CalpontSystemCatalog::UDOUBLE:
 						out->setDoubleField(val, i);
 						break;
 					case CalpontSystemCatalog::CHAR:
@@ -502,8 +553,9 @@ dec1:					uint64_t val = in.getIntField(i);
 						out->setStringField(os.str(), i);
 						break;
 					}
-					case CalpontSystemCatalog::DECIMAL: {
-dec2:					/* have to pick a scale to use for the double. using 5... */
+					case CalpontSystemCatalog::DECIMAL:
+                    case CalpontSystemCatalog::UDECIMAL: {
+dec3:					/* have to pick a scale to use for the double. using 5... */
 						uint scale = 5;
 						uint64_t ival = (uint64_t) (double) (val * pow((double) 10, (double) scale));
 						int diff = out->getScale(i) - scale;
@@ -522,7 +574,8 @@ dec2:					/* have to pick a scale to use for the double. using 5... */
 				}
 				break;
 			}
-			case CalpontSystemCatalog::DECIMAL: {
+            case CalpontSystemCatalog::DECIMAL:
+			case CalpontSystemCatalog::UDECIMAL: {
 				int64_t val = in.getIntField(i);
 				uint    scale = in.getScale(i);
 
@@ -532,7 +585,13 @@ dec2:					/* have to pick a scale to use for the double. using 5... */
 					case CalpontSystemCatalog::MEDINT:
 					case CalpontSystemCatalog::INT:
 					case CalpontSystemCatalog::BIGINT:
-					case CalpontSystemCatalog::DECIMAL: {
+                    case CalpontSystemCatalog::UTINYINT:
+                    case CalpontSystemCatalog::USMALLINT:
+                    case CalpontSystemCatalog::UMEDINT:
+                    case CalpontSystemCatalog::UINT:
+                    case CalpontSystemCatalog::UBIGINT:
+                    case CalpontSystemCatalog::DECIMAL:
+					case CalpontSystemCatalog::UDECIMAL: {
 						if (out->getScale(i) == scale)
 							out->setIntField(val, i);
 						else if (out->getScale(i) > scale)
@@ -542,7 +601,8 @@ dec2:					/* have to pick a scale to use for the double. using 5... */
 
 						break;
 					}
-					case CalpontSystemCatalog::FLOAT: {
+					case CalpontSystemCatalog::FLOAT: 
+					case CalpontSystemCatalog::UFLOAT: {
 						float fval = ((float) val) / IDB_pow[scale];
 						out->setFloatField(fval, i);
 						break;
@@ -556,7 +616,7 @@ dec2:					/* have to pick a scale to use for the double. using 5... */
 					case CalpontSystemCatalog::VARCHAR:
 					default: {
 						char buf[50];
-						dataconvert::DataConvert::decimalToString( val, scale, buf, 50 );
+						dataconvert::DataConvert::decimalToString(val, scale, buf, 50, out->getColTypes()[i]);
 					/*	ostringstream oss;
 						if (scale == 0)
 							oss << val;
@@ -595,10 +655,10 @@ void TupleUnion::run()
 	runRan = true;
 	lk.unlock();
 	
-	for (i = 0; i < inJSA.outSize(); i++)
-		inputs.push_back(inJSA.outAt(i)->rowGroupDL());
+	for (i = 0; i < fInputJobStepAssociation.outSize(); i++)
+		inputs.push_back(fInputJobStepAssociation.outAt(i)->rowGroupDL());
 
-	output = outJSA.outAt(0)->rowGroupDL();
+	output = fOutputJobStepAssociation.outAt(0)->rowGroupDL();
 	if (isDelivery) {
 		outputIt = output->getIterator();
 	}
@@ -632,14 +692,14 @@ void TupleUnion::join()
 const string TupleUnion::toString() const
 {
 	ostringstream oss;
- 	oss << "TupleUnion       ses:" << sessionID << " txn:" << txnID << " ver:" << verID;
-	oss << " st:" << stepId();
+ 	oss << "TupleUnion       ses:" << fSessionId << " txn:" << fTxnId << " ver:" << fVerId;
+	oss << " st:" << fStepId;
 	oss << " in:";
-    for (unsigned i = 0; i < inJSA.outSize(); i++)
-		oss << ((i==0) ? " " : ", ") << inJSA.outAt(i);
+    for (unsigned i = 0; i < fInputJobStepAssociation.outSize(); i++)
+		oss << ((i==0) ? " " : ", ") << fInputJobStepAssociation.outAt(i);
 	oss << " out:";
-    for (unsigned i = 0; i < outJSA.outSize(); i++)
-		oss << ((i==0) ? " " : ", ") << outJSA.outAt(i);
+    for (unsigned i = 0; i < fOutputJobStepAssociation.outSize(); i++)
+		oss << ((i==0) ? " " : ", ") << fOutputJobStepAssociation.outAt(i);
 	oss << endl;
 
 	return oss.str();
@@ -653,7 +713,12 @@ void TupleUnion::writeNull(Row *out, uint col)
 			out->setUintField<1>(joblist::TINYINTNULL, col); break;
 		case CalpontSystemCatalog::SMALLINT:
 			out->setUintField<1>(joblist::SMALLINTNULL, col); break;
+        case CalpontSystemCatalog::UTINYINT:
+            out->setUintField<1>(joblist::UTINYINTNULL, col); break;
+        case CalpontSystemCatalog::USMALLINT:
+            out->setUintField<1>(joblist::USMALLINTNULL, col); break;
 		case CalpontSystemCatalog::DECIMAL:
+        case CalpontSystemCatalog::UDECIMAL:
 		{
 			uint len = out->getColumnWidth(col);
 			switch (len)
@@ -673,13 +738,19 @@ void TupleUnion::writeNull(Row *out, uint col)
 		case CalpontSystemCatalog::MEDINT:
 		case CalpontSystemCatalog::INT:
 			out->setUintField<4>(joblist::INTNULL, col); break;
-		case CalpontSystemCatalog::FLOAT:
+        case CalpontSystemCatalog::UINT:
+            out->setUintField<4>(joblist::UINTNULL, col); break;
+        case CalpontSystemCatalog::FLOAT:
+		case CalpontSystemCatalog::UFLOAT:
 			out->setUintField<4>(joblist::FLOATNULL, col); break;
 		case CalpontSystemCatalog::DATE:
 			out->setUintField<4>(joblist::DATENULL, col); break;
 		case CalpontSystemCatalog::BIGINT:
 			out->setUintField<8>(joblist::BIGINTNULL, col); break;
+        case CalpontSystemCatalog::UBIGINT:
+            out->setUintField<8>(joblist::UBIGINTNULL, col); break;
 		case CalpontSystemCatalog::DOUBLE:
+        case CalpontSystemCatalog::UDOUBLE:
 			out->setUintField<8>(joblist::DOUBLENULL, col); break;
 		case CalpontSystemCatalog::DATETIME:
 			out->setUintField<8>(joblist::DATETIMENULL, col); break;

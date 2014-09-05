@@ -9595,7 +9595,7 @@ static Field *create_tmp_field_from_item(THD *thd, Item *item, TABLE *table,
                                      item->name, table->s,
                                      item->collation.collation);
     else
-      new_field= item->make_string_field(table, thd); //@InfiniDB
+      new_field= item->make_string_field(table);
     new_field->set_derivation(item->collation.derivation);
     break;
   case DECIMAL_RESULT:

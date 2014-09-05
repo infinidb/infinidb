@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
-* $Id: editem.cpp 2092 2013-01-09 20:53:52Z rdempsey $
+* $Id: editem.cpp 2124 2013-02-15 13:37:00Z dcathey $
 */
 
 #include <iostream>
@@ -66,6 +66,7 @@ bool aflg = false;
 bool fflg = false;
 bool vflg = false;
 bool mflg = false;
+bool uflg = false;
 
 struct SortExtentsByPartitionFirst
 {
@@ -127,6 +128,7 @@ void usage(const string& pname)
 		"   -t     \tdisplay min/max values as dates" << endl <<
 		"   -s     \tdisplay min/max values as timestamps" << endl <<
 		"   -a     \tdisplay min/max values as char strings" << endl <<
+        "   -u     \tdisplay min/max values as unsigned integers" << endl <<
 		"   -x     \tcreate/extend one or more oids" << endl <<
 		"   -e oid \tdelete oid" << endl <<
 		"   -r oid \trollback or delete extents" << endl <<
@@ -178,6 +180,13 @@ const string fmt(int64_t v)
 	{
 		oss << v;
 	}
+    else if (uflg)
+    {
+        if (static_cast<uint64_t>(v) > numeric_limits<uint64_t>::max() - 2)
+            oss << "notset";
+        else
+            oss << static_cast<uint64_t>(v);
+    }
 	else
 	{
 		if (v == numeric_limits<int64_t>::max() ||
@@ -188,6 +197,27 @@ const string fmt(int64_t v)
 	}
 
 	return oss.str();
+}
+
+//------------------------------------------------------------------------------
+// Check to see if the latest read operation from stdin was successful.
+// Primarily used to validate the case where we have prompted the user for
+// more than 1 parameter.  Ex: we are validating that the user correctly
+// formatted the input to enter 3 values separated by spaces (1 2 3) in-
+// stead of accidentally separating with commas (1,2,3).
+//------------------------------------------------------------------------------
+//@bug 4914: Validate that correct number of input parameters is given
+bool isInputValid()
+{
+	if (cin.good())
+		return true;
+
+	cin.clear();
+	cin.ignore( numeric_limits<std::streamsize>::max(),'\n');
+	cout << endl << "Invalid input; try again, be sure to enter spaces "
+		"between input parameters." << endl << endl;
+
+	return false;
 }
 
 //------------------------------------------------------------------------------
@@ -428,10 +458,24 @@ int extendOids( )
 	{
 		LBID_t lbid;
 		int    allocd;
+		execplan::CalpontSystemCatalog::ColDataType colDataType;
+		if (uflg)
+		{
+			colDataType = execplan::CalpontSystemCatalog::UBIGINT;
+		}
+		else
+		{
+			colDataType = execplan::CalpontSystemCatalog::BIGINT;
+		}
 
 		cout << "Enter OID, DBRoot, and Partition#, and Segment# "
 			"(separated by spaces): ";
-		cin >> oid >> dbRoot >> partNum >> segNum;
+		while (1)
+		{
+			cin >> oid >> dbRoot >> partNum >> segNum;
+			if (isInputValid())
+				break;
+		}
 
 		CHECK(emp->createDictStoreExtent ( oid, dbRoot, partNum, segNum,
 			lbid, allocd));
@@ -449,22 +493,49 @@ int extendOids( )
 	{
 		while (1)
 		{
-			cout << "Enter OID and column width (separated by spaces); "
-				"0 OID represents end of list: ";
-			cin >> oid >> colWidth;
-			if (oid == 0) break;
+			bool bFinished = false;
+
+			while (1)
+			{
+				cout << "Enter OID and column width (separated by spaces); "
+					"0 OID represents end of list: ";
+				cin >> oid >> colWidth;
+				if (oid == 0)
+				{
+					bFinished = true;
+					break;
+				}
+
+				if (isInputValid())
+					break;
+			}
+			if (bFinished)
+				break;
 
 			CreateStripeColumnExtentsArgIn colArg;
 			colArg.oid   = oid;
 			colArg.width = colWidth;
+			if (uflg)
+			{
+				colArg.colDataType = execplan::CalpontSystemCatalog::UBIGINT;
+			}
+			else
+			{
+				colArg.colDataType = execplan::CalpontSystemCatalog::BIGINT;
+			}
 			cols.push_back( colArg );
 		}
 
 		vector<CreateStripeColumnExtentsArgOut> newExtents;
 
-		cout << "Enter DBRoot and partition# (partition "
-			"only used for empty DBRoot): ";
-		cin  >> dbRoot >> partNum;
+		while (1)
+		{
+			cout << "Enter DBRoot and partition# (partition "
+				"only used for empty DBRoot): ";
+			cin  >> dbRoot >> partNum;
+			if (isInputValid())
+				break;
+		}
 	
 		CHECK(emp->createStripeColumnExtents(cols, dbRoot, partNum,
 			segNum, newExtents));
@@ -503,18 +574,29 @@ int rollbackExtents(OID_t oid)
 
 	if ((DictStoreOIDFlag == 'y') || (DictStoreOIDFlag == 'Y'))
 	{
-		unsigned int     hwmCount;
+		unsigned int     hwmCount = 0;
 		vector<uint16_t> segNums;
 		vector<HWM_t>    hwms;
 
-		cout << "Enter DBRoot#, part#, and the number of HWMs to be entered "
-			"(separated by spaces): ";
-		cin >> dbRoot >> partNum >> hwmCount;
+		while (1)
+		{
+			cout <<"Enter DBRoot#, part#, and the number of HWMs to be entered "
+				"(separated by spaces): ";
+			cin >> dbRoot >> partNum >> hwmCount;
+			if (isInputValid())
+				break;
+		}
 		for (unsigned int k=0; k<hwmCount; k++)
 		{
-			cout << "Enter seg# and HWM for a last extent " <<
-				"(separated by spaces): ";
-			cin >> segNum >> hwm;
+			while (1)
+			{
+				cout << "Enter seg# and HWM for that segment file " <<
+					"(separated by spaces): ";
+				cin >> segNum >> hwm;
+				if (isInputValid())
+					break;
+			}
+
 			hwms.push_back(hwm);
 			segNums.push_back(segNum);
 		}
@@ -524,9 +606,14 @@ int rollbackExtents(OID_t oid)
 	}
 	else
 	{
-		cout << "Enter DBRoot#, part#, seg#, and HWM for the last extent "
-			"on that DBRoot (separated by spaces): ";
-		cin >> dbRoot >> partNum >> segNum >> hwm;
+		while (1)
+		{
+			cout << "Enter DBRoot#, part#, seg#, and HWM for the last extent "
+				"on that DBRoot (separated by spaces): ";
+			cin >> dbRoot >> partNum >> segNum >> hwm;
+			if (isInputValid())
+				break;
+		}
 
 		CHECK(emp->rollbackColumnExtents_DBroot( oid, false,
 			dbRoot, partNum, segNum, hwm ));
@@ -569,8 +656,13 @@ int editHWM(OID_t oid)
 	uint32_t partNum   = 0;
 	uint16_t segNum    = 0;
 
-	cout << "Enter Partition#, and Segment# (separated by spaces): ";
-	cin >> partNum >> segNum;
+	while (1)
+	{
+		cout << "Enter Partition#, and Segment# (separated by spaces): ";
+		cin >> partNum >> segNum;
+		if (isInputValid())
+			break;
+	}
 	CHECK(emp->getLocalHWM(oid, partNum, segNum, oldHWM));
 
 	cout << "HWM for partition " << partNum << " and segment " << segNum <<
@@ -665,7 +757,7 @@ int main(int argc, char** argv)
 
 	opterr = 0;
 
-	while ((c = getopt(argc, argv, "dzCc:o:tsxe:r:fvhw:lb:aimp:S:")) != EOF)
+	while ((c = getopt(argc, argv, "dzCc:o:tsxue:r:fvhw:lb:aimp:S:")) != EOF)
 		switch (c)
 		{
 		case 'd':
@@ -688,6 +780,9 @@ int main(int argc, char** argv)
 		case 't':
 			tflg = true;
 			break;
+        case 'u':
+            uflg = true;
+            break;
 		case 's':
 			sflg = true;
 			break;
@@ -760,18 +855,24 @@ int main(int argc, char** argv)
 
 	emp = new DBRM();
 
-	MaxOID = -1;
-	if (localModuleType != "um")
-	{
-		ObjectIDManager oidm;
-		MaxOID = oidm.size();
-	}
+    if (!emp->isDBRMReady())
+    {
+        cerr << endl << "Error! The DBRM is currently not responding!" << endl
+            << "editem can't continue" << endl << endl;
+        return 1;
+    }
+    MaxOID = -1;
+    if (localModuleType != "um")
+    {
+        ObjectIDManager oidm;
+        MaxOID = oidm.size();
+    }
 
-	if (emp->isReadWrite() != ERR_OK)
-	{
-		cerr << endl << "Warning! The DBRM is currently in Read-Only mode!" << endl
-			<< "Updates will not propagate!" << endl << endl;
-	}
+    if (emp->isReadWrite() != ERR_OK)
+    {
+        cerr << endl << "Warning! The DBRM is currently in Read-Only mode!" << endl
+            << "Updates will not propagate!" << endl << endl;
+    }
 
 	if (iflg)
 	{
@@ -789,9 +890,9 @@ int main(int argc, char** argv)
 		return 1;
 	}
 
-	if ((int)sflg + (int)tflg + (int)aflg > 1)
+	if ((int)sflg + (int)tflg + (int)aflg + (int)uflg > 1)
 	{
-		cerr << "Only one of s/t/a can be specified." << endl;
+		cerr << "Only one of s/t/a/u can be specified." << endl;
 		usage(pname);
 		return 1;
 	}

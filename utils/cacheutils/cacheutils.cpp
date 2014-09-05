@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-// $Id: cacheutils.cpp 3518 2013-01-31 19:13:17Z pleblanc $
+// $Id: cacheutils.cpp 3515 2013-01-30 20:27:04Z pleblanc $
 
 #include <unistd.h>
 
@@ -66,7 +66,7 @@ int32_t extractRespCode(const ByteStream& bs)
 {
 		if (bs.length() < (sizeof(ISMPacketHeader) + sizeof(int32_t)))
 			return 1;
-		const ByteStream::byte* bytePtr = bs.buf();
+		const uint8_t* bytePtr = bs.buf();
 		const ISMPacketHeader* hdrp = reinterpret_cast<const ISMPacketHeader*>(bytePtr);
 		if (hdrp->Command != CACHE_OP_RESULTS)
 			return 1;
@@ -156,7 +156,7 @@ int flushPrimProcCache()
 	try
 	{
 		const int msgsize = sizeof(ISMPacketHeader);
-		ByteStream::byte msgbuf[msgsize];
+		uint8_t msgbuf[msgsize];
 		memset(msgbuf, 0, sizeof(ISMPacketHeader));
 		ISMPacketHeader* hdrp = reinterpret_cast<ISMPacketHeader*>(&msgbuf[0]);
 		hdrp->Command = CACHE_FLUSH;
@@ -187,7 +187,7 @@ int flushPrimProcBlocks(const BRM::BlockList_t& list)
 	try
 	{
 		const size_t msgsize = sizeof(ISMPacketHeader) + sizeof(uint32_t) + sizeof(LbidAtVer) * list.size();
-		scoped_array<ByteStream::byte> msgbuf(new ByteStream::byte[msgsize]);
+		scoped_array<uint8_t> msgbuf(new uint8_t[msgsize]);
 		memset(msgbuf.get(), 0, sizeof(ISMPacketHeader));
 		ISMPacketHeader* hdrp = reinterpret_cast<ISMPacketHeader*>(msgbuf.get());
 		hdrp->Command = CACHE_CLEAN_VSS;

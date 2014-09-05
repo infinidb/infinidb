@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-// $Id: anydatalist.cpp 8476 2012-04-25 22:28:15Z xlou $
+// $Id: anydatalist.cpp 9210 2013-01-21 14:10:42Z rdempsey $
 
 #include "elementtype.h"
 

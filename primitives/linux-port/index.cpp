@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: index.cpp 1855 2012-04-04 18:20:09Z rdempsey $
+ * $Id: index.cpp 2035 2013-01-21 14:12:19Z rdempsey $
  *
  ****************************************************************************/
 
@@ -241,7 +241,6 @@ void PrimitiveProcessor::indexWalk_1(const IndexWalkHeader *in,
 	// This is the general case where we're working within a bit test group
 	else {
 		GET_GROUP_SIZE();
-
 #ifdef VERBOSE
  		cerr << "  search string is 0x" << hex << in->SearchString[0] << dec << endl;
 #endif 

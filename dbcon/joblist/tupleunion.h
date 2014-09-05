@@ -45,32 +45,14 @@ namespace joblist
 class TupleUnion : public JobStep, public TupleDeliveryStep
 {
 public:
-	TupleUnion(const JobStepAssociation &in, 
-		const JobStepAssociation &out,
-		execplan::CalpontSystemCatalog::OID tableOID,
-		uint32_t sessionID,
-		uint32_t txnId,
-		uint32_t verId,
-		uint16_t stepID,
-		uint32_t statementID,
-		ResourceManager& r);
+	TupleUnion(execplan::CalpontSystemCatalog::OID tableOID, const JobInfo& jobInfo);
 	~TupleUnion();
 
 	void run();
 	void join();
 
 	const std::string toString() const;
-	void stepId(uint16_t);
-	uint16_t stepId() const;
-	uint32_t sessionId()   const;
-	uint32_t txnId()       const;
-	uint32_t statementId() const;
 	execplan::CalpontSystemCatalog::OID tableOid() const;
-	void logger(const SPJL& logger) { fLogger = logger; }
-	const JobStepAssociation & inputAssociation() const;
-	void inputAssociation(const JobStepAssociation &in);
-	const JobStepAssociation & outputAssociation() const;
-	void outputAssociation(const JobStepAssociation &out);
 
 	void setInputRowGroups(const std::vector<rowgroup::RowGroup> &);
 	void setOutputRowGroup(const rowgroup::RowGroup &);
@@ -101,15 +83,7 @@ private:
 	void writeNull(rowgroup::Row *out, uint col);
 	void readInput(uint);
 
-	JobStepAssociation inJSA;
-	JobStepAssociation outJSA;
 	execplan::CalpontSystemCatalog::OID fTableOID;
-	uint32_t sessionID;
-	uint32_t txnID;
-	uint32_t verID;
-	uint16_t stepID;
-	uint32_t statementID;
-	SPJL fLogger;
 	// @bug 598 for self-join
 	std::string fAlias1;
 	std::string fAlias2;

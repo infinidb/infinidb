@@ -371,7 +371,11 @@ list<string> ReplayTxnLog::getLogFileNames()
 	{
 		fs::path source = *iter;
 		if (!fs::is_directory(source) )	{
+#if BOOST_VERSION >= 105200
+			fileName = source.filename().c_str();
+#else
 			fileName = iter->leaf();
+#endif
 			if(fileName.find(logFileName, 0) == 0) { 
 				fileName = archiveDir + "/" + fileName;
 				dbFileNames.push_back(fileName);
@@ -773,7 +777,7 @@ void ReplayTxnLog::process() {
 
 	// Get the last version from issued before the backup.
 	#ifdef LAST_TXN_AVAILABLE
-		fStartVersionID = mgr.verID();
+		fStartVersionID = mgr.verID().currentScn;
 	#else
 		fStartVersionID = 0;
 	#endif

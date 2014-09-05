@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: batchprimitiveprocessor.h 1917 2012-08-01 15:58:55Z dhall $
+// $Id: batchprimitiveprocessor.h 2037 2013-01-24 18:41:11Z pleblanc $
 // C++ Interface: batchprimitiveprocessor
 //
 // Description: 
@@ -97,11 +97,13 @@ class BatchPrimitiveProcessor
 		/* Duplicate() returns a deep copy of this object as it was init'd by initBPP.
 			It's thread-safe wrt resetBPP. */
 		SBPP duplicate();
-		bool operator==(const BatchPrimitiveProcessor&) const;
-		inline bool operator!=(const BatchPrimitiveProcessor& bpp) const
-		{
-			return !(*this == bpp);
-		}
+
+		/* These need to be updated */
+		//bool operator==(const BatchPrimitiveProcessor&) const;
+		//inline bool operator!=(const BatchPrimitiveProcessor& bpp) const
+		//{
+		//	return !(*this == bpp);
+		//}
 
 		inline uint getSessionID() { return sessionID; }
 		inline uint getStepID() { return stepID; }
@@ -144,7 +146,7 @@ class BatchPrimitiveProcessor
 
 		BPSOutputType ot;
 
-		uint versionNum;
+		BRM::QueryContext versionInfo;
 		uint txnID;
 		uint sessionID;
 		uint stepID;
@@ -228,7 +230,7 @@ class BatchPrimitiveProcessor
 		bool hasRowGroup;
 		uint32_t valueColumn;
 		void copyInputRGColumns();
-		void initFromRowGroup();
+		//void initFromRowGroup();    // not in use, need to update
 
 		/* Rowgroups + join */
 		typedef std::tr1::unordered_multimap<uint64_t, uint32_t,

@@ -1,6 +1,6 @@
 /*
 
-   Copyright (C) 2009-2012 Calpont Corporation.
+   Copyright (C) 2009-2013 Calpont Corporation.
 
    Use of and access to the Calpont InfiniDB Community software is subject to the
    terms and conditions of the Calpont Open Source License Agreement. Use of and
@@ -85,6 +85,7 @@ public:
 	void shutdown();
     void feedData();
     unsigned int readDataFile(messageqcpp::SBS& Sbs);
+    unsigned int readBinaryDataFile(messageqcpp::SBS& Sbs, unsigned int recLen);
     void openInFile();
 
     int getNextRow(std::istream& ifs, char*pBuf, int MaxLen);

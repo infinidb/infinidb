@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_log.cpp 4506 2013-02-02 00:11:15Z bpaul $
+* $Id: we_log.cpp 4504 2013-02-02 00:07:43Z bpaul $
 *
 *******************************************************************************/
 
@@ -206,11 +206,7 @@ void Log::logSyslog( const std::string& msg,
             msgId = logging::M0076;
             break;
         }
-		case ERR_UNKNOWN:
-		{
-			msgId = logging::M0017;
-            break;
-		}
+
         default:
         {
             msgId = logging::M0087;

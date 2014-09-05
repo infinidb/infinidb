@@ -122,7 +122,7 @@ int64_t Func_last_day::getIntVal(rowgroup::Row& row,
 			return -1;
 	}
 	uint32_t lastday = day;
-	if (isLeapYear(year) && (month == 2))
+	if (helpers::isLeapYear(year) && (month == 2))
 	{
 		lastday = 29;
 	}
@@ -132,7 +132,7 @@ int64_t Func_last_day::getIntVal(rowgroup::Row& row,
 	}
 	else
 	{
-		lastday = daysInMonth[month-1];
+		lastday = helpers::daysInMonth[month-1];
 	}
 	if (day > lastday)
 	{

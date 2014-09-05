@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-/* $Id: ddl.l 8706 2012-07-13 16:25:50Z rdempsey $ */
+/* $Id: ddl.l 9342 2013-03-27 14:11:24Z chao $ */
 %{
 #include <iostream>
 #include <vector>
@@ -63,7 +63,7 @@ ident_cont [A-Za-z\200-\377_0-9\$]
 identifier {ident_start}{ident_cont}*
 
 integer			[-+]?{digit}+
-decimal			(({digit}*\.{digit}+)|({digit}+\.{digit}*))
+decimal			([-+]?({digit}*\.{digit}+)|({digit}+\.{digit}*))
 real			({integer}|{decimal})[Ee][-+]?{digit}+
 realfail1		({integer}|{decimal})[Ee]
 realfail2		({integer}|{decimal})[Ee][-+]
@@ -142,6 +142,7 @@ TABLE {return TABLE;}
 TINYINT {return TINYINT;}
 TO {return TO;}
 UNIQUE {return UNIQUE;}
+UNSIGNED {return UNSIGNED;}
 UPDATE {return UPDATE;}
 USER {return USER;}
 VARCHAR {return VARCHAR;}

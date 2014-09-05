@@ -17,7 +17,7 @@
 
 # $Id: Makefile.am 861 2009-04-02 14:14:12Z rdempsey $
 
-SUBDIRS = ddlpackage ddlpackageproc dmlpackage dmlpackageproc execplan joblist sm mysql
+SUBDIRS = ddlpackage ddlpackageproc dmlpackage dmlpackageproc execplan joblist mysql
 
 test:
 

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
-* $Id: we_columnautoinc.cpp 3720 2012-04-04 18:18:49Z rdempsey $
+* $Id: we_columnautoinc.cpp 4450 2013-01-21 14:13:24Z rdempsey $
 */
 
 /** @file
@@ -39,7 +39,7 @@
 
 namespace WriteEngine
 {
-
+
 //------------------------------------------------------------------------------
 // ColumnAutoInc constructor.
 //------------------------------------------------------------------------------
@@ -78,10 +78,11 @@ int ColumnAutoInc::init( const std::string& fullTableName,
         oss << "Error parsing full table name to get auto-increment value for "
             << fTableName;
         fLog->logMsg( oss.str(), ERR_AUTOINC_TABLE_NAME, MSGLVL_ERROR );
+		BulkLoad::addErrorMsg2BrmUpdater(fTableName, oss);
         return ERR_AUTOINC_TABLE_NAME;
     }
 
-    long long nextAuto = 0;
+    uint64_t nextAuto = 0;
     int rc = getNextValueFromSysCat( nextAuto );
     if (rc != NO_ERROR)
     {
@@ -90,13 +91,14 @@ int ColumnAutoInc::init( const std::string& fullTableName,
 
     std::string errMsg;
     rc = BRMWrapper::getInstance()->startAutoIncrementSequence(
-        fColumnOID, nextAuto, colInfo->column.width, errMsg );
+        fColumnOID, nextAuto, colInfo->column.width, colInfo->column.dataType, errMsg );
     if (rc != NO_ERROR)
     {
         std::ostringstream oss;
         oss << "Unable to initialize auto-increment sequence for " <<
             fTableName << "; " << errMsg;
         fLog->logMsg( oss.str(), rc, MSGLVL_ERROR );
+		BulkLoad::addErrorMsg2BrmUpdater(fTableName, oss);
         return rc;
     }
 
@@ -119,7 +121,7 @@ int ColumnAutoInc::init( const std::string& fullTableName,
 // for completeness.  Using the mutex should not affect performance, since this
 // function is only called once per table. 
 //------------------------------------------------------------------------------
-void ColumnAutoInc::initNextAutoInc( long long nextValue )
+void ColumnAutoInc::initNextAutoInc( uint64_t nextValue )
 {
     boost::mutex::scoped_lock lock(fAutoIncMutex);
     // nextValue is unusable if < 1; probably means we already reached max value
@@ -156,19 +158,20 @@ int ColumnAutoInc::finish( )
         oss << "Error locking auto-increment nextValue lock for table " <<
             fTableName << "; column " << fColumnName << "; " << ex.what();
         fLog->logMsg( oss.str(), ERR_AUTOINC_GET_LOCK, MSGLVL_ERROR );
+		BulkLoad::addErrorMsg2BrmUpdater(fTableName, oss);
         return ERR_AUTOINC_GET_LOCK;
     }
 
-    long long sysCatNextAuto = 0;
+    uint64_t sysCatNextAuto = 0;
     rc = getNextValueFromSysCat( sysCatNextAuto );
     if (rc == NO_ERROR)
     {
         // Update system catalog if my latest AI nextValue is > the current
-        // syscat AI nextValue.  -1 denotes an AI column that has maxed out.
-        long long myNextValue = getNextAutoIncToSave();
-        if ( (sysCatNextAuto != -1) && // do not update if syscat already at max
+        // syscat AI nextValue.  max(uint64_t) denotes an AI column that has maxed out.
+        uint64_t myNextValue = getNextAutoIncToSave();
+        if ( (sysCatNextAuto != AUTOINCR_SATURATED) && // do not update if syscat already at max
             ((myNextValue >  sysCatNextAuto) ||
-             (myNextValue == -1)) )
+             (myNextValue == AUTOINCR_SATURATED)) )
         {
             std::ostringstream oss2;
             oss2 << "Updating next auto increment for table-" << fTableName <<
@@ -185,7 +188,7 @@ int ColumnAutoInc::finish( )
                     fTableName << "; column " << fColumnName << "; rc=" << rc <<
                     "; " << ec.errorString(ERR_AUTOINC_UPDATE);
                 fLog->logMsg( oss.str(), ERR_AUTOINC_UPDATE, MSGLVL_ERROR );
-
+				BulkLoad::addErrorMsg2BrmUpdater(fTableName, oss);
                 // Don't exit this function yet.  We set return code and fall
                 // through to bottom of the function to release the AI lock.
                 rc = ERR_AUTOINC_UPDATE;
@@ -224,9 +227,9 @@ int ColumnAutoInc::finish( )
 // value tracked by this ColumnInfo object, that can/should be saved back
 // into the system catalog at the end of the job.
 //------------------------------------------------------------------------------
-long long ColumnAutoInc::getNextAutoIncToSave( )
+uint64_t ColumnAutoInc::getNextAutoIncToSave( )
 {
-    long long nextValue = -1;
+    uint64_t nextValue = AUTOINCR_SATURATED;
 
     boost::mutex::scoped_lock lock(fAutoIncMutex);
     // nextValue is returned as -1 if we reached max value
@@ -239,7 +242,7 @@ long long ColumnAutoInc::getNextAutoIncToSave( )
 //------------------------------------------------------------------------------
 // Get the current AI nextValue from the system catalog.
 //------------------------------------------------------------------------------
-int ColumnAutoInc::getNextValueFromSysCat( long long& nextValue )
+int ColumnAutoInc::getNextValueFromSysCat( uint64_t& nextValue )
 {
     std::string::size_type periodIdx = fTableName.find('.');
 
@@ -249,7 +252,7 @@ int ColumnAutoInc::getNextValueFromSysCat( long long& nextValue )
     tName.assign(fTableName, periodIdx+1,
         fTableName.length() - (periodIdx+1));
     execplan::CalpontSystemCatalog::TableName tbl(sName,tName);
-    long long nextAuto = 0;
+    uint64_t nextAuto = 0;
     try
     {
         boost::shared_ptr<execplan::CalpontSystemCatalog> systemCatPtr =
@@ -264,11 +267,7 @@ int ColumnAutoInc::getNextValueFromSysCat( long long& nextValue )
             throw std::runtime_error(
                 "Not an auto-increment column, or column not found");
         }
-        else if (nextAuto == -2) {
-            throw std::runtime_error(
-                "Not able to get current nextValue, table not found");
-        }
-        else if (nextAuto <   0) {
+        else if (nextAuto == AUTOINCR_SATURATED) {
             throw std::runtime_error(
                 "auto-increment max value already reached");
         }
@@ -281,6 +280,7 @@ int ColumnAutoInc::getNextValueFromSysCat( long long& nextValue )
         oss << "Unable to get current auto-increment value for " <<
             sName << "." << tName << "; " << ex.what();
         fLog->logMsg( oss.str(), ERR_AUTOINC_INIT1, MSGLVL_ERROR );
+		BulkLoad::addErrorMsg2BrmUpdater(tName, oss);
         return ERR_AUTOINC_INIT1;
     }
     catch (...)
@@ -289,6 +289,7 @@ int ColumnAutoInc::getNextValueFromSysCat( long long& nextValue )
         oss << "Unable to get current auto-increment value for " <<
             sName << "." << tName << "; unknown exception";
         fLog->logMsg( oss.str(), ERR_AUTOINC_INIT2, MSGLVL_ERROR );
+		BulkLoad::addErrorMsg2BrmUpdater(tName, oss);
         return ERR_AUTOINC_INIT2;
     }
 
@@ -317,7 +318,7 @@ ColumnAutoIncJob::~ColumnAutoIncJob( )
 /* virtual */
 int ColumnAutoIncJob::reserveNextRange(
     uint autoIncCount,
-    long long& nextValue )
+    uint64_t& nextValue )
 {
     boost::mutex::scoped_lock lock(fAutoIncMutex);
     if ((fMaxIntSat - autoIncCount) < fAutoIncLastValue)
@@ -355,7 +356,7 @@ ColumnAutoIncIncremental::~ColumnAutoIncIncremental( )
 /* virtual */
 int ColumnAutoIncIncremental::reserveNextRange(
     uint autoIncCount,
-    long long& nextValue )
+    uint64_t& nextValue )
 {
     u_int64_t countArg   = autoIncCount;
     u_int64_t nextValArg = 0;
@@ -371,11 +372,12 @@ int ColumnAutoIncIncremental::reserveNextRange(
         if (rc == ERR_AUTOINC_GEN_EXCEED_MAX)
             oss << " Max allowed value is " << fMaxIntSat << ".";
         fLog->logMsg( oss.str(), rc, MSGLVL_ERROR );
+		BulkLoad::addErrorMsg2BrmUpdater(fTableName, oss);
         return rc;
     }
 
     nextValue = nextValArg;
-    long long autoIncLastValue = nextValue + autoIncCount - 1;
+    uint64_t autoIncLastValue = nextValue + autoIncCount - 1;
 
     // For efficiency we delay the mutex till now, instead of before the call
     // to getAutoIncrementRange().  This means we could theoretically end up

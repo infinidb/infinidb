@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************************
-* $Id: messagequeue.h 3280 2012-09-13 16:27:28Z rdempsey $
+* $Id: messagequeue.h 3632 2013-03-13 18:08:46Z pleblanc $
 *
 *
 ******************************************************************************************/
@@ -35,12 +35,14 @@
 #include <netinet/in.h>
 #endif
 
-#include "configcpp.h"
 #include "serversocket.h"
 #include "iosocket.h"
-#include "clientsocket.h"
 #include "bytestream.h"
 #include "logger.h"
+namespace config
+{
+class Config;
+}
 
 class MessageQTestSuite;
 
@@ -93,27 +95,7 @@ public:
 	 * @brief destructor
 	 */
 	EXPORT ~MessageQueueServer();
-
-	/* The MQS read/write fcns are commented out b/c the normal usage is to
-	   do an accept, then use the IOSocket directly.  No need to have multiple
-	   ways to do the same thing */
-#if 0
-	/**
-	 * @brief read a message from the queue
-	 * 
-	 * wait for and return a message from the queue. The deafult timeout waits forever. Note that
-	 * eventhough struct timespec has nanosecond resolution, this method only has milisecond resolution.
-	 */
-	const SBS read(const struct timespec* timeout=0) const;
-
-	/**
-	 * @brief write a message to the queue
-	 * 
-	 * write a message to otherEnd
-	 */
-	void write(const ByteStream& msg, const struct timespec* timeout=0) const;
-#endif
-
+// 
 	/**
 	 * @brief wait for a connection and return an IOSocket
 	 *
@@ -123,11 +105,6 @@ public:
 	 * read() and/or write(). The caller is responsible for calling close() when it is done.
 	 */
 	EXPORT const IOSocket accept(const struct timespec* timeout=0) const;
-
-	/**
-	 * @brief get the client IOSocket
-	 */
-	//inline const IOSocket& clientSock() const;
 
 	/**
 	 * @brief get a mutable pointer to the client IOSocket
@@ -213,7 +190,7 @@ public:
 	 * wait for and return a message from otherEnd. The deafult timeout waits forever. Note that
 	 * eventhough struct timespec has nanosecond resolution, this method only has milisecond resolution.
 	 */
-	EXPORT const SBS read(const struct timespec* timeout=0, bool* isTimeOut = NULL) const;
+	EXPORT const SBS read(const struct timespec* timeout=0, bool* isTimeOut = NULL, Stats *stats = NULL) const;
 
 	/**
 	 * @brief write a message to the queue
@@ -221,7 +198,7 @@ public:
 	 * write a message to otherEnd. If the socket is not open, the timeout parm (in ms) will be used
 	 *  to establish a sync connection w/ the server
 	 */
-	EXPORT void write(const ByteStream& msg, const struct timespec* timeout=0) const;
+	EXPORT void write(const ByteStream& msg, const struct timespec* timeout=0, Stats *stats = NULL) const;
 
 	/**
 	 * @brief shutdown the connection to the server
@@ -288,7 +265,7 @@ private:
 	std::string fOtherEnd;		/// the process name for this process
 	struct sockaddr fServ_addr;	/// the addr of the server (may be this process)
 	config::Config* fConfig;			/// config file has the IP addrs and port numbers
-	mutable ClientSocket fClientSock;	/// the socket to communicate with the server
+	mutable IOSocket fClientSock;	/// the socket to communicate with the server
 	mutable logging::Logger fLogger;
 	bool fIsAvailable;
 	std::string fModuleName;
@@ -297,7 +274,7 @@ private:
 inline IOSocket& MessageQueueServer::clientSock() const { return fClientSock; }
 inline const std::string MessageQueueClient::addr2String() const { return fClientSock.addr2String(); }
 inline const bool MessageQueueClient::isSameAddr(const MessageQueueClient& rhs) const
-	{ return fClientSock.isSameAddr(rhs.fClientSock); }
+	{ return fClientSock.isSameAddr(&rhs.fClientSock); }
 inline void MessageQueueClient::syncProto(bool use) { fClientSock.syncProto(use); }
 
 } 

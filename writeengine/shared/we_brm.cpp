@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_brm.cpp 4496 2013-01-31 19:13:20Z pleblanc $
+* $Id: we_brm.cpp 4474 2013-01-28 20:12:16Z chao $
 *
 *******************************************************************************/
 /** @file */
@@ -29,6 +29,9 @@
 #include <algorithm>
 #include <unistd.h>
 using namespace std;
+#include <boost/thread/mutex.hpp>
+#include <boost/scoped_ptr.hpp>
+using namespace boost;
 
 #define WRITEENGINEBRM_DLLEXPORT
 #include "we_brm.h"
@@ -44,6 +47,7 @@ using namespace std;
 #include "we_config.h"
 
 using namespace BRM;
+using namespace execplan;
 //#include "stopwatch.h"
 //using namespace logging;
 /** Namespace WriteEngine */
@@ -59,7 +63,7 @@ boost::thread_specific_ptr<int> BRMWrapper::m_ThreadDataPtr;
 bool     BRMWrapper::m_useVb    = true;
 OID      BRMWrapper::m_curVBOid  = INVALID_NUM;
 FILE*    BRMWrapper::m_curVBFile = NULL;
-
+boost::mutex vbFileLock;
 struct fileInfoCompare // lt operator
 {
     bool operator()(const File& lhs, const File& rhs) const
@@ -92,13 +96,14 @@ int BRMWrapper::startAutoIncrementSequence(
     OID          colOID,
     u_int64_t    startNextValue,
     u_int32_t    colWidth,
+    execplan::CalpontSystemCatalog::ColDataType colDataType,
     std::string& errMsg)
 {
     int rc = NO_ERROR;
 
     try
     {
-        blockRsltnMgrPtr->startAISequence( colOID, startNextValue, colWidth );
+        blockRsltnMgrPtr->startAISequence( colOID, startNextValue, colWidth, colDataType );
     }
     catch (std::exception& ex)
     {
@@ -177,13 +182,14 @@ int   BRMWrapper::allocateColExtentExactFile(
     u_int16_t   dbRoot,
     u_int32_t   partition,
     u_int16_t   segment,
+    execplan::CalpontSystemCatalog::ColDataType colDataType,
     LBID_t&     startLbid,
     int&        allocSize,
     u_int32_t&  startBlock)
 {
     int rc = blockRsltnMgrPtr->createColumnExtentExactFile(
-            (int)oid, colWidth, dbRoot, partition, segment, startLbid,
-            allocSize, startBlock);
+            (int)oid, colWidth, dbRoot, partition, segment, colDataType,
+            startLbid, allocSize, startBlock);
 
     //std::ostringstream oss;
     //oss << "Allocated column extent: oid-" << oid <<
@@ -296,10 +302,10 @@ int   BRMWrapper::getStartLbid(const OID oid,
 //------------------------------------------------------------------------------
 // Get the real physical offset based on the LBID
 //------------------------------------------------------------------------------
-int  BRMWrapper::getFboOffset(const i64 lbid,
-    u_int16_t& dbRoot,
-    u_int32_t& partition,
-    u_int16_t& segment,
+int  BRMWrapper::getFboOffset(const uint64_t lbid,
+    uint16_t& dbRoot,
+    uint32_t& partition,
+    uint16_t& segment,
     int&       fbo)
 {
     int oid;
@@ -312,10 +318,10 @@ int  BRMWrapper::getFboOffset(const i64 lbid,
 //------------------------------------------------------------------------------
 // Get the real physical offset based on the LBID
 //------------------------------------------------------------------------------
-int  BRMWrapper::getFboOffset(const i64 lbid, int& oid,
-    u_int16_t& dbRoot,
-    u_int32_t& partition,
-    u_int16_t& segment,
+int  BRMWrapper::getFboOffset(const uint64_t lbid, int& oid,
+    uint16_t& dbRoot,
+    uint32_t& partition,
+    uint16_t& segment,
     int&       fbo)
 {
     // according to Patric, extendmap don't need vbflag, thus verid =0
@@ -606,7 +612,7 @@ int BRMWrapper::getBrmRc(bool reset)
 
 int BRMWrapper::copyVBBlock (FILE *pSourceFile, const OID sourceOid,
                 FILE *pTargetFile, const OID targetOid,
-                const std::vector < i32 > &fboList,
+                const std::vector < uint32_t > &fboList,
                 const BRM::VBRange &freeList,
                 size_t &nBlocksProcessed,
                 DbFileOp* pFileOp,
@@ -727,7 +733,7 @@ int BRMWrapper::copyVBBlock (FILE *pSourceFile, const OID sourceOid,
 }
 
 int BRMWrapper::copyVBBlock(FILE* pSourceFile, FILE* pTargetFile,
-                                  const i64 sourceFbo, const i64 targetFbo,
+                                  const uint64_t sourceFbo, const uint64_t targetFbo,
                                   DbFileOp* fileOp, const Column& column)
 {
     int rc, origin = 0;
@@ -803,7 +809,6 @@ int BRMWrapper::rollBack(const VER_t transID, int sessionId)
     OID_t       vbOid, weOid, currentVbOid;
     u_int32_t   vbFbo, weFbo;
     size_t      i;
-    VER_t       verID = (VER_t) transID;
     bool        vbFlag;
     uint16_t   vbDbRoot, weDbRoot, vbSegmentNum, weSegmentNum;
     uint32_t   vbPartitionNum, wePartitionNum;
@@ -862,21 +867,22 @@ int BRMWrapper::rollBack(const VER_t transID, int sessionId)
 	sort(lbidList.begin(), lbidList.end());
 	try {
       for(i = 0; i < lbidList.size(); i++) {
-        verID = (VER_t) transID;
+    	QueryContext verID(transID);
+    	VER_t outVer;
         range.start = lbidList[i];
         range.size = 1;
         lbidRangeList.push_back(range);
 		//timer.start("vssLookup");
         // get version id
         RETURN_ON_WE_ERROR(
-            blockRsltnMgrPtr->vssLookup(lbidList[i], verID, transID, vbFlag, true),
+            blockRsltnMgrPtr->vssLookup(lbidList[i], verID, transID, &outVer, &vbFlag, true),
             ERR_BRM_LOOKUP_VERSION);
 		//timer.stop("vssLookup");
         // copy buffer back
         //look for the block in extentmap
 		//timer.start("lookupLocalEX");
         RETURN_ON_WE_ERROR(
-            blockRsltnMgrPtr->lookupLocal(lbidList[i], /*transID*/verID, false, weOid,
+            blockRsltnMgrPtr->lookupLocal(lbidList[i], outVer, false, weOid,
             weDbRoot, wePartitionNum, weSegmentNum, weFbo), ERR_EXTENTMAP_LOOKUP);
 		//timer.stop("lookupLocalEX");
         Column column;
@@ -890,7 +896,7 @@ int BRMWrapper::rollBack(const VER_t transID, int sessionId)
 			idbassert(colType.columnOID != 0);
 			idbassert(colType.ddn.dictOID == weOid);
 		}
-        ColDataType colDataType = (ColDataType) colType.colDataType;
+        CalpontSystemCatalog::ColDataType colDataType = colType.colDataType;
         ColType weColType;
         Convertor::convertColType(colDataType, weColType);
         column.colWidth = Convertor::getCorrectRowWidth(colDataType, colType.colWidth);
@@ -910,15 +916,15 @@ int BRMWrapper::rollBack(const VER_t transID, int sessionId)
 #ifndef __LP64__
             printf(
                 "\n\tuncommitted lbid - lbidList[i]=%lld weOid =%d weFbo=%d verID=%d, weDbRoot=%d",
-                lbidList[i], weOid, weFbo, verID, weDbRoot);
+                lbidList[i], weOid, weFbo, outVer, weDbRoot);
 #else
             printf(
                 "\n\tuncommitted lbid - lbidList[i]=%ld weOid =%d weFbo=%d verID=%d, weDbRoot=%d",
-                lbidList[i], weOid, weFbo, verID, weDbRoot);
+                lbidList[i], weOid, weFbo, outVer, weDbRoot);
 #endif
         //look for the block in the version buffer
 		//timer.start("lookupLocalVB");
-        RETURN_ON_WE_ERROR(blockRsltnMgrPtr->lookupLocal(lbidList[i], verID, true, vbOid,
+        RETURN_ON_WE_ERROR(blockRsltnMgrPtr->lookupLocal(lbidList[i], outVer, true, vbOid,
                             vbDbRoot, vbPartitionNum, vbSegmentNum, vbFbo), ERR_BRM_LOOKUP_FBO);
 //timer.stop("lookupLocalVB");
         if (isDebug(DEBUG_3))
@@ -1042,7 +1048,7 @@ int BRMWrapper::rollBackBlocks(const VER_t transID, int sessionId)
     u_int32_t   vbFbo, weFbo;
     size_t      i;
     VER_t       verID = (VER_t) transID;
-    bool        vbFlag;
+
     uint16_t   vbDbRoot, weDbRoot, vbSegmentNum, weSegmentNum;
     uint32_t   vbPartitionNum, wePartitionNum;
     File  sourceFileInfo;
@@ -1107,12 +1113,13 @@ int BRMWrapper::rollBackBlocks(const VER_t transID, int sessionId)
         verID = (VER_t) transID;
 		//timer.start("vssLookup");
         // get version id
-		rc = blockRsltnMgrPtr->vssLookup(lbidList[i], verID, transID, vbFlag, true);
-		if ( rc != 0)
+
+        verID = blockRsltnMgrPtr->getHighestVerInVB(lbidList[i], transID);
+		if (verID < 0)
 		{
 			std::ostringstream oss;
-			BRM::errString(rc, errorMsg);
-			oss << "vssLookup error encountered while looking up lbid " << lbidList[i] << " and error code is " << rc << " with message " << errorMsg;
+			BRM::errString(verID, errorMsg);
+			oss << "vssLookup error encountered while looking up lbid " << lbidList[i] << " and error code is " << verID << " with message " << errorMsg;
 			throw std::runtime_error(oss.str());	
 		}
 		//timer.stop("vssLookup");
@@ -1149,7 +1156,7 @@ int BRMWrapper::rollBackBlocks(const VER_t transID, int sessionId)
 			idbassert(colType.columnOID != 0);
 			idbassert(colType.ddn.dictOID == weOid);
 		}
-        ColDataType colDataType = (ColDataType) colType.colDataType;
+        CalpontSystemCatalog::ColDataType colDataType = colType.colDataType;
         ColType weColType;
         Convertor::convertColType(colDataType, weColType);
         column.colWidth = Convertor::getCorrectRowWidth(colDataType, colType.colWidth);
@@ -1314,7 +1321,7 @@ int BRMWrapper::rollBackBlocks(const VER_t transID, int sessionId)
 		if (rc == BRM::ERR_READONLY)
 			return ERR_BRM_READ_ONLY;
 		else
-			return ERR_BRM_ROLLBACK;
+			return rc;
     }
     else
     {
@@ -1379,12 +1386,12 @@ int BRMWrapper::rollBackVersion(const VER_t transID, int sessionId)
 }
 
 
-int BRMWrapper::writeVB(FILE* pFile, const VER_t transID, const OID oid, const i64 lbid,
+int BRMWrapper::writeVB(FILE* pFile, const VER_t transID, const OID oid, const uint64_t lbid,
     DbFileOp* pFileOp)
 {
     int fbo;
     LBIDRange lbidRange;
-    std::vector<i32> fboList;
+    std::vector<uint32_t> fboList;
     std::vector<LBIDRange> rangeList;
 
     lbidRange.start = lbid;
@@ -1404,15 +1411,15 @@ int BRMWrapper::writeVB(FILE* pFile, const VER_t transID, const OID oid, const i
 
 // Eliminates blocks that have already been versioned by transaction transID
 void BRMWrapper::pruneLBIDList(VER_t transID, vector<LBIDRange> *rangeList,
-		vector<i32> *fboList) const
+		vector<uint32_t> *fboList) const
 {
 	vector<LBID_t> lbids;
     vector<BRM::VSSData> vssData;
-    VER_t verID = (VER_t) transID;
+    BRM::QueryContext verID(transID);
     uint i;
     int rc;
 	vector<LBIDRange> newrangeList;
-	vector<i32> newfboList;
+	vector<uint32_t> newfboList;
 
     for (i = 0; i < rangeList->size(); i++)
     	lbids.push_back((*rangeList)[i].start);
@@ -1442,7 +1449,7 @@ void BRMWrapper::pruneLBIDList(VER_t transID, vector<LBIDRange> *rangeList,
 }
 
 int BRMWrapper::writeVB(FILE* pSourceFile, const VER_t transID, const OID weOid,
-    std::vector<i32>& fboList, std::vector<LBIDRange>& rangeList, DbFileOp* pFileOp)
+    std::vector<uint32_t>& fboList, std::vector<LBIDRange>& rangeList, DbFileOp* pFileOp)
 {
     int rc;
     size_t i;
@@ -1531,7 +1538,7 @@ int BRMWrapper::writeVB(FILE* pSourceFile, const VER_t transID, const OID weOid,
     fileInfo.fSegment = 0;
 //    fileInfo.fDbRoot = (freeList[0].vbOID % rootCnt) + 1;
     fileInfo.fDbRoot = dbRoot;
-
+	mutex::scoped_lock lk(vbFileLock);
     pTargetFile = openFile(fileInfo, "r+b", true);
     if (pTargetFile == NULL)
     {
@@ -1596,208 +1603,6 @@ int BRMWrapper::writeVB(FILE* pSourceFile, const VER_t transID, const OID weOid,
     	fflush(pTargetFile);
 	return rc;
 cleanup:
-	if (pTargetFile)
-		fflush(pTargetFile);
-	writeVBEnd(transID,rangeList);
-    return rc;
-}
-
-int	BRMWrapper::writeBatchVBs( const VER_t transID,
-							  const std::vector<Column> columns, 
-							  std::vector<LBIDRange> &  rangeList, std::vector<DbFileOp*>& fileOps)
-{
-	int rc = 0;
-	//Build range list
-	LBIDRange   range;
-	LBID_t      lbid;
-	FILE* pTargetFile;
-	int32_t vbOid;
-	size_t i, k, rangeListCount;
-	size_t l, m;
-	vector<i32>    fboList;
-	vector<i32>    tmpFboList;
-	std::vector<VBRange> columnFreeList, tmpFreeList;
-	//Mark the extents to updating
-	std::vector<LBID_t> lbids;		
-	for (unsigned i=0; i<columns.size(); i++)
-	{
-		rc = getBrmInfo(columns[i].dataFile.oid, columns[i].dataFile.fPartition, columns[i].dataFile.fSegment, columns[i].dataFile.hwm, lbid);
-		if ( rc != 0)
-			return rc;
-			
-		range.start = lbid;
-		range.size = 1;
-		rangeList.push_back(range);
-		lbids.push_back(lbid);
-		fboList.push_back(columns[i].dataFile.hwm);
-	}
-	
-	rc = blockRsltnMgrPtr->markExtentsInvalid(lbids);
-	
-	//Allthese lbid should be under the same dbroot.
-	u_int16_t      dbRoot = columns[0].dataFile.fDbRoot;
-	//No need to prune it as this is the first batch
-	std::vector<VBRange> freeList;
-	rc = blockRsltnMgrPtr->beginVBCopy(transID, dbRoot, rangeList, freeList);
-	if (rc != NO_ERROR)
-	{
-		switch (rc)
-		{
-			case ERR_DEADLOCK: return ERR_BRM_DEAD_LOCK;
-			case ERR_VBBM_OVERFLOW: return ERR_BRM_VB_OVERFLOW;
-			case ERR_NETWORK: return ERR_BRM_NETWORK;
-			case ERR_READONLY: return ERR_BRM_READONLY;
-			default: return ERR_BRM_BEGIN_COPY;
-		}
-	}
-	
-	//Copy the blocks to version buffer
-	File fileInfo;
-    fileInfo.oid = freeList[0].vbOID;
-    fileInfo.fPartition = 0;
-    fileInfo.fSegment = 0;
-    fileInfo.fDbRoot = dbRoot;
-
-    pTargetFile = openFile(fileInfo, "r+b", true);
-    if (pTargetFile == NULL)
-    {
-        pTargetFile = openFile(fileInfo, "w+b");
-        if (pTargetFile == NULL)
-        {
-            rc = ERR_FILE_NOT_EXIST;
-            goto batchcleanup;
-        }
-        else
-        {
-            fclose(pTargetFile);
-            pTargetFile = openFile(fileInfo, "r+b",true);
-            if (pTargetFile == NULL)
-            {
-                rc = ERR_FILE_NOT_EXIST;
-                goto batchcleanup;
-            }
-        }
-    }
-
-    k = 0;
-    vbOid = freeList[0].vbOID;
-    rangeListCount = 0;
-    for (i = 0; i < freeList.size(); i++)
-    {
-		rangeListCount += k;
-		l = k; // store the number of blocks processed till now for this file
-		if (vbOid == freeList[i].vbOID)
-		{
-			columnFreeList.push_back(freeList[i]);
-			columnFreeList[0].size = 1;
-			l = 0;
-			for (m=0; m < columns.size(); m++)
-			{
-				// This call to copyVBBlock will consume whole of the freeList[i]
-				tmpFboList.clear();
-				tmpFreeList.clear();
-				tmpFboList.push_back(fboList[m]);
-				l += k;
-				columnFreeList[0].vbFBO += k;
-				rangeListCount = 0;
-				k = 0;
-				rc = copyVBBlock(columns[m].dataFile.pFile, columns[m].dataFile.oid, pTargetFile, fileInfo.oid,
-					tmpFboList,columnFreeList[0], k, fileOps[m], rangeListCount);
-
-				if (rc != NO_ERROR)
-					goto batchcleanup;
-
-			
-				rc = blockRsltnMgrPtr->writeVBEntry(transID, rangeList[m].start,
-						vbOid, columnFreeList[0].vbFBO);
-
-				if (rc != NO_ERROR)
-				{
-					switch (rc)
-					{
-						case ERR_DEADLOCK: rc = ERR_BRM_DEAD_LOCK;
-						case ERR_VBBM_OVERFLOW: rc = ERR_BRM_VB_OVERFLOW;
-						case ERR_NETWORK: rc = ERR_BRM_NETWORK;
-						case ERR_READONLY: rc = ERR_BRM_READONLY;
-						default: rc = ERR_BRM_WR_VB_ENTRY;
-					}
-					goto batchcleanup;
-				}
-			}	
-			
-        }
-        else
-        {
-            l = 0; //reset the begining of vb file offset
-            k = 0;
-            vbOid = freeList[i].vbOID;
-            fileInfo.oid = freeList[i].vbOID;
-            fileInfo.fPartition = 0;
-            fileInfo.fSegment = 0;
-            fileInfo.fDbRoot = dbRoot;
-            pTargetFile = openFile(fileInfo, "r+b", true);
-            if (pTargetFile == NULL)
-            {
-                pTargetFile = openFile(fileInfo, "w+b");
-                if (pTargetFile == NULL)
-                {
-                    rc = ERR_FILE_NOT_EXIST;
-                    goto batchcleanup;
-                }
-                else
-                {
-                    fclose(pTargetFile);
-                    pTargetFile = openFile(fileInfo, "r+b", true);
-                    if (pTargetFile == NULL)
-                    {
-                        rc = ERR_FILE_NOT_EXIST;
-                        goto batchcleanup;
-                    }
-                }
-            }
-
-            columnFreeList.push_back(freeList[i]);
-			columnFreeList[0].size = 1;
-			l = 0;
-			for (m=0; m < columns.size(); m++)
-			{
-				// This call to copyVBBlock will consume whole of the freeList[i]
-				tmpFboList.clear();
-				tmpFreeList.clear();
-				tmpFboList.push_back(fboList[m]);
-				l += k;
-				columnFreeList[0].vbFBO += k;
-				rangeListCount = 0;
-				k = 0;
-				rc = copyVBBlock(columns[m].dataFile.pFile, columns[m].dataFile.oid, pTargetFile, fileInfo.oid,
-					tmpFboList,columnFreeList[0], k, fileOps[m], rangeListCount);
-
-				if (rc != NO_ERROR)
-					goto batchcleanup;
-
-			
-				rc = blockRsltnMgrPtr->writeVBEntry(transID, rangeList[m].start,
-						vbOid, columnFreeList[0].vbFBO);
-
-				if (rc != NO_ERROR)
-				{
-					switch (rc)
-					{
-						case ERR_DEADLOCK: rc = ERR_BRM_DEAD_LOCK;
-						case ERR_VBBM_OVERFLOW: rc = ERR_BRM_VB_OVERFLOW;
-						case ERR_NETWORK: rc = ERR_BRM_NETWORK;
-						case ERR_READONLY: rc = ERR_BRM_READONLY;
-						default: rc = ERR_BRM_WR_VB_ENTRY;
-					}
-					goto batchcleanup;
-				}
-			}	
-        }
-    }
-    if (pTargetFile)
-    	fflush(pTargetFile);
-	return rc;
-batchcleanup:
 	if (pTargetFile)
 		fflush(pTargetFile);
 	writeVBEnd(transID,rangeList);

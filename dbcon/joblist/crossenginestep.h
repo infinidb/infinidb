@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: crossenginestep.h 8866 2012-09-07 15:58:05Z xlou $
+//  $Id: crossenginestep.h 9210 2013-01-21 14:10:42Z rdempsey $
 
 
 #ifndef JOBLIST_CROSSENGINESTEP_H
@@ -50,9 +50,6 @@ public:
     /** @brief CrossEngineStep constructor
      */
     CrossEngineStep(
-			const JobStepAssociation& inputJobStepAssociation,
-			const JobStepAssociation& outputJobStepAssociation,
-			uint32_t statementId,
 			const string& schema,
 			const string& table,
 			const string& alias,
@@ -65,43 +62,16 @@ public:
     /** @brief virtual void Run method
      */
     void run();
+
+    /** @brief virtual void join method
+     */
     void join();
 
-    /** @brief virtual JobStepAssociation * inputAssociation
-     * 
-     * @returns JobStepAssociation *
+    /** @brief virtual string toString method
      */
-    const JobStepAssociation& inputAssociation() const
-    {
-        return fInputJobStepAssociation;
-    }
-    void inputAssociation(const JobStepAssociation& inputAssociation)
-    {
-        fInputJobStepAssociation = inputAssociation;
-    }
-    /** @brief virtual JobStepAssociation * outputAssociation
-     * 
-     * @returns JobStepAssocation *
-     */
-    const JobStepAssociation& outputAssociation() const
-    {
-        return fOutputJobStepAssociation;
-    }
-    void outputAssociation(const JobStepAssociation& outputAssociation)
-    {
-        fOutputJobStepAssociation = outputAssociation;
-    }
-
-    void stepId(uint16_t stepId) { fStepId = stepId; }
-    uint16_t stepId() const { return fStepId; }
-    uint32_t sessionId()   const { return fSessionId; }
-    uint32_t txnId()   const { return fTxnId; }
-    uint32_t verId()   const { return fVerId; }
-    uint32_t statementId() const { return fStatementId; }
-
     const std::string toString() const;
 
-	// from BatchPrimitive 
+	// from BatchPrimitive
 	bool getFeederFlag() const { return false; }
 	execplan::CalpontSystemCatalog::OID getLastOid() const { return 0; }
 	uint getStepCount () const { return 1; }
@@ -120,7 +90,6 @@ public:
 	bool wasStepRun() const { return fRunExecuted; }
 	BPSOutputType getOutputType() const { return ROW_GROUP; }
 	uint64_t getRows() const { return fRowsReturned; }
-//	const execplan::CalpontSystemCatalog::TableName& tableName() const { return fTableName; }
 	const string& schemaName() const { return fSchema; }
 	const string& tableName() const { return fTable; }
 	const string& tableAlias() const { return fAlias; }
@@ -131,10 +100,9 @@ public:
 
 	// from DECEventListener
 	void newPMOnline(uint) {}
-	
+
 	const rowgroup::RowGroup& getDeliveredRowGroup() const;
 	uint nextBand(messageqcpp::ByteStream &bs);
-	void logger(const SPJL& logger) { fLogger = logger; }
 	void setIsDelivery(bool b) { fDelivery = b; }
 
 	void addFcnExpGroup1(const boost::shared_ptr<execplan::ParseTree>&);
@@ -161,17 +129,8 @@ protected:
 	virtual void printCalTrace();
 	virtual void handleMySqlError(const char*, unsigned int);
 
-	// for base
-    JobStepAssociation fInputJobStepAssociation;
-    JobStepAssociation fOutputJobStepAssociation;
-	uint32_t fSessionId;
-	uint32_t fTxnId;
-	uint32_t fVerId;
-    uint16_t fStepId;
-	uint32_t fStatementId;
 	uint64_t fRowsRetrieved;
 	uint64_t fRowsReturned;
-	SPJL     fLogger;
 	uint64_t fRowsPerGroup;
 
 	// output rowgroup and row

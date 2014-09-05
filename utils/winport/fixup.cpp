@@ -19,6 +19,7 @@
 #include <string>
 #include <iostream>
 #include <fstream>
+#include <time.h>
 using namespace std;
 
 #include <boost/filesystem.hpp>
@@ -307,8 +308,13 @@ int fixupCalpontXML()
 
 		rc = 0;
 	}
+	catch (exception& e)
+	{
+		cout << "fixupCalpontXML caught exception: " << e.what() << endl;
+	}
 	catch (...)
 	{
+		cout << "fixupCalpontXML caught exception (...): " << endl;
 	}
 
 	return rc;
@@ -365,8 +371,15 @@ int fixupConfig(const string& installDir, const string& mysqlPort)
 	ifs.close();
 	if (okayToRename)
 	{
-		fs::remove(cFilePath);
-		fs::rename(tmpPath, cFilePath);
+		try
+		{
+			fs::remove(cFilePath);
+			fs::rename(tmpPath, cFilePath);
+		}
+		catch (exception& e)
+		{
+			cout << "Failed to remove " << cFilePath.c_str() << e.what() << endl;
+		}
 	}
 	else
 		return -1;
@@ -384,12 +397,49 @@ int fixupConfig(const string& installDir, const string& mysqlPort)
 	getline(ifs, strLine);
 	while (ifs.good())
 	{
-		sedit(strLine, "##INSTDIR##", id);
-		sedit(strLine, "##PORT##", mysqlPort);
+		if (strLine[0] != '#')
+		{
+			sedit(strLine, "##INSTDIR##", id);
+			sedit(strLine, "##PORT##", mysqlPort);
+		}
 #ifndef SKIP_MYSQL_SETUP4
 		sedit(strLine, "#infinidb_compression_type=0", "infinidb_compression_type=2");
 		sedit(strLine, "infinidb_compression_type=1", "infinidb_compression_type=2");
 #endif
+		ofs << strLine << endl;
+		getline(ifs, strLine);
+	}
+	if (!ifs.bad() && !ofs.bad())
+		okayToRename = true;
+	ofs.close();
+	ifs.close();
+	if (okayToRename)
+	{
+		fs::remove(cFilePath);
+		fs::rename(tmpPath, cFilePath);
+	}
+	else
+		return -1;
+	ifs.clear();
+	ofs.clear();
+
+	// Add install timestamp to CalpontVersion.txt
+	char szTime[24];
+	time_t now = time(NULL);
+	struct tm* nowtm = localtime(&now);
+	strftime(szTime, 24, "%Y-%m-%d %H:%M:%S", nowtm);
+	okayToRename = false;
+	cFilePath = installDir;
+	cFilePath /= "etc/CalpontVersion.txt";
+	tmpPath = cFilePath;
+	tmpPath.replace_extension(".tmp");
+	fs::remove(tmpPath);
+	ifs.open(cFilePath.string().c_str());
+	ofs.open(tmpPath.string().c_str());
+	getline(ifs, strLine);
+	while (ifs.good())
+	{
+		sedit(strLine, "@@INSTALLDATE@@", szTime);
 		ofs << strLine << endl;
 		getline(ifs, strLine);
 	}

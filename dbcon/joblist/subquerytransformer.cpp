@@ -50,14 +50,14 @@ using namespace logging;
 namespace joblist
 {
 
-SubQueryTransformer::SubQueryTransformer(JobInfo* jobInfo, SErrorInfo& status) :
-	fOutJobInfo(jobInfo), fSubJobInfo(NULL), fStatus(status)
+SubQueryTransformer::SubQueryTransformer(JobInfo* jobInfo, SErrorInfo& err) :
+	fOutJobInfo(jobInfo), fSubJobInfo(NULL), fErrorInfo(err)
 {
 }
 
 
 SubQueryTransformer::SubQueryTransformer(JobInfo* jobInfo, SErrorInfo& err, const string& alias) :
-	fOutJobInfo(jobInfo), fSubJobInfo(NULL), fStatus(err)
+	fOutJobInfo(jobInfo), fSubJobInfo(NULL), fErrorInfo(err)
 {
 	fVtable.alias(algorithm::to_lower_copy(alias)); 
 }
@@ -88,7 +88,7 @@ SJSTEP& SubQueryTransformer::makeSubQueryStep(execplan::CalpontSelectExecutionPl
 	fSubJobInfo->keyInfo = fOutJobInfo->keyInfo;
 	fSubJobInfo->stringScanThreshold = fOutJobInfo->stringScanThreshold;
 	fSubJobInfo->tryTuples = true;
-	fSubJobInfo->status = fStatus;
+	fSubJobInfo->errorInfo = fErrorInfo;
 	fOutJobInfo->subNum++;
 	fSubJobInfo->subCount = fOutJobInfo->subCount;
 	fSubJobInfo->subId = ++(*(fSubJobInfo->subCount));
@@ -124,6 +124,7 @@ SJSTEP& SubQueryTransformer::makeSubQueryStep(execplan::CalpontSelectExecutionPl
 
     if (fSubJobInfo->trace)
 	{
+		cout << (*csep) << endl;
 		ostringstream oss;
 		oss << boldStart
 			<< "\nsubquery " << fSubJobInfo->subLevel << "." << fOutJobInfo->subNum << " steps:"
@@ -144,7 +145,7 @@ SJSTEP& SubQueryTransformer::makeSubQueryStep(execplan::CalpontSelectExecutionPl
 
 	// Convert subquery to step.
 	SubQueryStep* sqs =
-		new SubQueryStep(fSubJobInfo->sessionId, fSubJobInfo->txnId, fSubJobInfo->statementId);
+		new SubQueryStep(*fSubJobInfo);
 	sqs->tableOid(fVtable.tableOid());
 	sqs->alias(fVtable.alias());
 	sqs->subJoblist(fSubJobList);
@@ -153,7 +154,7 @@ SJSTEP& SubQueryTransformer::makeSubQueryStep(execplan::CalpontSelectExecutionPl
 	RowGroupDL* dl = new RowGroupDL(1, fSubJobInfo->fifoSize);
 	spdl->rowGroupDL(dl);
 	dl->OID(fVtable.tableOid());
-	JobStepAssociation jsa(fSubJobInfo->status);
+	JobStepAssociation jsa;
 	jsa.outAdd(spdl);
 	(querySteps.back())->outputAssociation(jsa);
 	sqs->outputAssociation(jsa);
@@ -191,7 +192,7 @@ SJSTEP& SubQueryTransformer::makeSubQueryStep(execplan::CalpontSelectExecutionPl
 				ct.colWidth = row.getColumnWidth(i);
 				ct.colDataType = row.getColTypes()[i];
 				ct.scale = row.getScale(i);
-				if (ct.scale != 0)
+				if (ct.scale != 0 && ct.precision != -1)
 					ct.colDataType = CalpontSystemCatalog::DECIMAL;
 				ct.precision = row.getPrecision(i);
 				fVtable.columnType(ct, i);
@@ -428,7 +429,7 @@ SimpleScalarTransformer::SimpleScalarTransformer(JobInfo* jobInfo, SErrorInfo& s
 
 
 SimpleScalarTransformer::SimpleScalarTransformer(const SubQueryTransformer& rhs) :
-	SubQueryTransformer(rhs.outJobInfo(), rhs.status()),
+	SubQueryTransformer(rhs.outJobInfo(), rhs.errorInfo()),
 	fInputDl(NULL),
 	fDlIterator(-1),
 	fEmptyResultSet(true),
@@ -459,7 +460,7 @@ void SimpleScalarTransformer::run()
 	getScalarResult();
 
 	// check result count
-	if (fStatus->errCode == ERR_MORE_THAN_1_ROW)
+	if (fErrorInfo->errCode == ERR_MORE_THAN_1_ROW)
 		throw MoreThan1RowExcept();
 }
 
@@ -484,7 +485,10 @@ void SimpleScalarTransformer::getScalarResult()
 
 			// For exist filter, stop the query after one or more rows retrieved.
 			if (fExistFilter)
-				fStatus->errCode = ERR_MORE_THAN_1_ROW;
+			{
+				fErrorInfo->errMsg = IDBErrorInfo::instance()->errorMsg(ERR_MORE_THAN_1_ROW);
+				fErrorInfo->errCode = ERR_MORE_THAN_1_ROW;
+			}
 		}
 
 		// more than 1 row case:
@@ -494,11 +498,12 @@ void SimpleScalarTransformer::getScalarResult()
 		{
 			// Stop the query after some rows retrieved.
 			fEmptyResultSet = false;
-			fStatus->errCode = ERR_MORE_THAN_1_ROW;
+			fErrorInfo->errMsg = IDBErrorInfo::instance()->errorMsg(ERR_MORE_THAN_1_ROW);
+			fErrorInfo->errCode = ERR_MORE_THAN_1_ROW;
 		}
 
 		// For scalar filter, have to check all blocks to ensure only one row.
-		if (fStatus->errCode != 0)
+		if (fErrorInfo->errCode != 0)
 			 while (more) more = fInputDl->next(fDlIterator, &rgData);
 		else
 	    	more = fInputDl->next(fDlIterator, &rgData);

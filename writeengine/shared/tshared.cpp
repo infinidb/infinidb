@@ -42,7 +42,7 @@ using namespace BRM;
 
 int compare (const void * a, const void * b)
 {
-  return ( *(i32*)a - *(i32*)b );
+  return ( *(uint32_t*)a - *(uint32_t*)b );
 }
 
 int compare1(const void * a, const void * b)
@@ -237,7 +237,7 @@ public:
       rc = fileOp.setFileOffset( pFile, -1, SEEK_SET );
       CPPUNIT_ASSERT( rc == ERR_FILE_SEEK );
       
-      i64 lbid1;
+      uint64_t lbid1;
       rc = BRMWrapper::getInstance()->getBrmInfo( 1999, 1, lbid1 );
       CPPUNIT_ASSERT( rc != NO_ERROR );
       rc = BRMWrapper::getInstance()->getBrmInfo( 999, 1, lbid1 );
@@ -245,7 +245,7 @@ public:
       rc = fileOp.setFileOffset( pFile, lbid1*BYTE_PER_BLOCK, SEEK_SET );
       CPPUNIT_ASSERT( rc == NO_ERROR );
       
-      i64 lbid9;
+      uint64_t lbid9;
       rc = BRMWrapper::getInstance()->getBrmInfo( 999, 9, lbid9 );
       
       CPPUNIT_ASSERT( rc == NO_ERROR );
@@ -463,7 +463,7 @@ CPPUNIT_ASSERT( fileOp.getFileSize( 999 ) == 81920 );
 
    void testBitShift() {
       BlockOp blockOp;
-      i64 curVal, result, mask;
+      uint64_t curVal, result, mask;
 
       curVal = 0x6a;
       mask = 0xe0; // first three bit
@@ -476,7 +476,7 @@ CPPUNIT_ASSERT( fileOp.getFileSize( 999 ) == 81920 );
 
    void testEmptyRowValue( ) {
       BlockOp  blockOp;
-      i64      curVal;
+      uint64_t      curVal;
       RID      curRID;
 
       curRID = blockOp.getRowId( 0, 1, 3 );
@@ -675,7 +675,7 @@ CPPUNIT_ASSERT( fileOp.getFileSize( 999 ) == 81920 );
    void testDbBlock() {
       DbFileOp    dbFileOp;
       DataBlock   block;
-      i64         outVal = 12345, inVal;
+      uint64_t    outVal = 12345, inVal;
       int         rc;
       FILE*       pFile;
       int         allocSize =0;
@@ -690,7 +690,7 @@ CPPUNIT_ASSERT( fileOp.getFileSize( 999 ) == 81920 );
       pFile = dbFileOp.openFile( 999 );
       CPPUNIT_ASSERT( pFile != NULL );
       
-      i64 lbid0;
+      uint64_t lbid0;
       BRMWrapper::getInstance()->getBrmInfo( 999, 0, lbid0 );
       rc = dbFileOp.readDBFile( pFile, block.data, lbid0 );
       CPPUNIT_ASSERT( rc == NO_ERROR );
@@ -745,7 +745,7 @@ CPPUNIT_ASSERT( fileOp.getFileSize( 999 ) == 81920 );
       dbFileOp.getSubBlockEntry( block.data, 1, 2, 8, &inVal );
       CPPUNIT_ASSERT( inVal == outVal );
 
-      rc = dbFileOp.writeSubBlockEntry( pFile, &block, (i64)0, 1, 2, 8, &inVal );
+      rc = dbFileOp.writeSubBlockEntry( pFile, &block, (uint64_t)0, 1, 2, 8, &inVal );
       CPPUNIT_ASSERT( rc == NO_ERROR );
 
       rc = dbFileOp.readDBFile( pFile, &block, 0 );
@@ -812,7 +812,7 @@ CPPUNIT_ASSERT( fileOp.getFileSize( 999 ) == 81920 );
       CPPUNIT_ASSERT( rc == NO_ERROR );
       CPPUNIT_ASSERT( extendBlock == 0 );
       
-      i64 lbidTarget; 
+      uint64_t lbidTarget; 
       BRMWrapper::getInstance()->getBrmInfo( 999, startFbo, lbidTarget );
       rc = dbFileOp.copyDBFile( pSourceFile, pTargetFile, lbidTarget );
       CPPUNIT_ASSERT( rc == NO_ERROR );
@@ -983,10 +983,10 @@ CPPUNIT_ASSERT( fileOp.getFileSize( 999 ) == 81920 );
       log.logMsg( "this is a critical message", 1211, CRITICAL );
 
       //...Test formatting an unsigned 64 bit integer.
-      i64 i64Value(UINT64_MAX);
+      uint64_t i64Value(UINT64_MAX);
       msg = Convertor::i64ToStr( i64Value );
       CPPUNIT_ASSERT( (msg == "18446744073709551615") );
-      log.logMsg( msg + " this is an info message with the max i64 integer value", INFO );
+      log.logMsg( msg + " this is an info message with the max uint64_t integer value", INFO );
    }
 
    void testHWM() 
@@ -1034,8 +1034,8 @@ CPPUNIT_ASSERT( fileOp.getFileSize( 999 ) == 81920 );
       OID                        oid = 999;
       LBIDRange                  range;
       vector<struct LBIDRange>   rangeList;
-      vector<i32>                fboList;
-      i64                        curLbid;
+      vector<uint32_t>           fboList;
+      uint64_t                   curLbid;
       int                        rc;
       VER_t                      transId = 11;
       
@@ -1108,7 +1108,7 @@ CPPUNIT_ASSERT( fileOp.getFileSize( 999 ) == 81920 );
       printf( "\n\nThis is the test for rollback after three insert for the same trans\n" );
       DbFileOp    dbFileOp;
       DataBlock   block, originBlock;
-      i64         lbid0;
+      uint64_t         lbid0;
       
       pFile = dbFileOp.openFile( oid );
       CPPUNIT_ASSERT( pFile != NULL );
@@ -1230,7 +1230,7 @@ CPPUNIT_ASSERT( fileOp.getFileSize( 999 ) == 81920 );
    {
       DataBlock block;
       OID       oid = 15;
-      i64       lbid = 1234, fbo = 3;
+      uint64_t  lbid = 1234, fbo = 3;
       int       rc;
       CacheKey  key;
       CommBlock cb;
@@ -1290,7 +1290,7 @@ CPPUNIT_ASSERT( fileOp.getFileSize( 999 ) == 81920 );
       DataBlock block;
       CommBlock cb;
       OID       oid = 16;
-      i64       lbid = 1234;
+      uint64_t  lbid = 1234;
       int       rc, totalBlock;
       int       allocSize =0;
 

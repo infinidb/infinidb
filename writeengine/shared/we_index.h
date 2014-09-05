@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************************
-* $Id: we_index.h 3720 2012-04-04 18:18:49Z rdempsey $
+* $Id: we_index.h 4450 2013-01-21 14:13:24Z rdempsey $
 *
 ******************************************************************************************/
 /** @file */
@@ -88,7 +88,7 @@ namespace WriteEngine
    const int   LLP_FULL                = 1;
    const int   TOTAL_CUR_LEVEL         = 10;
    const int   CUR_LEVEL_POS_WIDTH     = 20;
-   const i64   INVALID_KEY             = -1LL;                /** @brief Invalid number */
+   const uint64_t INVALID_KEY             = -1LL;                /** @brief Invalid number */
 
    /*****************************************************
    * mask definition
@@ -141,102 +141,102 @@ namespace WriteEngine
     * @brief index defintions
     ************************************************************************/
    typedef struct {
-      i64           type        :  IDX_TYPE_SIZE;  /** @brief entry type */
-      i64           spare       :  12;             /** @brief spare bits */
-      i64           group       :  IDX_GROUP_SIZE; /** @brief entry group type */
+      uint64_t       type        :  IDX_TYPE_SIZE;  /** @brief entry type */
+      uint64_t       spare       :  12;             /** @brief spare bits */
+      uint64_t       group       :  IDX_GROUP_SIZE; /** @brief entry group type */
       // The following is related to ptr
-      i64           fbo         :  FBO_SIZE;       /** @brief file block offset */
-      i64           sbid        :  SBID_SIZE;      /** @brief sub block id */
-      i64           entry       :  ENTRY_SIZE;     /** @brief entry within sub block */
+      uint64_t       fbo         :  FBO_SIZE;       /** @brief file block offset */
+      uint64_t       sbid        :  SBID_SIZE;      /** @brief sub block id */
+      uint64_t       entry       :  ENTRY_SIZE;     /** @brief entry within sub block */
    } IdxStartSubBlockEntry;                        /** @brief Index start block entry structure */
 
    typedef struct {
-      i64           type        :  IDX_TYPE_SIZE;  /** @brief entry type */
-      i64           spare       :  2;             /** @brief spare bits */
-      i64           group       :  IDX_GROUP_SIZE; /** @brief entry group type */
+      uint64_t       type        :  IDX_TYPE_SIZE;  /** @brief entry type */
+      uint64_t       spare       :  2;             /** @brief spare bits */
+      uint64_t       group       :  IDX_GROUP_SIZE; /** @brief entry group type */
       // The following is related to ptr
-      i64           spare2      :  10;             /** @brief spare bits */
-      i64           fbo         :  FBO_SIZE;       /** @brief file block offset */
-      i64           sbid        :  SBID_SIZE;      /** @brief sub block id */
-      i64           entry       :  ENTRY_SIZE;     /** @brief entry within sub block */
+      uint64_t       spare2      :  10;             /** @brief spare bits */
+      uint64_t       fbo         :  FBO_SIZE;       /** @brief file block offset */
+      uint64_t       sbid        :  SBID_SIZE;      /** @brief sub block id */
+      uint64_t       entry       :  ENTRY_SIZE;     /** @brief entry within sub block */
    } IdxEmptyListEntry;                            /** @brief Index empty list entry structure */
 
    typedef struct {
-      i64           type        :  IDX_TYPE_SIZE;  /** @brief entry type */
-      i64           spare       :  15;             /** @brief spare bits */
+      uint64_t       type        :  IDX_TYPE_SIZE;  /** @brief entry type */
+      uint64_t       spare       :  15;             /** @brief spare bits */
       // The following is related to ptr
-      i64           fbo         :  FBO_SIZE;       /** @brief file block offset */
-      i64           sbid        :  SBID_SIZE;      /** @brief sub block id */
-      i64           entry       :  ENTRY_SIZE;     /** @brief entry within sub block */
+      uint64_t       fbo         :  FBO_SIZE;       /** @brief file block offset */
+      uint64_t       sbid        :  SBID_SIZE;      /** @brief sub block id */
+      uint64_t       entry       :  ENTRY_SIZE;     /** @brief entry within sub block */
    } IdxBitmapPointerEntry;                        /** @brief Index bitmap pointer entry structure */
 
    typedef struct {
-      i64           type        :  IDX_TYPE_SIZE;  /** @brief entry type */
-      i64           bitTest     :  IDX_BITTEST_SIZE; /** @brief index bittest  */
-      i64           group       :  IDX_GROUP_SIZE; /** @brief entry group type */
-      i64           bitCompare  :  1;
-      i64           spare       :  1;              /** @brief spare bits */
+      uint64_t       type        :  IDX_TYPE_SIZE;  /** @brief entry type */
+      uint64_t       bitTest     :  IDX_BITTEST_SIZE; /** @brief index bittest  */
+      uint64_t       group       :  IDX_GROUP_SIZE; /** @brief entry group type */
+      uint64_t       bitCompare  :  1;
+      uint64_t       spare       :  1;              /** @brief spare bits */
       // The following is related to ptr
-      i64           fbo         :  FBO_SIZE;       /** @brief file block offset */
-      i64           sbid        :  SBID_SIZE;      /** @brief sub block id */
-      i64           entry       :  ENTRY_SIZE;     /** @brief entry within sub block */
+      uint64_t       fbo         :  FBO_SIZE;       /** @brief file block offset */
+      uint64_t       sbid        :  SBID_SIZE;      /** @brief sub block id */
+      uint64_t       entry       :  ENTRY_SIZE;     /** @brief entry within sub block */
    } IdxBitTestEntry;                              /** @brief Index bit test entry structure */
 
    typedef struct {
-      i64           type        :  IDX_TYPE_SIZE;  /** @brief entry type */
-      i64           spare       :  15;             /** @brief spare bits */
+      uint64_t       type        :  IDX_TYPE_SIZE;  /** @brief entry type */
+      uint64_t       spare       :  15;             /** @brief spare bits */
       // The following is related to ptr
-      i64           fbo         :  FBO_SIZE;       /** @brief file block offset */
-      i64           sbid        :  SBID_SIZE;      /** @brief sub block id */
-      i64           entry       :  ENTRY_SIZE;     /** @brief entry within sub block */
+      uint64_t       fbo         :  FBO_SIZE;       /** @brief file block offset */
+      uint64_t       sbid        :  SBID_SIZE;      /** @brief sub block id */
+      uint64_t       entry       :  ENTRY_SIZE;     /** @brief entry within sub block */
    } IdxTreePointerEntry;                          /** @brief Index tree pointer entry structure */
    /************************************************************************
     * @brief index list node defintions
     ************************************************************************/
    typedef struct {
-      i64           type        :  IDX_TYPE_SIZE;  /** @brief entry type 3 */
-      i64           spare       :  15;             /** @brief spare bits */
-      RID           rid         :  RID_SIZE;       /** @brief row id */
+      uint64_t       type        :  IDX_TYPE_SIZE;  /** @brief entry type 3 */
+      uint64_t       spare       :  15;             /** @brief spare bits */
+      RID            rid         :  RID_SIZE;       /** @brief row id */
    } IdxRidListEntry;                              /** @brief Index rid list entry structure */
                                  
    typedef struct {
-      i64           type        :  IDX_TYPE_SIZE;    /** @brief entry type */
-      i64           spare       :  5;
-      i64           count       :  RID_COUNT_SIZE;   /** the count of rids on the current blk */
-      i64           llp         :  LBID_SBID_ENTRY;  /** @brief size */
+      uint64_t       type        :  IDX_TYPE_SIZE;    /** @brief entry type */
+      uint64_t       spare       :  5;
+      uint64_t       count       :  RID_COUNT_SIZE;   /** the count of rids on the current blk */
+      uint64_t       llp         :  LBID_SBID_ENTRY;  /** @brief size */
    } IdxRidListPtr;
 
    typedef struct {
-      i64           type        :  IDX_TYPE_SIZE;    /** @brief entry type */
-      i64           spare       :  5;
-      i64           count       :  RID_COUNT_SIZE;   /** the count of rids on the current blk */ 
-      i64           lbid        :  FBO_SIZE;         /** @brief size */
-      i64           sbid        :  SBID_SIZE;        /** @brief sub block id */
-      i64           entry       :  ENTRY_SIZE;       /** @brief entry within sub block */
+      uint64_t       type        :  IDX_TYPE_SIZE;    /** @brief entry type */
+      uint64_t       spare       :  5;
+      uint64_t       count       :  RID_COUNT_SIZE;   /** the count of rids on the current blk */ 
+      uint64_t       lbid        :  FBO_SIZE;         /** @brief size */
+      uint64_t       sbid        :  SBID_SIZE;        /** @brief sub block id */
+      uint64_t       entry       :  ENTRY_SIZE;       /** @brief entry within sub block */
    } IdxRidLastListPtr;
 
    typedef struct {
-      i64           type        :  IDX_TYPE_SIZE;    /** @brief entry type */
-      i64           spare       :  13;
-      i64           llpStat     :  LLP_STATUS_WIDTH; /** llp status */
-      i64           childLbid   :  FBO_SIZE;         /** @brief file block offset */
-      i64           spare2      :  10;
+      uint64_t       type        :  IDX_TYPE_SIZE;    /** @brief entry type */
+      uint64_t       spare       :  13;
+      uint64_t       llpStat     :  LLP_STATUS_WIDTH; /** llp status */
+      uint64_t       childLbid   :  FBO_SIZE;         /** @brief file block offset */
+      uint64_t       spare2      :  10;
    } IdxRidChildListPtr;  
 
    typedef struct {
-      i64           type        :  IDX_TYPE_SIZE;    /** @brief entry type 0 or 6 */
-      i64           spare       :  5;
-      i64           count       :  RID_COUNT_SIZE;   /** the count of rids on the current blk */
-      i64           nextLbid    :  FBO_SIZE;       /** @brief file block offset */
-      i64           curLevel    :  TOTAL_CUR_LEVEL;     
+      uint64_t       type        :  IDX_TYPE_SIZE;    /** @brief entry type 0 or 6 */
+      uint64_t       spare       :  5;
+      uint64_t       count       :  RID_COUNT_SIZE;   /** the count of rids on the current blk */
+      uint64_t       nextLbid    :  FBO_SIZE;       /** @brief file block offset */
+      uint64_t       curLevel    :  TOTAL_CUR_LEVEL;     
     } IdxRidNextListPtr; 
 
    typedef struct {
-      i64           type        :  IDX_TYPE_SIZE;    /** @brief entry type 6*/
-      i64           spare       :  3;                /** @brief spare bits */
-      i64           curLevelPos :  CUR_LEVEL_POS_WIDTH;
-      i64           curBlkPos   :  CUR_BLK_POS_WIDTH;      /** the position of current blk */
-      i64           parentLbid  :  FBO_SIZE;       /** @brief file block offset */
+      uint64_t       type        :  IDX_TYPE_SIZE;    /** @brief entry type 6*/
+      uint64_t       spare       :  3;                /** @brief spare bits */
+      uint64_t       curLevelPos :  CUR_LEVEL_POS_WIDTH;
+      uint64_t       curBlkPos   :  CUR_BLK_POS_WIDTH;      /** the position of current blk */
+      uint64_t       parentLbid  :  FBO_SIZE;       /** @brief file block offset */
    } IdxRidParentListPtr; 
 
    typedef struct {
@@ -249,28 +249,28 @@ namespace WriteEngine
     * @brief index list header defintions
     ************************************************************************/
    typedef struct {
-      i64           type        :  IDX_TYPE_SIZE;  /** @brief entry type */
-      i64           spare       :  15;             /** @brief spare bits */
-      i64           size        :  RID_SIZE;       /** @brief size */
+      uint64_t       type        :  IDX_TYPE_SIZE;  /** @brief entry type */
+      uint64_t       spare       :  15;             /** @brief spare bits */
+      uint64_t       size        :  RID_SIZE;       /** @brief size */
    } IdxRidListHdrSize;
 
    typedef struct {
-      i64           type        :  IDX_TYPE_SIZE;  /** @brief entry type */
-      i64           spare       :  15;             /** @brief spare bits */
-      i64           llp         :  RID_SIZE;       /** @brief size */
+      uint64_t       type        :  IDX_TYPE_SIZE;  /** @brief entry type */
+      uint64_t       spare       :  15;             /** @brief spare bits */
+      uint64_t       llp         :  RID_SIZE;       /** @brief size */
    } IdxRidListHdrPtr;
 
    typedef struct {
       IdxRidListHdrSize idxRidListSize;
-      i64               key;
+      uint64_t          key;
       IdxRidListEntry   firstIdxRidListEntry;
       IdxRidListHdrPtr  nextIdxRidListPtr;
    } IdxRidListHdr;
 
     typedef struct {
-      i64           part1        :  15;              /** @brief entry type */
-      i64           part2        :  15;             /** @brief spare bits */
-      i64           spare        :  34;             /** @brief size */
+      uint64_t       part1        :  15;              /** @brief entry type */
+      uint64_t       part2        :  15;             /** @brief spare bits */
+      uint64_t       spare        :  34;             /** @brief size */
    } IdxRidListOffSet;
    /************************************************************************
     * @brief index tree node defintions
@@ -278,24 +278,24 @@ namespace WriteEngine
    typedef struct {
       IdxBitTestEntry   next;                      /** @brief next in the node */
       IdxBitTestEntry   current;                   /** @brief current addr */
-      i16               level;                     /** @brief tree level */
-      i16               allocCount;                /** @brief allocated entry cound from free mgr */
-      i16               useCount;                  /** @brief actual use entry count */
-      i16               offset;                    /** @brief entry offset */
+      uint16_t          level;                     /** @brief tree level */
+      uint16_t          allocCount;                /** @brief allocated entry cound from free mgr */
+      uint16_t          useCount;                  /** @brief actual use entry count */
+      uint16_t          offset;                    /** @brief entry offset */
       bool              used;                      /** @brief used flag */
    } IdxTreeNode;                                  /** @brief Index tree node */
 
    typedef struct {
       IdxTreeNode       node[IDX_MAX_TREE_LEVEL];  /** @brief node array */
-      i16               maxLevel;                  /** @brief max level */
+      uint16_t          maxLevel;                  /** @brief max level */
       RID               rid;                       /** @brief current row id */
-      i64               key;                       /** @brief current key */
-      i16               width;                     /** @brief current width */
+      uint64_t          key;                       /** @brief current key */
+      uint16_t          width;                     /** @brief current width */
    } IdxTree;                                      /** @brief Index tree */
 
    struct IdxTreeCacheNode {
       RID               rid;                       /** @brief RID */
-      i64               key;                       /** @brief Key */
+      uint64_t          key;                       /** @brief Key */
       IdxEmptyListEntry entry;                     /** @brief List pointer */
       bool              used;                      /** @brief Used flag */
       IdxTreeCacheNode() { used = false; }
@@ -335,12 +335,12 @@ namespace WriteEngine
 
       OID               indexTreeOid;              /** @brief Target index tree oid */
       OID               indexListOid;              /** @brief Target index list oid */
-      ColDataType       indexColDataType;          /** @brief Target index column type */
+      execplan::CalpontSystemCatalog::ColDataType indexColDataType;          /** @brief Target index column type */
       int               indexWidth;                /** @brief Target index width */
 
       int               maxLoadRow;                /** @brief Max rows for one load */
 
-      void  setIdxLoadParam( const OID treeOid, const OID listOid, const ColDataType colDataType, const int width, const int maxRow ) 
+      void  setIdxLoadParam( const OID treeOid, const OID listOid, const execplan::CalpontSystemCatalog::ColDataType colDataType, const int width, const int maxRow ) 
                         { indexTreeOid = treeOid; indexListOid = listOid; indexColDataType = colDataType;
                           indexWidth = width; maxLoadRow = maxRow; }
       bool  isValid()   { return indexTreeOid && indexListOid && indexWidth && maxLoadRow; }

@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: functor.h 3048 2012-04-04 15:33:45Z rdempsey $
+//  $Id: functor.h 3495 2013-01-21 14:09:51Z rdempsey $
 
 /** @file */
 
@@ -68,7 +68,13 @@ public:
 								bool& isNull,
 								execplan::CalpontSystemCatalog::ColType& op_ct) = 0;
 
-	virtual double getDoubleVal(rowgroup::Row& row,
+    virtual uint64_t getUintVal(rowgroup::Row& row,
+                                FunctionParm& fp,
+                                bool& isNull,
+                                execplan::CalpontSystemCatalog::ColType& op_ct)
+	{ return static_cast<uint64_t>(getIntVal(row,fp,isNull,op_ct)); }
+
+    virtual double getDoubleVal(rowgroup::Row& row,
 								FunctionParm& fp,
 								bool& isNull,
 								execplan::CalpontSystemCatalog::ColType& op_ct) = 0;

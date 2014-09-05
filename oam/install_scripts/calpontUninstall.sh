@@ -83,7 +83,6 @@ expect {
 }
 send_user "\n"
 
-
 if { $INSTALL == "2"} {
 	set timeout 600
 	#
@@ -97,6 +96,7 @@ if { $INSTALL == "2"} {
 	}
 	send_user "\n"
 }
+
 
 if { $PACKAGE == "binary" } {
 	send "$INFINIDB_INSTALL_DIR/bin/pre-uninstall\n"

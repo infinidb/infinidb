@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: primproc.cpp 2124 2013-07-08 19:47:42Z bpaul $
+ *   $Id: primproc.cpp 2125 2013-07-08 21:25:08Z bpaul $
  *
  *
  ***********************************************************************/
@@ -84,15 +84,6 @@ UDFFcnMap_t UDFFcnMap;
 string systemLang;
 bool utf8 = false;
 
-#ifdef _MSC_VER
-CRITICAL_SECTION preadCSObject;
-#else
-//#define IDB_COMP_POC_DEBUG
-#ifdef IDB_COMP_POC_DEBUG
-boost::mutex compDebugMutex;
-#endif
-#endif
-
 bool isDebug( const DebugLevel level )
 {
         return level <= gDebugLevel;
@@ -137,6 +128,7 @@ void setupSignalHandlers()
 	sigaddset(&sigset, SIGUSR1);
 	sigaddset(&sigset, SIGUSR2);
 	sigprocmask(SIG_BLOCK, &sigset, 0);
+
 #endif
 }
 
@@ -630,9 +622,7 @@ int main(int argc, char* argv[])
 #endif
 
 	loadUDFs();
-#ifdef _MSC_VER
-	InitializeCriticalSection(&preadCSObject);
-#endif
+
 	cout << "Starting PrimitiveServer: st = " << serverThreads << ", sq = " << serverQueueSize <<
 		", pw = " << processorWeight << ", pq = " << processorQueueSize <<
 		", nb = " << BRPBlocks << ", nt = " << BRPThreads << ", nc = " << cacheCount <<

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: command.h 1855 2012-04-04 18:20:09Z rdempsey $
+// $Id: command.h 2035 2013-01-21 14:12:19Z rdempsey $
 // C++ Interface: command
 //
 // Description: 

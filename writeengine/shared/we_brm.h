@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_brm.h 4496 2013-01-31 19:13:20Z pleblanc $
+* $Id: we_brm.h 4450 2013-01-21 14:13:24Z rdempsey $
 *
 *******************************************************************************/
 /** @file */
@@ -64,6 +64,7 @@ public:
     EXPORT int startAutoIncrementSequence( OID colOID,
                      u_int64_t    startNextValue, 
                      u_int32_t    colWidth,
+                     execplan::CalpontSystemCatalog::ColDataType colDataType,
                      std::string& errMsg);
 
     /**
@@ -105,6 +106,7 @@ public:
                      u_int16_t   dbRoot,
                      u_int32_t   partition,
                      u_int16_t   segment,
+                     execplan::CalpontSystemCatalog::ColDataType colDataType,
                      BRM::LBID_t& startLbid,
                      int&        allocSize,
                      u_int32_t&  startBlock);
@@ -152,12 +154,12 @@ public:
     /**
      * @brief Get the real physical offset based on the LBID
      */
-    EXPORT int getFboOffset( const i64 lbid, 
+    EXPORT int getFboOffset( const uint64_t lbid, 
                       u_int16_t& dbRoot,
                       u_int32_t& partition,
                       u_int16_t& segment,
                       int&       fbo );
-    EXPORT int getFboOffset( const i64 lbid, int& oid,
+    EXPORT int getFboOffset( const uint64_t lbid, int& oid,
                       u_int16_t& dbRoot,
                       u_int32_t& partition,
                       u_int16_t& segment,
@@ -232,17 +234,19 @@ public:
     /**
      * @brief Lookup LBID ranges for column specified OID
      */
-    int lookupLbidRanges( OID oid, BRM::LBIDRange_v& lbidRanges);
+    int lookupLbidRanges(OID oid, BRM::LBIDRange_v& lbidRanges);
 
     /**
      * @brief Mark extent invalid for causal partioning
      */
-    int markExtentInvalid( const i64 lbid );
+    int markExtentInvalid(const uint64_t lbid,
+                          const execplan::CalpontSystemCatalog::ColDataType colDataType);
 
     /**
      * @brief Mark multiple extents invalid for causal partioning
      */
-    int markExtentsInvalid(const std::vector<BRM::LBID_t>& lbids);
+    int markExtentsInvalid(const std::vector<BRM::LBID_t>& lbids,
+                           const std::vector<execplan::CalpontSystemCatalog::ColDataType>& colDataTypes);
 
     /**
      * @brief set extents CP min/max info into extent map
@@ -386,15 +390,15 @@ public:
      */
     EXPORT int copyVBBlock( FILE* pSourceFile,
                                FILE* pTargetFile,
-                               const i64 sourceFbo,
-                               const i64 targetFbo,
+                               const uint64_t sourceFbo,
+                               const uint64_t targetFbo,
                                DbFileOp* fileOp,
                                const Column& column );
     EXPORT int copyVBBlock( FILE* pSourceFile,
                                const OID sourceOid,
                                FILE* pTargetFile,
                                const OID targetOid,
-                               const std::vector<i32>& fboList,
+                               const std::vector<uint32_t>& fboList,
                                const BRM::VBRange& freeList,
                                size_t& nBlocksProcessed,
                                DbFileOp* pFileOp,
@@ -421,21 +425,15 @@ public:
     EXPORT int writeVB( FILE* pFile,
                               const BRM::VER_t transID,
                               const OID oid,
-                              const i64 lbid,
+                              const uint64_t lbid,
                               DbFileOp* pFileOp );
     int        writeVB( FILE* pFile,
                               const BRM::VER_t transID,
                               const OID weOid,
-                              std::vector<i32>& fboList,
+                              std::vector<uint32_t>& fboList,
                               std::vector<BRM::LBIDRange>& rangeList,
                               DbFileOp* pFileOp );
- 
-    int        writeBatchVBs( const BRM::VER_t transID,
-                              const std::vector<Column> columns,
-                              std::vector<BRM::LBIDRange>& rangeList,
-                              std::vector<DbFileOp*>& fileOps);
-
-    void        writeVBEnd(const BRM::VER_t transID,
+    void       writeVBEnd(const BRM::VER_t transID,
                               std::vector<BRM::LBIDRange>& rangeList);
 
     //--------------------------------------------------------------------------
@@ -574,15 +572,17 @@ inline int BRMWrapper::lookupLbidRanges( OID oid, BRM::LBIDRange_v& lbidRanges)
     return getRC( rc, ERR_BRM_LOOKUP_LBID_RANGES );
 }
 
-inline int BRMWrapper::markExtentInvalid( const i64 lbid )
+inline int BRMWrapper::markExtentInvalid( const uint64_t lbid,
+                                          const execplan::CalpontSystemCatalog::ColDataType colDataType )
 {
-    int rc = blockRsltnMgrPtr->markExtentInvalid( lbid );
+    int rc = blockRsltnMgrPtr->markExtentInvalid( lbid, colDataType );
     return getRC( rc, ERR_BRM_MARK_INVALID );
 }
 
-inline int BRMWrapper::markExtentsInvalid(const std::vector<BRM::LBID_t>& lbids)
+inline int BRMWrapper::markExtentsInvalid(const std::vector<BRM::LBID_t>& lbids,
+                                          const std::vector<execplan::CalpontSystemCatalog::ColDataType>& colDataTypes)
 {
-    int rc = blockRsltnMgrPtr->markExtentsInvalid( lbids ); 
+    int rc = blockRsltnMgrPtr->markExtentsInvalid(lbids, colDataTypes); 
     return getRC( rc, ERR_BRM_MARK_INVALID );
 }
 

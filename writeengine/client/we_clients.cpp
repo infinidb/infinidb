@@ -63,6 +63,7 @@ using namespace oam;
 using namespace WriteEngine;
 
 namespace {
+
  void  writeToLog(const char* file, int line, const string& msg, LOG_TYPE logto = LOG_TYPE_INFO)
   {
         LoggingID lid(05);
@@ -79,7 +80,7 @@ namespace {
         	case LOG_TYPE_DEBUG:	ml.logDebugMessage(m); break;		
         	case LOG_TYPE_INFO: 	ml.logInfoMessage(m); break;	
         	case LOG_TYPE_WARNING:	ml.logWarningMessage(m); break;	
-        	case LOG_TYPE_ERROR:	ml.logWarningMessage(m); break;	
+        	case LOG_TYPE_ERROR:	ml.logErrorMessage(m); break;	
         	case LOG_TYPE_CRITICAL:	ml.logCriticalMessage(m); break;	
 	}
   }
@@ -166,28 +167,17 @@ inline const string sin_addr2String(const in_addr src)
 }
 
 namespace WriteEngine {
-	boost::mutex WEClients::map_mutex;
-	WEClients* WEClients::fInstance = 0;
-  
-  /*static*/
-  WEClients* WEClients::instance(int PrgmID)
-  {
-    boost::mutex::scoped_lock lock(map_mutex);
-    if (fInstance == 0)
-        fInstance = new WEClients(PrgmID);
-
-    return fInstance;
-  }
-
   WEClients::WEClients(int PrgmID) :
 	fPrgmID(PrgmID),
 	pmCount(0)
   {
+	closingConnection = 0;
     Setup();
   }
 
   WEClients::~WEClients()
   {
+	
     Close();
   }
 
@@ -230,9 +220,28 @@ void WEClients::Setup()
 		bs << (ByteStream::byte) WE_SVR_BATCH_KEEPALIVE;
 		bs << (ByteStream::octbyte) moduleID;
 	}
+	
     for (unsigned i = 0; i < pmCountConfig; i++) {
 		//Find the module id
 		moduleID = atoi((moduletypeconfig.ModuleNetworkList[i]).DeviceName.substr(MAX_MODULE_TYPE_SIZE,MAX_MODULE_ID_SIZE).c_str());
+
+#if !defined(_MSC_VER) && !defined(SKIP_OAM_INIT)
+		//check if wes is ACTIVE
+		ProcessStatus processstatus;
+		processstatus.ProcessOpState = oam::ACTIVE;
+		try {
+			//Get the process information 
+			Oam oam;
+			oam.getProcessStatus("WriteEngineServer", moduletypeconfig.ModuleNetworkList[i].DeviceName, processstatus);
+		}
+		catch(...)
+		{
+			processstatus.ProcessOpState = oam::ACTIVE;
+		}
+
+		if (processstatus.ProcessOpState != oam::ACTIVE)
+			continue;
+#endif
 		//cout << "setting connection to moduleid " << moduleID << endl;
         snprintf(buff, sizeof(buff), "pm%u_WriteEngineServer", moduleID);
         string fServer (buff);
@@ -240,10 +249,29 @@ void WEClients::Setup()
         boost::shared_ptr<MessageQueueClient>
 			cl(new MessageQueueClient(fServer, rm.getConfig()));
         boost::shared_ptr<boost::mutex> nl(new boost::mutex());
+		//Bug 5224. Take out the retrys. If connection fails, we assume the server is down.
         try {
             if (cl->connect()) {
-				cl->write(bs);
-				bsRead = cl->read();
+				try {
+					cl->write(bs);
+				}
+				catch (std::exception& ex1)
+				{
+					ostringstream oss;
+					oss << "Write to WES during connect failed due to " << ex1.what();
+					 throw runtime_error(oss.str());
+				}
+				try
+				{
+					bsRead = cl->read();
+					if (bsRead.length() == 0)
+						throw runtime_error("Got byte 0 during reading " );
+				}
+				catch (std::exception& ex2) {
+					ostringstream oss;
+					oss << "Read from WES during connect failed due to " << ex2.what() << " and this = " << this;
+					throw runtime_error(oss.str());
+				}
                 fPmConnections[moduleID] = cl;
 				//cout << "connection is open. this = " << this << endl;
 				//cout << "set up connection to mudule " << moduleID << endl;
@@ -253,6 +281,9 @@ void WEClients::Setup()
 				cl->moduleName(getModuleNameByIPAddr(moduletypeconfig, ipAddress));
                 StartClientListener(cl, i);
 				pmCount++;
+				//ostringstream oss;
+				//oss << "WECLIENT: connected to " << fServer + " and this = " << this << " and pmcount is now " << pmCount;
+				//writeToLog(__FILE__, __LINE__, oss.str() , LOG_TYPE_DEBUG);
             } else {
                 throw runtime_error("Connection refused");
             }
@@ -262,17 +293,28 @@ void WEClients::Setup()
         } catch (...) {
             writeToLog(__FILE__, __LINE__, "Could not connect to " + fServer, LOG_TYPE_ERROR);
         }
-    }
+	  }
 	
 }
 
 int WEClients::Close()
 {
-    makeBusy(false);
-	cout << "connection is closed. this = " << this << endl;
-    // for each MessageQueueClient in pmConnections delete the MessageQueueClient;
+	makeBusy(false);
+	closingConnection = 1;
+	ByteStream bs;
+	bs << (ByteStream::byte) WE_SVR_CLOSE_CONNECTION;
+	write_to_all(bs);
+//cout << "connection is closed. this = " << this << " and closingConnection = " << closingConnection << endl;
+	for (uint i=0; i < fWESReader.size(); i++)
+	{
+		fWESReader[i]->join();
+	}
+	fWESReader.clear();
     fPmConnections.clear();
-    fWESReader.clear();
+	pmCount = 0;
+	//ostringstream oss;
+	//oss << "WECLIENT: closed connection to wes and this = " << this << " and pmcount is now " << pmCount;
+	//writeToLog(__FILE__, __LINE__, oss.str() , LOG_TYPE_DEBUG);
     return 0;
 }
 
@@ -292,7 +334,11 @@ void WEClients::Listen ( boost::shared_ptr<MessageQueueClient> client, uint conn
 			}
 			else // got zero bytes on read, nothing more will come
 			{
-				cerr << "WEC got 0 byte message" << endl;
+				if (closingConnection > 0)
+				{
+					return;
+				}
+				cerr << "WEC got 0 byte message for object " << this << endl;
 				goto Error;
 			}
 		}
@@ -338,6 +384,9 @@ Error:
 			{
 				(fPmConnections[itor->first]).reset();
 				pmCount--;
+				ostringstream oss;
+				//oss << "WECLIENT: connection to is reset and this = " << this << " and pmcount is decremented.";
+				//writeToLog(__FILE__, __LINE__, oss.str() , LOG_TYPE_DEBUG);
 			}
 				
 			itor++;
@@ -402,7 +451,7 @@ void WEClients::read(uint32_t key, SBS &bs)
     if(map_tok == fSessionMessages.end())
     {
       ostringstream os;
-      cout << " reading for key " << key << " not found" << endl;
+      //cout << " reading for key " << key << " not found" << endl;
       os << "WEClient: attempt to read(bs) from a nonexistent queue\n";
       throw runtime_error(os.str());
     }
@@ -421,6 +470,9 @@ void WEClients::write(const messageqcpp::ByteStream &msg, uint connection)
 {
 	if (pmCount == 0)
 	{
+		ostringstream oss;
+		oss << "WECLIENT: There is no connection to WES and this = " << this ;
+		writeToLog(__FILE__, __LINE__, oss.str() , LOG_TYPE_DEBUG);
 		throw runtime_error("There is no WriteEngineServer to send message to.");
 	}
 	if (fPmConnections[connection] != 0)
@@ -436,6 +488,9 @@ void WEClients::write_to_all(const messageqcpp::ByteStream &msg)
 {
 	if (pmCount == 0)
 	{
+		ostringstream oss;
+		oss << "WECLIENT:  There is no connection to WES and this = " << this ;
+		writeToLog(__FILE__, __LINE__, oss.str() , LOG_TYPE_DEBUG);
 		throw runtime_error("There is no WriteEngineServer to send message to.");
 	}
 
@@ -455,6 +510,7 @@ void WEClients::StartClientListener(boost::shared_ptr<MessageQueueClient> cl, ui
     boost::thread *thrd = new boost::thread(WEClientRunner(this, cl, connIndex));
     fWESReader.push_back(thrd);
 }
+
 
 void WEClients::addDataToOutput(SBS sbs, uint connIndex)
   {

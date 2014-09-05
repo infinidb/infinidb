@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: we_dctnrycompress.h 4096 2012-08-07 20:06:09Z dhall $
+//  $Id: we_dctnrycompress.h 4450 2013-01-21 14:13:24Z rdempsey $
 
 
 /** @file */
@@ -77,13 +77,13 @@ public:
    /**
    * @brief virtual method in DBFileOp
    */
-   EXPORT int readDBFile(FILE* pFile, unsigned char* readBuf, const i64 lbid,
+   EXPORT int readDBFile(FILE* pFile, unsigned char* readBuf, const uint64_t lbid,
                          const bool isFbo = false );
 
    /**
    * @brief virtual method in DBFileOp
    */
-   EXPORT int writeDBFile(FILE* pFile, const unsigned char* writeBuf, const i64 lbid,
+   EXPORT int writeDBFile(FILE* pFile, const unsigned char* writeBuf, const uint64_t lbid,
                           const int numOfBlock = 1);
 
 	/**
@@ -142,7 +142,7 @@ protected:
    /**
    * @brief convert lbid to fbo
    */
-   int lbidToFbo(const i64 lbid, int& fbo);
+   int lbidToFbo(const uint64_t lbid, int& fbo);
 };
 
 

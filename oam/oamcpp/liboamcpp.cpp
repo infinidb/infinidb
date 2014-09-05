@@ -37,6 +37,8 @@
 #include <arpa/inet.h>
 #include <sys/mount.h>
 #include <netdb.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #endif
 #include <stdexcept>
 #include <csignal>
@@ -72,13 +74,6 @@ using namespace messageqcpp;
 using namespace oam;
 using namespace logging;
 using namespace BRM;
-
-namespace
-{
-const string CalpontFile = "Calpont.xml";
-const string AlarmFile = "AlarmConfig.xml";
-const string ProcessFile = "ProcessConfig.xml";
-}
 
 namespace oam
 {
@@ -117,11 +112,11 @@ namespace oam
 		if (cf != 0 && *cf != 0)
 			calpontfiledir = cf;
 
-		CalpontConfigFile = calpontfiledir + "/" + CalpontFile;
+		CalpontConfigFile = calpontfiledir + "/Calpont.xml";
 	
-		AlarmConfigFile = calpontfiledir + "/" + AlarmFile;
+		AlarmConfigFile = calpontfiledir + "/AlarmConfig.xml";
 	
-		ProcessConfigFile = calpontfiledir + "/" + ProcessFile;
+		ProcessConfigFile = calpontfiledir + "/ProcessConfig.xml";
 
 	}
 
@@ -1351,6 +1346,10 @@ namespace oam
 
     void Oam::getSystemStatus(SystemStatus& systemstatus)
     {
+#ifdef _MSC_VER
+        // TODO: Remove when we create OAM for Windows
+        return;
+#endif
         ModuleStatus modulestatus;
         systemstatus.systemmodulestatus.modulestatus.clear();
         ExtDeviceStatus extdevicestatus;
@@ -1379,15 +1378,38 @@ namespace oam
 				struct timespec ts = { 10, 0 };
 				processor.write(obs, &ts);
 			}
+			catch (exception& e)
+			{
+				processor.shutdown();
+				string error = e.what();
+				writeLog("getSystemStatus: write exception: " + error, LOG_TYPE_ERROR);
+				exceptionControl("getSystemStatus", API_FAILURE);
+			}
 			catch(...)
 			{
-				exceptionControl("getSystemStatus", API_TIMEOUT);
+				processor.shutdown();
+				writeLog("getSystemStatus: write exception: unknown", LOG_TYPE_ERROR);
+				exceptionControl("getSystemStatus", API_FAILURE);
 			}
 
-			// wait 10 seconds for ACK from Process Monitor
-			struct timespec ts = { 20, 0 };
-
-			ibs = processor.read(&ts);
+			// wait 20 seconds for ACK from Process Monitor
+			try {
+				struct timespec ts = { 20, 0 };
+				ibs = processor.read(&ts);
+			}
+			catch (exception& e)
+			{
+				processor.shutdown();
+				string error = e.what();
+				writeLog("getSystemStatus: read exception: " + error, LOG_TYPE_ERROR);
+				exceptionControl("getSystemStatus", API_FAILURE);
+			}
+			catch(...)
+			{
+				processor.shutdown();
+				writeLog("getSystemStatus: read exception: unknown", LOG_TYPE_ERROR);
+				exceptionControl("getSystemStatus", API_FAILURE);
+			}
 
 			if (ibs.length() > 0)
 			{
@@ -1455,12 +1477,19 @@ namespace oam
 			}
 			// timeout ocurred, shutdown connection
 			processor.shutdown();
+			writeLog("getSystemStatus: read 0 length", LOG_TYPE_ERROR);
         }
-        catch(...)
-        {
-        	exceptionControl("getSystemStatus", API_FAILURE);
+		catch (exception& e)
+		{
+			string error = e.what();
+			writeLog("getSystemStatus: MessageQueueClient exception: " + error, LOG_TYPE_ERROR);
 		}
-		exceptionControl("getSystemStatus", API_TIMEOUT);
+		catch(...)
+		{
+			writeLog("getSystemStatus: MessageQueueClient exception: unknown", LOG_TYPE_ERROR);
+		}
+
+		exceptionControl("getSystemStatus", API_FAILURE);
     }
 
     /********************************************************************
@@ -2093,6 +2122,10 @@ namespace oam
 
     void Oam::getProcessStatus(const std::string process, const std::string module, ProcessStatus& processstatus)
     {
+#ifdef _MSC_VER
+        // TODO: Remove when we create OAM for Windows
+        return;
+#endif
         try
         {
             MessageQueueClient processor("ProcStatusControl");
@@ -2112,6 +2145,7 @@ namespace oam
 			}
 			catch(...)
 			{
+				processor.shutdown();
 				exceptionControl("getProcessStatus", API_TIMEOUT);
 			}
 
@@ -2704,12 +2738,14 @@ namespace oam
 				catch(...)
 				{
 					//system("touch /var/log/Calpont/test6");
+					processor.shutdown();
 					exceptionControl("getMyProcessStatus", API_INVALID_PARAMETER);
 				}
 			}
 			catch(...)
 			{
 				//system("touch /var/log/Calpont/test7");
+				processor.shutdown();
 				exceptionControl("getMyProcessStatus", API_INVALID_PARAMETER);
 			}
 
@@ -3664,6 +3700,9 @@ namespace oam
      ******************************************************************************************/
 	int Oam::getLocalDBRMID(const std::string moduleName)
 	{
+		string cmd = "touch " + CalpontConfigFile;
+		(void)system(cmd.c_str());
+
         string SECTION = "DBRM_Worker";
 
         Config* sysConfig = Config::makeConfig(CalpontConfigFile.c_str());
@@ -4332,6 +4371,8 @@ namespace oam
         ByteStream msg;
         ByteStream receivedMSG;
         ByteStream::byte entries;
+		ByteStream::byte retStatus;
+
         try
         {
             Oam::getSystemConfig(systemmoduletypeconfig);
@@ -4385,6 +4426,13 @@ namespace oam
                         receivedMSG = servermonitor.read(&ts);
                         if (receivedMSG.length() > 0)
                         {
+							receivedMSG >> retStatus;
+							if ( retStatus != oam::API_SUCCESS ) {
+                       			// shutdown connection
+                        		servermonitor.shutdown();
+                            	exceptionControl("getActiveSQLStatements", (int) retStatus);
+							}
+
                             receivedMSG >> entries;
                             ActiveSqlStatement activeSqlStatement;
                             for (int i = 0; i < entries; i++)
@@ -4612,7 +4660,7 @@ namespace oam
 		try {
 			getSystemStatus(systemstatus);
 		}
-		catch (exception& ex)
+		catch (exception& )
 		{}
 
 		if (systemstatus.SystemOpState == oam::MAN_INIT ||
@@ -4796,7 +4844,7 @@ namespace oam
 			// dbrootid not found, return with error
 			exceptionControl("getDbrootPmConfig", API_INVALID_PARAMETER);
 		}
-		catch (exception& e)
+		catch (exception& )
 		{}
 		
 		// dbrootid not found, return with error
@@ -4816,7 +4864,7 @@ namespace oam
 			pmid = itoa(PMid);
 			return;
 		}
-		catch (exception& e)
+		catch (exception& )
 		{}
 		
 		// dbrootid not found, return with error
@@ -4911,7 +4959,7 @@ namespace oam
 		{
 			setSystemDBrootCount();
 		}
-		catch (exception& e)
+		catch (exception& )
 		{
 			cout << endl << "**** setSystemDBrootCount Failed" << endl;
 			exceptionControl("assignPmDbrootConfig", API_FAILURE);
@@ -4987,7 +5035,7 @@ namespace oam
 				exceptionControl("manualMovePmDbroot", API_FAILURE);
 			}
 		}
-		catch (exception& e)
+		catch (exception& )
 		{
 			writeLog("ERROR: getPmDbrootConfig api failure for pm" + residePMID , LOG_TYPE_ERROR );
 			cout << endl << "ERROR: getPmDbrootConfig api failure for pm" + residePMID << endl;
@@ -5000,7 +5048,7 @@ namespace oam
 		{
 			getPmDbrootConfig(atoi(toPMID.c_str()), todbrootConfigList);
 		}
-		catch (exception& e)
+		catch (exception& )
 		{
 			writeLog("ERROR: getPmDbrootConfig api failure for pm" + toPMID , LOG_TYPE_ERROR );
 			cout << endl << "ERROR: getPmDbrootConfig api failure for pm" + toPMID << endl;
@@ -5034,7 +5082,7 @@ namespace oam
 						{
 							mountDBRoot(dbroot1, false);
 						}
-						catch (exception& e)
+						catch (exception& )
 						{
 							writeLog("ERROR: dbroot failed to unmount", LOG_TYPE_ERROR );
 							cout << endl << "ERROR: umountDBRoot api failure" << endl;
@@ -5053,7 +5101,7 @@ namespace oam
 					{
 						amazonReattach(toPM, dbroot1);
 					}
-					catch (exception& e)
+					catch (exception& )
 					{
 						writeLog("ERROR: amazonReattach api failure", LOG_TYPE_ERROR );
 						cout << endl << "ERROR: amazonReattach api failure" << endl;
@@ -5100,7 +5148,7 @@ namespace oam
 		{
 			setPmDbrootConfig(atoi(residePMID.c_str()), residedbrootConfigList);
 		}
-		catch (exception& e)
+		catch (exception& )
 		{
 			writeLog("ERROR: setPmDbrootConfig api failure for pm" + residePMID , LOG_TYPE_ERROR );
 			cout << endl << "ERROR: setPmDbrootConfig api failure for pm" + residePMID << endl;
@@ -5111,7 +5159,7 @@ namespace oam
 		{
 			setPmDbrootConfig(atoi(toPMID.c_str()), todbrootConfigList);
 		}
-		catch (exception& e)
+		catch (exception& )
 		{
 			writeLog("ERROR: setPmDbrootConfig api failure for pm" + toPMID , LOG_TYPE_ERROR );
 			cout << endl << "ERROR: setPmDbrootConfig api failure for pm" + toPMID << endl;
@@ -5123,7 +5171,7 @@ namespace oam
 		{
     		mountDBRoot(dbrootlist);
 		}
-		catch (exception& e)
+		catch (exception& )
 		{
 			writeLog("ERROR: mountDBRoot api failure", LOG_TYPE_DEBUG );
 			cout << endl << "ERROR: mountDBRoot api failure" << endl;
@@ -5205,7 +5253,7 @@ namespace oam
 			t = getStorageConfig();
 			moduledbrootlist = boost::get<2>(t);
 		}
-		catch (exception& e)
+		catch (exception& )
 		{
 			writeLog("ERROR: getStorageConfig failure", LOG_TYPE_ERROR );
 			exceptionControl("autoMovePmDbroot", API_FAILURE);
@@ -5286,7 +5334,7 @@ namespace oam
 						dbrootlist.push_back(itoa(dbrootID));
 						mountDBRoot(dbrootlist);
 					}
-					catch (exception& e)
+					catch (exception& )
 					{
 						writeLog("ERROR: mountDBRoot api failure", LOG_TYPE_DEBUG );
 						cout << endl << "ERROR: mountDBRoot api failure" << endl;
@@ -5339,7 +5387,7 @@ namespace oam
 
 					amazonReattach(localModuleName, dbrootlist, true);
 				}
-				catch (exception& e)
+				catch (exception& )
 				{
 					writeLog("ERROR: amazonReattach failure", LOG_TYPE_ERROR );
 					exceptionControl("autoMovePmDbroot", API_FAILURE);
@@ -5365,7 +5413,7 @@ namespace oam
 							exceptionControl("autoMovePmDbroot", API_INVALID_PARAMETER);
 						}
 					}
-					catch (exception& e)
+					catch (exception& )
 					{
 						writeLog("ERROR: glusterctl failure getting pm list for dbroot " + itoa(dbrootID), LOG_TYPE_ERROR );
 						exceptionControl("autoMovePmDbroot", API_INVALID_PARAMETER);
@@ -5439,7 +5487,7 @@ namespace oam
 		
 									mountDBRoot(dbrootlist);
 								}
-								catch (exception& e)
+								catch (exception& )
 								{
 									writeLog("ERROR: mountDBRoot api failure", LOG_TYPE_DEBUG );
 									cout << endl << "ERROR: mountDBRoot api failure" << endl;
@@ -5516,7 +5564,7 @@ namespace oam
 	
 									mountDBRoot(dbrootlist);
 								}
-								catch (exception& e)
+								catch (exception& )
 								{
 									writeLog("ERROR: mountDBRoot api failure", LOG_TYPE_DEBUG );
 									cout << endl << "ERROR: mountDBRoot api failure" << endl;
@@ -5543,7 +5591,7 @@ namespace oam
 		
 								amazonReattach(toPM, dbrootlist, true);
 							}
-							catch (exception& e)
+							catch (exception& )
 							{
 								writeLog("ERROR: amazonReattach failure", LOG_TYPE_ERROR );
 								exceptionFailure = true;
@@ -5887,6 +5935,27 @@ namespace oam
 		//get updated Calpont.xml distributed
 		distributeConfigFile("system");
 
+		//
+		//send message to Process Monitor to add new dbroot to shared memory
+		//
+		pt2 = dbrootlist.begin();
+		for( ; pt2 != dbrootlist.end() ; pt2++)
+		{
+			try
+			{
+				ByteStream obs;
+		
+				obs << (ByteStream::byte) ADD_DBROOT;
+				obs << itoa(*pt2);
+		
+				sendStatusUpdate(obs, ADD_DBROOT);
+			}
+			catch(...)
+			{
+				exceptionControl("setSystemConfig", API_INVALID_PARAMETER);
+			}
+		}
+
 		return;
 	}
 
@@ -6105,7 +6174,7 @@ namespace oam
 		{
 			setSystemDBrootCount();
 		}
-		catch (exception& e)
+		catch (exception& )
 		{
 			cout << endl << "**** setSystemDBrootCount Failed" << endl;
 			exceptionControl("assignPmDbrootConfig", API_FAILURE);
@@ -6116,7 +6185,7 @@ namespace oam
 		{
 			setFilesPerColumnPartition( oldSystemDbRootCount );
 		}
-		catch (exception& e)
+		catch (exception& )
 		{
 			cout << endl << "**** setFilesPerColumnPartition Failed" << endl;
 			exceptionControl("assignPmDbrootConfig", API_FAILURE);
@@ -6192,7 +6261,7 @@ namespace oam
 						{
 							mountDBRoot(dbroot1, false);
 						}
-						catch (exception& e)
+						catch (exception& )
 						{
 							writeLog("ERROR: dbroot failed to unmount", LOG_TYPE_ERROR );
 							cout << endl << "ERROR: umountDBRoot api failure" << endl;
@@ -6274,7 +6343,7 @@ namespace oam
 		{
 			setSystemDBrootCount();
 		}
-		catch (exception& e)
+		catch (exception& )
 		{
 			cout << endl << "**** setSystemDBrootCount Failed" << endl;
 			exceptionControl("unassignPmDbrootConfig", API_FAILURE);
@@ -6285,7 +6354,7 @@ namespace oam
 		{
 			setFilesPerColumnPartition( oldSystemDbRootCount );
 		}
-		catch (exception& e)
+		catch (exception& )
 		{
 			cout << endl << "**** setFilesPerColumnPartition Failed" << endl;
 			exceptionControl("unassignPmDbrootConfig", API_FAILURE);
@@ -6414,7 +6483,7 @@ namespace oam
 					exceptionControl("removeDbroot", API_FAILURE);
 				}
 			}
-			catch (exception& e)
+			catch (exception& )
 			{}
 
 			if (!isEmpty)
@@ -6428,7 +6497,7 @@ namespace oam
 			try {
 				getDbrootPmConfig(dbrootID, pmid);
 			}
-			catch (exception& e)
+			catch (exception& )
 			{}
 
 			if ( pmid > 0 )
@@ -6440,7 +6509,7 @@ namespace oam
 				try {
 					unassignDbroot("pm" + itoa(pmid), pmdbrootlist);
 				}
-				catch (exception& e)
+				catch (exception& )
 				{
 					cout << endl << "**** unassignDbroot Failed" << endl;
 					exceptionControl("removeDbroot", API_FAILURE);
@@ -6468,6 +6537,27 @@ namespace oam
 
 		//get updated Calpont.xml distributed
 		distributeConfigFile("system");
+
+		//
+		//send message to Process Monitor to add new dbroot to shared memory
+		//
+		pt = dbrootlist.begin();
+		for( ; pt != dbrootlist.end() ; pt++)
+		{
+			try
+			{
+				ByteStream obs;
+		
+				obs << (ByteStream::byte) REMOVE_DBROOT;
+				obs << itoa(*pt);
+		
+				sendStatusUpdate(obs, REMOVE_DBROOT);
+			}
+			catch(...)
+			{
+				exceptionControl("setSystemConfig", API_INVALID_PARAMETER);
+			}
+		}
 
 		return;
 	}
@@ -6756,7 +6846,7 @@ namespace oam
 
 		string cmd = mysqlscript + " " + command;
 		int status = system(cmd.c_str());
-		if (status != 0 && action != MYSQL_STATUS)
+		if (WEXITSTATUS(status) != 0 && action != MYSQL_STATUS)
 			exceptionControl("actionMysqlCalpont", API_FAILURE);
 
 		if (action == MYSQL_START || action == MYSQL_RESTART) {
@@ -6916,7 +7006,7 @@ namespace oam
 		try {
 			getSystemStatus(systemstatus);
 		}
-		catch (exception& ex)
+		catch (exception& )
 		{}
 		
 		if (systemstatus.SystemOpState != oam::ACTIVE )
@@ -7110,7 +7200,7 @@ namespace oam
 		// run script to get Instance status and IP Address
 		string cmd = InstallDir + "/bin/IDBInstanceCmds.sh getInstance  > /tmp/getInstanceInfo_" + name;
 		int status = system(cmd.c_str());
-		if (status != 0 )
+		if (WEXITSTATUS(status) != 0 )
 			return "failed";
 
 		// get Instance Name
@@ -7141,7 +7231,7 @@ namespace oam
 		// run script to get Instance status and IP Address
 		string cmd = InstallDir + "/bin/IDBInstanceCmds.sh getType  > /tmp/getInstanceType_" + name;
 		int status = system(cmd.c_str());
-		if (status != 0 )
+		if (WEXITSTATUS(status) != 0 )
 			return "failed";
 
 		// get Instance Name
@@ -7172,7 +7262,7 @@ namespace oam
 		// run script to get Instance status and IP Address
 		string cmd = InstallDir + "/bin/IDBInstanceCmds.sh launchInstance " + type + " " + group + " > /tmp/getInstance_" + name;
 		int status = system(cmd.c_str());
-		if (status != 0 )
+		if (WEXITSTATUS(status) != 0 )
 			return "failed";
 
 		if (checkLogStatus("/tmp/getInstance", "Required") )
@@ -7248,7 +7338,7 @@ namespace oam
 		// run script to get Instance status and IP Address
 		string cmd = InstallDir + "/bin/IDBInstanceCmds.sh startInstance " + instanceName + " > /tmp/startEC2Instance_" + instanceName;
 		int ret = system(cmd.c_str());
-		if (ret != 0 )
+		if (WEXITSTATUS(ret) != 0 )
 			return false;
 
 		return true;
@@ -7267,7 +7357,7 @@ namespace oam
 		// run script to get Instance status and IP Address
 		string cmd = InstallDir + "/bin/IDBInstanceCmds.sh assignElasticIP " + instanceName + " " + IpAddress + " > /tmp/assignElasticIP_" + instanceName;
 		int ret = system(cmd.c_str());
-		if (ret != 0 )
+		if (WEXITSTATUS(ret) != 0 )
             exceptionControl("assignElasticIP", oam::API_FAILURE);
 
 		return true;
@@ -7286,7 +7376,7 @@ namespace oam
 		// run script to get Instance status and IP Address
 		string cmd = InstallDir + "/bin/IDBInstanceCmds.sh deassignElasticIP " + IpAddress + " > /tmp/deassignElasticIP_" + IpAddress;
 		int ret = system(cmd.c_str());
-		if (ret != 0 )
+		if (WEXITSTATUS(ret) != 0 )
             exceptionControl("deassignElasticIP", oam::API_FAILURE);
 
 		return true;
@@ -7305,7 +7395,7 @@ namespace oam
 		// run script to get Volume Status
 		string cmd = InstallDir + "/bin/IDBVolumeCmds.sh describe " + volumeName + " > /tmp/getVolumeStatus_" + volumeName;
 		int ret = system(cmd.c_str());
-		if (ret != 0 )
+		if (WEXITSTATUS(ret) != 0 )
 			return "failed";
 
 		// get status
@@ -7336,7 +7426,7 @@ namespace oam
 		// run script to get Volume Status
 		string cmd = InstallDir + "/bin/IDBVolumeCmds.sh create " + size + " > /tmp/createVolumeStatus_" + name;
 		int ret = system(cmd.c_str());
-		if (ret != 0 )
+		if (WEXITSTATUS(ret) != 0 )
 			return "failed";
 
 		// get status
@@ -7381,7 +7471,7 @@ namespace oam
 			string cmd = InstallDir + "/bin/IDBVolumeCmds.sh attach " + volumeName + " " + instanceName + " " + deviceName + " > /tmp/attachVolumeStatus_" + volumeName;
 			ret = system(cmd.c_str());
 
-			if (ret == 0 )
+			if (WEXITSTATUS(ret) == 0 )
 				return true;
 			
 			//failing to attach, dettach and retry
@@ -7407,7 +7497,7 @@ namespace oam
 		// run script to attach Volume
 		string cmd = InstallDir + "/bin/IDBVolumeCmds.sh detach " + volumeName + " > /tmp/detachVolumeStatus_" + volumeName;
 		int ret = system(cmd.c_str());
-		if (ret != 0 )
+		if (WEXITSTATUS(ret) != 0 )
 			return false;
 
 		return true;
@@ -7426,7 +7516,7 @@ namespace oam
 		// run script to delete Volume
 		string cmd = InstallDir + "/bin/IDBVolumeCmds.sh delete " + volumeName + " > /tmp/deleteVolumeStatus_" + volumeName;
 		int ret = system(cmd.c_str());
-		if (ret != 0 )
+		if (WEXITSTATUS(ret) != 0 )
 			return false;
 
 		return true;
@@ -7445,7 +7535,7 @@ namespace oam
 		// run script to create a tag
 		string cmd = InstallDir + "/bin/IDBVolumeCmds.sh createTag " + resourceName + " " + tagName + " " + tagValue + " > /tmp/createTagStatus_" + resourceName;
 		int ret = system(cmd.c_str());
-		if (ret != 0 )
+		if (WEXITSTATUS(ret) != 0 )
 			return false;
 
 		return true;
@@ -7585,7 +7675,7 @@ namespace oam
 
 				int ret;
 				ret = system(glustercmd.c_str());
-				if ( ret == 0 )
+				if ( WEXITSTATUS(ret) == 0 )
 					return 0;
 
             	ret = checkGlusterLog("/tmp/gluster_status.log", errmsg);
@@ -7600,7 +7690,7 @@ namespace oam
 				glustercmd = glustercmd + " setddc " + copies + " > /tmp/gluster_setddc.log 2>&1";
 				int ret;
 				ret = system(glustercmd.c_str());
-				if ( ret == 0 )
+				if ( WEXITSTATUS(ret) == 0 )
 					return 0;
 
             	ret = checkGlusterLog("/tmp/gluster_setddc.log", errmsg);
@@ -7618,7 +7708,7 @@ namespace oam
 				int ret;
 				ret = system(glustercmd.c_str());
 				writeLog("glusterctl return: GLUSTER_ASSIGN: dbroot = " + dbrootID + " pm = " + pmID, LOG_TYPE_DEBUG );
-				if ( ret == 0 )
+				if ( WEXITSTATUS(ret) == 0 )
 					return 0;
 
             	ret = checkGlusterLog("/tmp/gluster_assign.log", errmsg);
@@ -7661,8 +7751,6 @@ namespace oam
 					writeLog("glusterctl: GLUSTER_WHOHAS: failure, retrying (restarting gluster) " + msg, LOG_TYPE_ERROR );
 
 					string cmd = "/etc/init.d/glusterd restart > /dev/null 2>&1";
-					int user;
-					user = getuid();
 					if (user != 0)
 						cmd = "sudo " + cmd;
 
@@ -7684,7 +7772,7 @@ namespace oam
 				glustercmd = glustercmd + " unassign " + dbrootID + " " + pmID + " > /tmp/gluster_unassign.log 2>&1";
 				int ret;
 				ret = system(glustercmd.c_str());
-				if ( ret == 0 )
+				if ( WEXITSTATUS(ret) == 0 )
 					return 0;
 
             	ret = checkGlusterLog("/tmp/gluster_unassign.log", errmsg);
@@ -7704,7 +7792,7 @@ namespace oam
 				int ret;
 				//writeLog("glusterctl: cmd = " + glustercmd, LOG_TYPE_DEBUG );
 				ret = system(glustercmd.c_str());
-				if ( ret == 0 )
+				if ( WEXITSTATUS(ret) == 0 )
 					return 0;
 
             	ret = checkGlusterLog("/tmp/gluster_add.log", errmsg);
@@ -7797,74 +7885,6 @@ namespace oam
 
 		return 1;
 	}
-
-
-    /***************************************************************************
-     *
-     * Function:  copyDatabaseFiles
-     *
-     * Purpose:   copy database files from src to dst
-     *
-     ****************************************************************************/
-    void Oam::copyDatabaseFiles(std::string src, std::string dst)
-    {
-        std::vector<std::string> dbFileNames;
-        std::string file_name;
-        fs::path sourceDir(src);
-        fs::directory_iterator iter(sourceDir);
-        fs::directory_iterator end_iter;
-        double total_bytes = 0;
-        for( ; iter != end_iter ; ++iter)
-        {
-            fs::path source = *iter;
-            if (!fs::is_directory(source) )
-            {
-#if BOOST_VERSION >= 105200
-                file_name = source.filename().generic_string();
-#else
-                file_name = iter->leaf();
-#endif
-                if (file_name.find(".dat", file_name.length() - 4) != string::npos)
-                {
-                    dbFileNames.push_back(file_name);
-                    total_bytes += fs::file_size(source);
-                }
-            }
-        }
-
-        // make sure there is enough disk space
-        double avail_bytes = getFreeSpace(dst);
-        if (avail_bytes < total_bytes)
-        {
-            char error[256];
-            sprintf(error, "Insufficient Disk Space. Avail: %8.0f kb, Needed: %8.0f kb\n", avail_bytes/1024, total_bytes/1024);
-            throw std::runtime_error(error);
-        }
-
-        boost::progress_display show_progress(dbFileNames.size());
-        std::vector<std::string>::iterator dbfiles_iter = dbFileNames.begin();
-        for( ; dbfiles_iter != dbFileNames.end() ; ++dbfiles_iter)
-        {
-            file_name = *dbfiles_iter;
-            std::string sourceFile = src;
-            std::string destFile = dst;
-
-            sourceFile += "/";
-            sourceFile += file_name;
-
-            destFile += "/";
-            destFile += file_name;
-
-            fs::path source = sourceFile;
-            fs::path destination  = destFile;
-            if (fs::exists(destination))
-                fs::remove(destination);
-            fs::copy_file( source, destination );
-
-            ++show_progress;
-        }
-
-    }
 
     /***************************************************************************
      *
@@ -8724,7 +8744,7 @@ namespace oam
 	******************************************************************************************/
 	void Oam::writeLog(const string logContent, const LOG_TYPE logType)
 	{
-		LoggingID lid(17);
+		LoggingID lid(8);
 		MessageLog ml(lid);
 		Message msg;
 		Message::Args args;

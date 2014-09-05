@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_from_days.cpp 3048 2012-04-04 15:33:45Z rdempsey $
+* $Id: func_from_days.cpp 3616 2013-03-04 14:56:29Z rdempsey $
 *
 *
 ****************************************************************************/
@@ -90,7 +90,7 @@ int64_t Func_from_days::getDatetimeIntVal(rowgroup::Row& row,
 		year = daynr * 100 / 36525;
 		temp =(((year-1)/100+1)*3)/4;
 		day_of_year = (daynr - (long) year * 365) - (year-1)/4 + temp;
-		while (day_of_year > (days_in_year= funcexp::calc_days_in_year(year)))
+		while (day_of_year > (days_in_year= helpers::calc_days_in_year(year)))
 		{
 			day_of_year-=days_in_year;
 			year++;
@@ -106,8 +106,8 @@ int64_t Func_from_days::getDatetimeIntVal(rowgroup::Row& row,
 			}
 		}
 
-		for (month_pos = 0, ret_month = 1 ; day_of_year > daysInMonth[month_pos]; month_pos++, ret_month++)
-			day_of_year-= daysInMonth[month_pos];
+		for (month_pos = 0, ret_month = 1 ; day_of_year > helpers::daysInMonth[month_pos]; month_pos++, ret_month++)
+			day_of_year-= helpers::daysInMonth[month_pos];
 
 		ret_year=year;
 		ret_day=day_of_year+leap_day;

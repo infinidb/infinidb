@@ -8,7 +8,6 @@ using namespace std;
 #include <cstdlib>
 #include <sys/types.h>
 #include <unistd.h>
-#include "sessionmonitor.h"
 #include "sessionmanager.h"
 
 #include <cppunit/extensions/HelperMacros.h>

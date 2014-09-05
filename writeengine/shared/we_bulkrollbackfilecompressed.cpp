@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
-* $Id: we_bulkrollbackfilecompressed.cpp 3911 2012-06-10 19:12:14Z dcathey $
+* $Id: we_bulkrollbackfilecompressed.cpp 4450 2013-01-21 14:13:24Z rdempsey $
 */
 
 #include "we_bulkrollbackfilecompressed.h"
@@ -32,6 +32,7 @@
 #include "we_convertor.h"
 #include "messageids.h"
 using namespace compress;
+using namespace execplan;
 
 namespace
 {
@@ -209,7 +210,7 @@ void BulkRollbackFileCompressed::reInitTruncColumnExtent(
     u_int32_t   segNum,
     long long   startOffsetBlk,
     int         nBlocks,
-    ColDataType colType,
+    CalpontSystemCatalog::ColDataType colType,
     u_int32_t   colWidth,
     bool        restoreHwmChk )
 {
@@ -352,7 +353,7 @@ void BulkRollbackFileCompressed::reInitTruncColumnExtent(
             nBlocksToInit = BLKS_PER_EXTENT; // don't init > 1 full extent
         if (nBlocksToInit > 0)
         {
-            i64 emptyVal = fDbFile.getEmptyRowValue( colType, colWidth );
+            uint64_t emptyVal = fDbFile.getEmptyRowValue( colType, colWidth );
             rc = fDbFile.reInitPartialColumnExtent( pFile,
                 (chunkPtrs[chunkIndex].first + restoredChunkLen),
                 nBlocksToInit,

@@ -16,12 +16,9 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: masterdbrmnode.cpp 1807 2012-12-20 16:56:10Z pleblanc $
+ * $Id: masterdbrmnode.cpp 1854 2013-03-05 19:42:17Z dcathey $
  *
  ****************************************************************************/
-
-//Major hack to get oam and brm to play nice.
-#define OAM_BRM_LEAN_AND_MEAN
 
 #include <unistd.h>
 #include <sys/types.h>
@@ -344,12 +341,11 @@ void MasterDBRMNode::msgProcessor()
  		else if (msg.length() == 0)
    			continue;
 
-#ifdef BRM_VERBOSE
-		cerr << "DBRM Controller: recv'd a message..." << endl;
-#endif
-		
 		/* Check for an command for the master */
 		msg.peek(cmd);
+#ifdef BRM_VERBOSE
+		cerr << "DBRM Controller: recv'd message " << (int)cmd << " length " << msg.length() << endl;
+#endif
 		switch (cmd) {
 			case HALT: doHalt(p->sock); continue;
 			case RESUME: doResume(p->sock); continue;
@@ -425,8 +421,9 @@ retrycmd:
 		slaveLock.lock();
 		if (haltloops == FIVE_MIN_TIMEOUT.tv_sec) {
 			ostringstream os;
-			os << "A node is unresponsive, no reconfigure in at least " << FIVE_MIN_TIMEOUT.tv_sec <<
-				" seconds.  Setting read-only mode.";
+			os << "A node is unresponsive for cmd = " << (uint32_t)cmd <<
+				", no reconfigure in at least " << 
+				FIVE_MIN_TIMEOUT.tv_sec << " seconds.  Setting read-only mode.";
 			log(os.str());
 			readOnly = true;
 			halting = false;
@@ -513,10 +510,10 @@ retrycmd:
 	*/
 
 		/* Need to atomically do the safety check and the clear. */
-		if (cmd == CLEAR) {
+		if (cmd == BRM_CLEAR) {
 			uint txnCount = sm.getTxnCount();
 			// do nothing if there's an active transaction
-			if (txnCount != 0) {
+            if (txnCount != 0) {
 				ByteStream *reply = new ByteStream();
 				*reply << (uint8_t) ERR_FAILURE;
 				responses.push_back(reply);
@@ -582,7 +579,7 @@ retrycmd:
   	}
 
 		// these cmds don't need the 2-phase commit
-		if (cmd == FLUSH_INODE_CACHES || cmd == CLEAR || cmd == TAKE_SNAPSHOT)
+		if (cmd == FLUSH_INODE_CACHES || cmd == BRM_CLEAR || cmd == TAKE_SNAPSHOT)
 			goto no_confirm;
 
 #ifdef BRM_VERBOSE
@@ -680,7 +677,13 @@ int MasterDBRMNode::gatherResponses(uint8_t cmd,
 			after a long timeout.
 			*/
 
-			halting = true;
+            ostringstream os;
+            os << "DBRM Controller: Network error reading from node " << i + 1 <<
+                ".  Reading response to command " << (uint32_t)cmd <<
+                ", length " << cmdMsgLength << ".  Will see if retry is possible.";
+            log(os.str());
+
+            halting = true;
 			readErrFlag = true;
 			delete tmp;
 			return ERR_OK;
@@ -701,6 +704,13 @@ int MasterDBRMNode::gatherResponses(uint8_t cmd,
 
 		if (tmp->length() == 0 && !halting) {
 			/* See the comment above */
+            ostringstream os;
+            os << "DBRM Controller: Network error reading from node " << i + 1<<
+                ".  Reading response to command " << (uint32_t)cmd <<
+                ", length " << cmdMsgLength << 
+                ".  0 length response, possible time-out"
+                ".  Will see if retry is possible.";
+            log(os.str());
 			halting = true;
 			readErrFlag = true;
 			delete tmp;
@@ -794,7 +804,7 @@ void MasterDBRMNode::undo() throw()
 	cerr << "DBRM Controller: sending undo()" << endl;
 #endif
 
-	undoMsg << (uint8_t) UNDO;
+	undoMsg << (uint8_t) BRM_UNDO;
 	if (iSlave != slaves.end())
 		lastSlave = iSlave + 1; //@Bug 2258 
 	else
@@ -1044,15 +1054,15 @@ void MasterDBRMNode::doReload(messageqcpp::IOSocket *sock)
 void MasterDBRMNode::doVerID(ByteStream &msg, ThreadParams *p)
 {
 	ByteStream reply;
-	int ver;
+	QueryContext context;
 
-	ver = sm.verID();
+	context = sm.verID();
 #ifdef BRM_VERBOSE
 	cerr << "doVerID returning " << ver << endl;
 #endif
 
 	reply << (uint8_t) ERR_OK;
-	reply << (uint32_t) ver;
+	reply << context;
 	try {
 		p->sock->write(reply);
 	}
@@ -1062,15 +1072,15 @@ void MasterDBRMNode::doVerID(ByteStream &msg, ThreadParams *p)
 void MasterDBRMNode::doSysCatVerID(ByteStream &msg, ThreadParams *p)
 {
 	ByteStream reply;
-	int ver;
+	QueryContext context;
 
-	ver = sm.sysCatVerID();
+	context = sm.sysCatVerID();
 #ifdef BRM_VERBOSE
 	cerr << "doSysCatVerID returning " << ver << endl;
 #endif
 
 	reply << (uint8_t) ERR_OK;
-	reply << (uint32_t) ver;
+	reply << context;
 	try {
 		p->sock->write(reply);
 	}
@@ -1089,7 +1099,7 @@ void MasterDBRMNode::doNewTxnID(ByteStream &msg, ThreadParams *p)
 		msg >> sessionID;
 		msg >> block;
 		msg >> isDDL;
-		txnid = sm.newTxnID(sessionID, (block == 0 ? false : true), (isDDL == 0 ? false : true) );
+		txnid = sm.newTxnID(sessionID, block, isDDL);
 		reply << (uint8_t) ERR_OK;
 		reply << (uint32_t) txnid.id;
 		reply << (uint8_t) txnid.valid;
@@ -1394,9 +1404,6 @@ void MasterDBRMNode::doClearSystemState(ByteStream &msg, ThreadParams *p)
 		msg >> ss;
 
 		sm.clearSystemState(ss);
-#ifdef BRM_VERBOSE
-		cerr << "doSetSystemState returning rc=" << rc << endl;
-#endif
 	}
 	catch (exception&) {
 		err = ERR_FAILURE;
@@ -1917,13 +1924,15 @@ void MasterDBRMNode::doStartAISequence(ByteStream &msg, ThreadParams *p)
 {
 	uint8_t cmd;
 	ByteStream reply;
+    uint8_t tmp8;
 	uint32_t oid, colWidth;
 	uint64_t firstNum;
-
+    execplan::CalpontSystemCatalog::ColDataType colDataType;
 	try {
-		msg >> cmd >> oid >> firstNum >> colWidth;
+		msg >> cmd >> oid >> firstNum >> colWidth >> tmp8;
+        colDataType = (execplan::CalpontSystemCatalog::ColDataType)tmp8;
 		idbassert(msg.length() == 0);
-		aiManager.startSequence(oid, firstNum, colWidth);
+		aiManager.startSequence(oid, firstNum, colWidth, colDataType);
 		reply << (uint8_t) ERR_OK;
 		p->sock->write(reply);
 	}
@@ -2065,7 +2074,7 @@ void MasterDBRMNode::MsgProcessor::operator()()
 	try {
 		m->msgProcessor();
 	}
-	catch (SocketClosed&) {
+	catch (SocketClosed& e) {
 #ifdef BRM_VERBOSE
 		cerr << e.what() << endl;
 #endif

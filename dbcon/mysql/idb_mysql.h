@@ -35,6 +35,9 @@
 #endif
 #define MYSQL_DYNAMIC_PLUGIN
 #define DONT_DEFINE_VOID
+#ifdef ETIMEDOUT
+#undef ETIMEDOUT
+#endif
 #endif
 
 #include "mysql_priv.h"
@@ -64,6 +67,7 @@
 #undef PACKAGE_NAME
 #undef PACKAGE_BUGREPORT
 #undef DEBUG
+#undef set_bits
 
 #endif
 // vim:ts=4 sw=4:

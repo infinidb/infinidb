@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_readthread.h 4216 2012-09-28 23:08:21Z xlou $
+* $Id: we_readthread.h 4566 2013-03-07 16:08:26Z chao $
 *
 *******************************************************************************/
 #ifndef WE_SRV_READTHREAD_H__
@@ -33,8 +33,8 @@ using namespace threadpool;
 #include "we_dmlcommandproc.h"
 #include "we_cleartablelockcmd.h"
 #include "we_dataloader.h"
-
-
+#include "we_getfilesizes.h"
+#include "dbrm.h"
 
 namespace WriteEngine
 {
@@ -61,21 +61,6 @@ private:
 
 };
 
-
-class DdlReadThread: public ReadThread
-{
-public:
-	explicit DdlReadThread(const messageqcpp::IOSocket& ios, ByteStream& ibs );
-	virtual ~DdlReadThread();
-
-	virtual void operator()();
-
-
-private:
-	boost::shared_ptr<WE_DDLCommandProc> fWeDDLprocessor;
-
-
-};
 
 class DmlReadThread: public ReadThread
 {
@@ -141,6 +126,21 @@ private:
 	
 };
 
+//------------------------------------------------------------------------------
+// Thread object that get file sizes for a table.
+//------------------------------------------------------------------------------
+class GetFileSizeThread : public ReadThread
+{
+public:
+
+	GetFileSizeThread(const messageqcpp::IOSocket& ios, ByteStream& ibs, BRM::DBRM &dbrm);
+	virtual ~GetFileSizeThread();
+    virtual void operator()();
+
+private:
+	boost::shared_ptr<WE_GetFileSizes> fWeGetFileSizes;
+	int key;
+};
 
 class ReadThreadFactory
 {
@@ -149,7 +149,7 @@ public:
 	virtual ~ReadThreadFactory(){}
 
 public:
-	static void CreateReadThread(ThreadPool& Tp, IOSocket& ios);
+	static void CreateReadThread(ThreadPool& Tp, IOSocket& ios, BRM::DBRM &dbrm);
 
 
 };

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: batchprimitiveprocessor-jl.cpp 8775 2012-08-01 16:12:11Z dhall $
+// $Id: batchprimitiveprocessor-jl.cpp 9215 2013-01-24 18:40:12Z pleblanc $
 // C++ Implementation: batchprimitiveprocessor
 //
 // Description: 
@@ -296,6 +296,7 @@ void BatchPrimitiveProcessorJL::addElementType(const ElementType &et, uint dbroo
 	idbassert(ridCount <= 8192);
 }
 
+#if 0
 void BatchPrimitiveProcessorJL::setRowGroupData(const rowgroup::RowGroup &rg)
 {
 	uint i;
@@ -316,6 +317,8 @@ void BatchPrimitiveProcessorJL::setRowGroupData(const rowgroup::RowGroup &rg)
 		baseRid = r.getRid() & 0xffffffffffffe000ULL;
 	}
 }
+
+#endif
 
 void BatchPrimitiveProcessorJL::addElementType(const StringElementType &et, uint dbroot)
 {
@@ -677,7 +680,8 @@ BatchPrimitiveProcessorJL::getRowGroupData(messageqcpp::ByteStream &in,
 
 	org.setData(ret.get());
 	rowCount = org.getRowCount();
-//	cout << "rowCount = " << rowCount << endl;
+	//cout << "baseRow from PM is " << org.getBaseRid() << endl;
+	//cout << "rowCount = " << rowCount << endl;
 	bool pmSendsMatchesAnyway = (hasSmallOuterJoin && *countThis && PMJoinerCount > 0 &&
 			(fe2 || aggregatorPM));
 
@@ -746,17 +750,37 @@ void BatchPrimitiveProcessorJL::reset()
 	needToSetLBID = true;
 }
 
-void BatchPrimitiveProcessorJL::setLBID(uint64_t l, uint dbroot)
-{
-	dbRoot = dbroot;
-	filterSteps[0]->setLBID(l, dbroot);
-}
-
-void BatchPrimitiveProcessorJL::setLBIDForScan(uint64_t rid, uint dbroot)
+void BatchPrimitiveProcessorJL::setLBID(uint64_t l, const BRM::EMEntry &scannedExtent)
 {
 	uint i;
 
-	baseRid = rid;
+	dbRoot = scannedExtent.dbRoot;
+	baseRid = rowgroup::convertToRid(scannedExtent.partitionNum,
+			scannedExtent.segmentNum,
+			scannedExtent.blockOffset/(scannedExtent.range.size * 1024),  // the extent #
+			(l - scannedExtent.range.start)/scannedExtent.range.size);    // the logical block #
+
+	/*
+	cout << "got baserid=" << baseRid << " from partnum=" << scannedExtent.partitionNum
+			<< " segnum=" << scannedExtent.segmentNum << " extentnum=" <<
+			scannedExtent.blockOffset/(scannedExtent.range.size * 1024) <<
+			" blocknum=" << (l - scannedExtent.range.start)/scannedExtent.range.size << endl;
+	*/
+
+	for (i = 0; i < filterCount; ++i)
+		filterSteps[i]->setLBID(baseRid, dbRoot);
+
+	for (i = 0; i < projectCount; ++i)
+		projectSteps[i]->setLBID(baseRid, dbRoot);
+}
+
+#if 0
+void BatchPrimitiveProcessorJL::setLBIDForScan(uint64_t rid, uint16_t dbroot, uint32_t partNum,
+		uint16_t segNum, uint8_t extentNum, uint16_t blockNum)
+{
+	uint i;
+
+//	baseRid = rid;
 // 	cout << "scan set base RID to " << baseRid << endl;
 
 	for (i = 1; i < filterCount; ++i)
@@ -767,6 +791,8 @@ void BatchPrimitiveProcessorJL::setLBIDForScan(uint64_t rid, uint dbroot)
 		projectSteps[i]->setLBID(rid, dbroot);
 	}
 }
+
+#endif
 
 string BatchPrimitiveProcessorJL::toString() const
 {
@@ -824,11 +850,11 @@ void BatchPrimitiveProcessorJL::createBPP(ByteStream &bs) const
 
 	bs.load((uint8_t *) &ism, sizeof(ism));
 	bs << (uint8_t) ot;
-	bs << (messageqcpp::ByteStream::quadbyte)versionNum;
 	bs << (messageqcpp::ByteStream::quadbyte)txnID;
 	bs << (messageqcpp::ByteStream::quadbyte)sessionID;
 	bs << (messageqcpp::ByteStream::quadbyte)stepID;
 	bs << uniqueID;
+	bs << versionInfo;
 
 	if (needStrValues)
 		flags |= NEED_STR_VALUES;
@@ -1122,7 +1148,11 @@ bool BatchPrimitiveProcessorJL::nextTupleJoinerMsg(ByteStream &bs)
 	Row r;
 	std::vector<uint8_t *> *tSmallSide;
 	joiner::TypelessData tlData;
+    uint smallKeyCol;
+    uint largeKeyCol;
+    uint64_t smallkey;
 	bool isNull;
+	bool bSignedUnsigned;
 
 	memset((void*)&ism, 0, sizeof(ism));
 	tSmallSide = tJoiners[joinerNum]->getSmallSide();
@@ -1165,14 +1195,32 @@ bool BatchPrimitiveProcessorJL::nextTupleJoinerMsg(ByteStream &bs)
 		for (i = pos; i < pos + toSend; i++) {
 			r.setData((*tSmallSide)[i]);
 			isNull = false;
-			for (j = 0; j < smallSideKeys[joinerNum].size(); j++)
+			bSignedUnsigned = tJoiners[joinerNum]->isSignedUnsignedJoin();
+			for (j = 0; j < smallSideKeys[joinerNum].size(); j++){
 				isNull |= r.isNullValue(smallSideKeys[joinerNum][j]);
+                if (UNLIKELY(bSignedUnsigned)) {
+                    // BUG 5628 If this is a signed/unsigned join column and the sign bit is set on either side,
+                    // then it should not compare. Send null to PM to prevent compare
+                    smallKeyCol = smallSideKeys[joinerNum][j];
+                    largeKeyCol = tJoiners[joinerNum]->getLargeKeyColumns()[j];
+                    if (r.isUnsigned(smallKeyCol) != largeSideRG.isUnsigned(largeKeyCol)) {
+                        if (r.isUnsigned(smallKeyCol))
+                            smallkey = r.getUintField(smallKeyCol);
+                        else
+                            smallkey = r.getIntField(smallKeyCol);
+                        if (smallkey & 0x8000000000000000ULL) {
+                            isNull = true;
+                            break;
+                        }
+                    }
+                }
+            }
 			bs << (uint8_t) isNull;
 			if (!isNull) {
-				tlData = makeTypelessKey(r, smallSideKeys[joinerNum],
-				  tlKeyLens[joinerNum], &fa);
-				tlData.serialize(bs);
-				bs << i;
+                tlData = makeTypelessKey(r, smallSideKeys[joinerNum],
+                  tlKeyLens[joinerNum], &fa);
+                tlData.serialize(bs);
+                bs << i;
 			}
 		}
 	}
@@ -1186,9 +1234,20 @@ bool BatchPrimitiveProcessorJL::nextTupleJoinerMsg(ByteStream &bs)
 		bs.needAtLeast(toSend * sizeof(JoinerElements));
 		arr = (JoinerElements *) bs.getInputPtr();
 
-		for (i = pos, j = 0; i < pos + toSend; i++, j++) {
+        smallKeyCol = smallSideKeys[joinerNum][0];
+        bSignedUnsigned = r.isUnsigned(smallKeyCol) != largeSideRG.isUnsigned(tJoiners[joinerNum]->getLargeKeyColumns()[0]);
+        j = 0;
+		for (i = pos, j = 0; i < pos + toSend; ++i, ++j) {
 			r.setData((*tSmallSide)[i]);
-			arr[j].key = r.getIntField(smallSideKeys[joinerNum][0]);
+			if (r.isUnsigned(smallKeyCol))
+				smallkey = r.getUintField(smallKeyCol);
+			else 
+				smallkey = r.getIntField(smallKeyCol);
+			// If this is a compare signed vs unsigned and the sign bit is on for this value, then all compares
+			// against the large side should fall. UBIGINTEMPTYROW is not a valid value, so nothing will match.
+			if (bSignedUnsigned && (smallkey & 0x8000000000000000ULL)) 
+				smallkey = joblist::UBIGINTEMPTYROW;
+			arr[j].key = (int64_t)smallkey;
 			arr[j].value = i;
 // 			cout << "sending " << arr[j].key << ", " << arr[j].value << endl;
 		}

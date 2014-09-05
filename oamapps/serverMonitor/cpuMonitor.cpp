@@ -96,9 +96,10 @@ void cpuMonitor()
 			cpuMajor = moduleTypeConfig.ModuleCPUMajorThreshold; 
 			cpuMinor = moduleTypeConfig.ModuleCPUMinorThreshold;
 			cpuMinorClear = moduleTypeConfig.ModuleCPUMinorClearThreshold;
-		} catch (runtime_error e)
+		} catch (...)
 		{
-			throw e;
+			sleep(5);
+			continue;
 		}
 
 		if (RESOURCE_DEBUG)
@@ -280,8 +281,8 @@ void cpuMonitor()
 
 		pthread_mutex_unlock(&CPU_LOCK);
 
-		// sleep
-		sleep(MONITOR_PERIOD);
+		// sleep, 5 minutes
+		sleep(MONITOR_PERIOD*5);
 
 		++periodCounter;
 		if ( periodCounter >= periodCount )

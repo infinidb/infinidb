@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: ddlpkg.cpp 8436 2012-04-04 18:18:21Z rdempsey $
+*   $Id: ddlpkg.cpp 9210 2013-01-21 14:10:42Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -82,7 +82,6 @@ namespace ddlpackage
 		}
 	}
 
-
 	ColumnType::ColumnType(int prec, int scale) :
 		fType(DDL_INVALID_DATATYPE),
 		fLength(0),
@@ -93,7 +92,7 @@ namespace ddlpackage
 		fLength = precision_width(fPrecision);
 	}
 
-	ColumnType::ColumnType(int type) :
+    ColumnType::ColumnType(int type) :
 		fType(type),
 		fLength(0),
 		fScale(0),
@@ -102,24 +101,29 @@ namespace ddlpackage
 		switch ( type )
 		{
 			case DDL_TINYINT:
+            case DDL_UNSIGNED_TINYINT:
 				fPrecision = 3;
 				break;
 			case DDL_SMALLINT:
+            case DDL_UNSIGNED_SMALLINT:
 				fPrecision = 5;
 				break;
 			case DDL_INT:
-			case DDL_MEDINT:
+			case DDL_UNSIGNED_INT:
+            case DDL_MEDINT:
 				fPrecision = 10;
 				break;
 			case DDL_BIGINT:
-				fPrecision = 19;
+                fPrecision = 19;
+            case DDL_UNSIGNED_BIGINT:
+                fPrecision = 20;
 				break;
 			default:
 				fPrecision = 10;
 				break;				
 		}		
 	}
-
+#if 0
     ColumnType::ColumnType(int type, int length, int precision, int scale, int compressiontype, const char* autoIncrement, int64_t nextValue, bool withTimezone) :
         fType(type)                            ,
         fLength(length),
@@ -131,7 +135,7 @@ namespace ddlpackage
 		fNextvalue(nextValue)
     {
     }        
-        
+#endif
 	ColumnConstraintDef::ColumnConstraintDef(DDL_CONSTRAINTS type) :
 		SchemaObject(),
 		fDeferrable(false),
@@ -162,4 +166,43 @@ namespace ddlpackage
 		   << "d=" << ReferentialActionStrings[ref.fOnDelete];
 		return os;
 	}
+
+    void ColumnDef::convertDecimal()
+    {		
+    	//@Bug 2089 decimal precision default to 10 if 0 is used.
+    	if (fType->fPrecision <= 0)
+    		fType->fPrecision = 10;
+
+    	if (fType->fPrecision == -1 || fType->fPrecision == 0)
+    	{
+    		fType->fType = DDL_BIGINT;
+    		fType->fLength = 8;
+    		fType->fScale = 0;
+    	}
+    	else if ((fType->fPrecision > 0) && (fType->fPrecision < 3))
+    	{
+    					//dataType = CalpontSystemCatalog::TINYINT;
+    		fType->fType = DDL_TINYINT;
+    		fType->fLength = 1;
+    	}
+
+    	else if (fType->fPrecision < 5 && (fType->fPrecision > 2))
+    	{
+    					//dataType = CalpontSystemCatalog::SMALLINT;
+    		fType->fType = DDL_SMALLINT;
+    		fType->fLength = 2;
+    	}
+    	else if (fType->fPrecision > 4 && fType->fPrecision < 10)
+    	{
+    					//dataType = CalpontSystemCatalog::INT;
+    		fType->fType = DDL_INT;
+    		fType->fLength = 4;
+    	}
+    	else if (fType->fPrecision > 9 && fType->fPrecision < 19)
+    	{
+    					//dataType = CalpontSystemCatalog::BIGINT;
+    		fType->fType = DDL_BIGINT;
+    		fType->fLength = 8;
+    	}
+    }
 }

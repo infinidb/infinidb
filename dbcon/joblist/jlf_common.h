@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: jlf_common.h 9704 2013-07-17 19:18:23Z xlou $
+//  $Id: jlf_common.h 9703 2013-07-17 19:18:19Z xlou $
 
 
 /** @file jlf_common.h
@@ -47,9 +47,11 @@
 #include "resourcemanager.h"
 #include "rowgroup.h"
 
+// forward reference
 namespace execplan
 {
 class AggregateColumn;
+class SimpleColumn;
 }
 
 
@@ -163,7 +165,6 @@ struct JobInfo
 		rm(r),
 		sessionId(0),
 		txnId(0),
-		verId(0),
 		statementId(0),
 		maxBuckets(rm.getHjMaxBuckets()),
 		maxElems(rm.getHjMaxElems()),
@@ -200,7 +201,7 @@ struct JobInfo
 	ResourceManager& rm;
 	uint32_t  sessionId;
 	uint32_t  txnId;
-	uint32_t  verId;
+	BRM::QueryContext  verId;
 	uint32_t  statementId;
 	boost::shared_ptr<execplan::CalpontSystemCatalog> csc;
 	DeliveredTablesSet tables;
@@ -221,7 +222,7 @@ struct JobInfo
 	uint32_t  traceFlags;
 	uint64_t  tupleDLMaxSize;
 	uint32_t  tupleMaxBuckets;
-	SErrorInfo status;
+	SErrorInfo errorInfo;
 	execplan::CalpontSystemCatalog::OID* projectingTableOID; // DeliveryWSDLs get a reference to this
 	bool      isExeMgr;
 	bool      trace;
@@ -285,6 +286,7 @@ struct JobInfo
 	std::set<uint> outerOnTable;
 	std::set<uint> tableHasIsNull;
 	JobStepVector  outerJoinExpressions;
+	std::vector<boost::shared_ptr<const execplan::ParseTree> > onClauseFilter;
 
 	// bug 3759, join in order
 	// mixed outer join
@@ -440,7 +442,8 @@ void makeJobSteps(execplan::CalpontSelectExecutionPlan* csep, JobInfo& jobInfo,
 void makeUnionJobSteps(execplan::CalpontSelectExecutionPlan* csep, JobInfo& jobInfo,
     JobStepVector& querySteps, JobStepVector&, DeliveredTableMap& deliverySteps);
 
-void updateDerivedColumn(JobInfo&, SimpleColumn*, execplan::CalpontSystemCatalog::ColType&);
+void updateDerivedColumn(JobInfo&, execplan::SimpleColumn*,
+	execplan::CalpontSystemCatalog::ColType&);
 
 bool filterWithDictionary(execplan::CalpontSystemCatalog::OID dictOid, uint64_t n);
 

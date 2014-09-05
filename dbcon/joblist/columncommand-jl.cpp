@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: columncommand-jl.cpp 8829 2012-08-28 15:49:49Z pleblanc $
+// $Id: columncommand-jl.cpp 9210 2013-01-21 14:10:42Z rdempsey $
 // C++ Implementation: columncommand
 //
 // Description: 
@@ -277,64 +277,41 @@ void ColumnCommandJL::runCommand(ByteStream &bs) const
 
 void ColumnCommandJL::setLBID(uint64_t rid, uint dbRoot)
 {
-	uint64_t l_rid, fbo;
+	uint32_t partNum;
+	uint16_t segNum;
+	uint8_t extentNum;
+	uint16_t blockNum;
+	uint colWidth;
+	uint i;
 
-	if (isScan) {
-		lbid = rid;   	//it's not a rid here need to convert it to a rid
-		fbo = getFBO(lbid);
-		l_rid = fbo << rpbShift;
-		bpp->setLBIDForScan(l_rid, dbRoot);
+	idbassert(extents.size() > 0);
+	colWidth = extents[0].colWid;
+	rowgroup::getLocationFromRid(rid, &partNum, &segNum, &extentNum, &blockNum);
+
+	for (i = 0; i < extents.size(); i++) {
+		if (extents[i].dbRoot == dbRoot &&
+		  extents[i].partitionNum == partNum &&
+		  extents[i].segmentNum == segNum &&
+		  extents[i].blockOffset == (extentNum * colWidth * 1024)) {
+
+			lbid = extents[i].range.start + (blockNum * colWidth);
+
+			/*
+			ostringstream os;
+			os << "CCJL: rid=" << rid << "; dbroot=" << dbRoot << "; partitionNum=" << partNum
+				<< "; segmentNum=" << segNum <<	"; extentNum = " << (int) extentNum <<
+				"; blockNum = " << blockNum << "; OID=" << OID << " LBID=" << lbid;
+			cout << os.str() << endl;
+			*/
+			return;
+		}
 	}
-	else {
-		uint extentIndex = 0;
-		uint extentOffset = 0;
-		fbo = (rid >> 13);	// a logical block FBO
-		fbo <<= (13-rpbShift);   // convert to a real FBO rounding down to a logical block boundary
-		extentOffset = fbo & modMask;
+	throw logic_error("ColumnCommandJL: setLBID didn't find the extent for the rid.");
 
-		// @Bug 2889.  Changed logic to find the extentIndex for the drop partition enhancement.  The passed in RID is 
-		// now relative to partition 0 and one or more partitions may have been dropped.  Find the extent in the extents
-		// array rather than doing the math directly off of the fbo. 
-		// extentIndex = fbo >> divShift;
-
-		// partitionNum = "RID / rows per partition"
-		uint64_t partitionNum = rid / ( fFilesPerColumnPartition * fExtentsPerSegmentFile * fExtentRows );
-
-		// segmentNum = (RID % rows per partition) / rows per extent) % files per partition
-		//            = (extent # within its partition) % files per partition
-		uint64_t segmentNum =
-			(((rid % (fFilesPerColumnPartition * fExtentsPerSegmentFile * fExtentRows)) / fExtentRows))
-			% fFilesPerColumnPartition;
-
-		// stripeWithinPartition = (RID - rows up to the partition before this one) / ??
-		uint64_t stripeWithinPartition = 
-			(rid - (partitionNum * fExtentsPerSegmentFile * fFilesPerColumnPartition * fExtentRows)) /
-                        (fFilesPerColumnPartition * fExtentRows);
-		uint64_t blockOffset = stripeWithinPartition * colType.colWidth * 1024;
-		
-		bool found = false;
-
-		for(uint i = 0; i < extents.size(); i++)
-		{
-			if(extents[i].dbRoot == dbRoot && (extents[i].partitionNum == partitionNum) &&
-					(extents[i].segmentNum == segmentNum) && (extents[i].blockOffset == blockOffset))
-			{
-				found = true;
-				extentIndex = i;	
-			}
-		}
-		if(!found)
-		{
-			 throw logic_error("ColumnCommandJL: setLBID didn't find the extent for the rid.");
-		}
-
-		// Calculate the lbid.
-		lbid = extents[extentIndex].range.start + extentOffset;
 //		ostringstream os;
 //		os << "CCJL: rid=" << rid << "; dbroot=" << dbRoot << "; partitionNum=" << partitionNum << "; segmentNum=" << segmentNum << "; stripeWithinPartition=" <<
 //			stripeWithinPartition << "; OID=" << OID << " LBID=" << lbid;
 //		BRM::log(os.str());
-	}
 }
 
 inline uint32_t ColumnCommandJL::getFBO(uint64_t lbid)
@@ -387,7 +364,7 @@ string ColumnCommandJL::toString()
 		ret << " (scan)";
 	if (isDict())
 		ret << " (tokens)";
-	else if (isCharType())
+	else if (execplan::isCharType(colType.colDataType))
 		ret << " (is char)";
 	return ret.str();
 }
@@ -395,12 +372,6 @@ string ColumnCommandJL::toString()
 uint16_t ColumnCommandJL::getWidth()
 {
 	return colType.colWidth;
-}
-
-bool ColumnCommandJL::isCharType() const
-{
-	return (colType.colDataType == execplan::CalpontSystemCatalog::CHAR ||
-	  colType.colDataType == execplan::CalpontSystemCatalog::VARCHAR);
 }
 
 void ColumnCommandJL::reloadExtents()

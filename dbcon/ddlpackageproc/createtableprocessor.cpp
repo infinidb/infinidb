@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//   $Id: createtableprocessor.cpp 9066 2012-11-13 21:37:23Z chao $
+//   $Id: createtableprocessor.cpp 9598 2013-06-04 21:43:07Z dhill $
 
 #define DDLPKGCREATETABLEPROC_DLLEXPORT
 #include "createtableprocessor.h"
@@ -52,7 +52,7 @@ CreateTableProcessor::DDLResult CreateTableProcessor::processPackage(
 	txnID.valid= fTxnid.valid;
 	result.result = NO_ERROR;
 	int rc1 = 0;
-	rc1 = fDbrm.isReadWrite();
+	rc1 = fDbrm->isReadWrite();
 	if (rc1 != 0 )
 	{
 		logging::Message::Args args;
@@ -193,7 +193,34 @@ keepGoing:
 	OamCache * oamcache = OamCache::makeOamCache();
 	string errorMsg;
 	//get a unique number
-	uint64_t uniqueId = fDbrm.getUnique64();
+	uint64_t uniqueId = 0;
+	//Bug 5070. Added exception handling
+	try {
+		uniqueId = fDbrm->getUnique64();
+	}
+	catch (std::exception& ex)
+	{
+		logging::Message::Args args;
+		logging::Message message(9);
+		args.add(ex.what());
+		message.format(args);
+		result.result = CREATE_ERROR;	
+		result.message = message;
+		fSessionManager.rolledback(txnID);
+		return result;
+	}
+	catch ( ... )
+	{
+		logging::Message::Args args;
+		logging::Message message(9);
+		args.add("Unknown error occured while getting unique number.");
+		message.format(args);
+		result.result = CREATE_ERROR;	
+		result.message = message;
+		fSessionManager.rolledback(txnID);
+		return result;
+	}
+	
 	fWEClient->addQueue(uniqueId);
 	try
 	{
@@ -224,6 +251,7 @@ cout << "Create table allocOIDs got the stating oid " << fStartingColOID << endl
 			logging::Message message(9);
 			args.add("Create table failed due to ");
 			args.add(errorMsg);
+			message.format(args);
 			result.message = message;
 			fSessionManager.rolledback(txnID);
 			return result;
@@ -256,7 +284,7 @@ cout << "Create table allocOIDs got the stating oid " << fStartingColOID << endl
 		u_int16_t  dbRoot;
 		BRM::OID_t sysOid = 1001;
 		//Find out where systable is
-		rc = fDbrm.getSysCatDBRoot(sysOid, dbRoot); 
+		rc = fDbrm->getSysCatDBRoot(sysOid, dbRoot); 
 		if (rc != 0)
 		{
 			result.result =(ResultCode) rc;
@@ -264,6 +292,7 @@ cout << "Create table allocOIDs got the stating oid " << fStartingColOID << endl
 			logging::Message message(9);
 			args.add("Error while calling getSysCatDBRoot ");
 			args.add(errorMsg);
+			message.format(args);
 			result.message = message;
 			//release transaction
 			fSessionManager.rolledback(txnID);
@@ -363,8 +392,9 @@ cout << "create table got unknown exception" << endl;
 		{
 			colDefPtr = *iter;
 
-			int dataType1 = convertDataType(colDefPtr->fType->fType);
-			if (dataType1 == CalpontSystemCatalog::DECIMAL)
+			CalpontSystemCatalog::ColDataType dataType = convertDataType(colDefPtr->fType->fType);
+			if (dataType == CalpontSystemCatalog::DECIMAL ||
+                dataType == CalpontSystemCatalog::UDECIMAL)
 			{
 				if (colDefPtr->fType->fPrecision == -1 || colDefPtr->fType->fPrecision == 0)
 				{
@@ -388,7 +418,6 @@ cout << "create table got unknown exception" << endl;
 					colDefPtr->fType->fLength = 8;
 				}	
 			}
-			WriteEngine::ColDataType dataType = static_cast<WriteEngine::ColDataType>(dataType1);
 			bytestream << (fStartingColOID + (colNum++) + 1);
 			bytestream << (u_int8_t) dataType;
 			bytestream << (u_int8_t) false;
@@ -396,9 +425,9 @@ cout << "create table got unknown exception" << endl;
 			bytestream << (uint32_t) colDefPtr->fType->fLength;
 			bytestream << (u_int16_t) useDBRoot;
 			bytestream << (uint32_t) colDefPtr->fType->fCompressiontype;
-			if ( (dataType == WriteEngine::CHAR && colDefPtr->fType->fLength > 8) ||
-				 (dataType == WriteEngine::VARCHAR && colDefPtr->fType->fLength > 7) ||
-				 (dataType == WriteEngine::VARBINARY && colDefPtr->fType->fLength > 7) )
+			if ( (dataType == CalpontSystemCatalog::CHAR && colDefPtr->fType->fLength > 8) ||
+				 (dataType == CalpontSystemCatalog::VARCHAR && colDefPtr->fType->fLength > 7) ||
+				 (dataType == CalpontSystemCatalog::VARBINARY && colDefPtr->fType->fLength > 7) )
 			{
 				bytestream << (uint32_t) (fStartingColOID+numColumns+(dictNum++)+1);
 				bytestream << (u_int8_t) dataType;

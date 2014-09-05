@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_mod.cpp 3048 2012-04-04 15:33:45Z rdempsey $
+* $Id: func_mod.cpp 3616 2013-03-04 14:56:29Z rdempsey $
 *
 *
 ****************************************************************************/
@@ -71,10 +71,10 @@ IDB_Decimal Func_mod::getDecimalVal(Row& row,
 	}
 
 	IDB_Decimal d = parm[0]->data()->getDecimalVal(row, isNull);
-	int64_t value = d.value / power(d.scale);
-	int lefto = d.value % power(d.scale);
+	int64_t value = d.value / helpers::power(d.scale);
+	int lefto = d.value % helpers::power(d.scale);
 
-	int64_t mod = (value % div) * power(d.scale) + lefto;
+	int64_t mod = (value % div) * helpers::power(d.scale) + lefto;
 
 	retValue.value = mod;
 	retValue.scale = d.scale;
@@ -116,7 +116,21 @@ double Func_mod::getDoubleVal(Row& row,
 		}
 		break;
 
-		case execplan::CalpontSystemCatalog::DOUBLE:
+        case execplan::CalpontSystemCatalog::UBIGINT:
+        case execplan::CalpontSystemCatalog::UINT:
+        case execplan::CalpontSystemCatalog::UMEDINT:
+        case execplan::CalpontSystemCatalog::UTINYINT:
+        case execplan::CalpontSystemCatalog::USMALLINT:
+        {
+            uint64_t udiv = parm[1]->data()->getIntVal(row, isNull);
+            uint64_t uvalue = parm[0]->data()->getUintVal(row, isNull);
+
+            mod = uvalue % udiv;
+        }
+        break;
+
+        case execplan::CalpontSystemCatalog::DOUBLE:
+        case execplan::CalpontSystemCatalog::UDOUBLE:
 		{
 			double value = parm[0]->data()->getDoubleVal(row, isNull);
 
@@ -125,6 +139,7 @@ double Func_mod::getDoubleVal(Row& row,
 		break;
 
 		case execplan::CalpontSystemCatalog::FLOAT:
+        case execplan::CalpontSystemCatalog::UFLOAT:
 		{
 			float value = parm[0]->data()->getFloatVal(row, isNull);
 
@@ -133,9 +148,10 @@ double Func_mod::getDoubleVal(Row& row,
 		break;
 
 		case execplan::CalpontSystemCatalog::DECIMAL:
+        case execplan::CalpontSystemCatalog::UDECIMAL:
 		{
 			IDB_Decimal d = parm[0]->data()->getDecimalVal(row, isNull);
-			int64_t value = d.value / power(d.scale);
+			int64_t value = d.value / helpers::power(d.scale);
 
 			mod = value % div;
 		}

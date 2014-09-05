@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_bulkload.h 4250 2012-10-12 17:57:53Z dcathey $
+* $Id: we_bulkload.h 4489 2013-01-30 18:47:53Z dcathey $
 *
 *******************************************************************************/
 /** @file */
@@ -108,7 +108,7 @@ public:
     *  @param columnOID  oid of autoincrement column to be updated
     *  @param nextValue next autoincrement value to assign to tableOID
     */
-    static int          updateNextValue(OID columnOID, long long nextValue);
+    static int          updateNextValue(OID columnOID, uint64_t nextValue);
 
     // Accessors and mutators
     void                addToCmdLineImportFileList(const std::string& importFile);
@@ -122,6 +122,7 @@ public:
 
     EXPORT int          setAlternateImportDir( const std::string& loadDir,
                                                std::string& errMsg);
+    void                setImportDataMode    ( ImportDataMode importMode );
     void                setColDelimiter      ( char delim );
     void                setBulkLoadMode      ( BulkModeType bulkMode,
                                                const std::string& rptFileName );
@@ -145,6 +146,8 @@ public:
     void                stopTimer            ( );
     double              getTotalRunTime      ( ) const;
 
+	// Add error message into appropriate BRM updater 
+	static bool 		addErrorMsg2BrmUpdater(const std::string& tablename, const std::ostringstream& oss);
 private:
 
     //--------------------------------------------------------------------------
@@ -168,7 +171,7 @@ private:
     long long   fMaxErrors;                // Max allowable errors per job
     std::string fAlternateImportDir;       // Alternate bulk import directory
     std::string fProcessName;              // Application process name
-    boost::ptr_vector<TableInfo> fTableInfo;// Vector of Table information
+    static boost::ptr_vector<TableInfo> fTableInfo;// Vector of Table information
     int         fNoOfParseThreads;         // Number of parse threads
     int         fNoOfReadThreads;          // Number of read threads
     boost::thread_group fReadThreads;      // Read thread group
@@ -189,6 +192,7 @@ private:
     BulkModeType fBulkMode;                // Distributed bulk mode (1,2, or 3)
     std::string fBRMRptFileName;           // Name of distributed mode rpt file
     bool        fbTruncationAsError;       // Treat string truncation as error
+    ImportDataMode fImportDataMode;        // Importing text or binary data
     bool        fbContinue;                // true when read and parse r running
                                            //
     static boost::mutex*       fDDLMutex;  // Insure only 1 DDL op at a time
@@ -322,6 +326,9 @@ inline void BulkLoad::setEnclosedByChar( char enChar ) {
 
 inline void BulkLoad::setEscapeChar( char esChar ) {
     fEscapeChar     = esChar; }
+
+inline void BulkLoad::setImportDataMode(ImportDataMode importMode) {
+    fImportDataMode = importMode; }
 
 inline void BulkLoad::setKeepRbMetaFiles( bool keepMeta ) {
     fKeepRbMetaFiles = keepMeta; }

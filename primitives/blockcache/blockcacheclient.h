@@ -17,7 +17,7 @@
 
 /***************************************************************************
  *
- *   $Id: blockcacheclient.h 2046 2013-01-31 19:13:16Z pleblanc $
+ *   $Id: blockcacheclient.h 2055 2013-02-08 19:09:09Z pleblanc $
  *
  *                                                                         *
  ***************************************************************************/
@@ -58,13 +58,13 @@ public:
 	/**
 	 * @brief verify that the Disk Block for the LBID lbid, ver are loaded into the Cache.
 	 **/
-	inline void check(BRM::LBID_t lbid, BRM::VER_t ver, BRM::VER_t txn, bool flg, int compType, bool& wasBlockInCache) {
+	inline void check(BRM::LBID_t lbid, const BRM::QueryContext &ver, BRM::VER_t txn, bool flg, int compType, bool& wasBlockInCache) {
 		fBCCBrp->check(lbid, ver, txn, flg, compType, wasBlockInCache); }
 
 	/**
 	 * @brief verify all Disk Blocks for the LBID range are loaded into the Cache
 	 **/
-	inline void check(const BRM::InlineLBIDRange& range, const BRM::VER_t ver, const BRM::VER_t txn, const int compType,
+	inline void check(const BRM::InlineLBIDRange& range, const BRM::QueryContext &ver, const BRM::VER_t txn, const int compType,
 		uint32_t& rCount) {
 		fBCCBrp->check(range, ver, txn, compType, rCount); }
 
@@ -82,14 +82,8 @@ public:
 	 **/
 	inline const int read(const BRM::LBID_t& lbid, const BRM::VER_t& ver, void* bufferPtr) {
 		return fBCCBrp->read(lbid, ver, bufferPtr); }
-
-	/**
-	 * @brief retrieve all disk Blocks in the LBIDRange range and insert them into fbList
-	 **/
-	inline const int read(const BRM::InlineLBIDRange& range, FileBufferList_t& fbList, const BRM::VER_t ver) {
-		return fBCCBrp->read(range, fbList, ver); }
 	
-	inline const int getBlock(const BRM::LBID_t& lbid, const BRM::VER_t& ver, const BRM::VER_t txn, const int compType,
+	inline const int getBlock(const BRM::LBID_t& lbid, const BRM::QueryContext &ver, const BRM::VER_t txn, const int compType,
 		void* bufferPtr, bool flg, bool &wasCached, bool *wasVersioned = NULL, bool insertIntoCache = true,
 		bool readFromCache = true) {
 		return fBCCBrp->getBlock(lbid, ver, txn, compType, bufferPtr, flg, wasCached, wasVersioned, insertIntoCache,

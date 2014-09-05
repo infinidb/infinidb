@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: we_chunkmanager.h 4395 2012-12-13 21:10:31Z chao $
+//  $Id: we_chunkmanager.h 4450 2013-01-21 14:13:24Z rdempsey $
 
 
 /** @file */
@@ -65,9 +65,10 @@ class FileOp;
 
 const int UNCOMPRESSED_CHUNK_SIZE = compress::IDBCompressInterface::UNCOMPRESSED_INBUF_LEN;
 const int COMPRESSED_FILE_HEADER_UNIT = compress::IDBCompressInterface::HDR_BUF_LEN;
+
 // assume UNCOMPRESSED_CHUNK_SIZE > 0xBFFF (49151), 8 * 1024 bytes padding
-const int COMPRESS_OVERHEADER = (UNCOMPRESSED_CHUNK_SIZE / 6) + (64 + 3) + (8 * 1024) + 9;
-const int COMPRESSED_CHUNK_SIZE = UNCOMPRESSED_CHUNK_SIZE + COMPRESS_OVERHEADER;
+const int COMPRESSED_CHUNK_SIZE = compress::IDBCompressInterface::maxCompressedSize(UNCOMPRESSED_CHUNK_SIZE) + 64+3 + 8*1024;
+
 const int BLOCKS_IN_CHUNK = UNCOMPRESSED_CHUNK_SIZE / BYTE_PER_BLOCK;
 const int MAXOFFSET_PER_CHUNK = 511*BYTE_PER_BLOCK;
 
@@ -126,7 +127,7 @@ struct FileID
 class CompFileData
 {
 public:
-    CompFileData(const FileID& id, const FID& fid, const ColDataType& colDataType, int colWidth) :
+    CompFileData(const FileID& id, const FID& fid, const execplan::CalpontSystemCatalog::ColDataType colDataType, int colWidth) :
        fFileID(id), fFid(fid), fColDataType(colDataType), fColWidth(colWidth), fDctnryCol(false),
        fFilePtr(NULL), fIoBSize(0) {}
 
@@ -135,7 +136,7 @@ public:
 protected:
     FileID          fFileID;
     FID             fFid;
-    ColDataType     fColDataType;
+    execplan::CalpontSystemCatalog::ColDataType fColDataType;
     int             fColWidth;
     bool            fDctnryCol;
     FILE*           fFilePtr;
@@ -191,11 +192,11 @@ public:
 
     // @brief Read a block from pFile at offset fbo.
     //        The data may copied from memory if the chunk it belongs to is already available.
-    int  readBlock(FILE* pFile, unsigned char* readBuf, i64 fbo);
+    int  readBlock(FILE* pFile, unsigned char* readBuf, uint64_t fbo);
 
     // @brief Save a block to a chunk in pFile.
     //        The block is not written to disk immediately, will be delayed until flush.
-    int  saveBlock(FILE* pFile, const unsigned char* writeBuf, i64 fbo);
+    int  saveBlock(FILE* pFile, const unsigned char* writeBuf, uint64_t fbo);
 
     // @brief Write all active chunks to disk, and reset all repository.
     EXPORT int  flushChunks(int rc, const std::map<FID, FID> & columOids);
@@ -204,7 +205,7 @@ public:
     void cleanUp(const std::map<FID, FID> & columOids);
 
     // @brief Expand an initial column, not dictionary, extent to a full extent.
-    int expandAbbrevColumnExtent(FILE* pFile, i64 emptyVal, int width);
+    int expandAbbrevColumnExtent(FILE* pFile, uint64_t emptyVal, int width);
 
     // @brief Update column extent
     int updateColumnExtent(FILE* pFile, int addBlockCount);
@@ -214,11 +215,11 @@ public:
 
     // @brief Read in n continuous blocks to read buffer.
     //        for backing up blocks to version buffer
-    int readBlocks(FILE* pFile, unsigned char* readBuf, i64 fbo, size_t n);
+    int readBlocks(FILE* pFile, unsigned char* readBuf, uint64_t fbo, size_t n);
 
     // @brief Restore the data block at offset fbo from version buffer
     //        for rollback
-    int restoreBlock(FILE* pFile, const unsigned char* writeBuf, i64 fbo);
+    int restoreBlock(FILE* pFile, const unsigned char* writeBuf, uint64_t fbo);
 
     // @brief Retrieve the total block count of a DB file.
     int getBlockCount(FILE* pFile);
@@ -249,7 +250,7 @@ protected:
                     std::string& filename,
                     const char* mode,
                     int size,
-                    const ColDataType& colDataType,
+                    const execplan::CalpontSystemCatalog::ColDataType colDataType,
                     int colWidth,
                     bool dictnry = false) const;
 

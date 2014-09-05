@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
-* $Id: cleartablelock.cpp 1872 2012-08-01 16:58:23Z dhall $
+* $Id: cleartablelock.cpp 2101 2013-01-21 14:12:52Z rdempsey $
 */
 
 #include <cstdlib>
@@ -220,7 +220,6 @@ int createMsgQueClts(
 		// Send bulk rollback request to each specified PM.
 		for (unsigned k=0; k<pmList.size(); k++)
 		{
-			std::ostringstream weServerName;
 			weServerName << "pm" << pmList[k] << "_WriteEngineServer";
 //			std::cout << "Connecting to " << weServerName.str() << " on " <<
 //				devName << std::endl;

@@ -97,6 +97,7 @@ arithmeticoperator.h \
 logicoperator.h \
 predicateoperator.h \
 simplecolumn_int.h \
+simplecolumn_uint.h \
 simplecolumn_decimal.h
 
 test:

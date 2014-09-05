@@ -41,6 +41,7 @@ namespace ddlpackageprocessor
     class RestorePartitionProcessor : public DDLPackageProcessor
     {
         public:
+			RestorePartitionProcessor(BRM::DBRM* aDbrm) : DDLPackageProcessor(aDbrm){}
             /** @brief process a drop table statement
              *
              *  @param dropTableStmt the drop table statement

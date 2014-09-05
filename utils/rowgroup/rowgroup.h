@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: rowgroup.h 3238 2012-08-16 13:34:36Z bwilkinson $
+//  $Id: rowgroup.h 3845 2013-05-31 21:08:53Z rdempsey $
 
 //
 // C++ Interface: rowgroup
@@ -102,12 +102,13 @@ class Row
 		inline uint getOffset(uint colIndex) const;
 		inline uint getScale(uint colIndex) const;
 		inline uint getPrecision(uint colIndex) const;
-		inline execplan::CalpontSystemCatalog::ColDataType getColType(uint colIndex);
+		inline execplan::CalpontSystemCatalog::ColDataType getColType(uint colIndex) const;
 		inline execplan::CalpontSystemCatalog::ColDataType* getColTypes();
 		inline const execplan::CalpontSystemCatalog::ColDataType* getColTypes() const;
 
 		// this returns true if the type is not CHAR or VARCHAR
-		inline bool isNumeric(uint colIndex) const;
+		inline bool isCharType(uint colIndex) const;
+        inline bool isUnsigned(uint colIndex) const;
 		inline bool isShortString(uint colIndex) const;
 		inline bool isLongString(uint colIndex) const;
 
@@ -123,14 +124,20 @@ class Row
 		inline double getDecimalField(uint colIndex) const {return 0.0;} // TODO: Do something here
 		inline long double getLongDoubleField(uint colIndex) const;
 
+		inline uint64_t getBaseRid() const;
 		inline uint64_t getRid() const;
+		inline uint16_t getRelRid() const;   // returns a rid relative to this logical block
+		inline uint64_t getExtentRelativeRid() const;   // returns a rid relative to the extent it's in
+		inline uint64_t getFileRelativeRid() const; // returns a file-relative rid
+		inline void getLocation(uint32_t *partNum, uint16_t *segNum, uint8_t *extentNum,
+				uint16_t *blockNum, uint16_t *rowNum);
 
 		template<int len> void setUintField(uint64_t val, uint colIndex);
 
 		/* Note: these 2 fcns avoid 1 array lookup per call.  Using them only
 		in projection on the PM resulted in a 2.8% performance gain on
 		the queries listed in bug 2223.
-		TODO: apply them everywhere else possible, and write equivalants
+		TODO: apply them everywhere else possible, and write equivalents
 		for the other types as well as the getters.
 		*/
 		template<int len> void setUintField_offset(uint64_t val, uint offset);
@@ -177,6 +184,7 @@ class Row
 		inline void copyField(uint8_t* destAddr, uint srcIndex) const;
 
 		std::string toString() const;
+		std::string toCSV() const;
 
 		/* These fcns are used only in joins.  The RID doesn't matter on the side that
 		gets hashed.  We steal that field here to "mark" a row. */
@@ -227,7 +235,7 @@ inline uint Row::getPrecision(uint col) const
 	return precision[col];
 }
 
-inline execplan::CalpontSystemCatalog::ColDataType Row::getColType(uint colIndex)
+inline execplan::CalpontSystemCatalog::ColDataType Row::getColType(uint colIndex) const
 {
 	return types[colIndex];
 }
@@ -242,20 +250,24 @@ inline const execplan::CalpontSystemCatalog::ColDataType* Row::getColTypes() con
 	return types;
 }
 
-inline bool Row::isNumeric(uint colIndex) const
+inline bool Row::isCharType(uint colIndex) const
 {
-	return (!(types[colIndex] == execplan::CalpontSystemCatalog::VARCHAR ||
-	  types[colIndex] == execplan::CalpontSystemCatalog::CHAR));
+    return execplan::isCharType(types[colIndex]);
+}
+
+inline bool Row::isUnsigned(uint colIndex) const
+{
+    return execplan::isUnsigned(types[colIndex]);
 }
 
 inline bool Row::isShortString(uint colIndex) const
 {
-	return (getColumnWidth(colIndex) <= 8 && !isNumeric(colIndex));
+	return (getColumnWidth(colIndex) <= 8 && isCharType(colIndex));
 }
 
 inline bool Row::isLongString(uint colIndex) const
 {
-	return (getColumnWidth(colIndex) > 8 && !isNumeric(colIndex));
+	return (getColumnWidth(colIndex) > 8 && isCharType(colIndex));
 }
 
 template<int len>
@@ -379,6 +391,16 @@ inline long double Row::getLongDoubleField(uint colIndex) const
 inline uint64_t Row::getRid() const
 {
 	return baseRid + *((uint16_t *) data);
+}
+
+inline uint16_t Row::getRelRid() const
+{
+	return *((uint16_t *) data);
+}
+
+inline uint64_t Row::getBaseRid() const
+{
+	return baseRid;
 }
 
 inline void Row::markRow()
@@ -623,11 +645,13 @@ public:
 	const std::vector<uint> & getOffsets() const;
 	const std::vector<uint> & getOIDs() const;
 	const std::vector<uint> & getKeys() const;
+    inline execplan::CalpontSystemCatalog::ColDataType getColType(uint colIndex) const;
 	const std::vector<execplan::CalpontSystemCatalog::ColDataType>& getColTypes() const;
 	std::vector<execplan::CalpontSystemCatalog::ColDataType>& getColTypes();
 
 	// this returns true if the type is not CHAR or VARCHAR
-	inline bool isNumeric(uint colIndex) const;
+	inline bool isCharType(uint colIndex) const;
+    inline bool isUnsigned(uint colIndex) const;
 	inline bool isShortString(uint colIndex) const;
 	inline bool isLongString(uint colIndex) const;
 
@@ -650,6 +674,11 @@ public:
 	
 	void addToSysDataList(execplan::CalpontSystemCatalog::NJLSysDataList& sysDataList);
 
+	/* Base RIDs are now a combination of partition#, segment#, extent#, and block#. */
+	inline void setBaseRid(const uint32_t &partNum, const uint16_t &segNum,
+			const uint8_t &extentNum, const uint16_t &blockNum);
+	inline void getLocation(uint32_t *partNum, uint16_t *segNum, uint8_t *extentNum,
+			uint16_t *blockNum);
 
 private:
 	uint columnCount;
@@ -674,6 +703,11 @@ private:
 	static const uint statusOffset = 12;
 	static const uint dbRootOffset = 14;
 };
+
+inline uint64_t convertToRid(const uint32_t &partNum, const uint16_t &segNum,
+		const uint8_t &extentNum, const uint16_t &blockNum);
+inline void getLocationFromRid(uint64_t rid, uint32_t *partNum,
+		uint16_t *segNum, uint8_t *extentNum, uint16_t *blockNum);
 
 /** operator+
 *
@@ -751,21 +785,101 @@ inline uint RowGroup::getRowSize() const
 	return offsets[columnCount];
 }
 
-inline bool RowGroup::isNumeric(uint colIndex) const
+inline bool RowGroup::isCharType(uint colIndex) const
 {
-	return (!(types[colIndex] == execplan::CalpontSystemCatalog::VARCHAR ||
-	  types[colIndex] == execplan::CalpontSystemCatalog::CHAR));
+    return execplan::isCharType(types[colIndex]);
+}
+
+inline bool RowGroup::isUnsigned(uint colIndex) const
+{
+    return execplan::isUnsigned(types[colIndex]);
 }
 
 inline bool RowGroup::isShortString(uint colIndex) const
 {
-	return (getColumnWidth(colIndex) <= 8 && !isNumeric(colIndex));
+	return (getColumnWidth(colIndex) <= 8 && isCharType(colIndex));
 }
 
 inline bool RowGroup::isLongString(uint colIndex) const
 {
-	return (getColumnWidth(colIndex) > 8 && !isNumeric(colIndex));
+	return (getColumnWidth(colIndex) > 8 && isCharType(colIndex));
 }
+
+inline execplan::CalpontSystemCatalog::ColDataType RowGroup::getColType(uint colIndex) const
+{
+	return types[colIndex];
+}
+
+inline const std::vector<execplan::CalpontSystemCatalog::ColDataType>& RowGroup::getColTypes() const
+{
+	return types;
+}
+
+inline std::vector<execplan::CalpontSystemCatalog::ColDataType>& RowGroup::getColTypes()
+{
+	return types;
+}
+
+
+// These type defs look stupid at first, yes.  I want to see compiler errors
+// if/when we change the widths of these parms b/c this fcn will have to be
+// reevaluated.
+inline uint64_t convertToRid(const uint32_t &partitionNum,
+		const uint16_t &segmentNum, const uint8_t &exNum, const uint16_t &blNum)
+{
+	uint64_t partNum = partitionNum, segNum = segmentNum, extentNum = exNum,
+			blockNum = blNum;
+
+	// extentNum gets trunc'd to 6 bits, blockNums to 10 bits
+	extentNum &= 0x3f;
+	blockNum &= 0x3ff;
+
+	return (partNum << 32) | (segNum << 16) | (extentNum << 10) | blockNum;
+}
+
+inline void RowGroup::setBaseRid(const uint32_t &partNum, const uint16_t &segNum,
+		const uint8_t &extentNum, const uint16_t &blockNum)
+{
+	*((uint64_t *) &data[baseRidOffset]) = convertToRid(partNum, segNum,
+			extentNum, blockNum);
+}
+
+inline void getLocationFromRid(uint64_t rid, uint32_t *partNum,
+		uint16_t *segNum, uint8_t *extentNum, uint16_t *blockNum)
+{
+	if (partNum) *partNum = rid >> 32;
+	if (segNum) *segNum = rid >> 16;
+	if (extentNum) *extentNum = (rid >> 10) & 0x3f;
+	if (blockNum) *blockNum = rid & 0x3ff;
+}
+
+inline void RowGroup::getLocation(uint32_t *partNum, uint16_t *segNum,
+		uint8_t *extentNum, uint16_t *blockNum)
+{
+	getLocationFromRid(getBaseRid(), partNum, segNum, extentNum, blockNum);
+}
+
+inline uint64_t Row::getExtentRelativeRid() const
+{
+	uint64_t blockNum = baseRid & 0x3ff;
+	return (blockNum << 13) | (getRelRid() & 0x1fff);
+}
+
+inline uint64_t Row::getFileRelativeRid() const
+{
+	uint64_t extentNum = (baseRid >> 10) & 0x3f;
+	uint64_t blockNum = baseRid & 0x3ff;
+	return (extentNum << 23) | (blockNum << 13) | (getRelRid() & 0x1fff);
+}
+
+inline void Row::getLocation(uint32_t *partNum, uint16_t *segNum, uint8_t *extentNum,
+				uint16_t *blockNum, uint16_t *rowNum)
+{
+	getLocationFromRid(baseRid, partNum, segNum, extentNum, blockNum);
+	if (rowNum) *rowNum = getRelRid();
+}
+
+
 
 }
 

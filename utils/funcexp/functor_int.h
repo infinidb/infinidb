@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: functor_int.h 3643 2013-03-18 20:42:26Z bpaul $
+//  $Id: functor_int.h 3642 2013-03-18 19:09:53Z bpaul $
 
 /** @file */
 
@@ -272,6 +272,29 @@ public:
 };
 
 
+/** @brief Func_cast_unsigned class
+  */
+class Func_cast_unsigned : public Func_Int
+{
+public:
+	Func_cast_unsigned() : Func_Int("cast_unsigned") {}
+	virtual ~Func_cast_unsigned() {}
+
+	execplan::CalpontSystemCatalog::ColType operationType(FunctionParm& fp, execplan::CalpontSystemCatalog::ColType& resultType);
+
+    int64_t getIntVal(rowgroup::Row& row,
+                        FunctionParm& fp,
+                        bool& isNull,
+                        execplan::CalpontSystemCatalog::ColType& op_ct)
+    { return (int64_t)(getUintVal(row, fp, isNull, op_ct)); }
+
+    uint64_t getUintVal(rowgroup::Row& row,
+						FunctionParm& fp,
+						bool& isNull,
+						execplan::CalpontSystemCatalog::ColType& op_ct);
+};
+
+
 /** @brief Func_bitand class
   */
 class Func_bitand : public Func_Int
@@ -303,6 +326,10 @@ public:
 						FunctionParm& fp,
 						bool& isNull,
 						execplan::CalpontSystemCatalog::ColType& op_ct);
+    uint64_t getUintVal(rowgroup::Row& row,
+                        FunctionParm& fp,
+                        bool& isNull,
+                        execplan::CalpontSystemCatalog::ColType& op_ct);
 };
 
 

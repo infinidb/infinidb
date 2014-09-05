@@ -1,7 +1,7 @@
 
 /*
 
-   Copyright (C) 2009-2012 Calpont Corporation.
+   Copyright (C) 2009-2013 Calpont Corporation.
 
    Use of and access to the Calpont InfiniDB Community software is subject to the
    terms and conditions of the Calpont Open Source License Agreement. Use of and
@@ -54,7 +54,7 @@ using namespace messageqcpp;
 
 /*
  *
-  #CP:   startLBID max min seqnum isChar newExtent
+  #CP:   startLBID max min seqnum type newExtent
   #HWM:  oid partition segment hwm
   #ROWS: numRowsRead numRowsInserted
   #DATA: columnNumber numOutOfRangeValues

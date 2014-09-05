@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: simplecolumn.cpp 8565 2012-05-28 20:48:07Z xlou $
+*   $Id: simplecolumn.cpp 9210 2013-01-21 14:10:42Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -492,6 +492,7 @@ void SimpleColumn::evaluate(Row& row, bool& isNull)
 		//In this case, we're trying to load a double output column with float data. This is the
 		// case when you do sum(floatcol), e.g.
 		case CalpontSystemCatalog::FLOAT:
+        case CalpontSystemCatalog::UFLOAT:
 		{
 			if (row.equals<4>(FLOATNULL, fInputIndex))
 				isNull = true;
@@ -500,6 +501,7 @@ void SimpleColumn::evaluate(Row& row, bool& isNull)
 			break;
 		}
 		case CalpontSystemCatalog::DOUBLE:
+        case CalpontSystemCatalog::UDOUBLE:
 		{
 			if (row.equals<8>(DOUBLENULL, fInputIndex))
 				isNull = true;
@@ -508,54 +510,55 @@ void SimpleColumn::evaluate(Row& row, bool& isNull)
 			break;
 		}
 		case CalpontSystemCatalog::DECIMAL:
+        case CalpontSystemCatalog::UDECIMAL:
 		{
-				switch (fResultType.colWidth)
-				{
-					case 1:
-					{
-						if (row.equals<1>(TINYINTNULL, fInputIndex))
-							isNull = true;
-						else
-						{
-							fResult.decimalVal.value = row.getIntField<1>(fInputIndex);
-							fResult.decimalVal.scale = (unsigned)fResultType.scale;
-						}
-						break;
-					}
-					case 2:
-					{
-						if (row.equals<2>(SMALLINTNULL, fInputIndex))
-							isNull = true;
-						else
-						{
-							fResult.decimalVal.value = row.getIntField<2>(fInputIndex);
-							fResult.decimalVal.scale = (unsigned)fResultType.scale;
-						}
-						break;
-					}
-					case 4:
-					{
-						if (row.equals<4>(INTNULL, fInputIndex))
-							isNull = true;
-						else
-						{
-							fResult.decimalVal.value = row.getIntField<4>(fInputIndex);
-							fResult.decimalVal.scale = (unsigned)fResultType.scale;
-						}
-						break;
-					}
-					default:
-					{
-						if (row.equals<8>(BIGINTNULL, fInputIndex))
-						isNull = true;
-						else
-						{
-							fResult.decimalVal.value = (int64_t)row.getUintField<8>(fInputIndex);
-							fResult.decimalVal.scale = (unsigned)fResultType.scale;
-						}
-						break;
-					}
-				}
+            switch (fResultType.colWidth)
+            {
+                case 1:
+                {
+                    if (row.equals<1>(TINYINTNULL, fInputIndex))
+                        isNull = true;
+                    else
+                    {
+                        fResult.decimalVal.value = row.getIntField<1>(fInputIndex);
+                        fResult.decimalVal.scale = (unsigned)fResultType.scale;
+                    }
+                    break;
+                }
+                case 2:
+                {
+                    if (row.equals<2>(SMALLINTNULL, fInputIndex))
+                        isNull = true;
+                    else
+                    {
+                        fResult.decimalVal.value = row.getIntField<2>(fInputIndex);
+                        fResult.decimalVal.scale = (unsigned)fResultType.scale;
+                    }
+                    break;
+                }
+                case 4:
+                {
+                    if (row.equals<4>(INTNULL, fInputIndex))
+                        isNull = true;
+                    else
+                    {
+                        fResult.decimalVal.value = row.getIntField<4>(fInputIndex);
+                        fResult.decimalVal.scale = (unsigned)fResultType.scale;
+                    }
+                    break;
+                }
+                default:
+                {
+                    if (row.equals<8>(BIGINTNULL, fInputIndex))
+                    isNull = true;
+                    else
+                    {
+                        fResult.decimalVal.value = (int64_t)row.getUintField<8>(fInputIndex);
+                        fResult.decimalVal.scale = (unsigned)fResultType.scale;
+                    }
+                    break;
+                }
+            }
 			break;
 		}
 		case CalpontSystemCatalog::VARBINARY:
@@ -564,6 +567,39 @@ void SimpleColumn::evaluate(Row& row, bool& isNull)
 			else
 				fResult.strVal = row.getVarBinaryStringField(fInputIndex);
 			break;
+        case CalpontSystemCatalog::UBIGINT:
+        {
+            if (row.equals<8>(UBIGINTNULL, fInputIndex))
+                isNull = true;
+            else
+                fResult.uintVal = row.getUintField<8>(fInputIndex);
+            break;
+        }
+        case CalpontSystemCatalog::UINT:
+        case CalpontSystemCatalog::UMEDINT:
+        {
+            if (row.equals<4>(UINTNULL, fInputIndex))
+                isNull = true;
+            else
+                fResult.uintVal = row.getUintField<4>(fInputIndex);
+            break;
+        }
+        case CalpontSystemCatalog::USMALLINT:
+        {
+            if (row.equals<2>(USMALLINTNULL, fInputIndex))
+                isNull = true;
+            else
+                fResult.uintVal = row.getUintField<2>(fInputIndex);
+            break;
+        }
+        case CalpontSystemCatalog::UTINYINT:
+        {
+            if (row.equals<1>(UTINYINTNULL, fInputIndex))
+                isNull = true;
+            else
+                fResult.uintVal = row.getUintField<1>(fInputIndex);
+            break;
+        }
 		default:	// treat as int64
 		{
 			if (row.equals<8>(BIGINTNULL, fInputIndex))

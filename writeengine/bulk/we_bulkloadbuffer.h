@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*********************************************************************
- *   $Id: we_bulkloadbuffer.h 3951 2012-06-19 22:13:37Z dhall $
+ *   $Id: we_bulkloadbuffer.h 4489 2013-01-30 18:47:53Z dcathey $
  *
  ********************************************************************/
 #ifndef _WE_BULKLOADBUFFER_H
@@ -25,11 +25,11 @@
 #include "we_type.h"
 #include "limits"
 #include "string"
-#include "map"
 #include "vector"
 #include "boost/thread/mutex.hpp"
 #include "boost/ptr_container/ptr_vector.hpp"
 #include "we_columninfo.h"
+#include "calpontsystemcatalog.h"
 
 namespace WriteEngine 
 {
@@ -42,10 +42,19 @@ class BLBufferStats
     int64_t minBufferVal;
     int64_t maxBufferVal;
     int64_t satCount;
-    BLBufferStats() :
-        minBufferVal(std::numeric_limits<int64_t>::max()),
-        maxBufferVal(std::numeric_limits<int64_t>::min() + 2),
-        satCount(0) {}
+    BLBufferStats(ColDataType colDataType) : satCount(0)
+    {
+        if (isUnsigned(colDataType))
+        {
+            minBufferVal = static_cast<int64_t>(MAX_UBIGINT);
+            maxBufferVal = static_cast<int64_t>(MIN_UBIGINT);
+        }
+        else
+        {
+            minBufferVal = MAX_BIGINT;
+            maxBufferVal = MIN_BIGINT;
+        }
+    }
 };
 
 class BulkLoadBuffer
@@ -104,7 +113,7 @@ private:
                                         //   to be generated for current buffer
     uint fAutoIncGenCountParser;        // for temporary use by parser
 
-    long long fAutoIncNextValue;        // Next auto-increment value assign to
+    uint64_t fAutoIncNextValue;         // Next auto-increment value assign to
                                         //   a row in this buffer
     unsigned fNumberOfColumns;          // Number of ColumnInfo objs in table
 
@@ -129,6 +138,8 @@ private:
     unsigned int fNumColsInFile;        // Number of flds in input file targeted
                                         //   for db cols (omits default cols)
     bool fbTruncationAsError;           // Treat string truncation as error
+    ImportDataMode fImportDataMode;     // Import data in text or binary mode
+    unsigned int fFixedBinaryRecLen;    // Fixed rec len used in binary mode
 
     //--------------------------------------------------------------------------
     // Private Functions
@@ -160,7 +171,7 @@ private:
     /** @brief Parse a Read buffer for a nonDictionary column
      */
     void parseColLogMinMax(std::ostringstream& oss,
-                           ColType             weType,
+                           ColDataType         colDataType,
                            int64_t             minBufferVal,
                            int64_t             maxBufferVal) const;
 
@@ -192,6 +203,17 @@ private:
      */
     void tokenize(const boost::ptr_vector<ColumnInfo>& columnsInfo,
                   unsigned int allowedErrCntThisCall);
+
+    /** @brief Binary tokenization of the buffer, and fill up the token array.
+     */
+    int tokenizeBinary(const boost::ptr_vector<ColumnInfo>& columnsInfo,
+                  unsigned int allowedErrCntThisCall,
+                  bool bEndOfData);
+
+    /** @brief Determine if specified value is NULL or not.
+     */
+    bool isBinaryFieldNull(void* val, WriteEngine::ColType ct,
+                  execplan::CalpontSystemCatalog::ColDataType dt);
 
 public:
 
@@ -312,6 +334,14 @@ public:
      */
     bool getTruncationAsError() const
     { return fbTruncationAsError; }
+
+    /** @brief Set text vs binary import mode along with corresponding fixed
+     *         record length that is used if the binary mode is set to TRUE.
+     */
+    void setImportDataMode( ImportDataMode importMode,
+        unsigned int fixedBinaryRecLen )
+    { fImportDataMode    = importMode;
+      fFixedBinaryRecLen = fixedBinaryRecLen; }
 };
 
 }

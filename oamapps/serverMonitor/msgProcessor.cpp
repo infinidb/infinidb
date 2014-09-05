@@ -347,10 +347,25 @@ void msgProcessor()
 									ifstream file (fileName.c_str());
 									if (!file)
 									{
-										ackmsg << (ByteStream::byte) API_FILE_OPEN_ERROR;
+										try {
+											LoggingID lid(SERVER_MONITOR_LOG_ID);
+											MessageLog ml(lid);
+											Message msg;
+											Message::Args args;
+											args.add("File open error: ");
+											args.add(fileName);
+											msg.format(args);
+											ml.logErrorMessage(msg);
+										}
+										catch (...)
+										{}
+
+										ackmsg << (ByteStream::byte) oam::API_FILE_OPEN_ERROR;
 										fIos.write(ackmsg);
 										break;
 									}
+
+									ackmsg << (ByteStream::byte) oam::API_SUCCESS;
 
 									// Read the file. Filter out anything we don't care about. Store
 									// each SQL Start statement. When a SQL End statement is found, remove the

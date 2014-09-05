@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: we_colopcompress.cpp 4096 2012-08-07 20:06:09Z dhall $
+//  $Id: we_colopcompress.cpp 4450 2013-01-21 14:13:24Z rdempsey $
 
 
 /** @file */
@@ -86,13 +86,13 @@ int ColumnOpCompress0::blocksInFile(FILE* pFile) const
 }
 
 
-int ColumnOpCompress0::readBlock(FILE* pFile, unsigned char* readBuf, const i64 fbo)
+int ColumnOpCompress0::readBlock(FILE* pFile, unsigned char* readBuf, const uint64_t fbo)
 {
    return readDBFile(pFile, readBuf, fbo, true);
 }
 
 
-int ColumnOpCompress0::saveBlock(FILE* pFile, const unsigned char* writeBuf, const i64 fbo)
+int ColumnOpCompress0::saveBlock(FILE* pFile, const unsigned char* writeBuf, const uint64_t fbo)
 {
    return writeDBFileFbo(pFile, writeBuf, fbo, 1);
 }
@@ -154,13 +154,13 @@ int ColumnOpCompress1::blocksInFile(FILE* pFile) const
 }
 
 
-int ColumnOpCompress1::readBlock(FILE* pFile, unsigned char* readBuf, const i64 fbo)
+int ColumnOpCompress1::readBlock(FILE* pFile, unsigned char* readBuf, const uint64_t fbo)
 {
    return m_chunkManager->readBlock(pFile, readBuf, fbo);
 }
 
 
-int ColumnOpCompress1::saveBlock(FILE* pFile, const unsigned char* writeBuf, const i64 fbo)
+int ColumnOpCompress1::saveBlock(FILE* pFile, const unsigned char* writeBuf, const uint64_t fbo)
 {
    return m_chunkManager->saveBlock(pFile, writeBuf, fbo);
 }
@@ -173,7 +173,7 @@ int ColumnOpCompress1::flushFile(int rc, std::map<FID,FID> & columnOids)
 
 
 int ColumnOpCompress1::expandAbbrevColumnExtent(
-   FILE* pFile, uint16_t dbRoot, i64 emptyVal, int width)
+   FILE* pFile, uint16_t dbRoot, uint64_t emptyVal, int width)
 {
    // update the uncompressed initial chunk to full chunk
    RETURN_ON_ERROR(m_chunkManager->expandAbbrevColumnExtent(pFile, emptyVal, width));

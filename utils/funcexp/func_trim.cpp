@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_trim.cpp 3741 2013-04-25 20:36:44Z bpaul $
+* $Id: func_trim.cpp 3742 2013-04-25 20:38:39Z bpaul $
 *
 *
 ****************************************************************************/
@@ -56,14 +56,13 @@ std::string Func_trim::getStrVal(rowgroup::Row& row,
     // this holds the number of characters (not bytes) in ourtrim tstr.
     size_t trimwclen;
 
-	// The original string
-	string tstr = fp[0]->data()->getStrVal(row, isNull);
+    // The original string
+    string tstr = fp[0]->data()->getStrVal(row, isNull);
 
-	// The trim characters.
-	string trim = (fp.size() > 1 ? fp[1]->data()->getStrVal(row, isNull) : " ");
-    
-	
-	if (isNull)
+    // The trim characters.
+    string trim = (fp.size() > 1 ? fp[1]->data()->getStrVal(row, isNull) : " ");
+
+    if (isNull)
         return "";
     if (tstr.empty() || tstr.length() == 0)
         return tstr;

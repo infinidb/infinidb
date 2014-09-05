@@ -1,6 +1,6 @@
 /*
 
-   Copyright (C) 2009-2012 Calpont Corporation.
+   Copyright (C) 2009-2013 Calpont Corporation.
 
    Use of and access to the Calpont InfiniDB Community software is subject to the
    terms and conditions of the Calpont Open Source License Agreement. Use of and
@@ -51,7 +51,6 @@
 #include "calpontsystemcatalog.h"
 #include "objectidmanager.h"
 #include "sessionmanager.h"
-#include "brmtypes.h"
 #include "ddlpkg.h"
 #include "messageobj.h"
 #include "we_type.h"
@@ -170,9 +169,24 @@ inline boost::any getNullValueForType(const execplan::CalpontSystemCatalog::ColT
 			}
 			break;
 
+		case execplan::CalpontSystemCatalog::UTINYINT:
+			{
+				uint8_t tinyintvalue = joblist::UTINYINTNULL;
+				value = tinyintvalue;
+
+			}
+			break;
+
 		case execplan::CalpontSystemCatalog::SMALLINT:
 			{
 				short smallintvalue = joblist::SMALLINTNULL;
+				value = smallintvalue;
+			}
+			break;
+
+		case execplan::CalpontSystemCatalog::USMALLINT:
+			{
+				uint16_t smallintvalue = joblist::USMALLINTNULL;
 				value = smallintvalue;
 			}
 			break;
@@ -185,6 +199,14 @@ inline boost::any getNullValueForType(const execplan::CalpontSystemCatalog::ColT
 			}
 			break;
 
+		case execplan::CalpontSystemCatalog::UMEDINT:
+		case execplan::CalpontSystemCatalog::UINT:
+			{
+				uint32_t intvalue = joblist::UINTNULL;
+				value = intvalue;
+			}
+			break;
+
 		case execplan::CalpontSystemCatalog::BIGINT:
 			{
 				long long bigint = joblist::BIGINTNULL;
@@ -192,7 +214,15 @@ inline boost::any getNullValueForType(const execplan::CalpontSystemCatalog::ColT
 			}
 			break;
 
-		case execplan::CalpontSystemCatalog::DECIMAL:
+        case execplan::CalpontSystemCatalog::UBIGINT:
+            {
+                uint64_t bigint = joblist::UBIGINTNULL;
+                value = bigint;
+            }
+            break;
+
+        case execplan::CalpontSystemCatalog::DECIMAL:
+		case execplan::CalpontSystemCatalog::UDECIMAL:
 			{
 				if (colType.colWidth <= execplan::CalpontSystemCatalog::FOUR_BYTE)
 				{
@@ -217,6 +247,7 @@ inline boost::any getNullValueForType(const execplan::CalpontSystemCatalog::ColT
 			}
 			break;
 		case execplan::CalpontSystemCatalog::FLOAT:
+		case execplan::CalpontSystemCatalog::UFLOAT:
 			{
 				uint32_t jlfloatnull = joblist::FLOATNULL;
 				float* fp = reinterpret_cast<float*>(&jlfloatnull);
@@ -225,6 +256,7 @@ inline boost::any getNullValueForType(const execplan::CalpontSystemCatalog::ColT
 			break;
 
 		case execplan::CalpontSystemCatalog::DOUBLE:
+		case execplan::CalpontSystemCatalog::UDOUBLE:
 			{
 				uint64_t jldoublenull = joblist::DOUBLENULL;
 				double* dp = reinterpret_cast<double*>(&jldoublenull);
@@ -406,7 +438,36 @@ inline int convertDataType(int dataType)
 			calpontDataType = CalpontSystemCatalog::BLOB;
 			break;
 
-		default:
+        case ddlpackage::DDL_UNSIGNED_TINYINT:
+            calpontDataType = CalpontSystemCatalog::UTINYINT;
+            break;
+
+        case ddlpackage::DDL_UNSIGNED_SMALLINT:
+            calpontDataType = CalpontSystemCatalog::USMALLINT;
+            break;
+
+        case ddlpackage::DDL_UNSIGNED_INT:
+            calpontDataType = CalpontSystemCatalog::UINT;
+            break;
+
+        case ddlpackage::DDL_UNSIGNED_BIGINT:
+            calpontDataType = CalpontSystemCatalog::UBIGINT;
+            break;
+
+        case ddlpackage::DDL_UNSIGNED_DECIMAL:
+        case ddlpackage::DDL_UNSIGNED_NUMERIC:
+            calpontDataType = CalpontSystemCatalog::UDECIMAL;
+            break;
+
+        case ddlpackage::DDL_UNSIGNED_FLOAT:
+            calpontDataType = CalpontSystemCatalog::UFLOAT;
+            break;
+
+        case ddlpackage::DDL_UNSIGNED_DOUBLE:
+            calpontDataType = CalpontSystemCatalog::UDOUBLE;
+            break;
+
+        default:
 			throw runtime_error("Unsupported datatype!");
 
 	}

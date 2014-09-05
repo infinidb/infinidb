@@ -78,7 +78,7 @@ void fe_getnumbertest()
 
 	for (unsigned i = 0; i < sizeof(tests)/sizeof(Check); i++)
 	{
-		int rc1 = getNumbers(tests[i].str,a1,func);
+		int rc1 = helpers::getNumbers(tests[i].str,a1,func);
 
 		cout << "For input \"" << tests[i].str << "\", numbers = " << rc1 << ",[";
 

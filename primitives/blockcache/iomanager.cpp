@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-// $Id: iomanager.cpp 2089 2013-05-06 17:56:34Z pleblanc $
+// $Id: iomanager.cpp 2090 2013-05-06 17:58:10Z pleblanc $
 //
 // C++ Implementation: iomanager
 //
@@ -95,15 +95,6 @@ namespace primitiveprocessor
 {
 extern Logger* mlp;
 extern int directIOFlag;
-#ifdef _MSC_VER
-extern CRITICAL_SECTION preadCSObject;
-#else
-//#define IDB_COMP_USE_CMP_SUFFIX
-//#define IDB_COMP_POC_DEBUG
-#ifdef IDB_COMP_POC_DEBUG
-extern boost::mutex compDebugMutex;
-#endif
-#endif
 }
 
 #include "rwlock_local.h"
@@ -523,6 +514,7 @@ void* thr_popper(ioManager *arg) {
 	BRM::LBID_t lbid=0;
 	BRM::OID_t oid=0;
 	BRM::VER_t ver=0;
+	BRM::QueryContext qc;
 	BRM::VER_t txn=0;
 	int compType = 0;
 	int blocksLoaded=0;
@@ -580,8 +572,8 @@ void* thr_popper(ioManager *arg) {
 #else
 	int fd = -1;
 #endif
-	//usually iom->blocksPerRead = 512, so adding 87 is giving us 117% room for decomp expansion
-	uint32_t readBufferSz=((iom->blocksPerRead+87)*BLOCK_SIZE)+pageSize;
+	uint32_t maxCompSz = IDBCompressInterface::maxCompressedSize(iom->blocksPerRead * BLOCK_SIZE);
+	uint32_t readBufferSz = maxCompSz + pageSize;
 
 	realbuff.reset(new char[readBufferSz]);
 	if (realbuff.get() == 0) {
@@ -616,7 +608,7 @@ void* thr_popper(ioManager *arg) {
 		if (iom->IOTrace())
 			clock_gettime(CLOCK_REALTIME, &rqst1);
 		lbid = fr->Lbid();
-		ver = fr->Ver();
+		qc = fr->Ver();
 		txn = fr->Txn();
 		flg = fr->Flg();
 		inFlg = fr->Flg();
@@ -632,21 +624,21 @@ void* thr_popper(ioManager *arg) {
 		segNum=0;
 		offset=0;
 
-		int rc = 0;
-
  		// special case for getBlock.
 		iom->dbrm()->lockLBIDRange(lbid, blocksRequested);
 		copyLocked = true;
-
-		//cout << "IOM: got request: start=" << lbid << " count=" << blocksRequested << " ver=" << ver << endl;
-
+		
 		// special case for getBlock.
 		if (blocksRequested==1) {
-			rc=iom->dbrm()->vssLookup((BRM::LBID_t)(lbid), ver, txn, flg);
+			BRM::VER_t outVer;
+			iom->dbrm()->vssLookup((BRM::LBID_t) lbid, qc, txn, &outVer, &flg);
+			ver = outVer;
 			fr->versioned(flg);
 		}
-		else
+		else {
 			fr->versioned(false);
+			ver = qc.currentScn;
+		}
 
 		err = iom->localLbidLookup(lbid,
 								ver,
@@ -994,12 +986,12 @@ retryReadHeaders:
 					}
 
 					//FIXME: make sure alignedbuff can hold fdit->second->ptrList[idx].second bytes
-					if (fdit->second->ptrList[idx].second > (iom->blocksPerRead+87)*BLOCK_SIZE)
+					if (fdit->second->ptrList[idx].second > maxCompSz)
 					{
 						errorOccurred = true;
 						errMsg << "aligned buff too small. dataSize="
 							<< fdit->second->ptrList[idx].second
-							<< ", buffSize=" << (iom->blocksPerRead+87)*BLOCK_SIZE;
+							<< ", buffSize=" << maxCompSz;
 						errorString = errMsg.str();
 						break;
 					}
@@ -1112,12 +1104,12 @@ retryReadHeaders:
 					}
 
 					//FIXME: make sure alignedbuff can hold fdit->second->ptrList[idx].second bytes
-					if (fdit->second->ptrList[idx].second > (iom->blocksPerRead+87)*BLOCK_SIZE)
+					if (fdit->second->ptrList[idx].second > maxCompSz)
 					{
 						errorOccurred = true;
 						errMsg << "aligned buff too small. dataSize="
 							<< fdit->second->ptrList[idx].second
-							<< ", buffSize=" << (iom->blocksPerRead+87)*BLOCK_SIZE;
+							<< ", buffSize=" << maxCompSz;
 						errorString = errMsg.str();
 						break;
 					}
@@ -1233,11 +1225,18 @@ cout << "pread1.2(" << fd << ", 0x" << hex << (ptrdiff_t)&alignedbuff[acc] << de
 			/* New bulk VSS lookup code */
 			{
 				vector<BRM::LBID_t> lbids;
-				vector<BRM::VSSData> vssData;
+				vector<BRM::VER_t> versions;
+				vector<bool> isLocked;
 				for (i = 0; (uint) i < blocksThisRead; i++)
 					lbids.push_back((BRM::LBID_t) (lbid + i) + (j * iom->blocksPerRead));
 
-				rc = iom->dbrm()->bulkVSSLookup(lbids, ver, txn, &vssData);
+				if (blocksRequested > 1 || !flg)  // prefetch, or an unversioned single-block read
+					iom->dbrm()->bulkGetCurrentVersion(lbids, &versions, &isLocked);
+				else {   // a single-block read that was versioned
+					versions.push_back(ver);
+					isLocked.push_back(false);
+				}
+
 				uint8_t *ptr = (uint8_t*)&alignedbuff[0];
 				if (blocksThisRead > 0 && fdit->second->isCompressed())
 				{
@@ -1315,10 +1314,8 @@ cout << "pread1.2(" << fd << ", 0x" << hex << (ptrdiff_t)&alignedbuff[acc] << de
 						primitiveprocessor::mlp->logInfoMessage(logging::M0006, args);
 					}
 				}
-				for (i = 0; useCache && (uint) i < vssData.size(); i++) {
-					BRM::VSSData &vd = vssData[i];
-					// if it was a prefetch and a block is marked versioned, don't cache
-					if ((blocksRequested > 1 && !vd.vbFlag) || blocksRequested == 1) {
+				for (i = 0; useCache && (uint) i < lbids.size(); i++) {
+					if (!isLocked[i]) {
 #ifdef IDB_COMP_POC_DEBUG
 {
 	if (debugWrite)
@@ -1349,12 +1346,9 @@ cout << "pread1.2(" << fd << ", 0x" << hex << (ptrdiff_t)&alignedbuff[acc] << de
 	}
 }
 #endif
-						cacheInsertOps.push_back(CacheInsert_t(lbids[i], vd.verID, (uint8_t *)
+						cacheInsertOps.push_back(CacheInsert_t(lbids[i], versions[i], (uint8_t *)
 							  &alignedbuff[i*BLOCK_SIZE]));
 					}
-//					else
-//						cout << "IOM: not inserting " << lbids[i] << "," << vd.verID << " vbflag=" << (int)
-//							vd.vbFlag << endl;
 				}
 				if (useCache) {
 					blocksLoaded += fbm->bulkInsert(cacheInsertOps);

@@ -83,10 +83,8 @@ BatchLoader::BatchLoader ( uint32_t tableOid,
 	4. If all dbroots have same number of extents, starts from the dbroot which has least number of blocks on the last partition.
 */
 //------------------------------------------------------------------------------
-int BatchLoader::selectFirstPM ( uint& PMId, bool& startFromNextPM)
+void BatchLoader::selectFirstPM ( uint& PMId)
 {
-    startFromNextPM = false;
-	int rc = 0;
 	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(fSessionId);
 	//cout << "calling tableName for oid " << fTableOid << endl;
 	CalpontSystemCatalog::TableName aTableName = systemCatalogPtr->tableName(fTableOid);
@@ -98,7 +96,7 @@ int BatchLoader::selectFirstPM ( uint& PMId, bool& startFromNextPM)
 	
 	//Build distVec, start from the PM where the table is created. If not in the PM list, 0 will be used.
 	uint16_t createdDbroot = 0;
-	
+	int rc = 0;
 	std::vector<BRM::EmDbRootHWMInfo_v> allInfo (fPMs.size());
 	for (unsigned i = 0; i < fPMs.size(); i++)
 	{
@@ -116,6 +114,10 @@ int BatchLoader::selectFirstPM ( uint& PMId, bool& startFromNextPM)
 		
 	std::vector<BRM::EMEntry>	entries;
 	uint numDbroot = fDbRoots.size();
+    if (numDbroot == 0)
+    {
+		throw std::runtime_error("There are no dbroots found during selectFirstPM");
+    }
 	int* rootExtents = (int*)alloca((numDbroot + 1) * sizeof(int));	//array of number extents for each dbroot
 	for (unsigned i = 0; i < fDbRoots.size(); i++)
 	{
@@ -177,6 +179,7 @@ int BatchLoader::selectFirstPM ( uint& PMId, bool& startFromNextPM)
 
 	//cout << "startDBRootSet = " << startDBRootSet << endl;	
 	bool allEqual = true;
+	bool allOtherDbrootEmpty = true;
 	if (!startDBRootSet)
 	{
 	
@@ -198,12 +201,12 @@ int BatchLoader::selectFirstPM ( uint& PMId, bool& startFromNextPM)
 			}			
 			rootsExtentsBlocks.push_back(aEntry);		
 		}
-		//cout << "rootsExtentsBlocks size is " << rootsExtentsBlocks.size() << endl;
-		bool allOtherDbrootEmpty = true;
+		//cout << "rootsExtentsBlocks size is " << rootsExtentsBlocks.size() << " and allOtherDbrootEmpty is " << allOtherDbrootEmpty<< endl;
 		for (unsigned i=1; i < rootsExtentsBlocks.size(); i++)
 		{
 			if (!allOtherDbrootEmpty)
 				break;
+			//cout << "createdDbroot is " << createdDbroot << endl;
 			if (i != createdDbroot)
 			{
 				for ( unsigned j=0; j < rootsExtentsBlocks[i].rootInfo.size(); j++)
@@ -223,7 +226,6 @@ int BatchLoader::selectFirstPM ( uint& PMId, bool& startFromNextPM)
 		{
 			//find the next PM id on the list
 			startDBRootSet = true;
-			startFromNextPM = true;
 			buildBatchDistSeqVector();
 			
 			allEqual = false;	
@@ -298,11 +300,18 @@ int BatchLoader::selectFirstPM ( uint& PMId, bool& startFromNextPM)
 		allEqual = false;
 	
 	fFirstPm = PMId;
-	if (allEqual && (PMId == 0))
-		startFromNextPM = true;
-	//cout << "selectFirstPM returns PMId:rc = " << PMId <<":"<<rc<<
-	//		" and startFromNextPM is set to " << startFromNextPM << endl;
-    return rc;
+	
+	if (!allOtherDbrootEmpty || (PMId == 0))	  
+	{
+		prepareForSecondPM();		
+		//cout << "prepareForSecondPM is called. " << endl;
+	}
+	if ((allEqual && (PMId == 0)) || allOtherDbrootEmpty)
+	{
+		PMId = selectNextPM();	
+		fFirstPm = PMId;
+		//cout << "PMId is now " << PMId << endl;
+	}
 }
 
 //------------------------------------------------------------------------------
@@ -466,7 +475,14 @@ std::vector<uint> BatchLoader::getBatchDistributionVector()
 
 uint BatchLoader::selectNextPM()
 {
-	if(0 == fPmDistSeq.size()) return 0;	//Dist sequence not ready.
+	if(0 == fPmDistSeq.size()) //Dist sequence not ready. First time the function is called
+	{
+		uint PMId = 0;
+		//cout << "selectNextPM: size is 0. " << endl;
+		selectFirstPM(PMId);
+		return 	PMId;
+	}
+	
 	if(fNextIdx >= fPmDistSeq.size()) fNextIdx=0;	//reset it
 	return fPmDistSeq[fNextIdx++];
 }

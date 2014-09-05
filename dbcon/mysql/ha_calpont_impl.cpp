@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
- * $Id: ha_calpont_impl.cpp 9355 2013-04-01 21:34:40Z zzhu $
+ * $Id: ha_calpont_impl.cpp 9528 2013-05-15 19:46:10Z chao $
  */
 
 #include <string>
@@ -133,7 +133,7 @@ namespace cal_impl_if
 
 namespace
 {
-// Calpont vtable non-support error message													 
+// Calpont vtable non-support error message
 const string infinidb_autoswitch_warning = "The query includes syntax that is not supported by InfiniDB distributed mode. The execution was switched to standard mode with downgraded performance.";
 
 // copied from item_timefunc.cc
@@ -163,8 +163,11 @@ void storeNumericField(Field** f, int64_t value, CalpontSystemCatalog::ColType& 
 {
 	// unset null bit first
 	if ((*f)->null_ptr)
-		*(*f)->null_ptr &= ~(*f)->null_bit;		
-	switch ((*f)->type())
+		*(*f)->null_ptr &= ~(*f)->null_bit;	
+    // For unsigned, use the ColType returned in the row rather than the 
+    // unsigned_flag set by mysql. This is because mysql gets it wrong for SUM()
+    // Hopefully, in all other cases we get it right.
+    switch ((*f)->type())
 	{
 		case MYSQL_TYPE_NEWDECIMAL:
 		{
@@ -174,7 +177,7 @@ void storeNumericField(Field** f, int64_t value, CalpontSystemCatalog::ColType& 
 			if (f2->dec < ct.scale)
 				f2->dec = ct.scale;
 			char buf[256];
-			dataconvert::DataConvert::decimalToString( value, (unsigned)ct.scale, buf, 256 );
+			dataconvert::DataConvert::decimalToString(value, (unsigned)ct.scale, buf, 256, ct.colDataType);
 			f2->store(buf, strlen(buf), f2->charset());
 			break;
 		}
@@ -224,7 +227,7 @@ void storeNumericField(Field** f, int64_t value, CalpontSystemCatalog::ColType& 
 		{
 			Field_longlong* f2 = (Field_longlong*)*f;
 			longlong int_val = (longlong)value;
-			f2->store(int_val, f2->unsigned_flag);
+            f2->store(int_val, f2->unsigned_flag);
 			break;
 		}
 	} 
@@ -289,12 +292,12 @@ int fetchNextRow(uchar *buf, cal_table_info& ti, cal_connection_info* ci)
 	try {
 		if (ti.conn_hndl)
 		{
-			sm_stat = sm::tpl_scan_fetch(ti.tpl_scan_ctx, NULL, 0, ti.conn_hndl);
+			sm_stat = sm::tpl_scan_fetch(ti.tpl_scan_ctx, ti.conn_hndl);
 			csc = ti.conn_hndl->csc;
 		}
 		else if (ci->cal_conn_hndl)
 		{
-			sm_stat = sm::tpl_scan_fetch(ti.tpl_scan_ctx, NULL, 0, ci->cal_conn_hndl, (int*)(&current_thd->killed));
+			sm_stat = sm::tpl_scan_fetch(ti.tpl_scan_ctx, ci->cal_conn_hndl, (int*)(&current_thd->killed));
 			csc = ci->cal_conn_hndl->csc;
 		}
 		else
@@ -323,6 +326,7 @@ int fetchNextRow(uchar *buf, cal_table_info& ti, cal_connection_info* ci)
 		memset(buf, -1, ti.msTablePtr->s->null_bytes);
 		std::vector<CalpontSystemCatalog::ColType> &colTypes = ti.tpl_scan_ctx->ctp;
 		int64_t intColVal = 0;
+        uint64_t uintColVal = 0;
 		string stringColVal;		
 		char tmp[256];
 		
@@ -482,27 +486,52 @@ int fetchNextRow(uchar *buf, cal_table_info& ti, cal_connection_info* ci)
 					storeNumericField(f, intColVal, colType);
 					break;
 				}
+                case CalpontSystemCatalog::UBIGINT:
+                {
+                    uintColVal = row.getUintField<8>(s);
+                    storeNumericField(f, uintColVal, colType);
+                    break;
+                }
 				case CalpontSystemCatalog::INT:
 				{
 					intColVal = row.getIntField<4>(s);
 					storeNumericField(f, intColVal, colType);
 					break;
 				}
+                case CalpontSystemCatalog::UINT:
+                {
+                    uintColVal = row.getUintField<4>(s);
+                    storeNumericField(f, uintColVal, colType);
+                    break;
+                }
 				case CalpontSystemCatalog::SMALLINT:
 				{
 					intColVal = row.getIntField<2>(s);
 					storeNumericField(f, intColVal, colType);
 					break;
 				}
+                case CalpontSystemCatalog::USMALLINT:
+                {
+                    uintColVal = row.getUintField<2>(s);
+                    storeNumericField(f, uintColVal, colType);
+                    break;
+                }
 				case CalpontSystemCatalog::TINYINT:
 				{
 					intColVal = row.getIntField<1>(s);
 					storeNumericField(f, intColVal, colType);
 					break;
 				}
+                case CalpontSystemCatalog::UTINYINT:
+                {
+                    uintColVal = row.getUintField<1>(s);
+                    storeNumericField(f, uintColVal, colType);
+                    break;
+                }
 				//In this case, we're trying to load a double output column with float data. This is the
 				// case when you do sum(floatcol), e.g.
 				case CalpontSystemCatalog::FLOAT:
+                case CalpontSystemCatalog::UFLOAT:
 				{
 					float dl = row.getFloatField(s);
 					if (dl == std::numeric_limits<float>::infinity())
@@ -526,6 +555,7 @@ int fetchNextRow(uchar *buf, cal_table_info& ti, cal_connection_info* ci)
 					//break;
 				}
 				case CalpontSystemCatalog::DOUBLE:
+                case CalpontSystemCatalog::UDOUBLE:
 				{
 					double dl = row.getDoubleField(s);
 					if (dl == std::numeric_limits<double>::infinity())
@@ -537,6 +567,13 @@ int fetchNextRow(uchar *buf, cal_table_info& ti, cal_connection_info* ci)
 					(*f)->field_length = 310;
 					//double double_val = *(double*)(&value);
 					//f2->store(double_val);
+
+					// @bug5736, double type with precision -1 indicates a double for decimal math,
+					//           restore the original decimal scale.
+					// This work around is only for mysqld 5.1.39, newer version 5.1.72 is OK.
+					if (colType.precision == -1)
+						((Field_new_decimal*)(*f))->dec = colType.scale;
+
 					f2->store(dl);
 					if ((*f)->null_ptr)
 						*(*f)->null_ptr &= ~(*f)->null_bit;	
@@ -549,6 +586,7 @@ int fetchNextRow(uchar *buf, cal_table_info& ti, cal_connection_info* ci)
 					//break;
 				}
 				case CalpontSystemCatalog::DECIMAL:
+				case CalpontSystemCatalog::UDECIMAL:
 				{
 					intColVal = row.getIntField(s);
 					storeNumericField(f, intColVal, colType);
@@ -562,9 +600,7 @@ int fetchNextRow(uchar *buf, cal_table_info& ti, cal_connection_info* ci)
 				}
 			}
 		}
-		
 
-	
 		ti.tpl_scan_ctx->rowsreturned++;
 		ti.c++;
 #ifdef INFINIDB_DEBUG
@@ -591,10 +627,7 @@ int fetchNextRow(uchar *buf, cal_table_info& ti, cal_connection_info* ci)
 	{
 		ti.moreRows = false;
 		rc = logging::ERR_LOST_CONN_EXEMGR;
-		char sessionIDstr[80];
-		snprintf(sessionIDstr, 80, "%u", tid2sid(current_thd->thread_id));
-		sessionIDstr[79] = 0;
-		sm::sm_init(0, 0, 0, sessionIDstr, (void**)&ci->cal_conn_hndl);
+		sm::sm_init(tid2sid(current_thd->thread_id), &ci->cal_conn_hndl);
 		idbassert(ci->cal_conn_hndl != 0);
 		ci->rc = rc;
 	}
@@ -703,7 +736,7 @@ uint doUpdateDelete(THD *thd)
 		setError(current_thd, HA_ERR_GENERIC, "Cannot execute the statement. DBRM is read only!");
 		return HA_ERR_UNSUPPORTED;
 	}
-
+	
 	if (!thd->infinidb_vtable.cal_conn_info)
 		thd->infinidb_vtable.cal_conn_info = (void*)(new cal_connection_info());
 	cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(thd->infinidb_vtable.cal_conn_info);
@@ -747,7 +780,7 @@ uint doUpdateDelete(THD *thd)
 			return HA_ERR_UNSUPPORTED;
 		}
 
-/* // @bug5050. turn on cross engine support for delete/update
+/*
 #if (defined(_MSC_VER) && defined(_DEBUG)) || defined(SAFE_MUTEX)
 		if ((strcmp((*tables->table->s->db_plugin)->name.str, "InfiniDB") != 0) && (strcmp((*tables->table->s->db_plugin)->name.str, "MEMORY") != 0) &&
 				       (tables->table->s->table_category != TABLE_CATEGORY_TEMPORARY) )
@@ -805,7 +838,13 @@ uint doUpdateDelete(THD *thd)
 	  	dmlStmt += string(item->name) + "=";
 		
 		string tmpTableName = bestTableName(item);
-		aliasName = item->table_name;
+		
+		//@Bug 5312 populate aliasname with tablename if it is empty
+		if (!item->table_name)
+			aliasName = tmpTableName;
+		else
+			aliasName = item->table_name;
+			
 		if (strcasecmp(tableName.c_str(), "") == 0)
 		{
 			tableName = tmpTableName;
@@ -819,7 +858,22 @@ uint doUpdateDelete(THD *thd)
 			thd->row_count_func = 0;	
 			return -1;
 		}
-		schemaName = string(item->db_name);
+		if (!item->db_name)
+		{
+			//@Bug 5312. if subselect, wait until the schema info is available.	
+			if (thd->derived_tables_processing)
+				return 0;
+			else
+			{
+				thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "The statement cannot be processed without schema.");
+				ci->rc = -1;
+				thd->row_count_func = 0;	
+				return -1;
+			}
+		}
+		else
+			schemaName = string(item->db_name);
+			
 		columnAssignmentPtr = new ColumnAssignment();
 		columnAssignmentPtr->fColumn = string(item->name);
 		columnAssignmentPtr->fOperator = "=";
@@ -906,7 +960,14 @@ uint doUpdateDelete(THD *thd)
 		else if ( value->type() ==  Item::INT_ITEM ) 
 		{
 			std::ostringstream oss;
-			oss << value->val_int();
+            if (value->unsigned_flag)
+            {
+                oss << value->val_uint();
+            }
+            else
+            {
+                oss << value->val_int();
+            }
 			dmlStmt += oss.str();
 			columnAssignmentPtr->fScalarExpression = oss.str();
 			columnAssignmentPtr->fFromCol = false;
@@ -974,9 +1035,18 @@ uint doUpdateDelete(THD *thd)
 		{
 			String val, *str;
             str = value->val_str(&val);
-			dmlStmt += string(str->c_ptr());
-			columnAssignmentPtr->fScalarExpression = string(str->c_ptr());
-			columnAssignmentPtr->fFromCol = false;
+			if (str)
+			{
+				dmlStmt += string(str->c_ptr());
+				columnAssignmentPtr->fScalarExpression = string(str->c_ptr());
+				columnAssignmentPtr->fFromCol = false;
+			}
+			else
+			{
+				dmlStmt += "NULL";
+				columnAssignmentPtr->fScalarExpression = "NULL";
+				columnAssignmentPtr->fFromCol = false;
+			}
 		}	
 		
 		colAssignmentListPtr->push_back ( columnAssignmentPtr );
@@ -993,7 +1063,6 @@ uint doUpdateDelete(THD *thd)
 	//save table oid for commit/rollback to use
 	uint32_t sessionID = tid2sid(thd->thread_id);
 	boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
-	csc->identity(execplan::CalpontSystemCatalog::FE);
 	CalpontSystemCatalog::TableName aTableName;
 	TABLE_LIST *first_table = 0;
 	if (( (thd->lex)->sql_command == SQLCOM_UPDATE ) || ( (thd->lex)->sql_command == SQLCOM_UPDATE_MULTI ) )
@@ -1078,14 +1147,16 @@ uint doUpdateDelete(THD *thd)
 	SELECT_LEX select_lex = lex->select_lex;
 	
 	//@Bug 2808 Error out on order by or limit clause
-	if (( select_lex.explicit_limit ) || ( select_lex.order_list.elements != 0 ) )
+	//@bug5096. support dml limit.
+	if (/*( select_lex.explicit_limit ) || */( select_lex.order_list.elements != 0 ) )
 	{
-		string emsg("DML Statement with a limit or order by clause is not currently supported.");
+		string emsg("DML Statement with order by clause is not currently supported.");
 		thd->main_da.set_error_status(thd, HA_ERR_INTERNAL_ERROR, emsg.c_str());
 		ci->rc = 1;
 		thd->row_count_func = 0;	
 		return 0;
 	}
+		
 	thd->infinidb_vtable.isInfiniDBDML = true;
 	THD::infinidb_state origState = thd->infinidb_vtable.vtable_state;
 	//if (( (thd->lex)->sql_command == SQLCOM_UPDATE ) || ( (thd->lex)->sql_command == SQLCOM_UPDATE_MULTI ) )
@@ -1104,7 +1175,7 @@ uint doUpdateDelete(THD *thd)
 			txnID.id = 0;
 			txnID.valid = true;
 		}
-		CalpontSystemCatalog::SCN verID;
+		QueryContext verID;
 		verID = sm.verID();
 		
 		updateCP->txnID(txnID.id);
@@ -1134,9 +1205,18 @@ uint doUpdateDelete(THD *thd)
 			}
 				
 			//check different error code
-			Message::Args args;
-			args.add(gwi.parseErrorText);
-			string emsg(IDBErrorInfo::instance()->errorMsg(ERR_DML_NOT_SUPPORT_FEATURE, args));
+			// avoid double set IDB error
+			string emsg;
+			if (gwi.parseErrorText.find("IDB-") == string::npos)
+			{
+				Message::Args args;
+				args.add(gwi.parseErrorText);
+				emsg = IDBErrorInfo::instance()->errorMsg(ERR_DML_NOT_SUPPORT_FEATURE, args);
+			}
+			else
+			{
+				emsg = gwi.parseErrorText;
+			}
 			thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, emsg.c_str());
 			ci->rc = -1;
 			thd->row_count_func = 0;	
@@ -1218,7 +1298,7 @@ uint doUpdateDelete(THD *thd)
 	}
 	
 	//updateCP->traceFlags(1);
-	//cout<< "Plan is " << endl << *updateCP << endl;
+	// cout<< "Plan is " << endl << *updateCP << endl;
 	pDMLPackage->HasFilter(true);
 	
 	ByteStream bytestream, bytestream1;
@@ -1368,6 +1448,7 @@ uint doUpdateDelete(THD *thd)
 		if (thd->killed && b == 0)
 		{
 			b = dmlpackageprocessor::DMLPackageProcessor::JOB_CANCELED;
+			errorMsg = "Command canceled by user";
 		}
 	}
 	catch (runtime_error& ex)
@@ -1380,7 +1461,7 @@ uint doUpdateDelete(THD *thd)
 	}
 	catch ( ... )
 	{
-		cout << "... exception while writing to DMLProc" << endl;
+		//cout << "... exception while writing to DMLProc" << endl;
 		b = 1;
 		delete ci->dmlProc;
 		ci->dmlProc = NULL;
@@ -1418,7 +1499,6 @@ uint doUpdateDelete(THD *thd)
 				if (!ci->dmlProc)
 				{
 					ci->dmlProc = new MessageQueueClient("DMLProc");
-					errorMsg = "Command canceled by user";
 //					cout << "test007:command use dml client " << ci->dmlProc << endl;
 				}
 				ci->dmlProc->write(bytestream);
@@ -1885,7 +1965,7 @@ long long callastinsertid(UDF_INIT* initid, UDF_ARGS* args,
 	THD* thd = current_thd;
 		
 	CalpontSystemCatalog::TableName tableName;
-	long long nextVal = 0;
+	uint64_t nextVal = 0;
 	if ( args->arg_count == 2 )
 	{
 		tableName.schema = args->args[0];
@@ -1903,17 +1983,19 @@ long long callastinsertid(UDF_INIT* initid, UDF_ARGS* args,
 	}
 
 	boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(tid2sid(thd->thread_id));
-	csc->identity(execplan::CalpontSystemCatalog::FE);
-	nextVal = csc->nextAutoIncrValue(tableName);	
 	
-	if (nextVal == -2)
-	{
-		string msg("No such table found");
-		setError(thd, HA_ERR_UNSUPPORTED, msg);
-		return nextVal;
-	}
+    try
+    {
+        nextVal = csc->nextAutoIncrValue(tableName);	
+    }
+	catch (std::exception&)
+    {
+        string msg("No such table found");
+        setError(thd, HA_ERR_UNSUPPORTED, msg);
+        return nextVal;
+    }
 	
-	if (nextVal < 0)
+	if (nextVal == AUTOINCR_SATURATED)
 	{
 		setError(thd, HA_ERR_UNSUPPORTED, IDBErrorInfo::instance()->errorMsg(ERR_EXCEED_LIMIT));
 		return nextVal;
@@ -2209,10 +2291,7 @@ int ha_calpont_impl_rnd_init(TABLE* table)
 		if (ti.conn_hndl == 0)
 		{
 			
-			char sessionIDstr[80];
-			snprintf(sessionIDstr, 80, "%u", sessionID);
-			sessionIDstr[79] = 0;
-			sm::sm_init(0, 0, 0, sessionIDstr, (void**)&ti.conn_hndl);
+			sm::sm_init(sessionID, &ti.conn_hndl);
 			ti.conn_hndl->csc	= csc;
 		}
 		hndl = ti.conn_hndl;
@@ -2238,7 +2317,7 @@ int ha_calpont_impl_rnd_init(TABLE* table)
 				txnID.id = 0;
 				txnID.valid = true;
 			}
-			CalpontSystemCatalog::SCN verID;
+			QueryContext verID;
 			verID = sm.verID();
 	
 			ti.csep->txnID(txnID.id);
@@ -2294,10 +2373,7 @@ int ha_calpont_impl_rnd_init(TABLE* table)
 		
 		if (!ci->cal_conn_hndl)
 		{
-			char sessionIDstr[80];
-			snprintf(sessionIDstr, 80, "%u", sessionID);
-			sessionIDstr[79] = 0;
-			sm::sm_init(0, 0, 0, sessionIDstr, (void**)&ci->cal_conn_hndl);
+			sm::sm_init(sessionID, &ci->cal_conn_hndl);
 			idbassert(ci->cal_conn_hndl != 0);
 			ci->cal_conn_hndl->csc = csc;
 		}
@@ -2328,7 +2404,7 @@ int ha_calpont_impl_rnd_init(TABLE* table)
 				txnID.id = 0;
 				txnID.valid = true;
 			}
-			CalpontSystemCatalog::SCN verID;
+			QueryContext verID;
 			verID = sm.verID();
 	
 			csep->txnID(txnID.id);
@@ -2452,14 +2528,11 @@ int ha_calpont_impl_rnd_init(TABLE* table)
 						ci->queryState = 1;
 					}
 					break;
-				} catch (...)
-				{
+				} catch (...) {
 					sm::sm_cleanup(hndl);					
+					hndl = 0;
 					
-					char sessionIDstr[80];
-					snprintf(sessionIDstr, 80, "%u", sessionID);
-					sessionIDstr[79] = 0;
-					sm::sm_init(0, 0, 0, sessionIDstr, (void**)&hndl);
+					sm::sm_init(sessionID, &hndl);
 					idbassert(hndl != 0);
 					hndl->csc = csc;
 					if (thd->infinidb_vtable.vtable_state == THD::INFINIDB_DISABLE_VTABLE)
@@ -2468,8 +2541,7 @@ int ha_calpont_impl_rnd_init(TABLE* table)
 						ci->cal_conn_hndl = hndl;
 					try {
 						hndl->connect();
-					} catch (...)
-					{
+					} catch (...) {
 						setError(thd, HA_ERR_INTERNAL_ERROR, IDBErrorInfo::instance()->errorMsg(ERR_LOST_CONN_EXEMGR));
 						CalpontSystemCatalog::removeCalpontSystemCatalog(sessionID);
 						goto error;
@@ -2506,8 +2578,8 @@ int ha_calpont_impl_rnd_init(TABLE* table)
 		}
 		
 		try {
-			sm::tpl_open(tableid, (void**)&ti.tpl_ctx, hndl);
-			sm::tpl_scan_open(tableid, sm::TPL_FH_READ, ti.tpl_scan_ctx, hndl);
+			sm::tpl_open(tableid, ti.tpl_ctx, hndl);
+			sm::tpl_scan_open(tableid, ti.tpl_scan_ctx, hndl);
 		} catch (std::exception& e)
 		{
 			string emsg = "table can not be opened: " + string(e.what());
@@ -2651,7 +2723,8 @@ int ha_calpont_impl_rnd_next(uchar *buf, TABLE* table)
 		return HA_ERR_INTERNAL_ERROR;	
 	}
 	ci->tableMap[table] = ti;
-	
+	//testing
+	//rc = 1;
 	if (rc != 0 && rc != HA_ERR_END_OF_FILE)
 	{
 		string emsg;
@@ -2664,6 +2737,7 @@ int ha_calpont_impl_rnd_next(uchar *buf, TABLE* table)
 			emsg = errorcodes.errorString(rc);
 		}
 		setError(thd, HA_ERR_INTERNAL_ERROR, emsg);
+		//setError(thd, HA_ERR_INTERNAL_ERROR, "testing");
 		ci->stats.fErrorNo = rc;
 		CalpontSystemCatalog::removeCalpontSystemCatalog(tid2sid(thd->thread_id));
 		rc = HA_ERR_INTERNAL_ERROR;		
@@ -2765,7 +2839,7 @@ int ha_calpont_impl_rnd_end(TABLE* table)
 		if (ti.tpl_scan_ctx.get())
 		{
 			try {
-				sm::tpl_scan_close(ti.tpl_scan_ctx, hndl);
+				sm::tpl_scan_close(ti.tpl_scan_ctx);
 			} catch (...) {
 				rc = HA_ERR_INTERNAL_ERROR;
 			}
@@ -2773,11 +2847,11 @@ int ha_calpont_impl_rnd_end(TABLE* table)
 		ti.tpl_scan_ctx.reset();
 		try {
 			sm::tpl_close(ti.tpl_ctx, &hndl, ci->stats);
-			// @bug5054. set conn hndl back. could be changed in tpl_close
+			// set conn hndl back. could be changed in tpl_close
 			if (thd->infinidb_vtable.vtable_state == THD::INFINIDB_DISABLE_VTABLE)
 				ti.conn_hndl = hndl;
 			else
-				ci->cal_conn_hndl = hndl;
+				ci->cal_conn_hndl = hndl;		
 			ti.tpl_ctx = 0;
 		}	catch (IDBExcept& e)
 		{
@@ -2792,7 +2866,13 @@ int ha_calpont_impl_rnd_end(TABLE* table)
 				rc = HA_ERR_INTERNAL_ERROR;
 			}
 		}
-		catch (...) {
+		catch (std::exception& e) {
+			setError(thd, HA_ERR_INTERNAL_ERROR, e.what());
+			rc = HA_ERR_INTERNAL_ERROR;
+		}
+		catch (...)
+		{
+			setError(thd, HA_ERR_INTERNAL_ERROR, "Internal error throwed in rnd_end");
 			rc = HA_ERR_INTERNAL_ERROR;
 		}
 	}
@@ -2831,7 +2911,7 @@ int ha_calpont_impl_create(const char *name, TABLE *table_arg, HA_CREATE_INFO *c
 int ha_calpont_impl_delete_table(const char *name)
 {	
 	//if this is an InfiniDB tmp table ('#sql*.frm') just leave...
-	if (!bcmp((uchar*)name, tmp_file_prefix, tmp_file_prefix_length)) return 0;
+	if (!memcmp((uchar*)name, tmp_file_prefix, tmp_file_prefix_length)) return 0;
 
 	THD *thd = current_thd;
 
@@ -3057,7 +3137,6 @@ void ha_calpont_impl_start_bulk_insert(ha_rows rows, TABLE* table)
 		}
 			
 		boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(tid2sid(thd->thread_id));
-		csc->identity(execplan::CalpontSystemCatalog::FE);
 		CalpontSystemCatalog::TableName tableName;
 		tableName.schema = table->s->db.str;
 		tableName.table = table->s->table_name.str;
@@ -3387,7 +3466,7 @@ int ha_calpont_impl_external_lock(THD *thd, TABLE* table, int lock_type)
 	
 	CalTableMap::iterator mapiter = ci->tableMap.find(table);
 #ifdef _MSC_VER
-	//FIMEX: fix this! (must be related to F_UNLCK define in winport)
+	//FIXME: fix this! (must be related to F_UNLCK define in winport)
 	if (mapiter != ci->tableMap.end() && lock_type == 0) // make sure it's the release lock (2nd) call
 #else
 	if (mapiter != ci->tableMap.end() && lock_type == 2) // make sure it's the release lock (2nd) call
@@ -3403,11 +3482,14 @@ int ha_calpont_impl_external_lock(THD *thd, TABLE* table, int lock_type)
 				ci->queryStats = mapiter->second.conn_hndl->queryStats;
 				ci->extendedStats = mapiter->second.conn_hndl->extendedStats;
 				ci->miniStats = mapiter->second.conn_hndl->miniStats;
-				sm::sm_cleanup((*mapiter).second.conn_hndl);
+				sm::sm_cleanup(mapiter->second.conn_hndl);
+				mapiter->second.conn_hndl = 0;
 			}
-			(*mapiter).second.conn_hndl = 0;
-			if ((*mapiter).second.condInfo)
-				delete (*mapiter).second.condInfo;
+			if (mapiter->second.condInfo)
+			{
+				delete mapiter->second.condInfo;
+				mapiter->second.condInfo = 0;
+			}
 
 			// only push this warning for once
 			if (ci->tableMap.size() == 1 && 

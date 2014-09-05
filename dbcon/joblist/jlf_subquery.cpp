@@ -84,6 +84,7 @@ void getColumnValue(ConstantColumn** cc, uint64_t i, const Row& row)
 			// else > 0; fall through
 
 		case CalpontSystemCatalog::DECIMAL:
+		case CalpontSystemCatalog::UDECIMAL:
 			data = row.getIntField(i);
 			oss << (data / IDB_pow[row.getScale(i)]);
 			if (row.getScale(i) > 0)
@@ -97,7 +98,17 @@ void getColumnValue(ConstantColumn** cc, uint64_t i, const Row& row)
 									IDB_Decimal(data, row.getScale(i), row.getPrecision(i)));
 			break;
 
+        case CalpontSystemCatalog::UTINYINT:
+        case CalpontSystemCatalog::USMALLINT:
+        case CalpontSystemCatalog::UMEDINT:
+        case CalpontSystemCatalog::UINT:
+        case CalpontSystemCatalog::UBIGINT:
+            oss << row.getUintField(i);
+            *cc = new ConstantColumn(oss.str(), row.getUintField(i));
+            break;
+
 		case CalpontSystemCatalog::FLOAT:
+        case CalpontSystemCatalog::UFLOAT:
 			oss << fixed << row.getFloatField(i);
 			*cc = new ConstantColumn(oss.str(), (double) row.getFloatField(i));
 			break;
@@ -144,25 +155,24 @@ bool simpleScalarFilterToParseTree(SimpleScalarFilter* sf, ParseTree*& pt, JobIn
 		lop = "or";
 
 	// Transformer sub to a scalar result.
-	SErrorInfo status(jobInfo.status);
-	SimpleScalarTransformer transformer(&jobInfo, status, false);
+	SErrorInfo errorInfo(jobInfo.errorInfo);
+	SimpleScalarTransformer transformer(&jobInfo, errorInfo, false);
 	transformer.makeSubQueryStep(csep);
 
 	// Do not catch exceptions here, let caller handle them.
 	transformer.run();
 
 	// if subquery errored out
-	if (status->errCode)
+	if (errorInfo->errCode)
 	{
 		ostringstream oss;
 		oss << "Sub-query failed: ";
-		if (status->errMsg.empty())
-			oss << "error code " << status->errCode;
-		else
-			oss << status->errMsg;
-
-		status->errMsg = oss.str();
-		throw runtime_error(status->errMsg);
+		if (errorInfo->errMsg.empty())
+		{
+			oss << "error code " << errorInfo->errCode;
+			errorInfo->errMsg = oss.str();
+		}
+		throw runtime_error(errorInfo->errMsg);
 	}
 
 	// Construct simple filters based on the scalar result.
@@ -335,15 +345,10 @@ void handleNotIn(JobStepVector& jsv, JobInfo* jobInfo)
 		sop->resultType(sop->operationType());
 		SimpleFilter* sf = new SimpleFilter(sop, lhs, rhs);
 
-		ExpressionStep* es = new ExpressionStep(jobInfo->sessionId,
-												jobInfo->txnId,
-												jobInfo->verId,
-												jobInfo->statementId);
-
+		ExpressionStep* es = new ExpressionStep(*jobInfo);
 		if (es == NULL)
 			throw runtime_error("Failed to create ExpressionStep 2");
 
-		es->logger(jobInfo->logger);
 		es->expressionFilter(sf, *jobInfo);
 		i->reset(es);
 
@@ -377,8 +382,8 @@ bool isNotInSubquery(JobStepVector& jsv)
 void doCorrelatedExists(const ExistsFilter* ef, JobInfo& jobInfo)
 {
 	// Transformer sub to a subquery step.
-	SErrorInfo status(jobInfo.status);
-	SubQueryTransformer transformer(&jobInfo, status);
+	SErrorInfo errorInfo(jobInfo.errorInfo);
+	SubQueryTransformer transformer(&jobInfo, errorInfo);
 	SJSTEP subQueryStep = transformer.makeSubQueryStep(ef->sub().get());
 
 	// @bug3524, special handling of not in.
@@ -402,8 +407,8 @@ void doNonCorrelatedExists(const ExistsFilter* ef, JobInfo& jobInfo)
 	if (!noFrom)
 	{
 		// Transformer sub to a scalar result set.
-		SErrorInfo status(new ErrorInfo());
-		SimpleScalarTransformer transformer(&jobInfo, status, true);
+		SErrorInfo errorInfo(new ErrorInfo());
+		SimpleScalarTransformer transformer(&jobInfo, errorInfo, true);
 		transformer.makeSubQueryStep(ef->sub().get());
 
 		// @bug 2839. error out in-relelvant correlated column case
@@ -453,13 +458,7 @@ void doNonCorrelatedExists(const ExistsFilter* ef, JobInfo& jobInfo)
 	}
 
 	JobStepVector jsv;
-	SJSTEP tcs(new TupleConstantBooleanStep(JobStepAssociation(),
-											JobStepAssociation(),
-											jobInfo.sessionId,
-											jobInfo.txnId,
-											jobInfo.verId,
-											jobInfo.statementId,
-											exists));
+	SJSTEP tcs(new TupleConstantBooleanStep(jobInfo, exists));
 	jsv.push_back(tcs);
 	jobInfo.stack.push(jsv);
 }
@@ -469,9 +468,9 @@ const SRCP doSelectSubquery(CalpontExecutionPlan* ep, SRCP& sc, JobInfo& jobInfo
 {
 	CalpontSelectExecutionPlan* csep = dynamic_cast<CalpontSelectExecutionPlan*>(ep);
 	SRCP rc;
-	SErrorInfo status(jobInfo.status);
+	SErrorInfo errorInfo(jobInfo.errorInfo);
 	jobInfo.subView = dynamic_cast<SimpleColumn*>(sc.get())->viewName();
-	SubQueryTransformer transformer(&jobInfo, status);
+	SubQueryTransformer transformer(&jobInfo, errorInfo);
 	transformer.setVarbinaryOK();
 	SJSTEP subQueryStep = transformer.makeSubQueryStep(csep);
 	if (transformer.correlatedSteps().size() > 0)
@@ -554,13 +553,7 @@ void doSimpleScalarFilter(ParseTree* p, JobInfo& jobInfo)
 		// not a scalar result
 		delete parseTree;
 		JobStepVector jsv;
-		SJSTEP tcs(new TupleConstantBooleanStep(JobStepAssociation(),
-												JobStepAssociation(),
-												jobInfo.sessionId,
-												jobInfo.txnId,
-												jobInfo.verId,
-												jobInfo.statementId,
-												false));
+		SJSTEP tcs(new TupleConstantBooleanStep(jobInfo, false));
 		jsv.push_back(tcs);
 		jobInfo.stack.push(jsv);
 	}
@@ -583,8 +576,8 @@ void doSelectFilter(const ParseTree* p, JobInfo& jobInfo)
 	const SelectFilter* sf = dynamic_cast<const SelectFilter*>(p->data());
 	idbassert(sf != NULL);
 
-	SErrorInfo status(jobInfo.status);
-	SubQueryTransformer transformer(&jobInfo, status);
+	SErrorInfo errorInfo(jobInfo.errorInfo);
+	SubQueryTransformer transformer(&jobInfo, errorInfo);
 	SJSTEP subQueryStep = transformer.makeSubQueryStep(sf->sub().get());
 	transformer.updateCorrelateInfo();
 	JobStepVector jsv = transformer.correlatedSteps();
@@ -626,11 +619,7 @@ void doSelectFilter(const ParseTree* p, JobInfo& jobInfo)
 
 	if (pt != NULL)
 	{
-		ExpressionStep* es = new ExpressionStep(jobInfo.sessionId,
-												jobInfo.txnId,
-												jobInfo.verId,
-												jobInfo.statementId);
-		es->logger(jobInfo.logger);
+		ExpressionStep* es = new ExpressionStep(jobInfo);
 		es->expressionFilter(pt, jobInfo);
 		es->selectFilter(true);
 		delete pt;
@@ -674,16 +663,13 @@ void preprocessHavingClause(CalpontSelectExecutionPlan* csep, JobInfo& jobInfo)
 int doFromSubquery(CalpontExecutionPlan* ep, const string& alias, const string& view, JobInfo& jobInfo)
 {
 	CalpontSelectExecutionPlan* csep = dynamic_cast<CalpontSelectExecutionPlan*>(ep);
-	SErrorInfo status(jobInfo.status);
+	SErrorInfo errorInfo(jobInfo.errorInfo);
 	jobInfo.subView = view;
-	SubQueryTransformer transformer(&jobInfo, status, alias);
+	SubQueryTransformer transformer(&jobInfo, errorInfo, alias);
 	transformer.setVarbinaryOK();
 	SJSTEP subQueryStep = transformer.makeSubQueryStep(csep, true);
 	subQueryStep->view(view);
-	SJSTEP subAd(new SubAdapterStep(jobInfo.sessionId,
-									jobInfo.txnId,
-									jobInfo.statementId,
-									subQueryStep));
+	SJSTEP subAd(new SubAdapterStep(subQueryStep, jobInfo));
 	jobInfo.selectAndFromSubs.push_back(subAd);
 
 	return CNX_VTABLE_ID;
@@ -780,16 +766,14 @@ void preprocessSelectSubquery(CalpontSelectExecutionPlan* csep, JobInfo& jobInfo
 SJSTEP doUnionSub(CalpontExecutionPlan* ep, JobInfo& jobInfo)
 {
 	CalpontSelectExecutionPlan* csep = dynamic_cast<CalpontSelectExecutionPlan*>(ep);
-	SErrorInfo status(jobInfo.status);
-	SubQueryTransformer transformer(&jobInfo, status);
+	SErrorInfo errorInfo(jobInfo.errorInfo);
+	SubQueryTransformer transformer(&jobInfo, errorInfo);
 	transformer.setVarbinaryOK();
 	SJSTEP subQueryStep = transformer.makeSubQueryStep(csep, false);
-	SJSTEP subAd(new SubAdapterStep(jobInfo.sessionId,
-									jobInfo.txnId,
-									jobInfo.statementId,
-									subQueryStep));
+	SJSTEP subAd(new SubAdapterStep(subQueryStep, jobInfo));
 	return subAd;
 }
+
 
 }
 // vim:ts=4 sw=4:

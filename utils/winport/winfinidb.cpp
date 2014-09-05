@@ -82,9 +82,15 @@ int runIt(const string& pName)
 	STARTUPINFO sInfo;
 	ZeroMemory(&sInfo, sizeof(sInfo));
 
-	if (CreateProcess(0, cmdLine, 0, 0, false, 0, 0, 0, &sInfo, &pInfo) == 0)
-		return -1;
-
+	try
+	{
+		if (CreateProcess(0, cmdLine, 0, 0, false, 0, 0, 0, &sInfo, &pInfo) == 0)
+			return -1;
+	}
+	catch (exception& e)
+	{
+        cout << e.what() << endl;
+	}
 	if (WaitForSingleObject(pInfo.hProcess, INFINITE) != WAIT_OBJECT_0)
 	{
 		rc = -1;
@@ -126,7 +132,7 @@ int loadBRM()
 		return 0;
 
 	// run load_brm and wait for it to finish
-	string brmCmd = "load_brm " + saveFilePfx;
+	string brmCmd = "load_brm \"" + saveFilePfx +"\"";
 	if (runIt(brmCmd))
 		return -1;
 	return 0;

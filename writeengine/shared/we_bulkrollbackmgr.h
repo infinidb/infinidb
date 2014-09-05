@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
-* $Id: we_bulkrollbackmgr.h 4496 2013-01-31 19:13:20Z pleblanc $
+* $Id: we_bulkrollbackmgr.h 4450 2013-01-21 14:13:24Z rdempsey $
 */
 
 /** @file

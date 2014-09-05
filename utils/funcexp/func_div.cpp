@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_div.cpp 3048 2012-04-04 15:33:45Z rdempsey $
+* $Id: func_div.cpp 3495 2013-01-21 14:09:51Z rdempsey $
 *
 *
 ****************************************************************************/
@@ -57,6 +57,22 @@ int64_t Func_div::getIntVal(rowgroup::Row& row,
 	}
 	int64_t int_val1 = (int64_t)(val1 > 0 ? val1 + 0.5 : val1 - 0.5);
 	return int_val1 / int_val2;
+}
+
+
+uint64_t Func_div::getUintVal(rowgroup::Row& row,
+						      FunctionParm& parm,
+						      bool& isNull,
+						      CalpontSystemCatalog::ColType& op_ct)
+{
+	uint64_t val1 = parm[0]->data()->getUintVal(row, isNull);
+	uint64_t val2 = parm[1]->data()->getUintVal(row, isNull);
+	if (val2 == 0)
+	{
+		isNull = true;
+		return 0;
+	}
+	return val1 / val2;
 }
 
 

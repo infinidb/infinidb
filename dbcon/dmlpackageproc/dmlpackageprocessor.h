@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: dmlpackageprocessor.h 8839 2012-08-28 21:49:45Z dhall $
+ *   $Id: dmlpackageprocessor.h 9311 2013-03-14 20:55:16Z chao $
  *
  *
  ***********************************************************************/
@@ -149,13 +149,21 @@ public:
 	
     /** @brief ctor
      */ 
-    DMLPackageProcessor() : fEC(0), DMLLoggingId(21), fRollbackPending(false), fDebugLevel(NONE)
+    DMLPackageProcessor(BRM::DBRM* aDbrm) : fEC(0), DMLLoggingId(21), fRollbackPending(false), fDebugLevel(NONE)
 	{
-		fWEClient = WriteEngine::WEClients::instance(WriteEngine::WEClients::DMLPROC);
+		try {
+		fWEClient = new WriteEngine::WEClients(WriteEngine::WEClients::DMLPROC);
+		//std::cout << "In DMLPackageProcessor constructor " << this << std::endl;
 		fPMCount = fWEClient->getPmCount();
-		fExeMgr.reset(new messageqcpp::MessageQueueClient("ExeMgr1"));
+		}
+		catch (...)
+		{
+			std::cout << "Cannot make connection to WES" << std::endl;
+		}
+		
 		oam::OamCache * oamCache = oam::OamCache::makeOamCache();
 		fDbRootPMMap = oamCache->getDBRootToPMMap();
+		fDbrm = aDbrm;
 	}
 
 
@@ -403,15 +411,6 @@ protected:
                                             DMLResult& result );            
 
         
-    /**
-     * @brief tokenize a columns data
-     *
-     * @param type the columns database type
-     * @param data the columns string representation of it's data
-     */
-    boost::any tokenizeData( execplan::CalpontSystemCatalog::SCN txnID, execplan::CalpontSystemCatalog::ColType,
-                             const std::string& data, DMLResult& result, bool isNULL );
-
     /** @brief get the column list for the supplied table
      *
      * @param schema the schema name
@@ -455,7 +454,7 @@ protected:
      */
     std::string projectTableErrCodeToMsg(uint ec);
     
-    bool validateNextValue(execplan::CalpontSystemCatalog::ColType colType, int64_t value, bool & offByOne);
+//    bool validateNextValue(execplan::CalpontSystemCatalog::ColType colType, int64_t value, bool & offByOne);
     
     bool validateVarbinaryVal( std::string & inStr);
     int commitTransaction(u_int64_t uniqueId, BRM::TxnID txnID);
@@ -464,10 +463,7 @@ protected:
     int rollBackBatchAutoOffTransaction(u_int64_t uniqueId, BRM::TxnID txnID, u_int32_t sessionID, const u_int32_t tableOid, std::string & errorMsg);
     int flushDataFiles (int rc, std::map<u_int32_t,u_int32_t> & columnOids, u_int64_t uniqueId, BRM::TxnID txnID);
 
-    /** @brief the write engine wrapper interface
-     */
-    WriteEngine::WriteEngineWrapper fWriteEngine;
-
+    
     /** @brief the Session Manager interface
      */
     execplan::SessionManager fSessionManager;
@@ -478,8 +474,7 @@ protected:
     const unsigned DMLLoggingId;
     uint fPMCount;
     WriteEngine::WEClients* fWEClient;
-    BRM::DBRM fDbrm;
-    boost::shared_ptr<messageqcpp::MessageQueueClient> fExeMgr;
+    BRM::DBRM* fDbrm;
     boost::shared_ptr<std::map<int, int> > fDbRootPMMap;
     oam::Oam fOam;
     bool fRollbackPending;         // When set, any derived object should stop what it's doing and cleanup in preparation for a Rollback

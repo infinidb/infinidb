@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
- * $Id: ha_calpont_dml.cpp 8792 2012-08-07 18:34:27Z chao $
+ * $Id: ha_calpont_dml.cpp 9712 2013-07-23 21:01:59Z chao $
  */
 
 #include <string>
@@ -474,7 +474,7 @@ int doProcessInsertValues ( TABLE* table, uint32_t size, cal_connection_info& ci
 					{	
 						rc = -1;
 						b=1;
-						errormsg = "Lost connection to DMLProc";
+						errormsg = "Lost connection to DMLProc after getting a new client";
 					}
 					else
 					{
@@ -488,7 +488,7 @@ int doProcessInsertValues ( TABLE* table, uint32_t size, cal_connection_info& ci
 				{
 					rc = -1;
 					thd->main_da.can_overwrite_status = true;
-					errormsg = "Lost connection to DMLProc";
+					errormsg = "Lost connection to DMLProc after getting a new client";
 					b = 1;
 				}	
 			}
@@ -496,7 +496,7 @@ int doProcessInsertValues ( TABLE* table, uint32_t size, cal_connection_info& ci
 			{
 				rc = -1;
 				thd->main_da.can_overwrite_status = true;
-				errormsg = "Lost connection to DMLProc";
+				errormsg = "Lost connection to DMLProc really";
 				b = 1;
 			}
 		}
@@ -520,8 +520,7 @@ int doProcessInsertValues ( TABLE* table, uint32_t size, cal_connection_info& ci
 		if ( b == dmlpackageprocessor::DMLPackageProcessor::IDBRANGE_WARNING )
 		{
 			rc = 0;
-			string errmsg ("Out of range value detected. Please check Calpont Syntax Guide for supported data range." );
-			push_warning(thd, MYSQL_ERROR::WARN_LEVEL_WARN, 9999, errmsg.c_str());
+			push_warning(thd, MYSQL_ERROR::WARN_LEVEL_WARN, 9999, errormsg.c_str());
 		}
 		
 		if ( rc != 0 )
@@ -549,7 +548,8 @@ int ha_calpont_impl_write_last_batch(TABLE* table, cal_connection_info& ci, bool
 		//@Bug 4516 always send the last package to allow DMLProc receive all messages from WES
 		if (( ci.rc != 0 ) || abort )
 		{
-			rc = doProcessInsertValues( table, size , ci, true);		
+			if (abort) //@Bug 5285. abort is different from error, dmlproc only clean up when erroring out
+				rc = doProcessInsertValues( table, size , ci, true);			
 			
 			//@Bug 2722 Log the statement into datamod log
 			//@Bug 4605 if error, rollback and no need to check whether the session is autocommit off 

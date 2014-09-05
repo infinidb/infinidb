@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: bppseeder.cpp 1960 2012-09-27 17:35:56Z pleblanc $
+// $Id: bppseeder.cpp 2035 2013-01-21 14:12:19Z rdempsey $
 // C++ Implementation: bppseeder
 //
 // Description: 

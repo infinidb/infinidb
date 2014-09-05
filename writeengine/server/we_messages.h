@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_messages.h 4216 2012-09-28 23:08:21Z xlou $
+* $Id: we_messages.h 4566 2013-03-07 16:08:26Z chao $
 *
 *******************************************************************************/
 #ifndef WE_MESSAGES_H__
@@ -74,6 +74,8 @@ enum ServerMessages
 	WE_SVR_REMOVE_TABLEDATA,
 	WE_SVR_UPDATE_SYSCOLUMN_DEFAULTVAL,
 	WE_SVR_REDISTRIBUTE,
+	WE_SVR_CLOSE_CONNECTION,
+	WE_SVR_GET_FILESIZES,
 
 	WE_CLT_SRV_DATA=100,
 	WE_CLT_SRV_EOD,

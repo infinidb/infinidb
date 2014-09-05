@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: expressionstep.h 8526 2012-05-17 02:28:10Z xlou $
+//  $Id: expressionstep.h 9210 2013-01-21 14:10:42Z rdempsey $
 
 
 /** @file
@@ -38,32 +38,14 @@ class ExpressionStep : public JobStep
 {
   public:
 	// constructors
-	ExpressionStep(
-		uint32_t sessionId,
-		uint32_t txnId,
-		uint32_t verId,
-		uint32_t statementId);
-
+	ExpressionStep(const JobInfo&);
 	// destructor constructors
 	virtual ~ExpressionStep();
 
 	// inherited methods
 	void run();
 	void join();
-	const JobStepAssociation& inputAssociation() const { return fInputJobStepAssociation; }
-	void inputAssociation(const JobStepAssociation& in) { fInputJobStepAssociation = in; }
-	const JobStepAssociation& outputAssociation() const { return fOutputJobStepAssociation; }
-	void outputAssociation(const JobStepAssociation& out) { fOutputJobStepAssociation = out; }
-	JobStepAssociation& outputAssociation() { return fOutputJobStepAssociation; }
-
 	const std::string toString() const;
-	void stepId(uint16_t sId) { fStepId = sId; }
-	uint16_t stepId() const { return fStepId; }
-	uint32_t sessionId()   const { return fSessionId; }
-	uint32_t txnId()	   const { return fTxnId; }
-	uint32_t verId()	   const { return fVerId; }
-	uint32_t statementId() const { return fStatementId; }
-	void logger(const SPJL& logger) { fLogger = logger; }
 
 	execplan::CalpontSystemCatalog::OID oid() const
 	{ return fOids.empty() ? 0 : fOids.front(); }
@@ -117,14 +99,6 @@ class ExpressionStep : public JobStep
 	virtual void addColumn(execplan::ReturnedColumn* rc, JobInfo& jobInfo);
 	virtual void populateColumnInfo(execplan::SimpleColumn* sc, JobInfo& jobInfo);
 
-	JobStepAssociation                               fInputJobStepAssociation;
-	JobStepAssociation                               fOutputJobStepAssociation;
-	uint32_t                                         fSessionId;
-	uint32_t                                         fTxnId;
-	uint32_t                                         fVerId;
-	uint16_t                                         fStepId;
-	uint32_t                                         fStatementId;
-	SPJL	                                         fLogger;
 
 	// expression
 	execplan::SRCP                                   fExpression;

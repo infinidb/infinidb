@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: treenode.cpp 8436 2012-04-04 18:18:21Z rdempsey $
+*   $Id: treenode.cpp 9317 2013-03-19 21:37:22Z dhall $
 *
 *
 ***********************************************************************/
@@ -51,7 +51,8 @@ void TreeNode::resultType ( const execplan::CalpontSystemCatalog::ColType& resul
 	fResultType = resultType; 
 		
 	// set scale/precision for the result
-	if (fResultType.colDataType == execplan::CalpontSystemCatalog::DECIMAL)
+	if (fResultType.colDataType == execplan::CalpontSystemCatalog::DECIMAL ||
+        fResultType.colDataType == execplan::CalpontSystemCatalog::UDECIMAL)
 	{
 		fResult.decimalVal.scale = fResultType.scale;
 		fResult.decimalVal.precision = fResultType.precision;

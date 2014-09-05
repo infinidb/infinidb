@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
- * $Id: calshowprocesslist.sql 9734 2013-08-02 16:46:23Z zzhu $
+ * $Id: calshowprocesslist.sql 9735 2013-08-02 18:48:11Z zzhu $
  */
 
 DELIMITER $$

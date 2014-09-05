@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: commandpackageprocessor.h 8436 2012-04-04 18:18:21Z rdempsey $
+*   $Id: commandpackageprocessor.h 9302 2013-03-07 16:06:59Z chao $
 *
 *
 ***********************************************************************/
@@ -50,6 +50,7 @@ class CommandPackageProcessor : public DMLPackageProcessor
 {
 
 public:
+	CommandPackageProcessor(BRM::DBRM* aDbrm) : DMLPackageProcessor(aDbrm){}
     /** @brief process an CommandDMLPackage
       *
       * @param cpackage the CommandDMLPackage to process

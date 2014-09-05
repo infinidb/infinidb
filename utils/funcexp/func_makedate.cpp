@@ -65,8 +65,8 @@ uint64_t makedate(rowgroup::Row& row,
 		case CalpontSystemCatalog::DECIMAL:
 		{
 			IDB_Decimal d = parm[0]->data()->getDecimalVal(row, isNull);
-			year = d.value / power(d.scale);
-			int lefto = (d.value - year * power(d.scale)) / power(d.scale-1);
+			year = d.value / helpers::power(d.scale);
+			int lefto = (d.value - year * helpers::power(d.scale)) / helpers::power(d.scale-1);
 			if ( year >= 0 && lefto > 4 )
 				year++;
 			if ( year < 0 && lefto < -4 )
@@ -109,8 +109,8 @@ uint64_t makedate(rowgroup::Row& row,
 		case CalpontSystemCatalog::DECIMAL:
 		{
 			IDB_Decimal d = parm[1]->data()->getDecimalVal(row, isNull);
-			int64_t tmp = d.value / power(d.scale);
-			int lefto = (d.value - tmp * power(d.scale)) / power(d.scale-1);
+			int64_t tmp = d.value / helpers::power(d.scale);
+			int lefto = (d.value - tmp * helpers::power(d.scale)) / helpers::power(d.scale-1);
 			if ( tmp >= 0 && lefto > 4 )
 				tmp++;
 			if ( tmp < 0 && lefto < -4 )
@@ -138,7 +138,7 @@ uint64_t makedate(rowgroup::Row& row,
 
 	uint64_t intDate = dataconvert::DataConvert::stringToDate(oss.str()) - 1;
 
-	uint64_t value = dateAdd( intDate, dayofyear, "DAY", true, "add" );
+	uint64_t value = helpers::dateAdd( intDate, dayofyear, "DAY", true, "add" );
 
 	if ( value == 0 ) {
 		isNull = true;

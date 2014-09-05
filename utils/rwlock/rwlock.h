@@ -228,6 +228,7 @@ class RWLock {
 		inline int getReading() const { return fPImpl->fState->reading; }
 		inline int getWritersWaiting() const { return fPImpl->fState->writerswaiting; }
 		inline int getReadersWaiting() const { return fPImpl->fState->readerswaiting; }
+		LockState getLockState();
 		
 	private:
 		RWLock(const RWLock& rwl);

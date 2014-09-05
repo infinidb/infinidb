@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_regexp.cpp 3048 2012-04-04 15:33:45Z rdempsey $
+* $Id: func_regexp.cpp 3495 2013-01-21 14:09:51Z rdempsey $
 *
 *
 ****************************************************************************/
@@ -62,11 +62,18 @@ namespace
 			case execplan::CalpontSystemCatalog::INT:
 			case execplan::CalpontSystemCatalog::MEDINT:
 			case execplan::CalpontSystemCatalog::TINYINT:
-			case execplan::CalpontSystemCatalog::SMALLINT:
+            case execplan::CalpontSystemCatalog::SMALLINT:
+            case execplan::CalpontSystemCatalog::UBIGINT:
+            case execplan::CalpontSystemCatalog::UINT:
+            case execplan::CalpontSystemCatalog::UMEDINT:
+            case execplan::CalpontSystemCatalog::UTINYINT:
+			case execplan::CalpontSystemCatalog::USMALLINT:
 			case execplan::CalpontSystemCatalog::VARCHAR: // including CHAR'
 			case execplan::CalpontSystemCatalog::CHAR:
 			case execplan::CalpontSystemCatalog::DOUBLE:
+            case execplan::CalpontSystemCatalog::UDOUBLE:
 			case execplan::CalpontSystemCatalog::FLOAT:
+            case execplan::CalpontSystemCatalog::UFLOAT:
 			{
 				expr = pm[0]->data()->getStrVal(row, isNull);
 				break;
@@ -84,12 +91,13 @@ namespace
 				break;
 			}		
 			case execplan::CalpontSystemCatalog::DECIMAL:
+            case execplan::CalpontSystemCatalog::UDECIMAL:
 			{
 				IDB_Decimal d = pm[0]->data()->getDecimalVal(row, isNull);
 	
 				char buf[80];
 	
-				dataconvert::DataConvert::decimalToString( d.value, d.scale, buf, 80);
+				dataconvert::DataConvert::decimalToString(d.value, d.scale, buf, 80, pm[0]->data()->resultType().colDataType);
 	
 				expr = buf;
 				break;
@@ -110,9 +118,16 @@ namespace
 			case execplan::CalpontSystemCatalog::MEDINT:
 			case execplan::CalpontSystemCatalog::TINYINT:
 			case execplan::CalpontSystemCatalog::SMALLINT:
+            case execplan::CalpontSystemCatalog::UBIGINT:
+            case execplan::CalpontSystemCatalog::UINT:
+            case execplan::CalpontSystemCatalog::UMEDINT:
+            case execplan::CalpontSystemCatalog::UTINYINT:
+            case execplan::CalpontSystemCatalog::USMALLINT:
 			case execplan::CalpontSystemCatalog::VARCHAR: // including CHAR'
 			case execplan::CalpontSystemCatalog::DOUBLE:
+            case execplan::CalpontSystemCatalog::UDOUBLE:
 			case execplan::CalpontSystemCatalog::FLOAT:
+            case execplan::CalpontSystemCatalog::UFLOAT:
 			case execplan::CalpontSystemCatalog::CHAR:
 			{
 				pattern = pm[1]->data()->getStrVal(row, isNull);
@@ -131,12 +146,13 @@ namespace
 				break;
 			}		
 			case execplan::CalpontSystemCatalog::DECIMAL:
+            case execplan::CalpontSystemCatalog::UDECIMAL:
 			{
 				IDB_Decimal d = pm[1]->data()->getDecimalVal(row, isNull);
 	
 				char buf[80];
 	
-				dataconvert::DataConvert::decimalToString( d.value, d.scale, buf, 80);
+				dataconvert::DataConvert::decimalToString( d.value, d.scale, buf, 80, pm[1]->data()->resultType().colDataType);
 	
 				pattern = buf;
 				break;

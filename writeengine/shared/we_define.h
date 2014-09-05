@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: we_define.h 4681 2013-06-18 17:31:02Z dcathey $
+//  $Id: we_define.h 4684 2013-06-18 19:47:46Z dcathey $
 
 /** @file */
 
@@ -74,6 +74,7 @@ namespace WriteEngine
     const unsigned int SUBSYSTEM_ID_WE      = 19;
     const unsigned int SUBSYSTEM_ID_WE_SRV  = 32;
     const unsigned int SUBSYSTEM_ID_WE_SPLIT= 33;
+    const unsigned int SUBSYSTEM_ID_WE_BULK = 34;
 
     //--------------------------------------------------------------------------
     // Default definitions
@@ -248,6 +249,8 @@ namespace WriteEngine
     const int   ERR_BULK_DBROOT_CHANGE      = ERR_BULKBASE + 7; // Local DBRoot settings changed during an import
     const int   ERR_BULK_ROLLBACK_MISS_ROOT = ERR_BULKBASE + 8; // Mode3 automatic rollback skipped with missing DBRoot
     const int   ERR_BULK_ROLLBACK_SEG_LIST  = ERR_BULKBASE + 9; // Error building segment file list in a directory
+    const int   ERR_BULK_BINARY_PARTIAL_REC = ERR_BULKBASE + 10;// Binary input did not end on fixed length record boundary
+    const int   ERR_BULK_BINARY_IGNORE_FLD  = ERR_BULKBASE + 11;// <IgnoreField> tag not supported for binary import
 
     //--------------------------------------------------------------------------
     // BRM error

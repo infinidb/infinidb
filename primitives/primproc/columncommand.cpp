@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: columncommand.cpp 2058 2013-02-13 18:07:30Z pleblanc $
+// $Id: columncommand.cpp 2057 2013-02-13 17:00:10Z pleblanc $
 // C++ Implementation: columncommand
 //
 // Description: 
@@ -188,7 +188,6 @@ void ColumnCommand::issuePrimitive()
 	oidLastLbid = getLastLbid();
 	uint blocksToLoad = 0;
 	BRM::LBID_t *lbids = (BRM::LBID_t *) alloca(8 * sizeof(BRM::LBID_t));
-	BRM::VER_t *vers = (BRM::VER_t *) alloca(8 * sizeof(BRM::VER_t));
 	uint8_t **blockPtrs = (uint8_t **) alloca(8 * sizeof(uint8_t *));	
 
 	_mask = mask;
@@ -199,7 +198,6 @@ void ColumnCommand::issuePrimitive()
 
 		if ((!lastBlockReached && _isScan) || (!_isScan && primMsg->RidFlags & _mask)) {
 			lbids[blocksToLoad] = primMsg->LBID + i;
-			vers[blocksToLoad] = bpp->versionNum;
 			blockPtrs[blocksToLoad] = &bpp->blockData[i * BLOCK_SIZE];
 			blocksToLoad++;
 			loadCount++;
@@ -251,7 +249,7 @@ void ColumnCommand::issuePrimitive()
 	
 	/* Do the load */
 	wasCached = primitiveprocessor::loadBlocks(lbids, 
-									vers, 
+									bpp->versionInfo,
 									bpp->txnID,
 									colType.compressionType,
 									blockPtrs, 
@@ -492,7 +490,7 @@ void ColumnCommand::prep(int8_t outputType, bool absRids)
 	primMsg->hdr.SessionID = bpp->sessionID;
 	//primMsg->hdr.StatementID = 0;
 	primMsg->hdr.TransactionID = bpp->txnID;
-	primMsg->hdr.VerID = bpp->versionNum;
+	primMsg->hdr.VerID = bpp->versionInfo.currentScn;
 	primMsg->hdr.StepID = bpp->stepID;
 	primMsg->DataSize = colType.colWidth;
 	primMsg->DataType = colType.colDataType;
@@ -778,62 +776,62 @@ void ColumnCommand::enableFilters()
 * RETURN:
 *    emptyVal - the value of empty row
 ***********************************************************/
-const int64_t ColumnCommand::getEmptyRowValue( const execplan::CalpontSystemCatalog::ColDataType dataType, const int width ) const
+const uint64_t ColumnCommand::getEmptyRowValue( const execplan::CalpontSystemCatalog::ColDataType dataType, const int width ) const
 {
-      int64_t emptyVal = 0;
-      int offset;
+    uint64_t emptyVal = 0;
+    int offset;
 
-      offset = ( dataType == execplan::CalpontSystemCatalog::VARCHAR )? -1 : 0;
-      switch( dataType ) {
-         case execplan::CalpontSystemCatalog::TINYINT : emptyVal = joblist::TINYINTEMPTYROW; break;
-         case execplan::CalpontSystemCatalog::SMALLINT: emptyVal = joblist::SMALLINTEMPTYROW; break;
-         case execplan::CalpontSystemCatalog::MEDINT :  
-         case execplan::CalpontSystemCatalog::INT :  
-                        emptyVal = joblist::INTEMPTYROW; break;
-         case execplan::CalpontSystemCatalog::BIGINT :  emptyVal = joblist::BIGINTEMPTYROW; break;
-         case execplan::CalpontSystemCatalog::FLOAT :   emptyVal = joblist::FLOATEMPTYROW; break;
-         case execplan::CalpontSystemCatalog::DOUBLE :  emptyVal = joblist::DOUBLEEMPTYROW; break;
-         case execplan::CalpontSystemCatalog::DECIMAL : 
-/*               if( width <= 4 )
-                  emptyVal = joblist::SMALLINTEMPTYROW;
-               else
-               if( width <= 9 )
-                  emptyVal = joblist::INTEMPTYROW;
-               else
-               if( width <= 18 )
-                  emptyVal = joblist::BIGINTEMPTYROW; 
-               else
-                  emptyVal = joblist::CHAR8EMPTYROW; 
-*/ 
-               // @bug 194 use the correct logic in handling empty value for decimal
-               if( width <= 1 )
-					emptyVal = joblist::TINYINTEMPTYROW; 
-				else if (width <= 2)
-                  emptyVal = joblist::SMALLINTEMPTYROW;
-               else if( width <= 4 )
-                  emptyVal = joblist::INTEMPTYROW;
-               else
-                  emptyVal = joblist::BIGINTEMPTYROW;
-               break;
-         case execplan::CalpontSystemCatalog::CHAR : 
-         case execplan::CalpontSystemCatalog::VARCHAR : 
-         case execplan::CalpontSystemCatalog::DATE :
-         case execplan::CalpontSystemCatalog::DATETIME :
-         case execplan::CalpontSystemCatalog::VARBINARY : 
-         default:
-               emptyVal = joblist::CHAR1EMPTYROW;
-               if( width == (2 + offset) )
-                  emptyVal = joblist::CHAR2EMPTYROW; 
-               else
-               if( width >= (3 + offset) && width <= ( 4 + offset ) )
-                  emptyVal = joblist::CHAR4EMPTYROW; 
-               else
-               if( width >= (5 + offset)  )
-                  emptyVal = joblist::CHAR8EMPTYROW;
-               break;
-      }
+    offset = ( dataType == execplan::CalpontSystemCatalog::VARCHAR )? -1 : 0;
+    switch ( dataType )
+    {
+        case execplan::CalpontSystemCatalog::TINYINT : emptyVal = joblist::TINYINTEMPTYROW; break;
+        case execplan::CalpontSystemCatalog::SMALLINT: emptyVal = joblist::SMALLINTEMPTYROW; break;
+        case execplan::CalpontSystemCatalog::MEDINT :  
+        case execplan::CalpontSystemCatalog::INT :     emptyVal = joblist::INTEMPTYROW; break;
+        case execplan::CalpontSystemCatalog::BIGINT :  emptyVal = joblist::BIGINTEMPTYROW; break;
 
-      return emptyVal;
+        case execplan::CalpontSystemCatalog::UTINYINT : emptyVal = joblist::UTINYINTEMPTYROW; break;
+        case execplan::CalpontSystemCatalog::USMALLINT: emptyVal = joblist::USMALLINTEMPTYROW; break;
+        case execplan::CalpontSystemCatalog::UMEDINT :  
+        case execplan::CalpontSystemCatalog::UINT :     emptyVal = joblist::UINTEMPTYROW; break;
+        case execplan::CalpontSystemCatalog::UBIGINT :  emptyVal = joblist::UBIGINTEMPTYROW; break;
+
+        case execplan::CalpontSystemCatalog::FLOAT :   
+        case execplan::CalpontSystemCatalog::UFLOAT :   emptyVal = joblist::FLOATEMPTYROW; break;
+        case execplan::CalpontSystemCatalog::DOUBLE :
+        case execplan::CalpontSystemCatalog::UDOUBLE :  emptyVal = joblist::DOUBLEEMPTYROW; break;
+
+        case execplan::CalpontSystemCatalog::DECIMAL : 
+        case execplan::CalpontSystemCatalog::UDECIMAL : 
+            if ( width <= 1 )
+                emptyVal = joblist::TINYINTEMPTYROW;
+            else if (width <= 2)
+                emptyVal = joblist::SMALLINTEMPTYROW;
+            else if ( width <= 4 )
+                emptyVal = joblist::INTEMPTYROW;
+            else
+                emptyVal = joblist::BIGINTEMPTYROW;
+            break;
+
+        case execplan::CalpontSystemCatalog::CHAR : 
+        case execplan::CalpontSystemCatalog::VARCHAR : 
+        case execplan::CalpontSystemCatalog::DATE :
+        case execplan::CalpontSystemCatalog::DATETIME :
+        case execplan::CalpontSystemCatalog::VARBINARY : 
+        default:
+            emptyVal = joblist::CHAR1EMPTYROW;
+            if ( width == (2 + offset) )
+                emptyVal = joblist::CHAR2EMPTYROW;
+            else
+                if ( width >= (3 + offset) && width <= ( 4 + offset ) )
+                emptyVal = joblist::CHAR4EMPTYROW;
+            else
+                if ( width >= (5 + offset)  )
+                emptyVal = joblist::CHAR8EMPTYROW;
+            break;
+    }
+
+    return emptyVal;
 }
 
 void ColumnCommand::getLBIDList(uint loopCount, vector<int64_t> *lbids)

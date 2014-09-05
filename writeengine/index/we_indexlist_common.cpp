@@ -119,7 +119,7 @@ namespace WriteEngine
         m_blockZero.state   = BLK_INIT;
         m_parentBlock.state = BLK_INIT;
         //Get the header info if the header exist already
-        if (m_hdrLbid != (i64)INVALID_LBID)
+        if (m_hdrLbid != (uint64_t)INVALID_LBID)
         {                     
           memset( &m_curIdxRidListHdr, 0, LIST_HDR_SIZE );
           rc =readSubBlockEntry(cb,&m_hdrBlock,m_hdrLbid, m_hdrSbid, m_hdrEntry,                                               
@@ -135,7 +135,7 @@ namespace WriteEngine
     * Private Function for getting the last Fbo on header
     * 
     ***************************************************************/    
-    const int IndexList::initGetHdr(const i64 &key, 
+    const int IndexList::initGetHdr(const uint64_t &key, 
                                    IdxEmptyListEntry* curIdxRidListHdrPtr)                                         
     {
         int rc;
@@ -217,7 +217,7 @@ namespace WriteEngine
     * either it is 0 or get it from BRM    
     * 
     ***************************************************************/         
-    const int  IndexList::resetBlkZero(i64& lbid0)
+    const int  IndexList::resetBlkZero(uint64_t& lbid0)
     {
         int rc = NO_ERROR;
         CommBlock cb;
@@ -244,7 +244,7 @@ namespace WriteEngine
     * Private Function for writing block zero
     * 
     ***************************************************************/         
-    const int  IndexList::writeBlkZero(i64& lbid0)
+    const int  IndexList::writeBlkZero(uint64_t& lbid0)
     { 
       int rc;
       CommBlock cb;
@@ -268,7 +268,7 @@ namespace WriteEngine
     {
       int rc = ERR_IDX_LIST_GET_SEGMT;
       CommBlock cb;
-      i64 lbid0; 
+      uint64_t lbid0; 
       
       m_pFile = pFile;
       cb.file.oid   = m_oid;
@@ -319,7 +319,7 @@ namespace WriteEngine
        IdxEmptyListEntry      releasePtrEntry;
        int entryType = 0;
        int rc;
-       i64 lbid0;
+       uint64_t lbid0;
        CommBlock cb;
        cb.file.oid = m_oid;
        cb.file.pFile = m_pFile;
@@ -349,10 +349,10 @@ namespace WriteEngine
     * Private Function for setting the last Fbo on header
     * 
     ***************************************************************/    
-    const int  IndexList::setLastLbid( i64& lastLbid)
+    const int  IndexList::setLastLbid( uint64_t& lastLbid)
     {
        int rc = NO_ERROR;
-       i64 lbid;
+       uint64_t lbid;
        int sbid,entry;
        IdxRidListPtr lastFboListPtr;
        
@@ -388,7 +388,7 @@ namespace WriteEngine
     * Private Function for setting the last Fbo on header
     * 
     ***************************************************************/    
-    const int IndexList::setLastFboPtr(i64& lbid, int& sbid, 
+    const int IndexList::setLastFboPtr(uint64_t& lbid, int& sbid, 
                                        IdxRidListPtr& lastFboListPtr)
     {
       int rc = NO_ERROR;
@@ -435,7 +435,7 @@ namespace WriteEngine
     const int  IndexList::getLastLbid()
     {
         int rc = NO_ERROR;
-        i64 lbid;
+        uint64_t lbid;
         int sbid,entry;
         IdxRidListPtr lastFboListPtr;
         if (m_curIdxRidListHdr.nextIdxRidListPtr.type !=(int)LIST_SUBBLOCK_TYPE)
@@ -462,7 +462,7 @@ namespace WriteEngine
     * Private Function for setting the last Fbo on header
     * 
     ***************************************************************/    
-    const int  IndexList::getLastFboPtr(i64& lbid, int& sbid, 
+    const int  IndexList::getLastFboPtr(uint64_t& lbid, int& sbid, 
                                         IdxRidListPtr& lastFboListPtr)
     {
       int rc = NO_ERROR;
@@ -501,7 +501,7 @@ namespace WriteEngine
     const int  IndexList::getSubBlk()
     {
         int rc = NO_ERROR;
-        i64 lbid;
+        uint64_t lbid;
         int sbid,entry;
         RID rowIdArray[ENTRY_PER_SUBBLOCK];
         DataBlock dataBlk;
@@ -523,7 +523,7 @@ namespace WriteEngine
     * Private Function for getting the sub block
     * 
     ***************************************************************/ 
-    const int  IndexList::getSubBlk(i64& lbid, int& sbid, int& entry)
+    const int  IndexList::getSubBlk(uint64_t& lbid, int& sbid, int& entry)
     {
         int rc = NO_ERROR;
        if (m_curIdxRidListHdr.nextIdxRidListPtr.type == (int)LIST_SUBBLOCK_TYPE)
@@ -551,7 +551,7 @@ namespace WriteEngine
     * Private Function for getting a particular block
     * 
     ***************************************************************/ 
-    const int  IndexList::getBlk(i64& lbid)
+    const int  IndexList::getBlk(uint64_t& lbid)
     {
         int rc = NO_ERROR;
         RID rowIdArray[MAX_BLOCK_ENTRY];
@@ -632,9 +632,9 @@ namespace WriteEngine
     *        true --found
     *        false--not found                 
     ************************************************/                
-    const int  IndexList::findFirstBlk(FILE* pFile, const i64& key,
+    const int  IndexList::findFirstBlk(FILE* pFile, const uint64_t& key,
                                  IdxEmptyListEntry* curIdxRidListHdrPtr,
-                                 i64& lbid)
+                                 uint64_t& lbid)
     {
       int rc; 
       CommBlock cb;
@@ -764,12 +764,12 @@ namespace WriteEngine
       { 
          IdxRidParentListPtr parentIdxListPtr;
          memset(&parentIdxListPtr, 0, sizeof(parentIdxListPtr));
-         parentIdxListPtr.parentLbid = (i64)INVALID_LBID;
+         parentIdxListPtr.parentLbid = (uint64_t)INVALID_LBID;
       
          rc = getParentInfoFromArray(parentIdxListPtr);
-         m_parentLbid = (i64)parentIdxListPtr.parentLbid;
+         m_parentLbid = (uint64_t)parentIdxListPtr.parentLbid;
          //If this block has no parent, then it is the first block
-         if ((m_parentLbid<= (i64)0)|| (m_parentLbid == (i64)INVALID_LBID))
+         if ((m_parentLbid<= (uint64_t)0)|| (m_parentLbid == (uint64_t)INVALID_LBID))
             m_parentLbid = m_lbid; //It is truly itself
          //The previous lbid m_lbid is full, so we have to go to nextLbid 
          // and register it to the parent block

@@ -1,34 +1,19 @@
-/*
+/* Copyright (C) 2013 Calpont Corp.
 
- Copyright (C) 2009-2012 Calpont Corporation.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; version 2 of
+   the License.
 
- Use of and access to the Calpont InfiniDB Community software is subject to the
- terms and conditions of the Calpont Open Source License Agreement. Use of and
- access to the Calpont InfiniDB Enterprise software is subject to the terms and
- conditions of the Calpont End User License Agreement.
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
 
- This program is distributed in the hope that it will be useful, and unless
- otherwise noted on your license agreement, WITHOUT ANY WARRANTY; without even
- the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- Please refer to the Calpont Open Source License Agreement and the Calpont End
- User License Agreement for more details.
-
- You should have received a copy of either the Calpont Open Source License
- Agreement or the Calpont End User License Agreement along with this program; if
- not, it is your responsibility to review the terms and conditions of the proper
- Calpont license agreement by visiting http://www.calpont.com for the Calpont
- InfiniDB Enterprise End User License Agreement or http://www.infinidb.org for
- the Calpont InfiniDB Community Calpont Open Source License Agreement.
-
- Calpont may make changes to these license agreements from time to time. When
- these changes are made, Calpont will make a new copy of the Calpont End User
- License Agreement available at http://www.calpont.com and a new copy of the
- Calpont Open Source License Agreement available at http:///www.infinidb.org.
- You understand and agree that if you use the Program after the date on which
- the license agreement authorizing your use has changed, Calpont will treat your
- use as acceptance of the updated License.
-
- */
+   You should have received a copy of the GNU General Public License
+   along with this program; if not, write to the Free Software
+   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+   MA 02110-1301, USA. */
 
 /*******************************************************************************
  * $Id$
@@ -162,6 +147,7 @@ WESDHandler::WESDHandler(WESplitterApp& Ref) :
 		fPmCount(0),
 		fTableLock(0),
 		fTableOId(0),
+		fFixedBinaryRecLen(0),
 		fRespMutex(),
 		fRespCond(),
 		fSendMutex(),
@@ -169,6 +155,7 @@ WESDHandler::WESDHandler(WESplitterApp& Ref) :
 		fpRespThread(0),
 		fDataFeedList(),
 		fFileReadThread(*this),
+		fDisconnectFailure(false),
 		fForcedFailure(false),
 		fAllCpiStarted(false),
 		fFirstDataSent(false),
@@ -218,6 +205,7 @@ void WESDHandler::reset()
 {
 	fTableLock = 0;
 	fTableOId = 0;
+	fFixedBinaryRecLen = 0;
 	//fpRespThread = 0;
 	//fFileReadThread(*this);
 	fForcedFailure = false;
@@ -442,7 +430,8 @@ void WESDHandler::setup()
 	if(getDebugLvl()>1) cout <<"ErrLogName : " << aErrLogName << endl;
 	// consoleFlag false will only output only MSGLOG_LVL1 to console
 	// and MSGLOG_LVL2 to log file without writing to console.
-	fLog.setLogFileName(aLogName.c_str(), aErrLogName.c_str(), false);
+	//fLog.setLogFileName(aLogName.c_str(), aErrLogName.c_str(), false);
+	fLog.setLogFileName(aLogName.c_str(), aErrLogName.c_str(), getConsoleLog());
 
 	// In mode 0 and Mode 1, we need to check for local file availability
 	if ((0==fRef.fCmdArgs.getMode()) || (1==fRef.fCmdArgs.getMode()))
@@ -560,26 +549,40 @@ void WESDHandler::setup()
 	if ((fRef.fCmdArgs.getMode() == 1) || (fRef.fCmdArgs.getMode() == 2))
 	{
 		fTableOId = 0;
+		fFixedBinaryRecLen = 0;
 		try
 		{
-			fTableOId = getTableOID(fRef.fCmdArgs.getSchemaName(),
+			int32_t tblOid = getTableOID(fRef.fCmdArgs.getSchemaName(),
 					fRef.fCmdArgs.getTableName());
+			fTableOId = tblOid;
 			if (getDebugLvl())
 				cout << "Table OID = " << fTableOId << endl;
+
+			if (fRef.fCmdArgs.getImportDataMode() != IMPORT_DATA_TEXT)
+			{
+				fFixedBinaryRecLen = calcTableRecLen(
+					fRef.fCmdArgs.getSchemaName(),
+					fRef.fCmdArgs.getTableName());
+			}
 		}
 		catch (std::exception& ex)
 		{
 			std::string aDetails = fRef.fCmdArgs.getSchemaName() + "."
 					+ fRef.fCmdArgs.getTableName() + " ERROR : ";
-					//+ " Exception on getTableOID(): ";
 			std::string aStr = aDetails + ex.what();
 			logging::Message::Args errMsgArgs;
-			errMsgArgs.add(aStr);
-			fRef.fpSysLog->logMsg(errMsgArgs, logging::LOG_TYPE_ERROR, logging::M0000);
-			//cout << aStr << endl;
+			//BUG 4152
+			errMsgArgs.add(fRef.fCmdArgs.getSchemaName());
+			errMsgArgs.add(fRef.fCmdArgs.getTableName());
+			errMsgArgs.add(ex.what());
+			fRef.fpSysLog->logMsg(errMsgArgs, logging::LOG_TYPE_ERROR, logging::M0097);
 			fLog.logMsg( aStr, MSGLVL_ERROR );
 			setContinue(false);
-			throw runtime_error("Please make sure both schema and table exists!!");
+			if (fTableOId == 0) // error getting table OID
+				throw runtime_error(
+					"Please make sure both schema and table exists!!");
+			else                // error getting fixed binary record length
+				throw runtime_error( ex.what() );
 		}
 
 		int aWaitIntvl = 10;	// In seconds
@@ -608,12 +611,6 @@ void WESDHandler::setup()
 			}
 			catch (std::exception&)
 			{
-		        //ostringstream oss;
-		        //oss << "Failed to acquire tablelock ";
-		        //oss << fRef.fCmdArgs.getSchemaName() << ".";
-				//oss << fRef.fCmdArgs.getTableName();
-		        //fLog.logMsg( oss.str(), MSGLVL_ERROR );
-				//setContinue(false);
 				//throw runtime_error(ex.what());
 			}
 			if (fTableLock != 0) break;
@@ -641,8 +638,8 @@ void WESDHandler::setup()
 						cout <<"PmId = "<< aPmVec[idx] << std::endl;
 				}
 				fpBatchLoader = new BatchLoader(fTableOId, 0, aPmVec);
-				int aRet=fpBatchLoader->selectFirstPM(fFirstPmToSend, fSelectOtherPm);
-				if (aRet != 0) throw runtime_error("BatchLoader error.. exiting");
+				//int aRet=fpBatchLoader->selectFirstPM(fFirstPmToSend, fSelectOtherPm);
+				//if (aRet != 0) throw runtime_error("BatchLoader error.. exiting");
 			}
 			catch(std::exception& ex)
 			{
@@ -673,9 +670,6 @@ void WESDHandler::setup()
 				{
 					std::string aStr;
 					aStr = "Encountered NULL WESplClient : " + PmId;
-					//logging::Message::Args errMsgArgs;
-					//errMsgArgs.add(aStr);
-					//fRef.fpSysLog->logMsg(errMsgArgs, logging::LOG_TYPE_ERROR, logging::M0000);
 					cout << aStr << endl;
 					fLog.logMsg( aStr, MSGLVL_ERROR );
 					throw WESdHandlerException(aStr);
@@ -692,7 +686,7 @@ void WESDHandler::setup()
 			releaseTableLocks();	//BUG 4295 - release table lock as connection fails
 			//cout << aStr << endl;
 			fLog.logMsg( aStr, MSGLVL_ERROR );
-			throw runtime_error("Error in WESDHandler::setup()");
+			throw runtime_error("Error in connection setup.");
 		}
 	}
 
@@ -730,9 +724,6 @@ void WESDHandler::setup()
 	}
 	catch(std::exception& ex)
 	{
-	    //ostringstream oss;
-	    //oss << ex.what();
-	    //fLog.logMsg(oss.str(), MSGLVL_ERROR);
 		releaseTableLocks();	//BUG 4295
 		throw runtime_error(ex.what());
 	}
@@ -777,9 +768,6 @@ bool WESDHandler::updateCPAndHWMInBRM() {
 void WESDHandler::cancelOutstandingCpimports()
 {
 	std::string aStr = "Canceling outstanding cpimports";
-	//logging::Message::Args errMsgArgs;
-	//errMsgArgs.add(aStr);
-	//fRef.fpSysLog->logMsg(errMsgArgs, logging::LOG_TYPE_INFO, logging::M0000);
 	if(getDebugLvl()) cout << aStr << endl;
 	fLog.logMsg( aStr, MSGLVL_INFO1 );
 
@@ -793,9 +781,7 @@ void WESDHandler::cancelOutstandingCpimports()
 				if(getDebugLvl())
 					cout << "Canceling Cpimport in " << aCnt << endl;
 				// clear the sendQ
-				//mutex::scoped_lock aLock(fWeSplClients[aCnt]->fSentQMutex);
 				fWeSplClients[aCnt]->clearSendQueue();
-				//aLock.unlock();
 				messageqcpp::ByteStream aBs;
 				aBs << (ByteStream::byte) WE_CLT_SRV_EOD;
 				if (fWeSplClients[aCnt]->isConnected()) {
@@ -899,6 +885,11 @@ void WESDHandler::sendHeartbeats()
 
 void WESDHandler::shutdown()
 {
+	if(fDisconnectFailure)
+	{
+		onDisconnectFailure();
+	}
+
 	if(fRef.fSigHup)
 	{
 		onHandlingSigHup();
@@ -907,6 +898,7 @@ void WESDHandler::shutdown()
 	{
 		onHandlingSignal();
 	}
+
 
 	fDataFeedList.clearPmList();
 
@@ -921,37 +913,11 @@ void WESDHandler::shutdown()
 		{
 			fWeSplClients[aCnt]->setContinue(false);
 			fWeSplClients[aCnt]->setConnected(false);
-			fWeSplClients[aCnt]->getFpThread()->join();
+			if(fWeSplClients[aCnt]->getFpThread() != NULL)
+				fWeSplClients[aCnt]->getFpThread()->join();
 			if(getDebugLvl()) fWeSplClients[aCnt]->printStats();
-			/*
-			//Update the ImportResult
-			{
-				//int aValue= static_cast<int>(fWeSplClients[aCnt]->getElapsedTime());
-				//fImportRslt.updateTotalTime(aValue);
-				int aValue = fWeSplClients[aCnt]->fRowsUploadInfo.fRowsRead;
-				fImportRslt.updateRowsProcessed(aValue);
-				aValue = fWeSplClients[aCnt]->fRowsUploadInfo.fRowsInserted;
-				fImportRslt.updateRowsInserted(aValue);
-			}
-			*/
 		}
 	}
-	/*
-    ostringstream oss;
-    //For table walt.abc: 1000 rows processed and 1000 rows inserted.
-    oss << "For table ";
-    oss << fRef.fCmdArgs.getSchemaName() << ".";
-	oss << fRef.fCmdArgs.getTableName() << ": ";
-	oss << fImportRslt.fRowsPro << " rows processed and ";
-	oss << fImportRslt.fRowsIns << " rows inserted.";
-    fLog.logMsg( oss.str(), MSGLVL_INFO1 );
-
-    ostringstream oss1;
-    //Bulk load completed, total run time :    2.98625 seconds
-    oss1 << "Bulk load completed, total run time : ";
-    oss1 << fImportRslt.getTotalRunTime()<<" seconds" << endl;
-    fLog.logMsg( oss1.str(), MSGLVL_INFO1 );
-    */
 
 
 	mutex::scoped_lock aLock(fRespMutex);
@@ -973,9 +939,7 @@ void WESDHandler::onStartCpiResponse(int PmId)
 		cout << "On Start CPI response arrived " << PmId << endl;
 	messageqcpp::ByteStream aBs;
 	aBs << (ByteStream::byte) WE_CLT_SRV_STARTCPI;
-	//mutex::scoped_lock aLock(fSendMutex);
 	send2Pm(aBs, PmId);
-	//aLock.unlock();
 	fWeSplClients[PmId]->setCpiStarted(true);
 }
 
@@ -1019,8 +983,6 @@ void WESDHandler::onEodResponse(int PmId) {
 	if (getDebugLvl())
 		cout << "Received a EOD from " << PmId << endl;
 	fWeSplClients[PmId]->setRdSecTo(1); //Set Rd T/O to 1 sec
-
-	//fWeSplClients[PmId]->setDataRqstCount(0);	//Don't send anymore data
 
 	if (fRef.fCmdArgs.getMode() == 0)
 	{
@@ -1080,9 +1042,6 @@ void WESDHandler::onImpFileError(int PmId)
 	std::stringstream aStrStr;
 	aStrStr << "Target file Error from PM" << PmId
 			<< " - File already exists or path doesn't exist";
-	//logging::Message::Args errMsgArgs;
-	//errMsgArgs.add(aStrStr.str());
-	//fRef.fpSysLog->logMsg(errMsgArgs, logging::LOG_TYPE_ERROR, logging::M0000);
 	char aDefCon[16], aRedCol[16];
 	snprintf(aDefCon, sizeof(aDefCon), "\033[0m");
 	snprintf(aRedCol, sizeof(aRedCol), "\033[0;31m");
@@ -1116,50 +1075,15 @@ void WESDHandler::onPmErrorResponse(int PmId) {
 void WESDHandler::onKeepAliveMessage(int PmId) {
 	if (getDebugLvl())
 		cout << "Received a Keep Alive from " << PmId << endl;
-	/*	This is implemented indirectly thru fWeSpclient.onDisconnect()
-	 bool aRet = checkForRollbackAndCleanup();
-	 if((fAllCpiStarted)&&(aRet))	// if true mean ALL PM's failed.
-	 {
-	 //doRollback();
-	 if(checkAllCpiFailStatus())
-	 {
-	 doRollback();
-	 }	//TODO // if a disconnection happened to one PM
-	 else
-	 {
-	 // Stop sending data to all PMs. Also send EOF to all PMs
-	 // so that all cpimports will finish bulk upload
-	 cancelOutstandingCpimports();
-	 }
-	 }
-	 */
-
-	/*
-	 bool aRet = checkForRollbackAndCleanup();
-	 // if true mean ALL PM's failed.
-	 if(aRet)	// if true we need to do a Rollback/or canclel other imports
-	 {
-	 //doRollback();
-	 if(checkAllCpiFailStatus())
-	 {
-	 doRollback();
-	 }
-	 else
-	 {
-	 // Stop sending data to all PMs. Also send EOF to all PMs
-	 // so that all cpimports will finish bulk upload
-	 cancelOutstandingCpimports();
-	 }
-	 }
-	 */
 }
 //------------------------------------------------------------------------------
 void WESDHandler::onCpimportPass(int PmId) {
 	std::stringstream aStrStr;
 	aStrStr << "Received a Cpimport Pass from PM" << PmId;
 	logging::Message::Args errMsgArgs;
-	errMsgArgs.add(aStrStr.str());
-	fRef.fpSysLog->logMsg(errMsgArgs, logging::LOG_TYPE_INFO, logging::M0000);
+	//BUG 4152
+	errMsgArgs.add(PmId);
+	fRef.fpSysLog->logMsg(errMsgArgs, logging::LOG_TYPE_INFO, logging::M0098);
 	if (getDebugLvl())
 		cout << aStrStr.str() << endl;
 	fLog.logMsg( aStrStr.str(), MSGLVL_INFO2 );
@@ -1167,13 +1091,6 @@ void WESDHandler::onCpimportPass(int PmId) {
 	fWeSplClients[PmId]->setCpiPassed(true);
 
 	// Every CPI passed, BRM report will be send to us b4 this Msg.
-	/* When cpimport pass, BRM report will be automatically send.
-	 if(checkAllCpiPassStatus())
-	 {
-	 if(fRef.fCmdArgs.getMode() != 0) doCleanup();
-	 //fRef.onSigInterrupt(1);		// 1 for the sake of it
-	 }
-	 */
 	if (checkForCpiFailStatus()) // someone else failed,
 	{ // so set this as failed for rollback.
 		fWeSplClients[PmId]->setCpiPassed(false);
@@ -1239,9 +1156,6 @@ void WESDHandler::onCpimportFail(int PmId, bool SigHandle)
 void WESDHandler::onBrmReport(int PmId, messageqcpp::SBS& Sbs) {
 	std::stringstream aStrStr;
 	aStrStr << "Received a BRM-Report from " << PmId;
-	//logging::Message::Args errMsgArgs;
-	//errMsgArgs.add(aStrStr.str());
-	//fRef.fpSysLog->logMsg(errMsgArgs, logging::LOG_TYPE_INFO, logging::M0000);
 	fLog.logMsg( aStrStr.str(), MSGLVL_INFO2 );
 	if (getDebugLvl())
 		cout << aStrStr.str() << endl;
@@ -1252,7 +1166,7 @@ void WESDHandler::onBrmReport(int PmId, messageqcpp::SBS& Sbs) {
 	int aTotRows = 0;
 	int aInsRows = 0;
 	int aColNum = 0;
-	ColDataType aColType = INT;
+	CalpontSystemCatalog::ColDataType aColType = CalpontSystemCatalog::INT;
 	int aOorVal = 0;
 	std::string aBadFileName;
 	std::string aErrFileName;
@@ -1328,9 +1242,6 @@ void WESDHandler::onBrmReport(int PmId, messageqcpp::SBS& Sbs) {
 		if (aRslt) {
 			std::stringstream aStrStr;
 			aStrStr << "BRM updated successfully ";
-			//logging::Message::Args errMsgArgs;
-			//errMsgArgs.add(aStrStr.str());
-			//fRef.fpSysLog->logMsg(errMsgArgs, logging::LOG_TYPE_INFO, logging::M0000);
 			if (getDebugLvl()) cout << aStrStr.str() << endl;
 			fLog.logMsg( aStrStr.str(), MSGLVL_INFO2 );
 
@@ -1348,9 +1259,6 @@ void WESDHandler::onBrmReport(int PmId, messageqcpp::SBS& Sbs) {
 				{
 					std::stringstream aStrStr;
 					aStrStr << "Failed to change TableLock state to cleanup";
-					//logging::Message::Args errMsgArgs;
-					//errMsgArgs.add(aStrStr.str());
-					//fRef.fpSysLog->logMsg(errMsgArgs, logging::LOG_TYPE_INFO,	logging::M0000);
 					fLog.logMsg( aStrStr.str(), MSGLVL_ERROR );
 					if (getDebugLvl()) cout << aStrStr.str() << endl;
 				}
@@ -1398,8 +1306,9 @@ void WESDHandler::onErrorFile(int PmId, messageqcpp::SBS& Sbs) {
 	std::stringstream aStrStr;
 	aStrStr << "Received ErrReport from " << PmId;
 	logging::Message::Args errMsgArgs;
-	errMsgArgs.add(aStrStr.str());
-	fRef.fpSysLog->logMsg(errMsgArgs, logging::LOG_TYPE_INFO, logging::M0000);
+	// BUG 4152
+	errMsgArgs.add(PmId);
+	fRef.fpSysLog->logMsg(errMsgArgs, logging::LOG_TYPE_INFO, logging::M0099);
 	if (getDebugLvl()) cout << aStrStr.str() << endl;
 	fLog.logMsg( aStrStr.str(), MSGLVL_INFO2 );
 
@@ -1454,6 +1363,7 @@ void WESDHandler::onErrorFile(int PmId, messageqcpp::SBS& Sbs) {
 			(*Sbs) >> aData;
 			if (getDebugLvl()>1) cout << aData << endl;
 			aErrFile << aData;
+			aErrFile << endl;
 		}
 		aErrFile.close();
 		setErrorFileName(PmId, aErrFileName);
@@ -1471,13 +1381,15 @@ void WESDHandler::onErrorFile(int PmId, messageqcpp::SBS& Sbs) {
 }
 
 //------------------------------------------------------------------------------
-
+// Process a bulk load *.bad file containing the rejected rows from a PM.
+//------------------------------------------------------------------------------
 void WESDHandler::onBadFile(int PmId, messageqcpp::SBS& Sbs) {
 	std::stringstream aStrStr;
 	aStrStr << "Received BadData Report from " << PmId;
 	logging::Message::Args errMsgArgs;
-	errMsgArgs.add(aStrStr.str());
-	fRef.fpSysLog->logMsg(errMsgArgs, logging::LOG_TYPE_INFO, logging::M0000);
+	//BUG 4152
+	errMsgArgs.add(PmId);
+	fRef.fpSysLog->logMsg(errMsgArgs, logging::LOG_TYPE_INFO, logging::M0100);
 	if (getDebugLvl()) cout << aStrStr.str() << endl;
 	fLog.logMsg( aStrStr.str(), MSGLVL_INFO2 );
 
@@ -1522,16 +1434,25 @@ void WESDHandler::onBadFile(int PmId, messageqcpp::SBS& Sbs) {
 	aBadFileName = aStrStr.str(); //PmId+"_"+aTmpFileName;
 	if (getDebugLvl()>1)
 		cout << "Bad File Name: " << aBadFileName << endl;
-	if (getDebugLvl()>1)
+	if ( (getDebugLvl()>1) &&
+		(fRef.fCmdArgs.getImportDataMode() == IMPORT_DATA_TEXT) )
 		cout << "Bad Data: " << endl;
+	std::string task;
 	try
 	{
+		task = "opening";
 		aBadFile.open(aBadFileName.c_str());
+
+		task = "copying rejected rows to";
 		while ((*Sbs).length() > 0)
 		{
 			(*Sbs) >> aData;
-			if (getDebugLvl()>1) cout << aData << endl;
-			aBadFile << aData;
+			if ( (getDebugLvl()>1) &&
+				(fRef.fCmdArgs.getImportDataMode() == IMPORT_DATA_TEXT) )
+			{
+				cout << aData;
+			}
+			aBadFile.write( aData.c_str(), aData.length() );
 		}
 		aBadFile.close();
 		setBadFileName(PmId, aBadFileName);
@@ -1540,14 +1461,14 @@ void WESDHandler::onBadFile(int PmId, messageqcpp::SBS& Sbs) {
 		aStrStr << "Exact error rows are listed in file : "<< aBadFileName;
 		fLog.logMsg( aStrStr.str(), MSGLVL_INFO1 );
 	}
-	catch (std::exception&)
+	catch (std::exception& ex)
 	{
-		cout << "Error in opening the Error file!!" << aBadFileName << endl;
-		cout << "Error in opening the Error file!!" << aTmpFileName << endl;
-		cout << "Check for ErrorFile " << aTmpFileName << " in Pm " << PmId << endl;
+		cout << "Error in " << task << " the bad file " <<
+			aBadFileName << "; " << ex.what() << endl;
+		cout << "Check for Bad File " << aTmpFileName << " on Pm " <<PmId<<endl;
 	}
-
 }
+
 //------------------------------------------------------------------------------
 
 void WESDHandler::getErrorLog(int PmId, const std::string& ErrFileName) {
@@ -1594,9 +1515,10 @@ void WESDHandler::onRollbackResult(int PmId, messageqcpp::SBS& Sbs) {
 		std::stringstream aStrStr;
 		aStrStr << "Rollback Failed on PM : " << PmId;
 		logging::Message::Args errMsgArgs;
-		errMsgArgs.add(aStrStr.str());
+		//BUG 4152
+		errMsgArgs.add(PmId);
 		fRef.fpSysLog->logMsg(errMsgArgs, logging::LOG_TYPE_ERROR,
-				logging::M0000);
+				logging::M0101);
 		fLog.logMsg( aStrStr.str(), MSGLVL_ERROR );
 		if (getDebugLvl())
 			cout << aStrStr.str() << endl;
@@ -1621,9 +1543,6 @@ void WESDHandler::onRollbackResult(int PmId, messageqcpp::SBS& Sbs) {
 	} else if (aStatus == 1) {
 		std::stringstream aStrStr;
 		aStrStr << "Rollback succeed on all PMs";
-		//logging::Message::Args errMsgArgs;
-		//errMsgArgs.add(aStrStr.str());
-		//fRef.fpSysLog->logMsg(errMsgArgs, logging::LOG_TYPE_INFO, logging::M0000);
 		fLog.logMsg( aStrStr.str(), MSGLVL_INFO2 );
 		if (getDebugLvl()) cout << aStrStr.str() << endl;
 
@@ -1649,8 +1568,9 @@ void WESDHandler::onCleanupResult(int PmId, messageqcpp::SBS& Sbs) {
 		std::stringstream aStrStr;
 		aStrStr << "ERROR: Cleanup Failed on PM : " << PmId;
 		logging::Message::Args errMsgArgs;
-		errMsgArgs.add(aStrStr.str());
-		fRef.fpSysLog->logMsg(errMsgArgs, logging::LOG_TYPE_ERROR, logging::M0000);
+		//BUG 4152
+		errMsgArgs.add(PmId);
+		fRef.fpSysLog->logMsg(errMsgArgs, logging::LOG_TYPE_ERROR, logging::M0102);
 		if (getDebugLvl()) cout << aStrStr.str() << endl;
 		fLog.logMsg( aStrStr.str(), MSGLVL_ERROR );
 	}
@@ -1675,9 +1595,6 @@ void WESDHandler::onCleanupResult(int PmId, messageqcpp::SBS& Sbs) {
 
 		std::stringstream aStrStr;
 		aStrStr << "Cleanup succeed on all PMs";
-		//logging::Message::Args errMsgArgs;
-		//errMsgArgs.add(aStrStr.str());
-		//fRef.fpSysLog->logMsg(errMsgArgs, logging::LOG_TYPE_INFO, logging::M0000);
 		fLog.logMsg( aStrStr.str(), MSGLVL_INFO2 );
 		if (getDebugLvl())
 			cout << aStrStr.str() << endl;
@@ -1703,16 +1620,16 @@ void WESDHandler::onCleanupResult(int PmId, messageqcpp::SBS& Sbs) {
 					ossSatCnt << "Column " << (*aIt).fColName << "; Number of ";
 					switch ((*aIt).fColType)
 					{
-					case DATE:
+					case CalpontSystemCatalog::DATE:
 						ossSatCnt << "invalid dates replaced with null: ";
 						break;
-					case DATETIME:
+					case CalpontSystemCatalog::DATETIME:
 						ossSatCnt << "invalid date/times replaced with null: ";
 						break;
-					case CHAR:
+					case CalpontSystemCatalog::CHAR:
 						ossSatCnt << "character strings truncated: ";
 						break;
-					case VARCHAR:
+					case CalpontSystemCatalog::VARCHAR:
 						ossSatCnt << "varchar strings truncated: ";
 						break;
 					default:
@@ -1775,6 +1692,7 @@ void WESDHandler::onDBRootCount(int PmId, messageqcpp::SBS& Sbs) {
 
 void WESDHandler::doRollback()
 {
+
 	std::string aAppName = "cpimport";
 	messageqcpp::ByteStream aBs;
 	aBs << (ByteStream::byte) WE_CLT_SRV_ROLLBACK;
@@ -1814,7 +1732,7 @@ bool WESDHandler::releaseTableLocks() {
 		bool aRet = aTLG.releaseTableLock(fTableLock);
 		if (aRet) {
 			std::stringstream aStrStr;
-			aStrStr << "Successfully released Table Lock!!";
+			aStrStr << "Released Table Lock";
 			logging::Message::Args errMsgArgs;
 			errMsgArgs.add(aStrStr.str());
 			fRef.fpSysLog->logMsg(errMsgArgs, logging::LOG_TYPE_INFO,
@@ -1996,18 +1914,6 @@ int WESDHandler::getNextDbrPm2Send() {
 		return aPmId; // Not all Cpi started.
 	}
 
-	/* TODO fix, so that we can choose specific PM can be imported.
-	 * It is returning a PM of the the users list.
-	//First Data should be send to PM w/least data
-	if((!fFirstDataSent)&& (1 == fRef.fCmdArgs.getMode()))
-	{
-		WEImportSelector aWeImpSel(*this);
-		aPmId = aWeImpSel.getFirstPm2SendData();
-		fFirstDataSent=true;
-		return aPmId;
-	}
-	*/
-
 	//NOTE : Implementing BatchLoader, which will be used to select the
 	//			FIRST PM to send data and subsequent PM's to send data
 	if(fpBatchLoader)//for mode 1 and 2 only, since mode 0 don't have tableOID
@@ -2112,6 +2018,62 @@ int WESDHandler::getTableOID(std::string Schema, std::string Table) {
 }
 
 //------------------------------------------------------------------------------
+// Get the expected import binary fixed record length for the specified table.
+//------------------------------------------------------------------------------
+unsigned int WESDHandler::calcTableRecLen(
+	const std::string& schema, const std::string table) {
+	unsigned int recLen = 0;
+
+	CalpontSystemCatalog::TableName tableName(schema, table);
+	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr =
+		CalpontSystemCatalog::makeCalpontSystemCatalog();
+	CalpontSystemCatalog::RIDList colRidList =
+		systemCatalogPtr->columnRIDs(tableName, true);
+	CalpontSystemCatalog::RIDList::const_iterator rid_iterator =
+		colRidList.begin();
+
+	std::set<std::string> colListInJobFile;
+	fRef.fCmdArgs.getColumnList( colListInJobFile );
+	std::set<std::string>::const_iterator setIter;
+
+	// Add up the column widths to get the total record length
+	while (rid_iterator != colRidList.end())
+	{
+		CalpontSystemCatalog::ROPair roPair = *rid_iterator;
+		CalpontSystemCatalog::OID       oid = roPair.objnum;
+		CalpontSystemCatalog::ColType   colType;
+
+		colType = systemCatalogPtr->colType(oid);
+
+		// If we have a list of column names taken from an XML job file,
+		// then we filter against that list
+		if (colListInJobFile.size() > 0)
+		{
+			CalpontSystemCatalog::TableColName colName;
+			colName = systemCatalogPtr->colName(oid);
+			
+			setIter = colListInJobFile.find( colName.column );
+			if (setIter != colListInJobFile.end())
+			{
+				recLen += colType.colWidth;
+			}
+		}
+		else
+		{
+			recLen += colType.colWidth;
+		}
+
+		++rid_iterator;
+	}
+
+	if(getDebugLvl())
+		cout << "Binary record length for " << schema << '.' << table <<
+			" is: " << recLen << endl;
+
+	return recLen;
+}
+
+//------------------------------------------------------------------------------
 
 void WESDHandler::check4CpiInvokeMode() {
 	try {
@@ -2139,8 +2101,6 @@ void WESDHandler::check4CpiInvokeMode() {
 					{
 				fRef.fCmdArgs.setCpiInvoke();
 			} else if (fRef.fCmdArgs.getArgMode() == 0) {
-				//if (getDebugLvl())
-				//	cout << "Mode 0 is NOT allowed in UM+PM Nodes" << endl;
 				throw runtime_error("Mode 0 allowed only in Multi-Nodes.");
 			}
 
@@ -2148,10 +2108,8 @@ void WESDHandler::check4CpiInvokeMode() {
 				&& (aModuleType == "um")) {
 			//BUG 4165
 			if (fRef.fCmdArgs.getMode() == 3) {
-				//if (getDebugLvl())
-				//	cout << "Mode 3 imports can only be run on a PM." << endl;
 				throw runtime_error("Mode 3 imports can only be run on a PM.");
-			} //fRef.fCmdArgs.setBlockMode3(); Not used anymore
+			} 
 			else if (fRef.fCmdArgs.getMode() == -1) //default mode //BUG 4210
 					{
 				fRef.fCmdArgs.setMode(1);
@@ -2230,13 +2188,6 @@ void WESDHandler::exportJobFile(std::string &JobId, std::string &JobFileName)
 	aInFile.open(JobFileName.c_str());
 	if ((aInFile.is_open()) && (!aInFile.eof()))
 	{
-
-		//char aBuff[256];
-		//snprintf(aBuff, sizeof(aBuff), "%s/Job_%s.xml",
-		//		fRef.fCmdArgs.getTmpFileDir().c_str(),
-		//		JobId.c_str());
-		//std::string aRmtFile(aBuff);
-
 		std::stringstream aSs;
 		aSs << fRef.fCmdArgs.getTmpFileDir();
 		aSs <<"/Job_";
@@ -2245,13 +2196,11 @@ void WESDHandler::exportJobFile(std::string &JobId, std::string &JobFileName)
 
 		messageqcpp::ByteStream aBs;
 		aBs << (ByteStream::byte) WE_CLT_SRV_JOBID;
-		//aBs << aRmtFile;
 		aBs << aSs.str();
 		send2Pm(aBs);
 
 		if (getDebugLvl())
 			cout << "exportJobFile::Send RmtFileName " << aSs.str() << endl;
-			//cout << "exportJobFile::Send RmtFileName " << aRmtFile << endl;
 
 		// Read everything to a String
 		std::string aData((std::istreambuf_iterator<char>(aInFile)),
@@ -2264,7 +2213,6 @@ void WESDHandler::exportJobFile(std::string &JobId, std::string &JobFileName)
 		send2Pm(aBs);
 
 	} else {
-		//cout << "Unable to open Job File: " << JobFileName << endl;
 		throw runtime_error("unable to open Job File");
 	}
 
@@ -2307,6 +2255,11 @@ std::string WESDHandler::getTableName() const
 std::string WESDHandler::getSchemaName() const
 {
 	return fRef.fCmdArgs.getSchemaName();
+}
+
+ImportDataMode WESDHandler::getImportDataMode() const
+{
+	return fRef.fCmdArgs.getImportDataMode();
 }
 
 //------------------------------------------------------------------------------
@@ -2354,9 +2307,6 @@ bool WESDHandler::check4InputFile(std::string InFileName)
 		aRet = (aFile.good())?true:false;
 		// add back to list, which we pop_front for checking the file.
 		if(aRet) fFileReadThread.add2InputDataFileList(aFileName);
-
-		//std::ifstream aFile(InFileName.c_str());
-		//aRet = (aFile.good())?true:false;
 	}
 	return aRet;
 }
@@ -2380,20 +2330,10 @@ void WESDHandler::onHandlingSignal()
 	aStrStr1 <<"Handling signal ......";
 	fLog.logMsg( aStrStr1.str(), MSGLVL_INFO1 );
 
-	//cout <<aRedCol<<"Handling signal... please be patient..."<<aDefCon<< endl;
 	fRef.fSignaled = false;
 	bool aTblLockReleased = false;
-	//fFileReadThread.shutdown();
-	//Give time to shutdown the read thread.
-	//if (fFileReadThread.getFpThread()) fFileReadThread.getFpThread()->join();
-	//usleep(2000000);
-	//TODO - this hard coded PM "1" has to change later to the first valid one
 	onCpimportFail(0, true);
-	//cout << "Canceling cpimport... please be patient." << endl;
-	//cout << "Canceling cpimport... please be patient." << endl;
 	usleep(2000000*fPmCount);
-	//cancelOutstandingCpimports();
-	//usleep(1500000*fPmCount);
 
 	//BUG 4649  - Some systems taking too long to finish the process.
 	//				So we have to wait some more time.
@@ -2464,7 +2404,103 @@ void WESDHandler::onHandlingSigHup()
 
 //------------------------------------------------------------------------------
 
+void WESDHandler::onDisconnectFailure()
+{
+	string aStr("Trying to reconnect and rollback");
+	fLog.logMsg( aStr, MSGLVL_INFO1 );
 
+	for (int aSec = 0; aSec < 15; aSec++ )
+	{
+		bool aDisconnect = false;
+		usleep(1000000);
+		for (int PmId = 1; PmId <= fPmCount; ++PmId)
+		{
+			if (fWeSplClients[PmId] != 0)
+			{
+				if (!fWeSplClients[PmId]->isConnected())
+				{
+					aDisconnect = true;
+					try
+					{
+						fWeSplClients[PmId]->setup();
+					}
+					catch(runtime_error& re)
+					{
+						cout << "Unable to connect to PM" <<
+								PmId <<"; Trying again..."<< endl;
+					}
+				}
+			}
+		}
+		if(!aDisconnect) break;
+	}
+
+	doRollback();
+
+	bool aTblLockReleased = false;
+	bool aRollbackSuccess = true;
+	//BUG 4649  - Some systems taking too long to finish the process.
+	//				So we have to wait some more time.
+	std::stringstream aStrStr2;
+	aStrStr2 << "Rolling back ..........";
+	fLog.logMsg( aStrStr2.str(), MSGLVL_INFO1 );
+	for(int aIdx=0; aIdx<10; aIdx++)
+	{
+		int aStatus = check4RollbackRslts();
+		if(1==aStatus)
+		{
+			if (getDebugLvl()) cout << "Rollback Successful... " << endl;
+			break;
+		}
+		else if(-1 == aStatus)
+		{
+			if (getDebugLvl()) cout << "Rollback Failed... " << endl;
+			aRollbackSuccess = false;
+			break;
+		}
+		usleep(2000000*fPmCount);
+	}
+
+	std::stringstream aStrStr3;
+	aStrStr3 << "Cleaning up ..........";
+	fLog.logMsg( aStrStr3.str(), MSGLVL_INFO1 );
+	for(int aIdx=0; aIdx<10; aIdx++)
+	{
+		int aStatus = check4CleanupRslts();
+		if(aStatus == 1)
+		{
+			if (getDebugLvl()) cout << "Cleanup Successful... " << endl;
+			if(aRollbackSuccess)
+			{
+				releaseTableLocks();
+				aTblLockReleased = true;
+			}
+			break;
+		}
+		usleep(2000000*fPmCount);
+	}
+
+	if((!aTblLockReleased) && (aRollbackSuccess))
+	{
+		releaseTableLocks();
+	}
+
+}
+
+//------------------------------------------------------------------------------
+
+void WESDHandler::setDisconnectFailure(bool Flag)
+{
+	if(fFileReadThread.isContinue())    //check already stopped running
+	{
+		sendEODMsg();
+		fFileReadThread.shutdown();
+	}
+	fDisconnectFailure = Flag;
+	fRef.onSigInterrupt(1);     // process altogether is a failure
+}
+
+//------------------------------------------------------------------------------
 
 } /* namespace WriteEngine */
 

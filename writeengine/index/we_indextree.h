@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************************
-* $Id: we_indextree.h 3720 2012-04-04 18:18:49Z rdempsey $
+* $Id: we_indextree.h 4450 2013-01-21 14:13:24Z rdempsey $
 *
 ******************************************************************************************/
 /** @file */
@@ -63,17 +63,17 @@ public:
    /**
     * @brief Build empty index tree part
     */
-   EXPORT const int      buildEmptyTreePart( const i64 key, const int width, const RID rid, const int startBitTestNo, const int offset = 0 );
+   EXPORT const int      buildEmptyTreePart( const uint64_t key, const int width, const RID rid, const int startBitTestNo, const int offset = 0 );
 
    /**
     * @brief Build empty index branch
     */
-   EXPORT const int      buildEmptyIndexTreeBranch( const i64 key, const int width, const RID rid, const int rootTestbitVal );
+   EXPORT const int      buildEmptyIndexTreeBranch( const uint64_t key, const int width, const RID rid, const int rootTestbitVal );
 
    /**
     * @brief Build exist index branch
     */
-   EXPORT const int      buildExistIndexTreeBranch( const i64 key, const int width, const RID rid, const int rootTestbitVal, IdxBitmapPointerEntry bitmapEntry );
+   EXPORT const int      buildExistIndexTreeBranch( const uint64_t key, const int width, const RID rid, const int rootTestbitVal, IdxBitmapPointerEntry bitmapEntry );
 
    /**
     * @brief Calculate bit test array
@@ -98,7 +98,7 @@ public:
    /**
     * @brief Delete a value from an index
     */
-   EXPORT const int      deleteIndex( const i64 key, const int width, const RID rid );
+   EXPORT const int      deleteIndex( const uint64_t key, const int width, const RID rid );
 
    /**
     * @brief Drop index related files
@@ -119,18 +119,18 @@ public:
    /**
     * @brief Get the test bit value
     */
-   EXPORT const bool     getTestbitValue( const i64 key, const int width, const int curTestNo, int* bittestVal );
+   EXPORT const bool     getTestbitValue( const uint64_t key, const int width, const int curTestNo, int* bittestVal );
 
    /**
     * @brief Get the match entry in the tree
     */
-   EXPORT const bool     getTreeMatchEntry( DataBlock* block, const i64 sbid, const i64 entry, const int width,
+   EXPORT const bool     getTreeMatchEntry( DataBlock* block, const uint64_t sbid, const uint64_t entry, const int width,
                                      const int allocCount, const bool* entryMap, int* matchEntry, IdxBitTestEntry* checkEntry );
 
    /**
     * @brief Get the tree node summary information
     */
-   EXPORT const int      getTreeNodeInfo( DataBlock* block, const i64 sbid, const i64 entry, const int width,
+   EXPORT const int      getTreeNodeInfo( DataBlock* block, const uint64_t sbid, const uint64_t entry, const int width,
                                    const IdxTreeGroupType group, int* allocCount, int* realCount, bool* entryMap );
 
    /**
@@ -151,8 +151,8 @@ public:
    /**
     * @brief Move tree entries
     */
-   EXPORT const int      moveEntry( const i64 oldFbo, const i64 oldSbid, const i64 oldEntry, const int width,  const i64 newFbo,
-                             const i64 newSbid, const i64 newEntry, const int newGroup, const int allocCount, bool* entryMap, int* moveCount, const int newAllocCount = 0 );
+   EXPORT const int      moveEntry( const uint64_t oldFbo, const uint64_t oldSbid, const uint64_t oldEntry, const int width,  const uint64_t newFbo,
+                             const uint64_t newSbid, const uint64_t newEntry, const int newGroup, const int allocCount, bool* entryMap, int* moveCount, const int newAllocCount = 0 );
 
    /**
     * @brief Open index related files
@@ -162,7 +162,7 @@ public:
    /**
     * @brief Process index, including delete and search
     */
-   EXPORT const int      processIndex( const i64 key, const int width, const RID rid, IdxEmptyListEntry& listHdrAddr, const bool bDelete = true );
+   EXPORT const int      processIndex( const uint64_t key, const int width, const RID rid, IdxEmptyListEntry& listHdrAddr, const bool bDelete = true );
 
    /**
     * @brief A wrapper for the call to free manager
@@ -182,7 +182,7 @@ public:
    /**
     * @brief Set bit test entry
     */
-   EXPORT void           setBittestEntry( IdxBitTestEntry* bittestEntry, const i64 testbitVal, const i64 group, const i64 fbo, const i64 sbid, const i64 entry, const i64 entryType = BIT_TEST ) const;
+   EXPORT void           setBittestEntry( IdxBitTestEntry* bittestEntry, const uint64_t testbitVal, const uint64_t group, const uint64_t fbo, const uint64_t sbid, const uint64_t entry, constu int64_t entryType = BIT_TEST ) const;
 
    /**
     * @brief Set blank entry
@@ -192,7 +192,7 @@ public:
    /**
     * @brief Set empty list ptr entry
     */
-   EXPORT void           setEmptyListEntry( IdxEmptyListEntry* myEntry, const i64 group, const i64 fbo, const i64 sbid, const i64 entry ) const;
+   EXPORT void           setEmptyListEntry( IdxEmptyListEntry* myEntry, const uint64_t group, const uint64_t fbo, const uint64_t sbid, const uint64_t entry ) const;
 
    /**
     * @brief Set transaction Id
@@ -206,9 +206,9 @@ public:
    /**
     * @brief Update a value in an index
     */
-   EXPORT const int      updateIndex( const i64 key, const int width, const RID rid );
+   EXPORT const int      updateIndex( const uint64_t key, const int width, const RID rid );
 
-   EXPORT const int      updateListFile( const i64 key, const int width, const RID rid, const int curLevel, const i64 group, const int allocCount, const int useCount, const int offset, const bool addFlag = false );
+   EXPORT const int      updateListFile( const uint64_t key, const int width, const RID rid, const int curLevel, const uint64_t group, const int allocCount, const int useCount, const int offset, const bool addFlag = false );
 
 
    // internal use functions
@@ -218,12 +218,12 @@ public:
    const DataBlock& getRootBlock() { return m_rootBlock; }
    const bool     getUseMultiRid() { return m_useMultiRid; }
 
-   EXPORT void           setTreeHeader( IdxTree* myTree, const i64 key, const RID rid, const int width,
+   EXPORT void           setTreeHeader( IdxTree* myTree, const uint64_t key, const RID rid, const int width,
                                   const int testbitVal, const IdxBitmapPointerEntry bitmapEntry );
    EXPORT void           setTreeNode( IdxTreeNode* myNode, const int level, const int allocCount, const int useCount,
                                  const int offset, const IdxBitTestEntry nextEntry, const IdxBitTestEntry curEntry  );
 
-   EXPORT const int      updateIndexList( const i64 key, const int width, const RID rid, IdxEmptyListEntry* myEntry, const int no, const bool addFlag = false);
+   EXPORT const int      updateIndexList( const uint64_t key, const int width, const RID rid, IdxEmptyListEntry* myEntry, const int no, const bool addFlag = false);
 
    EXPORT void           printMemSubBlock( DataBlock* curBlock, const int sbid, const bool bNoZero = false );
    EXPORT void           printSubBlock( const int fbo, const int sbid, const bool bNoZero = false );

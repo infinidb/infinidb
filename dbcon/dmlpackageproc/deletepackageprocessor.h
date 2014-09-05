@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: deletepackageprocessor.h 8436 2012-04-04 18:18:21Z rdempsey $
+ *   $Id: deletepackageprocessor.h 9302 2013-03-07 16:06:59Z chao $
  *
  *
  ***********************************************************************/
@@ -49,7 +49,7 @@ class DeletePackageProcessor : public DMLPackageProcessor
 
 public:
 
-    DeletePackageProcessor() : DMLPackageProcessor(){}
+    DeletePackageProcessor(BRM::DBRM* aDbrm) : DMLPackageProcessor(aDbrm){}
     /** @brief process a DeleteDMLPackage
       *
       * @param cpackage the delete dml package to process
@@ -71,7 +71,7 @@ private:
                    WriteEngine::RIDList& rowIDList, WriteEngine::ColValueList& colOldValuesList,
                    DMLResult& result);
 	  */
-    bool processRowgroup(messageqcpp::ByteStream & aRowGroup, DMLResult& result, const uint64_t uniqueId, dmlpackage::CalpontDMLPackage& cpackage, bool isMeta = false, uint dbroot=1);
+    bool processRowgroup(messageqcpp::ByteStream & aRowGroup, DMLResult& result, const uint64_t uniqueId, dmlpackage::CalpontDMLPackage& cpackage, std::map<unsigned, bool>& pmStateDel, bool isMeta = false, uint dbroot=1);
 
 
     /** @brief add all rows if we have no filter for the delete
@@ -79,7 +79,7 @@ private:
       * @param tablePtr a pointer to the table that is being operated on
       */
    uint64_t fixUpRows(dmlpackage::CalpontDMLPackage& cpackage, DMLResult& result, const uint64_t uniqueId);
-   bool receiveAll(DMLResult& result, const uint64_t uniqueId, std::vector<int>& fPMs);
+   bool receiveAll(DMLResult& result, const uint64_t uniqueId, std::vector<int>& fPMs, std::map<unsigned, bool>& pmStateDel);
    
 	//bandListsByExtent bandListsMap;
 

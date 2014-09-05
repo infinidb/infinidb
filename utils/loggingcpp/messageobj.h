@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************************
-* $Id: messageobj.h 3048 2012-04-04 15:33:45Z rdempsey $
+* $Id: messageobj.h 3495 2013-01-21 14:09:51Z rdempsey $
 *
 ******************************************************************************************/
 /**
@@ -25,12 +25,16 @@
 #ifndef LOGGING_MESSAGEOBJ_H
 #define LOGGING_MESSAGEOBJ_H
 
-#include <iosfwd>
 #include <string>
 #include <vector>
 #include <boost/any.hpp>
+#include <sys/types.h>
+#include <stdint.h>
 
-#include "configcpp.h"
+namespace config
+{
+class Config;
+}
 
 class MessageLoggingTest;
 

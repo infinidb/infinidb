@@ -20,12 +20,17 @@
  *
  ****************************************************************************/
 
+#include <iostream>
+#include <string>
+#include <cassert>
+using namespace std;
+
 #include "brm.h"
 #include "slavecomm.h"
-#include <iostream>
-
 using namespace BRM;
-using namespace std;
+
+#include "configcpp.h"
+using namespace config;
 
 void usage(char *name)
 {
@@ -39,19 +44,23 @@ int main(int argc, char **argv)
 	int err;
 	string prefix;
 
+	Config* cf = Config::makeConfig();
+
 	if (argc > 2)
 		usage(argv[0]);
 	else if (argc == 2)
 		prefix = argv[1];
 	else
-		prefix = "BRM_saves";
+		prefix = cf->getConfig("SystemConfig", "DBRMRoot");
+
+	assert(!prefix.empty());
 
 	err = brm.printJournal(prefix);
 	if (err == -1) {
-		cout << "Could not load BRM journal file\n";
+		cout << "Could not load BRM journal file" << endl;
 		return 1;
 	}
 
-	cout << "done\n";
+	cout << "done" << endl;
 	return 0;
 }

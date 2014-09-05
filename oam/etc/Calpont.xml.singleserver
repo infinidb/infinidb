@@ -488,4 +488,7 @@
 		<User>unassigned</User>
 		<Password></Password>
 	</CrossEngineSupport>
+	<NetworkCompression>
+		<Enabled>Y</Enabled>
+	</NetworkCompression>
 </Calpont>

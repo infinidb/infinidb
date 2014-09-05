@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_round.cpp 3048 2012-04-04 15:33:45Z rdempsey $
+* $Id: func_round.cpp 3648 2013-03-19 21:33:52Z dhall $
 *
 *
 ****************************************************************************/
@@ -81,6 +81,7 @@ CalpontSystemCatalog::ColType Func_round::operationType(FunctionParm& fp, Calpon
 			case execplan::CalpontSystemCatalog::TINYINT:
 			case execplan::CalpontSystemCatalog::SMALLINT:
 			case execplan::CalpontSystemCatalog::DECIMAL:
+            case execplan::CalpontSystemCatalog::UDECIMAL:
 			{
 				if (resultType.scale > ct.scale)
 					(resultType).scale = ct.scale;
@@ -122,6 +123,15 @@ int64_t Func_round::getIntVal(Row& row,
 }
 
 
+uint64_t Func_round::getUintVal(Row& row,
+							FunctionParm& parm,
+							bool& isNull,
+							CalpontSystemCatalog::ColType& op_ct)
+{
+    return parm[0]->data()->getUintVal(row, isNull);
+}
+
+
 double Func_round::getDoubleVal(Row& row,
 							FunctionParm& parm,
 							bool& isNull,
@@ -155,6 +165,10 @@ double Func_round::getDoubleVal(Row& row,
 
 		return x;
 	}
+    if (isUnsigned(op_ct.colDataType))
+    {
+        return getUintVal(row, parm, isNull, op_ct);
+    }
 
 	IDB_Decimal x = getDecimalVal(row, parm, isNull, op_ct);
 	if (isNull)
@@ -191,6 +205,7 @@ IDB_Decimal Func_round::getDecimalVal(Row& row,
 		case execplan::CalpontSystemCatalog::TINYINT:
 		case execplan::CalpontSystemCatalog::SMALLINT:
 		case execplan::CalpontSystemCatalog::DECIMAL:
+        case execplan::CalpontSystemCatalog::UDECIMAL:
 		{
 			int64_t d = 0;
 			//@Bug 3101 - GCC 4.5.1 optimizes too aggressively here. Mark as volatile.
@@ -201,7 +216,7 @@ IDB_Decimal Func_round::getDecimalVal(Row& row,
 				int64_t nvp = p;
 				d = parm[1]->data()->getIntVal(row, isNull);
 				if (!isNull)
-					decimalPlaceDec(d, nvp, decimal.scale);
+					helpers::decimalPlaceDec(d, nvp, decimal.scale);
 				p = nvp;
 			}
 
@@ -245,8 +260,27 @@ IDB_Decimal Func_round::getDecimalVal(Row& row,
 		}
 		break;
 	
-		case execplan::CalpontSystemCatalog::DOUBLE:
+        case execplan::CalpontSystemCatalog::UBIGINT:
+        case execplan::CalpontSystemCatalog::UINT:
+        case execplan::CalpontSystemCatalog::UMEDINT:
+        case execplan::CalpontSystemCatalog::UTINYINT:
+        case execplan::CalpontSystemCatalog::USMALLINT:
+        {
+            uint64_t x = parm[0]->data()->getUintVal(row, isNull);
+            if (x > (uint64_t)helpers::maxNumber_c[18])
+            {
+                x = helpers::maxNumber_c[18];
+            }
+
+            decimal.value = x;
+            decimal.scale = 0;
+        }
+        break;
+
+        case execplan::CalpontSystemCatalog::DOUBLE:
+        case execplan::CalpontSystemCatalog::UDOUBLE:
 		case execplan::CalpontSystemCatalog::FLOAT:
+        case execplan::CalpontSystemCatalog::UFLOAT:
 		case execplan::CalpontSystemCatalog::VARCHAR:
 		case execplan::CalpontSystemCatalog::CHAR:
 		{

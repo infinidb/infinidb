@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: parsetree.h 8436 2012-04-04 18:18:21Z rdempsey $
+*   $Id: parsetree.h 9210 2013-01-21 14:10:42Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -197,7 +197,15 @@ public:
 			return (reinterpret_cast<Operator*>(fData))->getIntVal(row, isNull, fLeft, fRight);
 		else
 			return fData->getIntVal(row, isNull);
-	 }
+    }
+
+    inline uint64_t getUintVal(rowgroup::Row& row, bool& isNull) 
+    { 
+        if (fLeft && fRight)
+            return (reinterpret_cast<Operator*>(fData))->getUintVal(row, isNull, fLeft, fRight);
+        else
+            return fData->getUintVal(row, isNull);
+    }
 	
 	inline float getFloatVal(rowgroup::Row& row, bool& isNull) 
 	{ 

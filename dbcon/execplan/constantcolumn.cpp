@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: constantcolumn.cpp 9261 2013-02-06 20:59:01Z xlou $
+*   $Id: constantcolumn.cpp 9585 2013-05-31 21:08:06Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -54,10 +54,14 @@ ConstantColumn::ConstantColumn(const string& sql, TYPE type) :
 	{
 		memcpy(tmp, sql.c_str(), sql.length());
 		memset(tmp+sql.length(), 0, 8);
-		fResult.intVal = uint64ToStr(*((uint64_t *) tmp));
+		fResult.uintVal = uint64ToStr(*((uint64_t *) tmp));
+		fResult.intVal = (int64_t)fResult.uintVal;
 	}
 	else
+	{
 		fResult.intVal = atoll(sql.c_str());
+		fResult.uintVal = strtoull(sql.c_str(), NULL, 0);
+	}
 	
 	fResult.floatVal = atof(sql.c_str());
 	fResult.doubleVal = atof(sql.c_str());
@@ -70,7 +74,14 @@ ConstantColumn::ConstantColumn(const string& sql, TYPE type) :
 	// @bug 3381, default null item to integer type.
 	if (fType == ConstantColumn::NULLDATA)
 	{
-		fResultType.colDataType = CalpontSystemCatalog::BIGINT;
+        if (fResult.uintVal > (uint64_t)MAX_BIGINT)
+        {
+            fResultType.colDataType = CalpontSystemCatalog::UBIGINT;
+        }
+        else
+        {
+            fResultType.colDataType = CalpontSystemCatalog::BIGINT;
+        }
 		fResultType.colWidth = 8;
 	}
 	else
@@ -89,6 +100,7 @@ ConstantColumn::ConstantColumn(const string& sql, const double val) :
 	fResult.strVal = sql;
 	fResult.doubleVal = val;
 	fResult.intVal = (int64_t)val;
+	fResult.uintVal = (uint64_t)val;
 	fResult.floatVal = (float)val;
 	// decimal for constant should be constructed by the caller and call the decimal constructor
 	fResult.decimalVal.value = fResult.intVal;
@@ -106,11 +118,29 @@ ConstantColumn::ConstantColumn(const string& sql, const int64_t val, TYPE type) 
 {
 	fResult.strVal = sql;
 	fResult.intVal = val;
+	fResult.uintVal = (uint64_t)fResult.intVal;
 	fResult.floatVal = (float)fResult.intVal;
 	fResult.doubleVal = (double)fResult.intVal;
 	fResult.decimalVal.value = fResult.intVal;
 	fResult.decimalVal.scale = 0;
 	fResultType.colDataType = CalpontSystemCatalog::BIGINT;
+	fResultType.colWidth = 8;
+}
+
+ConstantColumn::ConstantColumn(const string& sql, const uint64_t val, TYPE type) :
+  ReturnedColumn(),
+  fConstval(sql),
+	fType(type),
+	fData(sql)
+{
+	fResult.strVal = sql;
+	fResult.uintVal = val;
+	fResult.intVal = (int64_t)fResult.uintVal;
+	fResult.floatVal = (float)fResult.uintVal;
+	fResult.doubleVal = (double)fResult.uintVal;
+	fResult.decimalVal.value = fResult.uintVal;
+	fResult.decimalVal.scale = 0;
+	fResultType.colDataType = CalpontSystemCatalog::UBIGINT;
 	fResultType.colWidth = 8;
 }
 
@@ -121,7 +151,8 @@ ConstantColumn::ConstantColumn(const string& sql, const IDB_Decimal& val) :
 	fData(sql)
 {
 	fResult.strVal = sql;
-	fResult.intVal = (int64_t)atol(sql.c_str());
+	fResult.intVal = (int64_t)atoll(sql.c_str());
+    fResult.uintVal = strtoull(sql.c_str(), NULL, 0);
 	fResult.floatVal = atof(sql.c_str());
 	fResult.doubleVal = atof(sql.c_str());
 	fResult.decimalVal = val;
@@ -164,11 +195,31 @@ ConstantColumn::ConstantColumn(const int64_t val, TYPE type) :
 	fData = oss.str();
 	fResult.strVal = fData;
 	fResult.intVal = val;
+	fResult.uintVal = (uint64_t)fResult.intVal;
 	fResult.floatVal = (float)fResult.intVal;
 	fResult.doubleVal = (double)fResult.intVal;
 	fResult.decimalVal.value = fResult.intVal;
 	fResult.decimalVal.scale = 0;
 	fResultType.colDataType = CalpontSystemCatalog::BIGINT;
+	fResultType.colWidth = 8;
+}
+
+ConstantColumn::ConstantColumn(const uint64_t val, TYPE type) :
+  ReturnedColumn(),
+	fType(type)
+{
+	ostringstream oss;
+	oss << val;
+	fConstval = oss.str();
+	fData = oss.str();
+	fResult.strVal = fData;
+	fResult.intVal = (int64_t)val;
+	fResult.uintVal = val;
+	fResult.floatVal = (float)fResult.uintVal;
+	fResult.doubleVal = (double)fResult.uintVal;
+	fResult.decimalVal.value = fResult.uintVal;
+	fResult.decimalVal.scale = 0;
+	fResultType.colDataType = CalpontSystemCatalog::UBIGINT;
 	fResultType.colWidth = 8;
 }
 
@@ -183,7 +234,7 @@ ConstantColumn::~ConstantColumn()
 const string ConstantColumn::toString() const
 {
 	ostringstream oss;
-	oss << "ConstantColumn: " << fConstval << " intVal=" << fResult.intVal;
+	oss << "ConstantColumn: " << fConstval << " intVal=" << fResult.intVal << " uintVal=" << fResult.uintVal;
 	oss << '(';
 	if (fType == LITERAL)
 		oss << 'l';
@@ -192,6 +243,7 @@ const string ConstantColumn::toString() const
 	else
 	    oss << "null";
 	oss << ')';
+    oss << " resultType=" << fResultType.colDataType;
 	if (fAlias.length() > 0) oss << "/Alias: " << fAlias;
 	return oss.str();
 }
@@ -214,11 +266,12 @@ void ConstantColumn::serialize(messageqcpp::ByteStream& b) const
 	b << (ObjectReader::id_t) ObjectReader::CONSTANTCOLUMN;
 	ReturnedColumn::serialize(b);
 	b << fConstval;
-	b << (u_int32_t) fType;
+	b << (uint32_t) fType;
 	//b << fAlias;
 	b << fData;
 	b << static_cast<const ByteStream::doublebyte>(fReturnAll);	
 	b << (uint64_t)fResult.intVal;
+	b << fResult.uintVal;
 	b << (*(uint64_t*)(&fResult.doubleVal));
 	b << (*(uint32_t*)(&fResult.floatVal));
 	b << (uint8_t)fResult.boolVal;
@@ -236,15 +289,13 @@ void ConstantColumn::unserialize(messageqcpp::ByteStream& b)
 	//uint64_t val;
 	
 	b >> fConstval;
-	b >> (u_int32_t&) fType;
+	b >> (uint32_t&) fType;
 	b >> fData;
 	b >> reinterpret_cast< ByteStream::doublebyte&>(fReturnAll);	
 	b >> (uint64_t&)fResult.intVal;
-	
+	b >> fResult.uintVal;
 	b >> (uint64_t&)fResult.doubleVal;
-	
 	b >> (uint32_t&)fResult.floatVal;
-	
 	b >> (uint8_t&)fResult.boolVal;	
 	b >> fResult.strVal;
 	b >> (uint64_t&)fResult.decimalVal.value;
@@ -306,3 +357,4 @@ void ConstantColumn::constructRegex()
 }
 
 }
+// vim:ts=4 sw=4:

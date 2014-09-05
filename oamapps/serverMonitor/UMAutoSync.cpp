@@ -203,7 +203,7 @@ void rsync(std::string moduleName, std::string IPAddr, std::string rootPassword)
 	string cmd = startup::StartUp::installDir() + "/bin/rsync.sh " + IPAddr + " " + rootPassword + " 1 > /tmp/rsync_" + moduleName + ".log";
 	int ret = system(cmd.c_str());
 
-	if ( ret == 0 )
+	if ( WEXITSTATUS(ret) == 0 )
 	{
 /*		LoggingID lid(SERVER_MONITOR_LOG_ID);
 		MessageLog ml(lid);

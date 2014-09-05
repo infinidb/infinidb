@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
-* $Id: we_rbmetawriter.cpp 4496 2013-01-31 19:13:20Z pleblanc $
+* $Id: we_rbmetawriter.cpp 4450 2013-01-21 14:13:24Z rdempsey $
 */
 
 #define WRITEENGINERBMETAWRITER_DLLEXPORT
@@ -37,6 +37,7 @@
 #include "we_bulkrollbackmgr.h"
 #include "idbcompress.h"
 using namespace compress;
+using namespace execplan;
 
 namespace
 {
@@ -529,7 +530,7 @@ void RBMetaWriter::writeColumnMetaData (
     uint32_t           partition,
     uint16_t           segment,
     HWM                lastLocalHwm,
-    ColDataType        colType,
+    CalpontSystemCatalog::ColDataType colType,
     const std::string& colTypeName,
     int                colWidth,
     int                compressionType )

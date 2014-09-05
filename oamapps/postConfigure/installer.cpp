@@ -549,7 +549,7 @@ int main(int argc, char *argv[])
 					cout << endl << "----- Performing Uninstall on Module '" + remoteModuleName + "' -----" << endl << endl;
 					cmd = installDir + "/bin/user_installer.sh " + remoteModuleName + " " + remoteModuleIP + " " + password + " " + calpont_rpm + " " + mysql_rpm + " " + mysqld_rpm + " " + installType + " " + packageType + " " + nodeps + " " + temppwprompt + " " + installer_debug;
 					int rtnCode = system(cmd.c_str());
-					if (rtnCode != 0) {
+					if (WEXITSTATUS(rtnCode) != 0) {
 						cout << endl << "ERROR: returned from user_installer.sh" << endl;
 						exit(1);
 					}
@@ -560,7 +560,7 @@ int main(int argc, char *argv[])
 						password + " " + calpont_rpm + " " + remoteModuleType + " " + installType + " " +
 						serverTypeInstall + " " + installer_debug + " " + installDir;
 					int rtnCode = system(cmd.c_str());
-					if (rtnCode != 0) {
+					if (WEXITSTATUS(rtnCode) != 0) {
 						cout << endl << "ERROR: returned from binary_installer.sh" << endl;
 						exit(1);
 					}
@@ -575,7 +575,7 @@ int main(int argc, char *argv[])
 						cout << endl << "----- Performing Uninstall on Module '" + remoteModuleName + "' -----" << endl << endl;
 						cmd = installDir + "/bin/performance_installer.sh " + remoteModuleName + " " + remoteModuleIP + " " + password + " " + calpont_rpm + " " + mysql_rpm + " " + mysqld_rpm + " " + installType + " " + packageType + " " + nodeps + " " + installer_debug;
 						int rtnCode = system(cmd.c_str());
-						if (rtnCode != 0) {
+						if (WEXITSTATUS(rtnCode) != 0) {
 							cout << endl << "ERROR returned from performance_installer.sh" << endl;
 							exit(1);
 						}
@@ -586,7 +586,7 @@ int main(int argc, char *argv[])
 							" " + password + " " + calpont_rpm + " " + remoteModuleType + " " + installType + " " +
 							serverTypeInstall + " " + installer_debug + " " + installDir;
 						int rtnCode = system(cmd.c_str());
-						if (rtnCode != 0) {
+						if (WEXITSTATUS(rtnCode) != 0) {
 							cout << endl << "ERROR returned from binary_installer.sh" << endl;
 							exit(1);
 						}
@@ -646,7 +646,7 @@ int main(int argc, char *argv[])
 					cout << endl << "----- Performing Install on Module '" + remoteModuleName + "' -----" << endl << endl;
 					cmd = installDir + "/bin/user_installer.sh " + remoteModuleName + " " + remoteModuleIP + " " + password + " " + calpont_rpm + " " + mysql_rpm + " " + mysqld_rpm + " " + installType + " " + packageType + " " + nodeps + " " + temppwprompt + " " + installer_debug;
 					int rtnCode = system(cmd.c_str());
-					if (rtnCode != 0) {
+					if (WEXITSTATUS(rtnCode) != 0) {
 						cout << endl << "ERROR returned from user_installer.sh" << endl;
 						exit(1);
 					}
@@ -657,7 +657,7 @@ int main(int argc, char *argv[])
 						password + " " + calpont_rpm + " " + remoteModuleType + " " + installType + " " +
 						serverTypeInstall + " " + installer_debug + " " + installDir;
 					int rtnCode = system(cmd.c_str());
-					if (rtnCode != 0) {
+					if (WEXITSTATUS(rtnCode) != 0) {
 						cout << endl << "ERROR returned from binary_installer.sh" << endl;
 						exit(1);
 					}
@@ -672,7 +672,7 @@ int main(int argc, char *argv[])
 						cout << endl << "----- Performing Install on Module '" + remoteModuleName + "' -----" << endl << endl;
 						cmd = installDir + "/bin/performance_installer.sh " + remoteModuleName + " " + remoteModuleIP + " " + password + " " + calpont_rpm + " " + mysql_rpm + " " + mysqld_rpm + " " + installType + " " + packageType + " " + nodeps + " " + installer_debug;
 						int rtnCode = system(cmd.c_str());
-						if (rtnCode != 0) {
+						if (WEXITSTATUS(rtnCode) != 0) {
 							cout << endl << "ERROR returned from performance_installer.sh" << endl;
 							exit(1);
 						}
@@ -683,7 +683,7 @@ int main(int argc, char *argv[])
 							" " + password + " " + calpont_rpm + " " + remoteModuleType + " " + installType +
 							" " + serverTypeInstall + " " + installer_debug + " " + installDir;
 						int rtnCode = system(cmd.c_str());
-						if (rtnCode != 0) {
+						if (WEXITSTATUS(rtnCode) != 0) {
 							cout << endl << "ERROR returned from binary_installer.sh" << endl;
 							exit(1);
 						}
@@ -721,7 +721,7 @@ int main(int argc, char *argv[])
 			//run remote command script
 			cmd = installDir + "/bin/remote_command.sh " + remoteModuleIP + " " + password + " '" + idbstartcmd + "' " +  installer_debug;
 			int rtnCode = system(cmd.c_str());
-			if (rtnCode != 0)
+			if (WEXITSTATUS(rtnCode) != 0)
 				cout << "error with running remote_command.sh" << endl;
 		}
 
@@ -748,7 +748,7 @@ int main(int argc, char *argv[])
 	
 			//start on local module
 			int rtnCode = system(idbstartcmd.c_str());
-			if (rtnCode != 0)
+			if (WEXITSTATUS(rtnCode) != 0)
 				cout << "Error starting InfiniDB local module" << endl;
 			else
 				cout << "Start InfiniDB request successful" << endl;

@@ -1,5 +1,5 @@
 /***************************************************************************
-* $Id: processmonitor.cpp 2024 2013-06-25 18:25:49Z dhill $
+* $Id: processmonitor.cpp 2025 2013-06-25 18:26:01Z dhill $
 *
  ***************************************************************************/
 
@@ -682,7 +682,7 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 				{
 					msg >> processName; 
 					msg >> manualFlag;
-					int requestStatus = API_SUCCESS;
+
 					log.writeLog(__LINE__, "MSG RECEIVED: Re-Init process request on: " + processName);
 
 					if ( processName == "cpimport" )
@@ -700,12 +700,10 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 							if ((*listPtr).ProcessName == processName) {
 								if ( (*listPtr).processID <= 1 ) {
 									log.writeLog(__LINE__,  "ERROR: process not active" , LOG_TYPE_DEBUG );
-									requestStatus = API_SUCCESS;
 									break;
 								}
 	
 								reinitProcess((*listPtr).processID, (*listPtr).ProcessName, actIndicator);
-								requestStatus = API_SUCCESS;
 								break;
 							}
 						}
@@ -713,16 +711,10 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 						if (listPtr == aPtr->end())
 						{
 							log.writeLog(__LINE__,  "ERROR: No such process: " + processName, LOG_TYPE_ERROR );
-							requestStatus = API_FAILURE;
 						}
 					}
 
-					ackMsg << (ByteStream::byte) ACK;
-					ackMsg << (ByteStream::byte) PROCREINITPROCESS;
-					ackMsg << (ByteStream::byte) requestStatus;
-					mq.write(ackMsg);
-
-					log.writeLog(__LINE__, "PROCREINITPROCESS: ACK back to ProcMgr, return status = " + oam.itoa((int) requestStatus));
+					log.writeLog(__LINE__, "PROCREINITPROCESS: completed, no ack to ProcMgr");
 					break;
 				}
 				case STOPALL:
@@ -1540,6 +1532,7 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 				{
 					log.writeLog(__LINE__, "Unmount failed, device busy, dbroot: " + dbrootID, LOG_TYPE_ERROR);
 					return_status = API_FAILURE;
+					system("mv -f /tmp/umount.txt /tmp/umount_failed.txt");
 				}
 			}
 			else
@@ -1597,6 +1590,7 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 					if (!oam.checkLogStatus("/tmp/mount.txt", "already")) {
 						log.writeLog(__LINE__, "mount failed, dbroot: " + dbrootID, LOG_TYPE_ERROR);
 						return_status = API_FAILURE;
+						system("mv -f /tmp/mount.txt /tmp/mount_failed.txt");
 					}
 				}
 			}
@@ -1745,7 +1739,7 @@ pid_t ProcessMonitor::startProcess(string processModuleType, string processName,
 							launchID, newProcessID, FAILED, BootLaunch, RunType,
 							DepProcessName, DepModuleName, LogFile);
 
-		//Update ProcessConfig.xml: Mark Process INIT state 
+		//Update Process Status: Mark Process INIT state 
 		updateProcessInfo(processName, FAILED, newProcessID);
 
 		return oam::API_FAILURE;
@@ -1880,7 +1874,7 @@ pid_t ProcessMonitor::startProcess(string processModuleType, string processName,
 												launchID, newProcessID, FAILED, BootLaunch, RunType,
 												DepProcessName, DepModuleName, LogFile);
 					
-							//Update ProcessConfig.xml: Mark Process INIT state 
+							//Update Process Status: Mark Process INIT state 
 							updateProcessInfo(processName, FAILED, newProcessID);
 
 							return oam::API_FAILURE;
@@ -1954,7 +1948,6 @@ pid_t ProcessMonitor::startProcess(string processModuleType, string processName,
 			try {
 				int slavenodeID = oam.getLocalDBRMID(config.moduleName());
 				arg_list[i] = "DBRM_Worker" + oam.itoa(slavenodeID);
-				log.writeLog(__LINE__, "*** getLocalDBRMID Worker Node ID = " + oam.itoa(slavenodeID), LOG_TYPE_DEBUG);
 			}
 			catch(...)
 			{
@@ -1965,7 +1958,7 @@ pid_t ProcessMonitor::startProcess(string processModuleType, string processName,
 									launchID, newProcessID, FAILED, BootLaunch, RunType,
 									DepProcessName, DepModuleName, LogFile);
 		
-				//Update ProcessConfig.xml: Mark Process INIT state 
+				//Update Process Status: Mark Process INIT state 
 				updateProcessInfo(processName, FAILED, newProcessID);
 
 				return oam::API_FAILURE;
@@ -2006,7 +1999,7 @@ pid_t ProcessMonitor::startProcess(string processModuleType, string processName,
 									launchID, newProcessID, FAILED, BootLaunch, RunType,
 									DepProcessName, DepModuleName, LogFile);
 		
-				//Update ProcessConfig.xml: Mark Process INIT state 
+				//Update Process Status: Mark Process INIT state 
 				updateProcessInfo(processName, FAILED, newProcessID);
 
 				return oam::API_FAILURE;
@@ -2098,7 +2091,7 @@ pid_t ProcessMonitor::startProcess(string processModuleType, string processName,
 										launchID, newProcessID, FAILED, BootLaunch, RunType,
 										DepProcessName, DepModuleName, LogFile);
 			
-					//Update ProcessConfig.xml: Mark Process INIT state 
+					//Update Process Status: Mark Process INIT state 
 					updateProcessInfo(processName, FAILED, newProcessID);
 
 					return oam::API_FAILURE;
@@ -2234,7 +2227,7 @@ pid_t ProcessMonitor::startProcess(string processModuleType, string processName,
 								launchID, newProcessID, oam::ACTIVE, BootLaunch, RunType,
 								DepProcessName, DepModuleName, LogFile);
 	
-			//Update ProcessConfig.xml: Mark Process oam::ACTIVE state 
+			//Update Process Status: Mark Process oam::ACTIVE state 
 			updateProcessInfo(processName, oam::ACTIVE, newProcessID);
 
 		}
@@ -2247,8 +2240,8 @@ pid_t ProcessMonitor::startProcess(string processModuleType, string processName,
 								launchID, newProcessID, initType, BootLaunch, RunType,
 								DepProcessName, DepModuleName, LogFile);
 	
-			//Update ProcessConfig.xml: Mark Process INIT state 
-			updateProcessInfo(processName, initType, newProcessID);
+			//Update Process Status: Update PID
+			updateProcessInfo(processName, STATE_MAX, newProcessID);
 		}
 
 		log.writeLog(__LINE__, processName + " PID is " + oam.itoa(newProcessID), LOG_TYPE_DEBUG);
@@ -2345,7 +2338,7 @@ pid_t ProcessMonitor::startProcess(string processModuleType, string processName,
 							launchID, newProcessID, FAILED, BootLaunch, RunType,
 							DepProcessName, DepModuleName, LogFile);
 
-		//Update ProcessConfig.xml: Mark Process INIT state 
+		//Update Process Status: Mark Process INIT state 
 		updateProcessInfo(processName, FAILED, newProcessID);
 
 		exit(oam::API_FAILURE);
@@ -3504,7 +3497,7 @@ int ProcessMonitor::createDataDirs(std::string cloud)
 		
 					string cmd = "mkdir " + DBRootName + " > /dev/null 2>&1";
 					int rtnCode = system(cmd.c_str());
-					if (rtnCode == 0)
+					if (WEXITSTATUS(rtnCode) == 0)
 						log.writeLog(__LINE__, "Successful created directory " + DBRootName, LOG_TYPE_DEBUG);
 		
 					cmd = "chmod 1777 " + DBRootName + " > /dev/null 2>&1";
@@ -4024,79 +4017,10 @@ int ProcessMonitor::runStartupTest()
 ******************************************************************************************/
 int ProcessMonitor::updateConfigFile(messageqcpp::ByteStream msg)
 {
-	string fileName;
-	string calpontFile;
+	Config* sysConfig = Config::makeConfig();
+	sysConfig->writeConfigFile(msg);
 
-	string installDir(startup::StartUp::installDir());
-	string defaultCalpontConfigFile(installDir + "/etc/Calpont.xml");
-	string defaultCalpontConfigFileTemp(installDir + "/etc/Calpont.xml.temp");
-	string tmpCalpontConfigFileTemp(installDir + "/etc/Calpont.xml.temp1");
-	string saveCalpontConfigFileTemp(installDir + "/etc/Calpont.xml.calpontSave");
-
-	msg >> fileName;
-	ofstream out(fileName.c_str());
-	out << msg;
-
-/*	if ( fileName == defaultCalpontConfigFile ) {
-		unlink (defaultCalpontConfigFileTemp.c_str());
-	
-		ofstream newFile (defaultCalpontConfigFileTemp.c_str());
-	
-		newFile.write (calpontFile.c_str(), calpontFile.size() );
-	
-		newFile.close();
-	
-		struct flock fl;
-		int fd;
-	
-		fl.l_type   = F_WRLCK;  // write lock
-		fl.l_whence = SEEK_SET;
-		fl.l_start  = 0;
-		fl.l_len    = 0;
-		fl.l_pid    = getpid();
-	
-		fd = open(defaultCalpontConfigFile.c_str(), O_WRONLY);
-	
-		if (fcntl(fd, F_SETLKW, &fl) == -1) {
-			log.writeLog(__LINE__, "ERROR: Config::write: file lock error", LOG_TYPE_ERROR);
-			return oam::API_FAILURE;
-		}
-	
-		//save copy, copy temp file tp tmp then to Calpont.xml
-		//move to /tmp to get around a 'same file error' in mv command
-		string cmd = "rm -f " + saveCalpontConfigFileTemp;
-		system(cmd.c_str());
-		cmd = "cp " + defaultCalpontConfigFile + " " + saveCalpontConfigFileTemp;
-		system(cmd.c_str());
-	
-		cmd = "rm -f " + tmpCalpontConfigFileTemp;
-		system(cmd.c_str());
-		cmd = "mv -f " + defaultCalpontConfigFileTemp + " " + tmpCalpontConfigFileTemp;
-		system(cmd.c_str());
-	
-		cmd = "mv -f " + tmpCalpontConfigFileTemp + " " + defaultCalpontConfigFile;
-		system(cmd.c_str());
-	
-		fl.l_type   = F_UNLCK;	//unlock
-		if (fcntl(fd, F_SETLK, &fl) == -1)
-			throw runtime_error("Config::write: file unlock error " + defaultCalpontConfigFile);
-	
-		close(fd);
-	}
-	else
-	{
-		//update a non Calpont.xml file
-		unlink (fileName.c_str());
-	
-		ofstream newFile (fileName.c_str());
-	
-		newFile.write (calpontFile.c_str(), calpontFile.size() );
-	
-		newFile.close();
-	}
-*/
 	return oam::API_SUCCESS;
-
 }
 
 /******************************************************************************************

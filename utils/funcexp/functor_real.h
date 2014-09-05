@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: functor_real.h 3048 2012-04-04 15:33:45Z rdempsey $
+//  $Id: functor_real.h 3495 2013-01-21 14:09:51Z rdempsey $
 
 /** @file */
 
@@ -48,6 +48,11 @@ public:
 						execplan::CalpontSystemCatalog::ColType& op_ct)
 	{ return ((int64_t) getDoubleVal(row, fp, isNull, op_ct)); }
 
+	uint64_t getUintVal(rowgroup::Row& row,
+						FunctionParm& fp,
+						bool& isNull,
+						execplan::CalpontSystemCatalog::ColType& op_ct)
+	{ return ((uint64_t) getDoubleVal(row, fp, isNull, op_ct)); }
 /*
 	double getDoubleVal(rowgroup::Row& row,
 						FunctionParm& fp,
@@ -77,6 +82,11 @@ public:
 						FunctionParm& fp,
 						bool& isNull,
 						execplan::CalpontSystemCatalog::ColType& op_ct);
+
+    uint64_t getUintVal(rowgroup::Row& row,
+                        FunctionParm& fp,
+                        bool& isNull,
+                        execplan::CalpontSystemCatalog::ColType& op_ct);
 
 	double getDoubleVal(rowgroup::Row& row,
 						FunctionParm& fp,
@@ -139,7 +149,12 @@ public:
 						bool& isNull,
 						execplan::CalpontSystemCatalog::ColType& op_ct);
 
-	double getDoubleVal(rowgroup::Row& row,
+    uint64_t getUintVal(rowgroup::Row& row,
+                        FunctionParm& fp,
+                        bool& isNull,
+                        execplan::CalpontSystemCatalog::ColType& op_ct);
+
+    double getDoubleVal(rowgroup::Row& row,
 						FunctionParm& fp,
 						bool& isNull,
 						execplan::CalpontSystemCatalog::ColType& op_ct);
@@ -170,6 +185,11 @@ public:
 						FunctionParm& fp,
 						bool& isNull,
 						execplan::CalpontSystemCatalog::ColType& op_ct);
+
+    uint64_t getUintVal(rowgroup::Row& row,
+                        FunctionParm& fp,
+                        bool& isNull,
+                        execplan::CalpontSystemCatalog::ColType& op_ct);
 
 	double getDoubleVal(rowgroup::Row& row,
 						FunctionParm& fp,
@@ -203,6 +223,11 @@ public:
 						bool& isNull,
 						execplan::CalpontSystemCatalog::ColType& op_ct);
 
+    uint64_t getUintVal(rowgroup::Row& row,
+                        FunctionParm& fp,
+                        bool& isNull,
+                        execplan::CalpontSystemCatalog::ColType& op_ct);
+
 	double getDoubleVal(rowgroup::Row& row,
 						FunctionParm& fp,
 						bool& isNull,
@@ -230,7 +255,12 @@ public:
 						bool& isNull,
 						execplan::CalpontSystemCatalog::ColType& op_ct);
 
-	double getDoubleVal(rowgroup::Row& row,
+    uint64_t getUintVal(rowgroup::Row& row,
+                        FunctionParm& fp,
+                        bool& isNull,
+                        execplan::CalpontSystemCatalog::ColType& op_ct);
+
+    double getDoubleVal(rowgroup::Row& row,
 						FunctionParm& fp,
 						bool& isNull,
 						execplan::CalpontSystemCatalog::ColType& op_ct);
@@ -511,6 +541,11 @@ public:
 	execplan::CalpontSystemCatalog::ColType operationType(FunctionParm& fp, execplan::CalpontSystemCatalog::ColType& resultType);
 
 	int64_t getIntVal(rowgroup::Row& row,
+						FunctionParm& fp,
+						bool& isNull,
+						execplan::CalpontSystemCatalog::ColType& op_ct);
+
+	uint64_t getUintVal(rowgroup::Row& row,
 						FunctionParm& fp,
 						bool& isNull,
 						execplan::CalpontSystemCatalog::ColType& op_ct);

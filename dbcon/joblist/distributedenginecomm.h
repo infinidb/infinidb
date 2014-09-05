@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: distributedenginecomm.h 9469 2013-05-01 18:38:43Z pleblanc $
+// $Id: distributedenginecomm.h 9489 2013-05-06 18:25:49Z pleblanc $
 //
 // C++ Interface: distributedenginecomm
 //
@@ -47,11 +47,6 @@
 #include "threadsafequeue.h"
 #include "rwlock_local.h"
 #include "resourcemanager.h"
-
-//#define SHARED_NOTHING_DEMO
-#ifdef SHARED_NOTHING_DEMO
-#include "brmtypes.h"
-#endif
 
 #include "multicast.h"
 
@@ -140,11 +135,7 @@ public:
 	 * Writes a primitive message to a primitive server. Msg needs to conatin an ISMPacketHeader. The
 	 * LBID is extracted from the ISMPacketHeader and used to determine the actual P/M to send to.
 	 */
-#ifdef SHARED_NOTHING_DEMO
-	EXPORT void write(messageqcpp::ByteStream& msg, BRM::OID_t oid=0);
-#else
 	EXPORT void write(uint32_t key, messageqcpp::ByteStream& msg);
-#endif
 
 	//EXPORT void throttledWrite(const messageqcpp::ByteStream& msg);
 
@@ -191,6 +182,8 @@ public:
 	uint64_t connectedPmServers() const { return fPmConnections.size(); }
 	uint getPmCount() const { return pmCount; }
 
+	messageqcpp::Stats getNetworkStats(uint32_t uniqueID);
+
 	friend class ::TestDistributedEngineComm;
 
 private:
@@ -200,9 +193,10 @@ private:
 	//A queue of ByteStreams coming in from PrimProc heading for a JobStep
 	typedef ThreadSafeQueue<messageqcpp::SBS> StepMsgQueue;
 	
-	/* To keep some state associated with the connection */
-	struct MQE {
+	/* To keep some state associated with the connection.  These aren't copyable. */
+	struct MQE : public boost::noncopyable {
 		MQE(uint pmCount);
+		messageqcpp::Stats stats;
 		StepMsgQueue queue;
 		uint ackSocketIndex;
 #ifdef _MSC_VER
@@ -238,13 +232,13 @@ private:
 	/** @brief Add a message to the queue
 	 *
 	 */
-	void addDataToOutput(messageqcpp::SBS, uint connIndex);
+	void addDataToOutput(messageqcpp::SBS, uint connIndex, messageqcpp::Stats *statsToAdd);
 
 	/** @brief Writes data to the client at the index
  	*
  	* Continues trying to write data to the client at the next index until all clients have been tried.
  	*/
-	int  writeToClient(size_t index, const messageqcpp::ByteStream& bs,
+	int  writeToClient(size_t index, const messageqcpp::ByteStream& bs, 
 		uint32_t senderID = std::numeric_limits<uint32_t>::max(), bool doInterleaving=false);
 
 	static DistributedEngineComm* fInstance;

@@ -87,7 +87,6 @@ namespace
         logging::Logger logger(logid.fSubsysID);
         logger.logMessage(LOG_TYPE_DEBUG, msg, logid);
 		Dec->Setup();
-        WriteEngine::WEClients::instance(WriteEngine::WEClients::DDLPROC)->Setup();
 	}
 }
 

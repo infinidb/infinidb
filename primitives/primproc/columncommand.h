@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: columncommand.h 2058 2013-02-13 18:07:30Z pleblanc $
+// $Id: columncommand.h 2057 2013-02-13 17:00:10Z pleblanc $
 // C++ Interface: columncommand
 //
 // Description: 
@@ -61,7 +61,7 @@ public:
 	void resetCommand(messageqcpp::ByteStream &);
 	void setMakeAbsRids(bool m) { makeAbsRids = m; }
 	bool willPrefetch();
-	const int64_t getEmptyRowValue( const execplan::CalpontSystemCatalog::ColDataType dataType, const int width ) const;
+	const uint64_t getEmptyRowValue( const execplan::CalpontSystemCatalog::ColDataType dataType, const int width ) const;
 	const int64_t getLastLbid();
 	void getLBIDList(uint loopCount, std::vector<int64_t> *lbids);
 

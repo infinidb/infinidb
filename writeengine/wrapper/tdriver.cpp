@@ -119,7 +119,7 @@ public:
 
 	}
 
-   void SetColumnStruct( ColStruct& column, OID dataOid, int colWidth, ColDataType colDataType )
+   void SetColumnStruct( ColStruct& column, OID dataOid, int colWidth, CalpontSystemCatalog::ColDataType colDataType )
    {
       column.dataOid = dataOid;
       column.colWidth = colWidth;
@@ -127,7 +127,7 @@ public:
       column.tokenFlag = false;
    }
 
-   void CreateColumnFile( FID fid, int width, ColDataType colDataType, ColType colType )
+   void CreateColumnFile( FID fid, int width, CalpontSystemCatalog::ColDataType colDataType, ColType colType )
    {
       int rc;
       ColumnOp colOp;
@@ -233,7 +233,7 @@ public:
       Column   curCol, errCol;
       int      rc;
       unsigned char buf[BYTE_PER_BLOCK];
-      ColDataType colDataType;
+      CalpontSystemCatalog::ColDataType colDataType;
       
 //      colOp.setUseBrm(false);
       CPPUNIT_ASSERT( colOp.getColDataType( "integer", colDataType ) == true );
@@ -317,10 +317,10 @@ public:
       int         width = 8, totalRow = 3;
       FID         fid = 100;
       long long   valArray[3];
-      i64         oldValArray[3], verifyArray[3];
-      ColDataType colDataType = WriteEngine::BIGINT;
+      uint64_t    oldValArray[3], verifyArray[3];
+      CalpontSystemCatalog::ColDataType colDataType = CalpontSystemCatalog::BIGINT;
       ColType     colType = WriteEngine::WR_LONGLONG;
-      i64         emptyVal = 0x8000000000000001LL;
+      uint64_t     emptyVal = 0x8000000000000001LL;
 
  
       rowIdArray[0] = 1;
@@ -364,10 +364,10 @@ public:
       int         width = 8, totalRow = 3;
       FID         fid = 100;
       double      valArray[3];
-      i64         oldValArray[3];
-      ColDataType colDataType = WriteEngine::DOUBLE;
+      int64_t     oldValArray[3];
+      CalpontSystemCatalog::ColDataType colDataType = CalpontSystemCatalog::DOUBLE;
       ColType     colType = WriteEngine::WR_DOUBLE;
-      i64         emptyVal = 0xFFFAAAAAAAAAAAABLL;
+      int64_t     emptyVal = 0xFFFAAAAAAAAAAAABLL;
 
  
       rowIdArray[0] = 1;
@@ -402,10 +402,10 @@ public:
       FID         fid = 100;
       char        valArray[24], buf[8];
       char        testValue[3][8] = { "abc", "eDFFF", "GHK" };
-      i64         oldValArray[3];
-      ColDataType colDataType = WriteEngine::CHAR;
+      uint64_t    oldValArray[3];
+      CalpontSystemCatalog::ColDataType colDataType = CalpontSystemCatalog::CHAR;
       ColType     colType = WriteEngine::WR_CHAR;
-      i64         emptyVal = 0xFFFFFFFFFFFFFFFFLL;
+      uint64_t    emptyVal = 0xFFFFFFFFFFFFFFFFLL;
 
  
       rowIdArray[0] = 1;
@@ -442,7 +442,7 @@ public:
       int         rc, width = 8;
       int         hwm;
       FID         fid = 999;
-      ColDataType colDataType = WriteEngine::CHAR;
+      CalpontSystemCatalog::ColDataType colDataType = CalpontSystemCatalog::CHAR;
       ColType     colType = WriteEngine::WR_CHAR;
       
       colOp.deleteFile( 999 );
@@ -477,7 +477,7 @@ public:
       int         rc;
       int         width = 4, hwm = 0;
       FID         fid = 100;
-      ColDataType colDataType = WriteEngine::INT;
+      CalpontSystemCatalog::ColDataType colDataType = CalpontSystemCatalog::INT;
       ColType     colType = WriteEngine::WR_INT;
 
  
@@ -1736,7 +1736,7 @@ public:
       CPPUNIT_ASSERT( rc == NO_ERROR );
    }
 
-   void SetIndexStruct( IdxStruct& curStruct, OID treeOid, OID listOid, int width, ColDataType dataType )
+   void SetIndexStruct( IdxStruct& curStruct, OID treeOid, OID listOid, int width, CalpontSystemCatalog::ColDataType dataType )
    {
       curStruct.treeOid = treeOid;
       curStruct.listOid = listOid;
@@ -2004,7 +2004,7 @@ public:
           dctnryTuple.sigValue[i]=k;
           j--;          
          }
-         dctnryTuple.token.fbo=(i64)-1;
+         dctnryTuple.token.fbo=(uint64_t)-1;
          dctnryTuple.token.op =(int)-1;
          dctnryTuple.sigSize = smallSize;         
          rc = m_wrapper.tokenize( m_session.txnid, dctnryTuple); 
@@ -2018,7 +2018,7 @@ public:
             printf("fbo %llu op %i\n",dctnryTuple.token.fbo,dctnryTuple.token.op);
          }
          CPPUNIT_ASSERT( rc == NO_ERROR );
-         if ((dctnryTuple.token.fbo ==(i64)-1) ||(dctnryTuple.token.op==(int)-1))
+         if ((dctnryTuple.token.fbo ==(uint64_t)-1) ||(dctnryTuple.token.op==(int)-1))
          {
            printf("1440.Tokenize failed ERROR CODE : %i k %i\n", rc , k); 
           return; 
@@ -2106,7 +2106,7 @@ public:
           dctnryTuple.sigValue[i]=k;
           j--;          
          }
-         dctnryTuple.token.fbo=(i64)-1;
+         dctnryTuple.token.fbo=(uint64_t)-1;
          dctnryTuple.token.op =(int)-1;
          dctnryTuple.sigSize = smallSize;     
              
@@ -2121,7 +2121,7 @@ public:
             printf("fbo %llu op %i\n",dctnryTuple.token.fbo,dctnryTuple.token.op);
          }
          CPPUNIT_ASSERT( rc == NO_ERROR );
-         if ((dctnryTuple.token.fbo ==(i64)-1) ||(dctnryTuple.token.op==(int)-1))
+         if ((dctnryTuple.token.fbo ==(uint64_t)-1) ||(dctnryTuple.token.op==(int)-1))
          {
            printf("1440.Tokenize failed ERROR CODE : %i k %i\n", rc , k); 
           return; 
@@ -2338,7 +2338,7 @@ public:
       rc = m_wrapper.createIndex( m_session.txnid, 900, 901 );
       CPPUNIT_ASSERT( rc == NO_ERROR );
 
-      i64 totalRows;
+      uint64_t totalRows;
       rc = m_wrapper.buildIndex( 400, 900, 901, INT, 4, 0, true, totalRows );
       printf( "\nrc=%d", rc );
       printf( "\ntotalRows=%llu", totalRows );
@@ -2396,7 +2396,7 @@ public:
       rc = m_wrapper.createIndex( m_session.txnid, 900, 901 );
       CPPUNIT_ASSERT( rc == NO_ERROR );
 
-      i64 totalRows;
+      uint64_t totalRows;
       std::string indexName;
       rc = m_wrapper.buildIndex( "CPL_299_23839.dat", 900, 901, INT, 4, 0, false, totalRows , indexName, 0, 2000000 );
       printf( "\nrc=%d", rc );
@@ -2426,10 +2426,10 @@ void testBoostFloat()
    int               width = 4, totalRow = 3;
    FID               fid = 800;
    float             valArray[3];
-   i64               oldValArray[3];
-   ColDataType       colDataType = WriteEngine::FLOAT;
+   uint64_t          oldValArray[3];
+   CalpontSystemCatalog::ColDataType       colDataType = CalpontSystemCatalog::FLOAT;
    ColType           colType = WriteEngine::WR_FLOAT;
-   //i64               emptyVal = 0xFFAAAAAB;
+   //uint64_t          emptyVal = 0xFFAAAAAB;
    
  
 
@@ -2606,7 +2606,7 @@ void testBoostFloat()
 
      
      OID fid=600;
-     i64 emptyVal = 0;
+     uint64_t emptyVal = 0;
      int width =4;
          
      rc = fileop.oid2FileName( fid, fileName, true ) ;
@@ -2649,7 +2649,7 @@ void testBoostFloat()
 
 
      OID fid=1600;
-     i64 emptyVal = 0;
+     uint64_t emptyVal = 0;
      int width =4;
 
      rc = fileop.oid2FileName( fid, fileName, true ) ;
@@ -2695,7 +2695,7 @@ void testBoostFloat()
 
      
      OID fid=400;
-     i64 emptyVal = 0;
+     uint64_t emptyVal = 0;
      int width =4;
          
      rc = fileop.oid2FileName( fid, fileName, true ) ;
@@ -2736,7 +2736,7 @@ void testBoostFloat()
      struct timeb   t_start, t_current;   
 
      OID fid=500;
-     i64 emptyVal = 0;
+     uint64_t emptyVal = 0;
      int width = 4;
          
      rc = fileop.oid2FileName( fid, fileName, true ) ;
@@ -2771,7 +2771,7 @@ void testBoostFloat()
      int   rc, allocSize=8192;
      
      OID fid=401;
-     i64 emptyVal = 0;
+     uint64_t emptyVal = 0;
      
      
      //colOp.deleteFile( fid);

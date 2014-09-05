@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: filtercommand.cpp 1855 2012-04-04 18:20:09Z rdempsey $
+*   $Id: filtercommand.cpp 2035 2013-01-21 14:12:19Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -39,93 +39,6 @@ const uint32_t CC   = (cc << 8)  | cc;
 const uint32_t DCC  = (ds << 16) | (cc << 8)  | cc;
 const uint32_t CDC  = (cc << 16) | (ds << 8)  | cc;
 const uint32_t DCDC = (ds << 24) | (cc << 16) | (ds << 8) | cc;
-
-inline bool isNull(int64_t val, const execplan::CalpontSystemCatalog::ColType& ct)
-{
-	bool ret = false;
-
-	switch (ct.colDataType)
-	{
-		case execplan::CalpontSystemCatalog::TINYINT:
-		{
-			if ((int8_t) joblist::TINYINTNULL == val) ret = true;
-			break;
-		}
-		case execplan::CalpontSystemCatalog::CHAR:
-		{
-			int colWidth = ct.colWidth;
-			if (colWidth <= 8)
-			{
-				if ((colWidth == 1) && ((int8_t) joblist::CHAR1NULL == val)) ret = true ;
-				else if ((colWidth == 2) && ((int16_t) joblist::CHAR2NULL == val)) ret = true;
-				else if ((colWidth < 5) && ((int32_t) joblist::CHAR4NULL == val)) ret = true;
-				else if ((int64_t) joblist::CHAR8NULL == val) ret = true;
-			}
-			else
-			{
-				throw logic_error("Not a int column.");
-			}
-			break;
-		}
-		case execplan::CalpontSystemCatalog::SMALLINT:
-		{
-			if ((int16_t) joblist::SMALLINTNULL == val) ret = true;
-			break;
-		}
-		//TODO: does DECIMAL belong here?
-		case execplan::CalpontSystemCatalog::DECIMAL:
-		case execplan::CalpontSystemCatalog::DOUBLE:
-		{
-			if ((int64_t) joblist::DOUBLENULL == val) ret = true;
-			break;
-		}
-		case execplan::CalpontSystemCatalog::MEDINT:
-		case execplan::CalpontSystemCatalog::INT:
-		{
-			if ((int32_t) joblist::INTNULL == val) ret = true;
-			break;
-		}
-		case execplan::CalpontSystemCatalog::FLOAT:
-		{
-			if ((int32_t) joblist::FLOATNULL == val) ret = true;
-			break;
-		}
-		case execplan::CalpontSystemCatalog::DATE:
-		{
-			if ((int32_t) joblist::DATENULL == val) ret = true;
-			break;
-		}
-		case execplan::CalpontSystemCatalog::BIGINT:
-		{
-			if ((int64_t) joblist::BIGINTNULL == val) ret = true;
-			break;
-		}
-		case execplan::CalpontSystemCatalog::DATETIME:
-		{
-			if ((int64_t) joblist::DATETIMENULL == val) ret = true;
-			break;
-		}
-		case execplan::CalpontSystemCatalog::VARCHAR:
-		{
-			int colWidth = ct.colWidth;
-			if (colWidth <= 8)
-			{
-				if ((colWidth < 3) && ((int16_t) joblist::CHAR2NULL == val)) ret = true;
-				else if ((colWidth < 5) && ((int32_t) joblist::CHAR4NULL == val)) ret = true;
-				else if ((int64_t) joblist::CHAR8NULL == val) ret = true;
-			}
-			else
-			{
-				throw logic_error("Not a int column.");
-			}
-			break;
-		}
-		default:
-			break;
-	}
-
-	return ret;
-}
 
 };
 
@@ -366,8 +279,8 @@ void FilterCommand::doFilter()
 
 bool FilterCommand::compare(uint64_t i, uint64_t j)
 {
-	if (isNull(bpp->fFiltCmdValues[0][i], leftColType) ||
-		isNull(bpp->fFiltCmdValues[1][j], rightColType))
+	if (execplan::isNull(bpp->fFiltCmdValues[0][i], leftColType) ||
+		execplan::isNull(bpp->fFiltCmdValues[1][j], rightColType))
 		return false;
 
 	switch(fBOP)
@@ -436,8 +349,8 @@ SCommand ScaledFilterCmd::duplicate()
 
 bool ScaledFilterCmd::compare(uint64_t i, uint64_t j)
 {
-	if (isNull(bpp->fFiltCmdValues[0][i], leftColType) ||
-		isNull(bpp->fFiltCmdValues[1][j], rightColType))
+	if (execplan::isNull(bpp->fFiltCmdValues[0][i], leftColType) ||
+		execplan::isNull(bpp->fFiltCmdValues[1][j], rightColType))
 		return false;
 
 	switch(fBOP)
@@ -558,8 +471,8 @@ void StrFilterCmd::setCompareFunc(uint32_t columns)
 
 bool StrFilterCmd::compare_cc(uint64_t i, uint64_t j)
 {
-	if (isNull(bpp->fFiltCmdValues[0][i], leftColType) ||
-		isNull(bpp->fFiltCmdValues[1][j], rightColType))
+	if (execplan::isNull(bpp->fFiltCmdValues[0][i], leftColType) ||
+		execplan::isNull(bpp->fFiltCmdValues[1][j], rightColType))
 		return false;
 
 	switch(fBOP)
@@ -624,7 +537,7 @@ bool StrFilterCmd::compare_ss(uint64_t i, uint64_t j)
 
 bool StrFilterCmd::compare_cs(uint64_t i, uint64_t j)
 {
-	if (isNull(bpp->fFiltCmdValues[0][i], leftColType) ||
+	if (execplan::isNull(bpp->fFiltCmdValues[0][i], leftColType) ||
 		bpp->fFiltStrValues[1][j] == "" || bpp->fFiltStrValues[1][j] == joblist::CPNULLSTRMARK)
 		return false;
 
@@ -660,7 +573,7 @@ bool StrFilterCmd::compare_cs(uint64_t i, uint64_t j)
 bool StrFilterCmd::compare_sc(uint64_t i, uint64_t j)
 {
 	if (bpp->fFiltStrValues[0][i] == "" || bpp->fFiltStrValues[0][i] == joblist::CPNULLSTRMARK ||
-		isNull(bpp->fFiltCmdValues[1][j], rightColType))
+		execplan::isNull(bpp->fFiltCmdValues[1][j], rightColType))
 		return false;
 
 	int cmp = strncmp(bpp->fFiltStrValues[0][i].c_str(),

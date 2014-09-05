@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: deletepackageprocessor.cpp 9138 2012-12-11 20:13:47Z chao $
+ *   $Id: deletepackageprocessor.cpp 9378 2013-04-04 14:20:11Z chao $
  *
  *
  ***********************************************************************/
@@ -56,10 +56,8 @@ using namespace BRM;
 using namespace rowgroup;
 using namespace messageqcpp;
 using namespace oam;
-
 namespace dmlpackageprocessor
 {
-  std::map<unsigned, bool> pmStateDel;
   DMLPackageProcessor::DMLResult
   DeletePackageProcessor::processPackage(dmlpackage::CalpontDMLPackage& cpackage)
   {
@@ -68,11 +66,41 @@ namespace dmlpackageprocessor
     DMLResult result;
     result.result = NO_ERROR;
     BRM::TxnID txnid;
+	// set-up the transaction
+    txnid.id  = cpackage.get_TxnID();		
+	txnid.valid = true;
     fSessionID = cpackage.get_SessionID();
 	//StopWatch timer;
     VERBOSE_INFO("DeletePackageProcessor is processing CalpontDMLPackage ...");
 	TablelockData * tablelockData = TablelockData::makeTablelockData(fSessionID);
-	uint64_t uniqueId = fDbrm.getUnique64();
+	uint64_t uniqueId = 0;
+	//Bug 5070. Added exception handling
+	try {
+		uniqueId = fDbrm->getUnique64();
+	}
+	catch (std::exception& ex)
+	{
+		logging::Message::Args args;
+		logging::Message message(9);
+		args.add(ex.what());
+		message.format(args);
+		result.result = DELETE_ERROR;	
+		result.message = message;
+		fSessionManager.rolledback(txnid);
+		return result;
+	}
+	catch ( ... )
+	{
+		logging::Message::Args args;
+		logging::Message message(9);
+		args.add("Unknown error occured while getting unique number.");
+		message.format(args);
+		result.result = DELETE_ERROR;	
+		result.message = message;
+		fSessionManager.rolledback(txnid);
+		return result;
+	}
+	
 	uint64_t tableLockId = 0;
 	// get the table object from the package
     DMLTable* tablePtr =  cpackage.get_Table();
@@ -85,9 +113,6 @@ namespace dmlpackageprocessor
 	fWEClient->addQueue(uniqueId);
     try
     {
-      // set-up the transaction
-      txnid.id  = cpackage.get_TxnID();		
-	  txnid.valid = true;
 
       SQLLogger sqlLogger(cpackage.get_SQLStatement(), DMLLoggingId, fSessionID, txnid.id);
 
@@ -116,7 +141,7 @@ namespace dmlpackageprocessor
 			}
 				
 			try {
-				tableLockId = fDbrm.getTableLock(pms, roPair.objnum, &processName, &processID, &sessionId, &txnId, BRM::LOADING );
+				tableLockId = fDbrm->getTableLock(pms, roPair.objnum, &processName, &processID, &sessionId, &txnId, BRM::LOADING );
 			}
 			catch (std::exception&)
 			{
@@ -153,7 +178,7 @@ namespace dmlpackageprocessor
 						txnId = txnid.id;
 						sessionId = fSessionID;
 						processName = "DMLProc";
-						tableLockId = fDbrm.getTableLock(pms, roPair.objnum, &processName, &processID, &sessionId, &txnId, BRM::LOADING );
+						tableLockId = fDbrm->getTableLock(pms, roPair.objnum, &processName, &processID, &sessionId, &txnId, BRM::LOADING );
 					}
 					catch (std::exception&)
 					{
@@ -166,7 +191,7 @@ namespace dmlpackageprocessor
 
 				if (i >= numTries) //error out
 				{
-					result.result = UPDATE_ERROR;
+					result.result = DELETE_ERROR;
 					logging::Message::Args args;
 					args.add(processName);
 					args.add((uint64_t)processID);
@@ -194,9 +219,17 @@ namespace dmlpackageprocessor
 			colType = csc->colType(roPair.objnum);
 			if (colType.autoincrement)
 			{
-				uint64_t nextVal = csc->nextAutoIncrValue(aTableName);
-				fDbrm.startAISequence(roPair.objnum, nextVal, colType.colWidth);
-				break; //Only one autoincrement column per table
+                try
+                {
+    				uint64_t nextVal = csc->nextAutoIncrValue(aTableName);
+    				fDbrm->startAISequence(roPair.objnum, nextVal, colType.colWidth, colType.colDataType);
+    				break; //Only one autoincrement column per table
+                }
+                catch (std::exception& ex)
+                {
+                    result.result = DELETE_ERROR;
+                    throw std::runtime_error(ex.what());
+                }
 			}
 			++rid_iterator;
 		}
@@ -232,7 +265,7 @@ namespace dmlpackageprocessor
     {
       cerr << "DeletePackageProcessor::processPackage: caught unknown exception!" << endl;
       logging::Message::Args args;
-      logging::Message message(6);
+      logging::Message message(7);
       args.add( "Delete Failed: ");
       args.add( "encountered unknown exception" );
       args.add(result.message.msg());
@@ -272,47 +305,14 @@ namespace dmlpackageprocessor
 	bool metaData = false;
 	oam::OamCache * oamCache = oam::OamCache::makeOamCache();
 	std::vector<int> fPMs = oamCache->getModuleIds();
-	
+	std::map<unsigned, bool> pmStateDel;
+	boost::scoped_ptr<messageqcpp::MessageQueueClient> fExeMgr;
+	fExeMgr.reset( new messageqcpp::MessageQueueClient("ExeMgr1"));
 	try {
-#if !defined(_MSC_VER) && !defined(SKIP_OAM_INIT)
-		//@Bug 4495 check PM status first
-		std::vector<int> tmpPMs;
-		for (unsigned i=0; i<fPMs.size(); i++)
-		{
-			int opState = 0;
-			bool aDegraded = false;
-			ostringstream aOss;
-			aOss << "pm" << fPMs[i];
-			std::string aModName = aOss.str();
-			try
-			{
-				fOam.getModuleStatus(aModName, opState, aDegraded);
-			}
-			catch(std::exception& ex)
-			{
-				ostringstream oss;
-				oss << "Exception on getModuleStatus on module ";
-				oss <<	aModName;
-				oss <<  ":  ";
-				oss <<  ex.what();
-				throw runtime_error( oss.str() );
-			}
-
-			if(opState == oam::ACTIVE )
-			{
-				pmStateDel[fPMs[i]] = true;
-				tmpPMs.push_back(fPMs[i]);
-			}
-		}
-		
-		fPMs.swap(tmpPMs);
-#else
 		for (unsigned i=0; i<fPMs.size(); i++)
 		{
 			pmStateDel[fPMs[i]] = true;
 		}
-#endif
-
 		fExeMgr->write(msg);
 		fExeMgr->write(*(cpackage.get_ExecutionPlan()));	
 		//cout << "sending to ExeMgr plan with length " << (cpackage.get_ExecutionPlan())->length() << endl;
@@ -331,7 +331,7 @@ namespace dmlpackageprocessor
 			args.add("Update Failed: ");
 			args.add("Lost connection to ExeMgr");
 			message.format(args);
-			result.result = UPDATE_ERROR;
+			result.result = DELETE_ERROR;
 			result.message = message;
 			return rowsProcessed;
 		}
@@ -355,7 +355,7 @@ namespace dmlpackageprocessor
 			args.add("Delete Failed: ");
 			args.add(emsgStr);
 			message.format(args);
-			result.result = UPDATE_ERROR;
+			result.result = DELETE_ERROR;
 			result.message = message;
 			return rowsProcessed;
 		}
@@ -380,7 +380,7 @@ namespace dmlpackageprocessor
 				args.add("Delete Failed: ");
 				args.add("Lost connection to ExeMgr");
 				message.format(args);
-				result.result = UPDATE_ERROR;
+				result.result = DELETE_ERROR;
 				result.message = message;
 				//return rowsProcessed;
 				break;
@@ -392,7 +392,7 @@ namespace dmlpackageprocessor
 					//This is meta data, need to send to all PMs.
 					metaData = true;
 					//cout << "sending meta data" << endl;
-					err = processRowgroup(msgBk, result, uniqueId, cpackage, metaData, dbroot);
+					err = processRowgroup(msgBk, result, uniqueId, cpackage, pmStateDel, metaData, dbroot);
 					rowGroup.reset(new rowgroup::RowGroup());
 					rowGroup->deserialize(msg);
 					qb = 100;
@@ -416,10 +416,10 @@ namespace dmlpackageprocessor
 					args.add("Delete Failed: ");
 					args.add(errorMsg);
 					message.format(args);
-					result.result = UPDATE_ERROR;
+					result.result = DELETE_ERROR;
 					result.message = message;
 					DMLResult tmpResult;
-					receiveAll( tmpResult, uniqueId, fPMs);
+					receiveAll( tmpResult, uniqueId, fPMs, pmStateDel);
 					//@Bug 4358 get rid of broken pipe error.
 					//msg.restart();
 					//msg << qb;
@@ -433,20 +433,20 @@ namespace dmlpackageprocessor
 				}
 				if (rowGroup->getRowCount() == 0)  //done fetching
 				{
-					err = receiveAll( result, uniqueId, fPMs);
+					err = receiveAll( result, uniqueId, fPMs, pmStateDel);
 					//return rowsProcessed;
 					break;
 				}
-				if (rowGroup->getBaseRid() == (uint64_t) (-1 & ~0x1fff))
+				if (rowGroup->getBaseRid() == (uint64_t) (-1))
 				{
 					continue;  // @bug4247, not valid row ids, may from small side outer
 				}
 				dbroot = rowGroup->getDBRoot();
-				err = processRowgroup(msgBk, result, uniqueId, cpackage, metaData, dbroot);
+				err = processRowgroup(msgBk, result, uniqueId, cpackage, pmStateDel, metaData, dbroot);
 				if (err)
 				{
 					DMLResult tmpResult;
-					receiveAll( tmpResult, uniqueId, fPMs);
+					receiveAll( tmpResult, uniqueId, fPMs, pmStateDel);
 					//@Bug 4358 get rid of broken pipe error.
 					//msg.restart();
 					//msg << qb;
@@ -476,7 +476,7 @@ namespace dmlpackageprocessor
 
 			// Clean out the pipe;
 			DMLResult tmpResult;
-			receiveAll( tmpResult, uniqueId, fPMs);
+			receiveAll( tmpResult, uniqueId, fPMs, pmStateDel);
 		}
 
 		if (!err)
@@ -510,7 +510,7 @@ namespace dmlpackageprocessor
 		args.add("Delete Failed: ");
 		args.add(ex.what());
 		message.format(args);
-		result.result = UPDATE_ERROR;
+		result.result = DELETE_ERROR;
 		result.message = message;
 		return rowsProcessed;
 	}
@@ -522,7 +522,7 @@ namespace dmlpackageprocessor
 		args.add("Update Failed: ");
 		args.add("Unknown error caught when communicating with ExeMgr");
 		message.format(args);
-		result.result = UPDATE_ERROR;
+		result.result = DELETE_ERROR;
 		result.message = message;
 		return rowsProcessed;
 	}
@@ -531,7 +531,7 @@ namespace dmlpackageprocessor
   }
   
 bool DeletePackageProcessor::processRowgroup(ByteStream & aRowGroup, DMLResult& result, const uint64_t uniqueId, 
-			dmlpackage::CalpontDMLPackage& cpackage, bool isMeta, uint dbroot)
+			dmlpackage::CalpontDMLPackage& cpackage, std::map<unsigned, bool>& pmStateDel, bool isMeta, uint dbroot)
 {
 	bool rc = false;
 	//cout << "Get dbroot " << dbroot << endl;
@@ -597,7 +597,7 @@ bool DeletePackageProcessor::processRowgroup(ByteStream & aRowGroup, DMLResult& 
 			args.add("Delete Failed: ");
 			args.add(ex.what());
 			message.format(args);
-			result.result = UPDATE_ERROR;
+			result.result = DELETE_ERROR;
 			result.message = message;
 		}
 		catch (...)
@@ -608,7 +608,7 @@ bool DeletePackageProcessor::processRowgroup(ByteStream & aRowGroup, DMLResult& 
 			args.add("Delete Failed: ");
 			args.add("Unknown error caught when communicating with WES");
 			message.format(args);
-			result.result = UPDATE_ERROR;
+			result.result = DELETE_ERROR;
 			result.message = message;
 		}
 	}
@@ -655,7 +655,7 @@ bool DeletePackageProcessor::processRowgroup(ByteStream & aRowGroup, DMLResult& 
 				args.add("Delete Failed: ");
 				args.add(ex.what());
 				message.format(args);
-				result.result = UPDATE_ERROR;
+				result.result = DELETE_ERROR;
 				result.message = message;
 				break;
 			}
@@ -667,7 +667,7 @@ bool DeletePackageProcessor::processRowgroup(ByteStream & aRowGroup, DMLResult& 
 				args.add("Delete Failed: ");
 				args.add("Unknown error caught when communicating with WES");
 				message.format(args);
-				result.result = UPDATE_ERROR;
+				result.result = DELETE_ERROR;
 				result.message = message;
 				break;
 			}
@@ -676,7 +676,7 @@ bool DeletePackageProcessor::processRowgroup(ByteStream & aRowGroup, DMLResult& 
 	return rc;
 }
 
-bool DeletePackageProcessor::receiveAll(DMLResult& result, const uint64_t uniqueId, std::vector<int>& fPMs)
+bool DeletePackageProcessor::receiveAll(DMLResult& result, const uint64_t uniqueId, std::vector<int>& fPMs, std::map<unsigned, bool>& pmStateDel)
 {
 	//check how many message we need to receive
 	uint messagesNotReceived = 0;
@@ -707,7 +707,7 @@ bool DeletePackageProcessor::receiveAll(DMLResult& result, const uint64_t unique
 			args.add("Update Failed: ");
 			args.add("One of WriteEngineServer went away.");
 			message.format(args);
-			result.result = UPDATE_ERROR;
+			result.result = DELETE_ERROR;
 			result.message = message;
 			return err;
 		}
@@ -759,7 +759,7 @@ bool DeletePackageProcessor::receiveAll(DMLResult& result, const uint64_t unique
 				args.add("Delete Failed: ");
 				args.add(ex.what());
 				message.format(args);
-				result.result = UPDATE_ERROR;
+				result.result = DELETE_ERROR;
 				result.message = message;
 				break;
 			}
@@ -771,7 +771,7 @@ bool DeletePackageProcessor::receiveAll(DMLResult& result, const uint64_t unique
 				args.add("Delete Failed: ");
 				args.add("Unknown error caught when communicating with WES");
 				message.format(args);
-				result.result = UPDATE_ERROR;
+				result.result = DELETE_ERROR;
 				result.message = message;
 				break;
 			}

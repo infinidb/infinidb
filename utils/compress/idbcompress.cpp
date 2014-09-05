@@ -1,5 +1,5 @@
 /******************************************************************************************
-* $Id: idbcompress.cpp 3911 2013-06-18 15:38:31Z dcathey $
+* $Id: idbcompress.cpp 3917 2013-06-18 19:31:44Z dcathey $
 *
 ******************************************************************************************/
 #include <cstring>
@@ -139,7 +139,11 @@ int IDBCompressInterface::compressBlock(const char* in,
 	*checksum = hasher((char *) &out[HEADER_SIZE], snaplen);
 	*len = snaplen;
 
+	//cerr << "cb: " << inLen << '/' << outLen << '/' << (snappy::MaxCompressedLength(inLen) + HEADER_SIZE) <<
+	//	" : " << (snaplen + HEADER_SIZE) << endl;
+
 	outLen = snaplen + HEADER_SIZE;
+
 	return ERR_OK;
 }
 
@@ -234,6 +238,7 @@ int IDBCompressInterface::uncompressBlock(const char* in, const size_t inLen, un
 	}
 
 	outLen = ol;
+	//cerr << "ub: " << inLen << " : " << outLen << endl;
 
 	return ERR_OK;
 }
@@ -444,6 +449,38 @@ int IDBCompressInterface::padCompressedChunks(unsigned char* buf,
 
 	return 0;
 }
+
+/* static */
+uint64_t IDBCompressInterface::maxCompressedSize(uint64_t uncompSize)
+{
+	return (snappy::MaxCompressedLength(uncompSize) + HEADER_SIZE);
+}
+
+int IDBCompressInterface::compress(const char *in, size_t inLen, char *out,
+		size_t *outLen) const
+{
+	//memcpy(out, in, inLen);
+	//*outLen = inLen;
+	snappy::RawCompress(in, inLen, out, outLen);
+	return 0;
+}
+
+int IDBCompressInterface::uncompress(const char *in, size_t inLen, char *out) const
+{
+	//memcpy(out, in, inLen);
+	//return 0;
+	return !(snappy::RawUncompress(in, inLen, out));
+}
+
+bool IDBCompressInterface::getUncompressedSize(char *in, size_t inLen, size_t *outLen) const
+{
+	//*outLen = inLen;
+	//return true;
+	return snappy::GetUncompressedLength(in, inLen, outLen);
+}
+
 #endif
+
 } // namespace compress
+// vim:ts=4 sw=4:
 

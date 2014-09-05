@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_server.cpp 4702 2013-07-08 20:06:14Z bpaul $
+* $Id: we_server.cpp 4703 2013-07-08 21:34:14Z bpaul $
 *
 *******************************************************************************/
 
@@ -49,6 +49,7 @@ using namespace oam;
 #include "distributedenginecomm.h"
 
 #include "utils_utf8.h"
+#include "dbrm.h"
 
 namespace
 {
@@ -198,22 +199,23 @@ int main(int argc, char** argv)
 		}
 	}
 	cout << "WriteEngineServer is ready" << endl;
+	BRM::DBRM dbrm;
 	for (;;)
 	{
 		try // BUG 4834 -
 		{
 			ios = mqs->accept();
 			//tp.invoke(ReadThread(ios));
-			ReadThreadFactory::CreateReadThread(tp,ios);
+			ReadThreadFactory::CreateReadThread(tp,ios, dbrm);
 			{
-				logging::Message::Args args;
+/*				logging::Message::Args args;
 				logging::Message message;
 				string aMsg("WriteEngineServer : New incoming connection");
 				args.add(aMsg);
 				message.format(args);
 				logging::LoggingID lid(SUBSYSTEM_ID_WE_SRV);
 				logging::MessageLog ml(lid);
-				ml.logInfoMessage( message );
+				ml.logInfoMessage( message ); */
 			}
 		}
 		catch(std::exception& ex) // BUG 4834 - log the exception

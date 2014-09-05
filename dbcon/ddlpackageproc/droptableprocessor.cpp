@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: droptableprocessor.cpp 8923 2012-09-19 18:14:01Z dcathey $
+ *   $Id: droptableprocessor.cpp 9717 2013-07-24 20:42:34Z dhall $
  *
  *
  ***********************************************************************/
@@ -60,7 +60,7 @@ namespace ddlpackageprocessor
 		txnID.id= fTxnid.id;
 		txnID.valid= fTxnid.valid;
 		int rc1 = 0;
-		rc1= fDbrm.isReadWrite();
+		rc1= fDbrm->isReadWrite();
 		if (rc1 != 0 )
 		{
 			logging::Message::Args args;
@@ -81,7 +81,34 @@ namespace ddlpackageprocessor
 		execplan::CalpontSystemCatalog::ROPair roPair;
 		std::string errorMsg;
 		ByteStream bytestream;
-		uint64_t uniqueId = fDbrm.getUnique64();
+		uint64_t uniqueId = 0;
+		//Bug 5070. Added exception handling
+		try {
+			uniqueId = fDbrm->getUnique64();
+		}
+		catch (std::exception& ex)
+		{
+			logging::Message::Args args;
+			logging::Message message(9);
+			args.add(ex.what());
+			message.format(args);
+			result.result = DROP_ERROR;	
+			result.message = message;
+			fSessionManager.rolledback(txnID);
+			return result;
+		}
+		catch ( ... )
+		{
+			logging::Message::Args args;
+			logging::Message message(9);
+			args.add("Unknown error occured while getting unique number.");
+			message.format(args);
+			result.result = DROP_ERROR;	
+			result.message = message;
+			fSessionManager.rolledback(txnID);
+			return result;
+		}
+		
 		fWEClient->addQueue(uniqueId);
 		int pmNum = 1;
 		boost::shared_ptr<messageqcpp::ByteStream> bsIn;
@@ -113,7 +140,7 @@ namespace ddlpackageprocessor
 			}
 				
 			try {
-				tableLockId = fDbrm.getTableLock(pms, roPair.objnum, &processName, &processID, &sessionId, &txnid, BRM::LOADING );
+				tableLockId = fDbrm->getTableLock(pms, roPair.objnum, &processName, &processID, &sessionId, &txnid, BRM::LOADING );
 			}
 			catch (std::exception&)
 			{
@@ -150,7 +177,7 @@ namespace ddlpackageprocessor
 						txnid = txnID.id;
 						sessionId = dropTableStmt.fSessionID;;
 						processName = "DDLProc";
-						tableLockId = fDbrm.getTableLock(pms, roPair.objnum, &processName, &processID, &sessionId, &txnid, BRM::LOADING );
+						tableLockId = fDbrm->getTableLock(pms, roPair.objnum, &processName, &processID, &sessionId, &txnid, BRM::LOADING );
 					}
 					catch (std::exception&)
 					{
@@ -219,7 +246,7 @@ cout << "Removing the SYSTABLEs meta data" << endl;
 			ByteStream::byte rc = 0;
 			
 			u_int16_t  dbRoot;
-			rc = fDbrm.getSysCatDBRoot(sysOid, dbRoot);  
+			rc = fDbrm->getSysCatDBRoot(sysOid, dbRoot);  
 			if (rc != 0)
 			{
 				result.result =(ResultCode) rc;
@@ -288,7 +315,7 @@ cout << "Drop table got unknown exception" << endl;
 				result.message = message;
 				//release table lock and session
 				fSessionManager.rolledback(txnID);
-				lockReleased =  fDbrm.releaseTableLock(tableLockId);
+				lockReleased =  fDbrm->releaseTableLock(tableLockId);
 				fWEClient->removeQueue(uniqueId);
 				return result;				
 			}
@@ -309,7 +336,7 @@ cout << "Drop table got unknown exception" << endl;
 				args.add(oss.str());
 				fSessionManager.rolledback(txnID);
 				bool lockReleased = true;
-				lockReleased =  fDbrm.releaseTableLock(tableLockId);
+				lockReleased =  fDbrm->releaseTableLock(tableLockId);
 				message.format(args);
 				result.result = (ResultCode)rc;
 				result.message = message;
@@ -329,7 +356,7 @@ cout << "Drop table got unknown exception" << endl;
 			args.add(ex.what());
 			fSessionManager.rolledback(txnID);
 			try {
-				lockReleased =  fDbrm.releaseTableLock(tableLockId);
+				lockReleased =  fDbrm->releaseTableLock(tableLockId);
 			}
 			catch (std::exception&)
 			{
@@ -350,7 +377,7 @@ cout << "Drop table got unknown exception" << endl;
 			args.add(errorMsg);
 			fSessionManager.rolledback(txnID);
 			try {
-				lockReleased =  fDbrm.releaseTableLock(tableLockId);
+				lockReleased =  fDbrm->releaseTableLock(tableLockId);
 			}
 			catch (std::exception&)
 			{
@@ -363,7 +390,7 @@ cout << "Drop table got unknown exception" << endl;
 		}
 		
 		try {
-				lockReleased =  fDbrm.releaseTableLock(tableLockId);
+				lockReleased =  fDbrm->releaseTableLock(tableLockId);
 		}
 		catch (std::exception&)
 		{
@@ -395,6 +422,11 @@ cout << "Drop table got unknown exception" << endl;
 			fWEClient->removeQueue(uniqueId);
 			return result;
 		}
+        // Bug 4208 Drop the PrimProcFDCache before droping the column files
+        // For Windows, this ensures (most likely) that the column files have
+        // no open handles to hinder the deletion of the files.
+	    rc = cacheutils::dropPrimProcFdCache();
+
 		//Drop files
 		bytestream.restart();
 		bytestream << (ByteStream::byte)WE_SVR_WRITE_DROPFILES;
@@ -467,7 +499,7 @@ cout << "Drop table removing column files" << endl;
 		//Flush primProc cache
 		rc = cacheutils::flushOIDsFromCache( oidList );
 		//Delete extents from extent map
-		rc = fDbrm.deleteOIDs(oidList);
+		rc = fDbrm->deleteOIDs(oidList);
 		
 		if (rc != 0)
 		{
@@ -517,7 +549,7 @@ cout << "Drop table removing column files" << endl;
 
         // @Bug 4150. Check dbrm status before doing anything to the table.
 		int rc = 0;
-		rc = fDbrm.isReadWrite();
+		rc = fDbrm->isReadWrite();
 		BRM::TxnID txnID;
 		txnID.id= fTxnid.id;
 		txnID.valid= fTxnid.valid;
@@ -547,7 +579,33 @@ cout << "Drop table removing column files" << endl;
 		systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 		systemCatalogPtr->sessionID(truncTableStmt.fSessionID);
 		CalpontSystemCatalog::TableInfo tableInfo;
-		uint64_t uniqueId = fDbrm.getUnique64();
+		uint64_t uniqueId = 0;
+		//Bug 5070. Added exception handling
+		try {
+			uniqueId = fDbrm->getUnique64();
+		}
+		catch (std::exception& ex)
+		{
+			logging::Message::Args args;
+			logging::Message message(9);
+			args.add(ex.what());
+			message.format(args);
+			result.result = DROP_ERROR;	
+			result.message = message;
+			fSessionManager.rolledback(txnID);
+			return result;
+		}
+		catch ( ... )
+		{
+			logging::Message::Args args;
+			logging::Message message(9);
+			args.add("Unknown error occured while getting unique number.");
+			message.format(args);
+			result.result = DROP_ERROR;	
+			result.message = message;
+			fSessionManager.rolledback(txnID);
+			return result;
+		}
 		fWEClient->addQueue(uniqueId);
 		int pmNum = 1;
 		boost::shared_ptr<messageqcpp::ByteStream> bsIn;
@@ -575,7 +633,7 @@ cout << "Drop table removing column files" << endl;
 				pms.push_back((uint)moduleIds[i]);
 			}
 			try {
-				tableLockId = fDbrm.getTableLock(pms, roPair.objnum, &processName, &processID, &sessionId, &txnid, BRM::LOADING );
+				tableLockId = fDbrm->getTableLock(pms, roPair.objnum, &processName, &processID, &sessionId, &txnid, BRM::LOADING );
 			}
 			catch (std::exception&)
 			{
@@ -612,7 +670,7 @@ cout << "Drop table removing column files" << endl;
 						txnid = txnID.id;
 						sessionId = truncTableStmt.fSessionID;
 						processName = "DDLProc";
-						tableLockId = fDbrm.getTableLock(pms, roPair.objnum, &processName, &processID, &sessionId, &txnid, BRM::LOADING );
+						tableLockId = fDbrm->getTableLock(pms, roPair.objnum, &processName, &processID, &sessionId, &txnid, BRM::LOADING );
 					}
 					catch (std::exception&)
 					{
@@ -665,7 +723,7 @@ cout << "Drop table removing column files" << endl;
         	args.add("");    	 	       	
         	fSessionManager.rolledback(txnID);
 			try {
-				lockReleased =  fDbrm.releaseTableLock(tableLockId);
+				lockReleased =  fDbrm->releaseTableLock(tableLockId);
 			}
 			catch (std::exception&)
 			{
@@ -688,7 +746,7 @@ cout << "Drop table removing column files" << endl;
         	args.add( "encountered unkown exception" );
         	args.add("");
        	 	try {
-				lockReleased =  fDbrm.releaseTableLock(tableLockId);
+				lockReleased =  fDbrm->releaseTableLock(tableLockId);
 			}
 			catch (std::exception&)
 			{
@@ -717,7 +775,7 @@ cout << "Drop table removing column files" << endl;
 			message.format( args );
 			//@bug 4515 Release the tablelock as nothing has done to this table.
 			try {
-				lockReleased =  fDbrm.releaseTableLock(tableLockId);
+				lockReleased =  fDbrm->releaseTableLock(tableLockId);
 			}
 			catch (std::exception&) {}
 			result.result = TRUNC_ERROR;
@@ -729,13 +787,18 @@ cout << "Drop table removing column files" << endl;
 		ByteStream::byte tmp8;
 		try {
 			//Disable extents first
-			int rc1 = fDbrm.markAllPartitionForDeletion( allOidList);
+			int rc1 = fDbrm->markAllPartitionForDeletion( allOidList);
 			if (rc1 != 0)
 			{
 				string errMsg;
 				BRM::errString(rc, errMsg);
 				throw std::runtime_error(errMsg);
 			}
+
+            // Bug 4208 Drop the PrimProcFDCache before droping the column files
+            // FOr Windows, this ensures (most likely) that the column files have
+            // no open handles to hinder the deletion of the files.
+	        rc = cacheutils::dropPrimProcFdCache();
 
 			VERBOSE_INFO("Removing files");
 			bytestream << (ByteStream::byte)WE_SVR_WRITE_DROPFILES;
@@ -813,7 +876,7 @@ cout << "Drop table removing column files" << endl;
 			//Flush primProc cache
 			rc = cacheutils::flushOIDsFromCache( allOidList );
 			//Delete extents from extent map
-			rc = fDbrm.deleteOIDs(allOidList);
+			rc = fDbrm->deleteOIDs(allOidList);
 		
 			if (rc != 0)
 			{
@@ -997,7 +1060,7 @@ cout << "Truncate table sending We_SVR_WRITE_CREATETABLEFILES to pm " << pmNum <
 		// Log the DDL statement
 		logging::logDDL(truncTableStmt.fSessionID, txnID.id, truncTableStmt.fSql, truncTableStmt.fOwner);
 		try {
-			lockReleased =  fDbrm.releaseTableLock(tableLockId);
+			lockReleased =  fDbrm->releaseTableLock(tableLockId);
 		}
 		catch (std::exception&)
 		{

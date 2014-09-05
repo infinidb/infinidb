@@ -20,7 +20,7 @@
 
 /***************************************************************************
  *
- *   $Id: filerequest.h 1961 2012-09-28 23:08:12Z xlou $
+ *   $Id: filerequest.h 2055 2013-02-08 19:09:09Z pleblanc $
  *
  *   jrodriguez@calpont.com   *
  *                                                                         *
@@ -61,13 +61,13 @@ public:
 	 * @brief request for the disk block lbid@ver
 	 * note, useCache tells IOManager to cache the loaded blocks.
 	 **/
-	fileRequest(BRM::LBID_t lbid, BRM::VER_t ver, bool flg, BRM::VER_t txn, int compType,
+	fileRequest(BRM::LBID_t lbid, const BRM::QueryContext &ver, bool flg, BRM::VER_t txn, int compType,
 	  uint8_t *ptr=0, bool useCache = true);
 
 	/**
 	 * @brief request a range of disk blocks
 	 **/
-	fileRequest(const BRM::InlineLBIDRange& range, const BRM::VER_t ver, BRM::VER_t txn, int compType);
+	fileRequest(const BRM::InlineLBIDRange& range, const BRM::QueryContext &ver, BRM::VER_t txn, int compType);
 
 	/**
 	 * @brief class dtor
@@ -127,7 +127,7 @@ public:
 	/**
 	 * @brief version of the lbid requested
 	 **/
-	const BRM::VER_t 	Ver() const {return fVer;}
+	const BRM::QueryContext 	Ver() const {return fVer;}
 
 	/**
 	 * @brief VBBM flag of the LBID/Ver
@@ -222,7 +222,7 @@ private:
 	void init();
 
 	BRM::LBID_t fLBID;
-	BRM::VER_t fVer;
+	BRM::QueryContext fVer;
 	bool fFlg;
 	BRM::VER_t fTxn;
 	mutable boost::mutex fFRMutex;

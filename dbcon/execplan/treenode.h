@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//   $Id: treenode.h 9261 2013-02-06 20:59:01Z xlou $
+//   $Id: treenode.h 9317 2013-03-19 21:37:22Z dhall $
 
 
 /** @file */
@@ -247,11 +247,12 @@ inline std::string removeTrailing0(char* val, uint length)
  */
 struct Result
 {
-	Result():intVal(0), origIntVal(0), dummy(0),
+	Result():intVal(0), uintVal(0), origIntVal(0), dummy(0),
 			doubleVal(0), floatVal(0), boolVal(false),
 			strVal(""), decimalVal(IDB_Decimal(0,0,0)),
 			valueConverted(false) {}
 	int64_t intVal;
+    uint64_t uintVal;
 	uint64_t origIntVal;
 	// clear up the memory following origIntVal to make sure null terminated string
 	// when converting origIntVal
@@ -317,6 +318,7 @@ public:
 	 ***********************************************************************/
 	virtual std::string getStrVal(rowgroup::Row& row, bool& isNull) {return fResult.strVal;}
 	virtual int64_t getIntVal(rowgroup::Row& row, bool& isNull) {return fResult.intVal;}
+    virtual uint64_t getUintVal(rowgroup::Row& row, bool& isNull) {return fResult.uintVal;}
 	virtual float getFloatVal(rowgroup::Row& row, bool& isNull) {return fResult.floatVal;}
 	virtual double getDoubleVal(rowgroup::Row& row, bool& isNull) {return fResult.doubleVal;}
 	virtual IDB_Decimal getDecimalVal(rowgroup::Row& row, bool& isNull) {return fResult.decimalVal;}
@@ -328,6 +330,7 @@ public:
 	inline bool getBoolVal();
 	inline std::string getStrVal();
 	inline int64_t getIntVal();
+    inline uint64_t getUintVal();
 	inline float getFloatVal();
 	inline double getDoubleVal();
 	inline IDB_Decimal getDecimalVal();
@@ -387,11 +390,20 @@ inline bool TreeNode::getBoolVal()
 		case CalpontSystemCatalog::DATE:
 		case CalpontSystemCatalog::DATETIME:
 			return (fResult.intVal != 0);
-		case CalpontSystemCatalog::FLOAT:
+        case CalpontSystemCatalog::UBIGINT:
+        case CalpontSystemCatalog::USMALLINT:
+        case CalpontSystemCatalog::UMEDINT:
+        case CalpontSystemCatalog::UTINYINT:
+        case CalpontSystemCatalog::UINT:
+            return (fResult.uintVal != 0);
+        case CalpontSystemCatalog::FLOAT:
+        case CalpontSystemCatalog::UFLOAT:
 			return (fResult.floatVal != 0);
 		case CalpontSystemCatalog::DOUBLE:
+        case CalpontSystemCatalog::UDOUBLE:
 			return (fResult.doubleVal != 0);
 		case CalpontSystemCatalog::DECIMAL:
+        case CalpontSystemCatalog::UDECIMAL:
 			return (fResult.decimalVal.value != 0);
 		default:
 			throw logging::InvalidConversionExcept("TreeNode::getBoolVal: Invalid conversion.");
@@ -429,21 +441,37 @@ inline std::string TreeNode::getStrVal()
 #endif
 			return std::string(tmp);
 		}
+        case CalpontSystemCatalog::UBIGINT:
+        case CalpontSystemCatalog::USMALLINT:
+        case CalpontSystemCatalog::UMEDINT:
+        case CalpontSystemCatalog::UTINYINT:
+        case CalpontSystemCatalog::UINT:
+        {
+#ifndef __LP64__
+            snprintf(tmp, 20, "%llu", fResult.uintVal);
+#else
+            snprintf(tmp, 20, "%lu", fResult.uintVal);
+#endif
+            return std::string(tmp);
+        }
 		case CalpontSystemCatalog::FLOAT:
+		case CalpontSystemCatalog::UFLOAT:
 		{
 			snprintf(tmp, 312, "%f", fResult.floatVal);
 			//return std::string(tmp);
 			return removeTrailing0(tmp, 312);
 		}
 		case CalpontSystemCatalog::DOUBLE:
+        case CalpontSystemCatalog::UDOUBLE:
 		{
 			snprintf(tmp, 312, "%f", fResult.doubleVal);
 			return removeTrailing0(tmp, 312);
 			//return std::string(tmp);
 		}
-		case CalpontSystemCatalog::DECIMAL:
+        case CalpontSystemCatalog::DECIMAL:
+		case CalpontSystemCatalog::UDECIMAL:
 		{
-			dataconvert::DataConvert::decimalToString(fResult.decimalVal.value, fResult.decimalVal.scale, tmp, 22);
+			dataconvert::DataConvert::decimalToString(fResult.decimalVal.value, fResult.decimalVal.scale, tmp, 22, fResultType.colDataType);
 			return std::string(tmp);
 		}
 		case CalpontSystemCatalog::DATE:
@@ -485,13 +513,57 @@ inline int64_t TreeNode::getIntVal()
 		case CalpontSystemCatalog::MEDINT:
 		case CalpontSystemCatalog::INT:
 			return fResult.intVal;
-		case CalpontSystemCatalog::FLOAT:
+        case CalpontSystemCatalog::UBIGINT:
+        case CalpontSystemCatalog::UTINYINT:
+        case CalpontSystemCatalog::USMALLINT:
+        case CalpontSystemCatalog::UMEDINT:
+        case CalpontSystemCatalog::UINT:
+            return fResult.uintVal;
+        case CalpontSystemCatalog::FLOAT:
+        case CalpontSystemCatalog::UFLOAT:
 			return (int64_t)fResult.floatVal;
 		case CalpontSystemCatalog::DOUBLE:
+        case CalpontSystemCatalog::UDOUBLE:
 			return (int64_t)fResult.doubleVal;
 		case CalpontSystemCatalog::DECIMAL:
+        case CalpontSystemCatalog::UDECIMAL:
 		{
 			return (int64_t)(fResult.decimalVal.value / pow((double)10, fResult.decimalVal.scale));
+		}
+		case CalpontSystemCatalog::DATE:
+		case CalpontSystemCatalog::DATETIME:
+			return fResult.intVal;
+		default:
+			throw logging::InvalidConversionExcept("TreeNode::getIntVal: Invalid conversion.");
+	}
+	return fResult.intVal;
+}
+inline uint64_t TreeNode::getUintVal()
+{
+	switch (fResultType.colDataType)
+	{
+		case CalpontSystemCatalog::BIGINT:
+		case CalpontSystemCatalog::TINYINT:
+		case CalpontSystemCatalog::SMALLINT:
+		case CalpontSystemCatalog::MEDINT:
+		case CalpontSystemCatalog::INT:
+			return fResult.intVal;
+        case CalpontSystemCatalog::UBIGINT:
+        case CalpontSystemCatalog::UTINYINT:
+        case CalpontSystemCatalog::USMALLINT:
+        case CalpontSystemCatalog::UMEDINT:
+        case CalpontSystemCatalog::UINT:
+            return fResult.uintVal;
+        case CalpontSystemCatalog::FLOAT:
+        case CalpontSystemCatalog::UFLOAT:
+			return (uint64_t)fResult.floatVal;
+		case CalpontSystemCatalog::DOUBLE:
+        case CalpontSystemCatalog::UDOUBLE:
+			return (uint64_t)fResult.doubleVal;
+		case CalpontSystemCatalog::DECIMAL:
+        case CalpontSystemCatalog::UDECIMAL:
+		{
+			return (uint64_t)(fResult.decimalVal.value / pow((double)10, fResult.decimalVal.scale));
 		}
 		case CalpontSystemCatalog::DATE:
 		case CalpontSystemCatalog::DATETIME:
@@ -524,9 +596,17 @@ inline float TreeNode::getFloatVal()
 		case CalpontSystemCatalog::MEDINT:
 		case CalpontSystemCatalog::INT:
 			return (float)fResult.intVal;
+        case CalpontSystemCatalog::UBIGINT:
+        case CalpontSystemCatalog::UTINYINT:
+        case CalpontSystemCatalog::USMALLINT:
+        case CalpontSystemCatalog::UMEDINT:
+        case CalpontSystemCatalog::UINT:
+            return (float)fResult.uintVal;
 		case CalpontSystemCatalog::FLOAT:
+        case CalpontSystemCatalog::UFLOAT:
 			return fResult.floatVal;
-		case CalpontSystemCatalog::DOUBLE:
+        case CalpontSystemCatalog::DOUBLE:
+		case CalpontSystemCatalog::UDOUBLE:
 			return (float)fResult.doubleVal;
 		case CalpontSystemCatalog::DECIMAL:
 		{
@@ -563,11 +643,20 @@ inline double TreeNode::getDoubleVal()
 		case CalpontSystemCatalog::MEDINT:
 		case CalpontSystemCatalog::INT:
 			return (double)fResult.intVal;
+        case CalpontSystemCatalog::UBIGINT:
+        case CalpontSystemCatalog::UTINYINT:
+        case CalpontSystemCatalog::USMALLINT:
+        case CalpontSystemCatalog::UMEDINT:
+        case CalpontSystemCatalog::UINT:
+            return (double)fResult.uintVal;
 		case CalpontSystemCatalog::FLOAT:
+        case CalpontSystemCatalog::UFLOAT:
 			return (double)fResult.floatVal;
 		case CalpontSystemCatalog::DOUBLE:
+        case CalpontSystemCatalog::UDOUBLE:
 			return fResult.doubleVal;
 		case CalpontSystemCatalog::DECIMAL:
+        case CalpontSystemCatalog::UDECIMAL:
 		{
 			// this may not be accurate. if this is problematic, change to pre-calculated power array.
 			return (double)(fResult.decimalVal.value / pow((double)10, fResult.decimalVal.scale));
@@ -598,14 +687,28 @@ inline IDB_Decimal TreeNode::getDecimalVal()
 			fResult.decimalVal.scale = fResultType.scale;
 			fResult.decimalVal.precision = fResultType.precision;
 			break;
+        case CalpontSystemCatalog::UBIGINT:
+        case CalpontSystemCatalog::UMEDINT:
+        case CalpontSystemCatalog::UINT:
+        case CalpontSystemCatalog::USMALLINT:
+        case CalpontSystemCatalog::UTINYINT:
+            fResult.decimalVal.value =(int64_t)(fResult.uintVal * pow((double)10, fResultType.scale));
+            fResult.decimalVal.scale = fResultType.scale;
+            fResult.decimalVal.precision = fResultType.precision;
+            break;
 		case CalpontSystemCatalog::DATE:
 		case CalpontSystemCatalog::DATETIME:
 			throw logging::InvalidConversionExcept("TreeNode::getDecimalVal: Invalid conversion from datetime.");
 		case CalpontSystemCatalog::FLOAT:
-			throw logging::InvalidConversionExcept("TreeNode::getDecimalVal: non-support conversion from float");
+            throw logging::InvalidConversionExcept("TreeNode::getDecimalVal: non-support conversion from float");
+        case CalpontSystemCatalog::UFLOAT:
+			throw logging::InvalidConversionExcept("TreeNode::getDecimalVal: non-support conversion from float unsigned");
 		case CalpontSystemCatalog::DOUBLE:
 			throw logging::InvalidConversionExcept("TreeNode::getDecimalVal: non-support conversion from double");
-		case CalpontSystemCatalog::DECIMAL:
+        case CalpontSystemCatalog::UDOUBLE:
+            throw logging::InvalidConversionExcept("TreeNode::getDecimalVal: non-support conversion from double unsigned");
+        case CalpontSystemCatalog::DECIMAL:
+		case CalpontSystemCatalog::UDECIMAL:
 			return fResult.decimalVal;
 		default:
 			throw logging::InvalidConversionExcept("TreeNode::getDecimalVal: Invalid conversion.");

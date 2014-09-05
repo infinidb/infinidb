@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: limitedorderby.cpp 8436 2012-04-04 18:18:21Z rdempsey $
+//  $Id: limitedorderby.cpp 9530 2013-05-15 21:51:20Z xlou $
 
 
 #include <iostream>
@@ -261,11 +261,22 @@ void IdbOrderBy::initialize(const RowGroup& rg)
 			case CalpontSystemCatalog::INT:
 			case CalpontSystemCatalog::BIGINT:
 			case CalpontSystemCatalog::DECIMAL:
+            case CalpontSystemCatalog::UDECIMAL:
 			{
 				Compare* c = new IntCompare(i->first, i->second);
 				fRule.fCompares.push_back(c);
 				break;
 			}
+            case CalpontSystemCatalog::UTINYINT:
+            case CalpontSystemCatalog::USMALLINT:
+            case CalpontSystemCatalog::UMEDINT:
+            case CalpontSystemCatalog::UINT:
+            case CalpontSystemCatalog::UBIGINT:
+            {
+                Compare* c = new UintCompare(i->first, i->second);
+                fRule.fCompares.push_back(c);
+                break;
+            }
 			case CalpontSystemCatalog::CHAR:
 			case CalpontSystemCatalog::VARCHAR:
 			{
@@ -273,13 +284,15 @@ void IdbOrderBy::initialize(const RowGroup& rg)
 				fRule.fCompares.push_back(c);
 				break;
 			}
-			case CalpontSystemCatalog::DOUBLE:
+            case CalpontSystemCatalog::DOUBLE:
+			case CalpontSystemCatalog::UDOUBLE:
 			{
 				Compare* c = new DoubleCompare(i->first, i->second);
 				fRule.fCompares.push_back(c);
 				break;
 			}
 			case CalpontSystemCatalog::FLOAT:
+            case CalpontSystemCatalog::UFLOAT:
 			{
 				Compare* c = new FloatCompare(i->first, i->second);
 				fRule.fCompares.push_back(c);
@@ -393,6 +406,10 @@ void LimitedOrderBy::processRow(const rowgroup::Row& row)
 {
 	// check if this is a distinct row
 	if (fDistinct && fDistinctMap->find(row.getData() + 2) != fDistinctMap->end())
+		return;
+
+	// @bug5312, limit count is 0, do nothing.
+	if (fCount == 0)
 		return;
 
 	// if the row count is less than the limit

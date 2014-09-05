@@ -1,0 +1,30 @@
+@set CMD=status %1
+
+svn %CMD%
+@cd ..\utils
+svn %CMD%
+@cd ..\oam
+svn %CMD%
+@cd ..\dbcon
+svn %CMD%
+@cd ..\exemgr
+svn %CMD%
+@cd ..\ddlproc
+svn %CMD%
+@cd ..\dmlproc
+svn %CMD%
+@cd ..\writeengine
+svn %CMD%
+@cd ..\versioning
+svn %CMD%
+@cd ..\dmlib
+svn %CMD%
+@cd ..\primitives
+svn %CMD%
+@cd ..\snmpd
+svn %CMD%
+@cd ..\tools
+svn %CMD%
+@cd ..\decomsvr
+svn %CMD%
+@cd ..

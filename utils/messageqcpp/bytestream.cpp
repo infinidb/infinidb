@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: bytestream.cpp 3294 2012-09-19 18:12:52Z pleblanc $
+*   $Id: bytestream.cpp 3495 2013-01-21 14:09:51Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -50,7 +50,7 @@ void ByteStream::doCopy(const ByteStream &rhs)
 
 	if (fMaxLen < rlen) {
 		delete [] fBuf;
-		fBuf = new byte[rlen + ISSOverhead];
+		fBuf = new uint8_t[rlen + ISSOverhead];
 		fMaxLen = rlen;
 	}
 
@@ -97,7 +97,7 @@ ByteStream::ByteStream(uint32_t initSize) :
 	if (initSize > 0) growBuf(initSize);
 }
 
-void ByteStream::add(const byte b)
+void ByteStream::add(const uint8_t b)
 {
  	if (fBuf == 0 || (static_cast<uint32_t>(fCurInPtr - fBuf) == fMaxLen + ISSOverhead))
 		growBuf();
@@ -113,7 +113,7 @@ void ByteStream::growBuf(uint32_t toSize)
 			toSize = BlockSize;
 		else
 			toSize = ((toSize + BlockSize - 1) / BlockSize) * BlockSize;
-		fBuf = new byte[toSize + ISSOverhead];
+		fBuf = new uint8_t[toSize + ISSOverhead];
 #ifdef ZERO_ON_NEW
 		memset(fBuf, 0, (toSize+ISSOverhead));
 #endif
@@ -133,7 +133,7 @@ void ByteStream::growBuf(uint32_t toSize)
 		// Make sure we at least double the allocation
 		toSize = std::max(toSize, fMaxLen * 2);
 
-		byte* t = new byte[toSize + ISSOverhead];
+		uint8_t* t = new uint8_t[toSize + ISSOverhead];
 		uint32_t curOutOff = fCurOutPtr - fBuf;
 		uint32_t curInOff = fCurInPtr - fBuf;
 		memcpy(t, fBuf, fCurInPtr - fBuf);
@@ -148,29 +148,78 @@ void ByteStream::growBuf(uint32_t toSize)
 	}
 }
 
-ByteStream& ByteStream::operator<<(const byte b)
+ByteStream& ByteStream::operator<<(const int8_t b)
+{
+    if (fBuf == 0 || (fCurInPtr - fBuf + 1U > fMaxLen + ISSOverhead))
+        growBuf(fMaxLen + BlockSize);
+    *((int8_t *) fCurInPtr) = b;
+    fCurInPtr += 1;
+
+	return *this;
+}
+
+ByteStream& ByteStream::operator<<(const uint8_t b)
 {
 	add(b);
 
 	return *this;
 }
 
-ByteStream& ByteStream::operator<<(const quadbyte q)
+ByteStream& ByteStream::operator<<(const int16_t d)
+{
+	if (fBuf == 0 || (fCurInPtr - fBuf + 2U > fMaxLen + ISSOverhead))
+		growBuf(fMaxLen + BlockSize);
+	*((int16_t *) fCurInPtr) = d;
+ 	fCurInPtr += 2;
+
+	return *this;
+}
+
+ByteStream& ByteStream::operator<<(const uint16_t d)
+{
+	if (fBuf == 0 || (fCurInPtr - fBuf + 2U > fMaxLen + ISSOverhead))
+		growBuf(fMaxLen + BlockSize);
+	*((uint16_t *) fCurInPtr) = d;
+ 	fCurInPtr += 2;
+
+	return *this;
+}
+
+ByteStream& ByteStream::operator<<(const int32_t q)
 {
 	if (fBuf == 0 || (fCurInPtr - fBuf + 4U > fMaxLen + ISSOverhead))
 		growBuf(fMaxLen + BlockSize);
-	*((quadbyte *) fCurInPtr) = q;
+	*((int32_t *) fCurInPtr) = q;
  	fCurInPtr += 4;
 
 	return *this;
 }
 
-ByteStream& ByteStream::operator<<(const octbyte o)
+ByteStream& ByteStream::operator<<(const uint32_t q)
 {
+	if (fBuf == 0 || (fCurInPtr - fBuf + 4U > fMaxLen + ISSOverhead))
+		growBuf(fMaxLen + BlockSize);
+	*((uint32_t *) fCurInPtr) = q;
+ 	fCurInPtr += 4;
 
+	return *this;
+}
+
+ByteStream& ByteStream::operator<<(const int64_t o)
+{
 	if (fBuf == 0 || (fCurInPtr - fBuf + 8U > fMaxLen + ISSOverhead))
 		growBuf(fMaxLen + BlockSize);
-	*((octbyte *) fCurInPtr) = o;
+	*((int64_t *) fCurInPtr) = o;
+ 	fCurInPtr += 8;
+
+	return *this;
+}
+
+ByteStream& ByteStream::operator<<(const uint64_t o)
+{
+	if (fBuf == 0 || (fCurInPtr - fBuf + 8U > fMaxLen + ISSOverhead))
+		growBuf(fMaxLen + BlockSize);
+	*((uint64_t *) fCurInPtr) = o;
  	fCurInPtr += 8;
 
 	return *this;
@@ -178,7 +227,7 @@ ByteStream& ByteStream::operator<<(const octbyte o)
 
 ByteStream& ByteStream::operator<<(const string& s)
 {
-	quadbyte len = s.size();
+	uint32_t len = s.size();
 
 	*this << len;
 #if DEBUG_DUMP_STRINGS_LESS_THAN > 0
@@ -194,44 +243,61 @@ ByteStream& ByteStream::operator<<(const string& s)
 		cerr << endl;
 	}
 #endif
-	append(reinterpret_cast<const byte*>(s.c_str()), len);
+	append(reinterpret_cast<const uint8_t*>(s.c_str()), len);
 
 	return *this;
 }
 
-ByteStream& ByteStream::operator<<(const doublebyte d)
-{
-
-	if (fBuf == 0 || (fCurInPtr - fBuf + 2U > fMaxLen + ISSOverhead))
-		growBuf(fMaxLen + BlockSize);
-	*((doublebyte *) fCurInPtr) = d;
- 	fCurInPtr += 2;
-
-	return *this;
-}
-
-ByteStream& ByteStream::operator>>(byte& b)
+ByteStream& ByteStream::operator>>(int8_t& b)
 {
 	peek(b);
 	fCurOutPtr++;
 	return *this;
 }
 
-ByteStream& ByteStream::operator>>(doublebyte& d)
+ByteStream& ByteStream::operator>>(uint8_t& b)
+{
+	peek(b);
+	fCurOutPtr++;
+	return *this;
+}
+
+ByteStream& ByteStream::operator>>(int16_t& d)
 {
 	peek(d);
 	fCurOutPtr += 2;
 	return *this;
 }
 
-ByteStream& ByteStream::operator>>(quadbyte& q)
+ByteStream& ByteStream::operator>>(uint16_t& d)
+{
+	peek(d);
+	fCurOutPtr += 2;
+	return *this;
+}
+
+ByteStream& ByteStream::operator>>(int32_t& q)
 {
 	peek(q);
 	fCurOutPtr += 4;
 	return *this;
 }
 
-ByteStream& ByteStream::operator>>(octbyte& o)
+ByteStream& ByteStream::operator>>(uint32_t& q)
+{
+	peek(q);
+	fCurOutPtr += 4;
+	return *this;
+}
+
+ByteStream& ByteStream::operator>>(int64_t& o)
+{
+	peek(o);
+	fCurOutPtr += 8;
+	return *this;
+}
+
+ByteStream& ByteStream::operator>>(uint64_t& o)
 {
 	peek(o);
 	fCurOutPtr += 8;
@@ -245,53 +311,82 @@ ByteStream& ByteStream::operator>>(string& s)
 	return *this;
 }
 
-ByteStream& ByteStream::operator>>(byte*& bpr)
+ByteStream& ByteStream::operator>>(uint8_t*& bpr)
 {
 	peek(bpr);
 	restart();
 	return *this;
 }
 
-void ByteStream::peek(byte& b) const
+void ByteStream::peek(int8_t& b) const
 {
-
 	if (length() < 1)
-		throw underflow_error("ByteStream::peek(byte): not enough data in stream to fill datatype");
+		throw underflow_error("ByteStream::peek(int8_t): not enough data in stream to fill datatype");
 
 	b = *fCurOutPtr;
 }
 
-void ByteStream::peek(doublebyte& d) const
+void ByteStream::peek(uint8_t& b) const
 {
+	if (length() < 1)
+		throw underflow_error("ByteStream::peek(uint8_t): not enough data in stream to fill datatype");
 
+	b = *((int8_t *)fCurOutPtr);
+}
+
+void ByteStream::peek(int16_t& d) const
+{
 	if (length() < 2)
-		throw underflow_error("ByteStream>doublebyte: not enough data in stream to fill datatype");
+		throw underflow_error("ByteStream>int16_t: not enough data in stream to fill datatype");
 
-	d = *((doublebyte *) fCurOutPtr);
+	d = *((int16_t *) fCurOutPtr);
 }
 
-void ByteStream::peek(quadbyte& q) const
+void ByteStream::peek(uint16_t& d) const
 {
+	if (length() < 2)
+		throw underflow_error("ByteStream>uint16_t: not enough data in stream to fill datatype");
 
-	if (length() < 4)
-		throw underflow_error("ByteStream>quadbyte: not enough data in stream to fill datatype");
-	
-	q = *((quadbyte *) fCurOutPtr);
-
+	d = *((uint16_t *) fCurOutPtr);
 }
 
-void ByteStream::peek(octbyte& o) const
+void ByteStream::peek(int32_t& q) const
+{
+	if (length() < 4)
+		throw underflow_error("ByteStream>int32_t: not enough data in stream to fill datatype");
+	
+	q = *((int32_t *) fCurOutPtr);
+}
+
+void ByteStream::peek(uint32_t& q) const
+{
+	if (length() < 4)
+		throw underflow_error("ByteStream>uint32_t: not enough data in stream to fill datatype");
+	
+	q = *((uint32_t *) fCurOutPtr);
+}
+
+void ByteStream::peek(int64_t& o) const
 {
 
 	if (length() < 8)
-		throw underflow_error("ByteStream>octbyte: not enough data in stream to fill datatype");
+		throw underflow_error("ByteStream>uint64_t: not enough data in stream to fill datatype");
 
-	o = *((octbyte *) fCurOutPtr);
+	o = *((int64_t *) fCurOutPtr);
+}
+
+void ByteStream::peek(uint64_t& o) const
+{
+
+	if (length() < 8)
+		throw underflow_error("ByteStream>uint64_t: not enough data in stream to fill datatype");
+
+	o = *((uint64_t *) fCurOutPtr);
 }
 
 void ByteStream::peek(string& s) const
 {
-	quadbyte len;
+	uint32_t len;
 
 	peek(len);
 #if DEBUG_DUMP_STRINGS_LESS_THAN > 0
@@ -319,7 +414,7 @@ void ByteStream::peek(string& s) const
 	s.assign((char *) &fCurOutPtr[4], len);
 }
 
-void ByteStream::load(const byte* bp, uint32_t len)
+void ByteStream::load(const uint8_t* bp, uint32_t len)
 {
 	// Do all the stuff that could throw an exception first
 	if (bp == 0 && len != 0)
@@ -329,7 +424,7 @@ void ByteStream::load(const byte* bp, uint32_t len)
 
 	if (len > fMaxLen) {
 		delete [] fBuf;
-		fBuf = new byte[newMaxLen + ISSOverhead];
+		fBuf = new uint8_t[newMaxLen + ISSOverhead];
 		fMaxLen = newMaxLen;
 	}
 
@@ -338,7 +433,7 @@ void ByteStream::load(const byte* bp, uint32_t len)
 	fCurInPtr = fBuf + len + ISSOverhead;
 }
 
-void ByteStream::append(const byte* bp, uint32_t len)
+void ByteStream::append(const uint8_t* bp, uint32_t len)
 {
 	if (len == 0)
 		return;
@@ -370,7 +465,7 @@ ifstream& operator>>(ifstream& ifs, ByteStream& bs)
 	ifs.seekg(0, ios::beg);
 	boost::scoped_array<char> buf(new char[ifs_len]);
 	ifs.read(buf.get(), ifs_len);
-	bs.append(reinterpret_cast<const ByteStream::byte*>(buf.get()), ifs_len);
+	bs.append(reinterpret_cast<const uint8_t*>(buf.get()), ifs_len);
 	return ifs;
 }
 
@@ -419,8 +514,8 @@ ByteStream& ByteStream::operator<<(const uint ui)
 {
 	if (fBuf == 0 || (fCurInPtr - fBuf + 4U > fMaxLen + ISSOverhead))
 		growBuf(fMaxLen + BlockSize);
-	quadbyte q = static_cast<quadbyte>(ui);
-	*((quadbyte *) fCurInPtr) = q;
+	uint32_t q = ui;
+	*((uint32_t *) fCurInPtr) = q;
  	fCurInPtr += 4;
 
 	return *this;
@@ -428,10 +523,10 @@ ByteStream& ByteStream::operator<<(const uint ui)
 
 ByteStream& ByteStream::operator>>(uint& ui)
 {
-	quadbyte q;
+	uint32_t q;
 	peek(q);
 	fCurOutPtr += 4;
-	ui = static_cast<uint>(q);
+	ui = q;
 	return *this;
 }
 #endif
@@ -439,7 +534,7 @@ ByteStream& ByteStream::operator>>(uint& ui)
 
 ByteStream& ByteStream::operator<<(const ByteStream& bs)
 {
-	quadbyte len = bs.length();
+	uint32_t len = bs.length();
 
 	*this << len;
 
@@ -457,7 +552,7 @@ ByteStream& ByteStream::operator>>(ByteStream& bs)
 
 void ByteStream::peek(ByteStream& bs) const
 {
-	quadbyte len;
+	uint32_t len;
 
 	peek(len);
 

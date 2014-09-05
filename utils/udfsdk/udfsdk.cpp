@@ -90,15 +90,26 @@ CalpontSystemCatalog::ColType IDB_add::operationType (FunctionParm& fp,
 		rt.colWidth = 8;
 	}
 	else if (fp[0]->data()->resultType().colDataType == CalpontSystemCatalog::DECIMAL ||
-	       fp[1]->data()->resultType().colDataType == CalpontSystemCatalog::DECIMAL)
+             fp[0]->data()->resultType().colDataType == CalpontSystemCatalog::UDECIMAL ||
+             fp[1]->data()->resultType().colDataType == CalpontSystemCatalog::DECIMAL ||
+             fp[1]->data()->resultType().colDataType == CalpontSystemCatalog::UDECIMAL)
 	{
 		rt.colDataType = CalpontSystemCatalog::DECIMAL;
 		rt.colWidth = 8;
 	}
 	else
 	{
-		rt.colDataType = CalpontSystemCatalog::BIGINT;
-		rt.colWidth = 8;
+        if (isUnsigned(fp[0]->data()->resultType().colDataType) ||
+            isUnsigned(fp[1]->data()->resultType().colDataType))
+        {
+            rt.colDataType = CalpontSystemCatalog::UBIGINT;
+            rt.colWidth = 8;
+        }
+        else
+        {
+            rt.colDataType = CalpontSystemCatalog::BIGINT;
+            rt.colWidth = 8;
+        }
 	}
 	return rt;
 }
@@ -124,10 +135,17 @@ double IDB_add::getDoubleVal(Row& row,
 		case CalpontSystemCatalog::TINYINT:
 			return ( parm[0]->data()->getIntVal(row, isNull) +
 			         parm[1]->data()->getIntVal(row, isNull));
+        case CalpontSystemCatalog::UBIGINT:
+        case CalpontSystemCatalog::UMEDINT:
+        case CalpontSystemCatalog::USMALLINT:
+        case CalpontSystemCatalog::UTINYINT:
+            return ( parm[0]->data()->getUintVal(row, isNull) +
+                     parm[1]->data()->getUintVal(row, isNull));
 		case CalpontSystemCatalog::DOUBLE:
 			return ( parm[0]->data()->getDoubleVal(row, isNull) +
 			         parm[1]->data()->getDoubleVal(row, isNull));
 		case CalpontSystemCatalog::DECIMAL:
+        case CalpontSystemCatalog::UDECIMAL:
 		{
 			IDB_Decimal dec;
 			IDB_Decimal op1 = parm[0]->data()->getDecimalVal(row, isNull);
@@ -272,6 +290,7 @@ bool IDB_isnull::getBoolVal(Row& row,
 		// false, otherwise the result of the function would be considered NULL,
 		// which is not possible for idb_isnull().
 		case CalpontSystemCatalog::DECIMAL:
+        case CalpontSystemCatalog::UDECIMAL:
 			parm[0]->data()->getDecimalVal(row, isNull);
 			break;
 		case CalpontSystemCatalog::CHAR:

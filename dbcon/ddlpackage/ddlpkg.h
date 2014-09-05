@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: ddlpkg.h 8926 2012-09-25 21:56:32Z zzhu $
+*   $Id: ddlpkg.h 9210 2013-01-21 14:10:42Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -220,6 +220,15 @@ enum DDL_DATATYPES {
     DDL_NUMERIC,
     DDL_NUMBER,
     DDL_INTEGER,
+    DDL_UNSIGNED_TINYINT,
+    DDL_UNSIGNED_SMALLINT,
+    DDL_UNSIGNED_MEDINT,
+    DDL_UNSIGNED_INT,
+    DDL_UNSIGNED_BIGINT,
+    DDL_UNSIGNED_DECIMAL,
+    DDL_UNSIGNED_FLOAT,
+    DDL_UNSIGNED_DOUBLE,
+    DDL_UNSIGNED_NUMERIC,
     DDL_INVALID_DATATYPE
 };
 
@@ -247,6 +256,15 @@ const std::string DDLDatatypeString[] =
         "numeric",
         "number",
         "integer",
+        "unsigned-tinyint",
+        "unsigned-smallint",
+        "unsigned-medint",
+        "unsigned-int",
+        "unsigned-bigint",
+        "unsigned-decimal",
+        "unsigned-float",
+        "unsigned-double",
+        "unsigned-numeric",
         ""
     };
 
@@ -271,26 +289,35 @@ const std::string AlterActionString[] =
  */
 const int  DDLDatatypeLength[] =
     {
-        1,		// BIT
-        1,		// TINYINT
-        1,		// CHAR
-        2,		// SMALLINT
-        2,		// DECIMAL
-        4,		// MEDINT
-        4,		// INT
-        4,		// FLOAT
-        4,		// DATE
-        8,		// BIGINT
-        8,		// DOUBLE
-        8,		// DATETIME
-        8, 		// VARCHAR
-        8, 		// VARBINARY
-        8,		// CLOB
-        8,		// BLOB
-        4,		// REAL
-        2,		// NUMERIC
-        4,		// NUMBER
-        4,		// INTEGER
+        1,		// BIT                
+        1,		// TINYINT       
+        1,		// CHAR          
+        2,		// SMALLINT      
+        2,		// DECIMAL       
+        4,		// MEDINT        
+        4,		// INT           
+        4,		// FLOAT         
+        4,		// DATE          
+        8,		// BIGINT        
+        8,		// DOUBLE        
+        8,		// DATETIME      
+        8, 		// VARCHAR       
+        8, 		// VARBINAR      
+        8,		// CLOB          
+        8,		// BLOB          
+        4,		// REAL          
+        2,		// NUMERIC       
+        4,		// NUMBER        
+        4,		// INTEGER       
+        1,      // UNSIGNED_TINYINT, 
+        2,      // UNSIGNED_SMALLINT,
+        4,      // UNSIGNED_MEDINT,  
+        4,      // UNSIGNED_INT,     
+        8,      // UNSIGNED_BIGINT,  
+        2,      // UNSIGNED_DECIMAL, 
+        4,      // UNSIGNED_FLOAT,   
+        8,      // UNSIGNED_DOUBLE,  
+        2,      // UNSIGNED_NUMERIC, 
         -1		// INVALID LENGTH
     };
 
@@ -875,7 +902,7 @@ struct ColumnType
     /** @brief This constructor is used by Dharma interface to
         create a ColumnType object easily */
 
-    EXPORT ColumnType(int type, int length, int precision, int scale, int compressiontype, const char* autoIncrement, int64_t nextValue, bool withTimezone = false);
+    //EXPORT ColumnType(int type, int length, int precision, int scale, int compressiontype, const char* autoIncrement, int64_t nextValue, bool withTimezone = false);
 
     virtual ~ColumnType()
     {}
@@ -900,7 +927,7 @@ struct ColumnType
 	
 	std::string fAutoincrement;
 	
-	long long fNextvalue;
+	uint64_t fNextvalue;
 	
 };
 
@@ -1012,6 +1039,8 @@ struct ColumnDef : public SchemaObject
             fConstraints (constraints),
             fDefaultValue (defaultValue)		
     {}
+
+    void convertDecimal();
 
     /** @brief Never NULL since all Columns must have a type. */
     ColumnType* fType;

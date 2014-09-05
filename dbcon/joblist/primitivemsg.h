@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
-* $Id: primitivemsg.h 8774 2012-07-31 21:00:09Z pleblanc $
+* $Id: primitivemsg.h 9210 2013-01-21 14:10:42Z rdempsey $
 */
 
 /** @file */
@@ -701,8 +701,8 @@ struct NewColResultHeader
 	uint16_t NVALS;
 	uint16_t ValidMinMax;		// 1 if Min/Max are valid, otherwise 0
 	uint32_t OutputType;
-	int64_t Min; 			// Minimum value in this block (signed)
-	int64_t Max; 			// Maximum value in this block (signed)
+	int64_t Min; 			    // Minimum value in this block for signed data types 
+	int64_t Max; 			    // Maximum value in this block for signed data types
 	uint32_t CacheIO;			// I/O count from buffer cache
 	uint32_t PhysicalIO;		// Physical I/O count from disk
 	// if OutputType was OT_DATAVALUE, what follows is DataType[NVALS]
@@ -710,22 +710,7 @@ struct NewColResultHeader
 	// if OutputType was OT_BOTH, what follows is NVALS <Rid, DataType> pairs
 };
 
-struct NewColAggResultHeader
-{
-	ISMPacketHeader ism;
-	PrimitiveHeader hdr;
-	uint64_t LBID;
-	int64_t Sum;
-	uint16_t SumOverflow;	// SUM = (SumSign) Sum + (SumOverflow * 2^63)
-	uint8_t SumSign;			// 0 = +, 1 = -
-	int64_t Min;
-	int64_t Max;
-	uint16_t NVALS;		//number of values in the block
-};
-
-
 /* additional types to support p_dictionary */
-
 struct DictFilterElement
 {
 	uint8_t COP;

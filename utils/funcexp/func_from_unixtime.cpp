@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_from_unixtime.cpp 3048 2012-04-04 15:33:45Z rdempsey $
+* $Id: func_from_unixtime.cpp 3616 2013-03-04 14:56:29Z rdempsey $
 *
 *
 ****************************************************************************/
@@ -35,9 +35,10 @@ using namespace execplan;
 #include "dataconvert.h"
 using namespace dataconvert;
 
-namespace funcexp
+
+namespace
 {
-extern const string IDB_date_format(const DateTime& dt, const string& format);	
+using namespace funcexp;
 
 DateTime getDateTime(rowgroup::Row& row,
 							FunctionParm& parm,
@@ -62,7 +63,7 @@ DateTime getDateTime(rowgroup::Row& row,
 			val = parm[0]->data()->getIntVal(row, isNull);
 	}
 	
-	if (val < 0 || val > TIMESTAMP_MAX_VALUE)
+	if (val < 0 || val > helpers::TIMESTAMP_MAX_VALUE)
 		return 0;
 
 	DateTime dt;
@@ -81,6 +82,10 @@ DateTime getDateTime(rowgroup::Row& row,
 	dt.msecond = 0;
 	return dt;
 }
+}
+
+namespace funcexp
+{
 
 CalpontSystemCatalog::ColType Func_from_unixtime::operationType( FunctionParm& fp, CalpontSystemCatalog::ColType& resultType )
 {
@@ -105,7 +110,7 @@ string Func_from_unixtime::getStrVal(rowgroup::Row& row,
 	if (parm.size() == 2)
 	{
 		string format = parm[1]->data()->getStrVal(row, isNull);
-		return IDB_date_format(dt, format);
+		return helpers::IDB_date_format(dt, format);
 	}
 	
 	char buf[256] = {0};

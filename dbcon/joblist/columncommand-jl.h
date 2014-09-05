@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: columncommand-jl.h 8757 2012-07-27 19:00:31Z pleblanc $
+// $Id: columncommand-jl.h 9210 2013-01-21 14:10:42Z rdempsey $
 // C++ Interface: columncommand
 //
 // Description: 
@@ -59,7 +59,6 @@ public:
 	const uint16_t getFilterCount() const { return filterCount; }
 	const std::vector<struct BRM::EMEntry>& getExtents() { return extents; }
 	const execplan::CalpontSystemCatalog::ColType& getColType() const { return colType; }
-	bool isCharType() const;
 	bool isDict() const { return fIsDict; }
 
 	void  scan(bool b) { isScan = b; }
@@ -85,7 +84,6 @@ private:
 	uint8_t fFcnOrd;
 	std::vector<BRM::LBID_t> fLastLbid;
 
-	// care about colDataType, colWidth and scale fields.  On the PM the rest is uninitialized
 	execplan::CalpontSystemCatalog::ColType colType;
 	bool fIsDict;
 
@@ -96,6 +94,8 @@ private:
 	uint64_t fExtentRows;
 
 	uint numDBRoots;
+	uint dbroot;
+
 	static const unsigned DEFAULT_FILES_PER_COLUMN_PARTITION = 32;
 	static const unsigned DEFAULT_EXTENTS_PER_SEGMENT_FILE   =  4;
 };

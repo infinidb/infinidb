@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: distributedenginecomm.cpp 9469 2013-05-01 18:38:43Z pleblanc $
+// $Id: distributedenginecomm.cpp 9575 2013-05-29 18:07:44Z dhall $
 //
 // C++ Implementation: distributedenginecomm
 //
@@ -66,12 +66,6 @@ using namespace logging;
 #include "snmpmanager.h"
 using namespace snmpmanager;
 using namespace oam;
-
-#ifdef SHARED_NOTHING_DEMO
-#include "mastersegmenttable.h"
-#include "extentmap.h"
-#include "dbrm.h"
-#endif
 
 #include "jobstep.h"
 using namespace joblist;
@@ -161,94 +155,6 @@ namespace
       }
     }
   };
-
-  uint64_t getInterleaveData(ISMPacketHeader *data)
-  {
-    ISMPacketHeader *MsgIn = data;
-    int Command = MsgIn->Command;
-
-	switch (Command) {
-		case BATCH_PRIMITIVE_RUN:
-		case DICT_TOKEN_BY_SCAN_COMPARE:
-			return MsgIn->Interleave;
-		case COL_BY_SCAN: {
-			ColByScanRequestHeader * CRH;
-			CRH = (ColByScanRequestHeader *) (MsgIn+1);
-			return CRH->LBID;
-		}
-		case COL_BY_SCAN_RANGE: {
-			ColByScanRangeRequestHeader * CRH = (ColByScanRangeRequestHeader *) (MsgIn+1);
-			return CRH->LBID;
-		}
-		case COL_BY_RID: {
-			ColByRIDRequestHeader * CRH;
-			CRH = (ColByRIDRequestHeader *) (MsgIn+1);
-			return CRH->LBID;
-		}
-		case COL_AGG_BY_SCAN: {
-			ColAggByScanRequestHeader * CRH;
-			CRH = (ColAggByScanRequestHeader *) (MsgIn+1);
-			return CRH->LBID;
-		}
-		case COL_AGG_BY_RID: {
-			ColAggByRIDRequestHeader * CRH;
-			CRH = (ColAggByRIDRequestHeader *) (MsgIn+1);
-			return CRH->LBID;
-		}
-		case INDEX_BY_SCAN: {
-			IndexByScanRequestHeader * CRH;
-			CRH = (IndexByScanRequestHeader *) (MsgIn+1);
-			return CRH->LBID;
-		}
-		case INDEX_BY_COMPARE: {
-			IndexByCompareRequestHeader * CRH;
-			CRH = (IndexByCompareRequestHeader *) (MsgIn+1);
-			return CRH->LBID;
-		}
-		case DICT_TOKEN_BY_INDEX_COMPARE: {
-			DictTokenByIndexRequestHeader * CRH;
-			CRH = (DictTokenByIndexRequestHeader *) (MsgIn+1);
-			return CRH->LBID;
-		}
-#if 0
-		case DICT_TOKEN_BY_SCAN_COMPARE: {
-			DictTokenByScanRequestHeader * CRH;
-			CRH = (DictTokenByScanRequestHeader *) (MsgIn+1);
-			return CRH->LBID;
-		}
-#endif
-		case DICT_SIGNATURE: {
-			DictSignatureRequestHeader * CRH;
-			CRH = (DictSignatureRequestHeader *) (MsgIn+1);
-			return CRH->LBID;
-		}
-		case DICT_SIGNATURE_RANGE: {
-			DictSignatureRangeRequestHeader * CRH;
-			CRH = (DictSignatureRangeRequestHeader *) (MsgIn+1);
-			return CRH->LBID;
-		}
-		case DICT_AGGREGATE: {
-			DictAggregateRequestHeader * CRH;
-			CRH = (DictAggregateRequestHeader *) (MsgIn+1);
-			return CRH->LBID;
-		}
-		case INDEX_WALK: {
-			IndexWalkHeader *iwh = (IndexWalkHeader *)MsgIn;
-			return iwh->LBID;
-		}
-		case INDEX_LIST: {
-			IndexListHeader *ilh = (IndexListHeader *)MsgIn;
-			return ilh->LBID;
-		}
-		case COL_LOOPBACK: {
-			return (uint64_t)NULL;
-		}
-		default:
-			cout << "DEC::getInterleaveData(): unknown primitive command " << Command
-				<< endl;
-			throw logic_error("DEC::getInterleaveData(): unknown primitive command");
-	}
-}
 
 template <typename T>
 struct QueueShutdown : public unary_function<T&, void>
@@ -404,17 +310,18 @@ int DistributedEngineComm::Close()
     return 0;
   }
 
-void DistributedEngineComm::Listen ( boost::shared_ptr<MessageQueueClient> client, uint connIndex)
+void DistributedEngineComm::Listen(boost::shared_ptr<MessageQueueClient> client, uint connIndex)
 {
 	SBS sbs;
 
 	try {
-		while ( Busy() )
+		while (Busy())
 		{
+			Stats stats;
 			//TODO: This call blocks so setting Busy() in another thread doesn't work here...
-			sbs = client->read();
-			if ( sbs->length() != 0 )
-				addDataToOutput(sbs, connIndex);
+			sbs = client->read(0, NULL, &stats);
+			if (sbs->length() != 0)
+				addDataToOutput(sbs, connIndex, &stats);
 			else // got zero bytes on read, nothing more will come
 				goto Error;
 		}
@@ -829,11 +736,7 @@ void DistributedEngineComm::setFlowControl(bool enabled, uint32_t uniqueID, boos
 		writeToClient(i, msg);
 }
 
-#ifdef SHARED_NOTHING_DEMO
-  void DistributedEngineComm::write(ByteStream& msg, BRM::OID_t oid)
-#else
   void DistributedEngineComm::write(uint32_t senderID, ByteStream& msg)
-#endif
   {
 	ISMPacketHeader *ism = (ISMPacketHeader *) msg.buf();
 	uint dest;
@@ -888,7 +791,7 @@ void DistributedEngineComm::setFlowControl(bool enabled, uint32_t uniqueID, boos
 				// caller's queue information
 				dest = ism->Interleave;
 				writeToClient(dest, msg, senderID, true);
-				return;
+				break;
 			default:
 				idbassert_s(0, "Unknown message type");
 		}
@@ -903,13 +806,20 @@ void DistributedEngineComm::setFlowControl(bool enabled, uint32_t uniqueID, boos
 void DistributedEngineComm::write(messageqcpp::ByteStream &msg, uint connection)
 {
 	ISMPacketHeader *ism = (ISMPacketHeader *) msg.buf();
+	PrimitiveHeader *pm = (PrimitiveHeader *) (ism + 1);
+	uint32_t senderID = pm->UniqueID;
+	
+	mutex::scoped_lock lk(fMlock, defer_lock_t());
+	MessageQueueMap::iterator it;
+	Stats *senderStats = NULL;
 
-	if (ism->Command == BATCH_PRIMITIVE_CREATE) 
-	{
-		/* Disable flow control initially */
-		msg << (uint32_t) -1;
-	}
-	newClients[connection]->write(msg);
+	lk.lock();
+	it = fSessionMessages.find(senderID);
+	if (it != fSessionMessages.end())
+		senderStats = &(it->second->stats);
+	lk.unlock();
+
+	newClients[connection]->write(msg, NULL, senderStats);
 }
 
   void DistributedEngineComm::StartClientListener(boost::shared_ptr<MessageQueueClient> cl, uint connIndex)
@@ -918,7 +828,7 @@ void DistributedEngineComm::write(messageqcpp::ByteStream &msg, uint connection)
     fPmReader.push_back(thrd);
   }
 
-  void DistributedEngineComm::addDataToOutput(SBS sbs, uint connIndex)
+  void DistributedEngineComm::addDataToOutput(SBS sbs, uint connIndex, Stats *stats)
   {
     ISMPacketHeader *hdr = (ISMPacketHeader*)(sbs->buf());
     PrimitiveHeader *p = (PrimitiveHeader *)(hdr+1);
@@ -954,6 +864,8 @@ void DistributedEngineComm::write(messageqcpp::ByteStream &msg, uint connection)
 		if (!mqe->throttled && queueSize.size >= mqe->targetQueueSize)
 			setFlowControl(true, uniqueId, mqe);
 	}
+	if (stats)
+		mqe->stats.dataRecvd(stats->dataRecvd());
   }
 
 void DistributedEngineComm::doHasBigMsgs(boost::shared_ptr<MQE> mqe, uint64_t targetSize)
@@ -967,28 +879,32 @@ int DistributedEngineComm::writeToClient(size_t index, const ByteStream& bs, uin
 {
 	mutex::scoped_lock lk(fMlock, defer_lock_t());
 	MessageQueueMap::iterator it;
+	Stats *senderStats = NULL;
 	uint interleaver = 0;
 
 	if (fPmConnections.size() == 0)
 		return 0;
 	
-	if (doInterleaving && sender != numeric_limits<uint32_t>::max()) {
+	if (sender != numeric_limits<uint32_t>::max()) {
 		lk.lock();
 		it = fSessionMessages.find(sender);
-		if (it != fSessionMessages.end()) 
-			interleaver = it->second->interleaver[index % it->second->pmCount]++; 
+		if (it != fSessionMessages.end()) {
+			senderStats = &(it->second->stats);
+			if (doInterleaving)
+				interleaver = it->second->interleaver[index % it->second->pmCount]++; 
+		}
 		lk.unlock();
 	}
 
 	try
 	{
-		if (doInterleaving) 
+		if (doInterleaving)
 			index = (index + (interleaver * pmCount)) % fPmConnections.size();
 		ClientList::value_type client = fPmConnections[index];
 		if (!client->isAvailable()) return 0;
 
 		mutex::scoped_lock lk(*(fWlock[index]));
-		client->write(bs);
+		client->write(bs, NULL, senderStats);
 		return 0;
 	}
 	catch(...)
@@ -996,7 +912,7 @@ int DistributedEngineComm::writeToClient(size_t index, const ByteStream& bs, uin
 		// @bug 488. error out under such condition instead of re-trying other connection,
 		// by pushing 0 size bytestream to messagequeue and throw excpetion
 		SBS sbs;
-		mutex::scoped_lock lk(fMlock);
+		lk.lock();
 		//cout << "WARNING: DEC WRITE BROKEN PIPE. PMS index = " << index << endl;
 		MessageQueueMap::iterator map_tok;
 		sbs.reset(new ByteStream(0));
@@ -1076,6 +992,18 @@ void DistributedEngineComm::removeDECEventListener(DECEventListener *l)
 	eventListeners.swap(newListeners);
 }
 
+Stats DistributedEngineComm::getNetworkStats(uint32_t uniqueID)
+{
+	mutex::scoped_lock lk(fMlock);
+	MessageQueueMap::iterator it;
+	Stats empty;
+
+	it = fSessionMessages.find(uniqueID);
+	if (it != fSessionMessages.end())
+		return it->second->stats;
+	return empty;
+}
+
 DistributedEngineComm::MQE::MQE(uint pCount) : ackSocketIndex(0), pmCount(pCount), hasBigMsgs(false),
 				targetQueueSize(targetRecvQueueSize)
 {
@@ -1083,7 +1011,7 @@ DistributedEngineComm::MQE::MQE(uint pCount) : ackSocketIndex(0), pmCount(pCount
 	unackedWork.reset(new volatile long[pmCount]);
 	interleaver.reset(new long[pmCount]);
 	memset((void *) unackedWork.get(), 0, pmCount * sizeof(long));
-	memset((void *) interleaver.get(), 0, pmCount + sizeof(long));
+	memset((void *) interleaver.get(), 0, pmCount * sizeof(long));
 #else
 	unackedWork.reset(new volatile uint32_t[pmCount]);
 	interleaver.reset(new uint[pmCount]);

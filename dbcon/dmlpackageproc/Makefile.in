@@ -78,10 +78,9 @@ libLTLIBRARIES_INSTALL = $(INSTALL)
 LTLIBRARIES = $(lib_LTLIBRARIES)
 libdmlpackageproc_la_LIBADD =
 am_libdmlpackageproc_la_OBJECTS = deletepackageprocessor.lo \
-	dmlpackageprocessor.lo dmlpackageprocessorfactory.lo \
-	insertpackageprocessor.lo updatepackageprocessor.lo \
-	commandpackageprocessor.lo autoincrementdata.lo \
-	tablelockdata.lo
+	dmlpackageprocessor.lo insertpackageprocessor.lo \
+	updatepackageprocessor.lo commandpackageprocessor.lo \
+	autoincrementdata.lo tablelockdata.lo
 libdmlpackageproc_la_OBJECTS = $(am_libdmlpackageproc_la_OBJECTS)
 DEFAULT_INCLUDES = -I. -I$(srcdir) -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
@@ -231,7 +230,6 @@ AM_LDFLAGS = -version-info 1:0:0 $(idb_ldflags)
 lib_LTLIBRARIES = libdmlpackageproc.la
 libdmlpackageproc_la_SOURCES = deletepackageprocessor.cpp \
 dmlpackageprocessor.cpp \
-dmlpackageprocessorfactory.cpp \
 insertpackageprocessor.cpp \
 updatepackageprocessor.cpp \
 commandpackageprocessor.cpp \
@@ -240,7 +238,6 @@ tablelockdata.cpp
 
 include_HEADERS = deletepackageprocessor.h \
 dmlpackageprocessor.h \
-dmlpackageprocessorfactory.h \
 insertpackageprocessor.h \
 updatepackageprocessor.h \
 commandpackageprocessor.h\
@@ -320,7 +317,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/commandpackageprocessor.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/deletepackageprocessor.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dmlpackageprocessor.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dmlpackageprocessorfactory.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/insertpackageprocessor.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tablelockdata.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/updatepackageprocessor.Plo@am__quote@

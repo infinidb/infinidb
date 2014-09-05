@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_timediff.cpp 3614 2013-02-28 16:45:09Z dhall $
+* $Id: func_timediff.cpp 3616 2013-03-04 14:56:29Z rdempsey $
 *
 *
 ****************************************************************************/
@@ -41,13 +41,10 @@ using namespace logging;
 
 namespace funcexp
 {
-
-CalpontSystemCatalog::ColType Func_timediff::operationType( FunctionParm& fp, CalpontSystemCatalog::ColType& resultType )
+namespace helpers
 {
-	return resultType;
-}
 
-string timediff( int64_t time1, int64_t time2)
+const string timediff( int64_t time1, int64_t time2)
 {
 	long long seconds;
 	long long microseconds;
@@ -58,16 +55,15 @@ string timediff( int64_t time1, int64_t time2)
 		l_sign = -l_sign;
 
 	if ( time1 > time2 )
-		calc_time_diff(time1, time2, l_sign, &seconds, &microseconds);
+		helpers::calc_time_diff(time1, time2, l_sign, &seconds, &microseconds);
 	else
-		calc_time_diff(time2, time1, l_sign, &seconds, &microseconds);
+		helpers::calc_time_diff(time2, time1, l_sign, &seconds, &microseconds);
 
 	long t_seconds;
 	int hour= seconds/3600L;
 	t_seconds= seconds%3600L;
 	int minute= t_seconds/60L;
 	int second= t_seconds%60L;
-
     // Bug 5099: Standardize to mysql behavior. No timediff may be > 838:59:59
     if (hour > 838)
     {
@@ -90,6 +86,12 @@ string timediff( int64_t time1, int64_t time2)
 	time3 = ptr;
 
 	return time3;
+}
+}
+
+CalpontSystemCatalog::ColType Func_timediff::operationType( FunctionParm& fp, CalpontSystemCatalog::ColType& resultType )
+{
+	return resultType;
 }
 
 string Func_timediff::getStrVal(rowgroup::Row& row,
@@ -181,7 +183,7 @@ string Func_timediff::getStrVal(rowgroup::Row& row,
 	
 	// both date format or both datetime format
 	if ((isDate1 && isDate2) || (!isDate1 && !isDate2))
-		return timediff( val1, val2);
+		return helpers::timediff( val1, val2);
 	isNull = true;
 	return "";
 }

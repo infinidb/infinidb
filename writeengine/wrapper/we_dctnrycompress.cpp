@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: we_dctnrycompress.cpp 4096 2012-08-07 20:06:09Z dhall $
+//  $Id: we_dctnrycompress.cpp 4450 2013-01-21 14:13:24Z rdempsey $
 
 
 /** @file */
@@ -127,7 +127,7 @@ int DctnryCompress1::numOfBlocksInFile()
 }
 
 
-int DctnryCompress1::readDBFile(FILE* pFile, unsigned char* readBuf, const i64 lbid,
+int DctnryCompress1::readDBFile(FILE* pFile, unsigned char* readBuf, const uint64_t lbid,
                                 const bool isFbo)
 {
     int fbo = lbid;
@@ -138,7 +138,7 @@ int DctnryCompress1::readDBFile(FILE* pFile, unsigned char* readBuf, const i64 l
 }
 
 
-int DctnryCompress1::writeDBFile(FILE* pFile, const unsigned char* writeBuf, const i64 lbid,
+int DctnryCompress1::writeDBFile(FILE* pFile, const unsigned char* writeBuf, const uint64_t lbid,
                                  const int numOfBlock)
 {
     int fbo = 0;
@@ -169,7 +169,7 @@ int DctnryCompress1::flushFile(int rc, std::map<FID,FID> & columnOids)
 }
 
 
-int DctnryCompress1::lbidToFbo(const i64 lbid, int& fbo)
+int DctnryCompress1::lbidToFbo(const uint64_t lbid, int& fbo)
 {
     u_int16_t dbRoot;
     u_int16_t segment;

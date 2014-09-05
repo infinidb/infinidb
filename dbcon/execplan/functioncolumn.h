@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: functioncolumn.h 8436 2012-04-04 18:18:21Z rdempsey $
+*   $Id: functioncolumn.h 9210 2013-01-21 14:10:42Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -183,6 +183,10 @@ public:
 	{ 
 		return fFunctor->getIntVal(row, fFunctionParms, isNull, fOperationType);
 	}
+    virtual uint64_t getUintVal(rowgroup::Row& row, bool& isNull) 
+    { 
+        return fFunctor->getUintVal(row, fFunctionParms, isNull, fOperationType);
+    }
 	virtual float getFloatVal(rowgroup::Row& row, bool& isNull)
 	{
 		return fFunctor->getFloatVal(row, fFunctionParms, isNull, fOperationType);

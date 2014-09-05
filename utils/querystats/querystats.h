@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: querystats.h 4026 2013-08-02 16:41:23Z zzhu $
+*   $Id: querystats.h 4027 2013-08-02 18:47:28Z zzhu $
 *
 *
 ***********************************************************************/
@@ -127,7 +127,7 @@ struct QueryStats
 	 modified accordingly.
 	*/
 	void insert();
-	void handleMySqlError(const char* errStr, unsigned int errCode);
+	void handleMySqlError(const char*, unsigned int);
 	
 	/* User mysql API to query priority table and get this user's assigned priority */
 	uint userPriority(std::string host, const std::string user);

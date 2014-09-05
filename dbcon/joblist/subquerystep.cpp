@@ -54,15 +54,9 @@ using namespace joblist;
 namespace joblist
 {
 
-SubQueryStep::SubQueryStep(
-	uint32_t sessionId,
-	uint32_t txnId,
-	uint32_t statementId) :
-		fSessionId(sessionId),
-		fTxnId(txnId),
-		fStepId(0),
-		fStatementId(statementId),
-		fRowsReturned(0)
+SubQueryStep::SubQueryStep(const JobInfo& jobInfo)
+	: JobStep(jobInfo)
+	, fRowsReturned(0)
 {
 	fExtendedInfo = "SQS: ";
 }
@@ -117,7 +111,7 @@ void SubQueryStep::printCalTrace()
 			<< "\t1st read " << dlTimes.FirstReadTimeString()
 			<< "; EOI " << dlTimes.EndOfInputTimeString() << "; runtime-"
 			<< JSTimeStamp::tsdiffstr(dlTimes.EndOfInputTime(), dlTimes.FirstReadTime())
-			<< "s;\n\tJob completion status " << fOutputJobStepAssociation.status() << endl;
+			<< "s;\n\tJob completion status " << status() << endl;
 	logEnd(logStr.str().c_str());
 	fExtendedInfo += logStr.str();
 	formatMiniStats();
@@ -142,11 +136,8 @@ void SubQueryStep::formatMiniStats()
 */
 
 
-SubAdapterStep::SubAdapterStep(uint32_t sessionId, uint32_t txnId, uint32_t statementId, SJSTEP& s)
-	: fSessionId(sessionId)
-	, fTxnId(txnId)
-	, fStepId(0)
-	, fStatementId(statementId)
+SubAdapterStep::SubAdapterStep(SJSTEP& s, const JobInfo& jobInfo)
+	: JobStep(jobInfo)
 	, fTableOid(s->tableOid())
 	, fSubStep(s)
 	, fRowsReturned(0)
@@ -177,7 +168,7 @@ void SubAdapterStep::abort()
 void SubAdapterStep::run()
 {
 	if (fInputJobStepAssociation.outSize() == 0)
-		throw logic_error("No input data list for constant step.");
+		throw logic_error("No input data list for subquery adapter step.");
 
 	fInputDL = fInputJobStepAssociation.outAt(0)->rowGroupDL();
 	if (fInputDL == NULL)
@@ -217,7 +208,7 @@ uint SubAdapterStep::nextBand(messageqcpp::ByteStream &bs)
 		bs.restart();
 		
 		more = fOutputDL->next(fOutputIterator, &rgDataOut);
-		if (!more || (0 < fOutputJobStepAssociation.status() || die))
+		if (!more || cancelled())
 		{
 			//@bug4459.
 			while (more) more = fOutputDL->next(fOutputIterator, &rgDataOut);			
@@ -233,17 +224,14 @@ uint SubAdapterStep::nextBand(messageqcpp::ByteStream &bs)
 	}
 	catch(const std::exception& ex)
 	{
-		catchHandler(ex.what(), fSessionId);
-		if (fOutputJobStepAssociation.status() == 0)
-			fOutputJobStepAssociation.status(tupleConstantStepErr);
+		catchHandler(ex.what(), ERR_IN_DELIVERY, fErrorInfo, fSessionId);
 		while (more) more = fOutputDL->next(fOutputIterator, &rgDataOut);
 		fEndOfResult = true;
 	}
 	catch(...)
 	{
-		catchHandler("TupleConstantStep next band caught an unknown exception", fSessionId);
-		if (fOutputJobStepAssociation.status() == 0)
-			fOutputJobStepAssociation.status(tupleConstantStepErr);
+		catchHandler("SubAdapterStep next band caught an unknown exception",
+						ERR_IN_DELIVERY, fErrorInfo, fSessionId);
 		while (more) more = fOutputDL->next(fOutputIterator, &rgDataOut);
 		fEndOfResult = true;
 	}
@@ -254,7 +242,7 @@ uint SubAdapterStep::nextBand(messageqcpp::ByteStream &bs)
 		shared_array<uint8_t> rgData(new uint8_t[fRowGroupDeliver.getEmptySize()]);
 		fRowGroupDeliver.setData(rgData.get());
 		fRowGroupDeliver.resetRowGroup(0);
-		fRowGroupDeliver.setStatus(fOutputJobStepAssociation.status());
+		fRowGroupDeliver.setStatus(status());
 		bs.load(rgData.get(), fRowGroupDeliver.getDataSize());
 	}
 
@@ -356,7 +344,7 @@ void SubAdapterStep::execute()
 		more = fInputDL->next(fInputIterator, &rgDataIn);
 		if (traceOn()) dlTimes.setFirstReadTime();
 
-		while (more && 0 == fInputJobStepAssociation.status() && !die)
+		while (more && !cancelled())
 		{
 			fRowGroupIn.setData(rgDataIn.get());
 			rgDataOut.reset(new uint8_t[fRowGroupOut.getDataSize(fRowGroupIn.getRowCount())]);
@@ -408,18 +396,15 @@ void SubAdapterStep::execute()
 	}
 	catch(const std::exception& ex)
 	{
-		catchHandler(ex.what(), fSessionId);
-		if (fOutputJobStepAssociation.status() == 0)
-			fOutputJobStepAssociation.status(ERR_EXEMGR_MALFUNCTION);
+		catchHandler(ex.what(), ERR_EXEMGR_MALFUNCTION, fErrorInfo, fSessionId);
 	}
 	catch(...)
 	{
-		catchHandler("SubAdapterStep execute caught an unknown exception", fSessionId);
-		if (fOutputJobStepAssociation.status() == 0)
-			fOutputJobStepAssociation.status(ERR_EXEMGR_MALFUNCTION);
+		catchHandler("SubAdapterStep execute caught an unknown exception",
+						ERR_EXEMGR_MALFUNCTION, fErrorInfo, fSessionId);
 	}
 
-	if (fOutputJobStepAssociation.status() > 0 || die)
+	if (cancelled())
 		while (more) more = fInputDL->next(fInputIterator, &rgDataIn);
 
 	if (traceOn())
@@ -496,7 +481,7 @@ void SubAdapterStep::printCalTrace()
 			<< "\t1st read " << dlTimes.FirstReadTimeString()
 			<< "; EOI " << dlTimes.EndOfInputTimeString() << "; runtime-"
 			<< JSTimeStamp::tsdiffstr(dlTimes.EndOfInputTime(), dlTimes.FirstReadTime())
-			<< "s;\n\tJob completion status " << fOutputJobStepAssociation.status() << endl;
+			<< "s;\n\tJob completion status " << status() << endl;
 	logEnd(logStr.str().c_str());
 	fExtendedInfo += logStr.str();
 	formatMiniStats();

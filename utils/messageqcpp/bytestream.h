@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************************
-* $Id: bytestream.h 3137 2012-06-07 14:26:39Z rdempsey $
+* $Id: bytestream.h 3604 2013-02-25 22:53:23Z pleblanc $
 *
 *
 ******************************************************************************************/
@@ -59,8 +59,8 @@ typedef boost::shared_ptr<ByteStream> SBS;
  *
  * @warning Alas, due to recent changes this class no longer implements a strong execption guarantee.
  *
- * @warning the current implementation does not know how to compact memory, so it should
- * destructed or have reset() called to clear out the current byte array. Also, multi-byte
+ * @warning the current implementation does not know how to compact memory, so it should be
+ * destructed or have reset() called to clear out the current uint8_t array. Also, multi-uint8_t
  * numeric values are pushed and dequeued in the native byte order, so they are not portable
  * across machines with different byte orders.
  *
@@ -68,21 +68,11 @@ typedef boost::shared_ptr<ByteStream> SBS;
 class ByteStream : public Serializeable
 {
 public:
-	/**
-	 *	an 8-bit unsigned
-	 */
-	typedef uint8_t byte;
-	/**
-	 *	a 16-bit unsigned
-	 */
+    // We now use the standard Linux types of uint8_t, uint16_t, etc. 
+    // These are kept around for backward compatibility
+	typedef uint8_t  byte;
 	typedef uint16_t doublebyte;
-	/**
-	 *	a 32-bit unsigned
-	 */
 	typedef uint32_t quadbyte;
-	/**
-	 *	a 64-bit unsigned
-	 */
 	typedef uint64_t octbyte;
 
 	/**
@@ -90,9 +80,9 @@ public:
 	 */
 	EXPORT explicit ByteStream(uint32_t initSize=8192);   // multiples of pagesize are best
 	/**
-	 *	ctor with a byte array and len initializer
+	 *	ctor with a uint8_t array and len initializer
 	 */
-	inline ByteStream(const byte* bp, const uint32_t len);
+	inline ByteStream(const uint8_t* bp, const uint32_t len);
 	/**
 	 *	copy ctor
 	 */
@@ -112,29 +102,46 @@ public:
 	inline virtual ~ByteStream();
 
 	/**
-	 *	push a byte onto the end of the stream
+	 *	push a int8_t onto the end of the stream
 	 */
-	EXPORT ByteStream& operator<<(const byte b);
+	EXPORT ByteStream& operator<<(const int8_t b);
 	/**
-	 *	push a doublebyte onto the end of the stream. The byte order is whatever the native byte order is.
+	 *	push a uint8_t onto the end of the stream
 	 */
-	EXPORT ByteStream& operator<<(const doublebyte d);
+	EXPORT ByteStream& operator<<(const uint8_t b);
 	/**
-	 *	push a quadbyte onto the end of the stream. The byte order is whatever the native byte order is.
+	 *	push a int16_t onto the end of the stream. The byte order is whatever the native byte order is.
 	 */
-	EXPORT ByteStream& operator<<(const quadbyte q);
+	EXPORT ByteStream& operator<<(const int16_t d);
+	/**
+	 *	push a uint16_t onto the end of the stream. The byte order is whatever the native byte order is.
+	 */
+	EXPORT ByteStream& operator<<(const uint16_t d);
+	/**
+	 *	push a int32_t onto the end of the stream. The byte order is whatever the native byte order is.
+	 */
+	EXPORT ByteStream& operator<<(const int32_t q);
+	/**
+	 *	push a uint32_t onto the end of the stream. The byte order is whatever the native byte order is.
+	 */
+	EXPORT ByteStream& operator<<(const uint32_t q);
 #ifdef _MSC_VER
 #if BOOST_VERSION < 104500
 	//These 2 are to make MS VC++ w/ boost < 1.45 happy
+    // TODO: Do we still need these?
 	EXPORT ByteStream& operator<<(const uint ui);
 
 	EXPORT ByteStream& operator>>(uint& ui);
 #endif
 #endif
 	/**
-	 *	push an octbyte onto the end of the stream. The byte order is whatever the native byte order is.
+	 *	push an int64_t onto the end of the stream. The byte order is whatever the native byte order is.
 	 */
-	EXPORT ByteStream& operator<<(const octbyte o);
+	EXPORT ByteStream& operator<<(const int64_t o);
+	/**
+	 *	push an uint64_t onto the end of the stream. The byte order is whatever the native byte order is.
+	 */
+	EXPORT ByteStream& operator<<(const uint64_t o);
 	/**
 	 * push a std::string onto the end of the stream.
 	 */
@@ -149,22 +156,37 @@ public:
 	EXPORT ByteStream& operator<<(const ByteStream& bs);
 
 	/**
-	 *	extract a byte from the front of the stream.
+	 *	extract a int8_t from the front of the stream.
 	 */
-	EXPORT ByteStream& operator>>(byte& b);
+	EXPORT ByteStream& operator>>(int8_t& b);
 	/**
-	 *	extract a doublebyte from the front of the stream. The byte order is whatever the native byte order is.
+	 *	extract a uint8_t from the front of the stream.
 	 */
-	EXPORT ByteStream& operator>>(doublebyte& d);
+	EXPORT ByteStream& operator>>(uint8_t& b);
 	/**
-	 *	extract a quadbyte from the front of the stream. The byte order is whatever the native byte order is.
+	 *	extract a int16_t from the front of the stream. The byte order is whatever the native byte order is.
 	 */
-	EXPORT ByteStream& operator>>(quadbyte& q);
-
+	EXPORT ByteStream& operator>>(int16_t& d);
 	/**
-	 *	extract an octbyte from the front of the stream. The byte order is whatever the native byte order is.
+	 *	extract a uint16_t from the front of the stream. The byte order is whatever the native byte order is.
 	 */
-	EXPORT ByteStream& operator>>(octbyte& o);
+	EXPORT ByteStream& operator>>(uint16_t& d);
+	/**
+	 *	extract a int32_t from the front of the stream. The byte order is whatever the native byte order is.
+	 */
+	EXPORT ByteStream& operator>>(int32_t& q);
+	/**
+	 *	extract a uint32_t from the front of the stream. The byte order is whatever the native byte order is.
+	 */
+	EXPORT ByteStream& operator>>(uint32_t& q);
+	/**
+	 *	extract an int64_t from the front of the stream. The byte order is whatever the native byte order is.
+	 */
+	EXPORT ByteStream& operator>>(int64_t& o);
+	/**
+	 *	extract an uint64_t from the front of the stream. The byte order is whatever the native byte order is.
+	 */
+	EXPORT ByteStream& operator>>(uint64_t& o);
 	/**
 	 * extract a std::string from the front of the stream.
 	 */
@@ -174,7 +196,7 @@ public:
 	 * @warning the caller is responsible for making sure b is big enough to hold all the data (perhaps by
 	 * calling length()).
 	 */
-	EXPORT ByteStream& operator>>(byte*& b);
+	EXPORT ByteStream& operator>>(uint8_t*& b);
 	/**
 	 * extract an arbitrary object from the front of the stream.
 	 */
@@ -185,21 +207,37 @@ public:
 	EXPORT ByteStream& operator>>(ByteStream& bs);
 
 	/**
-	 *	Peek at a byte from the front of the stream.
+	 *	Peek at a int8_t from the front of the stream.
 	 */
-	EXPORT void peek(byte& b) const;
+	EXPORT void peek(int8_t& b) const;
 	/**
-	 *	Peek at a doublebyte from the front of the stream. The byte order is whatever the native byte order is.
+	 *	Peek at a uint8_t from the front of the stream.
 	 */
-	EXPORT void peek(doublebyte& d) const;
+	EXPORT void peek(uint8_t& b) const;
 	/**
-	 *	Peek at a quadbyte from the front of the stream. The byte order is whatever the native byte order is.
+	 *	Peek at a int16_t from the front of the stream. The byte order is whatever the native byte order is.
 	 */
-	EXPORT void peek(quadbyte& q) const;
+	EXPORT void peek(int16_t& d) const;
 	/**
-	 *	Peek at an octbyte from the front of the stream. The byte order is whatever the native byte order is.
+	 *	Peek at a uint16_t from the front of the stream. The byte order is whatever the native byte order is.
 	 */
-	EXPORT void peek(octbyte& o) const;
+	EXPORT void peek(uint16_t& d) const;
+	/**
+	 *	Peek at a int32_t from the front of the stream. The byte order is whatever the native byte order is.
+	 */
+	EXPORT void peek(int32_t& q) const;
+	/**
+	 *	Peek at a uint32_t from the front of the stream. The byte order is whatever the native byte order is.
+	 */
+	EXPORT void peek(uint32_t& q) const;
+	/**
+	 *	Peek at an int64_t from the front of the stream. The byte order is whatever the native byte order is.
+	 */
+	EXPORT void peek(int64_t& o) const;
+	/**
+	 *	Peek at an uint64_t from the front of the stream. The byte order is whatever the native byte order is.
+	 */
+	EXPORT void peek(uint64_t& o) const;
 	/**
 	 * Peek at a std::string from the front of the stream.
 	 */
@@ -209,7 +247,7 @@ public:
 	 * @warning the caller is responsible for making sure b is big enough to hold all the data (perhaps by
 	 * calling length()).
 	 */
-	inline void peek(byte*& b) const;
+	inline void peek(uint8_t*& b) const;
 	/**
 	 * Peek at a ByteStream from the front of the stream.
 	 */
@@ -218,12 +256,12 @@ public:
 	/**
 	 *	load the stream from an array. Clears out any previous data.
 	 */
-	EXPORT void load(const byte* bp, uint32_t len);
+	EXPORT void load(const uint8_t* bp, uint32_t len);
 
 	/**
 	 *	append bytes to the end of the stream.
 	 */
-	EXPORT void append(const byte* bp, uint32_t len);
+	EXPORT void append(const uint8_t* bp, uint32_t len);
 
 	/**
 	 * equality check on buffer contents.
@@ -240,20 +278,20 @@ public:
 	 * This will let us build the msg directly in the BS buffer.
 	 */
 	EXPORT void needAtLeast(size_t amount);
-	inline byte *getInputPtr();
+	inline uint8_t *getInputPtr();
 	inline void advanceInputPtr(size_t amount);
 
 	/**
 	 *	returns a const pointer to the current head of the queue.  If you use it for
 	 *  raw access, you might want to advance the current head.
 	 */
-	inline const byte* buf() const;
+	inline const uint8_t* buf() const;
 
 	/**
 	 *	returns a pointer to the current head of the queue.  If you use it for
 	 *  raw access, you might want to advance the current head.
 	 */
-	inline byte* buf();
+	inline uint8_t* buf();
 
 	/**
 	 *	advance the output ptr without having to extract bytes
@@ -266,6 +304,7 @@ public:
 	 * @warning do not attempt to make a ByteStream bigger than 4GB!
 	 */
 	inline uint32_t length() const;
+	inline bool empty() const;
 
 	/**
 	 *	returns the length of the queue, including header overhead (in bytes)
@@ -315,15 +354,15 @@ public:
 	EXPORT static const uint32_t BlockSize = 4096;
 
 	/** size of the space we want in front of the data */
-	EXPORT static const uint ISSOverhead = 2*sizeof(uint32_t);  //space for the BS magic & length
+	EXPORT static const uint32_t ISSOverhead = 2*sizeof(uint32_t);  //space for the BS magic & length
 
 	friend class ::ByteStreamTestSuite;
 
 protected:
 	/**
-	 *	pushes one byte onto the end of the stream
+	 *	pushes one uint8_t onto the end of the stream
 	 */
-	void add(const byte b);
+	void add(const uint8_t b);
 	/**
 	 *	adds another BlockSize bytes to the internal buffer
 	 */
@@ -335,18 +374,19 @@ protected:
 
 private:
 
-	byte* fBuf; ///the start of the allocated buffer
-	byte* fCurInPtr; //the point in fBuf where data is inserted next
-	byte* fCurOutPtr; //the point in fBuf where data is extracted from next
+	uint8_t* fBuf; ///the start of the allocated buffer
+	uint8_t* fCurInPtr; //the point in fBuf where data is inserted next
+	uint8_t* fCurOutPtr; //the point in fBuf where data is extracted from next
 	uint32_t fMaxLen; //how big fBuf is currently
 };
 
-inline ByteStream::ByteStream(const byte* bp, const uint32_t len) : fBuf(0), fMaxLen(0) { load(bp, len); }
+inline ByteStream::ByteStream(const uint8_t* bp, const uint32_t len) : fBuf(0), fMaxLen(0) { load(bp, len); }
 inline ByteStream::~ByteStream() { delete [] fBuf; }
 
-inline const ByteStream::byte* ByteStream::buf() const { return fCurOutPtr; }
-inline ByteStream::byte* ByteStream::buf() { return fCurOutPtr; }
+inline const uint8_t* ByteStream::buf() const { return fCurOutPtr; }
+inline uint8_t* ByteStream::buf() { return fCurOutPtr; }
 inline uint32_t ByteStream::length() const { return (uint32_t)(fCurInPtr - fCurOutPtr); }
+inline bool ByteStream::empty() const { return (length() == 0); }
 inline uint32_t ByteStream::lengthWithHdrOverhead() const
 	{return (length() + ISSOverhead);}
 inline void ByteStream::reset() { delete [] fBuf; fMaxLen = 0; 
@@ -362,9 +402,9 @@ inline void ByteStream::advance(uint32_t adv)
 		throw std::length_error("ByteStream: advanced beyond the end of the buffer");
 	fCurOutPtr += adv; 
 }
-inline ByteStream::byte* ByteStream::getInputPtr() { return fCurInPtr; }
+inline uint8_t* ByteStream::getInputPtr() { return fCurInPtr; }
 inline void ByteStream::advanceInputPtr(size_t amount) { fCurInPtr += amount; }
-inline void ByteStream::peek(byte*& bpr) const { memcpy(bpr, fCurOutPtr, length()); }
+inline void ByteStream::peek(uint8_t*& bpr) const { memcpy(bpr, fCurOutPtr, length()); }
 
 inline ByteStream& ByteStream::operator+=(const ByteStream& rhs) { append(rhs.buf(), rhs.length()); return *this; }
 inline ByteStream operator+(const ByteStream& lhs, const ByteStream& rhs) { ByteStream temp(lhs); return temp += rhs; }
@@ -387,7 +427,7 @@ EXPORT std::ifstream& operator>>(std::ifstream& os, ByteStream& bs);
 
 /// Generic method to export a vector of T's that implement Serializeable
 template<typename T>
-void serializeVector(messageqcpp::ByteStream& bs, const std::vector<T>& v)
+void serializeVector(ByteStream& bs, const std::vector<T>& v)
 {
 	typename std::vector<T>::const_iterator it;
 	uint64_t size;
@@ -400,7 +440,7 @@ void serializeVector(messageqcpp::ByteStream& bs, const std::vector<T>& v)
 
 /// Generic method to deserialize a vector of T's that implement Serializeable
 template<typename T>
-void deserializeVector(messageqcpp::ByteStream& bs, std::vector<T>& v)
+void deserializeVector(ByteStream& bs, std::vector<T>& v)
 {
 	uint i;
 	T tmp;
@@ -421,7 +461,7 @@ void deserializeVector(messageqcpp::ByteStream& bs, std::vector<T>& v)
 #endif
 
 template<typename T>
-void serializeInlineVector(messageqcpp::ByteStream &bs, const std::vector<T> &v)
+void serializeInlineVector(ByteStream &bs, const std::vector<T> &v)
 {
 	uint64_t size = v.size();
 	bs << size;
@@ -432,7 +472,7 @@ void serializeInlineVector(messageqcpp::ByteStream &bs, const std::vector<T> &v)
 inline void serializeVector(ByteStream& bs, const std::vector<int64_t>& v) { serializeInlineVector<int64_t>(bs, v); }
 
 template<typename T>
-void deserializeInlineVector(messageqcpp::ByteStream &bs, std::vector<T> &v)
+void deserializeInlineVector(ByteStream &bs, std::vector<T> &v)
 {
 	uint64_t size;
 	const uint8_t *buf;
@@ -456,7 +496,7 @@ inline void deserializeVector(ByteStream& bs, std::vector<int64_t>& v) { deseria
 
 /// Generic method to serialize a set of T's that implement Serializeable
 template<typename T>
-void serializeSet(messageqcpp::ByteStream &bs, const std::set<T> &s)
+void serializeSet(ByteStream &bs, const std::set<T> &s)
 {
 	uint64_t size = s.size();
 	bs << size;
@@ -467,7 +507,7 @@ void serializeSet(messageqcpp::ByteStream &bs, const std::set<T> &s)
 
 /// Generic method to deserialize a set of T's that implement Serializeable
 template<typename T>
-void deserializeSet(messageqcpp::ByteStream& bs, std::set<T>& s)
+void deserializeSet(ByteStream& bs, std::set<T>& s)
 {
 	uint i;
 	T tmp;

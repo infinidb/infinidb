@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-// $Id: passthrustep.cpp 8476 2012-04-25 22:28:15Z xlou $
+// $Id: passthrustep.cpp 9210 2013-01-21 14:10:42Z rdempsey $
 //
 // This is a simple optimization to take DV's out of an IDL and insert them into an ODL
 // without having to get them from PrimProc
@@ -29,8 +29,9 @@ using namespace std;
 #include <boost/thread.hpp>
 using namespace boost;
 
-#include "primitivestep.h"
+#include "jlf_common.h"
 #include "datalist.h"
+#include "primitivestep.h"
 using namespace execplan;
 
 //namespace {
@@ -206,32 +207,17 @@ using namespace execplan;
 
 namespace joblist {
 
-PassThruStep::PassThruStep(const JobStepAssociation& in, 
-	const JobStepAssociation& out,
-	DistributedEngineComm* dec,
-	execplan::CalpontSystemCatalog::ColType colType,
+PassThruStep::PassThruStep(
 	execplan::CalpontSystemCatalog::OID oid,
 	execplan::CalpontSystemCatalog::OID tableOid,
-	uint32_t sessionId,
-	uint32_t txnId,
-	uint32_t verId,
-	uint16_t stepId,
-	uint32_t statementId,
-	bool EM,
-	ResourceManager& rm) :
-	fInputJobStepAssociation(in),
-	fOutputJobStepAssociation(out),
-	fDec( dec),
+	const execplan::CalpontSystemCatalog::ColType& colType,
+	const JobInfo& jobInfo) :
+	JobStep(jobInfo),
 	fOid(oid),
 	fTableOid(tableOid),
-	fSessionId(sessionId),
-	fTxnId(txnId),
-	fVerId(verId),
-	fStepId(stepId),
-	fStatementId(statementId),
-	isEM(EM),
+	isEM(jobInfo.isExeMgr),
 	fSwallowRows(false),
-	fRm(rm)
+	fRm(jobInfo.rm)
 {
 	colWidth = colType.colWidth;
 	realWidth = colType.colWidth;
@@ -241,7 +227,7 @@ PassThruStep::PassThruStep(const JobStepAssociation& in,
 	
 }
 
-  PassThruStep::PassThruStep(const pColStep& rhs, bool EM): fRm(rhs.fRm)
+PassThruStep::PassThruStep(const pColStep& rhs) : JobStep(rhs), fRm(rhs.fRm)
 {
 	fInputJobStepAssociation = rhs.inputAssociation();
 	fOutputJobStepAssociation = rhs.outputAssociation();
@@ -249,17 +235,11 @@ PassThruStep::PassThruStep(const JobStepAssociation& in,
 	realWidth = rhs.realWidth;
 	fOid = rhs.oid();
 	fTableOid = rhs.tableOid();
-	fSessionId = rhs.sessionId();
-	fTxnId = rhs.txnId();
-	fVerId = rhs.verId();
-	fStepId = rhs.stepId();
-	fStatementId = rhs.statementId();
-	fLogger = rhs.logger();
 	fSwallowRows = rhs.getSwallowRows();
 	isDictColumn = rhs.isDictCol();
-	isEM = EM;
 //	fDec = rhs.dec();
 	fColType = rhs.colType();
+	isEM = rhs.isExeMgr();
 }
 
 PassThruStep::~PassThruStep()

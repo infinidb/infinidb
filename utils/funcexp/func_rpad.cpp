@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_rpad.cpp 3741 2013-04-25 20:36:44Z bpaul $
+* $Id: func_rpad.cpp 3742 2013-04-25 20:38:39Z bpaul $
 *
 *
 ****************************************************************************/
@@ -51,27 +51,27 @@ std::string Func_rpad::getStrVal(rowgroup::Row& row,
 						bool& isNull,
 						execplan::CalpontSystemCatalog::ColType&)
 {
-	unsigned i;
-	// The number of characters (not bytes) in our input str.
-	// Not all of these are necessarily significant. We need to search for the
-	// NULL terminator to be sure.
-	size_t strwclen;
-	// this holds the number of characters (not bytes) in our pad str.
-	size_t padwclen;
+    unsigned i;
+    // The number of characters (not bytes) in our input str.
+    // Not all of these are necessarily significant. We need to search for the 
+    // NULL terminator to be sure.
+    size_t strwclen; 
+    // this holds the number of characters (not bytes) in our pad str.
+    size_t padwclen;
 
-	// The original string
-	string tstr = fp[0]->data()->getStrVal(row, isNull);
+    // The original string
+    string tstr = fp[0]->data()->getStrVal(row, isNull);
 
-	// The result length in number of characters
-	unsigned int len = fp[1]->data()->getIntVal(row, isNull);
-	if (len < 1)
-		return "";
+    // The result length in number of characters
+    unsigned int len = fp[1]->data()->getIntVal(row, isNull);
+    if (len < 1)
+        return "";
 
-	// The pad characters.
-	string pad = fp[2]->data()->getStrVal(row, isNull);
+    // The pad characters.
+    string pad = fp[2]->data()->getStrVal(row, isNull);
 
-	if (isNull)
-		return "";
+    if (isNull)
+        return "";
 
     // Rather than calling the wideconvert functions with a null buffer to 
     // determine the size of buffer to allocate, we can be sure the wide
@@ -86,30 +86,30 @@ std::string Func_rpad::getStrVal(rowgroup::Row& row,
     wchar_t* wcbuf = (wchar_t*)alloca(bufsize);
     strwclen = utf8::idb_mbstowcs(wcbuf, tstr.c_str(), strwclen+1);
 
-	unsigned int strSize = strwclen;    // The number of significant characters
-	const wchar_t* pWChar = wcbuf;
-	for (i = 0; *pWChar != '\0' && i < strwclen; ++pWChar, ++i)
-	{
-	}
-	strSize = i;
+    unsigned int strSize = strwclen;    // The number of significant characters
+    const wchar_t* pWChar = wcbuf;
+    for (i = 0; *pWChar != '\0' && i < strwclen; ++pWChar, ++i)
+    {
+    }
+    strSize = i;
 
-	// If the incoming str is exactly the len of the result str,
-	// return the original
-	if (strSize == len)
-	{
-		return tstr;
-	}
+    // If the incoming str is exactly the len of the result str,
+    // return the original
+    if (strSize == len)
+    {
+        return tstr;
+    }
 
-	// If the incoming str is too big for the result str
-	// truncate the widechar buffer and return as a string
-	if (strSize > len)
-	{
+    // If the incoming str is too big for the result str
+    // truncate the widechar buffer and return as a string
+    if (strSize > len) 
+    {
 		// Trim the excess length of the buffer
 		wstring trimmed = wstring(wcbuf, len);
 		return utf8::wstring_to_utf8(trimmed.c_str());
-	}
+    }
 
-	// This is the case where there's room to pad.
+    // This is the case where there's room to pad.
 
     // Convert the pad string to wide
     padwclen = pad.length();  // A guess to start.
@@ -117,26 +117,26 @@ std::string Func_rpad::getStrVal(rowgroup::Row& row,
     wchar_t* wcpad = (wchar_t*)alloca(padbufsize);
     size_t padlen = utf8::idb_mbstowcs(wcpad, pad.c_str(), padwclen+1);
 
-	// How many chars do we need?
-	unsigned int padspace = len - strSize;
+    // How many chars do we need?
+    unsigned int padspace = len - strSize;
 
-	// Fill in the back of the buffer
-	wchar_t* firstpadchar = wcbuf + strSize;
-	for (wchar_t* pch = wcbuf; pch < wcbuf + len && padlen > 0;)
-	{
-		// Truncate the number of fill chars if running out of space
-		if (padlen > padspace)
-		{
-			padlen = padspace;
-		}
-		// Move the fill chars to buffer
-		for (wchar_t* padchar = wcpad; padchar < wcpad + padlen; ++padchar)
-		{
-			*firstpadchar++ = *padchar;
-		}
-		padspace -= padlen;
-		pch += padlen;
-	}
+    // Fill in the back of the buffer
+    wchar_t* firstpadchar = wcbuf + strSize;
+    for (wchar_t* pch = wcbuf; pch < wcbuf + len && padlen > 0;) 
+    {
+        // Truncate the number of fill chars if running out of space
+        if (padlen > padspace)
+        {
+            padlen = padspace;
+        }
+        // Move the fill chars to buffer
+        for (wchar_t* padchar = wcpad; padchar < wcpad + padlen; ++padchar)
+        {
+            *firstpadchar++ = *padchar;
+        }
+        padspace -= padlen;
+        pch += padlen;
+    }
 
 	wstring padded = wstring(wcbuf, len);
 

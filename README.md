@@ -1,4 +1,4 @@
-# This is InfiniDB 3.5
+# This is InfiniDB 3.6
 
 ## Build prerequisites
 To build InfiniDB from source you will need:
@@ -22,16 +22,16 @@ Along with a working C++ compiler and GNU software development tools you will ne
 
 ### InfiniDB
 
-    wget -Oinfinidb-3.5.tar.gz https://github.com/infinidb/infinidb/archive/3.5.tar.gz
-    tar -zxf infinidb-3.5.tar.gz
-    ln -s infinidb-3.5 infinidb
+    wget -Oinfinidb-3.6.tar.gz https://github.com/infinidb/infinidb/archive/3.6.tar.gz
+    tar -zxf infinidb-3.6.tar.gz
+    ln -s infinidb-3.6 infinidb
     cd infinidb
     ./configure --prefix=$HOME/infinidb
     make
     make install
     
 This will leave you with `$HOME/infinidb` as a binary tree. Follow the Binary Download
-instructions in the InfiniDB 3.5 Installation Guide (available on http://www.infinidb.co/).
+instructions in the InfiniDB 3.6 Installation Guide (available on http://www.infinidb.co/).
 
 ## How to Contribute
   * You may submit your contributions via GitHub pull requests.

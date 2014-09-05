@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-// $Id: filterstep.cpp 8526 2012-05-17 02:28:10Z xlou $
+// $Id: filterstep.cpp 9210 2013-01-21 14:10:42Z rdempsey $
 
 #include <string>
 #include <sstream>
@@ -61,16 +61,12 @@ namespace joblist
 //    }
 //};
     
-FilterStep::FilterStep(uint32_t sessionId,
-		uint32_t txnId,
-		uint32_t statementId,
-		execplan::CalpontSystemCatalog::ColType colType) :
-	fSessionId(sessionId),
-	fTxnId(txnId),
-	fStepId(0),
-	fStatementId(statementId),
-	fTableOID(0),
-	fColType(colType)
+FilterStep::FilterStep(
+	const execplan::CalpontSystemCatalog::ColType& colType,
+	const JobInfo& jobInfo) :
+		JobStep(jobInfo),
+		fTableOID(0),
+		fColType(colType)
 {
 }
 
@@ -149,11 +145,7 @@ void FilterStep::doFilter()
 //	}
 //	uint                cop = BOP();
 //		
-//	if (0 < fInputJobStepAssociation.status())
-//	{
-//		fOutputJobStepAssociation.status(fInputJobStepAssociation.status());
-//	}
-//	else
+//	if (0 == status())
 //	{
 //		FilterOperation filterOP;
 //		if ( !fFAP )
@@ -178,14 +170,14 @@ void FilterStep::doFilter()
 //				filterOP.filter( cop, *fFAP, *fFBP, *result,resultCount, timer );
 //			}
 //		}
-//	} //else fInputJobStepAssociation.status() == 0
+//	} // status() == 0
 //}//try
 //catch (std::exception &e) 
 //{
 //	std::cout << "FilterStep caught: " << e.what() << std::endl;
 //	unblockDataLists(fifo, strFifo, strResult, result);
 //	catchHandler(e.what());
-//	fOutputJobStepAssociation.status(logging::filterStepErr);
+//	status(logging::filterStepErr);
 //}
 //catch (...) 
 //{
@@ -193,7 +185,7 @@ void FilterStep::doFilter()
 //	std::cout << msg << std::endl;
 //	unblockDataLists(fifo, strFifo, strResult, result);
 //	catchHandler(msg);
-//	fOutputJobStepAssociation.status(logging::filterStepErr);
+//	status(logging::filterStepErr);
 //}
 //
 //		
@@ -217,7 +209,7 @@ void FilterStep::doFilter()
 //		<< "s, " << filterCompare << timer.totalTime(filterCompare) 
 //		<< "s, " << filterInsert << timer.totalTime(filterInsert) 
 //		<< "s, " << filterFinish << timer.totalTime(filterFinish)
-//		<< "s\n\t" << "Job completion status: " << fOutputJobStepAssociation.status() << endl;
+//		<< "s\n\t" << "Job completion status: " << status() << endl;
 //		
 //		logEnd(logStr.str().c_str());
 //

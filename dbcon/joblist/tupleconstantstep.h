@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: tupleconstantstep.h 8436 2012-04-04 18:18:21Z rdempsey $
+//  $Id: tupleconstantstep.h 9210 2013-01-21 14:10:42Z rdempsey $
 
 
 #ifndef JOBLIST_TUPLECONSTANTSTEP_H
@@ -33,16 +33,8 @@ class TupleConstantStep : public JobStep, public TupleDeliveryStep
 {
 public:
     /** @brief TupleConstantStep constructor
-     * @param in the inputAssociation pointer
-     * @param out the outputAssociation pointer
      */
-    TupleConstantStep(
-			const JobStepAssociation& inputJobStepAssociation,
-			const JobStepAssociation& outputJobStepAssociation,
-			uint32_t sessionId,
-			uint32_t txnId,
-			uint32_t verId,
-			uint32_t statementId);
+    TupleConstantStep(const JobInfo& jobInfo);
 
     /** @brief TupleConstantStep destructor
      */
@@ -51,47 +43,19 @@ public:
     /** @brief virtual void Run method
      */
     void run();
+
+    /** @brief virtual void join method
+     */
     void join();
 
-    /** @brief virtual JobStepAssociation * inputAssociation
-     * 
-     * @returns JobStepAssociation *
+    /** @brief virtual string toString method
      */
-    const JobStepAssociation& inputAssociation() const
-    {
-        return fInputJobStepAssociation;
-    }
-    void inputAssociation(const JobStepAssociation& inputAssociation)
-    {
-        fInputJobStepAssociation = inputAssociation;
-    }
-    /** @brief virtual JobStepAssociation * outputAssociation
-     * 
-     * @returns JobStepAssocation *
-     */
-    const JobStepAssociation& outputAssociation() const
-    {
-        return fOutputJobStepAssociation;
-    }
-    void outputAssociation(const JobStepAssociation& outputAssociation)
-    {
-        fOutputJobStepAssociation = outputAssociation;
-    }
-
-    void stepId(uint16_t stepId) { fStepId = stepId; }
-    uint16_t stepId() const { return fStepId; }
-    uint32_t sessionId()   const { return fSessionId; }
-    uint32_t txnId()   const { return fTxnId; }
-    uint32_t verId()   const { return fVerId; }
-    uint32_t statementId() const { return fStatementId; }
-
     const std::string toString() const;
 
 	void  setOutputRowGroup(const rowgroup::RowGroup&);
 	const rowgroup::RowGroup& getOutputRowGroup() const;
 	const rowgroup::RowGroup& getDeliveredRowGroup() const;
 	uint nextBand(messageqcpp::ByteStream &bs);
-	void logger(const SPJL& logger) { fLogger = logger; }
 	void setIsDelivery(bool b) { fDelivery = b; }
 
 	virtual void initialize(const JobInfo& jobInfo, const rowgroup::RowGroup* rgIn);
@@ -106,15 +70,7 @@ protected:
 	virtual void constructContanstRow(const JobInfo& jobInfo);
 
 	// for base
-    JobStepAssociation fInputJobStepAssociation;
-    JobStepAssociation fOutputJobStepAssociation;
-	uint32_t fSessionId;
-	uint32_t fTxnId;
-	uint32_t fVerId;
-    uint16_t fStepId;
-	uint32_t fStatementId;
 	uint64_t fRowsReturned;
-    SPJL     fLogger;
 
 	// input/output rowgroup and row
 	rowgroup::RowGroup fRowGroupIn;
@@ -154,16 +110,8 @@ class TupleConstantOnlyStep : public TupleConstantStep
 {
 public:
     /** @brief TupleConstantOnlyStep constructor
-     * @param in the inputAssociation pointer
-     * @param out the outputAssociation pointer
      */
-    TupleConstantOnlyStep(
-			const JobStepAssociation& inputJobStepAssociation,
-			const JobStepAssociation& outputJobStepAssociation,
-			uint32_t sessionId,
-			uint32_t txnId,
-			uint32_t verId,
-			uint32_t statementId);
+    TupleConstantOnlyStep(const JobInfo& jobInfo);
 
     /** @brief TupleConstantOnlyStep destructor
      */
@@ -190,17 +138,8 @@ class TupleConstantBooleanStep : public TupleConstantStep
 {
 public:
     /** @brief TupleConstantBooleanStep constructor
-     * @param in the inputAssociation pointer
-     * @param out the outputAssociation pointer
      */
-    TupleConstantBooleanStep(
-			const JobStepAssociation& inputJobStepAssociation,
-			const JobStepAssociation& outputJobStepAssociation,
-			uint32_t sessionId,
-			uint32_t txnId,
-			uint32_t verId,
-			uint32_t statementId,
-			bool value);
+    TupleConstantBooleanStep(const JobInfo& jobInfo, bool value);
 
     /** @brief TupleConstantBooleanStep destructor
      */

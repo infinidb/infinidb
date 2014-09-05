@@ -221,7 +221,7 @@ bool WEDataLoader::setupCpimport() // fork the cpimport
 	else if(aChPid == 0)// we are in child
 	{
 		int aStartFD = 3;
-		int aEndFD = fFIFO[1]+50;
+		int aEndFD = fFIFO[1]+256;
 		close(fFIFO[1]);	//close the WRITER of CHILD
 
 		cout << "Child Process Info: PID = "<< getpid()
@@ -1232,9 +1232,9 @@ void WEDataLoader::onReceiveBrmRptFileName(ByteStream& Ibs)
 		}
 		/*
 		#ifdef _MSC_VER
-		mkdir(aBuff);
+			mkdir(dirname.c_str());
 		#else
-		mkdir(aBuff, 0777);
+			mkdir(dirname.c_str(), 0777);
 			boost::filesystem::create_directories("/tmp/boby/test");
 		#endif
 		*/
@@ -1447,13 +1447,13 @@ void WEDataLoader::onReceiveJobId(ByteStream& Ibs)
 		}
 		/*
 		#ifdef _MSC_VER
-		mkdir(aBuff);
+			mkdir(dirname.c_str());
 		#else
-    	mkdir(aBuff, 0777);
+			mkdir(dirname.c_str(), 0777);
 			boost::filesystem::create_directories("/tmp/boby/test");
 		#endif
 		*/
-    }
+	}
 
 	fJobFile.open(aJobFileName.c_str());
 
@@ -1483,7 +1483,7 @@ void WEDataLoader::onReceiveErrFileRqst(ByteStream& Ibs)
 	obs << (ByteStream::byte) fPmId; // PM id
 	obs << aErrFileName;
 	BrmReportParser aErrFileParser;
-	bool aRet = aErrFileParser.serializeBlocks(aErrFileName, obs);
+	bool aRet = aErrFileParser.serialize(aErrFileName, obs);
 	if(aRet)
 	{
 		mutex::scoped_lock aLock(fClntMsgMutex);
@@ -1514,7 +1514,8 @@ void WEDataLoader::onReceiveErrFileRqst(ByteStream& Ibs)
 
 
 //------------------------------------------------------------------------------
-
+// Process the receipt of a msg containing the contents of a *.bad file.
+//------------------------------------------------------------------------------
 void WEDataLoader::onReceiveBadFileRqst(ByteStream& Ibs)
 {
 	std::string aBadFileName;
@@ -1549,6 +1550,7 @@ void WEDataLoader::onReceiveBadFileRqst(ByteStream& Ibs)
 		}
 		aLock.unlock();
 	}
+
 	// delete the temp files
 	if( remove(aBadFileName.c_str()) != 0)
 		cout << "Failed in removing Error file: " << aBadFileName << endl;

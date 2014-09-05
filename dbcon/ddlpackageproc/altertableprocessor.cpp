@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//   $Id: altertableprocessor.cpp 9178 2013-01-04 20:15:58Z pleblanc $
+//   $Id: altertableprocessor.cpp 9717 2013-07-24 20:42:34Z dhall $
 
 /** @file */
 
@@ -58,10 +58,6 @@ struct extentInfo
 
 namespace
 {
-const int MAX_INT = numeric_limits<int32_t>::max();
-const short MAX_TINYINT = numeric_limits<int8_t>::max(); //127;
-const short MAX_SMALLINT = numeric_limits<int16_t>::max(); //32767;
-const long long MAX_BIGINT = numeric_limits<int64_t>::max();//9223372036854775807LL
 
 bool typesAreSame(const CalpontSystemCatalog::ColType& colType, const ColumnType& newType)
 {
@@ -77,6 +73,10 @@ bool typesAreSame(const CalpontSystemCatalog::ColType& colType, const ColumnType
 		if (newType.fType == DDL_DECIMAL && colType.precision == newType.fPrecision &&
 			colType.scale == newType.fScale) return true;
 		break;
+	case (CalpontSystemCatalog::UTINYINT):
+		if (newType.fType == DDL_UNSIGNED_TINYINT && colType.precision == newType.fPrecision &&
+			colType.scale == newType.fScale) return true;
+		break;
 	case (CalpontSystemCatalog::CHAR):
 		if (newType.fType == DDL_CHAR && colType.colWidth == newType.fLength) return true;
 		break;
@@ -86,11 +86,20 @@ bool typesAreSame(const CalpontSystemCatalog::ColType& colType, const ColumnType
 		if (newType.fType == DDL_DECIMAL && colType.precision == newType.fPrecision &&
 			colType.scale == newType.fScale) return true;
 		break;
-	// Don't think there can be such a type in syscat right now...
-	case (CalpontSystemCatalog::DECIMAL):
-		if (newType.fType == DDL_DECIMAL && colType.precision == newType.fPrecision &&
+	case (CalpontSystemCatalog::USMALLINT):
+		if (newType.fType == DDL_UNSIGNED_SMALLINT && colType.precision == newType.fPrecision &&
 			colType.scale == newType.fScale) return true;
 		break;
+	case (CalpontSystemCatalog::DECIMAL):
+		if ((newType.fType == DDL_DECIMAL || newType.fType == DDL_NUMERIC) && 
+            colType.precision == newType.fPrecision && colType.scale == newType.fScale) 
+            return true;
+		break;
+    case (CalpontSystemCatalog::UDECIMAL):
+        if ((newType.fType == DDL_UNSIGNED_DECIMAL || newType.fType == DDL_UNSIGNED_NUMERIC) && 
+            colType.precision == newType.fPrecision && colType.scale == newType.fScale)
+            return true;
+        break;
 	// Don't think there can be such a type in syscat right now...
 	case (CalpontSystemCatalog::MEDINT):
 		if (newType.fType == DDL_MEDINT && colType.precision == newType.fPrecision &&
@@ -99,13 +108,20 @@ bool typesAreSame(const CalpontSystemCatalog::ColType& colType, const ColumnType
 			colType.scale == newType.fScale) return true;
 		break;
 	case (CalpontSystemCatalog::INT):
-		if (newType.fType == DDL_INTEGER && colType.precision == newType.fPrecision &&
+		if (newType.fType == DDL_INT && colType.precision == newType.fPrecision &&
 			colType.scale == newType.fScale) return true;
 		if (newType.fType == DDL_DECIMAL && colType.precision == newType.fPrecision &&
 			colType.scale == newType.fScale) return true;
 		break;
+	case (CalpontSystemCatalog::UINT):
+		if (newType.fType == DDL_UNSIGNED_INT && colType.precision == newType.fPrecision &&
+			colType.scale == newType.fScale) return true;
+		break;
 	case (CalpontSystemCatalog::FLOAT):
 		if (newType.fType == DDL_FLOAT) return true;
+		break;
+	case (CalpontSystemCatalog::UFLOAT):
+		if (newType.fType == DDL_UNSIGNED_FLOAT) return true;
 		break;
 	case (CalpontSystemCatalog::DATE):
 		if (newType.fType == DDL_DATE) return true;
@@ -117,8 +133,15 @@ bool typesAreSame(const CalpontSystemCatalog::ColType& colType, const ColumnType
 		if (newType.fType == DDL_DECIMAL && colType.precision == newType.fPrecision &&
 			colType.scale == newType.fScale) return true;
 		break;
+	case (CalpontSystemCatalog::UBIGINT):
+		if (newType.fType == DDL_UNSIGNED_BIGINT && colType.precision == newType.fPrecision &&
+			colType.scale == newType.fScale) return true;
+		break;
 	case (CalpontSystemCatalog::DOUBLE):
 		if (newType.fType == DDL_DOUBLE) return true;
+		break;
+	case (CalpontSystemCatalog::UDOUBLE):
+		if (newType.fType == DDL_UNSIGNED_DOUBLE) return true;
 		break;
 	case (CalpontSystemCatalog::DATETIME):
 		if (newType.fType == DDL_DATETIME) return true;
@@ -173,7 +196,7 @@ AlterTableProcessor::DDLResult AlterTableProcessor::processPackage(ddlpackage::A
 	uint64_t tableLockId = 0;
 	DETAIL_INFO(alterTableStmt);
 	int rc = 0;
-	rc = fDbrm.isReadWrite();
+	rc = fDbrm->isReadWrite();
 	if (rc != 0 )
 	{
 		logging::Message::Args args;
@@ -191,7 +214,34 @@ AlterTableProcessor::DDLResult AlterTableProcessor::processPackage(ddlpackage::A
 	VERBOSE_INFO("Getting current txnID");
 	OamCache * oamcache = OamCache::makeOamCache();
 	std::vector<int> moduleIds = oamcache->getModuleIds();
-	uint64_t uniqueId = fDbrm.getUnique64();
+	uint64_t uniqueId = 0;
+	//Bug 5070. Added exception handling
+	try {
+		uniqueId = fDbrm->getUnique64();
+	}
+	catch (std::exception& ex)
+	{
+		logging::Message::Args args;
+		logging::Message message(9);
+		args.add(ex.what());
+		message.format(args);
+		result.result = ALTER_ERROR;	
+		result.message = message;
+		fSessionManager.rolledback(txnID);
+		return result;
+	}
+	catch ( ... )
+	{
+		logging::Message::Args args;
+		logging::Message message(9);
+		args.add("Unknown error occured while getting unique number.");
+		message.format(args);
+		result.result = ALTER_ERROR;	
+		result.message = message;
+		fSessionManager.rolledback(txnID);
+		return result;
+	}
+	
 	fWEClient->addQueue(uniqueId);
 	try
 	{
@@ -218,7 +268,7 @@ AlterTableProcessor::DDLResult AlterTableProcessor::processPackage(ddlpackage::A
 		}
 				
 		try {
-			tableLockId = fDbrm.getTableLock(pms, roPair.objnum, &processName, &processID, &sessionId, &txnid, BRM::LOADING );
+			tableLockId = fDbrm->getTableLock(pms, roPair.objnum, &processName, &processID, &sessionId, &txnid, BRM::LOADING );
 		}
 		catch (std::exception&)
 		{
@@ -255,7 +305,7 @@ AlterTableProcessor::DDLResult AlterTableProcessor::processPackage(ddlpackage::A
 					txnid = txnID.id;
 					sessionId = alterTableStmt.fSessionID;;
 					processName = "DDLProc";
-					tableLockId = fDbrm.getTableLock(pms, roPair.objnum, &processName, &processID, &sessionId, &txnid, BRM::LOADING );
+					tableLockId = fDbrm->getTableLock(pms, roPair.objnum, &processName, &processID, &sessionId, &txnid, BRM::LOADING );
 				}
 				catch (std::exception&)
 				{
@@ -390,11 +440,10 @@ AlterTableProcessor::DDLResult AlterTableProcessor::processPackage(ddlpackage::A
 	{
 		rollBackAlter("encountered unknown exception. ", txnID, alterTableStmt.fSessionID, result, uniqueId);
 	}
-	
 	//release table lock
 	try {
 		bool lockReleased = true;
-		lockReleased = fDbrm.releaseTableLock(tableLockId);
+		lockReleased = fDbrm->releaseTableLock(tableLockId);
 		//cout << "table lock " << tableLockId << " is released" << endl;
 	}
 	catch (std::exception&)
@@ -451,7 +500,6 @@ void AlterTableProcessor::addColumn (u_int32_t sessionID, execplan::CalpontSyste
 	u_int16_t  dbRoot;
 	BRM::OID_t sysOid = 1001;
 	bool isDict = false;
-	
 	//@Bug 4111. Check whether the column exists in calpont systable
 	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr =
 		CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
@@ -484,7 +532,7 @@ void AlterTableProcessor::addColumn (u_int32_t sessionID, execplan::CalpontSyste
 		
 		throw std::runtime_error(err);
 	}
-	
+		
 	if ((columnDefPtr->fType->fType == CalpontSystemCatalog::CHAR && columnDefPtr->fType->fLength > 8) ||
 				 (columnDefPtr->fType->fType == CalpontSystemCatalog::VARCHAR && columnDefPtr->fType->fLength > 7) ||
 				 (columnDefPtr->fType->fType == CalpontSystemCatalog::VARBINARY && columnDefPtr->fType->fLength > 7))
@@ -492,7 +540,7 @@ void AlterTableProcessor::addColumn (u_int32_t sessionID, execplan::CalpontSyste
 		isDict = true;
 	}
 	//Find out where systables are
-	rc = fDbrm.getSysCatDBRoot(sysOid, dbRoot);
+	rc = fDbrm->getSysCatDBRoot(sysOid, dbRoot);
 	if (rc != 0)
 		throw std::runtime_error("Error while calling getSysCatDBRoot ");
 			
@@ -688,7 +736,8 @@ void AlterTableProcessor::addColumn (u_int32_t sessionID, execplan::CalpontSyste
 			throw std::runtime_error(errorMsg);	
 
 			//start a sequence in controller 
-			fDbrm.startAISequence(fStartingColOID, columnDefPtr->fType->fNextvalue, columnDefPtr->fType->fLength);
+			fDbrm->startAISequence(fStartingColOID, columnDefPtr->fType->fNextvalue, columnDefPtr->fType->fLength,
+								  convertDataType(columnDefPtr->fType->fType));
 		}
 		
 		//@Bug 4176. save oids to a log file for cleanup after fail over.
@@ -722,9 +771,9 @@ void AlterTableProcessor::addColumn (u_int32_t sessionID, execplan::CalpontSyste
 				//If there is atleast one existing column then use that as a reference to initialize the new column rows.
 				//get dbroot information
 
-				//fDbrm.getStartExtent((*column_iterator).oid, dbroot, partitionNum, true);
+				//fDbrm->getStartExtent((*column_iterator).oid, dbroot, partitionNum, true);
 
-				rc = fDbrm.getOutOfServicePartitions(column_iterator->oid, outOfSerPar);
+				rc = fDbrm->getOutOfServicePartitions(column_iterator->oid, outOfSerPar);
 
 				if (rc != 0)
 				{
@@ -738,15 +787,13 @@ void AlterTableProcessor::addColumn (u_int32_t sessionID, execplan::CalpontSyste
 			
 				int dataType1;
 				dataType1 = convertDataType(columnDefPtr->fType->fType);
-				if (dataType1 == CalpontSystemCatalog::DECIMAL) //Bug 4107
+				if (dataType1 == CalpontSystemCatalog::DECIMAL ||
+                    dataType1 == CalpontSystemCatalog::UDECIMAL)
 				{
-					convertDecimal(columnDefPtr);
+					columnDefPtr->convertDecimal();
 				}
 				
-				WriteEngine::ColDataType dataType =
-						static_cast<WriteEngine::ColDataType>(convertDataType(columnDefPtr->fType->fType));
-				WriteEngine::ColDataType refColDataType =
-						static_cast<WriteEngine::ColDataType>(convertDataType(column_iterator->colType.colDataType));
+				CalpontSystemCatalog::ColDataType dataType = convertDataType(columnDefPtr->fType->fType);
 			
 				if ((columnDefPtr->fType->fAutoincrement).compare("y") == 0)
 				{
@@ -766,6 +813,8 @@ void AlterTableProcessor::addColumn (u_int32_t sessionID, execplan::CalpontSyste
 				bs << (ByteStream::byte) dataType;
 				bs << (ByteStream::byte) autoincrement;
 				bs << (uint32_t) columnDefPtr->fType->fLength;
+				bs << (uint32_t) columnDefPtr->fType->fScale;
+				bs << (uint32_t) columnDefPtr->fType->fPrecision;
 				std::string tmpStr("");
 				if (columnDefPtr->fDefaultValue)
 				{
@@ -776,94 +825,93 @@ void AlterTableProcessor::addColumn (u_int32_t sessionID, execplan::CalpontSyste
 				bs << (ByteStream::byte) columnDefPtr->fType->fCompressiontype;
 				//ref column info
 				bs << (uint32_t) column_iterator->oid;
-				bs << (ByteStream::byte) refColDataType;
+				bs << (ByteStream::byte) column_iterator->colType.colDataType;
 				bs << (uint32_t) column_iterator->colType.colWidth;
 				bs << (ByteStream::byte) column_iterator->colType.compressionType;
 				//cout << "sending command fillcolumn " << endl;	 
-					uint msgRecived = 0;
-					fWEClient->write_to_all(bs);
-					bsIn.reset(new ByteStream());
-					while (1)
-					{
-						if (msgRecived == fPMCount)
-							break;
-						fWEClient->read(uniqueId, bsIn);
-						if ( bsIn->length() == 0 ) //read error
-						{
-							rc = NETWORK_ERROR;
-							break;
-						}			
-						else {
-							*bsIn >> tmp8;
-							*bsIn >> errorMsg;
-							rc = tmp8;
-							//cout << "Got error code from WES " << rc << endl;
-							if (rc != 0) 				
-								break;	
-							else
-								msgRecived++;						
-						}
-					}				
-					if (rc != 0) //delete the newly created files before erroring out
-					{					
-						bs.restart();
-						bs << (ByteStream::byte)WE_SVR_WRITE_DROPFILES;
-						bs << uniqueId;
-						bs << (uint32_t) oidList.size();
-						for (uint i=0; i < oidList.size(); i++)
-						{
-							bs << (uint32_t) oidList[i];
-						}
-						
-						uint msgRecived = 0;
-						try {
-							fWEClient->write_to_all(bs);
-							bsIn.reset(new ByteStream());
-							ByteStream::byte tmp8;
-							while (1)
-							{
-								if (msgRecived == fWEClient->getPmCount())
-									break;
-								fWEClient->read(uniqueId, bsIn);
-								if ( bsIn->length() == 0 ) //read error
-								{
-									rc = NETWORK_ERROR;
-									errorMsg = "Lost connection to Write Engine Server while dropping column files";
-									break;
-								}			
-								else {
-									*bsIn >> tmp8;
-									rc = tmp8;
-									if (rc != 0) {
-										*bsIn >> errorMsg;
-										break;
-									}
-									else
-										msgRecived++;						
-								}
-							}
-						}
-						catch (runtime_error& ex) //write error
-						{		
-							rc = NETWORK_ERROR;
-							errorMsg = ex.what();
-						}
-						catch (...)
-						{
-							rc = NETWORK_ERROR;
-							errorMsg = " Unknown exception caught while dropping column files.";
-						}
+                uint msgRecived = 0;
+                fWEClient->write_to_all(bs);
+                bsIn.reset(new ByteStream());
+                while (1)
+                {
+                    if (msgRecived == fPMCount)
+                        break;
+                    fWEClient->read(uniqueId, bsIn);
+                    if ( bsIn->length() == 0 ) //read error
+                    {
+                        rc = NETWORK_ERROR;
+                        break;
+                    }			
+                    else {
+                        *bsIn >> tmp8;
+                        *bsIn >> errorMsg;
+                        rc = tmp8;
+                        //cout << "Got error code from WES " << rc << endl;
+                        if (rc != 0) 				
+                            break;	
+                        else
+                            msgRecived++;						
+                    }
+                }				
+                if (rc != 0) //delete the newly created files before erroring out
+                {					
+                    bs.restart();
+                    bs << (ByteStream::byte)WE_SVR_WRITE_DROPFILES;
+                    bs << uniqueId;
+                    bs << (uint32_t) oidList.size();
+                    for (uint i=0; i < oidList.size(); i++)
+                    {
+                        bs << (uint32_t) oidList[i];
+                    }
+                    
+                    uint msgRecived = 0;
+                    try {
+                        fWEClient->write_to_all(bs);
+                        bsIn.reset(new ByteStream());
+                        ByteStream::byte tmp8;
+                        while (1)
+                        {
+                            if (msgRecived == fWEClient->getPmCount())
+                                break;
+                            fWEClient->read(uniqueId, bsIn);
+                            if ( bsIn->length() == 0 ) //read error
+                            {
+                                rc = NETWORK_ERROR;
+                                errorMsg = "Lost connection to Write Engine Server while dropping column files";
+                                break;
+                            }			
+                            else {
+                                *bsIn >> tmp8;
+                                rc = tmp8;
+                                if (rc != 0) {
+                                    *bsIn >> errorMsg;
+                                    break;
+                                }
+                                else
+                                    msgRecived++;						
+                            }
+                        }
+                    }
+                    catch (runtime_error& ex) //write error
+                    {		
+                        rc = NETWORK_ERROR;
+                        errorMsg = ex.what();
+                    }
+                    catch (...)
+                    {
+                        rc = NETWORK_ERROR;
+                        errorMsg = " Unknown exception caught while dropping column files.";
+                    }
 
-						if ( rc == 0 ) {
-							fWEClient->removeQueue(uniqueId);
-							deleteLogFile(DROPTABLE_LOG, ropair.objnum, uniqueId);
-							fWEClient->addQueue(uniqueId);
-						}
-							
-						throw std::runtime_error(errorMsg);
-					}
-						
-					//Update nextVal
+                    if ( rc == 0 ) {
+                        fWEClient->removeQueue(uniqueId);
+                        deleteLogFile(DROPTABLE_LOG, ropair.objnum, uniqueId);
+                        fWEClient->addQueue(uniqueId);
+                    }
+                    throw std::runtime_error(errorMsg);
+                }
+                    
+                //Update nextVal
 					break;
 			}
 				//Update nextVal
@@ -908,8 +956,9 @@ void AlterTableProcessor::addColumn (u_int32_t sessionID, execplan::CalpontSyste
 	}
 	std::vector <CalpontSystemCatalog::OID> oidList;
 	oidList.push_back(fStartingColOID);
+	
 	if (outOfSerPar.size() > 0)
-		rc = fDbrm.markPartitionForDeletion(oidList, outOfSerPar, errorMsg);
+		rc = fDbrm->markPartitionForDeletion(oidList, outOfSerPar, errorMsg);
 		
 	if (rc != 0)
 	{
@@ -948,13 +997,13 @@ void AlterTableProcessor::dropColumn (u_int32_t sessionID, execplan::CalpontSyst
 	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 	std::string err;
 	execplan::CalpontSystemCatalog::ROPair roPair;
-	CalpontSystemCatalog::OID oid;
+    CalpontSystemCatalog::OID oid;
 	CalpontSystemCatalog::ColType colType;
 	try {
 		roPair = systemCatalogPtr->tableRID( tableName );
-	
-		oid = systemCatalogPtr->lookupOID(tableColName);
-		colType = systemCatalogPtr->colType(oid);
+
+        oid = systemCatalogPtr->lookupOID(tableColName);
+        colType = systemCatalogPtr->colType(oid);
 	}
 	catch (std::exception& ex)
 	{
@@ -975,7 +1024,7 @@ void AlterTableProcessor::dropColumn (u_int32_t sessionID, execplan::CalpontSyst
 	BRM::OID_t sysOid = 1001;
 	ByteStream::byte rc = 0;
 	//Find out where systable is
-	rc = fDbrm.getSysCatDBRoot(sysOid, dbRoot);  
+	rc = fDbrm->getSysCatDBRoot(sysOid, dbRoot);  
 	if (rc != 0)
 		throw std::runtime_error("Error while calling getSysCatDBRoot ");
 	
@@ -1139,8 +1188,13 @@ cout << "Alter table drop column got unknown exception" << endl;
 	aTxnID.id= txnID;
 	aTxnID.valid= true;
 	commitTransaction(uniqueId, aTxnID);
-	
-	VERBOSE_INFO("Removing column files");
+
+    // Bug 4208 Drop the PrimProcFDCache before droping the column files
+    // FOr Windows, this ensures (most likely) that the column files have
+    // no open handles to hinder the deletion of the files.
+	rc = cacheutils::dropPrimProcFdCache();
+
+    VERBOSE_INFO("Removing column files");
 	//Drop files
 	std::vector <CalpontSystemCatalog::OID> oidList;
 	bytestream.restart();
@@ -1217,13 +1271,13 @@ cout << "create table got unknown exception" << endl;
 	//Flush primProc cache
 	rc = cacheutils::flushOIDsFromCache( oidList );
 	//Delete extents from extent map
-	rc = fDbrm.deleteOIDs(oidList);
+	rc = fDbrm->deleteOIDs(oidList);
 	if (fileDropped)
-	{
-		fWEClient->removeQueue(uniqueId);
-		deleteLogFile(DROPTABLE_LOG, roPair.objnum, uniqueId);
-		fWEClient->addQueue(uniqueId);
-	}
+    {
+        fWEClient->removeQueue(uniqueId);
+        deleteLogFile(DROPTABLE_LOG, roPair.objnum, uniqueId);
+        fWEClient->addQueue(uniqueId);
+    }
 }
 
 
@@ -1307,7 +1361,7 @@ void AlterTableProcessor::setColumnDefault (u_int32_t sessionID, execplan::Calpo
 	BRM::OID_t sysOid = 1001;
 	ByteStream::byte rc = 0;
 	//Find out where systable is
-	rc = fDbrm.getSysCatDBRoot(sysOid, dbRoot);  
+	rc = fDbrm->getSysCatDBRoot(sysOid, dbRoot);  
 	if (rc != 0)
 		throw std::runtime_error("Error while calling getSysCatDBRoot");
 	
@@ -1386,7 +1440,7 @@ void AlterTableProcessor::dropColumnDefault (u_int32_t sessionID, execplan::Calp
 	BRM::OID_t sysOid = 1001;
 	ByteStream::byte rc = 0;
 	//Find out where systable is
-	rc = fDbrm.getSysCatDBRoot(sysOid, dbRoot);  
+	rc = fDbrm->getSysCatDBRoot(sysOid, dbRoot);  
 	if (rc != 0)
 		throw std::runtime_error("Error while calling getSysCatDBRoot");
 	
@@ -1572,7 +1626,7 @@ void AlterTableProcessor::renameTable (uint32_t sessionID, execplan::CalpontSyst
 	BRM::OID_t sysOid = 1001;
 	ByteStream::byte rc = 0;
 	//Find out where systable is
-	rc = fDbrm.getSysCatDBRoot(sysOid, dbRoot);   
+	rc = fDbrm->getSysCatDBRoot(sysOid, dbRoot);   
 	if (rc != 0)
 		throw std::runtime_error("Error while calling getSysCatDBRoot");
 	
@@ -1644,7 +1698,7 @@ void AlterTableProcessor::renameColumn(uint32_t sessionID, execplan::CalpontSyst
 	BRM::OID_t sysOid = 1001;
 	ByteStream::byte rc = 0;
 	//Find out where systable is
-	rc = fDbrm.getSysCatDBRoot(sysOid, dbRoot);  
+	rc = fDbrm->getSysCatDBRoot(sysOid, dbRoot);  
 	if (rc != 0)
 		throw std::runtime_error("Error while calling getSysCatDBRoot");
 	
@@ -1757,15 +1811,16 @@ void AlterTableProcessor::renameColumn(uint32_t sessionID, execplan::CalpontSyst
 			//change a sequence in controller 
 			if (ataRenameColumn.fNewType->fAutoincrement.compare("y") == 0)
 			{
-				fDbrm.startAISequence(ropair.objnum, ataRenameColumn.fNewType->fNextvalue, ataRenameColumn.fNewType->fLength);	
-				//Reset it incase there is a sequence already
-				fDbrm.resetAISequence(ropair.objnum, ataRenameColumn.fNewType->fNextvalue);
+				fDbrm->startAISequence(ropair.objnum, ataRenameColumn.fNewType->fNextvalue, ataRenameColumn.fNewType->fLength,
+									  convertDataType(ataRenameColumn.fNewType->fType));	
+				//Reset it in case there is a sequence already
+				fDbrm->resetAISequence(ropair.objnum, ataRenameColumn.fNewType->fNextvalue);
 			}
 			
 		}	
 		else
 		{
-			fDbrm.resetAISequence(ropair.objnum, 0);
+			fDbrm->resetAISequence(ropair.objnum, 0);
 		}
 		
 		//Update SYSCOLUMN

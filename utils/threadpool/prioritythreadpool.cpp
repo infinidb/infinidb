@@ -148,7 +148,6 @@ void PriorityThreadPool::threadFcn(const Priority preferredQueue) throw()
 					rescheduleCount++;
 			}
 			catch (std::exception &e) {
-				i++;
 				cerr << e.what() << endl;
 			}
 		}
@@ -179,3 +178,4 @@ void PriorityThreadPool::stop()
 }
 
 } // namespace threadpool
+// vim:ts=4 sw=4:

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: ddlpackageprocessor.h 9038 2012-10-29 22:13:24Z zzhu $
+ *   $Id: ddlpackageprocessor.h 9303 2013-03-07 16:07:12Z chao $
  *
  *
  ***********************************************************************/
@@ -43,7 +43,6 @@
 #include "we_define.h"
 #include "writeengine.h"
 #include "columnresult.h"
-#include "brmtypes.h"
 #include "we_clients.h"
 #include "liboamcpp.h"
 #if defined(_MSC_VER) && defined(DDLPKGPROC_DLLEXPORT)
@@ -232,10 +231,12 @@ public:
 
     /** @brief constructor
       */
-    DDLPackageProcessor() : fStartingColOID(0), fDDLLoggingId(23), fDebugLevel( NONE )
+    DDLPackageProcessor(BRM::DBRM* aDbrm) : fStartingColOID(0), fDDLLoggingId(23), fDebugLevel( NONE )
 	{
-		fWEClient = WriteEngine::WEClients::instance(WriteEngine::WEClients::DDLPROC);
+		fWEClient = new WriteEngine::WEClients(WriteEngine::WEClients::DDLPROC);
 		fPMCount = fWEClient->getPmCount();
+		fDbrm = aDbrm;
+		//std::cout << "in DDLPackageProcessor constructor " << this << std::endl;
 	}
 
     /** @brief destructor
@@ -359,7 +360,7 @@ protected:
      *
      * @param dateType the parsed ddl data type
      */
-    int convertDataType(int dataType);
+    execplan::CalpontSystemCatalog::ColDataType convertDataType(int dataType);
 
     /** @brief get the null representation for the given column type
      *
@@ -759,7 +760,7 @@ protected:
 
     WriteEngine::WriteEngineWrapper fWriteEngine;
 	
-	BRM::DBRM fDbrm;
+	BRM::DBRM* fDbrm;
    
     execplan::SessionManager fSessionManager;
 	uint fPMCount;
@@ -804,7 +805,6 @@ protected:
 							
 	int rollBackTransaction(uint64_t uniqueId, BRM::TxnID txnID, uint32_t sessionID);
 	int commitTransaction(uint64_t uniqueId, BRM::TxnID txnID);
-	void convertDecimal (ddlpackage::ColumnDef* colDefPtr);
 					   
 private:
    /** @brief clean beginning and ending glitches and spaces from string

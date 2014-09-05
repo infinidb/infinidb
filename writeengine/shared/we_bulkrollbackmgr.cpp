@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
-* $Id: we_bulkrollbackmgr.cpp 4496 2013-01-31 19:13:20Z pleblanc $
+* $Id: we_bulkrollbackmgr.cpp 4450 2013-01-21 14:13:24Z rdempsey $
 */
 
 #include <sstream>
@@ -44,6 +44,8 @@
 #include "we_bulkrollbackfilecompressed.h"
 #include "messageids.h"
 #include "cacheutils.h"
+
+using namespace execplan;
 
 namespace
 {
@@ -223,7 +225,7 @@ int BulkRollbackMgr::rollback ( bool keepMetaFile )
 
     return rc;
 }
-
+
 //------------------------------------------------------------------------------
 // Validate that all the bulk rollback meta files on all the local DBRoots
 // exist.  This should apply for a cpimport.bin mode3 import for example.
@@ -265,7 +267,7 @@ void BulkRollbackMgr::validateAllMetaFilesExist (
         }
     }
 }
-
+
 //------------------------------------------------------------------------------
 // Open the meta-data file for fTableOID.  File contains information used in
 // rolling back the table to a previous state.
@@ -329,7 +331,7 @@ bool BulkRollbackMgr::openMetaDataFile ( u_int16_t dbRoot )
 
     return true;
 }
-
+
 //------------------------------------------------------------------------------
 // Close the current meta-data file used in rolling back fTableOID.
 //------------------------------------------------------------------------------
@@ -356,7 +358,7 @@ void BulkRollbackMgr::deleteMetaDataFiles ( )
         deleteSubDir( fMetaFileNames[k] );
     }
 }
-
+
 //------------------------------------------------------------------------------
 // Delete the subdirectory used to backup data needed for rollback.
 //------------------------------------------------------------------------------
@@ -383,7 +385,7 @@ void BulkRollbackMgr::deleteSubDir( const std::string& metaFileName )
             std::cout << oss.str() << std::endl;
     }
 }
-
+
 //------------------------------------------------------------------------------
 // Function that drives the rolling back or deletion of extents for a given
 // database table as specified in a meta-data bulk rollback file.
@@ -466,7 +468,7 @@ void BulkRollbackMgr::deleteExtents ( )
         deleteDbFiles( );
     }
 }
-
+
 //------------------------------------------------------------------------------
 // Read a meta-data dictionary record (DSTORE1 or DSTORE2) from meta-data file.
 // Each record specifies the rollback point for a given dbroot, partition,
@@ -544,7 +546,7 @@ void BulkRollbackMgr::readMetaDataRecDctnry ( const char* inBuf )
     fPendingDctnryStoreCompressionType = compressionType;
     fPendingDctnryStoreDbRoot          = dbRootHwm;
 }
-
+
 //------------------------------------------------------------------------------
 // Delete column extents based on COLUMN1 record input
 //------------------------------------------------------------------------------
@@ -566,7 +568,7 @@ void BulkRollbackMgr::deleteColumn2Extents ( const char* inBuf )
     else
         deleteColumn2ExtentsV4( inBuf );
 }
-
+
 //------------------------------------------------------------------------------
 // Delete all the column extents (from the extent map and the db files) that
 // logically follow the HWM extent contained in inBuf; where inBuf is a
@@ -590,7 +592,7 @@ void BulkRollbackMgr::deleteColumn1ExtentsV3 ( const char* inBuf )
 {
     deleteColumn1ExtentsV4( inBuf );
 }
-
+
 //------------------------------------------------------------------------------
 // Delete all the column extents (from the extent map and the db files) that
 // fall in a certain DBRoot; restoring the DBRoot to an "empty" state. inBuf
@@ -621,7 +623,7 @@ void BulkRollbackMgr::deleteColumn2ExtentsV3 ( const char* inBuf )
     u_int32_t   partNumHwm;
     u_int32_t   segNumHwm;
     int         colTypeInt;
-    ColDataType colType;
+    CalpontSystemCatalog::ColDataType colType;
     char        colTypeName[100];
     u_int32_t   colWidth;
     int         compressionType = 0; // optional parameter
@@ -631,7 +633,7 @@ void BulkRollbackMgr::deleteColumn2ExtentsV3 ( const char* inBuf )
         recType, &columnOID,
         &dbRootHwm, &partNumHwm, &segNumHwm,
         &colTypeInt, colTypeName, &colWidth, &compressionType );
-    colType = (WriteEngine::ColDataType)colTypeInt;
+    colType = (CalpontSystemCatalog::ColDataType)colTypeInt;
     if (numFields < 8) // compressionType is optional
     {
         std::ostringstream oss;
@@ -656,7 +658,7 @@ void BulkRollbackMgr::deleteColumn2ExtentsV3 ( const char* inBuf )
 
     deleteColumn2ExtentsV4( revisedBuf.str().c_str() );
 }
-
+
 //@bug 4091: V4 support for adding DBRoot
 //------------------------------------------------------------------------------
 // Delete all the column extents (from the extent map and the db files) that
@@ -675,7 +677,7 @@ void BulkRollbackMgr::deleteColumn1ExtentsV4 ( const char* inBuf )
     u_int32_t   segNumHwm;
     HWM         lastLocalHwm;
     int         colTypeInt;
-    ColDataType colType;
+    CalpontSystemCatalog::ColDataType colType;
     char        colTypeName[100];
     u_int32_t   colWidth;
     int         compressionType = 0; // optional parameter
@@ -685,7 +687,7 @@ void BulkRollbackMgr::deleteColumn1ExtentsV4 ( const char* inBuf )
         recType, &columnOID,
         &dbRootHwm, &partNumHwm, &segNumHwm, &lastLocalHwm,
         &colTypeInt, colTypeName, &colWidth, &compressionType );
-    colType = (WriteEngine::ColDataType)colTypeInt;
+    colType = (CalpontSystemCatalog::ColDataType)colTypeInt;
     if (numFields < 9) // compressionType is optional
     {
         std::ostringstream oss;
@@ -912,7 +914,7 @@ void BulkRollbackMgr::deleteColumn1ExtentsV4 ( const char* inBuf )
 
     } // end of loop to go thru all partitions till we find last segment file
 }
-
+
 //@bug 4091: V4 support for adding DBRoot
 //------------------------------------------------------------------------------
 // Delete all the column extents (from the extent map and the db files) that
@@ -931,7 +933,7 @@ void BulkRollbackMgr::deleteColumn2ExtentsV4 ( const char* inBuf )
     u_int32_t   segNumHwm;
     HWM         lastLocalHwm = 0;
     int         colTypeInt;
-    ColDataType colType;
+    CalpontSystemCatalog::ColDataType colType;
     char        colTypeName[100];
     u_int32_t   colWidth;
     int         compressionType = 0; // optional parameter
@@ -941,7 +943,7 @@ void BulkRollbackMgr::deleteColumn2ExtentsV4 ( const char* inBuf )
         recType, &columnOID,
         &dbRootHwm, &partNumHwm, &segNumHwm,
         &colTypeInt, colTypeName, &colWidth, &compressionType );
-    colType = (WriteEngine::ColDataType)colTypeInt;
+    colType = (CalpontSystemCatalog::ColDataType)colTypeInt;
     if (numFields < 8) // compressionType is optional
     {
         std::ostringstream oss;
@@ -1065,7 +1067,7 @@ void BulkRollbackMgr::deleteColumn2ExtentsV4 ( const char* inBuf )
 
     } // end of loop to go thru all partitions till we find last segment file
 }
-
+
 //------------------------------------------------------------------------------
 // Delete dictionary store extents based on COLUMN1 record input
 //------------------------------------------------------------------------------
@@ -1076,7 +1078,7 @@ void BulkRollbackMgr::deleteDctnryExtents ( )
     else
         deleteDctnryExtentsV4( );
 }
-
+
 //------------------------------------------------------------------------------
 // Delete all the dictionary store extents (from the extent map and db files)
 // that logically follow the extents contained in fPendingDctnryExtents; where
@@ -1123,7 +1125,7 @@ void BulkRollbackMgr::deleteDctnryExtentsV3 ( )
 
     deleteDctnryExtentsV4( );
 }
-
+
 //@bug 4091: V4 support for adding DBRoot
 //------------------------------------------------------------------------------
 // Delete all the dictionary store extents (from the extent map and db files)
@@ -1317,7 +1319,7 @@ void BulkRollbackMgr::deleteDctnryExtentsV4 ( )
 
     fPendingDctnryExtents.clear ( );
 }
-
+
 //------------------------------------------------------------------------------
 // Add specified segment file to the list of files to be deleted.  We are
 // accumulating the list of file names so that they can be deleted in reverse
@@ -1341,7 +1343,7 @@ void BulkRollbackMgr::createFileDeletionEntry(
     f.fSegFileName = segFileName;
     fPendingFilesToDelete.push_back( f );
 }
-
+
 //------------------------------------------------------------------------------
 // Delete db files for a column and DBRoot that are waiting to be deleted.
 // Files are deleted in reverse order, (see Bug 4241) to facilitate partial
@@ -1370,7 +1372,7 @@ void BulkRollbackMgr::deleteDbFiles( )
 
     fPendingFilesToDelete.clear();
 }
-
+
 //------------------------------------------------------------------------------
 // Get list of segment files found in the specified db directory path.
 //------------------------------------------------------------------------------
@@ -1398,10 +1400,16 @@ int BulkRollbackMgr::getSegFileList(
             itr != end_itr;
             ++itr )
         {
+#if BOOST_VERSION >= 105200
+            //@bug 4989 - stem() and extension() return a temp path object by 
+            // value so be sure to store in a string and not a string reference.
+            const std::string fileBase = itr->path().stem().generic_string();
+            const std::string fileExt  = itr->path().extension().generic_string();
+#else
             //const std::string& fileName = itr->path().filename();
             const std::string& fileBase = itr->path().stem();
             const std::string& fileExt  = itr->path().extension();
-
+#endif
             // Select files of interest ("FILE*.cdf")
             if ((fileBase.compare(0, DB_FILE_PREFIX_LEN, DB_FILE_PREFIX) == 0)&&
                 (fileExt == DB_FILE_EXTENSION) )
@@ -1443,7 +1451,7 @@ int BulkRollbackMgr::getSegFileList(
 
     return NO_ERROR;
 }
-
+
 //------------------------------------------------------------------------------
 // Log a message to syslog.  columnOID and text are used depending on the msgId.
 //
@@ -1690,7 +1698,7 @@ void BulkRollbackMgr::logAMessage (
         }
     }
 }
-
+
 //------------------------------------------------------------------------------
 // Standalone utility that can be used to delete bulk rollback files.
 // WARNING: this function can return an exception (from call to boost

@@ -15,7 +15,8 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-// $Id: shmkeys.h 1852 2013-02-22 17:20:54Z rdempsey $
+// $Id: shmkeys.h 1823 2013-01-21 14:13:09Z rdempsey $
+/** @file */
 #ifndef BRM_SHMEYS_H_
 #define BRM_SHMEYS_H_
 
@@ -45,7 +46,7 @@ public:
 #if defined(COMMUNITY_KEYRANGE)
 	const static uint32_t KEYRANGE_SIZE = 0x1000;
 #elif defined(_MSC_VER)
-	const static uint32_t KEYRANGE_SIZE = 0x2000;
+	const static uint32_t KEYRANGE_SIZE = 0x3800;
 #else
 	const static uint32_t KEYRANGE_SIZE = 0x10000;
 #endif

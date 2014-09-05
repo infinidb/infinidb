@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: jlf_common.cpp 8862 2012-09-07 14:38:08Z xlou $
+//  $Id: jlf_common.cpp 9210 2013-01-21 14:10:42Z rdempsey $
 
 
 #include "calpontsystemcatalog.h"

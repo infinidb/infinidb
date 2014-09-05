@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: expressionstep.cpp 8526 2012-05-17 02:28:10Z xlou $
+//  $Id: expressionstep.cpp 9210 2013-01-21 14:10:42Z rdempsey $
 
 
 //#define NDEBUG
@@ -53,32 +53,19 @@ using namespace rowgroup;
 
 namespace joblist
 {
-ExpressionStep::ExpressionStep(
-	uint32_t sessionId,
-	uint32_t txnId,
-	uint32_t verId,
-	uint32_t statementId) :
-		fSessionId(sessionId),
-		fTxnId(txnId),
-		fVerId(verId),
-		fStatementId(statementId),
-		fExpressionFilter(NULL),
-		fExpressionId(-1),
-		fVarBinOK(false),
-		fSelectFilter(false),
-		fAssociatedJoinId(0)
+ExpressionStep::ExpressionStep(const JobInfo& jobInfo) :
+	JobStep(jobInfo),
+	fExpressionFilter(NULL),
+	fExpressionId(-1),
+	fVarBinOK(false),
+	fSelectFilter(false),
+	fAssociatedJoinId(0)
 {
 }
 
 
 ExpressionStep::ExpressionStep(const ExpressionStep& rhs) :
-	fInputJobStepAssociation(rhs.inputAssociation()),
-	fOutputJobStepAssociation(rhs.outputAssociation()),
-	fSessionId(rhs.sessionId()),
-	fTxnId(rhs.txnId()),
-	fVerId(rhs.verId()),
-	fStepId(rhs.stepId()),
-	fStatementId(rhs.statementId()),
+	JobStep(rhs),
 	fExpression(rhs.expression()),
 	fExpressionFilter(NULL),
 	fExpressionId(rhs.expressionId()),

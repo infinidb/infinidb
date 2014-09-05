@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: primitiveprocessor.cpp 1855 2012-04-04 18:20:09Z rdempsey $
+ * $Id: primitiveprocessor.cpp 2035 2013-01-21 14:12:19Z rdempsey $
  *
  ****************************************************************************/
 
@@ -52,9 +52,9 @@ PrimitiveProcessor::~PrimitiveProcessor()
 }
 
 
-void PrimitiveProcessor::setBlockPtr(int *data)
+void PrimitiveProcessor::setParsedColumnFilter(boost::shared_ptr<ParsedColumnFilter> pcf)
 {
-	block = data;
+	parsedColumnFilter = pcf;
 }
 
 ParsedColumnFilter::ParsedColumnFilter() : columnFilterMode(STANDARD), likeOps(0)

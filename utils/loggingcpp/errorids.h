@@ -139,6 +139,17 @@ const unsigned ERR_HARD_FAILURE = 6006;
 const unsigned ERR_NON_IDB_TABLE = 7001;
 const unsigned ERR_CROSS_ENGINE_CONFIG = 8001;
 const unsigned ERR_CROSS_ENGINE_CONNECT = 8002;
+const unsigned ERR_AF_NON_SUPPORT = 9001;
+const unsigned ERR_AF_WINDOW_WITHOUT_ORDER = 9002;
+const unsigned ERR_AF_FUNCTION_NOT_EXISTS = 9003;
+const unsigned ERR_AF_INVALID_WINDOW = 9004;
+const unsigned ERR_AF_ORDER_BY_DISTINCT = 9005;
+const unsigned ERR_AF_INVALID_BOUND = 9006;
+const unsigned ERR_AF_INVALID_ORDER_KEY = 9007;
+const unsigned ERR_AF_BOUND_OUT_OF_RANGE = 9008;
+const unsigned ERR_AF_WINDOW_FUNC_NOT_ALLOWED = 9009;
+const unsigned ERR_AF_INVALID_ORDER_TYPE = 9010;
+const unsigned ERR_AF_INVALID_BOUND_TYPE = 9011;
 
 }//namespace logging
 

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************************
- * $Id: resourcemanager.h 9491 2013-05-06 20:57:41Z pleblanc $
+ * $Id: resourcemanager.h 9492 2013-05-06 21:00:08Z pleblanc $
  *
  ******************************************************************************************/
 /**
@@ -33,7 +33,6 @@
 
 #include "configcpp.h"
 #include "calpontselectexecutionplan.h"
-#include "jl_logger.h"
 #include "resourcedistributor.h"
 
 #if defined(_MSC_VER) && !defined(_WIN64)

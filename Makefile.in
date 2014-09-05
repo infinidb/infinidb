@@ -514,8 +514,7 @@ all-local: bootstrap
 		$(MAKE) -C ddlpackage install; \
 		$(MAKE) -C ddlpackageproc install; \
 		$(MAKE) -C dmlpackage install; \
-		$(MAKE) -C dmlpackageproc install; \
-		$(MAKE) -C sm install
+		$(MAKE) -C dmlpackageproc install
 	cd dbcon && $(MAKE) && $(MAKE) install
 	cd exemgr && $(MAKE) && $(MAKE) install
 	cd ddlproc && $(MAKE) && $(MAKE) install

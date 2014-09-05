@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: messagequeue.cpp 3280 2012-09-13 16:27:28Z rdempsey $
+*   $Id: messagequeue.cpp 3632 2013-03-13 18:08:46Z pleblanc $
 *
 *
 ***********************************************************************/
@@ -43,7 +43,11 @@ using namespace config;
 
 #include "bytestream.h"
 #include "inetstreamsocket.h"
+#ifndef SKIP_IDB_COMPRESSION
+#include "compressed_iss.h"
+#endif
 #include "socketclosed.h"
+
 #define MESSAGEQUEUE_DLLEXPORT
 #include "messagequeue.h"
 #undef MESSAGEQUEUE_DLLEXPORT
@@ -80,13 +84,21 @@ void MessageQueueServer::setup(size_t blocksize, int backlog, bool syncProto)
 	sinp->sin_addr.s_addr = listenAddr.s_addr;
 	sinp->sin_port = htons(port);
 
+#ifdef SKIP_IDB_COMPRESSION
 	fListenSock.setSocketImpl(new InetStreamSocket(blocksize));
+#else
+	fListenSock.setSocketImpl(new CompressedInetStreamSocket());
+#endif
 	fListenSock.syncProto(syncProto);
 	fListenSock.open();
 	fListenSock.bind(&fServ_addr);
 	fListenSock.listen(backlog);
 
+#ifdef SKIP_IDB_COMPRESSION
 	fClientSock.setSocketImpl(new InetStreamSocket(blocksize));
+#else
+	fClientSock.setSocketImpl(new CompressedInetStreamSocket());
+#endif
 	fClientSock.syncProto(syncProto);
 }
 
@@ -117,100 +129,10 @@ MessageQueueServer::~MessageQueueServer()
 	fListenSock.close();
 }
 
-/**
- * @brief read a message from the queue
- * 
- * wait for and return a message from otherEnd
- */
-#if 0
-const SBS MessageQueueServer::read(const struct timespec* timeout) const
-{
-	SBS res;
-	if (!fClientSock.isOpen())
-	{
-		fClientSock = fListenSock.accept(timeout);
-		if (!fClientSock.isOpen())
-			return res;
-	}
-	try
-	{
-		res = fClientSock.read(timeout);
-	}
-	catch (runtime_error& re)
-	{
-		// This is an I/O error from IOSocket::read()
-//		cerr << "MessageQueueServer::read close socket for " << re.what() << endl;
-		logging::Message::Args args;
-		logging::LoggingID li(31);
-		args.add("Server read close socket for");
-		args.add(re.what());
-		logger.logMessage(logging::LOG_TYPE_WARNING, logging::M0000, args, li);
-
-		fClientSock.close();
-	}
-
-	// We didn't get any data (no timeout). That should be an EOF. 
-	// Just close this end TODO: is this right?
-	if ((res->length() == 0) && (!timeout || (timeout->tv_sec == 0 && timeout->tv_nsec == 0)))
-	{
-//			cerr << "MessageQueueServer::read close socket for timeout" << endl;
-			logging::Message::Args args;
-			logging::LoggingID li(31);
-			args.add("Server read close socket for timeout");
-			logger.logMessage(logging::LOG_TYPE_WARNING, logging::M0000, args, li);
-			fClientSock.close();
-	}
-
-	return res;
-}
-#endif
-
 const IOSocket MessageQueueServer::accept(const struct timespec* timeout) const
 {
 	return fListenSock.accept(timeout);
 }
-
-/**
- * @brief write a ByteStream to the queue
- * 
- * write a ByteStream to otherEnd
- */
-#if 0
-void MessageQueueServer::write(const ByteStream& msg, const struct timespec* timeout) const
-{
-	if (!fClientSock.isOpen()) {
-		// I suspect this code shouldn't run; the normal usage is accept(), then
-		// read/write calls on the IOSocket not here
-		fClientSock = fListenSock.accept(timeout);
-		if (!fClientSock.isOpen())
-			throw runtime_error("MessageQueueServer: connection timed out\n");
-	}
-
-	try
-	{
-		fClientSock.write(msg);
-	}
-	catch (runtime_error &e)
-	{
-		try
-		{
-			ostringstream oss;
-			oss << "MessageQueueServer::write: error writing " << msg.length() << " bytes to "
-				<< fClientSock << ". Socket error was " << e.what() << endl;
-//			cerr << oss.str() << endl;
-			logging::Message::Args args;
-			logging::LoggingID li(31);
-			args.add(oss.str());
-			logger.logMessage(logging::LOG_TYPE_WARNING, logging::M0000, args, li);
-		}
-		catch (...)
-		{
-		}
-		fClientSock.close();
-		throw;
-	}
-}
-#endif
 
 void MessageQueueServer::syncProto(bool use)
 {
@@ -251,7 +173,11 @@ void MessageQueueClient::setup(bool syncProto)
 	sinp->sin_port = htons(port);
 	sinp->sin_addr.s_addr = inet_addr(otherEndIPStr.c_str());
 
+#ifdef SKIP_IDB_COMPRESSION
 	fClientSock.setSocketImpl(new InetStreamSocket());
+#else
+	fClientSock.setSocketImpl(new CompressedInetStreamSocket());
+#endif
 	fClientSock.syncProto(syncProto);
 	fClientSock.sa(&fServ_addr);
 }
@@ -271,7 +197,7 @@ MessageQueueClient::MessageQueueClient(const string& otherEnd, Config* config, b
 	setup(syncProto);
 }
 
-const SBS MessageQueueClient::read(const struct timespec* timeout, bool* isTimeOut) const
+const SBS MessageQueueClient::read(const struct timespec* timeout, bool* isTimeOut, Stats *stats) const
 {
 	if (!fClientSock.isOpen())
 	{
@@ -288,7 +214,7 @@ const SBS MessageQueueClient::read(const struct timespec* timeout, bool* isTimeO
 	SBS res;
 	try
 	{
-		res = fClientSock.read(timeout, isTimeOut);
+		res = fClientSock.read(timeout, isTimeOut, stats);
 	}
 	catch (runtime_error& re)
 	{
@@ -315,7 +241,7 @@ const SBS MessageQueueClient::read(const struct timespec* timeout, bool* isTimeO
 	return res;
 }
 
-void MessageQueueClient::write(const ByteStream& msg, const struct timespec* timeout) const
+void MessageQueueClient::write(const ByteStream& msg, const struct timespec* timeout, Stats *stats) const
 {
 	if (!fClientSock.isOpen())
 	{
@@ -331,7 +257,7 @@ void MessageQueueClient::write(const ByteStream& msg, const struct timespec* tim
 	}
 
 	try {
-		fClientSock.write(msg);
+		fClientSock.write(msg, stats);
 	}
 	catch (runtime_error &e) {
 		try

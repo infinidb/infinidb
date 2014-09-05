@@ -1,4 +1,4 @@
-# $Id: ErrorMessage.txt 3701 2013-04-09 18:48:00Z xlou $
+# $Id: ErrorMessage.txt 3700 2013-04-09 18:46:46Z xlou $
 #
 # This file maps error ID's to error texts.
 #
@@ -149,3 +149,17 @@
 # Cross Engine Errors
 8001	ERR_CROSS_ENGINE_CONFIG	CrossEngineSupport section in Calpont.xml is not properly configured.
 8002	ERR_CROSS_ENGINE_CONNECT	Error: %1%.
+
+# Analytic Function Errors
+#9001 is generaric unknown error. should not be thrown when feature gets stable.
+9001    ERR_AF_NON_SUPPORT      Non support item in analytic function.
+9002	ERR_AF_WINDOW_WITHOUT_ORDER	Missing ORDER BY expression in the window specification.
+9003	ERR_AF_FUNCTION_NOT_EXISTS	Analytic function '%1%' does not exist.
+9004	ERR_AF_INVALID_WINDOW	Invalid window aggregation group in the window specification.
+9005	ERR_AF_ORDER_BY_DISTINCT	Order By is not allowed when DISTINCT is specified for analytic function.
+9006	ERR_AF_INVALID_BOUND	Bound is out of range in the Window specification.
+9007	ERR_AF_INVALID_ORDER_KEY	Only one sort key is allowed for the RANGE window specified.
+9008	ERR_AF_BOUND_OUT_OF_RANGE	Bound '%1%' is out of range in the window specification.
+9009	ERR_AF_WINDOW_FUNC_NOT_ALLOWED	Window functions are not allowed here.
+9010	ERR_AF_INVALID_ORDER_TYPE	Invalid datatype for order by column in analytic function: '%1%';
+9011	ERR_AF_INVALID_BOUND_TYPE	Invalid datatype for window frame bound: '%1%'.

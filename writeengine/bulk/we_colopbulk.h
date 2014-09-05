@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: we_colopbulk.h 3720 2012-04-04 18:18:49Z rdempsey $
+ * $Id: we_colopbulk.h 4450 2013-01-21 14:13:24Z rdempsey $
  *
  *****************************************************************************/
 
@@ -53,8 +53,8 @@ class ColumnOpBulk : public ColumnOp
         uint16_t dbRoot, uint32_t partition, uint16_t segment,
         std::string& segFile, const char* mode = "r+b",
         int ioBuffSize = DEFAULT_BUFSIZ) const;
-    virtual int   readBlock(FILE*, unsigned char*, const i64);
-    virtual int   saveBlock(FILE*, const unsigned char*, const i64);
+    virtual int   readBlock(FILE*, unsigned char*, const uint64_t);
+    virtual int   saveBlock(FILE*, const unsigned char*, const uint64_t);
 };
 
 } //end of namespace

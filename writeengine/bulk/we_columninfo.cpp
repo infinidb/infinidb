@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
-* $Id: we_columninfo.cpp 4681 2013-06-18 17:31:02Z dcathey $
+* $Id: we_columninfo.cpp 4684 2013-06-18 19:47:46Z dcathey $
 *
 *******************************************************************************/
 
@@ -32,6 +32,7 @@
 #include "we_stats.h"
 #include "we_colopbulk.h"
 #include "brmtypes.h"
+#include "cacheutils.h"
 #include "we_columnautoinc.h"
 #include "we_dbrootextenttracker.h"
 #include "we_brmreporter.h"
@@ -181,6 +182,10 @@ ColumnInfo::ColumnInfo(Log*             logger,
         case WriteEngine::WR_BYTE:
         case WriteEngine::WR_LONGLONG:
         case WriteEngine::WR_INT:
+        case WriteEngine::WR_USHORT:
+        case WriteEngine::WR_UBYTE:
+        case WriteEngine::WR_ULONGLONG:
+        case WriteEngine::WR_UINT:
         default:
         {
             fColExtInf = new ColExtInf(column.mapOid, logger);
@@ -1153,7 +1158,7 @@ void ColumnInfo::lastInputRowInExtentInc( )
 //------------------------------------------------------------------------------
 // Parsing is complete for this column.  Flush pending data.  Close the current
 // segment file, and corresponding dictionary store file (if applicable).  Also
-// clears memory taken up by this ColumnInfo object.
+// flushes PrimProc cache, and clears memory taken up by this ColumnInfo object.
 //------------------------------------------------------------------------------
 int ColumnInfo::finishParsing( )
 {
@@ -1208,6 +1213,19 @@ int ColumnInfo::finishParsing( )
         return rc;
     }
 
+    // After closing the column and dictionary store files,
+    // flush any updated dictionary blocks in PrimProc
+    if (fDictBlocks.size() > 0)
+    {
+#ifdef PROFILE
+        Stats::startParseEvent(WE_STATS_FLUSH_PRIMPROC_BLOCKS);
+#endif
+        cacheutils::flushPrimProcAllverBlocks ( fDictBlocks );
+#ifdef PROFILE
+        Stats::stopParseEvent(WE_STATS_FLUSH_PRIMPROC_BLOCKS);
+#endif
+    }
+
     clearMemory();
 
     return NO_ERROR;
@@ -1229,7 +1247,7 @@ void ColumnInfo::getBRMUpdateInfo( BRMReporter& brmReporter )
 {
     boost::mutex::scoped_lock lock(fColMutex);
     // Useful for debugging
-    //printCPInfo();
+    //printCPInfo(column);
 
     int entriesAdded = getHWMInfoForBRM( brmReporter );
 
@@ -1243,10 +1261,7 @@ void ColumnInfo::getBRMUpdateInfo( BRMReporter& brmReporter )
 //------------------------------------------------------------------------------
 void ColumnInfo::getCPInfoForBRM( BRMReporter& brmReporter )
 {
-    fColExtInf->getCPInfoForBRM(
-        ((column.weType  == WriteEngine::WR_CHAR) &&
-         (column.colType != COL_TYPE_DICT)),
-         brmReporter );
+    fColExtInf->getCPInfoForBRM(column, brmReporter);
 }
 
 //------------------------------------------------------------------------------
@@ -1513,7 +1528,7 @@ int ColumnInfo::initAutoInc( const std::string& fullTableName )
 // Reserves the requested number of auto-increment numbers (autoIncCount).
 // The starting value of the reserved block of numbers is returned in nextValue.
 //------------------------------------------------------------------------------
-int ColumnInfo::reserveAutoIncNums(uint autoIncCount, long long& nextValue )
+int ColumnInfo::reserveAutoIncNums(uint autoIncCount, uint64_t& nextValue )
 {
     int rc = fAutoIncMgr->reserveNextRange( autoIncCount, nextValue );
 
@@ -1577,6 +1592,7 @@ int ColumnInfo::openDctnryStore( bool bMustExist )
     fStore->setColWidth( column.dctnryWidth );
     if (column.fWithDefault)
         fStore->setDefault( column.fDefaultChr );
+    fStore->setImportDataMode( fpTableInfo->getImportDataMode() );
 
     // If we are in the process of adding an extent to this column,
     // and the extent we are adding is the first extent for the
@@ -1709,11 +1725,8 @@ int ColumnInfo::closeDctnryStore(bool bAbort)
             WErrorCodes ec;
             std::ostringstream oss;
             oss << "closeDctnryStore: error closing store file for " <<
-                   "OID-"      << column.dctnry.dctnryOid    <<
-                   "; DBRoot-" << curCol.dataFile.fDbRoot    <<
-                   "; part-"   << curCol.dataFile.fPartition <<
-                   "; seg-"    << curCol.dataFile.fSegment   <<
-                   "; file-"   << fStore->getFileName()      <<
+                   "OID-"    << column.dctnry.dctnryOid <<
+                   "; file-" << fStore->getFileName()   <<
                    "; " << ec.errorString(rc);
             fLog->logMsg( oss.str(), rc, MSGLVL_ERROR );
         }
@@ -1741,7 +1754,10 @@ int ColumnInfo::updateDctnryStore(char* buf,
     // Should be safe to modify pos and buf arrays outside a mutex, as no other
     // thread should be accessing the strings from the same buffer, for this
     // column.
-    if (curCol.colType == WR_VARBINARY)
+    // This only applies to default text mode.  This step is bypassed for
+    // binary imports, because in that case, the data is already true binary.
+    if ((curCol.colType == WR_VARBINARY) &&
+        (fpTableInfo->getImportDataMode() == IMPORT_DATA_TEXT))
     {
 #ifdef PROFILE
         Stats::startParseEvent(WE_STATS_COMPACT_VARBINARY);

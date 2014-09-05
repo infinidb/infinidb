@@ -90,12 +90,12 @@ uint8_t WE_DMLCommandProc::processSingleInsert(messageqcpp::ByteStream& bs, std:
 	bs >> tmp32;
 	BRM::TxnID txnid;
 	txnid.valid = true;
-	txnid.id  = tmp32;	
+	txnid.id  = tmp32;
 	bs >> tmp32;
 	uint32_t dbroot = tmp32;
-	
+
 	//cout << "processSingleInsert received bytestream length " << bs.length() << endl;
-	
+
 	messageqcpp::ByteStream::byte packageType;
 	bs >> packageType;
 	insertPkg.read( bs);
@@ -103,7 +103,7 @@ uint8_t WE_DMLCommandProc::processSingleInsert(messageqcpp::ByteStream& bs, std:
 	//cout << " processSingleInsert for session " << sessionId << endl;
 	DMLTable *tablePtr = insertPkg.get_Table();
 	RowList rows = tablePtr->get_RowList();
-	
+
 	WriteEngine::ColStructList colStructs;
 	WriteEngine::DctnryStructList dctnryStructList;
 	WriteEngine::DctnryValueList dctnryValueList;
@@ -116,9 +116,11 @@ uint8_t WE_DMLCommandProc::processSingleInsert(messageqcpp::ByteStream& bs, std:
 
 	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionId);
 	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
+	CalpontSystemCatalog::ROPair tableRoPair;
+	std::vector<string> colNames;
+	bool isWarningSet = false;
 	
 	try {
-	
 	  if (rows.size())
 	  {
 		Row *rowPtr = rows.at(0);
@@ -134,7 +136,7 @@ uint8_t WE_DMLCommandProc::processSingleInsert(messageqcpp::ByteStream& bs, std:
 
 			CalpontSystemCatalog::ColType colType;
 			colType = systemCatalogPtr->colType(oid);
-			
+
 			WriteEngine::ColStruct colStruct;
 			colStruct.fColDbRoot = dbroot;
 			WriteEngine::DctnryStruct dctnryStruct;
@@ -152,7 +154,7 @@ uint8_t WE_DMLCommandProc::processSingleInsert(messageqcpp::ByteStream& bs, std:
 			{
 				colStruct.colWidth = colType.colWidth;
 			}
-			colStruct.colDataType = (WriteEngine::ColDataType) colType.colDataType;
+			colStruct.colDataType = colType.colDataType;
 
 			if (colStruct.tokenFlag)
 			{
@@ -179,7 +181,7 @@ uint8_t WE_DMLCommandProc::processSingleInsert(messageqcpp::ByteStream& bs, std:
 		std::string tmpStr("");
 		for (unsigned int i = 0; i < numcols; i++)
 		{
-			
+
 			WriteEngine::ColTupleList colTuples;
 			WriteEngine::DctColTupleList dctColTuples;
 			RowList::const_iterator row_iterator = rows.begin();
@@ -210,7 +212,7 @@ uint8_t WE_DMLCommandProc::processSingleInsert(messageqcpp::ByteStream& bs, std:
 							isNULL = true;
 						else
 							isNULL = false;
-							
+
 						if (colType.constraintType == CalpontSystemCatalog::NOTNULL_CONSTRAINT)
 						{
 							if (isNULL && colType.defaultValue.empty()) //error out
@@ -223,14 +225,22 @@ uint8_t WE_DMLCommandProc::processSingleInsert(messageqcpp::ByteStream& bs, std:
 							}
 							else if (isNULL && !(colType.defaultValue.empty()))
 							{
+
 								tmpStr = colType.defaultValue;
-							}							
+							}
 						}
 						if ( tmpStr.length() > (unsigned int)colType.colWidth )
 						{
 							tmpStr = tmpStr.substr(0, colType.colWidth);
 							if ( !pushWarning )
+							{
 								pushWarning = true;
+								isWarningSet = true;
+								if ((rc != NO_ERROR) && (rc != dmlpackageprocessor::DMLPackageProcessor::IDBRANGE_WARNING))
+									rc = dmlpackageprocessor::DMLPackageProcessor::IDBRANGE_WARNING;
+										
+								colNames.push_back(tableColName.column);
+							}
 						}
 						WriteEngine::ColTuple colTuple;
 						colTuple.data = datavalue;
@@ -254,14 +264,15 @@ uint8_t WE_DMLCommandProc::processSingleInsert(messageqcpp::ByteStream& bs, std:
 							isNULL = true;
 						else
 							isNULL = false;
-						
+
 						//check if autoincrement column and value is 0 or null
 						uint64_t nextVal = 1;
 						if (colType.autoincrement)
 						{
-							try {
+							try
+							{
 								nextVal = systemCatalogPtr->nextAutoIncrValue(tableName);
-								fDbrm.startAISequence(oid, nextVal, colType.colWidth);
+								fDbrm.startAISequence(oid, nextVal, colType.colWidth, colType.colDataType);
 							}
 							catch (std::exception& ex)
 							{
@@ -292,12 +303,12 @@ uint8_t WE_DMLCommandProc::processSingleInsert(messageqcpp::ByteStream& bs, std:
 							indata = oss.str();
 							isNULL = false;
 						}
-						
+
 						if (colType.constraintType == CalpontSystemCatalog::NOTNULL_CONSTRAINT)
 						{
-							if (((colType.colDataType == execplan::CalpontSystemCatalog::DATE) && (indata =="0000-00-00")) || 
+							if (((colType.colDataType == execplan::CalpontSystemCatalog::DATE) && (indata =="0000-00-00")) ||
 								((colType.colDataType == execplan::CalpontSystemCatalog::DATETIME) && (indata =="0000-00-00 00:00:00")))
-							{	
+							{
 								isNULL = true;
 							}
 							if (isNULL && colType.defaultValue.empty()) //error out
@@ -312,11 +323,11 @@ uint8_t WE_DMLCommandProc::processSingleInsert(messageqcpp::ByteStream& bs, std:
 							{
 								indata = colType.defaultValue;
 								isNULL = false;
-							} 
+							}
 						}
-						
+
 						try
-						{                    
+						{
 							datavalue = DataConvert::convertColumnData(colType, indata, pushWarning, isNULL);
 						}
 						catch(exception&)
@@ -331,12 +342,18 @@ uint8_t WE_DMLCommandProc::processSingleInsert(messageqcpp::ByteStream& bs, std:
 						{
 							return rc;
 						}
-						if ( pushWarning && ( rc != dmlpackageprocessor::DMLPackageProcessor::IDBRANGE_WARNING ) )
-							rc = dmlpackageprocessor::DMLPackageProcessor::IDBRANGE_WARNING;
-							
+						if ( pushWarning) 
+						{
+							isWarningSet = true;
+							if ( rc != dmlpackageprocessor::DMLPackageProcessor::IDBRANGE_WARNING )
+								rc = dmlpackageprocessor::DMLPackageProcessor::IDBRANGE_WARNING;
+									
+							colNames.push_back(tableColName.column);
+						}
+
 						WriteEngine::ColTuple colTuple;
 						colTuple.data = datavalue;
-						
+
 						colTuples.push_back(colTuple);
 						//@Bug 2515. Only pass string values to write engine
 						dicStrings.push_back( tmpStr );
@@ -361,10 +378,9 @@ uint8_t WE_DMLCommandProc::processSingleInsert(messageqcpp::ByteStream& bs, std:
 	//fWriteEngine.setDebugLevel(WriteEngine::DEBUG_3);
 	//cout << "inserting a row with transaction id " << txnid.id << endl;
 	fWEWrapper.setIsInsert(true);
-	
 	if (colValuesList[0].size() > 0)
 	{
-		if (NO_ERROR != 
+		if (NO_ERROR !=
 		(error = fWEWrapper.insertColumnRec_Single(txnid.id, colStructs, colValuesList, dctnryStructList, dicStringList)))
 		{
 			if (error == ERR_BRM_DEAD_LOCK)
@@ -406,9 +422,24 @@ uint8_t WE_DMLCommandProc::processSingleInsert(messageqcpp::ByteStream& bs, std:
 
 	fWEWrapper.setIsInsert(false);
 
+	if ((rc == dmlpackageprocessor::DMLPackageProcessor::IDBRANGE_WARNING) || isWarningSet)
+	{
+		if (rc == NO_ERROR)
+			rc = dmlpackageprocessor::DMLPackageProcessor::IDBRANGE_WARNING;
+		Message::Args args;
+		string cols = "'" + colNames[0] + "'";
+
+		for (unsigned i=1; i<colNames.size();i++)
+		{
+			cols = cols + ", " +  "'" + colNames[i] + "'";
+		}
+		args.add(cols);
+		err = IDBErrorInfo::instance()->errorMsg(WARN_DATA_TRUNC,args);
+	}
+
 	return rc;
 }
-	
+
 uint8_t WE_DMLCommandProc::commitVersion(ByteStream& bs, std::string & err)
 {
 	int rc = 0;
@@ -425,7 +456,7 @@ uint8_t WE_DMLCommandProc::commitVersion(ByteStream& bs, std::string & err)
 		ostringstream oss;
 		oss << "WE: Error commiting transaction; "  << txnID << ec.errorString(rc) << endl;
 		err = oss.str();
-	}	
+	}
 	return rc;
 }
 
@@ -465,7 +496,7 @@ uint8_t WE_DMLCommandProc::rollbackVersion(ByteStream& bs, std::string & err)
 		ostringstream oss;
 		oss << "WE: Error rolling back transaction "  << txnID << " for session " <<  sessionID << "; " << ec.errorString(rc) << endl;
 		err = oss.str();
-	}	
+	}
 	return rc;
 }
 
@@ -473,11 +504,11 @@ uint8_t WE_DMLCommandProc::processBatchInsert(messageqcpp::ByteStream& bs, std::
 {
 	int rc = 0;
 	//cout << "processBatchInsert received bytestream length " << bs.length() << endl;
-	
+
 	InsertDMLPackage insertPkg;
 	ByteStream::quadbyte tmp32;
 	bs >> tmp32;
-	//cout << "processBatchInsert got transaction id " << tmp32 << endl;	
+	//cout << "processBatchInsert got transaction id " << tmp32 << endl;
 	bs >> PMId;
 	//cout << "processBatchInsert gor PMId " << PMId << endl;
 	insertPkg.read( bs);
@@ -487,16 +518,16 @@ uint8_t WE_DMLCommandProc::processBatchInsert(messageqcpp::ByteStream& bs, std::
 	bool isAutocommitOn = insertPkg.get_isAutocommitOn();
 	//cout << "This session isAutocommitOn is " << isAutocommitOn << endl;
 	BRM::TxnID txnid;
-	txnid.id  = tmp32;	
+	txnid.id  = tmp32;
 	txnid.valid = true;
 	RowList rows = tablePtr->get_RowList();
 	bool isInsertSelect = insertPkg.get_isInsertSelect();
-		
+
 	WriteEngine::ColStructList colStructs;
 	WriteEngine::DctnryStructList dctnryStructList;
 	WriteEngine::DctnryValueList dctnryValueList;
 	WriteEngine::ColValueList colValuesList;
-    WriteEngine::DictStrList dicStringList ;
+	WriteEngine::DictStrList dicStringList ;
 	CalpontSystemCatalog::TableName tableName;
 	CalpontSystemCatalog::TableColName tableColName;
 	tableName.table = tableColName.table = tablePtr->get_TableName();
@@ -506,7 +537,7 @@ uint8_t WE_DMLCommandProc::processBatchInsert(messageqcpp::ByteStream& bs, std::
 	CalpontSystemCatalog::ROPair roPair;
 	CalpontSystemCatalog::RIDList ridList;
 	CalpontSystemCatalog::DictOIDList dictOids;
-	try {	
+	try {
 		ridList = systemCatalogPtr->columnRIDs(tableName, true);
 		roPair = systemCatalogPtr->tableRID( tableName);
 	}
@@ -516,13 +547,13 @@ uint8_t WE_DMLCommandProc::processBatchInsert(messageqcpp::ByteStream& bs, std::
 			rc = 1;
 			return rc;
 	}
-	
-	std::vector<OID>    dctnryStoreOids(ridList.size()) ;
+
+	std::vector<OID>	dctnryStoreOids(ridList.size()) ;
 	std::vector<BRM::EmDbRootHWMInfo_v> dbRootHWMInfoColVec(ridList.size());
-	
+
 	uint32_t  tblOid = roPair.objnum;
 	std::vector<Column> columns;
-	CalpontSystemCatalog::ColType colType;	
+	CalpontSystemCatalog::ColType colType;
 	std::vector<DBRootExtentInfo> colDBRootExtentInfo;
 	bool bFirstExtentOnThisPM = false;
 	Convertor convertor;
@@ -533,22 +564,36 @@ uint8_t WE_DMLCommandProc::processBatchInsert(messageqcpp::ByteStream& bs, std::
 		fRBMetaWriter.reset(new RBMetaWriter("BatchInsert", NULL));
 		fWEWrapper.setIsInsert(true);
 		try {
+		  // First gather HWM BRM information for all columns
+		  std::vector<int> colWidths;
 		  for (unsigned i=0; i < ridList.size(); i++)
 		  {
-			rc = BRMWrapper::getInstance()->getDbRootHWMInfo(ridList[i].objnum, dbRootHWMInfoColVec[i]);	
+			rc = BRMWrapper::getInstance()->getDbRootHWMInfo(ridList[i].objnum, dbRootHWMInfoColVec[i]);
 			//need handle error
+
+			CalpontSystemCatalog::ColType colType2 = systemCatalogPtr->colType(ridList[i].objnum);
+			colWidths.push_back( convertor.getCorrectRowWidth(
+				colType2.colDataType, colType2.colWidth) );
+		  }
+
+		  for (unsigned i=0; i < ridList.size(); i++)
+		  {
 			// Find DBRoot/segment file where we want to start adding rows
 			colType = systemCatalogPtr->colType(ridList[i].objnum);
-			BRM::EmDbRootHWMInfo_v& dbRootHWMInfo = dbRootHWMInfoColVec[i];		
-			DBRootExtentTracker* pDBRootExtentTracker = new DBRootExtentTracker(ridList[i].objnum, convertor.getCorrectRowWidth( static_cast<WriteEngine::ColDataType>(colType.colDataType), colType.colWidth), 0, dbRootHWMInfo );
+			DBRootExtentTracker* pDBRootExtentTracker = new DBRootExtentTracker(ridList[i].objnum,
+				colWidths, dbRootHWMInfoColVec, i, 0);
 			dbRootExtTrackerVec.push_back( pDBRootExtentTracker );
 			DBRootExtentInfo dbRootExtent;
 			std::string trkErrMsg;
-			rc = pDBRootExtentTracker->selectFirstSegFile(dbRootExtent,bFirstExtentOnThisPM, trkErrMsg);
+			if (i == 0)
+				rc = pDBRootExtentTracker->selectFirstSegFile(dbRootExtent,bFirstExtentOnThisPM, trkErrMsg);
+			else
+				pDBRootExtentTracker->assignFirstSegFile(*dbRootExtTrackerVec[0],dbRootExtent);
+
 			colDBRootExtentInfo.push_back(dbRootExtent);
 			Column aColumn;
-			aColumn.colWidth = convertor.getCorrectRowWidth( static_cast<WriteEngine::ColDataType>(colType.colDataType), colType.colWidth);
-			aColumn.colDataType = static_cast<WriteEngine::ColDataType>(colType.colDataType);
+			aColumn.colWidth = convertor.getCorrectRowWidth(colType.colDataType, colType.colWidth);
+			aColumn.colDataType = colType.colDataType;
 			aColumn.compressionType = colType.compressionType;
 			aColumn.dataFile.oid = ridList[i].objnum;
 			aColumn.dataFile.fPartition = dbRootExtent.fPartition;
@@ -581,18 +626,9 @@ uint8_t WE_DMLCommandProc::processBatchInsert(messageqcpp::ByteStream& bs, std::
 			rc = 1;
 			return rc;
 		}
-		//@Bug 5996 validate hwm before starts
-		rc = validateColumnHWMs(ridList, systemCatalogPtr, colDBRootExtentInfo, "Starting");
-		if ( rc != 0)
-		{
-			WErrorCodes ec;
-			err = ec.errorString(rc);
-			err += " Check err.log for detailed information.";
-			rc = 1;
-			return rc;
-		}
 	}
-	std::vector<BRM::LBIDRange>   rangeList;	
+
+	std::vector<BRM::LBIDRange>   rangeList;
 	if ( fIsFirstBatchPm && isAutocommitOn)
 	{
 		//save meta data, version last block for each dbroot at the start of batch insert
@@ -617,7 +653,7 @@ uint8_t WE_DMLCommandProc::processBatchInsert(messageqcpp::ByteStream& bs, std::
 		//Do versioning. Currently, we only version columns, not strings. If there is a design change, this will need to be re-visited
 		if ( rc != 0)
 			return rc;
-			
+
 		if (!bFirstExtentOnThisPM) //If no extent on this pm, there is no need to version it
 		{
 			//rc = fWEWrapper.processBatchVersions(txnid.id, columns, rangeList);
@@ -639,15 +675,19 @@ uint8_t WE_DMLCommandProc::processBatchInsert(messageqcpp::ByteStream& bs, std::
 			}
 		}
 	}
-	
+
+	std::vector<string> colNames;
+	bool isWarningSet = false;
 	if (rows.size())
 	{
 		Row *rowPtr = rows.at(0);
 		ColumnList columns = rowPtr->get_ColumnList();
 		ColumnList::const_iterator column_iterator = columns.begin();
-		try {
-		  while (column_iterator != columns.end())
-		  {
+
+		try
+		{
+			while (column_iterator != columns.end())
+			{
 				DMLColumn *columnPtr = *column_iterator;
 				tableColName.column = columnPtr->get_Name();
 				CalpontSystemCatalog::ROPair roPair = systemCatalogPtr->columnRID(tableColName);
@@ -656,7 +696,7 @@ uint8_t WE_DMLCommandProc::processBatchInsert(messageqcpp::ByteStream& bs, std::
 
 				CalpontSystemCatalog::ColType colType;
 				colType = systemCatalogPtr->colType(oid);
-				
+
 				WriteEngine::ColStruct colStruct;
 				WriteEngine::DctnryStruct dctnryStruct;
 				colStruct.dataOid = roPair.objnum;
@@ -672,7 +712,7 @@ uint8_t WE_DMLCommandProc::processBatchInsert(messageqcpp::ByteStream& bs, std::
 				{
 					colStruct.colWidth = colType.colWidth;
 				}
-				colStruct.colDataType = (WriteEngine::ColDataType) colType.colDataType;
+				colStruct.colDataType = colType.colDataType;
 
 				if (colStruct.tokenFlag)
 				{
@@ -707,10 +747,11 @@ uint8_t WE_DMLCommandProc::processBatchInsert(messageqcpp::ByteStream& bs, std::
 		try {
 		  for (unsigned int i = 0; i < numcols; i++)
 		  {
-				
+
 				WriteEngine::ColTupleList colTuples;
 				WriteEngine::DctColTupleList dctColTuples;
 				RowList::const_iterator row_iterator = rows.begin();
+				bool pushWarning = false;
 				while (row_iterator != rows.end())
 				{
 					Row *rowPtr = *row_iterator;
@@ -724,7 +765,6 @@ uint8_t WE_DMLCommandProc::processBatchInsert(messageqcpp::ByteStream& bs, std::
 
 					boost::any datavalue;
 					bool isNULL = false;
-					bool pushWarning = false;
 					std::vector<std::string> origVals;
 					origVals = columnPtr->get_DataVector();
 					WriteEngine::dictStr dicStrings;
@@ -738,7 +778,7 @@ uint8_t WE_DMLCommandProc::processBatchInsert(messageqcpp::ByteStream& bs, std::
 								isNULL = true;
 							else
 								isNULL = false;
-							
+
 							if (colType.constraintType == CalpontSystemCatalog::NOTNULL_CONSTRAINT)
 							{
 								if (isNULL && colType.defaultValue.empty()) //error out
@@ -752,7 +792,7 @@ uint8_t WE_DMLCommandProc::processBatchInsert(messageqcpp::ByteStream& bs, std::
 								else if (isNULL && !(colType.defaultValue.empty()))
 								{
 									tmpStr = colType.defaultValue;
-								}							
+								}
 							}
 
 							if ( tmpStr.length() > (unsigned int)colType.colWidth )
@@ -781,9 +821,10 @@ uint8_t WE_DMLCommandProc::processBatchInsert(messageqcpp::ByteStream& bs, std::
 						uint64_t nextVal = 1;
 						if (colType.autoincrement)
 						{
-							try {
+							try
+							{
 								nextVal = systemCatalogPtr->nextAutoIncrValue(tableName);
-								fDbrm.startAISequence(oid, nextVal, colType.colWidth);
+								fDbrm.startAISequence(oid, nextVal, colType.colWidth, colType.colDataType);
 							}
 							catch (std::exception& ex)
 							{
@@ -802,7 +843,7 @@ uint8_t WE_DMLCommandProc::processBatchInsert(messageqcpp::ByteStream& bs, std::
 									nextValNeeded++;
 							}
 						}
-						
+
 						if (nextValNeeded>0) //reserve next value
 						{
 							try {
@@ -821,7 +862,7 @@ uint8_t WE_DMLCommandProc::processBatchInsert(messageqcpp::ByteStream& bs, std::
 								return rc;
 							}
 						}
-						
+
 						for ( uint32_t i=0; i < origVals.size(); i++ )
 						{
 							indata = origVals[i];
@@ -829,24 +870,24 @@ uint8_t WE_DMLCommandProc::processBatchInsert(messageqcpp::ByteStream& bs, std::
 								isNULL = true;
 							else
 								isNULL = false;
-							
+
 							//check if autoincrement column and value is 0 or null
 							if (colType.autoincrement && ( isNULL || (indata.compare("0")==0)))
-							{		
+							{
 								ostringstream oss;
 								oss << nextVal++;
 								indata = oss.str();
 								isNULL = false;
 							}
-							
+
 							if (colType.constraintType == CalpontSystemCatalog::NOTNULL_CONSTRAINT)
 							{
-								if (((colType.colDataType == execplan::CalpontSystemCatalog::DATE) && (indata =="0000-00-00")) || 
+								if (((colType.colDataType == execplan::CalpontSystemCatalog::DATE) && (indata =="0000-00-00")) ||
 									((colType.colDataType == execplan::CalpontSystemCatalog::DATETIME) && (indata =="0000-00-00 00:00:00")))
-								{	
+								{
 									isNULL = true;
 								}
-								
+
 								if (isNULL && colType.defaultValue.empty()) //error out
 								{
 									Message::Args args;
@@ -859,11 +900,11 @@ uint8_t WE_DMLCommandProc::processBatchInsert(messageqcpp::ByteStream& bs, std::
 								{
 									indata = colType.defaultValue;
 									isNULL = false;
-								}							
+								}
 							}
-							
+
 							try
-							{                    
+							{
 								datavalue = DataConvert::convertColumnData(colType, indata, pushWarning, isNULL);
 							}
 							catch(exception&)
@@ -880,10 +921,10 @@ uint8_t WE_DMLCommandProc::processBatchInsert(messageqcpp::ByteStream& bs, std::
 							}
 							if ( pushWarning && ( rc != dmlpackageprocessor::DMLPackageProcessor::IDBRANGE_WARNING ) )
 								rc = dmlpackageprocessor::DMLPackageProcessor::IDBRANGE_WARNING;
-								
+
 							WriteEngine::ColTuple colTuple;
 							colTuple.data = datavalue;
-							
+
 							colTuples.push_back(colTuple);
 							//@Bug 2515. Only pass string values to write engine
 							dicStrings.push_back( tmpStr );
@@ -893,9 +934,15 @@ uint8_t WE_DMLCommandProc::processBatchInsert(messageqcpp::ByteStream& bs, std::
 					}
 					++row_iterator;
 				}
-		  }
-		 }
-		 catch (std::exception& ex)
+
+				if (pushWarning)
+				{
+					colNames.push_back(tableColName.column);
+					isWarningSet = true;
+				}
+			}
+		}
+		catch (std::exception& ex)
 		{
 			err = ex.what();
 			rc = 1;
@@ -911,8 +958,8 @@ uint8_t WE_DMLCommandProc::processBatchInsert(messageqcpp::ByteStream& bs, std::
 	{
 		if (colValuesList[0].size() > 0)
 		{
-			if (NO_ERROR != 
-			(error = fWEWrapper.insertColumnRecs(txnid.id, colStructs, colValuesList, dctnryStructList, dicStringList, 
+			if (NO_ERROR !=
+			(error = fWEWrapper.insertColumnRecs(txnid.id, colStructs, colValuesList, dctnryStructList, dicStringList,
 						dbRootExtTrackerVec, fRBMetaWriter.get(), bFirstExtentOnThisPM, isInsertSelect, 0, roPair.objnum, fIsFirstBatchPm)))
 			{
 				if (error == ERR_BRM_DEAD_LOCK)
@@ -944,6 +991,20 @@ uint8_t WE_DMLCommandProc::processBatchInsert(messageqcpp::ByteStream& bs, std::
 	{
 		fIsFirstBatchPm = false;
 	}
+	if ( isWarningSet && ( rc == NO_ERROR ) )
+	{
+		rc = dmlpackageprocessor::DMLPackageProcessor::IDBRANGE_WARNING;
+		Message::Args args;
+		string cols = "'" + colNames[0] + "'";
+
+		for (unsigned i=1; i<colNames.size();i++)
+		{
+			cols = cols + ", " +  "'" + colNames[i] + "'";
+		}
+		args.add(cols);
+		err = IDBErrorInfo::instance()->errorMsg(WARN_DATA_TRUNC,args);
+		
+	}
 	//cout << "Batch insert return code " << rc << endl;
 	return rc;
 }
@@ -962,9 +1023,9 @@ uint8_t WE_DMLCommandProc::commitBatchAutoOn(messageqcpp::ByteStream& bs, std::s
 	tableOid = tmp32;
 	bs >> tmp32;
 	sessionId = tmp32;
-	
+
 	BRM::DBRM dbrm;
-		
+
 	std::vector<BRM::BulkSetHWMArg> setHWMArgs;
 	TableMetaData* aTbaleMetaData = TableMetaData::makeTableMetaData(tableOid);
 	ColsExtsInfoMap colsExtsInfoMap = aTbaleMetaData->getColsExtsInfoMap();
@@ -975,7 +1036,7 @@ uint8_t WE_DMLCommandProc::commitBatchAutoOn(messageqcpp::ByteStream& bs, std::s
 	{
 		aIt = (it->second).begin();
 		aArg.oid = it->first;
-		//cout << "OID:" << aArg.oid; 
+		//cout << "OID:" << aArg.oid;
 		while (aIt != (it->second).end())
 		{
 			aArg.partNum = aIt->partNum;
@@ -987,15 +1048,15 @@ uint8_t WE_DMLCommandProc::commitBatchAutoOn(messageqcpp::ByteStream& bs, std::s
 		}
 		it++;
 	}
-	
+
 	bs.restart();
 	//cout << " serialized setHWMArgs size = " << setHWMArgs.size() << endl;
 	serializeInlineVector (bs, setHWMArgs);
-	
+
 	//flush files
 	//cout << "flush files when autocommit on" << endl;
 	fWEWrapper.setIsInsert(true);
-	
+
 	std::map<uint32_t,uint32_t> oids;
 	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr =
        CalpontSystemCatalog::makeCalpontSystemCatalog(sessionId);
@@ -1011,7 +1072,7 @@ uint8_t WE_DMLCommandProc::commitBatchAutoOn(messageqcpp::ByteStream& bs, std::s
 		rc = 1;
 		return rc;
 	}
-	
+
 	for (unsigned i=0; i < ridList.size(); i++)
 	{
 		oids[ridList[i].objnum] = ridList[i].objnum;
@@ -1026,12 +1087,12 @@ uint8_t WE_DMLCommandProc::commitBatchAutoOn(messageqcpp::ByteStream& bs, std::s
 		rc = 1;
 		return rc;
 	}
-	
+
 	for (unsigned i=0; i < dictOids.size(); i++)
 	{
 		oids[dictOids[i].dictOID] = dictOids[i].dictOID;
 	}
-		
+
 	fWEWrapper.setTransId(txnID);
 
 	// @bug5333, up to here, rc == 0, but flushchunk may fail.
@@ -1062,80 +1123,15 @@ uint8_t WE_DMLCommandProc::processBatchInsertHwm(messageqcpp::ByteStream& bs, st
 	bs >> tmp8;
 	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr =
     CalpontSystemCatalog::makeCalpontSystemCatalog(txnID);
-
-	TableMetaData* aTbaleMetaData = TableMetaData::makeTableMetaData(tableOid);
-	ColsExtsInfoMap colsExtsInfoMap = aTbaleMetaData->getColsExtsInfoMap();
-	ColsExtsInfoMap::iterator it = colsExtsInfoMap.begin();
-	ColExtsInfo::iterator aIt;
-	CalpontSystemCatalog::RIDList ridList;
-	CalpontSystemCatalog::TableName aTableName;
-	CalpontSystemCatalog::ROPair roPair;
-	std::vector<DBRootExtentInfo> colDBRootExtentInfo;
-	DBRootExtentInfo aExtentInfo;
-	while (it != colsExtsInfoMap.end())
-	{
-		aIt = (it->second).begin();
-		roPair.objnum = it->first;
-		aExtentInfo.fPartition = 0;
-		aExtentInfo.fDbRoot = 0;
-		aExtentInfo.fSegment = 0;
-		aExtentInfo.fLocalHwm = 0;
-		while (aIt != (it->second).end())
-		{
-			if ((aIt->partNum > aExtentInfo.fPartition) || ((aIt->partNum == aExtentInfo.fPartition) && (aIt->segNum > aExtentInfo.fSegment)) || 
-				((aIt->partNum == aExtentInfo.fPartition) && (aIt->segNum == aExtentInfo.fSegment) && (aIt->segNum >aExtentInfo.fLocalHwm )))
-			{
-				aExtentInfo.fPartition = aIt->partNum;
-				aExtentInfo.fDbRoot = aIt->dbRoot;
-				aExtentInfo.fSegment = aIt->segNum;
-				aExtentInfo.fLocalHwm = aIt->hwm;
-			}
-			aIt++;
-		}
-		ridList.push_back(roPair);
-		colDBRootExtentInfo.push_back(aExtentInfo);
-		it++;
-	}
-
-	//@Bug 5996. Validate hwm before set them
-	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
-	try {
-		aTableName = systemCatalogPtr->tableName(tableOid);
-		ridList = systemCatalogPtr->columnRIDs(aTableName);		
-	}
-	catch(exception& ex)
-	{
-		err = ex.what();
-		rc = 1;
-		TableMetaData::removeTableMetaData(tableOid);
-
-		fIsFirstBatchPm = true;
-		//cout << "flush files when autocommit off" << endl;
-		fWEWrapper.setIsInsert(true);
-		return rc;
-	}
-	rc = validateColumnHWMs(ridList, systemCatalogPtr, colDBRootExtentInfo, "Ending");
-	if ( rc != 0)
-	{
-		WErrorCodes ec;
-		err = ec.errorString(rc);
-		err += " Check err.log for detailed information.";
-		TableMetaData::removeTableMetaData(tableOid);
-
-		fIsFirstBatchPm = true;
-		fWEWrapper.setIsInsert(true);
-		rc = 1;
-		return rc;
-	}
-	
+	//cout << "processBatchInsertHwm: tranid:isAutoCommitOn = " <<txnID <<":"<< (int)isAutoCommitOn << endl;
 	try {
 	if (isAutoCommitOn)
 	{
 		bs.restart();
 		if (fWEWrapper.getIsInsert())
 		{
-			std::map<uint32_t,uint32_t> oids;		
-/*			CalpontSystemCatalog::TableName aTableName;
+			std::map<uint32_t,uint32_t> oids;
+			CalpontSystemCatalog::TableName aTableName;
 			CalpontSystemCatalog::RIDList ridList;
 			try {
 				aTableName =  systemCatalogPtr->tableName(tableOid);
@@ -1146,8 +1142,8 @@ uint8_t WE_DMLCommandProc::processBatchInsertHwm(messageqcpp::ByteStream& bs, st
 				err = "Systemcatalog error for tableoid " + tableOid;
 				rc = 1;
 				return rc;
-			
-			} */
+
+			}
 			for (unsigned i=0; i < ridList.size(); i++)
 			{
 				oids[ridList[i].objnum] = ridList[i].objnum;
@@ -1157,7 +1153,7 @@ uint8_t WE_DMLCommandProc::processBatchInsertHwm(messageqcpp::ByteStream& bs, st
 			{
 				oids[dictOids[i].dictOID] = dictOids[i].dictOID;
 			}
-		
+
 			fWEWrapper.setTransId(txnID);
 			// @bug5333, up to here, rc == 0, but flushchunk may fail.
 			rc = fWEWrapper.flushChunks(0, oids);
@@ -1178,46 +1174,44 @@ uint8_t WE_DMLCommandProc::processBatchInsertHwm(messageqcpp::ByteStream& bs, st
 		err = ex.what();
 		rc = 1;
 		return rc;
-			
+
 	}
-	
-	BRM::DBRM dbrm;
-	//cout << " In processBatchInsertHwm setting hwm" << endl;	
-	std::vector<BRM::BulkSetHWMArg> setHWMArgs;
-	//TableMetaData* aTbaleMetaData = TableMetaData::makeTableMetaData(tableOid);
-	//ColsExtsInfoMap colsExtsInfoMap = aTbaleMetaData->getColsExtsInfoMap();
-	it = colsExtsInfoMap.begin();
-	//ColExtsInfo::iterator aIt;
-	BulkSetHWMArg aArg;
-	while (it != colsExtsInfoMap.end())
-	{
-		aIt = (it->second).begin();
-		aArg.oid = it->first;
-		//cout << "for oid " << aArg.oid << endl;
-		while (aIt != (it->second).end())
+
+		BRM::DBRM dbrm;
+		//cout << " In processBatchInsertHwm setting hwm" << endl;
+		std::vector<BRM::BulkSetHWMArg> setHWMArgs;
+		TableMetaData* aTbaleMetaData = TableMetaData::makeTableMetaData(tableOid);
+		ColsExtsInfoMap colsExtsInfoMap = aTbaleMetaData->getColsExtsInfoMap();
+		ColsExtsInfoMap::iterator it = colsExtsInfoMap.begin();
+		ColExtsInfo::iterator aIt;
+		BulkSetHWMArg aArg;
+		while (it != colsExtsInfoMap.end())
 		{
-			aArg.partNum = aIt->partNum;
-			aArg.segNum = aIt->segNum;
-			aArg.hwm = aIt->hwm;
-			//cout << " part:seg:hwm = " << aArg.partNum <<":"<<aArg.segNum<<":"<<aArg.hwm<<endl;
-			setHWMArgs.push_back(aArg);
-			aIt++;
-		}
+			aIt = (it->second).begin();
+			aArg.oid = it->first;
+			//cout << "for oid " << aArg.oid << endl;
+			while (aIt != (it->second).end())
+			{
+				aArg.partNum = aIt->partNum;
+				aArg.segNum = aIt->segNum;
+				aArg.hwm = aIt->hwm;
+				//cout << " part:seg:hwm = " << aArg.partNum <<":"<<aArg.segNum<<":"<<aArg.hwm<<endl;
+				setHWMArgs.push_back(aArg);
+				aIt++;
+			}
 		it++;
 	}
-	bs.restart();
-	serializeInlineVector (bs, setHWMArgs);
-		
+
 	TableMetaData::removeTableMetaData(tableOid);
-	
+
 	fIsFirstBatchPm = true;
 	//cout << "flush files when autocommit off" << endl;
 	fWEWrapper.setIsInsert(true);
 
 	std::map<uint32_t,uint32_t> oids;
-		
-	//CalpontSystemCatalog::TableName aTableName =  systemCatalogPtr->tableName(tableOid);
-	//CalpontSystemCatalog::RIDList ridList = systemCatalogPtr->columnRIDs(aTableName, true);
+
+	CalpontSystemCatalog::TableName aTableName =  systemCatalogPtr->tableName(tableOid);
+	CalpontSystemCatalog::RIDList ridList = systemCatalogPtr->columnRIDs(aTableName, true);
 	for (unsigned i=0; i < ridList.size(); i++)
 	{
 		oids[ridList[i].objnum] = ridList[i].objnum;
@@ -1227,15 +1221,30 @@ uint8_t WE_DMLCommandProc::processBatchInsertHwm(messageqcpp::ByteStream& bs, st
 	{
 		oids[dictOids[i].dictOID] = dictOids[i].dictOID;
 	}
-		
+
 	fWEWrapper.setTransId(txnID);
 
 	// @bug5333, up to here, rc == 0, but flushchunk may fail.
 	if (fWEWrapper.flushChunks(0, oids) != NO_ERROR)
 		rc = 1;  // return hardcoded 1 as the above
-	fWEWrapper.setIsInsert(false);
 
+	bs.restart();
+	rc = 0;
+	try {
+		serializeInlineVector (bs, setHWMArgs);
+	}
+	catch (exception& ex)
+	{
+		err = ex.what();
+		rc = 1;
+		return rc;
+
+	}
+	//cout << "flush is called for transaction " << txnID << endl;
+	fWEWrapper.setIsInsert(false);
 	fIsFirstBatchPm = true;
+
+
 	return rc;
 }
 uint8_t WE_DMLCommandProc::commitBatchAutoOff(messageqcpp::ByteStream& bs, std::string & err)
@@ -1282,10 +1291,10 @@ uint8_t WE_DMLCommandProc::rollbackBatchAutoOff(messageqcpp::ByteStream& bs, std
 	//Rollbacked all versioned blocks
 	return rc;
 }
-uint8_t WE_DMLCommandProc::processUpdate(messageqcpp::ByteStream& bs, 
-	                                       std::string & err, 
-	                                       ByteStream::quadbyte & PMId,
-	                                       uint64_t& blocksChanged)
+uint8_t WE_DMLCommandProc::processUpdate(messageqcpp::ByteStream& bs,
+										 std::string & err,
+										 ByteStream::quadbyte & PMId,
+										 uint64_t& blocksChanged)
 {
 	uint8_t rc = 0;
 	//cout << " In processUpdate" << endl;
@@ -1322,7 +1331,7 @@ uint8_t WE_DMLCommandProc::processUpdate(messageqcpp::ByteStream& bs,
 	{
 		fetchColColwidths.push_back(rowGroups[txnId]->getColumnWidth(i));
 	}
-	
+
 	WriteEngine::ColTupleList aColList;
 	WriteEngine::ColTuple colTuple;
 	WriteEngine::ColStructList colStructList;
@@ -1332,8 +1341,8 @@ uint8_t WE_DMLCommandProc::processUpdate(messageqcpp::ByteStream& bs,
 
 	WriteEngine::DctnryStructList dctnryStructList;
 	WriteEngine::DctnryStruct dctnryStruct;
-    WriteEngine::DctnryValueList dctnryValueList;
-	
+	WriteEngine::DctnryValueList dctnryValueList;
+
 	CalpontSystemCatalog::TableName tableName;
 	CalpontSystemCatalog::TableColName tableColName;
 	DMLTable* tablePtr =  cpackages[txnId].get_Table();
@@ -1342,7 +1351,7 @@ uint8_t WE_DMLCommandProc::processUpdate(messageqcpp::ByteStream& bs,
 	tableColName.table = tableName.table = tablePtr->get_TableName();
 	tableColName.schema = tableName.schema = tablePtr->get_SchemaName();
 	tableColName.column  = columnsUpdated[0]->get_Name();
-	
+
 	sessionID = cpackages[txnId].get_SessionID();
 	
 	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr =
@@ -1365,24 +1374,25 @@ uint8_t WE_DMLCommandProc::processUpdate(messageqcpp::ByteStream& bs,
 		oss << "lookupOID got unknown exception with column " << tableColName.schema << "." << tableColName.table << "." << tableColName.column;
 		err =  oss.str();
 	}
-	
+
 	if (rc != 0)
 		return rc;
-		
+
 	rowGroups[txnId]->getRow(0, &row);
 	CalpontSystemCatalog::RID rid = row.getRid();
-	uint16_t dbRoot, segment;
+	uint16_t dbRoot, segment, blockNum;
 	uint32_t partition;
-	//get file info		
+	uint8_t extentNum;
+	//Get the file information from rowgroup
 	dbRoot = rowGroups[txnId]->getDBRoot();
-	convertRidToColumn (rid, partition, segment);
+	rowGroups[txnId]->getLocation(&partition, &segment, &extentNum, &blockNum);
 	colStruct.fColPartition = partition;
 	colStruct.fColSegment = segment;
 	colStruct.fColDbRoot = dbRoot;
 	dctnryStruct.fColPartition = partition;
 	dctnryStruct.fColSegment = segment;
 	dctnryStruct.fColDbRoot = dbRoot;
-	
+
 	//Build to be updated column structure and values
 	int error = 0;
 	unsigned fetchColPos = 0;
@@ -1392,7 +1402,7 @@ uint8_t WE_DMLCommandProc::processUpdate(messageqcpp::ByteStream& bs,
 	int64_t intColVal = 0;
 	//timer.start("fetch values");
 	std::vector<string> colNames;
-	
+
 	// for query stats
 	boost::scoped_array<CalpontSystemCatalog::ColType> colTypes(new CalpontSystemCatalog::ColType[columnsUpdated.size()]);
 	boost::scoped_array<int> preBlkNums(new int[columnsUpdated.size()]);
@@ -1403,7 +1413,7 @@ uint8_t WE_DMLCommandProc::processUpdate(messageqcpp::ByteStream& bs,
 		//timer.start("lookupsyscat");
 		tableColName.column  = columnsUpdated[j]->get_Name();
 		try {
-			oids[j] = systemCatalogPtr->lookupOID(tableColName);		
+			oids[j] = systemCatalogPtr->lookupOID(tableColName);
 			colTypes[j] = systemCatalogPtr->colType(oids[j]);
 		}
 		catch  (std::exception& ex)
@@ -1420,13 +1430,13 @@ uint8_t WE_DMLCommandProc::processUpdate(messageqcpp::ByteStream& bs,
 			oss << "colType got unknown exception with column oid " << oid;
 			err = oss.str();
 		}
-		
+
 		if (rc !=0)
 			return rc;
 
 		preBlkNums[j] = -1;
 	}
-		
+
 	for (unsigned int j = 0; j < columnsUpdated.size(); j++)
 	{
 	/*		WriteEngine::ColTupleList colTupleList;
@@ -1449,10 +1459,10 @@ uint8_t WE_DMLCommandProc::processUpdate(messageqcpp::ByteStream& bs,
 				oss <<  "lookupOID got unknown exception with column " << tableColName.schema << "." << tableColName.table << "." << tableColName.column;
 				err = oss.str();
 			}
-			
+
 			if (rc != 0)
 				return rc;
-				
+
 			CalpontSystemCatalog::ColType colType;
 			try {
 				colType = systemCatalogPtr->colType(oid);
@@ -1471,7 +1481,7 @@ uint8_t WE_DMLCommandProc::processUpdate(messageqcpp::ByteStream& bs,
 				oss << "colType got unknown exception with column oid " << oid;
 				err = oss.str();
 			}
-			
+
 			if (rc !=0)
 				return rc;
 			*/
@@ -1479,10 +1489,10 @@ uint8_t WE_DMLCommandProc::processUpdate(messageqcpp::ByteStream& bs,
 			CalpontSystemCatalog::ColType colType = colTypes[j];
 			oid = oids[j];
 			colStruct.dataOid = oid;
-			colStruct.colDataType = (WriteEngine::ColDataType)colType.colDataType;
+			colStruct.colDataType = colType.colDataType;
 			colStruct.tokenFlag = false;
 			colStruct.fCompressionType = colType.compressionType;
-			
+			tableColName.column  = columnsUpdated[j]->get_Name();
 			if( !ridsFetched)
 			{
 				// querystats
@@ -1493,7 +1503,8 @@ uint8_t WE_DMLCommandProc::processUpdate(messageqcpp::ByteStream& bs,
 					rowGroups[txnId]->getRow(i, &row);
 					rid = row.getRid();
 					relativeRID = rid - rowGroups[txnId]->getBaseRid();
-					convertRidToColumn (rid, partition, segment);
+					rid = relativeRID;
+					convertToRelativeRid (rid, extentNum, blockNum);
 					rowIDLists.push_back(rid);
 					uint colWidth = (colTypes[j].colWidth > 8 ? 8 : colTypes[j].colWidth);
 
@@ -1576,7 +1587,7 @@ uint8_t WE_DMLCommandProc::processUpdate(messageqcpp::ByteStream& bs,
 							}
 							continue;
 						}
-					
+
 						switch (fetchColTypes[fetchColPos])
 						{
 							case CalpontSystemCatalog::DATE:
@@ -1604,108 +1615,87 @@ uint8_t WE_DMLCommandProc::processUpdate(messageqcpp::ByteStream& bs,
 								value = row.getVarBinaryStringField(fetchColPos);
 								break;
 							}
-							case CalpontSystemCatalog::BIGINT:
-							{
-								intColVal = row.getIntField<8>(fetchColPos);
-							
-								if (fetchColScales[fetchColPos] <= 0)
-								{
-									ostringstream os;
-									os << intColVal;
-									value = os.str();
-								}
-								break;
-							}
-							case CalpontSystemCatalog::INT:
-							{
-								intColVal = row.getIntField<4>(fetchColPos);
-								if (fetchColScales[fetchColPos] <= 0)
-								{
-									ostringstream os;
-									os << intColVal;
-									value = os.str();
-								}
-								break;
-							}
-							case CalpontSystemCatalog::SMALLINT:
-							{
-								intColVal = row.getIntField<2>(fetchColPos);
-								if (fetchColScales[fetchColPos] <= 0)
-								{
-									ostringstream os;
-									os << intColVal;
-									value = os.str();
-								}
-								break;
-							}
-							case CalpontSystemCatalog::TINYINT:
-							{
-								intColVal = row.getIntField<1>(fetchColPos);
-								if (fetchColScales[fetchColPos] <= 0)
-								{
-									ostringstream os;
-									os << intColVal;
-									value = os.str();
-								}
-								break;
-							}
 							case CalpontSystemCatalog::DECIMAL:
+							case CalpontSystemCatalog::UDECIMAL:
 							{
-								if (fetchColColwidths[fetchColPos] == execplan::CalpontSystemCatalog::ONE_BYTE)
-								{
-									intColVal = row.getIntField<1>(fetchColPos);
-									ostringstream os;
-									os << intColVal;
-									value = os.str();
-								}
-								else if (fetchColColwidths[fetchColPos] == execplan::CalpontSystemCatalog::TWO_BYTE)
-								{
-									intColVal = row.getIntField<2>(fetchColPos);
-									ostringstream os;
-									os << intColVal;
-									value = os.str();
-								}
-								else if (fetchColColwidths[fetchColPos] == execplan::CalpontSystemCatalog::FOUR_BYTE)
-								{
-									intColVal = row.getIntField<4>(fetchColPos);
-									ostringstream os;
-									os << intColVal;
-									value = os.str();
-								}
-								else if (fetchColColwidths[fetchColPos] == execplan::CalpontSystemCatalog::EIGHT_BYTE)
-								{
-									intColVal = row.getIntField<8>(fetchColPos);
-									ostringstream os;
-									os << intColVal;
-									value = os.str();
-								}
-								else
+								// decimal width > 8 cannot be stored in an integer
+								if (fetchColColwidths[fetchColPos] > 8)
 								{
 									value = row.getStringField(fetchColPos);
 									unsigned i = strlen(value.c_str());
 									value = value.substr(0, i);
+									break;
+								}
+								// else
+								//     fall through to integer cases
+							}
+							case CalpontSystemCatalog::BIGINT:
+							case CalpontSystemCatalog::UBIGINT:
+							case CalpontSystemCatalog::INT:
+							case CalpontSystemCatalog::UINT:
+							case CalpontSystemCatalog::SMALLINT:
+							case CalpontSystemCatalog::USMALLINT:
+							case CalpontSystemCatalog::TINYINT:
+							case CalpontSystemCatalog::UTINYINT:
+							{
+								{
+									intColVal = row.getIntField(fetchColPos);
+									if (fetchColTypes[fetchColPos] == CalpontSystemCatalog::UDECIMAL
+										&& intColVal < 0)
+									{
+										intColVal = 0;
+									}
+
+									if (fetchColScales[fetchColPos] <= 0)
+									{
+										ostringstream os;
+										if (isUnsigned(fetchColTypes[fetchColPos]))
+											os << static_cast<uint64_t>(intColVal);
+										else
+											os << intColVal;
+										value = os.str();
+									}
+									else
+									{
+										const int ctmp_size = 65+1+1+1;
+										char ctmp[ctmp_size] = {0};
+										DataConvert::decimalToString(
+											intColVal, fetchColScales[fetchColPos],
+											ctmp, ctmp_size, fetchColTypes[fetchColPos]);
+										value = ctmp;  // null termination by decimalToString
+									}
 								}
 								break;
 							}
 							//In this case, we're trying to load a double output column with float data. This is the
 							// case when you do sum(floatcol), e.g.
 							case CalpontSystemCatalog::FLOAT:
+							case CalpontSystemCatalog::UFLOAT:
 							{
 								float dl = row.getFloatField(fetchColPos);
 								if (dl == std::numeric_limits<float>::infinity())
 									continue;
-								ostringstream os;	
+								if (fetchColTypes[fetchColPos] == CalpontSystemCatalog::UFLOAT && dl < 0.0)
+								{
+									dl = 0.0;
+								}
+								ostringstream os;
 								//@Bug 3350 fix the precision.
 								os << setprecision(7) << dl;
 								value = os.str();
 								break;
 							}
 							case CalpontSystemCatalog::DOUBLE:
-							{								
+							case CalpontSystemCatalog::UDOUBLE:
+							{
 								double dl = row.getDoubleField(fetchColPos);
 								if (dl == std::numeric_limits<double>::infinity())
 									continue;
-								ostringstream os;	
+								if (fetchColTypes[fetchColPos] == CalpontSystemCatalog::UDOUBLE && dl < 0.0)
+								{
+									dl = 0.0;
+								}
+								ostringstream os;
 								//@Bug 3350 fix the precision.
 								os <<setprecision(16)<< dl;
 								value = os.str();
@@ -1720,69 +1710,37 @@ uint8_t WE_DMLCommandProc::processUpdate(messageqcpp::ByteStream& bs,
 								break;
 							}
 						}
-						
-						if (fetchColScales[fetchColPos] > 0)
-						{
-							long long int_val = (long long)intColVal;
-							const int ctmp_size = 65+1+1+1;
-							char ctmp[ctmp_size] = {0};
-							snprintf(ctmp, ctmp_size, "%lld", int_val);
-							size_t l1 = strlen(ctmp);
-							char* ptr = &ctmp[0];
-							if (int_val < 0)
-							{
-								ptr++;
-								idbassert(l1 >= 2);
-								l1--;
-							}
 
-							if ((unsigned)fetchColScales[fetchColPos] > l1)
-							{
-								const char* zeros = "0000000000000000000"; //19 0's
-								size_t diff = fetchColScales[fetchColPos] - l1; //this will always be > 0
-								memmove((ptr + diff), ptr, l1 + 1); //also move null
-								memcpy(ptr, zeros, diff);
-								l1 = 0;
-							}
-							else
-								l1 -= fetchColScales[fetchColPos];
-							memmove((ptr + l1 + 1), (ptr + l1), fetchColScales[fetchColPos] + 1); //also move null
-							*(ptr + l1) = '.';
-							
-							value = ctmp;
-							string::size_type pos = value.find_first_of(".");
-							if (pos == 0)
-								value.insert(0,"0");
-						}
 						uint32_t funcScale = columnsUpdated[j]->get_funcScale();
-                                                if (funcScale != 0)
-                                                {
-                                                        string::size_type pos = value.find_first_of("."); //decimal point
-                                                        if ( pos >= value.length() )
-                                                                value.insert(value.length(),".");
-                                                        //padding 0 if needed
-                                                        pos = value.find_first_of(".");
-                                                        uint32_t digitsAfterPoint = value.length() - pos - 1;
-                                                        for (uint32_t i=0; i < (funcScale-digitsAfterPoint); i++)
-                                                        {
-                                                                value += "0";
-                                                        }
-                                                }
-                                                //check data length
+						if (funcScale != 0)
+						{
+							string::size_type pos = value.find_first_of("."); //decimal point
+							if ( pos >= value.length() )
+								value.insert(value.length(),".");
+							//padding 0 if needed
+							pos = value.find_first_of(".");
+							uint32_t digitsAfterPoint = value.length() - pos - 1;
+							if (digitsAfterPoint < funcScale)
+							{
+								for (uint32_t i=0; i < (funcScale-digitsAfterPoint); i++)
+									value += "0";
+							}
+						}
+						//check data length
 						//trim the string if needed
-                        if (value.length() > (unsigned int)colType.colWidth)
-                        {
-                              value = value.substr(0, colType.colWidth);
-							  
-							  if (!pushWarn)
-                                 pushWarn = true;
-								 
-                              if (!pushWarning)
-                                 pushWarning = true;
-								
-							  if (pushWarn)
+						if (value.length() > (unsigned int)colType.colWidth)
+						{
+							value = value.substr(0, colType.colWidth);
+
+							if (!pushWarn)
+								pushWarn = true;
+
+							if (!pushWarning)
+								pushWarning = true;
+
+							if (pushWarn)
 								nameNeeded = true;
-                        }
+						}
 
 						WriteEngine::DctnryTuple dctTuple;
 						memcpy(dctTuple.sigValue, value.c_str(), value.length());
@@ -1848,7 +1806,7 @@ uint8_t WE_DMLCommandProc::processUpdate(messageqcpp::ByteStream& bs,
 					else
 					{
 						value = columnsUpdated[j]->get_Data();
-						
+
 						if (value.length() > (unsigned int)colType.colWidth)
 						{
 							value = value.substr(0, colType.colWidth);
@@ -1921,107 +1879,88 @@ uint8_t WE_DMLCommandProc::processUpdate(messageqcpp::ByteStream& bs,
 									value = row.getVarBinaryStringField(fetchColPos);
 									break;
 								}
-								case CalpontSystemCatalog::BIGINT:
-								{
-									intColVal = row.getIntField<8>(fetchColPos);
-									if (fetchColScales[fetchColPos] <= 0)
-									{
-										ostringstream os;
-										os << intColVal;
-										value = os.str();
-									}
-									break;
-								}
-								case CalpontSystemCatalog::INT:
-								{
-									intColVal = row.getIntField<4>(fetchColPos);
-									if (fetchColScales[fetchColPos] <= 0)
-									{
-										ostringstream os;
-										os << intColVal;
-										value = os.str();
-									}
-									break;
-								}
-								case CalpontSystemCatalog::SMALLINT:
-								{
-									intColVal = row.getIntField<2>(fetchColPos);
-									if (fetchColScales[fetchColPos] <= 0)
-									{
-										ostringstream os;
-										os << intColVal;
-										value = os.str();
-									}
-									break;
-								}
-								case CalpontSystemCatalog::TINYINT:
-								{
-									intColVal = row.getIntField<1>(fetchColPos);
-									if (fetchColScales[fetchColPos] <= 0)
-									{
-										ostringstream os;
-										os << intColVal;
-										value = os.str();
-									}
-									break;
-								}
 								case CalpontSystemCatalog::DECIMAL:
+								case CalpontSystemCatalog::UDECIMAL:
 								{
-									if (fetchColColwidths[fetchColPos] == execplan::CalpontSystemCatalog::ONE_BYTE)
-									{
-										intColVal = row.getIntField<1>(fetchColPos);
-										ostringstream os;
-										os << intColVal;
-										value = os.str();
-									}
-									else if (fetchColColwidths[fetchColPos] == execplan::CalpontSystemCatalog::TWO_BYTE)
-									{
-										intColVal = row.getIntField<2>(fetchColPos);
-										ostringstream os;
-										os << intColVal;
-										value = os.str();
-									}
-									else if (fetchColColwidths[fetchColPos] == execplan::CalpontSystemCatalog::FOUR_BYTE)
-									{
-										intColVal = row.getIntField<4>(fetchColPos);
-										ostringstream os;
-										os << intColVal;
-										value = os.str();
-									}
-									else if (fetchColColwidths[fetchColPos] == execplan::CalpontSystemCatalog::EIGHT_BYTE)
-									{
-										intColVal = row.getIntField<8>(fetchColPos);
-										ostringstream os;
-										os << intColVal;
-										value = os.str();
-									}
-									else
+									// decimal width > 8 cannot be stored in an integer
+									if (fetchColColwidths[fetchColPos] > 8)
 									{
 										value = row.getStringField(fetchColPos);
 										unsigned i = strlen(value.c_str());
 										value = value.substr(0, i);
+										break;
+									}
+									// else
+									//     fall through to integer cases
+								}
+								case CalpontSystemCatalog::BIGINT:
+								case CalpontSystemCatalog::UBIGINT:
+								case CalpontSystemCatalog::INT:
+								case CalpontSystemCatalog::UINT:
+								case CalpontSystemCatalog::SMALLINT:
+								case CalpontSystemCatalog::USMALLINT:
+								case CalpontSystemCatalog::TINYINT:
+								case CalpontSystemCatalog::UTINYINT:
+								{
+									{
+										intColVal = row.getIntField(fetchColPos);
+										if (fetchColTypes[fetchColPos] ==
+													CalpontSystemCatalog::UDECIMAL
+											&& intColVal < 0)
+										{
+											intColVal = 0;
+										}
+
+										if (fetchColScales[fetchColPos] <= 0)
+										{
+											ostringstream os;
+											if (isUnsigned(fetchColTypes[fetchColPos]))
+												os << static_cast<uint64_t>(intColVal);
+											else
+												os << intColVal;
+											value = os.str();
+										}
+										else
+										{
+											const int ctmp_size = 65+1+1+1;
+											char ctmp[ctmp_size] = {0};
+											DataConvert::decimalToString(
+												intColVal, fetchColScales[fetchColPos],
+												ctmp, ctmp_size, fetchColTypes[fetchColPos]);
+											value = ctmp;  // null termination by decimalToString
+										}
 									}
 									break;
 								}
 								//In this case, we're trying to load a double output column with float data. This is the
 								// case when you do sum(floatcol), e.g.
 								case CalpontSystemCatalog::FLOAT:
+								case CalpontSystemCatalog::UFLOAT:
 								{
 									float dl = row.getFloatField(fetchColPos);
 									if (dl == std::numeric_limits<float>::infinity())
 										continue;
-									ostringstream os;	
+									if (fetchColTypes[fetchColPos] == CalpontSystemCatalog::UFLOAT && dl < 0.0)
+									{
+										dl = 0.0;
+									}
+									ostringstream os;
 									//@Bug 3350 fix the precision.
 									os << setprecision(7) << dl;
 									value = os.str();
 									break;
 								}
 								case CalpontSystemCatalog::DOUBLE:
-								{								
+								case CalpontSystemCatalog::UDOUBLE:
+								{
 									double dl = row.getDoubleField(fetchColPos);
 									if (dl == std::numeric_limits<double>::infinity())
 										continue;
-									ostringstream os;	
+									if (fetchColTypes[fetchColPos] == CalpontSystemCatalog::UDOUBLE && dl < 0.0)
+									{
+										dl = 0.0;
+									}
+									ostringstream os;
 									//@Bug 3350 fix the precision.
 									os <<setprecision(16)<< dl;
 									value = os.str();
@@ -2037,41 +1976,7 @@ uint8_t WE_DMLCommandProc::processUpdate(messageqcpp::ByteStream& bs,
 								}
 							}
 						}
-						
-						if (fetchColScales[fetchColPos] > 0)
-						{
-							long long int_val = (long long)intColVal;
-							const int ctmp_size = 65+1+1+1;
-							char ctmp[ctmp_size] = {0};
-							snprintf(ctmp, ctmp_size, "%lld", int_val);
-							size_t l1 = strlen(ctmp);
-							char* ptr = &ctmp[0];
-							if (int_val < 0)
-							{
-								ptr++;
-								idbassert(l1 >= 2);
-								l1--;
-							}
 
-							if ((unsigned)fetchColScales[fetchColPos] > l1)
-							{
-								const char* zeros = "0000000000000000000"; //19 0's
-								size_t diff = fetchColScales[fetchColPos] - l1; //this will always be > 0
-								memmove((ptr + diff), ptr, l1 + 1); //also move null
-								memcpy(ptr, zeros, diff);
-								l1 = 0;
-							}
-							else
-								l1 -= fetchColScales[fetchColPos];
-							memmove((ptr + l1 + 1), (ptr + l1), fetchColScales[fetchColPos] + 1); //also move null
-							*(ptr + l1) = '.';
-							
-							value = ctmp;
-							string::size_type pos = value.find_first_of(".");
-							if (pos == 0)
-								value.insert(0,"0");
-						}
-						
 						uint32_t funcScale = columnsUpdated[j]->get_funcScale();
 						if (funcScale != 0)
 						{
@@ -2081,12 +1986,13 @@ uint8_t WE_DMLCommandProc::processUpdate(messageqcpp::ByteStream& bs,
 							//padding 0 if needed
 							pos = value.find_first_of(".");
 							uint32_t digitsAfterPoint = value.length() - pos -1;
-							for (uint32_t i=0; i < (funcScale-digitsAfterPoint); i++)
+							if (digitsAfterPoint < funcScale)
 							{
-								value += "0";
+								for (uint32_t i=0; i < (funcScale-digitsAfterPoint); i++)
+									value += "0";
 							}
 						}
-						
+
 						//Check NOT NULL constraint and default value
 						if ((isNull) && (colType.defaultValue.length() <= 0) && (colType.constraintType == CalpontSystemCatalog::NOTNULL_CONSTRAINT))
 						{
@@ -2100,7 +2006,7 @@ uint8_t WE_DMLCommandProc::processUpdate(messageqcpp::ByteStream& bs,
 						{
 							isNull = false;
 							bool oneWarn = false;
-							
+
 							try {
 								datavalue = DataConvert::convertColumnData(colType, colType.defaultValue, pushWarn, isNull);
 							}
@@ -2112,16 +2018,16 @@ uint8_t WE_DMLCommandProc::processUpdate(messageqcpp::ByteStream& bs,
 								args.add(string("'") + colType.defaultValue + string("'"));
 								err = IDBErrorInfo::instance()->errorMsg(ERR_NON_NUMERIC_DATA, args);
 							}
-						
+
 							if ((pushWarn) && (!oneWarn))
 								oneWarn = true;
-								
+
 							colTuple.data = datavalue;
 							colTupleList.push_back (colTuple);
-							
+
 							if (oneWarn)
 								pushWarn = true;
-							
+
 							if (!pushWarning)
 							{
 								pushWarning = pushWarn;
@@ -2130,7 +2036,7 @@ uint8_t WE_DMLCommandProc::processUpdate(messageqcpp::ByteStream& bs,
 								nameNeeded = true;
 						}
 						else
-						{		
+						{
 							try {
 								datavalue = DataConvert::convertColumnData(colType, value, pushWarn, isNull);
 							}
@@ -2149,7 +2055,7 @@ uint8_t WE_DMLCommandProc::processUpdate(messageqcpp::ByteStream& bs,
 							{
 								pushWarning = pushWarn;
 							}
-						
+
 							if (pushWarn)
 								nameNeeded = true;
 						}
@@ -2168,18 +2074,18 @@ uint8_t WE_DMLCommandProc::processUpdate(messageqcpp::ByteStream& bs,
 					}
 
 					string inData (columnsUpdated[j]->get_Data());
-					if (((colType.colDataType == execplan::CalpontSystemCatalog::DATE) && (inData =="0000-00-00")) || 
+					if (((colType.colDataType == execplan::CalpontSystemCatalog::DATE) && (inData =="0000-00-00")) ||
 									((colType.colDataType == execplan::CalpontSystemCatalog::DATETIME) && (inData =="0000-00-00 00:00:00")))
-					{	
+					{
 						isNull = true;
 					}
-					
+
 					uint64_t nextVal = 0;
 					if (colType.autoincrement)
 					{
 						try {
 							nextVal = systemCatalogPtr->nextAutoIncrValue(tableName);
-							fDbrm.startAISequence(oid, nextVal, colType.colWidth);
+							fDbrm.startAISequence(oid, nextVal, colType.colWidth, colType.colDataType);
 						}
 						catch (std::exception& ex)
 						{
@@ -2210,7 +2116,7 @@ uint8_t WE_DMLCommandProc::processUpdate(messageqcpp::ByteStream& bs,
 						bool oneWarn = false;
 						for (unsigned row = 0; row < rowsThisRowgroup; row++)
 						{
-							
+
 							ostringstream oss;
 							oss << nextVal++;
 							inData = oss.str();
@@ -2232,7 +2138,7 @@ uint8_t WE_DMLCommandProc::processUpdate(messageqcpp::ByteStream& bs,
 						}
 						if (oneWarn)
 							pushWarn = true;
-							
+
 						if (!pushWarning)
 						{
 							pushWarning = pushWarn;
@@ -2265,16 +2171,16 @@ uint8_t WE_DMLCommandProc::processUpdate(messageqcpp::ByteStream& bs,
 								args.add(string("'") + colType.defaultValue + string("'"));
 								err = IDBErrorInfo::instance()->errorMsg(ERR_NON_NUMERIC_DATA, args);
 							}
-						
+
 							if ((pushWarn) && (!oneWarn))
 								oneWarn = true;
-								
+
 							colTuple.data = datavalue;
 							colTupleList.push_back (colTuple);
 						}
 						if (oneWarn)
 							pushWarn = true;
-							
+
 						if (!pushWarning)
 						{
 							pushWarning = pushWarn;
@@ -2308,20 +2214,20 @@ uint8_t WE_DMLCommandProc::processUpdate(messageqcpp::ByteStream& bs,
 					}
 				}
 			}
-			if (nameNeeded) 
+			if (nameNeeded)
 			{
 				colNames.push_back(tableColName.column);
 			}
-				
+
 			colStructList.push_back(colStruct);
 			colValueList.push_back (colTupleList);
 	} //end of bulding values and column structure.
 	//timer.stop("fetch values");
-	if (rowIDLists.size() > 0)	
-	{		
-		error = fWEWrapper.updateColumnRecs(txnId, colStructList, colValueList,  rowIDLists);	
+	if (rowIDLists.size() > 0)
+	{
+		error = fWEWrapper.updateColumnRecs(txnId, colStructList, colValueList,  rowIDLists);
 	}
-		
+
 	if (error != NO_ERROR)
 	{
 			rc = error;
@@ -2337,7 +2243,7 @@ uint8_t WE_DMLCommandProc::processUpdate(messageqcpp::ByteStream& bs,
 				rc = dmlpackageprocessor::DMLPackageProcessor::VB_OVERFLOW_ERROR;
 				err = IDBErrorInfo::instance()->errorMsg(ERR_VERSIONBUFFER_OVERFLOW);
 			}
-	}	
+	}
 	if (pushWarning)
 	{
 		rc = dmlpackageprocessor::DMLPackageProcessor::IDBRANGE_WARNING;
@@ -2352,650 +2258,6 @@ uint8_t WE_DMLCommandProc::processUpdate(messageqcpp::ByteStream& bs,
 		err = IDBErrorInfo::instance()->errorMsg(WARN_DATA_TRUNC,args);
 	}
 	//cout << "finished update" << endl;
-	return rc;
-}
-
-uint8_t WE_DMLCommandProc::processUpdate1(messageqcpp::ByteStream& bs, std::string & err)
-{
-	uint8_t rc = 0;
-	//cout << " In processUpdate" << endl;
-	uint32_t tmp32, sessionID;
-	TxnID txnId;
-	bs >> tmp32;
-	txnId = tmp32;
-	if (!rowGroups[txnId]) //meta data
-	{
-		rowGroups[txnId] = new rowgroup::RowGroup();
-		rowGroups[txnId]->deserialize(bs);
-		uint8_t pkgType;
-		bs >> pkgType;
-		cpackages[txnId].read(bs);
-		//cout << "Processed meta data in update" << endl;
-		return rc;
-	}
-	fWEWrapper.setIsInsert(false);
-
-	bool pushWarning = false;
-	rowGroups[txnId]->setData(const_cast<uint8_t*>(bs.buf()));
-	//get rows and values
-	rowgroup::Row row;
-	CalpontSystemCatalog::RID rid;
-	rowGroups[txnId]->initRow(&row);
-	string value("");
-	uint32_t rowsThisRowgroup = rowGroups[txnId]->getRowCount();
-	uint columnsSelected = rowGroups[txnId]->getColumnCount();
-	std::vector<execplan::CalpontSystemCatalog::ColDataType> fetchColTypes =  rowGroups[txnId]->getColTypes();
-	std::vector<uint> fetchColScales = rowGroups[txnId]->getScale();
-	std::vector<uint> fetchColColwidths;
-	std::vector<ColValues> colsVals(columnsSelected);
-	int64_t intColVal = 0;
-	WriteEngine::RIDList  rowIDLists;
-	bool isNull = false;
-	for (uint i=0; i < columnsSelected; i++)
-	{
-		fetchColColwidths.push_back(rowGroups[txnId]->getColumnWidth(i));
-	}
-	
-	WriteEngine::ColTupleList aColList;
-	WriteEngine::ColTuple colTuple;
-	WriteEngine::ColStructList colStructList;
-	WriteEngine::ColStruct colStruct;
-	WriteEngine::ColValueList colValueList;
-
-	WriteEngine::DctnryStructList dctnryStructList;
-	WriteEngine::DctnryStruct dctnryStruct;
-    WriteEngine::DctnryValueList dctnryValueList;
-	boost::any datavalue;
-	
-	CalpontSystemCatalog::TableName tableName;
-	CalpontSystemCatalog::TableColName tableColName;
-	DMLTable* tablePtr =  cpackages[txnId].get_Table();
-	RowList rows = tablePtr->get_RowList();
-	dmlpackage::ColumnList columnsUpdated = rows[0]->get_ColumnList();
-	tableColName.table = tableName.table = tablePtr->get_TableName();
-	tableColName.schema = tableName.schema = tablePtr->get_SchemaName();
-	tableColName.column  = columnsUpdated[0]->get_Name();
-	
-	sessionID = cpackages[txnId].get_SessionID();
-	
-	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr =
-        CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
-	CalpontSystemCatalog::OID oid;
-	try {
-		oid = systemCatalogPtr->lookupOID(tableColName);
-	}
-	catch  (std::exception& ex)
-	{
-		rc = 1;
-		ostringstream oss;
-		oss << "lookupOID got exception " << ex.what() << " with column " << tableColName.schema << "." + tableColName.table << "." << tableColName.column;
-		err = oss.str();
-	}
-	catch ( ... )
-	{
-		rc = 1;
-		ostringstream oss;
-		oss << "lookupOID got unknown exception with column " << tableColName.schema << "." << tableColName.table << "." << tableColName.column;
-		err =  oss.str();
-	}
-	
-	if (rc != 0)
-		return rc;
-		
-	rowGroups[txnId]->getRow(0, &row);
-	rid = row.getRid();
-	uint16_t dbRoot, segment;
-	uint32_t partition;
-	//get file info		
-	dbRoot = rowGroups[txnId]->getDBRoot();
-	//fDbrm.getStartExtent(oid, startDBRoot, startPartitionNum, true);	
-	convertRidToColumn (rid, partition, segment);
-	colStruct.fColPartition = partition;
-	colStruct.fColSegment = segment;
-	colStruct.fColDbRoot = dbRoot;
-	dctnryStruct.fColPartition = partition;
-	dctnryStruct.fColSegment = segment;
-	dctnryStruct.fColDbRoot = dbRoot;
-	
-	
-	for (unsigned i = 0; i < rowsThisRowgroup; i++)
-	{
-		rowGroups[txnId]->getRow(i, &row);
-		rid = row.getRid();
-		//timer.start("convertrid");
-		convertRidToColumn (rid, partition, segment);
-		//timer.stop("convertrid");
-		rowIDLists.push_back(rid);
-		//Fetch values
-		//timer.start("fetchval");
-		for (unsigned col = 0; col < columnsSelected; col++)
-		{
-			// fetch and store data
-			if (row.isNullValue(col))
-			{
-				value = "";
-				//cout << "update got value " << value << endl;
-				idbassert(col < colsVals.size());
-				colsVals[col].push_back(value);
-				continue;
-			}
-			switch (fetchColTypes[col])
-			{
-				case CalpontSystemCatalog::DATE:
-				{
-					intColVal = row.getUintField<4>(col);
-					value = DataConvert::dateToString(intColVal);
-					break;
-				}
-				case CalpontSystemCatalog::DATETIME:
-				{
-					intColVal = row.getUintField<8>(col);
-					value = DataConvert::datetimeToString(intColVal);
-					break;
-				}
-				case CalpontSystemCatalog::CHAR:
-				case CalpontSystemCatalog::VARCHAR:
-				{
-					value = row.getStringField(col);
-					unsigned i = strlen(value.c_str());
-					value = value.substr(0, i);
-					break;
-				}
-				case CalpontSystemCatalog::VARBINARY:
-				{
-					value = row.getVarBinaryStringField(col);
-					break;
-				}
-				case CalpontSystemCatalog::BIGINT:
-				{
-					intColVal = row.getIntField<8>(col);
-					if ( fetchColScales[col]<= 0)
-					{
-						ostringstream os;
-						os << intColVal;
-						value = os.str();
-					}
-					break;
-				}
-				case CalpontSystemCatalog::INT:
-				{
-					intColVal = row.getIntField<4>(col);
-					if (fetchColScales[col] <= 0)
-					{
-						ostringstream os;
-						os << intColVal;
-						value = os.str();
-					}
-					break;
-				}
-				case CalpontSystemCatalog::SMALLINT:
-				{
-					intColVal = row.getIntField<2>(col);
-					if (fetchColScales[col] <= 0)
-					{
-						ostringstream os;
-						os << intColVal;
-						value = os.str();
-					}
-					break;
-				}
-				case CalpontSystemCatalog::TINYINT:
-				{
-					intColVal = row.getIntField<1>(col);
-					if (fetchColScales[col] <= 0)
-					{
-						ostringstream os;
-						os << intColVal;
-						value = os.str();
-					}
-					break;
-				}
-				case CalpontSystemCatalog::DECIMAL:
-				{
-					if (fetchColColwidths[col] == execplan::CalpontSystemCatalog::ONE_BYTE)
-					{
-									intColVal = row.getIntField<1>(col);
-									ostringstream os;
-									os << intColVal;
-									value = os.str();
-					}
-					else if (fetchColColwidths[col] == execplan::CalpontSystemCatalog::TWO_BYTE)
-					{
-						intColVal = row.getIntField<2>(col);
-						ostringstream os;
-						os << intColVal;
-						value = os.str();
-					}
-					else if (fetchColColwidths[col] == execplan::CalpontSystemCatalog::FOUR_BYTE)
-					{
-						intColVal = row.getIntField<4>(col);
-						ostringstream os;
-						os << intColVal;
-						value = os.str();
-					}
-					else if (fetchColColwidths[col] == execplan::CalpontSystemCatalog::EIGHT_BYTE)
-					{
-						intColVal = row.getIntField<8>(col);
-						ostringstream os;
-						os << intColVal;
-						value = os.str();
-					}
-					else
-					{
-						value = row.getStringField(col);
-						unsigned i = strlen(value.c_str());
-						value = value.substr(0, i);
-					}
-					break;
-				}
-				//In this case, we're trying to load a double output column with float data. This is the
-				// case when you do sum(floatcol), e.g.
-				case CalpontSystemCatalog::FLOAT:
-				{
-					float dl = row.getFloatField(col);
-					if (dl == std::numeric_limits<float>::infinity())
-						continue;
-					ostringstream os;	
-					//@Bug 3350 fix the precision.
-					os << setprecision(7) << dl;
-					value = os.str();
-					break;
-				}
-				case CalpontSystemCatalog::DOUBLE:
-				{								
-					double dl = row.getDoubleField(col);
-					if (dl == std::numeric_limits<double>::infinity())
-						continue;
-					ostringstream os;	
-					//@Bug 3350 fix the precision.
-					os <<setprecision(16)<< dl;
-					value = os.str();
-					break;
-				}
-				default:	// treat as int64
-				{
-					ostringstream os;
-					intColVal = row.getUintField<8>(col);
-					os << intColVal;
-					value = os.str();
-					break;
-				}
-			}
-						
-			if (fetchColScales[col] > 0)
-			{
-				long long int_val = (long long)intColVal;
-				const int ctmp_size = 65+1+1+1;
-				char ctmp[ctmp_size] = {0};
-				snprintf(ctmp, ctmp_size, "%lld", int_val);
-				size_t l1 = strlen(ctmp);
-				char* ptr = &ctmp[0];
-				if (int_val < 0)
-				{
-					ptr++;
-					idbassert(l1 >= 2);
-					l1--;
-				}
-
-				if ((unsigned)fetchColScales[col] > l1)
-				{
-					const char* zeros = "0000000000000000000"; //19 0's
-					size_t diff = fetchColScales[col] - l1; //this will always be > 0
-					memmove((ptr + diff), ptr, l1 + 1); //also move null
-					memcpy(ptr, zeros, diff);
-					l1 = 0;
-				}
-				else
-					l1 -= fetchColScales[col];
-				memmove((ptr + l1 + 1), (ptr + l1), fetchColScales[col] + 1); //also move null
-				*(ptr + l1) = '.';
-							
-				value = ctmp;
-				string::size_type pos = value.find_first_of(".");
-				if (pos == 0)
-				value.insert(0,"0");
-			}
-						
-			//cout << "update got value " << value << endl;
-			idbassert(col < colsVals.size());
-			colsVals[col].push_back(value);
-		}
-		//timer.stop("fetchval");
-	}
-	
-	//Build structures for wrapper function
-	unsigned colSel = 0;
-	int error = 0;
-	//timer.start("buildval");
-	for (unsigned int j = 0; j < columnsUpdated.size(); j++)
-	{
-		WriteEngine::ColTupleList colTupleList;
-		tableColName.column  = columnsUpdated[j]->get_Name();
-		try {
-			oid = systemCatalogPtr->lookupOID(tableColName);
-		}
-		catch  (std::exception& ex)
-		{
-			rc = 1;
-			ostringstream oss;
-			oss << "lookupOID got exception " << ex.what() << " with column " << tableColName.schema << "." << tableColName.table << "." << tableColName.column;
-			err = oss.str();
-		}
-		catch ( ... )
-		{
-			rc = 1;
-			ostringstream oss;
-			oss <<  "lookupOID got unknown exception with column " << tableColName.schema << "." << tableColName.table << "." << tableColName.column;
-			err = oss.str();
-		}
-			
-		if (rc != 0)
-			return rc;
-				
-		CalpontSystemCatalog::ColType colType;
-		try {
-			colType = systemCatalogPtr->colType(oid);
-		}
-		catch  (std::exception& ex)
-		{
-			rc = 1;
-			ostringstream oss;
-			oss << "colType got exception " << ex.what() << " with column oid " << oid;
-			err = oss.str();
-		}
-		catch ( ... )
-		{
-			rc = 1;
-			ostringstream oss;
-			oss << "colType got unknown exception with column oid " << oid;
-			err = oss.str();
-		}
-			
-		if (rc !=0)
-			return rc;
-				
-		colStruct.dataOid = oid;
-		colStruct.colDataType = (WriteEngine::ColDataType)colType.colDataType;
-		colStruct.tokenFlag = false;
-		colStruct.fCompressionType = colType.compressionType;
-		if (isDictCol(colType))
-		{
-			colStruct.colWidth = 8;
-			colStruct.tokenFlag = true;
-			dctnryStruct.dctnryOid = colType.ddn.dictOID;
-			dctnryStruct.columnOid = colStruct.dataOid;
-			dctnryStruct.fCompressionType = colType.compressionType;
-			dctnryStruct.colWidth = colType.colWidth;
-			if (NO_ERROR != (error = fWEWrapper.openDctnry (txnId, dctnryStruct)))
-			{
-				WErrorCodes ec;
-				err = ec.errorString(error);
-				rc = error;
-				return rc;
-			}
-			if (columnsUpdated[j]->get_isFromCol())
-			{	
-				std::vector < std::string > colValues = colsVals[colSel++];
-				for (unsigned row = 0; row < colValues.size(); row++)
-				{
-					//@bug 3582. Check the real scale
-					uint32_t funcScale = columnsUpdated[j]->get_funcScale();
-					if (funcScale != 0)
-					{
-						string::size_type pos = colValues[row].find_first_of("."); //decimal point
-						if ( pos >= colValues[row].length() )
-							colValues[row].insert(colValues[row].length(),".");
-						//padding 0 if needed
-						pos = colValues[row].find_first_of(".");
-						uint32_t digitsAfterPoint = colValues[row].length() - pos - 1;
-						for (uint32_t i=0; i < (funcScale-digitsAfterPoint); i++)
-						{
-							colValues[row] += "0";
-						}
-					}
-					//check data length
-
-					if (colValues[row].length() > (unsigned int)colType.colWidth)
-					{
-						colValues[row] = colValues[row].substr(0, colType.colWidth);
-						pushWarning = true;
-					}
-						 
-						
-					if (colValues[row].compare ("") == 0) //Null value is not stored in dictionary file.
-					{
-						WriteEngine::Token nullToken;
-						colTuple.data = nullToken;
-					}
-					else
-					{							
-						WriteEngine::DctnryTuple dctTuple;
-						memcpy(dctTuple.sigValue, colValues[row].c_str(), colValues[row].length());
-						dctTuple.sigSize = colValues[row].length();
-						dctTuple.isNull = false;
-						error = fWEWrapper.tokenize(txnId,dctTuple, colType.compressionType);
-						if (error != NO_ERROR)
-						{
-							fWEWrapper.closeDctnry(txnId, colType.compressionType);
-							WErrorCodes ec;
-							err = ec.errorString(error);
-							rc = error;
-							return rc;
-						}
-						colTuple.data = dctTuple.token;
-					}
-					colTupleList.push_back (colTuple);
-				}
-				fWEWrapper.closeDctnry(txnId, colType.compressionType);
-			}	
-			else //constant
-			{
-				if (columnsUpdated[j]->get_isnull())
-				{
-					WriteEngine::Token nullToken;
-					colTuple.data = nullToken;
-				}
-				else
-				{
-					value = columnsUpdated[j]->get_Data();
-						
-					if (value.length() > (unsigned int)colType.colWidth)
-					{
-						value = value.substr(0, colType.colWidth);
-						pushWarning = true;
-						if (!pushWarning)
-						{
-							pushWarning = true;
-						}
-					}
-					WriteEngine::DctnryTuple dctTuple;
-					memcpy(dctTuple.sigValue, value.c_str(), value.length());
-					dctTuple.sigSize = value.length();
-					dctTuple.isNull = false;
-					error = fWEWrapper.tokenize(txnId, dctTuple, colType.compressionType);
-					if (error != NO_ERROR)
-					{
-						fWEWrapper.closeDctnry(txnId, colType.compressionType);
-						WErrorCodes ec;
-						err = ec.errorString(error);
-						rc = error;
-						return rc;
-					}
-					colTuple.data = dctTuple.token;
-					fWEWrapper.closeDctnry(txnId, colType.compressionType); // Constant only need to tokenize once.
-				}
-
-				for (unsigned row = 0; row < rowsThisRowgroup; row++)
-					colTupleList.push_back (colTuple);
-			}
-		}
-		else
-		{
-			colStruct.colWidth = colType.colWidth;
-			if (columnsUpdated[j]->get_isFromCol())
-			{
-				std::vector < std::string > colValues = colsVals[colSel++];
-				for (unsigned row = 0; row < colValues.size(); row++)
-				{
-					if (colValues[row].compare ("") == 0)
-						isNull = true;
-					else
-						isNull = false;
-							
-					//@bug 3582. Check the real scale
-					uint32_t funcScale = columnsUpdated[j]->get_funcScale();
-					if (funcScale != 0)
-					{
-						string::size_type pos = colValues[row].find_first_of("."); //decimal point
-						if ( pos >= colValues[row].length() )
-							colValues[row].insert(colValues[row].length(),".");
-						//padding 0 if needed
-						pos = colValues[row].find_first_of(".");
-						uint32_t digitsAfterPoint = colValues[row].length() - pos -1;
-						for (uint32_t i=0; i < (funcScale-digitsAfterPoint); i++)
-						{
-							colValues[row] += "0";
-						}
-					}
-
-					try {
-						datavalue = DataConvert::convertColumnData(colType, colValues[row], pushWarning, isNull);
-					}
-					catch (exception&)
-					{
-						//@Bug 2624. Error out on conversion failure
-						rc = 1;
-						Message::Args args;
-						args.add(string("'") + colValues[row] + string("'"));
-						err = IDBErrorInfo::instance()->errorMsg(ERR_NON_NUMERIC_DATA, args);
-						return rc;
-					}
-					colTuple.data = datavalue;
-					colTupleList.push_back (colTuple);
-					if (!pushWarning)
-					{
-						pushWarning = true;
-					}
-				}
-			}
-			else //constant
-			{
-				if (columnsUpdated[j]->get_isnull())
-				{
-					isNull = true;
-				}
-				else
-				{
-					isNull = false;
-				}
-
-				string inData (columnsUpdated[j]->get_Data());
-				uint64_t nextVal = 0;
-				if (colType.autoincrement)
-				{
-					try {
-						nextVal = systemCatalogPtr->nextAutoIncrValue(tableName);
-						fDbrm.startAISequence(oid, nextVal, colType.colWidth);
-					}
-					catch (std::exception& ex)
-					{
-						err = ex.what();
-						rc = 1;
-						return rc;
-					}
-				}
-				if (colType.autoincrement && ( isNull || (inData.compare("0")==0)))
-				{
-					//reserve nextVal
-					try {
-						bool reserved = fDbrm.getAIRange(oid, rowsThisRowgroup, &nextVal);
-						if (!reserved)
-						{
-							err = IDBErrorInfo::instance()->errorMsg(ERR_EXCEED_LIMIT);
-							rc = 1;
-							return rc;
-						}
-					}
-					catch (std::exception& ex)
-					{
-						err = ex.what();
-						rc = 1;
-						return rc;
-					}
-					isNull = false;
-					for (unsigned row = 0; row < rowsThisRowgroup; row++)
-					{
-							
-						ostringstream oss;
-						oss << nextVal++;
-						inData = oss.str();
-						try {
-							datavalue = DataConvert::convertColumnData(colType, inData, pushWarning, isNull);
-						}
-						catch (exception&)
-						{
-							//@Bug 2624. Error out on conversion failure
-							rc = 1;
-							Message::Args args;
-							args.add(string("'") + inData + string("'"));
-							err = IDBErrorInfo::instance()->errorMsg(ERR_NON_NUMERIC_DATA, args);
-						}
-						colTuple.data = datavalue;
-						colTupleList.push_back (colTuple);
-					}
-				}
-				else
-				{
-					bool pushWarn = false;
-					try {
-						datavalue = DataConvert::convertColumnData(colType, inData, pushWarn, isNull);
-					}
-					catch (exception&)
-					{
-						//@Bug 2624. Error out on conversion failure
-						rc = 1;
-						Message::Args args;
-						args.add(string("'") + inData + string("'"));
-						err = IDBErrorInfo::instance()->errorMsg(ERR_NON_NUMERIC_DATA, args);
-						return rc;
-					}
-					colTuple.data = datavalue;
-					if (!pushWarning)
-					{
-						pushWarning = pushWarn;
-					}
-					for (unsigned row = 0; row < rowsThisRowgroup; row++)
-						colTupleList.push_back (colTuple);
-				}
-			}								
-		}
-		colStructList.push_back(colStruct);
-		colValueList.push_back (colTupleList);
-	}
-	//timer.stop("buildval");
-	if (rowIDLists.size() > 0)	
-	{
-		//timer.start("updateColumnRecs");
-		error = fWEWrapper.updateColumnRecs(txnId, colStructList, colValueList,  rowIDLists);	
-		//timer.stop("updateColumnRecs");
-	}
-		
-	if (error != NO_ERROR)
-	{
-		rc = error;
-		WErrorCodes ec;
-		err = ec.errorString(error);
-
-		if (error == ERR_BRM_DEAD_LOCK)
-		{
-			rc = dmlpackageprocessor::DMLPackageProcessor::DEAD_LOCK_ERROR;
-		}
-		else if (error == ERR_BRM_VB_OVERFLOW)
-		{
-			rc = dmlpackageprocessor::DMLPackageProcessor::VB_OVERFLOW_ERROR;
-			err = IDBErrorInfo::instance()->errorMsg(ERR_VERSIONBUFFER_OVERFLOW);
-		}
-	}	
 	return rc;
 }
 
@@ -3030,10 +2292,10 @@ uint8_t WE_DMLCommandProc::processFlushFiles(messageqcpp::ByteStream& bs, std::s
 	return rc;
 }
 
-uint8_t WE_DMLCommandProc::processDelete(messageqcpp::ByteStream& bs, 
-	                                       std::string & err, 
-	                                       ByteStream::quadbyte & PMId,
-	                                       uint64_t& blocksChanged)
+uint8_t WE_DMLCommandProc::processDelete(messageqcpp::ByteStream& bs,
+										 std::string & err,
+										 ByteStream::quadbyte & PMId,
+										 uint64_t& blocksChanged)
 {
 	uint8_t rc = 0;
 	//cout << " In processDelete" << endl;
@@ -3046,7 +2308,7 @@ uint8_t WE_DMLCommandProc::processDelete(messageqcpp::ByteStream& bs,
 	string schema, tableName;
 	bs >> schema;
 	bs >> tableName;
-	
+
 	if (!rowGroups[txnId]) //meta data
 	{
 		rowGroups[txnId] = new rowgroup::RowGroup();
@@ -3060,13 +2322,14 @@ uint8_t WE_DMLCommandProc::processDelete(messageqcpp::ByteStream& bs,
 	WriteEngine::RIDList  rowIDList;
 	CalpontSystemCatalog::RID rid;
 	uint32_t rowsThisRowgroup = rowGroups[txnId]->getRowCount();
-	uint16_t dbRoot, segment;
+	uint16_t dbRoot, segment, blockNum;
 	uint32_t partition;
-	CalpontSystemCatalog::TableName aTableName;	
+	uint8_t extentNum;
+	CalpontSystemCatalog::TableName aTableName;
 	aTableName.schema = schema;
-	aTableName.table = tableName; 
+	aTableName.table = tableName;
 	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr =
-    CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
+	CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 	CalpontSystemCatalog::RIDList tableRidList;
 	try {
 		tableRidList = systemCatalogPtr->columnRIDs(aTableName, true);
@@ -3076,9 +2339,8 @@ uint8_t WE_DMLCommandProc::processDelete(messageqcpp::ByteStream& bs,
 		err = ex.what();
 		rc = 1;
 		return rc;
-			
 	}
-	
+
 	// querystats
 	uint64_t relativeRID = 0;
 	boost::scoped_array<int> preBlkNums(new int[row.getColumnCount()]);
@@ -3091,15 +2353,24 @@ uint8_t WE_DMLCommandProc::processDelete(messageqcpp::ByteStream& bs,
 		colWidth[j] = (row.getColumnWidth(j) >= 8 ? 8 : row.getColumnWidth(j));
 	}
 
+	//Get the file information from rowgroup
+	dbRoot = rowGroups[txnId]->getDBRoot();
+	rowGroups[txnId]->getLocation(&partition, &segment, &extentNum, &blockNum);
+	WriteEngine::ColStructList colStructList;
+	WriteEngine::ColStruct colStruct;
+	colStruct.fColPartition = partition;
+	colStruct.fColSegment = segment;
+	colStruct.fColDbRoot = dbRoot;
 
 	for (unsigned i = 0; i < rowsThisRowgroup; i++)
 	{
 		rowGroups[txnId]->getRow(i, &row);
 		rid = row.getRid();
 		relativeRID = rid - rowGroups[txnId]->getBaseRid();
-		convertRidToColumn (rid, partition, segment);
+		rid = relativeRID;
+		convertToRelativeRid (rid, extentNum, blockNum);
 		rowIDList.push_back(rid);
-		
+
 		// populate stats.blocksChanged
 		for (uint j = 0; j < row.getColumnCount(); j++)
 		{
@@ -3111,39 +2382,27 @@ uint8_t WE_DMLCommandProc::processDelete(messageqcpp::ByteStream& bs,
 		}
 	}
 
-	//Find the partition, segment, dbroot info for this rowgroup.
-	rowGroups[txnId]->getRow(0, &row);
-	rid = row.getRid();
-	dbRoot = rowGroups[txnId]->getDBRoot();
-	WriteEngine::ColStructList colStructList;	
-	WriteEngine::ColStruct colStruct;
-	//get file info													
-	convertRidToColumn (rid, partition, segment);
-	colStruct.fColPartition = partition;
-	colStruct.fColSegment = segment;
-	colStruct.fColDbRoot = dbRoot;
-	
 	try {
-	  for (unsigned i = 0; i < tableRidList.size(); i++)	
+	  for (unsigned i = 0; i < tableRidList.size(); i++)
 	  {
 		CalpontSystemCatalog::ColType colType;
-        colType = systemCatalogPtr->colType( tableRidList[i].objnum );
+		colType = systemCatalogPtr->colType( tableRidList[i].objnum );
 		colStruct.dataOid = tableRidList[i].objnum;
-        colStruct.tokenFlag = false;
+		colStruct.tokenFlag = false;
 		colStruct.fCompressionType = colType.compressionType;
-        if (colType.colWidth > 8)         //token
-        {
-          colStruct.colWidth = 8;
-          colStruct.tokenFlag = true;
-        }
-        else
-        {
-          colStruct.colWidth = colType.colWidth;
-        }
+		if (colType.colWidth > 8)		 //token
+		{
+		  colStruct.colWidth = 8;
+		  colStruct.tokenFlag = true;
+		}
+		else
+		{
+		  colStruct.colWidth = colType.colWidth;
+		}
 
-        colStruct.colDataType = (WriteEngine::ColDataType)colType.colDataType;
+		colStruct.colDataType = colType.colDataType;
 
-        colStructList.push_back( colStruct );
+		colStructList.push_back( colStruct );
 	  }
 	}
 	catch (exception& ex)
@@ -3151,9 +2410,9 @@ uint8_t WE_DMLCommandProc::processDelete(messageqcpp::ByteStream& bs,
 		err = ex.what();
 		rc = 1;
 		return rc;
-			
+
 	}
-		
+
 	std::vector<ColStructList> colExtentsStruct;
 	std::vector<void *> colOldValueList;
 	std::vector<RIDList> ridLists;
@@ -3180,7 +2439,7 @@ uint8_t WE_DMLCommandProc::processDelete(messageqcpp::ByteStream& bs,
 				rc = dmlpackageprocessor::DMLPackageProcessor::VB_OVERFLOW_ERROR;
 				err = IDBErrorInfo::instance()->errorMsg(ERR_VERSIONBUFFER_OVERFLOW);
 			}
-	}	
+	}
 	//cout << "WES return rc " << (int)rc << " with msg " << err << endl;
 	return rc;
 }
@@ -3188,14 +2447,13 @@ uint8_t WE_DMLCommandProc::processDelete(messageqcpp::ByteStream& bs,
 uint8_t WE_DMLCommandProc::processRemoveMeta(messageqcpp::ByteStream& bs, std::string & err)
 {
 	uint8_t rc = 0;
-	//cout << "In processRemoveMeta" << endl;
-	if (!fRBMetaWriter.get())
-		return rc;
-		
-	try 
+	uint32_t tableOID;
+
+	try
 	{
-		fRBMetaWriter->deleteFile();
-		fRBMetaWriter.reset();
+		bs >> tableOID;
+
+		BulkRollbackMgr::deleteMetaFile( tableOID );
 	}
 	catch(exception & ex)
 	{
@@ -3228,15 +2486,15 @@ uint8_t WE_DMLCommandProc::processBulkRollback(messageqcpp::ByteStream& bs,
 
 		bs >> tableOID;
 		std::cout << "; tableOID-" << tableOID;
-		
+
 		bs >> tableName;
 		if (tableName.length() == 0)
 		{
 			boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr =
 			CalpontSystemCatalog::makeCalpontSystemCatalog(0);
-			CalpontSystemCatalog::TableName aTableName = systemCatalogPtr->tableName(tableOID);	
+			CalpontSystemCatalog::TableName aTableName = systemCatalogPtr->tableName(tableOID);
 			tableName = aTableName.toString();
-			
+
 		}
 		std::cout << "; table-"    << tableName;
 
@@ -3274,19 +2532,19 @@ uint8_t WE_DMLCommandProc::processBulkRollbackCleanup(
 	uint8_t rc = 0;
 	err.clear();
 
-    try {
-        uint32_t tableOID;
+	try {
+		uint32_t tableOID;
 
 		// May want to eventually comment out this logging to stdout,
 		// but it shouldn't hurt to keep in here.
 		std::cout << "processBulkRollbackCleanup";
-        bs >> tableOID;
+		bs >> tableOID;
 		std::cout << ": tableOID-" << tableOID << std::endl;
 
-        BulkRollbackMgr::deleteMetaFile( tableOID );
-    }
-    catch(exception& ex)
-    {
+		BulkRollbackMgr::deleteMetaFile( tableOID );
+	}
+	catch(exception& ex)
+	{
 		std::cout << "processBulkRollbackCleanup: exception-" << ex.what() <<
 			std::endl;
 		err = ex.what();
@@ -3296,7 +2554,7 @@ uint8_t WE_DMLCommandProc::processBulkRollbackCleanup(
 	return rc;
 }
 
-	uint8_t WE_DMLCommandProc::updateSyscolumnNextval(ByteStream& bs, std::string & err) 
+	uint8_t WE_DMLCommandProc::updateSyscolumnNextval(ByteStream& bs, std::string & err)
 	{
 		uint32_t columnOid, sessionID;
 		uint64_t nextVal;
@@ -3304,271 +2562,14 @@ uint8_t WE_DMLCommandProc::processBulkRollbackCleanup(
 		bs >> columnOid;
 		bs >> nextVal;
 		bs >> sessionID;
-		
-		rc = fWEWrapper.updateNextValue(columnOid, nextVal, sessionID); 	
+
+		rc = fWEWrapper.updateNextValue(columnOid, nextVal, sessionID);
 		if (rc != 0)
 		{
 			err = "Error in WE::updateNextValue";
 			rc =1;
 		}
-			
+
 		return rc;
 	}
-//------------------------------------------------------------------------------
-// Validates the correctness of the current HWMs for this table.
-// The HWMs for all the 1 byte columns should be identical.  Same goes
-// for all the 2 byte columns, etc.  The 2 byte column HWMs should be
-// "roughly" (but not necessarily exactly) twice that of a 1 byte column.
-// Same goes for the 4 byte column HWMs vs their 2 byte counterparts, etc.
-// ridList - columns oids to be used to get column width on to use with validation.
-// segFileInfo - Vector of File objects carrying current DBRoot, partition,
-//            HWM, etc to be validated for the columns belonging to jobTable.
-// stage    - Current stage we are validating.  "Starting" or "Ending".
-//------------------------------------------------------------------------------
-int WE_DMLCommandProc::validateColumnHWMs(
-    CalpontSystemCatalog::RIDList& ridList,
-    boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr,
-    const std::vector<DBRootExtentInfo>& segFileInfo,
-    const char* stage )
-{
-    int rc = NO_ERROR;
-
-    // Used to track first 1-byte, 2-byte, 4-byte, and 8-byte columns in table
-    int byte1First = -1;
-    int byte2First = -1;
-    int byte4First = -1;
-    int byte8First = -1;
-
-    // Make sure the HWMs for all 1-byte columns match; same for all 2-byte,
-    // 4-byte, and 8-byte columns as well.
-    CalpontSystemCatalog::ColType colType;
-    Convertor convertor;
-    for (unsigned k=0; k<segFileInfo.size(); k++)
-    {
-        int k1 = 0;
-
-        // Find out column width
-        colType = systemCatalogPtr->colType(ridList[k].objnum);
-        
-		colType.colWidth = convertor.getCorrectRowWidth((WriteEngine::ColDataType)colType.colDataType, colType.colWidth);
-        // Find the first 1-byte, 2-byte, 4-byte, and 8-byte columns.
-        // Use those as our reference HWM for the respective column widths.
-        switch ( colType.colWidth )
-        {
-            case 1:
-            {
-                if (byte1First == -1)
-                    byte1First = k;
-                k1 = byte1First;
-                break;
-            }
-            case 2:
-            {
-                if (byte2First == -1)
-                    byte2First = k;
-                k1 = byte2First;
-                break;
-            }
-            case 4:
-            {
-                if (byte4First == -1)
-                    byte4First = k;
-                k1 = byte4First;
-                break;
-            }
-            case 8:
-            default:
-            {
-                if (byte8First == -1)
-                    byte8First = k;
-                k1 = byte8First;
-                break;
-            }
-        } // end of switch based on column width (1,2,4, or 8)
-
-//std::cout << "dbg: comparing0 " << stage << " refcol-" << k1 <<
-//  "; wid-" << jobColK1.width << "; hwm-" << segFileInfo[k1].fLocalHwm <<
-//  " <to> col-" << k <<
-//  "; wid-" << jobColK.width << " ; hwm-"<<segFileInfo[k].fLocalHwm<<std::endl;
-
-        // Validate that the HWM for this column (k) matches that of the
-        // corresponding reference column with the same width.
-        if ((segFileInfo[k1].fDbRoot    != segFileInfo[k].fDbRoot)    ||
-            (segFileInfo[k1].fPartition != segFileInfo[k].fPartition) ||
-            (segFileInfo[k1].fSegment   != segFileInfo[k].fSegment)   ||
-            (segFileInfo[k1].fLocalHwm  != segFileInfo[k].fLocalHwm))
-        {
-			CalpontSystemCatalog::ColType colType2;
-			colType2 = systemCatalogPtr->colType(ridList[k1].objnum);
-            ostringstream oss;
-            oss << stage << " HWMs do not match for"
-                " OID1-"       << ridList[k1].objnum              <<
-                "; DBRoot-"    << segFileInfo[k1].fDbRoot      <<
-                "; partition-" << segFileInfo[k1].fPartition   <<
-                "; segment-"   << segFileInfo[k1].fSegment     <<
-                "; hwm-"       << segFileInfo[k1].fLocalHwm    <<
-                "; width-"     << colType2.colWidth << ':'<<std::endl<<
-                " and OID2-"   << ridList[k].objnum               <<
-                "; DBRoot-"    << segFileInfo[k].fDbRoot       <<
-                "; partition-" << segFileInfo[k].fPartition    <<
-                "; segment-"   << segFileInfo[k].fSegment      <<
-                "; hwm-"       << segFileInfo[k].fLocalHwm     <<
-                "; width-"     << colType.colWidth;
-            fLog.logMsg( oss.str(), ERR_UNKNOWN, MSGLVL_ERROR );
-            return ERR_BRM_HWMS_NOT_EQUAL;
-        }
-
-        // HWM DBRoot, partition, and segment number should match for all
-        // columns; so compare DBRoot, part#, and seg# with first column.
-        if ((segFileInfo[0].fDbRoot    != segFileInfo[k].fDbRoot)    ||
-            (segFileInfo[0].fPartition != segFileInfo[k].fPartition) ||
-            (segFileInfo[0].fSegment   != segFileInfo[k].fSegment))
-        {
-			CalpontSystemCatalog::ColType colType2;
-			colType2 = systemCatalogPtr->colType(ridList[0].objnum);
-            ostringstream oss;
-            oss << stage << " HWM DBRoot,Part#, or Seg# do not match for"
-                " OID1-"       << ridList[0].objnum               <<
-                "; DBRoot-"    << segFileInfo[0].fDbRoot       <<
-                "; partition-" << segFileInfo[0].fPartition    <<
-                "; segment-"   << segFileInfo[0].fSegment      <<
-                "; hwm-"       << segFileInfo[0].fLocalHwm     <<
-                "; width-"     << colType2.colWidth << ':'<<std::endl<<
-                " and OID2-"   << ridList[k].objnum               <<
-                "; DBRoot-"    << segFileInfo[k].fDbRoot       <<
-                "; partition-" << segFileInfo[k].fPartition    <<
-                "; segment-"   << segFileInfo[k].fSegment      <<
-                "; hwm-"       << segFileInfo[k].fLocalHwm     <<
-                "; width-"     << colType.colWidth;
-            fLog.logMsg( oss.str(), ERR_UNKNOWN, MSGLVL_ERROR );
-            return ERR_BRM_HWMS_NOT_EQUAL;
-        }
-    } // end of loop to compare all 1-byte HWMs, 2-byte HWMs, etc.
-
-    // Validate/compare HWM for 1-byte column in relation to 2-byte column, etc.
-    // Without knowing the exact row count, we can't extrapolate the exact HWM
-    // for the wider column, but we can narrow it down to an expected range.
-    int refCol = 0;
-    int colIdx = 0;
-
-    // Validate/compare HWMs given a 1-byte column as a starting point
-    if (byte1First >= 0)
-    {
-        refCol = byte1First;
-
-        if (byte2First >= 0)
-        {
-            HWM hwmLo = segFileInfo[byte1First].fLocalHwm * 2;
-            HWM hwmHi = hwmLo + 1;
-            if ((segFileInfo[byte2First].fLocalHwm < hwmLo) ||
-                (segFileInfo[byte2First].fLocalHwm > hwmHi))
-            {
-                colIdx = byte2First;
-                rc     = ERR_BRM_HWMS_OUT_OF_SYNC;
-                goto errorCheck;
-            }
-        }
-        if (byte4First >= 0)
-        {
-            HWM hwmLo = segFileInfo[byte1First].fLocalHwm * 4;
-            HWM hwmHi = hwmLo + 3;
-            if ((segFileInfo[byte4First].fLocalHwm < hwmLo) ||
-                (segFileInfo[byte4First].fLocalHwm > hwmHi))
-            {
-                colIdx = byte4First;
-                rc     = ERR_BRM_HWMS_OUT_OF_SYNC;
-                goto errorCheck;
-            }
-        }
-        if (byte8First >= 0)
-        {
-            HWM hwmLo = segFileInfo[byte1First].fLocalHwm * 8;
-            HWM hwmHi = hwmLo + 7;
-            if ((segFileInfo[byte8First].fLocalHwm < hwmLo) ||
-                (segFileInfo[byte8First].fLocalHwm > hwmHi))
-            {
-                colIdx = byte8First;
-                rc     = ERR_BRM_HWMS_OUT_OF_SYNC;
-                goto errorCheck;
-            }
-        }
-    }
-
-    // Validate/compare HWMs given a 2-byte column as a starting point
-    if (byte2First >= 0)
-    {
-        refCol = byte2First;
-
-        if (byte4First >= 0)
-        {
-            HWM hwmLo = segFileInfo[byte2First].fLocalHwm * 2;
-            HWM hwmHi = hwmLo + 1;
-            if ((segFileInfo[byte4First].fLocalHwm < hwmLo) ||
-                (segFileInfo[byte4First].fLocalHwm > hwmHi))
-            {
-                colIdx = byte4First;
-                rc     = ERR_BRM_HWMS_OUT_OF_SYNC;
-                goto errorCheck;
-            }
-        }
-        if (byte8First >= 0)
-        {
-            HWM hwmLo = segFileInfo[byte2First].fLocalHwm * 4;
-            HWM hwmHi = hwmLo + 3;
-            if ((segFileInfo[byte8First].fLocalHwm < hwmLo) ||
-                (segFileInfo[byte8First].fLocalHwm > hwmHi))
-            {
-                colIdx = byte8First;
-                rc     = ERR_BRM_HWMS_OUT_OF_SYNC;
-                goto errorCheck;
-            }
-        }
-    }
-
-    // Validate/compare HWMs given a 4-byte column as a starting point
-    if (byte4First >= 0)
-    {
-        refCol = byte4First;
-
-        if (byte8First >= 0)
-        {
-            HWM hwmLo = segFileInfo[byte4First].fLocalHwm * 2;
-            HWM hwmHi = hwmLo + 1;
-            if ((segFileInfo[byte8First].fLocalHwm < hwmLo) ||
-                (segFileInfo[byte8First].fLocalHwm > hwmHi))
-            {
-                colIdx = byte8First;
-                rc     = ERR_BRM_HWMS_OUT_OF_SYNC;
-                goto errorCheck;
-            }
-        }
-    }
-
-// To avoid repeating this message 6 times in the preceding source code, we
-// use the "dreaded" goto to branch to this single place for error handling.
-errorCheck:
-    if (rc != NO_ERROR)
-    {
-		CalpontSystemCatalog::ColType colType1, colType2;
-		colType1 = systemCatalogPtr->colType(ridList[refCol].objnum);
-		colType2 = systemCatalogPtr->colType(ridList[colIdx].objnum);
-        ostringstream oss;
-        oss << stage << " HWMs are not in sync for"
-            " OID1-"       << ridList[refCol].objnum                <<
-            "; DBRoot-"    << segFileInfo[refCol].fDbRoot      <<
-            "; partition-" << segFileInfo[refCol].fPartition   <<
-            "; segment-"   << segFileInfo[refCol].fSegment     <<
-            "; hwm-"       << segFileInfo[refCol].fLocalHwm    <<
-            "; width-"     << colType1.colWidth<< ':'<<std::endl<<
-            " and OID2-"   << ridList[colIdx].objnum                 <<
-            "; DBRoot-"    << segFileInfo[colIdx].fDbRoot      <<
-            "; partition-" << segFileInfo[colIdx].fPartition   <<
-            "; segment-"   << segFileInfo[colIdx].fSegment     <<
-            "; hwm-"       << segFileInfo[colIdx].fLocalHwm    <<
-            "; width-"     << colType2.colWidth;
-        fLog.logMsg( oss.str(), ERR_UNKNOWN, MSGLVL_ERROR );
-    }
-
-    return rc;
-}
 }

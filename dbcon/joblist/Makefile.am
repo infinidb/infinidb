@@ -82,6 +82,7 @@ include_HEADERS = \
         distributedenginecomm.h \
         elementcompression.h \
         elementtype.h \
+        errorinfo.h \
         fifo.h \
         groupconcat.h \
         jl_logger.h \
