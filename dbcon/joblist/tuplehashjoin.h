@@ -194,6 +194,9 @@ public:
 	/* UM Join logic */
 	boost::shared_array<uint8_t> joinOneRG(boost::shared_array<uint8_t> input);
 
+	uint32_t tokenJoin() const { return fTokenJoin; }
+	void tokenJoin(uint32_t k) { fTokenJoin = k;    }
+
 private:
 	TupleHashJoinStep();
 	TupleHashJoinStep(const TupleHashJoinStep &);
@@ -373,6 +376,9 @@ private:
 	std::vector<std::string> smallTableNames;
 	bool isExeMgr;
 	uint lastSmallOuterJoiner;
+
+	//@bug5958 & 6117, stores the table key for identify token join
+	uint32_t fTokenJoin;
 };
 
 }

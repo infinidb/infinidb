@@ -57,14 +57,14 @@ using namespace funcexp;
 
 namespace joblist
 {
-	
+
 TupleHashJoinStep::TupleHashJoinStep(uint32_t ses, uint32_t stmt, uint32_t txn, ResourceManager *rm,
 	bool exemgr)
 	: joinType(INIT), sessionID(ses), statementID(stmt), txnID(txn), fTableOID1(0), fTableOID2(0),
 	fOid1(0), fOid2(0), fDictOid1(0), fDictOid2(0), fSequence1(-1), fSequence2(-1),
 	fTupleId1(-1), fTupleId2(-1), fCorrelatedSide(0), resourceManager(rm), totalUMMemoryUsage(0),
 	isDelivery(false), runRan(false), joinRan(false), largeSideIndex(1), joinIsTooBig(false),
-	isExeMgr(exemgr), lastSmallOuterJoiner(-1)
+	isExeMgr(exemgr), lastSmallOuterJoiner(-1), fTokenJoin(-1)
 {
 	/* Need to figure out how much memory these use...
 		Overhead storing 16 byte elements is about 32 bytes.  That

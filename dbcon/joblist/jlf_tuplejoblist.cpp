@@ -1124,6 +1124,7 @@ bool combineJobStepsByTable(TableInfoMap::iterator& mit, JobInfo& jobInfo)
 			thjs->setLargeSideBPS(tbps);
 			thjs->joinId(-1); // token join is a filter force it done before other joins
 			thjs->setJoinType(INNER);
+			thjs->tokenJoin(mit->first);
 			tbps->incWaitToRunStepCnt();
 			SJSTEP spthjs(thjs);
 
@@ -1668,7 +1669,7 @@ bool joinInfoCompare(const SP_JoinInfo& a, const SP_JoinInfo& b)
 string joinTypeToString(const JoinType& joinType)
 {
 	string ret;
-    if (joinType & INNER)
+	if (joinType & INNER)
 		ret = "inner";
 	else if (joinType & LARGEOUTER)
 		ret = "largeOuter";
@@ -1769,7 +1770,12 @@ SP_JoinInfo joinToLargeTable(uint large, TableInfoMap& tableInfoMap,
 		}
 
 		size_t dcf = 0; // for dictionary column filters, 0 if thjs is null.
-		if (thjs) dcf = thjs->getLargeKeys().size();
+		RowGroup largeSideRG = tableInfoMap[large].fRowGroup;
+		if (thjs && thjs->tokenJoin() == large)
+		{
+			dcf = thjs->getLargeKeys().size();
+			largeSideRG = thjs->getLargeRowGroup();
+		}
 
 		// info for debug trace
 		vector<string> tableNames;
@@ -1804,7 +1810,7 @@ SP_JoinInfo joinToLargeTable(uint large, TableInfoMap& tableInfoMap,
 			for (; k1 != keys1.end(); ++k1, ++k2)
 			{
 				smallIndices.push_back(getKeyIndex(*k1, info->fRowGroup));
-				largeIndices.push_back(getKeyIndex(*k2, tableInfoMap[large].fRowGroup));
+				largeIndices.push_back(getKeyIndex(*k2, largeSideRG));
 			}
 
 			smallKeyIndices.push_back(smallIndices);
@@ -1832,7 +1838,7 @@ SP_JoinInfo joinToLargeTable(uint large, TableInfoMap& tableInfoMap,
 					CalpontSystemCatalog::OID oid2 = jobInfo.keyInfo->tupleKeyVec[*k2].fId;
 					CalpontSystemCatalog::TableColName tcn2 = jobInfo.csc->colName(oid2);
 					largeKey << "(" << tcn2.column << ":" << oid2 << ":" << *k2 << ")";
-					largeIndex << " " << getKeyIndex(*k2, tableInfoMap[large].fRowGroup);
+					largeIndex << " " << getKeyIndex(*k2, largeSideRG);
 				}
 
 				ostringstream oss;
@@ -1850,7 +1856,7 @@ SP_JoinInfo joinToLargeTable(uint large, TableInfoMap& tableInfoMap,
 		if (jobInfo.trace)
 		{
 			ostringstream oss;
-			oss << "large side RG" << endl << tableInfoMap[large].fRowGroup.toString() << endl;
+			oss << "large side RG" << endl << largeSideRG.toString() << endl;
 			traces.push_back(oss.str());
 		}
 
@@ -2354,6 +2360,9 @@ void joinTablesInOrder(uint largest, JobStepVector& joinSteps, TableInfoMap& tab
 		}
 
 		size_t startPos = 0; // start point to add new smallsides
+		RowGroup largeSideRG = joinInfoMap[large]->fRowGroup;
+		if (thjs && thjs->tokenJoin() == large)
+			largeSideRG = thjs->getLargeRowGroup();
 
 		// get info to config the TupleHashjoin
 		vector<string> traces;
@@ -2432,7 +2441,7 @@ void joinTablesInOrder(uint largest, JobStepVector& joinSteps, TableInfoMap& tab
 			for (; k1 != keys1.end(); ++k1, ++k2)
 			{
 				smallIndices.push_back(getKeyIndex(*k1, info->fRowGroup));
-				largeIndices.push_back(getKeyIndex(*k2, joinInfoMap[large]->fRowGroup));
+				largeIndices.push_back(getKeyIndex(*k2, largeSideRG));
 			}
 
 			smallKeyIndices.push_back(smallIndices);
@@ -2460,7 +2469,7 @@ void joinTablesInOrder(uint largest, JobStepVector& joinSteps, TableInfoMap& tab
 					CalpontSystemCatalog::OID oid2 = jobInfo.keyInfo->tupleKeyVec[*k2].fId;
 					CalpontSystemCatalog::TableColName tcn2 = jobInfo.csc->colName(oid2);
 					largeKey << "(" << tcn2.column << ":" << oid2 << ":" << *k2 << ")";
-					largeIndex << " " << getKeyIndex(*k2, joinInfoMap[large]->fRowGroup);
+					largeIndex << " " << getKeyIndex(*k2, largeSideRG);
 				}
 
 				ostringstream oss;
@@ -2478,7 +2487,7 @@ void joinTablesInOrder(uint largest, JobStepVector& joinSteps, TableInfoMap& tab
 		if (jobInfo.trace)
 		{
 			ostringstream oss;
-			oss << "large side RG" << endl << joinInfoMap[large]->fRowGroup.toString() << endl;
+			oss << "large side RG" << endl << largeSideRG.toString() << endl;
 			traces.push_back(oss.str());
 		}
 
@@ -2772,6 +2781,12 @@ void joinTablesInOrder(uint largest, JobStepVector& joinSteps, TableInfoMap& tab
 
 			if (*i != large)
 			{
+				//@bug6117, token should be done for small side tables.
+				SJSTEP smallJs = joinStepMap[*i].first;
+				TupleHashJoinStep* smallThjs = dynamic_cast<TupleHashJoinStep*>(smallJs.get());
+				if (smallThjs && smallThjs->tokenJoin())
+					smallThjs->tokenJoin(-1);
+
 				// Set join priority for smallsides.
 				joinStepMap[*i] = make_pair(spjs, l);
 
