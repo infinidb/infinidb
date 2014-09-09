@@ -232,7 +232,7 @@ inline void IDBCompressInterface::initHdr(void*, void*, int,int) const {}
 inline int IDBCompressInterface::verifyHdr(const void*) const { return -1; }
 inline int IDBCompressInterface::getPtrList(const char*, const int, CompChunkPtrList&) const { return -1; }
 inline int IDBCompressInterface::getPtrList(const char*, CompChunkPtrList&) const { return -1; }
-inline unsigned int IDBCompressInterface::getPtrCount(const char* ptrBuf, ptrBufSize) const { return 0; }
+inline unsigned int IDBCompressInterface::getPtrCount(const char* ptrBuf, const int ptrBufSize) const { return 0; }
 inline unsigned int IDBCompressInterface::getPtrCount(const char* hdrBuf) const { return 0; }
 inline void IDBCompressInterface::storePtrs(const std::vector<uint64_t>&,void*,int) const {}
 inline void IDBCompressInterface::storePtrs(const std::vector<uint64_t>&, void*) const {}

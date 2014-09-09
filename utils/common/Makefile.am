@@ -25,7 +25,7 @@ AM_CXXFLAGS = $(idb_cxxflags)
 AM_LDFLAGS = -version-info 1:0:0 $(idb_ldflags)
 lib_LTLIBRARIES = libcommon.la
 libcommon_la_SOURCES = fixedallocator.cpp poolallocator.cpp
-include_HEADERS = hasher.h simpleallocator.h fixedallocator.h poolallocator.h stlpoolallocator.h syncstream.h
+include_HEADERS = hasher.h simpleallocator.h fixedallocator.h poolallocator.h stlpoolallocator.h syncstream.h atomicops.h
 
 test:
 

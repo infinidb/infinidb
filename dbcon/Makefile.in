@@ -199,7 +199,7 @@ sharedstatedir = @sharedstatedir@
 sysconfdir = @sysconfdir@
 target_alias = @target_alias@
 toolsdir = @toolsdir@
-SUBDIRS = ddlpackage ddlpackageproc dmlpackage dmlpackageproc execplan joblist mysql
+SUBDIRS = ddlpackage ddlpackageproc dmlpackage dmlpackageproc execplan joblist #mysql
 all: all-recursive
 
 .SUFFIXES:
