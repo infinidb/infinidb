@@ -176,6 +176,11 @@ pColScanStep::pColScanStep(
 		fColType.colWidth = 8;
 		fIsDict = true;
 	}
+	else if (fColType.colDataType == CalpontSystemCatalog::BIN16)
+	{
+		fColType.colWidth = 16;
+		fIsDict = false;
+	}
 	else if (fColType.colWidth > 8 )
 	{
 		fColType.colWidth = 8;

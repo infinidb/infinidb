@@ -3326,7 +3326,7 @@ void ha_calpont_impl_start_bulk_insert(ha_rows rows, TABLE* table)
 	    ((thd->lex)->sql_command == SQLCOM_LOAD) ||
 	    (thd->lex)->sql_command == SQLCOM_INSERT_SELECT) && !ci->singleInsert )
 	{
-    	ci->useCpimport = thd->variables.infinidb_use_import_for_batchinsert;
+		ci->useCpimport = thd->variables.infinidb_use_import_for_batchinsert;
 
 		if (((thd->lex)->sql_command == SQLCOM_INSERT) && (rows > 0))
 			ci->useCpimport = 0;
@@ -3470,7 +3470,7 @@ void ha_calpont_impl_start_bulk_insert(ha_rows rows, TABLE* table)
 			if (bSuccess)
 			{
 				pSectionMsg = "Create Stdin";
-				bSuccess = CreatePipe(&ci->cpimport_stdin_Rd, &ci->cpimport_stdin_Wr, &saAttr, 65536);
+				bSuccess = CreatePipe(&ci->cpimport_stdin_Rd, &ci->cpimport_stdin_Wr, &saAttr, 512);
 				// Ensure the write handle to the pipe for STDIN is not inherited. 
 				if (bSuccess)
 				{
@@ -3541,7 +3541,7 @@ void ha_calpont_impl_start_bulk_insert(ha_rows rows, TABLE* table)
 										NULL,          // process security attributes 
 										NULL,          // primary thread security attributes 
 										TRUE,          // handles are inherited 
-                                        EXTENDED_STARTUPINFO_PRESENT | CREATE_NEW_PROCESS_GROUP, // creation flags 
+          								EXTENDED_STARTUPINFO_PRESENT | CREATE_NEW_PROCESS_GROUP, // creation flags 
 										NULL,          // use parent's environment 
 										NULL,          // use parent's current directory 
 										&siStartInfo.StartupInfo,  // STARTUPINFO pointer 

@@ -2248,23 +2248,36 @@ void pingDeviceThread()
 ******************************************************************************************/
 static void hdfsActiveAlarmsPushingThread()
 {
+	Oam oam;
+
 	boost::filesystem::path filePath(ACTIVE_ALARM_FILE);
 	boost::filesystem::path dirPath = filePath.parent_path();
 	string dirName = boost::filesystem::canonical(dirPath).string();
 
 	if (boost::filesystem::exists("/etc/pdsh/machines"))
 	{
-		string cpCmd =  "pdcp -a -x " + localHostName + " " + ACTIVE_ALARM_FILE + " " + dirName +
-						" > /dev/null 2>&1";
-		string rmCmd =  "pdsh -a -x " + localHostName + " rm -f " + ACTIVE_ALARM_FILE +
-						" > /dev/null 2>&1";
 		while(1)
 		{
-			if (boost::filesystem::exists(filePath))
-				system(cpCmd.c_str());
-			else
-				system(rmCmd.c_str());
+			if (boost::filesystem::exists(filePath)) {
 
+				try {
+					oam.pdcp( localHostName, ACTIVE_ALARM_FILE, dirName, true );
+				}
+				catch(...)
+				{}
+			}
+			else
+			{
+
+				string cmd = "rm -f " + ACTIVE_ALARM_FILE;
+	
+				try {
+					oam.pdsh( localHostName, cmd );
+				}
+				catch(...)
+				{}
+			}
+	
 			sleep(ACTIVE_ALARMS_PUSHING_INTERVAL);
 		}
 	}

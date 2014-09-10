@@ -126,6 +126,10 @@ uint32_t convertDataType(int dataType)
 			calpontDataType = CalpontSystemCatalog::VARBINARY;
 			break;
 
+		case ddlpackage::DDL_BINARY:
+			calpontDataType = CalpontSystemCatalog::BIN16;
+			break;
+
 		case ddlpackage::DDL_BIT:
 			calpontDataType = CalpontSystemCatalog::BIT;
 			break;
@@ -701,14 +705,28 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 	 			return rc;
 			}
 
+			if ( (createTable->fTableDef->fColumns[i]->fType->fType == ddlpackage::DDL_BINARY) &&
+				(createTable->fTableDef->fColumns[i]->fType->fLength != 16) )
+			{
+				rc = 1;
+  	 			thd->main_da.can_overwrite_status = true;
+
+	 			thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Binary length has to be 16 only.");
+				ci->alterTableState = cal_connection_info::NOT_ALTER;
+				ci->isAlter = false;
+	 			return rc;
+			}
+
 			if (createTable->fTableDef->fColumns[i]->fDefaultValue)
 			{
-				if ((!createTable->fTableDef->fColumns[i]->fDefaultValue->fNull) && (createTable->fTableDef->fColumns[i]->fType->fType == ddlpackage::DDL_VARBINARY))
+				if ( (!createTable->fTableDef->fColumns[i]->fDefaultValue->fNull) &&
+					( (createTable->fTableDef->fColumns[i]->fType->fType == ddlpackage::DDL_VARBINARY) ||
+					(createTable->fTableDef->fColumns[i]->fType->fType == ddlpackage::DDL_BINARY) ) )
 				{
 					rc = 1;
 					thd->main_da.can_overwrite_status = true;
 
-					thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Varbinary column cannot have default value.");
+					thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Binary/varbinary column cannot have default value.");
 					ci->alterTableState = cal_connection_info::NOT_ALTER;
 					ci->isAlter = false;
 					return rc;
@@ -972,7 +990,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 				}
 
 				if ((addColumnPtr->fColumnDef->fType->fType == ddlpackage::DDL_VARBINARY) &&
-				((addColumnPtr->fColumnDef->fType->fLength > 8000) || (addColumnPtr->fColumnDef->fType->fLength < 8)))
+					((addColumnPtr->fColumnDef->fType->fLength > 8000) || (addColumnPtr->fColumnDef->fType->fLength < 8)))
 				{
 					rc = 1;
 					thd->main_da.can_overwrite_status = true;
@@ -981,6 +999,18 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 					ci->isAlter = false;
 					return rc;
 				}
+
+				if ( (addColumnPtr->fColumnDef->fType->fType == ddlpackage::DDL_BINARY) &&
+					(addColumnPtr->fColumnDef->fType->fLength != 16) )
+				{
+					rc = 1;
+					thd->main_da.can_overwrite_status = true;
+					thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Binary length has to be 16.");
+					ci->alterTableState = cal_connection_info::NOT_ALTER;
+					ci->isAlter = false;
+					return rc;
+				}
+
 				uint64_t startValue = 1;
 				bool autoIncre  = false;
 				if ( (addColumnPtr->fColumnDef->fConstraints.size() > 0 ) || addColumnPtr->fColumnDef->fDefaultValue )
@@ -1050,11 +1080,13 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 
 					if (addColumnPtr->fColumnDef->fDefaultValue)
 					{
-						if ((!addColumnPtr->fColumnDef->fDefaultValue->fNull) && (addColumnPtr->fColumnDef->fType->fType == ddlpackage::DDL_VARBINARY))
+						if ( (!addColumnPtr->fColumnDef->fDefaultValue->fNull) &&
+							( (addColumnPtr->fColumnDef->fType->fType == ddlpackage::DDL_VARBINARY) ||
+							(addColumnPtr->fColumnDef->fType->fType == ddlpackage::DDL_BINARY) ) )
 						{
 							rc = 1;
 							thd->main_da.can_overwrite_status = true;
-							thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Varbinary column cannot have default value.");
+							thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Binary/varbinary column cannot have default value.");
 							ci->alterTableState = cal_connection_info::NOT_ALTER;
 							ci->isAlter = false;
 							return rc;
@@ -1312,6 +1344,18 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 					ci->isAlter = false;
 					return rc;
 				}
+
+				if ( (addColumnsPtr->fColumns[0]->fType->fType == ddlpackage::DDL_BINARY) &&
+					(addColumnsPtr->fColumns[0]->fType->fLength != 16) )
+				{
+					rc = 1;
+					thd->main_da.can_overwrite_status = true;
+					thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Binary length has to be 16.");
+					ci->alterTableState = cal_connection_info::NOT_ALTER;
+					ci->isAlter = false;
+					return rc;
+				}
+
 				uint64_t startValue = 1;
 				bool autoIncre  = false;
 				if ( (addColumnsPtr->fColumns[0]->fConstraints.size() > 0 ) || addColumnsPtr->fColumns[0]->fDefaultValue )
@@ -1381,11 +1425,13 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 
 					if (addColumnsPtr->fColumns[0]->fDefaultValue)
 					{
-						if ((!addColumnsPtr->fColumns[0]->fDefaultValue->fNull) && (addColumnsPtr->fColumns[0]->fType->fType == ddlpackage::DDL_VARBINARY))
+						if ( (!addColumnsPtr->fColumns[0]->fDefaultValue->fNull) &&
+							( (addColumnsPtr->fColumns[0]->fType->fType == ddlpackage::DDL_VARBINARY) ||
+							(addColumnsPtr->fColumns[0]->fType->fType == ddlpackage::DDL_BINARY) ) )
 						{
 							rc = 1;
 							thd->main_da.can_overwrite_status = true;
-							thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Varbinary column cannot have default value.");
+							thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Binary/varbinary column cannot have default value.");
 							ci->alterTableState = cal_connection_info::NOT_ALTER;
 							ci->isAlter = false;
 							return rc;

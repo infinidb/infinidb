@@ -209,6 +209,7 @@
   <ItemGroup>
     <ClCompile Include="cgroupconfigurator.cpp" />
     <ClCompile Include="fixedallocator.cpp" />
+    <ClCompile Include="idbu16b.cpp" />
     <ClCompile Include="MonitorProcMem.cpp" />
     <ClCompile Include="nullvaluemanip.cpp" />
     <ClCompile Include="poolallocator.cpp" />
@@ -219,6 +220,7 @@
     <ClInclude Include="cgroupconfigurator.h" />
     <ClInclude Include="fixedallocator.h" />
     <ClInclude Include="hasher.h" />
+    <ClInclude Include="idbu16b.h" />
     <ClInclude Include="MonitorProcMem.h" />
     <ClInclude Include="nullvaluemanip.h" />
     <ClInclude Include="poolallocator.h" />

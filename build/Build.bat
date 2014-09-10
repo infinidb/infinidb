@@ -1,4 +1,4 @@
-::@echo off
+@echo off
 
 set branch=%1
 set basedir=\InfiniDB_%branch%
@@ -10,8 +10,6 @@ IF "%branch%" == "trunk" (
   set branch=develop
   set basedir=\InfiniDB
 )
-echo %branch%
-
 echo building %basedir%
 
 echo ======================================

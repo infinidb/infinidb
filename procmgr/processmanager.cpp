@@ -305,9 +305,9 @@ ProcessManager::~ProcessManager()
 *
 ******************************************************************************************/
 //void	ProcessManager::processMSG( messageqcpp::IOSocket fIos, messageqcpp::ByteStream msg)
-void processMSG(messageqcpp::IOSocket* cfIos)
+void processMSG(messageqcpp::IOSocket cfIos)
 {
-	messageqcpp::IOSocket fIos = *cfIos;
+	messageqcpp::IOSocket fIos = cfIos;
 
 	pthread_t ThreadId;
 	ThreadId = pthread_self();
@@ -1371,8 +1371,12 @@ void processMSG(messageqcpp::IOSocket* cfIos)
 						//run save.brm script
 						processManager.saveBRM();
 
-						string cmd = "pdsh -a -x " + localHostName + " '" + startup::StartUp::installDir() + "/infinidb stop' > /dev/null 2>&1";
-						system(cmd.c_str());
+						string cmd = startup::StartUp::installDir() + "/infinidb stop";
+						try {
+							oam.pdsh( localHostName, cmd );
+						}
+						catch(...)
+						{}
 
 						break;
 					}
@@ -7847,14 +7851,12 @@ int ProcessManager::distributeConfigFile(std::string name, std::string file)
 		{
 			if ( name == "system" )
 			{
-				string cmd = "pdcp -a -x " + localHostName + " " + fileName + " " + dirName;
-				int rtnCode = system(cmd.c_str());
-				if (WEXITSTATUS(rtnCode) == 0)
-				{
+				try {
+					oam.pdcp( localHostName, fileName, dirName, true );
 					log.writeLog(__LINE__, "distributeConfigFile using pdcp successful on " + fileName, LOG_TYPE_DEBUG);
 					return returnStatus;
 				}
-				else
+				catch(...)
 				{
 					log.writeLog(__LINE__, "distributeConfigFile using pdcp failed on " + fileName, LOG_TYPE_ERROR);
 				}
@@ -7867,14 +7869,12 @@ int ProcessManager::distributeConfigFile(std::string name, std::string file)
 				HostConfigList::iterator pt1 = moduleconfig.hostConfigList.begin();
 				string hostName = (*pt1).HostName;
 
-				string cmd = "pdcp -w " + hostName + " " + fileName + " " + dirName;
-				int rtnCode = system(cmd.c_str());
-				if (WEXITSTATUS(rtnCode) == 0)
-				{
+				try {
+					oam.pdcp( hostName, fileName, dirName, false );
 					log.writeLog(__LINE__, "distributeConfigFile using pdcp successful on " + fileName, LOG_TYPE_DEBUG);
 					return returnStatus;
 				}
-				else
+				catch(...)
 				{
 					log.writeLog(__LINE__, "distributeConfigFile using pdcp failed on " + fileName, LOG_TYPE_ERROR);
 				}

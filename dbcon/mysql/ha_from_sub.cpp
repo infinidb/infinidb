@@ -49,6 +49,9 @@ void derivedTableOptimization(SCSEP& csep)
 	// subquery may carry main query derived table list for column reference, those
 	// derived tables are not checked for optimization in this scope.
 	CalpontSelectExecutionPlan::SelectList derivedTbList = csep->derivedTableList();
+
+	// @bug6156. Skip horizontal optimization for no table union.
+	bool horizontalOptimization = true;
 	for (uint i = 0; i < derivedTbList.size(); i++)
 	{
 		CalpontSelectExecutionPlan *plan = dynamic_cast<CalpontSelectExecutionPlan*>(derivedTbList[i].get());
@@ -66,6 +69,17 @@ void derivedTableOptimization(SCSEP& csep)
 			{
 				unionColVec.push_back(
 				 dynamic_cast<CalpontSelectExecutionPlan*>(plan->unionVec()[j].get())->returnedCols());
+			}
+		}
+
+		if (plan->tableList().empty())
+			horizontalOptimization = false;
+		for (uint j = 0; j < plan->unionVec().size(); j++)
+		{
+			if (dynamic_cast<CalpontSelectExecutionPlan*>(plan->unionVec()[j].get())->tableList().empty())
+			{
+				horizontalOptimization = false;
+				break;
 			}
 		}
 
@@ -108,7 +122,7 @@ void derivedTableOptimization(SCSEP& csep)
 	 */
 	ParseTree* pt = csep->filters();
 	map<string, ParseTree*> derivedTbFilterMap;
-	if (pt)
+	if (horizontalOptimization && pt)
 	{
 		pt->walk(setDerivedTable);
 		setDerivedFilter(pt, derivedTbFilterMap, derivedTbList);

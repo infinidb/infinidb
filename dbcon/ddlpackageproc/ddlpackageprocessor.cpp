@@ -150,6 +150,10 @@ execplan::CalpontSystemCatalog::ColDataType DDLPackageProcessor::convertDataType
 			colDataType = CalpontSystemCatalog::VARBINARY;
 			break;
 
+		case ddlpackage::DDL_BINARY:
+			colDataType = CalpontSystemCatalog::BIN16;
+			break;
+
 		case ddlpackage::DDL_BIT:
 			colDataType = CalpontSystemCatalog::BIT;
 			break;

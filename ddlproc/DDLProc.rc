@@ -53,8 +53,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 4,6,0,0
- PRODUCTVERSION 4,6,0,0
+ FILEVERSION 5.0,0,0
+ PRODUCTVERSION 5.0,0,0
  FILEFLAGSMASK 0x17L
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -71,12 +71,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "InfiniDB, Inc."
             VALUE "FileDescription", "InfiniDB DDL Processor"
-            VALUE "FileVersion", "4.6.0-0"
+            VALUE "FileVersion", "5.0.0-0"
             VALUE "InternalName", "DDLProc"
             VALUE "LegalCopyright", "Copyright (C) 2014"
             VALUE "OriginalFilename", "DDLProc.exe"
             VALUE "ProductName", "InfiniDB"
-            VALUE "ProductVersion", "4.6.0.0 Beta"
+            VALUE "ProductVersion", "5.0.0.0 Alpha"
         END
     END
     BLOCK "VarFileInfo"

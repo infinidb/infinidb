@@ -8,9 +8,9 @@ OutFile InfiniDB64.exe
 
 !define DISPLAY_URL http://www.infinidb.co/
 
-!define DISPLAY_VERSION "4.6"
-VIAddVersionKey "FileVersion" "4.6-0"
-VIProductVersion "4.6.0.0"
+!define DISPLAY_VERSION "5.0"
+VIAddVersionKey "FileVersion" "5.0-0"
+VIProductVersion "5.0.0.0"
 
 VIAddVersionKey "ProductVersion" "${DISPLAY_VERSION}"
 VIAddVersionKey "CompanyName" "InfiniDB, Inc."

@@ -20,7 +20,7 @@
  *
  *****************************************************************************/
 
-/** @file 
+/** @file
  * class XXX interface
  */
 
@@ -46,9 +46,9 @@
 #define VBSTORAGE_INCREMENT (10000*sizeof(VBBMEntry))
 
 // (average list length = 4)
-#define VBTABLE_INITIAL_SIZE (25000*sizeof(int)) 
+#define VBTABLE_INITIAL_SIZE (25000*sizeof(int))
 #define VBTABLE_INCREMENT (2500*sizeof(int))
-	
+
 #define VBBM_INCREMENT (VBTABLE_INCREMENT + VBSTORAGE_INCREMENT)
 
 #if defined(_MSC_VER) && defined(xxxVBBM_DLLEXPORT)
@@ -87,7 +87,7 @@ struct VBShmsegHeader {
 	int vbCurrentSize;
 	int vbLWM;
 	int numHashBuckets;
-	
+
 	// the rest of the overlay looks like this
 // 	VBFileMetadata files[nFiles];
 // 	int hashBuckets[numHashBuckets];
@@ -128,23 +128,23 @@ private:
  *
  * At a high level, the VBBM maintains a table describing the contents of
  * the Version Buffer.  For every entry in the Version Buffer, it associates its
- * <LBID, VerID> identifier with the OID and offset it is stored at. 
+ * <LBID, VerID> identifier with the OID and offset it is stored at.
  *
  * As implemented, it is a hash table and a set of lists that exist in
  * shared memory.  The hash table is keyed by <LBID, VerID>, and
  * each valid entry points to the head of a unique list.  Each list element
  * contains the LBID, VerID, VB OID, and VB offset that encapsulate "an entry in the
  * VBBM table".  Every list contains all elements that collide on that hash table
- * entry that points to it, "load factor" has no bearing on performance, 
+ * entry that points to it, "load factor" has no bearing on performance,
  * and lists can grow arbitrarily large.
  * Technically lookups are O(n), but in normal circumstances it'll
- * be constant time.  As things are right now, we expect there to be about 
+ * be constant time.  As things are right now, we expect there to be about
  * 100k VBBM entries.  The hash table is sized such that on average there will be 4
  * entries per list when it's at capacity.
  *
  * The memory management & structure manipulation code is nearly identical
  * to that in the VSS, so any bugs found here are likely there as well.
- * 
+ *
  * Shared memory is managed using code similar to the ExtentMap & VSS.  When
  * the shared memory segment needs to grow, it is write-locked, a new one
  * is created, the contents are reinserted to the new one, the key is
@@ -159,19 +159,19 @@ class VBBM : public Undoable {
 			READ,
 			WRITE
 		};
-		
-		
+
+
 		EXPORT VBBM();
 		EXPORT ~VBBM();
-		
+
 		EXPORT void lock(OPS op);
 		EXPORT void release(OPS op);
 		EXPORT int lookup(LBID_t lbid, VER_t ver, OID_t &oid, uint32_t &fbo) const;
-		EXPORT void insert(LBID_t lbid, VER_t ver, OID_t oid, uint32_t fbo);
+		EXPORT void insert(LBID_t lbid, VER_t ver, OID_t oid, uint32_t fbo, bool loading = false);
 		EXPORT void getBlocks(int num, OID_t vbOID, std::vector<VBRange> &vbRanges, VSS& vss,
 				bool flushPMCache);
 		EXPORT void removeEntry(LBID_t, VER_t ver);
-		
+
 		EXPORT int size() const;
 		EXPORT bool hashEmpty() const;
 		EXPORT int checkConsistency() const;
@@ -186,16 +186,16 @@ class VBBM : public Undoable {
 #ifdef BRM_DEBUG
 		EXPORT int getShmid() const;
 #endif
-		
+
 	private:
 		VBBM(const VBBM &);
 		VBBM& operator=(const VBBM &);
-		
+
 		VBShmsegHeader *vbbm;
 		VBFileMetadata *files;
 		int *hashBuckets;
 		VBBMEntry *storage;
-		
+
 		key_t currentVBBMShmkey;
 		int vbbmShmid;
 		bool r_only;
@@ -208,9 +208,9 @@ class VBBM : public Undoable {
 		void growVBBM(bool addAFile = false);
 		void copyVBBM(VBShmsegHeader *dest);
 		void initShmseg(int nFiles);
-		
+
 		void _insert(VBBMEntry& e, VBShmsegHeader* dest, int* destTable, VBBMEntry*
-				destStorage);
+				destStorage, bool loading = false);
 		int getIndex(LBID_t lbid, VER_t verID, int& prev, int& bucket) const;
 		ShmKeys fShmKeys;
 		VBBMImpl* fPVBBMImpl;

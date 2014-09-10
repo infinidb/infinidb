@@ -9,9 +9,9 @@ endif
 EXPORT_ROOT=$(TOP)/export
 INSTALL=cp --preserve=timestamps
 
-CALPONT_INSTALL_ROOT=$(EXPORT_ROOT)
+INFINIDB_INSTALL_ROOT=$(EXPORT_ROOT)
 
-INSTALL_ROOT=$(CALPONT_INSTALL_ROOT)
+INSTALL_ROOT=$(INFINIDB_INSTALL_ROOT)
 INSTALL_ROOT_INCLUDE=$(INSTALL_ROOT)/include
 INSTALL_ROOT_LIB=$(INSTALL_ROOT)/lib
 INSTALL_ROOT_BIN=$(INSTALL_ROOT)/bin
@@ -23,8 +23,8 @@ INSTALL_ROOT_TOOLS=$(INSTALL_ROOT)/tools
 INSTALL_ROOT_DATDUP=$(INSTALL_ROOT)/gluster
 INSTALL_MIB=$(INSTALL_ROOT)/share/snmp/mibs
 
-CALPONT_LIBRARY_PATH=$(EXPORT_ROOT)/lib
-CALPONT_INCLUDE_PATH=$(EXPORT_ROOT)/include
+INFINIDB_LIBRARY_PATH=$(EXPORT_ROOT)/lib
+INFINIDB_INCLUDE_PATH=$(EXPORT_ROOT)/include
 
 IDB_COMMON_LIBS=-lwindowfunction -ljoblist -lexecplan -ljoiner -lrowgroup -lfuncexp -ludfsdk \
 -loamcpp -lsnmpmanager -ldataconvert -lbrm -lcacheutils -lmessageqcpp -lloggingcpp -lconfigcpp -lrwlock \
@@ -35,8 +35,8 @@ IDB_SNMP_LIBS=-lnetsnmpagent -lnetsnmp -lnetsnmpmibs -lnetsnmphelpers
 
 LDFLAGS=-Wl,--no-as-needed 
 
-#DEBUG_FLAGS=-ggdb3 -fno-tree-vectorize
-DEBUG_FLAGS=-g0 -O3 -fno-strict-aliasing -fno-tree-vectorize
+DEBUG_FLAGS=-ggdb3 -fno-tree-vectorize
+#DEBUG_FLAGS=-g0 -O3 -fno-strict-aliasing -fno-tree-vectorize
 
 #DEBUG_FLAGS+=-DVALGRIND
 #DEBUG_FLAGS+=-DSKIP_OAM_INIT

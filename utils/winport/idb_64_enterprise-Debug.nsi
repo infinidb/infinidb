@@ -8,9 +8,9 @@ OutFile InfiniDB64-ent-Debug.exe
 
 !define DISPLAY_URL http://www.infinidb.co/
 
-!define DISPLAY_VERSION "4.6 Debug"
-VIAddVersionKey "FileVersion" "4.6-Debug"
-VIProductVersion "4.6.0.0"
+!define DISPLAY_VERSION "5.0 Debug"
+VIAddVersionKey "FileVersion" "5.0-Debug"
+VIProductVersion "5.0.0.0"
 
 VIAddVersionKey "ProductVersion" "${DISPLAY_VERSION}"
 VIAddVersionKey "CompanyName" "InfiniDB, Inc."

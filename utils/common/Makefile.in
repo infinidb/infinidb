@@ -79,7 +79,8 @@ libLTLIBRARIES_INSTALL = $(INSTALL)
 LTLIBRARIES = $(lib_LTLIBRARIES)
 libcommon_la_LIBADD =
 am_libcommon_la_OBJECTS = fixedallocator.lo poolallocator.lo \
-	cgroupconfigurator.lo MonitorProcMem.lo nullvaluemanip.lo
+	cgroupconfigurator.lo MonitorProcMem.lo nullvaluemanip.lo \
+	idbu16b.lo
 libcommon_la_OBJECTS = $(am_libcommon_la_OBJECTS)
 DEFAULT_INCLUDES = -I. -I$(srcdir) -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
@@ -236,9 +237,11 @@ AM_CFLAGS = $(idb_cflags)
 AM_CXXFLAGS = $(idb_cxxflags)
 AM_LDFLAGS = -version-info 1:0:0 $(idb_ldflags)
 lib_LTLIBRARIES = libcommon.la
-libcommon_la_SOURCES = fixedallocator.cpp poolallocator.cpp cgroupconfigurator.cpp MonitorProcMem.cpp nullvaluemanip.cpp
+libcommon_la_SOURCES = fixedallocator.cpp poolallocator.cpp cgroupconfigurator.cpp MonitorProcMem.cpp nullvaluemanip.cpp \
+idbu16b.cpp
+
 include_HEADERS = hasher.h simpleallocator.h fixedallocator.h poolallocator.h \
-stlpoolallocator.h syncstream.h atomicops.h branchpred.h cgroupconfigurator.h MonitorProcMem.h nullvaluemanip.h
+stlpoolallocator.h syncstream.h atomicops.h branchpred.h cgroupconfigurator.h MonitorProcMem.h nullvaluemanip.h idbu16b.h
 
 all: all-am
 
@@ -312,6 +315,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/MonitorProcMem.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cgroupconfigurator.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fixedallocator.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/idbu16b.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/nullvaluemanip.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/poolallocator.Plo@am__quote@
 

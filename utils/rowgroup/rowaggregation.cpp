@@ -387,9 +387,9 @@ inline void RowAggregation::updateIntSum(int64_t val1, int64_t val2, int64_t col
 			ostringstream oss;
 			oss << overflowMsg << ": " << val2 << "+" << val1;
 			if (val2 > 0)
-				oss << " > " << numeric_limits<uint64_t>::max();
+				oss << " > " << numeric_limits<int64_t>::max();
 			else
-				oss << " < " << numeric_limits<uint64_t>::min();
+				oss << " < " << numeric_limits<int64_t>::min();
 			throw logging::QueryDataExcept(oss.str(), logging::aggregateDataErr);
 #else /* PROMOTE_AGGR_OVRFLW_TO_DBL */
 			double* dp2 = (double*)&val2;

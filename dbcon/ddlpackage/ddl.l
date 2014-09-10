@@ -155,6 +155,7 @@ EXISTS {return EXISTS;}
 CHANGE {return CHANGE;}
 TRUNCATE {return TRUNCATE;}
 VARBINARY {return VARBINARY;}
+BINARY {return BINARY;}
 
 \n { lineno++;}
 

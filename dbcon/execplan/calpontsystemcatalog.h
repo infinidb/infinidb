@@ -121,7 +121,8 @@ public:
 	/** the set of Calpont column widths
 	 *
 	 */
-	enum ColWidth { ONE_BIT, ONE_BYTE, TWO_BYTE, THREE_BYTE, FOUR_BYTE, FIVE_BYTE, SIX_BYTE, SEVEN_BYTE, EIGHT_BYTE };
+	enum ColWidth { ONE_BIT, ONE_BYTE, TWO_BYTE, THREE_BYTE, FOUR_BYTE, FIVE_BYTE, SIX_BYTE, SEVEN_BYTE, EIGHT_BYTE,
+		SIXTEEN_BYTE };
 
 	/** the set of Calpont column data types
 	 *
@@ -152,6 +153,7 @@ public:
 			UFLOAT,			/*!< Unsigned FLOAT type */
 			UBIGINT,		/*!< Unsigned BIGINT type */
 			UDOUBLE,		/*!< Unsigned DOUBLE type */
+			BIN16,			/*!< binary 16-byte type */
 			NUM_OF_COL_DATA_TYPE,
 			LONGDOUBLE,		/* @bug3241, dev and variance calculation only */
 			STRINT			/* @bug3532, string as int for fast comparison */

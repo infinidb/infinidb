@@ -368,6 +368,10 @@ inline int convertDataType(int dataType)
 			calpontDataType = CalpontSystemCatalog::VARBINARY;
 			break;
 
+		case ddlpackage::DDL_BINARY:
+			calpontDataType = CalpontSystemCatalog::BIN16;
+			break;
+
 		case ddlpackage::DDL_BIT:
 			calpontDataType = CalpontSystemCatalog::BIT;
 			break;

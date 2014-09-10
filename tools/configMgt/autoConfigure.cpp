@@ -1756,7 +1756,6 @@ int main(int argc, char *argv[])
 	catch(...)
 	{}
 
-
 	string AllowDiskBasedJoin;
 	string TempFilePath;
 	string TempFileCompression;
@@ -1804,7 +1803,6 @@ int main(int argc, char *argv[])
 	}
 	catch(...)
 	{}
-
 
 	//Write out Updated System Configuration File
 	sysConfigNew->write();

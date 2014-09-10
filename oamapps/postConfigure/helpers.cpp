@@ -839,8 +839,13 @@ void checkSystemMySQLPort(std::string& mysqlPort, Config* sysConfig, std::string
 		}
 	}
 
-	// set mysql password
-	oam.changeMyCnf( "port", mysqlPort );
+	//first check local mysql, if needed
+	if ( ( IserverTypeInstall == oam::INSTALL_COMBINE_DM_UM_PM ) ||
+		( ( IserverTypeInstall != oam::INSTALL_COMBINE_DM_UM_PM ) && pmwithum ) )
+	{
+		// set mysql password
+		oam.changeMyCnf( "port", mysqlPort );
+	}
 
 	return;
 }

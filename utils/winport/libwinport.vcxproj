@@ -204,6 +204,8 @@
     <PostBuildEvent>
       <Command>cd $(SolutionDir)
 $(SolutionDir)BuildCalpontVersion.bat</Command>
+    </PostBuildEvent>
+    <PostBuildEvent>
       <Message>BuildCalpontVersion.bat</Message>
     </PostBuildEvent>
   </ItemDefinitionGroup>

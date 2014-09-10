@@ -243,6 +243,7 @@ inline uint32_t ColumnCommandJL::getFBO(uint64_t lbid)
 uint8_t ColumnCommandJL::getTableColumnType()
 {
 	switch (colType.colWidth) {
+		case 16: return TableColumn::BIN16;
 		case 8: return TableColumn::UINT64;
 		case 4: return TableColumn::UINT32;
 		case 2: return TableColumn::UINT16;

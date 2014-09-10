@@ -7997,6 +7997,55 @@ namespace oam
 		return true;
 	}
 
+	/******************************************************************************************
+	* @brief	pdsh
+	*
+	* purpose:	run pdsh command
+	*
+	******************************************************************************************/
+	void Oam::pdsh( std::string localHost, std::string command )
+	{
+		string cmd;
+		string commandLog =  "/tmp/pdsh.log";
+		if ( localHost.empty() )
+			cmd = "pdsh -R ssh -a '" + command + "' > " + commandLog + " 2>&1";
+		else
+			cmd = "pdsh -R ssh -a -x " + localHost + " '" + command + "' > " + commandLog + " 2>&1";
+
+		system(cmd.c_str());
+		if (checkLogStatus(commandLog, "exit") ) {
+			writeLog("PDSH Error, check log " + commandLog, LOG_TYPE_ERROR );
+			exceptionControl("pdsh", API_FAILURE);
+		}
+
+		return;
+	}
+
+	/******************************************************************************************
+	* @brief	pdcp
+	*
+	* purpose:	run pdcp command
+	*
+	******************************************************************************************/
+	void Oam::pdcp( std::string host, std::string file, std::string directory, bool systemCopy )
+	{
+		string cmd;
+		string commandLog =  "/tmp/pdcp-" + file + ".log";
+		if ( systemCopy )
+			cmd = "pdcp -R ssh -d -a -x " + host + " " + file + " " + directory + "' > " + commandLog + " 2>&1";
+		else
+			cmd = "pdsh -R ssh -w " + host + " " + file + " " + directory + "' > " + commandLog + " 2>&1";
+
+		system(cmd.c_str());
+		int rtnCode = system(cmd.c_str());
+		if (WEXITSTATUS(rtnCode) != 0) {
+			writeLog("PDCP Error, check log " + commandLog, LOG_TYPE_ERROR );
+			exceptionControl("pdcp", API_FAILURE);
+		}
+
+		return;
+	}
+
 
     /***************************************************************************
      * PRIVATE FUNCTIONS

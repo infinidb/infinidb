@@ -21,6 +21,9 @@
     <ClCompile Include="fixedallocator.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="idbu16b.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="MonitorProcMem.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -45,6 +48,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="hasher.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="idbu16b.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="MonitorProcMem.h">

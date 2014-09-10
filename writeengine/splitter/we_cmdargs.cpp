@@ -490,6 +490,7 @@ void WECmdArgs::usage()
 			<<"\t-l\tName of import file to be loaded, relative to -f path,\n"
 			<<"\t-h\tPrint this message.\n"
 			<<"\t-q\tBatch Quantity, Number of rows distributed per batch in Mode 1\n"
+			<<"\t\t\tDefault value is 10000, Max=1,000,000, Min=1,000.\n"
 			<<"\t-i\tPrint extended info to console in Mode 3.\n"
 			<<"\t-j\tJob ID. In simple usage, default is the table OID.\n"
 			<<"\t\t\tunless a fully qualified input file name is given.\n"
@@ -767,8 +768,8 @@ void WECmdArgs::parseCmdLineArgs(int argc, char** argv)
 			if ((errno != 0) || (lValue < 1) || (lValue > UINT_MAX))
 				throw runtime_error("Option -q is invalid or out of range");
 			fBatchQty = lValue;
-			if(fBatchQty<10000) fBatchQty = 10000;
-			else if(fBatchQty>100000) fBatchQty = 10000;
+			if(fBatchQty<1000) fBatchQty = 1000;
+			else if(fBatchQty>1000000) fBatchQty = 1000000;
 			break;
 		}
 		case 'N': //-N no console output

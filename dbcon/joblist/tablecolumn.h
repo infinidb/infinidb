@@ -60,6 +60,7 @@ public:
 		UINT16,
 		UINT32,
 		UINT64,
+		BIN16,
 		STRING,
 		UNDEFINED
 	};

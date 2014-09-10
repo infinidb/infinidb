@@ -58,6 +58,7 @@
 #include "exceptclasses.h"
 
 #include "branchpred.h"
+#include "idbu16b.h"
 
 #include "winport.h"
 
@@ -295,6 +296,10 @@ class Row
 		inline const uint8_t* getVarBinaryField(uint32_t colIndex) const;
 		inline const uint8_t* getVarBinaryField(uint32_t& len, uint32_t colIndex) const;
 		inline void setVarBinaryField(const uint8_t* val, uint32_t len, uint32_t colIndex);
+
+		// 16-byte binary
+		inline utils::idbu16b get16ByteField(uint32_t colIndex) const;
+		inline void set16ByteField(const utils::idbu16b& val, uint32_t colIndex);
 
 		uint64_t getNullValue(uint32_t colIndex) const;
 		bool isNullValue(uint32_t colIndex) const;
@@ -789,6 +794,18 @@ inline void Row::setVarBinaryField(const uint8_t *val, uint32_t len, uint32_t co
 		*((uint16_t*) &data[offsets[colIndex]]) = len;
 		memcpy(&data[offsets[colIndex] + 2], val, len);
 	}
+}
+
+inline utils::idbu16b Row::get16ByteField(uint32_t colIndex) const
+{
+	utils::idbu16b val;
+	memcpy(&val.lo, &data[offsets[colIndex]], 16);
+	return val;
+}
+
+inline void Row::set16ByteField(const utils::idbu16b& val, uint32_t colIndex)
+{
+	memcpy(&data[offsets[colIndex]], &val.lo, 16);
 }
 
 inline void Row::copyField(uint32_t destIndex, uint32_t srcIndex) const
